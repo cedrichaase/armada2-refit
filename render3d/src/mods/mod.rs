@@ -54,6 +54,11 @@ pub trait Module {
     fn superseded(&self) -> Option<&'static str> {
         None
     }
+    /// Draws only its part of the menu scene, switched off for missions
+    /// (`hulls::MenuOnly`): not `running()`.
+    fn menu_only(&self) -> bool {
+        false
+    }
     /// A device to draw on (first frame, or after a new device): every plugin is
     /// loaded by now.
     fn device(&mut self) {}
@@ -122,7 +127,10 @@ pub fn init() {
     // `on`: whether the module runs when Render3D.ini does not say; a module that is
     // not finished yet is off until asked for.
     let mut add = |m: Box<dyn Module>, on: bool| {
-        if ini.int("Modules", m.name(), on as i32) != 0 {
+        if m.menu_only() {
+            log!("module {}: off for missions (Render3D.ini [Modules] {}=1 turns it on); loaded for the menu scene's part", m.name(), m.name());
+            mods.push(m);
+        } else if ini.int("Modules", m.name(), on as i32) != 0 {
             log!("module {}: loaded", m.name());
             mods.push(m);
         } else {
@@ -136,7 +144,13 @@ pub fn init() {
     // a recipe, and leaves every other one to particles and hulls.
     add(Box::new(world::World::default()), true);
     add(Box::new(particles::Particles::default()), true);
-    add(Box::new(hulls::Hulls::default()), true);
+    // hulls=0: the menu scene is render3d's own and the engine draws nothing in the
+    // front end, so its ships have no stock draw to fall back to and stay ours there.
+    if ini.int("Modules", "hulls", 1) != 0 {
+        add(Box::new(hulls::Hulls::default()), true);
+    } else {
+        add(Box::new(hulls::MenuOnly::new()), true);
+    }
     add(Box::new(effects::Effects::new()), true);
     add(Box::new(ordnance::Ordnance::new()), true);
     add(Box::new(specials::Specials::default()), true);
@@ -155,9 +169,13 @@ pub fn settle() {
         _ => true,
     });
     for m in mods.iter() {
-        log!("module {}: on", m.name());
+        if m.menu_only() {
+            log!("module {}: on, for the menu scene only", m.name());
+        } else {
+            log!("module {}: on", m.name());
+        }
     }
-    unsafe { NAMES = mods.iter().map(|m| m.name()).collect() };
+    unsafe { NAMES = mods.iter().filter(|m| !m.menu_only()).map(|m| m.name()).collect() };
     unsafe { ACTIVE = true };
 }
 

@@ -166,6 +166,9 @@ pub struct Hulls {
     said_menu: u32,
     /// The most damaged-sensor lights one view had, logged.
     said_sensors: usize,
+    /// `[Modules] hulls=0`: drawing the menu scene's ships only (`MenuOnly`); every
+    /// hull of a mission is the engine's.
+    menu_only: bool,
 }
 
 impl Default for Hulls {
@@ -183,7 +186,50 @@ impl Default for Hulls {
             said_extra: [0; 3],
             said_menu: 0,
             said_sensors: 0,
+            menu_only: false,
         }
+    }
+}
+
+/// The hulls module with `[Modules] hulls=0`: the menu scene's ships only. The front
+/// end has no game objects and the engine draws nothing there (Display8.log: 0 engine
+/// draws in "start"), so nothing could hand the menu's ships back to the engine or to
+/// passthrough; with the module simply off the scene showed no ships at all. In a
+/// mission it takes nothing: no step, no object, no `draw_instance` or `placeholder`,
+/// no shadow map lent, and it is not `running("hulls")`, so every hull there is the
+/// engine's, the stock look, as with the module off.
+pub struct MenuOnly(Hulls);
+
+impl MenuOnly {
+    pub fn new() -> MenuOnly {
+        MenuOnly(Hulls { menu_only: true, ..Hulls::default() })
+    }
+}
+
+impl Module for MenuOnly {
+    fn name(&self) -> &'static str {
+        "hulls"
+    }
+    fn menu_only(&self) -> bool {
+        true
+    }
+    fn superseded(&self) -> Option<&'static str> {
+        self.0.superseded()
+    }
+    fn reset(&mut self) {
+        self.0.reset();
+    }
+    fn begin_view(&mut self, _v: &View) {
+        // A mission's view: the menu's shadow map is not lent to the gas (as with the
+        // module off, there is none), and nothing posed in the menu is asked for.
+        shadow::clear_current();
+        unsafe { VIEWS = [None, None, None] };
+    }
+    fn menu_begin(&mut self, shot: &crate::menu::Shot, v: &View) {
+        self.0.menu_begin(shot, v);
+    }
+    fn menu(&mut self, pass: crate::menu::Pass, shot: &crate::menu::Shot, v: &View) {
+        self.0.menu(pass, shot, v);
     }
 }
 
@@ -492,7 +538,7 @@ pub fn placeholder(v: &View, class: usize, place: &M34, colour: V3, blocked: boo
         return false;
     }
     let me = unsafe { &mut *me };
-    if me.off {
+    if me.off || me.menu_only {
         return false;
     }
     let look = me.look().clone();
@@ -1061,7 +1107,7 @@ pub fn draw_instance(v: &View, key: usize, inst: usize, craft: bool, sod: &str, 
         return false;
     }
     let h = unsafe { &mut *h };
-    if h.off {
+    if h.off || h.menu_only {
         return false;
     }
     let Some(model) = scene::model(sod) else { return false };
