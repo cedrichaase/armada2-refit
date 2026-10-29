@@ -49,7 +49,7 @@ import urllib.error
 import urllib.request
 import zipfile
 
-INSTALLER_VERSION = '2.1.1'
+INSTALLER_VERSION = '2.2.0'
 SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, ::step and ::error lines
 REPO = 'cedrichaase/armada2-refit'
 API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'
@@ -1008,6 +1008,49 @@ def report_for_paste(text):
     return '```\n' + text + '\n```'
 
 
+def display8_backend(lines):
+    """What Display8.log says of the mode and the backend, as report sentences: the
+    mode (stub or forward), the backend the stub drew on (vulkan, d3d12, d3d9) and why
+    (Backend=auto's order, a fallback and its reason, or an order set by hand). The
+    wording is display/src/lib.rs's and display/src/stub/mod.rs's."""
+    text = '\n'.join(lines)
+    m = re.search(r'Display8 \S+ -- game dir .*?; mode (\S+?);', text)
+    if not m:
+        return ['Display8.log has no start line: Display8 did not run, or this is not its log.']
+    asked = m.group(1).lower()
+    out = []
+    standdown = re.search(r'Mode=stub: (.*?); forward mode instead', text)
+    chosen = re.findall(r'stub: the backend is (\w+)(?:, after (.+?) could not start)?\s*$',
+                        text, re.M)
+    order = re.search(r'stub mode on (.+?)(?:, with the validation layer)?\s*$', text, re.M)
+    auto = re.search(r'Backend=auto: on (\w+): (.+?)\s*$', text, re.M)
+    falls = re.findall(r'stub: (\w[\w ]*?) could not start: (.+?)(?:; falling back to (.+?))?\s*$',
+                       text, re.M)
+    failed = '; '.join(f'{n}: {r}' for n, r, _ in falls)
+    if standdown:
+        out.append('Display8 is in forward mode (Mode=stub was asked, then stood down: '
+                   f'{standdown.group(1)}); the real chain draws, no backend was chosen.')
+    elif asked == 'stub' and chosen:
+        b, after = chosen[-1]
+        if after:
+            why = f'after {after} could not start ({failed})'
+        elif auto:
+            why = f"Backend=auto's first that starts, on {auto.group(1)} ({auto.group(2)})"
+        else:
+            why = f'from an order set by hand ({order.group(1)})' if order else 'set by hand'
+        out.append(f'Display8 is in stub mode and drew on {b.lower()}: {why}.')
+    elif asked == 'stub' and order:
+        out.append(f'Display8 is in stub mode on {order.group(1)}, but the log has no backend '
+                   'chosen (the game stopped before the first CreateDevice, or none started)'
+                   + (f': {failed}.' if failed else '.'))
+    elif asked == 'stub':
+        out.append('Display8 asked for stub mode but logged no backend and no reason.')
+    else:
+        out.append(f'Display8 is in {asked} mode: the real chain draws and no backend is '
+                   'chosen (Mode=stub in Display8.ini turns the stub on).')
+    return out
+
+
 def diagnose(game, error=None):
     """The bug report: what a player sends when the mod does not work. Everything that
     tells why from a distance, nothing of the game's own files but their hashes, and
@@ -1205,7 +1248,7 @@ def diagnose(game, error=None):
 
     # ---- the logs
     logs = [n for n in names if n.lower().endswith('.log')
-            and n.rsplit('.', 1)[0].lower() in stems | {'binkproxy'}]
+            and n.rsplit('.', 1)[0].lower() in stems | {'binkproxy', 'display8'}]
     texts = {}
     for n in logs:
         lines = read_lines(p(n))
@@ -1254,6 +1297,8 @@ def diagnose(game, error=None):
             re.search(r'menus: scene \w+ on', l) for l in ui):
         findings.append('The menus never had render3d\'s scene behind them (UI.log: "menus: '
                         'scene off"): the main menu shows the faded stock art on black.')
+    if 'display8' in texts:
+        findings.extend(display8_backend(texts['display8']))
     for s, lines in texts.items():
         if any('PANIC' in l for l in lines):
             findings.append(f'{s}.log records a panic: the plugin stopped the game.')
@@ -2243,6 +2288,29 @@ def selftest():
         facts = inspect(mock)
         check(facts['display8'] and not facts['d3d8to9'] and not facts['dxvk'],
               'Display8 in front of another d3d8.dll: not d3d8to9, not DXVK')
+        # Display8.log's mode and backend, in the findings.
+        with open(os.path.join(mock, 'Display8.log'), 'w') as f:
+            f.write('Display8 0.9.0 -- game dir C:\\g; mode stub; the real chain: x\n'
+                    'stub: the backend is Vulkan\n')
+        check('drew on vulkan' in diagnose(mock), 'report: Display8.log is read, the backend named')
+        h = 'Display8 0.9.0 -- game dir C:\\g; mode stub; the real chain: d3d8_real.dll'
+        d8b = display8_backend
+        check('drew on vulkan' in d8b([h, 'Backend=auto: on Linux: vulkan, then d3d12, then d3d9',
+                                       'stub mode on vulkan, then d3d12, then d3d9',
+                                       'stub: the backend is Vulkan'])[0]
+              and "Backend=auto's" in d8b([h, 'Backend=auto: on Linux: vulkan, then d3d9',
+                                           'stub: the backend is Vulkan'])[0],
+              'display8: stub on vulkan by auto')
+        r = d8b([h, 'stub mode on vulkan, then d3d12, then d3d9',
+                 'stub: Vulkan could not start: no device; falling back to Direct3D 12',
+                 'stub: the backend is D3d9, after Vulkan, Direct3D 12 could not start'])[0]
+        check('drew on d3d9' in r and 'no device' in r and 'after Vulkan' in r,
+              'display8: a fallback and its reason')
+        check('set by hand' in d8b([h, 'stub mode on d3d9', 'stub: the backend is D3d9'])[0],
+              'display8: a hand-set order')
+        check('forward mode' in d8b([h.replace('stub', 'forward')])[0]
+              and 'stood down: HUD.asi is loaded' in d8b([h, 'Mode=stub: HUD.asi is loaded; forward mode instead'])[0]
+              and 'no start line' in d8b(['x'])[0], 'display8: forward, stood down, no log')
         # Errors in words (explain): every code its own, the files named, the cause said.
         heads = set()
         for code in ERROR_CODES:
