@@ -1,6 +1,6 @@
 [package]
 name = "display"
-version = "0.10.0"
+version = "0.11.0"
 edition = "2024"
 publish = false
 description = "Display8: Star Trek: Armada II's d3d8.dll, our own (README.md)"

@@ -56,7 +56,8 @@ fn make(o: *mut SObj, plugin: bool) -> Option<VkImage8> {
             return None;
         }
         let l0 = &t.levels[0];
-        let mut img = match v.image(l0.w, l0.h, t.nlev, vk::Format::B8G8R8A8_UNORM, vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST, vk::ImageAspectFlags::COLOR) {
+        // Copied from too: a recorded frame reads it back (gpu/README.md, "Record and replay").
+        let mut img = match v.image(l0.w, l0.h, t.nlev, vk::Format::B8G8R8A8_UNORM, vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::TRANSFER_SRC, vk::ImageAspectFlags::COLOR) {
             Ok(i) => i,
             Err(e) => {
                 log!("vulkan: no mirror: {}", e);

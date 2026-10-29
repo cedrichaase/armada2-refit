@@ -11,6 +11,8 @@ use crate::frame::{Frame, Span};
 use crate::pixels::Mapped;
 use crate::types::*;
 use crate::{d3d9, dx12, vulkan};
+use crate::record::wire::*;
+use crate::record::Recorder;
 use core::cell::Cell;
 use core::ffi::c_void;
 
@@ -52,12 +54,14 @@ pub struct Gpu {
     disp: Cell<Option<Display8>>,
     /// `display8_device_epoch`, looked up once: 0 not yet, 1 absent, else the address.
     epoch_fn: Cell<usize>,
+    /// Recording a frame of calls, when asked (`crate::record`).
+    rec: Recorder,
 }
 
 impl Gpu {
     /// Direct3D 9 only (no Display8 is asked).
     pub const fn new(log: Log) -> Gpu {
-        Gpu { log, d9: d3d9::Gpu::new(log), vk: vulkan::Gpu::new(log), dx: dx12::Gpu::new(log), lookup: None, mode: Cell::new(D3D9), seen: Cell::new(0), early: Cell::new(false), disp: Cell::new(None), epoch_fn: Cell::new(0) }
+        Gpu { log, d9: d3d9::Gpu::new(log), vk: vulkan::Gpu::new(log), dx: dx12::Gpu::new(log), lookup: None, mode: Cell::new(D3D9), seen: Cell::new(0), early: Cell::new(false), disp: Cell::new(None), epoch_fn: Cell::new(0), rec: Recorder::new(log) }
     }
 
     /// On the backend Display8 says, through `lookup` (the plugin's `GetProcAddress` on
@@ -86,6 +90,7 @@ impl Gpu {
             early: Cell::new(false),
             disp: Cell::new(None),
             epoch_fn: Cell::new(0),
+            rec: Recorder::new(log),
         }
     }
 
@@ -224,6 +229,22 @@ impl Gpu {
         }
     }
 
+    /// The recorder while it records a frame (`crate::record`).
+    #[inline]
+    fn rec(&self) -> Option<&Recorder> {
+        if self.rec.live(&self.vk, self as *const Gpu as usize) { Some(&self.rec) } else { None }
+    }
+
+    /// The engine is about to present (the plugin's `Present` hook): when this frame was
+    /// recorded (README.md, "Record and replay"), its streams are written now and its
+    /// name is given, for the plugin to dump the frame as presented beside them.
+    pub fn record_present(&self) -> Option<alloc::string::String> {
+        if !self.rec.live(&self.vk, self as *const Gpu as usize) {
+            return None;
+        }
+        self.rec.present(&self.vk)
+    }
+
     /// The Direct3D 9 backend (the plugins' engine glue that is Direct3D 9's alone).
     pub fn d3d9(&self) -> &d3d9::Gpu {
         &self.d9
@@ -312,11 +333,16 @@ impl Gpu {
     // -- resources --
 
     pub fn texture(&self, desc: TextureDesc, contents: Contents) -> Texture {
-        match self.make_on() {
+        let blob = self.rec().map(|r| r.blob(contents.bytes()));
+        let t = match self.make_on() {
             VULKAN => Texture::Vk(self.vk.texture(desc, contents)),
             D3D12 => Texture::Dx(self.dx.texture(desc, contents)),
             _ => Texture::D9(self.d9.texture(desc, contents)),
+        };
+        if let (Some(r), Some(b)) = (self.rec(), blob) {
+            r.texture_new(&t, &desc, b);
         }
+        t
     }
 
     pub fn wrap_d3d9_texture(&self, tex: d3d9::raw::Com) -> Texture {
@@ -332,6 +358,18 @@ impl Gpu {
     pub fn engine_texture(&self, tex8: *mut c_void) -> Option<Texture> {
         if tex8.is_null() {
             return None;
+        }
+        if let Some(r) = self.rec() {
+            let t = self.vk.engine_texture(tex8).map(Texture::Vk);
+            if let Some(t) = &t {
+                // IDirect3DBaseTexture8::GetLevelCount (the mirror has every level) and
+                // IDirect3DTexture8::GetLevelDesc (its format: X8R8G8B8's alpha reads one).
+                let levels = crate::vcall!(tex8, 13, fn() -> u32,);
+                let mut desc = [0u32; 8];
+                let hr = crate::vcall!(tex8, 14, fn(u32, *mut [u32; 8]) -> i32, 0, &mut desc);
+                r.mirror(t, levels, hr >= 0 && desc[0] == 22);
+            }
+            return t;
         }
         match self.mode() {
             VULKAN => self.vk.engine_texture(tex8).map(Texture::Vk),
@@ -378,19 +416,27 @@ impl Gpu {
     }
 
     pub fn buffer(&self, desc: BufferDesc, data: &[u8]) -> Buffer {
-        match self.make_on() {
+        let b = match self.make_on() {
             VULKAN => Buffer::Vk(self.vk.buffer(desc, data)),
             D3D12 => Buffer::Dx(self.dx.buffer(desc, data)),
             _ => Buffer::D9(self.d9.buffer(desc, data)),
+        };
+        if let Some(r) = self.rec() {
+            r.buffer_new(&b, &desc, data);
         }
+        b
     }
 
     pub fn buffer_transient(&self, desc: BufferDesc, data: &[u8]) -> Buffer {
-        match self.make_on() {
+        let b = match self.make_on() {
             VULKAN => Buffer::Vk(self.vk.buffer_transient(desc, data)),
             D3D12 => Buffer::Dx(self.dx.buffer_transient(desc, data)),
             _ => Buffer::D9(self.d9.buffer_transient(desc, data)),
+        };
+        if let Some(r) = self.rec() {
+            r.buffer_new(&b, &desc, data);
         }
+        b
     }
 
     /// Whether compute and storage are there (`Cmd::dispatch`, `Gpu::storage`, storage
@@ -406,11 +452,15 @@ impl Gpu {
 
     /// A storage buffer (`StorageDesc`); an empty one on Direct3D 9.
     pub fn storage(&self, desc: StorageDesc) -> Storage {
-        match self.make_on() {
+        let s = match self.make_on() {
             VULKAN => Storage::Vk(self.vk.storage(desc)),
             D3D12 => Storage::Dx(self.dx.storage(desc)),
             _ => Storage::None,
+        };
+        if let Some(r) = self.rec() {
+            r.storage_new(&s, &desc);
         }
+        s
     }
 
     /// A compute pipeline; an empty one on Direct3D 9 (never ready).
@@ -441,12 +491,14 @@ impl Gpu {
     // -- commands --
 
     pub fn begin<'a>(&'a self, frame: &'a mut Frame) -> Option<Cmd<'a>> {
+        let fp = frame as *const Frame;
         let inner = match self.mode() {
             VULKAN => CmdInner::Vk(self.vk.begin(frame)?),
             D3D12 => CmdInner::Dx(self.dx.begin(frame)?),
             _ => CmdInner::D9(self.d9.begin(frame)?),
         };
-        Some(Cmd { gpu: self, inner })
+        let rid = self.rec.begin(&self.vk, self.mode() == VULKAN, self as *const Gpu as usize, fp);
+        Some(Cmd { gpu: self, inner, rid })
     }
 
     pub fn read_back<R>(&self, tex: &Texture, f: impl FnOnce(&Mapped) -> R) -> Result<R, &'static str> {
@@ -518,6 +570,9 @@ impl Texture {
     }
 
     pub fn write(&self, src: *const u8, pitch: usize, w: u32, rows: u32) {
+        if let Some(g) = recording() {
+            g.rec.write(&g.vk, self, src, pitch, w, rows);
+        }
         each!(self, t => t.write(src, pitch, w, rows))
     }
 
@@ -700,6 +755,45 @@ enum CmdInner<'a> {
 pub struct Cmd<'a> {
     gpu: &'a Gpu,
     inner: CmdInner<'a>,
+    /// Its id in the recording (`crate::record`); 0 when none is made.
+    rid: u32,
+}
+
+impl Drop for Cmd<'_> {
+    fn drop(&mut self) {
+        if self.rid != 0 {
+            self.gpu.rec.end(self.rid);
+        }
+    }
+}
+
+/// The `Gpu` recording now, for what has none to ask (`Texture::write`, `Frame::next`).
+fn recording() -> Option<&'static Gpu> {
+    let p = crate::record::active();
+    if p == 0 {
+        return None;
+    }
+    let g = unsafe { &*(p as *const Gpu) };
+    g.rec.live(&g.vk, p).then_some(g)
+}
+
+/// `Frame::next` while a frame is recorded.
+pub(crate) fn frame_next(f: &Frame) {
+    if let Some(g) = recording() {
+        g.rec.frame_next(f as *const Frame);
+    }
+}
+
+/// While a frame is recorded: `$e` with the recorder `$r`, the Vulkan backend `$vk` and
+/// the `Cmd`'s id `$c` (README.md, "Record and replay").
+macro_rules! rec {
+    ($s:expr, |$r:ident, $vk:ident, $c:ident| $e:expr) => {
+        if $s.rid != 0 && $s.gpu.rec.on() {
+            let ($r, $vk, $c) = (&$s.gpu.rec, &$s.gpu.vk, $s.rid);
+            let _ = ($vk, $c);
+            $e;
+        }
+    };
 }
 
 macro_rules! all {
@@ -722,26 +816,58 @@ impl<'a> Cmd<'a> {
     }
 
     pub fn begin_pass(&mut self, pass: &Pass) -> bool {
+        rec!(self, |r, vk, c| r.begin_pass(vk, c, pass));
         all!(self, c => c.begin_pass(pass))
     }
 
     pub fn end_pass(&mut self) {
+        rec!(self, |r, vk, c| r.op(OP_END_PASS, |w| {
+            w.u32(c);
+        }));
         all!(self, c => c.end_pass())
     }
 
     pub fn set_viewport(&mut self, vp: &Viewport) {
+        rec!(self, |r, vk, c| r.op(OP_VIEWPORT, |w| {
+            w.u32(c).u32(vp.x).u32(vp.y).u32(vp.w).u32(vp.h).f32(vp.min_z).f32(vp.max_z);
+        }));
         all!(self, c => c.set_viewport(vp))
     }
 
-    pub fn set_scissor(&mut self, r: Rect) {
-        all!(self, c => c.set_scissor(r))
+    pub fn set_scissor(&mut self, rc: Rect) {
+        rec!(self, |r, vk, c| r.op(OP_SCISSOR, |w| {
+            w.u32(c).rect(rc);
+        }));
+        all!(self, c => c.set_scissor(rc))
     }
 
     pub fn clear_rects(&mut self, rects: &[Rect], color: Option<[f32; 4]>, depth: Option<f32>) {
+        rec!(self, |r, vk, c| r.op(OP_CLEAR_RECTS, |w| {
+            w.u32(c).u32(rects.len() as u32);
+            for x in rects {
+                w.rect(*x);
+            }
+            match color {
+                Some(v) => w.u8(1).floats(&v),
+                None => w.u8(0),
+            };
+            match depth {
+                Some(v) => w.u8(1).f32(v),
+                None => w.u8(0),
+            };
+        }));
         all!(self, c => c.clear_rects(rects, color, depth))
     }
 
     pub fn set_pipeline(&mut self, p: &Pipeline) -> bool {
+        if let Pipeline::Vk(vp) = p {
+            rec!(self, |r, vk, c| {
+                let id = r.pipe(vp);
+                r.op(OP_SET_PIPELINE, |w| {
+                    w.u32(c).u32(id);
+                })
+            });
+        }
         match (&mut self.inner, p) {
             (CmdInner::D9(c), Pipeline::D9(p)) => c.set_pipeline(p),
             (CmdInner::Vk(c), Pipeline::Vk(p)) => c.set_pipeline(p),
@@ -751,10 +877,19 @@ impl<'a> Cmd<'a> {
     }
 
     pub fn set_sampler(&mut self, slot: u32, s: &Sampler) {
+        rec!(self, |r, vk, c| r.op(OP_SET_SAMPLER, |w| {
+            w.u32(c).u32(slot).sampler(s);
+        }));
         all!(self, c => c.set_sampler(slot, s))
     }
 
     pub fn bind_texture(&mut self, slot: u32, t: Option<&Texture>, s: &Sampler) {
+        rec!(self, |r, vk, c| {
+            let id = r.tex(vk, t, true);
+            r.op(OP_BIND_TEXTURE, |w| {
+                w.u32(c).u32(slot).u32(id).sampler(s);
+            })
+        });
         match &mut self.inner {
             CmdInner::D9(c) => c.bind_texture(slot, t.and_then(|t| t.d9()), s),
             CmdInner::Vk(c) => c.bind_texture(slot, t.and_then(|t| t.vk()), s),
@@ -763,10 +898,16 @@ impl<'a> Cmd<'a> {
     }
 
     pub fn vs_block(&mut self, b: Block) {
+        rec!(self, |r, vk, c| r.op(OP_VS_BLOCK, |w| {
+            w.u32(c).u32(b.base).floats(b.data);
+        }));
         all!(self, c => c.vs_block(b))
     }
 
     pub fn ps_block(&mut self, b: Block) {
+        rec!(self, |r, vk, c| r.op(OP_PS_BLOCK, |w| {
+            w.u32(c).u32(b.base).floats(b.data);
+        }));
         all!(self, c => c.ps_block(b))
     }
 
@@ -788,6 +929,12 @@ impl<'a> Cmd<'a> {
     /// A read-only storage buffer at `slot` (`STORAGE(n)`: t16 + n), for draws and
     /// dispatches.
     pub fn bind_storage(&mut self, slot: u32, s: Option<&Storage>) {
+        rec!(self, |r, vk, c| {
+            let id = r.sto(vk, s);
+            r.op(OP_BIND_STORAGE, |w| {
+                w.u32(c).u32(slot).u32(id);
+            })
+        });
         match &mut self.inner {
             CmdInner::D9(_) => {}
             CmdInner::Vk(c) => c.bind_storage(slot, s.and_then(|s| s.vk())),
@@ -797,6 +944,12 @@ impl<'a> Cmd<'a> {
 
     /// A read-write storage buffer at `slot` (`STORAGE_RW(n)`: u n), for dispatches.
     pub fn bind_storage_rw(&mut self, slot: u32, s: Option<&Storage>) {
+        rec!(self, |r, vk, c| {
+            let id = r.sto(vk, s);
+            r.op(OP_BIND_STORAGE_RW, |w| {
+                w.u32(c).u32(slot).u32(id);
+            })
+        });
         match &mut self.inner {
             CmdInner::D9(_) => {}
             CmdInner::Vk(c) => c.bind_storage_rw(slot, s.and_then(|s| s.vk())),
@@ -807,6 +960,12 @@ impl<'a> Cmd<'a> {
     /// A storage image (a texture made with `Usage::STORAGE`) at `slot`
     /// (`STORAGE_IMAGE_*(n)`: u 8 + n), for dispatches; its first level.
     pub fn bind_storage_image(&mut self, slot: u32, t: Option<&Texture>) {
+        rec!(self, |r, vk, c| {
+            let id = r.tex(vk, t, true);
+            r.op(OP_BIND_STORAGE_IMAGE, |w| {
+                w.u32(c).u32(slot).u32(id);
+            })
+        });
         match &mut self.inner {
             CmdInner::D9(_) => {}
             CmdInner::Vk(c) => c.bind_storage_image(slot, t.and_then(|t| t.vk())),
@@ -816,6 +975,9 @@ impl<'a> Cmd<'a> {
 
     /// Registers of the compute shaders' register file (their cbuffers at b0).
     pub fn cs_block(&mut self, b: Block) {
+        rec!(self, |r, vk, c| r.op(OP_CS_BLOCK, |w| {
+            w.u32(c).u32(b.base).floats(b.data);
+        }));
         match &mut self.inner {
             CmdInner::D9(_) => {}
             CmdInner::Vk(c) => c.cs_block(b),
@@ -826,6 +988,12 @@ impl<'a> Cmd<'a> {
     /// `data` into a storage buffer at byte `offset`, through the frame's upload ring,
     /// ordered before whatever reads it after (whole words).
     pub fn write_storage(&mut self, s: &Storage, offset: u32, data: &[u8]) {
+        rec!(self, |r, vk, c| {
+            let id = r.sto(vk, Some(s));
+            r.op(OP_WRITE_STORAGE, |w| {
+                w.u32(c).u32(id).u32(offset).bytes(data);
+            })
+        });
         match (&mut self.inner, s) {
             (CmdInner::Vk(c), Storage::Vk(s)) => c.write_storage(s, offset, data),
             (CmdInner::Dx(c), Storage::Dx(s)) => c.write_storage(s, offset, data),
@@ -837,6 +1005,14 @@ impl<'a> Cmd<'a> {
     /// Ordered after what came before and before what comes after: what it writes is
     /// read by the next draw or dispatch as it left it. False: nothing was run.
     pub fn dispatch(&mut self, p: &ComputePipeline, x: u32, y: u32, z: u32) -> bool {
+        if let ComputePipeline::Vk(vp) = p {
+            rec!(self, |r, vk, c| {
+                let id = r.cpipe(vp);
+                r.op(OP_DISPATCH, |w| {
+                    w.u32(c).u32(id).u32(x).u32(y).u32(z);
+                })
+            });
+        }
         match (&mut self.inner, p) {
             (CmdInner::Vk(c), ComputePipeline::Vk(p)) => c.dispatch(p, x, y, z),
             (CmdInner::Dx(c), ComputePipeline::Dx(p)) => c.dispatch(p, x, y, z),
@@ -847,6 +1023,9 @@ impl<'a> Cmd<'a> {
     /// A barrier between everything recorded before and after (a dispatch and a copy
     /// already place their own).
     pub fn barrier(&mut self) {
+        rec!(self, |r, vk, c| r.op(OP_BARRIER, |w| {
+            w.u32(c);
+        }));
         match &mut self.inner {
             CmdInner::D9(_) => {}
             CmdInner::Vk(c) => c.barrier(),
@@ -855,22 +1034,49 @@ impl<'a> Cmd<'a> {
     }
 
     pub fn vertices<T: Copy>(&mut self, data: &[T]) -> Option<Span> {
-        all!(self, c => c.vertices(data))
+        let got = all!(self, c => c.vertices(data));
+        rec!(self, |r, vk, c| {
+            let bytes = unsafe { core::slice::from_raw_parts(data.as_ptr() as *const u8, core::mem::size_of_val(data)) };
+            r.span(OP_VERTICES, c, bytes, core::mem::size_of::<T>() as u32, 0, got.as_ref())
+        });
+        got
     }
 
     pub fn indices(&mut self, data: &[u16]) -> Option<Span> {
-        all!(self, c => c.indices(data))
+        let got = all!(self, c => c.indices(data));
+        rec!(self, |r, vk, c| {
+            let bytes = unsafe { core::slice::from_raw_parts(data.as_ptr() as *const u8, core::mem::size_of_val(data)) };
+            r.span(OP_INDICES, c, bytes, 2, 0, got.as_ref())
+        });
+        got
     }
 
     pub fn draw(&mut self, v: &Span) {
+        rec!(self, |r, vk, c| r.op(OP_DRAW, |w| {
+            w.u32(c);
+            r.span_ref(w, v);
+        }));
         all!(self, c => c.draw(v))
     }
 
     pub fn draw_indexed(&mut self, v: &Span, base_vertex: u32, vertices: u32, i: &Span, first: u32, count: u32) {
+        rec!(self, |r, vk, c| r.op(OP_DRAW_INDEXED, |w| {
+            w.u32(c);
+            r.span_ref(w, v);
+            w.u32(base_vertex).u32(vertices);
+            r.span_ref(w, i);
+            w.u32(first).u32(count);
+        }));
         all!(self, c => c.draw_indexed(v, base_vertex, vertices, i, first, count))
     }
 
     pub fn draw_buffer(&mut self, b: &Buffer, stride: u32, first: u32, count: u32) {
+        rec!(self, |r, vk, c| {
+            let id = r.buf(vk, b);
+            r.op(OP_DRAW_BUFFER, |w| {
+                w.u32(c).u32(id).u32(stride).u32(first).u32(count);
+            })
+        });
         match (&mut self.inner, b) {
             (CmdInner::D9(c), Buffer::D9(b)) => c.draw_buffer(b, stride, first, count),
             (CmdInner::Vk(c), Buffer::Vk(b)) => c.draw_buffer(b, stride, first, count),
@@ -880,15 +1086,25 @@ impl<'a> Cmd<'a> {
     }
 
     pub fn span_of(&mut self, b: &Buffer, stride: u32) -> Option<Span> {
-        match (&mut self.inner, b) {
+        let mut id = 0;
+        rec!(self, |r, vk, c| id = r.buf(vk, b));
+        let got = match (&mut self.inner, b) {
             (CmdInner::D9(c), Buffer::D9(b)) => c.span_of(b, stride),
             (CmdInner::Vk(c), Buffer::Vk(b)) => c.span_of(b, stride),
             (CmdInner::Dx(c), Buffer::Dx(b)) => c.span_of(b, stride),
             _ => None,
-        }
+        };
+        rec!(self, |r, vk, c| r.span(OP_SPAN_OF, c, &[], stride, id, got.as_ref()));
+        got
     }
 
     pub fn generate_mips(&mut self, t: &Texture) {
+        rec!(self, |r, vk, c| {
+            let id = r.tex(vk, Some(t), true);
+            r.op(OP_GEN_MIPS, |w| {
+                w.u32(c).u32(id);
+            })
+        });
         match (&mut self.inner, t) {
             (CmdInner::D9(c), Texture::D9(t)) => c.generate_mips(t),
             (CmdInner::Vk(c), Texture::Vk(t)) => c.generate_mips(t),
@@ -898,6 +1114,12 @@ impl<'a> Cmd<'a> {
     }
 
     pub fn resolve_depth(&mut self, src: &Texture, dst: &Texture) -> bool {
+        rec!(self, |r, vk, c| {
+            let (s, d) = (r.tex(vk, Some(src), false), r.tex(vk, Some(dst), false));
+            r.op(OP_RESOLVE_DEPTH, |w| {
+                w.u32(c).u32(s).u32(d);
+            })
+        });
         match (&mut self.inner, src, dst) {
             (CmdInner::D9(c), Texture::D9(s), Texture::D9(d)) => c.resolve_depth(s, d),
             (CmdInner::Vk(c), Texture::Vk(s), Texture::Vk(d)) => c.resolve_depth(s, d),
@@ -906,16 +1128,28 @@ impl<'a> Cmd<'a> {
         }
     }
 
-    pub fn resolve(&mut self, src: &Texture, dst: &Texture, r: Rect) {
+    pub fn resolve(&mut self, src: &Texture, dst: &Texture, rc: Rect) {
+        rec!(self, |r, vk, c| {
+            let (s, d) = (r.tex(vk, Some(src), true), r.tex(vk, Some(dst), true));
+            r.op(OP_RESOLVE, |w| {
+                w.u32(c).u32(s).u32(d).rect(rc);
+            })
+        });
         match (&mut self.inner, src, dst) {
-            (CmdInner::D9(c), Texture::D9(s), Texture::D9(d)) => c.resolve(s, d, r),
-            (CmdInner::Vk(c), Texture::Vk(s), Texture::Vk(d)) => c.resolve(s, d, r),
-            (CmdInner::Dx(c), Texture::Dx(s), Texture::Dx(d)) => c.resolve(s, d, r),
+            (CmdInner::D9(c), Texture::D9(s), Texture::D9(d)) => c.resolve(s, d, rc),
+            (CmdInner::Vk(c), Texture::Vk(s), Texture::Vk(d)) => c.resolve(s, d, rc),
+            (CmdInner::Dx(c), Texture::Dx(s), Texture::Dx(d)) => c.resolve(s, d, rc),
             _ => {}
         }
     }
 
     pub fn copy(&mut self, src: &Texture, sr: Option<Rect>, dst: &Texture, dr: Option<Rect>, f: Filter) -> bool {
+        rec!(self, |r, vk, c| {
+            let (s, d) = (r.tex(vk, Some(src), true), r.tex(vk, Some(dst), true));
+            r.op(OP_COPY, |w| {
+                w.u32(c).u32(s).opt_rect(sr).u32(d).opt_rect(dr).u32(f as u32);
+            })
+        });
         match (&mut self.inner, src, dst) {
             (CmdInner::D9(c), Texture::D9(s), Texture::D9(d)) => c.copy(s, sr, d, dr, f),
             (CmdInner::Vk(c), Texture::Vk(s), Texture::Vk(d)) => c.copy(s, sr, d, dr, f),
@@ -925,10 +1159,13 @@ impl<'a> Cmd<'a> {
     }
 
     pub fn read_back<R>(&mut self, tex: &Texture, f: impl FnOnce(&Mapped) -> R) -> Result<R, &'static str> {
-        self.gpu.read_back(tex, f)
+        self.read_back_layer(tex, 0, f)
     }
 
     pub fn read_back_layer<R>(&mut self, tex: &Texture, layer: u32, f: impl FnOnce(&Mapped) -> R) -> Result<R, &'static str> {
+        rec!(self, |r, vk, c| r.op(OP_READ_BACK, |w| {
+            w.u32(c).u32(layer);
+        }));
         self.gpu.read_back_layer(tex, layer, f)
     }
 }

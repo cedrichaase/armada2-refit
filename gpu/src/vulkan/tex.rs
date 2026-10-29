@@ -11,6 +11,9 @@ use alloc::vec::Vec;
 use ash::vk;
 use core::cell::{Cell, RefCell};
 
+// What the recorder reads of these objects (`crate::record`).
+mod snap;
+
 /// A texture: sampled, a target, or both. Clones share it.
 #[derive(Clone)]
 pub struct Texture(pub(crate) Rc<TexInner>);
@@ -491,7 +494,7 @@ impl Buffer {
         let size = (self.0.desc.size.max(4) as u64).div_ceil(4) * 4;
         let bci = vk::BufferCreateInfo::default()
             .size(size)
-            .usage(vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::INDEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST)
+            .usage(vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::INDEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::TRANSFER_SRC)
             .sharing_mode(vk::SharingMode::EXCLUSIVE);
         let buf = unsafe { dv.create_buffer(&bci, None) }.ok()?;
         let req = unsafe { dv.get_buffer_memory_requirements(buf) };

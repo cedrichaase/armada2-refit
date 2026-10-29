@@ -38,6 +38,10 @@ Moving both plugins onto it changed nothing on screen, so each move is judged by
 | `src/dx12/mod.rs` | the Direct3D 12 backend's `Gpu`: Display8's device opened, the root signature, descriptor heaps of its own, the frame's tables, Display8's textures wrapped |
 | `src/dx12/tex.rs`, `pipe.rs`, `cmd.rs`, `raw.rs` | its textures, buffers and timestamps; pipeline states; `Cmd`, the blits, the depth resolve and the read-back; Direct3D 12 by vtable slot |
 | `shaders/dx12.hlsl`, `src/dx12/shaders.rs` | its own shaders (the depth resolve, the blit), DXIL by `dx12-shaders.sh` |
+| `src/record/` | the recorder of a frame's calls (`mod.rs`), the file format (`wire.rs`), its kernel32 calls (`sys.rs`) ("Record and replay") |
+| `src/vulkan/tex/snap.rs` | what the recorder reads back of the objects a frame finds made |
+| `src/replay.rs` | a recorded frame drawn again on any backend |
+| `replay/`, `replay.sh` | `a2replay.exe`, the replayer, and the script that runs it under Wine on lavapipe; `replay/inspect.py` lists a recording |
 
 `gpu::Gpu`, `gpu::Texture` and the rest are `api.rs`'s, re-exported at the crate's
 root.
@@ -556,6 +560,146 @@ sky and planet surfaces. It is built on the interface, not the Direct3D 9 backen
 split is in the HLSL source, so the SPIR-V has the same passes, and a Vulkan or
 Direct3D 12 backend runs the same chain. A backend that takes the whole function in one
 shader may later be handed it as a single pass, with nothing changed for the callers.
+
+## Record and replay
+
+One frame of the plugins' calls can be recorded to files and drawn again with no game,
+on any backend, by a small 32-bit program under Wine on lavapipe: so a backend can be
+judged on a frame of the real game without starting it, and a difference between two
+backends found on one frame, not a scene. The recorder is `src/record/`, the replay
+`src/replay.rs`, the program `replay/` (`a2replay.exe`), the entry point `replay.sh`.
+
+    ./a2test drive --session ID record NAME          # the frame, into $A2_DATA/replays/NAME/
+    gpu/replay.sh NAME                                # replay-vulkan.ppm, replay-d3d9.ppm there
+    gpu/replay.sh NAME --backend d3d12                # vkd3d-proton, from A2_PROTON
+    ./a2test baseline diff $A2_DATA/replays/NAME/game.ppm $A2_DATA/replays/NAME/replay-vulkan.ppm
+
+**Asked for** as a frame dump is (`testbench/README.md`, "Frame dumps"): a trigger file
+beside the exe, `Gpu.record`, whose first line is the name. Each plugin's recorder
+looks for it twice a second (the clock is read at each `Cmd` begun: a plugin that
+begins a few a frame still looks twice a second at one frame a second, which a count of
+`Cmd`s did not); the first to see it picks one of Display8's frames a second and a half
+ahead (by the frame rate it has seen), so that every plugin has looked before it comes,
+and writes the frame and the request into a page every recorder in the process shares
+(`Local\a2-gpu-record-<pid>`, a file mapping: each plugin links its own copy of this
+crate). A plugin that sees the request only once its frame has begun records nothing
+rather than half of it. The page also holds the counter every record of every plugin
+takes its `seq` from, which is the order the calls were made in. While a recording is
+asked for or under way, every call asks Display8 which frame it is (`display8_vk_frame`),
+so what a plugin does before its first `Cmd` of the frame (the UI asks for its mirrors
+while it builds its draw list) is in it. Off, the recorder costs two flags per call and
+a read of the clock per `Cmd`; on a backend other than Vulkan it says once that it needs
+Vulkan and records nothing (the snapshots below are read back through the Vulkan
+backend).
+
+**What is recorded** is every call of the interface in that frame, in a stream per
+plugin (`Dumps\<name>\<module>.a2s`, moved by the bench into `$A2_DATA/replays/<name>/`),
+and `<module>.txt` beside it (records, snapshots, what could not be read):
+
+- the objects the frame makes (`Gpu::texture`, `buffer`, `storage`, with what they were
+  made with), the pipelines and compute pipelines it binds (the whole description, each
+  shader blob once: d3dbc, SPIR-V, DXIL and its alpha-tested twin), the `Cmd`s begun and
+  ended, the `Frame` each records into and **the viewport each starts with** (the
+  engine's, which no call of the plugin's names: a `Cmd` on Vulkan and Direct3D 12
+  starts with Display8's record of it, on Direct3D 9 with the device's; render3d's
+  modules draw the action camera's inset with it, and without it the inset came out
+  empty), `Frame::next`;
+- every command: passes with their load operations, viewports, scissors, clears,
+  pipelines, samplers, textures, uniform blocks (the floats as given), storage, writes,
+  dispatches, barriers, the vertices and indices written into the frame's rings (their
+  bytes and stride), static buffers drawn from, draws, mips, resolves, copies, texture
+  writes. A draw names the span written it is part of, so a span a module narrows
+  (`first`, `count`) is replayed narrowed;
+- **what the frame finds made** (a texture, buffer or storage buffer made in an earlier
+  frame, the engine's back buffer and depth, Display8's mirrors of the engine's
+  textures): its description and, at its first use in the frame, its contents as they
+  are then, every level and face (the contents it still holds when nothing has drawn
+  into it, else read back through the Vulkan backend: `src/vulkan/tex/snap.rs`; a
+  mirror has every level the engine's texture has, `GetLevelCount`). Reading back
+  submits the frame so far and waits, which changes what the frame draws in nothing,
+  only how long it takes. A target whose first use clears it whole needs no contents.
+
+Contents are **blobs**, files in `blobs\` named by their FNV-1a hash and length
+(`record/wire.rs`), so what both plugins read is written once; the stream holds the
+rest, little-endian (`wire.rs` has the layout); `replay/inspect.py` lists what a
+recording holds and each record's `seq`. Everything in a recording is derived from the game (the textures, the
+frame), so it lives in `A2_DATA`, never in a checkout (hard rule 8).
+
+**The frame as presented** comes with it: the UI's `Present` hook asks
+`Gpu::record_present`, which ends the UI's stream at the engine's `Present`, and dumps
+the back buffer as its `UI.dump` does, as `<name>-game` (`game.ppm` in the recording).
+render3d's stream ends at its first `Cmd` of the next frame.
+
+**The replay** (`a2replay.exe`, `no_std` Rust linking this crate, built by `replay.sh`
+with the toolchain of the plugins) is a game without the game: it opens a window at the
+recording's size, loads Display8 (`display/build/d3d8.dll`) in stub mode on the backend
+asked for, with the recording's own `Display8.ini` (its `PixelCentres=`) and
+`dxvk.conf` (the samplers' anisotropy and LOD bias), makes the device as the engine
+does (`Direct3DCreate8`, `CreateDevice` at the recorded size and depth format), and
+gives each stream a `Gpu` of its own on it (`Gpu::with_display`, `attach_engine`), as
+each plugin has. `replay::Replay` then makes every call again in `seq` order:
+
+- an object the frame made is made as it was; one it found made is made from its
+  snapshot. A target found made (a sky's cube, a bake) is a sampled texture holding the
+  snapshot while the frame only reads it, and is made a target at the first command
+  that draws into it, its first level (each face's) drawn from the snapshot (`promote`);
+- the engine's back buffer is Display8's, given the snapshot the first plugin to use it
+  took (one image for every plugin: the UI's snapshot holds what render3d drew, and
+  putting it back would hide render3d's replay): cleared to its colour when it was one
+  colour, else drawn in; its depth is cleared to 1;
+- a snapshot goes into a target through the replayer's blit (`replay/shaders/blit.hlsl`,
+  point-sampled, the quad moved half a pixel on Direct3D 9): Direct3D 9 copies only
+  between targets, and a texture with contents is not one;
+- vertices go into the frame's ring with the stride they had (`Cmd::vertices` of a
+  type that size), and each draw reads the span it read.
+
+At the end the engine's back buffer is read back and written as a binary PPM,
+`replay-<backend>.ppm`, beside `replay-<backend>.log` (what was replayed and skipped)
+and the run's `Display8.log`. `replay.sh` runs it on a headless sway of its own at the
+recording's size (as `display/vkprobe/run-wine.sh`), in a scratch prefix kept in
+`~/.cache/a2replay/`, always on **lavapipe with the Khronos validation layer**
+(`VK_ICD_FILENAMES`, `VK_INSTANCE_LAYERS`), whatever the backend: Vulkan is gpu's own
+on Display8's device, `d3d9` is Display8's Direct3D 9 device through DXVK
+(`platform/vendor/dxvk-3.1.1`), `d3d12` vkd3d-proton (`A2_PROTON`'s). The user's GPU is
+never touched. Its validation messages are counted (Display8's messenger on Vulkan,
+the layer's own lines under DXVK and vkd3d-proton).
+
+**What a replay cannot have**: what the engine draws itself (nothing in stub mode,
+which is the only mode a frame is recorded in), a multisampled target's samples and a
+depth target's contents found made (read back neither; each starts cleared), a mirror's
+levels when the `Texture` was had from `engine_texture` before the frame (one level
+then), and timers. A frame recorded with compute (render3d's clustered lights, `[Lights]
+Clustered=1`) dispatches on Vulkan and Direct3D 12 and does nothing on Direct3D 9,
+where render3d would have drawn without clusters: record with `Clustered=0` to compare
+Direct3D 9 with the others.
+
+### Measured
+
+`showcase` (`Seed=7 Step=16 Pause=200 Race=federation Hud=1`, `--clock bench`), 1280x720,
+Display8 on Vulkan on lavapipe with `PixelCentres=d3d9` and the validation layer,
+`[Lights] Clustered=0`, recorded paused, 2026-10-29. render3d's stream: 978 records, 57
+snapshots (264 MB: the sky's 1536 cube in half floats is 113 MB of it, three 8-bit cubes
+with their chains 75 MB); the UI's: 78 records, 8 snapshots (9 MB); the recording 282
+MB in all, the two streams 720 KB of it. The frame the game presented, recorded or not, is the same to the
+bit (RMSE 0 between `game.ppm` and a `UI.dump` of a frame not recorded). Replayed, each
+against `game.ppm` (`a2test baseline diff`):
+
+| Backend | RMSE (/255) | max | over 2/255 | validation messages |
+|---|---|---|---|---|
+| Vulkan (gpu's, on Display8's device) | **0** | 0 | 0 | 0 |
+| Direct3D 12 (vkd3d-proton) | 0.058 | 27 | 35 px | 10, vkd3d-proton's own (`VUID-VkWriteDescriptorSet-dstSet-04611`, its mutable descriptors on lavapipe) |
+| Direct3D 9 (DXVK 3.1.1) | 3.37 | 217 | 8.1% | 0 |
+
+Vulkan replays the frame exactly. Direct3D 12 is within single pixels of it. Direct3D 9
+is the d3dbc of the same shaders through DXVK on a CPU driver, which the port
+measurements above already put furthest from the others ("The Vulkan backend",
+"Measured": DXVK on lavapipe is not a reference); the differences are spread over the
+hulls' plating, the beams and faintly over the sky, not a part missing. The first replays
+found what a recording must carry beyond the calls: the viewport each `Cmd` starts with
+(the inset came out empty without it), a mirror's X8R8G8B8 alpha (the minimap's sensor
+circle was transparent), and that the engine's back buffer is one image for both plugins
+(the UI's snapshot of it, put back, had hidden render3d's replay under the game's own
+pixels).
 
 ## What is not there yet
 
