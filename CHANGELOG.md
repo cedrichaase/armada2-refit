@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.38.0 — 2026-10-29
+
+Layers: testbench 3.71.0.
+
+### Added
+- testbench: `display-inventory-modes`, the mode switch and the right-drag pan in
+  Display8's inventory (testbench 3.71.0). `d922e1e`
+
+Installed, not yet seen in game.
+
 ## 13.37.0 — 2026-10-29
 
 Layers: testbench 3.70.0, display 0.9.1.
