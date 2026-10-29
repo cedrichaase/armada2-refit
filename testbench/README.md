@@ -530,17 +530,19 @@ directory of images; a session ID, live or ended; or a baseline's name. `record`
 to a baseline and refuses to replace a shot it holds unless given `--force`.
 
 **Vulkan on the bench.** A game whose clone's `Display8.ini` says `Mode=stub` and
-`Backend=vulkan` runs on lavapipe, Mesa's CPU Vulkan, with the Khronos validation layer
-(`bench/session.py`, `vulkan_env`: `VK_DRIVER_FILES`, `VK_ICD_FILENAMES`,
-`VK_INSTANCE_LAYERS`; `display/bench-mode.sh` adds `Device=llvmpipe` and `Validate=1`),
-so new Vulkan code never runs on the user's GPU; `A2TEST_VULKAN_GPU=1` leaves the
-drivers alone for a deliberate run there. Judge such a run against a baseline taken
+`Backend=vulkan` runs on the user's GPU (the one DXVK uses) with the Khronos validation
+layer on (`bench/session.py`, `vulkan_env`: `VK_INSTANCE_LAYERS`; `display/bench-mode.sh`
+adds `Validate=1`), so errors are caught before they can hang the GPU. Flags of
+`session start`, `run` and `drive`-less runs: `--vulkan-device lavapipe` (or
+`A2TEST_VULKAN_DEVICE=lavapipe`) puts it on lavapipe, Mesa's CPU Vulkan
+(`VK_DRIVER_FILES`, `VK_ICD_FILENAMES`, `Device=llvmpipe`); `--no-validate` (or
+`A2TEST_VULKAN_VALIDATE=0`) drops the layer, for timing runs. Keep 1280x720 and stop
+sessions promptly: a GPU hang has crashed the desktop. Judge a lavapipe run against a baseline taken
 on the GPU (`pre-gpu-*`), not against `Backend=d3d9` on lavapipe: DXVK on lavapipe
 draws the port scenes visibly differently from DXVK on the GPU (`port-nebula` at RMSE
 25.8, `port-firing` 7.0), while render3d on Vulkan on lavapipe is within 1 to 2 of the
 GPU's (`gpu/README.md`, "Measured"). A whole campaign mission does not load on
-lavapipe on either backend (32-bit address space, likely): run `display-stub` on Vulkan
-with `A2TEST_VULKAN_GPU=1` once the port scenes are clean under the layer.
+lavapipe on either backend (32-bit address space, likely); on the GPU it does.
 
 **Direct3D 12 on the bench** (`Backend=d3d12`) runs through Proton's vkd3d-proton on
 the GPU; there is no CPU driver for it here. With `Validate=1` the game gets the Khronos

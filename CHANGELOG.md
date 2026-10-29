@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.37.0 — 2026-10-29
+
+Layers: testbench 3.70.0, display 0.9.1.
+
+### Changed
+- Bench games on `Backend=vulkan` run on the user's GPU with the validation layer on;
+  `--vulkan-device lavapipe` and `--no-validate` opt out. Display8 ranks Vulkan devices
+  discrete > integrated > virtual > other > CPU and logs its choice. `67c2e4c`
+
+Installed, not yet seen in game.
+
 ## 13.36.2 — 2026-10-29
 
 Layers: testbench 3.69.1.

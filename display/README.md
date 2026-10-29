@@ -358,8 +358,11 @@ the swap chain's image, submits and presents.
   same command buffer again (its pool reset): a plugin's read-back (the frame dumps).
 - **Mirrors** are the engine textures a plugin samples (`display8_vk_mirror`), as the
   Direct3D 9 mirror table has them, brought up to date when the frame is asked for.
-- **`Device=`** takes only a device whose name has it (the test bench: `llvmpipe`,
-  Mesa's CPU Vulkan, never the GPU); **`Validate=1`** the Khronos validation layer, its
+- **The physical device** is chosen by type: discrete, then integrated, virtual, other,
+  and a CPU (software) device last, among those with a queue that draws and presents;
+  `Display8.log` lists every device and its rank and says which it `chose`.
+  **`Device=`** takes only a device whose name has it (the test bench with
+  `--vulkan-device lavapipe`: `llvmpipe`, Mesa's CPU Vulkan); **`Validate=1`** the Khronos validation layer, its
   warnings and errors in `Display8.log` (`vulkan 0x...:`); **`PixelCentres=d3d9`**
   Direct3D 9's pixel centres for the plugins (`gpu/README.md`, "Pixel centres"), for
   comparing with `Backend=d3d9` pixel for pixel.
@@ -378,17 +381,17 @@ the swap chain's image, submits and presents.
   backends filter alike. Without it every hull read a level blurrier on Vulkan. Vulkan's cube maps are always seamless, as
   `d3d9.seamlessCubes = True` makes DXVK's.
 
-On the bench every Vulkan game runs on lavapipe with the layer on (unless
-`A2TEST_VULKAN_GPU=1`, for a deliberate run on the GPU): the game's
-environment gets `VK_DRIVER_FILES` (and `VK_ICD_FILENAMES`) naming
-`/usr/share/vulkan/icd.d/lvp_icd.json` and `VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation`
-(umu passes the bench's environment on; pressure-vessel honours both;
-`testbench/bench/session.py`, `vulkan_env`, sets them from the clone's `Display8.ini`),
-and `display/bench-mode.sh` gives `Display8.ini` `Device=llvmpipe` and `Validate=1`, so even an environment that lost the variables
-cannot reach the GPU. `Display8.log` names the device (`vulkan: physical device
-llvmpipe ...`); the process's maps show `libVkLayer_khronos_validation.so` and
-`libvulkan_lvp.so`, and no other driver. A frame takes seconds there: its time means
-nothing.
+On the bench every Vulkan game runs on the GPU (the one DXVK uses) with the layer on
+(display 0.9.1): the game's environment gets `VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation`
+(`testbench/bench/session.py`, `vulkan_env`, from the clone's `Display8.ini`) and
+`display/bench-mode.sh` gives `Display8.ini` `Validate=1`, so the layer catches errors
+before they can hang the GPU. `a2test ... --vulkan-device lavapipe`
+(`A2TEST_VULKAN_DEVICE=lavapipe`) puts the game on lavapipe instead: `VK_DRIVER_FILES`
+(and `VK_ICD_FILENAMES`) naming `/usr/share/vulkan/icd.d/lvp_icd.json` (umu passes the
+bench's environment on; pressure-vessel honours both) and `Device=llvmpipe`, so even
+an environment that lost the variables cannot reach the GPU; a frame takes seconds
+there and its time means nothing. `--no-validate` (`A2TEST_VULKAN_VALIDATE=0`) drops
+the layer, for timing runs. `Display8.log` names the device (`vulkan: chose ...`).
 
 ### Direct3D 12
 

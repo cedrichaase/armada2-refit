@@ -13,8 +13,8 @@ Direct3D 12, then Direct3D 9 (`display/README.md`, "Choosing a backend").
 engine's first `CreateDevice` has to take each down whole and make the Direct3D 9
 device on the same window, without the engine noticing. Direct3D 12 runs on the GPU
 here (vkd3d-proton). The plugins must then draw on Direct3D 9: they are told
-no backend until the device is made. Vulkan is tried on lavapipe unless
-`A2TEST_VULKAN_GPU=1` (`display/bench-mode.sh`).
+no backend until the device is made. Vulkan is tried on the GPU
+(`--vulkan-device lavapipe` for lavapipe; `display/bench-mode.sh`).
 
     ./a2test run display-fallback --install . -j 1
 

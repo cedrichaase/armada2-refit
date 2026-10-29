@@ -5,6 +5,21 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.70.0 — 2026-10-29
+
+### Added
+- `--vulkan-device gpu|lavapipe` (`A2TEST_VULKAN_DEVICE`) and `--no-validate`
+  (`A2TEST_VULKAN_VALIDATE=0`) on `run` and `session start`.
+
+### Changed
+- `Backend=vulkan` (and `auto`) bench games now run on the user's GPU by default, with
+  the Khronos validation layer on, instead of lavapipe: `vulkan_env` no longer sets
+  `VK_DRIVER_FILES`/`VK_ICD_FILENAMES` unless lavapipe is asked for, and
+  `display/bench-mode.sh` sets `Device=llvmpipe` only then. `A2TEST_VULKAN_GPU=1` is
+  now the default and ignored. The scenario notes that told to set it were updated.
+
+Installed, not yet seen in game.
+
 ## 3.69.1 — 2026-10-29
 
 ### Fixed

@@ -23,8 +23,8 @@ be the same still star, at half stock's size, and the plating near them should t
 small green light (`[Hulls] SensorSteady=`, `SensorSize=`, `SensorLight=`,
 `SensorLightReach=`). Before the fix the spark flipbook flickered.
 
-Run it with `A2TEST_VULKAN_GPU=1 ./a2test run render3d-hull-sparks --install .`, on
-the GPU: without the flag the game runs on lavapipe.
+Run it with `./a2test run render3d-hull-sparks --install .`, on
+the GPU (`--vulkan-device lavapipe` for the CPU).
 
 1. Launch the game.
 2. Wait up to 240 seconds for "Scene.log" to say "scene ready".
