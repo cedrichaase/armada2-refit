@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.37.0 — 2026-10-29
+
+Layers: gui-installer 2.2.0.
+
+### Added
+- gui-installer: the bug report states Display8's mode, backend and the reason, read from
+  `Display8.log` (gui-installer 2.2.0). The README notes where the logs are written and
+  the Program Files VirtualStore redirect; `display/vkprobe/README.md` no longer says
+  `Vk::start` leaves the portability flag unset (docs only).
+
+Installed, not yet seen in game.
+
 ## 13.36.1 — 2026-10-28
 
 Layers: gui-installer 2.1.1.

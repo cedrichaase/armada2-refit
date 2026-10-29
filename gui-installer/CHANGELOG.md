@@ -4,6 +4,18 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 2.2.0 — 2026-10-29
+
+Reads package schemas 0 and 1, unchanged.
+
+### Added
+- The bug report reads `Display8.log` (it was not collected before) and states in its
+  findings the mode, the backend chosen (vulkan, d3d12, d3d9) and why: `Backend=auto`'s
+  order, a fallback with its reason, an order set by hand, or a stand-down to forward
+  mode (`display8_backend`; selftest checks). All three systems share the code.
+
+Installed, not yet seen in game.
+
 ## 2.1.1 — 2026-10-28
 
 Reads package schemas 0 and 1, unchanged.
