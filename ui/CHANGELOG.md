@@ -12,7 +12,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
   textures are sprites of stock's `additive` material, and ours drew them as alpha
   images, so texels with no alpha added nothing. They are now added
   (`hud/minimap.rs`). Scenario `ui-hud-minimap-nebula` (scene `ui-minimap-nebula`).
-  Fixes #10. Installed, not yet seen in game.
+  `0f38f33`. Installed, not yet seen in game.
 
 ## 0.25.0 — 2026-10-29
 

@@ -11,7 +11,7 @@ Layers: ui 0.25.1.
 
 ### Fixed
 - The minimap showed no nebulae (issue 10): the engine's map picture is drawn
-  additively now. Installed, not yet seen in game.
+  additively now. `0f38f33`. Installed, not yet seen in game.
 
 ## 13.42.1 — 2026-10-29
 
