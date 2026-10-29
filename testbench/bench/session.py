@@ -933,9 +933,18 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         Returns the ones that had to be moved: each is a leak."""
         ns = (self.s.get('null_sink') or {}).get('name')
         leaks = []
+        corked = {it.get('index') for it in _pactl_json('sink-inputs') if it.get('corked')}
+        it_corked = corked.__contains__
         for idx, sink, label in self.audio_streams():
             if not sink:
                 continue      # not linked to any sink yet, so inaudible; its 'change' event comes back here
+            if it_corked(idx) and sink != ns and not sink.startswith('a2test-'):
+                # Corked: it plays nothing. winepulse opens a corked "format test stream"
+                # on EVERY sink at start-up (the user's outputs included) to probe its
+                # format and closes it within milliseconds; catching one was stopping the
+                # game as a leak (2026-10-29: 3 of 6 launches on a busy bench). An uncork
+                # is a 'change' event, which comes back here.
+                continue
             if sink != ns and not sink.startswith('a2test-'):   # any session's null sink is silent
                 subprocess.run(['pactl', 'set-sink-input-mute', str(idx), '1'], capture_output=True)
                 if ns:

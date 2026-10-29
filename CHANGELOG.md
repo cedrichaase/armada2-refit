@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.42.1 — 2026-10-29
+
+Layers: testbench 3.74.1.
+
+### Fixed
+- Intermittent "the game is no longer running" at launch on the bench: the audio guard
+  took winepulse's corked format-probe stream on the user's output for a leak. `8c0d697`
+
+Installed, not yet seen in game.
+
 ## 13.42.0 — 2026-10-29
 
 Layers: ui 0.25.0, testbench 3.74.0.

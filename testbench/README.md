@@ -247,8 +247,13 @@ stem held `Mfed300.wav`, the voice stem `a2_fed01_intro.wav`, and the effects st
   2026-09-26 that one reached the null sink five times and the default output twice
   (run `session-20260926-173731`: `alsa_output…analog-stereo`, within the first 6 s).
   The watchdog muted and moved it and stopped the game each time, but for that moment it
-  was on the user's output. Why the pre-registered default is not taken by that stream
-  is not known.
+  was on the user's output. **Explained 2026-10-29:** that stream is winepulse's
+  `format test stream`, which it opens *corked* on every sink at start-up (the user's
+  outputs and other sessions' null sinks included) to probe each one's format, and
+  closes within milliseconds. Corked, it plays nothing; the guard now ignores corked
+  streams (an uncork is a `change` event and is checked again). Catching one was the
+  intermittent "game is no longer running" at launch (1 of 17 launches alone, 3 of 6
+  on a busy bench, where every session's probes cover every other session's sinks).
 - **XTest input does not work.** In headless sway the seat has no devices. `xdotool`
   moves Xwayland's core pointer, and Wine even logs the `ButtonPress`, but the frame
   stays pixel-identical: with no keyboard on the seat nothing holds focus, and no
