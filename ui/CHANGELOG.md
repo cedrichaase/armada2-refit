@@ -11,7 +11,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
   folder, made if missing; the game directory when `LOCALAPPDATA` is unset or not
   writable. The first line says where (`log: <path>`). An uninstall leaves the folder.
 
-Installed, not yet seen in game. (HASH)
+Installed, not yet seen in game. (9a5e70a)
 
 ## 0.26.0 — 2026-10-30
 

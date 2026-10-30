@@ -10,7 +10,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 ### Changed
 - The plugins' logs are read from the clone's Wine prefix, `drive_c/users/*/AppData/Local/armada2-refit/logs/`, with the game directory as the fallback for older builds: `Session.game_log`, `log_path`/`log_dirs`, the log waits (`mark_logs`, `new_log_lines`), `collect_logs` (into `logs/` of the results as before), `Display the mark`, and the launch's clean-up of the previous logs in both places. `gpu/replay.sh`, `render3d/perf/ab.sh` and `compare.sh` read `Render3D.log` / `Display8.log` there too; `a2film`'s UI-mark tail follows the log to wherever it appears.
 
-Installed, not yet seen in game. (HASH)
+Installed, not yet seen in game. (9a5e70a)
 
 ## 3.76.0 — 2026-10-30
 
