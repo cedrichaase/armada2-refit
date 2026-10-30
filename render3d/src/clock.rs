@@ -11,40 +11,17 @@
 //! simulation freezes every animation, a seed is a fixed number, and the frame-to-frame
 //! sequences (the nebulae's `Temporal=` jitter) settle on one picture while the clock
 //! stands. Two sessions of one scene paused at one tick then draw the same frame.
-use crate::log;
-use core::sync::atomic::{AtomicBool, Ordering};
+pub use crate::rt::clock::{bench, seed};
 
-static BENCH: AtomicBool = AtomicBool::new(false);
-
-/// Reads `[Bench] Clock=` once, at start.
+/// Reads `[Bench] Clock=` once, at start (`rt::clock`).
 pub fn load() {
-    let ini = crate::config::ini();
-    let v = ini.string("Bench", "Clock").unwrap_or_default();
-    let v = v.trim();
-    let bench = v.eq_ignore_ascii_case("bench");
-    BENCH.store(bench, Ordering::Relaxed);
-    if bench {
-        log!("clock: bench: animations on the simulation's time, fixed seeds, the nebulae's frames settle while it stands");
-    } else if !v.is_empty() && !v.eq_ignore_ascii_case("wall") {
-        log!("clock: Clock={} is not wall or bench: the wall clock", v);
-    }
-}
-
-/// Whether the bench clock is on.
-pub fn bench() -> bool {
-    BENCH.load(Ordering::Relaxed)
+    crate::rt::clock::load(&crate::config::ini(), "animations on the simulation's time, fixed seeds, the nebulae's frames settle while it stands");
 }
 
 /// Seconds, for anything that moves on screen: the wall clock, or under the bench
 /// clock the simulation's time (which stands while the game is paused).
 pub fn anim_now() -> f64 {
-    if bench() { crate::engine::sim_time() as f64 } else { crate::rt::now() }
-}
-
-/// A seed for a cosmetic random sequence: from the wall clock, or a fixed one under
-/// the bench clock.
-pub fn seed() -> u32 {
-    if bench() { 0x2545_f491 } else { (crate::rt::now() * 1000.0) as u64 as u32 }
+    crate::rt::clock::anim_now(|| crate::engine::sim_time() as f64)
 }
 
 /// What a per-object cosmetic seed is made from: the object's address under the wall

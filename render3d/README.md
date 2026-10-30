@@ -52,7 +52,8 @@ target (`rustup target add i686-pc-windows-msvc`) and `lld-link` (LLVM); `build.
 uses `~/.cargo/bin/cargo` first, since a distribution's cargo has no such target. The
 crate links with `/nodefaultlib`, `kernel32` its only import (an import library made by
 `llvm-dlltool --kill-at` from `kernel32.def` in `build.rs`), and brings its own
-allocator, memory functions and stack probe (`src/rt/`). Shaders are HLSL in
+allocator, memory functions and stack probe (`crates/a2rt`, shared with the UI and
+Display8). Shaders are HLSL in
 `shaders/`, compiled by `tools/shaderc/hlsl-rs.sh` with `vkd3d-compiler` into `src/shaders/<name>.rs`
 and with `dxc` into SPIR-V in `src/shaders/<name>_spv.rs` and DXIL in
 `src/shaders/<name>_dxil.rs` ("One source, two compilers"), all committed with a stamp
@@ -487,7 +488,7 @@ to 8 bits, and the log says which.
 ## Frame dumps
 
 A grim shot is 8 bits, taken after the swapchain and the compositor, so it cannot say
-where in the frame two renderers part. `src/dump.rs` reads render3d's own targets back
+where in the frame two renderers part. `a2rt::dump` (`crates/a2rt/src/dump.rs`) reads render3d's own targets back
 from inside the process, byte for byte, when asked: for checking a port of the renderer
 (the shared `gpu` crate, then Vulkan and Direct3D 12) pixel for pixel, stage by stage.
 The files are what `a2test baseline compare` is meant to read (PFM and PPM, as well as

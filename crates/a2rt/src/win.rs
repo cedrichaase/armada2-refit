@@ -1,5 +1,6 @@
-//! The kernel32 functions the plugin uses, declared by hand (no Windows crate: the
-//! DLL links nothing but kernel32, through the import library build.rs makes).
+//! The kernel32 functions the plugins use, declared by hand (no Windows crate: each
+//! DLL links kernel32 through the import library its build.rs makes from its own
+//! `kernel32.def`; what a DLL does not call needs no line there).
 #![allow(non_snake_case, clippy::upper_case_acronyms)]
 
 pub type HANDLE = *mut u8;
@@ -31,6 +32,19 @@ pub struct FindData {
     pub alt_name: [u8; 14],
 }
 
+/// `MEMORY_BASIC_INFORMATION`, for telling which module an address is in.
+#[repr(C)]
+#[derive(Default)]
+pub struct MemInfo {
+    pub base: usize,
+    pub alloc_base: usize,
+    pub alloc_protect: u32,
+    pub size: usize,
+    pub state: u32,
+    pub protect: u32,
+    pub mtype: u32,
+}
+
 #[link(name = "kernel32")]
 unsafe extern "system" {
     pub fn HeapAlloc(heap: HANDLE, flags: u32, n: usize) -> *mut u8;
@@ -39,7 +53,6 @@ unsafe extern "system" {
     pub fn GetProcessHeap() -> HANDLE;
     pub fn GetModuleFileNameA(module: HANDLE, buf: *mut u8, n: u32) -> u32;
     pub fn GetModuleHandleA(name: *const u8) -> HANDLE;
-    pub fn GetProcAddress(module: HANDLE, name: *const u8) -> usize;
     pub fn VirtualProtect(p: *mut u8, n: usize, prot: u32, old: *mut u32) -> i32;
     pub fn FlushInstructionCache(proc_: HANDLE, p: *const u8, n: usize) -> i32;
     pub fn GetCurrentProcess() -> HANDLE;
@@ -52,11 +65,13 @@ unsafe extern "system" {
     pub fn GetFileAttributesA(name: *const u8) -> u32;
     pub fn CreateDirectoryA(name: *const u8, sec: *mut u8) -> i32;
     pub fn DeleteFileA(name: *const u8) -> i32;
+    pub fn GetEnvironmentVariableA(name: *const u8, buf: *mut u8, n: u32) -> u32;
     pub fn FindFirstFileA(pattern: *const u8, data: *mut FindData) -> HANDLE;
     pub fn FindNextFileA(h: HANDLE, data: *mut FindData) -> i32;
     pub fn FindClose(h: HANDLE) -> i32;
     pub fn GetPrivateProfileIntA(sec: *const u8, key: *const u8, def: i32, file: *const u8) -> u32;
     pub fn GetPrivateProfileStringA(sec: *const u8, key: *const u8, def: *const u8, out: *mut u8, n: u32, file: *const u8) -> u32;
+    pub fn WritePrivateProfileStringA(sec: *const u8, key: *const u8, val: *const u8, file: *const u8) -> i32;
     pub fn GetPrivateProfileSectionNamesA(out: *mut u8, n: u32, file: *const u8) -> u32;
     pub fn QueryPerformanceCounter(v: *mut i64) -> i32;
     pub fn QueryPerformanceFrequency(v: *mut i64) -> i32;
@@ -64,4 +79,12 @@ unsafe extern "system" {
     pub fn OutputDebugStringA(s: *const u8);
     pub fn ExitProcess(code: u32) -> !;
     pub fn GetCurrentThreadId() -> u32;
+    pub fn LoadLibraryA(name: *const u8) -> HANDLE;
+    pub fn GetProcAddress(module: HANDLE, name: *const u8) -> usize;
+    pub fn VirtualQuery(p: *const u8, info: *mut MemInfo, n: usize) -> usize;
+    pub fn GetCurrentProcessId() -> u32;
+    pub fn GetSystemDirectoryA(buf: *mut u8, n: u32) -> u32;
+    pub fn MoveFileExA(from: *const u8, to: *const u8, flags: u32) -> i32;
+    pub fn CreateEventA(sec: *mut u8, manual: i32, initial: i32, name: *const u8) -> HANDLE;
+    pub fn WaitForSingleObject(h: HANDLE, ms: u32) -> u32;
 }

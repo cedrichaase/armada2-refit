@@ -1,7 +1,7 @@
 //! Armada2.exe (GOG patch 1.1): the addresses, offsets and calls the renderer reads.
 //! Where each was established: `$A2_DATA/notes/renderer-inventory/` and the plugin
 //! READMEs it cites. Names come from the game's own `armada2.map`.
-pub mod hook;
+pub use crate::rt::hook;
 pub mod obj;
 pub mod sound;
 

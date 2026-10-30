@@ -5,8 +5,11 @@
 
 extern crate alloc;
 
-pub mod rt;
-pub mod dump;
+pub mod rt {
+    pub use a2rt::*;
+    pub mod win;
+}
+pub use a2rt::{dump, log, sfmt};
 pub mod app;
 pub mod clipboard;
 pub mod clock;

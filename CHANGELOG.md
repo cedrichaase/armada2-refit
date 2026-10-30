@@ -5,6 +5,23 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.46.0 — 2026-10-30
+
+Layers: render3d 0.29.5, ui 0.25.4, display 0.11.3.
+
+### Added
+- `crates/`: `a2rt`, the one runtime of Display8, render3d and the UI (allocator, memory
+  functions, kernel32, log, `sfmt!`/`log!`, ini, files, the animation clock's switch,
+  in-memory patching (`hook`), frame dumps behind feature `dump`), and `a2fmt`, moved from
+  `render3d/a2fmt`. Not a layer: versioned by the root. CI tests `crates/a2fmt`.
+
+### Changed
+- render3d, ui and display build on `a2rt` in place of their three copies of `src/rt`;
+  render3d's and the UI's `engine/hook.rs` and `dump.rs` are `a2rt`'s; the replayer and
+  vkprobe include its `win.rs` and `mem.rs`. Pure refactor: same pixels, same log lines.
+
+Installed, not yet seen in game. (3030e0c)
+
 ## 13.45.0 — 2026-10-30
 
 Layers: qol 1.7.1, online 0.7.1, cutscenes 2.3.1.

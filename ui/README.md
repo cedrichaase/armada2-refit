@@ -852,8 +852,8 @@ The hook is the d3d8 device's `Present` (slot 15 of its vtable), chained beside
 `Reset` (`engine/device.rs`, once per vtable): every present goes through it, the
 engine's `RefreshDisplay` and the screens of our own alike, and it looks for the
 trigger every 30 presents, so without one it costs a counter and one
-`GetFileAttributesA` every 30 frames. The read-back is `src/dump.rs` (the same file as
-render3d's): `GetRenderTargetData` into a system-memory copy (through a plain target
+`GetFileAttributesA` every 30 frames. The read-back is `a2rt::dump` (`crates/a2rt/src/dump.rs`, shared with
+render3d): `GetRenderTargetData` into a system-memory copy (through a plain target
 first if the back buffer is multisampled), converted a row at a time; it changes no
 state of the device. A format it has no conversion for is logged and skipped. Without
 a Direct3D 9 device behind the game's (DXVK's own d3d8) nothing is read, and the

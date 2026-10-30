@@ -88,7 +88,7 @@ jobs:
       - name: Build Display8 (d3d8.dll)
         run: CARGO="$(command -v cargo)" display/build.sh
       - name: a2fmt on the host
-        run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path render3d/a2fmt/Cargo.toml
+        run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path crates/a2fmt/Cargo.toml
 
   # Every generated shader file rebuilt from its HLSL with the pinned compilers, and a
   # difference from the committed file (or its stamp) fails the job: d3dbc by vkd3d-compiler

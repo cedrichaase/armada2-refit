@@ -4,6 +4,13 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.29.5 — 2026-10-30
+
+### Changed
+- `src/rt`, `engine/hook.rs`, `dump.rs` and the shared part of `clock.rs` moved into
+  `crates/a2rt` (shared with ui and display); `a2fmt` moved to `crates/a2fmt`. Pure
+  refactor: same pixels, same log lines. Installed, not yet seen in game (3030e0c).
+
 ## 0.29.4 — 2026-10-30
 
 ### Changed

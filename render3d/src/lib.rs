@@ -5,10 +5,12 @@
 
 extern crate alloc;
 
-pub mod rt;
+pub mod rt {
+    pub use a2rt::*;
+}
+pub use a2rt::{dump, log, sfmt};
 pub mod assets;
 pub mod clock;
-pub mod dump;
 pub mod config;
 pub mod engine;
 pub mod frame;

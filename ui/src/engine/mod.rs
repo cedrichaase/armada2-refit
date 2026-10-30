@@ -13,7 +13,7 @@ pub mod dev8;
 pub mod device;
 pub mod dialogs;
 pub mod display;
-pub mod hook;
+pub use crate::rt::hook;
 pub mod hud;
 pub mod info;
 pub mod intro;

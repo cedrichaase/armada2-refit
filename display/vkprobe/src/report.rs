@@ -23,7 +23,7 @@ fn r() -> &'static mut Report {
     unsafe { R.as_mut().expect("report") }
 }
 
-/// `format!` without `alloc::format!`, which does not link (display/src/rt).
+/// `format!` without `alloc::format!`, which does not link (crates/a2rt).
 pub fn fmt(args: core::fmt::Arguments) -> String {
     let mut s = String::new();
     let _ = s.write_fmt(args);

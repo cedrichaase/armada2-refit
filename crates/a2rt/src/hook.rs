@@ -1,7 +1,7 @@
 //! Patching Armada2.exe in memory: a `call rel32` re-pointed (checked against the
 //! target stock calls, so another plugin's patch makes us stand down instead of
 //! stacking), and vtable slots.
-use crate::rt::win::*;
+use crate::win::*;
 
 unsafe fn writable(p: *mut u8, n: usize, f: impl FnOnce()) -> bool {
     let mut old = 0u32;

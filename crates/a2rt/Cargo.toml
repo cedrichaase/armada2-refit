@@ -1,0 +1,18 @@
+[package]
+name = "a2rt"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "The plugins' runtime (Display8, Render3D.asi, UI.asi): allocator, Win32, log, ini, files, clock, in-memory patching, frame dumps; no_std"
+license = "MIT"
+
+[lib]
+name = "a2rt"
+path = "src/lib.rs"
+
+[features]
+# Frame dumps (dump.rs), which read targets back through gpu.
+dump = ["dep:gpu"]
+
+[dependencies]
+gpu = { path = "../../gpu", optional = true }

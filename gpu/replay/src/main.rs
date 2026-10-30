@@ -14,12 +14,12 @@
 
 extern crate alloc;
 
-// The no-C-runtime support Display8 has (the allocator, mem*, 64-bit division, the
-// stack probe) and its kernel32 declarations, shared rather than copied.
-#[path = "../../../display/src/rt/win.rs"]
+// The no-C-runtime support the plugins share (crates/a2rt: the allocator, mem*, 64-bit
+// division, the stack probe) and its kernel32 declarations, shared rather than copied.
+#[path = "../../../crates/a2rt/src/win.rs"]
 #[allow(dead_code)]
 mod win;
-#[path = "../../../display/src/rt/mem.rs"]
+#[path = "../../../crates/a2rt/src/mem.rs"]
 mod mem;
 
 mod window;
