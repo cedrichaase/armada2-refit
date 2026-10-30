@@ -60,7 +60,7 @@ if [ -n "$build" ]; then
     [ -x "$cargo" ] || { echo "replay.sh: cargo not found (rustup, then: rustup target add i686-pc-windows-msvc)" >&2; exit 1; }
     # The blit (replay/shaders/blit.hlsl) as render3d's shaders are built: committed
     # with a stamp, compiled again only when stale.
-    "$repo/render3d/hlsl-rs.sh" "$here/replay/src/shaders/blit.rs" "$here/replay/shaders/blit.hlsl" \
+    "$repo/tools/shaderc/hlsl-rs.sh" "$here/replay/src/shaders/blit.rs" "$here/replay/shaders/blit.hlsl" \
         vs_blit:vs_3_0:VS_BLIT ps_blit:ps_3_0:PS_BLIT >/dev/null
     env -C "$here/replay" "$cargo" build --release --quiet
     mkdir -p "$here/replay/build"

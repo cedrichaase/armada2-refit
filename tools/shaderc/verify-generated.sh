@@ -2,10 +2,10 @@
 # Rebuilds every generated shader file from its HLSL with the pinned compilers and fails
 # if one differs from the committed file, stamp included (CI, job "shaders").
 #
-#   gpu/shaders/verify-generated.sh
+#   tools/shaderc/verify-generated.sh
 #
 # What it covers: render3d/, ui/ and display/ (src/shaders/*.rs, *_spv.rs, *_dxil.rs, by
-# render3d/hlsl-rs.sh exactly as each build.sh calls it) and gpu's own (gpu/vk-shaders.sh
+# tools/shaderc/hlsl-rs.sh exactly as each build.sh calls it) and gpu's own (gpu/vk-shaders.sh
 # to src/vulkan/shaders.rs, gpu/dx12-shaders.sh to src/dx12/shaders.rs). The generated
 # files are deleted first, so a stamp that still matches cannot hide a compiler whose
 # output has changed; then every SPIR-V module is put through spirv-val on its own
@@ -51,7 +51,7 @@ for layer in render3d ui display; do
         entries=$(sed -n '1s#^// entries:##p' "$f")
         [ -n "$entries" ] || { echo "verify-generated: $f has no '// entries:' first line" >&2; exit 1; }
         # shellcheck disable=SC2086
-        render3d/hlsl-rs.sh --fix "$layer/src/shaders/$name.rs" "$f" $entries
+        tools/shaderc/hlsl-rs.sh --fix "$layer/src/shaders/$name.rs" "$f" $entries
         mods="$mods$name ${name}_spv ${name}_dxil "
     done
     # mod.rs as each build.sh writes it.

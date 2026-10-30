@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.43.0 — 2026-10-30
+
+Layers: render3d 0.29.3, ui 0.25.2, display 0.11.1.
+
+### Changed
+- The shader compiler scripts live in `tools/shaderc/` (new, not a layer): `hlsl-rs.sh`,
+  `d3dbc-fix.py`, `d3dbc-slots.py`, `dxil-spaces.py`, `dxil-alpha.py` from `render3d/`,
+  and `fetch-dxc.sh`, `fetch-vkd3d.sh`, `verify-generated.sh` from `gpu/shaders/`; the
+  build scripts, CI cache key and docs follow. Generated shader files change in their
+  header line only; the stamps are unchanged. `64aee16`. Installed, not yet seen in game
+
 ## 13.42.5 — 2026-10-30
 
 Layers: testbench 3.74.2.
