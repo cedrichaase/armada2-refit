@@ -4,7 +4,7 @@
 # ../build.sh builds d3d8.dll. README.md says what it is for.
 #
 # Shaders first, as ../build.sh does: shaders/probe.hlsl names its entry points on its
-# first line and is compiled by render3d's hlsl-rs.sh into src/shaders/probe.rs
+# first line and is compiled by tools/shaderc/hlsl-rs.sh into src/shaders/probe.rs
 # (Direct3D 9 bytecode, unused here) and probe_spv.rs (SPIR-V), committed with stamps.
 set -euo pipefail
 

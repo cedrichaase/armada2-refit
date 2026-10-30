@@ -5,7 +5,7 @@
 #
 # Shaders first: each shaders/<name>.hlsl names its entry points on its first line,
 #   // entries: <entry>:<profile>:<SYMBOL> ...
-# and is compiled by render3d's hlsl-rs.sh into src/shaders/<name>.rs, Direct3D 9
+# and is compiled by tools/shaderc/hlsl-rs.sh into src/shaders/<name>.rs, Direct3D 9
 # bytecode from vkd3d, src/shaders/<name>_spv.rs, SPIR-V from dxc, and
 # src/shaders/<name>_dxil.rs, DXIL from the pinned dxc (committed, with stamps, so a
 # machine without the compilers builds as long as they are current), with
