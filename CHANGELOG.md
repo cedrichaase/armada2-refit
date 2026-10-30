@@ -12,7 +12,7 @@ Layers: render3d 0.29.2.
 ### Fixed
 - render3d: with `[Modules] world=0` or `sky=0` the menu scene keeps its planets,
   nebulae and sky (the module is loaded for the menu scene only, as hulls=0 since
-  13.42.2); missions unchanged. HASH
+  13.42.2); missions unchanged. `e23d234`
 
 Installed, not yet seen in game.
 

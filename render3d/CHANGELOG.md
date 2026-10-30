@@ -13,7 +13,7 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   of the mission hooks), so `[World] Planets=`, `Nebulae=`, `Rocks=` and `Enable=` at 0
   leave the menu alone too. Missions keep the engine's look for a module at 0.
   Particles, effects, ordnance, specials and overlays draw nothing in the menu scene.
-  HASH
+  `e23d234`
 
 Installed, not yet seen in game.
 
