@@ -27,3 +27,14 @@ ExitProcess@4
 GetStdHandle@4
 ReadFile@20
 GetFileSize@8
+GetTickCount@0
+GetCurrentThreadId@0
+InitializeCriticalSection@4
+EnterCriticalSection@4
+LeaveCriticalSection@4
+GetProcessHeap@0
+HeapAlloc@12
+CreateThread@24
+WaitForSingleObject@8
+HeapFree@12
+GetPrivateProfileStringA@24

@@ -5,6 +5,13 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 1.7.1 — 2026-10-30
+
+### Changed
+- `qol.c` and `rules.c` shed their own copies of the helpers; the `.def` files moved to `csdk/def/`. Built on `csdk/a2asi.h` (the Win32 types, kernel32 imports, `s_*` string helpers, the append-a-line log, signature check and `VirtualProtect` patch) with the import libraries in `csdk/def/`; behaviour and log lines are unchanged.
+
+Installed, not yet seen in game. (HASH)
+
 ## 1.6.4 — 2026-10-23
 
 ### Fixed
