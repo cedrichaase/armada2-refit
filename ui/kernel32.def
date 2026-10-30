@@ -43,3 +43,6 @@ LockResource@4
 SizeofResource@8
 VirtualQuery@12
 GetProcAddress@8
+GetModuleHandleExA@12
+CreateFileMappingA@24
+MapViewOfFile@20

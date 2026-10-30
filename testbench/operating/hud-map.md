@@ -24,8 +24,13 @@ What was learned driving `[HUD] Minimap=1`, `Selection=1` and `UnitView=1`
   arrow opens Toggle Palette, Toggle Help and the Options Menu). It is shown in
   `DisplayInterface::SetInterfaceState` state 0 only; how a player gets there was not
   found, so `UnitView=1` has not been seen drawing.
-- **The tactical view** (Toggle View, the eye at about 1168,16 at 1280x720) keeps the
-  selection overlay working; the minimap then shows the tactical camera's ring.
+- **The tactical view** (Toggle View, the eye at about 1168,16 at 1280x720, or Caps
+  Lock: `Press Caps_Lock`) keeps the selection overlay working; the minimap then shows
+  the tactical camera's ring, and a fight's shot-director ring (`ui-leftovers-2`).
+- **Damaged systems on demand**: in `fog`, `weapons ship1 off` (and the others) before
+  the Klingon attacks, or ship1's friends kill it first; after 40-60 s ship1 (Defiant
+  class, at about 640,382 after `center ship1` at 1280x720) has systems out. The scene
+  hides the cursor (`Cursor=0`): `scene "cursor on"` for a cursor step.
 - **Quitting** (`drive quit`) ended with "the game did not exit through its menus; the
   prefix was stopped instead" every time that night (see `hud-takeover.md`); the
   session survives it and `drive launch` starts the game again.

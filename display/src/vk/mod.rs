@@ -20,6 +20,7 @@
 mod cache;
 pub mod exports;
 pub mod mirror;
+pub mod pass;
 
 use crate::log;
 use crate::shaders::present_spv::{PS_GAMMA_SPV, VS_PRESENT_SPV};
@@ -30,6 +31,9 @@ use gpu::display::{VkAlloc8, VkDevice8, VkFrame8, VkImage8};
 
 const SLOTS: usize = 2;
 const CHUNK: u64 = 4 << 20;
+/// A mirror's upload past this many bytes goes through a staging buffer of its own
+/// (`upload_levels`), not the ring.
+pub const STAGE_ABOVE: usize = 256 << 10;
 
 pub struct Img {
     pub image: vk::Image,
@@ -235,11 +239,12 @@ impl Vk {
         let surface = unsafe { w32.create_win32_surface(&sci, None) }.map_err(|_| "vkCreateWin32SurfaceKHR failed")?;
         part.surface = surface;
 
-        // A device with one family that draws and presents; a discrete one first, or
-        // only one whose name has `Device=` in it (the bench: lavapipe, never the GPU).
+        // A device with one family that draws and presents; discrete first, then
+        // integrated, virtual, other, and a CPU (software) device last; or only one whose
+        // name has `Device=` in it (the bench: lavapipe, with --vulkan-device lavapipe).
         let pdevs = unsafe { instance.enumerate_physical_devices() }.map_err(|_| "no physical devices")?;
         let want = crate::rt::lower(crate::vk_device());
-        let mut pick: Option<(vk::PhysicalDevice, u32, bool)> = None;
+        let mut pick: Option<(vk::PhysicalDevice, u32, u32)> = None;
         for &pd in &pdevs {
             let props = unsafe { instance.get_physical_device_properties(pd) };
             let pname = unsafe { crate::rt::cstr_at(props.device_name.as_ptr() as *const u8, 256) };
@@ -251,17 +256,30 @@ impl Vk {
             for (i, f) in fams.iter().enumerate() {
                 let present = unsafe { surface_fn.get_physical_device_surface_support(pd, i as u32, surface) }.unwrap_or(false);
                 if f.queue_flags.contains(vk::QueueFlags::GRAPHICS) && present {
-                    let discrete = props.device_type == vk::PhysicalDeviceType::DISCRETE_GPU;
-                    if pick.is_none() || (discrete && !pick.unwrap().2) {
-                        pick = Some((pd, i as u32, discrete));
+                    let rank = match props.device_type {
+                        vk::PhysicalDeviceType::DISCRETE_GPU => 4,
+                        vk::PhysicalDeviceType::INTEGRATED_GPU => 3,
+                        vk::PhysicalDeviceType::VIRTUAL_GPU => 2,
+                        vk::PhysicalDeviceType::CPU => 0,
+                        _ => 1,
+                    };
+                    log!("vulkan:   type {}, rank {}", props.device_type.as_raw(), rank);
+                    if pick.is_none() || rank > pick.unwrap().2 {
+                        pick = Some((pd, i as u32, rank));
                     }
                     break;
                 }
             }
         }
-        let (pdev, qfam, _) = pick.ok_or(if want.is_empty() { "no device that draws and presents on the window" } else { "no device named as Device= says that draws and presents" })?;
+        let (pdev, qfam, rank) = pick.ok_or(if want.is_empty() { "no device that draws and presents on the window" } else { "no device named as Device= says that draws and presents" })?;
         let props = unsafe { instance.get_physical_device_properties(pdev) };
         let name = unsafe { crate::rt::cstr_at(props.device_name.as_ptr() as *const u8, 256) };
+        log!(
+            "vulkan: chose {} (type {}, rank {}; discrete > integrated > virtual > other > cpu)",
+            name,
+            props.device_type.as_raw(),
+            rank
+        );
         log!(
             "vulkan: {} (Vulkan {}.{}.{}, driver {:#x}), queue family {}",
             name,
@@ -888,6 +906,7 @@ impl Vk {
         if !self.recording {
             self.begin();
         }
+        pass::close(self);
         let (w, h) = (self.color.w as i32, self.color.h as i32);
         let mut rs: Vec<vk::ClearRect> = Vec::new();
         let vr = [viewport[0] as i32, viewport[1] as i32, (viewport[0] + viewport[2]) as i32, (viewport[1] + viewport[3]) as i32];
@@ -938,6 +957,7 @@ impl Vk {
         if !self.recording {
             self.begin();
         }
+        pass::close(self);
         let row = w * bpp;
         let Some(a) = self.alloc(row * h, 16) else { return false };
         for y in 0..h as usize {
@@ -955,6 +975,75 @@ impl Vk {
         true
     }
 
+    /// Levels of a colour image (`B8G8R8A8`-sized texels: level, width, height, pixels,
+    /// pitch) through a staging buffer of their own, let go of once the frame is done.
+    /// False, with nothing recorded, when the buffer cannot be made.
+    pub fn upload_levels<'a>(&mut self, img: vk::Image, levels: impl Iterator<Item = (u32, u32, u32, &'a [u8], u32)>, from: vk::ImageLayout, to: vk::ImageLayout) -> bool {
+        if !self.recording {
+            self.begin();
+        }
+        pass::close(self);
+        let levels: Vec<(u32, u32, u32, &[u8], u32)> = levels.collect();
+        let mut at = 0u64;
+        let mut offsets = Vec::with_capacity(levels.len());
+        for &(_, w, h, _, _) in &levels {
+            offsets.push(at);
+            at += (w as u64 * h as u64 * 4).div_ceil(16) * 16;
+        }
+        if at == 0 {
+            return true;
+        }
+        let bci = vk::BufferCreateInfo::default().size(at).usage(vk::BufferUsageFlags::TRANSFER_SRC).sharing_mode(vk::SharingMode::EXCLUSIVE);
+        let Ok(buf) = (unsafe { self.dev.create_buffer(&bci, None) }) else { return false };
+        let req = unsafe { self.dev.get_buffer_memory_requirements(buf) };
+        let made = find_memory(&self.mem, req.memory_type_bits, vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT).and_then(|ty| {
+            let mem = unsafe { self.dev.allocate_memory(&vk::MemoryAllocateInfo::default().allocation_size(req.size).memory_type_index(ty), None) }.ok()?;
+            if unsafe { self.dev.bind_buffer_memory(buf, mem, 0) }.is_err() {
+                unsafe { self.dev.free_memory(mem, None) };
+                return None;
+            }
+            match unsafe { self.dev.map_memory(mem, 0, at, vk::MemoryMapFlags::empty()) } {
+                Ok(p) => Some((mem, p as *mut u8)),
+                Err(_) => {
+                    unsafe { self.dev.free_memory(mem, None) };
+                    None
+                }
+            }
+        });
+        let Some((mem, ptr)) = made else {
+            unsafe { self.dev.destroy_buffer(buf, None) };
+            return false;
+        };
+        for (n, &(_, w, h, src, pitch)) in levels.iter().enumerate() {
+            let row = (w * 4) as usize;
+            for y in 0..h as usize {
+                unsafe { core::ptr::copy_nonoverlapping(src.as_ptr().add(y * pitch as usize), ptr.add(offsets[n] as usize + y * row), row) };
+            }
+        }
+        unsafe { self.dev.unmap_memory(mem) };
+        let aspect = vk::ImageAspectFlags::COLOR;
+        for (n, &(level, w, h, _, _)) in levels.iter().enumerate() {
+            self.barrier_levels(img, aspect, level, 1, from, vk::ImageLayout::TRANSFER_DST_OPTIMAL);
+            let region = [vk::BufferImageCopy::default()
+                .buffer_offset(offsets[n])
+                .image_subresource(vk::ImageSubresourceLayers { aspect_mask: aspect, mip_level: level, base_array_layer: 0, layer_count: 1 })
+                .image_extent(vk::Extent3D { width: w, height: h, depth: 1 })];
+            unsafe { self.dev.cmd_copy_buffer_to_image(self.cmd(), buf, img, vk::ImageLayout::TRANSFER_DST_OPTIMAL, &region) };
+            self.barrier_levels(img, aspect, level, 1, vk::ImageLayout::TRANSFER_DST_OPTIMAL, to);
+        }
+        extern "C" fn free(p: *mut c_void) {
+            let b = unsafe { alloc::boxed::Box::from_raw(p as *mut (vk::Buffer, vk::DeviceMemory)) };
+            if let Some(v) = get() {
+                unsafe {
+                    v.dev.destroy_buffer(b.0, None);
+                    v.dev.free_memory(b.1, None);
+                }
+            }
+        }
+        self.defer(free, alloc::boxed::Box::into_raw(alloc::boxed::Box::new((buf, mem))) as *mut c_void);
+        true
+    }
+
     pub fn set_ramp(&mut self, r: &[u16; 768]) {
         self.ramp_values = Some(*r);
         self.stale = true;
@@ -966,6 +1055,7 @@ impl Vk {
         if !self.recording {
             self.begin();
         }
+        pass::presented(self);
         if self.stale {
             self.stale = false;
             if let Some(r) = self.ramp_values {
@@ -1075,6 +1165,7 @@ impl Vk {
         if !self.recording {
             return true;
         }
+        pass::close(self);
         let s = &self.slots[self.slot];
         let (cmd, fence, pool) = (s.cmd, s.fence, s.pool);
         unsafe {

@@ -571,6 +571,49 @@ pub fn tactical_camera(r: usize) -> Option<((f32, f32), (f32, f32))> {
     }
 }
 
+/// `shotDirector`: the cinematic camera's director. Its `+0x28` is a `std::list` of
+/// `Scene`s (the head node; each node's `+0` the next, the scene at `+8`), `+0x2c` how
+/// many. A scene is a place worth filming (a fight: `AddShot` gathers the shots the
+/// game offers it within a radius of one another): its centre at `+0x0c` (x, y, z) and
+/// its radius at `+0x18`, in world units. In the tactical view stock's
+/// `RenderCameraViewFrustum` rings each one in grey (`ST3D_Colour_Grey`), the radius
+/// scaled by the square's side (`RadarComponent+0x5c`).
+const SHOT_DIRECTOR: usize = 0x763608;
+const SHOT_DIRECTOR_VTABLE: usize = 0x6b4658;
+const SD_SCENES: usize = 0x28;
+const SCENE_CENTRE: usize = 0x0c;
+const SCENE_RADIUS: usize = 0x18;
+/// `RadarComponent+0x5c`: the square's side in world units.
+const RC_SIDE: usize = 0x5c;
+
+/// The shot director's scenes in the tactical view, each its centre in the unit
+/// square and its radius in the square's units; empty in any other view.
+pub fn shot_scenes(r: usize) -> Vec<((f32, f32), f32)> {
+    let mut out = Vec::new();
+    if view() != 1 || r == 0 || unsafe { rd::<usize>(SHOT_DIRECTOR) } != SHOT_DIRECTOR_VTABLE {
+        return out;
+    }
+    let side: f32 = unsafe { rd(r + RC_SIDE) };
+    if !(side.is_finite() && side > 0.0) {
+        return out;
+    }
+    let head = field(SHOT_DIRECTOR, SD_SCENES);
+    if head == 0 {
+        return out;
+    }
+    let mut n = field(head, 0);
+    while n != head && n != 0 && out.len() < 64 {
+        let s = n + 8;
+        let c: [f32; 3] = unsafe { rd(s + SCENE_CENTRE) };
+        let rad: f32 = unsafe { rd(s + SCENE_RADIUS) };
+        if c.iter().all(|v| v.is_finite()) && rad.is_finite() && rad > 0.0 {
+            out.push((to_square(r, c), rad / side));
+        }
+        n = field(n, 0);
+    }
+    out
+}
+
 // ---- clicks -----------------------------------------------------------------------
 
 /// What the UI frame asks the panel's next always-step to do.
@@ -728,6 +771,68 @@ unsafe fn act(p: Pending) {
                 crate::log!("minimap: order {:#x} at {:.0},{:.0}{}", action, pos[0], pos[2], if ok { "" } else { " (refused)" });
             }
         }
+    }
+}
+
+/// `cOverViewImp::SetCursorAiAction`'s table of the actions' cursors: an entry of 20
+/// bytes per action (`& 0xfff`), its cursor sprite at `+0x0c` and its "cannot" cursor
+/// at `+0x10` (the action's bit `0x4000`), the first entry's (`c_select`) for an action
+/// with none. Loaded with the cursor art; the names before them are `cursor.spr`'s.
+const ACTION_CURSORS: usize = 0x70fbd8;
+const ACTION_CURSORS_N: u32 = 57;
+/// `SetCursorAiAction`'s two reads of the table, as stock has them.
+const SET_CURSOR_ACTION: usize = 0x526b60;
+
+/// The cursor stock's minimap shows at a point of the square while the player has
+/// something selected, by `cursor.spr` name: `RadarComponent::Simulate` (from the
+/// panel's focus-step) asks `ActionMode::GetAction` (no target, the point) what a click
+/// there means, makes a plain move without Alt a `GO_WARP` (0x2b, the "cannot" bit
+/// kept), and names it to the overview (`SetCursorAiAction`, which picks the cursor
+/// from its table into `iCursor+0x2c`). Returns the action too. None with nothing
+/// selected or off the map, where stock shows the panel's own arrow
+/// (`minimapDefaultCursor`, `standard_cursor`).
+pub fn action_cursor(r: usize, u: f32, v: f32) -> Option<(u32, &'static str)> {
+    if r == 0 || selection_count() == 0 {
+        return None;
+    }
+    let pos = to_world(r, u, v);
+    if !inside(pos) {
+        return None;
+    }
+    let mut action = 0u32;
+    unsafe {
+        let get: unsafe extern "C" fn(*mut u32, usize, *const f32, usize) -> *mut u32 = core::mem::transmute(GET_ACTION);
+        get(&mut action, 0, pos.as_ptr(), 0);
+    }
+    if action & 0xfff == 4 && !alt_held() {
+        action = (action & 0x4000) | 0x2b;
+    }
+    let i = action & 0xfff;
+    if i >= ACTION_CURSORS_N {
+        return None;
+    }
+    let entry = ACTION_CURSORS + 20 * i as usize;
+    let mut sprite = field(entry, if action & 0x4000 != 0 { 0x10 } else { 0x0c });
+    if sprite == 0 {
+        sprite = field(ACTION_CURSORS, 0x0c);
+    }
+    let name = super::cursor::element_name(sprite)?;
+    Some((action, name))
+}
+
+/// `SetCursorAiAction` reads the table as `action_cursor` does, and `GetAction` is
+/// stock (checked once).
+pub fn action_cursors_stock() -> bool {
+    static mut STOCK: Option<bool> = None;
+    unsafe {
+        *(*core::ptr::addr_of_mut!(STOCK)).get_or_insert_with(|| {
+            let ok = functions_stock()
+                && super::starts(SET_CURSOR_ACTION, &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x8b, 0xc8, 0xc1, 0xe9, 0x0e, 0xf6, 0xc1, 0x01, 0x74, 0x11])
+                && super::starts(SET_CURSOR_ACTION + 0x18, &[0x8b, 0x04, 0x95, 0xe8, 0xfb, 0x70, 0x00])
+                && super::starts(SET_CURSOR_ACTION + 0x29, &[0x8b, 0x04, 0x85, 0xe4, 0xfb, 0x70, 0x00]);
+            crate::log!("minimap: the action cursor over it {}", if ok { "is stock's choice" } else { "stays the engine's (SetCursorAiAction is not stock)" });
+            ok
+        })
     }
 }
 

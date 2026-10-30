@@ -249,6 +249,10 @@ pub struct Gpu {
     /// everything again (another recorder may have bound its own since).
     serial: Cell<u32>,
     depth: Cell<u32>,
+    /// The pass now is published to Display8 at each outermost `Cmd`'s end, for its
+    /// passthrough (`display8_vk_pass`; render3d's, whose scene pass the engine's draws
+    /// it hands back belong in).
+    publish: Cell<bool>,
 }
 
 /// Whether a format of this interface is a depth one, and its Vulkan format on this
@@ -328,7 +332,12 @@ fn samples_flag(n: u32) -> vk::SampleCountFlags {
 
 impl Gpu {
     pub const fn new(log: Log) -> Gpu {
-        Gpu { log, st: RefCell::new(None), serial: Cell::new(0), depth: Cell::new(0) }
+        Gpu { log, st: RefCell::new(None), serial: Cell::new(0), depth: Cell::new(0), publish: Cell::new(false) }
+    }
+
+    /// As `new`, publishing its pass now at each `Cmd`'s end (`display8_vk_pass`).
+    pub const fn publishing(log: Log) -> Gpu {
+        Gpu { log, st: RefCell::new(None), serial: Cell::new(0), depth: Cell::new(0), publish: Cell::new(true) }
     }
 
     /// Opens the backend on Display8's device. False (and logged) when it cannot be.
@@ -552,6 +561,11 @@ impl Gpu {
     pub(crate) fn enter(&self) -> bool {
         self.serial.set(self.serial.get().wrapping_add(1));
         self.depth.set(self.depth.get() + 1);
+        if self.depth.get() == 1 {
+            // Display8 records none of the engine's draws while a Cmd is alive, and
+            // closes a render pass of its own first (gpu/src/display.rs, "Passthrough").
+            self.tell_display(crate::display::PASS_ENTER, None);
+        }
         self.with(|s| s.has_frame = false);
         self.new_frame().is_some()
     }
@@ -565,8 +579,52 @@ impl Gpu {
         let d = self.depth.get().saturating_sub(1);
         self.depth.set(d);
         if d == 0 {
+            let p = if self.publish.get() { self.published() } else { None };
             self.with(|s| s.has_frame = false);
+            match p {
+                Some(p) => self.tell_display(crate::display::PASS_PUBLISH, Some(&p)),
+                None => self.tell_display(crate::display::PASS_LEAVE, None),
+            }
         }
+    }
+
+    /// `display8_vk_pass`, when this Display8 has it.
+    fn tell_display(&self, event: u32, pass: Option<&crate::display::VkPass8>) {
+        let Some(f) = self.sh().and_then(|sh| sh.disp.vk_pass) else { return };
+        f(event, pass.map_or(core::ptr::null(), |p| p as *const _));
+    }
+
+    /// The pass now as Display8's passthrough draws into it, every attachment put in its
+    /// attachment layout (outside a render pass, which `leave` has closed): one colour
+    /// target, layer 0. None without a pass, or with several colour targets.
+    fn published(&self) -> Option<crate::display::VkPass8> {
+        let ps = self.with(|s| s.pass.clone())??;
+        if ps.colors.len() != 1 {
+            return None;
+        }
+        let cb = self.outside()?;
+        let c = &ps.colors[0];
+        self.transition(cb, &c.tex, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
+        if let Some(d) = &ps.depth {
+            self.transition(cb, &d.tex, vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+        }
+        // An image of Display8's goes back to its own layout (the same ones).
+        self.restore_externals();
+        let img = |a: &Att, layout: vk::ImageLayout| VkImage8 {
+            image: vk::Handle::as_raw(a.tex.image()),
+            view: vk::Handle::as_raw(a.tex.att_view(a.layer)),
+            format: a.tex.vk_format().as_raw() as u32,
+            width: ps.size.0,
+            height: ps.size.1,
+            samples: ps.key.samples.max(1),
+            layout: layout.as_raw() as u32,
+        };
+        let color = img(c, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
+        if color.view == 0 {
+            return None;
+        }
+        let depth = ps.depth.as_ref().map_or(VkImage8::default(), |d| img(d, vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL));
+        Some(crate::display::VkPass8 { color, depth })
     }
 
     pub(crate) fn serial(&self) -> u32 {

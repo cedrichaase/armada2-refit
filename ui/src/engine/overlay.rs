@@ -186,6 +186,75 @@ pub fn functions_stock() -> bool {
         && super::starts(RT_DYNAMIC_CAST, &[0xff, 0x25])
 }
 
+// ---- the systems' icons ---------------------------------------------------------------
+
+/// `SystemOrder`: the five systems (`eSystem`) in the order stock lays their icons out.
+const SYSTEM_ORDER: usize = 0x70dce0;
+/// `selectionDisplay+0x54`: a `RepairIcon` per system (by `eSystem`); its `+0x34` the
+/// system's icon sprite, `+0x40` the flash it blinks with while the system is repaired.
+const SD_REPAIR_ICONS: usize = 0x54;
+const RI_SPRITE: usize = 0x34;
+const RI_FLASH: usize = 0x40;
+/// `Craft+0x1e0`: its systems, 0x30 bytes each: `+0x4` the system's size (0: the craft
+/// has none), `+0x18` its strength now (a double), `+0x0` a flag that hides it unless
+/// the craft's `+0x1bf` is set.
+const CRAFT_SYSTEMS: usize = 0x1e0;
+const CRAFT_SHOW_ALL: usize = 0x1bf;
+
+/// One of a craft's systems as `SelectionDisplay` marks it under its gauges.
+pub struct SystemIcon {
+    /// `eSystem` (0..4).
+    pub system: usize,
+    /// The system's icon (an `ST3D_Sprite`), or 0.
+    pub sprite: usize,
+    /// Its strength now, of its full strength (0..1).
+    pub strength: f32,
+    pub state: super::info::SystemState,
+    /// The repair icon's flash (on half the time while it is repaired).
+    pub flash: bool,
+}
+
+/// The systems stock's overlay marks under a craft's gauges, in its order
+/// (`mDrawSystemInformation`, inlined in `SelectionDisplay::Render`: every system the
+/// craft has, `RepairIcon::Render` drawing each one's icon green by its strength, red
+/// while it is out with what is left to repair, and yellow on the flash while it is
+/// repaired). Empty for anything that is not a craft.
+pub fn systems(obj: usize) -> Vec<SystemIcon> {
+    let mut out = Vec::new();
+    if obj == 0 || unsafe { rd::<u8>(obj + OBJ_FLAGS) } & FLAG_CRAFT == 0 {
+        return out;
+    }
+    let base = field(obj, CRAFT_SYSTEMS);
+    if base == 0 {
+        return out;
+    }
+    let order: [u32; 5] = unsafe { rd(SYSTEM_ORDER) };
+    let show_all = unsafe { rd::<u8>(obj + CRAFT_SHOW_ALL) } != 0;
+    for &sys in &order {
+        let sys = sys as usize;
+        if sys >= super::info::N_SYSTEMS {
+            continue;
+        }
+        let s = base + sys * 0x30;
+        let size = unsafe { rd::<i32>(s + 4) };
+        if size == 0 || (unsafe { rd::<u8>(s) } != 0 && !show_all) {
+            continue;
+        }
+        let Some(state) = super::info::system_state(obj, sys) else { continue };
+        let now = unsafe { rd::<f64>(s + 0x18) } as f32;
+        let strength = if size > 0 && now.is_finite() { (now / size as f32).clamp(0.0, 1.0) } else { 1.0 };
+        let icon = field(SELECTION_DISPLAY + SD_REPAIR_ICONS + sys * 4, 0);
+        out.push(SystemIcon {
+            system: sys,
+            sprite: field(icon, RI_SPRITE),
+            strength,
+            state,
+            flash: icon != 0 && unsafe { rd::<u8>(icon + RI_FLASH) } != 0,
+        });
+    }
+    out
+}
+
 // ---- the selection bubbles ----------------------------------------------------------
 
 /// `RenderSelectionEffects` (cdecl, the camera): the 3D selection bubbles, an additive

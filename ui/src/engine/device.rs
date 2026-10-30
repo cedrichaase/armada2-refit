@@ -106,6 +106,14 @@ unsafe extern "system" fn present(dev8: *mut c_void, src: *const c_void, dst: *c
     if let Some(name) = crate::dump::poll("UI.dump") {
         dump_back_buffer(dev8, name, n);
     }
+    // A recorded frame (gpu/README.md, "Record and replay") ends here: its streams are
+    // written, and the frame as presented is dumped beside them, for the replay to be
+    // compared with.
+    if let Some(name) = crate::gfx::gpu().record_present() {
+        if crate::rt::create_dir(&crate::rt::game_path("Dumps")) {
+            dump_back_buffer(dev8, crate::sfmt!("{}-game", name), n);
+        }
+    }
     match unsafe { PRESENT } {
         0 => -1,
         f => unsafe { core::mem::transmute::<usize, Present8>(f)(dev8, src, dst, wnd, dirty) },

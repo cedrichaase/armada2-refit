@@ -70,7 +70,7 @@ fn startup() {
     let h = &config::get().hud;
     if mission && h.enable {
         // Drawn in the mission frame: without its hook they stay the engine's.
-        let n = engine::leftovers::install(h.overview, h.fade, h.unit_video);
+        let n = engine::leftovers::install(h.overview, h.fade, h.unit_video, h.frame_rate);
         log!("leftovers: {} of the engine's last draws are ours", n);
     }
     log!("shell: {}", if engine::shell::install() { "hooked" } else { "standing down" });

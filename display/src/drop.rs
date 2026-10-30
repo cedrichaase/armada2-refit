@@ -143,3 +143,11 @@ pub fn dropped(fp: usize) -> bool {
     }
     hit
 }
+
+/// Whether the call whose method has frame pointer `fp` comes from the engine's loading
+/// loop (a return address in `RenderLoopAssetLoadStatusUpdate` up its stack): the
+/// passthrough asks it of each `BeginScene` (`passthrough::begin_scene`).
+pub fn in_loading(fp: usize) -> bool {
+    let exe = trace::exe_range();
+    chain(fp, exe).iter().any(|&a| within(LOADING, a))
+}

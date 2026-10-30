@@ -10,8 +10,8 @@ Timeout: 14 min
 How far a fireball lights the nebula's gas (`render3d/README.md`, "Light inside the
 gas", `[Nebulae] LitExplosion=`, `LitExplosionCore=`, `LitExplosionFar=`), in the
 `nebula-battle` scene on Display8's Vulkan stub, where the clustered lights light the
-gas. Run it on the GPU with `A2TEST_VULKAN_GPU=1 ./a2test run
-render3d-nebula-explosion --install .`; without the flag it runs on lavapipe.
+gas. Run it on the GPU with `./a2test run
+render3d-nebula-explosion --install .` (on the GPU by default).
 
 **Inside.** The Sovereign (`sov`) blows up in the middle of the gas, paused 22 ticks
 after (the `render3d-nebula-lit` scenario's "breach"), and again 60 ticks after. The

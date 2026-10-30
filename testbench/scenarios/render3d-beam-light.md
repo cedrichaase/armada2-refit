@@ -14,7 +14,7 @@ render3d's phaser beams as line lights (`render3d/README.md`, "Clustered lights"
 beam's light evenly along it, brighter only at the emitter and where the beam hits
 the cube's shield. Line lights run with the clustered lights, on Vulkan and Direct3D
 12 only: run it on Display8's stub with `display/stub-scenario.sh render3d-beam-light
-stub Backend=vulkan` (with `A2TEST_VULKAN_GPU=1` on the GPU), and for the A/B with
+stub Backend=vulkan`, and for the A/B with
 `render3d/bench-ini.sh Lights:BeamLight=0` added before `beam-pass`. On Direct3D 9
 only the two ends light.
 

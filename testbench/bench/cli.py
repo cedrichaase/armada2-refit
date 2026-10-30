@@ -67,6 +67,9 @@ a2test -- run Armada II headless and test it end to end
   a2test drive dump [NAME]             Render3D.asi's targets (PFM) and UI.asi's presented
                                        frame (PPM), read back in the game, into dumps/NAME/
                                        with PNG previews (testbench/README.md, "Frame dumps")
+  a2test drive record [NAME]           one frame of the plugins' gpu calls (Display8 on Vulkan),
+                                       into $A2_DATA/replays/NAME/ for gpu/replay.sh
+                                       (gpu/README.md, "Record and replay")
   a2test drive note "TEXT"             say what you are doing now (the session's intent on
                                        the dashboard); again whenever it changes
   a2test drive running | log NAME | launch [ARGS] | quit
@@ -98,6 +101,15 @@ def _terminate(signum, frame):
     # unwind like Ctrl-C, so every `finally` runs and each session tears down: a killed
     # run otherwise leaves a game and a sway behind (measured)
     raise KeyboardInterrupt(f'signal {signum}')
+
+
+def _vulkan_flags(a):
+    """--vulkan-device / --no-validate as the environment session.vulkan_env and
+    display/bench-mode.sh read."""
+    if getattr(a, 'vulkan_device', None):
+        os.environ['A2TEST_VULKAN_DEVICE'] = a.vulkan_device
+    if getattr(a, 'no_validate', False):
+        os.environ['A2TEST_VULKAN_VALIDATE'] = '0'
 
 
 def main(argv=None):
@@ -162,12 +174,17 @@ def cmd_run(argv):
     ap.add_argument('--tolerance', type=float, default=0.05)
     ap.add_argument('--out')
     ap.add_argument('--install', action='append', default=[], metavar='PATH')
+    ap.add_argument('--vulkan-device', choices=['gpu', 'lavapipe'], default=None,
+                    help='where Backend=vulkan draws: gpu (default; A2TEST_VULKAN_DEVICE) or lavapipe, the CPU')
+    ap.add_argument('--no-validate', action='store_true',
+                    help='no Vulkan validation layer (timing runs; A2TEST_VULKAN_VALIDATE=0)')
     ap.add_argument('--clock', choices=['wall', 'bench'], default=None,
                     help='the plugins\' animation clock in every case (default: the scenario\'s Clock:, else A2TEST_CLOCK, else wall)')
     ap.add_argument('-j', '--jobs', type=int, default=config.JOBS,
                     help=f'cases at once (default {config.JOBS}; 1 = one case at a time); each waits for a game slot, so above A2_SLOTS they queue')
     a = ap.parse_args(argv)
     a.jobs = max(1, a.jobs)
+    _vulkan_flags(a)
     scns = [parse(_find_scenario(s)) for s in a.scenarios]
     run_id = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
     run_dir = Path(a.out) if a.out else config.RESULTS / run_id
@@ -421,10 +438,15 @@ def cmd_session(argv):
         ap.add_argument('--stems', default='', metavar='CATS',
                         help='record these of music, voice, interface on sinks of their own (Stems.asi); '
                              'the rest is the effects stem')
+        ap.add_argument('--vulkan-device', choices=['gpu', 'lavapipe'], default=None,
+                        help='where Backend=vulkan draws: gpu (default; A2TEST_VULKAN_DEVICE) or lavapipe, the CPU')
+        ap.add_argument('--no-validate', action='store_true',
+                        help='no Vulkan validation layer (timing runs; A2TEST_VULKAN_VALIDATE=0)')
         ap.add_argument('--clock', choices=['wall', 'bench'], default=None,
                         help='bench: [Bench] Clock=bench in Render3D.ini and UI.ini, animations on the '
                              'simulation\'s time (default A2TEST_CLOCK, else wall)')
         a = ap.parse_args(rest)
+        _vulkan_flags(a)
         mute = parse_categories(a.mute, what='--mute')
         stems = parse_categories(a.stems, STEMS, what='--stems')
         if set(mute) & set(stems):
@@ -687,6 +709,13 @@ def cmd_drive(argv):
         st, text, previews = dumps.take(s, name)
         log.action(f'dump "{name}"', status='fail' if st == 'fail' else 'warn' if st == 'warn' else 'ok',
                    detail=text, shots=previews)
+        print(text)
+        return 1 if st == 'fail' else 0
+    elif sub == 'record':
+        from . import record
+        name = rest[0] if rest else 'record'
+        st, text = record.take(s, name)
+        log.action(f'record "{name}"', status='fail' if st == 'fail' else 'warn' if st == 'warn' else 'ok', detail=text)
         print(text)
         return 1 if st == 'fail' else 0
     elif sub == 'scene':

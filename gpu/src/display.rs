@@ -36,6 +36,15 @@
 //! | `display8_vk_flush` | `fn() -> bool` | submits what the frame now has recorded and waits for it; the frame goes on in the same command buffer (begun again), its ring, pool and deferred calls untouched: for a read-back. Called with no render pass open |
 //! | `display8_engine_viewport` | `fn(out: *mut [u32; 6]) -> bool` | the engine's viewport (`D3DVIEWPORT8`: x, y, w, h, min z, max z as f32 bits) |
 //! | `display8_engine_transform` | `fn(state: u32, out: *mut [f32; 16]) -> bool` | the engine's transform (`D3DTRANSFORMSTATETYPE`), row-major as Direct3D sets it |
+//! | `display8_vk_pass` | `fn(event: u32, pass: *const VkPass8)` | optional (display 0.10.0): a plugin's `Cmd` begins (`PASS_ENTER`) or ends (`PASS_LEAVE`), or ends with `pass` its pass now (`PASS_PUBLISH`, a plugin that publishes: render3d), every attachment in its attachment layout. Display8's passthrough draws the engine's draws into the pass published last (in this frame), and records none while a `Cmd` is alive |
+//!
+//! **Passthrough** (display/README.md, "Passthrough"): in stub mode Display8 draws the
+//! engine's own Direct3D 8 draws on Vulkan, between the plugins' `Cmd`s, into the pass a
+//! plugin published at its last `Cmd`'s end (render3d's scene pass while its body runs),
+//! else into the engine's targets. Its render pass may be left open after a draw, and
+//! is closed at the next call into Display8 that records or hands the frame over
+//! (`display8_vk_frame`, `display8_vk_mirror`, `display8_vk_flush`, `display8_vk_pass`),
+//! so a recorder still never finds one open.
 //!
 //! **Direct3D 9** (`Backend=d3d9`, and forward mode): none of the above; the plugins
 //! reach the device as before (`QueryInterface(IID_IDirect3DDevice9)` on the engine's
@@ -106,6 +115,12 @@ pub const FEATURE_ANISOTROPY: u32 = 4;
 pub const TARGET_COLOR: u32 = 0;
 pub const TARGET_DEPTH: u32 = 1;
 
+/// `display8_vk_pass`'s events: a plugin's `Cmd` begins; ends; ends with its pass now
+/// published.
+pub const PASS_ENTER: u32 = 0;
+pub const PASS_LEAVE: u32 = 1;
+pub const PASS_PUBLISH: u32 = 2;
+
 /// The Vulkan device Display8 made. Dispatchable handles are pointers, the others
 /// 64-bit, as Vulkan defines them on a 32-bit process.
 #[repr(C)]
@@ -165,7 +180,7 @@ impl Default for VkFrame8 {
 
 /// An image Display8 owns: the engine's targets, a mirror.
 #[repr(C)]
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
 pub struct VkImage8 {
     pub image: u64,
     pub view: u64,
@@ -176,6 +191,17 @@ pub struct VkImage8 {
     pub samples: u32,
     /// The layout it is in between recorders (above).
     pub layout: u32,
+}
+
+/// A plugin's pass now, published at its `Cmd`'s end (`display8_vk_pass`): one colour
+/// attachment and the depth, if any (`depth.image` 0), each a view of one layer, in its
+/// attachment layout. Valid until the frame is presented: a plugin publishes again in
+/// each frame.
+#[repr(C)]
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+pub struct VkPass8 {
+    pub color: VkImage8,
+    pub depth: VkImage8,
 }
 
 /// The exports, looked up once.
@@ -191,6 +217,8 @@ pub struct Display8 {
     pub vk_flush: extern "C" fn() -> bool,
     pub engine_viewport: extern "C" fn(*mut [u32; 6]) -> bool,
     pub engine_transform: extern "C" fn(u32, *mut [f32; 16]) -> bool,
+    /// None: a Display8 before passthrough (0.10.0).
+    pub vk_pass: Option<extern "C" fn(u32, *const VkPass8)>,
 }
 
 impl Display8 {
@@ -213,6 +241,7 @@ impl Display8 {
                 vk_flush: core::mem::transmute::<usize, extern "C" fn() -> bool>(f("display8_vk_flush")?),
                 engine_viewport: core::mem::transmute::<usize, extern "C" fn(*mut [u32; 6]) -> bool>(f("display8_engine_viewport")?),
                 engine_transform: core::mem::transmute::<usize, extern "C" fn(u32, *mut [f32; 16]) -> bool>(f("display8_engine_transform")?),
+                vk_pass: f("display8_vk_pass").map(|p| core::mem::transmute::<usize, extern "C" fn(u32, *const VkPass8)>(p)),
             })
         }
     }

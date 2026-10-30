@@ -8,7 +8,7 @@ Timeout: 8 min
 
 The Assimilator's auto-assimilator (`borgbor`, a `Kind=cone` recipe with `Emitter=5`)
 on Display8's stub with `Backend=auto`, so Vulkan: run it with
-`A2TEST_VULKAN_GPU=1 ./a2test run render3d-cone-emitter --install .`, on the GPU.
+`./a2test run render3d-cone-emitter --install .` (on the GPU by default).
 Until render3d 0.26.1 the emitter flare drew as an opaque black square there (and only
 there: Direct3D 9 drew it right), because the fx pixel shader weighted every kind by 0
 or 1 and summed them, and the cone's kind, run on the flare's parameters, reached an

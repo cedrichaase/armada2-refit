@@ -5,13 +5,96 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.74.1 — 2026-10-29
+
+### Fixed
+- The audio guard no longer stops the game for a corked stream on a real output:
+  winepulse's start-up "format test stream", opened corked on every sink and closed
+  within milliseconds, was the "game is no longer running" at launch (`_silence`). `8c0d697`
+
+Confirmed in game 2026-10-30.
+
+## 3.74.0 — 2026-10-29
+
+### Added
+- `ui-leftovers-2`: the pointed unit's damaged systems, the warp cursor over the
+  minimap, the shot director's scenes in the tactical view and the frame rate
+  (`FRAMERATE_DISPLAY=1` in the clone) drawn by the UI, with the engine drawing
+  nothing in the mission (ui 0.25.0).
+
+Confirmed in game 2026-10-30.
+
+## 3.73.0 — 2026-10-29
+
+### Added
+- `a2test drive record NAME` (`bench/record.py`): one frame of the plugins' `gpu` calls
+  on Display8's Vulkan backend, moved with the frame as presented (`game.ppm`) and the
+  clone's settings into `$A2_DATA/replays/NAME/`, for `gpu/replay.sh` (`README.md`,
+  "Recording a frame of gpu calls"). `239f29c`
+
+Confirmed in game 2026-10-30.
+
+## 3.72.0 — 2026-10-29
+
+### Added
+- `display-passthrough`: render3d's hulls module off on Display8's stub with
+  `Passthrough=1`; the ships the engine draws must show, drawn into render3d's scene.
+  `display-passthrough-forward` is the same scene through the forward chain, its
+  reference (`baseline record`/`compare`). `24be351`
+
+Confirmed in game 2026-10-30.
+
+## 3.71.0 — 2026-10-29
+
+### Added
+- `display-inventory-modes`: phase 0 of the display plan's remaining contexts, with
+  Display8 in forward mode and tracing: a mission in the showcase scene, a display mode
+  chosen in Graphics Settings (the engine's `CreateDevice` at 800x600) and right-drag
+  pans (`SetCursorPos` and its callers), each a marked context. Its stub variant
+  (`display/stub-scenario.sh`) stops at the mode box: the stub offers one mode.
+
+Confirmed in game 2026-10-30.
+
+## 3.70.0 — 2026-10-29
+
+### Added
+- `--vulkan-device gpu|lavapipe` (`A2TEST_VULKAN_DEVICE`) and `--no-validate`
+  (`A2TEST_VULKAN_VALIDATE=0`) on `run` and `session start`.
+
+### Changed
+- `Backend=vulkan` (and `auto`) bench games now run on the user's GPU by default, with
+  the Khronos validation layer on, instead of lavapipe: `vulkan_env` no longer sets
+  `VK_DRIVER_FILES`/`VK_ICD_FILENAMES` unless lavapipe is asked for, and
+  `display/bench-mode.sh` sets `Device=llvmpipe` only then. `A2TEST_VULKAN_GPU=1` is
+  now the default and ignored. The scenario notes that told to set it were updated.
+
+Confirmed in game 2026-10-30.
+
+## 3.69.1 — 2026-10-29
+
+### Fixed
+- `prepare` sets the clone's `ARMADA.PRF` interface mode to 1 (`set_prf_interface_mode`):
+  the clone inherited the player's, and `ui-whole-game` and the `display-*` scenarios,
+  which press Ctrl+I three times to reach mode 0 (the unit view), ended in a mode that
+  hides the whole HUD when the player's was 0 (steps 54, 56, 61, 74, 75 failed).
+- `ui-whole-game`: the loading-screen check waits 2 s after "O.K." instead of 6 s (the
+  mission now loads in about 4 s, so the shot caught the fade into the mission); the
+  objectives button is `hud-right 1555,55` (1502 is the view toggle since the button row
+  gained its idle button).
+- `render3d-mode-switch` runs on the forward chain (`Setup: display/bench-mode.sh
+  forward ...`: the stub offers only the desktop's mode, so "800x600x32" is not in the
+  list) and waits 10 s before the "after" shot (the log lines come at once, the first
+  frame at the new size seconds later; 3.47.0's wait for logs had dropped the 10 s).
+
+Confirmed in game 2026-10-30.
+
 ## 3.69.0 — 2026-10-25
 
 ### Added
 - `display-movie-no-proxy`: the launch reels and the intro on Display8's stub without
   the cutscene proxy, as the release package installs them (ui 0.23.0). `6d7180d`
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.68.0 — 2026-10-23
 
@@ -20,7 +103,7 @@ Installed, not yet seen in game.
   the Mutara gas and another just outside it, paused 22 and 60 ticks after each, for
   how far a fireball lights the gas.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.67.0 — 2026-10-23
 
@@ -36,7 +119,7 @@ Installed, not yet seen in game.
 - `ui-pointer-bar`: three such screenshots with a bar up and a walk into it after each,
   with `[UI] KeepClip=1`: the re-clip runs, no jump of the pointer.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.66.0 — 2026-10-23
 
@@ -45,7 +128,7 @@ Installed, not yet seen in game.
   `Backend=auto` (Vulkan, on the GPU with `A2TEST_VULKAN_GPU=1`), shots of its emitter
   flare, which drew as a black square.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.65.0 — 2026-10-23
 
@@ -58,7 +141,7 @@ Installed, not yet seen in game.
   after, with `[UI] PointerLog=1`: no jump of the pointer, the engine not left holding
   it.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.64.0 — 2026-10-23
 
@@ -67,7 +150,7 @@ Installed, not yet seen in game.
   field at a Borg cube) and `render3d-beam-light`: paused frames for render3d's phaser
   beams as line lights.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.63.0 — 2026-10-23
 
@@ -75,7 +158,7 @@ Installed, not yet seen in game.
 - `render3d-hull-sparks`: the shields-down discharges in the Mutara gas, and a Borg
   scout's damaged sensors in two frames, on Display8's Vulkan stub.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.62.0 — 2026-10-23
 
@@ -84,7 +167,7 @@ Installed, not yet seen in game.
   Mutara nebula) and `render3d-nebula-lit`: a paused frame, frames in motion and a
   ship blown up in the gas, timed, for render3d's light inside the nebulae.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.61.0 — 2026-10-23
 
@@ -98,7 +181,7 @@ Installed, not yet seen in game.
   clearing, which it does when the start is in a corner of the map.
 - `README.md`: parallel installs of one tree, and Home before a click on a unit.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.60.0 — 2026-10-23
 
@@ -110,7 +193,7 @@ Installed, not yet seen in game.
 ### Changed
 - `ui-hud-bar` waits on "placement: footprint" and judges the placement's new look.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.58.0 — 2026-10-23
 
@@ -119,7 +202,7 @@ Installed, not yet seen in game.
   `render3d-clustered`, which pauses it on one tick for render3d's clustered lights and
   their GPU timings (`render3d/bench-ini.sh`).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.57.1 — 2026-10-23
 
@@ -128,7 +211,7 @@ Installed, not yet seen in game.
   themselves (`display/bench-mode.sh forward`), since the shipped default is now the
   stub; `display-stub` and `display-movie` describe the stub on `Backend=auto`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.57.0 — 2026-10-23
 
@@ -143,7 +226,7 @@ Installed, not yet seen in game.
   `Validate=1`, gets the Khronos validation layer (`VK_INSTANCE_LAYERS`); the drivers
   stay as they are (the GPU). Only `Backend=vulkan` alone is held to lavapipe.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.56.0 — 2026-10-23
 
@@ -156,7 +239,7 @@ Installed, not yet seen in game.
   bank's payments (3250, 3000), the refusal, the advisor for the local team and its chat line. Its log waits end on lines
   written after the action (the startup line is checked before LAUNCH).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.55.0 — 2026-10-23
 
@@ -170,7 +253,7 @@ Installed, not yet seen in game.
   `Display8.ini` gets the Khronos validation layer under vkd3d-proton, writing
   `logs/vvl.log` (`session.vulkan_env`).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.52.0 — 2026-10-23
 
@@ -182,7 +265,7 @@ Installed, not yet seen in game.
   and the `a2mod` script; built under a flock and renamed into place.
   `a2test stock-cache status | rebuild | drop`; `A2TEST_STOCK_CACHE=0` turns it off.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.51.0 — 2026-10-23
 
@@ -192,7 +275,7 @@ Installed, not yet seen in game.
   `VK_ICD_FILENAMES`, `VK_INSTANCE_LAYERS`; `session.vulkan_env`);
   `A2TEST_VULKAN_GPU=1` leaves the drivers as they are.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.50.1 — 2026-10-23
 
@@ -206,7 +289,7 @@ Installed, not yet seen in game.
   checks name the minimap and the tooltip as they are drawn, and it expects the UI's
   build footprint ("leftovers: build footprint at").
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.50.0 — 2026-10-23
 
@@ -216,7 +299,7 @@ Installed, not yet seen in game.
   pointed unit and move orders, the unit view and the pause, each expected to show no
   draw from `Armada2.exe`; and the in-mission menu over the UI's own copy of the frame.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.49.0 — 2026-10-23
 
@@ -225,7 +308,7 @@ Installed, not yet seen in game.
   bench clock, a shot and a frame dump: what a port of the renderer is compared by) and
   `display-stub` (the whole game with Display8 in stub mode).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.48.0 — 2026-10-23
 
@@ -238,7 +321,7 @@ Installed, not yet seen in game.
 - Scenario `display-inventory`: the whole game, a context marked at each stage, with
   `--install . --install display`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.47.0 — 2026-10-23
 
@@ -267,7 +350,7 @@ Bench-only; installs nothing into the game.
   striped placeholder that flickered with black while a session or game was launching;
   the resolution is no longer drawn across it (the chip still shows it).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.46.0 — 2026-10-22
 
@@ -446,7 +529,7 @@ over it: the Klingon theme).
 - Scenario `ui-widgets-cursor`: Scene.asi's `cursor off` then `cursor on`, with
   `UI.asi`'s cursor hidden and shown with it (ui 0.12.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.35.0 — 2026-10-17
 
@@ -457,7 +540,7 @@ Installed, not yet seen in game.
   with the same line. `Zoom=0.37` is the view of 150 `ctrl+Down` then 35 `ctrl+Up`.
   Scene `zoom`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.34.0 — 2026-10-17
 
@@ -478,7 +561,7 @@ Installed, not yet seen in game.
 ### Changed
 - Scene.asi's `select` takes up to 39 names in one command (a command had 12 words).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.33.0 — 2026-10-17
 
@@ -842,7 +925,7 @@ Installs nothing; seen working on the bench 2026-10-12.
 ### Added
 - Scene `planets`: one planet of each class and a dilithium moon, for `Surfaces.asi`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 3.5.0 — 2026-10-07
 

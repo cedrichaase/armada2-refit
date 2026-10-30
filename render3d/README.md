@@ -294,6 +294,23 @@ sections below: `effects`, `ordnance`, `specials`, `sky`, `overlays`, `particles
 `Armada2.exe` at the step as without the module.** There is no plugin to fall back to
 any more, so the old plugins' looks exist only as these modules.
 
+The menu scene is the exception, since it is render3d's own and has no engine draw to
+leave anything to: in the front end there are no game objects and the engine draws
+nothing (`Display8.log`: `0 engine draws` in `"start"`), so Display8's passthrough has
+nothing to show either. A module at 0 that has a part in the menu scene (`hulls`: the
+ships; `world`: the planet and the gas; `sky`: the sky, stars, sun and the warp's
+flashes) is therefore loaded for the menu scene only (Render3D.log: `module hulls: on,
+for the menu scene only`): `hulls::MenuOnly` for the hulls, `mods::MenuOnly` wrapping
+the sky and `World::menu_scene()` for the others. The menu is drawn pixel for pixel as
+with the module on, whatever `[World] Planets=`, `Nebulae=`, `Rocks=` or `Enable=` say
+(they belong to missions; with `world=1` too, the menu ignores them). In a mission the wrapper takes nothing (no step, object,
+feature, light or view, no `draw_instance` or `placeholder`, no shadow map lent to the
+gas, no hook installed, not `running(name)`), so that part is the engine's. It still
+stands down beside the old plugin that draws the part. `particles`, `effects`,
+`ordnance`, `specials` and `overlays` draw nothing in the menu scene, so at 0 they are
+simply off. A stock look in the menu would need the engine to draw SODs in the shell,
+which it never does.
+
 ## Timing
 
 `Timing=1` (`src/timing.rs`) times each view as a run of marks: the seam, our targets,

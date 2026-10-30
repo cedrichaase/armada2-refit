@@ -62,6 +62,7 @@ impl Frame {
     /// The next frame: what was retired in this one is let go of, and its ring space
     /// may be written again.
     pub fn next(&mut self) {
+        crate::api::frame_next(self);
         self.index = self.index.wrapping_add(1);
         self.retired.clear();
         self.vertices.used = 0;

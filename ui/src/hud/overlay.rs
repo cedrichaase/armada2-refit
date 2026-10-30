@@ -79,6 +79,12 @@ pub fn run(ui: &mut Ui, keep_out: &[R]) {
                 gauge(ui, R::new(x, y, gw, bh), f, hc);
             }
         }
+        // The damaged systems, under the brackets: where stock lays its row of system
+        // icons out under the gauges, for every unit whose gauges show (with
+        // `SelectionGauges=1` the selection's too) (`[HUD] SystemIcons`).
+        if show && u.craft && crate::config::get().hud.system_icons {
+            systems(ui, u.obj, (c.0, r.bottom() + ui.u(5.0)));
+        }
         if let Some(g) = u.group {
             let d = [b'0' + g];
             let s = core::str::from_utf8(&d).unwrap_or("?");
@@ -98,6 +104,97 @@ pub fn run(ui: &mut Ui, keep_out: &[R]) {
             }
         }
     }
+}
+
+/// The craft's damaged systems in a row centred on `top` (its middle and top): each
+/// the system's icon on a dark chip, in `bad` while it is out, `warn` on the flash
+/// while it is repaired, else by its strength as the hull gauge is coloured, with a bar
+/// under it: what is repaired so far while it is out, else its strength. A system at
+/// full strength, not out and not repaired is left out (stock draws it green).
+fn systems(ui: &mut Ui, obj: usize, top: (f32, f32)) {
+    let t = ui.theme;
+    let shown: alloc::vec::Vec<_> = overlay::systems(obj)
+        .into_iter()
+        .filter(|s| s.strength < 0.995 || s.state.repair_left > 0.01 || s.state.repairing)
+        .collect();
+    log_systems(obj, &shown);
+    if shown.is_empty() {
+        return;
+    }
+    let (sz, gap) = (ui.u(18.0), ui.u(3.0));
+    let w = shown.len() as f32 * sz + (shown.len() - 1) as f32 * gap;
+    let mut x = top.0 - w * 0.5;
+    for s in &shown {
+        let out = s.state.repair_left > 0.01;
+        let col = if s.state.repairing && s.flash {
+            t.warn
+        } else if out {
+            t.bad
+        } else if s.strength > 0.6 {
+            t.good
+        } else if s.strength > 0.3 {
+            t.warn
+        } else {
+            t.bad
+        };
+        let chip = R::new(libm::floorf(x), libm::floorf(top.1), sz, sz);
+        ui.draw.fill(chip, Corners::round(ui.u(3.0)), fade(0xff000000, 0.72));
+        ui.draw.stroke(chip, Corners::round(ui.u(3.0)), ui.u(1.0).max(1.0), fade(col, 0.85));
+        let ir = chip.inset(ui.u(3.0));
+        if !sprite_in(ui, s.sprite, ir, col) {
+            ui.draw.fill(ir.inset(ui.u(3.0)), Corners::round(ui.u(2.0)), col);
+        }
+        let f = if out { 1.0 - s.state.repair_left } else { s.strength };
+        let bar = R::new(chip.x, chip.bottom() + ui.u(1.5), sz, ui.u(2.0).max(2.0));
+        ui.draw.fill(bar, Corners::SQUARE, fade(t.track, 0.9));
+        ui.draw.fill(R::new(bar.x, bar.y, bar.w * f.clamp(0.0, 1.0), bar.h), Corners::SQUARE, col);
+        x += sz + gap;
+    }
+}
+
+/// A game sprite fitted into `r`, its aspect kept, tinted; false without its art.
+fn sprite_in(ui: &mut Ui, sp: usize, r: R, tint: u32) -> bool {
+    let Some((tex, uv)) = crate::engine::sprite::art(sp) else { return false };
+    let (tw, th) = crate::gfx::tex_size(tex);
+    let (pw, ph) = ((uv[2] - uv[0]).abs() * tw as f32, (uv[3] - uv[1]).abs() * th as f32);
+    if pw <= 0.0 || ph <= 0.0 {
+        return false;
+    }
+    let s = (r.w / pw).min(r.h / ph);
+    let (w, h) = (pw * s, ph * s);
+    ui.draw.image_uv(tex, R::new(r.x + (r.w - w) * 0.5, r.y + (r.h - h) * 0.5, w, h), uv, tint);
+    true
+}
+
+/// UI.log says which systems are shown when that changes ("overlay: systems of
+/// Galaxy: 2 out 40%, 0 62%"): the bench reads it.
+fn log_systems(obj: usize, shown: &[overlay::SystemIcon]) {
+    // The last row logged, per unit (a few units at once show their rows).
+    static mut LAST: [(usize, u64); 8] = [(0, 0); 8];
+    let mut key: u64 = 1;
+    for s in shown {
+        key = key.wrapping_mul(31).wrapping_add(s.system as u64 * 8 + (s.state.repair_left > 0.01) as u64 * 4 + s.state.repairing as u64 + 1);
+    }
+    unsafe {
+        let last = &mut *core::ptr::addr_of_mut!(LAST);
+        let i = last.iter().position(|e| e.0 == obj).unwrap_or_else(|| {
+            last.rotate_right(1);
+            last[0] = (obj, 1);
+            0
+        });
+        if last[i].1 == key {
+            return;
+        }
+        last[i].1 = key;
+    }
+    if shown.is_empty() {
+        return;
+    }
+    let mut line = alloc::string::String::new();
+    for s in shown {
+        line.push_str(&crate::sfmt!(" {}{}{} {:.0}%", s.system, if s.state.repair_left > 0.01 { " out" } else { "" }, if s.state.repairing { " repairing" } else { "" }, s.strength * 100.0));
+    }
+    crate::log!("overlay: systems of {}:{}", overlay::name(obj), line);
 }
 
 /// Four corner brackets around `r`.

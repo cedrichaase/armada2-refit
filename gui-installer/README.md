@@ -236,6 +236,18 @@ draws nothing, and it already knows the game folder, the launcher and the releas
   all: files of a release missing or unreadable in the installer's cache (each file of
   the newest unpack of each version, against its zip) or in the game folder, as an
   antivirus leaves them.
+- **Display8's choice is a finding** (`display8_backend`): the report reads
+  `Display8.log` and says the mode (stub or forward, or a stand-down with its reason) and,
+  in stub mode, the backend that drew (vulkan, d3d12, d3d9) and why: `Backend=auto`'s
+  order on that system, a fallback with each backend's reason, or an order set by hand.
+  It parses the lines `Display8 <ver> -- game dir ...; mode M`, `Backend=auto: on P: ...`,
+  `stub mode on ...`, `stub: the backend is B[, after X could not start]`,
+  `stub: X could not start: why; falling back to Y` and `Mode=stub: ...; forward mode
+  instead`; the same code serves all three systems. **Where the logs are**: every plugin's
+  log, `Display8.log` included, is written beside `Armada2.exe`, in the game folder. An
+  install under `C:\Program Files` may have Windows redirect those writes to the user's
+  VirtualStore (`%LOCALAPPDATA%\VirtualStore\Program Files...`); the report reads the
+  game folder only, so look there when a log is missing.
 - **Safe to post** (`redact`): the home folder becomes `~`; any other user folder
   (`C:\Users\name`, `/home/name`, `/Users/name`, Wine's `Z:\home\name`) loses the name;
   IPv4 addresses (Online.log's peers) become `<ip>`.

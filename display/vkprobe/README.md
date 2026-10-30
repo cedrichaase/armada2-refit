@@ -166,8 +166,10 @@ What this means for Display8's own Vulkan code:
   `VirtualQuery`; that is fine for code, not for mapped memory.
 - **The portability flag** is offered by Wine's instance here too
   (`VK_KHR_portability_enumeration`), and setting it costs nothing on a driver that is
-  not a portability one; Display8's `Vk::start` does not set it yet, and on a Mac it
-  will have to, together with `VK_KHR_portability_subset` on the device.
+  not a portability one; Display8's `Vk::start` sets it when the instance offers it
+  (`ENUMERATE_PORTABILITY_KHR`), and enables `VK_KHR_portability_subset` on the device
+  when the device offers it (`display/src/vk/mod.rs`; the log says "a portability
+  device").
 - **The surface** under Wine's X11 driver offers only `B8G8R8A8_UNORM` and
   `B8G8R8A8_SRGB` (`SRGB_NONLINEAR`), FIFO, FIFO_RELAXED, MAILBOX and IMMEDIATE, and
   composite alpha OPAQUE or INHERIT; the window manager resizing the window made the

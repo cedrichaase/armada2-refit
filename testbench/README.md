@@ -247,8 +247,13 @@ stem held `Mfed300.wav`, the voice stem `a2_fed01_intro.wav`, and the effects st
   2026-09-26 that one reached the null sink five times and the default output twice
   (run `session-20260926-173731`: `alsa_output…analog-stereo`, within the first 6 s).
   The watchdog muted and moved it and stopped the game each time, but for that moment it
-  was on the user's output. Why the pre-registered default is not taken by that stream
-  is not known.
+  was on the user's output. **Explained 2026-10-29:** that stream is winepulse's
+  `format test stream`, which it opens *corked* on every sink at start-up (the user's
+  outputs and other sessions' null sinks included) to probe each one's format, and
+  closes within milliseconds. Corked, it plays nothing; the guard now ignores corked
+  streams (an uncork is a `change` event and is checked again). Catching one was the
+  intermittent "game is no longer running" at launch (1 of 17 launches alone, 3 of 6
+  on a busy bench, where every session's probes cover every other session's sinks).
 - **XTest input does not work.** In headless sway the seat has no devices. `xdotool`
   moves Xwayland's core pointer, and Wine even logs the `ButtonPress`, but the frame
   stays pixel-identical: with no keyboard on the seat nothing holds focus, and no
@@ -480,6 +485,31 @@ shot (2 to 3, 10 to 13, 80 to 90, 255 to 255), and mapped through that curve the
 were identical. Something after `Present` (the swapchain, the compositor; a gamma ramp
 would do it) lifts the frame. So compare dumps with dumps, and shots with shots.
 
+## Recording a frame of gpu calls
+
+    ./a2test drive --session ID record NAME    # one frame of render3d's and the UI's calls
+    gpu/replay.sh NAME                         # drawn again with no game: vulkan, d3d9
+    ./a2test baseline diff $A2_DATA/replays/NAME/game.ppm $A2_DATA/replays/NAME/replay-vulkan.ppm
+
+`record` (`bench/record.py`) writes the trigger `Gpu.record` (the name and a time, so
+each request is new) and waits up to 180 s for every installed plugin to write its
+stream and the UI to dump the frame it recorded, then moves the recording from the
+clone's `Dumps\NAME\` into `$A2_DATA/replays/NAME/` (a time is added when that exists),
+with `game.ppm` (the frame as the game presented it), the clone's `Display8.ini`,
+`dxvk.conf`, `Render3D.ini` and `UI.ini` (the replay draws with the same Display8
+settings) and `meta.json` (the session, its installs, the time). It prints each
+plugin's sidecar: records, snapshots, and what could not be read back. A recording holds
+the game's textures, so it lives in `A2_DATA`, never in a checkout.
+
+The plugins record only on Display8's **Vulkan backend** (`display/bench-mode.sh stub
+Backend=vulkan PixelCentres=d3d9 ...`, which puts the game on lavapipe); on another
+backend `record` fails, saying so. It was proven on a paused mission scene. To compare the replay on
+Direct3D 9 with the others, record with render3d's `[Lights] Clustered=0` in the clone's
+`Render3D.ini`: clustered lights are compute, which Direct3D 9 does not have. What is
+recorded, how it replays and what it cannot hold: `gpu/README.md`, "Record and replay".
+The replays run on lavapipe with the validation layer, never on the GPU, and need no
+session: `gpu/replay.sh` brings up a headless display of its own.
+
 ## The stretch measurement
 
 Every aspect fix in this project keeps the vertical axis as stock draws it and corrects
@@ -530,17 +560,19 @@ directory of images; a session ID, live or ended; or a baseline's name. `record`
 to a baseline and refuses to replace a shot it holds unless given `--force`.
 
 **Vulkan on the bench.** A game whose clone's `Display8.ini` says `Mode=stub` and
-`Backend=vulkan` runs on lavapipe, Mesa's CPU Vulkan, with the Khronos validation layer
-(`bench/session.py`, `vulkan_env`: `VK_DRIVER_FILES`, `VK_ICD_FILENAMES`,
-`VK_INSTANCE_LAYERS`; `display/bench-mode.sh` adds `Device=llvmpipe` and `Validate=1`),
-so new Vulkan code never runs on the user's GPU; `A2TEST_VULKAN_GPU=1` leaves the
-drivers alone for a deliberate run there. Judge such a run against a baseline taken
+`Backend=vulkan` runs on the user's GPU (the one DXVK uses) with the Khronos validation
+layer on (`bench/session.py`, `vulkan_env`: `VK_INSTANCE_LAYERS`; `display/bench-mode.sh`
+adds `Validate=1`), so errors are caught before they can hang the GPU. Flags of
+`session start`, `run` and `drive`-less runs: `--vulkan-device lavapipe` (or
+`A2TEST_VULKAN_DEVICE=lavapipe`) puts it on lavapipe, Mesa's CPU Vulkan
+(`VK_DRIVER_FILES`, `VK_ICD_FILENAMES`, `Device=llvmpipe`); `--no-validate` (or
+`A2TEST_VULKAN_VALIDATE=0`) drops the layer, for timing runs. Keep 1280x720 and stop
+sessions promptly: a GPU hang has crashed the desktop. Judge a lavapipe run against a baseline taken
 on the GPU (`pre-gpu-*`), not against `Backend=d3d9` on lavapipe: DXVK on lavapipe
 draws the port scenes visibly differently from DXVK on the GPU (`port-nebula` at RMSE
 25.8, `port-firing` 7.0), while render3d on Vulkan on lavapipe is within 1 to 2 of the
 GPU's (`gpu/README.md`, "Measured"). A whole campaign mission does not load on
-lavapipe on either backend (32-bit address space, likely): run `display-stub` on Vulkan
-with `A2TEST_VULKAN_GPU=1` once the port scenes are clean under the layer.
+lavapipe on either backend (32-bit address space, likely); on the GPU it does.
 
 **Direct3D 12 on the bench** (`Backend=d3d12`) runs through Proton's vkd3d-proton on
 the GPU; there is no CPU driver for it here. With `Validate=1` the game gets the Khronos

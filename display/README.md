@@ -90,11 +90,11 @@ as before:
 | `display8_backend()` | what the plugins draw on: Direct3D 9, Vulkan, Direct3D 12 or none (`gpu/src/display.rs`, `BACKEND_*`) |
 | `display8_vk*`, `display8_dx12*`, `display8_engine_viewport`, `display8_engine_transform` | stub mode on Vulkan and Direct3D 12: the device, the frame, the upload ring, deferred frees, the engine's targets and mirrors, a flush, and the engine's state the plugins read. The contract is `gpu/src/display.rs` (its doc comment is the specification); `src/vk/exports.rs` and `src/dx12/exports.rs` implement it |
 
-The first four are the forward mode's (`src/api.rs`). No plugin reads
-`display8_device_epoch` yet: on Direct3D 9 render3d and the UI still tell a new device
-by the Direct3D 9 device behind the engine's (`gpu::Gpu::engine_id`), which they need
-on the chains without Display8 too; the epoch replaces that polling once the Direct3D 9
-backend goes (the display plan's last phase).
+The first four are the forward mode's (`src/api.rs`). render3d (`frame::begin`) and the
+UI (`gfx::attach`) tell a new device or a `Reset` by `display8_device_epoch`
+(`gpu::Gpu::device_epoch`, resolved once); on a `d3d8.dll` without it they compare the
+Direct3D 9 device behind the engine's (`gpu::Gpu::engine_id`) as before, until the
+Direct3D 9 backend goes (the display plan's last phase).
 
 ## How it works
 
@@ -212,7 +212,8 @@ engine's device, and draw the whole frame on it.
   kept for the engine's own `Get*` and goes nowhere.
 - **Resources are memory.** A texture's levels, a surface's pixels and a buffer's bytes
   live in Display8, and a lock hands out a pointer into them, as the managed pool's
-  system copy did. Draws are counted (the inventory) and dropped.
+  system copy did. Draws are counted (the inventory), and dropped, or drawn by the
+  passthrough on Vulkan ("Passthrough").
 - **The mirror table.** A texture a plugin asks for as Direct3D 9 (the radar's two
   scan-grid sprites, phase 0's only ones; the unit view's Bink frame) is made there
   once with every level and brought up to date when the engine unlocks a level, at
@@ -245,6 +246,140 @@ engine's device, and draw the whole frame on it.
 
 `display/bench-mode.sh stub` sets the mode in a bench clone from a scenario's `Setup:`;
 `display-stub` walks the whole game on it.
+
+## Passthrough
+
+`Passthrough=1` in `Display8.ini` (shipped, since the GPU runs below passed; 0 in the
+code, and the stub drops every engine draw as before): in stub mode on Vulkan the engine's own Direct3D 8 draws are
+drawn after all, on Display8's device, the way Direct3D 8's fixed function draws them
+(`src/passthrough.rs`, `src/vk/pass.rs`, `shaders/ff.hlsl`). It is ROADMAP phase 4's
+first slice (4a, 4b, most of 4c, 4d, 4e and 4f on Vulkan). Without it, whatever render3d
+or the UI does not draw itself vanishes in stub mode: a module switched off
+(`[Modules] hulls=0`), a SOD render3d hands back (one that does not load, a hologram's
+class that is not a plain database), an effect class it does not know, specials with
+no particle art, construction and the bees without the hulls module, a HUD part the UI
+has not taken. With it, each shows as stock, as on the forward chain.
+
+**Which draws.** Every draw on the stub's device is the engine's (the plugins draw
+through `gpu`), so routing is simple: every one is drawn, except
+
+- what `[Drop]` names (the same switches as in forward mode, so a category can still be
+  A/B'd: `Drop3D=1` drops the hand-backs again);
+- the frames of the engine's loading loop while `UI.asi` is loaded, whose loading screen
+  draws over them: a `BeginScene` with `RenderLoopAssetLoadStatusUpdate` up its stack
+  (`drop::in_loading`) marks its frame. Without the UI the engine's loading screen is
+  the only one and is drawn;
+- a draw into a render target of the engine's own other than its back buffer (none seen);
+- a draw through a vertex shader other than the one it has a port of (below), logged
+  once;
+- a draw made while a plugin's `Cmd` is recording (a plugin calling the engine with a
+  `Cmd` alive): logged once with its caller, never recorded into another recorder's
+  render pass.
+
+When claims arrive (ROADMAP phase 3 and 4g), they become the routing in place of "every
+one".
+
+**Where it lands.** In the frame's command buffer, at the moment the engine makes it,
+between the plugins' recorders: the same order as on Direct3D 9, where a plugin's targets
+stay bound after its `Cmd` and the engine's draws land in them. On Vulkan a plugin's
+pass ends with its `Cmd`, so render3d's `gpu` **publishes** its pass now at each of its
+`Cmd`s' ends (`display8_vk_pass`, `PASS_PUBLISH`; `gpu::Gpu::with_display_publishing`),
+every attachment put in its attachment layout first. While its body runs that is the
+scene pass (the half-float, multisampled target and its depth): the hulls it hands back
+are drawn into the scene, depth-tested against what render3d drew, then resolved,
+bloomed and tone-mapped with the rest. After its post passes it is the engine's back
+buffer, and the engine's targets are used (Display8's colour and depth). Without
+render3d (or before it publishes in a frame) every draw goes to the engine's targets,
+and the UI draws on top (4e). What was published is forgotten at `Present`: the views
+in it are render3d's, which it may let go of. The UI's `gpu` publishes nothing; it, and
+every other recorder, says only when a `Cmd` begins and ends (`PASS_ENTER`,
+`PASS_LEAVE`), which is how a draw inside one is told.
+
+**One render pass for a run of draws**, opened at an engine draw on the pass it goes to
+and left open; it is closed at the next call into Display8 that records or hands the
+frame over (`display8_vk_frame`, `display8_vk_mirror`, `display8_vk_flush`,
+`display8_vk_pass`, an upload, a `Clear`, `Present`), so the contract's "no render pass
+is open between recorders" still holds for every recorder. Draws are never merged or
+reordered, so the engine's back-to-front translucent order stands.
+
+**How Direct3D 8's state maps:**
+
+| Direct3D 8 | Here |
+|---|---|
+| FVF (`XYZ`, `XYZRHW`, normal, diffuse, specular, 0 to 8 coordinate sets of 1 to 4 floats) | vertex attributes at their offsets, at the stream's stride; what the FVF lacks reads a defaults buffer at stride 0: white diffuse, black specular, zero normal and coordinates, as Direct3D 8 has them. Vertex blending (`XYZB*`) is drawn unblended |
+| `XYZRHW` | screen pixels into clip space relative to the viewport, which Vulkan's viewport (the same rectangle) maps back, so the viewport clips them as Direct3D's does; w from 1/rhw, so coordinates are interpolated in perspective; Direct3D 9's pixel centres kept (DXVK's 0.5 - 1/128) |
+| `XYZ` | world, view and projection multiplied on the CPU; the viewport as the engine set it; Direct3D 9's centres only with `PixelCentres=d3d9`, as render3d's scene |
+| lighting (`LIGHTING`, the asteroid fields) | per vertex in world space: emissive, the ambient render state, each enabled light's (up to 8) ambient and diffuse, point and directional (a spot light as a point light), attenuation and range; material sources from `COLORVERTEX` and the four `*MATERIALSOURCE`s. No specular light |
+| texture stages 0 and 1 | `ps_ff` runs each stage's colour and alpha operation (every `D3DTOP_*` up to `LERP` but the bump-map ones and `PREMODULATE`) on its three arguments with complement and alpha replicate, `TEMP` as a result, `TEXTUREFACTOR`; a stage with no texture reads white. A third stage, a texture transform or generated coordinates are logged once and left out |
+| `SPECULARENABLE` | the specular colour added after the stages |
+| alpha test | in the pixel shader: the alpha as 255ths, rounded, against `ALPHAREF` by `ALPHAFUNC` |
+| blend | `ALPHABLENDENABLE`, `SRCBLEND`, `DESTBLEND` (`BOTH*` as Direct3D's), `BLENDOP`, `COLORWRITEENABLE`; on the engine's back buffer, which is X8R8G8B8, a destination alpha reads one |
+| depth | `ZENABLE`, `ZWRITEENABLE`, `ZFUNC`; off without a depth surface or attachment. `ZBIAS` is logged once and left out |
+| cull | `CULLMODE` as gpu has it (the vertex shader turns y over): `CW` is Vulkan's back face with a counter-clockwise front |
+| samplers | per stage: address, filters, mip filter, `MAXANISOTROPY`, `MIPMAPLODBIAS`, `MAXMIPLEVEL`, made as DXVK makes them under the game's `dxvk.conf` (the forced anisotropy and LOD bias), as the forward chain draws them |
+| fog | never enabled by the engine (the stock traces); logged once if it ever is |
+| fans | lists (a portability device has no fans) |
+
+Pipelines are made per target formats and samples, topology, vertex layout, blend,
+depth and cull, in Display8's pipeline cache (kept on disk). Everything else goes in
+two constant blocks in the upload ring, bound as dynamic uniform buffers of one set per
+ring chunk; a block equal to the last draw's is not sent again. Textures are the mirror
+table's: every engine texture a draw reads is mirrored at its first draw, with every
+level, and kept up to date as the engine writes it by lock; one over 256 KB goes up
+through a staging buffer of its own, let go of with the frame, so a mission's hull
+textures arriving at once do not grow the upload ring, whose chunks live as long as the
+device. A texture of another format than A8R8G8B8 and X8R8G8B8 (none seen), a cube or a
+volume, is drawn with white and logged once.
+
+**The engine's one vertex shader** (ROADMAP 4d) is the Borg hulls' bump pass. Display8
+keeps every vertex shader's declaration and function tokens at `CreateVertexShader`, the
+vertex shader constants at `SetVertexShaderConstant` and streams 1 to 3, and knows the
+shader by an FNV-1a hash of its function tokens (`passthrough::BORG_BUMP`); where its
+declaration puts each input in stream 0 is read off the declaration. Its port by hand is
+`vs_bump` in `shaders/ff.hlsl`: the position through the four rows the engine sets in
+constants 2 to 5, and the light direction of constant 6 taken into the vertex's tangent
+frame, normalised, offset and scaled by constants 0 and 1 into the diffuse colour, which
+the texture stages dot with the normal map (`DOTPRODUCT3`). The engine draws a Borg hull
+in three passes this way (two lights added, then the base texture multiplied over them),
+all of which the stage interpreter runs. Any other shader is refused and logged once with
+its hash; on the test bench its tokens are logged too, for porting.
+
+**What is not done yet** (ROADMAP phase 4): claims as
+the routing (4g, after phase 3); Direct3D 12 and the stub's Direct3D 9 (phase 10; the
+latter is to go). Specular lighting, spot cones, texture transforms, a third stage and
+`ZBIAS` are not drawn, each logged once when the engine uses it; none was seen in the
+stock traces.
+
+`display-passthrough` checks it (render3d's hulls off on the stub; the ships drawn),
+against `display-passthrough-forward`, the same scene through the forward chain.
+
+**Measured 2026-10-29** (1280x720, the showcase paused at its tick, bench clock): with
+`[Modules] hulls=0`, stub and passthrough on lavapipe with the validation layer against
+the forward chain (DXVK on the GPU). The Federation hulls are drawn into render3d's scene
+in place and lit as on the forward chain: RMSE 4.3/255 over the Galaxy, 4.8 over the
+Sovereign (a CPU rasteriser against a GPU's, as `gpu/README.md`'s "Measured"), no
+validation message, no draw made inside a plugin's recording. The Borg cubes are
+missing (their bump vertex shader, 4d), which makes the whole frame's RMSE 22.9. With
+every module on, `port-showcase` on the stub draws the same frame with `Passthrough=1`
+as with 0 (RMSE 0): the engine draws nothing there.
+
+**On the GPU** (RX 5700, RADV, the validation layer on; `A2TEST_VULKAN_GPU=1`), the same
+scene against the same forward frame, RMSE in 1/255:
+
+| | Galaxy | Sovereign | Borg cube | whole frame |
+|---|---|---|---|---|
+| before the bump port | 3.54 | 3.96 | missing | 22.83 |
+| with it | 3.54 | 3.96 | 18.78 | 6.81 |
+| with it, `PixelCentres=d3d9` | 3.04 | 3.79 | 1.37 | 1.64 |
+
+The cube's 18.8 is half a pixel: the engine's transformed draws keep Vulkan's pixel
+centres, as render3d's own scene does, unless `PixelCentres=d3d9`, and the cube's fine
+plating shows a half-pixel shift that much; with Direct3D 9's centres it is the forward
+frame within 1.4. No validation message in any run. `display-stub` (the whole game:
+intro to Exit, a campaign mission, save and load, an Instant Action match, the Credits)
+and `display-drop` both passed on the GPU with `Passthrough=1` and the layer, with no
+validation message; with every module on, the engine drew into the passthrough only
+once, in the shell, into its own targets.
 
 ## VSync
 
@@ -358,8 +493,13 @@ the swap chain's image, submits and presents.
   same command buffer again (its pool reset): a plugin's read-back (the frame dumps).
 - **Mirrors** are the engine textures a plugin samples (`display8_vk_mirror`), as the
   Direct3D 9 mirror table has them, brought up to date when the frame is asked for.
-- **`Device=`** takes only a device whose name has it (the test bench: `llvmpipe`,
-  Mesa's CPU Vulkan, never the GPU); **`Validate=1`** the Khronos validation layer, its
+  They can be copied from (`TRANSFER_SRC`), so a recorded frame (`gpu/README.md`,
+  "Record and replay") reads back the mirrors it samples as they were.
+- **The physical device** is chosen by type: discrete, then integrated, virtual, other,
+  and a CPU (software) device last, among those with a queue that draws and presents;
+  `Display8.log` lists every device and its rank and says which it `chose`.
+  **`Device=`** takes only a device whose name has it (the test bench with
+  `--vulkan-device lavapipe`: `llvmpipe`, Mesa's CPU Vulkan); **`Validate=1`** the Khronos validation layer, its
   warnings and errors in `Display8.log` (`vulkan 0x...:`); **`PixelCentres=d3d9`**
   Direct3D 9's pixel centres for the plugins (`gpu/README.md`, "Pixel centres"), for
   comparing with `Backend=d3d9` pixel for pixel.
@@ -378,17 +518,17 @@ the swap chain's image, submits and presents.
   backends filter alike. Without it every hull read a level blurrier on Vulkan. Vulkan's cube maps are always seamless, as
   `d3d9.seamlessCubes = True` makes DXVK's.
 
-On the bench every Vulkan game runs on lavapipe with the layer on (unless
-`A2TEST_VULKAN_GPU=1`, for a deliberate run on the GPU): the game's
-environment gets `VK_DRIVER_FILES` (and `VK_ICD_FILENAMES`) naming
-`/usr/share/vulkan/icd.d/lvp_icd.json` and `VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation`
-(umu passes the bench's environment on; pressure-vessel honours both;
-`testbench/bench/session.py`, `vulkan_env`, sets them from the clone's `Display8.ini`),
-and `display/bench-mode.sh` gives `Display8.ini` `Device=llvmpipe` and `Validate=1`, so even an environment that lost the variables
-cannot reach the GPU. `Display8.log` names the device (`vulkan: physical device
-llvmpipe ...`); the process's maps show `libVkLayer_khronos_validation.so` and
-`libvulkan_lvp.so`, and no other driver. A frame takes seconds there: its time means
-nothing.
+On the bench every Vulkan game runs on the GPU (the one DXVK uses) with the layer on
+(display 0.9.1): the game's environment gets `VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation`
+(`testbench/bench/session.py`, `vulkan_env`, from the clone's `Display8.ini`) and
+`display/bench-mode.sh` gives `Display8.ini` `Validate=1`, so the layer catches errors
+before they can hang the GPU. `a2test ... --vulkan-device lavapipe`
+(`A2TEST_VULKAN_DEVICE=lavapipe`) puts the game on lavapipe instead: `VK_DRIVER_FILES`
+(and `VK_ICD_FILENAMES`) naming `/usr/share/vulkan/icd.d/lvp_icd.json` (umu passes the
+bench's environment on; pressure-vessel honours both) and `Device=llvmpipe`, so even
+an environment that lost the variables cannot reach the GPU; a frame takes seconds
+there and its time means nothing. `--no-validate` (`A2TEST_VULKAN_VALIDATE=0`) drops
+the layer, for timing runs. `Display8.log` names the device (`vulkan: chose ...`).
 
 ### Direct3D 12
 

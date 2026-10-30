@@ -31,7 +31,8 @@ What an agent driving the game as `./install` now gives it (every part of the UI
 
 - The bench's profile starts in interface mode 1 (no unit view): Ctrl+I three times
   gives mode 0, and UI.log says "unit view: shown". The mode is kept in the clone's
-  `ARMADA.PRF`, so a second round in the same session cycles past it.
+  `ARMADA.PRF`, so a second round in the same session cycles past it. The bench sets
+  the clone's mode to 1 itself (`prepare`), whatever the player's profile holds.
 - Federation mission 1: the loading screen of ours, then about 70 s of opening cutscene
   (view 2, no HUD), then the briefing. After Abort Mission and Yes the Admiral's Log
   comes up over the mission; its Done leads to the single-player screen (Previous

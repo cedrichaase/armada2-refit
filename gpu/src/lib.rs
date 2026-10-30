@@ -41,6 +41,8 @@ pub mod display;
 pub mod dx12;
 mod frame;
 pub mod pixels;
+pub mod record;
+pub mod replay;
 pub mod types;
 pub mod vulkan;
 

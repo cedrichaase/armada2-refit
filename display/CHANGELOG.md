@@ -4,6 +4,53 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.11.0 — 2026-10-29
+
+### Added
+- On Vulkan, the mirrors of engine textures can be copied from (`TRANSFER_SRC`), so a
+  recorded `gpu` frame reads back the mirrors it samples (`gpu/README.md`, "Record and
+  replay"). `239f29c`
+
+Confirmed in game 2026-10-30.
+
+## 0.10.0 — 2026-10-29
+
+### Added
+- Passthrough (`Passthrough=` in `Display8.ini`, 1 as shipped, 0 in the code): in stub
+  mode on Vulkan the engine's own Direct3D 8 draws are drawn, through a fixed-function
+  emulation (`shaders/ff.hlsl`: pre-transformed and transformed vertices, per-vertex
+  lighting, two texture stages, alpha test, specular add), into the pass render3d
+  publishes (its scene) or the engine's targets. What render3d or the UI does not draw
+  (a module off, a SOD handed back) shows as stock instead of vanishing. ROADMAP
+  phase 4, first slice; Direct3D 12 and claims are still to come (README.md,
+  "Passthrough"). `24be351`
+- The engine's one vertex shader, the Borg hulls' bump pass, through the passthrough:
+  vertex shaders' tokens, constants and streams 1 to 3 are kept, the shader is known by
+  a hash of its tokens and drawn by a port of it (`vs_bump` in `shaders/ff.hlsl`); any
+  other shader is refused and logged (ROADMAP 4d). `7771201`
+- `display8_vk_pass` export: a plugin's `Cmd` begins, ends, or ends with its pass
+  published (`gpu/src/display.rs`, `VkPass8`).
+- Every engine texture a passed-through draw reads is mirrored; a mirror upload over
+  256 KB goes through a staging buffer of its own.
+
+### Changed
+- The stub device starts with Direct3D's default texture-stage and render states
+  (stage 0 modulate, `TEXTUREFACTOR`, `COLORWRITEENABLE`, ...), as its `Get*` now
+  return. `[Drop]` is read again every 60 presents in stub mode too.
+
+Confirmed in game 2026-10-30.
+
+## 0.9.1 — 2026-10-29
+
+### Changed
+- Vulkan picks its physical device by type: discrete, integrated, virtual, other, CPU
+  last (it took the first when none was discrete, so a software device could win), and
+  logs every candidate's rank and the device it `chose`. `bench-mode.sh` leaves
+  `Device=` empty unless `A2TEST_VULKAN_DEVICE=lavapipe` (the bench's Vulkan is on the
+  GPU now, testbench 3.70.0).
+
+Confirmed in game 2026-10-30.
+
 ## 0.9.0 — 2026-10-25
 
 ### Added
@@ -24,7 +71,7 @@ Confirmed in game 2026-10-25.
   installed `Mode=forward` and `Backend=d3d9` to the new defaults, and keeps any other
   value a player set.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.7.0 — 2026-10-23
 
@@ -49,7 +96,7 @@ Installed, not yet seen in game.
 - A Vulkan or Direct3D 12 start that fails takes down everything it made (instance,
   surface, device, swap chain, frame), so that the next backend can have the window.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.6.2 — 2026-10-23
 
@@ -88,7 +135,7 @@ Confirmed in game 2026-10-23.
 - `display8_backend` answers Direct3D 12 from the engine's `Direct3DCreate8` on, as it
   does Vulkan.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.5.0 — 2026-10-23
 

@@ -4,6 +4,18 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 2.2.0 — 2026-10-29
+
+Reads package schemas 0 and 1, unchanged.
+
+### Added
+- The bug report reads `Display8.log` (it was not collected before) and states in its
+  findings the mode, the backend chosen (vulkan, d3d12, d3d9) and why: `Backend=auto`'s
+  order, a fallback with its reason, an order set by hand, or a stand-down to forward
+  mode (`display8_backend`; selftest checks). All three systems share the code.
+
+Confirmed in game 2026-10-30.
+
 ## 2.1.1 — 2026-10-28
 
 Reads package schemas 0 and 1, unchanged.
@@ -13,7 +25,7 @@ Reads package schemas 0 and 1, unchanged.
   no longer "on Direct3D 9": `install.sh` now leaves `Display8.ini` on `Backend=auto`
   there (root 13.36.1). `test-macos.sh` expects `Backend=auto`. `4c0f9e4`
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 2.1.0 — 2026-10-25
 
@@ -30,7 +42,7 @@ as it comes.
 - The bug report names Display8 and `d3d8_real.dll`, and no longer says the plugins get
   no Direct3D 9 device when Display8 stands in front of d3d8to9. `2af094a`
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 2.0.0 — 2026-10-22
 
@@ -97,7 +109,7 @@ Reads package schemas 0 and 1.
   `d3d8.dll` back, old and new plugins together, `Enable=0`, the menu scene off, a
   panic. The home folder, user names and IPv4 addresses are left out (`redact`).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 1.6.0 — 2026-10-17
 
@@ -112,7 +124,7 @@ Reads package schemas 0 and 1.
 ### Changed
 - An install is recognised by `UI.asi` as well as `HUD.asi`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 1.5.0 — 2026-10-12
 
@@ -222,7 +234,7 @@ Reads package schemas 0 and 1.
 ### Changed
 - `INSTALLER_ASSET` is the AppImage, so the "newer installer" banner links to it.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 1.1.0 — 2026-10-09
 
@@ -242,7 +254,7 @@ Reads package schemas 0 and 1.
 - `FONT_URL`/`FONT_SHA` and the cached font; the window no longer fetches anything but
   the release list and the zip.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 1.0.0 — 2026-10-08
 
@@ -264,4 +276,4 @@ Reads package schemas 0 and 1.
 - Command line: `--list`, `--install [VERSION]`, `--package ZIP`, `--uninstall`,
   `--selftest`, `--check-version`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.

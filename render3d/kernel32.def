@@ -31,3 +31,7 @@ OutputDebugStringA@4
 ExitProcess@4
 GetCurrentThreadId@0
 GetProcAddress@8
+GetModuleHandleExA@12
+CreateFileMappingA@24
+MapViewOfFile@20
+GetCurrentProcessId@0

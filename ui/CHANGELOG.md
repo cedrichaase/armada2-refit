@@ -4,6 +4,65 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.25.1 — 2026-10-29
+
+### Fixed
+- Nebulae (and every other feature the engine's map picture carries, the warp
+  suppression field too) were missing from the minimap of `[HUD] Minimap=1`: both
+  textures are sprites of stock's `additive` material, and ours drew them as alpha
+  images, so texels with no alpha added nothing. They are now added
+  (`hud/minimap.rs`). Scenario `ui-hud-minimap-nebula` (scene `ui-minimap-nebula`).
+  `0f38f33`. Confirmed in game 2026-10-30.
+
+## 0.25.0 — 2026-10-29
+
+### Added
+- `[HUD] SystemIcons=1`: with `Selection=1`, the damaged systems of every unit whose
+  gauges show (the pointed one; the selection's with `SelectionGauges=1`) in a row of
+  chips under its brackets, as stock's `SelectionDisplay` showed its `RepairIcon`s
+  (`engine::overlay::systems`). `UI.log`: "overlay: systems of ...".
+- `[HUD] ShotScenes=1`: with `Minimap=1`, in the tactical view, a faint ring on the
+  minimap about each of the shot director's scenes (the fights), as stock's radar
+  drew them (`engine::radar::shot_scenes`).
+- `[HUD] MinimapCursor=1`: over our minimap, the action cursor stock's showed
+  (`ActionMode::GetAction` at the point, `SetCursorAiAction`'s table: patrol, the
+  "cannot" cursors...), keeping the warp/move choice for a plain move; 0 the arrow.
+- `[HUD] FrameRate=1`: what `RTS_CFG.h`'s `FRAMERATE_DISPLAY` prints (triangles, frame
+  rates, the timing slots) in a panel of the theme; `Armada_RenderFrame`'s two prints
+  are re-pointed (`engine::leftovers`). 0 the engine's lines.
+- `ui/bench-asi.sh --rts K=V`: an `int` of the clone's `RTS_CFG.h` (`FRAMERATE_DISPLAY=1`).
+
+Confirmed in game 2026-10-30.
+
+## 0.24.0 — 2026-10-29
+
+### Added
+- A frame of the UI's `gpu` calls can be recorded for a replay with no game
+  (`gpu/README.md`, "Record and replay"): asked for with `Gpu.record` beside the exe, on
+  Display8's Vulkan backend only, written to `Dumps\<name>\UI.asi.a2s`. The recorded
+  frame ends at the engine's `Present`, where the UI dumps it as presented
+  (`Dumps\<name>-game-*-present.ppm`) for the replay to be compared with. `239f29c`
+
+Confirmed in game 2026-10-30.
+
+## 0.23.2 — 2026-10-29
+
+### Changed
+- Built with `gpu`'s pass events: on Vulkan each `Cmd` tells Display8 when it begins
+  and ends (`display8_vk_pass`), so its passthrough never records inside the UI's
+  recording (display 0.10.0). `24be351`
+
+Confirmed in game 2026-10-30.
+
+## 0.23.1 — 2026-10-29
+
+### Changed
+- `gfx::attach` learns of a new device or a `Reset` from Display8's
+  `display8_device_epoch` when Display8 is present (`Gpu::device_epoch`); without the
+  export it takes the backend's new-device flag as before.
+
+Confirmed in game 2026-10-30.
+
 ## 0.23.0 — 2026-10-25
 
 ### Fixed
@@ -17,7 +76,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
   by the UI, fitted between black bars: `NextBinkFrame`'s `BinkCopyToBuffer` call is
   re-pointed and the frame handed to `ui_present_movie`. `6d7180d`
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.22.0 — 2026-10-23
 
@@ -40,7 +99,7 @@ Confirmed in game 2026-10-23.
   that the pan did not make ("focus: ...", "pointer: jumped ..."). For the cursor that
   jumps after the game lost the focus (README.md, "Focus and the pointer").
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.20.1 — 2026-10-23
 
@@ -49,7 +108,7 @@ Installed, not yet seen in game.
   own, renamed into place: two builds of one tree at once (`a2test -j` installing one
   checkout twice) failed on the shared `mod.rs.new`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.20.0 — 2026-10-23
 
@@ -76,7 +135,7 @@ Confirmed in game 2026-10-23.
   shipped file has it, with the upgrades kept per file (`[UI]` for `UI.ini`,
   `[Display8]` for `Display8.ini`); `UI.ini`'s merge is as before.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.19.1 — 2026-10-23
 
@@ -93,7 +152,7 @@ Confirmed in game 2026-10-23.
   pipelines carry their DXIL, and what took Display8's Vulkan device takes either of
   Display8's own (`gpu::Gpu::on_display`); the log names the backend.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.18.0 — 2026-10-23
 
@@ -124,7 +183,7 @@ Confirmed in game 2026-10-23.
 - The UI shader's DXIL for Direct3D 12 (`src/shaders/ui_dxil.rs`), from
   `render3d/hlsl-rs.sh`; the d3dbc and SPIR-V are byte for byte as before.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.17.0 — 2026-10-23
 
@@ -227,7 +286,7 @@ Confirmed in game 2026-10-19.
 - No cursor on the loading screen: the engine draws none there, and ours is drawn only
   where the engine would draw one.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 ## 0.13.1 — 2026-10-18
 
 ### Changed
@@ -270,7 +329,7 @@ Confirmed in game 2026-10-18.
   for five frames ("layout: WxH | info x,y,w,h | bar ..."; `hud/layout.rs`, HUD.md,
   "The layout log"). Nothing is kept or written at 0.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.11.1 — 2026-10-17
 
@@ -285,7 +344,7 @@ Installed, not yet seen in game.
   wider than the room beside the bar: 30 units take three rows of ten, not four of
   eight.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.11.0 — 2026-10-17
 

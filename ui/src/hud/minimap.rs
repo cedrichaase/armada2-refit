@@ -173,11 +173,15 @@ pub fn run(ui: &mut Ui) {
     // The map: space, the engine's picture of the map's features, warp suppression.
     ui.draw.fill(sq, Corners::SQUARE, rgba(4, 6, 12, 255));
     ui.draw.push_clip(sq);
+    // Both are sprites of the 'additive' material in stock (the texels are light to add,
+    // black adds nothing; their alpha is not coverage), so they are added here.
+    let corners = [(sq.x, sq.y), (sq.right(), sq.y), (sq.right(), sq.bottom()), (sq.x, sq.bottom())];
+    let uv = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)];
     if let Some(m) = ext_texture(&mut s.map, radar::map_texture()) {
-        ui.draw.image(m, sq, 0xffffffff);
+        ui.draw.quad_additive(m, corners, uv, 0xffffffff);
     }
     if let Some(w) = ext_texture(&mut s.warp, radar::warp_texture()) {
-        ui.draw.image(w, sq, 0xffffffff);
+        ui.draw.quad_additive(w, corners, uv, 0xffffffff);
     }
     let at = |u: f32, v: f32| (sq.x + u * sq.w, sq.y + v * sq.h);
     // A texel of the stock radar's 128-texel map, at our size.
@@ -271,6 +275,19 @@ pub fn run(ui: &mut Ui) {
         let w = ui.u(1.5).max(1.0);
         ui.draw.stroke(R::new(cx - rad, cy - rad, 2.0 * rad, 2.0 * rad), Corners::round(rad), w, fade(t.warn, 0.9));
         ui.draw.line((cx, cy), (ex, ey), w, fade(t.warn, 0.9));
+    }
+    // The tactical view: the places the shot director would film (the fights), each
+    // ringed faintly in stock's grey, here the theme's dim text (`[HUD] ShotScenes`).
+    if crate::config::get().hud.shot_scenes {
+        let scenes = radar::shot_scenes(r);
+        let w = ui.u(1.0).max(1.0);
+        for &((u, v), rad) in &scenes {
+            let (cx, cy) = at(u, v);
+            let rad = (rad * sq.w).max(ui.u(3.0));
+            let rr = R::new(cx - rad, cy - rad, 2.0 * rad, 2.0 * rad);
+            ui.draw.stroke(rr, Corners::round(rad), w, fade(t.text_dim, 0.75));
+        }
+        log_scenes(scenes.len());
     }
     ui.draw.pop_clip();
     ui.draw.stroke(sq, Corners::SQUARE, ui.u(1.0).max(1.0), fade(t.panel_edge, 0.8));
@@ -412,6 +429,18 @@ fn mouse(ui: &mut Ui, sq: R) {
         radar::queue_camera(uv.0, uv.1, tactical);
         if !tactical {
             s.drag = Some(cam_b);
+        }
+    }
+}
+
+/// UI.log says when the number of the shot director's scenes ringed changes (the
+/// bench reads it: "minimap: 2 shot scenes ringed").
+fn log_scenes(n: usize) {
+    static mut LAST: usize = 0;
+    unsafe {
+        if LAST != n {
+            LAST = n;
+            crate::log!("minimap: {} shot scenes ringed", n);
         }
     }
 }
