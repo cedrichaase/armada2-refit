@@ -15,7 +15,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - `no-assets` step 15 expects render3d's menu scene under the UI's column, not stock
   title art.
 
-Installed, not yet seen in game. `HASH`
+Installed, not yet seen in game. `6070901`
 
  — 2026-10-29
 

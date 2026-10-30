@@ -13,7 +13,7 @@ Layers: testbench 3.74.2.
 - The bench no longer leaks a null sink per launch and sweeps stale `a2test-*` sinks;
   `no-assets` step 15 expects the menu scene.
 
-Installed, not yet seen in game. `HASH`
+Installed, not yet seen in game. `6070901`
 
 ## 13.42.4 — 2026-10-30
 
