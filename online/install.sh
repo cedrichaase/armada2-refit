@@ -38,7 +38,11 @@ fi
 bash "$here/build.sh" >/dev/null
 
 cp "$here/build/Online.asi" "$GAME/Online.asi"
-cp "$here/Online.ini"       "$GAME/Online.ini"
+if [ -f "$GAME/Online.ini" ]; then
+    python3 "$here/../tools/ini-merge.py" "$here/Online.ini" "$GAME/Online.ini"
+else
+    cp "$here/Online.ini" "$GAME/Online.ini"
+fi
 rm -f "$GAME/Online.log"
 echo "installed into $GAME:"
 ls -l "$GAME/Online.asi" "$GAME/Online.ini"

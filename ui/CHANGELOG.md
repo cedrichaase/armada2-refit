@@ -4,6 +4,13 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.25.3 — 2026-10-30
+
+### Changed
+- `ini-merge.py` moved to `tools/ini-merge.py`, shared by every installer; `install.sh`
+  calls it there. Options `--before-comments` and a per-file retired-defaults table added.
+  Installed, not yet seen in game (1973ecb).
+
 ## 0.25.2 — 2026-10-30
 
 ### Changed

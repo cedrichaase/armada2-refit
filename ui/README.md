@@ -499,7 +499,7 @@ keys it is given; it is what a scenario's `Setup:` line runs.
 
 ### Installing
 
-`ui/install.sh` copies `UI.asi`, merges `UI.ini` into the player's (`ini-merge.py`:
+`ui/install.sh` copies `UI.asi`, merges `UI.ini` into the player's (`tools/ini-merge.py`:
 their values stay, a key they lack is added) and then runs `supersede.sh`, which
 takes out of the game directory the plugins whose places the parts switched on take:
 

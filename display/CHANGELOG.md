@@ -4,6 +4,12 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.11.2 — 2026-10-30
+
+### Changed
+- `install` calls the merge at `tools/ini-merge.py` (was `ui/ini-merge.py`); no change to
+  what it does. Installed, not yet seen in game (1973ecb).
+
 ## 0.11.1 — 2026-10-30
 
 ### Changed
