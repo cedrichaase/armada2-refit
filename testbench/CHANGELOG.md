@@ -14,7 +14,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
   `passthrough-nebula` at ticks 200, 202 and 220, and the stub with `Passthrough=1`
   held to it (RMSE 1.5), the paused frame to itself.
 
-Installed, not yet seen in game.
+Installed, not yet seen in game. (be4975d)
 
 ## 3.78.1 — 2026-10-30
 

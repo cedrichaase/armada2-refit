@@ -16,7 +16,7 @@ Layers: testbench 3.78.2.
   chain at three ticks. The reported extra motion was measured not to be the
   passthrough's (`display/README.md`, "Passthrough", "Map nebulae").
 
-Installed, not yet seen in game.
+Installed, not yet seen in game. (be4975d)
 
 ## 13.51.1 — 2026-10-30
 
