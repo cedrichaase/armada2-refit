@@ -14,7 +14,7 @@ Layers: render3d 0.30.0, testbench 3.75.0.
   Pivot=1`; 0 gives it back to the engine, drawn on the stub by Display8's
   passthrough); scenarios `render3d-pivot` and `render3d-pivot-stock`.
 
-Installed, not yet seen in game.
+Installed, not yet seen in game. (1da0694)
 
 ## 13.45.0 — 2026-10-30
 

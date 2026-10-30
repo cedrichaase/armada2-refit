@@ -12,7 +12,7 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   lens: a thin ring with four ticks on the map's plane, a soft halo under it, drawn as
   the height posts' lines. `[Overlays] Pivot=` (1; 0: the engine's), `PivotRadius`,
   `PivotWidth`, `PivotGlow`, `PivotColour`, `PivotBrightness`. Taken only while
-  `TacticalCamera::Render` is stock's. Installed, not yet seen in game
+  `TacticalCamera::Render` is stock's. Installed, not yet seen in game (1da0694)
 
 ## 0.29.4 — 2026-10-30
 

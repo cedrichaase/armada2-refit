@@ -10,7 +10,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 ### Added
 - `render3d-pivot` (render3d's pivot marker in the tactical view, the engine drawing
   nothing there) and `render3d-pivot-stock` (`Pivot=0` on the stub: the engine's marker
-  through the passthrough). Installed, not yet seen in game
+  through the passthrough). Installed, not yet seen in game (1da0694)
 
 ## 3.74.2 — 2026-10-30
 
