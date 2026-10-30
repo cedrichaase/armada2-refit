@@ -8,7 +8,7 @@ in [`README.md`](README.md).
 
 ### Changed
 - `install` calls the merge at `tools/ini-merge.py` (was `ui/ini-merge.py`); no change to
-  what it does. Installed, not yet seen in game. HASH
+  what it does. Installed, not yet seen in game (1973ecb).
 
 ## 0.11.0 — 2026-10-29
 

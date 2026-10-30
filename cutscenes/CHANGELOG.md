@@ -8,7 +8,7 @@ Details are in [`binkproxy/README.md`](binkproxy/README.md).
 
 ### Changed
 - `binkproxy/install.sh` merges an existing `BinkProxy.ini` with `tools/ini-merge.py`
-  (new keys added) instead of leaving it as it was. Installed, not yet seen in game. HASH
+  (new keys added) instead of leaving it as it was. Installed, not yet seen in game (1973ecb).
 
 ## 2.2.0 — 2026-10-25
 

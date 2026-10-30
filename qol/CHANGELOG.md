@@ -10,7 +10,7 @@ versions". Newest first. Details, and the planned changes, are in
 ### Changed
 - `install.sh` merges an existing `QOL.ini` and `QOLRules.ini` with `tools/ini-merge.py`
   (keys added, the player's values kept) instead of overwriting them; `--pan-speed` still
-  sets `PanSpeed=` afterwards. Installed, not yet seen in game. HASH
+  sets `PanSpeed=` afterwards. Installed, not yet seen in game (1973ecb).
 
 ## 1.6.4 — 2026-10-23
 

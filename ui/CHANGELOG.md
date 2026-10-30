@@ -9,7 +9,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
 ### Changed
 - `ini-merge.py` moved to `tools/ini-merge.py`, shared by every installer; `install.sh`
   calls it there. Options `--before-comments` and a per-file retired-defaults table added.
-  Installed, not yet seen in game. HASH
+  Installed, not yet seen in game (1973ecb).
 
 ## 0.25.1 — 2026-10-29
 

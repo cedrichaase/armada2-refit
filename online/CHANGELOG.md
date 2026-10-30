@@ -8,7 +8,7 @@ and versions". Newest first. Details are in [`README.md`](README.md).
 
 ### Changed
 - `install.sh` merges an existing `Online.ini` with `tools/ini-merge.py` instead of
-  overwriting it. Installed, not yet seen in game. HASH
+  overwriting it. Installed, not yet seen in game (1973ecb).
 
 ## 0.6.3 — 2026-10-21
 

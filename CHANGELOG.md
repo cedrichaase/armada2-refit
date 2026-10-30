@@ -16,7 +16,7 @@ Layers: qol 1.7.0, online 0.7.0, cutscenes 2.3.0, render3d 0.29.4, ui 0.25.3, di
 ### Changed
 - The QOL, QOLRules, Online and BinkProxy installers merge an existing ini instead of
   overwriting or ignoring it; render3d's inline merge became a call to the shared one.
-  Installed, not yet seen in game. HASH
+  Installed, not yet seen in game (1973ecb).
 
 ## 13.42.4 — 2026-10-30
 

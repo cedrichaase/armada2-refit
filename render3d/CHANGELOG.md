@@ -9,7 +9,7 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 ### Changed
 - `install.sh` merges `Render3D.ini` with `tools/ini-merge.py` (`--before-comments`, the old
   inline merge's placement; its retired-default table moved there), byte-identical on the
-  fixtures of `tools/ini-merge-selftest.sh`. Installed, not yet seen in game. HASH
+  fixtures of `tools/ini-merge-selftest.sh`. Installed, not yet seen in game (1973ecb).
 
 ## 0.29.2 — 2026-10-30
 
