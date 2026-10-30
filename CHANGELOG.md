@@ -5,6 +5,25 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.48.0 — 2026-10-30
+
+Layers: display 0.12.0, render3d 0.31.0, ui 0.26.0, testbench 3.76.0.
+
+**This release's `d3d8.dll`, `Render3D.asi` and `UI.asi` must ship and be installed
+together**: the contract between them changed incompatibly, the last time it does so
+in lock-step. From here a mismatch is told and stands down cleanly.
+
+### Added
+- The contract between Display8 and the plugins is versioned (ROADMAP Phase 4, "ABI
+  handshake"): `display8_abi()` (major, minor; contract 1.0), a `size` first in every
+  `#[repr(C)]` struct of `gpu/src/display.rs`, the exports renamed with their major
+  (`display8v1_*`). `gpu` 1.0.0 (`gpu::VERSION`) logs both versions; an older or newer
+  Display8, or plugins of another major, stand down to Direct3D 9 only, with "no
+  Display8" and "Display8 too old" logged apart. The rule for minors and majors is in
+  `gpu/README.md` and `display/README.md`, "Versions".
+
+Installed, not yet seen in game. (c470071)
+
 ## 13.47.0 — 2026-10-30
 
 Layers: render3d 0.30.0, testbench 3.75.0.

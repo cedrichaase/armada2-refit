@@ -47,6 +47,9 @@ earlier comes to the stub on `auto`, and a game whose `Backend=vulkan` (or any v
 other than d3d9) was set by hand keeps it, its `Mode=forward` moved to stub. A player
 who had chosen `forward` or `d3d9` before their default changed is moved too; the merge
 cannot tell that choice from the old default, and prints each key it moves.
+Since 0.12.0 the code's defaults are the shipped file's (`Mode=stub`, `Backend=auto`,
+`Passthrough=1`), so a `Display8.ini` without those keys, or none at all, runs as
+shipped.
 
 With no `d3d8.dll` in the game directory (the system's is the chain), Display8 goes in
 alone and loads the system's own (`GetSystemDirectory`: SysWOW64 on 64-bit Windows,
@@ -87,14 +90,55 @@ as before:
 | `display8_device_epoch()` | moves on at every `CreateDevice`, every `Reset` that succeeds, and when the device goes: whatever a plugin made at another epoch must be made again |
 | `display8_device()` | the engine's device now (ours, not referenced), or null |
 | `display8_frame()` | frames presented so far |
-| `display8_backend()` | what the plugins draw on: Direct3D 9, Vulkan, Direct3D 12 or none (`gpu/src/display.rs`, `BACKEND_*`) |
-| `display8_vk*`, `display8_dx12*`, `display8_engine_viewport`, `display8_engine_transform` | stub mode on Vulkan and Direct3D 12: the device, the frame, the upload ring, deferred frees, the engine's targets and mirrors, a flush, and the engine's state the plugins read. The contract is `gpu/src/display.rs` (its doc comment is the specification); `src/vk/exports.rs` and `src/dx12/exports.rs` implement it |
+| `display8_abi(caller_major, caller_minor, caller, &major, &minor)` | the contract's handshake (since 0.12.0): Display8's contract version, the plugin's logged beside it ("Versions of the contract" below) |
+| `display8v1_backend()` | what the plugins draw on: Direct3D 9, Vulkan, Direct3D 12 or none (`gpu/src/display.rs`, `BACKEND_*`) |
+| `display8v1_vk*`, `display8v1_dx12*`, `display8v1_engine_viewport`, `display8v1_engine_transform` | stub mode on Vulkan and Direct3D 12: the device, the frame, the upload ring, deferred frees, the engine's targets and mirrors, a flush, and the engine's state the plugins read. The contract is `gpu/src/display.rs` (its doc comment is the specification); `src/vk/exports.rs` and `src/dx12/exports.rs` implement it |
 
-The first four are the forward mode's (`src/api.rs`). render3d (`frame::begin`) and the
+The first five are the forward mode's (`src/api.rs`), unversioned: plain scalars, the
+same in every release. render3d (`frame::begin`) and the
 UI (`gfx::attach`) tell a new device or a `Reset` by `display8_device_epoch`
 (`gpu::Gpu::device_epoch`, resolved once); on a `d3d8.dll` without it they compare the
 Direct3D 9 device behind the engine's (`gpu::Gpu::engine_id`) as before, until the
 Direct3D 9 backend goes (the display plan's last phase).
+
+## Versions of the contract
+
+The `display8v1_*` exports and their `#[repr(C)]` structs are a contract between this
+DLL and the `gpu` crate linked into `Render3D.asi` and `UI.asi`. Up to display 0.11.0
+it had no version: a d3d8.dll and plugins from two releases would have read each
+other's structs at the wrong offsets. Since 0.12.0 (contract 1.0) it has a major and a
+minor (`gpu::display::ABI_MAJOR`, `ABI_MINOR`), and the rule is the one in
+`gpu/src/display.rs`, "Versions":
+
+- **A minor only adds**: an export, a constant, or a field at the end of a struct.
+  Every struct starts with `size`, so each side reads only what the other knows (a
+  struct handed out says its size; a struct to be filled says its room, and the
+  writer fills no more and sets `size` to what it wrote: `gpu::display::read`,
+  `write`). A plugin uses what minor N added only on a Display8 of minor N or more. A
+  struct inside another (`VkPass8`'s images) does not grow in a minor.
+- **Anything else is a new major**: a field removed, moved, retyped or meaning
+  something new; an export's signature or meaning; a rule between the recorders
+  (layouts, states, heaps, who closes a render pass). The exports carry the major in
+  their names (`display8v1_*`), so a plugin of another major finds none of them, and
+  `display8_abi`, whose name and signature never change, says why.
+
+What each side does with a mismatch, and logs:
+
+| Files | What happens | The log |
+|---|---|---|
+| plugins and Display8 of one major | the handshake agrees; the plugins draw on the backend Display8 says | `Render3D.log`/`UI.log`: `gpu 1.0.0 (contract 1.0): Display8 0.12.0 (contract 1.0)`; `Display8.log`: `contract: UI.asi asks for 1.0; Display8's is 1.0: drawn through` |
+| no Display8 (another chain's `d3d8.dll`: crosire's d3d8to9, DXVK's, Wine's) | Direct3D 9, as ever | `gpu ...: no Display8 (the game's d3d8.dll is another chain's): Direct3D 9` |
+| plugins newer than Display8 (a Display8 before 0.12.0) | `gpu` finds unversioned exports and no `display8_abi`: it stands down to Direct3D 9 only, which on Display8's own Vulkan or Direct3D 12 draws nothing | `gpu ...: Display8 0.11.0 is too old for this plugin (no contract handshake ...)` |
+| plugins older than Display8 (built before 0.12.0) | they look for `display8_backend` and find nothing: Direct3D 9 only, nothing drawn on Vulkan or Direct3D 12 | `Display8.log`, in stub mode 300 frames into the first mission (such a plugin calls nothing of Display8's, so it is told by not having asked): `contract: Render3D.asi is loaded and has not asked for the contract ...` |
+| another major either way | as above, both sides | `gpu ...: Display8 ... has contract 2.0, another major ...`; `Display8.log`: `... another major: it finds none of this Display8's exports and stands down` |
+
+On Vulkan the engine's own draws pass through where the plugins draw nothing
+("Passthrough"), so the game still shows its stock look and can be played; on Direct3D
+12, which passes nothing through yet, the 3D view stays empty. Display8 0.12.0,
+render3d 0.31.0 and UI 0.26.0 were the last release that had to ship together; from
+there a release of one may meet the others of the same major.
+`testbench/scenarios/display-abi-mismatch.md` runs both directions against 13.42.4
+(`bench-abi.sh`).
 
 ## How it works
 
@@ -249,8 +293,8 @@ engine's device, and draw the whole frame on it.
 
 ## Passthrough
 
-`Passthrough=1` in `Display8.ini` (shipped, since the GPU runs below passed; 0 in the
-code, and the stub drops every engine draw as before): in stub mode on Vulkan the engine's own Direct3D 8 draws are
+`Passthrough=1` in `Display8.ini` (shipped, since the GPU runs below passed, and the
+code's default too since 0.12.0; `0` drops every engine draw, as before): in stub mode on Vulkan the engine's own Direct3D 8 draws are
 drawn after all, on Display8's device, the way Direct3D 8's fixed function draws them
 (`src/passthrough.rs`, `src/vk/pass.rs`, `shaders/ff.hlsl`). It is ROADMAP phase 4's
 first slice (4a, 4b, most of 4c, 4d, 4e and 4f on Vulkan). Without it, whatever render3d

@@ -13,6 +13,7 @@ use gpu::display::VkImage8;
 
 fn info(img: &Img) -> VkImage8 {
     VkImage8 {
+        size: core::mem::size_of::<VkImage8>() as u32,
         image: vk::Handle::as_raw(img.image),
         view: vk::Handle::as_raw(img.view),
         format: img.format.as_raw() as u32,

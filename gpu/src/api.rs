@@ -2,11 +2,13 @@
 //! the device behind the game's d3d8 one, or Display8's own in stub mode), Vulkan
 //! (`vulkan`, Display8's device in stub mode with `Backend=vulkan`) or Direct3D 12
 //! (`dx12`, with `Backend=d3d12`). Which one is chosen at run time, once, by what
-//! Display8 says (`display8_backend`): with no Display8, an older one, or one that says
-//! Direct3D 9, it is Direct3D 9 as before. Each object is an enum of the backends' own,
+//! Display8 says (`display8v1_backend`), after the contract's handshake
+//! (`display8_abi`, gpu/src/display.rs, "Versions"): with no Display8, one too old or of
+//! another major (each logged apart), or one that says Direct3D 9, it is Direct3D 9 as
+//! before. Each object is an enum of the backends' own,
 //! and every call goes to the one it was made on.
 use crate::d3d9::raw::Device as Dev;
-use crate::display::{Display8, Display8Dx12, BACKEND_D3D12, BACKEND_D3D9, BACKEND_VULKAN};
+use crate::display::{Display8, Display8Dx12, Refused, ABI_MAJOR, ABI_MINOR, BACKEND_D3D12, BACKEND_D3D9, BACKEND_VULKAN};
 use crate::frame::{Frame, Span};
 use crate::pixels::Mapped;
 use crate::types::*;
@@ -124,13 +126,17 @@ impl Gpu {
         };
         let d = match self.disp.get() {
             Some(d) => d,
-            None => match Display8::load(lookup) {
-                Some(d) => {
+            None => match Display8::load(lookup, lookup as usize) {
+                Ok(d) => {
+                    (self.log)(format_args!("gpu {} (contract {}.{}): Display8 {} (contract {}.{})", crate::VERSION, ABI_MAJOR, ABI_MINOR, d.version, d.major, d.minor));
                     self.disp.set(Some(d));
                     d
                 }
-                None => {
-                    // Not Display8, or one without the Vulkan exports: Direct3D 9 for good.
+                Err(why) => {
+                    // Direct3D 9 for good: the d3d9 path as with no Display8, which on
+                    // Display8's own Vulkan or Direct3D 12 draws nothing (the engine's
+                    // draws pass through there).
+                    self.refused(why);
                     self.mode.set(D3D9);
                     return D3D9;
                 }
@@ -174,6 +180,24 @@ impl Gpu {
             // Not decided yet (before the engine's Direct3DCreate8): Direct3D 9's answer
             // for now, asked again next time.
             _ => UNDECIDED,
+        }
+    }
+
+    /// Logs why there is no contract to draw through (`Display8::load`): no Display8 at
+    /// all is the ordinary forward chain; the rest are files that do not belong together.
+    fn refused(&self, why: Refused) {
+        let me = crate::VERSION;
+        match why {
+            Refused::NoDisplay8 => (self.log)(format_args!("gpu {} (contract {}.{}): no Display8 (the game's d3d8.dll is another chain's): Direct3D 9", me, ABI_MAJOR, ABI_MINOR)),
+            Refused::TooOld(v) => (self.log)(format_args!(
+                "gpu {} (contract {}.{}): Display8 {} is too old for this plugin (no contract handshake, display8_abi; it needs Display8 0.12.0 or later): this plugin stands down to Direct3D 9 only, and on Display8's own Vulkan or Direct3D 12 draws nothing. Install d3d8.dll, Render3D.asi and UI.asi from one release",
+                me, ABI_MAJOR, ABI_MINOR, v.unwrap_or("(no version)")
+            )),
+            Refused::Major(ma, mi, v) => (self.log)(format_args!(
+                "gpu {} (contract {}.{}): Display8 {} has contract {}.{}, another major: this plugin stands down to Direct3D 9 only, and on Display8's own Vulkan or Direct3D 12 draws nothing. Install d3d8.dll, Render3D.asi and UI.asi from one release",
+                me, ABI_MAJOR, ABI_MINOR, v.unwrap_or("?"), ma, mi
+            )),
+            Refused::Missing(n) => (self.log)(format_args!("gpu {} (contract {}.{}): Display8 shakes hands at contract {}.x but has no {}: a broken build; this plugin stands down to Direct3D 9 only", me, ABI_MAJOR, ABI_MINOR, ABI_MAJOR, n)),
         }
     }
 

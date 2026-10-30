@@ -397,7 +397,8 @@ impl Gpu {
         if d.is_null() {
             return None;
         }
-        let d = unsafe { *d };
+        // Only the fields within the size Display8 says (gpu/src/display.rs, "Versions").
+        let d = unsafe { crate::display::read(d) };
         let dev = d.device as P;
         let Some(root) = root_signature(dev, d.serialize_root_signature, self.log, false) else {
             dlog!(self, "gpu: Direct3D 12: the root signature could not be made");
@@ -537,7 +538,7 @@ impl Gpu {
         if f.is_null() {
             return None;
         }
-        let f = unsafe { *f };
+        let f = unsafe { crate::display::read(f) };
         if f.command_list == 0 {
             return None;
         }
@@ -868,7 +869,7 @@ impl Gpu {
         Cmd::new(self, frame)
     }
 
-    /// Submits what is recorded and waits for it (`display8_dx12_flush`): for a
+    /// Submits what is recorded and waits for it (`display8v1_dx12_flush`): for a
     /// read-back. The frame goes on in the same list, which binds nothing any more.
     pub(crate) fn flush(&self) -> bool {
         let Some(sh) = self.sh() else { return false };

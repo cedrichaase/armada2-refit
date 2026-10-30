@@ -363,6 +363,7 @@ impl Vk {
             cache,
             cache_saved,
             exported: VkDevice8 {
+                size: core::mem::size_of::<VkDevice8>() as u32,
                 get_instance_proc_addr: gipa,
                 instance: 0,
                 physical_device: 0,
@@ -800,6 +801,7 @@ impl Vk {
         s.at = (0, 0);
         self.recording = true;
         self.frame_out = VkFrame8 {
+            size: core::mem::size_of::<VkFrame8>() as u32,
             index: self.index,
             slot: self.slot as u32,
             command_buffer: vk::Handle::as_raw(s.cmd) as usize,
@@ -867,7 +869,7 @@ impl Vk {
         let (ci, off) = (fresh.0, fresh.1);
         s.at = (ci, off + need);
         let c = &s.chunks[ci];
-        Some(VkAlloc8 { buffer: vk::Handle::as_raw(c.buf), offset: off as u32, cpu: unsafe { c.ptr.add(off as usize) } })
+        Some(VkAlloc8 { size: core::mem::size_of::<VkAlloc8>() as u32, buffer: vk::Handle::as_raw(c.buf), offset: off as u32, cpu: unsafe { c.ptr.add(off as usize) } })
     }
 
     fn chunk_for(&mut self, need: u64, align: u64) -> Option<(usize, u64)> {
@@ -1159,7 +1161,7 @@ impl Vk {
     }
 
     /// Submits what the frame has recorded and waits for it, then begins its command
-    /// buffer again (`display8_vk_flush`: a plugin's read-back). The frame's ring, pool
+    /// buffer again (`display8v1_vk_flush`: a plugin's read-back). The frame's ring, pool
     /// and deferred calls stay as they are; its fence is left signalled, as it was.
     pub fn flush(&mut self) -> bool {
         if !self.recording {
@@ -1196,6 +1198,7 @@ impl Vk {
             (&self.color, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
         };
         VkImage8 {
+            size: core::mem::size_of::<VkImage8>() as u32,
             image: vk::Handle::as_raw(i.image),
             view: vk::Handle::as_raw(i.view),
             format: i.format.as_raw() as u32,

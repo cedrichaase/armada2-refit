@@ -4,6 +4,16 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.31.0 — 2026-10-30
+
+### Changed
+- Built on `gpu` 1.0.0, contract 1.0 with Display8: asks `display8_abi` before it draws
+  on Display8's device and logs both versions; with a Display8 before 0.12.0 it logs
+  "too old" (apart from "no Display8") and stands down to Direct3D 9 only. Needs
+  display 0.12.0's `d3d8.dll`: ships with it.
+
+Installed, not yet seen in game. (c470071)
+
 ## 0.30.0 — 2026-10-30
 
 ### Added

@@ -4,6 +4,24 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.12.0 — 2026-10-30
+
+### Added
+- `display8_abi(caller_major, caller_minor, caller, &major, &minor)`: the contract's
+  handshake (contract 1.0); `Display8.log` names each plugin that asks and its version,
+  and, in stub mode 300 frames into the first mission, a loaded `Render3D.asi` or
+  `UI.asi` that never asked (built before the handshake).
+
+### Changed
+- The contract's exports are named with its major: `display8_backend`, `display8_vk*`,
+  `display8_dx12*`, `display8_engine_*` are now `display8v1_*`, so plugins built before
+  them find nothing rather than misreading. Every struct of the contract starts with
+  `size`; Display8 fills a plugin's struct no further than its `size` says.
+- The code's defaults are the shipped `Display8.ini`'s: `Mode=stub` (was forward),
+  `Backend=auto` (was d3d9), `Passthrough=1` (was 0).
+
+Installed, not yet seen in game. (c470071)
+
 ## 0.11.3 — 2026-10-30
 
 ### Changed
