@@ -4,6 +4,20 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.32.0 — 2026-10-30
+
+### Added
+- Registers with Display8 (contract 1.1, `gpu` 1.1.0) and claims each module running,
+  and `fog` and `selection` by `[Overlays] Fog` and `Selection` (`mods::claims`); a
+  module at 0 claims nothing.
+
+### Changed
+- The selection bubbles are left out while another plugin claims `selection` (the UI's
+  `[HUD] SelectionBubbles=0`), asked through `display8v1_claims`; the `ret` in
+  `RenderSelectionEffects` is read only on a `d3d8.dll` without claims.
+
+Installed, not yet seen in game.
+
 ## 0.31.0 — 2026-10-30
 
 ### Changed

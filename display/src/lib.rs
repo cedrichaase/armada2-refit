@@ -19,6 +19,7 @@ pub use a2rt::{log, sfmt};
 #[rustfmt::skip]
 pub mod shaders;
 pub mod api;
+pub mod claims;
 pub mod com;
 pub mod d3d8;
 pub mod detail;

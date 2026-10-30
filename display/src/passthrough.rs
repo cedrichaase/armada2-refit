@@ -16,9 +16,10 @@ use alloc::vec::Vec;
 use core::ffi::c_void;
 
 static mut ON: bool = false;
-/// The frame now is one of the engine's loading loop (told at `BeginScene`), and the
-/// UI's loading screen covers it: its draws are not drawn.
-static mut LOADING: bool = false;
+/// The engine's scene now (told at its `BeginScene`) is one a plugin claims to draw over
+/// (the loading loop's, the Credits', the cursor's: `drop::Scene`): its draws are not
+/// drawn.
+static mut CLAIMED: bool = false;
 
 /// `Passthrough=` in `Display8.ini` (1, as the shipped file has it).
 pub fn configure(ini: &crate::rt::Ini) {
@@ -31,17 +32,29 @@ pub fn on() -> bool {
     unsafe { ON }
 }
 
-/// The engine's `BeginScene` (`fp` its frame pointer): whether the frame is one of its
-/// loading loop's, which the UI's loading screen draws over (ROADMAP phase 4: "keep one
-/// drop for what the UI's loading screen overdraws"). Without `UI.asi` the engine's
-/// loading screen is the only one, and is drawn.
+/// The engine's `BeginScene` (`fp` its frame pointer): every plugin's claims asked
+/// (`claims::ask`), and whether the scene is one of the engine's that a plugin claims to
+/// draw over (ROADMAP Phase 4, "Claims"): the loading loop's (`CLAIM_LOADING`, the UI's
+/// loading screen), the Credits' (`CLAIM_CREDITS`) or the cursor's (`CLAIM_CURSOR`).
+/// What nobody claims is drawn: without the UI, or with its part at 0, or with a UI that
+/// stood down, the engine's loading screen is the only one.
 pub fn begin_scene(fp: usize) {
     crate::api::scene_begun(fp);
     if !on() {
         return;
     }
-    let ui = !unsafe { crate::rt::win::GetModuleHandleA(c"UI.asi".as_ptr() as *const u8) }.is_null();
-    unsafe { LOADING = ui && crate::drop::in_loading(fp) };
+    let claimed = crate::claims::ask();
+    let want = match crate::drop::scene(fp) {
+        crate::drop::Scene::Loading => gpu::display::CLAIM_LOADING,
+        crate::drop::Scene::Credits => gpu::display::CLAIM_CREDITS,
+        crate::drop::Scene::Cursor => gpu::display::CLAIM_CURSOR,
+        crate::drop::Scene::Other => 0,
+    };
+    let drop = claimed & want != 0;
+    if drop && unsafe { !CLAIMED } {
+        once(&sfmt!("PASSTHROUGH claims: a scene of the engine's ({}) is claimed by a plugin: its draws are not drawn", crate::claims::names(want)));
+    }
+    unsafe { CLAIMED = drop };
 }
 
 /// Where a vertex's parts are, from its FVF.
@@ -212,7 +225,7 @@ pub fn draw(this: *mut SObj, fp: usize, slot: u32, a: &[usize]) {
         once("PASSTHROUGH: the engine's draws are passed through on Vulkan only in this version: dropped");
         return;
     }
-    if crate::drop::dropped(fp) || unsafe { LOADING } {
+    if crate::drop::dropped(fp) || unsafe { CLAIMED } {
         return;
     }
     let dv: &Dev = crate::stub::device::state(this);

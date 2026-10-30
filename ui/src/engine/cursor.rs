@@ -25,6 +25,11 @@ const DEV_SYNCHRONOUS: usize = 0xe0;
 const ELEMENT_NAME: usize = 0x8;
 
 static mut HIDE: bool = false;
+/// Whether the latest `RefreshDisplay` (while it runs: this one) hides the engine's
+/// cursor: what the UI claims (`CLAIM_CURSOR`), asked by Display8 at each scene, that
+/// of the cursor inside this call included. Kept between presents, so the claim stays
+/// put while the UI keeps drawing its cursor.
+static mut HIDING: bool = false;
 static mut INSTALLED: bool = false;
 /// The probe on `RefreshDisplay`'s draw of the cursor (`install_probe`): the function
 /// the call went to before it (stock `DrawScaled2D`, or HUD.asi's wrap of it).
@@ -66,6 +71,7 @@ unsafe extern "thiscall" fn refresh(dev: usize) {
         return unsafe { stock(dev) };
     }
     let p = (dev + DEV_CURSOR) as *mut usize;
+    unsafe { HIDING = hide };
     unsafe {
         let sprite = *p;
         if PROBE.is_some() {
@@ -93,6 +99,12 @@ unsafe extern "thiscall" fn refresh(dev: usize) {
             stock(dev);
         }
     }
+}
+
+/// Whether the engine's cursor is kept from drawing at this present (asked inside
+/// `RefreshDisplay`) or was at the last: then the UI claims the cursor.
+pub fn hiding() -> bool {
+    unsafe { HIDING }
 }
 
 /// Keeps the engine from drawing its cursor at the next present. Call it every frame

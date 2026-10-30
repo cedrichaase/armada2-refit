@@ -198,9 +198,12 @@ pub fn is_taken(c: usize) -> bool {
     taken(c)
 }
 
+/// While the UI cannot draw (`gfx::drawing`: no device to draw with, so a panel of
+/// ours would not show), nothing is taken: the stock components draw, and on Display8's
+/// stub reach the screen through passthrough.
 #[allow(static_mut_refs)]
 fn taken(c: usize) -> bool {
-    c != 0 && unsafe { TAKEN.iter().any(|&(a, p)| a != 0 && if p { rd::<usize>(a) == c } else { a == c }) }
+    c != 0 && crate::gfx::drawing() && unsafe { TAKEN.iter().any(|&(a, p)| a != 0 && if p { rd::<usize>(a) == c } else { a == c }) }
 }
 
 /// Whether the pointer is over a panel of ours (the last UI frame's claim): then no

@@ -76,9 +76,15 @@ impl Selection {
     /// Every bubble; true: the engine's step is skipped.
     pub fn draw(&mut self, v: &View) -> bool {
         // UI.asi switches the bubbles off (`[HUD] SelectionBubbles=0`, its brackets mark
-        // the selection) by making `RenderSelectionEffects` return at once: drawn in
-        // its place, they are not drawn either.
-        if unsafe { rd::<u8>(FN_RENDER_SELECTION) } == 0xc3 {
+        // the selection) and claims them (`CLAIM_SELECTION`, gpu/src/display.rs,
+        // "Claims"): drawn in its place, they are not drawn either. Without claims (a
+        // d3d8.dll that is not Display8 of contract 1.1) the UI's sign is the `ret` it
+        // puts in `RenderSelectionEffects`.
+        let others = match crate::gfx::gpu().claimed_by_others() {
+            Some(c) => c & gpu::display::CLAIM_SELECTION != 0,
+            None => (unsafe { rd::<u8>(FN_RENDER_SELECTION) }) == 0xc3,
+        };
+        if others {
             return true;
         }
         let Some(model) = scene::model("select") else { return false };

@@ -5,6 +5,15 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.77.0 — 2026-10-30
+
+### Added
+- Scenario `display-claims`: three games on the stub, Display8 alone, with the UI, and
+  with render3d at `[Modules] sky=0`, each logging who claims what;
+  `display/bench-claims.sh` leaves plugins out of a clone by the player's name.
+
+Installed, not yet seen in game.
+
 ## 3.76.0 — 2026-10-30
 
 ### Added

@@ -76,6 +76,13 @@ const SIGS: &[(usize, &[u8])] = &[
 pub const QUIT: i32 = i32::MIN;
 
 static mut READY: bool = false;
+/// The Credits are ours (`[Menus] Credits=1`, the call patched): the claim `CLAIM_CREDITS`.
+static mut CREDITS: bool = false;
+
+/// Whether the Credits are ours: the engine's never run.
+pub fn credits_ours() -> bool {
+    unsafe { CREDITS }
+}
 
 /// Patches the hooks; false (and nothing patched) when a site is not stock.
 pub fn install() -> bool {
@@ -97,6 +104,7 @@ pub fn install() -> bool {
             log!("shell: could not patch {:#x}", SITE_CREDITS);
             return false;
         }
+        unsafe { CREDITS = true };
         log!("shell: [Menus] Credits=1 -- the Credits are ours");
         return true;
     }

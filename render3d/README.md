@@ -692,6 +692,21 @@ time it is posed (`hulls: menu scene:`). Keys:
 | | `Radius` | the class's radius (the ODF's `effectRadius`, else 300) |
 | | `KeyShare`, `Scatter`, `Opacity`, `Brightness` | over the recipe's, for the menu's class only (one set per class: the first field of the class that sets a key) |
 
+## Claims
+
+render3d registers with Display8 at load (contract 1.1, `gpu::Gpu::register`, once its
+frame seam is in; `display/README.md`, "Claims") with `mods::claims`, which says what it
+draws now: each module running (`sky`, `hulls`, `world`, `particles`, `effects`,
+`ordnance`, `specials`) and, of `overlays`, `fog` and `selection` as `[Overlays] Fog`
+and `Selection` say. A module at 0 (kept for the menu scene only), one standing down
+beside its old plugin, and anything before the first frame are not claimed. Display8
+drops none of the engine's 3D draws for these: a module that draws a category skips
+the engine's step, so whatever the engine still issues (a SOD handed back, a class no
+module takes) is drawn by passthrough into render3d's published pass. `Display8.log`
+names what render3d claims; `display-claims` runs it with `sky=0`. What another plugin
+claims is asked through `gpu::Gpu::claimed_by_others`: the selection bubbles
+(`overlays`).
+
 ## Modules
 
 ### effects
@@ -1343,9 +1358,12 @@ are `SelectionEffect::Render`'s (0x599e80): relation to the player's team on a c
 times `0.25 + 0.2 (1 - health) sin(phase)`; on anything else the team colour times
 0.25; a second shell at 1.1 times the scale in the team colour (full under the pointer,
 else times 0.25), all times `UserProfile+0x48`; a co-player's selection blinks on wall
-time. While the engine's `RenderSelectionEffects` has been made to return at once
-(its first byte `ret`: UI.asi's `[HUD] SelectionBubbles=0`), none is drawn, as the
-engine would draw none. The material `selection` is constant: the colour is added as it is, depth-tested,
+time. While another plugin claims the bubbles (`CLAIM_SELECTION` through Display8's
+`display8v1_claims`: UI.asi's `[HUD] SelectionBubbles=0`, whose brackets mark the
+selection; "Claims"), none is drawn. Only on a `d3d8.dll` without claims (not Display8
+of contract 1.1) does render3d read the UI's sign in the engine instead: the `ret` it
+puts in `RenderSelectionEffects`'s first byte, which keeps the engine's own from
+drawing either way. The material `selection` is constant: the colour is added as it is, depth-tested,
 not written, front faces only (on the bench stock's bubble adds one layer of its
 colour, not two). Seen on the bench: own ships grey with the team shell, an enemy
 Klingon violet with a red shell, the hover shell on a cube in its team colour, each

@@ -29,6 +29,12 @@ use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU32, Ordering};
 
 const LOADING: (usize, usize) = (0x598ba0, 0x598ff0);
+/// `Credits3D.obj`'s code (`Show_Credits` and the `Credits3D` class: 0x591340..0x592a70),
+/// which draws the stock Credits' scenes.
+const CREDITS: (usize, usize) = (0x591340, 0x592a70);
+/// `ST3D_DeviceDirectX8::RefreshDisplay` (0x624630..0x624750), which draws the engine's
+/// cursor in a scene of its own just before it presents.
+const REFRESH_DISPLAY: (usize, usize) = (0x624630, 0x624750);
 const SUBMIT: [(usize, usize); 2] = [(0x648af0, 0x648c30), (0x648520, 0x6485d0)];
 
 #[derive(Clone, PartialEq, Default)]
@@ -150,4 +156,31 @@ pub fn dropped(fp: usize) -> bool {
 pub fn in_loading(fp: usize) -> bool {
     let exe = trace::exe_range();
     chain(fp, exe).iter().any(|&a| within(LOADING, a))
+}
+
+/// Which of the engine's scenes a `BeginScene` begins, by the functions up its stack
+/// (`passthrough::begin_scene`, for the claims).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Scene {
+    /// From its loading loop (`RenderLoopAssetLoadStatusUpdate`).
+    Loading,
+    /// From the stock Credits (`Credits3D.obj`).
+    Credits,
+    /// `RefreshDisplay`'s scene of the cursor alone.
+    Cursor,
+    Other,
+}
+
+pub fn scene(fp: usize) -> Scene {
+    let exe = trace::exe_range();
+    let c = chain(fp, exe);
+    if c.iter().any(|&a| within(LOADING, a)) {
+        Scene::Loading
+    } else if c.iter().any(|&a| within(CREDITS, a)) {
+        Scene::Credits
+    } else if c.iter().take(2).any(|&a| within(REFRESH_DISPLAY, a)) {
+        Scene::Cursor
+    } else {
+        Scene::Other
+    }
 }

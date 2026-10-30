@@ -68,6 +68,9 @@ fn startup() {
     config::set(cfg);
     mods::init();
     if frame::install() {
+        // With Display8 (contract 1.1) the modules' claims are asked every frame
+        // (README.md, "Claims"); a render3d that does not hook the frame claims nothing.
+        gfx::gpu().register(mods::claims);
         log!("ready");
     }
 }

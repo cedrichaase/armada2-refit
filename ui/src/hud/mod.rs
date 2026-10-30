@@ -36,6 +36,11 @@ static mut SELECTION: bool = false;
 static mut UNIT_VIEW: bool = false;
 static mut TOOLTIPS: bool = false;
 
+/// Whether the selection overlay is ours (`[HUD] Selection=1`, its functions stock).
+pub fn selection_ours() -> bool {
+    unsafe { SELECTION }
+}
+
 /// Patches what the panels switched on in UI.ini need; each stands down on its own.
 pub fn install() -> bool {
     let cfg = &crate::config::get().hud;
@@ -104,8 +109,16 @@ fn map_panels(cfg: &crate::config::Hud) {
             unsafe { SELECTION = true };
             crate::log!("selection: ours, gauges {}", if cfg.selection_gauges { "on the selection" } else { "as stock" });
             if !cfg.selection_bubbles {
+                // Registered with Display8 (contract 1.1), the UI claims the bubbles
+                // (`CLAIM_SELECTION`) and render3d, asking, draws none. The engine's
+                // own are kept from drawing either way: Display8 cannot tell their
+                // draws apart.
                 let off = engine::overlay::hide_bubbles();
-                crate::log!("selection: the 3D bubbles {}", if off { "off" } else { "left on: RenderSelectionEffects is not stock" });
+                crate::log!(
+                    "selection: the 3D bubbles {}{}",
+                    if off { "off" } else { "left on: RenderSelectionEffects is not stock" },
+                    if crate::claims::registered() { ", claimed (render3d draws none)" } else { "" }
+                );
             }
         } else {
             crate::log!("selection: stays stock");

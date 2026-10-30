@@ -5,6 +5,27 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.49.0 — 2026-10-30
+
+Layers: display 0.13.0, render3d 0.32.0, ui 0.27.0, testbench 3.77.0.
+
+### Added
+- Claims (ROADMAP Phase 4, contract 1.1, `gpu` 1.1.0): the plugins register through the
+  contract at load (`display8v1_register`) with a callback saying what they draw now;
+  Display8 asks it at every scene and passes through what nobody claims. A render3d
+  module at 0, a UI part at 0 or a plugin that stood down claims nothing. Claims drop
+  the engine's draws only in the loading loop's, the Credits' and the cursor's scenes;
+  the 3D categories are drawn whatever the engine issues. `display8v1_claims` replaces
+  render3d's reading of the UI's `ret` in `RenderSelectionEffects`. ROADMAP's
+  "Contracts" text says registration through the contract.
+
+### Changed
+- Passthrough no longer looks up `UI.asi` by name: the engine's loading frames are
+  dropped only while the UI's loading screen claims them (with `[Loading] Enable=0`, or
+  a UI that cannot draw, the engine's loading screen shows on the stub).
+
+Installed, not yet seen in game.
+
 ## 13.48.0 — 2026-10-30
 
 Layers: display 0.12.0, render3d 0.31.0, ui 0.26.0, testbench 3.76.0.

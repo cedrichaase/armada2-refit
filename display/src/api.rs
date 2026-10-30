@@ -58,7 +58,7 @@ const MISSION_FRAMES: u32 = 300;
 const CONTRACT_PLUGINS: [&str; 2] = ["Render3D.asi", "UI.asi"];
 
 /// The module `a` is in: its handle and file name.
-fn module_of(a: usize) -> (usize, alloc::string::String) {
+pub(crate) fn module_of(a: usize) -> (usize, alloc::string::String) {
     let mut mi = MemInfo::default();
     if a == 0 || unsafe { VirtualQuery(a as *const u8, &mut mi, core::mem::size_of::<MemInfo>()) } == 0 || mi.alloc_base == 0 {
         return (0, sfmt!("a module at {:#x}", a));

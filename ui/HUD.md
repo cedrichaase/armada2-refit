@@ -607,8 +607,9 @@ ellipsoids (`RenderSelectionEffects`, 0x599900: an additive `select.sod` about e
 selected unit and the one under the pointer) were the same mark twice, and the user
 found them superfluous. `[HUD] SelectionBubbles=0` (the default) puts a `ret` in that
 function's first byte (cdecl, checked to be stock): the scene draws none. render3d
-draws them in that function's place from the same hash, so it follows the engine: no
-bubbles while the function's first byte is `ret` (render3d/README.md,
+draws them in that function's place from the same hash, and draws none while the UI
+claims them (`CLAIM_SELECTION`, asked through Display8: README.md, "Claims"); on a
+`d3d8.dll` without claims it reads the `ret` instead (render3d/README.md,
 `Step::Selection`). The effects themselves (the hash, the damage pulse) are untouched.
 
 ## The unit view
