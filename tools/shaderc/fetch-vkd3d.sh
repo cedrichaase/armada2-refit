@@ -3,11 +3,11 @@
 # 1.19, built from its source tarball, pinned by version and sha256, kept in
 # $A2_DATA/tools/ (a2env.sh). Prints the directory holding its vkd3d-compiler. Only CI
 # needs this (.github/workflows/ci.yml, job "shaders"): a developer machine uses its own
-# vkd3d-compiler, which render3d/hlsl-rs.sh does not version-check, and the committed
+# vkd3d-compiler, which tools/shaderc/hlsl-rs.sh does not version-check, and the committed
 # files were written by 1.19 (Arch's vkd3d 1.19).
 #
-#   gpu/shaders/fetch-vkd3d.sh          fetch and build it if it is not there yet
-#   gpu/shaders/fetch-vkd3d.sh --check  print the directory if it is there, else fail
+#   tools/shaderc/fetch-vkd3d.sh          fetch and build it if it is not there yet
+#   tools/shaderc/fetch-vkd3d.sh --check  print the directory if it is there, else fail
 #
 # Pinned because what one release writes is not byte for byte what the next writes
 # (Ubuntu 24.04 ships 1.10). The build needs gcc, make, flex, bison and pkg-config; it
@@ -31,7 +31,7 @@ if [ -x "$bin" ]; then
     echo "$dir/bin"
     exit 0
 fi
-[ "${1:-}" = "--check" ] && { echo "fetch-vkd3d.sh: no vkd3d-compiler $version in $dir (run gpu/shaders/fetch-vkd3d.sh)" >&2; exit 1; }
+[ "${1:-}" = "--check" ] && { echo "fetch-vkd3d.sh: no vkd3d-compiler $version in $dir (run tools/shaderc/fetch-vkd3d.sh)" >&2; exit 1; }
 
 command -v curl >/dev/null || { echo "fetch-vkd3d.sh: curl is not installed" >&2; exit 1; }
 mkdir -p "$A2_DATA/tools"

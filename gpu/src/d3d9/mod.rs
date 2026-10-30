@@ -104,7 +104,7 @@ pub fn slot_caps(dev: Dev) -> (u32, u32) {
 }
 
 /// The instruction slots a shader takes, as the runtime counts them against
-/// `slot_caps` (render3d/d3dbc-fix.py's `slots`, which the build checks).
+/// `slot_caps` (tools/shaderc/d3dbc-fix.py's `slots`, which the build checks).
 pub fn slots(code: &[u32]) -> u32 {
     let mut n = 0;
     let mut i = 1;

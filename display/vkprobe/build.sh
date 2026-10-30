@@ -18,7 +18,7 @@ f="$here/shaders/probe.hlsl"
 entries=$(sed -n '1s#^// entries:##p' "$f")
 [ -n "$entries" ] || { echo "vkprobe: $f has no '// entries:' first line" >&2; exit 1; }
 # shellcheck disable=SC2086
-"$here/../../render3d/hlsl-rs.sh" "$here/src/shaders/probe.rs" "$f" $entries
+"$here/../../tools/shaderc/hlsl-rs.sh" "$here/src/shaders/probe.rs" "$f" $entries
 
 env -C "$here" "$cargo" build --release --quiet
 mkdir -p "$here/build"

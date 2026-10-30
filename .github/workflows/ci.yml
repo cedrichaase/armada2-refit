@@ -92,9 +92,9 @@ jobs:
 
   # Every generated shader file rebuilt from its HLSL with the pinned compilers, and a
   # difference from the committed file (or its stamp) fails the job: d3dbc by vkd3d-compiler
-  # 1.19 (gpu/shaders/fetch-vkd3d.sh, built from the release tarball by sha256), SPIR-V and
-  # DXIL by dxc 1.9.2609 (gpu/shaders/fetch-dxc.sh, by sha256); then gpu's SPIR-V patches
-  # and links on every module (gpu/spirv-selftest.sh). gpu/shaders/verify-generated.sh.
+  # 1.19 (tools/shaderc/fetch-vkd3d.sh, built from the release tarball by sha256), SPIR-V and
+  # DXIL by dxc 1.9.2609 (tools/shaderc/fetch-dxc.sh, by sha256); then gpu's SPIR-V patches
+  # and links on every module (gpu/spirv-selftest.sh). tools/shaderc/verify-generated.sh.
   shaders:
     runs-on: ubuntu-24.04
     env:
@@ -110,13 +110,13 @@ jobs:
         uses: actions/cache@v5
         with:
           path: .a2data/tools
-          key: shader-compilers-${{ hashFiles('gpu/shaders/fetch-dxc.sh', 'gpu/shaders/fetch-vkd3d.sh') }}
+          key: shader-compilers-${{ hashFiles('tools/shaderc/fetch-dxc.sh', 'tools/shaderc/fetch-vkd3d.sh') }}
       - name: Fetch dxc and vkd3d-compiler
         run: |
-          gpu/shaders/fetch-dxc.sh
-          gpu/shaders/fetch-vkd3d.sh
+          tools/shaderc/fetch-dxc.sh
+          tools/shaderc/fetch-vkd3d.sh
       - name: Rebuild every shader and compare with the committed files
-        run: gpu/shaders/verify-generated.sh
+        run: tools/shaderc/verify-generated.sh
       - name: Show the difference
         if: failure()
         run: git diff --stat

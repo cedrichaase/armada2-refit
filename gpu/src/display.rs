@@ -70,11 +70,11 @@
 //! in an upload heap (`GENERIC_READ`), so a span of it can be a vertex, index or
 //! constant buffer (at `uniform_align`, 256) or a copy source as it is.
 //!
-//! Shaders are DXIL from the same sources (`render3d/hlsl-rs.sh`, `*_dxil.rs`): a
+//! Shaders are DXIL from the same sources (`tools/shaderc/hlsl-rs.sh`, `*_dxil.rs`): a
 //! stage's cbuffers at b0 (vertex) and b1 (pixel), the k-th cbuffer of a source in
 //! space k (each module's `CB_SPACES` says how many), all of them views of the stage's
 //! one register file; textures at tN and samplers at sN of space 0
-//! (`gpu/shaders/compat.hlsli`, `render3d/dxil-spaces.py`).
+//! (`gpu/shaders/compat.hlsli`, `tools/shaderc/dxil-spaces.py`).
 //!
 //! | Export | Signature | What |
 //! |---|---|---|

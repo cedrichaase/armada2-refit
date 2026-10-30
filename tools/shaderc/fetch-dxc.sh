@@ -3,14 +3,14 @@
 # v1.9.2609, pinned by version and sha256, kept in $A2_DATA/tools/ (a2env.sh) so every
 # checkout and worktree shares one copy. Prints the path of its dxc.
 #
-#   gpu/shaders/fetch-dxc.sh          fetch it if it is not there yet, then print the path
-#   gpu/shaders/fetch-dxc.sh --check  print the path if it is there, else fail
+#   tools/shaderc/fetch-dxc.sh          fetch it if it is not there yet, then print the path
+#   tools/shaderc/fetch-dxc.sh --check  print the path if it is there, else fail
 #
 # Pinned, not the system's: Arch's directx-shader-compiler 1.10 asserts writing DXIL, and
 # what one release writes is not byte for byte what the next writes, so the committed
-# *_dxil.rs files name the compiler in their stamps (render3d/hlsl-rs.sh). This release
+# *_dxil.rs files name the compiler in their stamps (tools/shaderc/hlsl-rs.sh). This release
 # signs its DXIL itself (libdxil.so beside it), which Windows' Direct3D 12 requires.
-# DXC= in the environment overrides the path; render3d/hlsl-rs.sh still checks the
+# DXC= in the environment overrides the path; tools/shaderc/hlsl-rs.sh still checks the
 # version it reports.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,7 +28,7 @@ if [ -x "$dxc" ]; then
     echo "$dxc"
     exit 0
 fi
-[ "${1:-}" = "--check" ] && { echo "fetch-dxc.sh: no dxc $version in $dir (run gpu/shaders/fetch-dxc.sh)" >&2; exit 1; }
+[ "${1:-}" = "--check" ] && { echo "fetch-dxc.sh: no dxc $version in $dir (run tools/shaderc/fetch-dxc.sh)" >&2; exit 1; }
 
 command -v curl >/dev/null || { echo "fetch-dxc.sh: curl is not installed" >&2; exit 1; }
 mkdir -p "$A2_DATA/tools"

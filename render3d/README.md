@@ -53,7 +53,7 @@ uses `~/.cargo/bin/cargo` first, since a distribution's cargo has no such target
 crate links with `/nodefaultlib`, `kernel32` its only import (an import library made by
 `llvm-dlltool --kill-at` from `kernel32.def` in `build.rs`), and brings its own
 allocator, memory functions and stack probe (`src/rt/`). Shaders are HLSL in
-`shaders/`, compiled by `hlsl-rs.sh` with `vkd3d-compiler` into `src/shaders/<name>.rs`
+`shaders/`, compiled by `tools/shaderc/hlsl-rs.sh` with `vkd3d-compiler` into `src/shaders/<name>.rs`
 and with `dxc` into SPIR-V in `src/shaders/<name>_spv.rs` and DXIL in
 `src/shaders/<name>_dxil.rs` ("One source, two compilers"), all committed with a stamp
 so a machine without the compilers builds as long as they are current.
@@ -104,17 +104,17 @@ is the warp, the ground, the mountains with the first slab of craters, two more 
 passes and the two fissure nets (a gas giant is the warp and itself). The values are
 full floats, so it bakes what the one shader did. The targets are tiles of at most
 1024 on a side, so the sky's 3072 supersampled face needs 48 MB of them, not 450.
-`d3dbc-fix.py` counts slots as the runtime does and refuses a shader past 4096 unless
+`tools/shaderc/d3dbc-fix.py` counts slots as the runtime does and refuses a shader past 4096 unless
 its entry is marked `:long`. Two are marked: `sky_ps`, the `Face=0` reference, and the
 march, which falls back to slices; cutting the march per frame is still to do.
-`Render3D.log` names every shader the runtime refuses, with its slots and the card's. `d3dbc-fix.py` mends four of them
+`Render3D.log` names every shader the runtime refuses, with its slots and the card's. `tools/shaderc/d3dbc-fix.py` mends four of them
 in the bytecode. It copies the extra register into a temporary (only the lanes the
 instruction consumes, so an input is never read outside its `dcl` mask), routes
 `sincos` through one, and widens the mask. And it gives the temporaries out again when
 a shader names more than 32: vkd3d never reuses a register, but at most 19 values are
 live at once in the march (liveness over its if/else; a value live into or out of an if
-keeps one register across all of it). `hlsl-rs.sh --fix` runs it on each shader, for
-both plugins (`build.sh`, `ui/build.sh`); `d3dbc-fix.py --check <file.bin>` lists all
+keeps one register across all of it). `tools/shaderc/hlsl-rs.sh --fix` runs it on each shader, for
+both plugins (`build.sh`, `ui/build.sh`); `tools/shaderc/d3dbc-fix.py --check <file.bin>` lists all
 five.
 
 Rule 4 is the HLSL's to keep. **Never sample with an implicit level (`Sample`) inside
@@ -138,7 +138,7 @@ vkd3d (1.19) has no `tex3Dlod` or `texCUBElod` in the old dialect; the modern
 
 How this was checked: every shader as committed is made on Windows 10's runtime on all
 four kinds of device; and a d3dbc interpreter ran each shader as vkd3d wrote it and as
-`d3dbc-fix.py` rewrote it, 300 random inputs and constants each (so the recipe's
+`tools/shaderc/d3dbc-fix.py` rewrote it, 300 random inputs and constants each (so the recipe's
 branches go both ways), with identical outputs for all 86, and the old and new
 compiles of every rewritten entry point with identical outputs too (textures there are
 a function of the coordinate alone, so the levels are the argument above). With the
@@ -153,7 +153,7 @@ Every shader of render3d and UI.asi is modern HLSL (`Texture2D`/`Texture3D`/
 Direct3D 9 shaders, the SPIR-V for `gpu`'s Vulkan backend and the DXIL for its
 Direct3D 12 one (below). vkd3d
 writes the d3dbc as before and `dxc` (`-spirv`, Vulkan 1.1) the SPIR-V, which
-`hlsl-rs.sh` puts through `spirv-val`. `gpu/shaders/compat.hlsli`, at the root because
+`tools/shaderc/hlsl-rs.sh` puts through `spirv-val`. `gpu/shaders/compat.hlsli`, at the root because
 both plugins include it, holds the few places the two compilers part (dxc predefines
 `__hlsl_dx_compiler`; vkd3d defines nothing to tell it by, and takes no `-D` or `-I`, so
 the shaders include it by a relative path that resolves from `shaders/` for both):
@@ -168,14 +168,14 @@ the shaders include it by a relative path that resolves from `shaders/` for both
 - **Samplers keep their stages, though vkd3d does not**: for shader model 1-3 it makes
   each texture/sampler pair a combined sampler named `<sampler>+<texture>` and gives the
   pairs s0, s1, ... in order, whatever the source declares (any `register()` on either
-  is dropped). `d3dbc-slots.py` puts each pair back on the stage the source names
+  is dropped). `tools/shaderc/d3dbc-slots.py` puts each pair back on the stage the source names
   (`register(tn)` on the texture and `register(sn)` on its sampler, which must agree),
   in the code and the constant table, so the Rust code binds textures as before.
 - **VPOS**: a pixel shader's `SV_Position` is the pixel's centre in Vulkan and its
   corner (VPOS, whole numbers) in Direct3D 9, where vkd3d reads it as VPOS.
   `d3d9_vpos()` gives the corner on both. vkd3d declares a float4 `SV_Position` as
   `vPos.xyzw`, which Windows refuses (the mask has to be `.x`, `.y` or `.xy`), so
-  `d3dbc-fix.py` narrows it to `.xy`, and refuses a shader that reads its z or w.
+  `tools/shaderc/d3dbc-fix.py` narrows it to `.xy`, and refuses a shader that reads its z or w.
 - **`select`** is a macro over `?:` for vkd3d, which has the vector `?:` and no
   `select`; dxc refuses a vector `?:` under HLSL 2021.
 - **0 x infinity is NaN on SPIR-V and DXIL, and 0 in Direct3D 9's shaders** (DXVK
@@ -205,21 +205,21 @@ shader's outputs and the pixel shader's inputs agree wherever both use one struc
 Direct3D 9's half-pixel offset (pixel centres on whole coordinates) is the caller's:
 DXVK moves the viewport by half a pixel, and the UI's `VP.zw` holds it.
 
-**DXIL**, for Direct3D 12, from the same sources: `hlsl-rs.sh` writes it into
+**DXIL**, for Direct3D 12, from the same sources: `tools/shaderc/hlsl-rs.sh` writes it into
 `src/shaders/<name>_dxil.rs` with dxc too, but a pinned release, DirectXShaderCompiler
-v1.9.2609, which `gpu/shaders/fetch-dxc.sh` fetches into `$A2_DATA/tools/` by version
+v1.9.2609, which `tools/shaderc/fetch-dxc.sh` fetches into `$A2_DATA/tools/` by version
 and sha256 the first time a DXIL file is stale (`DXC=` names another copy of the same
 release; the version is checked). Arch's dxc 1.10 asserts writing DXIL, and what one
 release writes is not what the next writes, so the stamp names the release. The DXIL
 is signed (the release's `libdxil.so` validates and signs it, which Windows' Direct3D
-12 requires; `hlsl-rs.sh` checks the container's hash is set), without debug info or
+12 requires; `tools/shaderc/hlsl-rs.sh` checks the container's hash is set), without debug info or
 reflection (`-Qstrip_debug -Qstrip_reflect`), shader model 6.0. Its layout: textures
 at `tN` and samplers at `sN` of space 0 (`STAGE(n)` is empty there: the `vk::`
 attributes are SPIR-V's alone); clip space is Direct3D's already. **The cbuffers need
 one change**: DXIL refuses two cbuffers at one register of one space, and several
 cbuffers of a stage alias its one register on purpose, some overlapping in it (one
 entry point's `c0` is not another's). So the source is preprocessed once (`dxc -P`)
-and `dxil-spaces.py` puts the k-th cbuffer at `register(bN)` in space k: a stage's
+and `tools/shaderc/dxil-spaces.py` puts the k-th cbuffer at `register(bN)` in space k: a stage's
 register file is bound at b0 (vertex) or b1 (pixel) in every space 0..k, and each
 module's `CB_SPACES` says how many (at most 8, which it checks). The d3dbc and SPIR-V
 are untouched by it: they compile the source as it is.
@@ -229,7 +229,7 @@ Two more things are DXIL's alone, both for `gpu`'s Direct3D 12 backend
 
 - **The alpha test.** Direct3D 12 has none, and DXIL cannot be patched as the SPIR-V
   is, so a pixel shader drawn with one (`PS_SOD`, the particles' `PS_SPRITE`, the
-  ghosts' `PS_GHOST`) is marked `:at` on its entries line, and `dxil-alpha.py` adds
+  ghosts' `PS_GHOST`) is marked `:at` on its entries line, and `tools/shaderc/dxil-alpha.py` adds
   `<entry>__alpha_test` beside it in the DXIL source: the entry called, then the
   fragment discarded by the interval gpu passes at b2. It is `SYMBOL_AT_DXIL`, the
   fourth name in `gpu::code!`. The mark changes nothing in the d3dbc or the SPIR-V.

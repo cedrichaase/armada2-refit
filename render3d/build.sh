@@ -23,7 +23,7 @@ for f in "$here"/shaders/*.hlsl; do
     entries=$(sed -n '1s#^// entries:##p' "$f")
     [ -n "$entries" ] || { echo "render3d: $f has no '// entries:' first line" >&2; exit 1; }
     # shellcheck disable=SC2086
-    "$here/hlsl-rs.sh" --fix "$here/src/shaders/$name.rs" "$f" $entries
+    "$here/../tools/shaderc/hlsl-rs.sh" --fix "$here/src/shaders/$name.rs" "$f" $entries
     mods="$mods$name ${name}_spv ${name}_dxil "
 done
 # Temp files of this run's own, beside their targets so each mv is a rename: several

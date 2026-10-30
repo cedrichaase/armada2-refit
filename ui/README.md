@@ -491,7 +491,7 @@ normally afterwards.
     ui/build.sh                                   # -> ui/build/UI.asi
     ui/bench-asi.sh <state.json> --demo mission,shell,loading [UI.Scale=1.5]
 
-`build.sh` compiles `shaders/*.hlsl` with render3d's `hlsl-rs.sh` (the generated
+`build.sh` compiles `shaders/*.hlsl` with `tools/shaderc/hlsl-rs.sh` (the generated
 `src/shaders/*.rs` is committed and stamped, so a machine without `vkd3d-compiler`
 builds) and the font atlas from the vendored TTFs (`src/text/`), then the DLL.
 `bench-asi.sh` copies `UI.asi` and `UI.ini` into a bench session's clone and sets the

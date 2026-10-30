@@ -29,8 +29,8 @@ Moving both plugins onto it changed nothing on screen, so each move is judged by
 | `src/d3d9/raw.rs`, `consts.rs` | Direct3D 9 through raw COM vtables, once `render3d/src/d3d` and `ui/src/d3d` (identical copies) |
 | `src/display.rs` | the contract with Display8 (`display/`, the game's `d3d8.dll` of ours): the device, frame, upload ring, targets and mirrors it owns and exports, on Vulkan (`display8_vk_*`) and Direct3D 12 (`display8_dx12_*`), as `#[repr(C)]` types; its doc comment is the specification |
 | `shaders/compat.hlsli` | what the shader compilers need apart: vkd3d (d3dbc), dxc to SPIR-V, dxc to DXIL (`render3d/README.md`, "One source, two compilers") |
-| `shaders/fetch-dxc.sh` | the dxc that writes the DXIL, DirectXShaderCompiler v1.9.2609, fetched into `$A2_DATA/tools/` by version and sha256 (`render3d/hlsl-rs.sh` runs it when a DXIL file is stale) |
-| `shaders/fetch-vkd3d.sh`, `shaders/verify-generated.sh` | CI's check that no generated shader is stale: the first builds the vkd3d-compiler that wrote the committed d3dbc (release 1.19, version string `1.19 (git 5c355b596)` as it is in every CTAB, by sha256), the second deletes every generated shader file of render3d, ui, display and gpu, rebuilds them with it and dxc 1.9.2609 (SPIR-V as well as DXIL), runs spirv-val on each module and fails on any difference from the committed files (`.github/workflows/ci.yml`, job `shaders`) |
+| `../tools/shaderc/fetch-dxc.sh` | the dxc that writes the DXIL, DirectXShaderCompiler v1.9.2609, fetched into `$A2_DATA/tools/` by version and sha256 (`tools/shaderc/hlsl-rs.sh` runs it when a DXIL file is stale) |
+| `../tools/shaderc/fetch-vkd3d.sh`, `../tools/shaderc/verify-generated.sh` | CI's check that no generated shader is stale: the first builds the vkd3d-compiler that wrote the committed d3dbc (release 1.19, version string `1.19 (git 5c355b596)` as it is in every CTAB, by sha256), the second deletes every generated shader file of render3d, ui, display and gpu, rebuilds them with it and dxc 1.9.2609 (SPIR-V as well as DXIL), runs spirv-val on each module and fails on any difference from the committed files (`.github/workflows/ci.yml`, job `shaders`) |
 | `src/vulkan/mod.rs` | the Vulkan backend's `Gpu`: Display8's device opened, the recording state (the pass now, layouts), samplers, render passes, the uniform ring, Display8's images wrapped |
 | `src/vulkan/tex.rs`, `pipe.rs`, `cmd.rs`, `mem.rs` | its textures, buffers and timestamps; pipelines; `Cmd` and the read-back; device memory in blocks |
 | `src/vulkan/spirv.rs` | what it reads out of dxc's SPIR-V (reflection) and the two patches it makes to a pixel shader; built on the host too by `spirv-selftest.sh` |
@@ -103,7 +103,7 @@ comes before and after, so what a dispatch writes is what the next draw or dispa
 reads; `barrier` is there for anything else. One queue: no async compute. The
 shaders spell the slots `STORAGE(n)` (t16 + n), `STORAGE_RW(n)` (u n) and
 `STORAGE_IMAGE_R32F(n)` / `_RGBA16F(n)` (u 8 + n) (`shaders/compat.hlsli`), and an
-entry dxc alone compiles is marked `:dxc` (`render3d/hlsl-rs.sh`). On Direct3D 9
+entry dxc alone compiles is marked `:dxc` (`tools/shaderc/hlsl-rs.sh`). On Direct3D 9
 every storage object is an empty one, a compute pipeline is never ready, and a
 dispatch does nothing: what uses compute asks `Gpu::compute` first and keeps its
 Direct3D 9 path as it was. render3d's clustered lights are the first user
@@ -426,7 +426,7 @@ plan in Direct3D 12's terms; what differs, and why:
 
 - **One root signature** for every pipeline, serialized once per plugin: each stage's
   register file as a root constant buffer, at b0 (vertex) or b1 (pixel) in each of the
-  eight spaces a cbuffer may take (`render3d/dxil-spaces.py` puts the k-th cbuffer of a
+  eight spaces a cbuffer may take (`tools/shaderc/dxil-spaces.py` puts the k-th cbuffer of a
   stage in space k, all of them views of the one register file); one table of the
   sixteen stages' shader views (t0..t15); one table of one sampler per stage (s0..s15);
   eight root constants at b2 (the alpha test, the blit's region); one table of the eight
@@ -454,7 +454,7 @@ plan in Direct3D 12's terms; what differs, and why:
   the d3dbc and the SPIR-V are as they were.
 - **The alpha test** cannot be patched into DXIL (it is LLVM bitcode, and signed), so a
   pixel shader drawn with one has an alpha-tested twin built beside it
-  (`render3d/dxil-alpha.py`, an entry marked `:at`, `Code::dxil_at`), which discards
+  (`tools/shaderc/dxil-alpha.py`, an entry marked `:at`, `Code::dxil_at`), which discards
   as Direct3D 9's test would by the interval at b2 (`spirv::alpha_interval`).
 - **The pass now** stays the pass across `Cmd`s, as on Vulkan; Direct3D 12 has no render
   pass to open or close, so its targets are set at the first draw of a `Cmd` (and when

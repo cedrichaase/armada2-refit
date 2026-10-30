@@ -438,7 +438,7 @@ pub const fn attr(offset: u16, format: AttrFormat, semantic: Semantic, index: u8
 /// Shader code for each backend a pipeline may be made on: Direct3D 9's bytecode
 /// (vkd3d's d3dbc), SPIR-V (dxc's) and DXIL (the pinned dxc's, signed), compiled from
 /// one HLSL source (render3d/README.md, "One source, two compilers"). `dxil_at` is a
-/// pixel shader's alpha-tested twin (an entry marked `:at`, `render3d/dxil-alpha.py`):
+/// pixel shader's alpha-tested twin (an entry marked `:at`, `tools/shaderc/dxil-alpha.py`):
 /// Direct3D 12 has no alpha test, so a pipeline with one draws with the twin. Empty
 /// where a form was not built.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

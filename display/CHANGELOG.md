@@ -4,6 +4,13 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.11.1 — 2026-10-30
+
+### Changed
+- `build.sh` and `vkprobe/build.sh` compile shaders with `tools/shaderc/hlsl-rs.sh`
+  (moved from `render3d/`); the generated shader files differ in their header line only.
+  HASH. Installed, not yet seen in game
+
 ## 0.11.0 — 2026-10-29
 
 ### Added

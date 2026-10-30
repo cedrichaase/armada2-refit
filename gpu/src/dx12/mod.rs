@@ -10,7 +10,7 @@
 //!
 //! - **One root signature** for every pipeline: each stage's register file as a root
 //!   constant buffer at b0 (vertex) or b1 (pixel) in every space a cbuffer may take
-//!   (`render3d/dxil-spaces.py`), one table of the sixteen stages' textures (t0..t15),
+//!   (`tools/shaderc/dxil-spaces.py`), one table of the sixteen stages' textures (t0..t15),
 //!   one table of one sampler per stage (s0..s15), and root constants at b2 (the
 //!   alpha test, the blit's region).
 //! - **The pass now** stays the pass across `Cmd`s, as on Direct3D 9 (its targets stay
@@ -56,7 +56,7 @@ pub(crate) use dlog;
 
 /// Direct3D 9's sampler stages.
 pub(crate) const SLOTS: usize = 16;
-/// The register spaces a stage's cbuffers may take (`render3d/dxil-spaces.py`).
+/// The register spaces a stage's cbuffers may take (`tools/shaderc/dxil-spaces.py`).
 pub(crate) const SPACES: u32 = 8;
 /// The root signature's parameters.
 pub(crate) const RP_VS: u32 = 0;
