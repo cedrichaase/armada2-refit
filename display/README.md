@@ -504,6 +504,30 @@ latter is to go). Specular lighting, spot cones, texture transforms, a third sta
 `ZBIAS` are not drawn, each logged once when the engine uses it; none was seen in the
 stock traces.
 
+**Map nebulae** (reported 2026-10-30: with every render3d module off, the cerulean
+nebulae "move a lot more than in stock"). The engine's map puffs are measured to draw
+and move through the passthrough exactly as on the forward chain and in stock, bench
+2026-10-30, 1280x720, scene `nebula-cerulean`, the bench clock, `Step=16`:
+
+- the same tick against the forward chain: RMSE 0.93/255 (the last bit of the additive
+  blend over the gas, the ship's edges); from four other camera positions, the 3D view
+  within RMSE 0.5;
+- frame-to-frame change over 2 ticks (mean absolute difference, 0..255): forward 1.24,
+  stub 1.24; over 16 ticks 6.07 and 6.05. A paused frame stands still in both;
+- against stock (`Mod: stock`, the HUD view): with the stock textures (`A2_DATA` empty)
+  the gas is stock's to the pixel and changes 0.72 per 2 ticks to stock's 0.75; on the
+  wall clock the motion per second is the same at 60, 300 and 700 frames a second, so
+  it is not the frame rate either (`VSync=0`);
+- with the refit's textures the same motion changes 1.01 per 2 ticks, 39% more: the
+  upscaled `Mnebula5` (`textures/targets/Mnebula5`, `blend=35`) carries finer, sharper
+  detail than stock's, and that detail is what is seen to swim. With render3d on, the
+  cerulean class is its marched volume (`render3d/nebulae/mnebula10.ini`), not these
+  puffs.
+
+No unsupported state is used by those draws (no texture transform, no generated
+coordinates). `display-passthrough-nebula` holds it, against
+`display-passthrough-nebula-forward`.
+
 `display-passthrough` checks it (render3d's hulls off on the stub; the ships drawn),
 against `display-passthrough-forward`, the same scene through the forward chain.
 `display-passthrough-all` checks it with every render3d module off, on a Borg mission
