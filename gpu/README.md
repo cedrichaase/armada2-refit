@@ -27,7 +27,7 @@ Moving both plugins onto it changed nothing on screen, so each move is judged by
 | `src/api.rs` | `Gpu`, `Texture`, `Buffer`, `Storage`, `Pipeline`, `ComputePipeline`, `Timer`, `Cmd` as the plugins see them: each an enum of the two backends' own, every call going to the one it was made on; the backend chosen at run time |
 | `src/d3d9/mod.rs` | the Direct3D 9 backend: `Gpu`, `Texture`, `Buffer`, `Pipeline`, `Cmd`, `Timer` |
 | `src/d3d9/raw.rs`, `consts.rs` | Direct3D 9 through raw COM vtables, once `render3d/src/d3d` and `ui/src/d3d` (identical copies) |
-| `src/display.rs` | the contract with Display8 (`display/`, the game's `d3d8.dll` of ours): the device, frame, upload ring, targets and mirrors it owns and exports, on Vulkan (`display8_vk_*`) and Direct3D 12 (`display8_dx12_*`), as `#[repr(C)]` types; its doc comment is the specification |
+| `src/display.rs` | the contract with Display8 (`display/`, the game's `d3d8.dll` of ours): the device, frame, upload ring, targets and mirrors it owns and exports, on Vulkan (`display8v1_vk_*`) and Direct3D 12 (`display8v1_dx12_*`), as `#[repr(C)]` types, each starting with its size; its version and the handshake (`display8_abi`, "Versions" below); its doc comment is the specification |
 | `shaders/compat.hlsli` | what the shader compilers need apart: vkd3d (d3dbc), dxc to SPIR-V, dxc to DXIL (`render3d/README.md`, "One source, two compilers") |
 | `../tools/shaderc/fetch-dxc.sh` | the dxc that writes the DXIL, DirectXShaderCompiler v1.9.2609, fetched into `$A2_DATA/tools/` by version and sha256 (`tools/shaderc/hlsl-rs.sh` runs it when a DXIL file is stale) |
 | `../tools/shaderc/fetch-vkd3d.sh`, `../tools/shaderc/verify-generated.sh` | CI's check that no generated shader is stale: the first builds the vkd3d-compiler that wrote the committed d3dbc (release 1.19, version string `1.19 (git 5c355b596)` as it is in every CTAB, by sha256), the second deletes every generated shader file of render3d, ui, display and gpu, rebuilds them with it and dxc 1.9.2609 (SPIR-V as well as DXIL), runs spirv-val on each module and fails on any difference from the committed files (`.github/workflows/ci.yml`, job `shaders`) |
@@ -45,6 +45,46 @@ Moving both plugins onto it changed nothing on screen, so each move is judged by
 
 `gpu::Gpu`, `gpu::Texture` and the rest are `api.rs`'s, re-exported at the crate's
 root.
+
+## Versions
+
+`gpu::VERSION` is this crate's version (`Cargo.toml`, 1.0.0 since root 13.48.0); it is
+not a layer, so the changelogs of render3d and the UI say when it moves. The contract
+with Display8 has a version of its own, `display::ABI_MAJOR` and `ABI_MINOR` (1.0 since
+display 0.12.0), which both sides build against.
+
+At the first question of which backend draws, `Gpu` shakes hands: `display8_abi`
+gets our major, minor and an address in the plugin's module (for Display8's log), and
+gives Display8's. Then `Display8::load` takes the `display8v1_*` exports. The log
+says both versions, `gpu 1.0.0 (contract 1.0): Display8 0.12.0 (contract 1.0)`, or why
+there is no contract to draw through (`display::Refused`), each case worded apart: **no
+Display8** (another chain's `d3d8.dll`: Direct3D 9, as ever), **Display8 too old** (it
+has the unversioned exports of before 0.12.0 and no `display8_abi`), **another major**,
+or an export of our major missing (a broken build). In all but the first the plugin
+stands down to Direct3D 9 only, which on Display8's own Vulkan or Direct3D 12 draws
+nothing; there the engine's draws pass through instead (`display/README.md`,
+"Versions of the contract").
+
+The rule for changing the contract (`src/display.rs`, "Versions"):
+
+- **A minor adds, and only at the end.** A new export, constant, or a field appended to
+  a struct; `ABI_MINOR` goes up. Every `#[repr(C)]` struct starts with `size: u32`. A
+  struct Display8 hands out (`VkDevice8`, `VkFrame8`, `Dx12Device8`, `Dx12Frame8`) is
+  read with `display::read`, which copies only the fields within the size Display8
+  says and leaves the rest at their defaults; a struct the plugin hands in to be filled
+  (`VkImage8`, `VkAlloc8`, the `Dx12*` ones) carries its room in `size`, and Display8
+  fills it with `display::write`, no more than that, setting `size` to what it wrote;
+  a struct the plugin hands in to be read (`VkPass8`) Display8 reads with `read`. Code
+  that uses what minor N added checks `Display8::minor >= N` first (and Display8 checks
+  the size of what a plugin hands in). A struct inside another does not grow in a
+  minor, since that would move what follows it.
+- **Anything else bumps the major**: removing, moving, retyping or redefining a field;
+  changing an export's signature or meaning; changing a rule between recorders (the
+  layouts and states between `Cmd`s, the heaps, who opens and closes a render pass).
+  The exports are renamed with it (`display8v2_*` for major 2) and `ABI_MINOR` starts
+  again at 0. `display8_abi` keeps its name and signature for ever. A major bump makes
+  the d3d8.dll, `Render3D.asi` and `UI.asi` of that release ship together, as 13.48.0
+  did for the first.
 
 ## The interface
 

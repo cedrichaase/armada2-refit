@@ -20,9 +20,9 @@ static mut ON: bool = false;
 /// UI's loading screen covers it: its draws are not drawn.
 static mut LOADING: bool = false;
 
-/// `Passthrough=` in `Display8.ini` (0 in the code; the shipped file has 1).
+/// `Passthrough=` in `Display8.ini` (1, as the shipped file has it).
 pub fn configure(ini: &crate::rt::Ini) {
-    let on = ini.int("Display8", "Passthrough", 0) != 0;
+    let on = ini.int("Display8", "Passthrough", 1) != 0;
     unsafe { ON = on };
     log!("Passthrough={}: {}", on as u8, if on { "the engine's own draws are drawn on Vulkan in stub mode" } else { "the engine's own draws are dropped in stub mode" });
 }

@@ -12,7 +12,7 @@ use gpu::display::{VkAlloc8, VkDevice8, VkFrame8, VkImage8, BACKEND_D3D12, BACKE
 /// backend that a fallback then leaves (README.md, "Choosing a backend"). `gpu` asks again
 /// while the answer is none.
 #[unsafe(no_mangle)]
-pub extern "C" fn display8_backend() -> u32 {
+pub extern "C" fn display8v1_backend() -> u32 {
     match crate::stub::made() {
         Some(Backend::Vulkan) => BACKEND_VULKAN,
         Some(Backend::D3d12) => BACKEND_D3D12,
@@ -22,12 +22,12 @@ pub extern "C" fn display8_backend() -> u32 {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn display8_vk() -> *const VkDevice8 {
+pub extern "C" fn display8v1_vk() -> *const VkDevice8 {
     get().map_or(core::ptr::null(), |v| &v.exported as *const VkDevice8)
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn display8_vk_frame() -> *const VkFrame8 {
+pub extern "C" fn display8v1_vk_frame() -> *const VkFrame8 {
     match get() {
         Some(v) => {
             super::pass::close(v);
@@ -39,11 +39,11 @@ pub extern "C" fn display8_vk_frame() -> *const VkFrame8 {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn display8_vk_alloc(bytes: u32, align: u32, out: *mut VkAlloc8) -> bool {
+pub extern "C" fn display8v1_vk_alloc(bytes: u32, align: u32, out: *mut VkAlloc8) -> bool {
     let (Some(v), false) = (get(), out.is_null()) else { return false };
     match v.alloc(bytes, align) {
         Some(a) => {
-            unsafe { *out = a };
+            unsafe { gpu::display::write(out, &a) };
             true
         }
         None => false,
@@ -51,7 +51,7 @@ pub extern "C" fn display8_vk_alloc(bytes: u32, align: u32, out: *mut VkAlloc8) 
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn display8_vk_defer(f: extern "C" fn(*mut c_void), arg: *mut c_void) {
+pub extern "C" fn display8v1_vk_defer(f: extern "C" fn(*mut c_void), arg: *mut c_void) {
     match get() {
         Some(v) => v.defer(f, arg),
         None => f(arg),
@@ -59,7 +59,7 @@ pub extern "C" fn display8_vk_defer(f: extern "C" fn(*mut c_void), arg: *mut c_v
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn display8_vk_flush() -> bool {
+pub extern "C" fn display8v1_vk_flush() -> bool {
     match get() {
         Some(v) => v.flush(),
         None => false,
@@ -67,20 +67,20 @@ pub extern "C" fn display8_vk_flush() -> bool {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn display8_vk_target(which: u32, out: *mut VkImage8) -> bool {
+pub extern "C" fn display8v1_vk_target(which: u32, out: *mut VkImage8) -> bool {
     let (Some(v), false) = (get(), out.is_null()) else { return false };
-    unsafe { *out = v.target(which) };
+    unsafe { gpu::display::write(out, &v.target(which)) };
     true
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn display8_vk_mirror(tex8: *mut c_void, out: *mut VkImage8) -> bool {
+pub extern "C" fn display8v1_vk_mirror(tex8: *mut c_void, out: *mut VkImage8) -> bool {
     if out.is_null() || !crate::stub::obj::is_stub(tex8) {
         return false;
     }
     match super::mirror::image(tex8 as *mut SObj) {
         Some(i) => {
-            unsafe { *out = i };
+            unsafe { gpu::display::write(out, &i) };
             true
         }
         None => false,
@@ -88,7 +88,7 @@ pub extern "C" fn display8_vk_mirror(tex8: *mut c_void, out: *mut VkImage8) -> b
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn display8_engine_viewport(out: *mut [u32; 6]) -> bool {
+pub extern "C" fn display8v1_engine_viewport(out: *mut [u32; 6]) -> bool {
     let d = crate::api::display8_device();
     if out.is_null() || !crate::stub::obj::is_stub(d) {
         return false;
@@ -98,7 +98,7 @@ pub extern "C" fn display8_engine_viewport(out: *mut [u32; 6]) -> bool {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn display8_engine_transform(state: u32, out: *mut [f32; 16]) -> bool {
+pub extern "C" fn display8v1_engine_transform(state: u32, out: *mut [f32; 16]) -> bool {
     let d = crate::api::display8_device();
     if out.is_null() || !crate::stub::obj::is_stub(d) {
         return false;
@@ -111,6 +111,6 @@ pub extern "C" fn display8_engine_transform(state: u32, out: *mut [f32; 16]) -> 
 /// A plugin's `Cmd` begins or ends, or ends with its pass now published (gpu/src/display.rs;
 /// the passthrough, `pass.rs`).
 #[unsafe(no_mangle)]
-pub extern "C" fn display8_vk_pass(event: u32, pass: *const gpu::display::VkPass8) {
+pub extern "C" fn display8v1_vk_pass(event: u32, pass: *const gpu::display::VkPass8) {
     super::pass::event(event, pass);
 }

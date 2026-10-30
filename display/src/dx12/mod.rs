@@ -17,7 +17,7 @@
 //!   target.
 //! - **Descriptors**: two shader-visible heaps (CBV/SRV/UAV and samplers), set on the
 //!   frame's command list when it begins, each split into one range per frame slot that
-//!   the recorders take descriptors from (`display8_dx12_descriptors`); the views of
+//!   the recorders take descriptors from (`display8v1_dx12_descriptors`); the views of
 //!   Display8's own resources (targets, mirrors, the ramp) live in heaps that are not
 //!   shader-visible and are copied into a frame's range to be bound.
 //! - **Two frames in flight**, as on Vulkan: each slot has a command allocator and list,
@@ -257,6 +257,7 @@ impl Dx {
             root: core::ptr::null_mut(),
             pso: core::ptr::null_mut(),
             exported: Dx12Device8 {
+                size: core::mem::size_of::<Dx12Device8>() as u32,
                 device: dev as usize,
                 queue: queue as usize,
                 serialize_root_signature: serialize,
@@ -660,7 +661,7 @@ impl Dx {
         let heaps = [self.views_heap, self.samplers_heap];
         vcall!(s.list, slot::LIST_SET_DESCRIPTOR_HEAPS, fn(u32, *const P) -> (), 2, heaps.as_ptr());
         self.recording = true;
-        self.frame_out = Dx12Frame8 { index: self.index, slot: self.slot as u32, command_list: s.list as usize };
+        self.frame_out = Dx12Frame8 { size: core::mem::size_of::<Dx12Frame8>() as u32, index: self.index, slot: self.slot as u32, command_list: s.list as usize };
         if self.first {
             self.first = false;
             if self.ramp_values.is_none() {
@@ -695,7 +696,7 @@ impl Dx {
         let s = &mut self.slots[self.slot];
         s.at = (ci, off + need);
         let c = &s.chunks[ci];
-        Some(Dx12Alloc8 { resource: c.res as usize, offset: off as u32, gpu: c.gpu + off, cpu: unsafe { c.ptr.add(off as usize) } })
+        Some(Dx12Alloc8 { size: core::mem::size_of::<Dx12Alloc8>() as u32, resource: c.res as usize, offset: off as u32, gpu: c.gpu + off, cpu: unsafe { c.ptr.add(off as usize) } })
     }
 
     fn chunk_for(&mut self, need: u64, align: u64) -> Option<(usize, u64)> {
@@ -740,7 +741,7 @@ impl Dx {
         }
         let i = self.slot as u32 * per + *at;
         *at += count;
-        Some(Dx12Descriptors8 { cpu: cpu + (i * inc) as usize, gpu: gpu + (i * inc) as u64, count })
+        Some(Dx12Descriptors8 { size: core::mem::size_of::<Dx12Descriptors8>() as u32, cpu: cpu + (i * inc) as usize, gpu: gpu + (i * inc) as u64, count })
     }
 
     pub fn defer(&mut self, f: extern "C" fn(*mut c_void), arg: *mut c_void) {
@@ -892,7 +893,7 @@ impl Dx {
     }
 
     /// Submits what the frame now has recorded, waits for it, and opens the same list
-    /// again with its heaps set (`display8_dx12_flush`: a plugin's read-back). The
+    /// again with its heaps set (`display8v1_dx12_flush`: a plugin's read-back). The
     /// frame's ring, descriptors and deferred calls stay as they are.
     pub fn flush(&mut self) -> bool {
         if self.lost {
@@ -933,6 +934,7 @@ impl Img {
 
     pub fn info(&self) -> Dx12Image8 {
         Dx12Image8 {
+            size: core::mem::size_of::<Dx12Image8>() as u32,
             resource: self.res as usize,
             format: self.format,
             width: self.w,

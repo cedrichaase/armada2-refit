@@ -225,7 +225,7 @@ fn started(d3d9: *mut c_void, mode: crate::d3d8::DisplayMode, order: Vec<Backend
 }
 
 /// The backend the device was made on; None before it is made, or when none could be.
-/// What `display8_backend` reports: a plugin is never told a backend before its device
+/// What `display8v1_backend` reports: a plugin is never told a backend before its device
 /// exists, so a fallback can never leave it on another.
 pub fn made() -> Option<Backend> {
     unsafe { STUB.as_ref().filter(|s| s.decided && device_exists(s)).map(|s| s.backend) }

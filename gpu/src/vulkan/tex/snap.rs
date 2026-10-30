@@ -163,7 +163,7 @@ impl Gpu {
         }
         if !self.flush() {
             done(buf, mem);
-            return Err("the frame could not be submitted (display8_vk_flush)");
+            return Err("the frame could not be submitted (display8v1_vk_flush)");
         }
         let Some(p) = sh.pools.borrow_mut().map(dv, &mem) else {
             done(buf, mem);

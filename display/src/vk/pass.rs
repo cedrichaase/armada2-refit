@@ -3,7 +3,7 @@
 //! made, through `shaders/ff.hlsl`.
 //!
 //! - **Where it lands**: the pass a plugin published at its last `Cmd`'s end in this
-//!   frame (`display8_vk_pass`: render3d's scene pass while its body runs, so what it
+//!   frame (`display8v1_vk_pass`: render3d's scene pass while its body runs, so what it
 //!   hands back is drawn into its scene, tone-mapped and bloomed with the rest), else
 //!   the engine's targets (Display8's colour and depth). Nothing is recorded while a
 //!   plugin's `Cmd` is alive (a draw then is logged once and not drawn).
@@ -144,7 +144,7 @@ pub fn presented(v: &Vk) {
     }
 }
 
-/// `display8_vk_pass`: a plugin's `Cmd` begins, ends, or ends with its pass now.
+/// `display8v1_vk_pass`: a plugin's `Cmd` begins, ends, or ends with its pass now.
 pub fn event(event: u32, pass: *const VkPass8) {
     let Some(v) = get() else { return };
     close(v);
@@ -163,7 +163,8 @@ pub fn event(event: u32, pass: *const VkPass8) {
         _ => {
             p.alive = p.alive.saturating_sub(1);
             if event == PASS_PUBLISH && !pass.is_null() {
-                p.published = Some((unsafe { *pass }, v.index));
+                // Only what the plugin's size says (gpu/src/display.rs, "Versions").
+                p.published = Some((unsafe { gpu::display::read(pass) }, v.index));
             }
         }
     }
@@ -706,7 +707,7 @@ pub fn draw(v: &mut Vk, dv: &Dev, d: &Draw, fp: usize) {
     note_unsupported(dv);
     // Where it goes: the pass published in this frame, unless that is the engine's own
     // back buffer (then the engine's targets, with their depth).
-    let own = VkPass8 { color: v.target(gpu::display::TARGET_COLOR), depth: v.target(gpu::display::TARGET_DEPTH) };
+    let own = VkPass8 { size: core::mem::size_of::<VkPass8>() as u32, color: v.target(gpu::display::TARGET_COLOR), depth: v.target(gpu::display::TARGET_DEPTH) };
     let pass = match p.published {
         Some((x, f)) if f == v.index && x.color.image != own.color.image => x,
         _ => own,
