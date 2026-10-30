@@ -190,12 +190,11 @@ Claims are asked in forward mode too (for `display8v1_claims`), but route nothin
 there: forward mode draws every call it is given, as before. `display-claims` checks
 three games on the stub: nothing claimed, the UI, and render3d at `sky=0`.
 
-**Not yet: the stub with no UI at all.** Without `UI.asi` (or with its `[Menus]` at 0)
-the game does not start in stub mode: a stack overflow before the engine's first
-`CreateDevice` (seen 2026-10-30, the same on 13.48.0), the engine's shell display mode,
-800x600x16, not being the one mode the stub offers; the UI's `raise_shell_mode` makes it
-the desktop's. Forward mode starts without the UI. So `display-claims`'s "alone" keeps
-the UI with every part at 0 but the shell's, which registers and claims nothing.
+**Display8 alone.** With no `UI.asi` and no `Render3D.asi` nothing registers, and in
+stub mode passthrough draws the whole game as the engine issues it: the stock menus,
+loading screen, HUD and 3D view ("Stub mode", "The engine's hard-coded modes", for
+why that needs Display8 to answer the engine's own mode requests). `display-claims`'s
+"alone" is that case.
 
 ## How it works
 
@@ -307,6 +306,8 @@ engine's device, and draw the whole frame on it.
   coordinate needs translating (phase 0 found the engine reads the mouse only through
   `GetCursorPos`, `ScreenToClient` and `GetClientRect`). The game's window becomes a
   borderless one covering the screen, and the swap chain is windowed on it.
+- **The engine's hard-coded modes get the one mode** (`src/stub/modes.rs`, since
+  0.15.1; below).
 - **What the plugins read of the engine's state reaches the Direct3D 9 device**: the
   transforms (render3d reads the view and the projection), the viewport, `Clear` of the
   engine's own back buffer and depth, `BeginScene` and `EndScene`. Everything else is
@@ -344,6 +345,47 @@ engine's device, and draw the whole frame on it.
   between the modes is past: if it cannot be made, the next backend is tried there,
   Direct3D 9 last ("Choosing a backend"), and that `CreateDevice` fails only when none
   starts.
+
+### The engine's hard-coded modes
+
+Storm3D keeps the modes the adapter lists on its display device and looks one up by
+width, height and depth (`ST3D_DisplayDevice::FindDisplayMode`, `0x626bf0`), which
+finds nothing without an exact match. Three of its callers ask for a mode of their own
+rather than one from the list: `SetActiveDisplay_Internal` the shell's 800x600x16 (the
+call at `0x62c4e0`; the same mode again at `0x62c643`, its fallback when a display does
+not open), `GameConfiguration::InitializeGraphicsSystem` the profile's (`0x53e7c9`,
+`0x53e7e7`; GOG's `ARMADA.PRF` holds 1024x768x32, no profile 800x600x16) and
+`Program::PlayIntroMovie` the intro's 640x480 (`0x4861da`, `0x4861f2`). The stub lists
+the desktop's mode alone, so with nothing raising those requests the shell's display
+was opened on no mode, which failed, and the game died of a stack overflow before the
+engine's first `CreateDevice` (seen on the bench 2026-10-30: Wine's log says
+`stack overflow`, `Display8.log` ends at `CheckDeviceType`). Until 0.15.1 only the
+UI's `raise_shell_mode` (`[Menus] Enable=1`) kept it from happening, by making the
+shell's request the desktop's; forward mode lists the real modes and never had it.
+
+Display8 re-points those six calls, in stub mode, at a lookup of its own
+(`modes::find`): the engine's first, and when it finds nothing, the listed mode of the
+stub's size. Each call and `FindDisplayMode`'s first bytes are checked before anything
+is written; one that is not stock is left alone and logged. The lookup's other callers
+keep the exact match: the adapter's enumeration, which uses it to skip a mode it has
+listed already, and Graphics Settings, which offers what is listed (the one mode).
+`Display8.log` says what was asked and given:
+
+    stub: the engine's own mode requests (6 of 6 calls) get the one mode offered when theirs is not listed
+    stub: the engine asks for 800x600x16, not listed: given the one mode, 1280x720x32
+
+The UI's raises are untouched and never write the same bytes: they patch the pushes
+before two of these calls and the call of `InitializeGraphicsSystem` (`0x484169`), so
+with the UI the lookup matches at once and Display8's answer is the engine's. No
+claim or contract change was needed.
+
+**What the stock shell looks like then** (Display8 alone, 1280x720 on the bench): the
+game's window covers the screen from the first `CreateDevice`, and the GDI menus draw
+at their stock 800x600, 1:1, in its top-left corner; the rest of the window is
+unpainted (white on the bench). Every screen works with the mouse at those
+coordinates (main menu, Single Player, the campaign's Select Mission), and a mission
+then opens at the desktop's size, drawn by the engine through passthrough. Scaling the
+shell into the window is the UI's (`ui/MENUS.md`).
 
 `display/bench-mode.sh stub` sets the mode in a bench clone from a scenario's `Setup:`;
 `display-stub` walks the whole game on it.

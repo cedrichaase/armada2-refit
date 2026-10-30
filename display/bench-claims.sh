@@ -5,16 +5,15 @@
 #
 #   display/bench-claims.sh <session state.json> [alone|ui|render3d] [scene ... | script.sh ...]
 #
-#   alone      no Render3D.asi, and every part of the UI at 0 but the shell's
+#   alone      no Render3D.asi and no UI.asi: Display8 alone
 #   ui         no Render3D.asi: Display8 and the UI
 #   render3d   render3d's [Modules] sky=0, and every part of the UI at 0 but the shell's
 #
-# Why the UI stays in "alone" and "render3d": on the stub the game does not start
-# without the UI's raise of the shell's 800x600x16 display mode (`[Menus] Enable=1`,
-# ui/src/engine/dialogs.rs `raise_shell_mode`), since the stub offers the desktop's mode
-# alone (display/README.md, "Claims"). With `[HUD] Enable=0`, `[Loading] Enable=0`,
-# `[UI] Cursor=0` and `[Menus] Credits=0` it registers and claims nothing, which is
-# what Display8 alone sees.
+# Since display 0.15.1 Display8 answers the engine's own mode requests on the stub with
+# its one mode (README.md, "Stub mode", "The engine's hard-coded modes"), so the game
+# starts with no UI at all. In "render3d" the UI stays, with `[HUD] Enable=0`,
+# `[Loading] Enable=0`, `[UI] Cursor=0` and `[Menus] Credits=0`, so that it registers and
+# claims nothing and the HUD is the engine's.
 #
 # Without the first word it is the session's player name (a scenario's `Players:
 # alone, ui, render3d`), so one scenario runs all three at once.
@@ -56,9 +55,8 @@ PY
 }
 case "$which" in
     alone)
-        rm -f "$game/Render3D.asi"
-        ui_parts_off
-        echo "claims: Display8 alone (no Render3D.asi; the UI with every part at 0 but the shell's)" ;;
+        rm -f "$game/Render3D.asi" "$game/UI.asi"
+        echo "claims: Display8 alone (no Render3D.asi, no UI.asi)" ;;
     ui) rm -f "$game/Render3D.asi"; echo "claims: Display8 and UI.asi (no Render3D.asi)" ;;
     render3d)
         ui_parts_off
