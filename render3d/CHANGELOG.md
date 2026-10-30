@@ -4,6 +4,19 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.29.2 — 2026-10-30
+
+### Fixed
+- `[Modules] world=0` and `sky=0` no longer empty the menu scene of its planet, gas and
+  sky: like `hulls=0`, the module stays loaded for the menu scene only
+  (`mods::MenuOnly`; `World::menu_scene()` has every `[World]` part on and installs none
+  of the mission hooks), so `[World] Planets=`, `Nebulae=`, `Rocks=` and `Enable=` at 0
+  leave the menu alone too. Missions keep the engine's look for a module at 0.
+  Particles, effects, ordnance, specials and overlays draw nothing in the menu scene.
+  `e23d234`
+
+Installed, not yet seen in game.
+
 ## 0.29.1 — 2026-10-30
 
 ### Fixed

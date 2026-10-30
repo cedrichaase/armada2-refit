@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.42.4 — 2026-10-30
+
+Layers: render3d 0.29.2.
+
+### Fixed
+- render3d: with `[Modules] world=0` or `sky=0` the menu scene keeps its planets,
+  nebulae and sky (the module is loaded for the menu scene only, as hulls=0 since
+  13.42.2); missions unchanged. `e23d234`
+
+Installed, not yet seen in game.
+
 ## 13.42.3 — 2026-10-29
 
 Layers: ui 0.25.1.

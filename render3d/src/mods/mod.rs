@@ -103,6 +103,41 @@ pub trait Module {
     fn menu(&mut self, _pass: crate::menu::Pass, _shot: &crate::menu::Shot, _v: &View) {}
 }
 
+/// A module with `[Modules] <name>=0`, kept for the menu scene's part only (the sky and
+/// the world; hulls has its own, `hulls::MenuOnly`). The front end has no game objects
+/// and the engine draws nothing there, so nothing could take the part back. It forwards
+/// the device, the resets and the menu scene's calls and nothing else: in a mission it
+/// has no step, object, feature, light or view, and it is not `running()`, so that part
+/// is the engine's, as with the module off.
+pub struct MenuOnly<M: Module>(pub M);
+
+impl<M: Module> Module for MenuOnly<M> {
+    fn name(&self) -> &'static str {
+        self.0.name()
+    }
+    fn superseded(&self) -> Option<&'static str> {
+        self.0.superseded()
+    }
+    fn menu_only(&self) -> bool {
+        true
+    }
+    fn device(&mut self) {
+        self.0.device();
+    }
+    fn reset(&mut self) {
+        self.0.reset();
+    }
+    fn forget(&mut self) {
+        self.0.forget();
+    }
+    fn menu_begin(&mut self, shot: &crate::menu::Shot, v: &View) {
+        self.0.menu_begin(shot, v);
+    }
+    fn menu(&mut self, pass: crate::menu::Pass, shot: &crate::menu::Shot, v: &View) {
+        self.0.menu(pass, shot, v);
+    }
+}
+
 static mut MODS: Vec<Box<dyn Module>> = Vec::new();
 static mut ACTIVE: bool = false;
 /// The names of the modules running, from the first frame on.
@@ -142,7 +177,12 @@ pub fn init() {
     // plain GameObject::Render as hulls do.
     // world first: it takes the nebulae (latinum included) and the rocks whose class has
     // a recipe, and leaves every other one to particles and hulls.
-    add(Box::new(world::World::default()), true);
+    // world=0 and sky=0 likewise keep the menu scene's planets, nebulae and sky.
+    if ini.int("Modules", "world", 1) != 0 {
+        add(Box::new(world::World::default()), true);
+    } else {
+        add(Box::new(MenuOnly(world::World::menu_scene())), true);
+    }
     add(Box::new(particles::Particles::default()), true);
     // hulls=0: the menu scene is render3d's own and the engine draws nothing in the
     // front end, so its ships have no stock draw to fall back to and stay ours there.
@@ -154,7 +194,11 @@ pub fn init() {
     add(Box::new(effects::Effects::new()), true);
     add(Box::new(ordnance::Ordnance::new()), true);
     add(Box::new(specials::Specials::default()), true);
-    add(Box::new(sky::Sky::default()), true);
+    if ini.int("Modules", "sky", 1) != 0 {
+        add(Box::new(sky::Sky::default()), true);
+    } else {
+        add(Box::new(MenuOnly(sky::Sky::default())), true);
+    }
     add(Box::new(overlays::Overlays::default()), true);
 }
 
