@@ -104,8 +104,9 @@ jobs:
       - name: Build tools and spirv-val
         run: |
           sudo apt-get update -qq
-          # libjson-perl: vkd3d's configure; spirv-tools: spirv-val.
-          sudo apt-get install -y -qq build-essential flex bison pkg-config libjson-perl spirv-tools curl
+          # libjson-perl and libvulkan-dev: vkd3d's configure (it links -lvulkan; the runner image no
+          # longer ships it); spirv-tools: spirv-val.
+          sudo apt-get install -y -qq build-essential flex bison pkg-config libjson-perl libvulkan-dev spirv-tools curl
       - name: The pinned compilers, cached by their scripts
         uses: actions/cache@v5
         with:
