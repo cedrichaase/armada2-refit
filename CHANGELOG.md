@@ -14,7 +14,7 @@ Layers: render3d 0.29.3, ui 0.25.2, display 0.11.1.
   `d3dbc-fix.py`, `d3dbc-slots.py`, `dxil-spaces.py`, `dxil-alpha.py` from `render3d/`,
   and `fetch-dxc.sh`, `fetch-vkd3d.sh`, `verify-generated.sh` from `gpu/shaders/`; the
   build scripts, CI cache key and docs follow. Generated shader files change in their
-  header line only; the stamps are unchanged. HASH. Installed, not yet seen in game
+  header line only; the stamps are unchanged. `64aee16`. Installed, not yet seen in game
 
 ## 13.42.4 — 2026-10-30
 

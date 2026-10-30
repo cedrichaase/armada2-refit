@@ -9,7 +9,7 @@ in [`README.md`](README.md).
 ### Changed
 - `build.sh` and `vkprobe/build.sh` compile shaders with `tools/shaderc/hlsl-rs.sh`
   (moved from `render3d/`); the generated shader files differ in their header line only.
-  HASH. Installed, not yet seen in game
+  `64aee16`. Installed, not yet seen in game
 
 ## 0.11.0 — 2026-10-29
 

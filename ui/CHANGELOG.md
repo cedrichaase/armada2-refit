@@ -8,7 +8,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
 
 ### Changed
 - `build.sh` compiles shaders with `tools/shaderc/hlsl-rs.sh` (moved from `render3d/`);
-  the generated `src/shaders/*.rs` differ in their header line only. HASH. Installed,
+  the generated `src/shaders/*.rs` differ in their header line only. `64aee16`. Installed,
   not yet seen in game
 
 ## 0.25.1 — 2026-10-29
