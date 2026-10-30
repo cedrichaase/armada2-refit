@@ -37,6 +37,13 @@ pub struct World {
     enable: bool,
     reload: bool,
     checked: f64,
+    /// `[Modules] world=0`: drawing the menu scene's planet and gas only
+    /// (`mods::MenuOnly`): every part on whatever `[World]` says, no hook installed.
+    menu_only: bool,
+    /// An old plugin draws the planets / the gas: the menu scene's part stands down
+    /// too (`[World]` keys at 0 do not).
+    plug_planets: bool,
+    plug_nebulae: bool,
 }
 
 /// The module, for the overlays' ghosts (set at every view).
@@ -72,11 +79,28 @@ impl Default for World {
             enable: ini.int("World", "Enable", 1) != 0,
             reload: ini.int("World", "Reload", 1) != 0,
             checked: 0.0,
+            menu_only: false,
+            plug_planets: false,
+            plug_nebulae: false,
         }
     }
 }
 
 impl World {
+    /// For `[Modules] world=0`: the menu scene's parts, all on (the `[World]` keys
+    /// belong to missions), with none of the hooks a mission's objects go through.
+    pub fn menu_scene() -> World {
+        World {
+            on_planets: true,
+            on_rocks: true,
+            on_nebulae: true,
+            enable: true,
+            reload: false,
+            menu_only: true,
+            ..World::default()
+        }
+    }
+
     /// At the first device, when every plugin is loaded: each part stands down beside
     /// the plugin that draws it.
     fn settle(&mut self) {
@@ -89,6 +113,8 @@ impl World {
         let beside = crate::config::ini().int("World", "BesidePlugins", 0) != 0;
         let lighting = !beside && crate::plugin_loaded("Lighting.asi");
         let surfaces = !beside && crate::plugin_loaded("Surfaces.asi");
+        self.plug_planets = lighting;
+        self.plug_nebulae = !beside && crate::plugin_loaded("Nebulae.asi");
         if self.on_planets && lighting {
             log!("world: Lighting.asi is loaded, which draws the planets: planets stay its");
             self.on_planets = false;
@@ -101,11 +127,13 @@ impl World {
             log!("world: Nebulae.asi is loaded, which draws the gas: nebulae stay its");
             self.on_nebulae = false;
         }
-        if self.on_nebulae {
-            self.nebulae.install();
+        if !self.menu_only {
+            if self.on_nebulae {
+                self.nebulae.install();
+            }
+            self.lights.install(self.on_planets);
+            self.nebulae.set_active(self.on_nebulae && self.enable);
         }
-        self.lights.install(self.on_planets);
-        self.nebulae.set_active(self.on_nebulae && self.enable);
         log!(
             "world: planets {}, moons and asteroids {}, nebulae {}",
             on(self.on_planets), on(self.on_rocks), on(self.on_nebulae)
@@ -202,16 +230,15 @@ impl Module for World {
         false
     }
     fn menu(&mut self, pass: crate::menu::Pass, shot: &crate::menu::Shot, v: &View) {
-        if !self.enable {
-            return;
-        }
+        // The menu scene ignores `[World] Enable`, `Planets` and `Nebulae`: they are a
+        // mission's, and the engine draws nothing in the front end to take it back.
         match pass {
-            crate::menu::Pass::Planet if self.on_planets => {
+            crate::menu::Pass::Planet if !self.plug_planets => {
                 if let Some(p) = &shot.planet {
                     self.planets.draw_menu(v, &mut self.surfaces, &p.ground, &p.atmo, &p.world, p.radius, p.cloud_yaw);
                 }
             }
-            crate::menu::Pass::Gas if self.on_nebulae => {
+            crate::menu::Pass::Gas if !self.plug_nebulae => {
                 let key = shot.key.map(|k| [k.x, k.y, k.z]);
                 self.nebulae.draw_menu(v, &shot.gas, key);
             }
