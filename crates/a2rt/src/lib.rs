@@ -1,5 +1,25 @@
-//! The plugin's own runtime: allocator, memory functions, Win32, log, ini, files,
-//! clock. Everything above it is ordinary `core` + `alloc` Rust.
+//! The plugins' own runtime, one copy for Display8 (`d3d8.dll`), `Render3D.asi` and
+//! `UI.asi`: allocator, memory functions, Win32, log, ini, files, the animation clock's
+//! switch, the patching of `Armada2.exe` in memory (`hook`) and frame dumps (`dump`,
+//! feature `dump`). Everything above it is ordinary `core` + `alloc` Rust. Each plugin
+//! reaches it as its own `rt` (`pub mod rt { pub use a2rt::*; }`), with `log!` and
+//! `sfmt!` re-exported at its root, and keeps its own statics: an rlib is linked into
+//! each DLL separately, so each has its own log, game directory and ini cache.
+//!
+//! The allocator (`mem::Heap`) and the panic handler are declared by each DLL, not
+//! here: the handler's last log line names the plugin and how to play without it, and
+//! a `#[global_allocator]` or `#[panic_handler]` in this crate would be forced on
+//! everything that links it (the replayer and vkprobe bring their own, and the host
+//! cannot test a crate that has one). `alloc::format!` does not link: use `sfmt!`.
+#![no_std]
+#![allow(clippy::missing_safety_doc, static_mut_refs)]
+
+extern crate alloc;
+
+pub mod clock;
+#[cfg(feature = "dump")]
+pub mod dump;
+pub mod hook;
 pub mod mem;
 pub mod win;
 
@@ -87,7 +107,9 @@ pub fn log_fmt(args: core::fmt::Arguments) {
     log_str(&s);
 }
 
-/// `format!` without `alloc::format!`, which does not link (as in ui/src/rt).
+/// `format!` without `alloc::format!`, which does not link: the prebuilt `alloc` is
+/// compiled to unwind, and its `format_inner` needs the C++ runtime's frame handler.
+/// Writing into a `String` does not.
 pub fn fmt_string(args: core::fmt::Arguments) -> String {
     let mut s = String::new();
     let _ = s.write_fmt(args);
@@ -96,12 +118,12 @@ pub fn fmt_string(args: core::fmt::Arguments) -> String {
 
 #[macro_export]
 macro_rules! sfmt {
-    ($($t:tt)*) => { $crate::rt::fmt_string(format_args!($($t)*)) };
+    ($($t:tt)*) => { $crate::fmt_string(format_args!($($t)*)) };
 }
 
 #[macro_export]
 macro_rules! log {
-    ($($t:tt)*) => { $crate::rt::log_fmt(format_args!($($t)*)) };
+    ($($t:tt)*) => { $crate::log_fmt(format_args!($($t)*)) };
 }
 
 /// Reads a whole file; None if it cannot be opened.
@@ -121,7 +143,7 @@ pub fn read_file(path: &str) -> Option<Vec<u8>> {
         if ok == 0 {
             return None;
         }
-        v.set_len(got as *const () as usize);
+        v.set_len(got as usize);
         Some(v)
     }
 }
@@ -270,7 +292,9 @@ pub fn now() -> f64 {
     if f == 0 { 0.0 } else { c as f64 / f as f64 }
 }
 
-/// An ini file read through GetPrivateProfile* (path absolute).
+/// An ini file (path absolute), read as `GetPrivateProfile*` reads one (`ini_cache`).
+/// Every getter goes through `lookup`, the one place a value is found, so a layer in
+/// front of the file (the settings overlay, ROADMAP.md Phase 5) goes there alone.
 pub struct Ini {
     path: Vec<u8>,
 }
@@ -282,8 +306,12 @@ impl Ini {
     pub fn exists(&self) -> bool {
         file_exists(core::str::from_utf8(&self.path[..self.path.len() - 1]).unwrap_or(""))
     }
+    /// The value of `key` in `[sec]` as written, or None when there is none.
+    fn lookup(&self, sec: &str, key: &str) -> Option<String> {
+        ini_cache::value(&self.path, sec, key)
+    }
     pub fn string(&self, sec: &str, key: &str) -> Option<String> {
-        let v = ini_cache::value(&self.path, sec, key)?;
+        let v = self.lookup(sec, key)?;
         // Strip a trailing ; comment and whitespace.
         let t = match v.find(';') {
             Some(c) => &v[..c],

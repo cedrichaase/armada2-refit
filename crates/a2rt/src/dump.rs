@@ -1,7 +1,7 @@
 //! Frame dumps on request: render targets read back byte for byte and written as PFM
 //! (float RGB) or binary PPM (8-bit RGB) into `Dumps\` in the game directory
-//! (README.md, "Frame dumps"). The same file is in `render3d/src/dump.rs` and
-//! `ui/src/dump.rs`; keep them alike.
+//! (render3d's and ui's README.md, "Frame dumps"). Behind the `dump` feature, which
+//! brings in `gpu`: Display8 has no targets of its own to dump.
 //!
 //! A dump is asked for with a trigger file beside `Armada2.exe` (`Render3D.dump`,
 //! `UI.dump`), looked for every `EVERY` frames as D3DTrace does, and deleted when seen.
@@ -14,7 +14,7 @@
 //! multisampled one resolved with `StretchRect` first) and converted row by row on the
 //! CPU, so nothing of the device's state changes. A format with no conversion
 //! (`gpu::Format::readable`) is logged and skipped.
-use crate::rt;
+use crate as rt;
 use gpu::d3d9::format_code;
 use alloc::string::String;
 use alloc::vec::Vec;

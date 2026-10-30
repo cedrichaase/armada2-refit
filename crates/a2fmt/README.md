@@ -1,6 +1,6 @@
 # a2fmt
 
-Readers for Star Trek: Armada II's asset formats, for the renderer in `render3d/`:
+Readers for Star Trek: Armada II's asset formats, for the renderers in `render3d/` and `ui/`:
 SOD models, TGA textures and their mip chains, `.spr` sprite tables and ODFs.
 `no_std` with `alloc`, one dependency (`libm`). Nothing here opens a file: callers pass
 bytes, and for formats that include other files, a closure that fetches them by name.
@@ -11,8 +11,8 @@ cargo check --target i686-pc-windows-msvc                       # as the rendere
 cargo test --release --target x86_64-unknown-linux-gnu           # host tests
 ```
 
-`render3d/.cargo/config.toml` makes i686 Windows the default target for anything run
-from inside `render3d/`, so the host tests need `--target` spelled out. The tests read
+Outside the plugins' directories no `.cargo/config.toml` applies, so the host is the
+default target and the plugins' target is spelled out. The tests read
 every stock file of the installed game (`A2_GAME`, else `a2env.sh`); without a game
 they print a note and pass. They write nothing.
 

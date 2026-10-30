@@ -97,7 +97,7 @@ no setting, and leaves the bottle as it was.
     display/vkprobe/build.sh      # -> display/vkprobe/build/vkprobe.exe
 
 Like Display8 (`display/build.sh`): rustup's `i686-pc-windows-msvc` target, `lld-link`,
-no C runtime (`display/src/rt/mem.rs` and `win.rs` are shared, not copied), kernel32
+no C runtime (`crates/a2rt/src/mem.rs` and `win.rs` are shared, not copied), kernel32
 and user32 through import libraries `build.rs` makes with `llvm-dlltool`, and a
 version resource. The shaders are `shaders/probe.hlsl`, compiled by
 `tools/shaderc/hlsl-rs.sh` (dxc to SPIR-V, validated by `spirv-val`; vkd3d's Direct3D 9

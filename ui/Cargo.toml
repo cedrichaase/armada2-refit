@@ -13,7 +13,8 @@ path = "src/lib.rs"
 
 [dependencies]
 libm = "0.2"
-a2fmt = { path = "../render3d/a2fmt" }
+a2fmt = { path = "../crates/a2fmt" }
+a2rt = { path = "../crates/a2rt", features = ["dump"] }
 gpu = { path = "../gpu" }
 
 [build-dependencies]

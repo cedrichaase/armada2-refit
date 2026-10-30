@@ -12,7 +12,10 @@ extern crate alloc;
 
 #[macro_use]
 pub mod macros;
-pub mod rt;
+pub mod rt {
+    pub use a2rt::*;
+}
+pub use a2rt::{log, sfmt};
 #[rustfmt::skip]
 pub mod shaders;
 pub mod api;
