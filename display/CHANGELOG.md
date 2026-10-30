@@ -14,7 +14,7 @@ in [`README.md`](README.md).
   Direct3D ignores them there, and the case is logged once ("the Borg bump shader
   drawn with LIGHTING on").
 
-Installed, not yet seen in game. (b08d6a8)
+Confirmed in game 2026-10-30. (b08d6a8)
 
 ## 0.15.1 — 2026-10-30
 
@@ -25,7 +25,7 @@ Installed, not yet seen in game. (b08d6a8)
   listed, instead of a stack overflow before the first `CreateDevice`. Display8 alone
   runs the stock game through passthrough.
 
-Installed, not yet seen in game. (c6d6189)
+Confirmed in game 2026-10-30. (c6d6189)
 
 ## 0.15.0 — 2026-10-30
 
@@ -37,7 +37,7 @@ Installed, not yet seen in game. (c6d6189)
   120 frames). The present pass goes through it too. Uninstalling on Windows takes the
   file out.
 
-Installed, not yet seen in game. (d860f47)
+Confirmed in game 2026-10-30. (d860f47)
 
 ## 0.14.0 — 2026-10-30
 
@@ -46,7 +46,7 @@ Installed, not yet seen in game. (d860f47)
   folder, made if missing; the game directory when `LOCALAPPDATA` is unset or not
   writable. The first line says where (`log: <path>`). An uninstall leaves the folder.
 
-Installed, not yet seen in game. (9a5e70a)
+Confirmed in game 2026-10-30. (9a5e70a)
 
 ## 0.13.0 — 2026-10-30
 
@@ -61,7 +61,7 @@ Installed, not yet seen in game. (9a5e70a)
   Credits' (`CLAIM_CREDITS`) and `RefreshDisplay`'s cursor scene (`CLAIM_CURSOR`)
   likewise; no 3D, HUD or selection draw is dropped by a claim.
 
-Installed, not yet seen in game. (cf3dec5)
+Confirmed in game 2026-10-30. (cf3dec5)
 
 ## 0.12.0 — 2026-10-30
 
@@ -79,27 +79,27 @@ Installed, not yet seen in game. (cf3dec5)
 - The code's defaults are the shipped `Display8.ini`'s: `Mode=stub` (was forward),
   `Backend=auto` (was d3d9), `Passthrough=1` (was 0).
 
-Installed, not yet seen in game. (c470071)
+Confirmed in game 2026-10-30. (c470071)
 
 ## 0.11.3 — 2026-10-30
 
 ### Changed
 - `src/rt` moved into `crates/a2rt`, shared with render3d and ui (with `move_file` and
   `env`, which only Display8 had); vkprobe includes its `win.rs` and `mem.rs` from there.
-  Pure refactor: same pixels, same log lines. Installed, not yet seen in game (3030e0c).
+  Pure refactor: same pixels, same log lines. Confirmed in game 2026-10-30 (3030e0c).
 
 ## 0.11.2 — 2026-10-30
 
 ### Changed
 - `install` calls the merge at `tools/ini-merge.py` (was `ui/ini-merge.py`); no change to
-  what it does. Installed, not yet seen in game (1973ecb).
+  what it does. Confirmed in game 2026-10-30 (1973ecb).
 
 ## 0.11.1 — 2026-10-30
 
 ### Changed
 - `build.sh` and `vkprobe/build.sh` compile shaders with `tools/shaderc/hlsl-rs.sh`
   (moved from `render3d/`); the generated shader files differ in their header line only.
-  `64aee16`. Installed, not yet seen in game
+  `64aee16`. Confirmed in game 2026-10-30
 
 ## 0.11.0 — 2026-10-29
 

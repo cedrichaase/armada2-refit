@@ -11,20 +11,20 @@ and versions". Newest first. Details are in [`README.md`](README.md).
   folder, made if missing; the game directory when `LOCALAPPDATA` is unset or not
   writable. The first line says where (`log: <path>`). An uninstall leaves the folder.
 
-Installed, not yet seen in game. (9a5e70a)
+Confirmed in game 2026-10-30. (9a5e70a)
 
 ## 0.7.1 — 2026-10-30
 
 ### Changed
 - `online.c` (and `peer.c` through it) shed its copies of the helpers; the `.def` files moved to `csdk/def/`. Built on `csdk/a2asi.h` (the Win32 types, kernel32 imports, `s_*` string helpers, the append-a-line log, signature check and `VirtualProtect` patch) with the import libraries in `csdk/def/`; behaviour and log lines are unchanged.
 
-Installed, not yet seen in game. (082d0c6)
+Confirmed in game 2026-10-30. (082d0c6)
 
 ## 0.7.0 — 2026-10-30
 
 ### Changed
 - `install.sh` merges an existing `Online.ini` with `tools/ini-merge.py` instead of
-  overwriting it. Installed, not yet seen in game (1973ecb).
+  overwriting it. Confirmed in game 2026-10-30 (1973ecb).
 
 ## 0.6.3 — 2026-10-21
 

@@ -16,7 +16,7 @@ Layers: testbench 3.78.3.
   chain at three ticks. The reported extra motion was measured not to be the
   passthrough's (`display/README.md`, "Passthrough", "Map nebulae").
 
-Installed, not yet seen in game. (be4975d)
+Confirmed in game 2026-10-30. (be4975d)
 
 ## 13.51.2 — 2026-10-30
 
@@ -28,7 +28,7 @@ Layers: display 0.15.2, testbench 3.78.2.
   only the hulls' glow. New scenarios `display-passthrough-all` (every module off)
   and its forward reference.
 
-Installed, not yet seen in game. (b08d6a8)
+Confirmed in game 2026-10-30. (b08d6a8)
 
 ## 13.51.1 — 2026-10-30
 
@@ -40,7 +40,7 @@ Layers: display 0.15.1, testbench 3.78.1.
   its one mode, where only the UI's raise of the shell's mode kept the game from a
   stack overflow at start. `display-claims`' "alone" now has neither plugin.
 
-Installed, not yet seen in game. (c6d6189)
+Confirmed in game 2026-10-30. (c6d6189)
 
 ## 13.51.0 — 2026-10-30
 
@@ -53,7 +53,7 @@ Layers: display 0.15.0, render3d 0.33.1, ui 0.28.1.
   absent or on any error), so a second launch compiles none it has seen. The Windows
   uninstaller removes the file.
 
-Installed, not yet seen in game. (d860f47)
+Confirmed in game 2026-10-30. (d860f47)
 
 ## 13.50.0 — 2026-10-30
 
@@ -62,7 +62,7 @@ Layers: display 0.14.0, render3d 0.33.0, ui 0.28.0, qol 1.8.0, online 0.8.0, cut
 ### Changed
 - **Every plugin's log is now `%LOCALAPPDATA%\armada2-refit\logs\<name>.log`** (`Render3D`, `UI`, `Display8`, `QOL`, `QOLRules`, `Online`, `BinkProxy`), beside `Display8.pipelines`' folder, made if missing; the game directory when `LOCALAPPDATA` is unset or not writable. The first line of each says where. `crates/a2rt` (`log_dir`, `log_open`) and `csdk/a2asi.h` (`a2_log_path`, `a2_log_where`) hold the rule once. An uninstall leaves the folder; the GUI installer's bug report reads it (and the game folder for older builds); the test bench reads the clone's prefix.
 
-Installed, not yet seen in game. (9a5e70a)
+Confirmed in game 2026-10-30. (9a5e70a)
 
 ## 13.49.0 — 2026-10-30
 
@@ -83,7 +83,7 @@ Layers: display 0.13.0, render3d 0.32.0, ui 0.27.0, testbench 3.77.0.
   dropped only while the UI's loading screen claims them (with `[Loading] Enable=0`, or
   a UI that cannot draw, the engine's loading screen shows on the stub).
 
-Installed, not yet seen in game. (cf3dec5)
+Confirmed in game 2026-10-30. (cf3dec5)
 
 ## 13.48.0 — 2026-10-30
 
@@ -102,7 +102,7 @@ in lock-step. From here a mismatch is told and stands down cleanly.
   Display8" and "Display8 too old" logged apart. The rule for minors and majors is in
   `gpu/README.md` and `display/README.md`, "Versions".
 
-Installed, not yet seen in game. (c470071)
+Confirmed in game 2026-10-30. (c470071)
 
 ## 13.47.0 — 2026-10-30
 
@@ -113,7 +113,7 @@ Layers: render3d 0.30.0, testbench 3.75.0.
   Pivot=1`; 0 gives it back to the engine, drawn on the stub by Display8's
   passthrough); scenarios `render3d-pivot` and `render3d-pivot-stock`.
 
-Installed, not yet seen in game. (1da0694)
+Confirmed in game 2026-10-30. (1da0694)
 
 ## 13.46.0 — 2026-10-30
 
@@ -130,7 +130,7 @@ Layers: render3d 0.29.5, ui 0.25.4, display 0.11.3.
   render3d's and the UI's `engine/hook.rs` and `dump.rs` are `a2rt`'s; the replayer and
   vkprobe include its `win.rs` and `mem.rs`. Pure refactor: same pixels, same log lines.
 
-Installed, not yet seen in game. (3030e0c)
+Confirmed in game 2026-10-30. (3030e0c)
 
 ## 13.45.0 — 2026-10-30
 
@@ -142,7 +142,7 @@ Layers: qol 1.7.1, online 0.7.1, cutscenes 2.3.1.
 ### Changed
 - qol, online and cutscenes `build.sh` read the `.def` files from `csdk/def/`; the plugins' sources use `a2asi.h` in place of their own copies. Pure refactor: same log lines.
 
-Installed, not yet seen in game. (082d0c6)
+Confirmed in game 2026-10-30. (082d0c6)
 
 ## 13.44.0 — 2026-10-30
 
@@ -155,7 +155,7 @@ Layers: qol 1.7.0, online 0.7.0, cutscenes 2.3.0, render3d 0.29.4, ui 0.25.3, di
 ### Changed
 - The QOL, QOLRules, Online and BinkProxy installers merge an existing ini instead of
   overwriting or ignoring it; render3d's inline merge became a call to the shared one.
-  Installed, not yet seen in game (1973ecb).
+  Confirmed in game 2026-10-30 (1973ecb).
 
 ## 13.43.0 — 2026-10-30
 
@@ -166,7 +166,7 @@ Layers: render3d 0.29.3, ui 0.25.2, display 0.11.1.
   `d3dbc-fix.py`, `d3dbc-slots.py`, `dxil-spaces.py`, `dxil-alpha.py` from `render3d/`,
   and `fetch-dxc.sh`, `fetch-vkd3d.sh`, `verify-generated.sh` from `gpu/shaders/`; the
   build scripts, CI cache key and docs follow. Generated shader files change in their
-  header line only; the stamps are unchanged. `64aee16`. Installed, not yet seen in game
+  header line only; the stamps are unchanged. `64aee16`. Confirmed in game 2026-10-30
 
 ## 13.42.5 — 2026-10-30
 
@@ -176,7 +176,7 @@ Layers: testbench 3.74.2.
 - The bench no longer leaks a null sink per launch and sweeps stale `a2test-*` sinks;
   `no-assets` step 15 expects the menu scene.
 
-Installed, not yet seen in game. `6070901`
+Confirmed in game 2026-10-30. `6070901`
 
 ## 13.42.4 — 2026-10-30
 

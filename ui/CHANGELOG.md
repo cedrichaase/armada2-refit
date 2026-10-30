@@ -11,7 +11,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
   from and stored into Display8's pipeline library (display 0.15.0); nothing changes
   on Direct3D 9 or Vulkan, or against a Display8 of minor 1.0 / 1.1.
 
-Installed, not yet seen in game. (d860f47)
+Confirmed in game 2026-10-30. (d860f47)
 
 ## 0.28.0 — 2026-10-30
 
@@ -20,7 +20,7 @@ Installed, not yet seen in game. (d860f47)
   folder, made if missing; the game directory when `LOCALAPPDATA` is unset or not
   writable. The first line says where (`log: <path>`). An uninstall leaves the folder.
 
-Installed, not yet seen in game. (9a5e70a)
+Confirmed in game 2026-10-30. (9a5e70a)
 
 ## 0.27.0 — 2026-10-30
 
@@ -35,7 +35,7 @@ Installed, not yet seen in game. (9a5e70a)
   nothing and gives every stock HUD component back, so the engine's HUD shows instead
   of vanishing.
 
-Installed, not yet seen in game. (cf3dec5)
+Confirmed in game 2026-10-30. (cf3dec5)
 
 ## 0.26.0 — 2026-10-30
 
@@ -45,7 +45,7 @@ Installed, not yet seen in game. (cf3dec5)
   "too old" (apart from "no Display8") and stands down to Direct3D 9 only. Needs
   display 0.12.0's `d3d8.dll`: ships with it.
 
-Installed, not yet seen in game. (c470071)
+Confirmed in game 2026-10-30. (c470071)
 
 ## 0.25.4 — 2026-10-30
 
@@ -53,14 +53,14 @@ Installed, not yet seen in game. (c470071)
 - `src/rt` (but the user32 and gdi32 declarations, still in `src/rt/win.rs`),
   `engine/hook.rs`, `dump.rs` and the shared part of `clock.rs` moved into `crates/a2rt`;
   `a2fmt` is read from `crates/a2fmt`. Pure refactor: same pixels, same log lines.
-  Installed, not yet seen in game (3030e0c).
+  Confirmed in game 2026-10-30 (3030e0c).
 
 ## 0.25.3 — 2026-10-30
 
 ### Changed
 - `ini-merge.py` moved to `tools/ini-merge.py`, shared by every installer; `install.sh`
   calls it there. Options `--before-comments` and a per-file retired-defaults table added.
-  Installed, not yet seen in game (1973ecb).
+  Confirmed in game 2026-10-30 (1973ecb).
 
 ## 0.25.2 — 2026-10-30
 

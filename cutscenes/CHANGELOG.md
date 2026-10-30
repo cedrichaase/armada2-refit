@@ -11,20 +11,20 @@ Details are in [`binkproxy/README.md`](binkproxy/README.md).
   folder, made if missing; the game directory when `LOCALAPPDATA` is unset or not
   writable. The first line says where (`log: <path>`). An uninstall leaves the folder.
 
-Installed, not yet seen in game. (9a5e70a)
+Confirmed in game 2026-10-30. (9a5e70a)
 
 ## 2.3.1 — 2026-10-30
 
 ### Changed
 - `binkproxy.c` sheds its copies of the helpers; the `.def` files moved to `csdk/def/`. Built on `csdk/a2asi.h` (the Win32 types, kernel32 imports, `s_*` string helpers, the append-a-line log, signature check and `VirtualProtect` patch) with the import libraries in `csdk/def/`; behaviour and log lines are unchanged.
 
-Installed, not yet seen in game. (082d0c6)
+Confirmed in game 2026-10-30. (082d0c6)
 
 ## 2.3.0 — 2026-10-30
 
 ### Changed
 - `binkproxy/install.sh` merges an existing `BinkProxy.ini` with `tools/ini-merge.py`
-  (new keys added) instead of leaving it as it was. Installed, not yet seen in game (1973ecb).
+  (new keys added) instead of leaving it as it was. Confirmed in game 2026-10-30 (1973ecb).
 
 ## 2.2.0 — 2026-10-25
 

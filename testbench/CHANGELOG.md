@@ -14,7 +14,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
   `passthrough-nebula` at ticks 200, 202 and 220, and the stub with `Passthrough=1`
   held to it (RMSE 1.5), the paused frame to itself.
 
-Installed, not yet seen in game. (be4975d)
+Confirmed in game 2026-10-30. (be4975d)
 
 ## 3.78.2 — 2026-10-30
 
@@ -23,7 +23,7 @@ Installed, not yet seen in game. (be4975d)
   off, the Borg campaign's *Strange Bedfellows* entered through the menus, the player's
   Borg stations drawn by the passthrough against the forward chain (b08d6a8).
 
-Installed, not yet seen in game. (b08d6a8)
+Confirmed in game 2026-10-30. (b08d6a8)
 
 ## 3.78.1 — 2026-10-30
 
@@ -32,14 +32,14 @@ Installed, not yet seen in game. (b08d6a8)
   (`display/bench-claims.sh alone`) and checks Display8's mode-request line; it no
   longer needs the UI's raise of the shell's mode.
 
-Installed, not yet seen in game. (c6d6189)
+Confirmed in game 2026-10-30. (c6d6189)
 
 ## 3.78.0 — 2026-10-30
 
 ### Changed
 - The plugins' logs are read from the clone's Wine prefix, `drive_c/users/*/AppData/Local/armada2-refit/logs/`, with the game directory as the fallback for older builds: `Session.game_log`, `log_path`/`log_dirs`, the log waits (`mark_logs`, `new_log_lines`), `collect_logs` (into `logs/` of the results as before), `Display the mark`, and the launch's clean-up of the previous logs in both places. `gpu/replay.sh`, `render3d/perf/ab.sh` and `compare.sh` read `Render3D.log` / `Display8.log` there too; `a2film`'s UI-mark tail follows the log to wherever it appears.
 
-Installed, not yet seen in game. (9a5e70a)
+Confirmed in game 2026-10-30. (9a5e70a)
 
 ## 3.77.0 — 2026-10-30
 
@@ -48,7 +48,7 @@ Installed, not yet seen in game. (9a5e70a)
   with render3d at `[Modules] sky=0`, each logging who claims what;
   `display/bench-claims.sh` leaves plugins out of a clone by the player's name.
 
-Installed, not yet seen in game. (cf3dec5)
+Confirmed in game 2026-10-30. (cf3dec5)
 
 ## 3.76.0 — 2026-10-30
 
@@ -58,14 +58,14 @@ Installed, not yet seen in game. (cf3dec5)
   `display/bench-abi.sh` puts a commit's files into a clone (built once into
   `$A2_DATA/builds/abi/<commit>/`).
 
-Installed, not yet seen in game. (c470071)
+Confirmed in game 2026-10-30. (c470071)
 
 ## 3.75.0 — 2026-10-30
 
 ### Added
 - `render3d-pivot` (render3d's pivot marker in the tactical view, the engine drawing
   nothing there) and `render3d-pivot-stock` (`Pivot=0` on the stub: the engine's marker
-  through the passthrough). Installed, not yet seen in game (1da0694)
+  through the passthrough). Confirmed in game 2026-10-30 (1da0694)
 
 ## 3.74.2 — 2026-10-30
 
@@ -77,7 +77,7 @@ Installed, not yet seen in game. (c470071)
 - `no-assets` step 15 expects render3d's menu scene under the UI's column, not stock
   title art.
 
-Installed, not yet seen in game. `6070901`
+Confirmed in game 2026-10-30. `6070901`
 
  — 2026-10-29
 
