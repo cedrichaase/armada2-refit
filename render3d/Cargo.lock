@@ -24,7 +24,7 @@ checksum = "0bb44936d800fea8f016d7f2311c6a4f97aebd5dc86f09906139ec848cf3a46f"
 
 [[package]]
 name = "gpu"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "ash",
 ]

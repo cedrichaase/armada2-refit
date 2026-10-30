@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.51.0 — 2026-10-30
+
+Layers: display 0.15.0, render3d 0.33.1, ui 0.28.1.
+
+### Added
+- **Direct3D 12 keeps a pipeline library on disk** (contract 1.2): Display8 owns an
+  `ID3D12PipelineLibrary` in `%LOCALAPPDATA%\armada2-refit\Display8.d3d12pipelines`, and `gpu` 1.2.0
+  loads and stores the plugins' graphics pipelines through it (plain creation when it is
+  absent or on any error), so a second launch compiles none it has seen. The Windows
+  uninstaller removes the file.
+
+Installed, not yet seen in game. (d860f47)
+
 ## 13.50.0 — 2026-10-30
 
 Layers: display 0.14.0, render3d 0.33.0, ui 0.28.0, qol 1.8.0, online 0.8.0, cutscenes 2.4.0, testbench 3.78.0, gui-installer 2.3.0.

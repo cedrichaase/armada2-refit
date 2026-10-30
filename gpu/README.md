@@ -51,7 +51,7 @@ root.
 `gpu::VERSION` is this crate's version (`Cargo.toml`, 1.1.0 since root 13.49.0; 1.0.0
 in 13.48.0); it is not a layer, so the changelogs of render3d and the UI say when it
 moves. The contract with Display8 has a version of its own, `display::ABI_MAJOR` and
-`ABI_MINOR` (1.0 since display 0.12.0, 1.1 since 0.13.0: the claims), which both sides
+`ABI_MINOR` (1.0 since display 0.12.0, 1.1 since 0.13.0: the claims, 1.2 since 0.15.0: the Direct3D 12 pipeline library), which both sides
 build against.
 
 At the first question of which backend draws, `Gpu` shakes hands: `display8_abi`
@@ -767,4 +767,5 @@ when something needs it. On Vulkan also: sRGB sampling (a sampler asking for it 
 linear; nothing does), sampling a multisampled colour target, render passes into a
 volume. On Direct3D 12 also: sRGB sampling, render targets in a volume, a copy of part
 of a depth target, a depth resolve from Display8's depth (which has no shader view), a
-pipeline cache of its own on disk.
+library for the compute pipelines (the graphics ones go through Display8's on-disk
+pipeline library, contract 1.2, since gpu 1.2.0).

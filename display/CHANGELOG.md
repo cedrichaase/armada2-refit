@@ -4,6 +4,18 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.15.0 — 2026-10-30
+
+### Added
+- Direct3D 12 pipeline library (contract 1.2): `Dx12Device8::pipeline_library`, an
+  `ID3D12PipelineLibrary` persisted in `%LOCALAPPDATA%\armada2-refit\Display8.d3d12pipelines`
+  (`src/dx12/cache.rs`; a header with file format, Display8 version and adapter, discarded
+  on a mismatch or a driver refusal, written atomically when it has grown, looked at every
+  120 frames). The present pass goes through it too. Uninstalling on Windows takes the
+  file out.
+
+Installed, not yet seen in game. (d860f47)
+
 ## 0.14.0 — 2026-10-30
 
 ### Changed

@@ -131,10 +131,12 @@ function Remove-Display8([switch]$All) {
         # d3d8to9 behind a Display8 since taken out by hand.
         Remove-Item -LiteralPath (G "d3d8.dll.a2display-backup") -ErrorAction SilentlyContinue
         if (Test-D3d8to9 (G "d3d8_real.dll")) { Remove-Item -LiteralPath (G "d3d8_real.dll") }
-        # Its Vulkan pipeline cache (display/src/vk/cache.rs); the folder is the GUI
-        # installer's too, and holds the logs, so only the file.
+        # Its Vulkan pipeline cache (display/src/vk/cache.rs) and Direct3D 12 pipeline
+        # library (display/src/dx12/cache.rs); the folder is the GUI installer's too,
+        # and holds the logs, so only the files.
         if ($env:LOCALAPPDATA) {
             Remove-Item -LiteralPath (Join-Path $env:LOCALAPPDATA "armada2-refit\Display8.pipelines") -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath (Join-Path $env:LOCALAPPDATA "armada2-refit\Display8.d3d12pipelines") -ErrorAction SilentlyContinue
         }
     }
 }

@@ -164,6 +164,13 @@ pub(crate) struct Shared {
     /// What DXVK's `dxvk.conf` makes of every sampler (`Dx12Device8::sampler_*`).
     pub force_aniso: i32,
     pub lod_bias: f32,
+    /// Display8's pipeline library (`Dx12Device8::pipeline_library`, contract 1.2), or
+    /// null: pipelines are made plainly.
+    pub lib: P,
+    pub log: Log,
+    /// Pipelines loaded from the library, and stored into it (made, then kept).
+    pub lib_loaded: Cell<u32>,
+    pub lib_stored: Cell<u32>,
     pub heaps: RefCell<[CpuHeap; 4]>,
     pub null_srv: [usize; 4],
     garbage: RefCell<Vec<(u64, Garbage)>>,
@@ -172,6 +179,16 @@ pub(crate) struct Shared {
 }
 
 impl Shared {
+    /// Counts a pipeline loaded from (or stored into) the library, and logs the counts
+    /// when they pass a power of two.
+    pub fn lib_count(&self, loaded: bool) {
+        let c = if loaded { &self.lib_loaded } else { &self.lib_stored };
+        c.set(c.get() + 1);
+        if c.get().is_power_of_two() {
+            dlog!(self, "gpu: Direct3D 12: pipeline library: {} loaded, {} stored", self.lib_loaded.get(), self.lib_stored.get());
+        }
+    }
+
     pub fn retire(&self, g: Garbage) {
         self.garbage.borrow_mut().push((self.now.get(), g));
     }
@@ -423,6 +440,10 @@ impl Gpu {
             features: d.features,
             force_aniso: d.sampler_anisotropy,
             lod_bias: d.sampler_lod_bias,
+            lib: if disp.minor >= 2 { d.pipeline_library as P } else { core::ptr::null_mut() },
+            log: self.log,
+            lib_loaded: Cell::new(0),
+            lib_stored: Cell::new(0),
             heaps: RefCell::new(heaps),
             null_srv: [0; 4],
             garbage: RefCell::new(Vec::new()),

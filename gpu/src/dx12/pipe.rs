@@ -401,8 +401,91 @@ fn dxil_inputs(w: &[u32]) -> Option<Vec<spirv::Sem>> {
     None
 }
 
+/// A 64-bit FNV-1a over what makes a pipeline state what it is, field by field (the
+/// structures have padding that is not ours to read): the name it has in the pipeline
+/// library. The library checks the description on loading as well, so a collision costs
+/// a plain creation and no more.
+struct Name(u64);
+
+impl Name {
+    fn bytes(&mut self, b: &[u8]) {
+        for &x in b {
+            self.0 = (self.0 ^ x as u64).wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
+    fn words(&mut self, w: &[u32]) {
+        for &x in w {
+            self.bytes(&x.to_le_bytes());
+        }
+    }
+    fn code(&mut self, b: &ShaderBytecode) {
+        self.words(&[b.len as u32]);
+        if !b.code.is_null() {
+            self.bytes(unsafe { core::slice::from_raw_parts(b.code as *const u8, b.len) });
+        }
+    }
+}
+
+fn pipeline_name(pd: &GraphicsPipelineDesc) -> [u16; 18] {
+    let mut n = Name(0xcbf2_9ce4_8422_2325);
+    for c in [&pd.vs, &pd.ps, &pd.ds, &pd.hs, &pd.gs] {
+        n.code(c);
+    }
+    n.words(&[pd.blend.alpha_to_coverage as u32, pd.blend.independent as u32, pd.sample_mask]);
+    for t in &pd.blend.targets {
+        n.words(&[t.blend as u32, t.logic_op_enable as u32, t.src, t.dst, t.op, t.src_alpha, t.dst_alpha, t.op_alpha, t.logic_op, t.write_mask as u32]);
+    }
+    let r = &pd.rasterizer;
+    n.words(&[r.fill, r.cull, r.front_ccw as u32, r.depth_bias as u32, r.depth_bias_clamp.to_bits(), r.slope_scaled_depth_bias.to_bits(), r.depth_clip as u32, r.multisample as u32, r.antialiased_line as u32, r.forced_sample_count, r.conservative]);
+    let d = &pd.depth_stencil;
+    n.words(&[d.depth as u32, d.write_mask, d.func, d.stencil as u32, d.stencil_read_mask as u32, d.stencil_write_mask as u32]);
+    for f in [&d.front, &d.back] {
+        n.words(&[f.fail, f.depth_fail, f.pass, f.func]);
+    }
+    n.words(&[pd.input_layout.count, pd.strip_cut, pd.topology, pd.num_targets, pd.dsv_format, pd.sample.count, pd.sample.quality, pd.node_mask, pd.flags]);
+    n.words(&pd.formats);
+    for i in 0..pd.input_layout.count as usize {
+        let e = unsafe { &*pd.input_layout.elements.add(i) };
+        let mut l = 0;
+        while !e.semantic.is_null() && unsafe { *e.semantic.add(l) } != 0 && l < 64 {
+            l += 1;
+        }
+        if !e.semantic.is_null() {
+            n.bytes(unsafe { core::slice::from_raw_parts(e.semantic, l) });
+        }
+        n.words(&[e.index, e.format, e.slot, e.offset, e.class, e.step_rate]);
+    }
+    let mut out = [0u16; 18];
+    out[0] = b'G' as u16;
+    out[1] = b'.' as u16;
+    for i in 0..16 {
+        out[2 + i] = b"0123456789abcdef"[((n.0 >> (60 - 4 * i)) & 15) as usize] as u16;
+    }
+    // 18 units: "G." and 16 digits; the terminator is the array's own next unit.
+    out
+}
+
 pub(crate) fn create(sh: &Shared, pd: &GraphicsPipelineDesc) -> Option<P> {
     let mut pso: P = core::ptr::null_mut();
+    if !sh.lib.is_null() {
+        let mut name = [0u16; 19];
+        name[..18].copy_from_slice(&pipeline_name(pd));
+        let hr = vcall!(sh.lib, slot::LIB_LOAD_GRAPHICS_PIPELINE, fn(*const u16, *const GraphicsPipelineDesc, *const Guid, *mut P) -> i32, name.as_ptr(), pd, &IID_PIPELINE_STATE, &mut pso);
+        if hr >= 0 && !pso.is_null() {
+            sh.lib_count(true);
+            return Some(pso);
+        }
+        pso = core::ptr::null_mut();
+        let hr = vcall!(sh.dev, slot::DEV_CREATE_GRAPHICS_PIPELINE_STATE, fn(*const GraphicsPipelineDesc, *const Guid, *mut P) -> i32, pd, &IID_PIPELINE_STATE, &mut pso);
+        if hr < 0 || pso.is_null() {
+            return None;
+        }
+        // A name the library has is E_INVALIDARG: not an error, and not a store.
+        if vcall!(sh.lib, slot::LIB_STORE_PIPELINE, fn(*const u16, P) -> i32, name.as_ptr(), pso) >= 0 {
+            sh.lib_count(false);
+        }
+        return Some(pso);
+    }
     let hr = vcall!(sh.dev, slot::DEV_CREATE_GRAPHICS_PIPELINE_STATE, fn(*const GraphicsPipelineDesc, *const Guid, *mut P) -> i32, pd, &IID_PIPELINE_STATE, &mut pso);
     (hr >= 0 && !pso.is_null()).then_some(pso)
 }
