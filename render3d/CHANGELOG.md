@@ -15,7 +15,7 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   Particles, effects, ordnance, specials and overlays draw nothing in the menu scene.
   `e23d234`
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.29.1 — 2026-10-30
 
@@ -25,7 +25,7 @@ Installed, not yet seen in game.
   (`hulls::MenuOnly`) and draws its ships as with `hulls=1`; missions keep every hull
   the engine's. `b1ff913`
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.29.0 — 2026-10-29
 
@@ -35,7 +35,7 @@ Installed, not yet seen in game.
   Display8's Vulkan backend only, written to `Dumps\<name>\Render3D.asi.a2s`. Idle, it
   costs two flags per call and a read of the clock per command list. `239f29c`
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.28.0 — 2026-10-29
 
@@ -45,7 +45,7 @@ Installed, not yet seen in game.
   hands back to the engine (a module off, a SOD it cannot draw) into the scene pass,
   tone-mapped and bloomed with the rest (display 0.10.0). `24be351`
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.27.1 — 2026-10-29
 
@@ -54,7 +54,7 @@ Installed, not yet seen in game.
   Display8 is present (`frame::begin`, through `Gpu::device_epoch`); without the
   export, the device pointer is compared every frame as before.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.27.0 — 2026-10-23
 
@@ -171,7 +171,7 @@ Confirmed in game 2026-10-23.
   directory beside its outputs instead of `/tmp`, so each generated file goes into place
   by one rename: two builds of one tree at once never read one half written.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.23.1 — 2026-10-23
 
@@ -180,7 +180,7 @@ Installed, not yet seen in game.
   at their defaults (`Clustered=1` and the rest), so an install adds them to a
   player's file and `Clustered=0` is there to switch.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.23.0 — 2026-10-23
 
@@ -262,7 +262,7 @@ firing 0.40 (/255). Confirmed in game 2026-10-23.
   committed. `gpu/shaders/compat.hlsli`: `STAGE(n)`'s `vk::` attributes only in SPIR-V.
   The d3dbc and SPIR-V are byte for byte as before (only their stamps changed).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.19.0 — 2026-10-23
 
@@ -391,7 +391,7 @@ Confirmed in game 2026-10-21.
   reaching its bounding radius and gone over 0.5 s. `[Ordnance] MuzzleLights` (1),
   `MuzzleBrightness` (4), `MuzzleTime` (0.5), `MuzzleReach` (1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.15.2 — 2026-10-17
 
@@ -401,7 +401,7 @@ Installed, not yet seen in game.
   (a target far off, met edge-on) no longer fades out before it reaches it. Still a
   translucent cone with fans; the other beams are unchanged.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 ## 0.15.1 — 2026-10-18
 
 ### Fixed

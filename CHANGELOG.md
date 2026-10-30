@@ -14,7 +14,7 @@ Layers: render3d 0.29.2.
   nebulae and sky (the module is loaded for the menu scene only, as hulls=0 since
   13.42.2); missions unchanged. `e23d234`
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.42.3 — 2026-10-29
 
@@ -24,7 +24,7 @@ Layers: ui 0.25.1.
 - The minimap showed no nebulae (issue 10): the engine's map picture is drawn
   additively now. `0f38f33`
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.42.2 — 2026-10-30
 
@@ -35,7 +35,7 @@ Layers: render3d 0.29.1.
   hulls module for the menu scene only; missions unchanged, every hull the engine's
   through passthrough). `b1ff913`
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.42.1 — 2026-10-29
 
@@ -45,7 +45,7 @@ Layers: testbench 3.74.1.
 - Intermittent "the game is no longer running" at launch on the bench: the audio guard
   took winepulse's corked format-probe stream on the user's output for a leak. `8c0d697`
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.42.0 — 2026-10-29
 
@@ -59,7 +59,7 @@ Layers: ui 0.25.0, testbench 3.74.0.
   (`FrameRate`), each on as shipped. `80ce17f`
 - testbench: `ui-leftovers-2` (testbench 3.74.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.41.0 — 2026-10-29
 
@@ -76,7 +76,7 @@ Layers: render3d 0.29.0, ui 0.24.0, display 0.11.0, testbench 3.73.0.
   diff`. The showcase frame replays on Vulkan identical to the game's (RMSE 0).
   `gpu/replay/inspect.py` lists a recording. Off by default; idle, two flags per call. `239f29c`
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.40.0 — 2026-10-29
 
@@ -92,7 +92,7 @@ Layers: display 0.10.0, render3d 0.28.0, ui 0.23.2, testbench 3.72.0.
   pass, every `gpu` says when a `Cmd` begins and ends.
 - testbench: `display-passthrough`, `display-passthrough-forward`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.39.1 — 2026-10-29
 
@@ -103,7 +103,7 @@ Layers: render3d 0.27.1, ui 0.23.1.
   (the shared `gpu` crate resolves the export once); the per-frame device comparison
   stays as the fallback without Display8. `4e1846a`
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.39.0 — 2026-10-29
 
@@ -115,7 +115,7 @@ Layers: gui-installer 2.2.0.
   the Program Files VirtualStore redirect; `display/vkprobe/README.md` no longer says
   `Vk::start` leaves the portability flag unset (docs only).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.38.0 — 2026-10-29
 
@@ -125,7 +125,7 @@ Layers: testbench 3.71.0.
 - testbench: `display-inventory-modes`, the mode switch and the right-drag pan in
   Display8's inventory (testbench 3.71.0). `d922e1e`
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.37.0 — 2026-10-29
 
@@ -136,7 +136,7 @@ Layers: testbench 3.70.0, display 0.9.1.
   `--vulkan-device lavapipe` and `--no-validate` opt out. Display8 ranks Vulkan devices
   discrete > integrated > virtual > other > CPU and logs its choice. `67c2e4c`
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.36.2 — 2026-10-29
 
@@ -147,7 +147,7 @@ Layers: testbench 3.69.1.
   interface mode, a loading-screen wait, the objectives button, forward chain and a longer
   wait for the mode switch); `ui-whole-game` passes at 1024x768 again. `6de8947`
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.36.1 — 2026-10-28
 
@@ -179,7 +179,7 @@ Layers: ui 0.23.0, cutscenes 2.2.0, testbench 3.69.0.
 - testbench: `display-movie-no-proxy`, the movies on the stub without the proxy, set up
   by `cutscenes/binkproxy/bench-unproxy.sh` (cutscenes 2.2.0, testbench 3.69.0, `6d7180d`).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.35.0 — 2026-10-25
 
@@ -254,7 +254,7 @@ Layers: ui 0.21.0, testbench 3.65.0.
 - testbench: the step `Take the focus from the game ...` and `ui-focus-pointer`
   (testbench 3.65.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.30.0 — 2026-10-23
 
@@ -320,7 +320,7 @@ Layers: testbench 3.61.0, ui 0.20.1, render3d 0.23.2, qol 1.6.4, cutscenes 2.1.1
   `render3d/hlsl-rs.sh` puts each shader file in place by one rename (render3d 0.23.2),
   and the QOL and Bink proxy builds take a lock (qol 1.6.4, cutscenes 2.1.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.26.0 — 2026-10-23
 
@@ -348,7 +348,7 @@ Layers: render3d 0.23.1.
 - The shipped `Render3D.ini` lists `[Lights]` with the clustered lights' keys at their
   defaults, so `./install` merges them into the game's file (render3d 0.23.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.24.0 — 2026-10-23
 
@@ -363,7 +363,7 @@ Layers: render3d 0.23.0 (with gpu's compute), testbench 3.58.0.
   Vulkan and Direct3D 12, `Gpu::compute` off on Direct3D 9 (render3d 0.23.0).
 - testbench: the `battle` scene and `render3d-clustered` (testbench 3.58.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.23.0 — 2026-10-23
 
@@ -376,7 +376,7 @@ Layers: display 0.8.0, ui 0.19.2, testbench 3.57.1.
   and keeps a value set by hand (`Defaults=2`, `ui/ini-merge.py`, ui 0.19.2).
   `display-inventory` and `display-engine-draws` pin forward mode (testbench 3.57.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.22.0 — 2026-10-23
 
@@ -390,7 +390,7 @@ Layers: display 0.7.0, testbench 3.57.0.
 - `display-fallback` (testbench 3.57.0): Vulkan and Direct3D 12 made to fail on
   purpose (`FailBackend=vulkan,d3d12`), Direct3D 9 drawing the game.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.21.1 — 2026-10-23
 
@@ -421,7 +421,7 @@ Layers: platform 3.6.0, menus 4.3.5, renderer 2.0.1.
   override check (menus 4.3.5); `renderer-config.sh`'s DXVK lookup (renderer 2.0.1);
   umu in `online/reference-dplay.sh` and Proton in `cutscenes/binkproxy/run-test.sh`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.19.0 — 2026-10-23
 
@@ -431,7 +431,7 @@ Layers: testbench 3.56.0.
 - `qol-refused-advisor` selects the starbase after Home, wherever the start view put
   it, and checks the selection, the keys, the payments and the refusal it stages (testbench 3.56.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.18.0 — 2026-10-23
 
@@ -487,7 +487,7 @@ Layers: testbench 3.52.0, models 5.0.1.
 - `hull-sod.py` keeps its rounded models in `$A2_DATA/cache/hull-sod/`, so a repeat
   install takes 3 s instead of 25 s (models 5.0.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.12.0 — 2026-10-23
 
@@ -529,7 +529,7 @@ Layers: display 0.4.0, render3d 0.20.0, ui 0.17.1.
   `$A2_DATA/tools/` by `gpu/shaders/fetch-dxc.sh`) (render3d 0.20.0, ui 0.17.1,
   display 0.4.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.8.0 — 2026-10-23
 
@@ -620,7 +620,7 @@ Layers: testbench 3.46.1.
 - The bench dashboard's screens stay black while a game launches, without the striped
   placeholder (testbench 3.46.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.2.0 — 2026-10-22
 
@@ -630,7 +630,7 @@ Layers: testbench 3.46.0.
 - `a2test watch --install-desktop`: the bench dashboard in the app launcher, always run
   from the main checkout (testbench 3.46.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 13.1.0 — 2026-10-22
 
@@ -810,7 +810,7 @@ Layers: gui-installer 1.7.0.
   against the release, changed settings, the plugins' logs, and findings such as
   UI.asi and Render3D.asi without crosire's d3d8to9; user names and addresses left out.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 12.38.1 — 2026-10-18
 
@@ -891,7 +891,7 @@ Layers: testbench 3.36.0, films 1.10.0.
 ### Fixed
 - Scenario `specials`: the assimilation beam forms (testbench 3.36.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 12.34.2 — 2026-10-17
 
@@ -902,7 +902,7 @@ Layers: ui 0.13.2, testbench 3.35.1.
   `cursor off` hides the pointer in refit takes again, and the loading screen shows no
   cursor, as in stock.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 ## 12.34.1 — 2026-10-18
 
 Layers: render3d 0.15.1, ui 0.13.1.
@@ -946,7 +946,7 @@ Layers: testbench 3.35.0.
 - Test bench: `Scene.asi`'s `Zoom=` key and `zoom` command, the RTS camera's zoom as a
   level from 0 to 1, for shots that need a player's-eye view without key presses.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 12.31.0 — 2026-10-17
 
@@ -957,7 +957,7 @@ Layers: ui 0.12.0, testbench 3.34.0.
   HUD out at 4:3, 16:9 and 21:9 with 1, 6 and 30 ships selected, from UI.asi's own
   panel rectangles (`[HUD] LayoutLog`), and writes the shots as a contact sheet.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 12.30.0 — 2026-10-17
 
@@ -969,7 +969,7 @@ Layers: testbench 3.33.0, films 1.9.0.
   and interface as separate tracks beside it (`--stems`, `Stems.asi` in the bench clone
   only), mixed per shot in the animatic with `Audio: effects + voice -6` (e682c70).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 12.29.0 — 2026-10-17
 
@@ -980,7 +980,7 @@ Layers: testbench 3.32.0, films 1.8.0.
   them as `<take>.marks.json`, lists them (`a2film marks`), suggests `In`/`Length` from
   them (`Cut:`) and checks a shot's `Expect:` after filming (1aacd31).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 12.28.0 — 2026-10-17
 
@@ -1037,7 +1037,7 @@ Layers: ui 0.11.1, testbench 3.30.1.
   moved right for it; above the minimap at 4:3. A group's tiles are smaller, so a big
   selection stays low (ui 0.11.1; testbench 3.30.1 follows it in two scenarios).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 12.24.0 — 2026-10-17
 
@@ -1063,7 +1063,7 @@ Layers: gui-installer 1.6.0.
   toolchain's own lld as `lld-link`, since Ubuntu's lld-link 18 refuses the `EXPORTAS`
   export rustc now writes for `DllMain` (red on `main` since 12.21.0 at least).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 12.23.0 — 2026-10-17
 
@@ -1481,7 +1481,7 @@ Layers: surfaces 1.1.1.
   same light, with their detail unchanged: pastel J, turquoise M, even orange L, violet
   patches on K, paler H; cloud on K, more on H and L, as stock's shell has (surfaces 1.1.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.39.0 — 2026-10-13
 
@@ -1496,7 +1496,7 @@ Layers: venting 1.0.0, testbench 3.15.0.
 - The bench's `Vent=` key and `vent` command show a system's damage node on a healed
   craft; `SCENE=venting` and scenario `venting` (testbench 3.15.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.38.0 — 2026-10-13
 
@@ -1508,7 +1508,7 @@ Layers: sky 1.3.0.
   time (`Fine=`), a supersampled bake, and a dither that no longer draws a grid
   (sky 1.3.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.37.0 — 2026-10-13
 
@@ -1520,7 +1520,7 @@ Layers: lighting 1.24.0, testbench 3.14.0.
   patch behind a glowing front (`Cloak=1` and the `Cloak*` keys; lighting 1.24.0).
 - `SCENE=cloak`, the scene command `cloak`, and the scenario `cloak` (testbench 3.14.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.36.0 — 2026-10-13
 
@@ -1538,7 +1538,7 @@ Layers: specials 1.0.0, shields 1.2.0, testbench 3.13.0.
 - `Scene.asi` fires special weapons (`special`, `energy`), `SCENE=specials`, scenario
   `specials`; the bench gathers `Specials.log` (testbench 3.13.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.35.0 — 2026-10-13
 
@@ -1555,7 +1555,7 @@ Layers: surfaces 1.1.0, lighting 1.23.0, models 4.3.0, testbench 3.12.0.
 - A model with a recipe is looked up about its mesh's centre, scaled to its extents,
   and its relief no longer scales with its size (lighting 1.23.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.34.1 — 2026-10-13
 
@@ -1564,7 +1564,7 @@ Layers: nebulae 1.5.1.
 ### Changed
 - The Cerulean nebula's swirl a little more noticeable: `Swirl=` 18 → 24 (nebulae 1.5.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.34.0 — 2026-10-13
 
@@ -1575,7 +1575,7 @@ Layers: lighting 1.22.0, nebulae 1.5.0.
   blue), and less brightly: `NebulaRecipeColour=1`, `NebulaBrightness` 2.0 → 1.4,
   through `Nebulae.asi`'s new export `NebulaLightColour`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.33.0 — 2026-10-13
 
@@ -1585,7 +1585,7 @@ Layers: nebulae 1.4.0.
 - The Cerulean nebula's specks wander in slow, roughly circular loops, each out of step
   with its neighbours: `Swirl=` (nebulae 1.4.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.32.1 — 2026-10-13
 
@@ -1594,7 +1594,7 @@ Layers: nebulae 1.3.1.
 ### Changed
 - The Metreon nebula's lightning flashes half as often (nebulae 1.3.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.32.0 — 2026-10-13
 
@@ -1606,7 +1606,7 @@ Layers: nebulae 1.3.0.
   a drifting fine noise); the flow changes the gas's shape instead of wobbling it
   (nebulae 1.3.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.31.1 — 2026-10-13
 
@@ -1615,7 +1615,7 @@ Layers: shields 1.1.1.
 ### Changed
 - The shields-down flash at half strength and the arcs a little sparser (shields 1.1.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.31.0 — 2026-10-13
 
@@ -1629,7 +1629,7 @@ Layers: lighting 1.21.0.
 - The dark outline round planets, most visible against the volumetric nebulae: the
   cloud shell no longer writes depth (lighting 1.21.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.30.2 — 2026-10-13
 
@@ -1640,7 +1640,7 @@ Layers: nebulae 1.2.1.
   shaft seen along its length is one streak, not a copy of the hull's silhouette per
   slice (nebulae 1.2.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.30.1 — 2026-10-13
 
@@ -1650,7 +1650,7 @@ Layers: sky 1.2.3.
 - The green sky `mbgrg` (Klingon mission 1 and four other maps) is dimmer and its gas
   soft-edged instead of hard clumps (sky 1.2.3).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.30.0 — 2026-10-13
 
@@ -1660,7 +1660,7 @@ Layers: fog 1.1.0.
 - Stock's darker rim along the fog's and the shroud's edge, back over the smooth edge:
   `FogRim=`, `ShroudRim=`, `RimWidth=` in `Fog.ini` (fog 1.1.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.29.0 — 2026-10-12
 
@@ -1674,7 +1674,7 @@ Layers: fog 1.0.0, testbench 3.11.0.
 - The `fog` scene and the `fog-edges` scenario; `no-assets` checks `Fog.log`
   (testbench 3.11.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.28.0 — 2026-10-12
 
@@ -1684,7 +1684,7 @@ Layers: nebulae 1.2.0.
 - Hulls in or before the gas keep exact edges: `EdgeRefine=1` draws the gas at full size
   along depth edges and at half size elsewhere (nebulae 1.2.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.27.0 — 2026-10-12
 
@@ -1702,7 +1702,7 @@ Layers: shields 1.1.0, repair 1.0.0, testbench 3.10.0.
 - The `shields-down-repair` scenario; `no-assets` checks `Repair.log`; the bench clears
   and gathers `Repair.log` (testbench 3.10.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.26.1 — 2026-10-12
 
@@ -1712,7 +1712,7 @@ Layers: explosions 1.0.1.
 - The shock ring matches stock's shockwave disc in size, brightness and colour: a broad,
   overdriven orange band with a dark centre in place of a thin rim (explosions 1.0.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.26.0 — 2026-10-12
 
@@ -1728,7 +1728,7 @@ Layers: shields 1.0.0, testbench 3.9.0.
 - The `shields` scene and the `shields-hits` scenario; `no-assets` checks
   `Shields.log` (testbench 3.9.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.25.0 — 2026-10-12
 
@@ -1743,7 +1743,7 @@ Layers: explosions 1.0.0, testbench 3.8.0.
 - `Scene.asi` `kill`, the `explosion` scene and the `explosions` scenario
   (testbench 3.8.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.24.0 — 2026-10-12
 
@@ -1754,7 +1754,7 @@ Layers: lighting 1.20.0, testbench 3.7.0.
   `Impact*` keys in `Lighting.ini`; lighting 1.20.0).
 - The `impacts` bench scene (testbench 3.7.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.23.0 — 2026-10-12
 
@@ -1766,7 +1766,7 @@ Layers: nebulae 1.1.0, lighting 1.19.0.
   `ShadowSoftness=`), from `Lighting.asi`'s Key and shadow map, now exported as
   `LightingKey` and `LightingShadowMap` (lighting 1.19.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.22.9 — 2026-10-12
 
@@ -1778,7 +1778,7 @@ Layers: lighting 1.18.2.
   Hulls under a mirrored matrix (the Steamrunner, the Intrepid) are drawn front faces
   out in the shaders, which was what had darkened them (lighting 1.18.2).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.22.8 — 2026-10-12
 
@@ -1793,7 +1793,7 @@ Layers: lighting 1.18.1, platform 3.4.1, sky 1.2.2, nebulae 1.0.3, surfaces 1.0.
   (platform 3.4.1); `Sky.asi`, `Nebulae.asi` and
   `Surfaces.asi` rebuilt with it (sky 1.2.2, nebulae 1.0.3, surfaces 1.0.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.22.7 — 2026-10-12
 
@@ -1803,7 +1803,7 @@ Layers: nebulae 1.0.2.
 - Nebulae: the blue-noise dither thresholds read linear, not as sRGB (nebulae 1.0.2).
   Changes the look slightly.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.22.6 — 2026-10-12
 
@@ -1816,7 +1816,7 @@ Layers: nebulae 1.0.1, sky 1.2.1.
   after a bake; timing queries; a log buffer (nebulae 1.0.1).
 - Sky: viewport restored after the bake; timing queries (sky 1.2.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.22.5 — 2026-10-12
 
@@ -1827,7 +1827,7 @@ Layers: online 0.6.1.
   exhaust a game, a kicked joiner is cut off, the network thread stops for good on
   `Close`, and the server rate-limits join-code lookups (online 0.6.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.22.4 — 2026-10-12
 
@@ -1840,7 +1840,7 @@ Layers: qol 1.6.1, grid 1.0.1.
 - `QOL.ini` refuses numbers too long to parse (qol 1.6.1).
 - `GridLayout.asi`: keys press nothing while the bar is hidden (grid 1.0.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.22.3 — 2026-10-12
 
@@ -1852,7 +1852,7 @@ Layers: menus 4.3.3.
   surfaces released on destroy; `menus/install.sh` always rebuilds and its closing check
   no longer stops `./install` (menus 4.3.3).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.22.2 — 2026-10-12
 
@@ -1864,7 +1864,7 @@ Layers: hud 2.2.1, msaa 1.1.1.
 - `MSAA.asi` finds 4x for `Samples=6` and other counts that are not a power of two
   (msaa 1.1.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.22.1 — 2026-10-12
 
@@ -1876,7 +1876,7 @@ Layers: cutscenes 2.0.2.
   export no longer leaves null pointers behind; an over-long movie path and a `.wav`'s
   inconsistent block align are handled (cutscenes 2.0.2).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.22.0 — 2026-10-12
 
@@ -1889,7 +1889,7 @@ surfaces 1.0.0, lighting 1.18.0, testbench 3.6.0
   `Lighting.asi`. `./install` runs `surfaces/install.sh`; `a2mod` switches it as the
   `surfaces` layer.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.21.0 — 2026-10-12
 
@@ -1899,7 +1899,7 @@ Layers: sky 1.2.0.
 - Detail in the procedural skies: grain, dust, haze and embedded stars as recipe keys,
   used by every sky recipe; `mbgblue` calibrated like `mbg02` (sky 1.2.0). `d1d15e2`
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.20.0 — 2026-10-12
 
@@ -1931,7 +1931,7 @@ Layers: gui-installer 1.5.0.
   `install.sh`'s test on macOS.
 - The zip's `README.txt` names the graphical installers and the macOS way.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.19.0 — 2026-10-10
 
@@ -1955,7 +1955,7 @@ Layers: platform 3.4.0.
   retries, in the game's Heroic config (platform 3.4.0). Run by hand; not in `./install`
   or the release installers.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.17.1 — 2026-10-09
 
@@ -2096,7 +2096,7 @@ Layers: menus 4.3.2.
 - The main menu could open off-screen, leaving a black screen after the intro (seen on
   NixOS with GE-Proton10-32): an embedded full-screen menu is pinned to the game window.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.7.0 — 2026-10-08
 
@@ -2118,7 +2118,7 @@ Layers: gui-installer 1.0.0 (new; reads package schemas 0 and 1), postfx 1.2.1.
 ### Fixed
 - `postfx/vkbasalt/build.sh` builds on Debian and Ubuntu (postfx 1.2.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 11.6.2 — 2026-10-07
 
@@ -2708,7 +2708,7 @@ Layers: menus 4.3.1, testbench 2.2.0.
 ### Added
 - `scenarios/menu-repaints.md`, which checks the three (testbench 2.2.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 8.1.0 — 2026-10-02
 
@@ -2750,7 +2750,7 @@ Layers: platform 3.0.0, postfx 1.1.0.
   --revert` now returns to GOG's own `d3d8.dll` rather than to its proxy (platform
   3.0.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 7.1.0 — 2026-09-28
 

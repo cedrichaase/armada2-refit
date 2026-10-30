@@ -11,7 +11,7 @@ in [`README.md`](README.md).
   recorded `gpu` frame reads back the mirrors it samples (`gpu/README.md`, "Record and
   replay"). `239f29c`
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.10.0 — 2026-10-29
 
@@ -38,7 +38,7 @@ Installed, not yet seen in game.
   (stage 0 modulate, `TEXTUREFACTOR`, `COLORWRITEENABLE`, ...), as its `Get*` now
   return. `[Drop]` is read again every 60 presents in stub mode too.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.9.1 — 2026-10-29
 
@@ -49,7 +49,7 @@ Installed, not yet seen in game.
   `Device=` empty unless `A2TEST_VULKAN_DEVICE=lavapipe` (the bench's Vulkan is on the
   GPU now, testbench 3.70.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.9.0 — 2026-10-25
 
@@ -71,7 +71,7 @@ Confirmed in game 2026-10-25.
   installed `Mode=forward` and `Backend=d3d9` to the new defaults, and keeps any other
   value a player set.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.7.0 — 2026-10-23
 
@@ -96,7 +96,7 @@ Installed, not yet seen in game.
 - A Vulkan or Direct3D 12 start that fails takes down everything it made (instance,
   surface, device, swap chain, frame), so that the next backend can have the window.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.6.2 — 2026-10-23
 
@@ -135,7 +135,7 @@ Confirmed in game 2026-10-23.
 - `display8_backend` answers Direct3D 12 from the engine's `Direct3DCreate8` on, as it
   does Vulkan.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-30.
 
 ## 0.5.0 — 2026-10-23
 
