@@ -153,8 +153,9 @@ use core::ffi::c_void;
 /// talk (above, "Versions"). 1: display 0.12.0, the first with the handshake.
 pub const ABI_MAJOR: u32 = 1;
 /// The contract's minor version: what of the major's additions this side knows. 1:
-/// display 0.13.0, the claims (`display8v1_register`, `display8v1_claims`).
-pub const ABI_MINOR: u32 = 1;
+/// display 0.13.0, the claims (`display8v1_register`, `display8v1_claims`). 2: display
+/// 0.15.0, `Dx12Device8::pipeline_library`.
+pub const ABI_MINOR: u32 = 2;
 
 /// `display8v1_register` (contract 1.1).
 pub type RegisterFn = extern "C" fn(plugin: *const Plugin8) -> u32;
@@ -521,6 +522,12 @@ pub struct Dx12Device8 {
     pub sampler_anisotropy: i32,
     /// The LOD bias of every sampler with mips, as `VkDevice8::sampler_lod_bias`.
     pub sampler_lod_bias: f32,
+    /// `ID3D12PipelineLibrary*`, or 0 (contract 1.2, display 0.15.0): Display8's pipeline
+    /// library, persisted in `%LOCALAPPDATA%\armada2-refit\Display8.d3d12pipelines`. A
+    /// plugin stores the pipeline states it makes in it and loads them from it, and falls
+    /// back to plain creation when it is 0 or a call fails. Display8 serializes it; the
+    /// plugin never does.
+    pub pipeline_library: usize,
 }
 
 /// The frame now.

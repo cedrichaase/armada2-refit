@@ -25,6 +25,7 @@
 //!   mapped for good; chunks added when a frame needs more) and the callbacks deferred
 //!   until its fence value has passed. A frame is begun at the first call that needs it
 //!   after a `Present`, and ended, submitted and presented at the next.
+pub mod cache;
 pub mod exports;
 pub mod mirror;
 pub mod raw;
@@ -118,6 +119,12 @@ pub struct Dx {
     first: bool,
     root: P,
     pso: P,
+    /// The pipeline library (null: none), its file (kept: the library may point into
+    /// it), the adapter's header words and the size last written.
+    lib: P,
+    lib_file: Vec<u8>,
+    lib_id: [u32; 8],
+    lib_saved: usize,
     pub exported: Dx12Device8,
     pub frame_out: Dx12Frame8,
     lost: bool,
@@ -256,6 +263,10 @@ impl Dx {
             first: true,
             root: core::ptr::null_mut(),
             pso: core::ptr::null_mut(),
+            lib: core::ptr::null_mut(),
+            lib_file: Vec::new(),
+            lib_id: [0; 8],
+            lib_saved: 0,
             exported: Dx12Device8 {
                 size: core::mem::size_of::<Dx12Device8>() as u32,
                 device: dev as usize,
@@ -269,10 +280,12 @@ impl Dx {
                 features: gpu::display::FEATURE_ANISOTROPY | if crate::d3d9_centres() { gpu::display::FEATURE_D3D9_CENTRES } else { 0 },
                 sampler_anisotropy: samplers.0,
                 sampler_lod_bias: samplers.1,
+                pipeline_library: 0,
             },
             frame_out: Dx12Frame8::default(),
             lost: false,
         };
+        me.make_library(create_factory);
         if let Err(e) = me.build(create_factory, hwnd, serialize) {
             me.destroy();
             return Err(e);
@@ -283,6 +296,24 @@ impl Dx {
         );
         unsafe { DX = Some(me) };
         Ok(())
+    }
+
+    /// The pipeline library, from the file if it is this device's.
+    fn make_library(&mut self, create_factory: usize) {
+        self.lib_id = cache::identity(create_factory);
+        let file = cache::load(&self.lib_id);
+        let mut lib = cache::create(self.dev, file.get(64..).unwrap_or(&[]));
+        if lib.is_null() && file.len() > 64 {
+            lib = cache::create(self.dev, &[]);
+            self.lib_file = Vec::new();
+        } else {
+            self.lib_file = file;
+        }
+        self.lib = lib;
+        self.exported.pipeline_library = lib as usize;
+        if !lib.is_null() {
+            self.lib_saved = cache::size(lib);
+        }
     }
 
     /// The heaps, swap chain, targets, pipeline and frame slots of a device just made.
@@ -331,6 +362,7 @@ impl Dx {
         }
         release(self.swap);
         release(self.pso);
+        release(self.lib);
         release(self.root);
         for img in [&self.color, &self.depth, &self.ramp] {
             release(img.res);
@@ -573,7 +605,22 @@ impl Dx {
             flags: 0,
         };
         let mut pso: P = core::ptr::null_mut();
-        let hr = vcall!(self.dev, slot::DEV_CREATE_GRAPHICS_PIPELINE_STATE, fn(*const GraphicsPipelineDesc, *const crate::com::Guid, *mut P) -> i32, &pd, &IID_PIPELINE_STATE, &mut pso);
+        // Through the library when it has the present pass (stored under this name, the
+        // pass being fixed for a given Display8; the library checks the description).
+        let name: Vec<u16> = "Display8.present\0".encode_utf16().collect();
+        let mut hr = -1;
+        if !self.lib.is_null() {
+            hr = vcall!(self.lib, slot::LIB_LOAD_GRAPHICS_PIPELINE, fn(*const u16, *const GraphicsPipelineDesc, *const crate::com::Guid, *mut P) -> i32, name.as_ptr(), &pd, &IID_PIPELINE_STATE, &mut pso);
+            if hr < 0 {
+                pso = core::ptr::null_mut();
+            }
+        }
+        if hr < 0 {
+            hr = vcall!(self.dev, slot::DEV_CREATE_GRAPHICS_PIPELINE_STATE, fn(*const GraphicsPipelineDesc, *const crate::com::Guid, *mut P) -> i32, &pd, &IID_PIPELINE_STATE, &mut pso);
+            if hr >= 0 && !pso.is_null() && !self.lib.is_null() {
+                cache::store(self.lib, &name, pso);
+            }
+        }
         self.pso = made(hr, pso, "CreateGraphicsPipelineState (the present pass)")?;
         Ok(())
     }
@@ -878,6 +925,9 @@ impl Dx {
         self.recording = false;
         self.slot = (self.slot + 1) % SLOTS;
         self.index += 1;
+        if self.index % cache::EVERY == 0 {
+            self.lib_saved = cache::save(self.lib, &self.lib_id, self.lib_saved);
+        }
         if hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET {
             let why = vcall!(self.dev, slot::DEV_GET_DEVICE_REMOVED_REASON, fn() -> i32,);
             log!("d3d12: the device is gone ({:#x}, reason {:#x}); nothing is drawn from here", hr as u32, why as u32);

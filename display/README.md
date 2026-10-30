@@ -76,7 +76,7 @@ Nothing in Display8 is Wine-specific (`platform()` only names the system in the 
 on Windows the stub runs on the GPU vendor's Vulkan, Direct3D 12 or Windows' own
 Direct3D 9; it has not been seen there yet. `--uninstall` puts d3d8to9 back as `d3d8.dll`
 and takes out what `display/install --remove` takes out (on Windows also
-`Display8.pipelines`).
+`Display8.pipelines` and `Display8.d3d12pipelines`).
 
 ## What the plugins can ask of it
 
@@ -610,6 +610,19 @@ the swap chain's image, submits and presents.
   VirtualStore there. It is read when the device is made, only if its header names this
   device and driver (vendor, device, cache UUID), and written again, through a
   temporary file and a rename, whenever it has grown (looked at every 600 frames).
+- **Direct3D 12 keeps a pipeline library** the same way
+  (`%LOCALAPPDATA%\armada2-refit\Display8.d3d12pipelines`, `src/dx12/cache.rs`, since
+  0.15.0). Display8 makes one `ID3D12PipelineLibrary` (`ID3D12Device1`) when the device
+  is made, from the file if its 64-byte header names the same file format, Display8
+  version and adapter (vendor, device, subsystem, revision, the user-mode driver's
+  version where DXGI says it) and the driver accepts the blob (a refusal starts empty);
+  hands it to the plugins as `Dx12Device8::pipeline_library` (contract 1.2); keeps its own
+  present pass in it; and writes it again, atomically, whenever its serialized size has
+  grown (looked at every 120 frames). The file's bytes stay in memory for as long as the
+  library lives, as D3D12 requires. A plugin stores the pipelines it makes in it and
+  loads them from it by a name hashed from the whole description; with no library, or on
+  any error, it creates them plainly. `gpu` logs `pipeline library: N loaded, M stored`
+  (at each power of two), Display8 the file's size read and written.
 - **Samplers as DXVK makes them.** On Direct3D 9 the game's `dxvk.conf` (the renderer
   layer, `renderer/README.md`) has DXVK give every linear sampler 16x anisotropy and
   every sampler with mips a LOD bias of -0.5. Display8 reads the same keys

@@ -4,6 +4,15 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.28.1 — 2026-10-30
+
+### Changed
+- Built on `gpu` 1.2.0 (contract 1.2): on Direct3D 12 the graphics pipelines are loaded
+  from and stored into Display8's pipeline library (display 0.15.0); nothing changes
+  on Direct3D 9 or Vulkan, or against a Display8 of minor 1.0 / 1.1.
+
+Installed, not yet seen in game. (HASH)
+
 ## 0.28.0 — 2026-10-30
 
 ### Changed
