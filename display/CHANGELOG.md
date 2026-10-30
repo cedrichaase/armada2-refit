@@ -4,6 +4,17 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.15.1 — 2026-10-30
+
+### Fixed
+- Stub mode starts with no `UI.asi` (or its `[Menus]` at 0): the engine's own mode
+  requests (the shell's 800x600x16, the profile's, the intro's 640x480; six calls of
+  `FindDisplayMode`, `src/stub/modes.rs`) get the stub's one mode when theirs is not
+  listed, instead of a stack overflow before the first `CreateDevice`. Display8 alone
+  runs the stock game through passthrough.
+
+Installed, not yet seen in game.
+
 ## 0.14.0 — 2026-10-30
 
 ### Changed

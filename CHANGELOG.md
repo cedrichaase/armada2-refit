@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.51.1 — 2026-10-30
+
+Layers: display 0.15.1, testbench 3.78.1.
+
+### Fixed
+- Display8 alone (no `UI.asi`, no `Render3D.asi`) runs the stock game in stub mode: it
+  answers the engine's hard-coded display-mode requests (the shell's 800x600x16) with
+  its one mode, where only the UI's raise of the shell's mode kept the game from a
+  stack overflow at start. `display-claims`' "alone" now has neither plugin.
+
+Installed, not yet seen in game.
+
 ## 13.50.0 — 2026-10-30
 
 Layers: display 0.14.0, render3d 0.33.0, ui 0.28.0, qol 1.8.0, online 0.8.0, cutscenes 2.4.0, testbench 3.78.0, gui-installer 2.3.0.

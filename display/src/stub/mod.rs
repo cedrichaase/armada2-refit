@@ -21,6 +21,7 @@
 pub mod d3d;
 pub mod device;
 pub mod gamma;
+pub mod modes;
 pub mod obj;
 pub mod res;
 
@@ -219,6 +220,7 @@ fn started(d3d9: *mut c_void, mode: crate::d3d8::DisplayMode, order: Vec<Backend
     d3d::install();
     device::install();
     res::install();
+    modes::install();
     let d = SObj::new(crate::com::Kind::D3D, crate::com::Role::Plain, obj::Body::D3D);
     stub().d3d8 = d;
     d as *mut c_void
