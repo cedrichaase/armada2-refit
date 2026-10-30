@@ -66,7 +66,7 @@ pub fn note(pos: V3) -> bool {
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-struct Vtx {
+pub(super) struct Vtx {
     a: [f32; 3],
     b: [f32; 3],
     se: [f32; 2],
@@ -149,37 +149,50 @@ impl Posts {
         for &(top, y) in &ps {
             let c = if y < top.y { green } else { red };
             let col = [c[0] * self.bright, c[1] * self.bright, c[2] * self.bright, 1.0];
-            let a = [top.x, top.y, top.z];
-            let b = [top.x, y, top.z];
-            let q = |s: f32, e: f32| Vtx { a, b, se: [s, e], col };
-            vs.extend_from_slice(&[q(-1.0, 0.0), q(1.0, 0.0), q(1.0, 1.0), q(-1.0, 0.0), q(1.0, 1.0), q(-1.0, 1.0)]);
+            segment(&mut vs, top, V3 { x: top.x, y, z: top.z }, col);
         }
         if self.said < 3 {
             self.said += 1;
             log!("overlays: {} height post(s), the first from {:.0},{:.0},{:.0} to y {:.0}", ps.len(), ps[0].0.x, ps[0].0.y, ps[0].0.z, ps[0].1);
         }
-        let Some(mut cmd) = gfx::cmd() else { return };
-        // Depth-tested (`LESSEQUAL`) and not written, blended by alpha, no culling.
-        let pipe = self.pipes.view(0, || {
-            let mut d = PipelineDesc::new(gpu::code!(VS_LINE, VS_LINE_SPV, VS_LINE_DXIL), gpu::code!(PS_LINE, PS_LINE_SPV, PS_LINE_DXIL), &VERTEX, 48, Topology::TriangleList, Format::Unknown);
-            d.depth = Depth { test: true, write: false, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
-            d.blend = Some(Blend::ALPHA);
-            d
-        });
-        let Some(pipe) = pipe else { return };
-        if !cmd.set_pipeline(&pipe) {
-            return;
-        }
-        // The old dynamic buffer held 64 KB: more posts than that were not drawn.
-        if core::mem::size_of_val(&vs[..]) > 64 * 1024 {
-            return;
-        }
-        let Some(span) = cmd.vertices(&vs) else { return };
         let scale = (v.rect.h as f32 / 1080.0).max(0.5);
-        cmd.vs_block(Block::new(4, &gfx::vp_constants(v)));
-        cmd.vs_block(Block::new(8, &[v.rect.w as f32, v.rect.h as f32, 0.5 * self.width * scale, self.soft]));
-        cmd.ps_block(Block::new(0, &[self.soft, 0.0, 0.0, 0.0]));
-        cmd.bind_texture(0, None, &crate::scene::SAMPLER);
-        cmd.draw(&span);
+        draw_quads(&mut self.pipes, v, &vs, 0.5 * self.width * scale, self.soft);
     }
+}
+
+/// A line from `a` to `b` in `col`, as the six vertices of its quad (`vs_line`).
+pub(super) fn segment(vs: &mut Vec<Vtx>, a: V3, b: V3, col: [f32; 4]) {
+    let (a, b) = ([a.x, a.y, a.z], [b.x, b.y, b.z]);
+    let q = |s: f32, e: f32| Vtx { a, b, se: [s, e], col };
+    vs.extend_from_slice(&[q(-1.0, 0.0), q(1.0, 0.0), q(1.0, 1.0), q(-1.0, 0.0), q(1.0, 1.0), q(-1.0, 1.0)]);
+}
+
+/// Draws lines made by `segment`, `half` pixels either side of each centre line with a
+/// soft edge `soft` pixels wide: depth-tested (`LESSEQUAL`) and not written, blended by
+/// alpha, no culling. The posts' and the pivot marker's.
+pub(super) fn draw_quads(pipes: &mut Pipes, v: &View, vs: &[Vtx], half: f32, soft: f32) {
+    if vs.is_empty() {
+        return;
+    }
+    let Some(mut cmd) = gfx::cmd() else { return };
+    let pipe = pipes.view(0, || {
+        let mut d = PipelineDesc::new(gpu::code!(VS_LINE, VS_LINE_SPV, VS_LINE_DXIL), gpu::code!(PS_LINE, PS_LINE_SPV, PS_LINE_DXIL), &VERTEX, 48, Topology::TriangleList, Format::Unknown);
+        d.depth = Depth { test: true, write: false, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
+        d.blend = Some(Blend::ALPHA);
+        d
+    });
+    let Some(pipe) = pipe else { return };
+    if !cmd.set_pipeline(&pipe) {
+        return;
+    }
+    // The old dynamic buffer held 64 KB: more posts than that were not drawn.
+    if core::mem::size_of_val(vs) > 64 * 1024 {
+        return;
+    }
+    let Some(span) = cmd.vertices(vs) else { return };
+    cmd.vs_block(Block::new(4, &gfx::vp_constants(v)));
+    cmd.vs_block(Block::new(8, &[v.rect.w as f32, v.rect.h as f32, half, soft]));
+    cmd.ps_block(Block::new(0, &[soft, 0.0, 0.0, 0.0]));
+    cmd.bind_texture(0, None, &crate::scene::SAMPLER);
+    cmd.draw(&span);
 }

@@ -1270,12 +1270,14 @@ timing slots" once. Setting it is for the bench (`ui/bench-asi.sh --rts
 FRAMERATE_DISPLAY=1`): an edited `RTS_CFG.h` keeps a player out of network games.
 
 The editor's own drag box (`mEditModeRender`, `mSelectionBox`) stays the engine's.
-**Not taken** (found on the bench by `ui-leftovers-2`): in the tactical view the
-engine still draws the tactical camera's pivot marker, a small flat 3D object (some
-100 triangles, through the trifan flush) where the camera turns about:
+**Not the UI's** (found on the bench by `ui-leftovers-2`): in the tactical view the
+engine drew the tactical camera's pivot marker, a small flat 3D object (some 100
+triangles, through the trifan flush) where the camera turns about:
 `TacticalCamera::Render` renders the object at its `+0xe0` (vtable `+0x18`) while its
 `+0xe4` is set and `View_Record` is 1. It is a 3D draw rather than the HUD's, seen
-when the camera's pivot is off the units.
+when the camera's pivot is off the units, so render3d takes it (render3d 0.30.0): its
+overlays module draws a ring of its own in its place (`render3d/README.md`,
+"overlays", the pivot marker; `[Overlays] Pivot=0` gives it back to the engine).
 
 ## Not done
 

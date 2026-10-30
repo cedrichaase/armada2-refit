@@ -4,6 +4,16 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.30.0 — 2026-10-30
+
+### Added
+- The overlays module draws the tactical camera's pivot marker (the feature
+  `TacticalCamera`, `src/mods/overlays/pivot.rs`) in place of the engine's `dummy.sod`
+  lens: a thin ring with four ticks on the map's plane, a soft halo under it, drawn as
+  the height posts' lines. `[Overlays] Pivot=` (1; 0: the engine's), `PivotRadius`,
+  `PivotWidth`, `PivotGlow`, `PivotColour`, `PivotBrightness`. Taken only while
+  `TacticalCamera::Render` is stock's. Installed, not yet seen in game (1da0694)
+
 ## 0.29.5 — 2026-10-30
 
 ### Changed

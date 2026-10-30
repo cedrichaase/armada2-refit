@@ -1419,6 +1419,43 @@ written, blended. At most 4096 posts a view.
 | `HeightPostWidth`, `HeightPostSoft` | 1.5, 1 | the line's width (pixels at 1080 lines) and its soft edge (pixels) |
 | `HeightPostBrightness` | 1 | the colour times this (above 1 it blooms) |
 
+**The pivot marker** (`pivot.rs`; the feature `TacticalCamera`, vtable 0x6b46c0, a
+game feature like the ghosts, drawn in `GameFeature_RenderAll`'s loop through slot 8,
+`TacticalCamera::Render` 0x4e5260). In the tactical view, once the camera has been
+panned off the units, it turns about a point of the map, and stock marks that point:
+`Render` draws the camera's `+0xe0`, an `ST3D_Instance` (vtable 0x6aff14) of
+`dummy.sod`, through the instance's `Render` (its vtable `+0x18`), only in the main
+view (`Render`'s bool), with the instance made, `+0xe4` set (the camera follows no
+entity) and `View_Record` 1. `TacticalCamera::Simulate` (0x4e4850) makes the instance
+the first time it is wanted (`FindLogicalDatabase` of `dummy.sod`) and moves it every
+tick to the camera's point of interest (`SetOrigin`, the instance's `+0x68`);
+`dummy.sod` is a small flat ellipsoid (some 30 by 23 by 8 units) with one additive
+material, which on the bench at 1280x720 reads as a rose-red lens about 26 by 9 pixels,
+srgb(163, 91, 89). It is drawn into the 3D scene, so `UI.asi`'s HUD never covered it
+(`ui/HUD.md`, "the last leftovers").
+
+Ours takes the feature under the same conditions (nothing is drawn where stock draws
+nothing) and draws at the instance's origin a thin ring on the map's plane,
+`PivotRadius` world units across its radius, with four short ticks pointing in at the
+point along the world's axes: the height posts' lines (above), so the same pixel width
+at any resolution, a faint wide halo (`PivotGlow`) under the ring's bright core, in stock's rose
+times `PivotBrightness` (the core blooms a little), depth-tested so a ship in front
+hides it, not written. It is fixed in the world: it turns only as the camera turns
+about it. It is taken only while slot 8 holds 0x4e5260 and that function's bytes are
+stock's (to its `ret 8`), and the instance's vtable is `ST3D_Instance`'s; otherwise the
+engine's `Render` runs (Render3D.log says which: "pivot marker: ours" or "is not
+stock's"). `Pivot=0` leaves it to the engine, drawn on the stub by Display8's
+passthrough (`render3d-pivot-stock`); `render3d-pivot` checks ours, with the engine
+drawing nothing in the tactical view.
+
+| Key (`[Overlays]`) | Default | |
+|---|---|---|
+| `Pivot` | 1 | 0: the engine's marker |
+| `PivotRadius` | 18 | the ring's radius, world units (stock's lens is about 15 across its half) |
+| `PivotWidth` | 1.5 | the core line's width, pixels at 1080 lines |
+| `PivotGlow` | 0.35 | the halo's opacity (0: none) |
+| `PivotColour`, `PivotBrightness` | 0.64 0.36 0.35, 1.6 | its colour (stock's rose) and the factor on it |
+
 ### particles
 
 #### particles
