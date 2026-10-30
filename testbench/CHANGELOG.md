@@ -5,7 +5,19 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
-## 3.74.1 — 2026-10-29
+## 3.74.2 — 2026-10-30
+
+### Fixed
+- `start_null_sink` leaked a same-named null sink per launch: a relaunch reuses the
+  session's sink, teardown unloads every module of the session, and a launch sweeps
+  the sinks of sessions that are gone (`session.py`). The cause of the main audio
+  stream reaching the real output is not found; see the README trap.
+- `no-assets` step 15 expects render3d's menu scene under the UI's column, not stock
+  title art.
+
+Installed, not yet seen in game. `HASH`
+
+ — 2026-10-29
 
 ### Fixed
 - The audio guard no longer stops the game for a corked stream on a real output:

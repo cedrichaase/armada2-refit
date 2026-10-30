@@ -850,8 +850,18 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
 
     def start_null_sink(self):
         """A sink on the real server that plays nowhere, one per session (parallel cases
-        each get their own). Unloaded in teardown."""
+        each get their own). Unloaded in teardown. A relaunch reuses the session's sink
+        (loading another of the same name leaked one per launch: the teardown unloaded
+        only the last), and the first launch sweeps the sinks of sessions that are gone."""
         name = f'a2test-{self.s["id"]}'
+        sweep_stale_sinks()
+        have = [m for m, n in _null_sink_modules() if n == name]
+        if have:
+            for extra in have[1:]:      # duplicates an earlier build leaked
+                subprocess.run(['pactl', 'unload-module', str(extra)], capture_output=True)
+            self.s['null_sink'] = dict(name=name, module=have[0])
+            self.save()
+            return name
         r = subprocess.run(['pactl', 'load-module', 'module-null-sink', f'sink_name={name}',
                             f'sink_properties=device.description={name}'],
                            capture_output=True, text=True)
@@ -862,11 +872,16 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         return name
 
     def stop_null_sink(self):
+        # every module that carries this session's names, not just the recorded ids
+        mine = f'a2test-{self.s["id"]}'
+        ids = {str(m) for m, n in _null_sink_modules() if n == mine or n.startswith(mine + '-')}
         ns = self.s.get('null_sink')
         if ns:
-            subprocess.run(['pactl', 'unload-module', str(ns['module'])], capture_output=True)
+            ids.add(str(ns['module']))
         for st in (self.s.get('stem_sinks') or {}).values():
-            subprocess.run(['pactl', 'unload-module', str(st['module'])], capture_output=True)
+            ids.add(str(st['module']))
+        for m in sorted(ids):
+            subprocess.run(['pactl', 'unload-module', m], capture_output=True)
 
     def start_stems(self):
         """`--stems`: a null sink per category, beside the session's own, and Stems.asi
@@ -1303,6 +1318,46 @@ def prf_volumes(prf):
     """{category: volume} from ARMADA.PRF line 3."""
     f = Path(prf).read_bytes().split(b'\r\n')[2].split(b' ')
     return {c: int(f[i]) for i, c in enumerate(CATEGORIES)}
+
+
+_SINK_SID = re.compile(r'^a2test-(\d{8}-\d{6}-\d+(?:-\d+)?)(?:-[a-z]+)?$')
+
+
+def _null_sink_modules():
+    """[(module id, sink name)] of the bench's null sinks (`a2test-<session>[-<stem>]`)."""
+    r = subprocess.run(['pactl', 'list', 'short', 'modules'], capture_output=True, text=True)
+    out = []
+    for line in r.stdout.splitlines():
+        f = line.split('\t')
+        if len(f) >= 3 and f[1] == 'module-null-sink':
+            m = re.search(r'sink_name=(\S+)', f[2])
+            if m and m.group(1).startswith('a2test-'):
+                out.append((int(f[0]), m.group(1)))
+    return out
+
+
+def sweep_stale_sinks():
+    """Unload the null sinks of sessions that no longer exist: their work directory is
+    gone, or its sway (up for the whole session) is dead. A live session's sink is never
+    touched: unloading a sink moves its streams to the default output. Returns the names
+    unloaded."""
+    gone = []
+    for mod, name in _null_sink_modules():
+        m = _SINK_SID.match(name)
+        if not m:
+            continue
+        sf = config.CACHE / 'sessions' / m.group(1) / 'session.json'
+        stale = not sf.exists()
+        if not stale:
+            try:
+                sway = (json.loads(sf.read_text()).get('pids') or {}).get('sway')
+            except (OSError, ValueError):
+                continue
+            stale = bool(sway) and not pid_alive(sway)
+        if stale:
+            subprocess.run(['pactl', 'unload-module', str(mod)], capture_output=True)
+            gone.append(name)
+    return gone
 
 
 def _pactl_json(what):

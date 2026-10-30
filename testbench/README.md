@@ -254,6 +254,19 @@ stem held `Mfed300.wav`, the voice stem `a2_fed01_intro.wav`, and the effects st
   streams (an uncork is a `change` event and is checked again). Catching one was the
   intermittent "game is no longer running" at launch (1 of 17 launches alone, 3 of 6
   on a busy bench, where every session's probes cover every other session's sinks).
+  **Sinks no longer leak (2026-10-30).** `start_null_sink` loaded a sink at every launch
+  and teardown unloaded only the last, so a session's relaunches (and every crashed
+  session) left same-named `a2test-*` sinks behind (28 found on the bench). A relaunch now
+  reuses the session's sink, teardown unloads every module carrying its names, and a
+  launch first sweeps the sinks of sessions whose work directory or sway is gone
+  (`sweep_stale_sinks`; a live session's sink is never touched). **The main stream
+  reaching the real output** (`20261029-201059`: first on the session's sink, 9 s later
+  the same stream index on `alsa_output…`) was not reproduced: the sink was alive and
+  unique at the time, and a probe on the shared server was not allowed. What is known:
+  PipeWire re-links a stream to the default output when its target changes under it, and
+  sinks coming and going (another job's teardown, or the leaked duplicates) are such
+  changes; the guard still moves, mutes and stops it. Fewer stray sinks means fewer such
+  events. If it recurs, log `pactl list short sinks` at the leak.
 - **XTest input does not work.** In headless sway the seat has no devices. `xdotool`
   moves Xwayland's core pointer, and Wine even logs the `ButtonPress`, but the frame
   stays pixel-identical: with no keyboard on the seat nothing holds focus, and no

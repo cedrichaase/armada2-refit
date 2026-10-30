@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.42.5 — 2026-10-30
+
+Layers: testbench 3.74.2.
+
+### Fixed
+- The bench no longer leaks a null sink per launch and sweeps stale `a2test-*` sinks;
+  `no-assets` step 15 expects the menu scene.
+
+Installed, not yet seen in game. `HASH`
+
 ## 13.42.4 — 2026-10-30
 
 Layers: render3d 0.29.2.
