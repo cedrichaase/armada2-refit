@@ -4,6 +4,13 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`binkproxy/README.md`](binkproxy/README.md).
 
+## 2.3.1 — 2026-10-30
+
+### Changed
+- `binkproxy.c` sheds its copies of the helpers; the `.def` files moved to `csdk/def/`. Built on `csdk/a2asi.h` (the Win32 types, kernel32 imports, `s_*` string helpers, the append-a-line log, signature check and `VirtualProtect` patch) with the import libraries in `csdk/def/`; behaviour and log lines are unchanged.
+
+Installed, not yet seen in game. (082d0c6)
+
 ## 2.3.0 — 2026-10-30
 
 ### Changed

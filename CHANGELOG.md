@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.45.0 — 2026-10-30
+
+Layers: qol 1.7.1, online 0.7.1, cutscenes 2.3.1.
+
+### Added
+- `csdk/`: `a2asi.h`, the header-only base of the C plugins (`QOL.asi`, `QOLRules.asi`, `Online.asi`, `binkw32.dll`), and `csdk/def/`, one set of import-library `.def` files (the union of what the four call). Not a layer: versioned by the root.
+
+### Changed
+- qol, online and cutscenes `build.sh` read the `.def` files from `csdk/def/`; the plugins' sources use `a2asi.h` in place of their own copies. Pure refactor: same log lines.
+
+Installed, not yet seen in game. (082d0c6)
+
 ## 13.44.0 — 2026-10-30
 
 Layers: qol 1.7.0, online 0.7.0, cutscenes 2.3.0, render3d 0.29.4, ui 0.25.3, display 0.11.2.

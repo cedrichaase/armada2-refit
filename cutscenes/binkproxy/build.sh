@@ -19,7 +19,7 @@ exec 9>"$out/.build.lock"
 flock 9
 
 for lib in kernel32 user32 winmm; do
-    llvm-dlltool -m i386 --kill-at -d "$here/$lib.def" -l "$out/$lib.lib"
+    llvm-dlltool -m i386 --kill-at -d "$here/../../csdk/def/$lib.def" -l "$out/$lib.lib"
 done
 
 cflags=(--target=i386-pc-windows-msvc -O2 -Wall -Wextra -msse2

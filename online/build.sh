@@ -2,7 +2,7 @@
 # Build Online.asi -- a 32-bit Windows DLL, cross-compiled on Linux.
 # Same toolchain and same reasons as menus/build.sh: no CRT
 # (/nodefaultlib), Win32 prototypes declared in the source, import library
-# generated from kernel32.def.  --kill-at is required; see that script.
+# generated from csdk/def/kernel32.def.  --kill-at is required; see that script.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,7 +10,7 @@ out="$here/build"
 mkdir -p "$out"
 
 for lib in kernel32 ws2_32 ole32 user32; do
-    llvm-dlltool -m i386 --kill-at -d "$here/$lib.def" -l "$out/$lib.lib"
+    llvm-dlltool -m i386 --kill-at -d "$here/../csdk/def/$lib.def" -l "$out/$lib.lib"
 done
 
 clang --target=i386-pc-windows-msvc \
