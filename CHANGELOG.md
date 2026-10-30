@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.51.2 — 2026-10-30
+
+Layers: display 0.15.2, testbench 3.78.2.
+
+### Fixed
+- Passthrough draws the Borg hulls on maps with lights (render3d's hulls module off):
+  the engine's lights no longer overwrite the bump shader's constants, which left
+  only the hulls' glow. New scenarios `display-passthrough-all` (every module off)
+  and its forward reference.
+
+Installed, not yet seen in game.
+
 ## 13.51.1 — 2026-10-30
 
 Layers: display 0.15.1, testbench 3.78.1.

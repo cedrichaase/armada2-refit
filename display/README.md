@@ -483,9 +483,21 @@ declaration puts each input in stream 0 is read off the declaration. Its port by
 constants 2 to 5, and the light direction of constant 6 taken into the vertex's tangent
 frame, normalised, offset and scaled by constants 0 and 1 into the diffuse colour, which
 the texture stages dot with the normal map (`DOTPRODUCT3`). The engine draws a Borg hull
-in three passes this way (two lights added, then the base texture multiplied over them),
-all of which the stage interpreter runs. Any other shader is refused and logged once with
-its hash; on the test bench its tokens are logged too, for porting.
+in four passes this way (two lights, the first written and the second added; the base
+texture multiplied over them; then the base texture again, blended by its alpha, which
+is the hull's glow), all of which the stage interpreter runs. Any other shader is
+refused and logged once with its hash; on the test bench its tokens are logged too, for
+porting.
+
+**The engine leaves `LIGHTING` on for these passes** on a map with lights (the Borg
+campaign's, not the showcase's `a2_borg01`). Direct3D ignores it under a vertex shader,
+and so must the passthrough: its fixed-function lights go in the vertex block from
+register 16, where `vs_bump`'s constants are, and until 0.15.2 they were written over
+them, so every pass but the glow's had its transform thrown away and the hull vanished
+around its lights (seen in game on *Strange Bedfellows* with every render3d module off;
+`display-passthrough-all`). Display8 logs once that it saw the case. (The `PASSTHROUGH`
+lines logged "once" are the tracer's: outside the bench, with `Trace=auto`, a player's
+log does not have them.)
 
 **What is not done yet**: Direct3D 12 and the stub's Direct3D 9 (phase 10; the
 latter is to go). Specular lighting, spot cones, texture transforms, a third stage and
@@ -494,6 +506,8 @@ stock traces.
 
 `display-passthrough` checks it (render3d's hulls off on the stub; the ships drawn),
 against `display-passthrough-forward`, the same scene through the forward chain.
+`display-passthrough-all` checks it with every render3d module off, on a Borg mission
+with lights entered through the menus, against `display-passthrough-all-forward`.
 
 **Measured 2026-10-29** (1280x720, the showcase paused at its tick, bench clock): with
 `[Modules] hulls=0`, stub and passthrough on lavapipe with the validation layer against
