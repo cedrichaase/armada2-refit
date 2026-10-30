@@ -17,6 +17,7 @@ Layers: testbench 3.78.3.
   passthrough's (`display/README.md`, "Passthrough", "Map nebulae").
 
 Confirmed in game 2026-10-30. (be4975d)
+Pre-release until the new display path (Display8 in stub mode, on Vulkan and Direct3D 12) is seen on more systems.
 
 ## 13.51.2 — 2026-10-30
 
