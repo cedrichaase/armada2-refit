@@ -20,7 +20,7 @@ Layers: render3d 0.29.5, ui 0.25.4, display 0.11.3.
   render3d's and the UI's `engine/hook.rs` and `dump.rs` are `a2rt`'s; the replayer and
   vkprobe include its `win.rs` and `mem.rs`. Pure refactor: same pixels, same log lines.
 
-Installed, not yet seen in game. (HASH)
+Installed, not yet seen in game. (3030e0c)
 
 ## 13.45.0 — 2026-10-30
 

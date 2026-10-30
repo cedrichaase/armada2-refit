@@ -10,7 +10,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
 - `src/rt` (but the user32 and gdi32 declarations, still in `src/rt/win.rs`),
   `engine/hook.rs`, `dump.rs` and the shared part of `clock.rs` moved into `crates/a2rt`;
   `a2fmt` is read from `crates/a2fmt`. Pure refactor: same pixels, same log lines.
-  Installed, not yet seen in game (HASH).
+  Installed, not yet seen in game (3030e0c).
 
 ## 0.25.3 — 2026-10-30
 

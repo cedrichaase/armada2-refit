@@ -9,7 +9,7 @@ in [`README.md`](README.md).
 ### Changed
 - `src/rt` moved into `crates/a2rt`, shared with render3d and ui (with `move_file` and
   `env`, which only Display8 had); vkprobe includes its `win.rs` and `mem.rs` from there.
-  Pure refactor: same pixels, same log lines. Installed, not yet seen in game (HASH).
+  Pure refactor: same pixels, same log lines. Installed, not yet seen in game (3030e0c).
 
 ## 0.11.2 — 2026-10-30
 
