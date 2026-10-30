@@ -5,6 +5,13 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.75.0 — 2026-10-30
+
+### Added
+- `render3d-pivot` (render3d's pivot marker in the tactical view, the engine drawing
+  nothing there) and `render3d-pivot-stock` (`Pivot=0` on the stub: the engine's marker
+  through the passthrough). Installed, not yet seen in game
+
 ## 3.74.2 — 2026-10-30
 
 ### Fixed

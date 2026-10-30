@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.47.0 — 2026-10-30
+
+Layers: render3d 0.30.0, testbench 3.75.0.
+
+### Added
+- render3d draws the tactical camera's pivot marker in the refit's look (`[Overlays]
+  Pivot=1`; 0 gives it back to the engine, drawn on the stub by Display8's
+  passthrough); scenarios `render3d-pivot` and `render3d-pivot-stock`.
+
+Installed, not yet seen in game.
+
 ## 13.45.0 — 2026-10-30
 
 Layers: qol 1.7.1, online 0.7.1, cutscenes 2.3.1.
