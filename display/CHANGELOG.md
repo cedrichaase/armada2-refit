@@ -13,7 +13,7 @@ in [`README.md`](README.md).
   listed, instead of a stack overflow before the first `CreateDevice`. Display8 alone
   runs the stock game through passthrough.
 
-Installed, not yet seen in game.
+Installed, not yet seen in game. (c6d6189)
 
 ## 0.14.0 — 2026-10-30
 

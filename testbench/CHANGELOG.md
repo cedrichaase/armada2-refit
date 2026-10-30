@@ -12,7 +12,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
   (`display/bench-claims.sh alone`) and checks Display8's mode-request line; it no
   longer needs the UI's raise of the shell's mode.
 
-Installed, not yet seen in game.
+Installed, not yet seen in game. (c6d6189)
 
 ## 3.78.0 — 2026-10-30
 

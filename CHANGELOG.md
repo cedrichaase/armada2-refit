@@ -15,7 +15,7 @@ Layers: display 0.15.1, testbench 3.78.1.
   its one mode, where only the UI's raise of the shell's mode kept the game from a
   stack overflow at start. `display-claims`' "alone" now has neither plugin.
 
-Installed, not yet seen in game.
+Installed, not yet seen in game. (c6d6189)
 
 ## 13.50.0 — 2026-10-30
 
