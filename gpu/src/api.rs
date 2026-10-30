@@ -2,11 +2,13 @@
 //! the device behind the game's d3d8 one, or Display8's own in stub mode), Vulkan
 //! (`vulkan`, Display8's device in stub mode with `Backend=vulkan`) or Direct3D 12
 //! (`dx12`, with `Backend=d3d12`). Which one is chosen at run time, once, by what
-//! Display8 says (`display8_backend`): with no Display8, an older one, or one that says
-//! Direct3D 9, it is Direct3D 9 as before. Each object is an enum of the backends' own,
+//! Display8 says (`display8v1_backend`), after the contract's handshake
+//! (`display8_abi`, gpu/src/display.rs, "Versions"): with no Display8, one too old or of
+//! another major (each logged apart), or one that says Direct3D 9, it is Direct3D 9 as
+//! before. Each object is an enum of the backends' own,
 //! and every call goes to the one it was made on.
 use crate::d3d9::raw::Device as Dev;
-use crate::display::{Display8, Display8Dx12, BACKEND_D3D12, BACKEND_D3D9, BACKEND_VULKAN};
+use crate::display::{Display8, Display8Dx12, Refused, ABI_MAJOR, ABI_MINOR, BACKEND_D3D12, BACKEND_D3D9, BACKEND_VULKAN};
 use crate::frame::{Frame, Span};
 use crate::pixels::Mapped;
 use crate::types::*;
@@ -52,6 +54,10 @@ pub struct Gpu {
     early: Cell<bool>,
     /// Display8's exports, looked up once.
     disp: Cell<Option<Display8>>,
+    /// `Display8::load` refused (logged once): Direct3D 9 for good.
+    no_display: Cell<bool>,
+    /// This plugin's id with Display8 (`display8v1_register`), 0 while not registered.
+    reg_id: Cell<u32>,
     /// `display8_device_epoch`, looked up once: 0 not yet, 1 absent, else the address.
     epoch_fn: Cell<usize>,
     /// Recording a frame of calls, when asked (`crate::record`).
@@ -61,7 +67,7 @@ pub struct Gpu {
 impl Gpu {
     /// Direct3D 9 only (no Display8 is asked).
     pub const fn new(log: Log) -> Gpu {
-        Gpu { log, d9: d3d9::Gpu::new(log), vk: vulkan::Gpu::new(log), dx: dx12::Gpu::new(log), lookup: None, mode: Cell::new(D3D9), seen: Cell::new(0), early: Cell::new(false), disp: Cell::new(None), epoch_fn: Cell::new(0), rec: Recorder::new(log) }
+        Gpu { log, d9: d3d9::Gpu::new(log), vk: vulkan::Gpu::new(log), dx: dx12::Gpu::new(log), lookup: None, mode: Cell::new(D3D9), seen: Cell::new(0), early: Cell::new(false), disp: Cell::new(None), no_display: Cell::new(false), reg_id: Cell::new(0), epoch_fn: Cell::new(0), rec: Recorder::new(log) }
     }
 
     /// On the backend Display8 says, through `lookup` (the plugin's `GetProcAddress` on
@@ -89,6 +95,8 @@ impl Gpu {
             seen: Cell::new(0),
             early: Cell::new(false),
             disp: Cell::new(None),
+            no_display: Cell::new(false),
+            reg_id: Cell::new(0),
             epoch_fn: Cell::new(0),
             rec: Recorder::new(log),
         }
@@ -122,19 +130,12 @@ impl Gpu {
             self.mode.set(D3D9);
             return D3D9;
         };
-        let d = match self.disp.get() {
-            Some(d) => d,
-            None => match Display8::load(lookup) {
-                Some(d) => {
-                    self.disp.set(Some(d));
-                    d
-                }
-                None => {
-                    // Not Display8, or one without the Vulkan exports: Direct3D 9 for good.
-                    self.mode.set(D3D9);
-                    return D3D9;
-                }
-            },
+        let Some(d) = self.display(lookup) else {
+            // Direct3D 9 for good: the d3d9 path as with no Display8, which on
+            // Display8's own Vulkan or Direct3D 12 draws nothing (the engine's draws
+            // pass through there).
+            self.mode.set(D3D9);
+            return D3D9;
         };
         match (d.backend)() {
             BACKEND_VULKAN => {
@@ -174,6 +175,85 @@ impl Gpu {
             // Not decided yet (before the engine's Direct3DCreate8): Direct3D 9's answer
             // for now, asked again next time.
             _ => UNDECIDED,
+        }
+    }
+
+    /// Display8's exports after the handshake, looked up once (and logged once, either
+    /// way). None: no Display8, or one this plugin does not talk to.
+    fn display(&self, lookup: fn(&str) -> usize) -> Option<Display8> {
+        if let Some(d) = self.disp.get() {
+            return Some(d);
+        }
+        if self.no_display.get() {
+            return None;
+        }
+        match Display8::load(lookup, lookup as usize) {
+            Ok(d) => {
+                (self.log)(format_args!("gpu {} (contract {}.{}): Display8 {} (contract {}.{})", crate::VERSION, ABI_MAJOR, ABI_MINOR, d.version, d.major, d.minor));
+                self.disp.set(Some(d));
+                Some(d)
+            }
+            Err(why) => {
+                self.refused(why);
+                self.no_display.set(true);
+                None
+            }
+        }
+    }
+
+    /// Registers the plugin with Display8 (`display8v1_register`, contract 1.1;
+    /// gpu/src/display.rs, "Claims"), handing it `claims`, which Display8 asks every
+    /// frame. Called once at load: the handshake is made here if it was not yet. False
+    /// (logged) without a Display8 of contract 1.1 or later: nothing is routed by
+    /// claims, and the plugin keeps to what it did before them.
+    pub fn register(&self, claims: crate::display::ClaimsCallback) -> bool {
+        if self.reg_id.get() != 0 {
+            return true;
+        }
+        let Some(lookup) = self.lookup else { return false };
+        let Some(d) = self.display(lookup) else { return false };
+        let Some(reg) = d.register else {
+            (self.log)(format_args!("gpu: Display8 {} has contract {}.{}, without claims (1.1): nothing of this plugin is routed by claims", d.version, d.major, d.minor));
+            return false;
+        };
+        let p = crate::display::Plugin8 { caller: lookup as usize, claims: Some(claims), ..Default::default() };
+        let id = reg(&p);
+        if id == 0 {
+            (self.log)(format_args!("gpu: Display8 refused this plugin's claims (display8v1_register): nothing of it is routed by claims"));
+            return false;
+        }
+        self.reg_id.set(id);
+        (self.log)(format_args!("gpu: registered with Display8 (claims asked every frame)"));
+        true
+    }
+
+    /// What the other plugins registered with Display8 claim now (`CLAIM_*`). None when
+    /// this plugin is not registered (no Display8 of contract 1.1): the caller does what
+    /// it did before claims.
+    pub fn claimed_by_others(&self) -> Option<u32> {
+        let id = self.reg_id.get();
+        if id == 0 {
+            return None;
+        }
+        let f = self.disp.get()?.claims?;
+        Some(f(id))
+    }
+
+    /// Logs why there is no contract to draw through (`Display8::load`): no Display8 at
+    /// all is the ordinary forward chain; the rest are files that do not belong together.
+    fn refused(&self, why: Refused) {
+        let me = crate::VERSION;
+        match why {
+            Refused::NoDisplay8 => (self.log)(format_args!("gpu {} (contract {}.{}): no Display8 (the game's d3d8.dll is another chain's): Direct3D 9", me, ABI_MAJOR, ABI_MINOR)),
+            Refused::TooOld(v) => (self.log)(format_args!(
+                "gpu {} (contract {}.{}): Display8 {} is too old for this plugin (no contract handshake, display8_abi; it needs Display8 0.12.0 or later): this plugin stands down to Direct3D 9 only, and on Display8's own Vulkan or Direct3D 12 draws nothing. Install d3d8.dll, Render3D.asi and UI.asi from one release",
+                me, ABI_MAJOR, ABI_MINOR, v.unwrap_or("(no version)")
+            )),
+            Refused::Major(ma, mi, v) => (self.log)(format_args!(
+                "gpu {} (contract {}.{}): Display8 {} has contract {}.{}, another major: this plugin stands down to Direct3D 9 only, and on Display8's own Vulkan or Direct3D 12 draws nothing. Install d3d8.dll, Render3D.asi and UI.asi from one release",
+                me, ABI_MAJOR, ABI_MINOR, v.unwrap_or("?"), ma, mi
+            )),
+            Refused::Missing(n) => (self.log)(format_args!("gpu {} (contract {}.{}): Display8 shakes hands at contract {}.x but has no {}: a broken build; this plugin stands down to Direct3D 9 only", me, ABI_MAJOR, ABI_MINOR, ABI_MAJOR, n)),
         }
     }
 

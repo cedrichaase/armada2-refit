@@ -40,7 +40,8 @@ testbench/input/a2input
 # render3d: cargo's build output
 render3d/target/
 render3d/build/
-render3d/a2fmt/target/
+crates/a2fmt/target/
+crates/a2rt/target/
 
 # display: cargo's build output
 display/target/

@@ -5,6 +5,29 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 1.8.0 — 2026-10-30
+
+### Changed
+- `QOL.log` and `QOLRules.log` move out of the game directory: `%LOCALAPPDATA%\armada2-refit\logs\` (`QOL.log`, `QOLRules.log`), beside `Display8.pipelines`'
+  folder, made if missing; the game directory when `LOCALAPPDATA` is unset or not
+  writable. The first line says where (`log: <path>`). An uninstall leaves the folder.
+
+Confirmed in game 2026-10-30. (9a5e70a)
+
+## 1.7.1 — 2026-10-30
+
+### Changed
+- `qol.c` and `rules.c` shed their own copies of the helpers; the `.def` files moved to `csdk/def/`. Built on `csdk/a2asi.h` (the Win32 types, kernel32 imports, `s_*` string helpers, the append-a-line log, signature check and `VirtualProtect` patch) with the import libraries in `csdk/def/`; behaviour and log lines are unchanged.
+
+Confirmed in game 2026-10-30. (082d0c6)
+
+## 1.7.0 — 2026-10-30
+
+### Changed
+- `install.sh` merges an existing `QOL.ini` and `QOLRules.ini` with `tools/ini-merge.py`
+  (keys added, the player's values kept) instead of overwriting them; `--pan-speed` still
+  sets `PanSpeed=` afterwards. Confirmed in game 2026-10-30 (1973ecb).
+
 ## 1.6.4 — 2026-10-23
 
 ### Fixed

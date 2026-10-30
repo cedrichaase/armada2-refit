@@ -24,6 +24,9 @@ first frame (the ASI loader may load `UI.asi` after this DLL); when it is missin
 answers 0 the frame is copied as before. `UseUI=0` in `BinkProxy.ini` keeps the copy.
 `BinkProxy.log` says which: "UI.asi draws the full-screen frames" or "no UI.asi".
 
+
+**Where the log is.** `BinkProxy.log` is `%LOCALAPPDATA%\armada2-refit\logs\BinkProxy.log` (the Wine prefix's, under Proton), beside Display8's pipeline cache; the game directory only if that is unset or not writable. Its first line says where. Written by `a2_log_path()` in `csdk/a2asi.h`; an uninstall leaves the folder.
+
 Why a code change and not a re-encode: a larger `.bik` in that path would
 have been copied into a 640x480 back buffer at its own height, past the end of
 the buffer. Nothing in the game's config reaches either number.

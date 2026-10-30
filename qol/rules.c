@@ -65,38 +65,8 @@
  * first; a different Armada2.exe leaves the plugin out and says so in the log.
  */
 
-typedef unsigned char       BYTE;
-typedef unsigned long       DWORD;
-typedef int                 BOOL;
-typedef unsigned int        UINT;
-typedef long                LONG;
-typedef void               *HANDLE;
-typedef HANDLE              HMODULE;
-typedef const char         *LPCSTR;
-typedef char               *LPSTR;
-
-#define NULLPTR ((void *)0)
-#define TRUE  1
-
-int _fltused = 0;
-
-#define GENERIC_WRITE          0x40000000
-#define FILE_SHARE_READ        0x00000001
-#define OPEN_ALWAYS            4
-#define FILE_ATTRIBUTE_NORMAL  0x80
-#define FILE_END               2
-#define INVALID_HANDLE_VALUE   ((HANDLE)(LONG)-1)
-#define PAGE_EXECUTE_READWRITE 0x40
-
-__declspec(dllimport) DWORD   __stdcall GetModuleFileNameA(HMODULE, LPSTR, DWORD);
-__declspec(dllimport) BOOL    __stdcall VirtualProtect(void *, UINT, DWORD, DWORD *);
-__declspec(dllimport) BOOL    __stdcall FlushInstructionCache(HANDLE, const void *, UINT);
-__declspec(dllimport) HANDLE  __stdcall GetCurrentProcess(void);
-__declspec(dllimport) HANDLE  __stdcall CreateFileA(LPCSTR, DWORD, DWORD, void *, DWORD, DWORD, HANDLE);
-__declspec(dllimport) BOOL    __stdcall WriteFile(HANDLE, const void *, DWORD, DWORD *, void *);
-__declspec(dllimport) DWORD   __stdcall SetFilePointer(HANDLE, LONG, LONG *, DWORD);
-__declspec(dllimport) BOOL    __stdcall CloseHandle(HANDLE);
-__declspec(dllimport) UINT    __stdcall GetPrivateProfileIntA(LPCSTR, LPCSTR, int, LPCSTR);
+#define A2_FLTUSED
+#include "../csdk/a2asi.h"
 
 /* ---- Producer layout and the engine's own functions (Armada2.exe, patch 1.1) */
 
@@ -150,50 +120,10 @@ typedef struct { int dil, lat, met, bio, crew, off; } Cost;
 static char g_logpath[320];
 static int  g_logging = 1;
 
-static int s_len(const char *s) { int n = 0; while (s[n]) n++; return n; }
-
-static void s_cat(char *d, const char *s)
-{
-    int n = s_len(d);
-    while (*s) d[n++] = *s++;
-    d[n] = 0;
-}
-
-static void s_num(char *d, long v)
-{
-    char t[16];
-    int  n = 0, neg = 0, k = s_len(d);
-    if (v < 0) { neg = 1; v = -v; }
-    if (!v) t[n++] = '0';
-    while (v) { t[n++] = (char)('0' + (v % 10)); v /= 10; }
-    if (neg) d[k++] = '-';
-    while (n) d[k++] = t[--n];
-    d[k] = 0;
-}
-
-static long f_round(float f)
-{
-    long r;
-    __asm__ __volatile__("flds %1\n\tfistpl %0" : "=m"(r) : "m"(f));
-    return r;
-}
-
 static void logline(const char *s)
 {
-    HANDLE h;
-    DWORD  wrote;
-    char   buf[512];
-
     if (!g_logging || !g_logpath[0]) return;
-    h = CreateFileA(g_logpath, GENERIC_WRITE, FILE_SHARE_READ, NULLPTR,
-                    OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULLPTR);
-    if (h == INVALID_HANDLE_VALUE) return;
-    SetFilePointer(h, 0, NULLPTR, FILE_END);
-    buf[0] = 0;
-    s_cat(buf, s);
-    s_cat(buf, "\r\n");
-    WriteFile(h, buf, (DWORD)s_len(buf), &wrote, NULLPTR);
-    CloseHandle(h);
+    a2_append_line(g_logpath, s);
 }
 
 /* ---- costs and the bank ------------------------------------------------ */
@@ -596,23 +526,9 @@ static int  g_ntramp;
 
 typedef struct { DWORD at; int len; BYTE sig[8]; } Entry;
 
-static void poke(BYTE *at, const BYTE *bytes, int n)
-{
-    DWORD old;
-    int   k;
-    if (!VirtualProtect(at, (UINT)n, PAGE_EXECUTE_READWRITE, &old)) return;
-    for (k = 0; k < n; k++) at[k] = bytes[k];
-    VirtualProtect(at, (UINT)n, old, &old);
-    FlushInstructionCache(GetCurrentProcess(), at, (UINT)n);
-}
+static void poke(BYTE *at, const BYTE *bytes, int n) { a2_poke((DWORD)at, bytes, n); }
 
-static int sig_ok(const Entry *e)
-{
-    int k;
-    for (k = 0; k < e->len; k++)
-        if (((const BYTE *)e->at)[k] != e->sig[k]) return 0;
-    return 1;
-}
+static int sig_ok(const Entry *e) { return a2_sig_is(e->at, e->sig, e->len); }
 
 /* Entry hooks.  The first `len` bytes of each (whole instructions, no relative
  * ones) are copied behind a jump back, and the entry jumps to the hook. */
@@ -690,15 +606,17 @@ static int patch_rules(void)
 static void startup(void)
 {
     char path[320], ini[320], b[200];
-    int  n = (int)GetModuleFileNameA(NULLPTR, path, sizeof path);
 
-    if (n <= 0) return;
-    while (n > 0 && path[n - 1] != '\\' && path[n - 1] != '/') n--;
-    path[n] = 0;
+    if (!a2_exe_dir(path, sizeof path)) return;
     ini[0] = 0;       s_cat(ini, path);       s_cat(ini, "QOLRules.ini");
     g_logpath[0] = 0; s_cat(g_logpath, path); s_cat(g_logpath, "QOLRules.log");
     g_logging = (int)GetPrivateProfileIntA("Rules", "Log", 1, ini);
     g_trace = g_logging > 1;
+    if (g_logging && g_logpath[0]) {
+        char dir[320];
+        a2_exe_dir(dir, sizeof dir);
+        a2_log_where(g_logpath, a2_log_path(g_logpath, sizeof g_logpath, dir, "QOLRules.log"));
+    }
 
     b[0] = 0;
     s_cat(b, "--- QOLRules PayOnQueue=");

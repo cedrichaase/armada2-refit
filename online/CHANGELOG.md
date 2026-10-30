@@ -4,6 +4,28 @@
 8 with a transport of our own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 and versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.8.0 — 2026-10-30
+
+### Changed
+- `Online.log` moves out of the game directory: `%LOCALAPPDATA%\armada2-refit\logs\Online.log`, beside `Display8.pipelines`'
+  folder, made if missing; the game directory when `LOCALAPPDATA` is unset or not
+  writable. The first line says where (`log: <path>`). An uninstall leaves the folder.
+
+Confirmed in game 2026-10-30. (9a5e70a)
+
+## 0.7.1 — 2026-10-30
+
+### Changed
+- `online.c` (and `peer.c` through it) shed its copies of the helpers; the `.def` files moved to `csdk/def/`. Built on `csdk/a2asi.h` (the Win32 types, kernel32 imports, `s_*` string helpers, the append-a-line log, signature check and `VirtualProtect` patch) with the import libraries in `csdk/def/`; behaviour and log lines are unchanged.
+
+Confirmed in game 2026-10-30. (082d0c6)
+
+## 0.7.0 — 2026-10-30
+
+### Changed
+- `install.sh` merges an existing `Online.ini` with `tools/ini-merge.py` instead of
+  overwriting it. Confirmed in game 2026-10-30 (1973ecb).
+
 ## 0.6.3 — 2026-10-21
 
 ### Changed

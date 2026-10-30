@@ -78,7 +78,11 @@ if [ ! -f "$GAME/binkw32.dll.a2neb-backup" ]; then
 fi
 cp -p "$GAME/binkw32.dll.a2neb-backup" "$GAME/binkw32_orig.dll"
 cp "$here/build/binkw32.dll" "$GAME/binkw32.dll"
-[ -f "$GAME/BinkProxy.ini" ] || cp "$here/BinkProxy.ini" "$GAME/BinkProxy.ini"
+if [ -f "$GAME/BinkProxy.ini" ]; then
+    python3 "$here/../../tools/ini-merge.py" "$here/BinkProxy.ini" "$GAME/BinkProxy.ini"
+else
+    cp "$here/BinkProxy.ini" "$GAME/BinkProxy.ini"
+fi
 
 for d in "$MOVIES"/*/; do
     name="$(basename "$d")"
@@ -97,4 +101,4 @@ rm -f "$GAME/BinkProxy.log"
 echo "installed into $GAME:"
 ls -l "$GAME/binkw32.dll" "$GAME/binkw32_orig.dll" "$GAME/BinkProxy.ini"
 ls -l "$GAME"/animations/*.mp4 "$GAME"/animations/*.wav 2>/dev/null || true
-echo "after a launch:  cat \"$GAME/BinkProxy.log\""
+echo "after a launch:  %LOCALAPPDATA%\\armada2-refit\\logs\\BinkProxy.log  (in the Wine prefix: drive_c/users/<user>/AppData/Local/armada2-refit/logs/)"

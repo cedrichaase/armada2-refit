@@ -5,10 +5,12 @@
 
 extern crate alloc;
 
-pub mod rt;
+pub mod rt {
+    pub use a2rt::*;
+}
+pub use a2rt::{dump, log, sfmt};
 pub mod assets;
 pub mod clock;
-pub mod dump;
 pub mod config;
 pub mod engine;
 pub mod frame;
@@ -66,6 +68,9 @@ fn startup() {
     config::set(cfg);
     mods::init();
     if frame::install() {
+        // With Display8 (contract 1.1) the modules' claims are asked every frame
+        // (README.md, "Claims"); a render3d that does not hook the frame claims nothing.
+        gfx::gpu().register(mods::claims);
         log!("ready");
     }
 }

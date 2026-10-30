@@ -130,6 +130,24 @@ def vulkan_validate():
     return os.environ.get('A2TEST_VULKAN_VALIDATE', '1') != '0'
 
 
+def log_dirs(prefix, game):
+    """The folders a plugin's log may be in: the prefix's LocalAppData logs folder, then
+    the game directory. `prefix` is the directory WINEPREFIX points at (its `pfx` inside
+    for Proton; the prefix itself for a plain Wine one)."""
+    prefix = Path(prefix)
+    out = []
+    for base in (prefix / 'pfx', prefix):
+        out += sorted((base / 'drive_c' / 'users').glob('*/AppData/Local/armada2-refit/logs'))
+    return out + [Path(game)]
+
+
+def log_path(dirs, name):
+    for d in dirs:
+        if (Path(d) / name).exists():
+            return Path(d) / name
+    return None
+
+
 def vulkan_env(game_dir, logs=None):
     """The environment of a game whose Display8 draws on Vulkan (`Mode=stub`,
     `Backend=vulkan` in its Display8.ini): Mesa's CPU Vulkan (lavapipe) as the only
@@ -270,6 +288,17 @@ class Session:
     @property
     def prefix_dir(self):
         return self.work / 'prefix'
+
+    @property
+    def log_dirs(self):
+        """Where the plugins write their logs: %LOCALAPPDATA%\\armada2-refit\\logs in this
+        clone's Wine prefix, and the game directory (builds before 13.50.0, and the
+        fallback when LOCALAPPDATA is unset or not writable)."""
+        return log_dirs(self.prefix_dir, self.game_dir)
+
+    def log_path(self, name):
+        """The file of the log `name` (a plugin's, or a file beside Armada2.exe), or None."""
+        return log_path(self.log_dirs, name)
 
     # ------------------------------------------------------------------ clone + prepare
 
@@ -777,10 +806,11 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                      'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Scene.marks', 'Armada2_d3d9.log',
                      'Render3D.log', 'Stems.log', 'UI.log', 'Online.log',
                      'Display8.log', 'Display8.inventory.tsv', 'Display8.mark'):
-            try:
-                (g / name).unlink()
-            except FileNotFoundError:
-                pass
+            for d in self.log_dirs:
+                try:
+                    (d / name).unlink()
+                except FileNotFoundError:
+                    pass
         logs = self.dir / 'logs'
         e = self.s['env']
         env = {k: v for k, v in os.environ.items()
@@ -850,8 +880,18 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
 
     def start_null_sink(self):
         """A sink on the real server that plays nowhere, one per session (parallel cases
-        each get their own). Unloaded in teardown."""
+        each get their own). Unloaded in teardown. A relaunch reuses the session's sink
+        (loading another of the same name leaked one per launch: the teardown unloaded
+        only the last), and the first launch sweeps the sinks of sessions that are gone."""
         name = f'a2test-{self.s["id"]}'
+        sweep_stale_sinks()
+        have = [m for m, n in _null_sink_modules() if n == name]
+        if have:
+            for extra in have[1:]:      # duplicates an earlier build leaked
+                subprocess.run(['pactl', 'unload-module', str(extra)], capture_output=True)
+            self.s['null_sink'] = dict(name=name, module=have[0])
+            self.save()
+            return name
         r = subprocess.run(['pactl', 'load-module', 'module-null-sink', f'sink_name={name}',
                             f'sink_properties=device.description={name}'],
                            capture_output=True, text=True)
@@ -862,11 +902,16 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         return name
 
     def stop_null_sink(self):
+        # every module that carries this session's names, not just the recorded ids
+        mine = f'a2test-{self.s["id"]}'
+        ids = {str(m) for m, n in _null_sink_modules() if n == mine or n.startswith(mine + '-')}
         ns = self.s.get('null_sink')
         if ns:
-            subprocess.run(['pactl', 'unload-module', str(ns['module'])], capture_output=True)
+            ids.add(str(ns['module']))
         for st in (self.s.get('stem_sinks') or {}).values():
-            subprocess.run(['pactl', 'unload-module', str(st['module'])], capture_output=True)
+            ids.add(str(st['module']))
+        for m in sorted(ids):
+            subprocess.run(['pactl', 'unload-module', m], capture_output=True)
 
     def start_stems(self):
         """`--stems`: a null sink per category, beside the session's own, and Stems.asi
@@ -1103,9 +1148,10 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         return shots[-1] if shots else None
 
     def game_log(self, name):
-        """A log the instrumented code writes beside Armada2.exe, or one of ours."""
-        for p in (self.game_dir / name, self.dir / 'logs' / name):
-            if p.exists():
+        """A log the instrumented code writes (the prefix's LocalAppData logs folder, or
+        beside Armada2.exe), or one of ours."""
+        for p in (self.log_path(name), self.dir / 'logs' / name):
+            if p and p.exists():
                 return p.read_text(errors='replace')
         return None
 
@@ -1153,8 +1199,9 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                      'GridLayout.ini', 'dxvk.conf', 'Online.log',
                      'Online.ini', 'OnlineServer.log', 'Render3D.log', 'Render3D.ini', 'UI.log', 'UI.ini',
                      'Display8.log', 'Display8.ini', 'Display8.inventory.tsv'):
-            if (g / name).exists():
-                shutil.copy2(g / name, dst / name)
+            src = self.log_path(name)
+            if src:
+                shutil.copy2(src, dst / name)
         if self.crashed():
             shutil.copy2(g / 'exception.txt', dst / 'exception.txt')
         # frame dumps not yet moved by `drive dump` (a trigger written by hand)
@@ -1303,6 +1350,46 @@ def prf_volumes(prf):
     """{category: volume} from ARMADA.PRF line 3."""
     f = Path(prf).read_bytes().split(b'\r\n')[2].split(b' ')
     return {c: int(f[i]) for i, c in enumerate(CATEGORIES)}
+
+
+_SINK_SID = re.compile(r'^a2test-(\d{8}-\d{6}-\d+(?:-\d+)?)(?:-[a-z]+)?$')
+
+
+def _null_sink_modules():
+    """[(module id, sink name)] of the bench's null sinks (`a2test-<session>[-<stem>]`)."""
+    r = subprocess.run(['pactl', 'list', 'short', 'modules'], capture_output=True, text=True)
+    out = []
+    for line in r.stdout.splitlines():
+        f = line.split('\t')
+        if len(f) >= 3 and f[1] == 'module-null-sink':
+            m = re.search(r'sink_name=(\S+)', f[2])
+            if m and m.group(1).startswith('a2test-'):
+                out.append((int(f[0]), m.group(1)))
+    return out
+
+
+def sweep_stale_sinks():
+    """Unload the null sinks of sessions that no longer exist: their work directory is
+    gone, or its sway (up for the whole session) is dead. A live session's sink is never
+    touched: unloading a sink moves its streams to the default output. Returns the names
+    unloaded."""
+    gone = []
+    for mod, name in _null_sink_modules():
+        m = _SINK_SID.match(name)
+        if not m:
+            continue
+        sf = config.CACHE / 'sessions' / m.group(1) / 'session.json'
+        stale = not sf.exists()
+        if not stale:
+            try:
+                sway = (json.loads(sf.read_text()).get('pids') or {}).get('sway')
+            except (OSError, ValueError):
+                continue
+            stale = bool(sway) and not pid_alive(sway)
+        if stale:
+            subprocess.run(['pactl', 'unload-module', str(mod)], capture_output=True)
+            gone.append(name)
+    return gone
 
 
 def _pactl_json(what):

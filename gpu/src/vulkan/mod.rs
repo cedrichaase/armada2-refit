@@ -250,7 +250,7 @@ pub struct Gpu {
     serial: Cell<u32>,
     depth: Cell<u32>,
     /// The pass now is published to Display8 at each outermost `Cmd`'s end, for its
-    /// passthrough (`display8_vk_pass`; render3d's, whose scene pass the engine's draws
+    /// passthrough (`display8v1_vk_pass`; render3d's, whose scene pass the engine's draws
     /// it hands back belong in).
     publish: Cell<bool>,
 }
@@ -335,7 +335,7 @@ impl Gpu {
         Gpu { log, st: RefCell::new(None), serial: Cell::new(0), depth: Cell::new(0), publish: Cell::new(false) }
     }
 
-    /// As `new`, publishing its pass now at each `Cmd`'s end (`display8_vk_pass`).
+    /// As `new`, publishing its pass now at each `Cmd`'s end (`display8v1_vk_pass`).
     pub const fn publishing(log: Log) -> Gpu {
         Gpu { log, st: RefCell::new(None), serial: Cell::new(0), depth: Cell::new(0), publish: Cell::new(true) }
     }
@@ -350,7 +350,8 @@ impl Gpu {
             vlog!(self, "gpu: Display8 says Vulkan but has no device");
             return false;
         }
-        let d = unsafe { *d };
+        // Only the fields within the size Display8 says (gpu/src/display.rs, "Versions").
+        let d = unsafe { crate::display::read(d) };
         let sfn = ash::StaticFn {
             get_instance_proc_addr: unsafe { core::mem::transmute::<usize, vk::PFN_vkGetInstanceProcAddr>(d.get_instance_proc_addr) },
         };
@@ -531,7 +532,7 @@ impl Gpu {
         if f.is_null() {
             return None;
         }
-        let f = unsafe { *f };
+        let f = unsafe { crate::display::read(f) };
         if f.command_buffer == 0 {
             return None;
         }
@@ -588,7 +589,7 @@ impl Gpu {
         }
     }
 
-    /// `display8_vk_pass`, when this Display8 has it.
+    /// `display8v1_vk_pass`, when this Display8 has it.
     fn tell_display(&self, event: u32, pass: Option<&crate::display::VkPass8>) {
         let Some(f) = self.sh().and_then(|sh| sh.disp.vk_pass) else { return };
         f(event, pass.map_or(core::ptr::null(), |p| p as *const _));
@@ -611,6 +612,7 @@ impl Gpu {
         // An image of Display8's goes back to its own layout (the same ones).
         self.restore_externals();
         let img = |a: &Att, layout: vk::ImageLayout| VkImage8 {
+            size: core::mem::size_of::<VkImage8>() as u32,
             image: vk::Handle::as_raw(a.tex.image()),
             view: vk::Handle::as_raw(a.tex.att_view(a.layer)),
             format: a.tex.vk_format().as_raw() as u32,
@@ -624,7 +626,7 @@ impl Gpu {
             return None;
         }
         let depth = ps.depth.as_ref().map_or(VkImage8::default(), |d| img(d, vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL));
-        Some(crate::display::VkPass8 { color, depth })
+        Some(crate::display::VkPass8 { size: core::mem::size_of::<crate::display::VkPass8>() as u32, color, depth })
     }
 
     pub(crate) fn serial(&self) -> u32 {
@@ -1052,7 +1054,7 @@ impl Gpu {
         Cmd::new(self, frame)
     }
 
-    /// Submits what is recorded and waits for it (Display8's `display8_vk_flush`): for
+    /// Submits what is recorded and waits for it (Display8's `display8v1_vk_flush`): for
     /// a read-back. The frame goes on in the same command buffer.
     pub(crate) fn flush(&self) -> bool {
         self.suspend();

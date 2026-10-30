@@ -4,6 +4,71 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.28.1 — 2026-10-30
+
+### Changed
+- Built on `gpu` 1.2.0 (contract 1.2): on Direct3D 12 the graphics pipelines are loaded
+  from and stored into Display8's pipeline library (display 0.15.0); nothing changes
+  on Direct3D 9 or Vulkan, or against a Display8 of minor 1.0 / 1.1.
+
+Confirmed in game 2026-10-30. (d860f47)
+
+## 0.28.0 — 2026-10-30
+
+### Changed
+- `UI.log` moves out of the game directory: `%LOCALAPPDATA%\armada2-refit\logs\UI.log`, beside `Display8.pipelines`'
+  folder, made if missing; the game directory when `LOCALAPPDATA` is unset or not
+  writable. The first line says where (`log: <path>`). An uninstall leaves the folder.
+
+Confirmed in game 2026-10-30. (9a5e70a)
+
+## 0.27.0 — 2026-10-30
+
+### Added
+- Registers with Display8 at load (contract 1.1, `gpu` 1.1.0, `src/claims.rs`) and
+  claims `hud`, `selection` (`[HUD] SelectionBubbles=0`), `loading` (`[Loading]
+  Enable=1`), `credits` (`[Menus] Credits=1`) and `cursor` (while its own is drawn);
+  a part at 0 claims nothing.
+
+### Changed
+- A UI that cannot draw (30 frames in a row without a device: `gfx::drawing`) claims
+  nothing and gives every stock HUD component back, so the engine's HUD shows instead
+  of vanishing.
+
+Confirmed in game 2026-10-30. (cf3dec5)
+
+## 0.26.0 — 2026-10-30
+
+### Changed
+- Built on `gpu` 1.0.0, contract 1.0 with Display8: asks `display8_abi` before it draws
+  on Display8's device and logs both versions; with a Display8 before 0.12.0 it logs
+  "too old" (apart from "no Display8") and stands down to Direct3D 9 only. Needs
+  display 0.12.0's `d3d8.dll`: ships with it.
+
+Confirmed in game 2026-10-30. (c470071)
+
+## 0.25.4 — 2026-10-30
+
+### Changed
+- `src/rt` (but the user32 and gdi32 declarations, still in `src/rt/win.rs`),
+  `engine/hook.rs`, `dump.rs` and the shared part of `clock.rs` moved into `crates/a2rt`;
+  `a2fmt` is read from `crates/a2fmt`. Pure refactor: same pixels, same log lines.
+  Confirmed in game 2026-10-30 (3030e0c).
+
+## 0.25.3 — 2026-10-30
+
+### Changed
+- `ini-merge.py` moved to `tools/ini-merge.py`, shared by every installer; `install.sh`
+  calls it there. Options `--before-comments` and a per-file retired-defaults table added.
+  Confirmed in game 2026-10-30 (1973ecb).
+
+## 0.25.2 — 2026-10-30
+
+### Changed
+- `build.sh` compiles shaders with `tools/shaderc/hlsl-rs.sh` (moved from `render3d/`);
+  the generated `src/shaders/*.rs` differ in their header line only. `64aee16`. Installed,
+  not yet seen in game
+
 ## 0.25.1 — 2026-10-29
 
 ### Fixed

@@ -491,7 +491,7 @@ normally afterwards.
     ui/build.sh                                   # -> ui/build/UI.asi
     ui/bench-asi.sh <state.json> --demo mission,shell,loading [UI.Scale=1.5]
 
-`build.sh` compiles `shaders/*.hlsl` with render3d's `hlsl-rs.sh` (the generated
+`build.sh` compiles `shaders/*.hlsl` with `tools/shaderc/hlsl-rs.sh` (the generated
 `src/shaders/*.rs` is committed and stamped, so a machine without `vkd3d-compiler`
 builds) and the font atlas from the vendored TTFs (`src/text/`), then the DLL.
 `bench-asi.sh` copies `UI.asi` and `UI.ini` into a bench session's clone and sets the
@@ -499,7 +499,7 @@ keys it is given; it is what a scenario's `Setup:` line runs.
 
 ### Installing
 
-`ui/install.sh` copies `UI.asi`, merges `UI.ini` into the player's (`ini-merge.py`:
+`ui/install.sh` copies `UI.asi`, merges `UI.ini` into the player's (`tools/ini-merge.py`:
 their values stay, a key they lack is added) and then runs `supersede.sh`, which
 takes out of the game directory the plugins whose places the parts switched on take:
 
@@ -558,6 +558,25 @@ that the old plugins are not installed:
   if `models/` installed it).
 - **`[UI] Cursor=0`** is the engine's cursor, kept square by the UI (below).
 
+### Claims
+
+With Display8 of contract 1.1 (display 0.13.0) the UI registers at load, before any
+part is patched (`src/claims.rs`, `gpu::Gpu::register`; `display/README.md`,
+"Claims"), and Display8 asks it at every scene what it draws now: `hud` (its panels
+are in), `selection` (`[HUD] SelectionBubbles=0`: render3d then draws no bubbles),
+`loading` (`[Loading] Enable=1`, its own screen: Display8's passthrough then drops the
+engine's loading frames under it), `credits` (`[Menus] Credits=1`) and `cursor` (while
+it keeps the engine's cursor from drawing). A part at 0 claims nothing, so on the stub
+the engine's own draws of it come through passthrough: with `[Loading] Enable=0` the
+engine's logo scene and bar, which until display 0.13.0 were dropped whenever `UI.asi`
+was loaded.
+
+A UI that cannot draw claims nothing and takes no stock component: after 30 frames in
+a row with no device or back buffer (`gfx::drawing`; logged), the HUD switch
+(`engine/hud.rs`, `taken`) lets every stock panel draw and have the mouse again, so the
+engine's HUD comes through instead of vanishing. A UI of another contract than
+Display8's never registers either.
+
 ### What the old plugins did, and where it is now
 
 | Plugin, part | Now |
@@ -596,7 +615,7 @@ is checked to be stock. `UI.log`: "cursor: the engine's cursor is kept square".
 | Key | Default | |
 |---|---|---|
 | `[UI] Enable` | 1 | 0: the plugin patches nothing |
-| `[UI] Log` | 1 | `UI.log` in the game directory: which hooks are in, and why one stood down |
+| `[UI] Log` | 1 | `UI.log` in `%LOCALAPPDATA%\armada2-refit\logs` (the game directory if that is unset or not writable; its first line says where): which hooks are in, and why one stood down |
 | `[UI] Scale` | 1.0 | the UI's size, as a multiple of a 1080-pixel-tall screen |
 | `[UI] Cursor` | 1 | draw the mouse cursor ourselves, from the game's own cursor art ("The cursor"); 0: the engine's, kept square |
 | `[UI] Movies` | 1 | the launch reels' and the intro's frames drawn by the UI, fitted ("Movies"), from the cutscene proxy or, without it, from the engine's own copy; 0: copied into the locked back buffer, scaled by the proxy or 640x480 without it |
@@ -852,8 +871,8 @@ The hook is the d3d8 device's `Present` (slot 15 of its vtable), chained beside
 `Reset` (`engine/device.rs`, once per vtable): every present goes through it, the
 engine's `RefreshDisplay` and the screens of our own alike, and it looks for the
 trigger every 30 presents, so without one it costs a counter and one
-`GetFileAttributesA` every 30 frames. The read-back is `src/dump.rs` (the same file as
-render3d's): `GetRenderTargetData` into a system-memory copy (through a plain target
+`GetFileAttributesA` every 30 frames. The read-back is `a2rt::dump` (`crates/a2rt/src/dump.rs`, shared with
+render3d): `GetRenderTargetData` into a system-memory copy (through a plain target
 first if the back buffer is multisampled), converted a row at a time; it changes no
 state of the device. A format it has no conversion for is logged and skipped. Without
 a Direct3D 9 device behind the game's (DXVK's own d3d8) nothing is read, and the

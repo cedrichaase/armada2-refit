@@ -1,0 +1,4 @@
+LIBRARY USER32.dll
+EXPORTS
+GetSystemMetrics@4
+IsWindow@4

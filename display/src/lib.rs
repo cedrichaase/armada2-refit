@@ -1,8 +1,8 @@
-//! Display8: Star Trek: Armada II's `d3d8.dll`, ours. In forward mode (the default) it
+//! Display8: Star Trek: Armada II's `d3d8.dll`, ours. In forward mode it
 //! stands in front of the real chain (`d3d8_real.dll`: crosire's d3d8to9, then DXVK's or
 //! Windows' d3d9) and passes every call through, tracing it on the bench (`Trace=1`),
 //! dropping the engine's draws by category (`[Drop]`), and telling the plugins of the
-//! device's comings and goings (`api.rs`). In stub mode (`stub/`) the engine draws
+//! device's comings and goings (`api.rs`). In stub mode (`stub/`, the default) the engine draws
 //! nothing, and render3d and the UI draw the whole frame on a device of ours: Direct3D 9,
 //! Vulkan (`vk/`) or Direct3D 12 (`dx12/`). See README.md beside this crate.
 #![no_std]
@@ -12,10 +12,14 @@ extern crate alloc;
 
 #[macro_use]
 pub mod macros;
-pub mod rt;
+pub mod rt {
+    pub use a2rt::*;
+}
+pub use a2rt::{log, sfmt};
 #[rustfmt::skip]
 pub mod shaders;
 pub mod api;
+pub mod claims;
 pub mod com;
 pub mod d3d8;
 pub mod detail;
@@ -51,7 +55,7 @@ static mut REAL: HANDLE = core::ptr::null_mut();
 /// `Mode=stub` asked for; whether it runs is decided at `Direct3DCreate8`.
 static mut STUB_ASKED: bool = false;
 /// `Backend=`: the backends the stub tries, in order, at the engine's first
-/// `CreateDevice` (d3d9 alone by default, until a backend is confirmed in game; README.md,
+/// `CreateDevice` (`auto` by default, as the shipped `Display8.ini`; README.md,
 /// "Choosing a backend").
 static mut ORDER: alloc::vec::Vec<stub::Backend> = alloc::vec::Vec::new();
 /// `FailBackend=`: backends that fail on purpose once made (a test bench clone only).
@@ -221,10 +225,10 @@ fn startup() {
         real: real_path(ini.string("Display8", "Real").filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("auto"))),
     };
     rt::log_open("Display8.log", cfg.log || cfg.trace);
-    let mode = ini.string("Display8", "Mode").unwrap_or_else(|| alloc::string::String::from("forward"));
+    let mode = ini.string("Display8", "Mode").unwrap_or_else(|| alloc::string::String::from("stub"));
     log!("Display8 {} -- game dir {}; mode {}; the real chain: {}", env!("CARGO_PKG_VERSION"), rt::game_dir(), mode, cfg.real);
     unsafe { STUB_ASKED = mode.eq_ignore_ascii_case("stub") };
-    let backend = ini.string("Display8", "Backend").unwrap_or_else(|| alloc::string::String::from("d3d9"));
+    let backend = ini.string("Display8", "Backend").unwrap_or_else(|| alloc::string::String::from("auto"));
     let fail = ini.string("Display8", "FailBackend").unwrap_or_default();
     unsafe {
         if STUB_ASKED {

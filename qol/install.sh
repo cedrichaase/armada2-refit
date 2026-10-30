@@ -5,6 +5,7 @@
 #   install.sh --pan-speed X    install and set PanSpeed=X (1 = leave right-drag alone)
 #   install.sh --remove         take it out again
 #
+# An existing QOL.ini / QOLRules.ini is merged (tools/ini-merge.py), never overwritten.
 # Adds QOL.asi, QOL.ini, QOLRules.asi, QOLRules.ini and (at run time) their logs, and nothing else; the exe is
 # patched in memory only, so removing those files is a complete uninstall.
 #
@@ -43,9 +44,17 @@ python3 "$here/rts-cfg-check.py" --fix "$GAME"
 bash "$here/build.sh" >/dev/null
 
 cp "$here/build/QOL.asi" "$GAME/QOL.asi"
-cp "$here/QOL.ini"       "$GAME/QOL.ini"
+if [ -f "$GAME/QOL.ini" ]; then
+    python3 "$here/../tools/ini-merge.py" "$here/QOL.ini" "$GAME/QOL.ini"
+else
+    cp "$here/QOL.ini" "$GAME/QOL.ini"
+fi
 cp "$here/build/QOLRules.asi" "$GAME/QOLRules.asi"
-cp "$here/QOLRules.ini"       "$GAME/QOLRules.ini"
+if [ -f "$GAME/QOLRules.ini" ]; then
+    python3 "$here/../tools/ini-merge.py" "$here/QOLRules.ini" "$GAME/QOLRules.ini"
+else
+    cp "$here/QOLRules.ini" "$GAME/QOLRules.ini"
+fi
 if [ -n "$pan" ]; then
     sed -i "s/^PanSpeed=.*/PanSpeed=$pan/" "$GAME/QOL.ini"
 fi
@@ -54,4 +63,4 @@ rm -f "$GAME/QOL.log" "$GAME/QOLRules.log"
 echo "installed into $GAME:"
 ls -l "$GAME/QOL.asi" "$GAME/QOL.ini" "$GAME/QOLRules.asi" "$GAME/QOLRules.ini"
 grep '^PanSpeed=' "$GAME/QOL.ini"
-echo "after a launch:  cat \"$GAME/QOL.log\""
+echo "after a launch:  %LOCALAPPDATA%\\armada2-refit\\logs\\QOL.log  (in the Wine prefix: drive_c/users/<user>/AppData/Local/armada2-refit/logs/)"

@@ -5,7 +5,81 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
-## 3.74.1 — 2026-10-29
+## 3.78.3 — 2026-10-30
+
+### Added
+- Scene `nebula-cerulean` (a Galaxy at a Big Cerulean Nebula, `mnebula10`) and the
+  scenarios `display-passthrough-nebula-forward` / `display-passthrough-nebula`: every
+  render3d module off, the engine's map puffs on the forward chain recorded as baseline
+  `passthrough-nebula` at ticks 200, 202 and 220, and the stub with `Passthrough=1`
+  held to it (RMSE 1.5), the paused frame to itself.
+
+Confirmed in game 2026-10-30. (be4975d)
+
+## 3.78.2 — 2026-10-30
+
+### Added
+- `display-passthrough-all` and `display-passthrough-all-forward`: every render3d module
+  off, the Borg campaign's *Strange Bedfellows* entered through the menus, the player's
+  Borg stations drawn by the passthrough against the forward chain (b08d6a8).
+
+Confirmed in game 2026-10-30. (b08d6a8)
+
+## 3.78.1 — 2026-10-30
+
+### Changed
+- `display-claims`' "alone" leaves out `UI.asi` as well as `Render3D.asi`
+  (`display/bench-claims.sh alone`) and checks Display8's mode-request line; it no
+  longer needs the UI's raise of the shell's mode.
+
+Confirmed in game 2026-10-30. (c6d6189)
+
+## 3.78.0 — 2026-10-30
+
+### Changed
+- The plugins' logs are read from the clone's Wine prefix, `drive_c/users/*/AppData/Local/armada2-refit/logs/`, with the game directory as the fallback for older builds: `Session.game_log`, `log_path`/`log_dirs`, the log waits (`mark_logs`, `new_log_lines`), `collect_logs` (into `logs/` of the results as before), `Display the mark`, and the launch's clean-up of the previous logs in both places. `gpu/replay.sh`, `render3d/perf/ab.sh` and `compare.sh` read `Render3D.log` / `Display8.log` there too; `a2film`'s UI-mark tail follows the log to wherever it appears.
+
+Confirmed in game 2026-10-30. (9a5e70a)
+
+## 3.77.0 — 2026-10-30
+
+### Added
+- Scenario `display-claims`: three games on the stub, Display8 alone, with the UI, and
+  with render3d at `[Modules] sky=0`, each logging who claims what;
+  `display/bench-claims.sh` leaves plugins out of a clone by the player's name.
+
+Confirmed in game 2026-10-30. (cf3dec5)
+
+## 3.76.0 — 2026-10-30
+
+### Added
+- Scenario `display-abi-mismatch`: two games, 13.42.4's plugins beside this checkout's
+  `d3d8.dll` and the reverse, each standing down cleanly through passthrough.
+  `display/bench-abi.sh` puts a commit's files into a clone (built once into
+  `$A2_DATA/builds/abi/<commit>/`).
+
+Confirmed in game 2026-10-30. (c470071)
+
+## 3.75.0 — 2026-10-30
+
+### Added
+- `render3d-pivot` (render3d's pivot marker in the tactical view, the engine drawing
+  nothing there) and `render3d-pivot-stock` (`Pivot=0` on the stub: the engine's marker
+  through the passthrough). Confirmed in game 2026-10-30 (1da0694)
+
+## 3.74.2 — 2026-10-30
+
+### Fixed
+- `start_null_sink` leaked a same-named null sink per launch: a relaunch reuses the
+  session's sink, teardown unloads every module of the session, and a launch sweeps
+  the sinks of sessions that are gone (`session.py`). The cause of the main audio
+  stream reaching the real output is not found; see the README trap.
+- `no-assets` step 15 expects render3d's menu scene under the UI's column, not stock
+  title art.
+
+Confirmed in game 2026-10-30. `6070901`
+
+ — 2026-10-29
 
 ### Fixed
 - The audio guard no longer stops the game for a corked stream on a real output:

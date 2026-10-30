@@ -54,7 +54,7 @@ cp "$here/build/d3d8.dll" "$GAME/d3d8.dll.a2display-new"
 mv "$GAME/d3d8.dll.a2display-new" "$GAME/d3d8.dll"
 
 if [ -f "$GAME/Display8.ini" ]; then
-    python3 "$here/../ui/ini-merge.py" "$here/Display8.ini" "$GAME/Display8.ini"
+    python3 "$here/../tools/ini-merge.py" "$here/Display8.ini" "$GAME/Display8.ini"
 else
     cp "$here/Display8.ini" "$GAME/Display8.ini"
 fi

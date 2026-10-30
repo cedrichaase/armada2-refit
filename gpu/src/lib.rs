@@ -34,6 +34,10 @@ macro_rules! vcall {
     }};
 }
 
+/// This crate's version, for the logs beside the contract's (`display::ABI_MAJOR`,
+/// `ABI_MINOR`): the plugins' changelogs say when it moves (README.md, "Versions").
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 mod api;
 pub mod chain;
 pub mod d3d9;

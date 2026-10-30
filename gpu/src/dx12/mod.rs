@@ -10,7 +10,7 @@
 //!
 //! - **One root signature** for every pipeline: each stage's register file as a root
 //!   constant buffer at b0 (vertex) or b1 (pixel) in every space a cbuffer may take
-//!   (`render3d/dxil-spaces.py`), one table of the sixteen stages' textures (t0..t15),
+//!   (`tools/shaderc/dxil-spaces.py`), one table of the sixteen stages' textures (t0..t15),
 //!   one table of one sampler per stage (s0..s15), and root constants at b2 (the
 //!   alpha test, the blit's region).
 //! - **The pass now** stays the pass across `Cmd`s, as on Direct3D 9 (its targets stay
@@ -56,7 +56,7 @@ pub(crate) use dlog;
 
 /// Direct3D 9's sampler stages.
 pub(crate) const SLOTS: usize = 16;
-/// The register spaces a stage's cbuffers may take (`render3d/dxil-spaces.py`).
+/// The register spaces a stage's cbuffers may take (`tools/shaderc/dxil-spaces.py`).
 pub(crate) const SPACES: u32 = 8;
 /// The root signature's parameters.
 pub(crate) const RP_VS: u32 = 0;
@@ -164,6 +164,13 @@ pub(crate) struct Shared {
     /// What DXVK's `dxvk.conf` makes of every sampler (`Dx12Device8::sampler_*`).
     pub force_aniso: i32,
     pub lod_bias: f32,
+    /// Display8's pipeline library (`Dx12Device8::pipeline_library`, contract 1.2), or
+    /// null: pipelines are made plainly.
+    pub lib: P,
+    pub log: Log,
+    /// Pipelines loaded from the library, and stored into it (made, then kept).
+    pub lib_loaded: Cell<u32>,
+    pub lib_stored: Cell<u32>,
     pub heaps: RefCell<[CpuHeap; 4]>,
     pub null_srv: [usize; 4],
     garbage: RefCell<Vec<(u64, Garbage)>>,
@@ -172,6 +179,16 @@ pub(crate) struct Shared {
 }
 
 impl Shared {
+    /// Counts a pipeline loaded from (or stored into) the library, and logs the counts
+    /// when they pass a power of two.
+    pub fn lib_count(&self, loaded: bool) {
+        let c = if loaded { &self.lib_loaded } else { &self.lib_stored };
+        c.set(c.get() + 1);
+        if c.get().is_power_of_two() {
+            dlog!(self, "gpu: Direct3D 12: pipeline library: {} loaded, {} stored", self.lib_loaded.get(), self.lib_stored.get());
+        }
+    }
+
     pub fn retire(&self, g: Garbage) {
         self.garbage.borrow_mut().push((self.now.get(), g));
     }
@@ -397,7 +414,8 @@ impl Gpu {
         if d.is_null() {
             return None;
         }
-        let d = unsafe { *d };
+        // Only the fields within the size Display8 says (gpu/src/display.rs, "Versions").
+        let d = unsafe { crate::display::read(d) };
         let dev = d.device as P;
         let Some(root) = root_signature(dev, d.serialize_root_signature, self.log, false) else {
             dlog!(self, "gpu: Direct3D 12: the root signature could not be made");
@@ -422,6 +440,10 @@ impl Gpu {
             features: d.features,
             force_aniso: d.sampler_anisotropy,
             lod_bias: d.sampler_lod_bias,
+            lib: if disp.minor >= 2 { d.pipeline_library as P } else { core::ptr::null_mut() },
+            log: self.log,
+            lib_loaded: Cell::new(0),
+            lib_stored: Cell::new(0),
             heaps: RefCell::new(heaps),
             null_srv: [0; 4],
             garbage: RefCell::new(Vec::new()),
@@ -537,7 +559,7 @@ impl Gpu {
         if f.is_null() {
             return None;
         }
-        let f = unsafe { *f };
+        let f = unsafe { crate::display::read(f) };
         if f.command_list == 0 {
             return None;
         }
@@ -868,7 +890,7 @@ impl Gpu {
         Cmd::new(self, frame)
     }
 
-    /// Submits what is recorded and waits for it (`display8_dx12_flush`): for a
+    /// Submits what is recorded and waits for it (`display8v1_dx12_flush`): for a
     /// read-back. The frame goes on in the same list, which binds nothing any more.
     pub(crate) fn flush(&self) -> bool {
         let Some(sh) = self.sh() else { return false };

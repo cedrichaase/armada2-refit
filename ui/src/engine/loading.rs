@@ -113,6 +113,12 @@ fn st() -> &'static mut State {
 /// Patches the hook; false (and nothing patched) when the site is not stock. With
 /// `own` (`[Loading] Enable=1`) also the splash and status-update hooks, which stand
 /// down on their own (the overlay still works) when their sites are not stock.
+/// Whether the loading screen is ours (`[Loading] Enable=1` and its sites stock): it
+/// covers the engine's whole loading frame (the claim `CLAIM_LOADING`).
+pub fn own() -> bool {
+    st().own
+}
+
 pub fn install(own: bool) -> bool {
     let fraction_sig: [u8; 12] = [0xd9, 0x05, 0x18, 0xe2, 0x6a, 0x00, 0xd8, 0x25, 0x28, 0x88, 0x7a, 0x00];
     if unsafe { core::slice::from_raw_parts(FN_LOAD_FRACTION as *const u8, 12) } != fraction_sig {

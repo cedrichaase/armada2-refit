@@ -164,6 +164,9 @@ unproxy() {
 # changes with every build. Display8 holds the word "dxvk" too, so ask this first.
 is_display8() { [ -f "$1" ] && grep -qa "Display8 stopped the game" "$1"; }
 # What Display8 writes beside the exe (display/install --remove takes the same out).
+# Its log, like every plugin's since 13.50.0, is in the Wine prefix's
+# %LOCALAPPDATA%\armada2-refit\logs: an uninstall leaves that folder (the bug report
+# reads it); the names here are what older builds wrote beside the exe.
 DISPLAY_FILES="Display8.ini Display8.log Display8.inventory.tsv Display8.inventory.tmp Display8.mark Display8.go"
 # Display8 out of the d3d8 slot, and the chain's d3d8.dll it stood in front of
 # (d3d8_real.dll) back in it. With --all, its settings and logs go too.
@@ -386,10 +389,10 @@ fi
 # chain left as it is stays the player's whole. Re-run, Display8 is replaced (the chain
 # step took it out) and Display8.ini merged again.
 #
-# The merge is ui/ini-merge.py's, without Python: every key the shipped file has and the
+# The merge is tools/ini-merge.py's, without Python: every key the shipped file has and the
 # player's lacks is added, in its section, and the player's values stay -- except that a
 # value still at an older set's default moves to the new one (Defaults=, numbered in the
-# shipped file). DISPLAY_UPGRADES is ui/ini-merge.py's table for Display8.ini, one
+# shipped file). DISPLAY_UPGRADES is tools/ini-merge.py's table for Display8.ini, one
 # "<section with Defaults=> <n> <section> <key> <old value>", separated by ";"; keep them in step.
 DISPLAY_UPGRADES="display8 2 display8 mode forward;display8 2 display8 backend d3d9"
 ini_merge() {   # shipped installed upgrades

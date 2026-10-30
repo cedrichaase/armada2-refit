@@ -8,7 +8,8 @@
 //! - the features `Ghost` (fog-of-war ghosts) and `PlaceholderFeature` (the build
 //!   ghost) (`ghosts`).
 //!
-//! - the height posts (`DrawHeightPost`, `posts`), as anti-aliased lines.
+//! - the height posts (`DrawHeightPost`, `posts`), as anti-aliased lines;
+//! - the tactical camera's pivot marker (the feature `TacticalCamera`, `pivot`).
 //!
 //! What it does not take stays the engine's: the shroud's `TreeGrid` path and the build
 //! footprints' sprites are called through.
@@ -16,6 +17,7 @@
 mod fog;
 mod ghosts;
 mod grid;
+mod pivot;
 mod posts;
 mod selection;
 
@@ -65,7 +67,7 @@ fn editor() -> bool {
     engine::field_u8(unsafe { rd::<usize>(USER_PROFILE) }, 0x84) != 0
 }
 
-fn view_record() -> u32 {
+pub(crate) fn view_record() -> u32 {
     unsafe { rd::<u32>(VIEW_RECORD) }
 }
 
@@ -98,11 +100,20 @@ pub struct Overlays {
     sel: selection::Selection,
     ghosts: ghosts::Ghosts,
     posts: posts::Posts,
+    pivot: pivot::Pivot,
+}
+
+/// `[Overlays] Fog` and `Selection` of the module made (`mods::claims`).
+static mut CLAIMS: (bool, bool) = (false, false);
+
+pub fn claims() -> (bool, bool) {
+    unsafe { CLAIMS }
 }
 
 impl Default for Overlays {
     fn default() -> Overlays {
         let s = Settings::read();
+        unsafe { CLAIMS = (s.fog, s.selection) };
         log!(
             "overlays: fog {} (filter {}), grid {}, selection {}, ghosts {}",
             s.fog as u8,
@@ -111,8 +122,11 @@ impl Default for Overlays {
             s.selection as u8,
             s.ghosts as u8
         );
-        let posts = posts::Posts::new(&crate::config::ini());
-        Overlays { s, fog: fog::Fog::new(), grid: grid::Grid::new(), sel: selection::Selection::new(), ghosts: ghosts::Ghosts::new(), posts }
+        let ini = crate::config::ini();
+        let posts = posts::Posts::new(&ini);
+        let pivot = pivot::Pivot::new(&ini);
+        log!("overlays: pivot marker {}", pivot.on as u8);
+        Overlays { s, fog: fog::Fog::new(), grid: grid::Grid::new(), sel: selection::Selection::new(), ghosts: ghosts::Ghosts::new(), posts, pivot }
     }
 }
 
@@ -202,10 +216,14 @@ impl Module for Overlays {
         }
     }
     fn feature(&mut self, f: usize, v: &View) -> bool {
+        let vt = engine::vtable(f);
+        if vt == pivot::VT_TACTICAL_CAMERA {
+            return self.pivot.feature(f, v);
+        }
         if !self.s.ghosts {
             return false;
         }
-        match engine::vtable(f) {
+        match vt {
             VT_GHOST => self.ghosts.ghosts(f, v),
             VT_PLACEHOLDER => self.ghosts.placeholder(f, v),
             _ => false,

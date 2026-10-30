@@ -49,7 +49,7 @@ import urllib.error
 import urllib.request
 import zipfile
 
-INSTALLER_VERSION = '2.2.0'
+INSTALLER_VERSION = '2.3.0'
 SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, ::step and ::error lines
 REPO = 'cedrichaase/armada2-refit'
 API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'
@@ -1051,6 +1051,34 @@ def display8_backend(lines):
     return out
 
 
+def log_folders(game, g=None, prefix_roots=()):
+    """Where the plugins' logs are, best first: `%LOCALAPPDATA%\\armada2-refit\\logs`
+    (on Windows, or in the Wine prefix the game runs in: Heroic's, the macOS bottle, or
+    the one the game folder is in), then the game folder, where builds before 13.50.0
+    wrote them and where the plugins fall back to."""
+    out = []
+    if SYSTEM == 'windows':
+        base = os.environ.get('LOCALAPPDATA') or os.path.join(HOME, 'AppData', 'Local')
+        out.append(os.path.join(base, 'armada2-refit', 'logs'))
+    roots = [r for r in prefix_roots if r]
+    if g and g.prefix:
+        roots.append(g.prefix.root)
+    pre = prefix_of(game) if SYSTEM != 'windows' else None
+    if pre:
+        roots.append(pre.root)
+    for root in roots:
+        for sub in ('pfx', ''):
+            out += sorted(glob.glob(os.path.join(
+                glob.escape(os.path.join(root, sub)), 'drive_c', 'users', '*', 'AppData', 'Local',
+                'armada2-refit', 'logs')))
+    out.append(game)
+    seen = []
+    for d in out:
+        if d not in seen:
+            seen.append(d)
+    return seen
+
+
 def diagnose(game, error=None):
     """The bug report: what a player sends when the mod does not work. Everything that
     tells why from a distance, nothing of the game's own files but their hashes, and
@@ -1106,10 +1134,12 @@ def diagnose(game, error=None):
     w('')
     w('Launcher:')
     env = {}
+    wine_roots = []
     if g and g.heroic:
         data = load_json(g.heroic.config)
         cfg = data.get(g.heroic.app) if isinstance(data, dict) else None
         if isinstance(cfg, dict):
+            wine_roots.append(cfg.get('winePrefix'))
             wine = cfg.get('wineVersion') if isinstance(cfg.get('wineVersion'), dict) else {}
             w(f'  {g.heroic.label()}: {wine.get("name", "?")} ({wine.get("type", "?")})')
             for k in ('autoInstallDxvk', 'autoInstallVkd3d', 'enableWineWayland', 'enableWoW64',
@@ -1247,15 +1277,26 @@ def diagnose(game, error=None):
         if menus and os.path.isdir(p(menus)) else False
 
     # ---- the logs
-    logs = [n for n in names if n.lower().endswith('.log')
-            and n.rsplit('.', 1)[0].lower() in stems | {'binkproxy', 'display8'}]
+    # %LOCALAPPDATA%\armada2-refit\logs first, the game folder (older builds, the plugins'
+    # fallback) after: a log is the first of that name found.
+    folders = log_folders(game, g, wine_roots)
+    logs = {}
+    for d in folders:
+        try:
+            listing = os.listdir(d)
+        except OSError:
+            continue
+        for n in listing:
+            if n.lower().endswith('.log') and n.rsplit('.', 1)[0].lower() in stems | {'binkproxy', 'display8'} \
+                    and n.lower() not in {k.lower() for k in logs}:
+                logs[n] = os.path.join(d, n)
     texts = {}
-    for n in logs:
-        lines = read_lines(p(n))
+    for n, path in sorted(logs.items(), key=lambda kv: kv[0].lower()):
+        lines = read_lines(path)
         texts[n.rsplit('.', 1)[0].lower()] = lines
         w('')
-        w(f'{n} ({time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(p(n))))}, '
-          f'{len(lines)} lines):')
+        w(f'{n} ({time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(path)))}, '
+          f'{len(lines)} lines, in {"the game folder" if os.path.dirname(path) == game else short(os.path.dirname(path))}):')
         out.extend('  ' + l for l in log_excerpt(lines))
 
     # ---- what it comes to
@@ -2293,6 +2334,22 @@ def selftest():
             f.write('Display8 0.9.0 -- game dir C:\\g; mode stub; the real chain: x\n'
                     'stub: the backend is Vulkan\n')
         check('drew on vulkan' in diagnose(mock), 'report: Display8.log is read, the backend named')
+        # 13.50.0: the logs are in %LOCALAPPDATA%\\armada2-refit\\logs, in the prefix the game runs
+        # in; one there is read first, and the game folder's is the fallback.
+        if SYSTEM != 'windows':
+            pre = os.path.join(t, 'prefix')
+            ld = os.path.join(pre, 'drive_c', 'users', 'steamuser', 'AppData', 'Local',
+                              'armada2-refit', 'logs')
+            os.makedirs(ld)
+            with open(os.path.join(ld, 'Display8.log'), 'w') as f:
+                f.write('log: C:\\users\\steamuser\\AppData\\Local\\armada2-refit\\logs\\Display8.log\n'
+                        'Display8 0.9.0 -- game dir C:\\g; mode stub; the real chain: x\n'
+                        'stub: the backend is Direct3D 12\n')
+            check(log_folders(mock, None, [pre])[:1] == [ld] and log_folders(mock)[-1] == mock,
+                  'report: the prefix\'s logs folder comes before the game folder')
+            gg = Game(mock, 'test')
+            gg.prefix = WinePrefix(pre, 'Wine')
+            check(log_folders(mock, gg)[0] == ld, 'report: a macOS bottle\'s logs folder is found')
         h = 'Display8 0.9.0 -- game dir C:\\g; mode stub; the real chain: d3d8_real.dll'
         d8b = display8_backend
         check('drew on vulkan' in d8b([h, 'Backend=auto: on Linux: vulkan, then d3d12, then d3d9',

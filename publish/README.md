@@ -127,7 +127,7 @@ and writes `armada2-refit-<version>.zip`:
   step, where `d3d8.dll` is crosire's d3d8to9, both installers put it in as
   `display/install` does (`display/README.md`, "Installing"): d3d8to9 moves behind it as
   `d3d8_real.dll`, and `Display8.ini` is copied if missing, else merged as
-  `ui/ini-merge.py` merges it (the missing keys added, the player's values kept, the
+  `tools/ini-merge.py` merges it (the missing keys added, the player's values kept, the
   `Defaults=` upgrade applied), in awk and in PowerShell, since neither may assume
   Python; keep their upgrade tables (`DISPLAY_UPGRADES`, `$DisplayUpgrades`) in step
   with `ini-merge.py`'s. On macOS too it goes in as shipped, on `Backend=auto`: Vulkan

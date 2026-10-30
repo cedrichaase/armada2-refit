@@ -5,6 +5,179 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.51.3 — 2026-10-30
+
+Layers: testbench 3.78.3.
+
+### Added
+- A passthrough nebula check (`display-passthrough-nebula`, against
+  `display-passthrough-nebula-forward`): the engine's cerulean map puffs drawn by
+  Display8 in stub mode, every render3d module off, frame for frame against the forward
+  chain at three ticks. The reported extra motion was measured not to be the
+  passthrough's (`display/README.md`, "Passthrough", "Map nebulae").
+
+Confirmed in game 2026-10-30. (be4975d)
+
+## 13.51.2 — 2026-10-30
+
+Layers: display 0.15.2, testbench 3.78.2.
+
+### Fixed
+- Passthrough draws the Borg hulls on maps with lights (render3d's hulls module off):
+  the engine's lights no longer overwrite the bump shader's constants, which left
+  only the hulls' glow. New scenarios `display-passthrough-all` (every module off)
+  and its forward reference.
+
+Confirmed in game 2026-10-30. (b08d6a8)
+
+## 13.51.1 — 2026-10-30
+
+Layers: display 0.15.1, testbench 3.78.1.
+
+### Fixed
+- Display8 alone (no `UI.asi`, no `Render3D.asi`) runs the stock game in stub mode: it
+  answers the engine's hard-coded display-mode requests (the shell's 800x600x16) with
+  its one mode, where only the UI's raise of the shell's mode kept the game from a
+  stack overflow at start. `display-claims`' "alone" now has neither plugin.
+
+Confirmed in game 2026-10-30. (c6d6189)
+
+## 13.51.0 — 2026-10-30
+
+Layers: display 0.15.0, render3d 0.33.1, ui 0.28.1.
+
+### Added
+- **Direct3D 12 keeps a pipeline library on disk** (contract 1.2): Display8 owns an
+  `ID3D12PipelineLibrary` in `%LOCALAPPDATA%\armada2-refit\Display8.d3d12pipelines`, and `gpu` 1.2.0
+  loads and stores the plugins' graphics pipelines through it (plain creation when it is
+  absent or on any error), so a second launch compiles none it has seen. The Windows
+  uninstaller removes the file.
+
+Confirmed in game 2026-10-30. (d860f47)
+
+## 13.50.0 — 2026-10-30
+
+Layers: display 0.14.0, render3d 0.33.0, ui 0.28.0, qol 1.8.0, online 0.8.0, cutscenes 2.4.0, testbench 3.78.0, gui-installer 2.3.0.
+
+### Changed
+- **Every plugin's log is now `%LOCALAPPDATA%\armada2-refit\logs\<name>.log`** (`Render3D`, `UI`, `Display8`, `QOL`, `QOLRules`, `Online`, `BinkProxy`), beside `Display8.pipelines`' folder, made if missing; the game directory when `LOCALAPPDATA` is unset or not writable. The first line of each says where. `crates/a2rt` (`log_dir`, `log_open`) and `csdk/a2asi.h` (`a2_log_path`, `a2_log_where`) hold the rule once. An uninstall leaves the folder; the GUI installer's bug report reads it (and the game folder for older builds); the test bench reads the clone's prefix.
+
+Confirmed in game 2026-10-30. (9a5e70a)
+
+## 13.49.0 — 2026-10-30
+
+Layers: display 0.13.0, render3d 0.32.0, ui 0.27.0, testbench 3.77.0.
+
+### Added
+- Claims (ROADMAP Phase 4, contract 1.1, `gpu` 1.1.0): the plugins register through the
+  contract at load (`display8v1_register`) with a callback saying what they draw now;
+  Display8 asks it at every scene and passes through what nobody claims. A render3d
+  module at 0, a UI part at 0 or a plugin that stood down claims nothing. Claims drop
+  the engine's draws only in the loading loop's, the Credits' and the cursor's scenes;
+  the 3D categories are drawn whatever the engine issues. `display8v1_claims` replaces
+  render3d's reading of the UI's `ret` in `RenderSelectionEffects`. ROADMAP's
+  "Contracts" text says registration through the contract.
+
+### Changed
+- Passthrough no longer looks up `UI.asi` by name: the engine's loading frames are
+  dropped only while the UI's loading screen claims them (with `[Loading] Enable=0`, or
+  a UI that cannot draw, the engine's loading screen shows on the stub).
+
+Confirmed in game 2026-10-30. (cf3dec5)
+
+## 13.48.0 — 2026-10-30
+
+Layers: display 0.12.0, render3d 0.31.0, ui 0.26.0, testbench 3.76.0.
+
+**This release's `d3d8.dll`, `Render3D.asi` and `UI.asi` must ship and be installed
+together**: the contract between them changed incompatibly, the last time it does so
+in lock-step. From here a mismatch is told and stands down cleanly.
+
+### Added
+- The contract between Display8 and the plugins is versioned (ROADMAP Phase 4, "ABI
+  handshake"): `display8_abi()` (major, minor; contract 1.0), a `size` first in every
+  `#[repr(C)]` struct of `gpu/src/display.rs`, the exports renamed with their major
+  (`display8v1_*`). `gpu` 1.0.0 (`gpu::VERSION`) logs both versions; an older or newer
+  Display8, or plugins of another major, stand down to Direct3D 9 only, with "no
+  Display8" and "Display8 too old" logged apart. The rule for minors and majors is in
+  `gpu/README.md` and `display/README.md`, "Versions".
+
+Confirmed in game 2026-10-30. (c470071)
+
+## 13.47.0 — 2026-10-30
+
+Layers: render3d 0.30.0, testbench 3.75.0.
+
+### Added
+- render3d draws the tactical camera's pivot marker in the refit's look (`[Overlays]
+  Pivot=1`; 0 gives it back to the engine, drawn on the stub by Display8's
+  passthrough); scenarios `render3d-pivot` and `render3d-pivot-stock`.
+
+Confirmed in game 2026-10-30. (1da0694)
+
+## 13.46.0 — 2026-10-30
+
+Layers: render3d 0.29.5, ui 0.25.4, display 0.11.3.
+
+### Added
+- `crates/`: `a2rt`, the one runtime of Display8, render3d and the UI (allocator, memory
+  functions, kernel32, log, `sfmt!`/`log!`, ini, files, the animation clock's switch,
+  in-memory patching (`hook`), frame dumps behind feature `dump`), and `a2fmt`, moved from
+  `render3d/a2fmt`. Not a layer: versioned by the root. CI tests `crates/a2fmt`.
+
+### Changed
+- render3d, ui and display build on `a2rt` in place of their three copies of `src/rt`;
+  render3d's and the UI's `engine/hook.rs` and `dump.rs` are `a2rt`'s; the replayer and
+  vkprobe include its `win.rs` and `mem.rs`. Pure refactor: same pixels, same log lines.
+
+Confirmed in game 2026-10-30. (3030e0c)
+
+## 13.45.0 — 2026-10-30
+
+Layers: qol 1.7.1, online 0.7.1, cutscenes 2.3.1.
+
+### Added
+- `csdk/`: `a2asi.h`, the header-only base of the C plugins (`QOL.asi`, `QOLRules.asi`, `Online.asi`, `binkw32.dll`), and `csdk/def/`, one set of import-library `.def` files (the union of what the four call). Not a layer: versioned by the root.
+
+### Changed
+- qol, online and cutscenes `build.sh` read the `.def` files from `csdk/def/`; the plugins' sources use `a2asi.h` in place of their own copies. Pure refactor: same log lines.
+
+Confirmed in game 2026-10-30. (082d0c6)
+
+## 13.44.0 — 2026-10-30
+
+Layers: qol 1.7.0, online 0.7.0, cutscenes 2.3.0, render3d 0.29.4, ui 0.25.3, display 0.11.2.
+
+### Added
+- `tools/`: `ini-merge.py` (moved from `ui/`), the one ini merge every installer uses, and
+  `ini-merge-selftest.sh`, its offline check against render3d's former inline merge.
+
+### Changed
+- The QOL, QOLRules, Online and BinkProxy installers merge an existing ini instead of
+  overwriting or ignoring it; render3d's inline merge became a call to the shared one.
+  Confirmed in game 2026-10-30 (1973ecb).
+
+## 13.43.0 — 2026-10-30
+
+Layers: render3d 0.29.3, ui 0.25.2, display 0.11.1.
+
+### Changed
+- The shader compiler scripts live in `tools/shaderc/` (new, not a layer): `hlsl-rs.sh`,
+  `d3dbc-fix.py`, `d3dbc-slots.py`, `dxil-spaces.py`, `dxil-alpha.py` from `render3d/`,
+  and `fetch-dxc.sh`, `fetch-vkd3d.sh`, `verify-generated.sh` from `gpu/shaders/`; the
+  build scripts, CI cache key and docs follow. Generated shader files change in their
+  header line only; the stamps are unchanged. `64aee16`. Confirmed in game 2026-10-30
+
+## 13.42.5 — 2026-10-30
+
+Layers: testbench 3.74.2.
+
+### Fixed
+- The bench no longer leaks a null sink per launch and sweeps stale `a2test-*` sinks;
+  `no-assets` step 15 expects the menu scene.
+
+Confirmed in game 2026-10-30. `6070901`
+
 ## 13.42.4 — 2026-10-30
 
 Layers: render3d 0.29.2.

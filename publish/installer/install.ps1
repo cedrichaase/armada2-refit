@@ -114,6 +114,9 @@ function Test-Display8([string]$f) {
         [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($f)).Contains("Display8 stopped the game")
 }
 # What Display8 writes beside the exe (display/install --remove takes the same out).
+# Its log, like every plugin's since 13.50.0, is in %LOCALAPPDATA%\armada2-refit\logs:
+# an uninstall leaves that folder (the bug report reads it); the names here are what
+# older builds wrote beside the exe.
 $DisplayFiles = "Display8.ini", "Display8.log", "Display8.inventory.tsv", "Display8.inventory.tmp", "Display8.mark", "Display8.go"
 # Display8 out of the d3d8 slot, and the chain's d3d8.dll it stood in front of
 # (d3d8_real.dll) back in it. With -All, its settings, logs and pipeline cache go too.
@@ -128,10 +131,12 @@ function Remove-Display8([switch]$All) {
         # d3d8to9 behind a Display8 since taken out by hand.
         Remove-Item -LiteralPath (G "d3d8.dll.a2display-backup") -ErrorAction SilentlyContinue
         if (Test-D3d8to9 (G "d3d8_real.dll")) { Remove-Item -LiteralPath (G "d3d8_real.dll") }
-        # Its Vulkan pipeline cache (display/src/vk/cache.rs); the folder is the GUI
-        # installer's too, so only the file.
+        # Its Vulkan pipeline cache (display/src/vk/cache.rs) and Direct3D 12 pipeline
+        # library (display/src/dx12/cache.rs); the folder is the GUI installer's too,
+        # and holds the logs, so only the files.
         if ($env:LOCALAPPDATA) {
             Remove-Item -LiteralPath (Join-Path $env:LOCALAPPDATA "armada2-refit\Display8.pipelines") -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath (Join-Path $env:LOCALAPPDATA "armada2-refit\Display8.d3d12pipelines") -ErrorAction SilentlyContinue
         }
     }
 }
@@ -431,10 +436,10 @@ if (Test-D3d8to9 $d8) {
 # it is stays the player's whole. Run again, Display8 is replaced (the chain step took it
 # out) and Display8.ini merged again.
 #
-# The merge is ui/ini-merge.py's, without Python: every key the shipped file has and the
+# The merge is tools/ini-merge.py's, without Python: every key the shipped file has and the
 # player's lacks is added, in its section, and the player's values stay -- except that a
 # value still at an older set's default moves to the new one (Defaults=, numbered in the
-# shipped file). $DisplayUpgrades is ui/ini-merge.py's table for Display8.ini: the
+# shipped file). $DisplayUpgrades is tools/ini-merge.py's table for Display8.ini: the
 # section with Defaults=, the number, the section, the key, the old value. Keep them in step.
 $DisplayUpgrades = @(
     @("display8", 2, "display8", "mode", "forward"),

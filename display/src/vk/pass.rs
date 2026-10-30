@@ -3,7 +3,7 @@
 //! made, through `shaders/ff.hlsl`.
 //!
 //! - **Where it lands**: the pass a plugin published at its last `Cmd`'s end in this
-//!   frame (`display8_vk_pass`: render3d's scene pass while its body runs, so what it
+//!   frame (`display8v1_vk_pass`: render3d's scene pass while its body runs, so what it
 //!   hands back is drawn into its scene, tone-mapped and bloomed with the rest), else
 //!   the engine's targets (Display8's colour and depth). Nothing is recorded while a
 //!   plugin's `Cmd` is alive (a draw then is logged once and not drawn).
@@ -144,7 +144,7 @@ pub fn presented(v: &Vk) {
     }
 }
 
-/// `display8_vk_pass`: a plugin's `Cmd` begins, ends, or ends with its pass now.
+/// `display8v1_vk_pass`: a plugin's `Cmd` begins, ends, or ends with its pass now.
 pub fn event(event: u32, pass: *const VkPass8) {
     let Some(v) = get() else { return };
     close(v);
@@ -163,7 +163,8 @@ pub fn event(event: u32, pass: *const VkPass8) {
         _ => {
             p.alive = p.alive.saturating_sub(1);
             if event == PASS_PUBLISH && !pass.is_null() {
-                p.published = Some((unsafe { *pass }, v.index));
+                // Only what the plugin's size says (gpu/src/display.rs, "Versions").
+                p.published = Some((unsafe { gpu::display::read(pass) }, v.index));
             }
         }
     }
@@ -578,6 +579,9 @@ fn mul(a: &[f32; 16], b: &[f32; 16]) -> [f32; 16] {
 }
 
 /// The two constant blocks (`shaders/ff.hlsl`, `ff_vs` and `ff_ps`), one after the other.
+/// Logged once (always, not only when tracing): the engine's bump passes with LIGHTING on.
+static mut BUMP_LIT: bool = false;
+
 fn blocks(v: &Vk, dv: &Dev, d: &Draw, vp: [u32; 6]) -> [u8; VS_BYTES + PS_BYTES] {
     let mut b = [0u8; VS_BYTES + PS_BYTES];
     let rs = &dv.rs;
@@ -594,7 +598,15 @@ fn blocks(v: &Vk, dv: &Dev, d: &Draw, vp: [u32; 6]) -> [u8; VS_BYTES + PS_BYTES]
     let centre = 0.5 - 1.0 / 128.0;
     let off = if d.layout.rhw || v.exported.features & gpu::display::FEATURE_D3D9_CENTRES != 0 { centre } else { 0.0 };
     f4(&mut b, 9, [f32::from_bits(vp[4]), f32::from_bits(vp[5]), off, 0.0]);
-    let lit = rs[137] != 0 && !d.layout.rhw;
+    // Direct3D's lighting is fixed function's: under a vertex shader (the Borg bump pass)
+    // LIGHTING is ignored, and the engine leaves it on there when the map has lights. Its
+    // lights must not be written then either: they share registers 16 on with the bump
+    // shader's constants (vs_bump), and overwrote its transform with them.
+    let lit = rs[137] != 0 && !d.layout.rhw && d.layout.bump.is_none();
+    if rs[137] != 0 && d.layout.bump.is_some() && unsafe { !BUMP_LIT } {
+        unsafe { BUMP_LIT = true };
+        log!("passthrough: the Borg bump shader drawn with LIGHTING on: the lights left out, as Direct3D ignores them under a vertex shader");
+    }
     let lights: Vec<&(u32, [u32; 26], bool)> = if lit { dv.lights.iter().filter(|l| l.2).take(8).collect() } else { Vec::new() };
     let vcol = if rs[141] != 0 { d.layout.diffuse.is_some() as u32 + 2 * d.layout.specular.is_some() as u32 } else { 0 };
     f4(&mut b, 10, [d.layout.rhw as u32 as f32, lit as u32 as f32, lights.len() as f32, vcol as f32]);
@@ -706,7 +718,7 @@ pub fn draw(v: &mut Vk, dv: &Dev, d: &Draw, fp: usize) {
     note_unsupported(dv);
     // Where it goes: the pass published in this frame, unless that is the engine's own
     // back buffer (then the engine's targets, with their depth).
-    let own = VkPass8 { color: v.target(gpu::display::TARGET_COLOR), depth: v.target(gpu::display::TARGET_DEPTH) };
+    let own = VkPass8 { size: core::mem::size_of::<VkPass8>() as u32, color: v.target(gpu::display::TARGET_COLOR), depth: v.target(gpu::display::TARGET_DEPTH) };
     let pass = match p.published {
         Some((x, f)) if f == v.index && x.color.image != own.color.image => x,
         _ => own,

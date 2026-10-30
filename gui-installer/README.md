@@ -244,10 +244,14 @@ draws nothing, and it already knows the game folder, the launcher and the releas
   `stub mode on ...`, `stub: the backend is B[, after X could not start]`,
   `stub: X could not start: why; falling back to Y` and `Mode=stub: ...; forward mode
   instead`; the same code serves all three systems. **Where the logs are**: every plugin's
-  log, `Display8.log` included, is written beside `Armada2.exe`, in the game folder. An
-  install under `C:\Program Files` may have Windows redirect those writes to the user's
-  VirtualStore (`%LOCALAPPDATA%\VirtualStore\Program Files...`); the report reads the
-  game folder only, so look there when a log is missing.
+  log, `Display8.log` included, is written to `%LOCALAPPDATA%\armada2-refit\logs\` since
+  13.50.0 (in the Wine prefix's `drive_c/users/<user>/AppData/Local/...` on Linux and macOS),
+  not into the game folder, which GOG puts under `C:\Program Files`, where Windows would
+  redirect the writes to VirtualStore. The report reads that folder first (`log_folders()`:
+  Heroic's `winePrefix`, the macOS bottle, the prefix the game folder is in), then the game
+  folder, where older builds wrote them and where the plugins fall back to when
+  `LOCALAPPDATA` is unset or not writable; each log's heading says where it was found.
+  An uninstall leaves the folder.
 - **Safe to post** (`redact`): the home folder becomes `~`; any other user folder
   (`C:\Users\name`, `/home/name`, `/Users/name`, Wine's `Z:\home\name`) loses the name;
   IPv4 addresses (Online.log's peers) become `<ip>`.

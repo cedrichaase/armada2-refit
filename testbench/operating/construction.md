@@ -32,7 +32,7 @@ Tested 2026-10-15, 1920x1080 (`--res 16:9`), `a2_borg01`.
 - Cancel a construction: `scene "kill rig"` mid-build: the rig explodes and the
   part-built station breaks into chunks (Render3D.log `debris: fbase broke into N
   chunks`).
-- Wait on log lines, not time: `until grep -qE "fbase at .*: [0-9]{4} of" .../Render3D.log`.
+- Wait on log lines, not time: `until grep -qE "fbase at .*: [0-9]{4} of" the clone's prefix, `.../AppData/Local/armada2-refit/logs/Render3D.log`.
 - `orbit <x y z> yaw pitch dist` takes world coordinates with `Anchor=world`.
 - Don't use `drive step "wait 12"`: `step` runs an AI agent (costs money, slow). Poll a
   log or just take the next shot.

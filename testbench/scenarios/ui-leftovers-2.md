@@ -20,9 +20,9 @@ the overlay shows its damaged systems under its brackets (`[HUD] SystemIcons=1`)
 it does for a pointed unit. With `ship2` and `scout` selected, the cursor over the
 minimap is the warp cursor (`MinimapCursor=1`). In the tactical view (Caps Lock) the
 minimap rings the fight, the shot director's scene (`ShotScenes=1`). The tactical view
-is a display context of its own and is not checked for engine draws: the engine still
-draws the tactical camera's pivot marker there (`TacticalCamera::Render`, the object
-at `+0xe0`, through the trifan flush), which is none of these four (`ui/HUD.md`).
+is a display context of its own and is not checked for engine draws here: the
+tactical camera's pivot marker there (`TacticalCamera::Render`, the object at `+0xe0`)
+is none of these four; render3d draws it, which `render3d-pivot` checks.
 
 At 1280x720 the minimap's square spans about 24..224 x 500..700.
 

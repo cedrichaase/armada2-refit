@@ -35,44 +35,12 @@
  * serialised by a critical section.
  */
 
-typedef unsigned char       BYTE;
-typedef unsigned short      WORD;
-typedef unsigned short      WCHAR;
-typedef unsigned long       DWORD;
-typedef int                 BOOL;
-typedef int                 INT;
-typedef unsigned int        UINT;
-typedef long                LONG;
-typedef long                HRESULT;
-typedef unsigned long       ULONG;
-typedef void               *HANDLE;
-typedef HANDLE              HMODULE;
-typedef const char         *LPCSTR;
-typedef char               *LPSTR;
+#include "../csdk/a2asi.h"
 
-#define NULLPTR ((void *)0)
-#define TRUE  1
-#define FALSE 0
-
-#define GENERIC_WRITE          0x40000000
-#define FILE_SHARE_READ        0x00000001
-#define CREATE_ALWAYS          2
-#define FILE_ATTRIBUTE_NORMAL  0x80
-#define INVALID_HANDLE_VALUE   ((HANDLE)(LONG)-1)
-#define PAGE_READWRITE         0x04
-#define PAGE_EXECUTE_READWRITE 0x40
 #define HEAP_ZERO_MEMORY       0x08
 
 typedef struct { BYTE opaque[24]; } CRITICAL_SECTION;
 
-__declspec(dllimport) HMODULE __stdcall GetModuleHandleA(LPCSTR);
-__declspec(dllimport) void *  __stdcall GetProcAddress(HMODULE, LPCSTR);
-__declspec(dllimport) DWORD   __stdcall GetModuleFileNameA(HMODULE, LPSTR, DWORD);
-__declspec(dllimport) BOOL    __stdcall VirtualProtect(void *, UINT, DWORD, DWORD *);
-__declspec(dllimport) HANDLE  __stdcall CreateFileA(LPCSTR, DWORD, DWORD, void *, DWORD, DWORD, HANDLE);
-__declspec(dllimport) BOOL    __stdcall WriteFile(HANDLE, const void *, DWORD, DWORD *, void *);
-__declspec(dllimport) UINT    __stdcall GetPrivateProfileIntA(LPCSTR, LPCSTR, INT, LPCSTR);
-__declspec(dllimport) DWORD   __stdcall GetPrivateProfileStringA(LPCSTR, LPCSTR, LPCSTR, LPSTR, DWORD, LPCSTR);
 __declspec(dllimport) BOOL    __stdcall IsWindow(HANDLE);
 __declspec(dllimport) DWORD   __stdcall GetTickCount(void);
 __declspec(dllimport) DWORD   __stdcall GetCurrentThreadId(void);
@@ -129,37 +97,6 @@ static int              g_payload = 16;     /* payload bytes shown per packet */
 static HANDLE           g_log = INVALID_HANDLE_VALUE;
 static CRITICAL_SECTION g_cs;
 static DWORD            g_t0;
-
-static int s_len(const char *s) { int n = 0; while (s[n]) n++; return n; }
-
-static void s_cat(char *d, const char *s)
-{
-    int n = s_len(d);
-    while (*s) d[n++] = *s++;
-    d[n] = 0;
-}
-
-static void s_num(char *d, long v)
-{
-    char t[16];
-    int  n = 0, neg = 0, k = s_len(d);
-    if (v < 0) { neg = 1; v = -v; }
-    if (!v) t[n++] = '0';
-    while (v) { t[n++] = (char)('0' + (v % 10)); v /= 10; }
-    if (neg) d[k++] = '-';
-    while (n) d[k++] = t[--n];
-    d[k] = 0;
-}
-
-static void s_hexw(char *d, DWORD v, int digits)
-{
-    static const char x[] = "0123456789abcdef";
-    int i, k = s_len(d);
-    for (i = (digits - 1) * 4; i >= 0; i -= 4) d[k++] = x[(v >> i) & 15];
-    d[k] = 0;
-}
-
-static void s_hex(char *d, DWORD v) { s_cat(d, "0x"); s_hexw(d, v, 8); }
 
 static void s_bytes(char *d, const BYTE *p, DWORD n, int max)
 {
@@ -838,14 +775,6 @@ static int  g_entry = 1;
 static BYTE g_label_tramp[16];
 typedef int (__cdecl *ReadLabel_t)(const char *section, const char *key, char *out);
 
-static int s_eq(const char *a, const char *b)
-{
-    while (*a && *a == *b) { a++; b++; }
-    return *a == *b;
-}
-
-static void s_copy(char *d, const char *s) { while ((*d++ = *s++)) {} }
-
 static int __cdecl label_hook(const char *section, const char *key, char *out)
 {
     static const char *const online[][3] = {
@@ -860,13 +789,13 @@ static int __cdecl label_hook(const char *section, const char *key, char *out)
 
     if (!section || !key || !out) return r;
     if (s_eq(section, "multiplayer_connection") && s_eq(key, "lan_ipx")) {
-        s_copy(out, "Internet - Online");
+        s_cpy(out, "Internet - Online");
         return 1;
     }
     if (g_online)
         for (i = 0; i < (int)(sizeof online / sizeof online[0]); i++)
             if (s_eq(section, online[i][0]) && s_eq(key, online[i][1])) {
-                s_copy(out, online[i][2]);
+                s_cpy(out, online[i][2]);
                 return 1;
             }
     return r;
@@ -892,13 +821,6 @@ static CRITICAL_SECTION g_ncs;
 static int  g_chat_hooked;
 static char g_pending[2][200];
 static char g_sticky[200];
-
-static void s_copyn(char *d, const char *s, int max)
-{
-    int i = 0;
-    if (s) for (; s[i] && i < max - 1; i++) d[i] = s[i];
-    d[i] = 0;
-}
 
 static void *chat_obj(int chat) { return (void *)(chat == CHAT_GAME ? CHAT_GAME_OBJ : CHAT_ROOM_OBJ); }
 
@@ -999,46 +921,11 @@ __attribute__((naked)) static void stub_ipx(void)
         "ret");
 }
 
-static int code_is(DWORD addr, const BYTE *bytes, int n)
-{
-    int i;
-    for (i = 0; i < n; i++) if (((const BYTE *)addr)[i] != bytes[i]) return 0;
-    return 1;
-}
+static int code_is(DWORD addr, const BYTE *bytes, int n) { return a2_sig_is(addr, bytes, n); }
 
-static int write_code(DWORD addr, const BYTE *bytes, int n)
-{
-    DWORD prot;
-    int   i;
-    if (!VirtualProtect((void *)addr, (UINT)n, PAGE_EXECUTE_READWRITE, &prot)) return 0;
-    for (i = 0; i < n; i++) ((BYTE *)addr)[i] = bytes[i];
-    VirtualProtect((void *)addr, (UINT)n, prot, &prot);
-    return 1;
-}
-
-/* a 5-byte call to `to` at `at`, NOP-padded to n bytes */
-static int write_call(DWORD at, void *to, int n)
-{
-    BYTE b[16];
-    DWORD rel = (DWORD)to - (at + 5);
-    int   i;
-    b[0] = 0xe8;
-    for (i = 0; i < 4; i++) b[1 + i] = (BYTE)(rel >> (8 * i));
-    for (i = 5; i < n; i++) b[i] = 0x90;
-    return write_code(at, b, n);
-}
-
-/* a 5-byte jmp to `to` at `at`, NOP-padded to n bytes */
-static int write_jmp(DWORD at, void *to, int n)
-{
-    BYTE b[16];
-    DWORD rel = (DWORD)to - (at + 5);
-    int   i;
-    b[0] = 0xe9;
-    for (i = 0; i < 4; i++) b[1 + i] = (BYTE)(rel >> (8 * i));
-    for (i = 5; i < n; i++) b[i] = 0x90;
-    return write_code(at, b, n);
-}
+/* a 5-byte call or jmp to `to` at `at`, NOP-padded to n bytes */
+static int write_call(DWORD at, void *to, int n) { return a2_write_call(at, to, n); }
+static int write_jmp(DWORD at, void *to, int n)  { return a2_write_jmp(at, to, n); }
 
 static void install_entry(char *b)
 {
@@ -1085,12 +972,7 @@ static void install_entry(char *b)
 static void build_paths(char *ini)
 {
     char path[320];
-    int  n, i, cut = 0;
-
-    n = (int)GetModuleFileNameA(NULLPTR, path, 300);
-    if (n <= 0) { ini[0] = 0; g_logpath[0] = 0; return; }
-    for (i = 0; i < n; i++) if (path[i] == '\\' || path[i] == '/') cut = i + 1;
-    path[cut] = 0;
+    if (!a2_exe_dir(path, 300)) { ini[0] = 0; g_logpath[0] = 0; return; }
 
     ini[0] = 0;       s_cat(ini, path);       s_cat(ini, "Online.ini");
     g_logpath[0] = 0; s_cat(g_logpath, path); s_cat(g_logpath, "Online.log");
@@ -1115,9 +997,19 @@ static void startup(void)
     if (g_loss > 50) g_loss = 50;
     g_direct  = (int)GetPrivateProfileIntA("Online", "Direct",  1,  ini);
     GetPrivateProfileStringA("Online", "Server", "c20e.de", g_server, sizeof g_server, ini);
-    if (g_logging && g_logpath[0])
+    if (g_logging && g_logpath[0]) {
+        char dir[320];
+        int  ad;
+        a2_exe_dir(dir, sizeof dir);
+        ad = a2_log_path(g_logpath, sizeof g_logpath, dir, "Online.log");
         g_log = CreateFileA(g_logpath, GENERIC_WRITE, FILE_SHARE_READ, NULLPTR,
                             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULLPTR);
+        b[0] = 0;
+        s_cat(b, "log: ");
+        s_cat(b, g_logpath);
+        if (!ad) s_cat(b, " (LOCALAPPDATA unset or not writable)");
+        logline(b);
+    }
 
     b[0] = 0;
     s_cat(b, "--- Online payload=");

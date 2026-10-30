@@ -52,8 +52,9 @@ target (`rustup target add i686-pc-windows-msvc`) and `lld-link` (LLVM); `build.
 uses `~/.cargo/bin/cargo` first, since a distribution's cargo has no such target. The
 crate links with `/nodefaultlib`, `kernel32` its only import (an import library made by
 `llvm-dlltool --kill-at` from `kernel32.def` in `build.rs`), and brings its own
-allocator, memory functions and stack probe (`src/rt/`). Shaders are HLSL in
-`shaders/`, compiled by `hlsl-rs.sh` with `vkd3d-compiler` into `src/shaders/<name>.rs`
+allocator, memory functions and stack probe (`crates/a2rt`, shared with the UI and
+Display8). Shaders are HLSL in
+`shaders/`, compiled by `tools/shaderc/hlsl-rs.sh` with `vkd3d-compiler` into `src/shaders/<name>.rs`
 and with `dxc` into SPIR-V in `src/shaders/<name>_spv.rs` and DXIL in
 `src/shaders/<name>_dxil.rs` ("One source, two compilers"), all committed with a stamp
 so a machine without the compilers builds as long as they are current.
@@ -104,17 +105,17 @@ is the warp, the ground, the mountains with the first slab of craters, two more 
 passes and the two fissure nets (a gas giant is the warp and itself). The values are
 full floats, so it bakes what the one shader did. The targets are tiles of at most
 1024 on a side, so the sky's 3072 supersampled face needs 48 MB of them, not 450.
-`d3dbc-fix.py` counts slots as the runtime does and refuses a shader past 4096 unless
+`tools/shaderc/d3dbc-fix.py` counts slots as the runtime does and refuses a shader past 4096 unless
 its entry is marked `:long`. Two are marked: `sky_ps`, the `Face=0` reference, and the
 march, which falls back to slices; cutting the march per frame is still to do.
-`Render3D.log` names every shader the runtime refuses, with its slots and the card's. `d3dbc-fix.py` mends four of them
+`Render3D.log` names every shader the runtime refuses, with its slots and the card's. `tools/shaderc/d3dbc-fix.py` mends four of them
 in the bytecode. It copies the extra register into a temporary (only the lanes the
 instruction consumes, so an input is never read outside its `dcl` mask), routes
 `sincos` through one, and widens the mask. And it gives the temporaries out again when
 a shader names more than 32: vkd3d never reuses a register, but at most 19 values are
 live at once in the march (liveness over its if/else; a value live into or out of an if
-keeps one register across all of it). `hlsl-rs.sh --fix` runs it on each shader, for
-both plugins (`build.sh`, `ui/build.sh`); `d3dbc-fix.py --check <file.bin>` lists all
+keeps one register across all of it). `tools/shaderc/hlsl-rs.sh --fix` runs it on each shader, for
+both plugins (`build.sh`, `ui/build.sh`); `tools/shaderc/d3dbc-fix.py --check <file.bin>` lists all
 five.
 
 Rule 4 is the HLSL's to keep. **Never sample with an implicit level (`Sample`) inside
@@ -138,7 +139,7 @@ vkd3d (1.19) has no `tex3Dlod` or `texCUBElod` in the old dialect; the modern
 
 How this was checked: every shader as committed is made on Windows 10's runtime on all
 four kinds of device; and a d3dbc interpreter ran each shader as vkd3d wrote it and as
-`d3dbc-fix.py` rewrote it, 300 random inputs and constants each (so the recipe's
+`tools/shaderc/d3dbc-fix.py` rewrote it, 300 random inputs and constants each (so the recipe's
 branches go both ways), with identical outputs for all 86, and the old and new
 compiles of every rewritten entry point with identical outputs too (textures there are
 a function of the coordinate alone, so the levels are the argument above). With the
@@ -153,7 +154,7 @@ Every shader of render3d and UI.asi is modern HLSL (`Texture2D`/`Texture3D`/
 Direct3D 9 shaders, the SPIR-V for `gpu`'s Vulkan backend and the DXIL for its
 Direct3D 12 one (below). vkd3d
 writes the d3dbc as before and `dxc` (`-spirv`, Vulkan 1.1) the SPIR-V, which
-`hlsl-rs.sh` puts through `spirv-val`. `gpu/shaders/compat.hlsli`, at the root because
+`tools/shaderc/hlsl-rs.sh` puts through `spirv-val`. `gpu/shaders/compat.hlsli`, at the root because
 both plugins include it, holds the few places the two compilers part (dxc predefines
 `__hlsl_dx_compiler`; vkd3d defines nothing to tell it by, and takes no `-D` or `-I`, so
 the shaders include it by a relative path that resolves from `shaders/` for both):
@@ -168,14 +169,14 @@ the shaders include it by a relative path that resolves from `shaders/` for both
 - **Samplers keep their stages, though vkd3d does not**: for shader model 1-3 it makes
   each texture/sampler pair a combined sampler named `<sampler>+<texture>` and gives the
   pairs s0, s1, ... in order, whatever the source declares (any `register()` on either
-  is dropped). `d3dbc-slots.py` puts each pair back on the stage the source names
+  is dropped). `tools/shaderc/d3dbc-slots.py` puts each pair back on the stage the source names
   (`register(tn)` on the texture and `register(sn)` on its sampler, which must agree),
   in the code and the constant table, so the Rust code binds textures as before.
 - **VPOS**: a pixel shader's `SV_Position` is the pixel's centre in Vulkan and its
   corner (VPOS, whole numbers) in Direct3D 9, where vkd3d reads it as VPOS.
   `d3d9_vpos()` gives the corner on both. vkd3d declares a float4 `SV_Position` as
   `vPos.xyzw`, which Windows refuses (the mask has to be `.x`, `.y` or `.xy`), so
-  `d3dbc-fix.py` narrows it to `.xy`, and refuses a shader that reads its z or w.
+  `tools/shaderc/d3dbc-fix.py` narrows it to `.xy`, and refuses a shader that reads its z or w.
 - **`select`** is a macro over `?:` for vkd3d, which has the vector `?:` and no
   `select`; dxc refuses a vector `?:` under HLSL 2021.
 - **0 x infinity is NaN on SPIR-V and DXIL, and 0 in Direct3D 9's shaders** (DXVK
@@ -205,21 +206,21 @@ shader's outputs and the pixel shader's inputs agree wherever both use one struc
 Direct3D 9's half-pixel offset (pixel centres on whole coordinates) is the caller's:
 DXVK moves the viewport by half a pixel, and the UI's `VP.zw` holds it.
 
-**DXIL**, for Direct3D 12, from the same sources: `hlsl-rs.sh` writes it into
+**DXIL**, for Direct3D 12, from the same sources: `tools/shaderc/hlsl-rs.sh` writes it into
 `src/shaders/<name>_dxil.rs` with dxc too, but a pinned release, DirectXShaderCompiler
-v1.9.2609, which `gpu/shaders/fetch-dxc.sh` fetches into `$A2_DATA/tools/` by version
+v1.9.2609, which `tools/shaderc/fetch-dxc.sh` fetches into `$A2_DATA/tools/` by version
 and sha256 the first time a DXIL file is stale (`DXC=` names another copy of the same
 release; the version is checked). Arch's dxc 1.10 asserts writing DXIL, and what one
 release writes is not what the next writes, so the stamp names the release. The DXIL
 is signed (the release's `libdxil.so` validates and signs it, which Windows' Direct3D
-12 requires; `hlsl-rs.sh` checks the container's hash is set), without debug info or
+12 requires; `tools/shaderc/hlsl-rs.sh` checks the container's hash is set), without debug info or
 reflection (`-Qstrip_debug -Qstrip_reflect`), shader model 6.0. Its layout: textures
 at `tN` and samplers at `sN` of space 0 (`STAGE(n)` is empty there: the `vk::`
 attributes are SPIR-V's alone); clip space is Direct3D's already. **The cbuffers need
 one change**: DXIL refuses two cbuffers at one register of one space, and several
 cbuffers of a stage alias its one register on purpose, some overlapping in it (one
 entry point's `c0` is not another's). So the source is preprocessed once (`dxc -P`)
-and `dxil-spaces.py` puts the k-th cbuffer at `register(bN)` in space k: a stage's
+and `tools/shaderc/dxil-spaces.py` puts the k-th cbuffer at `register(bN)` in space k: a stage's
 register file is bound at b0 (vertex) or b1 (pixel) in every space 0..k, and each
 module's `CB_SPACES` says how many (at most 8, which it checks). The d3dbc and SPIR-V
 are untouched by it: they compile the source as it is.
@@ -229,7 +230,7 @@ Two more things are DXIL's alone, both for `gpu`'s Direct3D 12 backend
 
 - **The alpha test.** Direct3D 12 has none, and DXIL cannot be patched as the SPIR-V
   is, so a pixel shader drawn with one (`PS_SOD`, the particles' `PS_SPRITE`, the
-  ghosts' `PS_GHOST`) is marked `:at` on its entries line, and `dxil-alpha.py` adds
+  ghosts' `PS_GHOST`) is marked `:at` on its entries line, and `tools/shaderc/dxil-alpha.py` adds
   `<entry>__alpha_test` beside it in the DXIL source: the entry called, then the
   fragment discarded by the interval gpu passes at b2. It is `SYMBOL_AT_DXIL`, the
   fourth name in `gpu::code!`. The mark changes nothing in the d3dbc or the SPIR-V.
@@ -257,7 +258,7 @@ as before).
 | Key | Default | |
 |---|---|---|
 | `Enable` | 1 | 0: the engine draws the 3D view, as without the plugin |
-| `Log` | 1 | `Render3D.log` in the game directory |
+| `Log` | 1 | `Render3D.log` in `%LOCALAPPDATA%\armada2-refit\logs` (the game directory if that is unset or not writable; its first line says where) |
 | `MSAA` | 4 | samples per pixel on the scene target: 0, 2, 4 or 8 |
 | `HDR` | 1 | 0: an 8-bit scene target (no light past white, no bloom), for comparison |
 | `Bloom` | 0.12 | how much of the light past the threshold spreads into a glow |
@@ -487,7 +488,7 @@ to 8 bits, and the log says which.
 ## Frame dumps
 
 A grim shot is 8 bits, taken after the swapchain and the compositor, so it cannot say
-where in the frame two renderers part. `src/dump.rs` reads render3d's own targets back
+where in the frame two renderers part. `a2rt::dump` (`crates/a2rt/src/dump.rs`) reads render3d's own targets back
 from inside the process, byte for byte, when asked: for checking a port of the renderer
 (the shared `gpu` crate, then Vulkan and Direct3D 12) pixel for pixel, stage by stage.
 The files are what `a2test baseline compare` is meant to read (PFM and PPM, as well as
@@ -690,6 +691,21 @@ time it is posed (`hulls: menu scene:`). Keys:
 | `[Nebula.<name>]` | `Group`, `Odf`, `At`, `Size`, `Spacing`, `Jitter`, `Seed` | its group; a nebula ODF with a gas recipe; the field's centre (its plane's height is its y); half extents in x and z; the grid's step (the radius x 1.2) and jitter (0.35); the seed |
 | | `Radius` | the class's radius (the ODF's `effectRadius`, else 300) |
 | | `KeyShare`, `Scatter`, `Opacity`, `Brightness` | over the recipe's, for the menu's class only (one set per class: the first field of the class that sets a key) |
+
+## Claims
+
+render3d registers with Display8 at load (contract 1.1, `gpu::Gpu::register`, once its
+frame seam is in; `display/README.md`, "Claims") with `mods::claims`, which says what it
+draws now: each module running (`sky`, `hulls`, `world`, `particles`, `effects`,
+`ordnance`, `specials`) and, of `overlays`, `fog` and `selection` as `[Overlays] Fog`
+and `Selection` say. A module at 0 (kept for the menu scene only), one standing down
+beside its old plugin, and anything before the first frame are not claimed. Display8
+drops none of the engine's 3D draws for these: a module that draws a category skips
+the engine's step, so whatever the engine still issues (a SOD handed back, a class no
+module takes) is drawn by passthrough into render3d's published pass. `Display8.log`
+names what render3d claims; `display-claims` runs it with `sky=0`. What another plugin
+claims is asked through `gpu::Gpu::claimed_by_others`: the selection bubbles
+(`overlays`).
 
 ## Modules
 
@@ -1342,9 +1358,12 @@ are `SelectionEffect::Render`'s (0x599e80): relation to the player's team on a c
 times `0.25 + 0.2 (1 - health) sin(phase)`; on anything else the team colour times
 0.25; a second shell at 1.1 times the scale in the team colour (full under the pointer,
 else times 0.25), all times `UserProfile+0x48`; a co-player's selection blinks on wall
-time. While the engine's `RenderSelectionEffects` has been made to return at once
-(its first byte `ret`: UI.asi's `[HUD] SelectionBubbles=0`), none is drawn, as the
-engine would draw none. The material `selection` is constant: the colour is added as it is, depth-tested,
+time. While another plugin claims the bubbles (`CLAIM_SELECTION` through Display8's
+`display8v1_claims`: UI.asi's `[HUD] SelectionBubbles=0`, whose brackets mark the
+selection; "Claims"), none is drawn. Only on a `d3d8.dll` without claims (not Display8
+of contract 1.1) does render3d read the UI's sign in the engine instead: the `ret` it
+puts in `RenderSelectionEffects`'s first byte, which keeps the engine's own from
+drawing either way. The material `selection` is constant: the colour is added as it is, depth-tested,
 not written, front faces only (on the bench stock's bubble adds one layer of its
 colour, not two). Seen on the bench: own ships grey with the team shell, an enemy
 Klingon violet with a red shell, the hover shell on a cube in its team colour, each
@@ -1417,6 +1436,43 @@ written, blended. At most 4096 posts a view.
 | `HeightPosts` | 1 | 0: the engine's `DrawHeightPost` |
 | `HeightPostWidth`, `HeightPostSoft` | 1.5, 1 | the line's width (pixels at 1080 lines) and its soft edge (pixels) |
 | `HeightPostBrightness` | 1 | the colour times this (above 1 it blooms) |
+
+**The pivot marker** (`pivot.rs`; the feature `TacticalCamera`, vtable 0x6b46c0, a
+game feature like the ghosts, drawn in `GameFeature_RenderAll`'s loop through slot 8,
+`TacticalCamera::Render` 0x4e5260). In the tactical view, once the camera has been
+panned off the units, it turns about a point of the map, and stock marks that point:
+`Render` draws the camera's `+0xe0`, an `ST3D_Instance` (vtable 0x6aff14) of
+`dummy.sod`, through the instance's `Render` (its vtable `+0x18`), only in the main
+view (`Render`'s bool), with the instance made, `+0xe4` set (the camera follows no
+entity) and `View_Record` 1. `TacticalCamera::Simulate` (0x4e4850) makes the instance
+the first time it is wanted (`FindLogicalDatabase` of `dummy.sod`) and moves it every
+tick to the camera's point of interest (`SetOrigin`, the instance's `+0x68`);
+`dummy.sod` is a small flat ellipsoid (some 30 by 23 by 8 units) with one additive
+material, which on the bench at 1280x720 reads as a rose-red lens about 26 by 9 pixels,
+srgb(163, 91, 89). It is drawn into the 3D scene, so `UI.asi`'s HUD never covered it
+(`ui/HUD.md`, "the last leftovers").
+
+Ours takes the feature under the same conditions (nothing is drawn where stock draws
+nothing) and draws at the instance's origin a thin ring on the map's plane,
+`PivotRadius` world units across its radius, with four short ticks pointing in at the
+point along the world's axes: the height posts' lines (above), so the same pixel width
+at any resolution, a faint wide halo (`PivotGlow`) under the ring's bright core, in stock's rose
+times `PivotBrightness` (the core blooms a little), depth-tested so a ship in front
+hides it, not written. It is fixed in the world: it turns only as the camera turns
+about it. It is taken only while slot 8 holds 0x4e5260 and that function's bytes are
+stock's (to its `ret 8`), and the instance's vtable is `ST3D_Instance`'s; otherwise the
+engine's `Render` runs (Render3D.log says which: "pivot marker: ours" or "is not
+stock's"). `Pivot=0` leaves it to the engine, drawn on the stub by Display8's
+passthrough (`render3d-pivot-stock`); `render3d-pivot` checks ours, with the engine
+drawing nothing in the tactical view.
+
+| Key (`[Overlays]`) | Default | |
+|---|---|---|
+| `Pivot` | 1 | 0: the engine's marker |
+| `PivotRadius` | 18 | the ring's radius, world units (stock's lens is about 15 across its half) |
+| `PivotWidth` | 1.5 | the core line's width, pixels at 1080 lines |
+| `PivotGlow` | 0.35 | the halo's opacity (0: none) |
+| `PivotColour`, `PivotBrightness` | 0.64 0.36 0.35, 1.6 | its colour (stock's rose) and the factor on it |
 
 ### particles
 

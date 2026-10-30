@@ -4,7 +4,7 @@
 # (.cargo/config.toml), as render3d/build.sh builds Render3D.asi.
 #
 # Shaders first, as ui/build.sh does: each shaders/<name>.hlsl names its entry points
-# on its first line and is compiled by render3d's hlsl-rs.sh into src/shaders/<name>.rs
+# on its first line and is compiled by tools/shaderc/hlsl-rs.sh into src/shaders/<name>.rs
 # (Direct3D 9 bytecode), <name>_spv.rs (SPIR-V) and <name>_dxil.rs (DXIL), committed
 # with stamps.
 set -euo pipefail
@@ -22,7 +22,7 @@ for f in "$here"/shaders/*.hlsl; do
     entries=$(sed -n '1s#^// entries:##p' "$f")
     [ -n "$entries" ] || { echo "display: $f has no '// entries:' first line" >&2; exit 1; }
     # shellcheck disable=SC2086
-    "$here/../render3d/hlsl-rs.sh" --fix "$here/src/shaders/$name.rs" "$f" $entries
+    "$here/../tools/shaderc/hlsl-rs.sh" --fix "$here/src/shaders/$name.rs" "$f" $entries
     mods="$mods$name ${name}_spv ${name}_dxil "
 done
 # Temp files of this run's own, beside their targets so each mv is a rename: several

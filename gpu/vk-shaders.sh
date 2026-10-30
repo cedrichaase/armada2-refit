@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The Vulkan backend's own shaders (shaders/vk_*.hlsl), SPIR-V only, into
-# src/vulkan/shaders.rs: dxc, Vulkan 1.1, as render3d/hlsl-rs.sh compiles the plugins'
+# src/vulkan/shaders.rs: dxc, Vulkan 1.1, as tools/shaderc/hlsl-rs.sh compiles the plugins'
 # (vertex shaders with -fvk-invert-y), each put through spirv-val. Committed, so a
 # machine without dxc builds; run it after changing a vk_*.hlsl.
 set -euo pipefail

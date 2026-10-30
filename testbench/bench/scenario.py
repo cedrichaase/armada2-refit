@@ -695,7 +695,7 @@ def s_display_mark(c, m):
     belong to that context. Written into `Display8.mark`, which d3d8.dll reads at its
     next `Present` (at most four times a second) and deletes."""
     g = c.sess.game_dir
-    if not (g / 'Display8.log').exists():
+    if not c.sess.log_path('Display8.log'):
         raise StepFailed('Display8 is not in this game (./install puts it in: --install .)')
     mark = g / 'Display8.mark'
     mark.write_text(m.group('name'))
@@ -1320,12 +1320,13 @@ class Case:
     def mark_logs(self):
         """How far each log beside Armada2.exe has got, before an action: a log wait reads
         only what is written after it."""
-        self.sess.log_marks = {p.name: p.stat().st_size for p in self.sess.game_dir.glob('*.log')}
+        self.sess.log_marks = {p.name: p.stat().st_size
+                               for d in reversed(self.sess.log_dirs) for p in d.glob('*.log')}
 
     def new_log_lines(self, name):
         """The lines of a game log written since the last action.  A log shorter than its
         mark was written afresh (each launch deletes the old ones) and is read whole."""
-        p = self.sess.game_dir / name
+        p = self.sess.log_path(name) or self.sess.game_dir / name
         try:
             with open(p, 'rb') as f:
                 size = f.seek(0, 2)

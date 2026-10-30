@@ -4,6 +4,103 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.15.2 — 2026-10-30
+
+### Fixed
+- Passthrough: the Borg hulls' bump passes no longer vanish (all but their glow) on a
+  map with lights. The engine leaves `LIGHTING` on for them; its lights were written
+  into the vertex block over the bump shader's constants (both from register 16),
+  which threw its transform away. Lights are left out under a vertex shader, as
+  Direct3D ignores them there, and the case is logged once ("the Borg bump shader
+  drawn with LIGHTING on").
+
+Confirmed in game 2026-10-30. (b08d6a8)
+
+## 0.15.1 — 2026-10-30
+
+### Fixed
+- Stub mode starts with no `UI.asi` (or its `[Menus]` at 0): the engine's own mode
+  requests (the shell's 800x600x16, the profile's, the intro's 640x480; six calls of
+  `FindDisplayMode`, `src/stub/modes.rs`) get the stub's one mode when theirs is not
+  listed, instead of a stack overflow before the first `CreateDevice`. Display8 alone
+  runs the stock game through passthrough.
+
+Confirmed in game 2026-10-30. (c6d6189)
+
+## 0.15.0 — 2026-10-30
+
+### Added
+- Direct3D 12 pipeline library (contract 1.2): `Dx12Device8::pipeline_library`, an
+  `ID3D12PipelineLibrary` persisted in `%LOCALAPPDATA%\armada2-refit\Display8.d3d12pipelines`
+  (`src/dx12/cache.rs`; a header with file format, Display8 version and adapter, discarded
+  on a mismatch or a driver refusal, written atomically when it has grown, looked at every
+  120 frames). The present pass goes through it too. Uninstalling on Windows takes the
+  file out.
+
+Confirmed in game 2026-10-30. (d860f47)
+
+## 0.14.0 — 2026-10-30
+
+### Changed
+- `Display8.log` moves out of the game directory: `%LOCALAPPDATA%\armada2-refit\logs\Display8.log`, beside `Display8.pipelines`'
+  folder, made if missing; the game directory when `LOCALAPPDATA` is unset or not
+  writable. The first line says where (`log: <path>`). An uninstall leaves the folder.
+
+Confirmed in game 2026-10-30. (9a5e70a)
+
+## 0.13.0 — 2026-10-30
+
+### Added
+- Claims (contract 1.1): `display8v1_register(&Plugin8)` and `display8v1_claims(except)`;
+  every registered plugin's claims asked at each of the engine's `BeginScene`s in stub
+  mode and logged when they change (`claims: <plugin> claims ...`, `src/claims.rs`).
+
+### Changed
+- Passthrough routes by the claims (README.md, "Claims"): the loading loop's scenes are
+  dropped while `CLAIM_LOADING` is claimed (was: while `UI.asi` is loaded), the stock
+  Credits' (`CLAIM_CREDITS`) and `RefreshDisplay`'s cursor scene (`CLAIM_CURSOR`)
+  likewise; no 3D, HUD or selection draw is dropped by a claim.
+
+Confirmed in game 2026-10-30. (cf3dec5)
+
+## 0.12.0 — 2026-10-30
+
+### Added
+- `display8_abi(caller_major, caller_minor, caller, &major, &minor)`: the contract's
+  handshake (contract 1.0); `Display8.log` names each plugin that asks and its version,
+  and, in stub mode 300 frames into the first mission, a loaded `Render3D.asi` or
+  `UI.asi` that never asked (built before the handshake).
+
+### Changed
+- The contract's exports are named with its major: `display8_backend`, `display8_vk*`,
+  `display8_dx12*`, `display8_engine_*` are now `display8v1_*`, so plugins built before
+  them find nothing rather than misreading. Every struct of the contract starts with
+  `size`; Display8 fills a plugin's struct no further than its `size` says.
+- The code's defaults are the shipped `Display8.ini`'s: `Mode=stub` (was forward),
+  `Backend=auto` (was d3d9), `Passthrough=1` (was 0).
+
+Confirmed in game 2026-10-30. (c470071)
+
+## 0.11.3 — 2026-10-30
+
+### Changed
+- `src/rt` moved into `crates/a2rt`, shared with render3d and ui (with `move_file` and
+  `env`, which only Display8 had); vkprobe includes its `win.rs` and `mem.rs` from there.
+  Pure refactor: same pixels, same log lines. Confirmed in game 2026-10-30 (3030e0c).
+
+## 0.11.2 — 2026-10-30
+
+### Changed
+- `install` calls the merge at `tools/ini-merge.py` (was `ui/ini-merge.py`); no change to
+  what it does. Confirmed in game 2026-10-30 (1973ecb).
+
+## 0.11.1 — 2026-10-30
+
+### Changed
+- `build.sh` and `vkprobe/build.sh` compile shaders with `tools/shaderc/hlsl-rs.sh`
+  (moved from `render3d/`); the generated shader files differ in their header line only.
+  `64aee16`. Confirmed in game 2026-10-30
+
 ## 0.11.0 — 2026-10-29
 
 ### Added

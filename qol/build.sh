@@ -2,7 +2,7 @@
 # Build QOL.asi -- a 32-bit Windows DLL, cross-compiled on Linux.
 # Same toolchain and same reasons as menus/build.sh and hud/build.sh: no CRT
 # (/nodefaultlib), Win32 prototypes declared in the source, import library
-# generated from kernel32.def.  --kill-at is required; see menus/build.sh.
+# generated from csdk/def/kernel32.def.  --kill-at is required; see menus/build.sh.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,7 +13,7 @@ mkdir -p "$out"
 exec 9>"$out/.build.lock"
 flock 9
 
-llvm-dlltool -m i386 --kill-at -d "$here/kernel32.def" -l "$out/kernel32.lib"
+llvm-dlltool -m i386 --kill-at -d "$here/../csdk/def/kernel32.def" -l "$out/kernel32.lib"
 
 clang --target=i386-pc-windows-msvc \
       -O2 -Wall -Wextra \

@@ -23,6 +23,9 @@ pub mod slot {
     pub const RELEASE: usize = 2;
     // ID3D12Device
     pub const DEV_CREATE_GRAPHICS_PIPELINE_STATE: usize = 10;
+    // ID3D12PipelineLibrary (Display8 owns it: contract 1.2)
+    pub const LIB_STORE_PIPELINE: usize = 8;
+    pub const LIB_LOAD_GRAPHICS_PIPELINE: usize = 9;
     pub const DEV_CREATE_COMPUTE_PIPELINE_STATE: usize = 11;
     pub const DEV_CREATE_UNORDERED_ACCESS_VIEW: usize = 19;
     pub const LIST_DISPATCH: usize = 14;

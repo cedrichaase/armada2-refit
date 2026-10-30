@@ -1042,7 +1042,7 @@ impl Gpu {
         }
         if !self.flush() {
             sh.retire(Garbage::Com(buf));
-            return Err("the frame could not be submitted (display8_dx12_flush)");
+            return Err("the frame could not be submitted (display8v1_dx12_flush)");
         }
         let Some(p) = map(buf, true) else {
             release(buf);

@@ -4,7 +4,7 @@
 #
 # Shaders first: each shaders/<name>.hlsl names its entry points on its first line,
 #   // entries: <entry>:<profile>:<SYMBOL> ...
-# and is compiled by hlsl-rs.sh into src/shaders/<name>.rs, Direct3D 9 bytecode from
+# and is compiled by tools/shaderc/hlsl-rs.sh into src/shaders/<name>.rs, Direct3D 9 bytecode from
 # vkd3d, src/shaders/<name>_spv.rs, SPIR-V from dxc, and src/shaders/<name>_dxil.rs,
 # DXIL from the pinned dxc (committed, with stamps, so a machine without the compilers
 # builds as long as they are current), with --fix:
@@ -23,7 +23,7 @@ for f in "$here"/shaders/*.hlsl; do
     entries=$(sed -n '1s#^// entries:##p' "$f")
     [ -n "$entries" ] || { echo "render3d: $f has no '// entries:' first line" >&2; exit 1; }
     # shellcheck disable=SC2086
-    "$here/hlsl-rs.sh" --fix "$here/src/shaders/$name.rs" "$f" $entries
+    "$here/../tools/shaderc/hlsl-rs.sh" --fix "$here/src/shaders/$name.rs" "$f" $entries
     mods="$mods$name ${name}_spv ${name}_dxil "
 done
 # Temp files of this run's own, beside their targets so each mv is a rename: several

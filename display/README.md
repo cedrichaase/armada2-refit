@@ -35,11 +35,11 @@ The release package carries it too, from 13.35.0 ("Installing", below).
 | `d3d8.dll` | Display8 |
 | `d3d8_real.dll` | the `d3d8.dll` that was there: crosire's d3d8to9 after `./install`'s platform step. Display8 loads it (`Real=auto`) and passes every call to it |
 | `d3d8.dll.a2display-backup` | the same file again: what `a2mod stock` copies back into `d3d8.dll`. Stock is the stock chain's binary, not ours passing through |
-| `Display8.ini` | the settings; a key the player's copy lacks is added (`ui/ini-merge.py`), and a value that still holds an older shipped default is moved to the new one (below) |
+| `Display8.ini` | the settings; a key the player's copy lacks is added (`tools/ini-merge.py`), and a value that still holds an older shipped default is moved to the new one (below) |
 
 **When the shipped defaults change**, an install must not keep the old ones by
 accident nor undo a player's choice. `Defaults=` numbers the set a file holds (as
-`UI.ini`'s does), and `ui/ini-merge.py` brings a copy with an older number (or none: 1)
+`UI.ini`'s does), and `tools/ini-merge.py` brings a copy with an older number (or none: 1)
 up to the new one: each key the newer set changed moves to its new value only where it
 still holds the old default. Defaults 2 (display 0.8.0) is `Mode=stub`,
 `Backend=auto`, where 1 was `forward` and `d3d9`: a game installed with display 0.7.0 or
@@ -47,6 +47,9 @@ earlier comes to the stub on `auto`, and a game whose `Backend=vulkan` (or any v
 other than d3d9) was set by hand keeps it, its `Mode=forward` moved to stub. A player
 who had chosen `forward` or `d3d9` before their default changed is moved too; the merge
 cannot tell that choice from the old default, and prints each key it moves.
+Since 0.12.0 the code's defaults are the shipped file's (`Mode=stub`, `Backend=auto`,
+`Passthrough=1`), so a `Display8.ini` without those keys, or none at all, runs as
+shipped.
 
 With no `d3d8.dll` in the game directory (the system's is the chain), Display8 goes in
 alone and loads the system's own (`GetSystemDirectory`: SysWOW64 on 64-bit Windows,
@@ -73,7 +76,7 @@ Nothing in Display8 is Wine-specific (`platform()` only names the system in the 
 on Windows the stub runs on the GPU vendor's Vulkan, Direct3D 12 or Windows' own
 Direct3D 9; it has not been seen there yet. `--uninstall` puts d3d8to9 back as `d3d8.dll`
 and takes out what `display/install --remove` takes out (on Windows also
-`Display8.pipelines`).
+`Display8.pipelines` and `Display8.d3d12pipelines`).
 
 ## What the plugins can ask of it
 
@@ -87,14 +90,111 @@ as before:
 | `display8_device_epoch()` | moves on at every `CreateDevice`, every `Reset` that succeeds, and when the device goes: whatever a plugin made at another epoch must be made again |
 | `display8_device()` | the engine's device now (ours, not referenced), or null |
 | `display8_frame()` | frames presented so far |
-| `display8_backend()` | what the plugins draw on: Direct3D 9, Vulkan, Direct3D 12 or none (`gpu/src/display.rs`, `BACKEND_*`) |
-| `display8_vk*`, `display8_dx12*`, `display8_engine_viewport`, `display8_engine_transform` | stub mode on Vulkan and Direct3D 12: the device, the frame, the upload ring, deferred frees, the engine's targets and mirrors, a flush, and the engine's state the plugins read. The contract is `gpu/src/display.rs` (its doc comment is the specification); `src/vk/exports.rs` and `src/dx12/exports.rs` implement it |
+| `display8_abi(caller_major, caller_minor, caller, &major, &minor)` | the contract's handshake (since 0.12.0): Display8's contract version, the plugin's logged beside it ("Versions of the contract" below) |
+| `display8v1_register(&plugin)`, `display8v1_claims(except)` | the claims (since 0.13.0, contract 1.1): a plugin registers at load with a callback saying what it draws now, and asks what the others claim ("Claims" below) |
+| `display8v1_backend()` | what the plugins draw on: Direct3D 9, Vulkan, Direct3D 12 or none (`gpu/src/display.rs`, `BACKEND_*`) |
+| `display8v1_vk*`, `display8v1_dx12*`, `display8v1_engine_viewport`, `display8v1_engine_transform` | stub mode on Vulkan and Direct3D 12: the device, the frame, the upload ring, deferred frees, the engine's targets and mirrors, a flush, and the engine's state the plugins read. The contract is `gpu/src/display.rs` (its doc comment is the specification); `src/vk/exports.rs` and `src/dx12/exports.rs` implement it |
 
-The first four are the forward mode's (`src/api.rs`). render3d (`frame::begin`) and the
+The first five are the forward mode's (`src/api.rs`), unversioned: plain scalars, the
+same in every release. render3d (`frame::begin`) and the
 UI (`gfx::attach`) tell a new device or a `Reset` by `display8_device_epoch`
 (`gpu::Gpu::device_epoch`, resolved once); on a `d3d8.dll` without it they compare the
 Direct3D 9 device behind the engine's (`gpu::Gpu::engine_id`) as before, until the
 Direct3D 9 backend goes (the display plan's last phase).
+
+## Versions of the contract
+
+The `display8v1_*` exports and their `#[repr(C)]` structs are a contract between this
+DLL and the `gpu` crate linked into `Render3D.asi` and `UI.asi`. Up to display 0.11.0
+it had no version: a d3d8.dll and plugins from two releases would have read each
+other's structs at the wrong offsets. Since 0.12.0 (contract 1.0) it has a major and a
+minor (`gpu::display::ABI_MAJOR`, `ABI_MINOR`), and the rule is the one in
+`gpu/src/display.rs`, "Versions":
+
+- **A minor only adds**: an export, a constant, or a field at the end of a struct.
+  Every struct starts with `size`, so each side reads only what the other knows (a
+  struct handed out says its size; a struct to be filled says its room, and the
+  writer fills no more and sets `size` to what it wrote: `gpu::display::read`,
+  `write`). A plugin uses what minor N added only on a Display8 of minor N or more. A
+  struct inside another (`VkPass8`'s images) does not grow in a minor.
+- **Anything else is a new major**: a field removed, moved, retyped or meaning
+  something new; an export's signature or meaning; a rule between the recorders
+  (layouts, states, heaps, who closes a render pass). The exports carry the major in
+  their names (`display8v1_*`), so a plugin of another major finds none of them, and
+  `display8_abi`, whose name and signature never change, says why.
+
+What each side does with a mismatch, and logs:
+
+| Files | What happens | The log |
+|---|---|---|
+| plugins and Display8 of one major | the handshake agrees; the plugins draw on the backend Display8 says | `Render3D.log`/`UI.log`: `gpu 1.0.0 (contract 1.0): Display8 0.12.0 (contract 1.0)`; `Display8.log`: `contract: UI.asi asks for 1.0; Display8's is 1.0: drawn through` |
+| no Display8 (another chain's `d3d8.dll`: crosire's d3d8to9, DXVK's, Wine's) | Direct3D 9, as ever | `gpu ...: no Display8 (the game's d3d8.dll is another chain's): Direct3D 9` |
+| plugins newer than Display8 (a Display8 before 0.12.0) | `gpu` finds unversioned exports and no `display8_abi`: it stands down to Direct3D 9 only, which on Display8's own Vulkan or Direct3D 12 draws nothing | `gpu ...: Display8 0.11.0 is too old for this plugin (no contract handshake ...)` |
+| plugins older than Display8 (built before 0.12.0) | they look for `display8_backend` and find nothing: Direct3D 9 only, nothing drawn on Vulkan or Direct3D 12 | `Display8.log`, in stub mode 300 frames into the first mission (such a plugin calls nothing of Display8's, so it is told by not having asked): `contract: Render3D.asi is loaded and has not asked for the contract ...` |
+| another major either way | as above, both sides | `gpu ...: Display8 ... has contract 2.0, another major ...`; `Display8.log`: `... another major: it finds none of this Display8's exports and stands down` |
+
+On Vulkan the engine's own draws pass through where the plugins draw nothing
+("Passthrough"), so the game still shows its stock look and can be played; on Direct3D
+12, which passes nothing through yet, the 3D view stays empty. Display8 0.12.0,
+render3d 0.31.0 and UI 0.26.0 were the last release that had to ship together; from
+there a release of one may meet the others of the same major.
+`testbench/scenarios/display-abi-mismatch.md` runs both directions against 13.42.4
+(`bench-abi.sh`).
+
+## Claims
+
+Since 0.13.0 (contract 1.1; ROADMAP Phase 4, "Claims") the plugins say what they draw,
+and passthrough draws what nobody does. `gpu::Gpu::register` (at the plugin's load, the
+handshake made then) hands Display8 a callback through `display8v1_register`; Display8
+asks every registered callback at each of the engine's `BeginScene`s in stub mode
+(`src/claims.rs`, `claims::ask`) and logs a plugin's claims when they change:
+
+    claims: UI.asi registers (id 1)
+    claims: UI.asi claims selection hud loading credits (was not asked)
+    claims: Render3D.asi claims hulls world particles effects ordnance specials fog selection (was none)
+
+The categories are `gpu::display::CLAIM_*`. A plugin claims only what it draws now:
+
+| Plugin | Claims | Not claimed |
+|---|---|---|
+| render3d | each module running (`sky`, `hulls`, `world`, `particles`, `effects`, `ordnance`, `specials`), `fog` and `selection` by `[Overlays] Fog` and `Selection` | a module at 0 (or kept for the menu scene only), one standing down beside its old plugin, everything before its first frame, and everything when its frame seam is not stock |
+| UI | `hud` (its panels are in), `selection` (`[HUD] SelectionBubbles=0`, its brackets marking the selection), `loading` (`[Loading] Enable=1`, the screen of ours), `credits` (`[Menus] Credits=1`), `cursor` (while it keeps the engine's cursor from drawing: at the present where its own is drawn) | a part at 0; everything while it cannot draw (`gfx::drawing`: 30 frames in a row with no device) |
+
+A plugin that stood down because of the contract (another major, a Display8 too old)
+never registers, and one built before 1.1 has nothing to register with: either claims
+nothing, so what it would have drawn is the engine's again.
+
+**How claims route.** Display8 drops the engine's draws of a claimed category only
+where the engine draws them *anyway*, under the plugin's, and tells them by the scene:
+
+| Category | The engine's scene | Dropped while claimed |
+|---|---|---|
+| `loading` | a `BeginScene` with `RenderLoopAssetLoadStatusUpdate` up its stack | yes: the UI's loading screen covers it |
+| `credits` | a `BeginScene` from `Credits3D.obj` (0x591340..0x592a70) | yes (with the UI's Credits the engine's never run, so none come) |
+| `cursor` | `RefreshDisplay`'s own scene (0x624630..0x624750, the immediate caller or the next) | yes (the UI empties the engine's cursor for that present, so it draws none) |
+| the 3D categories, `hud`, `selection` | — | never: the engine issues these draws only when no plugin draws the part (render3d skips the engine's step; the UI skips a stock component's `Render`; the UI's `ret` in `RenderSelectionEffects`), so what it still issues, a hand-back, is drawn |
+
+So `Passthrough=1` with every plugin on draws the same frame as before (the routing
+was "every draw but the loading loop's while `UI.asi` is loaded"), and without the UI,
+with `[Loading] Enable=0`, or with a UI that stood down, the engine's loading screen
+comes through instead of a black screen.
+
+**Between plugins.** `display8v1_claims(except)` is what every plugin but the caller
+claims, each callback asked as it is called (`gpu::Gpu::claimed_by_others`). render3d
+draws no selection bubbles while another plugin claims `selection`: that replaced its
+reading of the `ret` the UI puts in `RenderSelectionEffects`, which it reads only on a
+`d3d8.dll` without claims (`render3d/src/mods/overlays/selection.rs`). Nothing looks up
+a plugin by its DLL name for routing any more.
+
+Claims are asked in forward mode too (for `display8v1_claims`), but route nothing
+there: forward mode draws every call it is given, as before. `display-claims` checks
+three games on the stub: nothing claimed, the UI, and render3d at `sky=0`.
+
+**Display8 alone.** With no `UI.asi` and no `Render3D.asi` nothing registers, and in
+stub mode passthrough draws the whole game as the engine issues it: the stock menus,
+loading screen, HUD and 3D view ("Stub mode", "The engine's hard-coded modes", for
+why that needs Display8 to answer the engine's own mode requests). `display-claims`'s
+"alone" is that case.
 
 ## How it works
 
@@ -148,7 +248,7 @@ With `Trace=1` in `Display8.ini`:
   with the calls, the frames they fell in, and how many came from a thread other than
   the device's. `#` lines at the end give each context's frames, engine draws and time
   spent in the real `Present`.
-- **`Display8.log`**: each distinct line once per context: the answers the engine
+- **`Display8.log`** (in `%LOCALAPPDATA%\armada2-refit\logs\` since display 0.14.0, the game directory if that is unset or not writable; its first line says where): each distinct line once per context: the answers the engine
   branches on (`ANSWER`: caps, formats, modes, `ValidateDevice`), the present
   parameters of every `CreateDevice` and `Reset`, gamma ramps (`GAMMA`), every lock
   (`LOCK`) and read-back (`READBACK`), render targets, the plugins' queries for
@@ -206,6 +306,8 @@ engine's device, and draw the whole frame on it.
   coordinate needs translating (phase 0 found the engine reads the mouse only through
   `GetCursorPos`, `ScreenToClient` and `GetClientRect`). The game's window becomes a
   borderless one covering the screen, and the swap chain is windowed on it.
+- **The engine's hard-coded modes get the one mode** (`src/stub/modes.rs`, since
+  0.15.1; below).
 - **What the plugins read of the engine's state reaches the Direct3D 9 device**: the
   transforms (render3d reads the view and the projection), the viewport, `Clear` of the
   engine's own back buffer and depth, `BeginScene` and `EndScene`. Everything else is
@@ -244,13 +346,54 @@ engine's device, and draw the whole frame on it.
   Direct3D 9 last ("Choosing a backend"), and that `CreateDevice` fails only when none
   starts.
 
+### The engine's hard-coded modes
+
+Storm3D keeps the modes the adapter lists on its display device and looks one up by
+width, height and depth (`ST3D_DisplayDevice::FindDisplayMode`, `0x626bf0`), which
+finds nothing without an exact match. Three of its callers ask for a mode of their own
+rather than one from the list: `SetActiveDisplay_Internal` the shell's 800x600x16 (the
+call at `0x62c4e0`; the same mode again at `0x62c643`, its fallback when a display does
+not open), `GameConfiguration::InitializeGraphicsSystem` the profile's (`0x53e7c9`,
+`0x53e7e7`; GOG's `ARMADA.PRF` holds 1024x768x32, no profile 800x600x16) and
+`Program::PlayIntroMovie` the intro's 640x480 (`0x4861da`, `0x4861f2`). The stub lists
+the desktop's mode alone, so with nothing raising those requests the shell's display
+was opened on no mode, which failed, and the game died of a stack overflow before the
+engine's first `CreateDevice` (seen on the bench 2026-10-30: Wine's log says
+`stack overflow`, `Display8.log` ends at `CheckDeviceType`). Until 0.15.1 only the
+UI's `raise_shell_mode` (`[Menus] Enable=1`) kept it from happening, by making the
+shell's request the desktop's; forward mode lists the real modes and never had it.
+
+Display8 re-points those six calls, in stub mode, at a lookup of its own
+(`modes::find`): the engine's first, and when it finds nothing, the listed mode of the
+stub's size. Each call and `FindDisplayMode`'s first bytes are checked before anything
+is written; one that is not stock is left alone and logged. The lookup's other callers
+keep the exact match: the adapter's enumeration, which uses it to skip a mode it has
+listed already, and Graphics Settings, which offers what is listed (the one mode).
+`Display8.log` says what was asked and given:
+
+    stub: the engine's own mode requests (6 of 6 calls) get the one mode offered when theirs is not listed
+    stub: the engine asks for 800x600x16, not listed: given the one mode, 1280x720x32
+
+The UI's raises are untouched and never write the same bytes: they patch the pushes
+before two of these calls and the call of `InitializeGraphicsSystem` (`0x484169`), so
+with the UI the lookup matches at once and Display8's answer is the engine's. No
+claim or contract change was needed.
+
+**What the stock shell looks like then** (Display8 alone, 1280x720 on the bench): the
+game's window covers the screen from the first `CreateDevice`, and the GDI menus draw
+at their stock 800x600, 1:1, in its top-left corner; the rest of the window is
+unpainted (white on the bench). Every screen works with the mouse at those
+coordinates (main menu, Single Player, the campaign's Select Mission), and a mission
+then opens at the desktop's size, drawn by the engine through passthrough. Scaling the
+shell into the window is the UI's (`ui/MENUS.md`).
+
 `display/bench-mode.sh stub` sets the mode in a bench clone from a scenario's `Setup:`;
 `display-stub` walks the whole game on it.
 
 ## Passthrough
 
-`Passthrough=1` in `Display8.ini` (shipped, since the GPU runs below passed; 0 in the
-code, and the stub drops every engine draw as before): in stub mode on Vulkan the engine's own Direct3D 8 draws are
+`Passthrough=1` in `Display8.ini` (shipped, since the GPU runs below passed, and the
+code's default too since 0.12.0; `0` drops every engine draw, as before): in stub mode on Vulkan the engine's own Direct3D 8 draws are
 drawn after all, on Display8's device, the way Direct3D 8's fixed function draws them
 (`src/passthrough.rs`, `src/vk/pass.rs`, `shaders/ff.hlsl`). It is ROADMAP phase 4's
 first slice (4a, 4b, most of 4c, 4d, 4e and 4f on Vulkan). Without it, whatever render3d
@@ -265,10 +408,10 @@ through `gpu`), so routing is simple: every one is drawn, except
 
 - what `[Drop]` names (the same switches as in forward mode, so a category can still be
   A/B'd: `Drop3D=1` drops the hand-backs again);
-- the frames of the engine's loading loop while `UI.asi` is loaded, whose loading screen
-  draws over them: a `BeginScene` with `RenderLoopAssetLoadStatusUpdate` up its stack
-  (`drop::in_loading`) marks its frame. Without the UI the engine's loading screen is
-  the only one and is drawn;
+- the scenes a plugin claims to draw over ("Claims"): the loading loop's while the UI's
+  loading screen is up (`CLAIM_LOADING`), the stock Credits' and the cursor's. Without
+  the UI, with its part at 0 or with a UI that stood down, the engine's loading screen
+  is the only one and is drawn;
 - a draw into a render target of the engine's own other than its back buffer (none seen);
 - a draw through a vertex shader other than the one it has a port of (below), logged
   once;
@@ -276,8 +419,8 @@ through `gpu`), so routing is simple: every one is drawn, except
   `Cmd` alive): logged once with its caller, never recorded into another recorder's
   render pass.
 
-When claims arrive (ROADMAP phase 3 and 4g), they become the routing in place of "every
-one".
+Since 0.13.0 the plugins' claims are this routing ("Claims"): no DLL is looked up by
+name.
 
 **Where it lands.** In the frame's command buffer, at the moment the engine makes it,
 between the plugins' recorders: the same order as on Direct3D 9, where a plugin's targets
@@ -340,18 +483,55 @@ declaration puts each input in stream 0 is read off the declaration. Its port by
 constants 2 to 5, and the light direction of constant 6 taken into the vertex's tangent
 frame, normalised, offset and scaled by constants 0 and 1 into the diffuse colour, which
 the texture stages dot with the normal map (`DOTPRODUCT3`). The engine draws a Borg hull
-in three passes this way (two lights added, then the base texture multiplied over them),
-all of which the stage interpreter runs. Any other shader is refused and logged once with
-its hash; on the test bench its tokens are logged too, for porting.
+in four passes this way (two lights, the first written and the second added; the base
+texture multiplied over them; then the base texture again, blended by its alpha, which
+is the hull's glow), all of which the stage interpreter runs. Any other shader is
+refused and logged once with its hash; on the test bench its tokens are logged too, for
+porting.
 
-**What is not done yet** (ROADMAP phase 4): claims as
-the routing (4g, after phase 3); Direct3D 12 and the stub's Direct3D 9 (phase 10; the
+**The engine leaves `LIGHTING` on for these passes** on a map with lights (the Borg
+campaign's, not the showcase's `a2_borg01`). Direct3D ignores it under a vertex shader,
+and so must the passthrough: its fixed-function lights go in the vertex block from
+register 16, where `vs_bump`'s constants are, and until 0.15.2 they were written over
+them, so every pass but the glow's had its transform thrown away and the hull vanished
+around its lights (seen in game on *Strange Bedfellows* with every render3d module off;
+`display-passthrough-all`). Display8 logs once that it saw the case. (The `PASSTHROUGH`
+lines logged "once" are the tracer's: outside the bench, with `Trace=auto`, a player's
+log does not have them.)
+
+**What is not done yet**: Direct3D 12 and the stub's Direct3D 9 (phase 10; the
 latter is to go). Specular lighting, spot cones, texture transforms, a third stage and
 `ZBIAS` are not drawn, each logged once when the engine uses it; none was seen in the
 stock traces.
 
+**Map nebulae** (reported 2026-10-30: with every render3d module off, the cerulean
+nebulae "move a lot more than in stock"). The engine's map puffs are measured to draw
+and move through the passthrough exactly as on the forward chain and in stock, bench
+2026-10-30, 1280x720, scene `nebula-cerulean`, the bench clock, `Step=16`:
+
+- the same tick against the forward chain: RMSE 0.93/255 (the last bit of the additive
+  blend over the gas, the ship's edges); from four other camera positions, the 3D view
+  within RMSE 0.5;
+- frame-to-frame change over 2 ticks (mean absolute difference, 0..255): forward 1.24,
+  stub 1.24; over 16 ticks 6.07 and 6.05. A paused frame stands still in both;
+- against stock (`Mod: stock`, the HUD view): with the stock textures (`A2_DATA` empty)
+  the gas is stock's to the pixel and changes 0.72 per 2 ticks to stock's 0.75; on the
+  wall clock the motion per second is the same at 60, 300 and 700 frames a second, so
+  it is not the frame rate either (`VSync=0`);
+- with the refit's textures the same motion changes 1.01 per 2 ticks, 39% more: the
+  upscaled `Mnebula5` (`textures/targets/Mnebula5`, `blend=35`) carries finer, sharper
+  detail than stock's, and that detail is what is seen to swim. With render3d on, the
+  cerulean class is its marched volume (`render3d/nebulae/mnebula10.ini`), not these
+  puffs.
+
+No unsupported state is used by those draws (no texture transform, no generated
+coordinates). `display-passthrough-nebula` holds it, against
+`display-passthrough-nebula-forward`.
+
 `display-passthrough` checks it (render3d's hulls off on the stub; the ships drawn),
 against `display-passthrough-forward`, the same scene through the forward chain.
+`display-passthrough-all` checks it with every render3d module off, on a Borg mission
+with lights entered through the menus, against `display-passthrough-all-forward`.
 
 **Measured 2026-10-29** (1280x720, the showcase paused at its tick, bench clock): with
 `[Modules] hulls=0`, stub and passthrough on lavapipe with the validation layer against
@@ -510,6 +690,19 @@ the swap chain's image, submits and presents.
   VirtualStore there. It is read when the device is made, only if its header names this
   device and driver (vendor, device, cache UUID), and written again, through a
   temporary file and a rename, whenever it has grown (looked at every 600 frames).
+- **Direct3D 12 keeps a pipeline library** the same way
+  (`%LOCALAPPDATA%\armada2-refit\Display8.d3d12pipelines`, `src/dx12/cache.rs`, since
+  0.15.0). Display8 makes one `ID3D12PipelineLibrary` (`ID3D12Device1`) when the device
+  is made, from the file if its 64-byte header names the same file format, Display8
+  version and adapter (vendor, device, subsystem, revision, the user-mode driver's
+  version where DXGI says it) and the driver accepts the blob (a refusal starts empty);
+  hands it to the plugins as `Dx12Device8::pipeline_library` (contract 1.2); keeps its own
+  present pass in it; and writes it again, atomically, whenever its serialized size has
+  grown (looked at every 120 frames). The file's bytes stay in memory for as long as the
+  library lives, as D3D12 requires. A plugin stores the pipelines it makes in it and
+  loads them from it by a name hashed from the whole description; with no library, or on
+  any error, it creates them plainly. `gpu` logs `pipeline library: N loaded, M stored`
+  (at each power of two), Display8 the file's size read and written.
 - **Samplers as DXVK makes them.** On Direct3D 9 the game's `dxvk.conf` (the renderer
   layer, `renderer/README.md`) has DXVK give every linear sampler 16x anisotropy and
   every sampler with mips a LOD bias of -0.5. Display8 reads the same keys

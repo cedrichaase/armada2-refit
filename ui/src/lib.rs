@@ -5,9 +5,13 @@
 
 extern crate alloc;
 
-pub mod rt;
-pub mod dump;
+pub mod rt {
+    pub use a2rt::*;
+    pub mod win;
+}
+pub use a2rt::{dump, log, sfmt};
 pub mod app;
+pub mod claims;
 pub mod clipboard;
 pub mod clock;
 pub mod config;
@@ -54,6 +58,9 @@ fn startup() {
         return;
     }
     config::set(cfg);
+    // With Display8 (contract 1.1) the parts' claims route its passthrough: registered
+    // before any part is patched (README.md, "Claims").
+    claims::register();
     // Each context stands down on its own: a hook that is not stock leaves that part
     // of the game as it was, and the others still work.
     if config::get().native {
@@ -75,7 +82,9 @@ fn startup() {
     }
     log!("shell: {}", if engine::shell::install() { "hooked" } else { "standing down" });
     log!("loading: {}", if engine::loading::install(config::get().loading) { "hooked" } else { "standing down" });
-    log!("hud: {}", if hud::install() { "panels of ours" } else { "stock" });
+    let hud = hud::install();
+    claims::set_hud(hud);
+    log!("hud: {}", if hud { "panels of ours" } else { "stock" });
     log!("device: {}", if engine::device::install() { "DestroyRenderSurfaces chained: the UI lets go of the device with the engine" } else { "slot not stock: the UI lets go of the device when it sees the next one" });
     // The menus: [Menus] Enable=1 hosts the stock shell's dialogs (ui/MENUS.md). Patched
     // here, at DllMain, because the shell's display mode must be raised before the

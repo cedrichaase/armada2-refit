@@ -329,6 +329,40 @@ pub fn end_view(v: &View) {
     }
 }
 
+/// What render3d claims to draw now (gpu/src/display.rs, "Claims"; README.md,
+/// "Claims"): each module running, `[Overlays] Fog` and `Selection` apart. Nothing
+/// before the first frame, and nothing for a module at 0 (kept for the menu scene only
+/// is not running) or one standing down beside its old plugin. Display8 drops none of
+/// the engine's 3D draws for these: a module that draws a category skips the engine's
+/// step, so what the engine still issues (a hand-back) is drawn.
+pub extern "C" fn claims() -> u32 {
+    use gpu::display::*;
+    let mut c = 0;
+    for (name, bit) in [
+        ("sky", CLAIM_SKY),
+        ("hulls", CLAIM_HULLS),
+        ("world", CLAIM_WORLD),
+        ("particles", CLAIM_PARTICLES),
+        ("effects", CLAIM_EFFECTS),
+        ("ordnance", CLAIM_ORDNANCE),
+        ("specials", CLAIM_SPECIALS),
+    ] {
+        if running(name) {
+            c |= bit;
+        }
+    }
+    if running("overlays") {
+        let (fog, sel) = overlays::claims();
+        if fog {
+            c |= CLAIM_FOG;
+        }
+        if sel {
+            c |= CLAIM_SELECTION;
+        }
+    }
+    c
+}
+
 pub fn any() -> bool {
     unsafe { ACTIVE && !MODS.is_empty() }
 }

@@ -417,7 +417,8 @@ class Take:
     def follow(self):
         """Start following the game's UI.log, for the menu marks (none on a desktop)."""
         if not self.desktop:
-            self.tail = marks.Tail(str(self.bench().game_dir / 'UI.log')).start()
+            b = self.bench()
+            self.tail = marks.Tail(lambda: str(b.log_path('UI.log') or b.game_dir / 'UI.log')).start()
 
     def gather(self):
         """Read what the game wrote for the marks, while its clone is still there."""

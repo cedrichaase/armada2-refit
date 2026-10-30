@@ -30,22 +30,13 @@
  * No CRT, same toolchain as menus/: see build.sh.
  */
 
-typedef unsigned char       BYTE;
-typedef unsigned short      WORD;
-typedef unsigned long       DWORD;
-typedef unsigned int        UINT;
-typedef int                 BOOL;
-typedef long                LONG;
-typedef long                HRESULT;
+#define A2_FLTUSED
+#include "../../csdk/a2asi.h"
+
 typedef long long           LONGLONG;
 typedef unsigned long long  ULONGLONG;
-typedef void               *HANDLE;
-typedef void               *HMODULE;
-typedef unsigned short      WCHAR;
 typedef unsigned long       ULONG_PTR;
 
-#define WINAPI   __stdcall
-#define NULLPTR  ((void *)0)
 #define EXPORT   __declspec(dllexport)
 
 typedef struct { DWORD Data1; WORD Data2; WORD Data3; BYTE Data4[8]; } GUID;
@@ -54,25 +45,14 @@ typedef struct { LONGLONG QuadPart; } LARGE_INTEGER;
 /* ---- kernel32 / user32 / winmm (static imports, see *.def) -------------- */
 __declspec(dllimport) HMODULE WINAPI LoadLibraryA(const char *);
 __declspec(dllimport) BOOL    WINAPI FreeLibrary(HMODULE);
-__declspec(dllimport) void *  WINAPI GetProcAddress(HMODULE, const char *);
-__declspec(dllimport) HMODULE WINAPI GetModuleHandleA(const char *);
-__declspec(dllimport) DWORD   WINAPI GetModuleFileNameA(HMODULE, char *, DWORD);
-__declspec(dllimport) BOOL    WINAPI VirtualProtect(void *, DWORD, DWORD, DWORD *);
-__declspec(dllimport) BOOL    WINAPI FlushInstructionCache(HANDLE, const void *, DWORD);
-__declspec(dllimport) HANDLE  WINAPI GetCurrentProcess(void);
-__declspec(dllimport) HANDLE  WINAPI CreateFileA(const char *, DWORD, DWORD, void *, DWORD, DWORD, HANDLE);
-__declspec(dllimport) BOOL    WINAPI WriteFile(HANDLE, const void *, DWORD, DWORD *, void *);
 __declspec(dllimport) BOOL    WINAPI ReadFile(HANDLE, void *, DWORD, DWORD *, void *);
 __declspec(dllimport) DWORD   WINAPI GetFileSize(HANDLE, DWORD *);
-__declspec(dllimport) DWORD   WINAPI SetFilePointer(HANDLE, LONG, LONG *, DWORD);
-__declspec(dllimport) BOOL    WINAPI CloseHandle(HANDLE);
 __declspec(dllimport) DWORD   WINAPI GetFileAttributesA(const char *);
 __declspec(dllimport) DWORD   WINAPI GetFullPathNameA(const char *, DWORD, char *, char **);
 __declspec(dllimport) BOOL    WINAPI QueryPerformanceCounter(LARGE_INTEGER *);
 __declspec(dllimport) BOOL    WINAPI QueryPerformanceFrequency(LARGE_INTEGER *);
 __declspec(dllimport) void *  WINAPI VirtualAlloc(void *, DWORD, DWORD, DWORD);
 __declspec(dllimport) BOOL    WINAPI VirtualFree(void *, DWORD, DWORD);
-__declspec(dllimport) UINT    WINAPI GetPrivateProfileIntA(const char *, const char *, int, const char *);
 __declspec(dllimport) int     WINAPI MultiByteToWideChar(UINT, DWORD, const char *, int, WCHAR *, int);
 __declspec(dllimport) void    WINAPI Sleep(DWORD);
 __declspec(dllimport) BOOL    WINAPI IsBadWritePtr(void *, UINT);
@@ -94,13 +74,10 @@ __declspec(dllimport) UINT WINAPI waveOutSetVolume(HANDLE, DWORD);
 #define SM_CYSCREEN 1
 #define MEM_COMMIT_RESERVE 0x3000
 #define MEM_RELEASE 0x8000
-#define PAGE_READWRITE 0x04
-#define PAGE_EXECUTE_READWRITE 0x40
 #define INVALID_FILE_ATTRIBUTES 0xFFFFFFFF
 #define FILE_ATTRIBUTE_DIRECTORY 0x10
 #define WAVE_MAPPER 0xFFFFFFFF
 
-int _fltused = 0;
 
 void *memset(void *d, int c, unsigned n)
 {
@@ -117,45 +94,21 @@ void *memcpy(void *d, const void *s, unsigned n)
 }
 
 /* ---- small string helpers ------------------------------------------------ */
-static int s_len(const char *s) { int n = 0; while (s[n]) n++; return n; }
-static void s_cpy(char *d, const char *s) { while ((*d++ = *s++)) ; }
-static void s_cat(char *d, const char *s) { s_cpy(d + s_len(d), s); }
-static void s_num(char *d, long v)
-{
-    char b[16]; int i = 0; unsigned long u;
-    if (v < 0) { s_cat(d, "-"); u = (unsigned long)(-v); } else u = (unsigned long)v;
-    do { b[i++] = (char)('0' + u % 10); u /= 10; } while (u);
-    d += s_len(d);
-    while (i) *d++ = b[--i];
-    *d = 0;
-}
-static void s_hex(char *d, unsigned long v)
-{
-    static const char hx[] = "0123456789abcdef";
-    int i; d += s_len(d);
-    *d++ = '0'; *d++ = 'x';
-    for (i = 7; i >= 0; i--) *d++ = hx[(v >> (i * 4)) & 15];
-    *d = 0;
-}
-
 /* ---- config and log, both beside Armada2.exe ------------------------------ */
 static char g_dir[260];
 static char g_ini[280];
 static int  g_log = 1, g_replace = 1, g_raise = 1, g_fit = 1;
 
+static char g_logpath[320];
+
 static void logline(const char *msg)
 {
-    char path[300];
-    HANDLE h;
-    DWORD w;
     if (!g_log) return;
-    s_cpy(path, g_dir); s_cat(path, "BinkProxy.log");
-    h = CreateFileA(path, 0x40000000 /*GENERIC_WRITE*/, 1, NULLPTR, 4 /*OPEN_ALWAYS*/, 0x80, NULLPTR);
-    if (h == (HANDLE)-1) return;
-    SetFilePointer(h, 0, NULLPTR, 2 /*FILE_END*/);
-    WriteFile(h, msg, (DWORD)s_len(msg), &w, NULLPTR);
-    WriteFile(h, "\r\n", 2, &w, NULLPTR);
-    CloseHandle(h);
+    if (!g_logpath[0]) {
+        /* the first line says where the log is */
+        a2_log_where(g_logpath, a2_log_path(g_logpath, sizeof g_logpath, g_dir, "BinkProxy.log"));
+    }
+    a2_append_line(g_logpath, msg);
 }
 
 /* ---- the real DLL ---------------------------------------------------------- */
@@ -1084,9 +1037,7 @@ BOOL WINAPI DllMain(HANDLE inst, DWORD reason, void *res)
     (void)inst; (void)res;
     if (reason != 1) return 1;
 
-    GetModuleFileNameA(NULLPTR, g_dir, sizeof g_dir);
-    for (i = s_len(g_dir); i > 0 && g_dir[i - 1] != '\\' && g_dir[i - 1] != '/'; i--) ;
-    g_dir[i] = 0;
+    a2_exe_dir(g_dir, sizeof g_dir);
     s_cpy(g_ini, g_dir); s_cat(g_ini, "BinkProxy.ini");
 
     g_log     = (int)GetPrivateProfileIntA("BinkProxy", "Log",            1, g_ini);

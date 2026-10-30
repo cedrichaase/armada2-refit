@@ -14,12 +14,12 @@
 
 extern crate alloc;
 
-// The no-C-runtime support Display8 has (the allocator, mem*, 64-bit division, the
-// stack probe) and its kernel32 declarations, shared rather than copied.
-#[path = "../../../display/src/rt/win.rs"]
+// The no-C-runtime support the plugins share (crates/a2rt: the allocator, mem*, 64-bit
+// division, the stack probe) and its kernel32 declarations, shared rather than copied.
+#[path = "../../../crates/a2rt/src/win.rs"]
 #[allow(dead_code)]
 mod win;
-#[path = "../../../display/src/rt/mem.rs"]
+#[path = "../../../crates/a2rt/src/mem.rs"]
 mod mem;
 
 mod window;
@@ -202,8 +202,8 @@ fn run() -> bool {
         return false;
     }
     let create = lookup("Direct3DCreate8");
-    if create == 0 || lookup("display8_backend") == 0 {
-        say!("d3d8.dll is not Display8 (no Direct3DCreate8 or display8_backend)");
+    if create == 0 || lookup("display8v1_backend") == 0 {
+        say!("d3d8.dll is not Display8 (no Direct3DCreate8 or display8v1_backend)");
         return false;
     }
     let create: extern "system" fn(u32) -> *mut c_void = unsafe { core::mem::transmute(create) };

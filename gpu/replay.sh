@@ -4,7 +4,7 @@
 # (as display/vkprobe/run-wine.sh), through Display8 on each backend asked for, on
 # lavapipe (Mesa's CPU Vulkan) with the Khronos validation layer: the GPU is never
 # touched. Writes replay-<backend>.ppm, replay-<backend>.log and the run's Display8.log
-# (replay-<backend>-Display8.log) into the recording's directory, which is in A2_DATA.
+# (replay-<backend>-Display8.log, from the prefix's LocalAppData logs folder) into the recording's directory, which is in A2_DATA.
 #
 #   gpu/replay.sh <recording dir> [--backend vulkan|d3d9|d3d12]... [--stop SEQ] [--keep] [--no-build]
 #
@@ -60,7 +60,7 @@ if [ -n "$build" ]; then
     [ -x "$cargo" ] || { echo "replay.sh: cargo not found (rustup, then: rustup target add i686-pc-windows-msvc)" >&2; exit 1; }
     # The blit (replay/shaders/blit.hlsl) as render3d's shaders are built: committed
     # with a stamp, compiled again only when stale.
-    "$repo/render3d/hlsl-rs.sh" "$here/replay/src/shaders/blit.rs" "$here/replay/shaders/blit.hlsl" \
+    "$repo/tools/shaderc/hlsl-rs.sh" "$here/replay/src/shaders/blit.rs" "$here/replay/shaders/blit.hlsl" \
         vs_blit:vs_3_0:VS_BLIT ps_blit:ps_3_0:PS_BLIT >/dev/null
     env -C "$here/replay" "$cargo" build --release --quiet
     mkdir -p "$here/replay/build"
@@ -130,6 +130,8 @@ rc=0
 for b in "${backends[@]}"; do
     run="$work/run/$b"
     mkdir -p "$run"
+    # Display8.log is in the prefix's LocalAppData (kept between runs): a stale one is not this run's
+    rm -f "$pfx"/drive_c/users/*/AppData/Local/armada2-refit/logs/Display8.log "$run/Display8.log"
     cp "$exe" "$run/a2replay.exe"
     cp "$d3d8" "$run/d3d8.dll"
     # Display8 as it drew the frame (the clone's Display8.ini, copied by `record`), on
@@ -168,13 +170,14 @@ for b in "${backends[@]}"; do
     code=$?
     set -e
     cp "$run/a2replay.log" "$rec/replay-$b.log" 2>/dev/null || true
-    cp "$run/Display8.log" "$rec/replay-$b-Display8.log" 2>/dev/null || true
+    dlog=$(ls "$pfx"/drive_c/users/*/AppData/Local/armada2-refit/logs/Display8.log "$run/Display8.log" 2>/dev/null | head -1 || true)
+    cp "$dlog" "$rec/replay-$b-Display8.log" 2>/dev/null || true
     cp "$run/wine.log" "$rec/replay-$b-wine.log" 2>/dev/null || true
     [ -f "$run/a2replay.log" ] && sed 's/^/    /' "$run/a2replay.log" >&2
     # The validation layer's warnings and errors: Display8's messenger logs them
     # (`vulkan 0x100:`, `vulkan 0x1000:`); under DXVK and vkd3d-proton the layer writes
     # its own (`Validation Error: [ VUID-... ]`) to Wine's output.
-    msgs=$(cat "$run/Display8.log" "$run/wine.log" 2>/dev/null | grep -cE 'vulkan 0x(100|1000): |Validation (Error|Warning):' || true)
+    msgs=$(cat "$dlog" "$run/wine.log" 2>/dev/null | grep -cE 'vulkan 0x(100|1000): |Validation (Error|Warning):' || true)
     if [ "$code" -eq 0 ] && [ -f "$out" ]; then
         echo "replay.sh: $b: $out (validation messages: ${msgs:-0})" >&2
     else
