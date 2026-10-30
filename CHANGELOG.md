@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.51.3 — 2026-10-30
+
+Layers: testbench 3.78.2.
+
+### Added
+- A passthrough nebula check (`display-passthrough-nebula`, against
+  `display-passthrough-nebula-forward`): the engine's cerulean map puffs drawn by
+  Display8 in stub mode, every render3d module off, frame for frame against the forward
+  chain at three ticks. The reported extra motion was measured not to be the
+  passthrough's (`display/README.md`, "Passthrough", "Map nebulae").
+
+Installed, not yet seen in game.
+
 ## 13.51.1 — 2026-10-30
 
 Layers: display 0.15.1, testbench 3.78.1.
