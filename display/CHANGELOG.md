@@ -17,7 +17,7 @@ in [`README.md`](README.md).
   Credits' (`CLAIM_CREDITS`) and `RefreshDisplay`'s cursor scene (`CLAIM_CURSOR`)
   likewise; no 3D, HUD or selection draw is dropped by a claim.
 
-Installed, not yet seen in game.
+Installed, not yet seen in game. (cf3dec5)
 
 ## 0.12.0 — 2026-10-30
 

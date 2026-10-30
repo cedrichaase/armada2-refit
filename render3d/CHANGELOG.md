@@ -16,7 +16,7 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   `[HUD] SelectionBubbles=0`), asked through `display8v1_claims`; the `ret` in
   `RenderSelectionEffects` is read only on a `d3d8.dll` without claims.
 
-Installed, not yet seen in game.
+Installed, not yet seen in game. (cf3dec5)
 
 ## 0.31.0 — 2026-10-30
 

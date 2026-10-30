@@ -12,7 +12,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
   with render3d at `[Modules] sky=0`, each logging who claims what;
   `display/bench-claims.sh` leaves plugins out of a clone by the player's name.
 
-Installed, not yet seen in game.
+Installed, not yet seen in game. (cf3dec5)
 
 ## 3.76.0 — 2026-10-30
 

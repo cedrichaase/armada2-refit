@@ -24,7 +24,7 @@ Layers: display 0.13.0, render3d 0.32.0, ui 0.27.0, testbench 3.77.0.
   dropped only while the UI's loading screen claims them (with `[Loading] Enable=0`, or
   a UI that cannot draw, the engine's loading screen shows on the stub).
 
-Installed, not yet seen in game.
+Installed, not yet seen in game. (cf3dec5)
 
 ## 13.48.0 — 2026-10-30
 

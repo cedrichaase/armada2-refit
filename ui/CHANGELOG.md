@@ -17,7 +17,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
   nothing and gives every stock HUD component back, so the engine's HUD shows instead
   of vanishing.
 
-Installed, not yet seen in game.
+Installed, not yet seen in game. (cf3dec5)
 
 ## 0.26.0 — 2026-10-30
 
