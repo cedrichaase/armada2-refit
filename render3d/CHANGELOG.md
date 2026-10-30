@@ -12,7 +12,7 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   "too old" (apart from "no Display8") and stands down to Direct3D 9 only. Needs
   display 0.12.0's `d3d8.dll`: ships with it.
 
-Installed, not yet seen in game.
+Installed, not yet seen in game. (c470071)
 
 ## 0.29.4 — 2026-10-30
 

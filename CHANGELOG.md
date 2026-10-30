@@ -22,7 +22,7 @@ in lock-step. From here a mismatch is told and stands down cleanly.
   Display8" and "Display8 too old" logged apart. The rule for minors and majors is in
   `gpu/README.md` and `display/README.md`, "Versions".
 
-Installed, not yet seen in game.
+Installed, not yet seen in game. (c470071)
 
 ## 13.45.0 — 2026-10-30
 

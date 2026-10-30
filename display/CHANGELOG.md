@@ -20,7 +20,7 @@ in [`README.md`](README.md).
 - The code's defaults are the shipped `Display8.ini`'s: `Mode=stub` (was forward),
   `Backend=auto` (was d3d9), `Passthrough=1` (was 0).
 
-Installed, not yet seen in game.
+Installed, not yet seen in game. (c470071)
 
 ## 0.11.2 — 2026-10-30
 

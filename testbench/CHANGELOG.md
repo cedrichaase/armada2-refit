@@ -13,7 +13,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
   `display/bench-abi.sh` puts a commit's files into a clone (built once into
   `$A2_DATA/builds/abi/<commit>/`).
 
-Installed, not yet seen in game.
+Installed, not yet seen in game. (c470071)
 
 ## 3.74.2 — 2026-10-30
 
