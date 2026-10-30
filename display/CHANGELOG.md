@@ -14,7 +14,7 @@ in [`README.md`](README.md).
   120 frames). The present pass goes through it too. Uninstalling on Windows takes the
   file out.
 
-Installed, not yet seen in game. (HASH)
+Installed, not yet seen in game. (d860f47)
 
 ## 0.14.0 — 2026-10-30
 

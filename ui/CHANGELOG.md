@@ -11,7 +11,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
   from and stored into Display8's pipeline library (display 0.15.0); nothing changes
   on Direct3D 9 or Vulkan, or against a Display8 of minor 1.0 / 1.1.
 
-Installed, not yet seen in game. (HASH)
+Installed, not yet seen in game. (d860f47)
 
 ## 0.28.0 — 2026-10-30
 

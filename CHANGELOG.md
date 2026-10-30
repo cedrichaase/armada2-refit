@@ -16,7 +16,7 @@ Layers: display 0.15.0, render3d 0.33.1, ui 0.28.1.
   absent or on any error), so a second launch compiles none it has seen. The Windows
   uninstaller removes the file.
 
-Installed, not yet seen in game. (HASH)
+Installed, not yet seen in game. (d860f47)
 
 ## 13.50.0 — 2026-10-30
 
