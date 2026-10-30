@@ -431,10 +431,10 @@ if (Test-D3d8to9 $d8) {
 # it is stays the player's whole. Run again, Display8 is replaced (the chain step took it
 # out) and Display8.ini merged again.
 #
-# The merge is ui/ini-merge.py's, without Python: every key the shipped file has and the
+# The merge is tools/ini-merge.py's, without Python: every key the shipped file has and the
 # player's lacks is added, in its section, and the player's values stay -- except that a
 # value still at an older set's default moves to the new one (Defaults=, numbered in the
-# shipped file). $DisplayUpgrades is ui/ini-merge.py's table for Display8.ini: the
+# shipped file). $DisplayUpgrades is tools/ini-merge.py's table for Display8.ini: the
 # section with Defaults=, the number, the section, the key, the old value. Keep them in step.
 $DisplayUpgrades = @(
     @("display8", 2, "display8", "mode", "forward"),

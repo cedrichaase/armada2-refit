@@ -4,6 +4,12 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`binkproxy/README.md`](binkproxy/README.md).
 
+## 2.3.0 — 2026-10-30
+
+### Changed
+- `binkproxy/install.sh` merges an existing `BinkProxy.ini` with `tools/ini-merge.py`
+  (new keys added) instead of leaving it as it was. Installed, not yet seen in game. HASH
+
 ## 2.2.0 — 2026-10-25
 
 ### Added

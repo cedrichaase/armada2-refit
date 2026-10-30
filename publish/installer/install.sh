@@ -386,10 +386,10 @@ fi
 # chain left as it is stays the player's whole. Re-run, Display8 is replaced (the chain
 # step took it out) and Display8.ini merged again.
 #
-# The merge is ui/ini-merge.py's, without Python: every key the shipped file has and the
+# The merge is tools/ini-merge.py's, without Python: every key the shipped file has and the
 # player's lacks is added, in its section, and the player's values stay -- except that a
 # value still at an older set's default moves to the new one (Defaults=, numbered in the
-# shipped file). DISPLAY_UPGRADES is ui/ini-merge.py's table for Display8.ini, one
+# shipped file). DISPLAY_UPGRADES is tools/ini-merge.py's table for Display8.ini, one
 # "<section with Defaults=> <n> <section> <key> <old value>", separated by ";"; keep them in step.
 DISPLAY_UPGRADES="display8 2 display8 mode forward;display8 2 display8 backend d3d9"
 ini_merge() {   # shipped installed upgrades

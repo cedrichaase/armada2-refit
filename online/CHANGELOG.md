@@ -4,6 +4,12 @@
 8 with a transport of our own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 and versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.7.0 — 2026-10-30
+
+### Changed
+- `install.sh` merges an existing `Online.ini` with `tools/ini-merge.py` instead of
+  overwriting it. Installed, not yet seen in game. HASH
+
 ## 0.6.3 — 2026-10-21
 
 ### Changed

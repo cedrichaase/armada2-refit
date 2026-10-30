@@ -35,11 +35,11 @@ The release package carries it too, from 13.35.0 ("Installing", below).
 | `d3d8.dll` | Display8 |
 | `d3d8_real.dll` | the `d3d8.dll` that was there: crosire's d3d8to9 after `./install`'s platform step. Display8 loads it (`Real=auto`) and passes every call to it |
 | `d3d8.dll.a2display-backup` | the same file again: what `a2mod stock` copies back into `d3d8.dll`. Stock is the stock chain's binary, not ours passing through |
-| `Display8.ini` | the settings; a key the player's copy lacks is added (`ui/ini-merge.py`), and a value that still holds an older shipped default is moved to the new one (below) |
+| `Display8.ini` | the settings; a key the player's copy lacks is added (`tools/ini-merge.py`), and a value that still holds an older shipped default is moved to the new one (below) |
 
 **When the shipped defaults change**, an install must not keep the old ones by
 accident nor undo a player's choice. `Defaults=` numbers the set a file holds (as
-`UI.ini`'s does), and `ui/ini-merge.py` brings a copy with an older number (or none: 1)
+`UI.ini`'s does), and `tools/ini-merge.py` brings a copy with an older number (or none: 1)
 up to the new one: each key the newer set changed moves to its new value only where it
 still holds the old default. Defaults 2 (display 0.8.0) is `Mode=stub`,
 `Backend=auto`, where 1 was `forward` and `d3d9`: a game installed with display 0.7.0 or

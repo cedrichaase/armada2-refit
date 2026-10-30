@@ -5,6 +5,13 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 1.7.0 — 2026-10-30
+
+### Changed
+- `install.sh` merges an existing `QOL.ini` and `QOLRules.ini` with `tools/ini-merge.py`
+  (keys added, the player's values kept) instead of overwriting them; `--pan-speed` still
+  sets `PanSpeed=` afterwards. Installed, not yet seen in game. HASH
+
 ## 1.6.4 — 2026-10-23
 
 ### Fixed

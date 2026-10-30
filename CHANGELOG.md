@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.44.0 — 2026-10-30
+
+Layers: qol 1.7.0, online 0.7.0, cutscenes 2.3.0, render3d 0.29.4, ui 0.25.3, display 0.11.2.
+
+### Added
+- `tools/`: `ini-merge.py` (moved from `ui/`), the one ini merge every installer uses, and
+  `ini-merge-selftest.sh`, its offline check against render3d's former inline merge.
+
+### Changed
+- The QOL, QOLRules, Online and BinkProxy installers merge an existing ini instead of
+  overwriting or ignoring it; render3d's inline merge became a call to the shared one.
+  Installed, not yet seen in game. HASH
+
 ## 13.42.4 — 2026-10-30
 
 Layers: render3d 0.29.2.

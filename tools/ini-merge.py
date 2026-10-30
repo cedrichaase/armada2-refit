@@ -1,7 +1,17 @@
 #!/usr/bin/env python3
-"""ini-merge.py <shipped.ini> <installed.ini>: add to the installed file every key the
-shipped one has and it lacks, in its own section; the player's values stay (as
-render3d/install.sh does for Render3D.ini).
+"""ini-merge.py [--before-comments] <shipped.ini> <installed.ini>: add to the installed
+file every key the shipped one has and it lacks, in its own section; the player's values
+stay. Every installer that ships an .ini uses it (render3d, ui, display, qol, online, the
+Bink proxy), so a reinstall never overwrites a hand-edited file.
+
+--before-comments puts an added key before the blank lines *and comment lines* that end
+its section (they belong to the next section), as render3d/install.sh's own merge did for
+Render3D.ini; without it only blank lines are skipped.
+
+Retired defaults (RETIRED below), keyed by the installed file's name: a key whose meaning
+changed has its old default replaced by the shipped value, wherever it still holds it.
+Unlike `Defaults=` this needs no number in the file, so it serves files that never had one
+(Render3D.ini).
 
 One exception, when the shipped defaults themselves change: a `Defaults=` key numbers
 them, in whichever section of the shipped file has it (`[UI]` in UI.ini, `[Display8]`
@@ -28,6 +38,15 @@ UPGRADES = {
     'display8': {
         2: {('display8', 'mode'): 'forward',
             ('display8', 'backend'): 'd3d9'},
+    },
+}
+
+# installed file name (lower case) -> {(section, key): the old default}.
+RETIRED = {
+    'render3d.ini': {
+        ('lights', 'beamlight'): '1.0',        # render3d 0.26.0: a line of even emission
+        ('lights', 'beamreach'): '40',
+        ('nebulae', 'litexplosion'): '0.75',   # render3d 0.27.0: a core and a wash in the gas
     },
 }
 
@@ -61,15 +80,18 @@ def values(lines):
     return out
 
 
-shipped_text = open(sys.argv[1]).read()
+args = sys.argv[1:]
+before_comments = '--before-comments' in args
+args = [a for a in args if a != '--before-comments']
+shipped_text = open(args[0]).read()
 new = parse(shipped_text)
-lines = open(sys.argv[2]).read().splitlines()
+lines = open(args[1]).read().splitlines()
 
 # The defaults' upgrade, before any key is added.
 ship_vals = values(shipped_text.splitlines())
 have_vals = values(lines)
 dsec = next((s for (s, k) in ship_vals if k == 'defaults'), None)
-label = sys.argv[2].replace('\\', '/').rsplit('/', 1)[-1]
+label = args[1].replace('\\', '/').rsplit('/', 1)[-1]
 ship_n = int(ship_vals.get((dsec, 'defaults'), (0, '1'))[1] or 1)
 have_n = int(have_vals.get((dsec, 'defaults'), (0, '1'))[1] or 1)
 upgrades = UPGRADES.get(dsec, {})
@@ -87,6 +109,27 @@ if (dsec, 'defaults') in have_vals and have_n < ship_n:
     i, _ = have_vals[(dsec, 'defaults')]
     lines[i] = f'{KEY.match(lines[i]).group(1)}={ship_n}'
 
+# Retired defaults: the shipped line replaces the old default's, as it is spelled there.
+retired = RETIRED.get(label.lower(), {})
+if retired:
+    shipped_lines = {}
+    for sec, body in new.items():
+        for l in body:
+            m = re.match(r'^(\w+)=(.*)$', l)
+            if m:
+                shipped_lines[(sec, m.group(1).lower())] = l
+    cur = None
+    for i, l in enumerate(lines):
+        m = SEC.match(l)
+        if m:
+            cur = m.group(1).lower()
+            continue
+        m = KEY.match(l)
+        if m and cur is not None:
+            k = (cur, m.group(1).lower())
+            if k in retired and m.group(2) == retired[k] and k in shipped_lines:
+                lines[i] = shipped_lines[k]
+
 have = parse('\n'.join(lines))
 for sec, body in new.items():
     keys = {k.lower() for k in (re.match(r'^(\w+)=', l).group(1) for l in have.get(sec, []) if re.match(r'^(\w+)=', l))}
@@ -103,10 +146,11 @@ for sec, body in new.items():
                     at = i
                     break
                 cur = m.group(1).lower()
-        while at > 0 and not lines[at - 1].strip():
+        while at > 0 and (not lines[at - 1].strip() or
+                          (before_comments and lines[at - 1].lstrip().startswith(';'))):
             at -= 1
         lines[at:at] = missing
     else:
         name = next(l for l in shipped_text.splitlines() if l.strip().lower() == '[' + sec + ']')
         lines += ['', name] + missing
-open(sys.argv[2], 'w').write('\n'.join(lines) + '\n')
+open(args[1], 'w').write('\n'.join(lines) + '\n')

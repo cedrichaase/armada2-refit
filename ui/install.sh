@@ -8,7 +8,7 @@
 # removing the files gives the stock game back. The player's UI.ini stays; a key the
 # shipped file has and theirs lacks is added in its own section, and a part a newer
 # set of defaults switched on is switched on where theirs still holds the old default
-# (ini-merge.py). Then the plugins the UI's parts take the place of are taken out
+# (tools/ini-merge.py). Then the plugins the UI's parts take the place of are taken out
 # (supersede.sh: HUD.asi, GridLayout.asi, Menus.asi; the menu plates stay). --remove
 # does not put them back: their own install.sh does.
 set -euo pipefail
@@ -38,7 +38,7 @@ bash "$here/build.sh" >/dev/null
 
 cp "$here/build/UI.asi" "$GAME/UI.asi"
 if [ -f "$GAME/UI.ini" ]; then
-    python3 "$here/ini-merge.py" "$here/UI.ini" "$GAME/UI.ini"
+    python3 "$here/../tools/ini-merge.py" "$here/UI.ini" "$GAME/UI.ini"
 else
     cp "$here/UI.ini" "$GAME/UI.ini"
 fi

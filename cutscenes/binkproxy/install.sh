@@ -78,7 +78,11 @@ if [ ! -f "$GAME/binkw32.dll.a2neb-backup" ]; then
 fi
 cp -p "$GAME/binkw32.dll.a2neb-backup" "$GAME/binkw32_orig.dll"
 cp "$here/build/binkw32.dll" "$GAME/binkw32.dll"
-[ -f "$GAME/BinkProxy.ini" ] || cp "$here/BinkProxy.ini" "$GAME/BinkProxy.ini"
+if [ -f "$GAME/BinkProxy.ini" ]; then
+    python3 "$here/../../tools/ini-merge.py" "$here/BinkProxy.ini" "$GAME/BinkProxy.ini"
+else
+    cp "$here/BinkProxy.ini" "$GAME/BinkProxy.ini"
+fi
 
 for d in "$MOVIES"/*/; do
     name="$(basename "$d")"
