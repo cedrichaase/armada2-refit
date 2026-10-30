@@ -265,8 +265,10 @@ pub fn systems(obj: usize) -> Vec<SystemIcon> {
 const RENDER_SELECTION: usize = 0x599900;
 const RENDER_SELECTION_STOCK: [u8; 8] = [0x55, 0x8b, 0xec, 0xa1, 0x08, 0xd5, 0x7a, 0x00];
 
-/// Switches the bubbles off (`[HUD] SelectionBubbles=0`): the function returns at
-/// once (`ret` in its first byte). render3d sees the `ret` and draws none either. The
+/// Switches the engine's bubbles off (`[HUD] SelectionBubbles=0`): the function
+/// returns at once (`ret` in its first byte). render3d, which draws them in its place,
+/// draws none while the UI claims them (`CLAIM_SELECTION`, `crate::claims`); only on a
+/// `d3d8.dll` without claims (no Display8 of contract 1.1) does it read this `ret`. The
 /// effects themselves (the hash, their pulse) are left as they are: nothing the sim
 /// reads is changed.
 pub fn hide_bubbles() -> bool {

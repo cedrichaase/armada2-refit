@@ -103,9 +103,17 @@ pub struct Overlays {
     pivot: pivot::Pivot,
 }
 
+/// `[Overlays] Fog` and `Selection` of the module made (`mods::claims`).
+static mut CLAIMS: (bool, bool) = (false, false);
+
+pub fn claims() -> (bool, bool) {
+    unsafe { CLAIMS }
+}
+
 impl Default for Overlays {
     fn default() -> Overlays {
         let s = Settings::read();
+        unsafe { CLAIMS = (s.fog, s.selection) };
         log!(
             "overlays: fog {} (filter {}), grid {}, selection {}, ghosts {}",
             s.fog as u8,

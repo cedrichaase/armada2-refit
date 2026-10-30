@@ -4,6 +4,21 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.27.0 — 2026-10-30
+
+### Added
+- Registers with Display8 at load (contract 1.1, `gpu` 1.1.0, `src/claims.rs`) and
+  claims `hud`, `selection` (`[HUD] SelectionBubbles=0`), `loading` (`[Loading]
+  Enable=1`), `credits` (`[Menus] Credits=1`) and `cursor` (while its own is drawn);
+  a part at 0 claims nothing.
+
+### Changed
+- A UI that cannot draw (30 frames in a row without a device: `gfx::drawing`) claims
+  nothing and gives every stock HUD component back, so the engine's HUD shows instead
+  of vanishing.
+
+Installed, not yet seen in game. (cf3dec5)
+
 ## 0.26.0 — 2026-10-30
 
 ### Changed

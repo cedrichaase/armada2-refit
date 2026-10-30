@@ -4,6 +4,21 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.13.0 — 2026-10-30
+
+### Added
+- Claims (contract 1.1): `display8v1_register(&Plugin8)` and `display8v1_claims(except)`;
+  every registered plugin's claims asked at each of the engine's `BeginScene`s in stub
+  mode and logged when they change (`claims: <plugin> claims ...`, `src/claims.rs`).
+
+### Changed
+- Passthrough routes by the claims (README.md, "Claims"): the loading loop's scenes are
+  dropped while `CLAIM_LOADING` is claimed (was: while `UI.asi` is loaded), the stock
+  Credits' (`CLAIM_CREDITS`) and `RefreshDisplay`'s cursor scene (`CLAIM_CURSOR`)
+  likewise; no 3D, HUD or selection draw is dropped by a claim.
+
+Installed, not yet seen in game. (cf3dec5)
+
 ## 0.12.0 — 2026-10-30
 
 ### Added

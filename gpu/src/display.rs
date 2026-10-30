@@ -67,6 +67,29 @@
 //! | `display8v1_engine_transform` | `fn(state: u32, out: *mut [f32; 16]) -> bool` | the engine's transform (`D3DTRANSFORMSTATETYPE`), row-major as Direct3D sets it |
 //! | `display8v1_vk_pass` | `fn(event: u32, pass: *const VkPass8)` | optional (display 0.10.0): a plugin's `Cmd` begins (`PASS_ENTER`) or ends (`PASS_LEAVE`), or ends with `pass` its pass now (`PASS_PUBLISH`, a plugin that publishes: render3d), every attachment in its attachment layout. Display8's passthrough draws the engine's draws into the pass published last (in this frame), and records none while a `Cmd` is alive |
 //!
+//! **Claims** (contract 1.1, display 0.13.0; ROADMAP Phase 4, "Claims"). Every backend,
+//! forward mode included:
+//!
+//! | Export | Signature | What |
+//! |---|---|---|
+//! | `display8v1_register` | `fn(plugin: *const Plugin8) -> u32` | a plugin says who it is and hands Display8 its `claims` callback, at load; an id (1 and up) for `display8v1_claims`, 0 when refused. A module that registers again replaces its first registration |
+//! | `display8v1_claims` | `fn(except: u32) -> u32` | the `CLAIM_*` every registered plugin but `except` (an id, or 0 for none) draws now, each callback asked as it is called |
+//!
+//! A claim says "this plugin draws this category now". Display8 asks every callback at
+//! each of the engine's `BeginScene`s in stub mode and logs what changed; a category
+//! nobody claims is the engine's, drawn by passthrough. A plugin claims only what it
+//! draws now: a render3d module at 0, a UI part at 0, or a plugin that cannot draw (no
+//! device, another contract: it never registers) claims nothing. Display8 drops the
+//! engine's draws of a claimed category only where the engine draws it anyway under the
+//! plugin's (`CLAIM_LOADING`, `CLAIM_CREDITS`, `CLAIM_CURSOR`: told by the scene they
+//! are drawn in); the 3D categories, `CLAIM_HUD` and `CLAIM_SELECTION` are never dropped
+//! by Display8, since the engine issues those draws only when no plugin draws the part
+//! (render3d skips the engine's step; the UI skips a stock component), so what the
+//! engine issues there is always drawn. Claims also carry what one plugin must know of
+//! another's: render3d draws no selection bubbles while another plugin claims
+//! `CLAIM_SELECTION` (the UI's `[HUD] SelectionBubbles=0`), in place of reading an
+//! engine byte the UI patched.
+//!
 //! **Passthrough** (display/README.md, "Passthrough"): in stub mode Display8 draws the
 //! engine's own Direct3D 8 draws on Vulkan, between the plugins' `Cmd`s, into the pass a
 //! plugin published at its last `Cmd`'s end (render3d's scene pass while its body runs),
@@ -129,8 +152,72 @@ use core::ffi::c_void;
 /// The contract's major version: a plugin and a Display8 of different majors do not
 /// talk (above, "Versions"). 1: display 0.12.0, the first with the handshake.
 pub const ABI_MAJOR: u32 = 1;
-/// The contract's minor version: what of the major's additions this side knows.
-pub const ABI_MINOR: u32 = 0;
+/// The contract's minor version: what of the major's additions this side knows. 1:
+/// display 0.13.0, the claims (`display8v1_register`, `display8v1_claims`).
+pub const ABI_MINOR: u32 = 1;
+
+/// `display8v1_register` (contract 1.1).
+pub type RegisterFn = extern "C" fn(plugin: *const Plugin8) -> u32;
+/// `display8v1_claims` (contract 1.1).
+pub type ClaimsFn = extern "C" fn(except: u32) -> u32;
+/// A plugin's claims callback: the `CLAIM_*` it draws now.
+pub type ClaimsCallback = extern "C" fn() -> u32;
+
+/// What a plugin draws now (`Plugin8::claims`, above, "Claims"). The 3D categories are
+/// render3d's modules; the 2D ones the UI's parts.
+pub const CLAIM_SKY: u32 = 1 << 0;
+pub const CLAIM_HULLS: u32 = 1 << 1;
+/// Planets, moons, asteroids and nebulae (render3d's `world`).
+pub const CLAIM_WORLD: u32 = 1 << 2;
+pub const CLAIM_PARTICLES: u32 = 1 << 3;
+/// Shields, explosions and the game features (render3d's `effects`).
+pub const CLAIM_EFFECTS: u32 = 1 << 4;
+pub const CLAIM_ORDNANCE: u32 = 1 << 5;
+pub const CLAIM_SPECIALS: u32 = 1 << 6;
+/// The fog of war, the shroud and the tactical grid (render3d's `[Overlays] Fog`).
+pub const CLAIM_FOG: u32 = 1 << 7;
+/// The 3D selection bubbles (`RenderSelectionEffects`): render3d's `[Overlays]
+/// Selection`, or the UI's `[HUD] SelectionBubbles=0`, which marks the selection itself.
+pub const CLAIM_SELECTION: u32 = 1 << 8;
+/// The HUD's panels in a mission (the UI's `[HUD]`).
+pub const CLAIM_HUD: u32 = 1 << 16;
+/// The loading screen (the UI's `[Loading] Enable`).
+pub const CLAIM_LOADING: u32 = 1 << 17;
+/// The Credits (the UI's `[Menus] Credits`).
+pub const CLAIM_CREDITS: u32 = 1 << 18;
+/// The mouse cursor (the UI's `[UI] Cursor`).
+pub const CLAIM_CURSOR: u32 = 1 << 19;
+
+/// The claims' names, for the logs: (bit, name).
+pub const CLAIM_NAMES: [(u32, &str); 13] = [
+    (CLAIM_SKY, "sky"),
+    (CLAIM_HULLS, "hulls"),
+    (CLAIM_WORLD, "world"),
+    (CLAIM_PARTICLES, "particles"),
+    (CLAIM_EFFECTS, "effects"),
+    (CLAIM_ORDNANCE, "ordnance"),
+    (CLAIM_SPECIALS, "specials"),
+    (CLAIM_FOG, "fog"),
+    (CLAIM_SELECTION, "selection"),
+    (CLAIM_HUD, "hud"),
+    (CLAIM_LOADING, "loading"),
+    (CLAIM_CREDITS, "credits"),
+    (CLAIM_CURSOR, "cursor"),
+];
+
+/// A plugin, as it registers (`display8v1_register`, contract 1.1): handed in, read
+/// by Display8 within its `size`.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Plugin8 {
+    /// Its size in bytes (above, "Versions").
+    pub size: u32,
+    /// An address in the plugin's module (any function of it), by which Display8 names
+    /// it in its log.
+    pub caller: usize,
+    /// The `CLAIM_*` it draws now, asked every frame; None: it claims nothing.
+    pub claims: Option<ClaimsCallback>,
+}
 
 /// `display8_abi`: Display8's major and minor through `major` and `minor`. The caller
 /// says its own (`caller_major`, `caller_minor`) and an address in its own module
@@ -313,6 +400,9 @@ pub struct Display8 {
     pub engine_transform: extern "C" fn(u32, *mut [f32; 16]) -> bool,
     /// Always there from contract 1.0 (an Option from when it was new, display 0.10.0).
     pub vk_pass: Option<extern "C" fn(u32, *const VkPass8)>,
+    /// Contract 1.1 (display 0.13.0): None on a Display8 of minor 0.
+    pub register: Option<RegisterFn>,
+    pub claims: Option<ClaimsFn>,
 }
 
 /// Why `Display8::load` found nothing to draw through. Each is logged apart: no
@@ -391,6 +481,8 @@ impl Display8 {
                 engine_viewport: core::mem::transmute::<usize, extern "C" fn(*mut [u32; 6]) -> bool>(f("display8v1_engine_viewport")?),
                 engine_transform: core::mem::transmute::<usize, extern "C" fn(u32, *mut [f32; 16]) -> bool>(f("display8v1_engine_transform")?),
                 vk_pass: Some(core::mem::transmute::<usize, extern "C" fn(u32, *const VkPass8)>(f("display8v1_vk_pass")?)),
+                register: if minor >= 1 { Some(core::mem::transmute::<usize, RegisterFn>(f("display8v1_register")?)) } else { None },
+                claims: if minor >= 1 { Some(core::mem::transmute::<usize, ClaimsFn>(f("display8v1_claims")?)) } else { None },
             })
         }
     }
@@ -536,7 +628,7 @@ impl Display8Dx12 {
     }
 }
 
-sized8!(VkDevice8, VkFrame8, VkAlloc8, VkImage8, Dx12Device8, Dx12Frame8, Dx12Alloc8, Dx12Descriptors8, Dx12Image8);
+sized8!(Plugin8, VkDevice8, VkFrame8, VkAlloc8, VkImage8, Dx12Device8, Dx12Frame8, Dx12Alloc8, Dx12Descriptors8, Dx12Image8);
 
 impl Default for VkPass8 {
     fn default() -> Self {

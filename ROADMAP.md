@@ -73,11 +73,19 @@ changes on both sides together.
 
 ### Claims
 
-Each plugin exports `<Plugin>_Claims()`: the draw categories it draws now (sky, hulls,
-world, shields, sprites and ordnance, fog of war, HUD 2D, loading, credits, cursor).
-Display8 asks it every frame. A category nobody claims is drawn by passthrough; until the
-claims exist (Phase 4), Display8 routes by its own category switches. This replaces
-every DLL-name probe and the engine-byte signal between UI and render3d.
+Each plugin **registers through the contract** at load (`display8v1_register`, contract
+1.1, display 0.13.0): `gpu` hands Display8 the plugin's claims callback, which says the
+draw categories it draws now (sky, hulls, world, particles, effects, ordnance, specials,
+fog of war, selection, HUD 2D, loading, credits, cursor). Display8 asks every callback
+at each `BeginScene` and logs what changed; `display8v1_claims` tells one plugin what
+the others claim. A category nobody claims is drawn by passthrough: a render3d module
+at 0, a UI part at 0, or a plugin that stood down (another contract, no device) claims
+nothing. Claims drop the engine's draws only where the engine draws anyway under the
+plugin's (the loading loop's, the Credits' and the cursor's scenes); the 3D categories
+keep drawing whatever the engine issues, so render3d's hand-backs still come through.
+No DLL is looked up by name for this: it replaced `GetModuleHandleA("UI.asi")` in
+passthrough and the engine-byte signal for the selection bubbles between UI and
+render3d (`display/README.md`, "Claims").
 
 ### ABI handshake
 
@@ -280,7 +288,7 @@ category switches as the routing of passthrough.
 
 | | |
 |---|---|
-| Steps | `display8_abi()`, sizes in the contract structs, `gpu` checks and logs both versions. The claims export in render3d and UI. Display8 asks for them every frame and passes through every category nobody claims; a module set to 0, or a UI part at 0, counts as unclaimed. The Display8 code default matches the shipped ini (`stub`, `auto`) |
+| Steps | `display8_abi()`, sizes in the contract structs, `gpu` checks and logs both versions. The claims registered by render3d and UI through the contract (`display8v1_register`). Display8 asks for them every frame and passes through every category nobody claims; a module set to 0, or a UI part at 0, counts as unclaimed. The Display8 code default matches the shipped ini (`stub`, `auto`) |
 | Depends on | Phase 1 signed off in game; easier after Phase 3 |
 | Parallel with | Phase 3 |
 | Acceptance | New `display-claims` scenario: Display8 alone, Display8 + UI, Display8 + render3d with `[Modules] sky=0` all draw a frame on the stub through passthrough; full refit draws as before; an old `Render3D.asi` against a new `d3d8.dll` stands down cleanly |

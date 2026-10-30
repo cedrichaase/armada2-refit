@@ -91,6 +91,7 @@ as before:
 | `display8_device()` | the engine's device now (ours, not referenced), or null |
 | `display8_frame()` | frames presented so far |
 | `display8_abi(caller_major, caller_minor, caller, &major, &minor)` | the contract's handshake (since 0.12.0): Display8's contract version, the plugin's logged beside it ("Versions of the contract" below) |
+| `display8v1_register(&plugin)`, `display8v1_claims(except)` | the claims (since 0.13.0, contract 1.1): a plugin registers at load with a callback saying what it draws now, and asks what the others claim ("Claims" below) |
 | `display8v1_backend()` | what the plugins draw on: Direct3D 9, Vulkan, Direct3D 12 or none (`gpu/src/display.rs`, `BACKEND_*`) |
 | `display8v1_vk*`, `display8v1_dx12*`, `display8v1_engine_viewport`, `display8v1_engine_transform` | stub mode on Vulkan and Direct3D 12: the device, the frame, the upload ring, deferred frees, the engine's targets and mirrors, a flush, and the engine's state the plugins read. The contract is `gpu/src/display.rs` (its doc comment is the specification); `src/vk/exports.rs` and `src/dx12/exports.rs` implement it |
 
@@ -139,6 +140,62 @@ render3d 0.31.0 and UI 0.26.0 were the last release that had to ship together; f
 there a release of one may meet the others of the same major.
 `testbench/scenarios/display-abi-mismatch.md` runs both directions against 13.42.4
 (`bench-abi.sh`).
+
+## Claims
+
+Since 0.13.0 (contract 1.1; ROADMAP Phase 4, "Claims") the plugins say what they draw,
+and passthrough draws what nobody does. `gpu::Gpu::register` (at the plugin's load, the
+handshake made then) hands Display8 a callback through `display8v1_register`; Display8
+asks every registered callback at each of the engine's `BeginScene`s in stub mode
+(`src/claims.rs`, `claims::ask`) and logs a plugin's claims when they change:
+
+    claims: UI.asi registers (id 1)
+    claims: UI.asi claims selection hud loading credits (was not asked)
+    claims: Render3D.asi claims hulls world particles effects ordnance specials fog selection (was none)
+
+The categories are `gpu::display::CLAIM_*`. A plugin claims only what it draws now:
+
+| Plugin | Claims | Not claimed |
+|---|---|---|
+| render3d | each module running (`sky`, `hulls`, `world`, `particles`, `effects`, `ordnance`, `specials`), `fog` and `selection` by `[Overlays] Fog` and `Selection` | a module at 0 (or kept for the menu scene only), one standing down beside its old plugin, everything before its first frame, and everything when its frame seam is not stock |
+| UI | `hud` (its panels are in), `selection` (`[HUD] SelectionBubbles=0`, its brackets marking the selection), `loading` (`[Loading] Enable=1`, the screen of ours), `credits` (`[Menus] Credits=1`), `cursor` (while it keeps the engine's cursor from drawing: at the present where its own is drawn) | a part at 0; everything while it cannot draw (`gfx::drawing`: 30 frames in a row with no device) |
+
+A plugin that stood down because of the contract (another major, a Display8 too old)
+never registers, and one built before 1.1 has nothing to register with: either claims
+nothing, so what it would have drawn is the engine's again.
+
+**How claims route.** Display8 drops the engine's draws of a claimed category only
+where the engine draws them *anyway*, under the plugin's, and tells them by the scene:
+
+| Category | The engine's scene | Dropped while claimed |
+|---|---|---|
+| `loading` | a `BeginScene` with `RenderLoopAssetLoadStatusUpdate` up its stack | yes: the UI's loading screen covers it |
+| `credits` | a `BeginScene` from `Credits3D.obj` (0x591340..0x592a70) | yes (with the UI's Credits the engine's never run, so none come) |
+| `cursor` | `RefreshDisplay`'s own scene (0x624630..0x624750, the immediate caller or the next) | yes (the UI empties the engine's cursor for that present, so it draws none) |
+| the 3D categories, `hud`, `selection` | — | never: the engine issues these draws only when no plugin draws the part (render3d skips the engine's step; the UI skips a stock component's `Render`; the UI's `ret` in `RenderSelectionEffects`), so what it still issues, a hand-back, is drawn |
+
+So `Passthrough=1` with every plugin on draws the same frame as before (the routing
+was "every draw but the loading loop's while `UI.asi` is loaded"), and without the UI,
+with `[Loading] Enable=0`, or with a UI that stood down, the engine's loading screen
+comes through instead of a black screen.
+
+**Between plugins.** `display8v1_claims(except)` is what every plugin but the caller
+claims, each callback asked as it is called (`gpu::Gpu::claimed_by_others`). render3d
+draws no selection bubbles while another plugin claims `selection`: that replaced its
+reading of the `ret` the UI puts in `RenderSelectionEffects`, which it reads only on a
+`d3d8.dll` without claims (`render3d/src/mods/overlays/selection.rs`). Nothing looks up
+a plugin by its DLL name for routing any more.
+
+Claims are asked in forward mode too (for `display8v1_claims`), but route nothing
+there: forward mode draws every call it is given, as before. `display-claims` checks
+three games on the stub: nothing claimed, the UI, and render3d at `sky=0`.
+
+**Not yet: the stub with no UI at all.** Without `UI.asi` (or with its `[Menus]` at 0)
+the game does not start in stub mode: a stack overflow before the engine's first
+`CreateDevice` (seen 2026-10-30, the same on 13.48.0), the engine's shell display mode,
+800x600x16, not being the one mode the stub offers; the UI's `raise_shell_mode` makes it
+the desktop's. Forward mode starts without the UI. So `display-claims`'s "alone" keeps
+the UI with every part at 0 but the shell's, which registers and claims nothing.
 
 ## How it works
 
@@ -309,10 +366,10 @@ through `gpu`), so routing is simple: every one is drawn, except
 
 - what `[Drop]` names (the same switches as in forward mode, so a category can still be
   A/B'd: `Drop3D=1` drops the hand-backs again);
-- the frames of the engine's loading loop while `UI.asi` is loaded, whose loading screen
-  draws over them: a `BeginScene` with `RenderLoopAssetLoadStatusUpdate` up its stack
-  (`drop::in_loading`) marks its frame. Without the UI the engine's loading screen is
-  the only one and is drawn;
+- the scenes a plugin claims to draw over ("Claims"): the loading loop's while the UI's
+  loading screen is up (`CLAIM_LOADING`), the stock Credits' and the cursor's. Without
+  the UI, with its part at 0 or with a UI that stood down, the engine's loading screen
+  is the only one and is drawn;
 - a draw into a render target of the engine's own other than its back buffer (none seen);
 - a draw through a vertex shader other than the one it has a port of (below), logged
   once;
@@ -320,8 +377,8 @@ through `gpu`), so routing is simple: every one is drawn, except
   `Cmd` alive): logged once with its caller, never recorded into another recorder's
   render pass.
 
-When claims arrive (ROADMAP phase 3 and 4g), they become the routing in place of "every
-one".
+Since 0.13.0 the plugins' claims are this routing ("Claims"): no DLL is looked up by
+name.
 
 **Where it lands.** In the frame's command buffer, at the moment the engine makes it,
 between the plugins' recorders: the same order as on Direct3D 9, where a plugin's targets
@@ -388,8 +445,7 @@ in three passes this way (two lights added, then the base texture multiplied ove
 all of which the stage interpreter runs. Any other shader is refused and logged once with
 its hash; on the test bench its tokens are logged too, for porting.
 
-**What is not done yet** (ROADMAP phase 4): claims as
-the routing (4g, after phase 3); Direct3D 12 and the stub's Direct3D 9 (phase 10; the
+**What is not done yet**: Direct3D 12 and the stub's Direct3D 9 (phase 10; the
 latter is to go). Specular lighting, spot cones, texture transforms, a third stage and
 `ZBIAS` are not drawn, each logged once when the engine uses it; none was seen in the
 stock traces.

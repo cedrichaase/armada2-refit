@@ -558,6 +558,25 @@ that the old plugins are not installed:
   if `models/` installed it).
 - **`[UI] Cursor=0`** is the engine's cursor, kept square by the UI (below).
 
+### Claims
+
+With Display8 of contract 1.1 (display 0.13.0) the UI registers at load, before any
+part is patched (`src/claims.rs`, `gpu::Gpu::register`; `display/README.md`,
+"Claims"), and Display8 asks it at every scene what it draws now: `hud` (its panels
+are in), `selection` (`[HUD] SelectionBubbles=0`: render3d then draws no bubbles),
+`loading` (`[Loading] Enable=1`, its own screen: Display8's passthrough then drops the
+engine's loading frames under it), `credits` (`[Menus] Credits=1`) and `cursor` (while
+it keeps the engine's cursor from drawing). A part at 0 claims nothing, so on the stub
+the engine's own draws of it come through passthrough: with `[Loading] Enable=0` the
+engine's logo scene and bar, which until display 0.13.0 were dropped whenever `UI.asi`
+was loaded.
+
+A UI that cannot draw claims nothing and takes no stock component: after 30 frames in
+a row with no device or back buffer (`gfx::drawing`; logged), the HUD switch
+(`engine/hud.rs`, `taken`) lets every stock panel draw and have the mouse again, so the
+engine's HUD comes through instead of vanishing. A UI of another contract than
+Display8's never registers either.
+
 ### What the old plugins did, and where it is now
 
 | Plugin, part | Now |

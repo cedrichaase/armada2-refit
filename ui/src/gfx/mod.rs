@@ -680,10 +680,34 @@ fn pipeline(dev: usize, target: Format) -> Option<&'static gpu::Pipeline> {
 /// Runs `f` with the back buffer's size and a `Draw` to fill, then draws it into
 /// render target 0. Nothing on the device changes when `f` draws nothing.
 #[allow(static_mut_refs)]
+/// Frames in a row `frame` found no device or back buffer to draw on.
+static mut BLIND: u32 = 0;
+/// Frames in a row without a device after which the UI counts as unable to draw.
+const BLIND_FRAMES: u32 = 30;
+
+/// Whether the UI draws: false after `BLIND_FRAMES` frames in a row with no device or
+/// back buffer to draw on (no Direct3D 9 device behind the engine's, or a Display8 whose
+/// contract this `gpu` does not talk). Then it claims nothing (`crate::claims`) and
+/// takes no stock component, so the engine's own draws stand in.
+pub fn drawing() -> bool {
+    unsafe { BLIND < BLIND_FRAMES }
+}
+
+fn blind(yes: bool) {
+    unsafe {
+        let was = drawing();
+        BLIND = if yes { BLIND.saturating_add(1) } else { 0 };
+        if was != drawing() {
+            crate::log!("ui: {}", if drawing() { "drawing again" } else { "no device to draw with: the engine's own HUD, loading screen and cursor stand in" });
+        }
+    }
+}
+
 pub fn frame(f: impl FnOnce(u32, u32, &mut Draw)) {
-    let Some(dev) = attach().map(|a| a.id) else { return };
+    let Some(dev) = attach().map(|a| a.id) else { return blind(true) };
     let g = gpu();
-    let Some(bb) = g.engine_target() else { return };
+    let Some(bb) = g.engine_target() else { return blind(true) };
+    blind(false);
     let (w, h) = bb.size();
     if w == 0 || h == 0 {
         return;
