@@ -10,7 +10,7 @@ versions". Newest first. Details, and the planned changes, are in
 ### Changed
 - `qol.c` and `rules.c` shed their own copies of the helpers; the `.def` files moved to `csdk/def/`. Built on `csdk/a2asi.h` (the Win32 types, kernel32 imports, `s_*` string helpers, the append-a-line log, signature check and `VirtualProtect` patch) with the import libraries in `csdk/def/`; behaviour and log lines are unchanged.
 
-Installed, not yet seen in game. (HASH)
+Installed, not yet seen in game. (082d0c6)
 
 ## 1.6.4 — 2026-10-23
 

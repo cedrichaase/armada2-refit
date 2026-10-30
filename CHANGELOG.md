@@ -15,7 +15,7 @@ Layers: qol 1.7.1, online 0.7.1, cutscenes 2.3.1.
 ### Changed
 - qol, online and cutscenes `build.sh` read the `.def` files from `csdk/def/`; the plugins' sources use `a2asi.h` in place of their own copies. Pure refactor: same log lines.
 
-Installed, not yet seen in game. (HASH)
+Installed, not yet seen in game. (082d0c6)
 
 ## 13.42.4 — 2026-10-30
 
