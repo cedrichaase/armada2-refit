@@ -4,6 +4,15 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.28.0 — 2026-10-30
+
+### Changed
+- `UI.log` moves out of the game directory: `%LOCALAPPDATA%\armada2-refit\logs\UI.log`, beside `Display8.pipelines`'
+  folder, made if missing; the game directory when `LOCALAPPDATA` is unset or not
+  writable. The first line says where (`log: <path>`). An uninstall leaves the folder.
+
+Installed, not yet seen in game. (9a5e70a)
+
 ## 0.27.0 — 2026-10-30
 
 ### Added

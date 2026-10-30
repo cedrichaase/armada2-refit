@@ -5,6 +5,15 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.50.0 — 2026-10-30
+
+Layers: display 0.14.0, render3d 0.33.0, ui 0.28.0, qol 1.8.0, online 0.8.0, cutscenes 2.4.0, testbench 3.78.0, gui-installer 2.3.0.
+
+### Changed
+- **Every plugin's log is now `%LOCALAPPDATA%\armada2-refit\logs\<name>.log`** (`Render3D`, `UI`, `Display8`, `QOL`, `QOLRules`, `Online`, `BinkProxy`), beside `Display8.pipelines`' folder, made if missing; the game directory when `LOCALAPPDATA` is unset or not writable. The first line of each says where. `crates/a2rt` (`log_dir`, `log_open`) and `csdk/a2asi.h` (`a2_log_path`, `a2_log_where`) hold the rule once. An uninstall leaves the folder; the GUI installer's bug report reads it (and the game folder for older builds); the test bench reads the clone's prefix.
+
+Installed, not yet seen in game. (9a5e70a)
+
 ## 13.49.0 — 2026-10-30
 
 Layers: display 0.13.0, render3d 0.32.0, ui 0.27.0, testbench 3.77.0.

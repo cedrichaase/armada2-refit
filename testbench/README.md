@@ -153,7 +153,17 @@ under 2 s for the rest. The first `--install` of a checkout also builds its plug
 The launch step also proves isolation: it scans `/proc/<pid>/maps` and `fd` for the
 real install's path, and fails the case if the game has it open.
 
-Logs gathered per case: `wine.log` (umu, Proton, Wine; `A2TEST_WINEDEBUG` sets
+**Where the plugins' logs are.** Since 13.50.0 every plugin's log (`Render3D`, `UI`, `Display8`, `QOL`,
+`QOLRules`, `Online`, `BinkProxy`) is `%LOCALAPPDATA%\armada2-refit\logs\<name>.log`, which in a
+clone is `<session>/prefix/drive_c/users/steamuser/AppData/Local/armada2-refit/logs/`, not the clone's
+game directory (its first line says where; with `LOCALAPPDATA` unset or unwritable it is
+the game directory). `Session.log_dirs` / `log_path` / `game_log` look in the prefix first and
+the game directory second, so older builds and `Scene.log` (the scene plugin's, beside the exe)
+read the same way; every `Expect "X.log"` and `Wait ... for "X.log"` goes through them. A script
+that reads a log by path must glob the prefix (see `gpu/replay.sh`, `render3d/perf/ab.sh`).
+The launch deletes the previous logs in both places.
+
+Logs gathered per case (into the case's `logs/`, from wherever they were): `wine.log` (umu, Proton, Wine; `A2TEST_WINEDEBUG` sets
 channels, `trace+cursor` for Wine's pointer clip), `Menus.log`, `Render3D.log`, `BinkProxy.log`, `D3DTrace.log` (`d3dtrace/`), `D3D9Probe.log` (`d3d9probe/`), `Armada2_d3d9.log` and
 `xalia_dxgi.log` (DXVK), `sway.log` (with `A2TEST_XWAYLAND_DEBUG=1` in the
 environment of `session start` or `run`, every Wayland request and event of Xwayland's:

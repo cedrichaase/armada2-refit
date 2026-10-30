@@ -4,6 +4,15 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 2.3.0 — 2026-10-30
+
+Reads package schemas 0 and 1, unchanged.
+
+### Changed
+- The bug report collects the plugins' logs from `%LOCALAPPDATA%\armada2-refit\logs` (on Windows, in the Wine prefix on Linux and macOS: Heroic's `winePrefix`, the bottle, or the prefix the game folder is in), and from the game folder as the fallback for builds before 13.50.0; each log says which. A selftest check covers the prefix folder and the order.
+
+Installed, not yet seen in game. (9a5e70a)
+
 ## 2.2.0 — 2026-10-29
 
 Reads package schemas 0 and 1, unchanged.

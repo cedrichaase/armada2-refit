@@ -258,7 +258,7 @@ as before).
 | Key | Default | |
 |---|---|---|
 | `Enable` | 1 | 0: the engine draws the 3D view, as without the plugin |
-| `Log` | 1 | `Render3D.log` in the game directory |
+| `Log` | 1 | `Render3D.log` in `%LOCALAPPDATA%\armada2-refit\logs` (the game directory if that is unset or not writable; its first line says where) |
 | `MSAA` | 4 | samples per pixel on the scene target: 0, 2, 4 or 8 |
 | `HDR` | 1 | 0: an 8-bit scene target (no light past white, no bloom), for comparison |
 | `Bloom` | 0.12 | how much of the light past the threshold spreads into a glow |

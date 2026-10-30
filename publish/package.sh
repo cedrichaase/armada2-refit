@@ -102,7 +102,10 @@ done
 # Windows shows in Properties and antivirus heuristics look for. The vendored ones are
 # shipped as their authors built them.
 for f in "$d"/game/*.asi "$d"/game/*.dll "$d"/display/*.dll; do
-    llvm-readobj --coff-resources "$f" | grep -q 'Type: VERSIONINFO' \
+    # (read whole, then grep: `grep -q` closing the pipe early made llvm-readobj fail
+    # under pipefail, now and then, on a file that has the resource)
+    res=$(llvm-readobj --coff-resources "$f") || res=
+    grep -q 'Type: VERSIONINFO' <<<"$res" \
         || { echo "no version resource: $f (platform/versioninfo/build-res.sh)" >&2; exit 1; }
 done
 bash -n "$d/install.sh"

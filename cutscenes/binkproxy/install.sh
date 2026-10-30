@@ -101,4 +101,4 @@ rm -f "$GAME/BinkProxy.log"
 echo "installed into $GAME:"
 ls -l "$GAME/binkw32.dll" "$GAME/binkw32_orig.dll" "$GAME/BinkProxy.ini"
 ls -l "$GAME"/animations/*.mp4 "$GAME"/animations/*.wav 2>/dev/null || true
-echo "after a launch:  cat \"$GAME/BinkProxy.log\""
+echo "after a launch:  %LOCALAPPDATA%\\armada2-refit\\logs\\BinkProxy.log  (in the Wine prefix: drive_c/users/<user>/AppData/Local/armada2-refit/logs/)"

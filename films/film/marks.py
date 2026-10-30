@@ -100,12 +100,22 @@ class Tail:
     is read from its start. UI.asi writes each line straight to the file."""
 
     def __init__(self, path, every=0.05):
-        self.path, self.every = path, every
+        """`path` is a file, or a function that names it (the log moves from the game
+        directory to LocalAppData once the game writes it there)."""
+        self._path, self.every = path, every
+        self._at = None
         self.lines = []          # [(unix time, line)]
         self._stop = threading.Event()
         self._pos = None
         self._buf = b''
         self.thread = threading.Thread(target=self._run, daemon=True)
+
+    @property
+    def path(self):
+        p = self._path() if callable(self._path) else self._path
+        if p != self._at:
+            self._at, self._pos, self._buf = p, None, b''
+        return p
 
     def start(self):
         """From the log's end as it is now: what it already holds happened before."""
@@ -117,15 +127,16 @@ class Tail:
         return self
 
     def _read(self):
+        path = self.path
         try:
-            size = os.path.getsize(self.path)
+            size = os.path.getsize(path)
         except OSError:
             return
         if self._pos is None or size < self._pos:     # new or rewritten: from its start
             self._pos, self._buf = 0, b''
         if size == self._pos:
             return
-        with open(self.path, 'rb') as f:
+        with open(path, 'rb') as f:
             f.seek(self._pos)
             data = f.read(size - self._pos)
         self._pos += len(data)

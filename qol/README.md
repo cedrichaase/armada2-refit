@@ -15,6 +15,8 @@ version, and whether it has been seen in game is in [`CHANGELOG.md`](CHANGELOG.m
     qol/install.sh --remove         take it out (QOL.asi, QOL.ini, QOL.log)
     qol/rts-cfg-check.py [--fix]    is RTS_CFG.h stock where QOL.asi needs it to be?
 
+**Where the log is.** `QOL.log` (and `QOLRules.log`) is in `%LOCALAPPDATA%\armada2-refit\logs\` (the Wine prefix's, under Proton), beside Display8's pipeline cache; the game directory only if that is unset or not writable. The first line says where. Written by `a2_log_path()` in `csdk/a2asi.h`; an uninstall leaves the folder.
+
 `./install` runs `qol/install.sh`; `./a2mod stock` / `refit` switches `QOL.asi` and
 `QOL.ini` like the other plugins.
 

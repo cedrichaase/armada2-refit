@@ -46,4 +46,4 @@ fi
 rm -f "$GAME/Online.log"
 echo "installed into $GAME:"
 ls -l "$GAME/Online.asi" "$GAME/Online.ini"
-echo "after a launch:  cat \"$GAME/Online.log\""
+echo "after a launch:  %LOCALAPPDATA%\\armada2-refit\\logs\\Online.log  (in the Wine prefix: drive_c/users/<user>/AppData/Local/armada2-refit/logs/)"

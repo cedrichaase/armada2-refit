@@ -99,12 +99,16 @@ static char g_dir[260];
 static char g_ini[280];
 static int  g_log = 1, g_replace = 1, g_raise = 1, g_fit = 1;
 
+static char g_logpath[320];
+
 static void logline(const char *msg)
 {
-    char path[300];
     if (!g_log) return;
-    s_cpy(path, g_dir); s_cat(path, "BinkProxy.log");
-    a2_append_line(path, msg);
+    if (!g_logpath[0]) {
+        /* the first line says where the log is */
+        a2_log_where(g_logpath, a2_log_path(g_logpath, sizeof g_logpath, g_dir, "BinkProxy.log"));
+    }
+    a2_append_line(g_logpath, msg);
 }
 
 /* ---- the real DLL ---------------------------------------------------------- */

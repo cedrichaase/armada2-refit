@@ -67,19 +67,56 @@ pub fn init() {
     GAME_DIR.store(alloc::boxed::Box::into_raw(alloc::boxed::Box::new(dir)), Ordering::Relaxed);
 }
 
-/// Opens the log, truncating it. `on` false: nothing is written.
+/// The folder the logs go in: `%LOCALAPPDATA%\armada2-refit\logs` (beside Display8's
+/// pipeline cache), made if missing; None when `LOCALAPPDATA` is unset or the folder
+/// cannot be made.
+pub fn log_dir() -> Option<String> {
+    let mut d = env("LOCALAPPDATA")?;
+    d.push_str("\\armada2-refit");
+    if !create_dir(&d) {
+        return None;
+    }
+    d.push_str("\\logs");
+    create_dir(&d).then_some(d)
+}
+
+fn open_log(path: &str) -> HANDLE {
+    let p = cstr(path);
+    unsafe {
+        CreateFileA(p.as_ptr(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, core::ptr::null_mut(),
+            CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, core::ptr::null_mut())
+    }
+}
+
+/// Opens the log, truncating it: `%LOCALAPPDATA%\armada2-refit\logs\<name>`, or the
+/// game directory when that is unset or not writable. The first line says where.
+/// `on` false: nothing is written.
 pub fn log_open(name: &str, on: bool) {
     LOG_ON.store(on, Ordering::Relaxed);
     if !on {
         return;
     }
-    let p = cstr(&game_path(name));
-    let h = unsafe {
-        CreateFileA(p.as_ptr(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, core::ptr::null_mut(),
-            CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, core::ptr::null_mut())
-    };
+    let mut path = String::new();
+    let mut h = INVALID_HANDLE;
+    if let Some(mut d) = log_dir() {
+        d.push('\\');
+        d.push_str(name);
+        h = open_log(&d);
+        path = d;
+    }
+    let mut fell_back = false;
+    if h == INVALID_HANDLE {
+        path = game_path(name);
+        h = open_log(&path);
+        fell_back = true;
+    }
     if h != INVALID_HANDLE {
         LOG_FILE.store(h, Ordering::Relaxed);
+        if fell_back {
+            log_fmt(format_args!("log: {} (LOCALAPPDATA unset or not writable)", path));
+        } else {
+            log_fmt(format_args!("log: {}", path));
+        }
     }
 }
 

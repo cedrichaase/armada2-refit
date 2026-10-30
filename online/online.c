@@ -997,9 +997,19 @@ static void startup(void)
     if (g_loss > 50) g_loss = 50;
     g_direct  = (int)GetPrivateProfileIntA("Online", "Direct",  1,  ini);
     GetPrivateProfileStringA("Online", "Server", "c20e.de", g_server, sizeof g_server, ini);
-    if (g_logging && g_logpath[0])
+    if (g_logging && g_logpath[0]) {
+        char dir[320];
+        int  ad;
+        a2_exe_dir(dir, sizeof dir);
+        ad = a2_log_path(g_logpath, sizeof g_logpath, dir, "Online.log");
         g_log = CreateFileA(g_logpath, GENERIC_WRITE, FILE_SHARE_READ, NULLPTR,
                             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULLPTR);
+        b[0] = 0;
+        s_cat(b, "log: ");
+        s_cat(b, g_logpath);
+        if (!ad) s_cat(b, " (LOCALAPPDATA unset or not writable)");
+        logline(b);
+    }
 
     b[0] = 0;
     s_cat(b, "--- Online payload=");

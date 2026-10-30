@@ -130,6 +130,24 @@ def vulkan_validate():
     return os.environ.get('A2TEST_VULKAN_VALIDATE', '1') != '0'
 
 
+def log_dirs(prefix, game):
+    """The folders a plugin's log may be in: the prefix's LocalAppData logs folder, then
+    the game directory. `prefix` is the directory WINEPREFIX points at (its `pfx` inside
+    for Proton; the prefix itself for a plain Wine one)."""
+    prefix = Path(prefix)
+    out = []
+    for base in (prefix / 'pfx', prefix):
+        out += sorted((base / 'drive_c' / 'users').glob('*/AppData/Local/armada2-refit/logs'))
+    return out + [Path(game)]
+
+
+def log_path(dirs, name):
+    for d in dirs:
+        if (Path(d) / name).exists():
+            return Path(d) / name
+    return None
+
+
 def vulkan_env(game_dir, logs=None):
     """The environment of a game whose Display8 draws on Vulkan (`Mode=stub`,
     `Backend=vulkan` in its Display8.ini): Mesa's CPU Vulkan (lavapipe) as the only
@@ -270,6 +288,17 @@ class Session:
     @property
     def prefix_dir(self):
         return self.work / 'prefix'
+
+    @property
+    def log_dirs(self):
+        """Where the plugins write their logs: %LOCALAPPDATA%\\armada2-refit\\logs in this
+        clone's Wine prefix, and the game directory (builds before 13.50.0, and the
+        fallback when LOCALAPPDATA is unset or not writable)."""
+        return log_dirs(self.prefix_dir, self.game_dir)
+
+    def log_path(self, name):
+        """The file of the log `name` (a plugin's, or a file beside Armada2.exe), or None."""
+        return log_path(self.log_dirs, name)
 
     # ------------------------------------------------------------------ clone + prepare
 
@@ -777,10 +806,11 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                      'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Scene.marks', 'Armada2_d3d9.log',
                      'Render3D.log', 'Stems.log', 'UI.log', 'Online.log',
                      'Display8.log', 'Display8.inventory.tsv', 'Display8.mark'):
-            try:
-                (g / name).unlink()
-            except FileNotFoundError:
-                pass
+            for d in self.log_dirs:
+                try:
+                    (d / name).unlink()
+                except FileNotFoundError:
+                    pass
         logs = self.dir / 'logs'
         e = self.s['env']
         env = {k: v for k, v in os.environ.items()
@@ -1118,9 +1148,10 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         return shots[-1] if shots else None
 
     def game_log(self, name):
-        """A log the instrumented code writes beside Armada2.exe, or one of ours."""
-        for p in (self.game_dir / name, self.dir / 'logs' / name):
-            if p.exists():
+        """A log the instrumented code writes (the prefix's LocalAppData logs folder, or
+        beside Armada2.exe), or one of ours."""
+        for p in (self.log_path(name), self.dir / 'logs' / name):
+            if p and p.exists():
                 return p.read_text(errors='replace')
         return None
 
@@ -1168,8 +1199,9 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                      'GridLayout.ini', 'dxvk.conf', 'Online.log',
                      'Online.ini', 'OnlineServer.log', 'Render3D.log', 'Render3D.ini', 'UI.log', 'UI.ini',
                      'Display8.log', 'Display8.ini', 'Display8.inventory.tsv'):
-            if (g / name).exists():
-                shutil.copy2(g / name, dst / name)
+            src = self.log_path(name)
+            if src:
+                shutil.copy2(src, dst / name)
         if self.crashed():
             shutil.copy2(g / 'exception.txt', dst / 'exception.txt')
         # frame dumps not yet moved by `drive dump` (a trigger written by hand)

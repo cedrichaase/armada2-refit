@@ -249,7 +249,7 @@ With `Trace=1` in `Display8.ini`:
   with the calls, the frames they fell in, and how many came from a thread other than
   the device's. `#` lines at the end give each context's frames, engine draws and time
   spent in the real `Present`.
-- **`Display8.log`**: each distinct line once per context: the answers the engine
+- **`Display8.log`** (in `%LOCALAPPDATA%\armada2-refit\logs\` since display 0.14.0, the game directory if that is unset or not writable; its first line says where): each distinct line once per context: the answers the engine
   branches on (`ANSWER`: caps, formats, modes, `ValidateDevice`), the present
   parameters of every `CreateDevice` and `Reset`, gamma ramps (`GAMMA`), every lock
   (`LOCK`) and read-back (`READBACK`), render targets, the plugins' queries for

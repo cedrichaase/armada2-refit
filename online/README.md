@@ -6,6 +6,8 @@ does not work at all. This layer replaces DirectPlay with a transport of our own
 find each other through a small rendezvous server, connect directly where their routers
 allow it, and fall back to a relay where they do not.
 
+**Where the log is.** `Online.log` is in `%LOCALAPPDATA%\armada2-refit\logs\` (the Wine prefix's, under Proton), beside Display8's pipeline cache; the game directory only if that is unset or not writable. The first line says where. Written by `a2_log_path()` in `csdk/a2asi.h`; an uninstall leaves the folder.
+
 **State:** milestone 2 of the plan below. *Internet – Online* on the Multiplayer
 Connection screen runs the game on `Online.asi`'s own transport, over UDP, under Proton
 without Microsoft's DirectPlay. Through the server named in `Online.ini` (the public one
@@ -402,7 +404,7 @@ By hand, to look around in between:
     # joiner: rename at design 400,187 > Internet - Manual IP > design 400,292,
     #         type the host's "Local IP Address" > O.K. > click the game > Join Game
     # LAUNCH on the host, then on the joiner, then on the host again
-    # the logs: <clone>/game/Online.log
+    # the logs: <clone>/prefix/drive_c/users/steamuser/AppData/Local/armada2-refit/logs/Online.log
 
 Traps found on the way:
 

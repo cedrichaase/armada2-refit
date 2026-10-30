@@ -75,4 +75,4 @@ cp "$here"/nebulae/*.ini "$GAME/Nebulae/"
 
 rm -f "$GAME/Render3D.log"
 echo "installed into $GAME: Render3D.asi, Render3D.ini and the recipes${removed:+; took out the old$removed}"
-echo "after a launch:  cat \"$GAME/Render3D.log\""
+echo "after a launch:  %LOCALAPPDATA%\\armada2-refit\\logs\\Render3D.log  (in the Wine prefix: drive_c/users/<user>/AppData/Local/armada2-refit/logs/)"
