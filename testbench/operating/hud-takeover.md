@@ -29,7 +29,8 @@ agents after.
   does not show a mixed line.
 - **UI.log and UI.ini are gathered into the report** (`logs/`) since this work;
   `Expect "UI.log" contains` reads it from the clone while the game runs, and a session
-  can copy it from `~/.cache/a2test/sessions/<ID>/game/UI.log` before `session stop`.
+  can copy it from the clone's prefix, `~/.cache/a2test/sessions/<ID>/prefix/drive_c/users/steamuser/AppData/Local/armada2-refit/logs/UI.log`, before `session stop`
+  (13.50.0; older builds wrote it to `<ID>/game/UI.log`).
 - **Quitting from a mission hangs on a black screen** (2026-10-16, 1280x720): after
   Exit to Windows and Yes the game stays up with a black screen until the bench stops
   the prefix, so `Quit the game` fails. Seen in `ui-hud-bar` (with and without

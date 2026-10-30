@@ -54,7 +54,9 @@ take() {  # side tree scene label
     g=~/.cache/a2test/sessions/$id/game
     for _ in $(seq 1 60); do grep -q "scene ready" "$g/Scene.log" 2>/dev/null && break; sleep 3; done
     sleep "$settle"
-    cp "$g/Render3D.log" "$out/$4-$3.log" 2>/dev/null || echo "no Render3D.log"
+    # the log is in the prefix's LocalAppData (13.50.0), or beside the exe in older builds
+    rl=$(ls ~/.cache/a2test/sessions/$id/prefix/pfx/drive_c/users/*/AppData/Local/armada2-refit/logs/Render3D.log "$g/Render3D.log" 2>/dev/null | head -1)
+    cp "$rl" "$out/$4-$3.log" 2>/dev/null || echo "no Render3D.log"
     ./a2test drive --session "$id" shot "$4-$3" >/dev/null 2>&1
     ./a2test session stop "$id" >/dev/null 2>&1
     echo "    session $id"

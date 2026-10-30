@@ -4,6 +4,15 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`binkproxy/README.md`](binkproxy/README.md).
 
+## 2.4.0 — 2026-10-30
+
+### Changed
+- `BinkProxy.log` moves out of the game directory: `%LOCALAPPDATA%\armada2-refit\logs\BinkProxy.log`, beside `Display8.pipelines`'
+  folder, made if missing; the game directory when `LOCALAPPDATA` is unset or not
+  writable. The first line says where (`log: <path>`). An uninstall leaves the folder.
+
+Installed, not yet seen in game. (HASH)
+
 ## 2.3.1 — 2026-10-30
 
 ### Changed

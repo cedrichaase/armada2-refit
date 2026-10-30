@@ -38,3 +38,5 @@ CreateThread@24
 WaitForSingleObject@8
 HeapFree@12
 GetPrivateProfileStringA@24
+GetEnvironmentVariableA@12
+CreateDirectoryA@8

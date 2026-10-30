@@ -12,7 +12,10 @@
  *     would call the CRT's __ftol2);
  *   - the log: a2_append_line() opens the file, appends one line and closes it (a
  *     plugin that keeps its log open has its own logline() over the s_* helpers),
- *     and a2_exe_dir() gives the directory of Armada2.exe, where every ini and log sits;
+ *     and a2_exe_dir() gives the directory of Armada2.exe, where every ini sits;
+ *     a2_log_path() puts a log in %LOCALAPPDATA%\armada2-refit\logs (the game directory
+ *     if that is unset or not writable) and a2_log_where() writes the first line, which
+ *     says where;
  *   - patching: a2_sig_is() checks a site's bytes against this build before a plugin
  *     patches, a2_poke() writes through VirtualProtect and flushes the instruction
  *     cache, a2_write_call() / a2_write_jmp() write a rel32 call or jmp, NOP-padded.
@@ -73,6 +76,8 @@ __declspec(dllimport) DWORD   __stdcall SetFilePointer(HANDLE, LONG, LONG *, DWO
 __declspec(dllimport) BOOL    __stdcall CloseHandle(HANDLE);
 __declspec(dllimport) UINT    __stdcall GetPrivateProfileIntA(LPCSTR, LPCSTR, INT, LPCSTR);
 __declspec(dllimport) DWORD   __stdcall GetPrivateProfileStringA(LPCSTR, LPCSTR, LPCSTR, LPSTR, DWORD, LPCSTR);
+__declspec(dllimport) DWORD   __stdcall GetEnvironmentVariableA(LPCSTR, LPSTR, DWORD);
+__declspec(dllimport) BOOL    __stdcall CreateDirectoryA(LPCSTR, void *);
 
 /* ---- strings: the caller's buffer, no CRT ------------------------------ */
 
@@ -159,6 +164,50 @@ static inline void a2_append_line(const char *path, const char *s)
     WriteFile(h, s, (DWORD)s_len(s), &wrote, NULLPTR);
     WriteFile(h, "\r\n", 2, &wrote, NULLPTR);
     CloseHandle(h);
+}
+
+/* Where the log called name goes: %LOCALAPPDATA%\armada2-refit\logs\name, the folders
+ * made if missing, else beside Armada2.exe (dir, with its trailing slash, from
+ * a2_exe_dir).  The folder is checked by opening the file for append, which does not
+ * truncate it.  Returns 1 for the first place, 0 for the fallback. */
+static inline int a2_log_path(char *out, int cap, const char *dir, const char *name)
+{
+    char    d[300];
+    HANDLE  h;
+    DWORD   n = GetEnvironmentVariableA("LOCALAPPDATA", d, sizeof d);
+
+    if (n > 0 && n < sizeof d - 40) {
+        s_cat(d, "\\armada2-refit");
+        CreateDirectoryA(d, NULLPTR);
+        s_cat(d, "\\logs");
+        CreateDirectoryA(d, NULLPTR);
+        s_cat(d, "\\");
+        s_cat(d, name);
+        if (s_len(d) < cap) {
+            h = CreateFileA(d, GENERIC_WRITE, FILE_SHARE_READ, NULLPTR,
+                            OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULLPTR);
+            if (h != INVALID_HANDLE_VALUE) {
+                CloseHandle(h);
+                s_copyn(out, d, cap);
+                return 1;
+            }
+        }
+    }
+    out[0] = 0;
+    s_copyn(out, dir, cap);
+    if (s_len(out) + s_len(name) < cap) s_cat(out, name);
+    return 0;
+}
+
+/* The first line of a log: where it is. */
+static inline void a2_log_where(const char *path, int appdata)
+{
+    char b[400];
+    b[0] = 0;
+    s_cat(b, "log: ");
+    s_cat(b, path);
+    if (!appdata) s_cat(b, " (LOCALAPPDATA unset or not writable)");
+    a2_append_line(path, b);
 }
 
 /* ---- patching the exe in memory ------------------------------------------ */

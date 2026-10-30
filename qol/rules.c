@@ -612,6 +612,11 @@ static void startup(void)
     g_logpath[0] = 0; s_cat(g_logpath, path); s_cat(g_logpath, "QOLRules.log");
     g_logging = (int)GetPrivateProfileIntA("Rules", "Log", 1, ini);
     g_trace = g_logging > 1;
+    if (g_logging && g_logpath[0]) {
+        char dir[320];
+        a2_exe_dir(dir, sizeof dir);
+        a2_log_where(g_logpath, a2_log_path(g_logpath, sizeof g_logpath, dir, "QOLRules.log"));
+    }
 
     b[0] = 0;
     s_cat(b, "--- QOLRules PayOnQueue=");

@@ -4,6 +4,15 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.33.0 — 2026-10-30
+
+### Changed
+- `Render3D.log` moves out of the game directory: `%LOCALAPPDATA%\armada2-refit\logs\Render3D.log`, beside `Display8.pipelines`'
+  folder, made if missing; the game directory when `LOCALAPPDATA` is unset or not
+  writable. The first line says where (`log: <path>`). An uninstall leaves the folder.
+
+Installed, not yet seen in game. (HASH)
+
 ## 0.31.0 — 2026-10-30
 
 ### Changed

@@ -164,6 +164,9 @@ unproxy() {
 # changes with every build. Display8 holds the word "dxvk" too, so ask this first.
 is_display8() { [ -f "$1" ] && grep -qa "Display8 stopped the game" "$1"; }
 # What Display8 writes beside the exe (display/install --remove takes the same out).
+# Its log, like every plugin's since 13.50.0, is in the Wine prefix's
+# %LOCALAPPDATA%\armada2-refit\logs: an uninstall leaves that folder (the bug report
+# reads it); the names here are what older builds wrote beside the exe.
 DISPLAY_FILES="Display8.ini Display8.log Display8.inventory.tsv Display8.inventory.tmp Display8.mark Display8.go"
 # Display8 out of the d3d8 slot, and the chain's d3d8.dll it stood in front of
 # (d3d8_real.dll) back in it. With --all, its settings and logs go too.

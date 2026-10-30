@@ -5,6 +5,15 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 1.8.0 — 2026-10-30
+
+### Changed
+- `QOL.log` and `QOLRules.log` move out of the game directory: `%LOCALAPPDATA%\armada2-refit\logs\` (`QOL.log`, `QOLRules.log`), beside `Display8.pipelines`'
+  folder, made if missing; the game directory when `LOCALAPPDATA` is unset or not
+  writable. The first line says where (`log: <path>`). An uninstall leaves the folder.
+
+Installed, not yet seen in game. (HASH)
+
 ## 1.7.1 — 2026-10-30
 
 ### Changed

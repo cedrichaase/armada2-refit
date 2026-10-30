@@ -596,7 +596,7 @@ is checked to be stock. `UI.log`: "cursor: the engine's cursor is kept square".
 | Key | Default | |
 |---|---|---|
 | `[UI] Enable` | 1 | 0: the plugin patches nothing |
-| `[UI] Log` | 1 | `UI.log` in the game directory: which hooks are in, and why one stood down |
+| `[UI] Log` | 1 | `UI.log` in `%LOCALAPPDATA%\armada2-refit\logs` (the game directory if that is unset or not writable; its first line says where): which hooks are in, and why one stood down |
 | `[UI] Scale` | 1.0 | the UI's size, as a multiple of a 1080-pixel-tall screen |
 | `[UI] Cursor` | 1 | draw the mouse cursor ourselves, from the game's own cursor art ("The cursor"); 0: the engine's, kept square |
 | `[UI] Movies` | 1 | the launch reels' and the intro's frames drawn by the UI, fitted ("Movies"), from the cutscene proxy or, without it, from the engine's own copy; 0: copied into the locked back buffer, scaled by the proxy or 640x480 without it |

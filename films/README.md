@@ -364,7 +364,7 @@ The setup and action blocks take one command per line (`#` comments):
 | `lclick [X Y]` | a left click, after moving there |
 | `press COMBO` | a key press at human speed (`shift+1`); with `Keys: auto` it becomes a key hint |
 | `run` | `desktop` only: start the shot's `Run:` program |
-| `typelog PLAYER FILE MARKER` | `Players:` only: type the word after `MARKER` on the last line of `FILE` in that player's game directory that has it, waiting up to 30 s (`typelog host Online.log "join code"`) |
+| `typelog PLAYER FILE MARKER` | `Players:` only: type the word after `MARKER` on the last line of `FILE` in that player's log (`Session.game_log`: the prefix's `AppData/Local/armada2-refit/logs/`, else the game directory) that has it, waiting up to 30 s (`typelog host Online.log "join code"`) |
 | `PLAYER: CMD` | `Players:` only: the command goes to that player's game (`host: step Click "Create Game"`); a line without a player goes to each in turn, and a bare `wait` is waited once |
 
 Pointer coordinates (`ptr`, `drag`, `lclick`, `click`) are in the film's `Pointer` space,

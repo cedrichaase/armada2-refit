@@ -4,6 +4,15 @@
 8 with a transport of our own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 and versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.8.0 — 2026-10-30
+
+### Changed
+- `Online.log` moves out of the game directory: `%LOCALAPPDATA%\armada2-refit\logs\Online.log`, beside `Display8.pipelines`'
+  folder, made if missing; the game directory when `LOCALAPPDATA` is unset or not
+  writable. The first line says where (`log: <path>`). An uninstall leaves the folder.
+
+Installed, not yet seen in game. (HASH)
+
 ## 0.7.1 — 2026-10-30
 
 ### Changed

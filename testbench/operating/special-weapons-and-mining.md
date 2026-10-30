@@ -70,5 +70,6 @@ Tested 2026-10-15 on `a2_borg01`, `--install <copy> --install <copy>/testbench/s
 
 ## Survey
 
-- `grep 'ordnance:' ~/.cache/a2test/sessions/<ID>/game/Render3D.log` (and, after the
+- `./a2test drive --session ID log Render3D.log | grep 'ordnance:'`, or the file itself in the clone's prefix
+  (`~/.cache/a2test/sessions/<ID>/prefix/drive_c/users/steamuser/AppData/Local/armada2-refit/logs/Render3D.log`) (and, after the
   session stops, `<results>/interactive/<res>/logs/Render3D.log`).

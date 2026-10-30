@@ -1089,6 +1089,11 @@ static void startup(void)
 
     build_paths(ini);
     g_logging = (int)GetPrivateProfileIntA("QOL", "Log", 1, ini);
+    if (g_logging && g_logpath[0]) {
+        char dir[320];
+        a2_exe_dir(dir, sizeof dir);
+        a2_log_where(g_logpath, a2_log_path(g_logpath, sizeof g_logpath, dir, "QOL.log"));
+    }
     GetPrivateProfileStringA("QOL", "PanSpeed", "1", val, sizeof val, ini);
     f = s_parse(val);
 
