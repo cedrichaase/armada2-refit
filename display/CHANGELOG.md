@@ -14,7 +14,7 @@ in [`README.md`](README.md).
   Direct3D ignores them there, and the case is logged once ("the Borg bump shader
   drawn with LIGHTING on").
 
-Installed, not yet seen in game.
+Installed, not yet seen in game. (b08d6a8)
 
 ## 0.15.1 — 2026-10-30
 

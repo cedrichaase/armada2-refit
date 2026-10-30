@@ -10,7 +10,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 ### Added
 - `display-passthrough-all` and `display-passthrough-all-forward`: every render3d module
   off, the Borg campaign's *Strange Bedfellows* entered through the menus, the player's
-  Borg stations drawn by the passthrough against the forward chain.
+  Borg stations drawn by the passthrough against the forward chain (b08d6a8).
 
 ## 3.78.1 — 2026-10-30
 

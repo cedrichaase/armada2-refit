@@ -15,7 +15,7 @@ Layers: display 0.15.2, testbench 3.78.2.
   only the hulls' glow. New scenarios `display-passthrough-all` (every module off)
   and its forward reference.
 
-Installed, not yet seen in game.
+Installed, not yet seen in game. (b08d6a8)
 
 ## 13.51.1 — 2026-10-30
 
