@@ -5,6 +5,13 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.78.2 — 2026-10-30
+
+### Added
+- `display-passthrough-all` and `display-passthrough-all-forward`: every render3d module
+  off, the Borg campaign's *Strange Bedfellows* entered through the menus, the player's
+  Borg stations drawn by the passthrough against the forward chain (b08d6a8).
+
 ## 3.78.1 — 2026-10-30
 
 ### Changed

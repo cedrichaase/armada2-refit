@@ -579,6 +579,9 @@ fn mul(a: &[f32; 16], b: &[f32; 16]) -> [f32; 16] {
 }
 
 /// The two constant blocks (`shaders/ff.hlsl`, `ff_vs` and `ff_ps`), one after the other.
+/// Logged once (always, not only when tracing): the engine's bump passes with LIGHTING on.
+static mut BUMP_LIT: bool = false;
+
 fn blocks(v: &Vk, dv: &Dev, d: &Draw, vp: [u32; 6]) -> [u8; VS_BYTES + PS_BYTES] {
     let mut b = [0u8; VS_BYTES + PS_BYTES];
     let rs = &dv.rs;
@@ -595,7 +598,15 @@ fn blocks(v: &Vk, dv: &Dev, d: &Draw, vp: [u32; 6]) -> [u8; VS_BYTES + PS_BYTES]
     let centre = 0.5 - 1.0 / 128.0;
     let off = if d.layout.rhw || v.exported.features & gpu::display::FEATURE_D3D9_CENTRES != 0 { centre } else { 0.0 };
     f4(&mut b, 9, [f32::from_bits(vp[4]), f32::from_bits(vp[5]), off, 0.0]);
-    let lit = rs[137] != 0 && !d.layout.rhw;
+    // Direct3D's lighting is fixed function's: under a vertex shader (the Borg bump pass)
+    // LIGHTING is ignored, and the engine leaves it on there when the map has lights. Its
+    // lights must not be written then either: they share registers 16 on with the bump
+    // shader's constants (vs_bump), and overwrote its transform with them.
+    let lit = rs[137] != 0 && !d.layout.rhw && d.layout.bump.is_none();
+    if rs[137] != 0 && d.layout.bump.is_some() && unsafe { !BUMP_LIT } {
+        unsafe { BUMP_LIT = true };
+        log!("passthrough: the Borg bump shader drawn with LIGHTING on: the lights left out, as Direct3D ignores them under a vertex shader");
+    }
     let lights: Vec<&(u32, [u32; 26], bool)> = if lit { dv.lights.iter().filter(|l| l.2).take(8).collect() } else { Vec::new() };
     let vcol = if rs[141] != 0 { d.layout.diffuse.is_some() as u32 + 2 * d.layout.specular.is_some() as u32 } else { 0 };
     f4(&mut b, 10, [d.layout.rhw as u32 as f32, lit as u32 as f32, lights.len() as f32, vcol as f32]);

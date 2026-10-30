@@ -4,6 +4,18 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.15.2 — 2026-10-30
+
+### Fixed
+- Passthrough: the Borg hulls' bump passes no longer vanish (all but their glow) on a
+  map with lights. The engine leaves `LIGHTING` on for them; its lights were written
+  into the vertex block over the bump shader's constants (both from register 16),
+  which threw its transform away. Lights are left out under a vertex shader, as
+  Direct3D ignores them there, and the case is logged once ("the Borg bump shader
+  drawn with LIGHTING on").
+
+Installed, not yet seen in game. (b08d6a8)
+
 ## 0.15.1 — 2026-10-30
 
 ### Fixed
