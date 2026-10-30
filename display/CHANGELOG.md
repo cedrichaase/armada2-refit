@@ -9,8 +9,8 @@ in [`README.md`](README.md).
 ### Added
 - `display8_abi(caller_major, caller_minor, caller, &major, &minor)`: the contract's
   handshake (contract 1.0); `Display8.log` names each plugin that asks and its version,
-  and 120 frames in names `Render3D.asi` or `UI.asi` if loaded without asking (built
-  before the handshake).
+  and, in stub mode 300 frames into the first mission, a loaded `Render3D.asi` or
+  `UI.asi` that never asked (built before the handshake).
 
 ### Changed
 - The contract's exports are named with its major: `display8_backend`, `display8_vk*`,

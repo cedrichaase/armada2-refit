@@ -36,6 +36,7 @@ pub fn on() -> bool {
 /// drop for what the UI's loading screen overdraws"). Without `UI.asi` the engine's
 /// loading screen is the only one, and is drawn.
 pub fn begin_scene(fp: usize) {
+    crate::api::scene_begun(fp);
     if !on() {
         return;
     }

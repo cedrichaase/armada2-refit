@@ -129,7 +129,7 @@ What each side does with a mismatch, and logs:
 | plugins and Display8 of one major | the handshake agrees; the plugins draw on the backend Display8 says | `Render3D.log`/`UI.log`: `gpu 1.0.0 (contract 1.0): Display8 0.12.0 (contract 1.0)`; `Display8.log`: `contract: UI.asi asks for 1.0; Display8's is 1.0: drawn through` |
 | no Display8 (another chain's `d3d8.dll`: crosire's d3d8to9, DXVK's, Wine's) | Direct3D 9, as ever | `gpu ...: no Display8 (the game's d3d8.dll is another chain's): Direct3D 9` |
 | plugins newer than Display8 (a Display8 before 0.12.0) | `gpu` finds unversioned exports and no `display8_abi`: it stands down to Direct3D 9 only, which on Display8's own Vulkan or Direct3D 12 draws nothing | `gpu ...: Display8 0.11.0 is too old for this plugin (no contract handshake ...)` |
-| plugins older than Display8 (built before 0.12.0) | they look for `display8_backend` and find nothing: Direct3D 9 only, nothing drawn on Vulkan or Direct3D 12 | `Display8.log`, 120 frames in: `contract: Render3D.asi is loaded and has not asked for the contract ...` |
+| plugins older than Display8 (built before 0.12.0) | they look for `display8_backend` and find nothing: Direct3D 9 only, nothing drawn on Vulkan or Direct3D 12 | `Display8.log`, in stub mode 300 frames into the first mission (such a plugin calls nothing of Display8's, so it is told by not having asked): `contract: Render3D.asi is loaded and has not asked for the contract ...` |
 | another major either way | as above, both sides | `gpu ...: Display8 ... has contract 2.0, another major ...`; `Display8.log`: `... another major: it finds none of this Display8's exports and stands down` |
 
 On Vulkan the engine's own draws pass through where the plugins draw nothing

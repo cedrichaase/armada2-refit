@@ -40,18 +40,20 @@ pub fn device_gone(dev: *mut c_void) {
 }
 
 pub fn presented() {
-    if FRAME.fetch_add(1, Ordering::Relaxed) + 1 == HANDSHAKE_BY {
-        unshaken();
-    }
+    FRAME.fetch_add(1, Ordering::Relaxed);
 }
 
 /// The modules that shook hands at our major (`display8_abi`), by module handle.
 static SHOOK: [AtomicUsize; 8] = [const { AtomicUsize::new(0) }; 8];
 
-/// Frames presented by which every plugin of the contract has asked for it: `gpu` asks
-/// at its first object or backend question, in the front end's first frames.
-const HANDSHAKE_BY: u32 = 120;
-
+/// The first mission's frames (`scene_begun`): 0 before the engine's first loading
+/// loop, `LOADING` while it runs, then the frame the check is due at; `DONE` after it.
+static MISSION: AtomicU32 = AtomicU32::new(0);
+const LOADING: u32 = 1;
+const DONE: u32 = u32::MAX;
+/// Frames into the first mission at which every plugin of the contract has asked: by then
+/// render3d has drawn the mission and the UI its HUD.
+const MISSION_FRAMES: u32 = 300;
 /// The plugins of the contract.
 const CONTRACT_PLUGINS: [&str; 2] = ["Render3D.asi", "UI.asi"];
 
@@ -67,9 +69,33 @@ fn module_of(a: usize) -> (usize, alloc::string::String) {
     (mi.alloc_base, alloc::string::String::from(full.rsplit(['\\', '/']).next().unwrap_or(full)))
 }
 
-/// A plugin of the contract that is loaded and has not shaken hands by now is one built
-/// before the handshake (display 0.12.0): it finds none of the `display8v1_*` exports,
-/// so it draws on Direct3D 9 only, and on Vulkan or Direct3D 12 not at all.
+/// The engine's `BeginScene` in stub mode (`fp` its frame pointer), until the first
+/// mission has run `MISSION_FRAMES` frames: then a plugin of the contract that is loaded
+/// and has not shaken hands is one built before the handshake (display 0.12.0). It
+/// finds none of the `display8v1_*` exports and draws through Direct3D 9 only, so
+/// nothing of it on Vulkan or Direct3D 12. (Such a plugin calls nothing of Display8's:
+/// with no device to draw on it stops before it asks for the epoch.) Forward mode needs
+/// no check: there every plugin draws on Direct3D 9.
+pub fn scene_begun(fp: usize) {
+    let m = MISSION.load(Ordering::Relaxed);
+    if m == DONE {
+        return;
+    }
+    let loading = crate::drop::in_loading(fp);
+    let now = FRAME.load(Ordering::Relaxed);
+    let next = match (m, loading) {
+        (_, true) => LOADING,
+        (LOADING, false) => now.saturating_add(MISSION_FRAMES).max(2),
+        (0, false) => 0,
+        (due, false) if now >= due => {
+            unshaken();
+            DONE
+        }
+        (due, false) => due,
+    };
+    MISSION.store(next, Ordering::Relaxed);
+}
+
 fn unshaken() {
     for name in CONTRACT_PLUGINS {
         let h = unsafe { GetModuleHandleA(crate::rt::cstr(name).as_ptr()) } as usize;
@@ -77,8 +103,8 @@ fn unshaken() {
             continue;
         }
         log!(
-            "contract: {} is loaded and has not asked for the contract (display8_abi) in {} frames: built for a Display8 before 0.12.0 (or stood down on its own; its log says), it finds none of the contract's exports and draws through Direct3D 9 only, so nothing of it on Vulkan or Direct3D 12, where the engine's own draws stand in (passthrough). Install d3d8.dll, Render3D.asi and UI.asi from one release",
-            name, HANDSHAKE_BY
+            "contract: {} is loaded and has not asked for the contract (display8_abi) {} frames into the first mission: built for a Display8 before 0.12.0 (or stood down on its own; its log says), it finds none of the contract's exports and draws through Direct3D 9 only, so nothing of it on Vulkan or Direct3D 12, where the engine's own draws stand in (passthrough). Install d3d8.dll, Render3D.asi and UI.asi from one release",
+            name, MISSION_FRAMES
         );
     }
 }
