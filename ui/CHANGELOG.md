@@ -4,6 +4,14 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.28.2 — 2026-10-30
+
+### Fixed
+- Built on `gpu` 1.2.1: on Vulkan a frame that spends Display8's descriptor pool goes
+  on in pools of gpu's own instead of dropping its draws.
+
+Confirmed in game 2026-10-31.
+
 ## 0.28.1 — 2026-10-30
 
 ### Changed

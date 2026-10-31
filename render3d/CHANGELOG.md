@@ -4,6 +4,15 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.33.2 — 2026-10-30
+
+### Fixed
+- Built on `gpu` 1.2.1: on Vulkan a frame that spends Display8's descriptor pool, or
+  the storage sets' pool, goes on in pools of gpu's own (a chain per frame slot, up to
+  64 pools), instead of dropping its draws and dispatches.
+
+Confirmed in game 2026-10-31.
+
 ## 0.33.1 — 2026-10-30
 
 ### Changed
