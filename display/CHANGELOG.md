@@ -4,6 +4,20 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.15.3 — 2026-10-30
+
+### Fixed
+- Vulkan: a frame that could not be presented was left open, so its descriptor pool
+  was never reset and every later frame failed the same way: the picture froze while
+  the game ran on, and `vulkan: no swap chain image (TIMEOUT)` followed (a map with many
+  nebulae spent the plugins' share of the frame's pool). The present pass takes its two
+  sets from a pool of its own per slot (`Slot::ppool`), everything that can fail comes
+  before the image is acquired, and a frame that still cannot be presented is ended
+  unshown (`Vk::abandon`, logged as `vulkan: frame N not presented (...)`).
+- Built on `gpu` 1.2.1.
+
+Confirmed in game 2026-10-31.
+
 ## 0.15.2 — 2026-10-30
 
 ### Fixed

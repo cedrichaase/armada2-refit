@@ -5,6 +5,20 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.51.4 — 2026-10-30
+
+Layers: display 0.15.3, render3d 0.33.2, ui 0.28.2 (`gpu` 1.2.1).
+
+### Fixed
+- Vulkan (Display8 in stub mode): the picture froze for good as a mission with many
+  nebulae began ("Along the Neutral Zone"), the game and its sound running on. The
+  frame's descriptor pool was spent, the present pass could not get its sets, and the
+  frame was never ended. The present pass has a pool of its own, a frame that cannot be
+  presented is ended unshown, and gpu goes on in pools of its own once Display8's is
+  spent.
+
+Confirmed in game 2026-10-31.
+
 ## 13.51.3 — 2026-10-30
 
 Layers: testbench 3.78.3.

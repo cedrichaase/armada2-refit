@@ -200,6 +200,25 @@ pub(crate) struct Open {
     pub key: PassKey,
 }
 
+/// One frame slot's pools of the backend's own (`State::spools`).
+struct SlotPools {
+    /// The frame they were last reset for.
+    index: u64,
+    storage: Chain,
+    textures: Chain,
+}
+
+/// Pools of one kind, filled in turn: `at` is the one sets come from now.
+#[derive(Default)]
+struct Chain {
+    pools: Vec<vk::DescriptorPool>,
+    at: usize,
+}
+
+/// How many pools a chain may grow to in one frame: past it the frame's draws are dropped
+/// as before (a frame that needs that many is a leak, not a busy map).
+const CHAIN_MAX: usize = 64;
+
 pub(crate) struct State {
     pub sh: Rc<Shared>,
     pub set0: vk::DescriptorSetLayout,
@@ -212,10 +231,11 @@ pub(crate) struct State {
     pub layout: vk::PipelineLayout,
     pub clayout: vk::PipelineLayout,
     ubo_pool: vk::DescriptorPool,
-    /// Pools of the backend's own for the storage sets (Display8's frame pool has no
-    /// storage descriptors), one per frame slot, reset when its slot comes round: (the
-    /// frame it was last reset for, the pool).
-    spools: Vec<(u64, vk::DescriptorPool)>,
+    /// Pools of the backend's own, per frame slot, reset when its slot comes round: the
+    /// storage sets (Display8's frame pool has no storage descriptors) and the texture
+    /// sets a frame needs past Display8's pool. Each kind is a chain that grows by a pool
+    /// when the last is spent, so a busy frame draws everything.
+    spools: Vec<SlotPools>,
     /// A small storage buffer bound where a slot a shader reads has nothing.
     pub dummy_storage: Option<Storage>,
     samplers: Vec<(Sampler, vk::Sampler)>,
@@ -891,53 +911,76 @@ impl Gpu {
         Some(UboChunk { _buf: buf, _mem: mem, cpu, set })
     }
 
-    /// A set of the frame's pool, of set 1's layout.
+    /// A set of set 1's layout: from the frame's pool (Display8's), and once that is
+    /// spent from the backend's own chain for the frame slot (`chain_set`).
     pub(crate) fn texture_set(&self) -> Option<vk::DescriptorSet> {
         let sh = self.sh()?;
         let (pool, layout) = self.with(|s| (vk::Handle::from_raw(s.frame.descriptor_pool), s.set1))?;
         let layouts = [layout];
-        match unsafe { sh.dev.allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo::default().descriptor_pool(pool).set_layouts(&layouts)) } {
-            Ok(v) => Some(v[0]),
-            Err(e) => {
-                self.once(1 << 21, format_args!("gpu: Vulkan: the frame's descriptor pool is spent ({:?}); draws are dropped", e));
-                None
-            }
+        if let Ok(v) = unsafe { sh.dev.allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo::default().descriptor_pool(pool).set_layouts(&layouts)) } {
+            return Some(v[0]);
         }
+        self.once(1 << 21, format_args!("gpu: Vulkan: the frame's descriptor pool is spent; texture sets come from pools of gpu's own"));
+        let r = self.chain_set(false, layout);
+        if r.is_none() {
+            self.once(1 << 27, format_args!("gpu: Vulkan: the texture sets' pools are spent too ({} a frame); draws are dropped", CHAIN_MAX));
+        }
+        r
     }
 
-    /// A storage set (set 2 or 3's layout) from the backend's pool of the frame slot
-    /// now; the pool is reset the first time its slot is asked for in a new frame
-    /// (whatever it held is two frames old by then).
+    /// A storage set (set 2 or 3's layout) from the backend's chain of the frame slot now.
     pub(crate) fn storage_set(&self, which: u32) -> Option<vk::DescriptorSet> {
+        let layout = self.with(|s| if which == 3 { s.set3 } else { s.set2 })?;
+        let r = self.chain_set(true, layout);
+        if r.is_none() {
+            self.once(1 << 26, format_args!("gpu: Vulkan: the frame's storage descriptors are spent ({} pools); draws and dispatches are dropped", CHAIN_MAX));
+        }
+        r
+    }
+
+    /// A set from one of the frame slot's chains (`SlotPools`): both chains are reset the
+    /// first time the slot is asked for in a new frame (whatever they held is two frames
+    /// old by then), and a chain whose pool is spent goes on to its next, made if need be.
+    fn chain_set(&self, storage: bool, layout: vk::DescriptorSetLayout) -> Option<vk::DescriptorSet> {
         let sh = self.sh()?;
-        let (slot, index, layout) = self.with(|s| (s.frame.slot as usize % sh.fif.max(1) as usize, s.frame.index, if which == 3 { s.set3 } else { s.set2 }))?;
-        let pool = self.with(|s| {
+        let (slot, index) = self.with(|s| (s.frame.slot as usize % sh.fif.max(1) as usize, s.frame.index))?;
+        self.with(|s| {
             while s.spools.len() <= slot {
-                let sizes = [
-                    vk::DescriptorPoolSize { ty: vk::DescriptorType::STORAGE_BUFFER, descriptor_count: 4096 },
-                    vk::DescriptorPoolSize { ty: vk::DescriptorType::STORAGE_IMAGE, descriptor_count: 1024 },
-                ];
-                let p = unsafe { sh.dev.create_descriptor_pool(&vk::DescriptorPoolCreateInfo::default().max_sets(512).pool_sizes(&sizes), None) }.unwrap_or_default();
-                s.spools.push((u64::MAX, p));
+                s.spools.push(SlotPools { index: u64::MAX, storage: Chain::default(), textures: Chain::default() });
             }
             let e = &mut s.spools[slot];
-            if e.0 != index {
-                e.0 = index;
-                unsafe { sh.dev.reset_descriptor_pool(e.1, vk::DescriptorPoolResetFlags::empty()) }.ok();
+            if e.index != index {
+                e.index = index;
+                for c in [&mut e.storage, &mut e.textures] {
+                    for &p in &c.pools {
+                        unsafe { sh.dev.reset_descriptor_pool(p, vk::DescriptorPoolResetFlags::empty()) }.ok();
+                    }
+                    c.at = 0;
+                }
             }
-            e.1
-        })?;
-        if pool == vk::DescriptorPool::null() {
-            return None;
-        }
-        let layouts = [layout];
-        match unsafe { sh.dev.allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo::default().descriptor_pool(pool).set_layouts(&layouts)) } {
-            Ok(v) => Some(v[0]),
-            Err(e) => {
-                self.once(1 << 26, format_args!("gpu: Vulkan: the frame's storage descriptors are spent ({:?}); draws and dispatches are dropped", e));
-                None
+            let c = if storage { &mut e.storage } else { &mut e.textures };
+            let layouts = [layout];
+            while c.at < CHAIN_MAX {
+                if c.at == c.pools.len() {
+                    let sizes: &[vk::DescriptorPoolSize] = if storage {
+                        &[
+                            vk::DescriptorPoolSize { ty: vk::DescriptorType::STORAGE_BUFFER, descriptor_count: 4096 },
+                            vk::DescriptorPoolSize { ty: vk::DescriptorType::STORAGE_IMAGE, descriptor_count: 1024 },
+                        ]
+                    } else {
+                        &[vk::DescriptorPoolSize { ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER, descriptor_count: 512 * SLOTS as u32 }]
+                    };
+                    let p = unsafe { sh.dev.create_descriptor_pool(&vk::DescriptorPoolCreateInfo::default().max_sets(512).pool_sizes(sizes), None) }.ok()?;
+                    c.pools.push(p);
+                }
+                let pool = c.pools[c.at];
+                match unsafe { sh.dev.allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo::default().descriptor_pool(pool).set_layouts(&layouts)) } {
+                    Ok(v) => return Some(v[0]),
+                    Err(_) => c.at += 1,
+                }
             }
-        }
+            None
+        })?
     }
 
     /// The storage buffer bound where a slot a shader uses has nothing (16 bytes).
