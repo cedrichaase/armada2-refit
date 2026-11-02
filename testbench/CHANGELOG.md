@@ -5,6 +5,19 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.85.0 — 2026-11-02
+
+### Added
+- Scenario `ui-menus-refit` (the Refit screen in the shell, across a relaunch and in a
+  mission) and the recipe `operating/refit-screen.md`; `ui.json` screen `refit`
+  (`Wait for the refit screen`).
+
+### Changed
+- `multiplayer-two-players` checks the lock on *Pay when queued* in the running match;
+  `ui-menus-dialogs` expects `Refit` among the in-mission Options' (now ten) entries.
+
+Installed, not yet seen in game.
+
 ## 3.84.0 — 2026-11-02
 
 ### Fixed
