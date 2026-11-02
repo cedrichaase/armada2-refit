@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.62.0 — 2026-11-02
+
+Layers: testbench 3.85.0.
+
+### Added
+- Bench side of the Refit screen: scenario `ui-menus-refit`, `operating/refit-screen.md`,
+  the `refit` screen in `testbench/ui.json`, lock steps in `multiplayer-two-players`, ten
+  entries in `ui-menus-dialogs`.
+
+Installed, not yet seen in game.
+
 ## 13.61.0 — 2026-11-02
 
 Layers: render3d 0.36.0.
@@ -25,17 +36,6 @@ Layers: ui 0.31.0.
   `<Plugin>_SettingsNote` export (C5 amendment, `tools/settings/README.md`) with its
   `NoteFn` (`crates/a2rt`) and `A2SettingsNoteFn` (`csdk/a2asi.h`); UI exports
   `UI_SettingsNote`. The Redrawn menus row is ADVANCED.
-## 13.62.0 — 2026-11-02
-
-Layers: testbench 3.85.0.
-
-### Added
-- Bench side of the Refit screen: scenario `ui-menus-refit`, `operating/refit-screen.md`,
-  the `refit` screen in `testbench/ui.json`, lock steps in `multiplayer-two-players`, ten
-  entries in `ui-menus-dialogs`.
-
-Installed, not yet seen in game.
-
 ## 13.59.1 — 2026-11-02
 
 Layers: ui 0.30.1, testbench 3.84.0.
