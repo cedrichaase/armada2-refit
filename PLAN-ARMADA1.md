@@ -4,7 +4,7 @@ How Star Trek: Armada (1), the GOG release at patch 1.2, gets what Armada II has
 this project: a renderer of our own on Vulkan and Direct3D 12, the HUD and the menus
 redrawn, quality of life, online play, the texture, movie and backdrop pipelines, a
 stock/refit switch and a test bench. It is a plan, not a commitment of dates. The work
-happens in a **new repository**, not in this one. It starts after `ROADMAP.md` phase 8
+happens in **this repository**, in an `armada1/` folder beside the Armada II layers. It starts after `ROADMAP.md` phase 8
 and after Fleet Operations: Roots (`PLAN-FLEETOPS.md`), both decided 2026-11-02.
 
 The ground it stands on is a read-only survey of 2026-11-02 (scratch notes, not in the
@@ -16,7 +16,7 @@ Armada II's, and one launch on the bench mechanism.
 | Decision | Date | What it means here |
 |---|---|---|
 | Armada 1 after Fleet Operations: Roots and after ROADMAP phase 8 | 2026-11-02 | The symbol profile format, `a2engine` and the per-game bench exist before the first Armada 1 profile is written. Roots proves the (game, build) design on the same engine first |
-| A new repository with this one's structure | 2026-11-02 | Layer folders, each with a README and a CHANGELOG; a stock/refit switch; a test bench; the same publish rules |
+| Armada 1 stays in this repository | 2026-11-02 | An `armada1/` folder of layers, each with a README and a CHANGELOG; the shared code stays where it is; per-game tags and packages; one bench, one CI, the same publish rules (below) |
 | Full parity with today's Armada II refit | 2026-11-02 | Every layer this repository ships has an Armada 1 counterpart, where Armada 1 has the feature at all (below, "Parity") |
 | Vulkan and Direct3D 12 directly | 2026-11-02 | A "Display7" `ddraw.dll` on the `display8v1_*` contract. No Direct3D 9 path of ours, ever: no forward mode that ships, no `gpu` Direct3D 9 backend in the build |
 
@@ -45,81 +45,101 @@ little of the *hook code* does. About half of Armada II's hooks are re-findable 
 RTTI and vtables, about a quarter by strings and call patterns, and the rest have no
 counterpart (the planets' database, the button bar, the Bink shell backdrops).
 
-## The shared code: one core repository, a submodule in both
+## One repository, shared code where it is
 
-The two repositories share every unit that holds **no engine knowledge**: `gpu`,
-`crates/a2rt`, `crates/a2ini`, `crates/a2fmt`, the resolver half of `crates/a2engine`,
-`csdk/a2asi.h` and its `.def` files, `tools/shaderc`, `tools/settings`,
-`tools/ini-merge.py`, and the game-independent core of the test bench. After ROADMAP
-phase 7 that also covers the drawing half of each render3d module and the UI's runtime
-(2D renderer, text, widgets, theme, input capture), whose engine reads phase 7 and
-phase 8 move into per-module `hooks.rs` files and the profile.
+Armada 1 stays in **this** repository (decided 2026-11-02). Every unit that holds no
+engine knowledge is already here and stays where it is: `gpu/`, `crates/a2rt`,
+`crates/a2ini`, `crates/a2fmt`, the resolver half of `crates/a2engine`, `csdk/`,
+`tools/shaderc`, `tools/settings`, `tools/ini-merge.py`, `testbench/`, `publish/`. After
+ROADMAP phase 7 that also covers the drawing half of each render3d module and the UI's
+runtime (2D renderer, text, widgets, theme, input capture), whose engine reads phase 7
+and phase 8 move into per-module `hooks.rs` files and the profile. Armada 1's hooks
+link against these; nothing is copied and nothing is extracted.
 
-**Choice: a third public repository, `refit-core` (name open), with the shared units,
-included in both game repositories as a git submodule at `core/`.**
+**Why one repository**
 
-| Option | For | Against |
+- **Shared contracts change in one commit.** `display8v1_*` (`gpu/src/display.rs`) and
+  the settings ABI say "change both sides together"; with Display7 as a third side, one
+  commit moves Display8, Display7 and the plugins of both games, and one CI run proves
+  it. Two repositories would make every contract change a pointer move per game.
+- **One CI, one bench, one set of rules.** The bench's slot limit, the GPU and the
+  user's attention are shared anyway; `publish/check.sh`, hard rules 8 and 9 and the
+  changelog discipline apply once.
+- **No submodule pins.** No `git submodule update --init` in every new worktree, no
+  shared change as two commits in two repositories, no pinned commit to keep on `main`.
+  An earlier draft of this plan (a separate repository with a `refit-core` submodule,
+  and an extraction work package) is dropped; with one copy there is nothing to drift.
+
+**What a split would have bought, and how it is kept**
+
+| A split's benefit | Kept by |
+|---|---|
+| Armada 1 releases on its own cadence | Per-game tags and packages: `armada1-vX.Y.Z` beside `vX.Y.Z`, each with its own zip, versioned by the game's own changelog (below) |
+| Armada 1's engine findings kept apart from Armada II's | Hard rule 9 already files a finding with the layer whose code uses it: the `armada1/` layers hold Armada 1's findings, the existing layers Armada II's. An agent on one game need not read the other's READMEs unless the code is shared |
+| A checkout that shows only one game | `armada1/` is one folder; the tools take a game profile (below) and offer only that game's layers |
+| A name that fits the project | The repository may be renamed later; GitHub redirects the old URL, and nothing in the code depends on the name |
+
+**What `publish/` and CI need.** Today `.github/workflows/ci.yml` tags `vX.Y.Z` when the
+root `CHANGELOG.md`'s newest version has no release yet, and `publish/package.sh` writes
+`armada2-refit-<version>.zip`. For two games:
+
+- `armada1/CHANGELOG.md` is Armada 1's own top-level changelog with its own version. The
+  root `CHANGELOG.md` keeps versioning the project as it does today (Armada II, Roots
+  and the shared code). A shared-code change bumps the root and every game it touches,
+  and lists both in its entries.
+- The `release` job runs once per game: it reads that game's version, tags
+  `armada1-vX.Y.Z` (Armada II's tag stays `vX.Y.Z`), builds that game's zip with
+  `package.sh --game armada1`, and applies the same pre-release rule ("not yet seen in
+  game"). The "keep only the newest ten releases" step counts per tag prefix, so one
+  game's releases never prune the other's.
+- The VirusTotal job and `publish/installer/` take the game as an input, and the release
+  notes' install lines name the game's zip and installer. `publish/check.sh` already
+  guards the whole tree and needs no change.
+
+**The game profile.** `a2env`, `a2mod`, `./install`, `a2test` and `a2tex` gain a game
+profile, the same mechanism as Fleet Operations' FO-1 (`PLAN-FLEETOPS.md`: `A2_PROFILE=`
+or `--game` on each tool, setting the game directory, executable, prefix, Heroic entry
+and the layers on offer). Armada 1 is a second profile of it (`A2_PROFILE=armada1`,
+`Star Trek Armada`, `Armada.exe`, its own prefix). FO-1 builds the mechanism once; A1-1
+adds the profile. Assets go in `$A2_DATA/armada1/` (stock extracts, `ai/` layers,
+builds), never in a checkout, and `$A2_DATA` itself stays shared. `a2mod`'s snapshot is
+per game, in the game's own `.a2mod/`.
+
+## The `armada1/` folder
+
+Armada 1's own layers sit under one top-level folder, each with a `README.md` and a
+`CHANGELOG.md` and its own semver, like this repository's layers. `a2mod` under the
+Armada 1 profile switches them.
+
+| Folder | What | Counterpart |
 |---|---|---|
-| **Submodule of a core repository** (chosen) | One copy. Each game repository pins an exact core commit, so a core change reaches a game only when that game's repository moves the pointer, in a commit with its own changelog entry. The core has its own `CHANGELOG.md` and semver, which makes the contract versions (`display8v1`, `A2SET_ABI`) visible in one place. No engine finding can leak into it unnoticed, because it has no profile and no hook | Agents must run `git submodule update --init` in every new worktree; a core change is two commits in two repositories; CI checks out with submodules |
-| Subtree in each repository | Plain directories; no extra step for a worktree | Two copies that drift: a fix made in Armada 1's copy has to be split and pushed back by hand. That is the problem the architecture review found with `rt/` copied three times |
-| Vendored copy with a sync check | Simplest checkout | The same drift, caught only after the fact by CI |
-| Armada 1 includes this whole repository | No extraction | Couples Armada 1 to Armada II's release cadence; pulls Armada II's engine findings and docs into Armada 1's checkout, where agents would read them as if they applied |
+| `armada1/display7/` | `ddraw.dll`, "Display7" | `display/` (Display8) |
+| `armada1/render3d/` | `Render3D.asi` for Armada 1: the shared modules with Armada 1's `hooks.rs`, Armada 1's recipes (skies, surfaces, nebulae) | `render3d/` |
+| `armada1/ui/` | `UI.asi`: the shared runtime with Armada 1's engine hooks, HUD panels (the bridge UI among them) and menu specs | `ui/` |
+| `armada1/qol/` | `QOL.asi` and the rules plugin | `qol/` |
+| `armada1/online/` | `Online.asi`, our own peer in place of DirectPlay 4 | `online/` |
+| `armada1/textures/`, `cutscenes/`, `models/`, `backdrops/` | the asset pipelines, recipes only: targets (with an Index8 class), movie recipes, SOD rewrites, 640x480 plates | the same names |
+| `armada1/platform/` | the Heroic and Proton notes, the ASI loader choice, what `a2mod` never switches under this profile | `platform/` |
+| `armada1/README.md`, `armada1/CHANGELOG.md` | the game's overview and its top-level changelog | the root pair |
 
-Rules that make it work:
-
-- **Engine knowledge never enters the core.** Profiles, hooks, recipes and findings stay
-  in the game repository whose plugin uses them (hard rule 9 in both). `publish/check.sh`
-  in the core refuses a profile file and any address table.
-- **The core is publishable on its own**: the same `publish/check.sh`, MIT, its own CI
-  (the host tests of `a2fmt` and `a2ini`, `tools/shaderc/verify-generated.sh`, the
-  settings selftest, `gpu`'s SPIR-V selftest).
-- **A game repository's CI** checks out the submodule, builds against it, and fails if
-  the pinned commit is not on the core's `main`, so nothing ships against an unmerged
-  core branch.
-- **Local development** uses the core clone beside the game repositories; nothing is
-  pushed unless the user asks, as today. A core change made for one game is merged in
-  the core first, then each game moves its pointer when it has run its own regression
-  set.
-- **Contract changes** (`gpu/src/display.rs`, the settings ABI) bump the core's MAJOR or
-  MINOR and land in both games' pointers in the same round, because Display8 and
-  Display7 and the plugins of each game must agree.
-
-The extraction itself is work in **this** repository (work package C0 below): paths move
-from `gpu/` to `core/gpu/` and so on, and every script, build and doc that names them
-follows. It is done at a quiet moment, when few worktrees are open, after phase 8.
-
-## The new repository
-
-Name open (`armada1-refit` would match). MIT, as this one. Its layout mirrors this
-repository's, by `a1mod` layer:
-
-| Folder | What | Counterpart here |
-|---|---|---|
-| `core/` | the submodule | — |
-| `display/` | `ddraw.dll`, "Display7" | `display/` (Display8) |
-| `render3d/` | `Render3D.asi` for Armada 1: the core's modules with Armada 1's `hooks.rs`, Armada 1's recipes | `render3d/` |
-| `ui/` | `UI.asi`: the core's runtime with Armada 1's engine hooks, HUD panels (the bridge UI among them) and menu specs | `ui/` |
-| `qol/` | `QOL.asi` and the rules plugin | `qol/` |
-| `online/` | `Online.asi`, our own peer in place of DirectPlay 4 | `online/` |
-| `textures/`, `models/`, `cutscenes/`, `menus/` (backdrops only) | the asset pipelines, recipes only | the same |
-| `platform/` | the Heroic and Proton notes, the ASI loader, what `a1mod` never switches | `platform/` |
-| `testbench/` | Armada 1's game profile, scenarios, staging recipes; the bench itself is the core's | `testbench/` |
-| `publish/` | the same rules, the same check | `publish/` |
-| root | `a1env.sh`/`a1env.py` (`A1_GAME`, `A1_PREFIX`, `A1_PROTON`, `A1_DATA`, default `~/.local/share/armada1-refit`), `./a1mod`, `./a1test`, `./a1tex`, `./install`, `CLAUDE.md`, `ROADMAP.md`, root `CHANGELOG.md` | the same |
-
-There is no `renderer/` (no DXVK) and no `hud/`, `grid/` or legacy `menus/` plugin:
-Armada 1 starts where ROADMAP phase 11 ends. Core tools take paths as arguments and
-never read `A2_*` or `A1_*` themselves; each repository's env script supplies them.
+Where a layer's code is mostly shared, the folder holds only what is Armada 1's (the
+profile, `hooks.rs`, recipes) and builds the shared crate; whether `render3d` and `ui`
+become a second crate beside the existing ones or a game feature of the same crate is
+for the phase 7 split to settle, not this plan. The bench stays `testbench/`, with
+Armada 1's scenarios and staging recipes in a game subfolder. There is no `renderer/`
+(no DXVK) and no `hud/`, `grid/` or legacy `menus/` plugin: Armada 1 starts where
+ROADMAP phase 11 ends. Shared tools take paths as arguments and read the game and data
+locations only through `a2env`.
 
 ## Symbol recovery without a map
 
 Armada 1 has no symbol map, so every symbol a hook uses is recovered, and written into
-an Armada 1 profile in phase 8's format with its key extended from build to
+an Armada 1 profile in phase 8's format, keyed by
 **(game, build)**: `game = armada1`, `build = gog-1.2`, identified by PE timestamp and
 image size, with the hash recorded by the bench. `PLAN-FLEETOPS.md` already adds the
 `game` field, so the format does not change again here.
 
-The tooling, in the Armada 1 repository's `tools/` (it reads both games' executables
+The tooling, in `armada1/tools/` or the shared `tools/` (it reads both games' executables
 from the player's installs and writes only into scratch):
 
 1. **RTTI walk.** Type descriptors, complete object locators and vtables for the 460
@@ -158,9 +178,9 @@ Direct3D 8's.
 Its core is **passthrough from the start**, since there is no forward mode to fall back
 to: every Direct3D 7 draw is drawn on Vulkan or Direct3D 12 the way the game's own
 renderer would draw it, through a fixed-function translation shared with Display8. That
-sharing is a work package of its own: after ROADMAP phases 1 and 10, Display8's pipeline
-cache, texture mirrors, fixed-function shaders and lit path move into the core as one
-crate both front ends call (D3D7's fixed function is a subset of D3D8's, without vertex
+sharing is a work package of its own (C1): after ROADMAP phases 1 and 10, Display8's pipeline
+cache, texture mirrors, fixed-function shaders and lit path move into one shared crate
+in `crates/` that both front ends call (D3D7's fixed function is a subset of D3D8's, without vertex
 shaders).
 
 What Display7 has that Display8 does not:
@@ -197,13 +217,13 @@ What "full parity" means, layer by layer, where Armada 1 has the feature:
 | qol: pan speed, Shift+number, big selections, station groups, long moves at warp | each where Armada 1 has the mechanic | The selection cap and its 16-entry assumptions are audited afresh, as `QOL.asi`'s 1.1.0 crash taught |
 | qol rules (`PayOnQueue`) | the same, must match in a network game | Armada 1's network check is surveyed first |
 | online | our own peer in place of `IDirectPlay4`, the same server protocol and the *Internet – Online* entry | First measure whether Wine's DirectPlay 4 works for LAN at all; WON is gone |
-| textures (`a2tex`) | `a1tex` with the core's library; a new **Index8** class | Whether the engine reads `Textures/RGB` in place of `Index8` when both exist is measured before any paletted output is written. If not, an upscale must be written back as 8-bit against `Armada.pal`, which loses most of what it gains |
+| textures (`a2tex`) | `a2tex` under the Armada 1 profile, with the shared library; a new **Index8** class | Whether the engine reads `Textures/RGB` in place of `Index8` when both exist is measured before any paletted output is written. If not, an upscale must be written back as 8-bit against `Armada.pal`, which loses most of what it gains |
 | models | SOD rewrites (smoothed moons and asteroids where they exist) | `a2fmt` reads the versions |
 | cutscenes (binkproxy, movies) | the same proxy (static import), AV1 replacements | The sources are tiny: an 8x lift is where generative upscalers invent the most (rule 4 of the six) |
 | menus backdrops | 640x480 plates | The same per-frame composite |
-| testbench | the core's bench with Armada 1's profile | scenarios, staging recipes and the menu graph are Armada 1's own |
-| `a2mod` | `a1mod` | the same snapshot design |
-| GUI installer | the core's installer with a game choice, or a second build of it | open below |
+| testbench | `testbench/` with Armada 1's profile | scenarios, staging recipes and the menu graph are Armada 1's own |
+| `a2mod` | `a2mod` under the Armada 1 profile | the same snapshot design, per game |
+| GUI installer | the same installer with a game choice, or a second build of it | open below |
 
 Not carried: `HUD.asi`, `GridLayout.asi`, `Menus.asi` and their scripts (they are being
 removed here in phase 11), DXVK and `dxvk.conf`, the widescreen patch (Display7 owns the
@@ -217,31 +237,30 @@ the survey reached the intros only.
 | WP | What | Where | Depends on | Agent time · bench · round |
 |---|---|---|---|---|
 | A1-0 | **Platform.** Launch from Heroic: menus, a skirmish and the 3D view under GOG's wrapper. Which ASI loader name works. `ARMADA.PRF` lines 3 and 6. Whether Wine's DirectPlay 4 hosts a LAN game | notes, then `platform/` | nothing | 2–4 h · 2 · one user check |
-| C0 | **Core extraction**: `refit-core` with history (a filter of the shared paths), the submodule at `core/` here, every path, build, CI job and doc that names them | this repository, then the core | ROADMAP 8; FO-1 (the per-game bench) | 8–16 h · 1 full regression pass · none (nothing visible changes) |
-| C1 | **Shared fixed-function translation**: Display8's passthrough pipeline as a core crate both front ends call | the core, Display8 here | ROADMAP 1 and 10 signed off; C0 | 6–12 h · pixel-identical A/B on Armada II, 2–3 · none |
-| A1-1 | **Bootstrap**: the repository, `CLAUDE.md`, `publish/`, CI, `a1env`, `./install`, an `a1mod` with no layers, licence | new repository | C0 | 4–8 h · none · none |
-| A1-2 | **Bench profile**: executable, arguments, overrides, `ARMADA.PRF` adapter, prefix bootstrap, logs (`Logs/logfile.txt`), the menu graph found visually | new repository on the core's bench | A1-1, FO-1 | 10–20 h · 5–10 · none |
-| A1-3 | **Identity and recovery tooling**: the RTTI walk, the anchors, the matcher; the empty Armada 1 profile; `a1test syms` | new repository | ROADMAP 8, A1-2 | 20–40 h · none (offline) · none |
-| A1-4 | **Display7 tracer and inventory**, in front of GOG's wrapper in a clone | new repository | A1-2 | 10–15 h · 5–10 · none |
-| A1-5 | **Display7 on Vulkan, then Direct3D 12**, passthrough of everything the inventory shows, A/B against the stock baselines; the bail-out; Display7 in `./install` and `a1mod` | new repository | A1-4, C1 | 40–80 h · 20–40 with A/B · round 1: the game as stock, on our device |
-| A1-6 | **First visible win**: render3d's seam on Armada 1 with the scene target, MSAA, bloom and tone map over passthrough; the desktop's resolution | new repository | A1-3, A1-5 | 20–40 h · 10–15 · round 2 |
-| A1-7 | **render3d modules**, one at a time, each switchable, each falling back to passthrough; Armada 1 recipes (skies, surfaces, nebulae) fitted to stock by measurement | new repository | A1-6, ROADMAP 7 | 100–200 h · about 10 per module · a round per two or three modules |
-| A1-8 | **UI**: the runtime's hooks into Armada 1's mission frame, front end and loading screen; HUD panels including the bridge; the menu host and screen specs for the 640x480 shell; the Refit screen and settings | new repository | A1-3, A1-5 | 60–120 h · 20–30 · two or three rounds |
-| A1-9 | **QOL and rules** | new repository | A1-3 | 20–40 h · 5–10 gameplay passes · one round |
-| A1-10 | **Online** | new repository | A1-0's DirectPlay check, A1-3 | 30–60 h · 5–10 two-game passes · one round |
-| A1-11 | **Formats and assets**: the `.zfs` reader in `a2fmt` (core), paletted TGA reading, the content profile; `a1tex` with the Index8 class; binkproxy and the movie recipes; backdrop plates; SOD rewrites | core and new repository | A1-1; the RGB-versus-Index8 measurement first | 30–60 h of tooling · 5–10 · content rounds as targets are built |
-| A1-12 | **Release**: the package, the GUI installer's game choice, the first public release | new repository, core | A1-5 at least; parity for a 1.0 | 10–20 h · 2–3 · a release round |
+| C1 | **Shared fixed-function translation**: Display8's passthrough pipeline as a shared crate in `crates/` that both front ends call | `crates/`, Display8 | ROADMAP 1 and 10 signed off | 6–12 h · pixel-identical A/B on Armada II, 2–3 · none |
+| A1-1 | **Bootstrap**: the `armada1/` folder with its README and CHANGELOG, the `armada1` game profile in `a2env` / `a2mod` / `./install` (on FO-1's mechanism), an `a2mod` with no Armada 1 layers, the per-game release job and `package.sh --game` | `armada1/`, root tools, `publish/`, CI | ROADMAP 8; FO-1 | 4–8 h · none · none |
+| A1-2 | **Bench profile**: executable, arguments, overrides, `ARMADA.PRF` adapter, prefix bootstrap, logs (`Logs/logfile.txt`), the menu graph found visually | `testbench/` | A1-1, FO-1 | 10–20 h · 5–10 · none |
+| A1-3 | **Identity and recovery tooling**: the RTTI walk, the anchors, the matcher; the empty Armada 1 profile; `a2test syms --game armada1` | `armada1/` | ROADMAP 8, A1-2 | 20–40 h · none (offline) · none |
+| A1-4 | **Display7 tracer and inventory**, in front of GOG's wrapper in a clone | `armada1/` | A1-2 | 10–15 h · 5–10 · none |
+| A1-5 | **Display7 on Vulkan, then Direct3D 12**, passthrough of everything the inventory shows, A/B against the stock baselines; the bail-out; Display7 in `./install` and `a2mod` | `armada1/` | A1-4, C1 | 40–80 h · 20–40 with A/B · round 1: the game as stock, on our device |
+| A1-6 | **First visible win**: render3d's seam on Armada 1 with the scene target, MSAA, bloom and tone map over passthrough; the desktop's resolution | `armada1/` | A1-3, A1-5 | 20–40 h · 10–15 · round 2 |
+| A1-7 | **render3d modules**, one at a time, each switchable, each falling back to passthrough; Armada 1 recipes (skies, surfaces, nebulae) fitted to stock by measurement | `armada1/` | A1-6, ROADMAP 7 | 100–200 h · about 10 per module · a round per two or three modules |
+| A1-8 | **UI**: the runtime's hooks into Armada 1's mission frame, front end and loading screen; HUD panels including the bridge; the menu host and screen specs for the 640x480 shell; the Refit screen and settings | `armada1/` | A1-3, A1-5 | 60–120 h · 20–30 · two or three rounds |
+| A1-9 | **QOL and rules** | `armada1/` | A1-3 | 20–40 h · 5–10 gameplay passes · one round |
+| A1-10 | **Online** | `armada1/` | A1-0's DirectPlay check, A1-3 | 30–60 h · 5–10 two-game passes · one round |
+| A1-11 | **Formats and assets**: the `.zfs` reader in `a2fmt` (shared), paletted TGA reading, the content profile; `a2tex` with the Index8 class; binkproxy and the movie recipes; backdrop plates; SOD rewrites | `crates/`, `armada1/` | A1-1; the RGB-versus-Index8 measurement first | 30–60 h of tooling · 5–10 · content rounds as targets are built |
+| A1-12 | **Release**: the package, the GUI installer's game choice, the first public release | `armada1/`, `publish/`, `gui-installer/` | A1-5 at least; parity for a 1.0 | 10–20 h · 2–3 · a release round |
 
-Summed: about 370–740 agent hours, against about 55–115 for the whole ROADMAP. As there,
-the wall clock is set by the user's sign-off rounds and by the bench, which the two
-repositories share (one GPU, the same slot limit).
+Summed: about 360–725 agent hours, against about 55–115 for the whole ROADMAP. As there,
+the wall clock is set by the user's sign-off rounds and by the bench, which both games
+share (one GPU, the same slot limit).
 
 ## Dependencies
 
 ```
-ROADMAP 8, FO-1 (per-game bench) ── C0 core ── A1-1 bootstrap ── A1-2 bench ──┬── A1-3 recovery
+ROADMAP 8, FO-1 (game profile, per-game bench) ── A1-1 bootstrap ── A1-2 bench ──┬── A1-3 recovery
                                                                               └── A1-4 tracer
-ROADMAP 1 and 10 signed off, C0 ── C1 shared fixed function
+ROADMAP 1 and 10 signed off ── C1 shared fixed function
 A1-4, C1 ── A1-5 Display7
 A1-3, A1-5 ── A1-6 first win ── A1-7 render3d modules (and ROADMAP 7)
 A1-3, A1-5 ── A1-8 UI;  A1-3 ── A1-9 QOL;  A1-0, A1-3 ── A1-10 online
@@ -251,7 +270,7 @@ Fleet Operations: Roots signed off ── Armada 1 starts
 
 ROADMAP phase 11 is not a dependency: Armada 1 never builds the Direct3D 9 backend, so it
 can start before phase 11 with `gpu`'s Direct3D 9 backend left out of its build. Phase 11
-then removes it from the core for both.
+then removes it from the shared code for both.
 
 ## Risks
 
@@ -265,17 +284,22 @@ then removes it from the core for both.
    reads only `Index8` in the mode the player runs.
 4. **The front end at 640x480** has less room for the menu host's redraw to look right
    than Armada II's 800x600, and the bridge UI is new design work, not a port.
-5. **Two repositories, one bench, one user.** Rounds for Armada 1 compete with rounds for
+5. **Two games, one bench, one user.** Rounds for Armada 1 compete with rounds for
    Armada II; the plan does not run them in parallel beyond what the bench allows.
-6. **Core churn.** While ROADMAP phases 9 to 11 still change `gpu` and the contract,
-   every core change has to be taken into both games. C0 after phase 8, not before, keeps
-   most of that churn inside one repository.
+6. **Shared churn.** While ROADMAP phases 9 to 11 still change `gpu` and the contract,
+   every change lands in Display8 and, once it exists, Display7 in the same commit; that
+   is what one repository is for. Starting Armada 1 after phase 8, and C1 after phases 1
+   and 10, keeps most of that churn before Display7 exists.
+7. **Release tooling serves two games.** The CI release job, `package.sh` and the GUI
+   installer were written for one; keying them by game is a regression risk for Armada
+   II's releases, so A1-1 checks Armada II's release is unchanged before adding Armada 1's.
 
 ## Open decisions
 
-1. **Names**: the new repository (`armada1-refit`?) and the core (`refit-core`?).
-2. **Licence**: MIT for both, as this repository — to confirm.
-3. **The GUI installer**: one installer that offers both games (and Fleet Operations), or
-   one build per game from the same source.
-4. **Art direction for Armada 1**: whether it follows `ART-DIRECTION.md` as written for
+The repository, the licence (MIT, as the rest) and the shared code's home are decided
+and no longer open.
+
+1. **The GUI installer**: one installer that offers every game (Armada II, Roots,
+   Armada 1), or one build per game from the same source.
+2. **Art direction for Armada 1**: whether it follows `ART-DIRECTION.md` as written for
    Armada II, or gets a direction of its own (its stock look is older and flatter).

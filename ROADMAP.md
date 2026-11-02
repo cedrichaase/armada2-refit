@@ -405,13 +405,12 @@ validation). Each layer's README keeps its own derivations.
 ## Other games
 
 Decided 2026-11-02: **Fleet Operations: Roots first, in this repository**
-(`PLAN-FLEETOPS.md`); **then Star Trek: Armada (1), after phase 8 and after Roots, in a
-new repository** with this one's structure, at full parity with the Armada II refit,
+(`PLAN-FLEETOPS.md`); **then Star Trek: Armada (1), after phase 8 and after Roots, in this repository too**,
+in an `armada1/` folder of its own layers, at full parity with the Armada II refit,
 rendering directly on Vulkan and Direct3D 12 through a `ddraw.dll` of its own
 ("Display7") on the `display8v1_*` contract, with no Direct3D 9 path
-(`PLAN-ARMADA1.md`). The two repositories share the units with no engine knowledge
-through a core repository included as a submodule; extracting it is a work package here
-after phase 8.
+(`PLAN-ARMADA1.md`). The shared code stays where it is; the tools gain a game profile
+(Fleet Operations' FO-1), and each game gets its own release tag and package.
 
 ## Dependencies
 
@@ -424,7 +423,7 @@ P2 open items (beside P1)               │                   ├─ P7 render3d
                          P11 remove D3D9 and legacy (after P1, P9, P10) ── P12 docs ─────┘
 
 P8a ── FO-0..2 · P8b ── FO-3 · P1 signed off ── FO-4 · P7 ── FO-5     (PLAN-FLEETOPS.md)
-P8 and FO: Roots ── Armada 1 in a new repository                      (PLAN-ARMADA1.md)
+P8 and FO: Roots ── Armada 1 (armada1/ in this repository)              (PLAN-ARMADA1.md)
 ```
 
 | Phase | Depends on | Can run beside | Agent time · bench passes · round |
@@ -442,7 +441,7 @@ P8 and FO: Roots ── Armada 1 in a new repository                      (PLAN-
 | 11 remove D3D9 and legacy | 1, 9, 10 + two releases | — | 6–11 h · 2–3 · F |
 | 12 docs | 11 | — | 1–2 h · none · F |
 | Fleet Operations: Roots | FO-0/1 none; FO-2 8a; FO-3 8b; FO-4 1 signed off; FO-5 7 | 5–10 | 75–165 h · `PLAN-FLEETOPS.md` · FO-A to FO-C |
-| Armada 1 (new repository) | 8 and Roots; Display7 on 1 and 10; core extraction after 8 | — | 370–740 h · `PLAN-ARMADA1.md` |
+| Armada 1 (`armada1/`) | 8 and Roots; Display7 on 1 and 10; shared fixed-function crate after 1 and 10 | — | 360–725 h · `PLAN-ARMADA1.md` |
 
 Summed, the agent time is about 55–115 hours, much of it in parallel worktrees, not
 counting the two other games.
@@ -452,8 +451,8 @@ The wall-clock time is set by the five or six sign-off rounds and by the bench (
 
 Decided items leave this list for the text they decide: the overlay is `RefitPlayer.ini`
 in the game directory ("Settings descriptors and the player overlay"), QOLRules ships
-with `PayOnQueue` on (Phase 9), and Fleet Operations starts with Roots, then Armada 1 in a
-new repository ("Other games"), all 2026-11-02. The open questions of each game are in its
+with `PayOnQueue` on (Phase 9), and Fleet Operations starts with Roots, then Armada 1 in
+`armada1/` ("Other games"), all 2026-11-02. The open questions of each game are in its
 plan.
 
 1. **Packaging for modders**: built DLLs with ini files, source crates, or both. The
