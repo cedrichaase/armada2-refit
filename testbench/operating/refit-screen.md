@@ -52,4 +52,17 @@ It needs the redrawn menus (`[Menus] Enable=1`, the shipped default); with `Spec
 
 ## Screen places at 1280x720
 
-Filled from P6-A's report once the screen is built; until then click by label.
+The modal is 800x547, centred. Tab text and the title read in upper case. Tabs at y=138:
+Graphics x=323, Interface 470, Gameplay 621, Multiplayer 770, Movies 919. Foot at y=611:
+Reset tab 315, Show advanced 449 (box 399), Done 965. Rows from y=169, 36 px apart; left
+column labels at x=261, right at x=661; switches at x=575 / 975, drop-downs at x=538 / 938.
+Graphics: Anti-aliasing 169 (box at 538,176), HDR and bloom 205, Ships 241, Sky 277.
+Interface (right column): Theme at 938,356. Gameplay: Right-drag pan speed at 938,176.
+An open drop-down's list starts 29 px under its box and its rows are 26.7 px apart (Theme:
+Auto 871,385; Borg 871,545; pan speed: Stock 868,205, 2.5x 868,285). Options' `Refit` entry
+is at (641,407) in the shell and (641,538) in a mission.
+
+**Click rows and drop-downs by place, not by label.** The help strip repeats the words of
+the row under the pointer (`auto takes your race...`, `Sky`, `stock`), so OCR finds the label
+there first and the click lands on the strip. Tabs, `Done` and drop-down choices that the
+help strip does not repeat (`2x`, `4x`) are fine by label.
