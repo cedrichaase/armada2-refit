@@ -73,6 +73,9 @@ a2test -- run Armada II headless and test it end to end
   a2test drive note "TEXT"             say what you are doing now (the session's intent on
                                        the dashboard); again whenever it changes
   a2test drive running | log NAME | launch [ARGS] | quit
+  a2test drive overlay WORD...         set (Render3D.World:Surfaces=0) or remove (--unset
+                                       Render3D.World:Surfaces) a key of RefitPlayer.ini in the
+                                       running game; waits for UI.asi's hub to log the change
   a2test drive scene "CMD" ["CMD" ...]  commands to Scene.asi (testbench/scene/README.md),
                                        e.g. "orbit ship 30 15 900", "camera rts", "query"
 
@@ -328,7 +331,8 @@ def cmd_check(argv):
         print(f'{scn.title}\n  resolutions: {", ".join(config.res_name(r) + " (" + config.aspect_name(r) + ")" for r in scn.resolutions)}'
               f'\n  mod: {scn.mod}   launch: {scn.launch}   reference: {scn.reference}' +
               (f'\n  players: {", ".join(scn.players)}' if scn.players else '') +
-              (f'   setup: {scn.setup}' if scn.setup else ''))
+              (f'   setup: {scn.setup}' if scn.setup else '') +
+              (f'\n  overlay: {scn.overlay}' if scn.overlay else ''))
         for i, st in enumerate(scn.steps, 1):
             m = re.match(r'^\s*(\w+)\s*:\s*(.+)$', st)
             t = normalise(m.group(2) if m and m.group(1).lower() in scn.players else st)
@@ -723,6 +727,14 @@ def cmd_drive(argv):
     elif sub == 'launch':
         s.launch(' '.join(rest) or '-nointro')
         print(f'launched, pid {s.game_pid()}')
+    elif sub == 'overlay':
+        if not rest:
+            raise GameError('overlay what? a2test drive --session ID overlay Render3D.World:Surfaces=0 '
+                            '[--unset Render3D.World:Surfaces]')
+        ok, text = s.drive_overlay(rest)
+        log.action(f'overlay {" ".join(rest)}', status='ok' if ok else 'fail', detail=text)
+        print(text)
+        return 0 if ok else 1
     elif sub == 'quit':
         r = _adhoc_step(s, 'Quit the game')
         print(f'{r["status"]}: {r.get("detail") or ""}')
