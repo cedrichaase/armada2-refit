@@ -4,6 +4,20 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.36.0 — 2026-11-02
+
+### Added
+- `Render3D_SettingsNote`, the optional settings export that says why a part is not
+  running: a plugin-wide note when Render3D stood down (`Enable=0`, a seam that is not
+  stock, no usable device) and, on a module's row, "Stands down while <Plugin>.asi is
+  loaded". NULL when nothing is wrong.
+
+### Fixed
+- `Cargo.toml` and `Cargo.lock` said 0.16.3 while this changelog said 0.35.0 (the log
+  line `Render3D <version>` read the old one); now 0.36.0.
+
+Installed, not yet seen in game.
+
 ## 0.35.0 — 2026-11-02
 
 ### Added

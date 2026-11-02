@@ -236,11 +236,24 @@ pub fn settings_changed() -> alloc::string::String {
     said
 }
 
+/// The modules that stood down for a superseded plugin: their row and the plugin's file
+/// name (`Render3D_SettingsNote`, asked on the game thread).
+static mut STOOD: Vec<(&'static settings::Setting, &'static str)> = Vec::new();
+
+/// The plugin a module's row stood down for, if it did (`settle`).
+pub fn stood_down_for(row: *const settings::Setting) -> Option<&'static str> {
+    #[allow(static_mut_refs)]
+    let v = unsafe { &STOOD };
+    v.iter().find(|(r, _)| core::ptr::eq(*r, row)).map(|(_, p)| *p)
+}
+
 /// At the first frame, when every plugin is loaded: drop the modules whose plugin is.
 pub fn settle() {
     let mods = all();
     mods.retain(|e| match e.m.superseded() {
         Some(p) if crate::plugin_loaded(p) => {
+            #[allow(static_mut_refs)]
+            unsafe { STOOD.push((e.row, p)) };
             log!("module {}: {} is loaded, which draws this part; the module stands down", e.m.name(), p);
             false
         }

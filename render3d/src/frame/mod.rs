@@ -393,6 +393,7 @@ fn begin(cfg: &Config, over: Option<gpu::Viewport>) -> Option<Saved> {
             None => {
                 log!("frame: no targets at {}x{}: the engine draws the 3D view", w, h);
                 f.failed = Some((w, h));
+                crate::DOWN.store(crate::DOWN_DEVICE, core::sync::atomic::Ordering::Relaxed);
                 return None;
             }
         }
@@ -402,6 +403,7 @@ fn begin(cfg: &Config, over: Option<gpu::Viewport>) -> Option<Saved> {
         f.post = Post::create(g, t.fmt, rd.format);
         if f.post.is_none() {
             log!("frame: the post shaders could not be made: stock");
+            crate::DOWN.store(crate::DOWN_DEVICE, core::sync::atomic::Ordering::Relaxed);
             f.failed = Some((w, h));
             return None;
         }
