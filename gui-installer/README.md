@@ -252,6 +252,13 @@ draws nothing, and it already knows the game folder, the launcher and the releas
   folder, where older builds wrote them and where the plugins fall back to when
   `LOCALAPPDATA` is unset or not writable; each log's heading says where it was found.
   An uninstall leaves the folder.
+- **Player settings.** The report lists the key lines of `RefitPlayer.ini` (the player's
+  choices from the Refit screen; comments and blank lines left out, at most 80) from the
+  game folder and, on Windows, from `%LOCALAPPDATA%\VirtualStore\<game folder without its
+  drive>`, where a game under `Program Files` has it redirected (`overlay_files()`). The
+  installer only reads it: no install, upgrade or uninstall writes, merges or removes the
+  file, which `gui-installer/test.sh` and `publish/installer/test.sh` / `.ps1` check by
+  hash.
 - **Safe to post** (`redact`): the home folder becomes `~`; any other user folder
   (`C:\Users\name`, `/home/name`, `/Users/name`, Wine's `Z:\home\name`) loses the name;
   IPv4 addresses (Online.log's peers) become `<ip>`.

@@ -5,6 +5,20 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.57.0 — 2026-11-02
+
+Layers: gui-installer 2.4.0.
+
+### Added
+- The GUI installer's bug report lists `RefitPlayer.ini` (game folder, and Windows
+  VirtualStore), and the installer tests (`gui-installer/test.sh`,
+  `publish/installer/test.sh` and `.ps1`) seed one and assert it is byte-identical after
+  install, upgrade and uninstall.
+- Docs: `ui/MENUS.md` says a setting of ours goes only to the overlay; layout-table rows
+  for `crates/a2ini` and `tools/settings` in `CLAUDE.md`.
+
+Installed, not yet seen in game.
+
 ## 13.56.0 — 2026-11-02
 
 Layers: online 0.9.0, cutscenes 2.5.0.

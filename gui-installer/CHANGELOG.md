@@ -4,6 +4,19 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 2.4.0 — 2026-11-02
+
+Reads package schemas 0 and 1, unchanged.
+
+### Added
+- The bug report gains "Player settings (RefitPlayer.ini)": the file's key lines from the
+  game folder and, on Windows, from `%LOCALAPPDATA%\VirtualStore\<game folder without its
+  drive>` (`overlay_files`, `overlay_report`; selftest checks). The installer never writes
+  the file; `test.sh` seeds one and asserts it is byte-identical after install, report and
+  uninstall.
+
+Installed, not yet seen in game.
+
 ## 2.3.0 — 2026-10-30
 
 Reads package schemas 0 and 1, unchanged.
