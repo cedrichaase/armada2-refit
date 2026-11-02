@@ -642,6 +642,31 @@ writes, so a reinstall keeps it: `[UI.HUD] BarHidden` (Game Settings' "Command B
 `prefs.rs`, `HUD.md`, "The top-right buttons"). Every key of every ini in the game
 directory is read overlay first; `settings.rs` is the settings hub, which finds each
 plugin's `<Plugin>_Settings` table and tells the plugins when the overlay changes.
+
+### Settings
+
+`settings.toml` is the table of the keys a player may set (19 rows, tab Interface),
+exported as `UI_Settings` (`src/settings_table.rs` is generated: `python3
+tools/settings/gen.py`). `UI_SettingsChanged`, called by the hub after the overlay changes
+(`config.rs`), reads `UI.ini` and the overlay again and swaps the configuration whole
+(`config::CONFIG`, an `AtomicPtr`): a reader takes it each frame. Only the keys read
+every frame, or switched by `hud::apply_live`, are taken from the new read; every key a
+patch was installed for keeps its start value. By apply class:
+
+- **LIVE**: `HUD.Minimap`, `Info`, `Tooltips` (`hud::apply_live` gives the stock panel
+  back or takes it over; the minimap's click hook goes in at the start whatever the key,
+  so it can come back), `BarKeys` (`palette::set_stock_keys_off`), `BarLabels`, `Icons`,
+  `SelectionGauges`, `InfoCamera`, `UI.Cursor`, `UI.Theme` (read per frame). Shown
+  on the bench: `Minimap` at the same frame, `Theme`; `Info`, `Tooltips`, `BarKeys`
+  not yet driven.
+- **MISSION**: `Menus.Scene` (read when a screen asks for the scene), `HUD.BarHidden`
+  (applied at the next HUD frame).
+- **RESTART**: `HUD.Enable`, `Selection`, `UnitView`, `Bar`, `Menus.Enable`, `Credits`,
+  `Loading.Enable`: each installs or skips a patch at load.
+
+Log: `settings: applied HUD.Minimap=0`, or `settings: re-read, nothing changed`, and for
+a MISSION or RESTART row `settings: <Section.Key=v> (next mission or restart)`.
+
 | `[Menus] Trace` | 0 | UI.log: each hosted dialog's messages of note, its actions, and its surfaces as `UI-dlg<depth>-*.bmp` every 5 s |
 | `[Menus] Host` | 1 | 0 (with `Trace=1`): the dialogs run stock and are only traced, for comparing |
 | `[Loading] Enable` | 1 | the loading screen of ours (`LOADING.md`) in place of the engine's logo scene and bar |

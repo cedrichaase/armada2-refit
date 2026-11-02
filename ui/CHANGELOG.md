@@ -4,6 +4,20 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.30.0 — 2026-11-02
+
+### Added
+- `settings.toml` and the generated `settings_table.rs`: `UI_Settings` exports 19 rows
+  (the HUD panels, `UI.Cursor`, `UI.Theme`, the menu and loading keys, `HUD.BarHidden`
+  as a hidden row); `config.rs` and `prefs.rs` read their keys through the rows.
+- `UI_SettingsChanged`: the configuration is swappable at run time (`config::reload`),
+  and `HUD.Minimap`, `Info`, `Tooltips`, `BarKeys`, `BarLabels`, `Icons`,
+  `SelectionGauges`, `InfoCamera`, `UI.Cursor` and `UI.Theme` apply while playing
+  (`hud::apply_live`). The minimap's click hook is now installed whether or not
+  `Minimap=1` at the start.
+
+Installed, not yet seen in game
+
 ## 0.29.0 — 2026-11-02
 
 ### Added

@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.55.0 — 2026-11-02
+
+Layers: ui 0.30.0, testbench 3.82.0.
+
+### Added
+- UI.asi's settings table (`UI_Settings`) and `UI_SettingsChanged`: the HUD's minimap,
+  info panel, tooltips, grid keys, icons, cursor and theme change while playing, from
+  `RefitPlayer.ini`; scenario `ui-settings-live`.
+
+Installed, not yet seen in game
+
 ## 13.53.0 — 2026-11-02
 
 Layers: testbench 3.80.0.

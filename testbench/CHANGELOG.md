@@ -5,6 +5,13 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.82.0 — 2026-11-02
+
+### Added
+- Scenario `ui-settings-live` (overlay before launch: minimap off, Klingon theme).
+
+Installed, not yet seen in game
+
 ## 3.80.0 — 2026-11-02
 
 ### Added
