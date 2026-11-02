@@ -5,6 +5,21 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.56.0 — 2026-11-02
+
+Layers: qol 1.9.0, testbench 3.83.0.
+
+### Added
+- QOL.asi and QOLRules.asi describe their settings (`QOL_Settings`, `QOLRules_Settings`),
+  read them with `RefitPlayer.ini` in front, and apply the live ones when the overlay
+  changes (`QOL_SettingsChanged`, `QOLRules_SettingsChanged`); `PayOnQueue` is a must-match
+  row and takes hold at the next game. Scenario `qol-settings-live`.
+
+### Fixed
+- `QOL.asi`'s `PanSpeed` code default is 2.5, as shipped, not 1.
+
+Installed, not yet seen in game.
+
 ## 13.52.0 — 2026-11-02
 
 Layers: display 0.16.0, render3d 0.34.0, ui 0.29.0, testbench 3.79.0.

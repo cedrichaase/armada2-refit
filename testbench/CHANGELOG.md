@@ -5,6 +5,15 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.83.0 — 2026-11-02
+
+### Added
+- Scenario `qol-settings-live`: `ShiftAddsToGroup`, `StationGroups`, `PanSpeed`, `WarpDistance`
+  and `ViewDistance` flipped through `RefitPlayer.ini` in a running mission; checked by
+  QOL.log's `settings: applied` lines and by what the groups hold.
+
+Installed, not yet seen in game.
+
 ## 3.79.0 — 2026-11-02
 
 ### Added
