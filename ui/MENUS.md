@@ -387,6 +387,53 @@ widget and acts on it the stock way (`kit::button`, `cycle`, `combo`, `edit`, `l
 `[Menus] Specs=0` draws every screen generically, for comparing a spec with the stock
 screen.
 
+## The Refit screen
+
+`menus/refit.rs`: every setting of every plugin that exports a settings table
+(`tools/settings/README.md`), as rows on five tabs (Graphics, Interface, Gameplay,
+Multiplayer, Movies), in **a modal of ours over the hosted Options dialog**. It is not a
+shell screen of its own: the in-mission Options runs inside the dialog host's loop, which
+is the only thing that presents while a mission's menu is up, and the modal drawn by the
+host's frame (`menus::frame`, after the dialog stack, before the frame's claim) works the
+same in the shell and in a mission with the stock dialog still running under it.
+
+- **Life.** The Options spec's **Refit** button calls `refit::open(host)` (with the
+  shell's click sound). The modal closes on Done, on Esc, when its host leaves
+  `dialogs::stack()` (`menus::closed`; log `refit: closed (Options ended)`) and when a
+  dialog opens above its host (`refit: closed (a dialog opened over Options)`), so that a
+  network box takes the input as stock would. While it is open the Options spec is drawn
+  inert (`inert_unless`).
+- **Keys.** `Ui::modal` claims the keyboard every frame, so `menus::wants_keys()` is
+  true and `pump` sends neither Enter nor Esc to the stock dialog (IDOK, IDCANCEL, Return
+  to Game). The last branch of `pump` used to call `escape` without asking; an Esc that
+  arrives as a `WM_SYSKEYDOWN` at the game window (a focus left nowhere) is now noted as
+  the plain key for the modal and goes no further. Esc closes an open dropdown, then an
+  open question, then the modal; the first Esc after it has closed is stock's again
+  (shell: IDCANCEL; mission: Return to Game). On close `ui.blur()`.
+- **Rows** come from `settings::tables()` in `EXPORTS` order, left out when `FLAG_NO_ROW`,
+  `TAB_NONE`, refused by the hub or a plugin that is absent; `FLAG_ADVANCED` rows show
+  with "Show advanced" (session only). Two columns when one does not hold the page; a
+  scroll area only if two do not (not needed at 1280x720 today). A click anywhere on a
+  BOOL row toggles it; on an ENUM row's label it opens the dropdown. Every change is
+  `settings::set_row`; the screen writes nothing else (`RefitPlayer.ini` only).
+- **Badges**: apply class (`Now`, `Next mission`, `Restart`), replaced by `Restart needed`
+  or `Next mission` drawn active when the value differs from the one at the hub's start
+  (RESTART) or at the start of this mission (MISSION, in a mission), `Must match` on a
+  SCOPE_MATCH row, `Locked` with the control disabled. A must-match row is locked over a
+  mission when `engine::setup::network_game()` is true or unreadable.
+- **Notes**: `<Plugin>_SettingsNote` (optional export) says a part is not running now;
+  a plugin-wide note is a line under the tabs, a row note replaces the help (dimmed) and
+  the row is drawn dimmed but stays switchable. Asked when the screen opens and once a
+  second.
+- **Redrawn menus off** (an ADVANCED row) asks first, since it takes this screen with it.
+- **Reset tab** asks, then removes the overlay keys of the tab's visible rows
+  (`settings::remove_many`, the plugins told once).
+- **Log lines** (UI.log; the bench reads these words): `refit: opened in the shell|a
+  mission (Graphics 19, ...)`, `refit: closed`, `refit: [Render3D.Modules] sky 1 -> 0
+  (now|next mission|restart)`, `... could not be written`, `... locked in a network
+  game`, `refit: <Tab> reset (n keys removed)`, `refit: <Plugin>: <note>`, `refit:
+  menus off asked; yes|no`.
+
 ## The Options family
 
 Options (`options.rs`), Game, Graphics and Sound Settings (`game_settings.rs`,
@@ -405,9 +452,11 @@ the bar's track, a combo choice is below. **Every word is the stock control's ow
   setting of the UI's, not the game's, so it is kept in the player's overlay,
   `RefitPlayer.ini` (`[UI.HUD] BarHidden`, `prefs.rs`), and its words are ours; a click plays the shell's click sound (`cornrclk.wav`).
 - **Options**: the stock buttons in the order they stand on the stock screen (y, then
-  x), in one column; the one at the foot (Previous Menu, Return to Game: a button in the
+  x), in one column, then a separator and one entry of ours, **Refit** (the Refit screen,
+  below); the one at the foot (Previous Menu, Return to Game: a button in the
   bottom-left corner, `common::is_footer`) is the window's footer. In a mission there
-  are nine entries; from the main menu three. The window's title is the stock label at
+  are nine stock entries (ten with Refit); from the main menu three (four). The entry is
+  drawn only by this spec, and not when the settings hub found no row to show. The window's title is the stock label at
   the top ("OPTIONS"); the version is the small label at the bottom.
 - **The settings form** (`form.rs`) finds what belongs together by place, not text: the
   stock screens put a caption 16 to 30 pixels above the control it names, so each
@@ -788,6 +837,9 @@ hidden surfaces).
   opened again, and still off; Sound Settings' Music Volume slider and Unit Speech, the
   screen opened again; Game Settings' Game Difficulty stepped; back to the main menu;
   quit.
+- `ui-menus-refit.md`: the Refit screen (`testbench/operating/refit-screen.md`): the
+  tabs, a row of each kind written and logged, Esc closing only the modal, in the shell
+  and in a mission.
 - `ui-menus-dialogs.md`: the in-mission Options (nine entries), Abort Mission's and
   Exit to Windows' questions answered No, Sound Settings from the mission, Save Game's
   message and its O.K., Return to Game.

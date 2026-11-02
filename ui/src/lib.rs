@@ -100,6 +100,40 @@ fn startup() {
     }
 }
 
+/// `UI_SettingsNote` (tools/settings/README.md, C5): why a row's part is not running now.
+/// The HUD's rows while the HUD stood down; the command bar's rows while GridLayout.asi
+/// owns the bar. NULL for the plugin as a whole and for any other row.
+#[unsafe(no_mangle)]
+pub extern "C" fn UI_SettingsNote(row: *const rt::settings::Setting) -> *const u8 {
+    use settings_table::{HUD_BAR, HUD_BARHIDDEN, HUD_BARKEYS, HUD_BARLABELS, HUD_ENABLE};
+    if row.is_null() {
+        return core::ptr::null();
+    }
+    let r = unsafe { &*row };
+    if core::ptr::eq(r, HUD_ENABLE) || core::ptr::eq(r, HUD_BARHIDDEN) {
+        return core::ptr::null();
+    }
+    if r.section() == "HUD" {
+        let why: &'static [u8] = match unsafe { hud::STOOD_DOWN } {
+            1 => b"The HUD is switched off (Enable=0): the game's own HUD is drawn\0",
+            2 => b"No HUD panel is switched on: the game's own HUD is drawn\0",
+            3 => b"An engine function is not stock: the game's own HUD is drawn\0",
+            4 => b"The HUD could not be installed: the game's own HUD is drawn\0",
+            _ => b"\0",
+        };
+        if why[0] != 0 {
+            return why.as_ptr();
+        }
+    }
+    if core::ptr::eq(r, HUD_BAR) || core::ptr::eq(r, HUD_BARKEYS) || core::ptr::eq(r, HUD_BARLABELS) {
+        let grid = unsafe { rt::win::GetModuleHandleA(c"GridLayout.asi".as_ptr() as *const u8) };
+        if !grid.is_null() {
+            return b"The command bar is GridLayout.asi's while it is installed\0".as_ptr();
+        }
+    }
+    core::ptr::null()
+}
+
 #[unsafe(no_mangle)]
 pub extern "system" fn DllMain(_module: HANDLE, reason: u32, _reserved: *mut u8) -> i32 {
     if reason == 1 {

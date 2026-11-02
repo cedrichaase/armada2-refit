@@ -52,6 +52,13 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
     unsafe { ExitProcess(3) }
 }
 
+/// Why render3d is not drawing, for `Render3D_SettingsNote` (0: it is, or not known yet).
+pub static DOWN: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+pub const DOWN_DISABLED: u32 = 1;
+pub const DOWN_SEAM: u32 = 2;
+/// The 3D view's targets or post shaders could not be made (no usable device).
+pub const DOWN_DEVICE: u32 = 3;
+
 fn startup() {
     rt::init();
     let cfg = config::load();
@@ -61,6 +68,7 @@ fn startup() {
     clock::load();
     if !cfg.enable {
         log!("Enable=0: standing down, the engine draws the 3D view");
+        DOWN.store(DOWN_DISABLED, core::sync::atomic::Ordering::Relaxed);
         if cfg.timing && frame::install_measure() {
             log!("timing: the engine's own body is timed (Enable=0)");
         }
@@ -73,7 +81,43 @@ fn startup() {
         // (README.md, "Claims"); a render3d that does not hook the frame claims nothing.
         gfx::gpu().register(mods::claims);
         log!("ready");
+    } else {
+        DOWN.store(DOWN_SEAM, core::sync::atomic::Ordering::Relaxed);
     }
+}
+
+/// `Render3D_SettingsNote` (`tools/settings/README.md`, C5): why a row is not running,
+/// or NULL. `row` NULL asks about the plugin as a whole. The text lives in a static
+/// buffer, valid until the next call; nothing is written but that buffer.
+#[unsafe(no_mangle)]
+pub extern "C" fn Render3D_SettingsNote(row: *const rt::settings::Setting) -> *const u8 {
+    use core::sync::atomic::Ordering;
+    static mut BUF: [u8; 128] = [0; 128];
+    let b = unsafe { &mut *core::ptr::addr_of_mut!(BUF) };
+    let mut n = 0;
+    let mut put = |s: &str| {
+        for &c in s.as_bytes() {
+            if n < 126 {
+                b[n] = c;
+                n += 1;
+            }
+        }
+    };
+    if row.is_null() {
+        match DOWN.load(Ordering::Relaxed) {
+            DOWN_DISABLED => put("Render3D is off (Enable=0 in Render3D.ini): the engine draws the 3D view"),
+            DOWN_SEAM => put("Render3D stood down: the game's 3D call is not the stock one"),
+            DOWN_DEVICE => put("Render3D stood down: no usable graphics device, the engine draws the 3D view"),
+            _ => return core::ptr::null(),
+        }
+    } else {
+        let Some(p) = mods::stood_down_for(row) else { return core::ptr::null() };
+        put("Stands down while ");
+        put(p);
+        put(" is loaded");
+    }
+    b[n] = 0;
+    b.as_ptr()
 }
 
 /// The hub's call after the overlay or an ini changed (`tools/settings/README.md`, C5):
