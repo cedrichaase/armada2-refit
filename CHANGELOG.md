@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.53.0 — 2026-11-02
+
+Layers: testbench 3.80.0.
+
+### Added
+- Bench side of the `RefitPlayer.ini` overlay: clones start without it, a scenario
+  `Overlay:` header, `a2test drive overlay` for live flips (testbench 3.80.0).
+
+Installed, not yet seen in game.
+
 ## 13.52.0 — 2026-11-02
 
 Layers: display 0.16.0, render3d 0.34.0, ui 0.29.0, testbench 3.79.0.

@@ -92,6 +92,27 @@ scene file (`SCENE=planet|nebula|firing`). A free camera can be moved while the 
 runs: `a2test drive scene "orbit ship 120 20 250"`. `--install testbench/scene`; see
 `scene/README.md`.
 
+**The player's overlay** (`RefitPlayer.ini`, `tools/settings/README.md`): every clone
+starts with **no** `RefitPlayer.ini`, `RefitPlayer.ini.tmp`, `UIPlayer.ini` or
+`UIPlayer.ini.migrated` (deleted in `prepare`, logged `overlay emptied`), so the user's
+own choices never reach a bench game; `collect_logs` keeps the clone's `RefitPlayer.ini`
+in the run's `logs/`. Keys come back in three ways, all written with
+`tools/settings/overlay.py` (the edit `UI.asi` makes), the section spelled as in the
+overlay (`<Stem>.<Section>`):
+
+- a scenario's header **`Overlay: Render3D.Modules:sky=0 UI.HUD:Minimap=0`**, written
+  after `Setup:` and before the launch (`scenarios/README.md`); `a2test check` shows it;
+- **`./a2test drive --session ID overlay Render3D.World:Surfaces=0`** in a running game,
+  and `... overlay --unset Render3D.World:Surfaces`. It then waits up to 5 s for the hub's
+  `settings: RefitPlayer.ini changed` in `UI.log` and fails, saying so, when there is none
+  (no `UI.asi` in the clone, or the hub is not running); a game that is not running only
+  has the file written;
+- `Setup: tools/settings/bench-overlay.sh ...`, which still works and also runs a scene
+  or script after it.
+
+`python3 testbench/bench/overlay_selftest.py` checks the header, the emptying and
+`drive overlay` against a fake clone.
+
 **Sound by category** (`--mute`, `--stems`; "Audio stems" below): a session can set
 the game's music, voice, effects and interface volumes to 0 in its clone, and can play
 music, voice and the interface on silent sinks of their own, so a take records each as
