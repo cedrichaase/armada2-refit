@@ -19,6 +19,7 @@ pub mod math;
 pub mod menu;
 pub mod mods;
 pub mod scene;
+pub mod settings_table;
 #[rustfmt::skip]
 pub mod shaders;
 pub mod timing;
@@ -72,6 +73,24 @@ fn startup() {
         // (README.md, "Claims"); a render3d that does not hook the frame claims nothing.
         gfx::gpu().register(mods::claims);
         log!("ready");
+    }
+}
+
+/// The hub's call after the overlay or an ini changed (`tools/settings/README.md`, C5):
+/// the live rows are read again and applied on the game thread, in one log line. Rows
+/// that are not live (`apply` restart) are latched at load.
+#[unsafe(no_mangle)]
+pub extern "C" fn Render3D_SettingsChanged() {
+    // Stood down (Enable=0, or the seam is not stock's): nothing of ours to change.
+    if config::get().is_none() {
+        return;
+    }
+    rt::ini_refresh_all();
+    let said = mods::apply_settings();
+    if said.is_empty() {
+        log!("settings: re-read, nothing changed");
+    } else {
+        log!("settings: applied {}", said);
     }
 }
 

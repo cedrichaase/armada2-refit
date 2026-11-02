@@ -18,6 +18,8 @@ use crate::engine::{self, field, rd};
 use crate::frame::steps::View;
 use crate::gfx::Pipes;
 use crate::log;
+use crate::rt::settings;
+use crate::settings_table::OVERLAYS_PIVOT;
 use crate::math::{v3, V3};
 use alloc::vec::Vec;
 
@@ -52,7 +54,7 @@ impl Pivot {
         let c = ini.floats("Overlays", "PivotColour", [0.64, 0.36, 0.35]);
         let b = ini.float("Overlays", "PivotBrightness", 1.6);
         Pivot {
-            on: ini.int("Overlays", "Pivot", 1) != 0,
+            on: settings::on(ini, OVERLAYS_PIVOT),
             stock: None,
             radius: ini.float("Overlays", "PivotRadius", 18.0).max(1.0),
             width: ini.float("Overlays", "PivotWidth", 1.5).max(0.5),
@@ -61,6 +63,13 @@ impl Pivot {
             pipes: Pipes::new(),
             said: false,
         }
+    }
+
+    /// `[Overlays] Pivot` again (`Render3D_SettingsChanged`); true if it changed.
+    pub fn set_on(&mut self, on: bool) -> bool {
+        let changed = on != self.on;
+        self.on = on;
+        changed
     }
 
     /// Whether `TacticalCamera::Render` is stock's, checked once.

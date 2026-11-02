@@ -25,6 +25,8 @@ use super::{Module, Step};
 use crate::engine::{self, field, rd};
 use crate::frame::steps::View;
 use crate::log;
+use crate::rt::settings;
+use crate::settings_table::{OVERLAYS_FOG, OVERLAYS_GHOSTS, OVERLAYS_GRID, OVERLAYS_HEIGHTPOSTS, OVERLAYS_PIVOT, OVERLAYS_SELECTION};
 
 // ---- Armada2.exe, GOG patch 1.1 ----------------------------------------------------
 
@@ -83,12 +85,11 @@ pub struct Settings {
 impl Settings {
     fn read() -> Settings {
         let ini = crate::config::ini();
-        let on = |k: &str| ini.int("Overlays", k, 1) != 0;
         Settings {
-            fog: on("Fog"),
-            grid: on("Grid"),
-            selection: on("Selection"),
-            ghosts: on("Ghosts"),
+            fog: settings::on(&ini, OVERLAYS_FOG),
+            grid: settings::on(&ini, OVERLAYS_GRID),
+            selection: settings::on(&ini, OVERLAYS_SELECTION),
+            ghosts: settings::on(&ini, OVERLAYS_GHOSTS),
             fog_layers: fog::Settings::read(&ini) }
     }
 }
@@ -108,6 +109,51 @@ static mut CLAIMS: (bool, bool) = (false, false);
 
 pub fn claims() -> (bool, bool) {
     unsafe { CLAIMS }
+}
+
+/// The module, for `settings_changed` (set at its device; the box does not move).
+static mut ME: *mut Overlays = core::ptr::null_mut();
+
+/// `Render3D_SettingsChanged` for the overlays: every `[Overlays]` key with a row, read
+/// again (the fog's filter and thresholds with them). Returns what changed.
+pub fn settings_changed() -> alloc::string::String {
+    let me = unsafe { ME };
+    let mut said = alloc::string::String::new();
+    if me.is_null() {
+        return said;
+    }
+    let me = unsafe { &mut *me };
+    let mut note = |k: &str, v: bool| {
+        if !said.is_empty() {
+            said.push_str(", ");
+        }
+        said.push_str(&crate::sfmt!("Overlays.{}={}", k, v as u32));
+    };
+    let new = Settings::read();
+    if new.fog != me.s.fog {
+        note("Fog", new.fog);
+    }
+    if new.grid != me.s.grid {
+        note("Grid", new.grid);
+    }
+    if new.selection != me.s.selection {
+        note("Selection", new.selection);
+    }
+    if new.ghosts != me.s.ghosts {
+        note("Ghosts", new.ghosts);
+    }
+    me.s = new;
+    unsafe { CLAIMS = (me.s.fog, me.s.selection) };
+    let ini = crate::config::ini();
+    let hp = settings::on(&ini, OVERLAYS_HEIGHTPOSTS);
+    if me.posts.set_on(hp) {
+        note("HeightPosts", hp);
+    }
+    let pv = settings::on(&ini, OVERLAYS_PIVOT);
+    if me.pivot.set_on(pv) {
+        note("Pivot", pv);
+    }
+    said
 }
 
 impl Default for Overlays {
@@ -187,6 +233,7 @@ impl Module for Overlays {
         Some("Fog.asi")
     }
     fn device(&mut self) {
+        unsafe { ME = self as *mut Overlays };
         self.posts.install();
     }
     fn reset(&mut self) {
