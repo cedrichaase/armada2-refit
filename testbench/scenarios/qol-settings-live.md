@@ -12,11 +12,9 @@ Timeout: 10 min
 in `RefitPlayer.ini` (`[QOL.QOL]`, written here by `a2test drive overlay`) applies at
 once: UI.asi's settings hub sees the overlay change, calls `QOL_SettingsChanged`, and
 QOL.log says `settings: applied QOL.<Key>=<value>`. Checked by those lines and by what
-the groups hold. `MaxSelection` is `restart` and is not flipped. An `Overlay "<Section:Key=value>"`
-step is `./a2test drive --session ID overlay <Section:Key=value>` (`--unset` for `Overlay
-unset`): the scenario grammar has no step of its own for it yet, so the agent that
-takes such a step runs that command. Verified by hand with the same commands on
-2026-11-02 (all `PASS`).
+the groups hold. `MaxSelection` is `restart` and is not flipped. The `Overlay` step is
+`./a2test drive overlay` as a scenario step (`testbench/scenarios/README.md`); `Overlay
+--unset Section.Name:Key` removes a key.
 
 1. Launch the game.
 2. Wait up to 50 seconds for the logs the next steps expect.
@@ -30,7 +28,7 @@ takes such a step runs that command. Verified by hand with the same commands on
 10. Press shift+1.
 11. Expect scene "selection" answers "ship group 1 (2): ship1 ship2".
 12. Note "ShiftAddsToGroup off, live: Shift+2 no longer binds".
-13. Overlay "QOL.QOL:ShiftAddsToGroup=0".
+13. Overlay QOL.QOL:ShiftAddsToGroup=0
 14. Wait up to 10 seconds for the logs the next steps expect.
 15. Expect "QOL.log" contains "settings: applied QOL.ShiftAddsToGroup=0".
 16. Scene "select ship1".
@@ -39,7 +37,7 @@ takes such a step runs that command. Verified by hand with the same commands on
 19. Press shift+2.
 20. Expect scene "selection" answers "ship group 2 (1): ship1".
 21. Note "back on, live".
-22. Overlay unset "QOL.QOL:ShiftAddsToGroup".
+22. Overlay --unset QOL.QOL:ShiftAddsToGroup
 23. Wait up to 10 seconds for the logs the next steps expect.
 24. Expect "QOL.log" contains "settings: applied QOL.ShiftAddsToGroup=1".
 25. Scene "select ship2".
@@ -49,27 +47,27 @@ takes such a step runs that command. Verified by hand with the same commands on
 29. Scene "select yard1 yard2".
 30. Expect scene "selection" answers "selected 2: yard1".
 31. Note "StationGroups off, live: a second station replaces the first, as in stock".
-32. Overlay "QOL.QOL:StationGroups=0".
+32. Overlay QOL.QOL:StationGroups=0
 33. Wait up to 10 seconds for the logs the next steps expect.
 34. Expect "QOL.log" contains "settings: applied QOL.StationGroups=0".
 35. Scene "select yard1 yard2".
 36. Expect scene "selection" answers "selected 1: yard2".
 37. Note "back on, live".
-38. Overlay unset "QOL.QOL:StationGroups".
+38. Overlay --unset QOL.QOL:StationGroups
 39. Wait up to 10 seconds for the logs the next steps expect.
 40. Expect "QOL.log" contains "settings: applied QOL.StationGroups=1".
 41. Scene "select yard1 yard2".
 42. Expect scene "selection" answers "selected 2: yard1".
 43. Note "PanSpeed 1 (stock), live, then 4".
-44. Overlay "QOL.QOL:PanSpeed=1".
+44. Overlay QOL.QOL:PanSpeed=1
 45. Wait up to 10 seconds for the logs the next steps expect.
 46. Expect "QOL.log" contains "settings: applied QOL.PanSpeed=1 (coefficient".
-47. Overlay "QOL.QOL:PanSpeed=4".
+47. Overlay QOL.QOL:PanSpeed=4
 48. Wait up to 10 seconds for the logs the next steps expect.
 49. Expect "QOL.log" contains "settings: applied QOL.PanSpeed=4 (coefficient".
 50. Note "WarpDistance 0 and ViewDistance 0, live".
-51. Overlay "QOL.QOL:WarpDistance=0".
-52. Overlay "QOL.QOL:ViewDistance=0".
+51. Overlay QOL.QOL:WarpDistance=0
+52. Overlay QOL.QOL:ViewDistance=0
 53. Wait up to 10 seconds for the logs the next steps expect.
 54. Expect "QOL.log" contains "QOL.WarpDistance=0".
 55. Expect "QOL.log" contains "QOL.ViewDistance=0".

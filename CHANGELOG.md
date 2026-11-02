@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.58.1 — 2026-11-02
+
+Layers: testbench 3.83.1.
+
+### Changed
+- `render3d-settings-live` runs unattended with the `Overlay` step and also flips
+  `World.Surfaces` and `Modules.sky`; `qol-settings-live` uses the `Overlay` step too
+  (testbench 3.83.1).
+
+Installed, not yet seen in game.
+
 ## 13.58.0 — 2026-11-02
 
 Layers: testbench 3.83.0.

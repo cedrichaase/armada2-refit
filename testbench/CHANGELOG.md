@@ -5,6 +5,15 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.83.1 — 2026-11-02
+
+### Changed
+- `render3d-settings-live`: `Overlay` steps, plus `World.Surfaces=0` and `Modules.sky=0`
+  against their `roundC-main-port-showcase-*` baselines. `qol-settings-live`: the manual
+  `Overlay "..."` notes became the `Overlay` step.
+
+Installed, not yet seen in game.
+
 ## 3.83.0 — 2026-11-02
 
 ### Added
