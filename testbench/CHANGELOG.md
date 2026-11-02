@@ -5,6 +5,15 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.83.0 — 2026-11-02
+
+### Added
+- Scenario step `Overlay Section.Name:Key=value ...` / `Overlay --unset Section.Name:Key`:
+  `a2test drive overlay` for scenarios (same function), an action so later log waits see
+  only lines since it; so live-flip scenarios run unattended. Selftest extended.
+
+Installed, not yet seen in game.
+
 ## 3.80.0 — 2026-11-02
 
 ### Added
