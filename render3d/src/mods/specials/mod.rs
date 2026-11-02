@@ -226,7 +226,7 @@ impl Specials {
         }
         self.fx.clear();
         self.engine.clear();
-        if !self.on || !crate::mods::particles::live() {
+        if !self.on || !crate::core_particles::live() {
             return;
         }
         let mut alive: BTreeSet<(usize, usize)> = BTreeSet::new();
@@ -258,7 +258,7 @@ impl Specials {
                     continue;
                 };
                 // The instance's emitters at the placement (the weapons never scale it).
-                crate::mods::particles::feed(e + E_INSTANCE, &sod, &world, v);
+                crate::core_particles::feed(e + E_INSTANCE, &sod, &world, v);
                 self.fed += 1;
             }
             // The look: for a kind we have one for, while the effect lasts, whether or
@@ -363,13 +363,13 @@ impl Module for Specials {
             }
             self.gather(v);
         }
-        if self.on && crate::mods::particles::live() {
+        if self.on && crate::core_particles::live() {
             self.look.lights(v, &self.fx);
         }
     }
     fn step(&mut self, s: Step, v: &View) -> bool {
         // Without our particles nothing would draw the emitters: the engine's step.
-        if !self.on || !crate::mods::particles::live() {
+        if !self.on || !crate::core_particles::live() {
             return false;
         }
         match s {

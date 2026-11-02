@@ -35,13 +35,11 @@ use alloc::collections::BTreeSet;
 use alloc::vec::Vec;
 use draw::{Batch, Cam};
 
-const VT_DEVICE_DX8: usize = 0x6bc6ac;
+use crate::engine::DX8_VTABLE as VT_DEVICE_DX8;
 const SLOT_RENDER_PARTICLE: usize = 50;
 const FN_RENDER_PARTICLE: usize = 0x6262f0;
 const ENG_CURRENT_INSTANCE: usize = 0x100;
-const FN_NEW: usize = 0x652710; // operator new, cdecl
-const FN_POINT_LIGHT: usize = 0x62f240; // ST3D_Point_Light::ST3D_Point_Light(db, node, name), thiscall
-const FN_REGISTER_LIGHT: usize = 0x62d250; // ST3D_GraphicsEngine::RegisterLight(light, colour*, Matrix34*), thiscall
+use crate::engine::light::{FN_NEW, FN_POINT_LIGHT, FN_REGISTER_LIGHT};
 const MAX_LIGHTS: usize = 16;
 /// Whether the vents' lights are also added to the scene layer's list by hand (see
 /// `Particles::lights`).
@@ -70,27 +68,18 @@ unsafe extern "thiscall" fn render_particle(dev: usize, pt: usize) {
 }
 
 static mut SYS: Option<sim::System> = None;
-static mut LIVE: bool = false;
 
 #[allow(static_mut_refs)]
 fn sys() -> &'static mut sim::System {
     unsafe { SYS.get_or_insert_with(sim::System::new) }
 }
 
-/// For a module that draws an instance with emitters in the engine's place (a weapon's
-/// SOD, a special effect's): its emitters at `world` (the transform it is drawn with,
-/// scale included), simulated once this frame and drawn with every other particle.
-/// `key` names the instance (its address); call it every frame it exists.
-pub fn feed(key: usize, sod: &str, world: &M34, v: &View) {
-    if unsafe { LIVE } {
-        sys().feed(key, sod, world, v.time, v.eye);
+/// The emitters other modules fed this view (`core_particles`), into the simulation: each
+/// instance simulated once this frame and drawn with every other particle.
+fn drain() {
+    for f in crate::core_particles::take() {
+        sys().feed(f.key, &f.sod, &f.world, f.time, f.eye);
     }
-}
-
-/// Whether the module draws the particles in this view (`feed` does something): a
-/// module that would draw an instance with emitters leaves it to the engine otherwise.
-pub fn live() -> bool {
-    unsafe { LIVE }
 }
 
 pub struct Particles {
@@ -279,8 +268,8 @@ impl Module for Particles {
         }
         unsafe {
             SUPPRESS = self.enabled;
-            LIVE = self.enabled;
         }
+        crate::core_particles::set_live(self.enabled);
         billboard::skip(self.enabled);
         self.batch.clear();
         self.register_lights();
@@ -296,6 +285,7 @@ impl Module for Particles {
         if s != Step::Translucent || !self.enabled {
             return false;
         }
+        drain();
         let cam = Cam::of(v);
         // Every other particle in the stock look (the vents in theirs, below).
         let sys = sys();
@@ -327,10 +317,11 @@ impl Module for Particles {
         true
     }
     fn end_view(&mut self, _v: &View) {
+        drain();
         unsafe {
             SUPPRESS = false;
-            LIVE = false;
         }
+        crate::core_particles::set_live(false);
         billboard::skip(false);
     }
 }

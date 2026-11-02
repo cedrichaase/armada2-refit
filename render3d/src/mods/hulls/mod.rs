@@ -22,7 +22,7 @@
 //! For other modules: `posed(obj)` gives an object's posed model this view (every
 //! node's world matrix and whether it is shown), e.g. for its emitter nodes;
 //! `shadow_map()` lends the shadow map as `Lighting.asi`'s `LightingShadowMap` did.
-pub mod anim;
+use crate::scene::anim;
 pub mod game;
 pub mod look;
 mod draw;
@@ -34,59 +34,21 @@ use super::{Module, Step};
 use crate::engine::{self, field, field_u8, obj};
 use crate::frame::steps::View;
 use crate::math::{v3, M34, V3};
+use crate::scene::instance::{self, hide};
 use crate::scene::{self, pose, Model};
 use crate::{assets, log};
 use alloc::collections::BTreeMap;
-use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
 use look::Look;
 
-pub use draw::Waves;
+pub use crate::scene::pose::{norm_or, Posed, Warp, Waves};
 pub use shadow::ShadowMap;
-
-/// An object's model posed for this view.
-pub struct Posed {
-    pub obj: usize,
-    pub inst: usize,
-    pub model: Rc<Model>,
-    /// Every node's world matrix and whether it is drawn this view (its level of
-    /// detail, and the nodes the engine shows or hides per instance).
-    pub pose: pose::Pose,
-    /// The object's placement with the SOD's and the instance's scale folded in: what
-    /// the model's own coordinates are taken into world space with.
-    pub world: M34,
-    /// The instance's scale (the scale effects: strategic view, colonising).
-    pub scale: V3,
-    /// The model's bounding sphere, world.
-    pub centre: V3,
-    pub radius: f32,
-    /// The instance's animation clock (start `+0x18`, flags `+0xc`): what sprite nodes
-    /// play on (from its start whether it animates or not).
-    pub since_start: f32,
-    pub flags: u32,
-    /// Meshes' texture flipbooks play on this (0 while the instance does not animate).
-    pub clock: pose::Clock,
-    pub team: Option<V3>,
-    /// The Borg's assimilated look (`+0xa1`): the meshes' second textures.
-    pub assimilated: bool,
-    pub warp: Option<draw::Warp>,
-    pub waves: Option<Waves>,
-    /// The `glowdmoon` sprite node's colour on a Scrap object.
-    pub glow: Option<V3>,
-    /// The object's cloaking device: (state, how much of the hull is left 0..1, phase).
-    pub cloak: Option<(u32, f32, f32)>,
-    /// Drawn in the object loop of this view (not just posed for the shadow map).
-    pub drawn: bool,
-    /// A freighter's cargo markings: lighting materials (lower case) drawn unlit in
-    /// this colour (`game::cargo_markings`). Empty for everything else.
-    pub cargo: Vec<(String, V3)>,
-}
 
 /// What `begin_view` keeps per view.
 #[derive(Default)]
 struct ViewState {
-    posed: BTreeMap<usize, Posed>,
+    key: usize,
     /// Faded hulls (the object and its fade), cloaked hulls, for the flush.
     faded: Vec<(usize, f32)>,
     cloaked: Vec<usize>,
@@ -109,41 +71,28 @@ enum Extra {
     Faded(f32),
 }
 
+impl ViewState {
+    /// The posed objects of this view, kept in the core (`pose::posed` answers other
+    /// modules from it).
+    fn posed(&self) -> &'static mut BTreeMap<usize, Posed> {
+        pose::cache(self.key)
+    }
+}
+
 static mut VIEWS: [Option<ViewState>; 3] = [None, None, None];
-static mut CUR: usize = 0;
 /// The module, for the calls other modules make into it (`placeholder`); set at every
 /// `begin_view` (the box it lives in does not move).
 static mut ME: *mut Hulls = core::ptr::null_mut();
 
 #[allow(static_mut_refs)]
 fn view_state(key: usize) -> &'static mut ViewState {
-    unsafe { VIEWS[key.min(2)].get_or_insert_with(ViewState::default) }
-}
-
-/// The posed model of an object in the view being drawn (or last drawn), if the hulls
-/// module poses it: every node's world matrix (`pose.world`, by SOD node index) and
-/// whether the node is shown (`pose.shown`). Valid from the start of a view (the
-/// module's `begin_view`) until the next view begins.
-pub fn posed(o: usize) -> Option<&'static Posed> {
-    view_state(unsafe { CUR }).posed.get(&o)
-}
-
-/// Whether the object's instance draws a plain `ST3D_Database` (a SOD as it is, not
-/// a planet's or another special database); for other modules (effects' chunks).
-pub fn draws_plain_sod(o: usize) -> bool {
-    let db = field(obj::instance(o), 0x80);
-    db != 0 && engine::vtable(db) == game::VT_DATABASE
-}
-
-/// The instance's scale (the scale effects), as `GameObjectInstance` applies it.
-pub fn instance_scale(inst: usize) -> V3 {
-    game::instance_scale(inst)
+    unsafe { VIEWS[key.min(2)].get_or_insert_with(|| ViewState { key: key.min(2), ..ViewState::default() }) }
 }
 
 /// This view's shadow map from the Key, while there is one: the texture (R32F, depth
 /// 0..1 from the Key, 1 where no hull is), the world -> (u, v, depth) rows, a texel in
 /// uv and the depth bias. As `Lighting.asi`'s `LightingShadowMap` export did.
-pub fn shadow_map() -> Option<ShadowMap> {
+fn shadow_map() -> Option<ShadowMap> {
     shadow::current()
 }
 
@@ -254,7 +203,7 @@ impl Hulls {
         let clock = pose::Clock::of_instance(inst, v.time);
         let mut p = pose::pose(&model.sod, &model.info, &world, clock, pose::auto(v.eye));
         let craft = game::is_craft_instance(inst);
-        visibility(o, inst, craft, &model, &mut p);
+        instance::visibility(o, inst, craft, &model, &mut p);
         let (c, r) = draw::model_sphere(&model);
         let centre = world.transform_point(c);
         let radius = r * world.r[0].len().max(world.r[1].len()).max(world.r[2].len());
@@ -279,12 +228,12 @@ impl Hulls {
                 if unsafe { SAID } < 12 || unsafe { SAID } % 60 == 0 {
                     log!("hulls: {} warps: ramp {:.2}, stretch {:.2}, motion {:?}", name, b, sv, n);
                 }
-                draw::Warp::new(b, sv, n, &obj::transform(o), inst, scale)
+                draw::warp_new(b, sv, n, &obj::transform(o), inst, scale)
             })
         } else {
             None
         };
-        let waves = draw::Waves::of(o, craft && craft_ri(o), v.time);
+        let waves = draw::waves_of(o, craft && craft_ri(o), v.time);
         let glow = if game::render_fn(o) == game::FN_SCRAP_RENDER { game::scrap_glow(o) } else { None };
         let cargo = game::cargo_markings(o, &model.sod);
         Some(Posed {
@@ -486,13 +435,13 @@ impl Hulls {
 /// stock fades it, its height post with it (`overlays::height_post`, or the engine's
 /// `DrawHeightPost` without the overlays module). False when the hulls module does not
 /// draw it (not running, `BuildGhost=0`, no SOD): the caller leaves it to the engine.
-pub fn placeholder(v: &View, class: usize, place: &M34, colour: V3, blocked: bool) -> bool {
+fn placeholder(v: &View, class: usize, place: &M34, colour: V3, blocked: bool) -> bool {
     let me = unsafe { ME };
     if me.is_null() || class == 0 {
         return false;
     }
     let me = unsafe { &mut *me };
-    if me.off || !crate::mods::running("hulls") {
+    if me.off {
         return false;
     }
     let look = me.look().clone();
@@ -515,7 +464,11 @@ pub fn placeholder(v: &View, class: usize, place: &M34, colour: V3, blocked: boo
         );
     }
     view_state(v.key()).extras.push((p, Extra::Ghost(look.ghost.alpha, blocked)));
-    super::overlays::height_post(v, place.p);
+    match crate::core_services::post() {
+        Some(p) => p.height_post(v, place.p),
+        // Without the overlays module the posts are the engine's.
+        None => crate::engine::instance::draw_height_post(place.p, v.cam),
+    }
     true
 }
 
@@ -569,107 +522,29 @@ fn is_craft_class(class: usize) -> bool {
     field(engine::vtable(class), 7 * 4) == 0x4bfdf0
 }
 
-/// The nodes an instance shows as the engine would draw it, without its object: for a
-/// fog-of-war ghost (overlays), whose spirit keeps the instance as it was last seen.
-pub fn instance_visibility(inst: usize, model: &Model, p: &mut pose::Pose) {
-    visibility(0, inst, game::is_craft_instance(inst), model, p);
-}
-
-/// The nodes the engine shows or hides per instance, by writing flags into the shared
-/// database before it draws (`ST3D_Stream::ReadDatabase`, `GameObjectInstance::
-/// RenderInternal`, `CraftInstance::RenderInternal`, `Shipyard::Render`,
-/// `MiningStation::Render`), applied to this instance's pose instead.
-fn visibility(o: usize, inst: usize, craft: bool, model: &Model, p: &mut pose::Pose) {
-    let sod = &model.sod;
-    let hide_tree = |p: &mut pose::Pose, i: usize| hide(sod, i, &mut p.shown, true);
-    let hide_children = |p: &mut pose::Pose, i: usize| {
-        for &c in &sod.nodes[i].children {
-            hide(sod, c, &mut p.shown, true);
-        }
-    };
-    // `hardpoints`: never drawn.
-    if let Some(i) = sod.find("hardpoints") {
-        hide_tree(p, i);
-    }
-    // `lights` (or `light`): hidden at detail level 0 and while the instance's `+0x90`
-    // says so.
-    if field_u8(inst, 0x90) != 0 || game::detail_level() == 0 {
-        if let Some(i) = sod.find("lights").or_else(|| sod.find("light")) {
-            hide_tree(p, i);
-        }
-    }
-    if craft {
-        let class = game::instance_class(inst);
-        for (cf, ib) in game::DAMAGE_NODES {
-            let n = field(class, cf);
-            if n == 0 {
-                continue;
-            }
-            if let Some(i) = game::element_name(n).and_then(|nm| sod.find(nm)) {
-                if field_u8(inst, ib) != 0 {
-                    hide_children(p, i);
-                }
-            }
-        }
-        // The crew fires: under `crew`, node after node, one more hidden for each
-        // fifth of the crew (`CrewDamageTraverse`: hidden from `+0xa4` + 0.2 k >= 1).
-        // The engine's child lists run in reverse file order (`ST3D_Node::AddChild`
-        // puts each new child first), so `crew1`, stored last, is the first shown.
-        let crew = field(class, 0x408);
-        if crew != 0 {
-            if let Some(i) = game::element_name(crew).and_then(|nm| sod.find(nm)) {
-                let mut x = engine::field_f32(inst, 0xa4);
-                let mut stack: Vec<usize> = sod.nodes[i].children.iter().copied().collect();
-                let mut guard = 0;
-                while let Some(n) = stack.pop() {
-                    guard += 1;
-                    if guard > sod.nodes.len() {
-                        break;
-                    }
-                    if x >= 1.0 {
-                        p.shown[n] = false;
-                    }
-                    x += 0.2;
-                    stack.extend(sod.nodes[n].children.iter().copied());
-                }
-            }
-        }
-        // `borg`: shown only while assimilated.
-        let borg = field(class, 0x420);
-        if borg != 0 && field_u8(inst, 0xa1) == 0 {
-            if let Some(i) = game::element_name(borg).and_then(|nm| sod.find(nm)) {
-                hide_tree(p, i);
-            }
-        }
-    }
-    if let Some((n, hidden)) = game::station_node(o) {
-        if hidden {
-            if let Some(i) = game::element_name(n).and_then(|nm| sod.find(nm)) {
-                hide_tree(p, i);
-            }
-        }
-    }
-}
-
-fn hide(sod: &a2fmt::sod::Sod, root: usize, shown: &mut [bool], tree: bool) {
-    let mut stack = alloc::vec![root];
-    let mut guard = 0;
-    while let Some(i) = stack.pop() {
-        guard += 1;
-        if guard > sod.nodes.len() {
-            break;
-        }
-        shown[i] = false;
-        if tree {
-            stack.extend_from_slice(&sod.nodes[i].children);
-        }
-    }
-}
-
 /// The object-loop filters the step body applies (`frame::steps`): not a background
 /// object, not distance-culled for this view.
 fn in_loop(o: usize) -> bool {
     o != 0 && obj::flags(o) & 0x10000 == 0 && field_u8(o, 0x183) == 0
+}
+
+/// The hulls module's draws, offered to the others as `core_services::hulls()`.
+struct Provider;
+static PROVIDER: Provider = Provider;
+
+impl crate::core_services::HullDraw for Provider {
+    fn draw_instance(&self, v: &View, key: usize, inst: usize, craft: bool, sod: &str, world: &M34, team: Option<V3>) -> bool {
+        draw_instance(v, key, inst, craft, sod, world, team)
+    }
+    fn draws_plain_sod(&self, o: usize) -> bool {
+        crate::engine::instance::draws_plain_sod(o)
+    }
+    fn placeholder(&self, v: &View, class: usize, place: &M34, colour: V3, blocked: bool) -> bool {
+        placeholder(v, class, place, colour, blocked)
+    }
+    fn shadow_map(&self) -> Option<crate::core_services::ShadowRef> {
+        shadow_map()
+    }
 }
 
 impl Module for Hulls {
@@ -686,6 +561,9 @@ impl Module for Hulls {
         &[]
     }
     fn configure(&mut self, _ini: &crate::rt::Ini, _said: &mut crate::core_module::Changes) {}
+    fn provide(&mut self, id: crate::core_module::ModuleId, s: &mut crate::core_services::Services) {
+        s.hulls(id, &PROVIDER);
+    }
     /// `[Modules] hulls=0`: the menu scene's ships stay ours. The front end has no game
     /// objects and the engine draws nothing there (Display8.log: 0 engine draws in
     /// "start"), so nothing could hand them back to the engine or to passthrough. In a
@@ -700,6 +578,7 @@ impl Module for Hulls {
         // module off, there is none), and nothing posed in the menu is asked for.
         shadow::clear_current();
         unsafe { VIEWS = [None, None, None] };
+        pose::clear_views();
     }
     fn superseded(&self) -> Option<&'static str> {
         // `[Hulls] ABTest=1` (the bench only): stay on beside Lighting.asi, and stand
@@ -717,13 +596,14 @@ impl Module for Hulls {
         // The views' posed hulls hold their models, and the models their buffers, which
         // are in the default pool.
         unsafe { VIEWS = [None, None, None] };
+        pose::clear_views();
     }
     fn begin_view(&mut self, v: &View) {
-        unsafe { CUR = v.key() };
+        pose::set_current(v.key());
         unsafe { ME = self as *mut Hulls };
         unsafe { THIS = self as *mut Hulls };
         let st = view_state(v.key());
-        st.posed.clear();
+        st.posed().clear();
         st.faded.clear();
         st.cloaked.clear();
         st.additive.clear();
@@ -767,13 +647,13 @@ impl Module for Hulls {
         });
         for o in list {
             if let Some(p) = self.prepare(o, v) {
-                view_state(v.key()).posed.insert(o, p);
+                view_state(v.key()).posed().insert(o, p);
             }
         }
         // The damaged sensors' steady lights, into this view's list before anything
         // lit reads it (the clusters are built after every module's `begin_view`).
         let mut left = 32;
-        for p in view_state(v.key()).posed.values() {
+        for p in view_state(v.key()).posed().values() {
             left -= sprites::Sprites::sensor_lights(&look, p, left);
             if left == 0 {
                 break;
@@ -787,7 +667,7 @@ impl Module for Hulls {
         if look.shadows {
             let _z = crate::timing::zone("hulls: shadow map");
             let st = view_state(v.key());
-            self.shadow.render(v, &look, &st.posed, &mut self.draw, None);
+            self.shadow.render(v, &look, &st.posed(), &mut self.draw, None);
         } else {
             shadow::clear_current();
         }
@@ -820,7 +700,7 @@ impl Module for Hulls {
                 return true;
             }
         }
-        if !view_state(key).posed.contains_key(&o) {
+        if !view_state(key).posed().contains_key(&o) {
             // Not posed in begin_view: expired or unseen (nothing to draw, as stock),
             // or not ours (another database, no SOD: the engine draws it).
             if obj::expired(o) || !obj::can_user_see(o) {
@@ -828,7 +708,7 @@ impl Module for Hulls {
             }
             match self.prepare(o, v) {
                 Some(p) => {
-                    view_state(key).posed.insert(o, p);
+                    view_state(key).posed().insert(o, p);
                 }
                 None => return false,
             }
@@ -862,14 +742,14 @@ impl Module for Hulls {
         game::set_on_screen(o);
         // The frustum test may have changed the instance's scale (scale effects).
         let sc = game::instance_scale(inst);
-        let stale = view_state(key).posed.get(&o).is_some_and(|p| (p.scale - sc).len() > 1e-4);
+        let stale = view_state(key).posed().get(&o).is_some_and(|p| (p.scale - sc).len() > 1e-4);
         if stale {
             if let Some(p) = self.prepare(o, v) {
-                view_state(key).posed.insert(o, p);
+                view_state(key).posed().insert(o, p);
             }
         }
         let st = view_state(key);
-        let Some(p) = st.posed.get_mut(&o) else { return true };
+        let Some(p) = st.posed().get_mut(&o) else { return true };
         p.drawn = true;
         if self.said < 6 {
             self.said += 1;
@@ -898,11 +778,11 @@ impl Module for Hulls {
         true
     }
     fn menu_begin(&mut self, shot: &crate::menu::Shot, v: &View) {
-        unsafe { CUR = v.key() };
+        pose::set_current(v.key());
         unsafe { ME = self as *mut Hulls };
         unsafe { THIS = self as *mut Hulls };
         let st = view_state(v.key());
-        st.posed.clear();
+        st.posed().clear();
         st.faded.clear();
         st.cloaked.clear();
         st.additive.clear();
@@ -961,7 +841,7 @@ impl Module for Hulls {
                 team: if look.team { s.team } else { None },
                 assimilated: false,
                 // Departing: the hull's warp stretch about its own sphere.
-                warp: s.warp.map(|(b, sv, n)| draw::Warp::world(b, sv, n, centre, radius)),
+                warp: s.warp.map(|(b, sv, n)| draw::warp_world(b, sv, n, centre, radius)),
                 waves: None,
                 glow: None,
                 // Decloaking: as the engine's state 3, this much of the hull back.
@@ -972,11 +852,11 @@ impl Module for Hulls {
             if posed.cloak.is_some() && look.cloak {
                 st.cloaked.push(i + 1);
             }
-            st.posed.insert(i + 1, posed);
+            st.posed().insert(i + 1, posed);
         }
         if look.shadows {
             let planets: Vec<[f32; 4]> = shot.planet.iter().map(|p| [p.world.p.x, p.world.p.y, p.world.p.z, p.radius]).collect();
-            self.shadow.render(v, &look, &st.posed, &mut self.draw, Some(&planets));
+            self.shadow.render(v, &look, &st.posed(), &mut self.draw, Some(&planets));
         } else {
             shadow::clear_current();
         }
@@ -987,11 +867,11 @@ impl Module for Hulls {
             Pass::Ships => {
                 let look = self.look().clone();
                 let st = view_state(v.key());
-                let keys: Vec<usize> = st.posed.keys().copied().collect();
+                let keys: Vec<usize> = st.posed().keys().copied().collect();
                 // The map's other scenes are posed too: only what is in view is drawn.
                 let vp = v.view.mul(&v.proj);
                 for k in keys {
-                    let Some(p) = st.posed.get(&k) else { continue };
+                    let Some(p) = st.posed().get(&k) else { continue };
                     if !shadow::in_view(&vp, p.centre, p.radius) {
                         st.cloaked.retain(|&c| c != k);
                         continue;
@@ -1023,19 +903,19 @@ impl Module for Hulls {
         let st = view_state(v.key());
         // Additive meshes of the opaque hulls.
         for o in &st.additive {
-            if let Some(p) = st.posed.get(o) {
+            if let Some(p) = st.posed().get(o) {
                 self.draw.draw(v, &look, p, draw::Mode::Additive(1.0));
             }
         }
         // Faded and cloaked hulls, far to near.
         let mut order: Vec<(f32, usize, f32, bool)> = Vec::new();
         for &(o, f) in &st.faded {
-            if let Some(p) = st.posed.get(&o) {
+            if let Some(p) = st.posed().get(&o) {
                 order.push((v.view.transform_point(p.centre).z, o, f, false));
             }
         }
         for &o in &st.cloaked {
-            if let Some(p) = st.posed.get(&o) {
+            if let Some(p) = st.posed().get(&o) {
                 order.push((v.view.transform_point(p.centre).z, o, 1.0, true));
             }
         }
@@ -1052,7 +932,7 @@ impl Module for Hulls {
                 self.draw_extra(v, &look, p, *e, now);
                 continue;
             }
-            let Some(p) = st.posed.get(&o) else { continue };
+            let Some(p) = st.posed().get(&o) else { continue };
             if ck {
                 self.draw.draw(v, &look, p, draw::Mode::Cloak);
             } else {
@@ -1080,19 +960,19 @@ static mut THIS: *mut Hulls = core::ptr::null_mut();
 /// plain `ST3D_Instance` has no `IsCraftInstance` slot to ask.
 /// False when the hulls module does not run, stands aside, or the SOD does not load:
 /// the caller lets the engine draw it.
-pub fn draw_instance(v: &View, key: usize, inst: usize, craft: bool, sod: &str, world: &M34, team: Option<V3>) -> bool {
+fn draw_instance(v: &View, key: usize, inst: usize, craft: bool, sod: &str, world: &M34, team: Option<V3>) -> bool {
     let h = unsafe { THIS };
     if h.is_null() || inst == 0 {
         return false;
     }
     let h = unsafe { &mut *h };
-    if h.off || !crate::mods::running("hulls") {
+    if h.off {
         return false;
     }
     let Some(model) = scene::model(sod) else { return false };
     let clock = pose::Clock::of_instance(inst, v.time);
     let mut p = pose::pose(&model.sod, &model.info, world, clock, pose::auto(v.eye));
-    visibility(0, inst, craft, &model, &mut p);
+    instance::visibility(0, inst, craft, &model, &mut p);
     let (c, r) = draw::model_sphere(&model);
     let centre = world.transform_point(c);
     let radius = r * world.r[0].len().max(world.r[1].len()).max(world.r[2].len());
@@ -1122,14 +1002,9 @@ pub fn draw_instance(v: &View, key: usize, inst: usize, craft: bool, sod: &str, 
     h.draw.draw(v, &look, &posed, draw::Mode::Opaque);
     let st = view_state(v.key());
     h.sprites.collect(v, &look, &posed, &mut st.sprites);
-    st.posed.insert(key, posed);
+    st.posed().insert(key, posed);
     st.additive.push(key);
     true
-}
-
-/// A unit vector, or `d` when `v` is too short.
-pub fn norm_or(v: V3, d: V3) -> V3 {
-    if v.len() > 1e-6 { v.norm() } else { d }
 }
 
 pub const UP: V3 = v3(0.0, 1.0, 0.0);

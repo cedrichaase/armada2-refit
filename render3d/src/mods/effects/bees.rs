@@ -21,7 +21,6 @@ use crate::engine::{self, field, rd};
 use crate::frame::steps::View;
 use crate::log;
 use crate::math::{v3, M34, V3};
-use crate::mods::hulls;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -193,9 +192,7 @@ impl Bees {
     /// `BeeColony::Render` in our place. False (the engine draws the colony) when the
     /// hulls module does not run.
     pub fn feature(&mut self, colony: usize, drone: bool, v: &View) -> bool {
-        if !crate::mods::running("hulls") {
-            return false;
-        }
+        let Some(hulls) = crate::core_services::hulls() else { return false };
         let mut bees = Vec::new();
         walk(colony, |b| bees.push(b));
         for bee in bees {
@@ -203,12 +200,12 @@ impl Bees {
             if owner == 0 {
                 continue;
             }
-            if hulls::game::frustum_test(bee, v.cam) {
+            if crate::scene::instance::frustum_test(bee, v.cam) {
                 let name = self.sod(drone, owner);
                 let world: M34 = engine::field_m34(bee, 0x44);
-                let team = if owner > 1 { Some(hulls::game::team_colour(owner)) } else { None };
-                if hulls::draw_instance(v, bee, bee, false, &name, &world, team) {
-                    crate::mods::particles::feed(bee, &name, &world, v);
+                let team = if owner > 1 { Some(crate::scene::instance::team_colour(owner)) } else { None };
+                if hulls.draw_instance(v, bee, bee, false, &name, &world, team) {
+                    crate::core_particles::feed(bee, &name, &world, v);
                     if self.said < 3 {
                         self.said += 1;
                         log!("effects: bees: {} drawn ({})", name, if drone { "drone" } else { "worker bee" });

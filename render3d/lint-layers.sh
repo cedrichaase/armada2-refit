@@ -16,6 +16,9 @@
 #   lint-layers.sh --list             report, with every hit as file:line
 #   lint-layers.sh --strict DIR...    exit 1 on any hit of rules 1-3 under the DIRs
 #                                     (paths relative to render3d/, e.g. src/mods/hulls)
+#   ... --rules cross,byname          with --strict: only those rules (engine, cross, byname);
+#                                     CI holds the whole tree to cross and byname since the
+#                                     helpers were lifted into the core
 #
 # The generated shaders (src/shaders/) and generated settings tables are not read.
 set -euo pipefail
@@ -27,8 +30,14 @@ here = sys.argv[1]
 args = sys.argv[2:]
 listing = '--list' in args
 strict = []
+rules = ('engine', 'cross', 'byname')
+if '--rules' in args:
+    rules = tuple(args[args.index('--rules') + 1].split(','))
 if '--strict' in args:
-    strict = [os.path.normpath(a) for a in args[args.index('--strict') + 1:] if not a.startswith('--')]
+    rest = args[args.index('--strict') + 1:]
+    if '--rules' in rest:
+        rest = rest[:rest.index('--rules')]
+    strict = [os.path.normpath(a) for a in rest if not a.startswith('--')]
     if not strict:
         print('lint-layers.sh: --strict needs at least one directory', file=sys.stderr)
         sys.exit(2)
@@ -127,7 +136,7 @@ for r, hs in hits.items():
 print(f'lint-layers.sh: {total} hits of rules 1-3 ({len(hits["content"])} advisory)')
 
 if strict:
-    bad = [(r, rel, n) for r in ('engine', 'cross', 'byname') for rel, n in hits[r]
+    bad = [(r, rel, n) for r in rules for rel, n in hits[r]
            if any(rel == s or rel.startswith(s + os.sep) for s in strict)]
     for r, rel, n in bad:
         print(f'lint-layers.sh: {rel}:{n}: {names[r]}')

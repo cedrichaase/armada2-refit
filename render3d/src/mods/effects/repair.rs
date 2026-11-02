@@ -32,7 +32,7 @@ use alloc::vec::Vec;
 const SITE_ADD: usize = 0x4c90c0;
 const FN_ADD: usize = 0x4733c0;
 const SITE_SPRITE: usize = 0x473767;
-const FN_SPRITE: usize = 0x63aa60;
+use crate::engine::sprite::FN_DRAW_SCALED_3D as FN_SPRITE;
 const NP_LIST: usize = 0x736cfc;
 const NP_COUNT: usize = 0x736d00;
 const FN_WORLD_POS: usize = 0x4cff70;

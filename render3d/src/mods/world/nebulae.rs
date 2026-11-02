@@ -1362,8 +1362,8 @@ impl Nebulae {
         let view_vp = gfx::gpu().engine_viewport();
         // Ships' shadows in the gas: the hulls' shadow map of the Key, this view's
         // (bound by draw_states).
-        let shadow = if self.cfg.shadows && key.is_some() { crate::mods::hulls::shadow_map() } else { None };
-        self.sh_tex = shadow.as_ref().map(|sm| sm.texture());
+        let shadow = if self.cfg.shadows && key.is_some() { crate::core_services::hulls_any().and_then(|h| h.shadow_map()) } else { None };
+        self.sh_tex = shadow.as_ref().map(|sm| sm.tex.clone());
         if shadow.is_some() {
             self.note(4, "ships' shadows in the gas: the hulls' shadow map");
         }

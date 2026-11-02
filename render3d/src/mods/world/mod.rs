@@ -69,6 +69,8 @@ pub struct World {
     /// too (`[World]` keys at 0 do not).
     plug_planets: bool,
     plug_nebulae: bool,
+    /// Its place in the registry (set by `provide`), for asking about its own flag.
+    id: crate::core_module::ModuleId,
 }
 
 /// The module, for the overlays' ghosts (set at every view).
@@ -76,9 +78,9 @@ static mut ME: *mut World = core::ptr::null_mut();
 
 /// A planet's fog-of-war ghost (`overlays::ghosts`), drawn on our sphere like the
 /// planet itself; false if it is not a planet's or planets are the engine's.
-pub fn planet_ghost(sp: usize, v: &View) -> bool {
+fn planet_ghost(sp: usize, v: &View) -> bool {
     let me = unsafe { ME };
-    if me.is_null() || !crate::mods::running("world") {
+    if me.is_null() {
         return false;
     }
     let me = unsafe { &mut *me };
@@ -106,6 +108,7 @@ impl Default for World {
             checked: 0.0,
             plug_planets: false,
             plug_nebulae: false,
+            id: crate::core_module::ModuleId(0),
         }
     }
 }
@@ -140,7 +143,7 @@ impl World {
         // `[Modules] world=0` (latched at load): the menu scene's planet and gas only,
         // with no hook installed and no part of a mission's.
         unsafe { ME = self as *mut World };
-        if crate::mods::enabled("world") {
+        if super::enabled_id(self.id) {
             if self.on_nebulae {
                 self.nebulae.install();
             }
@@ -170,6 +173,16 @@ fn on(b: bool) -> &'static str {
     if b { "on" } else { "off" }
 }
 
+/// The world module's draws, offered to the others (`core_services`).
+struct Provider;
+static PROVIDER: Provider = Provider;
+
+impl crate::core_services::GhostDraw for Provider {
+    fn planet_ghost(&self, sp: usize, v: &View) -> bool {
+        planet_ghost(sp, v)
+    }
+}
+
 impl Module for World {
     fn name(&self) -> &'static str {
         "world"
@@ -186,6 +199,11 @@ impl Module for World {
     fn configure(&mut self, _ini: &crate::rt::Ini, said: &mut crate::core_module::Changes) {
         // Its live rows, read again (until its own reader takes every section).
         said.note(&settings_changed());
+    }
+    fn provide(&mut self, id: crate::core_module::ModuleId, s: &mut crate::core_services::Services) {
+        self.id = id;
+        s.ghost(id, &PROVIDER);
+        s.volumes(id);
     }
     /// `[Modules] world=0` keeps the menu scene's planet and gas.
     fn in_menu(&self) -> bool {
@@ -295,7 +313,7 @@ fn mark_on_screen(o: usize, v: &View) {
     if obj::expired(o) || !obj::can_user_see(o) {
         return;
     }
-    if crate::mods::hulls::game::frustum_test(obj::instance(o), v.cam) {
-        crate::mods::hulls::game::set_on_screen(o);
+    if crate::scene::instance::frustum_test(obj::instance(o), v.cam) {
+        crate::scene::instance::set_on_screen(o);
     }
 }

@@ -21,32 +21,9 @@ use crate::log;
 use alloc::collections::BTreeMap;
 use gpu::{Block, ColorTarget, Contents, Depth, DepthTarget, Format, Load, Pass, PipelineDesc, Texture, TextureDesc, Topology, Usage};
 
-/// The shadow map of the view being drawn.
-#[derive(Clone)]
-pub struct ShadowMap {
-    /// R32F: depth 0..1 from the Key, 1 where no hull is. Valid until the next view.
-    pub tex: Texture,
-    /// World -> u, v, depth, as rows (x, y, z, w) dotted with (p, 1).
-    pub rows: [[f32; 4]; 3],
-    /// A texel, in u and v.
-    pub texel: f32,
-    /// Half a texel's depth, in depth units.
-    pub bias: f32,
-    /// A texel in world units (the lookup moves a point out along its normal by it).
-    pub normal_offset: f32,
-    /// Towards the Key.
-    pub to_key: V3,
-    /// The map's width in world units, and its depth range.
-    pub width: f32,
-    pub range: f32,
-}
-
-impl ShadowMap {
-    /// The map, to bind.
-    pub fn texture(&self) -> Texture {
-        self.tex.clone()
-    }
-}
+/// The shadow map of the view being drawn: the core's `ShadowRef`, which other modules
+/// (the nebulae) sample.
+pub type ShadowMap = crate::core_services::ShadowRef;
 
 static mut CURRENT: Option<ShadowMap> = None;
 static mut PLANETS: [[f32; 4]; 8] = [[0.0; 4]; 8];

@@ -87,8 +87,10 @@ jobs:
         run: CARGO="$(command -v cargo)" ui/build.sh
       - name: Build Display8 (d3d8.dll)
         run: CARGO="$(command -v cargo)" display/build.sh
-      - name: render3d's layer rules (report; strict per directory as the modules are split)
-        run: render3d/lint-layers.sh
+      - name: render3d's layer rules (report; cross and byname strict over every module)
+        run: |
+          render3d/lint-layers.sh
+          render3d/lint-layers.sh --strict src/mods --rules cross,byname
       - name: a2fmt on the host
         run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path crates/a2fmt/Cargo.toml
       - name: a2ini on the host (the overlay's edit against tools/settings/fixtures)

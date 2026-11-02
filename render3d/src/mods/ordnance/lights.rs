@@ -35,9 +35,7 @@ use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-const FN_NEW: usize = 0x652710; // operator new, cdecl
-const FN_POINT_LIGHT: usize = 0x62f240; // ST3D_Point_Light::ST3D_Point_Light(db, node, name), thiscall
-const FN_REGISTER_LIGHT: usize = 0x62d250; // ST3D_GraphicsEngine::RegisterLight(light, colour&, Matrix34&), thiscall
+use crate::engine::light::{FN_NEW, FN_POINT_LIGHT, FN_REGISTER_LIGHT};
 const VT_POINT: usize = 0x6bc8ac;
 const VT_PHASER: usize = 0x6b8ee4;
 

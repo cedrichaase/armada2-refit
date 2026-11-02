@@ -30,9 +30,7 @@ use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-const FN_NEW: usize = 0x652710; // operator new, cdecl
-const FN_POINT_LIGHT: usize = 0x62f240; // ST3D_Point_Light::ST3D_Point_Light(db, node, name), thiscall
-const FN_REGISTER_LIGHT: usize = 0x62d250; // ST3D_GraphicsEngine::RegisterLight(light, colour&, Matrix34&), thiscall
+use crate::engine::light::{FN_NEW, FN_POINT_LIGHT, FN_REGISTER_LIGHT};
 const SITE_NEBULA_LIGHTS: usize = 0x4a4a7a; // in Nebula::Simulate
 const FN_NEBULA_LIGHTS: usize = 0x4a5160; // Nebula::Simulate_Nebula_Lights(float), thiscall
 const FN_ENTITY_TRANSFORM: usize = 0x4cfd50; // Entity::GetTransform() const, thiscall

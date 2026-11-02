@@ -99,6 +99,15 @@ Background and measurements live outside the repo, in
 
 ## Changes to the plan
 
+- 2026-11-03: **the shared helpers are in the core** (render3d 0.37.1). `Posed` and the
+  per-view cache moved into `scene::pose` with `Warp` and `Waves` as plain data (their
+  constructors are free functions of the hulls module). The particles' feed is a queue
+  the core owns (`core_particles`), taken at the particles module's translucent step and
+  at the end of the view, which is when the same feeds were simulated before.
+  `draws_plain_sod` and `instance_visibility` read the engine only, so they are core
+  functions (the trait method is kept and calls the same function). The nebulae's
+  shadow-map ask uses `hulls_any()` so the menu scene keeps its shadows with hulls off.
+
 - 2026-10-14: **Rust instead of C** (the user's request). Toolchain is rustup with
   `i686-pc-windows-msvc` in `~/.rustup`, and `lld-link`; spike and skeleton build with
   kernel32 as the only import. CI will need `rustup target add i686-pc-windows-msvc`.

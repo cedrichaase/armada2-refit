@@ -100,7 +100,7 @@ static mut RESET_VT: usize = 0;
 /// `ST3D_DeviceDirectX8`'s vtable and its slot 28, `DestroyRenderSurfaces` (0x624760),
 /// which releases the engine's device (`DestroyDevice`) at every change of display:
 /// between the shell's display and a mission's, and in Graphics Settings.
-const DX8_VTABLE: usize = 0x6bc6ac;
+use crate::engine::DX8_VTABLE;
 const SLOT_DESTROY: usize = 28;
 const DESTROY: usize = 0x624760;
 static mut DESTROY_NEXT: usize = 0;

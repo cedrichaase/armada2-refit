@@ -34,11 +34,9 @@ pub mod sparks;
 pub mod weldfx;
 
 use super::{Module, Step};
-use crate::engine::{self, field, hook, rd};
+use crate::engine::{self, field, hook};
 use crate::frame::steps::View;
 use crate::log;
-use crate::math::{v3, M34, V3};
-use alloc::vec::Vec;
 
 /// Positions alone (the fireballs' and the shields' quads and spheres).
 pub static XYZ: [gpu::VertexAttr; 1] = [gpu::attr(0, gpu::AttrFormat::Float3, gpu::Semantic::Position, 0)];
@@ -49,15 +47,7 @@ pub static QUAD2: [gpu::VertexAttr; 3] = [
     gpu::attr(28, gpu::AttrFormat::Float4, gpu::Semantic::TexCoord, 1),
 ];
 
-/// An effect's pipeline into the view: depth-tested (`LESSEQUAL`) and not written, red,
-/// green and blue, no culling, blended as `blend`.
-pub fn fx_desc(vs: gpu::Code, ps: gpu::Code, layout: &'static [gpu::VertexAttr], stride: u32, topology: gpu::Topology, blend: gpu::Blend) -> gpu::PipelineDesc {
-    let mut d = gpu::PipelineDesc::new(vs, ps, layout, stride, topology, gpu::Format::Unknown);
-    d.depth = gpu::Depth { test: true, write: false, compare: gpu::Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
-    d.blend = Some(blend);
-    d.write_mask = 7;
-    d
-}
+pub use crate::gfx::fx::fx_desc;
 
 /// Premultiplied over what is there: `ONE`, `INVSRCALPHA`.
 pub const PREMUL: gpu::Blend =
@@ -70,9 +60,6 @@ const VT_SHIELD_EFFECT: usize = 0x6b0134;
 const VT_NODE_PARTICLE: usize = 0x6b001c;
 
 const FN_ENTITY_GET: usize = 0x4cfff0; // Entity::Get(int handle), static, cdecl
-const FN_NEW: usize = 0x652710; // operator new, cdecl
-const FN_POINT_LIGHT: usize = 0x62f240; // ST3D_Point_Light::ST3D_Point_Light(db, node, name), thiscall
-const FN_REGISTER_LIGHT: usize = 0x62d250; // ST3D_GraphicsEngine::RegisterLight(light, colour&, Matrix34&), thiscall
 
 /// A live game object by handle, as the plugins took one: `Entity::Get`, a game
 /// object (flags bit 2), with an instance and a class. 0 if not.
@@ -85,128 +72,13 @@ pub fn object_of(handle: i32) -> usize {
     o
 }
 
-/// 32-bit integer hash (the plugins' `hash32`).
-pub fn hash32(mut x: u32) -> u32 {
-    x ^= x >> 16;
-    x = x.wrapping_mul(0x7feb352d);
-    x ^= x >> 15;
-    x = x.wrapping_mul(0x846ca68b);
-    x ^= x >> 16;
-    x
-}
+pub use crate::math::rand::{hash32, rnd};
 
-/// 0..1 from a seed.
-pub fn rnd(seed: u32) -> f32 {
-    (hash32(seed) & 0xffffff) as f32 / 16777216.0
-}
+pub use crate::engine::{ff, rv3};
+pub use crate::scene::camera::Cam;
+pub use crate::scene::lights::Pool as LightPool;
 
-/// The camera of a view, as the plugins read it off the device's VIEW and PROJECTION.
-#[derive(Clone, Copy)]
-pub struct Cam {
-    pub eye: V3,
-    pub right: V3,
-    pub up: V3,
-    pub fwd: V3,
-    /// Near plane's view depth.
-    pub zn: f32,
-    /// Projection `_11`, `_22`, `_33`, `_43`.
-    pub px: f32,
-    pub py: f32,
-    pub p33: f32,
-    pub p43: f32,
-    /// A pixel's size at unit distance.
-    pub pixel: f32,
-    /// View x projection, transposed (the columns, for `dot(p, col)` in the shaders).
-    pub vp: [f32; 16],
-}
-
-impl Cam {
-    pub fn of(v: &View) -> Option<Cam> {
-        let m = &v.view.0;
-        let p = &v.proj.0;
-        if p[2][3] == 0.0 || p[2][2] == 0.0 {
-            return None;
-        }
-        let right = v3(m[0][0], m[1][0], m[2][0]);
-        let up = v3(m[0][1], m[1][1], m[2][1]);
-        let fwd = v3(m[0][2], m[1][2], m[2][2]);
-        let t = v3(m[3][0], m[3][1], m[3][2]);
-        let eye = -(right * t.x + up * t.y + fwd * t.z);
-        let h = v.rect.h.max(1) as f32;
-        Some(Cam {
-            eye,
-            right,
-            up,
-            fwd,
-            zn: -p[3][2] / p[2][2],
-            px: p[0][0],
-            py: p[1][1],
-            p33: p[2][2],
-            p43: p[3][2],
-            pixel: if p[1][1] > 1e-6 { 2.0 / (p[1][1] * h) } else { 0.001 },
-            vp: crate::gfx::vp_constants(v),
-        })
-    }
-}
-
-/// Engine point lights of our own, made on first use and registered each view (the
-/// plugins' way: an ordinary `ST3D_Point_Light` registered after `GameObject_PreRenderAll`).
-pub struct LightPool {
-    name: &'static [u8],
-    objs: Vec<usize>,
-}
-
-impl LightPool {
-    pub const fn new(name: &'static [u8]) -> LightPool {
-        LightPool { name, objs: Vec::new() }
-    }
-    /// Light object `i` of the pool (made by `register`), 0 if none yet; for
-    /// `scene::lights::set_style`.
-    pub fn light(&self, i: usize) -> usize {
-        self.objs.get(i).copied().unwrap_or(0)
-    }
-    /// Registers light `i` of the pool at `pos`: full colour to `start`, gone `range`
-    /// further on. False if no light object could be made.
-    pub fn register(&mut self, i: usize, pos: V3, colour: V3, start: f32, range: f32) -> bool {
-        while self.objs.len() <= i {
-            let l = unsafe {
-                let new: unsafe extern "C" fn(u32) -> usize = core::mem::transmute(FN_NEW);
-                let l = new(0x138);
-                if l == 0 {
-                    return false;
-                }
-                let ctor: unsafe extern "thiscall" fn(usize, usize, usize, *const u8) -> usize = core::mem::transmute(FN_POINT_LIGHT);
-                ctor(l, 0, 0, self.name.as_ptr());
-                l
-            };
-            self.objs.push(l);
-        }
-        let l = self.objs[i];
-        unsafe {
-            core::ptr::write_unaligned((l + 0x100) as *mut f32, start);
-            core::ptr::write_unaligned((l + 0x104) as *mut f32, range);
-        }
-        let col = [colour.x, colour.y, colour.z, 1.0f32];
-        let m = M34 { r: M34::IDENTITY.r, p: pos };
-        unsafe {
-            let reg: unsafe extern "thiscall" fn(usize, usize, *const f32, *const M34) = core::mem::transmute(FN_REGISTER_LIGHT);
-            reg(engine::storm3d(), l, col.as_ptr(), &m);
-        }
-        true
-    }
-    /// `register`, the light then a spark to the nebulae's gas (`Gas::Spark`,
-    /// `[Nebulae] LitSpark=`): a small corona about it, not a ball its reach wide.
-    pub fn register_spark(&mut self, i: usize, pos: V3, colour: V3, start: f32, range: f32) -> bool {
-        if !self.register(i, pos, colour, start, range) {
-            return false;
-        }
-        crate::scene::lights::set_gas(self.objs[i], crate::scene::lights::Gas::Spark);
-        true
-    }
-}
-
-/// Settings from `Render3D.ini`, one section per part (`config::Section`, re-exported
-/// here until the helpers move into the core).
+/// Settings from `Render3D.ini`, one section per part (`config::Section`).
 pub use crate::config::Section as Sec;
 
 pub struct Effects {
@@ -408,14 +280,4 @@ impl Module for Effects {
         self.ex.notes.clear();
         true
     }
-}
-
-/// Reads an `f32` field.
-pub fn ff(base: usize, off: usize) -> f32 {
-    engine::field_f32(base, off)
-}
-
-/// Reads a `V3` at an address.
-pub fn rv3(a: usize) -> V3 {
-    unsafe { rd::<V3>(a) }
 }

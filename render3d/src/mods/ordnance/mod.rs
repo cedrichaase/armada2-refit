@@ -17,7 +17,6 @@ mod fx;
 mod ini;
 mod lights;
 mod models;
-pub mod sprite;
 
 use super::{Module, Step};
 use crate::engine::{self, field, field_f32, field_u8, hook, rd};
@@ -44,7 +43,7 @@ const SUB_CHAIN: usize = 0x574f20; // ChainPulsar: its sprite, and its emitter n
 
 // The warp flash: the call to ST3D_Sprite::DrawScaled3D in WarpSpriteEffect::Render.
 const SITE_WARP_SPRITE: usize = 0x59cc6b;
-const FN_DRAW_SCALED: usize = 0x63aa60;
+use crate::engine::sprite::FN_DRAW_SCALED_3D as FN_DRAW_SCALED;
 const SITE_WARP: usize = 0x598423; // RenderWarpSpriteEffects(cam), cdecl, in the body
 const FN_WARP: usize = 0x59c560;
 
@@ -59,7 +58,7 @@ enum Who {
 }
 
 pub struct Ordnance {
-    sprites: sprite::Sprites,
+    sprites: crate::scene::sprites::Sprites,
     fx: fx::Fx,
     models: models::Models,
     lights: lights::Lights,
@@ -100,7 +99,7 @@ impl Default for Ordnance {
 impl Ordnance {
     pub fn new() -> Ordnance {
         let s = ini::Settings::load();
-        let mut sprites = sprite::Sprites::new();
+        let mut sprites = crate::scene::sprites::Sprites::new();
         sprites.hot = s.f("Ordnance", "Hot", 0.6);
         sprites.hot_from = s.f("Ordnance", "HotFrom", 0.7);
         let mut lights = lights::Lights::new();
@@ -182,7 +181,7 @@ impl Ordnance {
         let cls = field(ord, 0x34);
         // The chain pulsar: its sprite is ours while the particles module fires its
         // emitter (+0xdc) and draws the trail; otherwise the engine's Submit does both.
-        if field(engine::vtable(ord), SLOT_SUBMIT) == SUB_CHAIN && !crate::mods::particles::live() {
+        if field(engine::vtable(ord), SLOT_SUBMIT) == SUB_CHAIN && !crate::core_particles::live() {
             self.submit(v, ord);
             return;
         }
@@ -285,7 +284,20 @@ impl Ordnance {
     }
 }
 
+/// The ordnance module's draws, offered to the others (`core_services`).
+struct Provider;
+static PROVIDER: Provider = Provider;
+
+impl crate::core_services::WaveDraw for Provider {
+    fn draw_wave(&self, expl: usize, v: &View) -> bool {
+        draw_wave(expl, v)
+    }
+}
+
 impl Module for Ordnance {
+    fn provide(&mut self, id: crate::core_module::ModuleId, s: &mut crate::core_services::Services) {
+        s.wave(id, &PROVIDER);
+    }
     fn name(&self) -> &'static str {
         "ordnance"
     }
@@ -371,7 +383,7 @@ unsafe extern "thiscall" fn warp_sprite(sprite: usize, cam: usize, pos: *const V
 /// `[Wave.<odf>]` recipe, the wave is drawn now and true returned; otherwise nothing
 /// is drawn (the caller draws its ring). The effects module calls this before it draws
 /// a shockwave. False while the ordnance module is off or standing down.
-pub fn draw_wave(expl: usize, v: &View) -> bool {
+fn draw_wave(expl: usize, v: &View) -> bool {
     unsafe {
         let m = MODULE;
         if m.is_null() || !(*m).fx.waves || expl == 0 {

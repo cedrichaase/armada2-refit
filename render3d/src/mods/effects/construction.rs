@@ -24,7 +24,6 @@ use crate::engine::{self, field, rd};
 use crate::frame::steps::View;
 use crate::log;
 use crate::math::{v3, M34, V3};
-use crate::mods::hulls;
 use alloc::vec::Vec;
 
 pub const VT_BUILDING: usize = 0x6afe4c;
@@ -362,13 +361,13 @@ impl Construction {
     /// hulls module; the welds are noted for `draw`. False (the engine draws the whole
     /// feature) when the hulls module does not run.
     pub fn feature(&mut self, v: &View) -> bool {
-        if !crate::mods::running("hulls") {
+        let Some(hulls) = crate::core_services::hulls() else {
             if !self.said_fallback {
                 self.said_fallback = true;
                 log!("effects: construction: the hulls module does not run: the engine draws construction");
             }
             return false;
-        }
+        };
         self.gather(v.time);
         let mut infos = Vec::new();
         walk(|i| infos.push(i));
@@ -406,18 +405,18 @@ impl Construction {
                 se(inst, field(info, I_SCALE_HANDLE));
                 let fl: unsafe extern "thiscall" fn(usize, i32) = core::mem::transmute(FN_FACE_LIMIT);
                 fl(inst, faces);
-                hulls::game::frustum_test(inst, v.cam)
+                crate::scene::instance::frustum_test(inst, v.cam)
             };
             if shown {
                 let name = class_odf(field(info, I_CLASS));
-                let s = hulls::instance_scale(inst) * scale_sod(name);
+                let s = crate::scene::instance::instance_scale(inst) * scale_sod(name);
                 let mut world: M34 = engine::field_m34(inst, 0x44);
                 world.r[0] = world.r[0] * s.x;
                 world.r[1] = world.r[1] * s.y;
                 world.r[2] = world.r[2] * s.z;
-                let ours = !name.is_empty() && hulls::draw_instance(v, inst, inst, true, &crate::assets::sod_of(name), &world, Some(colour));
+                let ours = !name.is_empty() && hulls.draw_instance(v, inst, inst, true, &crate::assets::sod_of(name), &world, Some(colour));
                 if ours {
-                    crate::mods::particles::feed(inst, name, &world, v);
+                    crate::core_particles::feed(inst, name, &world, v);
                     self.said += 1;
                     if self.said <= 4 || self.said % 600 == 0 {
                         log!(
@@ -436,7 +435,7 @@ impl Construction {
                 }
             }
             // The construction object's on-screen byte, which the HUD reads.
-            if b != 0 && hulls::game::render_fn(b) == hulls::game::FN_RIG_RENDER {
+            if b != 0 && crate::scene::instance::render_fn(b) == crate::engine::instance::FN_RIG_RENDER {
                 unsafe {
                     let f: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(FN_GET_CO);
                     let co = f(b);

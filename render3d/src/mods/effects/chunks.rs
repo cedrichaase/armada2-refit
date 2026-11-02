@@ -87,8 +87,8 @@ unsafe extern "thiscall" fn hook_fragment(inst: usize, colour: *const f32, vel: 
         if ACTIVE && faces < 0 && pending().len() < 64 {
             let o = object_of_instance(inst);
             let name = if o != 0 { obj::odf_name(o) } else { "" };
-            if !name.is_empty() && super::super::hulls::draws_plain_sod(o) && crate::assets::sod(&crate::assets::sod_of(name)).is_some() {
-                let s = super::super::hulls::instance_scale(inst) * scale_sod(name);
+            if !name.is_empty() && crate::engine::instance::draws_plain_sod(o) && crate::assets::sod(&crate::assets::sod_of(name)).is_some() {
+                let s = crate::scene::instance::instance_scale(inst) * scale_sod(name);
                 let mut world = obj::transform(o);
                 world.r[0] = world.r[0] * s.x;
                 world.r[1] = world.r[1] * s.y;
@@ -106,17 +106,17 @@ unsafe extern "thiscall" fn hook_fragment(inst: usize, colour: *const f32, vel: 
 /// The Evolver's cocoon breaking up (faces -1, the whole of it).
 unsafe extern "thiscall" fn hook_fragment_cocoon(inst: usize, colour: *const f32, vel: usize, smoking: u32, faces: i32, attractor: usize) {
     unsafe {
-        let hulls = super::super::hulls::game::VT_COCOON;
+        let hulls = crate::engine::instance::VT_COCOON;
         let db = engine::field(inst, 0x80);
         if ACTIVE
             && faces < 0
             && pending().len() < 64
             && engine::vtable(inst) == hulls
             && db != 0
-            && db == engine::rd::<usize>(super::super::hulls::game::COCOON_DB)
+            && db == engine::rd::<usize>(crate::engine::instance::COCOON_DB)
             && crate::assets::sod("8472_cocoon").is_some()
         {
-            let s = super::super::hulls::instance_scale(inst);
+            let s = crate::scene::instance::instance_scale(inst);
             let mut world = engine::field_m34(inst, 0x44);
             world.r[0] = world.r[0] * s.x;
             world.r[1] = world.r[1] * s.y;
@@ -149,7 +149,7 @@ unsafe extern "thiscall" fn hook_build_fragment(inst: usize, colour: *const f32,
                 ""
             };
             if !name.is_empty() && crate::assets::sod(&crate::assets::sod_of(name)).is_some() {
-                let s = super::super::hulls::instance_scale(inst) * scale_sod(name);
+                let s = crate::scene::instance::instance_scale(inst) * scale_sod(name);
                 let mut world = engine::field_m34(inst, 0x44);
                 world.r[0] = world.r[0] * s.x;
                 world.r[1] = world.r[1] * s.y;

@@ -53,8 +53,7 @@ const OBJ_BACKGROUND: u32 = 0x10000;
 const FN_GO_RENDER: usize = 0x4d54e0; // GameObject::Render, slot 11 of the classes that keep it
 const SLOT_RENDER: usize = 11;
 const VT_DATABASE: usize = 0x6bc56c; // a plain ST3D_Database
-const DEV_CLEAR_DEPTH: usize = 0x2c; // ST3D_Device vtable: ClearDepthBuffer(ST3D_Rect*)
-const DEV_FLUSH: usize = 0x38; // ST3D_Device vtable: Flush()
+use crate::engine::{DEV_CLEAR_DEPTH, DEV_FLUSH};
 
 /// The six faces `CreateBackgroundFace` builds for a prefix sky: face `i` shows
 /// `<prefix><i>` on a quad at +-100 about the camera, corners in this order with

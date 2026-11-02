@@ -761,7 +761,31 @@ always open (`Enable=0` installs none).
 `draws_plain_sod`, `placeholder`, `shadow_map`), `WaveDraw` (ordnance's shockwave),
 `PostDraw` (overlays' height posts) and `GhostDraw` (world's planet ghost). A consumer
 that gets `None` hands the object or effect back to the engine, as it did when the
-provider was not running.
+provider was not running: the bees and construction draw nothing of their own without
+hulls, a shockwave is the explosions' own ring without ordnance, a build ghost's height
+post is the engine's `DrawHeightPost` without overlays, and a fog-of-war planet ghost is
+overlays' own sphere without world. Two asks are not tied to "running": the nebulae's
+shadow map (`core_services::hulls_any()`) is lent to the menu scene's gas while hulls
+only keeps the menu's part, as before, and `core_services::volumes()` tells the
+particles module that world draws the nebulae.
+
+**Shared helpers** (the cross-module paths are gone: `lint-layers.sh --strict src/mods
+--rules cross,byname` passes and CI holds it). What other modules used to take from the
+hulls, effects, ordnance and particles modules lives in the core, and takes the engine
+reads from `src/engine/`:
+
+| Helper | Where |
+|---|---|
+| `frustum_test`, `instance_scale`, `set_on_screen`, `team_colour`, `element_name`, `render_fn`, `instance_visibility` | `scene::instance` (reads in `engine::instance`) |
+| the animation values `value` / `Value` | `scene::anim` |
+| the per-view posed objects (`Posed`, `posed`, `norm_or`) | `scene::pose`; the hulls module fills the cache, effects and specials read it |
+| `Cam` | `scene::camera` |
+| the engine point-light pool (`LightPool`) | `scene::lights::Pool` (reads in `engine::light`) |
+| `fx_desc` | `gfx::fx` |
+| `hash32` / `rnd` (render-side only, never `g_random`) | `math::rand` |
+| the ini section reader (`Sec`) | `config::Section` |
+| the stock sprites' batch (`Sprites`) | `scene::sprites` (reads in `engine::sprite`) |
+| the particles' feed | `core_particles`: producers push, the particles module takes the queue at its translucent step and at the end of the view; `live()` is false without it |
 
 **Recipes** (`src/core_recipes.rs`): `core_recipes::text(kind, name)` finds a recipe in
 the game directory (`Sky\<name>.ini`, `Surfaces\`, `Nebulae\`, `Menu\`) first, then the
@@ -774,7 +798,8 @@ The sky's recipes, the menu's `map.ini` and the built-in `ordnance.ini` (whose s
 built-in tables of game data names in its `content.rs`; its recipe files under
 `render3d/content/`. `render3d/lint-layers.sh` counts what is still elsewhere (report
 mode; `--strict DIR...` fails on any hit under those directories, as the modules are
-moved over).
+moved over; `--rules cross,byname` limits it to the two rules every module already
+keeps).
 
 ### Modules and settings
 

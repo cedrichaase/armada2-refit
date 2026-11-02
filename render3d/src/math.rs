@@ -1,5 +1,7 @@
 //! Vectors and matrices. Matrices are row-major with row vectors (v * M), as
 //! Direct3D 9 and the engine use them; shaders receive them transposed.
+pub mod rand;
+
 use core::ops::{Add, Mul, Neg, Sub};
 
 pub use libm::{acosf, atan2f, cosf, expf, fabsf, floorf, fmodf, logf, powf, sinf, sqrtf, tanf};

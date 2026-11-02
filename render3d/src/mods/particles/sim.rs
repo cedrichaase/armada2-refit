@@ -466,7 +466,7 @@ impl System {
             ow.visible = !expired && obj::can_user_see(o);
             let r = field_f32(inst, 0x40);
             ow.radius = if r > 1.0 && r < 20000.0 { r } else { 50.0 };
-            let s3 = crate::mods::hulls::instance_scale(inst);
+            let s3 = crate::scene::instance::instance_scale(inst);
             ow.scale = if s3.x > 0.0 { s3.x } else { 1.0 };
             // Age and move what there is (SimulateParticleList comes first in stock).
             age(&mut ow.parts, dt);
