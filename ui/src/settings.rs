@@ -29,12 +29,25 @@ pub struct Table {
     /// The rows this reader knows every code of, in screen order.
     pub rows: Vec<&'static Setting>,
     changed: Option<extern "C" fn()>,
+    /// `<Plugin>_SettingsNote`, when the plugin exports it (C5 amendment).
+    note: Option<NoteFn>,
+}
+
+/// A row's value at the hub's start and at the start of the current mission, for the
+/// Refit screen's "pending" badges.
+struct Snap {
+    row: *const Setting,
+    start: String,
+    mission: String,
 }
 
 static mut TABLES: Vec<Table> = Vec::new();
 static mut STARTED: bool = false;
 static mut STAMP: Option<([u32; 2], u32)> = None;
 static mut NEXT_CHECK: f64 = 0.0;
+static mut SNAPS: Vec<Snap> = Vec::new();
+/// A mission frame has been seen since the last shell or loading frame.
+static mut IN_MISSION: bool = false;
 
 /// Every table found (empty before the first frame).
 #[allow(static_mut_refs)]
@@ -42,13 +55,25 @@ pub fn tables() -> &'static [Table] {
     unsafe { &TABLES }
 }
 
-/// Once per UI frame, every context.
+/// Once per UI frame, every context. The first mission frame after the shell or a
+/// loading screen takes the snapshot the Refit screen compares MISSION rows to.
 #[allow(static_mut_refs)]
-pub fn frame() {
+pub fn frame(ctx: crate::surface::Context) {
+    use crate::surface::Context;
     unsafe {
         if !STARTED {
             STARTED = true;
             start();
+        }
+        match ctx {
+            Context::Mission if !IN_MISSION => {
+                IN_MISSION = true;
+                for s in SNAPS.iter_mut() {
+                    s.mission = value(&*s.row);
+                }
+            }
+            Context::Shell | Context::Loading => IN_MISSION = false,
+            _ => {}
         }
         let now = rt::now();
         if now < NEXT_CHECK {
@@ -75,6 +100,93 @@ pub fn set(file: &str, sec: &str, key: &str, value: Option<&str>) -> bool {
     let ok = overlay::set(file, sec, key, value);
     after_write();
     ok
+}
+
+/// Removes the overlay keys `(file, section, key)`, then tells the plugins once; the number
+/// of keys the overlay held.
+pub fn remove_many(keys: &[(&str, &str, &str)]) -> usize {
+    let mut n = 0;
+    for &(file, sec, key) in keys {
+        if holds(file, sec, key) && overlay::set(file, sec, key, None) {
+            n += 1;
+        }
+    }
+    after_write();
+    n
+}
+
+/// Whether the overlay holds a non-empty value for `[sec] key` of the plugin ini `file`.
+pub fn holds(file: &str, sec: &str, key: &str) -> bool {
+    let ini = rt::Ini::open(&overlay::path());
+    ini.string(&overlay::section(file, sec), key).is_some_and(|v| !v.is_empty())
+}
+
+/// Whether the overlay holds the row's key (the Refit screen's "changed" dot).
+pub fn overlay_holds(row: &Setting) -> bool {
+    holds(row.file(), row.section(), row.key())
+}
+
+/// The row's effective value: the overlay's, else the plugin's ini's, else the default.
+pub fn value(row: &Setting) -> String {
+    rt::settings::value(&rt::settings::ini(row), row)
+}
+
+/// A row's value changed but not applied yet.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Pending {
+    No,
+    /// A RESTART row that differs from its value at the start.
+    Restart,
+    /// A MISSION row that differs from its value at the start of this mission.
+    Mission,
+}
+
+#[allow(static_mut_refs)]
+pub fn pending(row: &Setting) -> Pending {
+    let Some(s) = (unsafe { SNAPS.iter().find(|s| core::ptr::eq(s.row, row)) }) else { return Pending::No };
+    let now = value(row);
+    let differs = |was: &str| !now.trim().eq_ignore_ascii_case(was.trim());
+    match row.apply {
+        APPLY_RESTART if differs(&s.start) => Pending::Restart,
+        APPLY_MISSION if crate::menus::backdrop::over_mission() && differs(&s.mission) => Pending::Mission,
+        _ => Pending::No,
+    }
+}
+
+/// Why a row cannot be changed now.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Lock {
+    No,
+    /// A network game, and every player must have the same.
+    Network,
+    /// A mission whose mode could not be read: locked to be safe.
+    Unknown,
+}
+
+/// Rows every player must share are locked in a network mission (and where that cannot
+/// be told). The Refit screen is reached only from Options, so the setup screens never
+/// show it.
+pub fn locked(row: &Setting) -> Lock {
+    if row.scope != SCOPE_MATCH || !crate::menus::backdrop::over_mission() {
+        return Lock::No;
+    }
+    match crate::engine::setup::network_game() {
+        Some(false) => Lock::No,
+        Some(true) => Lock::Network,
+        None => Lock::Unknown,
+    }
+}
+
+/// `<Plugin>_SettingsNote` for `row` of the table `plugin` (None: the plugin as a whole).
+pub fn note(plugin: &str, row: Option<&Setting>) -> Option<String> {
+    let t = tables().iter().find(|t| t.plugin == plugin)?;
+    let f = t.note?;
+    let p = f(row.map_or(core::ptr::null(), |r| r as *const Setting));
+    if p.is_null() {
+        return None;
+    }
+    let s = unsafe { rt::cstr_at(p, 120) };
+    (!s.is_empty()).then(|| String::from(s))
 }
 
 #[allow(static_mut_refs)]
@@ -148,10 +260,17 @@ fn start() {
         let changed_name = rt::cstr(&rt::sfmt!("{}_SettingsChanged", plugin));
         let cf = unsafe { GetProcAddress(m, changed_name.as_ptr()) };
         let changed: Option<extern "C" fn()> = (cf != 0).then(|| unsafe { core::mem::transmute::<usize, extern "C" fn()>(cf) });
+        let note_name = rt::cstr(&rt::sfmt!("{}_SettingsNote", plugin));
+        let nf = unsafe { GetProcAddress(m, note_name.as_ptr()) };
+        let note: Option<NoteFn> = (nf != 0).then(|| unsafe { core::mem::transmute::<usize, NoteFn>(nf) });
         let rows = if base.is_null() || count == 0 { Some(Vec::new()) } else { read_rows(export, base, count) };
         let Some(rows) = rows_or_refused(export, &module, rows) else { continue };
         log!("settings: {} in {}, {} rows{}", export, module, rows.len(), if changed.is_some() { "" } else { " (no _SettingsChanged)" });
-        unsafe { TABLES.push(Table { plugin, module, rows, changed }) };
+        for r in rows.iter() {
+            let v = value(r);
+            unsafe { SNAPS.push(Snap { row: *r as *const Setting, start: v.clone(), mission: v }) };
+        }
+        unsafe { TABLES.push(Table { plugin, module, rows, changed, note }) };
     }
     unsafe {
         STAMP = rt::file_stamp(&overlay::path());

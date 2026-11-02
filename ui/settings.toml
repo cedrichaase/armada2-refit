@@ -182,7 +182,8 @@ apply = "restart"
 scope = "local"
 tab = "interface"
 label = "Redrawn menus"
-help = "The shell's menus hosted and drawn by the UI. Off gives the game's menus back."
+help = "The shell's menus hosted and drawn by the UI, and this screen with them. Off gives the game's menus back."
+flags = ["advanced"]
 
 [[row]]
 name = "menus_scene"

@@ -15,6 +15,19 @@ Layers: render3d 0.36.0.
 
 Installed, not yet seen in game.
 
+## 13.60.0 — 2026-11-02
+
+Layers: ui 0.31.0.
+
+### Added
+- The Refit screen in UI.asi (ROADMAP Phase 6): a modal over the hosted Options dialog
+  with tabs, rows, badges, help, a restart banner and Reset tab; the optional
+  `<Plugin>_SettingsNote` export (C5 amendment, `tools/settings/README.md`) with its
+  `NoteFn` (`crates/a2rt`) and `A2SettingsNoteFn` (`csdk/a2asi.h`); UI exports
+  `UI_SettingsNote`. The Redrawn menus row is ADVANCED.
+
+Installed, not yet seen in game.
+
 ## 13.59.1 — 2026-11-02
 
 Layers: ui 0.30.1, testbench 3.84.0.

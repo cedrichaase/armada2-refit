@@ -4,6 +4,33 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.31.0 — 2026-11-02
+
+### Added
+- The Refit screen (`menus/refit.rs`): a modal of ours over the hosted Options dialog,
+  opened by a **Refit** entry under the stock buttons of Options (shell and mission).
+  Five tabs of rows from the settings hub, badges (`theme::status_badge`: Now, Next
+  mission, Restart, Restart needed, Must match, Locked), a help strip, a restart banner,
+  Reset tab (asks first), Show advanced, a "Drawn on <backend>" line; every change is
+  `settings::set_row`; UI.log `refit:` lines.
+- Hub: `Table.note` (`<Plugin>_SettingsNote`, optional), the values at start and at the
+  start of the mission, `pending`, `locked`, `overlay_holds`, `value`, `remove_many`;
+  `engine::setup::network_game()`.
+- `UI_SettingsNote` export: notes on the HUD rows while the HUD stood down and on the
+  command bar's rows while GridLayout.asi owns the bar.
+
+### Changed
+- `Menus.Enable` ("Redrawn menus") is an ADVANCED row; the Refit screen asks before
+  switching it off, since the screen goes with the menus.
+- `pump`: an Esc arriving as a system key while a widget of ours holds the keyboard is
+  noted for the UI and no longer clicks Return to Game.
+- The gallery shows the status badges.
+- `Ui::inert_unless` now also hides the pointer from widgets inside a modal's body
+  (`mouse_live` honoured `in_overlay` first), so a question drawn over the Refit page
+  and an open dropdown's list take the click alone.
+
+Installed, not yet seen in game
+
 ## 0.30.1 — 2026-11-02
 
 ### Fixed
