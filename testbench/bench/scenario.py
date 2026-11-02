@@ -477,6 +477,20 @@ def s_press(c, m):
     return None
 
 
+@step(r'^overlay (?P<words>.+)$')
+def s_overlay(c, m):
+    """`Overlay Render3D.Modules:hulls=0 UI.HUD:Minimap=0` / `Overlay --unset Render3D.Modules:hulls`:
+    `a2test drive overlay` in a scenario (Session.drive_overlay): writes RefitPlayer.ini in
+    the running game and waits up to 5 s for the hub's `settings: RefitPlayer.ini changed`."""
+    try:
+        ok, text = c.sess.drive_overlay(m.group('words').split())
+    except GameError as e:
+        raise StepFailed(str(e))
+    if not ok:
+        raise StepFailed(text)
+    return text
+
+
 @step(r'^(?:scroll|turn|roll) the (?:mouse )?wheel (?P<dir>up|down)(?: (?P<n>\d+) (?:times|notches?))?$')
 def s_wheel(c, m):
     # a2input counts notches positive = down
@@ -1101,7 +1115,7 @@ def s_judge(c, m):
 
 # The steps that act on the game: a log wait reads what was written after the last one.
 ACTIONS = {s_launch, s_quit, s_stop, s_click_at, s_click_text, s_click_named, s_drag, s_move, s_press,
-           s_wheel, s_type, s_type_address, s_type_from_log, s_scene, s_scene_answer}
+           s_wheel, s_overlay, s_type, s_type_address, s_type_from_log, s_scene, s_scene_answer}
 
 
 # ---------------------------------------------------------------------- one case

@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.58.0 — 2026-11-02
+
+Layers: testbench 3.83.0.
+
+### Added
+- Scenario step `Overlay ...`: a live `RefitPlayer.ini` flip in a running game, unattended
+  (testbench 3.83.0).
+
+Installed, not yet seen in game.
+
 ## 13.57.0 — 2026-11-02
 
 Layers: gui-installer 2.4.0.

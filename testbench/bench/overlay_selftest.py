@@ -80,5 +80,25 @@ with tempfile.TemporaryDirectory() as tmp:
     ok, text = s.drive_overlay(['Render3D.World:Surfaces=0'])
     check(ok and 'changed' in text, 'drive overlay sees the hub line')
 
+    # the scenario step
+    from bench import scenario as sc
+    class C: pass
+    c = C(); c.sess = s
+    t = sc.normalise('Then Overlay --unset Render3D.World:Surfaces.')
+    hit = [fn for rx, fn in sc.STEPS if rx.match(t)]
+    check(hit and hit[0] is sc.s_overlay, 'Overlay step grammar matches (first of STEPS)')
+    check(sc.s_overlay in sc.ACTIONS, 'Overlay is an action (log marks)')
+    m = sc.STEPS[[fn for rx, fn in sc.STEPS].index(sc.s_overlay)][0].match(t)
+    t2 = threading.Thread(target=later); t2.start()
+    out = sc.s_overlay(c, m)
+    check('changed' in out, 'step returns the hub line')
+    t2.join()
+    m = sc.STEPS[[fn for rx, fn in sc.STEPS].index(sc.s_overlay)][0].match('overlay Render3D.World:Surfaces=1')
+    try:
+        sc.s_overlay(c, m)
+        check(False, 'step fails when the hub is silent')
+    except sc.StepFailed:
+        check(True, 'step fails when the hub is silent')
+
 print('\n%d failed' % len(failed) if failed else '\nall passed')
 sys.exit(1 if failed else 0)
