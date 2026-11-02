@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.61.0 — 2026-11-02
+
+Layers: render3d 0.36.0.
+
+### Added
+- render3d: `Render3D_SettingsNote`, the stand-down notes for the Refit screen; the
+  crate's version corrected to match its changelog.
+
+Installed, not yet seen in game.
+
 ## 13.59.1 — 2026-11-02
 
 Layers: ui 0.30.1, testbench 3.84.0.

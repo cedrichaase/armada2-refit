@@ -731,6 +731,14 @@ read at load only. Checked on the bench at RMSE 0: live `hulls=0`, `sky=0` and
 (`testbench/scenarios/render3d-settings-live.md`). The other live rows (`specials`,
 `Nebulae.Lit`, `Overlays.*`) use the same mechanism and were not each flipped on the bench.
 
+`Render3D_SettingsNote` (the optional C5 export, `tools/settings/README.md`) tells the
+Refit screen why a part is not running: with a NULL row, why render3d as a whole stood
+down (`Enable=0`, a seam that is not stock's, or no targets or post shaders for the
+device: the reasons `lib.rs` and `frame` log, kept in `DOWN`); with a module's row,
+"Stands down while Sky.asi is loaded" for a module `mods::settle` dropped for its
+superseded plugin (`mods::stood_down_for`). NULL when nothing is wrong, so a run with no
+stand-down draws exactly as before. It only reads, into one static buffer.
+
 ### effects
 
 `src/mods/effects/`, on by default. The game features that are effects, hull debris,
