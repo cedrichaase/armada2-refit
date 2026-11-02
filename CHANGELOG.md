@@ -5,6 +5,22 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.70.0 — 2026-11-02
+
+Layers: render3d 0.37.0.
+
+### Added
+- render3d: the contracts of the split into core, modules and content, in code: the
+  module interface v2, the hook registry (the frame's hooks on it), the services'
+  traits, the recipe lookup, per-module settings fragments exported as one table, and
+  `render3d/lint-layers.sh` (report mode, run in CI).
+- tools/settings: fragments (`module = "<m>"`, a module's rows beside its code, written
+  to `settings_table.rs` with `ROWS`; the plugin's export then returns
+  `crate::settings_rows()`), `shared_sections`, `gen.py --rows`, lint rule 7 (one owning
+  table per section), and their fixtures in `selftest.sh`.
+
+Installed, not yet seen in game.
+
 ## 13.61.0 — 2026-11-02
 
 Layers: render3d 0.36.0.

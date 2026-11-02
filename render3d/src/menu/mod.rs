@@ -25,7 +25,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 /// The map built into the plugin.
-static BUILT_IN: &str = include_str!("../../menus/map.ini");
+const BUILT_IN: &str = include_str!("../../menus/map.ini");
 
 /// The passes of a menu frame, in order; the depth is cleared before `Ships`, which
 /// draw on a projection of their own (the planet is far beyond them).
@@ -205,12 +205,14 @@ fn parse_f(s: &str) -> Option<f32> {
     Some(if neg { -v as f32 } else { v as f32 })
 }
 
-/// The map's text: the game directory's `Menu\map.ini`, else the built-in one.
+/// The map's text: the game directory's `Menu\map.ini`, else the built-in one
+/// (`core_recipes`, kind "menu").
 fn text_of() -> (String, &'static str) {
-    if let Some(d) = rt::read_file(&rt::game_path("Menu\\map.ini")) {
-        return (String::from_utf8_lossy(&d).into_owned(), "Menu\\map.ini in the game directory");
+    crate::core_recipes::builtin("menu", &[("map", BUILT_IN)]);
+    match crate::core_recipes::text("menu", "map") {
+        Some(r) if r.source == crate::core_recipes::Source::Game => (r.text, "Menu\\map.ini in the game directory"),
+        _ => (String::from(BUILT_IN), "built in"),
     }
-    (String::from(BUILT_IN), "built in")
 }
 
 /// A group of the map: a place the scenes' ships, gas and cameras are given from.

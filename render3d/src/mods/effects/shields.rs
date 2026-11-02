@@ -462,7 +462,7 @@ impl Shields {
             let name = String::from(unsafe { crate::rt::cstr_at(p as *const u8, 31) });
             let mut sect = String::from("Shell.");
             sect.push_str(&name);
-            let ini = &self.ini.1;
+            let ini = self.ini.ini();
             let on = ini.int(&sect, "On", default_shell_on(&name) as i32) != 0 && self.s.shells;
             let (dc, db, dl, ds, dr) = default_shell(&name, &self.s);
             let col = ini.floats(&sect, "Colour", dc);

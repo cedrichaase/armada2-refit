@@ -41,7 +41,7 @@ use gpu::{
 };
 use crate::math;
 use crate::rt::{self, settings, Ini};
-use crate::settings_table::NEBULAE_LIT;
+use super::settings_table::NEBULAE_LIT;
 use crate::shaders::world_nebula::*;
 use crate::shaders::world_nebula_spv::*;
 use crate::shaders::world_nebula_dxil::*;

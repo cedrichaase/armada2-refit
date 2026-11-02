@@ -1,0 +1,4 @@
+[package]
+name = "frag-fixture"
+version = "0.0.0"
+# A fixture: never built. Its presence makes gen.py write src/settings_table.rs.

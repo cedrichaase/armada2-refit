@@ -676,6 +676,16 @@ impl Module for Hulls {
     fn name(&self) -> &'static str {
         "hulls"
     }
+    fn priority(&self) -> i32 {
+        30
+    }
+    fn claims(&self) -> u32 {
+        gpu::display::CLAIM_HULLS
+    }
+    fn rows(&self) -> &'static [crate::rt::settings::Setting] {
+        &[]
+    }
+    fn configure(&mut self, _ini: &crate::rt::Ini, _said: &mut crate::core_module::Changes) {}
     /// `[Modules] hulls=0`: the menu scene's ships stay ours. The front end has no game
     /// objects and the engine draws nothing there (Display8.log: 0 engine draws in
     /// "start"), so nothing could hand them back to the engine or to passthrough. In a

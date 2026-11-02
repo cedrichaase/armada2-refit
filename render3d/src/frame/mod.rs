@@ -19,7 +19,9 @@ pub mod post;
 pub mod steps;
 
 use crate::config::{self, Config};
-use crate::engine::{self, hook};
+use crate::core_hooks::{Hook, Hooks, Kind, Site};
+use crate::core_module::ModuleId;
+use crate::engine;
 use crate::gfx;
 use crate::log;
 use crate::timing;
@@ -32,6 +34,47 @@ use post::{PRect, Post, Targets};
 /// `Armada_RenderAllOurStuff(Armada_Camera*, Render_Stuff&, bool isMain)`, cdecl.
 const BODY: usize = 0x598110;
 const SITES: [usize; 2] = [0x59886e, 0x4e60f6];
+/// The functions the two calls are in, for the hooks' log (and Phase 8's profile).
+const SITE_SYMBOLS: [&str; 2] = ["Armada_RenderFrame", "CinematicView::RenderView"];
+/// What the seam's calls went to before us (`core_hooks::Prev`): stock's body, since
+/// the seam installs only over it.
+static mut PREV_BODY: usize = 0;
+
+/// The seam's hook at call site `i`, to `to`.
+fn seam(i: usize, used_by: &'static str, to: usize) -> Hook {
+    Hook {
+        owner: ModuleId::CORE,
+        used_by,
+        kind: Kind::Call,
+        site: Site { symbol: SITE_SYMBOLS[i], addr: SITES[i], expect: BODY },
+        to,
+        chain: false,
+    }
+}
+
+/// Points both seams at `to`, or neither: false, with nothing written, when either
+/// site does not call the stock body.
+fn install_seams(used_by: &'static str, to: usize, who: &str) -> bool {
+    let mut h = Hooks::core();
+    for i in 0..SITES.len() {
+        if !h.check(&seam(i, used_by, to)) {
+            log!("{}: the call at {:#x} is not to {:#x}: {}", who, SITES[i], BODY, if who == "frame" { "standing down" } else { "not timed" });
+            return false;
+        }
+    }
+    for i in 0..SITES.len() {
+        match h.install(seam(i, used_by, to)) {
+            Some(prev) => unsafe { PREV_BODY = prev.addr() },
+            None => return false,
+        }
+    }
+    true
+}
+
+/// The body the seam calls on to (`Prev`): stock's.
+fn prev_body() -> BodyFn {
+    unsafe { core::mem::transmute::<usize, BodyFn>(PREV_BODY) }
+}
 
 type BodyFn = unsafe extern "C" fn(usize, usize, u32);
 type Reset8 = unsafe extern "system" fn(*mut c_void, *mut c_void) -> HRESULT;
@@ -65,14 +108,8 @@ static mut DESTROY_NEXT: usize = 0;
 /// Points both call sites at our body. False, with nothing written, when either site
 /// does not call the stock body (a different `Armada2.exe`, or another plugin there).
 pub fn install() -> bool {
-    for s in SITES {
-        if hook::call_target(s) != Some(BODY) {
-            log!("frame: the call at {:#x} is not to {:#x}: standing down", s, BODY);
-            return false;
-        }
-    }
-    for s in SITES {
-        hook::patch_call(s, BODY, body as *const () as usize);
+    if !install_seams("the 3D views (the seam)", body as *const () as usize, "frame") {
+        return false;
     }
     log!("frame: both views come through render3d");
     if install_destroy() {
@@ -104,7 +141,7 @@ unsafe extern "C" fn body(cam: usize, rs: usize, is_main: u32) {
 }
 
 unsafe fn body_inner(cam: usize, rs: usize, is_main: u32) {
-    let stock: BodyFn = unsafe { core::mem::transmute(BODY) };
+    let stock = prev_body();
     let Some(cfg) = config::get() else {
         unsafe { stock(cam, rs, is_main) };
         return timing::mark("stock");
@@ -142,20 +179,11 @@ unsafe fn body_inner(cam: usize, rs: usize, is_main: u32) {
 /// engine's own, for comparing render3d with the plugins it replaces. False, with
 /// nothing written, under the same conditions as `install`.
 pub fn install_measure() -> bool {
-    for s in SITES {
-        if hook::call_target(s) != Some(BODY) {
-            log!("timing: the call at {:#x} is not to {:#x}: not timed", s, BODY);
-            return false;
-        }
-    }
-    for s in SITES {
-        hook::patch_call(s, BODY, measure_body as *const () as usize);
-    }
-    true
+    install_seams("timing the engine's body (Enable=0)", measure_body as *const () as usize, "timing")
 }
 
 unsafe extern "C" fn measure_body(cam: usize, rs: usize, is_main: u32) {
-    let stock: BodyFn = unsafe { core::mem::transmute(BODY) };
+    let stock = prev_body();
     let timed = time_view(is_main & 0xff != 0);
     unsafe { stock(cam, rs, is_main) };
     if timed {
@@ -228,17 +256,23 @@ fn frame() -> &'static mut Option<Frame> {
 /// False, with nothing written, when the slot holds neither the stock function nor
 /// another plugin's (one outside `Armada2.exe`'s code).
 pub fn install_destroy() -> bool {
-    let cur = engine::field(DX8_VTABLE, SLOT_DESTROY * 4);
-    if cur != DESTROY && (0x401000..0x6ae000).contains(&cur) {
-        log!("frame: slot {} of {:#x} is not DestroyRenderSurfaces: the device is let go of when the next one is seen", SLOT_DESTROY, DX8_VTABLE);
-        return false;
-    }
-    match hook::patch_slot(DX8_VTABLE, SLOT_DESTROY, destroy as *const () as usize) {
-        Some(old) => {
-            unsafe { DESTROY_NEXT = old };
+    let h = Hook {
+        owner: ModuleId::CORE,
+        used_by: "letting go of the device with the engine",
+        kind: Kind::Slot { vt: DX8_VTABLE, slot: SLOT_DESTROY },
+        site: Site { symbol: "ST3D_DeviceDirectX8::DestroyRenderSurfaces", addr: DX8_VTABLE, expect: DESTROY },
+        to: destroy as *const () as usize,
+        chain: true,
+    };
+    match Hooks::core().install(h) {
+        Some(prev) => {
+            unsafe { DESTROY_NEXT = prev.addr() };
             true
         }
-        None => false,
+        None => {
+            log!("frame: slot {} of {:#x} is not DestroyRenderSurfaces: the device is let go of when the next one is seen", SLOT_DESTROY, DX8_VTABLE);
+            false
+        }
     }
 }
 
@@ -338,8 +372,18 @@ fn hook_reset(dev8: *mut c_void) {
         if cur == reset as *const () as usize {
             return;
         }
-        if let Some(old) = hook::patch_slot(vt, 14, reset as *const () as usize) {
-            RESET = Some(core::mem::transmute::<usize, Reset8>(old));
+        // The d3d8 device's own vtable (Display8's or d3d8to9's), outside Armada2.exe:
+        // no stock value to check against.
+        let h = Hook {
+            owner: ModuleId::CORE,
+            used_by: "letting go of the default pool before a Reset",
+            kind: Kind::Slot { vt, slot: 14 },
+            site: Site { symbol: "IDirect3DDevice8::Reset", addr: vt, expect: 0 },
+            to: reset as *const () as usize,
+            chain: true,
+        };
+        if let Some(old) = Hooks::core().install(h) {
+            RESET = Some(core::mem::transmute::<usize, Reset8>(old.addr()));
             RESET_VT = vt;
         }
     }

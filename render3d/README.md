@@ -696,9 +696,9 @@ time it is posed (`hulls: menu scene:`). Keys:
 
 render3d registers with Display8 at load (contract 1.1, `gpu::Gpu::register`, once its
 frame seam is in; `display/README.md`, "Claims") with `mods::claims`, which says what it
-draws now: each module running (`sky`, `hulls`, `world`, `particles`, `effects`,
-`ordnance`, `specials`) and, of `overlays`, `fog` and `selection` as `[Overlays] Fog`
-and `Selection` say. A module at 0 (kept for the menu scene only), one standing down
+draws now: the OR of every running module's `Module::claims()`. Each claims its own
+category (`sky`, `hulls`, `world`, `particles`, `effects`, `ordnance`, `specials`), and
+`overlays` claims `fog` and `selection` as `[Overlays] Fog` and `Selection` say. A module at 0 (kept for the menu scene only), one standing down
 beside its old plugin, and anything before the first frame are not claimed. Display8
 drops none of the engine's 3D draws for these: a module that draws a category skips
 the engine's step, so whatever the engine still issues (a SOD handed back, a class no
@@ -709,33 +709,132 @@ claims is asked through `gpu::Gpu::claimed_by_others`: the selection bubbles
 
 ## Modules
 
+### Module interface
+
+A module is one `Module` (`src/core_module.rs`, version 2), made at load and kept in
+the registry (`src/mods/mod.rs`) in `priority()` order: world 10, particles 20, hulls
+30, effects 40, ordnance 50, specials 60, sky 70, overlays 80 (two modules never share
+one; `init` asserts it). The first module whose `step`, `object` or `feature` returns
+true draws that part; a part none takes is the engine's. Besides the per-view calls
+(`lights`, `begin_view`, `step`, `object`, `feature`, `end_view`, the menu scene's
+`menu_begin`/`menu`) and the device's (`device`, `reset`, `forget`,
+`formats_changed`), a module answers:
+
+| Call | What it is |
+|---|---|
+| `name()` | its `[Modules]` key and log prefix |
+| `priority()` | dispatch order, ascending |
+| `claims()` | the `gpu::display::CLAIM_*` it draws while it runs; `mods::claims` is the OR over running modules ("Claims") |
+| `rows()` | its settings rows, its fragment's `ROWS` (below); `&[]` if none |
+| `configure(ini, said)` | reads every section it owns, at load and at every `Render3D_SettingsChanged`, whether it runs or not; notes what changed for the log line |
+| `superseded()` | the old plugin it stands down beside |
+| `in_menu()` | has a part in the menu scene, so it keeps its device while off |
+| `provide(id, services)` | registers what it draws for the others (`core_services`), under its own id, once, at init |
+| `hooks(h)` | installs its hooks through `core_hooks` (below), once, at its first switch-on |
+| `on()` / `off()` | switched on (load or live, after `hooks`) / switched off live (drop the cosmetic state; `forget` follows at the next view) |
+
+The registry holds each module's on flag (an `AtomicBool`, which is also its hooks'
+gate) and its `ModuleId` (its index, stable within a run: a module that stands down
+keeps its place). `mods::running(name)` and `enabled(name)` remain for logging only:
+module code asks for a capability (`core_services::hulls()` and so on, `Some` only while
+the provider runs), never for another module by name (`lint-layers.sh`, rule 3).
+
+**Hooks** (`src/core_hooks.rs`). Every patch of `Armada2.exe` goes through
+`Hooks::install(Hook { owner, used_by, kind, site, to, chain })`. A `Site` is the
+function's name in the game's map, its address and what stock has there (`expect`: the
+call's target, or the slot's value; 0 for a slot of an object outside the executable,
+such as the d3d8 device's `Reset`). It is checked before anything is written: a `Call`
+must call `expect`, a `Slot` must hold it, and with `chain` another plugin's target (one
+outside the executable's code) is accepted too, logged `(chained)`. One line per hook:
+`hooks: <owner> <used by> at <symbol> (0x..) installed`, or `... not stock: <owner>
+stands down for <used by>`. `install` returns the `Prev` the detour calls on, never a
+constant; every detour starts with `if !GATE.open() { return prev(args) }`, and one that
+replaces an engine function whole calls `prev` while its gate is shut. Hooks are
+installed at the owner's first switch-on and never taken out (another plugin may have
+chained on top since); a module that is off at load installs nothing. A module whose
+`hooks()` could not install one it cannot draw without calls `h.stand_down(why)` and is
+not switched on. The frame's own hooks (the two seams of `Armada_RenderAllOurStuff`,
+`DestroyRenderSurfaces` and the device's `Reset`) are the core's, behind a gate that is
+always open (`Enable=0` installs none).
+
+**Services** (`src/core_services.rs`): `HullDraw` (hulls: `draw_instance`,
+`draws_plain_sod`, `placeholder`, `shadow_map`), `WaveDraw` (ordnance's shockwave),
+`PostDraw` (overlays' height posts) and `GhostDraw` (world's planet ghost). A consumer
+that gets `None` hands the object or effect back to the engine, as it did when the
+provider was not running.
+
+**Recipes** (`src/core_recipes.rs`): `core_recipes::text(kind, name)` finds a recipe in
+the game directory (`Sky\<name>.ini`, `Surfaces\`, `Nebulae\`, `Menu\`) first, then the
+one a module built in (`core_recipes::builtin(kind, &[(name, include_str!(..))])`).
+The sky's recipes, the menu's `map.ini` and the built-in `ordnance.ini` (whose sections
+`Render3D.ini` overrides one by one, ordnance's own rule) are read through it.
+
+**Layers.** The engine's addresses, call sites, vtable slots and field reads belong in
+`src/engine/` (the core's glue) or a module's own `src/mods/<m>/hooks.rs`; a module's
+built-in tables of game data names in its `content.rs`; its recipe files under
+`render3d/content/`. `render3d/lint-layers.sh` counts what is still elsewhere (report
+mode; `--strict DIR...` fails on any hit under those directories, as the modules are
+moved over).
+
 ### Modules and settings
 
 Every module is made at load and has an `on` flag from `[Modules]` (and the overlay,
-`RefitPlayer.ini`). Dispatch (`lights`, `begin_view`, `step`, `object`, `feature`,
-`end_view`) skips a module that is off, and `mods::running(name)` is false, so the
-engine's draw of that part runs (through Display8's passthrough). The menu scene's calls
-(`device`, `reset`, `menu*`) still reach `hulls`, `sky` and `world` while off
-(`Module::in_menu`), since nothing could hand the front end's scene back; `hulls` clears
-the menu's shadow map and posed ships at each mission view (`idle_view`).
+`RefitPlayer.ini`), read through the core's row `Modules.<name>`. Dispatch (`lights`,
+`begin_view`, `step`, `object`, `feature`, `end_view`) skips a module that is off, and
+`mods::running(name)` is false, so the engine's draw of that part runs (through
+Display8's passthrough). The menu scene's calls (`device`, `reset`, `menu*`) still reach
+`hulls`, `sky` and `world` while off (`Module::in_menu`), since nothing could hand the
+front end's scene back; `hulls` clears the menu's shadow map and posed ships at each
+mission view (`idle_view`).
 
-`Render3D_SettingsChanged` (called by the UI hub after an overlay or ini change)
-re-reads the **live** rows: `Modules.hulls/sky/specials` (a module switched off lets go
-of its GPU objects at the next view), `World.Surfaces`, `Nebulae.Lit`, `Overlays.*`.
-The rest are **latched at load**, because the modules install engine hooks once
-(effects: shields, repair, debris, sparks; ordnance; particles; the nebula hooks of
-world; the height posts of overlays) and a hook cannot be switched off from outside
-without auditing each one to hand back to its predecessor; the flag of such a module is
-read at load only. Checked on the bench at RMSE 0: live `hulls=0`, `sky=0` and
-`World.Surfaces=0` against the baselines of the same keys at load
-(`testbench/scenarios/render3d-settings-live.md`). The other live rows (`specials`,
-`Nebulae.Lit`, `Overlays.*`) use the same mechanism and were not each flipped on the bench.
+`Render3D_SettingsChanged` (called by the UI hub after an overlay or ini change) reads
+every module's `configure`, then every module's flag. A module switched off
+gets `off()` and lets go of its GPU objects at the next view; one switched on gets its
+`hooks()` the first time, then `on()`, and its `device()` at its next view if it missed
+this device. A module whose hooks are not yet gated by its flag (`NOT_YET_LIVE` in
+`mods/mod.rs`: world, particles, effects, ordnance, overlays) refuses a live change of
+its flag, logged `settings: Modules.<m> changes at the next launch (hooks not yet live)`,
+and its row stays `apply = "restart"`: effects (shields, repair, debris, sparks),
+ordnance, particles, the nebula hooks of world and the height posts of overlays install
+engine hooks that do not yet hand back to their predecessor. The live rows today are
+`Modules.hulls/sky/specials`, `World.Surfaces`, `Nebulae.Lit` and `Overlays.*`.
+Checked on the bench at RMSE 0: live `hulls=0`, `sky=0` and `World.Surfaces=0` against
+the baselines of the same keys at load (`testbench/scenarios/render3d-settings-live.md`).
+The other live rows (`specials`, `Nebulae.Lit`, `Overlays.*`) use the same mechanism and
+were not each flipped on the bench.
+
+**The rows are split per module.** `render3d/settings.toml` holds the core's: `MSAA`,
+`HDR` and the eight `Modules.*`. A module with rows has a fragment beside its code,
+`src/mods/<m>/settings.toml` (`module = "<m>"`, `tools/settings/README.md`,
+"Fragments"; today world's `World.*` and `Nebulae.Lit`, and overlays' `Overlays.*`),
+generated into `src/mods/<m>/settings_table.rs` (`ROWS`, one constant per row). Its
+`rows()` returns them. `Render3D_Settings` returns one contiguous table, built at load
+(`lib.rs`, `settings_rows`): the core's rows, then each built-in module's in priority
+order, copied (a module not built in has none, and with `Enable=0`, when no module is
+made, only the core's are exported). The code reads keys through the tables' own row
+constants; `Render3D_SettingsNote` matches a row of the exported copy by its section and
+key. Render3D.log says `settings: N rows exported (M the core's)`.
+
+**Which module reads which section** of `Render3D.ini` (each section has one owner;
+`[Lights]` is split by key, and `lint.py` rule 7 holds the fragments to it):
+
+| Owner | Sections |
+|---|---|
+| core | `[Render3D]` (`Enable`, `Log`, `MSAA`, `HDR`, `Bloom*`, `Exposure`, `Shoulder`, `Inset`, `Steps`, `Timing*`), `[Modules]`, `[Bench]` (`Clock`), `[Lights]`: the cluster keys (`Clustered`, `ClusterTile`, `ClusterSlices`, `ClusterLights`, `ClusterPerColour`), and for now the scene lights (`Replace`, `KeyColour`, `KeyAxis`, `FillColour`, `FillAxis`, `SkyLight`, read in `scene/lights.rs`) and the beam keys (`Beam*`, `ConeSpot`, read in `scene/clusters.rs`) |
+| world | `[World]` (the planets', rocks' and nebulae's switches and keys: there is no `[Planets]` or `[Rocks]` section), `[Nebulae]`; the recipe files' `[Surface]` and `[Nebula]` |
+| particles | `[Particles]` |
+| hulls | `[Hulls]` (the `Borg*` look keys with it); the `[Lights]` scene keys move here with the hulls' look |
+| effects | `[Bees]`, `[Construction]`, `[Debris]`, `[Repair]`, `[Sparks]`, `[Explosions]`, `[Shields]`, `[Shell.<name>]` |
+| ordnance | `[Warp]`, `[Ordnance.<odf>]`, `[Model.<odf>]`, `[Wave.<odf>]` (over the built-in `ordnance.ini`); the `[Lights]` beam keys move here |
+| specials | `[Specials]` |
+| sky | `[Sky]` |
+| overlays | `[Overlays]` |
 
 `Render3D_SettingsNote` (the optional C5 export, `tools/settings/README.md`) tells the
 Refit screen why a part is not running: with a NULL row, why render3d as a whole stood
 down (`Enable=0`, a seam that is not stock's, or no targets or post shaders for the
 device: the reasons `lib.rs` and `frame` log, kept in `DOWN`); with a module's row,
-"Stands down while Sky.asi is loaded" for a module `mods::settle` dropped for its
+"Stands down while Sky.asi is loaded" for a module `mods::settle` stood down for its
 superseded plugin (`mods::stood_down_for`). NULL when nothing is wrong, so a run with no
 stand-down draws exactly as before. It only reads, into one static buffer.
 

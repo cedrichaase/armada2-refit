@@ -19,7 +19,7 @@ use crate::frame::steps::View;
 use crate::gfx::Pipes;
 use crate::log;
 use crate::rt::settings;
-use crate::settings_table::OVERLAYS_PIVOT;
+use super::settings_table::OVERLAYS_PIVOT;
 use crate::math::{v3, V3};
 use alloc::vec::Vec;
 

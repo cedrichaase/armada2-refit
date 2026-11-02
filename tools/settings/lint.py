@@ -15,6 +15,9 @@ sources (tools/settings/README.md, "The lint").
 5. No literal read of a row's "Section", "Key" pair is left in the layer's sources
    (*.rs, *.c, *.h under the table's directory, the generated tables excepted).
 6. The table's generated file is up to date (gen.py).
+7. Within one plugin's table and its fragments (`module = "<m>"`, checked as one table:
+   2 across them, 3 against the plugin's one shipped ini), a section has one owning
+   table, except those the plugin table lists in `shared_sections`, whose keys are split.
 Exits 1 with one line per problem.
 """
 import os
@@ -57,6 +60,7 @@ def sources(d):
 def lint(paths):
     problems = []
     seen = {}
+    owners = {}  # (plugin, file, section) -> (table, shared)
     for path in paths:
         r = gen.rel(path)
         try:
@@ -68,9 +72,16 @@ def lint(paths):
         except Exception as e:  # tomllib's errors
             problems.append(f'{r}: {e}')
             continue
-        shipped = os.path.join(gen.ROOT, t['shipped'])
+        try:
+            base = gen.base_of(path) if 'module' in t else path
+            shipped_rel = gen.shipped_of(path)
+            shared = {x.lower() for x in gen.load(base)['shared_sections']}
+        except gen.TableError as e:
+            problems.append(str(e))
+            continue
+        shipped = os.path.join(gen.ROOT, shipped_rel)
         if not os.path.isfile(shipped):
-            problems.append(f'{r}: shipped ini {t["shipped"]} not found')
+            problems.append(f'{r}: shipped ini {shipped_rel} not found')
             text = None
         else:
             text = overlay.read(shipped)
@@ -78,7 +89,8 @@ def lint(paths):
                 problems.append(f'{r}: file {t["file"]} is not the shipped ini\'s name ({os.path.basename(shipped)})')
         raw = {row.get('name'): row for row in t['row']}
         gen_out = gen.output_path(path)
-        srcs = list(sources(os.path.dirname(path)))
+        # a fragment's keys are the plugin's: no literal read of them anywhere in it
+        srcs = list(sources(os.path.dirname(base)))
         for name, row in rows:
             where = f'{r} row `{name}`'
             src = raw[name]
@@ -121,16 +133,21 @@ def lint(paths):
                 problems.append(f'{where}: [{row["section"]}] {row["key"]} of {row["file"]} is also {seen[ident]}')
             else:
                 seen[ident] = where
+            # 7. one owning table per section
+            own = (t['plugin'], row['file'].lower(), row['section'].lower())
+            if own in owners and owners[own] != r and row['section'].lower() not in shared:
+                problems.append(f'{where}: section [{row["section"]}] is owned by {owners[own]}; a section has one owning table (or is in `shared_sections`)')
+            owners.setdefault(own, r)
             # 3 and 4. the shipped ini
             if text is not None:
                 got = shipped_value(text, row['section'], row['key'])
                 if 'NOT_SHIPPED' in row['flags']:
                     if got is not None:
-                        problems.append(f'{where}: NOT_SHIPPED, but {t["shipped"]} has [{row["section"]}] {row["key"]}={got}')
+                        problems.append(f'{where}: NOT_SHIPPED, but {shipped_rel} has [{row["section"]}] {row["key"]}={got}')
                 elif got is None:
-                    problems.append(f'{where}: {t["shipped"]} has no [{row["section"]}] {row["key"]}')
+                    problems.append(f'{where}: {shipped_rel} has no [{row["section"]}] {row["key"]}')
                 elif got.lower() != row['def'].lower():
-                    problems.append(f'{where}: {t["shipped"]} has {row["key"]}={got}, the table says {row["def"]}')
+                    problems.append(f'{where}: {shipped_rel} has {row["key"]}={got}, the table says {row["def"]}')
             # 5. reads go through the row
             pat = re.compile(r'"' + re.escape(row['section']) + r'"\s*,\s*"' + re.escape(row['key']) + r'"', re.I)
             for p, body in srcs:

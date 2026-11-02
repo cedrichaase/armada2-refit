@@ -604,6 +604,16 @@ impl Module for Sky {
     fn name(&self) -> &'static str {
         "sky"
     }
+    fn priority(&self) -> i32 {
+        70
+    }
+    fn claims(&self) -> u32 {
+        gpu::display::CLAIM_SKY
+    }
+    fn rows(&self) -> &'static [crate::rt::settings::Setting] {
+        &[]
+    }
+    fn configure(&mut self, _ini: &crate::rt::Ini, _said: &mut crate::core_module::Changes) {}
     fn superseded(&self) -> Option<&'static str> {
         Some("Sky.asi")
     }

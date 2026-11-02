@@ -25,7 +25,9 @@ impl Settings {
         let mut base: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
         let mut order = Vec::new();
         let mut cur = String::new();
-        for line in BUILT_IN.lines() {
+        crate::core_recipes::builtin("ordnance", &[("ordnance", BUILT_IN)]);
+        let text = crate::core_recipes::text("ordnance", "ordnance").map_or(String::new(), |r| r.text);
+        for line in text.lines() {
             let l = line.trim();
             if l.is_empty() || l.starts_with(';') || l.starts_with('#') {
                 continue;

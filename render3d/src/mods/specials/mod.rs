@@ -329,6 +329,16 @@ impl Module for Specials {
     fn name(&self) -> &'static str {
         "specials"
     }
+    fn priority(&self) -> i32 {
+        60
+    }
+    fn claims(&self) -> u32 {
+        gpu::display::CLAIM_SPECIALS
+    }
+    fn rows(&self) -> &'static [crate::rt::settings::Setting] {
+        &[]
+    }
+    fn configure(&mut self, _ini: &crate::rt::Ini, _said: &mut crate::core_module::Changes) {}
     fn device(&mut self) {
         if !self.hooked {
             self.hooked = true;

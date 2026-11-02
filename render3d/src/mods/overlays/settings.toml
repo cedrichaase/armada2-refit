@@ -1,0 +1,78 @@
+# The overlays module's settings rows: a fragment of render3d/settings.toml
+# (tools/settings/README.md, "Fragments"), exported after the core's rows in module
+# priority order. Generated: settings_table.rs beside it.
+plugin = "Render3D"
+file = "Render3D.ini"
+module = "overlays"
+
+[[row]]
+name = "overlays_fog"
+section = "Overlays"
+key = "Fog"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "Fog of war"
+help = "render3d draws the fog of war and the shroud."
+
+[[row]]
+name = "overlays_grid"
+section = "Overlays"
+key = "Grid"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "Grid"
+help = "render3d draws the tactical grid."
+
+[[row]]
+name = "overlays_selection"
+section = "Overlays"
+key = "Selection"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "Selection"
+help = "render3d draws the selection bubbles."
+
+[[row]]
+name = "overlays_ghosts"
+section = "Overlays"
+key = "Ghosts"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "Ghosts"
+help = "render3d draws the ghosts of what the fog has hidden."
+
+[[row]]
+name = "overlays_heightposts"
+section = "Overlays"
+key = "HeightPosts"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "Height posts"
+help = "Height posts as anti-aliased lines."
+
+[[row]]
+name = "overlays_pivot"
+section = "Overlays"
+key = "Pivot"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "Camera pivot marker"
+help = "The ring where the tactical camera turns."
