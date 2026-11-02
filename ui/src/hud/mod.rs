@@ -35,6 +35,10 @@ static mut MINIMAP: bool = false;
 static mut SELECTION: bool = false;
 static mut UNIT_VIEW: bool = false;
 static mut TOOLTIPS: bool = false;
+/// What the start found possible, for the panels `apply_live` switches while playing:
+/// the minimap's click hook is in, the info panel's engine functions are stock.
+static mut MINIMAP_CAP: bool = false;
+static mut INFO_CAP: bool = false;
 
 /// Whether the selection overlay is ours (`[HUD] Selection=1`, its functions stock).
 pub fn selection_ours() -> bool {
@@ -72,37 +76,56 @@ pub fn install() -> bool {
             crate::log!("bar: stays stock");
         }
     }
-    if cfg.info {
-        if engine::info::functions_stock() {
-            hud::set_taken(hud::SHIP_DISPLAY, false, true);
-            unsafe { INFO = true };
-            crate::log!("info: ours");
-        } else {
-            crate::log!("info: an engine function is not stock, the info panel stays stock");
-        }
-    }
+    unsafe { INFO_CAP = engine::info::functions_stock() };
     panels::install(cfg);
     comm::install(cfg);
-    if cfg.tooltips {
-        hud::take_tooltips(true);
-        unsafe { TOOLTIPS = true };
-        crate::log!("tooltips: ours");
-    }
+    apply_live(cfg);
     true
 }
+
+/// Switches the panels that can change while playing (the minimap, the info panel, the
+/// tooltips) to what `cfg` says, and the bar's key mode; logs each change. At the start
+/// it is the install; `UI_SettingsChanged` calls it again.
+#[allow(static_mut_refs)]
+pub fn apply_live(cfg: &crate::config::Hud) {
+    unsafe {
+        let want = cfg.minimap && MINIMAP_CAP;
+        if want != MINIMAP {
+            hud::set_taken(engine::radar::MAP_RADAR, false, want);
+            MINIMAP = want;
+            crate::log!("minimap: {}", if want { "ours" } else { "stock" });
+        } else if cfg.minimap && !MINIMAP_CAP && !MINIMAP_LOGGED {
+            crate::log!("minimap: stays stock");
+        }
+        MINIMAP_LOGGED = true;
+        let want = cfg.info && INFO_CAP;
+        if want != INFO {
+            hud::set_taken(hud::SHIP_DISPLAY, false, want);
+            INFO = want;
+            crate::log!("info: {}", if want { "ours" } else { "stock" });
+        } else if cfg.info && !INFO_CAP && !INFO_LOGGED {
+            crate::log!("info: an engine function is not stock, the info panel stays stock");
+        }
+        INFO_LOGGED = true;
+        if cfg.tooltips != TOOLTIPS {
+            hud::take_tooltips(cfg.tooltips);
+            TOOLTIPS = cfg.tooltips;
+            crate::log!("tooltips: {}", if cfg.tooltips { "ours" } else { "stock" });
+        }
+        if BAR {
+            engine::palette::set_stock_keys_off(cfg.bar_keys);
+        }
+    }
+}
+static mut MINIMAP_LOGGED: bool = false;
+static mut INFO_LOGGED: bool = false;
 
 /// The minimap, the selection overlay and the unit view's frame (minimap.rs,
 /// overlay.rs, unitview.rs).
 fn map_panels(cfg: &crate::config::Hud) {
-    if cfg.minimap {
-        if engine::radar::functions_stock() && minimap::install() {
-            hud::set_taken(engine::radar::MAP_RADAR, false, true);
-            unsafe { MINIMAP = true };
-            crate::log!("minimap: ours");
-        } else {
-            crate::log!("minimap: stays stock");
-        }
-    }
+    // The minimap is switched in `apply_live`; its click hook goes in whether or not the
+    // key is on at the start, so the key can be turned on while playing.
+    unsafe { MINIMAP_CAP = engine::radar::functions_stock() && minimap::install() };
     if cfg.selection {
         if engine::overlay::functions_stock() && engine::radar::functions_stock() {
             hud::set_taken(engine::overlay::SELECTION_DISPLAY, false, true);

@@ -52,6 +52,11 @@ with tempfile.TemporaryDirectory() as tmp:
     s.empty_overlay()
     check(not any((g / n).exists() for n in session.Session.OVERLAY_FILES), 'empty_overlay removes all four')
     check(s.log.lines[-1].startswith('overlay emptied'), 'empty_overlay logs "overlay emptied"')
+    import inspect
+    src = inspect.getsource(session.Session.launch)
+    check("'RefitPlayer.ini'" not in src and 'UIPlayer' not in src,
+          'launch() does not delete the overlay it was given (ui-settings-live regression)')
+    check("'RefitPlayer.ini'" in inspect.getsource(session.Session.collect_logs), 'collect_logs keeps RefitPlayer.ini')
     s.set_overlay(['Render3D.Modules:sky=0', 'UI.HUD:Minimap=0'])
     txt = (g / 'RefitPlayer.ini').read_text()
     check('[Render3D.Modules]' in txt and 'sky=0' in txt and 'Minimap=0' in txt, 'set_overlay writes both keys')

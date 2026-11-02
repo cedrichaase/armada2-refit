@@ -83,6 +83,12 @@ pub fn log_dir() -> Option<String> {
     create_dir(&d).then_some(d)
 }
 
+/// Whether `log!` has a file to write to (an overlay value read before it is open is
+/// noted again by the next read, not marked as logged).
+pub(crate) fn log_is_open() -> bool {
+    LOG_ON.load(Ordering::Relaxed) && !LOG_FILE.load(Ordering::Relaxed).is_null()
+}
+
 fn open_log(path: &str) -> HANDLE {
     let p = cstr(path);
     unsafe {

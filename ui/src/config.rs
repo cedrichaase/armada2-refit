@@ -1,5 +1,8 @@
 //! UI.ini, read at startup from the game directory.
+use crate::rt::settings::{on, value};
 use crate::rt::{self, Ini};
+use crate::settings_table::*;
+use core::sync::atomic::{AtomicPtr, Ordering};
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -152,35 +155,35 @@ pub fn load() -> Config {
         enable: ini.int("UI", "Enable", 1) != 0,
         log: ini.int("UI", "Log", 1) != 0,
         scale: ini.float("UI", "Scale", 1.0).clamp(0.25, 4.0),
-        cursor: ini.int("UI", "Cursor", 1) != 0,
+        cursor: on(&ini, UI_CURSOR),
         cursor_size: ini.float("UI", "CursorSize", 32.0).clamp(16.0, 128.0),
         native: ini.int("UI", "Native", 1) != 0,
         movies: ini.int("UI", "Movies", 1) != 0,
         pointer_log: ini.int("UI", "PointerLog", 0) != 0,
         keep_clip: ini.int("UI", "KeepClip", 1) != 0,
-        theme: ini.string("UI", "Theme").filter(|s| {
-            let l = rt::lower(s.trim());
-            !l.is_empty() && l != "auto"
-        }),
+        theme: {
+            let l = rt::lower(value(&ini, UI_THEME).trim());
+            (!l.is_empty() && l != "auto").then_some(l)
+        },
         demo_mission: ini.int("Demo", "Mission", 0) != 0,
         demo_shell: ini.int("Demo", "Shell", 0) != 0,
         demo_loading: ini.int("Demo", "Loading", 0) != 0,
         demo_style: ini.int("Demo", "Style", 0) != 0,
         hud: Hud {
-            enable: ini.int("HUD", "Enable", 1) != 0,
-            bar: ini.int("HUD", "Bar", 1) != 0,
-            bar_keys: ini.int("HUD", "BarKeys", 1) != 0,
-            bar_labels: ini.int("HUD", "BarLabels", 1) != 0,
-            icons: ini.int("HUD", "Icons", 1) != 0,
-            info: ini.int("HUD", "Info", 1) != 0,
-            info_camera: ini.int("HUD", "InfoCamera", 1) != 0,
+            enable: on(&ini, HUD_ENABLE),
+            bar: on(&ini, HUD_BAR),
+            bar_keys: on(&ini, HUD_BARKEYS),
+            bar_labels: on(&ini, HUD_BARLABELS),
+            icons: on(&ini, HUD_ICONS),
+            info: on(&ini, HUD_INFO),
+            info_camera: on(&ini, HUD_INFOCAMERA),
             info_scale: ini.float("HUD", "InfoScale", 1.3).clamp(0.6, 2.5),
-            minimap: ini.int("HUD", "Minimap", 1) != 0,
+            minimap: on(&ini, HUD_MINIMAP),
             minimap_size: ini.float("HUD", "MinimapSize", 300.0).clamp(120.0, 900.0),
-            selection: ini.int("HUD", "Selection", 1) != 0,
-            selection_gauges: ini.int("HUD", "SelectionGauges", 1) != 0,
+            selection: on(&ini, HUD_SELECTION),
+            selection_gauges: on(&ini, HUD_SELECTIONGAUGES),
             selection_bubbles: ini.int("HUD", "SelectionBubbles", 0) != 0,
-            unit_view: ini.int("HUD", "UnitView", 1) != 0,
+            unit_view: on(&ini, HUD_UNITVIEW),
             unit_view_size: ini.float("HUD", "UnitViewSize", 260.0).clamp(120.0, 600.0),
             resources: ini.int("HUD", "Resources", 1) != 0,
             buttons: ini.int("HUD", "Buttons", 1) != 0,
@@ -193,7 +196,7 @@ pub fn load() -> Config {
             comm: ini.int("HUD", "Comm", 1) != 0,
             drop_player: ini.int("HUD", "DropPlayer", 1) != 0,
             load_wait: ini.int("HUD", "LoadWait", 1) != 0,
-            tooltips: ini.int("HUD", "Tooltips", 1) != 0,
+            tooltips: on(&ini, HUD_TOOLTIPS),
             overview: ini.int("HUD", "Overview", 1) != 0,
             placement: ini.int("HUD", "Placement", 1) != 0,
             fade: ini.int("HUD", "Fade", 1) != 0,
@@ -204,32 +207,128 @@ pub fn load() -> Config {
             frame_rate: ini.int("HUD", "FrameRate", 1) != 0,
             layout_log: ini.int("HUD", "LayoutLog", 0) != 0,
         },
-        menus: ini.int("Menus", "Enable", 1) != 0,
+        menus: on(&ini, MENUS_ENABLE),
         menus_widgets: rt::lower(&ini.string("Menus", "Generic").unwrap_or_default()).trim() == "widgets",
         menus_specs: ini.int("Menus", "Specs", 1) != 0,
         menus_escape: ini.int("Menus", "EscapeReturns", 1) != 0,
         menus_trace: ini.int("Menus", "Trace", 0) != 0,
         menus_host: ini.int("Menus", "Host", 1) != 0,
-        menus_scene: ini.int("Menus", "Scene", 1) != 0,
-        credits: ini.int("Menus", "Credits", 1) != 0,
-        loading: ini.int("Loading", "Enable", 1) != 0,
+        menus_scene: on(&ini, MENUS_SCENE),
+        credits: on(&ini, MENUS_CREDITS),
+        loading: on(&ini, LOADING_ENABLE),
         loading_hold: ini.float("Loading", "Hold", 0.0).clamp(0.0, 600.0),
     }
 }
 
-static mut CONFIG: Option<Config> = None;
+/// The configuration in force: swapped whole by `reload`, so a reader never sees half of
+/// it. A replaced one is leaked (a few hundred bytes, once per settings change), which
+/// keeps `get()`'s `&'static` honest.
+static CONFIG: AtomicPtr<Config> = AtomicPtr::new(core::ptr::null_mut());
 
 pub fn set(c: Config) {
-    unsafe { CONFIG = Some(c) };
+    let new = alloc::boxed::Box::into_raw(alloc::boxed::Box::new(c));
+    CONFIG.store(new, Ordering::Release);
 }
 
 /// The configuration, None before it is read or with `Enable=0`.
-#[allow(static_mut_refs)]
 pub fn try_get() -> Option<&'static Config> {
-    unsafe { CONFIG.as_ref() }
+    unsafe { CONFIG.load(Ordering::Acquire).as_ref() }
 }
 
-#[allow(static_mut_refs)]
 pub fn get() -> &'static Config {
-    unsafe { CONFIG.as_ref() }.expect("config read at startup")
+    try_get().expect("config read at startup")
+}
+
+/// `UI_SettingsChanged`'s part: reads UI.ini and the overlay again and swaps in a
+/// configuration that takes the keys read every frame from the new read and keeps the
+/// rest as the start made it (a key a patch was installed for stays as installed: it is
+/// a restart row).
+pub fn reload() {
+    let Some(old) = try_get() else { return };
+    let new = load();
+    let mut c = old.clone();
+    c.scale = new.scale;
+    c.cursor = new.cursor;
+    c.cursor_size = new.cursor_size;
+    c.theme = new.theme;
+    c.menus_scene = new.menus_scene;
+    let (h, n) = (&mut c.hud, &new.hud);
+    h.minimap = n.minimap;
+    h.minimap_size = n.minimap_size;
+    h.info = n.info;
+    h.info_camera = n.info_camera;
+    h.info_scale = n.info_scale;
+    h.icons = n.icons;
+    h.bar_keys = n.bar_keys;
+    h.bar_labels = n.bar_labels;
+    h.selection_gauges = n.selection_gauges;
+    h.tooltips = n.tooltips;
+    h.unit_view_size = n.unit_view_size;
+    h.system_icons = n.system_icons;
+    h.shot_scenes = n.shot_scenes;
+    h.minimap_cursor = n.minimap_cursor;
+    h.placement = n.placement;
+    h.layout_log = n.layout_log;
+    set(c);
+}
+
+// ---- the settings hub (tools/settings/README.md, contract C5) ---------------------------
+
+/// Each row's value as of the last read, to say what a change applied.
+static mut LAST: alloc::vec::Vec<alloc::string::String> = alloc::vec::Vec::new();
+
+fn read_rows() -> alloc::vec::Vec<alloc::string::String> {
+    SETTINGS.iter().map(|r| value(&crate::rt::settings::ini(r), r)).collect()
+}
+
+/// The values at the start, the baseline for the first `UI_SettingsChanged`.
+#[allow(static_mut_refs)]
+pub fn remember() {
+    unsafe { LAST = read_rows() };
+}
+
+/// Called by the hub on the game thread after `RefitPlayer.ini` changed: reads the keys
+/// again, swaps the configuration (`reload`) and switches the panels that can change
+/// while playing (`hud::apply_live`). The rows read every frame take the new value at
+/// the next frame; a restart row is not applied again.
+#[unsafe(no_mangle)]
+#[allow(static_mut_refs)]
+pub extern "C" fn UI_SettingsChanged() {
+    rt::ini_refresh_all();
+    if try_get().is_none() {
+        return;
+    }
+    let now = read_rows();
+    let mut applied = alloc::string::String::new();
+    let mut latched = alloc::string::String::new();
+    let mut bar_hidden = false;
+    for (i, r) in SETTINGS.iter().enumerate() {
+        if unsafe { LAST.get(i) } == Some(&now[i]) {
+            continue;
+        }
+        if core::ptr::eq(r, HUD_BARHIDDEN) {
+            bar_hidden = true;
+        }
+        let list = if r.apply == crate::rt::settings::APPLY_LIVE { &mut applied } else { &mut latched };
+        if !list.is_empty() {
+            list.push_str(", ");
+        }
+        list.push_str(&rt::sfmt!("{}.{}={}", r.section(), r.key(), now[i]));
+    }
+    unsafe { LAST = now };
+    reload();
+    crate::hud::apply_live(&get().hud);
+    if bar_hidden {
+        crate::hud::bar_pref_changed();
+    }
+    if applied.is_empty() && latched.is_empty() {
+        crate::log!("settings: re-read, nothing changed");
+    } else {
+        if !applied.is_empty() {
+            crate::log!("settings: applied {}", applied);
+        }
+        if !latched.is_empty() {
+            crate::log!("settings: {} (next mission or restart)", latched);
+        }
+    }
 }
