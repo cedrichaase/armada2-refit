@@ -12,9 +12,11 @@ Timeout: 10 min
 in `RefitPlayer.ini` (`[QOL.QOL]`, written here by `a2test drive overlay`) applies at
 once: UI.asi's settings hub sees the overlay change, calls `QOL_SettingsChanged`, and
 QOL.log says `settings: applied QOL.<Key>=<value>`. Checked by those lines and by what
-the groups hold. `MaxSelection` is `restart` and is not flipped. The overlay steps need
-`a2test drive overlay` (testbench 3.80.0); a step is `Overlay "<Section:Key=value>"`
-or `Overlay unset "<Section:Key>"` and is handed to the agent that drives the game.
+the groups hold. `MaxSelection` is `restart` and is not flipped. An `Overlay "<Section:Key=value>"`
+step is `./a2test drive --session ID overlay <Section:Key=value>` (`--unset` for `Overlay
+unset`): the scenario grammar has no step of its own for it yet, so the agent that
+takes such a step runs that command. Verified by hand with the same commands on
+2026-11-02 (all `PASS`).
 
 1. Launch the game.
 2. Wait up to 50 seconds for the logs the next steps expect.
