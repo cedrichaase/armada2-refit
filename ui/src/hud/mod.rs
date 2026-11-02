@@ -46,21 +46,29 @@ pub fn selection_ours() -> bool {
 }
 
 /// Patches what the panels switched on in UI.ini need; each stands down on its own.
+/// Why the HUD stood down at the start, for `UI_SettingsNote`: 0 it runs, 1 `Enable=0`,
+/// 2 no panel on, 3 an engine function not stock, 4 the hook could not be installed.
+pub static mut STOOD_DOWN: u8 = 0;
+
 pub fn install() -> bool {
     let cfg = &crate::config::get().hud;
     if !cfg.enable {
         crate::log!("hud: Enable=0, the HUD is stock");
+        unsafe { STOOD_DOWN = 1 };
         return false;
     }
     if !cfg.bar && !cfg.info && !cfg.minimap && !cfg.selection && !cfg.unit_view && !cfg.tooltips && !panels::any(cfg) && !comm::any(cfg) {
         crate::log!("hud: no panel switched on, the HUD is stock");
+        unsafe { STOOD_DOWN = 2 };
         return false;
     }
     if !hud::functions_stock() || !engine::sound::functions_stock() || !engine::msvc::available() {
         crate::log!("hud: an engine function is not stock, the HUD stays stock");
+        unsafe { STOOD_DOWN = 3 };
         return false;
     }
     if !hud::install() {
+        unsafe { STOOD_DOWN = 4 };
         return false;
     }
     map_panels(cfg);

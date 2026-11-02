@@ -154,6 +154,22 @@ pub fn is_single_player() -> bool {
     transport_flag(VT_IS_SINGLE_PLAYER).unwrap_or(true)
 }
 
+/// Whether the game being played (or set up) is a network game: false for a campaign
+/// mission and for Instant Action (whose transport also answers "not single player", so
+/// it is asked first), true for a network transport. None when the transport or one of
+/// the getters cannot be read (no `g_transport`, or a function not stock): the caller
+/// then treats it as the stricter answer. Used by the Refit screen to lock the settings
+/// every player must share (`ui/README.md`, "The Refit screen").
+pub fn network_game() -> Option<bool> {
+    if transport() == 0 || !ok() {
+        return None;
+    }
+    if transport_flag(VT_IS_INSTANT_ACTION)? {
+        return Some(false);
+    }
+    Some(!transport_flag(VT_IS_SINGLE_PLAYER)?)
+}
+
 /// An instant-action race index's race name (`federation`), None for "random" (not
 /// dealt yet) or an index with no race.
 fn race_name_of(index: usize) -> Option<&'static str> {

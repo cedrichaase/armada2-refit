@@ -643,6 +643,22 @@ writes, so a reinstall keeps it: `[UI.HUD] BarHidden` (Game Settings' "Command B
 directory is read overlay first; `settings.rs` is the settings hub, which finds each
 plugin's `<Plugin>_Settings` table and tells the plugins when the overlay changes.
 
+### The Refit screen and `network_game()`
+
+The Refit screen (`menus/refit.rs`, `MENUS.md`) is drawn by the menu host. It needs one
+finding of the engine, in `engine/setup.rs`: `network_game()` says whether a mission is a
+network game, by `g_transport`'s virtual `IsSinglePlayer` (vtable +0x18) and
+`IsInstantAction` (+0x10), both called only after that file's signature checks have
+passed. Instant Action's transport answers "not single player" too, as a network one
+does, so it is asked first and answers false. No transport, or a getter that is not stock,
+gives None, and the screen locks the must-match rows to be safe. The hub
+(`settings.rs`) keeps each row's value at its start and at the start of the current
+mission (the first mission frame after the shell or a loading screen) for the "pending"
+badges, finds the optional `<Plugin>_SettingsNote` next to `_SettingsChanged`, and
+writes nothing but through `set_row` / `remove_many`. `UI_SettingsNote` gives the HUD
+rows a note while the HUD stood down (`hud::STOOD_DOWN`) and the bar rows one while
+GridLayout.asi owns the bar.
+
 ### Settings
 
 `settings.toml` is the table of the keys a player may set (19 rows, tab Interface),

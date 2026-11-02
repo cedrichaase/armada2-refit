@@ -1083,6 +1083,13 @@ fn pump(top: HWND) -> Option<i32> {
                 }
                 continue;
             }
+            // A modal of ours (the Refit screen) has the keyboard: an Esc that arrives as a
+            // system key (no window holds the focus) is its, noted as the plain key it is,
+            // and is not Return to Game.
+            if m.message == WM_SYSKEYDOWN && m.wparam as u8 == VK_ESCAPE && m.lparam & (1 << 29) == 0 && m.lparam & (1 << 30) == 0 && crate::menus::wants_keys() {
+                crate::input::note_message(WM_KEYDOWN, m.wparam);
+                continue;
+            }
             if escape(&m, top, cfg.menus_escape) {
                 continue;
             }

@@ -24,7 +24,7 @@ pub enum Context {
 /// without a Direct3D 9 device behind the game's (DXVK's own d3d8, GOG's d3d8to9).
 pub fn frame(ctx: Context) {
     // The settings hub: its tables at the first frame, the overlay's stamp once a second.
-    crate::settings::frame();
+    crate::settings::frame(ctx);
     crate::gfx::frame(|w, h, draw| {
         crate::input::poll(w, h);
         if ctx == Context::Mission {
