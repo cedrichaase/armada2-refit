@@ -5,6 +5,25 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.51.5 — 2026-11-02
+
+Layers: display 0.15.4, render3d 0.33.3, ui 0.28.3 (`gpu` 1.2.2).
+
+### Fixed
+- Vulkan and Direct3D 12 (Display8 in stub mode): a frame that cannot be presented is
+  ended unshown and reported as a dropped frame, not a lost device (the plugins no
+  longer rebuild everything over it). One routine ends a frame for both outcomes: a
+  failed `vkEndCommandBuffer` or `vkQueueSubmit` no longer leaves the slot's fence
+  unsignalled, and the pipeline cache is saved on an abandoned frame too.
+- Direct3D 12: the present pass's upload and descriptors are taken before anything is
+  recorded, and a frame that cannot get them is ended unshown (`Dx12::abandon`), as on
+  Vulkan, instead of staying open for ever.
+- Vulkan: Display8's descriptor pool takes 4096 texture sets a frame, not 2048; gpu
+  stops asking a pool it found spent, and grows its chain only on a spent or fragmented
+  pool, not on a lost device or out of memory.
+
+Installed, not yet seen in game.
+
 ## 13.51.4 — 2026-10-30
 
 Layers: display 0.15.3, render3d 0.33.2, ui 0.28.2 (`gpu` 1.2.1).

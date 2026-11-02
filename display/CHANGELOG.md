@@ -4,6 +4,24 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.15.4 — 2026-11-02
+
+### Fixed
+- An abandoned frame returns true (the frame is dropped, the device is fine): it was
+  `D3DERR_DEVICELOST`, and the stub's `Reset` rebuilt every plugin over one skipped frame.
+- Vulkan: `Vk::end_frame` ends a frame for `present` and `abandon` alike. A failed
+  `vkEndCommandBuffer` leaves the fence alone and submits nothing; a failed
+  `vkQueueSubmit` gives the slot a fresh signalled fence (`begin` waits on it for ever);
+  `abandon` saves the pipeline cache every `cache::EVERY` frames as `present` does.
+- Vulkan: the frame pool's `COMBINED_IMAGE_SAMPLER` count is 65536, so its 16384 sets
+  cover 4096 of gpu's 16-sampler texture sets (it was 2048).
+- Direct3D 12: the present pass's upload ring and descriptors come before the barriers,
+  and a frame that cannot get them is ended unshown (`Dx12::abandon`, logged as
+  `d3d12: frame N not presented (...)`), where it stayed open and froze every later frame.
+- Built on `gpu` 1.2.2.
+
+Installed, not yet seen in game.
+
 ## 0.15.3 — 2026-10-30
 
 ### Fixed

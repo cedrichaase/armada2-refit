@@ -749,7 +749,7 @@ impl Vk {
         let sizes = [
             vk::DescriptorPoolSize { ty: vk::DescriptorType::UNIFORM_BUFFER, descriptor_count: 16384 },
             vk::DescriptorPoolSize { ty: vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC, descriptor_count: 4096 },
-            vk::DescriptorPoolSize { ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER, descriptor_count: 32768 },
+            vk::DescriptorPoolSize { ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER, descriptor_count: 65536 }, // 16 per gpu texture set (SLOTS bindings): 4096 sets; past that gpu's own chain takes over
         ];
         let dpool = unsafe { self.dev.create_descriptor_pool(&vk::DescriptorPoolCreateInfo::default().max_sets(16384).pool_sizes(&sizes), None) }
             .map_err(|_| "descriptor pool")?;
@@ -1144,28 +1144,72 @@ impl Vk {
         }
         self.barrier(color, vk::ImageAspectFlags::COLOR, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
         let done = self.sc_done[image as usize];
-        let fence = self.slots[s].fence;
-        unsafe {
-            let _ = self.dev.end_command_buffer(cmd);
-            let _ = self.dev.reset_fences(&[fence]);
-            let waits = [acquired];
-            let stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
-            let cmds = [cmd];
-            let signals = [done];
-            let submit = [vk::SubmitInfo::default().wait_semaphores(&waits).wait_dst_stage_mask(&stages).command_buffers(&cmds).signal_semaphores(&signals)];
-            if self.dev.queue_submit(self.queue, &submit, fence).is_err() {
-                log!("vulkan: vkQueueSubmit failed");
-            }
+        let submitted = self.end_frame(Some((acquired, done)));
+        if submitted {
             let scs = [self.swapchain];
             let idx = [image];
+            let signals = [done];
             let pi = vk::PresentInfoKHR::default().wait_semaphores(&signals).swapchains(&scs).image_indices(&idx);
-            match self.swap_fn.queue_present(self.queue, &pi) {
+            match unsafe { self.swap_fn.queue_present(self.queue, &pi) } {
                 Ok(false) => {}
-                Ok(true) | Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+                Ok(true) | Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => unsafe {
                     let _ = self.dev.device_wait_idle();
                     let _ = self.make_swapchain();
-                }
+                },
                 Err(e) => log!("vulkan: vkQueuePresentKHR: {:?}", e),
+            }
+        }
+        true
+    }
+
+    /// Ends a frame that cannot reach the swap chain: its commands are submitted with no
+    /// semaphore (no image was acquired), so its fence signals, and the next frame begins
+    /// on the next slot with its pools reset. The frame is lost, the device is fine, so
+    /// this returns true: the game goes on drawing.
+    fn abandon(&mut self, why: &str) -> bool {
+        let n = ABANDONED.fetch_add(1, Ordering::Relaxed) + 1;
+        if n <= 8 || n % 600 == 0 {
+            log!("vulkan: frame {} not presented ({}); {} so far", self.index, why, n);
+        }
+        self.end_frame(None);
+        true
+    }
+
+    /// Ends the frame recorded in the slot and moves on to the next: closes the command
+    /// buffer and submits it (waiting on and signalling `sems` = (acquired, done) when
+    /// the frame is to be shown). `begin` waits on the slot's fence for ever, so the
+    /// fence is reset only when a submit is about to follow, and a failed submit gives
+    /// the slot a fresh signalled one. Returns whether the frame was submitted.
+    fn end_frame(&mut self, sems: Option<(vk::Semaphore, vk::Semaphore)>) -> bool {
+        let s = &self.slots[self.slot];
+        let (cmd, fence) = (s.cmd, s.fence);
+        let mut submitted = false;
+        unsafe {
+            if self.dev.end_command_buffer(cmd).is_err() {
+                log!("vulkan: vkEndCommandBuffer failed");
+            } else {
+                let _ = self.dev.reset_fences(&[fence]);
+                let cmds = [cmd];
+                let (waits, stages, signals);
+                let mut submit = vk::SubmitInfo::default().command_buffers(&cmds);
+                if let Some((acquired, done)) = sems {
+                    waits = [acquired];
+                    stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
+                    signals = [done];
+                    submit = submit.wait_semaphores(&waits).wait_dst_stage_mask(&stages).signal_semaphores(&signals);
+                }
+                match self.dev.queue_submit(self.queue, &[submit], fence) {
+                    Ok(()) => submitted = true,
+                    Err(e) => {
+                        log!("vulkan: vkQueueSubmit failed ({:?})", e);
+                        // The fence was reset and nothing will signal it; the failed submit
+                        // left it unused, so a signalled one takes its place.
+                        if let Ok(f) = self.dev.create_fence(&vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED), None) {
+                            self.dev.destroy_fence(fence, None);
+                            self.slots[self.slot].fence = f;
+                        }
+                    }
+                }
             }
         }
         self.recording = false;
@@ -1174,32 +1218,7 @@ impl Vk {
         if self.index % cache::EVERY == 0 {
             self.cache_saved = cache::save(&self.dev, self.cache, self.cache_saved);
         }
-        true
-    }
-
-    /// Ends a frame that cannot reach the swap chain: its commands are submitted with no
-    /// semaphore (no image was acquired), so its fence signals, and the next frame begins
-    /// on the next slot with its pools reset. The frame is lost; the game goes on drawing.
-    fn abandon(&mut self, why: &str) -> bool {
-        let n = ABANDONED.fetch_add(1, Ordering::Relaxed) + 1;
-        if n <= 8 || n % 600 == 0 {
-            log!("vulkan: frame {} not presented ({}); {} so far", self.index, why, n);
-        }
-        let s = &self.slots[self.slot];
-        let (cmd, fence) = (s.cmd, s.fence);
-        unsafe {
-            let _ = self.dev.end_command_buffer(cmd);
-            let _ = self.dev.reset_fences(&[fence]);
-            let cmds = [cmd];
-            let submit = [vk::SubmitInfo::default().command_buffers(&cmds)];
-            if self.dev.queue_submit(self.queue, &submit, fence).is_err() {
-                log!("vulkan: vkQueueSubmit failed");
-            }
-        }
-        self.recording = false;
-        self.slot = (self.slot + 1) % SLOTS;
-        self.index += 1;
-        false
+        submitted
     }
 
     /// Submits what the frame has recorded and waits for it, then begins its command

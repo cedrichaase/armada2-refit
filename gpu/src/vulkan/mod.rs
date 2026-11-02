@@ -258,6 +258,9 @@ pub(crate) struct State {
     pub depth_pipes: Vec<((bool, vk::Format), vk::Pipeline)>,
     pub depth_mods: Option<(vk::ShaderModule, vk::ShaderModule, vk::ShaderModule)>,
     pub told: u32,
+    /// The frame (`frame.index`) in which Display8's pool was found spent: its texture
+    /// sets go straight to the chain from then on, without asking the pool again.
+    dpool_spent: u64,
 }
 
 /// The backend's state for one plugin (as `d3d9::Gpu`): made at the first use once
@@ -476,6 +479,7 @@ impl Gpu {
             ubo,
             frame: VkFrame8::default(),
             has_frame: false,
+            dpool_spent: u64::MAX,
             open: None,
             pass: None,
             externals: Vec::new(),
@@ -915,12 +919,17 @@ impl Gpu {
     /// spent from the backend's own chain for the frame slot (`chain_set`).
     pub(crate) fn texture_set(&self) -> Option<vk::DescriptorSet> {
         let sh = self.sh()?;
-        let (pool, layout) = self.with(|s| (vk::Handle::from_raw(s.frame.descriptor_pool), s.set1))?;
+        let (pool, layout, spent) = self.with(|s| (vk::Handle::from_raw(s.frame.descriptor_pool), s.set1, s.dpool_spent == s.frame.index))?;
         let layouts = [layout];
-        if let Ok(v) = unsafe { sh.dev.allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo::default().descriptor_pool(pool).set_layouts(&layouts)) } {
-            return Some(v[0]);
+        if !spent {
+            match unsafe { sh.dev.allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo::default().descriptor_pool(pool).set_layouts(&layouts)) } {
+                Ok(v) => return Some(v[0]),
+                Err(e) => {
+                    self.with(|s| s.dpool_spent = s.frame.index);
+                    self.once(1 << 21, format_args!("gpu: Vulkan: the frame's descriptor pool is spent ({:?}); texture sets come from pools of gpu's own", e));
+                }
+            }
         }
-        self.once(1 << 21, format_args!("gpu: Vulkan: the frame's descriptor pool is spent; texture sets come from pools of gpu's own"));
         let r = self.chain_set(false, layout);
         if r.is_none() {
             self.once(1 << 27, format_args!("gpu: Vulkan: the texture sets' pools are spent too ({} a frame); draws are dropped", CHAIN_MAX));
@@ -976,7 +985,9 @@ impl Gpu {
                 let pool = c.pools[c.at];
                 match unsafe { sh.dev.allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo::default().descriptor_pool(pool).set_layouts(&layouts)) } {
                     Ok(v) => return Some(v[0]),
-                    Err(_) => c.at += 1,
+                    Err(vk::Result::ERROR_OUT_OF_POOL_MEMORY | vk::Result::ERROR_FRAGMENTED_POOL) => c.at += 1,
+                    // Anything else (a lost device, no memory) is not a spent pool.
+                    Err(_) => return None,
                 }
             }
             None
