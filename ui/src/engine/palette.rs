@@ -241,6 +241,11 @@ static mut STOCK_KEYS_OFF: bool = false;
 static mut ON_KEYS: Option<fn(usize)> = None;
 static ZERO: i32 = 0;
 
+/// The bar's keys are the grid's (`stock_keys_off`) or the engine's, from now on.
+pub fn set_stock_keys_off(on: bool) {
+    unsafe { STOCK_KEYS_OFF = on };
+}
+
 /// Wraps the bar's keyboard step: with `stock_keys_off`, stock's bar keys do nothing
 /// (the three hotkey tables are emptied for the stock call and put back, and the six
 /// menu toggles point at a zero), and `on_keys` runs after it, on the game's thread in

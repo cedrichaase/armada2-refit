@@ -29,6 +29,7 @@ pub mod menus;
 pub mod movie;
 pub mod prefs;
 pub mod settings;
+mod settings_table;
 #[rustfmt::skip]
 pub mod shaders;
 pub mod style;
@@ -59,6 +60,7 @@ fn startup() {
         return;
     }
     config::set(cfg);
+    config::remember();
     // With Display8 (contract 1.1) the parts' claims route its passthrough: registered
     // before any part is patched (README.md, "Claims").
     claims::register();
