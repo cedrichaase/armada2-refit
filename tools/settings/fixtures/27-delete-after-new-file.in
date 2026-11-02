@@ -1,0 +1,5 @@
+; RefitPlayer.ini: your choices from the Refit screen, written by UI.asi. Installers never touch it.
+; Delete a line to go back to the shipped setting.
+
+[UI.HUD]
+BarHidden=1

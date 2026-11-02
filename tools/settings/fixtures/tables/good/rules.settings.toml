@@ -1,0 +1,15 @@
+plugin = "GoodRules"
+file = "GoodRules.ini"
+shipped = "tools/settings/fixtures/tables/good/GoodRules.ini"
+
+[[row]]
+name = "rules_payonqueue"
+section = "Rules"
+key = "PayOnQueue"
+kind = "bool"
+default = "1"
+apply = "mission"
+scope = "match"
+tab = "multiplayer"
+label = "Pay on queue"
+help = "Every player must have the same."

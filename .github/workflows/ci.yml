@@ -89,6 +89,23 @@ jobs:
         run: CARGO="$(command -v cargo)" display/build.sh
       - name: a2fmt on the host
         run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path crates/a2fmt/Cargo.toml
+      - name: a2ini on the host (the overlay's edit against tools/settings/fixtures)
+        run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path crates/a2ini/Cargo.toml
+
+  # The settings descriptors (tools/settings/README.md): overlay.py, gen.py and lint.py
+  # against their fixtures, every generated table and the row's definition in a2rt and
+  # csdk/a2asi.h up to date with the schema, and every settings.toml against its shipped
+  # ini and its layer's sources.
+  settings:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: The settings tools against their fixtures (tools/settings/selftest.sh)
+        run: tools/settings/selftest.sh
+      - name: Generated files up to date (tools/settings/gen.py --check)
+        run: python3 tools/settings/gen.py --check
+      - name: The settings tables (tools/settings/lint.py)
+        run: python3 tools/settings/lint.py
 
   # Every generated shader file rebuilt from its HLSL with the pinned compilers, and a
   # difference from the committed file (or its stamp) fails the job: d3dbc by vkd3d-compiler

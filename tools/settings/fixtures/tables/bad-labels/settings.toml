@@ -1,0 +1,18 @@
+plugin = "Good"
+file = "Good.ini"
+shipped = "tools/settings/fixtures/tables/bad-labels/Good.ini"
+
+[[row]]
+name = "good_mode"
+section = "Good"
+key = "Mode"
+kind = "enum"
+default = "4"
+values = ["0", "2", "4", "8"]
+labels = ["Off", "2x", "4x"]
+apply = "restart"
+scope = "local"
+tab = "graphics"
+label = "Mode"
+help = "How many."
+flags = ["advanced"]

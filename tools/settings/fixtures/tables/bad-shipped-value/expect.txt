@@ -1,0 +1,1 @@
+has Mode=4, the table says 2

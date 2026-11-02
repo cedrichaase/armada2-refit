@@ -400,8 +400,8 @@ the bar's track, a combo choice is below. **Every word is the stock control's ow
 - **Game Settings' "Command Bar"** is the one row of ours on a stock settings screen
   (`form::draw_with`, `form::Own`): the button bar shown or hidden, the toggle that was
   the top-right palette button in a mission (HUD.md, "The top-right buttons"). It is a
-  setting of the UI's, not the game's, so it is kept in `UIPlayer.ini` (`prefs.rs`)
-  and its words are ours; a click plays the shell's click sound (`cornrclk.wav`).
+  setting of the UI's, not the game's, so it is kept in the player's overlay,
+  `RefitPlayer.ini` (`[UI.HUD] BarHidden`, `prefs.rs`), and its words are ours; a click plays the shell's click sound (`cornrclk.wav`).
 - **Options**: the stock buttons in the order they stand on the stock screen (y, then
   x), in one column; the one at the foot (Previous Menu, Return to Game: a button in the
   bottom-left corner, `common::is_footer`) is the window's footer. In a mission there

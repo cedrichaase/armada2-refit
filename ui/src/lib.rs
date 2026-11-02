@@ -28,6 +28,7 @@ pub mod math;
 pub mod menus;
 pub mod movie;
 pub mod prefs;
+pub mod settings;
 #[rustfmt::skip]
 pub mod shaders;
 pub mod style;

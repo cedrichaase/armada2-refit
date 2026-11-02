@@ -5,6 +5,20 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.79.0 — 2026-11-02
+
+### Added
+- Scenario `ui-settings-migrate`: an old `UIPlayer.ini` with `BarHidden=1` is migrated
+  into `RefitPlayer.ini` at the first frame, renamed `.migrated`, and the bar stays
+  hidden in the first Federation mission. Overlay keys for any scenario's `Setup:`
+  come from `tools/settings/bench-overlay.sh` (`Render3D.Modules:sky=0`).
+
+### Changed
+- `ui-hud-bar-after-cinematic` and `operating/menus-host.md` name `RefitPlayer.ini`'s
+  `[UI.HUD] BarHidden` in place of `UIPlayer.ini`.
+
+Installed, not yet seen in game.
+
 ## 3.78.3 — 2026-10-30
 
 ### Added

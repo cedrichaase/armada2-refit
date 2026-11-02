@@ -4,6 +4,16 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.16.0 — 2026-11-02
+
+### Added
+- `Display8.ini`'s keys may now come from the player's overlay, `RefitPlayer.ini`
+  (`[Display8.<Section>]`, read first; the a2rt overlay lookup,
+  `tools/settings/README.md`), with a `settings: RefitPlayer.ini [...]` line in
+  Display8.log for each value it supplies. Without the file nothing changes.
+
+Installed, not yet seen in game.
+
 ## 0.15.2 — 2026-10-30
 
 ### Fixed

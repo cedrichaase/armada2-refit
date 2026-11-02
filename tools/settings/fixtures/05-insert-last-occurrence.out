@@ -1,0 +1,12 @@
+[A.B]
+x=1
+
+[C.D]
+z=1
+[A.B]
+y=2
+k=v
+; trailing comment
+
+[E.F]
+w=1

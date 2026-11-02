@@ -42,6 +42,7 @@ render3d/target/
 render3d/build/
 crates/a2fmt/target/
 crates/a2rt/target/
+crates/a2ini/target/
 
 # display: cargo's build output
 display/target/

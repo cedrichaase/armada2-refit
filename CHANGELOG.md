@@ -5,6 +5,28 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.52.0 — 2026-11-02
+
+Layers: display 0.16.0, render3d 0.34.0, ui 0.29.0, testbench 3.79.0.
+
+### Added
+- The settings contracts in code (ROADMAP.md Phase 5, A2SET_ABI 1.0,
+  `tools/settings/README.md`): the player's overlay `RefitPlayer.ini` in the game
+  directory, read in front of every ini there by `a2rt::Ini` (Display8, Render3D.asi,
+  UI.asi) and by the new `a2_ini_*` / `a2_set_*` helpers of `csdk/a2asi.h`, with a
+  `settings: RefitPlayer.ini [...]` log line for each value it supplies.
+- `crates/a2ini`: the ini parser (moved out of `a2rt`) and `edit`, the overlay's
+  line-keeping writer, `no_std` and host-tested on `tools/settings/fixtures/`.
+- `tools/settings/`: `gen.py` (the descriptor row's schema; writes the row's definition
+  into `crates/a2rt/src/settings.rs` and `csdk/a2asi.h` and each layer's
+  `settings_table.rs` / `.h` from its `settings.toml`), `lint.py`, `overlay.py` (the
+  same edit for the bench and the GUI installer), `selftest.sh` and
+  `bench-overlay.sh`; no layer has a table yet.
+- CI: `cargo test` of a2ini, and a `settings` job (`selftest.sh`, `gen.py --check`,
+  `lint.py`).
+
+Installed, not yet seen in game.
+
 ## 13.51.3 — 2026-10-30
 
 Layers: testbench 3.78.3.

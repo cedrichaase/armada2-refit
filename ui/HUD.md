@@ -812,8 +812,9 @@ which works whether "show more" is set or not, so the menu button always shows.
 player saw do nothing; the palette toggle is Game Settings' "Command Bar" (MENUS.md,
 "The Options family"), and with both gone "more" uncovered only the menu button.
 
-**The bar's shown or hidden state is the player's** (`prefs.rs`, `UIPlayer.ini`'s
-`[HUD] BarHidden`, written by Game Settings): at the first mission frame in which the
+**The bar's shown or hidden state is the player's** (`prefs.rs`, `RefitPlayer.ini`'s
+`[UI.HUD] BarHidden`, written by Game Settings through the overlay's writer,
+`tools/settings/README.md`): at the first mission frame in which the
 HUD shows and the bar is in the view's render list, and at the next one after the
 setting changes, `hud::apply_bar_pref` compares the palette mode
 (`PopupPaletteImp+0x110`) with it and, when they differ, queues a press of the stock
@@ -825,9 +826,11 @@ draws: "hidden" is mode 0. **Never compare the component's hidden flag** (`+0x16
 reasons too (on the bench it was set with the mode at 0 under the first Federation
 mission's opening cinematic); compared, a "Shown" pressed the toggle with the bar
 already up and took it away for the mission (ui 0.13.3,
-`testbench/scenarios/ui-hud-bar-after-cinematic.md`). `UIPlayer.ini` is the player's
+`testbench/scenarios/ui-hud-bar-after-cinematic.md`). `RefitPlayer.ini` is the player's
 file: no install ships or writes it, so a reinstall (which writes `UI.ini`) keeps the
-choice.
+choice. Until ui 0.29.0 the key was `[HUD] BarHidden` of `UIPlayer.ini`; the settings
+hub carries a non-zero one over once and renames the old file `UIPlayer.ini.migrated`
+(`testbench/scenarios/ui-settings-migrate.md`).
 
 ### Messages and objectives (`MessageDisplay`, `ObjectivesDisplay`)
 

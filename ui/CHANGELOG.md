@@ -4,6 +4,26 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.29.0 — 2026-11-02
+
+### Added
+- `UI.ini`'s keys may now come from the player's overlay, `RefitPlayer.ini`
+  (`[UI.<Section>]`, read first; the a2rt overlay lookup, `tools/settings/README.md`),
+  with a `settings: RefitPlayer.ini [...]` line in UI.log for each value it supplies.
+- The settings hub (`src/settings.rs`): at the first frame it finds every loaded
+  plugin's `<Plugin>_Settings` table and `_SettingsChanged` by export name (UI.log
+  `settings: <Export> in <module>, N rows` / `settings: no <Export>`); once a second it
+  looks at the overlay and tells the plugins when it changed
+  (`settings: RefitPlayer.ini changed; told ...`).
+
+### Changed
+- Game Settings' "Command Bar" is kept in the overlay as `[UI.HUD] BarHidden`, written
+  by `a2rt::overlay` (no more `WritePrivateProfileString`); Shown removes the key. An
+  existing `UIPlayer.ini` is migrated once: a non-zero `[HUD] BarHidden` is carried
+  over and the file is renamed `UIPlayer.ini.migrated`.
+
+Installed, not yet seen in game.
+
 ## 0.28.1 — 2026-10-30
 
 ### Changed

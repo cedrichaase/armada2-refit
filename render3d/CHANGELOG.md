@@ -4,6 +4,17 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.34.0 — 2026-11-02
+
+### Added
+- `Render3D.ini`'s keys may now come from the player's overlay, `RefitPlayer.ini`
+  (`[Render3D.<Section>]`, e.g. `[Render3D.Modules] sky=0`, read first; the a2rt
+  overlay lookup, `tools/settings/README.md`), with a `settings: RefitPlayer.ini [...]`
+  line in Render3D.log for each value it supplies. Read at load as the ini is; applied
+  live from 0.35.0. Without the file nothing changes.
+
+Installed, not yet seen in game.
+
 ## 0.33.1 — 2026-10-30
 
 ### Changed

@@ -1,0 +1,5 @@
+[A.B]
+k=v
+; only a comment
+[C.D]
+z=1

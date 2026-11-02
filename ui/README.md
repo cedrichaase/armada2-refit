@@ -636,9 +636,12 @@ is checked to be stock. `UI.log`: "cursor: the engine's cursor is kept square".
 | `[Menus] Scene` | 1 | the front end's screens over render3d's 3D scene (`MENUS.md`, "The menu scene"); without Render3D.asi, as before |
 | `[Menus] Credits` | 1 | the Credits are ours, over the menu scene (`MENUS.md`, "The Credits"); 0: the game's |
 
-What the player sets on a screen of ours is not in `UI.ini` but in `UIPlayer.ini` beside
-it (`prefs.rs`), a file no install ships or writes, so a reinstall keeps it: `[HUD]
-BarHidden` (Game Settings' "Command Bar", `HUD.md`, "The top-right buttons").
+What the player sets on a screen of ours is not in `UI.ini` but in the player's overlay,
+`RefitPlayer.ini` beside it (`tools/settings/README.md`), a file no install ships or
+writes, so a reinstall keeps it: `[UI.HUD] BarHidden` (Game Settings' "Command Bar",
+`prefs.rs`, `HUD.md`, "The top-right buttons"). Every key of every ini in the game
+directory is read overlay first; `settings.rs` is the settings hub, which finds each
+plugin's `<Plugin>_Settings` table and tells the plugins when the overlay changes.
 | `[Menus] Trace` | 0 | UI.log: each hosted dialog's messages of note, its actions, and its surfaces as `UI-dlg<depth>-*.bmp` every 5 s |
 | `[Menus] Host` | 1 | 0 (with `Trace=1`): the dialogs run stock and are only traced, for comparing |
 | `[Loading] Enable` | 1 | the loading screen of ours (`LOADING.md`) in place of the engine's logo scene and bar |
