@@ -49,7 +49,7 @@ import urllib.error
 import urllib.request
 import zipfile
 
-INSTALLER_VERSION = '2.3.0'
+INSTALLER_VERSION = '2.4.0'
 SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, ::step and ::error lines
 REPO = 'cedrichaase/armada2-refit'
 API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'
@@ -1079,6 +1079,35 @@ def log_folders(game, g=None, prefix_roots=()):
     return seen
 
 
+def overlay_files(game):
+    """Where the player's settings file RefitPlayer.ini can be: the game folder and, on
+    Windows, where a game under Program Files has it redirected, `%LOCALAPPDATA%\\VirtualStore`
+    + the game folder without its drive (the game does not notice the redirect)."""
+    out = [('the game folder', os.path.join(game, 'RefitPlayer.ini'))]
+    if SYSTEM == 'windows':
+        base = os.environ.get('LOCALAPPDATA') or os.path.join(HOME, 'AppData', 'Local')
+        rest = os.path.splitdrive(os.path.abspath(game))[1].lstrip('\\/')
+        out.append(('VirtualStore', os.path.join(base, 'VirtualStore', rest, 'RefitPlayer.ini')))
+    return out
+
+
+def overlay_report(game):
+    """The report's lines for RefitPlayer.ini: each copy found, with its key lines (the
+    sections and keys are setting names, nothing personal; comments and blanks are left
+    out). Installers never write the file, so what is here is the player's."""
+    lines = []
+    for where, path in overlay_files(game):
+        if not os.path.isfile(path):
+            continue
+        keys = [l.strip() for l in read_lines(path)
+                if l.strip() and not l.strip().startswith((';', '#'))]
+        lines.append(f'  {where} ({len(keys)} lines):')
+        lines.extend('    ' + l for l in keys[:80])
+        if len(keys) > 80:
+            lines.append(f'    ... {len(keys) - 80} more')
+    return lines
+
+
 def diagnose(game, error=None):
     """The bug report: what a player sends when the mod does not work. Everything that
     tells why from a distance, nothing of the game's own files but their hashes, and
@@ -1275,6 +1304,12 @@ def diagnose(game, error=None):
     wide = menus and any((bmp_size(os.path.join(p(menus), n)) or (0, 0))[0] > 800
                          for n in os.listdir(p(menus)) if n.lower().endswith('.bmp')) \
         if menus and os.path.isdir(p(menus)) else False
+
+    # ---- the player's settings
+    ov = overlay_report(game)
+    w('')
+    w('Player settings (RefitPlayer.ini):' + ('' if ov else ' none'))
+    out.extend(ov)
 
     # ---- the logs
     # %LOCALAPPDATA%\armada2-refit\logs first, the game folder (older builds, the plugins'
@@ -2350,6 +2385,19 @@ def selftest():
             gg = Game(mock, 'test')
             gg.prefix = WinePrefix(pre, 'Wine')
             check(log_folders(mock, gg)[0] == ld, 'report: a macOS bottle\'s logs folder is found')
+        # RefitPlayer.ini: its key lines are in the report (comments left out), and the report
+        # never writes it.
+        with open(os.path.join(mock, 'RefitPlayer.ini'), 'w') as f:
+            f.write('; mine\n[Render3D.Modules]\nhulls=0\n')
+        before = sha256(os.path.join(mock, 'RefitPlayer.ini'))
+        rep = diagnose(mock)
+        check('Player settings (RefitPlayer.ini):' in rep and 'hulls=0' in rep
+              and '[Render3D.Modules]' in rep and '; mine' not in rep
+              and sha256(os.path.join(mock, 'RefitPlayer.ini')) == before,
+              'report: RefitPlayer.ini\'s key lines are listed, the file untouched')
+        os.remove(os.path.join(mock, 'RefitPlayer.ini'))
+        check('Player settings (RefitPlayer.ini): none' in diagnose(mock),
+              'report: no RefitPlayer.ini is said')
         h = 'Display8 0.9.0 -- game dir C:\\g; mode stub; the real chain: d3d8_real.dll'
         d8b = display8_backend
         check('drew on vulkan' in d8b([h, 'Backend=auto: on Linux: vulkan, then d3d12, then d3d9',

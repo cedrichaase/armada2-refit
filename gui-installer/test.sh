@@ -34,6 +34,10 @@ echo "== finds the game through Heroic"
 "${run[@]}" --list > "$T/out" 2>/dev/null
 check 'grep -q "Heroic · GOG .*Heroic app 1174788223" "$T/out"'
 
+# The player's settings file: byte for byte what the player left, through every step.
+printf '; mine\r\n[Render3D.Modules]\r\nhulls=0\r\n[UI.HUD]\r\nBarHidden=1\r\n' > "$G/RefitPlayer.ini"
+cp "$G/RefitPlayer.ini" "$T/RefitPlayer.ref"
+
 echo "== an earlier install left the cutscene player in"
 cp "$G/binkw32.dll" "$G/binkw32.dll.a2neb-backup"; mv "$G/binkw32.dll" "$G/binkw32_orig.dll"
 echo BinkProxy > "$G/binkw32.dll"; echo x > "$G/BinkProxy.ini"
@@ -53,6 +57,8 @@ echo "== the bug report on what went in"
 check 'grep -q "Refit: $ver, installed" "$T/out" && grep -q "QOL.asi: .*\[as released\]" "$T/out"'
 check 'grep -q "env WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b" "$T/out" && grep -q "^Findings" "$T/out"'
 check '! grep -qF "$T" "$T/out"'
+check 'grep -q "^Player settings (RefitPlayer.ini):" "$T/out" && grep -q "hulls=0" "$T/out" && ! grep -q "; mine" "$T/out"'
+check 'cmp -s "$T/RefitPlayer.ref" "$G/RefitPlayer.ini"'   # install and report leave it
 
 echo "== a package file an antivirus took: the window's words, every file named"
 python3 - "$zip" "$T/av.zip" <<'PY'
@@ -147,5 +153,6 @@ echo "== uninstall: the game and Heroic as they were"
 check '[ ! -e "$G/HUD.asi" ] && [ ! -e "$G/winmm.dll" ] && [ ! -e "$G/armada2-refit-installed.json" ]'
 check '[ ! -e "$G/Online.asi" ] && [ ! -e "$G/QOL.asi" ]'
 check '[ "$(cat "$G/binkw32.dll")" = stockbink ]'
+check 'cmp -s "$T/RefitPlayer.ref" "$G/RefitPlayer.ini"'   # uninstall leaves it
 check 'python3 -c "import json,sys; a,b=(json.load(open(f)) for f in sys.argv[1:]); sys.exit(a!=b)" "$H/GamesConfig/1174788223.json" "$T/heroic-before.json"'
 echo "all passed"

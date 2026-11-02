@@ -57,6 +57,14 @@ $env:A2_PYTHON = $FakePy
 
 $G = Join-Path $T "Star Trek Armada II"; Mock $G
 function G([string]$n) { Join-Path $G $n }
+# The player's settings file: no installer writes, merges, ships or removes it, so it is
+# byte for byte what the player left through install, upgrade and uninstall.
+[IO.File]::WriteAllText((G "RefitPlayer.ini"), "; mine`r`n[Render3D.Modules]`r`nhulls=0`r`n[UI.HUD]`r`nBarHidden=1`r`n")
+$OverlaySha = Sha (G "RefitPlayer.ini")
+function OverlayKept {
+    ((Sha (G "RefitPlayer.ini")) -eq $OverlaySha) -and -not (Test-Path (Join-Path $P "game\RefitPlayer.ini")) -and
+        (@(Get-ChildItem -LiteralPath $G -Filter "RefitPlayer.ini*").Count -eq 1)
+}
 # What earlier packages and installs left: the per-part plugins Render3D.asi replaced.
 foreach ($n in "MSAA", "Planets", "Lighting", "Sky", "Fog", "Specials") {
     Set-Content (G "$n.asi") "old"; Set-Content (G "$n.ini") "old"
@@ -114,6 +122,7 @@ Check "binkw32.dll is the proxy" ((Get-Content (G "binkw32.dll") -Raw) -match "B
 Check "binkw32_orig.dll is stock" ((Text (G "binkw32_orig.dll")) -eq "stockbink")
 Check "dxvk.conf installed" ((Sha (G "dxvk.conf")) -eq (Sha (Join-Path $P "game\dxvk.conf")))
 Check "no WINEDLLOVERRIDES" (-not (Has $out "*WINEDLLOVERRIDES*"))
+Check "RefitPlayer.ini untouched by the install" (OverlayKept)
 
 Write-Host "== no progress lines unasked; a failing model script is not fatal; the player's GridLayout.ini kept"
 Set-Content (G "GridLayout.ini") "[Cells]"
@@ -186,6 +195,7 @@ Check "Display8.ini: the player's values kept, the missing keys added once" (($i
 $merged = Sha (G "Display8.ini")
 Install @($G) | Out-Null
 Check "Display8.ini merged again: nothing left to change" ((Sha (G "Display8.ini")) -eq $merged)
+Check "RefitPlayer.ini untouched by the upgrade" (OverlayKept)
 Set-Content (G "d3d9.dll") "dxvk"
 
 Write-Host "== unzipped into the game directory, run with no argument"
@@ -220,6 +230,7 @@ foreach ($f in "BinkProxy.ini", "dxvk.conf", "A2Bloom.ini", "ReShadePreset.ini",
 Check "changed file left" (((Text (G "UltimateASILoader-license.txt")) -eq "mine") -and (Has $out "*left UltimateASILoader-license.txt*"))
 Check "d3d8to9 taken out again" (-not (Test-Path (G "d3d8.dll")))
 Check "the player's d3d9.dll left" ((Text (G "d3d9.dll")) -eq "dxvk")
+Check "RefitPlayer.ini left by the uninstall" (OverlayKept)
 
 Write-Host "== no d3d8.dll at all: d3d8to9 goes in, and out again; the game as it was"
 $N = Join-Path $T "nod3d8"; Mock $N -NoD3d8

@@ -368,7 +368,9 @@ widget and acts on it the stock way (`kit::button`, `cycle`, `combo`, `edit`, `l
    - act through the stock controls only: `s.click_control(c)` for a shell button or a
      window button, `actions::push(Action::Select { .. })` for a list or combo,
      `Action::Key` for typing into an edit. Never write a setting yourself: the stock
-     procedure's handler does, and so the screen keeps doing what it did;
+     procedure's handler does, and so the screen keeps doing what it did. A setting of
+     ours (a Refit choice, not an engine one) goes only to the overlay `RefitPlayer.ini`,
+     through `crate::settings::set_row`, never to a plugin's ini or the engine's files;
    - keep the art where it carries information with `s.mirror_part(ui, design_rect,
      screen_rect, tint)`: a map preview, a portrait, the screen's own background
      (the main menu fades it behind its buttons);

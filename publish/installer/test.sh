@@ -37,6 +37,10 @@ vars () { grep -E '^ {4}[A-Z][A-Z0-9_]*=' "$T/out" || true; }
 echo "(pass: ${A2_TEST_PASS:-first}; $(uname -s))"
 
 G="$T/Star Trek Armada II"; mock "$G"
+# The player's settings file: no installer writes, merges, ships or removes it, so it is
+# byte for byte what the player left through install, upgrade and uninstall.
+printf '; mine\r\n[Render3D.Modules]\r\nhulls=0\r\n[UI.HUD]\r\nBarHidden=1\r\n' > "$G/RefitPlayer.ini"
+cp "$G/RefitPlayer.ini" "$T/RefitPlayer.ref"
 # What earlier packages and installs left: the per-part plugins Render3D.asi replaced.
 for n in MSAA Planets Lighting Sky Fog Specials; do echo old > "$G/$n.asi"; echo old > "$G/$n.ini"; done
 mkdir -p "$G/Sky"; echo old > "$G/Sky/mbgaqu.ini"; echo "[Sky]" > "$G/Sky/myown.ini"
@@ -60,6 +64,7 @@ check '[ ! -e "$B" ] && grep -q "removed the old bloom" "$T/out"'
 check 'grep -q BinkProxy "$G/binkw32.dll"'
 check '[ "$(cat "$G/binkw32_orig.dll")" = stockbink ]'
 check '[ "$(vars)" = "    WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b" ]'
+check 'cmp -s "$T/RefitPlayer.ref" "$G/RefitPlayer.ini" && [ ! -e "$P/game/RefitPlayer.ini" ]'   # install
 if [ "$mac" = 0 ]; then
     check 'cmp -s "$P/game/dxvk.conf" "$G/dxvk.conf"'
 else
@@ -119,6 +124,7 @@ check 'grep -qx "Backend=auto" "$G/Display8.ini"'
 cp "$G/Display8.ini" "$T/d8.ini"
 "$P/install.sh" "$G" > "$T/out"
 check 'cmp -s "$T/d8.ini" "$G/Display8.ini"'   # merged again: nothing left to change
+check 'cmp -s "$T/RefitPlayer.ref" "$G/RefitPlayer.ini" && ! ls "$G" | grep -q "^RefitPlayer\.ini\."'   # upgrade
 
 if [ "$mac" = 1 ]; then
     echo "== macOS: a DXVK d3d9.dll of the player's own stays, and gets its override"
@@ -190,6 +196,7 @@ check '[ "$(cat "$G/UltimateASILoader-license.txt")" = mine ] && grep -q "left U
 check '[ "$(cat "$G/d3d8.dll")" = dxvk ] && [ ! -e "$G/d3d9.dll" ]'
 check '[ -z "$(ls "$G" | grep -E "^d3d8_real\.dll$|^Display8\.|a2display")" ]'
 check '[ ! -e "$B" ]'
+check 'cmp -s "$T/RefitPlayer.ref" "$G/RefitPlayer.ini" && ! ls "$G" | grep -q "^RefitPlayer\.ini\."'   # uninstall leaves it
 
 echo "== what it did not write is left alone: a loader, a dxvk.conf; A2_PYTHON runs the models"
 H="$T/other"; mock "$H"
