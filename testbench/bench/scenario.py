@@ -54,6 +54,7 @@ class Scenario:
     assets: str = ''               # 'none': install this checkout with an empty A2_DATA
     players: list = field(default_factory=list)   # ['host', 'joiner']: one game each
     setup: str = ''                # a script run on each clone before launch
+    overlay: str = ''              # `Section:Key=value` words written to RefitPlayer.ini before launch
     clock: str = ''                # 'bench': the plugins' animation clock on the simulation's time
     sheet: list = field(default_factory=list)     # shot names: a contact sheet, cases x shots
     description: str = ''
@@ -95,7 +96,7 @@ def case_dirname(res, mod, scn_mod):
     return config.res_name(res) + ('' if mod == scn_mod else f'-{mod}')
 
 
-HEADER = re.compile(r'^(resolutions?|aspects?|mod|launch|reference|timeout|stock shell|assets?|players?|setup|sheet|clock)'
+HEADER = re.compile(r'^(resolutions?|aspects?|mod|launch|reference|timeout|stock shell|assets?|players?|setup|overlay|sheet|clock)'
                     r'\s*:\s*(.+)$', re.I)
 STEP = re.compile(r'^\s*(?:\d+[.)]|[-*])\s+(.+?)\s*$')
 
@@ -162,6 +163,7 @@ def parse(path):
                     assets=hdr.get('asset', '').strip().lower(),
                     players=[w.lower() for w in re.split(r'[,\s]+', hdr.get('player', '')) if w],
                     setup=hdr.get('setup', '').strip('` '),
+                    overlay=hdr.get('overlay', '').strip('` '),
                     clock=hdr.get('clock', '').strip().lower(),
                     sheet=[w.strip().strip('"“”') for w in hdr.get('sheet', '').split(',') if w.strip()])
 
@@ -1149,6 +1151,8 @@ class Case:
         sess.start_display()
         if self.scn.setup:
             self.run_setup(sess)
+        if self.scn.overlay:
+            sess.set_overlay(self.scn.overlay.split())
         if sess.s.get('vnc_port'):
             self.say(f'    VNC{f" ({player})" if player else ""}: vncviewer localhost:{sess.s["vnc_port"]}')
 

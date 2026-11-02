@@ -18,6 +18,13 @@ Players: host, joiner                     (one game per player; see "Several pla
 Setup: online/bench-asi.sh --loss 10      (a script of this repo, run on each clone
                                            before launch, with its session state file
                                            and then any words after the script's name)
+Overlay: Render3D.Modules:sky=0 UI.HUD:Minimap=0
+                                          (keys written to the clone's RefitPlayer.ini before
+                                           launch, after Setup:; every clone starts without
+                                           one. Words are Section:Key=value with the section
+                                           spelled as in the overlay, <Stem>.<Section>. Grep
+                                           the plugin's log for `settings: RefitPlayer.ini [`.
+                                           In a running game: `a2test drive overlay`)
 Sheet: 1 ship, 6 ships, 30 ships          (shot names: <scenario>/sheet.png in the run,
                                            a row per case and a column per shot)
 Clock: bench                              (the plugins' animation clock on the simulation's

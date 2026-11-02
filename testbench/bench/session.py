@@ -23,6 +23,7 @@ import re
 import shutil
 import signal
 import subprocess
+import sys
 import threading
 import uuid
 import time
@@ -403,8 +404,66 @@ class Session:
                 self.log.action(f'prepare: {name} {" ".join(cmd[1:])}', detail='logs/prepare.log')
         if self.s['mod'] == 'stock' and self.s.get('stock_shell') == 'embed':
             self.embed_stock_shell()
+        self.empty_overlay()
         self.set_volumes()
         self.set_clock()
+
+    # the player's files the plugins read in front of their inis (tools/settings/README.md)
+    OVERLAY_FILES = ('RefitPlayer.ini', 'RefitPlayer.ini.tmp', 'UIPlayer.ini', 'UIPlayer.ini.migrated')
+
+    def empty_overlay(self):
+        """Every clone starts with no `RefitPlayer.ini` (and no `UIPlayer.ini`): the user's
+        own choices must never reach a bench game. A scenario's `Overlay:` writes it again."""
+        gone = []
+        for name in self.OVERLAY_FILES:
+            f = self.game_dir / name
+            if f.exists() or f.is_symlink():
+                f.unlink()
+                gone.append(name)
+        self.log.action('overlay emptied' + (f' (removed {", ".join(gone)})' if gone else ''))
+
+    def set_overlay(self, words):
+        """Writes `Section:Key=value` words (and `--unset Section:Key`) into the clone's
+        RefitPlayer.ini with tools/settings/overlay.py, the edit UI.asi makes. Returns
+        (ok, what overlay.py said)."""
+        words = list(words)
+        for i, w in enumerate(words):
+            if w == '--unset':
+                continue
+            if i and words[i - 1] == '--unset':
+                continue
+            if ':' not in w or '=' not in w:
+                raise GameError(f'overlay word {w!r}: want Section:Key=value (or --unset Section:Key), '
+                                'the section spelled as in the overlay, e.g. Render3D.World:Surfaces=0')
+        r = subprocess.run([sys.executable, str(config.REPO / 'tools/settings/overlay.py'),
+                            str(self.game_dir / 'RefitPlayer.ini'), *words],
+                           capture_output=True, text=True)
+        out = ((r.stdout or '') + (r.stderr or '')).strip()
+        if r.returncode:
+            raise GameError(f'overlay {" ".join(words)} failed: {out}')
+        self.log.action(f'overlay: {" ".join(words)}', detail=out or None)
+        return out
+
+    def drive_overlay(self, words):
+        """`a2test drive overlay ...` in a running game: writes the overlay, then waits up to
+        5 s for the hub in UI.asi to log `settings: RefitPlayer.ini changed` (it notices the
+        file's stamp). Fails clearly when the game has no UI to notice."""
+        key = 'settings: RefitPlayer.ini changed'
+        before = (self.game_log('UI.log') or '').count(key)
+        self.set_overlay(words)
+        if not self.running():
+            return True, 'written; the game is not running (it reads the file at start)'
+        if self.game_log('UI.log') is None:
+            return False, ('written, but this clone has no UI.asi / UI.log: nothing in the game '
+                           'watches RefitPlayer.ini for a change (it is read at start)')
+        end = time.time() + 5
+        while time.time() < end:
+            body = self.game_log('UI.log') or ''
+            if body.count(key) > before:
+                line = [l for l in body.splitlines() if key in l][-1].strip()
+                return True, line
+            time.sleep(0.2)
+        return False, f'written, but UI.log shows no "{key}" within 5 s (is the hub running? see drive log UI.log)'
 
     def set_clock(self):
         """`--clock bench`: `[Bench] Clock=bench` in the clone's Render3D.ini and UI.ini, so
@@ -802,7 +861,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         if self.game_pid():
             raise GameError('the game is already running in this session')
         g = self.game_dir
-        for name in ('Menus.log', 'HUD.log', 'QOL.log', 'QOLRules.log', 'GridLayout.log',
+        for name in ('RefitPlayer.ini', 'Menus.log', 'HUD.log', 'QOL.log', 'QOLRules.log', 'GridLayout.log',
                      'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Scene.marks', 'Armada2_d3d9.log',
                      'Render3D.log', 'Stems.log', 'UI.log', 'Online.log',
                      'Display8.log', 'Display8.inventory.tsv', 'Display8.mark'):

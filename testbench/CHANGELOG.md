@@ -5,6 +5,21 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.80.0 — 2026-11-02
+
+### Added
+- Every clone starts with `RefitPlayer.ini`, `RefitPlayer.ini.tmp`, `UIPlayer.ini` and
+  `UIPlayer.ini.migrated` deleted (`overlay emptied` in the log); `collect_logs` keeps
+  `RefitPlayer.ini`.
+- Scenario header `Overlay: Render3D.Modules:sky=0 UI.HUD:Minimap=0`, written with
+  `tools/settings/overlay.py` after `Setup:` and before launch; `a2test check` shows it.
+- `a2test drive --session ID overlay WORD... [--unset Section:Key]`: the same edit in a
+  running game, then waits up to 5 s for the hub's `settings: RefitPlayer.ini changed`
+  in `UI.log` and fails clearly without one.
+- `bench/overlay_selftest.py`.
+
+Installed, not yet seen in game.
+
 ## 3.79.0 — 2026-11-02
 
 ### Added
