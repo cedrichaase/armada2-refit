@@ -44,6 +44,9 @@ static mut SEEN: Vec<(String, String)> = Vec::new();
 /// `settings: RefitPlayer.ini [Render3D.World] Surfaces=0 overrides Render3D.ini's Surfaces=1`.
 #[allow(static_mut_refs)]
 pub(crate) fn note(osec: &str, key: &str, value: &str, file: &str, mine: impl FnOnce() -> Option<String>) {
+    if !crate::log_is_open() {
+        return;
+    }
     let mut id = crate::lower(osec);
     id.push('.');
     id.push_str(&crate::lower(key));

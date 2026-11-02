@@ -4,6 +4,14 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.30.1 — 2026-11-02
+
+### Fixed
+- Overlay values read by the first `config::load` (before the log is open) are logged
+  once the log is open (`settings: RefitPlayer.ini [...] ... overrides ...`).
+
+Installed, not yet seen in game
+
 ## 0.30.0 — 2026-11-02
 
 ### Added

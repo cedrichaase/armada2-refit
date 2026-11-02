@@ -5,6 +5,15 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.82.1 — 2026-11-02
+
+### Fixed
+- `Session.launch` deleted `RefitPlayer.ini` with the plugins' logs, so a scenario's
+  `Overlay:` (written before launch) never reached the game; it no longer does, and
+  `collect_logs` keeps the file. `overlay_selftest.py` checks both.
+
+Installed, not yet seen in game
+
 ## 3.82.0 — 2026-11-02
 
 ### Added

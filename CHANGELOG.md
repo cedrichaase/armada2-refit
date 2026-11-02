@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.55.1 — 2026-11-02
+
+Layers: ui 0.30.1, testbench 3.82.1.
+
+### Fixed
+- The bench's launch no longer deletes the clone's `RefitPlayer.ini` (`Overlay:` header
+  reached no game). a2rt: an overlay value read before the log is open is not marked as
+  logged (`overlay::note`), so it is logged on the next read; UI.asi reads once more
+  after opening its log.
+
+Installed, not yet seen in game
+
 ## 13.55.0 — 2026-11-02
 
 Layers: ui 0.30.0, testbench 3.82.0.

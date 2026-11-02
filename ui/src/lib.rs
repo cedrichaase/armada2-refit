@@ -53,6 +53,9 @@ fn startup() {
     rt::init();
     let cfg = config::load();
     rt::log_open("UI.log", cfg.log);
+    // The overlay's values read by `load` came before the log was open and were not
+    // noted (a2rt `overlay::note`): read once more, from the cache, so the log has them.
+    let _ = config::load();
     clock::load();
     log!("UI {} -- game dir {}", env!("CARGO_PKG_VERSION"), rt::game_dir());
     if !cfg.enable {
