@@ -10,7 +10,8 @@
 //! (100-200 ms a recipe). Cloud drift runs on the sim clock.
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
-use crate::rt::{self, Ini};
+use crate::rt::{self, settings, Ini};
+use crate::settings_table::WORLD_SURFACES;
 use crate::shaders::world_surface::*;
 use crate::shaders::world_surface_spv::*;
 use crate::shaders::world_surface_dxil::*;
@@ -81,7 +82,7 @@ impl Surfaces {
             face: ini.int("World", "SurfaceFace", 1024).clamp(64, 4096) as u32,
             cloud_face: ini.int("World", "CloudFace", 512).clamp(32, 2048) as u32,
             reload: ini.int("World", "Reload", 1) != 0,
-            enable: ini.int("World", "Surfaces", 1) != 0,
+            enable: settings::on(&ini, WORLD_SURFACES),
         }
     }
 

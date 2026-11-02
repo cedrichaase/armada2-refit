@@ -1,5 +1,6 @@
 //! Render3D.ini, read once at start (and again on `Reload=1` when a module asks).
-use crate::rt::{self, Ini};
+use crate::rt::{self, settings, Ini};
+use crate::settings_table::{HDR, MSAA};
 use alloc::boxed::Box;
 use core::sync::atomic::{AtomicPtr, Ordering};
 
@@ -60,8 +61,8 @@ pub fn load() -> Config {
     Config {
         enable: ini.int("Render3D", "Enable", d.enable as i32) != 0,
         log: ini.int("Render3D", "Log", d.log as i32) != 0,
-        msaa: ini.int("Render3D", "MSAA", d.msaa as i32).clamp(0, 8) as u32,
-        hdr: ini.int("Render3D", "HDR", d.hdr as i32) != 0,
+        msaa: settings::int(&ini, MSAA).clamp(0, 8) as u32,
+        hdr: settings::on(&ini, HDR),
         bloom: ini.float("Render3D", "Bloom", d.bloom),
         bloom_threshold: ini.float("Render3D", "BloomThreshold", d.bloom_threshold),
         bloom_knee: ini.float("Render3D", "BloomKnee", d.bloom_knee),

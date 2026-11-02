@@ -19,10 +19,37 @@ pub mod planets;
 pub mod rocks;
 pub mod surfaces;
 
+/// `Render3D_SettingsChanged` for the world: the surfaces (`[World] Surfaces`) and the
+/// nebulae's keys (`Lit` among them), read again at once. Returns what changed.
+pub fn settings_changed() -> alloc::string::String {
+    let me = unsafe { ME };
+    let mut said = alloc::string::String::new();
+    if me.is_null() {
+        return said;
+    }
+    let me = unsafe { &mut *me };
+    let ini = crate::config::ini();
+    let s = settings::on(&ini, WORLD_SURFACES);
+    if s != me.surfaces.enable {
+        me.surfaces.enable = s;
+        said.push_str(&crate::sfmt!("World.Surfaces={}", s as u32));
+    }
+    let lit = me.nebulae.reread();
+    if let Some(l) = lit {
+        if !said.is_empty() {
+            said.push_str(", ");
+        }
+        said.push_str(&crate::sfmt!("Nebulae.Lit={}", l as u32));
+    }
+    said
+}
+
 use super::{Module, Step};
 use crate::engine;
 use crate::frame::steps::View;
 use crate::log;
+use crate::rt::settings;
+use crate::settings_table::{WORLD_NEBULAE, WORLD_PLANETS, WORLD_ROCKS, WORLD_SURFACES};
 
 pub struct World {
     surfaces: surfaces::Surfaces,
@@ -37,9 +64,6 @@ pub struct World {
     enable: bool,
     reload: bool,
     checked: f64,
-    /// `[Modules] world=0`: drawing the menu scene's planet and gas only
-    /// (`mods::MenuOnly`): every part on whatever `[World]` says, no hook installed.
-    menu_only: bool,
     /// An old plugin draws the planets / the gas: the menu scene's part stands down
     /// too (`[World]` keys at 0 do not).
     plug_planets: bool,
@@ -53,7 +77,7 @@ static mut ME: *mut World = core::ptr::null_mut();
 /// planet itself; false if it is not a planet's or planets are the engine's.
 pub fn planet_ghost(sp: usize, v: &View) -> bool {
     let me = unsafe { ME };
-    if me.is_null() {
+    if me.is_null() || !crate::mods::running("world") {
         return false;
     }
     let me = unsafe { &mut *me };
@@ -72,14 +96,13 @@ impl Default for World {
             rocks: rocks::Rocks::new(),
             nebulae: nebulae::Nebulae::new(),
             lights: lights::Lights::new(),
-            on_planets: ini.int("World", "Planets", 1) != 0,
-            on_rocks: ini.int("World", "Rocks", 1) != 0,
-            on_nebulae: ini.int("World", "Nebulae", 1) != 0,
+            on_planets: settings::on(&ini, WORLD_PLANETS),
+            on_rocks: settings::on(&ini, WORLD_ROCKS),
+            on_nebulae: settings::on(&ini, WORLD_NEBULAE),
             settled: false,
             enable: ini.int("World", "Enable", 1) != 0,
             reload: ini.int("World", "Reload", 1) != 0,
             checked: 0.0,
-            menu_only: false,
             plug_planets: false,
             plug_nebulae: false,
         }
@@ -87,20 +110,6 @@ impl Default for World {
 }
 
 impl World {
-    /// For `[Modules] world=0`: the menu scene's parts, all on (the `[World]` keys
-    /// belong to missions), with none of the hooks a mission's objects go through.
-    pub fn menu_scene() -> World {
-        World {
-            on_planets: true,
-            on_rocks: true,
-            on_nebulae: true,
-            enable: true,
-            reload: false,
-            menu_only: true,
-            ..World::default()
-        }
-    }
-
     /// At the first device, when every plugin is loaded: each part stands down beside
     /// the plugin that draws it.
     fn settle(&mut self) {
@@ -127,7 +136,10 @@ impl World {
             log!("world: Nebulae.asi is loaded, which draws the gas: nebulae stay its");
             self.on_nebulae = false;
         }
-        if !self.menu_only {
+        // `[Modules] world=0` (latched at load): the menu scene's planet and gas only,
+        // with no hook installed and no part of a mission's.
+        unsafe { ME = self as *mut World };
+        if crate::mods::enabled("world") {
             if self.on_nebulae {
                 self.nebulae.install();
             }
@@ -161,6 +173,10 @@ impl Module for World {
     fn name(&self) -> &'static str {
         "world"
     }
+    /// `[Modules] world=0` keeps the menu scene's planet and gas.
+    fn in_menu(&self) -> bool {
+        true
+    }
     fn device(&mut self) {
         self.settle();
     }
@@ -187,7 +203,7 @@ impl Module for World {
                     self.enable = e;
                     log!("world: Enable={}", e as u32);
                 }
-                let s = ini.int("World", "Surfaces", 1) != 0;
+                let s = settings::on(&ini, WORLD_SURFACES);
                 if s != self.surfaces.enable {
                     self.surfaces.enable = s;
                     log!("world: Surfaces={}", s as u32);

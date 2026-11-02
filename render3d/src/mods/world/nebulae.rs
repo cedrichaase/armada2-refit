@@ -40,7 +40,8 @@ use gpu::{
     Topology, Usage, VertexAttr, Viewport,
 };
 use crate::math;
-use crate::rt::{self, Ini};
+use crate::rt::{self, settings, Ini};
+use crate::settings_table::NEBULAE_LIT;
 use crate::shaders::world_nebula::*;
 use crate::shaders::world_nebula_spv::*;
 use crate::shaders::world_nebula_dxil::*;
@@ -139,7 +140,7 @@ impl Settings {
             temporal: math::saturate(ini.float(s, "Temporal", 0.1)),
             temporal_clip: math::clamp(ini.float(s, "TemporalClip", 1.25), 0.25, 8.0),
             jitter: math::clamp(ini.float(s, "Jitter", 1.0), 0.0, 2.0),
-            lit: ini.int(s, "Lit", 1) != 0,
+            lit: settings::on(&ini, NEBULAE_LIT),
             lit_strength: ini.float(s, "LitStrength", 1.0).max(0.0),
             lit_tint: math::saturate(ini.float(s, "LitTint", 0.5)),
             lit_temporal: math::saturate(ini.float(s, "LitTemporal", 0.5)),
@@ -1044,8 +1045,24 @@ impl Nebulae {
         }
     }
 
+    /// `[Nebulae]` again, without the recipes (`Render3D_SettingsChanged`). Returns the
+    /// new `Lit` when it changed.
+    pub fn reread(&mut self) -> Option<bool> {
+        let old = self.cfg.lit;
+        self.reread_settings();
+        if old != self.cfg.lit { Some(self.cfg.lit) } else { None }
+    }
+
     /// Settings and recipes again (with `Reload=1`, once a second).
     pub fn reload(&mut self) {
+        self.reread_settings();
+        for c in self.classes.values_mut() {
+            c.reload();
+        }
+        unsafe { SPIRIT_ACTIVE = SPIRIT_ACTIVE && self.cfg.enable };
+    }
+
+    fn reread_settings(&mut self) {
         let old = self.cfg;
         self.cfg = Settings::read();
         if old.vol_max != self.cfg.vol_max || old.vol_maxy != self.cfg.vol_maxy || old.vol_texel != self.cfg.vol_texel || old.noise != self.cfg.noise {
@@ -1058,10 +1075,6 @@ impl Nebulae {
             }
             self.held.failed = false;
         }
-        for c in self.classes.values_mut() {
-            c.reload();
-        }
-        unsafe { SPIRIT_ACTIVE = SPIRIT_ACTIVE && self.cfg.enable };
     }
 
     /// The class of a nebula object (made on first sight).

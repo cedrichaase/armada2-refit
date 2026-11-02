@@ -607,6 +607,10 @@ impl Module for Sky {
     fn superseded(&self) -> Option<&'static str> {
         Some("Sky.asi")
     }
+    /// `[Modules] sky=0` keeps the menu scene's sky: nothing could hand it back.
+    fn in_menu(&self) -> bool {
+        true
+    }
     fn reset(&mut self) {
         self.baker.reset();
     }

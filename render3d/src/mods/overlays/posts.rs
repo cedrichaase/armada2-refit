@@ -18,6 +18,8 @@ use crate::engine::{hook, rd};
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::log;
+use crate::rt::settings;
+use crate::settings_table::OVERLAYS_HEIGHTPOSTS;
 use crate::math::V3;
 use crate::shaders::overlays::*;
 use crate::shaders::overlays_spv::*;
@@ -96,7 +98,7 @@ pub struct Posts {
 impl Posts {
     pub fn new(ini: &crate::rt::Ini) -> Posts {
         Posts {
-            on: ini.int("Overlays", "HeightPosts", 1) != 0,
+            on: settings::on(ini, OVERLAYS_HEIGHTPOSTS),
             width: ini.float("Overlays", "HeightPostWidth", 1.5).max(0.5),
             soft: ini.float("Overlays", "HeightPostSoft", 1.0).max(0.25),
             bright: ini.float("Overlays", "HeightPostBrightness", 1.0),
@@ -108,7 +110,9 @@ impl Posts {
 
     /// Re-points the engine's calls (once).
     pub fn install(&mut self) {
-        if !self.on || self.hooked {
+        // Installed whether or not `HeightPosts` is on, so the key can be switched live:
+        // while it is off the hook hands every call to the engine's (`IN_VIEW`).
+        if self.hooked {
             return;
         }
         self.hooked = true;
@@ -125,6 +129,13 @@ impl Posts {
 
     pub fn reset(&mut self) {
 
+    }
+
+    /// `[Overlays] HeightPosts` again (`Render3D_SettingsChanged`); true if it changed.
+    pub fn set_on(&mut self, on: bool) -> bool {
+        let changed = on != self.on;
+        self.on = on;
+        changed
     }
 
     pub fn begin_view(&mut self) {
