@@ -1,0 +1,215 @@
+# Plan: Fleet Operations: Roots
+
+How the refit comes to Fleet Operations: Roots, the total conversion of Armada II, in
+**this** repository. The first target is Roots 5.0Z11 (23 October 2026), as the user has
+it installed through Heroic. Decided 2026-11-02: Roots comes first among other
+executables, before Armada 1 (`PLAN-ARMADA1.md`), and its profile work rides on
+`ROADMAP.md` phase 8.
+
+It rests on a read-only survey of 2026-11-02: the install's files, its Heroic entry,
+and `Data/ArmadaL.exe` compared byte for byte with stock `Armada2.exe` 1.1 at every
+address our plugins use. Nothing was launched. What only a running game can show is
+listed as measurement in the work packages, not assumed.
+
+## What Roots is, measured
+
+### The executable
+
+`Data/ArmadaL.exe` is **stock 1.1's image, patched**, not a rebuild.
+
+| | Roots `ArmadaL.exe` | stock `Armada2.exe` 1.1 |
+|---|---|---|
+| PE timestamp | `0x3c4c76bd` | `0x3c4c76bd` |
+| Image size | `0x405000` | `0x3fa000` |
+| Entry point, image base | the same | — |
+| `.text`, `.rdata`, `.data`, `.idata`, `.rsrc` | the same addresses and sizes | — |
+| Extra section | `.test` at `0x7fa000`, about 43 KB, executable: Fleet Operations' code | — |
+| Imports | identical: the same 20 DLLs and functions (among them `d3d8`, `binkw32`, `NetworkManager`, `WINMM`, `Win2kDisableTaskSwitch`) | — |
+| `.text` differences | 4,235 bytes in 1,012 ranges over 210 functions; the largest range is 129 bytes. 154 ranges are a jump or call into `.test` (detours), 764 are edits of four bytes or fewer (constants, flipped branches), 94 other | — |
+| `.rdata`, `.data` differences | 90 and 410 bytes, small strings and tables; **none at an address our plugins read** | — |
+
+So about 99% of a stock symbol profile resolves to the same address with the same
+bytes. What differs, by our plugins:
+
+| Plugin | Checked here | Same in Roots | Where Roots differs |
+|---|---|---|---|
+| qol (`qol.c`, `rules.c`) | 61 byte signatures; 118 code and 17 data addresses | **all 61 signatures**; 103 of 118 enclosing functions | Roots detours four functions our sites sit in: `mCheckGroupSelect` (11 of our sites), `cOverViewImp::mProcessKeyboardInput`, `ComputerVoice::Say` (the rules plugin's) and part of `cOverViewImp::Simulate`. `Producer::FinishBuild` and `CraftProcess::Handle_New_Command` differ elsewhere in the function |
+| online | 9 code, 3 data | 7 | `InternetGameDlgProc`, `MultiplayerSetupDlgProc`: the dialog-size constants only |
+| binkproxy | 3 | 3 | — |
+| ui (`src/engine/`) | 228 code, 110 data | 212 | twelve dialog procedures (the shell's size constants), `Program::GameDoOne` (a three-byte edit), `PopupPaletteImp::mProcessKeyboardInput`, `SetActiveDisplay_Internal` |
+| render3d | 167 code, 100 data | 154 | **the seam is untouched**: both `Armada_RenderAllOurStuff` calls, `GameObject_PreRenderAll`, `Ordnance::PreRenderAll`. Roots detours `GameObject::RenderInternal` (hulls), `Craft::Explode` and `BuildingEffect::Render`, and edits `ShieldHit::DrawShield`, `PlaceholderFeature::Render` and `sRenderInternal`, `BuildingEffect::SafeDestroyConstruction`, `Terrain_Geometry::DrawGrid`, `GetSensorScramblerWaveLight`, `ST3D_ChunkManager::CreateChunks` |
+| display | 19 | 16 | `FindDisplayMode` (one branch), `SetActiveDisplay_Internal` (the shell mode) |
+
+**The shell is 1200x900, not 800x600.** Nine places where stock asks for an 800x600
+front end ask for 1200x900 in Roots, including `SetActiveDisplay_Internal` and the
+dialog procedures above, and Roots ships its shell art at 1200x900 to match. Everything
+in our code that assumes the 800x600 shell (the UI's menu host and its specs, the mode
+raise that `Menus.asi` and the UI do, the backdrop composite) is wrong for Roots.
+
+That is the static picture. **`FleetOpsHook.dll` patches more at run time**: it is a
+3 MB Delphi DLL, loaded through `Win2kDisableTaskSwitch.dll`, which `ArmadaL.exe` imports
+(Roots' own build of that DLL), and its unit names (shipped in `FleetOpsHook.map`)
+say it enhances `Craft`, `Producer`, `Shipyard`, `PopupPalette`, `cOverViewImp`, the
+file system, the chat and the version check. Which functions it rewrites in memory is
+not known until it is measured (FO-2). It also imports `d3d9`, `D3DX81ab` and
+`d3dx9_43`, so it may draw or hook the device itself.
+
+### The install
+
+| | Roots | stock |
+|---|---|---|
+| Layout | the game in `Data/` under a Delphi launcher, `FleetOps.exe`, which only starts `Data\ArmadaL.exe` | the game at the root |
+| Heroic | sideloaded app `fleetopsroots50`; Proton-CachyOS; prefix `~/Games/Heroic/Prefixes/Star Trek Armada II Fleet Operations Roots`, never run yet; `WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b;d3d9=n,b`, `PROTON_USE_WOW64=1`; DXVK auto-install on. Heroic is the Flatpak here (`~/.var/app/com.heroicgameslauncher.hgl/config/heroic`) | GOG app `1174788223` |
+| Direct3D chain | `d3d8.dll` is DxWrapper's stub, `dxwrapper.dll` runs its d3d8-to-9 conversion (`D3d8to9=1`), then `d3d9.dll`: DXVK as installed (byte-identical to the one in the stock game), with ReShade and a plain wrapper shipped as alternatives | Display8, then d3d8to9, then DXVK |
+| ASI loader | none; `winmm.dll` in `Data/` would be loaded, as stock's | Ultimate ASI Loader as `winmm.dll` |
+| Textures | `Textures/` (no `RGB/`): 911 TGA and **548 DDS** (DXT1, DXT3, DXT5 and uncompressed) | `Textures/RGB/`, 2115 TGA |
+| ODFs | **packed in `ODF.fpq`**, Fleet Operations' own archive, read through `FleetOpsHook`'s file-system hooks; `odf/` is empty | 1101 loose files |
+| HUD layout | `misc/gui_*.cfg` with aspect variants (4:3, 5:4, 16:10, 16:9; the 16:9 canvas is 2134x1200) | one 1600x1200 canvas |
+| Movies | eight Bink files under `bitmaps/single/`, no `animations/` | `animations/` |
+| Settings | `settings_saves_logs/Settings.xml` (`displayWidth`, `displayHeight`, `multisample`, `WindowMode`, ...); no `ARMADA.PRF` yet | `ARMADA.PRF` |
+| Submods | `Data/Mods/`: "Fleet Ops 4.0" and "STA2 Classic Mod", each with **its own `ArmadaL.exe`**, and a data-only third | — |
+| `RTS_CFG.h` | 568 lines against 511, with keys of its own (`unitcap_*`, `sr_*`); `cfgSCREEN_WIDTH` still 1600 | — |
+
+An older Fleet Operations install (non-Roots, its game named `Armada2.exe`, with its
+own prefix) is also on this machine. It is out of scope.
+
+### Multiplayer
+
+Roots keeps stock's lobby layer (`NetworkManager.dll`, DirectPlay 8 and GameSpy) and
+adds Tunngle. Its file check is its own: the engine's "files do not match" messages
+remain, but `FleetOpsHook` computes the CRC over its own file system (the FPQ archive
+included) with a list of allowed executable CRCs, and Roots' readme says `RTS_CFG.h` is
+in it. No scan of the game directory for foreign DLLs was found.
+
+What follows for us:
+
+- **Visual plugins are invisible to peers**, as on stock: Display8, render3d and the UI
+  write nothing the simulation reads and touch no checked file. To verify in a two-game
+  bench match (FO-8).
+- **The rules plugin must not run in a Roots game**: Roots has its own balance, and
+  `PayOnQueue` changes what every node simulates. It stands down under Roots.
+- **QOL's local features collide with Roots' own** where Roots detours the same
+  functions (group selection, the keyboard handler). Those stand down until each is
+  measured beside Roots' version.
+- **Under Proton, Roots' multiplayer has the stock problem**: Wine's `dpnet` stubs
+  `Host` and `EnumHosts`. `Online.asi`'s own peer could carry Roots games too, since it
+  replaces the transport and leaves the game's messages (Roots' CRC packets among them)
+  as they are. That is a measurement, not a promise.
+
+## The approach
+
+**Roots is an Armada II build with a content mod on top.** The profile key is
+(game, build) from the start, so Armada 1 (`game = armada1`, in this repository's `armada1/` folder) does not change the format again:
+`game = armada2`, `build = fo-roots-5.0Z11`, identified by timestamp **and image size**
+(the timestamp alone is stock's), with the hash recorded by the bench. The Roots profile
+**inherits** the stock profile and overrides only what differs: the shell mode, and
+each symbol in a function Roots changes, marked as such.
+
+The rule for a marked symbol: **a hook that uses one stands down under Roots until it
+has been verified beside Roots' change**, and the profile entry then records that it
+was. That turns the 210 changed functions, and whatever `FleetOpsHook` changes at run
+time, into a list worked through one hook at a time, rather than a hope that the
+signatures catch it. Signatures alone would not: all 61 of QOL's pass in Roots, yet four
+of its functions are detoured.
+
+**A content profile for Roots** carries what render3d and the UI know about the game's
+data: ODF names, the race lists, the sky, surface and ordnance recipes. A missing recipe
+means the engine's own look through passthrough, as everywhere.
+
+**Roots' own files are Roots' and stay untouched**: `FleetOpsHook.dll`, DxWrapper,
+ReShade, the FPQ archive and Roots' art. Everything we install goes beside them with a
+backup, as on stock. Hard rules 8 and 9 apply to Roots as to Armada II: nothing derived
+from its files is committed, and what we learn of `ArmadaL.exe` or `FleetOpsHook.dll` is
+written per hook. Observing the running game is preferred over reading
+`FleetOpsHook.dll`; its map stays where it is.
+
+## What runs on Roots, and what stands down
+
+| Layer | Under Roots | Why |
+|---|---|---|
+| display (Display8) | **yes**, in place of DxWrapper's `d3d8.dll`, which becomes the forward chain on the bench | Display8 is the seam everything else draws through. Roots' draws go through passthrough |
+| render3d | **yes**, module by module | The seam is untouched. Modules whose sites Roots detours (hulls, effects' construction and explosions, shields) are verified one at a time |
+| ui | the Refit screen, settings and the loading screen first; **HUD panels and the menu host off** at first | Roots changed its HUD (its own sprites and canvases) and its shell (1200x900, the dialog procedures); each part comes back when its specs are written for Roots |
+| qol | pan speed and the camera; **group, keyboard and station features off** until measured | Roots detours the same functions |
+| qol rules | **off** | must-match, and Roots has its own rules |
+| online | not at first; measured in FO-8 | Roots' lobby and CRC ride on top of the transport |
+| cutscenes (binkproxy) | yes, if the measurement passes | `FleetOpsHook` imports `binkw32` too; the proxy must forward every export it uses |
+| hud, grid, menus (legacy) | **no** | Roots has its own widescreen HUD layouts and shell; the legacy plugins assume stock's |
+| textures, models, menus backdrops, movies | **no** for now | the recipes are stock-hashed (`a2tex stock` refuses Roots' files, so nothing is installed by accident); Roots' art is mixed TGA and DDS |
+| renderer (`dxvk.conf`) | only for the forward chain on the bench | — |
+| platform | the ASI loader as `Data/winmm.dll`; DXVK left as Heroic installs it | — |
+
+## Work packages
+
+Estimates in ROADMAP units: agent hours, bench passes, sign-off round. FO-0 and FO-1
+can start now; FO-3 onward waits on phase 8's format and generator (8b).
+
+| WP | What | Depends on | Agent time · bench · round |
+|---|---|---|---|
+| FO-0 | **Roots as it ships, under Proton**: the user launches it once from Heroic (it creates the prefix and `Settings.xml`), plays the front end and a skirmish. Note anything Roots' launcher or first run asks | nothing | none · none · a user check |
+| FO-1 | **A game profile for the tooling**: `a2env` learns a profile (`A2_PROFILE=fo-roots`, or `--game` on each tool) that sets the game directory, the data directory (`Data/`), the executable (`ArmadaL.exe`), the prefix and the Heroic entry. The bench gets a game adapter: launch `ArmadaL.exe` directly in `Data/` (not the launcher), process matching by its name, a `Settings.xml` adapter in place of the `ARMADA.PRF` one, Roots' log files. `a2mod` and `./install` take the profile and offer only the layers above. A stock clone of Roots for `--install`. Scenarios `fo-launch` (to the main menu) and `fo-skirmish` (a map loaded, a tick logged). The profile mechanism is built once for every game: Armada 1 adds its own profile to it (`PLAN-ARMADA1.md`, A1-1) | FO-0 | 8–16 h · 5–8 · none |
+| FO-2 | **Measure Roots at run time**, Display8 in forward mode in front of DxWrapper in a clone: the d3d8 inventory against stock's (compressed textures, D3DX8 state blocks and fonts, any call stock never makes); whether `FleetOpsHook` makes its own Direct3D 9 device or patches ours; a diff of the in-memory `.text` against the file once the hook has run (which functions it rewrites, by name and address only); the load order of `FleetOpsHook` against the ASI loader | FO-1; ROADMAP 8a (the identity log) | 6–10 h · 3–5 · none |
+| FO-3 | **The Roots profile**: (game, build) in the format, inheritance with overrides, the "changed by Roots" mark and its stand-down rule; the marked list from the static diff and FO-2's run-time diff; `a2test syms --game fo-roots`; the negative test (the Roots profile on stock and the reverse, both standing down cleanly) | ROADMAP 8b; FO-2 | 6–12 h · 2 · none |
+| FO-4 | **Display8 on Roots**: stub and passthrough on Vulkan with whatever FO-2 found (block-compressed textures sampled natively, the D3DX8 calls, the 1200x900 shell mode, Roots' `FindDisplayMode` change). If `FleetOpsHook` draws through its own Direct3D 9, that is solved here or Display8 stands down under Roots. Installed by `./install --game fo-roots` with DxWrapper's `d3d8.dll` backed up | FO-2, ROADMAP 1 signed off | 10–25 h · 10–20 with A/B against the forward chain · **round FO-A**: Roots looks as Roots on our device |
+| FO-5 | **render3d on Roots**: the seam, then each module, verified beside Roots' changes; the Roots content profile; `a2fmt` reads DDS and Roots' FPQ archive, or render3d reads ODFs and textures through the engine's own file system (decided in this package by which is simpler and safer) | FO-3, FO-4; ROADMAP 7 for the per-module hooks | 20–40 h · 10–20 · **round FO-B**: a skirmish with the refit's look |
+| FO-6 | **UI on Roots**: the Refit screen and settings over Roots' Options dialog, the loading screen; then the menu host's specs for the 1200x900 shell and HUD panels against Roots' components, each its own row, as wanted | FO-3, FO-4; ROADMAP 6 | 10–30 h · 8–15 · with FO-B, then its own round if panels are taken |
+| FO-7 | **QOL on Roots**: pan speed and camera first; each of the other features measured beside Roots' own and switched on only where both agree | FO-3 | 4–10 h · 3–6 gameplay passes · with FO-B |
+| FO-8 | **Multiplayer**: two bench games of Roots with the refit's visual plugins, on Microsoft's DirectPlay in the clones (`online/reference-dplay.sh`), to show the CRC check passes; then whether `Online.asi`'s peer carries a Roots game | FO-4; ROADMAP 9 (the rules plugin as its own layer) | 6–12 h · 4–8 two-game passes · round FO-C if Online is taken |
+| FO-9 | **binkproxy** on Roots' intros, and the release package's Roots support (the GUI installer finding Roots, if wanted) | FO-4 | 4–10 h · 2–3 · with the release |
+
+Summed: about 75–165 agent hours, three sign-off rounds of its own (FO-A, FO-B, FO-C).
+
+**Where it sits in ROADMAP**: FO-0 and FO-1 now, beside rounds C and D. FO-2 needs only
+8a. FO-3 is phase 8's second profile and the test of its design, so it lands with or just
+after 8b–8d. FO-4 needs passthrough signed off (phase 1). FO-5 is best after phase 7, as
+8e is. FO-8 after phase 9. The legacy plugins phase 11 removes are never installed on
+Roots, so phase 11 changes nothing here.
+
+## Acceptance
+
+| Scenario | Shows |
+|---|---|
+| `fo-launch`, `fo-skirmish` | the bench runs Roots: front end, a map, a tick, with nothing of ours installed |
+| `fo-syms` | "symbols: N/N resolved" with Roots' marked symbols listed as standing down; the negative test both ways |
+| `fo-passthrough` | Roots with Display8 alone on Vulkan matches the forward chain pixel for pixel at a paused tick, in the front end and in a mission |
+| `fo-render3d-*` | per module, Roots' scenes with the module on, and with it off the passthrough look |
+| `fo-ui-refit` | the Refit screen in Roots' Options, a row toggled and kept after a relaunch |
+| `fo-multiplayer` | two Roots games with the refit's visual plugins join and play past the file check |
+| the stock set | unchanged on stock 1.1: the Roots work must not move a single stock pixel |
+
+## What the user signs off
+
+1. **FO-0**: Roots runs under Proton from Heroic as it ships.
+2. **Round FO-A**: Roots on our device looks and plays as Roots: the front end at
+   1200x900, a skirmish, the intro.
+3. **Round FO-B**: render3d on Roots, the Refit screen, QOL's pan speed.
+4. **Round FO-C**, if taken: a network game of Roots players with the refit.
+
+## Risks
+
+1. **`FleetOpsHook` at run time.** Its changes are invisible to the file diff. If it
+   rewrites a function a hook of ours patches, whichever runs second wins. FO-2 measures
+   it before any hook is let loose; the stand-down rule keeps the rest safe.
+2. **Its own Direct3D use.** If the hook makes a Direct3D 9 device or relies on DxWrapper
+   specifics, Display8 on Vulkan has nothing to give it. The fallback is Display8 in
+   forward mode under Roots, which phase 11 removes, so the decision is made in FO-4.
+3. **Struct layouts.** The survey found no data address that moved, but Roots edits
+   classes (`Evolver`, `LatinumNebula`, `UtritiumBall`, `Producer`, `cOverViewImp`).
+   A field a hook reads may mean something else. Each verified hook checks the fields it
+   reads in game.
+4. **Roots updates.** A new Roots release is a new build with a new profile; an unknown
+   build runs only what resolves by scan, as the profile design says. The three submods'
+   own `ArmadaL.exe` files are further builds, not in scope until asked.
+5. **Fairness and the Fleet Operations team.** A visual plugin in a competitive mod's
+   network games is a question of the community's norms as well as of CRCs.
+
+## Open decisions
+
+1. **The Fleet Operations team**: tell them before anything ships for Roots, or not.
+2. **The release**: ship Roots support in the same package and GUI installer, or as a
+   separate download.
+3. **Roots' art**: whether the texture and movie pipelines are ever pointed at Roots'
+   own art (its files are the Fleet Operations team's, under the same rule as stock's),
+   or Roots keeps its art and gets only the renderer.
+4. **The submods**: whether "Fleet Ops 4.0" and the classic mods (their own executables)
+   are wanted at all.

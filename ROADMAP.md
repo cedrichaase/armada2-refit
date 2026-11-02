@@ -64,7 +64,7 @@ What the architecture review found (four read-only reviews, 2026-10-23):
 4. **Players switch whole features** from the game's own Options menu. Tuning stays in
    the ini files.
 5. **Engine knowledge is data per executable build**, so another build (Fleet
-   Operations, later) is a new profile, not a rewrite.
+   Operations: Roots, `PLAN-FLEETOPS.md`) is a new profile, not a rewrite.
 
 ## Contracts
 
@@ -102,8 +102,9 @@ file, section, key, label, help, kind (bool or enum), default, apply class (live
 next mission, restart) and scope (local, or must match in a network game). An optional
 `<Plugin>_SettingsChanged()` applies live rows.
 
-Player choices go in **one overlay file that installers never write**, generalised from
-`UIPlayer.ini` (whose `BarHidden` migrates into it). A key is read overlay first, then
+Player choices go in **one overlay file that installers never write**: `RefitPlayer.ini`
+in the game directory (decided 2026-11-02), generalised from `UIPlayer.ini`, whose
+`BarHidden` migrates into it. A key is read overlay first, then
 the plugin's ini, then the default. Only values that differ from the default are
 stored, and setting a row back to its default deletes the key, so an overlay never pins
 an old default against an installer's upgrade. The overlay's writer is our own and
@@ -302,7 +303,7 @@ category switches as the routing of passthrough.
 
 | | |
 |---|---|
-| Steps | Overlay-first lookup in `a2rt::Ini` and `a2asi.h`; a log line whenever the overlay overrides the plugin's own ini. The overlay file and its writer; migrate `BarHidden`. Descriptor tables and `_Settings` exports, starting with QOL, render3d `[Render3D]`, `[Overlays]` and `[World]`, then UI, Online, binkproxy. A lint that checks shipped inis against the tables. Live paths: a per-module enabled flag in render3d's dispatch and `Render3D_SettingsChanged`; a writable UI `Config` for the per-frame keys; binkproxy re-reads `ReplaceMovies` at each open; QOL keeps its patches installed and gates them on a flag (`MaxSelection` stays restart). The bench empties the overlay in every clone and scenarios set toggles through it. The GUI installer lists the overlay in its "settings changed" report |
+| Steps | Overlay-first lookup in `a2rt::Ini` and `a2asi.h`; a log line whenever the overlay overrides the plugin's own ini. The overlay file (`RefitPlayer.ini`) and its writer; migrate `BarHidden` from `UIPlayer.ini`. Descriptor tables and `_Settings` exports, starting with QOL, render3d `[Render3D]`, `[Overlays]` and `[World]`, then UI, Online, binkproxy. A lint that checks shipped inis against the tables. Live paths: a per-module enabled flag in render3d's dispatch and `Render3D_SettingsChanged`; a writable UI `Config` for the per-frame keys; binkproxy re-reads `ReplaceMovies` at each open; QOL keeps its patches installed and gates them on a flag (`MaxSelection` stays restart). The bench empties the overlay in every clone and scenarios set toggles through it. The GUI installer lists the overlay in its "settings changed" report |
 | Depends on | Phases 1 (signed off) and 3 |
 | Parallel with | Phase 6 |
 | Acceptance | A player value set in the overlay survives `./install`; the lint passes; `ui-hud-bar-after-cinematic` and `no-assets` still pass; a live flip of hull surfaces mid-mission changes the frame at the same tick |
@@ -350,7 +351,7 @@ category switches as the routing of passthrough.
 | Versions | MINOR per plugin as it moves, root MINOR |
 | Estimate | Agent 8–16 h; one gameplay bench pass per rewritten C stub plus the negative test, about 6–10; round D |
 | Risks | Register and stack bugs in the rewritten C stubs: a bench gameplay pass per stub |
-| Fleet Operations | Not installed; no profile yet. A port needs its install, its executable's identity, and new findings tied to each hook |
+| Fleet Operations | **Fleet Operations: Roots first** (decided 2026-11-02), in this repository: `PLAN-FLEETOPS.md`. Roots' `Data/ArmadaL.exe` is stock 1.1's image patched (the same timestamp, `0x3c4c76bd`; image size `0x405000` against `0x3fa000`; one extra code section; 210 functions changed), so 8a records the image size and the bench the hash, and the profile key is (game, build) from the start. The Roots profile inherits the stock one, and a hook whose symbols Roots changed stands down until verified beside Roots' change. Its first steps (FO-0, FO-1, FO-2) need only 8a; its profile (FO-3) lands with 8b–8d as the format's second user |
 
 ### Phase 9 — Code to its owner, and the release package
 
@@ -358,7 +359,7 @@ category switches as the routing of passthrough.
 
 | | |
 |---|---|
-| Steps | QOLRules becomes its own layer in `./install`, `a2mod`, the manifest and the GUI installer; decide its shipped default. `KeepClip` and the window and display-mode handling move to Display8; the bar keys to QOL, with the UI drawing the labels QOL exports; the view distance to render3d. Per-layer selection in `./install` and the release installer. The release package keeps its legacy fallback until Phase 11 |
+| Steps | QOLRules becomes its own layer in `./install`, `a2mod`, the manifest and the GUI installer; it ships with `PayOnQueue` on, as today (decided 2026-11-02), and selected by default in the installers. `KeepClip` and the window and display-mode handling move to Display8; the bar keys to QOL, with the UI drawing the labels QOL exports; the view distance to render3d. Per-layer selection in `./install` and the release installer. The release package keeps its legacy fallback until Phase 11 |
 | Depends on | Phases 1 (signed off) and 4 |
 | Acceptance | `ui-focus-pointer`, `ui-pointer-bar`, `ui-hud-bar`, `qol-*`, a subset matrix on the bench (each supported subset draws and plays); user in-game check of the pointer and the bar keys |
 | Versions | qol MAJOR (layer split), ui MAJOR (bar keys leave), display MINOR, gui-installer MAJOR (per-layer selection changes the package schema), root MAJOR |
@@ -401,6 +402,16 @@ renderer rows), "renderer, platform", the render3d note on a missing Direct3D 9 
 "display", and the bench's GPU policy (`A2TEST_VULKAN_GPU=1`; lavapipe stays for
 validation). Each layer's README keeps its own derivations.
 
+## Other games
+
+Decided 2026-11-02: **Fleet Operations: Roots first, in this repository**
+(`PLAN-FLEETOPS.md`); **then Star Trek: Armada (1), after phase 8 and after Roots, in this repository too**,
+in an `armada1/` folder of its own layers, at full parity with the Armada II refit,
+rendering directly on Vulkan and Direct3D 12 through a `ddraw.dll` of its own
+("Display7") on the `display8v1_*` contract, with no Direct3D 9 path
+(`PLAN-ARMADA1.md`). The shared code stays where it is; the tools gain a game profile
+(Fleet Operations' FO-1), and each game gets its own release tag and package.
+
 ## Dependencies
 
 ```
@@ -410,6 +421,9 @@ P2 open items (beside P1)               │                   ├─ P7 render3d
                                         ├─ P4 ABI + claims ── P9 owners + package        │
                                         └─ P10 D3D12 + gates                             │
                          P11 remove D3D9 and legacy (after P1, P9, P10) ── P12 docs ─────┘
+
+P8a ── FO-0..2 · P8b ── FO-3 · P1 signed off ── FO-4 · P7 ── FO-5     (PLAN-FLEETOPS.md)
+P8 and FO: Roots ── Armada 1 (armada1/ in this repository)              (PLAN-ARMADA1.md)
 ```
 
 | Phase | Depends on | Can run beside | Agent time · bench passes · round |
@@ -426,22 +440,26 @@ P2 open items (beside P1)               │                   ├─ P7 render3d
 | 10 D3D12, gates | 1 | 9 | 3–6 h · 2–4 · E, plus the machines |
 | 11 remove D3D9 and legacy | 1, 9, 10 + two releases | — | 6–11 h · 2–3 · F |
 | 12 docs | 11 | — | 1–2 h · none · F |
+| Fleet Operations: Roots | FO-0/1 none; FO-2 8a; FO-3 8b; FO-4 1 signed off; FO-5 7 | 5–10 | 75–165 h · `PLAN-FLEETOPS.md` · FO-A to FO-C |
+| Armada 1 (`armada1/`) | 8 and Roots; Display7 on 1 and 10; shared fixed-function crate after 1 and 10 | — | 360–725 h · `PLAN-ARMADA1.md` |
 
-Summed, the agent time is about 55–115 hours, much of it in parallel worktrees.
+Summed, the agent time is about 55–115 hours, much of it in parallel worktrees, not
+counting the two other games.
 The wall-clock time is set by the five or six sign-off rounds and by the bench ("Pacing").
 
 ## Open decisions
 
-1. **QOLRules' shipped default.** Once it is its own layer, should `PayOnQueue` ship on
-   (as now) or off, so that installing the refit never changes single-player rules?
-2. **Where the overlay lives and what it is called**: keep `UIPlayer.ini` or rename it
-   (for example `RefitPlayer.ini`), in the game directory or the player's profile.
-3. **Packaging for modders**: built DLLs with ini files, source crates, or both. The
+Decided items leave this list for the text they decide: the overlay is `RefitPlayer.ini`
+in the game directory ("Settings descriptors and the player overlay"), QOLRules ships
+with `PayOnQueue` on (Phase 9), and Fleet Operations starts with Roots, then Armada 1 in
+`armada1/` ("Other games"), all 2026-11-02. The open questions of each game are in its
+plan.
+
+1. **Packaging for modders**: built DLLs with ini files, source crates, or both. The
    plan keeps code boundaries first and packaging granularity second.
-4. **Windows and Mac access** for Phase 10: who runs the native Direct3D 12 and the
+2. **Windows and Mac access** for Phase 10: who runs the native Direct3D 12 and the
    MoltenVK checks, and on which machines.
-5. **How long the Direct3D 9 path stays** after Phase 10: the plan's floor is two
+3. **How long the Direct3D 9 path stays** after Phase 10: the plan's floor is two
    releases with `auto` as the default; the user may shorten or lengthen it.
-6. **The renderer row in the Refit screen**: offer the backend choice to players
+4. **The renderer row in the Refit screen**: offer the backend choice to players
    (advanced tier), or leave it in `Display8.ini` only.
-7. **Fleet Operations**: when an install is available, which version to target first.
