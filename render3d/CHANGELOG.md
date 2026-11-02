@@ -4,6 +4,28 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.35.0 — 2026-11-02
+
+### Added
+- `settings.toml` and the generated `Render3D_Settings` table (`MSAA`, `HDR`, the eight
+  `[Modules]` flags, `World.Planets/Rocks/Nebulae/Surfaces`, `Nebulae.Lit`,
+  `Overlays.Fog/Grid/Selection/Ghosts/HeightPosts/Pivot`); the code reads those keys
+  through their rows. `Render3D_SettingsChanged` re-reads the live rows.
+- The shipped `Render3D.ini` has `[Modules]` with every module at 1.
+- Live without a restart: `Modules.hulls`, `.sky`, `.specials`, `World.Surfaces`,
+  `Nebulae.Lit` and the six `Overlays` keys. The others (`particles`, `effects`,
+  `ordnance`, `world`, `overlays`, `World.Planets/Rocks/Nebulae`, `MSAA`, `HDR`) are
+  latched at load: their engine hooks are installed once.
+
+### Changed
+- Every module is made at load behind an `on` flag, in place of the `MenuOnly`
+  wrappers; a module that is off is skipped by dispatch and is not `running()`, and one
+  without a menu-scene part and off at load is given no device, so installs nothing as before.
+- The height-post hook is installed whether or not `HeightPosts` is on (it hands every
+  call to the engine's while off).
+
+Installed, not yet seen in game.
+
 ## 0.34.0 — 2026-11-02
 
 ### Added

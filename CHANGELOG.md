@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.54.0 — 2026-11-02
+
+Layers: render3d 0.35.0, testbench 3.81.0.
+
+### Added
+- render3d's settings table and live paths (render3d 0.35.0); scenario
+  `render3d-settings-live` (testbench 3.81.0).
+
+Installed, not yet seen in game.
+
 ## 13.53.0 — 2026-11-02
 
 Layers: testbench 3.80.0.

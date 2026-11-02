@@ -709,6 +709,28 @@ claims is asked through `gpu::Gpu::claimed_by_others`: the selection bubbles
 
 ## Modules
 
+### Modules and settings
+
+Every module is made at load and has an `on` flag from `[Modules]` (and the overlay,
+`RefitPlayer.ini`). Dispatch (`lights`, `begin_view`, `step`, `object`, `feature`,
+`end_view`) skips a module that is off, and `mods::running(name)` is false, so the
+engine's draw of that part runs (through Display8's passthrough). The menu scene's calls
+(`device`, `reset`, `menu*`) still reach `hulls`, `sky` and `world` while off
+(`Module::in_menu`), since nothing could hand the front end's scene back; `hulls` clears
+the menu's shadow map and posed ships at each mission view (`idle_view`).
+
+`Render3D_SettingsChanged` (called by the UI hub after an overlay or ini change)
+re-reads the **live** rows: `Modules.hulls/sky/specials` (a module switched off lets go
+of its GPU objects at the next view), `World.Surfaces`, `Nebulae.Lit`, `Overlays.*`.
+The rest are **latched at load**, because the modules install engine hooks once
+(effects: shields, repair, debris, sparks; ordnance; particles; the nebula hooks of
+world; the height posts of overlays) and a hook cannot be switched off from outside
+without auditing each one to hand back to its predecessor; the flag of such a module is
+read at load only. Checked on the bench at RMSE 0: live `hulls=0`, `sky=0` and
+`World.Surfaces=0` against the baselines of the same keys at load
+(`testbench/scenarios/render3d-settings-live.md`). The other live rows (`specials`,
+`Nebulae.Lit`, `Overlays.*`) use the same mechanism and were not each flipped on the bench.
+
 ### effects
 
 `src/mods/effects/`, on by default. The game features that are effects, hull debris,
