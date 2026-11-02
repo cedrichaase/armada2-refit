@@ -59,6 +59,33 @@ Status values: **idea** (not investigated), **scoped** (approach known, nothing 
 | [QOL-8](#qol-8-long-moves-on-the-map-go-to-warp) | Long moves on the map go to warp | `QOL.asi`, `WarpDistance=` | A stock peer in a network game | **done** (`QOL.asi`), bench |
 | [QOL-9](#qol-9-the-view-reaches-across-the-map) | The view reaches across the map | `QOL.asi`, `ViewDistance=` | — | **done** (`QOL.asi`) |
 
+## Settings live
+
+Both plugins describe their keys to the Refit screen (`settings.toml` and
+`rules.settings.toml`, turned into `settings_table.h` / `rules_settings_table.h` by
+`tools/settings/gen.py`; contract: `tools/settings/README.md`) and read them through those
+rows, `RefitPlayer.ini` in front of the plugin's ini. The code never holds a default of its
+own: it was a `PanSpeed` of 1 in the code against 2.5 shipped, and the table's 2.5 won.
+
+**The patches stay installed and are gated.** A key at 0 used to leave its patch out; now
+the patch goes in whenever its site bytes match and the patched code reads a flag, so
+`QOL_SettingsChanged` (called by UI.asi's hub on the game thread after the overlay
+changes) can flip it. The log keeps the lines it always had and adds `gate:` lines for a
+patch that is in but switched off.
+
+| Key | Apply | How it flips |
+|---|---|---|
+| `PanSpeed` | live | the stub keeps the value `RTS_CFG.h` gave (`g_panOrig`) next to the factor; a change stores `orig x factor` again. 1 is a factor of 1: the store is unchanged |
+| `ShiftAddsToGroup` | live | `group_stub` tests the flag; the one byte that moves Shift's old meaning to Alt is written back or forth |
+| `StationGroups` | live | every station hook tests the flag (`sel_pre`, `bind_pre`, `producer_group`, `one_kind`, `focus_stub`) and takes the stock path when it is 0. Groups that already hold stations keep them |
+| `WarpDistance` | live | `warp_pre` already read the distance; 0 does what stock's Alt block did |
+| `ViewDistance` | mission | the two ART_CFG.h values are kept as parsed and re-raised on a change (and the copy a mission script restores from); the far plane is read when the mission's camera is made |
+| `MaxSelection` | restart | the selection array is moved at start; a bigger or smaller one is never re-applied |
+| `PayOnQueue` (QOLRules) | mission | the hooks are in whatever the key says; `g_pay` takes the key at `Program::GameOpenPreLoad`, so a queue is given back by the rules it was paid under. `QOLRules_Wanted`, which Online asks when a network game is set up, follows the key at once |
+
+`PayOnQueue` is the one row the players must agree on (scope must-match); it is on in the
+shipped `QOLRules.ini` and stays on until the layer split of the roadmap.
+
 ## Things that apply to all of them
 
 - **Multiplayer.** Anything that changes *what commands are issued* must keep issuing

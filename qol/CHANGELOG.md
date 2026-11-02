@@ -5,6 +5,37 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 1.9.0 — 2026-11-02
+
+### Added
+- Settings descriptors (A2SET_ABI 1.0): `QOL_Settings` (`settings.toml`, six rows on the
+  Gameplay tab: `PanSpeed`, `ShiftAddsToGroup`, `StationGroups`, `WarpDistance`, `ViewDistance`,
+  `MaxSelection`) and `QOLRules_Settings` (`rules.settings.toml`, `PayOnQueue`: default 1,
+  must match in a network game), with the generated `settings_table.h` and
+  `rules_settings_table.h`.
+- `QOL_SettingsChanged` and `QOLRules_SettingsChanged`, called by UI.asi's settings hub after
+  `RefitPlayer.ini` changes. QOL.log gets `settings: applied QOL.<Key>=<v>` (or `settings:
+  re-read, nothing changed`) and a `gate:` line for each patch installed but switched off.
+- Scenario `qol-settings-live` (testbench).
+
+### Changed
+- Every ini read of `QOL.asi` and `QOLRules.asi` goes through the `a2_ini_*` / `a2_set_*`
+  helpers, so `RefitPlayer.ini` (`[QOL.QOL]`, `[QOLRules.Rules]`) is read in front of
+  `QOL.ini` and `QOLRules.ini`. A row's default is the table's.
+- The patches stay installed whatever the keys say, behind flags the patched code reads, so
+  `PanSpeed` (re-scaled from the value `RTS_CFG.h` gave, kept), `ShiftAddsToGroup`,
+  `StationGroups`, `WarpDistance` and `ViewDistance` apply live (`ViewDistance`'s far plane
+  at the next mission). `MaxSelection` stays a restart. `PayOnQueue`'s hooks stay installed too;
+  a change takes hold when the next game starts (`Program::GameOpenPreLoad`), never mid-game,
+  and `QOLRules_Wanted` follows the new value at once. With the keys at 0 and at the shipped
+  values the game behaves as before.
+
+### Fixed
+- `PanSpeed`'s code default was 1 where the shipped `QOL.ini` says 2.5: with the key missing
+  the plugin left right-drag alone. The table's 2.5 is the default now.
+
+Installed, not yet seen in game.
+
 ## 1.8.0 — 2026-10-30
 
 ### Changed

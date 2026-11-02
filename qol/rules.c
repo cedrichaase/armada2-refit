@@ -67,6 +67,7 @@
 
 #define A2_FLTUSED
 #include "../csdk/a2asi.h"
+#include "rules_settings_table.h"
 
 /* ---- Producer layout and the engine's own functions (Armada2.exe, patch 1.1) */
 
@@ -128,7 +129,10 @@ static void logline(const char *s)
 
 /* ---- costs and the bank ------------------------------------------------ */
 
-static int g_pay;     /* PayOnQueue=1 */
+static A2Ini g_ini;   /* QOLRules.ini, with RefitPlayer.ini in front of it */
+static int g_pay;     /* the rules are in force in this game: PayOnQueue was 1 as it began */
+static int g_want;    /* PayOnQueue as the player has it now; g_pay takes it at the next game */
+static int g_patched; /* the hooks are in (they stay in, gated by g_pay) */
 static int g_trace;   /* Log=2: every hook, for finding what a path does */
 
 static void trace(const char *what, const BYTE *p)
@@ -161,7 +165,7 @@ static int rules_on(void)
 }
 
 /* for the online layer (Online.asi finds them by name) */
-__declspec(dllexport) int  __cdecl QOLRules_Wanted(void)    { return g_pay; }
+__declspec(dllexport) int  __cdecl QOLRules_Wanted(void)    { return g_want && g_patched; }
 __declspec(dllexport) void __cdecl QOLRules_Network(int on) { g_net = on != 0; }
 __declspec(dllexport) void __cdecl QOLRules_Reset(void)     { g_net = 0; g_latched = 0; g_latch = 0; }
 
@@ -485,6 +489,7 @@ static void __thiscall h_open(BYTE *prog, void *name)
 {
     g_latched = 0;
     g_latch = 0;
+    g_pay = g_want && g_patched;        /* a setting changed since is latched here */
     t_open(prog, name);
 }
 
@@ -603,26 +608,49 @@ static int patch_rules(void)
 
 /* ---- startup -------------------------------------------------------------- */
 
+/* Called by the UI's settings hub on the game thread after RefitPlayer.ini changed.
+ * PayOnQueue is latched at the next game's start (Program::GameOpenPreLoad), never
+ * mid-game: a queue already paid for must be given back by the rules it was paid
+ * under.  Online asks QOLRules_Wanted, which follows the new value at once. */
+__declspec(dllexport) void __cdecl QOLRules_SettingsChanged(void)
+{
+    int on = a2_set_int(&g_ini, QOLRULES_ROW_PAYONQUEUE) != 0;
+    char b[160];
+    if (on == g_want) {
+        logline("settings: re-read, nothing changed");
+        return;
+    }
+    g_want = on;
+    b[0] = 0;
+    s_cat(b, "settings: applied QOLRules.PayOnQueue=");
+    s_cat(b, on ? "1" : "0");
+    s_cat(b, g_patched ? "  (takes hold at the next game)" : "  (not patched, cannot apply)");
+    logline(b);
+}
+
 static void startup(void)
 {
-    char path[320], ini[320], b[200];
+    char b[200];
 
-    if (!a2_exe_dir(path, sizeof path)) return;
-    ini[0] = 0;       s_cat(ini, path);       s_cat(ini, "QOLRules.ini");
-    g_logpath[0] = 0; s_cat(g_logpath, path); s_cat(g_logpath, "QOLRules.log");
-    g_logging = (int)GetPrivateProfileIntA("Rules", "Log", 1, ini);
-    g_trace = g_logging > 1;
-    if (g_logging && g_logpath[0]) {
+    a2_ini_open(&g_ini, "QOLRules.ini", logline);
+    if (!g_ini.path[0]) return;
+    {
         char dir[320];
         a2_exe_dir(dir, sizeof dir);
-        a2_log_where(g_logpath, a2_log_path(g_logpath, sizeof g_logpath, dir, "QOLRules.log"));
+        g_logpath[0] = 0; s_cat(g_logpath, dir); s_cat(g_logpath, "QOLRules.log");
+        g_logging = (int)a2_ini_int(&g_ini, "Rules", "Log", 1);
+        g_trace = g_logging > 1;
+        if (g_logging && g_logpath[0])
+            a2_log_where(g_logpath, a2_log_path(g_logpath, sizeof g_logpath, dir, "QOLRules.log"));
     }
 
+    g_want = a2_set_int(&g_ini, QOLRULES_ROW_PAYONQUEUE) != 0;
+    g_patched = patch_rules();
     b[0] = 0;
     s_cat(b, "--- QOLRules PayOnQueue=");
-    if (GetPrivateProfileIntA("Rules", "PayOnQueue", 1, ini)) {
+    if (g_want) {
         s_cat(b, "1");
-        if (patch_rules()) {
+        if (g_patched) {
             g_pay = 1;
             s_cat(b, "  -> items are paid when queued, patched");
             s_cat(b, g_voice ? "; a refused order is announced as stock announces a stalled build"
@@ -634,6 +662,8 @@ static void startup(void)
         s_cat(b, "0  (items are paid as they start, as in stock)");
     }
     logline(b);
+    if (!g_want) logline(g_patched ? "gate: PayOnQueue off (hooks installed, gated)"
+                                   : "gate: PayOnQueue not patched, cannot apply");
 }
 
 BOOL __stdcall DllMain(HMODULE mod, DWORD reason, void *reserved)

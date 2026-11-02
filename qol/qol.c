@@ -114,6 +114,7 @@
 
 #define A2_FLTUSED
 #include "../csdk/a2asi.h"
+#include "settings_table.h"
 
 /* ---- addresses in this build (Armada2.exe, GOG patch 1.1) ------------- */
 
@@ -196,6 +197,13 @@ static DWORD g_sel[SEL_MAX];
 
 static char g_logpath[320];
 static int  g_logging = 1;
+static A2Ini g_ini;          /* QOL.ini, with RefitPlayer.ini in front of it */
+
+/* Every change is a flag the patched code reads (or a value it uses), so the
+ * patches stay installed and a setting applies live; see QOL_SettingsChanged. */
+static int g_panOk, g_shiftOk, g_stationsOk, g_warpOk, g_viewOk;   /* site bytes matched, patch in */
+int g_shiftAdds;      /* ShiftAddsToGroup */
+int g_stations;        /* StationGroups */
 
 /* A float with `places` decimals, for the log. */
 static void s_fixed(char *d, float v, int places)
@@ -242,12 +250,15 @@ static void logline(const char *s)
 
 /* ---- the pan-speed hook ----------------------------------------------- */
 
-float g_panSpeed = 1.0f;
+float g_panSpeed = 1.0f;     /* the factor; 1 leaves the parsed value as it is */
+float g_panOrig;             /* the value RTS_CFG.h gave, before the factor */
+int   g_panSet;              /* 1 once a parse has stored g_panOrig */
 
 /* After the stub's store: log what the game will use, once per parse. */
 void __cdecl pan_parsed(void)
 {
     char m[128];
+    if (g_panSpeed == 1.0f) return;
     m[0] = 0;
     s_cat(m, "RTS_CFG.h parsed: right-drag FASTSCROLL_COEFFICIENT now ");
     s_fixed(m, *(volatile float *)ADDR_FASTSCROLL, 4);
@@ -262,6 +273,8 @@ void __cdecl pan_parsed(void)
 __attribute__((naked)) void pan_stub(void)
 {
     __asm__ __volatile__(
+        "fsts _g_panOrig\n\t"
+        "movl $1, _g_panSet\n\t"
         "fmuls _g_panSpeed\n\t"
         "fstps 0x70fbb4\n\t"
         "pushal\n\t"
@@ -302,6 +315,9 @@ static const Site k_view = {
                        0x00 } };
 
 float g_viewDistance = 0.0f;
+float g_farOrig, g_cullOrig;     /* the two values ART_CFG.h gave */
+float g_farSet, g_cullSet;       /* what this plugin last stored in them */
+int   g_viewSet;                 /* 1 once a parse has stored the originals */
 
 void __cdecl view_parsed(void)
 {
@@ -309,8 +325,14 @@ void __cdecl view_parsed(void)
     volatile float *cull      = (volatile float *)ADDR_CULL_DIST;
     char m[160];
 
+    g_farOrig = *far_plane;
+    g_cullOrig = *cull;
+    g_viewSet = 1;
     if (*far_plane < g_viewDistance) *far_plane = g_viewDistance;
     if (*cull < g_viewDistance)      *cull = g_viewDistance;
+    g_farSet = *far_plane;
+    g_cullSet = *cull;
+    if (g_viewDistance <= 0.0f) return;
     m[0] = 0;
     s_cat(m, "ART_CFG.h parsed: FAR_CLIPPING_PLANE now ");
     s_num(m, f_round(*far_plane));
@@ -346,6 +368,8 @@ __attribute__((naked)) void group_stub(void)
         "movl 0x76133c, %edx\n\t"
         "cmpl $0, (%edx)\n\t"
         "jne 1f\n\t"
+        "cmpl $0, _g_shiftAdds\n\t"
+        "je 2f\n\t"
         "movl 0x761340, %eax\n\t"
         "cmpl $0, (%eax)\n\t"
         "je 2f\n\t"
@@ -379,16 +403,24 @@ static int patch_view(void)
     return 1;
 }
 
+/* The jump is always in; g_shiftAdds is what group_stub tests, and the one byte
+ * that moves Shift's old meaning to Alt follows it. */
 static int patch_groups(void)
 {
-    BYTE jmp[6], alt = 0x44;
+    BYTE jmp[6];
     if (!site_ok(&k_group_bind) || !site_ok(&k_group_focus)) return 0;
     jmp[0] = 0xE9;                                          /* jmp group_stub */
     *(LONG *)(jmp + 1) = (LONG)((DWORD)group_stub - (k_group_bind.at + 5));
     jmp[5] = 0x90;                                          /* nop */
     poke((BYTE *)k_group_bind.at, jmp, 6);
-    poke((BYTE *)k_group_focus.at + k_group_focus.patch, &alt, 1);
     return 1;
+}
+
+static void set_shift_adds(int on)
+{
+    BYTE b = on ? 0x44 : 0x40;                              /* g_pCommandAlt : g_pCommandShift */
+    g_shiftAdds = on;
+    if (g_shiftOk) poke((BYTE *)k_group_focus.at + k_group_focus.patch, &b, 1);
 }
 
 /* ---- stations in control groups --------------------------------------- */
@@ -478,7 +510,7 @@ int __cdecl sel_pre(BYTE *ov, BYTE *obj, int type)
     int   n = *(int *)(ov + OV_COUNT), i;
     typedef const int *(__thiscall *ListFn)(BYTE *);
 
-    if (n <= 0) return 0;
+    if (!g_stations || n <= 0) return 0;
     cur = ov_sel0(ov);
     if (!my_station(cur)) return 0;           /* ships, or someone else's: stock */
     if (my_station(obj) && *(void **)(obj + GO_CLASS) == *(void **)(cur + GO_CLASS))
@@ -503,7 +535,7 @@ int __cdecl bind_pre(BYTE *ov, int g, int replace)
     void *cls;
     int   station;
 
-    if (g < 0 || g > 9 || *(int *)(ov + OV_COUNT) <= 0) return 1;
+    if (!g_stations || g < 0 || g > 9 || *(int *)(ov + OV_COUNT) <= 0) return 1;
     cur = ov_sel0(ov);
     if (!is_obj(cur) || *(int *)(cur + GO_TEAM) != USER_TEAM()) return 1;   /* stock binds nothing */
     ship = ov + OV_SHIPGRP + 12 * g;
@@ -588,6 +620,8 @@ __attribute__((naked)) void focus_stub(void)
 {
     __asm__ __volatile__(
         "leal 0x14c(%ecx,%eax,4), %ebx\n\t"
+        "cmpl $0, _g_stations\n\t"
+        "je 1f\n\t"
         "movl (%ebx), %edx\n\t"
         "cmpl $0, (%edx)\n\t"
         "jne 1f\n\t"
@@ -604,7 +638,7 @@ __attribute__((naked)) void focus_stub(void)
  * A station's builds join no group (-1, which AddCraftToGroup ignores). */
 int __cdecl producer_group(BYTE *producer)
 {
-    return files_as_station(producer) ? -1 : *(int *)(producer + GO_LABEL);
+    return g_stations && files_as_station(producer) ? -1 : *(int *)(producer + GO_LABEL);
 }
 
 /* Replaces `mov eax,[esi+0x120]` (6 bytes at 0x4b9127, with a nop): esi = the
@@ -635,7 +669,7 @@ typedef int   (__thiscall *QueueSizeFn)(BYTE *producer);
 static int one_kind(BYTE **o, int n)
 {
     int i;
-    if (n < 2 || !my_station(o[0])) return 0;
+    if (!g_stations || n < 2 || !my_station(o[0])) return 0;
     for (i = 1; i < n; i++)
         if (!my_station(o[i]) || *(void **)(o[i] + GO_CLASS) != *(void **)(o[0] + GO_CLASS))
             return 0;
@@ -1073,99 +1107,223 @@ static int patch_selection(int max)
 
 /* ---- startup ---------------------------------------------------------- */
 
-static void build_paths(char *ini)
+static void build_paths(void)
 {
     char path[320];
-    if (!a2_exe_dir(path, sizeof path)) { ini[0] = 0; g_logpath[0] = 0; return; }
-    ini[0] = 0;       s_cat(ini, path);       s_cat(ini, "QOL.ini");
-    g_logpath[0] = 0; s_cat(g_logpath, path); s_cat(g_logpath, "QOL.log");
+    g_logpath[0] = 0;
+    if (!a2_exe_dir(path, sizeof path)) return;
+    s_cat(g_logpath, path); s_cat(g_logpath, "QOL.log");
+}
+
+static const char NOT_PATCHED[] = "  NOT PATCHED: site bytes differ -- not the Armada2.exe this was built for";
+
+/* The PanSpeed factor for a value as written: 1 (stock) for 1 and for what is not
+ * a number, otherwise 0.25 to 10.  *ok is 0 for a non-number. */
+static float pan_factor(const char *val, int *ok)
+{
+    float f = s_parse(val);
+    *ok = f >= 0.0f;
+    if (f < 0.0f || (f > 0.999f && f < 1.001f)) return 1.0f;
+    if (f < 0.25f) f = 0.25f;
+    if (f > 10.0f) f = 10.0f;
+    return f;
+}
+
+/* Puts the pan factor into the value the game is using, from the one RTS_CFG.h gave. */
+static void apply_pan(void)
+{
+    if (g_panOk && g_panSet) *(volatile float *)ADDR_FASTSCROLL = g_panOrig * g_panSpeed;
+}
+
+/* ViewDistance into the two ART_CFG.h values (and the copy a mission script restores
+ * from), from the ones the file gave; a value a script has changed since is left. */
+static void apply_view(void)
+{
+    volatile float *far_plane = (volatile float *)ADDR_FAR_PLANE;
+    volatile float *cull      = (volatile float *)ADDR_CULL_DIST;
+    volatile float *saved     = (volatile float *)(ADDR_CULL_DIST + 4);
+    float nf, nc;
+    if (!g_viewOk || !g_viewSet) return;
+    nf = g_viewDistance > g_farOrig ? g_viewDistance : g_farOrig;
+    nc = g_viewDistance > g_cullOrig ? g_viewDistance : g_cullOrig;
+    if (*far_plane == g_farSet) *far_plane = nf;
+    if (*cull == g_cullSet) { *cull = nc; *saved = nc; }
+    g_farSet = nf;
+    g_cullSet = nc;
+}
+
+/* One entry of the log line, naming a setting and the value now in force. */
+static void changed(char *m, int *n, const char *key, const char *val)
+{
+    if ((*n)++) s_cat(m, ", ");
+    s_cat(m, "QOL.");
+    s_cat(m, key);
+    s_cat(m, "=");
+    s_cat(m, val);
+}
+
+static void gate(const char *what, int on, int ok)
+{
+    char b[120];
+    b[0] = 0;
+    s_cat(b, "gate: ");
+    s_cat(b, what);
+    s_cat(b, !ok ? " not patched, cannot apply" : on ? " on" : " off (patch installed, gated)");
+    logline(b);
+}
+
+/* Called by the UI's settings hub on the game thread after RefitPlayer.ini changed:
+ * re-reads the live rows and applies what differs.  MaxSelection is read at start
+ * only.  Idempotent. */
+__declspec(dllexport) void __cdecl QOL_SettingsChanged(void)
+{
+    char  m[400], val[32];
+    int   n = 0, on, ok;
+    float f;
+
+    m[0] = 0;
+    s_cat(m, "settings: applied ");
+
+    a2_set_str(&g_ini, QOL_ROW_PANSPEED, val, sizeof val);
+    f = pan_factor(val, &ok);
+    if (f != g_panSpeed) {
+        g_panSpeed = f;
+        apply_pan();
+        changed(m, &n, "PanSpeed", val);
+        s_cat(m, " (coefficient ");
+        s_fixed(m, *(volatile float *)ADDR_FASTSCROLL, 4);
+        s_cat(m, ")");
+        if (!g_panOk) gate("PanSpeed", 0, 0);
+    }
+
+    on = a2_set_int(&g_ini, QOL_ROW_SHIFTADDSTOGROUP) != 0;
+    if (on != g_shiftAdds) {
+        set_shift_adds(on);
+        changed(m, &n, "ShiftAddsToGroup", on ? "1" : "0");
+        if (!g_shiftOk) gate("ShiftAddsToGroup", 0, 0);
+    }
+
+    on = a2_set_int(&g_ini, QOL_ROW_STATIONGROUPS) != 0;
+    if (on != g_stations) {
+        g_stations = on;
+        changed(m, &n, "StationGroups", on ? "1" : "0");
+        if (!g_stationsOk) gate("StationGroups", 0, 0);
+    }
+
+    a2_set_str(&g_ini, QOL_ROW_WARPDISTANCE, val, sizeof val);
+    f = s_parse(val);
+    if (f < 0.0f) f = 0.0f;
+    if (f != g_warpDistance) {
+        g_warpDistance = f;
+        changed(m, &n, "WarpDistance", val);
+        if (!g_warpOk) gate("WarpDistance", 0, 0);
+    }
+
+    a2_set_str(&g_ini, QOL_ROW_VIEWDISTANCE, val, sizeof val);
+    f = s_parse(val);
+    if (f < 0.0f) f = 0.0f;
+    if (f != g_viewDistance) {
+        g_viewDistance = f;
+        apply_view();
+        changed(m, &n, "ViewDistance", val);
+        if (!g_viewOk) gate("ViewDistance", 0, 0);
+    }
+
+    if (n) logline(m);
+    else   logline("settings: re-read, nothing changed");
 }
 
 static void startup(void)
 {
-    char  ini[320], val[32], b[200];
+    char  val[32], b[200];
     float f;
-    int   k, n;
+    int   k, n, ok;
 
-    build_paths(ini);
-    g_logging = (int)GetPrivateProfileIntA("QOL", "Log", 1, ini);
+    a2_ini_open(&g_ini, "QOL.ini", logline);
+    build_paths();
+    g_logging = (int)a2_ini_int(&g_ini, "QOL", "Log", 1);
     if (g_logging && g_logpath[0]) {
         char dir[320];
         a2_exe_dir(dir, sizeof dir);
         a2_log_where(g_logpath, a2_log_path(g_logpath, sizeof g_logpath, dir, "QOL.log"));
     }
-    GetPrivateProfileStringA("QOL", "PanSpeed", "1", val, sizeof val, ini);
-    f = s_parse(val);
+    a2_set_str(&g_ini, QOL_ROW_PANSPEED, val, sizeof val);
+    f = pan_factor(val, &ok);
+    g_panSpeed = f;
+    g_panOk = patch_pan();
 
     b[0] = 0;
     s_cat(b, "--- QOL PanSpeed=");
     s_cat(b, val);
-    if (f < 0.0f) {
+    if (!ok) {
         s_cat(b, "  (not a number: right-drag left alone)");
-    } else if (f > 0.999f && f < 1.001f) {
+    } else if (f == 1.0f) {
         s_cat(b, "  (1: right-drag left alone)");
     } else {
-        if (f < 0.25f) f = 0.25f;
-        if (f > 10.0f) f = 10.0f;
-        g_panSpeed = f;
         s_cat(b, "  -> x");
         s_fixed(b, f, 2);
-        s_cat(b, patch_pan() ? ", patched"
-                             : "  NOT PATCHED: site bytes differ -- not the Armada2.exe this was built for");
+        s_cat(b, g_panOk ? ", patched" : NOT_PATCHED);
     }
     logline(b);
+    if (f == 1.0f) gate("PanSpeed", 0, g_panOk);
 
     b[0] = 0;
     s_cat(b, "--- QOL ShiftAddsToGroup=");
-    if (GetPrivateProfileIntA("QOL", "ShiftAddsToGroup", 1, ini)) {
+    g_shiftOk = patch_groups();
+    if (a2_set_int(&g_ini, QOL_ROW_SHIFTADDSTOGROUP)) {
         s_cat(b, "1");
-        s_cat(b, patch_groups() ? "  -> Shift+N adds to group N, Alt+N selects and centres, patched"
-                                : "  NOT PATCHED: site bytes differ -- not the Armada2.exe this was built for");
+        if (g_shiftOk) set_shift_adds(1);
+        s_cat(b, g_shiftOk ? "  -> Shift+N adds to group N, Alt+N selects and centres, patched" : NOT_PATCHED);
     } else {
         s_cat(b, "0  (number keys left alone)");
     }
     logline(b);
+    if (!g_shiftAdds) gate("ShiftAddsToGroup", 0, g_shiftOk);
 
     b[0] = 0;
     s_cat(b, "--- QOL StationGroups=");
-    if (GetPrivateProfileIntA("QOL", "StationGroups", 1, ini)) {
+    g_stationsOk = patch_stations();
+    if (a2_set_int(&g_ini, QOL_ROW_STATIONGROUPS)) {
         s_cat(b, "1");
-        s_cat(b, patch_stations() ? "  -> stations of one kind select and group together, patched"
-                                  : "  NOT PATCHED: site bytes differ -- not the Armada2.exe this was built for");
+        if (g_stationsOk) g_stations = 1;
+        s_cat(b, g_stationsOk ? "  -> stations of one kind select and group together, patched" : NOT_PATCHED);
     } else {
         s_cat(b, "0  (stations select and group as in stock)");
     }
     logline(b);
+    if (!g_stations) gate("StationGroups", 0, g_stationsOk);
 
-    GetPrivateProfileStringA("QOL", "WarpDistance", WARP_DEFAULT, val, sizeof val, ini);
+    a2_set_str(&g_ini, QOL_ROW_WARPDISTANCE, val, sizeof val);
     f = s_parse(val);
+    g_warpOk = patch_warp();
     b[0] = 0;
     s_cat(b, "--- QOL WarpDistance=");
     s_cat(b, val);
     if (f <= 0.0f) {
         s_cat(b, f < 0.0f ? "  (not a number: moves left alone)" : "  (0: moves left alone)");
     } else {
-        g_warpDistance = f;
-        s_cat(b, patch_warp() ? "  -> a move farther than that goes to warp, patched"
-                              : "  NOT PATCHED: site bytes differ -- not the Armada2.exe this was built for");
+        if (g_warpOk) g_warpDistance = f;
+        s_cat(b, g_warpOk ? "  -> a move farther than that goes to warp, patched" : NOT_PATCHED);
     }
     logline(b);
+    if (g_warpDistance <= 0.0f) gate("WarpDistance", 0, g_warpOk);
 
-    GetPrivateProfileStringA("QOL", "ViewDistance", VIEW_DEFAULT, val, sizeof val, ini);
+    a2_set_str(&g_ini, QOL_ROW_VIEWDISTANCE, val, sizeof val);
     f = s_parse(val);
+    g_viewOk = patch_view();
     b[0] = 0;
     s_cat(b, "--- QOL ViewDistance=");
     s_cat(b, val);
     if (f <= 0.0f) {
         s_cat(b, f < 0.0f ? "  (not a number: view left alone)" : "  (0: view left alone)");
     } else {
-        g_viewDistance = f;
-        s_cat(b, patch_view() ? "  -> far plane and object culling raised to it, patched"
-                              : "  NOT PATCHED: site bytes differ -- not the Armada2.exe this was built for");
+        if (g_viewOk) g_viewDistance = f;
+        s_cat(b, g_viewOk ? "  -> far plane and object culling raised to it, patched" : NOT_PATCHED);
     }
     logline(b);
+    if (g_viewDistance <= 0.0f) gate("ViewDistance", 0, g_viewOk);
 
-    k = (int)GetPrivateProfileIntA("QOL", "MaxSelection", 40, ini);
+    k = (int)a2_set_int(&g_ini, QOL_ROW_MAXSELECTION);
     b[0] = 0;
     s_cat(b, "--- QOL MaxSelection=");
     s_num(b, k);
@@ -1182,7 +1340,7 @@ static void startup(void)
             s_num(b, n + 5);
             s_cat(b, " sites patched");
         } else {
-            s_cat(b, "  NOT PATCHED: site bytes differ -- not the Armada2.exe this was built for");
+            s_cat(b, NOT_PATCHED);
         }
     }
     logline(b);
