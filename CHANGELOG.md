@@ -17,6 +17,13 @@ Layers: qol 1.9.0, testbench 3.83.0.
 
 ### Fixed
 - `QOL.asi`'s `PanSpeed` code default is 2.5, as shipped, not 1.
+## 13.53.0 — 2026-11-02
+
+Layers: testbench 3.80.0.
+
+### Added
+- Bench side of the `RefitPlayer.ini` overlay: clones start without it, a scenario
+  `Overlay:` header, `a2test drive overlay` for live flips (testbench 3.80.0).
 
 Installed, not yet seen in game.
 
