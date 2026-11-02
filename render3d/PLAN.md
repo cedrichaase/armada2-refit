@@ -120,6 +120,18 @@ Background and measurements live outside the repo, in
 - 2026-10-15: `GameFeature_RenderAll` is re-implemented as a loop (each feature with
   flag bit 4 at `+0x20` gets `Render(cam, isMain)`, vtable `+0x20`), so modules take
   features one by one.
+- 2026-11-02: **the split into core, modules and content begins** (ROADMAP phase 7).
+  The contracts are in code, staged in the one crate until the crates are split:
+  `Module` version 2 (`src/core_module.rs`: `priority`, `claims`, `rows`, `configure`,
+  `provide`, `hooks`, `on`, `off`, `formats_changed`), the hook registry
+  (`src/core_hooks.rs`, with the frame's own hooks on it), the services' traits
+  (`src/core_services.rs`), the recipe lookup (`src/core_recipes.rs`) and
+  `config::Section`. The registry orders by priority instead of a name list, keeps
+  stood-down modules in place, and reads every flag at each settings change (the
+  modules whose hooks do not hand back yet refuse, logged). The settings rows are split
+  into per-module fragments (`src/mods/<m>/settings.toml`) and exported as one table.
+  `lint-layers.sh` counts what is still in the wrong layer. README.md, "Module
+  interface". Nothing draws differently.
 
 ## Milestone 4: how a module is built
 

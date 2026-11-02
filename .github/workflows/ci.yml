@@ -87,6 +87,8 @@ jobs:
         run: CARGO="$(command -v cargo)" ui/build.sh
       - name: Build Display8 (d3d8.dll)
         run: CARGO="$(command -v cargo)" display/build.sh
+      - name: render3d's layer rules (report; strict per directory as the modules are split)
+        run: render3d/lint-layers.sh
       - name: a2fmt on the host
         run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path crates/a2fmt/Cargo.toml
       - name: a2ini on the host (the overlay's edit against tools/settings/fixtures)
@@ -94,8 +96,8 @@ jobs:
 
   # The settings descriptors (tools/settings/README.md): overlay.py, gen.py and lint.py
   # against their fixtures, every generated table and the row's definition in a2rt and
-  # csdk/a2asi.h up to date with the schema, and every settings.toml against its shipped
-  # ini and its layer's sources.
+  # csdk/a2asi.h up to date with the schema, and every settings.toml (a plugin's table
+  # and its modules' fragments, as one) against its shipped ini and its layer's sources.
   settings:
     runs-on: ubuntu-24.04
     steps:

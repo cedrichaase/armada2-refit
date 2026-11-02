@@ -1,0 +1,5 @@
+Core On
+Beta On
+Shared B
+Alpha On
+Shared A

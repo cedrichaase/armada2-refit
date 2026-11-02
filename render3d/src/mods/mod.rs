@@ -1,23 +1,30 @@
-//! Modules: each takes over one or more of the body's steps, or the drawing of some
-//! objects in the object loop, from the engine. A step no module takes is the
-//! engine's own (`frame::steps`).
+//! The module registry (README.md, "Module interface"): every module, made at load, in
+//! priority order (`Module::priority`), each with its on flag. The interface is
+//! `core_module`; a module's hooks go through `core_hooks`, what it offers the others
+//! through `core_services`.
 //!
-//! A module is switched per category in `Render3D.ini` (`[Modules]`, `<name>=1`), and a
-//! module that replaces a plugin's work stands down while that plugin is loaded (its
-//! `superseded()`), so the plugin keeps drawing its part inside the engine's step.
+//! A module is switched per category in `Render3D.ini` (`[Modules]`, `<name>=1`, read
+//! through its row of the core's table), and a module that replaces a plugin's work
+//! stands down while that plugin is loaded (its `superseded()`), so the plugin keeps
+//! drawing its part inside the engine's step.
 //!
-//! Every module is made at load and has an `on` flag (`Entry`): dispatch skips a module
-//! that is off, and its `running()` is false, so the engine's own draw takes the part
-//! back. `hulls`, `sky` and `specials` are read again when the settings change
-//! (`settings_changed`); the others are latched at load, because they re-point engine
-//! calls whose hooks are installed once (README.md, "Modules and settings"). A module
-//! that is off at load and has no part in the menu scene (`in_menu`) is never given a
-//! device, so it installs nothing, as before.
+//! Dispatch skips a module that is off, and its `running()` is false, so the engine's
+//! own draw takes the part back. Every module's flag is read again when the settings
+//! change (`settings_changed`): one switched off gets `off()` there and lets go of its
+//! GPU objects at the next view; one switched on gets its `hooks()` the first time, then
+//! `on()`, and its `device()` at its next view if it never had this device. A module
+//! whose hooks are not yet gated by its flag (`NOT_YET_LIVE`) still refuses a live
+//! change, logged, and changes at the next launch (README.md, "Modules and settings").
+//! A module that is off at load and has no part in the menu scene (`in_menu`) is never
+//! given a device, so it installs nothing, as before.
+use crate::core_hooks::{Gate, Hooks};
+use crate::core_module::Changes;
+pub use crate::core_module::{Module, ModuleId, Step};
 use crate::frame::steps::View;
 use crate::log;
-use crate::rt::settings;
-use crate::settings_table::*;
-use core::sync::atomic::{AtomicU32, Ordering};
+use crate::rt::settings::{self, Setting};
+use crate::settings_table::SETTINGS;
+use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 pub mod effects;
 pub mod hulls;
@@ -30,136 +37,89 @@ pub mod world;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-/// The steps of the body a module can take over (`body-map.md`, section 2).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Step {
-    /// `Background_Render`: sky, stars, background objects, then the depth clear.
-    Background,
-    /// `Terrain_Geometry::Render`: footprints, tactical grid, fog, shroud.
-    Terrain,
-    /// The whole object loop (`Nebula::sCullOccludedNebula` and every `Render`).
-    Objects,
-    /// `Ordnance::RenderAll`.
-    Ordnance,
-    /// `SpecialObjectEffect::RenderAll`.
-    Specials,
-    /// `GameFeature_RenderAll`.
-    Features,
-    /// `RenderWarpSpriteEffects`.
-    Warp,
-    /// `RenderChunks`: debris.
-    Chunks,
-    /// `RenderParticleList`.
-    Particles,
-    /// Not an engine step: just before the device's `Flush` draws the sorted
-    /// translucent triangles. Returning true does not skip the flush.
-    Translucent,
-    /// `RenderSelectionEffects`.
-    Selection,
-}
+/// The modules whose hooks are not yet installed through `core_hooks` behind their
+/// flag: a live change of their `[Modules]` row is refused (logged) and applies at the
+/// next launch. One line per module; each is taken out when its hooks hand back.
+const NOT_YET_LIVE: &[&str] = &[
+    "world",
+    "particles",
+    "effects",
+    "ordnance",
+    "overlays",
+];
 
-pub trait Module {
-    fn name(&self) -> &'static str;
-    /// The plugin whose work this module replaces; while it is loaded the module
-    /// stands down.
-    fn superseded(&self) -> Option<&'static str> {
-        None
-    }
-    /// Has a part in the menu scene (the front end has no game objects and the engine
-    /// draws nothing there, so nothing could take that part back): it gets its device,
-    /// resets and menu calls even while its `[Modules]` flag is 0. In a mission it does
-    /// nothing then, and is not `running()`.
-    fn in_menu(&self) -> bool {
-        false
-    }
-    /// A view of a mission while the module is off but `in_menu`: drop what the menu
-    /// scene left that the mission's views must not see.
-    fn idle_view(&mut self, _v: &View) {}
-    /// A device to draw on (first frame, or after a new device): every plugin is
-    /// loaded by now.
-    fn device(&mut self) {}
-    /// Before a `Reset`. `gpu` lets go of its objects and makes them again itself; what
-    /// a module does here is for what they held: a target's contents are lost (a bake to
-    /// do again), and a texture or buffer made `Transient` cannot be made again (made
-    /// anew by its owner).
-    fn reset(&mut self) {}
-    /// Before the engine lets go of its device (`frame::forget`): as `reset`, unless a
-    /// module holds more.
-    fn forget(&mut self) {
-        self.reset();
-    }
-    /// Once per view, after `GameObject_PreRenderAll` and `Ordnance::PreRenderAll`
-    /// registered the engine's lights: register any light of one's own with the engine
-    /// (`ST3D_GraphicsEngine::RegisterLight`), so `scene::lights()` and the engine's own
-    /// draws both see it. The engine deletes the records at the end of the view.
-    fn lights(&mut self, _v: &View) {}
-    /// Once per view, after the lights are registered and before any step.
-    fn begin_view(&mut self, _v: &View) {}
-    /// Draws a step in the engine's place; true if it did (the engine's is skipped).
-    fn step(&mut self, _s: Step, _v: &View) -> bool {
-        false
-    }
-    /// Draws an object in the object loop in the engine's place (its `Render`); true if
-    /// it did. Called for every object that is not a background object and not culled.
-    fn object(&mut self, _obj: usize, _v: &View) -> bool {
-        false
-    }
-    /// Draws a game feature (`GameFeature_RenderAll`'s loop: explosions, shield hits,
-    /// sparks, construction, ghosts, the build ghost...) in the engine's place; true if
-    /// it did. Tell them apart by vtable.
-    fn feature(&mut self, _f: usize, _v: &View) -> bool {
-        false
-    }
-    /// Once per view, after the last flush, before the lights are deleted.
-    fn end_view(&mut self, _v: &View) {}
-    /// The menu scene (`crate::menu`): before its first pass that draws hulls (their
-    /// poses, the shadow map).
-    fn menu_begin(&mut self, _shot: &crate::menu::Shot, _v: &View) {}
-    /// The menu scene: one pass of it, for the part this module draws.
-    fn menu(&mut self, _pass: crate::menu::Pass, _shot: &crate::menu::Shot, _v: &View) {}
+/// Every module built in, one line each (the crates' features choose them later).
+fn built_in() -> Vec<Box<dyn Module>> {
+    alloc::vec![
+        Box::new(world::World::default()) as Box<dyn Module>,
+        Box::new(particles::Particles::default()),
+        Box::new(hulls::Hulls::default()),
+        Box::new(effects::Effects::new()),
+        Box::new(ordnance::Ordnance::new()),
+        Box::new(specials::Specials::default()),
+        Box::new(sky::Sky::default()),
+        Box::new(overlays::Overlays::default()),
+    ]
 }
 
 /// A module and whether it runs.
 struct Entry {
     m: Box<dyn Module>,
-    on: bool,
-    /// Read again by `settings_changed`; else latched at load.
-    live: bool,
-    row: &'static settings::Setting,
+    id: ModuleId,
+    /// Its on flag: dispatch reads it, and its hooks' gate is it.
+    flag: &'static AtomicBool,
+    row: &'static Setting,
     /// Let go of its GPU objects at the next view (it was just switched off).
     forget: bool,
+    /// Its `hooks()` ran.
+    hooked: bool,
+    /// A hook it cannot draw without did not install: never switched on.
+    failed: bool,
+    /// Stood down beside its superseded plugin (`settle`): never dispatched.
+    down: bool,
+    /// The device generation it last had a `device()` for.
+    dev: u32,
 }
 
 impl Entry {
+    fn on(&self) -> bool {
+        self.flag.load(Ordering::Relaxed)
+    }
     /// Gets a device, resets and the menu scene's calls.
     fn present(&self) -> bool {
-        self.on || self.m.in_menu()
+        !self.down && (self.on() || self.m.in_menu())
     }
 }
 
 static mut MODS: Vec<Entry> = Vec::new();
 static mut ACTIVE: bool = false;
-/// Which modules are on (`NAMES`' bits), from load on; `running` adds the first frame.
+/// Which modules are on (bit = registry index), from load on; `running` adds the
+/// first frame.
 static ON: AtomicU32 = AtomicU32::new(0);
+/// Bumped at every `device()`: a module switched on later gets its own at its next view.
+static mut DEV_GEN: u32 = 0;
 
-/// The modules, in dispatch order.
-const NAMES: [&str; 8] = ["world", "particles", "hulls", "effects", "ordnance", "specials", "sky", "overlays"];
-
-fn bit(name: &str) -> u32 {
-    NAMES.iter().position(|n| *n == name).map_or(0, |i| 1 << i)
+fn index(name: &str) -> Option<usize> {
+    all().iter().position(|e| e.m.name() == name)
 }
 
-/// Whether a module runs (asked by another module, e.g. whether a class of nebula is
-/// drawn as a volume). False before the first frame, and for a module that is off
-/// (one kept for the menu scene's part only is not running).
+/// Whether a module runs: false before the first frame, and for a module that is off
+/// (one kept for the menu scene's part only is not running). A logging aid: module
+/// code asks for a capability (`core_services`), never for a module by name.
 pub fn running(name: &str) -> bool {
-    let active = unsafe { ACTIVE };
-    active && ON.load(Ordering::Relaxed) & bit(name) != 0
+    index(name).is_some_and(|i| running_id(ModuleId(i as u8)))
 }
 
-/// Whether a module's flag is on (true from load on, unlike `running`).
+/// `running`, by registry index.
+pub fn running_id(id: ModuleId) -> bool {
+    let active = unsafe { ACTIVE };
+    active && (id.0 as u32) < 32 && ON.load(Ordering::Relaxed) & (1 << id.0) != 0
+}
+
+/// Whether a module's flag is on (true from load on, unlike `running`). A logging aid,
+/// as `running`.
 pub fn enabled(name: &str) -> bool {
-    ON.load(Ordering::Relaxed) & bit(name) != 0
+    index(name).is_some_and(|i| ON.load(Ordering::Relaxed) & (1 << i) != 0)
 }
 
 #[allow(static_mut_refs)]
@@ -167,12 +127,25 @@ fn all() -> &'static mut Vec<Entry> {
     unsafe { &mut MODS }
 }
 
+/// The `[Modules] <name>` row of the core's table.
+fn module_row(name: &str) -> Option<&'static Setting> {
+    SETTINGS.iter().find(|r| r.section() == "Modules" && r.key() == name)
+}
+
 /// Makes every module, with the flags `[Modules]` (and the overlay) says. Called once
 /// at load.
 pub fn init() {
     let ini = crate::config::ini();
+    let mut made = built_in();
+    made.sort_by_key(|m| m.priority());
+    for w in made.windows(2) {
+        assert!(w[0].priority() != w[1].priority(), "modules {} and {} share a priority", w[0].name(), w[1].name());
+    }
     let mods = all();
-    let mut add = |m: Box<dyn Module>, row: &'static settings::Setting, live: bool| {
+    for (i, m) in made.into_iter().enumerate() {
+        let Some(row) = module_row(m.name()) else {
+            panic!("module {} has no [Modules] row in render3d/settings.toml", m.name());
+        };
         let on = settings::on(&ini, row);
         if on {
             log!("module {}: loaded", m.name());
@@ -181,56 +154,102 @@ pub fn init() {
         } else {
             log!("module {}: off (Render3D.ini [Modules] {}=1 turns it on)", m.name(), m.name());
         }
-        mods.push(Entry { m, on, live, row, forget: false });
-    };
-    // One line per module; the first that takes a step or an object draws it.
-    // particles before hulls: it takes the latinum nebulae, which draw through the
-    // plain GameObject::Render as hulls do.
-    // world first: it takes the nebulae (latinum included) and the rocks whose class has
-    // a recipe, and leaves every other one to particles and hulls.
-    // world=0, hulls=0 and sky=0 keep the menu scene's planets, nebulae, ships and sky.
-    add(Box::new(world::World::default()), MODULES_WORLD, false);
-    add(Box::new(particles::Particles::default()), MODULES_PARTICLES, false);
-    add(Box::new(hulls::Hulls::default()), MODULES_HULLS, true);
-    add(Box::new(effects::Effects::new()), MODULES_EFFECTS, false);
-    add(Box::new(ordnance::Ordnance::new()), MODULES_ORDNANCE, false);
-    add(Box::new(specials::Specials::default()), MODULES_SPECIALS, true);
-    add(Box::new(sky::Sky::default()), MODULES_SKY, true);
-    add(Box::new(overlays::Overlays::default()), MODULES_OVERLAYS, false);
+        let flag: &'static AtomicBool = Box::leak(Box::new(AtomicBool::new(on)));
+        mods.push(Entry { m, id: ModuleId(i as u8), flag, row, forget: false, hooked: false, failed: false, down: false, dev: 0 });
+    }
+    for e in mods.iter_mut() {
+        e.m.provide(e.id, crate::core_services::services_mut());
+    }
+    for e in mods.iter_mut() {
+        e.m.configure(&ini, &mut Changes::default());
+    }
+    for e in mods.iter_mut() {
+        if e.on() && switch_on(e) {
+            e.m.on();
+        }
+    }
     publish_flags();
+}
+
+/// A module being switched on: its hooks, the first time. False (and the flag shut) if
+/// one it cannot draw without did not install.
+fn switch_on(e: &mut Entry) -> bool {
+    if e.failed {
+        e.flag.store(false, Ordering::Relaxed);
+        return false;
+    }
+    if !e.hooked {
+        e.hooked = true;
+        let mut h = Hooks::for_module(e.id, e.m.name(), Gate(e.flag));
+        e.m.hooks(&mut h);
+        if let Some(why) = h.down() {
+            log!("module {}: stands down: {}", e.m.name(), why);
+            e.failed = true;
+            e.flag.store(false, Ordering::Relaxed);
+            return false;
+        }
+    }
+    e.flag.store(true, Ordering::Relaxed);
+    true
+}
+
+/// The `[Modules]` row of a module, for the registry's callers.
+pub fn row_of(name: &str) -> Option<&'static Setting> {
+    index(name).map(|i| all()[i].row)
+}
+
+/// Each module's `rows()`, in priority order, appended to the core's for
+/// `Render3D_Settings` (`crate::settings_rows`). With `Enable=0` no module is made,
+/// so only the core's rows are exported.
+pub fn export_rows(out: &mut Vec<Setting>) {
+    for e in all().iter() {
+        for r in e.m.rows() {
+            // `Setting` is plain data (pointers to statics): copied bit for bit.
+            out.push(unsafe { core::ptr::read(r) });
+        }
+    }
 }
 
 fn publish_flags() {
     let mut m = 0;
     for e in all().iter() {
-        m |= if e.on { bit(e.m.name()) } else { 0 };
+        if e.on() && !e.down {
+            m |= 1 << e.id.0;
+        }
     }
     ON.store(m, Ordering::Relaxed);
 }
 
-/// The flags of the modules `live` read again, after the ini or the overlay changed
+/// The flags read again, after the ini or the overlay changed
 /// (`Render3D_SettingsChanged`, on the game thread). A module switched off lets go of
 /// its GPU objects at the next view, and the engine's own draw takes its part back at
 /// once. Returns the changes as `Modules.<name>=<0|1>, ...`.
-pub fn settings_changed() -> alloc::string::String {
-    let ini = crate::config::ini();
-    let mut said = alloc::string::String::new();
+fn settings_changed(ini: &crate::rt::Ini) -> Changes {
+    let mut said = Changes::default();
     for e in all().iter_mut() {
-        if !e.live {
+        if e.down {
             continue;
         }
-        let on = settings::on(&ini, e.row);
-        if on == e.on {
+        let want = settings::on(ini, e.row);
+        if want == e.on() {
             continue;
         }
-        e.on = on;
-        if !on {
+        let name = e.m.name();
+        if NOT_YET_LIVE.contains(&name) {
+            log!("settings: Modules.{} changes at the next launch (hooks not yet live)", name);
+            continue;
+        }
+        if want {
+            if !switch_on(e) {
+                continue;
+            }
+            e.m.on();
+        } else {
+            e.flag.store(false, Ordering::Relaxed);
+            e.m.off();
             e.forget = true;
         }
-        if !said.is_empty() {
-            said.push_str(", ");
-        }
-        said.push_str(&crate::sfmt!("Modules.{}={}", e.m.name(), on as u32));
+        said.note(&crate::sfmt!("Modules.{}={}", name, want as u32));
     }
     publish_flags();
     said
@@ -238,30 +257,41 @@ pub fn settings_changed() -> alloc::string::String {
 
 /// The modules that stood down for a superseded plugin: their row and the plugin's file
 /// name (`Render3D_SettingsNote`, asked on the game thread).
-static mut STOOD: Vec<(&'static settings::Setting, &'static str)> = Vec::new();
+static mut STOOD: Vec<(&'static Setting, &'static str)> = Vec::new();
 
-/// The plugin a module's row stood down for, if it did (`settle`).
-pub fn stood_down_for(row: *const settings::Setting) -> Option<&'static str> {
+/// The plugin a module's row stood down for, if it did (`settle`). The row is the
+/// exported copy's or the table's: compared by section and key.
+pub fn stood_down_for(row: *const Setting) -> Option<&'static str> {
+    if row.is_null() {
+        return None;
+    }
+    let row = unsafe { &*row };
     #[allow(static_mut_refs)]
     let v = unsafe { &STOOD };
-    v.iter().find(|(r, _)| core::ptr::eq(*r, row)).map(|(_, p)| *p)
+    v.iter().find(|(r, _)| core::ptr::eq(r.section, row.section) && core::ptr::eq(r.key, row.key)).map(|(_, p)| *p)
 }
 
-/// At the first frame, when every plugin is loaded: drop the modules whose plugin is.
+/// At the first frame, when every plugin is loaded: the modules whose plugin is stand
+/// down (they keep their place in the registry, and are never dispatched).
 pub fn settle() {
     let mods = all();
-    mods.retain(|e| match e.m.superseded() {
-        Some(p) if crate::plugin_loaded(p) => {
-            #[allow(static_mut_refs)]
-            unsafe { STOOD.push((e.row, p)) };
-            log!("module {}: {} is loaded, which draws this part; the module stands down", e.m.name(), p);
-            false
+    for e in mods.iter_mut() {
+        if let Some(p) = e.m.superseded() {
+            if crate::plugin_loaded(p) {
+                #[allow(static_mut_refs)]
+                unsafe { STOOD.push((e.row, p)) };
+                log!("module {}: {} is loaded, which draws this part; the module stands down", e.m.name(), p);
+                e.down = true;
+                e.flag.store(false, Ordering::Relaxed);
+            }
         }
-        _ => true,
-    });
+    }
     publish_flags();
     for e in mods.iter() {
-        if e.on {
+        if e.down {
+            continue;
+        }
+        if e.on() {
             log!("module {}: on", e.m.name());
         } else if e.m.in_menu() {
             log!("module {}: on, for the menu scene only", e.m.name());
@@ -271,9 +301,14 @@ pub fn settle() {
 }
 
 pub fn device() {
+    let g = unsafe {
+        DEV_GEN = DEV_GEN.wrapping_add(1).max(1);
+        DEV_GEN
+    };
     for e in all().iter_mut() {
         if e.present() {
             e.m.device();
+            e.dev = g;
         }
     }
 }
@@ -295,12 +330,18 @@ pub fn forget() {
 }
 
 /// Modules switched off since the last view let go of their GPU objects (they make
-/// them again themselves when switched on, or for the menu scene).
+/// them again themselves when switched on, or for the menu scene); modules switched on
+/// since their device's `device()` get it now.
 fn let_go() {
+    let g = unsafe { DEV_GEN };
     for e in all().iter_mut() {
         if e.forget {
             e.forget = false;
             e.m.forget();
+        }
+        if g != 0 && e.present() && e.dev != g {
+            e.m.device();
+            e.dev = g;
         }
     }
 }
@@ -308,7 +349,7 @@ fn let_go() {
 pub fn lights(v: &View) {
     let_go();
     for e in all().iter_mut() {
-        if !e.on {
+        if !e.on() || e.down {
             continue;
         }
         let _z = crate::timing::zone(e.m.name());
@@ -318,7 +359,10 @@ pub fn lights(v: &View) {
 
 pub fn begin_view(v: &View) {
     for e in all().iter_mut() {
-        if !e.on {
+        if e.down {
+            continue;
+        }
+        if !e.on() {
             if e.m.in_menu() {
                 e.m.idle_view(v);
             }
@@ -332,7 +376,7 @@ pub fn begin_view(v: &View) {
 pub fn step(s: Step, v: &View) -> bool {
     let mut done = false;
     for e in all().iter_mut() {
-        if !e.on {
+        if !e.on() || e.down {
             continue;
         }
         let _z = crate::timing::zone(e.m.name());
@@ -348,7 +392,7 @@ pub fn step(s: Step, v: &View) -> bool {
 
 pub fn object(o: usize, v: &View) -> bool {
     for e in all().iter_mut() {
-        if !e.on {
+        if !e.on() || e.down {
             continue;
         }
         let _z = crate::timing::zone(e.m.name());
@@ -382,7 +426,7 @@ fn survey(o: usize) {
 
 pub fn feature(f: usize, v: &View) -> bool {
     for e in all().iter_mut() {
-        if !e.on {
+        if !e.on() || e.down {
             continue;
         }
         let _z = crate::timing::zone(e.m.name());
@@ -411,7 +455,7 @@ pub fn menu(pass: crate::menu::Pass, shot: &crate::menu::Shot, v: &View) {
 
 pub fn end_view(v: &View) {
     for e in all().iter_mut() {
-        if !e.on {
+        if !e.on() || e.down {
             continue;
         }
         let _z = crate::timing::zone(e.m.name());
@@ -420,54 +464,41 @@ pub fn end_view(v: &View) {
 }
 
 /// What render3d claims to draw now (gpu/src/display.rs, "Claims"; README.md,
-/// "Claims"): each module running, `[Overlays] Fog` and `Selection` apart. Nothing
-/// before the first frame, and nothing for a module at 0 (kept for the menu scene only
-/// is not running) or one standing down beside its old plugin. Display8 drops none of
-/// the engine's 3D draws for these: a module that draws a category skips the engine's
-/// step, so what the engine still issues (a hand-back) is drawn.
+/// "Claims"): the OR of every running module's `claims()`. Nothing before the first
+/// frame, and nothing for a module at 0 (kept for the menu scene only is not running)
+/// or one standing down beside its old plugin. Display8 drops none of the engine's 3D
+/// draws for these: a module that draws a category skips the engine's step, so what
+/// the engine still issues (a hand-back) is drawn.
 pub extern "C" fn claims() -> u32 {
-    use gpu::display::*;
+    // Read only: Display8 may ask while the game thread is inside the registry.
+    #[allow(static_mut_refs)]
+    let mods = unsafe { &*core::ptr::addr_of!(MODS) };
     let mut c = 0;
-    for (name, bit) in [
-        ("sky", CLAIM_SKY),
-        ("hulls", CLAIM_HULLS),
-        ("world", CLAIM_WORLD),
-        ("particles", CLAIM_PARTICLES),
-        ("effects", CLAIM_EFFECTS),
-        ("ordnance", CLAIM_ORDNANCE),
-        ("specials", CLAIM_SPECIALS),
-    ] {
-        if running(name) {
-            c |= bit;
-        }
-    }
-    if running("overlays") {
-        let (fog, sel) = overlays::claims();
-        if fog {
-            c |= CLAIM_FOG;
-        }
-        if sel {
-            c |= CLAIM_SELECTION;
+    for e in mods.iter() {
+        if running_id(e.id) {
+            c |= e.m.claims();
         }
     }
     c
 }
 
 pub fn any() -> bool {
-    unsafe { ACTIVE && !MODS.is_empty() }
+    unsafe { ACTIVE && all().iter().any(|e| !e.down) }
 }
 
-/// `Render3D_SettingsChanged`'s body for the modules: the flags, then the keys the
-/// modules read through rows. Returns what changed, for the log line.
+/// `Render3D_SettingsChanged`'s body for the modules: every module's `configure`
+/// (whether it runs or not), in priority order, then the flags (a module switched on
+/// gets `hooks()` and `on()` with its configuration read). Returns what changed, for
+/// the log line: the flags first, then the keys.
 pub fn apply_settings() -> alloc::string::String {
-    let mut said = settings_changed();
-    for part in [world::settings_changed(), overlays::settings_changed()] {
-        if !part.is_empty() {
-            if !said.is_empty() {
-                said.push_str(", ");
-            }
-            said.push_str(&part);
+    let ini = crate::config::ini();
+    let mut parts = Changes::default();
+    for e in all().iter_mut() {
+        if !e.down {
+            e.m.configure(&ini, &mut parts);
         }
     }
-    said
+    let mut said = settings_changed(&ini);
+    said.note(&parts.0);
+    said.0
 }

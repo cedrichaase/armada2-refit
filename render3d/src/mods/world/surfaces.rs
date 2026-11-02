@@ -11,7 +11,7 @@
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::rt::{self, settings, Ini};
-use crate::settings_table::WORLD_SURFACES;
+use super::settings_table::WORLD_SURFACES;
 use crate::shaders::world_surface::*;
 use crate::shaders::world_surface_spv::*;
 use crate::shaders::world_surface_dxil::*;

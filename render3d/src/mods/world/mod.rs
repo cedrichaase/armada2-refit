@@ -14,6 +14,7 @@
 //! `[World] Reload=1`; `[World] Enable=0` hands everything back to the engine at once,
 //! for comparing with stock at the same moment on the bench.
 pub mod lights;
+pub mod settings_table;
 pub mod nebulae;
 pub mod planets;
 pub mod rocks;
@@ -49,7 +50,7 @@ use crate::engine;
 use crate::frame::steps::View;
 use crate::log;
 use crate::rt::settings;
-use crate::settings_table::{WORLD_NEBULAE, WORLD_PLANETS, WORLD_ROCKS, WORLD_SURFACES};
+use settings_table::{WORLD_NEBULAE, WORLD_PLANETS, WORLD_ROCKS, WORLD_SURFACES};
 
 pub struct World {
     surfaces: surfaces::Surfaces,
@@ -172,6 +173,19 @@ fn on(b: bool) -> &'static str {
 impl Module for World {
     fn name(&self) -> &'static str {
         "world"
+    }
+    fn priority(&self) -> i32 {
+        10
+    }
+    fn claims(&self) -> u32 {
+        gpu::display::CLAIM_WORLD
+    }
+    fn rows(&self) -> &'static [crate::rt::settings::Setting] {
+        &settings_table::ROWS
+    }
+    fn configure(&mut self, _ini: &crate::rt::Ini, said: &mut crate::core_module::Changes) {
+        // Its live rows, read again (until its own reader takes every section).
+        said.note(&settings_changed());
     }
     /// `[Modules] world=0` keeps the menu scene's planet and gas.
     fn in_menu(&self) -> bool {

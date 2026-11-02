@@ -29,12 +29,47 @@ for t in settings rules.settings; do
 done
 if python3 "$here/gen.py" --check; then ok "gen.py --check"; else bad "gen.py --check"; fi
 
+# 2b. fragments: a plugin's table and its modules' exported as one, in the order asked
+frag="$tables/good-fragments"
+if python3 "$here/gen.py" --rows "$frag/settings.toml" beta alpha | cmp -s - "$frag/expected-rows.txt"; then
+    ok "gen.py --rows (fragments in module order)"
+else
+    bad "gen.py --rows (fragments in module order)"
+fi
+# Render3D's export keeps the order it had before its rows were split into fragments:
+# the core's, then each module's in its priority (`fn priority` in the module's source).
+r3d="$here/../../render3d"
+order="$(python3 - "$r3d" <<'PY'
+import os, re, sys
+r3d = sys.argv[1]
+mods = []
+for m in sorted(os.listdir(os.path.join(r3d, 'src', 'mods'))):
+    f = os.path.join(r3d, 'src', 'mods', m, 'mod.rs')
+    if os.path.isfile(f):
+        g = re.search(r'fn priority\(&self\) -> i32 \{\s*(-?\d+)\s*\}', open(f).read())
+        if g:
+            mods.append((int(g.group(1)), m))
+print(' '.join(m for _, m in sorted(mods)))
+PY
+)"
+# shellcheck disable=SC2086
+if [ -n "$order" ] && python3 "$here/gen.py" --rows "$r3d/settings.toml" $order | cmp -s - "$fx/render3d-rows.txt"; then
+    ok "Render3D_Settings row order unchanged ($order)"
+else
+    bad "Render3D_Settings row order (modules: $order)"
+    # shellcheck disable=SC2086
+    python3 "$here/gen.py" --rows "$r3d/settings.toml" $order | diff "$fx/render3d-rows.txt" - | head -20 || true
+fi
+
 # 3. the lint
 if python3 "$here/lint.py" "$tables"/good/*.toml >/dev/null; then ok "lint.py good"; else bad "lint.py good"; python3 "$here/lint.py" "$tables"/good/*.toml; fi
+mapfile -t fragtables < <(find "$frag" -name '*settings.toml' | sort)
+if python3 "$here/lint.py" "${fragtables[@]}" >/dev/null; then ok "lint.py good-fragments"; else bad "lint.py good-fragments"; python3 "$here/lint.py" "${fragtables[@]}"; fi
 for d in "$tables"/bad-*/; do
     name="$(basename "$d")"
     want="$(cat "$d/expect.txt")"
-    if out="$(python3 "$here/lint.py" "$d"*.toml 2>&1)"; then
+    mapfile -t these < <(find "$d" -name '*settings.toml' | sort)
+    if out="$(python3 "$here/lint.py" "${these[@]}" 2>&1)"; then
         bad "lint.py $name passed"
     elif grep -qF -- "$want" <<<"$out"; then
         ok "lint.py $name"

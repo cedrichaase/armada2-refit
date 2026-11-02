@@ -12,6 +12,10 @@ pub use a2rt::{dump, log, sfmt};
 pub mod assets;
 pub mod clock;
 pub mod config;
+pub mod core_hooks;
+pub mod core_module;
+pub mod core_recipes;
+pub mod core_services;
 pub mod engine;
 pub mod frame;
 pub mod gfx;
@@ -59,6 +63,32 @@ pub const DOWN_SEAM: u32 = 2;
 /// The 3D view's targets or post shaders could not be made (no usable device).
 pub const DOWN_DEVICE: u32 = 3;
 
+/// `Render3D_Settings`' one table (A2SET_ABI 1.0, contiguous rows): the core's rows,
+/// then each built-in module's in priority order (README.md, "Modules and settings").
+/// Built once at load; the row constants the code reads with stay the tables' own.
+static mut ROWS: alloc::vec::Vec<rt::settings::Setting> = alloc::vec::Vec::new();
+static ROWS_BUILT: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+
+fn build_rows() {
+    let mut v = alloc::vec::Vec::new();
+    for r in settings_table::SETTINGS.iter() {
+        // `Setting` is plain data (pointers to statics): copied bit for bit.
+        v.push(unsafe { core::ptr::read(r) });
+    }
+    mods::export_rows(&mut v);
+    log!("settings: {} rows exported ({} the core's)", v.len(), settings_table::SETTINGS.len());
+    unsafe { ROWS = v };
+    ROWS_BUILT.store(true, core::sync::atomic::Ordering::Release);
+}
+
+/// The rows `Render3D_Settings` returns (`settings_table.rs`).
+pub fn settings_rows() -> &'static [rt::settings::Setting] {
+    if !ROWS_BUILT.load(core::sync::atomic::Ordering::Acquire) {
+        build_rows();
+    }
+    unsafe { &*core::ptr::addr_of!(ROWS) }
+}
+
 fn startup() {
     rt::init();
     let cfg = config::load();
@@ -72,10 +102,12 @@ fn startup() {
         if cfg.timing && frame::install_measure() {
             log!("timing: the engine's own body is timed (Enable=0)");
         }
+        build_rows();
         return;
     }
     config::set(cfg);
     mods::init();
+    build_rows();
     if frame::install() {
         // With Display8 (contract 1.1) the modules' claims are asked every frame
         // (README.md, "Claims"); a render3d that does not hook the frame claims nothing.

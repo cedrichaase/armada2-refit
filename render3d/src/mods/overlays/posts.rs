@@ -19,7 +19,7 @@ use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::log;
 use crate::rt::settings;
-use crate::settings_table::OVERLAYS_HEIGHTPOSTS;
+use super::settings_table::OVERLAYS_HEIGHTPOSTS;
 use crate::math::V3;
 use crate::shaders::overlays::*;
 use crate::shaders::overlays_spv::*;

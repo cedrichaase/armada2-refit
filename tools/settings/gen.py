@@ -5,6 +5,9 @@ and the generator of everything built from it (tools/settings/README.md).
     gen.py                    write every generated file
     gen.py --check            exit 1, naming them, when a generated file is out of date
     gen.py --emit TABLE.toml [--lang rs|h]   print one table's generated file
+    gen.py --rows TABLE.toml [MODULE ...]    print the rows a plugin exports, as
+                              `Section Key`: the table's, then its fragments' in the
+                              order given (default: by `module` name)
 
 It writes:
   - the row's definition, between the GENERATED markers of crates/a2rt/src/settings.rs
@@ -13,7 +16,12 @@ It writes:
   - for every `settings.toml` (or `<name>.settings.toml`) in the repository, its table:
     `src/<name>settings_table.rs` beside a Cargo.toml, else `<name>settings_table.h`
     (`rules.settings.toml` gives `rules_settings_table.h`), with the static array, one
-    named constant per row and the `<plugin>_Settings` export.
+    named constant per row and the `<plugin>_Settings` export;
+  - for every fragment (a `settings.toml` with `module = "<name>"`: one module's rows of
+    a plugin whose table is in a directory above it), `settings_table.rs` beside it (or
+    `src/settings_table.rs` beside a Cargo.toml) with `pub static ROWS`, the named
+    constants and `MODULE`, and no export: the plugin's table then exports its own rows
+    followed by its built-in modules' (`crate::settings_rows()`, assembled at init).
 """
 import os
 import re
@@ -143,9 +151,15 @@ def load(path):
             t = tomllib.load(f)
     except (OSError, tomllib.TOMLDecodeError) as e:
         raise TableError(f'{rel(path)}: {e}')
-    for k in ('plugin', 'file', 'shipped'):
+    if 'module' in t and (not isinstance(t['module'], str) or not re.fullmatch(r'[a-z][a-z0-9_]*', t['module'])):
+        raise TableError(f'{rel(path)}: module `{t["module"]}` is not a lower-case identifier')
+    for k in ('plugin', 'file') + (() if 'module' in t else ('shipped',)):
         if not isinstance(t.get(k), str) or not t[k]:
             raise TableError(f'{rel(path)}: top-level `{k}` missing')
+    shared = t.get('shared_sections', [])
+    if not isinstance(shared, list) or not all(isinstance(x, str) for x in shared):
+        raise TableError(f'{rel(path)}: `shared_sections` must be a list of section names')
+    t['shared_sections'] = shared
     if not re.fullmatch(r'[A-Za-z][A-Za-z0-9]*', t['plugin']):
         raise TableError(f'{rel(path)}: plugin `{t["plugin"]}` is not an identifier')
     rows = t.get('row', [])
@@ -155,13 +169,78 @@ def load(path):
     return t
 
 
+def is_fragment(path):
+    return 'module' in load(path)
+
+
 def output_path(path):
     """Where a table's generated file goes."""
     d, base = os.path.split(path)
     stem = base[:-len('settings.toml')].replace('.', '_') + 'settings_table'
     if os.path.exists(os.path.join(d, 'Cargo.toml')):
         return os.path.join(d, 'src', stem + '.rs')
+    if is_fragment(path):
+        return os.path.join(d, stem + '.rs')
     return os.path.join(d, stem + '.h')
+
+
+def walk_tables(top):
+    """Every settings table under `top`, in a stable order (the fixtures' excepted)."""
+    out = []
+    fixtures = os.path.join(ROOT, 'tools', 'settings', 'fixtures')
+    for d, dirs, files in os.walk(top):
+        dirs[:] = sorted(x for x in dirs if x not in SKIP_DIRS
+                         and (os.path.join(d, x) != fixtures or top.startswith(fixtures)))
+        for f in sorted(files):
+            if f == 'settings.toml' or f.endswith('.settings.toml'):
+                out.append(os.path.join(d, f))
+    return out
+
+
+def same_plugin(a, b):
+    return a['plugin'] == b['plugin'] and a['file'].lower() == b['file'].lower()
+
+
+def base_of(path):
+    """A fragment's plugin table: the nearest table above it of the same plugin and file
+    that is not a fragment itself."""
+    t = load(path)
+    d = os.path.dirname(os.path.dirname(path))
+    while True:
+        for f in sorted(os.listdir(d)):
+            p = os.path.join(d, f)
+            if (f == 'settings.toml' or f.endswith('.settings.toml')) and os.path.isfile(p):
+                b = load(p)
+                if 'module' not in b and same_plugin(b, t):
+                    return p
+        if d in (ROOT, os.path.dirname(d)):
+            raise TableError(f'{rel(path)}: fragment of {t["plugin"]} ({t["file"]}) with no table of that plugin above it')
+        d = os.path.dirname(d)
+
+
+def fragments_of(path):
+    """A plugin table's fragments: the tables below its directory with its plugin and
+    file and a `module`, by module name."""
+    t = load(path)
+    out = []
+    for p in walk_tables(os.path.dirname(path)):
+        if p == path:
+            continue
+        f = load(p)
+        if 'module' in f and same_plugin(f, t) and base_of(p) == path:
+            out.append(p)
+    mods = [load(p)['module'] for p in out]
+    if len(set(mods)) != len(mods):
+        raise TableError(f'{rel(path)}: two fragments for one module ({", ".join(sorted(mods))})')
+    return sorted(out, key=lambda p: load(p)['module'])
+
+
+def shipped_of(path):
+    """The shipped ini a table is checked against: its own, or its plugin table's."""
+    t = load(path)
+    if 'module' in t and 'shipped' not in t:
+        return load(base_of(path))['shipped']
+    return t['shipped']
 
 
 def rel(p):
@@ -230,12 +309,19 @@ def rows_of(t, path):
 def emit_rs(t, path):
     rows = rows_of(t, path)
     p = t['plugin']
-    o = [f'// generated by tools/settings/gen.py from {rel(path)}; do not edit',
-         f'//! The settings rows of {p} (A2SET_ABI {ABI}): read a key only through its row',
-         '//! (`rt::settings::on(&ini, ROW)`), so the default is the table\'s.',
-         '#![allow(dead_code)]',
-         'use crate::rt::settings::*;', '',
-         f'pub static SETTINGS: [Setting; {len(rows)}] = [']
+    frag = t.get('module')
+    array = 'ROWS' if frag else 'SETTINGS'
+    o = [f'// generated by tools/settings/gen.py from {rel(path)}; do not edit']
+    if frag:
+        o += [f'//! The settings rows of {p}\'s module `{frag}` (A2SET_ABI {ABI}): read a key only',
+              '//! through its row (`rt::settings::on(&ini, ROW)`), so the default is the table\'s.',
+              f'//! `{p}_Settings` exports them after the plugin\'s own, in module priority order.']
+    else:
+        o += [f'//! The settings rows of {p} (A2SET_ABI {ABI}): read a key only through its row',
+              '//! (`rt::settings::on(&ini, ROW)`), so the default is the table\'s.']
+    o += ['#![allow(dead_code)]',
+          'use crate::rt::settings::*;', '',
+          f'pub static {array}: [Setting; {len(rows)}] = [']
     for _, r in rows:
         def s(v):
             return 'core::ptr::null()' if v is None else f'c"{esc(v)}".as_ptr()'
@@ -252,7 +338,24 @@ def emit_rs(t, path):
         o.append('    },')
     o += ['];', '']
     for i, (n, _) in enumerate(rows):
-        o.append(f'pub const {n.upper()}: &Setting = &SETTINGS[{i}];')
+        o.append(f'pub const {n.upper()}: &Setting = &{array}[{i}];')
+    if frag:
+        o += ['', '/// The module these rows belong to (its `[Modules]` key).',
+              f'pub const MODULE: &str = "{frag}";']
+        return '\n'.join(o) + '\n'
+    if fragments_of(path):
+        o += ['',
+              f'/// The table, for the UI\'s settings hub (`count` may be NULL): these rows, then each',
+              '/// built-in module\'s fragment, in priority order (`crate::settings_rows()`).',
+              '#[unsafe(no_mangle)]',
+              f'pub extern "C" fn {p}_Settings(count: *mut u32) -> *const Setting {{',
+              '    let rows = crate::settings_rows();',
+              '    if !count.is_null() {',
+              '        unsafe { *count = rows.len() as u32 };',
+              '    }',
+              '    rows.as_ptr()',
+              '}']
+        return '\n'.join(o) + '\n'
     o += ['',
           f'/// The table, for the UI\'s settings hub (`count` may be NULL).',
           '#[unsafe(no_mangle)]',
@@ -302,7 +405,21 @@ def emit_h(t, path):
 def emit(path, lang=None):
     t = load(path)
     lang = lang or ('rs' if output_path(path).endswith('.rs') else 'h')
+    if lang == 'h' and ('module' in t or fragments_of(path)):
+        raise TableError(f'{rel(path)}: fragments are for Rust plugins only')
     return emit_rs(t, path) if lang == 'rs' else emit_h(t, path)
+
+
+def exported(path, order=None):
+    """(section, key) of every row a plugin exports, in order: its table's, then its
+    fragments' in `order` (module names; default: by name; a fragment left out of
+    `order` is a module not built in)."""
+    out = [(r['section'], r['key']) for _, r in rows_of(load(path), path)]
+    frags = {load(p)['module']: p for p in fragments_of(path)}
+    for m in (order if order is not None else sorted(frags)):
+        if m in frags:
+            out += [(r['section'], r['key']) for _, r in rows_of(load(frags[m]), frags[m])]
+    return out
 
 
 SKIP_DIRS = {'.git', '.claude', 'target', 'node_modules', '__pycache__', 'build'}
@@ -310,14 +427,7 @@ SKIP_DIRS = {'.git', '.claude', 'target', 'node_modules', '__pycache__', 'build'
 
 def tables():
     """Every settings table of the repository (the fixtures' excepted)."""
-    out = []
-    fixtures = os.path.join(ROOT, 'tools', 'settings', 'fixtures')
-    for d, dirs, files in os.walk(ROOT):
-        dirs[:] = sorted(x for x in dirs if x not in SKIP_DIRS and os.path.join(d, x) != fixtures)
-        for f in sorted(files):
-            if f == 'settings.toml' or f.endswith('.settings.toml'):
-                out.append(os.path.join(d, f))
-    return out
+    return walk_tables(ROOT)
 
 
 def wanted():
@@ -341,6 +451,17 @@ def current(path):
 
 
 def main(argv):
+    if argv[:1] == ['--rows']:
+        if len(argv) < 2:
+            print(__doc__.strip(), file=sys.stderr)
+            return 2
+        try:
+            for sec, key in exported(os.path.abspath(argv[1]), argv[2:] or None):
+                print(f'{sec} {key}')
+        except TableError as e:
+            print(f'gen.py: {e}', file=sys.stderr)
+            return 1
+        return 0
     if argv[:1] == ['--emit']:
         if len(argv) not in (2, 4) or (len(argv) == 4 and argv[2] != '--lang'):
             print(__doc__.strip(), file=sys.stderr)

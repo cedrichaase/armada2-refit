@@ -205,36 +205,9 @@ impl LightPool {
     }
 }
 
-/// Settings from `Render3D.ini`, one section per part.
-pub struct Sec(&'static str, crate::rt::Ini);
-
-impl Sec {
-    pub fn new(name: &'static str) -> Sec {
-        Sec(name, crate::config::ini())
-    }
-    pub fn f(&self, key: &str, def: f32) -> f32 {
-        self.1.float(self.0, key, def)
-    }
-    pub fn i(&self, key: &str, def: i32) -> i32 {
-        self.1.int(self.0, key, def)
-    }
-    /// A colour as `r,g,b` in 0..255, returned in 0..1.
-    pub fn rgb(&self, key: &str, def: [f32; 3]) -> V3 {
-        let c = self.1.floats(self.0, key, def);
-        v3(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
-    }
-    /// Three plain floats.
-    pub fn v3(&self, key: &str, def: [f32; 3]) -> V3 {
-        let c = self.1.floats(self.0, key, def);
-        v3(c[0], c[1], c[2])
-    }
-    pub fn pair(&self, key: &str, def: [f32; 2]) -> [f32; 2] {
-        self.1.floats(self.0, key, def)
-    }
-    pub fn s(&self, key: &str) -> Option<alloc::string::String> {
-        self.1.string(self.0, key)
-    }
-}
+/// Settings from `Render3D.ini`, one section per part (`config::Section`, re-exported
+/// here until the helpers move into the core).
+pub use crate::config::Section as Sec;
 
 pub struct Effects {
     ex: explosions::Explosions,
@@ -292,6 +265,16 @@ impl Module for Effects {
     fn name(&self) -> &'static str {
         "effects"
     }
+    fn priority(&self) -> i32 {
+        40
+    }
+    fn claims(&self) -> u32 {
+        gpu::display::CLAIM_EFFECTS
+    }
+    fn rows(&self) -> &'static [crate::rt::settings::Setting] {
+        &[]
+    }
+    fn configure(&mut self, _ini: &crate::rt::Ini, _said: &mut crate::core_module::Changes) {}
     fn device(&mut self) {
         if self.hooked {
             return;

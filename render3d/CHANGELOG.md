@@ -4,6 +4,40 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.37.0 — 2026-11-02
+
+### Added
+- The module interface, version 2 (`src/core_module.rs`): every module answers
+  `priority`, `claims`, `rows` and `configure`, and may answer `provide`, `hooks`,
+  `on`, `off` and `formats_changed`. The registry orders by priority (world 10 ...
+  overlays 80, as before) in place of a name list, and `mods::claims` is the OR of the
+  running modules' `claims()`.
+- The hook registry (`src/core_hooks.rs`: `Site`, `Hook`, `Hooks::install`, `Prev`,
+  `Gate`), which checks a call site or vtable slot against stock before writing and logs
+  `hooks: <owner> <used by> at <symbol> (0x..) installed`. The frame's seams,
+  `DestroyRenderSurfaces` and the device's `Reset` go through it.
+- The services' traits (`src/core_services.rs`: `HullDraw`, `WaveDraw`, `PostDraw`,
+  `GhostDraw`), the recipe lookup (`src/core_recipes.rs`; the sky's recipes, the menu's
+  `map.ini` and the built-in `ordnance.ini` are read through it) and `config::Section`
+  (effects' `Sec`, re-exported).
+- Per-module settings fragments: world's rows in `src/mods/world/settings.toml`,
+  overlays' in `src/mods/overlays/settings.toml`; `Render3D_Settings` returns the
+  core's rows and then each module's, one table in the same order as before (21 rows).
+  Render3D.log: `settings: N rows exported`.
+- `lint-layers.sh`, which counts engine reads, cross-module paths, modules asked for by
+  name and content names outside their layer (report mode; `--strict DIR...`).
+
+### Changed
+- Every module's `[Modules]` flag is read at each settings change. One whose hooks do
+  not hand back yet (world, particles, effects, ordnance, overlays) refuses the change,
+  logged `settings: Modules.<m> changes at the next launch (hooks not yet live)`.
+- A module that stands down beside its superseded plugin keeps its place in the
+  registry (it is never dispatched); a module switched on after its device was made
+  gets its `device()` at its next view.
+- With `Enable=0` only the core's ten rows are exported (no module is made).
+
+Installed, not yet seen in game.
+
 ## 0.36.0 — 2026-11-02
 
 ### Added

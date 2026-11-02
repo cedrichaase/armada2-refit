@@ -4,7 +4,7 @@
 #![allow(dead_code)]
 use crate::rt::settings::*;
 
-pub static SETTINGS: [Setting; 21] = [
+pub static SETTINGS: [Setting; 10] = [
     Setting {
         size: ROW_SIZE,
         kind: KIND_ENUM,
@@ -165,182 +165,6 @@ pub static SETTINGS: [Setting; 21] = [
         label: c"Overlays".as_ptr(),
         help: c"render3d draws the fog of war, grid, selection and ghosts.".as_ptr(),
     },
-    Setting {
-        size: ROW_SIZE,
-        kind: KIND_BOOL,
-        apply: APPLY_RESTART,
-        scope: SCOPE_LOCAL,
-        tab: TAB_GRAPHICS,
-        flags: 0,
-        file: c"Render3D.ini".as_ptr(),
-        section: c"World".as_ptr(),
-        key: c"Planets".as_ptr(),
-        def: c"1".as_ptr(),
-        values: core::ptr::null(),
-        value_labels: core::ptr::null(),
-        label: c"Planets".as_ptr(),
-        help: c"render3d draws the planets and moons. Off hands them back to the game.".as_ptr(),
-    },
-    Setting {
-        size: ROW_SIZE,
-        kind: KIND_BOOL,
-        apply: APPLY_RESTART,
-        scope: SCOPE_LOCAL,
-        tab: TAB_GRAPHICS,
-        flags: 0,
-        file: c"Render3D.ini".as_ptr(),
-        section: c"World".as_ptr(),
-        key: c"Rocks".as_ptr(),
-        def: c"1".as_ptr(),
-        values: core::ptr::null(),
-        value_labels: core::ptr::null(),
-        label: c"Asteroids".as_ptr(),
-        help: c"render3d draws asteroids and scrap. Off hands them back to the game.".as_ptr(),
-    },
-    Setting {
-        size: ROW_SIZE,
-        kind: KIND_BOOL,
-        apply: APPLY_RESTART,
-        scope: SCOPE_LOCAL,
-        tab: TAB_GRAPHICS,
-        flags: 0,
-        file: c"Render3D.ini".as_ptr(),
-        section: c"World".as_ptr(),
-        key: c"Nebulae".as_ptr(),
-        def: c"1".as_ptr(),
-        values: core::ptr::null(),
-        value_labels: core::ptr::null(),
-        label: c"Nebulae".as_ptr(),
-        help: c"render3d draws nebulae as lit gas. Off hands them back to the game.".as_ptr(),
-    },
-    Setting {
-        size: ROW_SIZE,
-        kind: KIND_BOOL,
-        apply: APPLY_LIVE,
-        scope: SCOPE_LOCAL,
-        tab: TAB_GRAPHICS,
-        flags: 0,
-        file: c"Render3D.ini".as_ptr(),
-        section: c"Nebulae".as_ptr(),
-        key: c"Lit".as_ptr(),
-        def: c"1".as_ptr(),
-        values: core::ptr::null(),
-        value_labels: core::ptr::null(),
-        label: c"Lit nebula gas".as_ptr(),
-        help: c"Explosions, shots and beams light the gas they are in. Needs the Vulkan or Direct3D 12 renderer.".as_ptr(),
-    },
-    Setting {
-        size: ROW_SIZE,
-        kind: KIND_BOOL,
-        apply: APPLY_LIVE,
-        scope: SCOPE_LOCAL,
-        tab: TAB_GRAPHICS,
-        flags: 0,
-        file: c"Render3D.ini".as_ptr(),
-        section: c"World".as_ptr(),
-        key: c"Surfaces".as_ptr(),
-        def: c"1".as_ptr(),
-        values: core::ptr::null(),
-        value_labels: core::ptr::null(),
-        label: c"Planet and asteroid surfaces".as_ptr(),
-        help: c"Planets and asteroids use render3d's surface recipes. Off keeps their original textures.".as_ptr(),
-    },
-    Setting {
-        size: ROW_SIZE,
-        kind: KIND_BOOL,
-        apply: APPLY_LIVE,
-        scope: SCOPE_LOCAL,
-        tab: TAB_GRAPHICS,
-        flags: 0,
-        file: c"Render3D.ini".as_ptr(),
-        section: c"Overlays".as_ptr(),
-        key: c"Fog".as_ptr(),
-        def: c"1".as_ptr(),
-        values: core::ptr::null(),
-        value_labels: core::ptr::null(),
-        label: c"Fog of war".as_ptr(),
-        help: c"render3d draws the fog of war and the shroud.".as_ptr(),
-    },
-    Setting {
-        size: ROW_SIZE,
-        kind: KIND_BOOL,
-        apply: APPLY_LIVE,
-        scope: SCOPE_LOCAL,
-        tab: TAB_GRAPHICS,
-        flags: 0,
-        file: c"Render3D.ini".as_ptr(),
-        section: c"Overlays".as_ptr(),
-        key: c"Grid".as_ptr(),
-        def: c"1".as_ptr(),
-        values: core::ptr::null(),
-        value_labels: core::ptr::null(),
-        label: c"Grid".as_ptr(),
-        help: c"render3d draws the tactical grid.".as_ptr(),
-    },
-    Setting {
-        size: ROW_SIZE,
-        kind: KIND_BOOL,
-        apply: APPLY_LIVE,
-        scope: SCOPE_LOCAL,
-        tab: TAB_GRAPHICS,
-        flags: 0,
-        file: c"Render3D.ini".as_ptr(),
-        section: c"Overlays".as_ptr(),
-        key: c"Selection".as_ptr(),
-        def: c"1".as_ptr(),
-        values: core::ptr::null(),
-        value_labels: core::ptr::null(),
-        label: c"Selection".as_ptr(),
-        help: c"render3d draws the selection bubbles.".as_ptr(),
-    },
-    Setting {
-        size: ROW_SIZE,
-        kind: KIND_BOOL,
-        apply: APPLY_LIVE,
-        scope: SCOPE_LOCAL,
-        tab: TAB_GRAPHICS,
-        flags: 0,
-        file: c"Render3D.ini".as_ptr(),
-        section: c"Overlays".as_ptr(),
-        key: c"Ghosts".as_ptr(),
-        def: c"1".as_ptr(),
-        values: core::ptr::null(),
-        value_labels: core::ptr::null(),
-        label: c"Ghosts".as_ptr(),
-        help: c"render3d draws the ghosts of what the fog has hidden.".as_ptr(),
-    },
-    Setting {
-        size: ROW_SIZE,
-        kind: KIND_BOOL,
-        apply: APPLY_LIVE,
-        scope: SCOPE_LOCAL,
-        tab: TAB_GRAPHICS,
-        flags: 0,
-        file: c"Render3D.ini".as_ptr(),
-        section: c"Overlays".as_ptr(),
-        key: c"HeightPosts".as_ptr(),
-        def: c"1".as_ptr(),
-        values: core::ptr::null(),
-        value_labels: core::ptr::null(),
-        label: c"Height posts".as_ptr(),
-        help: c"Height posts as anti-aliased lines.".as_ptr(),
-    },
-    Setting {
-        size: ROW_SIZE,
-        kind: KIND_BOOL,
-        apply: APPLY_LIVE,
-        scope: SCOPE_LOCAL,
-        tab: TAB_GRAPHICS,
-        flags: 0,
-        file: c"Render3D.ini".as_ptr(),
-        section: c"Overlays".as_ptr(),
-        key: c"Pivot".as_ptr(),
-        def: c"1".as_ptr(),
-        values: core::ptr::null(),
-        value_labels: core::ptr::null(),
-        label: c"Camera pivot marker".as_ptr(),
-        help: c"The ring where the tactical camera turns.".as_ptr(),
-    },
 ];
 
 pub const MSAA: &Setting = &SETTINGS[0];
@@ -353,23 +177,14 @@ pub const MODULES_ORDNANCE: &Setting = &SETTINGS[6];
 pub const MODULES_SPECIALS: &Setting = &SETTINGS[7];
 pub const MODULES_WORLD: &Setting = &SETTINGS[8];
 pub const MODULES_OVERLAYS: &Setting = &SETTINGS[9];
-pub const WORLD_PLANETS: &Setting = &SETTINGS[10];
-pub const WORLD_ROCKS: &Setting = &SETTINGS[11];
-pub const WORLD_NEBULAE: &Setting = &SETTINGS[12];
-pub const NEBULAE_LIT: &Setting = &SETTINGS[13];
-pub const WORLD_SURFACES: &Setting = &SETTINGS[14];
-pub const OVERLAYS_FOG: &Setting = &SETTINGS[15];
-pub const OVERLAYS_GRID: &Setting = &SETTINGS[16];
-pub const OVERLAYS_SELECTION: &Setting = &SETTINGS[17];
-pub const OVERLAYS_GHOSTS: &Setting = &SETTINGS[18];
-pub const OVERLAYS_HEIGHTPOSTS: &Setting = &SETTINGS[19];
-pub const OVERLAYS_PIVOT: &Setting = &SETTINGS[20];
 
-/// The table, for the UI's settings hub (`count` may be NULL).
+/// The table, for the UI's settings hub (`count` may be NULL): these rows, then each
+/// built-in module's fragment, in priority order (`crate::settings_rows()`).
 #[unsafe(no_mangle)]
 pub extern "C" fn Render3D_Settings(count: *mut u32) -> *const Setting {
+    let rows = crate::settings_rows();
     if !count.is_null() {
-        unsafe { *count = SETTINGS.len() as u32 };
+        unsafe { *count = rows.len() as u32 };
     }
-    SETTINGS.as_ptr()
+    rows.as_ptr()
 }

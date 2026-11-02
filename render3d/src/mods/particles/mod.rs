@@ -221,6 +221,16 @@ impl Module for Particles {
     fn name(&self) -> &'static str {
         "particles"
     }
+    fn priority(&self) -> i32 {
+        20
+    }
+    fn claims(&self) -> u32 {
+        gpu::display::CLAIM_PARTICLES
+    }
+    fn rows(&self) -> &'static [crate::rt::settings::Setting] {
+        &[]
+    }
+    fn configure(&mut self, _ini: &crate::rt::Ini, _said: &mut crate::core_module::Changes) {}
     fn superseded(&self) -> Option<&'static str> {
         Some("Venting.asi")
     }

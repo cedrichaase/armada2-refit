@@ -46,6 +46,10 @@ pub fn vtable(obj: usize) -> usize {
     field(obj, 0)
 }
 
+/// `Armada2.exe`'s code: a call target or slot value there that is not stock's is not
+/// another plugin's either (`core_hooks`).
+pub const EXE_CODE: core::ops::Range<usize> = 0x401000..0x6ae000;
+
 // ---- the engine root ------------------------------------------------------------
 
 /// `ST3D_GraphicsEngine*` (Storm3D).

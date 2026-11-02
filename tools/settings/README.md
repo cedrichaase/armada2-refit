@@ -206,7 +206,39 @@ only through its row, `rt::settings::on(&ini, WORLD_SURFACES)` (also `int`, `flo
 4. a NOT_SHIPPED key absent from the shipped ini;
 5. no literal `"Section", "Key"` of a row left in the layer's `*.rs`, `*.c`, `*.h` (the
    generated tables excepted): read it through the row;
-6. the generated file up to date.
+6. the generated file up to date;
+7. within one plugin's table and its fragments (below), a section has one owning table,
+   except the sections the plugin's table lists in `shared_sections` (render3d's
+   `[Lights]`, split by key).
+
+### Fragments
+
+A plugin made of modules (render3d) keeps each module's rows beside the module's code,
+in a **fragment**: a `settings.toml` in a directory below the plugin's table, with the
+same `plugin` and `file` and a `module`:
+
+```toml
+plugin = "Render3D"
+file = "Render3D.ini"
+module = "world"          # the module's [Modules] key; `shipped` is the plugin table's
+
+[[row]]
+...
+```
+
+`gen.py` writes `settings_table.rs` beside a fragment (`src/settings_table.rs` beside a
+Cargo.toml): `pub static ROWS`, one `pub const NAME: &Setting` per row and
+`pub const MODULE`, and no export. A plugin table with fragments (a Rust crate only)
+gets an export that returns `crate::settings_rows()`, which the plugin provides: its own
+rows, then each built-in module's `ROWS` in the plugin's module order, copied once into
+one contiguous array (so the export is still one table of 44-byte rows, A2SET_ABI 1.0;
+a module not built in has no rows, and the Refit screen shows none). The plugin table
+may list `shared_sections`. The lint takes a plugin's table and its fragments as one
+table: rule 2 across them, rule 3 against the plugin's one shipped ini, rule 5 over the
+whole plugin's sources, rule 7 between them. `gen.py --rows TABLE.toml [MODULE...]`
+prints the exported rows (`Section Key`) with the fragments in the order given;
+`selftest.sh` checks render3d's against `fixtures/render3d-rows.txt` (the order before
+the split) with the modules in their `priority()` order.
 
 ## The hub and `_SettingsChanged`
 

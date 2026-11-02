@@ -53,15 +53,16 @@ pub fn base_name(bg: &str) -> String {
     rt::lower(&bg[..end])
 }
 
-/// The recipe text for a base name: the game directory's file first, then the built-in.
+/// The recipe text for a base name: the game directory's file first, then the built-in
+/// (`core_recipes`, kind "sky").
 pub fn text_for(base: &str) -> Option<(String, &'static str)> {
-    let mut path = String::from("Sky\\");
-    path.push_str(base);
-    path.push_str(".ini");
-    if let Some(d) = rt::read_file(&rt::game_path(&path)) {
-        return Some((String::from_utf8_lossy(&d).into_owned(), "Sky\\ in the game directory"));
-    }
-    BUILT_IN.iter().find(|(n, _)| *n == base).map(|(_, t)| (String::from(*t), "built in"))
+    crate::core_recipes::builtin("sky", BUILT_IN);
+    let r = crate::core_recipes::text("sky", base)?;
+    let src = match r.source {
+        crate::core_recipes::Source::Game => "Sky\\ in the game directory",
+        crate::core_recipes::Source::BuiltIn => "built in",
+    };
+    Some((r.text, src))
 }
 
 /// The `[Sky]` section's keys, lower-cased, with their values (comments stripped).

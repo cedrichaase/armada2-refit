@@ -1,4 +1,5 @@
 //! Render3D.ini, read once at start (and again on `Reload=1` when a module asks).
+use crate::math::{v3, V3};
 use crate::rt::{self, settings, Ini};
 use crate::settings_table::{HDR, MSAA};
 use alloc::boxed::Box;
@@ -87,4 +88,46 @@ pub fn set(c: Config) {
 pub fn get() -> Option<&'static Config> {
     let p = CFG.load(Ordering::Acquire);
     if p.is_null() { None } else { Some(unsafe { &*p }) }
+}
+
+/// One section of an ini, read key by key with the caller's defaults (README.md,
+/// "Modules and settings": each module reads every section it owns through this, in its
+/// `configure`). Keys with a settings row are read through the row instead.
+pub struct Section(&'static str, Ini);
+
+impl Section {
+    /// A section of `Render3D.ini`.
+    pub fn new(name: &'static str) -> Section {
+        Section(name, ini())
+    }
+    /// A section of another ini.
+    pub fn with(ini: Ini, name: &'static str) -> Section {
+        Section(name, ini)
+    }
+    /// The ini it reads (for sections named at run time).
+    pub fn ini(&self) -> &Ini {
+        &self.1
+    }
+    pub fn f(&self, key: &str, def: f32) -> f32 {
+        self.1.float(self.0, key, def)
+    }
+    pub fn i(&self, key: &str, def: i32) -> i32 {
+        self.1.int(self.0, key, def)
+    }
+    /// A colour as `r,g,b` in 0..255, returned in 0..1.
+    pub fn rgb(&self, key: &str, def: [f32; 3]) -> V3 {
+        let c = self.1.floats(self.0, key, def);
+        v3(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
+    }
+    /// Three plain floats.
+    pub fn v3(&self, key: &str, def: [f32; 3]) -> V3 {
+        let c = self.1.floats(self.0, key, def);
+        v3(c[0], c[1], c[2])
+    }
+    pub fn pair(&self, key: &str, def: [f32; 2]) -> [f32; 2] {
+        self.1.floats(self.0, key, def)
+    }
+    pub fn s(&self, key: &str) -> Option<alloc::string::String> {
+        self.1.string(self.0, key)
+    }
 }

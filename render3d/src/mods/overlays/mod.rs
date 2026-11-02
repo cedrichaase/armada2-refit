@@ -15,6 +15,7 @@
 //! footprints' sprites are called through.
 //! Nothing the simulation reads is written.
 mod fog;
+pub mod settings_table;
 mod ghosts;
 mod grid;
 mod pivot;
@@ -26,7 +27,7 @@ use crate::engine::{self, field, rd};
 use crate::frame::steps::View;
 use crate::log;
 use crate::rt::settings;
-use crate::settings_table::{OVERLAYS_FOG, OVERLAYS_GHOSTS, OVERLAYS_GRID, OVERLAYS_HEIGHTPOSTS, OVERLAYS_PIVOT, OVERLAYS_SELECTION};
+use settings_table::{OVERLAYS_FOG, OVERLAYS_GHOSTS, OVERLAYS_GRID, OVERLAYS_HEIGHTPOSTS, OVERLAYS_PIVOT, OVERLAYS_SELECTION};
 
 // ---- Armada2.exe, GOG patch 1.1 ----------------------------------------------------
 
@@ -228,6 +229,21 @@ impl Overlays {
 impl Module for Overlays {
     fn name(&self) -> &'static str {
         "overlays"
+    }
+    fn priority(&self) -> i32 {
+        80
+    }
+    fn claims(&self) -> u32 {
+        // [Overlays] Fog and Selection, as they are now.
+        let (fog, sel) = crate::mods::overlays::claims();
+        (if fog { gpu::display::CLAIM_FOG } else { 0 }) | (if sel { gpu::display::CLAIM_SELECTION } else { 0 })
+    }
+    fn rows(&self) -> &'static [crate::rt::settings::Setting] {
+        &settings_table::ROWS
+    }
+    fn configure(&mut self, _ini: &crate::rt::Ini, said: &mut crate::core_module::Changes) {
+        // Its live rows, read again (until its own reader takes every section).
+        said.note(&settings_changed());
     }
     fn superseded(&self) -> Option<&'static str> {
         Some("Fog.asi")
