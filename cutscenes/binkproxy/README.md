@@ -93,6 +93,12 @@ decoded frames match the original MD5 for MD5.
 `IntroHeight`). `BinkProxy.log` records every open and close, with decode
 timing and a count of late frames.
 
+`ReplaceMovies` is a settings row (`settings.toml`, exported as `BinkProxy_Settings`, LIVE,
+tab Movies) and is read again at each `BinkOpen`, so `[BinkProxy.BinkProxy] ReplaceMovies=0`
+in `RefitPlayer.ini` gives the next movie opened as its stock `.bik`; one already playing
+finishes as it began. Every other key is read once at load, through the overlay.
+`BinkProxy_SettingsChanged` (called by the UI's hub) reads the row and logs it.
+
 ## Why AV1 and a separate WAV: measured, not chosen
 
 Under Proton-CachyOS, through `run-test.sh`:

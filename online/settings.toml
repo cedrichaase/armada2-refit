@@ -1,0 +1,15 @@
+plugin = "Online"
+file = "Online.ini"
+shipped = "online/Online.ini"
+
+[[row]]
+name = "entry"
+section = "Online"
+key = "Entry"
+kind = "bool"
+default = "1"
+apply = "restart"
+scope = "local"
+tab = "multiplayer"
+label = "Online entry"
+help = "The Multiplayer Connection screen's IPX button becomes Internet - Online. Off keeps the screen stock."

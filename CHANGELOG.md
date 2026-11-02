@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.57.0 — 2026-11-02
+
+Layers: online 0.9.0, cutscenes 2.5.0.
+
+### Added
+- `Online.asi` and `binkw32.dll` read their inis through `RefitPlayer.ini` and export
+  their settings tables (`Online_Settings`: `Entry`; `BinkProxy_Settings`:
+  `ReplaceMovies`, live, re-read at each movie open).
+
+Installed, not yet seen in game.
+
 ## 13.52.0 — 2026-11-02
 
 Layers: display 0.16.0, render3d 0.34.0, ui 0.29.0, testbench 3.79.0.

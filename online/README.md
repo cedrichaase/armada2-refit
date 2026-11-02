@@ -155,7 +155,10 @@ own on top of the game's. LAN (TCP/IP) and Manual IP stay as they were.
 | `0x5bff9b` | the IPX branch, its button just drawn pressed | `stub_ipx` | sets the flag and continues at `0x5c00b6`, the Manual IP branch after its own button: same frame, same stack depth, and that path sets every register it reads |
 
 Each site is checked against the bytes it replaces, and if any differs none is patched
-(`Online.log` says so). `Entry=0` in `Online.ini` leaves the screen stock.
+(`Online.log` says so). `Entry=0` in `Online.ini` leaves the screen stock. `Entry` is a settings row (`settings.toml`,
+exported as `Online_Settings`, RESTART, tab Multiplayer), so `[Online.Online] Entry=0` in
+`RefitPlayer.ini` does the same; every key of `Online.ini` is read through the overlay
+(`tools/settings/README.md`) and the override is logged to `Online.log`.
 
 The entry then runs the Manual IP flow (a blank field hosts, a join code or an address
 joins), and the flag makes `NetworkManager.dll` get our transport instead of DirectPlay
