@@ -32,6 +32,7 @@
 
 #define A2_FLTUSED
 #include "../../csdk/a2asi.h"
+#include "settings_table.h"
 
 typedef long long           LONGLONG;
 typedef unsigned long long  ULONGLONG;
@@ -96,7 +97,7 @@ void *memcpy(void *d, const void *s, unsigned n)
 /* ---- small string helpers ------------------------------------------------ */
 /* ---- config and log, both beside Armada2.exe ------------------------------ */
 static char g_dir[260];
-static char g_ini[280];
+static A2Ini g_bi;                 /* BinkProxy.ini with the overlay in front */
 static int  g_log = 1, g_replace = 1, g_raise = 1, g_fit = 1;
 
 static char g_logpath[320];
@@ -834,10 +835,26 @@ static int ui_movie(const BYTE *bgrx, int w, int h, int pitch)
 }
 
 /* ---- exports ------------------------------------------------------------------- */
+
+/* The UI's settings hub calls this after RefitPlayer.ini changed.  ReplaceMovies is read
+ * at each BinkOpen anyway; this only reads it and says so. */
+EXPORT void __cdecl BinkProxy_SettingsChanged(void)
+{
+    char m[120];
+    int  was = g_replace;
+    g_replace = (int)a2_set_int(&g_bi, BINKPROXY_ROW_REPLACEMOVIES);
+    m[0] = 0;
+    if (g_replace == was) { logline("settings: re-read, nothing changed"); return; }
+    s_cat(m, "settings: applied BinkProxy.ReplaceMovies=");
+    s_num(m, g_replace);
+    logline(m);
+}
+
 EXPORT void *WINAPI BinkOpen(const char *name, DWORD flags)
 {
     Movie *mv;
     char m[300];
+    g_replace = (int)a2_set_int(&g_bi, BINKPROXY_ROW_REPLACEMOVIES);   /* LIVE: read at each open */
     if (g_replace && name && (mv = open_replacement(name))) return mv->bink;
     if (!real_load()) return NULLPTR;
     m[0] = 0; s_cat(m, "bink "); if (name && s_len(name) < 200) s_cat(m, name);
@@ -1038,15 +1055,15 @@ BOOL WINAPI DllMain(HANDLE inst, DWORD reason, void *res)
     if (reason != 1) return 1;
 
     a2_exe_dir(g_dir, sizeof g_dir);
-    s_cpy(g_ini, g_dir); s_cat(g_ini, "BinkProxy.ini");
+    a2_ini_open(&g_bi, "BinkProxy.ini", logline);
 
-    g_log     = (int)GetPrivateProfileIntA("BinkProxy", "Log",            1, g_ini);
-    g_replace = (int)GetPrivateProfileIntA("BinkProxy", "ReplaceMovies",  1, g_ini);
-    g_raise   = (int)GetPrivateProfileIntA("BinkProxy", "RaiseIntroMode", 1, g_ini);
-    g_fit     = (int)GetPrivateProfileIntA("BinkProxy", "FitIntro",       1, g_ini);
-    g_useUi   = (int)GetPrivateProfileIntA("BinkProxy", "UseUI",          1, g_ini);
-    w         = (int)GetPrivateProfileIntA("BinkProxy", "IntroWidth",     0, g_ini);
-    h         = (int)GetPrivateProfileIntA("BinkProxy", "IntroHeight",    0, g_ini);
+    g_log     = (int)a2_ini_int(&g_bi, "BinkProxy", "Log",            1);
+    g_replace = (int)a2_set_int(&g_bi, BINKPROXY_ROW_REPLACEMOVIES);
+    g_raise   = (int)a2_ini_int(&g_bi, "BinkProxy", "RaiseIntroMode", 1);
+    g_fit     = (int)a2_ini_int(&g_bi, "BinkProxy", "FitIntro",       1);
+    g_useUi   = (int)a2_ini_int(&g_bi, "BinkProxy", "UseUI",          1);
+    w         = (int)a2_ini_int(&g_bi, "BinkProxy", "IntroWidth",     0);
+    h         = (int)a2_ini_int(&g_bi, "BinkProxy", "IntroHeight",    0);
 
     /* At DllMain time no mode change has happened yet, so this is the desktop
      * (the same observation Menus.asi relies on). */

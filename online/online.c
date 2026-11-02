@@ -36,6 +36,7 @@
  */
 
 #include "../csdk/a2asi.h"
+#include "settings_table.h"
 
 #define HEAP_ZERO_MEMORY       0x08
 
@@ -978,6 +979,8 @@ static void build_paths(char *ini)
     g_logpath[0] = 0; s_cat(g_logpath, path); s_cat(g_logpath, "Online.log");
 }
 
+static A2Ini g_ini;
+
 static void startup(void)
 {
     char    ini[320];
@@ -988,15 +991,9 @@ static void startup(void)
     InitializeCriticalSection(&g_ncs);
     g_t0 = GetTickCount();
     build_paths(ini);
-    g_logging = (int)GetPrivateProfileIntA("Online", "Log",     1,  ini);
-    g_payload = (int)GetPrivateProfileIntA("Online", "Payload", 16, ini);
-    if (g_payload > 64) g_payload = 64;
-    g_entry   = (int)GetPrivateProfileIntA("Online", "Entry",   1,  ini);
-    g_port    = (WORD)GetPrivateProfileIntA("Online", "Port",   2302, ini);
-    g_loss    = (int)GetPrivateProfileIntA("Online", "Loss",    0,  ini);
-    if (g_loss > 50) g_loss = 50;
-    g_direct  = (int)GetPrivateProfileIntA("Online", "Direct",  1,  ini);
-    GetPrivateProfileStringA("Online", "Server", "c20e.de", g_server, sizeof g_server, ini);
+    /* the log is not open yet: read Log first, without logging, and again below */
+    a2_ini_open(&g_ini, "Online.ini", NULLPTR);
+    g_logging = (int)a2_ini_int(&g_ini, "Online", "Log", 1);
     if (g_logging && g_logpath[0]) {
         char dir[320];
         int  ad;
@@ -1010,6 +1007,17 @@ static void startup(void)
         if (!ad) s_cat(b, " (LOCALAPPDATA unset or not writable)");
         logline(b);
     }
+
+    g_ini.log = logline;
+    g_logging = (int)a2_ini_int(&g_ini, "Online", "Log", 1);   /* again, so an overlay value is logged */
+    g_payload = (int)a2_ini_int(&g_ini, "Online", "Payload", 16);
+    if (g_payload > 64) g_payload = 64;
+    g_entry   = (int)a2_set_int(&g_ini, ONLINE_ROW_ENTRY);
+    g_port    = (WORD)a2_ini_int(&g_ini, "Online", "Port", 2302);
+    g_loss    = (int)a2_ini_int(&g_ini, "Online", "Loss", 0);
+    if (g_loss > 50) g_loss = 50;
+    g_direct  = (int)a2_ini_int(&g_ini, "Online", "Direct", 1);
+    a2_ini_str(&g_ini, "Online", "Server", "c20e.de", g_server, sizeof g_server);
 
     b[0] = 0;
     s_cat(b, "--- Online payload=");

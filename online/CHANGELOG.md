@@ -4,6 +4,15 @@
 8 with a transport of our own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 and versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.9.0 — 2026-11-02
+
+### Added
+- `Online.asi` reads `Online.ini` through the player's overlay `RefitPlayer.ini`
+  (`[Online.Online]`). `Entry` is a settings row (`settings.toml`, the `Online_Settings`
+  export, RESTART, tab Multiplayer).
+
+Installed, not yet seen in game.
+
 ## 0.8.0 — 2026-10-30
 
 ### Changed

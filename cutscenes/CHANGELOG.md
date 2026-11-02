@@ -4,6 +4,16 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`binkproxy/README.md`](binkproxy/README.md).
 
+## 2.5.0 — 2026-11-02
+
+### Added
+- `binkw32.dll` reads `BinkProxy.ini` through the player's overlay `RefitPlayer.ini`
+  (`[BinkProxy.BinkProxy]`). `ReplaceMovies` is a settings row (`settings.toml`, the
+  `BinkProxy_Settings` export, LIVE) read again at each movie open; `BinkProxy_SettingsChanged`
+  is exported for the UI's hub.
+
+Installed, not yet seen in game.
+
 ## 2.4.0 — 2026-10-30
 
 ### Changed
