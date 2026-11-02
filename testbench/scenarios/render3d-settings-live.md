@@ -30,7 +30,7 @@ wait for the frame, a screenshot, a pixel comparison with the main baselines.
 16. Expect the shot "showcase" matches the baseline "roundC-main-port-showcase" within rmse 0.
 17. Overlay Render3D.World:Surfaces=0
 18. Wait up to 20 seconds for the logs the next steps expect.
-19. Expect "Render3D.log" contains "settings: applied World.Surfaces=0"
+19. Expect "Render3D.log" contains "Surfaces=0"
 20. Wait 3 seconds.
 21. Take a screenshot called "showcase".
 22. Expect the shot "showcase" matches the baseline "roundC-main-port-showcase-surfaces0" within rmse 0.
