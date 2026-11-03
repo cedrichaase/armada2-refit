@@ -167,6 +167,14 @@ retire_table() {
             glob)       d="$1"; [ -d "$game/$d" ] || continue
                         for f in "$game/$d"/$2; do [ -e "$f" ] && retire_rm "$f"; done
                         rmdir "${game:?}/${d:?}" 2>/dev/null || true ;;
+            glob-hash)  d="$1"; [ -d "$game/$d" ] || continue
+                        local gp="$2" h k; shift 2
+                        for f in "$game/$d"/$gp; do
+                            [ -f "$f" ] || continue
+                            h="$(sha256 "$f")"
+                            for k in "$@"; do if [ "$h" = "$k" ]; then retire_rm "$f"; break; fi; done
+                        done
+                        rmdir "${game:?}/${d:?}" 2>/dev/null || true ;;
             file)       retire_rm "$game/$1" ;;
             hud-files)  # The file-based HUD fixes of hud 2.x, put back from their backups.
                         if [ -n "${PY:-}" ] && [ -f "$here/retire/hud-files.py" ]; then
@@ -623,11 +631,17 @@ lc() { echo "$1" | tr 'A-Z' 'a-z'; }
 # is removed either way -- tools/settings/move-keys.py's job in the repository's ./install.
 apply_moved() {
     [ -s "$here/moved.txt" ] || return 0
-    local ff fs fk tf ts tk def v
+    local ff fs fk tf ts tk def v nv
     while IFS=$'\t' read -r ff fs fk tf ts tk def || [ -n "$ff" ]; do
         [ -n "$ff" ] && [ -f "$game/$ff" ] || continue
         v="$(ini_op get "$game/$ff" "$fs" "$fk")" || continue
-        if [ "$(lc "$v")" != "$(lc "$def")" ]; then
+        # The one rule (tools/settings/README.md, "Moved keys"): a new key the player set
+        # (present, not empty, not the default) wins; else the old value moves if it is not
+        # the default; the old key goes either way.
+        nv=""; if [ -f "$game/$tf" ]; then nv="$(ini_op get "$game/$tf" "$ts" "$tk")" || nv=""; fi
+        if [ -n "$nv" ] && [ "$(lc "$nv")" != "$(lc "$def")" ]; then
+            echo "  $ff [$fs] $fk=$v dropped ($tf [$ts] $tk=$nv is set already)"
+        elif [ "$(lc "$v")" != "$(lc "$def")" ]; then
             if [ ! -f "$game/$tf" ]; then
                 echo "  $tf is not there; $ff [$fs] $fk=$v stays"; continue
             fi
@@ -645,6 +659,11 @@ if [ -e "$d8" ] && ! is_display8 "$d8" && ! is_gog_d3d8 "$d8" && ! is_d3d8to9 "$
 else
     if is_gog_d3d8 "$d8"; then
         [ -e "$d8.gog-backup" ] || cp -p "$d8" "$d8.gog-backup"
+    elif ! is_display8 "$d8" && ! is_d3d8to9 "$d8" && [ -e "$d8" ]; then
+        # A d3d8.dll whose hash we do not know (a DXVK's, the player's own build of it) is
+        # kept; the uninstall puts it back.
+        [ -e "$d8$CHAIN_BACKUP" ] || cp -p "$d8" "$d8$CHAIN_BACKUP"
+        echo "  d3d8.dll: not one we know, replaced (the old one is d3d8.dll$CHAIN_BACKUP)"
     elif ! is_display8 "$d8" && [ -e "$d8" ]; then
         echo "  d3d8.dll: the old chain's, replaced"
     fi

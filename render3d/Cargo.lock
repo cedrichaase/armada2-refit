@@ -142,7 +142,7 @@ dependencies = [
 
 [[package]]
 name = "render3d"
-version = "1.0.3"
+version = "1.0.4"
 dependencies = [
  "r3d-core",
  "r3d-effects",

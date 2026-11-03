@@ -39,3 +39,4 @@ GetSystemDirectoryA@8
 CreateEventA@16
 WaitForSingleObject@8
 GetEnvironmentVariableA@12
+Sleep@4

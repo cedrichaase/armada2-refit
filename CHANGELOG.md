@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.15 — 2026-11-04
+
+Layers: platform 4.0.1, render3d 1.0.4.
+
+### Fixed
+- Round-f review, installers: a player's own `Sky\<name>.ini` survives retire and `render3d/install.sh` (hash match only); `retire.sh --chain` keeps `dxvk.conf` when its samplers could not be carried; the release installers back up an unknown `d3d8.dll`; `./install` builds Display8 before it retires the old chain, so a failed build leaves the game as it was; one precedence rule in every settings mover (the player's new value wins), documented in `tools/settings/README.md`; `a2ini` ignores a UTF-8 BOM before the first section (no duplicate section on edit), treats `Key=` as no value in `rename`, and retries the rename over a file a reader holds; the overlay write's `a2rt::move_file` retries 8 x 50 ms (Sleep added to the render3d and display import lists); `a2mod refit` no longer needs `--force` after `platform --retire` took the `d3d8.dll` backup. Installed, not yet seen in game.
+
 ## 15.6.14 — 2026-11-04
 
 Layers: qol 2.2.2, rules 1.0.2, render3d 1.0.3.

@@ -21,7 +21,18 @@ fn write(path: &str, old: &str, new: &str) -> Result<bool, String> {
     }
     let tmp = format!("{path}.tmp");
     std::fs::write(&tmp, a2ini::to_latin1(new)).map_err(|e| format!("{tmp}: {e}"))?;
-    std::fs::rename(&tmp, path).map_err(|e| format!("{path}: {e}"))?;
+    // A reader holding the file open (Windows) makes the rename fail for a moment: retry.
+    let mut tries = 0;
+    loop {
+        match std::fs::rename(&tmp, path) {
+            Ok(()) => break,
+            Err(_) if tries < 8 => {
+                tries += 1;
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            Err(e) => return Err(format!("{path}: {e}")),
+        }
+    }
     Ok(true)
 }
 

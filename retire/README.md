@@ -16,7 +16,7 @@ byte for byte and then says which retired layers the snapshot holds.
 | Entry | How | Action |
 |---|---|---|
 | `HUD`, `GridLayout`, `Menus`, `MenuScale` (`.asi`, `.ini`, `.log`; `MenuScale/*.bmp`) | by name | removed. The plates in `Menus/` stay: `UI.asi` draws them |
-| the twelve per-part plugins render3d replaced, and `Sky/mbg*.ini` | by name | removed; a `Sky/` folder with anything else in it is the player's |
+| the twelve per-part plugins render3d replaced, and `Sky/mbg*.ini` | plugins by name; recipes by hash (`glob-hash`: every version ever shipped) | removed; a `Sky/` recipe the player edited, or made, stays, and so does the folder |
 | `A2EngineTest.ini` | by name | removed (the bench's fault injection, never shipped) |
 | the per-user vkBasalt bloom (`a2-vkbasalt` under `$XDG_DATA_HOME`) | by path; the library and cache only with the layer's manifest | removed |
 | `misc/gui_*.cfg`, the cursors `Sprites/cursor.spr` names | their `.a2neb-backup` | restored, then the backup dropped |

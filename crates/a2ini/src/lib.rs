@@ -28,7 +28,8 @@ impl Parsed {
         self.sections.clear();
         self.entries.clear();
     }
-    /// The value of `key` in `[sec]` as written, or None.
+    /// The value of `key` in `[sec]` as written (a trailing `; comment` included: the
+    /// plugins' `a2rt::Ini` drops it when it hands the value out), or None.
     pub fn value(&self, sec: &str, key: &str) -> Option<&str> {
         self.entries
             .iter()
@@ -37,9 +38,17 @@ impl Parsed {
     }
 }
 
+/// A UTF-8 byte order mark at the start of `s`, as a real U+FEFF or as the three latin-1
+/// chars (`from_latin1`) it is when the file was read byte for byte, taken off. Editors
+/// on Windows write one; left on, it hides the first section's header.
+fn strip_bom(s: &str) -> &str {
+    s.strip_prefix('\u{feff}').or_else(|| s.strip_prefix("\u{ef}\u{bb}\u{bf}")).unwrap_or(s)
+}
+
 /// Parses `text` into `f` (cleared first).
 pub fn parse_into(text: &str, f: &mut Parsed) {
     f.clear();
+    let text = strip_bom(text);
     let mut sec = String::new();
     for line in text.lines() {
         let l = line.trim();
@@ -139,14 +148,14 @@ fn eol(text: &str) -> &'static str {
 }
 
 fn header(content: &str) -> Option<&str> {
-    let t = trim(content);
+    let t = trim(strip_bom(content));
     let rest = t.strip_prefix('[')?;
     Some(trim(rest.split(']').next().unwrap_or("")))
 }
 
 /// The key of a key line (rule 2), else None.
 fn key_of(content: &str) -> Option<&str> {
-    let t = trim(content);
+    let t = trim(strip_bom(content));
     if t.is_empty() || t.starts_with([';', '#', '[']) {
         return None;
     }
@@ -290,14 +299,16 @@ fn raw_value(text: &str, section: &str, key: &str) -> Option<String> {
 
 /// Moves `[from_sec] from_key` to `[to_sec] to_key` (a settings row's `moved_from`,
 /// tools/settings/README.md): the value goes over with its key; when the new key is there
-/// already it wins and the old one is only removed. Unchanged when the old key is absent,
+/// already (with a value) it wins and the old one is only removed. Unchanged when the old key is absent,
 /// both are the same, or a name or the value is refused.
 pub fn rename(text: &str, from_sec: &str, from_key: &str, to_sec: &str, to_key: &str) -> String {
     if (from_sec.eq_ignore_ascii_case(to_sec) && from_key.eq_ignore_ascii_case(to_key)) || !valid_section(to_sec) || !valid_key(to_key) {
         return String::from(text);
     }
-    let Some(v) = raw_value(text, from_sec, from_key) else { return String::from(text) };
-    if raw_value(text, to_sec, to_key).is_some() {
+    // An empty value (`Key=`) is no choice of the player's: it does not move and does not
+    // hold the new key against a value that does.
+    let Some(v) = raw_value(text, from_sec, from_key).filter(|v| !v.is_empty()) else { return String::from(text) };
+    if raw_value(text, to_sec, to_key).is_some_and(|n| !n.is_empty()) {
         return edit(text, from_sec, from_key, None);
     }
     if !valid_value(&v) {

@@ -45,7 +45,10 @@ printf '; mine\r\n[Render3D.Modules]\r\nhulls=0\r\n[UI.HUD]\r\nBarHidden=1\r\n' 
 cp "$G/RefitPlayer.ini" "$T/RefitPlayer.ref"
 # What earlier packages and installs left: the per-part plugins Render3D.asi replaced.
 for n in MSAA Planets Lighting Sky Fog Specials; do echo old > "$G/$n.asi"; echo old > "$G/$n.ini"; done
-mkdir -p "$G/Sky"; echo old > "$G/Sky/mbgaqu.ini"; echo "[Sky]" > "$G/Sky/myown.ini"
+# ...and Sky.asi's recipes: a shipped copy goes, one the player edited stays.
+skyd="$src/../../render3d/content/sky"
+mkdir -p "$G/Sky"; cp "$skyd/mbgaqu.ini" "$G/Sky/mbgaqu.ini"; echo "[Sky]" > "$G/Sky/myown.ini"
+{ cat "$skyd/mbgred.ini"; echo "; mine"; } > "$G/Sky/mbgred.ini"
 # ...and the legacy plugins UI.asi replaced, with the file-based HUD fixes' backups: taken
 # out, and the stock files put back (retire/hud-files.py).
 for n in HUD Menus GridLayout MenuScale; do echo old > "$G/$n.asi"; echo old > "$G/$n.ini"; done
@@ -61,7 +64,7 @@ check '[ "$(sum "$G/winmm.dll")" = baba99929487b005bb9b168acfd852550055f22e5f105
 check '[ "$(sum "$G/STA2WidescreenPatch.asi")" = 193828b15b8cdba84617dd9a359b555302132a35bbaa6fd3143fdb99442343c5 ]'
 check '[ "$(cat "$G/d3d8.dll")" = gogd3d8to9 ] && [ ! -e "$G/d3d8.dll.gog-backup" ]'
 check '[ -z "$(ls "$G" | grep -E "^(MSAA|Planets|Lighting|Sky|Fog|Specials)\.(asi|ini)$")" ]'
-check '[ "$(ls "$G/Sky")" = myown.ini ]'
+check '[ "$(ls "$G/Sky" | tr "\n" " ")" = "mbgred.ini myown.ini " ] && grep -q "; mine" "$G/Sky/mbgred.ini"'
 check '[ -e "$G/QOL.asi" ] && [ -e "$G/QOL.ini" ]'
 check '[ -e "$G/Online.asi" ] && [ -e "$G/Online.ini" ]'
 # Display8 stays out of a d3d8.dll that is not GOG's or the old chain's, and so do Render3D.asi
@@ -111,6 +114,8 @@ check 'grep -q "STA2WidescreenPatch: already installed" "$T/out"'
 check 'grep -q "; mine" "$G/QOL.ini" && grep -qx "PanSpeed=2.5" "$G/QOL.ini" && [ ! -e "$G/QOL.ini.bak" ]'
 # a DXVK d3d8.dll is the old chain's: replaced by Display8, GOG's copy kept
 check 'cmp -s "$P/layers/display/d3d8.dll" "$G/d3d8.dll" && [ "$(cat "$G/d3d8.dll.gog-backup")" = gogd3d8to9 ]'
+# ...and the DXVK d3d8.dll itself is kept, not overwritten for good
+check '[ "$(cat "$G/d3d8.dll.a2chain-backup")" = dxvk ]'
 # the display step, then the retire step, then the plugins'
 check '[ "$(grep "^::step" "$T/out" | sed -n "3,5p" | cut -d" " -f2 | tr "\n" " ")" = "display retire render3d " ]'
 check '[ -z "$(grep "^::step" "$T/out" | grep -E " (chain|renderer) ")" ]'
@@ -224,6 +229,10 @@ check '[ "$(grep -ci "^KeepClip" "$M/Display8.ini")" = 1 ]'
 "$T/moved/install.sh" "$M" > "$T/out"   # idempotent
 check 'awk "/^\[/{s=\$0} /^KeepClip=0\$/{print s}" "$M/Display8.ini" | grep -qix "\[Window\]" && ! grep -q "^  moved" "$T/out"'
 check 'cmp -s "$T/RefitPlayer.ref" "$M/RefitPlayer.ini" && ! ls "$M" | grep -q "^RefitPlayer\.ini\."'
+# precedence: the value the player set in the new file wins over a late old key
+printf '[UI]\nKeepClip=2\n' >> "$M/UI.ini"
+"$T/moved/install.sh" "$M" > "$T/out"
+check 'grep -q "KeepClip=2 dropped (Display8.ini \[Window\] KeepClip=0 is set already)" "$T/out" && ! grep -qi "^KeepClip" "$M/UI.ini" && grep -qx "KeepClip=0" "$M/Display8.ini"'
 "$T/moved/install.sh" --uninstall "$M" > "$T/out"
 check '[ ! -e "$M/armada2-refit-layers.txt" ] && cmp -s "$T/RefitPlayer.ref" "$M/RefitPlayer.ini"'
 rm -rf "$T/moved" "$M"
