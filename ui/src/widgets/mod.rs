@@ -274,11 +274,21 @@ impl<'a> Ui<'a> {
     /// A horizontal slider over `lo..hi`; true while it changes `v`. Left and Right
     /// step it by a twentieth while it has the focus.
     pub fn slider(&mut self, r: R, label: &str, v: &mut f32, lo: f32, hi: f32) -> bool {
+        self.slider_step(r, label, v, lo, hi, (hi - lo) / 20.0)
+    }
+
+    /// `slider` with the size of a key step given (an integer slider with fewer than
+    /// twenty values needs at least one unit).
+    pub fn slider_step(&mut self, r: R, label: &str, v: &mut f32, lo: f32, hi: f32, step: f32) -> bool {
         let id = self.id(label);
         let focused = self.focus_register(id);
         let (hot, held, _) = self.interact(id, r);
         let mut changed = false;
         if held {
+            // A press on the track gives the slider the arrow keys (it takes them).
+            if self.input.pressed[0] {
+                self.focus(id);
+            }
             if let Some((mx, _)) = self.input.mouse {
                 let f = ((mx - r.x) / r.w.max(1.0)).clamp(0.0, 1.0);
                 let nv = lo + (hi - lo) * f;
@@ -287,7 +297,6 @@ impl<'a> Ui<'a> {
             }
         }
         if focused {
-            let step = (hi - lo) / 20.0;
             let input = self.input;
             for &k in input.keys() {
                 let nv = match k {

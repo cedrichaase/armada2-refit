@@ -9,6 +9,8 @@ Details are in [`binkproxy/README.md`](binkproxy/README.md).
 ### Removed
 - The Refit screen's Movies tab: `settings.toml`, `settings_table.h` and the exports `BinkProxy_Settings`, `BinkProxy_SettingsNote` and `BinkProxy_SettingsChanged` are gone, since no replacement movies are shipped. `ReplaceMovies` is still read from `BinkProxy.ini` and the overlay (`[BinkProxy.BinkProxy]`) at each movie open; the launch reels are still scaled full screen.
 
+A patch and not a major, by the table in CLAUDE.md: the exports were added after the last release (cutscenes 2.4.0, root 13.51.3 has none of them) and were read only by UI.asi, whose settings hub this release no longer asks for them; no release carried a UI.asi that reads them beside a BinkProxy without them.
+
 Installed, not yet seen in game.
 
 ## 3.0.0 — 2026-11-03

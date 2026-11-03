@@ -5,7 +5,16 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
-## 4.1.7 — 2026-11-04
+## 4.1.5 — 2026-11-04
+
+### Fixed
+- `bench/legacy.py`: the tag build of the legacy plugins is made under a file lock, so parallel sessions no longer race on the cache directory.
+- `a2test syms` exits 1 for a build no profile knows (it exited 0 unless `--record`).
+- `ui-whole-game` checks `shell: hooked` and no `standing down` in UI.log (the two `... is loaded` checks could no longer fail); `ui-menus-slider-max` steps Graphics Detail with a key from the top (reads back 3).
+
+Installed, not yet seen in game.
+
+## 4.1.4 — 2026-11-04
 
 ### Changed
 - Scenario `display-bail-out` expects the shell's mode not raised after the bail-out (`shell mode raised` absent from `Display8.log`, display 1.0.4). Installed, not yet seen in game.
@@ -213,6 +222,8 @@ Installed, not yet seen in game
 - `engine-syms` has BinkProxy, Online, QOL and QOLRules sections (identity, build, `symbols: N/M`, no stand-down); its `Setup:` also puts Online.asi in the clone (`online/bench-asi.sh`).
 - `qol-big-selection` and its scene `qol-bigselect`: twenty Galaxy class ships firing at a cube, all selected with the HUD on, a group of twenty bound and recalled (a selection over 16 with special weapons in combat, CLAUDE.md qol).
 
+Installed, not yet seen in game.
+
 ## 3.97.2 — 2026-11-03
 
 ### Added
@@ -248,6 +259,8 @@ Installed, not yet seen in game
   (`render3d/bench-asi.sh --without hulls`) on the paused showcase, at RMSE 0 against
   `roundD-base-port-showcase-hulls0`, with its rows and its `modules not built in` line;
   `render3d/subset-scenario.sh <m>` writes the variants for the other modules.
+
+Installed, not yet seen in game.
 
 ## 3.94.0 — 2026-11-03
 
@@ -285,6 +298,8 @@ Installed, not yet seen in game.
 - Scenarios `render3d-live-particles` (the module switched off live at RMSE 0 against
   its load-time baseline, on again, off again) and `render3d-live-ordnance` (the same
   flips on the firing scene, checked by the log and a running game).
+
+Installed, not yet seen in game.
 
 ## 3.90.0 — 2026-11-03
 

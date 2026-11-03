@@ -17,8 +17,8 @@ or in a space that follows the screen's aspect (`design` for the menus, `hud` /
 
 The way through: the intro movies (skipped with Esc), the main menu; Single Player, the
 Federation campaign's first mission (its loading screen, the briefing); in the mission
-Ctrl+I to the interface mode with the unit view, a drag selection, a move order, the
-minimap (a left click moves the camera, a right click orders the selection), the pause
+20. Expect "UI.log" contains "shell: hooked".
+21. Expect "UI.log" not contain "standing down".
 box, the objectives (the top-right checkmark of ours), the in-mission menu (Esc), Save Game with a typed name,
 Load Game of it; Abort Mission; Instant Action with Game Setup's defaults, the match,
 won with `succeed`, the Admiral's Log, back to the main menu; Options and its three
