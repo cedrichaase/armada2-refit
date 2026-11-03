@@ -51,6 +51,8 @@ jobs:
             publish/check.sh "$c" || fail=1
           done
           exit $fail
+      - name: The layer registry against a2mod, the release scripts and the GUI (tools/layers.py --check)
+        run: python3 tools/layers.py --check && python3 tools/layers-selftest.py
 
   # render3d builds Render3D.asi from Rust (no_std, i686-pc-windows-msvc, lld-link) and
   # tests its asset readers on the host (the tests that need a game install skip).
@@ -98,7 +100,7 @@ jobs:
         run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path crates/a2fmt/Cargo.toml
       - name: a2engine on the host (the PE identity on synthetic images, and its C twin)
         run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path crates/a2engine/Cargo.toml
-      - name: a2ini on the host (the overlay's edit against tools/settings/fixtures)
+      - name: a2ini on the host (the overlay's edit and rename against tools/settings/fixtures)
         run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path crates/a2ini/Cargo.toml
 
   # Render3D.asi with each module left out (render3d/build.sh --features, README.md,
@@ -133,10 +135,9 @@ jobs:
           features=$(printf '%s\n' $all | grep -vx '${{ matrix.without }}' | paste -sd, -)
           CARGO="$(command -v cargo)" render3d/build.sh --features "$features"
 
-  # The settings descriptors (tools/settings/README.md): overlay.py, gen.py and lint.py
-  # against their fixtures, every generated table and the row's definition in a2rt and
-  # csdk/a2asi.h up to date with the schema, and every settings.toml (a plugin's table
-  # and its modules' fragments, as one) against its shipped ini and its layer's sources.
+  # The settings descriptors (tools/settings/README.md): a2ini, gen.py and lint.py
+  # against their fixtures, every generated table up to date, and every settings.toml (a
+  # plugin's table and its modules' fragments, as one) against its shipped ini.
   settings:
     runs-on: ubuntu-24.04
     steps:

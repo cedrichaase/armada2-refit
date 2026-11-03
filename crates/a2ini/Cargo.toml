@@ -9,3 +9,13 @@ license = "MIT"
 [lib]
 name = "a2ini"
 path = "src/lib.rs"
+
+# The host tool (tools/settings/host.sh builds it): the edit for the bench, the GUI
+# installer and the installers' key moves. The library stays no_std.
+[features]
+std = []
+
+[[bin]]
+name = "a2ini"
+path = "src/main.rs"
+required-features = ["std"]

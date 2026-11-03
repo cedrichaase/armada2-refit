@@ -4,6 +4,11 @@
 8 with a transport of our own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 and versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.10.1 — 2026-11-03
+
+### Changed
+- `online/settings_table.h` is regenerated at A2SET_ABI 1.1 (48-byte rows). Nothing else changes. Installed, not yet seen in game.
+
 ## 0.10.0 — 2026-11-03
 
 ### Added

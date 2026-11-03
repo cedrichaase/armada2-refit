@@ -22,36 +22,16 @@ records a hash of every modded file, and `refit` checks each one on the way back
 
 WHAT COUNTS AS A CHANGE
 
-    textures      Textures/RGB/*.a2neb-backup  -- a2tex
-    models        SOD/*.a2neb-backup           -- logo-sod (the widened loading panel),
-                                                  moon-sod, select-sod, hull-sod, asteroid-sod
-    hud           HUD.asi/.ini                 -- added files: layout, font, cursors
-                  (before hud 2.0.0: misc/*.a2neb-backup from ui-widescreen,
-                  *.a2font-backup from ui-font-condense and the Curs_* art from
-                  cursor-aspect -- still recognised, filed under 'hud')
-    menus         Menus.asi/.ini, Menus/*.bmp  -- added files, stock has none
-                  (MenuScale.* before menus 2.0.0 -- still recognised, see LEGACY_MENUS)
-    render3d      Render3D.asi/.ini,           -- added files: the 3D view drawn through
-                  Surfaces/*.ini, Nebulae/*.ini   render3d (HDR, MSAA, bloom) and its recipes
-                  (the plugins it replaced -- MSAA, Lighting, Sky, Nebulae, Surfaces,
-                  Explosions, Shields, Repair, Venting, Specials, Fog, Planets -- and
-                  Sky/*.ini: still recognised, see LEGACY_RENDER)
-    qol           QOL.asi/.ini                 -- added files; not a look but a feel
-                  (right-drag pan speed), switched so stock really is stock
-    grid          GridLayout.asi/.ini          -- added files: the bar as a 5x3 grid with
-                  position keys; switched so stock has stock's bar and keys
-    ui            UI.asi/.ini                  -- added files: the HUD, the menus, the loading
-                  screen and the cursor drawn by the UI.  ./install no longer puts
-                  in HUD.asi, GridLayout.asi or Menus.asi (ui/supersede.sh takes them
-                  out); an older install that still has them is snapshot as it is
-    cutscenes    binkw32.dll.a2neb-backup, binkw32_orig.dll, BinkProxy.ini, and every
-                  animations/<Name>.mp4/.wav beside a <Name>.bik  -- cutscenes/binkproxy
-    renderer      dxvk.conf                    -- AF, LOD bias, seamless cubes
-    display       d3d8.dll.a2display-backup, d3d8_real.dll, Display8.ini
-                                               -- Display8, the d3d8.dll of ours in
-                  front of the real chain (display/install): stock puts the chain's own
-                  d3d8.dll back in its slot, so stock is the stock chain, not ours
-                  passing through
+Every layer in the registry (layers.toml; `tools/layers.py --list`) names what it adds
+to the game directory (`files`) and which stock files it changes in place beside a
+backup (`replaces`, `backups`): Render3D.asi and its recipes for render3d, the
+Textures/RGB/*.a2neb-backup of a2tex for textures, SOD/*.a2neb-backup for models,
+d3d8.dll.a2display-backup for display (stock puts the chain's own d3d8.dll back in
+its slot, so stock is the stock chain, not ours passing through), and so on.  Retired
+layers are in it too, so a stale copy of the per-part plugins render3d replaced, of
+MenuScale.* or of the file-based HUD fixes before hud 2.0.0 is set aside like the rest.
+Movies count only as <Name>.mp4/.wav beside a <Name>.bik; anything with a backup that
+no layer claims is filed under 'other'.
 
 DELIBERATELY NOT SWITCHED, in both states:
 
@@ -72,6 +52,7 @@ The game must not be running.  Anything that writes the game directory while in 
 a file that is no longer stock rather than overwrite it.  Deleting $GAME/.a2mod while
 in stock loses the only copy of the unmerged layers -- run `refit` first.
 """
+import fnmatch
 import hashlib
 import json
 import os
@@ -86,33 +67,22 @@ STORE = os.path.join(GAME, '.a2mod')
 SNAP = os.path.join(STORE, 'refit')
 STATE = os.path.join(STORE, 'state.json')
 
-BACKUPS = ('.a2neb-backup', '.a2font-backup', '.a2display-backup')
+# The layers, what each adds and the backup suffixes are the registry's (layers.toml,
+# read by tools/layers.py), retired layers included: a stale copy of a plugin that no
+# longer ships (the per-part plugins render3d replaced, MenuScale.* before menus
+# 2.0.0) is still a modded file, so it is found and set aside like the live ones rather
+# than left live in stock.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'tools'))
+import layers as registry  # noqa: E402
+REG = registry.load()
+BACKUPS = registry.backup_suffixes(REG)
 # Backups that exist but are not a visual change -- see "deliberately not switched".
 EXCLUDE = {'ARMADA.PRF', 'RTS_CFG.h'}
-# The menus plugin was MenuScale.asi (with .ini and a MenuScale/ plate folder) before
-# menus 2.0.0.  menus/install.sh removes the old names, but a stale copy -- or one
-# restored from a snapshot taken before the rename -- is still a modded file, so it
-# is found and set aside like the new ones rather than left live in stock.
+# The menus plugin was MenuScale.asi before menus 2.0.0 (see to_refit's note).
 LEGACY_MENUS = 'MenuScale'
-# The plugins render3d replaced, removed from the repository with render3d 0.2.0 (and
-# models 5.0.0 for Planets): render3d/install.sh takes them out, but a stale copy, or
-# one restored from an older snapshot, is still a modded file, filed under render3d.
-LEGACY_RENDER = ['MSAA', 'Lighting', 'Sky', 'Nebulae', 'Surfaces', 'Explosions', 'Shields',
-                 'Repair', 'Venting', 'Specials', 'Fog', 'Planets']
-ADDED = [('Menus.asi', 'menus'), ('Menus.ini', 'menus'),
-         ('MenuScale.asi', 'menus'), ('MenuScale.ini', 'menus'),
-         ('HUD.asi', 'hud'), ('HUD.ini', 'hud'),
-         ('Render3D.asi', 'render3d'), ('Render3D.ini', 'render3d'),
-         ('QOL.asi', 'qol'), ('QOL.ini', 'qol'),
-         ('QOLRules.asi', 'qol'), ('QOLRules.ini', 'qol'),
-         ('GridLayout.asi', 'grid'), ('GridLayout.ini', 'grid'),
-         ('UI.asi', 'ui'), ('UI.ini', 'ui'),
-         ('binkw32_orig.dll', 'cutscenes'), ('BinkProxy.ini', 'cutscenes'),
-         ('dxvk.conf', 'renderer'),
-         ('d3d8_real.dll', 'display'), ('Display8.ini', 'display')] + \
-        [(f'{n}.{x}', 'render3d') for n in LEGACY_RENDER for x in ('asi', 'ini')]
-LAYERS = ['textures', 'models', 'hud', 'menus', 'render3d', 'qol', 'grid', 'ui', 'cutscenes',
-          'renderer', 'display', 'other']
+# (pattern, layer): a literal name, or a glob over one directory's names.
+ADDED = registry.added_patterns(REG)
+LAYERS = [lay['id'] for lay in registry.layers(REG)] + ['other']
 # Replacement movies are whatever pairs cutscenes/binkproxy installed: <Name>.mp4 / .wav
 # beside a <Name>.bik.  The .bik itself is never touched, so it is not a change.
 MOVIE_DIR = 'animations'
@@ -128,23 +98,29 @@ def sha(path):
 
 
 def layer_of(rel, suffix):
-    if suffix == '.a2font-backup':
-        return 'hud'
-    if suffix == '.a2display-backup':
-        return 'display'
-    top = rel.split('/')[0]
-    # cursor-aspect.py's squashed art, from before HUD.asi (hud 2.0.0)
-    if rel.lower().startswith('textures/rgb/curs_'):
-        return 'hud'
-    if rel.startswith('Textures/RGB/'):
-        return 'textures'
-    if rel == 'binkw32.dll':
-        return 'cutscenes'
-    if top == 'misc':
-        return 'hud'
-    if top == 'SOD':
-        return 'models'
-    return 'other'
+    """The layer a file replaced in place belongs to, by the backup beside it."""
+    return registry.classify(REG, rel, suffix) or 'other'
+
+
+def added_files():
+    """(rel, layer) for every file of ADDED in the game directory. A glob's name part is
+    matched without regard to case; its directory is taken as written."""
+    out = []
+    for pat, layer in ADDED:
+        d, name = os.path.split(pat)
+        if not any(ch in name for ch in '*?['):
+            if os.path.exists(os.path.join(GAME, pat)):
+                out.append((pat, layer))
+            continue
+        try:
+            names = sorted(os.listdir(os.path.join(GAME, d)))
+        except (FileNotFoundError, NotADirectoryError):
+            continue
+        for f in names:
+            if fnmatch.fnmatchcase(f.lower(), name.lower()) and \
+                    os.path.isfile(os.path.join(GAME, d, f)):
+                out.append((f'{d}/{f}' if d else f, layer))
+    return out
 
 
 def discover():
@@ -169,32 +145,18 @@ def discover():
                 continue
             found.append({'rel': rel, 'kind': 'replaced', 'backup': rel + suffix,
                           'layer': layer_of(rel, suffix)})
-    for name, layer in ADDED:
-        if os.path.exists(os.path.join(GAME, name)):
-            found.append({'rel': name, 'kind': 'added', 'layer': layer})
+    # Replacement movies count only beside a <Name>.bik: the .bik itself is never
+    # touched, so it is not a change.
     try:
-        movies = os.listdir(os.path.join(GAME, MOVIE_DIR))
+        biks = {os.path.splitext(f)[0].lower() for f in os.listdir(os.path.join(GAME, MOVIE_DIR))
+                if f.lower().endswith('.bik')}
     except FileNotFoundError:
-        movies = []
-    biks = {os.path.splitext(f)[0].lower() for f in movies if f.lower().endswith('.bik')}
-    for f in movies:
-        stem, ext = os.path.splitext(f)
-        if ext.lower() in MOVIE_EXTS and stem.lower() in biks:
-            found.append({'rel': f'{MOVIE_DIR}/{f}', 'kind': 'added', 'layer': 'cutscenes'})
-    # The menus layer's backdrop plates (menus/backdrop.sh), one per menu screen.
-    for d in ('Menus', LEGACY_MENUS):
-        plates = os.path.join(GAME, d)
-        if os.path.isdir(plates):
-            for f in sorted(os.listdir(plates)):
-                if f.lower().endswith('.bmp'):
-                    found.append({'rel': f'{d}/{f}', 'kind': 'added', 'layer': 'menus'})
-    # render3d's recipes (render3d/install.sh), and Sky.asi's, which it takes out.
-    for d in ('Surfaces', 'Nebulae', 'Sky'):
-        recipes = os.path.join(GAME, d)
-        if os.path.isdir(recipes):
-            for f in sorted(os.listdir(recipes)):
-                if f.lower().endswith('.ini'):
-                    found.append({'rel': f'{d}/{f}', 'kind': 'added', 'layer': 'render3d'})
+        biks = set()
+    for rel, layer in added_files():
+        if rel.startswith(MOVIE_DIR + '/') and os.path.splitext(rel)[1].lower() in MOVIE_EXTS \
+                and os.path.splitext(os.path.basename(rel))[0].lower() not in biks:
+            continue
+        found.append({'rel': rel, 'kind': 'added', 'layer': layer})
     return sorted(found, key=lambda e: e['rel'])
 
 
@@ -231,21 +193,20 @@ def load_state():
             st = json.load(fh)
     except FileNotFoundError:
         return None
-    # Layer names older manifests use: 'menu scale' before menus 2.0.0; 'font',
-    # 'hud layout' and (for the cursor art) 'textures' before hud 2.0.0 merged them.
+    # Every entry is filed by the registry as it stands, whatever layer the manifest
+    # recorded. Older manifests used other names: 'menu scale' before menus 2.0.0;
+    # 'font', 'hud layout' and (for the cursor art) 'textures' before hud 2.0.0; a layer
+    # per plugin before render3d 0.2.0, and then 'render3d' for those plugins; 'qol' for
+    # QOLRules.* before the rules layer; 'other' for Online.*. The snapshot's layout is
+    # the same in all of them: only the label moves.
     for e in st.get('entries', []):
-        if e.get('layer') == 'menu scale':
-            e['layer'] = 'menus'
-        elif e.get('layer') in ('font', 'hud layout'):
-            e['layer'] = 'hud'
-        elif e.get('layer') == 'textures' and \
-                e.get('rel', '').lower().startswith('textures/rgb/curs_'):
-            e['layer'] = 'hud'
-        # The plugins render3d replaced had layers of their own before render3d 0.2.0.
-        elif e.get('layer') in ('msaa', 'lighting', 'sky', 'nebulae', 'surfaces', 'explosions',
-                                'shields', 'repair', 'venting', 'specials', 'fog') or \
-                e.get('rel', '').lower() in ('planets.asi', 'planets.ini'):
-            e['layer'] = 'render3d'
+        rel = e.get('rel', '')
+        if e.get('kind') == 'replaced':
+            got = registry.classify(REG, rel, e.get('backup', '')[len(rel):] or None)
+        else:
+            got = registry.classify(REG, rel)
+        if got:
+            e['layer'] = got
     return st
 
 

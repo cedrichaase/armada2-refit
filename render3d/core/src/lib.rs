@@ -59,7 +59,7 @@ pub const DOWN_SEAM: u32 = 2;
 /// The 3D view's targets or post shaders could not be made (no usable device).
 pub const DOWN_DEVICE: u32 = 3;
 
-/// `Render3D_Settings`' one table (A2SET_ABI 1.0, contiguous rows): the core's rows,
+/// `Render3D_Settings`' one table (A2SET_ABI 1.1, contiguous rows): the core's rows,
 /// then each built-in module's in priority order (README.md, "Modules and settings").
 /// Built once at load; the row constants the code reads with stay the tables' own.
 static mut ROWS: alloc::vec::Vec<rt::settings::Setting> = alloc::vec::Vec::new();

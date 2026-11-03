@@ -253,20 +253,20 @@ class Session:
     @classmethod
     def create(cls, artifacts_dir, res, mod='refit', vnc=False, record=False,
                audio=False, keep=False, label='', stock_shell=None, installs=None, assets=None, slot=None,
-               mute=None, stems=None, clock=None):
+               mute=None, stems=None, clock=None, layers=None):
         """`slot`: a game slot already taken for this session (several at once for a
         multi-player case, or handed down in A2_SLOT_FD); without one, waits for a slot here."""
         slot = slot or slots.adopt_from_env() or slots.acquire(label or 'session')[0]
         try:
             return cls._create(artifacts_dir, res, mod, vnc, record, audio, keep, label, stock_shell,
-                               installs, assets, slot, mute, stems, clock)
+                               installs, assets, slot, mute, stems, clock, layers)
         except BaseException:
             slot.release()
             raise
 
     @classmethod
     def _create(cls, artifacts_dir, res, mod, vnc, record, audio, keep, label, stock_shell, installs, assets, slot,
-                mute=None, stems=None, clock=None):
+                mute=None, stems=None, clock=None, layers=None):
         # timestamp and pid alone collide when a run starts cases in parallel threads
         with _SID_LOCK:
             n = next(_SID_SEQ)
@@ -278,7 +278,12 @@ class Session:
         # assets='none': the game as someone without a texture pack gets it -- A2_DATA is
         # an empty directory, and this checkout's ./install runs into the clone unless
         # --install names others.
-        if assets == 'none' and mod == 'refit' and not installs:
+        # layers: only these of the registry's (layers.toml) -- `./install --only`, into a
+        # clone that starts from stock; this checkout's unless --install names others.
+        layers = [w for x in (layers or []) for w in re.split(r'[,\s]+', x) if w]
+        if layers and mod != 'refit':
+            raise GameError('--layers selects what ./install puts in; it cannot go with --mod stock')
+        if (assets == 'none' or layers) and mod == 'refit' and not installs:
             installs = [config.REPO]
         installs = [checkout_provenance(p) for p in (installs or [])]
         # The plugins' animation clock (`[Bench] Clock=`): --clock, a scenario's `Clock:`,
@@ -287,7 +292,7 @@ class Session:
         if clock not in CLOCKS:
             raise GameError(f'clock {clock!r}: one of {", ".join(CLOCKS)}')
         state = dict(id=sid, dir=str(artifacts_dir), work=str(work), res=list(res), mod=mod, stock_shell=stock_shell,
-                     installs=installs, assets=assets,
+                     installs=installs, assets=assets, layers=layers or None,
                      mute=sorted(mute or []), stems=sorted(stems or []), clock=clock,
                      vnc=vnc, record=record, audio=audio, keep=keep, label=label,
                      created=now(), pids={}, env={}, shots=0, game_started=None,
@@ -307,6 +312,7 @@ class Session:
                       **({'mute': ', '.join(sorted(mute))} if mute else {}),
                       **({'stems': ', '.join(sorted(stems))} if stems else {}),
                       **({'clock': clock} if clock != 'wall' else {}),
+                      **({'layers': ','.join(layers)} if layers else {}),
                       **({'installs': [f"{i['path']} @ {i['describe']}" for i in installs]} if installs else {}))
         return sess
 
@@ -421,7 +427,9 @@ class Session:
             # the user's install happens to carry -- then each checkout's ./install, in
             # the order given, into the clone. So what the case shows is those commits
             # and nothing else, and the report names them.
-            steps = stock + [[str(Path(i['path']) / 'install')] for i in installs]
+            # With layers, each runs `--only` them (./install takes the others out).
+            only = ['--only', ','.join(self.s['layers'])] if self.s.get('layers') else []
+            steps = stock + [[str(Path(i['path']) / 'install')] + only for i in installs]
         else:
             # The user's install with this checkout's UI.asi: the UI lays the HUD, menus
             # and cursor out at run time for whatever mode is set, so the install takes

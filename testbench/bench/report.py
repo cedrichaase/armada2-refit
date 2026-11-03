@@ -162,6 +162,8 @@ def markdown(cases, meta):
     L.append('')
     for c in cases:
         L += [f'### {c["scenario"]} — {c["resolution"]} ({c["aspect"]}): {BADGE[c["status"]]}', '']
+        if c.get('layers'):
+            L += [f'Layers: {", ".join(c["layers"])} (./install --only)', '']
         for s in c['steps']:
             L.append(f'{s["n"] if s["n"] is not None else "·"}. [{BADGE.get(s["status"], s["status"])}] {s["text"]}')
             if s.get('detail') and s['status'] != 'ok':

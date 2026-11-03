@@ -12,7 +12,7 @@ use crate::rt::{self, overlay, settings::*, win::*};
 use alloc::string::String;
 use alloc::vec::Vec;
 
-/// The fixed export names (A2SET_ABI 1.0). `Display8_Settings` is reserved.
+/// The fixed export names (A2SET_ABI 1.1). `Display8_Settings` is reserved.
 const EXPORTS: [&str; 6] = ["Render3D_Settings", "UI_Settings", "QOL_Settings", "QOLRules_Settings", "Online_Settings", "BinkProxy_Settings"];
 
 #[link(name = "kernel32")]
@@ -272,9 +272,37 @@ fn start() {
         }
         unsafe { TABLES.push(Table { plugin, module, rows, changed, note }) };
     }
+    migrate_moved();
     unsafe {
         STAMP = rt::file_stamp(&overlay::path());
         NEXT_CHECK = rt::now() + 1.0;
+    }
+}
+
+/// A row's `moved_from` (C2): the overlay's value of the key it took over goes to the
+/// row's own key (the new key wins when both are there), and the plugins are told, so a
+/// choice made under the old name survives the move. Once: the old key is gone after.
+#[allow(static_mut_refs)]
+fn migrate_moved() {
+    let mut any = false;
+    for t in unsafe { TABLES.iter() } {
+        for r in t.rows.iter() {
+            let m = r.moved_from();
+            let Some((stem, rest)) = m.split_once('.') else { continue };
+            let Some((sec, key)) = rest.rsplit_once('.') else { continue };
+            let from = rt::sfmt!("{}.{}", stem, sec);
+            let to = overlay::section(r.file(), r.section());
+            any |= overlay::rename(&from, key, &to, r.key());
+        }
+    }
+    if any {
+        // the rows' values changed under the snapshots taken before the move
+        for s in unsafe { SNAPS.iter_mut() } {
+            s.start = value(unsafe { &*s.row });
+            s.mission = s.start.clone();
+        }
+        rt::ini_refresh_all();
+        log!("settings: {} moved keys; told {}", overlay::FILE, notify());
     }
 }
 

@@ -28,6 +28,8 @@ a2test -- run Armada II headless and test it end to end
       --no-claude                      judged steps become REVIEW, agent steps fail
       --install PATH                   refit cases: stock, then PATH/install, in
                                        order; repeatable (see session start)
+      --layers A,B                     refit cases: only these layers (layers.toml),
+                                       ./install --only; overrides a scenario's Layers:
       --tolerance 0.05                 allowed stretch for the measured checks
   a2test check SCENARIO...             parse only: show how each step would run
   a2test list                          scenarios in testbench/scenarios/
@@ -36,6 +38,8 @@ a2test -- run Armada II headless and test it end to end
                        [--vnc] [--no-launch]
       --install PATH                   start from stock, then run PATH/install into the
                                        clone; repeat to stack checkouts (public, private)
+      --layers A,B                     only these layers: ./install --only A,B (this
+                                       checkout's when no --install is given)
       --note "TEXT"                    the session's first intent (as drive note)
   a2test session stop ID [--keep] [--graceful]
                                        end session ID (terminated; --graceful: through its
@@ -188,6 +192,9 @@ def cmd_run(argv):
     ap.add_argument('--tolerance', type=float, default=0.05)
     ap.add_argument('--out')
     ap.add_argument('--install', action='append', default=[], metavar='PATH')
+    ap.add_argument('--layers', metavar='A,B',
+                    help='only these layers (layers.toml): ./install --only, into a clone from stock; '
+                         'overrides a scenario\'s Layers:')
     ap.add_argument('--vulkan-device', choices=['gpu', 'lavapipe'], default=None,
                     help='where Backend=vulkan draws: gpu (default; A2TEST_VULKAN_DEVICE) or lavapipe, the CPU')
     ap.add_argument('--no-validate', action='store_true',
@@ -214,7 +221,8 @@ def cmd_run(argv):
                 command='a2test run ' + ' '.join(shlex.quote(x) for x in argv), repo=str(config.REPO))
     stop = threading.Event()
     opts = dict(vnc=a.vnc, record=a.record, audio=a.audio, keep=a.keep, no_claude=a.no_claude,
-                tolerance=a.tolerance, stop=stop, tag=a.jobs > 1, installs=a.install, clock=a.clock)
+                tolerance=a.tolerance, stop=stop, tag=a.jobs > 1, installs=a.install, clock=a.clock,
+                layers=[a.layers] if a.layers else None)
     print(f'run {run_id} -> {run_dir}', flush=True)
     # Each scenario's reference case runs first, so every other case has something to
     # compare with; once it is done, that scenario's other cases join the queue. Up to
@@ -445,6 +453,8 @@ def cmd_session(argv):
         ap.add_argument('--note', default='', metavar='TEXT',
                         help='what this session is for: its first intent, as `drive note` (the dashboard shows it)')
         ap.add_argument('--install', action='append', default=[], metavar='PATH')
+        ap.add_argument('--layers', metavar='A,B',
+                        help='only these layers (layers.toml): ./install --only, into a clone from stock')
         ap.add_argument('--stock-shell', choices=['embed'], default=None)
         ap.add_argument('--assets', choices=['none'], default=None,
                         help='none: install into the clone from an empty A2_DATA (no textures, plates, movies)')
@@ -472,8 +482,8 @@ def cmd_session(argv):
             ap.error('--assets none goes with --mod refit')
         if a.stock_shell and a.mod != 'stock':
             ap.error('--stock-shell goes with --mod stock')
-        if a.install and a.mod == 'stock':
-            ap.error('--install builds a refit state; it cannot go with --mod stock')
+        if (a.install or a.layers) and a.mod == 'stock':
+            ap.error('--install and --layers build a refit state; they cannot go with --mod stock')
         res = config.parse_res(a.res)
         sid = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
         d = config.RESULTS / f'session-{sid}' / re.sub(r'[^A-Za-z0-9_.-]+', '-', a.label) / config.res_name(res)
@@ -491,7 +501,8 @@ def cmd_session(argv):
         try:
             s = Session.create(d, res, mod=a.mod, vnc=a.vnc, record=a.record, audio=a.audio, keep=a.keep,
                                label=a.label, installs=a.install, stock_shell=a.stock_shell,
-                               assets=a.assets, mute=mute, stems=stems, clock=a.clock)
+                               assets=a.assets, mute=mute, stems=stems, clock=a.clock,
+                               layers=[a.layers] if a.layers else None)
         except BaseException as e:
             if own:
                 jobs.finish(jid, 'start-failed', f'no session: {e}'.splitlines()[0][:300])

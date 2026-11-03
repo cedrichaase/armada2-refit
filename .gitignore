@@ -45,6 +45,7 @@ render3d/hosttest/target/
 crates/a2fmt/target/
 crates/a2rt/target/
 crates/a2ini/target/
+tools/settings/build/
 crates/a2engine/target/
 crates/a2engine/target/
 

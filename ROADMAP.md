@@ -207,6 +207,12 @@ outside the rounds, on whatever machines are available, and the two releases wit
 whichever merges second renumbers its versions. Between rounds the bench is what
 limits how many phases can be in flight at once.
 
+**One MAJOR per layer per round.** While a round is unreleased, the root and each layer
+take at most one MAJOR. The first package that breaks a layer's interface takes it;
+later packages of the same round that break it again take a MINOR, since no release lies
+between them and nobody installs an intermediate version. Without this, Phase 9 alone
+would number the root 14, 15, 16 and 17 (decided 2026-11-03).
+
 ## Phases
 
 Each phase is one or more merges into `main`, each with its own root version and
@@ -359,10 +365,11 @@ category switches as the routing of passthrough.
 
 | | |
 |---|---|
-| Steps | QOLRules becomes its own layer in `./install`, `a2mod`, the manifest and the GUI installer; it ships with `PayOnQueue` on, as today (decided 2026-11-02), and selected by default in the installers. `KeepClip` and the window and display-mode handling move to Display8; the bar keys to QOL, with the UI drawing the labels QOL exports; the view distance to render3d. Per-layer selection in `./install` and the release installer. The release package keeps its legacy fallback until Phase 11 |
+| Steps | One layer registry, `layers.toml`, read by `./install`, `a2mod`, the bench, `publish/package.sh`, the release scripts and the GUI installer in place of the six lists each kept. QOLRules becomes the `rules` layer (folder `rules/`, file names kept) in `./install`, `a2mod`, the manifest and the GUI installer; it ships with `PayOnQueue` on, as today (decided 2026-11-02), and selected by default in the installers. Online becomes a layer of `./install` and `a2mod`, on by default, as the release package has shipped it all along. `KeepClip` and the window and display-mode handling move to Display8; the bar keys to QOL, with the UI drawing the labels QOL exports; the view distance to render3d (its row to the Graphics tab; Grid keys stays on the Interface tab). Per-layer selection in `./install` and the release installer. The release package keeps its legacy fallback until Phase 11 |
+| Packaging | Decided 2026-11-03 (was open decision 1): both, cheaply. The release zip stays the players' package, its DLLs and inis in one folder per layer (`layers/<id>/`), so a modder can take one layer as it is. Its `sdk/` folder holds the contract headers (`csdk/a2asi.h`, `csdk/a2engine.h`, the settings ABI, Display8's contract `gpu/src/display.rs`) and a `MODDING.txt` naming what each layer requires (from the registry) and the tag the source is at. The source is the tagged repository (MIT), through GitHub's source archive; no crates.io crates, since they are `no_std`, i686-windows only and joined by path dependencies. Per-game packages come with their plans; the registry's `games` field means they need no format change |
 | Depends on | Phases 1 (signed off) and 4 |
 | Acceptance | `ui-focus-pointer`, `ui-pointer-bar`, `ui-hud-bar`, `qol-*`, a subset matrix on the bench (each supported subset draws and plays); user in-game check of the pointer and the bar keys |
-| Versions | qol MAJOR (layer split), ui MAJOR (bar keys leave), display MINOR, gui-installer MAJOR (per-layer selection changes the package schema), root MAJOR |
+| Versions | qol MAJOR (layer split), rules 1.0.0 (new, "split from qol"), ui MAJOR 1.0.0 (`KeepClip`, `Native` and the mode raise leave UI.ini; the bar keys later in the round are a MINOR), display MINOR, gui-installer MINOR (per-layer selection only adds optional manifest keys, so the package schema stays 1: an old GUI installs everything, the default, and a new GUI shows no choices for an old zip), root MAJOR 14.0.0 once |
 | Estimate | Agent 4–8 h; 3–5 bench passes (mostly the subset matrix); round E, which needs the user's own desktop for input |
 | Risks | Input under Wine and Xwayland is fragile |
 
@@ -452,14 +459,12 @@ The wall-clock time is set by the five or six sign-off rounds and by the bench (
 Decided items leave this list for the text they decide: the overlay is `RefitPlayer.ini`
 in the game directory ("Settings descriptors and the player overlay"), QOLRules ships
 with `PayOnQueue` on (Phase 9), and Fleet Operations starts with Roots, then Armada 1 in
-`armada1/` ("Other games"), all 2026-11-02. The open questions of each game are in its
-plan.
+`armada1/` ("Other games"), all 2026-11-02; packaging for modders is both, cheaply
+(Phase 9, 2026-11-03). The open questions of each game are in its plan.
 
-1. **Packaging for modders**: built DLLs with ini files, source crates, or both. The
-   plan keeps code boundaries first and packaging granularity second.
-2. **Windows and Mac access** for Phase 10: who runs the native Direct3D 12 and the
+1. **Windows and Mac access** for Phase 10: who runs the native Direct3D 12 and the
    MoltenVK checks, and on which machines.
-3. **How long the Direct3D 9 path stays** after Phase 10: the plan's floor is two
+2. **How long the Direct3D 9 path stays** after Phase 10: the plan's floor is two
    releases with `auto` as the default; the user may shorten or lengthen it.
-4. **The renderer row in the Refit screen**: offer the backend choice to players
+3. **The renderer row in the Refit screen**: offer the backend choice to players
    (advanced tier), or leave it in `Display8.ini` only.

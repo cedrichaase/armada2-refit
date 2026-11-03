@@ -1,0 +1,6 @@
+; c
+[UI.HUD]
+BarHidden=0
+
+[QOL.QOL]
+BarKeys=1

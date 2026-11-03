@@ -5,6 +5,32 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.92.0 — 2026-11-03
+
+Layers: ui 0.33.0, render3d 0.44.1, qol 1.10.1, online 0.10.1, cutscenes 2.6.1.
+
+### Added
+- Moved keys (contract C2, A2SET_ABI 1.1): a settings row may carry `moved_from = "<Stem>.<Section>.<Key>"`. The row grows to 48 bytes; readers step by its size and read the field only from 48. The UI hub moves a player's overlay value to the new key at its first frame; `tools/settings/move-keys.py`, which `./install` runs after every layer, moves it in plugin inis. No shipped row uses it yet (W-DISP, W-BAR and W-VIEW do).
+- `a2ini` host tool (`crates/a2ini`, feature `std`; `get`, `edit`, `unset`, `rename`), built by `tools/settings/host.sh` into the ignored `tools/settings/build/`; `a2ini::rename` with its own fixtures (`tools/settings/fixtures/rename/`).
+
+### Changed
+- The settings machinery is cut down with behaviour unchanged: `gen.py` no longer writes GENERATED regions into `crates/a2rt/src/settings.rs` and `csdk/a2asi.h` (the row is written by hand once per language, beside its size and offset asserts); `overlay.py` is a wrapper over `a2ini` (its Python edit is gone, CLI unchanged); `lint.py` drops the literal-read rule; the bad-table fixture folders became one `fixtures/bad-cases.toml`. Every generated `settings_table` is regenerated at ABI 1.1. Installed, not yet seen in game.
+
+## 13.91.0 — 2026-11-03
+
+Layers: testbench 3.99.0.
+
+### Added
+- `layers.toml`, the layer registry: one `[[layer]]` per layer (id, name, dir, install, remove, files, replaces, backups, select, requires, scope, games, steps, summary) and the release's `::step` order; `rules` is registered on qol's folder and installer until it has its own.
+- `tools/layers.py` (`--list`, `--resolve [--only|--without] [--commands]`, `--files`, `--json`, `--check`), its only reader, and `tools/layers-selftest.py`; CI's publishable job runs both. `--check` fails when a2mod, `install.sh`'s and `install.ps1`'s `::step` ids, `package.sh`'s manifest `steps` or the GUI installer's `STEPS`/`STATUS` disagree with the registry.
+- `./install --only a,b`, `--without a,b` and `--list`: a selectable layer not selected is taken out with its `remove`; plain `./install` is every core and `on` layer.
+
+### Changed
+- `./install` runs the registry's commands and now installs Online.asi (the online layer) as well.
+- `a2mod` takes its layers, added files and backup suffixes from the registry: `stock` now sets Online.asi/.ini aside (it was left live), `status` gains `rules` and `online` rows, and every entry of an existing snapshot is re-filed by the registry when read (QOLRules.* from qol to rules; the per-part plugins under `parts`, MenuScale.* under `menuscale`). The snapshot layout is unchanged.
+
+Installed, not yet seen in game
+
 ## 13.87.0 — 2026-11-03
 
 Layers: render3d 0.44.0, testbench 3.98.3.

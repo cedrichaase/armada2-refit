@@ -56,6 +56,7 @@ class Scenario:
     setup: str = ''                # a script run on each clone before launch
     overlay: str = ''              # `Section:Key=value` words written to RefitPlayer.ini before launch
     clock: str = ''                # 'bench': the plugins' animation clock on the simulation's time
+    layers: list = field(default_factory=list)    # `Layers: display render3d`: ./install --only these
     sheet: list = field(default_factory=list)     # shot names: a contact sheet, cases x shots
     description: str = ''
     steps: list = field(default_factory=list)
@@ -96,7 +97,7 @@ def case_dirname(res, mod, scn_mod):
     return config.res_name(res) + ('' if mod == scn_mod else f'-{mod}')
 
 
-HEADER = re.compile(r'^(resolutions?|aspects?|mod|launch|reference|timeout|stock shell|assets?|players?|setup|overlay|sheet|clock)'
+HEADER = re.compile(r'^(resolutions?|aspects?|mod|launch|reference|timeout|stock shell|assets?|players?|setup|overlay|sheet|clock|layers?)'
                     r'\s*:\s*(.+)$', re.I)
 STEP = re.compile(r'^\s*(?:\d+[.)]|[-*])\s+(.+?)\s*$')
 
@@ -165,6 +166,7 @@ def parse(path):
                     setup=hdr.get('setup', '').strip('` '),
                     overlay=hdr.get('overlay', '').strip('` '),
                     clock=hdr.get('clock', '').strip().lower(),
+                    layers=[w for w in re.split(r'[,\s]+', hdr.get('layer', '').strip('` ')) if w],
                     sheet=[w.strip().strip('"“”') for w in hdr.get('sheet', '').split(',') if w.strip()])
 
 
@@ -1157,7 +1159,9 @@ class Case:
                               record=self.opts.get('record'), audio=self.opts.get('audio'),
                               keep=self.opts.get('keep'), label=label,
                               installs=self.opts.get('installs') if self.mod == 'refit' else None, slot=slot,
-                              clock=self.opts.get('clock') or self.scn.clock or None)
+                              clock=self.opts.get('clock') or self.scn.clock or None,
+                              layers=(self.opts.get('layers') or self.scn.layers or None)
+                              if self.mod == 'refit' else None)
 
     def _bring_up(self, sess, player=None):
         sess.clone()
@@ -1274,6 +1278,8 @@ class Case:
             aspect=config.aspect_name(self.res), mod=self.mod, status=status,
             duration=round(self.duration, 1),
             exe=next((x.s['exe'] for x in ([self.sess] if self.sess else []) + list(self.sessions.values()) if x.s.get('exe')), None),
+            layers=next((x.s['layers'] for x in ([self.sess] if self.sess else []) + list(self.sessions.values())
+                         if x.s.get('layers')), None),
             steps=self.results), indent=1))
         return status
 

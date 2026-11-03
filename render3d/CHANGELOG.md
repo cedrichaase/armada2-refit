@@ -4,6 +4,11 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.44.1 — 2026-11-03
+
+### Changed
+- `Render3D_Settings` and the modules' settings tables are regenerated at A2SET_ABI 1.1 (48-byte rows; `moved_from` NULL on every row). Nothing else changes. Installed, not yet seen in game.
+
 ## 0.44.0 — 2026-11-03
 
 ### Added
@@ -57,7 +62,6 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
 Installed, not yet seen in game.
 
-## 0.42.0 — 2026-11-03
 
 ### Changed
 - The frame: `MSAA` and `HDR` are `apply = "live"`. `Render3D_SettingsChanged` swaps a
