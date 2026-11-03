@@ -4,10 +4,9 @@ What was learned driving a mission with the UI's own HUD panels (`ui/HUD.md`), f
 agents after.
 
 - **Getting UI.asi with a panel on into a clone.** `session start --no-launch` (with
-  or without `--install <checkout>`), then `ui/bench-asi.sh <state.json> --no-grid
-  HUD.Bar=1`, then `drive launch`. `--no-grid` takes `GridLayout.asi` out: an
-  `--install` of `./install` puts it in, and the UI's bar stands down while it is
-  loaded. To try a new build, `drive quit`, run `bench-asi.sh` again (it builds), and
+  or without `--install <checkout>`), then `ui/bench-asi.sh <state.json>
+  HUD.Bar=1`, then `drive launch`. (`bench-asi.sh` retires `GridLayout.asi` and the other
+  old plugins from the clone, so the UI's bar does not stand down.) To try a new build, `drive quit`, run `bench-asi.sh` again (it builds), and
   launch again: the session and its clone survive the quit.
 - **Instant Action by hand**: `drive launch`, then `step "Wait for the main menu."`,
   `step "Click the instant action cube."`, `step 'Wait for "GAME SETUP".'`, `click X Y

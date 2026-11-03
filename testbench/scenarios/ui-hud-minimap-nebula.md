@@ -3,7 +3,7 @@
 Resolutions: 1280x720
 Mod: refit
 Launch: -nointro a2_borg01
-Setup: ui/bench-asi.sh --no-grid --scene ui-minimap-nebula HUD.Minimap=1
+Setup: ui/bench-asi.sh --scene ui-minimap-nebula HUD.Minimap=1
 Timeout: 10 min
 
 `ui/HUD.md`, "The minimap". Two nebulae and a Galaxy, no fog or shroud. The minimap

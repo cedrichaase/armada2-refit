@@ -3,7 +3,7 @@
 Resolutions: 1024x768, 1920x1080, 2560x1080
 Mod: refit
 Launch: -nointro a2_borg01
-Setup: ui/bench-asi.sh --no-grid --scene ui-hud-layout UI.Theme=federation HUD.LayoutLog=1
+Setup: ui/bench-asi.sh --scene ui-hud-layout UI.Theme=federation HUD.LayoutLog=1
 Sheet: 1 ship, 6 ships, 30 ships
 Timeout: 10 min
 
