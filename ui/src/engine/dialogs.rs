@@ -351,19 +351,9 @@ fn hook_user32(name: &str, ours: usize) -> Option<usize> {
     patcher::patch_slot(slot, 0, ours)
 }
 
-/// Whether Menus.asi (or its old name, MenuScale.asi) is loaded: it hooks the same
-/// dialogs, so the UI's menus stand down.
-fn menus_asi_loaded() -> bool {
-    unsafe { !GetModuleHandleA(c"Menus.asi".as_ptr() as *const u8).is_null() || !GetModuleHandleA(c"MenuScale.asi".as_ptr() as *const u8).is_null() }
-}
-
 /// Installs the host, at DllMain time (the display mode must be raised before the
 /// engine first reads it). False, with nothing patched, when anything is not stock.
 pub fn install() -> bool {
-    if menus_asi_loaded() {
-        crate::log!("menus: Menus.asi is loaded: the UI's menus stand down (it hosts the same dialogs)");
-        return false;
-    }
     if eng().ready(hook::DIALOGS_READS_SCREENS).is_err() {
         return false;
     }

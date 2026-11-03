@@ -103,8 +103,7 @@ struct TexSrc {
 
 static mut TEXTURES: Vec<TexSrc> = Vec::new();
 
-/// Registers a single-channel texture (`R8`, which Direct3D 9 samples as luminance:
-/// the font atlases).
+/// Registers a single-channel texture (`R8`: the font atlases).
 pub fn texture_l8(w: u32, h: u32, pixels: &'static [u8]) -> Tex {
     let t = gpu().texture(TextureDesc::d2(w, h, Format::R8, Usage::SAMPLED), Contents::Static(pixels));
     register(TexSrc { w, h, tex: Some(t) })
@@ -728,9 +727,9 @@ fn submit(cmd: &mut gpu::Cmd, p: &gpu::Pipeline, bb: &gpu::Texture, ds: Option<&
     }
     cmd.set_sampler(0, &Sampler::LINEAR_CLAMP);
     cmd.set_viewport(&Viewport::of(Rect::new(0, 0, draw.w as u32, draw.h as u32)));
-    // Pixel (x, y)'s centre at x + 0.5: Direct3D 9 samples a pixel at its whole
-    // coordinate, so positions move by half a pixel on the way to clip space (Vulkan
-    // samples at the half: `half_pixel` is 0 there).
+    // Pixel (x, y)'s centre at x + 0.5: the comparison mode that samples a pixel
+    // at its whole coordinate moves positions by half a pixel on the way to clip space
+    // (`half_pixel`; it is 0 otherwise).
     let hp = cmd.gpu().half_pixel();
     let (sx, sy) = (2.0 / draw.w, -2.0 / draw.h);
     cmd.vs_block(Block::new(0, &[sx, sy, -1.0 - hp * sx, 1.0 - hp * sy]));

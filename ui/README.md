@@ -1,7 +1,7 @@
 # UI — the runtime for a HUD, menus and loading screen of our own
 
 `UI.asi` redraws the game's HUD, front-end menus and loading screen in our own code
-(`PLAN.md`): a 2D renderer on the game's Direct3D 9 device, text, widgets, input with
+(`PLAN.md`): a 2D renderer on the device Display8 hands out (Vulkan or Direct3D 12), text, widgets, input with
 capture, and a hook into each of the three places the UI draws, with the HUD's panels
 (`HUD.md`) and the menus (`MENUS.md`) taken over on top of them. **With the shipped
 `UI.ini` every part is on**: the HUD's panels, the menus, the loading screen and the
@@ -497,9 +497,20 @@ are taken out by `retire/retire.sh`, which `./install` runs before the first lay
 (`ui/backdrops/install-plates.sh`, in `./install`). The layers `hud`, `grid` and `menus`
 are gone from the repository (their last changelogs are `retire/history/`); `a2mod` still
 files their files, as retired rows. `ui/bench-asi.sh` runs `retire.sh` on a bench clone too,
-so a clone of an install from before still tests the UI alone. The UI's stand-downs for
-the old plugins (the bar while `GridLayout.asi` is loaded, its menus while `Menus.asi` or
-`MenuScale.asi` is, the square cursor while `HUD.asi` is) stay in the code until ui 2.2.0.
+so a clone of an install from before still tests the UI alone. The UI has no stand-down
+for the old plugins since ui 2.2.0: they are gone, and a copy `retire.sh` missed would
+hook the same sites as the UI does.
+
+**The overlay's retired keys** (`settings.rs`, `RETIRED`). The hub is the overlay's only
+writer, so at its first frame it removes what Direct3D 9's and the forward mode's removal
+left in `RefitPlayer.ini`: the token `d3d9` of `[Display8.Display8] Backend` (a list like
+`d3d9,vulkan` keeps `vulkan`; the key goes when nothing is left), and `Mode` and `Real`.
+Each is logged once (`settings: RefitPlayer.ini [Display8.Display8] Backend=d3d9 retired;
+removed`) and the plugins are told. Display8 skips the same values on its own read side,
+so a file the hub has not yet cleaned (no UI) behaves the same. The table has no row
+for a list value: `Backend` has no descriptor, so no validation of the rest of the list
+(`d3d12,vulkan`) is the hub's; Display8 parses it. The bench flags of the deleted
+plugins wrote no `Render3D.*` or `UI.*` key, so there are no others.
 
 **Upgrading an install.** Up to ui 0.3 every part shipped off (`0`), so a player's
 `UI.ini` from then holds 0 for each. `[UI] Defaults` numbers the shipped defaults (2:
@@ -511,8 +522,7 @@ switched on or set otherwise stays as they set it.
 
 `a2mod stock` puts `UI.asi` and `UI.ini` aside with the rest (the `ui` layer), and
 the plates under `menus`: the stock game has neither `HUD.asi` nor `Menus.asi`, so
-nothing else changes. An older install that still has the superseded plugins is
-snapshot as it is.
+nothing else changes.
 
 ### A part switched back to stock
 
@@ -523,19 +533,14 @@ that the old plugins are not installed:
   the engine scales to the screen per axis: on a wide screen it is stretched (the
   minimap, the info panel and the bar wider than tall, their text wide), as without
   `HUD.asi`. The panels of ours lay themselves out around what they read of it (the
-  bar is placed against the stock minimap's rectangle when ours is off). For the
-  stretch to be corrected, `hud/install.sh` puts `HUD.asi` back; with `[HUD] Enable=0`
-  the whole HUD is stock and `HUD.asi` corrects it as before. Not tested on the bench
-  with a mix of panels of ours and `HUD.asi`'s canvas.
-- **`[HUD] Bar=0`** is the stock bar with stock's keys; `grid/install.sh` gives the
-  grid back through `GridLayout.asi`, which places it against the stock info panel and
-  minimap: beside ours (drawn elsewhere) it lands in the wrong place, so it belongs
-  with `[HUD] Enable=0` and `HUD.asi` (as `grid-layout.md` sets it up).
+  bar is placed against the stock minimap's rectangle when ours is off). With
+  `[HUD] Enable=0` the whole HUD is stock; nothing corrects the stretch.
+- **`[HUD] Bar=0`** is the stock bar with stock's keys; the bar's keys
+  are then stock's too.
 - **`[HUD] UnitView=0`** leaves the unit view where the stock canvas puts it (the
   bottom right, 350 x 384 canvas units: wide on a wide screen), with its stock frame.
 - **`[Menus] Enable=0`** gives the stock GDI menus: the shell's 800 x 600 display mode,
-  every menu its own window under Wine. `menus/install.sh` gives the scaled, embedded
-  shell back through `Menus.asi`.
+  every menu its own window under Wine.
 - **`[Loading] Enable=0`** is the engine's logo scene and bar (the widened `logo.SOD`
   if `models/` installed it).
 - **`[UI] Cursor=0`** is the engine's cursor, kept square by the UI (below).
@@ -580,8 +585,7 @@ Display8's never registers either.
 ### The engine's cursor, square
 
 `engine/cursor.rs`, `install_square`, made when the mission hook goes in unless
-`HUD.asi` is loaded or the old squashed cursor art is installed (its
-`Curs_Move.tga.a2neb-backup`). The engine draws its cursor under the 2D scale it sets
+the probe on `DrawScaled2D` finds it not stock. The engine draws its cursor under the 2D scale it sets
 to the back buffer over 800 x 600 on each axis (`HUD.md`, "The references the
 stock HUD is drawn against", the cursors), so on a wide screen it is wide. The synchronous path's one draw (the
 `call ST3D_Sprite::DrawScaled2D` at 0x6246fa in `RefreshDisplay`) goes through the
@@ -611,7 +615,7 @@ is checked to be stock. `UI.log`: "cursor: the engine's cursor is kept square".
 | `[HUD] SystemIcons`, `ShotScenes`, `MinimapCursor`, `FrameRate` | 1, 1, 1, 1 | what the stock overlay and minimap drew that ours left out, and the frame rate: the pointed unit's damaged systems, the shot director's scenes on the minimap in the tactical view, the action cursor over the minimap, `FRAMERATE_DISPLAY`'s text (`HUD.md`, "What the stock overlay and minimap drew that ours left out") |
 | `[HUD] Placement` | 1 | with `Overview=1`, a placement's markers (the footprint, the cells other objects take) in the theme; 0 with the engine's sprites (`HUD.md`, "The placement markers") |
 | `[HUD] UnitView`, `UnitViewSize` | 1, 260 | the unit view placed by us, a square of that many units at the bottom right, in our frame (`HUD.md`, "The unit view") |
-| `[Menus] Enable` | 1 | the UI hosts the shell's dialogs (`MENUS.md`); stands down while Menus.asi is loaded |
+| `[Menus] Enable` | 1 | the UI hosts the shell's dialogs (`MENUS.md`); stands down on a build it does not know |
 | `[Menus] Generic` | mirror | a screen without a spec: `mirror` (as the game paints it) or `widgets` (its controls as ours) |
 | `[Menus] Specs` | 1 | 0: no screen spec, every screen generic |
 | `[Menus] EscapeReturns` | 1 | Esc in the in-mission menu is Return to Game |
@@ -638,8 +642,7 @@ gives None, and the screen locks the must-match rows to be safe. The hub
 mission (the first mission frame after the shell or a loading screen) for the "pending"
 badges, finds the optional `<Plugin>_SettingsNote` next to `_SettingsChanged`, and
 writes nothing but through `set_row` / `remove_many`. `UI_SettingsNote` gives the HUD
-rows a note while the HUD stood down (`hud::STOOD_DOWN`) and the bar rows one while
-GridLayout.asi owns the bar.
+rows a note while the HUD stood down (`hud::STOOD_DOWN`).
 
 ### Settings
 
@@ -710,11 +713,11 @@ not sample it.
 (`gpu/README.md`): one pipeline, a pass into the engine's own back buffer and depth
 (kept as they are), the frame's vertices and indices written once into `gpu`'s rings,
 and one indexed draw per run. `gpu` captures the device's state before the frame's
-first change and puts it back after (d3d8to9 keeps its own record of what the game
+first change and puts it back after (Display8 keeps its own record of what the game
 bound), with the block render3d records: once a frame, not per
 draw. Positions are in back-buffer pixels and move half a pixel on the way to clip
-space on Direct3D 9 (`gpu::Gpu::half_pixel`; none on Vulkan, whose pixel centres are
-at the half), so a rectangle with whole-number edges covers whole pixels exactly.
+space only in the comparison mode that puts pixel centres on whole coordinates
+(`gpu::Gpu::half_pixel`; none otherwise, as the centres are at the half), so a rectangle with whole-number edges covers whole pixels exactly.
 
 **On Vulkan and Direct3D 12** (Display8's stub mode with `Backend=vulkan` or `d3d12`)
 the same calls record into Display8's frame (`gpu/README.md`, "The Vulkan backend",
@@ -731,7 +734,7 @@ a `gpu::Texture`, which keeps them and is made on the device the first time it d
 there, and again after a `Reset` or on another device. `engine/device.rs` tells `gpu`
 when the device resets or goes (`gfx::reset`, `gfx::forget`).
 
-**Without a Direct3D 9, Vulkan or Direct3D 12 device** (DXVK's own d3d8, GOG's d3d8to9) `surface::frame` returns
+**Without a Vulkan or Direct3D 12 device** (Display8 bailed out to the system d3d8) `surface::frame` returns
 at once and the game draws as stock.
 
 ## Text (`src/text/`)
@@ -900,7 +903,7 @@ trigger every 30 presents, so without one it costs a counter and one
 render3d): `GetRenderTargetData` into a system-memory copy (through a plain target
 first if the back buffer is multisampled), converted a row at a time; it changes no
 state of the device. A format it has no conversion for is logged and skipped. Without
-a Direct3D 9 device behind the game's (DXVK's own d3d8) nothing is read, and the
+a Vulkan or Direct3D 12 device behind the game's (Display8 bailed out) nothing is read, and the
 sidecar says so.
 
 ## Content

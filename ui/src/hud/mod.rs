@@ -73,10 +73,7 @@ pub fn install() -> bool {
     }
     map_panels(cfg);
     if cfg.bar {
-        let grid = unsafe { crate::rt::win::GetModuleHandleA(c"GridLayout.asi".as_ptr() as *const u8) };
-        if !grid.is_null() {
-            crate::log!("bar: GridLayout.asi is loaded and owns the bar: ours stands down");
-        } else if bar::install() {
+        if bar::install() {
             hud::set_taken(hud::palette_ptr(), true, true);
             unsafe { BAR = true };
             crate::log!("bar: ours, its keys are QOL's");
