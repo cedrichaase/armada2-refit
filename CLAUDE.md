@@ -38,10 +38,10 @@ it bundles.
 |---|---|---|
 | `qol/` | `QOL.asi` — gameplay quality of life compatible with stock players (right-drag pan speed, Shift+number adds to a group, selections and groups beyond 16, stations in groups with one build menu for several, long moves on the map at warp, the button bar's position keys, `BarKeys`, with the UI drawing their labels), and the plan for the rest, split by whether other players need it | `qol/README.md` |
 | `rules/` | `QOLRules.asi` — the one change every player of a network game must share (pay when queuing, refund on cancel: QOL-7, `PayOnQueue`, on by default). A layer of its own, `scope = 'match'`: a player without it makes the game play stock rules for everyone; Online finds it by its export (`QOLRules_Wanted`) | `rules/README.md` |
-| `render3d/` | `Render3D.asi` — the 3D view through a renderer of our own, in `no_std` Rust, a workspace: the cdylib `render3d/src/lib.rs` (one Cargo feature per module), `core/` (`r3d-core`: frame, gfx, scene, assets, `core/src/engine/`, the menu scene, module/registry/hooks/services/recipes) and one crate per module under `mods/<m>/` that depends on the core alone; engine knowledge on the engine profile (`profiles/gog-1.1/render3d[.<module>].toml`), no address in its sources; recipes in `render3d/content/{sky,surfaces,nebulae,ordnance,menu}/…`. Both views of `Armada_RenderAllOurStuff` drawn into a half-float MSAA target, bloomed by energy and tone-mapped into the back buffer; seven modules of its own draw every category (hulls with the scene lights and shadows, sky, particles, ordnance, effects, planets, moons, asteroids and nebulae, fog and selection) from the game's assets, with its own cosmetic simulation (`PLAN.md`). Each module is live (its Refit row applies at once) and a module at 0 hands its category back to Display8's passthrough. It replaced the per-part plugins (MSAA, Lighting, Sky, Nebulae, Surfaces, Explosions, Shields, Repair, Venting, Specials, Fog and Planets), which were removed from the repository; their recipes live under `render3d/content/`, and `retire/` takes out any of those plugins an earlier install left | `render3d/README.md`, `render3d/PLAN.md` |
+| `render3d/` | `Render3D.asi` — the 3D view through a renderer of our own, in `no_std` Rust, a workspace: the cdylib `render3d/src/lib.rs` (one Cargo feature per module), `core/` (`r3d-core`: frame, gfx, scene, assets, `core/src/engine/`, the menu scene, module/registry/hooks/services/recipes) and one crate per module under `mods/<m>/` that depends on the core alone; engine knowledge on the engine profile (`profiles/gog-1.1/render3d[.<module>].toml`), no address in its sources; recipes in `render3d/content/{sky,surfaces,nebulae,ordnance,menu}/…`. Both views of `Armada_RenderAllOurStuff` drawn into a half-float MSAA target, bloomed by energy and tone-mapped into the back buffer; eight modules of its own (`[Modules]`: hulls, sky, particles, effects, ordnance, specials, world, overlays) draw every category (hulls with the scene lights and shadows, sky, particles, ordnance, effects, the special weapons' effects, planets, moons, asteroids and nebulae, fog and selection) from the game's assets, with its own cosmetic simulation (`PLAN.md`). Each module is live (its Refit row applies at once) and a module at 0 hands its category back to Display8's passthrough. It replaced the per-part plugins (MSAA, Lighting, Sky, Nebulae, Surfaces, Explosions, Shields, Repair, Venting, Specials, Fog and Planets), which were removed from the repository; their recipes live under `render3d/content/`, and `retire/` takes out any of those plugins an earlier install left | `render3d/README.md`, `render3d/PLAN.md` |
 | `ui/` | `UI.asi` — the game's whole 2D side, in `no_std` Rust like render3d: a 2D renderer on the Display8 device (SDF text from a vendored OFL font, rounded panels, nine-slices), immediate-mode widgets, input with capture, and hooks into a mission's frame, the front end (the menus it hosts and draws, `[Menus]`, `MENUS.md`, and the Refit screen) and the loading screen. Its HUD panels and button bar (`[HUD]`, `HUD.md`) replaced the legacy `HUD.asi`, `GridLayout.asi` and `Menus.asi`, which are gone; every part is on in the shipped `UI.ini` (a key at 0 gives a part back to the engine, drawn by Display8's passthrough). `ui/backdrops/` builds the widescreen plates the menus composite (`backdrop.sh`, `install-plates.sh`); `ui/bench-asi.sh` puts a working copy's build in a bench clone | `ui/README.md`, `ui/PLAN.md`, `ui/STYLE.md`, `ui/backdrops/BACKDROPS.md` |
 | `display/` | `d3d8.dll`, "Display8": the game's Direct3D 8, ours — the only one: nothing stands behind it. Its devices accept everything the engine does and draw nothing; render3d and the UI draw the frame on Display8's own Vulkan or Direct3D 12 device (`Backend=auto\|vulkan\|d3d12\|none`, `auto` shipped), and Display8 draws, by passthrough, whatever no plugin claims. When neither backend starts, or with `Backend=none`, it hands the game the system's own `d3d8.dll` (the bail-out) and the plugins stand down. No forward mode, no Direct3D 9. The contract with the plugins is `gpu/src/display.rs` (1.4); `[Window]` (the display mode, `KeepClip`) and `[Samplers]` (anisotropy and LOD bias) are its ini sections. On the bench it traces every call by context and caller (`Display8.inventory.tsv`), names the engine's draws (`Display8.go`) and drops them by category (`[Drop]`). `display/d12probe/` and `display/vkprobe/` are the native gates' probes | `display/README.md` |
-| `retire/` | not a layer: `retire.sh`, which takes out of a game directory everything an earlier version put in and nothing installs any more, by the table in `known.txt` — the legacy `HUD`, `GridLayout`, `Menus` and `MenuScale` plugins, the twelve per-part render3d plugins, the font atlases, cursors, UI configs and loading screen that `hud-files.py` puts back from their backups, the vkBasalt bloom, the old Direct3D chain (`d3d8_real.dll`, `d3d9.dll`, a marked `dxvk.conf`). `./install`, `render3d/install.sh`, `ui/bench-asi.sh` and the release installers run it; `history/` holds the changelogs of the deleted `hud`, `grid`, `menus` and `renderer` layers | `retire/README.md` |
+| `retire/` | not a layer: `retire.sh`, which takes out of a game directory everything an earlier version put in and nothing installs any more, by the table in `known.txt` — the legacy `HUD`, `GridLayout`, `Menus` and `MenuScale` plugins, the twelve per-part render3d plugins, the font atlases, cursors, UI configs and loading screen that `hud-files.py` puts back from their backups, the vkBasalt bloom, and with `--chain` (which `./install` passes) the old Direct3D chain (`d3d8_real.dll`, `d3d9.dll`, a marked `dxvk.conf`, whose samplers go into `Display8.ini` `[Samplers]` first). `./install`, `render3d/install.sh`, `ui/bench-asi.sh` and the release installers run it; `history/` holds the changelogs of the deleted `hud`, `grid`, `menus` and `renderer` layers | `retire/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 83 `targets/` — recipes only | `textures/README.md` |
 | `models/` | 3D geometry — the smoothed dilithium moons (`moon-sod.py`) and asteroids (`asteroid-sod.py`), and the other SOD rewrites. The planets' sphere is render3d's; the widened loading screen is gone (the UI draws the loading screen) | `models/README.md` |
 | `cutscenes/` | `binkproxy/`, a `binkw32.dll` that plays AV1 replacements full screen, and the `movies/` recipes | `cutscenes/binkproxy/README.md` |
@@ -51,12 +51,12 @@ it bundles.
 | `profiles/` | not a layer, versioned by the root: one directory per build of `Armada2.exe` (`build.toml` plus one `<plugin>[.<part>].toml` per plugin), only names, addresses, offsets and checks tied to hooks; `tools/engine/` generates the plugins' tables from it, lints it and tests the three resolvers. Another build (Fleet Operations: Roots, `PLAN-FLEETOPS.md`) is a new profile | `crates/a2engine/README.md`, `tools/engine/README.md` |
 | `crates/` | not a layer: `a2rt`, the one runtime of Display8, render3d and the UI (allocator, Win32, log, `sfmt!`, ini with the overlay lookup, files, in-memory patching, frame dumps), linked into each as its `rt`; `a2engine`, the resolver of `profiles/` (`no_std`; the C twin is `csdk/a2engine.h`, the host tools `tools/engine/`), which says which build of `Armada2.exe` is running and whether each hook may hook it; `a2fmt`, the readers of the game's SOD, TGA, `.spr` and ODF files | `crates/a2engine/README.md`, `crates/a2rt/src/lib.rs`, `crates/a2fmt/README.md` |
 | `crates/a2ini` | not a layer: the ini parser (shared by reader and writer) and `edit`, the line-keeping writer of the player's overlay `RefitPlayer.ini`, `no_std`, host-tested on `tools/settings/fixtures/` | `tools/settings/README.md` |
-| `tools/settings/` | not a layer: the settings contracts (A2SET_ABI 1.1) — `gen.py` writes each layer's `settings_table` (the descriptor row itself is written by hand in `a2rt` and `a2asi.h`: neither has generated regions), `lint.py` checks the tables, `host.sh` builds the `a2ini` host binary, the one overlay editor, which `overlay.py` wraps for the bench and the GUI installer, `move-keys.py` moves a row's `moved_from` key in the plugin inis, `selftest.sh`, `bench-overlay.sh`. Installers, `a2mod` and the release never write, ship or remove `RefitPlayer.ini`; the Refit screen is its only writer in the game | `tools/settings/README.md` |
+| `tools/settings/` | not a layer: the settings contracts (A2SET_ABI 1.1) — `gen.py` writes each layer's `settings_table` (the descriptor row itself is written by hand in `a2rt` and `a2asi.h`: neither has generated regions), `lint.py` checks the tables, `host.sh` builds the `a2ini` host binary, the one overlay editor, which `overlay.py` wraps for the bench (the GUI installer only reads the overlay, for its report), `move-keys.py` moves a row's `moved_from` key in the plugin inis, `selftest.sh`, `bench-overlay.sh`. Installers, `a2mod` and the release never write, ship or remove `RefitPlayer.ini`; the Refit screen is its only writer in the game. Its sections are `[<Stem>.<Section>]`, the plugin ini's name and section (`[Render3D.Modules]`, `[UI.HUD]`, `[Display8.Display8]`) | `tools/settings/README.md` |
 | `tools/` (the rest) | not layers: `ini-merge.py`, the one ini merge (keys added, the player's values kept, retired defaults moved); `layers.py` (above); `doclinks.py`, which checks the relative links and anchors of every tracked `.md` (run it after moving a file or renaming a heading); `engine/` (the profile tools); `gates/` (the native gates' kit: `gate-windows.ps1`, `gate-macos.sh`, `GATES.txt`; CI attaches it as `native-gates-<commit>`; a test tool like the bench, not an installer); `shaderc/` (below) | `tools/ini-merge.py`, `tools/gates/GATES.txt` |
 | `csdk/` | not a layer: `a2asi.h`, the header-only base the C plugins (`qol/`, `rules/`, `online/`, `cutscenes/binkproxy/`) are built on (Win32 types and imports, string and log helpers, signature checks, `VirtualProtect` patching, the overlay lookup), `a2engine.h`, and `def/`, their one set of import-library `.def` files | `csdk/a2asi.h` |
 | `gpu/` | not a layer: the graphics interface render3d and the UI draw through (`no_std`, linked into each), on Display8's Vulkan or Direct3D 12 device — no Direct3D 9 (gpu 2.0.0); stood down (nothing drawn) with none; `gpu/shaders/compat.hlsli` lets one HLSL source build SPIR-V and DXIL (dxc only) | `gpu/README.md` |
 | `tools/shaderc/` | not a layer: the shader compiler scripts every crate with shaders builds through (`hlsl-rs.sh` to SPIR-V and DXIL, the pinned dxc fetcher, `verify-generated.sh`, which CI runs); installs nothing, versioned by the root | `render3d/README.md`, "One source, two forms" |
-| `testbench/` | `./a2test`: the game headless at any resolution, scenarios, reports. Installs nothing. `bench/legacy.py` builds the legacy `Menus.asi` once from the last tag that has it into `$A2_DATA/bench/legacy/<tag>/` (the `Stock shell: embed` reference case, and the old-install clone that `retire-old-install` cleans) | `testbench/README.md` |
+| `testbench/` | `./a2test`: the game headless at any resolution, scenarios, reports. Installs nothing. `bench/legacy.py` builds the legacy `HUD.asi`, `GridLayout.asi` and `Menus.asi` once from the last tag that has them into `$A2_DATA/bench/legacy/<tag>/`, for the three places the bench still needs them (the `Stock shell: embed` reference case, `display/bench-abi.sh old-display`, and the old install that `retire-old-install` seeds and cleans; `testbench/README.md`, "The legacy plugins") | `testbench/README.md` |
 | `films/` | `./a2film`: storyboards (`films/<name>/storyboard.md`) filmed on the test bench — probes at 1280x720 in parallel, final takes at 4K — and cut into a rough cut and an edit manifest. Installs nothing | `films/README.md`, the `film` skill |
 | `publish/` | what may be published and the check that enforces it. Installs nothing; versioned by the root | `publish/README.md` |
 | `gui-installer/` | `armada2-refit-installer.py`, the graphical installer for Linux (GTK 4 and libadwaita, released as an AppImage), Windows and macOS (Tk, frozen by PyInstaller into a portable `.exe` and a universal2 `.app`), over a starfield drawn in code: installs GitHub release zips, cached, with a choice of layers, and writes the launch settings (Heroic's variables on Linux, the Wine prefix's registry on macOS; Windows needs none). Versioned on its own, with the release-package schema it reads (`manifest.json`, the scripts' `::step` lines). Leaves out textures and cutscenes for now | `gui-installer/README.md` |
@@ -92,7 +92,7 @@ log: 1280x720, a `Timeout:` of at most 15 minutes, stop the session as soon as i
 are taken, and stop at the first `device removed` in `Display8.log`). Memory is the other
 limit (15 GB; systemd-oomd has killed the session twice): `CARGO_BUILD_JOBS=2`, one
 build at a time, no build while your own game runs, start a game only with at least
-4 GB available, and keep about four agents, not six. A run whose result is a GPU time in
+4 GB available, and keep about four agents, not six. The bench's slot queue (`./a2test slots`) allows three games on this machine unless `A2_SLOTS=2` is set; the limit of two holds either way. A run whose result is a GPU time in
 milliseconds (`Timing=1`) runs alone, since other games skew it, while pixel
 comparisons under `--clock bench` are unaffected. **Vulkan on the bench runs on the
 user's GPU with the validation layer on**; `--vulkan-device lavapipe` (the CPU driver)
@@ -229,8 +229,8 @@ Until the sign-off, the work stays on its branch and in its worktree.
    restore a stock atlas under condensed metrics and garble every glyph. An old install
    may still hold them; `retire/hud-files.py` (run by `./install` through `retire/`)
    restores atlas and metrics together from the same suffix, and likewise the UI configs
-   in `misc/` and the cursors, whose `.a2neb-backup`s it also handles. Nothing writes
-   into `Textures/RGB/` outside `a2tex` now.
+   in `misc/` and the cursors, whose `.a2neb-backup`s it also handles. Apart from that
+   restore, nothing writes into `Textures/RGB/` outside `a2tex` now.
 2. **Match the stock TGA format exactly**: image type 2, uncompressed, no ID field, no
    colour map — and **the same bit depth as the file you are replacing.** The nebula
    textures are 24-bit; **1113 of the 2115 textures in the game are 32-bit with a live
@@ -353,8 +353,8 @@ Until the sign-off, the work stays on its branch and in its worktree.
   game's `d3d8.dll`), `Render3D.asi`, `UI.asi`, `QOL.asi`, the rules layer
   (`QOLRules.asi`), Online, cutscenes. The ASI loader, the widescreen patch and
   the player's own options (`ARMADA.PRF`, `RTS_CFG.h`, `RefitPlayer.ini`) stay as they
-  are in both states. A game with Display8 set aside runs on the system's own
-  `d3d8.dll`. The **retired rows** (`hud`, `menus`, `grid`, `parts`, `menuscale`,
+  are in both states. A game with Display8 set aside runs on the `d3d8.dll` that was in
+  the slot before (GOG's, from `d3d8.dll.a2display-backup`) or, with none, on the system's own. The **retired rows** (`hud`, `menus`, `grid`, `parts`, `menuscale`,
   `vkbasalt`, `renderer`) are never installed: `status` lists any file of theirs it
   finds, `stock` sets a stale copy aside, and `refit` restores an old snapshot byte for
   byte and then says which retired layers the snapshot holds (`retire/retire.sh` takes
@@ -570,8 +570,8 @@ still uses it, not in this file: the HUD's three references (the 1600x1200 layou
 the hard-coded 800x600 cursor, the 1280x1024 font tier), the button bar's slot plan and
 hotkey tables, and the HUD-side traps are in `ui/HUD.md`; the shell (the 800x600 mode it
 asks for, `BitBlt` and no `StretchBlt`, embedded dialogs, `GetDC`/`ReleaseDC` not
-pairing, the backdrops composited per frame) in `ui/MENUS.md`; the window and display
-mode in `display/README.md`; the backdrop pipeline in `ui/backdrops/BACKDROPS.md`.
+pairing) in `ui/MENUS.md`; the window and display
+mode in `display/README.md`; the backdrop plates (built by `ui/backdrops/backdrop.sh`, drawn by the UI's menus) in `ui/backdrops/BACKDROPS.md`.
 Two rules from them still bind:
 
 - **Do not change `cfgSCREEN_WIDTH` (`RTS_CFG.h`) to fix a canvas**, and never edit
@@ -588,11 +588,16 @@ Two rules from them still bind:
   `retire/` and `platform/d3d8-chain.py --retire` take out (by hash or marker, never by
   name or size), and the Wine overrides are `winmm=n,b;d3d8=n,b` (the ASI loader and
   Display8; `d3d9=n,b` went in 15.6.0). When neither backend starts, Display8 hands the
-  game the system's own `d3d8.dll` and the plugins stand down. The stock
-  `syswow64/d3d8.dll` is *Wine's builtin*; never identify a DLL by its byte count. The
-  Wine virtual desktop stays **off**: it would put the menus in one window, but
-  Display8 owns the window and the display mode (`display/README.md`, "Window and
-  display mode"); never turn it on to fix a window problem.
+  game the system's own `d3d8.dll` and the plugins stand down. Our DLLs go in the
+  **game directory**: the prefix is not durable (Proton restores its `d3d8.dll` and
+  `d3d9.dll` from symlinks). The stock `syswow64/d3d8.dll` is *Wine's builtin*; never
+  identify a DLL by its byte count (`platform/d3d8-chain.py --status` names each by
+  hash). Heroic's `autoInstallDxvk` redeploying DXVK into the prefix is it working as
+  designed, and matters only to the bail-out's look. The Wine virtual desktop stays
+  **off**: it would put the menus in one window, but inside it `ChangeDisplaySettingsEx`
+  fails and the game falls back to 640x480 (on our devices as on DXVK); never turn it on
+  to fix a window problem, fix it in the UI's menu host (`platform/README.md`,
+  "Hyprland / window management").
 - **Bloom, tone mapping and every other post-process are render3d's.** The vkBasalt
   bloom (and its ReShade preset) was removed in 13.0.0; `retire/` takes out what an
   earlier version set up. Don't bring back a swapchain post-process: it would bloom the
@@ -631,12 +636,13 @@ Two rules from them still bind:
   a build to *every* selected producer. Construction ships are ships and stay stock.
   `./a2test run qol-station-groups --install .` checks it.
 - **The button bar's position keys (`BarKeys`) are QOL's; the UI only draws the labels.**
-  Never patch the bar's vtable (`PopupPaletteImp`): the UI recognises the bar by the
-  `PostLoad` in it, and QOL wraps call sites inside `Update` and detours single
-  instructions. Don't touch the floating palette's width (+0x7c): it is also the slot
+  Never patch the bar's vtable (`PopupPaletteImp`): QOL wraps the call of
+  `mProcessKeyboardInput` inside its `Update` (checked stock first) and presses a button
+  through the button's own press slot. Don't touch the floating palette's width (+0x7c): it is also the slot
   plan's width (`row * [+0x7c] + col`) and changing it made buttons vanish. Stock's bar
   keys are global per selection, not per open menu (F5 builds from the top level), so
-  QOL empties the hotkey tables around the stock handler (`qol/README.md`, QOL-1;
+  QOL empties the hotkey tables around the stock handler and points the six menu
+  toggles at a zero; nothing outside the bar reads them (`qol/README.md`, QOL-1;
   `ui/HUD.md`, "The button bar").
 - **Never edit `RTS_CFG.h` for a QOL change.** Network games compare a CRC of its bytes
   ("EXE / RTS_CFG.h files do not match node %d"), so an edited file locks the player
@@ -652,7 +658,7 @@ Two rules from them still bind:
   (`[Modules] <name>=0`, or its Refit row) is live: its category goes back to *Display8's
   passthrough* and the engine's stock look is drawn on the same target, so it is
   tone-mapped and bloomed with the rest. A module stands down while a stale copy of its
-  old plugin is loaded (`src/lib.rs`).
+  old plugin is loaded (`core/src/lib.rs`).
 - **Modules are crates and hook through the core.** A module (`mods/<m>/`) depends on
   `r3d-core` alone and installs its engine hooks through the core's hooks registry,
   which also hands a hook back (the engine's own call runs) when the module is off or a
@@ -754,9 +760,11 @@ Two rules from them still bind:
   fallback.
 - **The plugins chain slots of our device's vtable** (`Reset`, `Present`), so the
   vtables are patchable statics and Display8 never calls its own methods through them.
-  `MoveWindow` and `SetWindowPos` in the exe's imports are Display8's to hook (the window
-  and the display mode are Display8's since 0.18.0, `[Window]` in `Display8.ini`:
-  `Native`, `KeepClip`); the tracer leaves them alone.
+  The display mode, the top-level window and the pointer's clip are Display8's (since
+  0.18.0, `[Window]` in `Display8.ini`: `Native`, `KeepClip`, `RaiseIntro`), but
+  `MoveWindow` and `SetWindowPos` in the exe's imports stay the UI's, for the hosted
+  menus: the tracer leaves them alone, and the UI's menu host stands down if it finds
+  them hooked.
 - **Callers are read off the stack**: the exact return address, then a scan for values
   just past a `call` in the exe. The scan finds stale addresses too: the `BeginScene`
   "caller" of the order ring was one. Confirm with `Display8.go` (a detail capture of the
@@ -775,7 +783,8 @@ Two rules from them still bind:
   retired `dxvk.conf`, and the plugins' samplers take the anisotropy and LOD bias from
   Display8.
 - Bench: `--install .` installs Display8 (tracing in a clone, `Trace=auto`);
-  `display/bench-mode.sh` sets its mode from a `Setup:`; `display/stub-scenario.sh`
+  `display/bench-mode.sh` sets its keys from a `Setup:` (the one mode is `stub`;
+  `Backend=none` is the bail-out); `display/stub-scenario.sh`
   makes any scenario's stub variant; `display-inventory`, `display-engine-draws`,
   `display-drop`, `display-stub`, `display-fallback` (Vulkan, Direct3D 12, bail-out).
 - **`Backend=vulkan` on the bench runs on the user's GPU with the validation layer on**
@@ -808,8 +817,9 @@ Two rules from them still bind:
   one shell screen that draws through Direct3D; the device can be re-created at every
   switch between the shell's display and the game's.
 - Findings stay in `ui/README.md` (or `HUD.md` / `MENUS.md`) beside the hook that uses
-  them, and every address in `src/engine/` (`ui/PLAN.md`, "What this exposes of
-  Armada2.exe").
+  them; addresses, offsets and checks come from the engine profile
+  (`profiles/gog-1.1/ui.<part>.toml`), read in `src/engine/`, one file per area
+  (`ui/PLAN.md`, "What this exposes of Armada2.exe").
 - **Every panel and screen is drawn through `widgets/theme.rs`** (`STYLE.md`): never
   hard-code a colour. A click gives keyboard focus only to a widget that takes typing
   or arrow keys; a focused button once kept every key from the engine.
