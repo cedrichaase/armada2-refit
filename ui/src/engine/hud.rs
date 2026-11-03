@@ -20,7 +20,7 @@
 //!   (nor the 3D view, `cOverViewImp`, the owner of last resort) reacts under it.
 //!
 //! The component's simulate steps are not touched, so its state stays current for our
-//! panel to read. No vtable is changed (HUD.asi recognises panels by their vtables).
+//! panel to read. No vtable is changed.
 //!
 //! With no owner, `CursorInterface::Render` gives the device no cursor at all (each
 //! owner's `Render` names its cursor in `iCursor+0x2c`). So while the pointer is over a

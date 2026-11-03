@@ -473,7 +473,7 @@ fn tooltip(ui: &mut Ui, at: R, bar: R, text: &str) {
     theme::tooltip(ui, R::new(x, y, w, h), &clean, 1.0);
 }
 
-/// `bar: menu=0 | Q=build W=order ...`, once per change, as GridLayout.log does.
+/// `bar: menu=0 | Q=build W=order ...`, once per change.
 fn log_layout(p: usize, menu: u32, cells: &[usize; CELLS], items: &[Item]) {
     let mut line = crate::sfmt!("bar: menu={} mode={} |", menu, palette::mode(p));
     for (c, &b) in cells.iter().enumerate() {

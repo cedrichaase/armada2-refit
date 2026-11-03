@@ -20,6 +20,17 @@ Layers: platform 4.0.0, renderer 3.0.0 (retired), gui-installer 3.0.0, testbench
 - `a2mod`: Display8's `d3d8.dll` is filed under the display layer by content when no `.a2display-backup` sits beside it, so `a2mod stock` on a game whose slot was empty sets Display8 aside and the game runs on the system's `d3d8.dll`; with a backup (GOG's) it is put back as before. The snapshot layout is unchanged.
 - `testbench/retire-old-install.py` now requires the chain class (`d3d8_real.dll`, `d3d9.dll`, `dxvk.conf`) to be removed.
 
+## 15.5.0 — 2026-11-03
+
+Layers: ui 2.2.0, qol 2.2.1.
+
+### Changed
+- The UI and QOL without the legacy plugins: no stand-down for `HUD.asi`, `GridLayout.asi`,
+  `Menus.asi` or the squashed cursor art; `ui/bench-legacy.sh` and `bench-asi.sh --no-grid`
+  gone. The UI's settings hub removes the retired `Backend` token `d3d9`, `Mode` and `Real`
+  from the overlay (logged once). Display8's check for those plugins in `ENGINE_PLUGINS`
+  stays (a safety net, no change). Details in `ui/CHANGELOG.md` and `qol/CHANGELOG.md`.
+
 Installed, not yet seen in game
 
 ## 15.4.0 — 2026-11-03

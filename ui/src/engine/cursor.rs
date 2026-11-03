@@ -27,7 +27,7 @@ static mut HIDE: bool = false;
 static mut HIDING: bool = false;
 static mut INSTALLED: bool = false;
 /// The probe on `RefreshDisplay`'s draw of the cursor (`install_probe`): the function
-/// the call went to before it (stock `DrawScaled2D`, or HUD.asi's wrap of it).
+/// the call went to before it (stock `DrawScaled2D`).
 static mut PROBE: Option<usize> = None;
 /// Whether the probe keeps the engine's cursor square (`install_square`).
 static mut SQUARE: bool = false;
@@ -174,7 +174,7 @@ const HW_SCALE_DISP_Y: u8 = 0x1c; // not an address
 /// game, Scene.asi with `cursor off`, skips it before it gets here, and then the UI
 /// draws no cursor either. While the UI draws its own, the probe skips the engine's
 /// draw (`hide_this_frame`), so the engine's choices are left as they are. Chains to
-/// whatever the call went to (stock, or HUD.asi's wrap). Made before any mission.
+/// whatever the call went to. Made before any mission.
 pub fn install_probe() -> bool {
     if eng().ready(hook::CORE_CURSOR_PROBE).is_err() {
         crate::log!("cursor: the UI cannot see whether the engine's cursor is shown");
@@ -192,25 +192,13 @@ pub fn install_probe() -> bool {
     ok
 }
 
-/// Keeps the engine's own cursor square, as HUD.asi did (hud/README.md, "HUD.asi",
-/// the cursors), for wherever the engine's cursor still shows (`[UI] Cursor=0`, or a
+/// Keeps the engine's own cursor square (ui/HUD.md, "The cursors"), for wherever the engine's cursor still shows (`[UI] Cursor=0`, or a
 /// cursor ours cannot hide): the engine scales it by the back buffer over 800 x 600
 /// on each axis, so on a wide screen it is drawn wide. The synchronous path's one draw
 /// (through the probe) is made so that, for that draw only, the x scale is the y scale
 /// and the position is moved so the hotspot stays on the pointer; the hardware path's
-/// width is multiplied by the y scale. Not made while HUD.asi is loaded (it makes the
-/// same two changes) or while `hud/cursor-aspect.py`'s squashed art is installed (it
-/// would be squashed twice), or without the probe on stock `DrawScaled2D`.
+/// width is multiplied by the y scale. Not made without the probe on stock `DrawScaled2D`.
 pub fn install_square() -> bool {
-    let hud_asi = unsafe { !crate::rt::win::GetModuleHandleA(c"HUD.asi".as_ptr() as *const u8).is_null() };
-    if hud_asi {
-        crate::log!("cursor: HUD.asi is loaded and keeps the engine's cursor square");
-        return false;
-    }
-    if crate::rt::file_exists(&crate::rt::game_path("Textures\\RGB\\Curs_Move.tga.a2neb-backup")) {
-        crate::log!("cursor: cursor-aspect.py's squashed art is installed: the engine's cursor is left as it is");
-        return false;
-    }
     if eng().ready(hook::CORE_CURSOR_SQUARE).is_err() {
         crate::log!("cursor: SetCursor's site is not stock: the engine's cursor is left as it is");
         return false;

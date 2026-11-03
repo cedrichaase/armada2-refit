@@ -16,9 +16,7 @@
  *
  * The keys work only while UI_BarCell exists and gives a cell (the UI's bar is drawn).
  * Otherwise they stand down: the stock bar keys run unchanged, the stock look and
- * stock keys.  They stand down also while GridLayout.asi is loaded (it wraps the same
- * call; a legacy name until the old plugins are removed).  Findings: qol/README.md,
- * "QOL-1".
+ * stock keys.  Findings: qol/README.md, "QOL-1".
  */
 
 #define BAR_CELLS 15
@@ -47,7 +45,6 @@ static const char *const k_barLabel[BAR_CELLS] = { "Q", "W", "E", "R", "T", "A",
 static int  g_rdyBar;               /* the bar_keys hook is ready */
 static int  g_barOk;                /* the call is patched */
 int         g_barKeys;              /* BarKeys */
-static int  g_barGrid;              /* GridLayout.asi is loaded */
 static int  g_barState = -1;        /* the last decision logged: 1 keys on, 0 off */
 static int  g_barZero;
 static BYTE g_barVk[BAR_CELLS];
@@ -59,7 +56,6 @@ static int  g_uiTries;
 static const char *bar_why(void)
 {
     if (!g_barKeys) return "BarKeys=0";
-    if (g_barGrid) return "GridLayout.asi is loaded";
     return NULLPTR;
 }
 

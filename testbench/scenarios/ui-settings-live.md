@@ -19,7 +19,7 @@ and back; a scenario has no step that edits the overlay in a running game.
 2. Expect "UI.log" contains "settings: RefitPlayer.ini [UI.HUD] Minimap=0 overrides UI.ini's Minimap=1".
 3. Expect "UI.log" contains "settings: RefitPlayer.ini [UI.UI] Theme=klingon overrides UI.ini's Theme=auto".
 4. Wait for the main menu.
-5. Expect "UI.log" contains "settings: UI_Settings in UI.asi, 19 rows".
+5. Expect "UI.log" contains "settings: UI_Settings in UI.asi, 18 rows".
 6. Click the instant action cube.
 7. Wait for "GAME SETUP".
 8. Click "Computer AI:Medium".

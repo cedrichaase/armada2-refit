@@ -5,17 +5,13 @@
 #
 # How the bench gets a working copy's UI.asi with keys of its own, as
 # online/bench-asi.sh does for Online.asi. A scenario's `Setup:` line can run it. As
-# ui/install.sh does, it then takes out of the clone the plugins the UI replaced (HUD.asi,
-# GridLayout.asi, Menus.asi: retire/retire.sh), which a clone of an older install still has.
 #
 #   --demo LIST   switches on the [Demo] overlay for each context named
-#   --no-grid     takes GridLayout.asi out of the clone (retire.sh does too anyway)
 #   S.K=V         any other UI.ini key, e.g. UI.Scale=1.5 or HUD.Bar=1
 #   --scene NAME  also puts Scene.asi and testbench/scene/scenes/NAME.ini into the clone
 #                 (testbench/scene/bench-setup.sh), for a scenario that needs both
 #   --menus       the UI hosts the shell's menus ([Menus] Enable=1, the default since
-#                 every part is on), and Menus.asi is taken out of the clone: the two
-#                 must not both host them (UI.asi stands down while it is loaded)
+#                 every part is on)
 #   --dplay       first puts Microsoft's DirectPlay and Online.asi into the clone
 #                 (online/reference-dplay.sh), for a multiplayer scenario with the
 #                 UI's menus: a scenario's Setup: line runs one script
@@ -32,7 +28,6 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 state="${1:?usage: bench-asi.sh <session state.json> [--demo LIST] [Section.Key=Value ...]}"
 shift
 sets=()
-nogrid=0
 scene=
 menus=0
 dplay=0
@@ -44,7 +39,6 @@ while [ $# -gt 0 ]; do
             IFS=, read -ra ctxs <<< "${2:?--demo needs a list}"
             for c in "${ctxs[@]}"; do sets+=("Demo.${c^}=1"); done
             shift 2 ;;
-        --no-grid) nogrid=1; shift ;;
         --scene) scene="${2:?--scene needs a name}"; shift 2 ;;
         --menus) menus=1; sets+=("Menus.Enable=1"); shift ;;
         --dplay) dplay=1; shift ;;
@@ -65,15 +59,6 @@ work="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["work"])
 [ "$online" = 1 ] && bash "$here/../online/bench-asi.sh" "$state" --server
 bash "$here/build.sh" >/dev/null
 cp "$here/build/UI.asi" "$here/UI.ini" "$work/game/"
-if [ "$nogrid" = 1 ]; then
-    rm -f "$work/game/GridLayout.asi" "$work/game/GridLayout.ini"
-    echo "GridLayout.asi taken out of $work/game/"
-fi
-if [ "$menus" = 1 ]; then
-    for f in Menus.asi MenuScale.asi; do
-        [ -e "$work/game/$f" ] && rm -f "$work/game/$f" && echo "removed $f from the clone"
-    done
-fi
 for s in "${sets[@]}"; do
     sec="${s%%.*}" rest="${s#*.}"
     key="${rest%%=*}" val="${rest#*=}"

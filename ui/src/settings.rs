@@ -285,10 +285,57 @@ fn start() {
         }
         unsafe { TABLES.push(Table { plugin, module, rows, changed, note }) };
     }
+    retire_overlay();
     migrate_moved();
     unsafe {
         STAMP = rt::file_stamp(&overlay::path());
         NEXT_CHECK = rt::now() + 1.0;
+    }
+}
+
+/// What the overlay may no longer hold (R-C3): a keyed value of a retired kind. `Token`
+/// takes one token out of a comma list (the key goes when none is left); `Key` takes the
+/// key out. Direct3D 9 and Display8's forward mode are gone, and Display8 skips them on
+/// its own read side; the hub, the overlay's only writer, cleans the file.
+enum Retired {
+    Token(&'static str),
+    Key,
+}
+const RETIRED: [(&str, &str, &str, Retired); 3] = [
+    ("Display8.ini", "Display8", "Backend", Retired::Token("d3d9")),
+    ("Display8.ini", "Display8", "Mode", Retired::Key),
+    ("Display8.ini", "Display8", "Real", Retired::Key),
+];
+
+/// Applies `RETIRED` to the overlay, once at the first frame, logged per key; the
+/// plugins are told after. A `Backend=` list like `d3d12,vulkan` keeps its other tokens.
+fn retire_overlay() {
+    let mut any = false;
+    for (file, sec, key, kind) in RETIRED.iter() {
+        let ini = rt::Ini::open(&overlay::path());
+        let section = overlay::section(file, sec);
+        let Some(v) = ini.string(&section, key) else { continue };
+        let new: Option<String> = match kind {
+            Retired::Key => None,
+            Retired::Token(t) => {
+                let all = v.split(',').filter(|x| !x.trim().is_empty()).count();
+                let kept: Vec<&str> = v.split(',').map(|x| x.trim()).filter(|x| !x.is_empty() && !x.eq_ignore_ascii_case(t)).collect();
+                if kept.len() == all {
+                    continue; // no such token
+                }
+                if kept.is_empty() { None } else { Some(kept.join(",")) }
+            }
+        };
+        let ok = overlay::set(file, sec, key, new.as_deref());
+        match &new {
+            None => log!("settings: {} [{}] {}={} retired; removed{}", overlay::FILE, section, key, v, if ok { "" } else { " (failed)" }),
+            Some(n) => log!("settings: {} [{}] {}={} retired; now {}{}", overlay::FILE, section, key, v, n, if ok { "" } else { " (failed)" }),
+        }
+        any |= ok;
+    }
+    if any {
+        rt::ini_refresh_all();
+        log!("settings: told {}", notify());
     }
 }
 

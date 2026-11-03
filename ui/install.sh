@@ -9,7 +9,7 @@
 # shipped file has and theirs lacks is added in its own section, and a part a newer
 # set of defaults switched on is switched on where theirs still holds the old default
 # (tools/ini-merge.py). The plugins the UI replaced (HUD.asi, GridLayout.asi, Menus.asi)
-# are taken out by retire/retire.sh, which ./install runs first.
+# are gone; retire/retire.sh, which ./install runs first, takes out any an old install left.
 set -euo pipefail
 
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/a2env.sh"

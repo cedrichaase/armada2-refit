@@ -27,8 +27,8 @@ pub fn registered() -> bool {
 
 /// The callback: what the UI draws now.
 pub extern "C" fn claims() -> u32 {
-    // The menu host hosts the shell's dialogs at the screen's size (`[Menus] Enable=1`,
-    // and Menus.asi absent): Display8 raises the shell's 800x600 request for it. Not a
+    // The menu host hosts the shell's dialogs at the screen's size (`[Menus] Enable=1`):
+    // Display8 raises the shell's 800x600 request for it. Not a
     // draw, so it holds whether or not the UI can draw.
     let menus = if crate::engine::dialogs::ready() { CLAIM_MENUS } else { 0 };
     if !crate::gfx::drawing() {

@@ -23,7 +23,7 @@ anything is patched or called.
                   ; the wait for the others' loads (below, "Comms, ...")
 
 Every panel key defaults to 1: with the shipped `UI.ini` the whole HUD is ours, and
-`ui/install.sh` takes `HUD.asi` and `GridLayout.asi` out (README.md, "Installing").
+`retire/retire.sh` (run by `./install`) takes `HUD.asi` and `GridLayout.asi` out of an old install (README.md, "Installing").
 A panel at 0 is the stock one, on the stock canvas (README.md, "A part switched back
 to stock").
 
@@ -102,14 +102,14 @@ mission frame draws them itself after `RenderAll` (`ChatDisplay::Render`,
 7. **Comms and the drop box**: multiplayer state, with the menus' multiplayer screens.
 
 When every panel is ours, `HUD.asi`'s canvas edit, font and seams matter to nothing we
-draw, and the install takes `HUD.asi` and `GridLayout.asi` out (PLAN.md).
+draw, and `HUD.asi` and `GridLayout.asi` are gone (PLAN.md).
 
 ## The panel switch
 
 `engine/hud.rs`. Two walks over the component list make a panel visible and give it
 the mouse; each is patched at the one instruction where it calls into a component,
 by a `mov ecx, esi; call <ours>` in the same seven bytes, checked to be stock first.
-No vtable is changed (`HUD.asi` recognises the bar by the `PostLoad` in its vtable).
+No vtable is changed.
 
 | Site | What is there | What ours does |
 |---|---|---|
@@ -256,9 +256,8 @@ the cursor coarser, and doing both would square it twice. `CursorA.tga` is unuse
 
 `hud/bar.rs` (the panel) over `engine/palette.rs` (the reads and the press): a 5x3
 grid of position keys, `[HUD] Bar=1`, the keys QOL's. The retired `GridLayout.asi`
-did the same; the UI **stands down while it is loaded** (the two would wrap the same
-call; UI.log says "GridLayout.asi is loaded and owns the bar"). Its `[Cells]` section
-(one button moved to another key by name) has no counterpart here; and the palette's
+did the same. Its `[Cells]` section (one button moved to another key by name) has no
+counterpart here (the plugin is gone, so no one has it any more); and the palette's
 mode switch (X in stock, `toggle_popup`) has no key while the grid is on, the HUD's
 palette button still switches it.
 
@@ -363,8 +362,7 @@ G=back", `(off)` for a disabled button), each click ("bar: click build"); QOL.lo
 
 ### Seen on the bench
 
-2026-10-16, Instant Action as the Borg at 1280x720 (`ui/bench-asi.sh --no-grid
-HUD.Bar=1`): the bar drew as a 5x3 grid of the game's icons above the info panel, the
+2026-10-16, Instant Action as the Borg at 1280x720 (`ui/bench-asi.sh HUD.Bar=1`): the bar drew as a 5x3 grid of the game's icons above the info panel, the
 stock bar did not draw; a click on build opened the build list (13 items, cancel on T,
 back on G), S started a mining station's placement and a click placed it; W opened
 orders (W=repair E=superRepair A=patrol S=scout Z=guard X=decom G=back), R the AI menu
@@ -1491,8 +1489,7 @@ is entered or called.
   bench, nor a Shift-click on a group icon, the slowed and spy icons, or the
   verbose tooltips' wording at length. Stock's wireframe and system colours are
   re-made in the theme's status colours rather than copied.
-- `GridLayout.ini`'s `[Cells]` (moving one button to another key) has no `UI.ini`
-  counterpart yet; nor the trade buttons' exchange-rate label and the percentage some
+- The trade buttons' exchange-rate label and the percentage some
   commands draw on their button (`ControlButton::Render` draws both as text).
 - A stock click on a palette button locks the cursor to the bar while held, and the
   bar's `PreSimulate` sends the bar back to the top level when a click lands outside it
