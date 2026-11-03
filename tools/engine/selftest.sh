@@ -32,4 +32,7 @@ if python3 "$here/lint.py" --selftest; then ok "lint.py fixtures"; else bad "lin
 if python3 "$here/gen.py" --check; then ok "gen.py --check"; else bad "gen.py --check"; fi
 if python3 "$here/lint.py"; then ok "lint.py"; else bad "lint.py"; fi
 
+# 5. the negative tests (the game-exe ones are skipped without a game)
+if bash "$here/negative.sh" >"$tmp/neg.log" 2>&1; then ok "negative.sh"; else bad "negative.sh"; cat "$tmp/neg.log"; fi
+
 [ "$fail" = 0 ] && echo "engine selftest: ok" || { echo "engine selftest: FAILED" >&2; exit 1; }

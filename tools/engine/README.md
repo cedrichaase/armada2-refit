@@ -14,6 +14,8 @@ The format, the generated code and the resolver are described in
 | `mkpe.py` | writes a fixture's synthetic PE image (`--identity` prints its three numbers, to put in the fixture set's `build.toml`) |
 | `fixtures.py` | runs the fixtures on the three resolvers (`run [py c rs]`); `bless` writes Python's transcripts into them, to be reviewed as the spec |
 | `ctest.c` | the C resolver's host driver (`csdk/a2engine.h` with `A2E_HOST`) |
+| `negative.sh` | the negative tests on scratch copies of the game's exe (timestamp changed, one checked entry changed per plugin file, a forced child build, `a2test syms --record`); skips the exe-based ones without a game |
+| `bench-exe.sh`, `bench-mismatch.sh` | the bench's `Setup:` scripts: a clone's exe stamped (unknown build), a clone's `A2EngineTest.ini` (`testbench/README.md`, "The symbol profiles, offline and on the bench") |
 | `selftest.sh` | all of the above, as CI's `engine` job runs it |
 
 ## Fixtures

@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.86.0 — 2026-11-03
+
+Layers: testbench 3.98.0.
+
+### Added
+- Phase 8g: `./a2test syms`, `tools/engine/negative.sh`, the bench scripts `bench-exe.sh` and `bench-mismatch.sh` and the scenarios `engine-unknown-build` and `engine-mismatch` (+ two pending variants); see `testbench/CHANGELOG.md`.
+
+### Fixed
+- The settings tools' walk skips every tool's fixture tree (CI's settings job failed on the engine tool's lint fixture).
+
+Installed, not yet seen in game
+
 ## 13.82.0 — 2026-11-03
 
 Layers: ui 0.32.0, testbench 3.97.2.

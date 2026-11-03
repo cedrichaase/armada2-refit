@@ -13,7 +13,7 @@ every hook down with that reason and leaves the game as stock: Display8 forwards
 old chain (P5), UI.asi draws nothing, and the settings screen shows the plugin note.
 The only hook that runs is a scan with `unknown = "run"` (binkproxy's build-independent
 intro-mode scan, from phase 8d; it makes no log line here until the C plugins move).
-The shell is the stock one (800x600 at the top left of the screen, so the Instant
+The shell is the stock one (4:3, centred in the window with black sides; the Instant
 Action cube is clicked in screen pixels), then a skirmish loads and ticks.
 
 The plugins on a profile at this point are Display8 and UI.asi. Each later package of
@@ -38,14 +38,14 @@ build`, its note, no `installed` hook line, no `read before its hook`.
 15. Expect "UI.log" not contains "PANIC".
 16. Expect "Display8.log" not contains "PANIC".
 ## Mission
-17. Click at 640,90.
+17. Click at 930,100.
 18. Wait for "GAME SETUP".
 19. Wait 2 seconds.
 20. Click "LAUNCH".
 21. Wait 60 seconds.
 22. Take a screenshot called "mission".
 23. Check that the screenshot shows a space battle map of Star Trek: Armada II drawn by the game (stars, ships or stations, and the game's own interface), not a black or garbled screen and not a second copy of the interface drawn over the game's.
-24. Expect "Display8.log" contains "passthrough: the engine's first draw".
+24. Expect "Display8.log" contains "engine: unknown build: Display8 forwards to the old chain".
 25. Expect "UI.log" not contains "hud: panels of ours".
 26. Expect "UI.log" not contains "installed".
 27. Expect "Display8.log" not contains "installed".

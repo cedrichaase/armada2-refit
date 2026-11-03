@@ -510,6 +510,36 @@ sha256 is the bench's alone: plugins never hash the file, and it is not a run-ti
 (`profiles/gog-1.1/build.toml` lists it as information). `Expect "Display8.log" contains
 "engine: Armada2.exe timestamp 0x3c4c76bd"` checks a plugin logged it.
 
+### The symbol profiles, offline and on the bench
+
+`./a2test syms [--exe PATH] [--build B] [--plugin P] [--record] [--json]` (`bench/syms.py`)
+checks `profiles/` against an executable file, read only (default `$A2_GAME/Armada2.exe`):
+it identifies the build, then runs every plugin table's hooks through the resolver of
+`tools/engine/resolve.py` (the algorithm the plugins run, so the same stand-down reasons),
+mapping addresses to file offsets through the sections. It prints each table's
+`symbols: N/M` line, each hook `ready` or its reason, and the total. `--build` forces a
+build's profile onto the exe (the wrong-profile test), `--record` appends the exe's
+sha256 to `[[known]]` of the matched build (it refuses an unknown one; the line is
+information, never a key), `--json` prints the same as data. It cannot see what changes
+at run time (FleetOpsHook, the widescreen `.asi`): the plugin's own log is for that.
+`tools/engine/negative.sh` runs it on scratch copies of the exe (timestamp changed,
+one checked entry changed per plugin file, a forced child build, `--record`): offline,
+no game running.
+
+The bench's negative cases use two `Setup:` scripts of `tools/engine/`, which chain to
+the next script as `display/bench-mode.sh` does. `bench-exe.sh stamp` flips one bit of
+the PE timestamp of the clone's `Armada2.exe` (written beside it and moved over its name,
+so the install's file is never written even if the clone shares its blocks):
+`engine-unknown-build`. `bench-mismatch.sh <globs>|by-player` writes the clone's
+`A2EngineTest.ini` (`[Test] Mismatch=<globs>`, `*` only): the hooks named stand down as
+a failed check would, on a stock exe. With `by-player` the scenario's `Players:` name
+picks the globs, so one file runs variants side by side (`engine-mismatch`: `display`,
+`radar`). A `Players:` list is one game each, so the variants that need a third or fourth
+game are their own files, pending the packages that put their plugin on a profile:
+`engine-mismatch-hulls` (render3d, 8e) and `engine-mismatch-cplugins` (QOL, rules, Online,
+8d). The Display8 shell under a forced `display.modes` is not the engine's: the forward
+chain draws UI.asi's menus.
+
 ## Frame dumps
 
     ./a2test drive --session ID dump NAME      # or a scenario step: Dump the frame called "NAME"
