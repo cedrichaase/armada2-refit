@@ -598,7 +598,7 @@ pub mod shields {
             if let Some(prev) = h.install(hk) {
                 unsafe { PREV_CREATE[i] = prev };
                 names.push(' ');
-                names.push_str(super::super::content::SITE_NAME[i]);
+                names.push_str(super::super::content::get().site_name(i));
                 if prev.addr() != fn_create_hit() {
                     names.push_str("(chained)");
                 }
@@ -622,7 +622,7 @@ pub mod shields {
 
     /// Whether the engine's table of shell names is the one this reads.
     pub fn names_ok() -> bool {
-        shield_type_names() != 0 && unsafe { rd::<usize>(fn_get_shield_type() + 4) == shield_type_names() }
+        TABLE.engine().resolved(sym::SHIELD_TYPE_NAMES) && shield_type_names() != 0 && unsafe { rd::<usize>(fn_get_shield_type() + 4) == shield_type_names() }
     }
 
     /// The name of shell type `k` in the engine's table: None at the table's end.

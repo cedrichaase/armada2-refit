@@ -142,6 +142,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         sections: 0xa1a8a321,
         image_base: 0x400000,
         n_resolved: 53,
+        content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x467730, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x30, 0x8b, 0x50, 0x34, 0xd9, 0x02], mask: &[], section: "", count: 0, value: 0 }, // fn_shock_radius
             a2engine::Entry { present: true, addr: 0x46a0f1, end: 0x0, target: 0x16, vtable: 0xffff, index: 0, chain: true, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_build_fragment

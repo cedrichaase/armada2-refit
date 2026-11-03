@@ -308,6 +308,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         sections: 0xa1a8a321,
         image_base: 0x400000,
         n_resolved: 137,
+        content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x763968, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_ship_display
             a2engine::Entry { present: true, addr: 0x6b41d8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_no_entity

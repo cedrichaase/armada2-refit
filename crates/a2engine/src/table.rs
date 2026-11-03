@@ -118,6 +118,9 @@ pub struct Build {
     /// The `N` of `symbols: N/M resolved` (entries present, minus those used only by
     /// blocked hooks).
     pub n_resolved: u16,
+    /// The content set this table's plugin reads in this build (`profiles/*/content.toml`,
+    /// README.md, "Content"), "" for none.
+    pub content: &'static str,
     /// One per symbol, in table order.
     pub entries: &'static [Entry],
     pub blocked: &'static [Block],

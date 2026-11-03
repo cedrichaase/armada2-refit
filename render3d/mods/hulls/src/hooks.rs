@@ -256,7 +256,7 @@ pub fn class_odf(class: usize) -> &'static str {
         }
         let s = crate::rt::cstr_at(p, 260);
         match s.len().checked_sub(4) {
-            Some(n) if s.is_char_boundary(n) && s[n..].eq_ignore_ascii_case(super::content::ODF_EXT) => &s[..n],
+            Some(n) if s.is_char_boundary(n) && s[n..].eq_ignore_ascii_case(super::content::get().odf_ext) => &s[..n],
             _ => s,
         }
     }
@@ -386,7 +386,7 @@ pub fn cargo_markings(o: usize, sod: &a2fmt::sod::Sod) -> alloc::vec::Vec<(alloc
     if o == 0 || vtable(o) != vt_freighter() {
         return out;
     }
-    let Some(ore) = sod.find(super::content::ORE_NODE) else { return out };
+    let Some(ore) = sod.find(super::content::get().ore_node) else { return out };
     let kind = field(o, 0x25c);
     let amount = field_f32(o, 0x258);
     let caps = field(o, 0x254);
@@ -394,7 +394,7 @@ pub fn cargo_markings(o: usize, sod: &a2fmt::sod::Sod) -> alloc::vec::Vec<(alloc
         let cap = field_f32(caps, kind * 4);
         let fill = if cap > 0.0 && amount.is_finite() { amount / cap * 100.0 } else { 0.0 };
         let p = field(resource_colours(), kind * 4);
-        let c = if p != 0 { unsafe { rd::<[f32; 3]>(p) } } else { super::content::RESOURCE_COLOURS_STOCK[kind] };
+        let c = if p != 0 { unsafe { rd::<[f32; 3]>(p) } } else { super::content::get().resource_colour(kind) };
         (fill, v3(c[0], c[1], c[2]))
     } else {
         (-1.0, v3(0.0, 0.0, 0.0))

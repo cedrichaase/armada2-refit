@@ -20,18 +20,13 @@ use crate::menus::{actions, Screen};
 use crate::rt::win::{HWND, WM_MOUSEMOVE};
 use crate::widgets::{theme, Align, Ui};
 
-/// A card: the stock panel's art (design rectangle), a point inside the stock panel to
-/// click, the default name.
+/// A card: the stock panel's art (design rectangle) and a point inside the stock panel
+/// to click. Its name, key, view and emblem are the content set's (`content.rs`,
+/// `campaigns`, in the same order).
 struct Card {
     art: [i32; 4],
     at: (i32, i32),
-    name: &'static str,
 }
-
-/// Each card's view of render3d's map, and its emblem: a race icon's cell in
-/// `allrace` (`gui_global.spr`, 84 px cells of 256), or None for the Academy's patch.
-const VIEWS: [(&core::ffi::CStr, Option<(u32, u32)>); 4] =
-    [(c"tutorials", None), (c"federation", Some((0, 0))), (c"klingon", Some((84, 0))), (c"borg", Some((84, 84)))];
 
 /// The race icons, loaded once (None inside: not found, the names stand alone).
 static mut ICONS: Option<Option<Tex>> = None;
@@ -48,10 +43,10 @@ fn icons() -> Option<Tex> {
 }
 
 const CARDS: [Card; 4] = [
-    Card { art: [24, 16, 330, 205], at: (186, 111), name: "Tutorials" },
-    Card { art: [436, 22, 310, 216], at: (589, 106), name: "Federation Campaign" },
-    Card { art: [24, 338, 330, 222], at: (186, 444), name: "Klingon Campaign" },
-    Card { art: [431, 340, 322, 222], at: (589, 439), name: "Borg Campaign" },
+    Card { art: [24, 16, 330, 205], at: (186, 111) },
+    Card { art: [436, 22, 310, 216], at: (589, 106) },
+    Card { art: [24, 338, 330, 222], at: (186, 444) },
+    Card { art: [431, 340, 322, 222], at: (589, 439) },
 ];
 
 /// Each card's name, from the stock screen's hidden labels, matched by the word that
@@ -59,14 +54,14 @@ const CARDS: [Card; 4] = [
 /// not always come in the same order (after an aborted mission the rows once read in
 /// the wrong order). A card no label names keeps its own name; when no label names any
 /// card (another language), the labels are taken in order, as before.
-const KEYS: [&str; 4] = ["tutorial", "federation", "klingon", "borg"];
 /// The labels were seen out of order (logged once).
 static mut SAID_ORDER: bool = false;
 
 fn card_names<'a>(labels: &[&'a crate::menus::model::Control]) -> [&'a str; 4] {
-    let mut out = [CARDS[0].name, CARDS[1].name, CARDS[2].name, CARDS[3].name];
+    let camps = crate::content::get().campaigns;
+    let mut out = [camps[0].name, camps[1].name, camps[2].name, camps[3].name];
     let mut any = false;
-    for (i, key) in KEYS.iter().enumerate() {
+    for (i, key) in camps.iter().map(|c| c.key).enumerate() {
         let hit = labels.iter().position(|c| crate::rt::lower(&c.text).contains(key));
         if let Some(j) = hit {
             out[i] = labels[j].text.as_str();
@@ -92,7 +87,8 @@ static mut HOVER: (HWND, i32) = (core::ptr::null_mut(), -1);
 
 pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     let names = kit::labels(s);
-    if names.len() < 4 {
+    // A set without the four campaigns leaves the screen to the engine's own.
+    if names.len() < 4 || crate::content::get().campaigns.len() != CARDS.len() {
         return false;
     }
     let buttons = kit::buttons(s);
@@ -125,7 +121,7 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     let mut hover = -1i32;
     for (i, card) in CARDS.iter().enumerate() {
         let r = R::new(x0 + (i % cols) as f32 * (card_w + gap), y0 + (i / cols) as f32 * (card_h + gap), card_w, card_h);
-        let id = ui.id(card.name);
+        let id = ui.id(names[i]);
         let live = s.top && s.model.button_at(card.at.0, card.at.1).is_none_or(|c| c.enabled);
         let (hot, held, clicked) = if live { ui.interact(id, r) } else { (false, false, false) };
         let st = theme::State::of(ui, id, hot, held);
@@ -166,7 +162,7 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
 
 /// The emblem of card `i` in `r` (a square), tinted.
 fn emblem(ui: &mut Ui, i: usize, r: R, c: crate::gfx::Color) {
-    match VIEWS[i].1 {
+    match crate::content::get().campaigns[i].emblem {
         Some((x, y)) => {
             let Some(t) = icons() else { return };
             let k = 1.0 / 256.0;
@@ -223,11 +219,11 @@ fn over_scene(ui: &mut Ui, s: &Screen, names: &[&str; 4], foot: &[&crate::menus:
     for (i, card) in CARDS.iter().enumerate() {
         let r = R::new(x, y, w, eh);
         y += eh + gap;
-        let id = ui.id(card.name);
+        let id = ui.id(names[i]);
         let live = s.top && s.model.button_at(card.at.0, card.at.1).is_none_or(|c| c.enabled);
         let (hot, held, clicked) = if live { ui.interact(id, r) } else { (false, false, false) };
         let st = theme::State::of(ui, id, hot, held);
-        let here = shown.is_some_and(|v| v == VIEWS[i].0) || (shown.is_none() && i == 1);
+        let here = shown.is_some_and(|v| v == crate::content::get().campaigns[i].scene) || (shown.is_none() && i == 1);
         let k = st.hot.max(if here { 0.45 } else { 0.0 });
         if k > 0.01 {
             ui.draw.rect_hgrad(r, fade(t.accent, 0.26 * st.hot), fade(t.accent, 0.0));
@@ -248,7 +244,7 @@ fn over_scene(ui: &mut Ui, s: &Screen, names: &[&str; 4], foot: &[&crate::menus:
         ui.text_in(tr, name, 24.0, Align::Left, c, Weight::Bold);
         if hot {
             hover = i as i32;
-            crate::menus::scene::choose(VIEWS[i].0);
+            crate::menus::scene::choose(crate::content::get().campaigns[i].scene);
         }
         if clicked {
             s.click(card.at.0, card.at.1);

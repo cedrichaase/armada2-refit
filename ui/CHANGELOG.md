@@ -4,6 +4,15 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.33.0 — 2026-11-03
+
+### Changed
+- The UI's built-in tables of game names (races and their aliases, resource names, the single
+  player campaigns, the credits tour and menu views) moved to `src/content.rs`, per content
+  set, chosen by `Engine::content()` (phase 8f). The `stock` set is the tables as they were. A
+  build with no set has no races, resources or views, and the single player screen stands down
+  to the engine's. Installed, not yet seen in game.
+
 ## 0.32.0 — 2026-11-03
 
 ### Changed

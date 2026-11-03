@@ -27,7 +27,6 @@ use crate::shaders::specials_spv::*;
 use crate::shaders::specials_dxil::*;
 
 pub const KINDS: usize = 3;
-use super::content::NAMES;
 
 /// Which look an effect takes, by its class.
 pub fn kind(vt: usize) -> Option<usize> {
@@ -77,10 +76,11 @@ pub struct Looks {
 impl Looks {
     pub fn new() -> Looks {
         let s = Sec::new("Specials");
-        let defs = super::content::DEFAULTS;
-        let mut kinds = [Kind { on: true, colour: V3::ZERO, strength: 0.0, creep: 1.0, scale: 1.0, rim: 0.0, light: V3::ZERO, light_brightness: 0.0, light_range: 0.0, fade: 1.0 }; KINDS];
+        let content = super::content::get();
+        let defs = content.defaults;
+        let mut kinds = [Kind { on: false, colour: V3::ZERO, strength: 0.0, creep: 1.0, scale: 1.0, rim: 0.0, light: V3::ZERO, light_brightness: 0.0, light_range: 0.0, fade: 1.0 }; KINDS];
         for (k, d) in defs.iter().enumerate() {
-            let n = NAMES[k];
+            let n = content.name(k);
             let key = |suffix: &str| {
                 let mut s = alloc::string::String::from(n);
                 s.push_str(suffix);
@@ -240,7 +240,7 @@ impl Looks {
             self.drawn += 1;
             if !self.said {
                 self.said = true;
-                crate::log!("specials: first layer drawn: {} over {} (radius {:.0})", NAMES[k], r3d_core::engine::obj::odf_name(f.victim), radius);
+                crate::log!("specials: first layer drawn: {} over {} (radius {:.0})", super::content::get().name(k), r3d_core::engine::obj::odf_name(f.victim), radius);
             }
         }
     }

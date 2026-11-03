@@ -113,7 +113,7 @@ impl Default for Particles {
             enabled: true,
             reload: true,
             cloud_fps: 30.0,
-            vent_sprites: [String::from(content::VENT_SPRITES[0]), String::from(content::VENT_SPRITES[1])],
+            vent_sprites: [String::from(content::get().vent_sprites[0]), String::from(content::get().vent_sprites[1])],
         }
     }
 }
@@ -199,8 +199,8 @@ impl Module for Particles {
     fn configure(&mut self, ini: &crate::rt::Ini, said: &mut Changes) {
         self.cloud_fps = ini.float("Particles", "CloudFps", 30.0).max(1.0);
         self.vent_sprites = [
-            ini.string("Particles", "PlasmaSprite").unwrap_or_else(|| String::from(content::VENT_SPRITES[0])),
-            ini.string("Particles", "GasSprite").unwrap_or_else(|| String::from(content::VENT_SPRITES[1])),
+            ini.string("Particles", "PlasmaSprite").unwrap_or_else(|| String::from(content::get().vent_sprites[0])),
+            ini.string("Particles", "GasSprite").unwrap_or_else(|| String::from(content::get().vent_sprites[1])),
         ];
         self.apply_to_sys();
         self.vcfg = vent::Cfg::read(ini);

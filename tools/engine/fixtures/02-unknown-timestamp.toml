@@ -30,6 +30,10 @@ word = [
   { at = 0x403008, value = 0x401100 },              # [2] = f2, the profile says f1
 ]
 
+[content]
+p = "none"
+s = "none"
+
 [expect]
 p = [
   "engine: Armada2.exe timestamp 0x5eed0099, image size 0x6000, sections 0x777d215e",
