@@ -87,7 +87,7 @@ You can also switch most of these off **without reinstalling**, from the Refit s
 
 ## The Refit screen
 
-In the main menu or in a mission: **Options**, then **Refit**. It lists every setting
+In the main menu or in a mission: **Options**, then **Refit settings**. It lists every setting
 of every Refit plugin that is installed, on five tabs: Graphics, Interface, Gameplay,
 Multiplayer and Movies. A click anywhere on an on/off row toggles it; a row with
 several values opens a list. *Show advanced* adds the rows meant for tuning or trouble.

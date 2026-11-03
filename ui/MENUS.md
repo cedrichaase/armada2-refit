@@ -411,7 +411,10 @@ range's span over the length plus one, and a release on an arrow button steps it
 screen's procedure reads the value with `GetValue`. So a slider of ours draws its own
 drag from the model's value and, when the player lets go, sends **one click at the
 point of the track that maps to the value** (`generic::click_scroll`); a key step is
-one click at once. The stock click sound plays once per change, not per pixel.
+one click at once. The stock click sound plays once per change, not per pixel. The top of
+the range is the exception: the point that maps to it lies past the track, so a click on
+the track reaches at most the top minus one and the top takes a further click on the far
+arrow button (`click_scroll`; before 2.2.1 a slider could not be set back to its top).
 
 **What is read**, each offset from the method that writes it:
 
@@ -571,7 +574,7 @@ is the only thing that presents while a mission's menu is up, and the modal draw
 host's frame (`menus::frame`, after the dialog stack, before the frame's claim) works the
 same in the shell and in a mission with the stock dialog still running under it.
 
-- **Life.** The Options spec's **Refit** button calls `refit::open(host)` (with the
+- **Life.** The Options spec's **Refit settings** button calls `refit::open(host)` (with the
   shell's click sound). The modal closes on Done, on Esc, when its host leaves
   `dialogs::stack()` (`menus::closed`; log `refit: closed (Options ended)`) and when a
   dialog opens above its host (`refit: closed (a dialog opened over Options)`), so that a
@@ -626,8 +629,8 @@ the bar's track, a combo choice is below. **Every word is the stock control's ow
   setting of the UI's, not the game's, so it is kept in the player's overlay,
   `RefitPlayer.ini` (`[UI.HUD] BarHidden`, `prefs.rs`), and its words are ours; a click plays the shell's click sound (`cornrclk.wav`).
 - **Options**: the stock buttons in the order they stand on the stock screen (y, then
-  x), in one column, then a separator and one entry of ours, **Refit** (the Refit screen,
-  below); the one at the foot (Previous Menu, Return to Game: a button in the
+  x), in one column, with one entry of ours, **Refit settings** (the Refit screen,
+  below), directly under Game Settings; the one at the foot (Previous Menu, Return to Game: a button in the
   bottom-left corner, `common::is_footer`) is the window's footer. In a mission there
   are nine stock entries (ten with Refit); from the main menu three (four). The entry is
   drawn only by this spec, and not when the settings hub found no row to show. The window's title is the stock label at
@@ -1011,6 +1014,8 @@ hidden surfaces).
   opened again, and still off; Sound Settings' Music Volume slider and Unit Speech, the
   screen opened again; Game Settings' Game Difficulty stepped; back to the main menu;
   quit.
+- `ui-menus-slider-max.md`: Graphics Detail set to its least and back to its most (the
+  stock bar's top lies past its track: `click_scroll`), read back from UI.log.
 - `ui-menus-refit.md`: the Refit screen (`testbench/operating/refit-screen.md`): the
   tabs, a row of each kind written and logged, Esc closing only the modal, in the shell
   and in a mission.

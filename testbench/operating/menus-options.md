@@ -9,7 +9,7 @@ these screen places.
 - **Options** (from the main menu): Graphics Settings (640,308), Sound Settings
   (640,346), Game Settings (640,383), Previous Menu (534,449). In a mission the nine stock
   entries stand in one column from y=196, 37.5 px apart (Abort Mission 383, Exit to
-  Windows 495) and Return to Game is at (534,561). A tenth entry of ours, `Refit`, stands under them (`refit-screen.md`).
+  Windows 495) and Return to Game is at (534,561). A tenth entry of ours, `Refit settings`, stands directly under Game Settings (`refit-screen.md`).
 - **Graphics Settings**: Display Mode drop-down (440,239): a click opens our list, rows
   from y=268, 27 px apart; the Display Driver (440,294); the switches on the right
   (Hardware Vertex 839,239, Bump Mapping 839,294, Cinematic Window 839,348, Asynchronous

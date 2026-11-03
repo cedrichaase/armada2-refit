@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.9 — 2026-11-03
+
+Layers: ui 2.2.1, testbench 4.1.1.
+
+### Changed
+- The Refit entry of Options is "Refit settings", directly under Game Settings (PLAYING.md,
+  scenarios and operating notes follow).
+
+### Fixed
+- Graphics Detail (and any stock slider) can be set back to its maximum in the redrawn menus.
+  Installed, not yet seen in game.
+
 ## 15.6.8 — 2026-11-03
 
 Layers: display 1.0.2, testbench 4.1.0.

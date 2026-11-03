@@ -46,8 +46,8 @@ other panels are ours). Display8 is on its stub here, so UI.asi draws on it.
 ## Radar: the Refit screen
 17. Radar: Click at 228,390.
 18. Radar: Wait 3 seconds.
-19. Radar: Expect "Refit" is visible.
-20. Radar: Click "Refit".
+19. Radar: Expect "Refit settings" is visible.
+20. Radar: Click "Refit settings".
 21. Radar: Wait for the refit screen.
 22. Radar: Click "Interface".
 23. Radar: Wait 2 seconds.

@@ -8,7 +8,6 @@ use super::common::*;
 use crate::gfx::{Weight, R};
 use crate::menus::model::Control;
 use crate::menus::{refit, Screen};
-use crate::widgets::theme;
 use crate::widgets::{Align, Anchor, Ui};
 use alloc::vec::Vec;
 
@@ -21,32 +20,32 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     backdrop_for(ui, s);
     let t = ui.theme;
     let (bh, gap) = (46.0, 10.0);
-    // One entry of ours under the stock ones, after a separator: the Refit screen.
+    // One entry of ours, "Refit settings", directly under Game Settings (at the foot
+    // when this screen has no such button): the Refit screen.
     let entry = refit::available();
+    let at = btns.iter().position(|c| c.text.eq_ignore_ascii_case("game settings")).unwrap_or(btns.len() - 1);
     let n = btns.len() as f32 + if entry { 1.0 } else { 0.0 };
-    let h = 64.0 + 2.0 * t.pad + n * bh + (n - 1.0) * gap + 24.0 + 44.0 + 20.0 + if entry { 16.0 } else { 0.0 };
+    let h = 64.0 + 2.0 * t.pad + n * bh + (n - 1.0) * gap + 24.0 + 44.0 + 20.0;
     let r = Anchor::Centre.place(ui.screen(), ui.u(560.0), ui.u(h.min(1040.0)), 0.0);
     let name = title(s).map_or("", |c| c.text.as_str());
     let inner = ui.window(r, name);
     let (body, foot) = inner.take_top(inner.h - ui.u(44.0 + 12.0));
     let mut hot = None;
     let mut y = body.y + ui.u(12.0);
-    for c in btns {
+    for (i, c) in btns.into_iter().enumerate() {
         stock_button(ui, s, c, R::new(body.x + ui.u(40.0), y, body.w - ui.u(80.0), ui.u(bh)), &mut hot);
         y += ui.u(bh + gap);
-    }
-    if entry {
-        let sep = R::new(body.x + ui.u(40.0), y, body.w - ui.u(80.0), ui.u(16.0));
-        theme::separator(ui, sep);
-        y += ui.u(16.0);
-        let er = R::new(body.x + ui.u(40.0), y, body.w - ui.u(80.0), ui.u(bh));
-        let clicked = ui.scope("refit entry", |ui| ui.button(er, "Refit"));
-        if clicked && s.top && !refit::is_open() {
-            crate::engine::sound::shell_click();
-            refit::open(s.slot.hwnd);
-        }
-        if ui.input.mouse.is_some_and(|p| er.contains(p)) {
-            hot = None;
+        if entry && i == at {
+            let er = R::new(body.x + ui.u(40.0), y, body.w - ui.u(80.0), ui.u(bh));
+            let clicked = ui.scope("refit entry", |ui| ui.button(er, "Refit settings"));
+            if clicked && s.top && !refit::is_open() {
+                crate::engine::sound::shell_click();
+                refit::open(s.slot.hwnd);
+            }
+            if ui.input.mouse.is_some_and(|p| er.contains(p)) {
+                hot = None;
+            }
+            y += ui.u(bh + gap);
         }
     }
     footer(ui, s, foot, &mut hot);

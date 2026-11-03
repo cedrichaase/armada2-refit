@@ -71,7 +71,7 @@ screen"); Esc closes only the Refit screen and Return to Game goes back to the m
 48. Host: Wait 30 seconds.
 49. Host: Press Escape.
 50. Host: Wait 3 seconds.
-51. Host: Click "Refit".
+51. Host: Click "Refit settings".
 52. Host: Wait 2 seconds.
 53. Host: Click "Multiplayer".
 54. Host: Wait 1 second.

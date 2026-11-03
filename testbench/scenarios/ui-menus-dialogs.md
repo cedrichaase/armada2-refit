@@ -6,7 +6,7 @@ Setup: ui/bench-asi.sh --menus
 Timeout: 15 min
 
 `ui/MENUS.md`. In a mission Esc opens Options (`do_escapeMenu`) with its ten entries (the
-nine stock ones and `Refit`, ours) and
+nine stock ones and `Refit settings`, ours) and
 Return to Game in the footer, as a spec over the mission's last frame, dimmed. Abort
 Mission asks a yes-or-no question (`do_yesNo`), and No leaves Options as it was; Save
 Game ends in a one-button message (`do_oneButton`, "Save Successful!") whose O.K. is
@@ -27,7 +27,7 @@ by text. The screens are read through the model of the hidden dialogs (UI.log li
 10. Expect "Technology Tree" is visible.
 11. Expect "Exit to Windows" is visible.
 12. Expect "Return to Game" is visible.
-13. Expect "Refit" is visible.
+13. Expect "Refit settings" is visible.
 14. Expect "UI.log" contains "over the mission's last frame".
 15. Take a screenshot called "options in the mission".
 16. Click "Abort Mission".
