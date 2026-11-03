@@ -12,8 +12,8 @@ use crate::rt::{self, overlay, settings::*, win::*};
 use alloc::string::String;
 use alloc::vec::Vec;
 
-/// The fixed export names (A2SET_ABI 1.1). `Display8_Settings` is reserved.
-const EXPORTS: [&str; 6] = ["Render3D_Settings", "UI_Settings", "QOL_Settings", "QOLRules_Settings", "Online_Settings", "BinkProxy_Settings"];
+/// The fixed export names (A2SET_ABI 1.1).
+const EXPORTS: [&str; 7] = ["Display8_Settings", "Render3D_Settings", "UI_Settings", "QOL_Settings", "QOLRules_Settings", "Online_Settings", "BinkProxy_Settings"];
 
 #[link(name = "kernel32")]
 unsafe extern "system" {

@@ -271,7 +271,7 @@ build it recognises and the summary:
 
     engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321
     engine: build armada2/gog-1.1
-    engine: symbols: 15/15 resolved; 0 hooks blocked
+    engine: symbols: 29/29 resolved; 0 hooks blocked
 
 | Hook | Entries | Used by | Without it |
 |---|---|---|---|

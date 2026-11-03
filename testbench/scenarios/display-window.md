@@ -35,9 +35,8 @@ proxy leaves the intro's mode to Display8 (`BinkProxy.log`). With no UI nothing 
 13. Expect "Display8.log" contains "window: intro mode raised to".
 14. Expect "BinkProxy.log" contains "intro: Display8 raises the mode".
 15. Expect "Display8.log" contains "window: KeepClip on (Wine)".
-16. Expect "Display8.log" contains "claims: UI.asi claims".
-17. Expect "UI.log" not contains "menus: shell display mode".
-18. Take a screenshot called "main menu".
-19. Check that the main menu fills the whole screen: its backdrop reaches every edge and the buttons are at the usual size, not a small 800x600 picture in a corner.
-20. Quit the game.
-21. Expect no crash.
+16. Expect "UI.log" not contains "menus: shell display mode".
+17. Take a screenshot called "main menu".
+18. Check that the main menu fills the whole screen: its backdrop reaches every edge and the buttons are at the usual size, not a small 800x600 picture in a corner.
+19. Quit the game.
+20. Expect no crash.

@@ -12,7 +12,7 @@ MAJOR: keys move out of `UI.ini`.
 - `[UI] Native` and `[UI] KeepClip` (now `[Window]` of `Display8.ini`; a value changed by hand is carried over by `./install` and, in `RefitPlayer.ini`, by the settings hub, once). The shell-mode raise (`dialogs::raise_shell_mode`) and the intro-mode raise (`intro::raise_mode`) are Display8's; `engine/display.rs` is gone, with the profile's `core.display`, `core.intro_mode32`, `core.intro_mode16` and `dialogs.shell_mode` hooks. Without Display8 the UI no longer raises anything and the shell stays at the stock 800x600.
 
 ### Added
-- The menu host claims `CLAIM_MENUS` (contract 1.3) while it runs, which is what asks Display8 to raise the shell's mode. `shell:` facts log what `display8v1_mode` says.
+- The settings hub reads `Display8_Settings`. The menu host claims `CLAIM_MENUS` (contract 1.3) while it runs, which is what asks Display8 to raise the shell's mode. `shell:` facts log what `display8v1_mode` says.
 
 Installed, not yet seen in game
 
