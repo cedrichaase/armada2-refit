@@ -4,6 +4,15 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 2.5.0 — 2026-11-03
+
+Reads package schemas 0 and 1, unchanged; reads the 14.3.0 package's `layers/<id>/` layout and its optional manifest keys.
+
+### Added
+- A "Parts" list (GTK: an expander of check rows; Tk: ticks under the card) built from the manifest's layers whose `select` is `on` or `off`, with `requires` and the layer's summary greyed beneath (the rules part says every player of a network game needs it). All parts are ticked by default, `off` layers excepted; unticking a part unticks those that need it. The choice goes to the scripts as `A2_SKIP` beside `EXCLUDED`, and is kept in `armada2-refit-installed.json` (`skip`) across upgrades. A package without `select` (before 14.3.0) offers no choice.
+- `--without ID,ID` and `--all` on the command line (`--package`, `--install`).
+- The bug report finds a release's files under `layers/<id>/` (or `game/` in an older one). Installed, not yet seen in game.
+
 ## 2.4.1 — 2026-11-03
 
 Reads package schemas 0 and 1, unchanged.
