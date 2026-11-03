@@ -50,7 +50,7 @@ const ORDER: [u32; 6] = [2, 4, 3, 5, 0, 1];
 pub fn run(ui: &mut Ui) {
     let mut shown = topbar::shown();
     shown.sort_by_key(|&(r, _)| ORDER.iter().position(|&o| o == r).unwrap_or(6));
-    if shown.is_empty() || crate::engine::hud::hidden(topbar::RESOURCE_PANEL) {
+    if shown.is_empty() || crate::engine::hud::hidden(topbar::resource_panel()) {
         return;
     }
     let names = names(crate::rt::now(), &shown);

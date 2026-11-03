@@ -24,7 +24,7 @@ fn frame_width(ui: &Ui) -> f32 {
 /// Where the engine draws the view: our place, or the stock one when ours is not
 /// written.
 fn view(ui: &Ui) -> Option<R> {
-    let c = overlay::CINEMATIC_VIEW;
+    let c = overlay::cinematic_view();
     let p = if unitview::enabled() { unitview::view_rect(ui.w, ui.h) } else { hud::panel_rect(c, ui.w, ui.h) }?;
     let r = R::new(p[0], p[1], p[2] - p[0], p[3] - p[1]);
     (r.w >= 8.0 && r.h >= 8.0).then_some(r)
@@ -33,7 +33,7 @@ fn view(ui: &Ui) -> Option<R> {
 /// The view with its frame, while it shows: the bottom row ends at its left
 /// (`hud::bottom_row`).
 pub fn shown_rect(ui: &Ui) -> Option<R> {
-    if hud::hidden(overlay::CINEMATIC_VIEW) || crate::engine::ingame::hud_hidden() {
+    if hud::hidden(overlay::cinematic_view()) || crate::engine::ingame::hud_hidden() {
         return None;
     }
     let r = view(ui)?;
@@ -43,7 +43,7 @@ pub fn shown_rect(ui: &Ui) -> Option<R> {
 static mut SHOWN: bool = false;
 
 pub fn run(ui: &mut Ui) {
-    let c = overlay::CINEMATIC_VIEW;
+    let c = overlay::cinematic_view();
     if unitview::enabled() {
         let r = place(ui);
         unitview::place([r.x, r.y, r.right(), r.bottom()], ui.w, ui.h);

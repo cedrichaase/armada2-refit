@@ -9,20 +9,31 @@
 //! there, and the release puts it back where the drag began. `MouseInit`, from
 //! `cOverViewImp::PostLoad`, clears both at every mission's start; the window's
 //! `WM_ACTIVATE` clears only the keyboard's state.
-use super::rd;
+use super::{eng, rd};
+use crate::syms_core::{hook, sym};
 
-/// `MouseDriver`'s button bits, set and cleared from the messages: 1 left, 2 right,
-/// 4 middle (higher bits are its click latches).
-const BUTTONS: usize = 0x763308;
-/// Non-zero while `ReadChannels` holds the pointer in the middle of the window.
-const HELD: usize = 0x763350;
+// The profile's (`ui.core.toml`, hook `core.reads_mouse`): `MouseDriver`'s button bits,
+// set and cleared from the messages (1 left, 2 right, 4 middle; higher bits are its
+// click latches), and a flag non-zero while `ReadChannels` holds the pointer in the
+// middle of the window.
+
+/// The address of a global of the hook, or 0 when it is not ready.
+fn global(s: a2engine::Sym) -> usize {
+    if eng().ready(hook::CORE_READS_MOUSE).is_err() { 0 } else { eng().addr(s) }
+}
 
 /// The buttons the engine believes are down: bit 0 left, 1 right, 2 middle.
 pub fn buttons() -> u32 {
-    unsafe { rd::<u32>(BUTTONS) & 7 }
+    match global(sym::CORE_MOUSE_BUTTONS) {
+        0 => 0,
+        a => unsafe { rd::<u32>(a) & 7 },
+    }
 }
 
 /// Whether the engine is holding the pointer in the middle of the window (a pan).
 pub fn held() -> bool {
-    unsafe { rd::<u32>(HELD) != 0 }
+    match global(sym::CORE_MOUSE_HELD) {
+        0 => false,
+        a => unsafe { rd::<u32>(a) != 0 },
+    }
 }

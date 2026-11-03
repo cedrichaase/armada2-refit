@@ -126,9 +126,14 @@ fn startup() {
 pub extern "C" fn UI_SettingsNote(row: *const rt::settings::Setting) -> *const u8 {
     use settings_table::{HUD_BAR, HUD_BARHIDDEN, HUD_BARKEYS, HUD_BARLABELS, HUD_ENABLE};
     if row.is_null() {
-        return core::ptr::null();
+        // The plugin as a whole: an Armada2.exe Refit does not know.
+        return syms::note_plugin().unwrap_or(core::ptr::null());
     }
     let r = unsafe { &*row };
+    // Why a hook that feeds this row stood down, in the engine's own words.
+    if let Some(n) = syms::note_for(r.section(), r.key()) {
+        return n;
+    }
     if core::ptr::eq(r, HUD_ENABLE) || core::ptr::eq(r, HUD_BARHIDDEN) {
         return core::ptr::null();
     }

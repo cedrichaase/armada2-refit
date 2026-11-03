@@ -2,25 +2,301 @@
 //! The symbol table of `ui` (crates/a2engine/README.md).
 
 pub mod sym {
-    pub const INFO_STUB: a2engine::Sym = a2engine::Sym(0);
+    pub const INFO_SHIP_DISPLAY: a2engine::Sym = a2engine::Sym(0);
+    pub const INFO_NO_ENTITY: a2engine::Sym = a2engine::Sym(1);
+    pub const INFO_CAMERA_MANAGER: a2engine::Sym = a2engine::Sym(2);
+    pub const INFO_G_STRING: a2engine::Sym = a2engine::Sym(3);
+    pub const INFO_COMMAND_SHIFT: a2engine::Sym = a2engine::Sym(4);
+    pub const INFO_TD_GAME_OBJECT: a2engine::Sym = a2engine::Sym(5);
+    pub const INFO_TD_CRAFT: a2engine::Sym = a2engine::Sym(6);
+    pub const INFO_TD_COLONY: a2engine::Sym = a2engine::Sym(7);
+    pub const INFO_TD_CONSTRUCTION: a2engine::Sym = a2engine::Sym(8);
+    pub const INFO_TD_ORDNANCE_CLASS: a2engine::Sym = a2engine::Sym(9);
+    pub const INFO_TD_ROMULAN_SPY_CLASS: a2engine::Sym = a2engine::Sym(10);
+    pub const INFO_DETERMINE_TYPE: a2engine::Sym = a2engine::Sym(11);
+    pub const INFO_REPAIR_LEFT: a2engine::Sym = a2engine::Sym(12);
+    pub const INFO_GET_BUILD_QUEUE: a2engine::Sym = a2engine::Sym(13);
+    pub const INFO_LOCALIZE: a2engine::Sym = a2engine::Sym(14);
+    pub const INFO_RT_DYNAMIC_CAST: a2engine::Sym = a2engine::Sym(15);
+    pub const INFO_SLOW_EFFECT: a2engine::Sym = a2engine::Sym(16);
+    pub const INFO_LOS_EFFECT: a2engine::Sym = a2engine::Sym(17);
+    pub const UNITVIEW_CINEMATIC_VIEW: a2engine::Sym = a2engine::Sym(101);
+    pub const UNITVIEW_CV_VTABLE: a2engine::Sym = a2engine::Sym(102);
+    pub const UNITVIEW_SB_VTABLE: a2engine::Sym = a2engine::Sym(103);
+    pub const UNITVIEW_CV_RENDER: a2engine::Sym = a2engine::Sym(104);
+    pub const UNITVIEW_SB_RENDER: a2engine::Sym = a2engine::Sym(105);
+    pub const UNITVIEW_SLOT_CV_RENDER: a2engine::Sym = a2engine::Sym(106);
+    pub const UNITVIEW_SLOT_SB_RENDER: a2engine::Sym = a2engine::Sym(107);
+    pub const CLOSEUP_INSET_RENDER_STUFF: a2engine::Sym = a2engine::Sym(113);
+    pub const CLOSEUP_DI_CURRENT_CAMERA: a2engine::Sym = a2engine::Sym(114);
+    pub const CLOSEUP_ENTITY_LIST: a2engine::Sym = a2engine::Sym(115);
+    pub const CLOSEUP_OBJECT_LIST: a2engine::Sym = a2engine::Sym(116);
+    pub const CLOSEUP_ARMADA_CAMERA_VTABLE: a2engine::Sym = a2engine::Sym(117);
+    pub const CLOSEUP_OPERATOR_NEW: a2engine::Sym = a2engine::Sym(118);
+    pub const CLOSEUP_CAMERA_CTOR: a2engine::Sym = a2engine::Sym(119);
+    pub const CLOSEUP_SET_NEAR: a2engine::Sym = a2engine::Sym(120);
+    pub const CLOSEUP_SET_FAR: a2engine::Sym = a2engine::Sym(121);
+    pub const CLOSEUP_SET_VIEWPORT: a2engine::Sym = a2engine::Sym(122);
+    pub const CLOSEUP_SET_TRANSFORM: a2engine::Sym = a2engine::Sym(123);
+    pub const CLOSEUP_SET_CURRENT_CAMERA: a2engine::Sym = a2engine::Sym(124);
+    pub const CLOSEUP_BODY: a2engine::Sym = a2engine::Sym(125);
+    pub const CLOSEUP_SLOT_SET_TRANSFORM: a2engine::Sym = a2engine::Sym(126);
+    pub const CLOSEUP_SITE_INSET: a2engine::Sym = a2engine::Sym(127);
 }
 
 pub mod hook {
-    pub const INFO_STUB: a2engine::HookId = a2engine::HookId(0);
+    pub const HUD_INFO: a2engine::HookId = a2engine::HookId(0);
+    pub const HUD_UNITVIEW: a2engine::HookId = a2engine::HookId(1);
+    pub const HUD_CLOSEUP: a2engine::HookId = a2engine::HookId(2);
 }
 
 pub mod field {
+    pub const INFO_SD_INFOBAR: usize = 0x70;
+    pub const INFO_SD_SYS_TEXT: usize = 0x74;
+    pub const INFO_SD_SYS_REPAIR: usize = 0xc4;
+    pub const INFO_SD_CREW_TEXT: usize = 0x88;
+    pub const INFO_SD_ENERGY_TEXT: usize = 0x8c;
+    pub const INFO_SD_CLASS_TEXT: usize = 0x90;
+    pub const INFO_SD_NAME_TEXT: usize = 0x94;
+    pub const INFO_SD_OFFICER_TEXT: usize = 0x98;
+    pub const INFO_SD_HULL_BAR: usize = 0xa0;
+    pub const INFO_SD_CARGO_BAR: usize = 0xa4;
+    pub const INFO_SD_METAL_BAR: usize = 0xa8;
+    pub const INFO_SD_WIREFRAME: usize = 0xac;
+    pub const INFO_SD_CONSTRUCTION_BAR: usize = 0xb0;
+    pub const INFO_SD_RESEARCH_TEXT: usize = 0xb4;
+    pub const INFO_SD_CARGO_TEXT: usize = 0xb8;
+    pub const INFO_SD_POPULATION_TEXT: usize = 0xbc;
+    pub const INFO_SD_PLANET_OWNER_TEXT: usize = 0xc0;
+    pub const INFO_SD_QUEUE: usize = 0x120;
+    pub const INFO_SD_CURRENT: usize = 0x1e8;
+    pub const INFO_SD_HOVER: usize = 0x1ec;
+    pub const INFO_IB_SHIELD_TEXT: usize = 0xc;
+    pub const INFO_IB_HULL_TEXT: usize = 0x10;
+    pub const INFO_BW_BUILDER: usize = 0x28;
+    pub const INFO_BW_CLASS: usize = 0x3c;
+    pub const INFO_VT_TOOLTIP: usize = 0x0;
+    pub const INFO_VT_VERBOSE: usize = 0x4;
+    pub const INFO_VT_SET_OBJECT: usize = 0x20;
+    pub const INFO_VT_INFORMATION: usize = 0x24;
+    pub const INFO_VT_LABEL: usize = 0x28;
+    pub const INFO_VT_CURRENT_COLOR: usize = 0x2c;
+    pub const INFO_VT_BAR_COLOR: usize = 0x20;
+    pub const INFO_VT_BAR_VALUE: usize = 0x24;
+    pub const INFO_TS_SPRITE: usize = 0x104;
+    pub const INFO_BAR_OBJECT: usize = 0x428;
+    pub const INFO_RI_OBJECT: usize = 0x28;
+    pub const INFO_RI_SYSTEM: usize = 0x2c;
+    pub const INFO_RI_REPAIR_ID: usize = 0x30;
+    pub const INFO_RI_SPRITE: usize = 0x34;
+    pub const INFO_RI_FLASH: usize = 0x40;
+    pub const INFO_WI_OBJECT: usize = 0x28;
+    pub const INFO_WI_FLASH: usize = 0x30;
+    pub const INFO_OBJ_FLAGS: usize = 0x14;
+    pub const INFO_OBJ_CLASS: usize = 0x40;
+    pub const INFO_CLASS_WIREFRAME: usize = 0x7c;
+    pub const INFO_CLASS_OFFICERS: usize = 0x88;
+    pub const INFO_CONSTRUCTING_CLASS: usize = 0x188;
+    pub const INFO_OBJ_CREW: usize = 0x1c4;
+    pub const INFO_OBJ_ENERGY: usize = 0x168;
+    pub const INFO_OBJ_STORE: usize = 0x17c;
+    pub const INFO_PLANET_SYSTEMS: usize = 0xec;
+    pub const INFO_OBJ_HEALTH: usize = 0x158;
+    pub const INFO_OBJ_RACE: usize = 0xfc;
+    pub const INFO_RACE_NAME: usize = 0x14;
+    pub const INFO_CRAFT_SHIELD: usize = 0x1c8;
+    pub const INFO_CRAFT_SHIELD_MAX: usize = 0x1cc;
+    pub const INFO_CRAFT_SYSTEMS: usize = 0x1e0;
+    pub const INFO_CRAFT_REPAIRS: usize = 0x30;
+    pub const INFO_SYS_OUT: usize = 0x1;
+    pub const INFO_SYS_REPAIR: usize = 0x28;
+    pub const INFO_REPAIR_ITEM_ID: usize = 0x10;
+    pub const INFO_OBJ_DESTROYED: usize = 0x113;
+    pub const INFO_VT_IS_PLANET: usize = 0xc;
+    pub const INFO_LOS_ORDNANCE: usize = 0x4;
+    pub const INFO_ORDNANCE_CLASS: usize = 0x18;
+    pub const INFO_VT_DELETE_QUEUE_ITEM: usize = 0x140;
+    pub const INFO_VT_SELECT: usize = 0x90;
+    pub const INFO_VT_SET_INTEREST_ENTITY: usize = 0x58;
+    pub const UNITVIEW_CV_RECT: usize = 0x4;
+    pub const UNITVIEW_CV_BACKGROUND_AREA: usize = 0x38;
+    pub const UNITVIEW_CV_DISPLAY_AREA: usize = 0x48;
+    pub const UNITVIEW_CV_FRAME: usize = 0x58;
+    pub const UNITVIEW_VT_RENDER: usize = 0x58;
+    pub const CLOSEUP_CAM_RENDER_STUFF: usize = 0x284;
+    pub const CLOSEUP_CAM_FOV: usize = 0x1a8;
+    pub const CLOSEUP_VT_SET_TRANSFORM: usize = 0x14;
+    pub const CLOSEUP_ENTITY_DRAWN: usize = 0x25;
+    pub const CLOSEUP_OBJECT_CULLED: usize = 0x183;
+    pub const CLOSEUP_ENTITY_INSTANCE: usize = 0x4;
+    pub const CLOSEUP_INST_SPHERE: usize = 0x34;
+    pub const CLOSEUP_INST_TRANSFORM: usize = 0x44;
 }
 
 pub mod value {
+    pub const INFO_N_SYSTEMS: i32 = 5;
+    pub const INFO_QUEUE_LEN: i32 = 10;
+    pub const INFO_SYSTEM_BYTES: i32 = 48;
+    pub const INFO_F_GAME_OBJECT: i32 = 4;
+    pub const INFO_F_CRAFT: i32 = 8;
+    pub const INFO_F_PRODUCER: i32 = 32;
+    pub const INFO_F_CARGO: i32 = 128;
+    pub const INFO_F_CARGO2: i32 = -2147483648;
+    pub const INFO_F_NAMED: i32 = 16384;
+    pub const INFO_F_CONSTRUCTION: i32 = 262144;
+    pub const INFO_F_WHOLE: i32 = 1052672;
+    pub const INFO_REPAIR_ID_0: i32 = 3;
+    pub const INFO_REPAIR_ID_1: i32 = 2;
+    pub const INFO_REPAIR_ID_2: i32 = 1;
+    pub const INFO_REPAIR_ID_3: i32 = 5;
+    pub const INFO_REPAIR_ID_4: i32 = 6;
+    pub const CLOSEUP_CAMERA_SIZE: i32 = 648;
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
-    a2engine::SymDef { id: "info_stub", symbol: "WinMain", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "info_ship_display", symbol: "shipDisplay", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "info_no_entity", symbol: "Entity::NO_ENTITY", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "info_camera_manager", symbol: "gCameraManager", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "info_g_string", symbol: "g_string", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "info_command_shift", symbol: "g_pCommandShift", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "info_td_game_object", symbol: "GameObject (type descriptor)", kind: a2engine::Kind::Rtti },
+    a2engine::SymDef { id: "info_td_craft", symbol: "Craft (type descriptor)", kind: a2engine::Kind::Rtti },
+    a2engine::SymDef { id: "info_td_colony", symbol: "Colony (type descriptor)", kind: a2engine::Kind::Rtti },
+    a2engine::SymDef { id: "info_td_construction", symbol: "ConstructionObject (type descriptor)", kind: a2engine::Kind::Rtti },
+    a2engine::SymDef { id: "info_td_ordnance_class", symbol: "OrdnanceClass (type descriptor)", kind: a2engine::Kind::Rtti },
+    a2engine::SymDef { id: "info_td_romulan_spy_class", symbol: "RomulanSpyClass (type descriptor)", kind: a2engine::Kind::Rtti },
+    a2engine::SymDef { id: "info_determine_type", symbol: "ShipDisplay::DetermineSelectedDisplayType", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "info_repair_left", symbol: "Craft::mComputeRepairLeft", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "info_get_build_queue", symbol: "Producer::GetBuildQueue", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "info_localize", symbol: "Localized_Strings::Localize", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "info_rt_dynamic_cast", symbol: "__RTDynamicCast", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "info_slow_effect", symbol: "GameObject::GetSlowEffect", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "info_los_effect", symbol: "GameObject::GetLineOfSightEffect", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "info_sd_infobar", symbol: "ShipDisplay::SDInfoBar", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_sd_sys_text", symbol: "ShipDisplay::system texts", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_sd_sys_repair", symbol: "ShipDisplay::repair icons", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_sd_crew_text", symbol: "ShipDisplay::crew text", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_sd_energy_text", symbol: "ShipDisplay::energy text", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_sd_class_text", symbol: "ShipDisplay::class text", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_sd_name_text", symbol: "ShipDisplay::name text", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_sd_officer_text", symbol: "ShipDisplay::officer text", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_sd_hull_bar", symbol: "ShipDisplay::hull bar", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_sd_cargo_bar", symbol: "ShipDisplay::cargo bar", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_sd_metal_bar", symbol: "ShipDisplay::metal bar", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_sd_wireframe", symbol: "ShipDisplay::wireframe icon", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_sd_construction_bar", symbol: "ShipDisplay::construction bar", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_sd_research_text", symbol: "ShipDisplay::research text", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_sd_cargo_text", symbol: "ShipDisplay::cargo text", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_sd_population_text", symbol: "ShipDisplay::population text", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_sd_planet_owner_text", symbol: "ShipDisplay::planet owner text", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_sd_queue", symbol: "ShipDisplay::build queue wireframes", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_sd_current", symbol: "ShipDisplay::current object", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_sd_hover", symbol: "ShipDisplay::hovered craft", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_ib_shield_text", symbol: "SDInfoBar::shield text", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_ib_hull_text", symbol: "SDInfoBar::hull text", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_bw_builder", symbol: "BuildWireframe::builder", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_bw_class", symbol: "BuildWireframe::queued class", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_vt_tooltip", symbol: "StandardComponent::vtable GetTooltip", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_vt_verbose", symbol: "StandardComponent::vtable GetVerboseTooltip", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_vt_set_object", symbol: "StandardText::vtable SetCurrentObject", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_vt_information", symbol: "StandardText::vtable GetInformation", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_vt_label", symbol: "StandardText::vtable GetLabel", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_vt_current_color", symbol: "StandardText::vtable GetCurrentColor", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_vt_bar_color", symbol: "StandardBar::vtable GetBarColor", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_vt_bar_value", symbol: "StandardBar::vtable GetBarValue", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_ts_sprite", symbol: "TextAndSprite::icon sprite", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_bar_object", symbol: "StandardBar::object", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_ri_object", symbol: "RepairIcon::craft", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_ri_system", symbol: "RepairIcon::system", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_ri_repair_id", symbol: "RepairIcon::repair id", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_ri_sprite", symbol: "RepairIcon::icon", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_ri_flash", symbol: "RepairIcon::flash", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_wi_object", symbol: "WireframeIcon::object", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_wi_flash", symbol: "WireframeIcon::flash", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_obj_flags", symbol: "Entity::what an object is", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_obj_class", symbol: "GameObject::class", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_class_wireframe", symbol: "GameObjectClass::wireframe name", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_class_officers", symbol: "GameObjectClass::officer cost", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_constructing_class", symbol: "ConstructionObject::class being built", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_obj_crew", symbol: "GameObject::crew", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_obj_energy", symbol: "GameObject::special energy", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_obj_store", symbol: "GameObject::cargo store", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_planet_systems", symbol: "Planet::systems", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_obj_health", symbol: "GameObject::health", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_obj_race", symbol: "GameObject::race", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_race_name", symbol: "Race::name", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_craft_shield", symbol: "Craft::shields now", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_craft_shield_max", symbol: "Craft::shields at most", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_craft_systems", symbol: "Craft::systems", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_craft_repairs", symbol: "Craft::systems being repaired", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_sys_out", symbol: "CraftSystem::out of action", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_sys_repair", symbol: "CraftSystem::repair under way", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_repair_item_id", symbol: "RepairItem::repair id", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_obj_destroyed", symbol: "GameObject::destroyed", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_vt_is_planet", symbol: "Entity::vtable IsPlanet", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_los_ordnance", symbol: "LineOfSightEffect::ordnance", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_ordnance_class", symbol: "Ordnance::class", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_vt_delete_queue_item", symbol: "Producer::vtable RequestDeleteBuildQueueItem", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_vt_select", symbol: "cOverViewImp::vtable Select", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_vt_set_interest_entity", symbol: "GameCamera::vtable SetInterestEntity", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "info_n_systems", symbol: "eSystem: the systems of a craft", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "info_queue_len", symbol: "Producer: the build queue's slots", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "info_system_bytes", symbol: "CraftSystem: bytes per system", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "info_f_game_object", symbol: "Entity+0x14: a game object", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "info_f_craft", symbol: "Entity+0x14: a craft", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "info_f_producer", symbol: "Entity+0x14: it produces", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "info_f_cargo", symbol: "Entity+0x14: it carries cargo", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "info_f_cargo2", symbol: "Entity+0x14: it carries cargo (the high bit)", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "info_f_named", symbol: "Entity+0x14: a named object that is no craft", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "info_f_construction", symbol: "Entity+0x14: under construction", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "info_f_whole", symbol: "Entity+0x14: drawn whole", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "info_repair_id_0", symbol: "Craft repair list: the id of system 0", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "info_repair_id_1", symbol: "Craft repair list: the id of system 1", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "info_repair_id_2", symbol: "Craft repair list: the id of system 2", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "info_repair_id_3", symbol: "Craft repair list: the id of system 3", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "info_repair_id_4", symbol: "Craft repair list: the id of system 4", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "unitview_cinematic_view", symbol: "g_cinematicView", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "unitview_cv_vtable", symbol: "CinematicView::vftable", kind: a2engine::Kind::Vtable },
+    a2engine::SymDef { id: "unitview_sb_vtable", symbol: "StandardBackground::vftable", kind: a2engine::Kind::Vtable },
+    a2engine::SymDef { id: "unitview_cv_render", symbol: "CinematicView::Render", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "unitview_sb_render", symbol: "StandardBackground::Render", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "unitview_slot_cv_render", symbol: "CinematicView::Render", kind: a2engine::Kind::Slot },
+    a2engine::SymDef { id: "unitview_slot_sb_render", symbol: "StandardBackground::Render", kind: a2engine::Kind::Slot },
+    a2engine::SymDef { id: "unitview_cv_rect", symbol: "CinematicView::rectangle", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "unitview_cv_background_area", symbol: "CinematicView::cinematicBackgroundArea", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "unitview_cv_display_area", symbol: "CinematicView::cinematicDisplayArea", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "unitview_cv_frame", symbol: "CinematicView::cinematicBackgroundPanel", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "unitview_vt_render", symbol: "CinematicView::vtable Render", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "closeup_inset_render_stuff", symbol: "g_cinematic_view_parameters", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "closeup_di_current_camera", symbol: "DisplayInterface::currentCamera", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "closeup_entity_list", symbol: "Entity list", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "closeup_object_list", symbol: "GameObject::objectList", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "closeup_armada_camera_vtable", symbol: "Armada_Camera::vftable", kind: a2engine::Kind::Vtable },
+    a2engine::SymDef { id: "closeup_operator_new", symbol: "operator new", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "closeup_camera_ctor", symbol: "Armada_Camera::Armada_Camera", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "closeup_set_near", symbol: "ST3D_Camera::SetNearPlane", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "closeup_set_far", symbol: "ST3D_Camera::SetFarPlane", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "closeup_set_viewport", symbol: "ST3D_Camera::SetViewport", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "closeup_set_transform", symbol: "ST3D_Camera::SetTransform", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "closeup_set_current_camera", symbol: "ST3D_GraphicsEngine::SetCurrentCamera", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "closeup_body", symbol: "Armada_RenderAllOurStuff", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "closeup_slot_set_transform", symbol: "ST3D_Camera::SetTransform", kind: a2engine::Kind::Slot },
+    a2engine::SymDef { id: "closeup_site_inset", symbol: "CinematicView::RenderView", kind: a2engine::Kind::Call },
+    a2engine::SymDef { id: "closeup_cam_render_stuff", symbol: "Armada_Camera::Render_Stuff", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "closeup_cam_fov", symbol: "ST3D_Camera::field of view", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "closeup_vt_set_transform", symbol: "ST3D_Camera::vtable SetTransform", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "closeup_entity_drawn", symbol: "Entity::on screen", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "closeup_object_culled", symbol: "GameObject::distance cull", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "closeup_entity_instance", symbol: "Entity::instance", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "closeup_inst_sphere", symbol: "Instance::bounding sphere", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "closeup_inst_transform", symbol: "Instance::transform", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "closeup_camera_size", symbol: "Armada_Camera: bytes to allocate", kind: a2engine::Kind::Value },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
-    a2engine::HookDef { id: "ui.info.stub", run_unknown: false, rows: &[], syms: &[0] },
+    a2engine::HookDef { id: "ui.hud.info", run_unknown: false, rows: &["HUD.Info"], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100] },
+    a2engine::HookDef { id: "ui.hud.unitview", run_unknown: false, rows: &["HUD.UnitView"], syms: &[101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112] },
+    a2engine::HookDef { id: "ui.hud.closeup", run_unknown: false, rows: &["HUD.InfoCamera"], syms: &[113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136] },
 ];
 
 pub const BUILDS: &[a2engine::Build] = &[
@@ -31,19 +307,155 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 1,
+        n_resolved: 137,
         entries: &[
-            a2engine::Entry { present: true, addr: 0x7ad508, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_stub
+            a2engine::Entry { present: true, addr: 0x763968, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_ship_display
+            a2engine::Entry { present: true, addr: 0x6b41d8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_no_entity
+            a2engine::Entry { present: true, addr: 0x763370, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_camera_manager
+            a2engine::Entry { present: true, addr: 0x7379fc, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_g_string
+            a2engine::Entry { present: true, addr: 0x761340, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_command_shift
+            a2engine::Entry { present: true, addr: 0x6f1280, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_td_game_object
+            a2engine::Entry { present: true, addr: 0x6f12a0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_td_craft
+            a2engine::Entry { present: true, addr: 0x6f14b0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_td_colony
+            a2engine::Entry { present: true, addr: 0x6ffc60, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_td_construction
+            a2engine::Entry { present: true, addr: 0x70cb08, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_td_ordnance_class
+            a2engine::Entry { present: true, addr: 0x70cb28, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_td_romulan_spy_class
+            a2engine::Entry { present: true, addr: 0x4f2ee0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x56, 0x8b, 0xf1, 0xc7, 0x86, 0xe8, 0x01, 0x00, 0x00], mask: &[], section: "", count: 0, value: 0 }, // info_determine_type
+            a2engine::Entry { present: true, addr: 0x4c8ca0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x4d, 0x08, 0x80, 0x39], mask: &[], section: "", count: 0, value: 0 }, // info_repair_left
+            a2engine::Entry { present: true, addr: 0x4b8070, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x56, 0x8b, 0xf1, 0x8b, 0x06, 0xff, 0x90, 0x68], mask: &[], section: "", count: 0, value: 0 }, // info_get_build_queue
+            a2engine::Entry { present: true, addr: 0x481c90, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x08, 0x8b, 0xc1], mask: &[], section: "", count: 0, value: 0 }, // info_localize
+            a2engine::Entry { present: true, addr: 0x6731a0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xff, 0x25, 0x70, 0x80, 0x7b, 0x00], mask: &[], section: "", count: 0, value: 0 }, // info_rt_dynamic_cast
+            a2engine::Entry { present: true, addr: 0x4d4ee0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x56, 0x57, 0x8b, 0xf9, 0x8b, 0x47], mask: &[], section: "", count: 0, value: 0 }, // info_slow_effect
+            a2engine::Entry { present: true, addr: 0x4d4f60, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x56, 0x57, 0x8b, 0xf9, 0x8b, 0x47], mask: &[], section: "", count: 0, value: 0 }, // info_los_effect
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 112 }, // info_sd_infobar
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 116 }, // info_sd_sys_text
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 196 }, // info_sd_sys_repair
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 136 }, // info_sd_crew_text
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 140 }, // info_sd_energy_text
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 144 }, // info_sd_class_text
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 148 }, // info_sd_name_text
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 152 }, // info_sd_officer_text
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 160 }, // info_sd_hull_bar
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 164 }, // info_sd_cargo_bar
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 168 }, // info_sd_metal_bar
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 172 }, // info_sd_wireframe
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 176 }, // info_sd_construction_bar
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 180 }, // info_sd_research_text
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 184 }, // info_sd_cargo_text
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 188 }, // info_sd_population_text
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 192 }, // info_sd_planet_owner_text
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 288 }, // info_sd_queue
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 488 }, // info_sd_current
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 492 }, // info_sd_hover
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 12 }, // info_ib_shield_text
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // info_ib_hull_text
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // info_bw_builder
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 60 }, // info_bw_class
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_vt_tooltip
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // info_vt_verbose
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // info_vt_set_object
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 36 }, // info_vt_information
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // info_vt_label
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 44 }, // info_vt_current_color
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // info_vt_bar_color
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 36 }, // info_vt_bar_value
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 260 }, // info_ts_sprite
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1064 }, // info_bar_object
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // info_ri_object
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 44 }, // info_ri_system
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 48 }, // info_ri_repair_id
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 52 }, // info_ri_sprite
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // info_ri_flash
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // info_wi_object
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 48 }, // info_wi_flash
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 20 }, // info_obj_flags
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // info_obj_class
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 124 }, // info_class_wireframe
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 136 }, // info_class_officers
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 392 }, // info_constructing_class
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 452 }, // info_obj_crew
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 360 }, // info_obj_energy
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 380 }, // info_obj_store
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 236 }, // info_planet_systems
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 344 }, // info_obj_health
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 252 }, // info_obj_race
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 20 }, // info_race_name
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 456 }, // info_craft_shield
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 460 }, // info_craft_shield_max
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 480 }, // info_craft_systems
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 48 }, // info_craft_repairs
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1 }, // info_sys_out
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // info_sys_repair
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // info_repair_item_id
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 275 }, // info_obj_destroyed
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 12 }, // info_vt_is_planet
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // info_los_ordnance
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 24 }, // info_ordnance_class
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 320 }, // info_vt_delete_queue_item
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 144 }, // info_vt_select
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 88 }, // info_vt_set_interest_entity
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 5 }, // info_n_systems
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 10 }, // info_queue_len
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 48 }, // info_system_bytes
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // info_f_game_object
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // info_f_craft
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // info_f_producer
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 128 }, // info_f_cargo
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: -2147483648 }, // info_f_cargo2
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16384 }, // info_f_named
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 262144 }, // info_f_construction
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1052672 }, // info_f_whole
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 3 }, // info_repair_id_0
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 2 }, // info_repair_id_1
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1 }, // info_repair_id_2
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 5 }, // info_repair_id_3
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 6 }, // info_repair_id_4
+            a2engine::Entry { present: true, addr: 0x763758, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // unitview_cinematic_view
+            a2engine::Entry { present: true, addr: 0x6b47b4, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // unitview_cv_vtable
+            a2engine::Entry { present: true, addr: 0x6b561c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // unitview_sb_vtable
+            a2engine::Entry { present: true, addr: 0x4e5d30, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x24], mask: &[], section: "", count: 0, value: 0 }, // unitview_cv_render
+            a2engine::Entry { present: true, addr: 0x50a820, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // unitview_sb_render
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x68, vtable: 0x66, index: 22, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // unitview_slot_cv_render
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x69, vtable: 0x67, index: 4, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // unitview_slot_sb_render
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // unitview_cv_rect
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // unitview_cv_background_area
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 72 }, // unitview_cv_display_area
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 88 }, // unitview_cv_frame
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 88 }, // unitview_vt_render
+            a2engine::Entry { present: true, addr: 0x7637b8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // closeup_inset_render_stuff
+            a2engine::Entry { present: true, addr: 0x765010, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // closeup_di_current_camera
+            a2engine::Entry { present: true, addr: 0x76104c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // closeup_entity_list
+            a2engine::Entry { present: true, addr: 0x761084, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // closeup_object_list
+            a2engine::Entry { present: true, addr: 0x6baa54, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // closeup_armada_camera_vtable
+            a2engine::Entry { present: true, addr: 0x652710, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // closeup_operator_new
+            a2engine::Entry { present: true, addr: 0x590a10, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x10], mask: &[], section: "", count: 0, value: 0 }, // closeup_camera_ctor
+            a2engine::Entry { present: true, addr: 0x6198c0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x89, 0x81, 0xa0, 0x01], mask: &[], section: "", count: 0, value: 0 }, // closeup_set_near
+            a2engine::Entry { present: true, addr: 0x6198a0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x89, 0x81, 0xa4, 0x01], mask: &[], section: "", count: 0, value: 0 }, // closeup_set_far
+            a2engine::Entry { present: true, addr: 0x61a550, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x08], mask: &[], section: "", count: 0, value: 0 }, // closeup_set_viewport
+            a2engine::Entry { present: true, addr: 0x619500, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // closeup_set_transform
+            a2engine::Entry { present: true, addr: 0x62c2d0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x14], mask: &[], section: "", count: 0, value: 0 }, // closeup_set_current_camera
+            a2engine::Entry { present: true, addr: 0x598110, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // closeup_body
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x7b, vtable: 0x75, index: 5, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // closeup_slot_set_transform
+            a2engine::Entry { present: true, addr: 0x4e60f6, end: 0x0, target: 0x7d, vtable: 0xffff, index: 0, chain: true, check: &[], mask: &[], section: "", count: 0, value: 0 }, // closeup_site_inset
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 644 }, // closeup_cam_render_stuff
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 424 }, // closeup_cam_fov
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 20 }, // closeup_vt_set_transform
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 37 }, // closeup_entity_drawn
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 387 }, // closeup_object_culled
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // closeup_entity_instance
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 52 }, // closeup_inst_sphere
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 68 }, // closeup_inst_transform
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 648 }, // closeup_camera_size
         ],
         blocked: &[
         ],
     },
 ];
 
-static HOOK_STATE: [core::sync::atomic::AtomicU64; 1] = [const { core::sync::atomic::AtomicU64::new(0) }; 1];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 1] = [const { core::sync::atomic::AtomicU8::new(0) }; 1];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 1] = [const { core::sync::atomic::AtomicUsize::new(0) }; 1];
-static NOTES: [a2engine::Note; 1] = [const { a2engine::Note::new() }; 1];
+static HOOK_STATE: [core::sync::atomic::AtomicU64; 3] = [const { core::sync::atomic::AtomicU64::new(0) }; 3];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 137] = [const { core::sync::atomic::AtomicU8::new(0) }; 137];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 137] = [const { core::sync::atomic::AtomicUsize::new(0) }; 137];
+static NOTES: [a2engine::Note; 3] = [const { a2engine::Note::new() }; 3];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 
 pub static TABLE: a2engine::Table = a2engine::Table {

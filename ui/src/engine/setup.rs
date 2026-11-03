@@ -3,80 +3,37 @@
 //! `GameSetup` getters, and how far each network player's load has got, from the
 //! transport. Every function is checked by its first bytes before the first call; with
 //! one not stock, nothing here is called and every read answers None.
-use super::{field, msvc, rd, starts};
+use super::{field, msvc, rd};
 use alloc::string::String;
 use alloc::vec::Vec;
 
-/// `g_transport` (`Transport*`): the game's connection, local or network.
-const TRANSPORT: usize = 0x76b8d4;
-/// `Transport::getGameSetup()`, thiscall: the `GameSetup` the shell filled in.
-const FN_GET_GAME_SETUP: usize = 0x557940;
-/// `GameSetup::getMapName() const`, thiscall: the map's file name (`a2_fed01`, `mp08gorn`).
-const FN_GET_MAP_NAME: usize = 0x5461f0;
-/// `GameSetup::getMapTitle() const`, thiscall: the map's title as the setup screens show it.
-const FN_GET_MAP_TITLE: usize = 0x546240;
-/// `GameSetup::getLocalSlot() const`, thiscall: this player's slot.
-const FN_GET_LOCAL_SLOT: usize = 0x547470;
-/// `GameSetup::getRace(int slot) const`, thiscall: an instant-action race index.
-const FN_GET_RACE: usize = 0x546650;
-/// `GameSetup::getTeam(int slot) const`, thiscall.
-const FN_GET_TEAM: usize = 0x546610;
-/// `GameSetup::isVacant(int slot) const`, thiscall.
-const FN_IS_VACANT: usize = 0x546af0;
-/// `GameSetup::isGamePlayer(int slot) const`, thiscall: a slot that plays (not an
-/// observer, not empty).
-const FN_IS_GAME_PLAYER: usize = 0x546b90;
-/// `GameSetup::getPlayerName(int slot) const`, thiscall, returns a `std::string` through
-/// a pointer it is given: the player's name, or the computer's ("Computer AI:Easy").
-const FN_GET_PLAYER_NAME: usize = 0x5466e0;
-/// `GameSetup::RaceRandom()`, static: the race index that stands for "random" until the
-/// load deals one (`Program::GameOpenPreLoad`).
-const FN_RACE_RANDOM: usize = 0x547cd0;
-/// `Race::FindInstantActionSlot(int)`, cdecl: the `Race` for an instant-action race
-/// index, or null. Its name (`federation`, `borg`, ...) is at `+0x14`.
-const FN_FIND_IA_RACE: usize = 0x48b180;
-const RACE_NAME: usize = 0x14;
+use crate::syms_shell::{field, hook, sym, value, TABLE};
+
+fn eng() -> &'static a2engine::Engine {
+    TABLE.engine()
+}
+
+// The engine functions (`Transport::getGameSetup` and the `GameSetup` getters, all
+// thiscall; `GameSetup::getPlayerName` returns a `std::string` through a pointer it is
+// given: the player's name, or the computer's "Computer AI:Easy"; `GameSetup::RaceRandom`
+// is static: the race index that stands for "random" until the load deals one,
+// `Program::GameOpenPreLoad`; `Race::FindInstantActionSlot(int)` is cdecl: the `Race`
+// for an instant-action race index, or null, its name `federation`, `borg`, ... in the
+// object) and `g_transport` (`Transport*`: the game's connection, local or network) are
+// in `syms_shell`, by name: `SETUP_*`.
 /// Slots in a game setup.
-pub const SLOTS: usize = 8;
+pub const SLOTS: usize = value::SETUP_SLOTS as usize;
 
-/// `Transport`'s virtual functions, by vtable offset (all thiscall).
-const VT_IS_INSTANT_ACTION: usize = 0x10;
-const VT_IS_SINGLE_PLAYER: usize = 0x18;
-const VT_SHOW_LOAD_PERCENTAGES: usize = 0x40;
-const VT_GET_LOAD_PERCENTAGE: usize = 0x44;
-const VT_IS_SEND_WORTHY: usize = 0x5c;
-
-const SIGS: &[(usize, &[u8])] = &[
-    (FN_GET_GAME_SETUP, &[0x8b, 0x41, 0x30, 0xc3]),
-    (FN_GET_MAP_NAME, &[0x56, 0x8b, 0xf1, 0x8b, 0x46, 0x10]),
-    (FN_GET_MAP_TITLE, &[0x8b, 0x41, 0x10, 0x83, 0xc0, 0x6c, 0xc3]),
-    (FN_GET_LOCAL_SLOT, &[0x8b, 0x01, 0xc3]),
-    (FN_GET_RACE, &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08]),
-    (FN_GET_TEAM, &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08]),
-    (FN_IS_VACANT, &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08]),
-    (FN_IS_GAME_PLAYER, &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08]),
-    (FN_GET_PLAYER_NAME, &[0x55, 0x8b, 0xec, 0x6a, 0xff]),
-    (FN_RACE_RANDOM, &[0xa1, 0xb4, 0x7c, 0x73, 0x00, 0xc3]),
-    (FN_FIND_IA_RACE, &[0x55, 0x8b, 0xec, 0x53, 0x56]),
-];
-
-static mut CHECKED: Option<bool> = None;
-
+/// Whether the engine lets the getters run: every function is checked by its first
+/// bytes before the first call; with one not stock, nothing here is called and every
+/// read answers None.
 fn ok() -> bool {
-    unsafe {
-        if CHECKED.is_none() {
-            let good = SIGS.iter().all(|&(a, s)| starts(a, s));
-            if !good {
-                crate::log!("setup: a GameSetup getter is not stock; the loading screen shows no mission details");
-            }
-            CHECKED = Some(good);
-        }
-        CHECKED == Some(true)
-    }
+    eng().ready(hook::SHELL_READS_SETUP).is_ok()
 }
 
 fn transport() -> usize {
-    unsafe { rd::<usize>(TRANSPORT) }
+    let a = eng().addr(sym::SETUP_TRANSPORT);
+    if a == 0 { 0 } else { unsafe { rd::<usize>(a) } }
 }
 
 unsafe fn this0(f: usize, this: usize) -> usize {
@@ -100,7 +57,7 @@ fn game_setup() -> usize {
     if t == 0 || !ok() {
         return 0;
     }
-    unsafe { this0(FN_GET_GAME_SETUP, t) }
+    unsafe { this0(eng().addr(sym::SETUP_GET_GAME_SETUP), t) }
 }
 
 /// A Latin-1 C string the engine owns, copied.
@@ -125,7 +82,7 @@ pub fn map_name() -> Option<String> {
     if gs == 0 {
         return None;
     }
-    let s = cstring(unsafe { this0(FN_GET_MAP_NAME, gs) })?;
+    let s = cstring(unsafe { this0(eng().addr(sym::SETUP_GET_MAP_NAME), gs) })?;
     let s = s.rsplit(['\\', '/']).next().unwrap_or(&s);
     let s = match s.rfind('.') {
         Some(i) if crate::rt::lower(&s[i..]) == ".bzn" => &s[..i],
@@ -140,18 +97,18 @@ pub fn map_title() -> Option<String> {
     if gs == 0 {
         return None;
     }
-    cstring(unsafe { this0(FN_GET_MAP_TITLE, gs) }).map(|s| String::from(s.trim()))
+    cstring(unsafe { this0(eng().addr(sym::SETUP_GET_MAP_TITLE), gs) }).map(|s| String::from(s.trim()))
 }
 
 /// Instant Action (against the computer, from the main menu).
 pub fn is_instant_action() -> bool {
-    transport_flag(VT_IS_INSTANT_ACTION).unwrap_or(false)
+    transport_flag(field::SETUP_VT_IS_INSTANT_ACTION).unwrap_or(false)
 }
 
 /// A campaign mission (or a replay). Not Instant Action: `TransportLocalInstantAction`
 /// answers false, as a network transport does; ask `is_instant_action` first.
 pub fn is_single_player() -> bool {
-    transport_flag(VT_IS_SINGLE_PLAYER).unwrap_or(true)
+    transport_flag(field::SETUP_VT_IS_SINGLE_PLAYER).unwrap_or(true)
 }
 
 /// Whether the game being played (or set up) is a network game: false for a campaign
@@ -164,24 +121,24 @@ pub fn network_game() -> Option<bool> {
     if transport() == 0 || !ok() {
         return None;
     }
-    if transport_flag(VT_IS_INSTANT_ACTION)? {
+    if transport_flag(field::SETUP_VT_IS_INSTANT_ACTION)? {
         return Some(false);
     }
-    Some(!transport_flag(VT_IS_SINGLE_PLAYER)?)
+    Some(!transport_flag(field::SETUP_VT_IS_SINGLE_PLAYER)?)
 }
 
 /// An instant-action race index's race name (`federation`), None for "random" (not
 /// dealt yet) or an index with no race.
 fn race_name_of(index: usize) -> Option<&'static str> {
     unsafe {
-        if index == core::mem::transmute::<usize, unsafe extern "C" fn() -> usize>(FN_RACE_RANDOM)() {
+        if index == core::mem::transmute::<usize, unsafe extern "C" fn() -> usize>(eng().addr(sym::SETUP_RACE_RANDOM))() {
             return None;
         }
-        let r = core::mem::transmute::<usize, unsafe extern "C" fn(usize) -> usize>(FN_FIND_IA_RACE)(index);
+        let r = core::mem::transmute::<usize, unsafe extern "C" fn(usize) -> usize>(eng().addr(sym::SETUP_FIND_IA_RACE))(index);
         if r == 0 {
             return None;
         }
-        Some(super::hud::cstr_static((r + RACE_NAME) as *const u8))
+        Some(super::hud::cstr_static((r + field::SETUP_RACE_NAME) as *const u8))
     }
 }
 
@@ -201,8 +158,8 @@ pub fn local_race_name() -> Option<&'static str> {
     if gs == 0 {
         return None;
     }
-    let slot = unsafe { this0(FN_GET_LOCAL_SLOT, gs) };
-    race_name_of(unsafe { this1(FN_GET_RACE, gs, slot) })
+    let slot = unsafe { this0(eng().addr(sym::SETUP_GET_LOCAL_SLOT), gs) };
+    race_name_of(unsafe { this1(eng().addr(sym::SETUP_GET_RACE), gs, slot) })
 }
 
 /// A player in the game being loaded.
@@ -223,19 +180,19 @@ pub fn players() -> Vec<Player> {
     if gs == 0 {
         return out;
     }
-    let local = unsafe { this0(FN_GET_LOCAL_SLOT, gs) };
+    let local = unsafe { this0(eng().addr(sym::SETUP_GET_LOCAL_SLOT), gs) };
     for slot in 0..SLOTS {
         unsafe {
-            if this1(FN_IS_VACANT, gs, slot) as u8 != 0 || this1(FN_IS_GAME_PLAYER, gs, slot) as u8 == 0 {
+            if this1(eng().addr(sym::SETUP_IS_VACANT), gs, slot) as u8 != 0 || this1(eng().addr(sym::SETUP_IS_GAME_PLAYER), gs, slot) as u8 == 0 {
                 continue;
             }
         }
         let name = msvc::with_string(|sp| unsafe {
-            core::mem::transmute::<usize, unsafe extern "thiscall" fn(usize, usize, usize) -> usize>(FN_GET_PLAYER_NAME)(gs, sp, slot);
+            core::mem::transmute::<usize, unsafe extern "thiscall" fn(usize, usize, usize) -> usize>(eng().addr(sym::SETUP_GET_PLAYER_NAME))(gs, sp, slot);
         })
         .unwrap_or_default();
-        let race = race_name_of(unsafe { this1(FN_GET_RACE, gs, slot) });
-        let team = unsafe { this1(FN_GET_TEAM, gs, slot) } as i32;
+        let race = race_name_of(unsafe { this1(eng().addr(sym::SETUP_GET_RACE), gs, slot) });
+        let team = unsafe { this1(eng().addr(sym::SETUP_GET_TEAM), gs, slot) } as i32;
         out.push(Player { slot, name, race, team, local: slot == local });
     }
     out
@@ -252,13 +209,13 @@ pub fn load_fractions() -> Option<[Option<f32>; SLOTS]> {
     }
     let vt = field(t, 0);
     unsafe {
-        if this0(field(vt, VT_SHOW_LOAD_PERCENTAGES), t) as u8 == 0 {
+        if this0(field(vt, field::SETUP_VT_SHOW_LOAD_PERCENTAGES), t) as u8 == 0 {
             return None;
         }
         let mut out = [None; SLOTS];
-        let get: unsafe extern "thiscall" fn(usize, usize) -> f32 = core::mem::transmute(field(vt, VT_GET_LOAD_PERCENTAGE));
+        let get: unsafe extern "thiscall" fn(usize, usize) -> f32 = core::mem::transmute(field(vt, field::SETUP_VT_GET_LOAD_PERCENTAGE));
         for (slot, o) in out.iter_mut().enumerate() {
-            if this1(field(vt, VT_IS_SEND_WORTHY), t, slot) as u8 != 0 {
+            if this1(field(vt, field::SETUP_VT_IS_SEND_WORTHY), t, slot) as u8 != 0 {
                 *o = Some(get(t, slot).clamp(0.0, 1.0));
             }
         }

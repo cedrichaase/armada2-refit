@@ -18,21 +18,31 @@
 //! swapped for an inert object whose `Render` (vtable `+0x10`, the only call made on
 //! it there) does nothing, and put back after.
 use super::{field, rd};
+use crate::syms_info::{field, hook, sym, TABLE};
 
-/// `g_cinematicView` (an instance).
-pub const CINEMATIC_VIEW: usize = 0x763758;
-/// Its vtable, and its `Render` (slot `+0x58`), checked to be stock.
-const CV_VTABLE: usize = 0x6b47b4;
-const CV_RENDER: usize = 0x4e5d30;
-const VT_RENDER: usize = 0x58;
-const CV_RECT: usize = 0x04;
-const CV_BACKGROUND_AREA: usize = 0x38;
-const CV_DISPLAY_AREA: usize = 0x48;
-const CV_FRAME: usize = 0x58;
-/// `StandardBackground`'s vtable, and its `Render` at `+0x10`.
-const SB_VTABLE: usize = 0x6b561c;
-const SB_RENDER: usize = 0x50a820;
-const SB_SLOT_RENDER: usize = 0x10;
+fn eng() -> &'static a2engine::Engine {
+    TABLE.engine()
+}
+
+fn at(s: a2engine::Sym) -> usize {
+    eng().addr(s)
+}
+
+/// `g_cinematicView` (an instance): its address, or 0 while the unit view's hook is not
+/// ready.
+pub fn cinematic_view() -> usize {
+    at(sym::UNITVIEW_CINEMATIC_VIEW)
+}
+
+/// The slots of `CinematicView`'s vtable (`Render`) and `StandardBackground`'s (`Render`)
+/// are checked by the hook to be stock; the code never reads them.
+#[allow(dead_code)]
+const CHECKED: [a2engine::Sym; 2] = [sym::UNITVIEW_SLOT_CV_RENDER, sym::UNITVIEW_SLOT_SB_RENDER];
+const VT_RENDER: usize = field::UNITVIEW_VT_RENDER;
+const CV_RECT: usize = field::UNITVIEW_CV_RECT;
+const CV_BACKGROUND_AREA: usize = field::UNITVIEW_CV_BACKGROUND_AREA;
+const CV_DISPLAY_AREA: usize = field::UNITVIEW_CV_DISPLAY_AREA;
+const CV_FRAME: usize = field::UNITVIEW_CV_FRAME;
 
 static mut ON: bool = false;
 static mut INERT_VT: [usize; 32] = [0; 32];
@@ -41,10 +51,9 @@ static mut LOGGED: [i32; 4] = [0; 4];
 
 unsafe extern "thiscall" fn inert(_this: usize) {}
 
-/// Whether the sites the placement relies on are stock.
+/// Whether the sites the placement relies on are stock (the unit view's hook is ready).
 pub fn functions_stock() -> bool {
-    let slots = unsafe { rd::<usize>(CV_VTABLE + VT_RENDER) == CV_RENDER && rd::<usize>(SB_VTABLE + SB_SLOT_RENDER) == SB_RENDER };
-    slots && super::starts(CV_RENDER, &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x24])
+    eng().ready(hook::HUD_UNITVIEW).is_ok()
 }
 
 /// Switches the placement on: from now on the panel switch draws the view through
@@ -68,7 +77,10 @@ pub fn enabled() -> bool {
 /// The view's rectangle in back-buffer pixels as the engine draws it (the panel's
 /// rectangle plus the display area), or None while there is none.
 pub fn view_rect(w: f32, h: f32) -> Option<[f32; 4]> {
-    let c = CINEMATIC_VIEW;
+    let c = cinematic_view();
+    if c == 0 {
+        return None;
+    }
     let p: [i32; 4] = unsafe { rd(c + CV_RECT) };
     let a: [i32; 4] = unsafe { rd(c + CV_DISPLAY_AREA) };
     let (l, t, r, b) = (p[0] + a[0], p[1] + a[1], p[0] + a[2], p[1] + a[3]);
@@ -91,7 +103,10 @@ pub fn place(px: [f32; 4], w: f32, h: f32) {
     let t = libm::floorf(px[1] * sy) as i32;
     let r = (libm::ceilf(px[2] * sx) as i32 - 1).max(l + 1);
     let b = (libm::ceilf(px[3] * sy) as i32 - 1).max(t + 1);
-    let c = CINEMATIC_VIEW;
+    let c = cinematic_view();
+    if c == 0 {
+        return;
+    }
     unsafe {
         *((c + CV_RECT) as *mut [i32; 4]) = [l, t, r, b];
         let area = [0, 0, r - l, b - t];
@@ -112,7 +127,8 @@ pub fn render(c: usize) {
         let render: unsafe extern "thiscall" fn(usize) = core::mem::transmute(rd::<usize>(rd::<usize>(c) + VT_RENDER));
         let slot = (c + CV_FRAME) as *mut usize;
         let frame = *slot;
-        if frame == 0 || field(frame, 0) != SB_VTABLE {
+        let sb_vtable = at(sym::UNITVIEW_SB_VTABLE);
+        if frame == 0 || sb_vtable == 0 || field(frame, 0) != sb_vtable {
             return render(c);
         }
         *slot = core::ptr::addr_of!(INERT) as usize;

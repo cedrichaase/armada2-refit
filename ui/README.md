@@ -922,6 +922,34 @@ state of the device. A format it has no conversion for is logged and skipped. Wi
 a Direct3D 9 device behind the game's (DXVK's own d3d8) nothing is read, and the
 sidecar says so.
 
+## Hooks (engine profile): core
+
+`profiles/gog-1.1/ui.core.toml` holds every address, call site, vtable slot, global and
+struct offset of `src/engine/{mod,ingame,display,intro,device,mouse,cursor,msvc}.rs`,
+`src/input.rs` and `src/clock.rs`, and `src/syms_core.rs` is generated from it. Each hook
+calls `ready` before it writes anything and stands down, with the engine's reason in
+`UI.log`, when a site is not stock; reads of engine memory from other parts go through
+`engine::storm3d()` and the helpers here, which return 0 / false / None when their hook
+is not ready. The findings each hook rests on are in the sections named in the table.
+
+| Hook | What it patches or reads, and why it needs the finding |
+|---|---|
+| `ui.core.storm3d` | The `Storm3D` global and its device table (index at +0xc0, devices from +0xcc, the d3d8 device at the `ST3D_DeviceDirectX8`'s +0x90): how every part finds the engine's device. Read lazily, so a part never reads address 0 |
+| `ui.core.mission` | The `call ChatDisplay::Render` in `Armada_RenderFrame`, after which the mission frame is drawn ("The mission frame"), and `ST3D_TrifanBuffer::Flush` on the device's trifan buffer (+0xe4), which flushes the HUD's batched quads first |
+| `ui.core.reads_hud_hidden` | `shipDisplay`'s hidden flag (+0x16): set by `DisplayInterface::SetInterfaceState` in every mode that hides the HUD |
+| `ui.core.cursor` | Slot 26 of `ST3D_DeviceDirectX8`'s vtable, `RefreshDisplay`, wrapped to empty the device's cursor sprite (+0x60) for one present ("The cursor"); +0xe0 says whether the cursor is the synchronous one |
+| `ui.core.cursor_probe` | The `DrawScaled2D` call in `RefreshDisplay` that draws the synchronous cursor, chained to whatever it called (another plugin's wrap); the global 2D scale and the sprite's hotspot (+0x30) |
+| `ui.core.cursor_square` | `SetCursor`'s `fmuls` of the hardware cursor width, its displacement moved from the x scale to the y scale ("The engine's cursor, square") |
+| `ui.core.display` | `GameConfiguration::InitializeGraphicsSystem`'s call in `WinMain`, with the profile (`UserProfile`) mode at +0x50, +0x54 and +0x58 and the two modes a profile holds when the player never chose one |
+| `ui.core.intro_mode32`, `ui.core.intro_mode16` | The pushes of `Program::PlayIntroMovie`'s two 640x480 mode lookups ("The intro without the cutscene proxy"); each is a hook of its own, as each was patched alone |
+| `ui.core.intro_frames` | `NextBinkFrame`'s `call [__imp__BinkCopyToBuffer@28]` and the import's slot, to route the movie's frames to the UI |
+| `ui.core.input` | `WindowProc`'s calls of `ProcessKeyboardMessages` and `ProcessMouseMessages`, and the `PeekMessageA` drains inside them ("Input and capture") |
+| `ui.core.window` | `ST3D_GraphicsEngine::GetWindowHandle`, thiscall on `Storm3D`, for the game window |
+| `ui.core.device` | `DestroyRenderSurfaces` (slot 28 of the device's vtable), chained: another plugin's wrap is kept; the d3d8 device at +0x90 is held across the engine's release |
+| `ui.core.reads_mouse` | `MouseDriver`'s button bits and the flag `g_bMousePosLocked` ("Focus and the pointer") |
+| `ui.core.reads_msvc` | Four `msvcp60.dll` import slots (`basic_stringstream`'s constructor, `str`, destructor and `basic_string`'s destructor), so the stream is made and freed by the library the engine's code expects |
+| `ui.core.reads_clock` | `Get_Time`'s float, the simulation's time for `Clock=bench` ("The animation clock") |
+
 ## Testing
 
 `./a2test run ui-widgets ui-widgets-cursor` (1280x720): the gallery driven by click,

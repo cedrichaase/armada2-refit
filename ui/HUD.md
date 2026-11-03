@@ -1283,6 +1283,81 @@ when the camera's pivot is off the units, so render3d takes it (render3d 0.30.0)
 overlays module draws a ring of its own in its place (`render3d/README.md`,
 "overlays", the pivot marker; `[Overlays] Pivot=0` gives it back to the engine).
 
+### Hooks of the panels (`ui.panels.*`)
+
+What `src/engine/{buttons,selection,chat,resources,topbar,trade,sound,race,comm}.rs` read
+and call of `Armada2.exe` is in the symbol profile `profiles/gog-1.1/ui.panels.toml`,
+generated into `src/syms_panels.rs` (`crates/a2engine/README.md`). Each hook is checked
+before anything is written or read, and stands down alone with `engine: <hook> stands
+down: <symbol> <why>`; the findings above (the fields, the press functions, the vtables)
+are the entries. A `fn` with a byte `check` is entered or called; a press function with
+none is only compared with a button's `+0x5c` or a vtable slot.
+
+| Hook | Entries | Without it |
+|---|---|---|
+| `ui.panels.buttons` | `StandardButton::mButtonPressFunction` and `Localized_Strings::Localize` (`fn`, entry bytes checked), `g_string`, the `StandardButton` / `ObjectivesText` fields | no press, label or localised text of ours (every panel below needs it) |
+| `ui.panels.toggle_press` | `ToggleButton::mButtonPressFunction` (`fn`, checked): the comm panel's toggles and colour buttons | a toggle is not pressed; the comm panel stays stock |
+| `ui.panels.presses` | `Entity::ResetVisibility` and its call in `Program::DisplayInputProcess` (patched: a press of ours is made at the simulate pass, "The button bar") | presses are made in the UI's frame |
+| `ui.panels.reads_selection` (`HUD.Info`, `HUD.Selection`) | `g_pOverView`, the overview's vtable slots `+0x94` / `+0x98`, `Entity::Get`, `Entity::GetUserTeam` (`fn`, checked) | no selection, no user team |
+| `ui.panels.reads_warp` (`HUD.Minimap`) | `g_allowWarp`, `g_transport`, `Transport::getGameSetup` and `GameSetup::isAllowWarpSpeed` (`fn`, checked), the object, craft and control fields | the minimap's move cursor is the engine's |
+| `ui.panels.resources` | `Team::GetTeam` and `Team::GetResource` (`fn`, checked) | no resource amounts |
+| `ui.panels.topbar` | `g_resourcePanel`, `g_buttonPanel`, `ResourceComponent::s_ResourceColor`, `CursorInterface::m_tooltipState`, `Team::GetMaxOfficers` (checked), the eight `ButtonPanel` press functions, the panels' fields | the resource panel and the top-right buttons stay stock |
+| `ui.panels.chat` | `g_chat_display`, the text-input region list (`g_random+0x10`), `ChatDisplay::RemoveExpiredText` (checked), `TextInput_Update` and its call in `Armada_RenderFrame` (patched), the region fields and flags | chat lines and the text entry stay stock |
+| `ui.panels.trade` | `Team::RenderUserTeamData` (checked) and its call in `Armada_RenderFrame` (patched), `Team::s_showTradesToTeam`, `s_pTeamList`, `s_teamMessage`, the team fields | the trade status and the team message stay stock |
+| `ui.panels.sound` | `operator new` and `AudioSound2D::AudioSound2D` (`fn`, checked), the two button sound names, the `ShellButton` sound fields | no click or hover sound of ours |
+| `ui.panels.reads_race` | `Race::s_missionRace`, the race's name field | the HUD's theme is the shell's |
+| `ui.panels.comm` | `commDisplay`, `dropPlayerBox`, `loadPercentageBox` and their vtables, `CommBar`'s, the two `GetInformation` slots of `DropPlayerText` / `LoadPercentageText` (`slot`, checked to hold their own), the buttons' callbacks, every field read | the comm panel, the drop box and the load wait stay stock |
+
+### Hooks of the HUD's engine side (`ui.hud.*`)
+
+What `src/engine/{hud,popups,palette,overlay,overlay_text,leftovers}.rs` patch, read and
+call of `Armada2.exe` is in `profiles/gog-1.1/ui.hud.toml`, generated into
+`src/syms_hud.rs`. The findings above (the panel switch's two calls, the components'
+fields, the bar's slots, the overlay's object walk, the boxes' press functions, each
+last draw's call site) are its entries. Each hook is checked before anything is written
+or read and stands down alone (`engine: <hook> stands down: <symbol> <why>`): the patched
+ones leave the stock draw or key, the `reads_` ones read nothing and return their
+empty value, so the panel that needs them stays the engine's. The settings rows a stand
+down is explained on are named in the profile.
+
+| Hook | Entries | Without it |
+|---|---|---|
+| `ui.hud.panels` (`HUD.Minimap`, `HUD.Info`, `HUD.Bar`, `HUD.UnitView`) | the call of a component's `Render` in `DisplayInterface::RenderAll` and of its `CursorOver` in `CursorInterface::RefreshOwner` (patched, 7 bytes each, "The panel switch"), `iCursor` and its owner / sprite fields | no panel of ours is taken over |
+| `ui.hud.tooltips` (`HUD.Tooltips`) | `iCursor+0x34` / `+0x38`, `CursorInterface::m_tooltipState` | the engine draws its tooltips at the pointer |
+| `ui.hud.reads_components` | `g_pPopupPalette`, `shipDisplay`, `mapRadar`, `DisplayInterface::s_pRenderList`, `View_Record`, the `DisplayInterface` rectangle / hidden fields and `GetName` slot | no component is found, hidden or placed |
+| `ui.hud.reads_calls` | `TextInput_IsActive` and `CinematicView::IsPlayingVideo` (`fn`, checked), `g_cinematicView` | keys are not held back for the chat line; a click sounds during a video |
+| `ui.hud.reads_popups` | the message, objectives, pause and replay boxes, their press functions, `IsGamePausedAtAll` and `ObjectivesDisplay::FocusSimulate` (`fn`, checked) | no box of ours ("Messages and objectives", "Pause and replay") |
+| `ui.hud.reads_bar` (`HUD.Bar`, `HUD.BarLabels`, `HUD.Icons`) | the bar's slots, mode and menu, the `ControlButton` / `CommandInfoClass` / `ModeInfo` fields, the `ButtonName` pair, `cPrjID::GetName`, `FindElement` and `ControlButton::mButtonPressFunction` (`fn`, checked), the sprite database | no button is described or drawn |
+| `ui.hud.barkeys` (`HUD.BarKeys`) | the call of `mProcessKeyboardInput` in `PopupPaletteImp::Update` (patched), the hotkey counts, the six menu toggles | the bar's keys are the engine's |
+| `ui.hud.reads_overlay` (`HUD.Selection`, `HUD.SelectionGauges`) | `GameObject::objectList`, the object / craft / `SelectionDisplay` fields, `ComputeContainerRect` and `__RTDynamicCast` (`fn`, checked), `currentCamera`, the virtual viewport, `SystemOrder` | no overlay of ours |
+| `ui.hud.bubbles` | `RenderSelectionEffects` (patched, its first byte) | the engine's 3D bubbles stay |
+| `ui.hud.reads_overlay_text` | `overlayText`, its map's `_Nil` and the message fields | no overlay messages of ours |
+| `ui.hud.drag_box` | the call of `DrawWireframeRectangle` in `cOverViewImp::mNormalModeRender` (patched) | the engine draws the drag box |
+| `ui.hud.height_posts` | the call of `ClipAndRenderLine` in `DrawHeightPost` (patched) | the engine draws the height posts |
+| `ui.hud.order_ring` | the calls of `ST3D_Sprite::DrawQuad` in `mRenderGridFX` and `mRenderWhere` (patched), `GetTexture` and `DemandLoad` (`fn`, checked) | the engine draws the order ring |
+| `ui.hud.footprints` | the three `DrawQuad` calls in `PlaceholderFeature::RenderFootprints` (patched, all or none), the same two functions | the engine draws the build footprints |
+| `ui.hud.fade` | the two draws of `ScreenFade::Render` (patched, 5 and 7 bytes) | the engine draws the fade |
+| `ui.hud.video` | the two callers of `BinkThread::BlitToBlackBackground` and its three draws (patched), `GetTexture` (`fn`, checked), the video's size | the engine draws the unit view's and the comm videos |
+| `ui.hud.frame_rate` | the two prints in `Armada_RenderFrame` (patched, both or none), `FrameStats::GetSlotName` / `GetTimeAvg` (`fn`, checked), `FRAMERATE_DISPLAY` | the engine prints the frame rate |
+
+### Hooks of the info panel, minimap, unit view and close-up (`ui.hud.*`)
+
+What `src/engine/{info,radar,unitview,closeup}.rs` read and call of `Armada2.exe` is in
+`profiles/gog-1.1/ui.info.toml` and `ui.radar.toml`, generated into `src/syms_info.rs`
+and `src/syms_radar.rs`. A hook is checked before anything is written or read and
+stands down alone, with its row's note in Settings; the findings above (the panel's
+children, the vtable slots, the radar's globals) are the entries, and every struct
+offset is a `field`. A slot is checked to hold the function it names; a `fn` with bytes
+is entered or called.
+
+| Hook | Entries | Without it |
+|---|---|---|
+| `ui.hud.info` (`HUD.Info`) | `shipDisplay`, `ShipDisplay::DetermineSelectedDisplayType`, `Craft::mComputeRepairLeft`, `Producer::GetBuildQueue`, `GameObject::GetSlowEffect` / `GetLineOfSightEffect`, `Localized_Strings::Localize` and `__RTDynamicCast` (`fn`, entry bytes checked), the type descriptors it casts with, `Entity::NO_ENTITY`, `gCameraManager`, `g_pCommandShift`, the panel's children and the objects' fields | the info panel stays stock |
+| `ui.hud.unitview` (`HUD.UnitView`) | `g_cinematicView`, `CinematicView::Render` (checked) and `StandardBackground::Render`, held by their vtables' slots, the three rectangles and the frame pointer | the unit view keeps its stock place and frame |
+| `ui.hud.closeup` (`HUD.InfoCamera`) | `Armada_Camera`'s constructor, `ST3D_Camera::SetViewport` / `SetNearPlane` / `SetFarPlane`, `ST3D_GraphicsEngine::SetCurrentCamera` (checked), `SetTransform` in `Armada_Camera`'s vtable, `operator new`, the action camera's `Render_Stuff`, `DisplayInterface::currentCamera`, the entity and object lists, and the action camera's call of `Armada_RenderAllOurStuff` in `CinematicView::RenderView` (a `call`, `chain`: render3d re-points it, and the close-up goes through it) | the wireframe shows |
+| `ui.hud.radar` (`HUD.Minimap`) | `mapRadar` and the radar's sprites, filters and fog (`g_terrain`, `Scanner::m_fog`, `m_shroud`), `RadarComponent::ConvertWorldToSquareNormal` / `ConvertSquareNormalToWorld`, `Entity::GetTeamsVisibleToUser` and its call in `MapRadar::AlwaysGameSimulate` (patched: the clicks are made there), the team and filter functions, `ActionMode::GetAction`, `CameraManager::SnapToNearestVisible`, `ST3D_Camera::ProjectScreenPointToWorldRay`, `cOverViewImp`'s slots `+0xbc` / `+0xc8` and `PopupPaletteImp`'s `+0xa4` (checked to hold their functions), the object, class and camera fields | the minimap stays stock |
+| `ui.hud.radar_cursor` (`HUD.Minimap`) | `cOverViewImp::SetCursorAiAction` (`fn`, checked) and the two reads of its cursor table (`label`, checked), the table, the entry layout | the cursor over the minimap is the engine's |
+
 ## Not done
 
 - Every panel after the info panel (the order above).

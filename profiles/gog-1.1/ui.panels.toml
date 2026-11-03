@@ -1,16 +1,1509 @@
-# UI.asi's symbols in Armada2.exe 1.1 (GOG): part "panels". STUB: its owner replaces it.
+# UI.asi's symbols in Armada2.exe 1.1 (GOG): part "panels" (ui/src/engine/{buttons,selection,
+# chat,resources,topbar,trade,sound,race,comm}.rs). The findings are in ui/HUD.md, "Hooks".
 schema = 1
 plugin = "ui"
-readme = "ui/README.md"
+readme = "ui/HUD.md"
 lang = "rust"
 out = "ui/src/syms_panels.rs"
 
-[hook."panels.stub"]
-doc = "placeholder"
+[hook."panels.buttons"]
+doc = "StandardButton's press and Localize called, its fields read: the HUD's buttons and texts"
+
+[hook."panels.toggle_press"]
+doc = "ToggleButton's press function, which the comm panel's toggles and colour buttons press"
+
+[hook."panels.presses"]
+doc = "A press of ours made at the game's simulate pass, in place of Entity::ResetVisibility's call"
+
+[hook."panels.reads_selection"]
+doc = "The overview's selection list, Entity::Get and Entity::GetUserTeam read and called"
+rows = ["HUD.Info", "HUD.Selection"]
+
+[hook."panels.reads_warp"]
+doc = "Whether the selected ships can warp, from their control and the setup's warp setting (minimap cursor)"
+rows = ["HUD.Minimap"]
+
+[hook."panels.resources"]
+doc = "Team::GetTeam and Team::GetResource called for the user's amounts"
+
+[hook."panels.topbar"]
+doc = "The resource panel and the top-right button panel read, their press functions recognised"
+
+[hook."panels.chat"]
+doc = "The chat lines and text-entry regions read, TextInput_Update's call in the mission frame patched"
+
+[hook."panels.trade"]
+doc = "The mission scripts' trade status and team message read, Team::RenderUserTeamData's call patched"
+
+[hook."panels.sound"]
+doc = "The button sounds played the way StandardButton::Simulate plays them"
+
+[hook."panels.reads_race"]
+doc = "The mission's race and its name, for the HUD's theme"
+
+[hook."panels.comm"]
+doc = "The comm panel, the drop box and the load wait read, their buttons recognised by press function"
+
+# ---- panels.buttons (buttons.rs) -----------------------------------------------------
 
 [[sym]]
-id = "panels_stub"
-symbol = "WinMain"
+id = "panels_standard_button_press"
+symbol = "StandardButton::mButtonPressFunction"
+kind = "fn"
+addr = 0x50bad0
+check = "8b 41 5c 85 c0"
+used_by = ["panels.buttons"]
+
+[[sym]]
+id = "panels_localize"
+symbol = "Localized_Strings::Localize"
+kind = "fn"
+addr = 0x481c90
+check = "55 8b ec"
+used_by = ["panels.buttons"]
+
+[[sym]]
+id = "panels_g_string"
+symbol = "g_string"
 kind = "global"
-addr = 0x7ad508
-used_by = ["panels.stub"]
+addr = 0x7379fc
+used_by = ["panels.buttons"]
+
+[[sym]]
+id = "panels_btn_border"
+symbol = "StandardButton"
+kind = "field"
+struct = "StandardButton"
+offset = 0x28
+type = "ptr"
+used_by = ["panels.buttons"]
+
+[[sym]]
+id = "panels_btn_sprite"
+symbol = "StandardButton"
+kind = "field"
+struct = "StandardButton"
+offset = 0x2c
+type = "ptr"
+used_by = ["panels.buttons"]
+
+[[sym]]
+id = "panels_btn_state"
+symbol = "StandardButton"
+kind = "field"
+struct = "StandardButton"
+offset = 0x34
+type = "u32"
+used_by = ["panels.buttons"]
+
+[[sym]]
+id = "panels_btn_label"
+symbol = "StandardButton"
+kind = "field"
+struct = "StandardButton"
+offset = 0x39
+type = "u8"
+used_by = ["panels.buttons"]
+
+[[sym]]
+id = "panels_btn_press_fn"
+symbol = "StandardButton"
+kind = "field"
+struct = "StandardButton"
+offset = 0x5c
+type = "ptr"
+used_by = ["panels.buttons"]
+
+[[sym]]
+id = "panels_btn_vt_tooltip"
+symbol = "StandardButton"
+kind = "field"
+struct = "StandardButton"
+offset = 0
+type = "u32"
+used_by = ["panels.buttons"]
+
+[[sym]]
+id = "panels_btn_vt_verbose"
+symbol = "StandardButton"
+kind = "field"
+struct = "StandardButton"
+offset = 4
+type = "u32"
+used_by = ["panels.buttons"]
+
+[[sym]]
+id = "panels_btn_vt_press"
+symbol = "StandardButton"
+kind = "field"
+struct = "StandardButton"
+offset = 0x20
+type = "u32"
+used_by = ["panels.buttons"]
+
+[[sym]]
+id = "panels_text_colour"
+symbol = "ObjectivesText"
+kind = "field"
+struct = "ObjectivesText"
+offset = 0x70
+type = "v3"
+used_by = ["panels.buttons"]
+
+[[sym]]
+id = "panels_text_string"
+symbol = "ObjectivesText"
+kind = "field"
+struct = "ObjectivesText"
+offset = 0x84
+type = "u8"
+used_by = ["panels.buttons"]
+
+[[sym]]
+id = "panels_text_max"
+symbol = "ObjectivesText::SetText"
+kind = "value"
+value = 0x800
+unit = "bytes"
+used_by = ["panels.buttons"]
+
+# ---- panels.toggle_press (buttons.rs, comm.rs) ---------------------------------------
+
+[[sym]]
+id = "panels_toggle_button_press"
+symbol = "ToggleButton::mButtonPressFunction"
+kind = "fn"
+addr = 0x510990
+check = "8b 41 34 85 c0"
+used_by = ["panels.toggle_press"]
+
+# ---- panels.presses (buttons.rs) -----------------------------------------------------
+
+[[sym]]
+id = "panels_reset_visibility"
+symbol = "Entity::ResetVisibility"
+kind = "fn"
+addr = 0x4cfac0
+used_by = ["panels.presses"]
+
+[[sym]]
+id = "panels_presses_site"
+symbol = "Program::DisplayInputProcess"
+kind = "call"
+addr = 0x483869
+target = "panels_reset_visibility"
+in = "Program::DisplayInputProcess"
+used_by = ["panels.presses"]
+
+# ---- panels.reads_selection (selection.rs) -------------------------------------------
+
+[[sym]]
+id = "panels_overview_ptr"
+symbol = "g_pOverView"
+kind = "global"
+addr = 0x768e3c
+used_by = ["panels.reads_selection"]
+
+[[sym]]
+id = "panels_vt_select_count"
+symbol = "cOverViewImp"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0x94
+type = "u32"
+used_by = ["panels.reads_selection"]
+
+[[sym]]
+id = "panels_vt_select_list"
+symbol = "cOverViewImp"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0x98
+type = "u32"
+used_by = ["panels.reads_selection"]
+
+[[sym]]
+id = "panels_entity_get"
+symbol = "Entity::Get"
+kind = "fn"
+addr = 0x4cfff0
+check = "55 8b ec 8b 4d 08"
+used_by = ["panels.reads_selection"]
+
+[[sym]]
+id = "panels_user_team"
+symbol = "Entity::GetUserTeam"
+kind = "fn"
+addr = 0x4d0060
+check = "8b 0d d4 b8 76 00"
+used_by = ["panels.reads_selection"]
+
+# ---- panels.reads_warp (selection.rs) ------------------------------------------------
+
+[[sym]]
+id = "panels_obj_flags"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x14
+type = "u8"
+used_by = ["panels.reads_warp"]
+
+[[sym]]
+id = "panels_obj_is_game_object"
+symbol = "GameObject"
+kind = "value"
+value = 4
+used_by = ["panels.reads_warp"]
+
+[[sym]]
+id = "panels_obj_class"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x40
+type = "ptr"
+used_by = ["panels.reads_warp"]
+
+[[sym]]
+id = "panels_obj_team"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0xec
+type = "i32"
+used_by = ["panels.reads_warp"]
+
+[[sym]]
+id = "panels_craft_control"
+symbol = "Craft"
+kind = "field"
+struct = "Craft"
+offset = 0x1b0
+type = "ptr"
+used_by = ["panels.reads_warp"]
+
+[[sym]]
+id = "panels_ctl_speed"
+symbol = "cCraftControl"
+kind = "field"
+struct = "cCraftControl"
+offset = 8
+type = "f32"
+used_by = ["panels.reads_warp"]
+
+[[sym]]
+id = "panels_ctl_warp"
+symbol = "cCraftControl"
+kind = "field"
+struct = "cCraftControl"
+offset = 0xc
+type = "f32"
+used_by = ["panels.reads_warp"]
+
+[[sym]]
+id = "panels_allow_warp"
+symbol = "g_allowWarp"
+kind = "global"
+addr = 0x6f4de0
+used_by = ["panels.reads_warp"]
+
+[[sym]]
+id = "panels_transport"
+symbol = "g_transport"
+kind = "global"
+addr = 0x76b8d4
+used_by = ["panels.reads_warp"]
+
+[[sym]]
+id = "panels_get_setup"
+symbol = "Transport::getGameSetup"
+kind = "fn"
+addr = 0x557940
+check = "8b 41 30 c3"
+used_by = ["panels.reads_warp"]
+
+[[sym]]
+id = "panels_allow_warp_speed"
+symbol = "GameSetup::isAllowWarpSpeed"
+kind = "fn"
+addr = 0x546280
+check = "8b 41 10 8a 80 d1"
+used_by = ["panels.reads_warp"]
+
+# ---- panels.resources (resources.rs) -------------------------------------------------
+
+[[sym]]
+id = "panels_team_get"
+symbol = "Team::GetTeam"
+kind = "fn"
+addr = 0x496340
+check = "55 8b ec 8b 45 08"
+used_by = ["panels.resources"]
+
+[[sym]]
+id = "panels_team_get_resource"
+symbol = "Team::GetResource"
+kind = "fn"
+addr = 0x498b00
+check = "55 8b ec 8b 45 08"
+used_by = ["panels.resources"]
+
+# ---- panels.topbar (topbar.rs) -------------------------------------------------------
+
+[[sym]]
+id = "panels_resource_panel"
+symbol = "g_resourcePanel"
+kind = "global"
+addr = 0x763dd0
+used_by = ["panels.topbar"]
+
+[[sym]]
+id = "panels_resource_colours"
+symbol = "ResourceComponent::s_ResourceColor"
+kind = "global"
+addr = 0x764664
+used_by = ["panels.topbar"]
+
+[[sym]]
+id = "panels_button_panel"
+symbol = "g_buttonPanel"
+kind = "global"
+addr = 0x763d58
+used_by = ["panels.topbar"]
+
+[[sym]]
+id = "panels_tooltip_state"
+symbol = "CursorInterface::m_tooltipState"
+kind = "global"
+addr = 0x764484
+used_by = ["panels.topbar"]
+
+[[sym]]
+id = "panels_get_max_officers"
+symbol = "Team::GetMaxOfficers"
+kind = "fn"
+addr = 0x497560
+check = "56 8b f1 8b 8e"
+used_by = ["panels.topbar"]
+
+[[sym]]
+id = "panels_rp_components"
+symbol = "ResourcePanel"
+kind = "field"
+struct = "ResourcePanel"
+offset = 0x2c
+type = "ptr"
+used_by = ["panels.topbar"]
+
+[[sym]]
+id = "panels_rc_resource"
+symbol = "ResourceComponent"
+kind = "field"
+struct = "ResourceComponent"
+offset = 0x28
+type = "u32"
+used_by = ["panels.topbar"]
+
+[[sym]]
+id = "panels_team_in_play"
+symbol = "Team"
+kind = "field"
+struct = "Team"
+offset = 0x16c
+type = "u32"
+used_by = ["panels.topbar"]
+
+[[sym]]
+id = "panels_team_officers"
+symbol = "Team"
+kind = "field"
+struct = "Team"
+offset = 0x160
+type = "i32"
+used_by = ["panels.topbar"]
+
+[[sym]]
+id = "panels_bp_buttons"
+symbol = "ButtonPanel"
+kind = "field"
+struct = "ButtonPanel"
+offset = 0x2c
+type = "ptr"
+used_by = ["panels.topbar"]
+
+[[sym]]
+id = "panels_bp_show_more"
+symbol = "ButtonPanel"
+kind = "field"
+struct = "ButtonPanel"
+offset = 0x4c
+type = "u8"
+used_by = ["panels.topbar"]
+
+[[sym]]
+id = "panels_press_0"
+symbol = "ButtonPanel::OpenMenu"
+kind = "fn"
+addr = 0x4ff080
+used_by = ["panels.topbar"]
+
+[[sym]]
+id = "panels_press_1"
+symbol = "ButtonPanel::OpenComm"
+kind = "fn"
+addr = 0x4ff090
+used_by = ["panels.topbar"]
+
+[[sym]]
+id = "panels_press_2"
+symbol = "ButtonPanel::IdleShip"
+kind = "fn"
+addr = 0x4ff0b0
+used_by = ["panels.topbar"]
+
+[[sym]]
+id = "panels_press_3"
+symbol = "ButtonPanel::ToggleView"
+kind = "fn"
+addr = 0x4ff0a0
+used_by = ["panels.topbar"]
+
+[[sym]]
+id = "panels_press_4"
+symbol = "ButtonPanel::ShowObjectives"
+kind = "fn"
+addr = 0x4ff0e0
+used_by = ["panels.topbar"]
+
+[[sym]]
+id = "panels_press_5"
+symbol = "ButtonPanel::ToggleHelp"
+kind = "fn"
+addr = 0x4ff0f0
+used_by = ["panels.topbar"]
+
+[[sym]]
+id = "panels_press_6"
+symbol = "ButtonPanel::TogglePalette"
+kind = "fn"
+addr = 0x4ff110
+used_by = ["panels.topbar"]
+
+[[sym]]
+id = "panels_press_7"
+symbol = "ButtonPanel::ToggleShowMore"
+kind = "fn"
+addr = 0x4ff120
+used_by = ["panels.topbar"]
+
+# ---- panels.chat (chat.rs) -----------------------------------------------------------
+
+[[sym]]
+id = "panels_chat"
+symbol = "g_chat_display"
+kind = "global"
+addr = 0x768de8
+used_by = ["panels.chat"]
+
+[[sym]]
+id = "panels_regions"
+symbol = "g_random"
+kind = "global"
+addr = 0x7b0fbc
+used_by = ["panels.chat"]
+
+[[sym]]
+id = "panels_remove_expired"
+symbol = "ChatDisplay::RemoveExpiredText"
+kind = "fn"
+addr = 0x51d190
+check = "53 56 57 8b f1"
+used_by = ["panels.chat"]
+
+[[sym]]
+id = "panels_text_input_update"
+symbol = "TextInput_Update"
+kind = "fn"
+addr = 0x65f150
+used_by = ["panels.chat"]
+
+[[sym]]
+id = "panels_text_input_site"
+symbol = "Armada_RenderFrame"
+kind = "call"
+addr = 0x598a07
+target = "panels_text_input_update"
+in = "Armada_RenderFrame"
+used_by = ["panels.chat"]
+
+[[sym]]
+id = "panels_chat_lines"
+symbol = "ChatDisplay"
+kind = "field"
+struct = "ChatDisplay"
+offset = 4
+type = "ptr"
+used_by = ["panels.chat"]
+
+[[sym]]
+id = "panels_node_text"
+symbol = "ChatLine"
+kind = "field"
+struct = "ChatLine"
+offset = 0xc
+type = "ptr"
+used_by = ["panels.chat"]
+
+[[sym]]
+id = "panels_node_colour"
+symbol = "ChatLine"
+kind = "field"
+struct = "ChatLine"
+offset = 0x18
+type = "ptr"
+used_by = ["panels.chat"]
+
+[[sym]]
+id = "panels_region_x"
+symbol = "TextInput region"
+kind = "field"
+struct = "TextInput region"
+offset = 0
+type = "i32"
+used_by = ["panels.chat"]
+
+[[sym]]
+id = "panels_region_y"
+symbol = "TextInput region"
+kind = "field"
+struct = "TextInput region"
+offset = 4
+type = "i32"
+used_by = ["panels.chat"]
+
+[[sym]]
+id = "panels_region_buf"
+symbol = "TextInput region"
+kind = "field"
+struct = "TextInput region"
+offset = 0x10
+type = "u8"
+used_by = ["panels.chat"]
+
+[[sym]]
+id = "panels_region_prompt"
+symbol = "TextInput region"
+kind = "field"
+struct = "TextInput region"
+offset = 0x130
+type = "u32"
+used_by = ["panels.chat"]
+
+[[sym]]
+id = "panels_region_end"
+symbol = "TextInput region"
+kind = "field"
+struct = "TextInput region"
+offset = 0x134
+type = "u32"
+used_by = ["panels.chat"]
+
+[[sym]]
+id = "panels_region_caret"
+symbol = "TextInput region"
+kind = "field"
+struct = "TextInput region"
+offset = 0x138
+type = "u32"
+used_by = ["panels.chat"]
+
+[[sym]]
+id = "panels_region_flags"
+symbol = "TextInput region"
+kind = "field"
+struct = "TextInput region"
+offset = 0x144
+type = "u32"
+used_by = ["panels.chat"]
+
+[[sym]]
+id = "panels_region_shown"
+symbol = "TextInput region flags"
+kind = "value"
+value = 1
+used_by = ["panels.chat"]
+
+[[sym]]
+id = "panels_region_active"
+symbol = "TextInput_IsActive"
+kind = "value"
+value = 0x100
+used_by = ["panels.chat"]
+
+[[sym]]
+id = "panels_region_changed"
+symbol = "TextInput_Update"
+kind = "value"
+value = 0x200
+used_by = ["panels.chat"]
+
+[[sym]]
+id = "panels_region_buf_max"
+symbol = "TextInput region"
+kind = "value"
+value = 0x118
+unit = "bytes"
+used_by = ["panels.chat"]
+
+# ---- panels.trade (trade.rs) ---------------------------------------------------------
+
+[[sym]]
+id = "panels_render_user_team_data"
+symbol = "Team::RenderUserTeamData"
+kind = "fn"
+addr = 0x497df0
+check = "55 8b ec 83 ec 08 a1 10 ea 6f 00"
+used_by = ["panels.trade"]
+
+[[sym]]
+id = "panels_trade_site"
+symbol = "Armada_RenderFrame"
+kind = "call"
+addr = 0x5988d0
+target = "panels_render_user_team_data"
+in = "Armada_RenderFrame"
+used_by = ["panels.trade"]
+
+[[sym]]
+id = "panels_show_trades_to"
+symbol = "Team::s_showTradesToTeam"
+kind = "global"
+addr = 0x6fea10
+used_by = ["panels.trade"]
+
+[[sym]]
+id = "panels_team_list"
+symbol = "Team::s_pTeamList"
+kind = "global"
+addr = 0x738db0
+used_by = ["panels.trade"]
+
+[[sym]]
+id = "panels_team_message"
+symbol = "Team::s_teamMessage"
+kind = "global"
+addr = 0x738df8
+used_by = ["panels.trade"]
+
+[[sym]]
+id = "panels_team_colour"
+symbol = "Team"
+kind = "field"
+struct = "Team"
+offset = 8
+type = "v3"
+used_by = ["panels.trade"]
+
+[[sym]]
+id = "panels_sent_dilithium"
+symbol = "Team"
+kind = "field"
+struct = "Team"
+offset = 0x2c
+type = "f32"
+used_by = ["panels.trade"]
+
+[[sym]]
+id = "panels_sent_latinum"
+symbol = "Team"
+kind = "field"
+struct = "Team"
+offset = 0x78
+type = "f32"
+used_by = ["panels.trade"]
+
+[[sym]]
+id = "panels_sent_metal"
+symbol = "Team"
+kind = "field"
+struct = "Team"
+offset = 0xc4
+type = "f32"
+used_by = ["panels.trade"]
+
+# ---- panels.sound (sound.rs) ---------------------------------------------------------
+
+[[sym]]
+id = "panels_operator_new"
+symbol = "operator new"
+kind = "fn"
+addr = 0x652710
+check = "55 8b ec a1"
+used_by = ["panels.sound"]
+
+[[sym]]
+id = "panels_sound2d"
+symbol = "AudioSound2D::AudioSound2D"
+kind = "fn"
+addr = 0x45fc50
+check = "55 8b ec 6a ff"
+used_by = ["panels.sound"]
+
+[[sym]]
+id = "panels_click_sound"
+symbol = "StandardButton::s_buttonClickSound"
+kind = "global"
+addr = 0x764854
+used_by = ["panels.sound"]
+
+[[sym]]
+id = "panels_rollover_sound"
+symbol = "StandardButton::s_buttonRolloverSound"
+kind = "global"
+addr = 0x764814
+used_by = ["panels.sound"]
+
+[[sym]]
+id = "panels_sound2d_bytes"
+symbol = "AudioSound2D"
+kind = "value"
+value = 0x1c
+unit = "bytes"
+used_by = ["panels.sound"]
+
+[[sym]]
+id = "panels_sb_has_sound"
+symbol = "ShellButton"
+kind = "field"
+struct = "ShellButton"
+offset = 0xec
+type = "u32"
+used_by = ["panels.sound"]
+
+[[sym]]
+id = "panels_sb_hover_sound"
+symbol = "ShellButton"
+kind = "field"
+struct = "ShellButton"
+offset = 0xf0
+type = "u8"
+used_by = ["panels.sound"]
+
+# ---- panels.reads_race (race.rs) -----------------------------------------------------
+
+[[sym]]
+id = "panels_mission_race"
+symbol = "Race::s_missionRace"
+kind = "global"
+addr = 0x737cc0
+used_by = ["panels.reads_race"]
+
+[[sym]]
+id = "panels_race_name"
+symbol = "Race"
+kind = "field"
+struct = "Race"
+offset = 0x14
+type = "u8"
+used_by = ["panels.reads_race"]
+
+# ---- panels.comm (comm.rs) -----------------------------------------------------------
+
+[[sym]]
+id = "panels_comm"
+symbol = "commDisplay"
+kind = "global"
+addr = 0x764a60
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_vt_comm"
+symbol = "CommDisplay"
+kind = "vtable"
+addr = 0x6b5a5c
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_vt_bar"
+symbol = "CommBar"
+kind = "vtable"
+addr = 0x6b5870
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_drop"
+symbol = "dropPlayerBox"
+kind = "global"
+addr = 0x764cd0
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_vt_drop"
+symbol = "DropPlayerBox"
+kind = "vtable"
+addr = 0x6b5b68
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_load"
+symbol = "loadPercentageBox"
+kind = "global"
+addr = 0x764de0
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_vt_load"
+symbol = "LoadPercentageBox"
+kind = "vtable"
+addr = 0x6b5d94
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_vt_drop_text"
+symbol = "DropPlayerText"
+kind = "vtable"
+addr = 0x6b5bec
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_vt_load_text"
+symbol = "LoadPercentageText"
+kind = "vtable"
+addr = 0x6b5e18
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_drop_text_info"
+symbol = "DropPlayerText::GetInformation"
+kind = "fn"
+addr = 0x516ae0
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_load_text_info"
+symbol = "LoadPercentageText::GetInformation"
+kind = "fn"
+addr = 0x518b70
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_drop_text_slot"
+symbol = "DropPlayerText::GetInformation"
+kind = "slot"
+vtable = "panels_vt_drop_text"
+index = 9
+target = "panels_drop_text_info"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_load_text_slot"
+symbol = "LoadPercentageText::GetInformation"
+kind = "slot"
+vtable = "panels_vt_load_text"
+index = 9
+target = "panels_load_text_info"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_cb_player_select"
+symbol = "CommBar::PlayerSelectCallback"
+kind = "fn"
+addr = 0x510530
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_cb_chat"
+symbol = "CommBar::ChatToggleCallback"
+kind = "fn"
+addr = 0x510610
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_cb_enemy"
+symbol = "CommBar::MakeEnemyCallback"
+kind = "fn"
+addr = 0x510550
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_cb_neutral"
+symbol = "CommBar::MakeNeutralCallback"
+kind = "fn"
+addr = 0x510590
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_cb_ally"
+symbol = "CommBar::MakeAllyCallback"
+kind = "fn"
+addr = 0x5105d0
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_cb_msg_all"
+symbol = "CommDisplay::MessageAllCallback"
+kind = "fn"
+addr = 0x514f60
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_cb_msg_allies"
+symbol = "CommDisplay::MessageAlliesCallback"
+kind = "fn"
+addr = 0x514fa0
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_cb_msg_enemies"
+symbol = "CommDisplay::MessageEnemiesCallback"
+kind = "fn"
+addr = 0x515040
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_cb_msg_private"
+symbol = "CommDisplay::PrivateMessageCallback"
+kind = "fn"
+addr = 0x5150e0
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_cb_give_units"
+symbol = "CommDisplay::GiveUnitsCallback"
+kind = "fn"
+addr = 0x515260
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_cb_okay"
+symbol = "CommDisplay::OkayCallback"
+kind = "fn"
+addr = 0x5155b0
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_cb_up"
+symbol = "CommDisplay::ResourceUpCallback"
+kind = "fn"
+addr = 0x5154f0
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_cb_down"
+symbol = "CommDisplay::ResourceDownCallback"
+kind = "fn"
+addr = 0x515520
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_cb_give"
+symbol = "CommDisplay::GiveResourceCallback"
+kind = "fn"
+addr = 0x515420
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_cb_victory"
+symbol = "CommDisplay::AlliedVictoryCallback"
+kind = "fn"
+addr = 0x515550
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_cb_latency"
+symbol = "CommDisplay::LatencyToggleCallback"
+kind = "fn"
+addr = 0x515580
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_cb_drop"
+symbol = "DropPlayerBox::DropCallback"
+kind = "fn"
+addr = 0x516a30
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_cb_ai"
+symbol = "DropPlayerBox::AiTakeoverCallback"
+kind = "fn"
+addr = 0x516a60
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_title"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x3c
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_head_player"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x40
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_head_message"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x44
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_head_team"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x48
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_head_alliance"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x4c
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_group_message"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x50
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_group_give"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x54
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_label_victory"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x58
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_label_latency"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x5c
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_msg_0"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x60
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_msg_1"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x64
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_msg_2"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x68
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_msg_3"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x6c
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_give_units"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x70
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_okay"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x74
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_row_0"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x78
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_row_1"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x7c
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_row_2"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x80
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_row_3"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x84
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_row_4"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x88
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_victory"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x8c
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_latency"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x90
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_bar_count"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x94
+type = "u32"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_bars"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x98
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_teams"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x9c
+type = "u8"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_alliances"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0x9d
+type = "u8"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_c_selected"
+symbol = "CommDisplay"
+kind = "field"
+struct = "CommDisplay"
+offset = 0xa0
+type = "u32"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_td_user"
+symbol = "StandardButton"
+kind = "field"
+struct = "StandardButton"
+offset = 0x60
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_td_amount"
+symbol = "TransferDetails"
+kind = "field"
+struct = "TransferDetails"
+offset = 0x40
+type = "i32"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_td_min"
+symbol = "TransferDetails"
+kind = "field"
+struct = "TransferDetails"
+offset = 0x48
+type = "i32"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_td_max"
+symbol = "TransferDetails"
+kind = "field"
+struct = "TransferDetails"
+offset = 0x4c
+type = "i32"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_b_present"
+symbol = "CommBar"
+kind = "field"
+struct = "CommBar"
+offset = 0x28
+type = "u8"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_b_slot"
+symbol = "CommBar"
+kind = "field"
+struct = "CommBar"
+offset = 0x2c
+type = "u32"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_b_team"
+symbol = "CommBar"
+kind = "field"
+struct = "CommBar"
+offset = 0x34
+type = "i32"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_b_show_team"
+symbol = "CommBar"
+kind = "field"
+struct = "CommBar"
+offset = 0x38
+type = "u8"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_b_show_alliance"
+symbol = "CommBar"
+kind = "field"
+struct = "CommBar"
+offset = 0x39
+type = "u8"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_b_name_button"
+symbol = "CommBar"
+kind = "field"
+struct = "CommBar"
+offset = 0x3c
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_b_name"
+symbol = "CommBar"
+kind = "field"
+struct = "CommBar"
+offset = 0x40
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_b_chat"
+symbol = "CommBar"
+kind = "field"
+struct = "CommBar"
+offset = 0x44
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_b_team_text"
+symbol = "CommBar"
+kind = "field"
+struct = "CommBar"
+offset = 0x48
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_b_alliance_0"
+symbol = "CommBar"
+kind = "field"
+struct = "CommBar"
+offset = 0x4c
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_b_alliance_1"
+symbol = "CommBar"
+kind = "field"
+struct = "CommBar"
+offset = 0x50
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_b_alliance_2"
+symbol = "CommBar"
+kind = "field"
+struct = "CommBar"
+offset = 0x54
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_b_colour"
+symbol = "CommBar"
+kind = "field"
+struct = "CommBar"
+offset = 0x58
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_text_inline"
+symbol = "StandardText"
+kind = "field"
+struct = "StandardText"
+offset = 0x84
+type = "u8"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_alliance_pending"
+symbol = "AllianceButton"
+kind = "field"
+struct = "AllianceButton"
+offset = 0x7c
+type = "u8"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_text_label_key"
+symbol = "StandardText"
+kind = "field"
+struct = "StandardText"
+offset = 0x54
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_vt_get_information"
+symbol = "StandardText"
+kind = "field"
+struct = "StandardText"
+offset = 0x24
+type = "u32"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_d_text"
+symbol = "DropPlayerBox"
+kind = "field"
+struct = "DropPlayerBox"
+offset = 0x2c
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_d_drop"
+symbol = "DropPlayerBox"
+kind = "field"
+struct = "DropPlayerBox"
+offset = 0x30
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_d_ai"
+symbol = "DropPlayerBox"
+kind = "field"
+struct = "DropPlayerBox"
+offset = 0x34
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_l_text"
+symbol = "LoadPercentageBox"
+kind = "field"
+struct = "LoadPercentageBox"
+offset = 0x2c
+type = "ptr"
+used_by = ["panels.comm"]
+
+[[sym]]
+id = "panels_l_ms"
+symbol = "LoadPercentageText"
+kind = "field"
+struct = "LoadPercentageText"
+offset = 0x284
+type = "i32"
+used_by = ["panels.comm"]

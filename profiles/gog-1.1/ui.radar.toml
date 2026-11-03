@@ -1,16 +1,967 @@
-# UI.asi's symbols in Armada2.exe 1.1 (GOG): part "radar". STUB: its owner replaces it.
+# UI.asi's symbols in Armada2.exe 1.1 (GOG): part "radar", the minimap (ui/src/engine/radar.rs).
+# Each entry is tied to the hook that uses it; the findings are in ui/HUD.md, "Hooks".
 schema = 1
 plugin = "ui"
-readme = "ui/README.md"
+readme = "ui/HUD.md"
 lang = "rust"
 out = "ui/src/syms_radar.rs"
 
-[hook."radar.stub"]
-doc = "placeholder"
+[hook."hud.radar"]
+doc = "The minimap: the always-step call, what the radar reads and the calls its clicks make"
+rows = ["HUD.Minimap"]
+
+[hook."hud.radar_cursor"]
+doc = "The cursor over the minimap: SetCursorAiAction reads its cursor table as the panel does"
+rows = ["HUD.Minimap"]
 
 [[sym]]
-id = "radar_stub"
-symbol = "WinMain"
+id = "radar_map_radar"
+symbol = "mapRadar"
 kind = "global"
-addr = 0x7ad508
-used_by = ["radar.stub"]
+addr = 0x763810
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_map_sprite"
+symbol = "RadarComponent::m_mapSprite"
+kind = "global"
+addr = 0x76387c
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_warp_sprite"
+symbol = "RadarComponent::m_warpSuppressionSprite"
+kind = "global"
+addr = 0x763880
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_fog_sprite"
+symbol = "RadarComponent::m_fogSprite"
+kind = "global"
+addr = 0x763874
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_ship_filter"
+symbol = "sg_shipFilterState"
+kind = "global"
+addr = 0x76386c
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_station_filter"
+symbol = "sg_stationFilterState"
+kind = "global"
+addr = 0x763870
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_terrain"
+symbol = "g_terrain"
+kind = "global"
+addr = 0x739590
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_scan_fog"
+symbol = "Scanner::m_fog"
+kind = "global"
+addr = 0x738a54
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_scan_shroud"
+symbol = "Scanner::m_shroud"
+kind = "global"
+addr = 0x738a58
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_user_profile"
+symbol = "UserProfile"
+kind = "global"
+addr = 0x76b5ac
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_transport"
+symbol = "g_transport"
+kind = "global"
+addr = 0x76b8d4
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_view_record"
+symbol = "View_Record"
+kind = "global"
+addr = 0x76b610
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_object_list"
+symbol = "GameObject::objectList"
+kind = "global"
+addr = 0x761084
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_ghost_list"
+symbol = "Ghost::ghostList"
+kind = "global"
+addr = 0x736c94
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_overview_ptr"
+symbol = "g_pOverView"
+kind = "global"
+addr = 0x768e3c
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_palette_ptr"
+symbol = "g_pPopupPalette"
+kind = "global"
+addr = 0x763c00
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_command_alt"
+symbol = "g_pCommandAlt"
+kind = "global"
+addr = 0x761344
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_camera_manager"
+symbol = "gCameraManager"
+kind = "global"
+addr = 0x763370
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_tactical_snap"
+symbol = "cfgTACTICAL_SNAP_DISTANCE"
+kind = "global"
+addr = 0x6fcb48
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_tactical_camera"
+symbol = "gTacticalCamera"
+kind = "global"
+addr = 0x763650
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_shot_director"
+symbol = "shotDirector"
+kind = "global"
+addr = 0x763608
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_g_string"
+symbol = "g_string"
+kind = "global"
+addr = 0x7379fc
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_shot_director_vtable"
+symbol = "ShotDirector::vftable"
+kind = "vtable"
+addr = 0x6b4658
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_overview_vtable"
+symbol = "cOverViewImp::vftable"
+kind = "vtable"
+addr = 0x6b5ff4
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_palette_vtable"
+symbol = "PopupPaletteImp::vftable"
+kind = "vtable"
+addr = 0x6b4f84
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_td_game_object_class"
+symbol = "GameObjectClass (type descriptor)"
+kind = "rtti"
+addr = 0x6eee98
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_td_craft_class"
+symbol = "CraftClass (type descriptor)"
+kind = "rtti"
+addr = 0x6eee08
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_td_planet_class"
+symbol = "PlanetClass (type descriptor)"
+kind = "rtti"
+addr = 0x700c08
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_action_cursors"
+symbol = "SetCursorAiAction (the actions' cursor table)"
+kind = "global"
+addr = 0x70fbd8
+used_by = ["hud.radar_cursor"]
+
+[[sym]]
+id = "radar_to_square"
+symbol = "RadarComponent::ConvertWorldToSquareNormal"
+kind = "fn"
+addr = 0x4e8670
+check = "55 8b ec 8b 45 0c d9 40 08"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_to_world"
+symbol = "RadarComponent::ConvertSquareNormalToWorld"
+kind = "fn"
+addr = 0x4e86e0
+check = "55 8b ec 8b 45 0c d9 05"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_teams_visible"
+symbol = "Entity::GetTeamsVisibleToUser"
+kind = "fn"
+addr = 0x4d0070
+check = "8b 0d d4 b8 76 00"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_get_game_setup"
+symbol = "Transport::getGameSetup"
+kind = "fn"
+addr = 0x557940
+check = "8b 41 30 c3"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_is_fog"
+symbol = "GameSetup::isFog"
+kind = "fn"
+addr = 0x5462f0
+check = "8b 41 10 8a 80 af 00 00 00 c3"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_is_shroud"
+symbol = "GameSetup::isShroud"
+kind = "fn"
+addr = 0x546300
+check = "8b 41 10 8a 80 b0 00 00 00 c3"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_rt_dynamic_cast"
+symbol = "__RTDynamicCast"
+kind = "fn"
+addr = 0x6731a0
+check = "ff 25"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_is_ally"
+symbol = "Team::IsUnconfirmedAlly"
+kind = "fn"
+addr = 0x4971f0
+check = "55 8b ec 8b 55 08 56 33 c0"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_is_neutral"
+symbol = "Team::IsUnconfirmedNeutral"
+kind = "fn"
+addr = 0x497210
+check = "55 8b ec 8b 55 08 56 33 c0"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_is_enemy"
+symbol = "Team::IsUnconfirmedEnemy"
+kind = "fn"
+addr = 0x497230
+check = "55 8b ec 8b 55 08 56 33 c0"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_team_get"
+symbol = "Team::GetTeam"
+kind = "fn"
+addr = 0x496340
+check = "55 8b ec 8b 45 08"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_snap_to_nearest"
+symbol = "CameraManager::SnapToNearestVisible"
+kind = "fn"
+addr = 0x4de460
+check = "55 8b ec 83 ec 3c"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_next_ship_filter"
+symbol = "MapRadar::NextShipFilter"
+kind = "fn"
+addr = 0x4eb7c0
+check = "55 8b ec 6a ff 68 93 ee 69 00"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_next_station_filter"
+symbol = "MapRadar::NextStationFilter"
+kind = "fn"
+addr = 0x4eb930
+check = "55 8b ec 6a ff 68 a6 ee 69 00"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_screen_ray"
+symbol = "ST3D_Camera::ProjectScreenPointToWorldRay"
+kind = "fn"
+addr = 0x619140
+check = "55 8b ec 83 ec 34 d9 81 a8 01"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_localize"
+symbol = "Localized_Strings::Localize"
+kind = "fn"
+addr = 0x481c90
+check = "55 8b ec 83 ec 08 8b c1"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_get_action"
+symbol = "ActionMode::GetAction"
+kind = "fn"
+addr = 0x44ab70
+check = "55 8b ec 6a ff 68 a8 a8 69 00"
+used_by = ["hud.radar", "hud.radar_cursor"]
+
+[[sym]]
+id = "radar_set_cursor_action"
+symbol = "cOverViewImp::SetCursorAiAction"
+kind = "fn"
+addr = 0x526b60
+check = "55 8b ec 8b 45 08 8b c8 c1 e9 0e f6 c1 01 74 11"
+used_by = ["hud.radar_cursor"]
+
+[[sym]]
+id = "radar_get_where_cursor"
+symbol = "cOverViewImp::GetWhereCursor"
+kind = "fn"
+addr = 0x525150
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_broadcast_command"
+symbol = "PopupPaletteImp::BroadcastCommand"
+kind = "fn"
+addr = 0x4fdca0
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_cursor_table_a"
+symbol = "cOverViewImp::SetCursorAiAction"
+kind = "label"
+addr = 0x526b78
+in = "cOverViewImp::SetCursorAiAction"
+check = "8b 04 95 e8 fb 70 00"
+used_by = ["hud.radar_cursor"]
+
+[[sym]]
+id = "radar_cursor_table_b"
+symbol = "cOverViewImp::SetCursorAiAction"
+kind = "label"
+addr = 0x526b89
+in = "cOverViewImp::SetCursorAiAction"
+check = "8b 04 85 e4 fb 70 00"
+used_by = ["hud.radar_cursor"]
+
+[[sym]]
+id = "radar_site_teams_visible"
+symbol = "MapRadar::AlwaysGameSimulate"
+kind = "call"
+addr = 0x4eb3b2
+target = "radar_teams_visible"
+in = "MapRadar::AlwaysGameSimulate"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_slot_set_cursor_action"
+symbol = "cOverViewImp::SetCursorAiAction"
+kind = "slot"
+target = "radar_set_cursor_action"
+vtable = "radar_overview_vtable"
+index = 50
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_slot_where_cursor"
+symbol = "cOverViewImp::GetWhereCursor"
+kind = "slot"
+target = "radar_get_where_cursor"
+vtable = "radar_overview_vtable"
+index = 47
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_slot_broadcast"
+symbol = "PopupPaletteImp::BroadcastCommand"
+kind = "slot"
+target = "radar_broadcast_command"
+vtable = "radar_palette_vtable"
+index = 41
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_mr_radar"
+symbol = "MapRadar::radar component"
+kind = "field"
+struct = "MapRadar"
+offset = 0x28
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_mr_ship_button"
+symbol = "MapRadar::ship filter button"
+kind = "field"
+struct = "MapRadar"
+offset = 0x2c
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_mr_station_button"
+symbol = "MapRadar::station filter button"
+kind = "field"
+struct = "MapRadar"
+offset = 0x30
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_btn_sprite"
+symbol = "StandardButton::image sprite"
+kind = "field"
+struct = "StandardButton"
+offset = 0x2c
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_rc_background"
+symbol = "RadarComponent::background sprite"
+kind = "field"
+struct = "RadarComponent"
+offset = 0x3c
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_rc_marks"
+symbol = "RadarComponent::message marks"
+kind = "field"
+struct = "RadarComponent"
+offset = 0x4c
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_rc_side"
+symbol = "RadarComponent::square side"
+kind = "field"
+struct = "RadarComponent"
+offset = 0x5c
+type = "f32"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_sprite_texture"
+symbol = "ST3D_Sprite::texture"
+kind = "field"
+struct = "ST3D_Sprite"
+offset = 0x58
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_tex_w"
+symbol = "ST3D_Texture::width"
+kind = "field"
+struct = "ST3D_Texture"
+offset = 0x1c
+type = "u32"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_tex_h"
+symbol = "ST3D_Texture::height"
+kind = "field"
+struct = "ST3D_Texture"
+offset = 0x20
+type = "u32"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_tex_devices"
+symbol = "ST3D_Texture::per-device textures"
+kind = "field"
+struct = "ST3D_Texture"
+offset = 0x40
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_devtex_d3d8"
+symbol = "ST3D_DeviceTexture::IDirect3DTexture8"
+kind = "field"
+struct = "ST3D_DeviceTexture"
+offset = 0x4
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_s3d_device_index"
+symbol = "ST3D_GraphicsEngine::device index"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 0xc0
+type = "u32"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_s3d_camera"
+symbol = "ST3D_GraphicsEngine::current camera"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 0xfc
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_grid_cells"
+symbol = "ScanGrid::cells"
+kind = "field"
+struct = "ScanGrid"
+offset = 0x4
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_grid_w"
+symbol = "ScanGrid::width"
+kind = "field"
+struct = "ScanGrid"
+offset = 0xc
+type = "i32"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_grid_h"
+symbol = "ScanGrid::height"
+kind = "field"
+struct = "ScanGrid"
+offset = 0x10
+type = "i32"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_up_swapped"
+symbol = "UserProfile::mouse buttons swapped"
+kind = "field"
+struct = "UserProfile"
+offset = 0x24
+type = "u8"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_up_editor"
+symbol = "UserProfile::map editor"
+kind = "field"
+struct = "UserProfile"
+offset = 0x84
+type = "u8"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_obj_removed"
+symbol = "GameObject::being removed"
+kind = "field"
+struct = "GameObject"
+offset = 0x113
+type = "u8"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_obj_class"
+symbol = "GameObject::class"
+kind = "field"
+struct = "GameObject"
+offset = 0x40
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_obj_pos"
+symbol = "GameObject::position"
+kind = "field"
+struct = "GameObject"
+offset = 0xac
+type = "v3"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_obj_team"
+symbol = "GameObject::team"
+kind = "field"
+struct = "GameObject"
+offset = 0xec
+type = "i32"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_obj_selected"
+symbol = "GameObject::selected by the player"
+kind = "field"
+struct = "GameObject"
+offset = 0x10e
+type = "u8"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_vt_can_user_see"
+symbol = "GameObject::vtable CanUserSee"
+kind = "field"
+struct = "GameObject"
+offset = 0x8
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_cls_off_radar"
+symbol = "GameObjectClass::hidden from the radar"
+kind = "field"
+struct = "GameObjectClass"
+offset = 0x18c
+type = "u32"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_cls_radar_sprite"
+symbol = "GameObjectClass::radar sprite"
+kind = "field"
+struct = "GameObjectClass"
+offset = 0x190
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_cls_has_map_size"
+symbol = "GameObjectClass::has a map size"
+kind = "field"
+struct = "GameObjectClass"
+offset = 0x184
+type = "u8"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_cls_station"
+symbol = "CraftClass::is a station"
+kind = "field"
+struct = "CraftClass"
+offset = 0x20d
+type = "u8"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_vt_map_size"
+symbol = "GameObjectClass::vtable MapSize"
+kind = "field"
+struct = "GameObjectClass"
+offset = 0x24
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_vt_is_craft_class"
+symbol = "GameObjectClass::vtable IsCraftClass"
+kind = "field"
+struct = "GameObjectClass"
+offset = 0x28
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_spirit_class"
+symbol = "Spirit::class"
+kind = "field"
+struct = "Spirit"
+offset = 0x4
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_spirit_team"
+symbol = "Spirit::team"
+kind = "field"
+struct = "Spirit"
+offset = 0xc
+type = "i32"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_vt_spirit_pos"
+symbol = "Spirit::vtable position"
+kind = "field"
+struct = "Spirit"
+offset = 0x10
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_team_colour"
+symbol = "Team::colour"
+kind = "field"
+struct = "Team"
+offset = 0x14
+type = "v3"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_vt_select_num"
+symbol = "cOverViewImp::vtable selected count"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0x94
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_vt_where_cursor"
+symbol = "cOverViewImp::vtable GetWhereCursor"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0xbc
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_vt_set_cursor_action"
+symbol = "cOverViewImp::vtable SetCursorAiAction"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0xc8
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_vt_broadcast"
+symbol = "PopupPaletteImp::vtable BroadcastCommand"
+kind = "field"
+struct = "PopupPaletteImp"
+offset = 0xa4
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_vt_camera_move"
+symbol = "GameCamera::vtable move to a point"
+kind = "field"
+struct = "GameCamera"
+offset = 0x54
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_cam_near"
+symbol = "ST3D_Camera::near plane"
+kind = "field"
+struct = "ST3D_Camera"
+offset = 0x1a0
+type = "f32"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_cam_far"
+symbol = "ST3D_Camera::far plane"
+kind = "field"
+struct = "ST3D_Camera"
+offset = 0x1a4
+type = "f32"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_cam_viewport"
+symbol = "ST3D_Camera::viewport x y w h"
+kind = "field"
+struct = "ST3D_Camera"
+offset = 0x1b0
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_cam_pos"
+symbol = "ST3D_Camera::position"
+kind = "field"
+struct = "ST3D_Camera"
+offset = 0xe4
+type = "v3"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_tc_eye_x"
+symbol = "TacticalCamera::eye x"
+kind = "field"
+struct = "TacticalCamera"
+offset = 0x8c
+type = "f32"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_tc_eye_z"
+symbol = "TacticalCamera::eye z"
+kind = "field"
+struct = "TacticalCamera"
+offset = 0x94
+type = "f32"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_tc_centre_x"
+symbol = "TacticalCamera::centre x"
+kind = "field"
+struct = "TacticalCamera"
+offset = 0x98
+type = "f32"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_tc_centre_z"
+symbol = "TacticalCamera::centre z"
+kind = "field"
+struct = "TacticalCamera"
+offset = 0xa0
+type = "f32"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_sd_scenes"
+symbol = "ShotDirector::scene list"
+kind = "field"
+struct = "ShotDirector"
+offset = 0x28
+type = "ptr"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_scene_centre"
+symbol = "Scene::centre"
+kind = "field"
+struct = "Scene"
+offset = 0xc
+type = "v3"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_scene_radius"
+symbol = "Scene::radius"
+kind = "field"
+struct = "Scene"
+offset = 0x18
+type = "f32"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_mark_radius"
+symbol = "MessageMark::ring radius"
+kind = "field"
+struct = "MessageMark"
+offset = 0x1c
+type = "i32"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_mark_colour"
+symbol = "MessageMark::colour"
+kind = "field"
+struct = "MessageMark"
+offset = 0x20
+type = "v3"
+used_by = ["hud.radar"]
+
+[[sym]]
+id = "radar_ac_cursor"
+symbol = "ActionCursor::cursor sprite"
+kind = "field"
+struct = "ActionCursor"
+offset = 0xc
+type = "ptr"
+used_by = ["hud.radar_cursor"]
+
+[[sym]]
+id = "radar_ac_cannot"
+symbol = "ActionCursor::cannot cursor sprite"
+kind = "field"
+struct = "ActionCursor"
+offset = 0x10
+type = "ptr"
+used_by = ["hud.radar_cursor"]
+
+[[sym]]
+id = "radar_action_cursor_stride"
+symbol = "SetCursorAiAction: bytes per action in the cursor table"
+kind = "value"
+value = 20
+used_by = ["hud.radar_cursor"]
+
+[[sym]]
+id = "radar_action_cursors_n"
+symbol = "SetCursorAiAction: actions in the cursor table"
+kind = "value"
+value = 57
+used_by = ["hud.radar_cursor"]
+
+[[sym]]
+id = "radar_action_mask"
+symbol = "AiAction: the action number's bits"
+kind = "value"
+value = 4095
+used_by = ["hud.radar", "hud.radar_cursor"]
+
+[[sym]]
+id = "radar_action_move"
+symbol = "AiAction: a plain move"
+kind = "value"
+value = 4
+used_by = ["hud.radar", "hud.radar_cursor"]
+
+[[sym]]
+id = "radar_action_go_warp"
+symbol = "AiAction: GO_WARP"
+kind = "value"
+value = 43
+used_by = ["hud.radar", "hud.radar_cursor"]
+
+[[sym]]
+id = "radar_action_cannot"
+symbol = "AiAction: the cannot bit"
+kind = "value"
+value = 16384
+used_by = ["hud.radar", "hud.radar_cursor"]

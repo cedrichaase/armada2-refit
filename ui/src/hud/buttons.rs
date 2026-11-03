@@ -24,7 +24,7 @@ pub fn bottom() -> Option<f32> {
 }
 
 pub fn run(ui: &mut Ui) {
-    if crate::engine::hud::hidden(topbar::BUTTON_PANEL) {
+    if crate::engine::hud::hidden(topbar::button_panel()) {
         return;
     }
     let list: Vec<(Which, usize)> = ORDER

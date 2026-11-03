@@ -10,28 +10,27 @@
 //! the 1600 x 1200 space, from the panel's corner), its justification at `+0x68`, its
 //! text a `std::string` at `+0x84` (the characters' pointer at `+0x88`) and its colour
 //! at `+0x94`; `GetInformation` multiplies the colour by the fade.
-use super::{buttons, field, rd};
+use super::{buttons, field as peek, rd};
+use crate::syms_hud::{field, hook, sym, TABLE};
+
+fn eng() -> &'static a2engine::Engine {
+    TABLE.engine()
+}
 use alloc::string::String;
 use alloc::vec::Vec;
 
-/// `overlayText`, an instance.
-pub const OVERLAY: usize = 0x764488;
-/// `+0x28`: the map's head node. A node (MSVC 6's `_Tree`): left `+0`, parent `+4`,
-/// right `+8`, the key at `+0xc`, the `auto_ptr`'s pointer at `+0x14`; the shared
-/// sentinel is `_Nil`.
-const MAP_HEAD: usize = 0x28;
-const NIL: usize = 0x7644c4;
+/// `overlayText`, an instance (its address); 0 when the engine is not known.
+pub fn overlay() -> usize {
+    if eng().ready(hook::HUD_READS_OVERLAY_TEXT).is_ok() { eng().addr(sym::OTEXT_OVERLAY) } else { 0 }
+}
+
+// `+0x28`: the map's head node. A node (MSVC 6's `_Tree`): left `+0`, parent `+4`, right
+// `+8`, the key at `+0xc`, the `auto_ptr`'s pointer at `+0x14`; the shared sentinel is
+// `_Nil`. A message: its point at `+0x58`, its justification at `+0x68`, its text at
+// `+0x88`, its colour at `+0x94`, its fade at `+0xa0`.
 const NODE_LEFT: usize = 0x0;
 const NODE_PARENT: usize = 0x4;
 const NODE_RIGHT: usize = 0x8;
-const NODE_KEY: usize = 0xc;
-const NODE_VALUE: usize = 0x14;
-
-const T_POINT: usize = 0x58;
-const T_JUSTIFY: usize = 0x68;
-const T_TEXT: usize = 0x88;
-const T_COLOUR: usize = 0x94;
-const T_FADE: usize = 0xa0;
 
 pub struct Line {
     pub key: i32,
@@ -48,12 +47,16 @@ pub struct Line {
 /// The messages, in key order (the order they were added).
 pub fn lines() -> Vec<Line> {
     let mut v = Vec::new();
-    let nil = unsafe { rd::<usize>(NIL) };
-    let head = field(OVERLAY, MAP_HEAD);
+    let o = overlay();
+    if o == 0 {
+        return v;
+    }
+    let nil = unsafe { rd::<usize>(eng().addr(sym::OTEXT_NIL)) };
+    let head = peek(o, field::OTEXT_MAP_HEAD);
     if head == 0 || nil == 0 {
         return v;
     }
-    let root = field(head, NODE_PARENT);
+    let root = peek(head, NODE_PARENT);
     walk(root, nil, head, &mut v, 0);
     v
 }
@@ -62,19 +65,19 @@ fn walk(n: usize, nil: usize, head: usize, v: &mut Vec<Line>, depth: u32) {
     if n == 0 || n == nil || n == head || depth > 32 || v.len() >= 32 {
         return;
     }
-    walk(field(n, NODE_LEFT), nil, head, v, depth + 1);
-    let t = field(n, NODE_VALUE);
+    walk(peek(n, NODE_LEFT), nil, head, v, depth + 1);
+    let t = peek(n, field::OTEXT_NODE_VALUE);
     if t != 0 {
-        let (x, y): (i32, i32) = unsafe { (rd(t + T_POINT), rd(t + T_POINT + 4)) };
+        let (x, y): (i32, i32) = unsafe { (rd(t + field::OTEXT_POINT), rd(t + field::OTEXT_POINT + 4)) };
         v.push(Line {
-            key: unsafe { rd(n + NODE_KEY) },
+            key: unsafe { rd(n + field::OTEXT_NODE_KEY) },
             x,
             y,
-            justify: unsafe { rd(t + T_JUSTIFY) },
-            text: buttons::clean(&buttons::latin1(field(t, T_TEXT), 512)),
-            colour: unsafe { rd(t + T_COLOUR) },
-            fade: unsafe { rd::<f32>(t + T_FADE) }.clamp(0.0, 1.0),
+            justify: unsafe { rd(t + field::OTEXT_JUSTIFY) },
+            text: buttons::clean(&buttons::latin1(peek(t, field::OTEXT_TEXT), 512)),
+            colour: unsafe { rd(t + field::OTEXT_COLOUR) },
+            fade: unsafe { rd::<f32>(t + field::OTEXT_FADE) }.clamp(0.0, 1.0),
         });
     }
-    walk(field(n, NODE_RIGHT), nil, head, v, depth + 1);
+    walk(peek(n, NODE_RIGHT), nil, head, v, depth + 1);
 }

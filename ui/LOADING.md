@@ -132,6 +132,22 @@ the screen needs no asset of this project):
 `Tech Tree Computed`, a sprite's name), so the screen says it in the player's words by
 its first word or two (`src/loading.rs`, `doing`).
 
+## Hooks
+
+What `src/engine/loading.rs` reads of `Armada2.exe` is in the symbol profile
+`profiles/gog-1.1/ui.loading.toml`, generated into `src/syms_loading.rs`
+(`crates/a2engine/README.md`). Each hook is checked before anything is written, and
+stands down alone with a line `engine: <hook> stands down: <symbol> <why>`.
+
+| Hook | Entries | Without it |
+|---|---|---|
+| `ui.loading.overlay` | `LoadBarComputeFraction` (`fn`, its code checked), `ST3D_GraphicsEngine::DeleteRegisteredLights` and the call of it in `RenderLoopAssetLoadStatusUpdate` (patched: the UI is drawn in its place, with the scene still open), and the `EndScene` that follows (`label`, 3 bytes checked) | no UI over the engine's loading frame |
+| `ui.loading.own` (`Loading.Enable`) | `RenderLoopAssetLoadStatusUpdate` and `RenderLoop_Show_Splash_Screen` (`fn`, entry bytes checked), their calls in `LoadBarNext` and `Program::GameDoOne` (patched) | no screen of ours: the engine's frames only |
+| `ui.loading.inner_db` (`Loading.Enable`) | `ST3D_GraphicsEngine::LoadDatabase` and its three calls in `FindLogicalDatabase` (twice) and `FindVisibleDatabase` (patched) | no frame after a SOD inside a step |
+| `ui.loading.inner_pixels` (`Loading.Enable`) | `ST3D_Texture::LoadPixelData` and its call in `DemandLoad` (patched) | no frame after a texture inside a step |
+| `ui.loading.reads_progress` | `s_fractionRemaining` and `Armada_AssetLoadStatusVisible` (`global`, read) | no progress: the screen shows none |
+| `ui.loading.reads_pump` | `HandleMessageQueue` (`fn`, called) | `[Loading] Hold` (bench only) does not pump the queue |
+
 ## Seen on the bench
 
 `testbench/scenarios/ui-loading-pace.md` loads the first Federation mission from the

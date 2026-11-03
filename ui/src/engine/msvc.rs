@@ -6,34 +6,51 @@
 //! the engine's code expects. The object is the most-derived `basic_stringstream`:
 //! the engine's functions take it as `basic_stringstream &` and write into its
 //! `ostream` part themselves.
-use super::rd;
+use super::{eng, rd};
+use crate::syms_core::{hook, sym};
 use alloc::string::String;
 use alloc::vec::Vec;
 
-/// Import slots in `Armada2.exe`'s import table (each holds the function's address).
-/// `basic_stringstream::basic_stringstream(int mode)`: thiscall, the mode and then the
-/// hidden "construct the virtual base" flag (1), as the game calls it (`push 1; push 3`).
-const IMP_SS_CTOR: usize = 0x7b7c58;
-/// `basic_stringstream::str() const`: thiscall, returns a `std::string` through a
-/// pointer it is given.
-const IMP_SS_STR: usize = 0x7b7db0;
-/// `basic_stringstream`'s whole-object destructor (`??_D`, the virtual base included).
-const IMP_SS_DTOR: usize = 0x7b7ea8;
-/// `basic_string::~basic_string()`.
-const IMP_STR_DTOR: usize = 0x7b7dc0;
+// The import slots in `Armada2.exe`'s import table (each holds the function's address)
+// are the profile's (`ui.core.toml`, hook `core.reads_msvc`): `basic_stringstream::
+// basic_stringstream(int mode)`, thiscall, the mode and then the hidden "construct the
+// virtual base" flag (1), as the game calls it (`push 1; push 3`); `basic_stringstream::
+// str() const`, thiscall, returns a `std::string` through a pointer it is given;
+// `basic_stringstream`'s whole-object destructor (`??_D`, the virtual base included);
+// and `basic_string::~basic_string()`.
+
 /// `ios_base::in | ios_base::out`.
 const MODE_IN_OUT: i32 = 3;
 /// Room for the stream: the engine allocates 0x8c bytes for one; more is harmless.
 const STREAM_BYTES: usize = 0x100;
 
+/// The four imports' function addresses, or None when the hook is not ready or an
+/// import is not filled in.
+fn imports() -> Option<[usize; 4]> {
+    if eng().ready(hook::CORE_READS_MSVC).is_err() {
+        return None;
+    }
+    let slots = [sym::CORE_IMP_SS_CTOR, sym::CORE_IMP_SS_STR, sym::CORE_IMP_SS_DTOR, sym::CORE_IMP_STR_DTOR];
+    let mut f = [0usize; 4];
+    for (i, s) in slots.iter().enumerate() {
+        let a = eng().addr(*s);
+        f[i] = if a == 0 { 0 } else { unsafe { rd::<usize>(a) } };
+        if f[i] <= 0x10000 {
+            return None;
+        }
+    }
+    Some(f)
+}
+
 /// Runs `f` with a fresh `std::stringstream` and returns what it wrote, or None when
 /// it wrote nothing.
 pub fn with_stringstream(f: impl FnOnce(usize)) -> Option<String> {
+    let imp = imports()?;
     unsafe {
-        let ctor: unsafe extern "thiscall" fn(usize, i32, i32) -> usize = core::mem::transmute(rd::<usize>(IMP_SS_CTOR));
-        let str_: unsafe extern "thiscall" fn(usize, usize) -> usize = core::mem::transmute(rd::<usize>(IMP_SS_STR));
-        let dtor: unsafe extern "thiscall" fn(usize) = core::mem::transmute(rd::<usize>(IMP_SS_DTOR));
-        let sdtor: unsafe extern "thiscall" fn(usize) = core::mem::transmute(rd::<usize>(IMP_STR_DTOR));
+        let ctor: unsafe extern "thiscall" fn(usize, i32, i32) -> usize = core::mem::transmute(imp[0]);
+        let str_: unsafe extern "thiscall" fn(usize, usize) -> usize = core::mem::transmute(imp[1]);
+        let dtor: unsafe extern "thiscall" fn(usize) = core::mem::transmute(imp[2]);
+        let sdtor: unsafe extern "thiscall" fn(usize) = core::mem::transmute(imp[3]);
         // u32s, so the object is 4-aligned.
         let mut obj: Vec<u32> = alloc::vec![0; STREAM_BYTES / 4];
         let ss = obj.as_mut_ptr() as usize;
@@ -67,7 +84,8 @@ pub unsafe fn stream_text(ss: usize) -> Option<String> {
     if ss == 0 {
         return None;
     }
-    let str_: unsafe extern "thiscall" fn(usize, usize) -> usize = unsafe { core::mem::transmute(rd::<usize>(IMP_SS_STR)) };
+    let imp = imports()?;
+    let str_: unsafe extern "thiscall" fn(usize, usize) -> usize = unsafe { core::mem::transmute(imp[1]) };
     with_string(|sp| unsafe {
         str_(ss, sp);
     })
@@ -76,8 +94,9 @@ pub unsafe fn stream_text(ss: usize) -> Option<String> {
 /// Runs `f` with an empty `std::string` (all zero, as its default constructor leaves
 /// it), returns what `f` left in it, and frees it.
 pub fn with_string(f: impl FnOnce(usize)) -> Option<String> {
+    let imp = imports()?;
     unsafe {
-        let sdtor: unsafe extern "thiscall" fn(usize) = core::mem::transmute(rd::<usize>(IMP_STR_DTOR));
+        let sdtor: unsafe extern "thiscall" fn(usize) = core::mem::transmute(imp[3]);
         let mut s = [0u32; 4];
         let sp = s.as_mut_ptr() as usize;
         f(sp);
@@ -95,5 +114,5 @@ pub fn with_string(f: impl FnOnce(usize)) -> Option<String> {
 /// The imports are filled in by the loader; each must point into `msvcp60.dll`, not at
 /// nothing.
 pub fn available() -> bool {
-    [IMP_SS_CTOR, IMP_SS_STR, IMP_SS_DTOR, IMP_STR_DTOR].iter().all(|&a| unsafe { rd::<usize>(a) } > 0x10000)
+    imports().is_some()
 }
