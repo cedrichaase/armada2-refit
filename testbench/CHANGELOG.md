@@ -5,6 +5,13 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.97.1 — 2026-11-03
+
+### Fixed
+- `engine-syms` waits a fixed 60 seconds after the launch instead of for the `passthrough: the engine's first draw` line: a wait reads only lines written after the last action, and the line was already written by the time the launch step returned.
+
+Installed, not yet seen in game
+
 ## 3.97.0 — 2026-11-03
 
 ### Added

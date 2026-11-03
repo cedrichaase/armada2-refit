@@ -16,7 +16,7 @@ appends its plugin's section and touches no other.
 
 ## Mission
 1. Launch the game.
-2. Wait up to 300 seconds for "Display8.log" to say "passthrough: the engine's first draw".
+2. Wait 60 seconds.
 3. Wait 20 seconds.
 4. Take a screenshot called "mission".
 5. Check that the screenshot shows a Star Trek: Armada II mission (its HUD around the map view; with no scene staged the 3D view may be empty), not a black or garbled screen.

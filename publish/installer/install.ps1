@@ -370,6 +370,10 @@ function Copy-Into([string]$src, [string]$dst) {
     }
 }
 
+# A2EngineTest.ini is the bench's fault injection (crates/a2engine/README.md); no package
+# ships it, and a stray one would stand hooks down: taken out, in every case.
+Remove-Item -LiteralPath (G "A2EngineTest.ini") -ErrorAction SilentlyContinue
+
 Step prereqs "prerequisites"
 Say "prerequisites:"
 foreach ($line in Get-Content -LiteralPath (Join-Path $here "prereqs.txt")) {

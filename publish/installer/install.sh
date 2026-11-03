@@ -323,6 +323,10 @@ prereq() {   # name|version|author|licence|page|files
     echo "      from $page"
 }
 
+# A2EngineTest.ini is the bench's fault injection (crates/a2engine/README.md); no package
+# ships it, and a stray one would stand hooks down: taken out, in every case.
+rm -f "$game/A2EngineTest.ini"
+
 step prereqs "prerequisites"
 echo "prerequisites:"
 while IFS= read -r line || [ -n "$line" ]; do

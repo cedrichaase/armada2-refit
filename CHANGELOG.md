@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.81.1 — 2026-11-03
+
+Layers: testbench 3.97.1.
+
+### Fixed
+- The release installers (`publish/installer/install.sh`, `install.ps1`) delete `A2EngineTest.ini` from the game directory after verifying the package, as `./install` does.
+- `engine-syms` no longer waits for a log line that was written before the wait began (testbench 3.97.1).
+
+Installed, not yet seen in game
+
 ## 13.81.0 — 2026-11-03
 
 Layers: display 0.17.0, testbench 3.97.0.
