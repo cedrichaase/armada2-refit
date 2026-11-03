@@ -5,6 +5,13 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.98.1 — 2026-11-03
+
+### Fixed
+- `engine-mismatch-cplugins` is no longer pending: its TEST-line step matches the log's ", " separator, and its frame step allows rmse 2.5 (the minimap's view-frustum lines differ while QOL's `view_distance` stands down; nothing else does).
+
+Installed, not yet seen in game
+
 ## 3.98.0 — 2026-11-03
 
 ### Added

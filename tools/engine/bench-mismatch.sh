@@ -14,7 +14,7 @@
 #   display    display.modes                (engine-mismatch: Display8 forwards)
 #   radar      ui.hud.radar                 (the stock minimap; the Refit row's note)
 #   hulls      render3d.hulls.*             (render3d's hull module; pending phase 8e)
-#   cplugins   qol.*,qolrules.*,online.*    (the C plugins; pending phase 8d)
+#   cplugins   qol.*,qolrules.*,online.*    (the C plugins)
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

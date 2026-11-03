@@ -5,6 +5,15 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.86.1 — 2026-11-03
+
+Layers: testbench 3.98.1.
+
+### Fixed
+- Integration of phase 8: `engine-mismatch-cplugins` un-pended (see `testbench/CHANGELOG.md`).
+
+Installed, not yet seen in game
+
 ## 13.86.0 — 2026-11-03
 
 Layers: testbench 3.98.0.
