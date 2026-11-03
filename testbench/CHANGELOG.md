@@ -5,6 +5,16 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.105.0 — 2026-11-03
+
+### Added
+- Frozen baselines in `$A2_DATA/baselines` (assets, never in git), recorded on round-e 4084eb4 at 1280x720: `p10-fwd-display-passthrough`, `-all`, `-nebula` (the forward chain), `p10-vk-` of those three plus `port-showcase`, `port-nebula`, `port-firing`, `ui-hud-bar`, `ui-menus-scene` (the GPU's Vulkan stub), and `p10-d12-port-showcase`, `-port-nebula`, `-port-firing` (Direct3D 12, every module on).
+
+### Changed
+- `display-passthrough` and `display-passthrough-nebula` compare against `p10-vk-*` (RMSE 0) and, the nebula, against `p10-fwd-display-passthrough-nebula` (RMSE 1.5) instead of a live forward run; `display-passthrough-d3d12` compares against `p10-vk-display-passthrough` (RMSE 1.0). The three `*-forward` scenarios are marked "reference recorder; phase 11 deletes", and `display-passthrough-nebula-forward` no longer records a baseline on every run. `display-passthrough-all` documents that the live mission is not repeatable (no whole-frame step). `port-showcase` names the frozen references; the lavapipe sentence of the README and "Baselines" point at `p10-vk-*` in place of `pre-gpu-*`.
+
+Installed, not yet seen in game.
+
 ## 3.104.0 — 2026-11-03
 
 ### Added

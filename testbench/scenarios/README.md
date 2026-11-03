@@ -203,8 +203,18 @@ Frames kept in `$A2_DATA/baselines/<B>/` and compared pixel for pixel
 
 A missing baseline, or a baseline without that shot, fails the step and names the step
 or command that records it. A baseline holds one size of frame: a scenario run at
-several resolutions needs a baseline per resolution (`"pre-gpu-720"`), or the
+several resolutions needs a baseline per resolution (`"p10-vk-port-showcase-720"`), or the
 comparison fails on the size.
+
+**Frozen baselines of phase 10** (`$A2_DATA/baselines`, never in git; provenance in each
+`meta.json`): `p10-fwd-<scenario>` is the forward chain on the GPU (`display-passthrough`,
+`-all`, `-nebula`; recorded by the `*-forward` scenarios, which are reference recorders and
+are deleted with forward mode in phase 11); `p10-vk-<scenario>` is the GPU's Vulkan stub
+(those three plus `port-showcase`, `port-nebula`, `port-firing`, `ui-hud-bar`,
+`ui-menus-scene`) and the gate after every package, RMSE 0; `p10-d12-<scenario>` is
+Direct3D 12 with every module on (`port-showcase`, `port-nebula`, `port-firing`). They
+replaced the live forward runs and `pre-gpu-*`. A variant is made with `display/stub-scenario.sh
+<scenario> stub Backend=vulkan|d3d12`; re-record only with `--force`, on purpose.
 
 ## Judged and delegated steps
 

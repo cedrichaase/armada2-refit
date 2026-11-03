@@ -6,6 +6,8 @@ Clock: bench
 Setup: display/bench-mode.sh forward render3d/bench-ini.sh Modules:effects=0 Modules:ordnance=0 Modules:specials=0 Modules:sky=0 Modules:overlays=0 Modules:particles=0 Modules:hulls=0 Modules:world=0
 Timeout: 15 min
 
+**Reference recorder; phase 11 deletes it** (with forward mode). Its frames are frozen as the baseline `p10-fwd-display-passthrough-all` (phase 10 X4, recorded from run 20261103-124333) and nothing compares against a live run of it any more; to re-record, `./a2test baseline record p10-fwd-display-passthrough-all --from <this run's case> --force`.
+
 Run with `--install .`. `display-passthrough-all`'s mission with Display8 in forward
 mode: every one of render3d's eight modules off, so the engine draws the whole scene
 through the real chain. What `display-passthrough-all` is compared against (its text

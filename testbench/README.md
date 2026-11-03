@@ -669,7 +669,7 @@ adds `Validate=1`), so errors are caught before they can hang the GPU. Flags of
 (`VK_DRIVER_FILES`, `VK_ICD_FILENAMES`, `Device=llvmpipe`); `--no-validate` (or
 `A2TEST_VULKAN_VALIDATE=0`) drops the layer, for timing runs. Keep 1280x720 and stop
 sessions promptly: a GPU hang has crashed the desktop. Judge a lavapipe run against a baseline taken
-on the GPU (`pre-gpu-*`), not against `Backend=d3d9` on lavapipe: DXVK on lavapipe
+on the GPU (`p10-vk-*`, which replaced `pre-gpu-*`), not against `Backend=d3d9` on lavapipe: DXVK on lavapipe
 draws the port scenes visibly differently from DXVK on the GPU (`port-nebula` at RMSE
 25.8, `port-firing` 7.0), while render3d on Vulkan on lavapipe is within 1 to 2 of the
 GPU's (`gpu/README.md`, "Measured"). A whole campaign mission does not load on

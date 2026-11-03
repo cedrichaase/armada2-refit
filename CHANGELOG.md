@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 14.14.0 — 2026-11-03
+
+Layers: testbench 3.105.0.
+
+### Added
+- Frozen `p10-fwd-*`, `p10-vk-*` and `p10-d12-*` baselines in `$A2_DATA/baselines` (phase 10 X4), so phase 11 can delete forward mode, the d3d9 path and the legacy plugins; the passthrough scenarios compare against them (testbench 3.105.0).
+
+Pre-release: Direct3D 12 passthrough confirmed on Linux only, not yet on native Windows.
+Installed, not yet seen in game.
+
 ## 14.13.0 — 2026-11-03
 
 Layers: display 0.21.0, renderer 2.0.2.
