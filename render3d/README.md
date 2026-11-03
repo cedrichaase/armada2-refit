@@ -823,6 +823,49 @@ not switched on. The frame's own hooks (the two seams of `Armada_RenderAllOurStu
 `DestroyRenderSurfaces` and the device's `Reset`) are the core's, behind a gate that is
 always open (`Enable=0` installs none).
 
+**The engine profile** (`profiles/gog-1.1/render3d.toml` for the core and frame,
+`render3d.<module>.toml` for each module; `tools/engine/README.md`, `crates/a2engine/README.md`).
+No address of `Armada2.exe` is in the sources: each is a `sym::` entry of a generated
+`syms.rs` (the core's in `core/src/`, a module's in its crate, so a module's symbols leave
+with it in a subset build), read with `at(sym::X)` (0 unless the hook that uses it is
+ready). `Hooks::ready(&TABLE, hook::X)` checks a hook's entries in live memory before the
+owner writes or reads anything, and logs `engine: <hook> stands down: <symbol> <why>`; a
+`Site` comes from `Site::of(&TABLE, sym::X)`. A module's `hooks()` readies its
+`<module>.reads` first and calls `h.stand_down` when it is not ready, so the engine draws
+that part as stock; its note reaches the Refit screen through the row `Modules.<module>`
+(`Render3D_SettingsNote`). On an unknown `Armada2.exe`, or when `core.reads` or
+`frame.seam` is not ready, render3d stands down whole. Engine reads live in
+`core/src/engine/**` and each module's `hooks.rs` (`lint-layers.sh`, rule 1, strict).
+Render3D.log names the executable (`engine: <identity>`), the build and
+`engine: <part> symbols: N/M resolved`. Hook ids (`render3d.<id>`), what each gates and the
+finding it rests on:
+
+| Hook | Gates | Finding |
+|---|---|---|
+| `render3d.core.reads` | the engine state every module shares: the object, light and feature lists, instances, sprites, sound, team and game-setup reads | the renderer stands down whole if these are not stock |
+| `render3d.frame.seam` | `Armada_RenderAllOurStuff`, called from `Armada_RenderFrame` and `CinematicView::RenderView`, both re-pointed at the renderer's body | "How the frame works" |
+| `render3d.frame.steps` | the calls inside the stock body that the frame's steps replace one by one | "How the frame works"; not ready: the stock body runs whole |
+| `render3d.frame.destroy` | `DestroyRenderSurfaces` chained, so render3d lets go of the device before the engine does | native Direct3D 9 keeps a device alive while anything made on it is held |
+| `render3d.hulls.reads` | the hulls module: class `Render` / `RenderInternal` functions and vtables, the fade, culling and wave-light reads and calls | hulls draws in `GameObject::Render`'s place and installs no hook; not ready: the engine draws the hulls |
+| `render3d.sky.reads` | the sky module: the background name, database, starfield, far planes, `GameObject::Render` and the plain database vtable | the sky takes `Step::Background`; not ready: the engine's sky |
+| `render3d.specials.reads` | the special-weapon effect list and the `Render` functions and vtables of the timed effects | only the timed effects draw; others go back to the engine |
+| `render3d.particles.reads` | the particles module's object, ordnance, nebula and freighter reads and calls | plain reads |
+| `render3d.particles.particle` | `ST3D_DeviceDirectX8::RenderParticle` (device vtable slot 50) | the engine's draw of an owned object's particles would double ours; required |
+| `render3d.particles.billboard` | the call of `ST3D_Instance::RenderSpriteNodeEffect` in `GameObject::RenderInternal` | skipped while one of our views runs; optional |
+| `render3d.effects.reads` | the effects module's list walks, vtables and calls, and the `RenderChunks` call site | the walks of the old Explosions, Shields and Repair plugins |
+| `render3d.effects.repair` | the `AddParticle` call in `Craft::RepairSystem` and the `DrawScaled3D` call in `NodeParticleEffect::Render` | the new tail of the particle list is a weld |
+| `render3d.effects.shields` | the weapons' calls of `CreateShieldHit` | records which weapon made a hit and its damage |
+| `render3d.effects.debris` | the `Fragment` calls in `Craft::Explode`, the Evolver's cocoon and `BuildingEffect::SafeDestroyConstruction` | the faces are drawn as our own debris; all or none |
+| `render3d.ordnance.reads` | the ordnance module's `Entity` calls, list head, vtables and each stock `Submit` | a shot's class is told by its `Submit` |
+| `render3d.ordnance.warp` | the `DrawScaled3D` call in `WarpSpriteEffect::Render` and the body's `RenderWarpSpriteEffects` call | notes stock's warp flash for ours; optional |
+| `render3d.ordnance.shots` | `Entity::Render`, slot 11 of an ordnance vtable, taken per class when first met | the profile holds the `Render` check; required for the per-class slots |
+| `render3d.overlays.reads` | the overlays module: terrain, fog and shroud grids, profile flags, game-setup, selection and team calls, the ghost list, the tactical camera | plain reads |
+| `render3d.overlays.posts` | the five calls of `DrawHeightPost` | handed back to the engine while the gate is shut; not ready: the engine's posts |
+| `render3d.world.reads` | the world module's vtables, nebula and ghost lists, population tables, culling distance and name table | plain reads |
+| `render3d.world.lights` | the call of `Nebula::Simulate_Nebula_Lights` in `Nebula::Simulate` | the nebulae's lights become ours; optional |
+| `render3d.world.cull` | `NebulaInstance` vtable slot 3, `FrustumTest` | the nebulae's cull; optional |
+| `render3d.world.ghosts` | `GameObjectSpirit` vtable slot 3, `Render` | hides a fogged nebula's billboards; optional |
+
 **Services** (`core/src/services.rs`): `HullDraw` (hulls: `draw_instance`,
 `draws_plain_sod`, `placeholder`, `shadow_map`), `WaveDraw` (ordnance's shockwave),
 `PostDraw` (overlays' height posts) and `GhostDraw` (world's planet ghost). A consumer

@@ -113,9 +113,23 @@ else:
 # (b) one checked entry per plugin file
 games = profs.load_game_sets()
 n = 0
-for t in profs.tables(games):
+all_tables = list(profs.tables(games))
+
+
+def other_addrs(t):
+    # addresses entries of the plugin's other files hold (render3d's modules share some)
+    out = set()
+    for u in all_tables:
+        if u is not t and u.plugin == t.plugin:
+            out |= {x['addr'] for x in u.builds[0]['entries'] if x and x.get('addr')}
+    return out
+
+
+for t in all_tables:
+    shared = other_addrs(t)
     k = next((k for k, i in enumerate(t.sym_ids)
               if t.defs[i].get('kind') in ('fn', 'label', 'patch') and t.defs[i].get('check')
+              and t.builds[0]['entries'][k] and t.builds[0]['entries'][k].get('addr') not in shared
               and t.builds[0]['entries'][k] and t.builds[0]['entries'][k].get('addr')), None)
     if k is None:
         print(f'skip (b) {t.file.rel()}: no entry with a check')
