@@ -51,7 +51,7 @@ appends its plugin's section and touches no other.
 ## BinkProxy
 29. Expect "BinkProxy.log" contains "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321".
 30. Expect "BinkProxy.log" contains "engine: build armada2/gog-1.1".
-31. Expect "BinkProxy.log" contains "engine: symbols: 6/6 resolved; 0 hooks blocked".
+31. Expect "BinkProxy.log" contains "engine: symbols: 4/4 resolved; 0 hooks blocked".
 32. Expect "BinkProxy.log" not contains "stands down: ".
 33. Expect "BinkProxy.log" not contains "read before its hook".
 34. Expect "BinkProxy.log" not contains "engine: TEST:".

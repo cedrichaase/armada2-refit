@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.4 — 2026-11-03
+
+Layers: testbench 4.0.5.
+
+### Fixed
+- `engine-syms` expects BinkProxy's `symbols: 4/4 resolved`, not 6/6: the `binkproxy.intro_mode` hook and its two scans went in cutscenes 3.0.0. Installed, not yet seen in game.
+
 ## 15.6.3 — 2026-11-03
 
 Layers: testbench 4.0.4.
