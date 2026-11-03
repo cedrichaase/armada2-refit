@@ -18,7 +18,7 @@
 //! for the shots we do not draw ourselves.
 use super::Ordnance;
 use r3d_core::hooks::{Gate, Hook, Hooks, Kind, Prev, Site};
-use r3d_core::engine::{field, field_f32, field_u8, hook, rd, storm3d, vtable};
+use r3d_core::engine::{field, field_f32, field_u8, hook as ehook, rd, storm3d, vtable};
 use r3d_core::frame::steps::View;
 use r3d_core::math::{M34, V3};
 use alloc::vec::Vec;
@@ -47,7 +47,7 @@ pub(crate) fn sub_srt() -> usize { at(sym::SUB_SRT) } // ShieldRemovingTorpedo
 pub(crate) fn sub_chain() -> usize { at(sym::SUB_CHAIN) } // ChainPulsar: its sprite, and its emitter node's Render
 
 // The warp flash: the call to ST3D_Sprite::DrawScaled3D in WarpSpriteEffect::Render.
-use crate::syms::{hook as hk, sym, TABLE};
+use crate::syms::{hook, sym, TABLE};
 
 /// An engine address of the profile: 0 unless the hook that uses it is ready.
 pub(crate) fn at(s: a2engine::Sym) -> usize { TABLE.engine().addr(s) }
@@ -209,19 +209,19 @@ unsafe extern "thiscall" fn ord_render(ord: usize, cam: usize) {
 /// per-class slots are taken when a class is first met (`take_class_slot`), through the
 /// same registry handle, which is kept here.
 pub fn install(h: &mut Hooks) {
-    if !h.ready(&TABLE, hk::ORDNANCE_READS) {
+    if !h.ready(&TABLE, hook::ORDNANCE_READS) {
         h.stand_down("the engine's reads are not stock");
         return;
     }
     unsafe {
         GATE = Some(h.gate());
         HOOKS = Some(Hooks::for_module(h.owner(), "ordnance", h.gate()));
-        SHOTS_OK = h.ready(&TABLE, hk::ORDNANCE_SHOTS);
+        SHOTS_OK = h.ready(&TABLE, hook::ORDNANCE_SHOTS);
     }
     let owner = h.owner();
     #[allow(static_mut_refs)]
     let Some(hooks) = (unsafe { HOOKS.as_mut() }) else { return };
-    if !h.ready(&TABLE, hk::ORDNANCE_WARP) {
+    if !h.ready(&TABLE, hook::ORDNANCE_WARP) {
         crate::log!("ordnance: the warp flash's site is not stock's, the engine draws it");
         return;
     }
@@ -281,7 +281,7 @@ pub fn take_class_slot(ord: usize) -> bool {
 /// plugin's chained onto it); the effects it moves and removes are noted by the hook.
 pub fn run_warp(cam: usize) {
     unsafe {
-        let f: unsafe extern "C" fn(usize) = core::mem::transmute(hook::call_target(site_warp()).unwrap_or(fn_warp()));
+        let f: unsafe extern "C" fn(usize) = core::mem::transmute(ehook::call_target(site_warp()).unwrap_or(fn_warp()));
         f(cam);
     }
 }
