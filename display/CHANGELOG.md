@@ -12,7 +12,7 @@ in [`README.md`](README.md).
   `tools/settings/README.md`), with a `settings: RefitPlayer.ini [...]` line in
   Display8.log for each value it supplies. Without the file nothing changes.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 0.15.2 — 2026-10-30
 

@@ -265,6 +265,23 @@ overlay, `[HUD] BarHidden`. When it exists and the overlay has no `[UI.HUD] BarH
 a non-zero value is set there; then the file is renamed `UIPlayer.ini.migrated`, and one
 line is logged (`settings: UIPlayer.ini migrated to RefitPlayer.ini [UI.HUD] (...)`).
 
+## `<Plugin>_SettingsNote` (C5 amendment)
+
+`const char *__cdecl <Plugin>_SettingsNote(const A2Setting *row)` (C), or
+`#[unsafe(no_mangle)] pub extern "C" fn <Plugin>_SettingsNote(row: *const Setting) -> *const u8`
+(Rust), is optional and exported next to `_SettingsChanged`; A2SET_ABI stays 1.0, since
+the row layout does not change. `row == NULL` asks about the plugin as a whole; otherwise
+`row` is a pointer into that plugin's own table, as `_Settings` returned it, so it may be
+compared by address with the plugin's row constants. It returns NULL when there is
+nothing to say, else a static NUL-terminated ASCII string of at most 120 characters,
+valid until the next call. The meaning is always "this part is not running now, and
+why"; the choice is still stored and applies when the part runs. The hub calls it on the
+game thread when the Refit screen opens and once a second while it is open, so it must be
+cheap and must not write. The hub finds it with `GetProcAddress` beside
+`_SettingsChanged` (`NoteFn` in `crates/a2rt/src/settings.rs`, `A2SettingsNoteFn` in
+`csdk/a2asi.h`, both outside the generated parts). In round C UI and Render3D export it;
+QOL, QOLRules, Online and BinkProxy get theirs with the symbol profiles of Phase 8.
+
 ## On the bench
 
 A scenario sets overlay keys before launch with

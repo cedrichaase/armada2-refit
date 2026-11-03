@@ -235,7 +235,7 @@ pub static SETTINGS: [Setting; 19] = [
         apply: APPLY_RESTART,
         scope: SCOPE_LOCAL,
         tab: TAB_INTERFACE,
-        flags: 0,
+        flags: FLAG_ADVANCED,
         file: c"UI.ini".as_ptr(),
         section: c"Menus".as_ptr(),
         key: c"Enable".as_ptr(),
@@ -243,7 +243,7 @@ pub static SETTINGS: [Setting; 19] = [
         values: core::ptr::null(),
         value_labels: core::ptr::null(),
         label: c"Redrawn menus".as_ptr(),
-        help: c"The shell's menus hosted and drawn by the UI. Off gives the game's menus back.".as_ptr(),
+        help: c"The shell's menus hosted and drawn by the UI, and this screen with them. Off gives the game's menus back.".as_ptr(),
     },
     Setting {
         size: ROW_SIZE,

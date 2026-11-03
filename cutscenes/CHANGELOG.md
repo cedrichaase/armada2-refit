@@ -12,7 +12,7 @@ Details are in [`binkproxy/README.md`](binkproxy/README.md).
   `BinkProxy_Settings` export, LIVE) read again at each movie open; `BinkProxy_SettingsChanged`
   is exported for the UI's hub.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 2.4.0 — 2026-10-30
 

@@ -11,7 +11,7 @@ and versions". Newest first. Details are in [`README.md`](README.md).
   (`[Online.Online]`). `Entry` is a settings row (`settings.toml`, the `Online_Settings`
   export, RESTART, tab Multiplayer).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 0.8.0 — 2026-10-30
 

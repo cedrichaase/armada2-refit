@@ -825,6 +825,31 @@ pub fn badge(ui: &mut Ui, r: R, s: &str, off: bool) {
     ui.text_in(r, s, t.micro_size, Align::Centre, col, Weight::Bold);
 }
 
+/// A status badge on a settings row (the Refit screen): a small plate with a word on it,
+/// "Now", "Restart needed", "Must match". `st.on` draws it active (a change waiting to
+/// apply), `st.off` dimmed. Its width for a word is `status_badge_w`. (`badge` above is
+/// the HUD bar's key letter.)
+pub fn status_badge(ui: &mut Ui, r: R, s: &str, st: State) {
+    let t = ui.theme;
+    let c = if t.form == Form::Lcars { Corners::pill(r) } else { t.px(ui, t.small) };
+    let (fill, edge, col) = if st.off {
+        (fade(t.track, 0.5), fade(t.button_edge, 0.4), t.text_off)
+    } else if st.on {
+        (fade(t.accent, 0.85), t.accent, t.text_on)
+    } else {
+        (fade(t.track, 0.9), fade(t.button_edge, 0.8), t.text_dim)
+    };
+    ui.draw.fill(r, c, fill);
+    ui.draw.stroke(r, c, hair(ui), edge);
+    ui.text_in(r, s, t.micro_size, Align::Centre, col, Weight::Bold);
+}
+
+/// The width a status badge for `s` takes.
+pub fn status_badge_w(ui: &Ui, s: &str) -> f32 {
+    let (w, _) = crate::text::measure_with(crate::text::font_bold(), s, ui.u(ui.theme.micro_size));
+    w + ui.u(ui.theme.pad)
+}
+
 /// A heading inside a panel.
 pub fn heading(ui: &mut Ui, r: R, s: &str) {
     let t = ui.theme;

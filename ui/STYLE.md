@@ -159,6 +159,11 @@ Each is one function in `theme.rs`, given its rectangle and a `State` (hover eas
 - **Tooltip** (`theme::tooltip`): small text on `tip` with a hairline `tip_edge` and a
   shadow; LCARS black with a lavender cap.
 - **Separator**, **heading**, **dropdown arrow**: as their names say.
+- **Status badge** (`theme::status_badge`, width `status_badge_w`): a small plate with
+  one word on it in `micro_size`, bold, from tokens only (`track`, `button_edge`,
+  `text_dim`; active in `accent` with `text_on`; dimmed with `text_off`). It states a
+  fact about a row of the Refit screen (Now, Restart needed, Must match, Locked); not
+  to be confused with `theme::badge`, the HUD bar's key letter.
 
 ## Screens
 
@@ -189,6 +194,12 @@ Each is one function in `theme.rs`, given its rectangle and a `State` (hover eas
   presented between the engine's 5% steps. The engine's logo scene and bar are covered,
   so the widened `logo.SOD` is not needed for it. With `Enable=0` the engine's screen
   stays, and `[Demo] Style=1` still shows the earlier band over it.
+- **The Refit screen** (`menus/refit.rs`, MENUS.md) is a modal over the Options dialog in
+  the menus' theme (`Theme::for_context(Context::Menus)`, so a live `UI.Theme` restyles
+  it): a tab strip, a page of rows in one or two columns (label over its badges at the
+  left, the control at the right, a dot at the left edge when the overlay holds the key),
+  a help strip two lines tall, a banner in `warn` when a restart is pending, and a foot
+  (Reset tab, Show advanced, Done).
 - **The HUD** takes the player's race's theme. Its panels are anchored to the screen
   edges (`Anchor`) at any aspect, translucent, the 3D view showing through.
 
