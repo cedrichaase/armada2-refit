@@ -36,6 +36,7 @@ use crate::log;
 use crate::rt::win::{CloseHandle, CreateEventA, GetProcAddress, LoadLibraryA, WaitForSingleObject, HANDLE};
 use alloc::vec::Vec;
 use core::ffi::c_void;
+use core::sync::atomic::{AtomicU32, Ordering};
 use gpu::display::{Dx12Alloc8, Dx12Descriptors8, Dx12Device8, Dx12Frame8, Dx12Image8};
 use raw::*;
 
@@ -131,6 +132,8 @@ pub struct Dx {
     lost: bool,
 }
 
+/// Frames `abandon` ended without presenting them, for the log.
+static ABANDONED: AtomicU32 = AtomicU32::new(0);
 static mut DX: Option<Dx> = None;
 
 #[allow(static_mut_refs)]
@@ -814,7 +817,8 @@ impl Dx {
     }
 
     /// The engine's `Present`: the last pass into the swap chain's buffer, then submit
-    /// and present. False: the device is gone.
+    /// and present. False: the device is gone; a frame that could not be presented is
+    /// ended unshown and still returns true.
     pub fn present(&mut self) -> bool {
         if self.lost {
             return false;
@@ -835,6 +839,13 @@ impl Dx {
                 self.ramp.state = STATE_SHADER_RESOURCE;
             }
         }
+        // Everything that can fail comes before the frame's last pass is recorded, and a
+        // frame that cannot be presented is still ended (`abandon`): a frame left open
+        // never resets its ring or descriptors, and every frame after it fails the same way.
+        let quad: [f32; 16] = [-1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, -1.0, -1.0, 0.0, 1.0, 1.0, -1.0, 1.0, 1.0];
+        let (Some(va), Some(table)) = (self.alloc(64, 16), self.descriptors(gpu::display::HEAP_CBV_SRV_UAV, 2)) else {
+            return self.abandon("no room in the upload ring or the descriptor heap");
+        };
         let l = self.list();
         let bb = vcall!(self.swap, slot::SWAP_GET_CURRENT_BACK_BUFFER_INDEX, fn() -> u32,) as usize % self.sc_buffers.len();
         let target = self.sc_buffers[bb];
@@ -842,10 +853,6 @@ impl Dx {
         let color = self.color.res;
         self.barrier(color, ALL_SUBRESOURCES, STATE_RENDER_TARGET, STATE_PIXEL_SHADER_RESOURCE);
         self.barrier(target, ALL_SUBRESOURCES, STATE_PRESENT, STATE_RENDER_TARGET);
-        let quad: [f32; 16] = [-1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, -1.0, -1.0, 0.0, 1.0, 1.0, -1.0, 1.0, 1.0];
-        let (Some(va), Some(table)) = (self.alloc(64, 16), self.descriptors(gpu::display::HEAP_CBV_SRV_UAV, 2)) else {
-            return false;
-        };
         unsafe { core::ptr::copy_nonoverlapping(quad.as_ptr() as *const u8, va.cpu, 64) };
         vcall!(self.dev, slot::DEV_COPY_DESCRIPTORS_SIMPLE, fn(u32, usize, usize, u32) -> (), 1, table.cpu, self.color.srv, DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
         vcall!(self.dev, slot::DEV_COPY_DESCRIPTORS_SIMPLE, fn(u32, usize, usize, u32) -> (), 1, table.cpu + self.inc[0] as usize, self.ramp.srv, DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -865,22 +872,7 @@ impl Dx {
         vcall!(l, slot::LIST_DRAW_INSTANCED, fn(u32, u32, u32, u32) -> (), 4, 1, 0, 0);
         self.barrier(target, ALL_SUBRESOURCES, STATE_RENDER_TARGET, STATE_PRESENT);
         self.barrier(color, ALL_SUBRESOURCES, STATE_PIXEL_SHADER_RESOURCE, STATE_RENDER_TARGET);
-        let hr = vcall!(l, slot::LIST_CLOSE, fn() -> i32,);
-        if hr < 0 {
-            log!("d3d12: the frame's command list did not close: {:#x}", hr as u32);
-        }
-        let lists = [l];
-        vcall!(self.queue, slot::QUEUE_EXECUTE_COMMAND_LISTS, fn(u32, *const P) -> (), 1, lists.as_ptr());
-        let hr = vcall!(self.swap, slot::SWAP_PRESENT, fn(u32, u32) -> i32, self.sync_interval, 0);
-        self.fence_value += 1;
-        vcall!(self.queue, slot::QUEUE_SIGNAL, fn(P, u64) -> i32, self.fence, self.fence_value);
-        self.slots[self.slot].done = self.fence_value;
-        self.recording = false;
-        self.slot = (self.slot + 1) % SLOTS;
-        self.index += 1;
-        if self.index % cache::EVERY == 0 {
-            self.lib_saved = cache::save(self.lib, &self.lib_id, self.lib_saved);
-        }
+        let hr = self.end_frame(true);
         if hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET {
             let why = vcall!(self.dev, slot::DEV_GET_DEVICE_REMOVED_REASON, fn() -> i32,);
             log!("d3d12: the device is gone ({:#x}, reason {:#x}); nothing is drawn from here", hr as u32, why as u32);
@@ -893,6 +885,42 @@ impl Dx {
             log!("d3d12: frame {} presented", self.index);
         }
         true
+    }
+
+    /// Ends a frame that cannot be presented: its commands are executed without a
+    /// `Present` and its fence is signalled, so the next frame begins on the next slot
+    /// with its ring and descriptors reset. The frame is lost, the device is fine, so
+    /// this returns true: the game goes on drawing.
+    fn abandon(&mut self, why: &str) -> bool {
+        let n = ABANDONED.fetch_add(1, Ordering::Relaxed) + 1;
+        if n <= 8 || n % 600 == 0 {
+            log!("d3d12: frame {} not presented ({}); {} so far", self.index, why, n);
+        }
+        self.end_frame(false);
+        true
+    }
+
+    /// Closes and executes the slot's list, presents it when `show`, signals the fence
+    /// for the slot and moves on to the next slot. Returns `Present`'s result (0 unshown).
+    fn end_frame(&mut self, show: bool) -> i32 {
+        let l = self.list();
+        let hr = vcall!(l, slot::LIST_CLOSE, fn() -> i32,);
+        if hr < 0 {
+            log!("d3d12: the frame's command list did not close: {:#x}", hr as u32);
+        }
+        let lists = [l];
+        vcall!(self.queue, slot::QUEUE_EXECUTE_COMMAND_LISTS, fn(u32, *const P) -> (), 1, lists.as_ptr());
+        let hr = if show { vcall!(self.swap, slot::SWAP_PRESENT, fn(u32, u32) -> i32, self.sync_interval, 0) } else { 0 };
+        self.fence_value += 1;
+        vcall!(self.queue, slot::QUEUE_SIGNAL, fn(P, u64) -> i32, self.fence, self.fence_value);
+        self.slots[self.slot].done = self.fence_value;
+        self.recording = false;
+        self.slot = (self.slot + 1) % SLOTS;
+        self.index += 1;
+        if self.index % cache::EVERY == 0 {
+            self.lib_saved = cache::save(self.lib, &self.lib_id, self.lib_saved);
+        }
+        hr
     }
 
     /// Submits what the frame now has recorded, waits for it, and opens the same list

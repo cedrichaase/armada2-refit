@@ -4,6 +4,18 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 1.0.3 — 2026-11-03
+
+### Fixed
+- Vulkan: a spent descriptor pool no longer freezes the picture (PR #23 by bmh129, ported from 0.15.3 and 0.15.4 onto the 1.0 code). A frame that could not be presented was left open, so its pool was never reset and every later frame failed the same way, ending in `vulkan: no swap chain image (TIMEOUT)`. The present pass takes its two sets from a pool of its own per slot (`Slot::ppool`), everything that can fail comes before the image is acquired, and a frame that still cannot be presented is ended unshown (`Vk::abandon`, logged as `vulkan: frame N not presented (...)`).
+- An abandoned frame returns true (the frame is dropped, the device is fine): it was `D3DERR_DEVICELOST`, and the stub's `Reset` rebuilt every plugin over one skipped frame.
+- Vulkan: `Vk::end_frame` ends a frame for `present` and `abandon` alike. A failed `vkEndCommandBuffer` leaves the fence alone and submits nothing; a failed `vkQueueSubmit` gives the slot a fresh signalled fence; `abandon` saves the pipeline cache every `cache::EVERY` frames as `present` does.
+- Vulkan: the frame pool's `COMBINED_IMAGE_SAMPLER` count is 65536, so its 16384 sets cover 4096 of gpu's 16-sampler texture sets (it was 2048).
+- Direct3D 12: the present pass's upload ring and descriptors come before the barriers, and a frame that cannot get them is ended unshown (`Dx12::abandon`, logged as `d3d12: frame N not presented (...)`), where it stayed open and froze every later frame.
+- Built on `gpu` 2.0.1.
+
+Installed, not yet seen in game.
+
 ## 1.0.2 — 2026-11-03
 
 ### Fixed
