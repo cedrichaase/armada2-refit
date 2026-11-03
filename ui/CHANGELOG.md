@@ -4,6 +4,13 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 2.2.2 — 2026-11-03
+
+### Fixed
+- Built on `gpu` 2.0.1 (PR #23 by bmh129 and its review): on Vulkan a frame that spends Display8's descriptor pool goes on in pools of gpu's own instead of dropping its draws; a frame that found the pool spent goes straight to gpu's own pools, and the chain grows only on a spent or fragmented pool. The spent-pool log line names the Vulkan error.
+
+Installed, not yet seen in game.
+
 ## 2.2.0 — 2026-11-03
 
 ### Added

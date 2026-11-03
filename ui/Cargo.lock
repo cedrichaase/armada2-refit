@@ -69,7 +69,7 @@ dependencies = [
 
 [[package]]
 name = "gpu"
-version = "2.0.0"
+version = "2.0.1"
 dependencies = [
  "ash",
 ]
@@ -138,7 +138,7 @@ dependencies = [
 
 [[package]]
 name = "ui"
-version = "2.1.0"
+version = "2.2.2"
 dependencies = [
  "a2engine",
  "a2fmt",

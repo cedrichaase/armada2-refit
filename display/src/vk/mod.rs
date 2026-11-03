@@ -27,9 +27,12 @@ use crate::shaders::present_spv::{PS_GAMMA_SPV, VS_PRESENT_SPV};
 use alloc::vec::Vec;
 use ash::vk;
 use core::ffi::c_void;
+use core::sync::atomic::{AtomicU32, Ordering};
 use gpu::display::{VkAlloc8, VkDevice8, VkFrame8, VkImage8};
 
 const SLOTS: usize = 2;
+/// Frames `abandon` ended without presenting them, for the log.
+static ABANDONED: AtomicU32 = AtomicU32::new(0);
 const CHUNK: u64 = 4 << 20;
 /// A mirror's upload past this many bytes goes through a staging buffer of its own
 /// (`upload_levels`), not the ring.
@@ -60,6 +63,9 @@ struct Slot {
     cmd: vk::CommandBuffer,
     fence: vk::Fence,
     dpool: vk::DescriptorPool,
+    /// The present pass's own two sets, apart from the plugins' `dpool`: a frame that
+    /// spends `dpool` must still reach the swap chain, or it is never ended (`present`).
+    ppool: vk::DescriptorPool,
     acquired: vk::Semaphore,
     chunks: Vec<Chunk>,
     /// (chunk, offset) of the next free byte.
@@ -493,6 +499,7 @@ impl Vk {
                 }
                 self.dev.destroy_semaphore(s.acquired, None);
                 self.dev.destroy_descriptor_pool(s.dpool, None);
+                self.dev.destroy_descriptor_pool(s.ppool, None);
                 self.dev.destroy_fence(s.fence, None);
                 self.dev.destroy_command_pool(s.pool, None);
             }
@@ -790,12 +797,18 @@ impl Vk {
         let sizes = [
             vk::DescriptorPoolSize { ty: vk::DescriptorType::UNIFORM_BUFFER, descriptor_count: 16384 },
             vk::DescriptorPoolSize { ty: vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC, descriptor_count: 4096 },
-            vk::DescriptorPoolSize { ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER, descriptor_count: 32768 },
+            vk::DescriptorPoolSize { ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER, descriptor_count: 65536 }, // 16 per gpu texture set (SLOTS bindings): 4096 sets; past that gpu's own chain takes over
         ];
         let dpool = unsafe { self.dev.create_descriptor_pool(&vk::DescriptorPoolCreateInfo::default().max_sets(16384).pool_sizes(&sizes), None) }
             .map_err(|_| "descriptor pool")?;
+        let psizes = [
+            vk::DescriptorPoolSize { ty: vk::DescriptorType::UNIFORM_BUFFER, descriptor_count: 1 },
+            vk::DescriptorPoolSize { ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER, descriptor_count: 2 },
+        ];
+        let ppool = unsafe { self.dev.create_descriptor_pool(&vk::DescriptorPoolCreateInfo::default().max_sets(2).pool_sizes(&psizes), None) }
+            .map_err(|_| "descriptor pool")?;
         let acquired = unsafe { self.dev.create_semaphore(&vk::SemaphoreCreateInfo::default(), None) }.map_err(|_| "semaphore")?;
-        let mut s = Slot { pool, cmd, fence, dpool, acquired, chunks: Vec::new(), at: (0, 0), deferred: Vec::new() };
+        let mut s = Slot { pool, cmd, fence, dpool, ppool, acquired, chunks: Vec::new(), at: (0, 0), deferred: Vec::new() };
         s.chunks.push(self.chunk(CHUNK)?);
         Ok(s)
     }
@@ -844,6 +857,7 @@ impl Vk {
         unsafe {
             let _ = self.dev.reset_command_pool(s.pool, vk::CommandPoolResetFlags::empty());
             let _ = self.dev.reset_descriptor_pool(s.dpool, vk::DescriptorPoolResetFlags::empty());
+            let _ = self.dev.reset_descriptor_pool(s.ppool, vk::DescriptorPoolResetFlags::empty());
             let _ = self.dev.begin_command_buffer(s.cmd, &vk::CommandBufferBeginInfo::default().flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT));
         }
         s.at = (0, 0);
@@ -1120,17 +1134,31 @@ impl Vk {
         }
         let s = self.slot;
         let acquired = self.slots[s].acquired;
+        // Everything that can fail comes before the swap chain's image is acquired, and a
+        // frame that cannot be presented is still ended (`abandon`): a frame left open
+        // never resets its pools, and every frame after it fails the same way.
+        let quad: [f32; 16] = [-1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, -1.0, -1.0, 0.0, 1.0, 1.0, -1.0, 1.0, 1.0];
+        let shift = [0f32; 4];
+        let ua = self.uniform_align;
+        let (Some(va), Some(ub)) = (self.alloc(64, 16), self.alloc(16, ua)) else { return self.abandon("no room in the upload ring") };
+        unsafe {
+            core::ptr::copy_nonoverlapping(quad.as_ptr() as *const u8, va.cpu, 64);
+            core::ptr::copy_nonoverlapping(shift.as_ptr() as *const u8, ub.cpu, 16);
+        }
+        let ppool = self.slots[s].ppool;
+        let sets = unsafe { self.dev.allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo::default().descriptor_pool(ppool).set_layouts(&self.dsl)) };
+        let Ok(sets) = sets else { return self.abandon("no descriptor sets for the present pass") };
         let image = match unsafe { self.swap_fn.acquire_next_image(self.swapchain, 5_000_000_000, acquired, vk::Fence::null()) } {
             Ok((i, _)) => i,
             Err(e) => {
                 log!("vulkan: no swap chain image ({:?}); the swap chain is made again", e);
                 let _ = unsafe { self.dev.device_wait_idle() };
                 if self.make_swapchain().is_err() {
-                    return false;
+                    return self.abandon("the swap chain could not be made again");
                 }
                 match unsafe { self.swap_fn.acquire_next_image(self.swapchain, 5_000_000_000, acquired, vk::Fence::null()) } {
                     Ok((i, _)) => i,
-                    Err(_) => return false,
+                    Err(_) => return self.abandon("still no swap chain image"),
                 }
             }
         };
@@ -1138,17 +1166,6 @@ impl Vk {
         let cmd = self.cmd();
         let color = self.color.image;
         self.barrier(color, vk::ImageAspectFlags::COLOR, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
-        let quad: [f32; 16] = [-1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, -1.0, -1.0, 0.0, 1.0, 1.0, -1.0, 1.0, 1.0];
-        let shift = [0f32; 4];
-        let ua = self.uniform_align;
-        let (Some(va), Some(ub)) = (self.alloc(64, 16), self.alloc(16, ua)) else { return false };
-        unsafe {
-            core::ptr::copy_nonoverlapping(quad.as_ptr() as *const u8, va.cpu, 64);
-            core::ptr::copy_nonoverlapping(shift.as_ptr() as *const u8, ub.cpu, 16);
-        }
-        let dpool = self.slots[s].dpool;
-        let sets = unsafe { self.dev.allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo::default().descriptor_pool(dpool).set_layouts(&self.dsl)) };
-        let Ok(sets) = sets else { return false };
         let bi = [vk::DescriptorBufferInfo { buffer: vk::Handle::from_raw(ub.buffer), offset: ub.offset as u64, range: 16 }];
         let ii0 = [vk::DescriptorImageInfo { sampler: self.sampler, image_view: self.color.view, image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL }];
         let ii1 = [vk::DescriptorImageInfo { sampler: self.sampler, image_view: self.ramp.view, image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL }];
@@ -1175,28 +1192,72 @@ impl Vk {
         }
         self.barrier(color, vk::ImageAspectFlags::COLOR, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
         let done = self.sc_done[image as usize];
-        let fence = self.slots[s].fence;
-        unsafe {
-            let _ = self.dev.end_command_buffer(cmd);
-            let _ = self.dev.reset_fences(&[fence]);
-            let waits = [acquired];
-            let stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
-            let cmds = [cmd];
-            let signals = [done];
-            let submit = [vk::SubmitInfo::default().wait_semaphores(&waits).wait_dst_stage_mask(&stages).command_buffers(&cmds).signal_semaphores(&signals)];
-            if self.dev.queue_submit(self.queue, &submit, fence).is_err() {
-                log!("vulkan: vkQueueSubmit failed");
-            }
+        let submitted = self.end_frame(Some((acquired, done)));
+        if submitted {
             let scs = [self.swapchain];
             let idx = [image];
+            let signals = [done];
             let pi = vk::PresentInfoKHR::default().wait_semaphores(&signals).swapchains(&scs).image_indices(&idx);
-            match self.swap_fn.queue_present(self.queue, &pi) {
+            match unsafe { self.swap_fn.queue_present(self.queue, &pi) } {
                 Ok(false) => {}
-                Ok(true) | Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+                Ok(true) | Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => unsafe {
                     let _ = self.dev.device_wait_idle();
                     let _ = self.make_swapchain();
-                }
+                },
                 Err(e) => log!("vulkan: vkQueuePresentKHR: {:?}", e),
+            }
+        }
+        true
+    }
+
+    /// Ends a frame that cannot reach the swap chain: its commands are submitted with no
+    /// semaphore (no image was acquired), so its fence signals, and the next frame begins
+    /// on the next slot with its pools reset. The frame is lost, the device is fine, so
+    /// this returns true: the game goes on drawing.
+    fn abandon(&mut self, why: &str) -> bool {
+        let n = ABANDONED.fetch_add(1, Ordering::Relaxed) + 1;
+        if n <= 8 || n % 600 == 0 {
+            log!("vulkan: frame {} not presented ({}); {} so far", self.index, why, n);
+        }
+        self.end_frame(None);
+        true
+    }
+
+    /// Ends the frame recorded in the slot and moves on to the next: closes the command
+    /// buffer and submits it (waiting on and signalling `sems` = (acquired, done) when
+    /// the frame is to be shown). `begin` waits on the slot's fence for ever, so the
+    /// fence is reset only when a submit is about to follow, and a failed submit gives
+    /// the slot a fresh signalled one. Returns whether the frame was submitted.
+    fn end_frame(&mut self, sems: Option<(vk::Semaphore, vk::Semaphore)>) -> bool {
+        let s = &self.slots[self.slot];
+        let (cmd, fence) = (s.cmd, s.fence);
+        let mut submitted = false;
+        unsafe {
+            if self.dev.end_command_buffer(cmd).is_err() {
+                log!("vulkan: vkEndCommandBuffer failed");
+            } else {
+                let _ = self.dev.reset_fences(&[fence]);
+                let cmds = [cmd];
+                let (waits, stages, signals);
+                let mut submit = vk::SubmitInfo::default().command_buffers(&cmds);
+                if let Some((acquired, done)) = sems {
+                    waits = [acquired];
+                    stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
+                    signals = [done];
+                    submit = submit.wait_semaphores(&waits).wait_dst_stage_mask(&stages).signal_semaphores(&signals);
+                }
+                match self.dev.queue_submit(self.queue, &[submit], fence) {
+                    Ok(()) => submitted = true,
+                    Err(e) => {
+                        log!("vulkan: vkQueueSubmit failed ({:?})", e);
+                        // The fence was reset and nothing will signal it; the failed submit
+                        // left it unused, so a signalled one takes its place.
+                        if let Ok(f) = self.dev.create_fence(&vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED), None) {
+                            self.dev.destroy_fence(fence, None);
+                            self.slots[self.slot].fence = f;
+                        }
+                    }
+                }
             }
         }
         self.recording = false;
@@ -1205,7 +1266,7 @@ impl Vk {
         if self.index % cache::EVERY == 0 {
             self.cache_saved = cache::save(&self.dev, self.cache, self.cache_saved);
         }
-        true
+        submitted
     }
 
     /// Submits what the frame has recorded and waits for it, then begins its command
