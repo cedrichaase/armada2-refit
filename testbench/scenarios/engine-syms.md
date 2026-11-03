@@ -68,7 +68,7 @@ appends its plugin's section and touches no other.
 ## QOL
 42. Expect "QOL.log" contains "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321".
 43. Expect "QOL.log" contains "engine: build armada2/gog-1.1".
-44. Expect "QOL.log" contains "engine: symbols: 133/133 resolved; 0 hooks blocked".
+44. Expect "QOL.log" contains "engine: symbols: 130/130 resolved; 0 hooks blocked".
 45. Expect "QOL.log" not contains "stands down: ".
 46. Expect "QOL.log" not contains "read before its hook".
 47. Expect "QOL.log" not contains "engine: TEST:".
@@ -84,7 +84,7 @@ appends its plugin's section and touches no other.
 ## Render3D
 54. Expect "Render3D.log" contains "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321".
 55. Expect "Render3D.log" contains "engine: build armada2/gog-1.1".
-56. Expect "Render3D.log" contains "engine: symbols: 72/72 resolved; 0 hooks blocked".
+56. Expect "Render3D.log" contains "engine: symbols: 75/75 resolved; 0 hooks blocked".
 57. Expect "Render3D.log" contains "engine: world symbols: 26/26 resolved; 0 hooks blocked".
 58. Expect "Render3D.log" contains "engine: particles symbols: 14/14 resolved; 0 hooks blocked".
 59. Expect "Render3D.log" contains "engine: hulls symbols: 34/34 resolved; 0 hooks blocked".

@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 14.4.0 — 2026-11-03
+
+Layers: render3d 0.46.0, qol 2.2.0, testbench 3.103.0.
+
+### Changed
+- View distance moves from QOL to render3d (`View.Distance`, W-VIEW); see the layers' changelogs. Installed, not yet seen in game.
+
 ## 14.3.0 — 2026-11-03
 
 Layers: gui-installer 2.5.0, testbench 3.102.0.

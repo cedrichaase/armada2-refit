@@ -8,6 +8,7 @@ pub mod obj;
 pub mod sound;
 pub mod sprite;
 pub mod view;
+pub mod viewdist;
 pub use view::{slot, entity_handle};
 
 use crate::math::{M34, V3};

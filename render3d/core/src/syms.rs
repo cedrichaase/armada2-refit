@@ -74,6 +74,9 @@ pub mod sym {
     pub const SIM_TIME: a2engine::Sym = a2engine::Sym(69);
     pub const SITE_SEAM_FRAME: a2engine::Sym = a2engine::Sym(70);
     pub const SITE_SEAM_VIEW: a2engine::Sym = a2engine::Sym(71);
+    pub const VIEW_SITE: a2engine::Sym = a2engine::Sym(72);
+    pub const VIEW_FAR_PLANE: a2engine::Sym = a2engine::Sym(73);
+    pub const VIEW_CULL_DIST: a2engine::Sym = a2engine::Sym(74);
 }
 
 pub mod hook {
@@ -81,6 +84,7 @@ pub mod hook {
     pub const FRAME_SEAM: a2engine::HookId = a2engine::HookId(1);
     pub const FRAME_STEPS: a2engine::HookId = a2engine::HookId(2);
     pub const FRAME_DESTROY: a2engine::HookId = a2engine::HookId(3);
+    pub const VIEW_DISTANCE: a2engine::HookId = a2engine::HookId(4);
 }
 
 pub mod field {
@@ -162,6 +166,9 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "sim_time", symbol: "(unnamed) simulation time, seconds", kind: a2engine::Kind::Global },
     a2engine::SymDef { id: "site_seam_frame", symbol: "Armada_RenderFrame", kind: a2engine::Kind::Call },
     a2engine::SymDef { id: "site_seam_view", symbol: "CinematicView::RenderView", kind: a2engine::Kind::Call },
+    a2engine::SymDef { id: "view_site", symbol: "RTS_Configure", kind: a2engine::Kind::Patch },
+    a2engine::SymDef { id: "view_far_plane", symbol: "FAR_CLIPPING_PLANE", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "view_cull_dist", symbol: "cfgOBJECT_CULLING_DISTANCE", kind: a2engine::Kind::Global },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
@@ -169,6 +176,7 @@ pub const HOOKS: &[a2engine::HookDef] = &[
     a2engine::HookDef { id: "render3d.frame.seam", run_unknown: false, rows: &[], syms: &[15, 70, 71] },
     a2engine::HookDef { id: "render3d.frame.steps", run_unknown: false, rows: &[], syms: &[1, 2, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 35, 37, 38, 39, 49, 50, 55, 56, 57] },
     a2engine::HookDef { id: "render3d.frame.destroy", run_unknown: false, rows: &[], syms: &[34, 46] },
+    a2engine::HookDef { id: "render3d.view.distance", run_unknown: false, rows: &["View.Distance"], syms: &[72, 73, 74] },
 ];
 
 pub const BUILDS: &[a2engine::Build] = &[
@@ -179,7 +187,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 72,
+        n_resolved: 75,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x45fc50, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x8a, 0xad], mask: &[], section: "", count: 0, value: 0 }, // sound2d
@@ -254,16 +262,19 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x7b0fc8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // sim_time
             a2engine::Entry { present: true, addr: 0x59886e, end: 0x0, target: 0xf, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_seam_frame
             a2engine::Entry { present: true, addr: 0x4e60f6, end: 0x0, target: 0xf, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_seam_view
+            a2engine::Entry { present: true, addr: 0x491bef, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x0d, 0xc0, 0xca, 0x6f, 0x00, 0x89, 0x15, 0xfc, 0x3c, 0x77, 0x00, 0x8d, 0x55, 0xf0, 0x89, 0x0d, 0xc4, 0xca, 0x6f, 0x00], mask: &[], section: "", count: 0, value: 0 }, // view_site
+            a2engine::Entry { present: true, addr: 0x6fcab0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // view_far_plane
+            a2engine::Entry { present: true, addr: 0x6fcac0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // view_cull_dist
         ],
         blocked: &[
         ],
     },
 ];
 
-static HOOK_STATE: [core::sync::atomic::AtomicU64; 4] = [const { core::sync::atomic::AtomicU64::new(0) }; 4];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 72] = [const { core::sync::atomic::AtomicU8::new(0) }; 72];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 72] = [const { core::sync::atomic::AtomicUsize::new(0) }; 72];
-static NOTES: [a2engine::Note; 4] = [const { a2engine::Note::new() }; 4];
+static HOOK_STATE: [core::sync::atomic::AtomicU64; 5] = [const { core::sync::atomic::AtomicU64::new(0) }; 5];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 75] = [const { core::sync::atomic::AtomicU8::new(0) }; 75];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 75] = [const { core::sync::atomic::AtomicUsize::new(0) }; 75];
+static NOTES: [a2engine::Note; 5] = [const { a2engine::Note::new() }; 5];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 
 pub static TABLE: a2engine::Table = a2engine::Table {

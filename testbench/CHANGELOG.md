@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.103.0 — 2026-11-03
+
+### Added
+- `render3d-view-distance`: the log of `View.Distance`'s patch and the live overlay change (W-VIEW). Installed, not yet seen in game.
+
+### Changed
+- `qol-settings-live` no longer flips `ViewDistance` (moved to render3d). Installed, not yet seen in game.
+
 ## 3.102.0 — 2026-11-03
 
 ### Added

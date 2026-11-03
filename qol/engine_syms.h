@@ -5,92 +5,89 @@
 
 #define QOL_S_PAN_SITE 0
 #define QOL_S_FASTSCROLL 1
-#define QOL_S_VIEW_SITE 2
-#define QOL_S_FAR_PLANE 3
-#define QOL_S_CULL_DIST 4
-#define QOL_S_GROUP_BIND 5
-#define QOL_S_GROUP_FOCUS 6
-#define QOL_S_CMD_CONTROL 7
-#define QOL_S_CMD_SHIFT 8
-#define QOL_S_CMD_ALT 9
-#define QOL_S_BIND_GROUP 10
-#define QOL_S_GROUP_CTRL_HELD 11
-#define QOL_S_GROUP_SELECT 12
-#define QOL_S_GROUP_DONE 13
-#define QOL_S_OVERVIEW 14
-#define QOL_S_SEL_00 15
-#define QOL_S_SEL_01 16
-#define QOL_S_SEL_02 17
-#define QOL_S_SEL_03 18
-#define QOL_S_SEL_04 19
-#define QOL_S_SEL_05 20
-#define QOL_S_SEL_06 21
-#define QOL_S_SEL_07 22
-#define QOL_S_SEL_08 23
-#define QOL_S_SEL_09 24
-#define QOL_S_SEL_10 25
-#define QOL_S_SEL_11 26
-#define QOL_S_SEL_12 27
-#define QOL_S_SEL_13 28
-#define QOL_S_SEL_14 29
-#define QOL_S_SEL_15 30
-#define QOL_S_SEL_16 31
-#define QOL_S_SEL_17 32
-#define QOL_S_SEL_18 33
-#define QOL_S_SEL_19 34
-#define QOL_S_SEL_20 35
-#define QOL_S_SEL_21 36
-#define QOL_S_SEL_22 37
-#define QOL_S_SEL_23 38
-#define QOL_S_SEL_24 39
-#define QOL_S_SEL_25 40
-#define QOL_S_SEL_26 41
-#define QOL_S_SEL_27 42
-#define QOL_S_SEL_28 43
-#define QOL_S_SEL_29 44
-#define QOL_S_SEL_30 45
-#define QOL_S_CAP_0 46
-#define QOL_S_CAP_1 47
-#define QOL_S_CAP_2 48
-#define QOL_S_SPEC_0 49
-#define QOL_S_SPEC_1 50
-#define QOL_S_SPEC_2 51
-#define QOL_S_SPEC_3 52
-#define QOL_S_SPEC_4 53
-#define QOL_S_SPEC_CONT_READ 54
-#define QOL_S_SPEC_CONT_FILL 55
-#define QOL_S_SPEC_CONT_QUEUE 56
-#define QOL_S_STN_SEL 57
-#define QOL_S_STN_FOCUS 58
-#define QOL_S_STN_ENABLE 59
-#define QOL_S_STN_ROUTE 60
-#define QOL_S_STN_CANCEL 61
-#define QOL_S_STN_BUILT 62
-#define QOL_S_STN_QSIZE 63
-#define QOL_S_SEL_CONT_SELECT 64
-#define QOL_S_SEL_CONT_TAKE 65
-#define QOL_S_SEL_CONT_STOCK 66
-#define QOL_S_BIND_CONT 67
-#define QOL_S_FOCUS_CONT 68
-#define QOL_S_CANCEL_CONT 69
-#define QOL_S_CANCEL_SKIP 70
-#define QOL_S_ENABLE_CONT 71
-#define QOL_S_ROUTE_CONT 72
-#define QOL_S_QUEUE_SIZE 73
-#define QOL_S_QUEUE_COMMAND 74
-#define QOL_S_SET_SELECTED 75
-#define QOL_S_REMOVE_SHIP 76
-#define QOL_S_ENTITY_GET 77
-#define QOL_S_USER_TEAM 78
-#define QOL_S_DYN_CAST 79
-#define QOL_S_RTTI_GOCLASS 80
-#define QOL_S_RTTI_CRAFTCLASS 81
-#define QOL_S_WARP_SITE 82
-#define QOL_S_WARP_CONT 83
-#define QOL_S_ALLOW_WARP 84
-#define QOL_S_TRANSPORT 85
-#define QOL_S_GET_SETUP 86
-#define QOL_S_SETUP_ALLOWS_WARP 87
+#define QOL_S_GROUP_BIND 2
+#define QOL_S_GROUP_FOCUS 3
+#define QOL_S_CMD_CONTROL 4
+#define QOL_S_CMD_SHIFT 5
+#define QOL_S_CMD_ALT 6
+#define QOL_S_BIND_GROUP 7
+#define QOL_S_GROUP_CTRL_HELD 8
+#define QOL_S_GROUP_SELECT 9
+#define QOL_S_GROUP_DONE 10
+#define QOL_S_OVERVIEW 11
+#define QOL_S_SEL_00 12
+#define QOL_S_SEL_01 13
+#define QOL_S_SEL_02 14
+#define QOL_S_SEL_03 15
+#define QOL_S_SEL_04 16
+#define QOL_S_SEL_05 17
+#define QOL_S_SEL_06 18
+#define QOL_S_SEL_07 19
+#define QOL_S_SEL_08 20
+#define QOL_S_SEL_09 21
+#define QOL_S_SEL_10 22
+#define QOL_S_SEL_11 23
+#define QOL_S_SEL_12 24
+#define QOL_S_SEL_13 25
+#define QOL_S_SEL_14 26
+#define QOL_S_SEL_15 27
+#define QOL_S_SEL_16 28
+#define QOL_S_SEL_17 29
+#define QOL_S_SEL_18 30
+#define QOL_S_SEL_19 31
+#define QOL_S_SEL_20 32
+#define QOL_S_SEL_21 33
+#define QOL_S_SEL_22 34
+#define QOL_S_SEL_23 35
+#define QOL_S_SEL_24 36
+#define QOL_S_SEL_25 37
+#define QOL_S_SEL_26 38
+#define QOL_S_SEL_27 39
+#define QOL_S_SEL_28 40
+#define QOL_S_SEL_29 41
+#define QOL_S_SEL_30 42
+#define QOL_S_CAP_0 43
+#define QOL_S_CAP_1 44
+#define QOL_S_CAP_2 45
+#define QOL_S_SPEC_0 46
+#define QOL_S_SPEC_1 47
+#define QOL_S_SPEC_2 48
+#define QOL_S_SPEC_3 49
+#define QOL_S_SPEC_4 50
+#define QOL_S_SPEC_CONT_READ 51
+#define QOL_S_SPEC_CONT_FILL 52
+#define QOL_S_SPEC_CONT_QUEUE 53
+#define QOL_S_STN_SEL 54
+#define QOL_S_STN_FOCUS 55
+#define QOL_S_STN_ENABLE 56
+#define QOL_S_STN_ROUTE 57
+#define QOL_S_STN_CANCEL 58
+#define QOL_S_STN_BUILT 59
+#define QOL_S_STN_QSIZE 60
+#define QOL_S_SEL_CONT_SELECT 61
+#define QOL_S_SEL_CONT_TAKE 62
+#define QOL_S_SEL_CONT_STOCK 63
+#define QOL_S_BIND_CONT 64
+#define QOL_S_FOCUS_CONT 65
+#define QOL_S_CANCEL_CONT 66
+#define QOL_S_CANCEL_SKIP 67
+#define QOL_S_ENABLE_CONT 68
+#define QOL_S_ROUTE_CONT 69
+#define QOL_S_QUEUE_SIZE 70
+#define QOL_S_QUEUE_COMMAND 71
+#define QOL_S_SET_SELECTED 72
+#define QOL_S_REMOVE_SHIP 73
+#define QOL_S_ENTITY_GET 74
+#define QOL_S_USER_TEAM 75
+#define QOL_S_DYN_CAST 76
+#define QOL_S_RTTI_GOCLASS 77
+#define QOL_S_RTTI_CRAFTCLASS 78
+#define QOL_S_WARP_SITE 79
+#define QOL_S_WARP_CONT 80
+#define QOL_S_ALLOW_WARP 81
+#define QOL_S_TRANSPORT 82
+#define QOL_S_GET_SETUP 83
+#define QOL_S_SETUP_ALLOWS_WARP 84
 #define QOL_F_OV_COUNT 0xb8
 #define QOL_F_OV_SEL 0xbc
 #define QOL_F_OV_SHIPGRP 0x14c
@@ -119,37 +116,33 @@
 #define QOL_V_CMD_CANCEL 19
 #define QOL_V_ACT_COMMAND 4095
 #define QOL_V_ACT_KEEP 16384
-#define QOL_S_BK_TOGGLES 116
-#define QOL_S_BK_PROCESS_KEYS 117
-#define QOL_S_BK_KEYS_CALL 118
+#define QOL_S_BK_TOGGLES 113
+#define QOL_S_BK_PROCESS_KEYS 114
+#define QOL_S_BK_KEYS_CALL 115
 #define QOL_F_BK_KEY_COMMANDS 0xcc
 #define QOL_F_BK_KEY_BUILDS 0xd8
 #define QOL_F_BK_KEY_WEAPONS 0xe4
 #define QOL_V_BK_N_TOGGLES 6
 #define QOL_F_BK_BTN_STATE 0x34
 #define QOL_F_BK_VT_PRESS 0x20
-#define QOL_S_BK_TEXT_INPUT 125
-#define QOL_S_BK_IS_PLAYING_VIDEO 126
-#define QOL_S_BK_CINEMATIC_VIEW 127
-#define QOL_S_BK_CLICK_SOUND 128
-#define QOL_S_BK_OPERATOR_NEW 129
-#define QOL_S_BK_SOUND2D 130
+#define QOL_S_BK_TEXT_INPUT 122
+#define QOL_S_BK_IS_PLAYING_VIDEO 123
+#define QOL_S_BK_CINEMATIC_VIEW 124
+#define QOL_S_BK_CLICK_SOUND 125
+#define QOL_S_BK_OPERATOR_NEW 126
+#define QOL_S_BK_SOUND2D 127
 #define QOL_V_BK_SOUND2D_BYTES 28
-#define QOL_S_BK_BUTTON_PRESS 132
+#define QOL_S_BK_BUTTON_PRESS 129
 #define QOL_H_PAN_SPEED 0
-#define QOL_H_VIEW_DISTANCE 1
-#define QOL_H_SHIFT_GROUP 2
-#define QOL_H_SELECTION 3
-#define QOL_H_SPECIAL_SELECT 4
-#define QOL_H_STATIONS 5
-#define QOL_H_WARP 6
-#define QOL_H_BAR_KEYS 7
+#define QOL_H_SHIFT_GROUP 1
+#define QOL_H_SELECTION 2
+#define QOL_H_SPECIAL_SELECT 3
+#define QOL_H_STATIONS 4
+#define QOL_H_WARP 5
+#define QOL_H_BAR_KEYS 6
 
 A2E_U32 a2s_qol_pan_site __attribute__((used));
 A2E_U32 a2s_qol_fastscroll __attribute__((used));
-A2E_U32 a2s_qol_view_site __attribute__((used));
-A2E_U32 a2s_qol_far_plane __attribute__((used));
-A2E_U32 a2s_qol_cull_dist __attribute__((used));
 A2E_U32 a2s_qol_group_bind __attribute__((used));
 A2E_U32 a2s_qol_group_focus __attribute__((used));
 A2E_U32 a2s_qol_cmd_control __attribute__((used));
@@ -247,9 +240,6 @@ A2E_U32 a2s_qol_bk_button_press __attribute__((used));
 static A2E_U32 *const qol_vars[] = {
     &a2s_qol_pan_site,
     &a2s_qol_fastscroll,
-    &a2s_qol_view_site,
-    &a2s_qol_far_plane,
-    &a2s_qol_cull_dist,
     &a2s_qol_group_bind,
     &a2s_qol_group_focus,
     &a2s_qol_cmd_control,
@@ -383,9 +373,6 @@ static A2E_U32 *const qol_vars[] = {
 static const A2ESymDef qol_syms[] = {
     {"pan_site", "RTS_Configure", 5},
     {"fastscroll", "FASTSCROLL_COEFFICIENT", 8},
-    {"view_site", "RTS_Configure", 5},
-    {"far_plane", "FAR_CLIPPING_PLANE", 8},
-    {"cull_dist", "cfgOBJECT_CULLING_DISTANCE", 8},
     {"group_bind", "cOverViewImp::mCheckGroupSelect", 5},
     {"group_focus", "cOverViewImp::mCheckGroupSelect", 5},
     {"cmd_control", "g_pCommandControl", 8},
@@ -517,201 +504,194 @@ static const A2ESymDef qol_syms[] = {
 };
 static const char *const qol_h0_rows[] = {"QOL.PanSpeed", 0};
 static const A2E_U16 qol_h0_syms[] = {0, 1, 0};
-static const char *const qol_h1_rows[] = {"QOL.ViewDistance", 0};
-static const A2E_U16 qol_h1_syms[] = {2, 3, 4, 0};
-static const char *const qol_h2_rows[] = {"QOL.ShiftAddsToGroup", 0};
-static const A2E_U16 qol_h2_syms[] = {5, 6, 7, 8, 9, 10, 11, 12, 13, 0};
+static const char *const qol_h1_rows[] = {"QOL.ShiftAddsToGroup", 0};
+static const A2E_U16 qol_h1_syms[] = {2, 3, 4, 5, 6, 7, 8, 9, 10, 0};
+static const char *const qol_h2_rows[] = {"QOL.MaxSelection", 0};
+static const A2E_U16 qol_h2_syms[] = {11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 85, 86, 0};
 static const char *const qol_h3_rows[] = {"QOL.MaxSelection", 0};
-static const A2E_U16 qol_h3_syms[] = {14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 88, 89, 0};
-static const char *const qol_h4_rows[] = {"QOL.MaxSelection", 0};
-static const A2E_U16 qol_h4_syms[] = {49, 50, 51, 52, 53, 54, 55, 56, 0};
-static const char *const qol_h5_rows[] = {"QOL.StationGroups", 0};
-static const A2E_U16 qol_h5_syms[] = {10, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 88, 90, 91, 94, 95, 96, 97, 98, 99, 100, 102, 103, 104, 105, 106, 112, 113, 0};
-static const char *const qol_h6_rows[] = {"QOL.WarpDistance", 0};
-static const A2E_U16 qol_h6_syms[] = {9, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 92, 93, 94, 95, 97, 99, 101, 107, 108, 109, 110, 111, 114, 115, 0};
-static const char *const qol_h7_rows[] = {"QOL.BarKeys", 0};
-static const A2E_U16 qol_h7_syms[] = {116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 0};
+static const A2E_U16 qol_h3_syms[] = {46, 47, 48, 49, 50, 51, 52, 53, 0};
+static const char *const qol_h4_rows[] = {"QOL.StationGroups", 0};
+static const A2E_U16 qol_h4_syms[] = {7, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 85, 87, 88, 91, 92, 93, 94, 95, 96, 97, 99, 100, 101, 102, 103, 109, 110, 0};
+static const char *const qol_h5_rows[] = {"QOL.WarpDistance", 0};
+static const A2E_U16 qol_h5_syms[] = {6, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 89, 90, 91, 92, 94, 96, 98, 104, 105, 106, 107, 108, 111, 112, 0};
+static const char *const qol_h6_rows[] = {"QOL.BarKeys", 0};
+static const A2E_U16 qol_h6_syms[] = {113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 0};
 static const A2EHookDef qol_hooks[] = {
     {"qol.pan_speed", 0, qol_h0_rows, 1, qol_h0_syms, 2},
-    {"qol.view_distance", 0, qol_h1_rows, 1, qol_h1_syms, 3},
-    {"qol.shift_group", 0, qol_h2_rows, 1, qol_h2_syms, 9},
-    {"qol.selection", 0, qol_h3_rows, 1, qol_h3_syms, 37},
-    {"qol.special_select", 0, qol_h4_rows, 1, qol_h4_syms, 8},
-    {"qol.stations", 0, qol_h5_rows, 1, qol_h5_syms, 43},
-    {"qol.warp", 0, qol_h6_rows, 1, qol_h6_syms, 27},
-    {"qol.bar_keys", 0, qol_h7_rows, 1, qol_h7_syms, 17},
+    {"qol.shift_group", 0, qol_h1_rows, 1, qol_h1_syms, 9},
+    {"qol.selection", 0, qol_h2_rows, 1, qol_h2_syms, 37},
+    {"qol.special_select", 0, qol_h3_rows, 1, qol_h3_syms, 8},
+    {"qol.stations", 0, qol_h4_rows, 1, qol_h4_syms, 43},
+    {"qol.warp", 0, qol_h5_rows, 1, qol_h5_syms, 27},
+    {"qol.bar_keys", 0, qol_h6_rows, 1, qol_h6_syms, 17},
 };
 static const A2E_U8 qol_b0_c0[] = {0x68, 0xcc, 0xd7, 0x6f, 0x00, 0xe8, 0x00, 0x6c, 0x1c, 0x00, 0x8b, 0x45, 0xf0, 0x85, 0xc0, 0x75, 0x08, 0xd9, 0x1d, 0xb4, 0xfb, 0x70, 0x00, 0xeb, 0x02};
-static const A2E_U8 qol_b0_c2[] = {0x8b, 0x0d, 0xc0, 0xca, 0x6f, 0x00, 0x89, 0x15, 0xfc, 0x3c, 0x77, 0x00, 0x8d, 0x55, 0xf0, 0x89, 0x0d, 0xc4, 0xca, 0x6f, 0x00};
-static const A2E_U8 qol_b0_c5[] = {0x8b, 0x15, 0x3c, 0x13, 0x76, 0x00, 0x83, 0x3a, 0x00, 0x74, 0x1c, 0xa1, 0x40, 0x13, 0x76, 0x00};
-static const A2E_U8 qol_b0_c6[] = {0x8b, 0x0d, 0x40, 0x13, 0x76, 0x00};
-static const A2E_U8 qol_b0_c10[] = {0x55, 0x8b, 0xec, 0x83, 0xec, 0x10};
-static const A2E_U8 qol_b0_c11[] = {0xa1, 0x40, 0x13, 0x76, 0x00, 0x8b};
-static const A2E_U8 qol_b0_c12[] = {0x8b, 0x0d, 0xd0, 0xfb, 0x70, 0x00};
-static const A2E_U8 qol_b0_c13[] = {0x8b, 0x45, 0xfc, 0x8b, 0x75, 0xf0};
-static const A2E_U8 qol_b0_c15[] = {0x8b, 0xb6, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c16[] = {0x8b, 0x83, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c17[] = {0x8d, 0xb3, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c18[] = {0x89, 0xb4, 0x83, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c19[] = {0x8d, 0xbb, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c20[] = {0x8d, 0x9f, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c21[] = {0x8d, 0xb7, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c22[] = {0x8d, 0x8f, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c23[] = {0x89, 0x8c, 0xb7, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c24[] = {0x81, 0xc7, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c25[] = {0x8d, 0x9f, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c26[] = {0x8b, 0xb4, 0xb7, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c27[] = {0x8d, 0xb3, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c28[] = {0x8b, 0x87, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c29[] = {0x8d, 0x87, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c30[] = {0x81, 0xc7, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c31[] = {0x8d, 0x97, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c32[] = {0x8d, 0x97, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c33[] = {0x8d, 0x81, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c34[] = {0x8d, 0xbe, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c35[] = {0x8d, 0xbe, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c36[] = {0x8d, 0xbb, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c37[] = {0x89, 0x84, 0x8e, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c38[] = {0x8d, 0x8e, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c39[] = {0x8d, 0x9e, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c40[] = {0x8d, 0xb9, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c41[] = {0x8d, 0xbb, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c42[] = {0x8d, 0xb3, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c43[] = {0x8d, 0xbb, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c44[] = {0x8b, 0xb4, 0xb3, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c45[] = {0x8d, 0x81, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c46[] = {0x83, 0xbb, 0xb8, 0x00, 0x00, 0x00, 0x10};
-static const A2E_U8 qol_b0_c47[] = {0x83, 0x39, 0x10};
-static const A2E_U8 qol_b0_c48[] = {0x83, 0xf9, 0x10};
-static const A2E_U8 qol_b0_c49[] = {0x8d, 0x4d, 0x88, 0x89, 0x4d, 0xe8, 0xeb, 0x03};
-static const A2E_U8 qol_b0_c50[] = {0x8d, 0x75, 0x88, 0x89, 0x45, 0xd8};
-static const A2E_U8 qol_b0_c51[] = {0x8b, 0x55, 0xf0, 0x8d, 0x45, 0x88, 0x52, 0x50};
-static const A2E_U8 qol_b0_c52[] = {0x8d, 0x4d, 0x80, 0x89, 0x4d, 0x0c};
-static const A2E_U8 qol_b0_c53[] = {0x8d, 0x75, 0x80, 0x8b, 0xf9};
-static const A2E_U8 qol_b0_c54[] = {0x8b, 0x16, 0x8b, 0x7d, 0xe4, 0x57};
-static const A2E_U8 qol_b0_c55[] = {0x8b, 0x13, 0x83, 0xf8, 0x01, 0x8b};
-static const A2E_U8 qol_b0_c56[] = {0x8b, 0x06, 0x85, 0xc0, 0x75, 0x07};
-static const A2E_U8 qol_b0_c57[] = {0x39, 0xbb, 0xb8, 0x00, 0x00, 0x00, 0x0f, 0x85, 0x90, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c58[] = {0x8d, 0x9c, 0x81, 0x4c, 0x01, 0x00, 0x00};
-static const A2E_U8 qol_b0_c59[] = {0x8b, 0x4f, 0x44, 0x33, 0xd2, 0x83, 0xf8, 0x01, 0x8b, 0x87, 0xf0, 0x00, 0x00, 0x00, 0x0f, 0x94, 0xc2};
-static const A2E_U8 qol_b0_c60[] = {0x8b, 0x45, 0xe8, 0x33, 0xf6, 0x85, 0xc0, 0x7e, 0x75};
-static const A2E_U8 qol_b0_c61[] = {0x8b, 0x45, 0xe0, 0x85, 0xc0, 0xc7, 0x45, 0xec, 0x00, 0x00, 0x00, 0x00, 0x0f, 0x8e, 0x1c, 0x01, 0x00, 0x00};
-static const A2E_U8 qol_b0_c62[] = {0x8b, 0x0d, 0x3c, 0x8e, 0x76, 0x00, 0x8b, 0x86, 0x20, 0x01, 0x00, 0x00, 0x50, 0x57};
-static const A2E_U8 qol_b0_c63[] = {0xf6, 0xc4, 0x02, 0x74, 0x13, 0xe8, 0xe8, 0xbb, 0xfb, 0xff};
-static const A2E_U8 qol_b0_c64[] = {0x8b, 0x83, 0xbc, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c65[] = {0x8b, 0x45, 0x0c, 0x33, 0xff, 0x2b};
-static const A2E_U8 qol_b0_c66[] = {0x8b, 0x83, 0xb8, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c67[] = {0x53, 0x56, 0x57, 0x8b, 0xf9, 0x89};
-static const A2E_U8 qol_b0_c68[] = {0xc7, 0x45, 0xf4, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c69[] = {0x8b, 0x55, 0xd8, 0x8b, 0x45, 0xec};
-static const A2E_U8 qol_b0_c70[] = {0x8b, 0x45, 0xdc, 0xc7, 0x45, 0xfc};
-static const A2E_U8 qol_b0_c71[] = {0x52, 0x50, 0xe8, 0x5c, 0xa1, 0xfe};
-static const A2E_U8 qol_b0_c72[] = {0x8b, 0x75, 0xec, 0x8b, 0x7f, 0x04};
-static const A2E_U8 qol_b0_c73[] = {0x8b, 0x89, 0x70, 0x02, 0x00, 0x00, 0x33, 0xc0};
-static const A2E_U8 qol_b0_c74[] = {0x55, 0x8b, 0xec, 0x56, 0x8b, 0xf1, 0x8b, 0x0d};
-static const A2E_U8 qol_b0_c75[] = {0x55, 0x8b, 0xec, 0x53, 0x8a, 0x5d, 0x08, 0x56};
-static const A2E_U8 qol_b0_c76[] = {0x55, 0x8b, 0xec, 0x83, 0xec, 0x08, 0x53, 0x56};
-static const A2E_U8 qol_b0_c77[] = {0x55, 0x8b, 0xec, 0x8b, 0x4d, 0x08, 0x8b, 0xc1};
-static const A2E_U8 qol_b0_c78[] = {0x8b, 0x0d, 0xd4, 0xb8, 0x76, 0x00, 0xe9, 0x45};
-static const A2E_U8 qol_b0_c79[] = {0xff, 0x25, 0x70, 0x80, 0x7b, 0x00, 0xcc, 0xcc};
-static const A2E_U8 qol_b0_c82[] = {0xa1, 0x44, 0x13, 0x76, 0x00, 0x83, 0x38, 0x00, 0x74, 0x1d, 0x8b, 0x4e, 0x3c, 0x81, 0xe1, 0xff, 0x0f, 0x00, 0x00, 0x83, 0xf9, 0x04, 0x75, 0x0f};
-static const A2E_U8 qol_b0_c83[] = {0x8b, 0x45, 0x08, 0x8b, 0xce, 0x50};
-static const A2E_U8 qol_b0_c86[] = {0x8b, 0x41, 0x30, 0xc3, 0x90, 0x90, 0x90, 0x90};
-static const A2E_U8 qol_b0_c87[] = {0x8b, 0x41, 0x10, 0x8a, 0x80, 0xd1, 0x00, 0x00};
-static const A2E_U8 qol_b0_c125[] = {0xa1, 0xbc, 0x0f, 0x7b, 0x00};
-static const A2E_U8 qol_b0_c126[] = {0x8b, 0x51, 0x24, 0x33, 0xc0};
-static const A2E_U8 qol_b0_c129[] = {0x55, 0x8b, 0xec, 0xa1};
-static const A2E_U8 qol_b0_c130[] = {0x55, 0x8b, 0xec, 0x6a, 0xff};
-static const A2E_U8 qol_b0_c132[] = {0x8b, 0xc1, 0x56, 0x8b, 0x90};
+static const A2E_U8 qol_b0_c2[] = {0x8b, 0x15, 0x3c, 0x13, 0x76, 0x00, 0x83, 0x3a, 0x00, 0x74, 0x1c, 0xa1, 0x40, 0x13, 0x76, 0x00};
+static const A2E_U8 qol_b0_c3[] = {0x8b, 0x0d, 0x40, 0x13, 0x76, 0x00};
+static const A2E_U8 qol_b0_c7[] = {0x55, 0x8b, 0xec, 0x83, 0xec, 0x10};
+static const A2E_U8 qol_b0_c8[] = {0xa1, 0x40, 0x13, 0x76, 0x00, 0x8b};
+static const A2E_U8 qol_b0_c9[] = {0x8b, 0x0d, 0xd0, 0xfb, 0x70, 0x00};
+static const A2E_U8 qol_b0_c10[] = {0x8b, 0x45, 0xfc, 0x8b, 0x75, 0xf0};
+static const A2E_U8 qol_b0_c12[] = {0x8b, 0xb6, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c13[] = {0x8b, 0x83, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c14[] = {0x8d, 0xb3, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c15[] = {0x89, 0xb4, 0x83, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c16[] = {0x8d, 0xbb, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c17[] = {0x8d, 0x9f, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c18[] = {0x8d, 0xb7, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c19[] = {0x8d, 0x8f, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c20[] = {0x89, 0x8c, 0xb7, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c21[] = {0x81, 0xc7, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c22[] = {0x8d, 0x9f, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c23[] = {0x8b, 0xb4, 0xb7, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c24[] = {0x8d, 0xb3, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c25[] = {0x8b, 0x87, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c26[] = {0x8d, 0x87, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c27[] = {0x81, 0xc7, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c28[] = {0x8d, 0x97, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c29[] = {0x8d, 0x97, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c30[] = {0x8d, 0x81, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c31[] = {0x8d, 0xbe, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c32[] = {0x8d, 0xbe, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c33[] = {0x8d, 0xbb, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c34[] = {0x89, 0x84, 0x8e, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c35[] = {0x8d, 0x8e, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c36[] = {0x8d, 0x9e, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c37[] = {0x8d, 0xb9, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c38[] = {0x8d, 0xbb, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c39[] = {0x8d, 0xb3, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c40[] = {0x8d, 0xbb, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c41[] = {0x8b, 0xb4, 0xb3, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c42[] = {0x8d, 0x81, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c43[] = {0x83, 0xbb, 0xb8, 0x00, 0x00, 0x00, 0x10};
+static const A2E_U8 qol_b0_c44[] = {0x83, 0x39, 0x10};
+static const A2E_U8 qol_b0_c45[] = {0x83, 0xf9, 0x10};
+static const A2E_U8 qol_b0_c46[] = {0x8d, 0x4d, 0x88, 0x89, 0x4d, 0xe8, 0xeb, 0x03};
+static const A2E_U8 qol_b0_c47[] = {0x8d, 0x75, 0x88, 0x89, 0x45, 0xd8};
+static const A2E_U8 qol_b0_c48[] = {0x8b, 0x55, 0xf0, 0x8d, 0x45, 0x88, 0x52, 0x50};
+static const A2E_U8 qol_b0_c49[] = {0x8d, 0x4d, 0x80, 0x89, 0x4d, 0x0c};
+static const A2E_U8 qol_b0_c50[] = {0x8d, 0x75, 0x80, 0x8b, 0xf9};
+static const A2E_U8 qol_b0_c51[] = {0x8b, 0x16, 0x8b, 0x7d, 0xe4, 0x57};
+static const A2E_U8 qol_b0_c52[] = {0x8b, 0x13, 0x83, 0xf8, 0x01, 0x8b};
+static const A2E_U8 qol_b0_c53[] = {0x8b, 0x06, 0x85, 0xc0, 0x75, 0x07};
+static const A2E_U8 qol_b0_c54[] = {0x39, 0xbb, 0xb8, 0x00, 0x00, 0x00, 0x0f, 0x85, 0x90, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c55[] = {0x8d, 0x9c, 0x81, 0x4c, 0x01, 0x00, 0x00};
+static const A2E_U8 qol_b0_c56[] = {0x8b, 0x4f, 0x44, 0x33, 0xd2, 0x83, 0xf8, 0x01, 0x8b, 0x87, 0xf0, 0x00, 0x00, 0x00, 0x0f, 0x94, 0xc2};
+static const A2E_U8 qol_b0_c57[] = {0x8b, 0x45, 0xe8, 0x33, 0xf6, 0x85, 0xc0, 0x7e, 0x75};
+static const A2E_U8 qol_b0_c58[] = {0x8b, 0x45, 0xe0, 0x85, 0xc0, 0xc7, 0x45, 0xec, 0x00, 0x00, 0x00, 0x00, 0x0f, 0x8e, 0x1c, 0x01, 0x00, 0x00};
+static const A2E_U8 qol_b0_c59[] = {0x8b, 0x0d, 0x3c, 0x8e, 0x76, 0x00, 0x8b, 0x86, 0x20, 0x01, 0x00, 0x00, 0x50, 0x57};
+static const A2E_U8 qol_b0_c60[] = {0xf6, 0xc4, 0x02, 0x74, 0x13, 0xe8, 0xe8, 0xbb, 0xfb, 0xff};
+static const A2E_U8 qol_b0_c61[] = {0x8b, 0x83, 0xbc, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c62[] = {0x8b, 0x45, 0x0c, 0x33, 0xff, 0x2b};
+static const A2E_U8 qol_b0_c63[] = {0x8b, 0x83, 0xb8, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c64[] = {0x53, 0x56, 0x57, 0x8b, 0xf9, 0x89};
+static const A2E_U8 qol_b0_c65[] = {0xc7, 0x45, 0xf4, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c66[] = {0x8b, 0x55, 0xd8, 0x8b, 0x45, 0xec};
+static const A2E_U8 qol_b0_c67[] = {0x8b, 0x45, 0xdc, 0xc7, 0x45, 0xfc};
+static const A2E_U8 qol_b0_c68[] = {0x52, 0x50, 0xe8, 0x5c, 0xa1, 0xfe};
+static const A2E_U8 qol_b0_c69[] = {0x8b, 0x75, 0xec, 0x8b, 0x7f, 0x04};
+static const A2E_U8 qol_b0_c70[] = {0x8b, 0x89, 0x70, 0x02, 0x00, 0x00, 0x33, 0xc0};
+static const A2E_U8 qol_b0_c71[] = {0x55, 0x8b, 0xec, 0x56, 0x8b, 0xf1, 0x8b, 0x0d};
+static const A2E_U8 qol_b0_c72[] = {0x55, 0x8b, 0xec, 0x53, 0x8a, 0x5d, 0x08, 0x56};
+static const A2E_U8 qol_b0_c73[] = {0x55, 0x8b, 0xec, 0x83, 0xec, 0x08, 0x53, 0x56};
+static const A2E_U8 qol_b0_c74[] = {0x55, 0x8b, 0xec, 0x8b, 0x4d, 0x08, 0x8b, 0xc1};
+static const A2E_U8 qol_b0_c75[] = {0x8b, 0x0d, 0xd4, 0xb8, 0x76, 0x00, 0xe9, 0x45};
+static const A2E_U8 qol_b0_c76[] = {0xff, 0x25, 0x70, 0x80, 0x7b, 0x00, 0xcc, 0xcc};
+static const A2E_U8 qol_b0_c79[] = {0xa1, 0x44, 0x13, 0x76, 0x00, 0x83, 0x38, 0x00, 0x74, 0x1d, 0x8b, 0x4e, 0x3c, 0x81, 0xe1, 0xff, 0x0f, 0x00, 0x00, 0x83, 0xf9, 0x04, 0x75, 0x0f};
+static const A2E_U8 qol_b0_c80[] = {0x8b, 0x45, 0x08, 0x8b, 0xce, 0x50};
+static const A2E_U8 qol_b0_c83[] = {0x8b, 0x41, 0x30, 0xc3, 0x90, 0x90, 0x90, 0x90};
+static const A2E_U8 qol_b0_c84[] = {0x8b, 0x41, 0x10, 0x8a, 0x80, 0xd1, 0x00, 0x00};
+static const A2E_U8 qol_b0_c122[] = {0xa1, 0xbc, 0x0f, 0x7b, 0x00};
+static const A2E_U8 qol_b0_c123[] = {0x8b, 0x51, 0x24, 0x33, 0xc0};
+static const A2E_U8 qol_b0_c126[] = {0x55, 0x8b, 0xec, 0xa1};
+static const A2E_U8 qol_b0_c127[] = {0x55, 0x8b, 0xec, 0x6a, 0xff};
+static const A2E_U8 qol_b0_c129[] = {0x8b, 0xc1, 0x56, 0x8b, 0x90};
 static const A2EEntry qol_b0_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 25, 0x491766, 0x0, 0, qol_b0_c0, 0, ""}, /* pan_site */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x70fbb4, 0x0, 0, 0, 0, ""}, /* fastscroll */
-    {1, 0, 0xffff, 0xffff, 0, 0, 21, 0x491bef, 0x0, 0, qol_b0_c2, 0, ""}, /* view_site */
-    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6fcab0, 0x0, 0, 0, 0, ""}, /* far_plane */
-    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6fcac0, 0x0, 0, 0, 0, ""}, /* cull_dist */
-    {1, 0, 0xffff, 0xffff, 0, 0, 16, 0x52129a, 0x0, 0, qol_b0_c5, 0, ""}, /* group_bind */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x521350, 0x0, 0, qol_b0_c6, 0, ""}, /* group_focus */
+    {1, 0, 0xffff, 0xffff, 0, 0, 16, 0x52129a, 0x0, 0, qol_b0_c2, 0, ""}, /* group_bind */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x521350, 0x0, 0, qol_b0_c3, 0, ""}, /* group_focus */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x76133c, 0x0, 0, 0, 0, ""}, /* cmd_control */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x761340, 0x0, 0, 0, 0, ""}, /* cmd_shift */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x761344, 0x0, 0, 0, 0, ""}, /* cmd_alt */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x520c40, 0x0, 0, qol_b0_c10, 0, ""}, /* bind_group */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x5212a5, 0x0, 0, qol_b0_c11, 0, ""}, /* group_ctrl_held */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x5212c1, 0x0, 0, qol_b0_c12, 0, ""}, /* group_select */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x52138a, 0x0, 0, qol_b0_c13, 0, ""}, /* group_done */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x520c40, 0x0, 0, qol_b0_c7, 0, ""}, /* bind_group */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x5212a5, 0x0, 0, qol_b0_c8, 0, ""}, /* group_ctrl_held */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x5212c1, 0x0, 0, qol_b0_c9, 0, ""}, /* group_select */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x52138a, 0x0, 0, qol_b0_c10, 0, ""}, /* group_done */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x768e40, 0x0, 0, 0, 0, ""}, /* overview */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x51efcc, 0x0, 0, qol_b0_c15, 0, ""}, /* sel_00 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x51f687, 0x0, 0, qol_b0_c16, 0, ""}, /* sel_01 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x51f7bb, 0x0, 0, qol_b0_c17, 0, ""}, /* sel_02 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x51f856, 0x0, 0, qol_b0_c18, 0, ""}, /* sel_03 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x51f8a1, 0x0, 0, qol_b0_c19, 0, ""}, /* sel_04 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x51fd55, 0x0, 0, qol_b0_c20, 0, ""}, /* sel_05 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x51fe8e, 0x0, 0, qol_b0_c21, 0, ""}, /* sel_06 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x520071, 0x0, 0, qol_b0_c22, 0, ""}, /* sel_07 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x52009c, 0x0, 0, qol_b0_c23, 0, ""}, /* sel_08 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x5204ea, 0x0, 0, qol_b0_c24, 0, ""}, /* sel_09 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x520ab1, 0x0, 0, qol_b0_c25, 0, ""}, /* sel_10 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x520b02, 0x0, 0, qol_b0_c26, 0, ""}, /* sel_11 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x520b8d, 0x0, 0, qol_b0_c27, 0, ""}, /* sel_12 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x520c4e, 0x0, 0, qol_b0_c28, 0, ""}, /* sel_13 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x520d2c, 0x0, 0, qol_b0_c29, 0, ""}, /* sel_14 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x520e37, 0x0, 0, qol_b0_c30, 0, ""}, /* sel_15 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x52115b, 0x0, 0, qol_b0_c31, 0, ""}, /* sel_16 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x521207, 0x0, 0, qol_b0_c32, 0, ""}, /* sel_17 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x5213df, 0x0, 0, qol_b0_c33, 0, ""}, /* sel_18 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x521f41, 0x0, 0, qol_b0_c34, 0, ""}, /* sel_19 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x5230ec, 0x0, 0, qol_b0_c35, 0, ""}, /* sel_20 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x52326f, 0x0, 0, qol_b0_c36, 0, ""}, /* sel_21 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x5232f8, 0x0, 0, qol_b0_c37, 0, ""}, /* sel_22 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x523347, 0x0, 0, qol_b0_c38, 0, ""}, /* sel_23 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x5233cd, 0x0, 0, qol_b0_c39, 0, ""}, /* sel_24 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x52355e, 0x0, 0, qol_b0_c40, 0, ""}, /* sel_25 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x52367f, 0x0, 0, qol_b0_c41, 0, ""}, /* sel_26 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x523f70, 0x0, 0, qol_b0_c42, 0, ""}, /* sel_27 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x525a1e, 0x0, 0, qol_b0_c43, 0, ""}, /* sel_28 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x525a68, 0x0, 0, qol_b0_c44, 0, ""}, /* sel_29 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x527ab0, 0x0, 0, qol_b0_c45, 0, ""}, /* sel_30 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x51f66e, 0x0, 0, qol_b0_c46, 0, ""}, /* cap_0 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 3, 0x520e97, 0x0, 0, qol_b0_c47, 0, ""}, /* cap_1 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 3, 0x5232e3, 0x0, 0, qol_b0_c48, 0, ""}, /* cap_2 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4fd32e, 0x0, 0, qol_b0_c49, 0, ""}, /* spec_0 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4fd3af, 0x0, 0, qol_b0_c50, 0, ""}, /* spec_1 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4fd40d, 0x0, 0, qol_b0_c51, 0, ""}, /* spec_2 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4fd8f1, 0x0, 0, qol_b0_c52, 0, ""}, /* spec_3 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 5, 0x4fd95d, 0x0, 0, qol_b0_c53, 0, ""}, /* spec_4 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4fd3b5, 0x0, 0, qol_b0_c54, 0, ""}, /* spec_cont_read */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4fd8f7, 0x0, 0, qol_b0_c55, 0, ""}, /* spec_cont_fill */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4fd962, 0x0, 0, qol_b0_c56, 0, ""}, /* spec_cont_queue */
-    {1, 0, 0xffff, 0xffff, 0, 0, 12, 0x51f67b, 0x0, 0, qol_b0_c57, 0, ""}, /* stn_sel */
-    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x520fcf, 0x0, 0, qol_b0_c58, 0, ""}, /* stn_focus */
-    {1, 0, 0xffff, 0xffff, 0, 0, 17, 0x4fc72c, 0x0, 0, qol_b0_c59, 0, ""}, /* stn_enable */
-    {1, 0, 0xffff, 0xffff, 0, 0, 9, 0x4fc486, 0x0, 0, qol_b0_c60, 0, ""}, /* stn_route */
-    {1, 0, 0xffff, 0xffff, 0, 0, 18, 0x4fc0a6, 0x0, 0, qol_b0_c61, 0, ""}, /* stn_cancel */
-    {1, 0, 0xffff, 0xffff, 0, 0, 14, 0x4b9121, 0x0, 0, qol_b0_c62, 0, ""}, /* stn_built */
-    {1, 0, 0xffff, 0xffff, 0, 0, 10, 0x4fbf7e, 0x0, 0, qol_b0_c63, 0, ""}, /* stn_qsize */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x51f687, 0x0, 0, qol_b0_c64, 0, ""}, /* sel_cont_select */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x51f78a, 0x0, 0, qol_b0_c65, 0, ""}, /* sel_cont_take */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x51f717, 0x0, 0, qol_b0_c66, 0, ""}, /* sel_cont_stock */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x520c46, 0x0, 0, qol_b0_c67, 0, ""}, /* bind_cont */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x520fd6, 0x0, 0, qol_b0_c68, 0, ""}, /* focus_cont */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4fc0b8, 0x0, 0, qol_b0_c69, 0, ""}, /* cancel_cont */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4fc1d4, 0x0, 0, qol_b0_c70, 0, ""}, /* cancel_skip */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4fc73d, 0x0, 0, qol_b0_c71, 0, ""}, /* enable_cont */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4fc504, 0x0, 0, qol_b0_c72, 0, ""}, /* route_cont */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b7b70, 0x0, 0, qol_b0_c73, 0, ""}, /* queue_size */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4280, 0x0, 0, qol_b0_c74, 0, ""}, /* queue_command */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d3c00, 0x0, 0, qol_b0_c75, 0, ""}, /* set_selected */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x527d20, 0x0, 0, qol_b0_c76, 0, ""}, /* remove_ship */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4cfff0, 0x0, 0, qol_b0_c77, 0, ""}, /* entity_get */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d0060, 0x0, 0, qol_b0_c78, 0, ""}, /* user_team */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x6731a0, 0x0, 0, qol_b0_c79, 0, ""}, /* dyn_cast */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x51efcc, 0x0, 0, qol_b0_c12, 0, ""}, /* sel_00 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x51f687, 0x0, 0, qol_b0_c13, 0, ""}, /* sel_01 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x51f7bb, 0x0, 0, qol_b0_c14, 0, ""}, /* sel_02 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x51f856, 0x0, 0, qol_b0_c15, 0, ""}, /* sel_03 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x51f8a1, 0x0, 0, qol_b0_c16, 0, ""}, /* sel_04 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x51fd55, 0x0, 0, qol_b0_c17, 0, ""}, /* sel_05 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x51fe8e, 0x0, 0, qol_b0_c18, 0, ""}, /* sel_06 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x520071, 0x0, 0, qol_b0_c19, 0, ""}, /* sel_07 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x52009c, 0x0, 0, qol_b0_c20, 0, ""}, /* sel_08 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x5204ea, 0x0, 0, qol_b0_c21, 0, ""}, /* sel_09 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x520ab1, 0x0, 0, qol_b0_c22, 0, ""}, /* sel_10 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x520b02, 0x0, 0, qol_b0_c23, 0, ""}, /* sel_11 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x520b8d, 0x0, 0, qol_b0_c24, 0, ""}, /* sel_12 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x520c4e, 0x0, 0, qol_b0_c25, 0, ""}, /* sel_13 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x520d2c, 0x0, 0, qol_b0_c26, 0, ""}, /* sel_14 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x520e37, 0x0, 0, qol_b0_c27, 0, ""}, /* sel_15 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x52115b, 0x0, 0, qol_b0_c28, 0, ""}, /* sel_16 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x521207, 0x0, 0, qol_b0_c29, 0, ""}, /* sel_17 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x5213df, 0x0, 0, qol_b0_c30, 0, ""}, /* sel_18 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x521f41, 0x0, 0, qol_b0_c31, 0, ""}, /* sel_19 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x5230ec, 0x0, 0, qol_b0_c32, 0, ""}, /* sel_20 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x52326f, 0x0, 0, qol_b0_c33, 0, ""}, /* sel_21 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x5232f8, 0x0, 0, qol_b0_c34, 0, ""}, /* sel_22 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x523347, 0x0, 0, qol_b0_c35, 0, ""}, /* sel_23 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x5233cd, 0x0, 0, qol_b0_c36, 0, ""}, /* sel_24 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x52355e, 0x0, 0, qol_b0_c37, 0, ""}, /* sel_25 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x52367f, 0x0, 0, qol_b0_c38, 0, ""}, /* sel_26 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x523f70, 0x0, 0, qol_b0_c39, 0, ""}, /* sel_27 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x525a1e, 0x0, 0, qol_b0_c40, 0, ""}, /* sel_28 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x525a68, 0x0, 0, qol_b0_c41, 0, ""}, /* sel_29 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x527ab0, 0x0, 0, qol_b0_c42, 0, ""}, /* sel_30 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x51f66e, 0x0, 0, qol_b0_c43, 0, ""}, /* cap_0 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 3, 0x520e97, 0x0, 0, qol_b0_c44, 0, ""}, /* cap_1 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 3, 0x5232e3, 0x0, 0, qol_b0_c45, 0, ""}, /* cap_2 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4fd32e, 0x0, 0, qol_b0_c46, 0, ""}, /* spec_0 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4fd3af, 0x0, 0, qol_b0_c47, 0, ""}, /* spec_1 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4fd40d, 0x0, 0, qol_b0_c48, 0, ""}, /* spec_2 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4fd8f1, 0x0, 0, qol_b0_c49, 0, ""}, /* spec_3 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 5, 0x4fd95d, 0x0, 0, qol_b0_c50, 0, ""}, /* spec_4 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4fd3b5, 0x0, 0, qol_b0_c51, 0, ""}, /* spec_cont_read */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4fd8f7, 0x0, 0, qol_b0_c52, 0, ""}, /* spec_cont_fill */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4fd962, 0x0, 0, qol_b0_c53, 0, ""}, /* spec_cont_queue */
+    {1, 0, 0xffff, 0xffff, 0, 0, 12, 0x51f67b, 0x0, 0, qol_b0_c54, 0, ""}, /* stn_sel */
+    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x520fcf, 0x0, 0, qol_b0_c55, 0, ""}, /* stn_focus */
+    {1, 0, 0xffff, 0xffff, 0, 0, 17, 0x4fc72c, 0x0, 0, qol_b0_c56, 0, ""}, /* stn_enable */
+    {1, 0, 0xffff, 0xffff, 0, 0, 9, 0x4fc486, 0x0, 0, qol_b0_c57, 0, ""}, /* stn_route */
+    {1, 0, 0xffff, 0xffff, 0, 0, 18, 0x4fc0a6, 0x0, 0, qol_b0_c58, 0, ""}, /* stn_cancel */
+    {1, 0, 0xffff, 0xffff, 0, 0, 14, 0x4b9121, 0x0, 0, qol_b0_c59, 0, ""}, /* stn_built */
+    {1, 0, 0xffff, 0xffff, 0, 0, 10, 0x4fbf7e, 0x0, 0, qol_b0_c60, 0, ""}, /* stn_qsize */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x51f687, 0x0, 0, qol_b0_c61, 0, ""}, /* sel_cont_select */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x51f78a, 0x0, 0, qol_b0_c62, 0, ""}, /* sel_cont_take */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x51f717, 0x0, 0, qol_b0_c63, 0, ""}, /* sel_cont_stock */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x520c46, 0x0, 0, qol_b0_c64, 0, ""}, /* bind_cont */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x520fd6, 0x0, 0, qol_b0_c65, 0, ""}, /* focus_cont */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4fc0b8, 0x0, 0, qol_b0_c66, 0, ""}, /* cancel_cont */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4fc1d4, 0x0, 0, qol_b0_c67, 0, ""}, /* cancel_skip */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4fc73d, 0x0, 0, qol_b0_c68, 0, ""}, /* enable_cont */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4fc504, 0x0, 0, qol_b0_c69, 0, ""}, /* route_cont */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b7b70, 0x0, 0, qol_b0_c70, 0, ""}, /* queue_size */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4280, 0x0, 0, qol_b0_c71, 0, ""}, /* queue_command */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d3c00, 0x0, 0, qol_b0_c72, 0, ""}, /* set_selected */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x527d20, 0x0, 0, qol_b0_c73, 0, ""}, /* remove_ship */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4cfff0, 0x0, 0, qol_b0_c74, 0, ""}, /* entity_get */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d0060, 0x0, 0, qol_b0_c75, 0, ""}, /* user_team */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x6731a0, 0x0, 0, qol_b0_c76, 0, ""}, /* dyn_cast */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6eee98, 0x0, 0, 0, 0, ""}, /* rtti_goclass */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6eee08, 0x0, 0, 0, 0, ""}, /* rtti_craftclass */
-    {1, 0, 0xffff, 0xffff, 0, 0, 24, 0x522cb8, 0x0, 0, qol_b0_c82, 0, ""}, /* warp_site */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x522cdf, 0x0, 0, qol_b0_c83, 0, ""}, /* warp_cont */
+    {1, 0, 0xffff, 0xffff, 0, 0, 24, 0x522cb8, 0x0, 0, qol_b0_c79, 0, ""}, /* warp_site */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x522cdf, 0x0, 0, qol_b0_c80, 0, ""}, /* warp_cont */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6f4de0, 0x0, 0, 0, 0, ""}, /* allow_warp */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x76b8d4, 0x0, 0, 0, 0, ""}, /* transport */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x557940, 0x0, 0, qol_b0_c86, 0, ""}, /* get_setup */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x546280, 0x0, 0, qol_b0_c87, 0, ""}, /* setup_allows_warp */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x557940, 0x0, 0, qol_b0_c83, 0, ""}, /* get_setup */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x546280, 0x0, 0, qol_b0_c84, 0, ""}, /* setup_allows_warp */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 184, 0, 0, ""}, /* ov_count */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 188, 0, 0, ""}, /* ov_sel */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 332, 0, 0, ""}, /* ov_shipgrp */
@@ -742,37 +722,37 @@ static const A2EEntry qol_b0_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 16384, 0, 0, ""}, /* act_keep */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x763d3c, 0x0, 0, 0, 0, ""}, /* bk_toggles */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x4fb5b0, 0x0, 0, 0, 0, ""}, /* bk_process_keys */
-    {1, 0, 0x75, 0xffff, 0, 0, 0, 0x4fb56a, 0x0, 0, 0, 0, ""}, /* bk_keys_call */
+    {1, 0, 0x72, 0xffff, 0, 0, 0, 0x4fb56a, 0x0, 0, 0, 0, ""}, /* bk_keys_call */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 204, 0, 0, ""}, /* bk_key_commands */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 216, 0, 0, ""}, /* bk_key_builds */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 228, 0, 0, ""}, /* bk_key_weapons */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 6, 0, 0, ""}, /* bk_n_toggles */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 52, 0, 0, ""}, /* bk_btn_state */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 32, 0, 0, ""}, /* bk_vt_press */
-    {1, 0, 0xffff, 0xffff, 0, 0, 5, 0x65f120, 0x0, 0, qol_b0_c125, 0, ""}, /* bk_text_input */
-    {1, 0, 0xffff, 0xffff, 0, 0, 5, 0x4e6350, 0x0, 0, qol_b0_c126, 0, ""}, /* bk_is_playing_video */
+    {1, 0, 0xffff, 0xffff, 0, 0, 5, 0x65f120, 0x0, 0, qol_b0_c122, 0, ""}, /* bk_text_input */
+    {1, 0, 0xffff, 0xffff, 0, 0, 5, 0x4e6350, 0x0, 0, qol_b0_c123, 0, ""}, /* bk_is_playing_video */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x763758, 0x0, 0, 0, 0, ""}, /* bk_cinematic_view */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x764854, 0x0, 0, 0, 0, ""}, /* bk_click_sound */
-    {1, 0, 0xffff, 0xffff, 0, 0, 4, 0x652710, 0x0, 0, qol_b0_c129, 0, ""}, /* bk_operator_new */
-    {1, 0, 0xffff, 0xffff, 0, 0, 5, 0x45fc50, 0x0, 0, qol_b0_c130, 0, ""}, /* bk_sound2d */
+    {1, 0, 0xffff, 0xffff, 0, 0, 4, 0x652710, 0x0, 0, qol_b0_c126, 0, ""}, /* bk_operator_new */
+    {1, 0, 0xffff, 0xffff, 0, 0, 5, 0x45fc50, 0x0, 0, qol_b0_c127, 0, ""}, /* bk_sound2d */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 28, 0, 0, ""}, /* bk_sound2d_bytes */
-    {1, 0, 0xffff, 0xffff, 0, 0, 5, 0x4e69e0, 0x0, 0, qol_b0_c132, 0, ""}, /* bk_button_press */
+    {1, 0, 0xffff, 0xffff, 0, 0, 5, 0x4e69e0, 0x0, 0, qol_b0_c129, 0, ""}, /* bk_button_press */
 };
 static const A2EBlock qol_b0_blocked[] = {
     {0xffff, 0, 0, 0}
 };
 static const A2EBuild qol_builds[] = {
-    {"gog-1.1", "armada2/gog-1.1", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qol_b0_entries, qol_b0_blocked, 0, 133},
+    {"gog-1.1", "armada2/gog-1.1", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qol_b0_entries, qol_b0_blocked, 0, 130},
 };
 
-static A2E_U8 qol_hook_state[8];
-static A2E_U8 qol_sym_flags[133];
-static A2E_U32 qol_sym_addr[133];
-static char qol_notes[8][A2E_NOTE_MAX + 1];
+static A2E_U8 qol_hook_state[7];
+static A2E_U8 qol_sym_flags[130];
+static A2E_U32 qol_sym_addr[130];
+static char qol_notes[7][A2E_NOTE_MAX + 1];
 
 static const A2ETable QOL_ENGINE = {
     "armada2", "qol",
-    qol_syms, 133, qol_hooks, 8, qol_builds, 1, 0,
+    qol_syms, 130, qol_hooks, 7, qol_builds, 1, 0,
     qol_vars, qol_hook_state, qol_sym_flags, qol_sym_addr, qol_notes
 };
 

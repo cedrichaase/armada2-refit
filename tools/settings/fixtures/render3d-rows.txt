@@ -1,5 +1,6 @@
 Render3D MSAA
 Render3D HDR
+View Distance
 Modules hulls
 Modules sky
 Modules particles

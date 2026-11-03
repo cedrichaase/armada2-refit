@@ -5,7 +5,8 @@
  * the selection to a control group (ShiftAddsToGroup=); selections and groups
  * beyond 16 (MaxSelection=); stations in control groups, with one build
  * menu for several (StationGroups=); long moves on the map going to warp
- * (WarpDistance=); and the view reaching across the whole map (ViewDistance=).
+ * (WarpDistance=).  (The view reaching across the whole map, ViewDistance=, is render3d's
+ * [View] Distance since qol 2.2.0.)
  *
  * WHY NOT JUST EDIT RTS_CFG.h
  * ---------------------------
@@ -133,7 +134,7 @@ typedef struct { DWORD sym; int len; int patch; } Site;
 
 /* Which hooks are ready, asked once at start before anything is written: a patch
  * changes bytes another hook's check reads. */
-static int g_rdyPan, g_rdyView, g_rdyShift, g_rdyStations, g_rdyWarp, g_rdySpec, g_rdySel;
+static int g_rdyPan, g_rdyShift, g_rdyStations, g_rdyWarp, g_rdySpec, g_rdySel;
 
 /* pan: the 25 bytes that pin down the parse; the fstp (6 bytes, at offset 17) is replaced */
 static const Site k_pan = { QOL_S_PAN_SITE, 25, 17 };
@@ -203,7 +204,7 @@ static A2Ini g_ini;          /* QOL.ini, with RefitPlayer.ini in front of it */
 
 /* Every change is a flag the patched code reads (or a value it uses), so the
  * patches stay installed and a setting applies live; see QOL_SettingsChanged. */
-static int g_panOk, g_shiftOk, g_stationsOk, g_warpOk, g_viewOk;   /* site bytes matched, patch in */
+static int g_panOk, g_shiftOk, g_stationsOk, g_warpOk;   /* site bytes matched, patch in */
 int g_shiftAdds;      /* ShiftAddsToGroup */
 int g_stations;        /* StationGroups */
 
@@ -299,65 +300,6 @@ static int patch_pan(void)
     return a2_write_call(AT(&k_pan) + (DWORD)k_pan.patch, pan_stub, 6);   /* call pan_stub; nop */
 }
 
-/* ---- view distance (QOL-9) -------------------------------------------- */
-
-/* Two values in ART_CFG.h end the view: FAR_CLIPPING_PLANE (20000, at
- * 0x6fcab0), the far plane PresetView::Init gives the game camera, and
- * cfgOBJECT_CULLING_DISTANCE (2800, at 0x6fcac0), past whose 0.9 every
- * object's ComputeFadeOut (ships, stations, planets, asteroids, nebulae) fades
- * it out.  RTS_Configure parses both and then, at 0x491bef, loads the culling
- * distance to copy it to 0x6fcac4, from which a mission script's
- * RestoreObjectCullingDistance puts it back.  That load becomes
- * `call view_stub; nop`: the stub raises both values to ViewDistance, then
- * loads ecx as the mov did.  Both are only ever read to draw, so this stays
- * stock-compatible; the fog and the shroud still decide what is drawn. */
-#define VIEW_DEFAULT    "1000000"
-
-/* the first six bytes (mov ecx,[cfgOBJECT_CULLING_DISTANCE]) are replaced */
-static const Site k_view = { QOL_S_VIEW_SITE, 21, 0 };
-
-float g_viewDistance = 0.0f;
-float g_farOrig, g_cullOrig;     /* the two values ART_CFG.h gave */
-float g_farSet, g_cullSet;       /* what this plugin last stored in them */
-int   g_viewSet;                 /* 1 once a parse has stored the originals */
-
-void __cdecl view_parsed(void)
-{
-    volatile float *far_plane = (volatile float *)a2s_qol_far_plane;
-    volatile float *cull      = (volatile float *)a2s_qol_cull_dist;
-    char m[160];
-
-    g_farOrig = *far_plane;
-    g_cullOrig = *cull;
-    g_viewSet = 1;
-    if (*far_plane < g_viewDistance) *far_plane = g_viewDistance;
-    if (*cull < g_viewDistance)      *cull = g_viewDistance;
-    g_farSet = *far_plane;
-    g_cullSet = *cull;
-    if (g_viewDistance <= 0.0f) return;
-    m[0] = 0;
-    s_cat(m, "ART_CFG.h parsed: FAR_CLIPPING_PLANE now ");
-    s_num(m, f_round(*far_plane));
-    s_cat(m, ", cfgOBJECT_CULLING_DISTANCE now ");
-    s_num(m, f_round(*cull));
-    logline(m);
-}
-
-/* Stands in for `mov ecx,[cfgOBJECT_CULLING_DISTANCE]`, reached by call; keeps every
- * register but ecx, which it loads as the mov did (the address, then the value). */
-__attribute__((naked)) void view_stub(void)
-{
-    __asm__ __volatile__(
-        "pushal\n\t"
-        "pushfl\n\t"
-        "call _view_parsed\n\t"
-        "popfl\n\t"
-        "popal\n\t"
-        "movl _a2s_qol_cull_dist, %ecx\n\t"
-        "movl (%ecx), %ecx\n\t"
-        "ret\n\t");
-}
-
 /* ---- Shift+number adds to a group ------------------------------------- */
 
 /* Reached by jmp from the Control test in mCheckGroupSelect: edi = cOverViewImp,
@@ -392,17 +334,6 @@ __attribute__((naked)) void group_stub(void)
 }
 
 static void poke(BYTE *at, const BYTE *bytes, int n) { a2_poke((DWORD)at, bytes, n); }
-
-static int patch_view(void)
-{
-    BYTE call[6];
-    if (!g_rdyView) return 0;
-    call[0] = 0xE8;                                         /* call view_stub */
-    *(LONG *)(call + 1) = (LONG)((DWORD)view_stub - (AT(&k_view) + 5));
-    call[5] = 0x90;                                         /* nop */
-    poke((BYTE *)AT(&k_view), call, 6);
-    return 1;
-}
 
 /* The jump is always in; g_shiftAdds is what group_stub tests, and the one byte
  * that moves Shift's old meaning to Alt follows it. */
@@ -1135,23 +1066,6 @@ static void apply_pan(void)
     if (g_panOk && g_panSet) *(volatile float *)a2s_qol_fastscroll = g_panOrig * g_panSpeed;
 }
 
-/* ViewDistance into the two ART_CFG.h values (and the copy a mission script restores
- * from), from the ones the file gave; a value a script has changed since is left. */
-static void apply_view(void)
-{
-    volatile float *far_plane = (volatile float *)a2s_qol_far_plane;
-    volatile float *cull      = (volatile float *)a2s_qol_cull_dist;
-    volatile float *saved     = cull + 1;      /* the copy a mission script restores from */
-    float nf, nc;
-    if (!g_viewOk || !g_viewSet) return;
-    nf = g_viewDistance > g_farOrig ? g_viewDistance : g_farOrig;
-    nc = g_viewDistance > g_cullOrig ? g_viewDistance : g_cullOrig;
-    if (*far_plane == g_farSet) *far_plane = nf;
-    if (*cull == g_cullSet) { *cull = nc; *saved = nc; }
-    g_farSet = nf;
-    g_cullSet = nc;
-}
-
 /* One entry of the log line, naming a setting and the value now in force. */
 static void changed(char *m, int *n, const char *key, const char *val)
 {
@@ -1236,16 +1150,6 @@ __declspec(dllexport) void __cdecl QOL_SettingsChanged(void)
         if (!g_warpOk) gate("WarpDistance", 0, 0);
     }
 
-    a2_set_str(&g_ini, QOL_ROW_VIEWDISTANCE, val, sizeof val);
-    f = s_parse(val);
-    if (f < 0.0f) f = 0.0f;
-    if (f != g_viewDistance) {
-        g_viewDistance = f;
-        apply_view();
-        changed(m, &n, "ViewDistance", val);
-        if (!g_viewOk) gate("ViewDistance", 0, 0);
-    }
-
     if (n) logline(m);
     else   logline("settings: re-read, nothing changed");
 }
@@ -1266,7 +1170,6 @@ static void startup(void)
     }
     a2e_init(&QOL_ENGINE, logline);
     g_rdyPan = a2e_ready(QOL_H_PAN_SPEED);
-    g_rdyView = a2e_ready(QOL_H_VIEW_DISTANCE);
     g_rdyShift = a2e_ready(QOL_H_SHIFT_GROUP);
     g_rdyStations = a2e_ready(QOL_H_STATIONS);
     g_rdyWarp = a2e_ready(QOL_H_WARP);
@@ -1336,22 +1239,6 @@ static void startup(void)
     }
     logline(b);
     if (g_warpDistance <= 0.0f) gate("WarpDistance", 0, g_warpOk);
-
-    a2_set_str(&g_ini, QOL_ROW_VIEWDISTANCE, val, sizeof val);
-    f = s_parse(val);
-    g_viewOk = patch_view();
-    b[0] = 0;
-    s_cat(b, "--- QOL ViewDistance=");
-    s_cat(b, val);
-    if (f <= 0.0f) {
-        s_cat(b, f < 0.0f ? "  (not a number: view left alone)" : "  (0: view left alone)");
-    } else {
-        if (g_viewOk) g_viewDistance = f;
-        if (g_viewOk) s_cat(b, "  -> far plane and object culling raised to it, patched");
-        else not_patched(b, QOL_H_VIEW_DISTANCE);
-    }
-    logline(b);
-    if (g_viewDistance <= 0.0f) gate("ViewDistance", 0, g_viewOk);
 
     g_barGrid = GetModuleHandleA("GridLayout.asi") != NULLPTR;
     g_barKeys = a2_set_int(&g_ini, QOL_ROW_BARKEYS) != 0;
