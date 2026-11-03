@@ -145,7 +145,7 @@ and the engine's own look shows through, as for a missing recipe. lint.py checks
 file (`schema`, `[set]`, keys that are plugins or plugin files of the game) and that a
 Rust plugin with a `content.rs` beside its generated file chooses every set named for
 it (`"<set>" =>`). The game directory's files (`Sky\`, `Surfaces\`, `Nebulae\`) still
-win over any set. C plugins carry no content (`csdk/a2engine.h` is unchanged).
+win over any set. `Engine::resolved(sym)` is the quiet twin of `addr` (no warning when no hook is ready), for a read that may come before its hook (a settings load); a module's `content::get()` starts its own table at first use, since a recipe is read before any hook. C plugins carry no content (`csdk/a2engine.h` is unchanged).
 
 ## The generated code
 
