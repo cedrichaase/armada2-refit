@@ -16,7 +16,7 @@ from a 256px stock file to a 1024px plate *is* the plate.)
 
 | | Here | Why |
 |---|---|---|
-| `HUD.asi`, `Menus.asi` — their C source, and `Render3D.asi`'s Rust | yes | our code. It patches the game at run time and ships none of it; the byte arrays in the sources are short instruction signatures, checked before each patch |
+| the C plugins' source (`QOL.asi`, `QOLRules.asi`, `Online.asi`, the cutscene proxy), and the Rust of `Render3D.asi`, `UI.asi` and Display8 | yes | our code. It patches the game at run time and ships none of it; the byte arrays in the sources are short instruction signatures, checked before each patch |
 | the Python and shell tooling, `.ini`/`.conf` files | yes | ours |
 | docs and changelogs | yes | ours. They quote the odd config line, which is commentary, and name functions and addresses from `armada2.map` — see "Engine findings" below |
 | `armada2.map`, disassembly or decompilation listings, hex dumps of game code | **no** | the game's own code, or a mechanical translation of it. `check.sh` refuses `*.map` |
@@ -34,7 +34,7 @@ that is `STA2WidescreenPatch` 1.0 (MIT) with the Ultimate ASI Loader 4.68 it bun
 | Third-party | Licence | Here |
 |---|---|---|
 | `STA2WidescreenPatch` 1.0, Ultimate ASI Loader 4.68 | MIT | vendored; in the zip |
-| DXVK | zlib | not yet: whether the installers should use it is open (below) |
+| DXVK | zlib | no: not used since 15.6.0 (Display8 draws on Vulkan and Direct3D 12 itself); its builds left `platform/vendor/` and only their hashes stay, in the retire table |
 
 `CREDITS.txt` in the zip names each author, licence and source.
 
@@ -84,7 +84,7 @@ every commit. The texture, model, cutscene and backdrop work joined it in one co
 without its history, which is full of stock art. So not every cited hash resolves here:
 
 - Hashes in the `textures/`, `models/` and `cutscenes/` changelogs, and `927f993` in the
-  root changelog and `79695b2`, `8a3562c` and `d3e1ccb` in `menus/CHANGELOG.md`, are in
+  root changelog and `79695b2`, `8a3562c` and `d3e1ccb` in the retired menus layer's changelog (`retire/history/menus-CHANGELOG.md`), are in
   that unfiltered history, which is not published and does not resolve here.
 - Every other hash resolves in this repository.
 
@@ -322,7 +322,8 @@ by hand. Web forms and Microsoft's portal (it needs an account) stay manual.
 carries no DXVK, no d3d8to9 and no `dxvk.conf`, and the launcher setting is
 `WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b`, which `install.sh` prints. What stands in the way:
 
-- **No plugin checks which `Armada2.exe` it is in.** Each should verify the exe and stand
-  down on any other build rather than patch the wrong bytes.
+- **Other builds of `Armada2.exe`.** The plugins check their hooks against the symbol
+  profile of the build (`profiles/gog-1.1/`) and stand down on any other rather than
+  patch the wrong bytes; only the GOG 1.1 profile exists.
 - **Untested**: Windows 11, a desktop other than Hyprland, and running without the
   widescreen patch.

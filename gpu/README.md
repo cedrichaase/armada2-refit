@@ -362,10 +362,10 @@ it. For comparing a frame with Direct3D 9's pixel for pixel, Display8's
 `PixelCentres=d3d9` keeps Direct3D 9's rule on Vulkan: the viewport moved as DXVK moves
 it and `half_pixel` 0.5 (`VkDevice8::features`, `FEATURE_D3D9_CENTRES`).
 
-### Samplers as DXVK makes them
+### Samplers as DXVK made them
 
-On Direct3D 9 (DXVK) the frame was filtered as the game's `dxvk.conf` has DXVK make every
-sampler (`dxvk.conf`; `display/README.md`, "Samplers as DXVK makes them"): 16x anisotropy in place of every linear filter, and a
+On Direct3D 9 (DXVK, until 15.6.0) the frame was filtered as the game's `dxvk.conf` had DXVK make every
+sampler (`display/README.md`, "Samplers"; the keys are now `Display8.ini [Samplers]`): 16x anisotropy in place of every linear filter, and a
 LOD bias of -0.5 on every sampler with mips. The plugins never ask for either; DXVK
 adds them. So on Vulkan Display8 reads the same keys and hands them over
 (`VkDevice8::sampler_anisotropy`, `sampler_lod_bias`), and `Gpu::sampler` makes each
@@ -377,7 +377,7 @@ a level blurrier than on Direct3D 9. Cube maps are seamless on Vulkan, as
 ### Measured
 
 render3d and the UI on Vulkan (`Backend=vulkan`, `PixelCentres=d3d9`, the validation
-layer on) against the same scenes on Direct3D 9 on the GPU (the `pre-gpu-*` baselines,
+layer on) against the same scenes on Direct3D 9 on the GPU, as measured before gpu 2.0.0 (the `pre-gpu-*` baselines,
 which the Direct3D 9 backend draws at RMSE 0), the screenshot of each port scene,
 2026-10-23. On the GPU (RX 5700, RADV) and on lavapipe (the bench's default for Vulkan):
 
@@ -392,8 +392,8 @@ Exit) on Vulkan on the GPU, which passes as on Direct3D 9. What is left is one o
 levels over the sky
 and the hulls, and single pixels at edges and on small bright details (the maxima, 117
 to 221, are on the Borg hulls' lights and the sprites): the rasteriser and the filtering of a CPU
-driver against a GPU's, and dxc's floating point against DXVK's translation of
-vkd3d's. The procedural bakes are where that shows most: their hashes
+driver against a GPU's, and dxc's floating point against the
+d3dbc form of the same shaders that DXVK translated (that leg is removed). The procedural bakes are where that shows most: their hashes
 (`render3d/shaders/world_surface.hlsl`, `hash13`) take the fraction of products in the
 tens of thousands, so one rounding apart, a fused multiply-add or not, moves a lattice
 value. The same scene on Direct3D 9 on lavapipe (DXVK there) is further from the GPU's
@@ -446,7 +446,7 @@ plan in Direct3D 12's terms; what differs, and why:
   semantics. A pixel shader that leaves out the position its vertex shader writes first
   (render3d's post passes, the sky's quad shaders, the ghosts) takes it first in DXIL
   alone (`DXIL_POS`, `DXIL_POS_MEMBER`, `DXIL_POS_FIRST` in `shaders/compat.hlsli`);
-  the d3dbc and the SPIR-V are as they were.
+  the SPIR-V is as it was.
 - **The alpha test** cannot be patched into DXIL (it is LLVM bitcode, and signed), so a
   pixel shader drawn with one has an alpha-tested twin built beside it
   (`tools/shaderc/dxil-alpha.py`, an entry marked `:at`, `Code::dxil_at`), which discards
@@ -493,9 +493,9 @@ plan in Direct3D 12's terms; what differs, and why:
 - **Read-back** copies the target into a read-back buffer and has Display8 submit the
   frame so far and wait for it (`display8_dx12_flush`); every `Cmd` sets everything
   again after. Timers are a timestamp query heap resolved into a read-back buffer.
-- **Pixel centres and samplers** as on Vulkan ("Pixel centres", "Samplers as DXVK makes
+- **Pixel centres and samplers** as on Vulkan ("Pixel centres", "Samplers as DXVK made
   them"): `Dx12Device8::features` carries `FEATURE_D3D9_CENTRES`, and the samplers are
-  made with `dxvk.conf`'s anisotropy and LOD bias.
+  made with `[Samplers]`'s anisotropy and LOD bias.
 - **Compute** has a root signature of its own: the register file at b0 in each space,
   the sixteen textures, a sampler per stage, the read-only storage (t16..t23) and the
   read-write storage and storage images (u0..u15, one table), each slot without
@@ -515,7 +515,7 @@ plan in Direct3D 12's terms; what differs, and why:
 ### Measured
 
 render3d and the UI on Direct3D 12 (`Backend=d3d12`, `PixelCentres=d3d9`), through
-Proton's vkd3d-proton on the GPU (RX 5700, RADV), against the same scenes on Direct3D 9
+Proton's vkd3d-proton on the GPU (RX 5700, RADV), against the same scenes on Direct3D 9 (before gpu 2.0.0)
 on the GPU (the `pre-gpu-*` baselines), the screenshot of each port scene, 2026-10-23:
 
 | Scene | RMSE (/255) | over 2/255 | max |
@@ -526,8 +526,8 @@ on the GPU (the `pre-gpu-*` baselines), the screenshot of each port scene, 2026-
 
 As on Vulkan: one or two levels over the sky and the hulls, and single pixels on the
 Borg hulls' lights and small bright details, which is dxc's floating point (fused
-multiply-adds in the procedural bakes, `hash13`) against DXVK's translation of vkd3d's
-d3dbc. `display-stub` (the whole game, intro to Exit) passes on `Backend=d3d12`; one
+multiply-adds in the procedural bakes, `hash13`) against DXVK's translation of the (since removed)
+d3dbc form. `display-stub` (the whole game, intro to Exit) passes on `Backend=d3d12`; one
 earlier run found the in-mission menu's "Save Not Allowed" while the mission's opening
 still ran (the scenario's fixed waits), and the next passed. **Validation**: Microsoft's debug layer is not there under vkd3d-proton
 (`D3D12GetDebugInterface` answers `DXGI_ERROR_SDK_COMPONENT_MISSING`), and the Khronos
@@ -646,8 +646,8 @@ render3d's stream ends at its first `Cmd` of the next frame.
 **The replay** (`a2replay.exe`, `no_std` Rust linking this crate, built by `replay.sh`
 with the toolchain of the plugins) is a game without the game: it opens a window at the
 recording's size, loads Display8 (`display/build/d3d8.dll`) in stub mode on the backend
-asked for, with the recording's own `Display8.ini` (its `PixelCentres=`) and
-`dxvk.conf` (the samplers' anisotropy and LOD bias), makes the device as the engine
+asked for, with the recording's own `Display8.ini` (its `PixelCentres=` and
+`[Samplers]`, the anisotropy and LOD bias), makes the device as the engine
 does (`Direct3DCreate8`, `CreateDevice` at the recorded size and depth format), and
 gives each stream a `Gpu` of its own on it (`Gpu::with_display`, `attach_engine`), as
 each plugin has. `replay::Replay` then makes every call again in `seq` order:
@@ -662,7 +662,7 @@ each plugin has. `replay::Replay` then makes every call again in `seq` order:
   colour, else drawn in; its depth is cleared to 1;
 - a snapshot goes into a target through the replayer's blit (`replay/shaders/blit.hlsl`,
   point-sampled, the quad moved half a pixel on Direct3D 9): Direct3D 9 copies only
-  between targets, and a texture with contents is not one;
+  between targets, and a texture with contents is not one (a rule of Direct3D 9, whose quad the replay's blit once moved by half a pixel);
 - vertices go into the frame's ring with the stride they had (`Cmd::vertices` of a
   type that size), and each draw reads the span it read.
 

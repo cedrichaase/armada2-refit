@@ -33,7 +33,7 @@ the host meets every one of them.
 save, campaign select, multiplayer) is a Win32 dialog drawn with GDI at hard-coded
 coordinates from 800x600 8-bit BMPs in `bitmaps/`. `Armada2.exe` imports `BitBlt` and
 no `StretchBlt` or `SetWorldTransform`, and the shell never touches Direct3D, so no
-`gui_*.cfg` (the in-game HUD's canvas), DXVK or display setting can scale it. And the
+`gui_*.cfg` (the in-game HUD's canvas) or renderer setting can scale it. And the
 engine asks for **800x600x16 while the menus are up**: `GetSystemMetrics` answers 800 at
 the main menu and the game window is 800x600 at 0,0, so a stock shell *fills a small
 screen* and there is nowhere to scale into. The request is
@@ -55,7 +55,7 @@ included, is `DialogBoxParamA(shell_hInstance, id, <3D window>, proc, lp)` with 
 (291). An owned popup is a second top-level window, which under Wine is a second X11
 window that Hyprland tiles and focuses like a new application (two visible top-level
 windows, both re-tiled when Options opened, injected clicks mostly lost). The Wine
-virtual desktop would also give one window, but DXVK cannot set a display mode inside it,
+virtual desktop would also give one window, but a display mode cannot be set inside it (DXVK could not; Display8's Vulkan or Direct3D 12 swap chain has no mode to set either),
 so it stays off. The remedy is the `WS_POPUP` to `WS_CHILD` rewrite of the template (the
 host's `CreateDialogIndirectParamA`); a child brings these, each measured:
 
@@ -510,8 +510,8 @@ Every dialog without a spec, `[Menus] Generic`:
   with `EM_GETLIMITTEXT`, and notifies its parent itself); a list's or combo's choice
   is `Action::Select`; a `ShellScrollBar` is a slider (above).
 
-**The design area** is 800x600 fitted into the back buffer as Menus.asi fits it: the
-full height, centred, at 4:3. `UI.log` logs it as Menus.asi logs its own
+**The design area** is 800x600 fitted into the back buffer as the retired Menus.asi fitted it: the
+full height, centred, at 4:3. `UI.log` logs it as Menus.asi logged its own
 (`menus: MoveWindow 800x600 @0,0 -> 960x720 @160,0 ...`), and the bench reads either log
 to map a scenario's design coordinates to the screen (`testbench/bench/scenario.py`,
 `design_to_screen`), so the existing scenarios' `Click at design X,Y` steps and
@@ -1068,7 +1068,7 @@ hidden surfaces).
   of the UI's own is not drawn.
 - **A display mode other than the desktop's** for the game: the shell is raised to the
   desktop size, so a game at another resolution re-creates the device at every switch
-  between the shell and a mission (as with Menus.asi); not measured.
+  between the shell and a mission (as it did with Menus.asi); not measured.
 
 ## The Credits
 

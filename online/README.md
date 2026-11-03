@@ -15,7 +15,7 @@ at `c20e.de` unless changed), the host gets a join code and players type it to j
 directly where the routers allow it, through the server's relay where not. With
 `Server=` empty, players join by address as on a LAN. The server is
 `server/a2online-server.py`. Every other connection type keeps the game's DirectPlay,
-traced but unchanged. `./install` does not install it yet.
+traced but unchanged. `./install` installs it (`online/install.sh`, the `online` layer of the registry, `layers.toml`), and `./a2mod` switches it with the other layers (online 0.11.0).
 
 **Seen in game (2026-10-03):** a player's own install joined a bench game on the same
 machine by join code, through the public server at `c20e.de`, and played the match. That confirms the menu entry, the transport, the join code and the default

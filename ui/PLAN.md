@@ -2,11 +2,18 @@
 
 Own everything the game shows outside the 3D view: the in-mission HUD, the front-end
 menus and the loading screen, drawn by `UI.asi` in our own code, as render3d owns the
-3D view. Today three plugins correct the stock UI from outside: `HUD.asi` (layout,
-font, cursors at any aspect), `GridLayout.asi` (the button bar as a grid) and
-`Menus.asi` (the GDI shell scaled and embedded). Each fix there works against a
-fixed-pixel design. A UI of our own can be laid out for any screen, extended freely
-and drawn at the back buffer's own resolution.
+3D view. Until the plan was done, three plugins corrected the stock UI from outside:
+`HUD.asi` (layout, font, cursors at any aspect), `GridLayout.asi` (the button bar as a
+grid) and `Menus.asi` (the GDI shell scaled and embedded). Each fix there worked against
+a fixed-pixel design. A UI of our own is laid out for any screen, extended freely and
+drawn at the back buffer's own resolution.
+
+**Status (15.x): every step below is done and shipped on.** `UI.asi` owns the HUD's
+panels, the menus, the loading screen and the cursor; the three plugins were superseded
+and then deleted from the repository (their last changelogs are `retire/history/`;
+`retire/retire.sh` takes them out of an old install). The sections keep the decisions
+the code still follows; where they speak of the plugins in the present tense, read
+history.
 
 The steps follow render3d's: a seam, then parts taken over one at a time, each
 switchable, each falling back to stock.
@@ -15,9 +22,9 @@ switchable, each falling back to stock.
 
 What every later screen is built from, and nothing the player sees by default:
 
-- **A 2D renderer** on the Direct3D 9 device behind d3d8to9 (`src/gfx/`): one shader
+- **A 2D renderer** on the device Display8 hands out, through `gpu` (Vulkan or Direct3D 12; first built on Direct3D 9, since removed) (`src/gfx/`): one shader
   pair for every primitive (solid, gradient, image, nine-slice, signed-distance text,
-  antialiased rounded rectangles), batched into a few `DrawIndexedPrimitiveUP` calls a
+  antialiased rounded rectangles), batched into a few draw calls a
   frame, clipped by scissor, the device's state saved and put back around it.
 - **Text** (`src/text/`): an OFL font vendored in `platform/vendor/`, baked at build
   time into a signed-distance atlas, so one atlas is sharp at every size.
@@ -36,17 +43,17 @@ the plugin patches its hooks and draws nothing.
 Reads and actions, kept in one module per area, each tagged with the panel that needs
 it: the selection and what it can do, a unit's state, resources, the minimap's
 picture, messages and objectives. Actions go through the game's own commands
-(the orders `QOL.asi` and `GridLayout.asi` already send), never around them, so a
+(the orders `QOL.asi` and the retired `GridLayout.asi` sent), never around them, so a
 player with the UI plays a player without it.
 
 ## 3. The HUD, a panel at a time
 
 Each `DisplayInterface` panel (`HUD.md`) replaced by one of ours, behind a
 switch, the stock panel's `Render` skipped while ours draws. Likely order: the button
-bar (where `GridLayout.asi` already owns the logic), the info panel, the selection,
-resources and messages, then the minimap. `HUD.asi`'s canvas, font and seam fixes stop
-mattering for each panel ours replaces; when the last goes, `HUD.asi` and
-`GridLayout.asi` are superseded.
+bar (where `GridLayout.asi` then owned the logic), the info panel, the selection,
+resources and messages, then the minimap. `HUD.asi`'s canvas, font and seam fixes stopped
+mattering for each panel ours replaced; when the last went, `HUD.asi` and
+`GridLayout.asi` were superseded. Done.
 
 ## 4. The menus, a screen at a time
 
@@ -55,7 +62,7 @@ the stock dialog returns and writing the same settings. Start with the screens t
 only read and write options (Graphics, Sound, Game Settings), then Load/Save and the
 mission lists, then Instant Action's setup. The multiplayer screens come last: their
 state is DirectPlay's and the lobby's, and `Online.asi` will own the game list anyway.
-When the last goes, `Menus.asi` is superseded.
+When the last went, `Menus.asi` was superseded. Done.
 
 ## 5. The loading screen
 
@@ -93,10 +100,10 @@ it returns. Rewriting 38 procedures would mean describing each of them. Instead,
   (owner-drawn art, a preview picture) is mirrored: printed off the hidden window into
   a texture. So every menu works from the start, and laying out a screen changes only
   how it looks.
-- **Menus.asi is superseded, not run alongside.** While `UI.asi` hosts the dialogs,
-  `Menus.asi` must not also hook them; the menu part of `UI.asi` stands down if it
-  finds `Menus.asi` loaded, and the install takes `Menus.asi` out when the UI's menus
-  are on. `UI.asi` raises the shell's display mode itself.
+- **Menus.asi was superseded, not run alongside.** While `UI.asi` hosts the dialogs,
+  `Menus.asi` could not also hook them; the menu part stood down if it found `Menus.asi`
+  loaded. Both are history since ui 2.2.0: the plugin is deleted and `retire.sh` takes
+  it out. The shell's display mode is raised by Display8 now (it was the UI's own patch).
 
 ### HUD: the stock panels keep running; we draw them and route their input
 
@@ -110,15 +117,15 @@ and their pictures and clicks are separate steps.
   running, so its state stays current.
 - **Our panel reads that state** from the component and from the engine through
   `src/engine/` (one file per area, step 2). It **acts by calling the component's own
-  functions** (the press function of a palette button, as `GridLayout.asi` does) or the
+  functions** (the press function of a palette button, as `GridLayout.asi` did) or the
   game's commands. It never goes around them.
 - **The layout is ours**: anchored to the screen, at any aspect, in the style of
   `STYLE.md`. No `gui_*.cfg` rectangle is read, except for what the engine needs to
   hit-test where we have not taken over.
-- **HUD.asi and GridLayout.asi are superseded panel by panel.** The UI's button bar has
-  the grid keys of its own (`HUD.md`, "The button bar", is the behaviour). The UI takes
-  the bar only while `GridLayout.asi` is not loaded. When the UI owns every panel, the
-  install takes `HUD.asi` and `GridLayout.asi` out.
+- **HUD.asi and GridLayout.asi were superseded panel by panel.** The UI's button bar
+  has the grid (`HUD.md`, "The button bar", is the behaviour; its keys are `QOL.asi`'s).
+  Now that the UI owns every panel, the install (`retire/retire.sh`) takes both out and
+  the UI has no stand-down for them.
 
 ### Art
 
@@ -145,7 +152,7 @@ A UI of our own reads much more of the engine's state than today's plugins patch
 
 ## Not decided yet
 
-- Our own cursor (the mission's is the engine's sprite, `HUD.md`).
+- (Settled: the cursor is ours, `[UI] Cursor=1`; `README.md`, "The cursor".)
 - Text entry (IME, the game's own chat box).
-- Whether `HUD.asi`'s fixes stay for panels we have not replaced, or the stock panels
-  are hidden as a whole once enough are ours.
+- (Settled: `HUD.asi` is gone; a panel not yet ours is the stock one on the stock canvas,
+  stretched, `README.md`, "A part switched back to stock".)

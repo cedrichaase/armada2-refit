@@ -179,7 +179,8 @@ mistaken for ours. The snapshot layout is unchanged.
 - **Never identify a DLL in this slot by size.** `syswow64/d3d8.dll` at 320548 bytes
   was once recorded as "DXVK's exact size"; it is byte-identical to *Wine's builtin*,
   and on the strength of that the game ran through wined3d/OpenGL while every
-  `dxvk.conf` key was silently ignored and the DXVK HUD never appeared. DXVK's d3d8 is
+  `dxvk.conf` key was silently ignored and the DXVK HUD never appeared (history: those
+  were the chain's tools until 4.0.0; the trap is the same for any DLL in this slot). DXVK's d3d8 is
   ~1.66 MB (Proton's 1658894, Heroic's 3.1.1 1687566). `d3d8-chain.py` hashes each link
   against the candidates actually present on the machine and names what it found,
   reporting `UNKNOWN` rather than guessing.
@@ -201,15 +202,15 @@ kept snapping back to a black fullscreen frame.
 **Cause:** every menu, the in-game Options included, is a `WS_POPUP` dialog, which Wine
 turns into a second X11 window that Hyprland tiles and focuses like a new application.
 
-**Fix: `Menus.asi` with `Embed=1`** (the default it ships with) re-creates each
-menu as a child of the game window, so the game is one OS window from launch to exit.
-See `ui/MENUS.md`, "What the shell is, in the engine" (the UI's host does what `Embed=1` did).
+**Fix: the UI's menu host** (`UI.asi`, `[Menus]`) re-creates each menu as a child of the
+game window, so the game is one OS window from launch to exit. See `ui/MENUS.md`, "What the
+shell is, in the engine". (Until 15.0.0 `Menus.asi` did this with `Embed=1`.)
 
 **The Wine virtual desktop must stay off.** It also puts everything in one window
 (`"Desktop"="Default"` under `[Software\\Wine\\Explorer]` in `<prefix>/pfx/user.reg`),
-but it is incompatible with DXVK: inside it `ChangeDisplaySettingsEx` fails and the game
-falls back to 640x480. Do not turn it on to fix a window problem; fix the window in
-`menus.c`.
+but it is incompatible with a Vulkan or Direct3D 12 device of our own (as it was with
+DXVK): inside it `ChangeDisplaySettingsEx` fails and the game falls back to 640x480. Do not
+turn it on to fix a window problem; fix the window in the UI's menu host (`ui/`).
 
 To check it is off (a fresh prefix never has it):
 
@@ -233,7 +234,7 @@ edit.
   Startup videos played fine, so Bink itself worked; the hypothesis was a D3D8 device
   reset on the transition from live 3D to fullscreen video. It produced no diagnostics
   at all — `Logs/` empty, no coredump, no MadExcept report, no Heroic session log — and
-  it has not been retested under DXVK or `binkproxy`.
+  it has not been retested under Display8 or `binkproxy`.
 
 ## Campaign progress format
 
@@ -282,7 +283,7 @@ ten each for Federation, Klingon and Borg.
 ## Verification recipes
 
     # what is in the d3d8 slot right now? by hash, never by size. Heroic's DXVK builds
-    # (tools/dxvk/dxvk-*/) are recognised from the native and the Flatpak Heroic
+    # (tools/dxvk/dxvk-*/) are still recognised, from the native and the Flatpak Heroic
     platform/d3d8-chain.py --status
 
     # did Heroic redeploy DXVK into the prefix? these four sharing an mtime means yes
@@ -297,5 +298,5 @@ ten each for Federation, Klingon and Borg.
     # stop it, its Wine session, and any stale audio node it left behind
     platform/stop-game.sh
 
-    # did Menus.asi load, and what did it patch?
-    cat "<game dir>/Menus.log"
+    # did the UI's menu host start, and what did it hook?
+    cat "<game dir>/UI.log"

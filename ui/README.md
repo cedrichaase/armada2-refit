@@ -53,9 +53,8 @@ Why that site:
   mission and freed when it ends, and the call is skipped while there is none. The front
   end and the loading screen draw through other paths and never reach it.
 - **No other plugin is there.** render3d patches the two `Armada_RenderAllOurStuff`
-  calls and the steps inside that body; HUD.asi wraps `RefreshDisplay`'s cursor draw
-  (0x6246fa) and `SimulateAll` in `DisplayInputProcess`; GridLayout.asi and QOL.asi
-  patch inside the HUD's panels. The hook checks the call still goes to
+  calls and the steps inside that body; QOL.asi patches inside the HUD's panels (the
+  retired HUD.asi wrapped `RefreshDisplay`'s cursor draw, 0x6246fa, and `SimulateAll`). The hook checks the call still goes to
   `ChatDisplay::Render` and stands down otherwise.
 - The other candidates were worse: the `EndScene` and `RefreshDisplay` calls are
   indirect (through the device's vtable), so a hook there needs the vtable and fires in
@@ -253,7 +252,7 @@ uses of it:
   is a Storm3D database element, so its name, the one `cursor.spr` gives it, is at
   `+0x8`. `cursor::shape()` reads it; by the mission hook this frame's choice has
   reached the device.
-- **Hiding it.** Under DXVK the cursor is the synchronous one (`+0xe0` set):
+- **Hiding it.** On the device the game gets now (Display8's; DXVK's before 15.0.0) the cursor is the synchronous one (`+0xe0` set):
   `RefreshDisplay` draws the sprite at `+0x60` in a scene of its own just before it
   presents, and draws none when `+0x60` is empty. `cursor::hide_this_frame()` makes the
   next `RefreshDisplay` run with `+0x60` emptied and put back after, through a wrap of
@@ -262,14 +261,14 @@ uses of it:
   so the UI calls it every frame it draws a cursor of its own. Calling the device's
   `SetCursor(NULL)` instead would also hide it, but `SetCursor` frees and rebuilds the
   cursor's texture whenever the sprite changes, every frame. With a hardware cursor
-  (`+0xe0` clear, not seen under DXVK) the wrap has no effect; `cursor::synchronous()`
+  (`+0xe0` clear, never seen since the bench ran DXVK) the wrap has no effect; `cursor::synchronous()`
   says which.
 - **Whether the engine would show it** (`cursor::install_probe`). Another plugin can
   hide the engine's cursor by wrapping `RefreshDisplay`'s one `DrawScaled2D` call
   (0x6246fa) and skipping it: Scene.asi's `Cursor=0` and `cursor off`
   (testbench/scene/README.md), which patches it once the scene is built and chains to
   whatever the call went to. The UI wraps the same call when it loads (the probe,
-  chaining to stock or to HUD.asi's wrap), so Scene.asi's wrap comes before it. Each
+  chaining to stock), so Scene.asi's wrap comes before it. Each
   present with a cursor sprite notes whether the draw got as far as the probe:
   `engine_shows()` is false while something before it skips it, and then the UI draws
   no cursor either (`cursor: Mission draws none`). It follows a change a present late.
@@ -329,12 +328,12 @@ display* (`ST3D_GraphicsEngine::SetActiveDisplay(3)`), calls the device's
 (1 is the main menu).
 
 `SetActiveDisplay` takes a display type: 2 is the 3D display at the game's own
-resolution, 3 the shell's. The shell asks for 800x600x16, which Menus.asi raises to the
-desktop size. When the mode the new display wants differs from the current one,
+resolution, 3 the shell's. The shell asks for 800x600x16, which Display8 raises to the
+desktop size (until 15.0.0 `Menus.asi` did). When the mode the new display wants differs from the current one,
 `ST3D_Device::ChangeDisplayMode` destroys the Direct3D device and creates a new one.
 When the two modes are the same, it does nothing at all. **So the `IDirect3DDevice8` can
 change whenever the shell and the 3D display switch.** In stock (an 800x600 shell
-under a bigger game resolution) it changes on every switch. With Menus.asi and the game
+under a bigger game resolution) it changes on every switch. With the shell raised to the desktop size and the game
 at desktop resolution it does not, which Display8's `[Window] Native` arranges from the
 first launch (a stock mode in the profile becomes the desktop's before
 `InitializeGraphicsSystem` opens the device). Anything that keeps resources must check
@@ -355,7 +354,7 @@ device. At the end it sets a black shell background (`SetCurrentBackground` with
 (`ClearDeviceDisplays`), puts the shell display back, calls `FlipToGDISurface`, drains
 the queue through `HandleMessageQueue`, and sets `g_shellMode` to 1. `run_screen` does
 exactly that around a closure, so a screen of ours leaves the shell as the engine's own
-3D screen does. The screen is not a dialog, so Menus.asi's `DialogBoxParamA` hook,
+3D screen does. The screen is not a dialog, so the menu host's `DialogBoxParamA` hook,
 subclasses and modality filter never see it.
 
 Each frame, `run_screen`:
@@ -383,9 +382,9 @@ passes the engine's "none" on.
 
 **Never subclass the 3D window.** Up to ui 0.15 the arrow came from a subclass of the
 window procedure (`SetWindowLongA(GWL_WNDPROC)`), installed the first time a dialog
-was hosted. DXVK hooks the window procedure of a full-screen device's window too, and
-when the device goes it puts the old procedure back only if its own is still on top,
-else it just forgets the window. So with the subclass made over the first device's
+was hosted. DXVK (the renderer then) hooked the window procedure of a full-screen device's window too, and
+when the device went it put the old procedure back only if its own was still on top,
+else it just forgot the window. So with the subclass made over the first device's
 hook, the engine's second `CreateDevice` (a display mode chosen in Graphics Settings
 in the middle of a mission) hooked the window again and took the subclass as the
 procedure before its own; the subclass's "previous procedure" was DXVK's hook. The
@@ -394,7 +393,7 @@ first message after the new device (the `UpdateWindow` in
 out: `virtual_setup_exception stack overflow` after `dispatch_user_callback` in
 `wine.log`, the last Display8 lines the new device's `CreateVertexBuffer`
 (`render3d-mode-switch`, which failed the same way on `main`). Any procedure chain
-over a window DXVK hooks has this shape; a patch at the engine's own answer has none.
+over a window another layer hooks has this shape; a patch at the engine's own answer has none.
 A screen that starts with no
 keyboard focus (Wine leaves it `NULL` after an embedded menu, `MENUS.md`, "What the shell is, in the engine") puts
 it on the 3D window.
@@ -412,12 +411,12 @@ it does not. It returns to the main menu over black, as the Credits do.
 
 ### Facts measured on the bench
 
-On the bench (2026-10-16, 1280x720, `./install` with Menus.asi `Embed=1`, UI.log):
+On the bench (2026-10-16, 1280x720, `./install` with the then Menus.asi `Embed=1`, UI.log):
 
 - At the main menu, the shell display is up (Storm3D's display type 3) and the device
   exists: one `ST3D_DeviceDirectX8` on the 3D window. Its back buffer is 1280x720
   X8R8G8B8, it is **not windowed** (fullscreen, flip swap effect, default present
-  interval), and the window's client area is 1280x720. Menus.asi raises the shell mode
+  interval), and the window's client area is 1280x720. the shell mode is raised
   to the desktop size, and the game's resolution is the same, so switching to the 3D
   display changed nothing: same device, same back buffer, same mode.
   `engine::d3d8_device()` is valid in the shell.
@@ -455,7 +454,7 @@ draws over the logo, the bar and the skybox, on every frame the loading screen p
 and on no other. Before patching, the site is checked to call stock and the `EndScene`
 after it (`call [eax+0x34]`) is checked to be where it should be. A mismatch makes the
 loading part stand down. The widened `logo.sod` changes only geometry and art, not this
-code, and HUD.asi does not touch the function.
+code, and the retired HUD.asi did not touch the function.
 
 **Progress** (`loading::progress()`) is `1 - s_fractionRemaining`, the value
 `LoadBarComputeFraction` (`0x601ce0`, checked by its bytes) returns and the bar is
@@ -481,8 +480,8 @@ normally afterwards.
     ui/build.sh                                   # -> ui/build/UI.asi
     ui/bench-asi.sh <state.json> --demo mission,shell,loading [UI.Scale=1.5]
 
-`build.sh` compiles `shaders/*.hlsl` with `tools/shaderc/hlsl-rs.sh` (the generated
-`src/shaders/*.rs` is committed and stamped, so a machine without `vkd3d-compiler`
+`build.sh` compiles `shaders/*.hlsl` with `tools/shaderc/hlsl-rs.sh` (SPIR-V and DXIL; the generated
+`src/shaders/*.rs` is committed and stamped, so a machine without `dxc`
 builds) and the font atlas from the vendored TTFs (`src/text/`), then the DLL.
 `bench-asi.sh` copies `UI.asi` and `UI.ini` into a bench session's clone and sets the
 keys it is given; it is what a scenario's `Setup:` line runs.
@@ -521,8 +520,8 @@ it. So `./install` over an older install gives the UI's parts, and a part a play
 switched on or set otherwise stays as they set it.
 
 `a2mod stock` puts `UI.asi` and `UI.ini` aside with the rest (the `ui` layer), and
-the plates under `menus`: the stock game has neither `HUD.asi` nor `Menus.asi`, so
-nothing else changes.
+the plates (`Menus/*.bmp`, filed under this layer): the stock game has none of the retired
+plugins, so nothing else changes.
 
 ### A part switched back to stock
 
@@ -531,8 +530,7 @@ that the old plugins are not installed:
 
 - **A `[HUD]` panel at 0** is the stock panel, on the stock 1600 x 1200 canvas that
   the engine scales to the screen per axis: on a wide screen it is stretched (the
-  minimap, the info panel and the bar wider than tall, their text wide), as without
-  `HUD.asi`. The panels of ours lay themselves out around what they read of it (the
+  minimap, the info panel and the bar wider than tall, their text wide), as in the stock game. The panels of ours lay themselves out around what they read of it (the
   bar is placed against the stock minimap's rectangle when ours is off). With
   `[HUD] Enable=0` the whole HUD is stock; nothing corrects the stretch.
 - **`[HUD] Bar=0`** is the stock bar with stock's keys; the bar's keys
@@ -564,7 +562,7 @@ a row with no device or back buffer (`gfx::drawing`; logged), the HUD switch
 engine's HUD comes through instead of vanishing. A UI of another contract than
 Display8's never registers either.
 
-### What the old plugins did, and where it is now
+### What the retired plugins did, and where it is now (history)
 
 | Plugin, part | Now |
 |---|---|
@@ -574,7 +572,7 @@ Display8's never registers either.
 | `HUD.asi` re-layout after a mode change | nothing to do: our panels lay out every frame, the stock canvas is the same at every mode |
 | `HUD.asi` cursor (square at any aspect) | ours with `Cursor=1`; with `Cursor=0` (or where ours cannot hide the engine's), `engine::cursor::install_square` makes HUD.asi's two changes (below) |
 | `GridLayout.asi` (the bar as a grid of position keys) | `[HUD] Bar` for the layout and drawing; the keys are QOL.asi's (`QOL.ini` `BarKeys`, `qol/bar.c`; `HUD.md`, "The button bar"). `GridLayout.ini`'s `[Cells]` has no counterpart yet |
-| `Menus.asi` display mode raised | the menu host raises it (`MENUS.md`, "The display") |
+| `Menus.asi` display mode raised | Display8 raises it (`display/README.md`, "Window and display mode"; `MENUS.md`, "The display") |
 | `Menus.asi` scaling, mouse mapping | the menus are drawn by us, and the pointer sent to each dialog in its design place |
 | `Menus.asi` `Embed=1` (one window) | every hosted dialog is a hidden child of the 3D window; the game is one window throughout |
 | `Menus.asi` `EscapeReturns` | `[Menus] EscapeReturns` |
@@ -705,7 +703,7 @@ antialiased over one pixel, so corners are smooth at any radius without a textur
 the style's *shape* (`src/gfx/fx.rs`, `STYLE.md`): each corner rounded or chamfered,
 filled or stroked, soft-edged for glows and shadows, an LCARS elbow's cut-out, stripes.
 The pixel shader weights the kinds with `step()` rather than branching on them, as
-vkd3d needs (`render3d/README.md`). A new draw call starts only when the texture or the
+the shader compilers' unrolling wants (`render3d/README.md`). A new draw call starts only when the texture or the
 clip rectangle changes; solid quads take whatever texture the run has, since they do
 not sample it.
 
