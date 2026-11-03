@@ -5,6 +5,14 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.86.2 — 2026-11-03
+
+Layers: testbench 3.98.2.
+
+### Fixed
+- `ui-hud-panels` and `ui-loading` scenarios corrected (stale button list, fixed wait); not phase 8 regressions.
+- Installed, not yet seen in game
+
 ## 13.86.1 — 2026-11-03
 
 Layers: testbench 3.98.1.

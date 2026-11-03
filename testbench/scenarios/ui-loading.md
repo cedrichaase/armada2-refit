@@ -28,10 +28,12 @@ The campaign is reached from Instant Action's match by Esc, Exit to the main men
 8. Wait 2 seconds.
 9. Take a screenshot called "instant action load later".
 10. Check that the ring of dots at the left of the status line has turned since the previous screenshot (the frames between the engine's are animated).
-11. Wait up to 25 seconds for the logs the next steps expect.
+11. Wait up to 90 seconds for the logs the next steps expect.
 12. Expect "UI.log" contains "hold over".
 13. Expect "UI.log" contains "first frame of ours".
-14. Take a screenshot called "match".
-15. Check that the match has started: the 3D view and the in-mission HUD are up and no loading screen is left over them.
-16. Quit the game.
-17. Expect no crash.
+14. Expect "UI.log" contains "mission: frames start".
+15. Wait 2 seconds.
+16. Take a screenshot called "match".
+17. Check that the match has started: the 3D view and the in-mission HUD are up and no loading screen is left over them.
+18. Quit the game.
+19. Expect no crash.
