@@ -5,6 +5,20 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.72.0 — 2026-11-03
+
+Layers: render3d 0.39.0, testbench 3.91.0.
+
+### Changed
+- render3d: particles and ordnance on the hook registry and live (`Modules.particles`,
+  `Modules.ordnance`), with their hooks, content and settings reads in their own files;
+  the chain bugs of their hooks fixed (they called a constant, not what was there
+  before). `ordnance.ini` moved to `render3d/content/ordnance/`. No change to what is
+  drawn. Installed, not yet seen in game
+
+### Added
+- testbench: scenarios `render3d-live-particles` and `render3d-live-ordnance`.
+
 ## 13.70.2 — 2026-11-03
 
 Layers: render3d 0.37.2.

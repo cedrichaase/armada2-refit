@@ -6,10 +6,10 @@ names the render3d module that will carry it out. A section describes the target
 installed: what a module draws today is in `render3d/README.md`, and what changed in
 `render3d/CHANGELOG.md`. When a module's recipes take a direction up, say so here.
 
-## Tractor and assimilation beams (render3d's `ordnance`, `render3d/ordnance.ini`)
+## Tractor and assimilation beams (render3d's `ordnance`, `render3d/content/ordnance/ordnance.ini`)
 
 The user's direction (2026-10-15), drawn since render3d 0.6.0 (`Kind=cone` in
-`render3d/ordnance.ini`), not yet seen in game: the tractor beams
+`render3d/content/ordnance/ordnance.ini`), not yet seen in game: the tractor beams
 (`tracbm`, `tracbmo`), the Borg holding beam (`holdbm`, the Borg tractor) and the
 assimilation beams should not be lasers. The current recipes draw them as ribbons with
 a hot core, flowing pulses and twisting strands. These beams should be **a fluctuating

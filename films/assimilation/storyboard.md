@@ -7,7 +7,7 @@ Variant refit: --assets none --install . --install testbench/scene
 A Borg cube reads a Sovereign with its technology assimilation beam (`gTechAssimBeam`),
 for a stock and refit before and after (a wipe) in the promo films, and for a 9:16 Short
 cut from the same takes. In refit the beam is render3d's cone of light through vapour
-(`render3d/ordnance.ini`, `techassimbeam`, `Kind=cone`; `ART-DIRECTION.md`, "Tractor
+(`render3d/content/ordnance/ordnance.ini`, `techassimbeam`, `Kind=cone`; `ART-DIRECTION.md`, "Tractor
 and assimilation beams"); in stock it is the engine's textured beam model.
 
 The scene is `testbench/scene/scenes/assimilation.ini`: the Sovereign (`tgt`, an enemy)

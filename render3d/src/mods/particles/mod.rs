@@ -19,53 +19,30 @@
 //! ordnance) are still the engine's, drawn into our target.
 pub mod anim;
 pub mod billboard;
+pub mod content;
 pub mod draw;
+pub mod hooks;
 pub mod look;
 pub mod nebula;
 pub mod sim;
 pub mod vent;
 
 use super::{Module, Step};
-use crate::engine::{self, hook, rd, storm3d};
+use crate::core_module::Changes;
 use crate::frame::steps::View;
 use crate::math::{v3, M34};
 use crate::scene;
 use crate::{log, rt};
-use alloc::collections::BTreeSet;
+use alloc::string::String;
 use alloc::vec::Vec;
 use draw::{Batch, Cam};
 
-use crate::engine::DX8_VTABLE as VT_DEVICE_DX8;
-const SLOT_RENDER_PARTICLE: usize = 50;
-const FN_RENDER_PARTICLE: usize = 0x6262f0;
-const ENG_CURRENT_INSTANCE: usize = 0x100;
 use crate::engine::light::{FN_NEW, FN_POINT_LIGHT, FN_REGISTER_LIGHT};
+use crate::engine::storm3d;
 const MAX_LIGHTS: usize = 16;
 /// Whether the vents' lights are also added to the scene layer's list by hand (see
 /// `Particles::lights`).
 const SCENE_POINTS: bool = false;
-
-static mut PREV_RP: usize = 0;
-static mut SUPPRESS: bool = false;
-static mut OWNED: BTreeSet<usize> = BTreeSet::new();
-static mut DROPPED: u32 = 0;
-
-#[allow(static_mut_refs)]
-unsafe extern "thiscall" fn render_particle(dev: usize, pt: usize) {
-    unsafe {
-        if SUPPRESS {
-            let inst = engine::field(storm3d(), ENG_CURRENT_INSTANCE);
-            // An owned object's list, or the global list (inst 0: the chain pulsar's and
-            // Manheim trails, ours too).
-            if inst == 0 || OWNED.contains(&inst) {
-                DROPPED = DROPPED.wrapping_add(1);
-                return;
-            }
-        }
-        let f: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(PREV_RP);
-        f(dev, pt)
-    }
-}
 
 static mut SYS: Option<sim::System> = None;
 
@@ -89,7 +66,6 @@ pub struct Particles {
     nebulae: nebula::Nebulae,
     vents: Vec<vent::VentAt>,
     frame: Option<u32>,
-    hooked: bool,
     /// The engine's light objects for the vents, made on first use.
     lights: Vec<usize>,
     engine_lights: bool,
@@ -101,55 +77,41 @@ pub struct Particles {
     /// comparison at the same moment, with `Reload=1`).
     enabled: bool,
     reload: bool,
+    /// `[Particles] CloudFps`, `PlasmaSprite`, `GasSprite`: given to the simulation
+    /// whenever it is made.
+    cloud_fps: f32,
+    vent_sprites: [String; 2],
 }
 
 impl Default for Particles {
     fn default() -> Particles {
-        let ini = crate::config::ini();
-        let sys = sys();
-        sys.cloud_fps = ini.float("Particles", "CloudFps", 30.0).max(1.0);
-        if let Some(s) = ini.string("Particles", "PlasmaSprite") {
-            sys.vent_sprites[0] = s;
-        }
-        if let Some(s) = ini.string("Particles", "GasSprite") {
-            sys.vent_sprites[1] = s;
-        }
         Particles {
             batch: Batch::new(),
             vdraw: vent::Drawer::new(),
-            vcfg: vent::Cfg::read(&ini),
+            // Defaults until `configure` (an ini with no file reads as every default).
+            vcfg: vent::Cfg::read(&rt::Ini::open_plain("")),
             nebulae: nebula::Nebulae::default(),
             vents: Vec::new(),
             frame: None,
-            hooked: false,
             lights: Vec::new(),
-            engine_lights: ini.int("Particles", "EngineLights", 1) != 0,
-            log_every: ini.int("Particles", "LogEvery", 600).max(0) as u32,
+            engine_lights: true,
+            log_every: 600,
             frames: 0,
             billboards: 0,
-            enabled: ini.int("Particles", "Enable", 1) != 0,
-            reload: ini.int("Particles", "Reload", 1) != 0,
+            enabled: true,
+            reload: true,
+            cloud_fps: 30.0,
+            vent_sprites: [String::from(content::VENT_SPRITES[0]), String::from(content::VENT_SPRITES[1])],
         }
     }
 }
 
 impl Particles {
-    fn hook(&mut self) {
-        if self.hooked {
-            return;
-        }
-        self.hooked = true;
-        billboard::install();
-        let prev = unsafe { rd::<usize>(VT_DEVICE_DX8 + SLOT_RENDER_PARTICLE * 4) };
-        match hook::patch_slot(VT_DEVICE_DX8, SLOT_RENDER_PARTICLE, render_particle as *const () as usize) {
-            Some(p) => {
-                unsafe { PREV_RP = p };
-                if p != FN_RENDER_PARTICLE {
-                    log!("particles: RenderParticle chained to {:#x} (not the engine's)", p);
-                }
-            }
-            None => log!("particles: RenderParticle not patched (was {:#x})", prev),
-        }
+    /// The simulation gets the configured values (it is made again after a switch-off).
+    fn apply_to_sys(&self) {
+        let sys = sys();
+        sys.cloud_fps = self.cloud_fps;
+        sys.vent_sprites = self.vent_sprites.clone();
     }
 
     /// The vents' lights: an engine `ST3D_Point_Light` per vent registered for the
@@ -220,9 +182,43 @@ impl Module for Particles {
     fn rows(&self) -> &'static [crate::rt::settings::Setting] {
         &[]
     }
-    fn configure(&mut self, _ini: &crate::rt::Ini, _said: &mut crate::core_module::Changes) {}
+    /// `[Particles]`: the module's own switch (`Enable`, `Reload`), the simulation's
+    /// (`CloudFps`, the vent sprites), the vents' look and lights, and the log.
+    fn configure(&mut self, ini: &crate::rt::Ini, said: &mut Changes) {
+        self.cloud_fps = ini.float("Particles", "CloudFps", 30.0).max(1.0);
+        self.vent_sprites = [
+            ini.string("Particles", "PlasmaSprite").unwrap_or_else(|| String::from(content::VENT_SPRITES[0])),
+            ini.string("Particles", "GasSprite").unwrap_or_else(|| String::from(content::VENT_SPRITES[1])),
+        ];
+        self.apply_to_sys();
+        self.vcfg = vent::Cfg::read(ini);
+        self.engine_lights = ini.int("Particles", "EngineLights", 1) != 0;
+        self.log_every = ini.int("Particles", "LogEvery", 600).max(0) as u32;
+        let on = ini.int("Particles", "Enable", 1) != 0;
+        if on != self.enabled {
+            said.note(&crate::sfmt!("Particles.Enable={}", on as u32));
+        }
+        self.enabled = on;
+        self.reload = ini.int("Particles", "Reload", 1) != 0;
+    }
     fn superseded(&self) -> Option<&'static str> {
         Some("Venting.asi")
+    }
+    fn hooks(&mut self, h: &mut crate::core_hooks::Hooks) {
+        hooks::install(h);
+    }
+    /// Switched off live: the simulation, what it owns and what others fed it are gone,
+    /// so a later switch-on starts clean (effects in flight end with the switch). The
+    /// engine's draws are let through (the hooks are behind the flag).
+    fn off(&mut self) {
+        unsafe { SYS = None };
+        hooks::clear();
+        let _ = crate::core_particles::take();
+        crate::core_particles::set_live(false);
+        self.vents.clear();
+        self.frame = None;
+        self.batch.clear();
+        self.apply_to_sys();
     }
     fn reset(&mut self) {
         self.batch.reset();
@@ -231,28 +227,19 @@ impl Module for Particles {
     /// Before the scene layer reads the light list (`Module::lights`): the frame's
     /// simulation, then the vents' lights, so this frame's vents light this frame.
     fn lights(&mut self, v: &View) {
-        self.hook();
         if self.frame != Some(v.frame) {
             self.frame = Some(v.frame);
             self.frames += 1;
             let t0 = rt::now();
             sys().simulate(v.time, v.eye);
             self.vents = vent::vents(sys(), &self.vcfg);
-            let owned = unsafe { &mut *core::ptr::addr_of_mut!(OWNED) };
-            owned.clear();
-            for ow in sys().owners.values() {
-                if ow.set.is_some() && ow.inst != 0 {
-                    owned.insert(ow.inst);
-                }
-            }
+            hooks::set_owned(sys().owners.values().filter(|ow| ow.set.is_some() && ow.inst != 0).map(|ow| ow.inst));
             if self.reload && self.frames % 120 == 0 {
-                let ini = crate::config::ini();
-                let on = ini.int("Particles", "Enable", 1) != 0;
-                if on != self.enabled {
-                    log!("particles: Enable={} (Render3D.ini read again)", on as u32);
+                let was = self.enabled;
+                self.configure(&crate::config::ini(), &mut Changes::default());
+                if self.enabled != was {
+                    log!("particles: Enable={} (Render3D.ini read again)", self.enabled as u32);
                 }
-                self.enabled = on;
-                self.vcfg = vent::Cfg::read(&ini);
             }
             if self.log_every > 0 && self.frames % self.log_every == 1 {
                 log!(
@@ -262,16 +249,13 @@ impl Module for Particles {
                     self.vents.len(),
                     self.nebulae.drawn,
                     self.billboards,
-                    unsafe { DROPPED },
+                    hooks::dropped(),
                     (rt::now() - t0) * 1000.0
                 );
             }
         }
-        unsafe {
-            SUPPRESS = self.enabled;
-        }
+        hooks::suppress(self.enabled);
         crate::core_particles::set_live(self.enabled);
-        billboard::skip(self.enabled);
         self.batch.clear();
         self.register_lights();
     }
@@ -312,17 +296,16 @@ impl Module for Particles {
                 self.batch.billboard(&cam, lk.material, tex, p.pos, hx, hy, uv, [c.x, c.y, c.z, 1.0]);
             }
         }
-        self.billboards += billboard::draw(v, &cam, &mut self.batch);
+        if hooks::billboards_hooked() {
+            self.billboards += billboard::draw(v, &cam, &mut self.batch);
+        }
         self.batch.draw(v);
         self.vdraw.draw(v, &cam, sys, &self.vents, &self.vcfg);
         true
     }
     fn end_view(&mut self, _v: &View) {
         drain();
-        unsafe {
-            SUPPRESS = false;
-        }
+        hooks::suppress(false);
         crate::core_particles::set_live(false);
-        billboard::skip(false);
     }
 }

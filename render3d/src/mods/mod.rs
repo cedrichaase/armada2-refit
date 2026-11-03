@@ -42,9 +42,7 @@ use alloc::vec::Vec;
 /// next launch. One line per module; each is taken out when its hooks hand back.
 const NOT_YET_LIVE: &[&str] = &[
     "world",
-    "particles",
     "effects",
-    "ordnance",
     "overlays",
 ];
 
