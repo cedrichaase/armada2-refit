@@ -122,6 +122,31 @@ they are consts while every build agrees.
 
 Globs: `*` matches any run of characters, everything else itself, over the whole id.
 
+### Content
+
+A plugin's tables of the game's own names (ODFs, sprites, SOD nodes, factions, races,
+recipes) are not addresses and do not belong to a build's executable, but to the game
+data it runs with. `build.toml`'s `content` names the **content set** its plugins read
+(`stock` for `gog-1.1`), and an optional `content.toml` beside it maps a plugin, or one
+plugin file (`render3d.hulls`), to another set:
+
+    schema = 1
+    [set]
+    render3d = "stock"
+    "render3d.hulls" = "fleetops"
+
+The nearest build's entry for the file, then for the plugin, wins; a build that names
+neither takes the nearest `content` of a `build.toml` up its `inherits` chain; the set
+`none` is no set. gen.py writes the resolved id into each table's `Build` (`content`),
+and `Engine::content()` returns it: `None` on an unknown build, before `init`, and for
+`none`. A plugin picks its tables by that id in its `content.rs` (`by_set`), and keeps
+an empty `NONE` for every other case: with no set it has no built-in names or recipes
+and the engine's own look shows through, as for a missing recipe. lint.py checks the
+file (`schema`, `[set]`, keys that are plugins or plugin files of the game) and that a
+Rust plugin with a `content.rs` beside its generated file chooses every set named for
+it (`"<set>" =>`). The game directory's files (`Sky\`, `Surfaces\`, `Nebulae\`) still
+win over any set. C plugins carry no content (`csdk/a2engine.h` is unchanged).
+
 ## The generated code
 
 `tools/engine/gen.py` writes each file's `out` (`--check` in CI). Rust:

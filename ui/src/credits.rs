@@ -117,15 +117,18 @@ fn logos() -> Option<Tex> {
 }
 
 /// The views of render3d's map the camera tours, each for `VIEW_TIME` seconds.
-const TOUR: [&core::ffi::CStr; 5] = [c"main", c"federation", c"klingon", c"tutorials", c"borg"];
 const VIEW_TIME: f64 = 16.0;
 
 /// Under the frame (inside the scene, the back buffer `w` x `h` bound and cleared):
 /// render3d's map, on its tour. False when it drew nothing.
 pub fn under(w: u32, h: u32) -> bool {
     let s = st();
-    let k = ((crate::rt::now() - s.started) / VIEW_TIME) as usize % TOUR.len();
-    crate::menus::scene::draw_view(TOUR[k], w, h)
+    let tour = crate::content::get().tour;
+    if tour.is_empty() {
+        return false;
+    }
+    let k = ((crate::rt::now() - s.started) / VIEW_TIME) as usize % tour.len();
+    crate::menus::scene::draw_view(tour[k], w, h)
 }
 
 static mut SCENE: bool = false;

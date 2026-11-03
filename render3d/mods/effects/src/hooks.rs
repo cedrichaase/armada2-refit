@@ -598,7 +598,7 @@ pub mod shields {
             if let Some(prev) = h.install(hk) {
                 unsafe { PREV_CREATE[i] = prev };
                 names.push(' ');
-                names.push_str(super::super::content::SITE_NAME[i]);
+                names.push_str(super::super::content::get().site_name(i));
                 if prev.addr() != fn_create_hit() {
                     names.push_str("(chained)");
                 }

@@ -1,6 +1,6 @@
 [package]
 name = "r3d-overlays"
-version = "0.44.0"
+version = "0.45.0"
 edition = "2024"
 publish = false
 description = "render3d's overlays module: the fog of war, selection, grid, pivot, height posts and ghosts"

@@ -255,7 +255,7 @@ impl Cls {
             env_gen: u32::MAX, ex0: 0.0, ez0: 0.0, ex1: 0.0, ez1: 0.0, ey: 0.0, vol: None, occ: None, vol_sig: 0,
             vol_gen: u32::MAX, vx: 0, vy: 0, vz: 0, vlo: [0.0; 3], vsize: [0.0; 3], glo: [0.0; 3], ghi: [0.0; 3], gbox: false,
         };
-        let found = recipes::find("nebulae", content::NEBULAE, odf);
+        let found = recipes::find("nebulae", content::get().nebulae, odf);
         c.bytes = found.as_ref().map(|f| f.bytes.clone());
         c.have = found.is_some_and(|f| c.read(&f.text));
         log!(
@@ -349,7 +349,7 @@ impl Cls {
     }
 
     fn reload(&mut self) {
-        let found = recipes::find("nebulae", content::NEBULAE, &self.odf);
+        let found = recipes::find("nebulae", content::get().nebulae, &self.odf);
         let b = found.as_ref().map(|f| f.bytes.clone());
         if b != self.bytes {
             self.bytes = b;

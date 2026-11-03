@@ -473,6 +473,45 @@ def rule2(games, R, rows_base, skip_fixtures):
 
 # ---- rule 5: inheritance and marks ---------------------------------------------------
 
+def rule6(games, R, src_root):
+    """Content sets (phase 8f): a build's `content.toml` is `schema = 1` and a `[set]`
+    table keyed by a plugin or a plugin file of its game; a set named for a plugin file
+    that has a `content.rs` beside its generated file must be chosen there (`"<set>" =>`)."""
+    for gs in games.values():
+        stems = {n[:-5] for n in gs.files} | {f.plugin for f in gs.files.values()}
+        for b in gs.builds:
+            w = relp(b.content_path)
+            d = b.content_data
+            if d:
+                if d.get('schema') != 1:
+                    R.add(w, 'schema must be 1')
+                for k in d:
+                    if k not in ('schema', 'set'):
+                        R.add(w, f'unknown key {k!r}')
+                m = d.get('set')
+                if not isinstance(m, dict):
+                    R.add(w, 'needs a [set] table')
+                    m = {}
+                for k, v in m.items():
+                    if k not in stems:
+                        R.add(w, f'[set] names {k!r}, which is no plugin or plugin file of {gs.game}')
+                    if not isstr(v):
+                        R.add(w, f'[set] {k} must be a non-empty string')
+            if src_root is None:
+                continue
+            for n, rf in gs.files.items():
+                sset = b.content_for(n)
+                if not sset or not rf.out or rf.lang != 'rust':
+                    continue
+                cr = os.path.join(src_root, os.path.dirname(rf.out), 'content.rs')
+                if not os.path.exists(cr):
+                    continue
+                with open(cr, encoding='utf-8', errors='replace') as fh:
+                    text = fh.read()
+                if f'"{sset}" =>' not in text:
+                    R.add(relp(b.path), f'{n}: content set {sset!r} is not chosen in {os.path.relpath(cr, src_root)}')
+
+
 def rule5(games, R):
     for gs in games.values():
         all_hooks = [f'{rf.plugin}.{h}' for rf in gs.files.values() for h in rf.hooks]
@@ -767,6 +806,7 @@ def run(roots, publish=False, src_root=None, rows_base=None, skip_fixtures=False
         rule1(games, R)
         rule2(games, R, rows_base or ROOT, skip_fixtures)
         rule5(games, R)
+        rule6(games, R, src_root)
         if not publish and src_root is not None:
             rules34(games, R, src_root)
     except Exception as e:                         # a malformed file the schema rules did not catch

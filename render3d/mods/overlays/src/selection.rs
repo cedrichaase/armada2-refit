@@ -70,7 +70,7 @@ impl Selection {
         if others {
             return true;
         }
-        let Some(model) = scene::model("select") else { return false };
+        let Some(model) = scene::model(super::content::get().selection_model) else { return false };
         let profile = hooks::selection_brightness();
         let user_team = hooks::user_team();
         let now_ms = (r3d_core::clock::anim_now() * 1000.0) as u64;

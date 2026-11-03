@@ -1,0 +1,16 @@
+# A child of b1 that gives plugin p no content set (a Fleet Ops shape with its own names
+# for s): 07-content-none.toml's image. Its content.toml overrides s.
+schema = 1
+game = "test"
+build = "b3"
+label = "Fixture build 3"
+exe = ["Test.exe"]
+inherits = "b1"
+content = "none"
+
+[pe]
+timestamp = 0x5eed0001
+image_size = 0x8000
+sections = 0x756db512
+image_base = 0x400000
+code = [0x401000, 0x403000]

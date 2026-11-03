@@ -145,6 +145,7 @@ def emit_rs(t):
         o.append(f'        sections: {p.get("sections", 0):#010x},')
         o.append(f'        image_base: {p.get("image_base", 0):#x},')
         o.append(f'        n_resolved: {n_resolved(t, b)},')
+        o.append(f'        content: "{esc(bb.content_for(t.fname))}",')
         o.append('        entries: &[')
         for k, e in enumerate(b['entries']):
             f = entry_fields(t, e)

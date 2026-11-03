@@ -38,7 +38,7 @@ pub fn base_name(bg: &str) -> String {
 /// The recipe text for a base name: the game directory's file first, then the built-in
 /// (`recipes`, kind "sky").
 pub fn text_for(base: &str) -> Option<(String, &'static str)> {
-    r3d_core::recipes::builtin("sky", super::content::RECIPES);
+    r3d_core::recipes::builtin("sky", super::content::get().recipes);
     let r = r3d_core::recipes::text("sky", base)?;
     let src = match r.source {
         r3d_core::recipes::Source::Game => "Sky\\ in the game directory",
