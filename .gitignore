@@ -51,6 +51,7 @@ crates/a2engine/target/
 
 # display: cargo's build output
 display/target/
+display/hosttest/target/
 display/build/
 display/vkprobe/target/
 display/vkprobe/build/

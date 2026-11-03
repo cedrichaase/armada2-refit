@@ -107,6 +107,9 @@ fn passes() -> &'static mut Passes {
 #[unsafe(no_mangle)]
 pub extern "C" fn display8v1_dx12_pass(event: u32, pass: *const Dx12Pass8) {
     let Some(d) = get() else { return };
+    // The plugin records on the frame's list around this: what the passthrough set on
+    // it is not there to be assumed (`pass::forget`).
+    super::pass::forget();
     let p = passes();
     match event {
         PASS_ENTER => p.alive += 1,

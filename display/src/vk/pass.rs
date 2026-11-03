@@ -19,7 +19,8 @@
 //!   first draw with every level; samplers by the stage's state, made as DXVK makes them
 //!   under the game's `dxvk.conf` (anisotropy, LOD bias), as the forward chain does.
 use super::{get, Img, Vk};
-use crate::passthrough::{Draw, Layout};
+use crate::passthrough::state::{self, Layout, PipeState, PS_AT, PS_BYTES, VS_BYTES};
+use crate::passthrough::{fixed, say, Draw};
 use crate::stub::device::Dev;
 use crate::stub::obj::SObj;
 use crate::trace::once;
@@ -32,12 +33,6 @@ use gpu::display::{VkPass8, PASS_ENTER, PASS_PUBLISH};
 
 use crate::shaders::ff_spv::{PS_FF_SPV, VS_BUMP_SPV, VS_FF_SPV};
 
-/// Bytes of the vertex block (56 registers) and the pixel block (7), and where the
-/// pixel block starts in their one allocation.
-const VS_BYTES: usize = 56 * 16;
-const PS_BYTES: usize = 7 * 16;
-const PS_AT: u32 = 1024;
-
 /// The render pass a pipeline is made for: what Vulkan makes them compatible by.
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct RpKey {
@@ -49,26 +44,13 @@ struct RpKey {
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct Key {
     rp: RpKey,
-    topology: vk::PrimitiveTopology,
     stride: u32,
     layout: Layout,
-    /// The texture coordinate sets stages 0 and 1 read.
-    sets: [u8; 2],
-    /// ALPHABLENDENABLE, SRCBLEND, DESTBLEND, BLENDOP, COLORWRITEENABLE.
-    blend: [u32; 5],
-    /// ZENABLE, ZWRITEENABLE, ZFUNC (with no depth attachment: all off).
-    depth: [u32; 3],
-    cull: u32,
+    /// Topology, coordinate sets, blend, depth and cull (`state::pipe_state`).
+    st: PipeState,
     /// The target's alpha is not kept (the engine's X8R8G8B8 back buffer): its
     /// destination alpha reads one.
     no_dst_alpha: bool,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-struct SKey {
-    /// ADDRESSU, ADDRESSV, MAGFILTER, MINFILTER, MIPFILTER, MAXANISOTROPY, MIPMAPLODBIAS
-    /// (f32 bits), MAXMIPLEVEL.
-    tss: [u32; 8],
 }
 
 /// The pass a draw records into.
@@ -94,7 +76,7 @@ pub struct Pt {
     ps: vk::ShaderModule,
     pipelines: Vec<(Key, vk::Pipeline)>,
     passes: Vec<(RpKey, vk::RenderPass)>,
-    samplers: Vec<(SKey, vk::Sampler)>,
+    samplers: Vec<(state::SKey, vk::Sampler)>,
     white: Img,
     white_ready: bool,
     limits: vk::PhysicalDeviceLimits,
@@ -105,7 +87,7 @@ pub struct Pt {
     fbs: Vec<([u64; 2], vk::RenderPass, vk::Framebuffer)>,
     /// What every vertex reads where its FVF has nothing: (buffer, offset).
     defaults: Option<(u64, u32)>,
-    last: Option<([u8; VS_BYTES + PS_BYTES], u64, u32)>,
+    last: Option<(state::Blocks, u64, u32)>,
     open: Option<Open>,
     /// The pass a plugin published last, and the frame it is for.
     published: Option<(VkPass8, u64)>,
@@ -320,18 +302,16 @@ fn samples_flag(n: u32) -> vk::SampleCountFlags {
     }
 }
 
-fn blend_factor(f: u32, no_dst_alpha: bool) -> vk::BlendFactor {
+/// A blend factor, from Direct3D's number (`state::blend` made it one of 1 to 11).
+fn blend_factor(f: u32) -> vk::BlendFactor {
     use vk::BlendFactor as B;
     match f {
         1 => B::ZERO,
-        2 => B::ONE,
         3 => B::SRC_COLOR,
         4 => B::ONE_MINUS_SRC_COLOR,
         5 => B::SRC_ALPHA,
         6 => B::ONE_MINUS_SRC_ALPHA,
-        7 if no_dst_alpha => B::ONE,
         7 => B::DST_ALPHA,
-        8 if no_dst_alpha => B::ZERO,
         8 => B::ONE_MINUS_DST_ALPHA,
         9 => B::DST_COLOR,
         10 => B::ONE_MINUS_DST_COLOR,
@@ -341,7 +321,7 @@ fn blend_factor(f: u32, no_dst_alpha: bool) -> vk::BlendFactor {
 }
 
 fn compare(f: u32) -> vk::CompareOp {
-    match f {
+    match state::compare(f) {
         1 => vk::CompareOp::NEVER,
         2 => vk::CompareOp::LESS,
         3 => vk::CompareOp::EQUAL,
@@ -357,36 +337,24 @@ fn compare(f: u32) -> vk::CompareOp {
 /// defaults (stride 0) for what the FVF lacks: position (0, 0, 0, 1) at 0, a zero normal
 /// at 16, white diffuse at 28, black specular at 32, (0, 0) coordinates at 36.
 fn attributes(k: &Key) -> Vec<vk::VertexInputAttributeDescription> {
+    use state::Fmt;
     use vk::Format as F;
-    let l = &k.layout;
-    if let Some(o) = l.bump {
-        // vs_bump: position, coordinates, tangent, binormal, normal.
-        return alloc::vec![
-            vk::VertexInputAttributeDescription { location: 0, binding: 0, format: F::R32G32B32_SFLOAT, offset: o[0] },
-            vk::VertexInputAttributeDescription { location: 1, binding: 0, format: F::R32G32_SFLOAT, offset: o[1] },
-            vk::VertexInputAttributeDescription { location: 2, binding: 0, format: F::R32G32B32_SFLOAT, offset: o[2] },
-            vk::VertexInputAttributeDescription { location: 3, binding: 0, format: F::R32G32B32_SFLOAT, offset: o[3] },
-            vk::VertexInputAttributeDescription { location: 4, binding: 0, format: F::R32G32B32_SFLOAT, offset: o[4] },
-        ];
-    }
-    let a = |loc: u32, own: Option<(u32, F)>, dflt: (u32, F)| {
-        let (binding, (offset, format)) = match own {
-            Some(o) => (0, o),
-            None => (1, dflt),
-        };
-        vk::VertexInputAttributeDescription { location: loc, binding, format, offset }
-    };
-    let tex = |s: u8| {
-        l.tex[s as usize].map(|(o, n)| (o, if n == 1 { F::R32_SFLOAT } else { F::R32G32_SFLOAT }))
-    };
-    alloc::vec![
-        a(0, Some((0, if l.rhw { F::R32G32B32A32_SFLOAT } else { F::R32G32B32_SFLOAT })), (0, F::R32G32B32A32_SFLOAT)),
-        a(1, l.normal.map(|o| (o, F::R32G32B32_SFLOAT)), (16, F::R32G32B32_SFLOAT)),
-        a(2, l.diffuse.map(|o| (o, F::B8G8R8A8_UNORM)), (28, F::B8G8R8A8_UNORM)),
-        a(3, l.specular.map(|o| (o, F::B8G8R8A8_UNORM)), (32, F::B8G8R8A8_UNORM)),
-        a(4, tex(k.sets[0]), (36, F::R32G32_SFLOAT)),
-        a(5, tex(k.sets[1]), (36, F::R32G32_SFLOAT)),
-    ]
+    let (attrs, n) = state::attributes(&k.layout, k.st.sets);
+    attrs[..n]
+        .iter()
+        .map(|a| vk::VertexInputAttributeDescription {
+            location: a.location,
+            binding: a.binding,
+            format: match a.fmt {
+                Fmt::F1 => F::R32_SFLOAT,
+                Fmt::F2 => F::R32G32_SFLOAT,
+                Fmt::F3 => F::R32G32B32_SFLOAT,
+                Fmt::F4 => F::R32G32B32A32_SFLOAT,
+                Fmt::Bgra8 => F::B8G8R8A8_UNORM,
+            },
+            offset: a.offset,
+        })
+        .collect()
 }
 
 fn pipeline(v: &Vk, p: &mut Pt, k: &Key) -> vk::Pipeline {
@@ -408,11 +376,11 @@ fn pipeline(v: &Vk, p: &mut Pt, k: &Key) -> vk::Pipeline {
     ];
     let va = attributes(k);
     let vi = vk::PipelineVertexInputStateCreateInfo::default().vertex_binding_descriptions(&vb).vertex_attribute_descriptions(&va);
-    let ia = vk::PipelineInputAssemblyStateCreateInfo::default().topology(k.topology);
+    let ia = vk::PipelineInputAssemblyStateCreateInfo::default().topology(topology(k.st.topology));
     let vp = vk::PipelineViewportStateCreateInfo::default().viewport_count(1).scissor_count(1);
     // Direct3D's culling on screen, as gpu's (the vertex shader turns y over): CW drops
     // what is clockwise on screen.
-    let cull = match k.cull {
+    let cull = match k.st.cull {
         2 => vk::CullModeFlags::BACK,
         3 => vk::CullModeFlags::FRONT,
         _ => vk::CullModeFlags::NONE,
@@ -425,32 +393,27 @@ fn pipeline(v: &Vk, p: &mut Pt, k: &Key) -> vk::Pipeline {
     let ms = vk::PipelineMultisampleStateCreateInfo::default().rasterization_samples(samples_flag(k.rp.samples));
     let has_depth = k.rp.depth != vk::Format::UNDEFINED;
     let ds = vk::PipelineDepthStencilStateCreateInfo::default()
-        .depth_test_enable(has_depth && k.depth[0] != 0)
-        .depth_write_enable(has_depth && k.depth[0] != 0 && k.depth[1] != 0)
-        .depth_compare_op(compare(k.depth[2]));
-    let [on, src, dst, op, mask] = k.blend;
-    let (src, dst) = match src {
-        12 => (5, 6),
-        13 => (6, 5),
-        _ => (src, dst),
-    };
-    let bop = match op {
+        .depth_test_enable(has_depth && k.st.depth[0] != 0)
+        .depth_write_enable(has_depth && k.st.depth[0] != 0 && k.st.depth[1] != 0)
+        .depth_compare_op(compare(k.st.depth[2]));
+    let b = state::blend(k.st.blend, k.no_dst_alpha);
+    let bop = match b.op {
         2 => vk::BlendOp::SUBTRACT,
         3 => vk::BlendOp::REVERSE_SUBTRACT,
         4 => vk::BlendOp::MIN,
         5 => vk::BlendOp::MAX,
         _ => vk::BlendOp::ADD,
     };
-    let (sf, df) = (blend_factor(src, k.no_dst_alpha), blend_factor(dst, k.no_dst_alpha));
+    let (sf, df) = (blend_factor(b.src), blend_factor(b.dst));
     let cba = [vk::PipelineColorBlendAttachmentState::default()
-        .blend_enable(on != 0)
+        .blend_enable(b.on)
         .src_color_blend_factor(sf)
         .dst_color_blend_factor(df)
         .color_blend_op(bop)
         .src_alpha_blend_factor(sf)
         .dst_alpha_blend_factor(df)
         .alpha_blend_op(bop)
-        .color_write_mask(vk::ColorComponentFlags::from_raw(mask & 0xf))];
+        .color_write_mask(vk::ColorComponentFlags::from_raw(b.mask))];
     let cb = vk::PipelineColorBlendStateCreateInfo::default().attachments(&cba);
     let dyns = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
     let dy = vk::PipelineDynamicStateCreateInfo::default().dynamic_states(&dyns);
@@ -482,40 +445,37 @@ fn pipeline(v: &Vk, p: &mut Pt, k: &Key) -> vk::Pipeline {
 }
 
 fn sampler(v: &Vk, p: &mut Pt, tss: &[u32; 32]) -> vk::Sampler {
-    let k = SKey { tss: [tss[13], tss[14], tss[16], tss[17], tss[18], tss[21], tss[19], tss[20]] };
+    let k = state::sampler_key(tss);
     if let Some(x) = p.samplers.iter().find(|x| x.0 == k) {
         return x.1;
     }
+    let env = state::SamplerEnv {
+        forced_anisotropy: v.exported.sampler_anisotropy,
+        forced_bias: v.exported.sampler_lod_bias,
+        have_anisotropy: v.exported.features & gpu::display::FEATURE_ANISOTROPY != 0,
+        max_bias: p.limits.max_sampler_lod_bias,
+        max_anisotropy: p.limits.max_sampler_anisotropy,
+    };
+    let q = state::sampler_params(&k, &env);
     let addr = |a: u32| match a {
-        2 | 5 => vk::SamplerAddressMode::MIRRORED_REPEAT,
+        2 => vk::SamplerAddressMode::MIRRORED_REPEAT,
         3 => vk::SamplerAddressMode::CLAMP_TO_EDGE,
         4 => vk::SamplerAddressMode::CLAMP_TO_BORDER,
         _ => vk::SamplerAddressMode::REPEAT,
     };
-    let filt = |f: u32| if f >= 2 { vk::Filter::LINEAR } else { vk::Filter::NEAREST };
-    let [au, av, mag, min, mip, most, bias, maxmip] = k.tss;
-    // As DXVK makes it under the game's dxvk.conf (README.md, "Samplers as DXVK makes
-    // them"): a linear filter anisotropic at the forced amount, the forced bias added
-    // on a sampler with mips.
-    let forced = v.exported.sampler_anisotropy;
-    let have = v.exported.features & gpu::display::FEATURE_ANISOTROPY != 0;
-    let wants = |f: u32| f == 3 || (forced >= 0 && f == 2);
-    let aniso = have && (wants(min) || wants(mag));
-    let amount = if forced >= 0 { forced as u32 } else { most.max(1) };
-    let lim = p.limits.max_sampler_lod_bias;
-    let lod = if mip == 0 { 0.0 } else { (f32::from_bits(bias) + v.exported.sampler_lod_bias).clamp(-lim, lim) };
+    let filt = |l: bool| if l { vk::Filter::LINEAR } else { vk::Filter::NEAREST };
     let ci = vk::SamplerCreateInfo::default()
-        .mag_filter(filt(mag))
-        .min_filter(filt(min))
-        .mipmap_mode(if mip >= 2 { vk::SamplerMipmapMode::LINEAR } else { vk::SamplerMipmapMode::NEAREST })
-        .address_mode_u(addr(au))
-        .address_mode_v(addr(av))
+        .mag_filter(filt(q.mag_linear))
+        .min_filter(filt(q.min_linear))
+        .mipmap_mode(if q.mip_linear { vk::SamplerMipmapMode::LINEAR } else { vk::SamplerMipmapMode::NEAREST })
+        .address_mode_u(addr(q.address_u))
+        .address_mode_v(addr(q.address_v))
         .address_mode_w(vk::SamplerAddressMode::REPEAT)
-        .anisotropy_enable(aniso)
-        .max_anisotropy(if aniso { (amount.clamp(1, 16) as f32).min(p.limits.max_sampler_anisotropy) } else { 1.0 })
-        .mip_lod_bias(lod)
-        .min_lod(if mip == 0 { 0.0 } else { maxmip as f32 })
-        .max_lod(if mip == 0 { 0.0 } else { vk::LOD_CLAMP_NONE })
+        .anisotropy_enable(q.anisotropy.is_some())
+        .max_anisotropy(q.anisotropy.unwrap_or(1.0))
+        .mip_lod_bias(q.lod_bias)
+        .min_lod(q.min_lod)
+        .max_lod(if q.max_lod >= state::LOD_NONE { vk::LOD_CLAMP_NONE } else { q.max_lod })
         .border_color(vk::BorderColor::FLOAT_TRANSPARENT_BLACK);
     let s = unsafe { v.dev.create_sampler(&ci, None) }.unwrap_or_default();
     p.samplers.push((k, s));
@@ -554,135 +514,6 @@ fn white(v: &mut Vk, p: &mut Pt) -> vk::ImageView {
     p.white.view
 }
 
-fn f4(b: &mut [u8], reg: usize, v: [f32; 4]) {
-    for (i, x) in v.iter().enumerate() {
-        b[reg * 16 + i * 4..reg * 16 + i * 4 + 4].copy_from_slice(&x.to_le_bytes());
-    }
-}
-
-fn color(c: u32) -> [f32; 4] {
-    [((c >> 16) & 255) as f32 / 255.0, ((c >> 8) & 255) as f32 / 255.0, (c & 255) as f32 / 255.0, (c >> 24) as f32 / 255.0]
-}
-
-fn transform(dv: &Dev, state: u32) -> [f32; 16] {
-    dv.transforms.iter().find(|t| t.0 == state).map_or([1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0], |t| t.1)
-}
-
-fn mul(a: &[f32; 16], b: &[f32; 16]) -> [f32; 16] {
-    let mut r = [0f32; 16];
-    for i in 0..4 {
-        for j in 0..4 {
-            r[i * 4 + j] = (0..4).map(|k| a[i * 4 + k] * b[k * 4 + j]).sum();
-        }
-    }
-    r
-}
-
-/// The two constant blocks (`shaders/ff.hlsl`, `ff_vs` and `ff_ps`), one after the other.
-/// Logged once (always, not only when tracing): the engine's bump passes with LIGHTING on.
-static mut BUMP_LIT: bool = false;
-
-fn blocks(v: &Vk, dv: &Dev, d: &Draw, vp: [u32; 6]) -> [u8; VS_BYTES + PS_BYTES] {
-    let mut b = [0u8; VS_BYTES + PS_BYTES];
-    let rs = &dv.rs;
-    let world = transform(dv, 256);
-    let wvp = mul(&mul(&world, &transform(dv, 2)), &transform(dv, 3));
-    for r in 0..4 {
-        f4(&mut b, r, [wvp[r * 4], wvp[r * 4 + 1], wvp[r * 4 + 2], wvp[r * 4 + 3]]);
-        f4(&mut b, 4 + r, [world[r * 4], world[r * 4 + 1], world[r * 4 + 2], world[r * 4 + 3]]);
-    }
-    f4(&mut b, 8, [vp[0] as f32, vp[1] as f32, vp[2].max(1) as f32, vp[3].max(1) as f32]);
-    // Direct3D 9's pixel centres, as DXVK keeps them (gpu/README.md, "Pixel centres"):
-    // the engine's screen-space draws always; its 3D ones in the comparison mode, as the
-    // plugins' scenes are.
-    let centre = 0.5 - 1.0 / 128.0;
-    let off = if d.layout.rhw || v.exported.features & gpu::display::FEATURE_D3D9_CENTRES != 0 { centre } else { 0.0 };
-    f4(&mut b, 9, [f32::from_bits(vp[4]), f32::from_bits(vp[5]), off, 0.0]);
-    // Direct3D's lighting is fixed function's: under a vertex shader (the Borg bump pass)
-    // LIGHTING is ignored, and the engine leaves it on there when the map has lights. Its
-    // lights must not be written then either: they share registers 16 on with the bump
-    // shader's constants (vs_bump), and overwrote its transform with them.
-    let lit = rs[137] != 0 && !d.layout.rhw && d.layout.bump.is_none();
-    if rs[137] != 0 && d.layout.bump.is_some() && unsafe { !BUMP_LIT } {
-        unsafe { BUMP_LIT = true };
-        log!("passthrough: the Borg bump shader drawn with LIGHTING on: the lights left out, as Direct3D ignores them under a vertex shader");
-    }
-    let lights: Vec<&(u32, [u32; 26], bool)> = if lit { dv.lights.iter().filter(|l| l.2).take(8).collect() } else { Vec::new() };
-    let vcol = if rs[141] != 0 { d.layout.diffuse.is_some() as u32 + 2 * d.layout.specular.is_some() as u32 } else { 0 };
-    f4(&mut b, 10, [d.layout.rhw as u32 as f32, lit as u32 as f32, lights.len() as f32, vcol as f32]);
-    let m = &dv.material;
-    f4(&mut b, 11, [m[0], m[1], m[2], m[3]]);
-    f4(&mut b, 12, [m[4], m[5], m[6], m[7]]);
-    f4(&mut b, 13, [m[12], m[13], m[14], m[15]]);
-    f4(&mut b, 14, color(rs[139]));
-    f4(&mut b, 15, [rs[145] as f32, rs[147] as f32, rs[148] as f32, 0.0]);
-    if d.layout.bump.is_some() {
-        // The bump shader's constants 0 to 6 (vs_bump).
-        for r in 0..7 {
-            f4(&mut b, 16 + r, dv.vs_const[r]);
-        }
-    }
-    for (i, l) in lights.iter().enumerate() {
-        // D3DLIGHT8: type; diffuse, specular, ambient (4 each); position, direction (3
-        // each); range, falloff, attenuation 0, 1, 2, theta, phi.
-        let f = |n: usize| f32::from_bits(l.1[n]);
-        if l.1[0] == 2 {
-            once("PASSTHROUGH a spot light: lit as a point light");
-        }
-        let r = 16 + 5 * i;
-        f4(&mut b, r, [f(13), f(14), f(15), l.1[0] as f32]);
-        f4(&mut b, r + 1, [f(16), f(17), f(18), f(19)]);
-        f4(&mut b, r + 2, [f(1), f(2), f(3), f(4)]);
-        f4(&mut b, r + 3, [f(9), f(10), f(11), f(21)]);
-        f4(&mut b, r + 4, [f(22), f(23), 0.0, 0.0]);
-    }
-    // The pixel block.
-    let ps = &mut b[VS_BYTES..];
-    let t = &dv.tss;
-    let st = |s: usize| [t[s][1] as f32, t[s][2] as f32, t[s][3] as f32, t[s][4] as f32];
-    let stb = |s: usize| [t[s][5] as f32, t[s][6] as f32, t[s][26] as f32, t[s][27] as f32];
-    f4(ps, 0, st(0));
-    f4(ps, 1, stb(0));
-    f4(ps, 2, st(1));
-    f4(ps, 3, stb(1));
-    f4(ps, 4, color(rs[60]));
-    f4(ps, 5, [(rs[15] != 0) as u32 as f32, rs[25] as f32, (rs[24] & 255) as f32, (rs[29] != 0) as u32 as f32]);
-    f4(ps, 6, [(t[0][28] == 5) as u32 as f32, (t[1][28] == 5) as u32 as f32, 0.0, 0.0]);
-    b
-}
-
-/// What is logged once of state the passthrough does not draw as Direct3D 8 would.
-fn note_unsupported(dv: &Dev) {
-    let rs = &dv.rs;
-    if rs[28] != 0 {
-        once("PASSTHROUGH fog is on: drawn without fog");
-    }
-    if rs[8] != 3 && rs[8] != 0 {
-        once(&sfmt!("PASSTHROUGH FILLMODE {}: drawn solid", rs[8]));
-    }
-    if rs[47] != 0 {
-        once(&sfmt!("PASSTHROUGH ZBIAS {}: drawn without a depth bias", rs[47]));
-    }
-    for s in 0..2 {
-        let op = dv.tss[s][1];
-        if matches!(op, 17 | 22 | 23) || op > 26 {
-            once(&sfmt!("PASSTHROUGH stage {} COLOROP {}: drawn as SELECTARG1", s, op));
-        }
-        if dv.tss[s][24] != 0 {
-            once("PASSTHROUGH a texture transform: drawn without it");
-        }
-        if dv.tss[s][11] > 0xffff {
-            once("PASSTHROUGH generated texture coordinates: drawn with the set's own");
-        }
-    }
-    if dv.tss[2][1] > 1 {
-        once("PASSTHROUGH a third texture stage: drawn with two");
-    }
-    if dv.ps != 0 {
-        once("PASSTHROUGH a pixel shader: drawn with fixed function");
-    }
-}
-
 fn topology(prim: u32) -> vk::PrimitiveTopology {
     match prim {
         1 => vk::PrimitiveTopology::POINT_LIST,
@@ -715,7 +546,8 @@ pub fn draw(v: &mut Vk, dv: &Dev, d: &Draw, fp: usize) {
         once(&sfmt!("PASSTHROUGH an engine draw while a plugin records: not drawn, by {}", crate::trace::caller(fp)));
         return;
     }
-    note_unsupported(dv);
+    let fx = fixed(dv);
+    state::notes(&fx, &mut say);
     // Where it goes: the pass published in this frame, unless that is the engine's own
     // back buffer (then the engine's targets, with their depth).
     let own = VkPass8 { size: core::mem::size_of::<VkPass8>() as u32, color: v.target(gpu::display::TARGET_COLOR), depth: v.target(gpu::display::TARGET_DEPTH) };
@@ -737,24 +569,14 @@ pub fn draw(v: &mut Vk, dv: &Dev, d: &Draw, fp: usize) {
     }
 
     // The viewport, inside the target.
-    let mut vp = dv.viewport;
-    vp[0] = vp[0].min(tw.saturating_sub(1));
-    vp[1] = vp[1].min(th.saturating_sub(1));
-    vp[2] = vp[2].min(tw - vp[0]).max(1);
-    vp[3] = vp[3].min(th - vp[1]).max(1);
+    let vp = state::clamp_viewport(dv.viewport, tw, th);
 
-    let rs = &dv.rs;
     let depth_fmt: vk::Format = if pass.depth.image != 0 { vk::Format::from_raw(pass.depth.format as i32) } else { vk::Format::UNDEFINED };
-    let zbuffer = !dv.zbuffer.is_null();
     let key = Key {
         rp: RpKey { color: vk::Format::from_raw(pass.color.format as i32), depth: depth_fmt, samples: pass.color.samples.max(1) },
-        topology: topology(d.prim),
         stride: d.stride,
         layout: d.layout,
-        sets: [(dv.tss[0][11] & 7) as u8, (dv.tss[1][11] & 7) as u8],
-        blend: [rs[27], rs[19], rs[20], rs[171], rs[168]],
-        depth: if zbuffer && rs[7] != 0 { [1, rs[14], rs[23]] } else { [0, 0, 8] },
-        cull: rs[22],
+        st: state::pipe_state(&fx, d.prim),
         no_dst_alpha: is_own,
     };
     let pl = pipeline(v, p, &key);
@@ -764,7 +586,7 @@ pub fn draw(v: &mut Vk, dv: &Dev, d: &Draw, fp: usize) {
 
     // The constant blocks, unless the same as the last draw's.
     let ua = v.uniform_align.max(16);
-    let bl = blocks(v, dv, d, vp);
+    let bl = state::blocks(&fx, &d.layout, vp, v.exported.features & gpu::display::FEATURE_D3D9_CENTRES != 0, &mut say);
     let (ubuf, uoff) = match &p.last {
         Some((b, buf, off)) if b[..] == bl[..] => (*buf, *off),
         _ => {
@@ -791,11 +613,9 @@ pub fn draw(v: &mut Vk, dv: &Dev, d: &Draw, fp: usize) {
     let defaults = match p.defaults {
         Some(x) => x,
         None => {
-            let Some(a) = v.alloc(48, 16) else { return };
-            let mut b = [0u8; 48];
-            b[12..16].copy_from_slice(&1.0f32.to_le_bytes());
-            b[28..32].copy_from_slice(&0xffff_ffffu32.to_le_bytes());
-            unsafe { core::ptr::copy_nonoverlapping(b.as_ptr(), a.cpu, 48) };
+            let Some(a) = v.alloc(state::DEFAULTS_BYTES as u32, 16) else { return };
+            let b = state::defaults();
+            unsafe { core::ptr::copy_nonoverlapping(b.as_ptr(), a.cpu, b.len()) };
             p.defaults = Some((a.buffer, a.offset));
             (a.buffer, a.offset)
         }

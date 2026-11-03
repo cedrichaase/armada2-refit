@@ -49,6 +49,7 @@ pub mod slot {
     pub const DEV_CREATE_SHADER_RESOURCE_VIEW: usize = 18;
     pub const DEV_CREATE_RENDER_TARGET_VIEW: usize = 20;
     pub const DEV_CREATE_DEPTH_STENCIL_VIEW: usize = 21;
+    pub const DEV_CREATE_SAMPLER: usize = 22;
     pub const DEV_COPY_DESCRIPTORS_SIMPLE: usize = 24;
     pub const DEV_CREATE_COMMITTED_RESOURCE: usize = 27;
     pub const DEV_CREATE_FENCE: usize = 36;
@@ -76,6 +77,7 @@ pub mod slot {
     pub const LIST_CLOSE: usize = 9;
     pub const LIST_RESET: usize = 10;
     pub const LIST_DRAW_INSTANCED: usize = 12;
+    pub const LIST_DRAW_INDEXED_INSTANCED: usize = 13;
     pub const LIST_COPY_TEXTURE_REGION: usize = 16;
     pub const LIST_IA_SET_PRIMITIVE_TOPOLOGY: usize = 20;
     pub const LIST_RS_SET_VIEWPORTS: usize = 21;
@@ -86,6 +88,8 @@ pub mod slot {
     pub const LIST_SET_GRAPHICS_ROOT_SIGNATURE: usize = 30;
     pub const LIST_SET_GRAPHICS_ROOT_DESCRIPTOR_TABLE: usize = 32;
     pub const LIST_SET_GRAPHICS_ROOT_32BIT_CONSTANTS: usize = 36;
+    pub const LIST_SET_GRAPHICS_ROOT_CBV: usize = 38;
+    pub const LIST_IA_SET_INDEX_BUFFER: usize = 43;
     pub const LIST_IA_SET_VERTEX_BUFFERS: usize = 44;
     pub const LIST_OM_SET_RENDER_TARGETS: usize = 46;
     pub const LIST_CLEAR_DEPTH_STENCIL_VIEW: usize = 47;
@@ -151,7 +155,12 @@ pub const CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT: u32 = 256;
 pub const CLEAR_FLAG_DEPTH: u32 = 1;
 
 pub const FORMAT_UNKNOWN: u32 = 0;
+pub const FORMAT_R32G32B32A32_FLOAT: u32 = 2;
+pub const FORMAT_R32G32B32_FLOAT: u32 = 6;
 pub const FORMAT_R32G32_FLOAT: u32 = 16;
+pub const FORMAT_R32_UINT: u32 = 42;
+pub const FORMAT_R32_FLOAT: u32 = 41;
+pub const FORMAT_R16_UINT: u32 = 57;
 pub const FORMAT_R8G8B8A8_UNORM: u32 = 28;
 pub const FORMAT_D16_UNORM: u32 = 55;
 pub const FORMAT_B8G8R8A8_UNORM: u32 = 87;
@@ -165,7 +174,9 @@ pub const ALPHA_ONE_COMPONENT_MAPPING: u32 = (1 << 12) | (5 << 9) | (2 << 6) | (
 
 pub const ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE: u32 = 0;
 pub const ROOT_PARAMETER_TYPE_32BIT_CONSTANTS: u32 = 1;
+pub const ROOT_PARAMETER_TYPE_CBV: u32 = 2;
 pub const DESCRIPTOR_RANGE_TYPE_SRV: u32 = 0;
+pub const DESCRIPTOR_RANGE_TYPE_SAMPLER: u32 = 3;
 pub const SHADER_VISIBILITY_VERTEX: u32 = 1;
 pub const SHADER_VISIBILITY_PIXEL: u32 = 5;
 pub const ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT: u32 = 1;
@@ -179,6 +190,7 @@ pub const STATIC_BORDER_COLOR_OPAQUE_BLACK: u32 = 1;
 pub const PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE: u32 = 3;
 pub const PRIMITIVE_TOPOLOGY_TRIANGLESTRIP: u32 = 5;
 pub const INPUT_CLASSIFICATION_PER_VERTEX_DATA: u32 = 0;
+pub const INPUT_CLASSIFICATION_PER_INSTANCE_DATA: u32 = 1;
 pub const FILL_MODE_SOLID: u32 = 3;
 pub const CULL_MODE_NONE: u32 = 1;
 pub const BLEND_ZERO: u32 = 1;
@@ -324,6 +336,30 @@ pub struct VertexBufferView {
     pub location: u64,
     pub size: u32,
     pub stride: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct IndexBufferView {
+    pub location: u64,
+    pub size: u32,
+    pub format: u32,
+}
+
+/// `D3D12_SAMPLER_DESC`.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SamplerDesc {
+    pub filter: u32,
+    pub address_u: u32,
+    pub address_v: u32,
+    pub address_w: u32,
+    pub mip_lod_bias: f32,
+    pub max_anisotropy: u32,
+    pub comparison: u32,
+    pub border: [f32; 4],
+    pub min_lod: f32,
+    pub max_lod: f32,
 }
 
 #[repr(C)]
@@ -541,6 +577,8 @@ const _: () = {
     assert!(size_of::<SrvDesc>() == 40);
     assert!(size_of::<Viewport>() == 24);
     assert!(size_of::<VertexBufferView>() == 16);
+    assert!(size_of::<IndexBufferView>() == 16);
+    assert!(size_of::<SamplerDesc>() == 52);
     assert!(size_of::<DescriptorRange>() == 20);
     assert!(size_of::<RootParameter>() == 20);
     assert!(size_of::<StaticSampler>() == 52);
