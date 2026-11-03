@@ -1,42 +1,67 @@
 # Roadmap: Display8 on Vulkan and Direct3D 12, modular plugins, feature toggles
 
-Where the project goes from 13.36.1, and in which order. It is the plan for the display
-work, and governs it: it carries the open items of the earlier display plan, whose
-phases 0 to 6 are done. The layer READMEs stay the reference for how each part works,
-and the changelogs for what has shipped. Update this file as phases land: tick the
-phase, link the merge, move what was learned into the layer's README.
+The plan for the display work and what grew from it, and the record of how far it got:
+phases 1 to 12, in order, each with the merge that landed it. It carries the open items
+of the earlier display plan, whose phases 0 to 6 are done. The layer READMEs stay the
+reference for how each part works, and the changelogs for what has shipped. Update this
+file as phases land: tick the phase, link the merge, move what was learned into the
+layer's README.
 
 **Order, decided 2026-10-29:** passthrough comes first and is signed off in game before
 anything else is built on it. The architecture phases (shared libraries, ABI and claims,
 settings, the Refit screen, the render3d split, symbol profiles) wait for that sign-off.
-The legacy plugins stay in the repository, and the release package keeps its fallback,
-until the end, beside the removal of Direct3D 9.
+The legacy plugins stayed in the repository, and the release package kept its fallback,
+until the end (phase 11), beside the removal of Direct3D 9.
+
+Phases 7 to 11 describe the work as it was planned; where the text below says "will" or
+"stay" about something phase 11 removed, read the phase's Status line first.
 
 ## Where we are
 
-Main is at `dbb106c`, 13.36.1. Phases 0 to 6 of the earlier display plan are done there:
-the tracer and inventory, the `gpu` crate, Display8's forward mode, the stub, the Vulkan
-backend and the Direct3D 12 backend, and `Backend=auto` with `Mode=stub` as the shipped
-default.
+**Root 15.6.0 on `round-f`** (2026-11-03), the tip of a stack of branches: `round-c`
+(phases 5 and 6) under `round-d` (7 and 8), `round-e` (9 and 10) and `round-f` (11, and
+12 in progress). **`main` is at 13.51.3** (`015f50c`): phases 1 to 4 (rounds A and B, signed
+off in game) are on it; **nothing after them has been merged.**
 
-- **Display8** (`display/`) is the game's `d3d8.dll`, in the release package since
-  13.35.0. In stub mode (`Backend=auto`) it owns the device on Vulkan, then Direct3D 12,
-  then Direct3D 9, and **drops every draw the engine makes**. render3d and the UI draw
-  the whole frame instead. On macOS the package ships the same `Display8.ini`
-  (`Backend=auto`, Vulkan on MoltenVK first) since 13.36.1.
-- **Forward mode** passes every call to the old chain: d3d8to9 as `d3d8_real.dll`, then
-  DXVK's `d3d9.dll`. The release package still ships that chain and the legacy plugins
-  (`HUD.asi`, `GridLayout.asi`, `Menus.asi`) as its fallback, and Display8 stands down
-  from the stub while those plugins are loaded. Both stay until Phase 11.
-- **render3d** and **UI** draw through the `gpu` crate, which has Direct3D 9, Vulkan and
-  Direct3D 12 backends. Shaders build to d3dbc (vkd3d), SPIR-V and DXIL (dxc).
-- **QOL**, **QOLRules**, **Online** and **binkproxy** are C plugins with their own ini
-  files, read once at load.
-- **In progress:** passthrough (Phase 1); CI that rebuilds every shader and fails on a
-  stale stamp, and the plugins' move from polling `d3d8_device()` to
-  `display8_device_epoch` (both in Phase 2).
+| Round | Phases | State |
+|---|---|---|
+| A, B | 1 passthrough on Vulkan, 2 open items, 3 shared libraries, 4 ABI and claims | **Done and on `main`**, signed off in game |
+| C | 5 settings, 6 the Refit screen | **Signed off in game 2026-11-03** ("simplify later"), recorded on `worktree-round-c` (`5c28635`); **waits for the user's merge to `main`** |
+| D | 7 render3d split, 8 symbol profiles | Implemented and merged into `round-e`; **waits for the user's final in-game check** |
+| E | 9 owners and the package, 10 Direct3D 12 and the platform gates | Implemented on `round-e` (root 14.14.0); waits for the final check. Gate W (native Windows) has not been run |
+| F | 11 remove Direct3D 9 and the legacy plugins, 12 docs | 11 implemented on `round-f` (root 15.6.0); 12: D3 (`PLAYING.md`, `MODDING.md`) merged, D1 (this file and `CLAUDE.md`) and D2 (the layer READMEs) in progress; waits for the final check |
 
-What the architecture review found (four read-only reviews, 2026-10-23):
+What is built, at 15.6.0:
+
+- **Display8** (`display/`) is the game's `d3d8.dll` and the only Direct3D in the
+  chain: no d3d8to9, no DXVK, no forward mode, no Direct3D 9 backend. It draws nothing
+  of its own accord; render3d and the UI draw the frame on its Vulkan or Direct3D 12
+  device (`Backend=auto` tries Vulkan, then Direct3D 12), and **passthrough** draws, as the
+  stock engine would, every category no plugin claims. With neither backend, or
+  `Backend=none`, it **bails out** to the system's `d3d8.dll` and the plugins stand
+  down. Contract 1.4 (`gpu/src/display.rs`, including pass publishing on Direct3D 12);
+  `[Window]` and `[Samplers]` in `Display8.ini`.
+- **render3d** is a workspace (`r3d-core` and one crate per module, chosen by Cargo
+  features), with recipes in `render3d/content/`, every module live, and its engine reads
+  on symbol profiles. **The UI** (`UI.asi`) has the HUD panels, the button bar, the
+  menus it hosts, the loading screen and the **Refit screen**, whose rows come from
+  every plugin's descriptor table and are written to the overlay `RefitPlayer.ini`
+  (A2SET_ABI 1.1). `HUD.asi`, `GridLayout.asi` and `Menus.asi` are gone; `retire/` takes
+  them and the old chain out of an old install.
+- **QOL** (with the bar keys), **QOLRules** (the `rules` layer, `PayOnQueue` on),
+  **Online** and **binkproxy** are C plugins on `csdk/a2asi.h`, on the engine profile
+  and with settings tables. `layers.toml` is the one layer registry; the release
+  package is one folder per layer with an `sdk/`.
+- **Engine knowledge is data** (`profiles/gog-1.1/`, `crates/a2engine`): each plugin
+  identifies the executable and a hook whose symbols do not all resolve stands down.
+- CI rebuilds every shader (dxc only: SPIR-V and DXIL) and fails on a stale stamp, and
+  runs the native-gates probes (`d12probe` on WARP with the debug layer, `vkprobe`);
+  `native-gates-<commit>` is the user's kit for Windows and macOS.
+- Releases are pre-releases while the Direct3D 12 line says it is confirmed on Linux
+  only (`CHANGELOG.md`).
+
+What the architecture review found (four read-only reviews, 2026-10-23), every row
+since answered by phases 1 to 11:
 
 | Problem | Effect |
 |---|---|
@@ -175,11 +200,11 @@ hours, with a six-hour gap overnight. Over the same day the root version went fr
 1. **The user's in-game sign-off rounds.** Each one waits for the user to play.
    Rounds are the critical path, so the phases below are grouped to need as few as
    possible.
-2. **Bench capacity.** There is one GPU and at most three bench games at once, shared by
-   every agent. A start takes about 80 s and a scenario a few minutes, so the bench runs
+2. **Bench capacity.** There is one GPU and, by the user's limit, at most two bench games
+   at once and one of them on Direct3D 12, shared by every agent. A start takes about 80 s and a scenario a few minutes, so the bench runs
    a few dozen games an hour at best. A `Timing=1` run needs the bench to itself. Vulkan
-   on the GPU (`A2TEST_VULKAN_GPU=1`) runs at 1280x720, and a session is stopped as soon
-   as it has done its job.
+   runs on the GPU (with the validation layer on) at 1280x720, and a session is stopped
+   as soon as it has done its job.
 3. **Pixel A/B iterations.** Each one is a change, a rebuild and a `baseline compare`.
    Wherever pixel exactness decides a phase (passthrough above all), the number of
    iterations sets the pace, not the code.
@@ -220,9 +245,11 @@ Each phase is one or more merges into `main`, each with its own root version and
 merged. A bench pass is evidence, not sign-off. A phase whose round has not come yet
 stays on its branch. Phase 1 comes first and gates Phases 3 to 8. Estimates follow "Pacing" above.
 
-### Phase 1 — Passthrough on Vulkan (in progress)
+### Phase 1 — Passthrough on Vulkan (done)
 
 **Goal:** Display8 draws every unclaimed engine draw on Vulkan the way stock does. It is the chosen answer for render3d's hand-backs (hologram classes, effect classes, construction, the bees) and for every module or UI part switched off: the stock look, not nothing drawn and logged.
+
+**Status: done**, signed off in game (round A) and on `main`: merged as `d0a520f` (`display-integration`, with phase 2's open items). Direct3D 12 followed in phase 10.
 
 What the engine uses, from the stock traces (2026-10-24): 58 methods; four vertex
 formats, nearly all pre-transformed and pre-lit (the bulk is position, colour and one
@@ -259,10 +286,12 @@ loading screen overdraws.
 | Estimate | Agent 12–24 h over the steps. The bench sets the pace: the baseline is recorded twice, then each category is A/B-compared against forward mode on the GPU until the pixels agree. That is realistically 10–20 bench passes and several dozen A/B games. Round A, with a second round only if 1f's tone-mapped look is disputed |
 | Risks | The invalid anisotropic mip filter and the half-pixel 2D decide pixel exactness; the cursor is assumed to be a sprite, to verify; whether weapon point lights reach the asteroid path is untraced; merging must never reorder the CPU-sorted alpha draws |
 
-### Phase 2 — Open items of the earlier plan
+### Phase 2 — Open items of the earlier plan (done)
 
 **Goal:** the loose ends of the earlier display plan, each small, none waiting on the
 architecture phases.
+
+**Status: done** and on `main`, in `d0a520f` with phase 1 (CI shader stamps, the device epoch, the HUD leftovers, record and replay of a `gpu` frame, logs in `%LOCALAPPDATA%`).
 
 | | |
 |---|---|
@@ -274,9 +303,11 @@ architecture phases.
 | Versions | display, render3d, ui PATCH or MINOR as touched; testbench MINOR; root MINOR |
 | Estimate | Agent 1–3 h each; 1 bench pass each; round A for the HUD leftovers, none for the rest |
 
-### Phase 3 — Shared libraries and the toolchain
+### Phase 3 — Shared libraries and the toolchain (done)
 
 **Goal:** one copy of the runtime, the formats, the shader toolchain and the C helpers.
+
+**Status: done** and on `main`: `round-b` merged as `cb7a1e5`, with phase 4.
 
 | | |
 |---|---|
@@ -288,10 +319,12 @@ architecture phases.
 | Estimate | Agent 4–8 h; 2–3 bench passes (the pixel compares under `--clock bench`); round B |
 | Risks | `alloc::format!` linking in the shared crate; a C signature check regressing in the rewrite |
 
-### Phase 4 — ABI handshake and claims
+### Phase 4 — ABI handshake and claims (done)
 
 **Goal:** mismatched files fail safe, and the plugins' claims replace Display8's own
 category switches as the routing of passthrough.
+
+**Status: done** and on `main` in `cb7a1e5` (contract 1.0 to 1.2 then; 1.4 now).
 
 | | |
 |---|---|
@@ -303,9 +336,11 @@ category switches as the routing of passthrough.
 | Estimate | Agent 2–4 h; 2 bench passes; round B |
 | Risks | Plugins load after `Direct3DCreate8`; the routing must be read at `CreateDevice` and every frame, when the ASI loader has run |
 
-### Phase 5 — Settings infrastructure
+### Phase 5 — Settings infrastructure (done, on a branch)
 
 **Goal:** settings are enumerable, persist in the overlay, and some apply live.
+
+**Status: done**; round C signed off in game 2026-11-03. On `worktree-round-c` (`5c28635`), not yet merged to `main`. Merges `44e1659` (contracts), `6a8b9e9` to `be11687` and `8f207c1` (the plugins), `3ad31dc` (the UI hub).
 
 | | |
 |---|---|
@@ -317,9 +352,11 @@ category switches as the routing of passthrough.
 | Estimate | Agent 3–6 h; 1–2 bench passes; round C, with Phase 6 |
 | Risks | The overlay silently winning over a hand edit (the log line and the screen show it); three copies of `rt` if Phase 3 has not landed |
 
-### Phase 6 — The Refit screen
+### Phase 6 — The Refit screen (done, on a branch)
 
 **Goal:** players switch whole features from the Options menu.
+
+**Status: done**; signed off with phase 5, "simplify later". The bench scenarios merged as `bf6d116`; the confirmation is recorded in `5c28635`. Whether "simplify" also meant the Refit screen itself is still open (see "Open decisions").
 
 | | |
 |---|---|
@@ -331,9 +368,11 @@ category switches as the routing of passthrough.
 | Estimate | Agent 4–8 h; 3–5 bench passes (iterating the new scenario's clicks); round C |
 | Risks | Input capture of a modal over a hosted dialog in a mission is untested; our labels are English only |
 
-### Phase 7 — render3d core and content
+### Phase 7 — render3d core and content (done, on a branch)
 
 **Goal:** render3d's modules can be taken separately, and the core holds no content.
+
+**Status: done**, awaiting the final check. Merges `5afac14` (module interface v2, hooks, services), `a211329`, `2681cd6`, `d257568` to `a5112c8` (the modules on `hooks.rs`/`content.rs`, live), `adfb1d9` (crates, render3d 0.43.0). Content lives in `render3d/content/`.
 
 | | |
 |---|---|
@@ -345,9 +384,11 @@ category switches as the routing of passthrough.
 | Estimate | Agent 8–16 h; one pixel-identical bench pass per step, about 8–10; round D (no visible change to judge) |
 | Risks | Statics and the `no_std` allocator linked once across crates; cdylib size |
 
-### Phase 8 — Executable identity and symbol tables
+### Phase 8 — Executable identity and symbol tables (done, on a branch)
 
 **Goal:** engine knowledge is data per build; a modified executable stands down cleanly.
+
+**Status: done**, awaiting the final check. Merges `d919edb` (e7: identity, profiles, UI, `a2test syms`), `3b64862` (the C plugins), `977783b` (render3d), `cfdff0c` (the content profile). Fleet Operations: Roots' profile (FO-3) is the format's second user, in its plan.
 
 | | |
 |---|---|
@@ -359,9 +400,11 @@ category switches as the routing of passthrough.
 | Risks | Register and stack bugs in the rewritten C stubs: a bench gameplay pass per stub |
 | Fleet Operations | **Fleet Operations: Roots first** (decided 2026-11-02), in this repository: `PLAN-FLEETOPS.md`. Roots' `Data/ArmadaL.exe` is stock 1.1's image patched (the same timestamp, `0x3c4c76bd`; image size `0x405000` against `0x3fa000`; one extra code section; 210 functions changed), so 8a records the image size and the bench the hash, and the profile key is (game, build) from the start. The Roots profile inherits the stock one, and a hook whose symbols Roots changed stands down until verified beside Roots' change. Its first steps (FO-0, FO-1, FO-2) need only 8a; its profile (FO-3) lands with 8b–8d as the format's second user |
 
-### Phase 9 — Code to its owner, and the release package
+### Phase 9 — Code to its owner, and the release package (done, on a branch)
 
 **Goal:** each plugin holds one concern, and Display8 owns the window and the display mode.
+
+**Status: done** on `round-e`, awaiting the final check (the pointer and the bar keys on the user's own desktop): `7bd9381` (`layers.toml`), `691e21b` (`rules`, root 14.0.0), `2c422b8` (the per-layer package, `sdk/`), `00520d0` (window and mode to Display8), `d119f1b` (bar keys to QOL), `8327bad` (view distance to render3d).
 
 | | |
 |---|---|
@@ -373,22 +416,26 @@ category switches as the routing of passthrough.
 | Estimate | Agent 4–8 h; 3–5 bench passes (mostly the subset matrix); round E, which needs the user's own desktop for input |
 | Risks | Input under Wine and Xwayland is fragile |
 
-### Phase 10 — Direct3D 12 parity and the platform gates
+### Phase 10 — Direct3D 12 parity and the platform gates (done on Linux; gate W open)
 
 **Goal:** passthrough on Direct3D 12, and proof that every platform has a backend.
 
+**Status: done** on `round-e` for Linux, awaiting the final check (`Backend=d3d12`): `9faaab6` (contract 1.4), `22d0707` (passthrough on Direct3D 12), `017b028` (`d12probe`, the native gates' CI jobs and kit), `4084eb4` (`[Samplers]`), `4600e4b` (frozen references). **Not done: gate W** (a native Windows run) and the optional macOS gate. Until gate W passes, releases carry the pre-release line. Display8's `Vk::start` already sets the portability flags (`display/vkprobe/README.md`).
+
 | | |
 |---|---|
-| Steps | Port 1a–1g to Direct3D 12. Measure Direct3D 12 on native Windows (every measurement so far ran on vkd3d-proton). Run `vkprobe` on a Mac through MoltenVK and set the portability flags in the Vulkan start-up. Record new GPU-Vulkan baselines to replace the `pre-gpu-*` ones recorded on Direct3D 9 |
+| Steps | Port 1a–1g to Direct3D 12. Measure Direct3D 12 on native Windows (every measurement so far ran on vkd3d-proton). Run `vkprobe` on a Mac through MoltenVK (the portability flags are set in Display8's Vulkan start-up). Record new GPU-Vulkan baselines to replace the `pre-gpu-*` ones recorded on Direct3D 9 |
 | Depends on | Phase 1 |
 | Acceptance | The Phase 1 scenarios on `Backend=d3d12`; a native Windows run; a Mac run of the probe and the game |
 | Versions | display MINOR, root MINOR |
 | Estimate | Agent 3–6 h for the port; 2–4 bench passes on `Backend=d3d12`; round E on Linux. The native Windows and Mac runs wait on access to those machines and sit outside the rounds |
-| Risks | MoltenVK is unproven; until a Mac run passes, the Mac only works through d3d8to9 on wined3d |
+| Risks | MoltenVK is unproven; until a Mac run passes, the Mac has the bail-out only (the system's Direct3D 8 on wined3d) |
 
-### Phase 11 — Remove Direct3D 9 and the legacy plugins
+### Phase 11 — Remove Direct3D 9 and the legacy plugins (done, on a branch; merge gated)
 
 **Goal:** the Direct3D 9 path and everything the UI superseded are gone; old installs are still cleaned.
+
+**Status: done** on `round-f` (root 15.6.0): `2de6b64` (findings moved to their owners, `doclinks.py`), `cd2e573` (the bail-out; forward mode and Direct3D 9 gone), `6a6f3bb` (gpu, render3d, shaders), `db49ea6` (legacy layers out, `retire/`), `a2ede51` (the bench; `legacy.py`), `ab99f78` (the UI), `93f1a8e` (platform and the package; the chain gone). **The merge to `main` is gated**: the final in-game check, native Windows gate W, and the floor below (two releases with `auto` as the default, 14 days). Phase 11 as planned below is kept as the record; the Status line wins where they differ (the bench's old-install and stock-shell cases build the legacy plugins from the last tag that has them, `testbench/bench/legacy.py`).
 
 | | |
 |---|---|
@@ -402,12 +449,17 @@ category switches as the routing of passthrough.
 | Estimate | Agent 6–11 h, of which 1–2 h move findings; 2–3 full regression passes on GPU Vulkan; round F, after two releases with `auto` as the default |
 | Risks | `GridLayout.ini [Cells]` has no UI counterpart; note the gap in `ui/README.md` rather than keep the plugin. **The stock front end over Vulkan, without `UI.asi`**, is a bench check, because most of it is already settled. The findings it reuses: (1) the shell asks for a fixed 800x600x16 mode, and Menus.asi, now the UI's menu host as well, raises that request to the desktop's size in memory, so the shell and the 3D display share one mode and the device is not re-created at each switch; (2) the stub offers the engine one mode, the desktop's, so no mode change happens on Vulkan at all, and the cursor and mouse need no translation; (3) `Embed=1`, and the UI's host after it, makes every dialog a child of the game window, so there is one OS window, with owner, z-order, input, focus and cursor each handled and measured; (4) while a GDI dialog is up the game thread sits in the dialog's modal loop and nothing presents, and only the intro movie and the Credits use the device in the shell; both already run on the stub (`display-stub`, intro to Exit; movies since display 0.6.1). **The check:** the stub on GPU Vulkan, with neither `UI.asi` nor `Menus.asi` loaded, through the main menu, Options and a nested screen, the Credits, a mission and its in-mission menu and back, with the cursor visible throughout. It runs with Phase 1's Display8-alone runs and again in this phase's acceptance. Stock's separate popup windows are stock behaviour and stay acceptable. If a stock dialog does not appear, Display8 takes over the shell-mode raise from the UI, which is code already written twice and a display concern anyway |
 
-### Phase 12 — Documentation
+### Phase 12 — Documentation (in progress)
 
-Rewrite the CLAUDE.md sections this plan changes: the layout table (hud, grid, menus,
-renderer rows), "renderer, platform", the render3d note on a missing Direct3D 9 device,
-"display", and the bench's GPU policy (`A2TEST_VULKAN_GPU=1`; lavapipe stays for
-validation). Each layer's README keeps its own derivations.
+**Status: in progress** on `round-f`; docs only, so no changelog entries. Done: `PLAYING.md`
+and `MODDING.md` (D3, `c2b57c1`). In flight: `CLAUDE.md` and this file (D1, `p12-d1`), the
+layer READMEs and the root `README.md` (D2, `p12-d2`).
+
+`CLAUDE.md` is rewritten for the end state: the layout table (the hud, grid, menus and
+renderer rows out; rows for `retire/`, `layers.toml`, `profiles/`, the settings tools,
+`tools/gates` and the probes in), the Display8-only chain, the bail-out, the render3d
+and display notes, the bench's GPU and memory policy, hard rule 1's exception as
+history, and the retired rows of `a2mod`. Each layer's README keeps its own derivations.
 
 ## Other games
 
@@ -435,7 +487,7 @@ P8 and FO: Roots ── Armada 1 (armada1/ in this repository)              (PLA
 
 | Phase | Depends on | Can run beside | Agent time · bench passes · round |
 |---|---|---|---|
-| 1 passthrough, Vulkan (in progress) | — | 2 | 12–24 h · 10–20 plus A/B · A |
+| 1 passthrough, Vulkan (done) | — | 2 | 12–24 h · 10–20 plus A/B · A |
 | 2 open items | (1 for the HUD leftovers) | 1 | 1–3 h each · 1 each · A |
 | 3 shared libraries | 1 signed off | 4 | 4–8 h · 2–3 · B |
 | 4 ABI and claims | 1 signed off, (3) | 3 | 2–4 h · 2 · B |
@@ -446,7 +498,7 @@ P8 and FO: Roots ── Armada 1 (armada1/ in this repository)              (PLA
 | 9 owners, package | 1 signed off, 4 | 10 | 4–8 h · 3–5 · E |
 | 10 D3D12, gates | 1 | 9 | 3–6 h · 2–4 · E, plus the machines |
 | 11 remove D3D9 and legacy | 1, 9, 10 + two releases | — | 6–11 h · 2–3 · F |
-| 12 docs | 11 | — | 1–2 h · none · F |
+| 12 docs (in progress) | 11 | — | 1–2 h · none · F |
 | Fleet Operations: Roots | FO-0/1 none; FO-2 8a; FO-3 8b; FO-4 1 signed off; FO-5 7 | 5–10 | 75–165 h · `PLAN-FLEETOPS.md` · FO-A to FO-C |
 | Armada 1 (`armada1/`) | 8 and Roots; Display7 on 1 and 10; shared fixed-function crate after 1 and 10 | — | 360–725 h · `PLAN-ARMADA1.md` |
 
@@ -456,15 +508,28 @@ The wall-clock time is set by the five or six sign-off rounds and by the bench (
 
 ## Open decisions
 
-Decided items leave this list for the text they decide: the overlay is `RefitPlayer.ini`
-in the game directory ("Settings descriptors and the player overlay"), QOLRules ships
-with `PayOnQueue` on (Phase 9), and Fleet Operations starts with Roots, then Armada 1 in
+Decided, and recorded where they apply: the overlay is `RefitPlayer.ini` in the game
+directory ("Settings descriptors and the player overlay"); QOLRules ships with
+`PayOnQueue` on (Phase 9); Fleet Operations starts with Roots, then Armada 1 in
 `armada1/` ("Other games"), all 2026-11-02; packaging for modders is both, cheaply
-(Phase 9, 2026-11-03). The open questions of each game are in its plan.
+(Phase 9, 2026-11-03). Decided in the phase 10 to 12 plan (2026-11-03): the
+renderer row is **no visible row**: `Display8.Backend` is an advanced, hidden
+descriptor the lint covers, and the Refit screen shows nothing for it (Phase 10).
+Who runs the native checks (decision 1) is answered by the kit: `tools/gates/` and
+`native-gates-<commit>`. The open questions of each game are in its plan
+(`PLAN-FLEETOPS.md`, `PLAN-ARMADA1.md`).
 
-1. **Windows and Mac access** for Phase 10: who runs the native Direct3D 12 and the
-   MoltenVK checks, and on which machines.
-2. **How long the Direct3D 9 path stays** after Phase 10: the plan's floor is two
-   releases with `auto` as the default; the user may shorten or lengthen it.
-3. **The renderer row in the Refit screen**: offer the backend choice to players
-   (advanced tier), or leave it in `Display8.ini` only.
+What is genuinely open:
+
+1. **The phase 11 merge gate.** Round F reaches `main` only when (a) the user has played
+   the final check (the front end, a mission, the bail-out, `Backend=d3d12`), (b) gate W
+   (the native Windows run of `tools/gates/gate-windows.ps1`) has passed, so the
+   pre-release line can go, and (c) `Backend=auto` has been the default for two
+   releases and 14 days with no Direct3D 9 in bug reports. The user may shorten or
+   lengthen the floor in (c).
+2. **Whether "simplify" also meant the Refit screen.** Round C was signed off with
+   "simplify later" (2026-11-03); the settings rows were simplified in phase 9 (moved
+   keys), but whether the user means fewer rows or tabs on the screen itself has not
+   been asked.
+3. **The macOS gate** (`gate-macos.sh`, the Sikarugir wrapper) is optional and not a
+   precondition; until a Mac runs it, the Mac is on MoltenVK unproven.
