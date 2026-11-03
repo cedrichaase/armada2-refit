@@ -1,11 +1,13 @@
 //! The Direct3D 12 exports of `gpu/src/display.rs` (the contract), shaped as the Vulkan
 //! ones (`vk/exports.rs`): the device, the frame, the upload ring, shader-visible
-//! descriptors, deferred frees, the engine's targets and mirrors. `display8v1_backend`
-//! and the engine's state (`display8_engine_*`) are shared, in `vk/exports.rs`.
+//! descriptors, deferred frees, the engine's targets and mirrors, and the pass a plugin
+//! publishes (contract 1.4, `display8v1_dx12_pass`). `display8v1_backend` and the
+//! engine's state (`display8_engine_*`) are shared, in `vk/exports.rs`.
 use super::get;
+use crate::log;
 use crate::stub::obj::SObj;
 use core::ffi::c_void;
-use gpu::display::{Dx12Alloc8, Dx12Descriptors8, Dx12Device8, Dx12Frame8, Dx12Image8};
+use gpu::display::{Dx12Alloc8, Dx12Descriptors8, Dx12Device8, Dx12Frame8, Dx12Image8, Dx12Pass8, PASS_ENTER, PASS_PUBLISH};
 
 #[unsafe(no_mangle)]
 pub extern "C" fn display8v1_dx12() -> *const Dx12Device8 {
@@ -79,4 +81,64 @@ pub extern "C" fn display8v1_dx12_mirror(tex8: *mut c_void, out: *mut Dx12Image8
         }
         None => false,
     }
+}
+
+/// What the plugins said of their `Cmd`s (`display8v1_dx12_pass`): the pass published
+/// last and the frame (Display8's index) it is for, how many `Cmd`s are alive, and the
+/// pass last logged (width, height, samples).
+struct Passes {
+    published: Option<(Dx12Pass8, u64)>,
+    alive: u32,
+    logged: (u32, u32, u32),
+}
+
+static mut PASSES: Passes = Passes { published: None, alive: 0, logged: (0, 0, 0) };
+
+#[allow(static_mut_refs)]
+fn passes() -> &'static mut Passes {
+    unsafe { &mut PASSES }
+}
+
+/// A plugin's outermost `Cmd` begins or ends, or ends with its pass now published
+/// (gpu/src/display.rs, "Pass publishing on Direct3D 12"). Kept for the passthrough,
+/// which draws the engine's draws into the pass published in this frame while no `Cmd`
+/// is alive; nothing is recorded here.
+#[unsafe(no_mangle)]
+pub extern "C" fn display8v1_dx12_pass(event: u32, pass: *const Dx12Pass8) {
+    let Some(d) = get() else { return };
+    let p = passes();
+    match event {
+        PASS_ENTER => p.alive += 1,
+        _ => {
+            p.alive = p.alive.saturating_sub(1);
+            if event == PASS_PUBLISH && !pass.is_null() {
+                // Only what the plugin's size says (gpu/src/display.rs, "Versions").
+                let v = unsafe { gpu::display::read(pass) };
+                if v.colour.resource == 0 || v.rtv == 0 {
+                    return;
+                }
+                let k = (v.width, v.height, v.samples);
+                if k != p.logged {
+                    p.logged = k;
+                    log!("dx12: pass published {}x{} x{}{} (frame {})", v.width, v.height, v.samples, if v.depth.resource != 0 { " with depth" } else { "" }, d.index);
+                }
+                p.published = Some((v, d.index));
+            }
+        }
+    }
+}
+
+/// The pass a plugin published in the frame now, if any: forgotten at the engine's
+/// `Present` (the frame's index moves on there).
+pub fn published() -> Option<Dx12Pass8> {
+    let d = get()?;
+    match passes().published {
+        Some((v, f)) if f == d.index => Some(v),
+        _ => None,
+    }
+}
+
+/// Whether a plugin's `Cmd` is alive now (Display8 records nothing into the list then).
+pub fn cmd_alive() -> bool {
+    passes().alive != 0
 }

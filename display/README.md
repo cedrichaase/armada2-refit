@@ -94,6 +94,7 @@ as before:
 | `display8v1_register(&plugin)`, `display8v1_claims(except)` | the claims (since 0.13.0, contract 1.1): a plugin registers at load with a callback saying what it draws now, and asks what the others claim ("Claims" below) |
 | `display8v1_backend()` | what the plugins draw on: Direct3D 9, Vulkan, Direct3D 12 or none (`gpu/src/display.rs`, `BACKEND_*`) |
 | `display8v1_vk*`, `display8v1_dx12*`, `display8v1_engine_viewport`, `display8v1_engine_transform` | stub mode on Vulkan and Direct3D 12: the device, the frame, the upload ring, deferred frees, the engine's targets and mirrors, a flush, and the engine's state the plugins read. The contract is `gpu/src/display.rs` (its doc comment is the specification); `src/vk/exports.rs` and `src/dx12/exports.rs` implement it |
+| `display8v1_vk_pass(event, &pass)`, `display8v1_dx12_pass(event, &pass)` | a plugin's `Cmd` begins or ends, or ends with its pass published (render3d's scene pass), for the passthrough to draw into; on Direct3D 12 since 0.19.0 (contract 1.4, below) |
 
 The first five are the forward mode's (`src/api.rs`), unversioned: plain scalars, the
 same in every release. render3d (`frame::begin`) and the
@@ -101,6 +102,38 @@ UI (`gfx::attach`) tell a new device or a `Reset` by `display8_device_epoch`
 (`gpu::Gpu::device_epoch`, resolved once); on a `d3d8.dll` without it they compare the
 Direct3D 9 device behind the engine's (`gpu::Gpu::engine_id`) as before, until the
 Direct3D 9 backend goes (the display plan's last phase).
+
+### The pass on Direct3D 12 (contract 1.4)
+
+Since 0.19.0 a plugin publishes its pass on Direct3D 12 as on Vulkan, through
+`display8v1_dx12_pass(event, pass)` (`gpu/src/display.rs`, "Pass publishing on
+Direct3D 12", is the specification):
+
+- **Events** as `display8v1_vk_pass`'s: `PASS_ENTER` (0) when a plugin's outermost
+  `Cmd` begins, `PASS_LEAVE` (1) when it ends, `PASS_PUBLISH` (2) when it ends with
+  `pass` its pass now. `PASS_PUBLISH` is a leave with a pass, not a second event;
+  `pass` is null for the other two. Only render3d publishes; the UI enters and leaves.
+- **`Dx12Pass8`**, read within its `size`: `colour` and `depth` (`Dx12Image8`, a null
+  `resource` is none; `format` the view's `DXGI_FORMAT`, `state` as below), `rtv` and
+  `dsv` (the `D3D12_CPU_DESCRIPTOR_HANDLE`s a draw sets with `OMSetRenderTargets`, in
+  the plugin's heaps that are not shader-visible; `rtv` is the published layer's view),
+  `samples`, `width` and `height`.
+- **Kept for the frame**: the pass published last, with the frame it came in
+  (`src/dx12/exports.rs`, `published()`), and forgotten at the engine's `Present`, when
+  the frame's index moves on. Whether a `Cmd` is alive is `cmd_alive()`: Display8
+  records nothing into the list then. Each new size is logged once:
+  `dx12: pass published 1280x720 x4 with depth (frame 412)`.
+- **States**: whenever no `Cmd` is alive the published colour is in `RENDER_TARGET` and
+  the depth in `DEPTH_WRITE`. Display8 draws into them so and leaves them so; it never
+  samples, copies or transitions them.
+- **The rebind rule**: Display8 may set anything on the list between `Cmd`s but the
+  descriptor heaps (it sets only its own two, at the frame's start and after a flush);
+  `gpu` binds everything again at its next `Cmd`. While a `Cmd` is alive, nothing
+  Display8 does in a call (the frame, the ring, descriptors, mirrors, targets) binds
+  anything on the list; a mirror's update is a copy and its barriers.
+
+The passthrough does not draw into it yet (phase 10 X1): with 0.19.0 the engine's
+draws on Direct3D 12 are dropped, as before.
 
 ## Versions of the contract
 

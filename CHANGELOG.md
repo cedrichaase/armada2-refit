@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 14.10.0 — 2026-11-03
+
+Layers: display 0.19.0, render3d 0.47.0, ui 1.1.1 (gpu 1.3.0).
+
+### Added
+- Contract 1.4, pass publishing on Direct3D 12 (phase 10 X0, X-C1): `display8v1_dx12_pass` and `Dx12Pass8` in `gpu/src/display.rs`, published by render3d as on Vulkan, kept by Display8 for its passthrough (X1), and the rebind rule (gpu binds everything again after any call into Display8; Display8 sets no heaps but its own). See the layers' changelogs. Installed, not yet seen in game.
+
 ## 14.4.0 — 2026-11-03
 
 Layers: render3d 0.46.0, qol 2.2.0, testbench 3.103.0.
