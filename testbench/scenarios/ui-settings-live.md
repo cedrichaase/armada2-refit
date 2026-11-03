@@ -2,7 +2,7 @@
 
 Resolutions: 1280x720
 Mod: refit
-Setup: ui/bench-asi.sh --no-grid
+Setup: ui/bench-asi.sh
 Overlay: UI.HUD:Minimap=0 UI.UI:Theme=klingon
 Timeout: 15 min
 

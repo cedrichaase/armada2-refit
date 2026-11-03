@@ -2,7 +2,7 @@
 
 Resolutions: 1280x720
 Mod: refit
-Setup: ui/bench-asi.sh --no-grid HUD.Bar=1
+Setup: ui/bench-asi.sh HUD.Bar=1
 Timeout: 12 min
 
 `ui/HUD.md`, "The button bar". With `[HUD] Bar=1` the UI draws the bar itself, as a

@@ -63,7 +63,8 @@ case "$which" in
     old-display)
         # The old Display8 falls back to forward mode here (Menus.asi, below), which needs
         # the chain it forwarded to: d3d8to9 as d3d8_real.dll and DXVK's d3d9.dll, from
-        # REF's platform/vendor (since display 1.0.0 nothing installs them).
+        # REF's platform/vendor (since display 1.0.0 nothing installs them); the bench adds the
+        # d3d9 override for a clone that carries a d3d9.dll (testbench/bench/session.py).
         if [ ! -f "$cache/d3d8_real.dll" ] || [ ! -f "$cache/d3d9.dll" ]; then
             vtmp="$(mktemp -d)"
             git -C "$repo" archive "$sha" platform/vendor/d3d8to9-1.16.0/d3d8.dll platform/vendor/dxvk-3.1.1/d3d9.dll | tar -x -C "$vtmp"
@@ -78,7 +79,8 @@ case "$which" in
         # Since display 0.18.0 the shell's 800x600 request is raised by Display8 (it was
         # the UI's, then): the old stub offers the desktop's mode alone, so the engine
         # would fail to create its device before the menu. Menus.asi does that raise
-        # itself, and the UI's menus stand down beside it.
-        bash "$repo/ui/bench-legacy.sh" "$state" menus
+        # itself, and the UI's menus stand down beside it. The layer left the repository
+        # in 15.2.0: it comes from the bench's cache of the last tag that has it.
+        python3 "$repo/testbench/bench/legacy.py" install "$game" menus
         echo "$sha's d3d8.dll -> $game/ (beside this checkout's Render3D.asi and UI.asi)" ;;
 esac

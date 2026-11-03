@@ -8,7 +8,8 @@ Timeout: 12 min
 A test that only ever passes proves nothing. This runs the game with every visual layer
 put aside (`a2mod stock`, on the clone). There the HUD and the font are known to draw
 ~1.79x too wide at 21:9 (`ui/HUD.md`, "The references the stock HUD is drawn against": 2.15 across against 1.20 down), and the 21:9
-case must MEASURE that stretch. It uses the same Borg briefing and regions as `hud.md`,
+case must MEASURE that stretch. It measures the Borg briefing
+and regions the retired `hud` scenario used,
 so a faction mix-up cannot pass it by accident. In the 4:3 reference case the
 comparisons are skipped.
 

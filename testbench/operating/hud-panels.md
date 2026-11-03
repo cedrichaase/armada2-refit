@@ -4,7 +4,7 @@ What was learned driving the `[HUD]` panels of `ui/HUD.md` ("The resources, the
 buttons, the boxes, the overlay and the chat"), for the agents after.
 
 - **Setup**: `session start --no-launch --res 1280x720`, then `ui/bench-asi.sh
-  <state.json> --no-grid HUD.Resources=1 HUD.Buttons=1 HUD.Messages=1 HUD.Pause=1
+  <state.json> HUD.Resources=1 HUD.Buttons=1 HUD.Messages=1 HUD.Pause=1
   HUD.Overlay=1 HUD.Chat=1`, then `drive launch`. `bench-asi.sh` copies a fresh
   `UI.ini` each time, so a key left out is back to 0.
 - **The pause key is `Pause`** (`drive key Pause`, Input.map's `pauseGame`); a second

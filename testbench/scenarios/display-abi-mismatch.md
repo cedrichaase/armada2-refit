@@ -30,10 +30,11 @@ Since display 0.18.0 the shell's 800x600 request is raised by Display8, not by t
 (`[Window]`); display 0.11.0's stub offers the desktop's mode alone, so the engine
 would fail to create its device (a Wine stack overflow before the menu) with no one to
 raise it. A player who mixes files like this needs what raised it before: in
-**olddisplay** `display/bench-abi.sh` puts Menus.asi back (`ui/bench-legacy.sh menus`),
+**olddisplay** `display/bench-abi.sh` puts Menus.asi back (built from the last tag that has it,
+`testbench/bench/legacy.py`),
 which raises the mode and scales the shell to the screen, the UI's menus standing
 down beside it; the cube is then at 930,100. Menus.asi also changes what the engine draws,
-which the old stub drops, so that Display8 falls back to forward mode and the UI's HUD draws on
+which the old stub drops; the old Display8 now simply runs in its forward mode (0.11.0's default, `mode forward` in its log, which this checkout's `Display8.ini` no longer overrides) and the UI's HUD draws on
 Direct3D 9; the game is not quit through its menus (their buttons moved), the case's end stops it.
 
 ## Main menu
@@ -55,7 +56,7 @@ Direct3D 9; the game is not quit through its menus (their buttons moved), the ca
 14. Take a screenshot called "mission".
 15. Check that the screenshot shows a space battle map of Star Trek: Armada II drawn by the game (stars, ships or stations, or the game's own interface), not a black or garbled screen.
 16. Oldplugins: Expect "Display8.log" contains "passthrough: the engine's first draw".
-17. Olddisplay: Expect "Display8.log" contains "forward mode instead".
+17. Olddisplay: Expect "Display8.log" contains "mode forward".
 18. Olddisplay: Expect "Render3D.log" contains "is too old for this plugin (no contract handshake".
 19. Oldplugins: Expect "Display8.log" contains "Render3D.asi is loaded and has not asked for the contract".
 20. Oldplugins: Expect "Display8.log" contains "UI.asi is loaded and has not asked for the contract".

@@ -3,7 +3,7 @@
 Resolutions: 1280x720
 Mod: refit
 Launch: -nointro a2_borg01
-Setup: display/bench-mode.sh forward ui/bench-asi.sh --no-grid --rts FRAMERATE_DISPLAY=1 --scene fog
+Setup: display/bench-mode.sh stub ui/bench-asi.sh --rts FRAMERATE_DISPLAY=1 --scene fog
 Timeout: 12 min
 
 `ui/HUD.md`, "What the stock overlay and minimap drew that ours left out, and the

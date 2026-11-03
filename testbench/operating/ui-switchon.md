@@ -11,8 +11,11 @@ What an agent driving the game as `./install` now gives it (every part of the UI
   empty argument into the default); a scenario's `Launch the game with ""` does launch
   without it. In a session, the main menu's REPLAY INTRO plays the intro (Esc skips it
   back to the main menu).
-- Scenarios that test the superseded plugins themselves put them back with
-  `Setup: ui/bench-legacy.sh hud|grid|menus` (the UI's part switched off).
+- The superseded plugins (HUD, GridLayout, Menus) are gone from the repository, and so are
+  the scenarios that tested them. The bench builds Menus.asi once from the last tag that
+  has it (`testbench/bench/legacy.py`, cached in `$A2_DATA/bench/legacy/<tag>/`) for the
+  stock shell of a reference case (`Stock shell: embed`), for the old half of
+  `display-abi-mismatch` and for `retire-old-install`; nothing else puts one back.
 - Do not copy a new `UI.asi` over the one a running game has loaded: stop the game first.
 
 ## Where things are, at any aspect

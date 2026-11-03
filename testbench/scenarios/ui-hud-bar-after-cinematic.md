@@ -2,7 +2,7 @@
 
 Resolutions: 1280x720
 Mod: refit
-Setup: ui/bench-asi.sh --no-grid
+Setup: ui/bench-asi.sh
 Timeout: 12 min
 
 `ui/HUD.md`, "The button bar". Game Settings' "Command Bar" (`RefitPlayer.ini`

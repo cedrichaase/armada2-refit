@@ -31,7 +31,7 @@ INPUT_SRC = BENCH / 'input'
 INPUT_BIN = INPUT_SRC / 'a2input'
 
 # The overrides Heroic launches with (GamesConfig/1174788223.json).
-DLL_OVERRIDES = 'winmm=n,b;d3d8=n,b;d3d9=n,b'
+DLL_OVERRIDES = 'winmm=n,b;d3d8=n,b'
 
 # "Every relevant aspect ratio".  21:9 is the resolution the project is played at.
 ASPECTS = {
