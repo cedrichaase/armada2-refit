@@ -30,7 +30,7 @@ static mut CLAIMED: bool = false;
 pub fn configure(ini: &crate::rt::Ini) {
     let on = ini.int("Display8", "Passthrough", 1) != 0;
     unsafe { ON = on };
-    log!("Passthrough={}: {}", on as u8, if on { "the engine's own draws are drawn on Vulkan in stub mode" } else { "the engine's own draws are dropped in stub mode" });
+    log!("Passthrough={}: {}", on as u8, if on { "the engine's own draws are drawn on Vulkan and Direct3D 12 in stub mode" } else { "the engine's own draws are dropped in stub mode" });
 }
 
 pub fn on() -> bool {

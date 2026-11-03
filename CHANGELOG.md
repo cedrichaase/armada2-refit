@@ -5,6 +5,14 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 14.11.0 — 2026-11-03
+
+Layers: display 0.20.0, testbench 3.104.0.
+
+### Added
+- Passthrough on Direct3D 12 (phase 10 X1): the engine's draws drawn by Display8 on `Backend=d3d12` as on Vulkan, into render3d's published pass (`dx12/pass.rs`), with the neutral `passthrough/state.rs` host-tested (`display/hosttest`). A module switched off, a SOD handed back or a HUD part not taken shows as stock on Direct3D 12 too. See display's changelog. Installed, not yet seen in game.
+- Pre-release: Direct3D 12 passthrough confirmed on Linux only, not yet on native Windows.
+
 ## 14.10.0 — 2026-11-03
 
 Layers: display 0.19.0, render3d 0.47.0, ui 1.1.1 (gpu 1.3.0).

@@ -17,6 +17,10 @@ paused frame stands still. Measured 2026-10-30: RMSE 0.93/255 against the forwar
 frame (additive blending's last bit over the gas, the ship's edges), the frame-to-frame
 change over 2 ticks 1.24 forward, 1.24 here.
 
+On Direct3D 12 (display 0.20.0, phase 10 X1) the variant is `display/stub-scenario.sh
+display-passthrough-nebula stub Backend=d3d12` (RMSE 0.9 against the forward chain's
+baseline, inside this scenario's 1.5), after `display-passthrough-d3d12` has passed.
+
 1. Launch the game.
 2. Wait up to 600 seconds for "Scene.log" to say "paused at tick".
 3. Expect "Render3D.log" contains "module particles: off".

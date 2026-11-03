@@ -26,6 +26,9 @@ whole frame (at 1280x720, the yard top right and the station bottom right):
 
 Measured 2026-10-30: 8 to 9/255 over the yard (24/255 with the stations gone).
 
+On Direct3D 12 (display 0.20.0, phase 10 X1) the variant is `display/stub-scenario.sh
+display-passthrough-all stub Backend=d3d12`, after `display-passthrough-d3d12` has passed.
+
 1. Launch the game.
 2. Wait for the main menu.
 3. Click the single player emblem.
