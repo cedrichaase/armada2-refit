@@ -144,6 +144,54 @@ pub fn get() -> Option<&'static mut Vk> {
 
 use crate::rt::win::{GetModuleHandleA, GetProcAddress, LoadLibraryA};
 
+/// Whether Vulkan can start, asked at `Direct3DCreate8` before the window exists (the
+/// bail-out, `bail.rs`): `vulkan-1.dll`, an instance with the surface extensions the start
+/// needs, and a physical device with a graphics queue (named as `Device=` says, if it
+/// says). Whether that device presents on the window is the start's to find out.
+pub fn probe() -> Result<(), &'static str> {
+    let m = unsafe { LoadLibraryA(c"vulkan-1.dll".as_ptr() as *const u8) };
+    if m.is_null() {
+        return Err("no vulkan-1.dll");
+    }
+    let gipa = unsafe { GetProcAddress(m, c"vkGetInstanceProcAddr".as_ptr() as *const u8) };
+    if gipa == 0 {
+        return Err("vulkan-1.dll has no vkGetInstanceProcAddr");
+    }
+    let entry = unsafe {
+        ash::Entry::from_static_fn(ash::StaticFn { get_instance_proc_addr: core::mem::transmute::<usize, vk::PFN_vkGetInstanceProcAddr>(gipa) })
+    };
+    let app = vk::ApplicationInfo::default().application_name(c"Armada2").engine_name(c"Display8").api_version(vk::make_api_version(0, 1, 1, 0));
+    let offered = unsafe { entry.enumerate_instance_extension_properties(None) }.unwrap_or_default();
+    let has = |n: &core::ffi::CStr| offered.iter().any(|e| e.extension_name_as_c_str().is_ok_and(|x| x == n));
+    if !has(ash::khr::surface::NAME) || !has(ash::khr::win32_surface::NAME) {
+        return Err("no VK_KHR_surface or VK_KHR_win32_surface");
+    }
+    let mut exts = alloc::vec![ash::khr::surface::NAME.as_ptr(), ash::khr::win32_surface::NAME.as_ptr()];
+    let mut flags = vk::InstanceCreateFlags::empty();
+    if has(ash::khr::portability_enumeration::NAME) {
+        exts.push(ash::khr::portability_enumeration::NAME.as_ptr());
+        flags |= vk::InstanceCreateFlags::ENUMERATE_PORTABILITY_KHR;
+    }
+    let ici = vk::InstanceCreateInfo::default().application_info(&app).enabled_extension_names(&exts).flags(flags);
+    let instance = unsafe { entry.create_instance(&ici, None) }.map_err(|_| "vkCreateInstance failed")?;
+    let want = crate::rt::lower(crate::vk_device());
+    let pdevs = unsafe { instance.enumerate_physical_devices() }.unwrap_or_default();
+    let found = pdevs.iter().any(|&pd| {
+        let props = unsafe { instance.get_physical_device_properties(pd) };
+        let name = unsafe { crate::rt::cstr_at(props.device_name.as_ptr() as *const u8, 256) };
+        (want.is_empty() || crate::rt::lower(name).contains(want.as_str()))
+            && unsafe { instance.get_physical_device_queue_family_properties(pd) }.iter().any(|f| f.queue_flags.contains(vk::QueueFlags::GRAPHICS))
+    });
+    unsafe { instance.destroy_instance(None) };
+    if found {
+        Ok(())
+    } else if pdevs.is_empty() {
+        Err("no physical devices")
+    } else {
+        Err(if want.is_empty() { "no device with a graphics queue" } else { "no device named as Device= says with a graphics queue" })
+    }
+}
+
 fn find_memory(props: &vk::PhysicalDeviceMemoryProperties, bits: u32, want: vk::MemoryPropertyFlags) -> Option<u32> {
     (0..props.memory_type_count).find(|&i| bits & (1 << i) != 0 && props.memory_types[i as usize].property_flags.contains(want))
 }

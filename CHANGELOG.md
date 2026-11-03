@@ -5,6 +5,26 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.0.0 — 2026-11-03
+
+Layers: display 1.0.0, cutscenes 3.0.0, testbench 3.106.0.
+
+Round F opens (phase 11 R1). MAJOR: the install/revert contract changes (Display8 moves no chain behind itself) and keys and values are removed.
+
+### Added
+- Display8's bail-out: when neither Vulkan nor Direct3D 12 can start (or on an unknown build, a stood-down `display.modes`, a legacy plugin), the game gets the system's own `d3d8.dll` and the plugins stand down; `Backend=none` takes it on purpose (display 1.0.0).
+- `display-bail-out`, `display-retired-keys` and `display-retired-keys-overlay` scenarios (testbench 3.106.0).
+
+### Changed
+- `display-fallback`, `engine-unknown-build` and `engine-mismatch` end in the bail-out; `display-inventory`, `display-engine-draws` and `display-drop` run on the stub (testbench 3.106.0).
+- `tools/ini-merge.py` `Defaults=3` for `Display8.ini` (drops `Mode`, `Real` and `d3d9` tokens; carries a marked `dxvk.conf`'s sampler keys into `[Samplers]`), mirrored in `publish/installer/install.sh` and `install.ps1`.
+
+### Removed
+- Display8's forward mode and Direct3D 9 (`Mode=`, `Real=`, `Backend=d3d9`, read past with a log line); `[Samplers]` no longer reads `dxvk.conf` (display 1.0.0).
+- binkproxy's `RaiseIntroMode`, `IntroWidth`, `IntroHeight` and its `intro_mode` hook: Display8 alone raises the intro's mode (cutscenes 3.0.0).
+
+Installed, not yet seen in game.
+
 ## 14.14.0 — 2026-11-03
 
 Layers: testbench 3.105.0.

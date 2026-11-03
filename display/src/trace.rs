@@ -17,7 +17,7 @@
 //!   than the device's. Answers and arguments worth seeing once (caps, formats, modes,
 //!   present parameters, gamma ramps, locks, the plugins' queries) go into
 //!   `Display8.log`, each distinct line once.
-use crate::com::{Guid, HRESULT, Kind, Obj};
+use crate::com::Kind;
 use crate::rt::win::*;
 use crate::{log, sfmt};
 use alloc::collections::BTreeSet;
@@ -353,24 +353,6 @@ pub fn chain(fp: usize) -> String {
         t.push_str(&place(a));
     }
     t
-}
-
-/// A `QueryInterface` for something not ours: a plugin reaching Direct3D 9 through
-/// an engine object (the mirror table of phase 0, item 4).
-pub fn query_seen(fp: usize, this: *mut Obj, iid: &Guid, hr: HRESULT) {
-    if !ON.load(Ordering::Relaxed) {
-        return;
-    }
-    let o = unsafe { &*this };
-    once(&sfmt!(
-        "QI {}{} {} for {} -> {:#x} by {}",
-        o.kind.name(),
-        o.role.name(),
-        crate::d3d8::describe(this),
-        iid,
-        hr as u32,
-        caller(fp)
-    ));
 }
 
 /// The context's index, made if new.

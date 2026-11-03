@@ -3,10 +3,10 @@
 Resolutions: 1280x720
 Reference: 1280x720
 Mod: refit
-Setup: display/bench-mode.sh forward Drop2D=1 Drop3D=1 DropLoading=1 ending
+Setup: display/bench-mode.sh stub Drop2D=1 Drop3D=1 DropLoading=1 ending
 Timeout: 50 min
 
-Run with `--install .`. Display8 in forward mode with every drop switch on
+Run with `--install .`. Display8 on the stub (forward mode went in display 1.0.0) with every drop switch on
 (`[Drop] Drop2D=1 Drop3D=1 DropLoading=1`, `display/README.md`, "Drop switches"): every
 draw the engine still makes is accepted and not passed on, and with the refit
 installed nothing on screen may change, since the UI and render3d draw it all (the

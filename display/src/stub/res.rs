@@ -55,7 +55,7 @@ pub fn create_texture(kind: Kind, w: u32, h: u32, d: u32, levels: u32, usage: u3
             }
         }
     }
-    let t = Tex { format: fmt, usage, pool, faces, nlev, levels: ls, lod: 0, priority: 0, mirror: core::ptr::null_mut(), dirty: AtomicU32::new(0), vk: 0, dx12: 0 };
+    let t = Tex { format: fmt, usage, pool, faces, nlev, levels: ls, lod: 0, priority: 0, dirty: AtomicU32::new(0), vk: 0, dx12: 0 };
     unsafe { *out = SObj::new(kind, Role::Plain, Body::Tex(t)) as P };
     S_OK
 }
@@ -148,7 +148,7 @@ pub fn update_texture(src: *mut SObj, dst: *mut SObj, fp: usize) -> HRESULT {
         }
     }
     d.dirty.store(u32::MAX, Ordering::Release);
-    if !d.mirror.is_null() {
+    if d.vk != 0 || d.dx12 != 0 {
         super::update_mirror(dst);
     }
     S_OK
@@ -233,11 +233,7 @@ fn child(tex: *mut SObj, index: u32, kind: Kind) -> *mut SObj {
 unsafe extern "system" fn qi(this: *mut SObj, iid: *const Guid, out: Out) -> HRESULT {
     let fp = frame!();
     trace::call(fp, unsafe { (*this).kind }, 0);
-    let hr = obj::query(this, iid, out);
-    if !iid.is_null() && unsafe { (*this).kind } == Kind::Texture && super::is_texture9(unsafe { &*iid }) {
-        once(&sfmt!("QI stub texture for Direct3D 9 -> {:#x} by {}", hr as u32, trace::caller(fp)));
-    }
-    hr
+    obj::query(this, iid, out)
 }
 unsafe extern "system" fn add_ref(this: *mut SObj) -> u32 {
     obj::add_ref(this)

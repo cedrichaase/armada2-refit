@@ -9,10 +9,10 @@ Run with `--install .`. `tools/engine/bench-exe.sh stamp` changes one bit of the
 timestamp of the clone's `Armada2.exe` (the clone's own copy, moved over its name; the
 install is never written), so the executable's identity is no build's. Every plugin on
 the symbol profile (`crates/a2engine/README.md`) logs `engine: unknown build`, stands
-every hook down with that reason and leaves the game as stock: Display8 forwards to the
-old chain (P5), UI.asi draws nothing, and the settings screen shows the plugin note.
-The only hook that runs is a scan with `unknown = "run"` (binkproxy's build-independent
-intro-mode scan, from phase 8d; it makes no log line here until the C plugins move).
+every hook down with that reason and leaves the game as stock: Display8 takes the
+bail-out (display 1.0.0: the system's own Direct3D 8; it forwarded to the old chain
+before), so the plugins are told no backend, UI.asi draws nothing, and the settings
+screen shows the plugin note.
 The shell is the stock one (4:3, centred in the window with black sides; the Instant
 Action cube is clicked in screen pixels), then a skirmish loads and ticks.
 
@@ -45,16 +45,18 @@ build`, its note, no `installed` hook line, no `read before its hook`.
 21. Wait 60 seconds.
 22. Take a screenshot called "mission".
 23. Check that the screenshot shows a space battle map of Star Trek: Armada II drawn by the game (stars, ships or stations, and the game's own interface), not a black or garbled screen and not a second copy of the interface drawn over the game's.
-24. Expect "Display8.log" contains "engine: unknown build: Display8 forwards to the old chain".
-25. Expect "UI.log" not contains "hud: panels of ours".
-26. Expect "UI.log" not contains "installed".
-27. Expect "Display8.log" not contains "installed".
-28. Expect "Render3D.log" contains "engine: unknown build".
-29. Expect "Render3D.log" contains "stands down".
-30. Expect "Render3D.log" not contains "engine: build armada2/gog-1.1".
-31. Expect "Render3D.log" not contains "installed".
-32. Expect "Render3D.log" not contains "read before its hook".
-33. Expect "Render3D.log" not contains "PANIC".
-34. Expect the game is still running.
-35. Quit the game.
-36. Expect no crash.
+24. Expect "Display8.log" contains "bail-out: engine: unknown build; the game draws through ".
+25. Expect "Display8.log" contains "the plugins stand down".
+26. Expect "Display8.log" not contains "stub: the backend is".
+27. Expect "UI.log" not contains "hud: panels of ours".
+28. Expect "UI.log" not contains "installed".
+29. Expect "Display8.log" not contains "installed".
+30. Expect "Render3D.log" contains "engine: unknown build".
+31. Expect "Render3D.log" contains "stands down".
+32. Expect "Render3D.log" not contains "engine: build armada2/gog-1.1".
+33. Expect "Render3D.log" not contains "installed".
+34. Expect "Render3D.log" not contains "read before its hook".
+35. Expect "Render3D.log" not contains "PANIC".
+36. Expect the game is still running.
+37. Quit the game.
+38. Expect no crash.

@@ -12,9 +12,9 @@
  *
  *   2. FULL-SCREEN LAUNCH REELS.  Program::PlayIntroMovie switches to a
  *      hard-coded 640x480 display mode, and NextBinkFrame copies each frame
- *      1:1 into the locked back buffer at (0,0).  This DLL raises that mode
- *      to the desktop size at load, and when a copy comes from that call site
- *      it scales the frame to fit the back buffer, centred, bars black.  That
+ *      1:1 into the locked back buffer at (0,0).  Display8 raises that mode
+ *      to the desktop size, and when a copy comes from that call site
+ *      this DLL scales the frame to fit the back buffer, centred, bars black.  That
  *      applies to real Bink reels too: they are decoded into a scratch buffer
  *      first and scaled from there.
  *
@@ -100,7 +100,7 @@ void *memcpy(void *d, const void *s, unsigned n)
 /* ---- config and log, both beside Armada2.exe ------------------------------ */
 static char g_dir[260];
 static A2Ini g_bi;                 /* BinkProxy.ini with the overlay in front */
-static int  g_log = 1, g_replace = 1, g_raise = 1, g_fit = 1;
+static int  g_log = 1, g_replace = 1, g_fit = 1;
 
 static char g_logpath[320];
 
@@ -1002,31 +1002,7 @@ EXPORT int WINAPI BinkCopyToBuffer(void *bink, void *dest, DWORD pitch, DWORD de
     return 0;
 }
 
-/* ---- load-time: config, and the intro display mode --------------------------- */
-/* Both sites are in Program::PlayIntroMovie and each signature occurs exactly once in
- * Armada2.exe (the profile's two scans, run on any build).  The scan's match starts
- * `at` bytes before the push-bpp; the height and the width follow it. */
-static int patch_intro_mode(int w, int h)
-{
-    static const DWORD syms[2] = { BINKPROXY_S_INTRO_MODE_A, BINKPROXY_S_INTRO_MODE_B };
-    static const DWORD ats[2]  = { 0, 3 };   /* where the push-bpp sits in each match */
-    int n, hits = 0;
-    if (!a2e_ready(BINKPROXY_H_INTRO_MODE)) return 0;
-    for (n = 0; n < 2; n++) {
-        BYTE *q = (BYTE *)a2e_addr(syms[n]);
-        DWORD old;
-        if (!q) continue;
-        q += ats[n];                    /* push bpp (2 bytes), push h, push w */
-        if (!VirtualProtect(q, 12, PAGE_EXECUTE_READWRITE, &old)) continue;
-        *(DWORD *)(q + 3) = (DWORD)h;
-        *(DWORD *)(q + 8) = (DWORD)w;
-        VirtualProtect(q, 12, old, &old);
-        FlushInstructionCache(GetCurrentProcess(), q, 12);
-        hits++;
-    }
-    return hits;
-}
-
+/* ---- load-time: config -------------------------------------------------------- */
 /* Whether the game's d3d8.dll is Display8: it exports the contract's handshake. The
  * name is the system's slot for Direct3D 8, not a plugin's file. Every import of the exe
  * is mapped before any DllMain runs, so the module is there to ask. */
@@ -1039,7 +1015,7 @@ static int display8_raises(void)
 BOOL WINAPI DllMain(HANDLE inst, DWORD reason, void *res)
 {
     char m[200];
-    int i, w, h;
+    int i;
     (void)inst; (void)res;
     if (reason != 1) return 1;
 
@@ -1048,16 +1024,8 @@ BOOL WINAPI DllMain(HANDLE inst, DWORD reason, void *res)
 
     g_log     = (int)a2_ini_int(&g_bi, "BinkProxy", "Log",            1);
     g_replace = (int)a2_set_int(&g_bi, BINKPROXY_ROW_REPLACEMOVIES);
-    g_raise   = (int)a2_ini_int(&g_bi, "BinkProxy", "RaiseIntroMode", 1);
     g_fit     = (int)a2_ini_int(&g_bi, "BinkProxy", "FitIntro",       1);
     g_useUi   = (int)a2_ini_int(&g_bi, "BinkProxy", "UseUI",          1);
-    w         = (int)a2_ini_int(&g_bi, "BinkProxy", "IntroWidth",     0);
-    h         = (int)a2_ini_int(&g_bi, "BinkProxy", "IntroHeight",    0);
-
-    /* At DllMain time no mode change has happened yet, so this is the desktop
-     * (the same observation Menus.asi relies on). */
-    if (w < 640) w = GetSystemMetrics(SM_CXSCREEN);
-    if (h < 480) h = GetSystemMetrics(SM_CYSCREEN);
 
     for (i = 0; i < MAX_W; i++) g_black[i] = 0xFF000000;
 
@@ -1067,18 +1035,8 @@ BOOL WINAPI DllMain(HANDLE inst, DWORD reason, void *res)
     m[0] = 0;
     s_cat(m, "--- BinkProxy loaded: replace="); s_num(m, g_replace);
     s_cat(m, " fit="); s_num(m, g_fit);
-    if (g_raise && display8_raises()) {
-        /* Display8 (d3d8.dll with the contract's handshake) raises the intro's mode
-         * itself, in its mode lookups ([Window] RaiseIntro); this stays the fallback
-         * for a d3d8.dll that is not Display8's. */
-        s_cat(m, " intro: Display8 raises the mode");
-    } else if (g_raise && w >= 640 && h >= 480) {
-        int hits = patch_intro_mode(w, h);
-        s_cat(m, " intro mode -> "); s_num(m, w); s_cat(m, "x"); s_num(m, h);
-        s_cat(m, " ("); s_num(m, hits); s_cat(m, "/2 sites)");
-    } else {
-        s_cat(m, " intro mode left at 640x480");
-    }
     logline(m);
+    /* The intro's mode is Display8's ([Window] RaiseIntro); without it the intro stays stock. */
+    if (!display8_raises()) logline("intro: stock mode (no Display8)");
     return 1;
 }

@@ -6,35 +6,8 @@ readme = "cutscenes/binkproxy/README.md"
 lang = "c"
 out = "cutscenes/binkproxy/engine_syms.h"
 
-[hook.intro_mode]
-doc = "The intro movie's hard-coded 640x480 mode raised to the desktop's (two signature scans)"
-unknown = "run"
-
 [hook.intro_copy]
 doc = "BinkCopyToBuffer trusts the intro's caller frame to find the back buffer's size"
-
-# ---- binkproxy.intro_mode: both sites sit in Program::PlayIntroMovie, and each signature
-# occurs exactly once in .text (the bare 640/480 push pair occurs a third time elsewhere).
-
-[[sym]]
-id = "intro_mode_a"
-symbol = "Program::PlayIntroMovie"
-kind = "scan"
-pattern = "6a 20 68 e0 01 00 00 68 80 02 00 00 8b b8 04 01 00 00"
-section = ".text"
-count = 1
-in = "Program::PlayIntroMovie"
-used_by = ["intro_mode"]
-
-[[sym]]
-id = "intro_mode_b"
-symbol = "Program::PlayIntroMovie"
-kind = "scan"
-pattern = "8b 4f 1c 6a 10 68 e0 01 00 00 68 80 02 00 00 e8"
-section = ".text"
-count = 1
-in = "Program::PlayIntroMovie"
-used_by = ["intro_mode"]
 
 # ---- binkproxy.intro_copy: the one call site whose frame is read ---------------------
 

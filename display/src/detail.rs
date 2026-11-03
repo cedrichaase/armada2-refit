@@ -6,7 +6,7 @@
 //! colours. That is how a draw the inventory counts is named without a picture: the
 //! engine's 2D goes through one dynamic vertex buffer (its "trifan buffer") written by
 //! lock, so the vertices are copied at `Unlock` while a capture runs.
-use crate::com::Obj;
+use crate::stub::obj::SObj;
 use crate::d3d8::describe;
 use crate::trace;
 use crate::{log, rt, sfmt};
@@ -75,26 +75,7 @@ pub fn set_vertex_shader(h: u32) {
     st().fvf = h;
 }
 
-pub fn locked(vb: *mut Obj, data: *mut *mut u8, off: u32, size: u32) {
-    if !on() || data.is_null() {
-        return;
-    }
-    let n = if size == 0 {
-        // The whole buffer from `off`: its size from the description.
-        let mut d = crate::d3d8::BufferDesc::default();
-        vcall!(unsafe { (*vb).real }, 13, fn(*mut crate::d3d8::BufferDesc) -> i32, &mut d);
-        d.size.saturating_sub(off)
-    } else {
-        size
-    };
-    locked_ptr(vb as usize, unsafe { *data } as usize, off, n);
-}
-
-pub fn unlocked(vb: *mut Obj) {
-    unlocked_ptr(vb as usize);
-}
-
-/// A buffer (by the object's address, ours in either mode) locked at `p` for `n` bytes
+/// A buffer (by the object's address) locked at `p` for `n` bytes
 /// from `off`.
 pub fn locked_ptr(key: usize, p: usize, off: u32, n: u32) {
     if !on() || p == 0 {
@@ -212,7 +193,7 @@ pub fn draw(fp: usize, slot: u8, a: &[usize]) {
         71 => sfmt!("DrawIndexedPrimitive pt {} n {}", a[0], a[4]),
         _ => sfmt!("DrawIndexedPrimitiveUP pt {} n {}", a[0], a[3]),
     };
-    let tex = if s.tex0 == 0 || !crate::com::is_ours(s.tex0 as *mut c_void) { String::from("none") } else { describe(s.tex0 as *mut Obj) };
+    let tex = if s.tex0 == 0 || !crate::stub::obj::is_stub(s.tex0 as *mut c_void) { String::from("none") } else { describe(s.tex0 as *mut SObj) };
     log!(
         "DRAW {} | fvf {:#x} | blend {} {}/{} | test {} ref {:#x} | z {},{} | tex {} | by {}",
         what,

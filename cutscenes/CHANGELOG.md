@@ -4,6 +4,14 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`binkproxy/README.md`](binkproxy/README.md).
 
+## 3.0.0 — 2026-11-03
+
+### Removed
+- `RaiseIntroMode` (with `IntroWidth` and `IntroHeight`): the key and the code that raised `PlayIntroMovie`'s 640x480 push pair. Display8 is the only owner of the intro's mode (`[Window] RaiseIntro`). Without Display8 the intro stays stock and BinkProxy logs `intro: stock mode (no Display8)` once.
+- The `binkproxy.intro_mode` hook and its two scans in `profiles/gog-1.1/binkproxy.toml` (`engine_syms.h` regenerated).
+
+Installed, not yet seen in game.
+
 ## 2.7.0 — 2026-11-03
 
 ### Changed

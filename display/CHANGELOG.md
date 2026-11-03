@@ -4,6 +4,24 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 1.0.0 — 2026-11-03
+
+### Added
+- The bail-out (phase 11 R1): when Display8 cannot draw the game it hands the engine the system's own `d3d8.dll` (`GetSystemDirectoryA`), never a `d3d8_real.dll`, and `display8v1_backend` answers none, so the plugins stand down (`bail.rs`). Early at `Direct3DCreate8` (`Backend=none`, an unknown build, a stood-down `display.modes`, a legacy plugin loaded, or both probes failing: `vk::probe`, `dx12::probe`); late at the engine's first `CreateDevice` when every backend fails there (the stub's `IDirect3D8` becomes a 16-method forward of the system's). Logged `bail-out: <why>; the game draws through <path>; the plugins stand down`.
+- `Backend=none`: the bail-out on purpose (the stock renderer); `none` ends a list.
+
+### Changed
+- `[Samplers]` is read from `Display8.ini` alone, shipped `Anisotropy=16`, `LodBias=-0.5`, `ClampNegativeLodBias=0` (`auto` is the same); `dxvk.conf` is no longer read. `Defaults=3` (`tools/ini-merge.py`) carries a marked `dxvk.conf`'s differing values into `[Samplers]`.
+- `display/install` moves no chain behind Display8 any more (no `d3d8_real.dll`); `--remove` puts back the backup, else an old `d3d8_real.dll`.
+- The tracer, `[Drop]` and the detail capture run on the stub's device; `display/bench-mode.sh` takes `stub` only (`forward` runs as the stub, with a warning) and can write the retired `Mode=`/`Real=` for `display-retired-keys`.
+- `display/bench-abi.sh old-display` puts the old Display8's chain (d3d8to9 as `d3d8_real.dll`, DXVK's `d3d9.dll`) into the clone itself, from the old commit's `platform/vendor`.
+
+### Removed
+- Forward mode: `Mode=` and `Real=` (read past, logged `settings: Mode=forward retired`), the forward wrappers (`d3d8/device.rs`, `direct3d.rs`, `resource.rs`, `com.rs`'s registry, `pass!`/`unknown!`/`draw!`).
+- Direct3D 9: `Backend=d3d9` (the token is skipped, logged `settings: Backend token d3d9 retired (Direct3D 9 removed)`; a list left empty is `auto`), the Direct3D 9 device, its mirrors and the QI for `IDirect3DDevice9`/`IDirect3DTexture9`, the gamma pass (`stub/gamma.rs`); `display8v1_backend` never answers `BACKEND_D3D9`.
+
+Installed, not yet seen in game.
+
 ## 0.21.0 — 2026-11-03
 
 ### Added

@@ -14,10 +14,12 @@ stand-down path runs for real. The globs follow the player's name
 cannot run yet are in their own files (`engine-mismatch-hulls.md`,
 `engine-mismatch-cplugins.md`).
 
-**display** (`display.modes`): Display8 forwards to the old chain (display 0.17.0, P5: a
-stub without the engine's mode requests died of a stack overflow), Display8.log names
-the hook and the test and says `forward mode instead`, and the game plays on that
-chain: UI.asi's shell (its own menus, drawn through the forward chain), then a skirmish.
+**display** (`display.modes`): Display8 takes the bail-out (display 0.17.0, P5: a stub
+without the engine's mode requests died of a stack overflow; it forwarded to the old
+chain until display 1.0.0), Display8.log names the hook and the test and says
+`bail-out:`, and the game plays on the system's own Direct3D 8 with the plugins standing
+down: the stock shell (4:3, centred with black sides, its Instant Action cube clicked in
+screen pixels), then a skirmish.
 
 **radar** (`ui.hud.radar`): UI.asi leaves the minimap to the engine. The Refit screen's
 Interface tab shows the `Minimap` row greyed, and pointing at it shows the note
@@ -33,7 +35,7 @@ other panels are ours). Display8 is on its stub here, so UI.asi draws on it.
 6. Display: Expect "Display8.log" contains "engine: display.modes stands down: ".
 7. Display: Expect "Display8.log" contains "test mismatch (A2EngineTest.ini)".
 8. Display: Expect "Display8.log" contains "engine: build armada2/gog-1.1".
-9. Display: Expect "Display8.log" contains "forward mode instead".
+9. Display: Expect "Display8.log" contains "bail-out: without display.modes the stub could open no display; the game draws through ".
 10. Display: Expect "Display8.log" not contains "PANIC".
 11. Radar: Expect "UI.log" contains "engine: TEST: A2EngineTest.ini forces a mismatch for ui.hud.radar".
 12. Radar: Expect "UI.log" contains "engine: ui.hud.radar stands down: ".
@@ -57,7 +59,7 @@ other panels are ours). Display8 is on its stub here, so UI.asi draws on it.
 29. Radar: Press Escape.
 30. Radar: Wait 2 seconds.
 ## Mission
-31. Display: Click "INSTANT ACTION".
+31. Display: Click at 930,100.
 32. Display: Wait for "GAME SETUP".
 33. Display: Wait 2 seconds.
 34. Display: Click "LAUNCH".

@@ -5,6 +5,19 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.106.0 — 2026-11-03
+
+### Added
+- `display-bail-out`: `Backend=none`, the stock game through the system's Direct3D 8 with the plugins standing down.
+- `display-retired-keys` (Direct3D 12: `Backend=d3d12,d3d9`, `Mode=forward`, `Real=` read past) and `display-retired-keys-overlay` (the overlay's `[Display8.Display8] Backend=d3d9`: auto, Vulkan).
+
+### Changed
+- `display-fallback`: Vulkan and Direct3D 12 fail at the first `CreateDevice`, then the late bail-out (was Direct3D 9); the stock shell's cube clicked in screen pixels.
+- `engine-unknown-build` and `engine-mismatch`: Display8 takes the bail-out (was the forward chain).
+- `display-inventory`, `display-engine-draws`, `display-drop`: on the stub (forward mode went); `display-stub`, `display-movie`: the Direct3D 9 and forward variants replaced by Direct3D 12.
+
+Installed, not yet seen in game.
+
 ## 3.105.0 — 2026-11-03
 
 ### Added

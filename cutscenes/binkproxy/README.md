@@ -89,16 +89,16 @@ size as the 640x480, 15 fps stock `.bik`**, plus an 11.9 MB WAV.
 decoded frames match the original MD5 for MD5.
 
 `BinkProxy.ini` switches each part off separately (`ReplaceMovies`, `UseUI`,
-`RaiseIntroMode`, `FitIntro`) and can pin the intro mode (`IntroWidth` and
-`IntroHeight`). `BinkProxy.log` records every open and close, with decode
+`FitIntro`). `BinkProxy.log` records every open and close, with decode
 timing and a count of late frames.
 
-**The intro's mode is Display8's** (cutscenes 2.7.0): with a Display8 as `d3d8.dll` (it
-exports `display8_abi`) the proxy leaves the intro's two mode lookups alone and logs
-`intro: Display8 raises the mode`; Display8 raises them inside its own lookup
-(`[Window] RaiseIntro`, `display/README.md`, "Window and display mode"), so
-`IntroWidth` and `IntroHeight` then do nothing. `RaiseIntroMode=1` is the fallback for
-any other `d3d8.dll`, until Display8 is required.
+**The intro's mode is Display8's** (cutscenes 3.0.0): Display8 raises `PlayIntroMovie`'s
+hard-coded 640x480 inside its own mode lookups (`[Window] RaiseIntro`,
+`display/README.md`, "Window and display mode"), and this proxy only fits each frame to
+the size it finds. The proxy's own `RaiseIntroMode`, `IntroWidth` and `IntroHeight` keys
+and the byte patch behind them are gone. Without Display8 as `d3d8.dll` (no
+`display8_abi` export) the intro's mode stays stock, and the log says
+`intro: stock mode (no Display8)` once.
 
 `ReplaceMovies` is a settings row (`settings.toml`, exported as `BinkProxy_Settings`, LIVE,
 tab Movies) and is read again at each `BinkOpen`, so `[BinkProxy.BinkProxy] ReplaceMovies=0`
@@ -156,9 +156,6 @@ for anything 720 lines or taller.
   `BinkOpenDirectSound`, read out of the import table rather than called, into
   `BinkSetSoundSystem`. That address is the replacement's own, so it is
   swapped for the real one on the way through.
-- **Mode patch sites:** `push 32/480/640` and the 16-bit fallback, both in
-  `PlayIntroMovie`. Each signature occurs once in the file. The bare 640/480
-  push pair also occurs a third time elsewhere, and is left alone.
 
 ## Hooks
 
@@ -169,7 +166,6 @@ and the symbol summary after its version line.
 
 | Hook | Entries | Used by | Without it |
 |---|---|---|---|
-| `binkproxy.intro_mode` | the two signatures above, as `scan` entries that must each match exactly once in `.text` | `patch_intro_mode`; `unknown = "run"`: the scans are build-independent, so this runs on a build the profiles do not know | the intro stays at 640x480 (movies still play) |
 | `binkproxy.intro_copy` | the return address of the `BinkCopyToBuffer` call in `NextBinkFrame` (a `label`, its first 8 bytes checked) and the three distances of the `D3DSURFACE_DESC` fields below the frame's EBP (`field`) | `intro_backbuffer` | the intro is copied 1:1 at its own size, not fitted |
 
 `BinkProxy_SettingsNote` (settings, C5) returns the engine's note for a row or the
