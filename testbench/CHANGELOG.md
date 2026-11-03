@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.95.0 — 2026-11-03
+
+### Added
+- Scenario `render3d-build-subset`: Render3D.asi built without hulls
+  (`render3d/bench-asi.sh --without hulls`) on the paused showcase, at RMSE 0 against
+  `roundD-base-port-showcase-hulls0`, with its rows and its `modules not built in` line;
+  `render3d/subset-scenario.sh <m>` writes the variants for the other modules.
+
 ## 3.94.0 — 2026-11-03
 
 ### Added

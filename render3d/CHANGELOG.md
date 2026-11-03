@@ -4,6 +4,33 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.43.0 — 2026-11-03
+
+### Changed
+- The crates (README.md, "Crates"): render3d is a workspace of a thin cdylib
+  (`render3d`: DllMain, allocator, panic handler, exports), `r3d-core` (`core/`: frame,
+  gfx, scene, assets, the shared engine glue, the menu scene, `module`, `registry`,
+  `hooks`, `services`, `recipes`, `particles`) and one `r3d-<m>` crate per module
+  (`mods/<m>/`), each depending on the core and on no other module. The staging names
+  `core_module`, `core_hooks`, `core_services`, `core_recipes` and `core_particles` are
+  `r3d_core::module`, `hooks`, `services`, `recipes` and `particles`; the registry is
+  `r3d_core::registry`. Each crate compiles its own `shaders/`; stock's sprite shaders
+  (`vs_sprite`/`ps_sprite`) moved from `ordnance.hlsl` into the core's `sprites.hlsl`,
+  since the core draws them. Every generated shader array is word for word as before.
+- `tools/settings`: the core's rows are generated into `core/src/settings_table.rs`
+  (`rows_in = "core"`); `Render3D_Settings` is the cdylib's.
+
+### Added
+- One Cargo feature per module, all on by default (the DLL that ships has every one):
+  `build.sh --features hulls,sky` builds a subset into `build/subset/Render3D.asi`. A
+  module not built in has no rows in `Render3D_Settings` (neither its fragment's nor
+  its `[Modules]` row), and Render3D.log says `modules not built in: ...`.
+- `bench-asi.sh` (a clone's Render3D.asi from this working copy, full or
+  `--without`/`--features`, from a `Setup:` line) and `subset-scenario.sh`
+  (`render3d-build-subset`'s variant for another module).
+
+Installed, not yet seen in game.
+
 ## 0.42.0 — 2026-11-03
 
 ### Changed

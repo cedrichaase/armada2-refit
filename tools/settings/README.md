@@ -233,7 +233,11 @@ gets an export that returns `crate::settings_rows()`, which the plugin provides:
 rows, then each built-in module's `ROWS` in the plugin's module order, copied once into
 one contiguous array (so the export is still one table of 44-byte rows, A2SET_ABI 1.0;
 a module not built in has no rows, and the Refit screen shows none). The plugin table
-may list `shared_sections`. The lint takes a plugin's table and its fragments as one
+may list `shared_sections`, and `rows_in = "<dir>"`, a crate directory below it: the
+table's generated file then goes into `<dir>/src/settings_table.rs`, without the export,
+which the plugin's cdylib defines itself (render3d: the rows are `r3d-core`'s, the
+export `render3d/src/lib.rs`'s, which leaves out the `[Modules]` row of a module not
+built in). The lint takes a plugin's table and its fragments as one
 table: rule 2 across them, rule 3 against the plugin's one shipped ini, rule 5 over the
 whole plugin's sources, rule 7 between them. `gen.py --rows TABLE.toml [MODULE...]`
 prints the exported rows (`Section Key`) with the fragments in the order given;
