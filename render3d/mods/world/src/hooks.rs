@@ -10,49 +10,49 @@ use r3d_core::engine::{self, field, field_f32, field_m34, field_u8, light, obj, 
 use r3d_core::math::{v3, M34, V3};
 use crate::{log, rt};
 use alloc::vec::Vec;
+use crate::syms::{hook, sym, TABLE};
+
+/// An engine address of the profile: 0 unless the hook that uses it is ready.
+pub(crate) fn at(s: a2engine::Sym) -> usize { TABLE.engine().addr(s) }
 
 // ---- the nebulae's lights ---------------------------------------------------------
 
 /// The call to `Nebula::Simulate_Nebula_Lights` inside `Nebula::Simulate`.
-const SITE_NEBULA_LIGHTS: usize = 0x4a4a7a;
-const FN_NEBULA_LIGHTS: usize = 0x4a5160; // Nebula::Simulate_Nebula_Lights(float), thiscall
-const FN_ENTITY_TRANSFORM: usize = 0x4cfd50; // Entity::GetTransform() const, thiscall
+pub(crate) fn fn_entity_transform() -> usize { at(sym::FN_ENTITY_TRANSFORM) } // Entity::GetTransform() const, thiscall
 /// `NebulaInstance`'s vtable; slot 3 is `ST3D_Instance::FrustumTest(cam)`.
-const VT_NEBULA_INSTANCE: usize = 0x6b1448;
+pub(crate) fn vt_nebula_instance() -> usize { at(sym::VT_NEBULA_INSTANCE) }
 const SLOT_FRUSTUM: usize = 3;
-const FN_FRUSTUM_TEST: usize = 0x62e990;
 
 // ---- the nebulae --------------------------------------------------------------------
 
-pub const VT_NEBULA: usize = 0x6b148c;
-pub const VT_LATINUM: usize = 0x6b132c;
-const NEBULA_LIST: usize = 0x73b1bc; // Nebula::nebulaList, std::vector<Nebula *> *
-const GHOST_LIST: usize = 0x736c90; // Ghost::ghostList, std::list<Spirit *>
-const VT_SPIRIT: usize = 0x6b1ca4;
+pub fn vt_nebula() -> usize { at(sym::VT_NEBULA) }
+pub fn vt_latinum() -> usize { at(sym::VT_LATINUM) }
+pub(crate) fn nebula_list() -> usize { at(sym::NEBULA_LIST) } // Nebula::nebulaList, std::vector<Nebula *> *
+pub(crate) fn ghost_list() -> usize { at(sym::GHOST_LIST) } // Ghost::ghostList, std::list<Spirit *>
+pub(crate) fn vt_spirit() -> usize { at(sym::VT_SPIRIT) }
 const SLOT_SPIRIT_RENDER: usize = 3;
-const FN_SPIRIT_RENDER: usize = 0x4d5f70;
-const FN_ENTITY_GET: usize = 0x4cfff0; // Entity::Get(int handle), cdecl
+pub(crate) fn fn_entity_get() -> usize { at(sym::FN_ENTITY_GET) } // Entity::Get(int handle), cdecl
 
 // ---- the planets ----------------------------------------------------------------------
 
-pub const VT_PLANET: usize = 0x6b2b3c;
-const VT_PLANET_DB: usize = 0x6bab74;
+pub fn vt_planet() -> usize { at(sym::VT_PLANET) }
+pub(crate) fn vt_planet_db() -> usize { at(sym::VT_PLANET_DB) }
 /// `PlanetInstance`: the instance a planet's fog-of-war spirit carries a copy of.
-const VT_PLANET_INSTANCE: usize = 0x6b2ce4;
-const FN_DISTANCE_CULL: usize = 0x4d5bb0; // GameObjectInstance::DistanceCull(eye, pos), thiscall
+pub(crate) fn vt_planet_instance() -> usize { at(sym::VT_PLANET_INSTANCE) }
+pub(crate) fn fn_distance_cull() -> usize { at(sym::FN_DISTANCE_CULL) } // GameObjectInstance::DistanceCull(eye, pos), thiscall
 /// cfgPOP_HEAVY: the population a colony's city map is full at (RTS_CFG.h).
-const POP_HEAVY: usize = 0x70213c;
+pub(crate) fn pop_heavy_addr() -> usize { at(sym::POP_HEAVY) }
 /// The four population levels' maxima (`PlanetClass+0x490` indexes it, from 1).
-const POP_LEVELS: usize = 0x702130;
+pub(crate) fn pop_levels() -> usize { at(sym::POP_LEVELS) }
 
 // ---- the rocks ------------------------------------------------------------------------
 
-pub const VT_SCRAP: usize = 0x6b15b4;
-pub const VT_ASTEROID_FIELD: usize = 0x6b0cb4;
-const ASTEROID_NAMES: usize = 0x6b07e8;
-const CFG_CULL_DISTANCE: usize = 0x6fcac0; // cfgOBJECT_CULLING_DISTANCE
-const FN_RES_VALUE: usize = 0x4d6820; // ResourceInterface::GetTotalValue, thiscall -> float
-const FN_RES_MAX: usize = 0x4cf1f0; // ResourceInterfaceClass::GetTotalMaxValue, thiscall -> float
+pub fn vt_scrap() -> usize { at(sym::VT_SCRAP) }
+pub fn vt_asteroid_field() -> usize { at(sym::VT_ASTEROID_FIELD) }
+pub(crate) fn asteroid_names() -> usize { at(sym::ASTEROID_NAMES) }
+pub(crate) fn cfg_cull_distance() -> usize { at(sym::CFG_CULL_DISTANCE) } // cfgOBJECT_CULLING_DISTANCE
+pub(crate) fn fn_res_value() -> usize { at(sym::FN_RES_VALUE) } // ResourceInterface::GetTotalValue, thiscall -> float
+pub(crate) fn fn_res_max() -> usize { at(sym::FN_RES_MAX) } // ResourceInterfaceClass::GetTotalMaxValue, thiscall -> float
 
 // ---- the detours' state -------------------------------------------------------------
 
@@ -71,14 +71,18 @@ fn open() -> bool {
 /// lights and cull are ours (no `Lighting.asi`); `spirit`: the ghosts' `Render` is
 /// wrapped (no `Nebulae.asi`). A site that is not stock's is logged and left as it is.
 pub fn install(h: &mut Hooks, lights: bool, spirit: bool) {
+    if !h.ready(&TABLE, hook::WORLD_READS) {
+        h.stand_down("the engine's reads are not stock");
+        return;
+    }
     unsafe { GATE = Some(h.gate()) };
     let owner = h.owner();
-    if lights {
+    if lights && h.ready(&TABLE, hook::WORLD_LIGHTS) {
         let hook = Hook {
             owner,
             used_by: "nebula lights",
             kind: Kind::Call,
-            site: Site { symbol: "Nebula::Simulate", addr: SITE_NEBULA_LIGHTS, expect: FN_NEBULA_LIGHTS },
+            site: Site::of(&TABLE, sym::SITE_NEBULA_LIGHTS),
             to: nebula_lights as *const () as usize,
             chain: false,
         };
@@ -87,11 +91,15 @@ pub fn install(h: &mut Hooks, lights: bool, spirit: bool) {
         } else {
             log!("world: lights: Nebula::Simulate's light call is not stock's: the nebulae's lights stay as they are");
         }
+    } else if lights {
+        log!("world: lights: Nebula::Simulate's light call is not stock's: the nebulae's lights stay as they are");
+    }
+    if lights && h.ready(&TABLE, hook::WORLD_CULL) {
         let hook = Hook {
             owner,
             used_by: "nebula cull",
-            kind: Kind::Slot { vt: VT_NEBULA_INSTANCE, slot: SLOT_FRUSTUM },
-            site: Site { symbol: "NebulaInstance::FrustumTest", addr: VT_NEBULA_INSTANCE, expect: FN_FRUSTUM_TEST },
+            kind: Kind::Slot { vt: vt_nebula_instance(), slot: SLOT_FRUSTUM },
+            site: Site { addr: vt_nebula_instance(), ..Site::of(&TABLE, sym::SLOT_NEBULA_FRUSTUM) },
             to: nebula_frustum as *const () as usize,
             chain: false,
         };
@@ -100,13 +108,15 @@ pub fn install(h: &mut Hooks, lights: bool, spirit: bool) {
         } else {
             log!("world: lights: NebulaInstance's frustum test is not stock's: stock's nebula cull");
         }
+    } else if lights {
+        log!("world: lights: NebulaInstance's frustum test is not stock's: stock's nebula cull");
     }
-    if spirit {
+    if spirit && h.ready(&TABLE, hook::WORLD_GHOSTS) {
         let hook = Hook {
             owner,
             used_by: "nebula ghosts",
-            kind: Kind::Slot { vt: VT_SPIRIT, slot: SLOT_SPIRIT_RENDER },
-            site: Site { symbol: "GameObjectSpirit::Render", addr: VT_SPIRIT, expect: FN_SPIRIT_RENDER },
+            kind: Kind::Slot { vt: vt_spirit(), slot: SLOT_SPIRIT_RENDER },
+            site: Site { addr: vt_spirit(), ..Site::of(&TABLE, sym::SLOT_SPIRIT_RENDER) },
             to: hook_spirit as *const () as usize,
             chain: false,
         };
@@ -116,6 +126,8 @@ pub fn install(h: &mut Hooks, lights: bool, spirit: bool) {
         } else {
             log!("world: nebulae: the ghosts' Render is not stock's: a fogged nebula keeps its billboards");
         }
+    } else if spirit {
+        log!("world: nebulae: the ghosts' Render is not stock's: a fogged nebula keeps its billboards");
     }
 }
 
@@ -159,9 +171,9 @@ unsafe extern "thiscall" fn nebula_frustum(inst: usize, cam: usize) -> u32 {
 unsafe extern "thiscall" fn hook_spirit(sp: usize, cam: usize) {
     unsafe {
         if open() && super::nebulae::spirit_active() && sp != 0 {
-            let get: unsafe extern "C" fn(i32) -> usize = core::mem::transmute(FN_ENTITY_GET);
+            let get: unsafe extern "C" fn(i32) -> usize = core::mem::transmute(fn_entity_get());
             let o = get(rd::<i32>(sp + 8));
-            if o != 0 && (engine::vtable(o) == VT_NEBULA || engine::vtable(o) == VT_LATINUM) && super::nebulae::drawn_as_gas(&rt::lower(obj::odf_name(o))) {
+            if o != 0 && (engine::vtable(o) == vt_nebula() || engine::vtable(o) == vt_latinum()) && super::nebulae::drawn_as_gas(&rt::lower(obj::odf_name(o))) {
                 return;
             }
         }
@@ -192,7 +204,7 @@ pub fn nebula_falloff(cls: usize) -> (f32, f32) {
 /// Registers the nebula's light at its transform (`Entity::GetTransform`).
 pub fn register_nebula_light(neb: usize, lt: usize, rgb: &[f32; 4]) {
     unsafe {
-        let tf: unsafe extern "thiscall" fn(usize) -> *const M34 = core::mem::transmute(FN_ENTITY_TRANSFORM);
+        let tf: unsafe extern "thiscall" fn(usize) -> *const M34 = core::mem::transmute(fn_entity_transform());
         light::register(lt, rgb, &*tf(neb));
     }
 }
@@ -241,7 +253,7 @@ pub fn position(o: usize) -> [f32; 3] {
 
 /// The handles the engine keeps ghosts of this frame (`Ghost::ghostList`).
 pub fn ghost_handles(out: &mut Vec<i32>) {
-    let head = field(GHOST_LIST, 4);
+    let head = field(ghost_list(), 4);
     if head == 0 {
         return;
     }
@@ -259,7 +271,7 @@ pub fn ghost_handles(out: &mut Vec<i32>) {
 
 /// Every `Nebula` in the engine's list (`Nebula::nebulaList`).
 pub fn each_nebula(mut f: impl FnMut(usize)) {
-    let vecp = unsafe { rd::<usize>(NEBULA_LIST) };
+    let vecp = unsafe { rd::<usize>(nebula_list()) };
     if vecp != 0 {
         let (mut it, end) = (field(vecp, 4), field(vecp, 8));
         while it != 0 && it < end {
@@ -315,14 +327,14 @@ pub fn planet_hidden(o: usize) -> bool {
 
 /// Whether a database is a planet's.
 pub fn is_planet_db(db: usize) -> bool {
-    db != 0 && engine::vtable(db) == VT_PLANET_DB
+    db != 0 && engine::vtable(db) == vt_planet_db()
 }
 
 /// A planet's fog-of-war spirit (`Ghost::ghostList`): the copy of its `PlanetInstance`
 /// (`+0x10`) and its class (`+4`). None if it is not a planet's.
 pub fn planet_spirit(sp: usize) -> Option<(usize, usize, usize)> {
     let inst = field(sp, 0x10);
-    if inst == 0 || engine::vtable(inst) != VT_PLANET_INSTANCE {
+    if inst == 0 || engine::vtable(inst) != vt_planet_instance() {
         return None;
     }
     let db = instance_db(inst);
@@ -336,7 +348,7 @@ pub fn planet_spirit(sp: usize) -> Option<(usize, usize, usize)> {
 /// `GameObjectInstance::DistanceCull(eye, pos)`.
 pub fn distance_culled(inst: usize, eye: &V3, pos: &V3) -> bool {
     unsafe {
-        let f: unsafe extern "thiscall" fn(usize, *const V3, *const V3) -> u8 = core::mem::transmute(FN_DISTANCE_CULL);
+        let f: unsafe extern "thiscall" fn(usize, *const V3, *const V3) -> u8 = core::mem::transmute(fn_distance_cull());
         f(inst, eye, pos) != 0
     }
 }
@@ -360,14 +372,14 @@ pub fn race_city_k(race: usize) -> f32 {
 
 /// cfgPOP_HEAVY, as RTS_CFG.h set it at load.
 pub fn pop_heavy() -> i32 {
-    unsafe { rd::<i32>(POP_HEAVY) }
+    unsafe { rd::<i32>(pop_heavy_addr()) }
 }
 
 /// The class's population level (`+0x490`) and that level's maximum population.
 pub fn class_max_population(cls: usize) -> f32 {
     let lvl = unsafe { rd::<i32>(cls + 0x490) };
     match lvl {
-        1..=4 => (unsafe { rd::<i32>(POP_LEVELS + (lvl as usize - 1) * 4) }) as f32,
+        1..=4 => (unsafe { rd::<i32>(pop_levels() + (lvl as usize - 1) * 4) }) as f32,
         _ => 0.0,
     }
 }
@@ -429,7 +441,7 @@ pub fn field_databases(cls: usize) -> (usize, usize) {
 
 /// The culling distance (cfgOBJECT_CULLING_DISTANCE).
 pub fn cull_distance() -> f32 {
-    unsafe { rd::<f32>(CFG_CULL_DISTANCE) }
+    unsafe { rd::<f32>(cfg_cull_distance()) }
 }
 
 /// One rock of a field: its `ST3D_Instance` (0x98 bytes each).
@@ -442,7 +454,7 @@ pub fn rock(arr: usize, i: usize) -> usize {
 pub fn rock_model(rock: usize, dbs: usize, ndb: usize) -> Option<&'static str> {
     let db = field(rock, 0x80);
     let k = (0..ndb).find(|&k| field(dbs, k * 4) == db)?;
-    Some(unsafe { rt::cstr_at(field(ASTEROID_NAMES, k * 4) as *const u8, 32) })
+    Some(unsafe { rt::cstr_at(field(asteroid_names(), k * 4) as *const u8, 32) })
 }
 
 /// A rock's placement (`+0x44`).
@@ -467,8 +479,8 @@ pub fn moon_dilithium(o: usize) -> f32 {
         return 1.0;
     }
     let (val, max) = unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> f32 = core::mem::transmute(FN_RES_VALUE);
-        let g: unsafe extern "thiscall" fn(usize) -> f32 = core::mem::transmute(FN_RES_MAX);
+        let f: unsafe extern "thiscall" fn(usize) -> f32 = core::mem::transmute(fn_res_value());
+        let g: unsafe extern "thiscall" fn(usize) -> f32 = core::mem::transmute(fn_res_max());
         (f(res), g(rc))
     };
     if max > 0.0 { val / max } else { 1.0 }

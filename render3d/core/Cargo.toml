@@ -1,6 +1,6 @@
 [package]
 name = "r3d-core"
-version = "0.43.0"
+version = "0.44.0"
 edition = "2024"
 publish = false
 description = "render3d's renderer core: frame, gfx, scene, assets, the shared engine glue, the menu scene, the module interface, registry, hooks, services and recipes"
@@ -16,3 +16,4 @@ a2fmt = { path = "../../crates/a2fmt" }
 a2rt = { path = "../../crates/a2rt", features = ["dump"] }
 gpu = { path = "../../gpu" }
 a2ini = { path = "../../crates/a2ini" }
+a2engine = { path = "../../crates/a2engine" }

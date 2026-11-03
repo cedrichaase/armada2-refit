@@ -3,12 +3,14 @@
 use super::{field, field_u8, rd, vtable};
 use crate::math::M34;
 
-const FN_TRANSFORM: usize = 0x4cfd50; // Entity::GetTransform() const, thiscall: Matrix34*
-const FN_ODF_NAME: usize = 0x4d5620; // GameObject::GetOdfName() const, thiscall: char*
+pub(crate) fn fn_transform() -> usize { at(sym::FN_TRANSFORM) } // Entity::GetTransform() const, thiscall: Matrix34*
+pub(crate) fn fn_odf_name() -> usize { at(sym::FN_ODF_NAME) } // GameObject::GetOdfName() const, thiscall: char*
 const SLOT_CAN_SEE: usize = 2; // GameObject::CanUserSee() const
 
 /// `GameObject::objectList`, every object the object loop visits.
-pub use super::OBJECT_LIST;
+pub use super::object_list;
+use crate::engine::at;
+use crate::syms::sym;
 
 /// The object's world transform (`Entity::GetTransform`).
 pub fn transform(o: usize) -> M34 {
@@ -16,7 +18,7 @@ pub fn transform(o: usize) -> M34 {
         return M34::IDENTITY;
     }
     unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> *const M34 = core::mem::transmute(FN_TRANSFORM);
+        let f: unsafe extern "thiscall" fn(usize) -> *const M34 = core::mem::transmute(fn_transform());
         let p = f(o);
         if p.is_null() { M34::IDENTITY } else { core::ptr::read_unaligned(p) }
     }
@@ -28,7 +30,7 @@ pub fn odf_name(o: usize) -> &'static str {
         return "";
     }
     unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(FN_ODF_NAME);
+        let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(fn_odf_name());
         let s = crate::rt::cstr_at(f(o), 260);
         // The engine's string carries the extension.
         match s.len().checked_sub(4) {

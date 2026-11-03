@@ -36,6 +36,7 @@ pub mod shaders;
 use r3d_core::scene::anim;
 pub mod content;
 pub mod hooks;
+mod syms;
 pub mod look;
 mod draw;
 mod shadow;
@@ -159,22 +160,23 @@ impl Default for Hulls {
 /// reproduce.
 fn our_class(o: usize, look: &Look) -> bool {
     let r = hooks::render_fn(o);
-    let ok = match r {
-        hooks::FN_GO_RENDER | hooks::FN_SHIPYARD_RENDER | hooks::FN_MINING_RENDER | hooks::FN_RIG_RENDER => true,
-        hooks::FN_SCRAP_RENDER => look.scrap,
-        _ => false,
+    let ok = if r == 0 {
+        false
+    } else if r == hooks::fn_go_render() || r == hooks::fn_shipyard_render() || r == hooks::fn_mining_render() || r == hooks::fn_rig_render() {
+        true
+    } else {
+        r == hooks::fn_scrap_render() && look.scrap
     };
-    ok && match hooks::render_internal_fn(o) {
-        hooks::FN_GO_RI | hooks::FN_CRAFT_RI | hooks::FN_FREIGHTER_RI => true,
-        hooks::FN_EVOLVER_RI => look.evolver,
-        _ => false,
-    }
+    let ri = hooks::render_internal_fn(o);
+    ok && ri != 0
+        && (ri == hooks::fn_go_ri() || ri == hooks::fn_craft_ri() || ri == hooks::fn_freighter_ri() || (ri == hooks::fn_evolver_ri() && look.evolver))
 }
 
 /// The `RenderInternal`s that are or end in `Craft::RenderInternal` (the warp stretch,
 /// the white wave light).
 fn craft_ri(o: usize) -> bool {
-    matches!(hooks::render_internal_fn(o), hooks::FN_CRAFT_RI | hooks::FN_FREIGHTER_RI | hooks::FN_EVOLVER_RI)
+    let ri = hooks::render_internal_fn(o);
+    ri != 0 && (ri == hooks::fn_craft_ri() || ri == hooks::fn_freighter_ri() || ri == hooks::fn_evolver_ri())
 }
 
 impl Hulls {
@@ -205,7 +207,7 @@ impl Hulls {
             return None;
         }
         let db = hooks::instance_database(inst);
-        if db == 0 || engine::vtable(db) != hooks::VT_DATABASE || db != hooks::class_visible_db(o) {
+        if db == 0 || engine::vtable(db) != hooks::vt_database() || db != hooks::class_visible_db(o) {
             return None;
         }
         let name = obj::odf_name(o);
@@ -254,7 +256,7 @@ impl Hulls {
             None
         };
         let waves = draw::waves_of(o, craft && craft_ri(o), v.time);
-        let glow = if hooks::render_fn(o) == hooks::FN_SCRAP_RENDER { hooks::scrap_glow(o) } else { None };
+        let glow = if hooks::render_fn(o) == hooks::fn_scrap_render() { hooks::scrap_glow(o) } else { None };
         let cargo = hooks::cargo_markings(o, &model.sod);
         Some(Posed {
             obj: o,
@@ -331,7 +333,7 @@ impl Hulls {
         let Some((inst, class)) = hooks::hologram_parts(h) else { return false };
         let db = hooks::instance_database(inst);
         let name = hooks::class_odf(class);
-        if db == 0 || engine::vtable(db) != hooks::VT_DATABASE || name.is_empty() || scene::model(&assets::sod_of(name)).is_none() {
+        if db == 0 || engine::vtable(db) != hooks::vt_database() || name.is_empty() || scene::model(&assets::sod_of(name)).is_none() {
             if self.said_extra[0] < 8 {
                 self.said_extra[0] += 1;
                 log!("hulls: a hologram of '{}' (database vtable {:#x}) is left to the engine", name, engine::vtable(db));
@@ -572,6 +574,13 @@ impl Module for Hulls {
     fn configure(&mut self, ini: &crate::rt::Ini, _said: &mut r3d_core::module::Changes) {
         self.look = Some(look::load(ini));
     }
+    /// No hook of its own: only the gate on what it reads. Not stock there, the module is
+    /// not switched on and the engine draws its hulls.
+    fn hooks(&mut self, h: &mut r3d_core::hooks::Hooks) {
+        if !h.ready(&syms::TABLE, syms::hook::HULLS_READS) {
+            h.stand_down("the engine's reads are not stock");
+        }
+    }
     fn provide(&mut self, id: r3d_core::module::ModuleId, s: &mut r3d_core::services::Services) {
         s.hulls(id, &PROVIDER);
     }
@@ -652,7 +661,7 @@ impl Module for Hulls {
         // Pose everything the object loop will reach, so the shadow map has this
         // frame's hulls and the object loop finds them posed.
         let mut list = Vec::new();
-        engine::for_each_in_list(engine::OBJECT_LIST, |o| {
+        engine::for_each_in_list(engine::object_list(), |o| {
             if hooks::in_loop(o) && !obj::expired(o) && our_class(o, &look) && obj::can_user_see(o) && !(look.holo.on && hooks::hologram(o) != 0) {
                 list.push(o);
             }
@@ -693,7 +702,7 @@ impl Module for Hulls {
         let key = v.key();
         // Evolver::RenderInternal: the cocoon first; past a third of the evolution
         // only the cocoon.
-        if hooks::render_internal_fn(o) == hooks::FN_EVOLVER_RI && !obj::expired(o) && obj::can_user_see(o) {
+        if hooks::render_internal_fn(o) == hooks::fn_evolver_ri() && !obj::expired(o) && obj::can_user_see(o) {
             let c = hooks::cocoon(o);
             if c != 0 {
                 hooks::instance_update(o);
@@ -737,7 +746,7 @@ impl Module for Hulls {
         if hooks::suppressed(o) {
             return true;
         }
-        if hooks::render_fn(o) == hooks::FN_RIG_RENDER {
+        if hooks::render_fn(o) == hooks::fn_rig_render() {
             match hooks::rig_placeholder_of(o) {
                 Some((class, place, colour)) => {
                     if !placeholder(v, class, &place, colour, false) {

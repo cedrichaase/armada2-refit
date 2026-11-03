@@ -144,8 +144,8 @@ impl Lights {
         }
         let Some(key) = scene::lights::Lights::gather().key() else { return };
         let mut planets = Vec::new();
-        engine::for_each_in_list(engine::OBJECT_LIST, |o| {
-            if o != 0 && engine::vtable(o) == hooks::VT_PLANET {
+        engine::for_each_in_list(engine::object_list(), |o| {
+            if o != 0 && engine::vtable(o) == hooks::vt_planet() {
                 planets.push(o);
             }
         });

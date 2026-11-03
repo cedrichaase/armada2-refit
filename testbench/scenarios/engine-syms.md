@@ -81,6 +81,23 @@ appends its plugin's section and touches no other.
 52. Expect "QOLRules.log" not contains "read before its hook".
 53. Expect "QOLRules.log" not contains "engine: TEST:".
 
+## Render3D
+54. Expect "Render3D.log" contains "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321".
+55. Expect "Render3D.log" contains "engine: build armada2/gog-1.1".
+56. Expect "Render3D.log" contains "engine: symbols: 72/72 resolved; 0 hooks blocked".
+57. Expect "Render3D.log" contains "engine: world symbols: 26/26 resolved; 0 hooks blocked".
+58. Expect "Render3D.log" contains "engine: particles symbols: 14/14 resolved; 0 hooks blocked".
+59. Expect "Render3D.log" contains "engine: hulls symbols: 34/34 resolved; 0 hooks blocked".
+60. Expect "Render3D.log" contains "engine: effects symbols: 53/53 resolved; 0 hooks blocked".
+61. Expect "Render3D.log" contains "engine: ordnance symbols: 23/23 resolved; 0 hooks blocked".
+62. Expect "Render3D.log" contains "engine: specials symbols: 10/10 resolved; 0 hooks blocked".
+63. Expect "Render3D.log" contains "engine: sky symbols: 11/11 resolved; 0 hooks blocked".
+64. Expect "Render3D.log" contains "engine: overlays symbols: 42/42 resolved; 0 hooks blocked".
+65. Expect "Render3D.log" not contains "stands down: ".
+66. Expect "Render3D.log" not contains "read before its hook".
+67. Expect "Render3D.log" not contains "engine: TEST:".
+68. Expect "Render3D.log" contains "hooks: frame the 3D views (the seam) at Armada_RenderFrame".
+
 ## End
-54. Quit the game.
-55. Expect no crash.
+69. Quit the game.
+70. Expect no crash.

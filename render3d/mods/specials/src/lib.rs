@@ -22,6 +22,7 @@ use r3d_core::{dump, log, rt, sfmt};
 pub mod shaders;
 pub mod content;
 pub mod hooks;
+mod syms;
 pub mod look;
 
 use r3d_core::module::{Module, Step};
@@ -32,7 +33,7 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
 use alloc::vec::Vec;
 use hooks::{effect_name, RenderKind};
-pub use hooks::{VT_CHANGE_TEAM, VT_CREW_DISRUPTION, VT_DRAIN};
+pub use hooks::{vt_change_team, vt_crew_disruption, vt_drain};
 
 /// One effect drawn this frame, for the looks.
 #[derive(Clone, Copy)]
@@ -153,7 +154,7 @@ impl Specials {
         let mut alive: BTreeSet<(usize, usize)> = BTreeSet::new();
         let mut objects: BTreeSet<usize> = BTreeSet::new();
         if !list.is_empty() {
-            r3d_core::engine::for_each_in_list(r3d_core::engine::OBJECT_LIST, |o| {
+            r3d_core::engine::for_each_in_list(r3d_core::engine::object_list(), |o| {
                 if o != 0 {
                     objects.insert(o);
                 }
@@ -260,6 +261,13 @@ impl Module for Specials {
     }
     fn rows(&self) -> &'static [crate::rt::settings::Setting] {
         &[]
+    }
+    /// No hook of its own: only the gate on what it reads. Not stock there, the module is
+    /// not switched on and the engine draws its effects.
+    fn hooks(&mut self, h: &mut r3d_core::hooks::Hooks) {
+        if !h.ready(&syms::TABLE, syms::hook::SPECIALS_READS) {
+            h.stand_down("the engine's reads are not stock");
+        }
     }
     /// `[Specials]`: the module's own keys (`Enable`, `Survey`, `Reload`, `LogEvery`) and
     /// each kind's look. Read at load and at every settings change; `Reload=1` reads

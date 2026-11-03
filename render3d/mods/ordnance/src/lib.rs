@@ -31,6 +31,8 @@ mod hooks;
 mod ini;
 mod lights;
 mod models;
+#[allow(dead_code)]
+mod syms;
 
 use r3d_core::module::{Module, Step};
 use r3d_core::frame::steps::View;

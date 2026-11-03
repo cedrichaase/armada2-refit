@@ -32,7 +32,7 @@
 //!   0x4d5f70) is wrapped while this part runs, so a ghosted nebula of a class drawn as
 //!   gas keeps its gas and loses its billboards, as with the plugin.
 use super::content;
-use super::hooks::{self, VT_LATINUM, VT_NEBULA};
+use super::hooks::{self, vt_latinum, vt_nebula};
 use super::recipes::{self, Text};
 use r3d_core::engine::{self, obj};
 use r3d_core::frame::steps::View;
@@ -1045,7 +1045,7 @@ impl Nebulae {
             return None;
         }
         if !self.classes.contains_key(&name) {
-            let latinum = engine::vtable(o) == VT_LATINUM;
+            let latinum = engine::vtable(o) == vt_latinum();
             let r0 = if latinum {
                 100.0
             } else {
@@ -1063,7 +1063,7 @@ impl Nebulae {
     /// Every nebula is marked, whoever draws its billboards (the particles module does
     /// not mark them): `Nebula::Simulate` registers its light only while it is marked.
     pub fn object(&mut self, o: usize, v: &View) -> bool {
-        if engine::vtable(o) == VT_NEBULA {
+        if engine::vtable(o) == vt_nebula() {
             hooks::mark_nebula_on_screen(o, v.cam);
         }
         if !self.cfg.enable || self.held.failed {
@@ -1073,7 +1073,7 @@ impl Nebulae {
         if !c.have || c.failed {
             return false;
         }
-        if engine::vtable(o) != VT_NEBULA {
+        if engine::vtable(o) != vt_nebula() {
             hooks::mark_nebula_on_screen(o, v.cam);
         }
         true
@@ -1119,8 +1119,8 @@ impl Nebulae {
         let mut any = false;
         hooks::each_nebula(|o| any |= self.gather_one(o));
         let mut lat = Vec::new();
-        engine::for_each_in_list(engine::OBJECT_LIST, |o| {
-            if o != 0 && engine::vtable(o) == VT_LATINUM {
+        engine::for_each_in_list(engine::object_list(), |o| {
+            if o != 0 && engine::vtable(o) == vt_latinum() {
                 lat.push(o);
             }
         });

@@ -1,6 +1,6 @@
 [package]
 name = "r3d-hulls"
-version = "0.43.0"
+version = "0.44.0"
 edition = "2024"
 publish = false
 description = "render3d's hulls module: the ships and stations, lit, with their shadows"
@@ -13,5 +13,6 @@ path = "src/lib.rs"
 [dependencies]
 r3d-core = { path = "../../core" }
 a2fmt = { path = "../../../crates/a2fmt" }
+a2engine = { path = "../../../crates/a2engine" }
 gpu = { path = "../../../gpu" }
 libm = "0.2"

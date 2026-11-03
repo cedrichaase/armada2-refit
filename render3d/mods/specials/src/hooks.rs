@@ -10,20 +10,24 @@ use r3d_core::engine::{self, field, field_f32, field_u8};
 use r3d_core::math::M34;
 use alloc::string::String;
 use alloc::vec::Vec;
+use crate::syms::sym;
+
+/// An engine address of the profile: 0 unless the hook that uses it is ready.
+pub(crate) fn at(s: a2engine::Sym) -> usize { crate::syms::TABLE.engine().addr(s) }
 
 /// The list's head node pointer (`mAllEffects` + 4).
-const EFFECT_HEAD: usize = 0x7a8c0c;
-const FN_GET_NAME: usize = 0x60be10; // SpecialObjectEffect::GetEffectName(), thiscall: char*
-const FN_PRJ_ODF: usize = 0x6593a0; // cPrjID::GetOdfName() const, thiscall: char*
-const FN_WORLD_TRANSFORM: usize = 0x4cff90; // Entity::GetWorldTransform(ST3D_Node*) const, thiscall, returns Matrix34 by hidden pointer
+pub(crate) fn effect_head() -> usize { at(sym::EFFECT_HEAD) }
+pub(crate) fn fn_get_name() -> usize { at(sym::FN_GET_NAME) } // SpecialObjectEffect::GetEffectName(), thiscall: char*
+pub(crate) fn fn_prj_odf() -> usize { at(sym::FN_PRJ_ODF) } // cPrjID::GetOdfName() const, thiscall: char*
+pub(crate) fn fn_world_transform() -> usize { at(sym::FN_WORLD_TRANSFORM) } // Entity::GetWorldTransform(ST3D_Node*) const, thiscall, returns Matrix34 by hidden pointer
 /// `Render` (slot 0) of the classes: the no-op base, the timed one (every `Timed*`,
 /// `BoardingParty`, `LineOfSightEffect`) and `TimedChangeTeam`'s.
-const FN_RENDER_BASE: usize = 0x49ea70;
-const FN_RENDER_TIMED: usize = 0x60c460;
-const FN_RENDER_CHANGE_TEAM: usize = 0x60e090;
-pub const VT_CHANGE_TEAM: usize = 0x6bbe9c; // TimedChangeTeam (Computer Override)
-pub const VT_CREW_DISRUPTION: usize = 0x6bbed4; // TimedCrewDisruption (Psionic Disruption)
-pub const VT_DRAIN: usize = 0x6bbf64; // TimedDrain (Energy Dissipator, micro-organisms)
+pub(crate) fn fn_render_base() -> usize { at(sym::FN_RENDER_BASE) }
+pub(crate) fn fn_render_timed() -> usize { at(sym::FN_RENDER_TIMED) }
+pub(crate) fn fn_render_change_team() -> usize { at(sym::FN_RENDER_CHANGE_TEAM) }
+pub fn vt_change_team() -> usize { at(sym::VT_CHANGE_TEAM) } // TimedChangeTeam (Computer Override)
+pub fn vt_crew_disruption() -> usize { at(sym::VT_CREW_DISRUPTION) } // TimedCrewDisruption (Psionic Disruption)
+pub fn vt_drain() -> usize { at(sym::VT_DRAIN) } // TimedDrain (Energy Dissipator, micro-organisms)
 
 /// Offsets in a timed effect.
 const E_OBJECT: usize = 0x8; // the object the effect is on
@@ -50,9 +54,10 @@ pub enum RenderKind {
 /// The class of an effect's `Render` (vtable slot 0).
 pub fn render_kind(e: usize) -> RenderKind {
     match field(engine::vtable(e), 0) {
-        FN_RENDER_BASE => RenderKind::Base,
-        FN_RENDER_TIMED => RenderKind::Timed,
-        FN_RENDER_CHANGE_TEAM => RenderKind::ChangeTeam,
+        0 => RenderKind::Other,
+        f if f == fn_render_base() => RenderKind::Base,
+        f if f == fn_render_timed() => RenderKind::Timed,
+        f if f == fn_render_change_team() => RenderKind::ChangeTeam,
         _ => RenderKind::Other,
     }
 }
@@ -65,7 +70,7 @@ pub fn render_fn(e: usize) -> usize {
 /// Every effect in `mAllEffects`, in the list's order.
 pub fn effects() -> Vec<usize> {
     let mut out = Vec::new();
-    let head = field(EFFECT_HEAD, 0);
+    let head = field(effect_head(), 0);
     if head == 0 {
         return out;
     }
@@ -84,7 +89,7 @@ pub fn effects() -> Vec<usize> {
 
 pub fn effect_name(e: usize) -> String {
     unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(FN_GET_NAME);
+        let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(fn_get_name());
         let p = f(e);
         if p.is_null() {
             return String::new();
@@ -104,7 +109,7 @@ pub fn ordnance_odf(e: usize) -> String {
         return String::new();
     }
     let name = unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(FN_PRJ_ODF);
+        let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(fn_prj_odf());
         let p = f(prj);
         if p.is_null() { "" } else { crate::rt::cstr_at(p, 260) }
     };
@@ -116,7 +121,7 @@ pub fn ordnance_odf(e: usize) -> String {
 pub fn world_of_node(target: usize, node: usize) -> M34 {
     let mut m = M34::IDENTITY;
     unsafe {
-        let f: unsafe extern "thiscall" fn(usize, *mut M34, usize) -> *mut M34 = core::mem::transmute(FN_WORLD_TRANSFORM);
+        let f: unsafe extern "thiscall" fn(usize, *mut M34, usize) -> *mut M34 = core::mem::transmute(fn_world_transform());
         f(target, &mut m, node);
     }
     m

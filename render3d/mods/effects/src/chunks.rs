@@ -67,7 +67,7 @@ fn pending() -> &'static mut Vec<Pending> {
 /// The instance's object, by walking the object list.
 fn object_of_instance(inst: usize) -> usize {
     let mut found = 0;
-    engine::for_each_in_list(engine::OBJECT_LIST, |o| {
+    engine::for_each_in_list(engine::object_list(), |o| {
         if found == 0 && o != 0 && obj::instance(o) == inst {
             found = o;
         }

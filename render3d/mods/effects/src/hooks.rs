@@ -30,6 +30,10 @@
 use r3d_core::hooks::{Gate, Hook, Hooks, Kind, Prev, Site};
 use r3d_core::engine::{self, field, field_f32, field_m34, field_u8, field_v3, hook, obj, rd};
 use r3d_core::math::{M34, V3};
+use crate::syms::{sym, TABLE};
+
+/// An engine address of the profile: 0 unless the hook that uses it is ready.
+pub(crate) fn at(s: a2engine::Sym) -> usize { crate::syms::TABLE.engine().addr(s) }
 
 static mut GATE: Option<Gate> = None;
 
@@ -48,8 +52,8 @@ pub fn keep_gate(h: &Hooks) {
 /// A live game object by handle, as the plugins took one: `Entity::Get`, a game
 /// object (flags bit 2), with an instance and a class. 0 if not.
 pub fn object_of(handle: i32) -> usize {
-    const FN_ENTITY_GET: usize = 0x4cfff0; // Entity::Get(int handle), static, cdecl
-    let f: unsafe extern "C" fn(i32) -> usize = unsafe { core::mem::transmute(FN_ENTITY_GET) };
+    pub(crate) fn fn_entity_get() -> usize { at(sym::FN_ENTITY_GET) } // Entity::Get(int handle), static, cdecl
+    let f: unsafe extern "C" fn(i32) -> usize = unsafe { core::mem::transmute(fn_entity_get()) };
     let o = unsafe { f(handle) };
     if o == 0 || field(o, 0x14) & 4 == 0 || field(o, 4) == 0 || field(o, 0x40) == 0 {
         return 0;
@@ -134,9 +138,9 @@ pub fn engine_render(inst: usize, cam: usize) {
 /// Whether the player sees everything: the map editor is on (the user profile's flag),
 /// or the view is the one that shows everything.
 pub fn sees_all() -> bool {
-    const USER_PROFILE: usize = 0x76b5ac; // +0x84: the map editor is on
-    const VIEW_RECORD: usize = 0x76b610;
-    unsafe { field_u8(rd::<usize>(USER_PROFILE), 0x84) != 0 || rd::<u32>(VIEW_RECORD) == 2 }
+    pub(crate) fn user_profile() -> usize { at(sym::USER_PROFILE) } // +0x84: the map editor is on
+    pub(crate) fn view_record() -> usize { at(sym::VIEW_RECORD) }
+    unsafe { field_u8(rd::<usize>(user_profile()), 0x84) != 0 || rd::<u32>(view_record()) == 2 }
 }
 
 /// A colour handed to a `Fragment` call: white for none.
@@ -158,19 +162,19 @@ pub enum Feature {
 }
 
 pub fn feature_kind(f: usize) -> Feature {
-    const VT_EXPLOSION_FEATURE: usize = 0x6afb30;
-    const VT_SHIELD_EFFECT: usize = 0x6b0134;
-    const VT_NODE_PARTICLE: usize = 0x6b001c;
-    const VT_BUILDING: usize = 0x6afe4c;
-    const VT_WORKER_BEE: usize = 0x6b017c;
-    const VT_DRONE_COLONY: usize = 0x6afe98;
+    pub(crate) fn vt_explosion_feature() -> usize { at(sym::VT_EXPLOSION_FEATURE) }
+    pub(crate) fn vt_shield_effect() -> usize { at(sym::VT_SHIELD_EFFECT) }
+    pub(crate) fn vt_node_particle() -> usize { at(sym::VT_NODE_PARTICLE) }
+    pub(crate) fn vt_building() -> usize { at(sym::VT_BUILDING) }
+    pub(crate) fn vt_worker_bee() -> usize { at(sym::VT_WORKER_BEE) }
+    pub(crate) fn vt_drone_colony() -> usize { at(sym::VT_DRONE_COLONY) }
     match engine::vtable(f) {
-        VT_EXPLOSION_FEATURE => Feature::Explosion,
-        VT_SHIELD_EFFECT => Feature::Shield,
-        VT_NODE_PARTICLE => Feature::NodeParticle,
-        VT_BUILDING => Feature::Building,
-        VT_WORKER_BEE => Feature::WorkerBee,
-        VT_DRONE_COLONY => Feature::DroneColony,
+        x if x != 0 && x == vt_explosion_feature() => Feature::Explosion,
+        x if x != 0 && x == vt_shield_effect() => Feature::Shield,
+        x if x != 0 && x == vt_node_particle() => Feature::NodeParticle,
+        x if x != 0 && x == vt_building() => Feature::Building,
+        x if x != 0 && x == vt_worker_bee() => Feature::WorkerBee,
+        x if x != 0 && x == vt_drone_colony() => Feature::DroneColony,
         _ => Feature::Other,
     }
 }
@@ -178,9 +182,9 @@ pub fn feature_kind(f: usize) -> Feature {
 /// The engine's own `RenderChunks`, through its call site (a plugin chained there
 /// runs too).
 pub fn engine_chunks() {
-    const SITE_CHUNKS: usize = 0x598446; // ST3D_GraphicsEngine::RenderChunks(), thiscall
-    const FN_CHUNKS: usize = 0x62d470;
-    let f = hook::call_target(SITE_CHUNKS).unwrap_or(FN_CHUNKS);
+    pub(crate) fn site_chunks() -> usize { at(sym::SITE_CHUNKS) } // ST3D_GraphicsEngine::RenderChunks(), thiscall
+    pub(crate) fn fn_chunks() -> usize { at(sym::FN_CHUNKS) }
+    let f = hook::call_target(site_chunks()).unwrap_or(fn_chunks());
     unsafe {
         let r: unsafe extern "thiscall" fn(usize) = core::mem::transmute(f);
         r(engine::storm3d());
@@ -192,16 +196,16 @@ pub fn engine_chunks() {
 pub mod explosions {
     use super::*;
 
-    const EXPLOSION_HEAD: usize = 0x7367c4;
-    const VT_FIREBALL: usize = 0x6afbd4;
-    const VT_SHOCKWAVE: usize = 0x6afdac;
-    const FN_SHOCK_RADIUS: usize = 0x467730;
+    pub(crate) fn explosion_head() -> usize { at(sym::EXPLOSION_HEAD) }
+    pub(crate) fn vt_fireball() -> usize { at(sym::VT_FIREBALL) }
+    pub(crate) fn vt_shockwave() -> usize { at(sym::VT_SHOCKWAVE) }
+    pub(crate) fn fn_shock_radius() -> usize { at(sym::FN_SHOCK_RADIUS) }
     const SLOT_VISIBLE: usize = 2;
     const SLOT_SUBMIT: usize = 15;
 
     /// Calls `f` with every live explosion, in the list's order.
     pub fn each(mut f: impl FnMut(usize)) {
-        let head = unsafe { rd::<usize>(EXPLOSION_HEAD) };
+        let head = unsafe { rd::<usize>(explosion_head()) };
         if head == 0 {
             return;
         }
@@ -216,11 +220,11 @@ pub mod explosions {
     }
 
     pub fn is_fireball(e: usize) -> bool {
-        engine::vtable(e) == VT_FIREBALL
+        vt_fireball() != 0 && engine::vtable(e) == vt_fireball()
     }
 
     pub fn is_shockwave(e: usize) -> bool {
-        engine::vtable(e) == VT_SHOCKWAVE
+        vt_shockwave() != 0 && engine::vtable(e) == vt_shockwave()
     }
 
     /// The explosion class's `IsVisible` (slot 2).
@@ -279,7 +283,7 @@ pub mod explosions {
     pub fn shockwave(e: usize) -> Shock {
         let cls = field(e, 0x30);
         let radius: f32 = unsafe {
-            let f: unsafe extern "thiscall" fn(usize) -> f32 = core::mem::transmute(FN_SHOCK_RADIUS);
+            let f: unsafe extern "thiscall" fn(usize) -> f32 = core::mem::transmute(fn_shock_radius());
             f(e)
         };
         Shock {
@@ -302,9 +306,9 @@ pub mod explosions {
 pub mod nodes {
     use super::*;
 
-    const LIST: usize = 0x736cfc;
-    const COUNT: usize = 0x736d00;
-    const FN_WORLD_POS: usize = 0x4cff70; // Entity::GetWorldPosition(ST3D_Node*), thiscall
+    pub(crate) fn list() -> usize { at(sym::LIST) }
+    pub(crate) fn count_addr() -> usize { at(sym::COUNT) }
+    pub(crate) fn fn_world_pos() -> usize { at(sym::FN_WORLD_POS) } // Entity::GetWorldPosition(ST3D_Node*), thiscall
     const P_HANDLE: usize = 0x08;
     const P_NODE: usize = 0x0c;
     const P_LOCAL: usize = 0x10;
@@ -316,7 +320,7 @@ pub mod nodes {
 
     /// Calls `f` with every particle node, in the list's order.
     pub fn each(mut f: impl FnMut(usize)) {
-        let head = unsafe { rd::<usize>(LIST) };
+        let head = unsafe { rd::<usize>(list()) };
         if head == 0 {
             return;
         }
@@ -331,18 +335,12 @@ pub mod nodes {
     }
 
     pub fn count() -> u32 {
-        unsafe { rd::<u32>(COUNT) }
-    }
-
-    /// Whether an address is the list's head (a signature check of the code that reads
-    /// it).
-    pub fn is_list(a: usize) -> bool {
-        a == LIST
+        unsafe { rd::<u32>(count_addr()) }
     }
 
     /// The list's newest node (the new tail), if there is one.
     pub fn tail() -> Option<usize> {
-        let head = unsafe { rd::<usize>(LIST) };
+        let head = unsafe { rd::<usize>(list()) };
         if head == 0 {
             return None;
         }
@@ -380,7 +378,7 @@ pub mod nodes {
     pub fn world_pos(o: usize, hp: usize) -> V3 {
         let mut out = V3::ZERO;
         unsafe {
-            let f: unsafe extern "thiscall" fn(usize, *mut V3, usize) -> *mut V3 = core::mem::transmute(FN_WORLD_POS);
+            let f: unsafe extern "thiscall" fn(usize, *mut V3, usize) -> *mut V3 = core::mem::transmute(fn_world_pos());
             f(o, &mut out, hp);
         }
         out
@@ -392,11 +390,8 @@ pub mod nodes {
 pub mod repair {
     use super::*;
 
-    const SITE_ADD: usize = 0x4c90c0;
-    const FN_ADD: usize = 0x4733c0;
-    const SITE_SPRITE: usize = 0x473767;
-    const SITE_LIST_CHECK: usize = 0x473677; // NodeParticleEffect::Render's read of the list head
-    use r3d_core::engine::sprite::FN_DRAW_SCALED_3D as FN_SPRITE;
+    pub(crate) fn fn_add() -> usize { at(sym::FN_ADD) }
+    pub(crate) fn fn_sprite() -> usize { at(sym::DRAWSCALED3D) }
 
     static mut PREV_ADD: Prev = Prev(0);
     static mut PREV_SPRITE: Prev = Prev(0);
@@ -451,20 +446,15 @@ pub mod repair {
     /// stock's.
     pub fn install(h: &mut Hooks) -> bool {
         let owner = h.owner();
-        let ok_list = nodes::is_list(unsafe { rd::<usize>(SITE_LIST_CHECK) });
-        if hook::call_target(SITE_ADD).is_none() || hook::call_target(SITE_SPRITE).is_none() {
-            crate::log!("effects: repair: the call sites are not calls here: stock sparks");
-            return false;
-        }
-        if !ok_list {
-            crate::log!("effects: repair: NodeParticleEffect::Render differs: stock sparks");
+        if !h.ready(&TABLE, crate::syms::hook::EFFECTS_REPAIR) || at(sym::SITE_LIST_CHECK) == 0 {
+            crate::log!("effects: repair: the call sites or NodeParticleEffect::Render differ here: stock sparks");
             return false;
         }
         let add_hook = Hook {
             owner,
             used_by: "effects' repair welds",
             kind: Kind::Call,
-            site: Site { symbol: "Craft::RepairSystem", addr: SITE_ADD, expect: FN_ADD },
+            site: Site::of(&TABLE, sym::SITE_ADD),
             to: add as *const () as usize,
             chain: true,
         };
@@ -472,7 +462,7 @@ pub mod repair {
             owner,
             used_by: "effects' repair weld sprites",
             kind: Kind::Call,
-            site: Site { symbol: "NodeParticleEffect::Render", addr: SITE_SPRITE, expect: FN_SPRITE },
+            site: Site::of(&TABLE, sym::SITE_SPRITE),
             to: sprite_thunk as *const () as usize,
             chain: true,
         };
@@ -487,8 +477,8 @@ pub mod repair {
             }
             crate::log!(
                 "effects: repair: AddParticle{} and DrawScaled3D{} hooked",
-                if PREV_ADD.addr() != 0 && PREV_ADD.addr() != FN_ADD { " (chained)" } else { "" },
-                if PREV_SPRITE.addr() != 0 && PREV_SPRITE.addr() != FN_SPRITE { " (chained)" } else { "" }
+                if PREV_ADD.addr() != 0 && PREV_ADD.addr() != fn_add() { " (chained)" } else { "" },
+                if PREV_SPRITE.addr() != 0 && PREV_SPRITE.addr() != fn_sprite() { " (chained)" } else { "" }
             );
             HOOKED = PREV_ADD.addr() != 0 && PREV_SPRITE.addr() != 0;
             HOOKED
@@ -502,15 +492,15 @@ pub mod shields {
     use super::*;
     pub use super::{object_key, object_radius};
 
-    const SHIELD_LIST: usize = 0x736de8;
-    const SHIELD_NIL: usize = 0x736e38;
-    const SHIELD_LOGICAL_DB: usize = 0x736ddc;
-    const SHIELD_MATERIAL: usize = 0x736e2c; // what ShieldEffect::Render hands DrawShield
-    const FN_DRAWSHIELD: usize = 0x474070;
-    const FN_CREATE_HIT: usize = 0x4743b0;
-    const SHIELD_TYPE_NAMES: usize = 0x6b00e0;
-    const FN_GET_SHIELD_TYPE: usize = 0x474720;
-    const HIT_SITES: [usize; 4] = [0x58bb95, 0x58cad8, 0x58d502, 0x58dd65];
+    pub(crate) fn shield_list() -> usize { at(sym::SHIELD_LIST) }
+    pub(crate) fn shield_nil() -> usize { at(sym::SHIELD_NIL) }
+    pub(crate) fn shield_logical_db() -> usize { at(sym::SHIELD_LOGICAL_DB) }
+    pub(crate) fn shield_material() -> usize { at(sym::SHIELD_MATERIAL) } // what ShieldEffect::Render hands DrawShield
+    pub(crate) fn fn_drawshield() -> usize { at(sym::FN_DRAWSHIELD) }
+    pub(crate) fn fn_create_hit() -> usize { at(sym::FN_CREATE_HIT) }
+    pub(crate) fn shield_type_names() -> usize { at(sym::SHIELD_TYPE_NAMES) }
+    pub(crate) fn fn_get_shield_type() -> usize { at(sym::FN_GET_SHIELD_TYPE) }
+    const HIT_SITES: [a2engine::Sym; 4] = [sym::SITE_HIT_0, sym::SITE_HIT_1, sym::SITE_HIT_2, sym::SITE_HIT_3];
 
     const HIT_MODEL: usize = 0x7c;
     const HIT_MODEL_RADIUS: usize = 0x40;
@@ -592,15 +582,16 @@ pub mod shields {
         let thunks: [usize; 4] = [thunk0 as *const () as usize, thunk1 as *const () as usize, thunk2 as *const () as usize, thunk3 as *const () as usize];
         let owner = h.owner();
         let mut names = alloc::string::String::new();
+        if !h.ready(&TABLE, crate::syms::hook::EFFECTS_SHIELDS) {
+            crate::log!("effects: shields: the weapons' calls of CreateShieldHit are not stock's here: no hit is noted");
+            return;
+        }
         for i in 0..4 {
-            if hook::call_target(HIT_SITES[i]).is_none() {
-                continue;
-            }
             let hk = Hook {
                 owner,
                 used_by: "effects' shield hits",
                 kind: Kind::Call,
-                site: Site { symbol: "CreateShieldHit", addr: HIT_SITES[i], expect: FN_CREATE_HIT },
+                site: Site::of(&TABLE, HIT_SITES[i]),
                 to: thunks[i],
                 chain: true,
             };
@@ -608,7 +599,7 @@ pub mod shields {
                 unsafe { PREV_CREATE[i] = prev };
                 names.push(' ');
                 names.push_str(super::super::content::SITE_NAME[i]);
-                if prev.addr() != FN_CREATE_HIT {
+                if prev.addr() != fn_create_hit() {
                     names.push_str("(chained)");
                 }
             }
@@ -618,25 +609,25 @@ pub mod shields {
 
     /// Walks `m_shieldList` in order (as `ShieldEffect::Render` does): (id, ShieldHit).
     pub fn walk(mut f: impl FnMut(i32, usize)) {
-        let head = unsafe { rd::<usize>(SHIELD_LIST + 4) };
-        let nil = unsafe { rd::<usize>(SHIELD_NIL) };
+        let head = unsafe { rd::<usize>(shield_list() + 4) };
+        let nil = unsafe { rd::<usize>(shield_nil()) };
         tree_walk(head, nil, 4096, |node| f(field(node, 0xc) as i32, field(node, 0x14)));
     }
 
     /// The `k`th model of the engine's shield database (0 if it is not loaded).
     pub fn db(k: usize) -> usize {
-        let db = unsafe { rd::<usize>(SHIELD_LOGICAL_DB) };
+        let db = unsafe { rd::<usize>(shield_logical_db()) };
         if db == 0 { 0 } else { field(db, k * 4) }
     }
 
     /// Whether the engine's table of shell names is the one this reads.
     pub fn names_ok() -> bool {
-        unsafe { rd::<usize>(FN_GET_SHIELD_TYPE + 4) == SHIELD_TYPE_NAMES }
+        shield_type_names() != 0 && unsafe { rd::<usize>(fn_get_shield_type() + 4) == shield_type_names() }
     }
 
     /// The name of shell type `k` in the engine's table: None at the table's end.
     pub fn type_name(k: usize) -> Option<&'static str> {
-        let p = unsafe { rd::<usize>(SHIELD_TYPE_NAMES + k * 4) };
+        let p = unsafe { rd::<usize>(shield_type_names() + k * 4) };
         if p == 0 {
             return None;
         }
@@ -645,9 +636,9 @@ pub mod shields {
 
     /// What `ShieldEffect::Render` hands `DrawShield`, and the engine's draw of a hit.
     pub fn draw_hit(sh: usize, cam: usize) {
-        let mat = unsafe { rd::<usize>(SHIELD_MATERIAL) };
+        let mat = unsafe { rd::<usize>(shield_material()) };
         unsafe {
-            let f: unsafe extern "thiscall" fn(usize, usize, usize) = core::mem::transmute(FN_DRAWSHIELD);
+            let f: unsafe extern "thiscall" fn(usize, usize, usize) = core::mem::transmute(fn_drawshield());
             f(sh, cam, mat);
         }
     }
@@ -704,14 +695,12 @@ pub mod shields {
 
 pub mod chunks {
     use super::*;
-    use r3d_core::engine::instance::{COCOON_DB, VT_COCOON};
+    use r3d_core::engine::instance::{cocoon_db, vt_cocoon};
 
-    const SITE_EXPLODE_FRAGMENT: usize = 0x4c6bfc; // in Craft::Explode: call ST3D_Instance::Fragment
-    const FN_FRAGMENT: usize = 0x62eb20;
-    const SITE_BUILD_FRAGMENT: usize = 0x46a0f1; // in BuildingEffect::SafeDestroyConstruction: the same call
-    const FN_CLASS_ODF: usize = 0x4ce370; // GameObjectClass::GetOdfName(), thiscall
+    pub(crate) fn fn_fragment() -> usize { at(sym::FN_FRAGMENT) }
+    pub(crate) fn fn_class_odf_addr() -> usize { at(sym::FN_CLASS_ODF) } // GameObjectClass::GetOdfName(), thiscall
     /// The Evolver's four calls of `Fragment` on its cocoon.
-    const SITES_COCOON: [usize; 4] = [0x4b07b4, 0x4b0872, 0x4b0914, 0x4b09b4];
+    const SITES_COCOON: [a2engine::Sym; 4] = [sym::SITE_COCOON_0, sym::SITE_COCOON_1, sym::SITE_COCOON_2, sym::SITE_COCOON_3];
 
     static mut PREV_FRAGMENT: Prev = Prev(0);
     static mut PREV_BUILD_FRAGMENT: Prev = Prev(0);
@@ -758,7 +747,7 @@ pub mod chunks {
     /// Whether an instance is the Evolver's cocoon (its class and its database).
     pub fn is_cocoon(inst: usize) -> bool {
         let db = field(inst, 0x80);
-        engine::vtable(inst) == VT_COCOON && db != 0 && db == unsafe { rd::<usize>(COCOON_DB) }
+        vt_cocoon() != 0 && engine::vtable(inst) == vt_cocoon() && db != 0 && db == unsafe { rd::<usize>(cocoon_db()) }
     }
 
     /// The ODF name of the class a construction's `Info` (the instance at its `+0x20`)
@@ -772,7 +761,7 @@ pub mod chunks {
             return "";
         }
         let s = unsafe {
-            let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(FN_CLASS_ODF);
+            let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(fn_class_odf_addr());
             crate::rt::cstr_at(f(class), 260)
         };
         r3d_core::assets::odf_stem(s)
@@ -782,21 +771,21 @@ pub mod chunks {
     /// `Craft::Explode`'s own call is not stock's (the engine's chunks entirely).
     pub fn install(h: &mut Hooks) -> bool {
         let owner = h.owner();
+        if !h.ready(&TABLE, crate::syms::hook::EFFECTS_DEBRIS) {
+            crate::log!("effects: debris: the calls of Fragment are not stock's here: the engine's chunks");
+            return false;
+        }
         let explode = Hook {
             owner,
             used_by: "effects' debris of a dying craft",
             kind: Kind::Call,
-            site: Site { symbol: "Craft::Explode", addr: SITE_EXPLODE_FRAGMENT, expect: FN_FRAGMENT },
+            site: Site::of(&TABLE, sym::SITE_EXPLODE_FRAGMENT),
             to: fragment as *const () as usize,
             chain: true,
         };
-        if hook::call_target(SITE_EXPLODE_FRAGMENT).is_none() {
-            crate::log!("effects: debris: Craft::Explode does not call Fragment here: the engine's chunks");
-            return false;
-        }
         let Some(prev) = h.install(explode) else { return false };
         unsafe { PREV_FRAGMENT = prev };
-        crate::log!("effects: debris: Craft::Explode's Fragment{} hooked: our own chunks", if prev.addr() != FN_FRAGMENT { " (chained)" } else { "" });
+        crate::log!("effects: debris: Craft::Explode's Fragment{} hooked: our own chunks", if prev.addr() != fn_fragment() { " (chained)" } else { "" });
         let detours: [usize; 4] = [cocoon::<0> as *const () as usize, cocoon::<1> as *const () as usize, cocoon::<2> as *const () as usize, cocoon::<3> as *const () as usize];
         let mut n = 0;
         for i in 0..4 {
@@ -804,7 +793,7 @@ pub mod chunks {
                 owner,
                 used_by: "effects' debris of the Evolver's cocoon",
                 kind: Kind::Call,
-                site: Site { symbol: "Evolver::mDoRemoveConstructionEffect", addr: SITES_COCOON[i], expect: FN_FRAGMENT },
+                site: Site::of(&TABLE, SITES_COCOON[i]),
                 to: detours[i],
                 chain: true,
             };
@@ -814,21 +803,19 @@ pub mod chunks {
             }
         }
         crate::log!("effects: debris: {} of the Evolver's {} cocoon Fragment calls ours", n, SITES_COCOON.len());
-        if hook::call_target(SITE_BUILD_FRAGMENT).is_some() {
+        {
             let hk = Hook {
                 owner,
                 used_by: "effects' debris of a cancelled construction",
                 kind: Kind::Call,
-                site: Site { symbol: "BuildingEffect::SafeDestroyConstruction", addr: SITE_BUILD_FRAGMENT, expect: FN_FRAGMENT },
+                site: Site::of(&TABLE, sym::SITE_BUILD_FRAGMENT),
                 to: build_fragment as *const () as usize,
                 chain: true,
             };
             if let Some(p) = h.install(hk) {
                 unsafe { PREV_BUILD_FRAGMENT = p };
-                crate::log!("effects: debris: a cancelled construction's Fragment{} hooked: our own chunks", if p.addr() != FN_FRAGMENT { " (chained)" } else { "" });
+                crate::log!("effects: debris: a cancelled construction's Fragment{} hooked: our own chunks", if p.addr() != fn_fragment() { " (chained)" } else { "" });
             }
-        } else {
-            crate::log!("effects: debris: SafeDestroyConstruction does not call Fragment here: the engine's chunks for it");
         }
         true
     }
@@ -839,7 +826,7 @@ pub mod chunks {
 pub mod bees {
     use super::*;
 
-    const BEE_NIL: usize = 0x736bc4; // the bees' multimap's _Nil
+    pub(crate) fn bee_nil() -> usize { at(sym::BEE_NIL) } // the bees' multimap's _Nil
     const SLOT_BEE_LIST: usize = 0x40; // the colony's GetBeeList()
 
     const B_POS: usize = 0x68;
@@ -861,7 +848,7 @@ pub mod bees {
             g(colony)
         };
         let head = field(list, 4);
-        let nil = unsafe { rd::<usize>(BEE_NIL) };
+        let nil = unsafe { rd::<usize>(bee_nil()) };
         tree_walk(head, nil, 1024, |node| f(node + 0x10));
     }
 
@@ -886,9 +873,9 @@ pub mod construction {
 
     /// `ConstructionObject::Render`: draws nothing (the object loop's view of a station
     /// being built).
-    const FN_CONSTRUCTION_OBJECT_RENDER: usize = 0x4a3790;
-    const BE_HEAD: usize = 0x736bd4; // BuildingEffect::m_list: its head node
-    const BE_NIL: usize = 0x736c1c; // that tree's _Nil
+    pub(crate) fn fn_construction_object_render() -> usize { at(sym::FN_CONSTRUCTION_OBJECT_RENDER) }
+    pub(crate) fn be_head() -> usize { at(sym::BE_HEAD) } // BuildingEffect::m_list: its head node
+    pub(crate) fn be_nil() -> usize { at(sym::BE_NIL) } // that tree's _Nil
 
     const I_BUILDER: usize = 0x0; // the builder's handle
     const I_TEAMS: usize = 0x4; // teams that see it
@@ -906,24 +893,24 @@ pub mod construction {
     const E_END: usize = 0x20;
     const E_T: usize = 0x2c;
 
-    const FN_TEAMS_VISIBLE: usize = 0x4d0070; // Entity::GetTeamsVisibleToUser(), cdecl
-    const FN_DISTANCE_CULL: usize = 0x4d5bb0; // GameObjectInstance::DistanceCull(eye, pos), thiscall
-    const FN_TEAM_COLOUR: usize = 0x4d5000; // GameObject::GetTeamColor(), thiscall
-    const FN_SCALE_EFFECTS: usize = 0x599760; // ApplyScaleEffects(ST3D_Instance*, handle), cdecl
-    const FN_FACE_LIMIT: usize = 0x62ea80; // ST3D_Instance::SetRenderFaceLimit(int), thiscall
-    const FN_CLASS_ODF: usize = 0x4ce370; // GameObjectClass::GetOdfName(), thiscall
-    const FN_GET_CO: usize = 0x4afe80; // ConstructionRig::GetConstructionObject(), thiscall
+    pub(crate) fn fn_teams_visible() -> usize { at(sym::FN_TEAMS_VISIBLE) } // Entity::GetTeamsVisibleToUser(), cdecl
+    pub(crate) fn fn_distance_cull() -> usize { at(sym::FN_DISTANCE_CULL) } // GameObjectInstance::DistanceCull(eye, pos), thiscall
+    pub(crate) fn fn_team_colour() -> usize { at(sym::FN_TEAM_COLOUR) } // GameObject::GetTeamColor(), thiscall
+    pub(crate) fn fn_scale_effects() -> usize { at(sym::FN_SCALE_EFFECTS) } // ApplyScaleEffects(ST3D_Instance*, handle), cdecl
+    pub(crate) fn fn_face_limit() -> usize { at(sym::FN_FACE_LIMIT) } // ST3D_Instance::SetRenderFaceLimit(int), thiscall
+    pub(crate) fn fn_class_odf_addr() -> usize { at(sym::FN_CLASS_ODF) } // GameObjectClass::GetOdfName(), thiscall
+    pub(crate) fn fn_get_co() -> usize { at(sym::FN_GET_CO) } // ConstructionRig::GetConstructionObject(), thiscall
     const S3D_TEAM: usize = 0x34; // Storm3D: the team colour of the instance drawn
 
     /// The station under construction as an object: its `Render` draws nothing.
     pub fn is_construction_object(o: usize) -> bool {
-        field(engine::vtable(o), 11 * 4) == FN_CONSTRUCTION_OBJECT_RENDER
+        fn_construction_object_render() != 0 && field(engine::vtable(o), 11 * 4) == fn_construction_object_render()
     }
 
     /// Walks `BuildingEffect::m_list` in order: each `Info`.
     pub fn each_info(mut f: impl FnMut(usize)) {
-        let head = unsafe { rd::<usize>(BE_HEAD) };
-        let nil = unsafe { rd::<usize>(BE_NIL) };
+        let head = unsafe { rd::<usize>(be_head()) };
+        let nil = unsafe { rd::<usize>(be_nil()) };
         tree_walk(head, nil, 1024, |node| {
             let info = field(node, 0x14);
             if info != 0 {
@@ -939,7 +926,7 @@ pub mod construction {
     /// Whether a team that sees it is one the player sees.
     pub fn teams_seen(info: usize) -> bool {
         let teams = unsafe {
-            let f: unsafe extern "C" fn() -> u32 = core::mem::transmute(FN_TEAMS_VISIBLE);
+            let f: unsafe extern "C" fn() -> u32 = core::mem::transmute(fn_teams_visible());
             f()
         };
         teams & field(info, I_TEAMS) as u32 != 0
@@ -989,7 +976,7 @@ pub mod construction {
             return "";
         }
         let s = unsafe {
-            let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(FN_CLASS_ODF);
+            let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(fn_class_odf_addr());
             crate::rt::cstr_at(f(class), 260)
         };
         r3d_core::assets::odf_stem(s)
@@ -998,7 +985,7 @@ pub mod construction {
     /// `GameInstance::DistanceCull(eye, pos)`.
     pub fn distance_culled(inst: usize, eye: &V3, pos: &V3) -> bool {
         unsafe {
-            let f: unsafe extern "thiscall" fn(usize, *const V3, *const V3) -> u8 = core::mem::transmute(FN_DISTANCE_CULL);
+            let f: unsafe extern "thiscall" fn(usize, *const V3, *const V3) -> u8 = core::mem::transmute(fn_distance_cull());
             f(inst, eye, pos) != 0
         }
     }
@@ -1007,7 +994,7 @@ pub mod construction {
     pub fn team_colour(info: usize, builder: usize) -> V3 {
         if builder != 0 {
             unsafe {
-                let f: unsafe extern "thiscall" fn(usize) -> *const V3 = core::mem::transmute(FN_TEAM_COLOUR);
+                let f: unsafe extern "thiscall" fn(usize) -> *const V3 = core::mem::transmute(fn_team_colour());
                 let p = f(builder);
                 if p.is_null() { colour(info) } else { core::ptr::read_unaligned(p) }
             }
@@ -1020,9 +1007,9 @@ pub mod construction {
     /// frustum test. Each writes only the effect's own instance.
     pub fn prepare(inst: usize, info: usize, faces: i32, cam: usize) -> bool {
         unsafe {
-            let se: unsafe extern "C" fn(usize, usize) = core::mem::transmute(FN_SCALE_EFFECTS);
+            let se: unsafe extern "C" fn(usize, usize) = core::mem::transmute(fn_scale_effects());
             se(inst, field(info, I_SCALE_HANDLE));
-            let fl: unsafe extern "thiscall" fn(usize, i32) = core::mem::transmute(FN_FACE_LIMIT);
+            let fl: unsafe extern "thiscall" fn(usize, i32) = core::mem::transmute(fn_face_limit());
             fl(inst, faces);
         }
         r3d_core::scene::instance::frustum_test(inst, cam)
@@ -1037,9 +1024,9 @@ pub mod construction {
 
     /// The construction object's on-screen byte, which the HUD reads.
     pub fn mark_on_screen(builder: usize, shown: bool) {
-        if builder != 0 && r3d_core::scene::instance::render_fn(builder) == r3d_core::engine::instance::FN_RIG_RENDER {
+        if builder != 0 && r3d_core::scene::instance::render_fn(builder) == r3d_core::engine::instance::fn_rig_render() {
             unsafe {
-                let f: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(FN_GET_CO);
+                let f: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(fn_get_co());
                 let co = f(builder);
                 if co != 0 {
                     core::ptr::write_volatile((co + 0x25) as *mut u8, shown as u8);

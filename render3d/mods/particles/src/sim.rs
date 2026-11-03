@@ -410,7 +410,7 @@ impl System {
         let lod = pose::auto(eye);
         let frame = self.frame;
         let mut objs: Vec<usize> = Vec::new();
-        engine::for_each_in_list(engine::OBJECT_LIST, |o| {
+        engine::for_each_in_list(engine::object_list(), |o| {
             if o != 0 && obj::flags(o) & 0x10000 == 0 && obj::instance(o) != 0 {
                 objs.push(o);
             }

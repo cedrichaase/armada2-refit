@@ -1,0 +1,88 @@
+# Render3D.asi's symbols in Armada2.exe 1.1 (GOG): module "specials" (render3d/mods/specials/src).
+# Each entry is tied to the hook that uses it; the findings are in render3d/README.md, "Hooks".
+schema = 1
+plugin = "render3d"
+readme = "render3d/README.md"
+lang = "rust"
+out = "render3d/mods/specials/src/syms.rs"
+
+[hook."specials.reads"]
+doc = "What the specials module reads of the engine: its objects, lists, globals and calls"
+rows = ["Modules.specials"]
+
+
+[[sym]]
+id = "fn_render_base"
+symbol = "SpecialObjectEffect::Render"
+kind = "fn"
+addr = 0x49ea70
+check = "c2 04 00 90 90 90 90 90"
+used_by = ["specials.reads"]
+
+[[sym]]
+id = "fn_world_transform"
+symbol = "Entity::GetWorldTransform"
+kind = "fn"
+addr = 0x4cff90
+check = "55 8b ec 8b 45 0c 8b 49"
+used_by = ["specials.reads"]
+
+[[sym]]
+id = "fn_get_name"
+symbol = "SpecialObjectEffect::GetEffectName"
+kind = "fn"
+addr = 0x60be10
+check = "8b 41 20 85 c0 75 0d 8b"
+used_by = ["specials.reads"]
+
+[[sym]]
+id = "fn_render_timed"
+symbol = "TimedSpecialObjectEffect::Render"
+kind = "fn"
+addr = 0x60c460
+check = "55 8b ec 8b c1 8b 88 b0"
+used_by = ["specials.reads"]
+
+[[sym]]
+id = "fn_render_change_team"
+symbol = "TimedChangeTeam::Render"
+kind = "fn"
+addr = 0x60e090
+check = "55 8b ec 83 ec 30 8b c1"
+used_by = ["specials.reads"]
+
+[[sym]]
+id = "fn_prj_odf"
+symbol = "cPrjID::GetOdfName"
+kind = "fn"
+addr = 0x6593a0
+check = "8b 01 85 c0 75 06 b8 dc"
+used_by = ["specials.reads"]
+
+[[sym]]
+id = "vt_change_team"
+symbol = "TimedChangeTeam"
+kind = "vtable"
+addr = 0x6bbe9c
+used_by = ["specials.reads"]
+
+[[sym]]
+id = "vt_crew_disruption"
+symbol = "TimedCrewDisruption"
+kind = "vtable"
+addr = 0x6bbed4
+used_by = ["specials.reads"]
+
+[[sym]]
+id = "vt_drain"
+symbol = "TimedDrain"
+kind = "vtable"
+addr = 0x6bbf64
+used_by = ["specials.reads"]
+
+[[sym]]
+id = "effect_head"
+symbol = "(unnamed) special effects list head"
+kind = "global"
+addr = 0x7a8c0c
+used_by = ["specials.reads"]

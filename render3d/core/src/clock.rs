@@ -29,5 +29,5 @@ pub fn anim_now() -> f64 {
 /// given out in order as objects are made), shifted to where an address's bits are: the
 /// heap's addresses differ from launch to launch, the handles do not.
 pub fn entity_key(e: usize) -> usize {
-    if bench() && e != 0 { crate::engine::field(e, 0x28) << 4 } else { e }
+    if bench() && e != 0 { crate::engine::entity_handle(e) << 4 } else { e }
 }

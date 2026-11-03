@@ -1,6 +1,6 @@
 [package]
 name = "r3d-world"
-version = "0.43.0"
+version = "0.44.0"
 edition = "2024"
 publish = false
 description = "render3d's world module: planets, moons, asteroids, surfaces and nebulae"
@@ -14,4 +14,5 @@ path = "src/lib.rs"
 r3d-core = { path = "../../core" }
 a2fmt = { path = "../../../crates/a2fmt" }
 a2ini = { path = "../../../crates/a2ini" }
+a2engine = { path = "../../../crates/a2engine" }
 gpu = { path = "../../../gpu" }
