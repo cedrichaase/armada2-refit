@@ -1,0 +1,24 @@
+[package]
+name = "d12probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "d12probe: does Direct3D 12 work for Display8 in this 32-bit process? (README.md)"
+license = "MIT"
+
+[[bin]]
+name = "d12probe"
+path = "src/main.rs"
+
+[dependencies]
+
+[profile.release]
+panic = "abort"
+opt-level = 2
+lto = true
+codegen-units = 1
+debug = 1
+
+[profile.dev]
+panic = "abort"
+opt-level = 1

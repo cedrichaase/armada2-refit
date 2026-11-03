@@ -1,0 +1,45 @@
+Armada II Refit -- the native gates
+===================================
+
+This folder is the artifact "native-gates-<commit>" of a CI run. It holds
+d12probe.exe and vkprobe.exe (32-bit probes: does Direct3D 12 / Vulkan work for the
+refit's Display8 on this machine), gate-windows.ps1, gate-macos.sh and this file.
+Nothing here installs anything. The scripts back up RefitPlayer.ini before they set a
+backend for a run and put it back after, and the Refit screen stays the only writer of
+your settings in the game.
+
+Gate W: native Windows 10 or 11
+-------------------------------
+1. Install the newest pre-release of Armada II Refit with the GUI installer (or the
+   zip). Unzip this folder somewhere writable.
+2. In PowerShell, in this folder:
+
+       powershell -ExecutionPolicy Bypass -File .\gate-windows.ps1 -Game "<game directory>"
+
+   (-WhatIf first, if you want to see what it would do.) It runs d12probe.exe and
+   vkprobe.exe, a few seconds each. Expect "GATE probe-d3d12: PASS". probe-vulkan may
+   say SKIP (no Vulkan driver): that is fine.
+3. The script starts the game on Direct3D 12. Then, by hand:
+     - main menu, then Options, then Refit;
+     - an Instant Action match, for 2 minutes;
+     - Refit, Graphics, Ships off (the stock ships show), then on again;
+     - quit the game.
+4. If probe-vulkan passed, it starts the game again on Vulkan: repeat step 3.
+5. Send the a2gates-*.zip it writes (next to the script).
+   Expect PASS for game-backend, game-mission, passthrough and device-removed on each
+   backend. timing is reported, not judged.
+
+Gate M: macOS (optional)
+------------------------
+In the Sikarugir wrapper used on 2026-10-28:
+1. In Terminal, in this folder:
+
+       ./gate-macos.sh "<wrapper>.app" "<game directory>"
+
+   It runs vkprobe.exe in the wrapper's Wine and expects its VERDICT line.
+2. It starts the game on Backend=auto (Vulkan on MoltenVK). Play as in W step 3. The
+   Ships-off check matters most here, because triangle fans become lists on a
+   portability device.
+3. Send the a2gates-macos-*.zip it writes.
+
+Every check prints one line: GATE <name>: PASS|FAIL|SKIP|INFO <why>.
