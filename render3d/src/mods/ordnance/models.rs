@@ -17,7 +17,7 @@ use super::ini::Settings;
 use crate::engine::{self, field, hook};
 use crate::frame::steps::View;
 use crate::math::{sinf, v3, M34, V3};
-use crate::mods::hulls::game;
+use crate::engine::instance as game;
 use crate::scene::{self, pose, Params};
 use crate::{assets, log};
 use a2fmt::sod::NodeKind;
@@ -159,7 +159,7 @@ impl Models {
     /// contrails), which the engine's `Submit` would have kept going, fed to the
     /// particles module at the shot's transform.
     pub fn feed_shot(&mut self, v: &View, ord: usize) {
-        if !self.on || !crate::mods::particles::live() {
+        if !self.on || !crate::core_particles::live() {
             return;
         }
         let odf = eng::ord_odf(ord);
@@ -174,7 +174,7 @@ impl Models {
         world.r[1] = world.r[1] * s.y;
         world.r[2] = world.r[2] * s.z;
         let key = ord ^ field(ord, 0x34).rotate_left(13);
-        crate::mods::particles::feed(key, &sod, &world, v);
+        crate::core_particles::feed(key, &sod, &world, v);
     }
 
     /// In place of `Entity::Render` for `ord`, while our ordnance step submits it. True
@@ -193,7 +193,7 @@ impl Models {
         let Some(k) = self.kind(odf) else { return false };
         let (sod, emitters, look) = (k.sod.clone(), k.emitters, k.look.clone());
         // Without the particles module the engine's own draw keeps the emitters going.
-        if emitters && !crate::mods::particles::live() {
+        if emitters && !crate::core_particles::live() {
             return false;
         }
         let Some(model) = scene::model(&sod) else { return false };
@@ -221,7 +221,7 @@ impl Models {
             // Keyed by the shot and its class, so a new shot at a freed address starts
             // its own trails.
             let key = ord ^ field(ord, 0x34).rotate_left(13);
-            crate::mods::particles::feed(key, &sod, &world, v);
+            crate::core_particles::feed(key, &sod, &world, v);
         }
         if look.glow > 0.0 {
             // The heart: the shown meshes' centre, the model's radius.

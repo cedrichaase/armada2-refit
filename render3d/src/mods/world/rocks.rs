@@ -301,9 +301,9 @@ impl Rocks {
             let Some(sp) = t.sprite(&nd.sprite) else { continue };
             let mut colour = nd.colour;
             if let Some(a) = nd.animation.as_deref().and_then(|a| t.animation(a)) {
-                match crate::mods::hulls::anim::value(a, time, flags) {
-                    Some(crate::mods::hulls::anim::Value::Draw(false)) => continue,
-                    Some(crate::mods::hulls::anim::Value::Colour(c)) => {
+                match crate::scene::anim::value(a, time, flags) {
+                    Some(crate::scene::anim::Value::Draw(false)) => continue,
+                    Some(crate::scene::anim::Value::Colour(c)) => {
                         colour = c;
                         if light.is_none() {
                             let mut peak = c;

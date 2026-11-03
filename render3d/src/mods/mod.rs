@@ -116,6 +116,11 @@ pub fn running_id(id: ModuleId) -> bool {
     active && (id.0 as u32) < 32 && ON.load(Ordering::Relaxed) & (1 << id.0) != 0
 }
 
+/// `enabled`, by registry index: for a module asking about itself.
+pub fn enabled_id(id: ModuleId) -> bool {
+    (id.0 as u32) < 32 && ON.load(Ordering::Relaxed) & (1 << id.0) != 0
+}
+
 /// Whether a module's flag is on (true from load on, unlike `running`). A logging aid,
 /// as `running`.
 pub fn enabled(name: &str) -> bool {

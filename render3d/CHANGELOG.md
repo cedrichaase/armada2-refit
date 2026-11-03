@@ -4,6 +4,26 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.37.1 — 2026-11-03
+
+### Changed
+- The helpers other modules took from the hulls, effects, ordnance and particles
+  modules moved into the core, with no change to what is drawn: `scene::instance`,
+  `scene::anim`, the posed objects in `scene::pose`, `scene::camera`,
+  `scene::lights::Pool`, `scene::sprites`, `gfx::fx`, `math::rand`, `core_particles`
+  (the particles' feed queue), and their engine reads in `engine::{instance, light,
+  sprite}`. The four duplicate address groups (`RegisterLight` and its two neighbours,
+  the DX8 device vtable, `DrawScaled3D`, the device's clear-depth and flush slots) are
+  one constant each.
+- hulls, ordnance, overlays and world register their draws as services
+  (`HullDraw`, `WaveDraw`, `PostDraw`, `GhostDraw`); effects, ordnance, specials and
+  overlays ask `core_services` in place of `crate::mods::<other>` and
+  `running("hulls")`. hulls' `ShadowMap` is an alias of `core_services::ShadowRef`.
+- `lint-layers.sh --rules cross,byname` (with `--strict`), run over every module in CI.
+  Cross-module paths 41 -> 0, by-name asks 7 -> 0, engine reads 909 -> 835.
+
+Installed, not yet seen in game
+
 ## 0.37.0 — 2026-11-02
 
 ### Added

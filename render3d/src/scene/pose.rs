@@ -6,6 +6,10 @@ use crate::engine::{self, field, field_u8, rd, storm3d};
 use crate::math::{v3, M34, V3};
 use a2fmt::math::Matrix34;
 use a2fmt::sod::{ChannelKeys, Role, Sod};
+use super::Model;
+use alloc::collections::BTreeMap;
+use alloc::rc::Rc;
+use alloc::string::String;
 use alloc::vec::Vec;
 
 pub fn m34(m: &Matrix34) -> M34 {
@@ -278,4 +282,105 @@ pub fn auto(eye: V3) -> Lod {
 /// Sim time, for clocks.
 pub fn now() -> f32 {
     engine::sim_time()
+}
+
+// ---- the posed objects of a view ------------------------------------------------
+
+/// The warp stretch, in world space (`spec-chunks-anim-lod.md` section 5).
+#[derive(Clone, Copy)]
+pub struct Warp {
+    pub n: V3,
+    pub d: f32,
+    pub s1: f32,
+    pub o: f32,
+}
+
+/// The wave light a draw of the object turns on (the first of them), as constants.
+#[derive(Clone, Copy)]
+pub struct Waves {
+    pub colour: V3,
+    pub dir: V3,
+    /// 2 pi / wavelength.
+    pub k: f32,
+    /// Its phase now.
+    pub phase: f32,
+}
+
+/// An object's model posed for this view: what the hulls module draws, and what the
+/// effects that sit on a hull read (`posed`). The cache is per view, here in the core;
+/// the module that poses fills it and empties it when its device goes.
+pub struct Posed {
+    pub obj: usize,
+    pub inst: usize,
+    pub model: Rc<Model>,
+    /// Every node's world matrix and whether it is drawn this view (its level of
+    /// detail, and the nodes the engine shows or hides per instance).
+    pub pose: Pose,
+    /// The object's placement with the SOD's and the instance's scale folded in: what
+    /// the model's own coordinates are taken into world space with.
+    pub world: M34,
+    /// The instance's scale (the scale effects: strategic view, colonising).
+    pub scale: V3,
+    /// The model's bounding sphere, world.
+    pub centre: V3,
+    pub radius: f32,
+    /// The instance's animation clock (start `+0x18`, flags `+0xc`): what sprite nodes
+    /// play on (from its start whether it animates or not).
+    pub since_start: f32,
+    pub flags: u32,
+    /// Meshes' texture flipbooks play on this (0 while the instance does not animate).
+    pub clock: Clock,
+    pub team: Option<V3>,
+    /// The Borg's assimilated look (`+0xa1`): the meshes' second textures.
+    pub assimilated: bool,
+    pub warp: Option<Warp>,
+    pub waves: Option<Waves>,
+    /// The `glowdmoon` sprite node's colour on a Scrap object.
+    pub glow: Option<V3>,
+    /// The object's cloaking device: (state, how much of the hull is left 0..1, phase).
+    pub cloak: Option<(u32, f32, f32)>,
+    /// Drawn in the object loop of this view (not just posed for the shadow map).
+    pub drawn: bool,
+    /// A freighter's cargo markings: lighting materials (lower case) drawn unlit in
+    /// this colour. Empty for everything else.
+    pub cargo: Vec<(String, V3)>,
+}
+
+static mut VIEWS: [BTreeMap<usize, Posed>; 3] = [BTreeMap::new(), BTreeMap::new(), BTreeMap::new()];
+static mut CUR: usize = 0;
+
+/// The posed objects of view `key` (the main view, the HUD's inset, the menu's).
+#[allow(static_mut_refs)]
+pub fn cache(key: usize) -> &'static mut BTreeMap<usize, Posed> {
+    unsafe { &mut VIEWS[key.min(2)] }
+}
+
+/// The view being drawn (or last drawn): what `posed` answers for.
+pub fn set_current(key: usize) {
+    unsafe { CUR = key };
+}
+
+/// Every view's posed objects dropped (they hold models, and the models their buffers,
+/// which are in the default pool).
+#[allow(static_mut_refs)]
+pub fn clear_views() {
+    unsafe {
+        for v in VIEWS.iter_mut() {
+            v.clear();
+        }
+    }
+}
+
+/// The posed model of an object in the view being drawn (or last drawn), if the hulls
+/// module poses it: every node's world matrix (`pose.world`, by SOD node index) and
+/// whether the node is shown (`pose.shown`). Valid from the start of a view (the
+/// posing module's `begin_view`) until the next view begins; None while that module
+/// does not run.
+pub fn posed(o: usize) -> Option<&'static Posed> {
+    cache(unsafe { CUR }).get(&o)
+}
+
+/// A unit vector, or `d` when `v` is too short.
+pub fn norm_or(v: V3, d: V3) -> V3 {
+    if v.len() > 1e-6 { v.norm() } else { d }
 }

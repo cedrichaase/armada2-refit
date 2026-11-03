@@ -12,8 +12,12 @@
 //! A module with its own look binds its own shaders around `draw_part`, or walks the
 //! model's parts itself.
 pub mod clusters;
+pub mod anim;
+pub mod camera;
+pub mod instance;
 pub mod lights;
 pub mod pose;
+pub mod sprites;
 
 use crate::assets;
 use crate::frame::steps::View;

@@ -86,7 +86,7 @@ impl Nebulae {
             p.push_str(".ini");
             crate::rt::file_exists(&crate::rt::game_path(&p))
         });
-        has && (crate::mods::running("world") || crate::plugin_loaded("Nebulae.asi"))
+        has && (crate::core_services::volumes() || crate::plugin_loaded("Nebulae.asi"))
     }
 
     /// Draws a nebula object's puffs into the batch; false if it is not one of ours.
@@ -122,7 +122,7 @@ impl Nebulae {
         if !(diffuse > 0.0) {
             return true;
         }
-        let s3 = crate::mods::hulls::instance_scale(inst);
+        let s3 = crate::scene::instance::instance_scale(inst);
         let s = s3 * ns.scale_sod;
         let mut world = obj::transform(o);
         world.r[0] = world.r[0] * s.x;

@@ -141,7 +141,7 @@ impl Explosions {
             }
             // A special weapon's wave with a recipe is the ordnance module's
             // (`[Wave.<odf>]`); every other shockwave gets the ring.
-            if vt == VT_SHOCKWAVE && crate::mods::ordnance::draw_wave(e, v) {
+            if vt == VT_SHOCKWAVE && crate::core_services::wave().is_some_and(|w| w.draw_wave(e, v)) {
                 return;
             }
             if vt == VT_FIREBALL || (vt == VT_SHOCKWAVE && rings) {

@@ -3,7 +3,7 @@
 //! `std::list` of records: `+0` the light, `+4` its colour, `+0x10` its transform).
 //! Plugins add theirs the same way (shields, repairs, venting), so every light source
 //! in the game is in this one list. Layouts as `Lighting.asi` established them.
-use crate::engine::{field, rd, storm3d, vtable};
+use crate::engine::{self, field, rd, storm3d, vtable};
 use crate::math::{M34, V3};
 use alloc::vec::Vec;
 
@@ -373,4 +373,48 @@ fn sky_light(c: &SceneConfig) -> Option<(V3, V3)> {
     }
     unsafe { SKY = Some((alloc::string::String::from(name), out)) };
     out
+}
+
+/// Engine point lights of our own, made on first use and registered each view (the
+/// plugins' way: an ordinary `ST3D_Point_Light` registered after `GameObject_PreRenderAll`).
+pub struct Pool {
+    name: &'static [u8],
+    objs: Vec<usize>,
+}
+
+impl Pool {
+    pub const fn new(name: &'static [u8]) -> Pool {
+        Pool { name, objs: Vec::new() }
+    }
+    /// Light object `i` of the pool (made by `register`), 0 if none yet; for
+    /// `scene::lights::set_style`.
+    pub fn light(&self, i: usize) -> usize {
+        self.objs.get(i).copied().unwrap_or(0)
+    }
+    /// Registers light `i` of the pool at `pos`: full colour to `start`, gone `range`
+    /// further on. False if no light object could be made.
+    pub fn register(&mut self, i: usize, pos: V3, colour: V3, start: f32, range: f32) -> bool {
+        while self.objs.len() <= i {
+            let l = engine::light::new_point_light(self.name);
+            if l == 0 {
+                return false;
+            }
+            self.objs.push(l);
+        }
+        let l = self.objs[i];
+        engine::light::set_reach(l, start, range);
+        let col = [colour.x, colour.y, colour.z, 1.0f32];
+        let m = M34 { r: M34::IDENTITY.r, p: pos };
+        engine::light::register(l, &col, &m);
+        true
+    }
+    /// `register`, the light then a spark to the nebulae's gas (`Gas::Spark`,
+    /// `[Nebulae] LitSpark=`): a small corona about it, not a ball its reach wide.
+    pub fn register_spark(&mut self, i: usize, pos: V3, colour: V3, start: f32, range: f32) -> bool {
+        if !self.register(i, pos, colour, start, range) {
+            return false;
+        }
+        set_gas(self.objs[i], Gas::Spark);
+        true
+    }
 }

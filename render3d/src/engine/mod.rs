@@ -2,8 +2,11 @@
 //! Where each was established: `$A2_DATA/notes/renderer-inventory/` and the plugin
 //! READMEs it cites. Names come from the game's own `armada2.map`.
 pub use crate::rt::hook;
+pub mod instance;
+pub mod light;
 pub mod obj;
 pub mod sound;
+pub mod sprite;
 
 use crate::math::{M34, V3};
 use core::ffi::c_void;
@@ -130,4 +133,22 @@ pub fn for_each_feature(mut f: impl FnMut(usize)) {
         p += 4;
         guard += 1;
     }
+}
+
+/// `ST3D_DeviceDirectX8`'s vtable (0x6bc6ac): the frame hooks `DestroyRenderSurfaces`
+/// in it, the particles `RenderParticle`.
+pub const DX8_VTABLE: usize = 0x6bc6ac;
+
+/// `ST3D_Device` vtable offsets: `ClearDepthBuffer(ST3D_Rect*)` and `Flush()`.
+pub const DEV_CLEAR_DEPTH: usize = 0x2c;
+pub const DEV_FLUSH: usize = 0x38;
+
+/// Reads an `f32` field (the effects' short name for `field_f32`).
+pub fn ff(base: usize, off: usize) -> f32 {
+    field_f32(base, off)
+}
+
+/// Reads a `V3` at an address.
+pub fn rv3(a: usize) -> V3 {
+    unsafe { rd::<V3>(a) }
 }

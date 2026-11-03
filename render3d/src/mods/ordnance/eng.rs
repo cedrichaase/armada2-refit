@@ -5,7 +5,6 @@ use crate::math::{M34, V3};
 
 const FN_ENTITY_GET: usize = 0x4cfff0; // Entity::Get(int handle), cdecl
 const FN_OBJ_EVEN_IF_DESTROYED: usize = 0x42bfa0; // GameObject::GetObjEvenIfDestroyed(int), cdecl
-const FN_CAM_POS: usize = 0x6194d0; // ST3D_Camera::GetPosition() const, thiscall: Vector3*
 const FN_PRJ_ODF: usize = 0x6593a0; // cPrjID::GetOdfName() const, thiscall: char*
 const FN_TRANSFORM: usize = 0x4cfd50; // Entity::GetTransform() const, thiscall: Matrix34*
 const FN_ODF_NAME: usize = 0x4d5620; // GameObject::GetOdfName() const, thiscall
@@ -69,10 +68,7 @@ pub fn obj_vel(o: usize) -> V3 {
 }
 
 pub fn camera_position(cam: usize) -> V3 {
-    unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> *const V3 = core::mem::transmute(FN_CAM_POS);
-        core::ptr::read_unaligned(f(cam))
-    }
+    crate::engine::sprite::camera_position(cam)
 }
 
 /// An entity's transform (`Entity::GetTransform`): position at +0x24.

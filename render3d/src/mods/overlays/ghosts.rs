@@ -145,7 +145,7 @@ impl Ghosts {
             let team = unsafe { core::mem::transmute::<usize, unsafe extern "C" fn(i32) -> usize>(FN_TEAM_GET)(field(sp, 0xc) as i32) };
             let tint = if team == 0 { V3::ZERO } else { unsafe { rd::<V3>(team + 8) } } * factor;
             // A planet's: on the world module's sphere, as the planet itself.
-            if crate::mods::world::planet_ghost(sp, v) || self.ghost(sp, v, tint, amb, diff) {
+            if crate::core_services::ghost().is_some_and(|g| g.planet_ghost(sp, v)) || self.ghost(sp, v, tint, amb, diff) {
                 continue;
             }
             // Not a plain SOD: the spirit's own Render, under stock's state.
@@ -195,7 +195,7 @@ impl Ghosts {
         world.r[1] = world.r[1] * s.y;
         world.r[2] = world.r[2] * s.z;
         let mut p = pose::pose(&model.sod, &model.info, &world, pose::Clock::of_instance(inst, v.time), pose::auto(v.eye));
-        crate::mods::hulls::instance_visibility(inst, &model, &mut p);
+        crate::scene::instance::instance_visibility(inst, &model, &mut p);
         let mut added = 0;
         for (pi, part) in model.parts.iter().enumerate() {
             if !p.shown.get(part.node).copied().unwrap_or(false) {
@@ -232,7 +232,7 @@ impl Ghosts {
             self.said_build += 1;
             log!("overlays: build ghost of class {:#x} ('{}'), blocked {}", class, class_odf(class), blocked);
         }
-        crate::mods::hulls::placeholder(v, class, &place, colour, blocked)
+        crate::core_services::hulls().is_some_and(|h| h.placeholder(v, class, &place, colour, blocked))
     }
 
     /// The ghosts gathered, as stock draws a spirit's meshes: each by its own texture

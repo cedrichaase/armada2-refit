@@ -22,7 +22,7 @@ use crate::engine::{self, field, rd};
 use crate::frame::steps::View;
 use crate::log;
 use crate::math::{v3, V3};
-use crate::mods::ordnance::sprite::Sprites;
+use crate::scene::sprites::Sprites;
 use alloc::vec::Vec;
 
 const NP_LIST: usize = 0x736cfc;
@@ -167,7 +167,7 @@ impl SparkFx {
             if sprite == 0 {
                 continue;
             }
-            let name = crate::mods::hulls::game::element_name(sprite).unwrap_or("");
+            let name = crate::scene::instance::element_name(sprite).unwrap_or("");
             let blast = name.len() >= 10 && name[..10].eq_ignore_ascii_case("systemexpl");
             let c: [f32; 3] = unsafe { rd(node + P_COLOUR) };
             let out = pos - tm.p;
@@ -247,7 +247,7 @@ impl SparkFx {
             let p = &live[0];
             log!(
                 "effects: sparks: {} particle(s) drawn; first: {}, size {:.1}, age {:.2}, at {:.0},{:.0},{:.0}",
-                live.len(), crate::mods::hulls::game::element_name(p.sprite).unwrap_or("?"), p.size, p.age, p.pos.x, p.pos.y, p.pos.z
+                live.len(), crate::scene::instance::element_name(p.sprite).unwrap_or("?"), p.size, p.age, p.pos.x, p.pos.y, p.pos.z
             );
         }
         self.live = live;

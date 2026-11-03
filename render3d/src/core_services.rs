@@ -17,6 +17,7 @@ use crate::math::{M34, V3};
 
 /// The hull shadow map of this view, as the hulls module made it: what a consumer
 /// (the nebulae) samples. Valid until the next view.
+#[derive(Clone)]
 pub struct ShadowRef {
     /// R32F: depth 0..1 from the Key, 1 where no hull is.
     pub tex: gpu::Texture,
@@ -66,6 +67,7 @@ pub trait GhostDraw {
 /// The providers registered, each with its owner (`Some` only while it runs).
 #[derive(Default)]
 pub struct Services {
+    volumes: Option<ModuleId>,
     hulls: Option<(ModuleId, &'static dyn HullDraw)>,
     wave: Option<(ModuleId, &'static dyn WaveDraw)>,
     post: Option<(ModuleId, &'static dyn PostDraw)>,
@@ -73,6 +75,11 @@ pub struct Services {
 }
 
 impl Services {
+    /// The world module draws the nebulae and the latinum clouds as volumes: the particles
+    /// module leaves those objects to it (`volumes()`).
+    pub fn volumes(&mut self, owner: ModuleId) {
+        self.volumes = Some(owner);
+    }
     pub fn hulls(&mut self, owner: ModuleId, p: &'static dyn HullDraw) {
         self.hulls = Some((owner, p));
     }
@@ -87,7 +94,7 @@ impl Services {
     }
 }
 
-static mut SERVICES: Services = Services { hulls: None, wave: None, post: None, ghost: None };
+static mut SERVICES: Services = Services { volumes: None, hulls: None, wave: None, post: None, ghost: None };
 
 /// The registry's, for `provide()` at init.
 #[allow(static_mut_refs)]
@@ -104,6 +111,20 @@ fn running<T: ?Sized>(p: Option<(ModuleId, &'static T)>) -> Option<&'static T> {
 #[allow(static_mut_refs)]
 pub fn hulls() -> Option<&'static dyn HullDraw> {
     running(unsafe { SERVICES.hulls })
+}
+
+/// The hulls module's draws whether it runs or only draws the menu scene's part
+/// (`in_menu`): what the shadow map lent to the menu's gas asks. A module that is off
+/// in a mission lends nothing (its `idle_view` clears it).
+#[allow(static_mut_refs)]
+pub fn hulls_any() -> Option<&'static dyn HullDraw> {
+    unsafe { SERVICES.hulls }.map(|(_, p)| p)
+}
+
+/// Whether the world module runs and so draws the nebulae and latinum clouds as volumes.
+#[allow(static_mut_refs)]
+pub fn volumes() -> bool {
+    unsafe { SERVICES.volumes }.is_some_and(crate::mods::running_id)
 }
 
 /// The ordnance module's shockwave, while it runs.

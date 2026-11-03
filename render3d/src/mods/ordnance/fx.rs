@@ -1103,7 +1103,7 @@ impl Fx {
         let verts = core::mem::take(&mut self.verts);
         let Some(mut cmd) = gfx::cmd() else { return };
         // Added, depth-tested and not written, red, green and blue, no culling.
-        let pipe = self.pipes.view(0, || crate::mods::effects::fx_desc(gpu::code!(VS_ORD_FX, VS_ORD_FX_SPV, VS_ORD_FX_DXIL), gpu::code!(PS_ORD_FX, PS_ORD_FX_SPV, PS_ORD_FX_DXIL), &FXLAYOUT, FX_STRIDE, Topology::TriangleList, Blend::ADD));
+        let pipe = self.pipes.view(0, || crate::gfx::fx::fx_desc(gpu::code!(VS_ORD_FX, VS_ORD_FX_SPV, VS_ORD_FX_DXIL), gpu::code!(PS_ORD_FX, PS_ORD_FX_SPV, PS_ORD_FX_DXIL), &FXLAYOUT, FX_STRIDE, Topology::TriangleList, Blend::ADD));
         let Some(pipe) = pipe else { return };
         if !cmd.set_pipeline(&pipe) {
             return;
@@ -1123,7 +1123,7 @@ impl Fx {
 /// opens on screen (`d` x `view`): its shown meshes' boxes as the hulls module posed
 /// them this view. None if the object is not posed.
 fn target_across(o: usize, d: V3, view: V3) -> Option<f32> {
-    let p = crate::mods::hulls::posed(o)?;
+    let p = crate::scene::pose::posed(o)?;
     let side = d.cross(view);
     if side.len() < 1e-8 {
         return None;

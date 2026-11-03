@@ -14,6 +14,7 @@ pub mod clock;
 pub mod config;
 pub mod core_hooks;
 pub mod core_module;
+pub mod core_particles;
 pub mod core_recipes;
 pub mod core_services;
 pub mod engine;

@@ -55,8 +55,7 @@ const FN_SELECTION: usize = 0x599900;
 const SITE_DEL_LIGHTS: usize = 0x5985b5; // ST3D_GraphicsEngine::DeleteRegisteredLights(), thiscall
 const FN_DEL_LIGHTS: usize = 0x62d2e0;
 const G_CREDITS: usize = 0x735dc0; // g_credits_instance
-const DEV_CLEAR_DEPTH: usize = 0x2c; // ST3D_Device vtable: ClearDepthBuffer(ST3D_Rect*)
-const DEV_FLUSH: usize = 0x38; // ST3D_Device vtable: Flush()
+use crate::engine::{DEV_CLEAR_DEPTH, DEV_FLUSH};
 /// Object flags (`+0x14`): a background object, drawn by `Background_Render`.
 const OBJ_BACKGROUND: u32 = 0x10000;
 const OBJ_CULLED: usize = 0x183; // byte: distance-culled for this view (PreRenderAll)

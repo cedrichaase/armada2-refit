@@ -227,6 +227,9 @@ impl Overlays {
 }
 
 impl Module for Overlays {
+    fn provide(&mut self, id: crate::core_module::ModuleId, s: &mut crate::core_services::Services) {
+        s.post(id, &PROVIDER);
+    }
     fn name(&self) -> &'static str {
         "overlays"
     }
@@ -296,11 +299,18 @@ impl Module for Overlays {
 
 /// A height post from `top` to the grid's plane, drawn with this view's posts; the
 /// engine's `DrawHeightPost` when posts are not ours.
-pub fn height_post(v: &View, top: crate::math::V3) {
+fn height_post(v: &View, top: crate::math::V3) {
     if !posts::note(top) {
-        unsafe {
-            let f: unsafe extern "C" fn(*const crate::math::V3, usize) = core::mem::transmute(0x593840usize);
-            f(&top, v.cam);
-        }
+        engine::instance::draw_height_post(top, v.cam);
+    }
+}
+
+/// The overlays module's draws, offered to the others (`core_services`).
+struct Provider;
+static PROVIDER: Provider = Provider;
+
+impl crate::core_services::PostDraw for Provider {
+    fn height_post(&self, v: &View, top: crate::math::V3) {
+        height_post(v, top)
     }
 }

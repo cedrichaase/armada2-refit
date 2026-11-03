@@ -6,12 +6,14 @@
 //! the sim go on reading as before.
 use crate::engine::{self, field, field_f32, field_u8, rd, vtable};
 use crate::math::{v3, M34, V3};
+pub use crate::engine::instance::{
+    class_node, crew_fire, detail_level, element_name, frustum_test, instance_byte, instance_class, instance_scale, is_craft_instance, lights_hidden,
+    render_fn, set_on_screen, station_node, team_colour, team_colours_on, COCOON_DB, DAMAGE_NODES, FN_MINING_RENDER, FN_RIG_RENDER, FN_SHIPYARD_RENDER,
+    VT_COCOON, VT_DATABASE,
+};
 
 /// Slot 11 of a class's vtable, `Render(ST3D_Camera*)`, for the classes we draw.
 pub const FN_GO_RENDER: usize = 0x4d54e0; // GameObject::Render
-pub const FN_SHIPYARD_RENDER: usize = 0x4bb900; // Shipyard::Render (Starbase too)
-pub const FN_MINING_RENDER: usize = 0x4b44a0; // MiningStation::Render (TradingStation too)
-pub const FN_RIG_RENDER: usize = 0x4af9b0; // ConstructionRig::Render
 pub const FN_SCRAP_RENDER: usize = 0x4a58e0; // Scrap::Render (dilithium moons, comets)
 /// Slot 22, `RenderInternal(ST3D_Camera*)`.
 pub const FN_GO_RI: usize = 0x4d52b0; // GameObject::RenderInternal
@@ -19,40 +21,10 @@ pub const FN_CRAFT_RI: usize = 0x4c8630; // Craft::RenderInternal
 pub const FN_FREIGHTER_RI: usize = 0x4b22c0; // Freighter::RenderInternal
 pub const FN_EVOLVER_RI: usize = 0x4b1170; // Evolver::RenderInternal
 
-pub const VT_DATABASE: usize = 0x6bc56c; // a plain ST3D_Database
-
-/// The class's `Render` (slot 11).
-pub fn render_fn(o: usize) -> usize {
-    field(vtable(o), 11 * 4)
-}
 
 /// The class's `RenderInternal` (slot 22).
 pub fn render_internal_fn(o: usize) -> usize {
     field(vtable(o), 22 * 4)
-}
-
-/// A craft instance (`GameObjectInstance::IsCraftInstance`, instance slot 10).
-pub fn is_craft_instance(inst: usize) -> bool {
-    if inst == 0 {
-        return false;
-    }
-    unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(field(vtable(inst), 10 * 4));
-        f(inst) != 0
-    }
-}
-
-/// The instance's frustum test (slot 3), as `Entity::Render` makes it. For a craft it
-/// also applies the scale effects (strategic view, colonising) into the instance's
-/// scale, which is why it is called rather than redone.
-pub fn frustum_test(inst: usize, cam: usize) -> bool {
-    if inst == 0 {
-        return false;
-    }
-    unsafe {
-        let f: unsafe extern "thiscall" fn(usize, usize) -> u8 = core::mem::transmute(field(vtable(inst), 3 * 4));
-        f(inst, cam) != 0
-    }
 }
 
 /// `GameObject::Render` calls the instance's `Update(object)` (slot 14) before it
@@ -70,15 +42,6 @@ pub fn instance_update(o: usize) {
     }
 }
 
-/// The instance's scale: `+0x28` while `+0x74` says one is set (`ApplyScaleEffects`).
-pub fn instance_scale(inst: usize) -> V3 {
-    if inst != 0 && field_u8(inst, 0x74) != 0 {
-        unsafe { rd::<V3>(inst + 0x28) }
-    } else {
-        v3(1.0, 1.0, 1.0)
-    }
-}
-
 /// The instance's bounding sphere: centre (object space) `+0x34`, radius `+0x40`.
 pub fn instance_sphere(inst: usize) -> (V3, f32) {
     (engine::field_v3(inst, 0x34), field_f32(inst, 0x40))
@@ -87,39 +50,6 @@ pub fn instance_sphere(inst: usize) -> (V3, f32) {
 /// The instance's placement (`+0x44`, a `Matrix34`), what its database is drawn with.
 pub fn instance_matrix(inst: usize) -> M34 {
     engine::field_m34(inst, 0x44)
-}
-
-/// The team colour `GameObject::RenderInternal` hands the engine (`Storm3D+0x34`):
-/// the team's (`Team::GetTeam(+0xec) + 8`), or in a game of type 2 the player's own
-/// (`[+0xfc] + 0x474`) when it has one.
-pub fn team_colour(o: usize) -> V3 {
-    unsafe {
-        let setup = {
-            let f: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(0x557940usize);
-            f(rd::<usize>(0x76b8d4))
-        };
-        let gt = if setup != 0 {
-            let f: unsafe extern "thiscall" fn(usize) -> i32 = core::mem::transmute(0x5464c0usize);
-            f(setup)
-        } else {
-            0
-        };
-        let p = field(o, 0xfc);
-        if gt == 2 && p != 0 {
-            return rd::<V3>(p + 0x474);
-        }
-        // Team::GetTeam reads Team::s_pTeamList (0x738db0) unchecked.
-        let i = field(o, 0xec) as i32;
-        let team = if (0..32).contains(&i) { rd::<usize>(0x738db0 + 4 * i as usize) } else { 0 };
-        if team == 0 { v3(1.0, 1.0, 1.0) } else { rd::<V3>(team + 8) }
-    }
-}
-
-/// Whether the engine shows team colours at all (`Storm3D+0x40`, which
-/// `ST3D_Workspace::SetLightingMaterial` asks before it gives a `team*` material the
-/// team's colour).
-pub fn team_colours_on() -> bool {
-    field_u8(engine::storm3d(), 0x40) != 0
 }
 
 /// The cloaking device's state: (state, alpha, phase). State 0 visible, 1 cloaking,
@@ -169,16 +99,6 @@ pub fn billboard_effect(o: usize) -> Option<&'static str> {
         return None;
     }
     element_name(nd)
-}
-
-/// The name of an engine database element (`+0x8`).
-pub fn element_name(e: usize) -> Option<&'static str> {
-    let p = field(e, 8);
-    if p == 0 {
-        return None;
-    }
-    let s = unsafe { crate::rt::cstr_at(p as *const u8, 64) };
-    if s.is_empty() { None } else { Some(s) }
 }
 
 /// The wave lights a draw of this object turns on (`GameObject::RenderInternal`: the
@@ -237,27 +157,11 @@ pub fn near_fade_on() -> bool {
     field(engine::storm3d(), 0xe8) != 0 && unsafe { rd::<u32>(0x76b610) } != 2 && unsafe { rd::<u8>(0x7637b5) } == 0
 }
 
-/// The engine's detail level (`ST3D_GraphicsEngine_Configuration+0x40`).
-pub fn detail_level() -> u32 {
-    field(field(engine::storm3d(), 0x104), 0x40) as u32
-}
-
 /// The class's visible database (`GameObjectClass+0x1dc`).
 pub fn class_visible_db(o: usize) -> usize {
     field(field(o, 0x40), 0x1dc)
 }
 
-/// Every damaged-system node of a craft's class with the instance byte that hides it
-/// (`CraftClass::InitializeDamageNodes`; `CraftInstance::RenderInternal`): shields
-/// `+0x40c`/`+0x9c`, engines `+0x418`/`+0x9d`, target `+0x410`/`+0x9e`, sensors
-/// `+0x414`/`+0x9f`, life `+0x41c`/`+0xa0`. A byte that is not 0 hides the node's
-/// subtree.
-pub const DAMAGE_NODES: [(usize, usize); 5] = [(0x40c, 0x9c), (0x418, 0x9d), (0x410, 0x9e), (0x414, 0x9f), (0x41c, 0xa0)];
-
-/// The instance's class (`GameObjectInstance+0x98`), for crafts the `CraftClass`.
-pub fn instance_class(inst: usize) -> usize {
-    field(inst, 0x98)
-}
 
 /// A hologram (`+0x174`, `TimedHoloEffect`): the engine draws it.
 pub fn hologram(o: usize) -> usize {
@@ -272,11 +176,6 @@ pub fn render_hologram(o: usize, h: usize) {
         let v = f(h);
         core::ptr::write_volatile((o + 0x25) as *mut u8, v);
     }
-}
-
-/// The on-screen byte `Entity::Render` sets when the frustum test passes.
-pub fn set_on_screen(o: usize) {
-    unsafe { core::ptr::write_volatile((o + 0x25) as *mut u8, 1) };
 }
 
 /// `+0x26`: the object is not drawn (stock's `RenderInternal` skips it).
@@ -313,31 +212,6 @@ pub fn rig_placeholder(o: usize) {
         let draw: unsafe extern "C" fn(usize, usize, usize) = core::mem::transmute(0x473aa0usize);
         draw(item, mp, c);
     }
-}
-
-/// A node of the engine's own database, for the per-class nodes the stations show or
-/// hide (`Shipyard::Render`: `class+0x4a4`, shown while a ship is being built, `+0x2b8`
-/// not `NO_ENTITY`; `MiningStation::Render`: `class+0x4b0`, shown while a freighter is
-/// docked).
-pub fn station_node(o: usize) -> Option<(usize, bool)> {
-    let class = field(o, 0x40);
-    match render_fn(o) {
-        FN_SHIPYARD_RENDER => {
-            let n = field(class, 0x4a4);
-            let none = unsafe { rd::<usize>(0x6b41d8) };
-            Some((n, field(o, 0x2b8) == none))
-        }
-        FN_MINING_RENDER => {
-            let n = field(class, 0x4b0);
-            let docked = unsafe {
-                let f: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(0x4d7020usize);
-                f(field(o, 0x2b0)) != 0
-            };
-            Some((n, !docked))
-        }
-        _ => None,
-    }
-    .filter(|(n, _)| *n != 0)
 }
 
 /// A scrap object's glow (`Scrap::Render`): the `glowdmoon` sprite node's colour,
@@ -402,8 +276,6 @@ pub fn hologram_parts(h: usize) -> Option<(usize, usize)> {
 
 /// The Evolver's cocoon (`Evolver+0x2ac`, a `CocoonInstance`, vtable 0x6b2630, of
 /// `8472_cocoon.sod`, whose database the engine keeps at 0x73fccc), while it evolves.
-pub const VT_COCOON: usize = 0x6b2630;
-pub const COCOON_DB: usize = 0x73fccc;
 pub fn cocoon(o: usize) -> usize {
     field(o, 0x2ac)
 }

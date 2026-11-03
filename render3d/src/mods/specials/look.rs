@@ -15,7 +15,10 @@ use gpu::{Blend, Block, Compare, Cull, Depth, Format, Pipeline, PipelineDesc, To
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::math::{v3, V3};
-use crate::mods::effects::{rnd, Cam, LightPool, Sec};
+use crate::config::Section as Sec;
+use crate::math::rand::rnd;
+use crate::scene::camera::Cam;
+use crate::scene::lights::Pool as LightPool;
 use crate::rt::Ini;
 use crate::scene;
 use crate::shaders::specials::*;
@@ -182,7 +185,7 @@ impl Looks {
             if e <= 0.005 {
                 continue;
             }
-            let Some(p) = crate::mods::hulls::posed(f.victim) else { continue };
+            let Some(p) = crate::scene::pose::posed(f.victim) else { continue };
             if !p.drawn || p.cloak.is_some_and(|c| c.0 != 0) {
                 continue;
             }
@@ -194,7 +197,7 @@ impl Looks {
                 began = true;
             }
             // The object's frame: its axes, unit; its centre and radius.
-            let ax = |i: usize| crate::mods::hulls::norm_or(p.world.r[i], v3((i == 0) as u32 as f32, (i == 1) as u32 as f32, (i == 2) as u32 as f32));
+            let ax = |i: usize| crate::scene::pose::norm_or(p.world.r[i], v3((i == 0) as u32 as f32, (i == 1) as u32 as f32, (i == 2) as u32 as f32));
             let (x, y, z) = (ax(0), ax(1), ax(2));
             let radius = p.radius.max(1.0);
             let c = p.centre;

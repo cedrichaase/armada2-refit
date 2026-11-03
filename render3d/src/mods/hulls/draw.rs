@@ -1,6 +1,6 @@
 //! Drawing a posed hull in the hull shaders (`shaders/hulls.hlsl`).
 use super::look::{Look, Profile};
-use super::{anim, game, shadow, Posed};
+use super::{anim, game, shadow, Posed, Warp, Waves};
 use crate::engine;
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
@@ -38,67 +38,44 @@ pub enum Mode {
     Holo,
 }
 
-/// The warp stretch, in world space (`spec-chunks-anim-lod.md` section 5).
-#[derive(Clone, Copy)]
-pub struct Warp {
-    pub n: V3,
-    pub d: f32,
-    pub s1: f32,
-    pub o: f32,
+/// The warp stretch, from the craft's ramp `b`, stretch `s`, its motion `n` (object
+/// space), its placement and the instance's bounding sphere (database space, which the
+/// instance's scale takes to the object's).
+pub fn warp_new(b: f32, s: f32, n: V3, xf: &M34, inst: usize, scale: V3) -> Warp {
+    let (mut n, mut s) = (n, s);
+    if s < 0.0 {
+        n = -n;
+        s = -s;
+    }
+    let (c, r) = game::instance_sphere(inst);
+    let c = v3(c.x * scale.x, c.y * scale.y, c.z * scale.z);
+    let r = r * scale.x;
+    let cw = xf.transform_point(c);
+    let nw = crate::scene::pose::norm_or(xf.transform_dir(n), n);
+    let d = nw.dot(cw) + r - 2.0 * r * b;
+    Warp { n: nw, d, s1: s - 1.0, o: (s - 1.0) * r * b }
 }
 
-impl Warp {
-    /// From the craft's ramp `b`, stretch `s`, its motion `n` (object space), its
-    /// placement and the instance's bounding sphere (database space, which the
-    /// instance's scale takes to the object's).
-    pub fn new(b: f32, s: f32, n: V3, xf: &M34, inst: usize, scale: V3) -> Warp {
-        let (mut n, mut s) = (n, s);
-        if s < 0.0 {
-            n = -n;
-            s = -s;
+/// A menu ship's departure (`crate::menu`), which has no instance: from a sphere
+/// and the way already in world space, and stretched forward only. The engine's
+/// shift back by o, seen from the camera behind the ships, threw the stretch across
+/// the screen towards it.
+pub fn warp_world(b: f32, s: f32, n: V3, centre: V3, r: f32) -> Warp {
+    let d = n.dot(centre) + r - 2.0 * r * b;
+    Warp { n, d, s1: s - 1.0, o: 0.0 }
+}
+
+/// The wave light a draw of the object turns on (the first of them).
+pub fn waves_of(o: usize, craft: bool, now: f32) -> Option<Waves> {
+    let two_pi = unsafe { engine::rd::<f32>(0x7913bc) };
+    let two_pi = if two_pi.is_finite() && two_pi > 0.1 { two_pi } else { core::f32::consts::TAU };
+    game::wave_lights(o, craft).iter().find_map(|&w| {
+        let wv = game::wave(w)?;
+        if !(wv.wavelength.abs() > 1e-4) {
+            return None;
         }
-        let (c, r) = game::instance_sphere(inst);
-        let c = v3(c.x * scale.x, c.y * scale.y, c.z * scale.z);
-        let r = r * scale.x;
-        let cw = xf.transform_point(c);
-        let nw = super::norm_or(xf.transform_dir(n), n);
-        let d = nw.dot(cw) + r - 2.0 * r * b;
-        Warp { n: nw, d, s1: s - 1.0, o: (s - 1.0) * r * b }
-    }
-
-    /// A menu ship's departure (`crate::menu`), which has no instance: from a sphere
-    /// and the way already in world space, and stretched forward only. The engine's
-    /// shift back by o, seen from the camera behind the ships, threw the stretch across
-    /// the screen towards it.
-    pub fn world(b: f32, s: f32, n: V3, centre: V3, r: f32) -> Warp {
-        let d = n.dot(centre) + r - 2.0 * r * b;
-        Warp { n, d, s1: s - 1.0, o: 0.0 }
-    }
-}
-
-/// The wave light a draw of the object turns on (the first of them), as constants.
-#[derive(Clone, Copy)]
-pub struct Waves {
-    pub colour: V3,
-    pub dir: V3,
-    /// 2 pi / wavelength.
-    pub k: f32,
-    /// Its phase now.
-    pub phase: f32,
-}
-
-impl Waves {
-    pub fn of(o: usize, craft: bool, now: f32) -> Option<Waves> {
-        let two_pi = unsafe { engine::rd::<f32>(0x7913bc) };
-        let two_pi = if two_pi.is_finite() && two_pi > 0.1 { two_pi } else { core::f32::consts::TAU };
-        game::wave_lights(o, craft).iter().find_map(|&w| {
-            let wv = game::wave(w)?;
-            if !(wv.wavelength.abs() > 1e-4) {
-                return None;
-            }
-            Some(Waves { colour: wv.colour, dir: wv.dir, k: two_pi / wv.wavelength, phase: now * wv.speed * two_pi })
-        })
-    }
+        Some(Waves { colour: wv.colour, dir: wv.dir, k: two_pi / wv.wavelength, phase: now * wv.speed * two_pi })
+    })
 }
 
 /// How far a mesh reaches from its origin, at most, for picking a hard light.

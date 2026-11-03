@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.70.1 — 2026-11-03
+
+Layers: render3d 0.37.1.
+
+### Changed
+- render3d: the cross-module helpers lifted into the core and the hulls', ordnance's,
+  overlays' and world's draws offered as services; no module reaches into another any
+  more (`lint-layers.sh --strict src/mods --rules cross,byname`, held in CI). No change
+  to what is drawn. Installed, not yet seen in game
+
 ## 13.70.0 — 2026-11-02
 
 Layers: render3d 0.37.0.

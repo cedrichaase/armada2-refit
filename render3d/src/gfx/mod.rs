@@ -7,6 +7,8 @@
 //! d3d8to9 keeps its own record of what the game bound (platform/D3D9.md), so a
 //! module that changes device state between the engine's steps must leave it as it
 //! found it: a `Cmd` does that with one of `gpu`'s state blocks, put back when dropped.
+pub mod fx;
+
 use crate::frame::steps::View;
 use crate::math::{M34, M4};
 use alloc::vec::Vec;
