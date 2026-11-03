@@ -5,6 +5,13 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 4.0.1 — 2026-11-03
+
+### Changed
+- `retire-old-install` expects the chain class (`d3d8_real.dll`, `d3d9.dll`, `dxvk.conf`) removed, not left or removed: `./install` passes `retire.sh --chain` (root 15.6.0).
+
+Installed, not yet seen in game
+
 ## 4.0.0 — 2026-11-03
 
 MAJOR: `--no-grid` is no longer passed, `ui/bench-legacy.sh` and the Direct3D 9 probes are no longer used, and the `-forward` scenarios are gone.

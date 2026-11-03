@@ -1,47 +1,33 @@
 #!/usr/bin/env python3
-"""Identify and set what actually implements Direct3D 8 for this game.
+"""What is in the game's Direct3D 8 slot, and how to leave it as the GOG release had it.
 
-    d3d8-chain.py --status        identify every link by CONTENT, not by size folklore
-    d3d8-chain.py --use dxvk      DXVK's d3d8 -> DXVK's d3d9 -> Vulkan
-    d3d8-chain.py --use d3d8to9   crosire's d3d8to9 (vendored) -> DXVK's d3d9 -> Vulkan;
-                                  plugins can reach Direct3D 9 (platform/D3D9.md)
-    d3d8-chain.py --use gog       GOG's d3d8to9 -> DXVK's d3d9 -> Vulkan
-    d3d8-chain.py --use wine      Wine's builtin d3d8 -> wined3d -> OpenGL
-    d3d8-chain.py --revert        the GOG release as shipped: its d3d8to9 in the game
-                                  directory, the prefix's d3d9, Heroic's DXVK re-enabled
-    d3d8-chain.py --upgrade       what ./install runs: the DXVK chain becomes the d3d8to9
-                                  one, by swapping the game directory's d3d8.dll alone;
-                                  any other chain is left as it is
+    d3d8-chain.py --status    identify every link by CONTENT, not by size folklore
+    d3d8-chain.py --retire    what ./install runs (platform 4.0.0): take out of the slot what
+                              earlier versions put there for the chain Display8 used to stand
+                              on -- crosire's d3d8to9 or DXVK's d3d8 as d3d8.dll (GOG's d3d8.dll
+                              back in its place if it was kept, else the system's is the
+                              game's), DXVK's d3d9.dll, a d3d8_real.dll that is the vendored
+                              d3d8to9. Game directory only: ./install runs in bench clones
+                              too, and Heroic's config is the player's.
+    d3d8-chain.py --retire --heroic
+                              also the `d3d9=n,b` entry of Heroic's WINEDLLOVERRIDES (Heroic
+                              closed), when the rest of the entry is ours
+    d3d8-chain.py --revert    the GOG release as shipped: its d3d8to9 in the game directory,
+                              no game-directory d3d9.dll, Heroic's DXVK re-enabled
 
---use keeps GOG's d3d8.dll as d3d8.dll.gog-backup the first time it replaces it, and
-refuses to replace a d3d8.dll it cannot identify.
+Since platform 4.0.0 nothing stands behind Display8: it draws on Vulkan or Direct3D 12 itself,
+and when it cannot it hands the game the system's own d3d8.dll (display/README.md, "The
+bail-out"). So the vendored d3d8to9 and DXVK are gone from the repository (their hashes stay
+in retire/known.txt, which recognises them), and `--use` and `--upgrade` with them.
 
-With Display8 (display/: the game's d3d8.dll of ours, in front of the real chain) in
-the game directory, the chain's own d3d8.dll is d3d8_real.dll behind it: every option
-here reads and writes that slot instead, and keeps d3d8.dll.a2display-backup (what
-`a2mod stock` puts back) the same file.
+Every file is recognised by hash, never by name or size: the vendored d3d8to9 and DXVK
+3.1.1 by the hashes below, GOG's d3d8.dll likewise, Display8 (our own build) by the
+message every build carries, any other DXVK by the builds on this machine. A file that is
+none of them is the player's and is never touched.
 
-WHY THIS EXISTS
-
-SETUP.md (now platform/README.md) recorded that `syswow64/d3d8.dll` at 320548 bytes was "DXVK's exact size" and
-built a whole regression narrative on it.  It is not DXVK.  320548 is the size of
-*Wine's builtin d3d8*, and the file saved beside it as `d3d8.dll.dxvk-backup` is
-byte-identical to the builtin as well.  DXVK's d3d8 is ~1.66 MB.
-
-The consequence is not cosmetic: the game has been rendering through
-wined3d/OpenGL, with DXVK nowhere in its chain, which is why no `d3d9.*` key in
-dxvk.conf had any effect and why the DXVK HUD never appeared.
-
-So this tool never identifies a DLL by size alone.  It hashes the file and compares it
-against every candidate actually present on this machine, and prints the name of what
-it found.  A chain member that cannot be identified is reported as unknown rather than
-guessed at.
-
-Heroic must be CLOSED: switching the chain also sets `autoInstallDxvk`, and Heroic
-rewrites GamesConfig on exit. Heroic's config is A2_HEROIC (a2env): the native
-package's ~/.config/heroic or the Flatpak's
-~/.var/app/com.heroicgameslauncher.hgl/config/heroic. The DXVK builds Heroic keeps
-under tools/dxvk/ are recognised from both.
+Heroic must be CLOSED to change its config (it rewrites GamesConfig on exit). Heroic's
+config is A2_HEROIC (a2env): the native package's ~/.config/heroic or the Flatpak's
+~/.var/app/com.heroicgameslauncher.hgl/config/heroic.
 """
 import hashlib
 import json
@@ -57,17 +43,13 @@ PREFIX = a2env.PREFIX
 SYSWOW = os.path.join(PREFIX, 'pfx/drive_c/windows/syswow64')
 PROTON = os.path.join(a2env.PROTON, 'files/lib/wine')
 CONFIG_DIR = os.path.join(a2env.HEROIC, 'GamesConfig')
-BACKUP_SUFFIX = '.a2chain-backup'
-# GOG's d3d8.dll (its d3d8to9 translator) as the GOG release ships it. Known by hash so
-# that it is recognised, and backed up, before anything has ever replaced it.
+# GOG's d3d8.dll (its d3d8to9 translator) as the GOG release ships it; kept as
+# d3d8.dll.gog-backup by the 3.x/14.x installs that replaced it.
 GOG_D3D8TO9 = '735dbb81a5fa0368c6436349fc5bf97a9ae15daeb6829dfe95a17704294e6719'
 GOG_BACKUP = os.path.join(GAME, 'd3d8.dll.gog-backup')
-# crosire's d3d8to9, vendored unmodified (vendor/d3d8to9-1.16.0/SOURCE.txt). Unlike
-# DXVK's d3d8 and GOG's build, it answers QueryInterface(IDirect3DDevice9).
-D3D8TO9 = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                       'vendor/d3d8to9-1.16.0/d3d8.dll')
-D3D8TO9_SHA = '122928cfe225c25d30decf7184a5d37e490cecf3b58256ba3206c7e1853f8ab8'
-
+# What the chain was made of, by hash (retire/known.txt has the same two).
+D3D8TO9_SHA = '122928cfe225c25d30decf7184a5d37e490cecf3b58256ba3206c7e1853f8ab8'  # crosire 1.16.0
+DXVK_D3D9_SHA = '265888c31ca78dffa290c39cb7e50bfb02762590e41927906e46fb32f01497fa'  # DXVK 3.1.1
 
 # Display8 is our own build, so it is known by what it says, not by a hash that changes
 # with every build: the panic message every version carries.
@@ -81,26 +63,6 @@ def is_display8(path):
             return DISPLAY8_MARK in fh.read()
     except OSError:
         return False
-
-
-def slot():
-    """The game directory's d3d8.dll as the chain sees it: d3d8_real.dll when Display8
-    stands in front of it, else d3d8.dll itself."""
-    gamed8 = os.path.join(GAME, 'd3d8.dll')
-    if is_display8(gamed8):
-        return os.path.join(GAME, 'd3d8_real.dll')
-    return gamed8
-
-
-def slot_written():
-    """After the chain's slot changed behind Display8: the backup a2mod restores in
-    stock follows it."""
-    real = os.path.join(GAME, 'd3d8_real.dll')
-    if is_display8(os.path.join(GAME, 'd3d8.dll')):
-        if os.path.exists(real):
-            shutil.copy2(real, DISPLAY_BACKUP)
-        elif os.path.exists(DISPLAY_BACKUP):
-            os.remove(DISPLAY_BACKUP)
 
 
 def sha(path):
@@ -143,7 +105,9 @@ def identify(path):
     if h == GOG_D3D8TO9:
         return 'GOG d3d8to9'
     if h == D3D8TO9_SHA:
-        return 'd3d8to9 1.16.0 (vendored)'
+        return 'd3d8to9 1.16.0 (vendored, retired)'
+    if h == DXVK_D3D9_SHA:
+        return 'DXVK d3d9 3.1.1 (vendored, retired)'
     if is_display8(path):
         return 'Display8 (ours: display/)'
     for name, cand in candidates().items():
@@ -179,55 +143,48 @@ def find_config():
 ENV_KEY = 'enviromentOptions'          # Heroic's typo; matching it is required
 OVERRIDE_KEY = 'WINEDLLOVERRIDES'
 D3D9_OVERRIDE = 'd3d9=n,b'
+# The rest of the override, as the installs wrote it: only then is the d3d9 entry ours to take out.
+OURS = {'winmm=n,b', 'd3d8=n,b'}
 
 
-def set_d3d9_override(want):
-    """Add or remove d3d9=n,b in WINEDLLOVERRIDES, preserving everything else.
+def env_list(block):
+    return block.setdefault(ENV_KEY, [])
 
-    DXVK's d3d8.dll imports d3d9.dll by name. Without native-first on the d3d9 slot,
-    Wine resolves it to builtin WineD3D and DXVK's d3d8 has nothing to sit on -- so
-    this belongs to the chain, not to the diagnostics that first introduced it.
-    """
-    path, data, key = find_config()
-    entries = data[key].setdefault(ENV_KEY, [])
-    before = json.dumps(entries, sort_keys=True)
 
-    target = None
-    for e in entries:
-        if e.get('key') == OVERRIDE_KEY:
-            target = e
-            break
-    parts = [p for p in str(target.get('value', '')).split(';')
-             if p.strip()] if target else []
-    parts = [p for p in parts if not p.strip().startswith('d3d9=')]
-    if want:
-        parts.append(D3D9_OVERRIDE)
-    value = ';'.join(parts)
-
-    if target is not None:
-        target['value'] = value
-    elif want:
-        entries.append({'key': OVERRIDE_KEY, 'value': value})
-
-    if json.dumps(entries, sort_keys=True) == before:
-        return False
-    if heroic_running():
-        raise SystemExit('Heroic is running, and WINEDLLOVERRIDES needs the d3d9 entry '
-                         '%s -- close Heroic fully and re-run.'
-                         % ('added' if want else 'removed'))
+def write_config(path, data):
     if not os.path.exists(path + '.bak-a2chain'):
         shutil.copy2(path, path + '.bak-a2chain')
     with open(path, 'w') as fh:
         json.dump(data, fh, indent=2)
-    print('WINEDLLOVERRIDES -> %s' % value)
-    return True
+
+
+def drop_d3d9_override():
+    """Take d3d9=n,b out of WINEDLLOVERRIDES, when the rest of the entry is ours (winmm and
+    d3d8 only): a player's own overrides are theirs, and the entry is then left whole."""
+    path, data, key = find_config()
+    for e in env_list(data[key]):
+        if e.get('key') != OVERRIDE_KEY:
+            continue
+        parts = [p.strip() for p in str(e.get('value', '')).split(';') if p.strip()]
+        if D3D9_OVERRIDE not in parts:
+            return False
+        rest = [p for p in parts if p != D3D9_OVERRIDE]
+        if not set(rest) <= OURS:
+            print('WINEDLLOVERRIDES holds more than ours (%s): d3d9=n,b left as it is' % ';'.join(parts))
+            return False
+        if heroic_running():
+            raise SystemExit('Heroic is running, and WINEDLLOVERRIDES still holds d3d9=n,b '
+                             '-- close Heroic fully and re-run.')
+        e['value'] = ';'.join(rest)
+        write_config(path, data)
+        print('WINEDLLOVERRIDES -> %s' % e['value'])
+        return True
+    return False
 
 
 def set_auto_dxvk(value):
     path, data, key = find_config()
     # Check whether a change is actually needed BEFORE demanding Heroic be closed.
-    # Installing into the game directory is none of Heroic's business, so when the flag
-    # already reads what we want there is no reason to make the user shut it down.
     if data[key].get('autoInstallDxvk') == value:
         return path, False
     if heroic_running():
@@ -242,18 +199,16 @@ def set_auto_dxvk(value):
 
 
 def status():
-    gamed8 = slot()
-    gamed9 = os.path.join(GAME, 'd3d9.dll')
+    gamed8 = os.path.join(GAME, 'd3d8.dll')
     print('GAME DIR (searched first by Wine -- the durable slot)')
-    if is_display8(os.path.join(GAME, 'd3d8.dll')):
-        print('    d3d8.dll   Display8 (ours: display/), in front of:')
-        print('    d3d8_real.dll %s' % identify(gamed8))
-    else:
-        print('    d3d8.dll   %s' % identify(gamed8))
-    print('    d3d9.dll   %s' % (identify(gamed9)
-                                 if os.path.exists(gamed9) else '(absent)'))
-    if os.path.exists(GOG_BACKUP):
-        print('    (way back: d3d8.dll.gog-backup holds the %s)' % identify(GOG_BACKUP))
+    print('    d3d8.dll   %s' % identify(gamed8))
+    for extra in ('d3d8_real.dll', 'd3d9.dll'):
+        if os.path.exists(os.path.join(GAME, extra)):
+            print('    %-10s %s   (nothing reads it any more: --retire)' %
+                  (extra, identify(os.path.join(GAME, extra))))
+    for b in (GOG_BACKUP, DISPLAY_BACKUP):
+        if os.path.exists(b):
+            print('    (%s holds the %s)' % (os.path.basename(b), identify(b)))
     print('PREFIX syswow64 (Proton resets these from symlinks on sync -- NOT durable)')
     print('    d3d8.dll   %s' % identify(os.path.join(SYSWOW, 'd3d8.dll')))
     print('    d3d9.dll   %s' % identify(os.path.join(SYSWOW, 'd3d9.dll')))
@@ -261,39 +216,30 @@ def status():
         path, data, key = find_config()
         print('HEROIC %s' % path)
         print('    autoInstallDxvk  %s' % data[key].get('autoInstallDxvk'))
+        for e in data[key].get(ENV_KEY, []):
+            if e.get('key') == OVERRIDE_KEY:
+                print('    %s  %s' % (OVERRIDE_KEY, e.get('value')))
     except SystemExit as exc:
         print('HEROIC %s' % exc)
-
-    # What the game actually gets is the game-directory d3d8, because of the
-    # d3d8=n,b override plus Wine's application-directory-first search -- or, with
-    # none there, the prefix's.
-    live = identify(gamed8)
-    if live == '(missing)':
-        live = identify(os.path.join(SYSWOW, 'd3d8.dll'))
     print()
-    if live.startswith('wine builtin'):
-        print('=> Direct3D 8 is implemented by WINED3D, running on OpenGL.')
-        print('   DXVK is NOT in this game\'s chain, so no d3d9.* key in dxvk.conf')
-        print('   can have any effect, and the DXVK HUD will never appear.')
-    elif live.startswith('DXVK'):
-        print('=> DXVK implements Direct3D 8 directly. dxvk.conf d3d9.* keys apply.')
-    elif live.startswith('d3d8to9'):
-        print('=> crosire\'s d3d8to9 translates to Direct3D 9; dxvk.conf d3d9.* keys apply')
-        print('   if the d3d9 above is DXVK (d3d8.* keys do not), and plugins can reach')
-        print('   the Direct3D 9 device (platform/D3D9.md).')
-    elif live.startswith('GOG'):
-        print('=> GOG\'s d3d8to9 translates to Direct3D 9; dxvk.conf applies if the')
-        print('   d3d9 above is DXVK. dxcfg.ini\'s own knobs become live too.')
+    if is_display8(gamed8):
+        print('=> Display8 draws the game on Vulkan or Direct3D 12 itself; when it cannot, the')
+        print('   game gets the system\'s own d3d8.dll (display/README.md, "The bail-out").')
+    elif os.path.exists(gamed8):
+        print('=> d3d8.dll is %s: Display8 is not installed (./install, display/install).' %
+              identify(gamed8))
     else:
-        print('=> Unrecognised d3d8 implementation -- identify it before changing it.')
+        print('=> no game-directory d3d8.dll: the system\'s is the game\'s.')
+
+
+def _remove(path):
+    if os.path.exists(path):
+        os.chmod(path, 0o644)
+        os.remove(path)
+        print('removed game-directory %s' % os.path.basename(path))
 
 
 def _place(src, dst):
-    """Copy src over dst, writable and re-runnable.
-
-    The DXVK and Wine sources are mode 555 and copy2 carries the mode across, so a
-    plain copy makes the destination read-only and the NEXT run dies with EACCES.
-    """
     if os.path.exists(dst):
         os.chmod(dst, 0o644)
         os.remove(dst)
@@ -301,130 +247,76 @@ def _place(src, dst):
     os.chmod(dst, 0o644)
 
 
-def install(which):
-    """which: dxvk, d3d8to9, gog, wine, or stock (--revert)."""
-    gamed8 = slot()
-    gamed9 = os.path.join(GAME, 'd3d9.dll')
+def _chain_file(path):
+    """A d3d8.dll (or its backup) that only the retired chain put there."""
+    what = identify(path)
+    return what.startswith('d3d8to9 1.16.0') or what.startswith('DXVK d3d8')
 
-    # Never replace or remove a d3d8.dll that is not one of ours to switch between:
-    # anything else in that slot is someone's own choice, and there is no way back to it.
+
+def _chain_leftovers(heroic):
+    real = os.path.join(GAME, 'd3d8_real.dll')
+    if sha(real) == D3D8TO9_SHA:
+        _remove(real)
+    d9 = os.path.join(GAME, 'd3d9.dll')
+    if os.path.exists(d9) and identify(d9).startswith('DXVK d3d9'):
+        _remove(d9)
+    if not heroic:
+        return
+    try:
+        drop_d3d9_override()
+    except SystemExit as exc:
+        print('note: %s' % exc)   # no config (a Mac, a bench clone), or Heroic is open
+
+
+def retire(heroic=False):
+    """Leave the game directory without the chain (and Heroic's d3d9 override, if asked)."""
+    gamed8 = os.path.join(GAME, 'd3d8.dll')
+    # The slot: what the retired chain put there goes; GOG's own, kept by the install that
+    # replaced it, comes back; Display8 and anything the player put there stay.
+    if _chain_file(gamed8):
+        _remove(gamed8)
+        if os.path.exists(GOG_BACKUP):
+            shutil.copy2(GOG_BACKUP, gamed8)
+            print('restored GOG\'s d3d8.dll from %s' % os.path.basename(GOG_BACKUP))
+    # a2mod stock puts the backup back: it must be GOG's or nothing, never the chain.
+    if os.path.exists(DISPLAY_BACKUP) and _chain_file(DISPLAY_BACKUP):
+        if os.path.exists(GOG_BACKUP):
+            shutil.copy2(GOG_BACKUP, DISPLAY_BACKUP)
+            print('%s is GOG\'s d3d8.dll again (it held the retired chain)' %
+                  os.path.basename(DISPLAY_BACKUP))
+        else:
+            os.remove(DISPLAY_BACKUP)
+            print('removed %s (it held the retired chain; stock is the system\'s d3d8.dll)' %
+                  os.path.basename(DISPLAY_BACKUP))
+    _chain_leftovers(heroic)
+    return 0
+
+
+def revert():
+    """The GOG release as shipped: GOG's d3d8to9, the prefix's d3d9 (Heroic's DXVK while
+    autoInstallDxvk is on), nothing of ours in the slot. A d3d8.dll that is none of GOG's,
+    Display8's or the retired chain's is the player's and stops it."""
+    gamed8 = os.path.join(GAME, 'd3d8.dll')
     have = identify(gamed8)
     if have.startswith('UNKNOWN'):
-        raise SystemExit('game-directory d3d8.dll is %s -- not DXVK, d3d8to9, Wine\'s or '
-                         'GOG\'s. '
-                         'Move it aside yourself first.' % have)
-    gog_there = have == 'GOG d3d8to9' or os.path.exists(GOG_BACKUP)
-    if which in ('stock', 'gog') and not gog_there:
-        raise SystemExit('GOG\'s d3d8.dll is neither in the game directory nor kept as %s'
-                         % os.path.basename(GOG_BACKUP))
-    dxvk8 = os.path.join(PROTON, 'dxvk/i386-windows/d3d8.dll')
-    dxvk9 = os.path.join(PROTON, 'dxvk/i386-windows/d3d9.dll')
-    for src in {'dxvk': (dxvk8, dxvk9), 'gog': (dxvk9,),
-                'd3d8to9': (D3D8TO9, dxvk9)}.get(which, ()):
-        if not os.path.exists(src):
-            raise SystemExit('source not present: %s' % src)
-    if which == 'd3d8to9' and sha(D3D8TO9) != D3D8TO9_SHA:
-        raise SystemExit('%s does not match its SOURCE.txt hash' % D3D8TO9)
-
-    # Fail before ANY side effect if the flag needs changing and Heroic is up: doing
-    # half a chain switch is worse than doing none.  An earlier version checked inside
-    # set_auto_dxvk() and left a backup behind after refusing.
-    #
-    # EXCEPT when returning to stock.  Getting back to a working game must never be
-    # blocked by Heroic being open: restoring the DLLs is always allowed and only the
-    # flag waits.
-    if which == 'stock':
-        try:
-            set_auto_dxvk(True)
-        except SystemExit as exc:
-            print('note: %s' % exc)
-            print('      Restoring the DLLs anyway; re-run with Heroic closed to set '
-                  'the flag too.')
-    else:
-        set_auto_dxvk(False)
-
-    # INSTALL INTO THE GAME DIRECTORY, NOT THE PREFIX.
-    #
-    # The prefix is not a durable place for this. Proton's default_pfx holds
-    # syswow64/d3d8.dll and d3d9.dll as SYMLINKS to its Wine builtins, and restores
-    # them on prefix sync -- so a DXVK d3d8 written into syswow64 survives exactly
-    # until the next launch. That is what happened: the file was installed, verified by
-    # hash, and was Wine's builtin again after one launch, with autoInstallDxvk already
-    # false. Heroic was not the culprit the second time; Proton was.
-    #
-    # Wine searches the application directory before the system directory, which is
-    # already what makes the game-directory winmm.dll and d3d8.dll load at all (see
-    # platform/README.md). Nothing manages the game directory, so that is where this belongs.
-    # Keep GOG's d3d8to9 once, and never overwrite that backup: it is the way back.
-    if have == 'GOG d3d8to9' and not os.path.exists(GOG_BACKUP):
-        shutil.copy2(gamed8, GOG_BACKUP)
-        print('backed up GOG\'s d3d8.dll -> %s' % os.path.basename(GOG_BACKUP))
-
-    # The d3d9 override is part of the DXVK chain, not of the diagnostics.
-    set_d3d9_override(which in ('dxvk', 'd3d8to9', 'gog'))
-
-    def remove(path):
-        if os.path.exists(path):
-            os.chmod(path, 0o644)
-            os.remove(path)
-            print('removed game-directory %s' % os.path.basename(path))
-
-    if which == 'stock':
-        # GOG's own d3d8to9 back, on the prefix's d3d9: Heroic's DXVK or Wine's.
-        if have != 'GOG d3d8to9':
-            _place(GOG_BACKUP, gamed8)
-        remove(gamed9)
-    elif which == 'wine':
-        # Nothing in the game directory: the prefix's d3d8, which is Wine's builtin
-        # once autoInstallDxvk is off.
-        remove(gamed8)
-        remove(gamed9)
-    elif which == 'dxvk':
-        _place(dxvk8, gamed8)
-        _place(dxvk9, gamed9)
-        # Both DXVK DLLs now sit beside the exe, so the prefix can do what it likes.
-    elif which == 'd3d8to9':
-        # The translator imports d3d9.dll by name, as DXVK's d3d8 does: DXVK's d3d9
-        # beside it, and the d3d9 override, keep the chain on Vulkan.
-        _place(D3D8TO9, gamed8)
-        _place(dxvk9, gamed9)
-    elif which == 'gog':
-        if have != 'GOG d3d8to9':
-            _place(GOG_BACKUP, gamed8)
-        _place(dxvk9, gamed9)
-
-    slot_written()
+        raise SystemExit('game-directory d3d8.dll is %s -- not GOG\'s, Display8 or the retired '
+                         'chain. Move it aside yourself first.' % have)
+    try:
+        set_auto_dxvk(True)
+    except SystemExit as exc:
+        # Getting back to a working game must never be blocked by Heroic being open.
+        print('note: %s' % exc)
+        print('      Restoring the DLLs anyway; re-run with Heroic closed to set the flag too.')
+    if have != 'GOG d3d8to9':
+        if not os.path.exists(GOG_BACKUP):
+            raise SystemExit('GOG\'s d3d8.dll is neither in the game directory nor kept as %s'
+                             % os.path.basename(GOG_BACKUP))
+        _place(GOG_BACKUP, gamed8)
+    _chain_leftovers(True)
+    if os.path.exists(DISPLAY_BACKUP):
+        os.remove(DISPLAY_BACKUP)
     print()
     status()
-
-
-def upgrade():
-    """The DXVK chain -> the d3d8to9 chain, touching nothing but the game directory's
-    d3d8.dll.
-
-    The two chains differ only there: both keep DXVK's d3d9 beside the exe, and both
-    need the d3d9 override and autoInstallDxvk off, which the DXVK chain already has.
-    So this never reads or writes Heroic's config, and runs fine with Heroic open and
-    in a test-bench clone. Any chain but exactly DXVK's d3d8 on DXVK's d3d9 (GOG's,
-    Wine's, one of the player's own) is left alone and named; `--use dxvk` goes back.
-    """
-    gamed8 = slot()
-    gamed9 = os.path.join(GAME, 'd3d9.dll')
-    have8 = identify(gamed8)
-    have9 = identify(gamed9) if os.path.exists(gamed9) else '(absent)'
-    if have8.startswith('d3d8to9'):
-        print('d3d8 chain: d3d8to9 already (plugins can reach Direct3D 9)')
-        return 0
-    if not (have8.startswith('DXVK d3d8') and have9.startswith('DXVK d3d9')):
-        print('d3d8 chain: left as it is (d3d8.dll: %s, d3d9.dll: %s); shaders need '
-              'd3d8to9 -- platform/d3d8-chain.py --use d3d8to9' % (have8, have9))
-        return 0
-    if sha(D3D8TO9) != D3D8TO9_SHA:
-        raise SystemExit('%s does not match its SOURCE.txt hash' % D3D8TO9)
-    _place(D3D8TO9, gamed8)
-    slot_written()
-    print('d3d8 chain: DXVK d3d8 -> d3d8to9 1.16.0 on %s (back: platform/d3d8-chain.py '
-          '--use dxvk)' % have9)
     return 0
 
 
@@ -435,14 +327,13 @@ def main():
         return 0
     if args[0] == '--status':
         status()
-    elif args[0] == '--use' and len(args) > 1:
-        if args[1] not in ('dxvk', 'd3d8to9', 'gog', 'wine'):
-            raise SystemExit('--use takes dxvk, d3d8to9, gog or wine')
-        install(args[1])
+    elif args[0] == '--retire':
+        return retire(heroic='--heroic' in args[1:])
     elif args[0] == '--revert':
-        install('stock')
-    elif args[0] == '--upgrade':
-        upgrade()
+        return revert()
+    elif args[0] in ('--use', '--upgrade'):
+        raise SystemExit('%s is gone (platform 4.0.0): nothing stands behind Display8 any more; '
+                         '--retire takes the old chain out' % args[0])
     else:
         raise SystemExit('unknown arguments: %s' % ' '.join(args))
     return 0

@@ -6,6 +6,21 @@ patch, and the Heroic/Proton setup, with the tools that manage them (`d3d8-chain
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. Details are in
 [`README.md`](README.md).
 
+## 4.0.0 — 2026-11-03
+
+MAJOR: the vendored chain and `d3d8-chain.py --use` / `--upgrade` are gone.
+
+### Removed
+- `vendor/d3d8to9-1.16.0/` and `vendor/dxvk-3.1.1/` (their hashes stay in `retire/known.txt`), `D3D9.md`, `d3d9/` (`d3d9dev.h`, `hlsl.sh`) and `dxvk-logging.py`. Nothing stands behind Display8: it draws on Vulkan and Direct3D 12 itself and bails out to the system's `d3d8.dll`. `d3d8-chain.py --use` and `--upgrade` are gone (they say so). The README's chain section is "The d3d8 slot".
+
+### Added
+- `d3d8-chain.py --retire` (the platform layer's install): takes the retired chain out of the game directory by hash, the vendored d3d8to9 or a DXVK d3d8 as `d3d8.dll` (GOG's `d3d8.dll.gog-backup` returns in its place, else the slot is empty), DXVK 3.1.1's `d3d9.dll`, a vendored `d3d8_real.dll`, and a `d3d8.dll.a2display-backup` that held the chain (GOG's file, else removed: that is what `a2mod stock` puts back). `--retire --heroic` also removes `d3d9=n,b` from Heroic's `WINEDLLOVERRIDES`, only when the rest of the entry is `winmm=n,b;d3d8=n,b`.
+
+### Changed
+- `--revert` (GOG as shipped) keeps its meaning and now recognises the retired chain by hash; `--status` names a leftover chain file. `heroic-umu.py` imports `d3d8-chain.py` for Heroic's config instead of `dxvk-logging.py`. `run-wine.sh` no longer sets `d3d9=n,b`.
+
+Installed, not yet seen in game
+
 ## 3.7.0 — 2026-11-03
 
 ### Added

@@ -16,8 +16,6 @@ T="$(mktemp -d "${TMPDIR:-/tmp}/a2test.XXXXXX")"; trap 'rm -rf "$T"' EXIT
 T="$(cd "$T" && pwd)"   # macOS: TMPDIR ends in "/", and the scripts print paths as pwd spells them
 unzip -q "$zip" -d "$T"
 P=$(ls -d "$T"/armada2-refit-*/)
-# crosire's d3d8to9 as the repository vendors it: the installers know it by hash.
-D3D8TO9="$src/../../platform/vendor/d3d8to9-1.16.0/d3d8.dll"
 # install.sh refuses while any Armada2.exe runs on the machine (a bench game, say): the test
 # must not depend on that, so pgrep sees none.
 mkdir -p "$T/bin"; printf '#!/bin/sh\nexit 1\n' > "$T/bin/pgrep"; chmod +x "$T/bin/pgrep"
@@ -57,7 +55,7 @@ echo stock-spr > "$G/Sprites/FontFinal4_12.spr.a2font-backup"; echo cond-spr > "
 echo stock-tga > "$G/Textures/RGB/FontFinal4_12.tga.a2font-backup"; echo cond-tga > "$G/Textures/RGB/FontFinal4_12.tga"
 mkdir -p "$B/Shaders"; printf '# written by armada2-refit install.sh\nbloom = "%s/A2Bloom.fx"\n' "$B" > "$B/vkBasalt.conf"
 
-echo "== install on a GOG game: prerequisites, no DXVK, the old plugins and the old bloom out"
+echo "== install on a game whose d3d8.dll is the player's own: prerequisites, the old plugins and bloom out"
 "$P/install.sh" "$G" > "$T/out"
 check '[ "$(sum "$G/winmm.dll")" = baba99929487b005bb9b168acfd852550055f22e5f1059c9032765209bb185e5 ]'
 check '[ "$(sum "$G/STA2WidescreenPatch.asi")" = 193828b15b8cdba84617dd9a359b555302132a35bbaa6fd3143fdb99442343c5 ]'
@@ -66,99 +64,121 @@ check '[ -z "$(ls "$G" | grep -E "^(MSAA|Planets|Lighting|Sky|Fog|Specials)\.(as
 check '[ "$(ls "$G/Sky")" = myown.ini ]'
 check '[ -e "$G/QOL.asi" ] && [ -e "$G/QOL.ini" ]'
 check '[ -e "$G/Online.asi" ] && [ -e "$G/Online.ini" ]'
-# The chain was left as it is: no Render3D.asi or UI.asi, and the legacy plugins are gone,
-# not put in: the game keeps its own HUD and menus.
+# Display8 stays out of a d3d8.dll that is not GOG's or the old chain's, and so do Render3D.asi
+# and UI.asi; the legacy plugins are gone, not put in: the game keeps its own HUD and menus.
+check 'grep -q "Display8 skipped" "$T/out" && [ ! -e "$G/Display8.ini" ] && [ ! -e "$G/d3d8_real.dll" ]'
 check '[ ! -e "$G/Render3D.asi" ] && [ ! -e "$G/UI.asi" ] && [ ! -e "$G/Surfaces" ] && grep -q "Render3D.asi skipped" "$T/out"'
 check '[ -z "$(ls "$G" | grep -E "^(HUD|Menus|MenuScale|GridLayout)\.(asi|ini)$")" ]'
 check '[ "$(cat "$G/misc/gui_fed.cfg")" = stock-cfg ] && [ ! -e "$G/misc/gui_fed.cfg.a2neb-backup" ]'
 check '[ "$(cat "$G/Sprites/FontFinal4_12.spr")" = stock-spr ] && [ "$(cat "$G/Textures/RGB/FontFinal4_12.tga")" = stock-tga ]'
 check '[ ! -e "$G/Sprites/FontFinal4_12.spr.a2font-backup" ] && [ ! -e "$G/Textures/RGB/FontFinal4_12.tga.a2font-backup" ]'
-# ...and Display8 too, which goes in front of d3d8to9 only.
-check 'grep -q "Display8 skipped" "$T/out" && [ ! -e "$G/d3d8_real.dll" ] && [ ! -e "$G/Display8.ini" ]'
 check '[ ! -e "$B" ] && grep -q "removed the old bloom" "$T/out"'
 check 'grep -q BinkProxy "$G/binkw32.dll"'
 check '[ "$(cat "$G/binkw32_orig.dll")" = stockbink ]'
 check '[ "$(vars)" = "    WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b" ]'
+# nothing of the chain: no dxvk.conf, no d3d9.dll, no chain/ in the package
+check '[ ! -e "$G/dxvk.conf" ] && [ ! -e "$G/d3d9.dll" ] && [ ! -d "$P/chain" ] && [ ! -d "$P/layers/renderer" ]'
 check 'cmp -s "$T/RefitPlayer.ref" "$G/RefitPlayer.ini" && [ ! -e "$P/layers/qol/RefitPlayer.ini" ]'   # install
-if [ "$mac" = 0 ]; then
-    check 'cmp -s "$P/layers/renderer/dxvk.conf" "$G/dxvk.conf"'
-else
-    check '[ ! -e "$G/d3d9.dll" ] && [ ! -e "$G/dxvk.conf" ] && grep -q "dxvk.conf skipped" "$T/out"'
-    check 'grep -q "^In CrossOver" "$T/out"'
-fi
+rm -rf "$G/Sky"
+mkdir -p "$G/Sky"; echo "[Sky]" > "$G/Sky/myown.ini"
 
-echo "== DXVK takes the d3d8 slot; reinstall with an edited .ini"
-echo dxvk > "$G/d3d8.dll"; echo "; mine" >> "$G/QOL.ini"
-mkdir -p "$G/Surfaces"; echo "[Surface]" > "$G/Surfaces/myown.ini"
-"$P/install.sh" "$G" > "$T/out"
-check 'grep -q "STA2WidescreenPatch: already installed" "$T/out"'
-# an edited .ini is merged (values kept, keys added), not set aside as .bak
-check 'grep -q "; mine" "$G/QOL.ini" && grep -qx "PanSpeed=2.5" "$G/QOL.ini" && [ ! -e "$G/QOL.ini.bak" ]'
-# d3d8to9 is in now, with Display8 in front of it (d3d8to9 behind as d3d8_real.dll, and
-# Display8.ini as shipped, on a Mac too): Render3D.asi with its recipes, UI.asi in place
-# of the older three.
-check 'cmp -s "$P/layers/display/d3d8.dll" "$G/d3d8.dll" && [ "$(sum "$G/d3d8_real.dll")" = "$(sum "$D3D8TO9")" ]'
+# From here on the package is a copy whose hashes are the mock files': the mock GOG d3d8.dll,
+# a stand-in for crosire's d3d8to9 and for DXVK's d3d9. The scripts know the real ones by
+# hash, and the repository no longer carries them.
+echo gogd3d8to9 > "$T/gog.dll"; echo faked3d8to9 > "$T/d3d8to9.dll"; echo fakedxvkd3d9 > "$T/dxvk9.dll"
+Q="$T/tweaked"; cp -R "$P" "$Q"
+sed -i.bak "s/^GOG_D3D8_SHA=.*/GOG_D3D8_SHA=$(sum "$T/gog.dll")/; s/^D3D8TO9_SHA=.*/D3D8TO9_SHA=$(sum "$T/d3d8to9.dll")/" "$Q/install.sh"
+sed -i.bak "s/122928cfe225c25d30decf7184a5d37e490cecf3b58256ba3206c7e1853f8ab8/$(sum "$T/d3d8to9.dll")/; s/265888c31ca78dffa290c39cb7e50bfb02762590e41927906e46fb32f01497fa/$(sum "$T/dxvk9.dll")/" "$Q/retire.txt"
+rm -f "$Q/install.sh.bak" "$Q/retire.txt.bak"
+grep -v ' retire.txt$' "$Q/SHA256SUMS" > "$Q/SHA256SUMS.new"
+echo "$(sum "$Q/retire.txt")  retire.txt" >> "$Q/SHA256SUMS.new"; mv "$Q/SHA256SUMS.new" "$Q/SHA256SUMS"
+P="$Q"
+
+echo "== GOG's d3d8.dll: Display8 goes in, GOG's kept; Render3D.asi and UI.asi with it; reinstall with an edited .ini"
+"$P/install.sh" "$G" > "$T/out"   # (the mock's d3d8.dll is GOG's by hash now)
+check 'cmp -s "$P/layers/display/d3d8.dll" "$G/d3d8.dll" && [ "$(cat "$G/d3d8.dll.gog-backup")" = gogd3d8to9 ]'
+check '[ ! -e "$G/d3d8_real.dll" ] && [ ! -e "$G/d3d9.dll" ] && [ ! -e "$G/dxvk.conf" ]'
 check 'cmp -s "$P/layers/display/Display8.ini" "$G/Display8.ini"'
 check '[ ! -e "$G/Display8.ini.a2ship" ] && [ ! -e "$G/d3d8.dll.a2display-new" ]'
 check 'cmp -s "$P/layers/render3d/Render3D.asi" "$G/Render3D.asi" && cmp -s "$P/layers/ui/UI.asi" "$G/UI.asi" && [ -e "$G/UI.ini" ]'
-check '[ "$(count "$G/Nebulae")" = "$(count "$P/layers/render3d/Nebulae")" ] && [ "$(count "$G/Surfaces")" = "$(( $(count "$P/layers/render3d/Surfaces") + 1 ))" ]'
-check '[ -z "$(ls "$G" | grep -E "^(HUD|Menus|GridLayout)\.(asi|ini)$")" ]'
-check '[ "$(cat "$G/binkw32_orig.dll")" = stockbink ]'
-if [ "$mac" = 0 ]; then
-    check '[ "$(vars)" = "    WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b;d3d9=n,b" ]'
-else
-    # d3d8to9 in (behind Display8) on Wine's own d3d9, DXVK's d3d8 kept; no d3d9.dll or dxvk.conf.
-    check '[ "$(sum "$G/d3d8_real.dll")" = "$(sum "$D3D8TO9")" ] && [ "$(cat "$G/d3d8.dll.a2chain-backup")" = dxvk ]'
-    check '[ ! -e "$G/d3d9.dll" ] && grep -q "d3d9.dll: Wine.s own (wined3d)" "$T/out"'
-    check '[ ! -e "$G/dxvk.conf" ]'
-    check '[ "$(vars)" = "    WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b" ]'
-
-    echo "== macOS: what an earlier install put in for DXVK comes out"
-    cp "$P/chain/d3d9.dll" "$G/d3d9.dll"; echo "d3d9.dll $(sum "$G/d3d9.dll")" >> "$G/armada2-refit-prereqs.txt"
-    cp "$P/layers/renderer/dxvk.conf" "$G/dxvk.conf"
-    "$P/install.sh" "$G" > "$T/out"
-    check '[ ! -e "$G/d3d9.dll" ] && ! grep -q "^d3d9\.dll " "$G/armada2-refit-prereqs.txt"'
-    check 'grep -q "d3d9.dll: took out the DXVK one" "$T/out"'
-    check '[ ! -e "$G/dxvk.conf" ]'
-    check '[ "$(vars)" = "    WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b" ]'
-fi
-
-echo "== reinstall over Display8: an older build replaced, d3d8to9 still behind, Display8.ini merged"
-printf 'MZ Display8 stopped the game: an older build\n' > "$G/d3d8.dll"
-printf '[Display8]\nMode=forward\nBackend=d3d9,vulkan\nVSync=0\nLog=1\n\n[Drop]\nDrop2D=1\n' > "$G/Display8.ini"
-printf '# generated by tools/renderer-config.sh\nd3d9.samplerAnisotropy = 4\n' > "$G/dxvk.conf"
+check '[ "$(count "$G/Nebulae")" = "$(count "$P/layers/render3d/Nebulae")" ] && [ "$(count "$G/Surfaces")" = "$(count "$P/layers/render3d/Surfaces")" ]'
+check '[ "$(vars)" = "    WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b" ]'
+echo dxvk > "$G/d3d8.dll"; echo "; mine" >> "$G/QOL.ini"
+mkdir -p "$G/Surfaces"; echo "[Surface]" > "$G/Surfaces/myown.ini"
 A2_PROGRESS=1 "$P/install.sh" "$G" > "$T/out"
-check 'cmp -s "$P/layers/display/d3d8.dll" "$G/d3d8.dll" && [ "$(sum "$G/d3d8_real.dll")" = "$(sum "$D3D8TO9")" ]'
-check 'grep -q "d3d8.dll: crosire.s d3d8to9 already" "$T/out" && cmp -s "$P/layers/ui/UI.asi" "$G/UI.asi"'
-# the step after the chain's, before the plugins'
-check '[ "$(grep "^::step" "$T/out" | sed -n "3,5p" | cut -d" " -f2 | tr "\n" " ")" = "chain display render3d " ]'
-# the old defaults moved (Defaults=2), then the retired keys dropped (Defaults=3: Mode,
-# Real, the d3d9 token), the player's own values kept, every missing key added, each once
-check '! grep -q "^Mode=" "$G/Display8.ini" && ! grep -q "^Real=" "$G/Display8.ini"'
-check 'grep -qx "VSync=0" "$G/Display8.ini" && grep -qx "Drop2D=1" "$G/Display8.ini" && grep -qx "Defaults=3" "$G/Display8.ini"'
-check 'grep -qx "Frames=3" "$G/Display8.ini" && [ "$(grep -c "^Backend=" "$G/Display8.ini")" = 1 ]'
-check 'grep -qx "Backend=vulkan" "$G/Display8.ini" || grep -qx "Backend=auto" "$G/Display8.ini"'
-check 'grep -qx "Anisotropy=4" "$G/Display8.ini"'   # the marked dxvk.conf's value carried to [Samplers]
-cp "$G/Display8.ini" "$T/d8.ini"
-"$P/install.sh" "$G" > "$T/out"
-check 'cmp -s "$T/d8.ini" "$G/Display8.ini"'   # merged again: nothing left to change
-check 'cmp -s "$T/RefitPlayer.ref" "$G/RefitPlayer.ini" && ! ls "$G" | grep -q "^RefitPlayer\.ini\."'   # upgrade
+check 'grep -q "STA2WidescreenPatch: already installed" "$T/out"'
+# an edited .ini is merged (values kept, keys added), not set aside as .bak
+check 'grep -q "; mine" "$G/QOL.ini" && grep -qx "PanSpeed=2.5" "$G/QOL.ini" && [ ! -e "$G/QOL.ini.bak" ]'
+# a DXVK d3d8.dll is the old chain's: replaced by Display8, GOG's copy kept
+check 'cmp -s "$P/layers/display/d3d8.dll" "$G/d3d8.dll" && [ "$(cat "$G/d3d8.dll.gog-backup")" = gogd3d8to9 ]'
+# the display step, then the retire step, then the plugins'
+check '[ "$(grep "^::step" "$T/out" | sed -n "3,5p" | cut -d" " -f2 | tr "\n" " ")" = "display retire render3d " ]'
+check '[ -z "$(grep "^::step" "$T/out" | grep -E " (chain|renderer) ")" ]'
+
+echo "== a 14.x-shaped game directory: the old chain, a marked dxvk.conf with an edited LodBias, the legacy plugins"
+O="$T/old"; mock "$O"
+cp "$G/d3d8.dll.gog-backup" "$O/d3d8.dll.gog-backup"
+printf 'MZ Display8 stopped the game: a 14.x build\n' > "$O/d3d8.dll"
+cp "$T/d3d8to9.dll" "$O/d3d8_real.dll"; cp "$T/dxvk9.dll" "$O/d3d9.dll"
+printf '%s\n%s\n' "d3d8.dll $(sum "$T/d3d8to9.dll")" "d3d9.dll $(sum "$T/dxvk9.dll")" > "$O/armada2-refit-prereqs.txt"
+printf '# generated by tools/renderer-config.sh\nd3d9.samplerAnisotropy = 16\nd3d9.samplerLodBias = -1.25\nd3d9.clampNegativeLodBias = False\n' > "$O/dxvk.conf"
+printf '[Display8]\nDefaults=2\nMode=forward\nBackend=d3d9,vulkan\nVSync=0\n' > "$O/Display8.ini"
+for n in HUD Menus GridLayout MSAA; do echo old > "$O/$n.asi"; echo old > "$O/$n.ini"; done
+cp "$T/RefitPlayer.ref" "$O/RefitPlayer.ini"
+A2_PROGRESS=1 "$P/install.sh" "$O" > "$T/out"
+check '[ ! -e "$O/d3d8_real.dll" ] && [ ! -e "$O/d3d9.dll" ] && [ ! -e "$O/dxvk.conf" ]'
+check 'cmp -s "$P/layers/display/d3d8.dll" "$O/d3d8.dll" && [ "$(cat "$O/d3d8.dll.gog-backup")" = gogd3d8to9 ]'
+check '[ -z "$(ls "$O" | grep -E "^(HUD|Menus|GridLayout|MSAA)\.(asi|ini)$")" ]'
+check '! grep -q "^d3d" "$O/armada2-refit-prereqs.txt"'
+check 'grep -qx "VSync=0" "$O/Display8.ini" && grep -qx "Defaults=3" "$O/Display8.ini" && ! grep -q "^Mode=" "$O/Display8.ini"'
+check 'grep -qx "LodBias=-1.25" "$O/Display8.ini"'   # the edited dxvk.conf value, in [Samplers]
+check 'awk "/^\[/{s=\$0} /^LodBias=-1.25\$/{print s}" "$O/Display8.ini" | grep -qix "\[Samplers\]"'
+check 'grep -qx "Backend=vulkan" "$O/Display8.ini" || grep -qx "Backend=auto" "$O/Display8.ini"'
+check 'cmp -s "$T/RefitPlayer.ref" "$O/RefitPlayer.ini"'   # the player's overlay, byte for byte
+check 'grep -q "retired dxvk.conf" "$T/out" && grep -q "retired d3d9.dll" "$T/out" && grep -q "retired d3d8_real.dll" "$T/out"'
+check '[ "$(vars)" = "    WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b" ]'
+cp "$O/Display8.ini" "$T/d8.ini"
+"$P/install.sh" "$O" > "$T/out"
+check 'cmp -s "$T/d8.ini" "$O/Display8.ini" && grep -q "nothing to take out" "$T/out"'   # again: nothing left to change
+echo "== ...uninstall from it: GOG's d3d8.dll is back, nothing of the chain left"
+"$P/install.sh" --uninstall "$O" > "$T/out"
+check '[ "$(cat "$O/d3d8.dll")" = gogd3d8to9 ] && [ ! -e "$O/d3d8.dll.gog-backup" ]'
+check '[ -z "$(ls "$O" | grep -E "^d3d9\.dll$|^d3d8_real\.dll$|^Display8\.|^dxvk\.conf$")" ]'
+check 'cmp -s "$T/RefitPlayer.ref" "$O/RefitPlayer.ini"'
+rm -rf "$O"
+
+echo "== a 14.x game without Display8: d3d8to9 in the slot, no Display8.ini, a marked dxvk.conf"
+O="$T/old2"; mock "$O"; rm "$O/d3d8.dll"
+cp "$T/d3d8to9.dll" "$O/d3d8.dll"; cp "$T/dxvk9.dll" "$O/d3d9.dll"; cp "$G/d3d8.dll.gog-backup" "$O/d3d8.dll.gog-backup"
+printf '# generated by tools/renderer-config.sh\nd3d9.samplerLodBias = -0.75\n' > "$O/dxvk.conf"
+"$P/install.sh" "$O" > "$T/out"
+check 'cmp -s "$P/layers/display/d3d8.dll" "$O/d3d8.dll" && [ ! -e "$O/d3d9.dll" ] && [ ! -e "$O/dxvk.conf" ]'
+check 'grep -qx "LodBias=-0.75" "$O/Display8.ini" && grep -qx "Defaults=3" "$O/Display8.ini"'
+rm -rf "$O"
+
+echo "== the slot was empty: Display8 in, nothing kept, uninstall leaves it empty (the system's is the game's)"
+O="$T/empty"; mock "$O"; rm "$O/d3d8.dll"
+"$P/install.sh" "$O" > "$T/out"
+check 'cmp -s "$P/layers/display/d3d8.dll" "$O/d3d8.dll" && [ ! -e "$O/d3d8.dll.gog-backup" ] && [ -e "$O/UI.asi" ]'
+"$P/install.sh" --uninstall "$O" > "$T/out"
+check '[ ! -e "$O/d3d8.dll" ] && [ -z "$(ls "$O" | grep -E "^Display8|\.asi$")" ]'
+rm -rf "$O"
+
+echo "== a marked dxvk.conf of the player's own making stays: no marker, no removal"
+O="$T/own"; mock "$O"; echo "d3d9.foo = 1" > "$O/dxvk.conf"; echo faked3d8to9 > "$O/d3d9.dll"
+"$P/install.sh" "$O" > "$T/out"
+check '[ "$(cat "$O/dxvk.conf")" = "d3d9.foo = 1" ] && [ "$(cat "$O/d3d9.dll")" = faked3d8to9 ]'   # not DXVK's hash: not ours
+rm -rf "$O"
 
 if [ "$mac" = 1 ]; then
-    echo "== macOS: a DXVK d3d9.dll of the player's own stays, and gets its override"
-    echo dxvk > "$G/d3d9.dll"
-    "$P/install.sh" "$G" > "$T/out"
-    check '[ "$(cat "$G/d3d9.dll")" = dxvk ] && grep -q "cannot run Direct3D 9 on a Mac" "$T/out"'
-    check '[ "$(vars)" = "    WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b;d3d9=n,b" ]'
-    rm -f "$G/d3d9.dll"
-
     echo "== macOS: with no argument, the game in a CrossOver bottle"
     C="$T/home/Library/Application Support/CrossOver/Bottles/GOG/drive_c/GOG Games/Star Trek Armada II"
     mock "$C"
     (unset A2_GAME; HOME="$T/home" "$P/install.sh" > "$T/out")
     check 'grep -q "^installing into $C\$" "$T/out"'
+    check 'grep -q "^In CrossOver" "$T/out"'
     (unset A2_GAME; HOME="$T/home" "$P/install.sh" --uninstall > "$T/out")
-    check '[ ! -e "$C/HUD.asi" ] && [ "$(cat "$C/binkw32.dll")" = stockbink ]'
+    check '[ ! -e "$C/HUD.asi" ] && [ "$(cat "$C/binkw32.dll")" = stockbink ] && [ "$(cat "$C/d3d8.dll")" = gogd3d8to9 ]'
 fi
 
 echo "== layer selection: A2_SKIP=rules, remembered by a plain re-run, --all brings it back"
@@ -175,7 +195,7 @@ check '! grep -qx "without rules" "$G/armada2-refit-layers.txt"'
 "$P/install.sh" --without=ui,render3d,models,cutscenes "$G" > "$T/out"   # taken out when left
 check '[ ! -e "$G/UI.asi" ] && [ ! -e "$G/Render3D.asi" ] && [ "$(ls "$G/Surfaces")" = myown.ini ] && [ ! -e "$G/Nebulae" ]'
 check '[ "$(cat "$G/binkw32.dll")" = stockbink ] && [ ! -e "$G/BinkProxy.ini" ] && [ ! -e "$G/HUD.asi" ]'
-check '[ -e "$G/QOL.asi" ] && [ -e "$G/d3d8_real.dll" ]'
+check '[ -e "$G/QOL.asi" ] && cmp -s "$P/layers/display/d3d8.dll" "$G/d3d8.dll"'
 check '! "$P/install.sh" --without display "$G" > "$T/out" 2> "$T/err" && grep -q "not a choice" "$T/err"'
 check '! "$P/install.sh" --without nonesuch "$G" > "$T/out" 2> "$T/err" && grep -q "unknown layer" "$T/err"'
 "$P/install.sh" --all "$G" > "$T/out"
@@ -258,7 +278,7 @@ rm -rf "$G/Surfaces"
 rm -rf "$G/Sky"
 check '[ ! -e "$G/winmm.dll" ] && [ ! -e "$G/armada2-refit-prereqs.txt" ]'
 check '[ "$(cat "$G/UltimateASILoader-license.txt")" = mine ] && grep -q "left UltimateASILoader-license.txt" "$T/out"'
-check '[ "$(cat "$G/d3d8.dll")" = dxvk ] && [ ! -e "$G/d3d9.dll" ]'
+check '[ "$(cat "$G/d3d8.dll")" = gogd3d8to9 ] && [ ! -e "$G/d3d9.dll" ] && [ ! -e "$G/d3d8.dll.gog-backup" ]'
 check '[ -z "$(ls "$G" | grep -E "^d3d8_real\.dll$|^Display8\.|a2display")" ]'
 check '[ ! -e "$B" ]'
 check 'cmp -s "$T/RefitPlayer.ref" "$G/RefitPlayer.ini" && ! ls "$G" | grep -q "^RefitPlayer\.ini\."'   # uninstall leaves it

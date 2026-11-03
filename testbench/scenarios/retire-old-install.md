@@ -16,7 +16,7 @@ snapshots the clone as the refit install leaves it, puts that old install over i
 last tag that has the layers (`testbench/bench/legacy.py`, cached in `$A2_DATA/bench/legacy/`),
 runs the checkout's `./install` over it and compares every file by sha256: the clone must
 come out exactly as it was (the chain class, `d3d8_real.dll`, `d3d9.dll` and `dxvk.conf`,
-stays until `retire.sh --chain`; the report says which). `Assets: none`, so no texture
+is taken out too: `./install` passes `retire.sh --chain` since 15.6.0). `Assets: none`, so no texture
 target puts back what the retire restored. The report is `RetireCheck.log` in the clone.
 
 1. Expect "RetireCheck.log" contains "retire-old-install: ok".

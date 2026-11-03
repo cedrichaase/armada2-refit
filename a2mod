@@ -26,8 +26,9 @@ Every layer in the registry (layers.toml; `tools/layers.py --list`) names what i
 to the game directory (`files`) and which stock files it changes in place beside a
 backup (`replaces`, `backups`): Render3D.asi and its recipes for render3d, the
 Textures/RGB/*.a2neb-backup of a2tex for textures, SOD/*.a2neb-backup for models,
-d3d8.dll.a2display-backup for display (stock puts the chain's own d3d8.dll back in
-its slot, so stock is the stock chain, not ours passing through), and so on.  Retired
+d3d8.dll.a2display-backup for display (stock puts back the d3d8.dll that was in the slot
+before Display8, GOG's; with none, Display8's d3d8.dll is set aside and the game runs on the
+system's own, which is stock), and so on.  Retired
 layers are in it too (hud, menus and grid, whose folders are gone, the per-part plugins
 render3d replaced, MenuScale.*, the file-based HUD fixes of hud 2.x): a stale copy is set
 aside like the rest, shown as a "retired" row in `status`, and an old snapshot restores.
@@ -37,9 +38,8 @@ no layer claims is filed under 'other'.
 
 DELIBERATELY NOT SWITCHED, in both states:
 
-    DXVK itself (d3d8.dll/d3d9.dll in the game dir, the chain behind Display8) --
-        plumbing, not a look; stock
-        wined3d is a different renderer and would make the comparison two changes.
+    Wine's and Proton's own Direct3D (nothing of ours stands behind Display8 since
+        platform 4.0.0) -- plumbing, not a look.
     The ASI loader (winmm.dll) and STA2WidescreenPatch.asi -- base setup; the menu
         and renderer hooks cannot load without the loader.
     ARMADA.PRF, RTS_CFG.h -- the player's options, set in game.  Not visual.
@@ -98,6 +98,15 @@ def sha(path):
     return h.hexdigest()
 
 
+def is_display8(path):
+    """Display8's d3d8.dll, by the message every build carries (a hash changes per build)."""
+    try:
+        with open(path, 'rb') as fh:
+            return b'Display8 stopped the game' in fh.read()
+    except OSError:
+        return False
+
+
 def layer_of(rel, suffix):
     """The layer a file replaced in place belongs to, by the backup beside it."""
     return registry.classify(REG, rel, suffix) or 'other'
@@ -153,7 +162,12 @@ def discover():
                 if f.lower().endswith('.bik')}
     except FileNotFoundError:
         biks = set()
+    have = {e['rel'] for e in found}
     for rel, layer in added_files():
+        if rel in have:
+            continue   # d3d8.dll with a backup beside it is a replaced file already
+        if rel == 'd3d8.dll' and not is_display8(os.path.join(GAME, rel)):
+            continue   # only ours: GOG's, or a d3d8.dll of the player's own, is not a change
         if rel.startswith(MOVIE_DIR + '/') and os.path.splitext(rel)[1].lower() in MOVIE_EXTS \
                 and os.path.splitext(os.path.basename(rel))[0].lower() not in biks:
             continue
@@ -380,7 +394,6 @@ def status():
             if layer in by:
                 parts = ', '.join(f'{n} {s}' for s, n in sorted(by[layer].items()))
                 print(f'  {label(layer):<19} {parts}')
-    print(f'  {"dxvk":<19} unchanged in both states')
 
 
 def main():

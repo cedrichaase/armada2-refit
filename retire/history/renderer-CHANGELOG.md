@@ -1,10 +1,24 @@
-# Changelog — renderer
+# Changelog — renderer (retired; history kept here, the folder is gone)
 
 The **renderer** `a2mod` layer: `dxvk.conf`, written by `renderer-config.sh`. This
 folder was `postfx/` before 2.0.0 and also held a **bloom** layer (vkBasalt, built by
 `vkbasalt/build.sh` and configured by `postfx.py`), versioned with it; the entries below
-2.0.0 are that folder's. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
-versions". Newest first. The tables behind the numbers are in [`README.md`](README.md).
+2.0.0 are that folder's. Versioning rules: [`CLAUDE.md`](../../CLAUDE.md), "Changelogs and
+versions". Newest first. The tables behind the numbers were in the layer's README, removed
+with it (what it established lives in `display/README.md`, "Samplers", and `render3d/README.md`).
+
+## 3.0.0 — 2026-11-03
+
+### Removed
+- The layer: `renderer-config.sh` and `dxvk.conf` (16x anisotropy, LOD bias, seamless cube
+  maps, `d3d9.*` keys), which only DXVK's Direct3D 9 read. Nothing stands on DXVK since
+  display 1.0.0, and the three sampler settings are `Display8.ini [Samplers]`
+  (`Anisotropy`, `LodBias`, `ClampNegativeLodBias`). `retire/retire.sh --chain` and the
+  release scripts take a `dxvk.conf` we wrote out (recognised by its marker line), after
+  carrying its values into `[Samplers]` (`tools/ini-merge.py`, Defaults 3). The layer stays
+  a retired row in `layers.toml` so `a2mod` still files a stale copy.
+
+Installed, not yet seen in game.
 
 ## 2.0.2 — 2026-11-03
 

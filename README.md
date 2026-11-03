@@ -206,7 +206,6 @@ d3d8to9 also needs the Visual C++ 2015–2022 (x86) and DirectX end-user runtime
 | Layer | Install | Why DXVK |
 |---|---|---|
 | 3D renderer | `render3d/build/Render3D.asi`, `render3d/Render3D.ini`, its recipes (`render3d/content/sky/` built in; `render3d/content/surfaces/` and `render3d/content/nebulae/` into `Surfaces` and `Nebulae` folders beside it) | Draws the 3D view through Direct3D 9 behind the game's d3d8, so it needs DXVK and crosire's d3d8to9 (below); under DXVK's own d3d8 the engine draws the view. Replaces the earlier `MSAA.asi`, `Lighting.asi`, `Sky.asi` and the other per-part plugins; `render3d/install.sh` takes any of them out ([`render3d/README.md`](render3d/README.md)) |
-| Renderer | `renderer/renderer-config.sh --stage 3` writes `dxvk.conf` | Only DXVK reads the file. Anisotropic filtering, LOD bias and seamless cube maps. The release zip has it ready, in `game/` |
 
 Bloom is `Render3D.asi`'s. A vkBasalt or ReShade bloom set up by an earlier version
 (`postfx/`, before 13.0.0) is taken out by `./install` and by the release installers,
@@ -226,7 +225,6 @@ The mod is a stack of independent layers, each in its own folder with its own RE
 | [`retire/`](retire/README.md) | (root) | `retire.sh`: takes out of a game what earlier versions installed and nothing installs now (`HUD.asi`, `GridLayout.asi`, `Menus.asi`, the per-part plugins, the file-based HUD fixes, the vkBasalt bloom) |
 | [`qol/`](qol/README.md) | qol | `QOL.asi`: gameplay quality of life that stays compatible with stock players (right-drag pan speed, `Shift+number` adds to a group, selections and groups beyond 16, stations in groups with one build menu, long moves at warp), and the plan for the rest |
 | [`render3d/`](render3d/README.md) | render3d | `Render3D.asi`: the 3D view through a renderer of our own, in Rust. Half-float multisampled target with bloom by energy, and modules for hulls (scene lights, shadows), sky, particles, ordnance, effects (explosions, shields, repair, venting, warp), planets, moons, asteroids and nebulae, and fog and selection. Replaced the per-part plugins |
-| [`renderer/`](renderer/README.md) | renderer | `dxvk.conf`: anisotropic filtering, LOD bias, seamless cube maps |
 | [`textures/`](textures/README.md) | textures | the texture pipeline, `./a2tex`: 84 targets (skyboxes, nebulae, planets, UI, hulls), each a recipe for one set of replacement textures |
 | [`models/`](models/README.md) | models | the smoothed dilithium moons and asteroids, the round selection bubble, and the loading-screen model, widened with its `LOADING` art. The planets' sphere is render3d's |
 | [`cutscenes/`](cutscenes/binkproxy/README.md) | cutscenes | `binkproxy`, a `binkw32.dll` that plays launch reels full screen and AV1 replacements in place of `.bik` movies, and the movie pipeline |

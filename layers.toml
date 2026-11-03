@@ -38,9 +38,9 @@ schema = 1
 # The ::step ids publish/installer/install.sh and install.ps1 print, in order, and
 # publish/package.sh's manifest `steps`. `own` are the steps of no layer; `extra` the
 # ones printed outside that order (--uninstall).
-steps = ['verify', 'prereqs', 'chain', 'display', 'render3d', 'ui', 'qol', 'rules', 'models',
-         'online', 'cutscenes', 'renderer', 'bloom', 'done']
-own = ['verify', 'done']
+steps = ['verify', 'prereqs', 'display', 'retire', 'render3d', 'ui', 'qol', 'rules', 'models',
+         'online', 'cutscenes', 'bloom', 'done']
+own = ['verify', 'retire', 'done']
 extra = ['uninstall']
 
 # ---------------------------------------------------------------- core
@@ -49,15 +49,15 @@ extra = ['uninstall']
 id = 'platform'
 name = 'Platform'
 dir = 'platform'
-install = 'python3 platform/d3d8-chain.py --upgrade'
+install = 'python3 platform/d3d8-chain.py --retire'
 remove = 'python3 platform/d3d8-chain.py --revert'
 files = []
 select = 'core'
 requires = []
 scope = 'local'
 games = ['armada2']
-steps = ['prereqs', 'chain']
-summary = "the Direct3D chain (crosire's d3d8to9 on DXVK's d3d9), the widescreen patch and the ASI loader; a2mod never switches it"
+steps = ['prereqs']
+summary = "the widescreen patch and the ASI loader, and taking the retired Direct3D chain (d3d8to9, DXVK) out of the game; a2mod never switches it"
 
 [[layer]]
 id = 'display'
@@ -65,28 +65,14 @@ name = 'Display8'
 dir = 'display'
 install = 'display/install'
 remove = 'display/install --remove'
-files = ['d3d8_real.dll', 'Display8.ini']
+files = ['d3d8.dll', 'Display8.ini']   # d3d8.dll only where it is Display8's (a2mod checks by content)
 backups = ['.a2display-backup']
 select = 'core'
 requires = ['platform']
 scope = 'local'
 games = ['armada2']
 steps = ['display']
-summary = "the game's Direct3D 8, ours, in front of the real chain"
-
-[[layer]]
-id = 'renderer'
-name = 'Renderer'
-dir = 'renderer'
-install = 'renderer/renderer-config.sh --stage 3'
-remove = 'renderer/renderer-config.sh --remove'
-files = ['dxvk.conf']
-select = 'core'
-requires = []
-scope = 'local'
-games = ['armada2']
-steps = ['renderer']
-summary = '16x anisotropic filtering, LOD bias, seamless cube maps (read by DXVK)'
+summary = "the game's Direct3D 8, ours: Vulkan or Direct3D 12 for the plugins, the system's own d3d8.dll when neither starts"
 
 # ---------------------------------------------------------------- selectable
 
@@ -298,3 +284,19 @@ scope = 'local'
 games = ['armada2']
 steps = ['bloom']
 summary = 'the per-user vkBasalt bloom, replaced by Render3D.asi'
+
+# dxvk.conf, DXVK's settings, and the d3d8_real.dll that Display8 stood in front of: nothing
+# reads them since display 1.0.0 (the samplers are Display8.ini [Samplers]). renderer's
+# folder is gone (renderer 3.0.0; its changelog is in retire/history/); retire/retire.sh
+# --chain and the release scripts take both out, and a2mod still files a stale copy.
+[[layer]]
+id = 'renderer'
+name = 'Renderer (retired)'
+dir = 'retire'
+files = ['dxvk.conf', 'd3d8_real.dll']
+select = 'retired'
+requires = []
+scope = 'local'
+games = ['armada2']
+steps = []
+summary = 'dxvk.conf, the filtering settings DXVK read, before Display8.ini [Samplers]'

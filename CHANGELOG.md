@@ -5,6 +5,23 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.0 — 2026-11-03
+
+Layers: platform 4.0.0, renderer 3.0.0 (retired), gui-installer 3.0.0, testbench 4.0.1.
+
+### Removed
+- The Direct3D 9 chain from the repository, the release package and the installers (phase 11, C1): `platform/vendor/d3d8to9-1.16.0` and `dxvk-3.1.1`, `D3D9.md`, `d3d9/`, `dxvk-logging.py`, `d3d8-chain.py --use` and `--upgrade`; the package has no `chain/` and no `layers/renderer/dxvk.conf`; the `chain` and `renderer` release steps; `renderer/` (its changelog is `retire/history/renderer-CHANGELOG.md`, and `renderer` stays a retired row in `layers.toml`). `WINEDLLOVERRIDES` is `winmm=n,b;d3d8=n,b` everywhere (`platform/run-wine.sh` too).
+
+### Added
+- The release step `retire` (after `display`): `install.sh` and `install.ps1` read `retire.txt` (baked from `retire/known.txt`) and take out the legacy plugins, the chain's `d3d8_real.dll` and `d3d9.dll` by hash and a marked `dxvk.conf` by its marker, whose sampler values go into `Display8.ini [Samplers]` first (the merge's Defaults 3, with a stub when there is no `Display8.ini`). Display8 goes into the `d3d8.dll` slot when it is empty, GOG's (kept as `d3d8.dll.gog-backup`, put back by `--uninstall`), the old chain's or an older Display8; a `d3d8.dll` of the player's own stays and so do `Render3D.asi` and `UI.asi`. Installer tests: a 14.x-shaped game directory (old chain, marked `dxvk.conf` with an edited LodBias, legacy plugins) upgrades cleanly with `RefitPlayer.ini` byte-identical, and uninstall puts GOG's `d3d8.dll` back.
+- `./install` passes `retire/retire.sh --chain`, which carries a marked `dxvk.conf`'s samplers into `Display8.ini` before removing it (`retire/selftest.sh` checks it); `platform/d3d8-chain.py --retire` (platform step) takes the retired chain's slot files out, `--retire --heroic` also `d3d9=n,b` from Heroic's overrides.
+
+### Changed
+- `a2mod`: Display8's `d3d8.dll` is filed under the display layer by content when no `.a2display-backup` sits beside it, so `a2mod stock` on a game whose slot was empty sets Display8 aside and the game runs on the system's `d3d8.dll`; with a backup (GOG's) it is put back as before. The snapshot layout is unchanged.
+- `testbench/retire-old-install.py` now requires the chain class (`d3d8_real.dll`, `d3d9.dll`, `dxvk.conf`) to be removed.
+
+Installed, not yet seen in game
+
 ## 15.4.0 — 2026-11-03
 
 Layers: testbench 4.0.0.

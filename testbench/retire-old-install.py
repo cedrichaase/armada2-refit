@@ -9,9 +9,8 @@ The clone is already the refit install (the scenario runs with `--install .` and
 scripts' edits and their backups, the d3d8to9 and DXVK chain, a marked dxvk.conf, the
 twelve per-part plugins, MenuScale, the widened loading screen's backups), runs the
 checkout's `./install` over that (B) and compares: B must be A, file for file by sha256,
-except the logs, the player's overlay and the chain class (d3d8_real.dll, d3d9.dll and
-dxvk.conf stay until retire.sh is given --chain: they are left untouched or removed, and
-the report says which). It writes `RetireCheck.log` into the clone and exits 1 on a
+except the logs and the player's overlay. The chain class (d3d8_real.dll, d3d9.dll and
+dxvk.conf) is taken out too since ./install passes retire.sh --chain (platform 4.0.0). It writes `RetireCheck.log` into the clone and exits 1 on a
 difference; the scenario's steps then check the log and launch the game.
 """
 import concurrent.futures
@@ -105,8 +104,6 @@ def main():
     b = snapshot(game)
     bad = []
     for n in sorted(set(a) | set(b)):
-        if n in CHAIN:
-            continue
         if n not in b and n.endswith(('.a2neb-backup', '.a2font-backup')) \
                 and n.rsplit('.', 1)[0] in a and a.get(n.rsplit('.', 1)[0]) == b.get(n.rsplit('.', 1)[0]):
             continue        # a2mod's own backup of a stock file, dropped beside a file now stock again
@@ -117,9 +114,7 @@ def main():
         elif a[n] != b[n]:
             bad.append(f'differs from the refit install: {n}')
     for n in CHAIN:
-        if n in b and b[n] not in (seeded.get(n), a.get(n)):
-            bad.append(f'chain file changed, neither left nor removed: {n}')
-        say(f'  chain class {n}: ' + ('left in place' if n in b else 'removed'))
+        say(f'  chain class {n}: ' + ('STILL THERE' if n in b else 'removed'))
     if (game / 'MenuScale').exists():
         bad.append('MenuScale/ folder still there')
     for line in bad[:40]:
