@@ -260,7 +260,9 @@ pub fn shell_slider(ui: &mut Ui, s: &Screen, c: &Control, track: R, id: &str) {
         crate::log!("menus: scroll bar read back at {} of {}..{}", c.pos, c.range.0, c.range.1);
     }
     let mut v = if drag { unsafe { DRAG.1 } } else { c.pos as f32 };
-    let changed = ui.slider(track, id, &mut v, lo, hi);
+    // A key steps a twentieth of the range, at least one value: a range under 20 would
+    // otherwise round back to where it stood.
+    let changed = ui.slider_step(track, id, &mut v, lo, hi, ((hi - lo) / 20.0).max(1.0));
     if !s.top {
         return;
     }

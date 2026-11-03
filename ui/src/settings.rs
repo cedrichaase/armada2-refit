@@ -13,7 +13,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 /// The fixed export names (A2SET_ABI 1.1).
-const EXPORTS: [&str; 7] = ["Display8_Settings", "Render3D_Settings", "UI_Settings", "QOL_Settings", "QOLRules_Settings", "Online_Settings", "BinkProxy_Settings"];
+const EXPORTS: [&str; 6] = ["Display8_Settings", "Render3D_Settings", "UI_Settings", "QOL_Settings", "QOLRules_Settings", "Online_Settings"];
 
 #[link(name = "kernel32")]
 unsafe extern "system" {
@@ -390,7 +390,7 @@ fn read_rows(export: &str, base: *const Setting, count: u32) -> Option<Vec<&'sta
             Some(("apply", r.apply))
         } else if !matches!(r.scope, SCOPE_LOCAL | SCOPE_MATCH) {
             Some(("scope", r.scope))
-        } else if r.tab > TAB_MOVIES {
+        } else if r.tab > TAB_MULTIPLAYER {
             Some(("tab", r.tab))
         } else {
             None

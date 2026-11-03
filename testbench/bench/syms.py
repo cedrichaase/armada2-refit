@@ -166,6 +166,9 @@ def main(argv):
         print(render(rep))
         if msg and a.record:
             print(msg)
-    if a.record and rep['build'] is None:
+    if rep['build'] is None and not a.build:
+        # an exe no profile knows: say so in the exit status, with or without --record
+        if not a.record:
+            print('a2test syms: unknown build', file=sys.stderr)
         return 1
     return 0

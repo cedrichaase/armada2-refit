@@ -95,7 +95,7 @@
 //!
 //! | Export | Signature | What |
 //! |---|---|---|
-//! | `display8v1_mode` | `fn(w: *mut u32, h: *mut u32) -> bool` | the display mode the shell and the game run at, once the device exists (the stub's mode, or the mode the real chain opened); false before, and `w`, `h` untouched. A plugin falls back to measuring the desktop when it is absent (minor below 3) |
+//! | `display8v1_mode` | `fn(w: *mut u32, h: *mut u32) -> bool` | the display mode the shell and the game run at, once the device exists (the mode the engine's request opened the device at); false before, and `w`, `h` untouched. A plugin falls back to measuring the desktop when it is absent (minor below 3) |
 //!
 //! and `CLAIM_MENUS`, which asks Display8 to raise the shell's own 800x600x16 request to
 //! the desktop's mode while a plugin that hosts the shell's menus at the screen's size

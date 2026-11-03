@@ -5,7 +5,8 @@
 #   install.sh --remove   take it out again
 #
 # Adds UI.asi, UI.ini and (at run time) UI.log: every hook is made in memory, so
-# removing the files gives the stock game back. The player's UI.ini stays; a key the
+# removing the files gives the stock game back: --remove deletes UI.asi, UI.ini and UI.log,
+# so it takes the player's UI.ini with it. An install keeps an existing UI.ini: a key the
 # shipped file has and theirs lacks is added in its own section, and a part a newer
 # set of defaults switched on is switched on where theirs still holds the old default
 # (tools/ini-merge.py). The plugins the UI replaced (HUD.asi, GridLayout.asi, Menus.asi)

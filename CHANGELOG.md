@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.16 — 2026-11-04
+
+Layers: ui 2.2.4, testbench 4.1.4.
+
+### Fixed
+- Round-f review, misc: the Refit screen's Reset covers the tab's advanced rows, a key step moves an integer slider of fewer than twenty values by one, the settings hub no longer looks for `BinkProxy_Settings`, `ui/install.sh`'s header says what `--remove` deletes, status lines backfilled (15.6.0, 15.2.0). cutscenes 3.0.1 stays a patch (see its entry). Installed, not yet seen in game.
+
 ## 15.6.12 — 2026-11-03
 
 Layers: cutscenes 3.0.1, rules 1.0.1, online 0.11.1, ui 2.2.3, testbench 4.1.3.
@@ -116,6 +123,8 @@ Layers: platform 4.0.0, renderer 3.0.0 (retired), gui-installer 3.0.0, testbench
 - `a2mod`: Display8's `d3d8.dll` is filed under the display layer by content when no `.a2display-backup` sits beside it, so `a2mod stock` on a game whose slot was empty sets Display8 aside and the game runs on the system's `d3d8.dll`; with a backup (GOG's) it is put back as before. The snapshot layout is unchanged.
 - `testbench/retire-old-install.py` now requires the chain class (`d3d8_real.dll`, `d3d9.dll`, `dxvk.conf`) to be removed.
 
+Installed, not yet seen in game.
+
 ## 15.5.0 — 2026-11-03
 
 Layers: ui 2.2.0, qol 2.2.1.
@@ -172,6 +181,8 @@ Layers: hud 3.0.0, grid 2.0.0, menus 5.0.0, ui 2.1.0, models 5.1.0, textures 2.2
 - `hud/`, `grid/` and `menus/` (their last changelogs are `retire/history/`), the
   `LOADING` texture target with `models/logo-sod.py`, `models/loading-panel.sh` and the
   `panel=` lines of `a2tex`. `ui/bench-legacy.sh` stays but stops with a message.
+
+Installed, not yet seen in game.
 
 ## 15.1.0 — 2026-11-03
 

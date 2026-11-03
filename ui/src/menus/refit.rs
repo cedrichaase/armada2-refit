@@ -20,12 +20,11 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 /// The tabs, in the order they stand.
-const TABS: [(u8, &str); 5] = [
+const TABS: [(u8, &str); 4] = [
     (TAB_GRAPHICS, "Graphics"),
     (TAB_INTERFACE, "Interface"),
     (TAB_GAMEPLAY, "Gameplay"),
     (TAB_MULTIPLAYER, "Multiplayer"),
-    (TAB_MOVIES, "Movies"),
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -667,7 +666,8 @@ fn answer(ui: &mut Ui, yes: bool) {
             if !yes {
                 return;
             }
-            let its = items(s.tab, s.advanced);
+            // Reset covers the tab's advanced rows too, shown or not.
+            let its = items(s.tab, true);
             let keys: Vec<(&str, &str, &str)> = its
                 .iter()
                 .filter_map(|i| match i {

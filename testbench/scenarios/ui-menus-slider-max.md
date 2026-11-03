@@ -10,7 +10,9 @@ its track onto its range over the track's length plus one, so the point that map
 range's top lies past the track: the player reached it with the far arrow button, and our
 slider sent a click on nothing (round F: Graphics Detail could not be set back to its
 maximum). The slider is clicked at its left end and at its right end; the UI logs what it
-sent and, when the bar's own value matches, the value read back.
+sent and, when the bar's own value matches, the value read back. A key step moves it
+by at least one value: Left from the top reads back 3 (a range under 20 stepped by a
+twentieth, rounded back to where it stood).
 
 1. Launch the game.
 2. Wait for the main menu.
@@ -26,13 +28,18 @@ sent and, when the bar's own value matches, the value read back.
 12. Click at 1020,453.
 13. Wait 1 second.
 14. Expect "UI.log" contains "scroll bar read back at 4 of 0..4".
-15. Take a screenshot called "graphics detail at max".
-16. Click "Previous Menu".
-17. Wait 2 seconds.
-18. Click "Graphics Settings".
-19. Wait 2 seconds.
-20. Take a screenshot called "graphics detail still max".
+15. Press Left.
+16. Wait 1 second.
+17. Expect "UI.log" contains "scroll bar read back at 3 of 0..4".
+18. Click at 1020,453.
+19. Wait 1 second.
+20. Take a screenshot called "graphics detail at max".
 21. Click "Previous Menu".
 22. Wait 2 seconds.
-23. Quit the game.
-24. Expect no crash.
+23. Click "Graphics Settings".
+24. Wait 2 seconds.
+25. Take a screenshot called "graphics detail still max".
+26. Click "Previous Menu".
+27. Wait 2 seconds.
+28. Quit the game.
+29. Expect no crash.

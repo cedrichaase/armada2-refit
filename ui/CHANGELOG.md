@@ -4,6 +4,14 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 2.2.4 — 2026-11-04
+
+### Fixed
+- Refit screen: Reset on a tab also removes the tab's advanced rows' keys when "Show advanced" is off; the Movies tab entry is gone from the tab list; the settings hub no longer looks for `BinkProxy_Settings` (it logged the export missing at every start).
+- A press on a slider now gives it the keyboard focus (it never took it, so its Left/Right steps were unreachable by mouse). A key step on a stock shell slider moves it at least one value: `widgets::Ui::slider_step`, used by `shell_slider`. A range under 20 (Graphics Detail, 0..4) rounded the twentieth back to where it stood.
+
+Installed, not yet seen in game.
+
 ## 2.2.3 — 2026-11-03
 
 ### Changed
@@ -67,6 +75,8 @@ Installed, not yet seen in game
 - `install.sh` no longer runs `supersede.sh`, which is gone: `retire/retire.sh` takes
   `HUD.asi`, `GridLayout.asi` and `Menus.asi` out (`./install` runs it first).
   `bench-asi.sh` calls it on a bench clone; `bench-legacy.sh` stops with a message (the plugins it built are gone; the bench takes them from a cached tag build).
+
+Installed, not yet seen in game.
 
 ## 2.0.0 — 2026-11-03
 
