@@ -6,8 +6,11 @@
 //! is a `u64` argument; a CPU descriptor handle a `usize`.
 #![allow(dead_code, clippy::upper_case_acronyms)]
 
-use crate::d3d9::raw::Guid;
 use core::ffi::c_void;
+
+/// A COM interface ID.
+#[repr(C)]
+pub struct Guid(pub u32, pub u16, pub u16, pub [u8; 8]);
 
 pub type P = *mut c_void;
 

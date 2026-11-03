@@ -8,7 +8,6 @@ use r3d_core::assets;
 use r3d_core::frame::steps::View;
 use r3d_core::gfx::{self, Pipes};
 use r3d_core::math::{M34, V3};
-use crate::shaders::particles::*;
 use crate::shaders::particles_spv::*;
 use crate::shaders::particles_dxil::*;
 use alloc::string::String;
@@ -158,7 +157,7 @@ impl Batch {
             Material::Cutout => 2,
         };
         self.pipes.view(key, || {
-            let mut d = PipelineDesc::new(gpu::code!(VS_SPRITE, VS_SPRITE_SPV, VS_SPRITE_DXIL), gpu::code!(PS_SPRITE, PS_SPRITE_SPV, PS_SPRITE_DXIL, PS_SPRITE_AT_DXIL), &LAYOUT, 36, Topology::TriangleList, Format::Unknown);
+            let mut d = PipelineDesc::new(gpu::code!(VS_SPRITE_SPV, VS_SPRITE_DXIL), gpu::code!(PS_SPRITE_SPV, PS_SPRITE_DXIL, PS_SPRITE_AT_DXIL), &LAYOUT, 36, Topology::TriangleList, Format::Unknown);
             d.write_mask = 7;
             d.depth = Depth { test: true, write: key == 2, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
             d.blend = match key {

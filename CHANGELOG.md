@@ -40,6 +40,19 @@ Layers: hud 3.0.0, grid 2.0.0, menus 5.0.0, ui 2.1.0, models 5.1.0, textures 2.2
   `LOADING` texture target with `models/logo-sod.py`, `models/loading-panel.sh` and the
   `panel=` lines of `a2tex`. `ui/bench-legacy.sh` stays but stops with a message.
 
+## 15.1.0 — 2026-11-03
+
+Layers: render3d 1.0.0, ui 2.0.0, display 1.0.1 (gpu 2.0.0, not a layer).
+
+Round F, phase 11 R2: gpu, render3d and the shader toolchain without Direct3D 9. `gpu::d3d9`
+and the Direct3D 9 path of render3d and the UI are gone, and so is the d3dbc form of every
+shader with `tools/shaderc/d3dbc-fix.py`, `d3dbc-slots.py` and `fetch-vkd3d.sh`: CI's
+`shaders` job rebuilds the SPIR-V and DXIL with dxc and checks them with spirv-val.
+`gpu/replay.sh` has no `d3d9` backend. MAJOR for render3d (no longer runs without Display8)
+and the UI (no Direct3D 9 device path). Docs: `gpu/README.md`, `render3d/README.md`
+("One source, two forms"), `platform/D3D9.md` marked historical. Installed, not yet seen
+in game.
+
 ## 15.0.0 — 2026-11-03
 
 Layers: display 1.0.0, cutscenes 3.0.0, testbench 3.106.0.

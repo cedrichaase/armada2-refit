@@ -5,7 +5,7 @@
 //! last pointed at (`choose`), the Federation's at first, and render3d moves the camera
 //! over. The screen specs then draw over it (`shown`) in place of the stock screen's art.
 //!
-//! Without Render3D.asi, or when it draws nothing (no Direct3D 9 device, its scene
+//! Without Render3D.asi, or when it draws nothing (no Display8 device, its scene
 //! switched off), `shown` is false and the specs draw what they drew before.
 //!
 //! **The departure.** A mission loaded while the scene is up (from the campaign

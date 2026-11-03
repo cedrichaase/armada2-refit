@@ -124,7 +124,7 @@ impl<'a> Cmd<'a> {
 
     // -- passes --
 
-    /// Begins a pass (see `d3d9::Cmd::begin_pass` for what the interface promises): the
+    /// Begins a pass (the interface promises what gpu/README.md says of the pass now): the
     /// targets made, the pass the pass now, its viewport its area. A clear is done at
     /// once (a load operation of the render pass over the whole target, else a clear of
     /// the area inside one); otherwise the render pass is opened at the first draw.
@@ -554,7 +554,7 @@ impl<'a> Cmd<'a> {
             return None;
         }
         unsafe { core::ptr::copy_nonoverlapping(src, a.cpu, n as usize) };
-        Some(Span { buf: core::ptr::null_mut(), vk: a.buffer, first: a.offset / stride, count: n / stride, stride })
+        Some(Span { vk: a.buffer, first: a.offset / stride, count: n / stride, stride })
     }
 
     pub fn vertices<T: Copy>(&mut self, data: &[T]) -> Option<Span> {
@@ -572,7 +572,7 @@ impl<'a> Cmd<'a> {
         if h == vk::Buffer::null() || stride == 0 {
             return None;
         }
-        Some(Span { buf: core::ptr::null_mut(), vk: vk::Handle::as_raw(h), first: 0, count: b.0.desc.size / stride, stride })
+        Some(Span { vk: vk::Handle::as_raw(h), first: 0, count: b.0.desc.size / stride, stride })
     }
 
     /// Makes the command buffer agree with the state for a draw (the module doc). None:

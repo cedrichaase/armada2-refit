@@ -17,13 +17,12 @@
 //!
 //! Each view has buffers of its own (`View::key`: the HUD's action camera draws the
 //! scene a second time each frame). Render only: nothing here is read by the game.
-//! On Direct3D 9, or with `Clustered=0`, nothing of this runs and every draw takes its
+//! Stood down, or with `Clustered=0`, nothing of this runs and every draw takes its
 //! lights from its constants as before.
 use super::lights;
 use crate::frame::steps::View;
 use crate::gfx;
 use crate::math::V3;
-use crate::shaders::clusters::*;
 use crate::shaders::clusters_dxil::*;
 use crate::shaders::clusters_spv::*;
 use alloc::collections::BTreeMap;
@@ -156,7 +155,7 @@ pub fn on() -> bool {
         return false;
     }
     let s = st();
-    let p = s.pipe.get_or_insert_with(|| g.compute_pipeline(ComputeDesc { cs: gpu::code!(CS_CLUSTER, CS_CLUSTER_SPV, CS_CLUSTER_DXIL) }));
+    let p = s.pipe.get_or_insert_with(|| g.compute_pipeline(ComputeDesc { cs: gpu::code!(CS_CLUSTER_SPV, CS_CLUSTER_DXIL) }));
     let ok = p.ready(g);
     if !s.said {
         s.said = true;

@@ -7,7 +7,6 @@
 use crate::config::Config;
 use crate::dump::{Area, Dump, Kind};
 use crate::log;
-use crate::shaders::post::*;
 use crate::shaders::post_spv::*;
 use crate::shaders::post_dxil::*;
 use alloc::vec::Vec;
@@ -87,7 +86,7 @@ impl Targets {
         for (fmt, samples) in tries {
             if let Some(t) = Self::try_create(gpu, w, h, fmt, samples, zfmt) {
                 if fmt != Format::Rgba16F && cfg.hdr || samples != ms {
-                    log!("frame: fell back to format {} with {} samples", gpu::d3d9::format_code(fmt), samples);
+                    log!("frame: fell back to format {} with {} samples", gpu::format_code(fmt), samples);
                 }
                 return Some(t);
             }
@@ -125,8 +124,8 @@ static LAYOUT: [VertexAttr; 3] = [
 
 /// A quad over `r` of a `dw` x `dh` target, `a` and `b` the two sets of texture
 /// coordinates at its corners (u0, v0, u1, v1). Positions are shifted half a pixel on
-/// Direct3D 9, which puts pixel centres on integers (`gpu::Gpu::half_pixel`; none on
-/// Vulkan).
+/// the comparison mode `PixelCentres=d3d9`, which puts pixel centres on integers
+/// (`gpu::Gpu::half_pixel`; none otherwise).
 fn quad(cmd: &mut Cmd, dw: u32, dh: u32, r: PRect, a: [f32; 4], b: [f32; 4]) {
     let hp = cmd.gpu().half_pixel();
     let x0 = (r.x as f32 - hp) / dw as f32 * 2.0 - 1.0;
@@ -177,16 +176,16 @@ impl Post {
     /// device refuses a shader.
     pub fn create(gpu: &Gpu, fmt: Format, out: Format) -> Option<Post> {
         let p = |ps: gpu::Code, target: Format, blend: Option<Blend>| {
-            let mut d = PipelineDesc::new(gpu::code!(VS_QUAD, VS_QUAD_SPV, VS_QUAD_DXIL), ps, &LAYOUT, 32, Topology::TriangleStrip, target);
+            let mut d = PipelineDesc::new(gpu::code!(VS_QUAD_SPV, VS_QUAD_DXIL), ps, &LAYOUT, 32, Topology::TriangleStrip, target);
             d.blend = blend;
             let p = gpu.pipeline(d);
             p.ready(gpu).then_some(p)
         };
         Some(Post {
-            prefilter: p(gpu::code!(PS_PREFILTER, PS_PREFILTER_SPV, PS_PREFILTER_DXIL), fmt, None)?,
-            down: p(gpu::code!(PS_DOWN, PS_DOWN_SPV, PS_DOWN_DXIL), fmt, None)?,
-            up: p(gpu::code!(PS_UP, PS_UP_SPV, PS_UP_DXIL), fmt, Some(Blend::ADD))?,
-            fin: p(gpu::code!(PS_FINAL, PS_FINAL_SPV, PS_FINAL_DXIL), out, None)?,
+            prefilter: p(gpu::code!(PS_PREFILTER_SPV, PS_PREFILTER_DXIL), fmt, None)?,
+            down: p(gpu::code!(PS_DOWN_SPV, PS_DOWN_DXIL), fmt, None)?,
+            up: p(gpu::code!(PS_UP_SPV, PS_UP_DXIL), fmt, Some(Blend::ADD))?,
+            fin: p(gpu::code!(PS_FINAL_SPV, PS_FINAL_DXIL), out, None)?,
             out,
         })
     }
@@ -280,7 +279,7 @@ impl Post {
         quad(cmd, ow, oh, view, su, bu);
         if let Some((d, label)) = dump.as_mut() {
             d.surface(gpu, out, None, &crate::sfmt!("{}-tonemapped", label), Kind::Ppm);
-            d.note("depth: not dumped (Direct3D 9 cannot read a depth surface back with GetRenderTargetData)");
+            d.note("depth: not dumped (the engine's depth is not read back)");
         }
         // 4. The engine's depth, for the HUD drawn over the view next.
         if out_depth.is_some() {

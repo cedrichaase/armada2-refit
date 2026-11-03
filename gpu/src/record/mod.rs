@@ -84,7 +84,6 @@ pub(crate) fn active() -> usize {
 /// draw reads.
 struct Alloc {
     vk: u64,
-    buf: usize,
     stride: u32,
     first: u32,
     count: u32,
@@ -647,7 +646,7 @@ impl Recorder {
     }
 
     fn codes(&self, c: &Code) -> [u32; 4] {
-        [self.code(c.d3d9), self.code(c.spirv), self.code(c.dxil), self.code(c.dxil_at)]
+        [0, self.code(c.spirv), self.code(c.dxil), self.code(c.dxil_at)]
     }
 
     pub fn pipe(&self, p: &vulkan::Pipeline) -> u32 {
@@ -756,7 +755,7 @@ impl Recorder {
         let id = self.with(|s| {
             let id = s.id();
             if let Some(sp) = got {
-                s.allocs.push(Alloc { vk: sp.vk, buf: sp.buf as usize, stride: sp.stride, first: sp.first, count: sp.count, id });
+                s.allocs.push(Alloc { vk: sp.vk, stride: sp.stride, first: sp.first, count: sp.count, id });
             }
             id
         });
@@ -779,7 +778,7 @@ impl Recorder {
                 .allocs
                 .iter()
                 .rev()
-                .find(|a| a.vk == sp.vk && a.buf == sp.buf as usize && a.stride == sp.stride && sp.first >= a.first && sp.first + sp.count <= a.first + a.count)
+                .find(|a| a.vk == sp.vk && a.stride == sp.stride && sp.first >= a.first && sp.first + sp.count <= a.first + a.count)
                 .map(|a| (a.id, sp.first - a.first));
             if found.is_none() {
                 s.missed_spans += 1;

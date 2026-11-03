@@ -3,7 +3,7 @@
 //! is drawn in (the formats and samples of the targets the pass really has, as on
 //! Vulkan: render3d's descriptions name the scene's, the UI's the back buffer's).
 //!
-//! - **Shaders** are the DXIL beside the d3dbc (`Code::dxil`); what they read (the
+//! - **Shaders** are the DXIL (`Code::dxil`); what they read (the
 //!   vertex inputs by semantic, the textures with their dimension, the bytes of each
 //!   register file) is read out of the SPIR-V of the same source (`vulkan::spirv`), since
 //!   the DXIL is built without reflection. With an alpha test, the pixel shader is its
@@ -16,7 +16,7 @@
 //!   scaled to the format's step, as on Vulkan.
 use super::raw::*;
 use super::{dlog, Gpu, PassKey, Shared, K_WORDS};
-use crate::d3d9::raw::Guid;
+use crate::dx12::raw::Guid;
 use crate::types::*;
 use crate::vulkan::spirv::{self, TexUse};
 use alloc::ffi::CString;

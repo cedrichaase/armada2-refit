@@ -4,7 +4,7 @@
 //! name the scene's, the UI's the back buffer's, and a description that guessed wrong
 //! must still draw as it did on Direct3D 9).
 //!
-//! - **Shaders** are the SPIR-V beside the d3dbc (`Code::spirv`), the pixel shader's
+//! - **Shaders** are the SPIR-V (`Code::spirv`), the pixel shader's
 //!   inputs moved to its vertex shader's outputs of the same semantic and, with an alpha
 //!   test, discarding as Direct3D 9's would (`spirv.rs`).
 //! - **Vertex input**: each input the vertex shader declares, by semantic, from the

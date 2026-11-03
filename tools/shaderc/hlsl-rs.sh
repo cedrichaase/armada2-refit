@@ -1,82 +1,60 @@
 #!/usr/bin/env bash
-# Compile HLSL into shader bytecode embedded in Rust source files: the Rust twin of
-# platform/d3d9/hlsl.sh, with the same stamp, so a build where a compiler is missing (CI)
-# keeps a committed file whose stamp matches and fails on a stale one.
+# Compile HLSL into shader bytecode embedded in Rust source files.
 #
-#   hlsl-rs.sh [--fix] [--headers DIR]... <out.rs> <file.hlsl> <entry>:<profile>:<SYMBOL>[:long] [...]
+#   hlsl-rs.sh [--headers DIR]... <out.rs> <file.hlsl> <entry>:<profile>:<SYMBOL>[:at] [...]
 #
-# Each entry point becomes `pub static SYMBOL: [u32; N]` in <out.rs>, legacy (d3dbc)
-# bytecode for CreateVertexShader/CreatePixelShader from vkd3d, each texture put on the
-# sampler stage its source names by d3dbc-slots.py; and `pub static SYMBOL_SPV: [u32; N]`
-# in <out>_spv.rs, SPIR-V for Vulkan from dxc (vs_6_0/ps_6_0 for vs_3_0/ps_3_0), checked
-# by spirv-val; and `pub static SYMBOL_DXIL: [u32; N]` in <out>_dxil.rs, signed DXIL for
+# Each entry point becomes `pub static SYMBOL_SPV: [u32; N]` in <out>_spv.rs, SPIR-V for
+# Vulkan from dxc (vs_6_0/ps_6_0 for vs_3_0/ps_3_0; cs_6_0 for cs_5_0), checked by
+# spirv-val; and `pub static SYMBOL_DXIL: [u32; N]` in <out>_dxil.rs, signed DXIL for
 # Direct3D 12 from the pinned dxc (tools/shaderc/fetch-dxc.sh: DirectXShaderCompiler
 # v1.9.2609 in $A2_DATA/tools/, fetched by version and sha256 when a DXIL file is stale;
 # DXC= overrides the path, not the version). The source is modern HLSL;
-# gpu/shaders/compat.hlsli holds what the compilers need apart (README.md, "Shaders on
-# Windows"). --fix puts each d3dbc shader
-# through d3dbc-fix.py, which rewrites what Windows' own Direct3D 9 refuses and fails on
-# what it cannot rewrite, including a shader past the 4096 instruction slots some cards
-# take, unless its entry is marked :long (the code stands down without it); DXVK takes
-# either. An entry marked :at (`entry:profile:SYMBOL:at`) also gets an alpha-tested
-# twin in the DXIL, `SYMBOL_AT_DXIL` (dxil-alpha.py: Direct3D 12 has no alpha test);
-# the mark changes nothing in the d3dbc or the SPIR-V. An entry marked :dxc
-# (`entry:profile:SYMBOL:dxc`, after any :at) is dxc's alone: no d3dbc, `SYMBOL` an empty
-# array. It is for what Direct3D 9 cannot run (compute, profile `cs_5_0`; storage
-# buffers), so it and everything it reads sit under `#ifdef __hlsl_dx_compiler`, where
-# vkd3d never sees them.
+# gpu/shaders/compat.hlsli holds what the two forms need apart (README.md, "Shaders on
+# Windows"). An entry marked :at (`entry:profile:SYMBOL:at`) also gets an alpha-tested
+# twin in the DXIL, `SYMBOL_AT_DXIL` (dxil-alpha.py: Direct3D 12 has no alpha test); the
+# mark changes nothing in the SPIR-V. There is no Direct3D 9 bytecode: the game's
+# Direct3D 9 is gone (render3d 1.0.0), so there is no vkd3d step either.
 set -euo pipefail
 here=$(dirname "$0")
-fix=""
-[ "${1:-}" = "--fix" ] && { fix="$here/d3dbc-fix.py"; shift; }
 # --headers DIR: the source includes headers from DIR too (render3d's modules include
 # the core's), so its stamps cover DIR/*.hlsli as they cover the source's own directory.
 more=()
 while [ "${1:-}" = "--headers" ]; do more+=("$2"); shift 2; done
-[ $# -ge 3 ] || { sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+[ $# -ge 3 ] || { sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 out=$1 src=$2; shift 2
-# The entries without the :at and :dxc marks (what the d3dbc and SPIR-V see), the
-# entries with :at, and those with :dxc.
-plain=() at=() dxconly=()
+# The entries without the :at mark (what the SPIR-V sees), and the entries with it.
+plain=() at=()
 for spec in "$@"; do
-    s=${spec%:dxc}
-    [ "$s" = "$spec" ] || dxconly+=("${spec%%:*}")
-    p=${s%:at}
+    p=${spec%:at}
     p=${p/:at:/:}
     plain+=("$p")
-    [ "$p" = "$s" ] || at+=("${spec%%:*}")
+    [ "$p" = "$spec" ] || at+=("${spec%%:*}")
 done
-# Whether entry $1 is dxc's alone.
-dxc_only() { [[ " ${dxconly[*]:-} " == *" $1 "* ]]; }
 spv_out="${out%.rs}_spv.rs"
 dxil_out="${out%.rs}_dxil.rs"
 inc=$(dirname "$src")
-slots="$here/d3dbc-slots.py"
 # The flags dxc is given besides the profile and entry: Vulkan 1.1, cbuffers laid out
 # as Direct3D's (a member at packoffset(cN) is at byte 16 N), and for a vertex shader
-# clip space's y turned over (Vulkan's points down; Direct3D 9's up).
+# clip space's y turned over (Vulkan's points down; Direct3D's up).
 dxc_flags=(-spirv -fspv-target-env=vulkan1.1 -fvk-use-dx-layout)
 dxc_vs_flags=(-fvk-invert-y)
 # DXIL: the pinned release only (tools/shaderc/fetch-dxc.sh), without debug info or
 # reflection; it signs what it writes. Clip space's y is Direct3D's already.
 dxil_version=1.9.2609
 dxil_flags=(-Qstrip_debug -Qstrip_reflect)
-# Each stamp covers the file, every header it can include, the entry list, and the
-# steps after the compiler.
+# Each stamp covers the file, every header it can include and the entry list.
 shopt -s nullglob
 headers=("$inc"/*.hlsli)
 for d in "${more[@]}"; do headers+=("$d"/*.hlsli); done
 headers+=("$here"/../../gpu/shaders/*.hlsli)
-stamp="source $(cat "$src" "${headers[@]}" <(printf '%s\n' "${plain[@]}" "${dxconly[@]:+dxc:}" "${dxconly[@]:-}") "$slots" ${fix:+"$fix"} | sha256sum | cut -d' ' -f1)"
 spv_stamp="spirv $(cat "$src" "${headers[@]}" <(printf '%s\n' "${plain[@]}" "${dxc_flags[@]}" "${dxc_vs_flags[@]}") | sha256sum | cut -d' ' -f1)"
 spaces="$here/dxil-spaces.py"
 alpha="$here/dxil-alpha.py"
 dxil_stamp="dxil $(cat "$src" "${headers[@]}" <(printf '%s\n' "$@" "$dxil_version" "${dxil_flags[@]}") "$spaces" ${at[@]:+"$alpha"} | sha256sum | cut -d' ' -f1)"
-need_d3dbc=1 need_spv=1 need_dxil=1
-[ -f "$out" ] && grep -qF "$stamp" "$out" && need_d3dbc=""
+need_spv=1 need_dxil=1
 [ -f "$spv_out" ] && grep -qF "$spv_stamp" "$spv_out" && need_spv=""
 [ -f "$dxil_out" ] && grep -qF "$dxil_stamp" "$dxil_out" && need_dxil=""
-[ -n "$need_d3dbc$need_spv$need_dxil" ] || exit 0
+[ -n "$need_spv$need_dxil" ] || exit 0
 # Scratch of this run's own beside the outputs, not in /tmp (a tmpfs, where the mv into
 # the tree is a copy): each output goes into place by one rename, so a build of the same
 # tree running at once (a2test -j, a2film --jobs) never reads a file half written.
@@ -85,40 +63,6 @@ tmp=$(mktemp -d "$(cd "$(dirname "$out")" && pwd)/.hlsl-rs.XXXXXX"); trap 'rm -r
 # Words of a binary file as the body of a Rust array.
 words() { od -An -v -t x4 -w16 "$1" | sed -E 's/ +([0-9a-f]{8})/ 0x\1,/g; s/^/   /'; }
 
-if [ -n "$need_d3dbc" ]; then
-    command -v vkd3d-compiler >/dev/null ||
-        { echo "hlsl-rs.sh: $out is stale and vkd3d-compiler is not installed (Arch: vkd3d)" >&2; exit 1; }
-    # From the source's directory: vkd3d looks an #include up from the working one.
-    env -C "$inc" vkd3d-compiler -x hlsl -E -o "$tmp/pre.hlsl" "$(basename "$src")"
-    {
-        echo "// generated by tools/shaderc/hlsl-rs.sh from $(basename "$src") -- do not edit"
-        echo "// $stamp"
-        for spec in "${plain[@]}"; do
-            IFS=: read -r entry profile sym long <<< "$spec"
-            if dxc_only "$entry"; then
-                echo "pub static $sym: [u32; 0] = []; // $entry: dxc's alone"
-                continue
-            fi
-            env -C "$inc" vkd3d-compiler -x hlsl -b d3dbc -p "$profile" -e "$entry" -o "$tmp/$sym.bin" \
-                "$(basename "$src")" 2> "$tmp/err" ||
-                { cat "$tmp/err" >&2; echo "hlsl-rs.sh: $src:$entry failed" >&2; exit 1; }
-            python3 "$slots" "$tmp/pre.hlsl" "$tmp/$sym.bin" "$tmp/$sym.slots" ||
-                { echo "hlsl-rs.sh: $src:$entry: sampler stages" >&2; exit 1; }
-            mv "$tmp/$sym.slots" "$tmp/$sym.bin"
-            if [ -n "$fix" ]; then
-                python3 "$fix" ${long:+--long} "$tmp/$sym.bin" "$tmp/$sym.fixed" || exit 1
-                mv "$tmp/$sym.fixed" "$tmp/$sym.bin"
-            fi
-            n=$(( $(stat -c %s "$tmp/$sym.bin") / 4 ))
-            echo "pub static $sym: [u32; $n] = [ // $entry, $profile"
-            words "$tmp/$sym.bin"
-            echo "];"
-        done
-    } > "$tmp/out.rs"
-    mv "$tmp/out.rs" "$out"
-    echo "hlsl-rs.sh: wrote $(basename "$out")"
-fi
-
 if [ -n "$need_spv" ]; then
     command -v dxc >/dev/null && command -v spirv-val >/dev/null ||
         { echo "hlsl-rs.sh: $spv_out is stale and dxc or spirv-val is not installed (Arch: directx-shader-compiler, spirv-tools)" >&2; exit 1; }
@@ -126,7 +70,7 @@ if [ -n "$need_spv" ]; then
         echo "// generated by tools/shaderc/hlsl-rs.sh from $(basename "$src") -- do not edit"
         echo "// $spv_stamp"
         for spec in "${plain[@]}"; do
-            IFS=: read -r entry profile sym long <<< "$spec"
+            IFS=: read -r entry profile sym <<< "$spec"
             stage=${profile%%_*}
             flags=("${dxc_flags[@]}")
             [ "$stage" = vs ] && flags+=("${dxc_vs_flags[@]}")
@@ -168,7 +112,7 @@ if [ -n "$need_dxil" ]; then
         echo "/// register file is bound at its register in each (tools/shaderc/dxil-spaces.py)."
         echo "pub const CB_SPACES: [u32; 2] = [${cb_spaces// /, }];"
         for spec in "${plain[@]}"; do
-            IFS=: read -r entry profile sym long <<< "$spec"
+            IFS=: read -r entry profile sym <<< "$spec"
             stage=${profile%%_*}
             twins=("$entry:$sym")
             [[ " ${at[*]} " == *" $entry "* ]] && twins+=("${entry}__alpha_test:${sym}_AT")

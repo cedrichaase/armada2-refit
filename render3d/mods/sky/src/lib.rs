@@ -27,7 +27,6 @@ use r3d_core::frame::steps::View;
 use r3d_core::gfx::{self, Pipes};
 use r3d_core::math::{M34, M4, V3, v3};
 use r3d_core::scene::{self, pose};
-use crate::shaders::sky::*;
 use crate::shaders::sky_spv::*;
 use crate::shaders::sky_dxil::*;
 use r3d_core::assets;
@@ -194,17 +193,17 @@ impl Sky {
     /// depth-tested; the tunnel over what is there (premultiplied).
     fn pipe(&mut self, which: u64, cull: Cull) -> Option<Pipeline> {
         self.pipes.view(which * 4 + cull as u64, || match which {
-            P_DRAW => quad_desc(gpu::code!(PS_DRAW, PS_DRAW_SPV, PS_DRAW_DXIL), Format::Unknown),
-            P_DIRECT => quad_desc(gpu::code!(PS_SKY, PS_SKY_SPV, PS_SKY_DXIL), Format::Unknown),
+            P_DRAW => quad_desc(gpu::code!(PS_DRAW_SPV, PS_DRAW_DXIL), Format::Unknown),
+            P_DIRECT => quad_desc(gpu::code!(PS_SKY_SPV, PS_SKY_DXIL), Format::Unknown),
             P_FACE => {
-                let mut d = PipelineDesc::new(gpu::code!(VS_FACE, VS_FACE_SPV, VS_FACE_DXIL), gpu::code!(PS_FACE, PS_FACE_SPV, PS_FACE_DXIL), &scene::VERTEX, 32, Topology::TriangleList, Format::Unknown);
+                let mut d = PipelineDesc::new(gpu::code!(VS_FACE_SPV, VS_FACE_DXIL), gpu::code!(PS_FACE_SPV, PS_FACE_DXIL), &scene::VERTEX, 32, Topology::TriangleList, Format::Unknown);
                 d.cull = cull;
                 d
             }
-            P_SPRITE => sprites::sprite_desc(gpu::code!(PS_SPRITE, PS_SPRITE_SPV, PS_SPRITE_DXIL)),
-            P_FLASH => sprites::sprite_desc(gpu::code!(PS_FLASH, PS_FLASH_SPV, PS_FLASH_DXIL)),
+            P_SPRITE => sprites::sprite_desc(gpu::code!(PS_SPRITE_SPV, PS_SPRITE_DXIL)),
+            P_FLASH => sprites::sprite_desc(gpu::code!(PS_FLASH_SPV, PS_FLASH_DXIL)),
             _ => {
-                let mut d = quad_desc(gpu::code!(PS_TUNNEL, PS_TUNNEL_SPV, PS_TUNNEL_DXIL), Format::Unknown);
+                let mut d = quad_desc(gpu::code!(PS_TUNNEL_SPV, PS_TUNNEL_DXIL), Format::Unknown);
                 d.blend = Some(Blend { color: BlendEq { src: Factor::One, dst: Factor::InvSrcAlpha, op: BlendOp::Add }, alpha: None });
                 d
             }

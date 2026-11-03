@@ -21,7 +21,6 @@ use r3d_core::gfx::{self, Pipes};
 use crate::rt::settings;
 use super::settings_table::OVERLAYS_HEIGHTPOSTS;
 use r3d_core::math::V3;
-use crate::shaders::overlays::*;
 use crate::shaders::overlays_spv::*;
 use crate::shaders::overlays_dxil::*;
 use alloc::vec::Vec;
@@ -177,7 +176,7 @@ pub(super) fn draw_quads(pipes: &mut Pipes, v: &View, vs: &[Vtx], half: f32, sof
     }
     let Some(mut cmd) = gfx::cmd() else { return };
     let pipe = pipes.view(0, || {
-        let mut d = PipelineDesc::new(gpu::code!(VS_LINE, VS_LINE_SPV, VS_LINE_DXIL), gpu::code!(PS_LINE, PS_LINE_SPV, PS_LINE_DXIL), &VERTEX, 48, Topology::TriangleList, Format::Unknown);
+        let mut d = PipelineDesc::new(gpu::code!(VS_LINE_SPV, VS_LINE_DXIL), gpu::code!(PS_LINE_SPV, PS_LINE_DXIL), &VERTEX, 48, Topology::TriangleList, Format::Unknown);
         d.depth = Depth { test: true, write: false, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
         d.blend = Some(Blend::ALPHA);
         d

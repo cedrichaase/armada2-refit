@@ -17,6 +17,25 @@ versions". Newest first. Details are in [`README.md`](README.md).
   `HUD.asi`, `GridLayout.asi` and `Menus.asi` out (`./install` runs it first).
   `bench-asi.sh` calls it on a bench clone; `bench-legacy.sh` stops with a message (the plugins it built are gone; the bench takes them from a cached tag build).
 
+## 2.0.0 — 2026-11-03
+
+MAJOR: no Direct3D 9 device path. With no Display8 device behind the game's d3d8
+(`Backend=none`, a Display8 of another contract) the UI stands down as before (`runs
+stock: no Vulkan or Direct3D 12 device to draw with`, `ui: no device to draw with`).
+
+### Removed
+- What reached the game's Direct3D 9 device: the swap-chain facts in the shell log
+  (`dev8::present_params9`), the dump of the back buffer through a wrapped d3d9
+  surface, the unbinding and the live-object tally in the `DestroyRenderSurfaces` and
+  `Reset` hooks, `gfx::forget` and `gfx::reset` (gpu 2.0.0). The hooks stay and let go
+  of the close-up's pictures.
+- The d3dbc form of the UI's shaders (`ui.rs`); `ui_spv.rs` and `ui_dxil.rs` are as
+  they were.
+
+### Changed
+- The Graphics tab's `Drawn on` line names the backend `gpu` reports (Vulkan or
+  Direct3D 12).
+
 Installed, not yet seen in game.
 
 ## 1.1.1 — 2026-11-03

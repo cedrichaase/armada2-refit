@@ -28,10 +28,8 @@ use r3d_core::frame::steps::View;
 use r3d_core::gfx::{self, Pipes};
 use r3d_core::math::{v3, M34, V3};
 use r3d_core::scene::{self, pose};
-use crate::shaders::overlays::PS_COLOUR;
 use crate::shaders::overlays_spv::PS_COLOUR_SPV;
 use crate::shaders::overlays_dxil::PS_COLOUR_DXIL;
-use r3d_core::shaders::sod::VS_SOD;
 use r3d_core::shaders::sod_spv::VS_SOD_SPV;
 use r3d_core::shaders::sod_dxil::VS_SOD_DXIL;
 
@@ -48,7 +46,7 @@ impl Selection {
     /// written.
     fn pipe(&mut self, cull: Cull) -> Option<Pipeline> {
         self.pipes.view(cull as u64, || {
-            let mut d = PipelineDesc::new(gpu::code!(VS_SOD, VS_SOD_SPV, VS_SOD_DXIL), gpu::code!(PS_COLOUR, PS_COLOUR_SPV, PS_COLOUR_DXIL), &scene::VERTEX, 32, Topology::TriangleList, Format::Unknown);
+            let mut d = PipelineDesc::new(gpu::code!(VS_SOD_SPV, VS_SOD_DXIL), gpu::code!(PS_COLOUR_SPV, PS_COLOUR_DXIL), &scene::VERTEX, 32, Topology::TriangleList, Format::Unknown);
             d.depth = Depth { test: true, write: false, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
             d.blend = Some(Blend::ADD);
             d.cull = cull;

@@ -37,7 +37,7 @@ pub use cmd::Cmd;
 pub use pipe::{ComputePipeline, Pipeline};
 pub use tex::{Buffer, Storage, Texture, Timer};
 
-use crate::d3d9::raw::Guid;
+use crate::dx12::raw::Guid;
 use crate::display::{Display8, Display8Dx12, Dx12Frame8, Dx12Image8, FEATURE_D3D9_CENTRES, HEAP_CBV_SRV_UAV, HEAP_SAMPLER};
 use crate::types::*;
 use alloc::collections::BTreeMap;

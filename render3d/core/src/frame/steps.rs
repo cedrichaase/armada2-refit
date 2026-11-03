@@ -11,7 +11,7 @@
 //! read every frame.
 use crate::timing;
 use super::post::PRect;
-use gpu::d3d9::raw::*;
+use gpu::{TS_PROJECTION, TS_VIEW};
 use crate::engine::{self, hook, storm3d};
 use crate::math::{M4, V3};
 use crate::registry::{self, Step};

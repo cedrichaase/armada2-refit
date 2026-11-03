@@ -26,7 +26,6 @@ use r3d_core::gfx::{self, Pipes};
 use gpu::{attr, AttrFormat, Blend, Block, Compare, Cull, Depth, Format, Pipeline, PipelineDesc, Semantic, Topology, VertexAttr};
 use r3d_core::math::{M34, V3, v3};
 use r3d_core::scene::{self, pose, Model};
-use crate::shaders::world_rock::*;
 use crate::shaders::world_rock_spv::*;
 use crate::shaders::world_rock_dxil::*;
 use r3d_core::assets;
@@ -511,10 +510,10 @@ impl Rocks {
     fn pipe(&mut self, kind: u64, cull: Cull) -> Option<Pipeline> {
         self.pipes.view(kind * 4 + cull as u64, || {
             let (vs, ps, layout, stride): (gpu::Code, gpu::Code, &'static [VertexAttr], u32) = match kind {
-                FLAT | GLOW => (gpu::code!(VS_ROCK, VS_ROCK_SPV, VS_ROCK_DXIL), gpu::code!(PS_FLAT, PS_FLAT_SPV, PS_FLAT_DXIL), &scene::VERTEX, 32),
-                ROCK => (gpu::code!(VS_ROCK, VS_ROCK_SPV, VS_ROCK_DXIL), gpu::code!(PS_ROCK, PS_ROCK_SPV, PS_ROCK_DXIL), &scene::VERTEX, 32),
-                ROCK_CL => (gpu::code!(VS_ROCK, VS_ROCK_SPV, VS_ROCK_DXIL), gpu::code!(PS_ROCK_CL, PS_ROCK_CL_SPV, PS_ROCK_CL_DXIL), &scene::VERTEX, 32),
-                _ => (gpu::code!(VS_RSPRITE, VS_RSPRITE_SPV, VS_RSPRITE_DXIL), gpu::code!(PS_RSPRITE, PS_RSPRITE_SPV, PS_RSPRITE_DXIL), &SPRITE_LAYOUT, 36),
+                FLAT | GLOW => (gpu::code!(VS_ROCK_SPV, VS_ROCK_DXIL), gpu::code!(PS_FLAT_SPV, PS_FLAT_DXIL), &scene::VERTEX, 32),
+                ROCK => (gpu::code!(VS_ROCK_SPV, VS_ROCK_DXIL), gpu::code!(PS_ROCK_SPV, PS_ROCK_DXIL), &scene::VERTEX, 32),
+                ROCK_CL => (gpu::code!(VS_ROCK_SPV, VS_ROCK_DXIL), gpu::code!(PS_ROCK_CL_SPV, PS_ROCK_CL_DXIL), &scene::VERTEX, 32),
+                _ => (gpu::code!(VS_RSPRITE_SPV, VS_RSPRITE_DXIL), gpu::code!(PS_RSPRITE_SPV, PS_RSPRITE_DXIL), &SPRITE_LAYOUT, 36),
             };
             let mut d = PipelineDesc::new(vs, ps, layout, stride, Topology::TriangleList, Format::Unknown);
             let write = matches!(kind, FLAT | ROCK | ROCK_CL);

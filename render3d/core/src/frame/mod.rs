@@ -5,16 +5,15 @@
 //!
 //! Each step of the body that we have not replaced yet is the engine's own: for now
 //! the whole stock body runs, into our scene target, so every plugin hooked inside it
-//! keeps working. Without a Direct3D 9 device behind d3d8, or when our targets cannot
-//! be made, the stock body runs as it always did.
+//! keeps working. Without a Vulkan or Direct3D 12 device behind d3d8 (Display8's), or
+//! when our targets cannot be made, the stock body runs as it always did.
 //!
 //! The targets and passes are `gpu`'s (gpu/README.md). The scene pass is begun before
 //! the body and left bound while it runs: the engine draws into it with its own calls
-//! (a pass's targets stay bound after its `Cmd` on the Direct3D 9 backend), and the
-//! modules through `gpu`, beginning it again after a pass of their own (`scene_pass`,
-//! `gfx::view_pass`). What this module reads of the engine's device (the d3d9 device
-//! behind d3d8, the view's viewport, the `Reset` and `DestroyRenderSurfaces` hooks) is
-//! the one raw Direct3D 9 left in render3d, glue Display8 will answer itself.
+//! (a pass's targets stay bound after its `Cmd`), and the modules through `gpu`,
+//! beginning it again after a pass of their own (`scene_pass`, `gfx::view_pass`). What
+//! this module reads of the engine's device (the view's viewport, the `Reset` and
+//! `DestroyRenderSurfaces` hooks) is Display8's.
 pub mod post;
 pub mod steps;
 
@@ -26,8 +25,7 @@ use crate::gfx;
 use crate::log;
 use crate::timing;
 use core::ffi::c_void;
-use gpu::d3d9::format_code;
-use gpu::d3d9::raw::*;
+use gpu::format_code;
 use gpu::{ColorTarget, DepthTarget, Format, Load, Pass, Rect};
 use post::{PRect, Post, Targets};
 
@@ -80,7 +78,7 @@ fn prev_body() -> BodyFn {
 }
 
 type BodyFn = unsafe extern "C" fn(usize, usize, u32);
-type Reset8 = unsafe extern "system" fn(*mut c_void, *mut c_void) -> HRESULT;
+type Reset8 = unsafe extern "system" fn(*mut c_void, *mut c_void) -> i32;
 
 struct Frame {
     /// The engine's device it was made for (`gpu::Gpu::engine_id`).
@@ -97,6 +95,8 @@ struct Frame {
 }
 
 static mut FRAME: Option<Frame> = None;
+/// The stand-down was logged (once).
+static mut SAID_DOWN: bool = false;
 static mut RESET: Option<Reset8> = None;
 static mut RESET_VT: usize = 0;
 
@@ -131,7 +131,7 @@ fn time_view(main: bool) -> bool {
     if !timing::on() {
         return false;
     }
-    match crate::gfx::gpu().attach_engine(engine::d3d8_device()) {
+    match crate::gfx::gpu().attach_engine() {
         Some(_) => {
             timing::begin(main);
             true
@@ -259,9 +259,7 @@ fn frame() -> &'static mut Option<Frame> {
 }
 
 /// Chains `DestroyRenderSurfaces`, so that render3d lets go of the device before the
-/// engine does. Under native Direct3D 9 a device lives while anything made on it is
-/// held, and the engine's next `CreateDevice` then fails ("Fatal error in Direct3D").
-/// False, with nothing written, when the slot holds neither the stock function nor
+/// engine does (the next frame sees a new device). False, with nothing written, when the slot holds neither the stock function nor
 /// another plugin's (one outside `Armada2.exe`'s code).
 pub fn install_destroy() -> bool {
     if !Hooks::core().ready(&TABLE, hook::FRAME_DESTROY) {
@@ -289,45 +287,9 @@ pub fn install_destroy() -> bool {
 }
 
 unsafe extern "thiscall" fn destroy(this: usize) {
-    // Hold the d3d9 device across the engine's release, to count who else still holds
-    // it: 0 once the engine has let go and so have we (and any plugin after us).
-    let dev8 = engine::view::device_d3d8(this) as *mut c_void;
-    let held = if dev8.is_null() { None } else { Device::from_d3d8(dev8).map(|d| Com::from_borrowed(d.p())) };
     forget();
-    // Whatever is still bound is held by the device: unbind it all (the engine is about
-    // to release the device, so nothing of its own needs to stay bound either).
-    if let Some(h) = held.as_ref() {
-        let d = Device(h.ptr());
-        for s in (0..16).chain(257..261) {
-            d.set_texture(s, core::ptr::null_mut());
-        }
-        for n in 0..16 {
-            d.set_stream(n, core::ptr::null_mut(), 0, 0);
-        }
-        d.set_indices(core::ptr::null_mut());
-        d.set_vs(core::ptr::null_mut());
-        d.set_ps(core::ptr::null_mut());
-        d.set_vertex_decl(core::ptr::null_mut());
-        for i in 1..4 {
-            d.set_render_target(i, core::ptr::null_mut());
-        }
-    }
-    let left = live();
-    if !left.is_empty() {
-        let mut t = alloc::string::String::new();
-        for (k, n) in left.iter() {
-            let _ = core::fmt::Write::write_fmt(&mut t, format_args!(" {} {}", n, k));
-        }
-        log!("frame: still held after letting go:{}", t);
-    }
     let next: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(DESTROY_NEXT) };
     unsafe { next(this) };
-    if let Some(h) = held {
-        let p = h.ptr();
-        core::mem::forget(h);
-        let left = vcall!(p, 2, fn() -> u32,);
-        log!("frame: the engine let go of its device; {} references to it left (0: it is gone)", left);
-    }
 }
 
 /// Lets go of everything render3d made on the device, in every pool.
@@ -341,7 +303,6 @@ fn forget() {
     }
     crate::registry::forget();
     crate::assets::reset();
-    crate::gfx::forget();
     crate::scene::reset();
     timing::reset();
 }
@@ -358,9 +319,8 @@ pub fn formats_changed() {
     crate::registry::formats_changed();
 }
 
-/// Before a `Reset`, everything we hold in the default pool must be gone (`gfx::reset`
-/// has `gpu` let go of its own).
-unsafe extern "system" fn reset(dev8: *mut c_void, params: *mut c_void) -> HRESULT {
+/// Before a `Reset`, everything we hold on the device must be gone.
+unsafe extern "system" fn reset(dev8: *mut c_void, params: *mut c_void) -> i32 {
     if let Some(f) = frame() {
         f.targets = None;
         f.post = None;
@@ -368,17 +328,8 @@ unsafe extern "system" fn reset(dev8: *mut c_void, params: *mut c_void) -> HRESU
     }
     crate::registry::reset();
     crate::assets::reset();
-    crate::gfx::reset();
     crate::scene::reset();
     timing::reset();
-    let left = live_default();
-    if !left.is_empty() {
-        let mut t = alloc::string::String::new();
-        for (k, n) in left.iter() {
-            let _ = core::fmt::Write::write_fmt(&mut t, format_args!(" {} {}", n, k));
-        }
-        log!("frame: still held at Reset:{}", t);
-    }
     log!("frame: device Reset");
     match unsafe { RESET } {
         Some(r) => unsafe { r(dev8, params) },
@@ -396,7 +347,7 @@ fn hook_reset(dev8: *mut c_void) {
         if cur == reset as *const () as usize {
             return;
         }
-        // The d3d8 device's own vtable (Display8's or d3d8to9's), outside Armada2.exe:
+        // The d3d8 device's own vtable (Display8's), outside Armada2.exe:
         // no stock value to check against.
         let h = Hook {
             owner: ModuleId::CORE,
@@ -414,12 +365,18 @@ fn hook_reset(dev8: *mut c_void) {
 }
 
 /// The view's targets and pass, before the body. `over`: the viewport to draw in, in
-/// place of the engine's (the menu scene's on Vulkan, where it cannot be set on the
-/// engine's device).
+/// place of the engine's (the menu scene's, where it cannot be set on the engine's
+/// device).
 fn begin(cfg: &Config, over: Option<gpu::Viewport>) -> Option<Saved> {
     let dev8 = engine::d3d8_device();
     let g = gfx::gpu();
-    let dev = g.engine_id(dev8)?;
+    let Some(dev) = g.engine_id() else {
+        if g.backend() == gpu::Backend::None && !unsafe { SAID_DOWN } {
+            unsafe { SAID_DOWN = true };
+            log!("frame: standing down: no Vulkan or Direct3D 12 device behind the engine's (gpu is stood down): the engine draws the 3D view");
+        }
+        return None;
+    };
     let f = frame();
     // A new device or a `Reset` is Display8's epoch moving on; without it, the device.
     let epoch = g.device_epoch();
@@ -440,7 +397,7 @@ fn begin(cfg: &Config, over: Option<gpu::Viewport>) -> Option<Saved> {
         hook_reset(dev8);
         crate::registry::device();
     }
-    g.attach_engine(dev8)?;
+    g.attach_engine()?;
     let f = f.as_mut()?;
     let rt = g.engine_target()?;
     let ds = g.engine_depth();
@@ -497,27 +454,15 @@ fn begin(cfg: &Config, over: Option<gpu::Viewport>) -> Option<Saved> {
 /// The menu scene (`crate::menu`): `draw` into our targets at `rect` of the back
 /// buffer, then the post passes put it there, as a view of the engine's. Called inside
 /// the caller's scene with the back buffer bound; it is bound again after. False, with
-/// nothing drawn, when there is no Direct3D 9 device or no targets.
+/// nothing drawn, when there is no Display8 device or no targets.
 pub fn menu_frame(rect: PRect, draw: impl FnOnce(u32)) -> bool {
     let Some(cfg) = config::get() else { return false };
     let over = gpu::Viewport { x: rect.x, y: rect.y, w: rect.w, h: rect.h, min_z: 0.0, max_z: 1.0 };
-    // On Direct3D 9 the rectangle is the device's viewport while the scene draws (what
-    // the modules read as the engine's); on Vulkan and Direct3D 12 the engine's viewport
-    // is Display8's record, so the pass is given it.
-    let dev = if gfx::gpu().on_display() { None } else { Device::from_d3d8(engine::d3d8_device()) };
-    if dev.is_none() && !gfx::gpu().on_display() {
+    // The engine's viewport is Display8's record, so the pass is given the rectangle.
+    if !gfx::gpu().on_display() {
         return false;
     }
-    let vp = dev.map(|d| d.get_viewport());
-    if let Some(d) = dev {
-        d.set_viewport(&Viewport { x: rect.x, y: rect.y, w: rect.w, h: rect.h, min_z: 0.0, max_z: 1.0 });
-    }
-    let Some(saved) = begin(cfg, dev.is_none().then_some(over)) else {
-        if let (Some(d), Some(vp)) = (dev, vp) {
-            d.set_viewport(&vp);
-        }
-        return false;
-    };
+    let Some(saved) = begin(cfg, Some(over)) else { return false };
     let frames = frame().as_ref().map_or(0, |f| f.frames);
     draw(frames);
     let Some(f) = frame().as_mut() else { return true };
@@ -531,9 +476,6 @@ pub fn menu_frame(rect: PRect, draw: impl FnOnce(u32)) -> bool {
     }
     f.frames = f.frames.saturating_add(1);
     gfx::frame().next();
-    if let (Some(d), Some(vp)) = (dev, vp) {
-        d.set_viewport(&vp);
-    }
     true
 }
 

@@ -4,6 +4,36 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 1.0.0 — 2026-11-03
+
+MAJOR: Render3D.asi no longer runs without Display8. With no Display8 of its contract,
+one that has stood down to the system's Direct3D 8 (`Backend=none`) or a device it
+cannot open, `gpu` is stood down and render3d leaves the 3D view to the engine; it
+logs `frame: standing down: no Vulkan or Direct3D 12 device behind the engine's` once.
+
+### Removed
+- The Direct3D 9 path: `gpu::d3d9` (gpu 2.0.0), the engine glue that reached the
+  game's d3d9 device (`Device::from_d3d8`, the raw COM tally, the unbinding in the
+  `DestroyRenderSurfaces` hook, the menu scene's `SetViewport`), `gfx::reset` and
+  `gfx::forget`. The `Reset` and `DestroyRenderSurfaces` hooks stay and drop what the
+  modules made.
+- The d3dbc form of every shader: `<crate>/src/shaders/<name>.rs` (vkd3d's bytecode) is
+  gone; the shaders are `<name>_spv.rs` and `<name>_dxil.rs`, byte for byte the SPIR-V
+  and DXIL they were (only the stamps moved). `gpu::code!` takes two names, three with
+  `_AT_DXIL`. `tools/shaderc`: `d3dbc-fix.py`, `d3dbc-slots.py`, `fetch-vkd3d.sh`, the
+  vkd3d step of `hlsl-rs.sh` and `verify-generated.sh`, `--fix`, and the `:long` and
+  `:dxc` marks of an entries line (CI's `shaders` job needs dxc and spirv-val only).
+
+### Changed
+- `gpu::Gpu::attach_engine` and `engine_id` take no device; `gpu::format_code` replaces
+  `gpu::d3d9::format_code` (same numbers, so logs and keys read as before).
+
+Installed, not yet seen in game. Pixel gate: `port-showcase`, `port-nebula` and
+`port-firing` against `roundD-base-*` at RMSE 0 (run 20261103-145601), `display-passthrough` at RMSE 0 against `p10-vk` and
+`display-passthrough-d3d12` at 0.479 (run 20261103-151214); `display-bail-out` and
+`display-fallback` show the stand-down lines; `render3d-settings-live`, `ui-menus-refit` and
+`no-assets` pass (run 20261103-151336).
+
 ## 0.47.0 — 2026-11-03
 
 ### Added

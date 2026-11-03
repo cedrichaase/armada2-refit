@@ -1,4 +1,4 @@
-// entries: vs_hull:vs_3_0:VS_HULL ps_hull:ps_3_0:PS_HULL ps_bump:ps_3_0:PS_BUMP ps_cloak:ps_3_0:PS_CLOAK ps_ghost:ps_3_0:PS_GHOST ps_holo:ps_3_0:PS_HOLO vs_depth:vs_3_0:VS_DEPTH ps_depth:ps_3_0:PS_DEPTH vs_sprite:vs_3_0:VS_SPRITE ps_sprite:ps_3_0:PS_SPRITE ps_hull_cl:ps_3_0:PS_HULL_CL:dxc ps_bump_cl:ps_3_0:PS_BUMP_CL:dxc
+// entries: vs_hull:vs_3_0:VS_HULL ps_hull:ps_3_0:PS_HULL ps_bump:ps_3_0:PS_BUMP ps_cloak:ps_3_0:PS_CLOAK ps_ghost:ps_3_0:PS_GHOST ps_holo:ps_3_0:PS_HOLO vs_depth:vs_3_0:VS_DEPTH ps_depth:ps_3_0:PS_DEPTH vs_sprite:vs_3_0:VS_SPRITE ps_sprite:ps_3_0:PS_SPRITE ps_hull_cl:ps_3_0:PS_HULL_CL ps_bump_cl:ps_3_0:PS_BUMP_CL
 // Hulls: ships, stations and the like, drawn from their SODs by render3d's hulls module
 // (mods/hulls/src/). Lighting.asi's hull look ported, drawn into render3d's half-float target. The lit hull
 // keeps Lighting.asi's highlight shoulder (`shoulder`): it stays within 1, as it did

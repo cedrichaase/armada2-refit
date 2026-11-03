@@ -1,4 +1,4 @@
-// entries: cs_cluster:cs_5_0:CS_CLUSTER:dxc
+// entries: cs_cluster:cs_5_0:CS_CLUSTER
 // The clustered lights' cull (src/scene/clusters.rs; README.md, "Clustered lights"): one
 // thread per cluster (a screen tile by a slice of view depth) tests every light of the
 // view against the cluster's box in view space and writes the lights that reach it,

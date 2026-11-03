@@ -9,7 +9,6 @@
 use super::hooks;
 use r3d_core::frame::steps::View;
 use r3d_core::gfx::{self, Pipes};
-use crate::shaders::overlays::*;
 use crate::shaders::overlays_spv::*;
 use crate::shaders::overlays_dxil::*;
 use alloc::vec::Vec;
@@ -61,7 +60,7 @@ impl Grid {
         let Some(mut cmd) = gfx::cmd() else { return };
         // Lines, depth-tested (`LESSEQUAL`) and written, opaque.
         let pipe = self.pipes.view(0, || {
-            let mut d = PipelineDesc::new(gpu::code!(VS_PLANE, VS_PLANE_SPV, VS_PLANE_DXIL), gpu::code!(PS_COLOUR, PS_COLOUR_SPV, PS_COLOUR_DXIL), &VERTEX, 20, Topology::LineList, Format::Unknown);
+            let mut d = PipelineDesc::new(gpu::code!(VS_PLANE_SPV, VS_PLANE_DXIL), gpu::code!(PS_COLOUR_SPV, PS_COLOUR_DXIL), &VERTEX, 20, Topology::LineList, Format::Unknown);
             d.depth = Depth::TEST_WRITE;
             d
         });
