@@ -5,7 +5,7 @@
 //!   its centre (the instance's transform +0x44 plus its bounding sphere +0x34, whose
 //!   centre is in object space), the Key's colour times the ground's mean colour times
 //!   `PlanetGlow`, full at the surface and gone at `PlanetGlowRange` radii. It is marked
-//!   a day side (`scene::lights::set_day_side`): a lit draw takes it times the share of
+//!   a day side (`FLAG_SHARE`, `is_day_side`): a lit draw takes it times the share of
 //!   the day side facing it, and the planets themselves never take one.
 //! - **Nebula lights.** Every nebula carries a point light (+0x1ac, made by
 //!   `Nebula::InitializeGeometry`), which `Nebula::Simulate` registers while the nebula is
@@ -31,6 +31,16 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use crate::engine::light::{FN_NEW, FN_POINT_LIGHT, FN_REGISTER_LIGHT};
+/// A nebula's own glow to the gas: it lights what is near it, never the gas
+/// (`[Nebulae] Lit=`).
+static OWN_GLOW: scene::lights::Medium = scene::lights::Medium::new("own_glow", scene::media::OWN_GLOW);
+
+/// Whether a light is a planet's day side (`Lights::view`): `FLAG_SHARE`, the one flag
+/// this module gives its planet glows.
+pub fn is_day_side(light: usize) -> bool {
+    scene::lights::has_flag(light, scene::lights::FLAG_SHARE)
+}
+
 const SITE_NEBULA_LIGHTS: usize = 0x4a4a7a; // in Nebula::Simulate
 const FN_NEBULA_LIGHTS: usize = 0x4a5160; // Nebula::Simulate_Nebula_Lights(float), thiscall
 const FN_ENTITY_TRANSFORM: usize = 0x4cfd50; // Entity::GetTransform() const, thiscall
@@ -150,7 +160,7 @@ impl Lights {
                 ctor(l, 0, 0, b"planet glow\0".as_ptr());
                 l
             };
-            scene::lights::set_day_side(l);
+            scene::lights::set_flag(l, scene::lights::FLAG_SHARE);
             self.pool.push(l);
         }
         Some(self.pool[i])
@@ -216,7 +226,7 @@ unsafe extern "thiscall" fn nebula_lights(neb: usize, _dt: f32) {
     }
     let rgb = [col[0] * c.neb_bright, col[1] * c.neb_bright, col[2] * c.neb_bright, 1.0];
     // It lights the hulls near it, never the gas (`[Nebulae] Lit=`).
-    scene::lights::set_gas(light, scene::lights::Gas::OwnGlow);
+    scene::lights::set_medium(light, OWN_GLOW.id());
     unsafe {
         core::ptr::write_unaligned((light + 0x100) as *mut f32, field_f32(cls, 0x244) * c.neb_range);
         core::ptr::write_unaligned((light + 0x104) as *mut f32, field_f32(cls, 0x248) * c.neb_range);

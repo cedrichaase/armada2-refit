@@ -91,6 +91,8 @@ jobs:
         run: |
           render3d/lint-layers.sh
           render3d/lint-layers.sh --strict src/mods --rules cross,byname
+      - name: render3d on the host (the light word, scene::media)
+        run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path render3d/hosttest/Cargo.toml
       - name: a2fmt on the host
         run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path crates/a2fmt/Cargo.toml
       - name: a2ini on the host (the overlay's edit against tools/settings/fixtures)

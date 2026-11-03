@@ -310,7 +310,10 @@ impl Module for Ordnance {
     fn rows(&self) -> &'static [crate::rt::settings::Setting] {
         &[]
     }
-    fn configure(&mut self, _ini: &crate::rt::Ini, _said: &mut crate::core_module::Changes) {}
+    /// `[Lights] Beam*=`, `ConeSpot=`: the beams' lights, set per line (not rows).
+    fn configure(&mut self, ini: &crate::rt::Ini, _said: &mut crate::core_module::Changes) {
+        self.lights.beam = lights::Beam::read(ini);
+    }
     fn superseded(&self) -> Option<&'static str> {
         Some("Specials.asi")
     }
@@ -330,7 +333,8 @@ impl Module for Ordnance {
         // With clustered lights, this module's points are the scene's own (not
         // registered with the engine): added after the list is read again.
         for p in self.lights.take_points() {
-            crate::scene::add_point(p);
+            let m = p.medium;
+            crate::scene::add_point(p, m);
         }
         if v.main {
             self.frames = self.frames.wrapping_add(1);

@@ -111,7 +111,7 @@ pub fn pick_points(at: V3, max: usize) -> [f32; 48 * 4] {
     let max = max.min(16);
     let lights = scene::lights();
     for p in &lights.points {
-        // A planet's day side lights only what faces it (scene::lights::set_day_side).
+        // A light with FLAG_SHARE (a planet's day side) lights only what faces it.
         let share = lights.share(p, at);
         if share <= 0.0 {
             continue;
