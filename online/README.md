@@ -154,8 +154,18 @@ own on top of the game's. LAN (TCP/IP) and Manual IP stay as they were.
 | `0x5bfd01` | the screen's `WM_LBUTTONUP` case | `stub_click` | clears the online flag on every click, so no other button inherits it |
 | `0x5bff9b` | the IPX branch, its button just drawn pressed | `stub_ipx` | sets the flag and continues at `0x5c00b6`, the Manual IP branch after its own button: same frame, same stack depth, and that path sets every register it reads |
 
-Each site is checked against the bytes it replaces, and if any differs none is patched
-(`Online.log` says so). `Entry=0` in `Online.ini` leaves the screen stock. `Entry` is a settings row (`settings.toml`,
+Every address is in the symbol profile, `profiles/<build>/online.toml`, generated into
+`engine_syms.h` (`crates/a2engine/README.md`), and the stubs jump through the resolved
+variables `a2s_online_*`. One hook, **`online.entry`**, feeds the row `Online.Entry`: the
+six patch sites with the bytes they replace (a `patch` each), the two continue points
+(`label`s), `Chat::Init` and `Chat::Append` (`fn`s with their first bytes), the two chat
+boxes and the click's object (`global`s) and the edit-control offset in `Chat` (`field`).
+They are checked as a whole before anything is written: if any differs on a build, none is
+patched, `Online.log` says `engine: online.entry stands down: ...` and the menu line says
+why, and `Online_SettingsNote` gives the same reason to the settings screen.
+Without the hook the IPX button and the chat boxes stay stock. (Before the profile, each
+site was checked against the bytes it replaces and `Online.log` said the exe was not
+the 1.1 this was made for.) `Entry=0` in `Online.ini` leaves the screen stock. `Entry` is a settings row (`settings.toml`,
 exported as `Online_Settings`, RESTART, tab Multiplayer), so `[Online.Online] Entry=0` in
 `RefitPlayer.ini` does the same; every key of `Online.ini` is read through the overlay
 (`tools/settings/README.md`) and the override is logged to `Online.log`.
