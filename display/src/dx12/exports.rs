@@ -85,14 +85,15 @@ pub extern "C" fn display8v1_dx12_mirror(tex8: *mut c_void, out: *mut Dx12Image8
 
 /// What the plugins said of their `Cmd`s (`display8v1_dx12_pass`): the pass published
 /// last and the frame (Display8's index) it is for, how many `Cmd`s are alive, and the
-/// pass last logged (width, height, samples).
+/// kinds of pass logged so far (width, height, samples, depth), each once.
 struct Passes {
     published: Option<(Dx12Pass8, u64)>,
     alive: u32,
-    logged: (u32, u32, u32),
+    logged: [(u32, u32, u32, bool); 8],
+    nlogged: usize,
 }
 
-static mut PASSES: Passes = Passes { published: None, alive: 0, logged: (0, 0, 0) };
+static mut PASSES: Passes = Passes { published: None, alive: 0, logged: [(0, 0, 0, false); 8], nlogged: 0 };
 
 #[allow(static_mut_refs)]
 fn passes() -> &'static mut Passes {
@@ -117,9 +118,10 @@ pub extern "C" fn display8v1_dx12_pass(event: u32, pass: *const Dx12Pass8) {
                 if v.colour.resource == 0 || v.rtv == 0 {
                     return;
                 }
-                let k = (v.width, v.height, v.samples);
-                if k != p.logged {
-                    p.logged = k;
+                let k = (v.width, v.height, v.samples, v.depth.resource != 0);
+                if p.nlogged < p.logged.len() && !p.logged[..p.nlogged].contains(&k) {
+                    p.logged[p.nlogged] = k;
+                    p.nlogged += 1;
                     log!("dx12: pass published {}x{} x{}{} (frame {})", v.width, v.height, v.samples, if v.depth.resource != 0 { " with depth" } else { "" }, d.index);
                 }
                 p.published = Some((v, d.index));

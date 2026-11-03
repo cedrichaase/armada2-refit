@@ -121,7 +121,7 @@ Direct3D 12", is the specification):
 - **Kept for the frame**: the pass published last, with the frame it came in
   (`src/dx12/exports.rs`, `published()`), and forgotten at the engine's `Present`, when
   the frame's index moves on. Whether a `Cmd` is alive is `cmd_alive()`: Display8
-  records nothing into the list then. Each new size is logged once:
+  records nothing into the list then. Each kind of pass (size, samples, depth) is logged once, the first eight:
   `dx12: pass published 1280x720 x4 with depth (frame 412)`.
 - **States**: whenever no `Cmd` is alive the published colour is in `RENDER_TARGET` and
   the depth in `DEPTH_WRITE`. Display8 draws into them so and leaves them so; it never

@@ -7,7 +7,7 @@ in [`README.md`](README.md).
 ## 0.19.0 — 2026-11-03
 
 ### Added
-- Contract 1.4 (`gpu/src/display.rs`, "Pass publishing on Direct3D 12"; gpu 1.3.0): the export `display8v1_dx12_pass(event, pass)` and `Dx12Pass8`, the Direct3D 12 twin of `display8v1_vk_pass`. Display8 keeps the pass published last for the frame (`dx12/exports.rs`, `published()`, forgotten at `Present`) and counts the `Cmd`s alive (`cmd_alive()`), for the passthrough on Direct3D 12 (phase 10 X1); nothing draws into it yet. `Display8.log` logs `dx12: pass published WxH xN` at each new size. The rebind rule: Display8 sets no descriptor heaps but its own, and gpu binds everything again after any call into Display8.
+- Contract 1.4 (`gpu/src/display.rs`, "Pass publishing on Direct3D 12"; gpu 1.3.0): the export `display8v1_dx12_pass(event, pass)` and `Dx12Pass8`, the Direct3D 12 twin of `display8v1_vk_pass`. Display8 keeps the pass published last for the frame (`dx12/exports.rs`, `published()`, forgotten at `Present`) and counts the `Cmd`s alive (`cmd_alive()`), for the passthrough on Direct3D 12 (phase 10 X1); nothing draws into it yet. `Display8.log` logs `dx12: pass published WxH xN` once for each kind of pass (on the bench render3d's 4x scene pass and a 1x pass, each frame). The rebind rule: Display8 sets no descriptor heaps but its own, and gpu binds everything again after any call into Display8.
 
 Installed, not yet seen in game
 
