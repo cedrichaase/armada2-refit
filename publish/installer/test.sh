@@ -18,6 +18,10 @@ unzip -q "$zip" -d "$T"
 P=$(ls -d "$T"/armada2-refit-*/)
 # crosire's d3d8to9 as the repository vendors it: the installers know it by hash.
 D3D8TO9="$src/../../platform/vendor/d3d8to9-1.16.0/d3d8.dll"
+# install.sh refuses while any Armada2.exe runs on the machine (a bench game, say): the test
+# must not depend on that, so pgrep sees none.
+mkdir -p "$T/bin"; printf '#!/bin/sh\nexit 1\n' > "$T/bin/pgrep"; chmod +x "$T/bin/pgrep"
+export PATH="$T/bin:$PATH"
 export XDG_DATA_HOME="$T/share"
 B="$XDG_DATA_HOME/armada2-refit-bloom"   # where packages before 13.0.0 put a vkBasalt bloom
 mac=0; [ "$(uname -s)" = Darwin ] && mac=1
@@ -64,9 +68,9 @@ check '[ ! -e "$B" ] && grep -q "removed the old bloom" "$T/out"'
 check 'grep -q BinkProxy "$G/binkw32.dll"'
 check '[ "$(cat "$G/binkw32_orig.dll")" = stockbink ]'
 check '[ "$(vars)" = "    WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b" ]'
-check 'cmp -s "$T/RefitPlayer.ref" "$G/RefitPlayer.ini" && [ ! -e "$P/game/RefitPlayer.ini" ]'   # install
+check 'cmp -s "$T/RefitPlayer.ref" "$G/RefitPlayer.ini" && [ ! -e "$P/layers/qol/RefitPlayer.ini" ]'   # install
 if [ "$mac" = 0 ]; then
-    check 'cmp -s "$P/game/dxvk.conf" "$G/dxvk.conf"'
+    check 'cmp -s "$P/layers/renderer/dxvk.conf" "$G/dxvk.conf"'
 else
     check '[ ! -e "$G/d3d9.dll" ] && [ ! -e "$G/dxvk.conf" ] && grep -q "dxvk.conf skipped" "$T/out"'
     check 'grep -q "^In CrossOver" "$T/out"'
@@ -77,15 +81,16 @@ echo dxvk > "$G/d3d8.dll"; echo "; mine" >> "$G/QOL.ini"
 mkdir -p "$G/Surfaces"; echo "[Surface]" > "$G/Surfaces/myown.ini"
 "$P/install.sh" "$G" > "$T/out"
 check 'grep -q "STA2WidescreenPatch: already installed" "$T/out"'
-check 'grep -q "; mine" "$G/QOL.ini.bak"'
+# an edited .ini is merged (values kept, keys added), not set aside as .bak
+check 'grep -q "; mine" "$G/QOL.ini" && grep -qx "PanSpeed=2.5" "$G/QOL.ini" && [ ! -e "$G/QOL.ini.bak" ]'
 # d3d8to9 is in now, with Display8 in front of it (d3d8to9 behind as d3d8_real.dll, and
 # Display8.ini as shipped, on a Mac too): Render3D.asi with its recipes, UI.asi in place
 # of the older three.
-check 'cmp -s "$P/display/d3d8.dll" "$G/d3d8.dll" && [ "$(sum "$G/d3d8_real.dll")" = "$(sum "$D3D8TO9")" ]'
-check 'cmp -s "$P/display/Display8.ini" "$G/Display8.ini"'
+check 'cmp -s "$P/layers/display/d3d8.dll" "$G/d3d8.dll" && [ "$(sum "$G/d3d8_real.dll")" = "$(sum "$D3D8TO9")" ]'
+check 'cmp -s "$P/layers/display/Display8.ini" "$G/Display8.ini"'
 check '[ ! -e "$G/Display8.ini.a2ship" ] && [ ! -e "$G/d3d8.dll.a2display-new" ]'
-check 'cmp -s "$P/game/Render3D.asi" "$G/Render3D.asi" && cmp -s "$P/game/UI.asi" "$G/UI.asi" && [ -e "$G/UI.ini" ]'
-check '[ "$(count "$G/Nebulae")" = "$(count "$P/game/Nebulae")" ] && [ "$(count "$G/Surfaces")" = "$(( $(count "$P/game/Surfaces") + 1 ))" ]'
+check 'cmp -s "$P/layers/render3d/Render3D.asi" "$G/Render3D.asi" && cmp -s "$P/layers/ui/UI.asi" "$G/UI.asi" && [ -e "$G/UI.ini" ]'
+check '[ "$(count "$G/Nebulae")" = "$(count "$P/layers/render3d/Nebulae")" ] && [ "$(count "$G/Surfaces")" = "$(( $(count "$P/layers/render3d/Surfaces") + 1 ))" ]'
 check '[ -z "$(ls "$G" | grep -E "^(HUD|Menus|GridLayout)\.(asi|ini)$")" ]'
 check '[ "$(cat "$G/binkw32_orig.dll")" = stockbink ]'
 if [ "$mac" = 0 ]; then
@@ -99,7 +104,7 @@ else
 
     echo "== macOS: what an earlier install put in for DXVK comes out"
     cp "$P/chain/d3d9.dll" "$G/d3d9.dll"; echo "d3d9.dll $(sum "$G/d3d9.dll")" >> "$G/armada2-refit-prereqs.txt"
-    cp "$P/game/dxvk.conf" "$G/dxvk.conf"
+    cp "$P/layers/renderer/dxvk.conf" "$G/dxvk.conf"
     "$P/install.sh" "$G" > "$T/out"
     check '[ ! -e "$G/d3d9.dll" ] && ! grep -q "^d3d9\.dll " "$G/armada2-refit-prereqs.txt"'
     check 'grep -q "d3d9.dll: took out the DXVK one" "$T/out"'
@@ -111,8 +116,8 @@ echo "== reinstall over Display8: an older build replaced, d3d8to9 still behind,
 printf 'MZ Display8 stopped the game: an older build\n' > "$G/d3d8.dll"
 printf '[Display8]\nMode=forward\nBackend=d3d9\nVSync=0\nLog=1\n\n[Drop]\nDrop2D=1\n' > "$G/Display8.ini"
 A2_PROGRESS=1 "$P/install.sh" "$G" > "$T/out"
-check 'cmp -s "$P/display/d3d8.dll" "$G/d3d8.dll" && [ "$(sum "$G/d3d8_real.dll")" = "$(sum "$D3D8TO9")" ]'
-check 'grep -q "d3d8.dll: crosire.s d3d8to9 already" "$T/out" && cmp -s "$P/game/UI.asi" "$G/UI.asi"'
+check 'cmp -s "$P/layers/display/d3d8.dll" "$G/d3d8.dll" && [ "$(sum "$G/d3d8_real.dll")" = "$(sum "$D3D8TO9")" ]'
+check 'grep -q "d3d8.dll: crosire.s d3d8to9 already" "$T/out" && cmp -s "$P/layers/ui/UI.asi" "$G/UI.asi"'
 # the step after the chain's, before the plugins'
 check '[ "$(grep "^::step" "$T/out" | sed -n "3,5p" | cut -d" " -f2 | tr "\n" " ")" = "chain display render3d " ]'
 # the old defaults moved (the shipped Defaults=2), the player's own values kept, every
@@ -143,6 +148,53 @@ if [ "$mac" = 1 ]; then
     check '[ ! -e "$C/HUD.asi" ] && [ "$(cat "$C/binkw32.dll")" = stockbink ]'
 fi
 
+echo "== layer selection: A2_SKIP=rules, remembered by a plain re-run, --all brings it back"
+check '[ -e "$G/QOLRules.asi" ] && [ -e "$G/QOLRules.ini" ] && [ ! -e "$G/armada2-refit-layers.txt" ]'
+A2_SKIP=rules "$P/install.sh" "$G" > "$T/out"
+check '[ -z "$(ls "$G" | grep "^QOLRules")" ] && grep -q "rules left out" "$T/out"'
+check 'grep -qx "without rules" "$G/armada2-refit-layers.txt"'
+check '[ -e "$G/QOL.asi" ] && [ -e "$G/Online.asi" ] && [ -e "$G/UI.asi" ]'
+"$P/install.sh" "$G" > "$T/out"   # an upgrade: the choice stays
+check 'grep -q "keeping your earlier choice: without rules" "$T/out" && [ -z "$(ls "$G" | grep "^QOLRules")" ]'
+"$P/install.sh" --without qol,online "$G" > "$T/out"   # a new choice replaces the old
+check '[ ! -e "$G/QOL.asi" ] && [ ! -e "$G/Online.asi" ] && [ -e "$G/QOLRules.asi" ] && grep -qx "without qol" "$G/armada2-refit-layers.txt"'
+check '! grep -qx "without rules" "$G/armada2-refit-layers.txt"'
+"$P/install.sh" --without=ui,render3d,models,cutscenes "$G" > "$T/out"   # taken out when left
+check '[ ! -e "$G/UI.asi" ] && [ ! -e "$G/Render3D.asi" ] && [ "$(ls "$G/Surfaces")" = myown.ini ] && [ ! -e "$G/Nebulae" ]'
+check '[ "$(cat "$G/binkw32.dll")" = stockbink ] && [ ! -e "$G/BinkProxy.ini" ] && [ ! -e "$G/HUD.asi" ]'
+check '[ -e "$G/QOL.asi" ] && [ -e "$G/d3d8_real.dll" ]'
+check '! "$P/install.sh" --without display "$G" > "$T/out" 2> "$T/err" && grep -q "not a choice" "$T/err"'
+check '! "$P/install.sh" --without nonesuch "$G" > "$T/out" 2> "$T/err" && grep -q "unknown layer" "$T/err"'
+"$P/install.sh" --all "$G" > "$T/out"
+check '[ ! -e "$G/armada2-refit-layers.txt" ] && [ -e "$G/QOLRules.asi" ] && [ -e "$G/QOL.asi" ] && [ -e "$G/UI.asi" ] && [ -e "$G/Render3D.asi" ] && [ -e "$G/Online.asi" ]'
+check 'grep -q BinkProxy "$G/binkw32.dll" && [ "$(cat "$G/binkw32_orig.dll")" = stockbink ]'
+"$P/install.sh" "$G" > "$T/out"
+check '[ -e "$G/QOLRules.asi" ] && ! grep -q "earlier choice" "$T/out"'
+check 'cmp -s "$T/RefitPlayer.ref" "$G/RefitPlayer.ini" && ! ls "$G" | grep -q "^RefitPlayer\.ini\."'   # selection
+
+echo "== a 13.x-shaped game directory: edited inis merged, UI.ini's KeepClip moved to Display8.ini"
+M="$T/upgrade"; mock "$M"; rm "$M/d3d8.dll"   # no d3d8.dll: d3d8to9 and Display8 go in
+cp "$T/RefitPlayer.ref" "$M/RefitPlayer.ini"
+"$P/install.sh" "$M" > "$T/out"
+printf '[QOL]\nPanSpeed=7\n' > "$M/QOL.ini"
+printf '[UI]\nKeepClip=0\nCursor=0\n' > "$M/UI.ini"
+cp -R "$P" "$T/moved"
+printf 'UI.ini\tUI\tKeepClip\tDisplay8.ini\tWindow\tKeepClip\t1\nUI.ini\tUI\tNoSuchKey\tDisplay8.ini\tWindow\tNoSuchKey\t1\n' >> "$T/moved/moved.txt"
+grep -v ' moved.txt$' "$T/moved/SHA256SUMS" > "$T/moved/SHA256SUMS.new"
+echo "$(sum "$T/moved/moved.txt")  moved.txt" >> "$T/moved/SHA256SUMS.new"; mv "$T/moved/SHA256SUMS.new" "$T/moved/SHA256SUMS"
+"$T/moved/install.sh" "$M" > "$T/out"
+check 'grep -qx "PanSpeed=7" "$M/QOL.ini" && grep -q "^ShiftAddsToGroup=" "$M/QOL.ini" && [ ! -e "$M/QOL.ini.bak" ]'
+check 'grep -q "moved UI.ini \[UI\] KeepClip=0 to Display8.ini \[Window\] KeepClip" "$T/out"'
+check 'awk "/^\[/{s=\$0} /^KeepClip=0\$/{print s}" "$M/Display8.ini" | grep -qix "\[Window\]"'
+check '! grep -qi "^KeepClip" "$M/UI.ini" && grep -qx "Cursor=1" "$M/UI.ini"'
+check '[ "$(grep -ci "^KeepClip" "$M/Display8.ini")" = 1 ]'
+"$T/moved/install.sh" "$M" > "$T/out"   # idempotent
+check 'awk "/^\[/{s=\$0} /^KeepClip=0\$/{print s}" "$M/Display8.ini" | grep -qix "\[Window\]" && ! grep -q "^  moved" "$T/out"'
+check 'cmp -s "$T/RefitPlayer.ref" "$M/RefitPlayer.ini" && ! ls "$M" | grep -q "^RefitPlayer\.ini\."'
+"$T/moved/install.sh" --uninstall "$M" > "$T/out"
+check '[ ! -e "$M/armada2-refit-layers.txt" ] && cmp -s "$T/RefitPlayer.ref" "$M/RefitPlayer.ini"'
+rm -rf "$T/moved" "$M"
+
 echo "== unzipped into the game directory, run with no argument"
 cp -R "$P" "$G/pkg"
 (cd / && "$G/pkg/install.sh" > "$T/out")
@@ -150,23 +202,23 @@ check 'grep -q "^installing into $G\$" "$T/out"'
 rm -rf "$G/pkg"
 
 echo "== a damaged package is refused, each file named, with ::error lines for the GUI"
-cp -R "$P" "$T/damaged"; echo x >> "$T/damaged/game/HUD.ini"
+cp -R "$P" "$T/damaged"; echo x >> "$T/damaged/layers/legacy/HUD.ini"
 check '! A2_PROGRESS=1 "$T/damaged/install.sh" "$G" > "$T/out" 2> "$T/err"'
-check 'grep -qx "::error damaged game/HUD.ini" "$T/out" && grep -q "^the package is damaged: game/HUD.ini does not match" "$T/err"'
+check 'grep -qx "::error damaged layers/legacy/HUD.ini" "$T/out" && grep -q "^the package is damaged: layers/legacy/HUD.ini does not match" "$T/err"'
 check '! "$T/damaged/install.sh" "$G" > "$T/out" 2> "$T/err" && ! grep -q "^::error" "$T/out"'
 
 echo "== files an antivirus took or locked: all of them named, as an antivirus"
-rm -f "$T/damaged/game/QOL.asi" "$T/damaged/game/Online.asi"
+rm -f "$T/damaged/layers/qol/QOL.asi" "$T/damaged/layers/online/Online.asi"
 check '! A2_PROGRESS=1 "$T/damaged/install.sh" "$G" > "$T/out" 2> "$T/err"'
-check 'grep -qx "::error av-missing game/QOL.asi" "$T/out" && grep -qx "::error av-missing game/Online.asi" "$T/out"'
-check 'grep -qx "::error damaged game/HUD.ini" "$T/out" && [ "$(grep "^::error" "$T/out" | tail -1)" = "::error av-missing game/QOL.asi" ]'
-check 'grep -q "game/Online.asi, game/QOL.asi from the package are missing. An antivirus" "$T/err" && grep -q "add exclusions for $T/damaged and $G" "$T/err"'
-chmod 000 "$T/damaged/game/Menus.asi"
-if [ ! -r "$T/damaged/game/Menus.asi" ]; then   # not as root
+check 'grep -qx "::error av-missing layers/qol/QOL.asi" "$T/out" && grep -qx "::error av-missing layers/online/Online.asi" "$T/out"'
+check 'grep -qx "::error damaged layers/legacy/HUD.ini" "$T/out" && [ "$(grep "^::error" "$T/out" | tail -1)" = "::error av-missing layers/qol/QOL.asi" ]'
+check 'grep -q "layers/online/Online.asi, layers/qol/QOL.asi from the package are missing. An antivirus" "$T/err" && grep -q "add exclusions for $T/damaged and $G" "$T/err"'
+chmod 000 "$T/damaged/layers/legacy/Menus.asi"
+if [ ! -r "$T/damaged/layers/legacy/Menus.asi" ]; then   # not as root
     check '! A2_PROGRESS=1 "$T/damaged/install.sh" "$G" > "$T/out" 2> "$T/err"'
-    check '[ "$(grep "^::error" "$T/out" | tail -1)" = "::error av-locked game/Menus.asi" ] && grep -q "are missing or could not be read" "$T/err"'
+    check '[ "$(grep "^::error" "$T/out" | tail -1)" = "::error av-locked layers/legacy/Menus.asi" ] && grep -q "are missing or could not be read" "$T/err"'
 fi
-chmod 644 "$T/damaged/game/Menus.asi"
+chmod 644 "$T/damaged/layers/legacy/Menus.asi"
 rm -rf "$T/damaged"
 
 echo "== a file the game folder refuses is named"

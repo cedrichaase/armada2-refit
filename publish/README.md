@@ -102,17 +102,27 @@ without its history, which is full of stock art. So not every cited hash resolve
 Separate from the repository. **`publish/package.sh [<out-dir>]`** builds the plugins
 and writes `armada2-refit-<version>.zip`:
 
-- `game/`: what goes beside `Armada2.exe`, which is `Render3D.asi`, `UI.asi`, `QOL.asi`,
-  `QOLRules.asi`, `Online.asi` and `binkw32.dll`, each with its `.ini`, Render3D's
-  recipes in `game/Surfaces/` and `game/Nebulae/`, and `dxvk.conf` at stage 3
-  (`renderer/renderer-config.sh --print`). `Render3D.asi` and `UI.asi` need a device to
-  draw on behind `d3d8.dll`, so the installers put them in only where `d3d8.dll` is
-  crosire's d3d8to9 after the chain step, or Display8 in front of it (below), taking out `HUD.asi`, `Menus.asi` and
-  `GridLayout.asi` as `ui/supersede.sh` does; elsewhere those three, also in `game/`, go
-  in instead and the 3D view stays the engine's. Either way the installers take out the
-  per-part plugins (`MSAA`, `Planets`, `Lighting`, `Sky` and the rest) that earlier
+- `layers/<id>/`, one folder per layer, whose files are copied beside `Armada2.exe`
+  (14.3.0 on; `game/` and `display/` before it): `render3d` (`Render3D.asi`, its `.ini`
+  and the recipes in `Surfaces/` and `Nebulae/`), `ui` (`UI.asi`), `qol`, `rules`
+  (`QOLRules.asi`), `online`, `cutscenes` (`binkw32.dll` and `BinkProxy.ini`), `renderer`
+  (`dxvk.conf` at stage 3, `renderer/renderer-config.sh --print`), `display` (Display8,
+  below) and `legacy` (`HUD.asi`, `Menus.asi`, `GridLayout.asi`). `Render3D.asi` and
+  `UI.asi` need a device to draw on behind `d3d8.dll`, so the installers put them in only
+  where `d3d8.dll` is crosire's d3d8to9 after the chain step, or Display8 in front of it
+  (below), taking out the `legacy` three as `ui/supersede.sh` does; elsewhere those three
+  go in instead and the 3D view stays the engine's. Either way the installers take out
+  the per-part plugins (`MSAA`, `Planets`, `Lighting`, `Sky` and the rest) that earlier
   packages put in, with the `Sky` recipes they copied. `package.sh` needs rustup's
   cargo with the `i686-pc-windows-msvc` target for the two Rust plugins;
+- `sdk/`: `a2asi.h`, `a2engine.h`, `def/` (the import definitions) and `MODDING.txt`
+  (`publish/MODDING.txt`): what a mod needs to be built on the same base. The source stays
+  at the release tag in the repository; nothing is published to crates.io;
+- `layers.txt` and `moved.txt`, baked by `package.sh` for the scripts, which have no
+  Python: `layers.txt` is `tools/layers.py`'s id, `select`, `requires` and `scope` per
+  layer, and `moved.txt` the settings that moved between files (a settings row's
+  `moved_from`: from file, section, key, to file, section, key, the new default), also
+  the manifest's `moved[]`;
 - `chain/`: crosire's d3d8to9 (`d3d8.dll`) and DXVK 3.1.1's `d3d9.dll`, from
   `platform/vendor/`. `install.sh` puts them in unless a `d3d8.dll` or `d3d9.dll` there is
   none of GOG's, DXVK's or these; a DXVK `d3d9.dll` already there stays. What it
@@ -157,8 +167,9 @@ and writes `armada2-refit-<version>.zip`:
   lets those two install a package.
 
 `install.sh` and `install.ps1` read three variables the GUI sets: `A2_PROGRESS=1` prints
-`::step <id>` as each stage starts, `A2_SKIP=cutscenes` leaves the Bink proxy out (and
-puts back a stock `binkw32.dll` an earlier install replaced), and `A2_PYTHON` names the
+`::step <id>` as each stage starts, `A2_SKIP="cutscenes qol ..."` leaves those layers out
+(see "Per-layer selection" below; `cutscenes` also puts back a stock `binkw32.dll` an
+earlier install replaced), and `A2_PYTHON` names the
 program that runs the SOD scripts (the frozen installer itself on Windows and macOS).
 With `A2_PROGRESS=1` a failure they understand is also named as `::error <code> <path>`,
 one line per file, before the sentence for a person (`av-locked`, `av-missing`,
@@ -189,9 +200,30 @@ and names what it skipped. They do the same on both systems:
   Windows `A2Bloom.ini` with the `ReShadePreset.ini` copy of it, if it is still that
   copy. vkBasalt or ReShade themselves are the player's and stay;
 - write `dxvk.conf` only over one that carries `renderer-config.sh`'s marker;
-- keep a changed `.ini` as `.ini.bak` (`Display8.ini` is merged instead, above);
+- merge every shipped `.ini` into the player's, never replace it (keys added, values kept; a `.ini.bak` copy is no longer made, 14.3.0), and never touch `RefitPlayer.ini`;
 - with `--uninstall` / `-Uninstall`, put all of it back. A prerequisite file goes only
   if its hash still matches the record, so nothing replaced since is removed.
+
+### Per-layer selection
+
+Every layer whose `select` is `on` or `off` in `layers.toml` (qol, rules, online,
+cutscenes, models, render3d, ui) can be left out: `./install.sh --without qol,rules`,
+`install.bat -Without qol,rules` or `A2_SKIP="qol rules"`; a core layer (the chain,
+Display8, the renderer) or an unknown id is refused. A layer left out is taken out when an
+earlier install left it, its plugin, `.ini` and log with it (the cutscene player as
+`unproxy` does, the models as `--revert` does). The choice is written to
+`armada2-refit-layers.txt` in the game directory (`without <id>` lines): a plain re-run,
+an upgrade, keeps it, `--all` / `-All` forgets it, and uninstall deletes it. The GUI
+installer builds its "Parts" list from the same manifest keys and passes the choice as
+`A2_SKIP`. The `rules` layer is ticked by default; a player without it plays stock rules,
+and a network game of players with and without it plays stock rules (`rules/README.md`).
+
+The scripts merge an `.ini` with the repository's `tools/ini-merge.py` logic, without
+Python: `INI_UPGRADES` / `$IniUpgrades` carry its `UPGRADES` (Display8.ini's and UI.ini's
+`Defaults=`) and `ini_retired` / `Get-Retired` its `RETIRED`; keep them in step. After the
+merge they apply `moved.txt`, as the repository's `./install` does with
+`tools/settings/move-keys.py`. `install.ps1` has been read for syntax only here: no
+PowerShell runs on the development machine, so `test.ps1` is CI's.
 
 `publish/installer/test.sh` and `test.ps1` run them against a mock game of placeholder
 files, so they prove the file handling, not that anything loads.

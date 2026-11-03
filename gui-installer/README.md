@@ -50,6 +50,14 @@ Keys: F5 refresh, Ctrl+Enter install, Ctrl+L the log.
    no layer table: what installs is the release's business. **Textures and the cutscene
    player are not installed from here** (`EXCLUDED`): a release cannot carry textures,
    and the cutscene player is held back for now.
+   **Parts** (2.5.0): a package from 14.3.0 marks each layer's `select` in its manifest;
+   the layers that are `on` or `off` are listed as ticks (`Package.parts`), `requires` and
+   the summary greyed beneath, and the rules part says that every player of a network game
+   needs it. All are ticked by default, `off` layers excepted; unticking a part unticks
+   those that need it (`toggle_part`). The unticked ids go to the script as `A2_SKIP`
+   beside `EXCLUDED`, and are kept in the state file (`skip`), so an upgrade keeps the
+   choice. `--without ID,ID` and `--all` do the same on the command line. A package
+   without `select` offers no choice and gets only `EXCLUDED`.
 4. **Installs** by unpacking the zip into the cache and running its own `install.sh`
    with the game directory, `A2_PROGRESS=1` and `A2_SKIP=cutscenes`. A schema-0 zip
    ignores `A2_SKIP`, so the installer puts the stock `binkw32.dll` back afterwards, as
@@ -95,7 +103,8 @@ a layer or a step is not a new schema: unknown ids are shown and counted as they
 | `linux` | `script` (`install.sh`), `uninstall` (its flag), `progress` (the variable) |
 | `windows`, `macos` | the same for those systems (`install.ps1`, `-Uninstall`; `install.sh`). The Windows and macOS installers install only a package that has its entry (`Package.for_system`): before 11.20.0, `install.ps1` printed no progress and `install.sh` did not run on a Mac. Adding them was not a new schema, since the Linux installer reads such a package as before |
 | `steps` | the `::step` ids `install.sh` prints, in order: the progress bar's denominator |
-| `layers[]` | `id`, `name`, `version`, `files`, `summary`, `when`: `always`, `missing` (prerequisites), `dxvk`, `dxvk.conf`, `d3d8to9` (Render3D, UI: needs d3d8to9 as `d3d8.dll` after the chain step, or behind Display8), from 13.35.0 `display8` (Display8: in front of d3d8to9 only; on macOS on Direct3D 9); before 13.0.0 also `vkbasalt` (bloom), which the window no longer lists |
+| `layers[]` | `id`, `name`, `version`, `files`, `summary`, `when`; from 14.3.0 also the optional `dir` (the package folder), `select` (`core`, `on`, `off`, `legacy`), `requires`, `scope` (`local` or `match`) and `games`, from `tools/layers.py --json` (a reader that does not know them ignores them; with `select` on or off the window offers the layer in its Parts list). `when`: `always`, `missing` (prerequisites), `dxvk`, `dxvk.conf`, `d3d8to9` (Render3D, UI: needs d3d8to9 as `d3d8.dll` after the chain step, or behind Display8), from 13.35.0 `display8` (Display8: in front of d3d8to9 only; on macOS on Direct3D 9); before 13.0.0 also `vkbasalt` (bloom), which the window no longer lists |
+| `moved[]` | from 14.3.0, optional: `from_file`, `from_section`, `from_key`, `to_file`, `to_section`, `to_key`, `default`: settings that moved between files, applied by the scripts (`moved.txt`) |
 | `not_included[]` | `id`, `name`, `summary`: shown as not available (textures) |
 
 ## Progress

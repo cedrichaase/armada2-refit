@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 14.3.0 — 2026-11-03
+
+Layers: gui-installer 2.5.0, testbench 3.102.0.
+
+### Added
+- The release package, contract C6 (phase 9 W-PKG; package schema stays 1): one folder per layer, `layers/<id>/` (display, render3d with its recipes, ui, qol, rules, online, cutscenes, renderer, and `legacy` for HUD, Menus and GridLayout) in place of `game/` and `display/`; `sdk/` (`a2asi.h`, `a2engine.h`, `def/`, `MODDING.txt`: the headers a mod is built on; the source stays at the release tag, nothing goes to crates.io); `layers.txt` and `moved.txt`, baked by `package.sh` from `tools/layers.py` and the settings tables. The manifest's `layers[]` gain optional `dir`, `select`, `requires`, `scope` and `games`, and the manifest a top-level `moved[]`.
+- Per-layer selection in `install.sh` and `install.ps1`: `--without a,b` / `-Without`, `A2_SKIP` and `--all` / `-All` for every layer whose `select` is `on` or `off`; a layer left out is taken out when an earlier install left it; the choice is remembered in `armada2-refit-layers.txt` (a plain re-run keeps it, `--all` resets it, uninstall deletes it).
+- The scripts apply `moved.txt` after the merge (a value other than the new default goes to the new key, the old key goes either way).
+- Six `subset-*` bench scenarios (testbench).
+
+### Changed
+- Every shipped plugin ini is merged into the player's (keys added, values kept, `Defaults=` upgrades and retired defaults as `tools/ini-merge.py`), never replaced with a `.ini.bak` copy; `UI.ini`'s upgrades and `Render3D.ini`'s retired defaults join Display8.ini's in the awk and PowerShell merges. `RefitPlayer.ini` is still never touched. `install.ps1` was only syntax-read here, not run. Installed, not yet seen in game.
+
 ## 14.0.0 — 2026-11-03
 
 Layers: qol 2.0.0, rules 1.0.0, online 0.11.0, ui 0.34.0, gui-installer 2.4.1, testbench 3.99.1.

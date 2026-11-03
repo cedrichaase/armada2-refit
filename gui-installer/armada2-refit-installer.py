@@ -49,7 +49,7 @@ import urllib.error
 import urllib.request
 import zipfile
 
-INSTALLER_VERSION = '2.4.1'
+INSTALLER_VERSION = '2.5.0'
 SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, ::step and ::error lines
 REPO = 'cedrichaase/armada2-refit'
 API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'
@@ -910,7 +910,8 @@ def log_excerpt(lines, head=40, tail=60, keep=60):
 
 def package_files(version):
     """{name in the game folder: sha256} of what the cached release `version` puts in
-    (game/, chain/ and the vendored loader), or None when it is not cached."""
+    (layers/<id>/, or game/ in a package before 14.3.0; chain/ and the vendored loader),
+    or None when it is not cached."""
     path = os.path.join(CACHE, 'releases', f'armada2-refit-{version}.zip')
     try:
         out = {}
@@ -921,6 +922,11 @@ def package_files(version):
                     continue
                 if parts[1] == 'game':
                     rel = '/'.join(parts[2:])
+                elif parts[1] == 'layers' and len(parts) >= 4:
+                    # Display8's d3d8.dll is not the chain's: only its .ini is compared.
+                    if parts[2] == 'display' and not parts[3].lower().endswith('.ini'):
+                        continue
+                    rel = '/'.join(parts[3:])
                 elif parts[1] == 'chain' and n.endswith('.dll'):
                     rel = parts[2]
                 elif parts[1] == 'vendor' and len(parts) == 4 and \
@@ -932,6 +938,19 @@ def package_files(version):
         return out
     except (OSError, zipfile.BadZipFile, KeyError):
         return None
+
+
+def package_member(names, top, rel):
+    """The zip member that puts `rel` in the game folder: layers/<id>/<rel> (14.3.0 on), else
+    game/<rel>."""
+    old = f'{top}/game/{rel}'
+    if old in names:
+        return old
+    tail = '/' + rel
+    for n in names:
+        if n.startswith(f'{top}/layers/') and n.endswith(tail) and n.count('/') >= 3:
+            return n
+    return None
 
 
 def readable(path):
@@ -1275,7 +1294,10 @@ def diagnose(game, error=None):
                 for n in sorted(shipped):
                     if not n.lower().endswith('.ini') or '/' in n or n.lower() not in has:
                         continue
-                    ref = ini_keys(z.read(f'{top}/game/{n}').decode(errors='replace'))
+                    member = package_member(z.namelist(), top, n)
+                    if not member:
+                        continue
+                    ref = ini_keys(z.read(member).decode(errors='replace'))
                     try:
                         cur = ini_keys(open(p(has[n.lower()]), errors='replace').read())
                     except OSError:
@@ -1799,6 +1821,49 @@ def download(rel, progress=None):
     return rel.cached
 
 
+# ------------------------------------------------------------------ parts
+
+def initial_skip(parts, state):
+    """The ids left unticked: the earlier choice kept in the state file, else the layers
+    whose select is `off` (everything else is ticked by default, the rules layer included)."""
+    ids = {p['id'] for p in parts}
+    if isinstance(state, dict) and isinstance(state.get('skip'), list):
+        return {i for i in state['skip'] if i in ids}
+    return {p['id'] for p in parts if p.get('select') == 'off'}
+
+
+def toggle_part(parts, skip, pid, on):
+    """Tick (on) or untick one part; a part another needs is not left out while the other
+    is ticked, and ticking a part ticks what it needs. Returns the new set."""
+    skip = set(skip)
+    by_id = {p['id']: p for p in parts}
+    if on:
+        todo = [pid]
+        while todo:
+            i = todo.pop()
+            if i in skip:
+                skip.discard(i)
+                todo += [r for r in by_id.get(i, {}).get('requires', []) if r in by_id]
+    else:
+        todo = [pid]
+        while todo:
+            i = todo.pop()
+            if i not in skip and i in by_id:
+                skip.add(i)
+                todo += [p['id'] for p in parts if i in p.get('requires', [])]
+    return skip
+
+
+def part_note(part):
+    """The grey line under a part: what it does, who needs it, what it needs."""
+    bits = [part.get('summary', '')]
+    if part.get('requires'):
+        bits.append('needs ' + ', '.join(part['requires']))
+    if part.get('scope') == 'match':
+        bits.append('every player of a network game needs it')
+    return ' — '.join(b for b in bits if b)
+
+
 # ------------------------------------------------------------------ packages
 
 class Package:
@@ -1823,6 +1888,15 @@ class Package:
         self.version = m.get('version', '?')
         self.layers = m.get('layers', [])
         self.steps = m.get('steps', STEPS)
+
+    def parts(self):
+        """The layers the player may leave out, from the manifest's optional `select`
+        (tools/layers.py): those whose select is on or off. A manifest without the key (a
+        package before 14.3.0) offers no choice. The cutscene player stays out of the list
+        (EXCLUDED); `requires` names the layers it needs."""
+        return [l for l in self.layers
+                if l.get('select') in ('on', 'off') and l['id'] not in EXCLUDED
+                and l['id'] != 'bloom']
 
     def supported(self):
         return self.schema in SCHEMAS and self.for_system()
@@ -1961,8 +2035,8 @@ class Job:
     def __init__(self, report, log):
         self.report, self.log = report, log
 
-    def _run_script(self, pkg, pkgdir, args, steps, lo, hi):
-        env = dict(host_env(), A2_PROGRESS='1', A2_SKIP=' '.join(EXCLUDED))
+    def _run_script(self, pkg, pkgdir, args, steps, lo, hi, skip=()):
+        env = dict(host_env(), A2_PROGRESS='1', A2_SKIP=' '.join(EXCLUDED + tuple(skip)))
         if FROZEN:
             # This program runs the scripts' Python steps itself (run_python).
             env['A2_PYTHON'] = sys.executable
@@ -2004,8 +2078,9 @@ class Job:
             raise RuntimeError(tail[0])      # a schema-0 zip, or a failure with no code
         return out
 
-    def install(self, rel, zip_path, game, launcher=True):
-        """rel may be None when installing a local zip."""
+    def install(self, rel, zip_path, game, launcher=True, skip=None):
+        """rel may be None when installing a local zip. skip: the ids of the parts to leave
+        out (parts of the package only); None keeps the choice of the last install."""
         if game_running():
             raise InstallError('game-running', ['Armada2.exe'],
                                'Armada II is running — quit the game first')
@@ -2024,7 +2099,15 @@ class Job:
             raise RuntimeError(pkg.why_not())
         self.report(0.32, 'unpack', None)
         pkgdir = pkg.unpack(os.path.join(CACHE, 'unpacked', pkg.version))
-        out = self._run_script(pkg, pkgdir, [game], pkg.steps, 0.35, 0.92)
+        old = load_json(os.path.join(game, STATE_FILE), {}) or {}
+        parts = pkg.parts()
+        ids = {p['id'] for p in parts}
+        if skip is None:
+            skip = initial_skip(parts, old)
+        skip = sorted(i for i in skip if i in ids)
+        if skip:
+            self.log('left out: ' + ', '.join(skip))
+        out = self._run_script(pkg, pkgdir, [game], pkg.steps, 0.35, 0.92, skip)
         if pkg.schema == 0 and 'cutscenes' in EXCLUDED:
             # Its install.sh knows no A2_SKIP: take the cutscene player out again.
             unproxy(game, self.log)
@@ -2035,10 +2118,11 @@ class Job:
             m = re.match(r'^ {4}([A-Z][A-Z0-9_]*)=(.*)$', line)
             if m:
                 wanted[m.group(1)] = m.group(2)
-        old = load_json(os.path.join(game, STATE_FILE), {}) or {}
         state = dict(version=pkg.version, schema=pkg.schema, installer=INSTALLER_VERSION,
                      installed=time.strftime('%Y-%m-%d %H:%M'), launcher_env=wanted,
                      heroic=old.get('heroic'), prefix=old.get('prefix'))
+        if parts:
+            state['skip'] = skip      # the next install, here, keeps the choice
         notes = []
         g = next((x for x in find_games() if os.path.realpath(x.path) == os.path.realpath(game)),
                  None)
@@ -2152,6 +2236,10 @@ def cli(argv):
     ap.add_argument('--uninstall', action='store_true')
     ap.add_argument('--game')
     ap.add_argument('--no-launcher', action='store_true')
+    ap.add_argument('--without', metavar='ID,ID',
+                    help='parts to leave out (the package\'s select on/off layers)')
+    ap.add_argument('--all', action='store_true',
+                    help='every part, forgetting an earlier choice')
     ap.add_argument('--check-version')
     ap.add_argument('--selftest', action='store_true')
     ap.add_argument('--report', action='store_true',
@@ -2199,11 +2287,17 @@ def cli(argv):
             last[0] = (step, text)
 
     job = Job(report, print)
+    # None keeps the earlier choice; --all resets it; --without names the parts to leave out.
+    skip = None
+    if a.all:
+        skip = set()
+    if a.without:
+        skip = {w for w in re.split(r'[,\s]+', a.without) if w}
     try:
         if a.uninstall:
             job.uninstall(releases(), game)
         elif a.package:
-            job.install(None, a.package, game, launcher=not a.no_launcher)
+            job.install(None, a.package, game, launcher=not a.no_launcher, skip=skip)
         elif a.install is not None:
             rels = releases()
             rel = next((r for r in rels if r.version == a.install), None) if a.install \
@@ -2211,7 +2305,7 @@ def cli(argv):
             if not rel:
                 print(f'no release {a.install}', file=sys.stderr)
                 return 1
-            job.install(rel, None, game, launcher=not a.no_launcher)
+            job.install(rel, None, game, launcher=not a.no_launcher, skip=skip)
         else:
             ap.print_help()
     except Exception as e:
@@ -2417,6 +2511,27 @@ def selftest():
         check('forward mode' in d8b([h.replace('stub', 'forward')])[0]
               and 'stood down: HUD.asi is loaded' in d8b([h, 'Mode=stub: HUD.asi is loaded; forward mode instead'])[0]
               and 'no start line' in d8b(['x'])[0], 'display8: forward, stood down, no log')
+        # Parts: the layers a manifest marks select on/off, the choice kept in the state file.
+        parts = [dict(id='render3d', name='3D view', select='on', requires=['display'],
+                      scope='local', summary='x'),
+                 dict(id='ui', name='HUD', select='on', requires=['display'], scope='local'),
+                 dict(id='rules', name='Rules', select='on', requires=[], scope='match',
+                      summary='pay when queued'),
+                 dict(id='extra', name='Extra', select='off', requires=['rules'], scope='local')]
+        check(initial_skip(parts, None) == {'extra'}
+              and initial_skip(parts, {'skip': ['ui', 'gone']}) == {'ui'},
+              'parts: defaults leave out the off layers (rules ticked); the state file wins')
+        check(toggle_part(parts, {'extra'}, 'extra', True) == set()
+              and toggle_part(parts, set(), 'rules', False) == {'rules', 'extra'}
+              and toggle_part(parts, {'extra'}, 'rules', False) == {'rules', 'extra'},
+              'parts: unticking a part unticks what needs it; ticking ticks what it needs')
+        check('every player of a network game needs it' in part_note(parts[2])
+              and 'needs display' in part_note(parts[0]), 'parts: the grey line')
+        members = ['top/layers/qol/QOL.ini', 'top/game/Old.ini', 'top/layers/ui/UI.ini']
+        check(package_member(members, 'top', 'QOL.ini') == 'top/layers/qol/QOL.ini'
+              and package_member(members, 'top', 'Old.ini') == 'top/game/Old.ini'
+              and package_member(members, 'top', 'None.ini') is None,
+              'package_member: layers/<id>/ (14.3.0 on) or game/')
         # Errors in words (explain): every code its own, the files named, the cause said.
         heads = set()
         for code in ERROR_CODES:
@@ -2873,6 +2988,14 @@ def run_gui():
             self.row_rel.add_suffix(self.dd_rel)
             rows.append(self.row_rel)
 
+            # The parts of the package that are a choice (manifest select on/off), ticked
+            # unless left out; the choice is kept in the game's state file.
+            self.row_parts = Adw.ExpanderRow(title='Parts', subtitle=' ', subtitle_lines=2)
+            self.part_rows = []
+            self.parts_key = None
+            self.skip = set()
+            rows.append(self.row_parts)
+
             # Always written: the game does not start right without them.
             self.row_heroic = Adw.ActionRow(title='Heroic launch settings', subtitle_lines=3)
             rows.append(self.row_heroic)
@@ -3242,7 +3365,41 @@ def run_gui():
                 self.package = None
 
         # ---------------------------------------------------------- what to show
+        def update_parts(self):
+            p, f = self.package, self.facts
+            parts = p.parts() if p else []
+            self.row_parts.set_visible(bool(parts))
+            key = (p.version if p else None, bool(parts), (self.game() or None) and self.game().path)
+            if key != self.parts_key:
+                self.parts_key = key
+                self.skip = initial_skip(parts, (f or {}).get('state'))
+            for r in self.part_rows:
+                self.row_parts.remove(r)
+            self.part_rows = []
+            for part in parts:
+                row = Adw.ActionRow(title=GLib.markup_escape_text(part['name']),
+                                    subtitle=GLib.markup_escape_text(part_note(part)),
+                                    subtitle_lines=3)
+                chk = Gtk.CheckButton(active=part['id'] not in self.skip, valign=Gtk.Align.CENTER)
+                chk.connect('toggled', lambda b, i=part['id']: self.on_part(i, b.get_active()))
+                row.add_prefix(chk)
+                row.set_activatable_widget(chk)
+                self.row_parts.add_row(row)
+                self.part_rows.append(row)
+            left = [x['name'] for x in parts if x['id'] in self.skip]
+            self.row_parts.set_subtitle(GLib.markup_escape_text(
+                ('Left out: ' + ', '.join(left)) if left else 'All of them'))
+
+        def on_part(self, pid, on):
+            parts = self.package.parts() if self.package else []
+            new = toggle_part(parts, self.skip, pid, on)
+            if new == self.skip:
+                return
+            self.skip = new
+            GLib.idle_add(lambda: self.update_all() and False)   # not from inside the signal
+
         def update_all(self):
+            self.update_parts()
             self.update_heads_up()
             self.update_get_heroic()
             self.update_launcher()
@@ -3258,7 +3415,7 @@ def run_gui():
             notes = []
             if p:
                 for l in p.layers:
-                    if l['id'] in EXCLUDED or l['id'] == 'bloom':
+                    if l['id'] in EXCLUDED or l['id'] == 'bloom' or l['id'] in self.skip:
                         continue
                     yes, why = layer_verdict(l, f)
                     if not yes:
@@ -3437,7 +3594,8 @@ def run_gui():
                     msg += '\n' + ' · '.join(res['notes'])
                 self.set_status(msg, 'ok')
                 self.on_game()
-            self.in_thread(lambda: self.job().install(r, None, g.path, launcher=write), done)
+            skip = set(self.skip)
+            self.in_thread(lambda: self.job().install(r, None, g.path, launcher=write, skip=skip), done)
 
         def on_launch(self):
             g = self.game()
@@ -4019,6 +4177,7 @@ def run_tk():
             self.q = queue.Queue()
             self.games, self.gi, self.releases, self.ri = [], 0, [], 0
             self.package, self.facts = None, None
+            self.skip, self.parts_key = set(), None
             self.busy, self.user_picked, self.check_error = False, False, None
             self.rel_note = None
             self.status, self.status_kind = '', ''
@@ -4471,7 +4630,7 @@ def run_tk():
                 return None, []
             yes, notes = [], []
             for l in p.layers:
-                if l['id'] in EXCLUDED or l['id'] == 'bloom':
+                if l['id'] in EXCLUDED or l['id'] == 'bloom' or l['id'] in self.skip:
                     continue
                 ok, why = layer_verdict(l, f)
                 if ok:
@@ -4530,9 +4689,27 @@ def run_tk():
             self.sky.resize(w, h)
             self.layout()
 
+        def sync_parts(self):
+            """The ticks follow the package and the game: the earlier choice from the state
+            file, else the defaults."""
+            p = self.package
+            parts = p.parts() if p else []
+            g = self.game()
+            key = (p.version if p else None, bool(parts), g.path if g else None)
+            if key != getattr(self, 'parts_key', None):
+                self.parts_key = key
+                self.skip = initial_skip(parts, (self.facts or {}).get('state'))
+            return parts
+
+        def on_part(self, pid):
+            parts = self.package.parts() if self.package else []
+            self.skip = toggle_part(parts, self.skip, pid, pid in self.skip)
+            self.update_all()
+
         def update_all(self):
             """Work out what the window shows (which may read the prefix's registry and
             list processes), then lay it out."""
+            self.sync_parts()
             self.view = dict(banner=self.banner(), info=self.launcher_info(),
                              lines=self.layer_lines())
             if self.size:
@@ -4773,6 +4950,27 @@ def run_tk():
                 cv.create_line(x0 + 1, sy, x1 - 1, sy, fill=SEP, tags=('ui',))
             y += px(14)
 
+            # The parts that are a choice: a tick each, the grey line under it.
+            parts = self.sync_parts()
+            if parts:
+                t = text(cx, y, 'Parts', F_SUB, DIM, anchor='n')
+                y = bottom(t) + px(4)
+                for part in parts:
+                    on = part['id'] not in self.skip
+                    tg = tag()
+                    box = text(x0 + px(8), y, '☑' if on else '☐', F_ROW, FG if on else DIM,
+                               tags=(tg,))
+                    nm = text(x0 + px(8) + F_ROW.measure('☑') + px(8), y, part['name'], F_SUB,
+                              FG if on else DIM, tags=(tg,))
+                    if not self.busy:
+                        cv.tag_bind(tg, '<Button-1>', lambda e, i=part['id']: self.on_part(i))
+                        hover(tg)
+                    y = max(bottom(box), bottom(nm)) + px(1)
+                    sub = text(x0 + px(8) + F_ROW.measure('☑') + px(8), y, part_note(part),
+                               F_SMALL, FAINT, width=cw - px(48))
+                    y = bottom(sub) + px(5)
+                y += px(8)
+
             # What goes in, and what will not.
             goes, notes = self.view['lines']
             if goes:
@@ -4873,7 +5071,8 @@ def run_tk():
                     msg += '\n' + ' · '.join(res['notes'])
                 self.status, self.status_kind = msg, 'ok'
                 self.on_game()
-            self.in_thread(lambda: self.job().install(r, None, g.path), done)
+            skip = set(self.skip)
+            self.in_thread(lambda: self.job().install(r, None, g.path, skip=skip), done)
 
         def on_launch(self):
             g = self.game()
