@@ -3,8 +3,16 @@ Armada II Refit -- install the release package into the game, on Windows.
 
   install.bat [<game dir>]                 install
   install.bat -Uninstall [<game dir>]      take all of it out again
+  install.bat -Without qol,rules [<game dir>]
+                                           leave layers out (also A2_SKIP="qol rules")
+  install.bat -All [<game dir>]            every layer again, forgetting an earlier choice
 
-No choices to make: what can work here is installed, the rest is skipped and says why.
+What can work here is installed, the rest is skipped and says why. The layers that are a
+choice are layers.txt's (select on or off); -Without / A2_SKIP names those to leave out (and
+takes them out when an earlier install left them), and the choice is remembered in
+armada2-refit-layers.txt in the game directory: a plain re-run, an upgrade, keeps it.
+Shipped .ini files are merged into the player's (their values stay), never replaced;
+RefitPlayer.ini, the Refit screen's overlay, is never touched.
 First the prerequisites (prereqs.txt: the ASI loader with STA2WidescreenPatch), bundled in
 vendor\, each file only if it is missing. Then the Direct3D chain: crosire's d3d8to9 as
 d3d8.dll (chain\), in place of GOG's own d3d8to9 build, on Windows' own Direct3D 9. In
@@ -22,8 +30,8 @@ parent if the package was unzipped into the game, else the GOG install found in 
 registry, else it asks. PowerShell 5.1 or later; install.bat runs it.
 
 For the GUI installer, as install.sh: A2_PROGRESS=1 prints "::step <id> <what>" as each
-stage starts (the ids are manifest.json's "steps"), A2_SKIP="cutscenes" leaves the
-cutscene player out, and A2_PYTHON names the program that runs the model scripts. Every
+stage starts (the ids are manifest.json's "steps"), A2_SKIP="cutscenes qol" leaves those
+layers out, and A2_PYTHON names the program that runs the model scripts. Every
 line goes to stdout through [Console]::Out, in order; an error is the last line, on
 stderr, and the exit code is 1. With A2_PROGRESS=1 an error the GUI can explain is first
 named on stdout as "::error <code> <path>", one line per file (codes: av-locked,
@@ -32,7 +40,9 @@ av-missing, damaged, game-running, no-game, write-denied; gui-installer/README.m
 #>
 param(
     [string]$GameDir = "",
-    [switch]$Uninstall
+    [switch]$Uninstall,
+    [string]$Without = "",
+    [switch]$All
 )
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"   # Invoke-WebRequest's bar: slow, and not output
@@ -63,8 +73,9 @@ $AvHelp = "https://github.com/cedrichaase/armada2-refit#antivirus-false-positive
 function Av-Advice { "Some antivirus programs flag Armada II Refit's plugins as a false positive. " +
     "Restore the files from the antivirus's quarantine, or add exclusions for $here and $GameDir, " +
     "then try again ($AvHelp)." }
-# A2_SKIP="cutscenes ..." leaves those parts out. Only cutscenes can be skipped so far.
-function Test-Skipped([string]$n) { (" " + $env:A2_SKIP + " ") -like "* $n *" }
+# The layers left out (the selection below sets $Skip).
+$Skip = @()
+function Test-Skipped([string]$n) { $Skip -contains $n }
 
 function Test-Game([string]$d) { $d -and (Test-Path -LiteralPath (Join-Path $d "Armada2.exe")) }
 
@@ -223,7 +234,7 @@ $Recipes = "Surfaces", "Nebulae"
 function Remove-Recipes {
     foreach ($d in $Recipes) {
         if (-not (Test-Path -LiteralPath (G $d))) { continue }
-        foreach ($f in Get-ChildItem -LiteralPath (Join-Path $here "game\$d") -Filter "*.ini") {
+        foreach ($f in Get-ChildItem -LiteralPath (Join-Path $here "layers\render3d\$d") -Filter "*.ini") {
             Remove-Item -LiteralPath (Join-Path (G $d) $f.Name) -ErrorAction SilentlyContinue
         }
         if (-not (Get-ChildItem -Force -LiteralPath (G $d))) { Remove-Item -LiteralPath (G $d) }
@@ -259,6 +270,7 @@ if ($Uninstall) {
     foreach ($n in "Render3D", "UI", "QOL", "QOLRules", "Online") {
         foreach ($e in ".asi", ".ini", ".log") { Remove-Item -LiteralPath (G "$n$e") -ErrorAction SilentlyContinue }
     }
+    Remove-Item -LiteralPath (G "armada2-refit-layers.txt") -ErrorAction SilentlyContinue   # the remembered choice
     Remove-LegacyUi
     Remove-Recipes
     Remove-OldPlugins
@@ -297,7 +309,7 @@ if ($Uninstall) {
     exit 0
 }
 
-# A package file as SHA256SUMS names it, the Windows way (game\Menus.asi).
+# A package file as SHA256SUMS names it, the Windows way (layers\legacy\Menus.asi).
 function Rel([string]$p) {
     if ($p.StartsWith($here + "\")) { $p = $p.Substring($here.Length + 1) }
     $p -replace "/", "\"
@@ -330,12 +342,12 @@ if ($missing.Count -or $locked.Count) {
         foreach ($p in $missing) { Say "::error av-missing $p" }
         foreach ($p in $locked) { Say "::error av-locked $p" }
     }
-    $all = @($missing) + @($locked)
+    $gone = @($missing) + @($locked)
     $what = "could not be read"
     if ($missing.Count) { $what = if ($locked.Count) { "are missing or could not be read" } else { "are missing" } }
-    if ($all.Count -eq 1) { $what = $what -replace "^are", "is" }
-    throw ("$($all -join ', ') from the package $what. An antivirus has most likely " +
-        "quarantined or locked $(if ($all.Count -eq 1) { 'it' } else { 'them' }). " + (Av-Advice))
+    if ($gone.Count -eq 1) { $what = $what -replace "^are", "is" }
+    throw ("$($gone -join ', ') from the package $what. An antivirus has most likely " +
+        "quarantined or locked $(if ($gone.Count -eq 1) { 'it' } else { 'them' }). " + (Av-Advice))
 }
 if ($damaged.Count) {
     Stop-With damaged $damaged ("the package is damaged: $($damaged -join ', ') " +
@@ -343,6 +355,43 @@ if ($damaged.Count) {
         "An antivirus that cleans or cuts files in place can do this too: look in its quarantine and history.")
 }
 Say "installing into $GameDir"
+
+# ------------------------------------------------------------------ the layers to install
+
+# layers.txt (tools/layers.py, baked by package.sh): id, select, requires, scope. A layer
+# can be left out when its select is on or off; core ones are the Direct3D chain's and
+# Display8's, and the legacy and retired ones are not a choice.
+$LayersFile = G "armada2-refit-layers.txt"
+$LayerSelect = @{}
+foreach ($l in Get-Content -LiteralPath (Join-Path $here "layers.txt")) {
+    $f = $l -split "`t"
+    if ($f.Count -ge 2) { $LayerSelect[$f[0]] = $f[1] }
+}
+$want = @()
+if (-not $All) { $want = @((("$($env:A2_SKIP) $Without") -split "[,\s]+") | Where-Object { $_ }) }
+if ($want.Count) {
+    foreach ($w in $want) {
+        if (-not $LayerSelect.ContainsKey($w)) { throw "unknown layer: $w (layers.txt lists them)" }
+        if ($LayerSelect[$w] -ne "on" -and $LayerSelect[$w] -ne "off") {
+            throw "layer $w is not a choice (select $($LayerSelect[$w])): it cannot be left out"
+        }
+        if ($Skip -notcontains $w) { $Skip += $w }
+    }
+} elseif (-not $All -and (Test-Path -LiteralPath $LayersFile)) {
+    # An earlier choice, kept across the upgrade.
+    foreach ($l in Get-Content -LiteralPath $LayersFile) {
+        $kw, $w = $l.Trim() -split "\s+"
+        if ($kw -eq "without" -and $w -and ($LayerSelect[$w] -eq "on" -or $LayerSelect[$w] -eq "off")) { $Skip += $w }
+    }
+    if ($Skip.Count) { Say "keeping your earlier choice: without $($Skip -join ' ') (-All for every layer)" }
+}
+if (-not $Skip.Count) {
+    Remove-Item -LiteralPath $LayersFile -ErrorAction SilentlyContinue
+} else {
+    $out = @("# armada2-refit: layers left out of the install; -All brings them back")
+    foreach ($w in $Skip) { $out += "without $w" }
+    [IO.File]::WriteAllText($LayersFile, (($out -join "`n") + "`n"))
+}
 
 # ------------------------------------------------------------------ prerequisites
 
@@ -443,12 +492,28 @@ if (Test-D3d8to9 $d8) {
 # The merge is tools/ini-merge.py's, without Python: every key the shipped file has and the
 # player's lacks is added, in its section, and the player's values stay -- except that a
 # value still at an older set's default moves to the new one (Defaults=, numbered in the
-# shipped file). $DisplayUpgrades is tools/ini-merge.py's table for Display8.ini: the
-# section with Defaults=, the number, the section, the key, the old value. Keep them in step.
-$DisplayUpgrades = @(
+# shipped file). $IniUpgrades is tools/ini-merge.py's UPGRADES (Display8.ini's and UI.ini's
+# Defaults 2): the section with Defaults=, the number, the section, the key, the old value;
+# Get-Retired is its RETIRED (a key whose meaning changed: its old default is replaced
+# wherever it still holds it). Keep them in step. Every shipped .ini goes through this,
+# never over the player's (Put, below).
+$IniUpgrades = @(
     @("display8", 2, "display8", "mode", "forward"),
-    @("display8", 2, "display8", "backend", "d3d9"))
-function Merge-Ini([string]$shipped, [string]$installed, $upgrades) {
+    @("display8", 2, "display8", "backend", "d3d9"),
+    @("ui", 2, "ui", "cursor", "0"),
+    @("ui", 2, "menus", "enable", "0"),
+    @("ui", 2, "loading", "enable", "0"))
+foreach ($k in "bar", "info", "minimap", "selection", "unitview", "resources", "buttons", "messages", "pause",
+               "replay", "overlay", "chat", "comm", "dropplayer", "loadwait") {
+    $IniUpgrades += , @("ui", 2, "hud", $k, "0")
+}
+function Get-Retired([string]$name) {
+    if ($name.ToLower() -eq "render3d.ini") {
+        return @(@("lights", "beamlight", "1.0"), @("lights", "beamreach", "40"), @("nebulae", "litexplosion", "0.75"))
+    }
+    @()
+}
+function Merge-Ini([string]$shipped, [string]$installed, $upgrades, $retired = @()) {
     $label = Split-Path -Leaf $installed
     $secRe = '^\s*\[([^\]]+)\]'
     $keyRe = '^\s*(\w+)\s*=\s*(.*?)\s*$'
@@ -487,6 +552,17 @@ function Merge-Ini([string]$shipped, [string]$installed, $upgrades) {
             Say "  ${label}: [$s] $name $v -> $new (defaults $n)"
         }
     }
+    foreach ($r in $retired) {
+        $s, $k, $old = $r
+        $sk = "$s|$k"
+        if (-not ($haveVals.ContainsKey($sk) -and $shipVals.ContainsKey($sk))) { continue }
+        $i, $v = $haveVals[$sk]; $new = $shipVals[$sk][1]
+        if ($v -ceq $old -and $v -cne $new) {
+            $null = $lines[$i] -match $keyRe; $name = $Matches[1]
+            $lines[$i] = "$name=$new"
+            Say "  ${label}: [$s] $name $v -> $new"
+        }
+    }
     if ($dsec -and $haveVals.ContainsKey("$dsec|defaults") -and $haveN -lt $shipN) {
         $i = $haveVals["$dsec|defaults"][0]
         $null = $lines[$i] -match $keyRe
@@ -522,20 +598,89 @@ function Merge-Ini([string]$shipped, [string]$installed, $upgrades) {
             $lines.Add(""); $lines.Add($head[$s]); $lines.AddRange([string[]]$missing)
         }
     }
-    [IO.File]::WriteAllText($installed, (($lines -join "`n") + "`n"))
+    # Nothing to add (line ends aside): the player's file stays byte for byte.
+    $before = (@([IO.File]::ReadAllLines($installed)) -join "`n")
+    if ($before -ne ($lines -join "`n")) { [IO.File]::WriteAllText($installed, (($lines -join "`n") + "`n")) }
+}
+
+# One key of an installed .ini: Get-IniKey returns its value (a ; comment dropped) or $null;
+# Set-IniKey replaces the key's first line, else adds it after the last line of its section
+# (the section is added at the end if missing); Remove-IniKey removes every line of the key.
+function Find-IniKey($lines, [string]$section, [string]$key) {
+    $cur = $null; $first = -1; $last = -1; $insec = $false; $hits = @()
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        $t = $lines[$i].Trim()
+        if ($t.StartsWith("[")) {
+            $cur = ($t.TrimStart("[") -split "\]")[0].Trim().ToLower()
+            if ($cur -eq $section.ToLower()) { $insec = $true; $last = $i }
+            continue
+        }
+        if ($cur -ne $section.ToLower()) { continue }
+        if ($t) { $last = $i }
+        if (-not $t.StartsWith(";") -and -not $t.StartsWith("#") -and $t.Contains("=")) {
+            if (($t -split "=", 2)[0].Trim().ToLower() -eq $key.ToLower()) {
+                if ($first -lt 0) { $first = $i }
+                $hits += $i
+            }
+        }
+    }
+    @{ First = $first; Last = $last; Insec = $insec; Hits = $hits }
+}
+function Get-IniKey([string]$file, [string]$section, [string]$key) {
+    $lines = @([IO.File]::ReadAllLines($file))
+    $f = Find-IniKey $lines $section $key
+    if ($f.First -lt 0) { return $null }
+    (($lines[$f.First] -split "=", 2)[1] -split ";")[0].Trim()
+}
+function Set-IniKey([string]$file, [string]$section, [string]$key, [string]$value) {
+    $lines = New-Object Collections.Generic.List[string]
+    foreach ($l in [IO.File]::ReadAllLines($file)) { $lines.Add($l) }
+    $f = Find-IniKey $lines $section $key
+    if ($f.First -ge 0) { $lines[$f.First] = (($lines[$f.First] -split "=", 2)[0]) + "=" + $value }
+    elseif ($f.Insec) { $lines.Insert($f.Last + 1, "$key=$value") }
+    else { $lines.Add(""); $lines.Add("[$section]"); $lines.Add("$key=$value") }
+    [IO.File]::WriteAllText($file, (($lines -join "`n") + "`n"))
+}
+function Remove-IniKey([string]$file, [string]$section, [string]$key) {
+    $lines = New-Object Collections.Generic.List[string]
+    foreach ($l in [IO.File]::ReadAllLines($file)) { $lines.Add($l) }
+    $f = Find-IniKey $lines $section $key
+    if (-not $f.Hits.Count) { return }
+    for ($j = $f.Hits.Count - 1; $j -ge 0; $j--) { $lines.RemoveAt($f.Hits[$j]) }
+    [IO.File]::WriteAllText($file, (($lines -join "`n") + "`n"))
+}
+# Settings that moved from one file to another (moved.txt, baked by package.sh from the
+# settings tables): a value other than the new default goes to the new key, and the old key
+# is removed either way -- tools/settings/move-keys.py's job in the repository's ./install.
+function Invoke-Moved {
+    $mf = Join-Path $here "moved.txt"
+    if (-not (Test-Path -LiteralPath $mf)) { return }
+    foreach ($l in Get-Content -LiteralPath $mf) {
+        if (-not $l.Trim()) { continue }
+        $ff, $fs, $fk, $tf, $ts, $tk, $def = $l -split "`t"
+        if (-not (Test-Path -LiteralPath (G $ff))) { continue }
+        $v = Get-IniKey (G $ff) $fs $fk
+        if ($null -eq $v) { continue }
+        if ($v.ToLower() -ne "$def".ToLower()) {
+            if (-not (Test-Path -LiteralPath (G $tf))) { Say "  $tf is not there; $ff [$fs] $fk=$v stays"; continue }
+            Set-IniKey (G $tf) $ts $tk $v
+            Say "  moved $ff [$fs] $fk=$v to $tf [$ts] $tk"
+        }
+        Remove-IniKey (G $ff) $fs $fk
+    }
 }
 
 Step display "Display8"
 if (Test-D3d8to9 (G "d3d8.dll")) {
     # The new one beside it first: a copy that fails leaves the chain as it was.
-    Copy-Into (Join-Path $here "display\d3d8.dll") (G "d3d8.dll.a2display-new")
+    Copy-Into (Join-Path $here "layers\display\d3d8.dll") (G "d3d8.dll.a2display-new")
     if (Test-Path -LiteralPath (G "d3d8_real.dll")) { Remove-Item -LiteralPath (G "d3d8_real.dll") }
     Move-Item -LiteralPath (G "d3d8.dll") (G "d3d8_real.dll")
     Move-Item -LiteralPath (G "d3d8.dll.a2display-new") (G "d3d8.dll")
     Say "  d3d8.dll: Display8, with crosire's d3d8to9 behind it as d3d8_real.dll"
-    $ship = Join-Path $here "display\Display8.ini"
+    $ship = Join-Path $here "layers\display\Display8.ini"
     if (Test-Path -LiteralPath (G "Display8.ini")) {
-        Merge-Ini $ship (G "Display8.ini") $DisplayUpgrades
+        Merge-Ini $ship (G "Display8.ini") $IniUpgrades
         Say "  Display8.ini (yours, brought up to date)"
     } else {
         Copy-Into $ship (G "Display8.ini")
@@ -549,16 +694,23 @@ Say "the mod:"
 
 # ------------------------------------------------------------------ plugins
 
-# A changed .ini is kept beside the new one, as <name>.ini.bak.
-function Put([string]$f) {
-    $src = Join-Path $here "game\$f"; $dst = G $f
-    if ($f.EndsWith(".ini") -and (Test-Path -LiteralPath $dst) -and
-        (Get-FileHash -LiteralPath $src).Hash -ne (Get-FileHash -LiteralPath $dst).Hash) {
-        Copy-Item -LiteralPath $dst "$dst.bak" -Force
-        Say "  kept your old $f as $f.bak"
+# A file of a layer into the game directory. An .ini the player has is merged with the
+# shipped one (Merge-Ini: the keys it lacks are added, the values stay), never replaced.
+function Put([string]$layer, [string]$f) {
+    $src = Join-Path $here "layers\$layer\$f"; $dst = G $f
+    if ($f.EndsWith(".ini") -and (Test-Path -LiteralPath $dst)) {
+        Merge-Ini $src $dst $IniUpgrades (Get-Retired $f)
+        Say "  $f (yours, brought up to date)"
+        return
     }
     Copy-Into $src $dst
     Say "  $f"
+}
+# A layer left out is taken out when an earlier install left it.
+function Remove-Layer([string[]]$names) {
+    foreach ($n in $names) {
+        foreach ($e in ".asi", ".ini", ".log") { Remove-Item -LiteralPath (G "$n$e") -ErrorAction SilentlyContinue }
+    }
 }
 
 # Render3D.asi and UI.asi need what the chain and display steps put in: Display8 in
@@ -570,59 +722,70 @@ $D3d9 = (Test-D3d8to9 (G "d3d8.dll")) -or
 
 Remove-OldPlugins   # earlier packages' per-part plugins: Render3D.asi's modules replace them
 Step render3d "the 3D view"
-if ($D3d9) {
-    Put "Render3D.asi"; Put "Render3D.ini"
+if (Test-Skipped "render3d") {
+    Remove-Layer "Render3D"; Remove-Recipes
+    Say "  the 3D view left out (you chose to)"
+} elseif ($D3d9) {
+    Put "render3d" "Render3D.asi"; Put "render3d" "Render3D.ini"
     Remove-Recipes
     foreach ($d in $Recipes) {
         New-Item -ItemType Directory -Force -Path (G $d) | Out-Null
         $n = 0
-        foreach ($f in Get-ChildItem -LiteralPath (Join-Path $here "game\$d") -Filter "*.ini") {
+        foreach ($f in Get-ChildItem -LiteralPath (Join-Path $here "layers\render3d\$d") -Filter "*.ini") {
             Copy-Into $f.FullName (Join-Path (G $d) $f.Name); $n++
         }
         Say "  $d\ ($n recipes)"
     }
 } else {
-    foreach ($e in ".asi", ".ini", ".log") { Remove-Item -LiteralPath (G "Render3D$e") -ErrorAction SilentlyContinue }
-    Remove-Recipes
+    Remove-Layer "Render3D"; Remove-Recipes
     Say "  Render3D.asi skipped: it needs crosire's d3d8to9 as d3d8.dll -- the 3D view stays the engine's"
 }
 Step ui "the HUD and the menus"
-if ($D3d9) {
+if (Test-Skipped "ui") {
+    Remove-Layer "UI"; Remove-LegacyUi
+    Say "  the HUD and menus left out (you chose to)"
+} elseif ($D3d9) {
     Remove-LegacyUi   # UI.asi takes their place; each would stand down against the other
-    Put "UI.asi"; Put "UI.ini"
+    Put "ui" "UI.asi"; Put "ui" "UI.ini"
 } else {
     # The UI cannot draw: the plugins it supersedes keep the HUD and menus widescreen.
-    foreach ($n in "UI.asi", "UI.ini", "UI.log", "MenuScale.asi", "MenuScale.ini") {
-        Remove-Item -LiteralPath (G $n) -ErrorAction SilentlyContinue
-    }
+    Remove-Layer "UI", "MenuScale"
     Say "  UI.asi skipped: it needs crosire's d3d8to9 as d3d8.dll -- the older plugins instead:"
-    Put "HUD.asi"; Put "HUD.ini"
-    Put "Menus.asi"; Put "Menus.ini"
-    Put "GridLayout.asi"
-    # The player's [Cells] choices survive a reinstall; only a missing file is replaced.
-    if (Test-Path -LiteralPath (G "GridLayout.ini")) { Say "  GridLayout.ini (yours, kept)" } else { Put "GridLayout.ini" }
+    Put "legacy" "HUD.asi"; Put "legacy" "HUD.ini"
+    Put "legacy" "Menus.asi"; Put "legacy" "Menus.ini"
+    Put "legacy" "GridLayout.asi"; Put "legacy" "GridLayout.ini"
 }
 Step qol "quality of life"
-Put "QOL.asi"; Put "QOL.ini"
+if (Test-Skipped "qol") { Remove-Layer "QOL"; Say "  quality of life left out (you chose to)" }
+else { Put "qol" "QOL.asi"; Put "qol" "QOL.ini" }
 Step rules "rules"
 # Pay on queue: every player of a network game needs it (a game with anyone lacking it
 # plays stock rules); against the computer only, it stands down in other transports.
-Put "QOLRules.asi"; Put "QOLRules.ini"
+if (Test-Skipped "rules") { Remove-Layer "QOLRules"; Say "  rules left out (you chose to)" }
+else { Put "rules" "QOLRules.asi"; Put "rules" "QOLRules.ini" }
 Step models "models"
 $Py = @(Find-Python)
-if ($Py.Count) {
+if (Test-Skipped "models") {
+    if ($Py.Count -and (Test-Path -LiteralPath (Join-Path $here "models"))) {
+        Say "  the models back to stock (you chose to leave them out):"
+        Invoke-Sods "--revert"
+    } else {
+        Say "  models left out (you chose to)"
+    }
+} elseif ($Py.Count) {
     Say "  the moons, the selection bubble, the hulls and the asteroids, from your own SOD files:"
     Invoke-Sods "--install"
 } else {
     Say "  moons, selection bubble, hulls and asteroids skipped: needs Python 3 (py or python)"
 }
 Step online "online multiplayer"
-Put "Online.asi"; Put "Online.ini"
+if (Test-Skipped "online") { Remove-Layer "Online"; Say "  online multiplayer left out (you chose to)" }
+else { Put "online" "Online.asi"; Put "online" "Online.ini" }
 
 Step cutscenes "cutscene player"
 if (Test-Skipped "cutscenes") {
     Remove-Proxy   # one an earlier install put in goes too
-    Say "  cutscene player skipped (A2_SKIP)"
+    Say "  cutscene player skipped (left out)"
 } else {
     # The proxy forwards every call to the stock DLL as binkw32_orig.dll.
     if (-not (Test-Proxy (G "binkw32.dll"))) {
@@ -631,15 +794,18 @@ if (Test-Skipped "cutscenes") {
         Copy-Item -LiteralPath (G "binkw32.dll") (G "binkw32_orig.dll") -Force
     }
     if (-not (Test-Path -LiteralPath (G "binkw32_orig.dll"))) { throw "binkw32.dll is the proxy but binkw32_orig.dll is missing" }
-    Put "binkw32.dll"; Put "BinkProxy.ini"
+    Put "cutscenes" "binkw32.dll"; Put "cutscenes" "BinkProxy.ini"
 }
 
 Step renderer "renderer settings"
 if ((Test-Path -LiteralPath (G "dxvk.conf")) -and -not (Test-OurDxvkConf)) {
     Say "  dxvk.conf skipped: there is one already that this package did not write"
 } else {
-    Put "dxvk.conf"
+    Put "renderer" "dxvk.conf"
 }
+
+# Settings that moved between files since the version the player had.
+Invoke-Moved
 
 # ------------------------------------------------------------------ old bloom
 

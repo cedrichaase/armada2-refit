@@ -62,7 +62,7 @@ function G([string]$n) { Join-Path $G $n }
 [IO.File]::WriteAllText((G "RefitPlayer.ini"), "; mine`r`n[Render3D.Modules]`r`nhulls=0`r`n[UI.HUD]`r`nBarHidden=1`r`n")
 $OverlaySha = Sha (G "RefitPlayer.ini")
 function OverlayKept {
-    ((Sha (G "RefitPlayer.ini")) -eq $OverlaySha) -and -not (Test-Path (Join-Path $P "game\RefitPlayer.ini")) -and
+    ((Sha (G "RefitPlayer.ini")) -eq $OverlaySha) -and -not (Test-Path (Join-Path $P "layers\qol\RefitPlayer.ini")) -and
         (@(Get-ChildItem -LiteralPath $G -Filter "RefitPlayer.ini*").Count -eq 1)
 }
 # What earlier packages and installs left: the per-part plugins Render3D.asi replaced.
@@ -74,7 +74,7 @@ Set-Content (G "Sky\mbgaqu.ini") "old"; Set-Content (G "Sky\myown.ini") "[Sky]"
 
 Write-Host "== every PE of ours carries its version resource, as Windows reads it (platform/versioninfo/)"
 $Ver = (Split-Path $P -Leaf) -replace '^armada2-refit-', ''
-foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $P "game"), (Join-Path $P "display") -File |
+foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $P "layers") -Recurse -File |
                  Where-Object { $_.Extension -in ".asi", ".dll" })) {
     $vi = $f.VersionInfo
     Check "$($f.Name): '$($vi.FileDescription)' $($vi.FileVersion), product $($vi.ProductVersion)" (
@@ -120,7 +120,7 @@ Remove-Item -LiteralPath $PyLog
 Check "no bloom" (-not (Test-Path (G "A2Bloom.ini")))
 Check "binkw32.dll is the proxy" ((Get-Content (G "binkw32.dll") -Raw) -match "BinkProxy")
 Check "binkw32_orig.dll is stock" ((Text (G "binkw32_orig.dll")) -eq "stockbink")
-Check "dxvk.conf installed" ((Sha (G "dxvk.conf")) -eq (Sha (Join-Path $P "game\dxvk.conf")))
+Check "dxvk.conf installed" ((Sha (G "dxvk.conf")) -eq (Sha (Join-Path $P "layers\renderer\dxvk.conf")))
 Check "no WINEDLLOVERRIDES" (-not (Has $out "*WINEDLLOVERRIDES*"))
 Check "RefitPlayer.ini untouched by the install" (OverlayKept)
 
@@ -132,19 +132,39 @@ $env:A2_PYTHON = $FakePy
 Check "no ::step lines" (-not (Has $out "::step*"))
 Check "model script failures said, install goes on" ((Has $out "    boom*") -and (Has $out "  hull-sod.py --install failed -- the rest goes on") -and
                                                      (Has $out "Uninstall: *"))
-Check "GridLayout.ini kept" (((Text (G "GridLayout.ini")) -eq "[Cells]") -and (Has $out "*GridLayout.ini (yours, kept)*") -and
+Check "GridLayout.ini kept (merged: nothing of the player's lost, no .bak)" (((Text (G "GridLayout.ini")) -match "\[Cells\]") -and
                              -not (Test-Path (G "GridLayout.ini.bak")))
 
-Write-Host "== A2_SKIP=cutscenes: the proxy out, the stock binkw32.dll back"
+Write-Host "== A2_SKIP=cutscenes: the proxy out, the stock binkw32.dll back (and remembered)"
 $env:A2_SKIP = "cutscenes"
 $out = Install @($G)
 $env:A2_SKIP = $null
-Check "said so" (Has $out "  cutscene player skipped (A2_SKIP)")
+Check "said so" (Has $out "  cutscene player skipped (left out)")
 Check "binkw32.dll stock again" ((Text (G "binkw32.dll")) -eq "stockbink")
 Check "no proxy files" (-not (Test-Path (G "binkw32_orig.dll")) -and -not (Test-Path (G "binkw32.dll.a2neb-backup")) -and
                         -not (Test-Path (G "BinkProxy.ini")))
+Check "the choice is remembered" ((Get-Content -LiteralPath (G "armada2-refit-layers.txt")) -contains "without cutscenes")
 $out = Install @($G)
-Check "the proxy back without A2_SKIP" (((Get-Content (G "binkw32.dll") -Raw) -match "BinkProxy") -and ((Text (G "binkw32_orig.dll")) -eq "stockbink"))
+Check "a plain re-run keeps it" ((Has $out "keeping your earlier choice: without cutscenes*") -and ((Text (G "binkw32.dll")) -eq "stockbink"))
+$out = Install @("-All", $G)
+Check "the proxy back with -All, the choice forgotten" (((Get-Content (G "binkw32.dll") -Raw) -match "BinkProxy") -and
+    ((Text (G "binkw32_orig.dll")) -eq "stockbink") -and -not (Test-Path (G "armada2-refit-layers.txt")))
+
+Write-Host "== -Without rules,qol: taken out, kept by a plain re-run, an unknown or core layer refused, -All brings them back"
+Set-Content (G "QOLRules.log") "log"
+$out = Install @("-Without", "rules,qol", $G)
+Check "no QOLRules.*, no QOL.*" (-not (@(Get-ChildItem -LiteralPath $G -Filter "QOLRules*").Count) -and -not (Test-Path (G "QOL.asi")) -and
+    -not (Test-Path (G "QOL.ini")))
+Check "the other layers stay" ((Test-Path (G "Online.asi")) -and (Test-Path (G "HUD.asi")))
+$out = Install @($G)
+Check "a plain re-run keeps the choice" ((Has $out "keeping your earlier choice: without rules qol*") -and -not (Test-Path (G "QOL.asi")))
+$r = Fail (Join-Path $P "install.ps1") @("-Without", "display", $G)
+Check "a core layer cannot be left out" ($r.Last -like "layer display is not a choice*")
+$r = Fail (Join-Path $P "install.ps1") @("-Without", "nonesuch", $G)
+Check "an unknown layer is refused" ($r.Last -like "unknown layer: nonesuch*")
+$out = Install @("-All", $G)
+Check "-All brings them back" ((Test-Path (G "QOL.asi")) -and (Test-Path (G "QOLRules.asi")) -and -not (Test-Path (G "armada2-refit-layers.txt")))
+Check "RefitPlayer.ini untouched by the selection" (OverlayKept)
 
 Write-Host "== DXVK's d3d8.dll: the player's own choice, left as it is; an old package's bloom preset out"
 Set-Content (G "d3d8.dll") "dxvk"
@@ -157,7 +177,7 @@ Check "prerequisites already installed" (Has $out "*STA2WidescreenPatch: already
 Check "DXVK's d3d8.dll left, nothing recorded" (((Text (G "d3d8.dll")) -eq "dxvk") -and
     -not (Test-Path (G "d3d8.dll.a2chain-backup")) -and (Has $out "*d3d8.dll is DXVK's*"))
 Check "no Display8 in front of DXVK" ((Has $out "*Display8 skipped*") -and -not (Test-Path (G "d3d8_real.dll")))
-Check "HUD.ini.bak kept" ((Get-Content (G "HUD.ini.bak") -Raw) -match "; mine")
+Check "HUD.ini merged, not set aside as .bak" (((Get-Content (G "HUD.ini") -Raw) -match "; mine") -and -not (Test-Path (G "HUD.ini.bak")))
 Check "old bloom preset out, ReShade's own file left" (-not (Test-Path (G "A2Bloom.ini")) -and
     -not (Test-Path (G "ReShadePreset.ini")) -and (Test-Path (G "ReShade.ini")) -and (Has $out "*removed the old bloom preset*"))
 
@@ -166,13 +186,13 @@ Remove-Item -LiteralPath (G "d3d8.dll")
 New-Item -ItemType Directory (G "Surfaces") | Out-Null
 Set-Content (G "Surfaces\myown.ini") "[Surface]"
 $out = Install @($G)
-Check "d3d8.dll is Display8, d3d8_real.dll d3d8to9" (((Sha (G "d3d8.dll")) -eq (Sha (Join-Path $P "display\d3d8.dll"))) -and
+Check "d3d8.dll is Display8, d3d8_real.dll d3d8to9" (((Sha (G "d3d8.dll")) -eq (Sha (Join-Path $P "layers\display\d3d8.dll"))) -and
     ((Sha (G "d3d8_real.dll")) -eq $D3d8to9Sha) -and -not (Test-Path (G "d3d8.dll.a2display-new")))
-Check "Display8.ini as shipped" ((Sha (G "Display8.ini")) -eq (Sha (Join-Path $P "display\Display8.ini")))
-Check "Render3D.asi and UI.asi" (((Sha (G "Render3D.asi")) -eq (Sha (Join-Path $P "game\Render3D.asi"))) -and
-    ((Sha (G "UI.asi")) -eq (Sha (Join-Path $P "game\UI.asi"))) -and (Test-Path (G "Render3D.ini")) -and (Test-Path (G "UI.ini")))
-Check "the recipes" ((@(Get-ChildItem (G "Nebulae")).Count -eq @(Get-ChildItem (Join-Path $P "game\Nebulae")).Count) -and
-    (@(Get-ChildItem (G "Surfaces")).Count -eq @(Get-ChildItem (Join-Path $P "game\Surfaces")).Count + 1))
+Check "Display8.ini as shipped" ((Sha (G "Display8.ini")) -eq (Sha (Join-Path $P "layers\display\Display8.ini")))
+Check "Render3D.asi and UI.asi" (((Sha (G "Render3D.asi")) -eq (Sha (Join-Path $P "layers\render3d\Render3D.asi"))) -and
+    ((Sha (G "UI.asi")) -eq (Sha (Join-Path $P "layers\ui\UI.asi"))) -and (Test-Path (G "Render3D.ini")) -and (Test-Path (G "UI.ini")))
+Check "the recipes" ((@(Get-ChildItem (G "Nebulae")).Count -eq @(Get-ChildItem (Join-Path $P "layers\render3d\Nebulae")).Count) -and
+    (@(Get-ChildItem (G "Surfaces")).Count -eq @(Get-ChildItem (Join-Path $P "layers\render3d\Surfaces")).Count + 1))
 foreach ($n in "HUD", "Menus", "GridLayout") {
     Check "$n.asi + $n.ini out for the UI" (-not (Test-Path (G "$n.asi")) -and -not (Test-Path (G "$n.ini")))
 }
@@ -184,8 +204,8 @@ Set-Content (G "d3d9.dll") "dxvk"
 [IO.File]::WriteAllText((G "Display8.ini"), "[Display8]`nMode=forward`nBackend=d3d9`nVSync=0`nLog=1`n`n[Drop]`nDrop2D=1`n")
 $out = Install @($G)
 Check "d3d8to9 already" (Has $out "*d3d8.dll: crosire's d3d8to9 already")
-Check "Display8 replaced, d3d8to9 behind it" (((Sha (G "d3d8.dll")) -eq (Sha (Join-Path $P "display\d3d8.dll"))) -and
-    ((Sha (G "d3d8_real.dll")) -eq $D3d8to9Sha) -and ((Sha (G "UI.asi")) -eq (Sha (Join-Path $P "game\UI.asi"))))
+Check "Display8 replaced, d3d8to9 behind it" (((Sha (G "d3d8.dll")) -eq (Sha (Join-Path $P "layers\display\d3d8.dll"))) -and
+    ((Sha (G "d3d8_real.dll")) -eq $D3d8to9Sha) -and ((Sha (G "UI.asi")) -eq (Sha (Join-Path $P "layers\ui\UI.asi"))))
 $ini = @(Get-Content -LiteralPath (G "Display8.ini"))
 Check "Display8.ini: the old defaults moved, said so" (($ini -ccontains "Mode=stub") -and ($ini -ccontains "Backend=auto") -and
     ($ini -ccontains "Defaults=2") -and ($out -ccontains "  Display8.ini: [display8] Mode forward -> stub (defaults 2)"))
@@ -255,36 +275,36 @@ $r = Fail (Join-Path $P "install.ps1") @((Join-Path $T "nowhere"))
 Check "no game: exit 1" ($r.Code -eq 1)
 Check "no game: said last" ($r.Last -like "no Armada2.exe in *nowhere*")
 $D = Join-Path $T "damaged"; Copy-Item -Recurse $P $D
-Add-Content (Join-Path $D "game\HUD.ini") "; tampered"
+Add-Content (Join-Path $D "layers\legacy\HUD.ini") "; tampered"
 $r = Fail (Join-Path $D "install.ps1") @($M)
 Check "damaged package: exit 1" ($r.Code -eq 1)
-Check "damaged package: said last" ($r.Last -like "the package is damaged: game\HUD.ini does not match SHA256SUMS*")
+Check "damaged package: said last" ($r.Last -like "the package is damaged: layers\legacy\HUD.ini does not match SHA256SUMS*")
 Check "damaged package: nothing installed" (-not (Test-Path (Join-Path $M "HUD.asi")))
 Check "no ::error lines unasked" (-not (Has $r.Out "::error*"))
 $env:A2_PROGRESS = "1"
 $r = Fail (Join-Path $D "install.ps1") @($M)
-Check "damaged package: ::error damaged game\HUD.ini" (Has $r.Out "::error damaged game\HUD.ini")
+Check "damaged package: ::error damaged layers\legacy\HUD.ini" (Has $r.Out "::error damaged layers\legacy\HUD.ini")
 $r = Fail (Join-Path $P "install.ps1") @((Join-Path $T "nowhere"))
 Check "no game: ::error no-game" (Has $r.Out "::error no-game *nowhere")
 
 Write-Host "== an antivirus holding package files open: every one named, as an antivirus"
 $A = Join-Path $T "locked"; Copy-Item -Recurse $P $A
-$held = foreach ($n in "Menus.asi", "QOL.asi") { [IO.File]::Open((Join-Path $A "game\$n"), "Open", "Read", "None") }
+$held = foreach ($n in "Menus.asi", "QOL.asi") { [IO.File]::Open((Join-Path $A "layers\legacy\$n"), "Open", "Read", "None") }
 try {
     $r = Fail (Join-Path $A "install.ps1") @($M)
 } finally { foreach ($h in $held) { $h.Dispose() } }
 Check "locked: exit 1" ($r.Code -eq 1)
-Check "locked: ::error av-locked for each" ((Has $r.Out "::error av-locked game\Menus.asi") -and (Has $r.Out "::error av-locked game\QOL.asi"))
-Check "locked: both named, as an antivirus, last" (($r.Last -like "*game\Menus.asi, game\QOL.asi from the package could not be read. An antivirus*") -and
+Check "locked: ::error av-locked for each" ((Has $r.Out "::error av-locked layers\legacy\Menus.asi") -and (Has $r.Out "::error av-locked layers\qol\QOL.asi"))
+Check "locked: both named, as an antivirus, last" (($r.Last -like "*layers\legacy\Menus.asi, layers\qol\QOL.asi from the package could not be read. An antivirus*") -and
     ($r.Last -like "*exclusions for *locked and *roundtrip*"))
 Check "locked: nothing installed" (-not (Test-Path (Join-Path $M "HUD.asi")))
 
 Write-Host "== an antivirus quarantined a package file: named, as an antivirus"
-Remove-Item -LiteralPath (Join-Path $A "game\Online.asi")
+Remove-Item -LiteralPath (Join-Path $A "layers\online\Online.asi")
 $r = Fail (Join-Path $A "install.ps1") @($M)
 Check "missing: exit 1" ($r.Code -eq 1)
-Check "missing: ::error av-missing" (Has $r.Out "::error av-missing game\Online.asi")
-Check "missing: named, as an antivirus, last" ($r.Last -like "game\Online.asi from the package is missing. An antivirus has most likely quarantined*")
+Check "missing: ::error av-missing" (Has $r.Out "::error av-missing layers\online\Online.asi")
+Check "missing: named, as an antivirus, last" ($r.Last -like "layers\online\Online.asi from the package is missing. An antivirus has most likely quarantined*")
 
 Write-Host "== a file the game folder refuses is named"
 $R = Join-Path $T "readonly"; Mock $R

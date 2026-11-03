@@ -5,6 +5,11 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.102.0 — 2026-11-03
+
+### Added
+- `subset-full`, `subset-stockcompat`, `subset-visuals`, `subset-display-render3d`, `subset-display-ui` and `subset-display`: one game each, a mission with `Layers:` (none for the full release), checked on the plugins' logs (phase 9 W-PKG). Installed, not yet seen in game.
+
 ## 3.101.0 — 2026-11-03
 
 ### Added

@@ -44,7 +44,7 @@ echo BinkProxy > "$G/binkw32.dll"; echo x > "$G/BinkProxy.ini"
 
 echo "== install from the package, with Heroic's launch variables"
 "${run[@]}" --package "$zip" --game "$G" > "$T/out" 2> "$T/err"
-check '[ -e "$G/HUD.asi" ] && [ -e "$G/QOL.asi" ] && [ -e "$G/Online.asi" ] && [ -e "$G/winmm.dll" ]'
+check '[ -e "$G/HUD.asi" ] && [ -e "$G/QOL.asi" ] && [ -e "$G/QOLRules.asi" ] && [ -e "$G/Online.asi" ] && [ -e "$G/winmm.dll" ]'
 check 'grep -q "Installing online play" "$T/err"'
 check '[ "$(cat "$G/binkw32.dll")" = stockbink ] && [ ! -e "$G/binkw32_orig.dll" ] && [ ! -e "$G/BinkProxy.ini" ]'
 check 'grep -q "Skipping the cutscene player" "$T/err" && grep -q "Installing the HUD" "$T/err"'
@@ -60,19 +60,85 @@ check '! grep -qF "$T" "$T/out"'
 check 'grep -q "^Player settings (RefitPlayer.ini):" "$T/out" && grep -q "hulls=0" "$T/out" && ! grep -q "; mine" "$T/out"'
 check 'cmp -s "$T/RefitPlayer.ref" "$G/RefitPlayer.ini"'   # install and report leave it
 
+echo "== parts: --without leaves layers out, the choice is kept across installs, --all resets it"
+skipped() { python3 -c "import json,sys; print(','.join(json.load(open(sys.argv[1])).get('skip', ['?'])))" "$1/armada2-refit-installed.json"; }
+check '[ "$(skipped "$G")" = "" ]'   # the default: every part ticked, rules too
+"${run[@]}" --package "$zip" --game "$G" --no-launcher --without rules,qol > "$T/out" 2> "$T/err"
+check '[ -z "$(ls "$G" | grep "^QOLRules")" ] && [ ! -e "$G/QOL.asi" ] && [ -e "$G/Online.asi" ]'
+check '[ "$(skipped "$G")" = "qol,rules" ] && grep -q "left out: qol, rules" "$T/out"'
+"${run[@]}" --package "$zip" --game "$G" --no-launcher > "$T/out" 2> "$T/err"   # an upgrade keeps it
+check '[ -z "$(ls "$G" | grep "^QOLRules")" ] && [ ! -e "$G/QOL.asi" ] && [ "$(skipped "$G")" = "qol,rules" ]'
+check 'cmp -s "$T/RefitPlayer.ref" "$G/RefitPlayer.ini"'
+"${run[@]}" --package "$zip" --game "$G" --no-launcher --all > "$T/out" 2> "$T/err"
+check '[ -e "$G/QOLRules.asi" ] && [ -e "$G/QOL.asi" ] && [ "$(skipped "$G")" = "" ]'
+check 'cmp -s "$T/RefitPlayer.ref" "$G/RefitPlayer.ini"'
+
+echo "== a package before 14.3.0 (game/ layout, no select keys) and the installers across it"
+root="$(git -C "$(dirname "$gui")" rev-parse --show-toplevel 2>/dev/null || true)"
+oldref=691e21b
+if [ -n "$root" ] && git -C "$root" cat-file -e "$oldref:gui-installer/armada2-refit-installer.py" 2>/dev/null; then
+    git -C "$root" show "$oldref:gui-installer/armada2-refit-installer.py" > "$T/oldgui.py"
+    git -C "$root" show "$oldref:publish/installer/install.sh" > "$T/oldinstall.sh"
+    python3 - "$zip" "$T/old.zip" "$T/oldinstall.sh" <<'PY'
+import hashlib, json, re, sys, zipfile
+src, dst, oldsh = sys.argv[1:4]
+files = {}
+with zipfile.ZipFile(src) as a:
+    top = a.namelist()[0].split('/')[0]
+    for n in a.namelist():
+        if n.endswith('/'):
+            continue
+        rel = n[len(top) + 1:]
+        m = re.match(r'layers/([^/]+)/(.*)$', rel)
+        if m:
+            rel = ('display/' if m.group(1) == 'display' else 'game/') + m.group(2)
+        elif rel in ('layers.txt', 'moved.txt', 'SHA256SUMS') or rel.startswith('sdk/'):
+            continue
+        files[rel] = a.read(n)
+files['install.sh'] = open(oldsh, 'rb').read()
+man = json.loads(files['manifest.json'])
+man.pop('moved', None)
+for l in man['layers']:
+    for k in ('dir', 'select', 'requires', 'scope', 'games'):
+        l.pop(k, None)
+files['manifest.json'] = json.dumps(man).encode()
+sums = ''.join(f'{hashlib.sha256(b).hexdigest()}  {n}\n' for n, b in sorted(files.items())
+               if n.startswith(('game/', 'chain/', 'display/', 'models/', 'vendor/'))
+               or n in ('a2env.py', 'prereqs.txt', 'manifest.json', 'armada2-refit-installer.py'))
+files['SHA256SUMS'] = sums.encode()
+with zipfile.ZipFile(dst, 'w', zipfile.ZIP_DEFLATED) as z:
+    for n, b in files.items():
+        zi = zipfile.ZipInfo(f'{top}/{n}')
+        zi.external_attr = (0o755 if n.endswith('.sh') else 0o644) << 16
+        z.writestr(zi, b)
+PY
+    # The new installer on the old package: no choice offered, nothing but the cutscene skip passed.
+    O="$T/Games/oldzip"; mkdir -p "$O"; echo exe > "$O/Armada2.exe"; echo stockbink > "$O/binkw32.dll"
+    "${run[@]}" --package "$T/old.zip" --game "$O" --no-launcher > "$T/out" 2> "$T/err"
+    check '[ -e "$O/QOL.asi" ] && [ -e "$O/QOLRules.asi" ] && [ "$(cat "$O/binkw32.dll")" = stockbink ]'
+    check '! grep -q "\"skip\"" "$O/armada2-refit-installed.json"'
+    # The previous installer (2.4.1) on the new package: it passes A2_SKIP=cutscenes and ignores the new keys.
+    O2="$T/Games/oldgui"; mkdir -p "$O2"; echo exe > "$O2/Armada2.exe"; echo stockbink > "$O2/binkw32.dll"
+    python3 "$T/oldgui.py" --package "$zip" --game "$O2" --no-launcher > "$T/out" 2> "$T/err"
+    check '[ -e "$O2/QOL.asi" ] && [ -e "$O2/QOLRules.asi" ] && [ "$(cat "$O2/binkw32.dll")" = stockbink ]'
+    check 'grep -q "\"version\": \"$ver\"" "$O2/armada2-refit-installed.json"'
+else
+    echo "(skipped: $oldref is not in this clone's history)"
+fi
+
 echo "== a package file an antivirus took: the window's words, every file named"
 python3 - "$zip" "$T/av.zip" <<'PY'
 import sys, zipfile
 with zipfile.ZipFile(sys.argv[1]) as a, zipfile.ZipFile(sys.argv[2], 'w') as b:
     for i in a.infolist():
-        if not i.filename.endswith(('/game/QOL.asi', '/game/Online.asi')):
+        if not i.filename.endswith(('/layers/qol/QOL.asi', '/layers/online/Online.asi')):
             b.writestr(i, a.read(i))
 PY
 check '! "${run[@]}" --package "$T/av.zip" --game "$G" --no-launcher > "$T/out" 2> "$T/err"'
-check 'grep -q "^error: game/QOL.asi, game/Online.asi are missing from the package: an antivirus has most likely quarantined them" "$T/err" || grep -q "^error: game/Online.asi, game/QOL.asi are missing" "$T/err"'
+check 'grep -q "^error: layers/qol/QOL.asi, layers/online/Online.asi are missing from the package: an antivirus has most likely quarantined them" "$T/err" || grep -q "^error: layers/online/Online.asi, layers/qol/QOL.asi are missing" "$T/err"'
 check 'grep -q "add exclusions for" "$T/err" && grep -q "More: https://github.com/cedrichaase/armada2-refit#antivirus-false-positives" "$T/err"'
 "${run[@]}" --report > "$T/out" 2> "$T/err"
-check 'grep -q "Files missing or unreadable, likely an antivirus" "$T/out" && grep -q "game/QOL.asi: missing (installer cache)" "$T/out"'
+check 'grep -q "Files missing or unreadable, likely an antivirus" "$T/out" && grep -q "layers/qol/QOL.asi: missing (installer cache)" "$T/out"'
 
 echo "== the scripts' ::error lines, a schema-0 script's last line, an unpack an antivirus holds"
 if [ -z "${A2_INSTALLER_APPIMAGE:-}" ]; then

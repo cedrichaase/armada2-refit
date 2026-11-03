@@ -4,8 +4,16 @@
 #
 #   ./install.sh [<game dir>]               install
 #   ./install.sh --uninstall [<game dir>]   take all of it out again
+#   ./install.sh --without qol,rules [<game dir>]
+#                                           leave layers out (also A2_SKIP="qol rules")
+#   ./install.sh --all [<game dir>]         every layer again, forgetting an earlier choice
 #
-# No choices to make: what can work here is installed, the rest is skipped and says why.
+# What can work here is installed, the rest is skipped and says why. The layers that are a
+# choice are layers.txt's (select on or off); --without / A2_SKIP names those to leave out
+# (and takes them out when an earlier install left them), and the choice is remembered in
+# armada2-refit-layers.txt in the game directory: a plain re-run, an upgrade, keeps it.
+# Shipped .ini files are merged into the player's (their values stay), never replaced;
+# RefitPlayer.ini, the Refit screen's overlay, is never touched.
 # First the prerequisites (prereqs.txt: the ASI loader with STA2WidescreenPatch), bundled
 # in vendor/, each file only if missing. Then the Direct3D chain the repository's ./install
 # sets up (chain/): crosire's d3d8to9 as d3d8.dll on DXVK's d3d9.dll, so dxvk.conf has
@@ -44,7 +52,7 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-action=install game=""
+action=install game="" without="" all=0
 mac=0; [ "$(uname -s)" = Darwin ] && mac=1
 
 # Portable to a Mac: no sha256sum there (shasum -a 256), no tac, a BSD sed.
@@ -68,6 +76,10 @@ reverse_lines() { awk '{ l[NR] = $0 } END { for (i = NR; i > 0; i--) print l[i] 
 while [ $# -gt 0 ]; do
     case "$1" in
         --uninstall) action=uninstall ;;
+        --all)       all=1 ;;
+        --without)   shift; [ $# -gt 0 ] || { echo "--without needs a list of layers" >&2; exit 2; }
+                     without="$without,$1" ;;
+        --without=*) without="$without,${1#--without=}" ;;
         -h|--help)   sed -n '2,/^set -e/p' "$0" | grep '^#' | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*)          echo "unknown option: $1" >&2; exit 2 ;;
         *)           game="$1" ;;
@@ -129,7 +141,7 @@ recipes_out() {
     local d f
     for d in $RECIPES; do
         [ -d "$game/$d" ] || continue
-        for f in "$here/game/$d"/*.ini; do
+        for f in "$here/layers/render3d/$d"/*.ini; do
             [ -e "$f" ] && rm -f "$game/$d/$(basename "$f")"
         done
         rmdir "$game/$d" 2>/dev/null || true
@@ -143,9 +155,9 @@ legacy_ui_out() {
 }
 
 is_proxy() { grep -q 'BinkProxy' "$1" 2>/dev/null; }
-# A2_SKIP="cutscenes ..." leaves those parts out -- the GUI installer does not install the
-# cutscene player yet. Only cutscenes can be skipped so far.
-skipped() { case " ${A2_SKIP:-} " in *" $1 "*) return 0 ;; esac; return 1; }
+# The layers left out (the selection below sets SKIP): " qol rules ".
+SKIP=" "
+skipped() { case "$SKIP" in *" $1 "*) return 0 ;; esac; return 1; }
 # The proxy out again, the stock binkw32.dll back.
 unproxy() {
     if is_proxy "$game/binkw32.dll"; then
@@ -224,6 +236,7 @@ if [ "$action" = uninstall ]; then
     for n in Render3D UI QOL QOLRules Online; do
         rm -f "$game/$n.asi" "$game/$n.ini" "$game/$n.log"
     done
+    rm -f "$game/armada2-refit-layers.txt"   # the remembered choice of layers
     legacy_ui_out
     recipes_out
     old_plugins_out
@@ -291,6 +304,42 @@ Download it again. An antivirus that cleans or cuts files in place can do this t
 quarantine and history." "${damaged[@]}"
 fi
 echo "installing into $game"
+
+# ------------------------------------------------------------------ the layers to install
+
+# layers.txt (tools/layers.py, baked by package.sh): id, select, requires, scope. A layer
+# can be left out when its select is on or off; core ones are the Direct3D chain's and
+# Display8's, and the legacy and retired ones are not a choice.
+LAYERS_FILE="$game/armada2-refit-layers.txt"
+layer_select() { awk -F'\t' -v id="$1" '$1 == id { print $2 }' "$here/layers.txt"; }
+want=""
+if [ "$all" = 0 ]; then
+    for w in $(echo "${A2_SKIP:-} $without" | tr ',' ' '); do want="$want $w"; done
+fi
+if [ -n "${want// /}" ]; then
+    for w in $want; do
+        sel="$(layer_select "$w")"
+        case "$sel" in
+            on|off) case "$SKIP" in *" $w "*) ;; *) SKIP="$SKIP$w " ;; esac ;;
+            "")     echo "unknown layer: $w (layers.txt lists them)" >&2; exit 2 ;;
+            *)      echo "layer $w is not a choice (select $sel): it cannot be left out" >&2; exit 2 ;;
+        esac
+    done
+elif [ "$all" = 0 ] && [ -f "$LAYERS_FILE" ]; then
+    # An earlier choice, kept across the upgrade.
+    while read -r kw w _ || [ -n "$kw" ]; do
+        if [ "$kw" = without ] && [ -n "$w" ]; then
+            case "$(layer_select "$w")" in on|off) SKIP="$SKIP$w " ;; esac
+        fi
+    done < "$LAYERS_FILE"
+    [ "$SKIP" = " " ] || echo "keeping your earlier choice: without${SKIP% } (--all for every layer)"
+fi
+if [ "$SKIP" = " " ]; then
+    rm -f "$LAYERS_FILE"
+else
+    { echo "# armada2-refit: layers left out of the install; --all brings them back"
+      for w in $SKIP; do echo "without $w"; done; } > "$LAYERS_FILE"
+fi
 
 # ------------------------------------------------------------------ prerequisites
 
@@ -396,12 +445,23 @@ fi
 # The merge is tools/ini-merge.py's, without Python: every key the shipped file has and the
 # player's lacks is added, in its section, and the player's values stay -- except that a
 # value still at an older set's default moves to the new one (Defaults=, numbered in the
-# shipped file). DISPLAY_UPGRADES is tools/ini-merge.py's table for Display8.ini, one
-# "<section with Defaults=> <n> <section> <key> <old value>", separated by ";"; keep them in step.
-DISPLAY_UPGRADES="display8 2 display8 mode forward;display8 2 display8 backend d3d9"
-ini_merge() {   # shipped installed upgrades
+# shipped file). INI_UPGRADES is tools/ini-merge.py's UPGRADES (Display8.ini's and UI.ini's
+# Defaults 2), one "<section with Defaults=> <n> <section> <key> <old value>", separated by
+# ";"; ini_retired is its RETIRED (a key whose meaning changed: its old default is
+# replaced wherever it still holds it). Keep them in step. Every shipped .ini goes through
+# this, never over the player's (put, below).
+INI_UPGRADES="display8 2 display8 mode forward;display8 2 display8 backend d3d9;ui 2 ui cursor 0;ui 2 menus enable 0;ui 2 loading enable 0"
+for k in bar info minimap selection unitview resources buttons messages pause replay overlay chat comm dropplayer loadwait; do
+    INI_UPGRADES="$INI_UPGRADES;ui 2 hud $k 0"
+done
+ini_retired() {   # installed file name -> "<section> <key> <old value>;..."
+    case "$(echo "$1" | tr 'A-Z' 'a-z')" in
+        render3d.ini) echo "lights beamlight 1.0;lights beamreach 40;nebulae litexplosion 0.75" ;;
+    esac
+}
+ini_merge() {   # shipped installed upgrades retired
     local new="$2.a2merge"
-    awk -v label="$(basename "$2")" -v up="$3" -v out="$new" '
+    awk -v label="$(basename "$2")" -v up="$3" -v ret="${4:-}" -v out="$new" '
     function trim(s) { sub(/^[ \t\r]+/, "", s); sub(/[ \t\r]+$/, "", s); return s }
     function secname(l) {
         if (l !~ /^[ \t]*\[[^]]+\]/) return ""
@@ -446,6 +506,16 @@ ini_merge() {   # shipped installed upgrades
                 printf "  %s: [%s] %s %s -> %s (defaults %d)\n", label, f[3], name, f[5], sval[sk], un
             }
         }
+        nr = split(ret, R, ";")
+        for (u = 1; u <= nr; u++) {
+            if (split(R[u], f, " ") < 3) continue
+            sk = f[1] SUBSEP f[2]
+            if ((sk in hidx) && (sk in sval) && hval[sk] == f[3] && hval[sk] != sval[sk]) {
+                i = hidx[sk]; name = nameof(L[i])
+                L[i] = name "=" sval[sk]
+                printf "  %s: [%s] %s %s -> %s\n", label, f[1], name, f[3], sval[sk]
+            }
+        }
         if (((dsec SUBSEP "defaults") in hidx) && haven < shipn) {
             i = hidx[dsec SUBSEP "defaults"]; L[i] = nameof(L[i]) "=" shipn
         }
@@ -474,21 +544,82 @@ ini_merge() {   # shipped installed upgrades
         for (i = 1; i <= n; i++) print L[i] > out
         close(out)
     }' "$1" "$2"
-    mv -f "$new" "$2"
+    # Nothing to add (line ends aside): the player's file stays byte for byte.
+    if cmp -s <(tr -d '\r' < "$2") "$new"; then rm -f "$new"; else mv -f "$new" "$2"; fi
+}
+# One key of an installed .ini, by an awk of its own: ini_op get|set|del FILE SECTION KEY
+# [VALUE]. get prints the value (a ; comment dropped) and fails when the key is absent;
+# set replaces the key's first line, else adds it after the last line of its section (the
+# section is added at the end if missing); del removes every line of the key.
+ini_op() {
+    local op="$1" f="$2"
+    awk -v op="$op" -v rsec="$3" -v rkey="$4" -v val="${5:-}" -v out="$f.a2edit" '
+    function trim(s) { sub(/^[ \t\r]+/, "", s); sub(/[ \t\r]+$/, "", s); return s }
+    { sub(/\r$/, ""); n++; L[n] = $0 }
+    END {
+        sec = tolower(rsec); key = tolower(rkey); cur = ""; insec = 0; last = 0; first = 0
+        for (i = 1; i <= n; i++) {
+            t = trim(L[i])
+            if (t ~ /^\[/) {
+                s = t; sub(/^\[/, "", s); sub(/\].*$/, "", s); cur = tolower(trim(s))
+                if (cur == sec) { insec = 1; last = i }
+                continue
+            }
+            if (cur != sec) continue
+            if (t != "") last = i
+            if (t !~ /^[;#]/ && t ~ /=/) {
+                nm = t; sub(/=.*$/, "", nm)
+                if (tolower(trim(nm)) == key) {
+                    if (!first) {
+                        first = i; v = t; sub(/^[^=]*=/, "", v); sub(/;.*$/, "", v); v = trim(v)
+                    }
+                    if (op == "del") drop[i] = 1
+                }
+            }
+        }
+        if (op == "get") { if (first) { print v; exit 0 } exit 1 }
+        if (op == "set") {
+            if (first) { nm = L[first]; sub(/=.*$/, "", nm); L[first] = nm "=" val }
+            else if (insec) { for (i = n; i > last; i--) L[i + 1] = L[i]; L[last + 1] = rkey "=" val; n++ }
+            else { L[++n] = ""; L[++n] = "[" rsec "]"; L[++n] = rkey "=" val }
+        }
+        for (i = 1; i <= n; i++) if (!(i in drop)) print L[i] > out
+        close(out)
+    }' "$f" && { [ "$op" = get ] || mv -f "$f.a2edit" "$f"; }
+}
+lc() { echo "$1" | tr 'A-Z' 'a-z'; }
+# Settings that moved from one file to another (moved.txt, baked by package.sh from the
+# settings tables): a value other than the new default goes to the new key, and the old key
+# is removed either way -- tools/settings/move-keys.py's job in the repository's ./install.
+apply_moved() {
+    [ -s "$here/moved.txt" ] || return 0
+    local ff fs fk tf ts tk def v
+    while IFS=$'\t' read -r ff fs fk tf ts tk def || [ -n "$ff" ]; do
+        [ -n "$ff" ] && [ -f "$game/$ff" ] || continue
+        v="$(ini_op get "$game/$ff" "$fs" "$fk")" || continue
+        if [ "$(lc "$v")" != "$(lc "$def")" ]; then
+            if [ ! -f "$game/$tf" ]; then
+                echo "  $tf is not there; $ff [$fs] $fk=$v stays"; continue
+            fi
+            ini_op set "$game/$tf" "$ts" "$tk" "$v"
+            echo "  moved $ff [$fs] $fk=$v to $tf [$ts] $tk"
+        fi
+        ini_op del "$game/$ff" "$fs" "$fk"
+    done < "$here/moved.txt"
 }
 
 step display "Display8"
 if is_d3d8to9 "$game/d3d8.dll"; then
     # The new one beside it first: a copy that fails leaves the chain as it was.
-    copy_into "$here/display/d3d8.dll" "$game/d3d8.dll.a2display-new"
+    copy_into "$here/layers/display/d3d8.dll" "$game/d3d8.dll.a2display-new"
     mv -f "$game/d3d8.dll" "$game/d3d8_real.dll"
     mv -f "$game/d3d8.dll.a2display-new" "$game/d3d8.dll"
     echo "  d3d8.dll: Display8, with crosire's d3d8to9 behind it as d3d8_real.dll"
     if [ -f "$game/Display8.ini" ]; then
-        ini_merge "$here/display/Display8.ini" "$game/Display8.ini" "$DISPLAY_UPGRADES"
+        ini_merge "$here/layers/display/Display8.ini" "$game/Display8.ini" "$INI_UPGRADES"
         echo "  Display8.ini (yours, brought up to date)"
     else
-        copy_into "$here/display/Display8.ini" "$game/Display8.ini"
+        copy_into "$here/layers/display/Display8.ini" "$game/Display8.ini"
         echo "  Display8.ini"
     fi
 else
@@ -499,14 +630,24 @@ echo "the mod:"
 
 # ------------------------------------------------------------------ plugins
 
-# A changed .ini is kept beside the new one, as <name>.ini.bak.
-put() {   # file -- copy from the package into the game directory
-    local f="$1" d="$game/$1"
-    if [ -f "$d" ] && [ "${f##*.}" = ini ] && ! cmp -s "$here/game/$f" "$d"; then
-        cp -p "$d" "$d.bak"; echo "  kept your old $f as $f.bak"
+# A file of a layer into the game directory. An .ini the player has is merged with the
+# shipped one (ini_merge: the keys it lacks are added, the values stay), never replaced.
+put() {   # layer file
+    local src="$here/layers/$1/$2" d="$game/$2"
+    if [ -f "$d" ] && [ "${2##*.}" = ini ]; then
+        ini_merge "$src" "$d" "$INI_UPGRADES" "$(ini_retired "$2")"
+        echo "  $2 (yours, brought up to date)"
+        return 0
     fi
-    copy_into "$here/game/$f" "$d"
-    echo "  $f"
+    copy_into "$src" "$d"
+    echo "  $2"
+}
+# A layer left out is taken out when an earlier install left it.
+layer_out() {   # name... -- each plugin with its ini and log
+    local n
+    for n in "$@"; do
+        rm -f "${game:?}/${n:?}.asi" "${game:?}/${n:?}.ini" "${game:?}/${n:?}.log"
+    done
 }
 
 # Render3D.asi and UI.asi need what the chain and display steps put in: Display8 in
@@ -521,40 +662,52 @@ fi
 
 old_plugins_out   # earlier packages' per-part plugins: Render3D.asi's modules replace them
 step render3d "the 3D view"
-if [ "$d3d9" = 1 ]; then
-    put Render3D.asi; put Render3D.ini
+if skipped render3d; then
+    layer_out Render3D; recipes_out
+    echo "  the 3D view left out (you chose to)"
+elif [ "$d3d9" = 1 ]; then
+    put render3d Render3D.asi; put render3d Render3D.ini
     recipes_out
     for d in $RECIPES; do
         mkdir -p "$game/$d"
-        for f in "$here/game/$d"/*.ini; do copy_into "$f" "$game/$d/$(basename "$f")"; done
-        echo "  $d/ ($(ls "$here/game/$d" | wc -l | tr -d ' ') recipes)"
+        for f in "$here/layers/render3d/$d"/*.ini; do copy_into "$f" "$game/$d/$(basename "$f")"; done
+        echo "  $d/ ($(ls "$here/layers/render3d/$d" | wc -l | tr -d ' ') recipes)"
     done
 else
-    rm -f "$game/Render3D.asi" "$game/Render3D.ini" "$game/Render3D.log"; recipes_out
+    layer_out Render3D; recipes_out
     echo "  Render3D.asi skipped: it needs crosire's d3d8to9 as d3d8.dll -- the 3D view stays the engine's"
 fi
 step ui "the HUD and the menus"
-if [ "$d3d9" = 1 ]; then
+if skipped ui; then
+    layer_out UI; legacy_ui_out
+    echo "  the HUD and menus left out (you chose to)"
+elif [ "$d3d9" = 1 ]; then
     legacy_ui_out   # UI.asi takes their place; each would stand down against the other
-    put UI.asi; put UI.ini
+    put ui UI.asi; put ui UI.ini
 else
     # The UI cannot draw: the plugins it supersedes keep the HUD and menus widescreen.
-    rm -f "$game/UI.asi" "$game/UI.ini" "$game/UI.log" "$game/MenuScale.asi" "$game/MenuScale.ini"
+    layer_out UI MenuScale
     echo "  UI.asi skipped: it needs crosire's d3d8to9 as d3d8.dll -- the older plugins instead:"
-    put HUD.asi; put HUD.ini
-    put Menus.asi; put Menus.ini
-    put GridLayout.asi
-    # The player's [Cells] choices survive a reinstall; only a missing file is replaced.
-    if [ -e "$game/GridLayout.ini" ]; then echo "  GridLayout.ini (yours, kept)"; else put GridLayout.ini; fi
+    put legacy HUD.asi; put legacy HUD.ini
+    put legacy Menus.asi; put legacy Menus.ini
+    put legacy GridLayout.asi; put legacy GridLayout.ini
 fi
 step qol "quality of life"
-put QOL.asi; put QOL.ini
+if skipped qol; then layer_out QOL; echo "  quality of life left out (you chose to)"
+else put qol QOL.asi; put qol QOL.ini; fi
 step rules "rules"
 # Pay on queue: every player of a network game needs it (a game with anyone lacking it
 # plays stock rules); against the computer only, it stands down in other transports.
-put QOLRules.asi; put QOLRules.ini
+if skipped rules; then layer_out QOLRules; echo "  rules left out (you chose to)"
+else put rules QOLRules.asi; put rules QOLRules.ini; fi
 step models "models"
-if [ -n "$PY" ]; then
+if skipped models; then
+    if [ -n "$PY" ] && [ -d "$here/models" ]; then
+        echo "  the models back to stock (you chose to leave them out):"; sods --revert
+    else
+        echo "  models left out (you chose to)"
+    fi
+elif [ -n "$PY" ]; then
     echo "  the moons, the selection bubble, the hulls and the asteroids, from your own SOD files:"
     sods --install
 else
@@ -562,12 +715,13 @@ else
 fi
 # Internet - Online, on our own transport: Wine's dpnet.dll cannot host.
 step online "online multiplayer"
-put Online.asi; put Online.ini
+if skipped online; then layer_out Online; echo "  online multiplayer left out (you chose to)"
+else put online Online.asi; put online Online.ini; fi
 
 step cutscenes "cutscene player"
 if skipped cutscenes; then
     unproxy   # one an earlier install put in goes too
-    echo "  cutscene player skipped (A2_SKIP)"
+    echo "  cutscene player skipped (left out)"
 else
     # The proxy forwards every call to the stock DLL as binkw32_orig.dll.
     if ! is_proxy "$game/binkw32.dll"; then
@@ -576,7 +730,7 @@ else
         cp -p "$game/binkw32.dll" "$game/binkw32_orig.dll"
     fi
     [ -f "$game/binkw32_orig.dll" ] || { echo "binkw32.dll is the proxy but binkw32_orig.dll is missing" >&2; exit 1; }
-    put binkw32.dll; put BinkProxy.ini
+    put cutscenes binkw32.dll; put cutscenes BinkProxy.ini
 fi
 
 step renderer "renderer settings"
@@ -589,8 +743,11 @@ if [ "$mac" = 1 ]; then
 elif [ -f "$game/dxvk.conf" ] && ! grep -qF "$DXVK_MARKER" "$game/dxvk.conf"; then
     echo "  dxvk.conf skipped: there is one already that this package did not write"
 else
-    put dxvk.conf
+    put renderer dxvk.conf
 fi
+
+# Settings that moved between files since the version the player had.
+apply_moved
 
 # ------------------------------------------------------------------ old bloom
 
