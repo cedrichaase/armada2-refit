@@ -227,7 +227,7 @@ impl System {
             dt: 0.0,
             rate: 1.0,
             cloud_fps: 30.0,
-            vent_sprites: [String::from(content::VENT_SPRITES[0]), String::from(content::VENT_SPRITES[1])],
+            vent_sprites: [String::from(content::get().vent_sprites[0]), String::from(content::get().vent_sprites[1])],
             said: 0,
         }
     }
@@ -275,7 +275,7 @@ impl System {
     /// world transform). None when it has none.
     fn set(&mut self, name: &str, scaled: bool) -> Option<Rc<EmitterSet>> {
         let mut key = crate::rt::lower(name);
-        if let Some(k) = key.strip_suffix(content::SOD_EXT) {
+        if let Some(k) = key.strip_suffix(content::get().sod_ext) {
             key = String::from(k);
         }
         let mut ck = key.clone();
@@ -289,7 +289,7 @@ impl System {
             let sod = assets::sod(&key)?;
             // The first node of each system's name, as FindElement finds it.
             let sys_nodes: Vec<Option<usize>> =
-                content::SYSTEMS.iter().map(|n| sod.nodes.iter().position(|nd| nd.name.eq_ignore_ascii_case(n))).collect();
+                content::get().systems.iter().map(|n| sod.nodes.iter().position(|nd| nd.name.eq_ignore_ascii_case(n))).collect();
             let mut emitters = Vec::new();
             for (i, nd) in sod.nodes.iter().enumerate() {
                 let NodeKind::Emitter { emitter } = &nd.kind else { continue };

@@ -14,6 +14,8 @@ pub struct Case {
     pub test_ini: Option<&'static str>,
     pub addr: &'static [&'static str],
     pub note_for: &'static [&'static str],
+    /// The content set expected ("none" for no set), "?" when the fixture does not say.
+    pub content: &'static str,
     pub expect: &'static [&'static str],
 }
 
@@ -96,6 +98,9 @@ fn transcript(c: &Case) -> Vec<String> {
         log(&format!("note_for {} {}", row, e.note_for(s, k).unwrap_or("-")));
     }
     log(&format!("note_plugin {}", e.note_plugin().unwrap_or("-")));
+    if c.content != "?" {
+        assert_eq!(e.content().unwrap_or("none"), c.content, "{}: content set", c.name);
+    }
     LINES.lock().unwrap().clone()
 }
 

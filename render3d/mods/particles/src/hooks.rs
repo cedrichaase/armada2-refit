@@ -267,10 +267,10 @@ pub fn free_emitter_shots() -> Vec<(usize, &'static str)> {
             let o = field(n, 8);
             n = field(n, 0);
             let vt = engine::vtable(o);
-            if vt == vt_chain_pulsar() && field(o, CHAIN_EMITTER) != 0 {
-                ords.push((o, content::CHAIN_EMITTER));
-            } else if vt == vt_manheim() && field(o, MANHEIM_EMITTER) != 0 {
-                ords.push((o, content::MANHEIM_EMITTER));
+            if vt == vt_chain_pulsar() && field(o, CHAIN_EMITTER) != 0 && !content::get().chain_emitter.is_empty() {
+                ords.push((o, content::get().chain_emitter));
+            } else if vt == vt_manheim() && field(o, MANHEIM_EMITTER) != 0 && !content::get().manheim_emitter.is_empty() {
+                ords.push((o, content::get().manheim_emitter));
             }
         }
     }

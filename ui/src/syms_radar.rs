@@ -264,6 +264,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         sections: 0xa1a8a321,
         image_base: 0x400000,
         n_resolved: 116,
+        content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x763810, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_map_radar
             a2engine::Entry { present: true, addr: 0x76387c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_map_sprite

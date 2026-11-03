@@ -167,7 +167,7 @@ impl Sprites {
                 continue;
             }
             let id = n.sprite_node_id();
-            let glow = if id.eq_ignore_ascii_case(super::content::SCRAP_GLOW_SPRITE) { p.glow } else { None };
+            let glow = if id.eq_ignore_ascii_case(super::content::get().scrap_glow_sprite) { p.glow } else { None };
             if look.sensor_steady && is_sensor(id) {
                 // Held on the flipbook's first frame (a full star), smaller: steady.
                 self.node_quad(v, &t, id, &p.pose.world[i], scale * look.sensor_size, 0.0, anim::LOOP, glow, look.sprites, None, out);

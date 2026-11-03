@@ -317,6 +317,14 @@ impl Engine {
         self.build_index().map(|i| self.t().builds[i].key)
     }
 
+    /// The content set this plugin reads in this build (phase 8f): the id its content
+    /// tables are chosen by. None on an unknown build, before `init`, and in a build whose
+    /// profile gives the plugin no set: the plugin then has no built-in names and shows
+    /// the engine's own look.
+    pub fn content(&self) -> Option<&'static str> {
+        self.build_index().map(|i| self.t().builds[i].content).filter(|c| !c.is_empty())
+    }
+
     /// The identity's first executable section, as mapped: replaces `EXE_CODE`.
     pub fn code(&self) -> (usize, usize) {
         let rt = self.t().rt;
@@ -568,6 +576,12 @@ impl Engine {
         }
         slot.store(ST_READY | (st & ST_TEST), Release);
         Ok(())
+    }
+
+    /// Whether a hook that uses the symbol is ready, without the warning `addr` logs when
+    /// it is not: for a read that may come before the hook does (a settings load).
+    pub fn resolved(&self, s: Sym) -> bool {
+        self.t().rt.flags.get(s.0 as usize).is_some_and(|f| f.load(Acquire) & READY != 0)
     }
 
     /// The symbol's address (relocated), offset or value: 0 unless a hook that uses it

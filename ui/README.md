@@ -911,6 +911,19 @@ state of the device. A format it has no conversion for is logged and skipped. Wi
 a Direct3D 9 device behind the game's (DXVK's own d3d8) nothing is read, and the
 sidecar says so.
 
+## Content
+
+The names of the game's races (display names and the aliases `[UI] Theme=` and the game
+spell), resources, the single player screen's four campaigns (card names, the words that
+match the stock labels, the view of the map behind each, the emblem's cell in `allrace`) and
+the credits tour's views are `src/content.rs`, one `Content` per set, chosen by
+`Engine::content()` of the UI's core table (`crates/a2engine/README.md`, "Content"). Users:
+`widgets::theme::Race::{name, from_name}` (the loading screen, the HUD race log, the theme),
+`hud/resources.rs`, `credits.rs` (the tour), `menus/scene.rs` and `menus/screens/single_player.rs`.
+A build with no set has no races (no theme of its own for the HUD's race), no resources
+names, no tour and no main-menu view, and the single player screen stands down to the
+engine's. The widget gallery's sample lists are demo text, not game data.
+
 ## Hooks (engine profile): core
 
 `profiles/gog-1.1/ui.core.toml` holds every address, call site, vtable slot, global and

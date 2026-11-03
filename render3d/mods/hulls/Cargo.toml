@@ -1,6 +1,6 @@
 [package]
 name = "r3d-hulls"
-version = "0.44.0"
+version = "0.45.0"
 edition = "2024"
 publish = false
 description = "render3d's hulls module: the ships and stations, lit, with their shadows"
