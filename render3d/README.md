@@ -823,12 +823,13 @@ every module's `configure`, then every module's flag. A module switched off
 gets `off()` and lets go of its GPU objects at the next view; one switched on gets its
 `hooks()` the first time, then `on()`, and its `device()` at its next view if it missed
 this device. A module whose hooks are not yet gated by its flag (`NOT_YET_LIVE` in
-`mods/mod.rs`: world, particles, effects, ordnance, overlays) refuses a live change of
+`mods/mod.rs`: world, effects, overlays) refuses a live change of
 its flag, logged `settings: Modules.<m> changes at the next launch (hooks not yet live)`,
-and its row stays `apply = "restart"`: effects (shields, repair, debris, sparks),
-ordnance, particles, the nebula hooks of world and the height posts of overlays install
+and its row stays `apply = "restart"`: effects (shields, repair, debris, sparks), the
+nebula hooks of world and the height posts of overlays install
 engine hooks that do not yet hand back to their predecessor. The live rows today are
-`Modules.hulls/sky/specials`, `World.Surfaces`, `Nebulae.Lit` and `Overlays.*`.
+`Modules.hulls/sky/specials/particles/ordnance`, `World.Surfaces`, `Nebulae.Lit` and
+`Overlays.*`.
 Checked on the bench at RMSE 0: live `hulls=0`, `sky=0` and `World.Surfaces=0` against
 the baselines of the same keys at load (`testbench/scenarios/render3d-settings-live.md`).
 The other live rows (`specials`, `Nebulae.Lit`, `Overlays.*`) use the same mechanism and
@@ -856,7 +857,7 @@ key. Render3D.log says `settings: N rows exported (M the core's)`.
 | particles | `[Particles]` |
 | hulls | `[Hulls]` (the `Borg*` look keys with it); the `[Lights]` scene keys (`Replace`, `KeyColour`, `KeyAxis`, `FillColour`, `FillAxis`, `SkyLight`), read by its `configure` in `hulls/scene_lights.rs` and handed to the core through `core_services::scene_lights()` |
 | effects | `[Bees]`, `[Construction]`, `[Debris]`, `[Repair]`, `[Sparks]`, `[Explosions]`, `[Shields]`, `[Shell.<name>]` |
-| ordnance | `[Warp]`, `[Ordnance.<odf>]`, `[Model.<odf>]`, `[Wave.<odf>]` (over the built-in `ordnance.ini`); the `[Lights]` beam keys (`Beam*`, `ConeSpot`, read by its `configure` in `ordnance/lights.rs`, `Beam`) |
+| ordnance | `[Warp]`, `[Ordnance.<odf>]`, `[Model.<odf>]`, `[Wave.<odf>]` (over the built-in `content/ordnance/ordnance.ini`); the `[Lights]` beam keys (`Beam*`, `ConeSpot`, read by its `configure` in `ordnance/lights.rs`, `Beam`) |
 | specials | `[Specials]` |
 | sky | `[Sky]` |
 | overlays | `[Overlays]` |
@@ -1218,7 +1219,7 @@ clock. Every torpedo and pulse weapon has it, on every ship. On the bench, at th
 defaults the mothership's volley washes its bow lime green for about half a second,
 clear from 500 away; at 3, 0.35 s and half the radius (the first guess) it was not seen.
 
-**Settings.** The recipes and `[Warp]` are `render3d/ordnance.ini`, built into the
+**Settings.** The recipes and `[Warp]` are `render3d/content/ordnance/ordnance.ini`, built into the
 plugin; a section or key of the same name in `Render3D.ini` overrides it. The
 module's own keys, in `Render3D.ini` `[Ordnance]`:
 
@@ -1642,6 +1643,38 @@ drawing nothing in the tactical view.
 | `PivotGlow` | 0.35 | the halo's opacity (0: none) |
 | `PivotColour`, `PivotBrightness` | 0.64 0.36 0.35, 1.6 | its colour (stock's rose) and the factor on it |
 
+#### Hooks, content and settings
+
+**Hooks** (`ordnance/hooks.rs`, the only file of the module that names an address; installed
+through `core_hooks` behind the module's flag, so a module switched off hands every call to
+what was there before, and `hooks: ordnance <used_by> at <symbol> installed` says which):
+
+| Symbol | Kind | What it does |
+|---|---|---|
+| `WarpSpriteEffect::Render`, the call of `DrawScaled3D` (0x59cc6b) | call, at the first switch-on | notes the flash for our warp step while one of our views runs and the flash is on (`[Warp] Enable`); otherwise the engine's sprite is drawn |
+| `Entity::Render`, slot 11 of an ordnance vtable | slot, when a class is first met | for the classes the engine submits for us (mines, pods, the beams' models): our draw of the instance while our ordnance step submits the shot, else what was there |
+
+`RenderWarpSpriteEffects` (the body's call at 0x598423) and each class's `Submit` are
+called, not patched. The detours call the target the registry found (`Prev`), never a
+constant: the warp sprite hook was seeded with `DrawScaled3D` and `ord_render` called
+`Entity::Render`, which unchained any plugin that had sat on the slot first. The flash is
+`[Warp] Enable` read again with the settings; with it off the hook stays in and hands the call
+on.
+
+**Content.** The special weapons' recipes, the models' looks and `[Warp]` are
+`render3d/content/ordnance/ordnance.ini`, compiled in through `ordnance/content.rs` and
+`core_recipes` (kind `ordnance`, no game directory); a section or key of the same name in
+`Render3D.ini` overrides it. Nothing is installed.
+
+**Settings.** `configure` reads `[Ordnance]`, `[Ordnance.<odf>]`, `[Model.<odf>]`,
+`[Wave.<odf>]`, `[Warp]` and the `[Lights]` beam keys at load and at every
+`Render3D_SettingsChanged`; the recipes, looks and flags are applied at once. When the
+recipes changed, the effects' ages, the flashes in flight and the classes' choice of who
+draws them are dropped; a settings change that leaves them as they were (another
+module's flag) touches nothing. The module has no rows of its own: its switch is
+`Modules.ordnance`, live. Switched off, `off()` drops the flashes, ages and muzzles; shots
+and flashes in flight are the engine's from then on, and a switch-on starts them clean.
+
 ### particles
 
 #### particles
@@ -1746,6 +1779,36 @@ vents (the look settled with the user, and the settings keep its keys, in
 | `LogEvery` | 600 | frames between log lines |
 | `Plasma`, `Gas` | 1 | 0: that kind of vent is the engine's sprite, stock's look |
 | `Plasma<K>`, `Gas<K>` | | the vent look, one key per kind: `Brightness`, `Size`, `Stretch`, `MinPixels`, `Flicker`, `Cooling`, `Glow`, `GlowSize`, `GlowMinPixels`, `GlowColour`, `Jet`, `JetLength`, `JetWidth`, `Light`, `LightColour`, `LightReach`; also `PlasmaHot`/`Mid`/`Cool`, `GasBright`/`Cold`, `BillowScale`/`Flow`/`Contrast` and `EdgeSoftness`. Defaults in `Cfg::read` (`vent.rs`) |
+
+#### Hooks, content and settings
+
+**Hooks** (`particles/hooks.rs`, the only file of the module that names an address;
+installed through `core_hooks` at the module's first switch-on, behind its flag):
+
+| Symbol | Kind | What it does |
+|---|---|---|
+| `ST3D_DeviceDirectX8::RenderParticle` (vtable 0x6bc6ac, slot 50) | slot, chained | drops the engine's draw of a particle handed over while the engine's current instance is an object we own, or the global list, in a view of ours |
+| `GameObject::RenderInternal`, the call of `RenderSpriteNodeEffect` (0x4d544c) | call | skipped in a view of ours, since we draw every object's billboard effect; if the site is not stock's the engine's call draws them and we do not |
+
+Both call what was there before (`Prev`) when the gate is shut: the billboard stub called
+`RenderSpriteNodeEffect` by its constant, which dropped a plugin chained onto the call.
+They went in from the first `lights()` before; they are installed at the first
+switch-on now, so a flip of `Modules.particles` live has them in place. If the particle
+slot is not stock's or chained, the module stands down rather than draw over the
+engine's.
+
+**Content** (`particles/content.rs`): the damage systems' node names, the vent sprites
+and the two free emitters of the chain pulsar and the Manheim effect. Their offsets
+and vtables are in `hooks.rs`.
+
+**Settings.** `configure` reads `[Particles]` at load and at every
+`Render3D_SettingsChanged` (and, with `Reload=1`, every 120 frames, as it did). The
+module has no rows of its own; its switch is `Modules.particles`, live. Switched off,
+`off()` drops the simulation, the owned set and the feed queue the other modules filled,
+so a switch-on starts clean: particles in flight at the switch end with it, and the
+engine's draw is back at once. `core_particles::live()` is false while it is off, so the
+modules that feed it (ordnance's models, effects, specials) hand their emitters to the
+engine.
 
 ### hulls
 

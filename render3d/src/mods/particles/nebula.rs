@@ -21,7 +21,8 @@
 //!   A node whose `draw` animation is off this moment is skipped.
 use super::draw::{Batch, Cam};
 use super::look::{self, Look};
-use crate::engine::{self, field_f32, field_u8, obj};
+use super::hooks;
+use crate::engine::obj;
 use crate::frame::steps::View;
 use crate::scene::pose::{self, SodInfo};
 use crate::{assets, log};
@@ -30,12 +31,6 @@ use alloc::collections::BTreeMap;
 use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
-
-pub const VT_NEBULA: usize = 0x6b148c;
-pub const VT_LATINUM: usize = 0x6b132c;
-const FN_FADE_OUT: usize = 0x4d5a20; // GameObjectInstance::ComputeFadeOut(float&) const, thiscall
-const NEB_HIDDEN: usize = 0x1b0;
-const NEB_INTENSITY: usize = 0x1d0;
 
 pub struct NebulaSod {
     sod: Rc<Sod>,
@@ -81,18 +76,14 @@ impl Nebulae {
     fn volume(&mut self, odf: &str) -> bool {
         let key = crate::rt::lower(odf);
         let has = *self.recipes.entry(key.clone()).or_insert_with(|| {
-            let mut p = String::from("Nebulae\\");
-            p.push_str(&key);
-            p.push_str(".ini");
-            crate::rt::file_exists(&crate::rt::game_path(&p))
+            crate::core_recipes::text("nebulae", &key).is_some()
         });
         has && (crate::core_services::volumes() || crate::plugin_loaded("Nebulae.asi"))
     }
 
     /// Draws a nebula object's puffs into the batch; false if it is not one of ours.
     pub fn object(&mut self, o: usize, v: &View, cam: &Cam, batch: &mut Batch) -> bool {
-        let vt = engine::vtable(o);
-        if vt != VT_NEBULA && vt != VT_LATINUM {
+        if !hooks::is_nebula_class(o) {
             return false;
         }
         let name = obj::odf_name(o);
@@ -106,15 +97,13 @@ impl Nebulae {
         }
         let inst = obj::instance(o);
         let mut diffuse = 1.0f32;
-        if vt == VT_NEBULA {
-            if field_u8(o, NEB_HIDDEN) != 0 {
+        if hooks::is_nebula(o) {
+            if hooks::nebula_hidden(o) {
                 return true;
             }
-            diffuse = field_f32(o, NEB_INTENSITY);
+            diffuse = hooks::nebula_intensity(o);
             if inst != 0 {
-                let mut f = 1.0f32;
-                let near: unsafe extern "thiscall" fn(usize, *mut f32) -> u8 = unsafe { core::mem::transmute(FN_FADE_OUT) };
-                if unsafe { near(inst, &mut f) } != 0 {
+                if let Some(f) = hooks::nebula_fade(inst) {
                     diffuse *= f;
                 }
             }

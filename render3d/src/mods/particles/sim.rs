@@ -35,7 +35,7 @@
 //! (stock's action camera ages what it shows twice, Q9: not reproduced), and for every
 //! owner, drawn or not (stock froze an off-screen object's particles, Q10: fixed).
 use super::look::{self, Look};
-use crate::engine::{self, field, field_f32, field_u8, obj};
+use crate::engine::{self, obj};
 use crate::math::{v3, M34, V3};
 use crate::scene::pose::{self, SodInfo};
 use crate::{assets, log};
@@ -129,43 +129,7 @@ pub struct EmitterNode {
     pub cargo: bool,
 }
 
-/// The engine's damage-node names and the instance byte each follows. A node is hidden
-/// while its byte is non-zero (the system is online), except `borg`, shown while it is.
-const SYSTEMS: [(&str, usize); 6] =
-    [("shields", 0x9c), ("engines", 0x9d), ("target", 0x9e), ("sensors", 0x9f), ("life", 0xa0), ("borg", 0xa1)];
-const VT_CRAFT_INSTANCE: usize = 0x6b3e2c;
-/// `CraftInstance::Update(const GameObject*)` (0x4cb390): the systems into the bytes.
-const SLOT_UPDATE: usize = 14;
-const ORDNANCE_LIST: usize = 0x771fa8; // Ordnance::ordnanceList, a std::list (head node at +4)
-const VT_CHAIN_PULSAR: usize = 0x6b7c74;
-const VT_MANHEIM: usize = 0x6b89fc;
-/// `Freighter` (vtable 0x6b26a8): the resource carried (`+0x25c`, an `eResource`: 3 is
-/// latinum, 6 none), the amount (`+0x258`) and the class's capacities, one float per
-/// resource (`+0x254`, a pointer).
-const VT_FREIGHTER: usize = 0x6b26a8;
-const FREIGHTER_CAPACITY: usize = 0x254;
-const FREIGHTER_AMOUNT: usize = 0x258;
-const FREIGHTER_KIND: usize = 0x25c;
-const RESOURCE_LATINUM: usize = 3;
-
-/// The latinum spray's rate: `cargo / capacity` while the hold carries latinum, else 0,
-/// as `Freighter::RenderInternal` sets it. Reads only.
-pub fn cargo_rate(o: usize) -> f32 {
-    if o == 0 || engine::vtable(o) != VT_FREIGHTER || field(o, FREIGHTER_KIND) != RESOURCE_LATINUM {
-        return 0.0;
-    }
-    let caps = field(o, FREIGHTER_CAPACITY);
-    if caps == 0 {
-        return 0.0;
-    }
-    let cap = field_f32(caps, RESOURCE_LATINUM * 4);
-    let amount = field_f32(o, FREIGHTER_AMOUNT);
-    if cap > 0.0 && amount.is_finite() {
-        (amount / cap).clamp(0.0, 1.0)
-    } else {
-        0.0
-    }
-}
+use super::{content, hooks};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Kind {
@@ -262,7 +226,7 @@ impl System {
             dt: 0.0,
             rate: 1.0,
             cloud_fps: 30.0,
-            vent_sprites: [String::from("ventplas"), String::from("ventgas")],
+            vent_sprites: [String::from(content::VENT_SPRITES[0]), String::from(content::VENT_SPRITES[1])],
             said: 0,
         }
     }
@@ -310,7 +274,7 @@ impl System {
     /// world transform). None when it has none.
     fn set(&mut self, name: &str, scaled: bool) -> Option<Rc<EmitterSet>> {
         let mut key = crate::rt::lower(name);
-        if let Some(k) = key.strip_suffix(".sod") {
+        if let Some(k) = key.strip_suffix(content::SOD_EXT) {
             key = String::from(k);
         }
         let mut ck = key.clone();
@@ -324,7 +288,7 @@ impl System {
             let sod = assets::sod(&key)?;
             // The first node of each system's name, as FindElement finds it.
             let sys_nodes: Vec<Option<usize>> =
-                SYSTEMS.iter().map(|(n, _)| sod.nodes.iter().position(|nd| nd.name.eq_ignore_ascii_case(n))).collect();
+                content::SYSTEMS.iter().map(|n| sod.nodes.iter().position(|nd| nd.name.eq_ignore_ascii_case(n))).collect();
             let mut emitters = Vec::new();
             for (i, nd) in sod.nodes.iter().enumerate() {
                 let NodeKind::Emitter { emitter } = &nd.kind else { continue };
@@ -372,7 +336,7 @@ impl System {
     fn object_set(&mut self, o: usize, odf: &str) -> Option<Rc<EmitterSet>> {
         let sod_name = assets::sod_of(odf);
         let base = self.set(&sod_name, true);
-        if engine::vtable(o) != VT_FREIGHTER {
+        if !hooks::is_freighter(o) {
             return base;
         }
         let mut ck = crate::rt::lower(odf);
@@ -451,7 +415,7 @@ impl System {
             }
         });
         for o in objs {
-            let key = (o, field(o, 0x28) as u32);
+            let key = hooks::object_key(o);
             if !self.owners.contains_key(&key) {
                 let name = obj::odf_name(o);
                 let set = if name.is_empty() { None } else { self.object_set(o, name) };
@@ -464,40 +428,14 @@ impl System {
             ow.inst = inst;
             let expired = obj::expired(o);
             ow.visible = !expired && obj::can_user_see(o);
-            let r = field_f32(inst, 0x40);
+            let r = hooks::instance_radius(inst);
             ow.radius = if r > 1.0 && r < 20000.0 { r } else { 50.0 };
             let s3 = crate::scene::instance::instance_scale(inst);
             ow.scale = if s3.x > 0.0 { s3.x } else { 1.0 };
             // Age and move what there is (SimulateParticleList comes first in stock).
             age(&mut ow.parts, dt);
             // Which emitters show: a hidden damage node hides its subtree.
-            let hidden = if engine::vtable(inst) == VT_CRAFT_INSTANCE {
-                // The bytes are written by the instance's Update (slot 14), which
-                // GameObject::Render calls before drawing; an object a module draws
-                // instead never gets it, so it is called here, through the vtable (the
-                // bench's Scene.asi wraps it). It only reads the craft.
-                unsafe {
-                    let up: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(engine::vtable(inst), SLOT_UPDATE * 4));
-                    up(inst, o);
-                }
-                // Another database shown (not the class's main one): none of its nodes.
-                let class = field(inst, 0x98);
-                if field(inst, 0x80) != field(class, 0x1dc) {
-                    0xff
-                } else {
-                    let mut h = 0u8;
-                    for (s, (_, off)) in SYSTEMS.iter().enumerate() {
-                        let b = field_u8(inst, *off);
-                        let hide = if s == 5 { b == 0 } else { b != 0 };
-                        if hide {
-                            h |= 1 << s;
-                        }
-                    }
-                    h
-                }
-            } else {
-                0
-            };
+            let hidden = hooks::hidden_systems(o, inst);
             let mut world = obj::transform(o);
             let s = s3 * set.scale_sod;
             world.r[0] = world.r[0] * s.x;
@@ -506,7 +444,7 @@ impl System {
             let shown = place(ow, &set, &world, if expired { 0xff } else { hidden }, pose::Clock::of_instance(inst, now), lod);
             for (i, e) in set.emitters.iter().enumerate() {
                 if e.cargo {
-                    ow.ems[i].rate = cargo_rate(o);
+                    ow.ems[i].rate = hooks::cargo_rate(o);
                 }
             }
             fire(ow, &set, dt, self.rate, &mut self.rng, self.cloud_fps);
@@ -520,22 +458,7 @@ impl System {
         }
         // The chain pulsar's and the Manheim effect's trails.
         let mut globals = 0u32;
-        let mut ords: Vec<(usize, &'static str)> = Vec::new();
-        let head = field(ORDNANCE_LIST, 4);
-        if head != 0 {
-            let mut n = field(head, 0);
-            let mut guard = 0;
-            while n != head && n != 0 && guard < 100_000 {
-                guard += 1;
-                let o = field(n, 8);
-                n = field(n, 0);
-                match engine::vtable(o) {
-                    VT_CHAIN_PULSAR if field(o, 0xdc) != 0 => ords.push((o, "crpulsar")),
-                    VT_MANHEIM if field(o, 0xd4) != 0 => ords.push((o, "gemini")),
-                    _ => {}
-                }
-            }
-        }
+        let ords = hooks::free_emitter_shots();
         for (o, em) in ords {
             let key = (o, 0xffff_fffd);
             if !self.owners.contains_key(&key) {

@@ -1,4 +1,4 @@
-//! The module's settings: `render3d/ordnance.ini` (the special weapons' recipes and the
+//! The module's settings: `render3d/content/ordnance/ordnance.ini` (the special weapons' recipes and the
 //! warp flash, ported from Specials.ini) is built into the plugin, and Render3D.ini
 //! overrides it key by key, section by section. Built in, because an installed copy
 //! would have to be merged with the player's edits section by section, which
@@ -8,24 +8,23 @@ use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-const BUILT_IN: &str = include_str!("../../../ordnance.ini");
-
-pub struct Settings {
+pub struct Settings<'a> {
     /// lower-case section -> lower-case key -> value
     base: BTreeMap<String, BTreeMap<String, String>>,
     /// The section names in the order the built-in file has them (as written).
     order: Vec<String>,
-    user: Ini,
+    user: &'a Ini,
     /// The sections Render3D.ini has, lower case (only those are asked).
     user_secs: Vec<String>,
 }
 
-impl Settings {
-    pub fn load() -> Settings {
+impl<'a> Settings<'a> {
+    /// The built-in recipes, with `user` (Render3D.ini) over them.
+    pub fn load(user: &'a Ini) -> Settings<'a> {
         let mut base: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
         let mut order = Vec::new();
         let mut cur = String::new();
-        crate::core_recipes::builtin("ordnance", &[("ordnance", BUILT_IN)]);
+        crate::core_recipes::builtin("ordnance", &super::content::RECIPES);
         let text = crate::core_recipes::text("ordnance", "ordnance").map_or(String::new(), |r| r.text);
         for line in text.lines() {
             let l = line.trim();
@@ -48,7 +47,6 @@ impl Settings {
                 base.entry(cur.clone()).or_default().entry(rt::lower(k)).or_insert_with(|| String::from(v));
             }
         }
-        let user = crate::config::ini();
         let user_secs = user.sections().iter().map(|s| rt::lower(s)).collect();
         Settings { base, order, user, user_secs }
     }

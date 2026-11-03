@@ -115,7 +115,7 @@ Status: probed
 
 A Borg cube fires its technology assimilation beam (`gTechAssimBeam`) at the Sovereign:
 in refit a green cone of light in vapour from the cube onto the ship
-(`render3d/ordnance.ini`, `techassimbeam`, `Kind=cone`; `ART-DIRECTION.md`, "Tractor
+(`render3d/content/ordnance/ordnance.ini`, `techassimbeam`, `Kind=cone`; `ART-DIRECTION.md`, "Tractor
 and assimilation beams"). The cube large in frame, the camera on its side and a little
 below, so the eye goes from the cube along the beam to the target. The beam needs its
 target within 300 (`TechAssimBeam.odf`): the cube is spawned 220 away, as in

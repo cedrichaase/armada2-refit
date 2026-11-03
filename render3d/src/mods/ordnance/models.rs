@@ -11,10 +11,10 @@
 //! pointed at `ord_render`, which draws the instance while our ordnance step has
 //! submitted it, and calls `Entity::Render` otherwise. So the class's own scaling runs
 //! as it is, and only the draw is ours.
-use super::eng;
+use super::{content, hooks};
 use super::fx::Fx;
 use super::ini::Settings;
-use crate::engine::{self, field, hook};
+use crate::engine;
 use crate::frame::steps::View;
 use crate::math::{sinf, v3, M34, V3};
 use crate::engine::instance as game;
@@ -25,14 +25,8 @@ use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-/// `Entity::Render(ST3D_Camera*)`, slot 11 of every ordnance vtable: the instance's
-/// frustum test (instance slot 3), the on-screen byte +0x25, the instance's draw
-/// (instance slot 5).
-pub const FN_ENTITY_RENDER: usize = 0x4cfda0;
-const SLOT_RENDER: usize = 11;
-
 /// `[Model.<odf>]`: how a shot's model looks.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct Look {
     /// The glow at the model's heart: brightness (0: none), colour, half size (of the
     /// model's radius), the pulse's share and rate (radians a second), the star's share.
@@ -83,64 +77,54 @@ pub struct Models {
     plain: Look,
     /// Per ODF stem: what it draws, or None (no SOD: the engine's).
     kinds: BTreeMap<String, Option<Kind>>,
-    /// The vtables whose slot 11 is ours.
-    patched: Vec<usize>,
     said: Vec<String>,
     pub drawn: u32,
 }
 
 impl Models {
-    pub fn new(s: &Settings) -> Models {
+    fn load_looks(s: &Settings) -> BTreeMap<String, Look> {
         let mut looks = BTreeMap::new();
         for sec in s.sections() {
             if let Some(n) = sec.strip_prefix("Model.") {
                 looks.insert(crate::rt::lower(n), Look::load(s, &sec));
             }
         }
+        looks
+    }
+
+    pub fn new(s: &Settings) -> Models {
         Models {
             on: s.i("Ordnance", "Models", 1) != 0,
-            looks,
+            looks: Self::load_looks(s),
             plain: Look::load(s, "Model"),
             kinds: BTreeMap::new(),
-            patched: Vec::new(),
             said: Vec::new(),
             drawn: 0,
+        }
+    }
+
+    /// The settings read again: the looks the shots were given are dropped if any changed.
+    pub fn configure(&mut self, s: &Settings) {
+        self.on = s.i("Ordnance", "Models", 1) != 0;
+        let (looks, plain) = (Self::load_looks(s), Look::load(s, "Model"));
+        if looks != self.looks || plain != self.plain {
+            self.looks = looks;
+            self.plain = plain;
+            self.kinds.clear();
         }
     }
 
     /// For a class the engine submits: points slot 11 of its vtable at `ord_render`,
     /// once, if it is still `Entity::Render`. False if it is not ours to draw.
     pub fn take_class(&mut self, ord: usize) -> bool {
-        if !self.on {
-            return false;
-        }
-        let vt = engine::vtable(ord);
-        if self.patched.contains(&vt) {
-            return true;
-        }
-        if field(vt, SLOT_RENDER * 4) != FN_ENTITY_RENDER {
-            return false;
-        }
-        match hook::patch_slot(vt, SLOT_RENDER, ord_render as *const () as usize) {
-            Some(prev) if prev == FN_ENTITY_RENDER => {
-                self.patched.push(vt);
-                log!("ordnance: slot 11 (Entity::Render) of vtable {:#x} ({}) is ours", vt, eng::ord_odf(ord));
-                true
-            }
-            Some(prev) => {
-                // Someone else's: put it back.
-                let _ = hook::patch_slot(vt, SLOT_RENDER, prev);
-                false
-            }
-            None => false,
-        }
+        self.on && hooks::take_class_slot(ord)
     }
 
     fn kind(&mut self, odf: &str) -> Option<&Kind> {
-        let stem = eng::stem(odf);
+        let stem = hooks::stem(odf);
         if !self.kinds.contains_key(&stem) {
             let k = assets::odf(&stem).and_then(|o| o.get_str("shotGeometry").map(String::from)).and_then(|g| {
-                let sod = crate::rt::lower(g.trim_end_matches(".sod").trim_end_matches(".SOD"));
+                let sod = crate::rt::lower(g.trim_end_matches(content::SOD_EXTS[0]).trim_end_matches(content::SOD_EXTS[1]));
                 let s = assets::sod(&sod)?;
                 let emitters = s.nodes.iter().any(|n| matches!(n.kind, NodeKind::Emitter { .. }));
                 let look = self.looks.get(&stem).cloned().unwrap_or_else(|| self.plain.clone());
@@ -162,34 +146,34 @@ impl Models {
         if !self.on || !crate::core_particles::live() {
             return;
         }
-        let odf = eng::ord_odf(ord);
+        let odf = hooks::ord_odf(ord);
         let Some(k) = self.kind(odf) else { return };
         if !k.emitters {
             return;
         }
         let sod = k.sod.clone();
-        let s = game::instance_scale(field(ord, 4));
-        let mut world: M34 = eng::transform(ord);
+        let s = game::instance_scale(hooks::shot_instance(ord));
+        let mut world: M34 = hooks::transform(ord);
         world.r[0] = world.r[0] * s.x;
         world.r[1] = world.r[1] * s.y;
         world.r[2] = world.r[2] * s.z;
-        let key = ord ^ field(ord, 0x34).rotate_left(13);
+        let key = hooks::shot_key(ord);
         crate::core_particles::feed(key, &sod, &world, v);
     }
 
     /// In place of `Entity::Render` for `ord`, while our ordnance step submits it. True
     /// if it was handled (drawn, or culled as stock culls it); false leaves it to the
     /// engine.
-    fn draw(&mut self, v: &View, fx: &mut Fx, ord: usize, cam: usize) -> bool {
-        let inst = field(ord, 4);
+    pub fn draw(&mut self, v: &View, fx: &mut Fx, ord: usize, cam: usize) -> bool {
+        let inst = hooks::shot_instance(ord);
         if inst == 0 {
             return false;
         }
-        let db = field(inst, 0x80);
+        let db = hooks::instance_database(inst);
         if db == 0 || engine::vtable(db) != game::VT_DATABASE {
             return false;
         }
-        let odf = eng::ord_odf(ord);
+        let odf = hooks::ord_odf(ord);
         let Some(k) = self.kind(odf) else { return false };
         let (sod, emitters, look) = (k.sod.clone(), k.emitters, k.look.clone());
         // Without the particles module the engine's own draw keeps the emitters going.
@@ -202,9 +186,9 @@ impl Models {
         if !game::frustum_test(inst, cam) {
             return true;
         }
-        unsafe { core::ptr::write_volatile((ord + 0x25) as *mut u8, 1) };
+        hooks::mark_on_screen(ord);
         let s = game::instance_scale(inst);
-        let mut world: M34 = eng::transform(ord);
+        let mut world: M34 = hooks::transform(ord);
         world.r[0] = world.r[0] * s.x;
         world.r[1] = world.r[1] * s.y;
         world.r[2] = world.r[2] * s.z;
@@ -213,14 +197,14 @@ impl Models {
         let a = look.ambient;
         // The `team*` groups (the mines' whole hull, the pods') in the owner's team
         // colour, as stock shows them.
-        let owner = eng::object_of(unsafe { engine::rd::<i32>(ord + 0x5c) });
+        let owner = hooks::shot_owner(ord);
         let team = if owner != 0 && game::team_colours_on() { Some(game::team_colour(owner)) } else { None };
         let params = Params { alpha: 1.0, team, ambient: v3(a, a, a * 1.1), self_illum: look.self_illum, lit: true };
         scene::draw(v, &model, &p, &params);
         if emitters {
             // Keyed by the shot and its class, so a new shot at a freed address starts
             // its own trails.
-            let key = ord ^ field(ord, 0x34).rotate_left(13);
+            let key = hooks::shot_key(ord);
             crate::core_particles::feed(key, &sod, &world, v);
         }
         if look.glow > 0.0 {
@@ -256,24 +240,5 @@ impl Models {
             );
         }
         true
-    }
-}
-
-/// Set by the ordnance step around the engine's `Submit` of a shot it hands over.
-pub static mut IN_SUBMIT: bool = false;
-
-/// Slot 11 of the vtables `take_class` took: `Entity::Render(ord, cam)`, drawn by us
-/// while our ordnance step submits, else the engine's.
-unsafe extern "thiscall" fn ord_render(ord: usize, cam: usize) {
-    unsafe {
-        if IN_SUBMIT {
-            if let Some((m, v)) = super::current() {
-                if m.models.draw(v, &mut m.fx, ord, cam) {
-                    return;
-                }
-            }
-        }
-        let f: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(FN_ENTITY_RENDER);
-        f(ord, cam);
     }
 }

@@ -4,6 +4,32 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.39.0 — 2026-11-03
+
+### Changed
+- particles and ordnance on the hook registry (module interface v2): every engine
+  read and hook of the two modules is in `particles/hooks.rs` and `ordnance/hooks.rs`
+  (`ordnance/eng.rs` became the latter), `render3d/lint-layers.sh --strict` is 0 for
+  both directories, and the two left `NOT_YET_LIVE`. `Modules.particles` and
+  `Modules.ordnance` are `apply = "live"`: a flip off hands every particle, shot, wave
+  and warp flash back to the engine, and a flip on takes them again. Their hooks go in at the
+  module's first switch-on behind its gate (particles' no longer from its first
+  `lights()`), and call what was there before, never a constant: the billboard
+  effects' call, the warp flash's sprite (its `Prev` was seeded with the constant) and
+  the per-class `Entity::Render` slots (taken lazily through the registry, each with
+  its own `Prev`). The warp flash's hook goes in whatever `[Warp] Enable` says and
+  hands on while it is 0 (read again with the settings).
+- `configure` reads `[Particles]` and ordnance's sections (`[Ordnance]`,
+  `[Ordnance.<odf>]`, `[Model.<odf>]`, `[Wave.<odf>]`, `[Warp]`, the `[Lights]` beam
+  keys) at load and at every settings change; a change that leaves the recipes as they
+  were drops nothing. `off()` clears particles' simulation, owned set, drop count and
+  feed queue, and ordnance's flashes, effect ages, muzzles and class choices.
+- Built-in tables in `content.rs` (the damage systems' node names, the vent sprites,
+  the two free emitters; ordnance's recipes, now `render3d/content/ordnance/ordnance.ini`
+  with `git mv`). The nebula puffs ask `core_recipes` whether a nebula has a recipe.
+- If the billboard effects' call is not stock's, particles no longer draws them over
+  the engine's own.
+
 ## 0.38.0 — 2026-11-03
 
 ### Changed
