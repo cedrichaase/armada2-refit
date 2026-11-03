@@ -28,7 +28,7 @@ network game simulates, and the two cannot ship in one plugin:
 - **`QOL.asi` — stock-compatible.** The camera, the keys, which ordinary command a key
   press turns into. A player with it can join a player without it, and nothing they
   simulate differs. Installed by default. QOL-2 to 6 and QOL-8 belong here. QOL-1 became
-  a plugin of its own, `GridLayout.asi` (`grid/`), so it can be switched separately.
+  a plugin of its own, `GridLayout.asi` (retired), and is now the UI's bar with this plugin's keys.
 - **A rules plugin (`QOLRules.asi`, the `rules/` layer since qol 2.0.0) — every player needs it.** Changes to
   what the game *does* with a command: when the bank is charged, what a group can
   hold if that travels over the network. Every node must run it with the same settings,
@@ -49,7 +49,7 @@ Status values: **idea** (not investigated), **scoped** (approach known, nothing 
 
 | ID | Idea | Surface | First step | Status |
 |---|---|---|---|---|
-| [QOL-1](#qol-1-grid-hotkeys-for-the-button-bar) | Grid hotkeys for the button bar | `GridLayout.asi` (`grid/`) | — | **done** ([`grid/`](../grid/README.md)) |
+| [QOL-1](#qol-1-grid-hotkeys-for-the-button-bar) | Grid hotkeys for the button bar | `GridLayout.asi` (retired) | — | **done** ([`ui/HUD.md`](../ui/HUD.md)) |
 | [QOL-2](#qol-2-configurable-right-drag-pan-speed) | Configurable right-drag pan speed | `QOL.asi`, `PanSpeed=` | A slider in the options screen | **done** (`QOL.asi`); slider open |
 | [QOL-3](#qol-3-larger-control-groups) | Larger control groups | `QOL.asi`, `MaxSelection=` | A count on the selection panel; a stock peer in a network game | **done** (`QOL.asi`), bench |
 | [QOL-4](#qol-4-shiftnumber-adds-to-a-group) | Shift+number adds to a group | `QOL.asi`, `ShiftAddsToGroup=` | — | **done** (`QOL.asi`), bench |
@@ -128,7 +128,7 @@ variable and then of the global; field offsets are spliced in with `A2_STR(QOL_F
   game, so the AI plays by it too (see QOL-7).
 - **No game files in the repository** (hard rule 8). `Input.map` and `RTS_CFG.h` are
   game files. A change to them ships as a script that edits the player's own copy, with
-  a backup and `--revert`, the way `hud/ui-widescreen.py` edits `misc/gui_*.cfg`.
+  a backup and `--revert`, the way the retired `ui-widescreen.py` edited `misc/gui_*.cfg`.
   It never ships as a modified copy of the file.
 - **Which plugin.** See "Two plugins" above; each idea below says which.
 
@@ -136,7 +136,7 @@ variable and then of the global; field offsets are spliced in with `A2_STR(QOL_F
 
 ## QOL-1: Grid hotkeys for the button bar
 
-*Done. First as `GridLayout.asi` ([`grid/`](../grid/README.md)), then drawn by the UI
+*Done. First as `GridLayout.asi` (retired), then drawn by the UI
 (`UI.asi`, [`ui/HUD.md`](../ui/HUD.md)); since phase 9 the keys are this plugin's
 (`BarKeys=` in `QOL.ini`, `bar.c`) and the UI keeps the layout and the drawing.
 Stock-compatible: a key sends the ordinary command its button sends. What follows
@@ -202,8 +202,8 @@ may need no code at all.
    with `B` then the F-keys.
 2. **Grid layout of the palette.** The floating button palette (`X`, `popupPalette*`
    in `misc/gui_*.cfg`) could be laid out as a 5×3 grid instead of a bar, with each
-   button labelled with its key. This is HUD work (`hud/`), and the palette's width keys
-   are already special-cased there (`popupPaletteXA`/`XB`).
+   button labelled with its key. This is HUD work (`ui/HUD.md`), and the palette's width keys
+   are special-cased there (`popupPaletteXA`/`XB`, "The references the stock HUD is drawn against").
 3. **Labels.** Show the grid key on each button, not only in the tooltip.
 
 **Open questions.** Are `Input.map` bindings global or scoped to the open menu? How many
@@ -270,8 +270,8 @@ alone, with a warning if the file still differs from stock.
 
 **Still open.**
 
-1. **The slider.** The options screen is a shell menu, a Win32 dialog that `Menus.asi`
-   already hooks (`menus/README.md`). A new slider means a new control on that dialog,
+1. **The slider.** The options screen is a shell menu, a Win32 dialog that the UI's menu
+   host already hosts (`ui/MENUS.md`). A new slider means a new control on that dialog,
    saved with the other options (`ARMADA.PRF`, which carries no network check), and read
    by `QOL.asi` in place of `PanSpeed=`. The fallback is to apply the mouse scroll
    speed slider's value to right-drag too.

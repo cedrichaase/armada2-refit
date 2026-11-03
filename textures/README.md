@@ -39,7 +39,7 @@ checkout and worktree builds from and into the same one, and nothing in it is ev
 committed: it holds the game's own art and what is made from it.
 
 Paths in this document are from the repository root unless they are plainly inside a
-target. The HUD, font and cursor scripts are in `hud/`; the loading-screen geometry is
+target. The HUD, font and cursor scripts were in `hud/` (retired: the UI draws the HUD); the loading-screen geometry is
 in `models/`.
 
 Four layers per target, all in its work directory, and the order matters:
@@ -1056,7 +1056,7 @@ Channel means match stock on all sixteen and R-G deviation comes out at or sligh
 
 ## The UI: 544 textures, and why they went up in sheets
 
-**The stretch had to be fixed first** — see `hud/README.md`. Upscaling a UI drawn through a
+**The stretch had to be fixed first** — see `ui/HUD.md`, "The references the stock HUD is drawn against". Upscaling a UI drawn through a
 1600x1200 canvas stretched 1.79x sideways would have been sharpening the wrong picture.
 
 `Sprites/gui_*.spr` and `cursor.spr` resolve to 569 distinct textures. Almost all of
@@ -1142,12 +1142,11 @@ the bug, not a lesser version of it. The three UI targets declare `maxsize=256`.
   (so `fit()` would square them). They are not drawn at native pixel size: at 3440x1440
   a 32x32 frame draws at ~138x77 screen px, because the cursor code scales against a
   hard-coded 800x600, so they come out 1.79x too wide like everything else. `HUD.asi`
-  corrects that at run time (`hud/cursor-aspect.py` is its derivation and never
-  installed beside it). **An AI upscale cannot help them**, read out of the binary:
+  corrects that at run time (the old file-based squash is gone). **An AI upscale cannot help them**, read out of the binary:
   `SetCursor` allocates the cursor texture at `texW * [device+0x18]` by
   `texH * [device+0x1c]`, so the engine magnifies it itself by a constant, and more
   source texels just draws a bigger cursor at the same density. The lever for sharpness
-  is code, not art. Derivation, and the two draw paths, are in `hud/README.md`.
+  is code, not art. Derivation, and the two draw paths, are in `ui/HUD.md`, "The references the stock HUD is drawn against".
 - **`colors`** — an 8x8 colour lookup table. Interpolating it blends the cells.
 - **`logos`** — Activision, Bink, GameSpy and Mad Doc trademarks, on a splash screen
   shown once. Invented shapes where there is a right answer, for no gain.
@@ -1394,7 +1393,7 @@ Even at 70 the gain is real but modest, and that is the honest ceiling. The upsc
 cleans and sharpens; it does not manufacture structure that was never in 256x256. The
 larger lever is not the texture at all — the saucer is viewed at a steep oblique angle,
 which is precisely where **anisotropic filtering** decides sharpness. That is the
-renderer layer's `dxvk.conf` (`d3d9.samplerAnisotropy = 16`, `renderer/README.md`), which
+renderer layer's `dxvk.conf` (`d3d9.samplerAnisotropy = 16`; Display8 applies the same on Vulkan, `display/README.md`), which
 sharpens every oblique surface in the game at once.
 
 ## The Federation hull class, after the Sovereign

@@ -89,8 +89,9 @@ trade in game. `--glow` smooths the shell too.
 
 That was judged without `d3d9.cachedWriteOnlyBuffers`. Before postfx 1.1.1 (now renderer), the CPU
 path read back every vertex it wrote from a buffer DXVK keeps in GPU memory, which made
-it far slower than its triangle count suggests (`renderer/README.md`, "Reading back a
-dynamic vertex buffer"). The shell's cost with that key set has not been measured.
+it far slower than its triangle count suggests: a blended draw goes down the CPU path
+(`RenderInternalNonVB`), and under DXVK it read back every vertex it wrote from a
+buffer kept in GPU memory, which `d3d9.cachedWriteOnlyBuffers` avoids. The shell's cost with that key set has not been measured.
 
 ## The selection bubble
 
@@ -98,8 +99,8 @@ dynamic vertex buffer"). The shell's cost with that key set has not been measure
 
 The translucent ellipse around each selected ship shows its polygon: a run of straight
 segments around the rim, with corners, and flat facets in its shading. It is
-`SelectionEffect`, an instance of `SOD/select.sod` scaled to the ship's shield ellipse
-(`renderer/README.md`, "Reading back a dynamic vertex buffer"). The model is a 3ds Max
+`SelectionEffect`, an instance of `SOD/select.sod` scaled to the ship's shield ellipse (the
+cost of selecting many ships was this effect's CPU-path draw, above). The model is a 3ds Max
 GeoSphere at frequency 4: 162 vertices, 320 triangles, about 20 segments around a great
 circle, every vertex at radius 89.943 about the origin. Like the moons, and unlike the
 planets, the engine draws the mesh the SOD stores.
@@ -123,8 +124,7 @@ is 2.
 
 The bubble is blended, so it goes down the CPU path (`RenderInternalNonVB`), as the
 moons' glow shell does, and its cost grows with the face count. With
-`d3d9.cachedWriteOnlyBuffers`, 30 selected stock bubbles took 0.60–0.81 ms
-(`renderer/README.md`). Four times the faces suggests about 3 ms at 30 selected. That is
+`d3d9.cachedWriteOnlyBuffers`, 30 selected stock bubbles took 0.60–0.81 ms. Four times the faces suggests about 3 ms at 30 selected. That is
 an estimate from that measurement, not a measurement of its own.
 
 ## Rounder hulls

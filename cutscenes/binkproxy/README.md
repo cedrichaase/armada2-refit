@@ -200,8 +200,12 @@ both of these hold. On another, `BinkProxy.log` says which failed:
   and last row) and logged as `back buffer not writable; frame skipped`. If
   that line appears, the reels play black, and the fix belongs in whatever
   plugin changed the back buffer, not here.
-- **The raised mode has to be found.** `FindDisplayMode` has to list the
-  desktop size. Menus.asi depends on the same thing for the shell.
+- **The raised mode has to be found.** `FindDisplayMode`
+  (`ST3D_DisplayDevice`, `0x626bf0`) looks a mode up by exact width, height and depth in
+  the modes the adapter lists, so a raised request finds nothing unless the desktop's
+  size is listed. Display8 lists the desktop's mode alone and re-points the six calls
+  that ask for a mode of their own at its lookup (`display/README.md`, "The engine's
+  hard-coded modes"); the shell's 800x600x16 depends on the same thing.
 
 ## Not yet tried
 

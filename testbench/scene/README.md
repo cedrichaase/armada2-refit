@@ -292,8 +292,8 @@ inert, and `Scene.log` says so.
   A dead end that shaped this: patching `TacticalCamera::UpdateCamera`'s slot in
   `TacticalCamera`'s vtable did nothing, because the camera in use is not that class.
 - **Cursor: the one `ST3D_Sprite::DrawScaled2D` call in `RefreshDisplay`** (0x6246fa),
-  which draws the cursor under DXVK. `HUD.asi` wraps the same call ("Cursors" in
-  `hud/README.md`). So `Scene.asi` patches it only once the scene is built, by when
+  which draws the cursor under DXVK. `HUD.asi` wraps the same call (`ui/HUD.md`, "The references the stock HUD
+  is drawn against", the cursors). So `Scene.asi` patches it only once the scene is built, by when
   `HUD.asi` has long since loaded, and chains to whatever the call went to. With the
   cursor off, the draw is skipped. Clicks still land where the pointer is. `UI.asi`
   wraps the same call when it loads, behind Scene.asi's wrap, and draws no cursor of

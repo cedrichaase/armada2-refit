@@ -51,7 +51,7 @@ minimap is clicked into the fog again; the selection stays.
 
 The thin-line checks are judged, and they are the weakest ones here: the lines hud 2.1.0 removed
 were one pixel wide and ~7 levels off the fog, and the judge reads the shot at its own
-size. The measurement behind that fix is in `hud/README.md`, "Seams between tiles".
+size. The measurement behind that fix is in `ui/HUD.md`, "The references the stock HUD is drawn against" (sprite edges).
 
 The font is allowed ±10% where the HUD gets ±5%. The condense (1.25·H/W) aims
 for the glyphs' own 1280x1024 shape, which is 0.9375 of stock's width at 4:3, and it

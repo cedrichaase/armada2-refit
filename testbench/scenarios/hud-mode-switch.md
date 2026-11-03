@@ -27,7 +27,7 @@ first version brought it back empty. So is the minimap, judged once the briefing
 closed: the re-layout rebuilds its panel but keeps the sensor grids, so the explored
 area around the fleet still shows. That step is weak: with the camera over the fog, the
 minimap shows little explored area in either frame, so both can read as uniform grey;
-the grids are kept by construction (`hud/README.md`). After the switch the 21:9 case
+the grids are kept by construction (`ui/HUD.md`, "The references the stock HUD is drawn against"). After the switch the 21:9 case
 draws into a pillarboxed 1920x1440, where the bench's HUD coordinates no longer hold,
 so nothing after it clicks the HUD: keys and OCR only.
 
