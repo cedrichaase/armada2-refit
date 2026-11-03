@@ -24,8 +24,9 @@ byte for byte and then says which retired layers the snapshot holds.
 | `SOD/logo.SOD`, `Textures/RGB/LOADING1..6` (the widened loading screen) | their `.a2neb-backup` | restored, then the backup dropped |
 | `d3d8_real.dll`, `d3d9.dll`, `dxvk.conf` | the vendored build's sha256 / our marker line | **chain class**: only with `--chain` |
 
-The chain class is off until Display8 no longer stands on d3d8to9 and DXVK's d3d9
-(platform 4.0.0); a `d3d9.dll` or `dxvk.conf` the player made is never touched either way.
+The chain class is the vendored d3d8to9/DXVK chain Display8 stood on until 15.6.0
+(platform 4.0.0), which `platform/d3d8-chain.py --retire` also takes out; a `d3d9.dll` or
+`dxvk.conf` the player made is never touched either way.
 The samplers of a marked `dxvk.conf` are carried into `Display8.ini` by `tools/ini-merge.py`
 before it goes.
 

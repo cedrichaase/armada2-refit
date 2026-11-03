@@ -154,7 +154,7 @@ nothing is charged a second time.
 
 ## QOL-7: built (qol 1.5.0, now rules 1.0.0)
 
-Where it stands. `QOLRules.asi` (`qol/rules.c`; its header comment holds the derivation)
+Where it stands. `QOLRules.asi` (`rules/rules.c`; its header comment holds the derivation)
 charges at the build order's `PushBuildQueueItem` call and marks the item paid in bit 30
 of its id; `StartBuild` gives a paid head back and lets stock charge it again (net zero,
 no advisor); Pop, CancelBuild, ActDelete, ClearBuildQueue and ClearTeam give paid items

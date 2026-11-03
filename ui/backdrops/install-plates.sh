@@ -3,7 +3,7 @@
 # UI.asi composites them.
 #
 #   install-plates.sh            every built plate: $A2_DATA/backdrops/<name>/wide.bmp -> Menus/<stock BMP name>
-#   install-plates.sh --remove   take them out (UI.asi then draws black sides)
+#   install-plates.sh --remove   take them out (UI.asi then draws the theme's gradient)
 #
 # Named after the stock BMP each stands for -- the name UI's menu backdrop list
 # resolves to. The screens are the ui/backdrops/<name>.conf recipes; one whose plate
@@ -34,7 +34,7 @@ for conf in "$here"/*.conf; do
     elif [ -f "$dst" ]; then
         echo "backdrop: $name not built in $A2_DATA -- keeping the installed Menus/$(basename "$src")"
     else
-        echo "backdrop: $name not built (ui/backdrops/backdrop.sh $name) -- black sides"
+        echo "backdrop: $name not built (ui/backdrops/backdrop.sh $name) -- the UI draws its gradient"
     fi
 done
 [ "${1:-}" = --remove ] && rmdir "$GAME/Menus" 2>/dev/null || true

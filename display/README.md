@@ -163,9 +163,9 @@ What each side does with a mismatch, and logs:
 | Files | What happens | The log |
 |---|---|---|
 | plugins and Display8 of one major | the handshake agrees; the plugins draw on the backend Display8 says | `Render3D.log`/`UI.log`: `gpu 1.0.0 (contract 1.0): Display8 0.12.0 (contract 1.0)`; `Display8.log`: `contract: UI.asi asks for 1.0; Display8's is 1.0: drawn through` |
-| no Display8 (another chain's `d3d8.dll`: crosire's d3d8to9, DXVK's, Wine's) | Direct3D 9, as ever | `gpu ...: no Display8 (the game's d3d8.dll is another chain's): Direct3D 9` |
-| plugins newer than Display8 (a Display8 before 0.12.0) | `gpu` finds unversioned exports and no `display8_abi`: it stands down to Direct3D 9 only, which on Display8's own Vulkan or Direct3D 12 draws nothing | `gpu ...: Display8 0.11.0 is too old for this plugin (no contract handshake ...)` |
-| plugins older than Display8 (built before 0.12.0) | they look for `display8_backend` and find nothing: Direct3D 9 only, nothing drawn on Vulkan or Direct3D 12 | `Display8.log`, in stub mode 300 frames into the first mission (such a plugin calls nothing of Display8's, so it is told by not having asked): `contract: Render3D.asi is loaded and has not asked for the contract ...` |
+| no Display8 (another `d3d8.dll`: crosire's d3d8to9, DXVK's, Wine's) | the plugins stand down and draw nothing (there is no Direct3D 9 to fall back to since gpu 2.0.0) | `gpu ...: no Display8 (the game's d3d8.dll is another chain's): this plugin stands down and draws nothing` |
+| plugins newer than Display8 (a Display8 before 0.12.0) | `gpu` finds unversioned exports and no `display8_abi`: it stands down and draws nothing | `gpu ...: Display8 0.11.0 is too old for this plugin (no contract handshake ...)` |
+| plugins older than Display8 (built before 0.12.0) | they look for `display8_backend` and find nothing: nothing drawn on Vulkan or Direct3D 12 | `Display8.log`, in stub mode 300 frames into the first mission (such a plugin calls nothing of Display8's, so it is told by not having asked): `contract: Render3D.asi is loaded and has not asked for the contract ...` |
 | another major either way | as above, both sides | `gpu ...: Display8 ... has contract 2.0, another major ...`; `Display8.log`: `... another major: it finds none of this Display8's exports and stands down` |
 
 On Vulkan the engine's own draws pass through where the plugins draw nothing
@@ -174,8 +174,8 @@ On Vulkan the engine's own draws pass through where the plugins draw nothing
 render3d 0.31.0 and UI 0.26.0 were the last release that had to ship together; from
 there a release of one may meet the others of the same major.
 `testbench/scenarios/display-abi-mismatch.md` runs both directions against 13.42.4
-(`bench-abi.sh`). Display8 0.11.0 beside the current plugins needs Menus.asi back (the
-shell's mode raise is Display8's since 0.18.0), which `bench-abi.sh` adds.
+(`bench-abi.sh`). Display8 0.11.0 beside the current plugins needs the retired `Menus.asi` back
+(the shell's mode raise is Display8's since 0.18.0), which `bench-abi.sh` adds.
 
 ## Claims
 
@@ -363,7 +363,7 @@ The stub (`src/stub/`), the only mode since display 1.0.0: the engine gets an
 makes a device of its own, on Vulkan or Direct3D 12 ("Backends"), on the game's window.
 render3d and the UI find it through the exports of `gpu/src/display.rs` and draw the
 whole frame on it. The answers the engine's `IDirect3D8` gives (caps, formats, modes) are
-those DXVK behind crosire's d3d8to9 gave on the bench in phase 0 (`stub/d3d.rs`), so the
+those DXVK behind crosire's d3d8to9 gave on the bench in phase 0 (the chain since removed) (`stub/d3d.rs`), so the
 engine takes the code paths it took there.
 
 - **One device for the game's life**, made at the engine's first `CreateDevice`. Its
@@ -400,8 +400,8 @@ engine takes the code paths it took there.
   present): a windowed swap chain ignores `SetGammaRamp`, and the ramp the engine sets at
   start-up lifts every frame (2 to 3, 80 to 90). So the back buffer is drawn into the
   swap chain through a 256x1 lookup of the ramp.
-- **Does not start** (the bail-out, "The bail-out") when `HUD.asi`, `GridLayout.asi` or
-  `Menus.asi` is loaded (each changes what the engine draws, which the stub drops;
+- **Does not start** (the bail-out, "The bail-out") when a stale `HUD.asi`, `GridLayout.asi` or
+  `Menus.asi` (retired plugins an old install left; `retire/` takes them out) is loaded (each changes what the engine draws, which the stub drops;
   `GridLayout.asi` would leave no button bar at all, since the UI's stands down beside
   it), on a build or with a `display.modes` hook that is not stock, with `Backend=none`,
   and when no backend of the order can start. A device is made at the engine's first
@@ -459,7 +459,7 @@ pointer's clip. The keys are `[Window]` in `Display8.ini` (`settings.toml`; ever
 - **The shell** (`SetActiveDisplay_Internal`'s 800x600x16, the calls at `0x62c4e0` and
   `0x62c643`) is raised to the desktop's size at 32 bits while a plugin claims
   `CLAIM_MENUS`, asked when the engine makes the request (`claims::menus`). The UI claims
-  it while its menu host runs (`[Menus] Enable=1`, no `Menus.asi`); the host draws the
+  it while its menu host runs (`[Menus] Enable=1`, no stale `Menus.asi`); the host draws the
   shell's dialogs at the screen's size, so a shell at 800x600 would be wrong for it. The
   raise is done inside the lookup (`modes::find`: the request is replaced before the
   engine's own lookup is called, and the engine's request is the fallback). The UI used
@@ -487,7 +487,7 @@ menu is a `WS_POPUP` dialog owned by the 3D window, which Wine turns into a seco
 window that Hyprland tiles and focuses like a new application (the menu is visible while
 input stays with the other window); the UI's host makes each dialog a hidden child of the
 3D window instead (`ui/MENUS.md`, "What the shell is, in the engine"). The Wine virtual
-desktop would also give one window but DXVK cannot set a display mode inside it, so it
+desktop would also give one window but a device of ours cannot set a display mode inside it (nor could DXVK), so it
 stays off. A stub window that covers the screen at the desktop's mode needs neither.
 
 `MoveWindow` and `SetWindowPos` in the exe's imports stay the UI's, for the hosted
@@ -510,7 +510,7 @@ or the UI does not draw itself vanishes: a module switched off
 (`[Modules] hulls=0`), a SOD render3d hands back (one that does not load, a hologram's
 class that is not a plain database), an effect class it does not know, specials with
 no particle art, construction and the bees without the hulls module, a HUD part the UI
-has not taken. With it, each shows as stock, as it did on the forward chain (DXVK, until display 1.0.0).
+has not taken. With it, each shows as stock, as it did on the forward chain (DXVK, until display 1.0.0; history).
 
 **Which draws.** Every draw on the stub's device is the engine's (the plugins draw
 through `gpu`), so routing is simple: every one is drawn, except
@@ -970,7 +970,7 @@ loaded that and passed every call to it).
   way to play with the stock renderer, or to test this path.
 - An unknown build, or a `display.modes` hook that stands down ("Hooks": the stub could
   open no display on it). This is what used to forward to the old chain.
-- `HUD.asi`, `GridLayout.asi` or `Menus.asi` is loaded: each changes what the engine
+- A stale `HUD.asi`, `GridLayout.asi` or `Menus.asi` (retired; `retire/` takes them out) is loaded: each changes what the engine
   draws, which the stub drops.
 - Both probes fail. A probe asks whether a backend can start without making the device.
   Vulkan (`vk::probe`): `vulkan-1.dll` loads, an instance with the surface extensions
@@ -1016,7 +1016,7 @@ run it on a Mac, and what it showed here: `vkprobe/README.md`.
 **Seen in game on a Mac (2026-10-28):** Apple M1, macOS 27.0.1, a Sikarugir wrapper on
 `WS12WineSikarugir11.0_1` (Wine 11, new-style WoW64). Display8 on `Backend=vulkan` made
 its device on MoltenVK (`vulkan: physical device Apple M1`, Vulkan 1.4), and the menu
-scene drew with Render3D's nebulae baked at full size. On `Backend=d3d9` the same scene
+scene drew with Render3D's nebulae baked at full size. On `Backend=d3d9` (since removed) the same scene
 crashed there. The wrapper's D9VK, under d3d8to9, emulates the nebulae's RESZ depth
 resolve, and Metal aborts on a pipeline with `MTLPixelFormatDepth16Unorm` as colour
 target 0 (issue #19). That is why Direct3D 9 was only the fallback on a Mac, and why the

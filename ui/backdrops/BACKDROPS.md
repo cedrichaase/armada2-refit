@@ -3,8 +3,9 @@
 How the widescreen plates behind the main menu and campaign selection are built.
 `UI.asi` composites them at run time; this is the half that starts from the game's
 own art, so only the recipes (`<name>.conf` beside this file) are committed and every layer
-and plate is built into `$A2_DATA/backdrops/<name>/`. The run-time side, including
-`N.soften=`, is in `../MENUS.md`, "Backdrops". Changes to a plate go in
+and plate is built into `$A2_DATA/backdrops/<name>/`. The run-time side is
+`widgets::theme::plate` and `menus::backdrop` in `ui/src` (`../MENUS.md` lists the backdrop
+among its contexts); the old `N.soften=` key no longer exists. Changes to a plate go in
 `../CHANGELOG.md`, since the plates are part of the ui layer that `a2mod` switches.
 
 **Which screens.** Only screens with open art are outpainted, and they are listed

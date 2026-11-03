@@ -1,7 +1,7 @@
 # a2engine — which executable this is, and what the plugins know of it
 
-`no_std`, no dependency, linked into Display8 (and, as each migrates, the UI and
-render3d); its C twin is `csdk/a2engine.h`, and `tools/engine/resolve.py` is the same
+`no_std`, no dependency, linked into Display8, render3d (the core and every module)
+and the UI; its C twin is `csdk/a2engine.h`, and `tools/engine/resolve.py` is the same
 resolver in Python for the offline tools. Three parts:
 
 - **`pe`** — the identity of an executable: `TimeDateStamp`, `SizeOfImage`, and an FNV-1a

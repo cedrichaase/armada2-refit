@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.6 — 2026-11-03
+
+Layers: render3d 1.0.1.
+
+### Changed
+- `render3d/Render3D.ini`: the `[Modules]` comment now says every module row is live.
+  Docs corrected beside it (render3d's eight modules, the profile as the home of the
+  UI's addresses, the backdrop and settings notes).
+
+Installed, not yet seen in game.
+
 ## 15.6.5 — 2026-11-03
 
 Layers: testbench 4.0.6.

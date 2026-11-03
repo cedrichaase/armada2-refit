@@ -7,7 +7,7 @@ every one of them. Each plugin describes the keys a player may set in a table of
 **descriptors** it exports, `<Plugin>_Settings`, which the UI's Refit screen lists
 (ROADMAP.md Phase 6). This folder holds the schema of those tables, the generator that
 writes them from each layer's `settings.toml`, their lint, the overlay's writer for
-the bench and the GUI installer, and the fixtures that pin all of it. The contract is
+the bench (the GUI installer only reads `RefitPlayer.ini` for its report), and the fixtures that pin all of it. The contract is
 **A2SET_ABI 1.1**. Nothing here is installed; it is versioned by the root.
 
 | File | What it is |
@@ -308,8 +308,8 @@ why"; the choice is still stored and applies when the part runs. The hub calls i
 game thread when the Refit screen opens and once a second while it is open, so it must be
 cheap and must not write. The hub finds it with `GetProcAddress` beside
 `_SettingsChanged` (`NoteFn` in `crates/a2rt/src/settings.rs`, `A2SettingsNoteFn` in
-`csdk/a2asi.h`, both outside the generated parts). In round C UI and Render3D export it;
-QOL, QOLRules, Online and BinkProxy get theirs with the symbol profiles of Phase 8.
+`csdk/a2asi.h`, both outside the generated parts). UI, Render3D, QOL, QOLRules, Online and
+BinkProxy export it (the C plugins since the symbol profiles of Phase 8).
 
 ## On the bench
 
@@ -317,8 +317,8 @@ A scenario sets overlay keys before launch with
 
 ```
 Setup: tools/settings/bench-overlay.sh Render3D.Modules:sky=0 showcase Seed=7 Pause=200
-Setup: tools/settings/bench-overlay.sh UI.HUD:Minimap=0 ui/bench-asi.sh --no-grid
-Setup: tools/settings/bench-overlay.sh --into UIPlayer.ini HUD:BarHidden=1 ui/bench-asi.sh
+Setup: tools/settings/bench-overlay.sh UI.HUD:Minimap=0 ui/bench-asi.sh --menus
+Setup: tools/settings/bench-overlay.sh --into Display8.ini Samplers:Anisotropy=8 ui/bench-asi.sh
 ```
 
 the word syntax of `render3d/bench-ini.sh`: each `Section:Key=value` sets a key (the

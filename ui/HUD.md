@@ -56,7 +56,7 @@ rectangle is at `+0x04` (left, top, right, bottom, inclusive), its hidden flag a
 ### The inventory
 
 The render list of a Borg Instant Action at 1280x720, as `UI.log` lists it at the
-start of each mission ("hud: 18 components, in drawing order"), with `HUD.asi`'s
+start of each mission ("hud: 18 components, in drawing order"), with the retired `HUD.asi`'s
 canvas: `OverviewImp, SelectionDisplay, CinematicView, ShipDisplay, EditMenu,
 MapRadar, ResourcePanel, ReplayPanel, PopupPalette, MessageDisplay, CommDisplay,
 OverlayText, ObjectivesDisplay, DropPlayerBox, LoadPercentBox, PauseBox, ButtonPanel,
@@ -89,7 +89,7 @@ mission frame draws them itself after `RenderAll` (`ChatDisplay::Render`,
 
 ### The order to take them over
 
-1. **The button bar** (done): the logic is the stock bar's, `GridLayout.asi` already
+1. **The button bar** (done): the logic is the stock bar's, `GridLayout.asi` (retired) already
    knew it, and every press goes through one function.
 2. **The info panel (`ShipDisplay`)** (done): the bar is placed against it, and it
    is the panel players read most.
@@ -101,8 +101,8 @@ mission frame draws them itself after `RenderAll` (`ChatDisplay::Render`,
    camera, the move order), last.
 7. **Comms and the drop box**: multiplayer state, with the menus' multiplayer screens.
 
-When every panel is ours, `HUD.asi`'s canvas edit, font and seams matter to nothing we
-draw, and `HUD.asi` and `GridLayout.asi` are gone (PLAN.md).
+Every panel is ours now: `HUD.asi`'s canvas edit, font and seams matter to nothing we
+draw, and `HUD.asi` and `GridLayout.asi` are gone (PLAN.md; `retire/`).
 
 ## The panel switch
 
@@ -242,7 +242,7 @@ the map-plane part of the selected-ship cursor, which is drawn from the `.spr`'s
 `W H`. Two paths draw the rest, chosen by `[device+0xe0]` (`SetSynchronousCursor`):
 clear, `SetCursor` (`0x625c90`) allocates a Direct3D hardware cursor texture at
 `texW * [+0x18]` by `texH * [+0x1c]` and `UpdateCursor` (`0x625b00`) copies 1:1;
-set, which is the one taken under DXVK, `SetCursor` makes no
+set, which is the one taken on the device the game gets now (and was under DXVK), `SetCursor` makes no
 hardware cursor and `RefreshDisplay` (`0x624630`) draws the sprite as a 2D quad after
 setting the global 2D scale (`0x7ad6e8`) to that pair and not restoring it (the scale is
 also set by `ST3D_Camera::SetViewport` and `ResizeViewportToExtents`, and every 2D draw
@@ -678,9 +678,9 @@ pressed as many times as it takes, all at the next step (`radar::queue_filter(st
 n)`), so the chat names only the last. A click on the name goes to the next state, as
 stock. The tooltips are the game's (`GUI_MM_ALL_SHIPS_VISIBLE`, ...).
 
-**HUD.asi** re-lays the stock `MapRadar` out after a display mode change
-("The references the stock HUD is drawn against", the mode change in a mission); ours reads no stock rectangle but the stock radar's
-width, to scale a ping, so that keeps working. The button bar (`hud/bar.rs`) still
+**The retired HUD.asi** re-laid the stock `MapRadar` out after a display mode change
+("The references the stock HUD is drawn against", the mode change in a mission); the stock radar is left on its canvas now, and ours reads no stock rectangle but the stock radar's
+width, to scale a ping, which that does not disturb. The button bar (`hud/bar.rs`) still
 places itself by the stock radar's rectangle (`MapRadar+0x04`), which ours covers at
 the default size.
 

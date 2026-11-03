@@ -11,8 +11,9 @@ Armada II plays every movie through RAD's Bink 1, via ten functions in
 2. **Full-screen launch reels.** `Program::PlayIntroMovie` switches to a
    hard-coded **640x480** display mode for the four launch reels (Activision,
    Paramount, Mad Doc, Intro), and `NextBinkFrame` copies each frame **1:1 into
-   the locked back buffer at (0,0)**. The replacement raises that mode to the
-   desktop size at load, and scales every reel to fit, centred, bars black. That
+   the locked back buffer at (0,0)**. Display8 raises that mode to the
+   desktop size (since cutscenes 3.0.0; "The intro's mode is Display8's" below), and
+   the proxy scales every reel to fit, centred, bars black. That
    applies to the three logo reels too: they stay real Bink, decoded into a
    scratch buffer and scaled from there.
 

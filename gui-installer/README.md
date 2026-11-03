@@ -247,14 +247,16 @@ draws nothing, and it already knows the game folder, the launcher and the releas
   logs. Among them: UI.asi or Render3D.asi without Display8 as `d3d8.dll` (they need
   it and stand down; GOG's `d3d8.dll` back after a Galaxy repair, or DXVK's put
   in by Heroic), the launcher not loading the folder's `winmm`/`d3d8`, UI.asi beside the
-  plugins it supersedes, and `Menus.asi` drawing without a widescreen plate, which
-  shows black at the sides of the main menu (the release carries no plates). First of
+  plugins it supersedes, and (a leftover of an old install, since the legacy plugins are
+  gone from the package) `Menus.asi` drawing without a widescreen plate, which
+  shows black at the sides of the main menu. First of
   all: files of a release missing or unreadable in the installer's cache (each file of
   the newest unpack of each version, against its zip) or in the game folder, as an
   antivirus leaves them.
 - **Display8's choice is a finding** (`display8_backend`): the report reads
-  `Display8.log` and says the mode (stub or forward, or a stand-down with its reason) and,
-  in stub mode, the backend that drew (vulkan, d3d12, d3d9) and why: `Backend=auto`'s
+  `Display8.log` and says the mode (stub, or a stand-down with its reason; forward mode only in the
+  logs of Display8 before 15.0.0) and, in stub mode, the backend that drew (vulkan or
+  d3d12; d3d9 in old logs) and why: `Backend=auto`'s
   order on that system, a fallback with each backend's reason, or an order set by hand.
   It parses the lines `Display8 <ver> -- game dir ...; mode M`, `Backend=auto: on P: ...`,
   `stub mode on ...`, `stub: the backend is B[, after X could not start]`,

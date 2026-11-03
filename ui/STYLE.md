@@ -11,8 +11,8 @@ tokens live in `src/widgets/theme.rs` (`Theme`), the drawing primitives in
 256-pixel panel sheets (`fedui0..5`, `klingUI0..5`, `romUI*`, `cardUI*`, `borgUI*`,
 `speciesUI0..6`), cut into nine-slices and laid out on a 1600x1200 canvas
 (`gui_<race>.cfg`). At 1080 lines and above they are magnified two to three times, so
-their bevels and rivets go soft, and their shapes are fixed to the 4:3 layout `HUD.asi`
-has to correct. The menus are 800x600 GDI bitmaps. Neither can be extended: a new
+their bevels and rivets go soft, and their shapes are fixed to the 4:3 layout the retired `HUD.asi`
+corrected. The menus are 800x600 GDI bitmaps. Neither can be extended: a new
 panel would need new art in the same style at the same resolution.
 
 So every frame, edge, button and bar is drawn by our renderer from a few numbers
@@ -279,7 +279,7 @@ mirrored to any corner), and optional stripes at any angle. Everything is comput
 from the pixel's offset to the box's centre, so one quad draws it at any size,
 antialiased over one pixel; glows, inner glows and shadows are the same shape with a
 wide soft edge. The corners and parts are chosen with `step`/`lerp`, no branches
-(vkd3d, `render3d/README.md`). Three float4s per vertex carry the parameters, so the
+(the shader compilers unroll and dislike branches, `render3d/README.md`). Three float4s per vertex carry the parameters, so the
 vertex is 84 bytes; a whole frame of UI is still a few draw calls.
 
 ## The gallery

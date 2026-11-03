@@ -14,7 +14,7 @@ What it does today:
   white glows by how bright it is: bloom by energy, which an 8-bit back buffer cannot
   hold. Below the tone map's shoulder every colour is stock's.
 - **The body is ours**: `Armada_RenderAllOurStuff`'s steps run in render3d's own
-  sequence (`frame/steps.rs`), and seven modules (`## Modules` below) draw every
+  sequence (`frame/steps.rs`), and eight modules (`## Modules` below) draw every
   category of the 3D view from the game's own assets, read by `a2fmt`: hulls, the sky
   and background, particles, ordnance, effects, the world (planets, moons, asteroids,
   nebulae) and the overlays (fog, grid, selection, ghosts). The cosmetic simulation
@@ -225,7 +225,7 @@ folds it away (their SPIR-V and DXIL are as long as before).
 
 | Key | Default | |
 |---|---|---|
-| `Clustered` | 1 | 0: every lit draw takes its lights from its constants, the strongest few per mesh, as on Direct3D 9 (for an A/B in game) |
+| `Clustered` | 1 | 0: every lit draw takes its lights from its constants, the strongest few per mesh, as before the clustered lights, when the engine's Direct3D 9 ran them (for an A/B in game) |
 | `ClusterTile` | 64 | a tile's side in pixels (larger when the view is wider than 64 tiles or taller than 40) |
 | `ClusterSlices` | 24 | slices of view depth, exponential from the near plane to the far one |
 | `ClusterLights` | 24 | the most lights a cluster lists (at most 32), the strongest at its box |
@@ -321,7 +321,7 @@ each step of the body (`setup` is the lights, the distance cull, the modules' li
 and the scene layer's shadow map; then `background`, `terrain`, `objects`, `ordnance`,
 `specials`, `features`, `warp`, `hud prep`, `chunks`, `particles`, `translucent`,
 `selection, end`) and `post` (resolve, bloom, tone map). Each mark notes the CPU clock
-and issues a Direct3D 9 timestamp query; a span is booked to the mark that ends it.
+and issues a GPU timestamp query (`gpu::Timer`); a span is booked to the mark that ends it.
 The queries are read back from a ring four frames deep without waiting, so timing
 does not stall the GPU; a set not finished when its turn comes again is counted as
 late. Every `TimingEvery` seconds the log has the frame's period (from one main view
@@ -456,8 +456,8 @@ Display8 of another contract) render3d stands down: `gpu` is stood down
 once, and the engine draws the 3D view.
 
 **Reset.** Every target is in the default pool and must be gone before the device
-resets. Slot 14 of the d3d8 device's vtable (`Reset`) is chained, as `Lighting.asi`
-chains it: render3d drops its targets and passes on the call, and makes new ones at
+resets. Slot 14 of the d3d8 device's vtable (`Reset`) is chained (as `Lighting.asi`
+chained it): render3d drops its targets and passes on the call, and makes new ones at
 the next frame, at the new size. A display mode chosen in Graphics Settings is not a
 `Reset`: the engine releases its device and creates another. The first frame on a
 device render3d has not seen ("frame: a new device") drops the frame's state, hooks
@@ -529,7 +529,7 @@ plain target of its own), locked, and converted a row at a time as it is written
 `A16B16G16R16F` to f32 on the CPU, 8-bit formats byte for byte. The read-backs sit
 inside the post passes' state block, between the passes that make each stage, and
 change no state of the device. A format without a conversion is logged and skipped,
-not guessed at. **Depth is not dumped**: Direct3D 9 cannot read a depth surface back
+not guessed at. **Depth is not dumped**: Direct3D 9, which the dump was written for, could not read a depth surface back
 (`GetRenderTargetData` takes render targets only), and a copy through an `INTZ`
 texture would be a pass of its own. `Render3D.log` has a `dump:` line per file and one
 for the whole.
@@ -555,7 +555,7 @@ on the other. `UI.asi`
 asks for a **view** of it by name (`[Menus] Scene=1`, ui/MENUS.md, "The menu scene")
 through render3d's export `Render3D_MenuScene(name, x, y, w, h)`: inside its own
 scene, with the back buffer bound, it gets the view drawn into that rectangle and draws
-the menu over it. A 0 back (no such view, no Direct3D 9 device, no targets) leaves the
+the menu over it. A 0 back (no such view, no device of Display8's, no targets) leaves the
 UI's own backdrop. The views UI.asi asks for: `main` (the main menu), and on the
 campaign selection `tutorials`, `federation`, `klingon` and `borg`, the campaign pointed
 at.
@@ -637,7 +637,7 @@ call after one of `Render3D_MenuScene` begins a departure from that view (Render
   at the eye (a star at radius rho and depth s is seen rho / s off the axis, so the
   depths it covers in a frame draw a radial streak), one star per angular cell in four
   rings, so each pixel looks only at its own cell of each ring: a fixed loop with no
-  branch, as vkd3d needs. A soft wall of gas in the group's `WarpColour` streams past
+  branch (the rule the shaders learned from vkd3d, which wrote the Direct3D 9 bytecode until 1.0.0). A soft wall of gas in the group's `WarpColour` streams past
   behind them (the Borg's green). The tunnel runs as long as the load does.
 
 The departure keeps the map's clock and the scene's passes; it only poses the
@@ -785,7 +785,7 @@ finding it rests on:
 | `render3d.core.reads` | the engine state every module shares: the object, light and feature lists, instances, sprites, sound, team and game-setup reads | the renderer stands down whole if these are not stock |
 | `render3d.frame.seam` | `Armada_RenderAllOurStuff`, called from `Armada_RenderFrame` and `CinematicView::RenderView`, both re-pointed at the renderer's body | "How the frame works" |
 | `render3d.frame.steps` | the calls inside the stock body that the frame's steps replace one by one | "How the frame works"; not ready: the stock body runs whole |
-| `render3d.frame.destroy` | `DestroyRenderSurfaces` chained, so render3d lets go of the device before the engine does | native Direct3D 9 keeps a device alive while anything made on it is held |
+| `render3d.frame.destroy` | `DestroyRenderSurfaces` chained, so render3d lets go of the device before the engine does | kept for the device Display8 hands out; native Direct3D 9 (gone in 15.0.0) kept a device alive while anything made on it was held |
 | `render3d.view.distance` | the load of the culling distance in `RTS_Configure` and the far plane and culling distance it parses (`View.Distance`) | "View distance"; not ready: the engine keeps its view limits |
 | `render3d.hulls.reads` | the hulls module: class `Render` / `RenderInternal` functions and vtables, the fade, culling and wave-light reads and calls | hulls draws in `GameObject::Render`'s place and installs no hook; not ready: the engine draws the hulls |
 | `render3d.sky.reads` | the sky module: the background name, database, starfield, far planes, `GameObject::Render` and the plain database vtable | the sky takes `Step::Background`; not ready: the engine's sky |
@@ -1570,7 +1570,7 @@ engine's mesh: the map centred in the texture's unit square with square texels, 
 running against z. The textures are the engine's: `fogTexture` (`+0x34`) and
 `shroudTexture` (`+0x38`), `ST3D_Texture`s whose per-device texture sits at `+0x40` +
 the device index (`Storm3D+0xc0`) times 4, and whose `+4` there is the
-`IDirect3DTexture8`, which d3d8to9 answers for its `IDirect3DTexture9`. They are never
+`IDirect3DTexture8`, which under Display8's stub device is the mirror of ours (`gfx::engine_texture`; until 15.0.0 d3d8to9 answered with its `IDirect3DTexture9`). They are never
 resized (one texel per scan cell; resizing them froze the game). The grid in them is
 `Scanner::m_fog` / `m_shroud` (0x738a54 / 0x738a58: width `+0xc`, height `+0x10`),
 centred. Stock's states: the depth test always passes and nothing is written; the fog
@@ -2110,7 +2110,7 @@ alike:
   by, the list scanned only to replace an entry and sorted only when one was: 0.16
   and 0.17 ms, the same clusters (the frame at RMSE 0 on both). What remains looks
   like the private arrays' traffic and the upload and barriers round the dispatch.
-- **Off** (`Clustered=0`, or Direct3D 9): nothing of it runs, and every draw is as
+- **Off** (`Clustered=0`): nothing of it runs, and every draw is as
   before: the port scenes draw the same pixels as without it (`gpu/README.md`,
   "Measured").
 - **Beams** (`cl_line` in `clustered.hlsli`). A phaser beam emits alike along its
@@ -2141,7 +2141,7 @@ alike:
   time goes with how many clusters a beam reaches: `BeamReach=120` takes the objects
   step to 1.16 ms. The angle is one `atan2` and the direction a bisector (two
   `atan2`s and a `tan` cost the same within 0.03 ms).
-  On Direct3D 9 (and with `Clustered=0`) a beam lights nothing but its two end
+  With `Clustered=0` (and always on the retired Direct3D 9 path) a beam lights nothing but its two end
   points: the per-mesh constants hold twelve points, and a point standing in for a
   line would light one patch of it, not the length.
 
@@ -2415,13 +2415,13 @@ The gas is **marched** at full size, not sliced. Each class draws its gas box on
 pixel finds its own ray (c41..c43: the ray at view depth 1 is linear in the pixel), cuts
 it to the box and to the scene's depth (a RESZ copy into INTZ, read as a texture; with
 this projection `z - _33` is below 0), and takes `Steps=` steps (8, 12, 16 or 24, an
-entry point each, since vkd3d unrolls the loop) spaced in proportion to the distance,
+entry point each, since the loop is unrolled by its count) spaced in proportion to the distance,
 each jittered in its span by the pixel's blue-noise threshold walked by the golden
 ratio. Its sums (light, optical depth) are added into a half-float target; `comp_ps`
 filters them with a 5x5 Gaussian of `Denoise=` pixels (sigma) that leaves out pixels
 whose scene depth differs by over 5%, so hull edges stay a pixel sharp, and applies
 `Opacity=`/`Obscure=` onto the frame. The slices (`vol_ps`) remain only without INTZ
-and for `Bake=0`. vkd3d has no `tex3Dlod`, and a read's level from the hardware's
+and for `Bake=0`. The Direct3D 9 route (vkd3d, until 1.0.0) had no `tex3Dlod`, and a read's level from the hardware's
 derivatives is undefined inside a branch that differs per pixel, so the march reads the
 noise with `tex3Dgrad` (the pixel's footprint at the step's distance, times
 `Footprint=`) and can then skip rays that miss the gas, columns the occupancy record
@@ -2451,7 +2451,7 @@ About 2.5 ms of the march does not depend on the step count (8 to 16 steps adds 
 a step). It is not the unrolled shader's size: Microsoft's compiler (`d3dcompiler_43`,
 run under Wine for the measurement only, never part of the build) makes the 8-step march
 a real `rep` loop of 2,200 dwords instead of vkd3d's 10,400, and on the bench (720p) the
-march took 2.53 ms either way against vkd3d's 2.52: DXVK's SPIR-V and the driver end
+march took 2.53 ms either way against vkd3d's 2.52, measured when the bytecode was still vkd3d's: DXVK's SPIR-V and the driver end
 up at the same code.
 
 **`Temporal=`** (default 0.1) adds the frames up, since in game 8 steps' stipple still
@@ -2554,8 +2554,8 @@ into its second target's green; `temporal_ps`'s twin weighs it against the gas's
 over the 3x3 and keeps that share in the history's meta (blue), and where either is
 large (now, or where a light just was) the clip narrows to `LitClip=` of
 `TemporalClip=` and this frame's share rises to `LitTemporal=`, so the glow follows its
-light within a frame or two. The pass with `Lit=0`, on Direct3D 9, or where no
-clusters run is the plain one (the same d3dbc; the port scenes as before).
+light within a frame or two. The pass with `Lit=0`, or where no
+clusters run, is the plain one (the same shader; the port scenes as before).
 
 Cost (`Timing=1`, `render3d-nebula-lit`'s paused frame: the `nebula-battle` scene, 32
 lights in the view, the camera in the gas; RX 5700, 2026-10-23), the march's GPU time
@@ -2567,7 +2567,7 @@ buffer word, and a froxel volume (a compute fill of some 215x90x64 cells and a p
 integrate them, about the cost of the lit march's whole addition before any light) had
 nothing left to win. Checked: the plain march with `Lit=0` at RMSE 0 against the
 clustered lights' commit on Vulkan and Direct3D 12 (`port-nebula`, all 25 frames of
-its dump), and Direct3D 9 at RMSE 0 against `pre-gpu-nebula`; on lavapipe the
+its dump), and (when Direct3D 9 still ran) at RMSE 0 against `pre-gpu-nebula`; on lavapipe the
 validation layer finds nothing but `Timing=1`'s query messages, which the scene
 without the gas gives too.
 
