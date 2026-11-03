@@ -4,6 +4,16 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 1.0.2 — 2026-11-03
+
+### Fixed
+- Below the top Graphics Detail, every texture the engine drew through the passthrough was white (the nebulae left to the engine as hard-edged flat squares; the fog's texture without a mirror for the overlays): the stub's `CheckDeviceFormat` said yes to R5G6B5, X1R5G5B5, A1R5G5B5 and A4R4G4B4 (and A8, L8, A8L8, DXT), which the engine asks for first below the top detail, and no mirror holds them. It now takes A8R8G8B8 and X8R8G8B8 alone as textures, so the engine creates them 32-bit at every detail (`stub/d3d.rs`, `texture_format_ok`).
+
+### Changed
+- A texture the passthrough draws white is logged once per format in `Display8.log`, tracer or not (`passthrough: a texture of format N ... drawn with a white one`).
+
+Installed, not yet seen in game.
+
 ## 1.0.1 — 2026-11-03
 
 ### Removed

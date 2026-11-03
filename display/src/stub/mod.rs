@@ -271,6 +271,19 @@ pub fn flush_mirrors() {
     }
 }
 
+static WHITE: AtomicU32 = AtomicU32::new(0);
+
+/// The passthrough meets an engine texture no mirror holds (a format other than
+/// A8R8G8B8 and X8R8G8B8, a cube, a volume) and draws it with white: logged once per
+/// format, tracing or not, so a scenario can expect it never happens
+/// (`render3d-nebula-detail`).
+pub fn drawn_white(format: u32, faces: u32) {
+    let bit = 1u32 << (format % 31);
+    if WHITE.fetch_or(bit, Ordering::Relaxed) & bit == 0 {
+        log!("passthrough: a texture of format {} ({} faces) has no mirror: drawn with a white one", format, faces);
+    }
+}
+
 pub fn forget_mirror(o: *mut SObj) {
     let s = stub();
     s.mirrors.retain(|&x| x != o);
