@@ -19,16 +19,14 @@
 //! between black bars at the present that follows; the back buffer is left as it is.
 //! The proxy does this itself, and a call through here would hide the return address
 //! it tells the intro by, so with the proxy loaded the site stays stock.
-use super::hook;
+use super::{eng, hook as patch};
 use crate::rt::win::*;
+use crate::syms_core::{hook, sym, value};
 use alloc::vec::Vec;
 
-/// The pushes of `PlayIntroMovie`'s two mode lookups: depth, height 480, width 640.
-const MODE_SITES: [(usize, u8); 2] = [(0x4861bf, 0x20), (0x4861e6, 0x10)];
-/// `call [__imp__BinkCopyToBuffer@28]` in `NextBinkFrame`.
-const COPY_SITE: usize = 0x4638af;
-const COPY_STOCK: [u8; 6] = [0xff, 0x15, 0xa0, 0x82, 0x7b, 0x00];
-const COPY_IMPORT: usize = 0x7b82a0;
+// The pushes of `PlayIntroMovie`'s two mode lookups (depth, height 480, width 640) and
+// `call [__imp__BinkCopyToBuffer@28]` in `NextBinkFrame` are the profile's
+// (`ui.core.toml`, hooks `core.intro_mode32`, `core.intro_mode16`, `core.intro_frames`).
 /// `BinkCopyToBuffer`'s surface type for 32-bit BGRX, as the proxy asks for.
 const BINK_32: u32 = 3;
 
@@ -37,8 +35,12 @@ type CopyFn = unsafe extern "system" fn(*mut u32, *mut u8, u32, u32, u32, u32, u
 static mut REAL_COPY: usize = 0;
 static mut SCRATCH: Vec<u8> = Vec::new();
 
-fn mode_stock(depth: u8) -> [u8; 12] {
-    [0x6a, depth, 0x68, 0xe0, 0x01, 0x00, 0x00, 0x68, 0x80, 0x02, 0x00, 0x00]
+/// `push depth; push height; push width`, as the lookups are in stock.
+fn mode_stock(depth: i32) -> [u8; 12] {
+    let mut b = [0x6a, depth as u8, 0x68, 0, 0, 0, 0, 0x68, 0, 0, 0, 0];
+    b[3..7].copy_from_slice(&(value::CORE_INTRO_HEIGHT as u32).to_le_bytes());
+    b[8..12].copy_from_slice(&(value::CORE_INTRO_WIDTH as u32).to_le_bytes());
+    b
 }
 
 /// Whether the loaded `binkw32.dll` is the cutscene proxy: it exports only the ten
@@ -58,20 +60,29 @@ pub fn raise_mode() -> bool {
         crate::log!("intro: desktop {}x{} is smaller than the intro: its mode is left at 640x480", w, h);
         return false;
     }
+    if proxy_loaded() {
+        crate::log!("intro: display mode left to the cutscene proxy");
+        return false;
+    }
     let mut n = 0;
-    for &(at, depth) in &MODE_SITES {
+    for (hook_id, site, depth) in [
+        (hook::CORE_INTRO_MODE32, sym::CORE_INTRO_MODE32, value::CORE_INTRO_DEPTH32),
+        (hook::CORE_INTRO_MODE16, sym::CORE_INTRO_MODE16, value::CORE_INTRO_DEPTH16),
+    ] {
+        if eng().ready(hook_id).is_err() {
+            continue;
+        }
+        let at = eng().addr(site);
         let stock = mode_stock(depth);
         let mut new = stock;
         new[3..7].copy_from_slice(&(h as u32).to_le_bytes());
         new[8..12].copy_from_slice(&(w as u32).to_le_bytes());
-        if hook::patch_bytes(at, &stock, &new) {
+        if patch::patch_bytes(at, &stock, &new) {
             n += 1;
         }
     }
     if n > 0 {
         crate::log!("intro: display mode -> {}x{} ({} of 2 sites)", w, h, n);
-    } else if proxy_loaded() {
-        crate::log!("intro: display mode left to the cutscene proxy");
     } else {
         crate::log!("intro: the mode lookups are not stock: left as they are");
     }
@@ -84,17 +95,23 @@ pub fn route_frames() -> bool {
         crate::log!("intro: frames left to the cutscene proxy");
         return false;
     }
-    let real = unsafe { super::rd::<usize>(COPY_IMPORT) };
-    if real == 0 || unsafe { core::slice::from_raw_parts(COPY_SITE as *const u8, 6) } != COPY_STOCK {
+    if eng().ready(hook::CORE_INTRO_FRAMES).is_err() {
+        return false;
+    }
+    let (site, import) = (eng().addr(sym::CORE_BINK_COPY_SITE), eng().addr(sym::CORE_BINK_COPY_IMPORT));
+    let real = unsafe { super::rd::<usize>(import) };
+    if real == 0 {
         crate::log!("intro: the frame copy is not stock: frames copied as the engine does");
         return false;
     }
     unsafe { REAL_COPY = real };
-    // call rel32 and a nop, in place of call [import].
-    let rel = (copy as *const () as i64 - (COPY_SITE as i64 + 5)) as i32;
+    // call rel32 and a nop, in place of call [import]; the six bytes are the ones the
+    // profile's check has just read.
+    let stock: [u8; 6] = unsafe { core::ptr::read_unaligned(site as *const [u8; 6]) };
+    let rel = (copy as *const () as i64 - (site as i64 + 5)) as i32;
     let mut new = [0xe8, 0, 0, 0, 0, 0x90];
     new[1..5].copy_from_slice(&rel.to_le_bytes());
-    let ok = hook::patch_bytes(COPY_SITE, &COPY_STOCK, &new);
+    let ok = patch::patch_bytes(site, &stock, &new);
     crate::log!("intro: {}", if ok { "frames drawn by the UI, fitted to the screen" } else { "could not patch the frame copy" });
     ok
 }

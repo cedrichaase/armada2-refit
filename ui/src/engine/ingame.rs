@@ -15,21 +15,18 @@
 //! mission (`Program::GameOpen` makes it) and nowhere else, and `Armada_RenderFrame`
 //! runs only from the mission loop, so the front end and the loading screen never
 //! reach this hook.
-use super::{field, rd, storm3d};
-use crate::engine::hook;
+use super::{eng, field, rd, storm3d};
+use crate::engine::hook as patch;
 use crate::surface::{self, Context};
+use crate::syms_core::{field, hook, sym};
 
-/// In `Armada_RenderFrame`: `call ChatDisplay::Render` (thiscall on `g_chat_display`).
-const SITE_CHAT: usize = 0x598a16;
-/// `ChatDisplay::Render`.
-const CHAT_RENDER: usize = 0x51d3c0;
-/// `ST3D_TrifanBuffer::Flush`, thiscall: draws the 2D quads the device has batched.
-const TRIFAN_FLUSH: usize = 0x621a90;
-/// `ST3D_DeviceDirectX8+0xe4`: its trifan buffer, which `EndScene` flushes.
-const DEV_TRIFAN: usize = 0xe4;
-/// `shipDisplay+0x16` (the HUD's ship panel, `ShipDisplay`): its hidden flag, which
-/// `DisplayInterface::SetInterfaceState` sets in every mode that hides the HUD.
-const SHIP_DISPLAY_HIDDEN: usize = 0x76397e;
+// The profile (`ui.core.toml`) names, for the hook `core.mission`: in
+// `Armada_RenderFrame`, `call ChatDisplay::Render` (thiscall on `g_chat_display`);
+// `ST3D_TrifanBuffer::Flush`, thiscall, draws the 2D quads the device has batched; and
+// `ST3D_DeviceDirectX8`'s trifan buffer, which `EndScene` flushes. For
+// `core.reads_hud_hidden`: `shipDisplay+0x16` (the HUD's ship panel, `ShipDisplay`),
+// its hidden flag, which `DisplayInterface::SetInterfaceState` sets in every mode that
+// hides the HUD.
 
 /// Frames drawn since the last log line, and when it was written.
 static mut FRAMES: u32 = 0;
@@ -39,11 +36,11 @@ static mut REPORTS: u32 = 0;
 
 /// Patches the hook; false (and nothing patched) when the site is not stock.
 pub fn install() -> bool {
-    if hook::call_target(SITE_CHAT) != Some(CHAT_RENDER) {
-        crate::log!("mission: the call at {:#x} is not to ChatDisplay::Render", SITE_CHAT);
+    if eng().ready(hook::CORE_MISSION).is_err() {
         return false;
     }
-    if !hook::patch_call(SITE_CHAT, CHAT_RENDER, chat_render as *const () as usize) {
+    let (site, render) = (eng().addr(sym::CORE_SITE_CHAT), eng().addr(sym::CORE_CHAT_RENDER));
+    if !patch::patch_call(site, render, chat_render as *const () as usize) {
         return false;
     }
     crate::log!("cursor: {}", if super::cursor::install() { "can be hidden" } else { "stays the engine's" });
@@ -53,22 +50,23 @@ pub fn install() -> bool {
 }
 
 unsafe extern "thiscall" fn chat_render(chat: usize) {
-    let stock: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(CHAT_RENDER) };
+    let stock: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(eng().addr(sym::CORE_CHAT_RENDER)) };
     super::chat::render_stock(chat, stock);
-    let dev = field(storm3d(), 0xcc);
-    if dev == 0 {
+    let dev = field(storm3d(), field::CORE_STORM3D_DEVICES);
+    let flush = eng().addr(sym::CORE_TRIFAN_FLUSH);
+    if dev == 0 || flush == 0 {
         return;
     }
     // The HUD's sprites and text are batched in the device's trifan buffer until the
     // scene ends; draw them now, or they would land on top of the UI.
-    let flush: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(TRIFAN_FLUSH) };
-    unsafe { flush(dev + DEV_TRIFAN) };
+    let flush: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(flush) };
+    unsafe { flush(dev + field::CORE_DX8_TRIFAN) };
     count();
     // The info panel's close-up: a view of the engine's, drawn before the UI's frame
     // and flushed with it (`engine::closeup`).
     if crate::config::get().hud.info_camera {
         super::closeup::render();
-        unsafe { flush(dev + DEV_TRIFAN) };
+        unsafe { flush(dev + field::CORE_DX8_TRIFAN) };
     }
     crate::widgets::theme::set_player_race(super::race::mission_race());
     surface::frame(Context::Mission);
@@ -106,7 +104,11 @@ fn count() {
 
 /// Whether the engine has hidden its HUD (a cinematic, or the player hiding it).
 pub fn hud_hidden() -> bool {
-    unsafe { rd::<u8>(SHIP_DISPLAY_HIDDEN) != 0 }
+    if eng().ready(hook::CORE_READS_HUD_HIDDEN).is_err() {
+        return false;
+    }
+    let a = eng().addr(sym::CORE_SHIP_DISPLAY_HIDDEN);
+    a != 0 && unsafe { rd::<u8>(a) != 0 }
 }
 
 /// Whether a mission frame was drawn in the last two seconds: the in-mission menus open

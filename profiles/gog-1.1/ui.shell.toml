@@ -1,0 +1,800 @@
+# UI.asi's symbols in Armada2.exe 1.1 (GOG): part "shell" (engine/shell.rs, shellui.rs,
+# shellcombo.rs, setup.rs). The findings are in ui/MENUS.md, "Hooks" (ui.shell.*).
+schema = 1
+plugin = "ui"
+readme = "ui/MENUS.md"
+lang = "rust"
+out = "ui/src/syms_shell.rs"
+
+[hook."shell.screens"]
+doc = "The shell's Credits call and the display, pump and background functions a screen of ours runs between screens"
+rows = ["Menus.Credits"]
+
+[hook."shell.reads_device"]
+doc = "The Storm3D device behind the shell, the pump's exit code and the Alt+Tab flag, read and its Flip slot called"
+
+[hook."shell.cursor"]
+doc = "The 3D window's WM_SETCURSOR answer re-pointed so a screen of ours or a hosted dialog has the arrow"
+
+[hook."shell.widgets"]
+doc = "Shell::Widget's constructor re-pointed so every shell button and label is remembered"
+rows = ["Menus.Enable"]
+
+[hook."shell.reads_widgets"]
+doc = "The shell's button, label, scroll bar and combo box objects read by class and field"
+
+[hook."shell.reads_combo"]
+doc = "A ComboBox's pull-down count, item height, rectangle, hidden combo window and direction"
+
+[hook."shell.reads_setup"]
+doc = "The game setup and transport getters the loading screen and the Refit screen ask about the game"
+
+# ---- shell.screens (shell.rs) ------------------------------------------------
+
+[[sym]]
+id = "shell_show_credits"
+symbol = "Show_Credits"
+kind = "fn"
+addr = 0x5913a0
+check = "55 8b ec 6a ff"
+used_by = ["shell.screens"]
+
+[[sym]]
+id = "shell_credits_site"
+symbol = "DispatchDialog"
+kind = "call"
+addr = 0x606bd4
+target = "shell_show_credits"
+in = "DispatchDialog"
+used_by = ["shell.screens"]
+
+[[sym]]
+id = "shell_set_active_display"
+symbol = "ST3D_GraphicsEngine::SetActiveDisplay"
+kind = "fn"
+addr = 0x62c6d0
+check = "55 8b ec 83 ec 1c"
+used_by = ["shell.screens"]
+
+[[sym]]
+id = "shell_clear_device_displays"
+symbol = "ST3D_GraphicsEngine::ClearDeviceDisplays"
+kind = "fn"
+addr = 0x62d880
+check = "55 8b ec 83 ec 18"
+used_by = ["shell.screens"]
+
+[[sym]]
+id = "shell_get_window_handle"
+symbol = "ST3D_GraphicsEngine::GetWindowHandle"
+kind = "fn"
+addr = 0x62bc70
+check = "8b 89 cc 00 00 00"
+used_by = ["shell.screens"]
+
+[[sym]]
+id = "shell_handle_message_queue"
+symbol = "HandleMessageQueue"
+kind = "fn"
+addr = 0x488730
+check = "55 8b ec 83 ec 1c"
+used_by = ["shell.screens"]
+
+[[sym]]
+id = "shell_st3d_test_coop"
+symbol = "ST3D_DeviceDirectX8::TestCooperativeLevel"
+kind = "fn"
+addr = 0x623c70
+check = "55 8b ec 83 ec 08"
+used_by = ["shell.screens"]
+
+[[sym]]
+id = "shell_set_current_background"
+symbol = "SetCurrentBackground"
+kind = "fn"
+addr = 0x6083f0
+check = "55 8b ec 51"
+used_by = ["shell.screens"]
+
+[[sym]]
+id = "shell_shell_bitmap"
+symbol = "ShellBitmap::ShellBitmap"
+kind = "fn"
+addr = 0x5a3960
+check = "55 8b ec 6a ff"
+used_by = ["shell.screens"]
+
+[[sym]]
+id = "shell_new"
+symbol = "operator new"
+kind = "fn"
+addr = 0x652710
+check = "55 8b ec"
+used_by = ["shell.screens"]
+
+[[sym]]
+id = "shell_colour_black"
+symbol = "ST3D_Colour_Black"
+kind = "global"
+addr = 0x7a8f98
+used_by = ["shell.screens"]
+
+[[sym]]
+id = "shell_all_black_background"
+symbol = "ALL_BLACK_8_BY_6_BACKGROUND"
+kind = "global"
+addr = 0x727fd0
+used_by = ["shell.screens"]
+
+[[sym]]
+id = "shell_mode"
+symbol = "g_shellMode"
+kind = "global"
+addr = 0x7a8980
+used_by = ["shell.screens"]
+
+[[sym]]
+id = "shell_display_3d"
+symbol = "ST3D_GraphicsEngine::SetActiveDisplay"
+kind = "value"
+value = 2
+used_by = ["shell.screens"]
+
+[[sym]]
+id = "shell_display_shell"
+symbol = "ST3D_GraphicsEngine::SetActiveDisplay"
+kind = "value"
+value = 3
+used_by = ["shell.screens"]
+
+[[sym]]
+id = "shell_mode_main_menu"
+symbol = "g_shellMode"
+kind = "value"
+value = 1
+used_by = ["shell.screens"]
+
+[[sym]]
+id = "shell_bitmap_size"
+symbol = "ShellBitmap::ShellBitmap"
+kind = "value"
+value = 48
+unit = "bytes"
+used_by = ["shell.screens"]
+
+# ---- shell.reads_device (shell.rs) -------------------------------------------
+
+[[sym]]
+id = "shell_dx8_vtable"
+symbol = "ST3D_DeviceDirectX8"
+kind = "vtable"
+addr = 0x6bc6ac
+used_by = ["shell.reads_device"]
+
+[[sym]]
+id = "shell_dx8_flip_to_gdi"
+symbol = "ST3D_DeviceDirectX8::FlipToGDISurface"
+kind = "slot"
+vtable = "shell_dx8_vtable"
+index = 27
+target = "any"
+used_by = ["shell.reads_device"]
+
+[[sym]]
+id = "shell_exit_code"
+symbol = "ExitCode"
+kind = "global"
+addr = 0x737bb0
+used_by = ["shell.reads_device"]
+
+[[sym]]
+id = "shell_program"
+symbol = "star_trek"
+kind = "global"
+addr = 0x737b30
+used_by = ["shell.reads_device"]
+
+[[sym]]
+id = "shell_storm3d_device_index"
+symbol = "ST3D_GraphicsEngine"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 192
+type = "u32"
+used_by = ["shell.screens", "shell.reads_device"]
+
+[[sym]]
+id = "shell_storm3d_devices"
+symbol = "ST3D_GraphicsEngine"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 204
+type = "ptr"
+used_by = ["shell.screens", "shell.reads_device"]
+
+[[sym]]
+id = "shell_storm3d_display"
+symbol = "ST3D_GraphicsEngine"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 268
+type = "u32"
+used_by = ["shell.screens", "shell.reads_device"]
+
+# ---- shell.cursor (shell.rs) -------------------------------------------------
+
+[[sym]]
+id = "shell_wm_setcursor"
+symbol = "WindowProc"
+kind = "patch"
+addr = 0x488883
+check = "ff 15 a8 81 7b 00"
+in = "WindowProc"
+used_by = ["shell.cursor"]
+
+# ---- shell.widgets (shellui.rs) ----------------------------------------------
+
+[[sym]]
+id = "shellui_widget_ctor"
+symbol = "Shell::Widget::Widget"
+kind = "fn"
+addr = 0x5a8060
+check = "55 8b ec 8b c1 8b 4d 08 89 48 04 c7 00 d4 b2 6b 00 5d c2 04 00"
+used_by = ["shell.widgets"]
+
+[[sym]]
+id = "shellui_vt_widget"
+symbol = "Shell::Widget"
+kind = "vtable"
+addr = 0x6bb2d4
+used_by = ["shell.widgets", "shell.reads_widgets"]
+
+# ---- shell.reads_widgets (shellui.rs) ----------------------------------------
+
+[[sym]]
+id = "shellui_button_update_hdc"
+symbol = "ShellButton::UpdateButton"
+kind = "fn"
+addr = 0x5a4af0
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_textlabel_draw"
+symbol = "TextLabel::Draw"
+kind = "fn"
+addr = 0x5a7590
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_vt_cycle_button"
+symbol = "CycleButton"
+kind = "vtable"
+addr = 0x6bb064
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_vt_toggle_button"
+symbol = "ShellToggleButton"
+kind = "vtable"
+addr = 0x6bb18c
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_vt_selbox"
+symbol = "ShellButtonSelBox"
+kind = "vtable"
+addr = 0x6bb0e4
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_vt_std_text_label"
+symbol = "StdTextLabel"
+kind = "vtable"
+addr = 0x6bbaa4
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_vt_scrollbar"
+symbol = "ShellScrollBar"
+kind = "vtable"
+addr = 0x6bb164
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_vt_combo_box"
+symbol = "ComboBox"
+kind = "vtable"
+addr = 0x6bad2c
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_vt_game_slot"
+symbol = "GameSelectionSlot"
+kind = "vtable"
+addr = 0x6badcc
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_vt_player_list"
+symbol = "PlayerListButton"
+kind = "vtable"
+addr = 0x6bae74
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_rdata_start"
+symbol = "Armada2.exe .rdata"
+kind = "value"
+value = 7012352
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_rdata_end"
+symbol = "Armada2.exe .rdata"
+kind = "value"
+value = 7143424
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_btn_hwnd"
+symbol = "ShellButton"
+kind = "field"
+struct = "ShellButton"
+offset = 32
+type = "ptr"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_btn_label"
+symbol = "ShellButton"
+kind = "field"
+struct = "ShellButton"
+offset = 60
+type = "u8"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_btn_mode"
+symbol = "ShellButton"
+kind = "field"
+struct = "ShellButton"
+offset = 192
+type = "u32"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_btn_rect"
+symbol = "ShellButton"
+kind = "field"
+struct = "ShellButton"
+offset = 196
+type = "i32"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_btn_shown"
+symbol = "ShellButton"
+kind = "field"
+struct = "ShellButton"
+offset = 228
+type = "u32"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_btn_enabled"
+symbol = "ShellButton"
+kind = "field"
+struct = "ShellButton"
+offset = 232
+type = "u32"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_btn_colour"
+symbol = "ShellButton"
+kind = "field"
+struct = "ShellButton"
+offset = 40
+type = "u32"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_btn_left"
+symbol = "ShellButton"
+kind = "field"
+struct = "ShellButton"
+offset = 372
+type = "u8"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_btn_right"
+symbol = "ShellButton"
+kind = "field"
+struct = "ShellButton"
+offset = 373
+type = "u8"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_selbox_rect"
+symbol = "ShellButtonSelBox"
+kind = "field"
+struct = "ShellButtonSelBox"
+offset = 376
+type = "i32"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_toggle_on"
+symbol = "ShellToggleButton"
+kind = "field"
+struct = "ShellToggleButton"
+offset = 392
+type = "u8"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_cycle_selection"
+symbol = "CycleButton"
+kind = "field"
+struct = "CycleButton"
+offset = 408
+type = "i32"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_sb_rect"
+symbol = "ShellScrollBar"
+kind = "field"
+struct = "ShellScrollBar"
+offset = 40
+type = "i32"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_sb_track_start"
+symbol = "ShellScrollBar"
+kind = "field"
+struct = "ShellScrollBar"
+offset = 16
+type = "i32"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_sb_track_top"
+symbol = "ShellScrollBar"
+kind = "field"
+struct = "ShellScrollBar"
+offset = 20
+type = "i32"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_sb_value"
+symbol = "ShellScrollBar"
+kind = "field"
+struct = "ShellScrollBar"
+offset = 60
+type = "i32"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_sb_track_len"
+symbol = "ShellScrollBar"
+kind = "field"
+struct = "ShellScrollBar"
+offset = 64
+type = "i32"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_sb_horizontal"
+symbol = "ShellScrollBar"
+kind = "field"
+struct = "ShellScrollBar"
+offset = 68
+type = "u8"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_sb_lo"
+symbol = "ShellScrollBar"
+kind = "field"
+struct = "ShellScrollBar"
+offset = 72
+type = "i32"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_sb_hi"
+symbol = "ShellScrollBar"
+kind = "field"
+struct = "ShellScrollBar"
+offset = 76
+type = "i32"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_lbl_hwnd"
+symbol = "TextLabel"
+kind = "field"
+struct = "TextLabel"
+offset = 4
+type = "ptr"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_lbl_text"
+symbol = "TextLabel"
+kind = "field"
+struct = "TextLabel"
+offset = 8
+type = "u8"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_lbl_rect"
+symbol = "TextLabel"
+kind = "field"
+struct = "TextLabel"
+offset = 1032
+type = "i32"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_lbl_flags"
+symbol = "TextLabel"
+kind = "field"
+struct = "TextLabel"
+offset = 1048
+type = "u32"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_lbl_shown"
+symbol = "TextLabel"
+kind = "field"
+struct = "TextLabel"
+offset = 1116
+type = "u32"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_lbl_colour"
+symbol = "TextLabel"
+kind = "field"
+struct = "TextLabel"
+offset = 1124
+type = "u32"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_std_lbl_string"
+symbol = "StdTextLabel"
+kind = "field"
+struct = "StdTextLabel"
+offset = 1128
+type = "ptr"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_btn_label_len"
+symbol = "ShellButton"
+kind = "value"
+value = 64
+unit = "bytes"
+used_by = ["shell.reads_widgets"]
+
+[[sym]]
+id = "shellui_lbl_text_len"
+symbol = "TextLabel"
+kind = "value"
+value = 1024
+unit = "bytes"
+used_by = ["shell.reads_widgets"]
+
+# ---- shell.reads_combo (shellcombo.rs) ---------------------------------------
+
+[[sym]]
+id = "shellcombo_count"
+symbol = "ComboBox"
+kind = "field"
+struct = "ComboBox"
+offset = 376
+type = "i32"
+used_by = ["shell.reads_combo"]
+
+[[sym]]
+id = "shellcombo_item_h"
+symbol = "ComboBox"
+kind = "field"
+struct = "ComboBox"
+offset = 380
+type = "i32"
+used_by = ["shell.reads_combo"]
+
+[[sym]]
+id = "shellcombo_pull"
+symbol = "ComboBox"
+kind = "field"
+struct = "ComboBox"
+offset = 384
+type = "i32"
+used_by = ["shell.reads_combo"]
+
+[[sym]]
+id = "shellcombo_combo"
+symbol = "ComboBox"
+kind = "field"
+struct = "ComboBox"
+offset = 408
+type = "ptr"
+used_by = ["shell.reads_combo"]
+
+[[sym]]
+id = "shellcombo_down"
+symbol = "ComboBox"
+kind = "field"
+struct = "ComboBox"
+offset = 436
+type = "u8"
+used_by = ["shell.reads_combo"]
+
+# ---- shell.reads_setup (setup.rs) --------------------------------------------
+
+[[sym]]
+id = "setup_transport"
+symbol = "g_transport"
+kind = "global"
+addr = 0x76b8d4
+used_by = ["shell.reads_setup"]
+
+[[sym]]
+id = "setup_get_game_setup"
+symbol = "Transport::getGameSetup"
+kind = "fn"
+addr = 0x557940
+check = "8b 41 30 c3"
+used_by = ["shell.reads_setup"]
+
+[[sym]]
+id = "setup_get_map_name"
+symbol = "GameSetup::getMapName"
+kind = "fn"
+addr = 0x5461f0
+check = "56 8b f1 8b 46 10"
+used_by = ["shell.reads_setup"]
+
+[[sym]]
+id = "setup_get_map_title"
+symbol = "GameSetup::getMapTitle"
+kind = "fn"
+addr = 0x546240
+check = "8b 41 10 83 c0 6c c3"
+used_by = ["shell.reads_setup"]
+
+[[sym]]
+id = "setup_get_local_slot"
+symbol = "GameSetup::getLocalSlot"
+kind = "fn"
+addr = 0x547470
+check = "8b 01 c3"
+used_by = ["shell.reads_setup"]
+
+[[sym]]
+id = "setup_get_race"
+symbol = "GameSetup::getRace"
+kind = "fn"
+addr = 0x546650
+check = "55 8b ec 8b 45 08"
+used_by = ["shell.reads_setup"]
+
+[[sym]]
+id = "setup_get_team"
+symbol = "GameSetup::getTeam"
+kind = "fn"
+addr = 0x546610
+check = "55 8b ec 8b 45 08"
+used_by = ["shell.reads_setup"]
+
+[[sym]]
+id = "setup_is_vacant"
+symbol = "GameSetup::isVacant"
+kind = "fn"
+addr = 0x546af0
+check = "55 8b ec 8b 45 08"
+used_by = ["shell.reads_setup"]
+
+[[sym]]
+id = "setup_is_game_player"
+symbol = "GameSetup::isGamePlayer"
+kind = "fn"
+addr = 0x546b90
+check = "55 8b ec 8b 45 08"
+used_by = ["shell.reads_setup"]
+
+[[sym]]
+id = "setup_get_player_name"
+symbol = "GameSetup::getPlayerName"
+kind = "fn"
+addr = 0x5466e0
+check = "55 8b ec 6a ff"
+used_by = ["shell.reads_setup"]
+
+[[sym]]
+id = "setup_race_random"
+symbol = "GameSetup::RaceRandom"
+kind = "fn"
+addr = 0x547cd0
+check = "a1 b4 7c 73 00 c3"
+used_by = ["shell.reads_setup"]
+
+[[sym]]
+id = "setup_find_ia_race"
+symbol = "Race::FindInstantActionSlot"
+kind = "fn"
+addr = 0x48b180
+check = "55 8b ec 53 56"
+used_by = ["shell.reads_setup"]
+
+[[sym]]
+id = "setup_vt_is_instant_action"
+symbol = "Transport::IsInstantAction"
+kind = "field"
+struct = "Transport vtable"
+offset = 16
+type = "ptr"
+used_by = ["shell.reads_setup"]
+
+[[sym]]
+id = "setup_vt_is_single_player"
+symbol = "Transport::IsSinglePlayer"
+kind = "field"
+struct = "Transport vtable"
+offset = 24
+type = "ptr"
+used_by = ["shell.reads_setup"]
+
+[[sym]]
+id = "setup_vt_show_load_percentages"
+symbol = "Transport::ShowLoadPercentages"
+kind = "field"
+struct = "Transport vtable"
+offset = 64
+type = "ptr"
+used_by = ["shell.reads_setup"]
+
+[[sym]]
+id = "setup_vt_get_load_percentage"
+symbol = "Transport::GetLoadPercentage"
+kind = "field"
+struct = "Transport vtable"
+offset = 68
+type = "ptr"
+used_by = ["shell.reads_setup"]
+
+[[sym]]
+id = "setup_vt_is_send_worthy"
+symbol = "Transport::IsSendWorthy"
+kind = "field"
+struct = "Transport vtable"
+offset = 92
+type = "ptr"
+used_by = ["shell.reads_setup"]
+
+[[sym]]
+id = "setup_race_name"
+symbol = "Race"
+kind = "field"
+struct = "Race"
+offset = 20
+type = "u8"
+used_by = ["shell.reads_setup"]
+
+[[sym]]
+id = "setup_slots"
+symbol = "GameSetup"
+kind = "value"
+value = 8
+used_by = ["shell.reads_setup"]

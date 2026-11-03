@@ -158,6 +158,16 @@ the desktop's resolution the shell and the 3D display have the same mode and the
 device is never re-created (`README.md`, "What the shell is, as far as Direct3D goes").
 The in-mission menus run on the 3D display that is already up.
 
+### Hooks (the engine profile)
+
+The host's engine findings are in `profiles/gog-1.1/ui.dialogs.toml`; `install` makes
+both hooks ready before it patches anything and stands down with the engine's reason.
+
+| Hook | What it needs of `Armada2.exe` |
+|---|---|
+| `ui.dialogs.shell_mode` | the two `push 16; push 600; push 800` of `SetActiveDisplay_Internal` (bytes checked, then raised to the desktop's size), and the front end's 800x600x16 as values; feeds `Menus.Enable` |
+| `ui.dialogs.reads_screens` | the 32 shell dialog procedures by address, which name a hosted screen (`screen_name`) and pick the in-mission menu's Esc handling, and the shell's code range that bounds what is hosted; feeds `Menus.Enable` |
+
 ### The in-mission menus
 
 `do_escapeMenu` (the in-mission menu, template 0x123 like the main menu), Save Game,
@@ -193,6 +203,24 @@ focus (menus/README.md, "Keyboard focus", saw the same after an embedded menu), 
 with no focus the active window gets every key as `WM_SYSKEYDOWN`: the in-mission
 menu never saw its Esc. The first hosted dialog puts the focus on the 3D window when
 it finds none, and an Esc without Alt counts as Esc whichever way it comes.
+
+## The shell's hooks (the engine profile)
+
+What the screens of ours, the widget finder, the game-setup getters and the `ComboBox`
+reads need of `Armada2.exe` is in `profiles/gog-1.1/ui.shell.toml` (`engine/shell.rs`,
+`shellui.rs`, `shellcombo.rs`, `setup.rs`). `install` makes the hooks it uses ready
+before it writes anything and stands down with the engine's reason; the reads answer
+nothing (None, an empty list, 0) while their hook is not ready.
+
+| Hook | What it needs of `Armada2.exe` |
+|---|---|
+| `ui.shell.screens` | `DispatchDialog`'s call of `Show_Credits` (re-pointed at the Credits of ours, or at the demo screen), and the functions a screen of ours calls between two shell screens: `SetActiveDisplay` (2 the 3D display, 3 the shell's), `ClearDeviceDisplays` with `ST3D_Colour_Black`, `GetWindowHandle`, `HandleMessageQueue`, `TestCooperativeLevel`, `SetCurrentBackground`, `ShellBitmap`'s constructor (0x30 bytes, from `operator new`) with `ALL_BLACK_8_BY_6_BACKGROUND`, and `g_shellMode` (1: main menu); feeds `Menus.Credits` |
+| `ui.shell.reads_device` | Storm3D's display, device index and device table (+0x10c, +0xc0, +0xcc), `ST3D_DeviceDirectX8`'s vtable (to tell the device) and its `FlipToGDISurface` slot, `ExitCode` (a `WM_QUIT`'s code) and the `star_trek` `Program`'s first byte (lets Alt+Tab through); read by the screens, the dialog host and the loading screen |
+| `ui.shell.cursor` | the one `call [SetCursor]` in `WindowProc`'s `WM_SETCURSOR` case, bytes checked, replaced by a call of ours; the arrow over a screen of ours or a hosted dialog |
+| `ui.shell.widgets` | `Shell::Widget`'s constructor, re-pointed (its bytes checked) at one that stores the same two fields and remembers the object, and `Shell::Widget`'s vtable; feeds `Menus.Enable` |
+| `ui.shell.reads_widgets` | the vtables of the shell's button, toggle, cycle, selection box, scroll bar, label, `ComboBox`, `GameSelectionSlot` and `PlayerListButton` classes, the two virtuals (`UpdateButton`, `TextLabel::Draw`) that tell a class by its slot, the `.rdata` range a vtable pointer must lie in, and every field read by offset |
+| `ui.shell.reads_combo` | a `ComboBox`'s item count, item height, pull-down rectangle, hidden combo window and direction (the table in `shellcombo.rs`) |
+| `ui.shell.reads_setup` | `g_transport` and the `Transport` / `GameSetup` getters (map, title, slots, race, team, name, vacancy), `RaceRandom` and `Race::FindInstantActionSlot`, with the `Transport` virtuals asked by vtable offset; the loading screen's mission details and the Refit screen's network test |
 
 ## The shell's widgets
 

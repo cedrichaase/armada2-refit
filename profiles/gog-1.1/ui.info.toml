@@ -1,0 +1,1162 @@
+# UI.asi's symbols in Armada2.exe 1.1 (GOG): part "info", the info panel (info.rs), the
+# unit view (unitview.rs) and the close-up (closeup.rs). Each entry is tied to the hook
+# that uses it; the findings are in ui/HUD.md, "Hooks".
+schema = 1
+plugin = "ui"
+readme = "ui/HUD.md"
+lang = "rust"
+out = "ui/src/syms_info.rs"
+
+[hook."hud.info"]
+doc = "The info panel: ShipDisplay's children asked for their answers, and the presses on the panel"
+rows = ["HUD.Info"]
+
+[hook."hud.unitview"]
+doc = "The unit view: CinematicView's rectangles written, its frame left out of Render"
+rows = ["HUD.UnitView"]
+
+[hook."hud.closeup"]
+doc = "The close-up: a camera of our own through the action camera's Armada_RenderAllOurStuff call"
+rows = ["HUD.InfoCamera"]
+
+[[sym]]
+id = "info_ship_display"
+symbol = "shipDisplay"
+kind = "global"
+addr = 0x763968
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_no_entity"
+symbol = "Entity::NO_ENTITY"
+kind = "global"
+addr = 0x6b41d8
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_camera_manager"
+symbol = "gCameraManager"
+kind = "global"
+addr = 0x763370
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_g_string"
+symbol = "g_string"
+kind = "global"
+addr = 0x7379fc
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_command_shift"
+symbol = "g_pCommandShift"
+kind = "global"
+addr = 0x761340
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_td_game_object"
+symbol = "GameObject (type descriptor)"
+kind = "rtti"
+addr = 0x6f1280
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_td_craft"
+symbol = "Craft (type descriptor)"
+kind = "rtti"
+addr = 0x6f12a0
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_td_colony"
+symbol = "Colony (type descriptor)"
+kind = "rtti"
+addr = 0x6f14b0
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_td_construction"
+symbol = "ConstructionObject (type descriptor)"
+kind = "rtti"
+addr = 0x6ffc60
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_td_ordnance_class"
+symbol = "OrdnanceClass (type descriptor)"
+kind = "rtti"
+addr = 0x70cb08
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_td_romulan_spy_class"
+symbol = "RomulanSpyClass (type descriptor)"
+kind = "rtti"
+addr = 0x70cb28
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_determine_type"
+symbol = "ShipDisplay::DetermineSelectedDisplayType"
+kind = "fn"
+addr = 0x4f2ee0
+check = "56 8b f1 c7 86 e8 01 00 00"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_repair_left"
+symbol = "Craft::mComputeRepairLeft"
+kind = "fn"
+addr = 0x4c8ca0
+check = "55 8b ec 8b 4d 08 80 39"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_get_build_queue"
+symbol = "Producer::GetBuildQueue"
+kind = "fn"
+addr = 0x4b8070
+check = "56 8b f1 8b 06 ff 90 68"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_localize"
+symbol = "Localized_Strings::Localize"
+kind = "fn"
+addr = 0x481c90
+check = "55 8b ec 83 ec 08 8b c1"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_rt_dynamic_cast"
+symbol = "__RTDynamicCast"
+kind = "fn"
+addr = 0x6731a0
+check = "ff 25 70 80 7b 00"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_slow_effect"
+symbol = "GameObject::GetSlowEffect"
+kind = "fn"
+addr = 0x4d4ee0
+check = "56 57 8b f9 8b 47"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_los_effect"
+symbol = "GameObject::GetLineOfSightEffect"
+kind = "fn"
+addr = 0x4d4f60
+check = "56 57 8b f9 8b 47"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_sd_infobar"
+symbol = "ShipDisplay::SDInfoBar"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0x70
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_sd_sys_text"
+symbol = "ShipDisplay::system texts"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0x74
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_sd_sys_repair"
+symbol = "ShipDisplay::repair icons"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0xc4
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_sd_crew_text"
+symbol = "ShipDisplay::crew text"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0x88
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_sd_energy_text"
+symbol = "ShipDisplay::energy text"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0x8c
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_sd_class_text"
+symbol = "ShipDisplay::class text"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0x90
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_sd_name_text"
+symbol = "ShipDisplay::name text"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0x94
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_sd_officer_text"
+symbol = "ShipDisplay::officer text"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0x98
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_sd_hull_bar"
+symbol = "ShipDisplay::hull bar"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0xa0
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_sd_cargo_bar"
+symbol = "ShipDisplay::cargo bar"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0xa4
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_sd_metal_bar"
+symbol = "ShipDisplay::metal bar"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0xa8
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_sd_wireframe"
+symbol = "ShipDisplay::wireframe icon"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0xac
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_sd_construction_bar"
+symbol = "ShipDisplay::construction bar"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0xb0
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_sd_research_text"
+symbol = "ShipDisplay::research text"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0xb4
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_sd_cargo_text"
+symbol = "ShipDisplay::cargo text"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0xb8
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_sd_population_text"
+symbol = "ShipDisplay::population text"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0xbc
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_sd_planet_owner_text"
+symbol = "ShipDisplay::planet owner text"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0xc0
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_sd_queue"
+symbol = "ShipDisplay::build queue wireframes"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0x120
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_sd_current"
+symbol = "ShipDisplay::current object"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0x1e8
+type = "i32"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_sd_hover"
+symbol = "ShipDisplay::hovered craft"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0x1ec
+type = "i32"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_ib_shield_text"
+symbol = "SDInfoBar::shield text"
+kind = "field"
+struct = "SDInfoBar"
+offset = 0xc
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_ib_hull_text"
+symbol = "SDInfoBar::hull text"
+kind = "field"
+struct = "SDInfoBar"
+offset = 0x10
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_bw_builder"
+symbol = "BuildWireframe::builder"
+kind = "field"
+struct = "BuildWireframe"
+offset = 0x28
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_bw_class"
+symbol = "BuildWireframe::queued class"
+kind = "field"
+struct = "BuildWireframe"
+offset = 0x3c
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_vt_tooltip"
+symbol = "StandardComponent::vtable GetTooltip"
+kind = "field"
+struct = "StandardComponent"
+offset = 0x0
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_vt_verbose"
+symbol = "StandardComponent::vtable GetVerboseTooltip"
+kind = "field"
+struct = "StandardComponent"
+offset = 0x4
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_vt_set_object"
+symbol = "StandardText::vtable SetCurrentObject"
+kind = "field"
+struct = "StandardText"
+offset = 0x20
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_vt_information"
+symbol = "StandardText::vtable GetInformation"
+kind = "field"
+struct = "StandardText"
+offset = 0x24
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_vt_label"
+symbol = "StandardText::vtable GetLabel"
+kind = "field"
+struct = "StandardText"
+offset = 0x28
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_vt_current_color"
+symbol = "StandardText::vtable GetCurrentColor"
+kind = "field"
+struct = "StandardText"
+offset = 0x2c
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_vt_bar_color"
+symbol = "StandardBar::vtable GetBarColor"
+kind = "field"
+struct = "StandardBar"
+offset = 0x20
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_vt_bar_value"
+symbol = "StandardBar::vtable GetBarValue"
+kind = "field"
+struct = "StandardBar"
+offset = 0x24
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_ts_sprite"
+symbol = "TextAndSprite::icon sprite"
+kind = "field"
+struct = "TextAndSprite"
+offset = 0x104
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_bar_object"
+symbol = "StandardBar::object"
+kind = "field"
+struct = "StandardBar"
+offset = 0x428
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_ri_object"
+symbol = "RepairIcon::craft"
+kind = "field"
+struct = "RepairIcon"
+offset = 0x28
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_ri_system"
+symbol = "RepairIcon::system"
+kind = "field"
+struct = "RepairIcon"
+offset = 0x2c
+type = "u32"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_ri_repair_id"
+symbol = "RepairIcon::repair id"
+kind = "field"
+struct = "RepairIcon"
+offset = 0x30
+type = "u32"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_ri_sprite"
+symbol = "RepairIcon::icon"
+kind = "field"
+struct = "RepairIcon"
+offset = 0x34
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_ri_flash"
+symbol = "RepairIcon::flash"
+kind = "field"
+struct = "RepairIcon"
+offset = 0x40
+type = "u8"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_wi_object"
+symbol = "WireframeIcon::object"
+kind = "field"
+struct = "WireframeIcon"
+offset = 0x28
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_wi_flash"
+symbol = "WireframeIcon::flash"
+kind = "field"
+struct = "WireframeIcon"
+offset = 0x30
+type = "u8"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_obj_flags"
+symbol = "Entity::what an object is"
+kind = "field"
+struct = "Entity"
+offset = 0x14
+type = "u32"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_obj_class"
+symbol = "GameObject::class"
+kind = "field"
+struct = "GameObject"
+offset = 0x40
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_class_wireframe"
+symbol = "GameObjectClass::wireframe name"
+kind = "field"
+struct = "GameObjectClass"
+offset = 0x7c
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_class_officers"
+symbol = "GameObjectClass::officer cost"
+kind = "field"
+struct = "GameObjectClass"
+offset = 0x88
+type = "i32"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_constructing_class"
+symbol = "ConstructionObject::class being built"
+kind = "field"
+struct = "ConstructionObject"
+offset = 0x188
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_obj_crew"
+symbol = "GameObject::crew"
+kind = "field"
+struct = "GameObject"
+offset = 0x1c4
+type = "f32"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_obj_energy"
+symbol = "GameObject::special energy"
+kind = "field"
+struct = "GameObject"
+offset = 0x168
+type = "f32"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_obj_store"
+symbol = "GameObject::cargo store"
+kind = "field"
+struct = "GameObject"
+offset = 0x17c
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_planet_systems"
+symbol = "Planet::systems"
+kind = "field"
+struct = "Planet"
+offset = 0xec
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_obj_health"
+symbol = "GameObject::health"
+kind = "field"
+struct = "GameObject"
+offset = 0x158
+type = "f32"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_obj_race"
+symbol = "GameObject::race"
+kind = "field"
+struct = "GameObject"
+offset = 0xfc
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_race_name"
+symbol = "Race::name"
+kind = "field"
+struct = "Race"
+offset = 0x14
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_craft_shield"
+symbol = "Craft::shields now"
+kind = "field"
+struct = "Craft"
+offset = 0x1c8
+type = "f32"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_craft_shield_max"
+symbol = "Craft::shields at most"
+kind = "field"
+struct = "Craft"
+offset = 0x1cc
+type = "f32"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_craft_systems"
+symbol = "Craft::systems"
+kind = "field"
+struct = "Craft"
+offset = 0x1e0
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_craft_repairs"
+symbol = "Craft::systems being repaired"
+kind = "field"
+struct = "Craft"
+offset = 0x30
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_sys_out"
+symbol = "CraftSystem::out of action"
+kind = "field"
+struct = "CraftSystem"
+offset = 0x1
+type = "u8"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_sys_repair"
+symbol = "CraftSystem::repair under way"
+kind = "field"
+struct = "CraftSystem"
+offset = 0x28
+type = "f32"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_repair_item_id"
+symbol = "RepairItem::repair id"
+kind = "field"
+struct = "RepairItem"
+offset = 0x10
+type = "u32"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_obj_destroyed"
+symbol = "GameObject::destroyed"
+kind = "field"
+struct = "GameObject"
+offset = 0x113
+type = "u8"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_vt_is_planet"
+symbol = "Entity::vtable IsPlanet"
+kind = "field"
+struct = "Entity"
+offset = 0xc
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_los_ordnance"
+symbol = "LineOfSightEffect::ordnance"
+kind = "field"
+struct = "LineOfSightEffect"
+offset = 0x4
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_ordnance_class"
+symbol = "Ordnance::class"
+kind = "field"
+struct = "Ordnance"
+offset = 0x18
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_vt_delete_queue_item"
+symbol = "Producer::vtable RequestDeleteBuildQueueItem"
+kind = "field"
+struct = "Producer"
+offset = 0x140
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_vt_select"
+symbol = "cOverViewImp::vtable Select"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0x90
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_vt_set_interest_entity"
+symbol = "GameCamera::vtable SetInterestEntity"
+kind = "field"
+struct = "GameCamera"
+offset = 0x58
+type = "ptr"
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_n_systems"
+symbol = "eSystem: the systems of a craft"
+kind = "value"
+value = 5
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_queue_len"
+symbol = "Producer: the build queue's slots"
+kind = "value"
+value = 10
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_system_bytes"
+symbol = "CraftSystem: bytes per system"
+kind = "value"
+value = 48
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_f_game_object"
+symbol = "Entity+0x14: a game object"
+kind = "value"
+value = 4
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_f_craft"
+symbol = "Entity+0x14: a craft"
+kind = "value"
+value = 8
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_f_producer"
+symbol = "Entity+0x14: it produces"
+kind = "value"
+value = 32
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_f_cargo"
+symbol = "Entity+0x14: it carries cargo"
+kind = "value"
+value = 128
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_f_cargo2"
+symbol = "Entity+0x14: it carries cargo (the high bit)"
+kind = "value"
+value = -2147483648
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_f_named"
+symbol = "Entity+0x14: a named object that is no craft"
+kind = "value"
+value = 16384
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_f_construction"
+symbol = "Entity+0x14: under construction"
+kind = "value"
+value = 262144
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_f_whole"
+symbol = "Entity+0x14: drawn whole"
+kind = "value"
+value = 1052672
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_repair_id_0"
+symbol = "Craft repair list: the id of system 0"
+kind = "value"
+value = 3
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_repair_id_1"
+symbol = "Craft repair list: the id of system 1"
+kind = "value"
+value = 2
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_repair_id_2"
+symbol = "Craft repair list: the id of system 2"
+kind = "value"
+value = 1
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_repair_id_3"
+symbol = "Craft repair list: the id of system 3"
+kind = "value"
+value = 5
+used_by = ["hud.info"]
+
+[[sym]]
+id = "info_repair_id_4"
+symbol = "Craft repair list: the id of system 4"
+kind = "value"
+value = 6
+used_by = ["hud.info"]
+
+[[sym]]
+id = "unitview_cinematic_view"
+symbol = "g_cinematicView"
+kind = "global"
+addr = 0x763758
+used_by = ["hud.unitview"]
+
+[[sym]]
+id = "unitview_cv_vtable"
+symbol = "CinematicView::vftable"
+kind = "vtable"
+addr = 0x6b47b4
+used_by = ["hud.unitview"]
+
+[[sym]]
+id = "unitview_sb_vtable"
+symbol = "StandardBackground::vftable"
+kind = "vtable"
+addr = 0x6b561c
+used_by = ["hud.unitview"]
+
+[[sym]]
+id = "unitview_cv_render"
+symbol = "CinematicView::Render"
+kind = "fn"
+addr = 0x4e5d30
+check = "55 8b ec 83 ec 24"
+used_by = ["hud.unitview"]
+
+[[sym]]
+id = "unitview_sb_render"
+symbol = "StandardBackground::Render"
+kind = "fn"
+addr = 0x50a820
+used_by = ["hud.unitview"]
+
+[[sym]]
+id = "unitview_slot_cv_render"
+symbol = "CinematicView::Render"
+kind = "slot"
+target = "unitview_cv_render"
+vtable = "unitview_cv_vtable"
+index = 22
+used_by = ["hud.unitview"]
+
+[[sym]]
+id = "unitview_slot_sb_render"
+symbol = "StandardBackground::Render"
+kind = "slot"
+target = "unitview_sb_render"
+vtable = "unitview_sb_vtable"
+index = 4
+used_by = ["hud.unitview"]
+
+[[sym]]
+id = "unitview_cv_rect"
+symbol = "CinematicView::rectangle"
+kind = "field"
+struct = "CinematicView"
+offset = 0x4
+type = "i32"
+used_by = ["hud.unitview"]
+
+[[sym]]
+id = "unitview_cv_background_area"
+symbol = "CinematicView::cinematicBackgroundArea"
+kind = "field"
+struct = "CinematicView"
+offset = 0x38
+type = "i32"
+used_by = ["hud.unitview"]
+
+[[sym]]
+id = "unitview_cv_display_area"
+symbol = "CinematicView::cinematicDisplayArea"
+kind = "field"
+struct = "CinematicView"
+offset = 0x48
+type = "i32"
+used_by = ["hud.unitview"]
+
+[[sym]]
+id = "unitview_cv_frame"
+symbol = "CinematicView::cinematicBackgroundPanel"
+kind = "field"
+struct = "CinematicView"
+offset = 0x58
+type = "ptr"
+used_by = ["hud.unitview"]
+
+[[sym]]
+id = "unitview_vt_render"
+symbol = "CinematicView::vtable Render"
+kind = "field"
+struct = "CinematicView"
+offset = 0x58
+type = "ptr"
+used_by = ["hud.unitview"]
+
+[[sym]]
+id = "closeup_inset_render_stuff"
+symbol = "g_cinematic_view_parameters"
+kind = "global"
+addr = 0x7637b8
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_di_current_camera"
+symbol = "DisplayInterface::currentCamera"
+kind = "global"
+addr = 0x765010
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_entity_list"
+symbol = "Entity list"
+kind = "global"
+addr = 0x76104c
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_object_list"
+symbol = "GameObject::objectList"
+kind = "global"
+addr = 0x761084
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_armada_camera_vtable"
+symbol = "Armada_Camera::vftable"
+kind = "vtable"
+addr = 0x6baa54
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_operator_new"
+symbol = "operator new"
+kind = "fn"
+addr = 0x652710
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_camera_ctor"
+symbol = "Armada_Camera::Armada_Camera"
+kind = "fn"
+addr = 0x590a10
+check = "55 8b ec 8b 45 10"
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_set_near"
+symbol = "ST3D_Camera::SetNearPlane"
+kind = "fn"
+addr = 0x6198c0
+check = "55 8b ec 8b 45 08 89 81 a0 01"
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_set_far"
+symbol = "ST3D_Camera::SetFarPlane"
+kind = "fn"
+addr = 0x6198a0
+check = "55 8b ec 8b 45 08 89 81 a4 01"
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_set_viewport"
+symbol = "ST3D_Camera::SetViewport"
+kind = "fn"
+addr = 0x61a550
+check = "55 8b ec 83 ec 08"
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_set_transform"
+symbol = "ST3D_Camera::SetTransform"
+kind = "fn"
+addr = 0x619500
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_set_current_camera"
+symbol = "ST3D_GraphicsEngine::SetCurrentCamera"
+kind = "fn"
+addr = 0x62c2d0
+check = "55 8b ec 83 ec 14"
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_body"
+symbol = "Armada_RenderAllOurStuff"
+kind = "fn"
+addr = 0x598110
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_slot_set_transform"
+symbol = "ST3D_Camera::SetTransform"
+kind = "slot"
+target = "closeup_set_transform"
+vtable = "closeup_armada_camera_vtable"
+index = 5
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_site_inset"
+symbol = "CinematicView::RenderView"
+kind = "call"
+addr = 0x4e60f6
+target = "closeup_body"
+in = "CinematicView::RenderView"
+chain = true
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_cam_render_stuff"
+symbol = "Armada_Camera::Render_Stuff"
+kind = "field"
+struct = "Armada_Camera"
+offset = 0x284
+type = "ptr"
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_cam_fov"
+symbol = "ST3D_Camera::field of view"
+kind = "field"
+struct = "ST3D_Camera"
+offset = 0x1a8
+type = "f32"
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_vt_set_transform"
+symbol = "ST3D_Camera::vtable SetTransform"
+kind = "field"
+struct = "ST3D_Camera"
+offset = 0x14
+type = "ptr"
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_entity_drawn"
+symbol = "Entity::on screen"
+kind = "field"
+struct = "Entity"
+offset = 0x25
+type = "u8"
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_object_culled"
+symbol = "GameObject::distance cull"
+kind = "field"
+struct = "GameObject"
+offset = 0x183
+type = "u8"
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_entity_instance"
+symbol = "Entity::instance"
+kind = "field"
+struct = "Entity"
+offset = 0x4
+type = "ptr"
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_inst_sphere"
+symbol = "Instance::bounding sphere"
+kind = "field"
+struct = "Instance"
+offset = 0x34
+type = "v3"
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_inst_transform"
+symbol = "Instance::transform"
+kind = "field"
+struct = "Instance"
+offset = 0x44
+type = "m34"
+used_by = ["hud.closeup"]
+
+[[sym]]
+id = "closeup_camera_size"
+symbol = "Armada_Camera: bytes to allocate"
+kind = "value"
+value = 648
+unit = "bytes"
+used_by = ["hud.closeup"]

@@ -278,7 +278,7 @@ fn place(ui: &Ui, w: f32, h: f32) -> R {
     let m = ui.u(10.0);
     // Ours when it draws, else the stock panel's rectangle.
     let ours = super::info::rect().map(|r| [r.x, r.y, r.right(), r.bottom()]);
-    let info = if hud::hidden(hud::SHIP_DISPLAY) { None } else if unsafe { super::INFO } { ours } else { hud::panel_rect(hud::SHIP_DISPLAY, ui.w, ui.h) };
+    let info = if hud::hidden(hud::ship_display()) { None } else if unsafe { super::INFO } { ours } else { hud::panel_rect(hud::ship_display(), ui.w, ui.h) };
     let mini = super::minimap_rect(ui);
     match (info, mini) {
         (Some(i), Some(mm)) if i[0] - mm[2] >= w + 2.0 * m - 1.0 => R::new(libm::roundf(mm[2] + m), ui.h - m - h, w, h),

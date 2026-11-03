@@ -6,12 +6,27 @@
 //! has no store of). We ask the same function. The `eResource` values are the game's
 //! own (0..5); which is which is read from the panel's components when the resource
 //! panel is taken over (HUD.md, "Not done").
-const TEAM_GET: usize = 0x496340;
-const TEAM_GET_RESOURCE: usize = 0x498b00;
+use crate::syms_panels::{hook, sym, TABLE};
+
+fn eng() -> &'static a2engine::Engine {
+    TABLE.engine()
+}
+
+/// An address of the engine: 0 unless the hook that uses it is ready.
+fn addr(s: a2engine::Sym) -> usize {
+    eng().addr(s)
+}
+
+fn ok(h: a2engine::HookId) -> bool {
+    eng().ready(h).is_ok()
+}
 
 /// The user's team object.
 pub fn user_team_object() -> usize {
-    let f: unsafe extern "C" fn(i32) -> usize = unsafe { core::mem::transmute(TEAM_GET) };
+    if !ok(hook::PANELS_RESOURCES) {
+        return 0;
+    }
+    let f: unsafe extern "C" fn(i32) -> usize = unsafe { core::mem::transmute(addr(sym::PANELS_TEAM_GET)) };
     unsafe { f(super::selection::user_team()) }
 }
 
@@ -24,10 +39,10 @@ pub fn amount(r: u32) -> f32 {
     if t == 0 {
         return 0.0;
     }
-    let f: unsafe extern "thiscall" fn(usize, u32) -> f32 = unsafe { core::mem::transmute(TEAM_GET_RESOURCE) };
+    let f: unsafe extern "thiscall" fn(usize, u32) -> f32 = unsafe { core::mem::transmute(addr(sym::PANELS_TEAM_GET_RESOURCE)) };
     unsafe { f(t, r) }
 }
 
 pub fn functions_stock() -> bool {
-    super::starts(TEAM_GET, &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08]) && super::starts(TEAM_GET_RESOURCE, &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08])
+    ok(hook::PANELS_RESOURCES)
 }

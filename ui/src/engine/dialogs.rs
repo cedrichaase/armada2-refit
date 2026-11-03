@@ -27,7 +27,7 @@
 //! - The two `push 16 / push 600 / push 800` of `SetActiveDisplay_Internal`: the shell's
 //!   display mode raised to the desktop's, so the shell and the 3D display share one
 //!   device and the UI draws at the screen's resolution.
-use super::{hook, shell};
+use super::{hook as patcher, shell};
 
 /// Reads a value at an address of Armada2.exe's image (always mapped).
 fn rd<T: Copy>(a: usize) -> T {
@@ -37,62 +37,81 @@ use crate::rt::win::*;
 use crate::surface::Context;
 use alloc::vec::Vec;
 
-/// The design space every shell screen is laid out in.
-pub const DESIGN_W: i32 = 800;
-pub const DESIGN_H: i32 = 600;
+use crate::syms_dialogs::{hook, sym, value, TABLE};
+
+fn eng() -> &'static a2engine::Engine {
+    TABLE.engine()
+}
+
+/// The design space every shell screen is laid out in (the front end's mode).
+pub const DESIGN_W: i32 = value::DIALOGS_FRONT_END_WIDTH;
+pub const DESIGN_H: i32 = value::DIALOGS_FRONT_END_HEIGHT;
 
 /// `SetActiveDisplay_Internal`'s two `push 16; push 600; push 800`, the shell's mode.
-const MODE_SITES: [usize; 2] = [0x62c4d4, 0x62c633];
-const MODE_STOCK: [u8; 12] = [0x6a, 0x10, 0x68, 0x58, 0x02, 0x00, 0x00, 0x68, 0x20, 0x03, 0x00, 0x00];
+const MODE_SITES: [a2engine::Sym; 2] = [sym::DIALOGS_MODE_PUSH_A, sym::DIALOGS_MODE_PUSH_B];
+
+/// The bytes of one site: push depth, push height, push width.
+fn mode_bytes(depth: u8, h: u32, w: u32) -> [u8; 12] {
+    let mut b = [0x6a, depth, 0x68, 0, 0, 0, 0, 0x68, 0, 0, 0, 0];
+    b[3..7].copy_from_slice(&h.to_le_bytes());
+    b[8..12].copy_from_slice(&w.to_le_bytes());
+    b
+}
+fn mode_stock() -> [u8; 12] {
+    mode_bytes(value::DIALOGS_FRONT_END_DEPTH as u8, DESIGN_H as u32, DESIGN_W as u32)
+}
 /// The shell's code: only dialog procedures in it are hosted (the map editor's dialogs
 /// are not shell screens).
-const SHELL_CODE: (usize, usize) = (0x5a0000, 0x610000);
+const SHELL_CODE: (usize, usize) = (value::DIALOGS_SHELL_CODE_START as usize, value::DIALOGS_SHELL_CODE_END as usize);
 /// `EscapeMenuDlgProc`, the in-mission menu, and its Return to Game button's centre in
 /// design coordinates (x 5, y 568, 172x22: menus/README.md, "Esc").
-const ESCAPE_MENU_PROC: usize = 0x5cddb0;
 const ESCAPE_RETURN_AT: (i32, i32) = (91, 579);
 /// The shell's dialog procedures by name: what a screen spec (`menus::screens`) is
 /// chosen by, and what UI.log calls a dialog. Templates are shared between screens
 /// (0x123 is the main menu, the in-mission menu, Load Game, Game and Sound Settings),
 /// the procedures are not. MENUS.md has the table with the `do_*` function of each.
-const SCREENS: &[(usize, &str)] = &[
-    (0x5d57c0, "main menu"),
-    (0x5dbdc0, "single player"),
-    (0x5d6d80, "mission select"),
-    (0x5d48c0, "load game"),
-    (0x5d9320, "save game"),
-    (0x5cddb0, "options"),
-    (0x5cf930, "game settings"),
-    (0x5d1540, "graphics settings"),
-    (0x5dce60, "sound settings"),
-    (0x5c2270, "game setup"),
-    (0x5ba900, "advanced options"),
-    (0x5b81e0, "map select"),
-    (0x5ba140, "map transfer"),
-    (0x5bf5a0, "multiplayer connection"),
-    (0x5b15f0, "internet game"),
-    (0x5b6c10, "manual ip"),
-    (0x5cb280, "room select"),
-    (0x5ab900, "create room"),
-    (0x5ac3d0, "game name"),
-    (0x5ca690, "password"),
-    (0x5a85b0, "change password"),
-    (0x5a9db0, "create account"),
-    (0x5cc620, "gamespy login"),
-    (0x5ca0b0, "net waiting"),
-    (0x5b07a0, "help"),
-    (0x5d3bd0, "licence agreement"),
-    (0x5d7730, "message"),
-    (0x5e1990, "yes or no"),
-    (0x5de0d0, "technology tree"),
-    (0x5e22c0, "admiral's log"),
-    (0x5f6010, "admiral's log pane"),
-    (0x5a2de0, "shell screen"),
+const SCREENS: &[(a2engine::Sym, &str)] = &[
+    (sym::DIALOGS_PROC_MAIN_MENU, "main menu"),
+    (sym::DIALOGS_PROC_SINGLE_PLAYER, "single player"),
+    (sym::DIALOGS_PROC_MISSION_SELECT, "mission select"),
+    (sym::DIALOGS_PROC_LOAD_GAME, "load game"),
+    (sym::DIALOGS_PROC_SAVE_GAME, "save game"),
+    (sym::DIALOGS_PROC_ESCAPE_MENU, "options"),
+    (sym::DIALOGS_PROC_GAME_SETTINGS, "game settings"),
+    (sym::DIALOGS_PROC_GRAPHICS_SETTINGS, "graphics settings"),
+    (sym::DIALOGS_PROC_SOUND_SETTINGS, "sound settings"),
+    (sym::DIALOGS_PROC_GAME_SETUP, "game setup"),
+    (sym::DIALOGS_PROC_ADVANCED_OPTIONS, "advanced options"),
+    (sym::DIALOGS_PROC_MAP_SELECT, "map select"),
+    (sym::DIALOGS_PROC_MAP_TRANSFER, "map transfer"),
+    (sym::DIALOGS_PROC_MULTIPLAYER_CONNECTION, "multiplayer connection"),
+    (sym::DIALOGS_PROC_INTERNET_GAME, "internet game"),
+    (sym::DIALOGS_PROC_MANUAL_IP, "manual ip"),
+    (sym::DIALOGS_PROC_ROOM_SELECT, "room select"),
+    (sym::DIALOGS_PROC_CREATE_ROOM, "create room"),
+    (sym::DIALOGS_PROC_GAME_NAME, "game name"),
+    (sym::DIALOGS_PROC_PASSWORD, "password"),
+    (sym::DIALOGS_PROC_CHANGE_PASSWORD, "change password"),
+    (sym::DIALOGS_PROC_CREATE_ACCOUNT, "create account"),
+    (sym::DIALOGS_PROC_GAMESPY_LOGIN, "gamespy login"),
+    (sym::DIALOGS_PROC_NET_WAITING, "net waiting"),
+    (sym::DIALOGS_PROC_HELP, "help"),
+    (sym::DIALOGS_PROC_LICENCE, "licence agreement"),
+    (sym::DIALOGS_PROC_MESSAGE, "message"),
+    (sym::DIALOGS_PROC_YES_NO, "yes or no"),
+    (sym::DIALOGS_PROC_TECH_TREE, "technology tree"),
+    (sym::DIALOGS_PROC_ADMIRALS_LOG, "admiral's log"),
+    (sym::DIALOGS_PROC_ADMIRALS_LOG_PANE, "admiral's log pane"),
+    (sym::DIALOGS_PROC_SHELL_SCREEN, "shell screen"),
 ];
 
-/// The name of a hosted dialog's screen ("main menu"), or "" for one not in the table.
+/// The name of a hosted dialog's screen ("main menu"), or "" for one not in the table
+/// (or before the host is installed: the addresses are not resolved then).
 pub fn screen_name(proc_addr: usize) -> &'static str {
-    SCREENS.iter().find(|s| s.0 == proc_addr).map_or("", |s| s.1)
+    if !ready() {
+        return "";
+    }
+    SCREENS.iter().find(|s| eng().addr(s.0) == proc_addr).map_or("", |s| s.1)
 }
 
 const MAX_SLOTS: usize = 32;
@@ -342,7 +361,7 @@ fn hook_user32(name: &str, ours: usize) -> Option<usize> {
         crate::log!("menus: Armada2.exe's import of {} is not user32's ({:#x}, user32 {:#x})", name, cur, real);
         return None;
     }
-    hook::patch_slot(slot, 0, ours)
+    patcher::patch_slot(slot, 0, ours)
 }
 
 /// Whether Menus.asi (or its old name, MenuScale.asi) is loaded: it hooks the same
@@ -358,11 +377,11 @@ pub fn install() -> bool {
         crate::log!("menus: Menus.asi is loaded: the UI's menus stand down (it hosts the same dialogs)");
         return false;
     }
-    for &at in &MODE_SITES {
-        if unsafe { core::slice::from_raw_parts(at as *const u8, MODE_STOCK.len()) } != MODE_STOCK {
-            crate::log!("menus: the shell's display mode at {:#x} is not stock: standing down", at);
-            return false;
-        }
+    if eng().ready(hook::DIALOGS_SHELL_MODE).is_err() {
+        return false;
+    }
+    if eng().ready(hook::DIALOGS_READS_SCREENS).is_err() {
+        return false;
     }
     let hooks: [(&str, usize, *mut usize); 13] = [
         ("DialogBoxParamA", my_dialog_box as *const () as usize, core::ptr::addr_of_mut!(O_DIALOG_BOX)),
@@ -416,14 +435,12 @@ pub fn install() -> bool {
 fn raise_shell_mode() {
     let (w, h) = unsafe { (GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)) };
     if w < DESIGN_W || h < DESIGN_H {
-        crate::log!("menus: desktop {}x{} is smaller than the shell: its display mode is left at 800x600", w, h);
+        crate::log!("menus: desktop {}x{} is smaller than the shell: its display mode is left at its stock mode", w, h);
         return;
     }
-    let mut new = MODE_STOCK;
-    new[1] = 32;
-    new[3..7].copy_from_slice(&(h as u32).to_le_bytes());
-    new[8..12].copy_from_slice(&(w as u32).to_le_bytes());
-    let n = MODE_SITES.iter().filter(|&&at| hook::patch_bytes(at, &MODE_STOCK, &new)).count();
+    let stock = mode_stock();
+    let new = mode_bytes(32, h as u32, w as u32);
+    let n = MODE_SITES.iter().filter(|&&at| patcher::patch_bytes(eng().addr(at), &stock, &new)).count();
     crate::log!("menus: shell display mode -> {}x{}x32 ({} of 2 sites)", w, h, n);
 }
 
@@ -1093,7 +1110,7 @@ fn pump(top: HWND) -> Option<i32> {
             if escape(&m, top, cfg.menus_escape) {
                 continue;
             }
-            if m.message == WM_SYSKEYDOWN && (m.wparam == 0x09 || m.wparam == 0x1b) && rd::<u8>(shell::PROGRAM) == 0 {
+            if m.message == WM_SYSKEYDOWN && (m.wparam == 0x09 || m.wparam == 0x1b) && { let p = shell::program_addr(); p == 0 || rd::<u8>(p) == 0 } {
                 continue;
             }
             TranslateMessage(&m);
@@ -1114,7 +1131,7 @@ fn escape(m: &Msg, top: HWND, on: bool) -> bool {
         return false;
     }
     let Some(s) = slot_of(top) else { return false };
-    if s.proc_addr != ESCAPE_MENU_PROC {
+    if s.proc_addr != eng().addr(sym::DIALOGS_PROC_ESCAPE_MENU) {
         return false;
     }
     crate::log!("menus: Esc -> Return to Game");
@@ -1168,7 +1185,7 @@ fn run_modal(h: HWND) -> isize {
         unsafe { QueryPerformanceCounter(&mut t0) };
         if let Some(code) = pump(h) {
             unsafe {
-                core::ptr::write_unaligned(shell::EXIT_CODE as *mut i32, code);
+                { let a = shell::exit_code_addr(); if a != 0 { core::ptr::write_unaligned(a as *mut i32, code); } }
                 PostQuitMessage(code);
             }
             crate::log!("menus: WM_QUIT ({}) while dialog {:p} was up", code, h);

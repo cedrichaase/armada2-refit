@@ -5,6 +5,15 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.82.0 — 2026-11-03
+
+Layers: ui 0.32.0, testbench 3.97.2.
+
+### Changed
+- Phase 8c: UI.asi on its symbol profile (`profiles/gog-1.1/ui.*.toml`); see `ui/CHANGELOG.md`.
+
+Installed, not yet seen in game
+
 ## 13.81.1 — 2026-11-03
 
 Layers: testbench 3.97.1.

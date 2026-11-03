@@ -80,7 +80,7 @@ pub fn run(ui: &mut Ui) {
 
 fn run_scaled(ui: &mut Ui) {
     let hover_craft = info::take_hover();
-    if hud::hidden(hud::SHIP_DISPLAY) || crate::engine::ingame::hud_hidden() {
+    if hud::hidden(hud::ship_display()) || crate::engine::ingame::hud_hidden() {
         unsafe { RECT = None };
         return;
     }

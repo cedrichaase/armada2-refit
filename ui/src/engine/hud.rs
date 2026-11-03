@@ -26,46 +26,52 @@
 //! owner's `Render` names its cursor in `iCursor+0x2c`). So while the pointer is over a
 //! panel of ours, `render_component` names the bar's own arrow there just before the
 //! cursor draws, as a stock panel would.
-use super::{field, hook, rd};
+use super::{field as peek, hook as rthook, rd};
+use crate::syms_hud::{field, hook, sym, TABLE};
+
+fn eng() -> &'static a2engine::Engine {
+    TABLE.engine()
+}
+
+/// The address of `s` when hook `h` is ready, else 0 (a read of a part that stood down
+/// finds nothing, and the stock game runs untouched).
+fn at(h: a2engine::HookId, s: a2engine::Sym) -> usize {
+    if eng().ready(h).is_ok() { eng().addr(s) } else { 0 }
+}
 
 // ---- the components ---------------------------------------------------------------
 
-/// `g_pPopupPalette`: the button bar (`PopupPaletteImp *`).
-pub const PALETTE_PTR: usize = 0x763c00;
+/// `g_pPopupPalette`: the button bar (`PopupPaletteImp *`), the address of the global.
+pub fn palette_ptr() -> usize {
+    at(hook::HUD_READS_COMPONENTS, sym::HUD_PALETTE_PTR)
+}
 /// `shipDisplay`: the info panel (an instance, not a pointer).
-pub const SHIP_DISPLAY: usize = 0x763968;
+pub fn ship_display() -> usize {
+    at(hook::HUD_READS_COMPONENTS, sym::HUD_SHIP_DISPLAY)
+}
 /// `mapRadar`: the minimap.
-pub const MAP_RADAR: usize = 0x763810;
+pub fn map_radar() -> usize {
+    at(hook::HUD_READS_COMPONENTS, sym::HUD_MAP_RADAR)
+}
 /// `iCursor`: the `CursorInterface`.
-pub const CURSOR: usize = 0x7643a8;
+fn cursor() -> usize {
+    eng().addr(sym::HUD_CURSOR)
+}
 
-/// `DisplayInterface+0x04`: the panel's rectangle, `{left, top, right, bottom}`,
-/// inclusive, in the 1600 x 1200 space every HUD rectangle is converted into
-/// (`cfgSCREEN_WIDTH` x `cfgSCREEN_HEIGHT`), which the engine scales to the back
-/// buffer per axis.
-const DI_RECT: usize = 0x04;
-/// `DisplayInterface+0x16`: hidden (`SetIsHidden`); `RenderAll` calls `HiddenRender`.
-const DI_HIDDEN: usize = 0x16;
-/// `DisplayInterface+0x24`: the cursor a panel shows while it owns the mouse.
-const DI_CURSOR: usize = 0x24;
-/// Vtable slots: `GetName` (+0x18), `Render` (+0x58), `CursorOver` (+0x70).
-const VT_NAME: usize = 0x18;
-const VT_RENDER: usize = 0x58;
-const VT_CURSOR_OVER: usize = 0x70;
-
-/// `iCursor+0x24`: the component that owns the mouse; `+0x2c`: the cursor sprite its
-/// `Render` named for this frame (cleared once handed to the device).
-const CURSOR_OWNER: usize = CURSOR + 0x24;
-const CURSOR_SPRITE: usize = CURSOR + 0x2c;
-
-/// `DisplayInterface::s_pRenderList`: one `std::list *` per view; `View_Record` is the
-/// view in use.
-const RENDER_LISTS: usize = 0x764fd8;
-const VIEW_RECORD: usize = 0x76b610;
+// `DisplayInterface+0x04` is the panel's rectangle, `{left, top, right, bottom}`,
+// inclusive, in the 1600 x 1200 space every HUD rectangle is converted into
+// (`cfgSCREEN_WIDTH` x `cfgSCREEN_HEIGHT`), which the engine scales to the back buffer
+// per axis; `+0x16` is hidden (`SetIsHidden`; `RenderAll` calls `HiddenRender`); `+0x24`
+// the cursor a panel shows while it owns the mouse. Vtable slots: `GetName` (+0x18),
+// `Render` (+0x58), `CursorOver` (+0x70). `iCursor+0x24` is the component that owns the
+// mouse; `+0x2c` the cursor sprite its `Render` named for this frame (cleared once
+// handed to the device). `DisplayInterface::s_pRenderList` is one `std::list *` per
+// view; `View_Record` is the view in use.
 
 /// The button bar, or 0 outside a mission.
 pub fn palette() -> usize {
-    unsafe { rd::<usize>(PALETTE_PTR) }
+    let g = palette_ptr();
+    if g == 0 { 0 } else { unsafe { rd::<usize>(g) } }
 }
 
 /// A panel's rectangle in back-buffer pixels: the 1600 x 1200 rectangle scaled per
@@ -74,7 +80,7 @@ pub fn panel_rect(c: usize, w: f32, h: f32) -> Option<[f32; 4]> {
     if c == 0 {
         return None;
     }
-    let r: [i32; 4] = unsafe { rd(c + DI_RECT) };
+    let r: [i32; 4] = unsafe { rd(c + field::HUD_DI_RECT) };
     if r[2] <= r[0] || r[3] <= r[1] {
         return None;
     }
@@ -95,7 +101,7 @@ pub fn hidden(c: usize) -> bool {
 /// The panel's own hidden flag alone (`+0x16`), whatever the view: what a toggle such
 /// as `TogglePalette` flips.
 pub fn flag_hidden(c: usize) -> bool {
-    c != 0 && unsafe { rd::<u8>(c + DI_HIDDEN) } != 0
+    c != 0 && unsafe { rd::<u8>(c + field::HUD_DI_HIDDEN) } != 0
 }
 
 /// Whether `RenderAll` walks this component in the view in use (true when the list
@@ -107,10 +113,10 @@ pub fn in_view(c: usize) -> bool {
 
 /// The component's name (`GetName`), e.g. "PopupPalette".
 pub fn name(c: usize) -> &'static str {
-    if c == 0 {
+    if c == 0 || eng().ready(hook::HUD_READS_COMPONENTS).is_err() {
         return "";
     }
-    let f: unsafe extern "thiscall" fn(usize) -> *const u8 = unsafe { core::mem::transmute(rd::<usize>(rd::<usize>(c) + VT_NAME)) };
+    let f: unsafe extern "thiscall" fn(usize) -> *const u8 = unsafe { core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_NAME)) };
     unsafe { cstr_static(f(c)) }
 }
 
@@ -131,14 +137,10 @@ pub unsafe fn cstr_static(p: *const u8) -> &'static str {
 
 // ---- the panel switch -------------------------------------------------------------
 
-/// In `DisplayInterface::RenderAll`: `mov edx,[esi]; mov ecx,esi; call [edx+0x58]`,
-/// the call of a visible component's `Render`.
-const SITE_RENDER: usize = 0x51abf7;
-const RENDER_STOCK: [u8; 7] = [0x8b, 0x16, 0x8b, 0xce, 0xff, 0x52, 0x58];
-/// In `CursorInterface::RefreshOwner`: `mov ecx,esi; mov edx,[esi]; call [edx+0x70]`,
-/// the call of each component's `CursorOver`.
-const SITE_OWNER: usize = 0x505316;
-const OWNER_STOCK: [u8; 7] = [0x8b, 0xce, 0x8b, 0x16, 0xff, 0x52, 0x70];
+// The two sites: in `DisplayInterface::RenderAll`, `mov edx,[esi]; mov ecx,esi; call
+// [edx+0x58]`, the call of a visible component's `Render`; in
+// `CursorInterface::RefreshOwner`, `mov ecx,esi; mov edx,[esi]; call [edx+0x70]`, the call
+// of each component's `CursorOver` (profiles/gog-1.1/ui.hud.toml, `hud.panels`).
 
 const MAX_TAKEN: usize = 16;
 /// The components taken over: each by its address, or (`by_pointer`) by the address
@@ -149,24 +151,24 @@ static mut OVER_UI: bool = false;
 static mut INSTALLED: bool = false;
 
 /// Patches both sites, each `mov ecx,esi; call <ours>` in the same seven bytes. False,
-/// with nothing written, when either is not stock.
+/// with nothing written, when either is not stock (`hud.panels` stands down).
 pub fn install() -> bool {
-    let at = |site: usize| unsafe { core::slice::from_raw_parts(site as *const u8, 7) };
-    if at(SITE_RENDER) != RENDER_STOCK || at(SITE_OWNER) != OWNER_STOCK {
-        crate::log!("hud: RenderAll's or RefreshOwner's call into the components is not stock: the HUD stays stock");
+    if eng().ready(hook::HUD_PANELS).is_err() {
         return false;
     }
-    let ok = patch(SITE_RENDER, &RENDER_STOCK, render_component as *const () as usize)
-        && patch(SITE_OWNER, &OWNER_STOCK, cursor_over as *const () as usize);
+    let (render, owner) = (eng().addr(sym::HUD_RENDER_CALL), eng().addr(sym::HUD_OWNER_CALL));
+    let ok = patch(render, render_component as *const () as usize) && patch(owner, cursor_over as *const () as usize);
     unsafe { INSTALLED = ok };
     ok
 }
 
-fn patch(site: usize, stock: &[u8; 7], to: usize) -> bool {
+fn patch(site: usize, to: usize) -> bool {
+    // The seven bytes are stock: `ready` checked them against the profile.
+    let stock: [u8; 7] = unsafe { rd(site) };
     let rel = (to as i64 - (site as i64 + 7)) as i32;
     let mut b = [0x8b, 0xce, 0xe8, 0, 0, 0, 0];
     b[3..7].copy_from_slice(&rel.to_le_bytes());
-    hook::patch_bytes(site, stock, &b)
+    rthook::patch_bytes(site, &stock, &b)
 }
 
 pub fn installed() -> bool {
@@ -203,7 +205,7 @@ pub fn is_taken(c: usize) -> bool {
 /// stub reach the screen through passthrough.
 #[allow(static_mut_refs)]
 fn taken(c: usize) -> bool {
-    c != 0 && crate::gfx::drawing() && unsafe { TAKEN.iter().any(|&(a, p)| a != 0 && if p { rd::<usize>(a) == c } else { a == c }) }
+    c != 0 && unsafe { INSTALLED } && crate::gfx::drawing() && unsafe { TAKEN.iter().any(|&(a, p)| a != 0 && if p { rd::<usize>(a) == c } else { a == c }) }
 }
 
 /// Whether the pointer is over a panel of ours (the last UI frame's claim): then no
@@ -214,50 +216,47 @@ pub fn set_pointer_over_ui(on: bool) {
 
 unsafe extern "thiscall" fn render_component(c: usize) {
     unsafe {
-        if c == CURSOR && rd::<usize>(CURSOR_SPRITE) == 0 {
+        if c == cursor() && rd::<usize>(cursor() + field::HUD_CURSOR_SPRITE) == 0 {
             // No cursor named this frame: no owner (the pointer is over a panel of
             // ours), or an owner we have taken, whose stock `Render`, which names it,
             // is skipped (the objectives box, which stays the owner while it shows: at
             // a mission's start nothing else showed a cursor). Show the owner's own
             // cursor, else the bar's arrow, as a stock panel would.
-            let owner = rd::<usize>(CURSOR_OWNER);
+            let owner = rd::<usize>(cursor() + field::HUD_CURSOR_OWNER);
             if (owner == 0 && OVER_UI) || taken(owner) {
-                let mut sprite = field(owner, DI_CURSOR);
+                let mut sprite = peek(owner, field::HUD_DI_CURSOR);
                 if sprite == 0 {
-                    sprite = field(palette(), DI_CURSOR);
+                    sprite = peek(palette(), field::HUD_DI_CURSOR);
                 }
                 if sprite != 0 {
-                    *(CURSOR_SPRITE as *mut usize) = sprite;
+                    *((cursor() + field::HUD_CURSOR_SPRITE) as *mut usize) = sprite;
                 }
             }
         }
-        if c == CURSOR && TOOLTIPS {
+        if c == cursor() && TOOLTIPS {
             return render_cursor_without_tooltip(c);
         }
         if taken(c) {
             return;
         }
-        if c == super::unitview::CINEMATIC_VIEW && super::unitview::enabled() {
+        if c == cinematic_view() && super::unitview::enabled() {
             return super::unitview::render(c);
         }
-        let f: unsafe extern "thiscall" fn(usize) = core::mem::transmute(rd::<usize>(rd::<usize>(c) + VT_RENDER));
+        let f: unsafe extern "thiscall" fn(usize) = core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_RENDER));
         f(c)
     }
 }
 
 // ---- the tooltips at the pointer ---------------------------------------------------
 
-/// `iCursor+0x34`, `+0x38`: the short and the verbose tooltip, each a
+// `iCursor+0x34`, `+0x38`: the short and the verbose tooltip, each a
 /// `std::stringstream *` that `CursorInterface::DoTooltip` makes afresh for the
 /// owner's tooltip once it has waited `s_tooltipDelay` / `s_verboseTooltipDelay`, NULL
 /// when there is none. `CursorInterface::Render` draws the verbose one while
 /// `m_tooltipState` is 0, else the short one, with `mDrawTooltip` at the pointer, 550
 /// units wide on the 1600 x 1200 canvas (stretched on a wide screen), and the verbose
 /// one's framing (`mDrawFramingElement`).
-const CURSOR_TIP: usize = CURSOR + 0x34;
-const CURSOR_TIP_VERBOSE: usize = CURSOR + 0x38;
-/// `CursorInterface::m_tooltipState` (the help button cycles it 0..2).
-const TOOLTIP_STATE: usize = 0x764484;
+// (`hud.tooltips`; `CursorInterface::m_tooltipState` is what the help button cycles, 0..2.)
 
 static mut TOOLTIPS: bool = false;
 static mut TIP: Option<alloc::string::String> = None;
@@ -265,7 +264,7 @@ static mut TIP: Option<alloc::string::String> = None;
 /// Takes the engine's tooltips at the pointer (`[HUD] Tooltips=1`): each frame their
 /// text is read for `tooltip()`, and the stock `Render` draws the cursor without them.
 pub fn take_tooltips(on: bool) {
-    unsafe { TOOLTIPS = on };
+    unsafe { TOOLTIPS = on && eng().ready(hook::HUD_TOOLTIPS).is_ok() };
 }
 
 /// This frame's tooltip at the pointer, as the engine would have drawn it; taken once.
@@ -279,15 +278,16 @@ pub fn tooltip() -> Option<alloc::string::String> {
 #[allow(static_mut_refs)]
 unsafe fn render_cursor_without_tooltip(c: usize) {
     unsafe {
-        let (short, verbose) = (rd::<usize>(CURSOR_TIP), rd::<usize>(CURSOR_TIP_VERBOSE));
-        let ss = if verbose != 0 && rd::<u32>(TOOLTIP_STATE) == 0 { verbose } else { short };
+        let (tip, tip_verbose) = (cursor() + field::HUD_CURSOR_TIP, cursor() + field::HUD_CURSOR_TIP_VERBOSE);
+        let (short, verbose) = (rd::<usize>(tip), rd::<usize>(tip_verbose));
+        let ss = if verbose != 0 && rd::<u32>(eng().addr(sym::HUD_TOOLTIP_STATE)) == 0 { verbose } else { short };
         TIP = if ss != 0 && !OVER_UI { super::msvc::stream_text(ss) } else { None };
-        *(CURSOR_TIP as *mut usize) = 0;
-        *(CURSOR_TIP_VERBOSE as *mut usize) = 0;
-        let f: unsafe extern "thiscall" fn(usize) = core::mem::transmute(rd::<usize>(rd::<usize>(c) + VT_RENDER));
+        *(tip as *mut usize) = 0;
+        *(tip_verbose as *mut usize) = 0;
+        let f: unsafe extern "thiscall" fn(usize) = core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_RENDER));
         f(c);
-        *(CURSOR_TIP as *mut usize) = short;
-        *(CURSOR_TIP_VERBOSE as *mut usize) = verbose;
+        *(tip as *mut usize) = short;
+        *(tip_verbose as *mut usize) = verbose;
     }
 }
 
@@ -296,14 +296,14 @@ unsafe extern "thiscall" fn cursor_over(c: usize) -> bool {
         // The objectives box stays the mouse's owner while it shows, ours or not, as
         // stock's modal box is: `GameKeysProcessInput` opens the chat line on Return
         // unless the owner is this box, and Return is also what closes it.
-        if c == super::popups::OBJECTIVES && rd::<u8>(c + DI_HIDDEN) == 0 && taken(c) {
-            let f: unsafe extern "thiscall" fn(usize) -> bool = core::mem::transmute(rd::<usize>(rd::<usize>(c) + VT_CURSOR_OVER));
+        if c == super::popups::objectives_box() && rd::<u8>(c + field::HUD_DI_HIDDEN) == 0 && taken(c) {
+            let f: unsafe extern "thiscall" fn(usize) -> bool = core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_CURSOR_OVER));
             return f(c);
         }
         if OVER_UI || taken(c) {
             return false;
         }
-        let f: unsafe extern "thiscall" fn(usize) -> bool = core::mem::transmute(rd::<usize>(rd::<usize>(c) + VT_CURSOR_OVER));
+        let f: unsafe extern "thiscall" fn(usize) -> bool = core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_CURSOR_OVER));
         f(c)
     }
 }
@@ -311,19 +311,23 @@ unsafe extern "thiscall" fn cursor_over(c: usize) -> bool {
 /// The components of the view in use, in the order `RenderAll` draws them.
 pub fn components() -> alloc::vec::Vec<usize> {
     let mut v = alloc::vec::Vec::new();
+    let (record, lists) = (at(hook::HUD_READS_COMPONENTS, sym::HUD_VIEW_RECORD), at(hook::HUD_READS_COMPONENTS, sym::HUD_RENDER_LISTS));
+    if record == 0 || lists == 0 {
+        return v;
+    }
     unsafe {
-        let view = rd::<u32>(VIEW_RECORD) as usize;
+        let view = rd::<u32>(record) as usize;
         if view > 8 {
             return v;
         }
-        let list = rd::<usize>(RENDER_LISTS + 4 * view);
-        let head = field(list, 4);
+        let list = rd::<usize>(lists + 4 * view);
+        let head = peek(list, 4);
         if head == 0 {
             return v;
         }
         let mut node = rd::<usize>(head);
         while node != head && node != 0 && v.len() < 64 {
-            let c = field(field(node, 8), 4);
+            let c = peek(peek(node, 8), 4);
             if c != 0 {
                 v.push(c);
             }
@@ -338,7 +342,7 @@ pub fn log_components() {
     let list = components();
     let mut s = alloc::string::String::new();
     for c in &list {
-        let r: [i32; 4] = unsafe { rd(c + DI_RECT) };
+        let r: [i32; 4] = unsafe { rd(c + field::HUD_DI_RECT) };
         s.push_str(&crate::sfmt!(" {}{}[{},{},{},{}]", name(*c), if hidden(*c) { "(hidden)" } else { "" }, r[0], r[1], r[2], r[3]));
     }
     crate::log!("hud: {} components, in drawing order:{}", list.len(), s);
@@ -346,27 +350,35 @@ pub fn log_components() {
 
 // ---- small reads every panel needs -------------------------------------------------
 
+/// `g_cinematicView`: the unit view (an instance); 0 when the engine is not known.
+pub fn cinematic_view() -> usize {
+    at(hook::HUD_READS_CALLS, sym::HUD_CINEMATIC_VIEW)
+}
+
 /// `TextInput_IsActive`: the chat line has the keyboard. The engine's `InputNext`
 /// skips every key binding then, and so do our keys.
-const TEXT_INPUT_ACTIVE: usize = 0x65f120;
-/// `CinematicView::IsPlayingVideo` on `g_cinematicView`: a button's click sound is
-/// skipped while a video plays (`StandardButton::Simulate`).
-const IS_PLAYING_VIDEO: usize = 0x4e6350;
-const CINEMATIC_VIEW: usize = 0x763758;
-
 pub fn typing() -> bool {
-    let f: unsafe extern "C" fn() -> usize = unsafe { core::mem::transmute(TEXT_INPUT_ACTIVE) };
+    let a = at(hook::HUD_READS_CALLS, sym::HUD_TEXT_INPUT_ACTIVE);
+    if a == 0 {
+        return false;
+    }
+    let f: unsafe extern "C" fn() -> usize = unsafe { core::mem::transmute(a) };
     unsafe { f() != 0 }
 }
 
+/// `CinematicView::IsPlayingVideo` on `g_cinematicView`: a button's click sound is
+/// skipped while a video plays (`StandardButton::Simulate`).
 pub fn video_playing() -> bool {
-    let f: unsafe extern "thiscall" fn(usize) -> bool = unsafe { core::mem::transmute(IS_PLAYING_VIDEO) };
-    unsafe { f(CINEMATIC_VIEW) }
+    let (a, c) = (at(hook::HUD_READS_CALLS, sym::HUD_IS_PLAYING_VIDEO), cinematic_view());
+    if a == 0 || c == 0 {
+        return false;
+    }
+    let f: unsafe extern "thiscall" fn(usize) -> bool = unsafe { core::mem::transmute(a) };
+    unsafe { f(c) }
 }
 
-/// Every function above that is called, checked by its first bytes before the HUD
-/// part patches anything.
+/// Every function above that is called, checked by its first bytes (the profile's
+/// `hud.reads_calls`) before the HUD part patches anything.
 pub fn functions_stock() -> bool {
-    super::starts(TEXT_INPUT_ACTIVE, &[0xa1, 0xbc, 0x0f, 0x7b, 0x00])
-        && super::starts(IS_PLAYING_VIDEO, &[0x8b, 0x51, 0x24, 0x33, 0xc0])
+    eng().ready(hook::HUD_READS_CALLS).is_ok() && eng().ready(hook::HUD_READS_COMPONENTS).is_ok()
 }

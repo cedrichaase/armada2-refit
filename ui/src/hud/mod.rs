@@ -77,7 +77,7 @@ pub fn install() -> bool {
         if !grid.is_null() {
             crate::log!("bar: GridLayout.asi is loaded and owns the bar: ours stands down");
         } else if bar::install() {
-            hud::set_taken(hud::PALETTE_PTR, true, true);
+            hud::set_taken(hud::palette_ptr(), true, true);
             unsafe { BAR = true };
             crate::log!("bar: ours, keys {}", if cfg.bar_keys { "QWERT/ASDFG/ZXCVB by position" } else { "stock" });
         } else {
@@ -99,7 +99,7 @@ pub fn apply_live(cfg: &crate::config::Hud) {
     unsafe {
         let want = cfg.minimap && MINIMAP_CAP;
         if want != MINIMAP {
-            hud::set_taken(engine::radar::MAP_RADAR, false, want);
+            hud::set_taken(engine::radar::map_radar(), false, want);
             MINIMAP = want;
             crate::log!("minimap: {}", if want { "ours" } else { "stock" });
         } else if cfg.minimap && !MINIMAP_CAP && !MINIMAP_LOGGED {
@@ -108,7 +108,7 @@ pub fn apply_live(cfg: &crate::config::Hud) {
         MINIMAP_LOGGED = true;
         let want = cfg.info && INFO_CAP;
         if want != INFO {
-            hud::set_taken(hud::SHIP_DISPLAY, false, want);
+            hud::set_taken(hud::ship_display(), false, want);
             INFO = want;
             crate::log!("info: {}", if want { "ours" } else { "stock" });
         } else if cfg.info && !INFO_CAP && !INFO_LOGGED {
@@ -136,7 +136,7 @@ fn map_panels(cfg: &crate::config::Hud) {
     unsafe { MINIMAP_CAP = engine::radar::functions_stock() && minimap::install() };
     if cfg.selection {
         if engine::overlay::functions_stock() && engine::radar::functions_stock() {
-            hud::set_taken(engine::overlay::SELECTION_DISPLAY, false, true);
+            hud::set_taken(engine::overlay::selection_display(), false, true);
             unsafe { SELECTION = true };
             crate::log!("selection: ours, gauges {}", if cfg.selection_gauges { "on the selection" } else { "as stock" });
             if !cfg.selection_bubbles {
@@ -169,7 +169,7 @@ fn map_panels(cfg: &crate::config::Hud) {
 /// The minimap's map square, when the minimap is ours and shows: a move ordered there
 /// is the radar's (`cursor::draw` shows the warp or move cursor over it).
 pub fn minimap_square(ui: &Ui) -> Option<crate::gfx::R> {
-    if unsafe { !MINIMAP } || engine::ingame::hud_hidden() || hud::hidden(engine::radar::MAP_RADAR) {
+    if unsafe { !MINIMAP } || engine::ingame::hud_hidden() || hud::hidden(engine::radar::map_radar()) {
         return None;
     }
     Some(minimap::place(ui).2)
@@ -178,13 +178,13 @@ pub fn minimap_square(ui: &Ui) -> Option<crate::gfx::R> {
 /// The minimap's rectangle in pixels while it shows: ours, else the stock radar's (on
 /// the stock canvas, stretched without HUD.asi).
 pub fn minimap_rect(ui: &Ui) -> Option<[f32; 4]> {
-    if hud::hidden(hud::MAP_RADAR) {
+    if hud::hidden(hud::map_radar()) {
         None
     } else if unsafe { MINIMAP } {
         let (o, _, _) = minimap::place(ui);
         Some([o.x, o.y, o.right(), o.bottom()])
     } else {
-        hud::panel_rect(hud::MAP_RADAR, ui.w, ui.h)
+        hud::panel_rect(hud::map_radar(), ui.w, ui.h)
     }
 }
 
