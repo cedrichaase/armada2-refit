@@ -160,6 +160,10 @@ def load(path):
     if not isinstance(shared, list) or not all(isinstance(x, str) for x in shared):
         raise TableError(f'{rel(path)}: `shared_sections` must be a list of section names')
     t['shared_sections'] = shared
+    rows_in = t.get('rows_in')
+    if rows_in is not None and ('module' in t or not isinstance(rows_in, str)
+                                or not os.path.exists(os.path.join(os.path.dirname(path), rows_in, 'Cargo.toml'))):
+        raise TableError(f'{rel(path)}: `rows_in` must name a crate directory below the plugin table')
     if not re.fullmatch(r'[A-Za-z][A-Za-z0-9]*', t['plugin']):
         raise TableError(f'{rel(path)}: plugin `{t["plugin"]}` is not an identifier')
     rows = t.get('row', [])
@@ -177,6 +181,9 @@ def output_path(path):
     """Where a table's generated file goes."""
     d, base = os.path.split(path)
     stem = base[:-len('settings.toml')].replace('.', '_') + 'settings_table'
+    rows_in = load(path).get('rows_in')
+    if rows_in:
+        return os.path.join(d, rows_in, 'src', stem + '.rs')
     if os.path.exists(os.path.join(d, 'Cargo.toml')):
         return os.path.join(d, 'src', stem + '.rs')
     if is_fragment(path):
@@ -342,6 +349,9 @@ def emit_rs(t, path):
     if frag:
         o += ['', '/// The module these rows belong to (its `[Modules]` key).',
               f'pub const MODULE: &str = "{frag}";']
+        return '\n'.join(o) + '\n'
+    if t.get('rows_in'):
+        # The rows are a library crate's; the plugin's cdylib defines the export.
         return '\n'.join(o) + '\n'
     if fragments_of(path):
         o += ['',

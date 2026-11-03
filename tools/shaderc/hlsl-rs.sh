@@ -3,7 +3,7 @@
 # platform/d3d9/hlsl.sh, with the same stamp, so a build where a compiler is missing (CI)
 # keeps a committed file whose stamp matches and fails on a stale one.
 #
-#   hlsl-rs.sh [--fix] <out.rs> <file.hlsl> <entry>:<profile>:<SYMBOL>[:long] [...]
+#   hlsl-rs.sh [--fix] [--headers DIR]... <out.rs> <file.hlsl> <entry>:<profile>:<SYMBOL>[:long] [...]
 #
 # Each entry point becomes `pub static SYMBOL: [u32; N]` in <out.rs>, legacy (d3dbc)
 # bytecode for CreateVertexShader/CreatePixelShader from vkd3d, each texture put on the
@@ -29,6 +29,10 @@ set -euo pipefail
 here=$(dirname "$0")
 fix=""
 [ "${1:-}" = "--fix" ] && { fix="$here/d3dbc-fix.py"; shift; }
+# --headers DIR: the source includes headers from DIR too (render3d's modules include
+# the core's), so its stamps cover DIR/*.hlsli as they cover the source's own directory.
+more=()
+while [ "${1:-}" = "--headers" ]; do more+=("$2"); shift 2; done
 [ $# -ge 3 ] || { sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 out=$1 src=$2; shift 2
 # The entries without the :at and :dxc marks (what the d3dbc and SPIR-V see), the
@@ -60,7 +64,9 @@ dxil_flags=(-Qstrip_debug -Qstrip_reflect)
 # Each stamp covers the file, every header it can include, the entry list, and the
 # steps after the compiler.
 shopt -s nullglob
-headers=("$inc"/*.hlsli "$here"/../../gpu/shaders/*.hlsli)
+headers=("$inc"/*.hlsli)
+for d in "${more[@]}"; do headers+=("$d"/*.hlsli); done
+headers+=("$here"/../../gpu/shaders/*.hlsli)
 stamp="source $(cat "$src" "${headers[@]}" <(printf '%s\n' "${plain[@]}" "${dxconly[@]:+dxc:}" "${dxconly[@]:-}") "$slots" ${fix:+"$fix"} | sha256sum | cut -d' ' -f1)"
 spv_stamp="spirv $(cat "$src" "${headers[@]}" <(printf '%s\n' "${plain[@]}" "${dxc_flags[@]}" "${dxc_vs_flags[@]}") | sha256sum | cut -d' ' -f1)"
 spaces="$here/dxil-spaces.py"
