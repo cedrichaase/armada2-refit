@@ -183,7 +183,7 @@ static void bar_scan(void)
 
 /* With the grid's keys on, stock's bar keys do nothing: the three hotkey tables' counts
  * are emptied for the stock call and put back, and the six menu toggles point at a zero
- * (stock's keys are global per selection, not per open menu).  After it, the UI takes
+ * for it and are put back after (stock's keys are global per selection, not per open menu).  After it, the UI takes
  * the update's layout and its clicks, and then the position keys are read. */
 static void __thiscall bar_keys_hook(BYTE *p, int crafts)
 {
@@ -194,11 +194,13 @@ static void __thiscall bar_keys_hook(BYTE *p, int crafts)
     if (on) {
         static const DWORD offs[3] = { QOL_F_BK_KEY_COMMANDS, QOL_F_BK_KEY_BUILDS, QOL_F_BK_KEY_WEAPONS };
         int  saved[3], i;
+        int *savedT[QOL_V_BK_N_TOGGLES];
         int **toggles = (int **)a2e_addr(QOL_S_BK_TOGGLES);
-        for (i = 0; i < QOL_V_BK_N_TOGGLES; i++) toggles[i] = &g_barZero;
+        for (i = 0; i < QOL_V_BK_N_TOGGLES; i++) { savedT[i] = toggles[i]; toggles[i] = &g_barZero; }
         for (i = 0; i < 3; i++) { saved[i] = *(int *)(p + offs[i]); *(int *)(p + offs[i]) = 0; }
         stock(p, crafts);
         for (i = 0; i < 3; i++) *(int *)(p + offs[i]) = saved[i];
+        for (i = 0; i < QOL_V_BK_N_TOGGLES; i++) toggles[i] = savedT[i];
     } else {
         stock(p, crafts);
     }

@@ -185,9 +185,8 @@ static const SelSite k_sel[] = {
     { QOL_S_SEL_30, 2 },
 };
 
-/* The three caps of 16, each an 8-bit immediate at `patch`:
- * cmp dword [ebx+count],0x10 (Select); cmp dword [ecx],0x10 (mBindGroup, add);
- * cmp ecx,0x10 (mEditModeSelect). */
+/* The three caps of 16, each an 8-bit immediate at `patch`: a comparison of the count
+ * against 0x10 in Select, in mBindGroup (add) and in mEditModeSelect. */
 static const Site k_cap[] = {
     { QOL_S_CAP_0, 7, 6 },
     { QOL_S_CAP_1, 3, 2 },
@@ -496,7 +495,7 @@ int __cdecl bind_pre(BYTE *ov, int g, int replace)
     return 1;
 }
 
-/* Replaces `cmp [ebx+count],edi; jne <stock>` (12 bytes at the Select site) in
+/* Replaces the 12 bytes at the Select site (a comparison of the count against edi and a branch to stock) in
  * Select: ebx = cOverViewImp, esi = the object, [ebp+0xc] = the type, edi = 1.
  * Every place it goes on to reloads eax first.  Registers: all kept but eax, which
  * carries sel_pre's answer to the test (popal restores the rest). */
@@ -525,7 +524,7 @@ __attribute__((naked)) void sel_stub(void)
         "ret\n\t");
 }
 
-/* mBindGroup's first six bytes (push ebp; mov ebp,esp; sub esp,0x10): ecx =
+/* mBindGroup's first six bytes (the frame setup and a 16-byte stack reservation): ecx =
  * cOverViewImp, [esp+4] = N, [esp+8] = replace (a bool, low byte). */
 __attribute__((naked)) void bind_stub(void)
 {
@@ -700,8 +699,8 @@ __attribute__((naked)) void qsize_stub(void)
         "ret\n\t");
 }
 
-/* Replaces the command loop's head `mov eax,[ebp-0x20]; test eax,eax;
- * mov dword [ebp-0x14],0; jle <skip>` (18 bytes at the cancel site): esi = the
+/* Replaces the command loop's head (18 bytes at the cancel site: it loads the
+ * count, clears a local and skips the loop when the count is not positive): esi = the
  * CommandInfoClass, [ebp-0x28] the CraftArray, a local the function frees.
  * Registers: all kept (pushal), then eax as the replaced code loads it. */
 __attribute__((naked)) void cancel_stub(void)
@@ -725,8 +724,8 @@ __attribute__((naked)) void cancel_stub(void)
         "ret\n\t");
 }
 
-/* Replaces `mov ecx,[edi+x44]; xor edx,edx; cmp eax,1; mov eax,[edi+build];
- * sete dl` (17 bytes at the enable site): ebx = the CraftArray, edi = the bar.
+/* Replaces the 17 bytes at the enable site, which load the build button's state
+ * and set a flag from a comparison against one: ebx = the CraftArray, edi = the bar.
  * Registers: all kept but ecx and eax, which are loaded as the replaced code
  * loads them; the build answer replaces edx's slot in the popal frame. */
 __attribute__((naked)) void enable_stub(void)
@@ -744,8 +743,8 @@ __attribute__((naked)) void enable_stub(void)
         "ret\n\t");
 }
 
-/* Replaces the loop's head `mov eax,[ebp-0x18]; xor esi,esi; test eax,eax;
- * jle` (9 bytes at the route site), and with it the loop: [ebp-0x20] the objects,
+/* Replaces the loop's head (9 bytes at the route site: it loads the object count,
+ * clears the index and leaves the loop when the count is not positive), and with it the loop: [ebp-0x20] the objects,
  * [ebp-0x18] how many, edi = the ModeInfo, whose class field is the class to build.
  * Registers: all kept (pushal), as the loop's end reloads what it reads. */
 __attribute__((naked)) void route_stub(void)
@@ -765,9 +764,9 @@ __attribute__((naked)) void route_stub(void)
 static const Site k_stn_enable = { QOL_S_STN_ENABLE, 17, 0 };
 static const Site k_stn_route  = { QOL_S_STN_ROUTE, 9, 0 };
 static const Site k_stn_cancel = { QOL_S_STN_CANCEL, 18, 0 };
-/* mov ecx,[g_pOverView]; mov eax,[esi+label]; push eax; push edi -- the load (at 6) becomes a call */
+/* The site loads the overview and the button's label and pushes two arguments; the load (at 6) becomes a call */
 static const Site k_stn_built  = { QOL_S_STN_BUILT, 14, 6 };
-/* test ah,2; je +0x13; call Producer::BuildQueueSize -- the call (at 5) is redirected */
+/* A flag test, a short skip, then the call of Producer::BuildQueueSize; the call (at 5) is redirected */
 static const Site k_stn_qsize  = { QOL_S_STN_QSIZE, 10, 5 };
 
 static const Site k_stn_sel   = { QOL_S_STN_SEL, 12, 0 };
@@ -904,9 +903,9 @@ __attribute__((naked)) void warp_stub(void)
         "ret\n\t");
 }
 
-/* mov eax,[g_pCommandAlt]; cmp dword [eax],0; je <the block's end>;
- * mov ecx,[esi+action]; and ecx,0xfff; cmp ecx,4; jne -- the head of the block
- * the stub does in its place, up to the `or edx,0x2b` it then makes. */
+/* The head of the block the stub does in its place: it tests the alternate-command
+ * flag (skipping the block when clear), masks the action's low twelve bits and
+ * compares them against 4, up to the flag-setting `or` it then makes. */
 static const Site k_warp = { QOL_S_WARP_SITE, 24, 0 };
 
 static int patch_warp(void)
@@ -934,7 +933,7 @@ static int patch_warp(void)
 DWORD g_spec_ships[SEL_MAX];     /* mSetupSpecialWeapons' ships */
 DWORD g_queue_ships[SEL_MAX];   /* mQueueSpecialWeaponCommand's ships */
 
-/* 0x4fd3af: lea esi,[ebp-0x78]; mov [ebp-0x28],eax -- the read-back loop */
+/* 0x4fd3af: the read-back loop's setup, which points esi at the 16-entry array and stores eax */
 __attribute__((naked)) void spec_read_stub(void)
 {
     __asm__ __volatile__(
@@ -944,7 +943,7 @@ __attribute__((naked)) void spec_read_stub(void)
         "ret\n\t");
 }
 
-/* 0x4fd8f1: lea ecx,[ebp-0x80]; mov [ebp+0xc],ecx -- the gathering loop's cursor */
+/* 0x4fd8f1: the gathering loop's cursor, set to the 16-entry array */
 __attribute__((naked)) void queue_fill_stub(void)
 {
     __asm__ __volatile__(
@@ -954,7 +953,7 @@ __attribute__((naked)) void queue_fill_stub(void)
         "ret\n\t");
 }
 
-/* 0x4fd95d: lea esi,[ebp-0x80]; mov edi,ecx -- the loop that turns them into handles */
+/* 0x4fd95d: the loop that turns them into handles, reading the 16-entry array */
 __attribute__((naked)) void queue_read_stub(void)
 {
     __asm__ __volatile__(
@@ -964,11 +963,12 @@ __attribute__((naked)) void queue_read_stub(void)
         "ret\n\t");
 }
 
-/* The five sequences (byte counts: lea ecx,[ebp-0x78]; mov [ebp-0x18],ecx; jmp +3 (over
- * mov esi,[ebp+8], which esi already holds here) -> mov dword [ebp-0x18],g_spec_ships; nop /
- * the read-back loop / mov edx,[ebp-0x10]; lea eax,[ebp-0x78]; push edx; push eax -> push
- * dword [ebp-0x10]; push g_spec_ships (edx, eax die in the call) / the gathering loop's
- * cursor / the loop that turns them into handles). */
+/* The five sequences, by byte count: (0) the setup that points the gathering cursor at
+ * the 16-entry stack array and jumps over a reload of esi, which already holds that value
+ * here; it is replaced by a store of the cursor pointing at g_spec_ships; (1) the
+ * read-back loop; (2) the two pushes of the array's end and base for a call, replaced by
+ * pushes of the same count and of g_spec_ships (edx and eax die in the call); (3) the
+ * gathering loop's cursor; (4) the loop that turns the ships into handles. */
 typedef struct { DWORD sym; int len; } Seq;
 static const Seq k_spec[5] = {
     { QOL_S_SPEC_0, 8 }, { QOL_S_SPEC_1, 6 }, { QOL_S_SPEC_2, 8 }, { QOL_S_SPEC_3, 6 }, { QOL_S_SPEC_4, 5 },
@@ -1112,9 +1112,11 @@ __declspec(dllexport) void __cdecl QOL_SettingsChanged(void)
         g_panSpeed = f;
         apply_pan();
         changed(m, &n, "PanSpeed", val);
-        s_cat(m, " (coefficient ");
-        s_fixed(m, *(volatile float *)a2s_qol_fastscroll, 4);
-        s_cat(m, ")");
+        if (g_panOk) {
+            s_cat(m, " (coefficient ");
+            s_fixed(m, *(volatile float *)a2s_qol_fastscroll, 4);
+            s_cat(m, ")");
+        }
         if (!g_panOk) gate("PanSpeed", 0, 0);
     }
 

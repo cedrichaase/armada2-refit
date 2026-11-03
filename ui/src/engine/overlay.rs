@@ -247,7 +247,7 @@ pub fn systems(obj: usize) -> Vec<SystemIcon> {
 // ellipsoid about each selected unit and the one under the pointer, drawn from
 // `SelectionEffect::sm_EffectHash` by the scene each frame (render3d draws them in its
 // place from the same hash: render3d/README.md, `Step::Selection`). Its stock start is
-// `push ebp; mov ebp,esp; mov eax,[Storm3D]` (the profile's `hud.bubbles`).
+// the frame setup followed by a load of the `Storm3D` global (the profile's `hud.bubbles`).
 
 /// Switches the engine's bubbles off (`[HUD] SelectionBubbles=0`): the function
 /// returns at once (`ret` in its first byte). render3d, which draws them in its place,

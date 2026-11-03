@@ -36,9 +36,9 @@
 //!   steps the fade's alpha (`+0x2c`, by `+0x30` a frame), finishes a script's wait when
 //!   it reaches 0 or 1, writes the alpha into its material (`+0x24`) and draws the
 //!   screen in white (`+0x28` = 1) or black through the device's
-//!   `DrawClippedRectangle` (vtable `+0x1c`). The two indirect calls are
-//!   `mov ecx, edi; call [edx+0x1c]` and `lea eax, [ebp-0x14]; push eax; call
-//!   [edx+0x1c]`; each is replaced by a call to a thunk that does the same and comes
+//!   `DrawClippedRectangle` (vtable `+0x1c`). The two indirect calls
+//!   (the white one passes the device in `ecx`, the black one pushes the rectangle's
+//!   address) are each replaced by a call to a thunk that does the same and comes
 //!   to `fade_draw`.
 //! - **The unit view's video** (`BinkThread`, the in-mission Bink: the unit view and a
 //!   mission's comm videos): `BlitToBlackBackground(rect)` copies the decoded frame
@@ -546,13 +546,13 @@ unsafe fn quad(sprite: usize, cam: usize, corners: *const [[f32; 3]; 4], what: &
 
 // ---- the fade ---------------------------------------------------------------------
 
-/// `mov ecx, edi; call [edx+0x1c]`, the device in `edi`, the arguments pushed.
+/// The white fade's call: the device, held in `edi`, goes into `ecx`; the arguments are pushed.
 #[unsafe(naked)]
 unsafe extern "C" fn fade_thunk_white() {
     core::arch::naked_asm!("mov ecx, edi", "jmp {f}", f = sym fade_draw);
 }
 
-/// `lea eax, [ebp-0x14]; push eax; call [edx+0x1c]`: the rectangle's address pushed
+/// The black fade's call: the rectangle's address is pushed
 /// under the return address, as the stock code would have before its call.
 #[unsafe(naked)]
 unsafe extern "C" fn fade_thunk_black() {
