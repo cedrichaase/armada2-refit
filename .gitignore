@@ -55,6 +55,8 @@ display/hosttest/target/
 display/build/
 display/vkprobe/target/
 display/vkprobe/build/
+display/d12probe/target/
+display/d12probe/build/
 
 # ui: cargo's build output
 ui/target/

@@ -27,32 +27,18 @@
 //!   instance data (a stride of 0 is not asked for).
 //! - **Textures** are the stub's mirrors (`mirror::passthrough`), or a white one;
 //!   samplers by the stage's state as DXVK makes them under `[Samplers]` or `dxvk.conf` (`crate::dxvk_samplers`).
+use super::build::{self, Key};
 use super::exports::{cmd_alive, published};
 use super::raw::*;
 use super::{Dx, Img};
-use crate::passthrough::state::{self, Blocks, Fmt, Layout, PipeState, SKey, PS_AT, PS_BYTES, VS_BYTES};
+use crate::passthrough::state::{self, Blocks, SKey, PS_AT, PS_BYTES, VS_BYTES};
 use crate::passthrough::{fixed, say, Draw};
-use crate::shaders::ff_dxil::{PS_FF_DXIL, VS_BUMP_DXIL, VS_FF_DXIL};
 use crate::stub::device::Dev;
 use crate::stub::obj::SObj;
 use crate::trace::once;
 use crate::{log, sfmt};
 use alloc::vec::Vec;
-use core::ffi::c_void;
 use gpu::display::{HEAP_CBV_SRV_UAV, HEAP_SAMPLER};
-
-/// A pipeline's key: the target, the vertices, and `state::PipeState`.
-#[derive(Clone, Copy, PartialEq, Eq)]
-struct Key {
-    color: u32,
-    depth: u32,
-    samples: u32,
-    stride: u32,
-    layout: Layout,
-    st: PipeState,
-    /// The target's alpha is not kept (the engine's X8R8G8B8 back buffer).
-    no_dst_alpha: bool,
-}
 
 /// Where a draw lands.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -122,7 +108,8 @@ fn make(d: &mut Dx) -> bool {
     if unsafe { PT.is_some() } {
         return true;
     }
-    let Some(root) = root_signature(d) else {
+    let note = |m: &str| log!("d3d12: D3D12SerializeRootSignature (passthrough): {}", m);
+    let Some(root) = build::pass_root(d.dev, d.exported.serialize_root_signature, &note).inspect_err(|e| log!("d3d12: {} (passthrough): {:#x}", e.0, e.1 as u32)).ok() else {
         log!("passthrough: its root signature could not be made: the engine's draws are dropped");
         return false;
     };
@@ -164,48 +151,6 @@ fn make(d: &mut Dx) -> bool {
     true
 }
 
-/// Parameters: 0 and 1 the vertex block's root CBVs (b0, spaces 0 and 1: `vs_ff` and
-/// `vs_bump`), 2 the pixel block's (b1), 3 the table of t0 and t1, 4 that of s0 and s1.
-fn root_signature(d: &Dx) -> Option<P> {
-    let srv = [DescriptorRange { ty: DESCRIPTOR_RANGE_TYPE_SRV, count: 2, base_register: 0, space: 0, offset_in_table: 0 }];
-    let smp = [DescriptorRange { ty: DESCRIPTOR_RANGE_TYPE_SAMPLER, count: 2, base_register: 0, space: 0, offset_in_table: 0 }];
-    let params = [
-        RootParameter { ty: ROOT_PARAMETER_TYPE_CBV, a: 0, b: 0, c: 0, visibility: SHADER_VISIBILITY_VERTEX },
-        RootParameter { ty: ROOT_PARAMETER_TYPE_CBV, a: 0, b: 1, c: 0, visibility: SHADER_VISIBILITY_VERTEX },
-        RootParameter { ty: ROOT_PARAMETER_TYPE_CBV, a: 1, b: 0, c: 0, visibility: SHADER_VISIBILITY_PIXEL },
-        RootParameter { ty: ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, a: 1, b: srv.as_ptr() as usize, c: 0, visibility: SHADER_VISIBILITY_PIXEL },
-        RootParameter { ty: ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, a: 1, b: smp.as_ptr() as usize, c: 0, visibility: SHADER_VISIBILITY_PIXEL },
-    ];
-    let desc = RootSignatureDesc {
-        count: params.len() as u32,
-        params: params.as_ptr(),
-        samplers_count: 0,
-        samplers: core::ptr::null(),
-        flags: ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
-    };
-    let serialize: unsafe extern "system" fn(*const RootSignatureDesc, u32, *mut P, *mut P) -> i32 = unsafe { core::mem::transmute(d.exported.serialize_root_signature) };
-    let (mut blob, mut err): (P, P) = (core::ptr::null_mut(), core::ptr::null_mut());
-    let hr = unsafe { serialize(&desc, ROOT_SIGNATURE_VERSION_1_0, &mut blob, &mut err) };
-    if hr < 0 || blob.is_null() {
-        if !err.is_null() {
-            let msg = vcall!(err, slot::BLOB_GET_BUFFER_POINTER, fn() -> *const u8,);
-            log!("d3d12: D3D12SerializeRootSignature (passthrough): {}", unsafe { crate::rt::cstr_at(msg, 1000) });
-        }
-        release(err);
-        return None;
-    }
-    release(err);
-    let (ptr, len) = (vcall!(blob, slot::BLOB_GET_BUFFER_POINTER, fn() -> *const c_void,), vcall!(blob, slot::BLOB_GET_BUFFER_SIZE, fn() -> usize,));
-    let mut root: P = core::ptr::null_mut();
-    let hr = vcall!(d.dev, slot::DEV_CREATE_ROOT_SIGNATURE, fn(u32, *const c_void, usize, *const crate::com::Guid, *mut P) -> i32, 0, ptr, len, &IID_ROOT_SIGNATURE, &mut root);
-    release(blob);
-    if hr < 0 || root.is_null() {
-        log!("d3d12: CreateRootSignature (passthrough): {:#x}", hr as u32);
-        return None;
-    }
-    Some(root)
-}
-
 /// A new frame: what the last one made per frame is let go of (its descriptors and ring
 /// are the frame slot's, which come round again).
 fn new_frame(d: &Dx, p: &mut Pt) {
@@ -220,127 +165,17 @@ fn new_frame(d: &Dx, p: &mut Pt) {
     p.bound = NOTHING;
 }
 
-fn semantic(bump: bool, location: u32) -> (&'static core::ffi::CStr, u32) {
-    if bump {
-        match location {
-            0 => (c"POSITION", 0),
-            1 => (c"TEXCOORD", 0),
-            2 => (c"TANGENT", 0),
-            3 => (c"BINORMAL", 0),
-            _ => (c"NORMAL", 0),
-        }
-    } else {
-        match location {
-            0 => (c"POSITION", 0),
-            1 => (c"NORMAL", 0),
-            2 => (c"COLOR", 0),
-            3 => (c"COLOR", 1),
-            4 => (c"TEXCOORD", 0),
-            _ => (c"TEXCOORD", 1),
-        }
-    }
-}
-
-fn dxgi(f: Fmt) -> u32 {
-    match f {
-        Fmt::F1 => FORMAT_R32_FLOAT,
-        Fmt::F2 => FORMAT_R32G32_FLOAT,
-        Fmt::F3 => FORMAT_R32G32B32_FLOAT,
-        Fmt::F4 => FORMAT_R32G32B32A32_FLOAT,
-        Fmt::Bgra8 => FORMAT_B8G8R8A8_UNORM,
-    }
-}
-
-/// `D3D12_COMPARISON_FUNC` is Direct3D's own numbering.
 fn pipeline(d: &mut Dx, p: &mut Pt, k: &Key) -> P {
     if let Some(x) = p.pipelines.iter().find(|x| x.0 == *k) {
         return x.1;
     }
-    let bump = k.layout.bump.is_some();
-    let (attrs, n) = state::attributes(&k.layout, k.st.sets);
-    let mut elements: Vec<InputElement> = Vec::with_capacity(n);
-    for a in &attrs[..n] {
-        let (name, index) = semantic(bump, a.location);
-        elements.push(InputElement {
-            semantic: name.as_ptr() as *const u8,
-            index,
-            format: dxgi(a.fmt),
-            slot: a.binding,
-            offset: a.offset,
-            // The defaults are instance data, read once by the draw's one instance.
-            class: if a.binding == 0 { INPUT_CLASSIFICATION_PER_VERTEX_DATA } else { INPUT_CLASSIFICATION_PER_INSTANCE_DATA },
-            step_rate: if a.binding == 0 { 0 } else { 1 },
-        });
-    }
-    let b = state::blend(k.st.blend, k.no_dst_alpha);
-    let mut blend = BlendDesc::default();
-    blend.targets[0] = RenderTargetBlend {
-        blend: b.on as i32,
-        logic_op_enable: 0,
-        src: b.src,
-        dst: b.dst,
-        op: b.op,
-        src_alpha: state::alpha_factor(b.src),
-        dst_alpha: state::alpha_factor(b.dst),
-        op_alpha: b.op,
-        logic_op: LOGIC_OP_NOOP,
-        write_mask: b.mask as u8,
+    let pso = match build::pass_pipeline(d.dev, p.root, k) {
+        Ok(o) => o,
+        Err(hr) => {
+            once(&sfmt!("PASSTHROUGH a pipeline could not be made ({:#x}): its draws are not drawn", hr as u32));
+            core::ptr::null_mut()
+        }
     };
-    // Direct3D's culling on screen: CW (2) drops what is clockwise, which with the
-    // front face clockwise is the front.
-    let cull = match k.st.cull {
-        2 => 2,
-        3 => 3,
-        _ => CULL_MODE_NONE,
-    };
-    let has_depth = k.depth != FORMAT_UNKNOWN;
-    let test = has_depth && k.st.depth[0] != 0;
-    let keep = StencilOpDesc { fail: STENCIL_OP_KEEP, depth_fail: STENCIL_OP_KEEP, pass: STENCIL_OP_KEEP, func: COMPARISON_FUNC_ALWAYS };
-    let mut formats = [FORMAT_UNKNOWN; 8];
-    formats[0] = k.color;
-    let ttype = match k.st.topology {
-        1 => 1,
-        2 | 3 => 2,
-        _ => PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
-    };
-    let pd = GraphicsPipelineDesc {
-        root: p.root,
-        vs: ShaderBytecode::of(if bump { &VS_BUMP_DXIL } else { &VS_FF_DXIL }),
-        ps: ShaderBytecode::of(&PS_FF_DXIL),
-        ds: ShaderBytecode::NONE,
-        hs: ShaderBytecode::NONE,
-        gs: ShaderBytecode::NONE,
-        stream_output: StreamOutputDesc { decl: core::ptr::null(), entries: 0, strides: core::ptr::null(), nstrides: 0, rasterized_stream: 0 },
-        blend,
-        sample_mask: u32::MAX,
-        rasterizer: RasterizerDesc { fill: FILL_MODE_SOLID, cull, front_ccw: 0, depth_clip: 1, ..Default::default() },
-        depth_stencil: DepthStencilDesc {
-            depth: test as i32,
-            write_mask: (test && k.st.depth[1] != 0) as u32,
-            func: state::compare(k.st.depth[2]),
-            stencil: 0,
-            stencil_read_mask: 0xff,
-            stencil_write_mask: 0xff,
-            front: keep,
-            back: keep,
-        },
-        input_layout: InputLayoutDesc { elements: elements.as_ptr(), count: elements.len() as u32 },
-        strip_cut: 0,
-        topology: ttype,
-        num_targets: 1,
-        formats,
-        dsv_format: k.depth,
-        sample: SampleDesc { count: k.samples.max(1), quality: 0 },
-        node_mask: 0,
-        cached: CachedPso { blob: core::ptr::null(), len: 0 },
-        flags: 0,
-    };
-    let mut pso: P = core::ptr::null_mut();
-    let hr = vcall!(d.dev, slot::DEV_CREATE_GRAPHICS_PIPELINE_STATE, fn(*const GraphicsPipelineDesc, *const crate::com::Guid, *mut P) -> i32, &pd, &IID_PIPELINE_STATE, &mut pso);
-    if hr < 0 || pso.is_null() {
-        once(&sfmt!("PASSTHROUGH a pipeline could not be made ({:#x}): its draws are not drawn", hr as u32));
-        pso = core::ptr::null_mut();
-    }
     p.pipelines.push((*k, pso));
     if p.pipelines.len().is_power_of_two() {
         log!("passthrough: {} pipelines", p.pipelines.len());
