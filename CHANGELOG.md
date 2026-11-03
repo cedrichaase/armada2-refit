@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.5 — 2026-11-03
+
+Layers: testbench 4.0.6.
+
+### Fixed
+- `display-window` step 14 expects BinkProxy not to log `intro: stock mode (no Display8)` instead of the `Display8 raises the mode` line it stopped writing in cutscenes 3.0.0. Installed, not yet seen in game.
+
 ## 15.6.4 — 2026-11-03
 
 Layers: testbench 4.0.5.

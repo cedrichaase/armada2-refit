@@ -33,7 +33,7 @@ proxy leaves the intro's mode to Display8 (`BinkProxy.log`). With no UI nothing 
 11. Expect "Display8.log" contains "window: shell mode raised to".
 12. Expect "Display8.log" contains "(MENUS claimed)".
 13. Expect "Display8.log" contains "window: intro mode raised to".
-14. Expect "BinkProxy.log" contains "intro: Display8 raises the mode".
+14. Expect "BinkProxy.log" not contains "intro: stock mode (no Display8)".
 15. Expect "Display8.log" contains "window: KeepClip on (Wine)".
 16. Expect "UI.log" not contains "menus: shell display mode".
 17. Take a screenshot called "main menu".

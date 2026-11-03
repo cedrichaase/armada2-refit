@@ -5,6 +5,11 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 4.0.6 — 2026-11-03
+
+### Fixed
+- `display-window` step 14: the intro raise is read from the absence of BinkProxy's stock-mode line (root 15.6.5). Installed, not yet seen in game.
+
 ## 4.0.5 — 2026-11-03
 
 ### Fixed
