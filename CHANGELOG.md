@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.13 — 2026-11-04
+
+Layers: display 1.0.4.
+
+### Fixed
+- Display8: the Vulkan flush's failed submit no longer hangs the next frame, a part-made Vulkan swap chain holds no destroyed handles, a Direct3D 12 fence timeout no longer resets or frees what the GPU may be using, a second `Direct3DCreate8` keeps the late bail-out's forward, and the shell's mode is not raised after a bail-out. Installed, not yet seen in game.
+
 ## 15.6.12 — 2026-11-03
 
 Layers: cutscenes 3.0.1, rules 1.0.1, online 0.11.1, ui 2.2.3, testbench 4.1.3.

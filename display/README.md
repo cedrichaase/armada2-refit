@@ -846,6 +846,13 @@ the swap chain's image, submits and presents.
   sampled and copied too (render3d's depth resolve, the dumps).
 - **`display8_vk_flush`** submits what the frame has recorded and waits, then begins the
   same command buffer again (its pool reset): a plugin's read-back (the frame dumps).
+  A failed submit gives the slot a fresh signalled fence, as a failed frame does, and
+  the command buffer is begun again all the same, so the frame stays open and the next
+  `begin` on the slot does not wait for ever.
+- **A swap chain made again** destroys the old images' views, framebuffers and
+  semaphores as it takes them out of its lists, so a failure part way leaves the lists
+  short, never holding a destroyed handle; `present` makes it again before it acquires
+  an image while the lists do not cover every image.
 - **Mirrors** are the engine textures a plugin samples (`display8_vk_mirror`), brought
   up to date when the frame is asked for (the stub's mirror table, "Stub mode").
   They can be copied from (`TRANSFER_SRC`), so a recorded frame (`gpu/README.md`,
@@ -937,7 +944,11 @@ made DXVK's.
 - The last pass is `shaders/present.hlsl` as DXIL (`src/shaders/present_dxil.rs`), with
   a root signature of four root constants (b0) and a table of the frame and the ramp
   (t0, t1) under two static point samplers.
-- A device that is removed is logged with its reason, and nothing is drawn after.
+- A device that is removed is logged with its reason, and nothing is drawn after. A
+  fence that is not reached in six waits of 5 s, or with the device removed, makes the
+  device lost the same way: the slot's allocator, list and deferred frees are left as
+  they are (the GPU may still be using them), no frame begins, and
+  `display8v1_dx12_frame` answers null.
 - **The backend is said once the device is made**, as on Vulkan: `display8v1_backend`
   answers Direct3D 12 from the engine's first `CreateDevice` on, and `gpu` opens its
   backend then (`display8_dx12` is null before).
@@ -997,8 +1008,16 @@ loaded that and passed every call to it).
   start: <why>`. Whether the device presents on the window is the start's to find out,
   at the engine's first `CreateDevice`.
 
-Where `display.modes` is ready the shell's and the intro's mode raise ("Window and
-display mode") is still installed, answered from the system's own list of modes.
+Where `display.modes` is ready the intro's mode raise ("Window and display mode") is
+still installed, answered from the system's own list of modes. The shell's is not
+raised after a bail-out, though the UI's menu host claims the menus from load: with no
+device the host refuses every dialog, and a stock shell draws 800x600, so it keeps its
+800x600 mode and fills the screen as stock does.
+
+A second `Direct3DCreate8` never starts the stub again (starting it reinstalls the
+stub's methods over the forward a late bail-out made, and begins a new stub over the
+one whose device exists): after a late bail-out it gets the system's `IDirect3D8`, while
+the stub runs another `IDirect3D8` of the stub's.
 
 **Late**, at the engine's first `CreateDevice`, when every backend of the order failed
 there (a swap chain the probe could not foresee, or `FailBackend=` on the bench): the

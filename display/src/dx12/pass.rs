@@ -237,10 +237,9 @@ pub fn draw(d: &mut Dx, dv: &Dev, dr: &Draw, fp: usize) {
         return;
     }
     let Some(p) = pt() else { return };
-    if p.failed || d.lost {
+    if p.failed || d.lost || d.frame().is_none() {
         return;
     }
-    d.frame();
     new_frame(d, p);
     if cmd_alive() {
         once(&sfmt!("PASSTHROUGH an engine draw while a plugin records: not drawn, by {}", crate::trace::caller(fp)));

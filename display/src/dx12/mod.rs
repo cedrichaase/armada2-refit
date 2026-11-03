@@ -49,6 +49,8 @@ const FRAME_SAMPLERS: u32 = 1024;
 /// Views of Display8's own resources (targets, ramp, mirrors), not shader-visible.
 const OWN_VIEWS: u32 = 1024;
 const SWAP_BUFFERS: u32 = 2;
+/// How many 5 s waits a fence gets before the device is treated as gone (`wait`).
+const WAIT_STEPS: u32 = 6;
 
 pub struct Img {
     pub res: P,
@@ -631,27 +633,63 @@ impl Dx {
         self.slots[self.slot].list
     }
 
-    /// The frame now, begun if no frame is being recorded.
-    pub fn frame(&mut self) -> &Dx12Frame8 {
+    /// The frame now, begun if no frame is being recorded; None once the device is
+    /// gone (`wait`), when there is no list a plugin may record into.
+    pub fn frame(&mut self) -> Option<&Dx12Frame8> {
+        if !self.ready() {
+            return None;
+        }
+        Some(&self.frame_out)
+    }
+
+    /// Whether a frame is being recorded, beginning one if none is: false once the
+    /// device is gone.
+    fn ready(&mut self) -> bool {
         if !self.recording {
             self.begin();
         }
-        &self.frame_out
+        self.recording
     }
 
-    fn wait(&self, value: u64) {
-        if value == 0 || vcall!(self.fence, slot::FENCE_GET_COMPLETED_VALUE, fn() -> u64,) >= value {
-            return;
+    /// Waits until the GPU has reached `value` on the fence. False when it has not and
+    /// will not: the device was removed, or it has not answered for `WAIT_STEPS` waits of
+    /// 5 s (a device that stops answering does not hang the game for good). The device
+    /// is then marked lost, and nothing the GPU may still be using is reset or freed.
+    fn wait(&mut self, value: u64) -> bool {
+        let reached = |d: &Self| value == 0 || vcall!(d.fence, slot::FENCE_GET_COMPLETED_VALUE, fn() -> u64,) >= value;
+        if reached(self) {
+            return true;
+        }
+        if self.lost {
+            return false;
         }
         if vcall!(self.fence, slot::FENCE_SET_EVENT_ON_COMPLETION, fn(u64, HANDLE) -> i32, value, self.fence_event) >= 0 {
-            // A device that stops answering does not hang the game for good.
-            unsafe { WaitForSingleObject(self.fence_event, 5000) };
+            for _ in 0..WAIT_STEPS {
+                unsafe { WaitForSingleObject(self.fence_event, 5000) };
+                if reached(self) {
+                    return true;
+                }
+                if vcall!(self.dev, slot::DEV_GET_DEVICE_REMOVED_REASON, fn() -> i32,) < 0 {
+                    break;
+                }
+            }
         }
+        if reached(self) {
+            return true;
+        }
+        let why = vcall!(self.dev, slot::DEV_GET_DEVICE_REMOVED_REASON, fn() -> i32,);
+        log!("d3d12: the GPU did not reach fence value {} (removed reason {:#x}); the device is treated as gone, nothing is drawn from here", value, why as u32);
+        self.lost = true;
+        false
     }
 
     fn begin(&mut self) {
         let done = self.slots[self.slot].done;
-        self.wait(done);
+        if !self.wait(done) {
+            // The slot's list, allocator and deferred frees may still be in the GPU's
+            // hands: they are left as they are (and leak), and no frame is begun.
+            return;
+        }
         let s = &mut self.slots[self.slot];
         for (f, arg) in s.deferred.drain(..) {
             f(arg);
@@ -690,8 +728,8 @@ impl Dx {
 
     /// Space in the frame's upload ring.
     pub fn alloc(&mut self, bytes: u32, align: u32) -> Option<Dx12Alloc8> {
-        if !self.recording {
-            self.begin();
+        if !self.ready() {
+            return None;
         }
         let align = align.max(4) as u64;
         let need = bytes as u64;
@@ -729,8 +767,8 @@ impl Dx {
 
     /// `count` descriptors in a shader-visible heap (`HEAP_*`), for the frame now.
     pub fn descriptors(&mut self, heap: u32, count: u32) -> Option<Dx12Descriptors8> {
-        if !self.recording {
-            self.begin();
+        if !self.ready() {
+            return None;
         }
         let s = &mut self.slots[self.slot];
         let (per, at, cpu, gpu, inc) = if heap == gpu::display::HEAP_SAMPLER {
@@ -754,8 +792,8 @@ impl Dx {
 
     /// The engine's `Clear` of its targets: rectangles (none: the whole viewport).
     pub fn clear(&mut self, rects: &[[i32; 4]], viewport: [u32; 4], flags: u32, color: u32, z: f32) {
-        if !self.recording {
-            self.begin();
+        if !self.ready() {
+            return;
         }
         let (w, h) = (self.color.w as i32, self.color.h as i32);
         let vr = [viewport[0] as i32, viewport[1] as i32, (viewport[0] + viewport[2]) as i32, (viewport[1] + viewport[3]) as i32];
@@ -784,8 +822,8 @@ impl Dx {
     /// the ring: a mirror's level, the ramp, the engine's back buffer written by lock.
     /// The level goes from state `from` to `to`.
     pub fn upload(&mut self, res: P, format: u32, level: u32, w: u32, h: u32, src: &[u8], pitch: u32, bpp: u32, from: u32, to: u32) -> bool {
-        if !self.recording {
-            self.begin();
+        if !self.ready() {
+            return false;
         }
         let row = w * bpp;
         let rp = row.div_ceil(TEXTURE_DATA_PITCH_ALIGNMENT) * TEXTURE_DATA_PITCH_ALIGNMENT;
@@ -823,8 +861,8 @@ impl Dx {
         if self.lost {
             return false;
         }
-        if !self.recording {
-            self.begin();
+        if !self.ready() {
+            return false;
         }
         if self.stale {
             self.stale = false;
@@ -944,7 +982,11 @@ impl Dx {
         vcall!(self.queue, slot::QUEUE_EXECUTE_COMMAND_LISTS, fn(u32, *const P) -> (), 1, lists.as_ptr());
         self.fence_value += 1;
         vcall!(self.queue, slot::QUEUE_SIGNAL, fn(P, u64) -> i32, self.fence, self.fence_value);
-        self.wait(self.fence_value);
+        if !self.wait(self.fence_value) {
+            // The list is still the GPU's: it is not reset, and the frame ends here.
+            self.recording = false;
+            return false;
+        }
         vcall!(alloc, slot::ALLOC_RESET, fn() -> i32,);
         vcall!(l, slot::LIST_RESET, fn(P, P) -> i32, alloc, core::ptr::null_mut());
         let heaps = [self.views_heap, self.samplers_heap];

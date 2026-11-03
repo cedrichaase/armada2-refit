@@ -672,14 +672,19 @@ impl Vk {
             .clipped(true)
             .old_swapchain(old);
         self.swapchain = unsafe { self.swap_fn.create_swapchain(&ci, None) }.map_err(|_| "vkCreateSwapchainKHR failed")?;
+        // The old image's handles are taken out of the vectors as they are destroyed, so
+        // a failure from here on leaves them empty (`complete` is false, and `present`
+        // makes the swap chain again before it acquires), never holding a destroyed handle
+        // that a later call would use or destroy a second time.
+        self.sc_images.clear();
         unsafe {
-            for &fb in &self.sc_fbs {
+            for fb in self.sc_fbs.drain(..) {
                 self.dev.destroy_framebuffer(fb, None);
             }
-            for &v in &self.sc_views {
+            for v in self.sc_views.drain(..) {
                 self.dev.destroy_image_view(v, None);
             }
-            for &s in &self.sc_done {
+            for s in self.sc_done.drain(..) {
                 self.dev.destroy_semaphore(s, None);
             }
             if old != vk::SwapchainKHR::null() {
@@ -687,33 +692,58 @@ impl Vk {
             }
         }
         if self.present_pass == vk::RenderPass::null() || old_format != self.sc_format {
+            if self.present_pass != vk::RenderPass::null() {
+                // Callers have waited for the device to be idle.
+                unsafe { self.dev.destroy_render_pass(self.present_pass, None) };
+                self.present_pass = vk::RenderPass::null();
+            }
             self.make_present_pass()?;
         }
-        self.sc_images = unsafe { self.swap_fn.get_swapchain_images(self.swapchain) }.map_err(|_| "no swap chain images")?;
-        self.sc_views.clear();
-        self.sc_fbs.clear();
-        self.sc_done.clear();
-        for &img in &self.sc_images {
+        let images = unsafe { self.swap_fn.get_swapchain_images(self.swapchain) }.map_err(|_| "no swap chain images")?;
+        for &img in &images {
             let vci = vk::ImageViewCreateInfo::default()
                 .image(img)
                 .view_type(vk::ImageViewType::TYPE_2D)
                 .format(self.sc_format)
                 .subresource_range(vk::ImageSubresourceRange { aspect_mask: vk::ImageAspectFlags::COLOR, base_mip_level: 0, level_count: 1, base_array_layer: 0, layer_count: 1 });
+            // Each image's three handles go into the vectors together, so they stay the
+            // same length; what one image made before a failure is destroyed with it.
             let v = unsafe { self.dev.create_image_view(&vci, None) }.map_err(|_| "vkCreateImageView failed (swap chain)")?;
             let views = [v];
-            let fb = unsafe {
+            let fb = match unsafe {
                 self.dev.create_framebuffer(
                     &vk::FramebufferCreateInfo::default().render_pass(self.present_pass).attachments(&views).width(extent.width).height(extent.height).layers(1),
                     None,
                 )
-            }
-            .map_err(|_| "vkCreateFramebuffer failed (swap chain)")?;
-            let s = unsafe { self.dev.create_semaphore(&vk::SemaphoreCreateInfo::default(), None) }.map_err(|_| "vkCreateSemaphore failed")?;
+            } {
+                Ok(fb) => fb,
+                Err(_) => {
+                    unsafe { self.dev.destroy_image_view(v, None) };
+                    return Err("vkCreateFramebuffer failed (swap chain)");
+                }
+            };
+            let s = match unsafe { self.dev.create_semaphore(&vk::SemaphoreCreateInfo::default(), None) } {
+                Ok(s) => s,
+                Err(_) => {
+                    unsafe {
+                        self.dev.destroy_framebuffer(fb, None);
+                        self.dev.destroy_image_view(v, None);
+                    }
+                    return Err("vkCreateSemaphore failed");
+                }
+            };
             self.sc_views.push(v);
             self.sc_fbs.push(fb);
             self.sc_done.push(s);
         }
+        self.sc_images = images;
         Ok(())
+    }
+
+    /// Whether every image of the swap chain has its view, framebuffer and semaphore: a
+    /// failed `make_swapchain` leaves this false until one succeeds.
+    fn swapchain_complete(&self) -> bool {
+        !self.sc_images.is_empty() && self.sc_fbs.len() == self.sc_images.len()
     }
 
     fn make_pipeline(&mut self) -> Result<(), &'static str> {
@@ -1148,6 +1178,15 @@ impl Vk {
         let ppool = self.slots[s].ppool;
         let sets = unsafe { self.dev.allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo::default().descriptor_pool(ppool).set_layouts(&self.dsl)) };
         let Ok(sets) = sets else { return self.abandon("no descriptor sets for the present pass") };
+        // A swap chain an earlier `make_swapchain` left part made is made again before an
+        // image is acquired (an acquired image must be presented, or its semaphore stays
+        // signalled).
+        if !self.swapchain_complete() {
+            let _ = unsafe { self.dev.device_wait_idle() };
+            if self.make_swapchain().is_err() {
+                return self.abandon("the swap chain is not made");
+            }
+        }
         let image = match unsafe { self.swap_fn.acquire_next_image(self.swapchain, 5_000_000_000, acquired, vk::Fence::null()) } {
             Ok((i, _)) => i,
             Err(e) => {
@@ -1271,7 +1310,10 @@ impl Vk {
 
     /// Submits what the frame has recorded and waits for it, then begins its command
     /// buffer again (`display8v1_vk_flush`: a plugin's read-back). The frame's ring, pool
-    /// and deferred calls stay as they are; its fence is left signalled, as it was.
+    /// and deferred calls stay as they are; its fence is left signalled, as it was. When
+    /// the close or the submit fails, what was recorded is lost, but the slot is still
+    /// left a frame being recorded with a signalled fence (as `end_frame` leaves a failed
+    /// submit): `begin` waits on that fence for ever, and `end_frame` ends the buffer.
     pub fn flush(&mut self) -> bool {
         if !self.recording {
             return true;
@@ -1279,23 +1321,42 @@ impl Vk {
         pass::close(self);
         let s = &self.slots[self.slot];
         let (cmd, fence, pool) = (s.cmd, s.fence, s.pool);
+        let mut ok = true;
         unsafe {
             if self.dev.end_command_buffer(cmd).is_err() {
                 log!("vulkan: flush: vkEndCommandBuffer failed");
-                return false;
+                ok = false;
+            } else {
+                let _ = self.dev.reset_fences(&[fence]);
+                let cmds = [cmd];
+                let submit = [vk::SubmitInfo::default().command_buffers(&cmds)];
+                match self.dev.queue_submit(self.queue, &submit, fence) {
+                    Ok(()) => {
+                        let _ = self.dev.wait_for_fences(&[fence], true, u64::MAX);
+                    }
+                    Err(e) => {
+                        log!("vulkan: flush: vkQueueSubmit failed ({:?})", e);
+                        ok = false;
+                        // The fence was reset and nothing will signal it; the failed
+                        // submit left it unused, so a signalled one takes its place.
+                        match self.dev.create_fence(&vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED), None) {
+                            Ok(f) => {
+                                self.dev.destroy_fence(fence, None);
+                                self.slots[self.slot].fence = f;
+                            }
+                            Err(_) => log!("vulkan: flush: no fence to replace the reset one"),
+                        }
+                    }
+                }
             }
-            let _ = self.dev.reset_fences(&[fence]);
-            let cmds = [cmd];
-            let submit = [vk::SubmitInfo::default().command_buffers(&cmds)];
-            if self.dev.queue_submit(self.queue, &submit, fence).is_err() {
-                log!("vulkan: flush: vkQueueSubmit failed");
-                return false;
-            }
-            let _ = self.dev.wait_for_fences(&[fence], true, u64::MAX);
             // The pool's one command buffer, begun again (a transient pool's buffers are
-            // reset with their pool).
+            // reset with their pool), whether or not the submit went through, so the
+            // frame stays one being recorded.
             let _ = self.dev.reset_command_pool(pool, vk::CommandPoolResetFlags::empty());
             let _ = self.dev.begin_command_buffer(cmd, &vk::CommandBufferBeginInfo::default().flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT));
+        }
+        if !ok {
+            return false;
         }
         true
     }

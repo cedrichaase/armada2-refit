@@ -289,6 +289,12 @@ pub fn forget_mirror(o: *mut SObj) {
     s.mirrors.retain(|&x| x != o);
 }
 
+/// Another `IDirect3D8` of the running stub's (a second `Direct3DCreate8`): the vtables
+/// and the `Stub` are kept as they are.
+pub fn another() -> *mut c_void {
+    SObj::new(crate::com::Kind::D3D, crate::com::Role::Plain, obj::Body::D3D) as *mut c_void
+}
+
 pub fn d3d8_object() -> *mut SObj {
     stub().d3d8
 }

@@ -96,7 +96,11 @@ fn front_end(w: i32, h: i32, bpp: i32) -> bool {
 unsafe extern "thiscall" fn find(dev: usize, w: i32, h: i32, bpp: i32) -> usize {
     let real: Find = unsafe { core::mem::transmute(REAL) };
     if dev != 0 {
-        if let Some((rw, rh, rb)) = crate::window::raise(w, h, bpp, crate::claims::menus) {
+        // After a bail-out no plugin has a device, so the UI's menu host refuses every
+        // dialog and the shell draws stock, 800x600: its mode is not raised, whatever the
+        // host claims (it claims the menus from load, before a device is known).
+        let menus = || !crate::bail::taken() && crate::claims::menus();
+        if let Some((rw, rh, rb)) = crate::window::raise(w, h, bpp, menus) {
             let m = unsafe { real(dev, rw, rh, rb) };
             unsafe {
                 if m != 0 && RAISED < 8 {
