@@ -30,7 +30,7 @@
 use r3d_core::hooks::{Gate, Hook, Hooks, Kind, Prev, Site};
 use r3d_core::engine::{self, field, field_f32, field_m34, field_u8, field_v3, hook, obj, rd};
 use r3d_core::math::{M34, V3};
-use crate::syms::sym;
+use crate::syms::{sym, TABLE};
 
 /// An engine address of the profile: 0 unless the hook that uses it is ready.
 pub(crate) fn at(s: a2engine::Sym) -> usize { crate::syms::TABLE.engine().addr(s) }
@@ -169,12 +169,12 @@ pub fn feature_kind(f: usize) -> Feature {
     pub(crate) fn vt_worker_bee() -> usize { at(sym::VT_WORKER_BEE) }
     pub(crate) fn vt_drone_colony() -> usize { at(sym::VT_DRONE_COLONY) }
     match engine::vtable(f) {
-        vt_explosion_feature() => Feature::Explosion,
-        vt_shield_effect() => Feature::Shield,
-        vt_node_particle() => Feature::NodeParticle,
-        vt_building() => Feature::Building,
-        vt_worker_bee() => Feature::WorkerBee,
-        vt_drone_colony() => Feature::DroneColony,
+        x if x != 0 && x == vt_explosion_feature() => Feature::Explosion,
+        x if x != 0 && x == vt_shield_effect() => Feature::Shield,
+        x if x != 0 && x == vt_node_particle() => Feature::NodeParticle,
+        x if x != 0 && x == vt_building() => Feature::Building,
+        x if x != 0 && x == vt_worker_bee() => Feature::WorkerBee,
+        x if x != 0 && x == vt_drone_colony() => Feature::DroneColony,
         _ => Feature::Other,
     }
 }
@@ -220,11 +220,11 @@ pub mod explosions {
     }
 
     pub fn is_fireball(e: usize) -> bool {
-        engine::vtable(e) == vt_fireball()
+        vt_fireball() != 0 && engine::vtable(e) == vt_fireball()
     }
 
     pub fn is_shockwave(e: usize) -> bool {
-        engine::vtable(e) == vt_shockwave()
+        vt_shockwave() != 0 && engine::vtable(e) == vt_shockwave()
     }
 
     /// The explosion class's `IsVisible` (slot 2).
@@ -338,12 +338,6 @@ pub mod nodes {
         unsafe { rd::<u32>(count_addr()) }
     }
 
-    /// Whether an address is the list's head (a signature check of the code that reads
-    /// it).
-    pub fn is_list(a: usize) -> bool {
-        a == list()
-    }
-
     /// The list's newest node (the new tail), if there is one.
     pub fn tail() -> Option<usize> {
         let head = unsafe { rd::<usize>(list()) };
@@ -396,11 +390,8 @@ pub mod nodes {
 pub mod repair {
     use super::*;
 
-    pub(crate) fn site_add() -> usize { at(sym::SITE_ADD) }
     pub(crate) fn fn_add() -> usize { at(sym::FN_ADD) }
-    pub(crate) fn site_sprite() -> usize { at(sym::SITE_SPRITE) }
-    pub(crate) fn site_list_check() -> usize { at(sym::SITE_LIST_CHECK) } // NodeParticleEffect::Render's read of the list head
-    use r3d_core::engine::sprite::FN_DRAW_SCALED_3D as FN_SPRITE;
+    pub(crate) fn fn_sprite() -> usize { at(sym::DRAWSCALED3D) }
 
     static mut PREV_ADD: Prev = Prev(0);
     static mut PREV_SPRITE: Prev = Prev(0);
@@ -455,20 +446,15 @@ pub mod repair {
     /// stock's.
     pub fn install(h: &mut Hooks) -> bool {
         let owner = h.owner();
-        let ok_list = nodes::is_list(unsafe { rd::<usize>(site_list_check()) });
-        if hook::call_target(site_add()).is_none() || hook::call_target(site_sprite()).is_none() {
-            crate::log!("effects: repair: the call sites are not calls here: stock sparks");
-            return false;
-        }
-        if !ok_list {
-            crate::log!("effects: repair: NodeParticleEffect::Render differs: stock sparks");
+        if !h.ready(&TABLE, crate::syms::hook::EFFECTS_REPAIR) || at(sym::SITE_LIST_CHECK) == 0 {
+            crate::log!("effects: repair: the call sites or NodeParticleEffect::Render differ here: stock sparks");
             return false;
         }
         let add_hook = Hook {
             owner,
             used_by: "effects' repair welds",
             kind: Kind::Call,
-            site: Site { symbol: "Craft::RepairSystem", addr: site_add(), expect: fn_add() },
+            site: Site::of(&TABLE, sym::SITE_ADD),
             to: add as *const () as usize,
             chain: true,
         };
@@ -476,7 +462,7 @@ pub mod repair {
             owner,
             used_by: "effects' repair weld sprites",
             kind: Kind::Call,
-            site: Site { symbol: "NodeParticleEffect::Render", addr: site_sprite(), expect: FN_SPRITE },
+            site: Site::of(&TABLE, sym::SITE_SPRITE),
             to: sprite_thunk as *const () as usize,
             chain: true,
         };
@@ -492,7 +478,7 @@ pub mod repair {
             crate::log!(
                 "effects: repair: AddParticle{} and DrawScaled3D{} hooked",
                 if PREV_ADD.addr() != 0 && PREV_ADD.addr() != fn_add() { " (chained)" } else { "" },
-                if PREV_SPRITE.addr() != 0 && PREV_SPRITE.addr() != FN_SPRITE { " (chained)" } else { "" }
+                if PREV_SPRITE.addr() != 0 && PREV_SPRITE.addr() != fn_sprite() { " (chained)" } else { "" }
             );
             HOOKED = PREV_ADD.addr() != 0 && PREV_SPRITE.addr() != 0;
             HOOKED
@@ -514,7 +500,7 @@ pub mod shields {
     pub(crate) fn fn_create_hit() -> usize { at(sym::FN_CREATE_HIT) }
     pub(crate) fn shield_type_names() -> usize { at(sym::SHIELD_TYPE_NAMES) }
     pub(crate) fn fn_get_shield_type() -> usize { at(sym::FN_GET_SHIELD_TYPE) }
-    const HIT_SITES: [usize; 4] = [0x58bb95, 0x58cad8, 0x58d502, 0x58dd65];
+    const HIT_SITES: [a2engine::Sym; 4] = [sym::SITE_HIT_0, sym::SITE_HIT_1, sym::SITE_HIT_2, sym::SITE_HIT_3];
 
     const HIT_MODEL: usize = 0x7c;
     const HIT_MODEL_RADIUS: usize = 0x40;
@@ -596,15 +582,16 @@ pub mod shields {
         let thunks: [usize; 4] = [thunk0 as *const () as usize, thunk1 as *const () as usize, thunk2 as *const () as usize, thunk3 as *const () as usize];
         let owner = h.owner();
         let mut names = alloc::string::String::new();
+        if !h.ready(&TABLE, crate::syms::hook::EFFECTS_SHIELDS) {
+            crate::log!("effects: shields: the weapons' calls of CreateShieldHit are not stock's here: no hit is noted");
+            return;
+        }
         for i in 0..4 {
-            if hook::call_target(HIT_SITES[i]).is_none() {
-                continue;
-            }
             let hk = Hook {
                 owner,
                 used_by: "effects' shield hits",
                 kind: Kind::Call,
-                site: Site { symbol: "CreateShieldHit", addr: HIT_SITES[i], expect: fn_create_hit() },
+                site: Site::of(&TABLE, HIT_SITES[i]),
                 to: thunks[i],
                 chain: true,
             };
@@ -635,7 +622,7 @@ pub mod shields {
 
     /// Whether the engine's table of shell names is the one this reads.
     pub fn names_ok() -> bool {
-        unsafe { rd::<usize>(fn_get_shield_type() + 4) == shield_type_names() }
+        shield_type_names() != 0 && unsafe { rd::<usize>(fn_get_shield_type() + 4) == shield_type_names() }
     }
 
     /// The name of shell type `k` in the engine's table: None at the table's end.
@@ -708,14 +695,12 @@ pub mod shields {
 
 pub mod chunks {
     use super::*;
-    use r3d_core::engine::instance::{COCOON_DB, VT_COCOON};
+    use r3d_core::engine::instance::{cocoon_db, vt_cocoon};
 
-    pub(crate) fn site_explode_fragment() -> usize { at(sym::SITE_EXPLODE_FRAGMENT) } // in Craft::Explode: call ST3D_Instance::Fragment
     pub(crate) fn fn_fragment() -> usize { at(sym::FN_FRAGMENT) }
-    pub(crate) fn site_build_fragment() -> usize { at(sym::SITE_BUILD_FRAGMENT) } // in BuildingEffect::SafeDestroyConstruction: the same call
     pub(crate) fn fn_class_odf_addr() -> usize { at(sym::FN_CLASS_ODF) } // GameObjectClass::GetOdfName(), thiscall
     /// The Evolver's four calls of `Fragment` on its cocoon.
-    const SITES_COCOON: [usize; 4] = [0x4b07b4, 0x4b0872, 0x4b0914, 0x4b09b4];
+    const SITES_COCOON: [a2engine::Sym; 4] = [sym::SITE_COCOON_0, sym::SITE_COCOON_1, sym::SITE_COCOON_2, sym::SITE_COCOON_3];
 
     static mut PREV_FRAGMENT: Prev = Prev(0);
     static mut PREV_BUILD_FRAGMENT: Prev = Prev(0);
@@ -762,7 +747,7 @@ pub mod chunks {
     /// Whether an instance is the Evolver's cocoon (its class and its database).
     pub fn is_cocoon(inst: usize) -> bool {
         let db = field(inst, 0x80);
-        engine::vtable(inst) == VT_COCOON && db != 0 && db == unsafe { rd::<usize>(COCOON_DB) }
+        vt_cocoon() != 0 && engine::vtable(inst) == vt_cocoon() && db != 0 && db == unsafe { rd::<usize>(cocoon_db()) }
     }
 
     /// The ODF name of the class a construction's `Info` (the instance at its `+0x20`)
@@ -786,18 +771,18 @@ pub mod chunks {
     /// `Craft::Explode`'s own call is not stock's (the engine's chunks entirely).
     pub fn install(h: &mut Hooks) -> bool {
         let owner = h.owner();
+        if !h.ready(&TABLE, crate::syms::hook::EFFECTS_DEBRIS) {
+            crate::log!("effects: debris: the calls of Fragment are not stock's here: the engine's chunks");
+            return false;
+        }
         let explode = Hook {
             owner,
             used_by: "effects' debris of a dying craft",
             kind: Kind::Call,
-            site: Site { symbol: "Craft::Explode", addr: site_explode_fragment(), expect: fn_fragment() },
+            site: Site::of(&TABLE, sym::SITE_EXPLODE_FRAGMENT),
             to: fragment as *const () as usize,
             chain: true,
         };
-        if hook::call_target(site_explode_fragment()).is_none() {
-            crate::log!("effects: debris: Craft::Explode does not call Fragment here: the engine's chunks");
-            return false;
-        }
         let Some(prev) = h.install(explode) else { return false };
         unsafe { PREV_FRAGMENT = prev };
         crate::log!("effects: debris: Craft::Explode's Fragment{} hooked: our own chunks", if prev.addr() != fn_fragment() { " (chained)" } else { "" });
@@ -808,7 +793,7 @@ pub mod chunks {
                 owner,
                 used_by: "effects' debris of the Evolver's cocoon",
                 kind: Kind::Call,
-                site: Site { symbol: "Evolver::mDoRemoveConstructionEffect", addr: SITES_COCOON[i], expect: fn_fragment() },
+                site: Site::of(&TABLE, SITES_COCOON[i]),
                 to: detours[i],
                 chain: true,
             };
@@ -818,12 +803,12 @@ pub mod chunks {
             }
         }
         crate::log!("effects: debris: {} of the Evolver's {} cocoon Fragment calls ours", n, SITES_COCOON.len());
-        if hook::call_target(site_build_fragment()).is_some() {
+        {
             let hk = Hook {
                 owner,
                 used_by: "effects' debris of a cancelled construction",
                 kind: Kind::Call,
-                site: Site { symbol: "BuildingEffect::SafeDestroyConstruction", addr: site_build_fragment(), expect: fn_fragment() },
+                site: Site::of(&TABLE, sym::SITE_BUILD_FRAGMENT),
                 to: build_fragment as *const () as usize,
                 chain: true,
             };
@@ -831,8 +816,6 @@ pub mod chunks {
                 unsafe { PREV_BUILD_FRAGMENT = p };
                 crate::log!("effects: debris: a cancelled construction's Fragment{} hooked: our own chunks", if p.addr() != fn_fragment() { " (chained)" } else { "" });
             }
-        } else {
-            crate::log!("effects: debris: SafeDestroyConstruction does not call Fragment here: the engine's chunks for it");
         }
         true
     }
@@ -921,7 +904,7 @@ pub mod construction {
 
     /// The station under construction as an object: its `Render` draws nothing.
     pub fn is_construction_object(o: usize) -> bool {
-        field(engine::vtable(o), 11 * 4) == fn_construction_object_render()
+        fn_construction_object_render() != 0 && field(engine::vtable(o), 11 * 4) == fn_construction_object_render()
     }
 
     /// Walks `BuildingEffect::m_list` in order: each `Info`.
@@ -1041,7 +1024,7 @@ pub mod construction {
 
     /// The construction object's on-screen byte, which the HUD reads.
     pub fn mark_on_screen(builder: usize, shown: bool) {
-        if builder != 0 && r3d_core::scene::instance::render_fn(builder) == r3d_core::engine::instance::FN_RIG_RENDER {
+        if builder != 0 && r3d_core::scene::instance::render_fn(builder) == r3d_core::engine::instance::fn_rig_render() {
             unsafe {
                 let f: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(fn_get_co());
                 let co = f(builder);

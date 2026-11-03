@@ -34,6 +34,7 @@ extern crate alloc;
 use r3d_core::{dump, log, rt, sfmt};
 
 #[rustfmt::skip]
+mod syms;
 pub mod shaders;
 pub mod bees;
 pub mod chunks;
@@ -206,6 +207,10 @@ impl Module for Effects {
     /// `Scene.asi` is one: it reads the shield hit sites), and the hooks chain onto
     /// whatever is there, as they always did.
     fn hooks(&mut self, h: &mut Hooks) {
+        if !h.ready(&syms::TABLE, syms::hook::EFFECTS_READS) {
+            h.stand_down("the engine's reads are not stock");
+            return;
+        }
         hooks::keep_gate(h);
         self.later = Some(h.clone());
     }
