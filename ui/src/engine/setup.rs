@@ -32,6 +32,9 @@ fn ok() -> bool {
 }
 
 fn transport() -> usize {
+    if !ok() {
+        return 0;
+    }
     let a = eng().addr(sym::SETUP_TRANSPORT);
     if a == 0 { 0 } else { unsafe { rd::<usize>(a) } }
 }

@@ -5,6 +5,13 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.97.1 — 2026-11-03
+
+### Added
+- Scenario `engine-syms`: UI section (the build recognised, every part's `symbols: N/N resolved; 0 hooks blocked`, no stand-down, no early read).
+
+Installed, not yet seen in game
+
 ## 3.97.0 — 2026-11-03
 
 ### Added

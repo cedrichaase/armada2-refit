@@ -4,6 +4,19 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.32.0 — 2026-11-03
+
+### Changed
+- UI.asi runs on the symbol profile (`profiles/gog-1.1/ui.<part>.toml`, eight parts: core, loading, radar, info, hud, panels, shell, dialogs; generated `src/syms_<part>.rs`). Every engine address, call site, slot, global, offset and mode value in `src/` comes from it; each hook calls `ready` before it writes and stands down with the engine's reason (`engine: ui.<hook> stands down: <symbol> <why>`). On a build Refit does not know every hook stands down and the game runs stock.
+- `UI_SettingsNote` gives the engine's note for a row whose hook stood down, and the plugin note for a build Refit does not know.
+- UI.log: the identity and build lines once, then one `engine: <part> symbols: N/M resolved; H hooks blocked` line per part.
+- A radar/info/panels/hud stand-down is now per hook (the ring's two sites, a last draw, a panel family go together; before, some sites could be patched alone).
+
+### Fixed
+- `Cargo.toml` carries the real version (was 0.1.0), so UI.log's version line is right.
+
+Installed, not yet seen in game
+
 ## 0.31.1 — 2026-11-03
 
 ### Added
