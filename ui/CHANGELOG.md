@@ -4,6 +4,13 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.31.1 — 2026-11-03
+
+### Added
+- UI.log logs `engine: Armada2.exe timestamp 0x…, image size 0x…, sections 0x…` (the executable's identity: `crates/a2engine`, `csdk/a2engine.h`) right after its start-up line. Changes no behaviour.
+
+Installed, not yet seen in game
+
 ## 0.31.0 — 2026-11-02
 
 ### Added

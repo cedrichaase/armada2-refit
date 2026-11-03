@@ -5,6 +5,15 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.80.0 — 2026-11-03
+
+Layers: display 0.16.1, ui 0.31.1, qol 1.9.1, online 0.9.1, cutscenes 2.5.1, testbench 3.96.0.
+
+### Added
+- Phase 8a, executable identity (contract P1): `crates/a2engine` (`no_std`, host-tested on synthetic PE images, with a C twin test) and `csdk/a2engine.h`. Every plugin except Render3D logs the identical `engine:` line; the bench records the exe's sha256 and identity. Changes no behaviour. Render3D's line comes with phase 8e.
+
+Installed, not yet seen in game
+
 ## 13.70.2 — 2026-11-03
 
 Layers: render3d 0.37.2.

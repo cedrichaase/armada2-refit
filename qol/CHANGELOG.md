@@ -5,6 +5,13 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 1.9.1 — 2026-11-03
+
+### Added
+- QOL.log and QOLRules.log each log the identity line after the log-location line (`csdk/a2engine.h`). Changes no behaviour.
+
+Installed, not yet seen in game
+
 ## 1.9.0 — 2026-11-02
 
 ### Added

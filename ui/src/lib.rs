@@ -58,6 +58,10 @@ fn startup() {
     let _ = config::load();
     clock::load();
     log!("UI {} -- game dir {}", env!("CARGO_PKG_VERSION"), rt::game_dir());
+    match a2engine::pe::this_process() {
+        Some(id) => log!("engine: {}", id),
+        None => log!("engine: Armada2.exe identity unreadable"),
+    }
     if !cfg.enable {
         log!("Enable=0: standing down");
         return;

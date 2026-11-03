@@ -497,6 +497,19 @@ posts, a hologram, the Evolver, a survey of what no module draws).
   the first one. A note is a line in the session's log like any drive command; it
   touches nothing in the game.
 
+## Which executable ran
+
+At session start the bench reads the clone's `Armada2.exe` and records
+`exe: {name, sha256, timestamp, image_size, sections}` in `session.json`, notes it in
+the session log, and copies it into each case's `result.json` and the run's `report.md`.
+`timestamp`, `image_size` and `sections` are the executable's identity, as the plugins
+read it from memory and log it (`engine: Armada2.exe timestamp 0x…, image size 0x…,
+sections 0x…`; `crates/a2engine/src/pe.rs` is the reader, `bench/session.py`
+`exe_identity` its offline twin), so a log line and a report can be compared by eye. The
+sha256 is the bench's alone: plugins never hash the file, and it is not a run-time key
+(`profiles/gog-1.1/build.toml` lists it as information). `Expect "Display8.log" contains
+"engine: Armada2.exe timestamp 0x3c4c76bd"` checks a plugin logged it.
+
 ## Frame dumps
 
     ./a2test drive --session ID dump NAME      # or a scenario step: Dump the frame called "NAME"

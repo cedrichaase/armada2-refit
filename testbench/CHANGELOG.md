@@ -5,6 +5,13 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.96.0 — 2026-11-03
+
+### Added
+- The executable's identity is recorded: `session.json` and each case's `result.json` (and the report) carry `exe: {name, sha256, timestamp, image_size, sections}`, read from the clone's `Armada2.exe` at session start (`bench/session.py`, `exe_identity`), and the session log notes it.
+
+Installed, not yet seen in game
+
 ## 3.85.0 — 2026-11-02
 
 ### Added

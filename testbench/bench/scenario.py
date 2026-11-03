@@ -1272,7 +1272,9 @@ class Case:
         (self.dir / 'result.json').write_text(json.dumps(dict(
             case=self.name, scenario=self.scn.title, file=str(self.scn.path), resolution=config.res_name(self.res),
             aspect=config.aspect_name(self.res), mod=self.mod, status=status,
-            duration=round(self.duration, 1), steps=self.results), indent=1))
+            duration=round(self.duration, 1),
+            exe=next((x.s['exe'] for x in ([self.sess] if self.sess else []) + list(self.sessions.values()) if x.s.get('exe')), None),
+            steps=self.results), indent=1))
         return status
 
     def run_step(self, text):

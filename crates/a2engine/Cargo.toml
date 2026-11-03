@@ -1,0 +1,11 @@
+[package]
+name = "a2engine"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Which executable is this: the PE identity the plugins log and the profiles are keyed by, no_std"
+license = "MIT"
+
+[lib]
+name = "a2engine"
+path = "src/lib.rs"

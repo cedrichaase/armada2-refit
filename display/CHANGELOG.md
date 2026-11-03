@@ -4,6 +4,13 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.16.1 — 2026-11-03
+
+### Added
+- Display8.log logs `engine: Armada2.exe timestamp 0x…, image size 0x…, sections 0x…` (the executable's identity: `crates/a2engine`, `csdk/a2engine.h`) right after its start-up line. Changes no behaviour. `trace::exe_range` reads the module through the same PE reader.
+
+Installed, not yet seen in game
+
 ## 0.16.0 — 2026-11-02
 
 ### Added

@@ -4,6 +4,13 @@
 8 with a transport of our own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 and versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.9.1 — 2026-11-03
+
+### Added
+- Online.log logs the identity line after the log-location line (`csdk/a2engine.h`). Changes no behaviour.
+
+Installed, not yet seen in game
+
 ## 0.9.0 — 2026-11-02
 
 ### Added

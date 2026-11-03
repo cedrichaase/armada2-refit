@@ -16,12 +16,14 @@ the game keeps running), so everything needed to reattach is in session.json.
 import datetime
 import fcntl
 import glob
+import hashlib
 import itertools
 import json
 import os
 import re
 import shutil
 import signal
+import struct
 import subprocess
 import sys
 import threading
@@ -103,6 +105,42 @@ def _group_has_members(pgid):
 
 class GameError(Exception):
     pass
+
+
+def exe_identity(path):
+    """`exe: {name, sha256, timestamp, image_size, sections}` of the executable at path
+    (phase 8, contract P1; crates/a2engine/src/pe.rs is the run-time twin and its
+    fixtures pin the same fingerprint). The hex strings are what the plugins log
+    (`engine: Armada2.exe timestamp 0x.., image size 0x.., sections 0x..`); the sha256
+    is the bench's alone, never a run-time key. None parts if the file is not a PE."""
+    path = Path(path)
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        head = f.read(0x2000)
+        h.update(head)
+        for chunk in iter(lambda: f.read(1 << 20), b''):
+            h.update(chunk)
+    out = dict(name=path.name, sha256=h.hexdigest(), timestamp=None, image_size=None, sections=None)
+    try:
+        nt = struct.unpack_from('<I', head, 0x3c)[0]
+        if head[:2] != b'MZ' or head[nt:nt + 4] != b'PE\0\0':
+            return out
+        count, ts = struct.unpack_from('<HI', head, nt + 6)
+        opt_size = struct.unpack_from('<H', head, nt + 20)[0]
+        opt = nt + 24
+        size = struct.unpack_from('<I', head, opt + 56)[0]
+        fnv = 0x811c9dc5
+        for i in range(count):
+            at = opt + opt_size + i * 40
+            name = head[at:at + 8]
+            vsize, va, raw = struct.unpack_from('<III', head, at + 8)
+            for chunk in (name, struct.pack('<III', va, vsize, raw)):
+                for b in chunk:
+                    fnv = ((fnv ^ b) * 0x01000193) & 0xffffffff
+        out.update(timestamp=f'{ts:#010x}', image_size=f'{size:#x}', sections=f'{fnv:#010x}')
+    except (struct.error, IndexError):
+        pass
+    return out
 
 
 def checkout_provenance(path):
@@ -339,6 +377,12 @@ class Session:
             if r.returncode:
                 raise GameError(f'reflink clone of {src} failed (must be btrfs, same '
                                 f'filesystem as {config.CACHE}): {r.stderr.strip()}')
+        exe = self.game_dir / 'Armada2.exe'
+        if exe.is_file():
+            self.s['exe'] = exe_identity(exe)
+            e = self.s['exe']
+            self.log.action(f"Armada2.exe sha256 {e['sha256']}; timestamp {e['timestamp']}, image size "
+                            f"{e['image_size']}, sections {e['sections']}")
         exc = self.game_dir / 'exception.txt'
         self.s['exception_mtime'] = exc.stat().st_mtime if exc.exists() else None
         self.save()

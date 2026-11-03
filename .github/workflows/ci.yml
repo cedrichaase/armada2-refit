@@ -95,6 +95,8 @@ jobs:
         run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path render3d/hosttest/Cargo.toml
       - name: a2fmt on the host
         run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path crates/a2fmt/Cargo.toml
+      - name: a2engine on the host (the PE identity on synthetic images, and its C twin)
+        run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path crates/a2engine/Cargo.toml
       - name: a2ini on the host (the overlay's edit against tools/settings/fixtures)
         run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path crates/a2ini/Cargo.toml
 

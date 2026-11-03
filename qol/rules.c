@@ -67,6 +67,7 @@
 
 #define A2_FLTUSED
 #include "../csdk/a2asi.h"
+#include "../csdk/a2engine.h"
 #include "rules_settings_table.h"
 
 /* ---- Producer layout and the engine's own functions (Armada2.exe, patch 1.1) */
@@ -642,6 +643,7 @@ static void startup(void)
         g_trace = g_logging > 1;
         if (g_logging && g_logpath[0])
             a2_log_where(g_logpath, a2_log_path(g_logpath, sizeof g_logpath, dir, "QOLRules.log"));
+        a2e_log(logline);
     }
 
     g_want = a2_set_int(&g_ini, QOLRULES_ROW_PAYONQUEUE) != 0;

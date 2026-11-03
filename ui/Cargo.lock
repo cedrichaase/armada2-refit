@@ -3,6 +3,10 @@
 version = 4
 
 [[package]]
+name = "a2engine"
+version = "0.1.0"
+
+[[package]]
 name = "a2fmt"
 version = "0.1.0"
 dependencies = [
@@ -136,6 +140,7 @@ dependencies = [
 name = "ui"
 version = "0.1.0"
 dependencies = [
+ "a2engine",
  "a2fmt",
  "a2rt",
  "fontbake",

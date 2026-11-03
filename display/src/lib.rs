@@ -227,6 +227,10 @@ fn startup() {
     rt::log_open("Display8.log", cfg.log || cfg.trace);
     let mode = ini.string("Display8", "Mode").unwrap_or_else(|| alloc::string::String::from("stub"));
     log!("Display8 {} -- game dir {}; mode {}; the real chain: {}", env!("CARGO_PKG_VERSION"), rt::game_dir(), mode, cfg.real);
+    match a2engine::pe::this_process() {
+        Some(id) => log!("engine: {}", id),
+        None => log!("engine: Armada2.exe identity unreadable"),
+    }
     unsafe { STUB_ASKED = mode.eq_ignore_ascii_case("stub") };
     let backend = ini.string("Display8", "Backend").unwrap_or_else(|| alloc::string::String::from("auto"));
     let fail = ini.string("Display8", "FailBackend").unwrap_or_default();

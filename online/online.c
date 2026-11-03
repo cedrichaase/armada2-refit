@@ -36,6 +36,7 @@
  */
 
 #include "../csdk/a2asi.h"
+#include "../csdk/a2engine.h"
 #include "settings_table.h"
 
 #define HEAP_ZERO_MEMORY       0x08
@@ -1006,6 +1007,7 @@ static void startup(void)
         s_cat(b, g_logpath);
         if (!ad) s_cat(b, " (LOCALAPPDATA unset or not writable)");
         logline(b);
+        a2e_log(logline);
     }
 
     g_ini.log = logline;

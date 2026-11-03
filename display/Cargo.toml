@@ -1,6 +1,6 @@
 [package]
 name = "display"
-version = "0.16.0"
+version = "0.16.1"
 edition = "2024"
 publish = false
 description = "Display8: Star Trek: Armada II's d3d8.dll, our own (README.md)"
@@ -13,6 +13,7 @@ path = "src/lib.rs"
 
 [dependencies]
 a2rt = { path = "../crates/a2rt" }
+a2engine = { path = "../crates/a2engine" }
 gpu = { path = "../gpu" }
 ash = { version = "0.38", default-features = false }
 
