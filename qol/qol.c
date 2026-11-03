@@ -1091,8 +1091,6 @@ static void gate(const char *what, int on, int ok)
  * hooks of the row); asked on the game thread. */
 __declspec(dllexport) const char *__cdecl QOL_SettingsNote(const A2Setting *row)
 {
-    if (row && g_barGrid && row->key[0] == 'B' && row->key[3] == 'K')   /* BarKeys */
-        return "GridLayout.asi owns the command bar's keys while it is installed";
     return row ? a2e_note_for(row->section, row->key) : a2e_note_plugin();
 }
 
@@ -1240,7 +1238,6 @@ static void startup(void)
     logline(b);
     if (g_warpDistance <= 0.0f) gate("WarpDistance", 0, g_warpOk);
 
-    g_barGrid = GetModuleHandleA("GridLayout.asi") != NULLPTR;
     g_barKeys = a2_set_int(&g_ini, QOL_ROW_BARKEYS) != 0;
     g_barOk = patch_bar();
     b[0] = 0;
@@ -1250,7 +1247,6 @@ static void startup(void)
         s_cat(b, "  (the bar's keys left as in stock)");
     } else if (g_barOk) {
         s_cat(b, "  -> Q W E R T / A S D F G / Z X C V B press the Refit bar's cells, patched");
-        if (g_barGrid) s_cat(b, "; GridLayout.asi is loaded, so they stand down");
     } else {
         not_patched(b, QOL_H_BAR_KEYS);
     }

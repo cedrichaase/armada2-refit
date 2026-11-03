@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.5.0 — 2026-11-03
+
+Layers: ui 2.2.0, qol 2.2.1.
+
+### Changed
+- The UI and QOL without the legacy plugins: no stand-down for `HUD.asi`, `GridLayout.asi`,
+  `Menus.asi` or the squashed cursor art; `ui/bench-legacy.sh` and `bench-asi.sh --no-grid`
+  gone. The UI's settings hub removes the retired `Backend` token `d3d9`, `Mode` and `Real`
+  from the overlay (logged once). Display8's check for those plugins in `ENGINE_PLUGINS`
+  stays (a safety net, no change). Details in `ui/CHANGELOG.md` and `qol/CHANGELOG.md`.
+
+Installed, not yet seen in game
+
 ## 15.4.0 — 2026-11-03
 
 Layers: testbench 4.0.0.

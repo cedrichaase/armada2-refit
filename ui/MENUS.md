@@ -19,10 +19,9 @@ Three parts, each in its own file:
 | actions | `src/menus/actions.rs` | what the UI does to a dialog, run after the frame |
 | the backdrop | `src/menus/backdrop.rs` | the mission, dimmed, under the in-mission menus |
 
-**Menus.asi is superseded, not run alongside.** If `Menus.asi` (or `MenuScale.asi`) is
-loaded, the menu part stands down at startup and the shell runs as Menus.asi makes it.
-It also stands down if any of the user32 imports it hooks is not user32's own (another
-plugin hooked it first). `ui/bench-asi.sh --menus` takes Menus.asi out of a bench clone.
+**Menus.asi is gone.** The menu part stands down at startup if any of the user32
+imports it hooks is not user32's own (another plugin hooked it first). `retire/retire.sh`
+takes `Menus.asi` out of an old install.
 
 ## What the shell is, in the engine
 
@@ -285,10 +284,10 @@ it after `Present`.
 
 A dialog runs through user32 as before, with a line in `UI.log`, when: its procedure is
 not in the shell's code (0x5a0000–0x610000: the map editor's dialogs are not screens);
-there is no 3D window or no Direct3D 9 device behind the game's (DXVK's own d3d8); its
+there is no 3D window or no Vulkan or Direct3D 12 device behind the game's (Display8 bailed out); its
 owner is a window the UI does not host; its template cannot be read; or the hidden
 dialog could not be made. With the shell's mode raised (below) a stock dialog then draws
-800x600 in the corner, as stock does without Menus.asi, but it works.
+800x600 in the corner, as stock does, but it works.
 
 ### The display
 
@@ -957,7 +956,7 @@ a Mutara nebula with the queen's Diamond (`render3d/README.md`, "The menu scene"
 - **How it is asked for.** `Render3D_MenuScene(name, x, y, w, h)`, a render3d
   export, looked up once with `GetModuleHandleA("Render3D.asi")` and
   `GetProcAddress`. It draws into the whole back buffer and returns 1, or 0 when it
-  cannot (no Render3D.asi, render3d stood down, no such view, no Direct3D 9 device);
+  cannot (no Render3D.asi, render3d stood down, no such view, no device);
   the frame then goes on as without it.
 - **The specs over it** ask `scene::shown()`. The main menu (`over_scene`) draws none
   of the stock screen's art and **passes no input to it**: off the column a click does
@@ -1000,7 +999,7 @@ a Mutara nebula with the queen's Diamond (`render3d/README.md`, "The menu scene"
 ## Testing
 
 `ui/bench-asi.sh --menus` (a scenario's `Setup:` line) puts `UI.asi` in a bench clone
-with `[Menus] Enable=1` and takes Menus.asi out. `testbench/operating/menus-host.md`
+with `[Menus] Enable=1`. `testbench/operating/menus-host.md`
 has where things are and how to look inside a hosted dialog (`Menus.Trace=1` dumps the
 hidden surfaces).
 

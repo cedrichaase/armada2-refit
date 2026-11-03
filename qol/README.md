@@ -153,8 +153,7 @@ button of that cell", and which button sits in which cell is the UI's layout.
   the player's is selected and the game is not paused) is re-pointed at a function of
   ours that calls the stock one, then `UI_BarStep` (the UI presses its queued clicks and
   takes the layout of this update's buttons), then reads the keys. The wrap checks the
-  call's target first (`a2e_ready`): with `GridLayout.asi` loaded, which wraps the same
-  call, the hook is not ready and the keys are never installed.
+  call's target first (`a2e_ready`).
 - **Stock's keys are global per selection**, not per open menu (F5 builds from the top
   level whatever menu is open). With the grid's keys on, the three hotkey tables'
   counts (commands `+0xcc`, build items `+0xd8`, special weapons `+0xe4`) are set to
@@ -176,7 +175,7 @@ button of that cell", and which button sits in which cell is the UI's layout.
   letter, NULL while the keys are off). **The keys work only while `UI_BarCell`
   exists and gives a cell**, i.e. while the UI's bar is drawn; otherwise
   they stand down with `bar: no refit bar, position keys off` in `QOL.log` and the stock
-  bar keys run. They stand down as well while `GridLayout.asi` is loaded.
+  bar keys run.
 
 **Problem.** The button bar's hotkeys are hard to use without looking. Each building's
 build menu binds its items to `F1`–`F12` by slot. The menus themselves sit on letters

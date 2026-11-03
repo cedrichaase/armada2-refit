@@ -4,6 +4,32 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 2.2.0 — 2026-11-03
+
+### Added
+- The hub's retire table for the overlay (`settings.rs`, `RETIRED`): at its first frame it
+  takes the token `d3d9` out of `[Display8.Display8] Backend` in `RefitPlayer.ini` (the key
+  goes when nothing is left; `d3d9,vulkan` keeps `vulkan`) and removes `Mode` and `Real`, each
+  logged once (`settings: RefitPlayer.ini [Display8.Display8] Backend=d3d9 retired; removed`),
+  then tells the plugins. Display8 skips the same values on its read side. The bench flags of
+  the deleted plugins wrote no `Render3D.*` or `UI.*` key, so the table has no others.
+  Scenario `ui-settings-retired`.
+
+### Removed
+- Every stand-down for the retired plugins: the bar while `GridLayout.asi` is loaded (and its
+  settings note), the menu host while `Menus.asi` or `MenuScale.asi` is, the square engine
+  cursor while `HUD.asi` is or while `hud/cursor-aspect.py`'s squashed art is installed.
+  `retire/retire.sh` takes those plugins and that art out of an old install.
+- `bench-asi.sh --no-grid` (and `bench-hud-info.sh` passing it); `--menus` no longer takes
+  `Menus.asi` out of the clone; `bench-legacy.sh`.
+
+### Changed
+- README, HUD.md, MENUS.md, `UI.ini` comments and the Rust comments no longer describe
+  Direct3D 9, `menus/install-plates.sh` (now `ui/backdrops/install-plates.sh`),
+  `hud/cursor-aspect.py` or the old plugins' stand-downs as live.
+
+Installed, not yet seen in game
+
 ## 2.1.0 — 2026-11-03
 
 ### Added

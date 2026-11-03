@@ -5,6 +5,13 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 2.2.1 — 2026-11-03
+
+### Removed
+- The `GridLayout.asi` stand-down of the bar's position keys (`bar.c`, `qol.c`, the `BarKeys`
+  settings note, the log suffix): the plugin is gone (`retire/retire.sh` takes it out of an
+  old install). Installed, not yet seen in game.
+
 ## 2.2.0 — 2026-11-03
 
 ### Removed
