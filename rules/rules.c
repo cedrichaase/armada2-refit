@@ -491,7 +491,13 @@ static void __thiscall h_open(BYTE *prog, void *name)
 {
     g_latched = 0;
     g_latch = 0;
-    g_pay = g_want && g_patched;        /* a setting changed since is latched here */
+    /* A setting changed since is latched here; but while the online layer has announced
+     * "every player has the rules" (g_net), the announcement decides, not the setting
+     * as it is now: a player who switched it off after connecting would otherwise
+     * queue stock while the peers pay on queue, and the games would diverge.  g_net is
+     * only set when this player wanted the rules as it was announced, and the session
+     * ending clears it (QOLRules_Reset). */
+    g_pay = g_patched && (g_net || g_want);
     t_open(prog, name);
 }
 

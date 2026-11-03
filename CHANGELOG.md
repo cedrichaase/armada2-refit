@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.14 — 2026-11-04
+
+Layers: qol 2.2.2, rules 1.0.2, render3d 1.0.3.
+
+### Fixed
+- Review fixes in the plugins: the pan coefficient read behind its patch check, the grid's menu-toggle keys restored when it is turned off live, pay-on-queue in a network game following the announcement, the effects module's sprite drops limited to render3d's own views, and instruction listings in comments turned to prose. Installed, not yet seen in game.
+
 ## 15.6.12 — 2026-11-03
 
 Layers: cutscenes 3.0.1, rules 1.0.1, online 0.11.1, ui 2.2.3, testbench 4.1.3.

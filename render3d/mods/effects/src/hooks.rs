@@ -42,6 +42,20 @@ pub fn open() -> bool {
     unsafe { GATE.is_some_and(|g| g.open()) }
 }
 
+static mut IN_VIEW: bool = false;
+
+/// Whether a view of render3d's own is running (`begin_view` to `end_view`). The engine's
+/// sprite draws are dropped only then: a view the engine draws itself (the inset with
+/// `Inset=0`) has no weld or spark of ours, so it keeps the engine's.
+pub fn in_view() -> bool {
+    unsafe { IN_VIEW }
+}
+
+/// Set by the module around each view of ours.
+pub fn set_in_view(on: bool) {
+    unsafe { IN_VIEW = on };
+}
+
 /// Keeps the module's gate for the detours (the first thing `hooks()` does).
 pub fn keep_gate(h: &Hooks) {
     unsafe { GATE = Some(h.gate()) };
@@ -423,7 +437,7 @@ pub mod repair {
     unsafe extern "thiscall" fn sprite(sp: usize, cam: usize, pos: *const f32, size: f32) {
         unsafe {
             let node = RP_NODE;
-            if open() && HOOKED && node != 0 && (super::super::sparks::takes() || super::super::repair::is_weld(node)) {
+            if open() && super::in_view() && HOOKED && node != 0 && (super::super::sparks::takes() || super::super::repair::is_weld(node)) {
                 return;
             }
             let f: unsafe extern "thiscall" fn(usize, usize, *const f32, f32) = core::mem::transmute(PREV_SPRITE.addr());

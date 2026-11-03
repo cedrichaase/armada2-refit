@@ -137,10 +137,9 @@ pub unsafe fn cstr_static(p: *const u8) -> &'static str {
 
 // ---- the panel switch -------------------------------------------------------------
 
-// The two sites: in `DisplayInterface::RenderAll`, `mov edx,[esi]; mov ecx,esi; call
-// [edx+0x58]`, the call of a visible component's `Render`; in
-// `CursorInterface::RefreshOwner`, `mov ecx,esi; mov edx,[esi]; call [edx+0x70]`, the call
-// of each component's `CursorOver` (profiles/gog-1.1/ui.hud.toml, `hud.panels`).
+// The two sites: in `DisplayInterface::RenderAll`, the virtual call (vtable slot 0x58) of a
+// visible component's `Render`; in `CursorInterface::RefreshOwner`, the virtual call (slot
+// 0x70) of each component's `CursorOver` (profiles/gog-1.1/ui.hud.toml, `hud.panels`).
 
 const MAX_TAKEN: usize = 16;
 /// The components taken over: each by its address, or (`by_pointer`) by the address
@@ -150,7 +149,7 @@ static mut TAKEN: [(usize, bool); MAX_TAKEN] = [(0, false); MAX_TAKEN];
 static mut OVER_UI: bool = false;
 static mut INSTALLED: bool = false;
 
-/// Patches both sites, each `mov ecx,esi; call <ours>` in the same seven bytes. False,
+/// Patches both sites, each seven bytes of a register move and a call, replaced by a call of ours. False,
 /// with nothing written, when either is not stock (`hud.panels` stands down).
 pub fn install() -> bool {
     if eng().ready(hook::HUD_PANELS).is_err() {
