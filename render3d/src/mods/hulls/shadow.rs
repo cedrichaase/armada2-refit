@@ -9,7 +9,6 @@
 //! as spheres (`planets()`), as `Lighting.asi` did.
 use super::look::Look;
 use super::{draw, Posed};
-use crate::engine;
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::math::{v3, V3};
@@ -42,8 +41,6 @@ pub fn clear_current() {
 pub fn planets() -> ([[f32; 4]; 8], V3) {
     unsafe { (PLANETS, SUN) }
 }
-
-const VT_PLANET: usize = 0x6b2b3c;
 
 pub struct Shadow {
     pipes: Pipes,
@@ -184,7 +181,7 @@ impl Shadow {
             cmd.vs_block(Block::new(8, &k[..20]));
             // The faces the instance draws (construction); a model that is no
             // instance's (the menu scene) draws them all.
-            let limit = if p.inst == 0 { -1 } else { engine::field(p.inst, 0x10) as i32 };
+            let limit = super::hooks::face_limit(p.inst);
             let mut faces_left: i64 = if limit >= 0 { limit as i64 } else { i64::MAX };
             for part in &p.model.parts {
                 if part.blend != Blend::Opaque || !p.pose.shown.get(part.node).copied().unwrap_or(false) {
@@ -241,22 +238,10 @@ impl Shadow {
     }
 
     fn find_planets(&mut self) {
-        let mut n = 0;
         let mut out = [[0.0f32; 4]; 8];
-        engine::for_each_in_list(engine::OBJECT_LIST, |o| {
-            if n >= 8 || o == 0 || engine::vtable(o) != VT_PLANET {
-                return;
-            }
-            let inst = engine::field(o, 4);
-            let r = engine::field_f32(inst, 0x40);
-            if !(r > 0.0) {
-                return;
-            }
-            let c = engine::field_v3(inst, 0x34);
-            let t = engine::field_v3(inst, 0x44 + 0x24);
-            out[n] = [t.x + c.x, t.y + c.y, t.z + c.z, r];
-            n += 1;
-        });
+        for (slot, s) in out.iter_mut().zip(super::hooks::planet_spheres(8)) {
+            *slot = s;
+        }
         unsafe { PLANETS = out };
     }
 }

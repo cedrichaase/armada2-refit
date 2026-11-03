@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.90.0 — 2026-11-03
+
+### Added
+- Scenarios `render3d-live-hulls` (the showcase, `Modules.hulls` and `Modules.specials`
+  switched off and on through the overlay, each frame at RMSE 0 against the same key at
+  load) and `render3d-live-specials` (off at load, switched on live, a fresh effect is
+  drawn by the module). Installed, not yet seen in game
+
 ## 3.85.0 — 2026-11-02
 
 ### Added

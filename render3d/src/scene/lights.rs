@@ -220,14 +220,14 @@ impl Lights {
     /// engine's list already) or with `Replace=0`. `gather` applies it, so every
     /// reading of the list (a module's re-read after registering lights too) has them.
     pub fn replace_scene_lights(&mut self) {
-        let c = scene_config();
+        let Some(c) = crate::core_services::scene_lights().and_then(|p| p.scene_config()) else { return };
         if !c.replace || self.dirs.is_empty() {
             return;
         }
         self.dirs.clear();
         self.dirs.push(Directional { dir: c.key_axis, colour: c.key });
         self.dirs.push(Directional { dir: c.fill_axis, colour: c.fill });
-        if let Some((col, dir)) = sky_light(c) {
+        if let Some((col, dir)) = sky_light(&c) {
             self.dirs.push(Directional { dir, colour: col });
         }
     }
@@ -285,8 +285,11 @@ impl Lights {
     }
 }
 
-/// `[Lights]` of Render3D.ini: the scene lights (`Lighting.asi`'s `Lights=1` and its
-/// settled values).
+/// The scene lights (`Lighting.asi`'s `Lights=1` and its settled values): what replaces
+/// the map's directional lights. Its keys are the hulls module's (`[Lights]`: `Replace`,
+/// `KeyColour`, `KeyAxis`, `FillColour`, `FillAxis`, `SkyLight`); the core only applies
+/// what `core_services::scene_lights()` gives, and changes nothing without it.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SceneConfig {
     pub replace: bool,
     pub key: V3,
@@ -294,36 +297,6 @@ pub struct SceneConfig {
     pub fill: V3,
     pub fill_axis: V3,
     pub sky: f32,
-}
-
-static mut SCENE_CFG: Option<SceneConfig> = None;
-
-#[allow(static_mut_refs)]
-pub fn scene_config() -> &'static SceneConfig {
-    unsafe {
-        SCENE_CFG.get_or_insert_with(|| {
-            let ini = crate::config::ini();
-            let v = |k: &str, d: [f32; 3]| {
-                let a = ini.floats("Lights", k, d);
-                crate::math::v3(a[0], a[1], a[2])
-            };
-            let key_axis = v("KeyAxis", [0.50, -0.50, 0.71]).norm();
-            let replace = ini.int("Lights", "Replace", 1) != 0 && !crate::plugin_loaded("Lighting.asi");
-            let c = SceneConfig {
-                replace,
-                key: v("KeyColour", [1.00, 0.96, 0.90]),
-                key_axis,
-                fill: v("FillColour", [0.06, 0.08, 0.18]),
-                fill_axis: v("FillAxis", [-key_axis.x, -key_axis.y, -key_axis.z]).norm(),
-                sky: ini.float("Lights", "SkyLight", 0.35),
-            };
-            crate::log!(
-                "lights: scene lights {} (key {:?} along {:?})",
-                if c.replace { "replace the map's" } else { "are the map's" }, c.key, c.key_axis
-            );
-            c
-        })
-    }
 }
 
 /// The sky's own light: the map's background (`engine::light::background_name`: a

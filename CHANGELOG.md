@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.71.0 — 2026-11-03
+
+Layers: render3d 0.38.0, testbench 3.90.0.
+
+### Changed
+- render3d: hulls and specials onto the module layers (`hooks.rs`, `content.rs`,
+  `configure`); the scene lights' keys and the `Lighting.asi` test moved to the hulls
+  module. No change to what is drawn. Installed, not yet seen in game
+
+### Added
+- testbench: scenarios `render3d-live-hulls` (hulls and specials flipped live against
+  their off-at-load frames) and `render3d-live-specials`.
+
 ## 13.70.2 — 2026-11-03
 
 Layers: render3d 0.37.2.

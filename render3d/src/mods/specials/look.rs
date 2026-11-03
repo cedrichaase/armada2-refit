@@ -11,6 +11,7 @@
 //! The hull is the hulls module's pose of the affected object (`hulls::posed`); an
 //! object it does not draw (or a cloaked one) gets no layer.
 use super::{Fx, VT_CHANGE_TEAM, VT_CREW_DISRUPTION, VT_DRAIN};
+use super::hooks;
 use gpu::{Blend, Block, Compare, Cull, Depth, Format, Pipeline, PipelineDesc, Topology};
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
@@ -26,7 +27,7 @@ use crate::shaders::specials_spv::*;
 use crate::shaders::specials_dxil::*;
 
 pub const KINDS: usize = 3;
-const NAMES: [&str; KINDS] = ["Override", "Drain", "Psionic"];
+use super::content::NAMES;
 
 /// Which look an effect takes, by its class.
 pub fn kind(vt: usize) -> Option<usize> {
@@ -73,14 +74,9 @@ pub struct Looks {
 }
 
 impl Looks {
-    pub fn new(_ini: &Ini) -> Looks {
+    pub fn new() -> Looks {
         let s = Sec::new("Specials");
-        // Defaults: (colour 0..255, gain, strength, creep s, scale, rim, light colour, brightness, range)
-        let defs: [([f32; 3], f32, f32, f32, f32, f32, [f32; 3], f32, f32); KINDS] = [
-            ([60.0, 255.0, 110.0], 1.6, 1.0, 2.5, 14.0, 0.15, [80.0, 255.0, 120.0], 1.6, 3.0),
-            ([235.0, 80.0, 190.0], 1.4, 0.9, 1.5, 10.0, 0.3, [235.0, 90.0, 200.0], 1.0, 2.5),
-            ([150.0, 110.0, 255.0], 1.6, 1.0, 0.8, 3.0, 0.6, [160.0, 110.0, 255.0], 1.4, 3.0),
-        ];
+        let defs = super::content::DEFAULTS;
         let mut kinds = [Kind { on: true, colour: V3::ZERO, strength: 0.0, creep: 1.0, scale: 1.0, rim: 0.0, light: V3::ZERO, light_brightness: 0.0, light_range: 0.0, fade: 1.0 }; KINDS];
         for (k, d) in defs.iter().enumerate() {
             let n = NAMES[k];
@@ -121,8 +117,8 @@ impl Looks {
     }
     /// `Render3D.ini` read again (`[Specials] Reload=1`): the settings, keeping what is
     /// on the device.
-    pub fn reload(&mut self, ini: &Ini) {
-        let n = Looks::new(ini);
+    pub fn reload(&mut self, _ini: &Ini) {
+        let n = Looks::new();
         self.overlay = n.overlay;
         self.lights_on = n.lights_on;
         self.kinds = n.kinds;
@@ -267,6 +263,6 @@ impl Looks {
 /// An object's bounding radius (its instance's `+0x40`), or 50.
 fn radius_of(o: usize) -> f32 {
     let inst = crate::engine::obj::instance(o);
-    let r = if inst != 0 { crate::engine::field_f32(inst, 0x40) } else { 0.0 };
+    let r = hooks::bounding_radius(inst);
     if r > 1.0 && r < 20000.0 { r } else { 50.0 }
 }

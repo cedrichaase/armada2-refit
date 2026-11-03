@@ -23,15 +23,17 @@
 //! node's world matrix and whether it is shown), e.g. for its emitter nodes;
 //! `shadow_map()` lends the shadow map as `Lighting.asi`'s `LightingShadowMap` did.
 use crate::scene::anim;
-pub mod game;
+pub mod content;
+pub mod hooks;
 pub mod look;
 mod draw;
+mod scene_lights;
 mod shadow;
 mod sprites;
 
 use super::{Module, Step};
 
-use crate::engine::{self, field, field_u8, obj};
+use crate::engine::{self, obj};
 use crate::frame::steps::View;
 use crate::math::{v3, M34, V3};
 use crate::scene::instance::{self, hide};
@@ -80,6 +82,12 @@ impl ViewState {
 }
 
 static mut VIEWS: [Option<ViewState>; 3] = [None, None, None];
+/// `Render3D.ini` as it is now, for `Reload=1` (the bench re-reads `[Hulls]` every
+/// second, between settings changes).
+fn open_ini() -> crate::rt::Ini {
+    crate::rt::Ini::open(&crate::rt::game_path("Render3D.ini"))
+}
+
 /// The module, for the calls other modules make into it (`placeholder`); set at every
 /// `begin_view` (the box it lives in does not move).
 static mut ME: *mut Hulls = core::ptr::null_mut();
@@ -140,15 +148,15 @@ impl Default for Hulls {
 /// scrap overrides that set some nodes and then call it), with a `RenderInternal` we
 /// reproduce.
 fn our_class(o: usize, look: &Look) -> bool {
-    let r = game::render_fn(o);
+    let r = hooks::render_fn(o);
     let ok = match r {
-        game::FN_GO_RENDER | game::FN_SHIPYARD_RENDER | game::FN_MINING_RENDER | game::FN_RIG_RENDER => true,
-        game::FN_SCRAP_RENDER => look.scrap,
+        hooks::FN_GO_RENDER | hooks::FN_SHIPYARD_RENDER | hooks::FN_MINING_RENDER | hooks::FN_RIG_RENDER => true,
+        hooks::FN_SCRAP_RENDER => look.scrap,
         _ => false,
     };
-    ok && match game::render_internal_fn(o) {
-        game::FN_GO_RI | game::FN_CRAFT_RI | game::FN_FREIGHTER_RI => true,
-        game::FN_EVOLVER_RI => look.evolver,
+    ok && match hooks::render_internal_fn(o) {
+        hooks::FN_GO_RI | hooks::FN_CRAFT_RI | hooks::FN_FREIGHTER_RI => true,
+        hooks::FN_EVOLVER_RI => look.evolver,
         _ => false,
     }
 }
@@ -156,13 +164,15 @@ fn our_class(o: usize, look: &Look) -> bool {
 /// The `RenderInternal`s that are or end in `Craft::RenderInternal` (the warp stretch,
 /// the white wave light).
 fn craft_ri(o: usize) -> bool {
-    matches!(game::render_internal_fn(o), game::FN_CRAFT_RI | game::FN_FREIGHTER_RI | game::FN_EVOLVER_RI)
+    matches!(hooks::render_internal_fn(o), hooks::FN_CRAFT_RI | hooks::FN_FREIGHTER_RI | hooks::FN_EVOLVER_RI)
 }
 
 impl Hulls {
     fn look(&mut self) -> &Look {
+        // `configure` has read `[Hulls]` before any view; this is for a call that comes
+        // first anyway.
         if self.look.is_none() {
-            self.look = Some(look::load());
+            self.look = Some(look::load(&open_ini()));
         }
         self.look.as_ref().unwrap()
     }
@@ -184,8 +194,8 @@ impl Hulls {
         if inst == 0 {
             return None;
         }
-        let db = field(inst, 0x80);
-        if db == 0 || engine::vtable(db) != game::VT_DATABASE || db != game::class_visible_db(o) {
+        let db = hooks::instance_database(inst);
+        if db == 0 || engine::vtable(db) != hooks::VT_DATABASE || db != hooks::class_visible_db(o) {
             return None;
         }
         let name = obj::odf_name(o);
@@ -193,8 +203,8 @@ impl Hulls {
             return None;
         }
         let model = scene::model(&assets::sod_of(name))?;
-        game::instance_update(o);
-        let scale = game::instance_scale(inst);
+        hooks::instance_update(o);
+        let scale = hooks::instance_scale(inst);
         let s = scale * self.scale_sod(name);
         let mut world: M34 = obj::transform(o);
         world.r[0] = world.r[0] * s.x;
@@ -202,17 +212,17 @@ impl Hulls {
         world.r[2] = world.r[2] * s.z;
         let clock = pose::Clock::of_instance(inst, v.time);
         let mut p = pose::pose(&model.sod, &model.info, &world, clock, pose::auto(v.eye));
-        let craft = game::is_craft_instance(inst);
+        let craft = hooks::is_craft_instance(inst);
         instance::visibility(o, inst, craft, &model, &mut p);
         let (c, r) = draw::model_sphere(&model);
         let centre = world.transform_point(c);
         let radius = r * world.r[0].len().max(world.r[1].len()).max(world.r[2].len());
         let look = self.look().clone();
-        let team = if look.team && game::team_colours_on() { Some(game::team_colour(o)) } else { None };
-        let start = engine::field_f32(inst, 0x18);
+        let team = if look.team && hooks::team_colours_on() { Some(hooks::team_colour(o)) } else { None };
+        let start = hooks::instance_start(inst);
         let since_start = (v.time - start).max(0.0);
-        let cloak = if field(o, 0x108) != 0 {
-            let (st, a, ph) = game::cloak(o);
+        let cloak = if hooks::has_cloak(o) {
+            let (st, a, ph) = hooks::cloak(o);
             match st {
                 1 | 3 => Some((st, ((a - 0.2) / 0.8).clamp(0.0, 1.0), ph)),
                 2 => Some((st, 0.0, ph)),
@@ -222,7 +232,7 @@ impl Hulls {
             None
         };
         let warp = if craft && craft_ri(o) {
-            game::warp(o, &obj::transform(o)).map(|(b, sv, n)| {
+            hooks::warp(o, &obj::transform(o)).map(|(b, sv, n)| {
                 static mut SAID: u32 = 0;
                 unsafe { SAID += 1 };
                 if unsafe { SAID } < 12 || unsafe { SAID } % 60 == 0 {
@@ -234,8 +244,8 @@ impl Hulls {
             None
         };
         let waves = draw::waves_of(o, craft && craft_ri(o), v.time);
-        let glow = if game::render_fn(o) == game::FN_SCRAP_RENDER { game::scrap_glow(o) } else { None };
-        let cargo = game::cargo_markings(o, &model.sod);
+        let glow = if hooks::render_fn(o) == hooks::FN_SCRAP_RENDER { hooks::scrap_glow(o) } else { None };
+        let cargo = hooks::cargo_markings(o, &model.sod);
         Some(Posed {
             obj: o,
             inst,
@@ -246,10 +256,10 @@ impl Hulls {
             centre,
             radius,
             since_start,
-            flags: field(inst, 0xc) as u32,
+            flags: hooks::instance_flags(inst),
             clock,
             team,
-            assimilated: craft && field_u8(inst, 0xa1) != 0,
+            assimilated: craft && hooks::assimilated(inst),
             warp,
             waves,
             glow,
@@ -308,24 +318,24 @@ impl Hulls {
     /// `GameObject::RenderInternal` writes the call's answer. False to leave it to the
     /// engine (not a plain SOD).
     fn hologram(&mut self, o: usize, h: usize, v: &View, look: &Look) -> bool {
-        let Some((inst, class)) = game::hologram_parts(h) else { return false };
-        let db = field(inst, 0x80);
-        let name = game::class_odf(class);
-        if db == 0 || engine::vtable(db) != game::VT_DATABASE || name.is_empty() || scene::model(&assets::sod_of(name)).is_none() {
+        let Some((inst, class)) = hooks::hologram_parts(h) else { return false };
+        let db = hooks::instance_database(inst);
+        let name = hooks::class_odf(class);
+        if db == 0 || engine::vtable(db) != hooks::VT_DATABASE || name.is_empty() || scene::model(&assets::sod_of(name)).is_none() {
             if self.said_extra[0] < 8 {
                 self.said_extra[0] += 1;
                 log!("hulls: a hologram of '{}' (database vtable {:#x}) is left to the engine", name, engine::vtable(db));
             }
             return false;
         }
-        let seen = game::frustum_test(inst, v.cam);
-        unsafe { core::ptr::write_volatile((o + 0x25) as *mut u8, seen as u8) };
+        let seen = hooks::frustum_test(inst, v.cam);
+        hooks::write_seen(o, seen);
         if !seen {
             return true;
         }
-        let place = game::instance_matrix(inst);
+        let place = hooks::instance_matrix(inst);
         let clock = pose::Clock::of_instance(inst, v.time);
-        let team = game::team_colour(o);
+        let team = hooks::team_colour(o);
         let Some(p) = self.pose_extra(v, name, &place, v3(1.0, 1.0, 1.0), clock, Some(team), class, false) else { return false };
         if self.said_extra[0] < 8 {
             self.said_extra[0] += 1;
@@ -342,24 +352,23 @@ impl Hulls {
     /// by distance, its scale effects applied, faded while it forms. Whether it is in
     /// view (stock's answer, the on-screen byte while only the cocoon shows).
     fn cocoon(&mut self, c: usize, v: &View, look: &Look) -> bool {
-        let pos = engine::field_v3(c, 0x68);
-        if game::distance_culled(pos, v.eye) {
+        let pos = hooks::cocoon_position(c);
+        if hooks::distance_culled(pos, v.eye) {
             return false;
         }
-        game::cocoon_scale_effects(c);
-        let db = field(c, 0x80);
-        let ours = engine::vtable(c) == game::VT_COCOON && db != 0 && engine::vtable(db) == game::VT_DATABASE && db == unsafe { engine::rd::<usize>(game::COCOON_DB) };
-        let place = game::instance_matrix(c);
+        hooks::cocoon_scale_effects(c);
+        let ours = hooks::is_known_cocoon(c);
+        let place = hooks::instance_matrix(c);
         let p = if ours {
-            self.pose_extra(v, "8472_cocoon", &place, game::instance_scale(c), pose::Clock::of_instance(c, v.time), None, 0, false)
+            self.pose_extra(v, content::COCOON_SOD, &place, hooks::instance_scale(c), pose::Clock::of_instance(c, v.time), None, 0, false)
         } else {
             None
         };
         let Some(p) = p else {
             // Not the cocoon we know: the engine's own draw of the instance.
-            return game::instance_render(c, v.cam);
+            return hooks::instance_render(c, v.cam);
         };
-        if !game::frustum_test(c, v.cam) {
+        if !hooks::frustum_test(c, v.cam) {
             return false;
         }
         // (`p.inst` stays 0: the cocoon's `+0x10` is not a face limit.)
@@ -372,7 +381,7 @@ impl Hulls {
         if self.said_extra[1] % 60 == 1 {
             log!(
                 "hulls: an Evolver's cocoon at {:.0},{:.0},{:.0}, scale {:.2}, far fade {:.2}, stock's fade {:.2} (+0x98 {:.2})",
-                pos.x, pos.y, pos.z, game::instance_scale(c).x, fade, game::cocoon_fade(c), engine::field_f32(c, 0x98)
+                pos.x, pos.y, pos.z, hooks::instance_scale(c).x, fade, hooks::cocoon_fade(c), hooks::cocoon_ramp(c)
             );
         }
         let st = view_state(v.key());
@@ -448,11 +457,11 @@ fn placeholder(v: &View, class: usize, place: &M34, colour: V3, blocked: bool) -
     if !look.ghost.on {
         return false;
     }
-    let name = game::class_odf(class);
+    let name = hooks::class_odf(class);
     if name.is_empty() {
         return false;
     }
-    if game::distance_culled(place.p, v.eye) {
+    if hooks::distance_culled(place.p, v.eye) {
         return true;
     }
     let Some(p) = me.pose_extra(v, name, place, v3(1.0, 1.0, 1.0), pose::Clock::FROZEN, Some(colour), class, true) else { return false };
@@ -476,25 +485,25 @@ fn placeholder(v: &View, class: usize, place: &M34, colour: V3, blocked: bool) -
 /// Borg node hidden (a craft class), `lights` too when asked, `hardpoints` always.
 fn clean(model: &Model, class: usize, no_lights: bool, p: &mut pose::Pose) {
     let sod = &model.sod;
-    if let Some(i) = sod.find("hardpoints") {
+    if let Some(i) = sod.find(content::HARDPOINTS_NODE) {
         hide(sod, i, &mut p.shown, true);
     }
-    if no_lights || game::detail_level() == 0 {
-        if let Some(i) = sod.find("lights").or_else(|| sod.find("light")) {
+    if no_lights || hooks::detail_level() == 0 {
+        if let Some(i) = content::LIGHTS_NODES.iter().find_map(|n| sod.find(n)) {
             hide(sod, i, &mut p.shown, true);
         }
     }
-    if class == 0 || !is_craft_class(class) {
+    if class == 0 || !hooks::is_craft_class(class) {
         return;
     }
-    for (cf, _) in game::DAMAGE_NODES.iter().copied().chain([(0x408usize, 0usize)]) {
-        if let Some(i) = game::element_name(field(class, cf)).and_then(|nm| sod.find(nm)) {
+    for nm in hooks::class_effect_nodes(class) {
+        if let Some(i) = sod.find(nm) {
             for &c in &sod.nodes[i].children {
                 hide(sod, c, &mut p.shown, true);
             }
         }
     }
-    if let Some(i) = game::element_name(field(class, 0x420)).and_then(|nm| sod.find(nm)) {
+    if let Some(i) = hooks::class_borg_node(class).and_then(|nm| sod.find(nm)) {
         hide(sod, i, &mut p.shown, true);
     }
 }
@@ -504,28 +513,16 @@ fn clean(model: &Model, class: usize, no_lights: bool, p: &mut pose::Pose) {
 /// `weapons`, `shield`, `shields`, `sensors`, `crew`, `damage`) and the `borg` node.
 fn clean_named(model: &Model, p: &mut pose::Pose) {
     let sod = &model.sod;
-    for n in ["life", "engines", "weapons", "shield", "shields", "sensors", "crew", "damage"] {
+    for n in content::DAMAGE_PARENT_NODES {
         if let Some(i) = sod.find(n) {
             for &c in &sod.nodes[i].children {
                 hide(sod, c, &mut p.shown, true);
             }
         }
     }
-    if let Some(i) = sod.find("borg") {
+    if let Some(i) = sod.find(content::BORG_NODE) {
         hide(sod, i, &mut p.shown, true);
     }
-}
-
-/// Whether a class is a `CraftClass` (its node fields are where `clean` reads them):
-/// `DisableSpecialNodes` (vtable slot 7) is `CraftClass`'s (0x4bfdf0).
-fn is_craft_class(class: usize) -> bool {
-    field(engine::vtable(class), 7 * 4) == 0x4bfdf0
-}
-
-/// The object-loop filters the step body applies (`frame::steps`): not a background
-/// object, not distance-culled for this view.
-fn in_loop(o: usize) -> bool {
-    o != 0 && obj::flags(o) & 0x10000 == 0 && field_u8(o, 0x183) == 0
 }
 
 /// The hulls module's draws, offered to the others as `core_services::hulls()`.
@@ -560,9 +557,15 @@ impl Module for Hulls {
     fn rows(&self) -> &'static [crate::rt::settings::Setting] {
         &[]
     }
-    fn configure(&mut self, _ini: &crate::rt::Ini, _said: &mut crate::core_module::Changes) {}
+    /// `[Hulls]` (the look, `Borg*` included) and the scene lights in `[Lights]`
+    /// (`scene_lights.rs`), at load and at every settings change.
+    fn configure(&mut self, ini: &crate::rt::Ini, _said: &mut crate::core_module::Changes) {
+        self.look = Some(look::load(ini));
+        scene_lights::configure(ini);
+    }
     fn provide(&mut self, id: crate::core_module::ModuleId, s: &mut crate::core_services::Services) {
         s.hulls(id, &PROVIDER);
+        s.scene_lights(&scene_lights::PROVIDER);
     }
     /// `[Modules] hulls=0`: the menu scene's ships stay ours. The front end has no game
     /// objects and the engine draws nothing there (Display8.log: 0 engine draws in
@@ -584,7 +587,7 @@ impl Module for Hulls {
         // `[Hulls] ABTest=1` (the bench only): stay on beside Lighting.asi, and stand
         // aside while `Render3D.hulls-off` exists in the game directory, so one session
         // can show either at the same moment.
-        if crate::config::ini().int("Hulls", "ABTest", 0) != 0 {
+        if self.look.as_ref().is_some_and(|l| l.ab_test) {
             return None;
         }
         Some("Lighting.asi")
@@ -613,8 +616,9 @@ impl Module for Hulls {
         let now = crate::rt::now();
         if now - self.loaded_at > 1.0 {
             self.loaded_at = now;
-            if crate::config::ini().int("Hulls", "Reload", 0) != 0 {
+            if open_ini().int("Hulls", "Reload", 0) != 0 {
                 let old = self.look.take().map(|l| (l.ghost.alpha, l.ghost.lift, l.holo.alpha));
+                self.look = Some(look::load(&open_ini()));
                 let new = self.look().clone();
                 if old != Some((new.ghost.alpha, new.ghost.lift, new.holo.alpha)) {
                     log!("hulls: [Hulls] read again: ghost alpha {:.2} lift {:.2}, hologram alpha {:.2}", new.ghost.alpha, new.ghost.lift, new.holo.alpha);
@@ -641,7 +645,7 @@ impl Module for Hulls {
         // frame's hulls and the object loop finds them posed.
         let mut list = Vec::new();
         engine::for_each_in_list(engine::OBJECT_LIST, |o| {
-            if in_loop(o) && !obj::expired(o) && our_class(o, &look) && obj::can_user_see(o) && !(look.holo.on && game::hologram(o) != 0) {
+            if hooks::in_loop(o) && !obj::expired(o) && our_class(o, &look) && obj::can_user_see(o) && !(look.holo.on && hooks::hologram(o) != 0) {
                 list.push(o);
             }
         });
@@ -681,21 +685,21 @@ impl Module for Hulls {
         let key = v.key();
         // Evolver::RenderInternal: the cocoon first; past a third of the evolution
         // only the cocoon.
-        if game::render_internal_fn(o) == game::FN_EVOLVER_RI && !obj::expired(o) && obj::can_user_see(o) {
-            let c = game::cocoon(o);
+        if hooks::render_internal_fn(o) == hooks::FN_EVOLVER_RI && !obj::expired(o) && obj::can_user_see(o) {
+            let c = hooks::cocoon(o);
             if c != 0 {
-                game::instance_update(o);
+                hooks::instance_update(o);
                 let shown = self.cocoon(c, v, &look);
-                if game::evolution(o) > 1.0 / 3.0 {
-                    unsafe { core::ptr::write_volatile((o + 0x25) as *mut u8, shown as u8) };
+                if hooks::evolution(o) > 1.0 / 3.0 {
+                    hooks::write_seen(o, shown);
                     return true;
                 }
             }
         }
         // A hologram: GameObject::RenderInternal draws it in place of the hull.
-        let h = game::hologram(o);
+        let h = hooks::hologram(o);
         if h != 0 && look.holo.on && !obj::expired(o) && obj::can_user_see(o) {
-            game::instance_update(o);
+            hooks::instance_update(o);
             if self.hologram(o, h, v, &look) {
                 return true;
             }
@@ -717,31 +721,31 @@ impl Module for Hulls {
         if obj::expired(o) || !obj::can_user_see(o) {
             return true;
         }
-        let h = game::hologram(o);
+        let h = hooks::hologram(o);
         if h != 0 {
-            game::render_hologram(o, h);
+            hooks::render_hologram(o, h);
             return true;
         }
-        if game::suppressed(o) {
+        if hooks::suppressed(o) {
             return true;
         }
-        if game::render_fn(o) == game::FN_RIG_RENDER {
-            match game::rig_placeholder_of(o) {
+        if hooks::render_fn(o) == hooks::FN_RIG_RENDER {
+            match hooks::rig_placeholder_of(o) {
                 Some((class, place, colour)) => {
                     if !placeholder(v, class, &place, colour, false) {
-                        game::rig_placeholder(o);
+                        hooks::rig_placeholder(o);
                     }
                 }
                 None => {}
             }
         }
         let inst = obj::instance(o);
-        if !game::frustum_test(inst, v.cam) {
+        if !hooks::frustum_test(inst, v.cam) {
             return true;
         }
-        game::set_on_screen(o);
+        hooks::set_on_screen(o);
         // The frustum test may have changed the instance's scale (scale effects).
-        let sc = game::instance_scale(inst);
+        let sc = hooks::instance_scale(inst);
         let stale = view_state(key).posed().get(&o).is_some_and(|p| (p.scale - sc).len() > 1e-4);
         if stale {
             if let Some(p) = self.prepare(o, v) {
@@ -772,7 +776,7 @@ impl Module for Hulls {
             st.additive.push(o);
         }
         self.sprites.collect(v, &look, p, &mut st.sprites);
-        if let Some(name) = game::billboard_effect(o) {
+        if let Some(name) = hooks::billboard_effect(o) {
             self.sprites.billboard(v, &look, p, name, &mut st.sprites);
         }
         true
@@ -977,7 +981,7 @@ fn draw_instance(v: &View, key: usize, inst: usize, craft: bool, sod: &str, worl
     let centre = world.transform_point(c);
     let radius = r * world.r[0].len().max(world.r[1].len()).max(world.r[2].len());
     let look = h.look().clone();
-    let team = if look.team && game::team_colours_on() { team } else { None };
+    let team = if look.team && hooks::team_colours_on() { team } else { None };
     let posed = Posed {
         obj: 0,
         inst,
@@ -987,8 +991,8 @@ fn draw_instance(v: &View, key: usize, inst: usize, craft: bool, sod: &str, worl
         scale: v3(1.0, 1.0, 1.0),
         centre,
         radius,
-        since_start: (v.time - engine::field_f32(inst, 0x18)).max(0.0),
-        flags: field(inst, 0xc) as u32,
+        since_start: (v.time - hooks::instance_start(inst)).max(0.0),
+        flags: hooks::instance_flags(inst),
         clock,
         team,
         assimilated: false,

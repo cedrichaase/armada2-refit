@@ -851,10 +851,10 @@ key. Render3D.log says `settings: N rows exported (M the core's)`.
 
 | Owner | Sections |
 |---|---|
-| core | `[Render3D]` (`Enable`, `Log`, `MSAA`, `HDR`, `Bloom*`, `Exposure`, `Shoulder`, `Inset`, `Steps`, `Timing*`), `[Modules]`, `[Bench]` (`Clock`), `[Lights]`: the cluster keys (`Clustered`, `ClusterTile`, `ClusterSlices`, `ClusterLights`, `ClusterPerColour`), and for now the scene lights (`Replace`, `KeyColour`, `KeyAxis`, `FillColour`, `FillAxis`, `SkyLight`, read in `scene/lights.rs`) |
+| core | `[Render3D]` (`Enable`, `Log`, `MSAA`, `HDR`, `Bloom*`, `Exposure`, `Shoulder`, `Inset`, `Steps`, `Timing*`), `[Modules]`, `[Bench]` (`Clock`), `[Lights]`: the cluster keys (`Clustered`, `ClusterTile`, `ClusterSlices`, `ClusterLights`, `ClusterPerColour`), the scene lights' data type and their application (`scene/lights.rs`; the keys are hulls') |
 | world | `[World]` (the planets', rocks' and nebulae's switches and keys: there is no `[Planets]` or `[Rocks]` section), `[Nebulae]`; the recipe files' `[Surface]` and `[Nebula]` |
 | particles | `[Particles]` |
-| hulls | `[Hulls]` (the `Borg*` look keys with it); the `[Lights]` scene keys move here with the hulls' look |
+| hulls | `[Hulls]` (the `Borg*` look keys with it); the `[Lights]` scene keys (`Replace`, `KeyColour`, `KeyAxis`, `FillColour`, `FillAxis`, `SkyLight`), read by its `configure` in `hulls/scene_lights.rs` and handed to the core through `core_services::scene_lights()` |
 | effects | `[Bees]`, `[Construction]`, `[Debris]`, `[Repair]`, `[Sparks]`, `[Explosions]`, `[Shields]`, `[Shell.<name>]` |
 | ordnance | `[Warp]`, `[Ordnance.<odf>]`, `[Model.<odf>]`, `[Wave.<odf>]` (over the built-in `ordnance.ini`); the `[Lights]` beam keys (`Beam*`, `ConeSpot`, read by its `configure` in `ordnance/lights.rs`, `Beam`) |
 | specials | `[Specials]` |
@@ -1235,6 +1235,14 @@ module's own keys, in `Render3D.ini` `[Ordnance]`:
 | `Survey` | 0 | log every ordnance ODF the first time it shows, with its vtable and `Submit` |
 
 ### specials
+
+**Layout (phase 7).** `hooks.rs` holds the reads of `mAllEffects` and its effects, and
+the engine's own `Render(cam)` for the classes it leaves to the engine; the module has
+no hook to install (it takes `Step::Specials`, and the frame hands the step back to the
+engine while it is off). `content.rs` holds the three kinds' names and their shipped
+looks. `configure` reads `[Specials]` at load and at every settings change (`Reload=1`
+reads it again every 120 frames, as before). `Modules.specials` is live, checked by
+`render3d-live-hulls` (pixels) and `render3d-live-specials` (off at load, on live).
 
 `src/mods/specials/`, `shaders/specials.hlsl`, on by default (`[Modules] specials=0`
 leaves it to the engine). `Step::Specials`: the special-object effects, which stock
@@ -1742,6 +1750,22 @@ vents (the look settled with the user, and the settings keep its keys, in
 ### hulls
 
 #### hulls
+
+**Layout (phase 7).** `hooks.rs` is the engine glue: every address, call and field offset
+the module reads of an object and its instance, behind named accessors (it was
+`game.rs`). The module installs no hook of its own: the frame's object loop calls it,
+and it draws `GameObject::Render` by returning true there, so with it off the engine's
+own draw stands as stock (`Modules.hulls` is live, checked by `render3d-live-hulls`).
+`content.rs` holds its names of the game's data (SOD nodes, the cocoon's SOD, the
+scrap glow's sprite) and stock's resource colours. `scene_lights.rs` reads the scene
+keys and answers the core's `SceneLightSource`: the `Lighting.asi` test is made at the
+first gather (every plugin is loaded by then, not at load), and the replacement goes on
+with the module at 0, since the other modules light by it. `configure` reads `[Hulls]`
+and the scene keys at load and at every settings change; `Reload=1` and `ABTest` (the
+bench) work as before. The module has no settings row of its own beyond
+`Modules.hulls`. `Style`/`set_style` stay in `scene/lights.rs`: they are a light's
+semantics for the cluster pass, set by effects and ordnance, and no hulls code reads or
+sets them.
 
 `src/mods/hulls/`, `shaders/hulls.hlsl`, on by default; supersedes `Lighting.asi`'s
 hull path (and stands down while a stale `Lighting.asi` is loaded). Settings in `[Hulls]`
