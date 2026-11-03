@@ -8,7 +8,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 ## 4.0.4 — 2026-11-03
 
 ### Fixed
-- `render3d-build-subset` and `render3d/subset-scenario.sh`: the exported settings row count is 22 (11 the core's), not 20 (9) (root 15.6.3). Installed, not yet seen in game.
+- `render3d-build-subset` and `render3d/subset-scenario.sh`: the exported settings row count without a module is 21 (10 the core's), not 20 (9) (root 15.6.3). Installed, not yet seen in game.
 
 ## 4.0.3 — 2026-11-03
 

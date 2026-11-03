@@ -25,7 +25,7 @@ sky or planet in the menu scene, since nothing else draws them (README.md, "Crat
 2. Wait up to 240 seconds for "Scene.log" to say "paused at tick".
 3. Expect "Render3D.log" contains "clock: bench".
 4. Expect "Render3D.log" contains "modules not built in: hulls".
-5. Expect "Render3D.log" contains "settings: 22 rows exported (11 the core's)".
+5. Expect "Render3D.log" contains "settings: 21 rows exported (10 the core's)".
 6. Expect "Render3D.log" not contains "module hulls:".
 7. Wait 5 seconds.
 8. Take a screenshot called "showcase".
