@@ -6,8 +6,7 @@
 #   layers/<id>/  one folder per layer, whose files go beside Armada2.exe: display
 #             (d3d8.dll, ours, and Display8.ini), render3d (Render3D.asi, its .ini and
 #             its recipes in Surfaces/ and Nebulae/), ui, qol, rules, online, cutscenes,
-#             renderer (dxvk.conf) and legacy (HUD, Menus and GridLayout, for a chain
-#             UI.asi cannot draw on)
+#             renderer (dxvk.conf)
 #   chain/    the Direct3D chain ./install sets up: crosire's d3d8to9 as d3d8.dll on
 #             DXVK's d3d9.dll (both from platform/vendor/, with their licences)
 #   models/   models/moon-sod.py, select-sod.py, hull-sod.py (+ hull-sod.sha256),
@@ -18,8 +17,9 @@
 #   prereqs.txt  CREDITS.txt  what they install first, and who made it
 #   sdk/      what a mod needs to be built on the same base: csdk/'s headers and import
 #             definitions, and MODDING.txt (publish/MODDING.txt)
-#   layers.txt  moved.txt   each layer's select, requires and scope (tools/layers.py) and the
-#             settings that moved between files (the settings tables), as the scripts read them
+#   layers.txt  moved.txt  retire.txt   each layer's select, requires and scope
+#             (tools/layers.py), the settings that moved between files (the settings tables)
+#             and what earlier versions installed (retire/known.txt), as the scripts read them
 #   README.txt  LICENSE  SHA256SUMS
 #   manifest.json               what is in it, for the GUI installer (package schema 1)
 #   armada2-refit-installer.py  the GUI installer (gui-installer/), also written beside
@@ -46,11 +46,8 @@ commit="$(git -C "$root" rev-parse --short HEAD)"
 # target (render3d/build.sh says how to get it).
 bash "$root/render3d/build.sh"         >/dev/null
 bash "$root/ui/build.sh"               >/dev/null
-bash "$root/hud/build.sh"              >/dev/null
-bash "$root/menus/build.sh"            >/dev/null
 bash "$root/qol/build.sh"              >/dev/null
 bash "$root/rules/build.sh"            >/dev/null
-bash "$root/grid/build.sh"             >/dev/null
 bash "$root/online/build.sh"           >/dev/null
 bash "$root/cutscenes/binkproxy/build.sh" >/dev/null
 bash "$root/display/build.sh"          >/dev/null
@@ -60,16 +57,12 @@ stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
 d="$stage/$name"
 L="$d/layers"
-mkdir -p "$L"/{display,render3d,ui,legacy,qol,rules,online,cutscenes,renderer} "$d/chain" "$d/models" "$d/sdk"
+mkdir -p "$L"/{display,render3d,ui,qol,rules,online,cutscenes,renderer} "$d/chain" "$d/models" "$d/sdk"
 cp "$root/render3d/build/Render3D.asi"      "$root/render3d/Render3D.ini"       "$L/render3d/"
 mkdir -p "$L/render3d/Surfaces" "$L/render3d/Nebulae"
 cp "$root/render3d/content/surfaces/"*.ini "$L/render3d/Surfaces/"
 cp "$root/render3d/content/nebulae/"*.ini  "$L/render3d/Nebulae/"
 cp "$root/ui/build/UI.asi"                  "$root/ui/UI.ini"                   "$L/ui/"
-# HUD.asi, Menus.asi and GridLayout.asi go in only where UI.asi cannot draw (no d3d8to9).
-cp "$root/hud/build/HUD.asi"                "$root/hud/HUD.ini"                 "$L/legacy/"
-cp "$root/menus/build/Menus.asi"            "$root/menus/Menus.ini"             "$L/legacy/"
-cp "$root/grid/build/GridLayout.asi"        "$root/grid/GridLayout.ini"         "$L/legacy/"
 cp "$root/qol/build/QOL.asi"                "$root/qol/QOL.ini"                 "$L/qol/"
 cp "$root/rules/build/QOLRules.asi"         "$root/rules/QOLRules.ini"          "$L/rules/"
 cp "$root/online/build/Online.asi"          "$root/online/Online.ini"           "$L/online/"
@@ -96,6 +89,10 @@ cp "$root/display/build/d3d8.dll" "$root/display/Display8.ini" "$L/display/"
 cp "$root/models/moon-sod.py" "$root/models/select-sod.py" "$root/models/hull-sod.py" \
    "$root/models/hull-sod.sha256" "$root/models/asteroid-sod.py" "$d/models/"
 cp "$root/a2env.py" "$d/"
+# What puts the file-based HUD fixes of hud 2.x back from their backups, for the installers
+# (retire/known.txt, baked as retire.txt, lists the rest).
+mkdir -p "$d/retire"
+cp "$root/retire/hud-files.py" "$d/retire/"
 # cmd.exe wants CRLF.
 sed 's/$/\r/' "$root/publish/installer/install.bat" > "$d/install.bat"
 cp "$root/LICENSE" "$d/"
@@ -116,6 +113,8 @@ for l in json.load(sys.stdin)["layers"]:
     if "armada2" in l["games"]:
         print("\t".join([l["id"], l["select"], ",".join(l["requires"]), l["scope"]]))
 ' > "$d/layers.txt"
+# What earlier versions installed and is retired (retire/known.txt, without its comments).
+grep -vE '^(#|$)' "$root/retire/known.txt" > "$d/retire.txt"
 python3 -I - "$root" > "$d/moved.txt" <<'PYEOF'
 import os, sys
 root = sys.argv[1]
@@ -186,10 +185,8 @@ WHAT GOES IN (layers/<id>/, copied beside Armada2.exe)
                                                cube maps; only DXVK reads it
 Render3D.asi and UI.asi draw on Display8's own device (below), or on the Direct3D 9
 device of d3d8to9 behind it. Where the installer leaves the chain as it is, they are not
-installed, and these take the UI's place instead (the 3D view is then the engine's):
-  HUD.asi      + HUD.ini        hud $(version "$root/hud/CHANGELOG.md")        in-game HUD, font and cursors at any aspect
-  Menus.asi    + Menus.ini      menus $(version "$root/menus/CHANGELOG.md")      the shell menus scaled to fill the screen
-  GridLayout.asi + .ini         grid $(version "$root/grid/CHANGELOG.md")       the button bar as a 5x3 grid of position keys
+installed. HUD.asi, Menus.asi and GridLayout.asi, which UI.asi replaced, are not in the
+package any more: the installer takes out the copies an earlier version put in.
 DISPLAY8 (layers/display/)     display $(version "$root/display/CHANGELOG.md")
   d3d8.dll     + Display8.ini   the game's Direct3D 8, ours, in front of d3d8to9 (below),
                                 which goes behind it as d3d8_real.dll. In stub mode, as
@@ -246,9 +243,7 @@ NEEDS FROM YOU
   Star Trek: Armada II, GOG release (patch 1.1). Under Wine/Proton, the DLL overrides
   the installer prints, in the launcher (the graphical installer writes them into
   Heroic's settings on Linux and into the Wine prefix's registry on macOS). A plugin that does not recognise Armada2.exe
-  patches nothing and says so in its .log. Never install HUD.asi alongside the
-  file-based fixes (hud/ui-widescreen.py and friends): every correction would apply
-  twice.
+  patches nothing and says so in its .log.
 
 BLOOM
   Render3D.asi blooms the 3D view itself. Packages before 13.0.0 set up a separate
@@ -353,7 +348,7 @@ json.dump({
               'the 3D view through a renderer of our own: HDR, anti-aliasing, bloom, lit hulls '
               'with shadows, skies, effects, planets and nebulae', 'd3d8to9'),
         layer('ui', 'HUD and menus', '$(version "$root/ui/CHANGELOG.md")',
-              ['layers/ui/*', 'layers/legacy/*'],
+              ['layers/ui/*'],
               'the HUD, the menus, the loading screen and the cursor redrawn at any aspect ratio, '
               'the button bar as a grid of position keys', 'd3d8to9'),
         layer('qol', 'Quality of life', '$(version "$root/qol/CHANGELOG.md")',
@@ -383,8 +378,8 @@ json.dump({
 }, open(sys.argv[1], 'w'), indent=1)
 EOF
 
-(cd "$d" && { find layers chain models sdk vendor -type f | LC_ALL=C sort
-               printf '%s\n' a2env.py prereqs.txt layers.txt moved.txt manifest.json armada2-refit-installer.py
+(cd "$d" && { find layers chain models retire sdk vendor -type f | LC_ALL=C sort
+               printf '%s\n' a2env.py prereqs.txt layers.txt moved.txt retire.txt manifest.json armada2-refit-installer.py
              } | tr '\n' '\0' | xargs -0 sha256sum -- > SHA256SUMS)
 rm -f "$out/$name.zip"
 (cd "$stage" && zip -qrX "$out/$name.zip" "$name")

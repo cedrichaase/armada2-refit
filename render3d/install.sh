@@ -11,16 +11,13 @@
 # Render3D replaced the plugins that drew parts of the 3D view one at a time (MSAA,
 # Lighting, Sky, Nebulae, Surfaces, Explosions, Shields, Repair, Venting, Specials, Fog,
 # and the models layer's Planets.asi); they are no longer in this repository. A module
-# stands down while its old plugin is loaded, so this takes out any an earlier install
-# left.
+# stands down while its old plugin is loaded, so this runs retire/retire.sh, whose table
+# (retire/known.txt) lists them, to take out any an earlier install left.
 set -euo pipefail
 
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/a2env.sh"
 GAME="$A2_GAME"
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# The plugins render3d replaced, as an earlier install left them.
-OLD="MSAA Lighting Sky Nebulae Surfaces Explosions Shields Repair Venting Specials Fog Planets"
 
 remove_recipes() {
     local f
@@ -60,13 +57,7 @@ else
     cp "$here/Render3D.ini" "$GAME/Render3D.ini"
 fi
 
-removed=""
-for n in $OLD; do
-    if [ -e "$GAME/$n.asi" ] || [ -e "$GAME/$n.ini" ]; then
-        rm -f "$GAME/$n.asi" "$GAME/$n.ini" "$GAME/$n.log"
-        removed="$removed $n.asi"
-    fi
-done
+bash "$here/../retire/retire.sh" "$GAME" | sed "s/^/  /"
 
 remove_recipes
 mkdir -p "$GAME/Surfaces" "$GAME/Nebulae"
@@ -74,5 +65,5 @@ cp "$here"/content/surfaces/*.ini "$GAME/Surfaces/"
 cp "$here"/content/nebulae/*.ini "$GAME/Nebulae/"
 
 rm -f "$GAME/Render3D.log"
-echo "installed into $GAME: Render3D.asi, Render3D.ini and the recipes${removed:+; took out the old$removed}"
+echo "installed into $GAME: Render3D.asi, Render3D.ini and the recipes"
 echo "after a launch:  %LOCALAPPDATA%\\armada2-refit\\logs\\Render3D.log  (in the Wine prefix: drive_c/users/<user>/AppData/Local/armada2-refit/logs/)"

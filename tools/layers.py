@@ -34,7 +34,7 @@ import tomllib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REGISTRY = os.path.join(ROOT, 'layers.toml')
-SELECTS = ('core', 'on', 'off', 'legacy', 'retired')
+SELECTS = ('core', 'on', 'off', 'retired')
 SCOPES = ('local', 'match')
 FIELDS = ('id', 'name', 'dir', 'files', 'select', 'requires', 'scope', 'games', 'steps',
           'summary')
@@ -81,7 +81,7 @@ def resolve(reg, only=None, without=None):
         if i not in ids:
             raise Refused(f'{i}: no such layer (tools/layers.py --list)')
     for i in only or []:
-        if ids[i]['select'] in ('legacy', 'retired'):
+        if ids[i]['select'] == 'retired':
             raise Refused(f'{i}: a {ids[i]["select"]} layer, not offered')
     for i in without or []:
         if ids[i]['select'] == 'core':
@@ -93,7 +93,7 @@ def resolve(reg, only=None, without=None):
         while todo:
             for r in ids[todo.pop()]['requires']:
                 if r not in want:
-                    if ids[r]['select'] in ('legacy', 'retired'):
+                    if ids[r]['select'] == 'retired':
                         raise Refused(f'{r}: required, but a {ids[r]["select"]} layer')
                     want.add(r)
                     todo.append(r)
@@ -196,7 +196,7 @@ def _check_registry(reg, errs):
         for r in lay.get('requires', []):
             if r not in ids:
                 errs.append(f'{i}: requires {r}, no such layer')
-            elif by_id(reg)[r]['select'] in ('legacy', 'retired') and lay['select'] != 'legacy':
+            elif by_id(reg)[r]['select'] == 'retired':
                 errs.append(f'{i}: requires {r}, which is {by_id(reg)[r]["select"]}')
         if lay.get('select') == 'retired':
             if lay['install']:
@@ -262,7 +262,8 @@ def _check_a2mod(reg, errs):
                            ('binkw32.dll', BACKUP, 'cutscenes'),
                            ('d3d8.dll', '.a2display-backup', 'display'),
                            ('QOLRules.asi', None, 'rules'), ('Online.ini', None, 'online'),
-                           ('Menus/MainBk.bmp', None, 'menus'), ('Sky/Aqua.ini', None, 'parts')]:
+                           ('Menus/MainBk.bmp', None, 'ui'), ('Menus.asi', None, 'menus'), ('HUD.ini', None, 'hud'),
+                           ('GridLayout.asi', None, 'grid'), ('Sky/Aqua.ini', None, 'parts')]:
         got = m.layer_of(rel, suffix) if suffix else classify(reg, rel)
         if got != i:
             errs.append(f'a2mod: files {rel} under {got}, expected {i}')

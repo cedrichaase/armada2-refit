@@ -49,7 +49,7 @@ while IFS= read -r p; do
   [ -n "$p" ] || continue
   case "$p" in
     archive/*|promo/*|textures/.scratch/*|textures/targets/*/*/*|\
-    cutscenes/movies/*/*/*|menus/backdrops/*/*)
+    cutscenes/movies/*/*/*|menus/backdrops/*/*|ui/backdrops/*/*)
                                                echo "asset path  $p"; bad=1 ;;
   esac
   case "${p,,}" in

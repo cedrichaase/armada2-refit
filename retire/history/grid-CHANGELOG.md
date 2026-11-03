@@ -1,8 +1,17 @@
-# Changelog — grid
+# Changelog — grid (retired; history kept here, the folder is gone)
 
 `GridLayout.asi`: the button bar as a fixed 5×3 grid with one key per cell, by keyboard
-position. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions".
-Newest first. How and why: [`README.md`](README.md).
+position. Versioning rules: [`CLAUDE.md`](../../CLAUDE.md), "Changelogs and versions".
+Newest first. How and why: the layer's README, removed with it (what it established lives in `ui/HUD.md`, `ui/MENUS.md` and `display/README.md`).
+
+## 2.0.0 — 2026-11-03
+
+### Removed
+- The layer: `GridLayout.asi`, `GridLayout.ini`, `build.sh` and `install.sh`. The UI's button
+  bar (`ui/HUD.md`) is the grid. `retire/retire.sh` takes the plugin out of an old install;
+  the layer stays a retired row in `layers.toml`.
+
+Installed, not yet seen in game.
 
 ## 1.0.2 — 2026-10-21
 

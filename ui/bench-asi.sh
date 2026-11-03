@@ -5,13 +5,11 @@
 #
 # How the bench gets a working copy's UI.asi with keys of its own, as
 # online/bench-asi.sh does for Online.asi. A scenario's `Setup:` line can run it. As
-# ui/install.sh does, it then takes out of the clone the plugins the UI's parts switched
-# on take the place of (supersede.sh: HUD.asi, GridLayout.asi, Menus.asi), which a
-# clone of an older install still has.
+# ui/install.sh does, it then takes out of the clone the plugins the UI replaced (HUD.asi,
+# GridLayout.asi, Menus.asi: retire/retire.sh), which a clone of an older install still has.
 #
 #   --demo LIST   switches on the [Demo] overlay for each context named
-#   --no-grid     takes GridLayout.asi out of the clone (supersede.sh does too, with
-#                 [HUD] Bar on)
+#   --no-grid     takes GridLayout.asi out of the clone (retire.sh does too anyway)
 #   S.K=V         any other UI.ini key, e.g. UI.Scale=1.5 or HUD.Bar=1
 #   --scene NAME  also puts Scene.asi and testbench/scene/scenes/NAME.ini into the clone
 #                 (testbench/scene/bench-setup.sh), for a scenario that needs both
@@ -107,7 +105,7 @@ for kv in "${rts[@]}"; do
     sed -i -E "s/^(int +$k *= *)[-0-9]+;/\\1$v;/" "$work/game/RTS_CFG.h"
     echo "RTS_CFG.h: $(grep -E "^int +$k *=" "$work/game/RTS_CFG.h" | tr -d '\r')"
 done
-A2_GAME="$work/game" bash "$here/supersede.sh"
+bash "$here/../retire/retire.sh" "$work/game" >/dev/null
 if [ -n "$scene" ]; then
     bash "$here/../testbench/scene/bench-setup.sh" "$state" "$scene"
 fi

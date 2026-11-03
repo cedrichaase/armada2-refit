@@ -5,6 +5,43 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.2.0 — 2026-11-03
+
+Layers: hud 3.0.0, grid 2.0.0, menus 5.0.0, ui 2.1.0, models 5.1.0, textures 2.2.0, platform 3.7.0.
+
+### Added
+- `retire/`: `retire.sh [--check] [--chain] [<game dir>]` takes out of a game what earlier
+  versions installed and nothing installs now, by `retire/known.txt`: `HUD.asi`,
+  `GridLayout.asi`, `Menus.asi` and `MenuScale`, the twelve per-part plugins and their `Sky/`
+  recipes, `A2EngineTest.ini`, the per-user vkBasalt bloom; and, with `hud-files.py`, puts
+  the file-based HUD fixes of hud 2.x (`misc/gui_*.cfg`, the cursors, the `FontFinal4_*`
+  atlases and metrics from `.a2font-backup`) and the widened loading screen (`SOD/logo.SOD`,
+  `LOADING1..6`) back from their backups. The Direct3D chain's files (`d3d8_real.dll`,
+  `d3d9.dll`, a marked `dxvk.conf`) are in the table by hash and marker but taken out only
+  with `--chain`, which nothing passes yet. `retire/selftest.sh` checks it on a mock game
+  directory.
+- `retire.txt` in the release package (`known.txt` without comments) and `retire/hud-files.py`,
+  which `install.sh` and `install.ps1` run when they take the legacy plugins out.
+
+### Changed
+- `./install` runs `retire.sh` before the first layer installs (it took the vkBasalt bloom out
+  itself); `render3d/install.sh` runs it for the per-part plugins; `ui/bench-asi.sh` for a
+  bench clone. `ui/supersede.sh` and `hud/revert-files.sh` are gone.
+- `layers.toml`: `hud`, `menus` and `grid` are `retired` rows (`dir = 'retire'`), the
+  `legacy` select value is gone, the `ui` layer files `Menus/*.bmp`. `a2mod status` marks
+  retired rows; `a2mod refit` says when a snapshot holds retired files and points at
+  `retire.sh` instead of `menus/install.sh`.
+- The release package has no `layers/legacy/` and no HUD, Menus or GridLayout build: where
+  `UI.asi` cannot draw, the installers leave the game's own HUD and menus and take any old
+  copy of the three out (`publish/package.sh`, `install.sh`, `install.ps1`, their tests).
+
+### Removed
+- `hud/`, `grid/` and `menus/` (their last changelogs are `retire/history/`), the
+  `LOADING` texture target with `models/logo-sod.py`, `models/loading-panel.sh` and the
+  `panel=` lines of `a2tex`. `ui/bench-legacy.sh` stays but stops with a message.
+
+Installed, not yet seen in game.
+
 ## 14.14.0 — 2026-11-03
 
 Layers: testbench 3.105.0.
@@ -3791,9 +3828,9 @@ history.
 |---|---|---|
 | textures | 1.0.0 | [`textures/CHANGELOG.md`](textures/CHANGELOG.md) |
 | models | 1.0.0 | [`models/CHANGELOG.md`](models/CHANGELOG.md) |
-| hud | 1.0.0 | [`hud/CHANGELOG.md`](hud/CHANGELOG.md) |
+| hud | 1.0.0 | [`retire/history/hud-CHANGELOG.md`](retire/history/hud-CHANGELOG.md) |
 | font | 1.0.0 | `font/CHANGELOG.md` (removed) |
-| menus | 1.0.0 | [`menus/CHANGELOG.md`](menus/CHANGELOG.md) |
+| menus | 1.0.0 | [`retire/history/menus-CHANGELOG.md`](retire/history/menus-CHANGELOG.md) |
 | msaa | 1.0.0 | `msaa/CHANGELOG.md` (removed) |
 | cutscenes | 1.0.0 | [`cutscenes/CHANGELOG.md`](cutscenes/CHANGELOG.md) |
 | postfx | 1.0.0 | `postfx/CHANGELOG.md` (removed) |

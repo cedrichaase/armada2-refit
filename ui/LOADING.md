@@ -12,13 +12,13 @@ frames. The look is decided in `STYLE.md` ("Screens"); the hooks it draws from a
 
 The screen is drawn edge to edge and opaque, so whatever the engine drew under it
 never shows: the skybox (`mbg02`), the logo model and the stock bar. **A player without
-the widened `logo.SOD` (the models layer's `LOADING` target, `models/README.md`) gets
+the widened `logo.SOD` (the `LOADING` target, retired in models 5.1.0) gets
 the same screen**, since nothing of the logo is seen. The engine still loads and draws
 the logo scene at each 5% (its frames are the only ones it presents, and they come from
 the same function that pumps the message queue and reports the load's progress to the
-other players, so it is called, not replaced). With `[Loading] Enable=1` the `LOADING`
-target and `logo-sod.py` therefore change nothing on screen; they still matter to a
-player with the UI's loading screen off, and to the moment before the first frame of
+other players, so it is called, not replaced). With `[Loading] Enable=1` the widened
+logo model (retired with `logo-sod.py`) changed nothing on screen anyway; it only mattered
+to a player with the UI's loading screen off, and to the moment before the first frame of
 ours (below).
 
 **Frames of ours.** `LoadBarNext` calls `RenderLoopAssetLoadStatusUpdate` once per

@@ -71,7 +71,7 @@ position, not legal advice):
   takes a deliberate `git add -f`.
 - **`.gitignore`** also ignores every data directory a checkout from before `A2_DATA`
   may still have (`textures/targets/*/*/`, `cutscenes/movies/*/*/`,
-  `menus/backdrops/*/`, `textures/.scratch/`).
+  `ui/backdrops/*/`, `textures/.scratch/`).
 - **`publish/check.sh [-C <repo>] [<commit>]`** fails on any **binary** file in the
   index (or the commit), on any game format by extension, and on any path inside those
   data directories or the old `archive/` and `promo/`. No publishable file here is
@@ -107,11 +107,13 @@ and writes `armada2-refit-<version>.zip`:
   and the recipes in `Surfaces/` and `Nebulae/`), `ui` (`UI.asi`), `qol`, `rules`
   (`QOLRules.asi`), `online`, `cutscenes` (`binkw32.dll` and `BinkProxy.ini`), `renderer`
   (`dxvk.conf` at stage 3, `renderer/renderer-config.sh --print`), `display` (Display8,
-  below) and `legacy` (`HUD.asi`, `Menus.asi`, `GridLayout.asi`). `Render3D.asi` and
+  below). `Render3D.asi` and
   `UI.asi` need a device to draw on behind `d3d8.dll`, so the installers put them in only
   where `d3d8.dll` is crosire's d3d8to9 after the chain step, or Display8 in front of it
-  (below), taking out the `legacy` three as `ui/supersede.sh` does; elsewhere those three
-  go in instead and the 3D view stays the engine's. Either way the installers take out
+  (below); elsewhere neither goes in and the game keeps its own look (`HUD.asi`,
+  `Menus.asi` and `GridLayout.asi` are not in the package any more). Either way the
+  installers take out those three (`retire.txt`, baked from `retire/known.txt`, lists them;
+  `retire/hud-files.py` puts the hud 2.x file fixes back) and
   the per-part plugins (`MSAA`, `Planets`, `Lighting`, `Sky` and the rest) that earlier
   packages put in, with the `Sky` recipes they copied. `package.sh` needs rustup's
   cargo with the `i686-pc-windows-msvc` target for the two Rust plugins;

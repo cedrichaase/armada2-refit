@@ -1,9 +1,24 @@
-# Changelog — menus
+# Changelog — menus (retired; history kept here, the folder is gone)
 
 `Menus.asi`: the 800x600 shell menus scaled to fill the screen, embedded in the game
-window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
+window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../../CLAUDE.md),
 "Changelogs and versions". Newest first. The full write-up is in
-[`README.md`](README.md).
+the layer's README, removed with it (what it established lives in `ui/HUD.md`, `ui/MENUS.md` and `display/README.md`).
+
+## 5.0.0 — 2026-11-03
+
+### Removed
+- The plugin and the layer: `Menus.asi`, `Menus.ini`, `build.sh`, `install.sh`, `probe.c`
+  and the capture scripts. `UI.asi` hosts the menus (`ui/MENUS.md`). `retire/retire.sh`
+  takes `Menus.asi` (and `MenuScale`) out of an old install; the layer stays a retired row
+  in `layers.toml`.
+
+### Changed
+- The backdrop pipeline (`backdrop.sh`, `backdrops/*.conf`, `BACKDROPS.md`,
+  `install-plates.sh`) moved to `ui/backdrops/`; the plates in `Menus/` are the ui layer's
+  now (`UI.asi` composites them), and `stop-game.sh` and `run-wine.sh` moved to `platform/`.
+
+Installed, not yet seen in game.
 
 ## 4.3.5 — 2026-10-23
 

@@ -489,25 +489,17 @@ keys it is given; it is what a scenario's `Setup:` line runs.
 
 ### Installing
 
-`ui/install.sh` copies `UI.asi`, merges `UI.ini` into the player's (`tools/ini-merge.py`:
-their values stay, a key they lack is added) and then runs `supersede.sh`, which
-takes out of the game directory the plugins whose places the parts switched on take:
-
-| Part on in the installed `UI.ini` | Taken out | How |
-|---|---|---|
-| `[HUD] Enable=1` with any panel on | `HUD.asi`, and the file-based HUD fixes put back to stock | `hud/install.sh --remove`, `hud/revert-files.sh` (the UI reads the stock rectangles, font and cursor art) |
-| `[HUD] Enable=1` and `Bar=1` | `GridLayout.asi` | `grid/install.sh --remove` |
-| `[Menus] Enable=1` | `Menus.asi` (and `MenuScale.asi`), with their `.ini` and `.log` | the plates in `Menus/` stay: the UI's menus draw them (`menus/install-plates.sh`, still in `./install`) |
-
-`./install` no longer runs `hud/install.sh`, `grid/install.sh` or `menus/install.sh`.
-The three layers stay in the repository: they describe the stock HUD and shell the
-UI works on, their findings are what several hooks here rest on, and a player who
-switches a part back to stock can put the old plugin back by hand (`supersede.sh`
-leaves a plugin alone while the part that supersedes it is off). Each pair also
-stands down against the other at run time: the UI's bar while `GridLayout.asi` is
-loaded, its menus while `Menus.asi` or `MenuScale.asi` is, and its square cursor
-(below) while `HUD.asi` is. `ui/bench-asi.sh` runs `supersede.sh` on a bench clone too,
-so a clone of an install from before still tests the UI alone.
+`ui/install.sh` copies `UI.asi` and merges `UI.ini` into the player's (`tools/ini-merge.py`:
+their values stay, a key they lack is added). The plugins `UI.asi` replaced -- `HUD.asi`,
+`GridLayout.asi`, `Menus.asi` (and `MenuScale.asi`) -- and the file-based HUD fixes of hud 2.x
+are taken out by `retire/retire.sh`, which `./install` runs before the first layer installs
+(`retire/README.md`); the plates in `Menus/` stay, the UI's menus draw them
+(`ui/backdrops/install-plates.sh`, in `./install`). The layers `hud`, `grid` and `menus`
+are gone from the repository (their last changelogs are `retire/history/`); `a2mod` still
+files their files, as retired rows. `ui/bench-asi.sh` runs `retire.sh` on a bench clone too,
+so a clone of an install from before still tests the UI alone. The UI's stand-downs for
+the old plugins (the bar while `GridLayout.asi` is loaded, its menus while `Menus.asi` or
+`MenuScale.asi` is, the square cursor while `HUD.asi` is) stay in the code until ui 2.2.0.
 
 **Upgrading an install.** Up to ui 0.3 every part shipped off (`0`), so a player's
 `UI.ini` from then holds 0 for each. `[UI] Defaults` numbers the shipped defaults (2:
@@ -582,7 +574,7 @@ Display8's never registers either.
 | `Menus.asi` `Embed=1` (one window) | every hosted dialog is a hidden child of the 3D window; the game is one window throughout |
 | `Menus.asi` `EscapeReturns` | `[Menus] EscapeReturns` |
 | `Menus.asi` `Underlay=0` (the 1:1 flash between menus) | while a dialog is hosted, the shell's paint onto the 3D window goes into a scratch DC |
-| `Menus.asi` backdrops (the plates) | drawn by the UI's menus behind the main menu; installed by `menus/install-plates.sh` |
+| `Menus.asi` backdrops (the plates) | drawn by the UI's menus behind the main menu; installed by `ui/backdrops/install-plates.sh` |
 | `Menus.asi` `[Labels]` (labels kept off the art) | the spec screens draw labels of their own; a mirrored screen shows the stock overrun |
 
 ### The engine's cursor, square

@@ -307,7 +307,7 @@ ten each for Federation, Klingon and Borg.
 
       ps -eo pid=,args= | awk '/Armada2\.exe/ { print $1 }'
 
-  **`menus/stop-game.sh` does this properly** — it also kills the Wine helpers
+  **`platform/stop-game.sh` does this properly** — it also kills the Wine helpers
   for this prefix only (matched by `WINEPREFIX` out of `/proc/<pid>/environ`, so an
   unrelated Wine app cannot be caught in it), and drops stale PipeWire nodes, which
   outlive the process, stay in state `running`, and keep playing. Killing the processes
@@ -339,7 +339,7 @@ ten each for Federation, Klingon and Borg.
     ps -eo pid=,args= | awk '/Armada2\.exe/ { print $1 }'
 
     # stop it, its Wine session, and any stale audio node it left behind
-    menus/stop-game.sh
+    platform/stop-game.sh
 
     # did Menus.asi load, and what did it patch?
     cat "<game dir>/Menus.log"

@@ -2,10 +2,12 @@
 
 The game's 3D geometry, where the refit changes it:
 
-- **The loading screen**, `SOD/logo.SOD`, widened to fill a wide screen
-  (`logo-sod.py`, with its art from `loading-panel.sh`). It ships with the `LOADING`
-  texture target, and `a2tex install`/`revert` move the two together. The reasoning is
-  in `textures/README.md`, in the loading-screen section.
+- **The loading screen** is not here any more: `SOD/logo.SOD` was widened by `logo-sod.py`
+  (with its art from `loading-panel.sh`) together with the `LOADING` texture target, and
+  both were retired in models 5.1.0 / textures 2.2.0, since the UI draws the loading screen
+  and Display8's stub drops the engine's scene. `retire/retire.sh` puts a widened
+  `logo.SOD` and the `LOADING` textures back from their backups. The measurements are in
+  `textures/README.md`, in the loading-screen section.
 - **Planets** are not here: their shape is not in their SOD, and they are drawn on a
   sphere of render3d's own (`render3d/README.md`, world module). What was learned
   before that is below, under "Planets".

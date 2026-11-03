@@ -20,8 +20,9 @@ front of it Display8 (display\), the game's d3d8.dll of ours, with d3d8to9 behin
 d3d8_real.dll: in stub mode, as shipped, the engine draws nothing and Render3D.asi (the 3D
 view) and UI.asi (the HUD, the menus and the loading screen) draw the whole frame on
 Display8's own device, the first that starts of Vulkan, Direct3D 12 and Direct3D 9. Where
-the chain is left as it is, Display8 stays out, the UI's place is taken by the plugins it
-supersedes (HUD.asi, Menus.asi, GridLayout.asi) and the 3D view stays the engine's.
+the chain is left as it is, Display8 stays out, and so do Render3D.asi and UI.asi: the game
+keeps its own look (HUD.asi, Menus.asi and GridLayout.asi are not in the package any more;
+copies an earlier version put in are taken out, as retire.txt lists).
 The models are rewritten from the player's own SOD files with Python 3 (py, python or
 A2_PYTHON), skipped without it.
 
@@ -240,10 +241,17 @@ function Remove-Recipes {
         if (-not (Get-ChildItem -Force -LiteralPath (G $d))) { Remove-Item -LiteralPath (G $d) }
     }
 }
-# The plugins UI.asi takes the place of (ui/supersede.sh), and Menus.asi's old name.
+# The plugins UI.asi replaced (retire/known.txt), and Menus.asi's old name.
 function Remove-LegacyUi {
     foreach ($n in "HUD", "Menus", "MenuScale", "GridLayout") {
         foreach ($e in ".asi", ".ini", ".log") { Remove-Item -LiteralPath (G "$n$e") -ErrorAction SilentlyContinue }
+    }
+    # The file-based HUD fixes of hud 2.x, if an earlier repository install left them: put
+    # back from their backups (retire\hud-files.py; nothing to do without any).
+    $hf = Join-Path $here "retire\hud-files.py"
+    if ($Py.Count -and (Test-Path -LiteralPath $hf)) {
+        $ErrorActionPreference = "Continue"
+        try { & $Py[0] @(@($Py | Select-Object -Skip 1)) $hf $GameDir 2>&1 | ForEach-Object { Say "  $_" } } catch { }
     }
 }
 
@@ -748,12 +756,9 @@ if (Test-Skipped "ui") {
     Remove-LegacyUi   # UI.asi takes their place; each would stand down against the other
     Put "ui" "UI.asi"; Put "ui" "UI.ini"
 } else {
-    # The UI cannot draw: the plugins it supersedes keep the HUD and menus widescreen.
-    Remove-Layer "UI", "MenuScale"
-    Say "  UI.asi skipped: it needs crosire's d3d8to9 as d3d8.dll -- the older plugins instead:"
-    Put "legacy" "HUD.asi"; Put "legacy" "HUD.ini"
-    Put "legacy" "Menus.asi"; Put "legacy" "Menus.ini"
-    Put "legacy" "GridLayout.asi"; Put "legacy" "GridLayout.ini"
+    # The UI cannot draw, and there is no older plugin to fall back on: the game keeps its own.
+    Remove-Layer "UI"; Remove-LegacyUi
+    Say "  UI.asi skipped: it needs crosire's d3d8to9 as d3d8.dll -- the HUD and menus stay the engine's"
 }
 Step qol "quality of life"
 if (Test-Skipped "qol") { Remove-Layer "QOL"; Say "  quality of life left out (you chose to)" }

@@ -6,6 +6,15 @@ dilithium moons (`moon-sod.py`), the selection bubble (`select-sod.py`), the hul
 (`hull-sod.py`) and the asteroids (`asteroid-sod.py`); `Planets.asi` until 5.0.0. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 5.1.0 — 2026-11-03
+
+### Removed
+- `logo-sod.py` and `loading-panel.sh`, the widened loading-screen model and its art, with
+  the `LOADING` texture target (textures 2.2.0): the UI draws the loading screen.
+  `retire/retire.sh` restores a widened `SOD/logo.SOD` from its backup.
+
+Installed, not yet seen in game.
+
 ## 5.0.1 — 2026-10-23
 
 ### Changed
