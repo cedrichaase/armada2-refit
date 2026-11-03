@@ -63,24 +63,6 @@ fn ranges() -> Option<Ranges> {
     }
 }
 
-// Value parity (phase 8, E2): the ranges this file had, against the generated stock
-// table. Transitional: dropped once the profile is the only source.
-mod parity {
-    use crate::engine_syms::{sym, BUILDS};
-    const fn at(s: a2engine::Sym) -> (u32, u32) {
-        let e = &BUILDS[0].entries[s.0 as usize];
-        (e.addr, e.end)
-    }
-    const fn eq(a: (u32, u32), b: (u32, u32)) -> bool {
-        a.0 == b.0 && a.1 == b.1
-    }
-    const _: () = assert!(eq(at(sym::LOADING_STATUS), (0x598ba0, 0x598ff0))); // value parity
-    const _: () = assert!(eq(at(sym::CREDITS), (0x591340, 0x592a70))); // value parity
-    const _: () = assert!(eq(at(sym::REFRESH_DISPLAY), (0x624630, 0x624750))); // value parity
-    const _: () = assert!(eq(at(sym::SUBMIT_VB), (0x648af0, 0x648c30))); // value parity
-    const _: () = assert!(eq(at(sym::SUBMIT_NON_VB), (0x648520, 0x6485d0))); // value parity
-}
-
 #[derive(Clone, PartialEq, Default)]
 struct Config {
     d2: bool,

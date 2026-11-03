@@ -39,34 +39,6 @@ const SITES: [(a2engine::Sym, &str); 6] = [
     (sym::INTRO_MODE_FIND_AGAIN, "the intro movie"),
 ];
 
-// Value parity (phase 8, E2): the constants this file had, against the generated stock
-// table. Transitional: dropped once the profile is the only source.
-mod parity {
-    use crate::engine_syms::{sym, BUILDS};
-    const FIND_DISPLAY_MODE: u32 = 0x626bf0; // value parity
-    const SITES: [u32; 6] = [0x62c4e0, 0x62c643, 0x53e7c9, 0x53e7e7, 0x4861da, 0x4861f2]; // value parity
-    const FIND_STOCK: [u8; 13] = [0x55, 0x8b, 0xec, 0x8b, 0x51, 0x14, 0x53, 0x56, 0x57, 0x8b, 0x0a, 0x3b, 0xca];
-    const fn at(s: a2engine::Sym) -> u32 {
-        BUILDS[0].entries[s.0 as usize].addr
-    }
-    const _: () = assert!(at(sym::FIND_DISPLAY_MODE) == FIND_DISPLAY_MODE);
-    const _: () = assert!(at(sym::SHELL_DISPLAY_FIND) == SITES[0]);
-    const _: () = assert!(at(sym::FAILED_DISPLAY_FIND) == SITES[1]);
-    const _: () = assert!(at(sym::GAME_MODE_FIND) == SITES[2]);
-    const _: () = assert!(at(sym::GAME_MODE_FIND_AGAIN) == SITES[3]);
-    const _: () = assert!(at(sym::INTRO_MODE_FIND) == SITES[4]);
-    const _: () = assert!(at(sym::INTRO_MODE_FIND_AGAIN) == SITES[5]);
-    const _: () = {
-        let c = BUILDS[0].entries[sym::FIND_DISPLAY_MODE.0 as usize].check;
-        assert!(c.len() == FIND_STOCK.len());
-        let mut i = 0;
-        while i < c.len() {
-            assert!(c[i] == FIND_STOCK[i]);
-            i += 1;
-        }
-    };
-}
-
 type Find = unsafe extern "thiscall" fn(usize, i32, i32, i32) -> usize;
 
 static mut DONE: bool = false;

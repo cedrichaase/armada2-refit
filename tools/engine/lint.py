@@ -804,11 +804,29 @@ def selftest():
         print('\n'.join('  ' + p for p in probs))
         bad += 1
     cases = sorted(d for d in os.listdir(os.path.join(base, 'bad')) if os.path.isdir(os.path.join(base, 'bad', d)))
+    import shutil
+    import tempfile
     for c in cases:
         d = os.path.join(base, 'bad', c)
         phrase = open(os.path.join(d, 'expect.txt')).read().strip()
-        s = os.path.join(d, 'src')
-        probs, _ = run([d], src_root=s if os.path.isdir(s) else None, rows_base=d)
+        with tempfile.TemporaryDirectory() as tmp:
+            # a case holds only the files it changes; `<path>.delete` removes one
+            shutil.copytree(good, tmp, dirs_exist_ok=True)
+            for root, _, files in os.walk(d):
+                for f in files:
+                    rel = os.path.relpath(os.path.join(root, f), d)
+                    if rel == 'expect.txt':
+                        continue
+                    if rel.endswith('.delete'):
+                        try:
+                            os.remove(os.path.join(tmp, rel[:-len('.delete')]))
+                        except OSError:
+                            pass
+                        continue
+                    os.makedirs(os.path.dirname(os.path.join(tmp, rel)), exist_ok=True)
+                    shutil.copyfile(os.path.join(root, f), os.path.join(tmp, rel))
+            s = os.path.join(tmp, 'src')
+            probs, _ = run([tmp], src_root=s if os.path.isdir(s) else None, rows_base=tmp)
         if not any(phrase in p for p in probs):
             print(f'selftest: bad/{c}: expected a message containing {phrase!r}, got:')
             print('\n'.join('  ' + p for p in probs) or '  (nothing)')
