@@ -225,6 +225,13 @@ full; the rest of the line is not volumes):
 game starts; the user's install keeps its own. This is what the user did by hand on
 2026-10-17 to film mission intros without their narration and music, as a bench option.
 
+**Graphics Detail is the player's too**: a clone inherits the user's `ARMADA.PRF`, and
+with it the Graphics Detail slider (line 5, field 6, 0 to 4), which changes the
+engine's texture formats, levels of detail, starfield and first mip level loaded
+(`display/README.md`, "Texture formats"). A scenario that depends on it sets it:
+`Setup: testbench/bench-detail.sh <0-4> [the rest of the setup]`
+(`render3d-nebula-detail` runs at 2).
+
 **`--stems music,voice`** records them apart. The engine plays every sound through one
 DirectSound device, and Wine mixes all of a device's buffers into one output stream, so
 the bench could only ever record the whole mix: no setting of the game or of PipeWire

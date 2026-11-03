@@ -24,11 +24,16 @@ pub const CAPS: [u32; 53] = [
     0x00555555, 0x00ffffff, 0x00000010, 0x000001fc, 0xfffe0101, 0x00000100, 0xffff0104, 0x7f7fffff, // not an address
 ];
 
-/// Formats the stub takes as textures (`CheckDeviceFormat`): what the engine asked for
-/// and the chain said yes to (A8R8G8B8, X8R8G8B8), and the rest it may ask that any
-/// card has. R8G8B8 (20) is refused, as DXVK refused it.
+/// Formats the stub takes as textures (`CheckDeviceFormat`): A8R8G8B8 and X8R8G8B8, the
+/// two a mirror holds (`vk/mirror.rs`, `dx12/mirror.rs`), and no other. The engine picks
+/// its texture formats by asking in an order its graphics detail sets
+/// (`ST3D_DeviceDirectX8::SelectTextureFormats`): below the top detail it asks for
+/// R5G6B5, X1R5G5B5, A4R4G4B4 and A1R5G5B5 first, and a yes to those drew every engine
+/// texture white (the nebulae's puffs as flat squares). Refused, it falls through to
+/// the two above at every detail (README.md, "Texture formats"). R8G8B8 (20) is refused
+/// too, as DXVK refused it.
 fn texture_format_ok(fmt: u32) -> bool {
-    matches!(fmt, 21 | 22 | 23 | 24 | 25 | 26 | 28 | 50 | 51 | 0x3154_5844 | 0x3254_5844 | 0x3354_5844 | 0x3454_5844 | 0x3554_5844)
+    matches!(fmt, 21 | 22)
 }
 
 unsafe extern "system" fn qi(this: *mut SObj, iid: *const Guid, out: *mut *mut c_void) -> HRESULT {

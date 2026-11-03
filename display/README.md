@@ -581,8 +581,23 @@ table's: every engine texture a draw reads is mirrored at its first draw, with e
 level, and kept up to date as the engine writes it by lock; one over 256 KB goes up
 through a staging buffer of its own, let go of with the frame, so a mission's hull
 textures arriving at once do not grow the upload ring, whose chunks live as long as the
-device. A texture of another format than A8R8G8B8 and X8R8G8B8 (none seen), a cube or a
-volume, is drawn with white and logged once.
+device. A texture of another format than A8R8G8B8 and X8R8G8B8, a cube or a volume, is
+drawn with white and logged once; the stub offers the engine no other texture format,
+so none should arrive.
+
+**Texture formats.** `CheckDeviceFormat` says yes to A8R8G8B8 and X8R8G8B8 alone as
+textures (`stub/d3d.rs`, `texture_format_ok`), because a mirror holds no other. The
+engine chooses its texture formats in `ST3D_DeviceDirectX8::SelectTextureFormats`
+(0x625f80) by asking in an order its graphics detail sets (`ST3D_GraphicsEngine_Configuration`
++0x40, the Graphics Detail slider, `ARMADA.PRF` line 5, field 6): at the top detail
+X8R8G8B8 and A8R8G8B8 come first; below it R5G6B5, X1R5G5B5, A4R4G4B4 and A1R5G5B5 do.
+Until display 1.0.2 the stub also said yes to the 16-bit formats (a list from when stub
+mode drew on a Direct3D 9 device), so below the top detail every engine texture was
+created 16-bit and drawn white: the nebulae left to the engine (`[World] Nebulae=0`)
+were flat squares, and the fog's texture had no mirror for the overlays
+(`render3d-nebula-detail`). Refused, the engine falls through to the two 32-bit formats
+at every detail; the detail still sets the levels of detail, the starfield and the
+first level of a texture's chain it loads (`ST3D_GraphicsEngine::GetLargestMipMapToUse`).
 
 **The engine's one vertex shader** (ROADMAP 4d) is the Borg hulls' bump pass. Display8
 keeps every vertex shader's declaration and function tokens at `CreateVertexShader`, the

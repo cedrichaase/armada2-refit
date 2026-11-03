@@ -5,6 +5,20 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.8 — 2026-11-03
+
+Layers: display 1.0.2, testbench 4.1.0.
+
+### Fixed
+- Nebulae drawn as flat squares below the top Graphics Detail: Display8's stub offered
+  the engine 16-bit texture formats no mirror can hold, so every engine texture was
+  drawn white; it now offers A8R8G8B8 and X8R8G8B8 alone.
+
+### Added
+- `testbench/bench-detail.sh`, scene `nebula-detail`, scenario `render3d-nebula-detail`.
+
+Installed, not yet seen in game.
+
 ## 15.6.6 — 2026-11-03
 
 Layers: render3d 1.0.1.

@@ -34,7 +34,7 @@ fn make(o: *mut SObj, plugin: bool) -> Option<Dx12Image8> {
             if plugin {
                 log!("d3d12: no mirror for a texture of format {} ({} faces)", t.format, t.faces);
             } else {
-                crate::trace::once(&crate::sfmt!("PASSTHROUGH a texture of format {} ({} faces): drawn with a white one", t.format, t.faces));
+                crate::stub::drawn_white(t.format, t.faces);
             }
             return None;
         }

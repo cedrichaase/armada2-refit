@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 4.1.0 — 2026-11-03
+
+### Added
+- `testbench/bench-detail.sh <0-4>`: a `Setup:` script that sets the clone's Graphics Detail (`ARMADA.PRF` line 5, fields 6 and 10), then runs the rest of the setup.
+- Scene `nebula-detail` (six nebula classes from above) and scenario `render3d-nebula-detail`: the engine's nebula puffs at Graphics Detail 2 through Display8's passthrough; expects the 16-bit texture formats refused and nothing drawn white (root 15.6.8).
+
+Installed, not yet seen in game.
+
 ## 4.0.6 — 2026-11-03
 
 ### Fixed
