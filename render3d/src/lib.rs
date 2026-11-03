@@ -83,6 +83,11 @@ pub extern "C" fn Render3D_SettingsNote(row: *const rt::settings::Setting) -> *c
         }
     };
     if row.is_null() {
+        if let Some(t) = r3d_core::engine::plugin_note() {
+            put(t);
+            b[n] = 0;
+            return b.as_ptr();
+        }
         match DOWN.load(Ordering::Relaxed) {
             DOWN_DISABLED => put("Render3D is off (Enable=0 in Render3D.ini): the engine draws the 3D view"),
             DOWN_SEAM => put("Render3D stood down: the game's 3D call is not the stock one"),
@@ -90,10 +95,18 @@ pub extern "C" fn Render3D_SettingsNote(row: *const rt::settings::Setting) -> *c
             _ => return core::ptr::null(),
         }
     } else {
-        let Some(p) = registry::stood_down_for(row) else { return core::ptr::null() };
-        put("Stands down while ");
-        put(p);
-        put(" is loaded");
+        if let Some(p) = registry::stood_down_for(row) {
+            put("Stands down while ");
+            put(p);
+            put(" is loaded");
+        } else {
+            let cs = |p: *const core::ffi::c_char| unsafe { core::ffi::CStr::from_ptr(p).to_str().unwrap_or("") };
+            let (sec, key) = unsafe { (cs((*row).section), cs((*row).key)) };
+            match r3d_core::engine::note_for(sec, key) {
+                Some(t) => put(t),
+                None => return core::ptr::null(),
+            }
+        }
     }
     b[n] = 0;
     b.as_ptr()
