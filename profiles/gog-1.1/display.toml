@@ -12,6 +12,12 @@ doc = "The engine's own mode requests answered with the stub's one mode"
 [hook.drop]
 doc = "The engine's draws told apart by caller: [Drop] and the claimed scenes"
 
+[hook.native]
+doc = "InitializeGraphicsSystem's call: a stock profile mode becomes the desktop's"
+
+[hook.keepclip]
+doc = "The engine's mouse state, read so the pointer clip is not asked for while a button is down or a pan holds the pointer"
+
 # ---- display.modes (stub/modes.rs) ------------------------------------------------
 
 [[sym]]
@@ -101,6 +107,124 @@ kind = "value"
 value = 16
 unit = "bpp"
 used_by = ["modes"]
+
+# The intro's own request (Program::PlayIntroMovie asks for 640x480, 32 bits and then
+# 16), raised to the desktop's under [Window] RaiseIntro.
+[[sym]]
+id = "intro_width"
+symbol = "Program::PlayIntroMovie"
+kind = "value"
+value = 640
+unit = "px"
+used_by = ["modes"]
+
+[[sym]]
+id = "intro_height"
+symbol = "Program::PlayIntroMovie"
+kind = "value"
+value = 480
+unit = "px"
+used_by = ["modes"]
+
+# ---- display.native (window.rs) ---------------------------------------------------
+
+[[sym]]
+id = "init_graphics"
+symbol = "GameConfiguration::InitializeGraphicsSystem"
+kind = "fn"
+addr = 0x53e420
+used_by = ["native"]
+
+[[sym]]
+id = "site_init_graphics"
+symbol = "GameConfiguration::InitializeGraphicsSystem"
+kind = "call"
+addr = 0x484169
+target = "init_graphics"
+in = "WinMain"
+used_by = ["native"]
+
+[[sym]]
+id = "user_profile"
+symbol = "UserProfile"
+kind = "global"
+addr = 0x76b5ac
+used_by = ["native"]
+
+[[sym]]
+id = "profile_mode_w"
+symbol = "GraphicsSettings"
+kind = "field"
+struct = "GameConfiguration"
+offset = 0x50
+type = "u32"
+used_by = ["native"]
+
+[[sym]]
+id = "profile_mode_h"
+symbol = "GraphicsSettings"
+kind = "field"
+struct = "GameConfiguration"
+offset = 0x54
+type = "u32"
+used_by = ["native"]
+
+[[sym]]
+id = "profile_mode_bpp"
+symbol = "GraphicsSettings"
+kind = "field"
+struct = "GameConfiguration"
+offset = 0x58
+type = "u32"
+used_by = ["native"]
+
+[[sym]]
+id = "default_mode_w"
+symbol = "GraphicsSettings"
+kind = "value"
+value = 800
+unit = "px"
+used_by = ["native"]
+
+[[sym]]
+id = "default_mode_h"
+symbol = "GraphicsSettings"
+kind = "value"
+value = 600
+unit = "px"
+used_by = ["native"]
+
+[[sym]]
+id = "gog_mode_w"
+symbol = "GraphicsSettings"
+kind = "value"
+value = 1024
+unit = "px"
+used_by = ["native"]
+
+[[sym]]
+id = "gog_mode_h"
+symbol = "GraphicsSettings"
+kind = "value"
+value = 768
+unit = "px"
+used_by = ["native"]
+
+# ---- display.keepclip (window.rs) -------------------------------------------------
+
+[[sym]]
+id = "mouse_buttons"
+symbol = "MouseDriver button bits"
+kind = "global"
+addr = 0x763308
+used_by = ["keepclip"]
+
+[[sym]]
+id = "mouse_held"
+symbol = "g_bMousePosLocked"
+kind = "global"
+addr = 0x763350
+used_by = ["keepclip"]
 
 # ---- display.drop (drop.rs; the claims' scenes in passthrough.rs, api.rs) ----------
 

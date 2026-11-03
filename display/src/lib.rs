@@ -33,6 +33,9 @@ pub mod trace;
 pub mod stub;
 pub mod user32;
 pub mod vk;
+pub mod window;
+#[rustfmt::skip]
+pub mod settings_table;
 
 use core::ffi::c_void;
 use rt::win::*;
@@ -300,6 +303,7 @@ fn startup() {
         passthrough::configure(&ini);
     }
     detail::configure(&ini);
+    window::configure(&ini);
     if config().trace {
         trace::start();
         user32::install();
@@ -357,6 +361,9 @@ pub extern "system" fn Direct3DCreate8(sdk: u32) -> *mut c_void {
         }
         log!("Mode=stub: the stub could not start on {}; forward mode instead", stub::names(unsafe { &ORDER }));
     }
+    // Forward mode: the engine's mode lookups are still answered for the shell and the
+    // intro (stub/modes.rs), by the real chain's own list.
+    stub::modes::install();
     let f = real_proc("Direct3DCreate8");
     if f == 0 {
         return core::ptr::null_mut();

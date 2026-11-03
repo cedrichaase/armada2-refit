@@ -133,8 +133,8 @@ const A2Setting *__cdecl <Plugin>_Settings(UINT *count)                         
 ```
 
 The names are fixed: `Render3D_Settings`, `UI_Settings`, `QOL_Settings`,
-`QOLRules_Settings`, `Online_Settings`, `BinkProxy_Settings` (`Display8_Settings` is
-reserved). `count` may be NULL; the rows are static and live as long as the DLL. A row,
+`QOLRules_Settings`, `Online_Settings`, `BinkProxy_Settings`, `Display8_Settings` (read
+by the UI hub since ui 1.0.0). `count` may be NULL; the rows are static and live as long as the DLL. A row,
 C ABI, i686, 48 bytes in version 1.1 (44 in 1.0):
 
 | off | field | type | |

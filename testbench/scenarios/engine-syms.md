@@ -24,7 +24,7 @@ appends its plugin's section and touches no other.
 ## Display8
 6. Expect "Display8.log" contains "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321".
 7. Expect "Display8.log" contains "engine: build armada2/gog-1.1".
-8. Expect "Display8.log" contains "engine: symbols: 15/15 resolved; 0 hooks blocked".
+8. Expect "Display8.log" contains "engine: symbols: 29/29 resolved; 0 hooks blocked".
 9. Expect "Display8.log" contains "stub: the engine's own mode requests (6 of 6 calls)".
 10. Expect "Display8.log" not contains "stands down: ".
 11. Expect "Display8.log" not contains "read before its hook".
@@ -35,14 +35,14 @@ appends its plugin's section and touches no other.
 14. Wait up to 60 seconds for "UI.log" to say "hud: panels of ours".
 15. Expect "UI.log" contains "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321".
 16. Expect "UI.log" contains "engine: build armada2/gog-1.1".
-17. Expect "UI.log" contains "engine: symbols: 54/54 resolved; 0 hooks blocked".
+17. Expect "UI.log" contains "engine: symbols: 38/38 resolved; 0 hooks blocked".
 18. Expect "UI.log" contains "engine: loading symbols: 17/17 resolved; 0 hooks blocked".
 19. Expect "UI.log" contains "engine: radar symbols: 116/116 resolved; 0 hooks blocked".
 20. Expect "UI.log" contains "engine: info symbols: 137/137 resolved; 0 hooks blocked".
 21. Expect "UI.log" contains "engine: hud symbols: 177/177 resolved; 0 hooks blocked".
 22. Expect "UI.log" contains "engine: panels symbols: 175/175 resolved; 0 hooks blocked".
 23. Expect "UI.log" contains "engine: shell symbols: 92/92 resolved; 0 hooks blocked".
-24. Expect "UI.log" contains "engine: dialogs symbols: 39/39 resolved; 0 hooks blocked".
+24. Expect "UI.log" contains "engine: dialogs symbols: 36/36 resolved; 0 hooks blocked".
 25. Expect "UI.log" not contains "stands down: ".
 26. Expect "UI.log" not contains "read before its hook".
 27. Expect "UI.log" not contains "engine: TEST:".

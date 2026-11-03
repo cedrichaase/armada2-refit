@@ -18,6 +18,13 @@ Layers: gui-installer 2.5.0, testbench 3.102.0.
 ### Changed
 - Every shipped plugin ini is merged into the player's (keys added, values kept, `Defaults=` upgrades and retired defaults as `tools/ini-merge.py`), never replaced with a `.ini.bak` copy; `UI.ini`'s upgrades and `Render3D.ini`'s retired defaults join Display8.ini's in the awk and PowerShell merges. `RefitPlayer.ini` is still never touched. `install.ps1` was only syntax-read here, not run. Installed, not yet seen in game.
 
+## 14.1.0 — 2026-11-03
+
+Layers: display 0.18.0, ui 1.0.0, cutscenes 2.7.0.
+
+### Changed
+- Window and display mode go to Display8 (phase 9, C3): `[UI] Native` and `[UI] KeepClip` become `[Window]` of `Display8.ini` (first use of `moved_from`), the shell's and the intro's mode raises move out of the UI into Display8's mode lookups (the UI's menu host claims the new `CLAIM_MENUS`; contract 1.3 adds it and `display8v1_mode`), and the cutscene proxy keeps its raise only when `d3d8.dll` is not Display8. testbench 3.100.0. Installed, not yet seen in game.
+
 ## 14.0.0 — 2026-11-03
 
 Layers: qol 2.0.0, rules 1.0.0, online 0.11.0, ui 0.34.0, gui-installer 2.4.1, testbench 3.99.1.
@@ -1496,6 +1503,7 @@ Layers: ui 0.13.2, testbench 3.35.1.
   cursor, as in stock.
 
 Confirmed in game 2026-10-30.
+
 ## 12.34.1 — 2026-10-18
 
 Layers: render3d 0.15.1, ui 0.13.1.

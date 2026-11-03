@@ -41,6 +41,7 @@ pub fn device_gone(dev: *mut c_void) {
 
 pub fn presented() {
     FRAME.fetch_add(1, Ordering::Relaxed);
+    crate::window::present();
 }
 
 /// The modules that shook hands at our major (`display8_abi`), by module handle.

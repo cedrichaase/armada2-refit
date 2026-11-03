@@ -331,7 +331,7 @@ fn log_facts(when: &str) {
     let mut cr = WinRect::default();
     let style = if w.is_null() { 0 } else { unsafe { GetClientRect(w, &mut cr); GetWindowLongA(w, GWL_STYLE) } };
     log!(
-        "shell: {}: Storm3D {:#x} display {} device[{}] {:#x} (dx8 class: {}) d3d8 {:p} window {:p} client {}x{} style {:#x}",
+        "shell: {}: Storm3D {:#x} display {} device[{}] {:#x} (dx8 class: {}) d3d8 {:p} window {:p} client {}x{} style {:#x}; Display8 says the mode is {:?}",
         when,
         s,
         field(s, field::SHELL_STORM3D_DISPLAY),
@@ -342,7 +342,8 @@ fn log_facts(when: &str) {
         w,
         cr.right - cr.left,
         cr.bottom - cr.top,
-        style as u32
+        style as u32,
+        crate::gfx::gpu().display_mode()
     );
     if dev.is_null() {
         return;

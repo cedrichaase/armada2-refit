@@ -47,19 +47,6 @@ fn eng() -> &'static a2engine::Engine {
 pub const DESIGN_W: i32 = value::DIALOGS_FRONT_END_WIDTH;
 pub const DESIGN_H: i32 = value::DIALOGS_FRONT_END_HEIGHT;
 
-/// `SetActiveDisplay_Internal`'s two `push 16; push 600; push 800`, the shell's mode.
-const MODE_SITES: [a2engine::Sym; 2] = [sym::DIALOGS_MODE_PUSH_A, sym::DIALOGS_MODE_PUSH_B];
-
-/// The bytes of one site: push depth, push height, push width.
-fn mode_bytes(depth: u8, h: u32, w: u32) -> [u8; 12] {
-    let mut b = [0x6a, depth, 0x68, 0, 0, 0, 0, 0x68, 0, 0, 0, 0];
-    b[3..7].copy_from_slice(&h.to_le_bytes());
-    b[8..12].copy_from_slice(&w.to_le_bytes());
-    b
-}
-fn mode_stock() -> [u8; 12] {
-    mode_bytes(value::DIALOGS_FRONT_END_DEPTH as u8, DESIGN_H as u32, DESIGN_W as u32)
-}
 /// The shell's code: only dialog procedures in it are hosted (the map editor's dialogs
 /// are not shell screens).
 const SHELL_CODE: (usize, usize) = (value::DIALOGS_SHELL_CODE_START as usize, value::DIALOGS_SHELL_CODE_END as usize);
@@ -377,9 +364,6 @@ pub fn install() -> bool {
         crate::log!("menus: Menus.asi is loaded: the UI's menus stand down (it hosts the same dialogs)");
         return false;
     }
-    if eng().ready(hook::DIALOGS_SHELL_MODE).is_err() {
-        return false;
-    }
     if eng().ready(hook::DIALOGS_READS_SCREENS).is_err() {
         return false;
     }
@@ -422,26 +406,13 @@ pub fn install() -> bool {
             }
         }
     }
-    raise_shell_mode();
+    // The shell's 800x600x16 request is raised to the desktop's by Display8 while this
+    // host claims `CLAIM_MENUS` (`claims.rs`).
     if !super::shellui::install() {
         crate::log!("menus: the generic screens draw every dialog as the game paints it");
     }
     unsafe { READY = true };
     true
-}
-
-/// The shell's 800x600x16 raised to the desktop, as Menus.asi does (menus/README.md,
-/// item 1); measured at DllMain, before the engine changes any mode.
-fn raise_shell_mode() {
-    let (w, h) = unsafe { (GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)) };
-    if w < DESIGN_W || h < DESIGN_H {
-        crate::log!("menus: desktop {}x{} is smaller than the shell: its display mode is left at its stock mode", w, h);
-        return;
-    }
-    let stock = mode_stock();
-    let new = mode_bytes(32, h as u32, w as u32);
-    let n = MODE_SITES.iter().filter(|&&at| patcher::patch_bytes(eng().addr(at), &stock, &new)).count();
-    crate::log!("menus: shell display mode -> {}x{}x32 ({} of 2 sites)", w, h, n);
 }
 
 // ---- calling user32 through the originals --------------------------------------------

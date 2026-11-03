@@ -6,31 +6,9 @@ readme = "ui/MENUS.md"
 lang = "rust"
 out = "ui/src/syms_dialogs.rs"
 
-[hook."dialogs.shell_mode"]
-doc = "The shell's 800x600x16 display mode raised to the desktop's, patched in SetActiveDisplay_Internal"
-rows = ["Menus.Enable"]
-
 [hook."dialogs.reads_screens"]
 doc = "The shell's dialog procedures, told by address to name a hosted screen and bound the shell's code"
 rows = ["Menus.Enable"]
-
-[[sym]]
-id = "dialogs_mode_push_a"
-symbol = "ST3D_GraphicsEngine::SetActiveDisplay_Internal"
-kind = "patch"
-addr = 0x62c4d4
-in = "ST3D_GraphicsEngine::SetActiveDisplay_Internal"
-check = "6a 10 68 58 02 00 00 68 20 03 00 00"
-used_by = ["dialogs.shell_mode"]
-
-[[sym]]
-id = "dialogs_mode_push_b"
-symbol = "ST3D_GraphicsEngine::SetActiveDisplay_Internal"
-kind = "patch"
-addr = 0x62c633
-in = "ST3D_GraphicsEngine::SetActiveDisplay_Internal"
-check = "6a 10 68 58 02 00 00 68 20 03 00 00"
-used_by = ["dialogs.shell_mode"]
 
 [[sym]]
 id = "dialogs_front_end_width"
@@ -38,7 +16,7 @@ symbol = "SetActiveDisplay_Internal"
 kind = "value"
 value = 800
 unit = "px"
-used_by = ["dialogs.shell_mode", "dialogs.reads_screens"]
+used_by = ["dialogs.reads_screens"]
 
 [[sym]]
 id = "dialogs_front_end_height"
@@ -46,15 +24,7 @@ symbol = "SetActiveDisplay_Internal"
 kind = "value"
 value = 600
 unit = "px"
-used_by = ["dialogs.shell_mode", "dialogs.reads_screens"]
-
-[[sym]]
-id = "dialogs_front_end_depth"
-symbol = "SetActiveDisplay_Internal"
-kind = "value"
-value = 16
-unit = "bits"
-used_by = ["dialogs.shell_mode"]
+used_by = ["dialogs.reads_screens"]
 
 [[sym]]
 id = "dialogs_shell_code_start"

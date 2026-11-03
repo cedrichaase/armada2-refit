@@ -93,6 +93,13 @@ decoded frames match the original MD5 for MD5.
 `IntroHeight`). `BinkProxy.log` records every open and close, with decode
 timing and a count of late frames.
 
+**The intro's mode is Display8's** (cutscenes 2.7.0): with a Display8 as `d3d8.dll` (it
+exports `display8_abi`) the proxy leaves the intro's two mode lookups alone and logs
+`intro: Display8 raises the mode`; Display8 raises them inside its own lookup
+(`[Window] RaiseIntro`, `display/README.md`, "Window and display mode"), so
+`IntroWidth` and `IntroHeight` then do nothing. `RaiseIntroMode=1` is the fallback for
+any other `d3d8.dll`, until Display8 is required.
+
 `ReplaceMovies` is a settings row (`settings.toml`, exported as `BinkProxy_Settings`, LIVE,
 tab Movies) and is read again at each `BinkOpen`, so `[BinkProxy.BinkProxy] ReplaceMovies=0`
 in `RefitPlayer.ini` gives the next movie opened as its stock `.bik`; one already playing

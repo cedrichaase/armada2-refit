@@ -144,6 +144,7 @@ unsafe extern "system" fn create_device(
     );
     if !pp.is_null() && hr >= 0 {
         let got = unsafe { *pp };
+        crate::window::device_opened(hwnd, if got.width > 0 { got.width } else { asked.width }, if got.height > 0 { got.height } else { asked.height });
         if got.text() != asked.text() {
             log!("CreateDevice #{}: parameters as the chain left them: {}", n, got.text());
         }

@@ -2,45 +2,42 @@
 //! The symbol table of `ui` (crates/a2engine/README.md).
 
 pub mod sym {
-    pub const DIALOGS_MODE_PUSH_A: a2engine::Sym = a2engine::Sym(0);
-    pub const DIALOGS_MODE_PUSH_B: a2engine::Sym = a2engine::Sym(1);
-    pub const DIALOGS_PROC_MAIN_MENU: a2engine::Sym = a2engine::Sym(7);
-    pub const DIALOGS_PROC_SINGLE_PLAYER: a2engine::Sym = a2engine::Sym(8);
-    pub const DIALOGS_PROC_MISSION_SELECT: a2engine::Sym = a2engine::Sym(9);
-    pub const DIALOGS_PROC_LOAD_GAME: a2engine::Sym = a2engine::Sym(10);
-    pub const DIALOGS_PROC_SAVE_GAME: a2engine::Sym = a2engine::Sym(11);
-    pub const DIALOGS_PROC_ESCAPE_MENU: a2engine::Sym = a2engine::Sym(12);
-    pub const DIALOGS_PROC_GAME_SETTINGS: a2engine::Sym = a2engine::Sym(13);
-    pub const DIALOGS_PROC_GRAPHICS_SETTINGS: a2engine::Sym = a2engine::Sym(14);
-    pub const DIALOGS_PROC_SOUND_SETTINGS: a2engine::Sym = a2engine::Sym(15);
-    pub const DIALOGS_PROC_GAME_SETUP: a2engine::Sym = a2engine::Sym(16);
-    pub const DIALOGS_PROC_ADVANCED_OPTIONS: a2engine::Sym = a2engine::Sym(17);
-    pub const DIALOGS_PROC_MAP_SELECT: a2engine::Sym = a2engine::Sym(18);
-    pub const DIALOGS_PROC_MAP_TRANSFER: a2engine::Sym = a2engine::Sym(19);
-    pub const DIALOGS_PROC_MULTIPLAYER_CONNECTION: a2engine::Sym = a2engine::Sym(20);
-    pub const DIALOGS_PROC_INTERNET_GAME: a2engine::Sym = a2engine::Sym(21);
-    pub const DIALOGS_PROC_MANUAL_IP: a2engine::Sym = a2engine::Sym(22);
-    pub const DIALOGS_PROC_ROOM_SELECT: a2engine::Sym = a2engine::Sym(23);
-    pub const DIALOGS_PROC_CREATE_ROOM: a2engine::Sym = a2engine::Sym(24);
-    pub const DIALOGS_PROC_GAME_NAME: a2engine::Sym = a2engine::Sym(25);
-    pub const DIALOGS_PROC_PASSWORD: a2engine::Sym = a2engine::Sym(26);
-    pub const DIALOGS_PROC_CHANGE_PASSWORD: a2engine::Sym = a2engine::Sym(27);
-    pub const DIALOGS_PROC_CREATE_ACCOUNT: a2engine::Sym = a2engine::Sym(28);
-    pub const DIALOGS_PROC_GAMESPY_LOGIN: a2engine::Sym = a2engine::Sym(29);
-    pub const DIALOGS_PROC_NET_WAITING: a2engine::Sym = a2engine::Sym(30);
-    pub const DIALOGS_PROC_HELP: a2engine::Sym = a2engine::Sym(31);
-    pub const DIALOGS_PROC_LICENCE: a2engine::Sym = a2engine::Sym(32);
-    pub const DIALOGS_PROC_MESSAGE: a2engine::Sym = a2engine::Sym(33);
-    pub const DIALOGS_PROC_YES_NO: a2engine::Sym = a2engine::Sym(34);
-    pub const DIALOGS_PROC_TECH_TREE: a2engine::Sym = a2engine::Sym(35);
-    pub const DIALOGS_PROC_ADMIRALS_LOG: a2engine::Sym = a2engine::Sym(36);
-    pub const DIALOGS_PROC_ADMIRALS_LOG_PANE: a2engine::Sym = a2engine::Sym(37);
-    pub const DIALOGS_PROC_SHELL_SCREEN: a2engine::Sym = a2engine::Sym(38);
+    pub const DIALOGS_PROC_MAIN_MENU: a2engine::Sym = a2engine::Sym(4);
+    pub const DIALOGS_PROC_SINGLE_PLAYER: a2engine::Sym = a2engine::Sym(5);
+    pub const DIALOGS_PROC_MISSION_SELECT: a2engine::Sym = a2engine::Sym(6);
+    pub const DIALOGS_PROC_LOAD_GAME: a2engine::Sym = a2engine::Sym(7);
+    pub const DIALOGS_PROC_SAVE_GAME: a2engine::Sym = a2engine::Sym(8);
+    pub const DIALOGS_PROC_ESCAPE_MENU: a2engine::Sym = a2engine::Sym(9);
+    pub const DIALOGS_PROC_GAME_SETTINGS: a2engine::Sym = a2engine::Sym(10);
+    pub const DIALOGS_PROC_GRAPHICS_SETTINGS: a2engine::Sym = a2engine::Sym(11);
+    pub const DIALOGS_PROC_SOUND_SETTINGS: a2engine::Sym = a2engine::Sym(12);
+    pub const DIALOGS_PROC_GAME_SETUP: a2engine::Sym = a2engine::Sym(13);
+    pub const DIALOGS_PROC_ADVANCED_OPTIONS: a2engine::Sym = a2engine::Sym(14);
+    pub const DIALOGS_PROC_MAP_SELECT: a2engine::Sym = a2engine::Sym(15);
+    pub const DIALOGS_PROC_MAP_TRANSFER: a2engine::Sym = a2engine::Sym(16);
+    pub const DIALOGS_PROC_MULTIPLAYER_CONNECTION: a2engine::Sym = a2engine::Sym(17);
+    pub const DIALOGS_PROC_INTERNET_GAME: a2engine::Sym = a2engine::Sym(18);
+    pub const DIALOGS_PROC_MANUAL_IP: a2engine::Sym = a2engine::Sym(19);
+    pub const DIALOGS_PROC_ROOM_SELECT: a2engine::Sym = a2engine::Sym(20);
+    pub const DIALOGS_PROC_CREATE_ROOM: a2engine::Sym = a2engine::Sym(21);
+    pub const DIALOGS_PROC_GAME_NAME: a2engine::Sym = a2engine::Sym(22);
+    pub const DIALOGS_PROC_PASSWORD: a2engine::Sym = a2engine::Sym(23);
+    pub const DIALOGS_PROC_CHANGE_PASSWORD: a2engine::Sym = a2engine::Sym(24);
+    pub const DIALOGS_PROC_CREATE_ACCOUNT: a2engine::Sym = a2engine::Sym(25);
+    pub const DIALOGS_PROC_GAMESPY_LOGIN: a2engine::Sym = a2engine::Sym(26);
+    pub const DIALOGS_PROC_NET_WAITING: a2engine::Sym = a2engine::Sym(27);
+    pub const DIALOGS_PROC_HELP: a2engine::Sym = a2engine::Sym(28);
+    pub const DIALOGS_PROC_LICENCE: a2engine::Sym = a2engine::Sym(29);
+    pub const DIALOGS_PROC_MESSAGE: a2engine::Sym = a2engine::Sym(30);
+    pub const DIALOGS_PROC_YES_NO: a2engine::Sym = a2engine::Sym(31);
+    pub const DIALOGS_PROC_TECH_TREE: a2engine::Sym = a2engine::Sym(32);
+    pub const DIALOGS_PROC_ADMIRALS_LOG: a2engine::Sym = a2engine::Sym(33);
+    pub const DIALOGS_PROC_ADMIRALS_LOG_PANE: a2engine::Sym = a2engine::Sym(34);
+    pub const DIALOGS_PROC_SHELL_SCREEN: a2engine::Sym = a2engine::Sym(35);
 }
 
 pub mod hook {
-    pub const DIALOGS_SHELL_MODE: a2engine::HookId = a2engine::HookId(0);
-    pub const DIALOGS_READS_SCREENS: a2engine::HookId = a2engine::HookId(1);
+    pub const DIALOGS_READS_SCREENS: a2engine::HookId = a2engine::HookId(0);
 }
 
 pub mod field {
@@ -49,17 +46,13 @@ pub mod field {
 pub mod value {
     pub const DIALOGS_FRONT_END_WIDTH: i32 = 800;
     pub const DIALOGS_FRONT_END_HEIGHT: i32 = 600;
-    pub const DIALOGS_FRONT_END_DEPTH: i32 = 16;
     pub const DIALOGS_SHELL_CODE_START: i32 = 5898240;
     pub const DIALOGS_SHELL_CODE_END: i32 = 6356992;
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
-    a2engine::SymDef { id: "dialogs_mode_push_a", symbol: "ST3D_GraphicsEngine::SetActiveDisplay_Internal", kind: a2engine::Kind::Patch },
-    a2engine::SymDef { id: "dialogs_mode_push_b", symbol: "ST3D_GraphicsEngine::SetActiveDisplay_Internal", kind: a2engine::Kind::Patch },
     a2engine::SymDef { id: "dialogs_front_end_width", symbol: "SetActiveDisplay_Internal", kind: a2engine::Kind::Value },
     a2engine::SymDef { id: "dialogs_front_end_height", symbol: "SetActiveDisplay_Internal", kind: a2engine::Kind::Value },
-    a2engine::SymDef { id: "dialogs_front_end_depth", symbol: "SetActiveDisplay_Internal", kind: a2engine::Kind::Value },
     a2engine::SymDef { id: "dialogs_shell_code_start", symbol: "Shell::Screen::WindowsProcedure", kind: a2engine::Kind::Value },
     a2engine::SymDef { id: "dialogs_shell_code_end", symbol: "Shell::Screen::WindowsProcedure", kind: a2engine::Kind::Value },
     a2engine::SymDef { id: "dialogs_proc_main_menu", symbol: "MainMenuDlgProc", kind: a2engine::Kind::Fn },
@@ -97,8 +90,7 @@ pub const SYMS: &[a2engine::SymDef] = &[
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
-    a2engine::HookDef { id: "ui.dialogs.shell_mode", run_unknown: false, rows: &["Menus.Enable"], syms: &[0, 1, 2, 3, 4] },
-    a2engine::HookDef { id: "ui.dialogs.reads_screens", run_unknown: false, rows: &["Menus.Enable"], syms: &[2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38] },
+    a2engine::HookDef { id: "ui.dialogs.reads_screens", run_unknown: false, rows: &["Menus.Enable"], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35] },
 ];
 
 pub const BUILDS: &[a2engine::Build] = &[
@@ -109,14 +101,11 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 39,
+        n_resolved: 36,
         content: "stock",
         entries: &[
-            a2engine::Entry { present: true, addr: 0x62c4d4, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x6a, 0x10, 0x68, 0x58, 0x02, 0x00, 0x00, 0x68, 0x20, 0x03, 0x00, 0x00], mask: &[], section: "", count: 0, value: 0 }, // dialogs_mode_push_a
-            a2engine::Entry { present: true, addr: 0x62c633, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x6a, 0x10, 0x68, 0x58, 0x02, 0x00, 0x00, 0x68, 0x20, 0x03, 0x00, 0x00], mask: &[], section: "", count: 0, value: 0 }, // dialogs_mode_push_b
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 800 }, // dialogs_front_end_width
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 600 }, // dialogs_front_end_height
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // dialogs_front_end_depth
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 5898240 }, // dialogs_shell_code_start
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 6356992 }, // dialogs_shell_code_end
             a2engine::Entry { present: true, addr: 0x5d57c0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_main_menu
@@ -157,10 +146,10 @@ pub const BUILDS: &[a2engine::Build] = &[
     },
 ];
 
-static HOOK_STATE: [core::sync::atomic::AtomicU64; 2] = [const { core::sync::atomic::AtomicU64::new(0) }; 2];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 39] = [const { core::sync::atomic::AtomicU8::new(0) }; 39];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 39] = [const { core::sync::atomic::AtomicUsize::new(0) }; 39];
-static NOTES: [a2engine::Note; 2] = [const { a2engine::Note::new() }; 2];
+static HOOK_STATE: [core::sync::atomic::AtomicU64; 1] = [const { core::sync::atomic::AtomicU64::new(0) }; 1];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 36] = [const { core::sync::atomic::AtomicU8::new(0) }; 36];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 36] = [const { core::sync::atomic::AtomicUsize::new(0) }; 36];
+static NOTES: [a2engine::Note; 1] = [const { a2engine::Note::new() }; 1];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 
 pub static TABLE: a2engine::Table = a2engine::Table {

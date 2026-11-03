@@ -10,6 +10,16 @@ versions". Newest first. The why is in [`README.md`](README.md).
 ### Added
 - `subset-full`, `subset-stockcompat`, `subset-visuals`, `subset-display-render3d`, `subset-display-ui` and `subset-display`: one game each, a mission with `Layers:` (none for the full release), checked on the plugins' logs (phase 9 W-PKG). Installed, not yet seen in game.
 
+## 3.100.0 — 2026-11-03
+
+### Added
+- Scenarios `display-window` (the shell and intro raised by Display8, `KeepClip`, forward and stub, and without the UI through `--layers`) and `ui-settings-moved` (an old `[UI] Native` in `UI.ini` and `[UI.UI] KeepClip` in `RefitPlayer.ini` move to Display8's `[Window]`, once), with `display/bench-moved.sh` as its setup.
+
+### Changed
+- `ui-pointer-bar` and `display-movie-no-proxy` read Display8.log for the clip and the intro's mode (they moved there).
+
+Installed, not yet seen in game
+
 ## 3.99.1 — 2026-11-03
 
 ### Changed
@@ -550,6 +560,7 @@ Confirmed in game 2026-10-30.
 ### Added
 - `display-movie`: the launch reels and the intro on screen (a 4:3 picture between
   bars, not a black frame), through the UI; on the stub with `display/stub-scenario.sh`.
+
 ## 3.53.0 — 2026-10-23
 
 ### Added

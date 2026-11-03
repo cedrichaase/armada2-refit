@@ -158,7 +158,7 @@ The categories are `gpu::display::CLAIM_*`. A plugin claims only what it draws n
 | Plugin | Claims | Not claimed |
 |---|---|---|
 | render3d | each module running (`sky`, `hulls`, `world`, `particles`, `effects`, `ordnance`, `specials`), `fog` and `selection` by `[Overlays] Fog` and `Selection` | a module at 0 (or kept for the menu scene only), one standing down beside its old plugin, everything before its first frame, and everything when its frame seam is not stock |
-| UI | `hud` (its panels are in), `selection` (`[HUD] SelectionBubbles=0`, its brackets marking the selection), `loading` (`[Loading] Enable=1`, the screen of ours), `credits` (`[Menus] Credits=1`), `cursor` (while it keeps the engine's cursor from drawing: at the present where its own is drawn) | a part at 0; everything while it cannot draw (`gfx::drawing`: 30 frames in a row with no device) |
+| UI | `menus` (the menu host runs: Display8 raises the shell's mode, "Window and display mode"; not a draw, so it holds when the UI cannot draw), `hud` (its panels are in), `selection` (`[HUD] SelectionBubbles=0`, its brackets marking the selection), `loading` (`[Loading] Enable=1`, the screen of ours), `credits` (`[Menus] Credits=1`), `cursor` (while it keeps the engine's cursor from drawing: at the present where its own is drawn) | a part at 0; everything while it cannot draw (`gfx::drawing`: 30 frames in a row with no device) |
 
 A plugin that stood down because of the contract (another major, a Display8 too old)
 never registers, and one built before 1.1 has nothing to register with: either claims
@@ -271,11 +271,13 @@ build it recognises and the summary:
 
     engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321
     engine: build armada2/gog-1.1
-    engine: symbols: 15/15 resolved; 0 hooks blocked
+    engine: symbols: 29/29 resolved; 0 hooks blocked
 
 | Hook | Entries | Used by | Without it |
 |---|---|---|---|
 | `display.modes` | `ST3D_DisplayDevice::FindDisplayMode` (`fn`, its first 13 bytes checked), its six calls (`call`, each checked to call it), and the front end's 800x600x16 request (`value`) | `stub/modes.rs` ("The engine's hard-coded modes"); the stub's start in `lib.rs` | no stub: forward mode, the old chain |
+| `display.native` | `GameConfiguration::InitializeGraphicsSystem` (`fn`) and its call in `WinMain` (`call`, checked), `UserProfile` (`global`), the profile's mode fields at +0x50, +0x54, +0x58 and the two stock modes (`value`) | `window.rs`: `[Window] Native` ("Window and display mode") | the profile's mode is as set |
+| `display.keepclip` | the mouse driver's button bits and the flag that says the pointer is held for a pan (`global`; read only) | `window.rs`: `[Window] KeepClip` | the clip is put back regardless of a held button |
 | `display.drop` | the code ranges of `RenderLoopAssetLoadStatusUpdate`, the Credits (`Credits3D.obj`, from its first function `SpriteWithLocation::Render`), `ST3D_DeviceDirectX8::RefreshDisplay` and the two workspaces' `Submit` (`fn` with `end`; nothing is written, so nothing is checked) | `drop.rs`: `[Drop]` ("Drop switches"), and the scene a `BeginScene` begins for the claims (`passthrough.rs`) and the contract's mission check (`api.rs`) | nothing is dropped and no scene of the engine's is claimed: the engine draws its own loading screen, Credits and cursor |
 
 The tracer's caller names (`trace.rs`) are not a hook: they are addresses read off the
@@ -406,10 +408,8 @@ listed already, and Graphics Settings, which offers what is listed (the one mode
     stub: the engine's own mode requests (6 of 6 calls) get the one mode offered when theirs is not listed
     stub: the engine asks for 800x600x16, not listed: given the one mode, 1280x720x32
 
-The UI's raises are untouched and never write the same bytes: they patch the pushes
-before two of these calls and the call of `InitializeGraphicsSystem` (`0x484169`), so
-with the UI the lookup matches at once and Display8's answer is the engine's. No
-claim or contract change was needed.
+Since 0.18.0 the same six calls are also where the shell's and the intro's modes are
+raised ("Window and display mode"); the UI no longer patches anything of the kind.
 
 **What the stock shell looks like then** (Display8 alone, 1280x720 on the bench): the
 game's window covers the screen from the first `CreateDevice`, and the GDI menus draw
@@ -418,6 +418,48 @@ unpainted (white on the bench). Every screen works with the mouse at those
 coordinates (main menu, Single Player, the campaign's Select Mission), and a mission
 then opens at the desktop's size, drawn by the engine through passthrough. Scaling the
 shell into the window is the UI's (`ui/MENUS.md`).
+
+### Window and display mode
+
+Since 0.18.0 (contract 1.3; ROADMAP phase 9, C3) Display8 is the only plugin that
+changes a display-mode request of the engine, the game's top-level window or the
+pointer's clip. The keys are `[Window]` in `Display8.ini` (`settings.toml`; every row is
+`NO_ROW`, none on the Refit screen), and the first three moved there from `UI.ini`'s
+`[UI]` (`Native`, `KeepClip`) and the cutscene proxy's own raise:
+
+- **The shell** (`SetActiveDisplay_Internal`'s 800x600x16, the calls at `0x62c4e0` and
+  `0x62c643`) is raised to the desktop's size at 32 bits while a plugin claims
+  `CLAIM_MENUS`, asked when the engine makes the request (`claims::menus`). The UI claims
+  it while its menu host runs (`[Menus] Enable=1`, no `Menus.asi`); the host draws the
+  shell's dialogs at the screen's size, so a shell at 800x600 would be wrong for it. The
+  raise is done inside the lookup (`modes::find`: the request is replaced before the
+  engine's own lookup is called, and the engine's request is the fallback). The UI used
+  to patch the two pushes before these calls instead; this needed no byte patch because
+  the engine goes on with the mode the lookup returned. In forward mode the six calls
+  are re-pointed from `Direct3DCreate8` and the lookup is the real chain's alone.
+- **The intro** (`PlayIntroMovie`'s 640x480 at 32 bits and then 16, the calls at
+  `0x4861da` and `0x4861f2`) is raised the same way under `RaiseIntro=1` (shipped 1). The
+  cutscene proxy keeps `RaiseIntroMode=` and its `Fit`: it raises the pushes itself only
+  when `d3d8.dll` is not a Display8 (no `display8_abi` export), until Display8 is
+  required. When it did raise them, the request is the desktop's already and nothing
+  here matches.
+- **`Native`**: `display.native`, a stock profile mode (800x600 with no `ARMADA.PRF`,
+  GOG's 1024x768) becomes the desktop's before `InitializeGraphicsSystem`; a mode chosen
+  in Graphics Settings is kept.
+- **`KeepClip`** (`display.keepclip`): under Wine, at each `Present` (forward and stub,
+  every scene, not only the mission), Wine's clip is handed to `ClipCursor` again at most
+  every 500 ms, on a frame where the pointer moved, while the game's window is the
+  foreground and active one and the engine has no button down and is not holding the
+  pointer for a pan.
+- **`display8v1_mode(&w, &h)`** (contract 1.3) tells a plugin the mode the device was
+  opened at (the stub's, or what the real chain opened); false before. The UI reads it
+  for its log line of what the shell runs at; a plugin falls back to measuring the
+  desktop when the export is absent.
+
+`MoveWindow` and `SetWindowPos` in the exe's imports stay the UI's, for the hosted
+dialogs (`user32.rs` leaves them alone). Without Display8 nothing raises the shell
+(UI no longer does), so it stays at the stock 800x600: fail safe. The bench checks:
+`display-window`, `ui-settings-moved`, `display-movie`, `ui-menus-refit`.
 
 `display/bench-mode.sh stub` sets the mode in a bench clone from a scenario's `Setup:`;
 `display-stub` walks the whole game on it.
