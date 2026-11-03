@@ -185,12 +185,18 @@ def output_path(path):
 
 
 def walk_tables(top):
-    """Every settings table under `top`, in a stable order (the fixtures' excepted)."""
+    """Every settings table under `top`, in a stable order (the tools' fixture trees
+    excepted: tools/<tool>/fixtures/ holds that tool's own test input, some of it
+    invalid on purpose; a `top` inside one walks it)."""
     out = []
-    fixtures = os.path.join(ROOT, 'tools', 'settings', 'fixtures')
+    tools = os.path.join(ROOT, 'tools') + os.sep
+
+    def fixture_tree(path):
+        return path.startswith(tools) and os.path.basename(path) == 'fixtures'
+
     for d, dirs, files in os.walk(top):
         dirs[:] = sorted(x for x in dirs if x not in SKIP_DIRS
-                         and (os.path.join(d, x) != fixtures or top.startswith(fixtures)))
+                         and not (fixture_tree(os.path.join(d, x)) and not top.startswith(os.path.join(d, x))))
         for f in sorted(files):
             if f == 'settings.toml' or f.endswith('.settings.toml'):
                 out.append(os.path.join(d, f))

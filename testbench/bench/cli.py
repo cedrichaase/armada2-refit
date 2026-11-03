@@ -79,6 +79,14 @@ a2test -- run Armada II headless and test it end to end
   a2test drive scene "CMD" ["CMD" ...]  commands to Scene.asi (testbench/scene/README.md),
                                        e.g. "orbit ship 30 15 900", "camera rts", "query"
 
+  a2test syms [--exe PATH] [--build B] [--plugin P] [--record] [--json]
+                                       the symbol profiles (profiles/) checked offline against
+                                       an Armada2.exe (default $A2_GAME's, only read): the
+                                       build, `symbols: N/M resolved`, each hook ready or its
+                                       stand-down reason; --build forces a profile (the
+                                       wrong-profile test); --record appends the exe's sha256
+                                       to [[known]] of the matched build
+
   a2test baseline record NAME --from SRC... [--shot S]... [--force]
                                        keep shots (PNG, PPM, PFM) as $A2_DATA/baselines/NAME;
                                        SRC: an image, a case or image dir, a session id
@@ -150,6 +158,9 @@ def main(argv=None):
             except stockcache.StockCacheError as e:
                 print(f'a2test: {e}', file=sys.stderr)
                 return 1
+        if cmd == 'syms':
+            from . import syms
+            return syms.main(rest)
         if cmd == 'baseline':
             from . import baseline
             return baseline.main(rest)
