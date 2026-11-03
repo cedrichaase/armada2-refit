@@ -34,6 +34,23 @@ mod settings_table;
 pub mod shaders;
 pub mod style;
 pub mod surface;
+pub mod syms;
+#[rustfmt::skip]
+pub mod syms_core;
+#[rustfmt::skip]
+pub mod syms_dialogs;
+#[rustfmt::skip]
+pub mod syms_hud;
+#[rustfmt::skip]
+pub mod syms_info;
+#[rustfmt::skip]
+pub mod syms_loading;
+#[rustfmt::skip]
+pub mod syms_panels;
+#[rustfmt::skip]
+pub mod syms_radar;
+#[rustfmt::skip]
+pub mod syms_shell;
 pub mod text;
 pub mod widgets;
 
@@ -58,10 +75,8 @@ fn startup() {
     let _ = config::load();
     clock::load();
     log!("UI {} -- game dir {}", env!("CARGO_PKG_VERSION"), rt::game_dir());
-    match a2engine::pe::this_process() {
-        Some(id) => log!("engine: {}", id),
-        None => log!("engine: Armada2.exe identity unreadable"),
-    }
+    // The identity, the build and each part's symbols summary (crates/a2engine).
+    syms::init();
     if !cfg.enable {
         log!("Enable=0: standing down");
         return;

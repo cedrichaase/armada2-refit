@@ -1,0 +1,16 @@
+# UI.asi's symbols in Armada2.exe 1.1 (GOG): part "radar". STUB: its owner replaces it.
+schema = 1
+plugin = "ui"
+readme = "ui/README.md"
+lang = "rust"
+out = "ui/src/syms_radar.rs"
+
+[hook."radar.stub"]
+doc = "placeholder"
+
+[[sym]]
+id = "radar_stub"
+symbol = "WinMain"
+kind = "global"
+addr = 0x7ad508
+used_by = ["radar.stub"]

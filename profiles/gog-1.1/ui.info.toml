@@ -1,0 +1,16 @@
+# UI.asi's symbols in Armada2.exe 1.1 (GOG): part "info". STUB: its owner replaces it.
+schema = 1
+plugin = "ui"
+readme = "ui/README.md"
+lang = "rust"
+out = "ui/src/syms_info.rs"
+
+[hook."info.stub"]
+doc = "placeholder"
+
+[[sym]]
+id = "info_stub"
+symbol = "WinMain"
+kind = "global"
+addr = 0x7ad508
+used_by = ["info.stub"]
