@@ -5,6 +5,15 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.75.0 — 2026-11-03
+
+Layers: render3d 0.42.0, testbench 3.94.0.
+
+### Changed
+- render3d: the frame on the new layers: `MSAA` and `HDR` are live (the scene target is
+  made again at the next view); the menu scene's map recipe moved to
+  `render3d/content/menu/`. Installed, not yet seen in game.
+
 ## 13.74.0 — 2026-11-03
 
 Layers: render3d 0.41.0, testbench 3.93.0.

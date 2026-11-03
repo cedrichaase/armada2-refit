@@ -334,6 +334,18 @@ fn forget() {
     timing::reset();
 }
 
+/// MSAA or HDR changed live: the scene target and the post passes made for it go (the
+/// next view makes them again with the fallback list: HDR with MSAA, HDR, 8-bit), and
+/// every module drops what it made for the old format.
+pub fn formats_changed() {
+    if let Some(f) = frame() {
+        f.targets = None;
+        f.post = None;
+        f.failed = None;
+    }
+    crate::mods::formats_changed();
+}
+
 /// Before a `Reset`, everything we hold in the default pool must be gone (`gfx::reset`
 /// has `gpu` let go of its own).
 unsafe extern "system" fn reset(dev8: *mut c_void, params: *mut c_void) -> HRESULT {

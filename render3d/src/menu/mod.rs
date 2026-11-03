@@ -6,7 +6,7 @@
 //! cloak) and the frame's bloom and tone map. README.md, "The menu scene".
 //!
 //! Nothing of a mission is read: in the front end there is no game object, no camera
-//! and no registered light. The map is a recipe (`render3d/menus/map.ini`, built in; a
+//! and no registered light. The map is a recipe (`render3d/content/menu/map.ini`, built in; a
 //! `Menu\map.ini` in the game directory takes precedence and is read again when it
 //! changes), posed on a clock of its own, and the view is ours. Every module that draws
 //! a part of it does so in `Module::menu`, given the posed `Shot`.
@@ -25,7 +25,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 /// The map built into the plugin.
-const BUILT_IN: &str = include_str!("../../menus/map.ini");
+const BUILT_IN: &str = include_str!("../../content/menu/map.ini");
 
 /// The passes of a menu frame, in order; the depth is cleared before `Ships`, which
 /// draw on a projection of their own (the planet is far beyond them).

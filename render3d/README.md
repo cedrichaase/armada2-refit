@@ -491,6 +491,20 @@ is in the chain after render3d, render3d's count includes the UI's one reference
 body runs as stock. An `A16B16G16R16F` target with MSAA falls back to one without, then
 to 8 bits, and the log says which.
 
+**`MSAA`, `HDR` and the tone map are live** (0.42.0). `Render3D_SettingsChanged` reads
+`[Render3D]` again and swaps the whole `Config` in (`config::reload`; the old one is
+leaked, a view may still hold it; `Enable`, `Log` and `Timing*` stay as loaded), so
+`Bloom`, `BloomThreshold`, `BloomKnee`, `Exposure` and `Shoulder` follow at the next
+view, too. When `MSAA` or `HDR` moved, `frame::formats_changed` drops the scene targets
+and the post passes (made for the target's format) and calls every present module's
+`formats_changed`, which defaults to its `reset`; the next view makes the targets with
+the usual fallback list (HDR with MSAA, HDR, 8 bits). `gfx::Pipes::view` re-keys on the
+scene pass's formats by itself, sky's view pipelines are the only thing it drops of its
+own, and on Vulkan and Direct3D 12 the published pass carries the new samples to
+Display8's passthrough. The log line is `settings: applied Render3D.MSAA=0` (and
+`.HDR`, `.Bloom`, ...). Checked on the paused showcase at RMSE 0 against the baselines of
+the same keys at load, and back (`testbench/scenarios/render3d-live-msaa.md`).
+
 ## Frame dumps
 
 A grim shot is 8 bits, taken after the swapchain and the compositor, so it cannot say
@@ -547,7 +561,7 @@ the UI's presented frame (the scene has no HUD).
 
 ## The menu scene
 
-`src/menu/`, the map in `menus/map.ini`: a map of render3d's own behind the front end's
+`src/menu/`, the map in `content/menu/map.ini`: a map of render3d's own behind the front end's
 main menu and campaign selection, every scene on it under one sun. A Federation fleet
 in orbit over a class M planet, a starbase beside it, Klingon ships before a Metreon
 nebula far out on one side, a Borg fusion cube and the queen's Diamond in a Mutara nebula
@@ -666,7 +680,7 @@ groups that are not self-illuminating) were left out of the map, half of a Borg 
 cube among them, and now cast what the hull pass draws of them, their texture's alpha
 cut at 0.5 as `ps_hull` does.
 
-**The map.** `menus/map.ini` is built into the plugin; `Menu\map.ini` in the game
+**The map.** `content/menu/map.ini` is built into the plugin; `Menu\map.ini` in the game
 directory takes precedence and is read again within a second of an edit (copy it there
 to tune it live on the bench). Render3D.log lists what it read (`menu: map`), each
 change of view (`menu: view <name>`) and each hull's radius and cut-out parts the first
