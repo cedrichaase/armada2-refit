@@ -4,6 +4,11 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`binkproxy/README.md`](binkproxy/README.md).
 
+## 2.6.1 — 2026-11-03
+
+### Changed
+- `binkproxy/settings_table.h` is regenerated at A2SET_ABI 1.1 (48-byte rows). Nothing else changes. Installed, not yet seen in game.
+
 ## 2.6.0 — 2026-11-03
 
 ### Added

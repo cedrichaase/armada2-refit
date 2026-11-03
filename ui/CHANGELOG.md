@@ -4,6 +4,11 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.33.0 — 2026-11-03
+
+### Added
+- The settings hub moves keys (C2): at its first frame, for every loaded row with `moved_from` whose old key is in `RefitPlayer.ini`, the value goes to the row's own `[<Stem>.<Section>]` key (the new key wins when both are there, the old one is removed), logged as `settings: RefitPlayer.ini [UI.HUD] BarKeys moved to [QOL.QOL] BarKeys`, and the plugins are told. Rows of 44 bytes (A2SET_ABI 1.0) have none. `UI_Settings` is regenerated at ABI 1.1. Installed, not yet seen in game.
+
 ## 0.32.0 — 2026-11-03
 
 ### Changed

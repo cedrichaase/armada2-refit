@@ -100,3 +100,7 @@ while IFS=$'\t' read -r -u 3 verb id cmd; do
     echo "== $verb $id: $cmd"
     (cd "$here" && eval "$cmd")
 done 3<<<"$plan"
+
+# A settings row that took over another file's key (moved_from) gets a player's value
+# for the old key (tools/settings/README.md, "Moved keys"); nothing to do without one.
+python3 "$here/tools/settings/move-keys.py" "$A2_GAME"

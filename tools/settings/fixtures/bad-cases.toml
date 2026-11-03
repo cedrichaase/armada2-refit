@@ -1,0 +1,140 @@
+# The tables lint.py must refuse, one case each: selftest.sh copies tables/good/ into a
+# temporary directory, applies the case's `replace` (old text -> new text, once, in
+# settings.toml), appends `append` to settings.toml, adds each `[case.files]` file
+# beside it, and wants lint.py to fail with `expect` in its output.
+#
+# A case needs no generated table of its own: lint.py also says the table is out of
+# date, which does not hide the problem the case is about.
+
+[[case]]
+name = "apply"
+expect = "apply `soon` is not one of"
+replace = ['apply = "live"', 'apply = "soon"']
+
+[[case]]
+name = "kind"
+expect = "kind `toggle` is not one of"
+replace = ['kind = "bool"', 'kind = "toggle"']
+
+[[case]]
+name = "flag"
+expect = "flag `hidden` is not one of"
+replace = ['flags = ["advanced"]', 'flags = ["hidden"]']
+
+[[case]]
+name = "bool-default"
+expect = "a BOOL's default is 0 or 1"
+replace = ['default = "1"', 'default = "2"']
+
+[[case]]
+name = "enum-default"
+expect = "is not one of its values"
+replace = ['default = "4"', 'default = "5"']
+
+[[case]]
+name = "labels"
+expect = "`labels` must have 4 entries"
+replace = ['labels = ["Off", "2x", "4x", "8x"]', 'labels = ["Off", "2x", "4x"]']
+
+[[case]]
+name = "help-long"
+expect = "help is 201 characters, at most 200"
+replace = ['help = "Turns the good thing on."', 'help = "XHELPX"']
+fill = ["XHELPX", 201]
+
+[[case]]
+name = "label-long"
+expect = "label is 41 characters, at most 40"
+replace = ['label = "Good thing"', 'label = "XLABELX"']
+fill = ["XLABELX", 41]
+
+[[case]]
+name = "not-shipped-present"
+expect = "NOT_SHIPPED, but"
+replace = ['help = "Turns the good thing on."', 'help = "x"\nflags = ["not_shipped"]']
+
+[[case]]
+name = "shipped-value"
+expect = "has Mode=4, the table says 2"
+replace = ['default = "4"', 'default = "2"']
+
+[[case]]
+name = "shipped-missing"
+expect = "has no [Good] Missing"
+append = '''
+[[row]]
+name = "missing"
+section = "Good"
+key = "Missing"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "Missing"
+help = ""
+'''
+
+[[case]]
+name = "duplicate"
+expect = "is also"
+append = '''
+[[row]]
+name = "again"
+section = "Good"
+key = "Enable"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "Again"
+help = ""
+'''
+
+[[case]]
+name = "moved-from-own-key"
+expect = "is the row's own key"
+replace = ['help = "Turns the good thing on."', 'help = "x"\nmoved_from = "Good.Good.Enable"']
+
+[[case]]
+name = "moved-from-shape"
+expect = "is not `Stem.Section.Key`"
+replace = ['help = "Turns the good thing on."', 'help = "x"\nmoved_from = "Enable"']
+
+[[case]]
+name = "section-owner"
+expect = "section [Core] is owned by"
+append = '''
+[[row]]
+name = "core_a"
+section = "Core"
+key = "A"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "A"
+help = ""
+flags = ["not_shipped"]
+'''
+[case.files]
+"other.settings.toml" = '''
+plugin = "Good"
+file = "Good.ini"
+shipped = "tools/settings/fixtures/tables/good/Good.ini"
+
+[[row]]
+name = "core_b"
+section = "Core"
+key = "B"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "B"
+help = ""
+flags = ["not_shipped"]
+'''

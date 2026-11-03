@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# The settings tools against their fixtures (tools/settings/README.md): overlay.py's
-# edit on every fixtures/NN-*.in (the spec crates/a2ini passes too, under cargo test),
+# The settings tools against their fixtures (tools/settings/README.md): the overlay's
+# edit and rename on fixtures/ (cargo test of crates/a2ini, the one implementation),
 # gen.py's output for the fixture tables against the committed golden files, lint.py
-# passing the good tables and failing each bad one for its reason, the generated files
-# of the repository up to date, the fixture C source compiled against csdk/a2asi.h (when
-# clang is there), and bench-overlay.sh on a mock clone. Writes only to a temp dir.
+# passing the good tables and failing each case of fixtures/bad-cases.toml for its
+# reason, the generated files of the repository up to date, the fixture C source
+# compiled against csdk/a2asi.h (when clang is there), and bench-overlay.sh and
+# move-keys.py on a mock game directory. Writes only to a temp dir.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -16,8 +17,12 @@ bad() { echo "FAIL $*"; fail=1; }
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-# 1. the writer
-if python3 "$here/overlay.py" --fixtures "$fx"; then ok "overlay.py fixtures"; else bad "overlay.py fixtures"; fi
+# 1. the writer: a2ini's own tests run the edit and rename fixtures
+if CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" cargo test -q --manifest-path "$here/../../crates/a2ini/Cargo.toml" >"$tmp/cargo.log" 2>&1; then
+    ok "a2ini cargo test (edit and rename fixtures)"
+else
+    bad "a2ini cargo test"; tail -20 "$tmp/cargo.log"
+fi
 
 # 2. the generator's golden output
 python3 "$here/gen.py" --emit "$tables/good/settings.toml" --lang rs > "$tmp/good.rs"
@@ -65,19 +70,39 @@ fi
 if python3 "$here/lint.py" "$tables"/good/*.toml >/dev/null; then ok "lint.py good"; else bad "lint.py good"; python3 "$here/lint.py" "$tables"/good/*.toml; fi
 mapfile -t fragtables < <(find "$frag" -name '*settings.toml' | sort)
 if python3 "$here/lint.py" "${fragtables[@]}" >/dev/null; then ok "lint.py good-fragments"; else bad "lint.py good-fragments"; python3 "$here/lint.py" "${fragtables[@]}"; fi
-for d in "$tables"/bad-*/; do
-    name="$(basename "$d")"
-    want="$(cat "$d/expect.txt")"
-    mapfile -t these < <(find "$d" -name '*settings.toml' | sort)
-    if out="$(python3 "$here/lint.py" "${these[@]}" 2>&1)"; then
-        bad "lint.py $name passed"
-    elif grep -qF -- "$want" <<<"$out"; then
-        ok "lint.py $name"
-    else
-        bad "lint.py $name: wanted \"$want\", got:"
-        echo "$out"
-    fi
-done
+python3 - "$here" "$tmp" <<'PY' || fail=1
+import os, subprocess, sys, tomllib
+here, tmp = sys.argv[1:3]
+with open(os.path.join(here, 'fixtures', 'bad-cases.toml'), 'rb') as f:
+    cases = tomllib.load(f)['case']
+bad = 0
+for c in cases:
+    with open(os.path.join(here, 'fixtures', 'tables', 'good', 'settings.toml')) as f:
+        text = f.read()
+    if 'replace' in c:
+        old, new = (x.replace('\\n', '\n') for x in c['replace'])
+        assert old in text, c['name']
+        if 'fill' in c:
+            new = new.replace(c['fill'][0], 'x' * c['fill'][1])
+        text = text.replace(old, new, 1)
+    text += c.get('append', '')
+    d = os.path.join(tmp, 'case-' + c['name'])
+    os.makedirs(d)
+    files = {'settings.toml': text, **c.get('files', {})}
+    for n, t in files.items():
+        with open(os.path.join(d, n), 'w') as f:
+            f.write(t)
+    r = subprocess.run([sys.executable, os.path.join(here, 'lint.py')] + [os.path.join(d, n) for n in sorted(files)],
+                       capture_output=True, text=True)
+    out = r.stdout + r.stderr
+    if r.returncode == 0:
+        print(f"FAIL lint.py case {c['name']} passed"); bad += 1
+    elif c['expect'] not in out:
+        print(f"FAIL lint.py case {c['name']}: wanted \"{c['expect']}\", got:\n{out}"); bad += 1
+    else:
+        print(f"ok   lint.py case {c['name']}")
+sys.exit(1 if bad else 0)
+PY
 if python3 "$here/lint.py" >/dev/null; then ok "lint.py on the repository"; else bad "lint.py on the repository"; python3 "$here/lint.py"; fi
 
 # 4. the C helpers and a generated table compile, with the header's static asserts
@@ -105,6 +130,45 @@ if [ "$(python3 "$here/overlay.py" --get "$o" Render3D.Modules:sky)" = 0 ] \
 else
     bad "bench-overlay.sh"
     cat -A "$o"
+fi
+
+# 6. move-keys.py: a plugin-ini key moved by a row's moved_from, once
+mv="$tmp/move"
+mkdir -p "$mv/game" "$mv/repo/layer"
+cat > "$mv/repo/layer/settings.toml" <<'EOT'
+plugin = "New"
+file = "New.ini"
+shipped = "layer/New.ini"
+
+[[row]]
+name = "moved"
+section = "Sec"
+key = "Key"
+kind = "bool"
+default = "0"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "Moved"
+help = ""
+moved_from = "Old.OSec.OKey"
+EOT
+printf '[Sec]\nKey=0\n' > "$mv/repo/layer/New.ini"
+printf '; keep\r\n[OSec]\r\nOKey=1\r\nOther=2\r\n' > "$mv/game/Old.ini"
+printf '[Sec]\nKey=0\n' > "$mv/game/New.ini"
+python3 "$here/move-keys.py" --repo "$mv/repo" "$mv/game" >"$tmp/move.log"
+if [ "$(python3 "$here/overlay.py" --get "$mv/game/New.ini" Sec:Key)" = 1 ] \
+        && ! python3 "$here/overlay.py" --get "$mv/game/Old.ini" OSec:OKey >/dev/null \
+        && [ "$(python3 "$here/overlay.py" --get "$mv/game/Old.ini" OSec:Other)" = 2 ] \
+        && grep -q 'moved Old.ini \[OSec\] OKey' "$tmp/move.log"; then
+    python3 "$here/move-keys.py" --repo "$mv/repo" "$mv/game" >"$tmp/move2.log"
+    if [ "$(python3 "$here/overlay.py" --get "$mv/game/New.ini" Sec:Key)" = 1 ] && ! grep -q moved "$tmp/move2.log"; then
+        ok "move-keys.py (moved once, then nothing)"
+    else
+        bad "move-keys.py second run"; cat "$tmp/move2.log"
+    fi
+else
+    bad "move-keys.py"; cat "$tmp/move.log"
 fi
 
 [ "$fail" = 0 ] && echo "tools/settings/selftest.sh: all pass" || echo "tools/settings/selftest.sh: FAILED"

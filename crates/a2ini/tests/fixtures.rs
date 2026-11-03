@@ -1,10 +1,10 @@
 //! `edit` against every fixture of tools/settings/fixtures (the spec it shares with
-//! tools/settings/overlay.py): `NN-name.in`, `.args` (a JSON array: section, key, and
+//! the host tool `a2ini`): `NN-name.in`, `.args` (a JSON array: section, key, and
 //! the value or null to remove the key) and `.out`, all latin-1.
 use std::path::PathBuf;
 
 /// The three entries of a fixture's `.args`, a JSON array of strings and null.
-fn args(text: &str) -> (String, String, Option<String>) {
+fn args_of(text: &str) -> Vec<Option<String>> {
     let mut out: Vec<Option<String>> = Vec::new();
     let inner = text.trim().strip_prefix('[').and_then(|t| t.strip_suffix(']')).expect("args: not an array");
     let mut it = inner.chars().peekable();
@@ -41,8 +41,13 @@ fn args(text: &str) -> (String, String, Option<String>) {
             Some(c) => panic!("args: unexpected {c:?}"),
         }
     }
-    assert_eq!(out.len(), 3, "args: want [section, key, value]");
-    (out[0].clone().unwrap(), out[1].clone().unwrap(), out[2].clone())
+    out
+}
+
+fn args(text: &str) -> (String, String, Option<String>) {
+    let a = args_of(text);
+    assert_eq!(a.len(), 3, "args: want [section, key, value]");
+    (a[0].clone().unwrap(), a[1].clone().unwrap(), a[2].clone())
 }
 
 #[test]
@@ -66,6 +71,24 @@ fn fixtures() {
     }
     assert!(bad.is_empty(), "{} of {} fixtures fail: {bad:?}", bad.len(), names.len());
     println!("{} fixtures pass", names.len());
+}
+
+/// `rename` on fixtures/rename: `.args` is [from section, from key, to section, to key].
+#[test]
+fn rename_fixtures() {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tools/settings/fixtures/rename");
+    let mut names: Vec<String> = std::fs::read_dir(&dir)
+        .expect("tools/settings/fixtures/rename")
+        .filter_map(|e| e.ok()?.file_name().into_string().ok()?.strip_suffix(".in").map(String::from))
+        .collect();
+    names.sort();
+    assert!(!names.is_empty(), "no rename fixtures");
+    for n in &names {
+        let read = |ext: &str| a2ini::from_latin1(&std::fs::read(dir.join(format!("{n}.{ext}"))).unwrap());
+        let a: Vec<String> = args_of(&read("args")).into_iter().map(Option::unwrap).collect();
+        assert_eq!(a.len(), 4, "{n}: want four names");
+        assert_eq!(a2ini::rename(&read("in"), &a[0], &a[1], &a[2], &a[3]), read("out"), "{n}");
+    }
 }
 
 #[test]

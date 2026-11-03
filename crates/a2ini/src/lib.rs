@@ -1,7 +1,9 @@
 //! Ini text, read and edited: the one parser of the plugins' `a2rt::Ini` and the one
 //! writer of the settings overlay, `RefitPlayer.ini` (`a2rt::overlay`). `no_std` with
 //! `alloc` and no Win32, so the host tests it: `tests/fixtures.rs` runs `edit` on every
-//! fixture in `tools/settings/fixtures/`, which `tools/settings/overlay.py` passes too.
+//! fixture in `tools/settings/fixtures/` (and `rename` on `fixtures/rename/`). The `a2ini`
+//! binary (`src/main.rs`, feature `std`) is this code for the bench, the GUI installer and
+//! `tools/settings/move-keys.py`.
 //! The fixtures are the spec of `edit` (tools/settings/README.md, "The writer").
 #![no_std]
 
@@ -270,6 +272,39 @@ pub fn edit(text: &str, section: &str, key: &str, value: Option<&str>) -> String
         out.push_str(eol);
     }
     out
+}
+
+/// The raw value of the first `[section] key` line (text after `=`, trimmed), or None.
+fn raw_value(text: &str, section: &str, key: &str) -> Option<String> {
+    let lines = split(text);
+    for (h, e) in occurrences(&lines, section) {
+        for l in &lines[h + 1..e] {
+            if key_of(&l.content).is_some_and(|k| k.eq_ignore_ascii_case(key)) {
+                let c = &l.content;
+                return Some(String::from(trim(&c[c.find('=').map_or(c.len(), |i| i + 1)..])));
+            }
+        }
+    }
+    None
+}
+
+/// Moves `[from_sec] from_key` to `[to_sec] to_key` (a settings row's `moved_from`,
+/// tools/settings/README.md): the value goes over with its key; when the new key is there
+/// already it wins and the old one is only removed. Unchanged when the old key is absent,
+/// both are the same, or a name or the value is refused.
+pub fn rename(text: &str, from_sec: &str, from_key: &str, to_sec: &str, to_key: &str) -> String {
+    if (from_sec.eq_ignore_ascii_case(to_sec) && from_key.eq_ignore_ascii_case(to_key)) || !valid_section(to_sec) || !valid_key(to_key) {
+        return String::from(text);
+    }
+    let Some(v) = raw_value(text, from_sec, from_key) else { return String::from(text) };
+    if raw_value(text, to_sec, to_key).is_some() {
+        return edit(text, from_sec, from_key, None);
+    }
+    if !valid_value(&v) {
+        return String::from(text);
+    }
+    let set = edit(text, to_sec, to_key, Some(&v));
+    edit(&set, from_sec, from_key, None)
 }
 
 fn kv(key: &str, v: &str) -> String {

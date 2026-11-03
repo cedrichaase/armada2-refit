@@ -99,13 +99,12 @@ jobs:
         run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path crates/a2fmt/Cargo.toml
       - name: a2engine on the host (the PE identity on synthetic images, and its C twin)
         run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path crates/a2engine/Cargo.toml
-      - name: a2ini on the host (the overlay's edit against tools/settings/fixtures)
+      - name: a2ini on the host (the overlay's edit and rename against tools/settings/fixtures)
         run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path crates/a2ini/Cargo.toml
 
-  # The settings descriptors (tools/settings/README.md): overlay.py, gen.py and lint.py
-  # against their fixtures, every generated table and the row's definition in a2rt and
-  # csdk/a2asi.h up to date with the schema, and every settings.toml (a plugin's table
-  # and its modules' fragments, as one) against its shipped ini and its layer's sources.
+  # The settings descriptors (tools/settings/README.md): a2ini, gen.py and lint.py
+  # against their fixtures, every generated table up to date, and every settings.toml (a
+  # plugin's table and its modules' fragments, as one) against its shipped ini.
   settings:
     runs-on: ubuntu-24.04
     steps:

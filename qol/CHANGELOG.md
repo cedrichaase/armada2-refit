@@ -5,6 +5,11 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 1.10.1 — 2026-11-03
+
+### Changed
+- `qol/settings_table.h` and `rules_settings_table.h` are regenerated at A2SET_ABI 1.1 (48-byte rows). Nothing else changes. Installed, not yet seen in game.
+
 ## 1.10.0 — 2026-11-03
 
 ### Added

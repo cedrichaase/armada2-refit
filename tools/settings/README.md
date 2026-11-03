@@ -8,14 +8,17 @@ every one of them. Each plugin describes the keys a player may set in a table of
 (ROADMAP.md Phase 6). This folder holds the schema of those tables, the generator that
 writes them from each layer's `settings.toml`, their lint, the overlay's writer for
 the bench and the GUI installer, and the fixtures that pin all of it. The contract is
-**A2SET_ABI 1.0**. Nothing here is installed; it is versioned by the root.
+**A2SET_ABI 1.1**. Nothing here is installed; it is versioned by the root.
 
 | File | What it is |
 |---|---|
-| `gen.py` | the schema of a row, and the generator of everything built from it |
+| `gen.py` | the generator of every layer's `settings_table` from its `settings.toml` |
 | `lint.py` | the tables against the schema, each other, the shipped inis and the sources |
-| `overlay.py` | the overlay's edit in Python (the bench, the GUI installer) |
-| `fixtures/` | `NN-name.in` / `.args` / `.out`: the spec of the edit; `tables/`: tables for the generator and the lint |
+| `overlay.py` | the overlay's edit for the bench: a wrapper over the `a2ini` host tool |
+| `host.sh` | builds `a2ini` (`crates/a2ini`, feature `std`) into the ignored `build/` and prints its path |
+| `move-keys.py` | moves a plugin-ini key a row took over (`moved_from`); `./install` runs it |
+| `inival.py` | what the tools read of an ini and of the overlay's names (reading only) |
+| `fixtures/` | `NN-name.in` / `.args` / `.out`: the spec of the edit (`rename/`: of the rename); `tables/`: tables for the generator and the lint; `bad-cases.toml`: the tables the lint must refuse, one case each |
 | `selftest.sh` | all of the above against the fixtures (CI runs it) |
 | `bench-overlay.sh` | sets overlay keys in a bench clone from a scenario's `Setup:` line |
 
@@ -80,8 +83,9 @@ value.
 One process writes the overlay (the game) and one DLL in it (`UI.asi`, through
 `a2rt::overlay::set` / `set_row`); the C plugins have no writer, and Wine's
 `WritePrivateProfileString` is not used. The edit is a pure function,
-`a2ini::edit(text, section, key, value)`, and `overlay.py`'s `edit` is the same
-function in Python; both pass every fixture. The text is handled as latin-1, so a byte
+`a2ini::edit(text, section, key, value)`; the bench and the installers run the same
+code through the `a2ini` host tool (`a2ini get|edit|unset|rename`, built by `host.sh`),
+and `cargo test` of `crates/a2ini` runs every fixture. The text is handled as latin-1, so a byte
 the edit does not touch is kept whatever the file's encoding. The rules, which the
 fixtures pin:
 
@@ -131,7 +135,7 @@ const A2Setting *__cdecl <Plugin>_Settings(UINT *count)                         
 The names are fixed: `Render3D_Settings`, `UI_Settings`, `QOL_Settings`,
 `QOLRules_Settings`, `Online_Settings`, `BinkProxy_Settings` (`Display8_Settings` is
 reserved). `count` may be NULL; the rows are static and live as long as the DLL. A row,
-C ABI, i686, 44 bytes in version 1:
+C ABI, i686, 48 bytes in version 1.1 (44 in 1.0):
 
 | off | field | type | |
 |---|---|---|---|
@@ -149,19 +153,21 @@ C ABI, i686, 44 bytes in version 1:
 | 32 | value_labels | const char* | ENUM: `Off\|2x\|4x\|8x`; BOOL: NULL, meaning `Off\|On` |
 | 36 | label | const char* | English, at most 40 characters |
 | 40 | help | const char* | English, at most 200 characters, may be empty |
+| 44 | moved_from | const char* | 1.1: `Stem.Section.Key` the value is moved from (below), or NULL; read only when `size` >= 48 |
 
 Strings are ASCII. A BOOL is on when its value parses as a non-zero integer. An ENUM
 value outside `values` (a hand edit) is kept and shown as "Custom (v)"; nothing rewrites
 it until the player picks a value. Rows are in screen order within a tab. A minor
 change only appends fields (the size grows) or adds enum values or flags; a reader
-refuses a table whose `rows[0].size` is below 44, hides a row with a kind, apply, scope
+refuses a table whose `rows[0].size` is below 44 (1.0's row; a 44-byte table has no `moved_from`), hides a row with a kind, apply, scope
 or tab it does not know, and logs each once. A major change renames the export
 (`<Plugin>_Settings2`).
 
-`gen.py` holds the layout once and writes it between the GENERATED markers of
+The row is written by hand, once per language, beside its size and offset asserts:
 `crates/a2rt/src/settings.rs` (`#[repr(C)] pub struct Setting`, `KIND_*`, `APPLY_*`,
-`SCOPE_*`, `TAB_*`, `FLAG_*`, size and offset asserts) and of `csdk/a2asi.h`
-(`A2Setting`, the `A2SET_*` defines, negative-array asserts).
+`SCOPE_*`, `TAB_*`, `FLAG_*`) and `csdk/a2asi.h` (`A2Setting`, the `A2SET_*` defines,
+negative-array asserts). `gen.py` writes the tables only, so a row field is added in
+those two places and in `gen.py`'s emitters, and the asserts fail a compile that missed one.
 
 **A layer's table is data**, `<layer>/settings.toml` (or `<layer>/<name>.settings.toml`,
 as `qol/rules.settings.toml`):
@@ -204,9 +210,8 @@ only through its row, `rt::settings::on(&ini, WORLD_SURFACES)` (also `int`, `flo
 2. no (file, section, key) twice across the tables;
 3. each row's key in the shipped ini, in its section, at `default` (unless NOT_SHIPPED);
 4. a NOT_SHIPPED key absent from the shipped ini;
-5. no literal `"Section", "Key"` of a row left in the layer's `*.rs`, `*.c`, `*.h` (the
-   generated tables excepted): read it through the row;
-6. the generated file up to date;
+5. the generated file up to date;
+6. a `moved_from` is `Stem.Section.Key` and not the row's own key;
 7. within one plugin's table and its fragments (below), a section has one owning table,
    except the sections the plugin's table lists in `shared_sections` (render3d's
    `[Lights]`, split by key).
@@ -231,11 +236,10 @@ Cargo.toml): `pub static ROWS`, one `pub const NAME: &Setting` per row and
 `pub const MODULE`, and no export. A plugin table with fragments (a Rust crate only)
 gets an export that returns `crate::settings_rows()`, which the plugin provides: its own
 rows, then each built-in module's `ROWS` in the plugin's module order, copied once into
-one contiguous array (so the export is still one table of 44-byte rows, A2SET_ABI 1.0;
+one contiguous array (so the export is still one table of 48-byte rows, A2SET_ABI 1.1;
 a module not built in has no rows, and the Refit screen shows none). The plugin table
 may list `shared_sections`. The lint takes a plugin's table and its fragments as one
-table: rule 2 across them, rule 3 against the plugin's one shipped ini, rule 5 over the
-whole plugin's sources, rule 7 between them. `gen.py --rows TABLE.toml [MODULE...]`
+table: rule 2 across them, rule 3 against the plugin's one shipped ini, rule 7 between them. `gen.py --rows TABLE.toml [MODULE...]`
 prints the exported rows (`Section Key`) with the fragments in the order given;
 `selftest.sh` checks render3d's against `fixtures/render3d-rows.txt` (the order before
 the split) with the modules in their `priority()` order.
@@ -265,12 +269,32 @@ overlay, `[HUD] BarHidden`. When it exists and the overlay has no `[UI.HUD] BarH
 a non-zero value is set there; then the file is renamed `UIPlayer.ini.migrated`, and one
 line is logged (`settings: UIPlayer.ini migrated to RefitPlayer.ini [UI.HUD] (...)`).
 
+## Moved keys (`moved_from`, A2SET_ABI 1.1)
+
+A row may carry `moved_from = "<Stem>.<Section>.<Key>"` in its `settings.toml`: the
+key it took over from another file (`UI.UI.KeepClip` for `Display8.ini`'s
+`[Window] KeepClip`; the stem has no dot, the section may). Two places hold a player's
+value, and each has one mover:
+
+- **The overlay**: at its first frame the hub (`ui/src/settings.rs`) checks each loaded
+  table's rows, size 48 or more. For every `moved_from` key present in `RefitPlayer.ini`
+  it moves the value to the row's own `[<Stem>.<Section>] Key` (`a2ini::rename`; when
+  both are present the new key wins and the old one is deleted), logs
+  `settings: RefitPlayer.ini [UI.HUD] BarKeys moved to [QOL.QOL] BarKeys` and tells the
+  plugins. The UI stays the overlay's one writer. Without `UI.asi` an old overlay key is
+  ignored and the shipped value applies.
+- **The plugin inis**: `./install` runs `move-keys.py <game dir>` after every layer. When
+  the old file holds the old key, a value other than the row's default goes to the row's
+  file and key, and the old key is removed either way; one line per key. The release
+  scripts do the same from `moved.txt`, which `publish/package.sh` bakes from these tables.
+
+Both are idempotent: the old key is gone after the first run.
+
 ## `<Plugin>_SettingsNote` (C5 amendment)
 
 `const char *__cdecl <Plugin>_SettingsNote(const A2Setting *row)` (C), or
 `#[unsafe(no_mangle)] pub extern "C" fn <Plugin>_SettingsNote(row: *const Setting) -> *const u8`
-(Rust), is optional and exported next to `_SettingsChanged`; A2SET_ABI stays 1.0, since
-the row layout does not change. `row == NULL` asks about the plugin as a whole; otherwise
+(Rust), is optional and exported next to `_SettingsChanged`; it is not part of the row layout. `row == NULL` asks about the plugin as a whole; otherwise
 `row` is a pointer into that plugin's own table, as `_Settings` returned it, so it may be
 compared by address with the plugin's row constants. It returns NULL when there is
 nothing to say, else a static NUL-terminated ASCII string of at most 120 characters,
@@ -294,6 +318,6 @@ Setup: tools/settings/bench-overlay.sh --into UIPlayer.ini HUD:BarHidden=1 ui/be
 
 the word syntax of `render3d/bench-ini.sh`: each `Section:Key=value` sets a key (the
 section as in the overlay), `--unset Section:Key` removes one, and what follows is the
-scene or script the scenario would have run. `overlay.py FILE WORD...` does the same by
+scene or script the scenario would have run. `overlay.py FILE WORD...` (the `a2ini` tool) does the same by
 hand, and `overlay.py --get FILE Section:Key` prints a value. `selftest.sh` runs every
 check here without a game.

@@ -62,10 +62,37 @@ pub(crate) fn note(osec: &str, key: &str, value: &str, file: &str, mine: impl Fn
     }
 }
 
+/// Edits the overlay's text with `f`: nothing is written when the text does not change;
+/// otherwise the whole file goes to `RefitPlayer.ini.tmp`, which is renamed over the
+/// overlay, and every cached ini is marked stale. `what` names the keys for the log.
+/// Some(changed), or None when the file could not be read or written.
+fn rewrite(what: &str, f: impl FnOnce(&str) -> String) -> Option<bool> {
+    let path = path();
+    let old = match crate::read_file(&path) {
+        Some(b) => a2ini::from_latin1(&b),
+        None if crate::file_exists(&path) => {
+            log!("settings: {} could not be read; {} not written", FILE, what);
+            return None;
+        }
+        None => String::new(),
+    };
+    let new = f(&old);
+    if new == old {
+        return Some(false);
+    }
+    let tmp = crate::sfmt!("{}.tmp", path);
+    if !crate::write_file(&tmp, &a2ini::to_latin1(&new)) || !crate::move_file(&tmp, &path) {
+        crate::delete_file(&tmp);
+        log!("settings: {} could not be written; {} unchanged", FILE, what);
+        return None;
+    }
+    crate::ini_refresh_all();
+    Some(true)
+}
+
 /// Sets `[<Stem>.<sec>] key` of the overlay to `value`, or removes it (None). Nothing is
-/// written when the text does not change; otherwise the whole file goes to
-/// `RefitPlayer.ini.tmp`, which is renamed over the overlay, and every cached ini is
-/// marked stale. False when the value was refused or the file could not be written.
+/// written when the text does not change (`rewrite`). False when the value was refused or
+/// the file could not be written.
 pub fn set(file: &str, sec: &str, key: &str, value: Option<&str>) -> bool {
     let osec = section(file, sec);
     if let Some(v) = value
@@ -74,31 +101,29 @@ pub fn set(file: &str, sec: &str, key: &str, value: Option<&str>) -> bool {
         log!("settings: {} [{}] {}={:?} refused (CR, LF or surrounding whitespace)", FILE, osec, key, v);
         return false;
     }
-    let path = path();
-    let old = match crate::read_file(&path) {
-        Some(b) => a2ini::from_latin1(&b),
-        None if crate::file_exists(&path) => {
-            log!("settings: {} could not be read; [{}] {} not written", FILE, osec, key);
-            return false;
+    match rewrite(&crate::sfmt!("[{}] {}", osec, key), |old| a2ini::edit(old, &osec, key, value)) {
+        Some(true) => {
+            match value {
+                Some(v) => log!("settings: {} [{}] {}={} written", FILE, osec, key, v),
+                None => log!("settings: {} [{}] {} removed", FILE, osec, key),
+            }
+            true
         }
-        None => String::new(),
-    };
-    let new = a2ini::edit(&old, &osec, key, value);
-    if new == old {
-        return true;
+        Some(false) => true,
+        None => false,
     }
-    let tmp = crate::sfmt!("{}.tmp", path);
-    if !crate::write_file(&tmp, &a2ini::to_latin1(&new)) || !crate::move_file(&tmp, &path) {
-        crate::delete_file(&tmp);
-        log!("settings: {} could not be written; [{}] {} unchanged", FILE, osec, key);
-        return false;
+}
+
+/// Moves the overlay's `[from_sec] from_key` to `[to_sec] to_key` (a row's `moved_from`,
+/// `a2ini::rename`), logging `settings: RefitPlayer.ini [UI.HUD] BarKeys moved to [QOL.QOL]
+/// BarKeys`. True when the overlay changed.
+pub fn rename(from_sec: &str, from_key: &str, to_sec: &str, to_key: &str) -> bool {
+    let what = crate::sfmt!("[{}] {}", from_sec, from_key);
+    let moved = rewrite(&what, |old| a2ini::rename(old, from_sec, from_key, to_sec, to_key)) == Some(true);
+    if moved {
+        log!("settings: {} [{}] {} moved to [{}] {}", FILE, from_sec, from_key, to_sec, to_key);
     }
-    crate::ini_refresh_all();
-    match value {
-        Some(v) => log!("settings: {} [{}] {}={} written", FILE, osec, key, v),
-        None => log!("settings: {} [{}] {} removed", FILE, osec, key),
-    }
-    true
+    moved
 }
 
 /// Sets a row to `value`, or removes its key when `value` is what the plugin reads
