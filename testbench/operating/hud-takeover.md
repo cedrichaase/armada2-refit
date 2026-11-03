@@ -24,7 +24,7 @@ agents after.
   its build list); 1000,200 is refused ("Cannot build at specified location").
 - **The bar's log is the evidence**: `UI.log` writes each layout once per change
   (`bar: menu=2 mode=1 | Q=bbase ... T=cancel(off) ... G=back`) and each press (`bar:
-  click build`, `bar: key S=bmining`). For one frame after a press the menu number
+  click build`; QOL.log has `bar: key S`). For one frame after a press the menu number
   changes before the buttons do; the bar lays out by the buttons' menu, so the log
   does not show a mixed line.
 - **UI.log and UI.ini are gathered into the report** (`logs/`) since this work;

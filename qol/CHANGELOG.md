@@ -5,6 +5,11 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 2.1.0 — 2026-11-03
+
+### Added
+- `BarKeys=` (`[QOL] BarKeys`, shipped 1; a live row on the Interface tab, "Grid keys", `moved_from = "UI.HUD.BarKeys"`): the command bar's position keys (Q W E R T / A S D F G / Z X C V B) are QOL's now (`bar.c`, hook `qol.bar_keys`, its entries moved from the UI's profile). QOL wraps the bar's keyboard step, empties the stock key tables around the stock call, reads the keys and presses the button of that cell with the click. The layout and drawing stay the UI's: the plugins meet at `UI_BarCell`, `UI_BarStep` (UI.asi) and `QOL_BarLabel` (this plugin), found by name. Without the Refit bar (no UI.asi, `[HUD] Bar=0`) or with `GridLayout.asi` loaded the keys stand down (`bar: no refit bar, position keys off`) and the stock bar keys work. `QOL.log` names each key (`bar: key Q`). `build.sh` links `user32`. Installed, not yet seen in game.
+
 ## 2.0.0 — 2026-11-03
 
 ### Removed

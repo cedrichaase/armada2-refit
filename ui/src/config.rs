@@ -74,8 +74,6 @@ pub struct Hud {
     pub enable: bool,
     /// The button bar (`PopupPaletteImp`), with the grid keys.
     pub bar: bool,
-    /// The bar's keys are the grid's (QWERT/ASDFG/ZXCVB by position); 0 keeps stock's.
-    pub bar_keys: bool,
     /// The key in each button's corner.
     pub bar_labels: bool,
     /// Our own icons (`icons`) on the bar's and the top-right buttons in place of the
@@ -172,7 +170,6 @@ pub fn load() -> Config {
         hud: Hud {
             enable: on(&ini, HUD_ENABLE),
             bar: on(&ini, HUD_BAR),
-            bar_keys: on(&ini, HUD_BARKEYS),
             bar_labels: on(&ini, HUD_BARLABELS),
             icons: on(&ini, HUD_ICONS),
             info: on(&ini, HUD_INFO),
@@ -259,7 +256,6 @@ pub fn reload() {
     h.info_camera = n.info_camera;
     h.info_scale = n.info_scale;
     h.icons = n.icons;
-    h.bar_keys = n.bar_keys;
     h.bar_labels = n.bar_labels;
     h.selection_gauges = n.selection_gauges;
     h.tooltips = n.tooltips;

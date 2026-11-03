@@ -106,6 +106,7 @@ variable and then of the global; field offsets are spliced in with `A2_STR(QOL_F
 | `qol.selection` | `MaxSelection` | `cOverViewImp` (`global`), its 31 selection-array sites and 3 caps (`patch`, each with the bytes it replaces) | selection of 16 |
 | `qol.special_select` | `MaxSelection` | the five special-weapon array sequences (`patch`) and three continue points | selection of 16 (it is moved only with this hook) |
 | `qol.stations` | `StationGroups` | the eight stub sites (`patch`/`fn`), nine continue points, the engine functions and RTTI the stations code calls, and the object fields | stations as stock |
+| `qol.bar_keys` | `BarKeys` | the call of `mProcessKeyboardInput` in `PopupPaletteImp::Update` (`call`) and that function, the three hotkey counts and the six menu toggles, a button's state and press slot, and the click's sound (`operator new`, the `AudioSound2D` constructor, the click-sound global), `TextInput_IsActive`, `CinematicView::IsPlayingVideo` | position keys off, stock's bar keys |
 | `qol.warp` | `WarpDistance` | the Alt block (`patch`) and its continue point, the warp globals and functions | moves as stock |
 
 `MaxSelection` needs both of its hooks; the log names the one that failed.
@@ -137,9 +138,47 @@ variable and then of the global; field offsets are spliced in with `A2_STR(QOL_F
 
 ## QOL-1: Grid hotkeys for the button bar
 
-*Done, as a plugin of its own: [`grid/`](../grid/README.md), `GridLayout.asi`, so it can be
-switched on and off by itself. Stock-compatible. What follows is the plan as it was
-written; the README there has what was built and why.*
+*Done. First as `GridLayout.asi` ([`grid/`](../grid/README.md)), then drawn by the UI
+(`UI.asi`, [`ui/HUD.md`](../ui/HUD.md)); since phase 9 the keys are this plugin's
+(`BarKeys=` in `QOL.ini`, `bar.c`) and the UI keeps the layout and the drawing.
+Stock-compatible: a key sends the ordinary command its button sends. What follows
+the next section is the plan as it was written.*
+
+### What `bar.c` does, and what it reads
+
+The stock bar (`PopupPaletteImp`) keeps running: its `Update` works out which buttons the
+selection and the open menu show, and a press goes through the button's own press slot
+(vtable `+0x20`), which hands its command or mode to the bar. So a key is "press the
+button of that cell", and which button sits in which cell is the UI's layout.
+
+- **The wrap.** The call of `mProcessKeyboardInput` in `Update` (made when something of
+  the player's is selected and the game is not paused) is re-pointed at a function of
+  ours that calls the stock one, then `UI_BarStep` (the UI presses its queued clicks and
+  takes the layout of this update's buttons), then reads the keys. The wrap checks the
+  call's target first (`a2e_ready`): with `GridLayout.asi` loaded, which wraps the same
+  call, the hook is not ready and the keys are never installed.
+- **Stock's keys are global per selection**, not per open menu (F5 builds from the top
+  level whatever menu is open). With the grid's keys on, the three hotkey tables'
+  counts (commands `+0xcc`, build items `+0xd8`, special weapons `+0xe4`) are set to
+  zero for the stock call and put back after, and the six menu toggles' control
+  pointers (a global array that `Init` fills: popup, build, orders, trade, AI,
+  formations) point at a zero for good. Nothing outside the bar reads them. The bar's
+  vtable is never patched.
+- **The keys** are scancodes (Q W E R T / A S D F G / Z X C V B), turned into virtual
+  keys with `MapVirtualKeyA` and read with `GetAsyncKeyState`, so they are positions on
+  any layout. A key goes down once. Nothing happens while chat has the keyboard
+  (`TextInput_IsActive`), Ctrl or Alt is held, or the game is not the foreground window.
+- **A press** is what releasing a click does: nothing for a disabled button, else the
+  click (a fire-and-forget `AudioSound2D` made with the game's `operator new`, named by
+  `StandardButton::s_buttonClickSound`, unless a video plays) and the press slot.
+- **The two plugins meet at three exports**, each found by name in the loaded modules
+  (`a2_find_export`; UI.asi loads after this plugin, so the lookup repeats until it
+  succeeds): the UI's `UI_BarCell(cell)` (the stock button in cell 0..14, or NULL),
+  the UI's `UI_BarStep(palette)` and this plugin's `QOL_BarLabel(cell)` (the key's
+  letter, NULL while the keys are off). **The keys work only while `UI_BarCell`
+  exists and gives a cell**, i.e. while the UI's bar is drawn; otherwise
+  they stand down with `bar: no refit bar, position keys off` in `QOL.log` and the stock
+  bar keys run. They stand down as well while `GridLayout.asi` is loaded.
 
 **Problem.** The button bar's hotkeys are hard to use without looking. Each building's
 build menu binds its items to `F1`–`F12` by slot. The menus themselves sit on letters

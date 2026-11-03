@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 14.2.0 — 2026-11-03
+
+Layers: qol 2.1.0, ui 1.1.0, testbench 3.101.0.
+
+### Changed
+- Phase 9 W-BAR (contract C4): the command bar's position keys move from UI.asi to QOL.asi (`qol/bar.c`); the UI keeps the layout and drawing of the bar and its labels. `[HUD] BarKeys` becomes `[QOL] BarKeys` (`moved_from`). `csdk/def/{kernel32,user32}.def` gain the imports QOL's key scan needs. Installed, not yet seen in game.
+
 ## 14.0.0 — 2026-11-03
 
 Layers: qol 2.0.0, rules 1.0.0, online 0.11.0, ui 0.34.0, gui-installer 2.4.1, testbench 3.99.1.

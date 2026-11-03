@@ -2,3 +2,7 @@ LIBRARY USER32.dll
 EXPORTS
 GetSystemMetrics@4
 IsWindow@4
+GetAsyncKeyState@4
+GetForegroundWindow@0
+GetWindowThreadProcessId@8
+MapVirtualKeyA@8

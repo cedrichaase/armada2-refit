@@ -1,5 +1,5 @@
 //! The button bar (`PopupPaletteImp`, `g_pPopupPalette`): what it shows, pressing its
-//! buttons, and its keys. Read by `hud::bar` (HUD.md, "The button bar").
+//! buttons. Read by `hud::bar` (HUD.md, "The button bar").
 //!
 //! The bar's `Update` (in its `AlwaysGameSimulate`) works out the buttons for what is
 //! selected and the menu open (`mUpdateButtonsAndPosition`), and keeps them in 21
@@ -7,8 +7,7 @@
 //! says so, which is when `Render` draws it. Each holds a `CommandInfoClass` (`+0x88`)
 //! or a `ModeInfo` (`+0x84`), its state (`+0x34`: 0 disabled, 2 active, else normal)
 //! and, once drawn, its icon sprite (`+0x2c`, looked up by the name the command or
-//! mode gives: `ControlButton::Render`). The rest is grid/README.md's: the names, the
-//! hotkey tables, the menu toggles and the press.
+//! mode gives: `ControlButton::Render`). Its keys are QOL's (`qol/bar.c`).
 use super::{field as peek, rd};
 use crate::syms_hud::{field, hook, sym, value, TABLE};
 
@@ -26,11 +25,9 @@ use alloc::string::String;
 // bar, 2 the build-locked bar, else floating) and `+0x124` the menu shown (`eMenuType`:
 // 0 the top level, 1 orders, 2..4 build, evolve, research, 8 the top level again after a
 // menu closed). The hotkey tables' counts (commands `+0xcc`, build items `+0xd8`,
-// special weapons `+0xe4`) are what `mProcessKeyboardInput` walks. `Init` keeps six menu
-// toggles' control pointers in a global (popup, build, orders, trade, AI, formations).
+// special weapons `+0xe4`) and the six menu toggles are what the bar's keys walk, and are
+// QOL's now (`qol/bar.c`, "QOL-1").
 pub const N_SLOTS: usize = value::PALETTE_N_SLOTS as usize;
-const N_TOGGLES: usize = value::PALETTE_N_TOGGLES as usize;
-const KEY_COUNTS: [usize; 3] = [field::PALETTE_KEY_COMMANDS, field::PALETTE_KEY_BUILDS, field::PALETTE_KEY_WEAPONS];
 
 // `ControlButton`: its state `+0x34` (0 disabled, 2 active, else normal), its icon sprite
 // `+0x2c`, a `ModeInfo` `+0x84` or `CommandInfoClass` `+0x88`; vtable slots GetTooltip
@@ -45,6 +42,11 @@ const KEY_COUNTS: [usize; 3] = [field::PALETTE_KEY_COMMANDS, field::PALETTE_KEY_
 // `CommandInfoClass::ButtonName(std::string &) const` and `ModeInfo::ButtonName` give the
 // name of the button's sprite; `DisplayInterface::m_spriteDatabase` and
 // `ST3D_Database::FindElement(name, class)` find it.
+
+/// Whether the bar can be read (`hud.reads_bar`).
+pub fn readable() -> bool {
+    eng().ready(hook::HUD_READS_BAR).is_ok()
+}
 
 pub fn palette() -> usize {
     super::hud::palette()
@@ -228,63 +230,4 @@ pub fn press(b: usize) -> bool {
     let f: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(rd::<usize>(rd::<usize>(b) + field::PALETTE_VT_PRESS)) };
     unsafe { f(b) };
     true
-}
-
-// ---- the keys ----------------------------------------------------------------------
-
-// In `PopupPaletteImp::Update`: `call mProcessKeyboardInput`, made when something of the
-// player's is selected and the game is not paused (`hud.barkeys`).
-
-static mut STOCK_KEYS_OFF: bool = false;
-static mut ON_KEYS: Option<fn(usize)> = None;
-static ZERO: i32 = 0;
-
-/// The bar's keys are the grid's (`stock_keys_off`) or the engine's, from now on.
-pub fn set_stock_keys_off(on: bool) {
-    unsafe { STOCK_KEYS_OFF = on };
-}
-
-/// Wraps the bar's keyboard step: with `stock_keys_off`, stock's bar keys do nothing
-/// (the three hotkey tables are emptied for the stock call and put back, and the six
-/// menu toggles point at a zero), and `on_keys` runs after it, on the game's thread in
-/// the bar's own update. False, with nothing written, when the site is not stock (it
-/// is not while GridLayout.asi is loaded: it wraps the same call).
-pub fn install_keys(stock_keys_off: bool, on_keys: fn(usize)) -> bool {
-    // Not stock while GridLayout.asi is loaded: it wraps the same call.
-    if eng().ready(hook::HUD_BARKEYS).is_err() || eng().ready(hook::HUD_READS_BAR).is_err() {
-        return false;
-    }
-    // `ControlButton::mButtonPressFunction`, which a button's press slot leads to, was
-    // checked with the rest of `hud.reads_bar`: the press below hands its command to the bar.
-    let _ = eng().addr(sym::PALETTE_BUTTON_PRESS);
-    unsafe {
-        STOCK_KEYS_OFF = stock_keys_off;
-        ON_KEYS = Some(on_keys);
-    }
-    super::hook::patch_call(eng().addr(sym::PALETTE_KEYS_CALL), eng().addr(sym::PALETTE_PROCESS_KEYS), process_keys as *const () as usize)
-}
-
-unsafe extern "thiscall" fn process_keys(p: usize, crafts: usize) {
-    let stock: unsafe extern "thiscall" fn(usize, usize) = unsafe { core::mem::transmute(eng().addr(sym::PALETTE_PROCESS_KEYS)) };
-    unsafe {
-        if STOCK_KEYS_OFF {
-            let toggles = eng().addr(sym::PALETTE_TOGGLES);
-            for i in 0..N_TOGGLES {
-                *((toggles + 4 * i) as *mut *const i32) = &ZERO;
-            }
-            let saved = KEY_COUNTS.map(|o| rd::<i32>(p + o));
-            for o in KEY_COUNTS {
-                *((p + o) as *mut i32) = 0;
-            }
-            stock(p, crafts);
-            for (o, v) in KEY_COUNTS.iter().zip(saved) {
-                *((p + o) as *mut i32) = v;
-            }
-        } else {
-            stock(p, crafts);
-        }
-        if let Some(f) = ON_KEYS {
-            f(p);
-        }
-    }
 }

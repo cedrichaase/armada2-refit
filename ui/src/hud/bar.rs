@@ -15,14 +15,13 @@
 //!  Z  X  C  V | B      B  the 13th item of a construction ship's build list
 //! ```
 //!
-//! Keys are scancodes, so they are positions on any layout. A key does what clicking
-//! its button does, and nothing while chat has the keyboard, Ctrl or Alt is held, or
-//! the game is not in the foreground. Clicks and keys are both pressed in the bar's
-//! own keyboard step (the game's simulate), not in the UI's frame.
+//! The keys are QOL's (`qol/bar.c`, QOL-1): it asks `UI_BarCell` which button sits in a
+//! cell, presses it, and names the key for the label the UI draws (`QOL_BarLabel`). A
+//! click is pressed in the bar's own update (the game's simulate), which QOL tells the UI
+//! of through `UI_BarStep`; without QOL the UI takes that step in its own frame.
 use crate::engine::palette::{self, Kind};
 use crate::engine::{hud, sound, sprite};
 use crate::gfx::{fade, Weight, R};
-use crate::rt::win::*;
 use crate::widgets::{theme, Align, Ui};
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -37,8 +36,7 @@ const CELL_CANCEL: usize = cell(4, 0);
 const CELL_BACK: usize = cell(4, 1);
 const CELL_OVERFLOW: usize = cell(4, 2);
 
-/// Set-1 scancodes, row by row: Q W E R T / A S D F G / Z X C V B.
-const SCAN: [u8; CELLS] = [0x10, 0x11, 0x12, 0x13, 0x14, 0x1e, 0x1f, 0x20, 0x21, 0x22, 0x2c, 0x2d, 0x2e, 0x2f, 0x30];
+/// The cell names the layout log uses (the keys are QOL's: `QOL_BarLabel`).
 const LABEL: &[u8; CELLS] = b"QWERTASDFGZXCVB";
 /// Free cells are taken down each of the four left columns, then the fifth column's
 /// spare: the left of the keyboard fills first.
@@ -163,9 +161,6 @@ struct State {
     /// UI frames since `pending` was set: a press the game did not take in time (the
     /// game paused, the selection gone) is dropped rather than made late.
     pending_age: u32,
-    /// Grid keys: virtual key per cell, and held last time.
-    vk: [u8; CELLS],
-    down: [bool; CELLS],
     /// The button under the pointer, and since when (for the tooltip).
     hover: usize,
     hover_since: f64,
@@ -180,8 +175,6 @@ struct State {
 static mut STATE: State = State {
     pending: 0,
     pending_age: 0,
-    vk: [0; CELLS],
-    down: [false; CELLS],
     hover: 0,
     hover_since: 0.0,
     tip: None,
@@ -194,52 +187,35 @@ fn st() -> &'static mut State {
     unsafe { &mut *core::ptr::addr_of_mut!(STATE) }
 }
 
-/// Patches the bar's keyboard step. False: the bar stays stock.
+/// Whether the bar can be taken over. False: the bar stays stock.
 pub fn install() -> bool {
-    let s = st();
-    for (c, &sc) in SCAN.iter().enumerate() {
-        s.vk[c] = unsafe { MapVirtualKeyA(sc as u32, 1) } as u8;
+    palette::readable()
+}
+
+// ---- QOL: the keys and the labels -----------------------------------------------------
+
+/// The button in each cell as of the bar's last update, and when the bar was last drawn:
+/// what `UI_BarCell` gives. Empty while the bar is not drawn.
+static mut CELL_BTNS: [usize; CELLS] = [0; CELLS];
+static mut DRAWN_AT: f64 = -1.0;
+
+/// `UI_BarCell(cell)`: the stock button in cell 0..14 of the menu now shown, or NULL
+/// (nothing there, or the bar is not drawn). QOL presses it.
+pub fn cell_button(c: u32) -> usize {
+    let c = c as usize;
+    if c >= CELLS || crate::rt::now() - unsafe { DRAWN_AT } > 0.5 {
+        return 0;
     }
-    palette::install_keys(crate::config::get().hud.bar_keys, on_keys)
+    unsafe { CELL_BTNS[c] }
 }
 
-// ---- the game's simulate: presses ----------------------------------------------------
-
-fn game_has_focus() -> bool {
-    let w = unsafe { GetForegroundWindow() };
-    if w.is_null() {
-        return false;
-    }
-    let mut pid = 0u32;
-    unsafe { GetWindowThreadProcessId(w, &mut pid) };
-    pid == unsafe { GetCurrentProcessId() }
-}
-
-fn held(vk: u8) -> bool {
-    vk != 0 && (unsafe { GetAsyncKeyState(vk as i32) } as u16 & 0x8000) != 0
-}
-
-/// The cell whose key went down since the last step.
-fn key_pressed() -> Option<usize> {
-    let s = st();
-    let ok = game_has_focus() && !hud::typing() && !held(0x11) && !held(0x12);
-    let mut hit = None;
-    for c in 0..CELLS {
-        let d = held(s.vk[c]);
-        if d && !s.down[c] && ok && hit.is_none() {
-            hit = Some(c);
-        }
-        s.down[c] = d;
-    }
-    hit
-}
-
-/// After the stock keyboard step, in the bar's `Update`: the buttons are those of this
-/// update.
-fn on_keys(p: usize) {
+/// `UI_BarStep(palette)`: the bar's update has run (QOL calls it after the stock
+/// keyboard step, on the game's thread). The buttons are those of this update.
+pub fn step(p: usize) {
     let s = st();
     if hud::hidden(p) {
         s.pending = 0;
+        unsafe { CELL_BTNS = [0; CELLS] };
         return;
     }
     // A press below changes the menu at once, and the buttons only at the bar's next
@@ -247,6 +223,7 @@ fn on_keys(p: usize) {
     s.built_menu = palette::menu(p);
     s.built_at = crate::rt::now();
     let (cells, items) = layout(p, s.built_menu);
+    unsafe { CELL_BTNS = cells };
     if s.pending != 0 {
         let b = core::mem::take(&mut s.pending);
         if let Some(it) = items.iter().find(|it| it.btn == b) {
@@ -254,16 +231,51 @@ fn on_keys(p: usize) {
             palette::press(b);
         }
     }
-    if crate::config::get().hud.bar_keys {
-        if let Some(c) = key_pressed() {
-            let b = cells[c];
-            if b != 0 {
-                let name = items.iter().find(|it| it.btn == b).map_or("?", |it| it.desc.name.as_str());
-                crate::log!("bar: key {}={}{}", LABEL[c] as char, name, if palette::state(b) == 0 { " (disabled)" } else { "" });
-                palette::press(b);
+}
+
+/// `QOL_BarLabel`, found by name in whichever module has it, never by file name: the key
+/// of a cell, or None while the keys are off or stood down (or there is no QOL.asi).
+fn qol_label(c: usize) -> Option<&'static str> {
+    static mut FN: usize = 0;
+    static mut TRIES: u32 = 0;
+    unsafe {
+        if FN == 0 {
+            TRIES += 1;
+            if TRIES % 120 != 1 {
+                return None;
+            }
+            FN = crate::settings::find_export("QOL_BarLabel");
+            if FN == 0 {
+                return None;
             }
         }
+        let f: extern "C" fn(u32) -> *const u8 = core::mem::transmute(FN);
+        let p = f(c as u32);
+        if p.is_null() {
+            return None;
+        }
+        let mut n = 0;
+        while *p.add(n) != 0 && n < 8 {
+            n += 1;
+        }
+        core::str::from_utf8(core::slice::from_raw_parts(p, n)).ok()
     }
+}
+
+/// Whether QOL's keys are on: the labels and the tooltips (which drop stock's hotkey
+/// while they are) follow it.
+fn keys_on() -> bool {
+    qol_label(0).is_some()
+}
+
+/// Whether QOL's update step has arrived (it calls `UI_BarStep` in each update of the
+/// bar); until it does, or without QOL, the UI takes the step itself, in its frame.
+static mut QOL_STEPS: bool = false;
+
+/// `UI_BarStep`: QOL's step. From the first one on the UI takes none of its own.
+pub fn step_from_qol(p: usize) {
+    unsafe { QOL_STEPS = true };
+    step(p);
 }
 
 // ---- the UI's frame: drawing and the mouse -----------------------------------------
@@ -315,7 +327,11 @@ pub fn run(ui: &mut Ui) {
     if p == 0 || hud::hidden(p) || crate::engine::ingame::hud_hidden() {
         s.hover = 0;
         s.tip = None;
+        unsafe { CELL_BTNS = [0; CELLS] };
         return;
+    }
+    if unsafe { !QOL_STEPS } {
+        step(p);
     }
     // The menu the buttons were built for, while the bar's updates run (they do not
     // while the game is paused or nothing of the player's is selected).
@@ -327,6 +343,10 @@ pub fn run(ui: &mut Ui) {
         return;
     }
     log_layout(p, menu, &cells, &items);
+    unsafe {
+        CELL_BTNS = cells;
+        DRAWN_AT = crate::rt::now();
+    }
 
     let cfg = crate::config::get();
     let t = ui.theme;
@@ -388,9 +408,7 @@ pub fn run(ui: &mut Ui) {
                 ui.text_in(icon, name, t.micro_size, Align::Centre, content, Weight::Regular);
             }
         }
-        if cfg.hud.bar_keys && cfg.hud.bar_labels {
-            let k = [LABEL[c]];
-            let label = core::str::from_utf8(&k).unwrap_or("?");
+        if let Some(label) = if cfg.hud.bar_labels { qol_label(c) } else { None } {
             let sz = ui.u(t.micro_size + 1.0);
             let lr = R::new(r.x + ui.u(3.0), r.y + ui.u(2.0), sz * 1.1, sz * 1.15);
             theme::badge(ui, lr, label, !enabled);
@@ -431,7 +449,7 @@ fn tooltip(ui: &mut Ui, at: R, bar: R, text: &str) {
     }
     // '^' marks the hotkey letter in the game's strings, and "<...>" names stock's
     // hotkey, which does nothing while the grid's keys are on.
-    let keys = crate::config::get().hud.bar_keys;
+    let keys = keys_on();
     let mut clean = String::new();
     let mut depth = 0;
     for c in text.chars() {

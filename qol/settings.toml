@@ -84,3 +84,16 @@ tab = "gameplay"
 label = "Largest selection"
 help = "How many objects a selection and a control group can hold. Takes effect when the game is started."
 flags = ["advanced"]
+
+[[row]]
+name = "barkeys"
+section = "QOL"
+key = "BarKeys"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "interface"
+label = "Grid keys"
+help = "The command bar's keys are the grid's, by position: Q W E R T / A S D F G / Z X C V B. Off keeps the game's own keys. Needs the Refit command bar."
+moved_from = "UI.HUD.BarKeys"

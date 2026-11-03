@@ -79,7 +79,7 @@ pub fn install() -> bool {
         } else if bar::install() {
             hud::set_taken(hud::palette_ptr(), true, true);
             unsafe { BAR = true };
-            crate::log!("bar: ours, keys {}", if cfg.bar_keys { "QWERT/ASDFG/ZXCVB by position" } else { "stock" });
+            crate::log!("bar: ours, its keys are QOL's");
         } else {
             crate::log!("bar: stays stock");
         }
@@ -119,9 +119,6 @@ pub fn apply_live(cfg: &crate::config::Hud) {
             hud::take_tooltips(cfg.tooltips);
             TOOLTIPS = cfg.tooltips;
             crate::log!("tooltips: {}", if cfg.tooltips { "ours" } else { "stock" });
-        }
-        if BAR {
-            engine::palette::set_stock_keys_off(cfg.bar_keys);
         }
     }
 }

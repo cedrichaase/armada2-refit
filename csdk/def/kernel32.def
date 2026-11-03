@@ -41,3 +41,4 @@ GetPrivateProfileStringA@24
 GetEnvironmentVariableA@12
 CreateDirectoryA@8
 K32EnumProcessModules@16
+GetCurrentProcessId@0
