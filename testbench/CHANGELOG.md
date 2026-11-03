@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.97.2 — 2026-11-03
+
+### Added
+- `engine-syms` has BinkProxy, Online, QOL and QOLRules sections (identity, build, `symbols: N/M`, no stand-down); its `Setup:` also puts Online.asi in the clone (`online/bench-asi.sh`).
+- `qol-big-selection` and its scene `qol-bigselect`: twenty Galaxy class ships firing at a cube, all selected with the HUD on, a group of twenty bound and recalled (a selection over 16 with special weapons in combat, CLAUDE.md qol).
+
+Installed, not yet seen in game
+
 ## 3.97.1 — 2026-11-03
 
 ### Fixed

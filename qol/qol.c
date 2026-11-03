@@ -1076,11 +1076,12 @@ static int patch_specials(void)
 static int patch_selection(int max)
 {
     BYTE  cap = (BYTE)max;
-    DWORD overview = a2e_addr(QOL_S_OVERVIEW);
-    DWORD disp = (DWORD)g_sel - overview;
+    DWORD overview, disp;
     int   i, k, n = (int)(sizeof k_sel / sizeof k_sel[0]);
 
     if (!g_rdySel) return 0;
+    overview = a2e_addr(QOL_S_OVERVIEW);
+    disp = (DWORD)g_sel - overview;
     /* whatever is selected already comes along (nothing is, this early) */
     for (k = 0; k < 16; k++) g_sel[k] = *(volatile DWORD *)(overview + QOL_F_OV_SEL + 4 * k);
     for (i = 0; i < n; i++)
@@ -1349,7 +1350,7 @@ static void startup(void)
     } else {
         if (k > SEL_MAX) k = SEL_MAX;
         /* the special-weapon arrays first: a bigger selection without them overruns the stack */
-        n = patch_specials() ? patch_selection(k) : 0;
+        n = (g_rdySpec && g_rdySel && patch_specials()) ? patch_selection(k) : 0;
         if (n) {
             s_cat(b, "  -> selections and groups up to ");
             s_num(b, k);

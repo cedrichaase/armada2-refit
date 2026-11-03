@@ -930,7 +930,7 @@ static int write_jmp(DWORD at, void *to, int n)  { return a2_write_jmp(at, to, n
 
 static void install_entry(char *b)
 {
-    DWORD prot, rel, rl = a2e_addr(ONLINE_S_READ_LABEL);
+    DWORD prot, rel, rl;
     int   i;
 
     if (!g_entry) { s_cat(b, "  menu entry off (Entry=0)"); return; }
