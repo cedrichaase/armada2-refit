@@ -10,13 +10,13 @@ already hosts the menus, so there is no `Setup:`; run it with `--install .` so t
 clone has the checkout's UI.asi, Render3D.asi and QOL.asi.
 
 **Shell.** Options shows `Refit settings` under `Game Settings`; a click opens the modal with its
-five tabs. Graphics: `Sky` (live) writes `[Render3D.Modules] sky=0` to `RefitPlayer.ini`
+three tabs. Graphics: `Sky` (live) writes `[Render3D.Modules] sky=0` to `RefitPlayer.ini`
 and Render3D.log says `settings: applied`; `Anti-aliasing` 2x is a live row since render3d
 0.42.0 (the scene target is made again at the next view), so Render3D.log says
 `settings: applied Render3D.MSAA=2`, the badge is `Now` and no restart banner shows.
 Interface: `Theme` Borg restyles the screen at once, Auto removes the key again. Gameplay:
 `Right-drag pan speed` Stock is applied by QOL at once; `Show advanced` reveals `Largest
-selection`. Multiplayer: `Must match` stands on *Pay when queued* and nothing is `Locked`
+selection`. Gameplay (also): *Pay when queued* stands (its `Must match` badge is too small for OCR) and nothing is `Locked`
 in the shell. The keyboard: Tab and Right move to the next tab, Esc closes only the modal
 (Options is still up and UI.log has no `Esc -> Return to Game`).
 
@@ -25,7 +25,7 @@ in the shell. The keyboard: Tab and Right move to the next tab, Esc closes only 
 screen shows 2x and Stock, and the three rows are set back, which removes the keys.
 
 **Mission.** In the Borg campaign's first mission Esc shows Options with `Refit settings` under Game Settings, as its
-tenth entry. Multiplayer shows no `Locked` in a single-player mission. `Ships` off gives
+tenth entry. Gameplay shows no `Locked` in a single-player mission. `Ships` off gives
 the engine's own ships (passthrough: a judged step); Esc closes only the modal, Return to
 Game works. (The Esc after Return to Game opens no menu in this mission, with or without
 Refit, so `Ships` is not switched on again here; the clone is discarded.)
@@ -47,8 +47,8 @@ Refit, so `Ships` is not switched on again here; the clone is discarded.)
 13. Expect "Graphics" is visible.
 14. Expect "Interface" is visible.
 15. Expect "Gameplay" is visible.
-16. Expect "Multiplayer" is visible.
-17. Expect "Movies" is visible.
+16. Expect "Multiplayer" is not visible.
+17. Expect "Movies" is not visible.
 18. Expect "Now" is visible.
 19. Take a screenshot called "refit graphics".
 ## Graphics
@@ -101,107 +101,103 @@ Refit, so `Ships` is not switched on again here; the clone is discarded.)
 64. Wait 1 second.
 65. Expect "Largest selection" is visible.
 66. Take a screenshot called "refit gameplay advanced".
-## Multiplayer and Movies
-67. Click "Multiplayer".
+## Must match
+67. Click "Gameplay".
 68. Wait 1 second.
-69. Expect "Must match" is visible.
+69. Expect "Pay when queued" is visible.
 70. Expect "Locked" is not visible.
-71. Take a screenshot called "refit multiplayer".
-72. Click "Movies".
-73. Wait 1 second.
-74. Expect "Replacement movies" is visible.
-75. Take a screenshot called "refit movies".
+71. Take a screenshot called "refit must match".
 ## Keyboard
-76. Click "Graphics".
-77. Wait 1 second.
-78. Press Tab.
-79. Press Right.
-80. Wait 1 second.
-81. Take a screenshot called "refit keyboard".
-82. Press Escape.
-83. Wait 2 seconds.
-84. Expect "UI.log" contains "refit: closed".
-85. Expect "UI.log" not contain "menus: Esc -> Return to Game".
-86. Expect "Graphics Settings" is visible.
-87. Expect "Refit settings" is visible.
+72. Click "Graphics".
+73. Wait 1 second.
+74. Press Tab.
+75. Press Right.
+76. Wait 1 second.
+77. Take a screenshot called "refit keyboard".
+78. Press Escape.
+79. Wait 2 seconds.
+80. Expect "UI.log" contains "refit: closed".
+81. Expect "UI.log" not contain "menus: Esc -> Return to Game".
+82. Expect "Graphics Settings" is visible.
+83. Expect "Refit settings" is visible.
 ## Relaunch
-88. Quit the game.
-89. Launch the game.
-90. Wait for the main menu.
-91. Expect "RefitPlayer.ini" contains "sky=0".
-92. Expect "Render3D.log" contains "settings: RefitPlayer.ini [Render3D.Modules] sky=0 overrides".
-93. Expect "RefitPlayer.ini" contains "MSAA=2".
-94. Expect "QOL.log" contains "settings: RefitPlayer.ini [QOL.QOL] PanSpeed=1 overrides".
-95. Click at 228,390.
-96. Wait 3 seconds.
-97. Click "Refit settings".
-98. Wait for the refit screen.
+84. Quit the game.
+85. Launch the game.
+86. Wait for the main menu.
+87. Expect "RefitPlayer.ini" contains "sky=0".
+88. Expect "Render3D.log" contains "settings: RefitPlayer.ini [Render3D.Modules] sky=0 overrides".
+89. Expect "RefitPlayer.ini" contains "MSAA=2".
+90. Expect "QOL.log" contains "settings: RefitPlayer.ini [QOL.QOL] PanSpeed=1 overrides".
+91. Click at 228,390.
+92. Wait 3 seconds.
+93. Click "Refit settings".
+94. Wait for the refit screen.
+95. Wait 2 seconds.
+96. Expect "2x" is visible.
+97. Take a screenshot called "refit after relaunch".
+98. Click at 270,313.
 99. Wait 2 seconds.
-100. Expect "2x" is visible.
-101. Take a screenshot called "refit after relaunch".
-102. Click at 270,313.
+100. Click at 538,176.
+101. Wait 1 second.
+102. Click "4x".
 103. Wait 2 seconds.
-104. Click at 538,176.
+104. Click "Gameplay".
 105. Wait 1 second.
-106. Click "4x".
-107. Wait 2 seconds.
-108. Click "Gameplay".
-109. Wait 1 second.
-110. Expect "Stock" is visible.
-111. Click at 938,176.
-112. Wait 1 second.
-113. Click at 868,285.
-114. Wait 2 seconds.
-115. Expect "RefitPlayer.ini" not contain "sky=".
-116. Expect "RefitPlayer.ini" not contain "MSAA=".
-117. Expect "RefitPlayer.ini" not contain "PanSpeed=".
-118. Click "Done".
-119. Wait 2 seconds.
-120. Expect "Graphics Settings" is visible.
+106. Expect "Stock" is visible.
+107. Click at 938,176.
+108. Wait 1 second.
+109. Click at 868,285.
+110. Wait 2 seconds.
+111. Expect "RefitPlayer.ini" not contain "sky=".
+112. Expect "RefitPlayer.ini" not contain "MSAA=".
+113. Expect "RefitPlayer.ini" not contain "PanSpeed=".
+114. Click "Done".
+115. Wait 2 seconds.
+116. Expect "Graphics Settings" is visible.
 ## Mission
-121. Click "Previous Menu".
-122. Wait 2 seconds.
-123. Quit the game.
-124. Launch the game.
-125. Wait for the main menu.
-126. Click the single player emblem.
-127. Wait for the single player screen.
-128. Click the Borg campaign.
-129. Wait for "Werewolf Pack".
-130. Click "Werewolf Pack".
-131. Wait 1 second.
-132. Click "O.K.".
-133. Wait up to 300 seconds for the briefing.
+117. Click "Previous Menu".
+118. Wait 2 seconds.
+119. Quit the game.
+120. Launch the game.
+121. Wait for the main menu.
+122. Click the single player emblem.
+123. Wait for the single player screen.
+124. Click the Borg campaign.
+125. Wait for "Werewolf Pack".
+126. Click "Werewolf Pack".
+127. Wait 1 second.
+128. Click "O.K.".
+129. Wait up to 300 seconds for the briefing.
+130. Wait 3 seconds.
+131. Click "OK".
+132. Wait 3 seconds.
+133. Press Escape.
 134. Wait 3 seconds.
-135. Click "OK".
-136. Wait 3 seconds.
-137. Press Escape.
-138. Wait 3 seconds.
-139. Expect "Return to Game" is visible.
-140. Expect "Refit settings" is visible.
-141. Take a screenshot called "mission options with refit".
-142. Click "Refit settings".
-143. Wait for the refit screen.
-144. Wait 2 seconds.
-145. Expect "UI.log" contains "refit: opened in a mission".
-146. Click "Multiplayer".
+135. Expect "Return to Game" is visible.
+136. Expect "Refit settings" is visible.
+137. Take a screenshot called "mission options with refit".
+138. Click "Refit settings".
+139. Wait for the refit screen.
+140. Wait 2 seconds.
+141. Expect "UI.log" contains "refit: opened in a mission".
+142. Click "Gameplay".
+143. Wait 1 second.
+144. Expect "Locked" is not visible.
+145. Expect "UI.log" not contain "locked in a network game".
+146. Click "Graphics".
 147. Wait 1 second.
-148. Expect "Locked" is not visible.
-149. Expect "UI.log" not contain "locked in a network game".
-150. Click "Graphics".
-151. Wait 1 second.
-152. Click at 270,277.
-153. Wait 2 seconds.
-154. Expect "UI.log" contains "refit: [Render3D.Modules] hulls 1 -> 0 (now)".
-155. Press Escape.
-156. Wait 2 seconds.
-157. Expect "UI.log" contains "refit: closed".
-158. Expect "UI.log" not contain "menus: Esc -> Return to Game".
-159. Expect "Return to Game" is visible.
-160. Click "Return to Game".
-161. Wait 3 seconds.
-162. Take a screenshot called "ships through passthrough".
-163. Note "ships through passthrough: judge the screenshot by eye, the ships are specks at 1280x720".
-164. Expect the game is still running.
-165. Quit the game.
-166. Expect no crash.
+148. Click at 270,277.
+149. Wait 2 seconds.
+150. Expect "UI.log" contains "refit: [Render3D.Modules] hulls 1 -> 0 (now)".
+151. Press Escape.
+152. Wait 2 seconds.
+153. Expect "UI.log" contains "refit: closed".
+154. Expect "UI.log" not contain "menus: Esc -> Return to Game".
+155. Expect "Return to Game" is visible.
+156. Click "Return to Game".
+157. Wait 3 seconds.
+158. Take a screenshot called "ships through passthrough".
+159. Note "ships through passthrough: judge the screenshot by eye, the ships are specks at 1280x720".
+160. Expect the game is still running.
+161. Quit the game.
+162. Expect no crash.

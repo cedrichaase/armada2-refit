@@ -32,7 +32,7 @@
     "refit": {
       "aliases": ["refit screen"],
       "text": ["Graphics", "Interface"],
-      "_note": "the Refit screen (ui/MENUS.md, 'The Refit screen'): a modal of ours over the hosted Options dialog, whose tab strip reads Graphics, Interface, Gameplay, Multiplayer, Movies"
+      "_note": "the Refit screen (ui/MENUS.md, 'The Refit screen'): a modal of ours over the hosted Options dialog, whose tab strip reads Graphics, Interface, Gameplay"
     },
     "admiral's log": {
       "aliases": ["admirals log", "log", "score"],

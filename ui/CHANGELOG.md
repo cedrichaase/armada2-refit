@@ -4,6 +4,11 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 2.2.3 — 2026-11-03
+
+### Changed
+- The Refit screen's plugin-wide note "Pay on queue is not installed" shows on the Gameplay tab (where `PayOnQueue` now stands), not Multiplayer. A tab with no row is not shown, so Movies and Multiplayer are gone from the strip (rows moved by cutscenes 3.0.1, rules 1.0.1, online 0.11.1). Installed, not yet seen in game.
+
 ## 2.2.2 — 2026-11-03
 
 ### Fixed

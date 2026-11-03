@@ -4,6 +4,11 @@
 8 with a transport of our own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 and versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.11.1 — 2026-11-03
+
+### Changed
+- The `Entry` row moves from the Multiplayer tab to Interface (`tab = "interface"`), beside the other menu rows; key and section unchanged. Installed, not yet seen in game.
+
 ## 0.11.0 — 2026-11-03
 
 ### Changed

@@ -6,7 +6,7 @@
 #define ONLINE_SETTINGS_TABLE_H
 
 static const A2Setting ONLINE_SETTINGS[] = {
-    { sizeof(A2Setting), A2SET_KIND_BOOL, A2SET_APPLY_RESTART, A2SET_SCOPE_LOCAL, A2SET_TAB_MULTIPLAYER, 0,
+    { sizeof(A2Setting), A2SET_KIND_BOOL, A2SET_APPLY_RESTART, A2SET_SCOPE_LOCAL, A2SET_TAB_INTERFACE, 0,
       "Online.ini", "Online", "Entry", "1", NULLPTR, NULLPTR,
       "Online entry",
       "The Multiplayer Connection screen's IPX button becomes Internet - Online. Off keeps the screen stock.", NULLPTR },

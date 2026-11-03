@@ -33,7 +33,6 @@
 #define A2_FLTUSED
 #include "../../csdk/a2asi.h"
 #include "../../csdk/a2engine.h"
-#include "settings_table.h"
 #include "engine_syms.h"
 
 typedef long long           LONGLONG;
@@ -839,32 +838,11 @@ static int ui_movie(const BYTE *bgrx, int w, int h, int pitch)
 
 /* ---- exports ------------------------------------------------------------------- */
 
-/* <Plugin>_SettingsNote (tools/settings/README.md, C5): why a row is not running, or NULL;
- * a NULL row asks about the plugin as a whole.  The engine's notes feed it. */
-EXPORT const char *__cdecl BinkProxy_SettingsNote(const A2Setting *row)
-{
-    return row ? a2e_note_for(row->section, row->key) : a2e_note_plugin();
-}
-
-/* The UI's settings hub calls this after RefitPlayer.ini changed.  ReplaceMovies is read
- * at each BinkOpen anyway; this only reads it and says so. */
-EXPORT void __cdecl BinkProxy_SettingsChanged(void)
-{
-    char m[120];
-    int  was = g_replace;
-    g_replace = (int)a2_set_int(&g_bi, BINKPROXY_ROW_REPLACEMOVIES);
-    m[0] = 0;
-    if (g_replace == was) { logline("settings: re-read, nothing changed"); return; }
-    s_cat(m, "settings: applied BinkProxy.ReplaceMovies=");
-    s_num(m, g_replace);
-    logline(m);
-}
-
 EXPORT void *WINAPI BinkOpen(const char *name, DWORD flags)
 {
     Movie *mv;
     char m[300];
-    g_replace = (int)a2_set_int(&g_bi, BINKPROXY_ROW_REPLACEMOVIES);   /* LIVE: read at each open */
+    g_replace = (int)a2_ini_int(&g_bi, "BinkProxy", "ReplaceMovies", 1);   /* read at each open */
     if (g_replace && name && (mv = open_replacement(name))) return mv->bink;
     if (!real_load()) return NULLPTR;
     m[0] = 0; s_cat(m, "bink "); if (name && s_len(name) < 200) s_cat(m, name);
@@ -1023,7 +1001,7 @@ BOOL WINAPI DllMain(HANDLE inst, DWORD reason, void *res)
     a2_ini_open(&g_bi, "BinkProxy.ini", logline);
 
     g_log     = (int)a2_ini_int(&g_bi, "BinkProxy", "Log",            1);
-    g_replace = (int)a2_set_int(&g_bi, BINKPROXY_ROW_REPLACEMOVIES);
+    g_replace = (int)a2_ini_int(&g_bi, "BinkProxy", "ReplaceMovies", 1);
     g_fit     = (int)a2_ini_int(&g_bi, "BinkProxy", "FitIntro",       1);
     g_useUi   = (int)a2_ini_int(&g_bi, "BinkProxy", "UseUI",          1);
 
