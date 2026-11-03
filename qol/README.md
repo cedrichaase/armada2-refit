@@ -86,6 +86,34 @@ patch that is in but switched off.
 `PayOnQueue` is the one row the players must agree on (scope must-match); it is on in the
 shipped `QOLRules.ini` and stays on until the layer split of the roadmap.
 
+## Hooks: what the plugins read of Armada2.exe
+
+Every address, field offset and signature of `QOL.asi` and `QOLRules.asi` is in the symbol
+profiles, `profiles/<build>/qol.toml` and `qolrules.toml` (`profiles/gog-1.1/` for GOG's
+1.1), generated into `engine_syms.h` and `rules_engine_syms.h` by `tools/engine/gen.py`
+(`crates/a2engine/README.md`). A feature is a **hook**: its entries are checked in memory
+by `a2e_ready` before the plugin writes anything, and a hook that fails stands down on its
+own, with the reason in the log (`engine: <hook> stands down: ...`), on the feature's
+`--- QOL` line (`NOT PATCHED: ...`) and in `QOL_SettingsNote` / `QOLRules_SettingsNote`
+for the settings screen. All hooks are asked first, before the first patch, because
+patches change bytes another hook's check reads. Each asm stub continues through a
+resolved variable (`pushl _a2s_qol_<id>; ret`), and reads a global as a load of the
+variable and then of the global; field offsets are spliced in with `A2_STR(QOL_F_...)`.
+
+| Hook | Setting | Entries | Without it |
+|---|---|---|---|
+| `qol.pan_speed` | `PanSpeed` | the parse's 25-byte pattern (`patch`) and the coefficient (`global`) | right-drag as stock |
+| `qol.view_distance` | `ViewDistance` | the load that copies the culling distance (`patch`), the far plane and the culling distance (`global`s) | view as stock |
+| `qol.shift_group` | `ShiftAddsToGroup` | the Control test and the centre test in `mCheckGroupSelect` (`patch`), `mBindGroup` (`fn`), three continue points (`label`), the three modifier globals | number keys as stock |
+| `qol.selection` | `MaxSelection` | `cOverViewImp` (`global`), its 31 selection-array sites and 3 caps (`patch`, each with the bytes it replaces) | selection of 16 |
+| `qol.special_select` | `MaxSelection` | the five special-weapon array sequences (`patch`) and three continue points | selection of 16 (it is moved only with this hook) |
+| `qol.stations` | `StationGroups` | the eight stub sites (`patch`/`fn`), nine continue points, the engine functions and RTTI the stations code calls, and the object fields | stations as stock |
+| `qol.warp` | `WarpDistance` | the Alt block (`patch`) and its continue point, the warp globals and functions | moves as stock |
+| `qolrules.pay_on_queue` | `PayOnQueue` | nine entries (`fn`, the first bytes copied behind a jump back), the queue call in `Handle_New_Command` (`call`), the bank and cost functions, the two local transports' vtables | stock payment |
+| `qolrules.advisor` | `PayOnQueue` | `StartBuild`'s own advisor calls (`label`, `call`s), `ComputerVoice::Say`, `Race::GetInsufficentOfficerEventId`, `Entity::GetUserTeam` | a refused order is not announced |
+
+`MaxSelection` needs both of its hooks; the log names the one that failed.
+
 ## Things that apply to all of them
 
 - **Multiplayer.** Anything that changes *what commands are issued* must keep issuing

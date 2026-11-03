@@ -7,10 +7,10 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 
 ## 13.83.0 — 2026-11-03
 
-Layers: cutscenes 2.6.0.
+Layers: cutscenes 2.6.0, online 0.10.0, qol 1.10.0.
 
 ### Changed
-- Phase 8d: the C plugins move onto the symbol profiles, one commit each. binkproxy first (`profiles/gog-1.1/binkproxy.toml`, `BinkProxy_SettingsNote`).
+- Phase 8d: the C plugins move onto the symbol profiles, one commit each. binkproxy (`profiles/gog-1.1/binkproxy.toml`, `BinkProxy_SettingsNote`), Online (`online.toml`, `Online_SettingsNote`), then QOL and QOLRules (`qol.toml`, `qolrules.toml`, `QOL_SettingsNote`, `QOLRules_SettingsNote`).
 
 Installed, not yet seen in game
 

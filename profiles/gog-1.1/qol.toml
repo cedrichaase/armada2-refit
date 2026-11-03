@@ -1,0 +1,1036 @@
+# QOL.asi's symbols in Armada2.exe 1.1 (GOG): what qol/qol.c reads and patches of the exe, each entry
+# tied to the hook that uses it. The findings are in qol/README.md, "Hooks". Generated once from the
+# exe and the developer's map (names only) by a script; edited by hand since.
+schema = 1
+plugin = "qol"
+readme = "qol/README.md"
+lang = "c"
+out = "qol/engine_syms.h"
+
+[hook.pan_speed]
+doc = "The right-drag pan factor, stored over the parsed FASTSCROLL_COEFFICIENT"
+rows = ["QOL.PanSpeed"]
+
+[hook.view_distance]
+doc = "The far plane and object culling raised to ViewDistance"
+rows = ["QOL.ViewDistance"]
+
+[hook.shift_group]
+doc = "Shift+number adds the selection to a group; Alt+number selects and centres"
+rows = ["QOL.ShiftAddsToGroup"]
+
+[hook.selection]
+doc = "The selection array moved to ours, the three caps of 16 raised"
+rows = ["QOL.MaxSelection"]
+
+[hook.special_select]
+doc = "The special-weapon button gathers into buffers of ours, not 16-entry stack arrays"
+rows = ["QOL.MaxSelection"]
+
+[hook.stations]
+doc = "Stations in groups, one build menu for several of one kind"
+rows = ["QOL.StationGroups"]
+
+[hook.warp]
+doc = "Long moves on the map go to warp"
+rows = ["QOL.WarpDistance"]
+
+[[sym]]
+id = "pan_site"
+symbol = "RTS_Configure"
+kind = "patch"
+addr = 0x491766
+check = "68 cc d7 6f 00 e8 00 6c 1c 00 8b 45 f0 85 c0 75 08 d9 1d b4 fb 70 00 eb 02"
+in = "RTS_Configure"
+used_by = ["pan_speed"]
+
+[[sym]]
+id = "fastscroll"
+symbol = "FASTSCROLL_COEFFICIENT"
+kind = "global"
+addr = 0x70fbb4
+used_by = ["pan_speed"]
+
+[[sym]]
+id = "view_site"
+symbol = "RTS_Configure"
+kind = "patch"
+addr = 0x491bef
+check = "8b 0d c0 ca 6f 00 89 15 fc 3c 77 00 8d 55 f0 89 0d c4 ca 6f 00"
+in = "RTS_Configure"
+used_by = ["view_distance"]
+
+[[sym]]
+id = "far_plane"
+symbol = "FAR_CLIPPING_PLANE"
+kind = "global"
+addr = 0x6fcab0
+used_by = ["view_distance"]
+
+[[sym]]
+id = "cull_dist"
+symbol = "cfgOBJECT_CULLING_DISTANCE"
+kind = "global"
+addr = 0x6fcac0
+used_by = ["view_distance"]
+
+[[sym]]
+id = "group_bind"
+symbol = "cOverViewImp::mCheckGroupSelect"
+kind = "patch"
+addr = 0x52129a
+check = "8b 15 3c 13 76 00 83 3a 00 74 1c a1 40 13 76 00"
+in = "cOverViewImp::mCheckGroupSelect"
+used_by = ["shift_group"]
+
+[[sym]]
+id = "group_focus"
+symbol = "cOverViewImp::mCheckGroupSelect"
+kind = "patch"
+addr = 0x521350
+check = "8b 0d 40 13 76 00"
+in = "cOverViewImp::mCheckGroupSelect"
+used_by = ["shift_group"]
+
+[[sym]]
+id = "cmd_control"
+symbol = "g_pCommandControl"
+kind = "global"
+addr = 0x76133c
+used_by = ["shift_group"]
+
+[[sym]]
+id = "cmd_shift"
+symbol = "g_pCommandShift"
+kind = "global"
+addr = 0x761340
+used_by = ["shift_group"]
+
+[[sym]]
+id = "cmd_alt"
+symbol = "g_pCommandAlt"
+kind = "global"
+addr = 0x761344
+used_by = ["shift_group", "warp"]
+
+[[sym]]
+id = "bind_group"
+symbol = "cOverViewImp::mBindGroup"
+kind = "fn"
+addr = 0x520c40
+check = "55 8b ec 83 ec 10"
+used_by = ["shift_group", "stations"]
+
+[[sym]]
+id = "group_ctrl_held"
+symbol = "cOverViewImp::mCheckGroupSelect"
+kind = "label"
+addr = 0x5212a5
+check = "a1 40 13 76 00 8b"
+in = "cOverViewImp::mCheckGroupSelect"
+used_by = ["shift_group"]
+
+[[sym]]
+id = "group_select"
+symbol = "cOverViewImp::mCheckGroupSelect"
+kind = "label"
+addr = 0x5212c1
+check = "8b 0d d0 fb 70 00"
+in = "cOverViewImp::mCheckGroupSelect"
+used_by = ["shift_group"]
+
+[[sym]]
+id = "group_done"
+symbol = "cOverViewImp::mCheckGroupSelect"
+kind = "label"
+addr = 0x52138a
+check = "8b 45 fc 8b 75 f0"
+in = "cOverViewImp::mCheckGroupSelect"
+used_by = ["shift_group"]
+
+[[sym]]
+id = "overview"
+symbol = "cOverViewImp"
+kind = "global"
+addr = 0x768e40
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_00"
+symbol = "cOverViewImp::Simulate"
+kind = "patch"
+addr = 0x51efcc
+check = "8b b6 bc 00 00 00"
+in = "cOverViewImp::Simulate"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_01"
+symbol = "cOverViewImp::Select"
+kind = "patch"
+addr = 0x51f687
+check = "8b 83 bc 00 00 00"
+in = "cOverViewImp::Select"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_02"
+symbol = "cOverViewImp::Select"
+kind = "patch"
+addr = 0x51f7bb
+check = "8d b3 bc 00 00 00"
+in = "cOverViewImp::Select"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_03"
+symbol = "cOverViewImp::Select"
+kind = "patch"
+addr = 0x51f856
+check = "89 b4 83 bc 00 00 00"
+in = "cOverViewImp::Select"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_04"
+symbol = "cOverViewImp::Select"
+kind = "patch"
+addr = 0x51f8a1
+check = "8d bb bc 00 00 00"
+in = "cOverViewImp::Select"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_05"
+symbol = "cOverViewImp::GetSelectedEntityIds"
+kind = "patch"
+addr = 0x51fd55
+check = "8d 9f bc 00 00 00"
+in = "cOverViewImp::GetSelectedEntityIds"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_06"
+symbol = "cOverViewImp::FlushLists"
+kind = "patch"
+addr = 0x51fe8e
+check = "8d b7 bc 00 00 00"
+in = "cOverViewImp::FlushLists"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_07"
+symbol = "cOverViewImp::SwapLists"
+kind = "patch"
+addr = 0x520071
+check = "8d 8f bc 00 00 00"
+in = "cOverViewImp::SwapLists"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_08"
+symbol = "cOverViewImp::SwapLists"
+kind = "patch"
+addr = 0x52009c
+check = "89 8c b7 bc 00 00 00"
+in = "cOverViewImp::SwapLists"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_09"
+symbol = "cOverViewImp::mSetFormationOrientationToCurrentView"
+kind = "patch"
+addr = 0x5204ea
+check = "81 c7 bc 00 00 00"
+in = "cOverViewImp::mSetFormationOrientationToCurrentView"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_10"
+symbol = "cOverViewImp::mFocusNextSelected"
+kind = "patch"
+addr = 0x520ab1
+check = "8d 9f bc 00 00 00"
+in = "cOverViewImp::mFocusNextSelected"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_11"
+symbol = "cOverViewImp::mFocusNextSelected"
+kind = "patch"
+addr = 0x520b02
+check = "8b b4 b7 bc 00 00 00"
+in = "cOverViewImp::mFocusNextSelected"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_12"
+symbol = "cOverViewImp::mSelectMeanY"
+kind = "patch"
+addr = 0x520b8d
+check = "8d b3 bc 00 00 00"
+in = "cOverViewImp::mSelectMeanY"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_13"
+symbol = "cOverViewImp::mBindGroup"
+kind = "patch"
+addr = 0x520c4e
+check = "8b 87 bc 00 00 00"
+in = "cOverViewImp::mBindGroup"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_14"
+symbol = "cOverViewImp::mBindGroup"
+kind = "patch"
+addr = 0x520d2c
+check = "8d 87 bc 00 00 00"
+in = "cOverViewImp::mBindGroup"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_15"
+symbol = "cOverViewImp::mBindGroup"
+kind = "patch"
+addr = 0x520e37
+check = "81 c7 bc 00 00 00"
+in = "cOverViewImp::mBindGroup"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_16"
+symbol = "cOverViewImp::mCheckGroupSelect"
+kind = "patch"
+addr = 0x52115b
+check = "8d 97 bc 00 00 00"
+in = "cOverViewImp::mCheckGroupSelect"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_17"
+symbol = "cOverViewImp::mCheckGroupSelect"
+kind = "patch"
+addr = 0x521207
+check = "8d 97 bc 00 00 00"
+in = "cOverViewImp::mCheckGroupSelect"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_18"
+symbol = "cOverViewImp::mClearFromGroup"
+kind = "patch"
+addr = 0x5213df
+check = "8d 81 bc 00 00 00"
+in = "cOverViewImp::mClearFromGroup"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_19"
+symbol = "cOverViewImp::mMainInput"
+kind = "patch"
+addr = 0x521f41
+check = "8d be bc 00 00 00"
+in = "cOverViewImp::mMainInput"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_20"
+symbol = "cOverViewImp::mEditModeInput"
+kind = "patch"
+addr = 0x5230ec
+check = "8d be bc 00 00 00"
+in = "cOverViewImp::mEditModeInput"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_21"
+symbol = "cOverViewImp::mDeselectAll"
+kind = "patch"
+addr = 0x52326f
+check = "8d bb bc 00 00 00"
+in = "cOverViewImp::mDeselectAll"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_22"
+symbol = "cOverViewImp::mEditModeSelect"
+kind = "patch"
+addr = 0x5232f8
+check = "89 84 8e bc 00 00 00"
+in = "cOverViewImp::mEditModeSelect"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_23"
+symbol = "cOverViewImp::mEditModeSelect"
+kind = "patch"
+addr = 0x523347
+check = "8d 8e bc 00 00 00"
+in = "cOverViewImp::mEditModeSelect"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_24"
+symbol = "cOverViewImp::mEditModeDragAll"
+kind = "patch"
+addr = 0x5233cd
+check = "8d 9e bc 00 00 00"
+in = "cOverViewImp::mEditModeDragAll"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_25"
+symbol = "cOverViewImp::mEditModeDeleteAll"
+kind = "patch"
+addr = 0x52355e
+check = "8d b9 bc 00 00 00"
+in = "cOverViewImp::mEditModeDeleteAll"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_26"
+symbol = "cOverViewImp::mEditModeCopy"
+kind = "patch"
+addr = 0x52367f
+check = "8d bb bc 00 00 00"
+in = "cOverViewImp::mEditModeCopy"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_27"
+symbol = "cOverViewImp::mEditModeDrag"
+kind = "patch"
+addr = 0x523f70
+check = "8d b3 bc 00 00 00"
+in = "cOverViewImp::mEditModeDrag"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_28"
+symbol = "cOverViewImp::mProcessKeyboardInput"
+kind = "patch"
+addr = 0x525a1e
+check = "8d bb bc 00 00 00"
+in = "cOverViewImp::mProcessKeyboardInput"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_29"
+symbol = "cOverViewImp::mProcessKeyboardInput"
+kind = "patch"
+addr = 0x525a68
+check = "8b b4 b3 bc 00 00 00"
+in = "cOverViewImp::mProcessKeyboardInput"
+used_by = ["selection"]
+
+[[sym]]
+id = "sel_30"
+symbol = "cOverViewImp::GetSelectList"
+kind = "patch"
+addr = 0x527ab0
+check = "8d 81 bc 00 00 00"
+in = "cOverViewImp::GetSelectList"
+used_by = ["selection"]
+
+[[sym]]
+id = "cap_0"
+symbol = "cOverViewImp::Select"
+kind = "patch"
+addr = 0x51f66e
+check = "83 bb b8 00 00 00 10"
+in = "cOverViewImp::Select"
+used_by = ["selection"]
+
+[[sym]]
+id = "cap_1"
+symbol = "cOverViewImp::mBindGroup"
+kind = "patch"
+addr = 0x520e97
+check = "83 39 10"
+in = "cOverViewImp::mBindGroup"
+used_by = ["selection"]
+
+[[sym]]
+id = "cap_2"
+symbol = "cOverViewImp::mEditModeSelect"
+kind = "patch"
+addr = 0x5232e3
+check = "83 f9 10"
+in = "cOverViewImp::mEditModeSelect"
+used_by = ["selection"]
+
+[[sym]]
+id = "spec_0"
+symbol = "PopupPaletteImp::mSetupSpecialWeapons"
+kind = "patch"
+addr = 0x4fd32e
+check = "8d 4d 88 89 4d e8 eb 03"
+in = "PopupPaletteImp::mSetupSpecialWeapons"
+used_by = ["special_select"]
+
+[[sym]]
+id = "spec_1"
+symbol = "PopupPaletteImp::mSetupSpecialWeapons"
+kind = "patch"
+addr = 0x4fd3af
+check = "8d 75 88 89 45 d8"
+in = "PopupPaletteImp::mSetupSpecialWeapons"
+used_by = ["special_select"]
+
+[[sym]]
+id = "spec_2"
+symbol = "PopupPaletteImp::mSetupSpecialWeapons"
+kind = "patch"
+addr = 0x4fd40d
+check = "8b 55 f0 8d 45 88 52 50"
+in = "PopupPaletteImp::mSetupSpecialWeapons"
+used_by = ["special_select"]
+
+[[sym]]
+id = "spec_3"
+symbol = "PopupPaletteImp::mQueueSpecialWeaponCommand"
+kind = "patch"
+addr = 0x4fd8f1
+check = "8d 4d 80 89 4d 0c"
+in = "PopupPaletteImp::mQueueSpecialWeaponCommand"
+used_by = ["special_select"]
+
+[[sym]]
+id = "spec_4"
+symbol = "PopupPaletteImp::mQueueSpecialWeaponCommand"
+kind = "patch"
+addr = 0x4fd95d
+check = "8d 75 80 8b f9"
+in = "PopupPaletteImp::mQueueSpecialWeaponCommand"
+used_by = ["special_select"]
+
+[[sym]]
+id = "spec_cont_read"
+symbol = "PopupPaletteImp::mSetupSpecialWeapons"
+kind = "label"
+addr = 0x4fd3b5
+check = "8b 16 8b 7d e4 57"
+in = "PopupPaletteImp::mSetupSpecialWeapons"
+used_by = ["special_select"]
+
+[[sym]]
+id = "spec_cont_fill"
+symbol = "PopupPaletteImp::mQueueSpecialWeaponCommand"
+kind = "label"
+addr = 0x4fd8f7
+check = "8b 13 83 f8 01 8b"
+in = "PopupPaletteImp::mQueueSpecialWeaponCommand"
+used_by = ["special_select"]
+
+[[sym]]
+id = "spec_cont_queue"
+symbol = "PopupPaletteImp::mQueueSpecialWeaponCommand"
+kind = "label"
+addr = 0x4fd962
+check = "8b 06 85 c0 75 07"
+in = "PopupPaletteImp::mQueueSpecialWeaponCommand"
+used_by = ["special_select"]
+
+[[sym]]
+id = "stn_sel"
+symbol = "cOverViewImp::Select"
+kind = "patch"
+addr = 0x51f67b
+check = "39 bb b8 00 00 00 0f 85 90 00 00 00"
+in = "cOverViewImp::Select"
+used_by = ["stations"]
+
+[[sym]]
+id = "stn_focus"
+symbol = "cOverViewImp::mFocusCameraOnShipGroup"
+kind = "patch"
+addr = 0x520fcf
+check = "8d 9c 81 4c 01 00 00"
+in = "cOverViewImp::mFocusCameraOnShipGroup"
+used_by = ["stations"]
+
+[[sym]]
+id = "stn_enable"
+symbol = "PopupPaletteImp::mUpdateButtonsAndPosition"
+kind = "patch"
+addr = 0x4fc72c
+check = "8b 4f 44 33 d2 83 f8 01 8b 87 f0 00 00 00 0f 94 c2"
+in = "PopupPaletteImp::mUpdateButtonsAndPosition"
+used_by = ["stations"]
+
+[[sym]]
+id = "stn_route"
+symbol = "PopupPaletteImp::CheckCanExecute"
+kind = "patch"
+addr = 0x4fc486
+check = "8b 45 e8 33 f6 85 c0 7e 75"
+in = "PopupPaletteImp::CheckCanExecute"
+used_by = ["stations"]
+
+[[sym]]
+id = "stn_cancel"
+symbol = "PopupPaletteImp::CheckCanExecute"
+kind = "patch"
+addr = 0x4fc0a6
+check = "8b 45 e0 85 c0 c7 45 ec 00 00 00 00 0f 8e 1c 01 00 00"
+in = "PopupPaletteImp::CheckCanExecute"
+used_by = ["stations"]
+
+[[sym]]
+id = "stn_built"
+symbol = "Producer::FinishBuild"
+kind = "patch"
+addr = 0x4b9121
+check = "8b 0d 3c 8e 76 00 8b 86 20 01 00 00 50 57"
+in = "Producer::FinishBuild"
+used_by = ["stations"]
+
+[[sym]]
+id = "stn_qsize"
+symbol = "PopupPaletteImp::CheckCanExecute"
+kind = "patch"
+addr = 0x4fbf7e
+check = "f6 c4 02 74 13 e8 e8 bb fb ff"
+in = "PopupPaletteImp::CheckCanExecute"
+used_by = ["stations"]
+
+[[sym]]
+id = "sel_cont_select"
+symbol = "cOverViewImp::Select"
+kind = "label"
+addr = 0x51f687
+check = "8b 83 bc 00 00 00"
+in = "cOverViewImp::Select"
+used_by = ["stations"]
+
+[[sym]]
+id = "sel_cont_take"
+symbol = "cOverViewImp::Select"
+kind = "label"
+addr = 0x51f78a
+check = "8b 45 0c 33 ff 2b"
+in = "cOverViewImp::Select"
+used_by = ["stations"]
+
+[[sym]]
+id = "sel_cont_stock"
+symbol = "cOverViewImp::Select"
+kind = "label"
+addr = 0x51f717
+check = "8b 83 b8 00 00 00"
+in = "cOverViewImp::Select"
+used_by = ["stations"]
+
+[[sym]]
+id = "bind_cont"
+symbol = "cOverViewImp::mBindGroup"
+kind = "label"
+addr = 0x520c46
+check = "53 56 57 8b f9 89"
+in = "cOverViewImp::mBindGroup"
+used_by = ["stations"]
+
+[[sym]]
+id = "focus_cont"
+symbol = "cOverViewImp::mFocusCameraOnShipGroup"
+kind = "label"
+addr = 0x520fd6
+check = "c7 45 f4 00 00 00"
+in = "cOverViewImp::mFocusCameraOnShipGroup"
+used_by = ["stations"]
+
+[[sym]]
+id = "cancel_cont"
+symbol = "PopupPaletteImp::CheckCanExecute"
+kind = "label"
+addr = 0x4fc0b8
+check = "8b 55 d8 8b 45 ec"
+in = "PopupPaletteImp::CheckCanExecute"
+used_by = ["stations"]
+
+[[sym]]
+id = "cancel_skip"
+symbol = "PopupPaletteImp::CheckCanExecute"
+kind = "label"
+addr = 0x4fc1d4
+check = "8b 45 dc c7 45 fc"
+in = "PopupPaletteImp::CheckCanExecute"
+used_by = ["stations"]
+
+[[sym]]
+id = "enable_cont"
+symbol = "PopupPaletteImp::mUpdateButtonsAndPosition"
+kind = "label"
+addr = 0x4fc73d
+check = "52 50 e8 5c a1 fe"
+in = "PopupPaletteImp::mUpdateButtonsAndPosition"
+used_by = ["stations"]
+
+[[sym]]
+id = "route_cont"
+symbol = "PopupPaletteImp::CheckCanExecute"
+kind = "label"
+addr = 0x4fc504
+check = "8b 75 ec 8b 7f 04"
+in = "PopupPaletteImp::CheckCanExecute"
+used_by = ["stations"]
+
+[[sym]]
+id = "queue_size"
+symbol = "Producer::BuildQueueSize"
+kind = "fn"
+addr = 0x4b7b70
+check = "8b 89 70 02 00 00 33 c0"
+used_by = ["stations"]
+
+[[sym]]
+id = "queue_command"
+symbol = "GameObject::QueueCommand"
+kind = "fn"
+addr = 0x4d4280
+check = "55 8b ec 56 8b f1 8b 0d"
+used_by = ["stations"]
+
+[[sym]]
+id = "set_selected"
+symbol = "GameObject::SetSelected"
+kind = "fn"
+addr = 0x4d3c00
+check = "55 8b ec 53 8a 5d 08 56"
+used_by = ["stations"]
+
+[[sym]]
+id = "remove_ship"
+symbol = "cGroup::RemoveShip"
+kind = "fn"
+addr = 0x527d20
+check = "55 8b ec 83 ec 08 53 56"
+used_by = ["stations"]
+
+[[sym]]
+id = "entity_get"
+symbol = "Entity::Get"
+kind = "fn"
+addr = 0x4cfff0
+check = "55 8b ec 8b 4d 08 8b c1"
+used_by = ["stations", "warp"]
+
+[[sym]]
+id = "user_team"
+symbol = "Entity::GetUserTeam"
+kind = "fn"
+addr = 0x4d0060
+check = "8b 0d d4 b8 76 00 e9 45"
+used_by = ["stations", "warp"]
+
+[[sym]]
+id = "dyn_cast"
+symbol = "__RTDynamicCast"
+kind = "fn"
+addr = 0x6731a0
+check = "ff 25 70 80 7b 00 cc cc"
+used_by = ["stations", "warp"]
+
+[[sym]]
+id = "rtti_goclass"
+symbol = "GameObjectClass"
+kind = "rtti"
+addr = 0x6eee98
+used_by = ["stations", "warp"]
+
+[[sym]]
+id = "rtti_craftclass"
+symbol = "CraftClass"
+kind = "rtti"
+addr = 0x6eee08
+used_by = ["stations", "warp"]
+
+[[sym]]
+id = "warp_site"
+symbol = "cOverViewImp::mNormalModeInput"
+kind = "patch"
+addr = 0x522cb8
+check = "a1 44 13 76 00 83 38 00 74 1d 8b 4e 3c 81 e1 ff 0f 00 00 83 f9 04 75 0f"
+in = "cOverViewImp::mNormalModeInput"
+used_by = ["warp"]
+
+[[sym]]
+id = "warp_cont"
+symbol = "cOverViewImp::mNormalModeInput"
+kind = "label"
+addr = 0x522cdf
+check = "8b 45 08 8b ce 50"
+in = "cOverViewImp::mNormalModeInput"
+used_by = ["warp"]
+
+[[sym]]
+id = "allow_warp"
+symbol = "g_allowWarp"
+kind = "global"
+addr = 0x6f4de0
+used_by = ["warp"]
+
+[[sym]]
+id = "transport"
+symbol = "g_transport"
+kind = "global"
+addr = 0x76b8d4
+used_by = ["warp"]
+
+[[sym]]
+id = "get_setup"
+symbol = "Transport::getGameSetup"
+kind = "fn"
+addr = 0x557940
+check = "8b 41 30 c3 90 90 90 90"
+used_by = ["warp"]
+
+[[sym]]
+id = "setup_allows_warp"
+symbol = "GameSetup::isAllowWarpSpeed"
+kind = "fn"
+addr = 0x546280
+check = "8b 41 10 8a 80 d1 00 00"
+used_by = ["warp"]
+
+[[sym]]
+id = "ov_count"
+symbol = "cOverViewImp"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0xb8
+type = "u32"
+used_by = ["selection", "stations", "warp"]
+
+[[sym]]
+id = "ov_sel"
+symbol = "cOverViewImp"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0xbc
+type = "u32"
+used_by = ["selection"]
+
+[[sym]]
+id = "ov_shipgrp"
+symbol = "cOverViewImp"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0x14c
+type = "u32"
+used_by = ["stations"]
+
+[[sym]]
+id = "ov_stngrp"
+symbol = "cOverViewImp"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0x1c4
+type = "u32"
+used_by = ["stations"]
+
+[[sym]]
+id = "ov_action"
+symbol = "cOverViewImp"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0x3c
+type = "u32"
+used_by = ["warp"]
+
+[[sym]]
+id = "ov_point"
+symbol = "cOverViewImp"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0xa4
+type = "v3"
+used_by = ["warp"]
+
+[[sym]]
+id = "ov_vt_select_list"
+symbol = "cOverViewImp vtable"
+kind = "field"
+struct = "cOverViewImp vtable"
+offset = 0x98
+type = "u32"
+used_by = ["stations", "warp"]
+
+[[sym]]
+id = "go_flags"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x14
+type = "u8"
+used_by = ["stations", "warp"]
+
+[[sym]]
+id = "go_id"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x28
+type = "i32"
+used_by = ["stations"]
+
+[[sym]]
+id = "go_class"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x40
+type = "ptr"
+used_by = ["stations", "warp"]
+
+[[sym]]
+id = "go_dying"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x113
+type = "u8"
+used_by = ["stations"]
+
+[[sym]]
+id = "go_team"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0xec
+type = "i32"
+used_by = ["stations", "warp"]
+
+[[sym]]
+id = "go_label"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x120
+type = "i32"
+used_by = ["stations"]
+
+[[sym]]
+id = "go_pos"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0xac
+type = "v3"
+used_by = ["warp"]
+
+[[sym]]
+id = "cc_station"
+symbol = "CraftClass"
+kind = "field"
+struct = "CraftClass"
+offset = 0x20d
+type = "u8"
+used_by = ["stations"]
+
+[[sym]]
+id = "ci_command"
+symbol = "CommandInfoClass"
+kind = "field"
+struct = "CommandInfoClass"
+offset = 0x1a0
+type = "i32"
+used_by = ["stations"]
+
+[[sym]]
+id = "mode_class"
+symbol = "ModeInfo"
+kind = "field"
+struct = "ModeInfo"
+offset = 0xc
+type = "ptr"
+used_by = ["stations"]
+
+[[sym]]
+id = "bar_x44"
+symbol = "PopupPaletteImp"
+kind = "field"
+struct = "PopupPaletteImp"
+offset = 0x44
+type = "u32"
+used_by = ["stations"]
+
+[[sym]]
+id = "bar_build"
+symbol = "PopupPaletteImp"
+kind = "field"
+struct = "PopupPaletteImp"
+offset = 0xf0
+type = "u32"
+used_by = ["stations"]
+
+[[sym]]
+id = "craft_control"
+symbol = "Craft"
+kind = "field"
+struct = "Craft"
+offset = 0x1b0
+type = "ptr"
+used_by = ["warp"]
+
+[[sym]]
+id = "ctl_speed"
+symbol = "cCraftControl"
+kind = "field"
+struct = "cCraftControl"
+offset = 0x8
+type = "f32"
+used_by = ["warp"]
+
+[[sym]]
+id = "ctl_warp"
+symbol = "cCraftControl"
+kind = "field"
+struct = "cCraftControl"
+offset = 0xc
+type = "f32"
+used_by = ["warp"]
+
+[[sym]]
+id = "cmd_go"
+symbol = "AiCommand GO"
+kind = "value"
+value = 4
+used_by = ["warp"]
+
+[[sym]]
+id = "cmd_go_warp"
+symbol = "AiCommand GO_WARP"
+kind = "value"
+value = 43
+used_by = ["warp"]
+
+[[sym]]
+id = "cmd_build"
+symbol = "AiCommand BUILD"
+kind = "value"
+value = 25
+used_by = ["stations"]
+
+[[sym]]
+id = "cmd_cancel"
+symbol = "AiCommand CANCEL"
+kind = "value"
+value = 19
+used_by = ["stations"]
+
+[[sym]]
+id = "act_command"
+symbol = "cOverViewImp action: command bits"
+kind = "value"
+value = 4095
+used_by = ["warp"]
+
+[[sym]]
+id = "act_keep"
+symbol = "cOverViewImp action: carried bit"
+kind = "value"
+value = 16384
+used_by = ["warp"]
