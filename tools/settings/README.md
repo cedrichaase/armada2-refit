@@ -7,7 +7,7 @@ every one of them. Each plugin describes the keys a player may set in a table of
 **descriptors** it exports, `<Plugin>_Settings`, which the UI's Refit screen lists
 (ROADMAP.md Phase 6). This folder holds the schema of those tables, the generator that
 writes them from each layer's `settings.toml`, their lint, the overlay's writer for
-the bench and the GUI installer, and the fixtures that pin all of it. The contract is
+the bench (the GUI installer only reads `RefitPlayer.ini` for its report), and the fixtures that pin all of it. The contract is
 **A2SET_ABI 1.1**. Nothing here is installed; it is versioned by the root.
 
 | File | What it is |

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Build QOL.asi -- a 32-bit Windows DLL, cross-compiled on Linux.
-# Same toolchain and same reasons as menus/build.sh and hud/build.sh: no CRT
+# Same toolchain and reasons as the other C plugins (csdk/a2asi.h): no CRT
 # (/nodefaultlib), Win32 prototypes declared in the source, import library
-# generated from csdk/def/kernel32.def.  --kill-at is required; see menus/build.sh.
+# generated from csdk/def/kernel32.def.  --kill-at is required (the .def files carry
+# decorated names; the real DLLs export undecorated ones).
 # QOLRules.asi is the rules layer's (rules/build.sh).
 set -euo pipefail
 

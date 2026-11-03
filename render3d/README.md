@@ -14,7 +14,7 @@ What it does today:
   white glows by how bright it is: bloom by energy, which an 8-bit back buffer cannot
   hold. Below the tone map's shoulder every colour is stock's.
 - **The body is ours**: `Armada_RenderAllOurStuff`'s steps run in render3d's own
-  sequence (`frame/steps.rs`), and seven modules (`## Modules` below) draw every
+  sequence (`frame/steps.rs`), and eight modules (`## Modules` below) draw every
   category of the 3D view from the game's own assets, read by `a2fmt`: hulls, the sky
   and background, particles, ordnance, effects, the world (planets, moons, asteroids,
   nebulae) and the overlays (fog, grid, selection, ghosts). The cosmetic simulation

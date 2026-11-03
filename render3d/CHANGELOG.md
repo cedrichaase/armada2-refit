@@ -4,6 +4,14 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 1.0.1 — 2026-11-03
+
+### Changed
+- `Render3D.ini`: the `[Modules]` comment says every module row is read again while the
+  game runs (it listed only some). Comment only; no behaviour changes.
+
+Installed, not yet seen in game.
+
 ## 1.0.0 — 2026-11-03
 
 MAJOR: Render3D.asi no longer runs without Display8. With no Display8 of its contract,

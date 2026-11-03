@@ -140,8 +140,8 @@ A UI of our own reads much more of the engine's state than today's plugins patch
 (`HUD.md`, "Engine findings" in `publish/README.md`). It stays within hard rule
 9 by construction:
 
-- **Every address and offset lives in `src/engine/`**, one file per area, each with
-  the hook or panel that needs it. Removing a panel removes its findings.
+- **Every address and offset lives in the engine profile** (`profiles/gog-1.1/ui.<part>.toml`),
+  read through `src/engine/`, one file per area, each with the hook or panel that needs it. Removing a panel removes its findings.
 - **Fields are read by offset, never through a mirrored layout**: no `#[repr(C)]`
   struct that copies a class's shape.
 - **Behaviour is specified from the running game** (the test bench), not by
