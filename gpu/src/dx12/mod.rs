@@ -295,6 +295,9 @@ pub struct Gpu {
     /// flush): buffers decay to `COMMON` then, so a storage buffer's state recorded in
     /// an earlier one is `COMMON` now.
     pub(crate) epoch: Cell<u64>,
+    /// The pass now is published to Display8 at each outermost `Cmd`'s end
+    /// (`display8v1_dx12_pass`, contract 1.4), as on Vulkan: render3d's.
+    publish: Cell<bool>,
 }
 
 /// The root signature every pipeline of the backend shares (the module doc).
@@ -401,7 +404,12 @@ pub(crate) fn dxgi(f: Format) -> Option<Fmt> {
 
 impl Gpu {
     pub const fn new(log: Log) -> Gpu {
-        Gpu { log, st: RefCell::new(None), serial: Cell::new(0), depth: Cell::new(0), epoch: Cell::new(0) }
+        Gpu { log, st: RefCell::new(None), serial: Cell::new(0), depth: Cell::new(0), epoch: Cell::new(0), publish: Cell::new(false) }
+    }
+
+    /// As `new`, publishing its pass now at each `Cmd`'s end (`display8v1_dx12_pass`).
+    pub const fn publishing(log: Log) -> Gpu {
+        Gpu { log, st: RefCell::new(None), serial: Cell::new(0), depth: Cell::new(0), epoch: Cell::new(0), publish: Cell::new(true) }
     }
 
     /// Opens the backend on Display8's device. None: Display8 has no device yet (asked
@@ -579,24 +587,90 @@ impl Gpu {
         Some(f.command_list as P)
     }
 
-    /// A `Cmd` begins: the frame now is asked for. False without one.
+    /// A `Cmd` begins: Display8 is told (`PASS_ENTER`), and the frame now is asked for.
+    /// False without one. The serial moves on, so the `Cmd` binds everything afresh at
+    /// its first draw: Display8 may have set its own root signature, pipeline state,
+    /// targets, viewport, scissor, topology and buffers on the list since the last
+    /// `Cmd` (the rebind rule, gpu/src/display.rs, "Pass publishing on Direct3D 12").
     pub(crate) fn enter(&self) -> bool {
         self.serial.set(self.serial.get().wrapping_add(1));
         self.depth.set(self.depth.get() + 1);
+        if self.depth.get() == 1 {
+            self.tell_display(crate::display::PASS_ENTER, None);
+        }
         self.with(|s| s.has_frame = false);
         self.new_frame().is_some()
     }
 
     /// A `Cmd` ends: Display8's textures go back in their states, and the next recorder
-    /// may be another.
+    /// may be another. At the outermost one's end Display8 is told: the pass now
+    /// (`PASS_PUBLISH`, when this plugin publishes and has one), else `PASS_LEAVE`.
     pub(crate) fn leave(&self) {
         self.restore_externals();
         self.serial.set(self.serial.get().wrapping_add(1));
         let d = self.depth.get().saturating_sub(1);
         self.depth.set(d);
         if d == 0 {
+            let p = if self.publish.get() { self.published() } else { None };
             self.with(|s| s.has_frame = false);
+            match p {
+                Some(p) => self.tell_display(crate::display::PASS_PUBLISH, Some(&p)),
+                None => self.tell_display(crate::display::PASS_LEAVE, None),
+            }
         }
+    }
+
+    /// `display8v1_dx12_pass`, when this Display8 has it (contract 1.4).
+    fn tell_display(&self, event: u32, pass: Option<&crate::display::Dx12Pass8>) {
+        let Some(f) = self.sh().and_then(|sh| sh.disp.dx12_pass) else { return };
+        f(event, pass.map_or(core::ptr::null(), |p| p as *const _));
+    }
+
+    /// The pass now as Display8 draws into it: the colour in `RENDER_TARGET`, the depth
+    /// in `DEPTH_WRITE` (barriers recorded now, if they were in another state). None
+    /// without a pass, with several colour targets, or with one not made.
+    fn published(&self) -> Option<crate::display::Dx12Pass8> {
+        use crate::display::Dx12Pass8;
+        let ps = self.with(|s| s.pass.clone())??;
+        if ps.colors.len() != 1 {
+            return None;
+        }
+        let c = &ps.colors[0];
+        let rtv = c.tex.rtv(c.layer);
+        if rtv == 0 || c.tex.res().is_null() {
+            return None;
+        }
+        self.transition(&c.tex, STATE_RENDER_TARGET);
+        if let Some(d) = &ps.depth {
+            self.transition(&d.tex, STATE_DEPTH_WRITE);
+        }
+        // A texture of Display8's goes back to its own state (the same ones).
+        self.restore_externals();
+        let img = |t: &Texture, state: u32| Dx12Image8 {
+            size: core::mem::size_of::<Dx12Image8>() as u32,
+            resource: t.res() as usize,
+            format: t.fmt().map_or(0, |f| f.view),
+            width: ps.size.0,
+            height: ps.size.1,
+            levels: t.levels(),
+            samples: ps.key.samples.max(1),
+            state,
+            rtv: t.rtv(0),
+            dsv: t.dsv(),
+            srv: t.srv(),
+        };
+        let colour = img(&c.tex, STATE_RENDER_TARGET);
+        let depth = ps.depth.as_ref().map_or(Dx12Image8::default(), |d| img(&d.tex, STATE_DEPTH_WRITE));
+        Some(Dx12Pass8 {
+            size: core::mem::size_of::<Dx12Pass8>() as u32,
+            colour,
+            depth,
+            rtv,
+            dsv: depth.dsv,
+            samples: ps.key.samples.max(1),
+            width: ps.size.0,
+            height: ps.size.1,
+        })
     }
 
     pub(crate) fn serial(&self) -> u32 {

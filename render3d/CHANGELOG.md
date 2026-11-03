@@ -4,6 +4,11 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.47.0 — 2026-11-03
+
+### Added
+- Publishes its scene pass on Direct3D 12 too (gpu 1.3.0, contract 1.4: `display8v1_dx12_pass`, PASS_ENTER at each `Cmd`'s start, PASS_PUBLISH with the pass at its end), as on Vulkan, for Display8's passthrough there. Against a Display8 of contract 1.3 or older it publishes nothing, as before. The picture is unchanged. Installed, not yet seen in game.
+
 ## 0.46.0 — 2026-11-03
 
 ### Added

@@ -4,6 +4,11 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 1.1.1 — 2026-11-03
+
+### Changed
+- Rebuilt on gpu 1.3.0 (contract 1.4): on Direct3D 12 the UI's `Cmd`s now tell Display8 PASS_ENTER and PASS_LEAVE (it publishes no pass). Nothing else changes. Installed, not yet seen in game.
+
 ## 1.1.0 — 2026-11-03
 
 ### Changed

@@ -51,8 +51,8 @@ root.
 `gpu::VERSION` is this crate's version (`Cargo.toml`, 1.1.0 since root 13.49.0; 1.0.0
 in 13.48.0); it is not a layer, so the changelogs of render3d and the UI say when it
 moves. The contract with Display8 has a version of its own, `display::ABI_MAJOR` and
-`ABI_MINOR` (1.0 since display 0.12.0, 1.1 since 0.13.0: the claims, 1.2 since 0.15.0: the Direct3D 12 pipeline library), which both sides
-build against.
+`ABI_MINOR` (1.0 since display 0.12.0, 1.1 since 0.13.0: the claims, 1.2 since 0.15.0: the Direct3D 12 pipeline library, 1.3 since 0.18.0: `CLAIM_MENUS` and `display8v1_mode`, 1.4 since 0.19.0: `display8v1_dx12_pass`, the pass published on Direct3D 12), which both sides
+build against. gpu 1.3.0 is the first on contract 1.4.
 
 At the first question of which backend draws, `Gpu` shakes hands: `display8_abi`
 gets our major, minor and an address in the plugin's module (for Display8's log), and
@@ -516,6 +516,24 @@ plan in Direct3D 12's terms; what differs, and why:
   pass to open or close, so its targets are set at the first draw of a `Cmd` (and when
   the pass changes), and a clear (a load operation, `clear_rects`) is
   `ClearRenderTargetView` / `ClearDepthStencilView` over the area at once.
+- **Publishing the pass** (contract 1.4, gpu 1.3.0; `src/display.rs`, "Pass publishing
+  on Direct3D 12"). A `Gpu::with_display_publishing` (render3d's) publishes on
+  Direct3D 12 as on Vulkan: an outermost `Cmd`'s start tells Display8 `PASS_ENTER`, its
+  end `PASS_PUBLISH` with a `Dx12Pass8` (the one colour target and the depth, the
+  pass's RTV and DSV handles from the backend's own heaps, samples, size), or
+  `PASS_LEAVE` without a pass, with several colour targets, or for a plugin that does
+  not publish (the UI). Before it publishes, the colour is put in `RENDER_TARGET` and
+  the depth in `DEPTH_WRITE`, and Display8 leaves them so. The export is looked up
+  only on a Display8 of minor 4 or more (`Display8::dx12_pass`); without it nothing is
+  told and the engine's draws between `Cmd`s go to the engine's targets.
+- **The rebind rule.** Between a plugin's `Cmd`s Display8 may record into the same
+  list (its passthrough), setting its own root signature, pipeline state, targets,
+  viewport, scissor, topology and buffers. So a `Cmd` assumes nothing of the list:
+  `Gpu::serial` moves on at every `Cmd`'s start and end and at a flush, and a `Cmd`
+  whose serial is not the backend's forgets every binding (`Cmd::forget`) and sets
+  each again at its next draw or dispatch, the targets included. A `Cmd` begins
+  unbound anyway. Display8 never sets descriptor heaps but its own two, so the heaps
+  are never set again by the backend.
 - **States** are tracked per texture, the whole of it in one, and changed by a barrier
   when the next use needs another (the shaders read a texture in
   `PIXEL | NON_PIXEL_SHADER_RESOURCE`). Display8's textures go back to theirs when the

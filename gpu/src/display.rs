@@ -150,6 +150,46 @@
 //! | `display8v1_dx12_target` | `fn(which: u32, out: *mut Dx12Image8) -> bool` | `TARGET_COLOR`, `TARGET_DEPTH` |
 //! | `display8v1_dx12_mirror` | `fn(tex8: *mut c_void, out: *mut Dx12Image8) -> bool` | an engine texture as a sampled texture, kept up to date by Display8 |
 //! | `display8v1_dx12_flush` | `fn() -> bool` | submits what the frame now has recorded and waits for it; the frame goes on in the same command list (reset, its heaps set again), its ring, descriptors and deferred calls untouched: for a read-back (display 0.6.0) |
+//! | `display8v1_dx12_pass` | `fn(event: u32, pass: *const Dx12Pass8)` | optional (contract 1.4, display 0.19.0): as `display8v1_vk_pass`, below |
+//!
+//! **Pass publishing on Direct3D 12** (contract 1.4, display 0.19.0; phase 10, X-C1).
+//! `display8v1_dx12_pass(event, pass)` takes the events of `display8v1_vk_pass`: a
+//! plugin's outermost `Cmd` begins (`PASS_ENTER`, `pass` null) or ends (`PASS_LEAVE`,
+//! `pass` null), or ends with `pass` its pass now (`PASS_PUBLISH`, a plugin that
+//! publishes: render3d, `Gpu::with_display_publishing`). A plugin looks it up only
+//! when Display8's minor is 4 or more, and it is optional even then: a plugin against
+//! a Display8 without it publishes nothing, and what the engine draws between its
+//! `Cmd`s goes to the engine's targets (Direct3D 12 with passthrough off, as before).
+//! Display8 reads `Dx12Pass8` within its `size` and keeps it for the frame now: the
+//! pass published last is the one, and Display8 forgets it at the engine's `Present`,
+//! as on Vulkan. What it keeps of it is valid that long, provided the plugin keeps the
+//! textures, which a publishing plugin does for the frame.
+//!
+//! - **States.** At `PASS_PUBLISH` and `PASS_LEAVE`, and so whenever no `Cmd` of the
+//!   plugin is alive, the published colour is in `RENDER_TARGET` and the depth in
+//!   `DEPTH_WRITE`. Display8 draws into them in those states and leaves them so. It
+//!   never samples them, copies them, or changes their state.
+//! - **The rebind rule.** Display8 may record into the frame's command list whenever no
+//!   `Cmd` is alive (its passthrough, phase 10 X1), and sets on it what it draws with: a
+//!   root signature, a pipeline state, render targets, a viewport, a scissor, a
+//!   primitive topology, vertex and index buffers, root arguments. So after any call into
+//!   Display8, a recorder sets all of that again before its next draw or dispatch:
+//!   gpu forgets every binding at each `Cmd`'s start (`PASS_ENTER` is told first) and
+//!   after a flush, and binds afresh at its first draw. Display8 never sets descriptor
+//!   heaps but its own two, at the frame's start and after a flush, so the heaps stay
+//!   the frame's. While a `Cmd` is alive, Display8's calls (the frame, the ring,
+//!   descriptors, mirrors, targets) record nothing that binds: a mirror's update is a
+//!   copy and its barriers.
+//! - **The fields.** `colour` and `depth` are the textures (`Dx12Image8`; a null
+//!   `resource` is none, and `depth` may be none), each with its `format` the view's
+//!   (`DXGI_FORMAT`, what a pipeline state's `RTVFormats` or `DSVFormat` takes; a
+//!   depth texture of gpu's is typeless underneath), its `state` as above, and its
+//!   `rtv`/`dsv`/`srv` as gpu has them (0 where none). `rtv` and `dsv` of the pass are
+//!   the descriptors a draw sets with `OMSetRenderTargets` (`D3D12_CPU_DESCRIPTOR_HANDLE`,
+//!   a pointer-sized integer, in gpu's heaps that are not shader-visible; `rtv` the
+//!   view of the colour's published layer, so it may differ from `colour.rtv`, which
+//!   is layer 0's), `samples` the sample count of both, and `width` and `height` the
+//!   pass's area in pixels.
 //!
 //! `Dx12Device8::features`, `sampler_anisotropy` and `sampler_lod_bias` (display 0.6.0,
 //! after the fields before them) are as `VkDevice8`'s: `PixelCentres=d3d9`, and the
@@ -167,8 +207,8 @@ pub const ABI_MAJOR: u32 = 1;
 /// The contract's minor version: what of the major's additions this side knows. 1:
 /// display 0.13.0, the claims (`display8v1_register`, `display8v1_claims`). 2: display
 /// 0.15.0, `Dx12Device8::pipeline_library`. 3: display 0.18.0, `CLAIM_MENUS` and
-/// `display8v1_mode`.
-pub const ABI_MINOR: u32 = 3;
+/// `display8v1_mode`. 4: display 0.19.0, `display8v1_dx12_pass` and `Dx12Pass8`.
+pub const ABI_MINOR: u32 = 4;
 
 /// `display8v1_register` (contract 1.1).
 pub type RegisterFn = extern "C" fn(plugin: *const Plugin8) -> u32;
@@ -177,6 +217,9 @@ pub type ClaimsFn = extern "C" fn(except: u32) -> u32;
 /// `display8v1_mode` (contract 1.3): the display mode the game runs at, through `w`
 /// and `h`; false until the engine has opened its display (see "Window and display mode").
 pub type ModeFn = extern "C" fn(w: *mut u32, h: *mut u32) -> bool;
+/// `display8v1_dx12_pass` (contract 1.4): a plugin's `Cmd` begins or ends, or ends with
+/// its pass now published (above, "Pass publishing on Direct3D 12").
+pub type Dx12PassFn = extern "C" fn(event: u32, pass: *const Dx12Pass8);
 /// A plugin's claims callback: the `CLAIM_*` it draws now.
 pub type ClaimsCallback = extern "C" fn() -> u32;
 
@@ -307,8 +350,8 @@ pub const FEATURE_ANISOTROPY: u32 = 4;
 pub const TARGET_COLOR: u32 = 0;
 pub const TARGET_DEPTH: u32 = 1;
 
-/// `display8v1_vk_pass`'s events: a plugin's `Cmd` begins; ends; ends with its pass now
-/// published.
+/// `display8v1_vk_pass`'s and `display8v1_dx12_pass`'s events: a plugin's `Cmd`
+/// begins; ends; ends with its pass now published.
 pub const PASS_ENTER: u32 = 0;
 pub const PASS_LEAVE: u32 = 1;
 pub const PASS_PUBLISH: u32 = 2;
@@ -427,6 +470,9 @@ pub struct Display8 {
     pub claims: Option<ClaimsFn>,
     /// Contract 1.3 (display 0.18.0): None on a Display8 of minor 2 or less.
     pub mode: Option<ModeFn>,
+    /// Contract 1.4 (display 0.19.0), optional: None on a Display8 of minor 3 or less,
+    /// or one without it (the plugin then publishes nothing on Direct3D 12).
+    pub dx12_pass: Option<Dx12PassFn>,
 }
 
 /// Why `Display8::load` found nothing to draw through. Each is logged apart: no
@@ -508,6 +554,10 @@ impl Display8 {
                 register: if minor >= 1 { Some(core::mem::transmute::<usize, RegisterFn>(f("display8v1_register")?)) } else { None },
                 claims: if minor >= 1 { Some(core::mem::transmute::<usize, ClaimsFn>(f("display8v1_claims")?)) } else { None },
                 mode: if minor >= 3 { Some(core::mem::transmute::<usize, ModeFn>(f("display8v1_mode")?)) } else { None },
+                dx12_pass: match if minor >= 4 { lookup("display8v1_dx12_pass") } else { 0 } {
+                    0 => None,
+                    p => Some(core::mem::transmute::<usize, Dx12PassFn>(p)),
+                },
             })
         }
     }
@@ -621,6 +671,31 @@ pub struct Dx12Image8 {
     pub srv: usize,
 }
 
+/// A plugin's pass now on Direct3D 12, published at its outermost `Cmd`'s end
+/// (`display8v1_dx12_pass`, contract 1.4; above, "Pass publishing on Direct3D 12"):
+/// one colour target and the depth, if any. Valid until the frame is presented: a plugin
+/// publishes again in each frame. Handed out; read by Display8 within its `size`.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Dx12Pass8 {
+    /// Its size in bytes (above, "Versions").
+    pub size: u32,
+    /// The colour target, in `RENDER_TARGET`.
+    pub colour: Dx12Image8,
+    /// The depth target, in `DEPTH_WRITE`; a null `resource`: none.
+    pub depth: Dx12Image8,
+    /// `D3D12_CPU_DESCRIPTOR_HANDLE` of the colour's render-target view (the published
+    /// layer's) and of the depth's depth-stencil view (0: none), in heaps of the plugin's
+    /// that are not shader-visible.
+    pub rtv: usize,
+    pub dsv: usize,
+    /// The sample count of both.
+    pub samples: u32,
+    /// The pass's area in pixels.
+    pub width: u32,
+    pub height: u32,
+}
+
 /// The Direct3D 12 exports, looked up once; beside `Display8`, which holds the ones
 /// every backend has.
 #[derive(Clone, Copy)]
@@ -667,3 +742,10 @@ impl Default for VkPass8 {
     }
 }
 unsafe impl Sized8 for VkPass8 {}
+
+impl Default for Dx12Pass8 {
+    fn default() -> Self {
+        Dx12Pass8 { size: core::mem::size_of::<Dx12Pass8>() as u32, colour: Dx12Image8::default(), depth: Dx12Image8::default(), rtv: 0, dsv: 0, samples: 0, width: 0, height: 0 }
+    }
+}
+unsafe impl Sized8 for Dx12Pass8 {}

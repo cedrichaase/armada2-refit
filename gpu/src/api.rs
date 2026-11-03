@@ -76,10 +76,11 @@ impl Gpu {
         Self::on_display_of(log, lookup, false)
     }
 
-    /// As `with_display`, publishing the pass now to Display8 at each `Cmd`'s end on
-    /// Vulkan, so that the engine's draws Display8 passes through land in it
-    /// (gpu/src/display.rs, "Passthrough"): render3d's, whose scene pass the draws it
-    /// hands back to the engine belong in.
+    /// As `with_display`, publishing the pass now to Display8 at each `Cmd`'s end, on
+    /// Vulkan (`display8v1_vk_pass`) and on Direct3D 12 (`display8v1_dx12_pass`,
+    /// contract 1.4), so that the engine's draws Display8 passes through land in it
+    /// (gpu/src/display.rs, "Passthrough", "Pass publishing on Direct3D 12"): render3d's,
+    /// whose scene pass the draws it hands back to the engine belong in.
     pub const fn with_display_publishing(log: Log, lookup: fn(&str) -> usize) -> Gpu {
         Self::on_display_of(log, lookup, true)
     }
@@ -89,7 +90,7 @@ impl Gpu {
             log,
             d9: d3d9::Gpu::new(log),
             vk: if publish { vulkan::Gpu::publishing(log) } else { vulkan::Gpu::new(log) },
-            dx: dx12::Gpu::new(log),
+            dx: if publish { dx12::Gpu::publishing(log) } else { dx12::Gpu::new(log) },
             lookup: Some(lookup),
             mode: Cell::new(UNDECIDED),
             seen: Cell::new(0),
