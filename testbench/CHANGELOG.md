@@ -5,6 +5,16 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 4.0.7 — 2026-11-03
+
+### Added
+- Scenario `ui-menus-slider-max`: Graphics Detail to its least and back to its most, read back
+  from UI.log.
+
+### Changed
+- Scenarios and operating notes click the Options entry as "Refit settings".
+  Installed, not yet seen in game.
+
 ## 4.0.6 — 2026-11-03
 
 ### Fixed

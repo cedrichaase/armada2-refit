@@ -7,8 +7,8 @@ It needs the redrawn menus (`[Menus] Enable=1`, the shipped default); with `Spec
 `Enable=0` there is no `Refit` entry.
 
 - **Reach it**: shell, `Click at 228,390` (Options in the main menu spec), then `Click
-  "Refit"`; in a mission, `Press Escape`, `Click "Refit"` (the tenth entry, under a
-  separator, above Return to Game). `Wait for the refit screen` (`ui.json`, text
+  "Refit settings"`; in a mission, `Press Escape`, `Click "Refit settings"` (the tenth entry, directly under
+  Game Settings). `Wait for the refit screen` (`ui.json`, text
   "Graphics", "Interface"). UI.log: `refit: opened in the shell (Graphics 19, ...)` /
   `... in a mission (...)`.
 - **Everything is clicked by its label**: tabs (`Graphics`, `Interface`, `Gameplay`,

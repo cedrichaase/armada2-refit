@@ -9,7 +9,7 @@ Timeout: 25 min
 already hosts the menus, so there is no `Setup:`; run it with `--install .` so that the
 clone has the checkout's UI.asi, Render3D.asi and QOL.asi.
 
-**Shell.** Options shows `Refit` after the stock entries; a click opens the modal with its
+**Shell.** Options shows `Refit settings` under `Game Settings`; a click opens the modal with its
 five tabs. Graphics: `Sky` (live) writes `[Render3D.Modules] sky=0` to `RefitPlayer.ini`
 and Render3D.log says `settings: applied`; `Anti-aliasing` 2x is a live row since render3d
 0.42.0 (the scene target is made again at the next view), so Render3D.log says
@@ -24,7 +24,7 @@ in the shell. The keyboard: Tab and Right move to the next tab, Esc closes only 
 `RefitPlayer.ini` across launches since 3.82.1): the plugins log their overrides, the
 screen shows 2x and Stock, and the three rows are set back, which removes the keys.
 
-**Mission.** In the Borg campaign's first mission Esc shows Options with `Refit` as its
+**Mission.** In the Borg campaign's first mission Esc shows Options with `Refit settings` under Game Settings, as its
 tenth entry. Multiplayer shows no `Locked` in a single-player mission. `Ships` off gives
 the engine's own ships (passthrough: a judged step); Esc closes only the modal, Return to
 Game works. (The Esc after Return to Game opens no menu in this mission, with or without
@@ -38,9 +38,9 @@ Refit, so `Ships` is not switched on again here; the clone is discarded.)
 4. Click at 228,390.
 5. Wait 3 seconds.
 6. Expect "Graphics Settings" is visible.
-7. Expect "Refit" is visible.
+7. Expect "Refit settings" is visible.
 8. Take a screenshot called "options with refit".
-9. Click "Refit".
+9. Click "Refit settings".
 10. Wait for the refit screen.
 11. Wait 2 seconds.
 12. Expect "UI.log" contains "refit: opened in the shell".
@@ -123,7 +123,7 @@ Refit, so `Ships` is not switched on again here; the clone is discarded.)
 84. Expect "UI.log" contains "refit: closed".
 85. Expect "UI.log" not contain "menus: Esc -> Return to Game".
 86. Expect "Graphics Settings" is visible.
-87. Expect "Refit" is visible.
+87. Expect "Refit settings" is visible.
 ## Relaunch
 88. Quit the game.
 89. Launch the game.
@@ -134,7 +134,7 @@ Refit, so `Ships` is not switched on again here; the clone is discarded.)
 94. Expect "QOL.log" contains "settings: RefitPlayer.ini [QOL.QOL] PanSpeed=1 overrides".
 95. Click at 228,390.
 96. Wait 3 seconds.
-97. Click "Refit".
+97. Click "Refit settings".
 98. Wait for the refit screen.
 99. Wait 2 seconds.
 100. Expect "2x" is visible.
@@ -178,9 +178,9 @@ Refit, so `Ships` is not switched on again here; the clone is discarded.)
 137. Press Escape.
 138. Wait 3 seconds.
 139. Expect "Return to Game" is visible.
-140. Expect "Refit" is visible.
+140. Expect "Refit settings" is visible.
 141. Take a screenshot called "mission options with refit".
-142. Click "Refit".
+142. Click "Refit settings".
 143. Wait for the refit screen.
 144. Wait 2 seconds.
 145. Expect "UI.log" contains "refit: opened in a mission".

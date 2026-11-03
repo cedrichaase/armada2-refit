@@ -4,6 +4,19 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 2.2.1 — 2026-11-03
+
+### Changed
+- Options: the Refit entry is labelled "Refit settings" and stands directly under "Game
+  Settings" (shell and mission), no longer after a separator at the foot (`screens/options.rs`).
+
+### Fixed
+- A stock slider could not be set to the top of its range (Graphics Detail, once lowered,
+  stayed low): the stock bar maps a click only up to its range's top minus one, so
+  `generic::click_scroll` sends the high end as a click at the track's last pixel and one on
+  the far arrow button. The UI logs `menus: scroll bar set to N of lo..hi` and `... read back
+  at N ...`. Scenario `ui-menus-slider-max`. Installed, not yet seen in game.
+
 ## 2.2.0 — 2026-11-03
 
 ### Added
