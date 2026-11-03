@@ -291,7 +291,7 @@ pub fn install_destroy() -> bool {
 unsafe extern "thiscall" fn destroy(this: usize) {
     // Hold the d3d9 device across the engine's release, to count who else still holds
     // it: 0 once the engine has let go and so have we (and any plugin after us).
-    let dev8 = engine::field(this, 0x90) as *mut c_void;
+    let dev8 = engine::view::device_d3d8(this) as *mut c_void;
     let held = if dev8.is_null() { None } else { Device::from_d3d8(dev8).map(|d| Com::from_borrowed(d.p())) };
     forget();
     // Whatever is still bound is held by the device: unbind it all (the engine is about
@@ -392,7 +392,7 @@ fn hook_reset(dev8: *mut c_void) {
         if vt == 0 || vt == RESET_VT {
             return;
         }
-        let cur = engine::field(vt, 14 * 4);
+        let cur = engine::slot(vt, 14);
         if cur == reset as *const () as usize {
             return;
         }

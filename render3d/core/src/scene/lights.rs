@@ -3,12 +3,11 @@
 //! `std::list` of records: `+0` the light, `+4` its colour, `+0x10` its transform).
 //! Plugins add theirs the same way (shields, repairs, venting), so every light source
 //! in the game is in this one list. Layouts as `Lighting.asi` established them.
-use crate::engine::{self, field, rd, storm3d, vtable};
+use crate::engine::{self};
+use crate::engine::view::{for_each_registered_light, RegisteredKind, RegisteredLight};
 use crate::math::{M34, V3};
 use alloc::vec::Vec;
 
-pub(crate) fn vt_directional() -> usize { at(sym::VT_DIRECTIONAL) } // ST3D_Directional_Light
-pub(crate) fn vt_point() -> usize { at(sym::VT_POINT) } // ST3D_Point_Light
 
 #[derive(Clone, Copy, Debug)]
 pub struct Directional {
@@ -73,8 +72,6 @@ fn style_of(light: usize) -> Style {
 }
 
 pub use super::media::{FLAG_SHARE, MediumId, MediumParams, Response, Share};
-use crate::engine::at;
-use crate::syms::sym;
 
 static mut FLAGS: alloc::collections::BTreeMap<usize, u32> = alloc::collections::BTreeMap::new();
 
@@ -173,43 +170,28 @@ pub struct Lights {
 impl Lights {
     pub fn gather() -> Lights {
         let mut l = Lights::default();
-        let s = storm3d();
-        let head = field(s, 0x60);
-        if head == 0 {
-            return l;
-        }
-        let mut node = field(head, 0);
-        let mut guard = 0;
-        while node != head && node != 0 && guard < 4096 {
-            guard += 1;
-            let rec = field(node, 8);
-            node = field(node, 0);
-            let light = field(rec, 0);
-            if rec == 0 || light == 0 {
-                continue;
-            }
-            let colour: V3 = unsafe { rd(rec + 4) };
-            let m: M34 = unsafe { rd(rec + 0x10) };
-            match vtable(light) {
-                v if v != 0 && v == vt_directional() => {
+        let any = for_each_registered_light(|RegisteredLight { kind, light, colour, m, start, range }| {
+            match kind {
+                RegisteredKind::Directional => {
                     let d = m.r[2];
                     if d.len() > 1e-6 {
                         l.dirs.push(Directional { dir: d.norm(), colour });
                     }
                 }
-                v if v != 0 && v == vt_point() => {
-                    let (start, range) = unsafe { (rd::<f32>(light + 0x100), rd::<f32>(light + 0x104)) };
+                RegisteredKind::Point => {
                     l.points.push(Point { pos: m.p, colour, start, range, light, style: style_of(light), medium: medium_of(light) });
                 }
                 // Another kind (a plugin's own vtable for a light the CPU path must not
                 // take, as Lighting.asi's planet glow): read as a point light.
-                _ => {
-                    let (start, range) = unsafe { (rd::<f32>(light + 0x100), rd::<f32>(light + 0x104)) };
+                RegisteredKind::Other => {
                     if start.is_finite() && range.is_finite() && start >= 0.0 && range >= 0.0 && start + range < 1.0e6 {
                         l.points.push(Point { pos: m.p, colour, start, range, light, style: style_of(light), medium: medium_of(light) });
                     }
                 }
             }
+        });
+        if !any {
+            return l;
         }
         l.replace_scene_lights();
         l

@@ -7,6 +7,8 @@ pub mod light;
 pub mod obj;
 pub mod sound;
 pub mod sprite;
+pub mod view;
+pub use view::{slot, entity_handle};
 
 use crate::math::{M34, V3};
 use core::ffi::c_void;

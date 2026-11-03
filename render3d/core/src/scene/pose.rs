@@ -2,7 +2,7 @@
 //! played on the sim clock and its level of detail chosen, as the engine's
 //! `ST3D_Instance::RenderInternal` does (`spec-chunks-anim-lod.md`, sections 2 and 4),
 //! but per instance, with nothing written into shared data.
-use crate::engine::{self, field, field_u8, rd, storm3d};
+use crate::engine::{self};
 use crate::math::{v3, M34, V3};
 use a2fmt::math::Matrix34;
 use a2fmt::sod::{ChannelKeys, Role, Sod};
@@ -37,11 +37,10 @@ impl Clock {
         if inst == 0 {
             return Clock::looping(now);
         }
-        let flags = field(inst, 0xc) as u32;
-        if field_u8(inst, 0x76) == 0 {
+        let (flags, animating, start) = crate::engine::view::instance_clock(inst);
+        if !animating {
             return Clock { elapsed: 0.0, flags };
         }
-        let start = unsafe { rd::<f32>(inst + 0x18) };
         Clock { elapsed: (now - start).max(0.0), flags }
     }
 }
@@ -146,15 +145,9 @@ pub struct LodSettings {
 
 impl LodSettings {
     pub fn read() -> LodSettings {
-        let cfg = field(storm3d(), 0x104);
-        if cfg == 0 {
-            return LodSettings { detail: 4, dist: [700.0, 300.0, 150.0, 75.0] };
-        }
-        unsafe {
-            LodSettings {
-                detail: rd::<u32>(cfg + 0x40),
-                dist: [rd(cfg + 0x30), rd(cfg + 0x34), rd(cfg + 0x38), rd(cfg + 0x3c)],
-            }
+        match crate::engine::view::lod_config() {
+            None => LodSettings { detail: 4, dist: [700.0, 300.0, 150.0, 75.0] },
+            Some((detail, dist)) => LodSettings { detail, dist },
         }
     }
     /// The level `k` (0 = coarsest wanted) at distance `d` from the sphere's surface.

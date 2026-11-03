@@ -132,12 +132,10 @@ pub fn engine_texture(st3d_tex: usize) -> Option<gpu::Texture> {
     if st3d_tex == 0 {
         return None;
     }
-    let idx = crate::engine::field(crate::engine::storm3d(), 0xc0);
-    if idx > 8 {
+    let t8 = crate::engine::view::d3d8_texture(st3d_tex);
+    if t8 == 0 {
         return None;
     }
-    let devtex = crate::engine::field(st3d_tex, 0x40 + idx * 4);
-    let t8 = crate::engine::field(devtex, 4);
     gpu().engine_texture(t8 as *mut c_void)
 }
 

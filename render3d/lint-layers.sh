@@ -21,10 +21,9 @@
 #                                     (paths relative to render3d/, e.g. mods/hulls)
 #   ... --rules cross,byname          with --strict: only those rules (engine, cross, byname)
 #
-# CI holds every module crate (mods) to rules 1-3 and the whole tree (core mods) to
-# cross and byname. The core's own engine reads (the frame's body, the light list, the
-# pose and texture fields) are reported, not strict: they move with render3d onto its
-# symbol profile (phase 8).
+# CI holds every module crate (mods) and the core to rules 1-3 (the core's engine reads
+# live in core/src/engine/**: phase 8e moved them there, with the addresses into the
+# symbol profile).
 #
 # The generated shaders (src/shaders/) and generated settings tables are not read.
 set -euo pipefail

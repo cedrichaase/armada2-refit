@@ -12,7 +12,7 @@
 use crate::timing;
 use super::post::PRect;
 use gpu::d3d9::raw::*;
-use crate::engine::{self, hook, rd, storm3d};
+use crate::engine::{self, hook, storm3d};
 use crate::math::{M4, V3};
 use crate::registry::{self, Step};
 
@@ -25,9 +25,7 @@ pub(crate) fn site_prerender() -> usize { at(sym::SITE_PRERENDER) } // GameObjec
 pub(crate) fn fn_prerender() -> usize { at(sym::FN_PRERENDER) }
 pub(crate) fn site_ord_pre() -> usize { at(sym::SITE_ORD_PRE) } // Ordnance::PreRenderAll(cam), cdecl
 pub(crate) fn fn_ord_pre() -> usize { at(sym::FN_ORD_PRE) }
-pub(crate) fn g_ambient() -> usize { at(sym::G_AMBIENT) } // 3 floats, stored into Storm3D+0x28
 pub(crate) fn fn_near_fade() -> usize { at(sym::FN_NEAR_FADE) } // ST3D_GraphicsEngine::SetNearFadeOut, thiscall
-pub(crate) fn cfg_fade_out() -> usize { at(sym::CFG_FADE_OUT) } // cfgFADE_OUT_ENABLED, int
 pub(crate) fn site_background() -> usize { at(sym::SITE_BACKGROUND) } // Background_Render(cam, sky, stars), cdecl
 pub(crate) fn fn_background() -> usize { at(sym::FN_BACKGROUND) }
 pub(crate) fn site_terrain() -> usize { at(sym::SITE_TERRAIN) } // Terrain_Geometry::Render(cam), thiscall
@@ -45,7 +43,6 @@ pub(crate) fn site_warp() -> usize { at(sym::SITE_WARP) } // RenderWarpSpriteEff
 pub(crate) fn fn_warp() -> usize { at(sym::FN_WARP) }
 pub(crate) fn site_ui_pre() -> usize { at(sym::SITE_UI_PRE) } // DisplayInterface::PreRenderAll(mode), cdecl
 pub(crate) fn fn_ui_pre() -> usize { at(sym::FN_UI_PRE) }
-pub(crate) fn view_mode() -> usize { at(sym::VIEW_MODE) } // View_Record.mode
 pub(crate) fn site_chunks() -> usize { at(sym::SITE_CHUNKS) } // ST3D_GraphicsEngine::RenderChunks(), thiscall
 pub(crate) fn fn_chunks() -> usize { at(sym::FN_CHUNKS) }
 pub(crate) fn site_particles() -> usize { at(sym::SITE_PARTICLES) } // ST3D_GraphicsEngine::RenderParticleList(list&), thiscall
@@ -54,14 +51,8 @@ pub(crate) fn site_selection() -> usize { at(sym::SITE_SELECTION) } // RenderSel
 pub(crate) fn fn_selection() -> usize { at(sym::FN_SELECTION) }
 pub(crate) fn site_del_lights() -> usize { at(sym::SITE_DEL_LIGHTS) } // ST3D_GraphicsEngine::DeleteRegisteredLights(), thiscall
 pub(crate) fn fn_del_lights() -> usize { at(sym::FN_DEL_LIGHTS) }
-pub(crate) fn g_credits() -> usize { at(sym::G_CREDITS) } // g_credits_instance
-use crate::engine::{DEV_CLEAR_DEPTH, DEV_FLUSH};
 use crate::engine::at;
 use crate::syms::sym;
-/// Object flags (`+0x14`): a background object, drawn by `Background_Render`.
-const OBJ_BACKGROUND: u32 = 0x10000;
-const OBJ_CULLED: usize = 0x183; // byte: distance-culled for this view (PreRenderAll)
-const OBJ_RENDER: usize = 0x2c; // GameObject vtable: Render(ST3D_Camera*)
 
 /// Where the call at `site` goes now, or `stock` if the site is not a `call rel32`.
 fn via(site: usize, stock: usize) -> usize {
@@ -102,8 +93,6 @@ pub struct View {
 }
 
 /// `g_cinematicView` (`CinematicView`), its camera at `+0x2c`: the HUD's action camera.
-pub(crate) fn cinematic_view() -> usize { at(sym::CINEMATIC_VIEW) }
-const CV_CAMERA: usize = 0x2c;
 
 impl View {
     /// Which view this is, for what a module keeps per view: 0 the main view, 1 the
@@ -118,7 +107,7 @@ impl View {
 pub fn view_key(cam: usize, main: bool) -> usize {
     if main {
         0
-    } else if cam == engine::field(cinematic_view(), CV_CAMERA) {
+    } else if cam == engine::view::cinematic_camera() {
         1
     } else {
         2
@@ -134,12 +123,12 @@ pub fn set_ready(ok: bool) {
 
 /// Whether this frame can go through the steps at all.
 pub fn usable() -> bool {
-    READY.load(core::sync::atomic::Ordering::Relaxed) && unsafe { rd::<usize>(g_credits()) == 0 }
+    READY.load(core::sync::atomic::Ordering::Relaxed) && !engine::view::credits_active()
 }
 
 /// The view's rectangle from the camera (`+0x1b0`, four floats in back-buffer pixels).
 pub fn cam_rect(cam: usize, w: u32, h: u32) -> PRect {
-    let f = |o: usize| engine::field_f32(cam, 0x1b0 + o);
+    let f = |o: usize| engine::view::cam_viewport_f(cam, o);
     let x = (f(0).max(0.0) as u32).min(w.saturating_sub(1));
     let y = (f(4).max(0.0) as u32).min(h.saturating_sub(1));
     let rw = (f(8).max(1.0) as u32).min(w - x);
@@ -151,19 +140,17 @@ pub fn cam_rect(cam: usize, w: u32, h: u32) -> PRect {
 pub fn run(cam: usize, rs: usize, main: bool, tw: u32, th: u32, frame: u32) -> PRect {
     let s3d = storm3d();
     let st3d = engine::st3d_device();
-    let rsf = |o: usize| engine::field(rs, o) != 0;
+    let rsf = |o: usize| engine::view::render_state_flag(rs, o);
     unsafe {
         // 1-3: the viewport (the main camera follows the back buffer), the view's depth.
         this0(fn_update_viewport(), cam);
-        let r: [f32; 4] = rd(cam + 0x1b0);
-        let dvt = engine::vtable(st3d);
-        this1(engine::field(dvt, DEV_CLEAR_DEPTH), st3d, r.as_ptr() as usize);
+        let r: [f32; 4] = engine::view::cam_viewport(cam);
+        this1(engine::view::device_clear_depth_fn(st3d), st3d, r.as_ptr() as usize);
         // 4-5: lights and the distance cull, which the HUD and the sim read too.
         cdecl1(via(site_prerender(), fn_prerender()), cam);
         cdecl1(via(site_ord_pre(), fn_ord_pre()), cam);
         // 6-7
-        let amb: [f32; 3] = rd(g_ambient());
-        core::ptr::write_unaligned((s3d + 0x28) as *mut [f32; 3], amb);
+        engine::view::copy_ambient_to_storm3d(s3d);
         this1(fn_near_fade(), s3d, 0);
     }
     let v = View {
@@ -174,7 +161,7 @@ pub fn run(cam: usize, rs: usize, main: bool, tw: u32, th: u32, frame: u32) -> P
         st3d,
         view: M4(transform(TS_VIEW)),
         proj: M4(transform(TS_PROJECTION)),
-        eye: engine::field_v3(cam, 0xe4),
+        eye: engine::view::cam_eye(cam),
         time: engine::sim_time(),
         frame,
     };
@@ -203,15 +190,15 @@ pub fn run(cam: usize, rs: usize, main: bool, tw: u32, th: u32, frame: u32) -> P
         }
         timing::mark("terrain");
         // 10-12: objects, with the near fade on.
-        this1(fn_near_fade(), s3d, rd::<i32>(cfg_fade_out()) as usize);
+        this1(fn_near_fade(), s3d, engine::view::fade_out_enabled());
         if !registry::step(Step::Objects, &v) {
             cdecl1(via(site_cull_nebula(), fn_cull_nebula()), cam);
             engine::for_each_in_list(engine::object_list(), |o| {
-                if o == 0 || engine::field(o, 0x14) as u32 & OBJ_BACKGROUND != 0 || engine::field_u8(o, OBJ_CULLED) != 0 {
+                if !engine::view::object_drawn_by_body(o) {
                     return;
                 }
                 if !registry::object(o, &v) {
-                    this1(engine::field(engine::vtable(o), OBJ_RENDER), o, cam);
+                    this1(engine::view::object_render_fn(o), o, cam);
                 }
             });
         }
@@ -231,9 +218,9 @@ pub fn run(cam: usize, rs: usize, main: bool, tw: u32, th: u32, frame: u32) -> P
         if !registry::step(Step::Features, &v) {
             if hook::call_target(site_features()) == Some(fn_features()) {
                 engine::for_each_feature(|f| {
-                    if f != 0 && engine::field_u8(f, 0x20) & 4 != 0 && !registry::feature(f, &v) {
-                        let r: unsafe extern "thiscall" fn(usize, usize, u32) =
-                            core::mem::transmute(engine::field(engine::vtable(f), 0x20));
+                    let render = engine::view::feature_render_fn(f);
+                    if render != 0 && !registry::feature(f, &v) {
+                        let r: unsafe extern "thiscall" fn(usize, usize, u32) = core::mem::transmute(render);
                         r(f, cam, main as u32);
                     }
                 });
@@ -248,7 +235,7 @@ pub fn run(cam: usize, rs: usize, main: bool, tw: u32, th: u32, frame: u32) -> P
         timing::mark("warp");
         // 17: the HUD's per-frame preparation (main view only).
         if main {
-            cdecl1(via(site_ui_pre(), fn_ui_pre()), rd::<usize>(view_mode()));
+            cdecl1(via(site_ui_pre(), fn_ui_pre()), engine::view::view_mode_word());
         }
         timing::mark("hud prep");
         // 18-20: debris, particles, then every sorted translucent triangle.
@@ -265,14 +252,13 @@ pub fn run(cam: usize, rs: usize, main: bool, tw: u32, th: u32, frame: u32) -> P
             crate::scene::flush(&v);
         }
         registry::step(Step::Translucent, &v);
-        let dvt = engine::vtable(st3d);
-        this0(engine::field(dvt, DEV_FLUSH), st3d);
+        this0(engine::view::device_flush_fn(st3d), st3d);
         timing::mark("translucent");
         // 21-22: selection circles and the like.
-        if main && rd::<u32>(view_mode()) != 2 && !registry::step(Step::Selection, &v) {
+        if main && engine::view::view_mode_value() != 2 && !registry::step(Step::Selection, &v) {
             cdecl1(via(site_selection(), fn_selection()), cam);
         }
-        this0(engine::field(dvt, DEV_FLUSH), st3d);
+        this0(engine::view::device_flush_fn(st3d), st3d);
         registry::end_view(&v);
         // 24: the lights registered for this view.
         this0(via(site_del_lights(), fn_del_lights()), s3d);
