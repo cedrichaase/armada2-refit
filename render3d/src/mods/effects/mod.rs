@@ -75,6 +75,12 @@ pub fn object_of(handle: i32) -> usize {
 pub use crate::math::rand::{hash32, rnd};
 
 pub use crate::engine::{ff, rv3};
+
+/// This module's media (`scene::media`): a fireball's light to the gas
+/// (`[Nebulae] LitExplosion=`), and a weld's, a bee's or a shields-down discharge's, a
+/// spark (`LitSpark=`).
+pub(crate) static FIREBALL: crate::scene::lights::Medium = crate::scene::lights::Medium::new("fireball", crate::scene::media::FIREBALL);
+pub(crate) static SPARK: crate::scene::lights::Medium = crate::scene::lights::Medium::new("spark", crate::scene::media::SPARK);
 pub use crate::scene::camera::Cam;
 pub use crate::scene::lights::Pool as LightPool;
 

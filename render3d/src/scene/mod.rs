@@ -16,6 +16,7 @@ pub mod anim;
 pub mod camera;
 pub mod instance;
 pub mod lights;
+pub mod media;
 pub mod pose;
 pub mod sprites;
 
@@ -290,8 +291,10 @@ pub fn lights() -> &'static Lights {
 
 /// Adds a point light to the view being drawn, for the modules that draw after this
 /// (a module's own light source: the particles module's vents). Call from
-/// `begin_view`; the list is gathered again for the next view.
-pub fn add_point(p: lights::Point) {
+/// `begin_view`; the list is gathered again for the next view. `medium` is what it is
+/// to the nebulae's gas (`lights::medium_of(p.light)` for an engine light's).
+pub fn add_point(mut p: lights::Point, medium: lights::MediumId) {
+    p.medium = medium;
     st().lights.points.push(p);
     st().added.push(p);
 }

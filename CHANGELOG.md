@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.70.2 — 2026-11-03
+
+Layers: render3d 0.37.2.
+
+### Changed
+- render3d: light semantics as data: the gas kinds are registered media packed into the
+  same bits, the planets' day side a generic flag world sets, the beam constants set by
+  ordnance under the same `[Lights]` keys. A host test of the packed word runs in CI.
+  No change to what is drawn. Installed, not yet seen in game
+
 ## 13.70.1 — 2026-11-03
 
 Layers: render3d 0.37.1.

@@ -279,6 +279,12 @@ as before).
 | `ClusterSlices` | 24 | slices of view depth, exponential from the near plane to the far one |
 | `ClusterLights` | 24 | the most lights a cluster lists (at most 32), the strongest at its box |
 | `ClusterPerColour` | 2 | the most of one colour (one group: a volley's bolts) a cluster lists |
+
+The beam keys below are in the same section and read by the ordnance module, which sets
+them per line light (`clusters::LineParams`, `SpotParams`):
+
+| Key | Default | |
+|---|---|---|
 | `BeamLight` | 4.0 | a phaser beam's line light, times the beam's colour, beside the middle of a long beam at `BeamCore` from it (0: none); every unit of the beam emits alike ("Clustered lights", "Beams") |
 | `BeamCore` | 8 | world units: closer to the beam than this its light grows no brighter |
 | `BeamReach` | 200 | world units from the beam where its light on surfaces has faded to nothing (it falls as 1 / distance before) |
@@ -845,12 +851,12 @@ key. Render3D.log says `settings: N rows exported (M the core's)`.
 
 | Owner | Sections |
 |---|---|
-| core | `[Render3D]` (`Enable`, `Log`, `MSAA`, `HDR`, `Bloom*`, `Exposure`, `Shoulder`, `Inset`, `Steps`, `Timing*`), `[Modules]`, `[Bench]` (`Clock`), `[Lights]`: the cluster keys (`Clustered`, `ClusterTile`, `ClusterSlices`, `ClusterLights`, `ClusterPerColour`), and for now the scene lights (`Replace`, `KeyColour`, `KeyAxis`, `FillColour`, `FillAxis`, `SkyLight`, read in `scene/lights.rs`) and the beam keys (`Beam*`, `ConeSpot`, read in `scene/clusters.rs`) |
+| core | `[Render3D]` (`Enable`, `Log`, `MSAA`, `HDR`, `Bloom*`, `Exposure`, `Shoulder`, `Inset`, `Steps`, `Timing*`), `[Modules]`, `[Bench]` (`Clock`), `[Lights]`: the cluster keys (`Clustered`, `ClusterTile`, `ClusterSlices`, `ClusterLights`, `ClusterPerColour`), and for now the scene lights (`Replace`, `KeyColour`, `KeyAxis`, `FillColour`, `FillAxis`, `SkyLight`, read in `scene/lights.rs`) |
 | world | `[World]` (the planets', rocks' and nebulae's switches and keys: there is no `[Planets]` or `[Rocks]` section), `[Nebulae]`; the recipe files' `[Surface]` and `[Nebula]` |
 | particles | `[Particles]` |
 | hulls | `[Hulls]` (the `Borg*` look keys with it); the `[Lights]` scene keys move here with the hulls' look |
 | effects | `[Bees]`, `[Construction]`, `[Debris]`, `[Repair]`, `[Sparks]`, `[Explosions]`, `[Shields]`, `[Shell.<name>]` |
-| ordnance | `[Warp]`, `[Ordnance.<odf>]`, `[Model.<odf>]`, `[Wave.<odf>]` (over the built-in `ordnance.ini`); the `[Lights]` beam keys move here |
+| ordnance | `[Warp]`, `[Ordnance.<odf>]`, `[Model.<odf>]`, `[Wave.<odf>]` (over the built-in `ordnance.ini`); the `[Lights]` beam keys (`Beam*`, `ConeSpot`, read by its `configure` in `ordnance/lights.rs`, `Beam`) |
 | specials | `[Specials]` |
 | sky | `[Sky]` |
 | overlays | `[Overlays]` |
@@ -1886,7 +1892,25 @@ alike:
   shoulder keeps plating within 1, and the Borg profile and the inward normals are as
   before. Cloaked hulls, ghosts and holograms keep the per-mesh lights. The nebulae's
   march reads the same clusters for the light inside the gas (`[Nebulae] Lit=`, under
-  world, "Nebulae"); each light's `t.z` says what it is to the gas.
+  world, "Nebulae"); each light's `t.z` says what it is to the gas (its medium, below).
+- **Media and flags** (`scene/media.rs`, light semantics as data). What a light is to
+  the gas is a *medium*: a module names one with `lights::register_medium(name,
+  MediumParams)` (or a `static lights::Medium`, registered on first use) and marks a
+  light with `set_medium`, or passes it to `scene::add_point` for a point it adds by
+  hand. A medium is a response of the march (`Scatter`, `Fireball`, `Corona`, `Unlit`)
+  and the gas share it takes (`LitExplosion=`, `LitBolt=`, `LitSpark=`), and the march
+  knows its responses by the literal it reads from `t.z`, so the slot is fixed by the
+  response in `media::MEDIA`, not by who registers first: 0 `plain` (the core's), 1
+  `fireball` and 4 `spark` (effects; hulls' sensor glows take `spark` too), 2 `bolt`
+  (ordnance), 3 `own_glow` (world); 5 to 7 are reserved. The shaders are unchanged by
+  this: `render3d/hosttest` (`cargo test`, in CI) asserts the packed word is the one
+  the old `Gas` enum gave, for every kind with and without the day side, that the
+  march's literals are the table's slots, and pins the falloff functions by hash.
+  `FLAG_SHARE` (`t.x` bit 4) is a generic flag: a light that lights what is near it
+  times the share of a sphere about it facing the Key, never that sphere; world sets
+  it on its planet glows and keeps `is_day_side` to itself. A line light's parameters
+  (`LineParams`) and a spot's (`SpotParams`) come from the module that adds it
+  (ordnance, from the `[Lights] Beam*` keys).
 - **Per view.** Each view (`View::key`: the HUD's action camera draws the scene a
   second time) has its buffers; a draw binds them only in the view they were built for
   (the menu scene has none).
@@ -1992,7 +2016,7 @@ light. The user wanted it steady, smaller, and a light source. So, with
 the node's colour times `SensorLight=` (2), reaching `SensorLightReach=` (4) times its
 drawn half size: a small green glow on the plating beside it (about 7 units on a
 scout). `begin_view` adds these lights to the scene's list by hand, at most 32 a view.
-The cluster list takes them, and the gas takes them as sparks (`Gas::Spark`). A
+The cluster list takes them, and the gas takes them as sparks (the `spark` medium). A
 cloaking hull gives none.
 
 **Holograms** (`TimedHoloEffect`, the object's `+0x174`). `GameObject::RenderInternal`
@@ -2328,8 +2352,8 @@ a torpedo's or pulse's (each ordnance class's light, which rides with its shots)
 since a ball lit evenly to its edge read as a sphere in the gas. A **spark** at a hull
 gets the same corona, at `LitSpark=` (0.3) of its light: the repair and construction
 welds, the bees' welds, the shields-down discharges and the damaged sensors' glow
-(`Gas::Spark`; `LightPool::register_spark`, or `scene::lights::SPARK_POINT` for a
-point added by hand). Taken as plain lights, the shields-down discharges lit a ball of
+(the `spark` medium, `scene::media::SPARK`; `Pool::register_in`, or
+`scene::add_point(.., medium)` for a point added by hand). Taken as plain lights, the shields-down discharges lit a ball of
 gas 1.2 bounding radii wide about the strike they were at, blue. In the Mutara, which
 takes every ship's shields down, the user saw these as big round blue blobs beside
 every Borg ship (2026-10-23). A/B on the bench with `[Shields] DownLight=0` put the
@@ -2367,7 +2391,7 @@ without the gas gives too.
 (`Module::lights`), a point light at its centre (the instance's transform +0x44 plus
 its bounding sphere +0x34) in the Key's colour times its ground's mean colour times
 `PlanetGlow`, full at the surface and gone at `PlanetGlowRange` radii, marked a day
-side (`scene::lights::set_day_side`): a draw takes it times the share of the day side
+side (`scene::lights::FLAG_SHARE`, `is_day_side`): a draw takes it times the share of the day side
 facing it (`Lights::share`), and the planets take none. *Nebula lights*: the call to
 `Simulate_Nebula_Lights` (0x4a5160) at 0x4a4a7a in `Nebula::Simulate` is re-pointed;
 stock's colour (the class's glow, +0x22c, swung by a noise term) came out black, so

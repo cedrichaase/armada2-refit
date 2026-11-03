@@ -59,6 +59,39 @@ pub struct Lights {
     /// This view's lights go to the clusters (`emit`), and the points kept for them.
     cl: bool,
     points: Vec<crate::scene::lights::Point>,
+    /// The beams' lights with clustered lights (`[Lights] Beam*=`, `ConeSpot=`).
+    pub beam: Beam,
+}
+
+/// A torpedo's or pulse's own light to the gas: a bolt (`[Nebulae] LitBolt=`).
+static BOLT: crate::scene::lights::Medium = crate::scene::lights::Medium::new("bolt", crate::scene::media::BOLT);
+
+/// `[Lights]` of Render3D.ini, the beams' part (README.md, "Clustered lights",
+/// "Beams"): a phaser beam as a line light (`scene::clusters::add_line`), and a tractor
+/// or assimilation beam's wash as a spot in its cone (`ConeSpot=`, else a point).
+/// Read by `configure`.
+pub struct Beam {
+    pub line: crate::scene::clusters::LineParams,
+    pub cone_spot: bool,
+}
+
+/// `BeamLight`'s default.
+pub const BEAM_LIGHT: f32 = 4.0;
+
+impl Beam {
+    pub fn read(ini: &crate::rt::Ini) -> Beam {
+        let s = "Lights";
+        Beam {
+            line: crate::scene::clusters::LineParams {
+                light: ini.float(s, "BeamLight", BEAM_LIGHT).max(0.0),
+                core: ini.float(s, "BeamCore", 8.0).max(0.5),
+                reach: ini.float(s, "BeamReach", 200.0).max(1.0),
+                wrap: ini.float(s, "BeamWrap", 0.4).clamp(0.0, 1.0),
+                gas_reach: ini.float(s, "BeamGasReach", 40.0).max(1.0),
+            },
+            cone_spot: ini.int(s, "ConeSpot", 1) != 0,
+        }
+    }
 }
 
 /// Where a shot left its ship: its owner's handle, the point's offset from the
@@ -86,6 +119,7 @@ impl Lights {
             said_muzzle: 0,
             cl: false,
             points: Vec::new(),
+            beam: Beam::read(&crate::config::ini()),
         }
     }
 
@@ -130,7 +164,7 @@ impl Lights {
     /// moves on.
     fn emit(&mut self, n: &mut usize, pos: V3, col: V3, start: f32, range: f32, style: crate::scene::lights::Style) {
         if self.cl {
-            self.points.push(crate::scene::lights::Point { pos, colour: col, start, range: range.max(0.01), light: 0, style });
+            self.points.push(crate::scene::lights::Point { pos, colour: col, start, range: range.max(0.01), light: 0, style, medium: crate::scene::lights::MediumId::PLAIN });
             return;
         }
         self.register(*n, pos, col, start, range);
@@ -382,7 +416,7 @@ impl Lights {
             if self.cl {
                 // The beam itself, a line light, even along its length, lighting the
                 // plating, rocks and gas it passes.
-                crate::scene::clusters::add_line(a, b, c);
+                crate::scene::clusters::add_line(a, b, c, &self.beam.line);
             }
         }
         n
@@ -401,7 +435,7 @@ impl Lights {
             eng::for_each_ordnance(|o| {
                 let l = field(field(o, 0x34), 0x10);
                 if l != 0 && engine::vtable(l) == VT_POINT {
-                    crate::scene::lights::set_gas(l, crate::scene::lights::Gas::Bolt);
+                    crate::scene::lights::set_medium(l, BOLT.id());
                 }
             });
         }
@@ -416,14 +450,19 @@ impl Lights {
         if self.muzzle[0] > 0.0 {
             n = self.muzzle_lights(n, now, main);
         }
-        let spot = crate::scene::clusters::config().cone_spot;
+        let spot = self.beam.cone_spot;
         for l in fx {
             if n >= 128 {
                 break;
             }
             match (self.cl && spot, l.cone) {
                 // A tractor's or an assimilation beam's wash: the cone's footprint.
-                (true, Some(c)) => crate::scene::clusters::add_spot(c.apex, c.axis, c.reach, c.hw0, c.slope, l.col, c.reach * 0.15, 0.2),
+                (true, Some(c)) => crate::scene::clusters::add_spot(
+                    c.apex,
+                    c.axis,
+                    l.col,
+                    &crate::scene::clusters::SpotParams { reach: c.reach, hw0: c.hw0, slope: c.slope, fade: c.reach * 0.15, wrap: 0.2 },
+                ),
                 _ => self.emit(&mut n, l.pos, l.col, l.start, l.range, crate::scene::lights::Style::default()),
             }
         }

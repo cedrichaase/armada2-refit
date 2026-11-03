@@ -28,6 +28,9 @@ pub struct Point {
     pub light: usize,
     /// How the module that registered it wants it taken (`set_style`), else default.
     pub style: Style,
+    /// What it is to the nebulae's gas (`set_medium`; a point added by hand,
+    /// `scene::add_point`'s).
+    pub medium: MediumId,
 }
 
 /// How a light a module registers is to be taken by the lit draws (as `Lighting.asi`
@@ -69,71 +72,94 @@ fn style_of(light: usize) -> Style {
     unsafe { STYLES.get(&light).copied().unwrap_or_default() }
 }
 
-static mut DAY_SIDE: alloc::collections::BTreeSet<usize> = alloc::collections::BTreeSet::new();
+pub use super::media::{FLAG_SHARE, MediumId, MediumParams, Response, Share};
 
-/// Marks a light object as a planet's day side (`Lighting.asi`'s planet glow): it lights
-/// what is near it times the share of the day side facing it (`Lights::share`), and not
-/// the planet itself (`is_day_side`).
+static mut FLAGS: alloc::collections::BTreeMap<usize, u32> = alloc::collections::BTreeMap::new();
+
+/// Gives a light object a flag (`FLAG_SHARE`); it stays so for as long as the object
+/// lives (a module's pool).
 #[allow(static_mut_refs)]
-pub fn set_day_side(light: usize) {
-    unsafe { DAY_SIDE.insert(light) };
+pub fn set_flag(light: usize, flag: u32) {
+    unsafe { *FLAGS.entry(light).or_insert(0) |= flag };
 }
 
 #[allow(static_mut_refs)]
-pub fn is_day_side(light: usize) -> bool {
-    unsafe { DAY_SIDE.contains(&light) }
+pub fn has_flag(light: usize, flag: u32) -> bool {
+    unsafe { FLAGS.get(&light).is_some_and(|f| f & flag != 0) }
 }
 
-/// What a light is to the nebulae's gas (`[Nebulae] Lit=`; `world_nebula.hlsl`, "light
-/// inside the gas"): how much of it the gas scatters, and how it falls off there.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-#[repr(u32)]
-pub enum Gas {
-    /// Any other light: scattered as it falls off on the plating.
-    Plain = 0,
-    /// A fireball's (`LitExplosion=`).
-    Fireball = 1,
-    /// A torpedo's or pulse's, the class's light that rides with the shot: a corona close
-    /// about it fading softly outward (`LitBolt=`), not a lit ball of gas.
-    Bolt = 2,
-    /// A nebula's own glow (`world::lights`): it lights what is near it, never the gas,
-    /// whose look without lights is its own.
-    OwnGlow = 3,
-    /// A small light at a hull (a repair or construction weld, a shields-down
-    /// discharge, a damaged sensor's glow): a corona about it as a bolt's, its share
-    /// `LitSpark=`, so it does not light a ball of gas its reach wide.
-    Spark = 4,
+/// The media modules have named, by slot (`media::MEDIA`: the slot is the response's).
+static mut MEDIUM_NAMES: [Option<&'static str>; super::media::SLOTS] = [Some("plain"), None, None, None, None, None, None, None];
+
+/// Names the medium of these parameters (`media.rs`): its id, the same for the same
+/// parameters whoever registers it first. Parameters the gas has no response for are
+/// taken as plain, logged.
+#[allow(static_mut_refs)]
+pub fn register_medium(name: &'static str, p: MediumParams) -> MediumId {
+    let Some(id) = super::media::slot_of(p) else {
+        crate::log!("lights: medium {}: the gas has no response for {:?}; taken as plain", name, p);
+        return MediumId::PLAIN;
+    };
+    unsafe {
+        let n = &mut MEDIUM_NAMES[id.0 as usize];
+        if n.is_none() {
+            *n = Some(name);
+        }
+    }
+    id
 }
 
-/// The light "object" of a point a module adds to the scene's list by hand
-/// (`scene::add_point`) that the gas takes as a spark: not an engine light, only a
-/// key for `gas_of`.
-pub const SPARK_POINT: usize = 1;
+/// The name a slot was registered under first, if any.
+#[allow(static_mut_refs)]
+pub fn medium_name(id: MediumId) -> Option<&'static str> {
+    unsafe { MEDIUM_NAMES.get(id.0 as usize).copied().flatten() }
+}
 
-static mut GAS: alloc::collections::BTreeMap<usize, Gas> = alloc::collections::BTreeMap::new();
+/// A module's medium, registered the first time it is asked for (a `static` of the
+/// module's: `static SPARK: Medium = Medium::new("spark", media::SPARK)`).
+pub struct Medium {
+    name: &'static str,
+    params: MediumParams,
+    id: core::sync::atomic::AtomicU8,
+}
+
+impl Medium {
+    pub const fn new(name: &'static str, params: MediumParams) -> Medium {
+        Medium { name, params, id: core::sync::atomic::AtomicU8::new(u8::MAX) }
+    }
+    pub fn id(&self) -> MediumId {
+        use core::sync::atomic::Ordering::Relaxed;
+        let v = self.id.load(Relaxed);
+        if v != u8::MAX {
+            return MediumId(v);
+        }
+        let id = register_medium(self.name, self.params);
+        self.id.store(id.0, Relaxed);
+        id
+    }
+}
+
+static mut MEDIUM: alloc::collections::BTreeMap<usize, MediumId> = alloc::collections::BTreeMap::new();
 
 /// Marks a light object as what it is to the gas; it stays so for as long as the object
 /// lives (a module's pool, a class's light, a nebula's).
 #[allow(static_mut_refs)]
-pub fn set_gas(light: usize, g: Gas) {
+pub fn set_medium(light: usize, m: MediumId) {
     unsafe {
-        if g == Gas::Plain {
-            GAS.remove(&light);
+        if m == MediumId::PLAIN {
+            MEDIUM.remove(&light);
         } else {
-            GAS.insert(light, g);
+            MEDIUM.insert(light, m);
         }
     }
 }
 
 #[allow(static_mut_refs)]
-pub fn gas_of(light: usize) -> Gas {
+pub fn medium_of(light: usize) -> MediumId {
     if light == 0 {
-        return Gas::Plain;
+        return MediumId::PLAIN;
     }
-    if light == SPARK_POINT {
-        return Gas::Spark;
-    }
-    unsafe { GAS.get(&light).copied().unwrap_or(Gas::Plain) }
+    unsafe { MEDIUM.get(&light).copied().unwrap_or(MediumId::PLAIN) }
 }
 
 #[derive(Default, Clone)]
@@ -171,14 +197,14 @@ impl Lights {
                 }
                 VT_POINT => {
                     let (start, range) = unsafe { (rd::<f32>(light + 0x100), rd::<f32>(light + 0x104)) };
-                    l.points.push(Point { pos: m.p, colour, start, range, light, style: style_of(light) });
+                    l.points.push(Point { pos: m.p, colour, start, range, light, style: style_of(light), medium: medium_of(light) });
                 }
                 // Another kind (a plugin's own vtable for a light the CPU path must not
                 // take, as Lighting.asi's planet glow): read as a point light.
                 _ => {
                     let (start, range) = unsafe { (rd::<f32>(light + 0x100), rd::<f32>(light + 0x104)) };
                     if start.is_finite() && range.is_finite() && start >= 0.0 && range >= 0.0 && start + range < 1.0e6 {
-                        l.points.push(Point { pos: m.p, colour, start, range, light, style: style_of(light) });
+                        l.points.push(Point { pos: m.p, colour, start, range, light, style: style_of(light), medium: medium_of(light) });
                     }
                 }
             }
@@ -206,12 +232,12 @@ impl Lights {
         }
     }
 
-    /// How much of a light reaches `at`: 1, or for a planet's day side (`set_day_side`)
-    /// the share of it facing `at`, 0 over the night side (`Lighting.asi`'s
-    /// `glow_phase`: half of one minus the cosine between the Key's direction and the
-    /// way from the light to `at`).
+    /// How much of a light reaches `at`: 1, or for a light with `FLAG_SHARE` (a
+    /// planet's day side) the share of it facing `at`, 0 over the far side
+    /// (`Lighting.asi`'s `glow_phase`: half of one minus the cosine between the Key's
+    /// direction and the way from the light to `at`).
     pub fn share(&self, p: &Point, at: V3) -> f32 {
-        if !is_day_side(p.light) {
+        if !has_flag(p.light, FLAG_SHARE) {
             return 1.0;
         }
         let Some(k) = self.key() else { return 1.0 };
@@ -223,8 +249,8 @@ impl Lights {
         0.5 - 0.5 * d.dot(k.dir) / (dl * kl)
     }
 
-    /// The point lights that reach a sphere, strongest first, at most `max`; a planet's
-    /// day side with its colour times its `share` at the centre.
+    /// The point lights that reach a sphere, strongest first, at most `max`; one with
+    /// `FLAG_SHARE` with its colour times its `share` at the centre.
     pub fn points_near(&self, centre: V3, radius: f32, max: usize) -> Vec<Point> {
         let mut v: Vec<(f32, Point)> = self
             .points
@@ -300,8 +326,8 @@ pub fn scene_config() -> &'static SceneConfig {
     }
 }
 
-/// The sky's own light: the map's background (the name `Starfield_Load_Background_
-/// Geometry` keeps at 0x738538: a prefix of six faces, or a cube SOD), its texels'
+/// The sky's own light: the map's background (`engine::light::background_name`: a
+/// prefix of six faces, or a cube SOD), its texels'
 /// mean weighted by their chroma, scaled to a peak of `SkyLight`, from the side where
 /// that colour is (the faces of a prefix sky face +z, +x, -z, -x, +y, -y); a SOD sky's
 /// faces carry no direction, so it falls along the Fill's axis. Read once per map.
@@ -311,7 +337,7 @@ fn sky_light(c: &SceneConfig) -> Option<(V3, V3)> {
     if !(c.sky > 0.0) {
         return None;
     }
-    let name = unsafe { crate::rt::cstr_at(0x738538 as *const u8, 63) };
+    let name = engine::light::background_name();
     unsafe {
         if let Some((n, v)) = SKY.as_ref() {
             if n == name {
@@ -408,13 +434,13 @@ impl Pool {
         engine::light::register(l, &col, &m);
         true
     }
-    /// `register`, the light then a spark to the nebulae's gas (`Gas::Spark`,
-    /// `[Nebulae] LitSpark=`): a small corona about it, not a ball its reach wide.
-    pub fn register_spark(&mut self, i: usize, pos: V3, colour: V3, start: f32, range: f32) -> bool {
+    /// `register`, the light then of `medium` to the nebulae's gas (a module's spark,
+    /// `media::SPARK`: a small corona about it, not a ball its reach wide).
+    pub fn register_in(&mut self, i: usize, pos: V3, colour: V3, start: f32, range: f32, medium: MediumId) -> bool {
         if !self.register(i, pos, colour, start, range) {
             return false;
         }
-        set_gas(self.objs[i], Gas::Spark);
+        set_medium(self.objs[i], medium);
         true
     }
 }

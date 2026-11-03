@@ -38,28 +38,41 @@ const MAX_TILES: (u32, u32) = (64, 40);
 /// Pixel constants c100..c103 (`clustered.hlsli`).
 pub const PS_BASE: u32 = 100;
 
-const KIND_LINE: u32 = 1;
-const KIND_SPOT: u32 = 2;
-const DAY_SIDE: u32 = 16;
+use super::media::{self, FLAG_SHARE, KIND_LINE, KIND_SPOT};
 
-/// `[Lights]` of Render3D.ini, clustered part.
+/// `[Lights]` of Render3D.ini, clustered part (the beams' keys are ordnance's, which
+/// sets them per line, `LineParams`).
 pub struct Config {
     pub on: bool,
     pub tile: u32,
     pub slices: u32,
     pub per_cluster: u32,
     pub per_colour: u32,
-    /// A phaser beam's line light (`add_line`): its brightness beside the middle of a
-    /// long beam at `beam_core` from it (times the beam's colour, 0: none), falling as
-    /// 1 / distance and gone at `beam_reach`; how far round the plating it wraps; its
-    /// reach in the gas (the nebulae's march, as it was tuned).
-    pub beam: f32,
-    pub beam_core: f32,
-    pub beam_reach: f32,
-    pub beam_wrap: f32,
-    pub beam_gas_reach: f32,
-    /// The tractor and assimilation beams' wash as a spot in the cone (else a point).
-    pub cone_spot: bool,
+}
+
+/// A line light's parameters (`add_line`; ordnance's `[Lights] Beam*=`): its brightness
+/// `light` beside the middle of a long line at `core` from it (times its colour, 0:
+/// none), falling as 1 / distance and gone at `reach`; how far round the plating it
+/// wraps; its reach in the gas (the nebulae's march, as it was tuned).
+#[derive(Clone, Copy, Debug)]
+pub struct LineParams {
+    pub light: f32,
+    pub core: f32,
+    pub reach: f32,
+    pub wrap: f32,
+    pub gas_reach: f32,
+}
+
+/// A spot's parameters (`add_spot`): out to `reach` along its axis, half width `hw0`
+/// at the apex growing by `slope` per unit along it, fading over its last `fade`,
+/// wrapped `wrap` round the plating.
+#[derive(Clone, Copy, Debug)]
+pub struct SpotParams {
+    pub reach: f32,
+    pub hw0: f32,
+    pub slope: f32,
+    pub fade: f32,
+    pub wrap: f32,
 }
 
 /// One light as the shaders read it (`ClLight`, 80 bytes).
@@ -127,12 +140,6 @@ pub fn config() -> &'static Config {
             slices: ini.int(s, "ClusterSlices", 24).clamp(4, 64) as u32,
             per_cluster: (ini.int(s, "ClusterLights", 24).clamp(1, MAX_PER_CLUSTER as i32)) as u32,
             per_colour: ini.int(s, "ClusterPerColour", 2).clamp(1, MAX_PER_CLUSTER as i32) as u32,
-            beam: ini.float(s, "BeamLight", BEAM_LIGHT).max(0.0),
-            beam_core: ini.float(s, "BeamCore", 8.0).max(0.5),
-            beam_reach: ini.float(s, "BeamReach", 200.0).max(1.0),
-            beam_wrap: ini.float(s, "BeamWrap", 0.4).clamp(0.0, 1.0),
-            beam_gas_reach: ini.float(s, "BeamGasReach", 40.0).max(1.0),
-            cone_spot: ini.int(s, "ConeSpot", 1) != 0,
         }
     })
 }
@@ -178,43 +185,37 @@ pub fn forget_view() {
     st().built = None;
 }
 
-/// `BeamLight`'s default.
-pub const BEAM_LIGHT: f32 = 4.0;
-
-/// A phaser beam from `a` to `b` as a line light for the view being drawn (call from a
-/// module's `begin_view`), in the beam's `colour` (its peak 1 at full strength): every
-/// unit of it emits alike (`clustered.hlsli`, `cl_line`), `BeamLight` beside the middle
-/// of a long beam at `BeamCore` from it, falling as 1 / distance, gone at `BeamReach`,
-/// wrapped `BeamWrap` round the plating. In the gas it is the beam's colour from its
-/// nearest point out to `BeamGasReach`. A light of its own (never merged).
-pub fn add_line(a: V3, b: V3, colour: V3) {
-    let c = config();
-    if c.beam <= 0.0 {
+/// A line from `a` to `b` (a phaser beam) as a line light for the view being drawn
+/// (call from a module's `begin_view`), in its `colour` (its peak 1 at full strength):
+/// every unit of it emits alike (`clustered.hlsli`, `cl_line`), `p.light` beside the
+/// middle of a long line at `p.core` from it, falling as 1 / distance, gone at
+/// `p.reach`, wrapped `p.wrap` round the plating. In the gas it is its colour from its
+/// nearest point out to `p.gas_reach`. A light of its own (never merged).
+pub fn add_line(a: V3, b: V3, colour: V3, p: &LineParams) {
+    if p.light <= 0.0 {
         return;
     }
-    let core = c.beam_core.min(c.beam_reach * 0.5);
-    let col = colour * c.beam;
+    let core = p.core.min(p.reach * 0.5);
+    let col = colour * p.light;
     let l = GpuLight {
         a: [a.x, a.y, a.z, core],
-        c: [col.x, col.y, col.z, 1.0 / (c.beam_reach - core).max(1e-3)],
-        b: [b.x, b.y, b.z, c.beam_gas_reach],
-        k: [c.beam_wrap, 2.0, 0.0, 1.0 / c.beam],
-        t: [KIND_LINE, 0, 0, 0],
+        c: [col.x, col.y, col.z, 1.0 / (p.reach - core).max(1e-3)],
+        b: [b.x, b.y, b.z, p.gas_reach],
+        k: [p.wrap, 2.0, 0.0, 1.0 / p.light],
+        t: media::shape_word(KIND_LINE),
     };
     st().extra.push(Extra { l, distinct: true });
 }
 
-/// A spot from `apex` along `axis` (unit) for the view being drawn: lights what lies
-/// inside the cone (half width `hw0` at the apex, growing by `slope` per unit along
-/// it, soft at its side) out to `reach` along the axis, fading over its last `fade`.
-#[allow(clippy::too_many_arguments)]
-pub fn add_spot(apex: V3, axis: V3, reach: f32, hw0: f32, slope: f32, colour: V3, fade: f32, wrap: f32) {
+/// A spot from `apex` along `axis` (unit) for the view being drawn, in `colour`: lights
+/// what lies inside the cone (`SpotParams`; soft at its side).
+pub fn add_spot(apex: V3, axis: V3, colour: V3, p: &SpotParams) {
     let l = GpuLight {
         a: [apex.x, apex.y, apex.z, 0.0],
-        c: [colour.x, colour.y, colour.z, 1.0 / fade.max(1e-3)],
-        b: [axis.x, axis.y, axis.z, reach],
-        k: [wrap, 1.0, hw0, slope],
-        t: [KIND_SPOT, 0, 0, 0],
+        c: [colour.x, colour.y, colour.z, 1.0 / p.fade.max(1e-3)],
+        b: [axis.x, axis.y, axis.z, p.reach],
+        k: [p.wrap, 1.0, p.hw0, p.slope],
+        t: media::shape_word(KIND_SPOT),
     };
     st().extra.push(Extra { l, distinct: true });
 }
@@ -240,7 +241,7 @@ fn gather() -> Vec<GpuLight> {
         if v.len() >= MAX_LIGHTS {
             break;
         }
-        let day = lights::is_day_side(p.light);
+        let day = lights::has_flag(p.light, FLAG_SHARE);
         let fade = if p.range > 1e-3 { 1.0 / p.range } else { 1000.0 };
         let kd = key.map_or(V3::ZERO, |k| k.dir);
         let g = group(p.colour, p.style.distinct || day);
@@ -251,7 +252,7 @@ fn gather() -> Vec<GpuLight> {
                 c: [p.colour.x, p.colour.y, p.colour.z, fade],
                 b: [kd.x, kd.y, kd.z, 0.0],
                 k: [p.style.wrap, p.style.power, 0.0, 0.0],
-                t: [if day && key.is_some() { DAY_SIDE } else { 0 }, g, lights::gas_of(p.light) as u32, 0],
+                t: media::point_word(day && key.is_some(), g, p.medium),
             },
         ));
     }

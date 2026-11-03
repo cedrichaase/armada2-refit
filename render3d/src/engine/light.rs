@@ -37,3 +37,9 @@ pub fn register(light: usize, colour: &[f32; 4], at: &M34) {
         reg(super::storm3d(), light, colour.as_ptr(), at);
     }
 }
+
+/// The map's background, as `Starfield_Load_Background_Geometry` keeps its name at
+/// 0x738538: a prefix of six faces, or a cube SOD (`scene::lights`, the sky's light).
+pub fn background_name() -> &'static str {
+    unsafe { crate::rt::cstr_at(0x738538 as *const u8, 63) }
+}

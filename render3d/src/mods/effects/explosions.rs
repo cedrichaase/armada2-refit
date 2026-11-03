@@ -193,7 +193,7 @@ impl Explosions {
             let col = self.s.light_col * (self.s.light_bright * k);
             if self.lights.register(n, pos, col, r, r * (self.s.light_range - 1.0).max(0.01)) {
                 // The gas takes it as a fireball's (`[Nebulae] LitExplosion=`).
-                crate::scene::lights::set_gas(self.lights.light(n), crate::scene::lights::Gas::Fireball);
+                crate::scene::lights::set_medium(self.lights.light(n), super::FIREBALL.id());
                 n += 1;
             }
             if n >= 24 {

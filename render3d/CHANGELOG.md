@@ -4,6 +4,25 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.37.2 — 2026-11-03
+
+### Changed
+- Light semantics as data (`scene/media.rs`): what a light is to the nebulae's gas is a
+  registered medium (`lights::register_medium`, `set_medium`, `scene::add_point(..,
+  medium)`, `Pool::register_in`) in place of the `Gas` enum, `set_gas` and
+  `SPARK_POINT`; effects names `fireball` and `spark`, ordnance `bolt`, world
+  `own_glow`. Each slot is fixed by the gas's response, so the packed word is
+  unchanged; `render3d/hosttest` asserts it on the host (in CI) and pins the shaders'
+  falloff, which is untouched.
+- The planets' day side is a generic light flag (`FLAG_SHARE`, the same bit) that
+  world sets; `is_day_side` is world's. The beam keys (`[Lights] Beam*`, `ConeSpot`,
+  same names and defaults) are read by ordnance's `configure` and passed per light
+  (`clusters::LineParams`, `SpotParams`); the core keeps the cluster keys. The sky
+  light's read of the map's background name moved to `engine::light`. No change to what
+  is drawn.
+
+Installed, not yet seen in game
+
 ## 0.37.1 — 2026-11-03
 
 ### Changed

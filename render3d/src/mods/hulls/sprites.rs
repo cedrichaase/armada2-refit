@@ -30,6 +30,10 @@ use a2fmt::spr::SpriteTable;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+/// A damaged sensor's glow to the gas: a spark (`scene::media::SPARK`, the medium
+/// effects' welds take too; the same parameters give the same slot).
+static SPARK: crate::scene::lights::Medium = crate::scene::lights::Medium::new("spark", crate::scene::media::SPARK);
+
 #[derive(Clone, Copy, PartialEq)]
 pub enum Kind {
     Add,
@@ -199,14 +203,19 @@ impl Sprites {
             let reach = look.sensor_reach * half.max(0.05);
             let c = def.colour;
             let colour = v3(c[0], c[1], c[2]) * look.sensor_light;
-            crate::scene::add_point(crate::scene::lights::Point {
-                pos: p.pose.world[i].p,
-                colour,
-                start: reach * 0.3,
-                range: reach * 0.7,
-                light: crate::scene::lights::SPARK_POINT,
-                style: crate::scene::lights::Style::default(),
-            });
+            // Not an engine light; a spark to the gas (`[Nebulae] LitSpark=`).
+            crate::scene::add_point(
+                crate::scene::lights::Point {
+                    pos: p.pose.world[i].p,
+                    colour,
+                    start: reach * 0.3,
+                    range: reach * 0.7,
+                    light: 0,
+                    style: crate::scene::lights::Style::default(),
+                    medium: crate::scene::lights::MediumId::PLAIN,
+                },
+                SPARK.id(),
+            );
             n += 1;
         }
         n

@@ -707,7 +707,7 @@ impl Planets {
         }
         // Without the planets' own glows, which the CPU path never lit a planet with
         // either.
-        let near: Vec<_> = ls.points_near(centre, radius, 16).into_iter().filter(|p| !scene::lights::is_day_side(p.light)).take(8).collect();
+        let near: Vec<_> = ls.points_near(centre, radius, 16).into_iter().filter(|p| !super::lights::is_day_side(p.light)).take(8).collect();
         for (i, p) in near.iter().enumerate() {
             k[(16 + i) * 4..(16 + i) * 4 + 3].copy_from_slice(&[p.colour.x, p.colour.y, p.colour.z]);
             k[(24 + i) * 4..(24 + i) * 4 + 3].copy_from_slice(&[p.pos.x, p.pos.y, p.pos.z]);
