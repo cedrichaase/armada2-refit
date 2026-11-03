@@ -5,6 +5,21 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 14.12.0 — 2026-11-03
+
+Layers: none (installs nothing: `d12probe`, `tools/gates`, CI).
+
+### Added
+- `display/d12probe` (phase 10 X3): `d12probe.exe`, `vkprobe`'s Direct3D 12 sister. It builds Display8's present and passthrough root signatures and pipelines by Display8's own code, draws 300 frames through a flip-model swap chain and an 8 MB mapped upload ring, reads seven pixels back and prints a `VERDICT`; `--warp`, `--debug` and `--agility <version> <folder>` (the debug layer from the Agility SDK, which CI downloads and never keeps). `run-wine.sh` runs it once under Wine on vkd3d-proton.
+- CI: jobs `probes` (builds both probes, Display8's host tests, the gates kit), `d3d12-probe` (windows-2025, WARP, and WARP with the debug layer; blocking), `vulkan-probe-windows` (lavapipe; non-blocking), `gates-windows` (`gate-windows.ps1 -WhatIf` against a mock game), `mac-probe` (a timeboxed macOS spike; non-blocking), and the artifact `native-gates-<commit>`. The release waits for `probes`, `d3d12-probe` and `gates-windows`.
+- `tools/gates/`: `gate-windows.ps1` (gate W, five steps) and `gate-macos.sh` (gate M, a Sikarugir wrapper) with `GATES.txt`, the user's short checklists.
+
+### Changed
+- Display8's root signatures and pipeline descriptions (present pass, passthrough) moved into `display/src/dx12/build.rs` so the probe can include them; no change in behaviour (display's version is not bumped).
+
+Installed, not yet seen in game. The CI jobs are untried until the first run on a branch push.
+Pre-release: Direct3D 12 passthrough confirmed on Linux only, not yet on native Windows.
+
 ## 14.11.0 — 2026-11-03
 
 Layers: display 0.20.0, testbench 3.104.0.

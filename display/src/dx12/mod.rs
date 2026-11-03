@@ -25,6 +25,7 @@
 //!   mapped for good; chunks added when a frame needs more) and the callbacks deferred
 //!   until its fence value has passed. A frame is begun at the first call that needs it
 //!   after a `Present`, and ended, submitted and presented at the next.
+pub mod build;
 pub mod cache;
 pub mod exports;
 pub mod mirror;
@@ -33,7 +34,6 @@ pub mod raw;
 
 use crate::log;
 use crate::rt::win::{CloseHandle, CreateEventA, GetProcAddress, LoadLibraryA, WaitForSingleObject, HANDLE};
-use crate::shaders::present_dxil::{PS_GAMMA_DXIL, VS_PRESENT_DXIL};
 use alloc::vec::Vec;
 use core::ffi::c_void;
 use gpu::display::{Dx12Alloc8, Dx12Descriptors8, Dx12Device8, Dx12Frame8, Dx12Image8};
@@ -515,113 +515,29 @@ impl Dx {
     }
 
     fn make_pipeline(&mut self, serialize: usize) -> Result<(), &'static str> {
-        // b0: the vertex shader's register file, four root constants (the half-pixel
-        // shift, nought here); t0, t1: the frame and the ramp; s0, s1: point, clamped.
-        let range = [DescriptorRange { ty: DESCRIPTOR_RANGE_TYPE_SRV, count: 2, base_register: 0, space: 0, offset_in_table: 0 }];
-        let params = [
-            RootParameter { ty: ROOT_PARAMETER_TYPE_32BIT_CONSTANTS, a: 0, b: 0, c: 4, visibility: SHADER_VISIBILITY_VERTEX },
-            RootParameter { ty: ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, a: 1, b: range.as_ptr() as usize, c: 0, visibility: SHADER_VISIBILITY_PIXEL },
-        ];
-        let sampler = |register| StaticSampler {
-            filter: FILTER_MIN_MAG_MIP_POINT,
-            address_u: TEXTURE_ADDRESS_MODE_CLAMP,
-            address_v: TEXTURE_ADDRESS_MODE_CLAMP,
-            address_w: TEXTURE_ADDRESS_MODE_CLAMP,
-            mip_lod_bias: 0.0,
-            max_anisotropy: 1,
-            comparison: COMPARISON_FUNC_ALWAYS,
-            border: STATIC_BORDER_COLOR_OPAQUE_BLACK,
-            min_lod: 0.0,
-            max_lod: 0.0,
-            register,
-            space: 0,
-            visibility: SHADER_VISIBILITY_PIXEL,
-        };
-        let samplers = [sampler(0), sampler(1)];
-        let desc = RootSignatureDesc {
-            count: params.len() as u32,
-            params: params.as_ptr(),
-            samplers_count: samplers.len() as u32,
-            samplers: samplers.as_ptr(),
-            flags: ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
-        };
-        let serialize: unsafe extern "system" fn(*const RootSignatureDesc, u32, *mut P, *mut P) -> i32 = unsafe { core::mem::transmute(serialize) };
-        let (mut blob, mut err): (P, P) = (core::ptr::null_mut(), core::ptr::null_mut());
-        let hr = unsafe { serialize(&desc, ROOT_SIGNATURE_VERSION_1_0, &mut blob, &mut err) };
-        if hr < 0 || blob.is_null() {
-            if !err.is_null() {
-                let msg = vcall!(err, slot::BLOB_GET_BUFFER_POINTER, fn() -> *const u8,);
-                log!("d3d12: D3D12SerializeRootSignature: {}", unsafe { crate::rt::cstr_at(msg, 1000) });
+        let note = |m: &str| log!("d3d12: D3D12SerializeRootSignature: {}", m);
+        self.root = build::present_root(self.dev, serialize, &note).map_err(|e| e.0)?;
+        let (dev, lib, root) = (self.dev, self.lib, self.root);
+        let (hr, pso) = build::present_desc(root, |pd| {
+            let mut pso: P = core::ptr::null_mut();
+            // Through the library when it has the present pass (stored under this name, the
+            // pass being fixed for a given Display8; the library checks the description).
+            let name: Vec<u16> = "Display8.present\0".encode_utf16().collect();
+            let mut hr = -1;
+            if !lib.is_null() {
+                hr = vcall!(lib, slot::LIB_LOAD_GRAPHICS_PIPELINE, fn(*const u16, *const GraphicsPipelineDesc, *const crate::com::Guid, *mut P) -> i32, name.as_ptr(), pd, &IID_PIPELINE_STATE, &mut pso);
+                if hr < 0 {
+                    pso = core::ptr::null_mut();
+                }
             }
-            release(err);
-            return Err("D3D12SerializeRootSignature failed");
-        }
-        release(err);
-        let (ptr, len) = (vcall!(blob, slot::BLOB_GET_BUFFER_POINTER, fn() -> *const c_void,), vcall!(blob, slot::BLOB_GET_BUFFER_SIZE, fn() -> usize,));
-        let mut root: P = core::ptr::null_mut();
-        let hr = vcall!(self.dev, slot::DEV_CREATE_ROOT_SIGNATURE, fn(u32, *const c_void, usize, *const crate::com::Guid, *mut P) -> i32, 0, ptr, len, &IID_ROOT_SIGNATURE, &mut root);
-        release(blob);
-        self.root = made(hr, root, "CreateRootSignature")?;
-
-        let inputs = [
-            InputElement { semantic: c"POSITION".as_ptr() as *const u8, index: 0, format: FORMAT_R32G32_FLOAT, slot: 0, offset: 0, class: INPUT_CLASSIFICATION_PER_VERTEX_DATA, step_rate: 0 },
-            InputElement { semantic: c"TEXCOORD".as_ptr() as *const u8, index: 0, format: FORMAT_R32G32_FLOAT, slot: 0, offset: 8, class: INPUT_CLASSIFICATION_PER_VERTEX_DATA, step_rate: 0 },
-        ];
-        let mut blend = BlendDesc::default();
-        blend.targets[0] = RenderTargetBlend {
-            src: BLEND_ONE,
-            dst: BLEND_ZERO,
-            op: BLEND_OP_ADD,
-            src_alpha: BLEND_ONE,
-            dst_alpha: BLEND_ZERO,
-            op_alpha: BLEND_OP_ADD,
-            logic_op: LOGIC_OP_NOOP,
-            write_mask: COLOR_WRITE_ENABLE_ALL,
-            ..Default::default()
-        };
-        let keep = StencilOpDesc { fail: STENCIL_OP_KEEP, depth_fail: STENCIL_OP_KEEP, pass: STENCIL_OP_KEEP, func: COMPARISON_FUNC_ALWAYS };
-        let mut formats = [FORMAT_UNKNOWN; 8];
-        formats[0] = FORMAT_B8G8R8A8_UNORM;
-        let pd = GraphicsPipelineDesc {
-            root: self.root,
-            vs: ShaderBytecode::of(&VS_PRESENT_DXIL),
-            ps: ShaderBytecode::of(&PS_GAMMA_DXIL),
-            ds: ShaderBytecode::NONE,
-            hs: ShaderBytecode::NONE,
-            gs: ShaderBytecode::NONE,
-            stream_output: StreamOutputDesc { decl: core::ptr::null(), entries: 0, strides: core::ptr::null(), nstrides: 0, rasterized_stream: 0 },
-            blend,
-            sample_mask: u32::MAX,
-            rasterizer: RasterizerDesc { fill: FILL_MODE_SOLID, cull: CULL_MODE_NONE, depth_clip: 1, ..Default::default() },
-            depth_stencil: DepthStencilDesc { depth: 0, write_mask: 0, func: COMPARISON_FUNC_ALWAYS, front: keep, back: keep, ..Default::default() },
-            input_layout: InputLayoutDesc { elements: inputs.as_ptr(), count: inputs.len() as u32 },
-            strip_cut: 0,
-            topology: PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
-            num_targets: 1,
-            formats,
-            dsv_format: FORMAT_UNKNOWN,
-            sample: SampleDesc { count: 1, quality: 0 },
-            node_mask: 0,
-            cached: CachedPso { blob: core::ptr::null(), len: 0 },
-            flags: 0,
-        };
-        let mut pso: P = core::ptr::null_mut();
-        // Through the library when it has the present pass (stored under this name, the
-        // pass being fixed for a given Display8; the library checks the description).
-        let name: Vec<u16> = "Display8.present\0".encode_utf16().collect();
-        let mut hr = -1;
-        if !self.lib.is_null() {
-            hr = vcall!(self.lib, slot::LIB_LOAD_GRAPHICS_PIPELINE, fn(*const u16, *const GraphicsPipelineDesc, *const crate::com::Guid, *mut P) -> i32, name.as_ptr(), &pd, &IID_PIPELINE_STATE, &mut pso);
             if hr < 0 {
-                pso = core::ptr::null_mut();
+                hr = vcall!(dev, slot::DEV_CREATE_GRAPHICS_PIPELINE_STATE, fn(*const GraphicsPipelineDesc, *const crate::com::Guid, *mut P) -> i32, pd, &IID_PIPELINE_STATE, &mut pso);
+                if hr >= 0 && !pso.is_null() && !lib.is_null() {
+                    cache::store(lib, &name, pso);
+                }
             }
-        }
-        if hr < 0 {
-            hr = vcall!(self.dev, slot::DEV_CREATE_GRAPHICS_PIPELINE_STATE, fn(*const GraphicsPipelineDesc, *const crate::com::Guid, *mut P) -> i32, &pd, &IID_PIPELINE_STATE, &mut pso);
-            if hr >= 0 && !pso.is_null() && !self.lib.is_null() {
-                cache::store(self.lib, &name, pso);
-            }
-        }
+            (hr, pso)
+        });
         self.pso = made(hr, pso, "CreateGraphicsPipelineState (the present pass)")?;
         Ok(())
     }

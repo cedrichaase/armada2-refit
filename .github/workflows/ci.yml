@@ -11,6 +11,9 @@
 # "Release packages". On main and on dispatch, every program in the release is also
 # scanned on VirusTotal, report only, and the reports attached to the release
 # (publish/README.md, "VirusTotal").
+# The native probes (d12probe on WARP with the D3D12 debug layer, vkprobe on lavapipe, a
+# macOS spike) and the gates kit artifact: jobs probes, d3d12-probe, vulkan-probe-windows,
+# gates-windows, mac-probe (display/d12probe/README.md, tools/gates/GATES.txt).
 name: CI
 
 on:
@@ -350,6 +353,220 @@ jobs:
           path: dist/armada2-refit-installer-macos.zip
           if-no-files-found: error
 
+  # The native probes (phase 10 X3; display/d12probe/README.md, display/vkprobe/README.md):
+  # d12probe.exe and vkprobe.exe, 32-bit, cross-compiled here, and the artifact
+  # native-gates-<commit> (the probes, tools/gates/gate-windows.ps1, gate-macos.sh and
+  # GATES.txt) for the user's gates W and M. Nothing of Microsoft's is in the repository
+  # or in the artifact: the windows jobs below download what they need, at run time.
+  probes:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install lld-link, llvm-dlltool and llvm-rc
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lld llvm
+          bin=$(ls -d /usr/lib/llvm-*/bin | sort -V | tail -1)
+          test -x "$bin/llvm-rc" && test -x "$bin/llvm-dlltool"
+          echo "$bin" >> "$GITHUB_PATH"
+      - name: Rust with the 32-bit Windows target
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup target add i686-pc-windows-msvc
+          lld="$(rustc --print sysroot)/lib/rustlib/x86_64-unknown-linux-gnu/bin/rust-lld"
+          mkdir -p "$RUNNER_TEMP/lld"
+          ln -s "$lld" "$RUNNER_TEMP/lld/lld-link"
+          echo "$RUNNER_TEMP/lld" >> "$GITHUB_PATH"
+      - name: Build d12probe.exe
+        run: CARGO="$(command -v cargo)" display/d12probe/build.sh
+      - name: Build vkprobe.exe
+        run: CARGO="$(command -v cargo)" display/vkprobe/build.sh
+      - name: Display8's host tests (the passthrough's state.rs)
+        run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path display/hosttest/Cargo.toml
+      - name: The gate scripts
+        run: |
+          bash -n tools/gates/gate-macos.sh
+          mkdir -p native-gates
+          cp display/d12probe/build/d12probe.exe display/vkprobe/build/vkprobe.exe \
+             tools/gates/gate-windows.ps1 tools/gates/gate-macos.sh tools/gates/GATES.txt native-gates/
+          chmod +x native-gates/gate-macos.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: native-gates-${{ github.sha }}
+          path: native-gates/
+          if-no-files-found: error
+
+  # d12probe on the runner's WARP, blocking: first with the system's Direct3D 12, then
+  # with the debug layer of the Agility SDK (Microsoft.Direct3D.D3D12 from NuGet, pinned,
+  # else the newest stable; downloaded into the runner's temp directory, never kept or
+  # published), whose messages fail the probe when any is an error. Display8's own root
+  # signatures and pipelines are what it builds (display/src/dx12/build.rs).
+  d3d12-probe:
+    needs: probes
+    runs-on: windows-2025
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: native-gates-${{ github.sha }}
+          path: gates
+      - name: d12probe on WARP
+        shell: pwsh
+        run: |
+          $p = Start-Process gates/d12probe.exe -ArgumentList '--warp' -PassThru -Wait -WorkingDirectory gates
+          Get-Content gates/d12probe.txt
+          if ($p.ExitCode -ne 0) { throw "d12probe exited $($p.ExitCode)" }
+          if ((Get-Content gates/d12probe.txt -TotalCount 1) -ne 'VERDICT: Direct3D 12 works for Display8') { throw 'no verdict' }
+      - name: The Agility SDK (NuGet), for its debug layer
+        shell: pwsh
+        run: |
+          $id = 'microsoft.direct3d.d3d12'
+          $want = '1.616.1'
+          $dir = Join-Path $env:RUNNER_TEMP 'agility'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          $ver = $want
+          try { Invoke-WebRequest "https://api.nuget.org/v3-flatcontainer/$id/$ver/$id.$ver.nupkg" -OutFile "$dir/sdk.zip" }
+          catch {
+            $all = (Invoke-RestMethod "https://api.nuget.org/v3-flatcontainer/$id/index.json").versions | Where-Object { $_ -notmatch '-' }
+            $ver = $all | Sort-Object { [version]$_ } | Select-Object -Last 1
+            Write-Host "pinned $want is not on NuGet; using $ver"
+            Invoke-WebRequest "https://api.nuget.org/v3-flatcontainer/$id/$ver/$id.$ver.nupkg" -OutFile "$dir/sdk.zip"
+          }
+          Expand-Archive "$dir/sdk.zip" "$dir/x" -Force
+          New-Item -ItemType Directory -Force gates/D3D12 | Out-Null
+          Copy-Item "$dir/x/build/native/bin/x86/D3D12Core.dll" gates/D3D12/
+          Copy-Item "$dir/x/build/native/bin/x86/d3d12SDKLayers.dll" gates/D3D12/
+          # 1.616.1 is SDK version 616.
+          "AGILITY=$($ver.Split('.')[1])" | Out-File -Append -Encoding ascii $env:GITHUB_ENV
+          Write-Host "Agility SDK $ver"
+      - name: d12probe on WARP with the debug layer
+        shell: pwsh
+        run: |
+          $p = Start-Process gates/d12probe.exe -ArgumentList '--warp', '--debug', '--agility', $env:AGILITY, 'D3D12' -PassThru -Wait -WorkingDirectory gates
+          Get-Content gates/d12probe.txt
+          if ($p.ExitCode -ne 0) { throw "d12probe --debug exited $($p.ExitCode)" }
+          if ((Get-Content gates/d12probe.txt -TotalCount 1) -ne 'VERDICT: Direct3D 12 works for Display8') { throw 'no verdict' }
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: d12probe-report-${{ github.sha }}
+          path: gates/d12probe.txt
+
+  # vkprobe on Windows through Mesa's lavapipe (mesa-dist-win, MIT; downloaded here, not
+  # kept) and the Vulkan loader (LunarG's runtime components): NON-BLOCKING, since both
+  # downloads are of third parties' layout. The report says what happened.
+  vulkan-probe-windows:
+    needs: probes
+    runs-on: windows-2025
+    continue-on-error: true
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: native-gates-${{ github.sha }}
+          path: gates
+      - name: lavapipe (32-bit) and the Vulkan loader
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'lvp'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          $rel = gh api repos/pal1000/mesa-dist-win/releases/latest | ConvertFrom-Json
+          $asset = $rel.assets | Where-Object { $_.name -match '^mesa3d-.*-release-msvc\.7z$' } | Select-Object -First 1
+          Write-Host "mesa-dist-win $($rel.tag_name): $($asset.name)"
+          Invoke-WebRequest $asset.browser_download_url -OutFile "$dir/mesa.7z"
+          7z x "$dir/mesa.7z" "-o$dir/mesa" -y | Out-Null
+          $json = Get-ChildItem "$dir/mesa" -Recurse -Filter 'lvp_icd*.json' | Where-Object { $_.FullName -match 'x86' -and $_.FullName -notmatch 'x64' } | Select-Object -First 1
+          Write-Host "ICD: $($json.FullName)"
+          $loader = Get-ChildItem "$dir/mesa" -Recurse -Filter 'vulkan-1.dll' | Where-Object { $_.FullName -match 'x86' -and $_.FullName -notmatch 'x64' } | Select-Object -First 1
+          if (-not $loader) {
+            Invoke-WebRequest 'https://sdk.lunarg.com/sdk/download/latest/windows/vulkan-runtime-components.zip' -OutFile "$dir/rt.zip"
+            Expand-Archive "$dir/rt.zip" "$dir/rt" -Force
+            $loader = Get-ChildItem "$dir/rt" -Recurse -Filter 'vulkan-1.dll' | Where-Object { $_.FullName -match 'x86' } | Select-Object -First 1
+          }
+          Write-Host "loader: $($loader.FullName)"
+          Copy-Item $loader.FullName gates/
+          Copy-Item (Split-Path $json.FullName) -Destination gates/lvp -Recurse
+          "VK_DRIVER_FILES=$((Resolve-Path gates/lvp).Path)\$($json.Name)" | Out-File -Append -Encoding ascii $env:GITHUB_ENV
+      - name: vkprobe on lavapipe
+        shell: pwsh
+        run: |
+          $p = Start-Process gates/vkprobe.exe -PassThru -Wait -WorkingDirectory gates
+          Get-Content gates/vkprobe.txt
+          if ($p.ExitCode -ne 0) { throw "vkprobe exited $($p.ExitCode)" }
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: vkprobe-report-windows-${{ github.sha }}
+          path: gates/vkprobe.txt
+
+  # The gates kit's Windows script, against a mock game directory: -WhatIf (nothing is
+  # written or started), with d12probe on WARP. Also run here, on Windows, as in the
+  # windows-installer and windows-gui jobs: install.ps1 (publish/installer/test.ps1)
+  # and the frozen GUI installer (gui-installer/test-windows.ps1).
+  gates-windows:
+    needs: probes
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: native-gates-${{ github.sha }}
+          path: gates
+      - name: gate-windows.ps1 -WhatIf against a mock game
+        shell: powershell
+        run: |
+          $game = Join-Path $env:RUNNER_TEMP 'mockgame'
+          New-Item -ItemType Directory -Force $game | Out-Null
+          Set-Content (Join-Path $game 'Armada2.exe') 'MZ'
+          $out = & gates/gate-windows.ps1 -Game $game -ProbeArgs '--warp' -WhatIf *>&1 | Out-String
+          Write-Host $out
+          if ($out -notmatch 'GATE probe-d3d12: PASS') { throw 'the d3d12 probe did not pass through the gate script' }
+          if ($out -notmatch 'GATE zip: SKIP') { throw 'the WhatIf run did not reach its end' }
+          if (Test-Path (Join-Path $game 'RefitPlayer.ini')) { throw 'WhatIf wrote RefitPlayer.ini' }
+
+  # A timeboxed spike (display/vkprobe/README.md, "CI spike"): does this runner have a
+  # Metal device, and if so does vkprobe run under Wine on MoltenVK? Non-blocking; it
+  # ends green with the reason in its summary when there is no Metal device.
+  mac-probe:
+    needs: probes
+    runs-on: macos-15
+    timeout-minutes: 25
+    continue-on-error: true
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: native-gates-${{ github.sha }}
+          path: gates
+      - name: A Metal device?
+        id: metal
+        run: |
+          system_profiler SPDisplaysDataType || true
+          cat > "$RUNNER_TEMP/m.swift" <<'EOF'
+          import Metal
+          let d = MTLCopyAllDevices()
+          print("metal devices: \(d.count)")
+          for x in d { print(x.name) }
+          exit(d.isEmpty ? 1 : 0)
+          EOF
+          if swiftc "$RUNNER_TEMP/m.swift" -o "$RUNNER_TEMP/m" && "$RUNNER_TEMP/m"; then
+            echo "metal=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "metal=no" >> "$GITHUB_OUTPUT"
+            echo "mac-probe: no Metal device on this runner; the spike is dropped (Gate M stays the user's)." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: vkprobe under Wine on MoltenVK
+        if: steps.metal.outputs.metal == 'yes'
+        run: |
+          brew install --cask --no-quarantine gcenx/wine/wine-stable || brew install --cask wine-stable
+          brew install molten-vk vulkan-loader
+          export WINEPREFIX="$RUNNER_TEMP/pfx" WINEARCH=wow64 WINEDEBUG=-all
+          export VK_ICD_FILENAMES="$(brew --prefix)/etc/vulkan/icd.d/MoltenVK_icd.json"
+          wine="$(command -v wine64 || command -v wine || ls /Applications/Wine*/Contents/Resources/wine/bin/wine64 | head -1)"
+          cd gates
+          timeout 300 "$wine" vkprobe.exe || true
+          cat vkprobe.txt | tee -a "$GITHUB_STEP_SUMMARY"
+          head -1 vkprobe.txt | grep -q 'VERDICT: Vulkan works for Display8'
+
   # Every PE in the release zip and the Windows installer, scanned on VirusTotal
   # (publish/virustotal.py): report only. On pushes to main and on dispatch, never on every
   # branch push: the public API allows 4 requests a minute and 500 a day. Without the
@@ -400,7 +617,7 @@ jobs:
           if-no-files-found: ignore
 
   release:
-    needs: [publishable, package, appimage, windows-installer, windows-gui, macos-gui]
+    needs: [publishable, package, appimage, windows-installer, windows-gui, macos-gui, probes, d3d12-probe, gates-windows]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     permissions:
