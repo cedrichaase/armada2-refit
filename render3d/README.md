@@ -574,7 +574,7 @@ the looks they give a mission:
 
 | Pass | Module | |
 |---|---|---|
-| `Sky` | sky | the recipe sky of `Sky=` (`skies/`), turned about +x by `SkyTurn` a second; a starfield of our own (`Stars` quads of the stock `bstar.0` and `mstar.0` sprites, seeded, the brighter ones lifted past white); the sun, `Sun=`'s SOD (a background object, `Msun1`) and its sprite nodes where the Key comes from, drawn about the eye as a map's suns are, so it stands in the same place from every view |
+| `Sky` | sky | the recipe sky of `Sky=` (`content/sky/`), turned about +x by `SkyTurn` a second; a starfield of our own (`Stars` quads of the stock `bstar.0` and `mstar.0` sprites, seeded, the brighter ones lifted past white); the sun, `Sun=`'s SOD (a background object, `Msun1`) and its sprite nodes where the Key comes from, drawn about the eye as a map's suns are, so it stands in the same place from every view |
 | `Planet` | world | `Planets::draw_menu`: the class's ground (`groundTextureName`, or its surface recipe) and cloud shell (`atmosphereTextureName`, stock's `PA_ECFR0` when the ODF names none) on render3d's sphere, the same body draw as a mission planet's (`draw_body`) without cities |
 | (depth cleared) | | the ships and the gas are drawn on a projection of their own, 2 to 16000 |
 | `Ships` | hulls | `menu_begin` poses every ship of the map (finest level of detail, its animation looping, `hardpoints` and the damage, crew and Borg nodes hidden by name, as no class says which) and draws the shadow map from those in view, with the menu planet in place of the engine's; then the hull look, opaque, of the ships in view, and their running lights collected |
@@ -823,12 +823,10 @@ every module's `configure`, then every module's flag. A module switched off
 gets `off()` and lets go of its GPU objects at the next view; one switched on gets its
 `hooks()` the first time, then `on()`, and its `device()` at its next view if it missed
 this device. A module whose hooks are not yet gated by its flag (`NOT_YET_LIVE` in
-`mods/mod.rs`: effects) refuses a live change of
-its flag, logged `settings: Modules.<m> changes at the next launch (hooks not yet live)`,
-and its row stays `apply = "restart"`: effects (shields, repair, debris, sparks) install
-engine hooks that do not yet hand back to their predecessor. The live rows today are
-`Modules.hulls/sky/specials/world/overlays/particles/ordnance`,
-`World.Planets/Rocks/Nebulae/Surfaces`, `Nebulae.Lit` and `Overlays.*`.
+`mods/mod.rs`, empty now that every module hands back) refuses a live change of
+its flag, logged `settings: Modules.<m> changes at the next launch (hooks not yet live)`.
+Every `Modules.*` row is live, as are `World.Planets/Rocks/Nebulae/Surfaces`, `Nebulae.Lit`
+and `Overlays.*`.
 Checked on the bench at RMSE 0: live `hulls=0`, `sky=0` and `World.Surfaces=0` against
 the baselines of the same keys at load (`testbench/scenarios/render3d-settings-live.md`),
 and `Modules.world=0` and `Modules.overlays=0` against `-world0` and `-overlays0` on the
@@ -876,7 +874,7 @@ stand-down draws exactly as before. It only reads, into one static buffer.
 and their lights; it ports `Explosions.asi`, `Shields.asi` and `Repair.asi`, whose
 looks were settled with the user (kept as they were; the settings keep the plugins'
 keys, in `Render3D.ini` sections `[Explosions]`, `[Shields]`, `[Repair]` and
-`[Debris]`, read once at start). Each part stands down while a stale copy of its old
+`[Debris]`, plus `[Construction]`, `[Bees]`, `[Sparks]` and the `[Shell.<name>]` recipes; read in the module's `configure`, at load and at every settings change). Each part stands down while a stale copy of its old
 plugin is loaded. Everything noted while the features run is drawn at `Step::Chunks`, after
 the debris and the engine's own `RenderChunks` (called through its call site, so
 construction's chunks and any plugin chained there still draw), when every opaque hull
@@ -1319,6 +1317,25 @@ moment (`Enable=0` with `Reload=1`): the clouds sit where the engine puts them; 
 layers come up on the Sovereign as described, main view and with the HUD's inset.
 Scenario `render3d-specialfx`.
 
+#### effects: Hooks, Content, Settings
+
+**Hooks** (`effects/hooks.rs`; each part installs its own when its `Enable` is on and no plugin of its own is loaded, all through `core_hooks`, behind the module's gate, chained onto what is there):
+
+| Symbol | Kind | What it is for |
+|---|---|---|
+| `Craft::Explode`'s call of `ST3D_Instance::Fragment` (0x4c6bfc) | call | a dying craft whose SOD we read is noted for our own chunks; the engine makes none |
+| the Evolver's four `Fragment` calls (0x4b07b4, 0x4b0872, 0x4b0914, 0x4b09b4) | call, one hook each | the cocoon bursting, whole; each site calls what was at that site |
+| `BuildingEffect::SafeDestroyConstruction`'s `Fragment` call (0x46a0f1) | call | a cancelled construction's faces built so far |
+| `Craft::RepairSystem`'s `AddParticle` call (0x4c90c0) | call | the new tail of the particle list is a weld |
+| `NodeParticleEffect::Render`'s `DrawScaled3D` call (0x473767) | call | the particle's node (in `esi`) is noted; a weld, or every particle while the sparks are ours, is not drawn by the engine |
+| the four `CreateShieldHit` calls (0x58bb95, 0x58cad8, 0x58d502, 0x58dd65) | call, one hook each | which weapon made a hit, and its damage: a passive tap (it records and calls on, so it has no gate; a hit made while off keeps its damage if the module comes on) |
+
+The hooks are put in at the module's first frame (`device()`), not at load: other plugins check the stock bytes of these sites when they load, and the bench's `Scene.asi` reads the shield sites. With the gate shut, or a part off, every detour hands the call to what was there, so the engine breaks craft up and draws welds and particles itself. The explosion, shield, bee and construction draws need no hook (`feature()` and `object()`); the registry hands them back.
+
+**Content** (`effects/content.rs`): the weapons' names for the shield taps and the faction keys and colours of `[Shields]`.
+
+**Settings**: `Modules.effects` (live) is the only row. A flip off drops the debris in flight; the shield hits, welds and construction edges are keyed to the engine's own records and stay, so a flip on picks them up where they are. Effects already in flight finish in the look they started with.
+
 ### sky
 
 Takes over `Step::Background`, the whole of `Background_Render` (0x590d90), and
@@ -1334,7 +1351,7 @@ supersedes `Sky.asi` (it stands down while that plugin is loaded). In stock's or
    (`g_background_geometry_db`, 0x7720fc). The map's background name is the lower-cased
    string `Starfield_Load_Background_Geometry` (0x590c30) keeps at 0x738538:
    `<name>.sod` or a bare prefix.
-   - **With a recipe** (`render3d/skies/<name>.ini`, built into the plugin; a
+   - **With a recipe** (`render3d/content/sky/<name>.ini`, built into the plugin; a
      `Sky\<name>.ini` in the game directory takes precedence and is re-read when it
      changes), the procedural sky of `Sky.asi`, each recipe's shape and grade fitted
      to its stock sky, with soft billows and no filaments ("Sky recipes" below): one quad over the
@@ -1381,7 +1398,7 @@ supersedes `Sky.asi` (it stands down while that plugin is loaded). In stock's or
 5. The device's `Flush` (anything the engine queued), the far plane back, and
    `ClearDepthBuffer` over the view for the scene.
 
-`Render3D.ini`, `[Sky]` (read again every 60 views):
+`Render3D.ini`, `[Sky]` (read at load and at every settings change):
 
 | Key | Default | |
 |---|---|---|
@@ -1403,7 +1420,7 @@ equal to 0.1/255; `mbgborg` means equal to 0.05), the starfield matches with
 recipe skies match `Sky.asi`'s away from the (random) starfield blobs. The HUD's action
 camera draws the sky without stars, as stock.
 
-**Sky recipes** (`render3d/skies/<name>.ini`, section `[Sky]`, one per stock sky name;
+**Sky recipes** (`render3d/content/sky/<name>.ini`, section `[Sky]`, one per stock sky name;
 built into the plugin with `include_str!`, so the sky needs no file in the game
 directory; a `Sky\<name>.ini` there takes precedence). Colours are 0-255; directions
 are yaw (degrees about +y; 0 looks along +z, 90 along +x) and pitch (up from the
@@ -1463,6 +1480,11 @@ they stay off. The descent is greedy: started from the hand-set `Scale`, `mbg02`
 `Scale` of 7-9 (to 0.14-0.25). Read the bands before trusting a fit that stays far
 from stock, and look at it: the measure is blind to a value-noise lattice (hence the
 `Octaves` floor).
+
+
+#### sky: Hooks, Content, Settings
+
+**Hooks** (`sky/hooks.rs`): none installed. The sky takes `Step::Background` and the background objects from the seam, and hands an object it cannot draw back to the engine's `Render`; the file holds the reads (the background name, the sky database, `g_starfield` and its octree, the far planes, the detail byte that turns the sky off, edit mode, the background instance). **Content**: the built-in recipes (`render3d/content/sky/`, `sky/content.rs`; a `Sky\<name>.ini` in the game directory wins) and the point-star texture. **Settings**: `Modules.sky` (live); `[Sky]` is read in `configure`. `formats_changed` drops the view pipelines and keeps the baked cube, which does not depend on the scene target.
 
 ### overlays
 
@@ -2237,7 +2259,7 @@ sphere) and `Nebulae.asi` (the recipes, `Nebulae\<odf>.ini`); the looks settled 
 the user are kept. Each part stands down while a stale copy of the plugin that drew it
 is loaded: the planets beside `Lighting.asi`, the moons and asteroids beside
 `Lighting.asi` or `Surfaces.asi`, the gas beside `Nebulae.asi`, the lights beside
-`Lighting.asi`. The recipes live in this folder: `skies/` (built into the plugin),
+`Lighting.asi`. The recipes live in this folder: `content/sky/` (built into the plugin),
 `content/surfaces/` and `content/nebulae/` (copied by `install.sh` into the game's
 `Surfaces\` and `Nebulae\`, where an edited copy is re-read while the game runs, and
 built into the plugin too: "Content" below); see "Recipes" below. Settings in `[World]` (the parts: `Planets`, `Rocks`, `Nebulae`,
@@ -2521,7 +2543,7 @@ times `NebulaCull`, and puts it back.
 
 **Recipes.** Three folders, one per kind, all plain `.ini` files you can edit.
 
-- `skies/<name>.ini`: the sky recipes, built into the plugin ("Sky recipes" above).
+- `content/sky/<name>.ini`: the sky recipes, built into the plugin ("Sky recipes" above).
 - `surfaces/<texture>.ini`: planets (classes D, H, J, K, L, M), the dilithium moon
   `Mdmoon` and the asteroids `Master1`/`Master2`. Installed by `install.sh` into the
   game's `Surfaces\`; a name without a file keeps its stock texture. A recipe for a hull

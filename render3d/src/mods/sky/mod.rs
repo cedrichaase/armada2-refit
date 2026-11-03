@@ -4,11 +4,13 @@
 //! wreck), each in the order and with the far plane stock uses, then the depth is
 //! cleared over the view for the scene. Supersedes `Sky.asi`.
 pub mod bake;
+pub mod content;
+pub mod hooks;
 pub mod recipe;
 pub mod sprites;
 
 use super::{Module, Step};
-use crate::engine::{self, field, field_u8, obj, rd};
+use crate::engine::{self, obj};
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::math::{M34, M4, V3, v3};
@@ -28,33 +30,6 @@ use gpu::{
 use recipe::Recipe;
 use sprites::{Batch, SprInfo, Starfield};
 
-// ---- Armada2.exe ------------------------------------------------------------------
-
-/// The map's background name, lower-cased, as `Starfield_Load_Background_Geometry`
-/// keeps it: `<name>.sod` (a cube model) or a bare prefix (six faces `<prefix>0..5`).
-const BG_NAME: usize = 0x738538;
-/// `g_background_geometry_db`: the sky's database; stock draws the sky only with one.
-const G_BG_DB: usize = 0x7720fc;
-/// `g_starfield`.
-const G_STARFIELD: usize = 0x773d04;
-/// `STAR_FAR_CLIP_PLANE` and `FAR_CLIPPING_PLANE` (`ART_CFG.h`; QOL may scale the
-/// second in memory): the camera's far plane during the background, and after.
-const STAR_FAR: usize = 0x6fcac8;
-const FAR_PLANE: usize = 0x6fcab0;
-/// `Starfield_Load_Background_Geometry(char*)`, cdecl: a new background (bench only).
-const FN_LOAD_BG: usize = 0x590c30;
-const FN_SET_FAR: usize = 0x6198a0; // ST3D_Camera::SetFarPlane(float), thiscall
-/// `UserProfile*`; its byte +0x84 is edit mode (`Program::Toggle_Edit_Mode`).
-const USER_PROFILE: usize = 0x76b5ac;
-/// The class's `hidden` flag (`dlight` has it): not drawn outside edit mode.
-const CLASS_HIDDEN: usize = 0x19c;
-/// Object flags: a background object, drawn here and skipped by the object loop.
-const OBJ_BACKGROUND: u32 = 0x10000;
-const FN_GO_RENDER: usize = 0x4d54e0; // GameObject::Render, slot 11 of the classes that keep it
-const SLOT_RENDER: usize = 11;
-const VT_DATABASE: usize = 0x6bc56c; // a plain ST3D_Database
-use crate::engine::{DEV_CLEAR_DEPTH, DEV_FLUSH};
-
 /// The six faces `CreateBackgroundFace` builds for a prefix sky: face `i` shows
 /// `<prefix><i>` on a quad at +-100 about the camera, corners in this order with
 /// texture coordinates (0,0) (1,0) (1,1) (0,1), as two triangles (0,1,2) (0,2,3).
@@ -66,16 +41,6 @@ const PREFIX_FACES: [[[f32; 3]; 4]; 6] = [
     [[-100.0, 100.0, -100.0], [100.0, 100.0, -100.0], [100.0, 100.0, 100.0], [-100.0, 100.0, 100.0]],
     [[-100.0, -100.0, 100.0], [100.0, -100.0, 100.0], [100.0, -100.0, -100.0], [-100.0, -100.0, -100.0]],
 ];
-
-unsafe fn this0(f: usize, this: usize) {
-    unsafe { core::mem::transmute::<usize, unsafe extern "thiscall" fn(usize)>(f)(this) }
-}
-unsafe fn this1(f: usize, this: usize, a: usize) {
-    unsafe { core::mem::transmute::<usize, unsafe extern "thiscall" fn(usize, usize)>(f)(this, a) }
-}
-unsafe fn set_far(cam: usize, far: f32) {
-    unsafe { core::mem::transmute::<usize, unsafe extern "thiscall" fn(usize, f32)>(FN_SET_FAR)(cam, far) }
-}
 
 /// `Render3D.ini` `[Sky]`.
 struct Cfg {
@@ -97,8 +62,7 @@ struct Cfg {
 }
 
 impl Cfg {
-    fn read() -> Cfg {
-        let ini = crate::config::ini();
+    fn read(ini: &rt::Ini) -> Cfg {
         let face = ini.int("Sky", "Face", 1536).max(0) as u32;
         Cfg {
             draw: ini.int("Sky", "Draw", 1) != 0,
@@ -129,14 +93,13 @@ pub struct Sky {
     pipes: Pipes,
     said_inst: bool,
     said_objects: usize,
-    tick: u32,
     loaded: String,
 }
 
 impl Default for Sky {
     fn default() -> Sky {
         Sky {
-            cfg: Cfg::read(),
+            cfg: Cfg::read(&rt::Ini::open_plain("")),
             baker: Baker::new(),
             bg: String::new(),
             recipe: None,
@@ -148,7 +111,6 @@ impl Default for Sky {
             pipes: Pipes::new(),
             said_inst: false,
             said_objects: 0,
-            tick: 0,
             loaded: String::new(),
         }
     }
@@ -323,7 +285,7 @@ impl Sky {
         }
         cmd.ps_block(Block::new(0, &[1.0, 1.0, 1.0, 0.0]));
         // The background instance sits at the camera; its turn and scale are its own.
-        let inst = engine::field_m34(0x772068, 0x44);
+        let inst = hooks::background_instance();
         let mut world = M34 { r: inst.r, p: v.eye };
         if !(0.5..2.0).contains(&world.r[0].len()) {
             world.r = M34::IDENTITY.r;
@@ -408,12 +370,11 @@ impl Sky {
     /// view's lights; its sprite nodes go into the batch. False: the engine's draw.
     fn object(&mut self, o: usize, v: &View) -> bool {
         let _z = crate::timing::zone("sky: background objects");
-        if field(engine::vtable(o), SLOT_RENDER * 4) != FN_GO_RENDER {
+        if !hooks::plain_render(o) {
             return false;
         }
         let inst = obj::instance(o);
-        let db = field(inst, 0x80);
-        if db == 0 || engine::vtable(db) != VT_DATABASE {
+        if !hooks::plain_database(inst) {
             return false;
         }
         let name = obj::odf_name(o);
@@ -424,7 +385,7 @@ impl Sky {
         if obj::expired(o) || !obj::can_user_see(o) {
             return true;
         }
-        let s = if inst == 0 { v3(1.0, 1.0, 1.0) } else { unsafe { rd::<V3>(inst + 0x28) } } * self.scale_sod(name);
+        let s = hooks::instance_scale(inst) * self.scale_sod(name);
         let mut world: M34 = obj::transform(o);
         world.r[0] = world.r[0] * s.x;
         world.r[1] = world.r[1] * s.y;
@@ -612,7 +573,12 @@ impl Module for Sky {
     fn rows(&self) -> &'static [crate::rt::settings::Setting] {
         &[]
     }
-    fn configure(&mut self, _ini: &crate::rt::Ini, _said: &mut crate::core_module::Changes) {}
+    /// `[Sky]`, at load and at every settings change (it was read again every 60 views
+    /// before the settings contract): the draw switch, the cube's edge, the lifts and the
+    /// bench's background.
+    fn configure(&mut self, ini: &crate::rt::Ini, _said: &mut crate::core_module::Changes) {
+        self.cfg = Cfg::read(ini);
+    }
     fn superseded(&self) -> Option<&'static str> {
         Some("Sky.asi")
     }
@@ -622,6 +588,12 @@ impl Module for Sky {
     }
     fn reset(&mut self) {
         self.baker.reset();
+    }
+    /// The scene target's format or samples changed: the pipelines of the view draw
+    /// into the new one. The baked cube does not depend on it (the chain's targets and
+    /// the bake's pipelines are keyed by their own formats), so it stays.
+    fn formats_changed(&mut self) {
+        self.pipes = Pipes::new();
     }
     fn forget(&mut self) {
         self.baker.reset();
@@ -639,34 +611,26 @@ impl Module for Sky {
             return false;
         }
         let cam = v.cam;
-        // Render3D.ini's [Sky] is read again every 60 views, for tuning live.
-        self.tick = self.tick.wrapping_add(1);
-        if self.tick % 60 == 0 {
-            self.cfg = Cfg::read();
-        }
         if !self.cfg.load.is_empty() && self.cfg.load != self.loaded {
             self.loaded = self.cfg.load.clone();
             log!("sky: Load={}: loading it as the map's background", self.loaded);
-            let mut c = rt::cstr(&self.loaded);
-            unsafe { core::mem::transmute::<usize, unsafe extern "C" fn(*mut u8)>(FN_LOAD_BG)(c.as_mut_ptr()) };
+            hooks::load_background(&self.loaded);
         }
         if !self.cfg.draw {
             return false;
         }
-        let rsf = |o: usize| field(v.rs, o) != 0;
-        // Background_Render's own test: detail configuration +0x2c == 2 turns the sky off.
-        let cfg3d = field(engine::storm3d(), 0x104);
-        let sky_on = rsf(4) && field(cfg3d, 0x2c) != 2;
-        let stars_on = rsf(8);
-        let star_far: f32 = unsafe { rd(STAR_FAR) };
-        unsafe { set_far(cam, star_far) };
+        // Background_Render's own test, and the stars'.
+        let sky_on = hooks::sky_on(v.rs);
+        let stars_on = hooks::stars_on(v.rs);
+        let star_far = hooks::star_far();
+        hooks::set_far(cam, star_far);
         let vf = view_with(v, with_far(&v.proj, star_far));
         let vp = vf.view.mul(&vf.proj);
         if let Some(mut cmd) = gfx::cmd() {
             let cmd = &mut cmd;
             let evp = gfx::gpu().engine_viewport();
-            let bg = unsafe { String::from(rt::cstr_at(BG_NAME as *const u8, 64)) };
-            let have_db = unsafe { rd::<usize>(G_BG_DB) } != 0;
+            let bg = hooks::background_name();
+            let have_db = hooks::has_sky_db();
             if sky_on && have_db {
                 let recipe = self.cfg.recipes && self.recipe_now(&bg).is_some();
                 if !(recipe && self.draw_recipe(cmd, &vf, &vp, evp)) {
@@ -675,7 +639,7 @@ impl Module for Sky {
             } else {
                 Self::clear(cmd, v, evp);
             }
-            if stars_on && unsafe { rd::<usize>(G_STARFIELD) } != 0 {
+            if stars_on && hooks::starfield() != 0 {
                 let lift = self.cfg.star_lift;
                 let _z = crate::timing::zone("sky: stars");
                 self.stars.gather(&mut self.batch, lift);
@@ -684,10 +648,10 @@ impl Module for Sky {
         }
         // The background objects, with depth: each draws itself, or the engine does.
         let _zo = crate::timing::zone("sky: object list");
-        let edit = field_u8(unsafe { rd::<usize>(USER_PROFILE) }, 0x84) != 0;
+        let edit = hooks::edit_mode();
         let mut list: Vec<usize> = Vec::new();
         engine::for_each_in_list(engine::OBJECT_LIST, |o| {
-            if o != 0 && obj::flags(o) & OBJ_BACKGROUND != 0 && (edit || field_u8(obj::class(o), CLASS_HIDDEN) == 0) {
+            if hooks::background_object(o, edit) {
                 list.push(o);
             }
         });
@@ -700,19 +664,13 @@ impl Module for Sky {
         }
         for o in list {
             if !self.object(o, &vf) {
-                unsafe { this1(field(engine::vtable(o), SLOT_RENDER * 4), o, cam) };
+                hooks::engine_render(o, cam);
             }
         }
         if let Some(mut cmd) = gfx::cmd() {
             self.draw_batch(&mut cmd, &vp);
         }
-        unsafe {
-            let dvt = engine::vtable(v.st3d);
-            this0(field(dvt, DEV_FLUSH), v.st3d);
-            set_far(cam, rd::<f32>(FAR_PLANE));
-            let r: [f32; 4] = rd(cam + 0x1b0);
-            this1(field(dvt, DEV_CLEAR_DEPTH), v.st3d, r.as_ptr() as usize);
-        }
+        hooks::finish(v.st3d, cam);
         true
     }
 }

@@ -16,25 +16,14 @@
 //! on. Ours, at `Step::Chunks`: stock's sprite and flipbook, drawn as stock draws it
 //! (the ordnance module's `Sprites`, its hottest texels past white), and new: a burst
 //! of sparks streaking off it, cooling, and a flash of light on the hull.
-use super::{object_of, rnd, Cam, LightPool, Sec};
+use super::hooks::{nodes, object_of};
 use super::weldfx::{self, Fx};
-use crate::engine::{self, field, rd};
+use super::{blank, rnd, Cam, LightPool, Sec};
 use crate::frame::steps::View;
 use crate::log;
 use crate::math::{v3, V3};
 use crate::scene::sprites::Sprites;
 use alloc::vec::Vec;
-
-const NP_LIST: usize = 0x736cfc;
-const FN_WORLD_POS: usize = 0x4cff70; // Entity::GetWorldPosition(ST3D_Node*), thiscall
-const P_HANDLE: usize = 0x08;
-const P_NODE: usize = 0x0c;
-const P_LOCAL: usize = 0x10;
-const P_SPRITE: usize = 0x1c;
-const P_COLOUR: usize = 0x20;
-const P_SIZE: usize = 0x2c;
-const P_AGE: usize = 0x34;
-
 
 static mut TAKE: bool = false;
 
@@ -80,6 +69,8 @@ struct Set {
 
 pub struct SparkFx {
     pub on: bool,
+    /// `Enable=`: the part wants to run (it needs repair's hooks in as well).
+    pub want: bool,
     s: Set,
     sprites: Sprites,
     live: Vec<Spark>,
@@ -89,15 +80,22 @@ pub struct SparkFx {
 
 impl SparkFx {
     pub fn new() -> SparkFx {
-        let c = Sec::new("Sparks");
+        let c = Sec::with(blank(), "Sparks");
+        SparkFx {
+            on: false,
+            want: false,
+            s: Self::read(&c),
+            sprites: Sprites::new(),
+            live: Vec::new(),
+            lights: LightPool::new(b"spark\0"),
+            said: 0,
+        }
+    }
+
+    fn read(c: &Sec) -> Set {
         let life = c.pair("SparkLife", [0.3, 0.9]);
         let l0 = life[0].max(0.02);
-        let mut sprites = Sprites::new();
-        sprites.hot = c.f("Hot", 0.6);
-        sprites.hot_from = c.f("HotFrom", 0.7);
-        SparkFx {
-            on: c.i("Enable", 1) != 0,
-            s: Set {
+        Set {
                 blast_sparks: c.i("BlastSparks", 14).clamp(0, 48) as usize,
                 hit_sparks: c.i("HitSparks", 6).clamp(0, 48) as usize,
                 spark_speed: c.f("SparkSpeed", 4.0),
@@ -110,21 +108,21 @@ impl SparkFx {
                 light: c.f("Light", 2.0),
                 light_reach: c.f("LightReach", 6.0),
                 light_time: c.f("LightTime", 0.5).max(0.05),
-            },
-            sprites,
-            live: Vec::new(),
-            lights: LightPool::new(b"spark\0"),
-            said: 0,
         }
     }
 
-    /// Takes the particles over: only while repair.rs's thunk is in place.
-    pub fn install(&mut self) {
-        if !super::repair::hooked() {
-            log!("effects: sparks: NodeParticleEffect's draw is not hooked (repair off): stock sparks");
-            self.on = false;
-        }
-        unsafe { TAKE = self.on };
+    /// Switched off: the particles gathered go.
+    pub fn clear(&mut self) {
+        self.live.clear();
+    }
+
+    /// `[Sparks]`.
+    pub fn configure(&mut self, ini: &crate::rt::Ini) {
+        let c = Sec::of(ini, "Sparks");
+        self.want = c.i("Enable", 1) != 0;
+        self.s = Self::read(&c);
+        self.sprites.hot = c.f("Hot", 0.6);
+        self.sprites.hot_from = c.f("HotFrom", 0.7);
     }
 
     pub fn reset(&mut self) {
@@ -134,57 +132,41 @@ impl SparkFx {
     /// Every live particle that is not a weld, as `NodeParticleEffect::Render` places it.
     fn gather(&mut self) {
         self.live.clear();
-        let head = unsafe { rd::<usize>(NP_LIST) };
-        if head == 0 {
-            return;
-        }
-        let mut n = field(head, 0);
-        let mut guard = 0;
-        while n != 0 && n != head && guard < 1024 {
-            guard += 1;
-            let node = n;
-            n = field(n, 0);
+        let mut nodes_now = Vec::new();
+        nodes::each(|n| nodes_now.push(n));
+        for node in nodes_now {
             if super::repair::is_weld(node) {
                 continue;
             }
-            let o = object_of(field(node, P_HANDLE) as i32);
+            let o = object_of(nodes::handle(node));
             if o == 0 || !crate::engine::obj::can_user_see(o) {
                 continue;
             }
             let tm = crate::engine::obj::transform(o);
-            let hp = field(node, P_NODE);
-            let pos = if hp != 0 {
-                let mut out = V3::ZERO;
-                unsafe {
-                    let f: unsafe extern "thiscall" fn(usize, *mut V3, usize) -> *mut V3 = core::mem::transmute(FN_WORLD_POS);
-                    f(o, &mut out, hp);
-                }
-                out
-            } else {
-                tm.transform_point(super::rv3(node + P_LOCAL))
-            };
-            let sprite = field(node, P_SPRITE);
+            let hp = nodes::hardpoint(node);
+            let pos = if hp != 0 { nodes::world_pos(o, hp) } else { tm.transform_point(nodes::local(node)) };
+            let sprite = nodes::sprite(node);
             if sprite == 0 {
                 continue;
             }
             let name = crate::scene::instance::element_name(sprite).unwrap_or("");
             let blast = name.len() >= 10 && name[..10].eq_ignore_ascii_case("systemexpl");
-            let c: [f32; 3] = unsafe { rd(node + P_COLOUR) };
+            let c = nodes::colour(node);
             let out = pos - tm.p;
             let out = if out.len() > 1e-4 { out.norm() } else { v3(0.0, 1.0, 0.0) };
             self.live.push(Spark {
                 pos,
                 out,
-                size: engine::field_f32(node, P_SIZE),
-                age: engine::field_f32(node, P_AGE),
+                size: nodes::size(node),
+                age: nodes::age(node),
 
                 colour: v3(c[0], c[1], c[2]),
                 blast,
                 // Under the bench clock not the node's address (clock.rs): when it was born.
                 seed: if crate::clock::bench() {
-                    super::hash32((engine::sim_time() - engine::field_f32(node, P_AGE)).to_bits() ^ field(node, P_HANDLE) as u32)
+                    super::hash32((crate::engine::sim_time() - nodes::age(node)).to_bits() ^ nodes::handle(node) as u32)
                 } else {
-                    super::hash32(node as u32 ^ field(node, P_HANDLE) as u32)
+                    super::hash32(node as u32 ^ nodes::handle(node) as u32)
                 },
                 sprite,
             });

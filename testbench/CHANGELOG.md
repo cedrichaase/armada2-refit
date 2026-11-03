@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.93.0 — 2026-11-03
+
+### Added
+- Scenario `render3d-live-effects` (the effects module switched off live at RMSE 0
+  against `roundD-base-port-showcase-effects0`, on again against the base, off again).
+
+Installed, not yet seen in game.
+
 ## 3.92.0 — 2026-11-03
 
 ### Added

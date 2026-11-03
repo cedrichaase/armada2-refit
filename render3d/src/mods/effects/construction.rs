@@ -18,46 +18,13 @@
 //! at the weld and cooling along the edge to orange and dull red, which goes on cooling
 //! after the edge is done. A few arcs per construction light the hull
 //! (`Module::lights`).
-use super::{object_of, rnd, Cam, LightPool, Sec};
+use super::hooks::{construction as hk, sees_all};
+use super::{blank, rnd, Cam, LightPool, Sec};
 use super::weldfx::{self, Fx};
-use crate::engine::{self, field, rd};
 use crate::frame::steps::View;
 use crate::log;
 use crate::math::{v3, M34, V3};
 use alloc::vec::Vec;
-
-pub const VT_BUILDING: usize = 0x6afe4c;
-/// `ConstructionObject::Render`: draws nothing (the object loop's view of a station
-/// being built).
-pub const FN_CONSTRUCTION_OBJECT_RENDER: usize = 0x4a3790;
-const BE_HEAD: usize = 0x736bd4; // BuildingEffect::m_list: its head node
-const BE_NIL: usize = 0x736c1c; // that tree's _Nil
-
-const I_BUILDER: usize = 0x0; // the builder's handle
-const I_TEAMS: usize = 0x4; // teams that see it
-const I_COLOUR: usize = 0x8; // its colour at the start
-const I_INST: usize = 0x20; // the station's instance (a CraftInstance)
-const I_SCALE_HANDLE: usize = 0xb4; // the handle ApplyScaleEffects is asked for
-const I_FACES: usize = 0xcc; // faces built so far
-const I_CLASS: usize = 0xd0; // the station's class
-const I_SPEED: usize = 0xe0; // weldingSpeed: an edge's progress a second
-const I_RADIUS: usize = 0xe8; // weldingRadius: the spark sprite's half size
-const I_EDGES: usize = 0x100; // the welding edges' list head node
-// A welding edge's list node: start +0x14, end +0x20, progress +0x2c.
-const E_START: usize = 0x14;
-const E_END: usize = 0x20;
-const E_T: usize = 0x2c;
-
-const FN_TEAMS_VISIBLE: usize = 0x4d0070; // Entity::GetTeamsVisibleToUser(), cdecl
-const FN_DISTANCE_CULL: usize = 0x4d5bb0; // GameObjectInstance::DistanceCull(eye, pos), thiscall
-const FN_TEAM_COLOUR: usize = 0x4d5000; // GameObject::GetTeamColor(), thiscall
-const FN_SCALE_EFFECTS: usize = 0x599760; // ApplyScaleEffects(ST3D_Instance*, handle), cdecl
-const FN_FACE_LIMIT: usize = 0x62ea80; // ST3D_Instance::SetRenderFaceLimit(int), thiscall
-const FN_CLASS_ODF: usize = 0x4ce370; // GameObjectClass::GetOdfName(), thiscall
-const FN_GET_CO: usize = 0x4afe80; // ConstructionRig::GetConstructionObject(), thiscall
-const USER_PROFILE: usize = 0x76b5ac; // +0x84: the map editor is on
-const VIEW_RECORD: usize = 0x76b610;
-const S3D_TEAM: usize = 0x34; // Storm3D: the team colour of the instance drawn
 
 /// A welding edge, live (the engine's) or done and cooling (ours).
 #[derive(Clone, Copy)]
@@ -114,6 +81,8 @@ struct Set {
 
 pub struct Construction {
     pub on: bool,
+    /// `Enable=`: the part wants to run.
+    pub want: bool,
     s: Set,
     edges: Vec<Edge>,
     made: u32,
@@ -122,69 +91,14 @@ pub struct Construction {
     said_fallback: bool,
 }
 
-/// Walks `BuildingEffect::m_list` in order: each `Info`.
-fn walk(mut f: impl FnMut(usize)) {
-    let head = unsafe { rd::<usize>(BE_HEAD) };
-    let nil = unsafe { rd::<usize>(BE_NIL) };
-    if head == 0 || nil == 0 {
-        return;
-    }
-    let mut node = field(head, 0);
-    let mut guard = 0;
-    while node != 0 && node != head && guard < 1024 {
-        guard += 1;
-        let info = field(node, 0x14);
-        if info != 0 {
-            f(info);
-        }
-        let mut next = field(node, 8);
-        if next != nil {
-            while field(next, 0) != nil {
-                next = field(next, 0);
-            }
-            node = next;
-        } else {
-            let mut p = field(node, 4);
-            while node == field(p, 8) {
-                node = p;
-                p = field(p, 4);
-            }
-            if field(node, 8) != p {
-                node = p;
-            }
-        }
-    }
-}
-
 /// `BuildingEffect::Render`'s test: the builder is seen, or its team is one the player
 /// sees, or the editor is on, or the view is the one that shows everything.
 fn visible(info: usize) -> bool {
-    let b = object_of(field(info, I_BUILDER) as i32);
+    let b = hk::builder(info);
     if b != 0 && crate::engine::obj::can_user_see(b) {
         return true;
     }
-    let teams = unsafe {
-        let f: unsafe extern "C" fn() -> u32 = core::mem::transmute(FN_TEAMS_VISIBLE);
-        f()
-    };
-    if teams & field(info, I_TEAMS) as u32 != 0 {
-        return true;
-    }
-    unsafe { engine::field_u8(rd::<usize>(USER_PROFILE), 0x84) != 0 || rd::<u32>(VIEW_RECORD) == 2 }
-}
-
-fn class_odf(class: usize) -> &'static str {
-    if class == 0 {
-        return "";
-    }
-    unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(FN_CLASS_ODF);
-        let s = crate::rt::cstr_at(f(class), 260);
-        match s.len().checked_sub(4) {
-            Some(n) if s.is_char_boundary(n) && s[n..].eq_ignore_ascii_case(".odf") => &s[..n],
-            _ => s,
-        }
-    }
+    hk::teams_seen(info) || sees_all()
 }
 
 fn scale_sod(odf: &str) -> f32 {
@@ -193,12 +107,23 @@ fn scale_sod(odf: &str) -> f32 {
 
 impl Construction {
     pub fn new() -> Construction {
-        let c = Sec::new("Construction");
+        let c = Sec::with(blank(), "Construction");
+        Construction {
+            on: false,
+            want: false,
+            s: Self::read(&c),
+            edges: Vec::new(),
+            made: 0,
+            lights: LightPool::new(b"construction weld\0"),
+            said: 0,
+            said_fallback: false,
+        }
+    }
+
+    fn read(c: &Sec) -> Set {
         let life = c.pair("SparkLife", [0.2, 0.6]);
         let l0 = life[0].max(0.02);
-        Construction {
-            on: c.i("Enable", 1) != 0,
-            s: Set {
+        Set {
                 sparks: c.i("Sparks", 3).clamp(0, 16) as usize,
                 brightness: c.f("Brightness", 1.2),
                 flicker_rate: c.f("FlickerRate", 24.0).max(1.0),
@@ -225,13 +150,14 @@ impl Construction {
                 lights: c.i("Lights", 4).clamp(0, 8) as usize,
                 light: c.f("Light", 1.5),
                 light_reach: c.f("LightReach", 0.35),
-            },
-            edges: Vec::new(),
-            made: 0,
-            lights: LightPool::new(b"construction weld\0"),
-            said: 0,
-            said_fallback: false,
         }
+    }
+
+    /// `[Construction]`.
+    pub fn configure(&mut self, ini: &crate::rt::Ini) {
+        let c = Sec::of(ini, "Construction");
+        self.want = c.i("Enable", 1) != 0;
+        self.s = Self::read(&c);
     }
 
     /// The engine's edges into ours: new ones taken, gone ones marked done.
@@ -240,31 +166,31 @@ impl Construction {
             e.seen = false;
         }
         let mut infos = Vec::new();
-        walk(|i| infos.push(i));
+        hk::each_info(|i| infos.push(i));
         for &info in &infos {
             let vis = visible(info);
-            let complete = field(info, I_FACES) >= field(info, 0xc8);
+            let complete = hk::faces(info) >= hk::faces_total(info);
             for e in self.edges.iter_mut().filter(|e| e.info == info) {
                 e.complete = complete;
             }
-            let speed = engine::field_f32(info, I_SPEED).max(0.01);
-            let inst = info + I_INST;
-            let mut r = engine::field_f32(inst, 0x40);
+            let speed = hk::speed(info).max(0.01);
+            let inst = hk::instance(info);
+            let mut r = super::hooks::instance_radius(inst);
             if !(r > 1.0 && r < 1e5) {
                 r = 100.0;
             }
-            let centre = engine::field_v3(inst, 0x68);
-            let head = field(info, I_EDGES);
+            let centre = super::hooks::instance_centre(inst);
+            let head = hk::edges_head(info);
             if head == 0 {
                 continue;
             }
-            let mut n = field(head, 0);
+            let mut n = hk::edge_next(head);
             let mut guard = 0;
             while n != 0 && n != head && guard < 4096 {
                 guard += 1;
-                let s = super::rv3(n + E_START);
-                let e = super::rv3(n + E_END);
-                let t = engine::field_f32(n, E_T).clamp(0.0, 1.0);
+                let s = hk::edge_start(n);
+                let e = hk::edge_end(n);
+                let t = hk::edge_t(n).clamp(0.0, 1.0);
                 match self.edges.iter_mut().find(|x| x.done < 0.0 && x.node == n && (x.s - s).len() < 1e-3 && (x.e - e).len() < 1e-3) {
                     Some(x) => {
                         x.t = t;
@@ -294,7 +220,7 @@ impl Construction {
                         }
                     }
                 }
-                n = field(n, 0);
+                n = hk::edge_next(n);
             }
         }
         self.edges.retain(|e| e.complete || infos.contains(&e.info));
@@ -370,47 +296,29 @@ impl Construction {
         };
         self.gather(v.time);
         let mut infos = Vec::new();
-        walk(|i| infos.push(i));
+        hk::each_info(|i| infos.push(i));
         for info in infos {
             if !visible(info) {
                 continue;
             }
-            let faces = field(info, I_FACES) as i32;
-            let inst = info + I_INST;
+            let faces = hk::faces(info);
+            let inst = hk::instance(info);
             if faces <= 0 {
                 continue;
             }
-            let pos = engine::field_v3(inst, 0x68);
-            let culled = unsafe {
-                let f: unsafe extern "thiscall" fn(usize, *const V3, *const V3) -> u8 = core::mem::transmute(FN_DISTANCE_CULL);
-                f(inst, &v.eye, &pos) != 0
-            };
-            if culled {
+            let pos = super::hooks::instance_centre(inst);
+            if hk::distance_culled(inst, &v.eye, &pos) {
                 continue;
             }
-            let b = object_of(field(info, I_BUILDER) as i32);
-            let colour = if b != 0 {
-                unsafe {
-                    let f: unsafe extern "thiscall" fn(usize) -> *const V3 = core::mem::transmute(FN_TEAM_COLOUR);
-                    let p = f(b);
-                    if p.is_null() { engine::field_v3(info, I_COLOUR) } else { core::ptr::read_unaligned(p) }
-                }
-            } else {
-                engine::field_v3(info, I_COLOUR)
-            };
+            let b = hk::builder(info);
+            let colour = hk::team_colour(info, b);
             // As stock: the scale effects into the instance, its frustum test, its face
             // limit. Each writes only the effect's own instance.
-            let shown = unsafe {
-                let se: unsafe extern "C" fn(usize, usize) = core::mem::transmute(FN_SCALE_EFFECTS);
-                se(inst, field(info, I_SCALE_HANDLE));
-                let fl: unsafe extern "thiscall" fn(usize, i32) = core::mem::transmute(FN_FACE_LIMIT);
-                fl(inst, faces);
-                crate::scene::instance::frustum_test(inst, v.cam)
-            };
+            let shown = hk::prepare(inst, info, faces, v.cam);
             if shown {
-                let name = class_odf(field(info, I_CLASS));
+                let name = hk::class_odf(info);
                 let s = crate::scene::instance::instance_scale(inst) * scale_sod(name);
-                let mut world: M34 = engine::field_m34(inst, 0x44);
+                let mut world: M34 = super::hooks::instance_world(inst);
                 world.r[0] = world.r[0] * s.x;
                 world.r[1] = world.r[1] * s.y;
                 world.r[2] = world.r[2] * s.z;
@@ -421,29 +329,17 @@ impl Construction {
                     if self.said <= 4 || self.said % 600 == 0 {
                         log!(
                             "effects: construction: {} at {:.0},{:.0},{:.0}: {} of {} faces, {} welding edge(s) live",
-                            name, world.p.x, world.p.y, world.p.z, faces, field(info, 0xc8),
+                            name, world.p.x, world.p.y, world.p.z, faces, hk::faces_total(info),
                             self.edges.iter().filter(|e| e.info == info && e.done < 0.0).count()
                         );
                     }
                 } else {
                     // The engine's own draw of the instance, as stock makes it.
-                    unsafe {
-                        core::ptr::write_unaligned((engine::storm3d() + S3D_TEAM) as *mut V3, colour);
-                        let ri: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(engine::vtable(inst), 0x14));
-                        ri(inst, v.cam);
-                    }
+                    hk::engine_draw(inst, colour, v.cam);
                 }
             }
             // The construction object's on-screen byte, which the HUD reads.
-            if b != 0 && crate::scene::instance::render_fn(b) == crate::engine::instance::FN_RIG_RENDER {
-                unsafe {
-                    let f: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(FN_GET_CO);
-                    let co = f(b);
-                    if co != 0 {
-                        core::ptr::write_volatile((co + 0x25) as *mut u8, shown as u8);
-                    }
-                }
-            }
+            hk::mark_on_screen(b, shown);
         }
         true
     }
@@ -457,7 +353,7 @@ impl Construction {
             if len < 1e-4 {
                 continue;
             }
-            let wr = engine::field_f32(e.info, I_RADIUS);
+            let wr = hk::welding_radius(e.info);
             let wr = if e.done < 0.0 && wr > 0.0 && wr < 100.0 { wr } else { 1.0 };
             let edge_time = 1.0 / e.speed;
             let (end, age, fade) = if e.done < 0.0 {

@@ -15,30 +15,15 @@
 //! construction ship's; the drones' from `gdrones`), its emitters (the drones' steam)
 //! fed to the particles module; the beam as an arc of light (`weldfx` kind 4) with
 //! the repair welding's flare, hot spot and sparks at the spot, and a light on the hull.
-use super::{object_of, rnd, Cam, LightPool, Sec};
+use super::hooks::{bees as hk, sees_all};
+use super::{blank, rnd, Cam, LightPool, Sec};
 use super::weldfx::{self, Fx};
-use crate::engine::{self, field, rd};
 use crate::frame::steps::View;
 use crate::log;
 use crate::math::{v3, M34, V3};
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
-
-pub const VT_WORKER_BEE: usize = 0x6b017c;
-pub const VT_DRONE_COLONY: usize = 0x6afe98;
-const BEE_NIL: usize = 0x736bc4; // the bees' multimap's _Nil
-const SLOT_BEE_LIST: usize = 0x40; // the colony's GetBeeList()
-
-const B_POS: usize = 0x68;
-const B_WIDTH: usize = 0x88;
-const B_STATE: usize = 0x8c;
-const B_SPOT: usize = 0xac;
-const B_OWNER: usize = 0xbc;
-const STATE_WELDING: u32 = 4;
-
-const USER_PROFILE: usize = 0x76b5ac;
-const VIEW_RECORD: usize = 0x76b610;
 
 /// A bee welding this frame.
 #[derive(Clone, Copy)]
@@ -74,6 +59,8 @@ struct Set {
 
 pub struct Bees {
     pub on: bool,
+    /// `Enable=`: the part wants to run.
+    pub want: bool,
     s: Set,
     welds: Vec<Weld>,
     /// By the owner's ODF: the bee's SOD.
@@ -86,58 +73,34 @@ pub struct Bees {
 /// `BeeColony::ShouldDrawBee`: the owner is a live game object the player sees, or
 /// the editor is on, or the view shows everything.
 fn should_draw(bee: usize) -> usize {
-    let o = object_of(field(bee, B_OWNER) as i32);
-    let seen = o != 0 && engine::field_u8(o, 0x113) == 0 && crate::engine::obj::can_user_see(o);
-    if seen || unsafe { engine::field_u8(rd::<usize>(USER_PROFILE), 0x84) != 0 || rd::<u32>(VIEW_RECORD) == 2 } {
+    let o = hk::owner(bee);
+    let seen = o != 0 && !super::hooks::object_hidden(o) && crate::engine::obj::can_user_see(o);
+    if seen || sees_all() {
         if o != 0 { o } else { 1 }
     } else {
         0
     }
 }
 
-/// The colony's bees, in order.
-fn walk(colony: usize, mut f: impl FnMut(usize)) {
-    let list = unsafe {
-        let g: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(field(engine::vtable(colony), SLOT_BEE_LIST));
-        g(colony)
-    };
-    let head = field(list, 4);
-    let nil = unsafe { rd::<usize>(BEE_NIL) };
-    if head == 0 || nil == 0 {
-        return;
-    }
-    let mut node = field(head, 0);
-    let mut guard = 0;
-    while node != 0 && node != head && guard < 1024 {
-        guard += 1;
-        f(node + 0x10);
-        let mut next = field(node, 8);
-        if next != nil {
-            while field(next, 0) != nil {
-                next = field(next, 0);
-            }
-            node = next;
-        } else {
-            let mut p = field(node, 4);
-            while node == field(p, 8) {
-                node = p;
-                p = field(p, 4);
-            }
-            if field(node, 8) != p {
-                node = p;
-            }
-        }
-    }
-}
-
 impl Bees {
     pub fn new() -> Bees {
-        let c = Sec::new("Bees");
+        let c = Sec::with(blank(), "Bees");
+        Bees {
+            on: false,
+            want: false,
+            s: Self::read(&c),
+            welds: Vec::new(),
+            names: BTreeMap::new(),
+            drone_sod: None,
+            lights: LightPool::new(b"bee weld\0"),
+            said: 0,
+        }
+    }
+
+    fn read(c: &Sec) -> Set {
         let life = c.pair("SparkLife", [0.15, 0.45]);
         let l0 = life[0].max(0.02);
-        Bees {
-            on: c.i("Enable", 1) != 0,
-            s: Set {
+        Set {
                 beam: c.f("Beam", 0.9),
                 beam_col: c.rgb("BeamColour", [110.0, 160.0, 255.0]),
                 beam_min_px: c.f("BeamMinPixels", 2.5),
@@ -157,13 +120,19 @@ impl Bees {
                 light_col: c.rgb("LightColour", [150.0, 185.0, 255.0]),
                 light_reach: c.f("LightReach", 40.0),
                 brightness: c.f("Brightness", 1.3),
-            },
-            welds: Vec::new(),
-            names: BTreeMap::new(),
-            drone_sod: None,
-            lights: LightPool::new(b"bee weld\0"),
-            said: 0,
         }
+    }
+
+    /// Switched off: the welds of the last view go.
+    pub fn clear(&mut self) {
+        self.welds.clear();
+    }
+
+    /// `[Bees]`.
+    pub fn configure(&mut self, ini: &crate::rt::Ini) {
+        let c = Sec::of(ini, "Bees");
+        self.want = c.i("Enable", 1) != 0;
+        self.s = Self::read(&c);
     }
 
     /// The bee's SOD: the owner's `workerBeeName` for a worker bee, the drones' weapon's
@@ -194,7 +163,7 @@ impl Bees {
     pub fn feature(&mut self, colony: usize, drone: bool, v: &View) -> bool {
         let Some(hulls) = crate::core_services::hulls() else { return false };
         let mut bees = Vec::new();
-        walk(colony, |b| bees.push(b));
+        hk::walk(colony, |b| bees.push(b));
         for bee in bees {
             let owner = should_draw(bee);
             if owner == 0 {
@@ -202,7 +171,7 @@ impl Bees {
             }
             if crate::scene::instance::frustum_test(bee, v.cam) {
                 let name = self.sod(drone, owner);
-                let world: M34 = engine::field_m34(bee, 0x44);
+                let world: M34 = super::hooks::instance_world(bee);
                 let team = if owner > 1 { Some(crate::scene::instance::team_colour(owner)) } else { None };
                 if hulls.draw_instance(v, bee, bee, false, &name, &world, team) {
                     crate::core_particles::feed(bee, &name, &world, v);
@@ -211,18 +180,15 @@ impl Bees {
                         log!("effects: bees: {} drawn ({})", name, if drone { "drone" } else { "worker bee" });
                     }
                 } else {
-                    unsafe {
-                        let ri: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(engine::vtable(bee), 0x14));
-                        ri(bee, v.cam);
-                    }
+                    super::hooks::engine_render(bee, v.cam);
                 }
             }
-            if field(bee, B_STATE) as u32 == STATE_WELDING && self.welds.len() < 64 {
+            if hk::welding(bee) && self.welds.len() < 64 {
                 self.welds.push(Weld {
 
-                    from: engine::field_v3(bee, B_POS),
-                    spot: engine::field_v3(bee, B_SPOT),
-                    width: engine::field_f32(bee, B_WIDTH),
+                    from: hk::from(bee),
+                    spot: hk::spot(bee),
+                    width: hk::width(bee),
                     seed: super::hash32(bee as u32),
                 });
             }

@@ -73,11 +73,11 @@ section = "Modules"
 key = "effects"
 kind = "bool"
 default = "1"
-apply = "restart"
+apply = "live"
 scope = "local"
 tab = "graphics"
 label = "Effects"
-help = "render3d draws explosions, shields, repair and debris. Off hands them back to the game."
+help = "render3d draws explosions, shields, repair and debris. Off hands them back to the game. Effects already in flight finish in the look they started with."
 
 [[row]]
 name = "modules_ordnance"
