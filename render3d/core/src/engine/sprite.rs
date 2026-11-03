@@ -21,16 +21,18 @@
 use super::{field, field_f32, field_u8, rd, st3d_device, storm3d};
 use crate::math::V3;
 use alloc::string::String;
+use crate::engine::at;
+use crate::syms::sym;
 
 /// `ST3D_Sprite::DrawScaled3D`, the square facing the camera.
-pub const FN_DRAW_SCALED_3D: usize = 0x63aa60;
-const FN_ANIMATE: usize = 0x63a580; // ST3D_Sprite::Animate(), thiscall
-const TEX_OFFSET: usize = 0x7ad6d0; // ST3D_Sprite::m_texture_coordinate_offset, Vector2
+pub fn fn_draw_scaled_3d() -> usize { at(sym::FN_DRAW_SCALED_3D) }
+pub(crate) fn fn_animate() -> usize { at(sym::FN_ANIMATE) } // ST3D_Sprite::Animate(), thiscall
+pub(crate) fn tex_offset() -> usize { at(sym::TEX_OFFSET) } // ST3D_Sprite::m_texture_coordinate_offset, Vector2
 /// The time the engine's animation channels are evaluated at (`ST3D_AnimationChannel::
 /// Evaluate` reads it; `SetStartTime` sets it from Storm3D's wall clock): under the bench
 /// clock, the sim time while we call `Animate`, then put back (README "The animation clock").
-const ANIM_TIME: usize = 0x7a8e74;
-const FN_CAM_POS: usize = 0x6194d0; // ST3D_Camera::GetPosition() const, thiscall: Vector3*
+pub(crate) fn anim_time() -> usize { at(sym::ANIM_TIME) }
+pub(crate) fn fn_cam_pos() -> usize { at(sym::FN_CAM_POS) } // ST3D_Camera::GetPosition() const, thiscall: Vector3*
 
 /// `D3DBLEND_ONE`.
 pub const BLEND_ONE: u32 = 2;
@@ -61,9 +63,9 @@ pub fn look(sprite: usize) -> Option<Look> {
     let flags = field_u8(sprite, 0x50);
     if flags & 0x10 == 0 {
         unsafe {
-            let f: unsafe extern "thiscall" fn(usize) = core::mem::transmute(FN_ANIMATE);
+            let f: unsafe extern "thiscall" fn(usize) = core::mem::transmute(fn_animate());
             if crate::clock::bench() {
-                let t = ANIM_TIME as *mut f32;
+                let t = anim_time() as *mut f32;
                 let saved = t.read_unaligned();
                 t.write_unaligned(crate::clock::anim_now() as f32);
                 f(sprite);
@@ -73,7 +75,7 @@ pub fn look(sprite: usize) -> Option<Look> {
             }
         }
     }
-    let off: [f32; 2] = unsafe { rd(TEX_OFFSET) };
+    let off: [f32; 2] = unsafe { rd(tex_offset()) };
     let r: [f32; 4] = unsafe { rd(sprite + 0x38) };
     let mat = field(sprite, 0x54);
     let (mut src, mut dst) = (field(mat, 0x1c) as u32, field(mat, 0x20) as u32);
@@ -108,7 +110,7 @@ pub fn draw_scale() -> Option<f32> {
 /// A camera's position (`ST3D_Camera::GetPosition`).
 pub fn camera_position(cam: usize) -> V3 {
     unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> *const V3 = core::mem::transmute(FN_CAM_POS);
+        let f: unsafe extern "thiscall" fn(usize) -> *const V3 = core::mem::transmute(fn_cam_pos());
         core::ptr::read_unaligned(f(cam))
     }
 }

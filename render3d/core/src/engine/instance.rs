@@ -6,18 +6,20 @@
 //! as before.
 use super::{field, field_f32, field_u8, rd, storm3d};
 use crate::math::{v3, V3};
+use crate::engine::at;
+use crate::syms::sym;
 
 /// A plain `ST3D_Database`'s vtable.
-pub const VT_DATABASE: usize = 0x6bc56c;
+pub fn vt_database() -> usize { at(sym::VT_DATABASE) }
 /// `Shipyard::Render` (a Starbase too), `MiningStation::Render` (a TradingStation too)
 /// and `ConstructionRig::Render`: the classes whose `Render` shows or hides nodes.
-pub const FN_SHIPYARD_RENDER: usize = 0x4bb900;
-pub const FN_MINING_RENDER: usize = 0x4b44a0;
-pub const FN_RIG_RENDER: usize = 0x4af9b0;
+pub fn fn_shipyard_render() -> usize { at(sym::FN_SHIPYARD_RENDER) }
+pub fn fn_mining_render() -> usize { at(sym::FN_MINING_RENDER) }
+pub fn fn_rig_render() -> usize { at(sym::FN_RIG_RENDER) }
 /// The Evolver's cocoon (`CocoonInstance`, vtable 0x6b2630, of `8472_cocoon.sod`, whose
 /// database the engine keeps at 0x73fccc).
-pub const VT_COCOON: usize = 0x6b2630;
-pub const COCOON_DB: usize = 0x73fccc;
+pub fn vt_cocoon() -> usize { at(sym::VT_COCOON) }
+pub fn cocoon_db() -> usize { at(sym::COCOON_DB) }
 
 /// The class's `Render` (slot 11).
 pub fn render_fn(o: usize) -> usize {
@@ -109,7 +111,7 @@ pub fn element_name(e: usize) -> Option<&'static str> {
 /// planet's or another special database).
 pub fn draws_plain_sod(o: usize) -> bool {
     let db = field(super::obj::instance(o), 0x80);
-    db != 0 && super::vtable(db) == VT_DATABASE
+    db != 0 && super::vtable(db) == vt_database()
 }
 
 /// The engine's detail level (`ST3D_GraphicsEngine_Configuration+0x40`).
@@ -157,12 +159,12 @@ pub fn lights_hidden(inst: usize) -> bool {
 pub fn station_node(o: usize) -> Option<(usize, bool)> {
     let class = field(o, 0x40);
     match render_fn(o) {
-        FN_SHIPYARD_RENDER => {
+        fn_shipyard_render() => {
             let n = field(class, 0x4a4);
             let none = unsafe { rd::<usize>(0x6b41d8) };
             Some((n, field(o, 0x2b8) == none))
         }
-        FN_MINING_RENDER => {
+        fn_mining_render() => {
             let n = field(class, 0x4b0);
             let docked = unsafe {
                 let f: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(0x4d7020usize);

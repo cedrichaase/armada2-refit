@@ -7,8 +7,8 @@ use crate::engine::{self, field, rd, storm3d, vtable};
 use crate::math::{M34, V3};
 use alloc::vec::Vec;
 
-const VT_DIRECTIONAL: usize = 0x6bc8fc; // ST3D_Directional_Light
-const VT_POINT: usize = 0x6bc8ac; // ST3D_Point_Light
+pub(crate) fn vt_directional() -> usize { at(sym::VT_DIRECTIONAL) } // ST3D_Directional_Light
+pub(crate) fn vt_point() -> usize { at(sym::VT_POINT) } // ST3D_Point_Light
 
 #[derive(Clone, Copy, Debug)]
 pub struct Directional {
@@ -73,6 +73,8 @@ fn style_of(light: usize) -> Style {
 }
 
 pub use super::media::{FLAG_SHARE, MediumId, MediumParams, Response, Share};
+use crate::engine::at;
+use crate::syms::sym;
 
 static mut FLAGS: alloc::collections::BTreeMap<usize, u32> = alloc::collections::BTreeMap::new();
 
@@ -189,13 +191,13 @@ impl Lights {
             let colour: V3 = unsafe { rd(rec + 4) };
             let m: M34 = unsafe { rd(rec + 0x10) };
             match vtable(light) {
-                VT_DIRECTIONAL => {
+                vt_directional() => {
                     let d = m.r[2];
                     if d.len() > 1e-6 {
                         l.dirs.push(Directional { dir: d.norm(), colour });
                     }
                 }
-                VT_POINT => {
+                vt_point() => {
                     let (start, range) = unsafe { (rd::<f32>(light + 0x100), rd::<f32>(light + 0x104)) };
                     l.points.push(Point { pos: m.p, colour, start, range, light, style: style_of(light), medium: medium_of(light) });
                 }

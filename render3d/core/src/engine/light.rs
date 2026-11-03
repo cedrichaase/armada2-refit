@@ -2,21 +2,23 @@
 //! `ST3D_Point_Light` made once and registered each view after `GameObject_PreRenderAll`
 //! (`scene::lights::Pool`).
 use crate::math::M34;
+use crate::engine::at;
+use crate::syms::sym;
 
-pub const FN_NEW: usize = 0x652710; // operator new, cdecl
-pub const FN_POINT_LIGHT: usize = 0x62f240; // ST3D_Point_Light::ST3D_Point_Light(db, node, name), thiscall
-pub const FN_REGISTER_LIGHT: usize = 0x62d250; // ST3D_GraphicsEngine::RegisterLight(light, colour&, Matrix34&), thiscall
+pub fn fn_new() -> usize { at(sym::FN_NEW) } // operator new, cdecl
+pub fn fn_point_light() -> usize { at(sym::FN_POINT_LIGHT) } // ST3D_Point_Light::ST3D_Point_Light(db, node, name), thiscall
+pub fn fn_register_light() -> usize { at(sym::FN_REGISTER_LIGHT) } // ST3D_GraphicsEngine::RegisterLight(light, colour&, Matrix34&), thiscall
 
 /// A new point light named `name` (a NUL-terminated byte string); 0 if the engine could
 /// not allocate one.
 pub fn new_point_light(name: &'static [u8]) -> usize {
     unsafe {
-        let new: unsafe extern "C" fn(u32) -> usize = core::mem::transmute(FN_NEW);
+        let new: unsafe extern "C" fn(u32) -> usize = core::mem::transmute(fn_new());
         let l = new(0x138);
         if l == 0 {
             return 0;
         }
-        let ctor: unsafe extern "thiscall" fn(usize, usize, usize, *const u8) -> usize = core::mem::transmute(FN_POINT_LIGHT);
+        let ctor: unsafe extern "thiscall" fn(usize, usize, usize, *const u8) -> usize = core::mem::transmute(fn_point_light());
         ctor(l, 0, 0, name.as_ptr());
         l
     }
@@ -33,7 +35,7 @@ pub fn set_reach(light: usize, start: f32, range: f32) {
 /// `ST3D_GraphicsEngine::RegisterLight`.
 pub fn register(light: usize, colour: &[f32; 4], at: &M34) {
     unsafe {
-        let reg: unsafe extern "thiscall" fn(usize, usize, *const f32, *const M34) = core::mem::transmute(FN_REGISTER_LIGHT);
+        let reg: unsafe extern "thiscall" fn(usize, usize, *const f32, *const M34) = core::mem::transmute(fn_register_light());
         reg(super::storm3d(), light, colour.as_ptr(), at);
     }
 }

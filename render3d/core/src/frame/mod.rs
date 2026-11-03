@@ -32,7 +32,7 @@ use gpu::{ColorTarget, DepthTarget, Format, Load, Pass, Rect};
 use post::{PRect, Post, Targets};
 
 /// `Armada_RenderAllOurStuff(Armada_Camera*, Render_Stuff&, bool isMain)`, cdecl.
-const BODY: usize = 0x598110;
+pub(crate) fn body_addr() -> usize { at(sym::BODY) }
 const SITES: [usize; 2] = [0x59886e, 0x4e60f6];
 /// The functions the two calls are in, for the hooks' log (and Phase 8's profile).
 const SITE_SYMBOLS: [&str; 2] = ["Armada_RenderFrame", "CinematicView::RenderView"];
@@ -46,7 +46,7 @@ fn seam(i: usize, used_by: &'static str, to: usize) -> Hook {
         owner: ModuleId::CORE,
         used_by,
         kind: Kind::Call,
-        site: Site { symbol: SITE_SYMBOLS[i], addr: SITES[i], expect: BODY },
+        site: Site { symbol: SITE_SYMBOLS[i], addr: SITES[i], expect: body_addr() },
         to,
         chain: false,
     }
@@ -58,7 +58,7 @@ fn install_seams(used_by: &'static str, to: usize, who: &str) -> bool {
     let mut h = Hooks::core();
     for i in 0..SITES.len() {
         if !h.check(&seam(i, used_by, to)) {
-            log!("{}: the call at {:#x} is not to {:#x}: {}", who, SITES[i], BODY, if who == "frame" { "standing down" } else { "not timed" });
+            log!("{}: the call at {:#x} is not to {:#x}: {}", who, SITES[i], body_addr(), if who == "frame" { "standing down" } else { "not timed" });
             return false;
         }
     }
@@ -100,9 +100,11 @@ static mut RESET_VT: usize = 0;
 /// `ST3D_DeviceDirectX8`'s vtable and its slot 28, `DestroyRenderSurfaces` (0x624760),
 /// which releases the engine's device (`DestroyDevice`) at every change of display:
 /// between the shell's display and a mission's, and in Graphics Settings.
-use crate::engine::DX8_VTABLE;
+use crate::engine::dx8_vtable;
+use crate::engine::at;
+use crate::syms::sym;
 const SLOT_DESTROY: usize = 28;
-const DESTROY: usize = 0x624760;
+pub(crate) fn destroy_addr() -> usize { at(sym::DESTROY) }
 static mut DESTROY_NEXT: usize = 0;
 
 /// Points both call sites at our body. False, with nothing written, when either site
@@ -259,8 +261,8 @@ pub fn install_destroy() -> bool {
     let h = Hook {
         owner: ModuleId::CORE,
         used_by: "letting go of the device with the engine",
-        kind: Kind::Slot { vt: DX8_VTABLE, slot: SLOT_DESTROY },
-        site: Site { symbol: "ST3D_DeviceDirectX8::DestroyRenderSurfaces", addr: DX8_VTABLE, expect: DESTROY },
+        kind: Kind::Slot { vt: dx8_vtable(), slot: SLOT_DESTROY },
+        site: Site { symbol: "ST3D_DeviceDirectX8::DestroyRenderSurfaces", addr: dx8_vtable(), expect: destroy_addr() },
         to: destroy as *const () as usize,
         chain: true,
     };
@@ -270,7 +272,7 @@ pub fn install_destroy() -> bool {
             true
         }
         None => {
-            log!("frame: slot {} of {:#x} is not DestroyRenderSurfaces: the device is let go of when the next one is seen", SLOT_DESTROY, DX8_VTABLE);
+            log!("frame: slot {} of {:#x} is not DestroyRenderSurfaces: the device is let go of when the next one is seen", SLOT_DESTROY, dx8_vtable());
             false
         }
     }
