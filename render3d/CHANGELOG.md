@@ -29,7 +29,10 @@ logs `frame: standing down: no Vulkan or Direct3D 12 device behind the engine's`
   `gpu::d3d9::format_code` (same numbers, so logs and keys read as before).
 
 Installed, not yet seen in game. Pixel gate: `port-showcase`, `port-nebula` and
-`port-firing` against `roundD-base-*` at RMSE 0 (the root changelog has the run ids).
+`port-firing` against `roundD-base-*` at RMSE 0 (run 20261103-145601), `display-passthrough` at RMSE 0 against `p10-vk` and
+`display-passthrough-d3d12` at 0.479 (run 20261103-151214); `display-bail-out` and
+`display-fallback` show the stand-down lines; `render3d-settings-live`, `ui-menus-refit` and
+`no-assets` pass (run 20261103-151336).
 
 ## 0.47.0 — 2026-11-03
 

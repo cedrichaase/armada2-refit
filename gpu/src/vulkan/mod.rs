@@ -240,7 +240,7 @@ pub(crate) struct State {
     pub told: u32,
 }
 
-/// The backend's state for one plugin (as `d3d9::Gpu`): made at the first use once
+/// The backend's state for one plugin (as the removed Direct3D 9 one was): made at the first use once
 /// Display8 has said the plugins draw on Vulkan.
 pub struct Gpu {
     log: Log,

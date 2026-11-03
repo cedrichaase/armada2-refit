@@ -124,7 +124,7 @@ impl<'a> Cmd<'a> {
 
     // -- passes --
 
-    /// Begins a pass (see `d3d9::Cmd::begin_pass` for what the interface promises): the
+    /// Begins a pass (the interface promises what gpu/README.md says of the pass now): the
     /// targets made, the pass the pass now, its viewport its area. A clear is done at
     /// once (a load operation of the render pass over the whole target, else a clear of
     /// the area inside one); otherwise the render pass is opened at the first draw.

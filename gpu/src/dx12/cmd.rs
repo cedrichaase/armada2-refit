@@ -162,7 +162,7 @@ impl<'a> Cmd<'a> {
 
     // -- passes --
 
-    /// Begins a pass (see `d3d9::Cmd::begin_pass` for what the interface promises): the
+    /// Begins a pass (the interface promises what gpu/README.md says of the pass now): the
     /// targets made, the pass the pass now, its viewport its area, a clear done at once
     /// inside the area (every colour target with the first's colour, as Direct3D 9's
     /// `Clear`). `DontCare` keeps the contents, as Direct3D 9 does.
