@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.1 — 2026-11-03
+
+Layers: testbench 4.0.2.
+
+### Fixed
+- `tools/layers-selftest.py` no longer lists the retired `renderer` layer among the core layers the default and `--only` resolve to. Installed, not yet seen in game.
+
 ## 15.6.0 — 2026-11-03
 
 Layers: platform 4.0.0, renderer 3.0.0 (retired), gui-installer 3.0.0, testbench 4.0.1.

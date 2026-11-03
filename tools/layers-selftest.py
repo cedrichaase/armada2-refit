@@ -117,12 +117,12 @@ check(L.commands(toy, ['base', 'lib', 'app', 'twin']) ==
 
 # The real registry: the default is ./install's, and a2mod's filing.
 reg = L.load()
-check(L.resolve(reg) == ['platform', 'display', 'renderer', 'qol', 'rules', 'online', 'textures',
+check(L.resolve(reg) == ['platform', 'display', 'qol', 'rules', 'online', 'textures',
                          'models', 'cutscenes', 'render3d', 'ui'],
       'layers.toml: the default is every core and on layer')
-check(L.resolve(reg, only=['render3d']) == ['platform', 'display', 'renderer', 'render3d'],
+check(L.resolve(reg, only=['render3d']) == ['platform', 'display', 'render3d'],
       'layers.toml: --only render3d is the core layers and render3d')
-check(L.resolve(reg, only=['display']) == ['platform', 'display', 'renderer'],
+check(L.resolve(reg, only=['display']) == ['platform', 'display'],
       'layers.toml: --only display names a core layer, which is in anyway')
 for rel, suffix, want in [('Textures/RGB/mnebula4.TGA', L.BACKUP, 'textures'),
                           ('Textures/RGB/curs_arrow.tga', L.BACKUP, 'hud'),
