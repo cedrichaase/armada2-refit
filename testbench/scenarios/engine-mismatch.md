@@ -18,7 +18,8 @@ cannot run yet are in their own files (`engine-mismatch-hulls.md`,
 without the engine's mode requests died of a stack overflow; it forwarded to the old
 chain until display 1.0.0), Display8.log names the hook and the test and says
 `bail-out:`, and the game plays on the system's own Direct3D 8 with the plugins standing
-down: the stock shell, then a skirmish.
+down: the stock shell (4:3, centred with black sides, its Instant Action cube clicked in
+screen pixels), then a skirmish.
 
 **radar** (`ui.hud.radar`): UI.asi leaves the minimap to the engine. The Refit screen's
 Interface tab shows the `Minimap` row greyed, and pointing at it shows the note
@@ -58,7 +59,7 @@ other panels are ours). Display8 is on its stub here, so UI.asi draws on it.
 29. Radar: Press Escape.
 30. Radar: Wait 2 seconds.
 ## Mission
-31. Display: Click "INSTANT ACTION".
+31. Display: Click at 930,100.
 32. Display: Wait for "GAME SETUP".
 33. Display: Wait 2 seconds.
 34. Display: Click "LAUNCH".
