@@ -172,7 +172,8 @@ On Vulkan the engine's own draws pass through where the plugins draw nothing
 render3d 0.31.0 and UI 0.26.0 were the last release that had to ship together; from
 there a release of one may meet the others of the same major.
 `testbench/scenarios/display-abi-mismatch.md` runs both directions against 13.42.4
-(`bench-abi.sh`).
+(`bench-abi.sh`). Display8 0.11.0 beside the current plugins needs Menus.asi back (the
+shell's mode raise is Display8's since 0.18.0), which `bench-abi.sh` adds.
 
 ## Claims
 

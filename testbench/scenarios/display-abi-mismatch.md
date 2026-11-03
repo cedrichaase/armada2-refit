@@ -26,30 +26,42 @@ Display8s have passthrough on Vulkan), the game reaches the menu and a mission, 
 nothing crashes. With the UI standing down the shell is the stock one, 800x600 at the
 screen's top left, so the Instant Action cube is clicked in screen pixels.
 
+Since display 0.18.0 the shell's 800x600 request is raised by Display8, not by the UI
+(`[Window]`); display 0.11.0's stub offers the desktop's mode alone, so the engine
+would fail to create its device (a Wine stack overflow before the menu) with no one to
+raise it. A player who mixes files like this needs what raised it before: in
+**olddisplay** `display/bench-abi.sh` puts Menus.asi back (`ui/bench-legacy.sh menus`),
+which raises the mode and scales the shell to the screen, the UI's menus standing
+down beside it; the cube is then at 930,100. Menus.asi also changes what the engine draws,
+which the old stub drops, so that Display8 falls back to forward mode and the UI's HUD draws on
+Direct3D 9; the game is not quit through its menus (their buttons moved), the case's end stops it.
+
 ## Main menu
 1. Launch the game.
 2. Wait up to 300 seconds for the main menu.
 3. Wait 5 seconds.
 4. Take a screenshot called "main menu".
 5. Olddisplay: Expect "UI.log" contains "is too old for this plugin (no contract handshake".
-6. Olddisplay: Expect "UI.log" contains "runs stock: no Direct3D 9, Vulkan or Direct3D 12 device to draw with".
+6. Olddisplay: Expect "UI.log" not contains "menus: hosted by the UI".
 7. Olddisplay: Expect "UI.log" not contains "no Display8 (the game's d3d8.dll is another chain's)".
 
 ## Mission
-8. Click at 640,90.
-9. Wait for "GAME SETUP".
-10. Wait 2 seconds.
-11. Click "LAUNCH".
-12. Wait 60 seconds.
-13. Take a screenshot called "mission".
-14. Check that the screenshot shows a space battle map of Star Trek: Armada II drawn by the game (stars, ships or stations, or the game's own interface), not a black or garbled screen.
-15. Expect "Display8.log" contains "passthrough: the engine's first draw".
-16. Olddisplay: Expect "Render3D.log" contains "is too old for this plugin (no contract handshake".
-17. Oldplugins: Expect "Display8.log" contains "Render3D.asi is loaded and has not asked for the contract".
-18. Oldplugins: Expect "Display8.log" contains "UI.asi is loaded and has not asked for the contract".
-19. Oldplugins: Expect "Display8.log" not contains "contract: Render3D.asi asks for".
-20. Expect "Display8.log" not contains "PANIC".
-21. Expect "Render3D.log" not contains "PANIC".
-22. Expect "UI.log" not contains "PANIC".
-23. Quit the game.
-24. Expect no crash.
+8. Oldplugins: Click at 640,90.
+9. Olddisplay: Click at 930,100.
+10. Wait for "GAME SETUP".
+11. Wait 2 seconds.
+12. Click "LAUNCH".
+13. Wait 60 seconds.
+14. Take a screenshot called "mission".
+15. Check that the screenshot shows a space battle map of Star Trek: Armada II drawn by the game (stars, ships or stations, or the game's own interface), not a black or garbled screen.
+16. Oldplugins: Expect "Display8.log" contains "passthrough: the engine's first draw".
+17. Olddisplay: Expect "Display8.log" contains "forward mode instead".
+18. Olddisplay: Expect "Render3D.log" contains "is too old for this plugin (no contract handshake".
+19. Oldplugins: Expect "Display8.log" contains "Render3D.asi is loaded and has not asked for the contract".
+20. Oldplugins: Expect "Display8.log" contains "UI.asi is loaded and has not asked for the contract".
+21. Oldplugins: Expect "Display8.log" not contains "contract: Render3D.asi asks for".
+22. Expect "Display8.log" not contains "PANIC".
+23. Expect "Render3D.log" not contains "PANIC".
+24. Expect "UI.log" not contains "PANIC".
+25. Oldplugins: Quit the game.
+26. Expect no crash.

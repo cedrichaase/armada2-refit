@@ -63,5 +63,10 @@ case "$which" in
     old-display)
         [ -f "$game/d3d8_real.dll" ] || { echo "no d3d8_real.dll in $game: install Display8 first (--install .)" >&2; exit 1; }
         cp "$cache/d3d8.dll" "$game/d3d8.dll"
+        # Since display 0.18.0 the shell's 800x600 request is raised by Display8 (it was
+        # the UI's, then): the old stub offers the desktop's mode alone, so the engine
+        # would fail to create its device before the menu. Menus.asi does that raise
+        # itself, and the UI's menus stand down beside it.
+        bash "$repo/ui/bench-legacy.sh" "$state" menus
         echo "$sha's d3d8.dll -> $game/ (beside this checkout's Render3D.asi and UI.asi)" ;;
 esac

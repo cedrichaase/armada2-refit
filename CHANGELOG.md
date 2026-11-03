@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 14.10.1 — 2026-11-03
+
+Layers: testbench 3.103.1.
+
+### Fixed
+- `display-abi-mismatch` olddisplay half brought up to date after display 0.18.0 (bench setup and scenario only; no plugin change). Installed, not yet seen in game.
+
 ## 14.10.0 — 2026-11-03
 
 Layers: display 0.19.0, render3d 0.47.0, ui 1.1.1 (gpu 1.3.0).
