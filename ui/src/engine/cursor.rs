@@ -8,21 +8,16 @@
 //! `+0x60` is empty. Hiding it for a frame therefore needs no change to what the engine
 //! chose: `RefreshDisplay` is wrapped, through its vtable slot, to empty `+0x60` for
 //! the one call and put it back.
-use super::{field, rd, storm3d};
-use crate::engine::hook;
+use super::{eng, field, rd, storm3d};
+use crate::engine::hook as patch;
+use crate::syms_core::{field, hook, sym};
 
-/// `ST3D_DeviceDirectX8`'s vtable.
-const DEVICE_VTABLE: usize = 0x6bc6ac;
-/// Its slot 26 (+0x68): `ST3D_DeviceDirectX8::RefreshDisplay`, thiscall.
-const SLOT_REFRESH: usize = 0x68 / 4;
-const REFRESH_DISPLAY: usize = 0x624630;
-/// `ST3D_DeviceDirectX8+0x60`: the cursor sprite `SetCursor` was last given.
-const DEV_CURSOR: usize = 0x60;
-/// `ST3D_DeviceDirectX8+0xe0`: set when the engine draws the cursor itself
-/// (`SetSynchronousCursor`), clear for a Direct3D hardware cursor.
-const DEV_SYNCHRONOUS: usize = 0xe0;
-/// `ST3D_DatabaseElement+0x8`: the element's name (a cursor sprite's `cursor.spr` name).
-const ELEMENT_NAME: usize = 0x8;
+// The profile's (`ui.core.toml`, hooks `core.cursor`, `core.cursor_probe`,
+// `core.cursor_square`): `ST3D_DeviceDirectX8`'s slot 26 (+0x68), `RefreshDisplay`,
+// thiscall; `ST3D_DeviceDirectX8+0x60`, the cursor sprite `SetCursor` was last given;
+// `+0xe0`, set when the engine draws the cursor itself (`SetSynchronousCursor`), clear
+// for a Direct3D hardware cursor; and `ST3D_DatabaseElement+0x8`, the element's name (a
+// cursor sprite's `cursor.spr` name).
 
 static mut HIDE: bool = false;
 /// Whether the latest `RefreshDisplay` (while it runs: this one) hides the engine's
@@ -49,28 +44,27 @@ static mut SPRITE: usize = 0;
 
 /// The engine's current device (`Storm3D+0xcc`), 0 before there is one.
 fn device() -> usize {
-    field(storm3d(), 0xcc)
+    field(storm3d(), field::CORE_STORM3D_DEVICES)
 }
 
 /// Wraps `RefreshDisplay`. False, with nothing written, when its slot is not stock.
 pub fn install() -> bool {
-    let slot = DEVICE_VTABLE + SLOT_REFRESH * 4;
-    if unsafe { rd::<usize>(slot) } != REFRESH_DISPLAY {
-        crate::log!("cursor: RefreshDisplay's slot is not stock: the engine's cursor cannot be hidden");
+    if eng().ready(hook::CORE_CURSOR).is_err() {
+        crate::log!("cursor: the engine's cursor cannot be hidden");
         return false;
     }
-    let ok = hook::patch_slot(DEVICE_VTABLE, SLOT_REFRESH, refresh as *const () as usize).is_some();
+    let ok = patch::patch_slot(eng().addr(sym::CORE_SLOT_REFRESH), 0, refresh as *const () as usize).is_some();
     unsafe { INSTALLED = ok };
     ok
 }
 
 unsafe extern "thiscall" fn refresh(dev: usize) {
-    let stock: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(REFRESH_DISPLAY) };
+    let stock: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(eng().addr(sym::CORE_REFRESH_DISPLAY)) };
     let hide = unsafe { core::mem::take(&mut *core::ptr::addr_of_mut!(HIDE)) };
     if dev == 0 {
         return unsafe { stock(dev) };
     }
-    let p = (dev + DEV_CURSOR) as *mut usize;
+    let p = (dev + field::CORE_DX8_CURSOR) as *mut usize;
     unsafe { HIDING = hide };
     unsafe {
         let sprite = *p;
@@ -81,7 +75,7 @@ unsafe extern "thiscall" fn refresh(dev: usize) {
             SUPPRESS = hide;
             stock(dev);
             SUPPRESS = false;
-            let sync = rd::<u8>(dev + DEV_SYNCHRONOUS) != 0;
+            let sync = rd::<u8>(dev + field::CORE_DX8_SYNCHRONOUS) != 0;
             let shown = sync && sprite != 0 && REACHED;
             if sync && sprite != 0 && shown != SHOWN {
                 crate::log!("cursor: the engine's cursor is {}", if shown { "shown" } else { "held back (something before ours skips its draw)" });
@@ -120,7 +114,7 @@ pub fn hide_this_frame() {
 /// Direct3D hardware cursor, which `hide_this_frame` does not reach.
 pub fn synchronous() -> bool {
     let d = device();
-    d != 0 && unsafe { rd::<u8>(d + DEV_SYNCHRONOUS) } != 0
+    d != 0 && unsafe { rd::<u8>(d + field::CORE_DX8_SYNCHRONOUS) } != 0
 }
 
 /// The name of the cursor the engine shows now, as `cursor.spr` names it (the move,
@@ -128,12 +122,12 @@ pub fn synchronous() -> bool {
 /// hook): that is when this frame's choice has reached the device. None when no cursor
 /// is shown.
 pub fn shape() -> Option<&'static str> {
-    element_name(field(device(), DEV_CURSOR))
+    element_name(field(device(), field::CORE_DX8_CURSOR))
 }
 
 /// A cursor sprite's `cursor.spr` name; None for no sprite.
 pub fn element_name(sprite: usize) -> Option<&'static str> {
-    let name = field(sprite, ELEMENT_NAME);
+    let name = field(sprite, field::CORE_ELEMENT_NAME);
     if name == 0 {
         return None;
     }
@@ -166,18 +160,13 @@ pub fn installed() -> bool {
 
 // ---- the engine's cursor, square at any aspect --------------------------------------
 
-/// In `RefreshDisplay`: the `call ST3D_Sprite::DrawScaled2D` that draws the
-/// synchronous cursor, after `SetScaleFactor2D(&device+0x18)`.
-const SITE_CURSOR_DRAW: usize = 0x6246fa;
-const DRAW_SCALED_2D: usize = 0x63ada0;
-/// `ST3D_Sprite`'s global 2D scale `{x, y}` that `DrawScaled2D` multiplies by.
-const SCALE_2D: usize = 0x7ad6e8;
-/// `ST3D_Sprite+0x30`: the sprite's hotspot x, in texels.
-const SPRITE_ORIGIN_X: usize = 0x30;
-/// In `SetCursor`: `fmuls 0x18(%esi)`, the hardware cursor's width times the x scale.
-const SITE_HW_SCALE: usize = 0x625dd9;
-const HW_SCALE_STOCK: [u8; 3] = [0xd8, 0x4e, 0x18];
-const HW_SCALE_SQUARE: [u8; 3] = [0xd8, 0x4e, 0x1c];
+// In `RefreshDisplay`: the `call ST3D_Sprite::DrawScaled2D` that draws the synchronous
+// cursor, after `SetScaleFactor2D(&device+0x18)`; `ST3D_Sprite`'s global 2D scale
+// `{x, y}` that `DrawScaled2D` multiplies by; `ST3D_Sprite+0x30`, the sprite's hotspot x,
+// in texels; and, in `SetCursor`, `fmuls 0x18(%esi)`, the hardware cursor's width times
+// the x scale: its displacement byte (the third) becomes the y scale's, one float on.
+const HW_SCALE_DISP: usize = 2;
+const HW_SCALE_DISP_Y: u8 = 0x1c; // not an address
 
 /// Wraps the one `DrawScaled2D` call in `RefreshDisplay` that draws the synchronous
 /// cursor (the probe). Through it the UI learns whether the engine's draw of its cursor
@@ -187,11 +176,15 @@ const HW_SCALE_SQUARE: [u8; 3] = [0xd8, 0x4e, 0x1c];
 /// draw (`hide_this_frame`), so the engine's choices are left as they are. Chains to
 /// whatever the call went to (stock, or HUD.asi's wrap). Made before any mission.
 pub fn install_probe() -> bool {
-    let Some(next) = super::hook::call_target(SITE_CURSOR_DRAW) else {
-        crate::log!("cursor: RefreshDisplay's cursor draw is not a call: the UI cannot see whether the engine's cursor is shown");
+    if eng().ready(hook::CORE_CURSOR_PROBE).is_err() {
+        crate::log!("cursor: the UI cannot see whether the engine's cursor is shown");
+        return false;
+    }
+    let site = eng().addr(sym::CORE_SITE_CURSOR_DRAW);
+    let Some(next) = patch::call_target(site) else {
         return false;
     };
-    let ok = super::hook::patch_call(SITE_CURSOR_DRAW, next, cursor_draw as *const () as usize);
+    let ok = patch::patch_call(site, next, cursor_draw as *const () as usize);
     if ok {
         unsafe { PROBE = Some(next) };
     }
@@ -218,11 +211,19 @@ pub fn install_square() -> bool {
         crate::log!("cursor: cursor-aspect.py's squashed art is installed: the engine's cursor is left as it is");
         return false;
     }
-    if unsafe { PROBE } != Some(DRAW_SCALED_2D) || !super::starts(SITE_HW_SCALE, &HW_SCALE_STOCK) {
-        crate::log!("cursor: RefreshDisplay's or SetCursor's site is not stock: the engine's cursor is left as it is");
+    if eng().ready(hook::CORE_CURSOR_SQUARE).is_err() {
+        crate::log!("cursor: SetCursor's site is not stock: the engine's cursor is left as it is");
         return false;
     }
-    let ok = super::hook::patch_bytes(SITE_HW_SCALE, &HW_SCALE_STOCK, &HW_SCALE_SQUARE);
+    if unsafe { PROBE } != Some(eng().addr(sym::CORE_DRAW_SCALED_2D)) {
+        crate::log!("cursor: RefreshDisplay's draw is not stock: the engine's cursor is left as it is");
+        return false;
+    }
+    let site = eng().addr(sym::CORE_SITE_HW_SCALE);
+    let stock: [u8; 3] = unsafe { core::ptr::read_unaligned(site as *const [u8; 3]) };
+    let mut square = stock;
+    square[HW_SCALE_DISP] = HW_SCALE_DISP_Y;
+    let ok = patch::patch_bytes(site, &stock, &square);
     unsafe { SQUARE = ok };
     crate::log!("cursor: the engine's cursor {}", if ok { "is kept square" } else { "could not be patched" });
     ok
@@ -236,11 +237,11 @@ unsafe extern "thiscall" fn cursor_draw(sprite: usize, pos: *mut f32, w: f32, h:
         }
         let Some(next) = PROBE else { return };
         let draw: unsafe extern "thiscall" fn(usize, *mut f32, f32, f32) = core::mem::transmute(next);
-        let scale = SCALE_2D as *mut f32;
+        let scale = eng().addr(sym::CORE_SCALE_2D) as *mut f32;
         let (sx, sy) = (*scale, *scale.add(1));
         if SQUARE && sx > 0.0 && sy > 0.0 && sx != sy && !pos.is_null() {
             // The engine passes pointer / scale - hotspot: the same point at the y scale.
-            let ox: f32 = rd(sprite + SPRITE_ORIGIN_X);
+            let ox: f32 = rd(sprite + field::CORE_SPRITE_ORIGIN_X);
             *pos = (*pos + ox) * sx / sy - ox;
             *scale = sy;
             draw(sprite, pos, w, h);

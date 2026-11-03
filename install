@@ -65,6 +65,13 @@ for old in "${old_bloom[@]}"; do
     rm -rf "$old"
     echo "removed the old vkBasalt bloom: $old"
 done
+# Retired from the game directory: A2EngineTest.ini, the bench's fault injection
+# (crates/a2engine/README.md, "The test mismatch file"), which no install ships.
+for old in "$A2_GAME/A2EngineTest.ini"; do
+    [ -e "$old" ] || continue
+    rm -f "$old"
+    echo "removed $old (a test bench file)"
+done
 "$here/a2tex" install
 "$here/models/install.sh"
 "$here/cutscenes/binkproxy/install.sh"

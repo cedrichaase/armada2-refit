@@ -4,6 +4,24 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.17.0 — 2026-11-03
+
+### Changed
+- On the symbol profile (`profiles/gog-1.1/display.toml`, generated `src/engine_syms.rs`): hooks `display.modes` (FindDisplayMode, its six calls, the front end's 800x600x16 as `value` entries) and `display.drop` (the `[Drop]` and claimed-scene code ranges). No address is left in the sources. Display8.log logs the build line and `engine: symbols: 15/15 resolved; 0 hooks blocked` after the identity line.
+- `display.modes` is now all or nothing: if FindDisplayMode or any of its six calls is not stock, none is written.
+
+### Added
+- On a build it does not know, or with `display.modes` standing down, Display8 forwards to the old chain instead of starting the stub (`engine: unknown build: Display8 forwards to the old chain`): measured, the stub cannot open a display without its mode hook. `display.drop` standing down drops nothing and claims no scene of the engine's.
+
+Installed, not yet seen in game
+
+## 0.16.1 — 2026-11-03
+
+### Added
+- Display8.log logs `engine: Armada2.exe timestamp 0x…, image size 0x…, sections 0x…` (the executable's identity: `crates/a2engine`, `csdk/a2engine.h`) right after its start-up line. Changes no behaviour. `trace::exe_range` reads the module through the same PE reader.
+
+Installed, not yet seen in game
+
 ## 0.16.0 — 2026-11-02
 
 ### Added

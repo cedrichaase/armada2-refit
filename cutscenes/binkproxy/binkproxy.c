@@ -32,6 +32,7 @@
 
 #define A2_FLTUSED
 #include "../../csdk/a2asi.h"
+#include "../../csdk/a2engine.h"
 #include "settings_table.h"
 
 typedef long long           LONGLONG;
@@ -1071,6 +1072,8 @@ BOOL WINAPI DllMain(HANDLE inst, DWORD reason, void *res)
     if (h < 480) h = GetSystemMetrics(SM_CYSCREEN);
 
     for (i = 0; i < MAX_W; i++) g_black[i] = 0xFF000000;
+
+    a2e_log(logline);
 
     m[0] = 0;
     s_cat(m, "--- BinkProxy loaded: replace="); s_num(m, g_replace);

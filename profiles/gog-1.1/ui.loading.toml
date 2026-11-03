@@ -1,0 +1,174 @@
+# UI.asi's symbols in Armada2.exe 1.1 (GOG): part "loading" (ui/src/engine/loading.rs).
+# The findings are in ui/LOADING.md, "Hooks".
+schema = 1
+plugin = "ui"
+readme = "ui/LOADING.md"
+lang = "rust"
+out = "ui/src/syms_loading.rs"
+
+[hook."loading.overlay"]
+doc = "The UI drawn over the engine's loading frame, in place of its DeleteRegisteredLights call"
+
+[hook."loading.own"]
+doc = "The load's splash and status updates hooked, for the loading screen of ours and its frames"
+rows = ["Loading.Enable"]
+
+[hook."loading.inner_db"]
+doc = "A frame of ours after each SOD (LoadDatabase) a loading step reads"
+rows = ["Loading.Enable"]
+
+[hook."loading.inner_pixels"]
+doc = "A frame of ours after each texture's pixels (LoadPixelData) a loading step reads"
+rows = ["Loading.Enable"]
+
+[hook."loading.reads_progress"]
+doc = "How far a load has got, read from the load bar's fraction and the loading-screen flag"
+
+[hook."loading.reads_pump"]
+doc = "The engine's message pump, called while [Loading] Hold keeps the screen up (bench only)"
+
+# ---- loading.overlay ------------------------------------------------------------------
+
+[[sym]]
+id = "loading_load_fraction"
+symbol = "LoadBarComputeFraction"
+kind = "fn"
+addr = 0x601ce0
+check = "d9 05 18 e2 6a 00 d8 25 28 88 7a 00"
+used_by = ["loading.overlay"]
+
+[[sym]]
+id = "loading_delete_lights"
+symbol = "ST3D_GraphicsEngine::DeleteRegisteredLights"
+kind = "fn"
+addr = 0x62d2e0
+used_by = ["loading.overlay"]
+
+[[sym]]
+id = "loading_lights_site"
+symbol = "RenderLoopAssetLoadStatusUpdate"
+kind = "call"
+addr = 0x598f53
+target = "loading_delete_lights"
+in = "RenderLoopAssetLoadStatusUpdate"
+used_by = ["loading.overlay"]
+
+[[sym]]
+id = "loading_end_scene_site"
+symbol = "RenderLoopAssetLoadStatusUpdate"
+kind = "label"
+addr = 0x598fa0
+in = "RenderLoopAssetLoadStatusUpdate"
+check = "ff 50 34"
+used_by = ["loading.overlay"]
+
+# ---- loading.own ----------------------------------------------------------------------
+
+[[sym]]
+id = "loading_status_update"
+symbol = "RenderLoopAssetLoadStatusUpdate"
+kind = "fn"
+addr = 0x598ba0
+check = "55 8b ec 81 ec 88 00 00 00"
+used_by = ["loading.own"]
+
+[[sym]]
+id = "loading_show_splash"
+symbol = "RenderLoop_Show_Splash_Screen"
+kind = "fn"
+addr = 0x598ff0
+check = "55 8b ec 6a ff"
+used_by = ["loading.own"]
+
+[[sym]]
+id = "loading_status_site"
+symbol = "LoadBarNext"
+kind = "call"
+addr = 0x6019eb
+target = "loading_status_update"
+in = "LoadBarNext"
+used_by = ["loading.own"]
+
+[[sym]]
+id = "loading_splash_site"
+symbol = "Program::GameDoOne"
+kind = "call"
+addr = 0x4871ad
+target = "loading_show_splash"
+in = "Program::GameDoOne"
+used_by = ["loading.own"]
+
+# ---- loading.inner_db / inner_pixels --------------------------------------------------
+
+[[sym]]
+id = "loading_load_db"
+symbol = "ST3D_GraphicsEngine::LoadDatabase"
+kind = "fn"
+addr = 0x62ccd0
+used_by = ["loading.inner_db"]
+
+[[sym]]
+id = "loading_load_db_site_logical_a"
+symbol = "ST3D_GraphicsEngine::FindLogicalDatabase"
+kind = "call"
+addr = 0x62cf2a
+target = "loading_load_db"
+in = "ST3D_GraphicsEngine::FindLogicalDatabase"
+used_by = ["loading.inner_db"]
+
+[[sym]]
+id = "loading_load_db_site_logical_b"
+symbol = "ST3D_GraphicsEngine::FindLogicalDatabase"
+kind = "call"
+addr = 0x62cf44
+target = "loading_load_db"
+in = "ST3D_GraphicsEngine::FindLogicalDatabase"
+used_by = ["loading.inner_db"]
+
+[[sym]]
+id = "loading_load_db_site_visible"
+symbol = "ST3D_GraphicsEngine::FindVisibleDatabase"
+kind = "call"
+addr = 0x62cf79
+target = "loading_load_db"
+in = "ST3D_GraphicsEngine::FindVisibleDatabase"
+used_by = ["loading.inner_db"]
+
+[[sym]]
+id = "loading_load_pixels"
+symbol = "ST3D_Texture::LoadPixelData"
+kind = "fn"
+addr = 0x6434b0
+used_by = ["loading.inner_pixels"]
+
+[[sym]]
+id = "loading_load_pixels_site"
+symbol = "ST3D_Texture::DemandLoad"
+kind = "call"
+addr = 0x6426e2
+target = "loading_load_pixels"
+in = "ST3D_Texture::DemandLoad"
+used_by = ["loading.inner_pixels"]
+
+# ---- loading.reads_progress / reads_pump ----------------------------------------------
+
+[[sym]]
+id = "loading_fraction_remaining"
+symbol = "s_fractionRemaining"
+kind = "global"
+addr = 0x7a8828
+used_by = ["loading.reads_progress"]
+
+[[sym]]
+id = "loading_status_visible"
+symbol = "Armada_AssetLoadStatusVisible"
+kind = "global"
+addr = 0x773be4
+used_by = ["loading.reads_progress"]
+
+[[sym]]
+id = "loading_handle_message_queue"
+symbol = "HandleMessageQueue"
+kind = "fn"
+addr = 0x488730
+used_by = ["loading.reads_pump"]

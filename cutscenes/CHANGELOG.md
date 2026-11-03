@@ -4,6 +4,13 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`binkproxy/README.md`](binkproxy/README.md).
 
+## 2.5.1 — 2026-11-03
+
+### Added
+- BinkProxy.log logs the identity line before its `loaded` line (`csdk/a2engine.h`). Changes no behaviour.
+
+Installed, not yet seen in game
+
 ## 2.5.0 — 2026-11-02
 
 ### Added

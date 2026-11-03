@@ -68,20 +68,32 @@ pub fn starts(a: usize, bytes: &[u8]) -> bool {
     ok
 }
 
-/// `ST3D_GraphicsEngine*` (Storm3D).
-pub const STORM3D: usize = 0x7ad508;
-pub fn storm3d() -> usize {
-    unsafe { rd::<usize>(STORM3D) }
+use crate::syms_core::{sym, TABLE};
+
+/// The core part's engine profile (`profiles/gog-1.1/ui.core.toml`).
+pub(crate) fn eng() -> &'static a2engine::Engine {
+    TABLE.engine()
 }
 
-/// The game's `IDirect3DDevice8`: Storm3D `+0xc0` index into the device table at
-/// `+0xcc`, the `ST3D_DeviceDirectX8` holding it at `+0x90` (render3d/README.md).
+/// `ST3D_GraphicsEngine*` (Storm3D): 0 when the global is not known on this build (the
+/// hook `core.storm3d` is not ready) or the engine has not made it yet. Asked lazily by
+/// every reader: `ready` is cached, so this is cheap.
+pub fn storm3d() -> usize {
+    if eng().ready(crate::syms_core::hook::CORE_STORM3D).is_err() {
+        return 0;
+    }
+    let g = eng().addr(sym::CORE_STORM3D);
+    if g == 0 { 0 } else { unsafe { rd::<usize>(g) } }
+}
+
+/// The game's `IDirect3DDevice8`: Storm3D's device index selects a device from the table
+/// in Storm3D, the `ST3D_DeviceDirectX8` holding it (render3d/README.md).
 pub fn d3d8_device() -> *mut c_void {
     let s = storm3d();
     if s == 0 {
         return core::ptr::null_mut();
     }
-    let idx = field(s, 0xc0);
-    let dev = field(s + 0xcc, idx * 4);
-    field(dev, 0x90) as *mut c_void
+    let idx = field(s, crate::syms_core::field::CORE_STORM3D_DEVICE_INDEX);
+    let dev = field(s + crate::syms_core::field::CORE_STORM3D_DEVICES, idx * 4);
+    field(dev, crate::syms_core::field::CORE_DX8_D3D8_DEVICE) as *mut c_void
 }

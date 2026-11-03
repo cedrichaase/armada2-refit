@@ -34,6 +34,23 @@ mod settings_table;
 pub mod shaders;
 pub mod style;
 pub mod surface;
+pub mod syms;
+#[rustfmt::skip]
+pub mod syms_core;
+#[rustfmt::skip]
+pub mod syms_dialogs;
+#[rustfmt::skip]
+pub mod syms_hud;
+#[rustfmt::skip]
+pub mod syms_info;
+#[rustfmt::skip]
+pub mod syms_loading;
+#[rustfmt::skip]
+pub mod syms_panels;
+#[rustfmt::skip]
+pub mod syms_radar;
+#[rustfmt::skip]
+pub mod syms_shell;
 pub mod text;
 pub mod widgets;
 
@@ -58,6 +75,8 @@ fn startup() {
     let _ = config::load();
     clock::load();
     log!("UI {} -- game dir {}", env!("CARGO_PKG_VERSION"), rt::game_dir());
+    // The identity, the build and each part's symbols summary (crates/a2engine).
+    syms::init();
     if !cfg.enable {
         log!("Enable=0: standing down");
         return;
@@ -107,9 +126,14 @@ fn startup() {
 pub extern "C" fn UI_SettingsNote(row: *const rt::settings::Setting) -> *const u8 {
     use settings_table::{HUD_BAR, HUD_BARHIDDEN, HUD_BARKEYS, HUD_BARLABELS, HUD_ENABLE};
     if row.is_null() {
-        return core::ptr::null();
+        // The plugin as a whole: an Armada2.exe Refit does not know.
+        return syms::note_plugin().unwrap_or(core::ptr::null());
     }
     let r = unsafe { &*row };
+    // Why a hook that feeds this row stood down, in the engine's own words.
+    if let Some(n) = syms::note_for(r.section(), r.key()) {
+        return n;
+    }
     if core::ptr::eq(r, HUD_ENABLE) || core::ptr::eq(r, HUD_BARHIDDEN) {
         return core::ptr::null();
     }

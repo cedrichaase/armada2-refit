@@ -10,7 +10,10 @@
 #     is derived and lives in A2_DATA -- so the rule needs no list of extensions a
 #     renamed file could slip past;
 #   - game file formats by extension, and anything under a target's, movie's or
-#     backdrop's data directory (where assets lived before A2_DATA).
+#     backdrop's data directory (where assets lived before A2_DATA);
+#   - a symbol profile (profiles/, */profiles/) that is not what hard rule 9 allows:
+#     tools/engine/lint.py --publish (schema, signatures of at most 32 bytes, every entry
+#     tied to a hook written in its layer's README, inheritance and marks).
 # .gitignore keeps these out by default; this catches `git add -f`.
 set -uo pipefail
 if [ "${1:-}" = -C ]; then cd "$2" || exit 2; shift 2; else cd "$(dirname "$0")/.."; fi
@@ -53,4 +56,7 @@ while IFS= read -r p; do
                                                echo "game format $p"; bad=1 ;;
   esac
 done <<< "$paths"
+if [ -f tools/engine/lint.py ] && ! python3 tools/engine/lint.py --publish; then
+  echo "profiles    tools/engine/lint.py --publish"; bad=1
+fi
 [ "$bad" = 0 ] && echo "publishable: ${1:-index}" || { echo "NOT publishable: ${1:-index}" >&2; exit 1; }

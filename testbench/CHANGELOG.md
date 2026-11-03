@@ -5,6 +5,47 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.98.0 — 2026-11-03
+
+### Added
+- `./a2test syms [--exe PATH] [--build B] [--plugin P] [--record] [--json]` (`bench/syms.py`): the symbol profiles checked offline against an executable, each hook ready or its stand-down reason, `symbols: N/M`; `--record` appends the sha256 to the matched build's `[[known]]`.
+- `tools/engine/negative.sh`: the offline negative tests on scratch copies of the exe (timestamp, one changed entry per plugin file, forced child build, `--record`); also a step of `tools/engine/selftest.sh`.
+- Setup scripts `tools/engine/bench-exe.sh stamp` (the clone's exe with a changed PE timestamp) and `bench-mismatch.sh` (the clone's `A2EngineTest.ini`, globs or by player).
+- Scenarios `engine-unknown-build` (every plugin on a profile stands down on an unknown build, the stock game plays) and `engine-mismatch` (`Players: display, radar`: Display8 forwards under a forced `display.modes`; `ui.hud.radar` gives the stock minimap and the Minimap row's note). `engine-mismatch-hulls` (render3d, RMSE 0 against `roundD-base-port-showcase-hulls0`) and `engine-mismatch-cplugins` are written and pending phases 8e and 8d.
+
+### Fixed
+- `tools/settings/gen.py` (so `lint.py` and `gen.py --check`) skips every `tools/<tool>/fixtures/` tree, not only the settings tool's own: the engine tool's good lint fixture failed CI's settings job.
+
+Installed, not yet seen in game
+
+## 3.97.2 — 2026-11-03
+
+### Added
+- Scenario `engine-syms`: UI section (the build recognised, every part's `symbols: N/N resolved; 0 hooks blocked`, no stand-down, no early read).
+
+Installed, not yet seen in game
+
+## 3.97.1 — 2026-11-03
+
+### Fixed
+- `engine-syms` waits a fixed 60 seconds after the launch instead of for the `passthrough: the engine's first draw` line: a wait reads only lines written after the last action, and the line was already written by the time the launch step returned.
+
+Installed, not yet seen in game
+
+## 3.97.0 — 2026-11-03
+
+### Added
+- Scenario `engine-syms` (Display8 section): the build recognised, `symbols: 15/15 resolved; 0 hooks blocked`, no hook standing down and no symbol read before its hook. Later phase 8 packages append their plugins' sections.
+
+Installed, not yet seen in game
+
+## 3.96.0 — 2026-11-03
+
+### Added
+- The executable's identity is recorded: `session.json` and each case's `result.json` (and the report) carry `exe: {name, sha256, timestamp, image_size, sections}`, read from the clone's `Armada2.exe` at session start (`bench/session.py`, `exe_identity`), and the session log notes it.
+
+Installed, not yet seen in game
+
 ## 3.94.0 — 2026-11-03
 
 ### Added

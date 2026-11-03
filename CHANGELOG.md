@@ -5,6 +5,57 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.86.0 — 2026-11-03
+
+Layers: testbench 3.98.0.
+
+### Added
+- Phase 8g: `./a2test syms`, `tools/engine/negative.sh`, the bench scripts `bench-exe.sh` and `bench-mismatch.sh` and the scenarios `engine-unknown-build` and `engine-mismatch` (+ two pending variants); see `testbench/CHANGELOG.md`.
+
+### Fixed
+- The settings tools' walk skips every tool's fixture tree (CI's settings job failed on the engine tool's lint fixture).
+
+Installed, not yet seen in game
+
+## 13.82.0 — 2026-11-03
+
+Layers: ui 0.32.0, testbench 3.97.2.
+
+### Changed
+- Phase 8c: UI.asi on its symbol profile (`profiles/gog-1.1/ui.*.toml`); see `ui/CHANGELOG.md`.
+
+Installed, not yet seen in game
+
+## 13.81.1 — 2026-11-03
+
+Layers: testbench 3.97.1.
+
+### Fixed
+- The release installers (`publish/installer/install.sh`, `install.ps1`) delete `A2EngineTest.ini` from the game directory after verifying the package, as `./install` does.
+- `engine-syms` no longer waits for a log line that was written before the wait began (testbench 3.97.1).
+
+Installed, not yet seen in game
+
+## 13.81.0 — 2026-11-03
+
+Layers: display 0.17.0, testbench 3.97.0.
+
+### Added
+- Phase 8b, symbol profiles (contracts P2–P8): the format (`profiles/<build>/build.toml`, `<plugin>[.<part>].toml`; `crates/a2engine/README.md`), `profiles/gog-1.1/display.toml`, and `tools/engine/`: `gen.py` (Rust and C tables, `--check`), `lint.py` (rules 1–6; `--publish` in `publish/check.sh`), `resolve.py`, `annotate.py`, `mkpe.py`, `fixtures.py`, `ctest.c`, `selftest.sh` (CI job `engine`).
+- The resolver in three implementations proven on the same synthetic-image fixtures: `crates/a2engine` (`table`, `engine`: `init`, `ready`, `addr`, `range`, `site`, the notes), `csdk/a2engine.h` (`a2e_init`, `a2e_ready`, `a2e_addr`, ...), `tools/engine/resolve.py`.
+- `A2EngineTest.ini` (`[Test] Mismatch=<globs>`), the bench's fault injection: the hooks it names stand down as a failed check would. `./install` deletes it.
+
+Installed, not yet seen in game
+
+## 13.80.0 — 2026-11-03
+
+Layers: display 0.16.1, ui 0.31.1, qol 1.9.1, online 0.9.1, cutscenes 2.5.1, testbench 3.96.0.
+
+### Added
+- Phase 8a, executable identity (contract P1): `crates/a2engine` (`no_std`, host-tested on synthetic PE images, with a C twin test) and `csdk/a2engine.h`. Every plugin except Render3D logs the identical `engine:` line; the bench records the exe's sha256 and identity. Changes no behaviour. Render3D's line comes with phase 8e.
+
+Installed, not yet seen in game
+
 ## 13.75.0 — 2026-11-03
 
 Layers: render3d 0.42.0, testbench 3.94.0.

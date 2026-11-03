@@ -24,6 +24,9 @@ pub mod com;
 pub mod d3d8;
 pub mod detail;
 pub mod drop;
+#[allow(dead_code)]
+#[rustfmt::skip]
+pub mod engine_syms;
 pub mod passthrough;
 pub mod dx12;
 pub mod trace;
@@ -207,6 +210,34 @@ fn stub_allowed() -> bool {
     true
 }
 
+/// The stub offers one mode, so it needs `display.modes` (stub/modes.rs): without it the
+/// engine's own requests find no mode, the shell's display opens on none and the game
+/// dies of a stack overflow before its first `CreateDevice` (measured with
+/// `A2EngineTest.ini` `Mismatch=display.modes`, README.md, "Hooks"). So on a build this
+/// Display8 does not know, or with that hook stood down, the game gets the old chain.
+fn stub_modes() -> bool {
+    let e = engine();
+    let ready = e.ready(engine_syms::hook::MODES).is_ok();
+    if e.build().is_none() {
+        log!("engine: unknown build: Display8 forwards to the old chain");
+        return false;
+    }
+    if !ready {
+        log!("Mode=stub: without display.modes the stub could open no display; forward mode instead");
+    }
+    ready
+}
+
+fn engine_log(line: &str) {
+    log!("{}", line);
+}
+
+/// Display8's symbols in this `Armada2.exe` (`engine_syms.rs`, from
+/// `profiles/<build>/display.toml`; README.md, "Hooks").
+pub fn engine() -> &'static a2engine::Engine {
+    engine_syms::TABLE.engine()
+}
+
 fn config() -> &'static Config {
     unsafe { CONFIG.as_ref().expect("config") }
 }
@@ -227,6 +258,8 @@ fn startup() {
     rt::log_open("Display8.log", cfg.log || cfg.trace);
     let mode = ini.string("Display8", "Mode").unwrap_or_else(|| alloc::string::String::from("stub"));
     log!("Display8 {} -- game dir {}; mode {}; the real chain: {}", env!("CARGO_PKG_VERSION"), rt::game_dir(), mode, cfg.real);
+    // The identity line, the build line and the symbols summary (crates/a2engine).
+    a2engine::init(&engine_syms::TABLE, engine_log);
     unsafe { STUB_ASKED = mode.eq_ignore_ascii_case("stub") };
     let backend = ini.string("Display8", "Backend").unwrap_or_else(|| alloc::string::String::from("auto"));
     let fail = ini.string("Display8", "FailBackend").unwrap_or_default();
@@ -317,7 +350,7 @@ fn real_proc(name: &str) -> usize {
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Direct3DCreate8(sdk: u32) -> *mut c_void {
-    if unsafe { STUB_ASKED } && stub_allowed() {
+    if unsafe { STUB_ASKED } && stub_allowed() && stub_modes() {
         if let Some(d) = stub::start(unsafe { ORDER.clone() }, unsafe { VALIDATE }) {
             log!("Direct3DCreate8({}) -> the stub: the engine draws nothing from here", sdk);
             return d;

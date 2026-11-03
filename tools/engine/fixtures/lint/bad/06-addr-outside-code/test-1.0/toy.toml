@@ -1,0 +1,117 @@
+schema = 1
+plugin = "toy"
+readme = "./README.md"
+lang = "rust"
+out = "toy/engine_syms.rs"
+
+[hook.speed]
+doc = "How fast the toy moves"
+rows = ["Toy.Speed"]
+
+[hook.look]
+doc = "What the toy reads of its model"
+
+[hook.find]
+doc = "Found by pattern, runs on unknown builds"
+unknown = "run"
+
+[[sym]]
+id = "update_fn"
+symbol = "Toy::Update"
+kind = "fn"
+addr = 0x401100
+end = 0x401200
+check = "55 8b ec"
+used_by = ["speed"]
+
+[[sym]]
+id = "tick_fn"
+symbol = "Toy::Tick"
+kind = "fn"
+addr = 0x401300
+used_by = ["speed"]
+
+[[sym]]
+id = "tick_call"
+symbol = "Toy::Update"
+kind = "call"
+addr = 0x401150
+target = "tick_fn"
+in = "Toy::Update"
+used_by = ["speed"]
+
+[[sym]]
+id = "tick_jmp"
+symbol = "Toy::Update"
+kind = "jmp"
+addr = 0x401158
+target = "tick_fn"
+chain = true
+in = "Toy::Update"
+used_by = ["speed"]
+
+[[sym]]
+id = "speed_patch"
+symbol = "Toy::Update"
+kind = "patch"
+addr = 0x401160
+in = "Toy::Update"
+check = "d9 05 00 10 40 00"
+used_by = ["speed"]
+
+[[sym]]
+id = "speed_label"
+symbol = "Toy::Update"
+kind = "label"
+addr = 0x409000
+in = "Toy::Update"
+used_by = ["speed"]
+
+[[sym]]
+id = "toy_vt"
+symbol = "Toy"
+kind = "vtable"
+addr = 0x4f0000
+used_by = ["look"]
+
+[[sym]]
+id = "toy_global"
+symbol = "g_toy"
+kind = "global"
+addr = 0x4f1000
+used_by = ["look"]
+
+[[sym]]
+id = "toy_slot"
+symbol = "Toy::Render"
+kind = "slot"
+vtable = "toy_vt"
+index = 3
+target = "any"
+used_by = ["look"]
+
+[[sym]]
+id = "toy_hp"
+symbol = "Toy"
+kind = "field"
+struct = "Toy"
+offset = 0x24
+type = "u32"
+used_by = ["look"]
+
+[[sym]]
+id = "toy_width"
+symbol = "Toy"
+kind = "value"
+value = 800
+unit = "px"
+used_by = ["look"]
+
+[[sym]]
+id = "toy_scan"
+symbol = "Toy::Spawn"
+kind = "scan"
+pattern = "55 8b ?? 83"
+section = ".text"
+count = 1
+used_by = ["find"]

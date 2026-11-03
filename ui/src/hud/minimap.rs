@@ -162,7 +162,7 @@ fn ext_texture(slot: &mut Option<Tex>, st3d: usize) -> Option<Tex> {
 pub fn run(ui: &mut Ui) {
     let s = st();
     let r = radar::radar();
-    if r == 0 || hud::hidden(radar::MAP_RADAR) || crate::engine::ingame::hud_hidden() {
+    if r == 0 || hud::hidden(radar::map_radar()) || crate::engine::ingame::hud_hidden() {
         s.drag = None;
         return;
     }
@@ -251,7 +251,7 @@ pub fn run(ui: &mut Ui) {
     }
 
     // Pings: shrinking rings.
-    let stock_w = hud::panel_rect(radar::MAP_RADAR, ui.w, ui.h).map_or(sq.w, |p| (p[2] - p[0]).max(1.0));
+    let stock_w = hud::panel_rect(radar::map_radar(), ui.w, ui.h).map_or(sq.w, |p| (p[2] - p[0]).max(1.0));
     for m in radar::marks(r) {
         let (x, y) = at(m.u, m.v);
         let rad = (m.radius * sq.w / stock_w).max(ui.u(3.0));

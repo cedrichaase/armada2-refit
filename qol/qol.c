@@ -114,6 +114,7 @@
 
 #define A2_FLTUSED
 #include "../csdk/a2asi.h"
+#include "../csdk/a2engine.h"
 #include "settings_table.h"
 
 /* ---- addresses in this build (Armada2.exe, GOG patch 1.1) ------------- */
@@ -1246,6 +1247,7 @@ static void startup(void)
         char dir[320];
         a2_exe_dir(dir, sizeof dir);
         a2_log_where(g_logpath, a2_log_path(g_logpath, sizeof g_logpath, dir, "QOL.log"));
+        a2e_log(logline);
     }
     a2_set_str(&g_ini, QOL_ROW_PANSPEED, val, sizeof val);
     f = pan_factor(val, &ok);

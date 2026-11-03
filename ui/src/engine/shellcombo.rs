@@ -22,11 +22,19 @@ use crate::rt::win::*;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-const COUNT: usize = 0x178;
-const ITEM_H: usize = 0x17c;
-const PULL: usize = 0x180;
-const COMBO: usize = 0x198;
-const DOWN: usize = 0x1b4;
+use crate::syms_shell::{field, hook, TABLE};
+
+const COUNT: usize = field::SHELLCOMBO_COUNT;
+const ITEM_H: usize = field::SHELLCOMBO_ITEM_H;
+const PULL: usize = field::SHELLCOMBO_PULL;
+const COMBO: usize = field::SHELLCOMBO_COMBO;
+const DOWN: usize = field::SHELLCOMBO_DOWN;
+
+/// Whether the engine lets the `ComboBox` reads run (its fields are compile-time; the
+/// hook is the one place that names them in the profile).
+fn ready() -> bool {
+    TABLE.engine().ready(hook::SHELL_READS_COMBO).is_ok()
+}
 
 fn rd<T: Copy>(a: usize) -> T {
     unsafe { core::ptr::read_unaligned(a as *const T) }
@@ -35,6 +43,9 @@ fn rd<T: Copy>(a: usize) -> T {
 /// The hidden combo box behind the `ComboBox` at `obj` (a widget `shellui` returned
 /// this frame), if it is a window.
 pub fn combo(obj: usize) -> Option<HWND> {
+    if !ready() {
+        return None;
+    }
     let h = rd::<usize>(obj + COMBO) as HWND;
     if h.is_null() || unsafe { IsWindow(h) } == 0 {
         return None;
@@ -69,6 +80,9 @@ pub fn items(obj: usize) -> (Vec<String>, i32) {
 /// The point (in the dialog's client coordinates) of item `i` in the pull-down, which
 /// a click there chooses once the pull-down is open.
 pub fn item_point(obj: usize, i: i32) -> Option<(i32, i32)> {
+    if !ready() {
+        return None;
+    }
     let count: i32 = rd(obj + COUNT);
     let h: i32 = rd(obj + ITEM_H);
     if i < 0 || i >= count || !(4..=64).contains(&h) {

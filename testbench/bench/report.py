@@ -149,6 +149,12 @@ def markdown(cases, meta):
         L.append('')
     for sh in sorted({c['sheet'] for c in cases if c.get('sheet')}):
         L += [f'Contact sheet: `{sh}`', '']
+    exes = sorted({(c['exe']['name'], c['exe']['sha256'], c['exe'].get('timestamp'), c['exe'].get('image_size'),
+                    c['exe'].get('sections')) for c in cases if c.get('exe')})
+    if exes:
+        L += ['Executable' + ('s' if len(exes) > 1 else '') + ': ' +
+              '; '.join(f'{n} sha256 `{sha}`, timestamp {ts}, image size {sz}, sections {sec}'
+                        for n, sha, ts, sz, sec in exes), '']
     L += ['## Cases', '', '| scenario | resolution | aspect | mod | result | time |', '|---|---|---|---|---|---|']
     for c in cases:
         L.append(f'| {c["scenario"]} | {c["resolution"]} | {c["aspect"]} | {c["mod"]} | '

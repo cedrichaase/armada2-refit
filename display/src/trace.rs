@@ -110,12 +110,10 @@ pub fn start() {
 
 /// `Armada2.exe`'s image in memory, past its headers: where its code is.
 pub fn exe_range() -> (usize, usize) {
-    let base = unsafe { GetModuleHandleA(core::ptr::null()) } as usize;
-    let size = unsafe {
-        let nt = base + *((base + 0x3c) as *const u32) as usize;
-        *((nt + 0x50) as *const u32) as usize // OptionalHeader.SizeOfImage
-    };
-    (base + 0x1000, base + size)
+    match a2engine::pe::this_process() {
+        Some(id) => (id.base + 0x1000, id.base + id.image_size as usize),
+        None => (0, 0),
+    }
 }
 
 /// State setters and getters, called thousands of times a frame: only their

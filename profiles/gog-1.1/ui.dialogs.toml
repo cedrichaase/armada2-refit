@@ -1,0 +1,295 @@
+# UI.asi's symbols in Armada2.exe 1.1 (GOG): part "dialogs" (engine/dialogs.rs), the dialog host.
+# The findings are in ui/MENUS.md, "Hooks".
+schema = 1
+plugin = "ui"
+readme = "ui/MENUS.md"
+lang = "rust"
+out = "ui/src/syms_dialogs.rs"
+
+[hook."dialogs.shell_mode"]
+doc = "The shell's 800x600x16 display mode raised to the desktop's, patched in SetActiveDisplay_Internal"
+rows = ["Menus.Enable"]
+
+[hook."dialogs.reads_screens"]
+doc = "The shell's dialog procedures, told by address to name a hosted screen and bound the shell's code"
+rows = ["Menus.Enable"]
+
+[[sym]]
+id = "dialogs_mode_push_a"
+symbol = "ST3D_GraphicsEngine::SetActiveDisplay_Internal"
+kind = "patch"
+addr = 0x62c4d4
+in = "ST3D_GraphicsEngine::SetActiveDisplay_Internal"
+check = "6a 10 68 58 02 00 00 68 20 03 00 00"
+used_by = ["dialogs.shell_mode"]
+
+[[sym]]
+id = "dialogs_mode_push_b"
+symbol = "ST3D_GraphicsEngine::SetActiveDisplay_Internal"
+kind = "patch"
+addr = 0x62c633
+in = "ST3D_GraphicsEngine::SetActiveDisplay_Internal"
+check = "6a 10 68 58 02 00 00 68 20 03 00 00"
+used_by = ["dialogs.shell_mode"]
+
+[[sym]]
+id = "dialogs_front_end_width"
+symbol = "SetActiveDisplay_Internal"
+kind = "value"
+value = 800
+unit = "px"
+used_by = ["dialogs.shell_mode", "dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_front_end_height"
+symbol = "SetActiveDisplay_Internal"
+kind = "value"
+value = 600
+unit = "px"
+used_by = ["dialogs.shell_mode", "dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_front_end_depth"
+symbol = "SetActiveDisplay_Internal"
+kind = "value"
+value = 16
+unit = "bits"
+used_by = ["dialogs.shell_mode"]
+
+[[sym]]
+id = "dialogs_shell_code_start"
+symbol = "Shell::Screen::WindowsProcedure"
+kind = "value"
+value = 0x5a0000
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_shell_code_end"
+symbol = "Shell::Screen::WindowsProcedure"
+kind = "value"
+value = 0x610000
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_main_menu"
+symbol = "MainMenuDlgProc"
+kind = "fn"
+addr = 0x5d57c0
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_single_player"
+symbol = "SingleDlgProc"
+kind = "fn"
+addr = 0x5dbdc0
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_mission_select"
+symbol = "MissionSelectDlgProc"
+kind = "fn"
+addr = 0x5d6d80
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_load_game"
+symbol = "LoadGameDlgProc"
+kind = "fn"
+addr = 0x5d48c0
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_save_game"
+symbol = "SaveGameDlgProc"
+kind = "fn"
+addr = 0x5d9320
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_escape_menu"
+symbol = "EscapeMenuDlgProc"
+kind = "fn"
+addr = 0x5cddb0
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_game_settings"
+symbol = "GameSettingsDlgProc"
+kind = "fn"
+addr = 0x5cf930
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_graphics_settings"
+symbol = "GraphicsOptionsDlgProc"
+kind = "fn"
+addr = 0x5d1540
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_sound_settings"
+symbol = "SoundSettingsDlgProc"
+kind = "fn"
+addr = 0x5dce60
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_game_setup"
+symbol = "MultiplayerSetupDlgProc"
+kind = "fn"
+addr = 0x5c2270
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_advanced_options"
+symbol = "MultiplayerAdvancedOptionsDlgProc"
+kind = "fn"
+addr = 0x5ba900
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_map_select"
+symbol = "MapSelectDlgProc"
+kind = "fn"
+addr = 0x5b81e0
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_map_transfer"
+symbol = "MapTransferDlgProc"
+kind = "fn"
+addr = 0x5ba140
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_multiplayer_connection"
+symbol = "MultiplayerConnectionDlgProc"
+kind = "fn"
+addr = 0x5bf5a0
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_internet_game"
+symbol = "InternetGameDlgProc"
+kind = "fn"
+addr = 0x5b15f0
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_manual_ip"
+symbol = "ManualIPDlgProc"
+kind = "fn"
+addr = 0x5b6c10
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_room_select"
+symbol = "RoomSelectDlgProc"
+kind = "fn"
+addr = 0x5cb280
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_create_room"
+symbol = "CreateRoomDlgProc"
+kind = "fn"
+addr = 0x5ab900
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_game_name"
+symbol = "GameNameDlgProc"
+kind = "fn"
+addr = 0x5ac3d0
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_password"
+symbol = "PasswordDlgProc"
+kind = "fn"
+addr = 0x5ca690
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_change_password"
+symbol = "ChangePasswordDlgProc"
+kind = "fn"
+addr = 0x5a85b0
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_create_account"
+symbol = "CreateNewAccountDlgProc"
+kind = "fn"
+addr = 0x5a9db0
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_gamespy_login"
+symbol = "GameSpyLoginDlgProc"
+kind = "fn"
+addr = 0x5cc620
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_net_waiting"
+symbol = "NetWaitingDlgProc"
+kind = "fn"
+addr = 0x5ca0b0
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_help"
+symbol = "HelpWindowDlgProc"
+kind = "fn"
+addr = 0x5b07a0
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_licence"
+symbol = "LicenseAgreementWindowDlgProc"
+kind = "fn"
+addr = 0x5d3bd0
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_message"
+symbol = "OneButtonDlgProc"
+kind = "fn"
+addr = 0x5d7730
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_yes_no"
+symbol = "YesNoDlgProc"
+kind = "fn"
+addr = 0x5e1990
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_tech_tree"
+symbol = "TechTreeWindowDlgProc"
+kind = "fn"
+addr = 0x5de0d0
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_admirals_log"
+symbol = "AdmiralsLogDlgProc"
+kind = "fn"
+addr = 0x5e22c0
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_admirals_log_pane"
+symbol = "ScreenInformation::CallDialogProc"
+kind = "fn"
+addr = 0x5f6010
+used_by = ["dialogs.reads_screens"]
+
+[[sym]]
+id = "dialogs_proc_shell_screen"
+symbol = "Shell::Screen::WindowsProcedure"
+kind = "fn"
+addr = 0x5a2de0
+used_by = ["dialogs.reads_screens"]

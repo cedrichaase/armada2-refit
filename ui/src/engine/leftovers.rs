@@ -55,78 +55,49 @@
 //!   and average time. Both calls (cdecl, `call rel32`) are re-pointed at ours, which
 //!   record the same numbers and print nothing; the triangle count and the high-water
 //!   marks the code around them keeps stay the engine's.
-use super::{field, hook, rd, storm3d};
+use super::{field as peek, hook as rthook, rd, storm3d};
+use crate::syms_hud::{field, hook, sym, TABLE};
+
+fn eng() -> &'static a2engine::Engine {
+    TABLE.engine()
+}
+
+/// The address of a symbol of a hook that became ready (its `install` passed).
+fn a(s: a2engine::Sym) -> usize {
+    eng().addr(s)
+}
 use alloc::vec::Vec;
 
 // ---- sites ------------------------------------------------------------------------
 
-/// `mNormalModeRender`'s `call ST3D_Device::DrawWireframeRectangle`.
-const SITE_DRAG_BOX: usize = 0x52220a;
-const FN_WIREFRAME_RECT: usize = 0x6212b0;
-/// `DrawHeightPost`'s `call ST3D_Camera::ClipAndRenderLine`.
-const SITE_HEIGHT_POST: usize = 0x5938a0;
-const FN_CLIP_AND_RENDER_LINE: usize = 0x618590;
-/// `cOverViewImp::mRenderGridFX`'s `call ST3D_Sprite::DrawQuad` (the order ring).
-const SITE_GRID_FX: usize = 0x522537;
-/// `cOverViewImp::mRenderWhere`'s: the same sprite, still, at the point it marks.
-const SITE_WHERE: usize = 0x5222f0;
-const FN_SPRITE_DRAW_QUAD: usize = 0x63a7c0;
-/// `PlaceholderFeature::RenderFootprints`'s three `call ST3D_Sprite::DrawQuad`: a cell
-/// that is not clear, a clear placement, a blocked one.
-const SITES_FOOTPRINT: [usize; 3] = [0x473a05, 0x473a77, 0x473a8e];
+// Each site and the function it calls are in profiles/gog-1.1/ui.hud.toml, one hook each
+// (`hud.drag_box`, `hud.height_posts`, `hud.order_ring`, `hud.footprints`, `hud.fade`,
+// `hud.video`, `hud.frame_rate`):
+//
+// - `mNormalModeRender`'s `call ST3D_Device::DrawWireframeRectangle`; `DrawHeightPost`'s
+//   `call ST3D_Camera::ClipAndRenderLine`; `cOverViewImp::mRenderGridFX`'s and
+//   `mRenderWhere`'s `call ST3D_Sprite::DrawQuad` (the order ring, and the same sprite
+//   still at the point it marks); `PlaceholderFeature::RenderFootprints`'s three `call
+//   ST3D_Sprite::DrawQuad` (a cell that is not clear, a clear placement, a blocked one).
+// - `ST3D_Texture::DemandLoad(device index)`, thiscall: 0 when the texture is on that
+//   device. `ST3D_Sprite+0x24`: its colour (`SetColour`), three floats.
+// - `ScreenFade::Render`'s two draws: white, then black.
+// - `CinematicView`'s two calls of `BinkThread::BlitToBlackBackground(const
+//   ST3D_Rect&)`, and inside it the two `call ST3D_Device::DrawRectangle` and the `call
+//   ST3D_Sprite::DrawScaled2D`; `BinkThread`'s statics `s_width` and `s_height` are the
+//   video's size; `ST3D_Sprite::GetTexture()`, thiscall.
+// - `Armada_RenderFrame`'s two prints while `FRAMERATE_DISPLAY` (an int) is set: the
+//   triangle count (`call ST3D_Font::PrintString`) and `call Armada_DisplayFrameRate`.
+//   `Storm3D+0x88`: the frame rate (-1 before there is one); `+0x80`: the total frame
+//   rate. `FrameStats::GetSlotName(int)` and `GetTimeAvg(int)` (cdecl), and the number of
+//   slots (`sm_nameArray`'s size, at its `+0x8`).
+// - `ST3D_Camera`: its projection (a 4x4 matrix, `+0x160`) and its viewport (left, top,
+//   width, height, in pixels, `+0x1b0`). `Storm3D+0xfc`: the current camera (the main
+//   view's).
+
 /// Cells recorded a frame, at most: a big map's occupied cells, all of them, so the
 /// footprint drawn after them is never crowded out.
 const MAX_CELLS: usize = 8192;
-/// `ST3D_Texture::DemandLoad(device index)`, thiscall: 0 when the texture is on that
-/// device.
-const FN_DEMAND_LOAD: usize = 0x642610;
-static mut DEMAND_LOAD_OK: bool = false;
-/// `ST3D_Sprite+0x24`: its colour (`SetColour`), three floats.
-const SPRITE_COLOUR: usize = 0x24;
-/// `ScreenFade::Render`'s two draws: white, then black.
-const SITE_FADE_WHITE: usize = 0x5076cc;
-const STOCK_FADE_WHITE: [u8; 5] = [0x8b, 0xcf, 0xff, 0x52, 0x1c];
-const SITE_FADE_BLACK: usize = 0x507704;
-const STOCK_FADE_BLACK: [u8; 7] = [0x8d, 0x45, 0xec, 0x50, 0xff, 0x52, 0x1c];
-/// `CinematicView`'s two calls of `BinkThread::BlitToBlackBackground(const ST3D_Rect&)`.
-const SITES_BLIT: [usize; 2] = [0x4e5da5, 0x4e6153];
-const FN_BLIT: usize = 0x464350;
-/// Inside it: the two `call ST3D_Device::DrawRectangle` and the `call
-/// ST3D_Sprite::DrawScaled2D`.
-const SITES_VIDEO_BARS: [usize; 2] = [0x46457c, 0x4645cd];
-const FN_DRAW_RECTANGLE: usize = 0x621200;
-const SITE_VIDEO_SPRITE: usize = 0x464656;
-const FN_DRAW_SCALED_2D: usize = 0x63ada0;
-/// `BinkThread`'s statics `s_width` and `s_height`: the video's size.
-const BINK_WIDTH: usize = 0x736770;
-const BINK_HEIGHT: usize = 0x736774;
-/// `ST3D_Sprite::GetTexture()`, thiscall.
-const FN_SPRITE_TEXTURE: usize = 0x63b150;
-
-/// `Armada_RenderFrame`'s two prints while `FRAMERATE_DISPLAY` is set: the triangle
-/// count (`call ST3D_Font::PrintString`) and `call Armada_DisplayFrameRate`.
-const SITE_FPS_TRI: usize = 0x5989a6;
-const FN_PRINT_STRING: usize = 0x628890;
-const SITE_FPS: usize = 0x5989b0;
-const FN_DISPLAY_FRAME_RATE: usize = 0x599300;
-/// `FRAMERATE_DISPLAY` (an int).
-const FRAMERATE_DISPLAY: usize = 0x6fc8a8;
-/// `Storm3D+0x88`: the frame rate (-1 before there is one); `+0x80`: the total frame
-/// rate.
-const S3D_FPS: usize = 0x88;
-const S3D_TOTAL_FPS: usize = 0x80;
-/// `FrameStats::GetSlotName(int)` and `GetTimeAvg(int)` (cdecl), and the number of
-/// slots (`sm_nameArray`'s size, at its `+0x8`).
-const FN_SLOT_NAME: usize = 0x653950;
-const FN_TIME_AVG: usize = 0x653990;
-const SLOT_COUNT: usize = 0x7aec38;
-
-/// `ST3D_Camera`: its projection (a 4x4 matrix) and its viewport (left, top, width,
-/// height, in pixels).
-const CAM_PROJECTION: usize = 0x160;
-const CAM_VIEWPORT: usize = 0x1b0;
-/// `Storm3D+0xfc`: the current camera (the main view's).
-const S3D_CAMERA: usize = 0xfc;
 
 // ---- what was recorded this frame -------------------------------------------------
 
@@ -208,7 +179,7 @@ pub struct Projector {
 
 impl Projector {
     fn of(cam: usize) -> Projector {
-        Projector { m: unsafe { rd(cam + CAM_PROJECTION) }, vp: viewport(cam) }
+        Projector { m: unsafe { rd(cam + field::LO_CAM_PROJECTION) }, vp: viewport(cam) }
     }
 
     /// A point in the world on the screen, in pixels; None behind the eye.
@@ -254,7 +225,7 @@ static mut FPS_ON: bool = false;
 #[allow(static_mut_refs)]
 pub fn frame_rate() -> Option<&'static FrameRate> {
     unsafe {
-        if !FPS_ON || rd::<i32>(FRAMERATE_DISPLAY) == 0 || crate::rt::now() - FPS.at > 0.5 {
+        if !FPS_ON || rd::<i32>(a(sym::LO_FRAMERATE_DISPLAY)) == 0 || crate::rt::now() - FPS.at > 0.5 {
             return None;
         }
         Some(&FPS)
@@ -306,91 +277,64 @@ pub fn drag_on() -> bool {
 /// stock. Returns how many are ours.
 pub fn install(overview: bool, fade: bool, video: bool, frame_rate: bool) -> u32 {
     let mut n = 0;
-    if frame_rate {
+    if frame_rate && eng().ready(hook::HUD_FRAME_RATE).is_ok() {
         // Both or neither, so the text is never half the engine's.
-        let stock = hook::call_target(SITE_FPS_TRI) == Some(FN_PRINT_STRING)
-            && hook::call_target(SITE_FPS) == Some(FN_DISPLAY_FRAME_RATE)
-            && super::starts(FN_SLOT_NAME, &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x8b, 0x0d, 0x30, 0xec, 0x7a, 0x00])
-            && super::starts(FN_TIME_AVG, &[0x55, 0x8b, 0xec, 0xdd, 0x05]);
-        if stock {
-            hook::patch_call(SITE_FPS_TRI, FN_PRINT_STRING, fps_triangles as *const () as usize);
-            hook::patch_call(SITE_FPS, FN_DISPLAY_FRAME_RATE, fps_display as *const () as usize);
-            unsafe { FPS_ON = true };
-            n += 1;
-        } else {
-            crate::log!("leftovers: Armada_RenderFrame's frame-rate prints are not stock: the engine prints them");
-        }
+        let (tri, fps) = (a(sym::LO_FPS_TRI_CALL), a(sym::LO_FPS_CALL));
+        rthook::patch_call(tri, a(sym::LO_PRINT_STRING), fps_triangles as *const () as usize);
+        rthook::patch_call(fps, a(sym::LO_DISPLAY_FRAME_RATE), fps_display as *const () as usize);
+        unsafe { FPS_ON = true };
+        n += 1;
     }
     if overview {
-        if hook::patch_call(SITE_DRAG_BOX, FN_WIREFRAME_RECT, drag_box as *const () as usize) {
+        if eng().ready(hook::HUD_DRAG_BOX).is_ok() && rthook::patch_call(a(sym::LO_DRAG_BOX_CALL), a(sym::LO_WIREFRAME_RECT), drag_box as *const () as usize) {
             unsafe { DRAG_ON = true };
             n += 1;
-        } else {
-            crate::log!("leftovers: the drag box's call at {:#x} is not stock: the engine draws it", SITE_DRAG_BOX);
         }
-        if hook::patch_call(SITE_HEIGHT_POST, FN_CLIP_AND_RENDER_LINE, height_post as *const () as usize) {
+        if eng().ready(hook::HUD_HEIGHT_POSTS).is_ok() && rthook::patch_call(a(sym::LO_HEIGHT_POST_CALL), a(sym::LO_CLIP_AND_RENDER_LINE), height_post as *const () as usize) {
             unsafe { POSTS_ON = true };
             n += 1;
-        } else {
-            crate::log!("leftovers: the height posts' call at {:#x} is not stock: the engine draws them", SITE_HEIGHT_POST);
         }
-        let tex_stock = super::starts(FN_SPRITE_TEXTURE, &[0x8b, 0x41, 0x58, 0xc3]);
-        unsafe { DEMAND_LOAD_OK = super::starts(FN_DEMAND_LOAD, &[0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68]) };
-        for site in [SITE_GRID_FX, SITE_WHERE] {
-            if tex_stock && unsafe { DEMAND_LOAD_OK } && hook::patch_call(site, FN_SPRITE_DRAW_QUAD, grid_fx as *const () as usize) {
-                n += 1;
-            } else {
-                crate::log!("leftovers: the order ring's call at {:#x} is not stock: the engine draws it", site);
+        if eng().ready(hook::HUD_ORDER_RING).is_ok() {
+            let quad = a(sym::LO_SPRITE_DRAW_QUAD);
+            for site in [sym::LO_GRID_FX_CALL, sym::LO_WHERE_CALL] {
+                if rthook::patch_call(a(site), quad, grid_fx as *const () as usize) {
+                    n += 1;
+                }
             }
         }
         // All three or none, so a placement is never drawn by both.
-        let feet = tex_stock
-            && unsafe { DEMAND_LOAD_OK }
-            && SITES_FOOTPRINT.iter().all(|&s| hook::call_target(s) == Some(FN_SPRITE_DRAW_QUAD));
-        if feet {
+        if eng().ready(hook::HUD_FOOTPRINTS).is_ok() {
+            let quad = a(sym::LO_SPRITE_DRAW_QUAD);
             let ours = [foot_cell as *const () as usize, foot_clear as *const () as usize, foot_blocked as *const () as usize];
-            for (&s, &to) in SITES_FOOTPRINT.iter().zip(ours.iter()) {
-                hook::patch_call(s, FN_SPRITE_DRAW_QUAD, to);
+            let sites = [sym::LO_FOOTPRINT_CELL_CALL, sym::LO_FOOTPRINT_CLEAR_CALL, sym::LO_FOOTPRINT_BLOCKED_CALL];
+            for (&s, &to) in sites.iter().zip(ours.iter()) {
+                rthook::patch_call(a(s), quad, to);
             }
             n += 1;
-        } else {
-            crate::log!("leftovers: RenderFootprints' draws are not stock: the engine draws the build footprints");
         }
     }
-    if fade {
-        let ok = unsafe {
-            core::slice::from_raw_parts(SITE_FADE_WHITE as *const u8, 5) == STOCK_FADE_WHITE
-                && core::slice::from_raw_parts(SITE_FADE_BLACK as *const u8, 7) == STOCK_FADE_BLACK
-        };
-        if ok {
-            let a = call_bytes::<5>(SITE_FADE_WHITE, fade_thunk_white as *const () as usize);
-            let b = call_bytes::<7>(SITE_FADE_BLACK, fade_thunk_black as *const () as usize);
-            if hook::patch_bytes(SITE_FADE_WHITE, &STOCK_FADE_WHITE, &a) && hook::patch_bytes(SITE_FADE_BLACK, &STOCK_FADE_BLACK, &b) {
-                unsafe { FADE_ON = true };
-                n += 1;
-            }
-        } else {
-            crate::log!("leftovers: ScreenFade::Render's draws are not stock: the engine draws the fade");
-        }
-    }
-    if video {
-        let stock = SITES_BLIT.iter().all(|&s| hook::call_target(s) == Some(FN_BLIT))
-            && SITES_VIDEO_BARS.iter().all(|&s| hook::call_target(s) == Some(FN_DRAW_RECTANGLE))
-            && hook::call_target(SITE_VIDEO_SPRITE) == Some(FN_DRAW_SCALED_2D)
-            && super::starts(FN_SPRITE_TEXTURE, &[0x8b, 0x41, 0x58, 0xc3]);
-        if stock {
-            for &s in &SITES_BLIT {
-                hook::patch_call(s, FN_BLIT, blit as *const () as usize);
-            }
-            for &s in &SITES_VIDEO_BARS {
-                hook::patch_call(s, FN_DRAW_RECTANGLE, video_bar as *const () as usize);
-            }
-            hook::patch_call(SITE_VIDEO_SPRITE, FN_DRAW_SCALED_2D, video_sprite as *const () as usize);
-            unsafe { VIDEO_ON = true };
+    if fade && eng().ready(hook::HUD_FADE).is_ok() {
+        let (white, black) = (a(sym::LO_FADE_WHITE), a(sym::LO_FADE_BLACK));
+        // The bytes are stock: `ready` checked them against the profile.
+        let (stock_white, stock_black): ([u8; 5], [u8; 7]) = unsafe { (rd(white), rd(black)) };
+        let w = call_bytes::<5>(white, fade_thunk_white as *const () as usize);
+        let b = call_bytes::<7>(black, fade_thunk_black as *const () as usize);
+        if rthook::patch_bytes(white, &stock_white, &w) && rthook::patch_bytes(black, &stock_black, &b) {
+            unsafe { FADE_ON = true };
             n += 1;
-        } else {
-            crate::log!("leftovers: BinkThread::BlitToBlackBackground or its draws are not stock: the engine draws the video");
         }
+    }
+    if video && eng().ready(hook::HUD_VIDEO).is_ok() {
+        let (blit_fn, rect_fn, scaled_fn) = (a(sym::LO_BLIT), a(sym::LO_DRAW_RECTANGLE), a(sym::LO_DRAW_SCALED_2D));
+        for s in [sym::LO_BLIT_RENDER_CALL, sym::LO_BLIT_UPDATE_CALL] {
+            rthook::patch_call(a(s), blit_fn, blit as *const () as usize);
+        }
+        for s in [sym::LO_VIDEO_BAR_CALL_A, sym::LO_VIDEO_BAR_CALL_B] {
+            rthook::patch_call(a(s), rect_fn, video_bar as *const () as usize);
+        }
+        rthook::patch_call(a(sym::LO_VIDEO_SPRITE_CALL), scaled_fn, video_sprite as *const () as usize);
+        unsafe { VIDEO_ON = true };
+        n += 1;
     }
     n
 }
@@ -416,7 +360,7 @@ fn viewport(cam: usize) -> [f32; 4] {
     if cam == 0 {
         return [0.0, 0.0, 1.0e6, 1.0e6];
     }
-    unsafe { rd(cam + CAM_VIEWPORT) }
+    unsafe { rd(cam + field::LO_CAM_VIEWPORT) }
 }
 
 fn log_once(bit: u32, f: impl FnOnce()) {
@@ -431,7 +375,7 @@ fn log_once(bit: u32, f: impl FnOnce()) {
 // ---- the drag box -----------------------------------------------------------------
 
 unsafe extern "thiscall" fn drag_box(_dev: usize, x: f32, y: f32, w: f32, h: f32, _z: f32, col: usize) {
-    let cam = field(storm3d(), S3D_CAMERA);
+    let cam = peek(storm3d(), field::LO_S3D_CAMERA);
     let vp = viewport(cam);
     let rgb = colour(col);
     log_once(1, || crate::log!("leftovers: drag box {:.0},{:.0} {:.0}x{:.0} in the viewport {:.0},{:.0} {:.0}x{:.0}, colour {:.2} {:.2} {:.2}", x, y, w, h, vp[0], vp[1], vp[2], vp[3], rgb[0], rgb[1], rgb[2]));
@@ -447,7 +391,7 @@ unsafe extern "thiscall" fn height_post(cam: usize, a: *const [f32; 3], b: *cons
     let (pa, pb) = unsafe { (*a, *b) };
     let rgb = colour(col);
     let vp = viewport(cam);
-    let m: [f32; 16] = unsafe { rd(cam + CAM_PROJECTION) };
+    let m: [f32; 16] = unsafe { rd(cam + field::LO_CAM_PROJECTION) };
     let clip = |p: [f32; 3]| -> [f32; 4] {
         let mut o = [0f32; 4];
         for (k, v) in o.iter_mut().enumerate() {
@@ -550,20 +494,18 @@ fn art(sprite: usize) -> Option<Art> {
     if sprite == 0 {
         return None;
     }
-    let get: unsafe extern "thiscall" fn(usize) -> usize = unsafe { core::mem::transmute(FN_SPRITE_TEXTURE) };
+    let get: unsafe extern "thiscall" fn(usize) -> usize = unsafe { core::mem::transmute(a(sym::LO_SPRITE_TEXTURE)) };
     let tex = unsafe { get(sprite) };
     if tex == 0 {
         return None;
     }
-    if unsafe { DEMAND_LOAD_OK } {
-        let load: unsafe extern "thiscall" fn(usize, u32) -> u32 = unsafe { core::mem::transmute(FN_DEMAND_LOAD) };
-        if unsafe { load(tex, field(storm3d(), 0xc0) as u32) } != 0 {
-            return None;
-        }
+    let load: unsafe extern "thiscall" fn(usize, u32) -> u32 = unsafe { core::mem::transmute(a(sym::LO_DEMAND_LOAD)) };
+    if unsafe { load(tex, peek(storm3d(), field::LO_S3D_DEVICE) as u32) } != 0 {
+        return None;
     }
     let uv = super::sprite::uv(sprite);
     let uv = if uv.iter().all(|v| v.is_finite() && (-0.01..=1.01).contains(v)) { uv } else { [0.0, 0.0, 1.0, 1.0] };
-    Some(Art { texture: tex, uv, rgb: colour(sprite + SPRITE_COLOUR) })
+    Some(Art { texture: tex, uv, rgb: colour(sprite + field::LO_SPRITE_COLOUR) })
 }
 
 /// A sprite's quad on the map's plane, projected and recorded to be drawn by the UI.
@@ -580,9 +522,9 @@ unsafe fn quad(sprite: usize, cam: usize, corners: *const [[f32; 3]; 4], what: &
         let Some(s) = pr.project(*p) else { return };
         out[i] = s;
     }
-    let get: unsafe extern "thiscall" fn(usize) -> usize = unsafe { core::mem::transmute(FN_SPRITE_TEXTURE) };
+    let get: unsafe extern "thiscall" fn(usize) -> usize = unsafe { core::mem::transmute(a(sym::LO_SPRITE_TEXTURE)) };
     let tex = unsafe { get(sprite) };
-    let rgb = colour(sprite + SPRITE_COLOUR);
+    let rgb = colour(sprite + field::LO_SPRITE_COLOUR);
     log_once(bit, || crate::log!("leftovers: {} at {:.0},{:.0} {:.0},{:.0} {:.0},{:.0} {:.0},{:.0}, colour {:.2} {:.2} {:.2}", what, out[0].0, out[0].1, out[1].0, out[1].1, out[2].0, out[2].1, out[3].0, out[3].1, rgb[0], rgb[1], rgb[2]));
     if tex == 0 {
         return;
@@ -590,11 +532,9 @@ unsafe fn quad(sprite: usize, cam: usize, corners: *const [[f32; 3]; 4], what: &
     // The engine loads a texture onto the device the first time it is set for a draw
     // (`SetTexture` calls `DemandLoad`); this one is no longer drawn by it, so it is
     // loaded here, as `SetTexture` would, for the device in use.
-    if unsafe { DEMAND_LOAD_OK } {
-        let load: unsafe extern "thiscall" fn(usize, u32) -> u32 = unsafe { core::mem::transmute(FN_DEMAND_LOAD) };
-        if unsafe { load(tex, field(storm3d(), 0xc0) as u32) } != 0 {
-            return;
-        }
+    let load: unsafe extern "thiscall" fn(usize, u32) -> u32 = unsafe { core::mem::transmute(a(sym::LO_DEMAND_LOAD)) };
+    if unsafe { load(tex, peek(storm3d(), field::LO_S3D_DEVICE) as u32) } != 0 {
+        return;
     }
     let f = unsafe { &mut *core::ptr::addr_of_mut!(FRAME) };
     if f.rings.len() < 256 {
@@ -635,7 +575,7 @@ unsafe extern "thiscall" fn fade_draw(_dev: usize, rect: *const [f32; 4], _z: f3
         return;
     }
     let r = unsafe { *rect };
-    let alpha = if mat != 0 { unsafe { rd::<f32>(mat + 0x24) } } else { 1.0 };
+    let alpha = if mat != 0 { unsafe { rd::<f32>(mat + field::LO_FADE_ALPHA) } } else { 1.0 };
     let rgb = colour(col);
     log_once(4, || crate::log!("leftovers: fade over {:.0},{:.0} {:.0}x{:.0}, colour {:.2} {:.2} {:.2}, alpha {:.2}", r[0], r[1], r[2], r[3], rgb[0], rgb[1], rgb[2], alpha));
     if !alpha.is_finite() || !r.iter().all(|v| v.is_finite()) {
@@ -647,7 +587,7 @@ unsafe extern "thiscall" fn fade_draw(_dev: usize, rect: *const [f32; 4], _z: f3
 // ---- the video --------------------------------------------------------------------
 
 unsafe extern "C" fn blit(rect: *const [f32; 4]) {
-    let stock: unsafe extern "C" fn(*const [f32; 4]) = unsafe { core::mem::transmute(FN_BLIT) };
+    let stock: unsafe extern "C" fn(*const [f32; 4]) = unsafe { core::mem::transmute(a(sym::LO_BLIT)) };
     unsafe {
         BLIT_RECT = if rect.is_null() { None } else { Some(*rect) };
         stock(rect);
@@ -659,9 +599,9 @@ unsafe extern "thiscall" fn video_bar(_dev: usize, _x: f32, _y: f32, _w: f32, _h
 
 unsafe extern "thiscall" fn video_sprite(sprite: usize, _pos: *const [f32; 3], _w: f32, _h: f32) {
     let Some(rect) = (unsafe { BLIT_RECT }) else { return };
-    let get: unsafe extern "thiscall" fn(usize) -> usize = unsafe { core::mem::transmute(FN_SPRITE_TEXTURE) };
+    let get: unsafe extern "thiscall" fn(usize) -> usize = unsafe { core::mem::transmute(a(sym::LO_SPRITE_TEXTURE)) };
     let tex = if sprite != 0 { unsafe { get(sprite) } } else { 0 };
-    let size = unsafe { (rd::<i32>(BINK_WIDTH).max(0) as u32, rd::<i32>(BINK_HEIGHT).max(0) as u32) };
+    let size = unsafe { (rd::<i32>(a(sym::LO_BINK_WIDTH)).max(0) as u32, rd::<i32>(a(sym::LO_BINK_HEIGHT)).max(0) as u32) };
     log_once(8, || crate::log!("leftovers: video {}x{} into {:.0},{:.0} {:.0}x{:.0}", size.0, size.1, rect[0], rect[1], rect[2], rect[3]));
     if tex == 0 || size.0 == 0 || size.1 == 0 {
         return;
@@ -688,15 +628,15 @@ unsafe extern "C" fn fps_display(_y: *mut i32, _line: i32) {
         return;
     }
     let f = unsafe { &mut *core::ptr::addr_of_mut!(FPS) };
-    let fps: f32 = unsafe { rd(s3d + S3D_FPS) };
+    let fps: f32 = unsafe { rd(s3d + field::LO_S3D_FPS) };
     f.fps = if fps == -1.0 || !fps.is_finite() { None } else { Some(fps) };
-    let total: f32 = unsafe { rd(s3d + S3D_TOTAL_FPS) };
+    let total: f32 = unsafe { rd(s3d + field::LO_S3D_TOTAL_FPS) };
     f.total_fps = if total.is_finite() { total } else { 0.0 };
     f.slots.clear();
     if f.fps.is_some() {
-        let n = unsafe { rd::<i32>(SLOT_COUNT) }.clamp(0, 32);
-        let name: unsafe extern "C" fn(i32) -> usize = unsafe { core::mem::transmute(FN_SLOT_NAME) };
-        let avg: unsafe extern "C" fn(i32) -> f64 = unsafe { core::mem::transmute(FN_TIME_AVG) };
+        let n = unsafe { rd::<i32>(a(sym::LO_SLOT_COUNT)) }.clamp(0, 32);
+        let name: unsafe extern "C" fn(i32) -> usize = unsafe { core::mem::transmute(a(sym::LO_SLOT_NAME)) };
+        let avg: unsafe extern "C" fn(i32) -> f64 = unsafe { core::mem::transmute(a(sym::LO_TIME_AVG)) };
         for i in 0..n {
             let label = super::buttons::latin1(unsafe { name(i) }, 64);
             let ms = unsafe { avg(i) } as f32;
