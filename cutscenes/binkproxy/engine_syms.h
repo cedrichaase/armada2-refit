@@ -3,22 +3,15 @@
 #ifndef BINKPROXY_ENGINE_SYMS_H
 #define BINKPROXY_ENGINE_SYMS_H
 
-#define BINKPROXY_S_INTRO_MODE_A 0
-#define BINKPROXY_S_INTRO_MODE_B 1
-#define BINKPROXY_S_INTRO_COPY_RET 2
+#define BINKPROXY_S_INTRO_COPY_RET 0
 #define BINKPROXY_F_INTRO_DESC_FORMAT 0x28
 #define BINKPROXY_F_INTRO_DESC_WIDTH 0x10
 #define BINKPROXY_F_INTRO_DESC_HEIGHT 0xc
-#define BINKPROXY_H_INTRO_MODE 0
-#define BINKPROXY_H_INTRO_COPY 1
+#define BINKPROXY_H_INTRO_COPY 0
 
-A2E_U32 a2s_binkproxy_intro_mode_a __attribute__((used));
-A2E_U32 a2s_binkproxy_intro_mode_b __attribute__((used));
 A2E_U32 a2s_binkproxy_intro_copy_ret __attribute__((used));
 
 static A2E_U32 *const binkproxy_vars[] = {
-    &a2s_binkproxy_intro_mode_a,
-    &a2s_binkproxy_intro_mode_b,
     &a2s_binkproxy_intro_copy_ret,
     0,
     0,
@@ -26,30 +19,19 @@ static A2E_U32 *const binkproxy_vars[] = {
 };
 
 static const A2ESymDef binkproxy_syms[] = {
-    {"intro_mode_a", "Program::PlayIntroMovie", 6},
-    {"intro_mode_b", "Program::PlayIntroMovie", 6},
     {"intro_copy_ret", "NextBinkFrame", 4},
     {"intro_desc_format", "NextBinkFrame", 10},
     {"intro_desc_width", "NextBinkFrame", 10},
     {"intro_desc_height", "NextBinkFrame", 10},
 };
 static const char *const binkproxy_h0_rows[] = {0};
-static const A2E_U16 binkproxy_h0_syms[] = {0, 1, 0};
-static const char *const binkproxy_h1_rows[] = {0};
-static const A2E_U16 binkproxy_h1_syms[] = {2, 3, 4, 5, 0};
+static const A2E_U16 binkproxy_h0_syms[] = {0, 1, 2, 3, 0};
 static const A2EHookDef binkproxy_hooks[] = {
-    {"binkproxy.intro_mode", 1, binkproxy_h0_rows, 0, binkproxy_h0_syms, 2},
-    {"binkproxy.intro_copy", 0, binkproxy_h1_rows, 0, binkproxy_h1_syms, 4},
+    {"binkproxy.intro_copy", 0, binkproxy_h0_rows, 0, binkproxy_h0_syms, 4},
 };
-static const A2E_U8 binkproxy_b0_c0[] = {0x6a, 0x20, 0x68, 0xe0, 0x01, 0x00, 0x00, 0x68, 0x80, 0x02, 0x00, 0x00, 0x8b, 0xb8, 0x04, 0x01, 0x00, 0x00};
-static const A2E_U8 binkproxy_b0_m0[] = {0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01};
-static const A2E_U8 binkproxy_b0_c1[] = {0x8b, 0x4f, 0x1c, 0x6a, 0x10, 0x68, 0xe0, 0x01, 0x00, 0x00, 0x68, 0x80, 0x02, 0x00, 0x00, 0xe8};
-static const A2E_U8 binkproxy_b0_m1[] = {0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01};
-static const A2E_U8 binkproxy_b0_c2[] = {0x8b, 0xf0, 0x8b, 0x45, 0x14, 0x50, 0x8b, 0x08};
+static const A2E_U8 binkproxy_b0_c0[] = {0x8b, 0xf0, 0x8b, 0x45, 0x14, 0x50, 0x8b, 0x08};
 static const A2EEntry binkproxy_b0_entries[] = {
-    {1, 0, 0xffff, 0xffff, 0, 1, 18, 0x0, 0x0, 0, binkproxy_b0_c0, binkproxy_b0_m0, ".text"}, /* intro_mode_a */
-    {1, 0, 0xffff, 0xffff, 0, 1, 16, 0x0, 0x0, 0, binkproxy_b0_c1, binkproxy_b0_m1, ".text"}, /* intro_mode_b */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4638b5, 0x0, 0, binkproxy_b0_c2, 0, ""}, /* intro_copy_ret */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4638b5, 0x0, 0, binkproxy_b0_c0, 0, ""}, /* intro_copy_ret */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 40, 0, 0, ""}, /* intro_desc_format */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 16, 0, 0, ""}, /* intro_desc_width */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 12, 0, 0, ""}, /* intro_desc_height */
@@ -58,17 +40,17 @@ static const A2EBlock binkproxy_b0_blocked[] = {
     {0xffff, 0, 0, 0}
 };
 static const A2EBuild binkproxy_builds[] = {
-    {"gog-1.1", "armada2/gog-1.1", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, binkproxy_b0_entries, binkproxy_b0_blocked, 0, 6},
+    {"gog-1.1", "armada2/gog-1.1", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, binkproxy_b0_entries, binkproxy_b0_blocked, 0, 4},
 };
 
-static A2E_U8 binkproxy_hook_state[2];
-static A2E_U8 binkproxy_sym_flags[6];
-static A2E_U32 binkproxy_sym_addr[6];
-static char binkproxy_notes[2][A2E_NOTE_MAX + 1];
+static A2E_U8 binkproxy_hook_state[1];
+static A2E_U8 binkproxy_sym_flags[4];
+static A2E_U32 binkproxy_sym_addr[4];
+static char binkproxy_notes[1][A2E_NOTE_MAX + 1];
 
 static const A2ETable BINKPROXY_ENGINE = {
     "armada2", "binkproxy",
-    binkproxy_syms, 6, binkproxy_hooks, 2, binkproxy_builds, 1, 2,
+    binkproxy_syms, 4, binkproxy_hooks, 1, binkproxy_builds, 1, 0,
     binkproxy_vars, binkproxy_hook_state, binkproxy_sym_flags, binkproxy_sym_addr, binkproxy_notes
 };
 

@@ -13,8 +13,6 @@ every hook down with that reason and leaves the game as stock: Display8 takes th
 bail-out (display 1.0.0: the system's own Direct3D 8; it forwarded to the old chain
 before), so the plugins are told no backend, UI.asi draws nothing, and the settings
 screen shows the plugin note.
-The only hook that runs is a scan with `unknown = "run"` (binkproxy's build-independent
-intro-mode scan, from phase 8d; it makes no log line here until the C plugins move).
 The shell is the stock one (4:3, centred in the window with black sides; the Instant
 Action cube is clicked in screen pixels), then a skirmish loads and ticks.
 

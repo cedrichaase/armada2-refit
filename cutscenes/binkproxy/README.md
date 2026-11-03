@@ -156,9 +156,6 @@ for anything 720 lines or taller.
   `BinkOpenDirectSound`, read out of the import table rather than called, into
   `BinkSetSoundSystem`. That address is the replacement's own, so it is
   swapped for the real one on the way through.
-- **Mode patch sites:** `push 32/480/640` and the 16-bit fallback, both in
-  `PlayIntroMovie`. Each signature occurs once in the file. The bare 640/480
-  push pair also occurs a third time elsewhere, and is left alone.
 
 ## Hooks
 
@@ -169,7 +166,6 @@ and the symbol summary after its version line.
 
 | Hook | Entries | Used by | Without it |
 |---|---|---|---|
-| `binkproxy.intro_mode` | the two signatures above, as `scan` entries that must each match exactly once in `.text` | `patch_intro_mode`; `unknown = "run"`: the scans are build-independent, so this runs on a build the profiles do not know | the intro stays at 640x480 (movies still play) |
 | `binkproxy.intro_copy` | the return address of the `BinkCopyToBuffer` call in `NextBinkFrame` (a `label`, its first 8 bytes checked) and the three distances of the `D3DSURFACE_DESC` fields below the frame's EBP (`field`) | `intro_backbuffer` | the intro is copied 1:1 at its own size, not fitted |
 
 `BinkProxy_SettingsNote` (settings, C5) returns the engine's note for a row or the

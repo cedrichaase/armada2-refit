@@ -32,10 +32,14 @@ esac
 while [ $# -gt 0 ] && [[ "$1" == *=* ]]; do
     key=${1%%=*}
     if ! grep -q "^$key=" "$ini"; then
-        # FailBackend= is the bench's alone (README.md, "Choosing a backend"): not in the
-        # shipped Display8.ini, so it is added under [Display8].
-        [ "$key" = FailBackend ] || { echo "Display8.ini has no key $key" >&2; exit 1; }
-        sed -i 's/^\[Display8\]\r\?$/&\nFailBackend=/' "$ini"
+        # FailBackend= is the bench's alone (README.md, "Choosing a backend"), and Mode=
+        # and Real= are retired (display 1.0.0; display-retired-keys writes them to see
+        # them read past): not in the shipped Display8.ini, so added under [Display8].
+        case "$key" in
+            FailBackend|Mode|Real) ;;
+            *) echo "Display8.ini has no key $key" >&2; exit 1 ;;
+        esac
+        sed -i "s/^\[Display8\]\r\?\$/&\n$key=/" "$ini"
     fi
     sed -i "s/^$key=.*/${1//\//\\/}/" "$ini"
     shift
