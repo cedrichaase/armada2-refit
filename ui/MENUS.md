@@ -567,8 +567,7 @@ screen.
 ## The Refit screen
 
 `menus/refit.rs`: every setting of every plugin that exports a settings table
-(`tools/settings/README.md`), as rows on five tabs (Graphics, Interface, Gameplay,
-Multiplayer, Movies), in **a modal of ours over the hosted Options dialog**. It is not a
+(`tools/settings/README.md`), as rows on three tabs (Graphics, Interface, Gameplay; a tab with no row is not shown, which is why Movies and Multiplayer are gone: cutscenes 3.0.1, Pay when queued on Gameplay, Online entry on Interface), in **a modal of ours over the hosted Options dialog**. It is not a
 shell screen of its own: the in-mission Options runs inside the dialog host's loop, which
 is the only thing that presents while a mission's menu is up, and the modal drawn by the
 host's frame (`menus::frame`, after the dialog stack, before the frame's claim) works the

@@ -166,7 +166,7 @@ why, and `Online_SettingsNote` gives the same reason to the settings screen.
 Without the hook the IPX button and the chat boxes stay stock. (Before the profile, each
 site was checked against the bytes it replaces and `Online.log` said the exe was not
 the 1.1 this was made for.) `Entry=0` in `Online.ini` leaves the screen stock. `Entry` is a settings row (`settings.toml`,
-exported as `Online_Settings`, RESTART, tab Multiplayer), so `[Online.Online] Entry=0` in
+exported as `Online_Settings`, RESTART, tab Interface), so `[Online.Online] Entry=0` in
 `RefitPlayer.ini` does the same; every key of `Online.ini` is read through the overlay
 (`tools/settings/README.md`) and the override is logged to `Online.log`.
 

@@ -11,8 +11,8 @@ It needs the redrawn menus (`[Menus] Enable=1`, the shipped default); with `Spec
   Game Settings). `Wait for the refit screen` (`ui.json`, text
   "Graphics", "Interface"). UI.log: `refit: opened in the shell (Graphics 19, ...)` /
   `... in a mission (...)`.
-- **Everything is clicked by its label**: tabs (`Graphics`, `Interface`, `Gameplay`,
-  `Multiplayer`, `Movies`), rows (`Sky`, `Ships`, `Anti-aliasing`, `Theme`, `Right-drag
+- **Everything is clicked by its label**: tabs (`Graphics`, `Interface`, `Gameplay`),
+  rows (`Sky`, `Ships`, `Anti-aliasing`, `Theme`, `Right-drag
   pan speed`, `Pay when queued`), the foot (`Reset tab`, `Show advanced`, `Done`). A click
   anywhere on a BOOL row toggles it; a click on an ENUM row's label opens its drop-down,
   and the choice is then clicked by its words (`2x`, `Borg`, `Stock`).
@@ -53,7 +53,7 @@ It needs the redrawn menus (`[Menus] Enable=1`, the shipped default); with `Spec
 ## Screen places at 1280x720
 
 The modal is 800x547, centred. Tab text and the title read in upper case. Tabs at y=138:
-Graphics x=323, Interface 470, Gameplay 621, Multiplayer 770, Movies 919. Foot at y=611:
+Graphics x=323, Interface 470, Gameplay 621 (three tabs since 15.6.12). Foot at y=611:
 Reset tab 315, Show advanced 449 (box 399), Done 965. Rows from y=169, 36 px apart; left
 column labels at x=261, right at x=661; switches at x=575 / 975, drop-downs at x=538 / 938.
 Graphics: Anti-aliasing 169 (box at 538,176), HDR and bloom 205, Ships 241, Sky 277.

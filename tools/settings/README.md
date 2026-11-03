@@ -133,7 +133,7 @@ const A2Setting *__cdecl <Plugin>_Settings(UINT *count)                         
 ```
 
 The names are fixed: `Render3D_Settings`, `UI_Settings`, `QOL_Settings`,
-`QOLRules_Settings`, `Online_Settings`, `BinkProxy_Settings`, `Display8_Settings` (read
+`QOLRules_Settings`, `Online_Settings`, `Display8_Settings` (read
 by the UI hub since ui 1.0.0). `count` may be NULL; the rows are static and live as long as the DLL. A row,
 C ABI, i686, 48 bytes in version 1.1 (44 in 1.0):
 
@@ -308,8 +308,8 @@ why"; the choice is still stored and applies when the part runs. The hub calls i
 game thread when the Refit screen opens and once a second while it is open, so it must be
 cheap and must not write. The hub finds it with `GetProcAddress` beside
 `_SettingsChanged` (`NoteFn` in `crates/a2rt/src/settings.rs`, `A2SettingsNoteFn` in
-`csdk/a2asi.h`, both outside the generated parts). UI, Render3D, QOL, QOLRules, Online and
-BinkProxy export it (the C plugins since the symbol profiles of Phase 8).
+`csdk/a2asi.h`, both outside the generated parts). UI, Render3D, QOL, QOLRules and
+Online export it (the C plugins since the symbol profiles of Phase 8).
 
 ## On the bench
 

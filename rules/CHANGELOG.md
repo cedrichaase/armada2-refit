@@ -4,6 +4,11 @@
 refund on cancel: QOL-7). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 1.0.1 — 2026-11-03
+
+### Changed
+- `PayOnQueue`'s row moves from the Multiplayer tab to Gameplay (`tab = "gameplay"`); key, section and hint unchanged, so a player's `RefitPlayer.ini` value carries over. Installed, not yet seen in game.
+
 ## 1.0.0 — 2026-11-03
 
 ### Added

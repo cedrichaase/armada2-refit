@@ -17,7 +17,7 @@ multiplayer match starts with 999999 of each resource (9999999 for Species 8, th
 counter it has), which is what the HUD is waited for by. The joiner quits first, so
 neither game is left with a "player left" dialog. Names are typed in lower case
 (scenarios/multiplayer-name.md says why). After the match has started the host opens the
-Refit screen (Esc, Refit, Multiplayer): *Pay when queued* is a must-match row and so reads
+Refit screen (Esc, Refit, Gameplay): *Pay when queued* is a must-match row and so reads
 `Locked` in a network mission, and a click on it writes nothing (`ui/MENUS.md`, "The Refit
 screen"); Esc closes only the Refit screen and Return to Game goes back to the match.
 
@@ -73,7 +73,7 @@ screen"); Esc closes only the Refit screen and Return to Game goes back to the m
 50. Host: Wait 3 seconds.
 51. Host: Click "Refit settings".
 52. Host: Wait 2 seconds.
-53. Host: Click "Multiplayer".
+53. Host: Click "Gameplay".
 54. Host: Wait 1 second.
 55. Host: Expect "Locked" is visible.
 56. Host: Take a screenshot called "refit locked".

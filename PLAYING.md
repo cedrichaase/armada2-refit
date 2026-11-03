@@ -79,7 +79,7 @@ same.
 | Quality of life | `QOL.asi` | Faster right-drag panning, `Shift+number` adds to a group, selections and groups beyond 16, stations in control groups, long moves at warp. Works with players who do not have it | stock handling |
 | Rules | `QOLRules.asi` | *Pay when queued*. Every player of a network game needs it (see "Multiplayer") | stock payment |
 | Online | `Online.asi` | The *Internet - Online* entry in Multiplayer | the entry is not there |
-| Cutscene player | `binkw32.dll` | The launch reels full screen, and AV1 replacements for the movies if you have built any | stock player |
+| Cutscene player | `binkw32.dll` | The launch reels full screen (and AV1 replacements for the movies, if you have built any and put them beside the game) | stock player |
 | Models | SOD files | Smoothed moons and asteroids, a round selection bubble, a widened loading screen. Rewritten from your own files | stock models |
 
 You can also switch most of these off **without reinstalling**, from the Refit screen
@@ -88,8 +88,7 @@ You can also switch most of these off **without reinstalling**, from the Refit s
 ## The Refit screen
 
 In the main menu or in a mission: **Options**, then **Refit settings**. It lists every setting
-of every Refit plugin that is installed, on five tabs: Graphics, Interface, Gameplay,
-Multiplayer and Movies. A click anywhere on an on/off row toggles it; a row with
+of every Refit plugin that is installed, on three tabs: Graphics, Interface and Gameplay. A click anywhere on an on/off row toggles it; a row with
 several values opens a list. *Show advanced* adds the rows meant for tuning or trouble.
 *Reset tab* removes your choices on that tab and goes back to the shipped defaults
 (it asks first). *Done* or Esc closes the screen.
@@ -164,7 +163,7 @@ transport.
 - **Playing against players without Refit** works for everything that stays on your
   machine: the HUD, the renderer, the menus and `QOL.asi`. A game with someone who
   lacks the plugins is a normal game for them.
-- **Pay when queued** (Multiplayer tab, `[Rules] PayOnQueue`) is the one rule that
+- **Pay when queued** (Gameplay tab, `[Rules] PayOnQueue`) is the one rule that
   changes what every machine simulates: an item is paid for when it is queued, and
   refunded on cancel. It is on by default. In an *Internet - Online* game each joiner
   reports whether it runs the rules plugin with the setting on, and the host decides:

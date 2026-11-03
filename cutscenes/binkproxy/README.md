@@ -101,11 +101,11 @@ and the byte patch behind them are gone. Without Display8 as `d3d8.dll` (no
 `display8_abi` export) the intro's mode stays stock, and the log says
 `intro: stock mode (no Display8)` once.
 
-`ReplaceMovies` is a settings row (`settings.toml`, exported as `BinkProxy_Settings`, LIVE,
-tab Movies) and is read again at each `BinkOpen`, so `[BinkProxy.BinkProxy] ReplaceMovies=0`
+`ReplaceMovies` is not a Refit settings row (the Movies tab was removed in 3.0.1, since no
+replacement movies are shipped) and the plugin exports no settings table. It is still read
+through the overlay and again at each `BinkOpen`, so `[BinkProxy.BinkProxy] ReplaceMovies=0`
 in `RefitPlayer.ini` gives the next movie opened as its stock `.bik`; one already playing
 finishes as it began. Every other key is read once at load, through the overlay.
-`BinkProxy_SettingsChanged` (called by the UI's hub) reads the row and logs it.
 
 ## Why AV1 and a separate WAV: measured, not chosen
 

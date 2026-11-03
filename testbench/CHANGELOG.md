@@ -5,6 +5,11 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 4.1.3 — 2026-11-03
+
+### Changed
+- Scenarios `ui-menus-refit` (three tabs; Movies and Multiplayer not visible; Must match checked on Gameplay) and `multiplayer-two-players` (the lock is checked on Gameplay); `operating/refit-screen.md` and `ui.json` updated. Installed, not yet seen in game.
+
 ## 4.1.2 — 2026-11-03
 
 ### Fixed

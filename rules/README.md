@@ -30,7 +30,7 @@ stock` / `refit` switches `QOLRules.asi` and `QOLRules.ini` like the other plugi
 - `online/` finds the plugin by its export (`a2_find_export("QOLRules_Wanted")` in
   `csdk/a2asi.h`: module enumeration), never by the file name.
 - When the plugin's settings table (`QOLRules_Settings`) is absent, the Refit screen's
-  Multiplayer tab shows one note row, "Pay on queue is not installed: network games you
+  Gameplay tab shows one note row, "Pay on queue is not installed: network games you
   join play stock rules". The `PayOnQueue` row stays locked in network games.
 
 ## Settings live

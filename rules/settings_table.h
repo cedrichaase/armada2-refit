@@ -6,7 +6,7 @@
 #define QOLRULES_SETTINGS_TABLE_H
 
 static const A2Setting QOLRULES_SETTINGS[] = {
-    { sizeof(A2Setting), A2SET_KIND_BOOL, A2SET_APPLY_MISSION, A2SET_SCOPE_MATCH, A2SET_TAB_MULTIPLAYER, 0,
+    { sizeof(A2Setting), A2SET_KIND_BOOL, A2SET_APPLY_MISSION, A2SET_SCOPE_MATCH, A2SET_TAB_GAMEPLAY, 0,
       "QOLRules.ini", "Rules", "PayOnQueue", "1", NULLPTR, NULLPTR,
       "Pay when queued",
       "An item is paid for the moment it is queued, not when it starts. Every player in a network game must have the same setting.", NULLPTR },

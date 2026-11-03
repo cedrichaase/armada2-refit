@@ -4,6 +4,13 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`binkproxy/README.md`](binkproxy/README.md).
 
+## 3.0.1 — 2026-11-03
+
+### Removed
+- The Refit screen's Movies tab: `settings.toml`, `settings_table.h` and the exports `BinkProxy_Settings`, `BinkProxy_SettingsNote` and `BinkProxy_SettingsChanged` are gone, since no replacement movies are shipped. `ReplaceMovies` is still read from `BinkProxy.ini` and the overlay (`[BinkProxy.BinkProxy]`) at each movie open; the launch reels are still scaled full screen.
+
+Installed, not yet seen in game.
+
 ## 3.0.0 — 2026-11-03
 
 ### Removed
