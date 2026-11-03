@@ -16,6 +16,7 @@ MAJOR: `--no-grid` is no longer passed, `ui/bench-legacy.sh` and the Direct3D 9 
 ### Changed
 - `Stock shell: embed` copies Menus.asi from the cache (was `menus/build.sh` of the checkout, which is gone). `display/bench-abi.sh old-display` takes Menus.asi from it too.
 - `DLL_OVERRIDES` is `winmm=n,b;d3d8=n,b`: a clone that carries its own `d3d9.dll` (the old Display8 of `display-abi-mismatch`) gets `d3d9=n,b` added at launch.
+- `display-abi-mismatch` step 17 expects the old Display8's `mode forward` (0.11.0's default; the "forward mode instead" fallback text is gone).
 - Scenarios and notes drop `--no-grid` (twelve `ui-*` scenarios, `operating/`); `render3d-pivot` and `ui-leftovers-2` run on the stub (`bench-mode.sh stub`, were `forward`). `menus/run-wine.sh` and `menus/stop-game.sh` are `platform/` in the README, `admirals-log` and `session.py`. `GAMEPLAY.md` and `operating/ui-switchon.md` say the grid and the legacy plugins are retired.
 
 ### Removed
