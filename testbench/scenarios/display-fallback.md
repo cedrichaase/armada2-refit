@@ -35,7 +35,7 @@ Direct3D 12 draws).
 9. Expect "Display8.log" contains "stub: no backend could start (vulkan, then d3d12)".
 10. Expect "Display8.log" contains "bail-out: no backend could start at the engine's first CreateDevice; the game draws through ".
 11. Expect "Display8.log" contains "bail-out: the system's CreateDevice -> 0x0".
-12. Expect "Display8.log" not contain "stub: the backend is".
+12. Expect "Display8.log" not contain "after vulkan, then d3d12 could not start".
 13. Wait 8 seconds.
 14. Take a screenshot called "intro".
 15. Press Escape.
