@@ -14,7 +14,7 @@ controls' own, so the steps click by text; the controls that have none (a switch
 button labelled "On") are clicked at their screen place, at 1280x720 only. A setting
 changed through the UI must persist, exactly as in stock: Bump Mapping is switched off,
 Graphics Settings left and opened again, and it must still read Off; the display mode
-list opens and a choice closes it; the Music Volume slider is clicked in the middle and
+list opens and holds the one mode Display8 offers in stub mode, the desktop's (1280x720x32 on the bench; never 800x600x32), and choosing it closes the list; the Music Volume slider is clicked in the middle and
 Unit Speech switched, then Sound Settings opened again; Game Difficulty is stepped. No
 step is judged (a judged step would add a 4:3 reference game).
 
@@ -39,11 +39,11 @@ step is judged (a judged step would add a 4:3 reference game).
 19. Take a screenshot called "bump mapping off".
 20. Click at 440,239.
 21. Wait 1 second.
-22. Expect "800x600x32" is visible.
+22. Expect "1280x720x32" is visible.
 23. Take a screenshot called "display mode list".
-24. Click at 440,348.
+24. Click at 440,268.
 25. Wait 1 second.
-26. Expect "800x600x32" is not visible.
+26. Expect "Display8 on Vulkan" is visible.
 27. Click "Previous Menu".
 28. Wait 2 seconds.
 29. Click "Graphics Settings".
