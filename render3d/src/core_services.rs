@@ -49,6 +49,13 @@ pub trait HullDraw {
     fn shadow_map(&self) -> Option<ShadowRef>;
 }
 
+/// The scene lights that replace the map's directional lights (`[Lights]`, the hull
+/// look's): given by the hulls module, whether it draws hulls or not, and `None` while
+/// they are the map's (`Replace=0`, or `Lighting.asi` has replaced them already).
+pub trait SceneLightSource {
+    fn scene_config(&self) -> Option<crate::scene::lights::SceneConfig>;
+}
+
 /// The ordnance module's shockwave (the explosions' wave).
 pub trait WaveDraw {
     fn draw_wave(&self, expl: usize, v: &View) -> bool;
@@ -69,6 +76,7 @@ pub trait GhostDraw {
 pub struct Services {
     volumes: Option<ModuleId>,
     hulls: Option<(ModuleId, &'static dyn HullDraw)>,
+    scene_lights: Option<&'static dyn SceneLightSource>,
     wave: Option<(ModuleId, &'static dyn WaveDraw)>,
     post: Option<(ModuleId, &'static dyn PostDraw)>,
     ghost: Option<(ModuleId, &'static dyn GhostDraw)>,
@@ -83,6 +91,9 @@ impl Services {
     pub fn hulls(&mut self, owner: ModuleId, p: &'static dyn HullDraw) {
         self.hulls = Some((owner, p));
     }
+    pub fn scene_lights(&mut self, p: &'static dyn SceneLightSource) {
+        self.scene_lights = Some(p);
+    }
     pub fn wave(&mut self, owner: ModuleId, p: &'static dyn WaveDraw) {
         self.wave = Some((owner, p));
     }
@@ -94,7 +105,7 @@ impl Services {
     }
 }
 
-static mut SERVICES: Services = Services { volumes: None, hulls: None, wave: None, post: None, ghost: None };
+static mut SERVICES: Services = Services { volumes: None, hulls: None, scene_lights: None, wave: None, post: None, ghost: None };
 
 /// The registry's, for `provide()` at init.
 #[allow(static_mut_refs)]
@@ -119,6 +130,12 @@ pub fn hulls() -> Option<&'static dyn HullDraw> {
 #[allow(static_mut_refs)]
 pub fn hulls_any() -> Option<&'static dyn HullDraw> {
     unsafe { SERVICES.hulls }.map(|(_, p)| p)
+}
+
+/// The scene lights' source (the hulls module's keys), whether the module runs or not.
+#[allow(static_mut_refs)]
+pub fn scene_lights() -> Option<&'static dyn SceneLightSource> {
+    unsafe { SERVICES.scene_lights }
 }
 
 /// Whether the world module runs and so draws the nebulae and latinum clouds as volumes.

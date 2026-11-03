@@ -4,6 +4,31 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.38.0 — 2026-11-03
+
+### Changed
+- hulls and specials onto the module layers (phase 7, W-A): `hulls/game.rs` is
+  `hooks.rs` (every engine read behind a named accessor, including the instance's
+  fade, face limit and sphere, the cocoon, the class effect nodes and the planets the
+  shadow map sees), `specials/hooks.rs` holds the effect list's reads; their built-in
+  names and tables are in `content.rs`. `configure` reads `[Hulls]` and `[Specials]`
+  (`look::load(&Ini)`), and `render3d/lint-layers.sh --strict src/mods/hulls
+  src/mods/specials` is clean.
+- The scene lights' keys (`[Lights]` `Replace`, `KeyColour`, `KeyAxis`, `FillColour`,
+  `FillAxis`, `SkyLight`) and the `Lighting.asi` test moved from `scene/lights.rs` to
+  the hulls module (`scene_lights.rs`); the core applies them through the new
+  `core_services::SceneLightSource`, as before whether the hulls module runs or not.
+  `SceneConfig` stays in `scene/lights.rs`, with `Style`.
+- No change to what is drawn: the base's frames at RMSE 0 (`port-showcase`,
+  `port-firing`, hulls and specials off at load and live). `Modules.hulls` and
+  `Modules.specials` were live already.
+
+### Added
+- `specials::off()` drops the per-effect ages. Scenarios `render3d-live-hulls` and
+  `render3d-live-specials` (testbench 3.90.0).
+
+Installed, not yet seen in game
+
 ## 0.37.2 — 2026-11-03
 
 ### Changed

@@ -167,7 +167,7 @@ impl Sprites {
                 continue;
             }
             let id = n.sprite_node_id();
-            let glow = if id.eq_ignore_ascii_case("glowdmoon") { p.glow } else { None };
+            let glow = if id.eq_ignore_ascii_case(super::content::SCRAP_GLOW_SPRITE) { p.glow } else { None };
             if look.sensor_steady && is_sensor(id) {
                 // Held on the flipbook's first frame (a full star), smaller: steady.
                 self.node_quad(v, &t, id, &p.pose.world[i], scale * look.sensor_size, 0.0, anim::LOOP, glow, look.sprites, None, out);
@@ -226,8 +226,8 @@ impl Sprites {
     pub fn billboard(&self, v: &View, look: &Look, p: &Posed, name: &str, out: &mut Vec<Quad>) {
         let t = assets::sprites();
         let inst = p.inst;
-        let (c, r) = super::game::instance_sphere(inst);
-        let base = crate::engine::field_v3(inst, 0x68) + c;
+        let (c, r) = super::hooks::instance_sphere(inst);
+        let base = super::hooks::instance_origin(inst) + c;
         let to_eye = super::norm_or(v.eye - base, v3(0.0, 1.0, 0.0));
         let mut at = crate::math::M34::IDENTITY;
         at.p = base + to_eye * r;

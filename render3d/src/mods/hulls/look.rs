@@ -1,5 +1,4 @@
 //! The hulls' look, `[Hulls]` in Render3D.ini: Lighting.asi's settled values, carried over with their names.
-use crate::config;
 use crate::math::{v3, V3};
 
 #[derive(Clone, Copy)]
@@ -124,8 +123,7 @@ fn v(a: [f32; 3]) -> V3 {
     v3(a[0], a[1], a[2])
 }
 
-pub fn load() -> Look {
-    let ini = config::ini();
+pub fn load(ini: &crate::rt::Ini) -> Look {
     let s = "Hulls";
     let f = |k: &str, d: f32| ini.float(s, k, d);
     let c = |k: &str, d: [f32; 3]| v(ini.floats(s, k, d));

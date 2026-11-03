@@ -1,9 +1,13 @@
-//! What the hulls module reads of a game object and its instance, besides what
-//! `engine::obj` has. Every address and offset here is described in render3d's README
-//! ("Hulls"), with the engine function it was read from. Reads only, except for the
-//! two writes `GameObject::Render` itself makes every frame (the on-screen byte +0x25,
-//! and what the engine's own frustum test and hologram call write), which the HUD and
-//! the sim go on reading as before.
+//! The hulls module's engine glue (README.md, "Hulls", "Hooks"): every address, call
+//! and field offset the module reads of a game object and its instance, besides what
+//! `engine::obj` has. The module installs no hook of its own: it is called from the
+//! frame's object loop and steps, and draws in `GameObject::Render`'s place by
+//! returning true there, so while it is off nothing of ours stands between the engine
+//! and its draw. Every finding is described in render3d's README ("Hulls") with the
+//! engine function it was read from. Reads only, except for the two writes
+//! `GameObject::Render` itself makes every frame (the on-screen byte +0x25, and what the
+//! engine's own frustum test and hologram call write), which the HUD and the sim go on
+//! reading as before.
 use crate::engine::{self, field, field_f32, field_u8, rd, vtable};
 use crate::math::{v3, M34, V3};
 pub use crate::engine::instance::{
@@ -249,7 +253,7 @@ pub fn class_odf(class: usize) -> &'static str {
         }
         let s = crate::rt::cstr_at(p, 260);
         match s.len().checked_sub(4) {
-            Some(n) if s.is_char_boundary(n) && s[n..].eq_ignore_ascii_case(".odf") => &s[..n],
+            Some(n) if s.is_char_boundary(n) && s[n..].eq_ignore_ascii_case(super::content::ODF_EXT) => &s[..n],
             _ => s,
         }
     }
@@ -363,8 +367,6 @@ const VT_FREIGHTER: usize = 0x6b26a8;
 /// `ResourceComponent::s_ResourceColor`: a pointer per resource to its colour (three
 /// floats), made by `InitResourceComponents`; stock's values when it has not run.
 const RESOURCE_COLOURS: usize = 0x764664;
-const RESOURCE_COLOURS_STOCK: [[f32; 3]; 6] =
-    [[0.0, 1.0, 0.0], [1.0, 1.0, 1.0], [0.6, 0.9, 1.0], [1.0, 1.0, 0.0], [0.8, 0.8, 0.8], [1.0, 0.0, 0.0]];
 
 /// A freighter's cargo markings, as `Freighter::UpdateDilithiumMarkings` (0x4b1fa0)
 /// sets them before each draw: every mesh among the children of the SOD's `ore` node
@@ -381,7 +383,7 @@ pub fn cargo_markings(o: usize, sod: &a2fmt::sod::Sod) -> alloc::vec::Vec<(alloc
     if o == 0 || vtable(o) != VT_FREIGHTER {
         return out;
     }
-    let Some(ore) = sod.find("ore") else { return out };
+    let Some(ore) = sod.find(super::content::ORE_NODE) else { return out };
     let kind = field(o, 0x25c);
     let amount = field_f32(o, 0x258);
     let caps = field(o, 0x254);
@@ -389,7 +391,7 @@ pub fn cargo_markings(o: usize, sod: &a2fmt::sod::Sod) -> alloc::vec::Vec<(alloc
         let cap = field_f32(caps, kind * 4);
         let fill = if cap > 0.0 && amount.is_finite() { amount / cap * 100.0 } else { 0.0 };
         let p = field(RESOURCE_COLOURS, kind * 4);
-        let c = if p != 0 { unsafe { rd::<[f32; 3]>(p) } } else { RESOURCE_COLOURS_STOCK[kind] };
+        let c = if p != 0 { unsafe { rd::<[f32; 3]>(p) } } else { super::content::RESOURCE_COLOURS_STOCK[kind] };
         (fill, v3(c[0], c[1], c[2]))
     } else {
         (-1.0, v3(0.0, 0.0, 0.0))
@@ -410,5 +412,146 @@ pub fn cargo_markings(o: usize, sod: &a2fmt::sod::Sod) -> alloc::vec::Vec<(alloc
             }
         }
     }
+    out
+}
+
+// ---- Reads the drawing code makes of an instance and an object (draw.rs, shadow.rs,
+// sprites.rs, mod.rs), by name. ----
+
+/// The engine's 2 pi (`0x7913bc`), or Rust's when it is not a sane value.
+pub fn two_pi() -> f32 {
+    let t = unsafe { rd::<f32>(0x7913bc) };
+    if t.is_finite() && t > 0.1 { t } else { core::f32::consts::TAU }
+}
+
+/// Whether fades are on in this pass at all (`Storm3D+0xe8`, `SetNearFadeOut`).
+pub fn fades_on() -> bool {
+    field(engine::storm3d(), 0xe8) != 0
+}
+
+/// Stock's near fade of an instance (`GameObjectInstance::ComputeFadeOut`): its bounding
+/// sphere over the distance (`+0x40`, `+0x8c`) against the engine's three constants
+/// (`0x70444c`, `0x704450`, `0x704454`). 1 when it does not fade.
+pub fn stock_near_fade(inst: usize) -> f32 {
+    let q = field_f32(inst, 0x40) / field_f32(inst, 0x8c).max(1e-3);
+    let (minf, maxf, maxa) = unsafe { (rd::<f32>(0x70444c), rd::<f32>(0x704450), rd::<f32>(0x704454)) };
+    if !(q > minf) || !(maxf > minf) {
+        return 1.0;
+    }
+    1.0 - (q.min(maxf) - minf) * maxa / (maxf - minf)
+}
+
+/// The instance's bounding radius (`+0x40`).
+pub fn instance_radius(inst: usize) -> f32 {
+    field_f32(inst, 0x40)
+}
+
+/// Where the instance's placement has its origin (`+0x68`).
+pub fn instance_origin(inst: usize) -> V3 {
+    engine::field_v3(inst, 0x68)
+}
+
+/// The faces the instance draws (`sm_faces_remaining`, `+0x10`: construction); -1 for no
+/// limit, and for no instance.
+pub fn face_limit(inst: usize) -> i32 {
+    if inst == 0 { -1 } else { field(inst, 0x10) as i32 }
+}
+
+/// The instance's database (`+0x80`).
+pub fn instance_database(inst: usize) -> usize {
+    field(inst, 0x80)
+}
+
+/// The sim time the instance started at (`+0x18`).
+pub fn instance_start(inst: usize) -> f32 {
+    field_f32(inst, 0x18)
+}
+
+/// The instance's flags (`+0xc`).
+pub fn instance_flags(inst: usize) -> u32 {
+    field(inst, 0xc) as u32
+}
+
+/// A craft instance with the Borg assimilation byte set (`+0xa1`).
+pub fn assimilated(inst: usize) -> bool {
+    field_u8(inst, 0xa1) != 0
+}
+
+/// Whether the object carries a cloaking device (`+0x108`).
+pub fn has_cloak(o: usize) -> bool {
+    field(o, 0x108) != 0
+}
+
+/// The object loop's own filters: not a background object (flag `0x10000`), not
+/// distance-culled for this view (`+0x183`).
+pub fn in_loop(o: usize) -> bool {
+    o != 0 && engine::obj::flags(o) & 0x10000 == 0 && field_u8(o, 0x183) == 0
+}
+
+/// Writes the on-screen byte (`+0x25`) as `GameObject::RenderInternal` writes the answer
+/// of its frustum test.
+pub fn write_seen(o: usize, seen: bool) {
+    unsafe { core::ptr::write_volatile((o + 0x25) as *mut u8, seen as u8) };
+}
+
+/// The cocoon's position (`+0x68`).
+pub fn cocoon_position(c: usize) -> V3 {
+    engine::field_v3(c, 0x68)
+}
+
+/// Whether an instance is the cocoon we know: a `CocoonInstance` on the plain database
+/// the engine keeps for `8472_cocoon.sod`.
+pub fn is_known_cocoon(c: usize) -> bool {
+    let db = field(c, 0x80);
+    engine::vtable(c) == VT_COCOON && db != 0 && engine::vtable(db) == VT_DATABASE && db == unsafe { rd::<usize>(COCOON_DB) }
+}
+
+/// The cocoon's ramp (`+0x98`, 0..1 over the first third of the evolution).
+pub fn cocoon_ramp(c: usize) -> f32 {
+    field_f32(c, 0x98)
+}
+
+/// The nodes of a craft class whose children are the engine's damage and crew-fire
+/// effects (the class's damage node names, `DAMAGE_NODES`, and the crew-fire one at
+/// `+0x408`): hidden when a model is shown clean.
+pub fn class_effect_nodes(class: usize) -> alloc::vec::Vec<&'static str> {
+    DAMAGE_NODES
+        .iter()
+        .copied()
+        .chain([(0x408usize, 0usize)])
+        .filter_map(|(cf, _)| element_name(field(class, cf)))
+        .collect()
+}
+
+/// The name of a craft class's Borg node (`+0x420`).
+pub fn class_borg_node(class: usize) -> Option<&'static str> {
+    element_name(field(class, 0x420))
+}
+
+/// Whether a class is a `CraftClass` (its node fields are where `class_effect_nodes`
+/// reads them): `DisableSpecialNodes` (vtable slot 7) is `CraftClass`'s (0x4bfdf0).
+pub fn is_craft_class(class: usize) -> bool {
+    field(engine::vtable(class), 7 * 4) == 0x4bfdf0
+}
+
+/// The planets in the object list (`vtable 0x6b2b3c`), as the shadow map's occluders:
+/// (centre, radius) of each, from the instance's sphere (`+0x34`, `+0x40`) and the
+/// translation of its placement (`+0x44` + `0x24`), at most `max`.
+pub fn planet_spheres(max: usize) -> alloc::vec::Vec<[f32; 4]> {
+    const VT_PLANET: usize = 0x6b2b3c;
+    let mut out = alloc::vec::Vec::new();
+    engine::for_each_in_list(engine::OBJECT_LIST, |o| {
+        if out.len() >= max || o == 0 || engine::vtable(o) != VT_PLANET {
+            return;
+        }
+        let inst = field(o, 4);
+        let r = field_f32(inst, 0x40);
+        if !(r > 0.0) {
+            return;
+        }
+        let c = engine::field_v3(inst, 0x34);
+        let t = engine::field_v3(inst, 0x44 + 0x24);
+        out.push([t.x + c.x, t.y + c.y, t.z + c.z, r]);
+    });
     out
 }

@@ -1,7 +1,6 @@
 //! Drawing a posed hull in the hull shaders (`shaders/hulls.hlsl`).
 use super::look::{Look, Profile};
-use super::{anim, game, shadow, Posed, Warp, Waves};
-use crate::engine;
+use super::{anim, hooks, shadow, Posed, Warp, Waves};
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::math::{v3, M34, V3};
@@ -47,7 +46,7 @@ pub fn warp_new(b: f32, s: f32, n: V3, xf: &M34, inst: usize, scale: V3) -> Warp
         n = -n;
         s = -s;
     }
-    let (c, r) = game::instance_sphere(inst);
+    let (c, r) = hooks::instance_sphere(inst);
     let c = v3(c.x * scale.x, c.y * scale.y, c.z * scale.z);
     let r = r * scale.x;
     let cw = xf.transform_point(c);
@@ -67,10 +66,9 @@ pub fn warp_world(b: f32, s: f32, n: V3, centre: V3, r: f32) -> Warp {
 
 /// The wave light a draw of the object turns on (the first of them).
 pub fn waves_of(o: usize, craft: bool, now: f32) -> Option<Waves> {
-    let two_pi = unsafe { engine::rd::<f32>(0x7913bc) };
-    let two_pi = if two_pi.is_finite() && two_pi > 0.1 { two_pi } else { core::f32::consts::TAU };
-    game::wave_lights(o, craft).iter().find_map(|&w| {
-        let wv = game::wave(w)?;
+    let two_pi = hooks::two_pi();
+    hooks::wave_lights(o, craft).iter().find_map(|&w| {
+        let wv = hooks::wave(w)?;
         if !(wv.wavelength.abs() > 1e-4) {
             return None;
         }
@@ -213,24 +211,18 @@ fn cloak_waves(p: &Posed, look: &Look, time: f32, eye: V3, sway: f32) -> [f32; 1
 /// The fade a hull is drawn at: the engine's far fade, or (crafts) Lighting.asi's near
 /// fade, which waits for the near plane to cut into the hull's box.
 pub fn fade(p: &Posed, v: &View, look: &Look) -> f32 {
-    if engine::field(engine::storm3d(), 0xe8) == 0 {
+    if !hooks::fades_on() {
         return 1.0;
     }
-    if let Some(f) = game::far_fade(p.inst) {
+    if let Some(f) = hooks::far_fade(p.inst) {
         return f.clamp(0.0, 1.0);
     }
-    if !game::is_craft_instance(p.inst) || !game::near_fade_on() {
+    if !hooks::is_craft_instance(p.inst) || !hooks::near_fade_on() {
         return 1.0;
     }
     if !look.near_fade {
         // Stock's near fade: the bounding sphere over the distance.
-        let inst = p.inst;
-        let q = engine::field_f32(inst, 0x40) / engine::field_f32(inst, 0x8c).max(1e-3);
-        let (minf, maxf, maxa) = unsafe { (engine::rd::<f32>(0x70444c), engine::rd::<f32>(0x704450), engine::rd::<f32>(0x704454)) };
-        if !(q > minf) || !(maxf > minf) {
-            return 1.0;
-        }
-        return 1.0 - (q.min(maxf) - minf) * maxa / (maxf - minf);
+        return hooks::stock_near_fade(p.inst);
     }
     // The near plane from the projection (left-handed: z' = a z + b, near = -b / a).
     let a = v.proj.0[2][2];
@@ -514,12 +506,12 @@ impl Drawer {
             // The instance's sphere, as Lighting.asi took it: the radius `+0x40` about
             // the placement's origin (`+0x44`'s translation). Its patches are laid
             // out over it.
-            let ir = engine::field_f32(p.inst, 0x40);
-            let (cc, cr) = if ir > 0.0 && ir < 1e5 { (engine::field_v3(p.inst, 0x68), ir) } else { (p.centre, p.radius) };
+            let ir = hooks::instance_radius(p.inst);
+            let (cc, cr) = if ir > 0.0 && ir < 1e5 { (hooks::instance_origin(p.inst), ir) } else { (p.centre, p.radius) };
             ck[16..20].copy_from_slice(&[cc.x, cc.y, cc.z, cr]);
             ck[20..24].copy_from_slice(&[vis, v.time * look.cloak_speed, look.cloak_bend, look.cloak_split]);
             // The player's own ships keep a trace of their hull; no one else's does.
-            let floor = if game::is_users(p.obj) { look.cloak_hull } else { look.cloak_hull_others };
+            let floor = if hooks::is_users(p.obj) { look.cloak_hull } else { look.cloak_hull_others };
             ck[24..28].copy_from_slice(&[look.cloak_ripple, look.cloak_rim, look.cloak_glint, floor]);
             let t = look.cloak_tint;
             ck[28..32].copy_from_slice(&[t.x, t.y, t.z, look.cloak_front]);
@@ -540,7 +532,7 @@ impl Drawer {
         let mut shared: Option<(bool, [f32; 74 * 4])> = None;
         // The faces the instance draws (`sm_faces_remaining`, `+0x10`: construction).
         // (None for a model that is not an instance's: inst 0.)
-        let limit = if p.inst == 0 { -1 } else { engine::field(p.inst, 0x10) as i32 };
+        let limit = hooks::face_limit(p.inst);
         let mut faces_left: i64 = if limit >= 0 { limit as i64 } else { i64::MAX };
         // With a face limit the faces are counted in the engine's walk of the node tree
         // (children in its order, the reverse of the file's: `ST3D_Node::AddChild` puts
@@ -621,7 +613,7 @@ impl Drawer {
                 faces_left -= tris as i64;
                 let team = if g.material.starts_with("team") { p.team } else { None };
                 // A freighter's cargo markings: the resource's colour or black, unlit (the
-                // engine's material colour; `game::cargo_markings`).
+                // engine's material colour; `hooks::cargo_markings`).
                 let cargo = p.cargo.iter().find(|(k, _)| *k == g.material).map(|(_, c)| *c);
                 let t = cargo.or(team).unwrap_or(v3(1.0, 1.0, 1.0));
                 let unlit = matches!(mode, Mode::Additive(_)) || cargo.is_some();

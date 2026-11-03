@@ -1,19 +1,19 @@
 //! Specials: `Step::Specials`, the special-object effects (`SpecialObjectEffect::
 //! RenderAll`, 0x60be90), drawn by us. See README.md, "specials".
 //!
-//! Stock walks `SpecialObjectEffect::mAllEffects` (a list whose head node pointer is at
-//! 0x7a8c0c; each node's +8 is an effect) and calls each effect's `Render(cam)` (vtable
-//! slot 0). Only the timed effects draw anything, and only those whose embedded
+//! Stock walks `SpecialObjectEffect::mAllEffects` and calls each effect's `Render(cam)`
+//! (`hooks.rs` has the addresses). Only the timed effects draw anything, and only those whose embedded
 //! `ST3D_Instance` (+0x2c) was given a database (+0xac) and a visual target (+0xb0) by
 //! the weapon that made them: an instance of the weapon's `particleArt` SOD, a single
 //! cloud emitter, placed on the target and rendered with `ST3D_Instance::Render`, which
 //! also simulates and draws its particle list. Here those emitters go to the particles
 //! module (`particles::feed`), so their particles are ours, and each kind gets a look
 //! of its own on top (`look.rs`).
+pub mod content;
+pub mod hooks;
 pub mod look;
 
 use super::{Module, Step};
-use crate::engine::{self, field, field_u8};
 use crate::engine::obj;
 use crate::frame::steps::View;
 use crate::log;
@@ -21,29 +21,8 @@ use crate::math::M34;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
 use alloc::vec::Vec;
-
-/// The list's head node pointer (`mAllEffects` + 4).
-const EFFECT_HEAD: usize = 0x7a8c0c;
-const FN_GET_NAME: usize = 0x60be10; // SpecialObjectEffect::GetEffectName(), thiscall: char*
-const FN_PRJ_ODF: usize = 0x6593a0; // cPrjID::GetOdfName() const, thiscall: char*
-const FN_WORLD_TRANSFORM: usize = 0x4cff90; // Entity::GetWorldTransform(ST3D_Node*) const, thiscall, returns Matrix34 by hidden pointer
-/// `Render` (slot 0) of the classes: the no-op base, the timed one (every `Timed*`,
-/// `BoardingParty`, `LineOfSightEffect`) and `TimedChangeTeam`'s.
-const FN_RENDER_BASE: usize = 0x49ea70;
-const FN_RENDER_TIMED: usize = 0x60c460;
-const FN_RENDER_CHANGE_TEAM: usize = 0x60e090;
-pub const VT_CHANGE_TEAM: usize = 0x6bbe9c; // TimedChangeTeam (Computer Override)
-pub const VT_CREW_DISRUPTION: usize = 0x6bbed4; // TimedCrewDisruption (Psionic Disruption)
-pub const VT_DRAIN: usize = 0x6bbf64; // TimedDrain (Energy Dissipator, micro-organisms)
-
-/// Offsets in a timed effect.
-const E_OBJECT: usize = 0x8; // the object the effect is on
-const E_INSTANCE: usize = 0x2c;
-const E_DATABASE: usize = 0xac; // instance +0x80
-const E_TARGET: usize = 0xb0;
-const E_NODE: usize = 0xc8; // TimedChangeTeam: the target's node it sits on
-const E_TIME_LEFT: usize = 0x28;
-const E_DEAD: usize = 0xc;
+use hooks::{effect_name, RenderKind};
+pub use hooks::{VT_CHANGE_TEAM, VT_CREW_DISRUPTION, VT_DRAIN};
 
 /// One effect drawn this frame, for the looks.
 #[derive(Clone, Copy)]
@@ -86,90 +65,23 @@ pub struct Specials {
 
 impl Default for Specials {
     fn default() -> Specials {
-        let ini = crate::config::ini();
         Specials {
-            on: ini.int("Specials", "Enable", 1) != 0,
-            survey: ini.int("Specials", "Survey", 1) != 0,
-            reload: ini.int("Specials", "Reload", 1) != 0,
+            on: true,
+            survey: true,
+            reload: true,
             hooked: false,
             sods: BTreeMap::new(),
             seen: BTreeSet::new(),
             born: BTreeMap::new(),
             frame: None,
             frames: 0,
-            log_every: ini.int("Specials", "LogEvery", 600).max(0) as u32,
+            log_every: 600,
             fed: 0,
             fallback: 0,
             fx: Vec::new(),
             engine: Vec::new(),
-            look: look::Looks::new(&ini),
+            look: look::Looks::new(),
         }
-    }
-}
-
-/// Every effect in `mAllEffects`, in the list's order.
-fn effects() -> Vec<usize> {
-    let mut out = Vec::new();
-    let head = field(EFFECT_HEAD, 0);
-    if head == 0 {
-        return out;
-    }
-    let mut n = field(head, 0);
-    let mut guard = 0;
-    while n != head && n != 0 && guard < 100_000 {
-        guard += 1;
-        let e = field(n, 8);
-        if e != 0 {
-            out.push(e);
-        }
-        n = field(n, 0);
-    }
-    out
-}
-
-fn effect_name(e: usize) -> String {
-    unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(FN_GET_NAME);
-        let p = f(e);
-        if p.is_null() {
-            return String::new();
-        }
-        String::from(crate::rt::cstr_at(p, 64))
-    }
-}
-
-/// The ODF stem of the ordnance that made an effect (`overrid`), or "".
-fn ordnance_odf(e: usize) -> String {
-    let wc = field(e, 4);
-    let oc = if wc != 0 { field(wc, 0x18) } else { 0 };
-    let prj = if oc != 0 { field(oc, 0x150) } else { 0 };
-    if prj == 0 {
-        return String::new();
-    }
-    let name = unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(FN_PRJ_ODF);
-        let p = f(prj);
-        if p.is_null() { "" } else { crate::rt::cstr_at(p, 260) }
-    };
-    let s = name.rsplit(['\\', '/']).next().unwrap_or(name);
-    crate::rt::lower(s.split('.').next().unwrap_or(s))
-}
-
-/// `Entity::GetWorldTransform(node)`: the node's world matrix on the entity.
-fn world_of_node(target: usize, node: usize) -> M34 {
-    let mut m = M34::IDENTITY;
-    unsafe {
-        let f: unsafe extern "thiscall" fn(usize, *mut M34, usize) -> *mut M34 = core::mem::transmute(FN_WORLD_TRANSFORM);
-        f(target, &mut m, node);
-    }
-    m
-}
-
-/// The engine's own `Render(cam)` of one effect.
-fn engine_render(e: usize, cam: usize) {
-    unsafe {
-        let r: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(engine::vtable(e), 0));
-        r(e, cam);
     }
 }
 
@@ -182,7 +94,7 @@ impl Specials {
         if let Some(s) = self.sods.get(&db) {
             return s.clone();
         }
-        let ord = ordnance_odf(e);
+        let ord = hooks::ordnance_odf(e);
         let art = if ord.is_empty() { None } else { crate::assets::odf(&ord).and_then(|o| o.get_str("particleArt").map(String::from)) };
         let sod = art.clone().filter(|a| crate::assets::sod(a).is_some());
         log!("specials: database {:#x} of '{}' (ordnance {}): {}", db, effect_name(e), if ord.is_empty() { "?" } else { ord.as_str() }, match (&sod, &art) {
@@ -195,20 +107,20 @@ impl Specials {
     }
 
     /// What stock's `Render` would place, and where: None when it draws nothing.
-    fn placement(&self, e: usize, render: usize) -> Option<(usize, M34)> {
-        let db = field(e, E_DATABASE);
-        let target = field(e, E_TARGET);
+    fn placement(&self, e: usize, render: RenderKind) -> Option<(usize, M34)> {
+        let db = hooks::database(e);
+        let target = hooks::target(e);
         if db == 0 || target == 0 {
             return None;
         }
         match render {
-            FN_RENDER_TIMED => Some((target, obj::transform(target))),
-            FN_RENDER_CHANGE_TEAM => {
-                let node = field(e, E_NODE);
-                if node == 0 || field_u8(target, 0x27) != 0 || field(target, 0x14) & 8 == 0 {
+            RenderKind::Timed => Some((target, obj::transform(target))),
+            RenderKind::ChangeTeam => {
+                let node = hooks::node(e);
+                if node == 0 || !hooks::node_target_ok(target) {
                     return None;
                 }
-                Some((target, world_of_node(target, node)))
+                Some((target, hooks::world_of_node(target, node)))
             }
             _ => None,
         }
@@ -217,11 +129,10 @@ impl Specials {
     /// Once a frame, before the scene reads the lights (the particles module has
     /// simulated by then): the effects, their emitters fed to the particles module.
     fn gather(&mut self, v: &View) {
-        let list = effects();
+        let list = hooks::effects();
         if self.survey {
             for &e in &list {
-                let render = field(engine::vtable(e), 0);
-                self.survey(e, render);
+                self.survey(e);
             }
         }
         self.fx.clear();
@@ -232,19 +143,19 @@ impl Specials {
         let mut alive: BTreeSet<(usize, usize)> = BTreeSet::new();
         let mut objects: BTreeSet<usize> = BTreeSet::new();
         if !list.is_empty() {
-            engine::for_each_in_list(engine::OBJECT_LIST, |o| {
+            crate::engine::for_each_in_list(crate::engine::OBJECT_LIST, |o| {
                 if o != 0 {
                     objects.insert(o);
                 }
             });
         }
         for &e in &list {
-            let vt = engine::vtable(e);
-            let render = field(vt, 0);
+            let vt = crate::engine::vtable(e);
+            let render = hooks::render_kind(e);
             match render {
-                FN_RENDER_BASE => continue,
-                FN_RENDER_TIMED | FN_RENDER_CHANGE_TEAM => {}
-                _ => {
+                RenderKind::Base => continue,
+                RenderKind::Timed | RenderKind::ChangeTeam => {}
+                RenderKind::Other => {
                     // A class we do not know: as stock.
                     self.engine.push(e);
                     continue;
@@ -252,22 +163,22 @@ impl Specials {
             }
             let placed = self.placement(e, render);
             if let Some((_, world)) = placed {
-                let db = field(e, E_DATABASE);
+                let db = hooks::database(e);
                 let Some(sod) = self.sod_of(e, db) else {
                     self.engine.push(e);
                     continue;
                 };
                 // The instance's emitters at the placement (the weapons never scale it).
-                crate::core_particles::feed(e + E_INSTANCE, &sod, &world, v);
+                crate::core_particles::feed(hooks::instance_key(e), &sod, &world, v);
                 self.fed += 1;
             }
             // The look: for a kind we have one for, while the effect lasts, whether or
             // not stock shows its cloud this frame (between the shot and the hit the
             // override's cloud has no node to sit on).
-            if look::kind(vt).is_none() || field_u8(e, E_DEAD) != 0 {
+            if look::kind(vt).is_none() || hooks::dead(e) {
                 continue;
             }
-            let o = field(e, E_OBJECT);
+            let o = hooks::object(e);
             let victim = if objects.contains(&o) && !obj::expired(o) && obj::can_user_see(o) { o } else { 0 };
             let target = placed.map(|p| p.0).unwrap_or(0);
             let world = match placed {
@@ -283,13 +194,13 @@ impl Specials {
                     log!(
                         "specials: {} begins on {} (cloud on {}), {:.1} s left",
                         effect_name(e), if victim != 0 { obj::odf_name(victim) } else { "-" },
-                        if target != 0 { obj::odf_name(target) } else { "-" }, engine::field_f32(e, E_TIME_LEFT)
+                        if target != 0 { obj::odf_name(target) } else { "-" }, hooks::time_left(e)
                     );
                     self.born.insert(k, v.time);
                     v.time
                 }
             };
-            self.fx.push(Fx { effect: e, vt, target: if target != 0 { target } else { victim }, victim, world, left: engine::field_f32(e, E_TIME_LEFT), age: (v.time - born).max(0.0) });
+            self.fx.push(Fx { effect: e, vt, target: if target != 0 { target } else { victim }, victim, world, left: hooks::time_left(e), age: (v.time - born).max(0.0) });
         }
         self.fallback += self.engine.len() as u32;
         self.born.retain(|k, _| alive.contains(k));
@@ -306,20 +217,22 @@ impl Specials {
         }
     }
 
-    fn survey(&mut self, e: usize, render: usize) {
-        let vt = engine::vtable(e);
+    fn survey(&mut self, e: usize) {
+        let vt = crate::engine::vtable(e);
+        let kind = hooks::render_kind(e);
+        let base = kind == RenderKind::Base;
         let name = effect_name(e);
-        let db = field(e, E_DATABASE);
-        let key = (vt, name.clone(), db != 0 && matches!(render, FN_RENDER_TIMED | FN_RENDER_CHANGE_TEAM));
+        let db = hooks::database(e);
+        let key = (vt, name.clone(), db != 0 && matches!(kind, RenderKind::Timed | RenderKind::ChangeTeam));
         if self.seen.contains(&key) {
             return;
         }
-        let target = if render == FN_RENDER_BASE { 0 } else { field(e, E_TARGET) };
+        let target = if base { 0 } else { hooks::target(e) };
         log!(
             "specials: survey: effect vtable {:#x} (Render {:#x}) '{}', database {:#x}, target {:#x} ({}), left {:.1} s",
-            vt, render, name, if render == FN_RENDER_BASE { 0 } else { db }, target,
+            vt, hooks::render_fn(e), name, if base { 0 } else { db }, target,
             if target != 0 { obj::odf_name(target) } else { "-" },
-            if render == FN_RENDER_BASE { 0.0 } else { engine::field_f32(e, E_TIME_LEFT) }
+            if base { 0.0 } else { hooks::time_left(e) }
         );
         self.seen.insert(key);
     }
@@ -338,7 +251,16 @@ impl Module for Specials {
     fn rows(&self) -> &'static [crate::rt::settings::Setting] {
         &[]
     }
-    fn configure(&mut self, _ini: &crate::rt::Ini, _said: &mut crate::core_module::Changes) {}
+    /// `[Specials]`: the module's own keys (`Enable`, `Survey`, `Reload`, `LogEvery`) and
+    /// each kind's look. Read at load and at every settings change; `Reload=1` reads
+    /// them again every 120 frames (the bench).
+    fn configure(&mut self, ini: &crate::rt::Ini, _said: &mut crate::core_module::Changes) {
+        self.on = ini.int("Specials", "Enable", 1) != 0;
+        self.survey = ini.int("Specials", "Survey", 1) != 0;
+        self.reload = ini.int("Specials", "Reload", 1) != 0;
+        self.log_every = ini.int("Specials", "LogEvery", 600).max(0) as u32;
+        self.look.reload(ini);
+    }
     fn device(&mut self) {
         if !self.hooked {
             self.hooked = true;
@@ -348,12 +270,20 @@ impl Module for Specials {
     fn reset(&mut self) {
         self.look.reset();
     }
+    /// Switched off live: the effects' ages and the frame's lists go. What the engine
+    /// draws now is the engine's; a module switched on again counts ages from when it
+    /// first sees an effect.
+    fn off(&mut self) {
+        self.born.clear();
+        self.fx.clear();
+        self.engine.clear();
+    }
     fn lights(&mut self, v: &View) {
         if self.frame != Some(v.frame) {
             self.frame = Some(v.frame);
             self.frames += 1;
             if self.reload && self.frames % 120 == 0 {
-                let ini = crate::config::ini();
+                let ini = crate::rt::Ini::open(&crate::rt::game_path("Render3D.ini"));
                 self.look.reload(&ini);
                 let on = ini.int("Specials", "Enable", 1) != 0;
                 if on != self.on {
@@ -375,7 +305,7 @@ impl Module for Specials {
         match s {
             Step::Specials => {
                 for &e in &self.engine {
-                    engine_render(e, v.cam);
+                    hooks::engine_render(e, v.cam);
                 }
                 true
             }
