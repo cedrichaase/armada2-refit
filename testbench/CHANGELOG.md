@@ -5,6 +5,13 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.98.2 — 2026-11-03
+
+### Fixed
+- `ui-hud-panels` follows the UI's five top-right buttons (help, palette and "show more" were removed in ui 0.25.0): it expects `resources: Dilithium=` and `buttons: menu comm idle view objectives(off)` and clicks idle at 1189,27 instead of "more" (it failed the same way on the pre-phase-8 base).
+- `ui-loading` waits up to 90 s for the logs and for `mission: frames start` before the "match" shot (the 25 s `[Loading] Hold` ends at 51% and the load goes on; the fixed 25 s was too short, also on the base).
+- Installed, not yet seen in game
+
 ## 3.98.1 — 2026-11-03
 
 ### Fixed
