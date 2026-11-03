@@ -228,6 +228,16 @@ What the bench showed on the way, each now built in:
 on one machine, where nothing is ever lost. With `Loss=10` on both sides a match sent
 about 960 datagrams each way, dropped about 100, resent 65 and 92, and played on.
 
+### The rules handshake (the `rules` layer)
+
+Joiners report whether they run `QOLRules.asi` with `PayOnQueue` on, and the host answers
+every player with whether all of them do (`R_RULES` in `peer.c`); the plugin latches the
+answer when the next game opens. The plugin is found by its exports (`QOLRules_Wanted`,
+`QOLRules_Network`, `QOLRules_Reset`) through `a2_find_export` in `csdk/a2asi.h`, a walk
+over the loaded modules, never by the file name. A player without the `rules` layer
+reports none, so the game plays stock rules for everyone; nobody desyncs (`rules/README.md`,
+"Must-match").
+
 ## The server and join codes (milestone 2)
 
 `server/a2online-server.py` is the rendezvous and relay server: one UDP port (2399), Python
