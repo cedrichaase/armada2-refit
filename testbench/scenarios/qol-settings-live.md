@@ -65,13 +65,11 @@ the groups hold. `MaxSelection` is `restart` and is not flipped. The `Overlay` s
 47. Overlay QOL.QOL:PanSpeed=4
 48. Wait up to 10 seconds for the logs the next steps expect.
 49. Expect "QOL.log" contains "settings: applied QOL.PanSpeed=4 (coefficient".
-50. Note "WarpDistance 0 and ViewDistance 0, live".
+50. Note "WarpDistance 0, live".
 51. Overlay QOL.QOL:WarpDistance=0
-52. Overlay QOL.QOL:ViewDistance=0
-53. Wait up to 10 seconds for the logs the next steps expect.
-54. Expect "QOL.log" contains "QOL.WarpDistance=0".
-55. Expect "QOL.log" contains "QOL.ViewDistance=0".
-56. Expect "QOL.log" contains "settings: RefitPlayer.ini [QOL.QOL] PanSpeed=4 overrides QOL.ini's PanSpeed=2.5".
-57. Expect the game is still running.
-58. Quit the game.
-59. Expect no crash.
+52. Wait up to 10 seconds for the logs the next steps expect.
+53. Expect "QOL.log" contains "QOL.WarpDistance=0".
+54. Expect "QOL.log" contains "settings: RefitPlayer.ini [QOL.QOL] PanSpeed=4 overrides QOL.ini's PanSpeed=2.5".
+55. Expect the game is still running.
+56. Quit the game.
+57. Expect no crash.

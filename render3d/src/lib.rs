@@ -136,6 +136,13 @@ pub extern "C" fn Render3D_SettingsChanged() {
             frame::formats_changed();
         }
     }
+    let view = r3d_core::engine::viewdist::settings_changed();
+    if !view.is_empty() {
+        if !said.is_empty() {
+            said.push_str(", ");
+        }
+        said.push_str(&view);
+    }
     if said.is_empty() {
         log!("settings: re-read, nothing changed");
     } else {

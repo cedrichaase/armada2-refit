@@ -897,6 +897,7 @@ finding it rests on:
 | `render3d.frame.seam` | `Armada_RenderAllOurStuff`, called from `Armada_RenderFrame` and `CinematicView::RenderView`, both re-pointed at the renderer's body | "How the frame works" |
 | `render3d.frame.steps` | the calls inside the stock body that the frame's steps replace one by one | "How the frame works"; not ready: the stock body runs whole |
 | `render3d.frame.destroy` | `DestroyRenderSurfaces` chained, so render3d lets go of the device before the engine does | native Direct3D 9 keeps a device alive while anything made on it is held |
+| `render3d.view.distance` | the load of the culling distance in `RTS_Configure` and the far plane and culling distance it parses (`View.Distance`) | "View distance"; not ready: the engine keeps its view limits |
 | `render3d.hulls.reads` | the hulls module: class `Render` / `RenderInternal` functions and vtables, the fade, culling and wave-light reads and calls | hulls draws in `GameObject::Render`'s place and installs no hook; not ready: the engine draws the hulls |
 | `render3d.sky.reads` | the sky module: the background name, database, starfield, far planes, `GameObject::Render` and the plain database vtable | the sky takes `Step::Background`; not ready: the engine's sky |
 | `render3d.specials.reads` | the special-weapon effect list and the `Render` functions and vtables of the timed effects | only the timed effects draw; others go back to the engine |

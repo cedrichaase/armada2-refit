@@ -4,6 +4,11 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.46.0 — 2026-11-03
+
+### Added
+- `View.Distance` (`[View] Distance`, `Render3D.ini`; ENUM, applies with the next mission, LOCAL, `moved_from = "QOL.QOL.ViewDistance"`) and the profile hook `view.distance`: `core/src/engine/viewdist.rs` raises the far plane and the object culling distance after ART_CFG.h's parse, live through `Render3D_SettingsChanged`. With `Enable=0` the patch is not installed (QOL's was). W-VIEW. Installed, not yet seen in game.
+
 ## 0.45.0 — 2026-11-03
 
 ### Changed

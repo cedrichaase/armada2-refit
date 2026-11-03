@@ -5,6 +5,11 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 2.2.0 — 2026-11-03
+
+### Removed
+- `ViewDistance` (key, hook `view.distance`, settings row and code) moves to render3d's `View.Distance` (render3d 0.46.0); a player's value is carried over by `tools/settings/move-keys.py`. A removed key is normally MAJOR; MINOR here by the phase 9 plan (one MAJOR per layer per round, the `moved_from` migration). W-VIEW. Installed, not yet seen in game.
+
 ## 2.0.0 — 2026-11-03
 
 ### Removed
