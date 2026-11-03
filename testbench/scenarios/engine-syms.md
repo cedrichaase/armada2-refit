@@ -3,7 +3,7 @@
 Resolutions: 1280x720
 Mod: refit
 Launch: -nointro a2_borg01
-Setup: display/bench-mode.sh stub
+Setup: display/bench-mode.sh stub online/bench-asi.sh
 Timeout: 20 min
 
 Run with `--install .`. On GOG's 1.1 every plugin that has moved onto its symbol
@@ -48,6 +48,39 @@ appends its plugin's section and touches no other.
 27. Expect "UI.log" not contains "engine: TEST:".
 28. Expect "UI.log" not contains "PANIC".
 
+## BinkProxy
+29. Expect "BinkProxy.log" contains "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321".
+30. Expect "BinkProxy.log" contains "engine: build armada2/gog-1.1".
+31. Expect "BinkProxy.log" contains "engine: symbols: 6/6 resolved; 0 hooks blocked".
+32. Expect "BinkProxy.log" not contains "stands down: ".
+33. Expect "BinkProxy.log" not contains "read before its hook".
+34. Expect "BinkProxy.log" not contains "engine: TEST:".
+
+## Online
+35. Expect "Online.log" contains "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321".
+36. Expect "Online.log" contains "engine: build armada2/gog-1.1".
+37. Expect "Online.log" contains "engine: symbols: 13/13 resolved; 0 hooks blocked".
+38. Expect "Online.log" not contains "stands down: ".
+39. Expect "Online.log" not contains "read before its hook".
+40. Expect "Online.log" not contains "engine: TEST:".
+41. Expect "Online.log" contains "menu entry: LAN (IPX) is Internet - Online".
+
+## QOL
+42. Expect "QOL.log" contains "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321".
+43. Expect "QOL.log" contains "engine: build armada2/gog-1.1".
+44. Expect "QOL.log" contains "engine: symbols: 116/116 resolved; 0 hooks blocked".
+45. Expect "QOL.log" not contains "stands down: ".
+46. Expect "QOL.log" not contains "read before its hook".
+47. Expect "QOL.log" not contains "engine: TEST:".
+
+## QOLRules
+48. Expect "QOLRules.log" contains "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321".
+49. Expect "QOLRules.log" contains "engine: build armada2/gog-1.1".
+50. Expect "QOLRules.log" contains "engine: symbols: 63/63 resolved; 0 hooks blocked".
+51. Expect "QOLRules.log" not contains "stands down: ".
+52. Expect "QOLRules.log" not contains "read before its hook".
+53. Expect "QOLRules.log" not contains "engine: TEST:".
+
 ## End
-29. Quit the game.
-30. Expect no crash.
+54. Quit the game.
+55. Expect no crash.

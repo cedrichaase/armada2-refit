@@ -69,27 +69,28 @@
 #include "../csdk/a2asi.h"
 #include "../csdk/a2engine.h"
 #include "rules_settings_table.h"
+#include "rules_engine_syms.h"
 
 /* ---- Producer layout and the engine's own functions (Armada2.exe, patch 1.1) */
 
-#define P_TEAMIDX   0xec     /* the owner's team number */
-#define P_TEAM      0xf0     /* its Team* */
-#define P_CUR       0x254    /* class being built, or 0 */
-#define P_HEAD      0x270    /* queue head: item {class, prev, next, id} */
-#define P_COUNT     0x274
-#define P_CURID     0x2a0    /* id of the item in progress */
-#define P_NEXTID    0x2a8    /* the next id to hand out */
-#define Q_MAX       10
+#define P_TEAMIDX   QOLRULES_F_P_TEAMIDX     /* the owner's team number */
+#define P_TEAM      QOLRULES_F_P_TEAM     /* its Team* */
+#define P_CUR       QOLRULES_F_P_CUR    /* class being built, or 0 */
+#define P_HEAD      QOLRULES_F_P_HEAD    /* queue head: item {class, prev, next, id} */
+#define P_COUNT     QOLRULES_F_P_COUNT
+#define P_CURID     QOLRULES_F_P_CURID    /* id of the item in progress */
+#define P_NEXTID    QOLRULES_F_P_NEXTID    /* the next id to hand out */
+#define Q_MAX       QOLRULES_V_Q_MAX
 #define PAID        0x40000000   /* bit 30 of an item's id: paid at enqueue */
 #define SAVE_TAG    0x10000000   /* bit 28 of the saved counter: marks follow in bits 16-25 */
 
 #define IT_CLS(it)  (*(void **)(it))
-#define IT_NEXT(it) (*(BYTE **)((it) + 8))
-#define IT_ID(it)   (*(int *)((it) + 0xc))
+#define IT_NEXT(it) (*(BYTE **)((it) + QOLRULES_F_IT_NEXT))
+#define IT_ID(it)   (*(int *)((it) + QOLRULES_F_IT_ID))
 
-#define G_TRANSPORT 0x76b8d4          /* Transport * */
-#define VT_LOCAL         0x6b6d8c     /* TransportLocal: the campaign */
-#define VT_LOCAL_INSTANT 0x6b6eb8     /* TransportLocalInstantAction: skirmish */
+#define G_TRANSPORT a2s_qolrules_transport   /* Transport * (g_transport) */
+#define VT_LOCAL         a2s_qolrules_vt_local          /* TransportLocal: the campaign */
+#define VT_LOCAL_INSTANT a2s_qolrules_vt_local_instant  /* TransportLocalInstantAction: skirmish */
 
 typedef int   (__thiscall *CostFn)(void *cls, int team);
 typedef float (__thiscall *AddFn)(void *team, float v);
@@ -98,22 +99,22 @@ typedef void  (__thiscall *OffFn)(void *team, int n);
 typedef int   (__thiscall *VacFn)(void *team);
 typedef void  (__thiscall *PushFn)(BYTE *p, void *cls);
 
-#define COST_DIL  ((CostFn)0x4cddc0)   /* GameObjectClass::Get_Dilithium_Cost(team) */
-#define COST_LAT  ((CostFn)0x4cde90)
-#define COST_MET  ((CostFn)0x4cdfa0)
-#define COST_BIO  ((CostFn)0x4ce070)
-#define COST_OFF  ((CostFn)0x4ce140)
-#define COST_CREW ((CostFn)0x4ce160)
-#define ADD_DIL   ((AddFn)0x496e30)    /* Team::AddDilithium */
-#define ADD_LAT   ((AddFn)0x496f20)
-#define ADD_MET   ((AddFn)0x497010)
-#define ADD_BIO   ((AddFn)0x496d40)
-#define ADD_CREW  ((CrewFn)0x4974b0)
-#define ENLIST    ((OffFn)0x498870)    /* Team::EnlistOfficers */
-#define DISCHARGE ((OffFn)0x498890)
-#define VACANCIES ((VacFn)0x497580)    /* Team::GetOfficerVacancies */
-#define ENGINE_PUSH ((PushFn)0x4b7930) /* Producer::PushBuildQueueItem */
-#define EPSILON   (*(volatile double *)0x6ae228)
+#define COST_DIL  ((CostFn)a2s_qolrules_cost_dil)   /* GameObjectClass::Get_Dilithium_Cost(team) */
+#define COST_LAT  ((CostFn)a2s_qolrules_cost_lat)
+#define COST_MET  ((CostFn)a2s_qolrules_cost_met)
+#define COST_BIO  ((CostFn)a2s_qolrules_cost_bio)
+#define COST_OFF  ((CostFn)a2s_qolrules_cost_off)
+#define COST_CREW ((CostFn)a2s_qolrules_cost_crew)
+#define ADD_DIL   ((AddFn)a2s_qolrules_add_dil)    /* Team::AddDilithium */
+#define ADD_LAT   ((AddFn)a2s_qolrules_add_lat)
+#define ADD_MET   ((AddFn)a2s_qolrules_add_met)
+#define ADD_BIO   ((AddFn)a2s_qolrules_add_bio)
+#define ADD_CREW  ((CrewFn)a2s_qolrules_add_crew)
+#define ENLIST    ((OffFn)a2s_qolrules_enlist)    /* Team::EnlistOfficers */
+#define DISCHARGE ((OffFn)a2s_qolrules_discharge)
+#define VACANCIES ((VacFn)a2s_qolrules_vacancies)    /* Team::GetOfficerVacancies */
+#define ENGINE_PUSH ((PushFn)a2s_qolrules_push_item) /* Producer::PushBuildQueueItem */
+#define EPSILON   (*(volatile double *)a2s_qolrules_epsilon)
 
 typedef struct { int dil, lat, met, bio, crew, off; } Cost;
 
@@ -189,12 +190,12 @@ enum { SHORT_NONE, SHORT_DIL, SHORT_OFF, SHORT_CREW, SHORT_LAT, SHORT_MET, SHORT
 static int short_of(const BYTE *team, const Cost *c)
 {
     float d = 0, m = 0, l = 0, b = 0, k = 0;
-    if (*(const int *)(team + 0x16c)) {
-        d = *(const float *)(team + 0x28);
-        m = *(const float *)(team + 0xc0);
-        l = *(const float *)(team + 0x74);
-        b = *(const float *)(team + 0x168);
-        k = *(const float *)(team + 0x10c);
+    if (*(const int *)(team + QOLRULES_F_T_BANK)) {
+        d = *(const float *)(team + QOLRULES_F_T_DIL);
+        m = *(const float *)(team + QOLRULES_F_T_MET);
+        l = *(const float *)(team + QOLRULES_F_T_LAT);
+        b = *(const float *)(team + QOLRULES_F_T_BIO);
+        k = *(const float *)(team + QOLRULES_F_T_CREW);
     }
     if ((double)d + EPSILON < (double)c->dil) return SHORT_DIL;
     if (c->off && c->off > VACANCIES((void *)team)) return SHORT_OFF;
@@ -216,25 +217,25 @@ static int short_of(const BYTE *team, const Cost *c)
 typedef void (__cdecl *SayFn)(int topic, void *obj, const void *race);
 typedef int  (__thiscall *RaceEventFn)(const void *race);
 
-#define SAY_TOPIC     ((SayFn)0x45d8c0)        /* ComputerVoice::Say(Topic, GameObject *, const Race *) */
-#define SAY_EVENT     ((SayFn)0x45db20)        /* ComputerVoice::Say(int, GameObject *, const Race *) */
-#define OFFICER_EVENT ((RaceEventFn)0x48c120)  /* Race::GetInsufficentOfficerEventId */
-#define T_RACE        0x244                    /* Team: its Race * */
+#define SAY_TOPIC     ((SayFn)a2s_qolrules_say_topic)        /* ComputerVoice::Say(Topic, GameObject *, const Race *) */
+#define SAY_EVENT     ((SayFn)a2s_qolrules_say_event)        /* ComputerVoice::Say(int, GameObject *, const Race *) */
+#define OFFICER_EVENT ((RaceEventFn)a2s_qolrules_officer_event)  /* Race::GetInsufficentOfficerEventId */
+#define T_RACE        QOLRULES_F_T_RACE                    /* Team: its Race * */
 
 static int g_voice;   /* StartBuild's calls are the ones this was read from */
 
 static const int k_topic[] = {
     0,
-    9,      /* InsufficientDilithium */
-    0,      /* officers: the race's event */
-    10,     /* InsufficientCrew */
-    0x36,   /* InsufficientLatinum */
-    0x37,   /* InsufficientMetal */
-    0x38,   /* InsufficientBiomatter */
+    QOLRULES_V_TOPIC_DIL,   /* InsufficientDilithium */
+    0,                      /* officers: the race's event */
+    QOLRULES_V_TOPIC_CREW,  /* InsufficientCrew */
+    QOLRULES_V_TOPIC_LAT,   /* InsufficientLatinum */
+    QOLRULES_V_TOPIC_MET,   /* InsufficientMetal */
+    QOLRULES_V_TOPIC_BIO,   /* InsufficientBiomatter */
 };
 
 typedef long (__cdecl *UserTeamFn)(void);
-#define USER_TEAM ((UserTeamFn)0x4d0060)       /* Entity::GetUserTeam: the local player's */
+#define USER_TEAM ((UserTeamFn)a2s_qolrules_user_team)       /* Entity::GetUserTeam: the local player's */
 
 static void advise(BYTE *p, BYTE *team, int why)
 {
@@ -269,7 +270,7 @@ static void charge(BYTE *team, const Cost *c, int sign)
      * the bank is already over: a start's give-back would then lose crew the
      * charge takes again.  A gain goes into the field itself. */
     if (sign < 0) ADD_CREW(team, -(float)c->crew);
-    else *(float *)(team + 0x10c) += (float)c->crew;
+    else *(float *)(team + QOLRULES_F_T_CREW) += (float)c->crew;
 }
 
 static void note(const char *what, const BYTE *team, const Cost *c)
@@ -284,9 +285,9 @@ static void note(const char *what, const BYTE *team, const Cost *c)
     s_cat(m, " crew "); s_num(m, c->crew);
     s_cat(m, " off "); s_num(m, c->off);
     s_cat(m, "; bank dil ");
-    s_num(m, team ? f_round(*(const float *)(team + 0x28)) : 0);
+    s_num(m, team ? f_round(*(const float *)(team + QOLRULES_F_T_DIL)) : 0);
     s_cat(m, " crew ");
-    s_num(m, team ? f_round(*(const float *)(team + 0x10c)) : 0);
+    s_num(m, team ? f_round(*(const float *)(team + QOLRULES_F_T_CREW)) : 0);
     s_cat(m, " officers free ");
     s_num(m, team ? VACANCIES((void *)team) : 0);
     logline(m);
@@ -323,14 +324,14 @@ static void drain(BYTE *p, const char *why)
  * It calls mRemoveConstructionEffect (+0x170) when IsBusy (+0x138); Producer's
  * discharges only while the construction effect (+0x268) is live, Evolver's
  * always. */
-#define VT_REMOVE_EFFECT 0x4b7700     /* Producer::mRemoveConstructionEffect */
-#define P_EFFECT         0x268
+#define VT_REMOVE_EFFECT a2s_qolrules_remove_effect   /* Producer::mRemoveConstructionEffect */
+#define P_EFFECT         QOLRULES_F_P_EFFECT
 
 static int stock_returns_officers(BYTE *p)
 {
     const DWORD *vt = *(const DWORD **)p;
-    if (!((BYTE (__thiscall *)(BYTE *))vt[0x138 / 4])(p)) return 0;
-    return vt[0x170 / 4] != VT_REMOVE_EFFECT || *(const int *)(p + P_EFFECT) != -1;
+    if (!((BYTE (__thiscall *)(BYTE *))vt[QOLRULES_F_VT_IS_BUSY / 4])(p)) return 0;
+    return vt[QOLRULES_F_VT_REMOVE_EFFECT / 4] != VT_REMOVE_EFFECT || *(const int *)(p + P_EFFECT) != -1;
 }
 
 /* ---- hooks -------------------------------------------------------------- */
@@ -419,7 +420,7 @@ static BYTE __thiscall h_cancel(BYTE *p)
     void *cls = head ? IT_CLS(head) : NULLPTR;
     void *cur = *(void **)(p + P_CUR);
     int   paid = !cur && is_paid(head);
-    float crew0 = team ? *(float *)(team + 0x10c) : 0.0f;
+    float crew0 = team ? *(float *)(team + QOLRULES_F_T_CREW) : 0.0f;
     BYTE  r;
 
     trace("CancelBuild", p);
@@ -430,9 +431,9 @@ static BYTE __thiscall h_cancel(BYTE *p)
         /* the item in progress: stock gives it back in full except crew, which
          * AddCrew clamps to the cap -- what the cancel did not return is added */
         Cost  c;
-        float got = *(float *)(team + 0x10c) - crew0;
+        float got = *(float *)(team + QOLRULES_F_T_CREW) - crew0;
         cost_of(p, cur, &c);
-        if (got < (float)c.crew) *(float *)(team + 0x10c) += (float)c.crew - got;
+        if (got < (float)c.crew) *(float *)(team + QOLRULES_F_T_CREW) += (float)c.crew - got;
         note("cancelled in progress", team, &c);
     }
     return r;
@@ -530,64 +531,50 @@ static BYTE __thiscall h_load(BYTE *p, void *rd)
 static BYTE g_tramp[16][16] __attribute__((aligned(16)));
 static int  g_ntramp;
 
-typedef struct { DWORD at; int len; BYTE sig[8]; } Entry;
+/* An entry hook: the profile's symbol and how many bytes (whole instructions) the jump
+ * replaces. */
+typedef struct { DWORD sym; int len; } Entry;
 
 static void poke(BYTE *at, const BYTE *bytes, int n) { a2_poke((DWORD)at, bytes, n); }
 
-static int sig_ok(const Entry *e) { return a2_sig_is(e->at, e->sig, e->len); }
-
 /* Entry hooks.  The first `len` bytes of each (whole instructions, no relative
- * ones) are copied behind a jump back, and the entry jumps to the hook. */
-static const Entry k_start    = { 0x4b8180, 6, { 0x55, 0x8B, 0xEC, 0x83, 0xEC, 0x14 } };
-static const Entry k_pop      = { 0x4b79b0, 6, { 0x53, 0x56, 0x8B, 0xF1, 0x33, 0xDB } };
-static const Entry k_actdel   = { 0x4b7a60, 5, { 0x55, 0x8B, 0xEC, 0x53, 0x56 } };
-static const Entry k_cancel   = { 0x4b84b0, 6, { 0x55, 0x8B, 0xEC, 0x51, 0x53, 0x56 } };
-static const Entry k_clearq   = { 0x4b78c0, 6, { 0x53, 0x56, 0x8B, 0xF1, 0x33, 0xDB } };
-static const Entry k_clearteam= { 0x4b7790, 5, { 0x56, 0x8B, 0xF1, 0x8B, 0x06 } };
-static const Entry k_save     = { 0x4b8aa0, 6, { 0x55, 0x8B, 0xEC, 0x83, 0xEC, 0x08 } };
-static const Entry k_load     = { 0x4b88d0, 6, { 0x55, 0x8B, 0xEC, 0x83, 0xEC, 0x10 } };
-static const Entry k_open     = { 0x4846a0, 5, { 0x55, 0x8B, 0xEC, 0x6A, 0xFF } };  /* Program::GameOpenPreLoad */
+ * ones; the profile checks them) are copied behind a jump back, and the entry jumps
+ * to the hook. */
+static const Entry k_start    = { QOLRULES_S_ENTRY_START, 6 };
+static const Entry k_pop      = { QOLRULES_S_ENTRY_POP, 6 };
+static const Entry k_actdel   = { QOLRULES_S_ENTRY_ACTDEL, 5 };
+static const Entry k_cancel   = { QOLRULES_S_ENTRY_CANCEL, 6 };
+static const Entry k_clearq   = { QOLRULES_S_ENTRY_CLEARQ, 6 };
+static const Entry k_clearteam= { QOLRULES_S_ENTRY_CLEARTEAM, 5 };
+static const Entry k_save     = { QOLRULES_S_ENTRY_SAVE, 6 };
+static const Entry k_load     = { QOLRULES_S_ENTRY_LOAD, 6 };
+static const Entry k_open     = { QOLRULES_S_ENTRY_OPEN, 5 };  /* Program::GameOpenPreLoad */
 
 static void *hook(const Entry *e, void *fn)
 {
     BYTE *tr = g_tramp[g_ntramp++];
     BYTE  jmp[8];
+    DWORD at = a2e_addr(e->sym);
     int   k;
 
-    for (k = 0; k < e->len; k++) tr[k] = ((const BYTE *)e->at)[k];
+    for (k = 0; k < e->len; k++) tr[k] = ((const BYTE *)at)[k];
     tr[e->len] = 0xE9;
-    *(LONG *)(tr + e->len + 1) = (LONG)((e->at + (DWORD)e->len) - ((DWORD)tr + (DWORD)e->len + 5));
+    *(LONG *)(tr + e->len + 1) = (LONG)((at + (DWORD)e->len) - ((DWORD)tr + (DWORD)e->len + 5));
     jmp[0] = 0xE9;
-    *(LONG *)(jmp + 1) = (LONG)((DWORD)fn - (e->at + 5));
+    *(LONG *)(jmp + 1) = (LONG)((DWORD)fn - (at + 5));
     for (k = 5; k < e->len; k++) jmp[k] = 0x90;
-    poke((BYTE *)e->at, jmp, e->len);
+    poke((BYTE *)at, jmp, e->len);
     return tr;
 }
 
-static int calls(DWORD at, DWORD to)
-{
-    return *(const BYTE *)at == 0xE8 && at + 5 + *(const LONG *)(at + 1) == to;
-}
-
-/* StartBuild's own advisor calls, checked where the topics were read: the
- * dilithium one (topic 9) and the officers' (event from the race). */
-static int voice_ok(void)
-{
-    return *(const BYTE *)0x4b826c == 0x6A && *(const BYTE *)0x4b826d == 9 &&
-           calls(0x4b826e, 0x45d8c0) && calls(0x4b829a, 0x48c120) &&
-           calls(0x4b82a0, 0x45db20);
-}
+static int g_rdyPay, g_rdyVoice;   /* a2e_ready, asked once at start, before any write */
 
 static int patch_rules(void)
 {
-    DWORD old;
+    DWORD old, at;
     BYTE  call[5];
 
-    if (!sig_ok(&k_start) || !sig_ok(&k_pop) || !sig_ok(&k_actdel) || !sig_ok(&k_cancel) ||
-        !sig_ok(&k_clearq) || !sig_ok(&k_clearteam) || !sig_ok(&k_open) ||
-        !sig_ok(&k_save) || !sig_ok(&k_load)) return 0;
-    /* the push call: its target is checked from its displacement */
-    if (!calls(0x431532, 0x4b7930)) return 0;
+    if (!g_rdyPay) return 0;
     if (!VirtualProtect(g_tramp, sizeof g_tramp, PAGE_EXECUTE_READWRITE, &old)) return 0;
 
     t_start     = (BoolFn)hook(&k_start, (void *)h_start);
@@ -600,14 +587,23 @@ static int patch_rules(void)
     t_load      = (PtrFn) hook(&k_load, (void *)h_load);
     t_open      = (OpenFn)hook(&k_open, (void *)h_open);
 
+    /* the push call in Handle_New_Command (its target was checked by the profile) */
+    at = a2e_addr(QOLRULES_S_PUSH_CALL);
     call[0] = 0xE8;
-    *(LONG *)(call + 1) = (LONG)((DWORD)h_push - (0x431532 + 5));
-    poke((BYTE *)0x431532, call, 5);
-    g_voice = voice_ok();
+    *(LONG *)(call + 1) = (LONG)((DWORD)h_push - (at + 5));
+    poke((BYTE *)at, call, 5);
+    g_voice = g_rdyVoice;   /* StartBuild's own advisor calls, checked by qolrules.advisor */
     return 1;
 }
 
 /* ---- startup -------------------------------------------------------------- */
+
+/* <Plugin>_SettingsNote (tools/settings/README.md, C5): why a row is not running, or NULL;
+ * a NULL row asks about the plugin as a whole.  The engine's notes feed it. */
+__declspec(dllexport) const char *__cdecl QOLRules_SettingsNote(const A2Setting *row)
+{
+    return row ? a2e_note_for(row->section, row->key) : a2e_note_plugin();
+}
 
 /* Called by the UI's settings hub on the game thread after RefitPlayer.ini changed.
  * PayOnQueue is latched at the next game's start (Program::GameOpenPreLoad), never
@@ -643,7 +639,21 @@ static void startup(void)
         g_trace = g_logging > 1;
         if (g_logging && g_logpath[0])
             a2_log_where(g_logpath, a2_log_path(g_logpath, sizeof g_logpath, dir, "QOLRules.log"));
-        a2e_log(logline);
+    }
+    a2e_init(&QOLRULES_ENGINE, logline);
+    g_rdyPay = a2e_ready(QOLRULES_H_PAY_ON_QUEUE);
+    g_rdyVoice = a2e_ready(QOLRULES_H_ADVISOR);
+    if (g_trace && g_rdyVoice) {      /* Log=2: where StartBuild's advisor calls were found */
+        static const DWORD voice[4] = { QOLRULES_S_VOICE_TOPIC, QOLRULES_S_VOICE_SAY_TOPIC,
+                                        QOLRULES_S_VOICE_OFFICER, QOLRULES_S_VOICE_SAY_EVENT };
+        char m[60];
+        int  i;
+        for (i = 0; i < 4; i++) {
+            m[0] = 0;
+            s_cat(m, "  advisor site ");
+            s_hex(m, a2e_addr(voice[i]));
+            logline(m);
+        }
     }
 
     g_want = a2_set_int(&g_ini, QOLRULES_ROW_PAYONQUEUE) != 0;
@@ -656,9 +666,10 @@ static void startup(void)
             g_pay = 1;
             s_cat(b, "  -> items are paid when queued, patched");
             s_cat(b, g_voice ? "; a refused order is announced as stock announces a stalled build"
-                             : "; a refused order is NOT announced (StartBuild's advisor calls differ)");
+                             : "; a refused order is NOT announced (qolrules.advisor stood down)");
         } else {
-            s_cat(b, "  NOT PATCHED: site bytes differ -- not the Armada2.exe this was built for");
+            s_cat(b, "  NOT PATCHED: ");
+            s_cat(b, a2e_note(QOLRULES_H_PAY_ON_QUEUE) ? a2e_note(QOLRULES_H_PAY_ON_QUEUE) : "stood down");
         }
     } else {
         s_cat(b, "0  (items are paid as they start, as in stock)");

@@ -5,6 +5,17 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 1.10.0 — 2026-11-03
+
+### Added
+- QOL and QOLRules are on the symbol profiles (`profiles/gog-1.1/qol.toml`, `qolrules.toml`; phase 8d). Hooks `qol.pan_speed`, `view_distance`, `shift_group`, `selection`, `special_select`, `stations`, `warp` and `qolrules.pay_on_queue`, `advisor` are checked before any write; one that fails stands down alone, with its reason on the feature's log line.
+- `QOL_SettingsNote` and `QOLRules_SettingsNote` exports (the engine's notes for the settings screen).
+
+### Changed
+- No address literal is left in `qol.c` or `rules.c`: every stub continues through `a2s_qol_*` / `a2s_qolrules_*`. `NOT PATCHED: site bytes differ` became the engine's reason. `Shift+N`'s old meaning moves to Alt+N by writing the whole 4-byte address of `g_pCommandAlt` (it patched its low byte). The `gate:` lines are unchanged.
+
+Installed, not yet seen in game
+
 ## 1.9.1 — 2026-11-03
 
 ### Added

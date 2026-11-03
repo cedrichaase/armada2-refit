@@ -38,6 +38,7 @@
 #include "../csdk/a2asi.h"
 #include "../csdk/a2engine.h"
 #include "settings_table.h"
+#include "engine_syms.h"
 
 #define HEAP_ZERO_MEMORY       0x08
 
@@ -738,39 +739,33 @@ static void *patch_iat(HMODULE mod, const char *dll, const char *name, void *rep
  * game's label.map.  IPX has not existed on Windows since Vista, and neither
  * Wine's DirectPlay nor Microsoft's can use it there, so its button becomes
  * Internet - Online.  Three patches, each checked against the bytes it
- * replaces (and 0x5c00b6, where stub_ipx goes, checked too), all or none:
+ * replaces (and the Manual IP branch where stub_ipx goes, checked too), all or none:
  *
- *   0x4d9a30  read_text_label's entry jumps here (label_hook): lan_ipx reads
- *             "Internet - Online"; while that entry is the one chosen, the
- *             Manual IP dialog's prompt and the connect/host texts read as
- *             online ones.  Every replacement is no longer than the stock
- *             text, so it fits whatever buffer the stock text fits.
- *   0x5bfd01  the screen's WM_LBUTTONUP case: every click first clears the
- *             online flag (stub_click), so no other button inherits it.
- *   0x5bff9b  the IPX button has just been drawn pressed; instead of its LAN
- *             connection, stub_ipx sets the flag and continues at 0x5c00b6,
- *             the Manual IP branch after its own button: do_manual_ip, then
- *             GenericConnection as an internet connection to the address
- *             typed (manual_ip_address).  Both branches are in the same
- *             frame with the same stack depth there, and the Manual IP path
- *             sets every register it reads after that point.
+ *   read_label     read_text_label's entry jumps to label_hook: lan_ipx reads
+ *                  "Internet - Online"; while that entry is the one chosen, the
+ *                  Manual IP dialog's prompt and the connect/host texts read as
+ *                  online ones.  Every replacement is no longer than the stock
+ *                  text, so it fits whatever buffer the stock text fits.
+ *   click          the screen's WM_LBUTTONUP case: every click first clears the
+ *                  online flag (stub_click), so no other button inherits it.
+ *   ipx_pressed    the IPX button has just been drawn pressed; instead of its LAN
+ *                  connection, stub_ipx sets the flag and continues at the
+ *                  profile's manual_dialog, the Manual IP branch after its own
+ *                  button: do_manual_ip, then GenericConnection as an internet
+ *                  connection to the address typed (manual_ip_address).  Both
+ *                  branches are in the same frame with the same stack depth
+ *                  there, and the Manual IP path sets every register it reads
+ *                  after that point.
+ *
+ * Every address is the profile's (profiles/<build>/online.toml, hook online.entry,
+ * checked whole before anything is written); the stubs jump through the resolved
+ * variables a2s_online_*.
  *
  * Until our transport exists the entry connects exactly as Manual IP does,
  * through whatever DirectPlay is installed; g_online is what the transport
  * will go by.
  */
-#define A_READ_LABEL     0x4d9a30
-#define A_CLICK          0x5bfd01
-#define A_CLICK_BACK     0x5bfd0a
-#define A_IPX_PRESSED    0x5bff9b
-#define A_MANUAL_DIALOG  0x5c00b6
-#define A_ROOM_INIT      0x5b2ff2   /* InternetGameDlgProc: chatRoom.Init(...) */
-#define A_GAME_INIT      0x5c5395   /* MultiplayerSetupDlgProc: chatGame.Init(...) */
-#define A_CHAT_INIT      0x5a9890   /* Chat::Init, thiscall, one argument */
-#define A_CHAT_APPEND    0x5a98b0   /* Chat::Append(this, format, ...), cdecl */
-#define CHAT_ROOM_OBJ    0x79df50   /* chatRoom: the Internet Game screen's chat box */
-#define CHAT_GAME_OBJ    0x79b838   /* chatGame: GAME SETUP's */
-#define CHAT_HWND        0x2714     /* Chat: the edit control Init was given */
+#define PATCH_LABEL_LEN  8       /* not an address: the bytes read_label's jump replaces */
 
 __attribute__((used)) volatile int g_online;   /* Internet - Online is the entry chosen */
 static int  g_entry = 1;
@@ -824,17 +819,20 @@ static int  g_chat_hooked;
 static char g_pending[2][200];
 static char g_sticky[200];
 
-static void *chat_obj(int chat) { return (void *)(chat == CHAT_GAME ? CHAT_GAME_OBJ : CHAT_ROOM_OBJ); }
+static void *chat_obj(int chat)
+{
+    return (void *)a2e_addr(chat == CHAT_GAME ? ONLINE_S_CHAT_GAME : ONLINE_S_CHAT_ROOM);
+}
 
 static int chat_open(int chat)
 {
-    HANDLE h = *(HANDLE *)((BYTE *)chat_obj(chat) + CHAT_HWND);
+    HANDLE h = *(HANDLE *)((BYTE *)chat_obj(chat) + ONLINE_F_CHAT_HWND);
     return h && IsWindow(h);
 }
 
 static void chat_put(int chat, const char *text)
 {
-    ((ChatAppend_t)A_CHAT_APPEND)(chat_obj(chat), "%s", text);
+    ((ChatAppend_t)a2e_addr(ONLINE_S_CHAT_APPEND))(chat_obj(chat), "%s", text);
 }
 
 static void notice(int chat, const char *text, int sticky)
@@ -861,7 +859,7 @@ static void notice_unstick(void)
 /* after a screen's Chat::Init: what was waiting for it */
 __attribute__((used)) void __cdecl on_chat_init(void *obj)
 {
-    int  chat = obj == (void *)CHAT_GAME_OBJ ? CHAT_GAME : CHAT_ROOM;
+    int  chat = obj == chat_obj(CHAT_GAME) ? CHAT_GAME : CHAT_ROOM;
     char t[200], s[200];
     EnterCriticalSection(&g_ncs);
     s_copyn(t, g_pending[chat], sizeof t);
@@ -874,14 +872,15 @@ __attribute__((used)) void __cdecl on_chat_init(void *obj)
 
 /* in place of `mov ecx, chat; call Chat::Init` (10 bytes): the same, then
  * on_chat_init(chat).  On entry ecx is free (it is loaded here), the argument is
- * on the stack, and Init pops it. */
+ * on the stack, and Init pops it.  Registers: ecx and eax written, as the stock
+ * pair writes ecx and the call clobbers eax. */
 __attribute__((naked)) static void stub_room_init(void)
 {
     __asm__ volatile(
-        "movl $0x79df50, %ecx\n\t"
+        "movl _a2s_online_chat_room, %ecx\n\t"
         "pushl %ecx\n\t"
         "pushl 8(%esp)\n\t"
-        "movl $0x5a9890, %eax\n\t"
+        "movl _a2s_online_chat_init, %eax\n\t"
         "call *%eax\n\t"
         "call _on_chat_init\n\t"
         "addl $4, %esp\n\t"
@@ -891,10 +890,10 @@ __attribute__((naked)) static void stub_room_init(void)
 __attribute__((naked)) static void stub_game_init(void)
 {
     __asm__ volatile(
-        "movl $0x79b838, %ecx\n\t"
+        "movl _a2s_online_chat_game, %ecx\n\t"
         "pushl %ecx\n\t"
         "pushl 8(%esp)\n\t"
-        "movl $0x5a9890, %eax\n\t"
+        "movl _a2s_online_chat_init, %eax\n\t"
         "call *%eax\n\t"
         "call _on_chat_init\n\t"
         "addl $4, %esp\n\t"
@@ -902,14 +901,16 @@ __attribute__((naked)) static void stub_game_init(void)
 }
 
 /* every click on the connection screen: clear the flag, then the two
- * instructions the jump replaced */
+ * instructions the jump replaced, then on at click_back.  Registers: ebx and ecx
+ * written, as the stock pair does; nothing else. */
 __attribute__((naked)) static void stub_click(void)
 {
     __asm__ volatile(
         "movl $0, _g_online\n\t"
         "movl 0x14(%ebp), %ebx\n\t"
-        "movl 0x7a30a0, %ecx\n\t"
-        "pushl $0x5bfd0a\n\t"
+        "movl _a2s_online_click_object, %ecx\n\t"
+        "movl (%ecx), %ecx\n\t"
+        "pushl _a2s_online_click_back\n\t"
         "ret");
 }
 
@@ -919,11 +920,9 @@ __attribute__((naked)) static void stub_ipx(void)
 {
     __asm__ volatile(
         "call _on_online_chosen\n\t"
-        "pushl $0x5c00b6\n\t"
+        "pushl _a2s_online_manual_dialog\n\t"
         "ret");
 }
-
-static int code_is(DWORD addr, const BYTE *bytes, int n) { return a2_sig_is(addr, bytes, n); }
 
 /* a 5-byte call or jmp to `to` at `at`, NOP-padded to n bytes */
 static int write_call(DWORD at, void *to, int n) { return a2_write_call(at, to, n); }
@@ -931,25 +930,20 @@ static int write_jmp(DWORD at, void *to, int n)  { return a2_write_jmp(at, to, n
 
 static void install_entry(char *b)
 {
-    static const BYTE sig_label[8] = { 0x55, 0x8b, 0xec, 0xa0, 0x68, 0x13, 0x76, 0x00 };
-    static const BYTE sig_click[9] = { 0x8b, 0x5d, 0x14, 0x8b, 0x0d, 0xa0, 0x30, 0x7a, 0x00 };
-    static const BYTE sig_ipx[8]   = { 0xa1, 0x00, 0x2d, 0x7a, 0x00, 0x8b, 0x4d, 0x08 };
-    static const BYTE sig_dlg[9]   = { 0x8b, 0x4d, 0x08, 0x51, 0xe8, 0x21, 0x6b, 0xff, 0xff };
-    static const BYTE sig_room[10] = { 0xb9, 0x50, 0xdf, 0x79, 0x00, 0xe8, 0x94, 0x68, 0xff, 0xff };
-    static const BYTE sig_game[10] = { 0xb9, 0x38, 0xb8, 0x79, 0x00, 0xe8, 0xf1, 0x44, 0xfe, 0xff };
-    DWORD prot, rel;
+    DWORD prot, rel, rl;
     int   i;
 
     if (!g_entry) { s_cat(b, "  menu entry off (Entry=0)"); return; }
-    if (!code_is(A_READ_LABEL, sig_label, 8) || !code_is(A_CLICK, sig_click, 9)
-        || !code_is(A_IPX_PRESSED, sig_ipx, 8) || !code_is(A_MANUAL_DIALOG, sig_dlg, 9)
-        || !code_is(A_ROOM_INIT, sig_room, 10) || !code_is(A_GAME_INIT, sig_game, 10)) {
-        s_cat(b, "  menu entry NOT installed: Armada2.exe is not the 1.1 this was made for");
+    if (!a2e_ready(ONLINE_H_ENTRY)) {
+        const char *why = a2e_note(ONLINE_H_ENTRY);
+        s_cat(b, "  menu entry NOT installed: ");
+        s_cat(b, why ? why : a2e_note_plugin());
         return;
     }
+    rl = a2e_addr(ONLINE_S_READ_LABEL);
     /* trampoline: read_text_label's first 8 bytes, then back to the rest */
-    for (i = 0; i < 8; i++) g_label_tramp[i] = sig_label[i];
-    rel = (A_READ_LABEL + 8) - ((DWORD)g_label_tramp + 8 + 5);
+    for (i = 0; i < PATCH_LABEL_LEN; i++) g_label_tramp[i] = ((const BYTE *)rl)[i];
+    rel = (rl + PATCH_LABEL_LEN) - ((DWORD)g_label_tramp + PATCH_LABEL_LEN + 5);
     g_label_tramp[8] = 0xe9;
     for (i = 0; i < 4; i++) g_label_tramp[9 + i] = (BYTE)(rel >> (8 * i));
     if (!VirtualProtect(g_label_tramp, sizeof g_label_tramp, PAGE_EXECUTE_READWRITE, &prot)) {
@@ -957,11 +951,11 @@ static void install_entry(char *b)
         return;
     }
 
-    if (write_jmp(A_READ_LABEL, (void *)label_hook, 8)
-        && write_jmp(A_CLICK, (void *)stub_click, 9)
-        && write_jmp(A_IPX_PRESSED, (void *)stub_ipx, 5)
-        && write_call(A_ROOM_INIT, (void *)stub_room_init, 10)
-        && write_call(A_GAME_INIT, (void *)stub_game_init, 10)) {
+    if (write_jmp(rl, (void *)label_hook, PATCH_LABEL_LEN)
+        && write_jmp(a2e_addr(ONLINE_S_CLICK), (void *)stub_click, 9)
+        && write_jmp(a2e_addr(ONLINE_S_IPX_PRESSED), (void *)stub_ipx, 5)
+        && write_call(a2e_addr(ONLINE_S_ROOM_INIT), (void *)stub_room_init, 10)
+        && write_call(a2e_addr(ONLINE_S_GAME_INIT), (void *)stub_game_init, 10)) {
         g_chat_hooked = 1;
         s_cat(b, "  menu entry: LAN (IPX) is Internet - Online");
     }
@@ -1007,8 +1001,8 @@ static void startup(void)
         s_cat(b, g_logpath);
         if (!ad) s_cat(b, " (LOCALAPPDATA unset or not writable)");
         logline(b);
-        a2e_log(logline);
     }
+    a2e_init(&ONLINE_ENGINE, logline);
 
     g_ini.log = logline;
     g_logging = (int)a2_ini_int(&g_ini, "Online", "Log", 1);   /* again, so an overlay value is logged */
@@ -1038,6 +1032,13 @@ static void startup(void)
     }
     install_entry(b);
     logline(b);
+}
+
+/* <Plugin>_SettingsNote (tools/settings/README.md, C5): why a row is not running, or NULL;
+ * a NULL row asks about the plugin as a whole.  The engine's notes feed it. */
+__declspec(dllexport) const char *__cdecl Online_SettingsNote(const A2Setting *row)
+{
+    return row ? a2e_note_for(row->section, row->key) : a2e_note_plugin();
 }
 
 BOOL __stdcall DllMain(HMODULE mod, DWORD reason, void *reserved)

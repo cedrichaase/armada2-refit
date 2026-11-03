@@ -141,8 +141,8 @@ for anything 720 lines or taller.
 - **Back buffer size:** `NextBinkFrame` (`0x4637f0`) reads the back buffer's
   `D3DSURFACE_DESC` at `[ebp-0x28]` and calls `BinkCopyToBuffer` from
   `0x4638af`. The DLL reads Width (`-0x10`) and Height (`-0x0c`) from that
-  frame only when its return address is exactly `0x4638b5` and the values are
-  sane. That's why `build.sh` keeps frame pointers.
+  frame only when its return address is exactly the profile's `intro_copy_ret`
+  and the values are sane. That's why `build.sh` keeps frame pointers.
 - **Pixel formats:** A8R8G8B8, X8R8G8B8, R5G6B5 and X1R5G5B5 map to Bink
   surface types 5, 3, 10 and 9. All four are handled.
 - **Sound system:** `AudioManager::Open` passes the address of
@@ -152,6 +152,21 @@ for anything 720 lines or taller.
 - **Mode patch sites:** `push 32/480/640` and the 16-bit fallback, both in
   `PlayIntroMovie`. Each signature occurs once in the file. The bare 640/480
   push pair also occurs a third time elsewhere, and is left alone.
+
+## Hooks
+
+What the proxy reads of `Armada2.exe` is in `profiles/<build>/binkproxy.toml`
+(`profiles/gog-1.1/` for GOG's 1.1), generated into `engine_syms.h` by
+`tools/engine/gen.py` (`crates/a2engine/README.md`). It logs the identity, the build
+and the symbol summary after its version line.
+
+| Hook | Entries | Used by | Without it |
+|---|---|---|---|
+| `binkproxy.intro_mode` | the two signatures above, as `scan` entries that must each match exactly once in `.text` | `patch_intro_mode`; `unknown = "run"`: the scans are build-independent, so this runs on a build the profiles do not know | the intro stays at 640x480 (movies still play) |
+| `binkproxy.intro_copy` | the return address of the `BinkCopyToBuffer` call in `NextBinkFrame` (a `label`, its first 8 bytes checked) and the three distances of the `D3DSURFACE_DESC` fields below the frame's EBP (`field`) | `intro_backbuffer` | the intro is copied 1:1 at its own size, not fitted |
+
+`BinkProxy_SettingsNote` (settings, C5) returns the engine's note for a row or the
+plugin; neither hook feeds a row of its own.
 
 ## Testing without the game
 

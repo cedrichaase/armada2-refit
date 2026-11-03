@@ -4,6 +4,17 @@
 8 with a transport of our own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 and versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.10.0 — 2026-11-03
+
+### Added
+- Online is on the symbol profile (`profiles/gog-1.1/online.toml`, hook `online.entry`; phase 8d): the menu entry's nine addresses, data addresses and six signatures are checked whole before any is written, and stand down with a reason.
+- `Online_SettingsNote` export (the engine's note for the `Entry` row and the plugin).
+
+### Changed
+- No address literal is left in `online.c`; the stubs jump through `a2s_online_*`. `peer.c` is untouched.
+
+Installed, not yet seen in game
+
 ## 0.9.1 — 2026-11-03
 
 ### Added

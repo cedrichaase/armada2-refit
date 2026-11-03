@@ -17,6 +17,15 @@ Layers: testbench 3.98.0.
 
 Installed, not yet seen in game
 
+## 13.83.0 — 2026-11-03
+
+Layers: cutscenes 2.6.0, online 0.10.0, qol 1.10.0, testbench 3.97.3.
+
+### Changed
+- Phase 8d: the C plugins move onto the symbol profiles, one commit each. binkproxy (`profiles/gog-1.1/binkproxy.toml`, `BinkProxy_SettingsNote`), Online (`online.toml`, `Online_SettingsNote`), then QOL and QOLRules (`qol.toml`, `qolrules.toml`, `QOL_SettingsNote`, `QOLRules_SettingsNote`).
+
+Installed, not yet seen in game
+
 ## 13.82.0 — 2026-11-03
 
 Layers: ui 0.32.0, testbench 3.97.2.

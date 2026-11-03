@@ -4,6 +4,17 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`binkproxy/README.md`](binkproxy/README.md).
 
+## 2.6.0 — 2026-11-03
+
+### Added
+- BinkProxy is on the symbol profile (`profiles/gog-1.1/binkproxy.toml`, hooks `binkproxy.intro_mode` and `binkproxy.intro_copy`; phase 8d): the intro-mode signature scans run on any build, the intro's back-buffer read stands down with a reason when the call site is not stock.
+- `BinkProxy_SettingsNote` export (the engine's notes for the settings screen).
+
+### Changed
+- No address literal is left in `binkproxy.c`; the intro-mode patch reads the scans' matches instead of walking `.text` itself.
+
+Installed, not yet seen in game
+
 ## 2.5.1 — 2026-11-03
 
 ### Added
