@@ -5,6 +5,11 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.103.1 — 2026-11-03
+
+### Fixed
+- `display-abi-mismatch`, olddisplay half: since display 0.18.0 moved the shell's mode raise from the UI to Display8, Display 0.11.0's one-mode stub left the engine with no 800x600 mode and Wine overflowed the stack before the menu. `display/bench-abi.sh` now puts Menus.asi back beside the old Display8 (`ui/bench-legacy.sh menus`); the scenario clicks the cube at 930,100 there and expects the forward-mode fallback. Installed, not yet seen in game.
+
 ## 3.103.0 — 2026-11-03
 
 ### Added
