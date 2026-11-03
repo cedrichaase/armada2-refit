@@ -15,13 +15,16 @@ forward chain. The showcase scene paused on one tick with the bench clock, as
 `port-showcase`. On the bench the stub's Vulkan is the GPU with the validation layer (testbench
 3.70.0; `--vulkan-device lavapipe` for Mesa's CPU Vulkan).
 
-The same scene through the forward chain (`display-passthrough-forward`) is the
-reference:
+The same scene through the forward chain is the reference, frozen as the baseline
+`p10-fwd-display-passthrough` (phase 10 X4, run 20261103-124055; the recorder is
+`display-passthrough-forward`). Against it, at the default `PixelCentres=vulkan`, the whole
+frame is RMSE 10.6 (the cube and the engine's hulls sit half a pixel apart); with
+`PixelCentres=d3d9` it is 1.64 (`display/README.md`). That comparison is done by hand:
 
-    ./a2test run display-passthrough-forward --install .
-    ./a2test baseline record passthrough-hulls --from <that run's case>
-    ./a2test run display-passthrough --install .
-    ./a2test baseline compare passthrough-hulls --from <this run's case>
+    ./a2test baseline compare p10-fwd-display-passthrough --from <this run's case>
+
+This scenario's own gate is its Vulkan frame, frozen as `p10-vk-display-passthrough`
+(run 20261103-124642): step 9, RMSE 0 after every package.
 
 On Direct3D 12 (display 0.20.0, phase 10 X1) this scene is `display-passthrough-d3d12`:
 run it first, one paused frame, and never two Direct3D 12 games at once.
@@ -34,4 +37,5 @@ run it first, one paused frame, and never two Direct3D 12 games at once.
 6. Expect "Display8.log" contains "passthrough: the engine's first draw, into a plugin's pass".
 7. Expect "Display8.log" not contain "PASSTHROUGH an engine draw while a plugin records".
 8. Expect "Display8.log" not contain "vulkan 0x".
-9. Expect no crash.
+9. Expect the screenshot "showcase" matches baseline "p10-vk-display-passthrough" within RMSE 0.
+10. Expect no crash.

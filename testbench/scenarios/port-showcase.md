@@ -19,6 +19,13 @@ Record it from the tree before a port and compare the tree after:
 
 `port-nebula` and `port-firing` are the same for two more scenes.
 
+Frozen references (phase 10 X4, `$A2_DATA/baselines`; assets, never in git), recorded on
+round-e 4084eb4 at 1280x720 through `display/stub-scenario.sh <scenario> stub Backend=<b>`:
+`p10-vk-port-showcase`, `-port-nebula`, `-port-firing` (the GPU's Vulkan, the gate after every
+package: RMSE 0; `p10-vk-port-showcase` is RMSE 0 against `roundD-base-port-showcase`) and
+`p10-d12-port-showcase`, `-port-nebula`, `-port-firing` (Direct3D 12 with every module on, the
+engine draws nothing: RMSE 0 against itself; against Vulkan's 0.48 on the showcase).
+
 1. Launch the game.
 2. Wait up to 240 seconds for "Scene.log" to say "paused at tick".
 3. Expect "Render3D.log" contains "clock: bench".

@@ -19,9 +19,9 @@ frame, and a Direct3D 12 game on the bench is on the GPU with no validation that
 the log (`testbench/README.md`). A `device removed` in `Display8.log` stops the work;
 nothing else is run until it is fixed.
 
-The references are the same scene on Vulkan (`display-passthrough` through
-`display/stub-scenario.sh display-passthrough stub Backend=vulkan`, recorded as
-`p10-vk-display-passthrough`) and the forward chain (`display-passthrough-forward`):
+The references are the same scene on Vulkan (`display-passthrough`, recorded as the frozen
+baseline `p10-vk-display-passthrough`) and the forward chain (the frozen
+`p10-fwd-display-passthrough`, recorded by `display-passthrough-forward`):
 
     ./a2test baseline compare p10-vk-display-passthrough --from <this run's case>
 
@@ -40,4 +40,5 @@ round a little differently); against the forward chain, Vulkan's own figure
 9. Expect "Display8.log" not contain "passed through on Vulkan and Direct3D 12 only".
 10. Expect "Display8.log" not contain "device is gone".
 11. Expect "Display8.log" not contain "pipeline could not be made".
-12. Expect no crash.
+12. Expect the screenshot "showcase" matches baseline "p10-vk-display-passthrough" within RMSE 1.0.
+13. Expect no crash.

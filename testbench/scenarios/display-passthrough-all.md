@@ -16,13 +16,20 @@ bump passes, and until display 0.15.2 the passthrough wrote those lights over th
 shader's constants, so every Borg hull vanished but its glow (`display/README.md`,
 "Passthrough"). The showcase on `a2_borg01` has no such lights and never showed it.
 
-The same mission through the forward chain (`display-passthrough-all-forward`) is the
-reference. The stars are dealt anew at every launch, so compare the stations, not the
-whole frame (at 1280x720, the yard top right and the station bottom right):
+The same mission through the forward chain is the reference, frozen as the baseline
+`p10-fwd-display-passthrough-all` (phase 10 X4, run 20261103-124333; the recorder is
+`display-passthrough-all-forward`), and this scenario's own Vulkan frames as
+`p10-vk-display-passthrough-all` (run 20261103-124759). The stars are dealt anew at every
+launch, so compare the stations, not the whole frame (at 1280x720, the yard top right and
+the station bottom right); the baselines' files are in `$A2_DATA/baselines/`:
 
-    ./a2test run display-passthrough-all-forward display-passthrough-all --install .
+    ./a2test run display-passthrough-all --install .
     magick compare -metric RMSE <(magick FWD -crop 260x260+800+0 +repage png:-) \
         <(magick STUB -crop 260x260+800+0 +repage png:-) null:
+
+The live mission is not repeatable (`borg07` is RMSE 7.8 from one launch of this scenario to the next
+against `p10-vk-display-passthrough-all`; its `target` shot, the briefing's, is RMSE 0), so no
+step compares it whole.
 
 Measured 2026-10-30: 8 to 9/255 over the yard (24/255 with the stations gone).
 
