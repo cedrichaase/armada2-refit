@@ -27,17 +27,15 @@
 //! engine draws takes them as it takes a torpedo's; then the scene's list is read
 //! again for ours. With `Lighting.asi` loaded, it recolours and lights phasers itself
 //! and this module leaves both to it.
-use super::eng;
+use super::hooks;
+use crate::engine;
 use crate::assets;
-use crate::engine::{self, field, field_f32, rd};
 use crate::math::{v3, M34, V3};
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 
 use crate::engine::light::{FN_NEW, FN_POINT_LIGHT, FN_REGISTER_LIGHT};
-const VT_POINT: usize = 0x6bc8ac;
-const VT_PHASER: usize = 0x6b8ee4;
 
 pub struct Lights {
     pool: Vec<usize>,
@@ -77,6 +75,16 @@ pub struct Beam {
 
 /// `BeamLight`'s default.
 pub const BEAM_LIGHT: f32 = 4.0;
+
+impl Default for Beam {
+    /// What `read` gives an ini without the keys.
+    fn default() -> Beam {
+        Beam {
+            line: crate::scene::clusters::LineParams { light: BEAM_LIGHT, core: 8.0, reach: 200.0, wrap: 0.4, gas_reach: 40.0 },
+            cone_spot: true,
+        }
+    }
+}
 
 impl Beam {
     pub fn read(ini: &crate::rt::Ini) -> Beam {
@@ -119,7 +127,7 @@ impl Lights {
             said_muzzle: 0,
             cl: false,
             points: Vec::new(),
-            beam: Beam::read(&crate::config::ini()),
+            beam: Beam::default(),
         }
     }
 
@@ -172,6 +180,14 @@ impl Lights {
         *n += 1;
     }
 
+    /// Switched off: the muzzles still lit and the shots remembered go (the engine's light
+    /// objects of the pool are kept).
+    pub fn drop_state(&mut self) {
+        self.shots_seen.clear();
+        self.muzzles.clear();
+        self.points.clear();
+    }
+
     /// The points `emit` kept for the scene's list (after the module read it again).
     pub fn take_points(&mut self) -> Vec<crate::scene::lights::Point> {
         core::mem::take(&mut self.points)
@@ -219,20 +235,19 @@ impl Lights {
 
     /// A sprite's texture (its stem) and its first frame's rectangle.
     fn sprite_rect(sprite: usize) -> Option<(String, [f32; 4])> {
-        let tex = field(sprite, 0x58);
-        let name = unsafe { crate::rt::cstr_at(field(tex, 8) as *const u8, 260) };
+        let name = hooks::sprite_texture_name(sprite);
         if name.is_empty() {
             return None;
         }
         let base = name.rsplit(['\\', '/']).next().unwrap_or(name);
         let stem = base.split('.').next().unwrap_or(base);
-        Some((String::from(stem), unsafe { rd(sprite + 0x38) }))
+        Some((String::from(stem), hooks::sprite_rect(sprite)))
     }
 
     /// A torpedo's or pulse's light colour: its class light's ODF colour (+0xf4), in
     /// its sprite's hue when recolouring (as `recolour_registry`).
     fn shot_colour(&mut self, l: usize, sprite: usize) -> V3 {
-        let odf: V3 = unsafe { rd(l + 0xf4) };
+        let odf = hooks::light_colour(l);
         if !self.recolour {
             return odf;
         }
@@ -254,36 +269,35 @@ impl Lights {
         if main {
             let mut now_seen: Vec<usize> = Vec::new();
             let mut new: Vec<(usize, usize, usize)> = Vec::new();
-            eng::for_each_ordnance(|o| {
-                if engine::vtable(o) == VT_PHASER {
+            hooks::for_each_ordnance(|o| {
+                if hooks::is_phaser(o) {
                     return;
                 }
-                let cls = field(o, 0x34);
-                let l = if cls != 0 { field(cls, 0x10) } else { 0 };
-                if l == 0 || engine::vtable(l) != VT_POINT {
+                let l = hooks::shot_point_light(o);
+                if l == 0 {
                     return;
                 }
                 now_seen.push(o);
-                new.push((o, l, field(cls, 0x12c)));
+                new.push((o, l, hooks::shot_sprite(o)));
             });
             for (o, l, spr) in new {
                 if self.shots_seen.contains(&o) || self.muzzles.len() >= 64 {
                     continue;
                 }
-                let h = unsafe { rd::<i32>(o + 0x5c) };
-                let owner = eng::object_of(h);
+                let h = hooks::shot_owner_handle(o);
+                let owner = hooks::object_of(h);
                 if owner == 0 {
                     continue;
                 }
-                let pos = eng::transform(o).p;
-                let op = eng::obj_pos(owner);
-                let rad = eng::radius_of(owner);
+                let pos = hooks::transform(o).p;
+                let op = hooks::obj_pos(owner);
+                let rad = hooks::radius_of(owner);
                 let col = self.shot_colour(l, spr);
                 if self.said_muzzle < 16 {
                     self.said_muzzle += 1;
                     crate::log!(
                         "ordnance: muzzle of {} on {} at {:.0} from its centre (radius {:.0}), colour {:.2} {:.2} {:.2}",
-                        eng::ord_odf(o), eng::odf_name(owner), (pos - op).len(), rad, col.x, col.y, col.z
+                        hooks::ord_odf(o), hooks::odf_name(owner), (pos - op).len(), rad, col.x, col.y, col.z
                     );
                 }
                 self.muzzles.push(Muzzle { owner: h, off: pos - op, col, t0: now, reach: rad * reach });
@@ -298,7 +312,7 @@ impl Lights {
             .muzzles
             .iter()
             .filter_map(|m| {
-                let owner = eng::object_of(m.owner);
+                let owner = hooks::object_of(m.owner);
                 if owner == 0 {
                     return None;
                 }
@@ -306,7 +320,7 @@ impl Lights {
                 if k <= 0.0 {
                     return None;
                 }
-                Some((eng::obj_pos(owner) + m.off, m.col * (bright * k), m.reach))
+                Some((hooks::obj_pos(owner) + m.off, m.col * (bright * k), m.reach))
             })
             .collect();
         for (p, c, r) in lit {
@@ -322,55 +336,47 @@ impl Lights {
     fn recolour_registry(&mut self) {
         // The ordnance classes' lights in play, with their sprites.
         let mut ls: Vec<(usize, usize)> = Vec::new();
-        eng::for_each_ordnance(|o| {
-            let cls = field(o, 0x34);
-            let l = field(cls, 0x10);
-            if l != 0 && engine::vtable(l) == VT_POINT && !ls.iter().any(|e| e.0 == l) {
-                ls.push((l, field(cls, 0x12c)));
+        hooks::for_each_ordnance(|o| {
+            let l = hooks::shot_point_light(o);
+            if l != 0 && !ls.iter().any(|e| e.0 == l) {
+                ls.push((l, hooks::shot_sprite(o)));
             }
         });
         if ls.is_empty() {
             return;
         }
-        let head = field(engine::storm3d(), 0x60);
-        if head == 0 {
-            return;
-        }
-        let mut node = field(head, 0);
-        let mut guard = 0;
-        while node != head && node != 0 && guard < 4096 {
-            guard += 1;
-            let rec = field(node, 8);
-            node = field(node, 0);
-            let l = field(rec, 0);
-            let Some(&(_, sprite)) = ls.iter().find(|e| e.0 == l) else { continue };
-            let odf: V3 = unsafe { rd(l + 0xf4) };
+        hooks::for_each_light_record(|rec, l| {
+            let Some(&(_, sprite)) = ls.iter().find(|e| e.0 == l) else { return };
+            let odf = hooks::light_colour(l);
             let peak = odf.x.max(odf.y).max(odf.z);
-            let Some((tex, r)) = Self::sprite_rect(sprite) else { continue };
-            let Some(m) = self.mean(&tex, r) else { continue };
+            let Some((tex, r)) = Self::sprite_rect(sprite) else { return };
+            let Some(m) = self.mean(&tex, r) else { return };
             let mp = m.x.max(m.y).max(m.z);
             if peak <= 0.0 || mp <= 0.0 {
-                continue;
+                return;
             }
             let c = m * (peak / mp);
             if self.said < 16 {
                 self.said += 1;
                 crate::log!("ordnance: light of {} recoloured {:.2} {:.2} {:.2} -> {:.2} {:.2} {:.2}", tex, odf.x, odf.y, odf.z, c.x, c.y, c.z);
             }
-            unsafe { core::ptr::write_unaligned((rec + 4) as *mut V3, c) };
-        }
+            hooks::set_record_colour(rec, c);
+        });
     }
 
     /// The phasers' emitter and impact lights; returns how many lights were used.
     fn phaser_lights(&mut self, mut n: usize) -> usize {
         let mut shots: Vec<(V3, V3, V3, usize)> = Vec::new();
-        eng::for_each_ordnance(|o| {
-            if engine::vtable(o) != VT_PHASER || eng::byte(o, 0x27) != 0 || eng::byte(o, 0x24) == 0 {
+        hooks::for_each_ordnance(|o| {
+            if !hooks::is_phaser(o) || !hooks::phaser_active(o) {
                 return;
             }
-            let cls = field(o, 0x34);
-            let (left, len) = (field_f32(o, 0xac), field_f32(cls, 0x1c));
-            if cls == 0 || left <= 0.0 || len <= 0.0 {
+            let cls = hooks::shot_class(o);
+            if cls == 0 {
+                return;
+            }
+            let (left, len) = (hooks::shot_life_left(o), hooks::class_life(cls));
+            if left <= 0.0 || len <= 0.0 {
                 return;
             }
             let age = len - left;
@@ -381,11 +387,9 @@ impl Lights {
             if k <= 0.0 {
                 return;
             }
-            let a: V3 = unsafe { rd(o + 0xbc) };
-            let b: V3 = unsafe { rd(o + 0xc8) };
-            let tint: V3 = unsafe { rd(o + 0xf0) };
+            let (a, b, tint) = (hooks::shot_start(o), hooks::shot_end(o), hooks::shot_tint(o));
             let t = v3(tint.x.clamp(0.0, 1.0), tint.y.clamp(0.0, 1.0), tint.z.clamp(0.0, 1.0)) * k;
-            shots.push((a, b, t, field(cls, 0x12c)));
+            shots.push((a, b, t, hooks::class_sprite(cls)));
         });
         for (a, b, t, spr) in shots {
             if n >= 96 {
@@ -432,9 +436,9 @@ impl Lights {
         // The shots' own lights (each class's, riding with its shots) are bolts to the
         // gas (`[Nebulae] LitBolt=`): a corona about the shot, not a lit ball.
         if self.cl {
-            eng::for_each_ordnance(|o| {
-                let l = field(field(o, 0x34), 0x10);
-                if l != 0 && engine::vtable(l) == VT_POINT {
+            hooks::for_each_ordnance(|o| {
+                let l = hooks::shot_point_light(o);
+                if l != 0 {
                     crate::scene::lights::set_medium(l, BOLT.id());
                 }
             });

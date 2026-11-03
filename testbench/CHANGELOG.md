@@ -14,6 +14,13 @@ versions". Newest first. The why is in [`README.md`](README.md).
   `render3d-live-world-nebula` (the nebula scene, the nebulae's light hook handing back
   to the engine's). Installed, not yet seen in game
 
+## 3.91.0 — 2026-11-03
+
+### Added
+- Scenarios `render3d-live-particles` (the module switched off live at RMSE 0 against
+  its load-time baseline, on again, off again) and `render3d-live-ordnance` (the same
+  flips on the firing scene, checked by the log and a running game).
+
 ## 3.90.0 — 2026-11-03
 
 ### Added

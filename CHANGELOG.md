@@ -20,6 +20,20 @@ Layers: render3d 0.40.0, testbench 3.92.0.
 ### Added
 - testbench: scenarios `render3d-live-world` and `render3d-live-world-nebula`.
 
+## 13.72.0 — 2026-11-03
+
+Layers: render3d 0.39.0, testbench 3.91.0.
+
+### Changed
+- render3d: particles and ordnance on the hook registry and live (`Modules.particles`,
+  `Modules.ordnance`), with their hooks, content and settings reads in their own files;
+  the chain bugs of their hooks fixed (they called a constant, not what was there
+  before). `ordnance.ini` moved to `render3d/content/ordnance/`. No change to what is
+  drawn. Installed, not yet seen in game
+
+### Added
+- testbench: scenarios `render3d-live-particles` and `render3d-live-ordnance`.
+
 ## 13.71.0 — 2026-11-03
 
 Layers: render3d 0.38.0, testbench 3.90.0.

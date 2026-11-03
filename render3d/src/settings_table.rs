@@ -72,7 +72,7 @@ pub static SETTINGS: [Setting; 10] = [
     Setting {
         size: ROW_SIZE,
         kind: KIND_BOOL,
-        apply: APPLY_RESTART,
+        apply: APPLY_LIVE,
         scope: SCOPE_LOCAL,
         tab: TAB_GRAPHICS,
         flags: 0,
@@ -104,7 +104,7 @@ pub static SETTINGS: [Setting; 10] = [
     Setting {
         size: ROW_SIZE,
         kind: KIND_BOOL,
-        apply: APPLY_RESTART,
+        apply: APPLY_LIVE,
         scope: SCOPE_LOCAL,
         tab: TAB_GRAPHICS,
         flags: 0,

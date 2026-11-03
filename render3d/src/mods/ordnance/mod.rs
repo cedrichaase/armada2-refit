@@ -12,40 +12,21 @@
 //!   removes the effects), with its one sprite draw re-pointed at us; we draw the flash.
 //! - The special weapons' waves: `draw_wave`, which the module that draws the
 //!   shockwaves (effects) asks first.
-mod eng;
+//!
+//! Every address, hook and field is in `hooks.rs`; the built-in recipes in `content.rs`.
+mod content;
 mod fx;
+mod hooks;
 mod ini;
 mod lights;
 mod models;
 
 use super::{Module, Step};
-use crate::engine::{self, field, field_f32, field_u8, hook, rd};
 use crate::frame::steps::View;
 use crate::log;
-use crate::math::V3;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
-
-const CULL_DISTANCE: usize = 0x6fcac0; // cfgOBJECT_CULLING_DISTANCE, f32
-const SLOT_SUBMIT: usize = 0x5c; // Ordnance vtable: Submit(ST3D_Camera*)
-
-// Stock's Submit functions this module draws in their place (sprite.rs).
-const SUB_PHASER: usize = 0x57edc0;
-const SUB_PULSE: usize = 0x581cb0;
-const SUB_PHOTON: usize = 0x57f100;
-const SUB_PLASMA: usize = 0x57f580;
-const SUB_POLERON: usize = 0x5800d0;
-const SUB_ARTILLERY: usize = 0x5730a0;
-const SUB_SRT: usize = 0x5853b0; // ShieldRemovingTorpedo
-const SUB_CHAIN: usize = 0x574f20; // ChainPulsar: its sprite, and its emitter node's Render
-
-
-// The warp flash: the call to ST3D_Sprite::DrawScaled3D in WarpSpriteEffect::Render.
-const SITE_WARP_SPRITE: usize = 0x59cc6b;
-use crate::engine::sprite::FN_DRAW_SCALED_3D as FN_DRAW_SCALED;
-const SITE_WARP: usize = 0x598423; // RenderWarpSpriteEffects(cam), cdecl, in the body
-const FN_WARP: usize = 0x59c560;
 
 /// What draws a class's shots.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -65,29 +46,10 @@ pub struct Ordnance {
     /// Stock's sprites drawn by us (0: the engine's Submit draws them).
     stock: bool,
     survey: bool,
-    hooked: bool,
-    warp_hooked: bool,
     /// Per ordnance class: its ODF and what draws it.
     classes: BTreeMap<usize, (String, Who)>,
     seen: Vec<String>,
     frames: u32,
-}
-
-static mut MODULE: *mut Ordnance = core::ptr::null_mut();
-static mut VIEW: *const View = core::ptr::null();
-static mut PREV_WARP_SPRITE: usize = FN_DRAW_SCALED;
-/// Flashes noted by the warp hook in this view: (effect, position).
-static mut NOTED: Vec<(usize, V3)> = Vec::new();
-
-/// The module and the view being drawn, while one is (for the hooks).
-fn current() -> Option<(&'static mut Ordnance, &'static View)> {
-    unsafe {
-        if MODULE.is_null() || VIEW.is_null() {
-            None
-        } else {
-            Some((&mut *MODULE, &*VIEW))
-        }
-    }
 }
 
 impl Default for Ordnance {
@@ -97,12 +59,31 @@ impl Default for Ordnance {
 }
 
 impl Ordnance {
+    /// With the built-in recipes alone; `configure` reads the player's `Render3D.ini` over
+    /// them (at load, and whenever the settings change).
     pub fn new() -> Ordnance {
-        let s = ini::Settings::load();
-        let mut sprites = crate::scene::sprites::Sprites::new();
-        sprites.hot = s.f("Ordnance", "Hot", 0.6);
-        sprites.hot_from = s.f("Ordnance", "HotFrom", 0.7);
-        let mut lights = lights::Lights::new();
+        let none = crate::rt::Ini::open_plain("");
+        let s = ini::Settings::load(&none);
+        Ordnance {
+            sprites: crate::scene::sprites::Sprites::new(),
+            fx: fx::Fx::new(&s),
+            models: models::Models::new(&s),
+            lights: lights::Lights::new(),
+            stock: true,
+            survey: false,
+            classes: BTreeMap::new(),
+            seen: Vec::new(),
+            frames: 0,
+        }
+    }
+
+    /// The settings (built-in recipes under `Render3D.ini`'s sections) into the module.
+    /// What it holds that depends on the recipes (the classes' choice of who draws them)
+    /// is forgotten only when they changed.
+    fn apply(&mut self, s: &ini::Settings) {
+        self.sprites.hot = s.f("Ordnance", "Hot", 0.6);
+        self.sprites.hot_from = s.f("Ordnance", "HotFrom", 0.7);
+        let lights = &mut self.lights;
         lights.recolour = s.i("Ordnance", "Recolour", 1) != 0;
         lights.phasers = s.i("Ordnance", "PhaserLights", 1) != 0;
         lights.ph = [
@@ -120,56 +101,37 @@ impl Ordnance {
             s.f("Ordnance", "MuzzleTime", 0.5),
             s.f("Ordnance", "MuzzleReach", 1.0),
         ];
-        Ordnance {
-            sprites,
-            fx: fx::Fx::new(&s),
-            models: models::Models::new(&s),
-            lights,
-            stock: s.i("Ordnance", "Stock", 1) != 0,
-            survey: s.i("Ordnance", "Survey", 0) != 0,
-            hooked: false,
-            warp_hooked: false,
-            classes: BTreeMap::new(),
-            seen: Vec::new(),
-            frames: 0,
+        let before = (self.stock, self.models.on, self.fx.specials);
+        self.stock = s.i("Ordnance", "Stock", 1) != 0;
+        self.survey = s.i("Ordnance", "Survey", 0) != 0;
+        let recipes = self.fx.configure(s);
+        self.models.configure(s);
+        if recipes || before != (self.stock, self.models.on, self.fx.specials) {
+            self.classes.clear();
         }
-    }
-
-    fn install(&mut self) {
-        if self.hooked {
-            return;
-        }
-        self.hooked = true;
-        unsafe { MODULE = self as *mut Ordnance };
-        if self.fx.warp_on() {
-            self.warp_hooked = hook::patch_call(SITE_WARP_SPRITE, FN_DRAW_SCALED, warp_sprite as *const () as usize);
-            log!(
-                "ordnance: warp flash {}",
-                if self.warp_hooked { "hooked (WarpSpriteEffect::Render's sprite)" } else { "NOT hooked: the site is not stock's, the engine draws it" }
-            );
-        }
+        hooks::set_warp_on(self.fx.warp_on());
     }
 
     /// What draws a class's shots, by its ODF and its Submit (cached per class).
     fn who(&mut self, ord: usize) -> Who {
-        let cls = field(ord, 0x34);
-        let odf = eng::ord_odf(ord);
+        let cls = hooks::shot_class(ord);
+        let odf = hooks::ord_odf(ord);
         if let Some((name, w)) = self.classes.get(&cls) {
             if name.as_str() == odf {
                 return *w;
             }
         }
-        let sub = field(engine::vtable(ord), SLOT_SUBMIT);
+        let sub = hooks::submit_addr(ord);
         let w = match self.fx.recipe_of(odf, false) {
             Some(rc) if self.fx.specials => Who::Recipe(rc),
-            _ if self.stock && matches!(sub, SUB_PHASER | SUB_PULSE | SUB_PHOTON | SUB_PLASMA | SUB_POLERON | SUB_ARTILLERY | SUB_SRT | SUB_CHAIN) => Who::Stock,
+            _ if self.stock && hooks::stock_submit(ord).is_some() => Who::Stock,
             _ if self.models.take_class(ord) => Who::Model,
             _ => Who::Engine,
         };
         if self.survey || !self.seen.iter().any(|s| s == odf) {
             if !self.seen.iter().any(|s| s == odf) && self.seen.len() < 256 {
                 self.seen.push(String::from(odf));
-                log!("ordnance: {} (vtable {:#x}, Submit {:#x}): {:?}", odf, engine::vtable(ord), sub, w);
+                log!("ordnance: {} (vtable {:#x}, Submit {:#x}): {:?}", odf, crate::engine::vtable(ord), sub, w);
             }
         }
         self.classes.insert(cls, (String::from(odf), w));
@@ -178,89 +140,50 @@ impl Ordnance {
 
     /// Our copy of stock's `Submit` for the classes `who` calls Stock.
     fn draw_stock(&mut self, v: &View, ord: usize) {
-        let cls = field(ord, 0x34);
+        let cls = hooks::shot_class(ord);
+        let kind = hooks::stock_submit(ord);
         // The chain pulsar: its sprite is ours while the particles module fires its
         // emitter (+0xdc) and draws the trail; otherwise the engine's Submit does both.
-        if field(engine::vtable(ord), SLOT_SUBMIT) == SUB_CHAIN && !crate::core_particles::live() {
-            self.submit(v, ord);
+        if kind == Some(hooks::StockSubmit::Chain) && !crate::core_particles::live() {
+            hooks::submit(ord, v.cam);
             return;
         }
-        let spr = field(cls, 0x12c);
+        let spr = hooks::class_sprite(cls);
         if spr == 0 {
             return;
         }
-        let w = field_f32(cls, 0x148);
-        let v3at = |off: usize| -> V3 { unsafe { rd(ord + off) } };
-        match field(engine::vtable(ord), SLOT_SUBMIT) {
-            SUB_PHASER => self.sprites.polygon(v, spr, v3at(0xbc), v3at(0xc8), w, w, v3at(0xf0)),
-            SUB_PULSE => {
-                // From the head (+0xc8) back towards the start, at most the class's
-                // length (+0x144).
-                let (start, end) = (v3at(0xbc), v3at(0xc8));
+        let w = hooks::class_width(cls);
+        match kind.unwrap_or(hooks::StockSubmit::Plasma) {
+            hooks::StockSubmit::Phaser => self.sprites.polygon(v, spr, hooks::shot_start(ord), hooks::shot_end(ord), w, w, hooks::shot_tint(ord)),
+            hooks::StockSubmit::Pulse => {
+                // From the head back towards the start, at most the class's length.
+                let (start, end) = (hooks::shot_start(ord), hooks::shot_end(ord));
                 let d = start - end;
                 let l = d.len();
-                let len = field_f32(cls, 0x144);
+                let len = hooks::class_length(cls);
                 let tail = if l < len { end + d } else { end + d * (len / l) };
-                self.sprites.polygon(v, spr, end, tail, w, w, v3at(0xd4));
+                self.sprites.polygon(v, spr, end, tail, w, w, hooks::shot_hue_b(ord));
             }
             sub => {
-                let col = match sub {
-                    SUB_PHOTON | SUB_POLERON | SUB_SRT => v3at(0xd0),
-                    SUB_ARTILLERY => v3at(0xd4),
-                    // The plasma cannon sets no colour: the sprite's own.
-                    _ => unsafe { rd::<V3>(spr + 0x24) },
-                };
-                self.sprites.scaled(v, spr, eng::transform(ord).p, w, col);
+                let col = hooks::stock_colour(ord, sub, spr);
+                self.sprites.scaled(v, spr, hooks::transform(ord).p, w, col);
             }
-        }
-    }
-
-    /// The engine's own `Submit` of a shot (vtable +0x5c).
-    fn submit(&mut self, v: &View, ord: usize) {
-        unsafe {
-            let f: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(engine::vtable(ord), SLOT_SUBMIT));
-            f(ord, v.cam);
         }
     }
 
     /// `Ordnance::RenderAll`, as stock runs it, each shot drawn by us or the engine.
     fn render_all(&mut self, v: &View) {
         let cam = v.cam;
-        let cull = unsafe { rd::<f32>(CULL_DISTANCE) };
-        let eye = eng::camera_position(cam);
+        let eye = hooks::camera_position(cam);
         let mut list: Vec<usize> = Vec::new();
-        eng::for_each_ordnance(|o| list.push(o));
+        hooks::for_each_ordnance(|o| list.push(o));
         self.fx.begin_shots();
         for ord in list {
             if ord == 0 {
                 continue;
             }
-            // The owner, if it is a game object and not +0x113 (gone).
-            let mut owner = eng::entity_get(unsafe { rd::<i32>(ord + 0x5c) });
-            if owner != 0 && (field(owner, 0x14) & 4 == 0 || field_u8(owner, 0x113) != 0) {
-                owner = 0;
-            }
-            let mut target = eng::entity_get(unsafe { rd::<i32>(ord + 0x60) });
-            if target != 0 && field(target, 0x14) & 4 == 0 {
-                target = 0;
-            } else if target != 0 && field_u8(target, 0x10f) != 0 {
-                // Stock's one write in RenderAll: a shot whose target has +0x10f set
-                // forgets it. Kept, so the game runs as it does without us.
-                unsafe { core::ptr::write_unaligned((ord + 0x60) as *mut i32, 0) };
-                target = 0;
-            } else if target != 0 {
-                let h = unsafe { rd::<i32>(ord + 0x5c) };
-                let o2 = eng::obj_even_if_destroyed(h);
-                if o2 != 0 && field_u8(o2, 0x113) == 0 && field_u8(o2, 0x112) == 0 && field_u8(target, 0x112) != 0 {
-                    // ... and so does one whose owner is not +0x112 while its target is.
-                    unsafe { core::ptr::write_unaligned((ord + 0x60) as *mut i32, 0) };
-                    target = 0;
-                }
-            }
-            let shown = (owner != 0 && field_u8(owner, 0x183) == 0 && eng::can_see(owner))
-                || (target != 0 && field_u8(target, 0x183) == 0 && eng::can_see(target))
-                || ((eye - eng::transform(ord).p).len() <= cull && eng::can_see(ord));
-            if !shown {
+            let (owner, target) = hooks::shot_parties(ord);
+            if !hooks::shot_shown(ord, owner, target, eye) {
                 continue;
             }
             match self.who(ord) {
@@ -271,16 +194,22 @@ impl Ordnance {
                     }
                 }
                 Who::Stock => self.draw_stock(v, ord),
-                Who::Model => unsafe {
-                    models::IN_SUBMIT = true;
-                    self.submit(v, ord);
-                    models::IN_SUBMIT = false;
-                },
-                Who::Engine => self.submit(v, ord),
+                Who::Model => {
+                    hooks::set_in_submit(true);
+                    hooks::submit(ord, cam);
+                    hooks::set_in_submit(false);
+                }
+                Who::Engine => hooks::submit(ord, cam),
             }
         }
         self.sprites.draw(v);
         self.fx.draw(v);
+    }
+
+    /// A model-drawing class's `Entity::Render`, ours while the ordnance step submits it
+    /// (the detour in `hooks.rs` asks).
+    fn models_draw(&mut self, v: &View, ord: usize, cam: usize) -> bool {
+        self.models.draw(v, &mut self.fx, ord, cam)
     }
 }
 
@@ -310,22 +239,42 @@ impl Module for Ordnance {
     fn rows(&self) -> &'static [crate::rt::settings::Setting] {
         &[]
     }
-    /// `[Lights] Beam*=`, `ConeSpot=`: the beams' lights, set per line (not rows).
+    /// `[Ordnance]`, `[Ordnance.<odf>]`, `[Model.<odf>]`, `[Wave.<odf>]` and `[Warp]`
+    /// over the built-in recipes, and `[Lights] Beam*=`, `ConeSpot=`: the beams' lights,
+    /// set per line (not rows).
     fn configure(&mut self, ini: &crate::rt::Ini, _said: &mut crate::core_module::Changes) {
+        let s = ini::Settings::load(ini);
+        self.apply(&s);
         self.lights.beam = lights::Beam::read(ini);
     }
     fn superseded(&self) -> Option<&'static str> {
         Some("Specials.asi")
     }
-    fn device(&mut self) {
-        self.install();
+    /// The warp flash's hook; the per-class slots follow when a class is first met.
+    fn hooks(&mut self, h: &mut crate::core_hooks::Hooks) {
+        hooks::set_module(self as *mut Ordnance);
+        hooks::install(h);
+    }
+    fn on(&mut self) {
+        hooks::set_module(self as *mut Ordnance);
+        hooks::set_warp_on(self.fx.warp_on());
+    }
+    /// Switched off live: its flashes, effect ages, muzzles and noted shots go, and the
+    /// classes are asked again when it is switched on. The detours hand every call to
+    /// the engine's (the hooks are behind the flag).
+    fn off(&mut self) {
+        self.fx.drop_state();
+        self.lights.drop_state();
+        self.classes.clear();
+        hooks::set_view(None);
+        hooks::clear_noted();
     }
     fn reset(&mut self) {
         self.sprites.reset();
         self.fx.reset();
     }
     fn begin_view(&mut self, v: &View) {
-        unsafe { VIEW = v as *const View };
+        hooks::set_view(Some(v));
         let ls = self.fx.take_lights(v.time, v.main).to_vec();
         if self.lights.begin_view(&ls, v.time, v.main) {
             crate::scene::regather_lights();
@@ -346,14 +295,11 @@ impl Module for Ordnance {
                 self.render_all(v);
                 true
             }
-            Step::Warp if self.warp_hooked => {
-                unsafe {
-                    NOTED.clear();
-                    let f: unsafe extern "C" fn(usize) = core::mem::transmute(hook::call_target(SITE_WARP).unwrap_or(FN_WARP));
-                    f(v.cam);
-                    for &(eff, pos) in NOTED.iter() {
-                        self.fx.note_flash(eff, pos, v.time);
-                    }
+            Step::Warp if hooks::warp_hooked() && self.fx.warp_on() => {
+                hooks::clear_noted();
+                hooks::run_warp(v.cam);
+                for (eff, pos) in hooks::noted() {
+                    self.fx.note_flash(eff, pos, v.time);
                 }
                 self.fx.warp_draw(v);
                 true
@@ -362,44 +308,26 @@ impl Module for Ordnance {
         }
     }
     fn end_view(&mut self, _v: &View) {
-        unsafe { VIEW = core::ptr::null() };
-    }
-}
-
-/// In `WarpSpriteEffect::Render`, in place of its `DrawScaled3D` of stock's warp
-/// sprite: notes the flash (at `pos`, the effect's +4) for our warp step.
-unsafe extern "thiscall" fn warp_sprite(sprite: usize, cam: usize, pos: *const V3, size: f32) {
-    unsafe {
-        if !VIEW.is_null() && !pos.is_null() && NOTED.len() < 64 {
-            let eff = pos as usize - 4;
-            if eng::object_of(rd::<i32>(eff)) != 0 {
-                NOTED.push((eff, core::ptr::read_unaligned(pos)));
-                return;
-            }
-        }
-        let f: unsafe extern "thiscall" fn(usize, usize, *const V3, f32) = core::mem::transmute(PREV_WARP_SPRITE);
-        f(sprite, cam, pos, size);
+        hooks::set_view(None);
     }
 }
 
 /// A special weapon's wave: `expl` is a `ShockwaveExplosion` (an `ExplosionFeature`'s
-/// explosion). If its class (+0x30) names, through its `cPrjID` (+0x24), an ODF with a
-/// `[Wave.<odf>]` recipe, the wave is drawn now and true returned; otherwise nothing
-/// is drawn (the caller draws its ring). The effects module calls this before it draws
-/// a shockwave. False while the ordnance module is off or standing down.
+/// explosion). If its class names, through its `cPrjID`, an ODF with a `[Wave.<odf>]`
+/// recipe, the wave is drawn now and true returned; otherwise nothing is drawn (the
+/// caller draws its ring). The effects module calls this before it draws a shockwave.
+/// False while the ordnance module is off or standing down.
 fn draw_wave(expl: usize, v: &View) -> bool {
-    unsafe {
-        let m = MODULE;
-        if m.is_null() || !(*m).fx.waves || expl == 0 {
-            return false;
+    let Some(m) = hooks::module() else { return false };
+    if !m.fx.waves || expl == 0 {
+        return false;
+    }
+    let odf = hooks::wave_odf(expl);
+    match m.fx.recipe_of(odf, true) {
+        Some(rc) => {
+            m.fx.wave(v, expl, rc);
+            true
         }
-        let odf = eng::prj_odf(field(field(expl, 0x30), 0x24));
-        match (*m).fx.recipe_of(odf, true) {
-            Some(rc) => {
-                (*m).fx.wave(v, expl, rc);
-                true
-            }
-            None => false,
-        }
+        None => false,
     }
 }

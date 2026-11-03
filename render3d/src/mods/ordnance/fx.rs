@@ -1,5 +1,5 @@
 //! Specials.asi, ported: the warp flash and the special weapons drawn by shaders from
-//! recipes (`render3d/ordnance.ini`, overridable in Render3D.ini; the looks
+//! recipes (`render3d/content/ordnance/ordnance.ini`, overridable in Render3D.ini; the looks
 //! the user settled in Specials.asi are kept, but for the tractor, holding and
 //! assimilation beams, cones since 0.4.0: `Fx::cone`). Every effect is built here as
 //! world-space quads for `fx_ps` in `shaders/ordnance.hlsl`, drawn additively, depth
@@ -9,10 +9,9 @@
 //! paused game holds every effect; the quads are drawn in the ordnance and warp steps
 //! (and a wave where the engine submits it) instead of after `RenderChunks`; the
 //! lights go to the engine's registry at the start of the next view (`lights.rs`).
-use super::eng;
+use super::hooks;
 use super::ini::Settings;
 use gpu::{attr, AttrFormat, Blend, Block, Semantic, Topology, VertexAttr};
-use crate::engine::{field, field_f32};
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::math::{clamp, expf, powf, sinf, sqrtf, v3, V3};
@@ -42,7 +41,7 @@ const K_WAVE: f32 = 5.0;
 const K_CONE: f32 = 6.0;
 
 /// One recipe: `[Ordnance.<odf>]` or `[Wave.<odf>]`.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Recipe {
     pub name: String,
     pub kind: Kind,
@@ -179,6 +178,7 @@ impl Recipe {
 }
 
 /// `[Warp]`: the warp flash.
+#[derive(Clone, Debug, PartialEq)]
 struct Warp {
     on: bool,
     bright: f32,
@@ -367,7 +367,8 @@ pub struct Fx {
 }
 
 impl Fx {
-    pub fn new(s: &Settings) -> Fx {
+    /// The recipes of `[Ordnance.<odf>]` and `[Wave.<odf>]` sections, by name.
+    fn load_recipes(s: &Settings) -> (Vec<Recipe>, BTreeMap<(String, bool), usize>) {
         let mut recipes = Vec::new();
         let mut by_name = BTreeMap::new();
         for sec in s.sections() {
@@ -385,6 +386,11 @@ impl Fx {
             by_name.insert(key, recipes.len());
             recipes.push(Recipe::load(s, &sec, name, wave));
         }
+        (recipes, by_name)
+    }
+
+    pub fn new(s: &Settings) -> Fx {
+        let (recipes, by_name) = Self::load_recipes(s);
         crate::log!("ordnance: {} recipes for special weapons and their waves", recipes.len());
         Fx {
             specials: s.i("Ordnance", "Specials", 1) != 0,
@@ -405,6 +411,35 @@ impl Fx {
         }
     }
 
+    /// The settings read again (load, and every change of Render3D.ini or the overlay).
+    /// True if the recipes changed: what indexed them (the effects' ages, the flashes in
+    /// flight) is dropped. The flags and the warp flash's look take effect at once.
+    pub fn configure(&mut self, s: &Settings) -> bool {
+        self.specials = s.i("Ordnance", "Specials", 1) != 0;
+        self.waves = s.i("Ordnance", "Waves", 1) != 0;
+        self.warp = Warp::load(s);
+        let (recipes, by_name) = Self::load_recipes(s);
+        if recipes == self.recipes {
+            return false;
+        }
+        crate::log!("ordnance: {} recipes for special weapons and their waves", recipes.len());
+        self.recipes = recipes;
+        self.by_name = by_name;
+        self.flashes.clear();
+        self.ages.clear();
+        true
+    }
+
+    /// Switched off: the cosmetic state (flashes, ages, the lights waiting for the next
+    /// view) goes with it.
+    pub fn drop_state(&mut self) {
+        self.flashes.clear();
+        self.ages.clear();
+        self.lights.clear();
+        self.lights_next.clear();
+        self.verts.clear();
+    }
+
     pub fn reset(&mut self) {
 
     }
@@ -418,7 +453,7 @@ impl Fx {
         if odf.is_empty() {
             return None;
         }
-        self.by_name.get(&(eng::stem(odf), wave)).copied()
+        self.by_name.get(&(hooks::stem(odf), wave)).copied()
     }
 
     // ---- quads ---------------------------------------------------------------------
@@ -511,9 +546,9 @@ impl Fx {
     /// `WarpSpriteEffect::Render` drew (we kept it from drawing) stock's sprite for the
     /// effect `eff` at `p` (its +4: its handle is at +0, its distance at +0x10).
     pub fn note_flash(&mut self, eff: usize, p: V3, now: f32) {
-        let handle = unsafe { crate::engine::rd::<i32>(eff) };
-        let dist = field_f32(eff, 0x10);
-        let o = eng::object_of(handle);
+        let handle = hooks::effect_handle(eff);
+        let dist = hooks::effect_distance(eff);
+        let o = hooks::object_of(handle);
         if o == 0 {
             return;
         }
@@ -529,7 +564,7 @@ impl Fx {
                 }
                 self.flashes_made += 1;
                 if self.flashes_made <= 8 {
-                    crate::log!("ordnance: warp flash: {}, radius {:.1}, made {:.0} ahead", eng::odf_name(o), eng::radius_of(o), dist);
+                    crate::log!("ordnance: warp flash: {}, radius {:.1}, made {:.0} ahead", hooks::odf_name(o), hooks::radius_of(o), dist);
                 }
                 self.flashes.push(Flash {
                     handle,
@@ -544,11 +579,11 @@ impl Fx {
                 self.flashes.len() - 1
             }
         };
-        let (pos_o, vel) = (eng::obj_pos(o), eng::obj_vel(o));
+        let (pos_o, vel) = (hooks::obj_pos(o), hooks::obj_vel(o));
         let d = p - pos_o;
         let vl = vel.len();
         let s = if vl > 1e-4 { d.dot(vel) / vl } else { d.len() };
-        let r = eng::radius_of(o);
+        let r = hooks::radius_of(o);
         let f = &mut self.flashes[i];
         f.pos = p;
         f.r = r;
@@ -704,8 +739,8 @@ impl Fx {
 
     fn beam(&mut self, cam: &Cam, ord: usize, rc: usize, age: usize, now: f32) {
         let r = self.recipes[rc].clone();
-        let a: V3 = unsafe { crate::engine::rd(ord + 0xbc) };
-        let b: V3 = unsafe { crate::engine::rd(ord + 0xc8) };
+        let a = hooks::shot_start(ord);
+        let b = hooks::shot_end(ord);
         let d = b - a;
         let len = d.len();
         if len < 1e-3 {
@@ -759,9 +794,9 @@ impl Fx {
         // (a mining beam ends inside the moon, where a flare and a light show nothing).
         let mut b = b;
         if r.surface > 0.0 {
-            let tgt = eng::object_of(unsafe { crate::engine::rd::<i32>(ord + 0x60) });
+            let tgt = hooks::shot_target(ord);
             if tgt != 0 {
-                let (c, rad) = (eng::obj_pos(tgt), eng::radius_of(tgt) * r.surface);
+                let (c, rad) = (hooks::obj_pos(tgt), hooks::radius_of(tgt) * r.surface);
                 // a + d t, |a + d t - c| = rad: the first root within the beam.
                 let m = a - c;
                 let bq = m.dot(d);
@@ -796,17 +831,17 @@ impl Fx {
     /// light is a wash on the side of the target the cone falls on.
     fn cone(&mut self, cam: &Cam, ord: usize, rc: usize, age: usize, now: f32) {
         let r = self.recipes[rc].clone();
-        let a: V3 = unsafe { crate::engine::rd(ord + 0xbc) };
-        let b: V3 = unsafe { crate::engine::rd(ord + 0xc8) };
+        let a = hooks::shot_start(ord);
+        let b = hooks::shot_end(ord);
         let d = b - a;
         let len = d.len();
         if len < 1e-3 {
             return;
         }
         let d = d * (1.0 / len);
-        let tgt = eng::object_of(unsafe { crate::engine::rd::<i32>(ord + 0x60) });
+        let tgt = hooks::shot_target(ord);
         // The target's size, or without one a cone an eighth as wide as it is long.
-        let (tc, tr) = if tgt != 0 { (eng::obj_pos(tgt), eng::radius_of(tgt)) } else { (b, (len * 0.125).max(r.width)) };
+        let (tc, tr) = if tgt != 0 { (hooks::obj_pos(tgt), hooks::radius_of(tgt)) } else { (b, (len * 0.125).max(r.width)) };
         let seed = hash32(crate::clock::entity_key(ord) as u32);
         let bright = r.bright * clamp((now - self.ages[age].first) / r.fade_in, 0.0, 1.0) * Self::flicker(&r, seed, now);
         if bright <= 0.004 {
@@ -901,7 +936,7 @@ impl Fx {
 
     fn bolt(&mut self, cam: &Cam, ord: usize, rc: usize, age: usize, now: f32) {
         let r = self.recipes[rc].clone();
-        let t = eng::transform(ord);
+        let t = hooks::transform(ord);
         let pos = t.p;
         // The way it flies: from where it was last; at first, toward its target.
         let ag = &mut self.ages[age];
@@ -913,8 +948,8 @@ impl Fx {
                 }
             }
             None => {
-                let tgt = eng::object_of(unsafe { crate::engine::rd::<i32>(ord + 0x60) });
-                ag.dir = if tgt != 0 { (eng::obj_pos(tgt) - pos).norm() } else { t.r[2].norm() };
+                let tgt = hooks::shot_target(ord);
+                ag.dir = if tgt != 0 { (hooks::obj_pos(tgt) - pos).norm() } else { t.r[2].norm() };
             }
         }
         ag.last = Some(pos);
@@ -959,9 +994,8 @@ impl Fx {
 
     fn field_(&mut self, cam: &Cam, ord: usize, rc: usize, age: usize, now: f32) {
         let r = self.recipes[rc].clone();
-        let h = unsafe { crate::engine::rd::<i32>(ord + if r.on_owner { 0x5c } else { 0x60 }) };
-        let o = eng::object_of(h);
-        let (c, rad) = if o != 0 { (eng::obj_pos(o), r.radius * eng::radius_of(o)) } else { (eng::transform(ord).p, r.radius * 50.0) };
+        let o = hooks::shot_party(ord, r.on_owner);
+        let (c, rad) = if o != 0 { (hooks::obj_pos(o), r.radius * hooks::radius_of(o)) } else { (hooks::transform(ord).p, r.radius * 50.0) };
         let seed = hash32(crate::clock::entity_key(ord) as u32);
         let bright = r.bright * clamp((now - self.ages[age].first) / r.fade_in, 0.0, 1.0) * Self::flicker(&r, seed, now);
         if bright <= 0.004 {
@@ -1033,16 +1067,9 @@ impl Fx {
     /// fading after its class's `fadeFactor` (+0xe0) of the way, as stock fades its
     /// disc.
     pub fn wave(&mut self, v: &View, ex: usize, rc: usize) {
-        const FN_SHOCK_RADIUS: usize = 0x467730; // ShockwaveExplosion::GetCurrentRadius() const
         let r = self.recipes[rc].clone();
-        let cls = field(ex, 0x30);
-        let t = eng::transform(ex);
-        let rad = unsafe {
-            let f: unsafe extern "thiscall" fn(usize) -> f32 = core::mem::transmute(FN_SHOCK_RADIUS);
-            f(ex)
-        };
-        let end = field_f32(ex, 0x50);
-        let fade = if cls != 0 { field_f32(cls, 0xe0) } else { 0.5 };
+        let t = hooks::transform(ex);
+        let (rad, end, fade) = hooks::wave_state(ex);
         if !(rad > 0.01) {
             return;
         }
