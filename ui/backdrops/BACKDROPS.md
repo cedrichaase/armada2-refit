@@ -1,14 +1,14 @@
 # Menu backdrop plates
 
 How the widescreen plates behind the main menu and campaign selection are built.
-`Menus.asi` composites them at run time; this is the half that starts from the game's
-own art, so only the recipes (`backdrops/<name>.conf`) are committed and every layer
+`UI.asi` composites them at run time; this is the half that starts from the game's
+own art, so only the recipes (`<name>.conf` beside this file) are committed and every layer
 and plate is built into `$A2_DATA/backdrops/<name>/`. The run-time side, including
-`N.soften=`, is in `README.md`, "Backdrops". Changes to a plate go in
-`CHANGELOG.md`, since the plates are part of the menus layer that `a2mod` switches.
+`N.soften=`, is in `../MENUS.md`, "Backdrops". Changes to a plate go in
+`../CHANGELOG.md`, since the plates are part of the ui layer that `a2mod` switches.
 
 **Which screens.** Only screens with open art are outpainted, and they are listed
-in `backdrops/*.conf`:
+in `*.conf` beside this file:
 
 - **`mainbkgr`:** nebula to the edges. Outpainted, and the joins are step-free
   (column means 39→36→35 and 44→45 across them).
@@ -16,7 +16,7 @@ in `backdrops/*.conf`:
   drawn black frame that is hard-edged at x 28 and x 771. Outpainting the whole
   screen continued the frame and then started a different sky beyond it. So
   `field=32,0,768,600` hands the outpaint the open field alone. The plate replaces
-  the frame too: Menus.asi shows the plate wherever the shell draws stock
+  the frame too: UI.asi shows the plate wherever the shell draws stock
   background, and the frame is stock background. The joins are step-free (column
   means 43→45→48 and 83→86→81).
   Of four expands (about $0.02 each): seed 1 invented a lens-flare sun, and seed 3
@@ -39,9 +39,9 @@ in `backdrops/*.conf`:
   `keep=29,16,60,212` makes the plate take the upscaled stock over that bar, so
   its corners are stock's.
 
-**Building a plate:** `menus/backdrop.sh <name>` uses the same recipe as
-`models/loading-panel.sh`, and keeps its paid layers in `$A2_DATA/backdrops/<name>/ai/` (the recipe,
-`menus/backdrops/<name>.conf`, is all that is committed).
+**Building a plate:** `ui/backdrops/backdrop.sh <name>` uses the same recipe as
+the loading panel's (retired with the `LOADING` target), and keeps its paid layers in `$A2_DATA/backdrops/<name>/ai/` (the recipe,
+`ui/backdrops/<name>.conf`, is all that is committed).
 
 1. Upscale the stock 4x with `bria/increase-resolution`. pruna hung in "running"
    for 10 minutes on the day this was built.
@@ -53,5 +53,5 @@ in `backdrops/*.conf`:
 5. Resize to exactly 3450x1440, centre 1920 at x 765. The plate is authored at
    the screen height, so at 1440 it goes on 1:1.
 
-`--reblend` re-derives it offline. `menus/install-plates.sh` (run by `./install`) copies each
-built plate to `Menus/`, and `a2mod` moves them with the rest of the menus layer.
+`--reblend` re-derives it offline. `ui/backdrops/install-plates.sh` (run by `./install`) copies each
+built plate to `Menus/`, and `a2mod` moves them with the rest of the ui layer.

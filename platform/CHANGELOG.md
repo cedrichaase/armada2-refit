@@ -6,6 +6,14 @@ patch, and the Heroic/Proton setup, with the tools that manage them (`d3d8-chain
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. Details are in
 [`README.md`](README.md).
 
+## 3.7.0 — 2026-11-03
+
+### Added
+- `stop-game.sh` and `run-wine.sh`, moved here from `menus/` (their paths in the docs
+  follow). Neither is installed.
+
+Installed, not yet seen in game.
+
 ## 3.6.0 — 2026-10-23
 
 ### Added

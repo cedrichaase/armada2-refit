@@ -48,6 +48,10 @@ open(path, 'w').write('\r\n'.join(out) + '\r\n')
 PY
 }
 
+if [ ! -d "$here/../hud" ]; then
+    echo "bench-legacy.sh: hud/, grid/ and menus/ were deleted in 15.2.0; the legacy plugins now come from a cached tag build (L1b)" >&2
+    exit 1
+fi
 for layer in "$@"; do
     case "$layer" in
         hud)   A2_GAME="$game" bash "$here/../hud/install.sh" >/dev/null;   set_key HUD Enable 0 ;;

@@ -275,27 +275,27 @@ $r = Fail (Join-Path $P "install.ps1") @((Join-Path $T "nowhere"))
 Check "no game: exit 1" ($r.Code -eq 1)
 Check "no game: said last" ($r.Last -like "no Armada2.exe in *nowhere*")
 $D = Join-Path $T "damaged"; Copy-Item -Recurse $P $D
-Add-Content (Join-Path $D "layers\legacy\HUD.ini") "; tampered"
+Add-Content (Join-Path $D "layers\ui\UI.ini") "; tampered"
 $r = Fail (Join-Path $D "install.ps1") @($M)
 Check "damaged package: exit 1" ($r.Code -eq 1)
-Check "damaged package: said last" ($r.Last -like "the package is damaged: layers\legacy\HUD.ini does not match SHA256SUMS*")
+Check "damaged package: said last" ($r.Last -like "the package is damaged: layers\ui\UI.ini does not match SHA256SUMS*")
 Check "damaged package: nothing installed" (-not (Test-Path (Join-Path $M "HUD.asi")))
 Check "no ::error lines unasked" (-not (Has $r.Out "::error*"))
 $env:A2_PROGRESS = "1"
 $r = Fail (Join-Path $D "install.ps1") @($M)
-Check "damaged package: ::error damaged layers\legacy\HUD.ini" (Has $r.Out "::error damaged layers\legacy\HUD.ini")
+Check "damaged package: ::error damaged layers\ui\UI.ini" (Has $r.Out "::error damaged layers\ui\UI.ini")
 $r = Fail (Join-Path $P "install.ps1") @((Join-Path $T "nowhere"))
 Check "no game: ::error no-game" (Has $r.Out "::error no-game *nowhere")
 
 Write-Host "== an antivirus holding package files open: every one named, as an antivirus"
 $A = Join-Path $T "locked"; Copy-Item -Recurse $P $A
-$held = foreach ($n in "Menus.asi", "QOL.asi") { [IO.File]::Open((Join-Path $A "layers\legacy\$n"), "Open", "Read", "None") }
+$held = foreach ($n in "qol\QOL.asi", "ui\UI.asi") { [IO.File]::Open((Join-Path $A "layers\$n"), "Open", "Read", "None") }
 try {
     $r = Fail (Join-Path $A "install.ps1") @($M)
 } finally { foreach ($h in $held) { $h.Dispose() } }
 Check "locked: exit 1" ($r.Code -eq 1)
-Check "locked: ::error av-locked for each" ((Has $r.Out "::error av-locked layers\legacy\Menus.asi") -and (Has $r.Out "::error av-locked layers\qol\QOL.asi"))
-Check "locked: both named, as an antivirus, last" (($r.Last -like "*layers\legacy\Menus.asi, layers\qol\QOL.asi from the package could not be read. An antivirus*") -and
+Check "locked: ::error av-locked for each" ((Has $r.Out "::error av-locked layers\ui\UI.asi") -and (Has $r.Out "::error av-locked layers\qol\QOL.asi"))
+Check "locked: both named, as an antivirus, last" (($r.Last -like "*layers\qol\QOL.asi, layers\ui\UI.asi from the package could not be read. An antivirus*") -and
     ($r.Last -like "*exclusions for *locked and *roundtrip*"))
 Check "locked: nothing installed" (-not (Test-Path (Join-Path $M "HUD.asi")))
 

@@ -28,8 +28,10 @@ backup (`replaces`, `backups`): Render3D.asi and its recipes for render3d, the
 Textures/RGB/*.a2neb-backup of a2tex for textures, SOD/*.a2neb-backup for models,
 d3d8.dll.a2display-backup for display (stock puts the chain's own d3d8.dll back in
 its slot, so stock is the stock chain, not ours passing through), and so on.  Retired
-layers are in it too, so a stale copy of the per-part plugins render3d replaced, of
-MenuScale.* or of the file-based HUD fixes before hud 2.0.0 is set aside like the rest.
+layers are in it too (hud, menus and grid, whose folders are gone, the per-part plugins
+render3d replaced, MenuScale.*, the file-based HUD fixes of hud 2.x): a stale copy is set
+aside like the rest, shown as a "retired" row in `status`, and an old snapshot restores.
+`refit` does not remove them: it says so and points at retire/retire.sh, which does.
 Movies count only as <Name>.mp4/.wav beside a <Name>.bik; anything with a backup that
 no layer claims is filed under 'other'.
 
@@ -78,8 +80,7 @@ REG = registry.load()
 BACKUPS = registry.backup_suffixes(REG)
 # Backups that exist but are not a visual change -- see "deliberately not switched".
 EXCLUDE = {'ARMADA.PRF', 'RTS_CFG.h'}
-# The menus plugin was MenuScale.asi before menus 2.0.0 (see to_refit's note).
-LEGACY_MENUS = 'MenuScale'
+REG_BY_ID = registry.by_id(REG)
 # (pattern, layer): a literal name, or a glob over one directory's names.
 ADDED = registry.added_patterns(REG)
 LAYERS = [lay['id'] for lay in registry.layers(REG)] + ['other']
@@ -239,6 +240,8 @@ def is_stock(path, e):
     if not os.path.exists(path):
         return False
     bak = os.path.join(GAME, e['backup'])
+    if not os.path.exists(bak):
+        return False   # the backup went (retire/retire.sh drops one beside a stock file)
     return os.path.getsize(path) == os.path.getsize(bak) and sha(path) == sha(bak)
 
 
@@ -333,11 +336,16 @@ def to_refit(dry, force):
         except OSError:
             pass
     print(f'refit: {len(entries)} files restored and verified against the manifest')
-    if any(e['rel'].split('/')[0].startswith(LEGACY_MENUS) for e in entries):
-        print(f'note: this snapshot predates the menus rename and restored {LEGACY_MENUS}.*; '
-              f'run menus/install.sh to replace it with Menus.asi (a Menus.asi beside it '
-              f'stands down rather than hook twice)')
+    old = sorted({e['layer'] for e in entries
+                  if REG_BY_ID.get(e['layer'], {}).get('select') == 'retired'})
+    if old:
+        print(f'note: this snapshot holds files of retired layers ({", ".join(old)}); '
+              f'retire/retire.sh takes them out (./install runs it)')
     status()
+
+
+def label(layer):
+    return layer + (' (retired)' if REG_BY_ID.get(layer, {}).get('select') == 'retired' else '')
 
 
 def report(entries, verb):
@@ -346,7 +354,7 @@ def report(entries, verb):
         by.setdefault(e['layer'], []).append(e)
     for layer in LAYERS:
         if layer in by:
-            print(f'  {verb:<16} {layer:<11} {len(by[layer]):>5} files')
+            print(f'  {verb:<16} {label(layer):<19} {len(by[layer]):>5} files')
 
 
 def status():
@@ -371,8 +379,8 @@ def status():
         for layer in LAYERS:
             if layer in by:
                 parts = ', '.join(f'{n} {s}' for s, n in sorted(by[layer].items()))
-                print(f'  {layer:<11} {parts}')
-    print(f'  {"dxvk":<11} unchanged in both states')
+                print(f'  {label(layer):<19} {parts}')
+    print(f'  {"dxvk":<19} unchanged in both states')
 
 
 def main():

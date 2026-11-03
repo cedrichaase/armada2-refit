@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Build a widescreen, hi-res menu backdrop for Menus.asi: $A2_DATA/backdrops/<name>/wide.bmp.
+# Build a widescreen, hi-res menu backdrop for UI.asi: $A2_DATA/backdrops/<name>/wide.bmp.
 #
-#   menus/backdrop.sh <name> [--blend N] [--reblend] [--force]
-#     <name>      menus/backdrops/<name>.conf -- source=, blend=, seed=, prompt=, negative=,
+#   ui/backdrops/backdrop.sh <name> [--blend N] [--reblend] [--force]
+#     <name>      ui/backdrops/<name>.conf -- source=, blend=, seed=, prompt=, negative=,
 #                 upscaler=pruna|bria (default bria), outpaint=no (centre only),
 #                 field=L,T,R,B (design px: the open art inside a drawn frame),
 #                 clone=W,H,SX,SY,DX,DY[,F] ... (ai/expanded.png px: patch over a
@@ -15,11 +15,11 @@
 #     --reblend   no network: rebuild wide.bmp from the ai/ layers already on disk
 #     --force     pay again for both generative steps
 #
-# The menus are 800x600 GDI screens, drawn by the shell 1:1 into Menus.asi's offscreen
+# The menus are 800x600 GDI screens, drawn by the shell 1:1 into UI.asi's offscreen
 # DC and stretched to the screen height, pillarboxed. So the art cannot be swapped in
-# bitmaps/ -- the shell would still draw 800x600 of it -- and Menus.asi composites this
+# bitmaps/ -- the shell would still draw 800x600 of it -- and UI.asi composites this
 # plate itself: its sides fill the pillarboxes and its centre replaces the stretched
-# stock wherever the shell is still showing the stock background. See menus.c.
+# stock wherever the shell is still showing the stock background. See ui/MENUS.md.
 #
 # Same recipe as models/loading-panel.sh, and the same order for the same reason:
 # upscale the stock art first, then outpaint, then feather the upscale back over the
@@ -31,14 +31,14 @@
 #   wide.bmp         3450x1440, 24-bit: what install.sh copies to Menus/<name>.bmp
 #
 # Geometry. The plate is authored at the screen height it is shown at (1440, the one
-# screen this has been built for) so Menus.asi never resamples it; any other height is
+# screen this has been built for) so UI.asi never resamples it; any other height is
 # stretched once when the backdrop is first shown. The centre 4:3 is H*4/3 wide and
-# Menus.asi assumes it is horizontally centred, so the plate width minus 1920 must be
+# UI.asi assumes it is horizontally centred, so the plate width minus 1920 must be
 # even: 3680x1536 -> 3450x1440 is x0.9375 exactly and puts the centre at 765..2685.
 # 3450/1440 = 2.396:1 covers 21:9 (2.389) with 5px to spare each side.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
-. "$(cd "$here/.." && pwd)/a2env.sh"; GAME="$A2_GAME"
+. "$(cd "$here/../.." && pwd)/a2env.sh"; GAME="$A2_GAME"
 UP=pruna/p-image-upscale@7j4n1pr7
 UPB=bria/increase-resolution@6yjh1gjj
 EX=bria/expand@1d8zqs34
@@ -46,7 +46,7 @@ H=1440 EH=1536 EW=3680 PW=2048
 
 name=${1:-}; [ -n "$name" ] && [ "${name#-}" = "$name" ] || { sed -n '2,38p' "$0" | sed 's/^# \?//'; exit 2; }
 shift
-conf="$here/backdrops/$name.conf"; [ -f "$conf" ] || { echo "no $conf" >&2; exit 1; }
+conf="$here/$name.conf"; [ -f "$conf" ] || { echo "no $conf" >&2; exit 1; }
 BLEND="" REBLEND=0 FORCE=0
 while [ $# -gt 0 ]; do case $1 in
   --blend) BLEND=$2; shift 2;; --reblend) REBLEND=1; shift;; --force) FORCE=1; shift;;
@@ -56,7 +56,7 @@ blend=${BLEND:-$(cfg blend)}; blend=${blend:-35}
 seed=$(cfg seed); seed=${seed:-1}
 # field=: the part of the 800x600 art that is open picture rather than a drawn frame.
 # The outpaint sees only this, and the plate replaces everything outside it -- frame
-# included, which is invisible in game only because Menus.asi shows the plate wherever
+# included, which is invisible in game only because UI.asi shows the plate wherever
 # the shell still draws the stock background. Default: the whole screen.
 IFS=, read -r fL fT fR fB <<<"$(cfg field),"
 fL=${fL:-0} fT=${fT:-0} fR=${fR:-800} fB=${fB:-600}
@@ -104,7 +104,7 @@ magick "$T/lz.png" "$A/up.png" -define compose:args="$blend" -compose blend -com
     "PNG24:$T/plate.png"
 
 # --- 2. outpaint to 2.4:1 ---------------------------------------------------------
-# outpaint=no: the hi-res centre alone, 1920x1440, and Menus.asi keeps the sides black.
+# outpaint=no: the hi-res centre alone, 1920x1440, and UI.asi keeps the sides black.
 # (A screen drawn inside its own black frame wants field= instead -- see singleplay.conf.)
 if [ "$(cfg outpaint)" = no ]; then
   C=$(( H * 4 / 3 ))

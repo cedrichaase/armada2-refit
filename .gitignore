@@ -28,6 +28,7 @@ textures/.scratch/
 textures/targets/*/*/
 cutscenes/movies/*/*/
 menus/backdrops/*/
+ui/backdrops/*/
 
 # platform/ab-shot.sh captures
 platform/ab/

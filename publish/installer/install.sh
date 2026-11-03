@@ -22,8 +22,9 @@
 # nothing and Render3D.asi (the 3D view) and UI.asi (the HUD, the menus and the loading
 # screen) draw the whole frame on Display8's own device, the first that starts of
 # Vulkan, Direct3D 12 and Direct3D 9. Where the chain is left as it is, Display8 stays
-# out, the UI's place is taken by the plugins it supersedes (HUD.asi, Menus.asi,
-# GridLayout.asi) and the 3D view stays the engine's. The models are rewritten from the
+# out, and so do Render3D.asi and UI.asi: the game keeps its own look (HUD.asi, Menus.asi and
+# GridLayout.asi are not in the package any more; copies an earlier version put in are taken
+# out, as retire/known.txt, baked as retire.txt, lists). The models are rewritten from the
 # player's own SOD files with python3. Textures,
 # the menu backdrops and the replacement movies are built from the game's own art, so a
 # release cannot carry them.
@@ -147,11 +148,17 @@ recipes_out() {
         rmdir "$game/$d" 2>/dev/null || true
     done
 }
-# The plugins UI.asi takes the place of (ui/supersede.sh), and Menus.asi's old name.
+# The plugins UI.asi replaced (retire/known.txt), and Menus.asi's old name.
 LEGACY_UI="HUD Menus MenuScale GridLayout"
 legacy_ui_out() {
     local n
     for n in $LEGACY_UI; do rm -f "$game/$n.asi" "$game/$n.ini" "$game/$n.log"; done
+    rm -f "$game/MenuScale"/*.bmp; rmdir "$game/MenuScale" 2>/dev/null || true
+    # The file-based HUD fixes of hud 2.x, if an earlier repository install left them: put
+    # back from their backups (retire/hud-files.py; nothing to do without any).
+    if [ -n "${PY:-}" ] && [ -f "$here/retire/hud-files.py" ]; then
+        "$PY" "$here/retire/hud-files.py" "$game" 2>&1 | sed 's/^/  /' || true
+    fi
 }
 
 is_proxy() { grep -q 'BinkProxy' "$1" 2>/dev/null; }
@@ -739,12 +746,9 @@ elif [ "$d3d9" = 1 ]; then
     legacy_ui_out   # UI.asi takes their place; each would stand down against the other
     put ui UI.asi; put ui UI.ini
 else
-    # The UI cannot draw: the plugins it supersedes keep the HUD and menus widescreen.
-    layer_out UI MenuScale
-    echo "  UI.asi skipped: it needs crosire's d3d8to9 as d3d8.dll -- the older plugins instead:"
-    put legacy HUD.asi; put legacy HUD.ini
-    put legacy Menus.asi; put legacy Menus.ini
-    put legacy GridLayout.asi; put legacy GridLayout.ini
+    # The UI cannot draw, and there is no older plugin to fall back on: the game keeps its own.
+    layer_out UI; legacy_ui_out
+    echo "  UI.asi skipped: it needs crosire's d3d8to9 as d3d8.dll -- the HUD and menus stay the engine's"
 fi
 step qol "quality of life"
 if skipped qol; then layer_out QOL; echo "  quality of life left out (you chose to)"

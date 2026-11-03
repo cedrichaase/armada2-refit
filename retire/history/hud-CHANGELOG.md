@@ -1,9 +1,22 @@
-# Changelog — hud
+# Changelog — hud (retired; history kept here, the folder is gone)
 
 The in-game HUD: its layout canvas, its font and its cursors — `HUD.asi` since 2.0.0,
 before that `ui-widescreen.py`, `cursor-aspect.py` and (as the separate `font` layer)
-`ui-font-condense.py`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
-versions". Newest first. The derivations are in [`README.md`](README.md).
+`ui-font-condense.py`. Versioning rules: [`CLAUDE.md`](../../CLAUDE.md), "Changelogs and
+versions". Newest first. The derivations are in the layer's README, removed with it (what it established lives in `ui/HUD.md`, `ui/MENUS.md` and `display/README.md`).
+
+## 3.0.0 — 2026-11-03
+
+### Removed
+- The layer: `HUD.asi`, `HUD.ini`, `build.sh` and `install.sh`, and the three file-based
+  fixes' scripts (`ui-widescreen.py`, `ui-font-condense.py`, `cursor-aspect.py`) with
+  `revert-files.sh`. `UI.asi`'s HUD panels (`ui/HUD.md`) replaced them. Nothing installs
+  any of it; `retire/retire.sh` takes `HUD.asi` out of an old install and
+  `retire/hud-files.py` puts `misc/gui_*.cfg`, the cursors and the font atlases and metrics
+  back to stock from their `.a2neb-backup` and `.a2font-backup`. The layer stays a retired
+  row in `layers.toml` so `a2mod` still files and restores an old snapshot.
+
+Installed, not yet seen in game.
 
 ## 2.2.3 — 2026-10-21
 

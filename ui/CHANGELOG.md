@@ -4,6 +4,21 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 2.1.0 — 2026-11-03
+
+### Added
+- `ui/backdrops/`: the menu backdrop pipeline moved here from `menus/` (`backdrop.sh`,
+  the `*.conf` recipes, `BACKDROPS.md`, `install-plates.sh`, which `./install` runs and
+  `a2mod` files under this layer as `Menus/*.bmp`). The plates and the recipes are
+  unchanged.
+
+### Changed
+- `install.sh` no longer runs `supersede.sh`, which is gone: `retire/retire.sh` takes
+  `HUD.asi`, `GridLayout.asi` and `Menus.asi` out (`./install` runs it first).
+  `bench-asi.sh` calls it on a bench clone; `bench-legacy.sh` stops with a message (the plugins it built are gone; the bench takes them from a cached tag build).
+
+Installed, not yet seen in game.
+
 ## 1.1.1 — 2026-11-03
 
 ### Changed

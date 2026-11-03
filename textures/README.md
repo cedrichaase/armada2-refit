@@ -100,8 +100,8 @@ needs editing — `target.conf` already carries the right flags for every nebula
 | `mips` | number of hand-authored mip levels the stock texture has, or `auto` to take the depth per texture from stock. The build emits the whole chain, each level exactly half the previous, spelled as stock spells it (`mip_name()`). **Required** for any texture with a chain — `install` refuses the base otherwise |
 | `alphafilter` | the resize filter for the alpha plate (default `Lanczos`). `Mitchell` where Lanczos ringing on a sparse mask drifts the alpha mean — `fedpod10` is the case (`FedSmall`, `BorgPlain`, `XenoLit64`) |
 | `fit` | `match` (default) matches each channel to its stock file; `none` resizes only, for tiles that are a third of a wider picture rather than their namesake (`LOADING`) |
-| `panel` | the width, in model units, of the widened loading-screen model this art is cut for; `a2tex install` writes `SOD/logo.SOD` to match (`LOADING` only) |
-| `upscaler` | which paid upscaler `models/loading-panel.sh` uses (`bria`, or `pruna` for the project default) |
+| `panel` | retired with the `LOADING` target (textures 2.2.0): the width of the widened loading-screen model the art was cut for |
+| `upscaler` | retired with `models/loading-panel.sh` (textures 2.2.0): which paid upscaler the loading panel used |
 | `keepcolour` | puff only: skip the greyscale conversion. `Mnebula2` is the one stock puff with its own colour |
 | `fill` | puff only: percent of the quadrant the subject occupies (default 92) |
 | `sheet` | `GxP`: pack the units into GxG contact sheets with a P-pixel gutter and upscale the sheet, then slice back. A quality setting before a cost one — the app's `megapixels` is an integer, so a lone 64px icon gets a 16x lift at the 1MP floor where a 512px sheet of 49 gets 4x |
@@ -135,7 +135,7 @@ install), and `INVENTORY.md` for what is done, what could be and what should not
 | UI | icons 64→256 via contact sheets, panels at 256. `UImid` is `install=no` — see the crash section |
 | hulls and stations | every faction, at 1024 with rebuilt chains; hull alpha goes through the upscaler (`alpha=ai`) at `blend=70`, not the usual 35 — the Sovereign section has why |
 | weapons, effects, props, map features | the final run; see `INVENTORY.md` for what was left and why |
-| loading screen | `LOADING`, shipped with `SOD/logo.SOD` (the `models` layer) |
+| loading screen | `LOADING` and `SOD/logo.SOD`: retired in textures 2.2.0 (`retire/` restores an old install) |
 
 Four things cost a crash, a freeze or a visible artifact, and each one is written up
 below rather than only fixed: **a UI sprite over 256x256 crashes the game**, **doubling
@@ -1693,6 +1693,10 @@ alpha a flat 255). The camera fits that to the screen **height**: at 3440x1440 i
 x 646..2792, measured off `$A2_DATA/promo/before.mp4`, and the MBG02 skybox shows either side.
 Because it is a model texture, hard rule 4's 256 ceiling does not apply; the tiles go
 to 1024.
+
+**Retired in textures 2.2.0 / models 5.1.0: the `LOADING` target, `logo-sod.py` and
+`loading-panel.sh` are gone (the UI draws the loading screen; `retire/retire.sh` restores an
+old install). What follows is the record of what they did and measured.**
 
 Widening is a geometry change **and** new art, never one alone. `models/logo-sod.py`
 scales the quads' x coordinates to `panel=` units in `textures/targets/LOADING/target.conf`

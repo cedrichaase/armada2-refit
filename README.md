@@ -27,12 +27,12 @@ a time, and every fix can be undone.
 
 | | |
 |---|---|
-| **Stretch-free HUD** | `HUD.asi` lays out the in-game HUD, font and cursors correctly at any aspect ratio (16:9, 21:9, 32:9), from the display mode the game actually sets |
-| **Full-screen menus** | `Menus.asi` scales the 800x600 shell menus to fill the screen and draws them inside the game window, with optional widescreen backdrops (black sides without them) |
+| **Stretch-free HUD** | `UI.asi` draws the in-game HUD, its font and the cursors correctly at any aspect ratio (16:9, 21:9, 32:9), from the display mode the game actually sets ([`ui/HUD.md`](ui/HUD.md)) |
+| **Full-screen menus** | `UI.asi` hosts the shell menus and draws them at any size inside the game window, with optional widescreen backdrops (black sides without them; [`ui/MENUS.md`](ui/MENUS.md)) |
 | **Our own 3D renderer** | `Render3D.asi` takes over the 3D view and draws it into a half-float, multisampled target, bloomed by energy and tone-mapped into the back buffer, with modules of its own for every category: ships and stations lit per pixel by a warm key, a dim blue fill and a faint sky light, with shadows and light from nebulae, planets, explosions and weapons; each map's sky computed in a shader from a recipe, with no cube seams; planets and the dilithium moon made from recipes (relief, craters, oceans, ice, clouds, a night side); every nebula as a cloud of gas you can fly through; fireballs and shockwaves, shield hits, repair welding, venting plasma, the warp flash and the special weapons drawn by shaders; and the fog of war and the shroud with smooth edges. It replaces the earlier per-part plugins (MSAA, lighting, sky, nebulae, surfaces, explosions, shields, repair, venting, specials, fog, planets). Needs crosire's d3d8to9 (which `./install` sets up); without it the engine draws the 3D view. Built from the repository; not in the release zip yet ([`render3d/README.md`](render3d/README.md)) |
 | **Renderer tuning** | anisotropic filtering, LOD bias and seamless cube maps through `dxvk.conf` |
 | **Quality of life, stock-compatible** | `QOL.asi`: faster right-drag panning, `Shift+number` adds to a control group, selections and groups beyond 16 ships (40 by default), stations in control groups with one build menu for several, and long moves on the map going to warp as minimap moves do. Everything stays on your machine, so you can still play against unmodded players |
-| **Grid hotkeys** | `GridLayout.asi` lays the button bar out as a 5x3 grid with one key per cell by keyboard position (`QWERT`/`ASDFG`/`ZXCVB`), labelled on the buttons and placed between the minimap and the info panel on wide screens |
+| **Grid hotkeys** | `UI.asi`'s button bar lays the bar out as a 5x3 grid with one key per cell by keyboard position (`QWERT`/`ASDFG`/`ZXCVB`), labelled on the buttons and placed between the minimap and the info panel on wide screens |
 | **Smoother geometry** | the dilithium moons and the asteroids are smoothed, and the selection bubble is round instead of a visible polygon (SOD rewrites from your own stock files, `models/install.sh`) |
 | **Texture replacement** | `./a2tex`, a pipeline for replacement textures, whether upscaled, generated or drawn by hand. It checks each one against the engine's format rules (bit depth, mip chains, size limits), installs it with a backup, and packs a set so others can install it. There are 84 recipes so far: skyboxes, nebulae, planets, UI and ship hulls |
 | **Video replacement** | a replacement `binkw32.dll` that plays the launch reels full screen and plays AV1 replacements in place of the original Bink movies, plus a pipeline to build them |
@@ -135,8 +135,8 @@ together what helps with an issue.
 
 **Which files are ours:** everything in the release zip's `game/` folder that ends in
 `.asi`, and `binkw32.dll` (the cutscene player), which is today `Render3D.asi`,
-`UI.asi`, `QOL.asi`, `QOLRules.asi`, `Online.asi`, `HUD.asi`, `Menus.asi`,
-`GridLayout.asi`; the zip's `display/d3d8.dll` (Display8, the game's Direct3D 8 of
+`UI.asi`, `QOL.asi`, `QOLRules.asi`, `Online.asi` (and, from earlier versions, `HUD.asi`, `Menus.asi`,
+`GridLayout.asi`, which the installers take out); the zip's `display/d3d8.dll` (Display8, the game's Direct3D 8 of
 ours, which the installers put in front of d3d8to9); and the installer itself
 (`armada2-refit-installer-windows.exe`).
 The others are third-party and unmodified: `winmm.dll` (the Ultimate ASI Loader),
@@ -171,8 +171,8 @@ The layers are grouped from "copy a file, works anywhere" to "needs a specific s
 **Building.** The plugins are 32-bit Windows DLLs, built with `clang` + `lld-link` +
 `llvm-dlltool` by each folder's `build.sh`, which writes to `<folder>/build/`.
 **Prebuilt**, the zip on each
-[release](https://github.com/cedrichaase/armada2-refit/releases) has `HUD.asi`,
-`Menus.asi`, `QOL.asi`, `Online.asi` and the Bink proxy with their `.ini` files and `dxvk.conf` (`GridLayout.asi` and `Render3D.asi` are built from the repository). It also has installers that do this
+[release](https://github.com/cedrichaase/armada2-refit/releases) has `UI.asi`,
+`Render3D.asi`, `QOL.asi`, `Online.asi` and the Bink proxy with their `.ini` files and `dxvk.conf`. It also has installers that do this
 section for you: `install.sh` on Linux and macOS, `install.bat` on Windows (`README.txt`
 in the zip), and the graphical installers for all three, which leave the Bink proxy out
 for now. `publish/package.sh` builds the same zip locally.
@@ -189,10 +189,7 @@ loads and nothing reports an error. On Windows no override is needed.
 
 | Layer | Copy | Notes |
 |---|---|---|
-| HUD | `hud/build/HUD.asi`, `hud/HUD.ini` | Don't also run `hud/ui-widescreen.py`, `ui-font-condense.py` or `cursor-aspect.py`; they are its file-based predecessors. Handles both cursor paths: D3D8's hardware cursor and the sprite path DXVK takes |
 | Quality of life | `qol/build/QOL.asi`, `qol/QOL.ini` | Right-drag pan speed (`PanSpeed=`, default 2.5x), `Shift+number` adds to a group (`ShiftAddsToGroup=`), selections beyond 16 (`MaxSelection=`, default 40), stations in control groups (`StationGroups=`), long map moves at warp (`WarpDistance=`, default 1100). Leave `RTS_CFG.h` stock: network games compare it, and the plugin scales the value in memory ([`qol/README.md`](qol/README.md)) |
-| Grid hotkeys | `grid/build/GridLayout.asi`, `grid/GridLayout.ini` | The button bar as a 5x3 grid, one key per cell by position (`QWERT`/`ASDFG`/`ZXCVB`; T cancel, G back). Replaces the bar's stock keys; delete the `.asi` to get them back ([`grid/README.md`](grid/README.md)) |
-| Menus | `menus/build/Menus.asi`, `menus/Menus.ini` | GDI only, so the renderer doesn't matter. Delete any old `MenuScale.asi`. Without backdrop plates it draws black sides |
 | Cutscenes (launch reels) | `cutscenes/binkproxy/build/binkw32.dll`, `BinkProxy.ini` | First rename the stock `binkw32.dll` to `binkw32_orig.dll`, because the proxy forwards to it. With no `.mp4` beside a `.bik` it only scales the launch reels to full screen. Replacement movies are AV1 through Media Foundation: under Proton that works (GStreamer + dav1d), and on Windows it presumably needs the AV1 Video Extension |
 
 Uninstall by deleting the files you copied (plus the `.log` each one writes), and for
@@ -226,10 +223,8 @@ The mod is a stack of independent layers, each in its own folder with its own RE
 
 | Folder | Layer | What it changes |
 |---|---|---|
-| [`hud/`](hud/README.md) | hud | `HUD.asi`: the in-game HUD layout, font and cursors undistorted at any aspect, at run time |
-| [`menus/`](menus/README.md) | menus | `Menus.asi`: the 800x600 shell menus scaled to fill the screen, embedded in the game window, with outpainted backdrops ([`BACKDROPS.md`](menus/BACKDROPS.md) builds them) |
+| [`retire/`](retire/README.md) | (root) | `retire.sh`: takes out of a game what earlier versions installed and nothing installs now (`HUD.asi`, `GridLayout.asi`, `Menus.asi`, the per-part plugins, the file-based HUD fixes, the vkBasalt bloom) |
 | [`qol/`](qol/README.md) | qol | `QOL.asi`: gameplay quality of life that stays compatible with stock players (right-drag pan speed, `Shift+number` adds to a group, selections and groups beyond 16, stations in groups with one build menu, long moves at warp), and the plan for the rest |
-| [`grid/`](grid/README.md) | grid | `GridLayout.asi`: the button bar as a fixed 5x3 grid with one key per cell, by keyboard position, labelled on the buttons |
 | [`render3d/`](render3d/README.md) | render3d | `Render3D.asi`: the 3D view through a renderer of our own, in Rust. Half-float multisampled target with bloom by energy, and modules for hulls (scene lights, shadows), sky, particles, ordnance, effects (explosions, shields, repair, venting, warp), planets, moons, asteroids and nebulae, and fog and selection. Replaced the per-part plugins |
 | [`renderer/`](renderer/README.md) | renderer | `dxvk.conf`: anisotropic filtering, LOD bias, seamless cube maps |
 | [`textures/`](textures/README.md) | textures | the texture pipeline, `./a2tex`: 84 targets (skyboxes, nebulae, planets, UI, hulls), each a recipe for one set of replacement textures |
@@ -254,8 +249,8 @@ nothing:
     ./a2test ...                            the game headless, for testing (testbench/)
     ./a2env.sh                              print where the game, prefix, Proton and assets are
 
-Each layer installs and removes itself with its own script: `install.sh` in `hud/`,
-`menus/`, `qol/`, `grid/`, `models/`, `render3d/` and `cutscenes/binkproxy/`, `a2tex install`/`revert` for textures, or
+Each layer installs and removes itself with its own script: `install.sh` in `ui/`,
+`qol/`, `models/`, `render3d/` and `cutscenes/binkproxy/`, `a2tex install`/`revert` for textures, or
 a `--revert` flag on the Python tools. The layer's README has the details.
 
 ## Versions

@@ -71,11 +71,6 @@ select = 'on'
 requires = []
 
 [[layer]]
-id = 'old'
-select = 'legacy'
-requires = []
-
-[[layer]]
 id = 'gone'
 select = 'retired'
 requires = []
@@ -101,7 +96,6 @@ check(refused(toy, only=['app'], without=['lib']) == 'app requires lib, which --
       '--only app --without lib: a conflict, refused')
 check(refused(toy, without=['base']) == 'base: a core layer, always installed',
       '--without a core layer: refused')
-check(refused(toy, only=['old']) == 'old: a legacy layer, not offered', '--only a legacy layer: refused')
 check(refused(toy, only=['gone']) == 'gone: a retired layer, not offered', '--only a retired layer: refused')
 check((refused(toy, only=['nope']) or '').startswith('nope: no such layer'), '--only an unknown id: refused')
 check(L.resolve(toy, without=['app']) == ['base', 'twin', 'tool'], '--without app (and so no conflict)')
@@ -136,7 +130,7 @@ for rel, suffix, want in [('Textures/RGB/mnebula4.TGA', L.BACKUP, 'textures'),
                           ('d3d8.dll', '.a2display-backup', 'display'),
                           ('Sprites/cursor.spr', L.BACKUP, None),
                           ('QOLRules.ini', None, 'rules'), ('QOL.ini', None, 'qol'),
-                          ('Online.asi', None, 'online'), ('menus/x.bmp', None, 'menus'),
+                          ('Online.asi', None, 'online'), ('menus/x.bmp', None, 'ui'), ('Menus.asi', None, 'menus'),
                           ('MenuScale/x.bmp', None, 'menuscale'), ('Lighting.asi', None, 'parts'),
                           ('animations/Intro.mp4', None, 'cutscenes'), ('Render3D.log', None, None)]:
     got = L.classify(reg, rel, suffix)

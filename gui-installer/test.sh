@@ -44,7 +44,7 @@ echo BinkProxy > "$G/binkw32.dll"; echo x > "$G/BinkProxy.ini"
 
 echo "== install from the package, with Heroic's launch variables"
 "${run[@]}" --package "$zip" --game "$G" > "$T/out" 2> "$T/err"
-check '[ -e "$G/HUD.asi" ] && [ -e "$G/QOL.asi" ] && [ -e "$G/QOLRules.asi" ] && [ -e "$G/Online.asi" ] && [ -e "$G/winmm.dll" ]'
+check '[ ! -e "$G/HUD.asi" ] && [ -e "$G/QOL.asi" ] && [ -e "$G/QOLRules.asi" ] && [ -e "$G/Online.asi" ] && [ -e "$G/winmm.dll" ]'
 check 'grep -q "Installing online play" "$T/err"'
 check '[ "$(cat "$G/binkw32.dll")" = stockbink ] && [ ! -e "$G/binkw32_orig.dll" ] && [ ! -e "$G/BinkProxy.ini" ]'
 check 'grep -q "Skipping the cutscene player" "$T/err" && grep -q "Installing the HUD" "$T/err"'
@@ -216,7 +216,7 @@ check '[ ! -e "$N/d3d8.dll" ] && [ ! -e "$N/d3d8_real.dll" ] && [ ! -e "$N/Displ
 
 echo "== uninstall: the game and Heroic as they were"
 "${run[@]}" --uninstall --game "$G" > "$T/out" 2> "$T/err"
-check '[ ! -e "$G/HUD.asi" ] && [ ! -e "$G/winmm.dll" ] && [ ! -e "$G/armada2-refit-installed.json" ]'
+check '[ ! -e "$G/QOL.asi" ] && [ ! -e "$G/winmm.dll" ] && [ ! -e "$G/armada2-refit-installed.json" ]'
 check '[ ! -e "$G/Online.asi" ] && [ ! -e "$G/QOL.asi" ]'
 check '[ "$(cat "$G/binkw32.dll")" = stockbink ]'
 check 'cmp -s "$T/RefitPlayer.ref" "$G/RefitPlayer.ini"'   # uninstall leaves it

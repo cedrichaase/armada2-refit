@@ -26,7 +26,7 @@ aspect, any size, extensible by code. What the game's art is kept for is what ca
 | Build and special-weapon icons (the square button art) | they identify a unit or a weapon; 64 px art, drawn inside our buttons, never stretched past 2x. The **command** icons are ours (below, "Icons") |
 | Race emblems (the Federation delta, the Klingon trefoil, ...) | identity; drawn as images inside our frames |
 | Cursor shapes (`cursor.spr`) | the cursor's shape says which order a click gives (`README.md`, "The cursor"); `src/cursor.rs` draws the engine's art sharp |
-| The menu plates (`Menus/mainbkgr.bmp`, built by `menus/backdrop.sh`) | the front end's backdrop (below) |
+| The menu plates (`Menus/mainbkgr.bmp`, built by `ui/backdrops/backdrop.sh`) | the front end's backdrop (below) |
 
 Not kept: the panel sheets, the GDI button and frame bitmaps, the bitmap font (the
 UI's text is Noto Sans Condensed, `README.md`, "Text").
@@ -168,8 +168,8 @@ Each is one function in `theme.rs`, given its rectangle and a `State` (hover eas
 ## Screens
 
 - **The menu backdrop.** A screen of ours in the front end draws `theme::backdrop`:
-  the widescreen menu plate the menus layer builds (`menus/BACKDROPS.md`, which moves under `ui/backdrops/` with the scripts), read at run
-  time from the game's `Menus/mainbkgr.bmp`, where `menus/install-plates.sh` installs
+  the widescreen menu plate (`ui/backdrops/BACKDROPS.md`), read at run
+  time from the game's `Menus/mainbkgr.bmp`, where `ui/backdrops/install-plates.sh` installs
   it, scaled to cover the screen and darkened toward the bottom (the panels sit
   there). It is an asset in `$A2_DATA`, never in the repository; **without it** (no
   plate built) the screen is a dark blue gradient with a fixed field of faint stars,

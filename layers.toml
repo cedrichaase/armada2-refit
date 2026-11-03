@@ -18,9 +18,9 @@
 #   select          core     always installed, not offered (platform, display, renderer)
 #                   on       offered, on by default
 #                   off      offered, off by default
-#                   legacy   installed only by the release's d3d9-less fallback
 #                   retired  never installed; only recognised (a2mod files a stale copy
-#                            under it, and the installers take it out)
+#                            under it, and retire/retire.sh and the installers take it
+#                            out). dir = 'retire' for the layers whose folder is gone
 #   requires        ids this layer needs; ./install --only adds them, --without refuses
 #                   to take one out from under a layer that needs it
 #   scope           local    stays on this player's machine
@@ -192,15 +192,15 @@ games = ['armada2']
 steps = ['render3d']
 summary = 'the 3D view through a renderer of our own: HDR, anti-aliasing, bloom, lit hulls with shadows, skies, effects, planets and nebulae'
 
-# The menu backdrop plates are built by menus/backdrop.sh and filed under menus (a2mod),
-# but go in with the UI, which draws them behind the main menu.
+# The menu backdrop plates are built by ui/backdrops/backdrop.sh, go in with the UI, which
+# draws them behind the main menu, and are filed under it (a2mod).
 [[layer]]
 id = 'ui'
 name = 'HUD and menus'
 dir = 'ui'
-install = ['menus/install-plates.sh', 'ui/install.sh']
-remove = ['ui/install.sh --remove', 'menus/install-plates.sh --remove']
-files = ['UI.asi', 'UI.ini']
+install = ['ui/backdrops/install-plates.sh', 'ui/install.sh']
+remove = ['ui/install.sh --remove', 'ui/backdrops/install-plates.sh --remove']
+files = ['UI.asi', 'UI.ini', 'Menus/*.bmp']
 select = 'on'
 requires = ['display']
 scope = 'local'
@@ -208,62 +208,57 @@ games = ['armada2']
 steps = ['ui']
 summary = 'the HUD, the menus, the loading screen and the cursor redrawn at any aspect ratio'
 
-# ---------------------------------------------------------------- legacy: what the release
-# installs in the UI's place where Display8 has no Direct3D 9 behind it
+# ---------------------------------------------------------------- retired: recognised only
 
+# HUD.asi, GridLayout.asi and Menus.asi, which UI.asi's parts replaced; their folders are
+# gone (hud 3.0.0, grid 2.0.0, menus 5.0.0; their changelogs are in retire/history/).
+# retire/retire.sh takes them out, and puts the file-based HUD fixes of hud 2.x back from
+# their backups (hud-files.py); a2mod still files them, so an old snapshot restores.
 [[layer]]
 id = 'hud'
-name = 'HUD (legacy)'
-dir = 'hud'
-install = 'hud/install.sh'
-remove = 'hud/install.sh --remove'
+name = 'HUD (retired)'
+dir = 'retire'
 files = ['HUD.asi', 'HUD.ini']
-# Before hud 2.0.0: the file-based fixes (ui-widescreen, ui-font-condense, cursor-aspect).
+# Before hud 2.0.0 the file-based fixes (ui-widescreen, ui-font-condense, cursor-aspect).
 replaces = ['misc/*', 'Textures/RGB/Curs_*']
 backups = ['.a2font-backup']
-select = 'legacy'
+select = 'retired'
 requires = []
 scope = 'local'
 games = ['armada2']
-steps = ['ui']
-summary = 'in-game HUD, font and cursors at any aspect'
+steps = []
+summary = 'the in-game HUD plugin and the file-based HUD fixes, before UI.asi'
 
 [[layer]]
 id = 'menus'
-name = 'Menus (legacy)'
-dir = 'menus'
-install = 'menus/install.sh'
-remove = 'menus/install.sh --remove'
-files = ['Menus.asi', 'Menus.ini', 'Menus/*.bmp']
-select = 'legacy'
+name = 'Menus (retired)'
+dir = 'retire'
+files = ['Menus.asi', 'Menus.ini']
+select = 'retired'
 requires = []
 scope = 'local'
 games = ['armada2']
-steps = ['ui']
-summary = 'the shell menus scaled to fill the screen'
+steps = []
+summary = 'the shell menus plugin, before UI.asi hosted them'
 
 [[layer]]
 id = 'grid'
-name = 'Grid keys (legacy)'
-dir = 'grid'
-install = 'grid/install.sh'
-remove = 'grid/install.sh --remove'
+name = 'Grid keys (retired)'
+dir = 'retire'
 files = ['GridLayout.asi', 'GridLayout.ini']
-select = 'legacy'
+select = 'retired'
 requires = []
 scope = 'local'
 games = ['armada2']
-steps = ['ui']
-summary = 'the button bar as a 5x3 grid of position keys'
-
-# ---------------------------------------------------------------- retired: recognised only
+steps = []
+summary = 'the button bar as a 5x3 grid of position keys, before UI.asi'
 
 # The per-part plugins render3d replaced (render3d 0.2.0; Planets in models 5.0.0), and
-# Sky.asi's recipes. render3d/install.sh and the release scripts take them out.
+# Sky.asi's recipes. retire/retire.sh and the release scripts take them out.
 [[layer]]
 id = 'parts'
 name = 'Per-part plugins (retired)'
-dir = 'render3d'
+dir = 'retire'
 files = ['MSAA.asi', 'MSAA.ini', 'Lighting.asi', 'Lighting.ini', 'Sky.asi', 'Sky.ini',
          'Nebulae.asi', 'Nebulae.ini', 'Surfaces.asi', 'Surfaces.ini',
          'Explosions.asi', 'Explosions.ini', 'Shields.asi', 'Shields.ini',
@@ -277,12 +272,11 @@ games = ['armada2']
 steps = []
 summary = 'the plugins that drew parts of the 3D view one at a time, before Render3D.asi'
 
-# Menus.asi before menus 2.0.0. menus/install.sh, ui/supersede.sh and the release scripts
-# take it out.
+# Menus.asi before menus 2.0.0. retire/retire.sh and the release scripts take it out.
 [[layer]]
 id = 'menuscale'
 name = 'MenuScale (retired)'
-dir = 'menus'
+dir = 'retire'
 files = ['MenuScale.asi', 'MenuScale.ini', 'MenuScale/*.bmp']
 select = 'retired'
 requires = []
@@ -291,12 +285,12 @@ games = ['armada2']
 steps = []
 summary = 'the menus plugin before it was Menus.asi'
 
-# The vkBasalt bloom before 13.0.0, outside the game directory: ./install and the
+# The vkBasalt bloom before 13.0.0, outside the game directory: retire/retire.sh and the
 # release scripts (step bloom) take it out.
 [[layer]]
 id = 'vkbasalt'
 name = 'vkBasalt bloom (retired)'
-dir = 'renderer'
+dir = 'retire'
 files = []
 select = 'retired'
 requires = []

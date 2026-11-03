@@ -48,6 +48,13 @@ cp "$G/RefitPlayer.ini" "$T/RefitPlayer.ref"
 # What earlier packages and installs left: the per-part plugins Render3D.asi replaced.
 for n in MSAA Planets Lighting Sky Fog Specials; do echo old > "$G/$n.asi"; echo old > "$G/$n.ini"; done
 mkdir -p "$G/Sky"; echo old > "$G/Sky/mbgaqu.ini"; echo "[Sky]" > "$G/Sky/myown.ini"
+# ...and the legacy plugins UI.asi replaced, with the file-based HUD fixes' backups: taken
+# out, and the stock files put back (retire/hud-files.py).
+for n in HUD Menus GridLayout MenuScale; do echo old > "$G/$n.asi"; echo old > "$G/$n.ini"; done
+mkdir -p "$G/misc" "$G/Sprites" "$G/Textures/RGB"
+echo stock-cfg > "$G/misc/gui_fed.cfg.a2neb-backup"; echo wide-cfg > "$G/misc/gui_fed.cfg"
+echo stock-spr > "$G/Sprites/FontFinal4_12.spr.a2font-backup"; echo cond-spr > "$G/Sprites/FontFinal4_12.spr"
+echo stock-tga > "$G/Textures/RGB/FontFinal4_12.tga.a2font-backup"; echo cond-tga > "$G/Textures/RGB/FontFinal4_12.tga"
 mkdir -p "$B/Shaders"; printf '# written by armada2-refit install.sh\nbloom = "%s/A2Bloom.fx"\n' "$B" > "$B/vkBasalt.conf"
 
 echo "== install on a GOG game: prerequisites, no DXVK, the old plugins and the old bloom out"
@@ -59,9 +66,13 @@ check '[ -z "$(ls "$G" | grep -E "^(MSAA|Planets|Lighting|Sky|Fog|Specials)\.(as
 check '[ "$(ls "$G/Sky")" = myown.ini ]'
 check '[ -e "$G/QOL.asi" ] && [ -e "$G/QOL.ini" ]'
 check '[ -e "$G/Online.asi" ] && [ -e "$G/Online.ini" ]'
-# The chain was left as it is: no Render3D.asi or UI.asi, the older plugins in the UI's place.
+# The chain was left as it is: no Render3D.asi or UI.asi, and the legacy plugins are gone,
+# not put in: the game keeps its own HUD and menus.
 check '[ ! -e "$G/Render3D.asi" ] && [ ! -e "$G/UI.asi" ] && [ ! -e "$G/Surfaces" ] && grep -q "Render3D.asi skipped" "$T/out"'
-check '[ -e "$G/HUD.asi" ] && [ -e "$G/Menus.asi" ] && [ -e "$G/GridLayout.asi" ] && [ -e "$G/GridLayout.ini" ]'
+check '[ -z "$(ls "$G" | grep -E "^(HUD|Menus|MenuScale|GridLayout)\.(asi|ini)$")" ]'
+check '[ "$(cat "$G/misc/gui_fed.cfg")" = stock-cfg ] && [ ! -e "$G/misc/gui_fed.cfg.a2neb-backup" ]'
+check '[ "$(cat "$G/Sprites/FontFinal4_12.spr")" = stock-spr ] && [ "$(cat "$G/Textures/RGB/FontFinal4_12.tga")" = stock-tga ]'
+check '[ ! -e "$G/Sprites/FontFinal4_12.spr.a2font-backup" ] && [ ! -e "$G/Textures/RGB/FontFinal4_12.tga.a2font-backup" ]'
 # ...and Display8 too, which goes in front of d3d8to9 only.
 check 'grep -q "Display8 skipped" "$T/out" && [ ! -e "$G/d3d8_real.dll" ] && [ ! -e "$G/Display8.ini" ]'
 check '[ ! -e "$B" ] && grep -q "removed the old bloom" "$T/out"'
@@ -204,23 +215,23 @@ check 'grep -q "^installing into $G\$" "$T/out"'
 rm -rf "$G/pkg"
 
 echo "== a damaged package is refused, each file named, with ::error lines for the GUI"
-cp -R "$P" "$T/damaged"; echo x >> "$T/damaged/layers/legacy/HUD.ini"
+cp -R "$P" "$T/damaged"; echo x >> "$T/damaged/layers/ui/UI.ini"
 check '! A2_PROGRESS=1 "$T/damaged/install.sh" "$G" > "$T/out" 2> "$T/err"'
-check 'grep -qx "::error damaged layers/legacy/HUD.ini" "$T/out" && grep -q "^the package is damaged: layers/legacy/HUD.ini does not match" "$T/err"'
+check 'grep -qx "::error damaged layers/ui/UI.ini" "$T/out" && grep -q "^the package is damaged: layers/ui/UI.ini does not match" "$T/err"'
 check '! "$T/damaged/install.sh" "$G" > "$T/out" 2> "$T/err" && ! grep -q "^::error" "$T/out"'
 
 echo "== files an antivirus took or locked: all of them named, as an antivirus"
 rm -f "$T/damaged/layers/qol/QOL.asi" "$T/damaged/layers/online/Online.asi"
 check '! A2_PROGRESS=1 "$T/damaged/install.sh" "$G" > "$T/out" 2> "$T/err"'
 check 'grep -qx "::error av-missing layers/qol/QOL.asi" "$T/out" && grep -qx "::error av-missing layers/online/Online.asi" "$T/out"'
-check 'grep -qx "::error damaged layers/legacy/HUD.ini" "$T/out" && [ "$(grep "^::error" "$T/out" | tail -1)" = "::error av-missing layers/qol/QOL.asi" ]'
+check 'grep -qx "::error damaged layers/ui/UI.ini" "$T/out" && [ "$(grep "^::error" "$T/out" | tail -1)" = "::error av-missing layers/qol/QOL.asi" ]'
 check 'grep -q "layers/online/Online.asi, layers/qol/QOL.asi from the package are missing. An antivirus" "$T/err" && grep -q "add exclusions for $T/damaged and $G" "$T/err"'
-chmod 000 "$T/damaged/layers/legacy/Menus.asi"
-if [ ! -r "$T/damaged/layers/legacy/Menus.asi" ]; then   # not as root
+chmod 000 "$T/damaged/layers/ui/UI.asi"
+if [ ! -r "$T/damaged/layers/ui/UI.asi" ]; then   # not as root
     check '! A2_PROGRESS=1 "$T/damaged/install.sh" "$G" > "$T/out" 2> "$T/err"'
-    check '[ "$(grep "^::error" "$T/out" | tail -1)" = "::error av-locked layers/legacy/Menus.asi" ] && grep -q "are missing or could not be read" "$T/err"'
+    check '[ "$(grep "^::error" "$T/out" | tail -1)" = "::error av-locked layers/ui/UI.asi" ] && grep -q "are missing or could not be read" "$T/err"'
 fi
-chmod 644 "$T/damaged/layers/legacy/Menus.asi"
+chmod 644 "$T/damaged/layers/ui/UI.asi"
 rm -rf "$T/damaged"
 
 echo "== a file the game folder refuses is named"

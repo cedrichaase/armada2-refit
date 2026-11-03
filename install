@@ -20,12 +20,12 @@
 # (online/install.sh), the textures and the loading-screen model built in $A2_DATA
 # (./a2tex install), the smoothed moons, asteroids, hulls and selection ring
 # (models/install.sh), the cutscene proxy and its movies (cutscenes/binkproxy/install.sh),
-# Render3D.asi (render3d/install.sh, which also takes out the per-part plugins it
-# replaced), and the menu backdrop plates and UI.asi (menus/install-plates.sh,
-# ui/install.sh, which takes out HUD.asi, GridLayout.asi and Menus.asi: ui/supersede.sh).
-# HUD.asi, GridLayout.asi and Menus.asi are `legacy` layers: only the release's fallback
-# without Direct3D 9 installs them, and a player who switches a part of the UI back to
-# stock can install the old plugin by hand.
+# Render3D.asi (render3d/install.sh), and the menu backdrop plates and UI.asi
+# (ui/backdrops/install-plates.sh, ui/install.sh). Before the first install it runs
+# retire/retire.sh, which takes out what earlier versions put in and nothing installs any
+# more: HUD.asi, GridLayout.asi, Menus.asi and MenuScale, the twelve per-part plugins, the
+# file-based HUD fixes (put back to stock from their backups), the widened loading screen
+# and the vkBasalt bloom (retire/known.txt).
 #
 # The code layers need nothing but this checkout. The asset layers install what is
 # BUILT in A2_DATA (a2env.sh; default ~/.local/share/armada2-refit): with nothing
@@ -33,10 +33,9 @@
 # the game keeps its own art. That is a supported state, not an error.
 #
 # Bloom is Render3D.asi's. The per-user vkBasalt bloom that postfx/vkbasalt/build.sh put
-# in before 13.0.0 (the retired vkbasalt layer) is taken out here on every run (its layer,
-# library and shaders, all under the a2-vkbasalt name), since both would bloom the frame
-# twice; the ENABLE_VKBASALT and VKBASALT_CONFIG_FILE it set in Heroic do nothing without
-# the layer. The test bench runs this into its clone of the game (a2test session start
+# in before 13.0.0 (the retired vkbasalt layer) is taken out by retire.sh on every run,
+# since both would bloom the frame twice; the ENABLE_VKBASALT and VKBASALT_CONFIG_FILE it
+# set in Heroic do nothing without the layer. The test bench runs this into its clone of the game (a2test session start
 # --install PATH [--layers a,b]).
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
@@ -66,29 +65,9 @@ plan=$(python3 "$layers" --resolve "${sel[@]}" --commands) || exit 2
 echo "== $(git -C "$here" describe --always --dirty 2>/dev/null || echo '?') -> $A2_GAME (assets: $A2_DATA)"
 echo "== layers: $(python3 "$layers" --resolve "${sel[@]}" | tr '\n' ' ')"
 
-# The retired vkBasalt bloom, outside the game directory.
-retire() {
-    local share="${XDG_DATA_HOME:-$HOME/.local/share}"
-    local old_bloom=("$share/a2-vkbasalt")
-    # The library and the build cache only with the layer's manifest: the bench's run has its
-    # own XDG_DATA_HOME, and must not reach into the real ~/.local/lib.
-    local manifest="$share/vulkan/implicit_layer.d/vkBasalt.a2.x86.json"
-    [ -e "$manifest" ] && old_bloom+=("$manifest" "$HOME/.local/lib/a2-vkbasalt" \
-                                      "${XDG_CACHE_HOME:-$HOME/.cache}/a2-vkbasalt")
-    local old
-    for old in "${old_bloom[@]}"; do
-        [ -e "$old" ] || continue
-        rm -rf "$old"
-        echo "removed the old vkBasalt bloom: $old"
-    done
-    # Retired from the game directory: A2EngineTest.ini, the bench's fault injection
-    # (crates/a2engine/README.md, "The test mismatch file"), which no install ships.
-    for old in "$A2_GAME/A2EngineTest.ini"; do
-        [ -e "$old" ] || continue
-        rm -f "$old"
-        echo "removed $old (a test bench file)"
-    done
-}
+# What earlier versions installed and nothing installs now (the legacy plugins, the
+# per-part plugins, the file-based HUD fixes, the vkBasalt bloom): retire/retire.sh.
+retire() { bash "$here/retire/retire.sh" "$A2_GAME"; }
 
 retired=0
 while IFS=$'\t' read -r -u 3 verb id cmd; do
