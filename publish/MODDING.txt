@@ -7,6 +7,10 @@ repository at the release tag (https://github.com/cedrichaase/armada2-refit, tag
 vX.Y.Z of this package); nothing here is published as a library, and nothing is on
 crates.io.
 
+The fuller guide (contracts, symbol and content profiles, render3d recipes, what may be
+published) is MODDING.md at the root of the repository, at this release's tag:
+https://github.com/cedrichaase/armada2-refit/blob/main/MODDING.md
+
 What is here
   a2asi.h      header-only, no CRT: Win32 types and imports, string and log helpers,
                signature checks and VirtualProtect patching (a2_sig_is, a2_poke,

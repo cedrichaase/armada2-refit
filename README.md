@@ -23,6 +23,11 @@ a time, and every fix can be undone.
   notes on what the engine actually does, with the dead ends included. They should be
   useful to anyone modding this game or others like it.
 
+## Where to read next
+
+- [`PLAYING.md`](PLAYING.md): for players: installing, the Refit screen, `RefitPlayer.ini`, multiplayer, the graphics backend, logs and troubleshooting, uninstalling.
+- [`MODDING.md`](MODDING.md): for modders: the plugin contracts, symbol and content profiles, building plugins, and what may be published.
+
 ## Features
 
 | | |
