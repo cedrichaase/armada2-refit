@@ -9,3 +9,8 @@ license = "MIT"
 [lib]
 name = "a2engine"
 path = "src/lib.rs"
+
+[features]
+# The resolver fixtures (tools/engine/fixtures.py run rs): tests/fixtures.rs includes
+# the module that script generates, named by A2E_FIXTURES_RS.
+fixtures = []

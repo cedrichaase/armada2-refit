@@ -1,0 +1,40 @@
+schema = 1
+plugin = "toyc"
+readme = "./README.md"
+lang = "c"
+out = "toyc/engine_syms.h"
+
+[hook.pan]
+doc = "A C plugin's one hook"
+
+[[sym]]
+id = "pan_fn"
+symbol = "Toy::Pan"
+kind = "fn"
+addr = 0x402000
+used_by = ["pan"]
+
+[[sym]]
+id = "pan_patch"
+symbol = "Toy::Pan"
+kind = "patch"
+addr = 0x402010
+in = "Toy::Pan"
+check = "90 90"
+used_by = ["pan"]
+
+[[sym]]
+id = "pan_off"
+symbol = "Toy"
+kind = "field"
+struct = "Toy"
+offset = 0x1c4
+type = "f32"
+used_by = ["pan"]
+
+[[sym]]
+id = "pan_k"
+symbol = "Toy"
+kind = "value"
+value = 1600
+used_by = ["pan"]

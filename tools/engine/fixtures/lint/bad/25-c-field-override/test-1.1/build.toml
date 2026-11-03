@@ -1,0 +1,23 @@
+schema = 1
+game = "toy"
+build = "test-1.1"
+label = "Toy game 1.1"
+exe = ["Toy.exe"]
+inherits = "test-1.0"
+content = "stock"
+
+[pe]
+timestamp = 0x22222222
+image_size = 0x101000
+sections = 0x05060708
+image_base = 0x400000
+code = [0x401000, 0x408000]
+
+[[changed]]
+fn = "Toy::Update"
+how = "detour"
+verified = ["toy.speed"]
+
+[[disable]]
+hooks = ["toyc.*"]
+why = "the 1.1 rules differ"

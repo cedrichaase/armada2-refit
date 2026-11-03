@@ -5,6 +5,13 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.97.0 — 2026-11-03
+
+### Added
+- Scenario `engine-syms` (Display8 section): the build recognised, `symbols: 15/15 resolved; 0 hooks blocked`, no hook standing down and no symbol read before its hook. Later phase 8 packages append their plugins' sections.
+
+Installed, not yet seen in game
+
 ## 3.96.0 — 2026-11-03
 
 ### Added

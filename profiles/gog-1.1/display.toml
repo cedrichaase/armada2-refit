@@ -1,0 +1,145 @@
+# Display8's symbols in Armada2.exe 1.1 (GOG): what display/src reads of the exe, each
+# entry tied to the hook that uses it. The findings are in display/README.md, "Hooks".
+schema = 1
+plugin = "display"
+readme = "display/README.md"
+lang = "rust"
+out = "display/src/engine_syms.rs"
+
+[hook.modes]
+doc = "The engine's own mode requests answered with the stub's one mode"
+
+[hook.drop]
+doc = "The engine's draws told apart by caller: [Drop] and the claimed scenes"
+
+# ---- display.modes (stub/modes.rs) ------------------------------------------------
+
+[[sym]]
+id = "find_display_mode"
+symbol = "ST3D_DisplayDevice::FindDisplayMode"
+kind = "fn"
+addr = 0x626bf0
+check = "55 8b ec 8b 51 14 53 56 57 8b 0a 3b ca"
+used_by = ["modes"]
+
+[[sym]]
+id = "shell_display_find"
+symbol = "ST3D_GraphicsEngine::SetActiveDisplay_Internal"
+kind = "call"
+addr = 0x62c4e0
+target = "find_display_mode"
+in = "ST3D_GraphicsEngine::SetActiveDisplay_Internal"
+used_by = ["modes"]
+
+[[sym]]
+id = "failed_display_find"
+symbol = "ST3D_GraphicsEngine::SetActiveDisplay_Internal"
+kind = "call"
+addr = 0x62c643
+target = "find_display_mode"
+in = "ST3D_GraphicsEngine::SetActiveDisplay_Internal"
+used_by = ["modes"]
+
+[[sym]]
+id = "game_mode_find"
+symbol = "GameConfiguration::InitializeGraphicsSystem"
+kind = "call"
+addr = 0x53e7c9
+target = "find_display_mode"
+in = "GameConfiguration::InitializeGraphicsSystem"
+used_by = ["modes"]
+
+[[sym]]
+id = "game_mode_find_again"
+symbol = "GameConfiguration::InitializeGraphicsSystem"
+kind = "call"
+addr = 0x53e7e7
+target = "find_display_mode"
+in = "GameConfiguration::InitializeGraphicsSystem"
+used_by = ["modes"]
+
+[[sym]]
+id = "intro_mode_find"
+symbol = "Program::PlayIntroMovie"
+kind = "call"
+addr = 0x4861da
+target = "find_display_mode"
+in = "Program::PlayIntroMovie"
+used_by = ["modes"]
+
+[[sym]]
+id = "intro_mode_find_again"
+symbol = "Program::PlayIntroMovie"
+kind = "call"
+addr = 0x4861f2
+target = "find_display_mode"
+in = "Program::PlayIntroMovie"
+used_by = ["modes"]
+
+# The front end's hard-coded request (SetActiveDisplay_Internal's 800x600x16), which
+# FO-4 raises: Display8 names it when it answers it.
+[[sym]]
+id = "front_end_width"
+symbol = "ST3D_GraphicsEngine::SetActiveDisplay_Internal"
+kind = "value"
+value = 800
+unit = "px"
+used_by = ["modes"]
+
+[[sym]]
+id = "front_end_height"
+symbol = "ST3D_GraphicsEngine::SetActiveDisplay_Internal"
+kind = "value"
+value = 600
+unit = "px"
+used_by = ["modes"]
+
+[[sym]]
+id = "front_end_depth"
+symbol = "ST3D_GraphicsEngine::SetActiveDisplay_Internal"
+kind = "value"
+value = 16
+unit = "bpp"
+used_by = ["modes"]
+
+# ---- display.drop (drop.rs; the claims' scenes in passthrough.rs, api.rs) ----------
+
+[[sym]]
+id = "loading_status"
+symbol = "RenderLoopAssetLoadStatusUpdate"
+kind = "fn"
+addr = 0x598ba0
+end = 0x598ff0
+used_by = ["drop"]
+
+[[sym]]
+id = "credits"
+symbol = "SpriteWithLocation::Render"
+kind = "fn"
+addr = 0x591340
+end = 0x592a70
+used_by = ["drop"]
+
+[[sym]]
+id = "refresh_display"
+symbol = "ST3D_DeviceDirectX8::RefreshDisplay"
+kind = "fn"
+addr = 0x624630
+end = 0x624750
+used_by = ["drop"]
+
+[[sym]]
+id = "submit_vb"
+symbol = "ST3D_WorkspaceDirectX8::Submit"
+kind = "fn"
+addr = 0x648af0
+end = 0x648c30
+used_by = ["drop"]
+
+[[sym]]
+id = "submit_non_vb"
+symbol = "ST3D_WorkspaceDirectX8NonVB::Submit"
+kind = "fn"
+addr = 0x648520
+end = 0x6485d0
+used_by = ["drop"]

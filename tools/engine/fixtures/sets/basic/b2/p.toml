@@ -1,0 +1,14 @@
+# b2 fixes f2's bytes and adds n1.
+schema = 1
+plugin = "p"
+
+[[sym]]
+id = "f2"
+check = "55 8b ec"
+
+[[sym]]
+id = "n1"
+symbol = "g_new"
+kind = "global"
+addr = 0x406000
+used_by = ["badcheck"]

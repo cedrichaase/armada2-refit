@@ -22,20 +22,64 @@
 //!   0x648af0..0x648c30, `ST3D_WorkspaceDirectX8NonVB::Submit` 0x648520..0x6485d0),
 //!   which every mesh the engine draws goes through;
 //! - 2D: any other draw of the engine's (the trifan batch, `DrawLineStrip`, `BinkThread`).
+use crate::engine_syms::{hook, sym};
 use crate::rt::Ini;
 use crate::trace;
 use crate::{log, rt};
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU32, Ordering};
 
-const LOADING: (usize, usize) = (0x598ba0, 0x598ff0);
-/// `Credits3D.obj`'s code (`Show_Credits` and the `Credits3D` class: 0x591340..0x592a70),
-/// which draws the stock Credits' scenes.
-const CREDITS: (usize, usize) = (0x591340, 0x592a70);
-/// `ST3D_DeviceDirectX8::RefreshDisplay` (0x624630..0x624750), which draws the engine's
-/// cursor in a scene of its own just before it presents.
-const REFRESH_DISPLAY: (usize, usize) = (0x624630, 0x624750);
-const SUBMIT: [(usize, usize); 2] = [(0x648af0, 0x648c30), (0x648520, 0x6485d0)];
+/// The functions a draw is told apart by (`display.drop` in `profiles/<build>/display.toml`):
+/// their code ranges, once the hook is ready; None when it stood down, and then nothing
+/// is dropped and every scene is `Scene::Other`.
+#[derive(Clone, Copy)]
+struct Ranges {
+    loading: (usize, usize),
+    credits: (usize, usize),
+    refresh_display: (usize, usize),
+    submit: [(usize, usize); 2],
+}
+
+static mut RANGES: Option<Option<Ranges>> = None;
+
+#[allow(static_mut_refs)]
+fn ranges() -> Option<Ranges> {
+    unsafe {
+        if let Some(r) = RANGES {
+            return r;
+        }
+        let e = crate::engine();
+        let r = e.ready(hook::DROP).is_ok().then(|| Ranges {
+            loading: e.range(sym::LOADING_STATUS),
+            credits: e.range(sym::CREDITS),
+            refresh_display: e.range(sym::REFRESH_DISPLAY),
+            submit: [e.range(sym::SUBMIT_VB), e.range(sym::SUBMIT_NON_VB)],
+        });
+        if r.is_none() {
+            log!("drop: the engine's draws cannot be told apart in this Armada2.exe: nothing is dropped, no scene is claimed");
+        }
+        RANGES = Some(r);
+        r
+    }
+}
+
+// Value parity (phase 8, E2): the ranges this file had, against the generated stock
+// table. Transitional: dropped once the profile is the only source.
+mod parity {
+    use crate::engine_syms::{sym, BUILDS};
+    const fn at(s: a2engine::Sym) -> (u32, u32) {
+        let e = &BUILDS[0].entries[s.0 as usize];
+        (e.addr, e.end)
+    }
+    const fn eq(a: (u32, u32), b: (u32, u32)) -> bool {
+        a.0 == b.0 && a.1 == b.1
+    }
+    const _: () = assert!(eq(at(sym::LOADING_STATUS), (0x598ba0, 0x598ff0))); // value parity
+    const _: () = assert!(eq(at(sym::CREDITS), (0x591340, 0x592a70))); // value parity
+    const _: () = assert!(eq(at(sym::REFRESH_DISPLAY), (0x624630, 0x624750))); // value parity
+    const _: () = assert!(eq(at(sym::SUBMIT_VB), (0x648af0, 0x648c30))); // value parity
+    const _: () = assert!(eq(at(sym::SUBMIT_NON_VB), (0x648520, 0x6485d0))); // value parity
+}
 
 #[derive(Clone, PartialEq, Default)]
 struct Config {
@@ -134,11 +178,13 @@ pub fn dropped(fp: usize) -> bool {
         return false;
     }
     let c = chain(fp, exe);
+    let r = ranges();
     let hit = cfg.callers.iter().any(|a| c.contains(a)) || {
-        let loading = c.iter().any(|&a| within(LOADING, a));
+        let Some(r) = r else { return false };
+        let loading = c.iter().any(|&a| within(r.loading, a));
         if loading {
             cfg.loading
-        } else if SUBMIT.iter().any(|&r| within(r, ra)) {
+        } else if r.submit.iter().any(|&s| within(s, ra)) {
             cfg.d3
         } else {
             cfg.d2
@@ -154,8 +200,9 @@ pub fn dropped(fp: usize) -> bool {
 /// loop (a return address in `RenderLoopAssetLoadStatusUpdate` up its stack): the
 /// passthrough asks it of each `BeginScene` (`passthrough::begin_scene`).
 pub fn in_loading(fp: usize) -> bool {
+    let Some(r) = ranges() else { return false };
     let exe = trace::exe_range();
-    chain(fp, exe).iter().any(|&a| within(LOADING, a))
+    chain(fp, exe).iter().any(|&a| within(r.loading, a))
 }
 
 /// Which of the engine's scenes a `BeginScene` begins, by the functions up its stack
@@ -172,13 +219,14 @@ pub enum Scene {
 }
 
 pub fn scene(fp: usize) -> Scene {
+    let Some(r) = ranges() else { return Scene::Other };
     let exe = trace::exe_range();
     let c = chain(fp, exe);
-    if c.iter().any(|&a| within(LOADING, a)) {
+    if c.iter().any(|&a| within(r.loading, a)) {
         Scene::Loading
-    } else if c.iter().any(|&a| within(CREDITS, a)) {
+    } else if c.iter().any(|&a| within(r.credits, a)) {
         Scene::Credits
-    } else if c.iter().take(2).any(|&a| within(REFRESH_DISPLAY, a)) {
+    } else if c.iter().take(2).any(|&a| within(r.refresh_display, a)) {
         Scene::Cursor
     } else {
         Scene::Other

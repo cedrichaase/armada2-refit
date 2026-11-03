@@ -1,0 +1,46 @@
+# Scan hooks, which run on an unknown build too.
+schema = 1
+plugin = "s"
+readme = "./README.md"
+lang = "rust"
+out = "-"
+
+[hook.scan1]
+doc = "A pattern found once, as it should be"
+unknown = "run"
+
+[hook.scan0]
+doc = "A pattern found nowhere"
+unknown = "run"
+
+[hook.scan2]
+doc = "A pattern found twice where one is wanted"
+unknown = "run"
+
+[[sym]]
+id = "sc1"
+symbol = "Two::scanned"
+kind = "scan"
+pattern = "de ad ?? ef"
+section = ".text"
+count = 1
+addr = 0x401800
+used_by = ["scan1"]
+
+[[sym]]
+id = "sc0"
+symbol = "Two::missing"
+kind = "scan"
+pattern = "0b ad f0 0d"
+section = ".text"
+count = 1
+used_by = ["scan0"]
+
+[[sym]]
+id = "sc2"
+symbol = "Two::twice"
+kind = "scan"
+pattern = "ca fe ba be"
+section = ".text"
+count = 1
+used_by = ["scan2"]

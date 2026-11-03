@@ -261,6 +261,37 @@ With `Trace=1` in `Display8.ini`:
 - **`Expect the engine to draw nothing in "mission"`** reads the inventory: no `Draw*`
   on the device whose caller is in `Armada2.exe`, in that context.
 
+## Hooks
+
+What Display8 reads of `Armada2.exe` is in its symbol profile,
+`profiles/<build>/display.toml` (`profiles/gog-1.1/` for GOG's 1.1), generated into
+`src/engine_syms.rs` by `tools/engine/gen.py`; the format and the resolver are
+`crates/a2engine/README.md`. At start Display8 logs the executable's identity, the
+build it recognises and the summary:
+
+    engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321
+    engine: build armada2/gog-1.1
+    engine: symbols: 15/15 resolved; 0 hooks blocked
+
+| Hook | Entries | Used by | Without it |
+|---|---|---|---|
+| `display.modes` | `ST3D_DisplayDevice::FindDisplayMode` (`fn`, its first 13 bytes checked), its six calls (`call`, each checked to call it), and the front end's 800x600x16 request (`value`) | `stub/modes.rs` ("The engine's hard-coded modes"); the stub's start in `lib.rs` | no stub: forward mode, the old chain |
+| `display.drop` | the code ranges of `RenderLoopAssetLoadStatusUpdate`, the Credits (`Credits3D.obj`, from its first function `SpriteWithLocation::Render`), `ST3D_DeviceDirectX8::RefreshDisplay` and the two workspaces' `Submit` (`fn` with `end`; nothing is written, so nothing is checked) | `drop.rs`: `[Drop]` ("Drop switches"), and the scene a `BeginScene` begins for the claims (`passthrough.rs`) and the contract's mission check (`api.rs`) | nothing is dropped and no scene of the engine's is claimed: the engine draws its own loading screen, Credits and cursor |
+
+The tracer's caller names (`trace.rs`) are not a hook: they are addresses read off the
+stack against the identity's image range, and mean the same on any build.
+
+**On a build Display8 does not know** (`engine: unknown build`, or `display.modes`
+standing down) it forwards to the old chain: `engine: unknown build: Display8 forwards
+to the old chain`. Measured on the bench 2026-11-03 with `A2EngineTest.ini`
+`Mismatch=display.modes` on the stock exe and no `UI.asi` (what an unknown build
+leaves, since the UI stands down there too): the stub started, the engine's own mode
+requests found no mode, and the game died of a stack overflow right after
+`CheckDeviceType`, as before 0.15.1. So the stub with passthrough is not an option
+without the mode hook; forward mode gives the stock look on DXVK. The bench's
+`A2EngineTest.ini` (`[Test] Mismatch=<globs>`) makes chosen hooks stand down on the
+stock exe as a failed check would; `./install` deletes it.
+
 ## Drop switches
 
 `[Drop]` in `Display8.ini` (`src/drop.rs`): the engine's draws, accepted and not passed
@@ -365,8 +396,9 @@ shell's request the desktop's; forward mode lists the real modes and never had i
 
 Display8 re-points those six calls, in stub mode, at a lookup of its own
 (`modes::find`): the engine's first, and when it finds nothing, the listed mode of the
-stub's size. Each call and `FindDisplayMode`'s first bytes are checked before anything
-is written; one that is not stock is left alone and logged. The lookup's other callers
+stub's size. The six calls and `FindDisplayMode`'s first bytes are one hook, `display.modes`
+("Hooks", below): all are checked before anything is written, and if one is not stock
+none is written and the stub is not started (the game gets the old chain). The lookup's other callers
 keep the exact match: the adapter's enumeration, which uses it to skip a mode it has
 listed already, and Graphics Settings, which offers what is listed (the one mode).
 `Display8.log` says what was asked and given:

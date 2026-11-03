@@ -1,0 +1,6 @@
+schema = 1
+plugin = "toyc"
+
+[[sym]]
+id = "pan_off"
+offset = 0x1c8

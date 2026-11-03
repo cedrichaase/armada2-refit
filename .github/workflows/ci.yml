@@ -115,6 +115,23 @@ jobs:
       - name: The settings tables (tools/settings/lint.py)
         run: python3 tools/settings/lint.py
 
+  # The symbol profiles (crates/a2engine/README.md, tools/engine/README.md): the three
+  # resolvers (Python, C and Rust) on every synthetic-image fixture, gen.py's golden
+  # output, lint.py on its good and bad profiles, then the repository's profiles: every
+  # generated engine_syms file up to date and lint.py clean (rules 1-6). No game file.
+  engine:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Rust (stable)
+        run: rustup toolchain install stable --profile minimal
+      - name: The resolvers on the fixtures, gen and lint (tools/engine/selftest.sh)
+        run: tools/engine/selftest.sh
+      - name: Generated files up to date (tools/engine/gen.py --check)
+        run: python3 tools/engine/gen.py --check
+      - name: The profiles (tools/engine/lint.py)
+        run: python3 tools/engine/lint.py
+
   # Every generated shader file rebuilt from its HLSL with the pinned compilers, and a
   # difference from the committed file (or its stamp) fails the job: d3dbc by vkd3d-compiler
   # 1.19 (tools/shaderc/fetch-vkd3d.sh, built from the release tarball by sha256), SPIR-V and

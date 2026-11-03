@@ -1,0 +1,136 @@
+# Every kind, and each way a check can fail.
+schema = 1
+plugin = "p"
+readme = "./README.md"
+lang = "rust"
+out = "-"
+
+[hook.fnhook]
+doc = "fn, call, patch, label, global, field and value: all hold"
+rows = ["Graphics.Other"]
+
+[hook.chained]
+doc = "A call another plugin has chained"
+
+[hook.wrongcall]
+doc = "A call to something else"
+
+[hook.slothook]
+doc = "A vtable slot that holds"
+
+[hook.wrongslot]
+doc = "A vtable slot that holds something else"
+
+[hook.badcheck]
+doc = "Bytes that differ"
+rows = ["Graphics.Thing"]
+
+[[sym]]
+id = "f1"
+symbol = "One::f1"
+kind = "fn"
+addr = 0x401000
+check = "55 8b ec 83 ec 10"
+used_by = ["fnhook"]
+
+[[sym]]
+id = "c1"
+symbol = "One::caller"
+kind = "call"
+addr = 0x401200
+target = "f1"
+in = "One::caller"
+used_by = ["fnhook"]
+
+[[sym]]
+id = "pt"
+symbol = "One::patched"
+kind = "patch"
+addr = 0x401300
+in = "One::patched"
+check = "90 90 90 90 90"
+used_by = ["fnhook"]
+
+[[sym]]
+id = "l1"
+symbol = "One::patched"
+kind = "label"
+addr = 0x401305
+in = "One::patched"
+used_by = ["fnhook"]
+
+[[sym]]
+id = "g1"
+symbol = "g_thing"
+kind = "global"
+addr = 0x404010
+used_by = ["fnhook"]
+
+[[sym]]
+id = "fd"
+symbol = "One"
+kind = "field"
+struct = "One"
+offset = 0x1c
+type = "u32"
+used_by = ["fnhook"]
+
+[[sym]]
+id = "v1"
+symbol = "One::caller"
+kind = "value"
+value = 640
+unit = "px"
+used_by = ["fnhook"]
+
+[[sym]]
+id = "c2"
+symbol = "One::chainer"
+kind = "call"
+addr = 0x401210
+target = "f1"
+chain = true
+in = "One::chainer"
+used_by = ["chained", "wrongcall"]
+
+[[sym]]
+id = "c3"
+symbol = "One::caller"
+kind = "call"
+addr = 0x401220
+target = "f1"
+in = "One::caller"
+used_by = ["wrongcall"]
+
+[[sym]]
+id = "vt"
+symbol = "One::vftable"
+kind = "vtable"
+addr = 0x403000
+used_by = ["slothook", "wrongslot"]
+
+[[sym]]
+id = "s1"
+symbol = "One::vftable"
+kind = "slot"
+vtable = "vt"
+index = 1
+target = "f1"
+used_by = ["slothook"]
+
+[[sym]]
+id = "s2"
+symbol = "One::vftable"
+kind = "slot"
+vtable = "vt"
+index = 2
+target = "f1"
+used_by = ["wrongslot"]
+
+[[sym]]
+id = "f2"
+symbol = "One::f2"
+kind = "fn"
+addr = 0x401100
+check = "55 89 e5"
+used_by = ["badcheck"]

@@ -114,6 +114,30 @@ pub fn identify(mem: &dyn Image) -> Option<Identity> {
     Some(Identity { timestamp, image_size, sections: h, base, code: code.unwrap_or((0, 0)) })
 }
 
+/// The section named `name` (its 8 header bytes, NUL-padded): (RVA, VirtualSize).
+pub fn section(mem: &dyn Image, name: &str) -> Option<(usize, usize)> {
+    let nt = u32_at(mem, 0x3c)? as usize;
+    let count = u16_at(mem, nt + 6)? as usize;
+    let opt_size = u16_at(mem, nt + 20)? as usize;
+    let table = nt + 24 + opt_size;
+    let want = name.as_bytes();
+    if want.len() > 8 || count > MAX_SECTIONS {
+        return None;
+    }
+    for i in 0..count {
+        let mut s = [0u8; 40];
+        if !mem.read(table + i * 40, &mut s) {
+            return None;
+        }
+        let n = s[..8].iter().position(|&c| c == 0).unwrap_or(8);
+        if &s[..n] == want {
+            let word = |o: usize| u32::from_le_bytes([s[o], s[o + 1], s[o + 2], s[o + 3]]) as usize;
+            return Some((word(12), word(8)));
+        }
+    }
+    None
+}
+
 /// The log line, identical in every plugin: `engine: ` + this. The name is fixed on
 /// purpose: it is the line's key, not a reading of the file.
 impl core::fmt::Display for Identity {

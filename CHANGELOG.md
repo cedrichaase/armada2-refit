@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.81.0 — 2026-11-03
+
+Layers: display 0.17.0, testbench 3.97.0.
+
+### Added
+- Phase 8b, symbol profiles (contracts P2–P8): the format (`profiles/<build>/build.toml`, `<plugin>[.<part>].toml`; `crates/a2engine/README.md`), `profiles/gog-1.1/display.toml`, and `tools/engine/`: `gen.py` (Rust and C tables, `--check`), `lint.py` (rules 1–6; `--publish` in `publish/check.sh`), `resolve.py`, `annotate.py`, `mkpe.py`, `fixtures.py`, `ctest.c`, `selftest.sh` (CI job `engine`).
+- The resolver in three implementations proven on the same synthetic-image fixtures: `crates/a2engine` (`table`, `engine`: `init`, `ready`, `addr`, `range`, `site`, the notes), `csdk/a2engine.h` (`a2e_init`, `a2e_ready`, `a2e_addr`, ...), `tools/engine/resolve.py`.
+- `A2EngineTest.ini` (`[Test] Mismatch=<globs>`), the bench's fault injection: the hooks it names stand down as a failed check would. `./install` deletes it.
+
+Installed, not yet seen in game
+
 ## 13.80.0 — 2026-11-03
 
 Layers: display 0.16.1, ui 0.31.1, qol 1.9.1, online 0.9.1, cutscenes 2.5.1, testbench 3.96.0.
