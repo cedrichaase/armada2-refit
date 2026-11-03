@@ -5,6 +5,11 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.104.0 — 2026-11-03
+
+### Added
+- `display-passthrough-d3d12`: `display-passthrough` on `Backend=d3d12` (hulls module off; the engine's ships drawn by Display8 into render3d's published pass), the one paused frame a change to `dx12/pass.rs` runs first. Installed, not yet seen in game.
+
 ## 3.103.1 — 2026-11-03
 
 ### Fixed

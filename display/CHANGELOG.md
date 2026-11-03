@@ -4,6 +4,18 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.20.0 — 2026-11-03
+
+### Added
+- Passthrough on Direct3D 12 (phase 10 X1; `src/dx12/pass.rs`): the engine's own draws are recorded onto the frame's list as `vk/pass.rs` records them on Vulkan, into the pass render3d published last in the frame (`exports::published`, by its own `rtv`/`dsv`, formats and sample count) or else the engine's targets. One root signature (the vertex block as root CBVs at b0 spaces 0 and 1, the pixel block at b1, tables of t0-t1 and s0-s1), pipelines by the target's formats and samples, topology, vertex layout, blend, depth and cull, a defaults record as instance data in slot 1, a white texture, mirrors for the engine's textures (`mirror::passthrough`), per-stage samplers as DXVK makes them. Nothing is assumed set that a plugin's `Cmd` may have changed and nothing is recorded while one is alive: `pass::forget` at each plugin `Cmd` event and flush.
+- `display/hosttest`: host tests of `passthrough/state.rs` (`cargo test --release --target x86_64-unknown-linux-gnu --manifest-path display/hosttest/Cargo.toml`).
+
+### Changed
+- `src/passthrough.rs` is `src/passthrough/{mod.rs,state.rs}`: `state.rs` holds the API-neutral translation that sat in `vk/pass.rs` (layouts, constant blocks, blend/depth/cull/topology keys, sampler parameters, attributes, viewport clamp, notes on state not drawn as Direct3D 8 would); the Vulkan frame is unchanged (RMSE 0 against the base).
+- The once-log "passed through on Vulkan only" is gone: a stub on Direct3D 9 still drops the engine's draws and says so. `Passthrough=` logs "Vulkan and Direct3D 12".
+
+Installed, not yet seen in game
+
 ## 0.19.0 — 2026-11-03
 
 ### Added

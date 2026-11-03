@@ -5,15 +5,20 @@
 //! instead of vanishing.
 //!
 //! This half is the backend's neutral part: whether a draw is drawn at all, and what
-//! it draws (its vertex layout from the FVF, its vertices and indices out of the
-//! stub's buffers, which are memory). The Vulkan backend records it (`vk/pass.rs`);
-//! Direct3D 12 and the stub's Direct3D 9 do not pass anything through yet.
+//! it draws (its vertices and indices out of the stub's buffers, which are memory); the
+//! translation of the engine's state (`state.rs`, host-tested) is neutral too. The
+//! Vulkan backend records it (`vk/pass.rs`) and so does Direct3D 12 (`dx12/pass.rs`);
+//! the stub's Direct3D 9 does not pass anything through yet.
+pub mod state;
+
 use crate::stub::device::Dev;
 use crate::stub::obj::{Body, SObj};
 use crate::trace::once;
 use crate::{log, sfmt};
 use alloc::vec::Vec;
 use core::ffi::c_void;
+pub use state::Layout;
+use state::{bump_layout, fan, layout, vertices_of, Note};
 
 static mut ON: bool = false;
 /// The engine's scene now (told at its `BeginScene`) is one a plugin claims to draw over
@@ -25,7 +30,7 @@ static mut CLAIMED: bool = false;
 pub fn configure(ini: &crate::rt::Ini) {
     let on = ini.int("Display8", "Passthrough", 1) != 0;
     unsafe { ON = on };
-    log!("Passthrough={}: {}", on as u8, if on { "the engine's own draws are drawn on Vulkan in stub mode" } else { "the engine's own draws are dropped in stub mode" });
+    log!("Passthrough={}: {}", on as u8, if on { "the engine's own draws are drawn on Vulkan and Direct3D 12 in stub mode" } else { "the engine's own draws are dropped in stub mode" });
 }
 
 pub fn on() -> bool {
@@ -57,108 +62,19 @@ pub fn begin_scene(fp: usize) {
     unsafe { CLAIMED = drop };
 }
 
-/// Where a vertex's parts are, from its FVF.
-#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
-pub struct Layout {
-    /// The FVF's own size; the stream's stride is what the vertices are read at.
-    pub size: u32,
-    /// Pre-transformed (`XYZRHW`): screen pixels, z and 1/w.
-    pub rhw: bool,
-    pub normal: Option<u32>,
-    pub diffuse: Option<u32>,
-    pub specular: Option<u32>,
-    /// Each texture coordinate set: (offset, floats).
-    pub tex: [Option<(u32, u32)>; 8],
-    /// Drawn through the Borg bump shader (`BORG_BUMP`): the offsets in stream 0 of its
-    /// position, coordinates, tangent, binormal and normal.
-    pub bump: Option<[u32; 5]>,
-}
-
 /// The hash (`stub::device::token_hash`) of the engine's one vertex shader's function
 /// tokens: the Borg hulls' bump pass, ported by hand as `vs_bump` in `shaders/ff.hlsl`
 /// (ROADMAP 4d). Any other shader is refused and logged.
 pub const BORG_BUMP: u32 = 0xaaa1_e806;
 
 /// A vertex shader's layout, when it is one the passthrough has a port of: its
-/// declaration read for where each input register is in stream 0 (`D3DVSD_REG`; float1
-/// to float4 and colours; every register in stream 0).
+/// declaration read for where each input register is in stream 0 (`state::bump_layout`).
 fn shader_layout(dv: &Dev) -> Option<Layout> {
     let sh = dv.shaders.iter().find(|s| s.handle == dv.vs)?;
     if sh.hash != BORG_BUMP {
         return None;
     }
-    let mut at = 0u32;
-    let mut reg = [None::<u32>; 16];
-    for &t in &sh.decl {
-        match t >> 28 {
-            0x2 if t & 0xf != 0 => return None, // a stream other than 0
-            0x2 => {}
-            0x4 => {
-                let size = match (t >> 16) & 0xf {
-                    0 => 4,
-                    1 => 8,
-                    2 => 12,
-                    3 => 16,
-                    4 => 4,
-                    _ => return None,
-                };
-                reg[(t & 0xf) as usize] = Some(at);
-                at += size;
-            }
-            0x5 => at += 4 * ((t >> 16) & 0xf), // skip
-            0xf if t == 0xffff_ffff => break,
-            _ => {}
-        }
-    }
-    Some(Layout { size: at, bump: Some([reg[0]?, reg[2]?, reg[3]?, reg[4]?, reg[5]?]), ..Layout::default() })
-}
-
-/// The FVF's layout. None: not one of fixed function's (a vertex shader's handle).
-pub fn layout(fvf: u32) -> Option<Layout> {
-    if fvf & 1 != 0 {
-        return None;
-    }
-    let mut l = Layout::default();
-    let mut at = match fvf & 0xe {
-        0x2 => 12,
-        0x4 => {
-            l.rhw = true;
-            16
-        }
-        p @ 0x6..=0xe => {
-            once("PASSTHROUGH vertex blending (XYZB*): drawn unblended");
-            12 + 4 * ((p - 0x4) / 2)
-        }
-        _ => return None,
-    };
-    if fvf & 0x10 != 0 {
-        l.normal = Some(at);
-        at += 12;
-    }
-    if fvf & 0x20 != 0 {
-        at += 4; // point size
-    }
-    if fvf & 0x40 != 0 {
-        l.diffuse = Some(at);
-        at += 4;
-    }
-    if fvf & 0x80 != 0 {
-        l.specular = Some(at);
-        at += 4;
-    }
-    let sets = ((fvf >> 8) & 0xf).min(8);
-    for i in 0..sets {
-        let n = match (fvf >> (16 + 2 * i)) & 3 {
-            0 => 2,
-            1 => 3,
-            2 => 4,
-            _ => 1,
-        };
-        l.tex[i as usize] = Some((at, n));
-        at += 4 * n;
-    }
-    l.size = at;
-    Some(l)
+    bump_layout(&sh.decl)
 }
 
 /// One draw, as the backend records it.
@@ -177,18 +93,6 @@ pub struct Draw<'a> {
     pub count: u32,
 }
 
-/// Vertices (or indices) a primitive count takes.
-fn vertices_of(prim: u32, n: u32) -> u32 {
-    match prim {
-        1 => n,
-        2 => 2 * n,
-        3 => n + 1,
-        4 => 3 * n,
-        5 | 6 => n + 2,
-        _ => 0,
-    }
-}
-
 fn buf(p: *mut c_void) -> Option<&'static crate::stub::obj::Buf> {
     if !crate::stub::obj::is_stub(p) {
         return None;
@@ -199,21 +103,6 @@ fn buf(p: *mut c_void) -> Option<&'static crate::stub::obj::Buf> {
     }
 }
 
-/// A fan's triangles as a list's indices: (0, i, i + 1), through `ix` when it is
-/// indexed.
-fn fan(n: u32, ix: Option<(&[u8], bool)>) -> Vec<u32> {
-    let at = |i: u32| match ix {
-        Some((b, false)) => u16::from_le_bytes([b[2 * i as usize], b[2 * i as usize + 1]]) as u32,
-        Some((b, true)) => u32::from_le_bytes([b[4 * i as usize], b[4 * i as usize + 1], b[4 * i as usize + 2], b[4 * i as usize + 3]]),
-        None => i,
-    };
-    let mut v = Vec::with_capacity(3 * n as usize);
-    for i in 1..=n {
-        v.extend_from_slice(&[at(0), at(i), at(i + 1)]);
-    }
-    v
-}
-
 /// One of the device's draws (`slot`: `DrawPrimitive` 70, `DrawIndexedPrimitive` 71,
 /// `DrawPrimitiveUP` 72, `DrawIndexedPrimitiveUP` 73; `a` its arguments), passed through
 /// when it is the engine's to draw.
@@ -221,10 +110,14 @@ pub fn draw(this: *mut SObj, fp: usize, slot: u32, a: &[usize]) {
     if !on() || !(70..=73).contains(&slot) {
         return;
     }
-    if !crate::stub::vulkan() {
-        once("PASSTHROUGH: the engine's draws are passed through on Vulkan only in this version: dropped");
+    let backend = if crate::stub::vulkan() {
+        Backend::Vulkan
+    } else if crate::stub::d3d12() {
+        Backend::D3d12
+    } else {
+        once("PASSTHROUGH: the engine's draws are passed through on Vulkan and Direct3D 12 only in this version: dropped");
         return;
-    }
+    };
     if crate::drop::dropped(fp) || unsafe { CLAIMED } {
         return;
     }
@@ -237,6 +130,9 @@ pub fn draw(this: *mut SObj, fp: usize, slot: u32, a: &[usize]) {
         once(&sfmt!("PASSTHROUGH a draw through a vertex shader ({:#x}): not one the passthrough has a port of: not drawn, by {}", dv.vs, crate::trace::caller(fp)));
         return;
     };
+    if lay.blended {
+        once("PASSTHROUGH vertex blending (XYZB*): drawn unblended");
+    }
     let prim = a[0] as u32;
     if !(1..=6).contains(&prim) {
         return;
@@ -305,7 +201,59 @@ pub fn draw(this: *mut SObj, fp: usize, slot: u32, a: &[usize]) {
         let bytes = unsafe { core::slice::from_raw_parts(made.as_mut_ptr() as *const u8, made.len() * 4) };
         d = Draw { prim: 4, indices: Some((bytes, true)), count: made.len() as u32, ..d };
     }
-    if let Some(v) = crate::vk::get() {
-        crate::vk::pass::draw(v, dv, &d, fp);
+    match backend {
+        Backend::Vulkan => {
+            if let Some(v) = crate::vk::get() {
+                crate::vk::pass::draw(v, dv, &d, fp);
+            }
+        }
+        Backend::D3d12 => {
+            if let Some(x) = crate::dx12::get() {
+                crate::dx12::pass::draw(x, dv, &d, fp);
+            }
+        }
+    }
+}
+
+enum Backend {
+    Vulkan,
+    D3d12,
+}
+
+/// The device state a draw reads, borrowed for `state`.
+pub fn fixed(dv: &Dev) -> state::Fixed<'_> {
+    state::Fixed {
+        rs: &dv.rs,
+        tss: &dv.tss,
+        transforms: &dv.transforms,
+        material: &dv.material,
+        lights: &dv.lights,
+        vs_const: &dv.vs_const,
+        ps: dv.ps,
+        zbuffer: !dv.zbuffer.is_null(),
+    }
+}
+
+static mut BUMP_LIT: bool = false;
+
+/// Says once what `state` found of state it does not draw as Direct3D 8 would.
+pub fn say(n: Note) {
+    match n {
+        Note::Fog => once("PASSTHROUGH fog is on: drawn without fog"),
+        Note::FillMode(m) => once(&sfmt!("PASSTHROUGH FILLMODE {}: drawn solid", m)),
+        Note::ZBias(z) => once(&sfmt!("PASSTHROUGH ZBIAS {}: drawn without a depth bias", z)),
+        Note::ColorOp(s, op) => once(&sfmt!("PASSTHROUGH stage {} COLOROP {}: drawn as SELECTARG1", s, op)),
+        Note::TextureTransform => once("PASSTHROUGH a texture transform: drawn without it"),
+        Note::GeneratedCoordinates => once("PASSTHROUGH generated texture coordinates: drawn with the set's own"),
+        Note::ThirdStage => once("PASSTHROUGH a third texture stage: drawn with two"),
+        Note::PixelShader => once("PASSTHROUGH a pixel shader: drawn with fixed function"),
+        Note::SpotLight => once("PASSTHROUGH a spot light: lit as a point light"),
+        // Logged once whether tracing or not: the engine's bump passes with LIGHTING on.
+        Note::BumpLit => unsafe {
+            if !BUMP_LIT {
+                BUMP_LIT = true;
+                log!("passthrough: the Borg bump shader drawn with LIGHTING on: the lights left out, as Direct3D ignores them under a vertex shader");
+            }
+        },
     }
 }

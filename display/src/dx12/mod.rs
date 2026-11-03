@@ -28,6 +28,7 @@
 pub mod cache;
 pub mod exports;
 pub mod mirror;
+pub mod pass;
 pub mod raw;
 
 use crate::log;
@@ -968,6 +969,8 @@ impl Dx {
         vcall!(l, slot::LIST_RESET, fn(P, P) -> i32, alloc, core::ptr::null_mut());
         let heaps = [self.views_heap, self.samplers_heap];
         vcall!(l, slot::LIST_SET_DESCRIPTOR_HEAPS, fn(u32, *const P) -> (), 2, heaps.as_ptr());
+        // A list reset has nothing set on it.
+        pass::forget();
         true
     }
 

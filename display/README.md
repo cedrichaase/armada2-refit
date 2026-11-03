@@ -501,9 +501,9 @@ dialogs (`user32.rs` leaves them alone). Without Display8 nothing raises the she
 ## Passthrough
 
 `Passthrough=1` in `Display8.ini` (shipped, since the GPU runs below passed, and the
-code's default too since 0.12.0; `0` drops every engine draw, as before): in stub mode on Vulkan the engine's own Direct3D 8 draws are
+code's default too since 0.12.0; `0` drops every engine draw, as before): in stub mode on Vulkan, and since 0.20.0 on Direct3D 12, the engine's own Direct3D 8 draws are
 drawn after all, on Display8's device, the way Direct3D 8's fixed function draws them
-(`src/passthrough.rs`, `src/vk/pass.rs`, `shaders/ff.hlsl`). It is ROADMAP phase 4's
+(`src/passthrough/`, `src/vk/pass.rs`, `src/dx12/pass.rs`, `shaders/ff.hlsl`). It is ROADMAP phase 4's
 first slice (4a, 4b, most of 4c, 4d, 4e and 4f on Vulkan). Without it, whatever render3d
 or the UI does not draw itself vanishes in stub mode: a module switched off
 (`[Modules] hulls=0`), a SOD render3d hands back (one that does not load, a hologram's
@@ -607,8 +607,57 @@ around its lights (seen in game on *Strange Bedfellows* with every render3d modu
 lines logged "once" are the tracer's: outside the bench, with `Trace=auto`, a player's
 log does not have them.)
 
-**What is not done yet**: Direct3D 12 and the stub's Direct3D 9 (phase 10; the
-latter is to go). Specular lighting, spot cones, texture transforms, a third stage and
+**On Direct3D 12** (0.20.0, phase 10 X1; `src/dx12/pass.rs`). The routing is the same
+code (`src/passthrough/mod.rs`), and so is every translation of the engine's state to
+what a pipeline and its constants hold: `src/passthrough/state.rs` names no API type,
+and `display/hosttest` (`cargo test --release --target x86_64-unknown-linux-gnu
+--manifest-path display/hosttest/Cargo.toml`) tests it on the host. Where Direct3D 8
+and Direct3D 12 number a thing alike (blend factors and operations, comparison
+functions, primitive topologies) the number is Direct3D's. What differs:
+
+- **No render pass is open between draws.** A draw sets what differs from what is set
+  (root signature, pipeline, targets, viewport and scissor, topology, root arguments,
+  vertex and index buffers) and draws. What it assumes set is forgotten whenever someone
+  else may have recorded: a plugin's `Cmd` begins or ends (`display8v1_dx12_pass`), a
+  `display8v1_dx12_flush`, a new frame (`pass::forget`). Display8 never sets descriptor
+  heaps (the frame's two are set when it begins; it takes descriptors from their ranges
+  as the plugins do), never samples, copies or changes the state of the pass it draws
+  into, and while a `Cmd` is alive records nothing (a mirror's update is copies and
+  barriers, which bind nothing: `gpu/src/display.rs`, "The rebind rule").
+- **Where it lands**: `exports::published()`, the pass a plugin published in this frame
+  (render3d publishes two kinds each frame, its 4x scene pass with depth while its body
+  runs, then a 1x pass with depth; the last published is the one), by its own `rtv` and
+  `dsv`, its formats and sample count in the pipeline's key; a published colour that is
+  Display8's own colour target is the engine's targets, as on Vulkan.
+- **One root signature**: the vertex block as a root CBV at b0 in space 0 (`vs_ff`) and
+  in space 1 (`vs_bump`; the DXIL's `CB_SPACES`), the pixel block as one at b1, a table
+  of t0 and t1 and a table of s0 and s1. The blocks are written once per change into the
+  frame's ring at 256 alignment (the pixel block at `PS_AT`).
+- **Pipelines** are made on first use (no library yet), keyed by the target's formats
+  and sample count, topology type, vertex layout, blend, depth and cull. The destination
+  alpha of the engine's back buffer reads one, as on Vulkan; blend factors that read
+  colour become the alpha ones for the alpha channel (Direct3D 12 refuses colour factors
+  there, Vulkan reads the same component). Cull follows Direct3D 8's clockwise culling
+  with a clockwise front face. What the vertices lack comes from a 48-byte defaults record
+  in the frame's ring, in slot 1 as **instance data** read by the draw's one instance:
+  a vertex stream of stride 0 is not asked for.
+- **Samplers** are made in the frame's sampler heap, one pair per distinct pair of stage
+  states in a frame, by `state::sampler_params` (DXVK's way under the game's
+  `dxvk.conf`: a linear filter anisotropic at the forced amount, the forced bias added
+  where there are mips); **textures** are the stub's mirrors (a view copied into the
+  frame's range, one table per distinct pair) or a 1x1 white one.
+
+Measured on the bench (2026-11-03, 1280x720, the GPU): `display-passthrough-d3d12`
+against Vulkan's frame RMSE 0.48 (`roundD-base-display-passthrough`; the plan's
+tolerance is 1.0), the showcase with `sky=0` and `hulls=0` against the same on Vulkan
+0.48, the nebula scene against the forward chain's baseline 0.9 (inside the scenario's
+1.5), `display-passthrough-all` (every module off, a Borg mission with the bump
+passes) and the stock front end through a campaign mission, save and load, Instant
+Action and the Credits (`display-stub`) with no `device removed`. The Vulkan frames are
+unchanged (RMSE 0 against the base).
+
+**What is not done yet**: the stub's Direct3D 9 (phase 10; it is to go) and a pipeline
+library for these pipelines. Specular lighting, spot cones, texture transforms, a third stage and
 `ZBIAS` are not drawn, each logged once when the engine uses it; none was seen in the
 stock traces.
 

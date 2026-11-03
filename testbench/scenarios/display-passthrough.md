@@ -23,6 +23,9 @@ reference:
     ./a2test run display-passthrough --install .
     ./a2test baseline compare passthrough-hulls --from <this run's case>
 
+On Direct3D 12 (display 0.20.0, phase 10 X1) this scene is `display-passthrough-d3d12`:
+run it first, one paused frame, and never two Direct3D 12 games at once.
+
 1. Launch the game.
 2. Wait up to 600 seconds for "Scene.log" to say "paused at tick".
 3. Expect "Render3D.log" contains "module hulls: off".
