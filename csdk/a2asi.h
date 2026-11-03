@@ -1,7 +1,7 @@
 /*
  * csdk/a2asi.h -- what every C plugin of this repository shares.  Header-only, no CRT.
  *
- * Used by qol/qol.c, qol/rules.c, online/online.c (and peer.c, which it includes) and
+ * Used by qol/qol.c, rules/rules.c, online/online.c (and peer.c, which it includes) and
  * cutscenes/binkproxy/binkproxy.c; built by each layer's build.sh with the import
  * libraries of csdk/def/ (one set of .def files, the union of what the plugins call:
  * an import library only costs a thunk for what a plugin really references).
@@ -16,6 +16,8 @@
  *     a2_log_path() puts a log in %LOCALAPPDATA%\armada2-refit\logs (the game directory
  *     if that is unset or not writable) and a2_log_where() writes the first line, which
  *     says where;
+ *   - a2_find_export(name): the address of an export of any loaded module (Online finds
+ *     QOLRules this way, never by its file name);
  *   - patching: a2_sig_is() checks a site's bytes against this build before a plugin
  *     patches, a2_poke() writes through VirtualProtect and flushes the instruction
  *     cache, a2_write_call() / a2_write_jmp() write a rel32 call or jmp, NOP-padded;
@@ -69,6 +71,7 @@ int _fltused = 0;
 #define PAGE_EXECUTE_READWRITE 0x40
 
 __declspec(dllimport) HMODULE __stdcall GetModuleHandleA(LPCSTR);
+__declspec(dllimport) BOOL    __stdcall K32EnumProcessModules(HANDLE, HMODULE *, DWORD, DWORD *);
 __declspec(dllimport) void *  __stdcall GetProcAddress(HMODULE, LPCSTR);
 __declspec(dllimport) DWORD   __stdcall GetModuleFileNameA(HMODULE, LPSTR, DWORD);
 __declspec(dllimport) BOOL    __stdcall VirtualProtect(void *, UINT, DWORD, DWORD *);
@@ -139,6 +142,27 @@ static inline long f_round(float f)
     long r;
     __asm__ __volatile__("flds %1\n\tfistpl %0" : "=m"(r) : "m"(f));
     return r;
+}
+
+/* ---- plugins find each other by what they export -------------------------- */
+
+/* The address of the export `name` of whichever loaded module has one, or NULL.  Walks
+ * the process's modules, so a plugin is found by what it does and never by its file
+ * name (a renamed or repackaged plugin still answers).  It takes a few microseconds:
+ * ask when you need it, not every frame. */
+static inline void *a2_find_export(const char *name)
+{
+    HMODULE mods[256];
+    DWORD needed = 0;
+    if (!K32EnumProcessModules(GetCurrentProcess(), mods, (DWORD)sizeof mods, &needed))
+        return NULLPTR;
+    DWORD n = needed / (DWORD)sizeof(HMODULE);
+    if (n > 256) n = 256;
+    for (DWORD i = 0; i < n; i++) {
+        void *f = GetProcAddress(mods[i], name);
+        if (f) return f;
+    }
+    return NULLPTR;
 }
 
 /* ---- the files beside Armada2.exe ---------------------------------------- */

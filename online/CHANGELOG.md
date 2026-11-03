@@ -4,6 +4,11 @@
 8 with a transport of our own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 and versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.11.0 — 2026-11-03
+
+### Changed
+- The rules handshake finds QOLRules through `a2_find_export` (`QOLRules_Wanted`, `_Network`, `_Reset`) instead of `GetModuleHandleA("QOLRules.asi")`: by what the plugin exports, not by its file name. The protocol (`R_RULES`) is unchanged. Installed, not yet seen in game.
+
 ## 0.10.1 — 2026-11-03
 
 ### Changed

@@ -12,13 +12,11 @@
 # A selectable layer a run does not select is TAKEN OUT, with its remove command, so
 # `--only render3d` on an install that has the UI leaves no UI.asi behind; on a clone that
 # started from stock (the test bench's --layers) that is a no-op. ./install keeps no
-# memory of the selection: the next plain ./install puts everything back. Until the rules
-# layer has its own installer it shares qol's, so --without rules leaves QOLRules.asi in
-# while qol is in.
+# memory of the selection: the next plain ./install puts everything back.
 #
 # The commands, in order, are each layer's `install` in layers.toml: the Direct3D chain
 # (platform/d3d8-chain.py --upgrade), Display8 (display/install), dxvk.conf
-# (renderer/renderer-config.sh), QOL.asi and QOLRules.asi (qol/install.sh), Online.asi
+# (renderer/renderer-config.sh), QOL.asi (qol/install.sh), QOLRules.asi (rules/install.sh), Online.asi
 # (online/install.sh), the textures and the loading-screen model built in $A2_DATA
 # (./a2tex install), the smoothed moons, asteroids, hulls and selection ring
 # (models/install.sh), the cutscene proxy and its movies (cutscenes/binkproxy/install.sh),

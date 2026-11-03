@@ -5,6 +5,11 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 2.0.0 — 2026-11-03
+
+### Removed
+- `QOLRules.asi` leaves the layer (MAJOR): it is the `rules` layer now (`rules/`). `qol/install.sh` no longer installs or removes `QOLRules.asi`, `QOLRules.ini` and `QOLRules.log` (`rules/install.sh` does), `qol/build.sh` no longer builds it, and QOL-7's README section moved to `rules/README.md`. `./install` installs both as before. Installed, not yet seen in game.
+
 ## 1.10.1 — 2026-11-03
 
 ### Changed

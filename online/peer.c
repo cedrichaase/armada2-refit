@@ -749,7 +749,7 @@ static void conn_lost(Peer *p, Conn *c, DWORD reason)
 static void say(Peer *p, int chat, const char *text, int sticky);
 
 /* ---- QOLRules: agreeing on the rules (caller holds p->cs) -------------------
- * QOLRules.asi (qol/) changes when the bank is charged, which every node of a
+ * QOLRules.asi (rules/) changes when the bank is charged, which every node of a
  * network game simulates, so it may run only if every player runs it.  Each joiner
  * tells the host whether it does (R_RULES, right after it is accepted); the host
  * answers every joiner, and again on every change, with whether all of them
@@ -761,8 +761,7 @@ typedef void (*RulesSetFn)(int);
 
 static void *rules_proc(const char *name)
 {
-    HMODULE m = GetModuleHandleA("QOLRules.asi");
-    return m ? (void *)GetProcAddress(m, name) : 0;
+    return a2_find_export(name);   /* by export, never by the plugin's file name */
 }
 
 static int rules_wanted(void)

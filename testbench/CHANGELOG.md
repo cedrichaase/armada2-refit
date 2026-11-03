@@ -5,6 +5,11 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.99.1 — 2026-11-03
+
+### Changed
+- `multiplayer-online-rules-mixed` keeps `online/bench-asi.sh --no-rules joiner` (`Layers:` applies to a whole run, not to one player); the QOL-7 references of the rules scenarios point at `rules/README.md`. Installed, not yet seen in game.
+
 ## 3.99.0 — 2026-11-03
 
 ### Added

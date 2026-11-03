@@ -38,7 +38,7 @@ schema = 1
 # The ::step ids publish/installer/install.sh and install.ps1 print, in order, and
 # publish/package.sh's manifest `steps`. `own` are the steps of no layer; `extra` the
 # ones printed outside that order (--uninstall).
-steps = ['verify', 'prereqs', 'chain', 'display', 'render3d', 'ui', 'qol', 'models',
+steps = ['verify', 'prereqs', 'chain', 'display', 'render3d', 'ui', 'qol', 'rules', 'models',
          'online', 'cutscenes', 'renderer', 'bloom', 'done']
 own = ['verify', 'done']
 extra = ['uninstall']
@@ -104,22 +104,19 @@ games = ['armada2']
 steps = ['qol']
 summary = 'right-drag pan speed, bigger selections and control groups; plays against stock players'
 
-# Shares qol's folder and installer until it has its own (rules/, phase 9 W-RULES):
-# until then qol/install.sh puts both in, so --without rules takes QOLRules out only
-# when qol goes too.
 [[layer]]
 id = 'rules'
 name = 'Rules'
-dir = 'qol'
-install = 'qol/install.sh'
-remove = 'qol/install.sh --remove'
+dir = 'rules'
+install = 'rules/install.sh'
+remove = 'rules/install.sh --remove'
 files = ['QOLRules.asi', 'QOLRules.ini']
 select = 'on'
 requires = []
 scope = 'match'
 games = ['armada2']
-steps = ['qol']
-summary = 'pay for an item when it is queued; against the computer only, it stands down online'
+steps = ['rules']
+summary = 'pay for an item when it is queued; every player of a network game needs it, and a game with anyone lacking it plays stock rules'
 
 [[layer]]
 id = 'online'

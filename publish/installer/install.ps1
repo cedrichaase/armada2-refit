@@ -604,7 +604,9 @@ if ($D3d9) {
 }
 Step qol "quality of life"
 Put "QOL.asi"; Put "QOL.ini"
-# Pay on queue; against the computer only, it stands down in a network game.
+Step rules "rules"
+# Pay on queue: every player of a network game needs it (a game with anyone lacking it
+# plays stock rules); against the computer only, it stands down in other transports.
 Put "QOLRules.asi"; Put "QOLRules.ini"
 Step models "models"
 $Py = @(Find-Python)

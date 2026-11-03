@@ -1,8 +1,8 @@
 # The QOLRules.asi settings the Refit screen lists (A2SET_ABI 1.0; tools/settings/README.md).
-# Edit here, then run tools/settings/gen.py: it writes rules_settings_table.h.
+# Edit here, then run tools/settings/gen.py: it writes settings_table.h.
 plugin = "QOLRules"
 file = "QOLRules.ini"
-shipped = "qol/QOLRules.ini"
+shipped = "rules/QOLRules.ini"
 
 [[row]]
 name = "payonqueue"

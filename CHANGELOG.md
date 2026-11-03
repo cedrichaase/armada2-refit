@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 14.0.0 — 2026-11-03
+
+Layers: qol 2.0.0, rules 1.0.0, online 0.11.0, ui 0.34.0, gui-installer 2.4.1, testbench 3.99.1.
+
+### Added
+- The `rules` layer (`rules/`, phase 9 W-RULES): QOLRules.asi leaves `qol/` with its source, settings table, symbol profile output and ini, and gets its own `build.sh`, `install.sh`, README and changelog. File names, exports and the `[QOLRules.Rules]` overlay section are unchanged. `layers.toml`: `rules` is `dir = 'rules'` with its own install and remove, step `rules` after `qol`; the release scripts print `::step rules`, `package.sh` builds it and lists it in the manifest as a layer of its own, and the GUI installer has the step.
+- `a2_find_export(name)` in `csdk/a2asi.h` (module enumeration); `K32EnumProcessModules` in `csdk/def/kernel32.def`.
+
+### Changed
+- Contract C7: Online asks for `QOLRules_Wanted` / `_Network` / `_Reset` by export, not by DLL name. A player without the layer reports no rules and the host plays stock for everyone (the protocol is unchanged). The Refit screen's Multiplayer tab says so when `QOLRules_Settings` is absent.
+- `PayOnQueue` ships on and the installers select the layer by default. Installed, not yet seen in game.
+
 ## 13.92.0 — 2026-11-03
 
 Layers: ui 0.33.0, render3d 0.44.1, qol 1.10.1, online 0.10.1, cutscenes 2.6.1.
