@@ -5,6 +5,19 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.94.0 — 2026-11-03
+
+### Added
+- Scenario `render3d-live-msaa` (`MSAA` 4 to 0, 8, 4 and `HDR` 1 to 0 to 1 on the paused
+  showcase, each at RMSE 0 against the baseline of the same key at load).
+
+### Changed
+- `ui-menus-refit`: the Anti-aliasing step is a live row now (`Now`, no restart banner).
+- `Clock: bench` for `render3d-cone-emitter`, `-hulls-extras`, `-hull-sparks`,
+  `-specialfx` and `-planet-ghost`, so two launches draw the same picture.
+
+Installed, not yet seen in game.
+
 ## 3.93.0 — 2026-11-03
 
 ### Added

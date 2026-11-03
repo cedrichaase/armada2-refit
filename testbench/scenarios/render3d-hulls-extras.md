@@ -3,6 +3,7 @@
 Resolutions: 16:9
 Mod: refit
 Launch: -nointro a2_borg01
+Clock: bench
 Setup: testbench/scene/bench-setup.sh stations
 Timeout: 12 min
 

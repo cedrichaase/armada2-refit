@@ -321,6 +321,14 @@ pub fn reset() {
     }
 }
 
+pub fn formats_changed() {
+    for e in all().iter_mut() {
+        if e.present() {
+            e.m.formats_changed();
+        }
+    }
+}
+
 pub fn forget() {
     for e in all().iter_mut() {
         if e.present() {

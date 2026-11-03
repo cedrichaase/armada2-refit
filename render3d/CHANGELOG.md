@@ -4,6 +4,22 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.42.0 — 2026-11-03
+
+### Changed
+- The frame: `MSAA` and `HDR` are `apply = "live"`. `Render3D_SettingsChanged` swaps a
+  new `Config` in (`config::reload`) and, when either moved, `frame::formats_changed`
+  drops the scene targets and post passes and calls every present module's
+  `formats_changed`; the next view makes them again. `Bloom`, `BloomThreshold`,
+  `BloomKnee`, `Exposure` and `Shoulder` follow live as well. The settings log line
+  names them (`Render3D.MSAA=0`).
+- The menu scene's map recipe moved from `render3d/menus/map.ini` to
+  `render3d/content/menu/map.ini` (still built in; `Menu\map.ini` in the game
+  directory still takes precedence). `install.sh` takes every recipe from
+  `render3d/content/`.
+
+Installed, not yet seen in game.
+
 ## 0.41.0 — 2026-11-03
 
 ### Changed

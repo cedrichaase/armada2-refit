@@ -163,7 +163,20 @@ pub extern "C" fn Render3D_SettingsChanged() {
         return;
     }
     rt::ini_refresh_all();
-    let said = mods::apply_settings();
+    let mut said = mods::apply_settings();
+    // The frame's own keys: swapped in whole; MSAA or HDR moving rebuilds the scene
+    // target (and the post passes made for its format) at the next view.
+    if let Some((parts, formats)) = config::reload() {
+        if !parts.is_empty() {
+            if !said.is_empty() {
+                said.push_str(", ");
+            }
+            said.push_str(&parts);
+        }
+        if formats {
+            frame::formats_changed();
+        }
+    }
     if said.is_empty() {
         log!("settings: re-read, nothing changed");
     } else {

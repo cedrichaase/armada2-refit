@@ -11,8 +11,9 @@ clone has the checkout's UI.asi, Render3D.asi and QOL.asi.
 
 **Shell.** Options shows `Refit` after the stock entries; a click opens the modal with its
 five tabs. Graphics: `Sky` (live) writes `[Render3D.Modules] sky=0` to `RefitPlayer.ini`
-and Render3D.log says `settings: applied`; `Anti-aliasing` 2x is a restart row, so the
-badge `Restart needed` and the banner `Restart the game to apply: Anti-aliasing` show.
+and Render3D.log says `settings: applied`; `Anti-aliasing` 2x is a live row since render3d
+0.42.0 (the scene target is made again at the next view), so Render3D.log says
+`settings: applied Render3D.MSAA=2`, the badge is `Now` and no restart banner shows.
 Interface: `Theme` Borg restyles the screen at once, Auto removes the key again. Gameplay:
 `Right-drag pan speed` Stock is applied by QOL at once; `Show advanced` reveals `Largest
 selection`. Multiplayer: `Must match` stands on *Pay when queued* and nothing is `Locked`
@@ -64,11 +65,11 @@ Refit, so `Ships` is not switched on again here; the clone is discarded.)
 30. Wait 1 second.
 31. Click "2x".
 32. Wait 2 seconds.
-33. Expect "UI.log" contains "(restart)".
-34. Expect "Restart needed" is visible.
-35. Expect "Restart the game to apply: Anti-aliasing" is visible.
+33. Expect "UI.log" contains "(now)".
+34. Expect "Render3D.log" contains "Render3D.MSAA=2".
+35. Expect "Restart the game to apply: Anti-aliasing" is not visible.
 36. Expect "RefitPlayer.ini" contains "MSAA=2".
-37. Take a screenshot called "refit restart needed".
+37. Take a screenshot called "refit msaa live".
 ## Interface
 38. Click "Interface".
 39. Wait 1 second.

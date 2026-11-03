@@ -3,6 +3,7 @@
 Resolutions: 1280x720
 Mod: refit
 Launch: -nointro a2_borg01
+Clock: bench
 Setup: testbench/scene/bench-setup.sh fog-planet
 Timeout: 6 min
 

@@ -84,6 +84,51 @@ pub fn set(c: Config) {
     let _ = old;
 }
 
+/// `Render3D_SettingsChanged`: reads `[Render3D]` again and swaps the configuration in.
+/// `Enable`, `Log` and `Timing` are latched at load and stay as they were. Returns what
+/// changed for the settings log line (`Render3D.MSAA=0`, ...), and whether the scene
+/// target's format or samples did (`frame::formats_changed` is then owed). None when
+/// stood down.
+pub fn reload() -> Option<(alloc::string::String, bool)> {
+    let old = get()?;
+    let mut n = load();
+    n.enable = old.enable;
+    n.log = old.log;
+    n.timing = old.timing;
+    n.timing_every = old.timing_every;
+    let mut said = alloc::string::String::new();
+    let mut note = |k: &str, v: &dyn core::fmt::Display| {
+        if !said.is_empty() {
+            said.push_str(", ");
+        }
+        said.push_str(&crate::sfmt!("Render3D.{}={}", k, v));
+    };
+    if n.msaa != old.msaa {
+        note("MSAA", &n.msaa);
+    }
+    if n.hdr != old.hdr {
+        note("HDR", &(n.hdr as u32));
+    }
+    if n.bloom != old.bloom {
+        note("Bloom", &n.bloom);
+    }
+    if n.bloom_threshold != old.bloom_threshold {
+        note("BloomThreshold", &n.bloom_threshold);
+    }
+    if n.bloom_knee != old.bloom_knee {
+        note("BloomKnee", &n.bloom_knee);
+    }
+    if n.exposure != old.exposure {
+        note("Exposure", &n.exposure);
+    }
+    if n.shoulder != old.shoulder {
+        note("Shoulder", &n.shoulder);
+    }
+    let formats = n.msaa != old.msaa || n.hdr != old.hdr;
+    set(n);
+    Some((said, formats))
+}
+
 /// The configuration; None when the plugin stood down.
 pub fn get() -> Option<&'static Config> {
     let p = CFG.load(Ordering::Acquire);
