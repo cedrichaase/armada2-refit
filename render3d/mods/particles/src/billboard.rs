@@ -20,7 +20,7 @@ use r3d_core::frame::steps::View;
 pub fn draw(v: &View, cam: &Cam, batch: &mut Batch) -> u32 {
     let mut n = 0;
     let t = v.time.max(0.0);
-    engine::for_each_in_list(engine::OBJECT_LIST, |o| {
+    engine::for_each_in_list(engine::object_list(), |o| {
         let Some(name) = hooks::billboard_effect(o) else { return };
         if obj::expired(o) || !obj::can_user_see(o) {
             return;

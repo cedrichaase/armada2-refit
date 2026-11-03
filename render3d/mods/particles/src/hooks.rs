@@ -22,17 +22,14 @@ use r3d_core::math::V3;
 use alloc::collections::BTreeSet;
 use alloc::vec::Vec;
 
-use r3d_core::engine::DX8_VTABLE as VT_DEVICE_DX8;
-use crate::syms::sym;
+use crate::syms::{hook, sym, TABLE};
 
 /// An engine address of the profile: 0 unless the hook that uses it is ready.
-pub(crate) fn at(s: a2engine::Sym) -> usize { crate::syms::TABLE.engine().addr(s) }
-const SLOT_RENDER_PARTICLE: usize = 50;
-pub(crate) fn fn_render_particle() -> usize { at(sym::FN_RENDER_PARTICLE) }
+pub(crate) fn at(s: a2engine::Sym) -> usize { TABLE.engine().addr(s) }
+pub(crate) fn vt_device_dx8() -> usize { at(sym::VT_DEVICE_DX8) }
+const SLOT_RENDER_PARTICLE: usize = 50; // = the profile's slot_render_particle index
 const ENG_CURRENT_INSTANCE: usize = 0x100;
 
-pub(crate) fn site_billboard() -> usize { at(sym::SITE_BILLBOARD) } // GameObject::RenderInternal: call RenderSpriteNodeEffect
-pub(crate) fn fn_effect() -> usize { at(sym::FN_EFFECT) } // ST3D_Instance::RenderSpriteNodeEffect(nd, size, pull), thiscall
 pub(crate) fn fn_sphere() -> usize { at(sym::FN_SPHERE) } // Entity::GetBoundingSphere() const, thiscall: centre, radius
 const OBJ_EFFECT: usize = 0x3c;
 
@@ -116,32 +113,42 @@ unsafe extern "thiscall" fn billboard_stub(inst: usize, nd: usize, size: f32, pu
 /// the module cannot draw without: the engine's draw of an owned object's particles
 /// would double ours.
 pub fn install(h: &mut Hooks) {
+    if !h.ready(&TABLE, hook::PARTICLES_READS) {
+        h.stand_down("the engine's reads are not stock");
+        return;
+    }
     unsafe { GATE = Some(h.gate()) };
     let owner = h.owner();
-    let rp = Hook {
-        owner,
-        used_by: "particles' draw of an owned object's particles",
-        kind: Kind::Slot { vt: VT_DEVICE_DX8, slot: SLOT_RENDER_PARTICLE },
-        site: Site { symbol: "ST3D_DeviceDirectX8::RenderParticle", addr: VT_DEVICE_DX8, expect: fn_render_particle() },
-        to: render_particle as *const () as usize,
-        chain: true,
-    };
-    match h.install(rp) {
-        Some(p) => unsafe { PREV_RP = p },
-        None => h.stand_down("RenderParticle is not stock's"),
+    if h.ready(&TABLE, hook::PARTICLES_PARTICLE) {
+        let rp = Hook {
+            owner,
+            used_by: "particles' draw of an owned object's particles",
+            kind: Kind::Slot { vt: vt_device_dx8(), slot: SLOT_RENDER_PARTICLE },
+            site: Site { addr: vt_device_dx8(), ..Site::of(&TABLE, sym::SLOT_RENDER_PARTICLE) },
+            to: render_particle as *const () as usize,
+            chain: true,
+        };
+        match h.install(rp) {
+            Some(p) => unsafe { PREV_RP = p },
+            None => h.stand_down("RenderParticle is not stock's"),
+        }
+    } else {
+        h.stand_down("RenderParticle is not stock's");
     }
-    let bb = Hook {
-        owner,
-        used_by: "particles' billboard effects",
-        kind: Kind::Call,
-        site: Site { symbol: "GameObject::RenderInternal", addr: site_billboard(), expect: fn_effect() },
-        to: billboard_stub as *const () as usize,
-        chain: false,
-    };
-    if let Some(p) = h.install(bb) {
-        unsafe {
-            PREV_EFFECT = p;
-            BILLBOARDS = true;
+    if h.ready(&TABLE, hook::PARTICLES_BILLBOARD) {
+        let bb = Hook {
+            owner,
+            used_by: "particles' billboard effects",
+            kind: Kind::Call,
+            site: Site::of(&TABLE, sym::SITE_BILLBOARD),
+            to: billboard_stub as *const () as usize,
+            chain: false,
+        };
+        if let Some(p) = h.install(bb) {
+            unsafe {
+                PREV_EFFECT = p;
+                BILLBOARDS = true;
+            }
         }
     }
 }
@@ -259,10 +266,11 @@ pub fn free_emitter_shots() -> Vec<(usize, &'static str)> {
             guard += 1;
             let o = field(n, 8);
             n = field(n, 0);
-            match engine::vtable(o) {
-                vt_chain_pulsar() if field(o, CHAIN_EMITTER) != 0 => ords.push((o, content::CHAIN_EMITTER)),
-                vt_manheim() if field(o, MANHEIM_EMITTER) != 0 => ords.push((o, content::MANHEIM_EMITTER)),
-                _ => {}
+            let vt = engine::vtable(o);
+            if vt == vt_chain_pulsar() && field(o, CHAIN_EMITTER) != 0 {
+                ords.push((o, content::CHAIN_EMITTER));
+            } else if vt == vt_manheim() && field(o, MANHEIM_EMITTER) != 0 {
+                ords.push((o, content::MANHEIM_EMITTER));
             }
         }
     }
