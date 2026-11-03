@@ -224,7 +224,7 @@ impl Draw {
 // ---- images for the style --------------------------------------------------------------
 
 /// A BMP from the game's files (`Menus/mainbkgr.bmp`, the widescreen menu plates that
-/// `menus/install-plates.sh` installs), 24- or 32-bit uncompressed, as a texture; None
+/// `ui/backdrops/install-plates.sh` installs), 24- or 32-bit uncompressed, as a texture; None
 /// if it is missing or another format. The caller keeps the `Tex`.
 pub fn load_bmp(rel: &str) -> Option<super::Tex> {
     let b = crate::rt::read_file(&crate::rt::game_path(rel))?;

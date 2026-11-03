@@ -1264,7 +1264,7 @@ pub fn tooltip(ui: &mut Ui, r: R, s: &str, alpha: f32) {
 
 static mut PLATE: Option<Option<crate::gfx::Tex>> = None;
 
-/// The menu plate (`Menus/mainbkgr.bmp`, installed by menus/install-plates.sh), loaded
+/// The menu plate (`Menus/mainbkgr.bmp`, installed by ui/backdrops/install-plates.sh), loaded
 /// on first use; None when it is not installed.
 #[allow(static_mut_refs)]
 pub fn plate() -> Option<crate::gfx::Tex> {

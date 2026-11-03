@@ -22,8 +22,8 @@ fn eng() -> &'static a2engine::Engine {
 }
 
 /// `ST3D_GraphicsEngine::SetActiveDisplay(ST3D_DisplayType)`, thiscall: 2 is the 3D
-/// display (the game's resolution), 3 the shell's (800x600 stock, or what Menus.asi
-/// raises it to).
+/// display (the game's resolution), 3 the shell's (800x600 stock, or what Display8
+/// raises it to for the menu host).
 const DISPLAY_3D: u32 = value::SHELL_DISPLAY_3D as u32;
 const DISPLAY_SHELL: u32 = value::SHELL_DISPLAY_SHELL as u32;
 const SHELL_MODE_MAIN_MENU: i32 = value::SHELL_MODE_MAIN_MENU;

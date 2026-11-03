@@ -24,7 +24,7 @@ use crate::widgets::Ui;
 use alloc::vec::Vec;
 
 /// Where the 800x600 design space lands on the back buffer: filling its height, centred,
-/// at 4:3 (wider screens get bars, or what a screen draws there), as Menus.asi fits it.
+/// at 4:3 (wider screens get bars, or what a screen draws there).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Fit {
     pub x: f32,

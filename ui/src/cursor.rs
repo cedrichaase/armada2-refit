@@ -8,9 +8,7 @@
 //! The sprites come from `Sprites/cursor.spr`, read at run time: each line names a
 //! texture, a rectangle in it (in a reference size, so as fractions of the texture),
 //! how many frames of the strip it animates (`@anim=cursorNx1`) and its hotspot
-//! (`@origin`, in texels of the 32x32 sprite). The art is the stock art: when the
-//! texture has a `.a2neb-backup` beside it (an earlier run of `hud/cursor-aspect.py`
-//! squashed it), that is read instead. Black is the colour key, as in the engine.
+//! (`@origin`, in texels of the 32x32 sprite). The art is the stock art. Black is the colour key, as in the engine.
 use crate::gfx::{self, Tex, R};
 use crate::surface::Context;
 use crate::widgets::Ui;

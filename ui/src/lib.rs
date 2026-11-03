@@ -118,11 +118,10 @@ fn startup() {
 }
 
 /// `UI_SettingsNote` (tools/settings/README.md, C5): why a row's part is not running now.
-/// The HUD's rows while the HUD stood down; the command bar's rows while GridLayout.asi
-/// owns the bar. NULL for the plugin as a whole and for any other row.
+/// The HUD's rows while the HUD stood down. NULL for the plugin as a whole and for any other row.
 #[unsafe(no_mangle)]
 pub extern "C" fn UI_SettingsNote(row: *const rt::settings::Setting) -> *const u8 {
-    use settings_table::{HUD_BAR, HUD_BARHIDDEN, HUD_BARLABELS, HUD_ENABLE};
+    use settings_table::{HUD_BARHIDDEN, HUD_ENABLE};
     if row.is_null() {
         // The plugin as a whole: an Armada2.exe Refit does not know.
         return syms::note_plugin().unwrap_or(core::ptr::null());
@@ -145,12 +144,6 @@ pub extern "C" fn UI_SettingsNote(row: *const rt::settings::Setting) -> *const u
         };
         if why[0] != 0 {
             return why.as_ptr();
-        }
-    }
-    if core::ptr::eq(r, HUD_BAR) || core::ptr::eq(r, HUD_BARLABELS) {
-        let grid = unsafe { rt::win::GetModuleHandleA(c"GridLayout.asi".as_ptr() as *const u8) };
-        if !grid.is_null() {
-            return b"The command bar is GridLayout.asi's while it is installed\0".as_ptr();
         }
     }
     core::ptr::null()
