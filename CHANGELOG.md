@@ -5,6 +5,21 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.73.0 — 2026-11-03
+
+Layers: render3d 0.40.0, testbench 3.92.0.
+
+### Changed
+- render3d: world and overlays onto the module layers (`hooks.rs`, `content.rs`,
+  `configure`), their hooks behind the module gates, `Modules.world`, `Modules.overlays`
+  and `World.Planets/Rocks/Nebulae` live; the surfaces' and nebulae's recipes moved to
+  `render3d/content/` and are built in. No change to what is drawn. Installed, not yet
+  seen in game
+- `render3d/install.sh`, `publish/package.sh`: the recipes' new source paths.
+
+### Added
+- testbench: scenarios `render3d-live-world` and `render3d-live-world-nebula`.
+
 ## 13.71.0 — 2026-11-03
 
 Layers: render3d 0.38.0, testbench 3.90.0.

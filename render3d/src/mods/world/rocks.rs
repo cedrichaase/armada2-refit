@@ -18,7 +18,9 @@
 //!   `ScaleSOD`; `AsteroidFieldInstance::RenderInternal` draws each rock its distance
 //!   cull keeps.
 use super::surfaces::{self, Surfaces};
-use crate::engine::{self, field, field_f32, field_m34, field_u8, obj, rd};
+use super::hooks;
+use crate::engine::obj;
+use crate::rt::Ini;
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use gpu::{attr, AttrFormat, Blend, Block, Compare, Cull, Depth, Format, Pipeline, PipelineDesc, Semantic, Topology, VertexAttr};
@@ -27,18 +29,13 @@ use crate::scene::{self, pose, Model};
 use crate::shaders::world_rock::*;
 use crate::shaders::world_rock_spv::*;
 use crate::shaders::world_rock_dxil::*;
-use crate::{assets, log, rt};
+use crate::{assets, log};
 use alloc::collections::BTreeMap;
 use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-pub const VT_SCRAP: usize = 0x6b15b4;
-pub const VT_ASTEROID_FIELD: usize = 0x6b0cb4;
-const ASTEROID_NAMES: usize = 0x6b07e8;
-const CFG_CULL_DISTANCE: usize = 0x6fcac0; // cfgOBJECT_CULLING_DISTANCE
-const FN_RES_VALUE: usize = 0x4d6820; // ResourceInterface::GetTotalValue, thiscall -> float
-const FN_RES_MAX: usize = 0x4cf1f0; // ResourceInterfaceClass::GetTotalMaxValue, thiscall -> float
+pub use super::hooks::{VT_ASTEROID_FIELD, VT_SCRAP};
 
 /// What a part of a model is to us.
 #[derive(Clone, Copy, PartialEq)]
@@ -132,8 +129,7 @@ struct Look {
 }
 
 impl Look {
-    fn read() -> Look {
-        let ini = crate::config::ini();
+    fn read(ini: &Ini) -> Look {
         let s = "World";
         Look {
             ambient: ini.floats(s, "RockAmbient", [0.05, 0.05, 0.07]),
@@ -154,21 +150,21 @@ impl Look {
 }
 
 impl Rocks {
-    pub fn new() -> Rocks {
+    pub fn new(ini: &Ini) -> Rocks {
         Rocks {
             pipes: Pipes::new(),
             info: BTreeMap::new(),
             scales: BTreeMap::new(),
             glows: Vec::new(),
             sprites: Vec::new(),
-            look: Look::read(),
+            look: Look::read(ini),
             said: 0,
         }
     }
 
     /// The look read again (`[World] Reload=1`).
-    pub fn reload(&mut self) {
-        self.look = Look::read();
+    pub fn reload(&mut self, ini: &Ini) {
+        self.look = Look::read(ini);
     }
 
     pub fn reset(&mut self) {
@@ -249,7 +245,7 @@ impl Rocks {
         let mut world: M34 = obj::transform(o);
         // The scale an Entity sets on its instance (a moon shrinks as it is mined),
         // applied while the instance's flag +0x74 is on.
-        let sc = if inst != 0 && field_u8(inst, 0x74) != 0 { unsafe { rd::<V3>(inst + 0x28) } } else { v3(1.0, 1.0, 1.0) };
+        let sc = hooks::instance_scale(inst);
         if s <= 0.0 {
             s = 1.0;
         }
@@ -261,7 +257,7 @@ impl Rocks {
         let p = pose::pose(&model.sod, &model.info, &world, clock, pose::auto(v.eye));
         // Its sprite nodes (the moon's `oreglow` nimbus), on the instance's clock as
         // GameObject::RenderInternal plays them; their colour is the light in the cracks.
-        let (since, flags) = if inst != 0 { ((v.time - unsafe { rd::<f32>(inst + 0x18) }).max(0.0), field(inst, 0xc) as u32) } else { (v.time, 3) };
+        let (since, flags) = hooks::instance_clock(inst, v.time);
         let nimbus = self.sprite_nodes(v, &model, &p, sc.x * s, since, flags);
         let core = self.crack_light(glow, nimbus);
         self.draw_model(v, &model, &p, glow, core, surf);
@@ -359,9 +355,8 @@ impl Rocks {
     pub fn draw_field(&mut self, o: usize, v: &View, surf: &mut Surfaces) -> bool {
         let inst = obj::instance(o);
         let cls = obj::class(o);
-        let (arr, n) = (field(inst, 0x98), field(inst, 0x9c));
-        let dbs = field(cls, 0x1e0);
-        let ndb = field(cls, 0x1fc).min(16);
+        let (arr, n) = hooks::field_rocks(inst);
+        let (dbs, ndb) = hooks::field_databases(cls);
         if arr == 0 || dbs == 0 || n > 256 {
             return false;
         }
@@ -369,17 +364,15 @@ impl Rocks {
             return true;
         }
         let scale = self.scale_sod(obj::odf_name(o));
-        let limit = unsafe { rd::<f32>(CFG_CULL_DISTANCE) };
+        let limit = hooks::cull_distance();
         for i in 0..n {
-            let a = arr + i * 0x98;
-            let db = field(a, 0x80);
-            let Some(k) = (0..ndb).find(|&k| field(dbs, k * 4) == db) else { continue };
-            let nm = unsafe { rt::cstr_at(field(ASTEROID_NAMES, k * 4) as *const u8, 32) };
-            let world0 = field_m34(a, 0x44);
+            let a = hooks::rock(arr, i);
+            let Some(nm) = hooks::rock_model(a, dbs, ndb) else { continue };
+            let world0 = hooks::rock_world(a);
             // GameObjectInstance::DistanceCull, as the field's RenderInternal asks it:
             // the distance with height counted a quarter, against the culling distance.
             let d = world0.p - v.eye;
-            if engine::field_u8(a, 0x84) != 0 || (d.x * d.x + d.y * d.y / 16.0 + d.z * d.z) > limit * limit {
+            if hooks::rock_hidden(a) || (d.x * d.x + d.y * d.y / 16.0 + d.z * d.z) > limit * limit {
                 continue;
             }
             let Some(model) = scene::model(nm) else { continue };
@@ -632,21 +625,5 @@ fn relief_strength(s: &surfaces::Surface) -> f32 {
 /// The moon's glow colour as `Scrap::Render` sets it, or None for a Scrap without
 /// dilithium (its shell keeps the material's colour: the full glow).
 fn glow_colour(o: usize) -> Option<V3> {
-    let res = field(o, 0x17c);
-    let full = v3(0.0, 0.5, 1.0);
-    if res == 0 || field_u8(res, 0x18) != 0 {
-        return Some(full);
-    }
-    let rc = field(res, 4);
-    if rc == 0 {
-        return Some(full);
-    }
-    let (val, max) = unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> f32 = core::mem::transmute(FN_RES_VALUE);
-        let g: unsafe extern "thiscall" fn(usize) -> f32 = core::mem::transmute(FN_RES_MAX);
-        (f(res), g(rc))
-    };
-    let frac = if max > 0.0 { val / max } else { 1.0 };
-    let _ = field_f32;
-    Some(full * frac)
+    Some(v3(0.0, 0.5, 1.0) * hooks::moon_dilithium(o))
 }

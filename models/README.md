@@ -174,7 +174,7 @@ meet at a median of 22 to 39 degrees with a tail of sharp edges up to 138, and a
 `--crease 55` the sharpest sixth stay edges: broken ridges with rounded faces between.
 No patch folds over (a triangle turned against the stock face it was cut from) at any
 crease up to 70; at 90 two do on `Master7`. The surface detail is not geometry: it is
-render3d's recipes `Master1` and `Master2` (`render3d/surfaces/`), lit per pixel by its
+render3d's recipes `Master1` and `Master2` (`render3d/content/surfaces/`), lit per pixel by its
 hulls module (`render3d/README.md`, world module).
 
 `Master6` is the one model whose node matrix is a mirror and whose triangles are wound

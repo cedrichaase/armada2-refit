@@ -22,7 +22,8 @@
 //! is, added, depth-tested and not written. Stock stretches the bubble with a warping
 //! hull (`WarpInstance`); that is not done here yet.
 use gpu::{Blend, Block, Compare, Cull, Depth, Format, Pipeline, PipelineDesc, Topology};
-use crate::engine::{field, field_f32, obj, rd};
+use super::hooks::{self, entity, team_colour};
+use crate::engine::obj;
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::math::{v3, M34, V3};
@@ -33,24 +34,6 @@ use crate::shaders::overlays_dxil::PS_COLOUR_DXIL;
 use crate::shaders::sod::VS_SOD;
 use crate::shaders::sod_spv::VS_SOD_SPV;
 use crate::shaders::sod_dxil::VS_SOD_DXIL;
-
-const BUCKETS: usize = 0x773c8c;
-const FN_RENDER_SELECTION: usize = 0x599900; // RenderSelectionEffects, cdecl
-const FN_ENTITY_GET: usize = 0x4cfff0; // Entity::Get(handle), cdecl
-const FN_USER_TEAM: usize = 0x5578b0; // Transport::getUserTeam, thiscall
-const FN_RELATION: usize = 0x4d1080; // GameObject::GetTeamRelation(team), thiscall
-const FN_IS_SCALED: usize = 0x4cff60; // Entity::IsScaled, thiscall
-const FN_SCALE_FACTOR: usize = 0x4cff40; // Entity::GetScaleFactor, thiscall: Vector3*
-
-pub fn entity(handle: usize) -> usize {
-    unsafe { core::mem::transmute::<usize, unsafe extern "C" fn(usize) -> usize>(FN_ENTITY_GET)(handle) }
-}
-
-/// An object's team colour (`+0xf0`, the team, `+8`).
-pub fn team_colour(o: usize) -> V3 {
-    let t = field(o, 0xf0);
-    if t == 0 { V3::ZERO } else { unsafe { rd::<V3>(t + 8) } }
-}
 
 pub struct Selection {
     pipes: Pipes,
@@ -82,29 +65,17 @@ impl Selection {
         // puts in `RenderSelectionEffects`.
         let others = match crate::gfx::gpu().claimed_by_others() {
             Some(c) => c & gpu::display::CLAIM_SELECTION != 0,
-            None => (unsafe { rd::<u8>(FN_RENDER_SELECTION) }) == 0xc3,
+            None => hooks::selection_effects_returns(),
         };
         if others {
             return true;
         }
         let Some(model) = scene::model("select") else { return false };
-        let profile = field_f32(unsafe { rd::<usize>(super::USER_PROFILE) }, 0x48);
-        let user_team = unsafe {
-            let t = rd::<usize>(super::G_TRANSPORT);
-            if t == 0 { -1 } else { core::mem::transmute::<usize, unsafe extern "thiscall" fn(usize) -> i32>(FN_USER_TEAM)(t) }
-        };
+        let profile = hooks::selection_brightness();
+        let user_team = hooks::user_team();
         let now_ms = (crate::clock::anim_now() * 1000.0) as u64;
         let mut passes: alloc::vec::Vec<(M34, V3)> = alloc::vec::Vec::new();
-        for b in 0..16 {
-            let mut e = unsafe { rd::<usize>(BUCKETS + b * 4) };
-            let mut guard = 0;
-            while e != 0 && guard < 10000 {
-                guard += 1;
-                let next = field(e, 0x9c);
-                self.entry(e, profile, user_team, now_ms, &mut passes);
-                e = next;
-            }
-        }
+        hooks::each_selection_entry(|e| self.entry(e, profile, user_team, now_ms, &mut passes));
         if passes.is_empty() {
             return true;
         }
@@ -141,11 +112,11 @@ impl Selection {
 
     /// One entry's passes (world transform, colour), as `SelectionEffect::Render`.
     fn entry(&self, e: usize, profile: f32, user_team: i32, now_ms: u64, out: &mut alloc::vec::Vec<(M34, V3)>) {
-        let o = entity(field(e, 0x88));
+        let o = entity(hooks::entry_handle(e));
         if o == 0 || obj::flags(o) & 4 == 0 || !obj::can_user_see(o) {
             return;
         }
-        let bits = field(e, 0x84) as u32;
+        let bits = hooks::entry_bits(e);
         if bits & 2 != 0 {
             let period: u64 = if bits & 1 != 0 { 506 } else { 500 };
             if now_ms % period > period / 2 {
@@ -156,15 +127,15 @@ impl Selection {
         let team = team_colour(o);
         let mut c1 = if bits & 3 != 0 {
             if craft {
-                let rel = unsafe { core::mem::transmute::<usize, unsafe extern "thiscall" fn(usize, i32) -> i32>(FN_RELATION)(o, user_team) };
+                let rel = hooks::team_relation(o, user_team);
                 let base = match rel {
                     0 => v3(0.7, 0.0, 1.0),
                     1 => v3(0.0, 0.7, 1.0),
                     2 => v3(0.6, 0.6, 0.6),
                     _ => v3(0.0, 1.0, 0.0), // the material's own green, never changed
                 };
-                let h = field_f32(o, 0x158);
-                let phase = field_f32(e, 0x8c);
+                let h = hooks::object_pulse(o);
+                let phase = hooks::entry_phase(e);
                 base * (0.25 + 0.2 * (1.0 - h) * libm::sinf(phase))
             } else {
                 team * 0.25
@@ -173,14 +144,9 @@ impl Selection {
             V3::ZERO
         };
         c1 = c1 * profile;
-        let mut s: V3 = unsafe { rd(e + 0x90) };
-        unsafe {
-            if core::mem::transmute::<usize, unsafe extern "thiscall" fn(usize) -> u8>(FN_IS_SCALED)(o) != 0 {
-                let f = core::mem::transmute::<usize, unsafe extern "thiscall" fn(usize) -> *const V3>(FN_SCALE_FACTOR)(o);
-                if !f.is_null() {
-                    s = s.mul_comp(core::ptr::read_unaligned(f));
-                }
-            }
+        let mut s = hooks::entry_scale(e);
+        if let Some(f) = hooks::entity_scale_factor(o) {
+            s = s.mul_comp(f);
         }
         let t = obj::transform(o);
         let scaled = |k: f32| {

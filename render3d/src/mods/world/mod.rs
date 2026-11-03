@@ -13,36 +13,20 @@
 //! Settings: `[World]` (and `[Nebulae]`) in Render3D.ini, read again every second with
 //! `[World] Reload=1`; `[World] Enable=0` hands everything back to the engine at once,
 //! for comparing with stock at the same moment on the bench.
+pub mod content;
+pub mod hooks;
 pub mod lights;
 pub mod settings_table;
 pub mod nebulae;
 pub mod planets;
+pub mod recipes;
 pub mod rocks;
 pub mod surfaces;
 
-/// `Render3D_SettingsChanged` for the world: the surfaces (`[World] Surfaces`) and the
-/// nebulae's keys (`Lit` among them), read again at once. Returns what changed.
-pub fn settings_changed() -> alloc::string::String {
-    let me = unsafe { ME };
-    let mut said = alloc::string::String::new();
-    if me.is_null() {
-        return said;
-    }
-    let me = unsafe { &mut *me };
-    let ini = crate::config::ini();
-    let s = settings::on(&ini, WORLD_SURFACES);
-    if s != me.surfaces.enable {
-        me.surfaces.enable = s;
-        said.push_str(&crate::sfmt!("World.Surfaces={}", s as u32));
-    }
-    let lit = me.nebulae.reread();
-    if let Some(l) = lit {
-        if !said.is_empty() {
-            said.push_str(", ");
-        }
-        said.push_str(&crate::sfmt!("Nebulae.Lit={}", l as u32));
-    }
-    said
+/// `Render3D.ini` as it is now, for `[World] Reload=1` (once a second, between settings
+/// changes).
+fn open_ini() -> Ini {
+    Ini::open(&crate::rt::game_path("Render3D.ini"))
 }
 
 use super::{Module, Step};
@@ -50,6 +34,7 @@ use crate::engine;
 use crate::frame::steps::View;
 use crate::log;
 use crate::rt::settings;
+use crate::rt::Ini;
 use settings_table::{WORLD_NEBULAE, WORLD_PLANETS, WORLD_ROCKS, WORLD_SURFACES};
 
 pub struct World {
@@ -61,6 +46,10 @@ pub struct World {
     on_planets: bool,
     on_rocks: bool,
     on_nebulae: bool,
+    /// An old plugin draws that part (`settle`): the row cannot take it back.
+    stand_planets: bool,
+    stand_rocks: bool,
+    stand_nebulae: bool,
     settled: bool,
     enable: bool,
     reload: bool,
@@ -92,16 +81,19 @@ fn planet_ghost(sp: usize, v: &View) -> bool {
 
 impl Default for World {
     fn default() -> World {
-        let ini = crate::config::ini();
+        let ini = open_ini();
         World {
-            surfaces: surfaces::Surfaces::new(),
-            planets: planets::Planets::new(),
-            rocks: rocks::Rocks::new(),
-            nebulae: nebulae::Nebulae::new(),
+            surfaces: surfaces::Surfaces::new(&ini),
+            planets: planets::Planets::new(&ini),
+            rocks: rocks::Rocks::new(&ini),
+            nebulae: nebulae::Nebulae::new(&ini),
             lights: lights::Lights::new(),
             on_planets: settings::on(&ini, WORLD_PLANETS),
             on_rocks: settings::on(&ini, WORLD_ROCKS),
             on_nebulae: settings::on(&ini, WORLD_NEBULAE),
+            stand_planets: false,
+            stand_rocks: false,
+            stand_nebulae: false,
             settled: false,
             enable: ini.int("World", "Enable", 1) != 0,
             reload: ini.int("World", "Reload", 1) != 0,
@@ -123,37 +115,62 @@ impl World {
         self.settled = true;
         // `[World] BesidePlugins=1` (bench only): draw beside the plugins anyway, so that
         // `Enable=0`/`1` flips between the plugins' look and ours at the same moment.
-        let beside = crate::config::ini().int("World", "BesidePlugins", 0) != 0;
+        let ini = open_ini();
+        let beside = ini.int("World", "BesidePlugins", 0) != 0;
         let lighting = !beside && crate::plugin_loaded("Lighting.asi");
         let surfaces = !beside && crate::plugin_loaded("Surfaces.asi");
         self.plug_planets = lighting;
         self.plug_nebulae = !beside && crate::plugin_loaded("Nebulae.asi");
+        self.stand_planets = lighting;
+        self.stand_rocks = lighting || surfaces;
+        self.stand_nebulae = self.plug_nebulae;
         if self.on_planets && lighting {
             log!("world: Lighting.asi is loaded, which draws the planets: planets stay its");
-            self.on_planets = false;
         }
         if self.on_rocks && (lighting || surfaces) {
             log!("world: Lighting.asi or Surfaces.asi is loaded: moons and asteroids stay the engine's");
-            self.on_rocks = false;
         }
-        if self.on_nebulae && !beside && crate::plugin_loaded("Nebulae.asi") {
+        if self.on_nebulae && self.stand_nebulae {
             log!("world: Nebulae.asi is loaded, which draws the gas: nebulae stay its");
-            self.on_nebulae = false;
         }
-        // `[Modules] world=0` (latched at load): the menu scene's planet and gas only,
-        // with no hook installed and no part of a mission's.
+        self.rows(&ini);
         unsafe { ME = self as *mut World };
-        if super::enabled_id(self.id) {
-            if self.on_nebulae {
-                self.nebulae.install();
-            }
-            self.lights.install(self.on_planets);
-            self.nebulae.set_active(self.on_nebulae && self.enable);
-        }
+        self.parts();
         log!(
             "world: planets {}, moons and asteroids {}, nebulae {}",
             on(self.on_planets), on(self.on_rocks), on(self.on_nebulae)
         );
+    }
+
+    /// The three part rows, read again: a part is ours when its row is on and no old
+    /// plugin has it. Returns the notes of what changed.
+    fn rows(&mut self, ini: &Ini) -> alloc::vec::Vec<&'static str> {
+        let mut changed = alloc::vec::Vec::new();
+        let (p, r, n) = (
+            settings::on(ini, WORLD_PLANETS) && !self.stand_planets,
+            settings::on(ini, WORLD_ROCKS) && !self.stand_rocks,
+            settings::on(ini, WORLD_NEBULAE) && !self.stand_nebulae,
+        );
+        if p != self.on_planets {
+            self.on_planets = p;
+            changed.push(if p { "World.Planets=1" } else { "World.Planets=0" });
+        }
+        if r != self.on_rocks {
+            self.on_rocks = r;
+            changed.push(if r { "World.Rocks=1" } else { "World.Rocks=0" });
+        }
+        if n != self.on_nebulae {
+            self.on_nebulae = n;
+            changed.push(if n { "World.Nebulae=1" } else { "World.Nebulae=0" });
+        }
+        changed
+    }
+
+    /// What follows from the parts and `Enable`: the planets' glows, and whether the
+    /// nebulae's ghost hook hides a fogged nebula's billboards.
+    fn parts(&mut self) {
+        self.lights.set_planets(self.on_planets);
+        self.nebulae.set_active(self.on_nebulae && self.enable);
     }
 }
 
@@ -196,9 +213,49 @@ impl Module for World {
     fn rows(&self) -> &'static [crate::rt::settings::Setting] {
         &settings_table::ROWS
     }
-    fn configure(&mut self, _ini: &crate::rt::Ini, said: &mut crate::core_module::Changes) {
-        // Its live rows, read again (until its own reader takes every section).
-        said.note(&settings_changed());
+    /// `[World]` and `[Nebulae]`, at load and at every settings change: the rows
+    /// `Surfaces`, `Planets`, `Rocks`, `Nebulae` and `Nebulae.Lit` are honoured at the
+    /// next view, and the keys without a row are read again with them.
+    fn configure(&mut self, ini: &Ini, said: &mut crate::core_module::Changes) {
+        lights::Lights::read(ini);
+        self.enable = ini.int("World", "Enable", 1) != 0;
+        self.reload = ini.int("World", "Reload", 1) != 0;
+        let sf = settings::on(ini, WORLD_SURFACES);
+        if sf != self.surfaces.enable {
+            self.surfaces.enable = sf;
+            said.note(&crate::sfmt!("World.Surfaces={}", sf as u32));
+        }
+        if let Some(l) = self.nebulae.reread(ini) {
+            said.note(&crate::sfmt!("Nebulae.Lit={}", l as u32));
+        }
+        for part in self.rows(ini) {
+            said.note(part);
+        }
+        self.planets.configure(ini);
+        self.rocks.reload(ini);
+        self.parts();
+    }
+    /// Its hooks, at the first enable: the nebulae's lights and cull (unless
+    /// `Lighting.asi` has them) and the ghosts' `Render` (unless `Nebulae.asi` draws the
+    /// gas). Gated by the module's flag; shut, each hands the call to what it replaced.
+    fn hooks(&mut self, h: &mut crate::core_hooks::Hooks) {
+        let beside = open_ini().int("World", "BesidePlugins", 0) != 0;
+        let lights = !crate::plugin_loaded("Lighting.asi");
+        if !lights {
+            log!("world: lights: Lighting.asi is loaded: the nebulae's and planets' lights are its");
+        }
+        let spirit = beside || !crate::plugin_loaded("Nebulae.asi");
+        hooks::install(h, lights, spirit);
+    }
+    fn on(&mut self) {
+        unsafe { ME = self as *mut World };
+        self.parts();
+    }
+    /// Switched off live: the engine's own code takes the hooks back through their
+    /// gate; the ghosts' hiding stops, and the planets' glows with it.
+    fn off(&mut self) {
+        self.nebulae.set_active(false);
+        self.lights.set_planets(false);
     }
     fn provide(&mut self, id: crate::core_module::ModuleId, s: &mut crate::core_services::Services) {
         self.id = id;
@@ -229,7 +286,7 @@ impl Module for World {
             let now = crate::rt::now();
             if now - self.checked > 1.0 {
                 self.checked = now;
-                let ini = crate::config::ini();
+                let ini = open_ini();
                 let e = ini.int("World", "Enable", 1) != 0;
                 if e != self.enable {
                     self.enable = e;
@@ -241,10 +298,10 @@ impl Module for World {
                     log!("world: Surfaces={}", s as u32);
                 }
                 if self.on_rocks {
-                    self.rocks.reload();
+                    self.rocks.reload(&ini);
                 }
                 if self.on_nebulae {
-                    self.nebulae.reload();
+                    self.nebulae.reload(&ini);
                 }
                 self.nebulae.set_active(self.on_nebulae && self.enable);
             }
@@ -255,10 +312,10 @@ impl Module for World {
             return false;
         }
         let ours = match engine::vtable(o) {
-            planets::VT_PLANET if self.on_planets => self.planets.draw(o, v, &mut self.surfaces),
-            rocks::VT_SCRAP if self.on_rocks => self.rocks.draw_scrap(o, v, &mut self.surfaces),
-            rocks::VT_ASTEROID_FIELD if self.on_rocks => self.rocks.draw_field(o, v, &mut self.surfaces),
-            nebulae::VT_NEBULA | nebulae::VT_LATINUM if self.on_nebulae => self.nebulae.object(o, v),
+            hooks::VT_PLANET if self.on_planets => self.planets.draw(o, v, &mut self.surfaces),
+            hooks::VT_SCRAP if self.on_rocks => self.rocks.draw_scrap(o, v, &mut self.surfaces),
+            hooks::VT_ASTEROID_FIELD if self.on_rocks => self.rocks.draw_field(o, v, &mut self.surfaces),
+            hooks::VT_NEBULA | hooks::VT_LATINUM if self.on_nebulae => self.nebulae.object(o, v),
             _ => false,
         };
         if ours {

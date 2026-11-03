@@ -6,7 +6,7 @@
 //! `+0x18` z1, `+0x1c` y, with `+0x20` + 1 lines along z and `+0x24` + 1 along x, each
 //! through `ST3D_Camera::ClipAndRenderLine` in `ST3D_Colour_Dark_Orange` (0x7a8ee8),
 //! depth-tested and written. (`DRAW_PIZZA_BOX`'s blue lines are a debug switch.)
-use crate::engine::{field, field_f32, rd};
+use super::hooks;
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::shaders::overlays::*;
@@ -14,9 +14,6 @@ use crate::shaders::overlays_spv::*;
 use crate::shaders::overlays_dxil::*;
 use alloc::vec::Vec;
 use gpu::{attr, AttrFormat, Block, Depth, Format, PipelineDesc, Semantic, Topology, VertexAttr};
-
-const GRID_SIZE: usize = 0x71a78c;
-const DARK_ORANGE: usize = 0x7a8ee8;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -39,9 +36,9 @@ impl Grid {
     pub fn reset(&mut self) {}
 
     pub fn draw(&mut self, v: &View, tg: usize) {
-        let step = unsafe { rd::<f32>(GRID_SIZE) };
-        let (x0, z0, x1, z1, y) = (field_f32(tg, 0x4), field_f32(tg, 0xc), field_f32(tg, 0x10), field_f32(tg, 0x18), field_f32(tg, 0x1c));
-        let (nx, nz) = (field(tg, 0x20) as i32, field(tg, 0x24) as i32);
+        let step = hooks::grid_step();
+        let (x0, z0, x1, z1, y) = hooks::terrain_rect(tg);
+        let (nx, nz) = hooks::terrain_cells(tg);
         if !(step > 0.0) || nx < 0 || nz < 0 || nx > 2000 || nz > 2000 {
             return;
         }
@@ -60,7 +57,7 @@ impl Grid {
             lines.push(p(x1, z));
             z += step;
         }
-        let c: [f32; 3] = unsafe { rd(DARK_ORANGE) };
+        let c = hooks::grid_colour();
         let Some(mut cmd) = gfx::cmd() else { return };
         // Lines, depth-tested (`LESSEQUAL`) and written, opaque.
         let pipe = self.pipes.view(0, || {

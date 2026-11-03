@@ -15,6 +15,7 @@
 //! footprints' sprites are called through.
 //! Nothing the simulation reads is written.
 mod fog;
+pub mod hooks;
 pub mod settings_table;
 mod ghosts;
 mod grid;
@@ -23,56 +24,12 @@ mod posts;
 mod selection;
 
 use super::{Module, Step};
-use crate::engine::{self, field, rd};
+use crate::engine;
 use crate::frame::steps::View;
 use crate::log;
 use crate::rt::settings;
+use crate::rt::Ini;
 use settings_table::{OVERLAYS_FOG, OVERLAYS_GHOSTS, OVERLAYS_GRID, OVERLAYS_HEIGHTPOSTS, OVERLAYS_PIVOT, OVERLAYS_SELECTION};
-
-// ---- Armada2.exe, GOG patch 1.1 ----------------------------------------------------
-
-/// `g_terrain_geometry`: the `Terrain_Geometry` `Terrain_Geometry::Render` draws.
-const G_TERRAIN: usize = 0x772140;
-/// `Terrain_Geometry::m_initialized`: false until its first `Initialize`.
-const TERRAIN_INITIALIZED: usize = 0x772180;
-/// `View_Record` (`PresetView`): 0 the RTS camera, 1 the tactical one, 2 cineractive.
-const VIEW_RECORD: usize = 0x76b610;
-/// `UserProfile` (`GameConfiguration*`): `+0x84` the map editor is on, `+0x45` the
-/// tactical shroud option, `+0x48` the selection bubbles' brightness.
-const USER_PROFILE: usize = 0x76b5ac;
-const G_TRANSPORT: usize = 0x76b8d4;
-const FN_GET_GAME_SETUP: usize = 0x557940; // Transport::getGameSetup, thiscall
-const FN_IS_FOG: usize = 0x5462f0; // GameSetup::isFog, thiscall
-const FN_IS_SHROUD: usize = 0x546300; // GameSetup::isShroud, thiscall
-const FN_GRID_VISIBLE: usize = 0x51e180; // GridVisible(), cdecl
-const FN_DRAW_GRID: usize = 0x593480; // Terrain_Geometry::DrawGrid(cam), thiscall
-const PLACEHOLDER: usize = 0x736d50; // placeholderFeature
-const FN_FOOTPRINTS: usize = 0x473930; // PlaceholderFeature::RenderFootprints(cam, float), thiscall
-const VT_GHOST: usize = 0x6aff8c;
-const VT_PLACEHOLDER: usize = 0x6b005c;
-
-pub(crate) unsafe fn this0_ret(f: usize, this: usize) -> usize {
-    unsafe { core::mem::transmute::<usize, unsafe extern "thiscall" fn(usize) -> usize>(f)(this) }
-}
-
-fn game_setup_flag(f: usize) -> bool {
-    unsafe {
-        let t = rd::<usize>(G_TRANSPORT);
-        if t == 0 {
-            return false;
-        }
-        let gs = this0_ret(FN_GET_GAME_SETUP, t);
-        gs != 0 && (core::mem::transmute::<usize, unsafe extern "thiscall" fn(usize) -> u8>(f)(gs)) != 0
-    }
-}
-
-fn editor() -> bool {
-    engine::field_u8(unsafe { rd::<usize>(USER_PROFILE) }, 0x84) != 0
-}
-
-pub(crate) fn view_record() -> u32 {
-    unsafe { rd::<u32>(VIEW_RECORD) }
-}
 
 /// Settings from `Render3D.ini`, `[Overlays]`.
 pub struct Settings {
@@ -84,14 +41,13 @@ pub struct Settings {
 }
 
 impl Settings {
-    fn read() -> Settings {
-        let ini = crate::config::ini();
+    fn read(ini: &Ini) -> Settings {
         Settings {
-            fog: settings::on(&ini, OVERLAYS_FOG),
-            grid: settings::on(&ini, OVERLAYS_GRID),
-            selection: settings::on(&ini, OVERLAYS_SELECTION),
-            ghosts: settings::on(&ini, OVERLAYS_GHOSTS),
-            fog_layers: fog::Settings::read(&ini) }
+            fog: settings::on(ini, OVERLAYS_FOG),
+            grid: settings::on(ini, OVERLAYS_GRID),
+            selection: settings::on(ini, OVERLAYS_SELECTION),
+            ghosts: settings::on(ini, OVERLAYS_GHOSTS),
+            fog_layers: fog::Settings::read(ini) }
     }
 }
 
@@ -112,54 +68,15 @@ pub fn claims() -> (bool, bool) {
     unsafe { CLAIMS }
 }
 
-/// The module, for `settings_changed` (set at its device; the box does not move).
-static mut ME: *mut Overlays = core::ptr::null_mut();
-
-/// `Render3D_SettingsChanged` for the overlays: every `[Overlays]` key with a row, read
-/// again (the fog's filter and thresholds with them). Returns what changed.
-pub fn settings_changed() -> alloc::string::String {
-    let me = unsafe { ME };
-    let mut said = alloc::string::String::new();
-    if me.is_null() {
-        return said;
-    }
-    let me = unsafe { &mut *me };
-    let mut note = |k: &str, v: bool| {
-        if !said.is_empty() {
-            said.push_str(", ");
-        }
-        said.push_str(&crate::sfmt!("Overlays.{}={}", k, v as u32));
-    };
-    let new = Settings::read();
-    if new.fog != me.s.fog {
-        note("Fog", new.fog);
-    }
-    if new.grid != me.s.grid {
-        note("Grid", new.grid);
-    }
-    if new.selection != me.s.selection {
-        note("Selection", new.selection);
-    }
-    if new.ghosts != me.s.ghosts {
-        note("Ghosts", new.ghosts);
-    }
-    me.s = new;
-    unsafe { CLAIMS = (me.s.fog, me.s.selection) };
-    let ini = crate::config::ini();
-    let hp = settings::on(&ini, OVERLAYS_HEIGHTPOSTS);
-    if me.posts.set_on(hp) {
-        note("HeightPosts", hp);
-    }
-    let pv = settings::on(&ini, OVERLAYS_PIVOT);
-    if me.pivot.set_on(pv) {
-        note("Pivot", pv);
-    }
-    said
+/// `Render3D.ini` as it is now, for the module's construction.
+fn open_ini() -> Ini {
+    Ini::open(&crate::rt::game_path("Render3D.ini"))
 }
 
 impl Default for Overlays {
     fn default() -> Overlays {
-        let s = Settings::read();
+        let ini = open_ini();
+        let s = Settings::read(&ini);
         unsafe { CLAIMS = (s.fog, s.selection) };
         log!(
             "overlays: fog {} (filter {}), grid {}, selection {}, ghosts {}",
@@ -169,7 +86,6 @@ impl Default for Overlays {
             s.selection as u8,
             s.ghosts as u8
         );
-        let ini = crate::config::ini();
         let posts = posts::Posts::new(&ini);
         let pivot = pivot::Pivot::new(&ini);
         log!("overlays: pivot marker {}", pivot.on as u8);
@@ -181,38 +97,32 @@ impl Overlays {
     /// `Terrain_Geometry::Render`, as stock runs it, with the grid and the two layers
     /// ours. False to leave the whole step to the engine.
     fn terrain(&mut self, v: &View) -> bool {
-        let tg = G_TERRAIN;
-        if unsafe { rd::<u8>(TERRAIN_INITIALIZED) } == 0 {
+        let tg = hooks::G_TERRAIN;
+        if !hooks::terrain_initialized() {
             // The engine's first call makes its meshes and finds its textures.
             return false;
         }
-        let ed = editor();
-        let vr = view_record();
-        let shroud_on = !ed && game_setup_flag(FN_IS_SHROUD);
+        let ed = hooks::editor();
+        let vr = hooks::view_record();
+        let shroud_on = !ed && hooks::is_shroud();
         // In the tactical view with the profile's shroud option on, stock draws the
         // shroud as a `TreeGrid` (`+0x28`): not seen on the bench, left to the engine.
         if shroud_on && vr == 1 {
-            let opt = engine::field_u8(unsafe { rd::<usize>(USER_PROFILE) }, 0x45);
-            if (opt == 1 || opt == 2) && field(tg, 0x28) != 0 {
+            let opt = hooks::tactical_shroud_option();
+            if (opt == 1 || opt == 2) && hooks::shroud_tree_grid(tg) {
                 return false;
             }
         }
         let shroud = shroud_on && vr == 0;
-        let fog = !ed && vr == 0 && game_setup_flag(FN_IS_FOG);
+        let fog = !ed && vr == 0 && hooks::is_fog();
         // 1: the build footprints, the engine's sprites.
-        unsafe {
-            let f: unsafe extern "thiscall" fn(usize, usize, f32) = core::mem::transmute(FN_FOOTPRINTS);
-            f(PLACEHOLDER, v.cam, engine::field_f32(tg, 0x1c));
-        }
+        hooks::render_footprints(v.cam, tg);
         // 2: the tactical grid.
-        if unsafe { core::mem::transmute::<usize, unsafe extern "C" fn() -> i32>(FN_GRID_VISIBLE)() } != 0 {
+        if hooks::grid_visible() {
             if self.s.grid {
                 self.grid.draw(v, tg);
             } else {
-                unsafe {
-                    let f: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(FN_DRAW_GRID);
-                    f(tg, v.cam);
-                }
+                hooks::draw_engine_grid(tg, v.cam);
             }
         }
         // 3, 4: the fog of war, then the shroud over it.
@@ -244,16 +154,45 @@ impl Module for Overlays {
     fn rows(&self) -> &'static [crate::rt::settings::Setting] {
         &settings_table::ROWS
     }
-    fn configure(&mut self, _ini: &crate::rt::Ini, said: &mut crate::core_module::Changes) {
-        // Its live rows, read again (until its own reader takes every section).
-        said.note(&settings_changed());
+    /// `[Overlays]`, at load and at every settings change: every key with a row is read
+    /// again (the fog's filter and thresholds with them), and the claims follow.
+    fn configure(&mut self, ini: &Ini, said: &mut crate::core_module::Changes) {
+        let mut note = |k: &str, v: bool| said.note(&crate::sfmt!("Overlays.{}={}", k, v as u32));
+        let new = Settings::read(ini);
+        if new.fog != self.s.fog {
+            note("Fog", new.fog);
+        }
+        if new.grid != self.s.grid {
+            note("Grid", new.grid);
+        }
+        if new.selection != self.s.selection {
+            note("Selection", new.selection);
+        }
+        if new.ghosts != self.s.ghosts {
+            note("Ghosts", new.ghosts);
+        }
+        self.s = new;
+        unsafe { CLAIMS = (self.s.fog, self.s.selection) };
+        let hp = settings::on(ini, OVERLAYS_HEIGHTPOSTS);
+        if self.posts.set_on(hp) {
+            note("HeightPosts", hp);
+        }
+        let pv = settings::on(ini, OVERLAYS_PIVOT);
+        if self.pivot.set_on(pv) {
+            note("Pivot", pv);
+        }
+    }
+    /// The height posts' five calls, at the first enable; gated by the module's flag.
+    fn hooks(&mut self, h: &mut crate::core_hooks::Hooks) {
+        self.posts.install(h);
+    }
+    /// Switched off live: the posts noted in a view are dropped; the hook hands its
+    /// calls to the engine through its gate.
+    fn off(&mut self) {
+        self.posts.end_view();
     }
     fn superseded(&self) -> Option<&'static str> {
         Some("Fog.asi")
-    }
-    fn device(&mut self) {
-        unsafe { ME = self as *mut Overlays };
-        self.posts.install();
     }
     fn reset(&mut self) {
         self.grid.reset();
@@ -283,15 +222,15 @@ impl Module for Overlays {
     }
     fn feature(&mut self, f: usize, v: &View) -> bool {
         let vt = engine::vtable(f);
-        if vt == pivot::VT_TACTICAL_CAMERA {
+        if vt == hooks::VT_TACTICAL_CAMERA {
             return self.pivot.feature(f, v);
         }
         if !self.s.ghosts {
             return false;
         }
         match vt {
-            VT_GHOST => self.ghosts.ghosts(f, v),
-            VT_PLACEHOLDER => self.ghosts.placeholder(f, v),
+            hooks::VT_GHOST => self.ghosts.ghosts(f, v),
+            hooks::VT_PLACEHOLDER => self.ghosts.placeholder(f, v),
             _ => false,
         }
     }

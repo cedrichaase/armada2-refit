@@ -2,7 +2,7 @@
 //! decisions hold here: the envelope, the bake, the slices on a ladder fixed in distance
 //! from the eye kept per view, the blue-noise thresholds that stay put, the spectral
 //! noise). A class is drawn as gas when
-//! it has a recipe, `Nebulae\<odf>.ini` in the game directory (`render3d/nebulae/`);
+//! it has a recipe, `Nebulae\<odf>.ini` in the game directory (`render3d/content/nebulae/`);
 //! anything else keeps the stock billboards, drawn where they always were.
 //!
 //! What changed in the move:
@@ -31,7 +31,10 @@
 //! - Ghosts: slot 3 of the `GameObjectSpirit` vtable (0x6b1ca4, `GameObjectSpirit::Render`
 //!   0x4d5f70) is wrapped while this part runs, so a ghosted nebula of a class drawn as
 //!   gas keeps its gas and loses its billboards, as with the plugin.
-use crate::engine::{self, field, field_u8, hook, obj, rd};
+use super::content;
+use super::hooks::{self, VT_LATINUM, VT_NEBULA};
+use super::recipes::{self, Text};
+use crate::engine::{self, obj};
 use crate::frame::steps::View;
 use crate::gfx::{self, PerView, Pipes};
 use gpu::{
@@ -50,15 +53,6 @@ use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
-
-pub const VT_NEBULA: usize = 0x6b148c;
-pub const VT_LATINUM: usize = 0x6b132c;
-const NEBULA_LIST: usize = 0x73b1bc; // Nebula::nebulaList, std::vector<Nebula *> *
-const GHOST_LIST: usize = 0x736c90; // Ghost::ghostList, std::list<Spirit *>
-const VT_SPIRIT: usize = 0x6b1ca4;
-const SLOT_SPIRIT_RENDER: usize = 3;
-const FN_SPIRIT_RENDER: usize = 0x4d5f70;
-const FN_ENTITY_GET: usize = 0x4cfff0; // Entity::Get(int handle), cdecl
 
 const NCONST: usize = 21;
 const MAX_NEB: usize = 256;
@@ -115,8 +109,7 @@ struct Settings {
 
 impl Settings {
     /// `[Nebulae]` in Render3D.ini, with `Nebulae.ini`'s keys and defaults.
-    fn read() -> Settings {
-        let ini = crate::config::ini();
+    fn read(ini: &Ini) -> Settings {
         let s = "Nebulae";
         let noise = ini.int(s, "NoiseSize", 128);
         Settings {
@@ -140,7 +133,7 @@ impl Settings {
             temporal: math::saturate(ini.float(s, "Temporal", 0.1)),
             temporal_clip: math::clamp(ini.float(s, "TemporalClip", 1.25), 0.25, 8.0),
             jitter: math::clamp(ini.float(s, "Jitter", 1.0), 0.0, 2.0),
-            lit: settings::on(&ini, NEBULAE_LIT),
+            lit: settings::on(ini, NEBULAE_LIT),
             lit_strength: ini.float(s, "LitStrength", 1.0).max(0.0),
             lit_tint: math::saturate(ini.float(s, "LitTint", 0.5)),
             lit_temporal: math::saturate(ini.float(s, "LitTemporal", 0.5)),
@@ -165,7 +158,6 @@ const SIG0: u32 = 2_166_136_261;
 /// A nebula class with its recipe, and what is on the device for it.
 struct Cls {
     odf: String,
-    path: String,
     bytes: Option<Vec<u8>>,
     have: bool,
     failed: bool,
@@ -236,26 +228,23 @@ struct Cls {
 }
 
 /// `n` numbers under `key` of `[Nebula]`, or None unless all of them are there.
-fn vals(f: &Ini, key: &str, n: usize) -> Option<Vec<f32>> {
+fn vals(f: &Text, key: &str, n: usize) -> Option<Vec<f32>> {
     let s = f.string("Nebula", key)?;
     let v: Vec<f32> = s.split([',', ' ', '\t']).filter(|p| !p.is_empty()).filter_map(rt::parse_f32).collect();
     if v.len() >= n { Some(v[..n].to_vec()) } else { None }
 }
-fn one(f: &Ini, key: &str, def: f32) -> f32 {
+fn one(f: &Text, key: &str, def: f32) -> f32 {
     vals(f, key, 1).map_or(def, |v| v[0])
 }
-fn rgb(f: &Ini, key: &str) -> [f32; 4] {
+fn rgb(f: &Text, key: &str) -> [f32; 4] {
     let v = vals(f, key, 3).unwrap_or(vec![0.0, 0.0, 0.0]);
     [v[0] / 255.0, v[1] / 255.0, v[2] / 255.0, 0.0]
 }
 
 impl Cls {
     fn new(odf: &str, latinum: bool, radius0: f32) -> Cls {
-        let mut path = rt::game_path("Nebulae\\");
-        path.push_str(odf);
-        path.push_str(".ini");
         let mut c = Cls {
-            odf: String::from(odf), path, bytes: None, have: false, failed: false, generation: 0,
+            odf: String::from(odf), bytes: None, have: false, failed: false, generation: 0,
             k: [[0.0; 4]; NCONST], ex: [[0.0; 4]; 8], fz: [0.0; 4], fuzz_speed: 0.0, fringe_reach: 0.0, sw: [0.0; 4],
             swirl_period: 40.0, ring_cycle: 6.0, pulse_speed: 0.5, pulse_wander: 0.5, pulse_phase: 0.0, pulse_last: -1.0,
             extent: 1.3, height: 3.0, radius: radius0, radius0, flow_speed: 0.0, edge_warp: 0.0, fil_reach: 0.0,
@@ -265,8 +254,9 @@ impl Cls {
             env_gen: u32::MAX, ex0: 0.0, ez0: 0.0, ex1: 0.0, ez1: 0.0, ey: 0.0, vol: None, occ: None, vol_sig: 0,
             vol_gen: u32::MAX, vx: 0, vy: 0, vz: 0, vlo: [0.0; 3], vsize: [0.0; 3], glo: [0.0; 3], ghi: [0.0; 3], gbox: false,
         };
-        c.bytes = rt::read_file(&c.path);
-        c.have = c.bytes.is_some() && c.read();
+        let found = recipes::find("nebulae", content::NEBULAE, odf);
+        c.bytes = found.as_ref().map(|f| f.bytes.clone());
+        c.have = found.is_some_and(|f| c.read(&f.text));
         log!(
             "world: nebula class {}{}, radius {:.0}: {}",
             odf, if latinum { " (latinum)" } else { "" }, c.radius,
@@ -276,11 +266,7 @@ impl Cls {
     }
 
     /// As Nebulae.asi read a recipe.
-    fn read(&mut self) -> bool {
-        let f = Ini::open(&self.path);
-        if !f.exists() {
-            return false;
-        }
+    fn read(&mut self, f: &Text) -> bool {
         self.k = [[0.0; 4]; NCONST];
         let k = &mut self.k;
         self.radius = one(&f, "Radius", self.radius0);
@@ -357,15 +343,16 @@ impl Cls {
         self.height = one(&f, "Height", 3.0);
         self.generation = self.generation.wrapping_add(1);
         self.failed = false;
-        log!("world: nebula recipe {} read", self.path);
+        log!("world: nebula recipe {} read", self.odf);
         true
     }
 
     fn reload(&mut self) {
-        let b = rt::read_file(&self.path);
+        let found = recipes::find("nebulae", content::NEBULAE, &self.odf);
+        let b = found.as_ref().map(|f| f.bytes.clone());
         if b != self.bytes {
             self.bytes = b;
-            self.have = self.bytes.is_some() && self.read();
+            self.have = found.is_some_and(|f| self.read(&f.text));
         }
     }
 
@@ -913,37 +900,24 @@ pub struct Nebulae {
     said: u32,
 }
 
-static mut SPIRIT_OLD: usize = 0;
 static mut SPIRIT_ACTIVE: bool = false;
-/// The ODFs whose gas is drawn now (for the ghost hook, which has no `self`).
 static mut GAS_ODFS: Vec<String> = Vec::new();
 
-/// `GameObjectSpirit::Render`, wrapped: a ghost of a nebula whose class is drawn as gas
-/// draws nothing (its gas is drawn with the class's).
-unsafe extern "thiscall" fn hook_spirit(sp: usize, cam: usize) {
-    unsafe {
-        if SPIRIT_ACTIVE && sp != 0 {
-            let get: unsafe extern "C" fn(i32) -> usize = core::mem::transmute(FN_ENTITY_GET);
-            let o = get(rd::<i32>(sp + 8));
-            if o != 0 && (engine::vtable(o) == VT_NEBULA || engine::vtable(o) == VT_LATINUM) {
-                let odf = rt::lower(obj::odf_name(o));
-                #[allow(static_mut_refs)]
-                if GAS_ODFS.iter().any(|s| *s == odf) {
-                    return;
-                }
-            }
-        }
-        if SPIRIT_OLD != 0 {
-            let f: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(SPIRIT_OLD);
-            f(sp, cam);
-        }
-    }
+/// Whether a nebula's ghost may be hidden at all now (the ghost hook asks).
+pub fn spirit_active() -> bool {
+    unsafe { SPIRIT_ACTIVE }
+}
+
+/// Whether the class named `odf` (lower case) is drawn as gas now.
+#[allow(static_mut_refs)]
+pub fn drawn_as_gas(odf: &str) -> bool {
+    unsafe { GAS_ODFS.iter().any(|s| s == odf) }
 }
 
 impl Nebulae {
-    pub fn new() -> Nebulae {
+    pub fn new(ini: &Ini) -> Nebulae {
         Nebulae {
-            cfg: Settings::read(),
+            cfg: Settings::read(ini),
             classes: BTreeMap::new(),
             held: Held::default(),
             pipes: Pipes::new(),
@@ -1009,20 +983,6 @@ impl Nebulae {
         }
     }
 
-    /// Wraps the ghosts' draw (once).
-    pub fn install(&mut self) {
-        unsafe {
-            if SPIRIT_OLD == 0 && field(VT_SPIRIT, SLOT_SPIRIT_RENDER * 4) == FN_SPIRIT_RENDER {
-                if let Some(old) = hook::patch_slot(VT_SPIRIT, SLOT_SPIRIT_RENDER, hook_spirit as *const () as usize) {
-                    SPIRIT_OLD = old;
-                    log!("world: nebulae: the ghosts' Render wrapped");
-                }
-            } else if SPIRIT_OLD == 0 {
-                log!("world: nebulae: the ghosts' Render is not stock's: a fogged nebula keeps its billboards");
-            }
-        }
-    }
-
     pub fn set_active(&mut self, on: bool) {
         unsafe { SPIRIT_ACTIVE = on && self.cfg.enable };
     }
@@ -1047,24 +1007,24 @@ impl Nebulae {
 
     /// `[Nebulae]` again, without the recipes (`Render3D_SettingsChanged`). Returns the
     /// new `Lit` when it changed.
-    pub fn reread(&mut self) -> Option<bool> {
+    pub fn reread(&mut self, ini: &Ini) -> Option<bool> {
         let old = self.cfg.lit;
-        self.reread_settings();
+        self.reread_settings(ini);
         if old != self.cfg.lit { Some(self.cfg.lit) } else { None }
     }
 
     /// Settings and recipes again (with `Reload=1`, once a second).
-    pub fn reload(&mut self) {
-        self.reread_settings();
+    pub fn reload(&mut self, ini: &Ini) {
+        self.reread_settings(ini);
         for c in self.classes.values_mut() {
             c.reload();
         }
         unsafe { SPIRIT_ACTIVE = SPIRIT_ACTIVE && self.cfg.enable };
     }
 
-    fn reread_settings(&mut self) {
+    fn reread_settings(&mut self, ini: &Ini) {
         let old = self.cfg;
-        self.cfg = Settings::read();
+        self.cfg = Settings::read(ini);
         if old.vol_max != self.cfg.vol_max || old.vol_maxy != self.cfg.vol_maxy || old.vol_texel != self.cfg.vol_texel || old.noise != self.cfg.noise {
             for c in self.classes.values_mut() {
                 c.vol_gen = u32::MAX;
@@ -1088,7 +1048,7 @@ impl Nebulae {
             let r0 = if latinum {
                 100.0
             } else {
-                let r = engine::field_f32(obj::class(o), 0x1e0);
+                let r = hooks::nebula_class_radius(o);
                 if r > 10.0 && r < 5000.0 { r } else { 300.0 }
             };
             self.classes.insert(name.clone(), Cls::new(&name, latinum, r0));
@@ -1103,7 +1063,7 @@ impl Nebulae {
     /// not mark them): `Nebula::Simulate` registers its light only while it is marked.
     pub fn object(&mut self, o: usize, v: &View) -> bool {
         if engine::vtable(o) == VT_NEBULA {
-            mark_on_screen(o, v.cam);
+            hooks::mark_nebula_on_screen(o, v.cam);
         }
         if !self.cfg.enable || self.held.failed {
             return false;
@@ -1113,7 +1073,7 @@ impl Nebulae {
             return false;
         }
         if engine::vtable(o) != VT_NEBULA {
-            mark_on_screen(o, v.cam);
+            hooks::mark_nebula_on_screen(o, v.cam);
         }
         true
     }
@@ -1121,20 +1081,7 @@ impl Nebulae {
     /// The handles the engine keeps ghosts of this frame.
     fn gather_ghosts(&mut self) {
         self.ghosts.clear();
-        let head = field(GHOST_LIST, 4);
-        if head == 0 {
-            return;
-        }
-        let mut n = field(head, 0);
-        let mut guard = 0;
-        while n != 0 && n != head && guard < 100_000 {
-            let sp = field(n, 8);
-            if sp != 0 {
-                self.ghosts.push(unsafe { rd::<i32>(sp + 8) });
-            }
-            n = field(n, 0);
-            guard += 1;
-        }
+        hooks::ghost_handles(&mut self.ghosts);
     }
 
     fn gather_one(&mut self, o: usize) -> bool {
@@ -1142,7 +1089,7 @@ impl Nebulae {
             return false;
         }
         let ghosted = {
-            let h = unsafe { rd::<i32>(o + 0x28) };
+            let h = hooks::handle(o);
             self.ghosts.contains(&h)
         };
         let seen = obj::can_user_see(o);
@@ -1153,7 +1100,7 @@ impl Nebulae {
         if !seen && !ghosted {
             return false;
         }
-        let p: [f32; 3] = unsafe { rd(o + 0xac) };
+        let p = hooks::position(o);
         c.pos.push(p);
         for x in p {
             c.sig = (c.sig ^ (x.to_bits() >> 4)).wrapping_mul(16_777_619);
@@ -1169,14 +1116,7 @@ impl Nebulae {
         }
         self.gather_ghosts();
         let mut any = false;
-        let vecp = unsafe { rd::<usize>(NEBULA_LIST) };
-        if vecp != 0 {
-            let (mut it, end) = (field(vecp, 4), field(vecp, 8));
-            while it != 0 && it < end {
-                any |= self.gather_one(field(it, 0));
-                it += 4;
-            }
-        }
+        hooks::each_nebula(|o| any |= self.gather_one(o));
         let mut lat = Vec::new();
         engine::for_each_in_list(engine::OBJECT_LIST, |o| {
             if o != 0 && engine::vtable(o) == VT_LATINUM {
@@ -2011,22 +1951,6 @@ fn flicker(t: f32) -> f32 {
         }
     }
     s
-}
-
-/// Marks a nebula on screen as `GameObject::Render` would (not hidden, seen by the
-/// player, its instance in the frustum: slot 3 of the instance's vtable), for the engine's
-/// nebula lights.
-fn mark_on_screen(o: usize, cam: usize) {
-    let inst = obj::instance(o);
-    if field_u8(o, 0x27) != 0 || inst == 0 || cam == 0 || !obj::can_user_see(o) {
-        return;
-    }
-    unsafe {
-        let f: unsafe extern "thiscall" fn(usize, usize) -> u8 = core::mem::transmute(field(engine::vtable(inst), 3 * 4));
-        if f(inst, cam) != 0 {
-            core::ptr::write((o + 0x25) as *mut u8, 1);
-        }
-    }
 }
 
 /// Where a class's gas may be, from above (Nebulae.asi's bake_envelope): alpha each nebula

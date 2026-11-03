@@ -1,6 +1,6 @@
 [package]
 name = "render3d"
-version = "0.38.0"
+version = "0.40.0"
 edition = "2024"
 publish = false
 description = "Render3D.asi: Star Trek: Armada II's 3D view drawn by our own renderer"
@@ -16,6 +16,7 @@ libm = "0.2"
 a2fmt = { path = "../crates/a2fmt" }
 a2rt = { path = "../crates/a2rt", features = ["dump"] }
 gpu = { path = "../gpu" }
+a2ini = { path = "../crates/a2ini" }
 
 [profile.release]
 panic = "abort"
