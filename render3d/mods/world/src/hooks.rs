@@ -10,7 +10,7 @@ use r3d_core::engine::{self, field, field_f32, field_m34, field_u8, light, obj, 
 use r3d_core::math::{v3, M34, V3};
 use crate::{log, rt};
 use alloc::vec::Vec;
-use crate::syms::{hook as hk, sym, TABLE};
+use crate::syms::{hook, sym, TABLE};
 
 /// An engine address of the profile: 0 unless the hook that uses it is ready.
 pub(crate) fn at(s: a2engine::Sym) -> usize { TABLE.engine().addr(s) }
@@ -71,13 +71,13 @@ fn open() -> bool {
 /// lights and cull are ours (no `Lighting.asi`); `spirit`: the ghosts' `Render` is
 /// wrapped (no `Nebulae.asi`). A site that is not stock's is logged and left as it is.
 pub fn install(h: &mut Hooks, lights: bool, spirit: bool) {
-    if !h.ready(&TABLE, hk::WORLD_READS) {
+    if !h.ready(&TABLE, hook::WORLD_READS) {
         h.stand_down("the engine's reads are not stock");
         return;
     }
     unsafe { GATE = Some(h.gate()) };
     let owner = h.owner();
-    if lights && h.ready(&TABLE, hk::WORLD_LIGHTS) {
+    if lights && h.ready(&TABLE, hook::WORLD_LIGHTS) {
         let hook = Hook {
             owner,
             used_by: "nebula lights",
@@ -94,7 +94,7 @@ pub fn install(h: &mut Hooks, lights: bool, spirit: bool) {
     } else if lights {
         log!("world: lights: Nebula::Simulate's light call is not stock's: the nebulae's lights stay as they are");
     }
-    if lights && h.ready(&TABLE, hk::WORLD_CULL) {
+    if lights && h.ready(&TABLE, hook::WORLD_CULL) {
         let hook = Hook {
             owner,
             used_by: "nebula cull",
@@ -111,7 +111,7 @@ pub fn install(h: &mut Hooks, lights: bool, spirit: bool) {
     } else if lights {
         log!("world: lights: NebulaInstance's frustum test is not stock's: stock's nebula cull");
     }
-    if spirit && h.ready(&TABLE, hk::WORLD_GHOSTS) {
+    if spirit && h.ready(&TABLE, hook::WORLD_GHOSTS) {
         let hook = Hook {
             owner,
             used_by: "nebula ghosts",
