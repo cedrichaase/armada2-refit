@@ -70,11 +70,11 @@ pub fn set_on_screen(o: usize) {
 pub fn team_colour(o: usize) -> V3 {
     unsafe {
         let setup = {
-            let f: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(0x557940usize);
-            f(rd::<usize>(0x76b8d4))
+            let f: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(at(sym::FN_GET_GAME_SETUP));
+            f(rd::<usize>(at(sym::G_TRANSPORT)))
         };
         let gt = if setup != 0 {
-            let f: unsafe extern "thiscall" fn(usize) -> i32 = core::mem::transmute(0x5464c0usize);
+            let f: unsafe extern "thiscall" fn(usize) -> i32 = core::mem::transmute(at(sym::FN_GET_GAME_TYPE));
             f(setup)
         } else {
             0
@@ -83,9 +83,9 @@ pub fn team_colour(o: usize) -> V3 {
         if gt == 2 && p != 0 {
             return rd::<V3>(p + 0x474);
         }
-        // Team::GetTeam reads Team::s_pTeamList (0x738db0) unchecked.
+        // Team::GetTeam reads Team::s_pTeamList unchecked.
         let i = field(o, 0xec) as i32;
-        let team = if (0..32).contains(&i) { rd::<usize>(0x738db0 + 4 * i as usize) } else { 0 };
+        let team = if (0..32).contains(&i) { rd::<usize>(at(sym::TEAM_LIST) + 4 * i as usize) } else { 0 };
         if team == 0 { v3(1.0, 1.0, 1.0) } else { rd::<V3>(team + 8) }
     }
 }
@@ -159,15 +159,15 @@ pub fn lights_hidden(inst: usize) -> bool {
 pub fn station_node(o: usize) -> Option<(usize, bool)> {
     let class = field(o, 0x40);
     match render_fn(o) {
-        fn_shipyard_render() => {
+        f if f != 0 && f == fn_shipyard_render() => {
             let n = field(class, 0x4a4);
-            let none = unsafe { rd::<usize>(0x6b41d8) };
+            let none = unsafe { rd::<usize>(at(sym::NO_ENTITY)) };
             Some((n, field(o, 0x2b8) == none))
         }
-        fn_mining_render() => {
+        f if f != 0 && f == fn_mining_render() => {
             let n = field(class, 0x4b0);
             let docked = unsafe {
-                let f: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(0x4d7020usize);
+                let f: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(at(sym::FN_IS_SHIP_DOCKED));
                 f(field(o, 0x2b0)) != 0
             };
             Some((n, !docked))
@@ -181,7 +181,7 @@ pub fn station_node(o: usize) -> Option<(usize, bool)> {
 /// the overlays' posts are not drawn.
 pub fn draw_height_post(top: V3, cam: usize) {
     unsafe {
-        let f: unsafe extern "C" fn(*const V3, usize) = core::mem::transmute(0x593840usize);
+        let f: unsafe extern "C" fn(*const V3, usize) = core::mem::transmute(at(sym::FN_DRAW_HEIGHT_POST));
         f(&top, cam);
     }
 }

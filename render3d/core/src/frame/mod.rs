@@ -33,9 +33,8 @@ use post::{PRect, Post, Targets};
 
 /// `Armada_RenderAllOurStuff(Armada_Camera*, Render_Stuff&, bool isMain)`, cdecl.
 pub(crate) fn body_addr() -> usize { at(sym::BODY) }
-const SITES: [usize; 2] = [0x59886e, 0x4e60f6];
-/// The functions the two calls are in, for the hooks' log (and Phase 8's profile).
-const SITE_SYMBOLS: [&str; 2] = ["Armada_RenderFrame", "CinematicView::RenderView"];
+/// The two calls of the body: in `Armada_RenderFrame` and `CinematicView::RenderView`.
+const SEAMS: [a2engine::Sym; 2] = [sym::SITE_SEAM_FRAME, sym::SITE_SEAM_VIEW];
 /// What the seam's calls went to before us (`hooks::Prev`): stock's body, since
 /// the seam installs only over it.
 static mut PREV_BODY: usize = 0;
@@ -46,7 +45,7 @@ fn seam(i: usize, used_by: &'static str, to: usize) -> Hook {
         owner: ModuleId::CORE,
         used_by,
         kind: Kind::Call,
-        site: Site { symbol: SITE_SYMBOLS[i], addr: SITES[i], expect: body_addr() },
+        site: Site::of(&TABLE, SEAMS[i]),
         to,
         chain: false,
     }
@@ -56,13 +55,17 @@ fn seam(i: usize, used_by: &'static str, to: usize) -> Hook {
 /// site does not call the stock body.
 fn install_seams(used_by: &'static str, to: usize, who: &str) -> bool {
     let mut h = Hooks::core();
-    for i in 0..SITES.len() {
+    if !h.ready(&TABLE, hook::FRAME_SEAM) {
+        log!("{}: the calls to the 3D body are not stock's: {}", who, if who == "frame" { "standing down" } else { "not timed" });
+        return false;
+    }
+    for i in 0..SEAMS.len() {
         if !h.check(&seam(i, used_by, to)) {
-            log!("{}: the call at {:#x} is not to {:#x}: {}", who, SITES[i], body_addr(), if who == "frame" { "standing down" } else { "not timed" });
+            log!("{}: a call to the 3D body is not to {:#x}: {}", who, body_addr(), if who == "frame" { "standing down" } else { "not timed" });
             return false;
         }
     }
-    for i in 0..SITES.len() {
+    for i in 0..SEAMS.len() {
         match h.install(seam(i, used_by, to)) {
             Some(prev) => unsafe { PREV_BODY = prev.addr() },
             None => return false,
@@ -102,7 +105,7 @@ static mut RESET_VT: usize = 0;
 /// between the shell's display and a mission's, and in Graphics Settings.
 use crate::engine::dx8_vtable;
 use crate::engine::at;
-use crate::syms::sym;
+use crate::syms::{hook, sym, TABLE};
 const SLOT_DESTROY: usize = 28;
 pub(crate) fn destroy_addr() -> usize { at(sym::DESTROY) }
 static mut DESTROY_NEXT: usize = 0;
@@ -114,6 +117,9 @@ pub fn install() -> bool {
         return false;
     }
     log!("frame: both views come through render3d");
+    // The steps call the engine's own sub-functions through their sites: without the
+    // profile's say-so every frame is the stock body.
+    steps::set_ready(Hooks::core().ready(&TABLE, hook::FRAME_STEPS));
     if install_destroy() {
         log!("frame: DestroyRenderSurfaces chained: render3d lets go of the device with the engine");
     }
@@ -258,6 +264,10 @@ fn frame() -> &'static mut Option<Frame> {
 /// False, with nothing written, when the slot holds neither the stock function nor
 /// another plugin's (one outside `Armada2.exe`'s code).
 pub fn install_destroy() -> bool {
+    if !Hooks::core().ready(&TABLE, hook::FRAME_DESTROY) {
+        log!("frame: DestroyRenderSurfaces is not stock's: the device is let go of when the next one is seen");
+        return false;
+    }
     let h = Hook {
         owner: ModuleId::CORE,
         used_by: "letting go of the device with the engine",

@@ -29,6 +29,7 @@ pub mod menu;
 pub mod registry;
 pub mod scene;
 pub mod settings_table;
+pub mod syms;
 #[rustfmt::skip]
 pub mod shaders;
 pub mod timing;
@@ -98,6 +99,12 @@ pub fn start(version: &str, built: &'static [registry::BuiltIn]) {
     let cfg = config::load();
     rt::log_open("Render3D.log", cfg.log);
     log!("Render3D {} -- game dir {}", version, rt::game_dir());
+    match a2engine::pe::this_process() {
+        Some(id) => log!("engine: {}", id),
+        None => log!("engine: Armada2.exe identity unreadable"),
+    }
+    engine::start_table("core", &syms::TABLE);
+    let reads = hooks::Hooks::core().ready(&syms::TABLE, syms::hook::CORE_READS);
     registry::log_built_in();
     timing::configure(cfg.timing, cfg.timing_every);
     clock::load();
@@ -107,6 +114,12 @@ pub fn start(version: &str, built: &'static [registry::BuiltIn]) {
         if cfg.timing && frame::install_measure() {
             log!("timing: the engine's own body is timed (Enable=0)");
         }
+        build_rows();
+        return;
+    }
+    if !reads {
+        log!("core: the engine's reads are not stock's: standing down");
+        DOWN.store(DOWN_SEAM, core::sync::atomic::Ordering::Relaxed);
         build_rows();
         return;
     }

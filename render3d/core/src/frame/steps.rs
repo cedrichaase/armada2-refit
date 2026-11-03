@@ -125,9 +125,16 @@ pub fn view_key(cam: usize, main: bool) -> usize {
     }
 }
 
+static READY: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+
+/// `frame.steps` of the profile is ready (set once, at the seam's install).
+pub fn set_ready(ok: bool) {
+    READY.store(ok, core::sync::atomic::Ordering::Relaxed);
+}
+
 /// Whether this frame can go through the steps at all.
 pub fn usable() -> bool {
-    unsafe { rd::<usize>(g_credits()) == 0 }
+    READY.load(core::sync::atomic::Ordering::Relaxed) && unsafe { rd::<usize>(g_credits()) == 0 }
 }
 
 /// The view's rectangle from the camera (`+0x1b0`, four floats in back-buffer pixels).

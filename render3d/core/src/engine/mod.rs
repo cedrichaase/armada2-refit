@@ -21,6 +21,10 @@ pub(crate) fn at(s: a2engine::Sym) -> usize { crate::syms::TABLE.engine().addr(s
 /// `a` must be a valid, aligned-enough address of a `T`.
 #[inline(always)]
 pub unsafe fn rd<T: Copy>(a: usize) -> T {
+    // An address the profile did not give (0: its hook is not ready) reads as zero.
+    if a < 0x1000 {
+        return unsafe { core::mem::zeroed() };
+    }
     unsafe { core::ptr::read_unaligned(a as *const T) }
 }
 
@@ -55,7 +59,10 @@ pub fn vtable(obj: usize) -> usize {
 
 /// `Armada2.exe`'s code: a call target or slot value there that is not stock's is not
 /// another plugin's either (`hooks`).
-pub const EXE_CODE: core::ops::Range<usize> = 0x401000..0x6ae000;
+pub fn exe_code() -> core::ops::Range<usize> {
+    let (lo, hi) = crate::syms::TABLE.engine().code();
+    lo..hi
+}
 
 // ---- the engine root ------------------------------------------------------------
 
@@ -89,9 +96,9 @@ pub fn st3d_device() -> usize {
 
 // ---- clock ----------------------------------------------------------------------
 
-/// Sim time in seconds (`Get_Time` reads the float at 0x7b0fc8).
+/// Sim time in seconds (`Get_Time` reads the float behind `sim_time`).
 pub fn sim_time() -> f32 {
-    unsafe { rd::<f32>(0x7b0fc8) }
+    unsafe { rd::<f32>(at(sym::SIM_TIME)) }
 }
 
 // ---- lists ----------------------------------------------------------------------
@@ -155,4 +162,65 @@ pub fn ff(base: usize, off: usize) -> f32 {
 /// Reads a `V3` at an address.
 pub fn rv3(a: usize) -> V3 {
     unsafe { rd::<V3>(a) }
+}
+
+// ---- the symbol tables ----------------------------------------------------------
+
+use alloc::vec::Vec;
+use core::sync::atomic::{AtomicBool, Ordering};
+
+/// Every table started so far (the core's first), for the settings notes.
+static mut STARTED: Vec<(&'static str, &'static a2engine::Table)> = Vec::new();
+/// The table being started: its log lines are filtered (`table_log`).
+static mut STARTING: &str = "core";
+static STARTING_CORE: AtomicBool = AtomicBool::new(true);
+
+#[allow(static_mut_refs)]
+fn started() -> &'static [(&'static str, &'static a2engine::Table)] {
+    unsafe { &STARTED }
+}
+
+/// The resolvers log the identity, the build and the test line once per table; render3d
+/// logs the identity itself (`start`), the core table its build, summary and test line,
+/// and each module's table only its own summary, named.
+fn table_log(s: &str) {
+    if s.starts_with("engine: Armada2.exe") {
+        return;
+    }
+    if STARTING_CORE.load(Ordering::Relaxed) {
+        crate::log!("{}", s);
+    } else if let Some(rest) = s.strip_prefix("engine: symbols:") {
+        crate::log!("engine: {} symbols:{}", unsafe { STARTING }, rest);
+    } else if !(s.starts_with("engine: build ") || s == "engine: unknown build" || s.starts_with("engine: TEST:")) {
+        crate::log!("{}", s);
+    }
+}
+
+/// Starts a symbol table (once; the core's is `"core"`, a module's its name), before any
+/// of its hooks is readied. `Hooks::ready` does it at a table's first use.
+#[allow(static_mut_refs)]
+pub fn start_table(name: &'static str, t: &'static a2engine::Table) {
+    if started().iter().any(|(_, s)| core::ptr::eq(*s, t)) {
+        return;
+    }
+    unsafe {
+        STARTED.push((name, t));
+        STARTING = name;
+    }
+    STARTING_CORE.store(name == "core", Ordering::Relaxed);
+    a2engine::init(t, table_log);
+}
+
+/// The note for the plugin as a whole: a build Refit does not know, else why the core's
+/// reads or the frame's seam stood down.
+pub fn plugin_note() -> Option<&'static str> {
+    let e = crate::syms::TABLE.engine();
+    e.note_plugin()
+        .or_else(|| e.note(crate::syms::hook::CORE_READS))
+        .or_else(|| e.note(crate::syms::hook::FRAME_SEAM))
+}
+
+/// The note for a settings row: why a hook of any started table feeding it stood down.
+pub fn note_for(section: &str, key: &str) -> Option<&'static str> {
+    started().iter().find_map(|(_, t)| t.engine().note_for(section, key))
 }

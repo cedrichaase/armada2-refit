@@ -191,13 +191,13 @@ impl Lights {
             let colour: V3 = unsafe { rd(rec + 4) };
             let m: M34 = unsafe { rd(rec + 0x10) };
             match vtable(light) {
-                vt_directional() => {
+                v if v != 0 && v == vt_directional() => {
                     let d = m.r[2];
                     if d.len() > 1e-6 {
                         l.dirs.push(Directional { dir: d.norm(), colour });
                     }
                 }
-                vt_point() => {
+                v if v != 0 && v == vt_point() => {
                     let (start, range) = unsafe { (rd::<f32>(light + 0x100), rd::<f32>(light + 0x104)) };
                     l.points.push(Point { pos: m.p, colour, start, range, light, style: style_of(light), medium: medium_of(light) });
                 }

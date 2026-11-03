@@ -36,6 +36,15 @@ pub struct Site {
     pub expect: usize,
 }
 
+impl Site {
+    /// The site of a profile entry: its map name, address and what stock has there; addr
+    /// 0 (the site stands down) unless the hook the entry belongs to is ready.
+    pub fn of(t: &'static a2engine::Table, s: a2engine::Sym) -> Site {
+        let (symbol, addr, expect) = t.engine().site(s);
+        Site { symbol, addr, expect }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum Kind {
     /// A `call rel32` at `site.addr`, re-pointed.
@@ -116,7 +125,7 @@ pub struct Hooks {
 /// Whether a value is in the executable's code: a target there that is not stock's is
 /// not another plugin's either, so nothing is chained onto it.
 fn in_exe_code(a: usize) -> bool {
-    engine::EXE_CODE.contains(&a)
+    engine::exe_code().contains(&a)
 }
 
 impl Hooks {
@@ -138,6 +147,14 @@ impl Hooks {
     /// The owner's gate, for its detours to keep in a static.
     pub fn gate(&self) -> Gate {
         self.gate
+    }
+
+    /// Whether the engine's checks of `hk` of `t` passed (the table is started at its first
+    /// use): true when the hook's entries are stock's in this `Armada2.exe`. On false the
+    /// engine has logged why and has the settings note; nothing else is kept.
+    pub fn ready(&mut self, t: &'static a2engine::Table, hk: a2engine::HookId) -> bool {
+        engine::start_table(self.name, t);
+        t.engine().ready(hk).is_ok()
     }
 
     /// A hook the owner cannot draw without did not install: it is not switched on.

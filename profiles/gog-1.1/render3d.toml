@@ -504,3 +504,88 @@ symbol = "ST3D_Sprite::m_texture_coordinate_offset"
 kind = "global"
 addr = 0x7ad6d0
 used_by = ["core.reads"]
+
+[[sym]]
+id = "fn_get_game_setup"
+symbol = "Transport::getGameSetup"
+kind = "fn"
+addr = 0x557940
+check = "8b 41 30 c3 90 90 90 90"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "fn_get_game_type"
+symbol = "GameSetup::getGameType"
+kind = "fn"
+addr = 0x5464c0
+check = "8b 41 10 8a 88 e0 00 00"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "fn_is_ship_docked"
+symbol = "ResourceTransferInterface::IsShipDocked"
+kind = "fn"
+addr = 0x4d7020
+check = "8b 49 04 8b 15 d8 41 6b"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "fn_draw_height_post"
+symbol = "DrawHeightPost"
+kind = "fn"
+addr = 0x593840
+check = "55 8b ec 83 ec 18 8b 4d"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "g_transport"
+symbol = "g_transport"
+kind = "global"
+addr = 0x76b8d4
+used_by = ["core.reads"]
+
+[[sym]]
+id = "team_list"
+symbol = "Team::s_pTeamList"
+kind = "global"
+addr = 0x738db0
+used_by = ["core.reads"]
+
+[[sym]]
+id = "no_entity"
+symbol = "Entity::NO_ENTITY"
+kind = "global"
+addr = 0x6b41d8
+used_by = ["core.reads"]
+
+[[sym]]
+id = "background_name"
+symbol = "STARFIELD_GEOMETRY_NAME"
+kind = "global"
+addr = 0x738538
+used_by = ["core.reads"]
+
+[[sym]]
+id = "sim_time"
+symbol = "(unnamed) simulation time, seconds"
+kind = "global"
+addr = 0x7b0fc8
+used_by = ["core.reads"]
+
+[[sym]]
+id = "site_seam_frame"
+symbol = "Armada_RenderFrame"
+kind = "call"
+addr = 0x59886e
+target = "body"
+in = "Armada_RenderFrame"
+used_by = ["frame.seam"]
+
+[[sym]]
+id = "site_seam_view"
+symbol = "CinematicView::RenderView"
+kind = "call"
+addr = 0x4e60f6
+target = "body"
+in = "CinematicView::RenderView"
+used_by = ["frame.seam"]
