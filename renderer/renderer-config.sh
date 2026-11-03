@@ -21,6 +21,9 @@
 # 70 ms a frame with 30 ships selected).  It is left out, with a warning, on a DXVK build
 # that does not know it.  renderer/README.md, "Reading back a dynamic vertex buffer".
 #
+# Display8 (Vulkan, Direct3D 12) takes the same three sampler settings from
+# Display8.ini [Samplers]; they stay `auto` (= this file's values) until a player sets them.
+#
 # Nothing else in the game directory is touched.  dxvk.conf does not exist in a stock
 # install, so there is no backup to keep: removing the file restores stock exactly.
 #

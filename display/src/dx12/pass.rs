@@ -26,7 +26,7 @@
 //!   vertices lack comes from a defaults record in slot 1, read once per draw as
 //!   instance data (a stride of 0 is not asked for).
 //! - **Textures** are the stub's mirrors (`mirror::passthrough`), or a white one;
-//!   samplers by the stage's state as DXVK makes them under the game's `dxvk.conf`.
+//!   samplers by the stage's state as DXVK makes them under `[Samplers]` or `dxvk.conf` (`crate::dxvk_samplers`).
 use super::build::{self, Key};
 use super::exports::{cmd_alive, published};
 use super::raw::*;

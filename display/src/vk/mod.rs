@@ -324,7 +324,7 @@ impl Vk {
         drop(saved);
 
         let samplers = crate::dxvk_samplers();
-        log!("vulkan: the plugins' samplers as dxvk.conf has DXVK make them: anisotropy {}, LOD bias {}", samplers.0, samplers.1);
+        log!("vulkan: the plugins' samplers: anisotropy {}, LOD bias {}", samplers.0, samplers.1);
         let mut me = Vk {
             _entry: entry,
             instance,

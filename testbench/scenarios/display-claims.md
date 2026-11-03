@@ -25,9 +25,9 @@ loading screen and the Credits, and the 3D view is the engine's. In **render3d**
 parts at 0): it claims every module but the sky, which it leaves to the engine (drawn
 by passthrough), and the HUD is the engine's.
 
-The UI stays in the clone in **render3d**, with every part at 0 (`[HUD] Enable=0`,
-`[Loading] Enable=0`, `[UI] Cursor=0`, `[Menus] Credits=0`), so it registers and claims
-none and the HUD is the engine's.
+The UI stays in the clone in **render3d**, with its HUD, loading screen, cursor and Credits at 0 (`[HUD] Enable=0`,
+`[Loading] Enable=0`, `[UI] Cursor=0`, `[Menus] Credits=0`), so it registers and claims only
+the menus (since phase 9 it hosts them) and the HUD is the engine's.
 
 1. Launch the game.
 2. Wait up to 600 seconds for "Scene.log" to say "paused at tick".
@@ -46,7 +46,7 @@ none and the HUD is the engine's.
 15. Render3d: Expect "Display8.log" contains "claims: Render3D.asi claims hulls world particles effects ordnance specials fog selection".
 16. Render3d: Expect "Display8.log" not contains "claims: Render3D.asi claims sky".
 17. Render3d: Expect "Render3D.log" contains "module sky: off".
-18. Render3d: Expect "Display8.log" contains "claims: UI.asi claims none".
+18. Render3d: Expect "Display8.log" contains "claims: UI.asi claims menus".
 19. Expect "Display8.log" not contains "PASSTHROUGH an engine draw while a plugin records".
 20. Expect "Display8.log" not contains "PANIC".
 21. Expect no crash.

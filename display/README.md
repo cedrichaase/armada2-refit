@@ -865,7 +865,16 @@ the swap chain's image, submits and presents.
   every sampler with mips a LOD bias of -0.5. Display8 reads the same keys
   (`d3d9.samplerAnisotropy`, `d3d9.samplerLodBias`, `d3d9.clampNegativeLodBias`) and
   hands them to `gpu` (`VkDevice8::sampler_anisotropy`, `sampler_lod_bias`), so the two
-  backends filter alike. Without it every hull read a level blurrier on Vulkan. Vulkan's cube maps are always seamless, as
+  backends filter alike. Without it every hull read a level blurrier on Vulkan. Since
+  0.21.0 `Display8.ini`'s `[Samplers]` (`Anisotropy`, `LodBias`, `ClampNegativeLodBias`;
+  rows in `settings.toml`, no screen row, advanced) names the values itself, on Vulkan,
+  on Direct3D 12 and for the passthrough's samplers alike (`crate::dxvk_samplers` feeds
+  all three): a key that is not `auto` wins, `auto` (shipped) reads that key from
+  `dxvk.conf`, and `Display8.log` says which (`samplers: Anisotropy=16 (Display8.ini)`
+  or `(dxvk.conf)`). The keys have no `moved_from`: a `dxvk.conf` is not a plugin ini
+  (`move-keys.py` moves between those), so `auto` is how a player's `dxvk.conf` values
+  carry over, and `Defaults=` is not bumped: the merge adds the section. The Direct3D 9
+  backend still gets its filtering from DXVK, hence from `dxvk.conf`. Vulkan's cube maps are always seamless, as
   `d3d9.seamlessCubes = True` makes DXVK's.
 
 On the bench every Vulkan game runs on the GPU (the one DXVK uses) with the layer on

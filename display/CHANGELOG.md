@@ -4,6 +4,13 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.21.0 — 2026-11-03
+
+### Added
+- `Display8.ini [Samplers]` (phase 10 X2): `Anisotropy`, `LodBias` and `ClampNegativeLodBias`, rows in `settings.toml` (no screen row, advanced). A value that is not `auto` is what the plugins' samplers on Vulkan and Direct3D 12 and the passthrough's (`vk/pass.rs`, `dx12/pass.rs` through `passthrough/state.rs`) take; the shipped `auto` reads that key from the game's `dxvk.conf`, as before. `Display8.log` says which: `samplers: Anisotropy=16 (Display8.ini)` or `(dxvk.conf)`. `Defaults=` is not bumped; the merge adds the section and keeps the player's values.
+
+Installed, not yet seen in game.
+
 ## 0.20.0 — 2026-11-03
 
 ### Added
