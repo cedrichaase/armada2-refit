@@ -271,6 +271,14 @@ function Invoke-Retire {
                 foreach ($f in @(Get-ChildItem -LiteralPath (G $rest[0]) -Filter $rest[1] -File)) { Remove-Retired $f.FullName }
                 Remove-Empty (G $rest[0])
             }
+            "glob-hash" {
+                if (-not (Test-Path -LiteralPath (G $rest[0]) -PathType Container)) { continue }
+                $known = @($rest | Select-Object -Skip 2)
+                foreach ($f in @(Get-ChildItem -LiteralPath (G $rest[0]) -Filter $rest[1] -File)) {
+                    if ($known -contains (Get-Sha $f.FullName)) { Remove-Retired $f.FullName }
+                }
+                Remove-Empty (G $rest[0])
+            }
             "file" { Remove-Retired (G $rest[0]) }
             "hud-files" {
                 # The file-based HUD fixes of hud 2.x, put back from their backups.
@@ -740,7 +748,14 @@ function Invoke-Moved {
         if (-not (Test-Path -LiteralPath (G $ff))) { continue }
         $v = Get-IniKey (G $ff) $fs $fk
         if ($null -eq $v) { continue }
-        if ($v.ToLower() -ne "$def".ToLower()) {
+        # The one rule (tools/settings/README.md, "Moved keys"): a new key the player set
+        # (present, not empty, not the default) wins; else the old value moves if it is not
+        # the default; the old key goes either way.
+        $nv = $null
+        if (Test-Path -LiteralPath (G $tf)) { $nv = Get-IniKey (G $tf) $ts $tk }
+        if ($nv -and ($nv.ToLower() -ne "$def".ToLower())) {
+            Say "  $ff [$fs] $fk=$v dropped ($tf [$ts] $tk=$nv is set already)"
+        } elseif ($v.ToLower() -ne "$def".ToLower()) {
             if (-not (Test-Path -LiteralPath (G $tf))) { Say "  $tf is not there; $ff [$fs] $fk=$v stays"; continue }
             Set-IniKey (G $tf) $ts $tk $v
             Say "  moved $ff [$fs] $fk=$v to $tf [$ts] $tk"
@@ -758,6 +773,11 @@ if ((Test-Path -LiteralPath $d8) -and -not (Test-Display8 $d8) -and -not (Test-G
 } else {
     if (Test-GogD3d8 $d8) {
         if (-not (Test-Path -LiteralPath "$d8.gog-backup")) { Copy-Item -LiteralPath $d8 "$d8.gog-backup" }
+    } elseif ((Test-Path -LiteralPath $d8) -and -not (Test-Display8 $d8) -and -not (Test-D3d8to9 $d8)) {
+        # A d3d8.dll whose hash we do not know (a DXVK's, the player's own build of it) is
+        # kept; the uninstall puts it back.
+        if (-not (Test-Path -LiteralPath "$d8$ChainBackup")) { Copy-Item -LiteralPath $d8 "$d8$ChainBackup" }
+        Say "  d3d8.dll: not one we know, replaced (the old one is d3d8.dll$ChainBackup)"
     } elseif ((Test-Path -LiteralPath $d8) -and -not (Test-Display8 $d8)) {
         Say "  d3d8.dll: the old chain's, replaced"
     }

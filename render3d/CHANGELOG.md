@@ -4,6 +4,11 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 1.0.4 — 2026-11-04
+
+### Fixed
+- `install.sh` (and `--remove`) no longer deletes `Sky\<name>.ini` by the names of the shipped recipes: a sky recipe of the player's own, the override the README documents, survives. The old Sky.asi copies are taken out by hash, by `retire/retire.sh` (platform 4.0.1). Installed, not yet seen in game.
+
 ## 1.0.2 — 2026-11-03
 
 ### Fixed

@@ -23,9 +23,9 @@ remove_recipes() {
     local f
     for f in "$here"/content/surfaces/*.ini; do rm -f "$GAME/Surfaces/$(basename "$f")"; done
     for f in "$here"/content/nebulae/*.ini; do rm -f "$GAME/Nebulae/$(basename "$f")"; done
-    # Sky.asi's copies of the sky recipes, which would shadow the built-in ones.
-    for f in "$here"/content/sky/*.ini; do rm -f "$GAME/Sky/$(basename "$f")"; done
-    rmdir "$GAME/Surfaces" "$GAME/Nebulae" "$GAME/Sky" 2>/dev/null || true
+    # Sky.asi's copies of the sky recipes are retire/retire.sh's, by hash: a Sky\<name>.ini
+    # of the player's own, even one named like a shipped recipe, is theirs and stays.
+    rmdir "$GAME/Surfaces" "$GAME/Nebulae" 2>/dev/null || true
 }
 
 remove=0

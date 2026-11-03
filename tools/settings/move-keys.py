@@ -5,8 +5,9 @@
     move-keys.py [--repo DIR] GAME_DIR
 
 For every row with `moved_from`, in the game directory's `<Stem>.ini`: when it holds
-`[Section] Key`, a value other than the row's default goes to the row's own ini and key,
-and the old key is removed either way. Run by ./install after every layer, so a value a
+`[Section] Key`, a value other than the row's default goes to the row's own ini and key
+unless the player has set that already (the one rule of README.md, "Moved keys"), and the
+old key is removed either way. Run by ./install after every layer, so a value a
 player set under the old name survives; a second run finds nothing to do. The edit is
 a2ini's (host.sh); a file that does not exist is left alone, with a line saying so.
 The overlay is the UI hub's to move (`ui/src/settings.rs`), not this script's.
@@ -62,7 +63,13 @@ def main(argv):
                 continue
             if a2ini is None:
                 a2ini = host()
-            if v.lower() != r['def'].lower():
+            # One rule for every mover (README, "Moved keys"): the new key wins when the
+            # player set it (present, not empty, not the row's default); otherwise the
+            # old value moves when it is not the default; the old key goes either way.
+            nv = inival.value(inival.read(new), r['section'], r['key']) if os.path.isfile(new) else None
+            if nv is not None and nv != '' and nv.lower() != r['def'].lower():
+                print(f'move-keys: dropped {stem}.ini [{osec}] {okey}={v} ({r["file"]} [{r["section"]}] {r["key"]}={nv} is set already)')
+            elif v.lower() != r['def'].lower():
                 if not os.path.isfile(new):
                     print(f'move-keys: {r["file"]} is not there; {stem}.ini [{osec}] {okey}={v} stays')
                     continue
