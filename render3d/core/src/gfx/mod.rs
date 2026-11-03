@@ -2,11 +2,8 @@
 //! interface shared with UI.asi, gpu/README.md), a module's pipelines kept per
 //! combination of states (`Pipes`), the view's pass begun again after a pass of a
 //! module's own (`view_pass`), and the engine's textures wrapped (`engine_texture`).
-//! Every module draws through a `gpu::Cmd` (`cmd`); none calls Direct3D 9 itself.
-//!
-//! d3d8to9 keeps its own record of what the game bound (platform/D3D9.md), so a
-//! module that changes device state between the engine's steps must leave it as it
-//! found it: a `Cmd` does that with one of `gpu`'s state blocks, put back when dropped.
+//! Every module draws through a `gpu::Cmd` (`cmd`); none calls the engine's device
+//! itself. A `Cmd` leaves the engine's state as it found it when it is dropped.
 pub mod fx;
 
 use crate::frame::steps::View;
@@ -30,8 +27,8 @@ fn display_export(name: &str) -> usize {
 }
 
 /// render3d's `gpu` context (each plugin keeps its own) and the frame it records into,
-/// moved on after each main view. Its backend is Direct3D 9, or Vulkan when Display8
-/// draws on it (gpu/README.md). On Vulkan it publishes its pass now to Display8, whose
+/// moved on after each main view. Its backend is Vulkan or Direct3D 12, Display8's
+/// device (gpu/README.md); with no Display8 it is stood down and draws nothing. On Vulkan it publishes its pass now to Display8, whose
 /// passthrough draws what render3d hands back to the engine into the scene pass
 /// (display/README.md, "Passthrough").
 static mut GPU: gpu::Gpu = gpu::Gpu::with_display_publishing(log_line, display_export);
@@ -45,18 +42,6 @@ pub fn gpu() -> &'static gpu::Gpu {
 #[allow(static_mut_refs)]
 pub fn frame() -> &'static mut gpu::Frame {
     unsafe { &mut FRAME }
-}
-
-/// Before a `Reset`: `gpu` lets go of its state blocks and what it holds in the
-/// default pool.
-pub fn reset() {
-    gpu().before_reset();
-}
-
-/// When the engine lets go of its device: `gpu` lets go of everything it holds (every
-/// object holds its device, and native Direct3D 9 cannot make another while it lives).
-pub fn forget() {
-    gpu().release_device();
 }
 
 /// render3d's command recorder for a module's draws: `gpu().begin(frame())`. None
@@ -127,7 +112,7 @@ pub fn view_pass(cmd: &mut gpu::Cmd, v: &View, vp: Option<gpu::Viewport>) -> boo
 /// An engine texture (`ST3D_Texture`) to sample: its per-device texture (`+0x40 +
 /// device index * 4`, the index at `Storm3D+0xc0`), whose `+4` is the
 /// `IDirect3DTexture8`, which `gpu` makes a texture of (`gpu::Gpu::engine_texture`:
-/// d3d8to9's `IDirect3DTexture9` behind it, or Display8's Vulkan mirror of it).
+/// Display8's mirror of it).
 pub fn engine_texture(st3d_tex: usize) -> Option<gpu::Texture> {
     if st3d_tex == 0 {
         return None;

@@ -1,4 +1,4 @@
-// entries: planet_vs:vs_3_0:VS_PLANET ground_ps:ps_3_0:PS_GROUND city_ps:ps_3_0:PS_CITY cloud_ps:ps_3_0:PS_CLOUD halo_ps:ps_3_0:PS_HALO surface_ps:ps_3_0:PS_SURFACE ground_ps_cl:ps_3_0:PS_GROUND_CL:dxc city_ps_cl:ps_3_0:PS_CITY_CL:dxc cloud_ps_cl:ps_3_0:PS_CLOUD_CL:dxc surface_ps_cl:ps_3_0:PS_SURFACE_CL:dxc
+// entries: planet_vs:vs_3_0:VS_PLANET ground_ps:ps_3_0:PS_GROUND city_ps:ps_3_0:PS_CITY cloud_ps:ps_3_0:PS_CLOUD halo_ps:ps_3_0:PS_HALO surface_ps:ps_3_0:PS_SURFACE ground_ps_cl:ps_3_0:PS_GROUND_CL city_ps_cl:ps_3_0:PS_CITY_CL cloud_ps_cl:ps_3_0:PS_CLOUD_CL surface_ps_cl:ps_3_0:PS_SURFACE_CL
 // The world module's planets (mods/world/src/planets.rs): Lighting.asi's planet shaders
 // (its planet.hlsl) over a sphere of our
 // own instead of the engine's re-tessellated GroundMesh. The pixel shaders are the

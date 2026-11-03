@@ -1,4 +1,4 @@
-// entries: vs_rock:vs_3_0:VS_ROCK ps_rock:ps_3_0:PS_ROCK ps_flat:ps_3_0:PS_FLAT vs_sprite:vs_3_0:VS_RSPRITE ps_sprite:ps_3_0:PS_RSPRITE ps_rock_cl:ps_3_0:PS_ROCK_CL:dxc
+// entries: vs_rock:vs_3_0:VS_ROCK ps_rock:ps_3_0:PS_ROCK ps_flat:ps_3_0:PS_FLAT vs_sprite:vs_3_0:VS_RSPRITE ps_sprite:ps_3_0:PS_RSPRITE ps_rock_cl:ps_3_0:PS_ROCK_CL
 // The world module's rocks (mods/world/src/rocks.rs): the dilithium moons' rock and the
 // asteroids', surfaces from recipes, as Lighting.asi's moon_ps drew
 // them (in its hull shader): the colour, the relief and the cut-out from three cubes in

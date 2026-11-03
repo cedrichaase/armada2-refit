@@ -1,8 +1,8 @@
 //! The graphics interface `Render3D.asi` and `UI.asi` draw through (README.md beside
-//! this crate). It is shaped for Vulkan and Direct3D 12 and implemented on Direct3D 9
-//! (`d3d9`: the device behind the game's d3d8 one) and on Vulkan (`vulkan`: Display8's
-//! device in its stub mode), the backend chosen at run time by what Display8 says
-//! (`api`):
+//! this crate). It is implemented on Vulkan (`vulkan`: Display8's device) and on
+//! Direct3D 12 (`dx12`: Display8's device with `Backend=d3d12`), the backend chosen at
+//! run time by what Display8 says (`api`); with no Display8 of this contract it draws
+//! nothing (the plugin stands down):
 //!
 //! - **Resources** (`Texture`, `Buffer`, `Pipeline`) are made once from a description
 //!   and stay valid until dropped. A pipeline is immutable: shaders, vertex layout,
@@ -40,7 +40,6 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 mod api;
 pub mod chain;
-pub mod d3d9;
 pub mod display;
 pub mod dx12;
 mod frame;

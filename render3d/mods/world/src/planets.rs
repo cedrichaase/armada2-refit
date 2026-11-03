@@ -14,7 +14,6 @@ use crate::rt::Ini;
 use r3d_core::frame::steps::View;
 use r3d_core::gfx::{self, Pipes};
 use r3d_core::math::{self, M34, V3, v3};
-use crate::shaders::world_planet::*;
 use crate::shaders::world_planet_spv::*;
 use crate::shaders::world_planet_dxil::*;
 use r3d_core::{assets, scene};
@@ -58,16 +57,16 @@ struct Sphere {
 
 /// The pixel shaders, by the index the pipelines' keys carry.
 const PS: [gpu::Code; 9] = [
-    gpu::code!(PS_GROUND, PS_GROUND_SPV, PS_GROUND_DXIL),
-    gpu::code!(PS_CITY, PS_CITY_SPV, PS_CITY_DXIL),
-    gpu::code!(PS_CLOUD, PS_CLOUD_SPV, PS_CLOUD_DXIL),
-    gpu::code!(PS_HALO, PS_HALO_SPV, PS_HALO_DXIL),
-    gpu::code!(PS_SURFACE, PS_SURFACE_SPV, PS_SURFACE_DXIL),
+    gpu::code!(PS_GROUND_SPV, PS_GROUND_DXIL),
+    gpu::code!(PS_CITY_SPV, PS_CITY_DXIL),
+    gpu::code!(PS_CLOUD_SPV, PS_CLOUD_DXIL),
+    gpu::code!(PS_HALO_SPV, PS_HALO_DXIL),
+    gpu::code!(PS_SURFACE_SPV, PS_SURFACE_DXIL),
     // The clustered twins of ground, city, cloud and surface (`scene::clusters`).
-    gpu::code!(PS_GROUND_CL, PS_GROUND_CL_SPV, PS_GROUND_CL_DXIL),
-    gpu::code!(PS_CITY_CL, PS_CITY_CL_SPV, PS_CITY_CL_DXIL),
-    gpu::code!(PS_CLOUD_CL, PS_CLOUD_CL_SPV, PS_CLOUD_CL_DXIL),
-    gpu::code!(PS_SURFACE_CL, PS_SURFACE_CL_SPV, PS_SURFACE_CL_DXIL),
+    gpu::code!(PS_GROUND_CL_SPV, PS_GROUND_CL_DXIL),
+    gpu::code!(PS_CITY_CL_SPV, PS_CITY_CL_DXIL),
+    gpu::code!(PS_CLOUD_CL_SPV, PS_CLOUD_CL_DXIL),
+    gpu::code!(PS_SURFACE_CL_SPV, PS_SURFACE_CL_DXIL),
 ];
 
 /// A pixel shader's clustered twin, if it has one.
@@ -253,7 +252,7 @@ impl Planets {
     fn pipe(&mut self, ps: usize, mode: u8) -> Option<Pipeline> {
         let ps = if self.cl { clustered_twin(ps).unwrap_or(ps) } else { ps };
         self.pipes.view((ps * 4 + mode as usize) as u64, || {
-            let mut d = PipelineDesc::new(gpu::code!(VS_PLANET, VS_PLANET_SPV, VS_PLANET_DXIL), PS[ps], &LAYOUT, 32, Topology::TriangleList, Format::Unknown);
+            let mut d = PipelineDesc::new(gpu::code!(VS_PLANET_SPV, VS_PLANET_DXIL), PS[ps], &LAYOUT, 32, Topology::TriangleList, Format::Unknown);
             d.depth = Depth { test: true, write: mode == OPAQUE, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
             d.cull = Cull::CounterClockwise;
             d.blend = match mode {

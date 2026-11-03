@@ -1,4 +1,4 @@
-// entries: sky_vs:vs_3_0:VS_SKY sky_ps:ps_3_0:PS_SKY:long bake_warp_ps:ps_3_0:PS_BAKE_WARP bake_field_ps:ps_3_0:PS_BAKE_FIELD bake_gas_ps:ps_3_0:PS_BAKE_GAS bake_stars_ps:ps_3_0:PS_BAKE_STARS bake_end_ps:ps_3_0:PS_BAKE_END down_ps:ps_3_0:PS_DOWN draw_ps:ps_3_0:PS_DRAW face_vs:vs_3_0:VS_FACE face_ps:ps_3_0:PS_FACE sprite_vs:vs_3_0:VS_SPRITE sprite_ps:ps_3_0:PS_SPRITE tunnel_ps:ps_3_0:PS_TUNNEL flash_ps:ps_3_0:PS_FLASH
+// entries: sky_vs:vs_3_0:VS_SKY sky_ps:ps_3_0:PS_SKY bake_warp_ps:ps_3_0:PS_BAKE_WARP bake_field_ps:ps_3_0:PS_BAKE_FIELD bake_gas_ps:ps_3_0:PS_BAKE_GAS bake_stars_ps:ps_3_0:PS_BAKE_STARS bake_end_ps:ps_3_0:PS_BAKE_END down_ps:ps_3_0:PS_DOWN draw_ps:ps_3_0:PS_DRAW face_vs:vs_3_0:VS_FACE face_ps:ps_3_0:PS_FACE sprite_vs:vs_3_0:VS_SPRITE sprite_ps:ps_3_0:PS_SPRITE tunnel_ps:ps_3_0:PS_TUNNEL flash_ps:ps_3_0:PS_FLASH
 // The background of the 3D view (mods/sky/src/): the procedural sky ported from
 // Sky.asi (its settled looks kept), the stock cube's faces, and the sprites of the
 // starfield and of the background objects (the suns).

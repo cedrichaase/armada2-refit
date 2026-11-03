@@ -4,6 +4,16 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 1.0.1 — 2026-11-03
+
+### Removed
+- The d3dbc form of the shaders (`src/shaders/ff.rs`, `present.rs`), unused since 1.0.0;
+  the stamps of the SPIR-V and DXIL moved (their code did not). `build.sh` no longer
+  passes `--fix`. The contract's `BACKEND_D3D9` is retired in `gpu/src/display.rs`
+  (Display8 never answers it).
+
+Installed, not yet seen in game.
+
 ## 1.0.0 — 2026-11-03
 
 ### Added

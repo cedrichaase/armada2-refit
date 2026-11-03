@@ -7,7 +7,6 @@ use r3d_core::frame::steps::View;
 use r3d_core::gfx::{self, Pipes};
 use gpu::{Blend, Block, Topology};
 use r3d_core::math::{v3, V3};
-use crate::shaders::effects_construction::*;
 use crate::shaders::effects_construction_spv::*;
 use crate::shaders::effects_construction_dxil::*;
 use alloc::vec::Vec;
@@ -104,7 +103,7 @@ impl Fx {
             return;
         }
         let _ = v;
-        let pipe = self.pipes.view(0, || super::fx_desc(gpu::code!(VS_CWELD, VS_CWELD_SPV, VS_CWELD_DXIL), gpu::code!(PS_CWELD, PS_CWELD_SPV, PS_CWELD_DXIL), &super::QUAD2, 44, Topology::TriangleList, Blend::ADD));
+        let pipe = self.pipes.view(0, || super::fx_desc(gpu::code!(VS_CWELD_SPV, VS_CWELD_DXIL), gpu::code!(PS_CWELD_SPV, PS_CWELD_DXIL), &super::QUAD2, 44, Topology::TriangleList, Blend::ADD));
         if let (Some(mut cmd), Some(pipe)) = (gfx::cmd(), pipe) {
             if cmd.set_pipeline(&pipe) {
                 cmd.vs_block(Block::new(0, &c.vp));

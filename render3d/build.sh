@@ -11,11 +11,9 @@
 # Shaders first, crate by crate (core/ and each mods/<m>/): each <crate>/shaders/<name>.hlsl
 # names its entry points on its first line,
 #   // entries: <entry>:<profile>:<SYMBOL> ...
-# and is compiled by tools/shaderc/hlsl-rs.sh into <crate>/src/shaders/<name>.rs, Direct3D 9
-# bytecode from vkd3d, <name>_spv.rs, SPIR-V from dxc, and <name>_dxil.rs, DXIL from the
-# pinned dxc (committed, with stamps, so a machine without the compilers builds as long
-# as they are current), with --fix: Windows' own Direct3D 9 refuses vkd3d's bytecode as
-# it is (README.md, "Shaders on Windows"). A module's shaders include the core's headers
+# and is compiled by tools/shaderc/hlsl-rs.sh into <crate>/src/shaders/<name>_spv.rs,
+# SPIR-V from dxc, and <name>_dxil.rs, DXIL from the pinned dxc (committed, with stamps,
+# so a machine without the compilers builds as long as they are current). A module's shaders include the core's headers
 # (core/shaders/*.hlsli), which its stamps cover (--headers). <crate>/src/shaders/mod.rs
 # lists them and is written here too. Every crate's shaders are compiled whatever the
 # features, so the committed files stay current.
@@ -51,8 +49,8 @@ for crate in "$here/core" "$here"/mods/*; do
         entries=$(sed -n '1s#^// entries:##p' "$f")
         [ -n "$entries" ] || { echo "render3d: $f has no '// entries:' first line" >&2; exit 1; }
         # shellcheck disable=SC2086
-        "$here/../tools/shaderc/hlsl-rs.sh" --fix "${headers[@]}" "$crate/src/shaders/$name.rs" "$f" $entries
-        mods="$mods$name ${name}_spv ${name}_dxil "
+        "$here/../tools/shaderc/hlsl-rs.sh" "${headers[@]}" "$crate/src/shaders/$name.rs" "$f" $entries
+        mods="$mods${name}_spv ${name}_dxil "
     done
     new=$(mktemp "$crate/src/shaders/.mod.rs.XXXXXX")
     {

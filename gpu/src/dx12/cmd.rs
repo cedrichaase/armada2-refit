@@ -485,7 +485,7 @@ impl<'a> Cmd<'a> {
         }
         unsafe { core::ptr::copy_nonoverlapping(src, a.cpu, n as usize) };
         // `vk` is the buffer's GPU address, `first` the element there.
-        Some(Span { buf: core::ptr::null_mut(), vk: a.gpu - a.offset as u64, first: a.offset / stride, count: n / stride, stride })
+        Some(Span { vk: a.gpu - a.offset as u64, first: a.offset / stride, count: n / stride, stride })
     }
 
     pub fn vertices<T: Copy>(&mut self, data: &[T]) -> Option<Span> {
@@ -503,7 +503,7 @@ impl<'a> Cmd<'a> {
         if a == 0 || stride == 0 {
             return None;
         }
-        Some(Span { buf: core::ptr::null_mut(), vk: a, first: 0, count: b.0.desc.size / stride, stride })
+        Some(Span { vk: a, first: 0, count: b.0.desc.size / stride, stride })
     }
 
     /// Makes the list agree with the state for a draw (the module doc). None: nothing

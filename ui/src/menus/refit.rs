@@ -623,10 +623,7 @@ fn foot_row(ui: &mut Ui, f: R) {
     }
     let done = R::new(f.right() - bw, f.y, bw, f.h);
     if s.tab == TAB_GRAPHICS {
-        let name = match crate::gfx::gpu().backend_name() {
-            "d3d9" => "Direct3D 9",
-            n => n,
-        };
+        let name = crate::gfx::gpu().backend_name();
         let r = R::new(tg.right() + gap, f.y, done.x - gap - tg.right() - gap, f.h);
         ui.text_in(r, &sfmt!("Drawn on {}", name), t.small_size, Align::Right, t.text_dim, Weight::Regular);
     }

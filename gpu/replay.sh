@@ -6,13 +6,12 @@
 # touched. Writes replay-<backend>.ppm, replay-<backend>.log and the run's Display8.log
 # (replay-<backend>-Display8.log, from the prefix's LocalAppData logs folder) into the recording's directory, which is in A2_DATA.
 #
-#   gpu/replay.sh <recording dir> [--backend vulkan|d3d9|d3d12]... [--stop SEQ] [--keep] [--no-build]
+#   gpu/replay.sh <recording dir> [--backend vulkan|d3d12]... [--stop SEQ] [--keep] [--no-build]
 #
 # <recording dir>  what `a2test drive record NAME` wrote: $A2_DATA/replays/NAME/ (a bare
 #                  NAME is looked for there)
-# --backend B      vulkan (gpu's Vulkan backend on Display8's device), d3d9 (Display8's
-#                  Direct3D 9 device: DXVK, platform/vendor), d3d12 (vkd3d-proton, from
-#                  A2_PROTON); repeatable; default vulkan and d3d9
+# --backend B      vulkan (gpu's Vulkan backend on Display8's device), d3d12
+#                  (vkd3d-proton, from A2_PROTON); repeatable; default vulkan
 # --stop SEQ       replay only the records before SEQ (each record's place in the frame,
 #                  across the plugins: gpu/replay/inspect.py lists them), to see the frame
 #                  part way; the picture is replay-<backend>-<SEQ>.ppm
@@ -23,7 +22,7 @@
 # (game.ppm, the UI's dump of the recorded frame) and against each other:
 #
 #   ./a2test baseline diff <dir>/game.ppm <dir>/replay-vulkan.ppm
-#   ./a2test baseline diff <dir>/replay-vulkan.ppm <dir>/replay-d3d9.ppm
+#   ./a2test baseline diff <dir>/replay-vulkan.ppm <dir>/replay-d3d12.ppm
 #
 # Needs sway, Xwayland and the 32-bit lavapipe and validation layer (Arch:
 # lib32-vulkan-swrast, lib32-vulkan-icd-loader, lib32-vulkan-validation-layers).
@@ -38,7 +37,7 @@ rec="" keep="" build=1 upto=
 backends=()
 while [ $# -gt 0 ]; do
     case "$1" in
-        --backend) backends+=("${2:?--backend vulkan|d3d9|d3d12}"); shift ;;
+        --backend) backends+=("${2:?--backend vulkan|d3d12}"); shift ;;
         --stop) upto="${2:?--stop SEQ}"; shift ;;
         --keep) keep=1 ;;
         --no-build) build="" ;;
@@ -52,7 +51,7 @@ done
 [ -d "$rec" ] || { echo "replay.sh: no recording at $rec" >&2; exit 1; }
 rec="$(cd "$rec" && pwd)"
 ls "$rec"/*.a2s >/dev/null 2>&1 || { echo "replay.sh: no *.a2s stream in $rec" >&2; exit 1; }
-[ ${#backends[@]} -gt 0 ] || backends=(vulkan d3d9)
+[ ${#backends[@]} -gt 0 ] || backends=(vulkan)
 
 cargo="${CARGO:-$HOME/.cargo/bin/cargo}"
 [ -x "$cargo" ] || cargo=$(command -v cargo || true)
@@ -143,9 +142,6 @@ for b in "${backends[@]}"; do
     overrides="d3d8=n;winemenubuilder.exe=d"
     case "$b" in
         vulkan) ;;
-        d3d9)
-            cp "$repo/platform/vendor/dxvk-3.1.1/d3d9.dll" "$run/d3d9.dll"
-            overrides="d3d8,d3d9=n;winemenubuilder.exe=d" ;;
         d3d12)
             vk="$A2_PROTON/files/lib/wine/vkd3d-proton/i386-windows"
             dx="$A2_PROTON/files/lib/wine/dxvk/i386-windows"
@@ -153,7 +149,7 @@ for b in "${backends[@]}"; do
             cp "$vk/d3d12.dll" "$vk/d3d12core.dll" "$run/"
             [ -f "$dx/dxgi.dll" ] && cp "$dx/dxgi.dll" "$run/"
             overrides="d3d8,d3d12,d3d12core,dxgi=n;winemenubuilder.exe=d" ;;
-        *) echo "replay.sh: $b is not a backend (vulkan, d3d9, d3d12)" >&2; rc=1; continue ;;
+        *) echo "replay.sh: $b is not a backend (vulkan, d3d12)" >&2; rc=1; continue ;;
     esac
     out="$rec/replay-$b${upto:+-$upto}.ppm"
     rm -f "$out"

@@ -409,7 +409,7 @@ impl<'a> R<'a> {
         }
         let depth_format = if self.u8() != 0 { Some(self.format()) } else { None };
         let samples = self.u32();
-        let empty = Code::new(&[], &[]);
+        let empty = Code::new(&[]);
         let d = PipelineDesc {
             vs: empty,
             ps: empty,

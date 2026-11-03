@@ -37,7 +37,6 @@ use r3d_core::frame::steps::View;
 use r3d_core::gfx::{self, Pipes};
 use crate::log;
 use r3d_core::math::{v3, V3};
-use crate::shaders::effects_shields::*;
 use crate::shaders::effects_shields_spv::*;
 use crate::shaders::effects_shields_dxil::*;
 use alloc::string::String;
@@ -734,8 +733,8 @@ impl Shields {
             return;
         }
         let g = gfx::gpu();
-        let hit = self.pipes.view(0, || super::fx_desc(gpu::code!(VS_SHIELD, VS_SHIELD_SPV, VS_SHIELD_DXIL), gpu::code!(PS_SHIELD, PS_SHIELD_SPV, PS_SHIELD_DXIL), &super::XYZ, 12, Topology::TriangleList, Blend::ADD));
-        let down = self.pipes.view(1, || super::fx_desc(gpu::code!(VS_SHIELD, VS_SHIELD_SPV, VS_SHIELD_DXIL), gpu::code!(PS_DOWN, PS_DOWN_SPV, PS_DOWN_DXIL), &super::XYZ, 12, Topology::TriangleList, Blend::ADD));
+        let hit = self.pipes.view(0, || super::fx_desc(gpu::code!(VS_SHIELD_SPV, VS_SHIELD_DXIL), gpu::code!(PS_SHIELD_SPV, PS_SHIELD_DXIL), &super::XYZ, 12, Topology::TriangleList, Blend::ADD));
+        let down = self.pipes.view(1, || super::fx_desc(gpu::code!(VS_SHIELD_SPV, VS_SHIELD_DXIL), gpu::code!(PS_DOWN_SPV, PS_DOWN_DXIL), &super::XYZ, 12, Topology::TriangleList, Blend::ADD));
         let Some(hit) = hit.filter(|p| p.ready(g)) else { return };
         let down = down.filter(|p| p.ready(g));
         self.down_ok = down.is_some();

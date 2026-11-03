@@ -5,7 +5,7 @@
 //! dropped. The device is Display8's and never goes away, so nothing is made twice.
 use super::raw::*;
 use super::{dlog, dxgi, Fmt, Garbage, Gpu, Shared, H_DSV, H_RTV, H_SRV};
-use crate::d3d9::raw::Guid;
+use crate::dx12::raw::Guid;
 use crate::display::Dx12Image8;
 use crate::types::*;
 use alloc::rc::Rc;

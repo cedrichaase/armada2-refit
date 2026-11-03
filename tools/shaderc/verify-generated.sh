@@ -5,7 +5,7 @@
 #   tools/shaderc/verify-generated.sh
 #
 # What it covers: render3d's crates (render3d/core/ and each render3d/mods/<m>/), ui/ and
-# display/ (<crate>/src/shaders/*.rs, *_spv.rs, *_dxil.rs, by tools/shaderc/hlsl-rs.sh
+# display/ (<crate>/src/shaders/*_spv.rs, *_dxil.rs, by tools/shaderc/hlsl-rs.sh
 # exactly as each build.sh calls it; a render3d module's with --headers render3d/core/shaders) and gpu's own (gpu/vk-shaders.sh
 # to src/vulkan/shaders.rs, gpu/dx12-shaders.sh to src/dx12/shaders.rs). The generated
 # files are deleted first, so a stamp that still matches cannot hide a compiler whose
@@ -13,9 +13,8 @@
 # (hlsl-rs.sh checks each as it writes it; gpu/spirv-selftest.sh checks the links and
 # patches gpu makes).
 #
-# The compilers are the pinned ones: dxc 1.9.2609 (fetch-dxc.sh) first on PATH, so it
-# writes the SPIR-V as well as the DXIL, and vkd3d-compiler 1.19 (fetch-vkd3d.sh), which
-# is built if the one on PATH is not that version. Needs git, spirv-val and python3.
+# The compiler is the pinned one: dxc 1.9.2609 (fetch-dxc.sh) first on PATH, so it
+# writes the SPIR-V as well as the DXIL. Needs git, spirv-val and python3.
 # Leaves the tree as it found it only if the files match; on a difference it leaves the
 # regenerated files for `git diff`.
 set -euo pipefail
@@ -27,9 +26,6 @@ command -v spirv-val >/dev/null || { echo "verify-generated: no spirv-val (Ubunt
 
 dxc_dir=$(dirname "$("$here/fetch-dxc.sh")")
 PATH="$dxc_dir:$PATH"
-command -v vkd3d-compiler >/dev/null && vkd3d-compiler --version 2>&1 | grep -qF "vkd3d-shader 1.19 (git 5c355b596)" ||
-    PATH="$("$here/fetch-vkd3d.sh"):$PATH"
-echo "verify-generated: $(vkd3d-compiler --version 2>&1 | head -1)"
 echo "verify-generated: dxc $(dxc --version 2>&1 | head -1)"
 
 # The crates with shaders of their own: <crate>/shaders/*.hlsl into <crate>/src/shaders/.
@@ -60,8 +56,8 @@ for layer in "${crates[@]}"; do
         entries=$(sed -n '1s#^// entries:##p' "$f")
         [ -n "$entries" ] || { echo "verify-generated: $f has no '// entries:' first line" >&2; exit 1; }
         # shellcheck disable=SC2086
-        tools/shaderc/hlsl-rs.sh --fix "${headers[@]}" "$layer/src/shaders/$name.rs" "$f" $entries
-        mods="$mods$name ${name}_spv ${name}_dxil "
+        tools/shaderc/hlsl-rs.sh "${headers[@]}" "$layer/src/shaders/$name.rs" "$f" $entries
+        mods="$mods${name}_spv ${name}_dxil "
     done
     # mod.rs as each build.sh writes it.
     {

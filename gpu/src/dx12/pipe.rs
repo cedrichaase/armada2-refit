@@ -16,7 +16,7 @@
 //!   scaled to the format's step, as on Vulkan.
 use super::raw::*;
 use super::{dlog, Gpu, PassKey, Shared, K_WORDS};
-use crate::d3d9::raw::Guid;
+use crate::dx12::raw::Guid;
 use crate::types::*;
 use crate::vulkan::spirv::{self, TexUse};
 use alloc::ffi::CString;

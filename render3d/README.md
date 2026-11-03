@@ -54,10 +54,10 @@ crate links with `/nodefaultlib`, `kernel32` its only import (an import library 
 `llvm-dlltool --kill-at` from `kernel32.def` in `build.rs`), and brings its own
 allocator, memory functions and stack probe (`crates/a2rt`, shared with the UI and
 Display8). Shaders are HLSL in each
-crate's `shaders/` ("Crates"), compiled by `tools/shaderc/hlsl-rs.sh` with `vkd3d-compiler` into `<crate>/src/shaders/<name>.rs`
-and with `dxc` into SPIR-V in `<crate>/src/shaders/<name>_spv.rs` and DXIL in
-`<crate>/src/shaders/<name>_dxil.rs` ("One source, two compilers"), all committed with a stamp
-so a machine without the compilers builds as long as they are current.
+crate's `shaders/` ("Crates"), compiled by `tools/shaderc/hlsl-rs.sh` with `dxc` into SPIR-V in
+`<crate>/src/shaders/<name>_spv.rs` and DXIL in `<crate>/src/shaders/<name>_dxil.rs`
+("One source, two forms"), both committed with a stamp so a machine without the
+compiler builds as long as they are current.
 
 ### Crates
 
@@ -102,155 +102,56 @@ Recipes are data in `content/<kind>/`, `include_str!`'d by the crate that reads 
   into the core (`rows_in = "core"`, `tools/settings/README.md`), and the cdylib
   defines the export. Fragments stay under it, one per module crate.
 
-### Shaders on Windows
-
-**Windows' own Direct3D 9 refuses vkd3d's bytecode; DXVK takes it as it is.** On
-Windows the chain is crosire's d3d8to9 over the system's d3d9, with no DXVK, and the
-runtime validates every shader at `CreateVertexShader`/`CreatePixelShader`. Measured
-on Windows 10 (Radeon RX 5700 XT, a 32-bit process): 51 of the 86 shaders of
-Render3D.asi and UI.asi came back `D3DERR_INVALIDCALL`, on every kind of device
-(software, hardware, mixed and pure vertex processing). The state block and the vertex
-declarations were made. So both plugins stood down: UI.asi drew nothing (a black
-screen over working menus) and render3d left the 3D view to the engine.
-
-Taking the refused shaders apart instruction by instruction (each prefix of a shader,
-closed off with a write of `oC0`) found what the runtime refuses:
-
-1. **One constant register and one input register per instruction.** `mul r0.x, c0.x,
-   c12.x` and `mul r1.x, v0.x, v2.y` are refused; the same register twice is
-   accepted. vkd3d writes both freely.
-2. **`sincos` may not write the register it reads**: `sincos r1.y, r1.x` is refused,
-   `sincos r2.y, r1.x` accepted.
-3. **`oDepth` takes the full write mask**: `mov oDepth.x, r0.x` is refused.
-4. **No `texld` (or `dsx`, `dsy`) inside an `if`.** The same `texld` on its own is
-   accepted, on a 2D, cube or volume sampler alike, and so is any prefix that stops
-   before the first one inside a branch.
-5. **r0 to r31 only.** The nebula march shaders use r33.
-
-These five predict the runtime's verdict on all 86 on that card. A sixth depends on the
-card:
-
-6. **No more instruction slots than the card takes** (`D3DCAPS9`'s
-   `MaxPixelShader30InstructionSlots`). The Radeon above takes 32768, the most shader
-   model 3 allows, so it took everything; other cards take 4096. A player's report
-   (Windows 11, 2026-10-20) had the main menu's sky black and its planet stock: every
-   shader up to 3659 slots was made and every one from 5861 refused. That is the
-   sky's bake (8761), the planets' height (17812) and the nebulae's march (5861 at
-   `Steps=8`), the last of which fell back to slices without a word. The bakes'
-   noise is unrolled by vkd3d (a value-noise lookup is 143 slots, a lattice of 27
-   craters 3891), and shortening it would change what it draws.
-
-So **a bake longer than 4096 slots is a chain of passes** (`gpu/src/chain.rs`,
-`core/shaders/chain.hlsli`): each pass works out part of the function at its texel and
-hands it to the next through a float32 target. The sky is the warp, the field, the
-gas, two slabs of the star lattice, and the last slab put together. A planet's height
-is the warp, the ground, the mountains with the first slab of craters, two more crater
-passes and the two fissure nets (a gas giant is the warp and itself). The values are
-full floats, so it bakes what the one shader did. The targets are tiles of at most
-1024 on a side, so the sky's 3072 supersampled face needs 48 MB of them, not 450.
-`tools/shaderc/d3dbc-fix.py` counts slots as the runtime does and refuses a shader past 4096 unless
-its entry is marked `:long`. Two are marked: `sky_ps`, the `Face=0` reference, and the
-march, which falls back to slices; cutting the march per frame is still to do.
-`Render3D.log` names every shader the runtime refuses, with its slots and the card's. `tools/shaderc/d3dbc-fix.py` mends four of them
-in the bytecode. It copies the extra register into a temporary (only the lanes the
-instruction consumes, so an input is never read outside its `dcl` mask), routes
-`sincos` through one, and widens the mask. And it gives the temporaries out again when
-a shader names more than 32: vkd3d never reuses a register, but at most 19 values are
-live at once in the march (liveness over its if/else; a value live into or out of an if
-keeps one register across all of it). `tools/shaderc/hlsl-rs.sh --fix` runs it on each shader, for
-both plugins (`build.sh`, `ui/build.sh`); `tools/shaderc/d3dbc-fix.py --check <file.bin>` lists all
-five.
-
-Rule 4 is the HLSL's to keep. **Never sample with an implicit level (`Sample`) inside
-an `if`, or after an early `return`** (vkd3d puts the rest of the function inside one).
-Each place that did was rewritten so it samples what it sampled before:
-
-- a texture with one level and the same min and mag filter (the noise volume of the
-  fire, the surfaces' height cube, the nebulae's baked volume and blue noise) is read
-  with zero gradients or `SampleLevel` at 0, which is level 0, as before;
-- a mipped one (the rocks' baked cubes) is read with `SampleGrad`, the gradients taken
-  before the branch from the same coordinates. A tap of the crack march at
-  `q - vq * t` (t the same on every pixel) has the gradient `ddx(q) - ddx(vq) * t`, and
-  needs no normalising: a cube lookup and its level read only the direction;
-- where the branch only saved work in a pass that is rarely drawn (the nebulae's bake,
-  their reference, the slices drawn without the march), the branches are `[flatten]`ed
-  and the early returns turned into a choice at the end.
-
-vkd3d (1.19) has no `tex3Dlod` or `texCUBElod` in the old dialect; the modern
-`SampleLevel` it compiles to `texldl` on every kind of texture, and `SampleGrad` to
-`texldd`.
-
-How this was checked: every shader as committed is made on Windows 10's runtime on all
-four kinds of device; and a d3dbc interpreter ran each shader as vkd3d wrote it and as
-`tools/shaderc/d3dbc-fix.py` rewrote it, 300 random inputs and constants each (so the recipe's
-branches go both ways), with identical outputs for all 86, and the old and new
-compiles of every rewritten entry point with identical outputs too (textures there are
-a function of the coordinate alone, so the levels are the argument above). With the
-allocator's rule for ifs taken out, the interpreter found the marches wrong in every
-run.
-
-### One source, two compilers
+### One source, two forms
 
 Every shader of render3d and UI.asi is modern HLSL (`Texture2D`/`Texture3D`/
 `TextureCube` with a `SamplerState`, `cbuffer`, `SV_Position`/`SV_Target`, `Sample`,
-`SampleLevel`, `SampleGrad`, HLSL 2021's `select`), so that one source builds the
-Direct3D 9 shaders, the SPIR-V for `gpu`'s Vulkan backend and the DXIL for its
-Direct3D 12 one (below). vkd3d
-writes the d3dbc as before and `dxc` (`-spirv`, Vulkan 1.1) the SPIR-V, which
-`tools/shaderc/hlsl-rs.sh` puts through `spirv-val`. `gpu/shaders/compat.hlsli`, at the root because
-both plugins include it, holds the few places the two compilers part (dxc predefines
-`__hlsl_dx_compiler`; vkd3d defines nothing to tell it by, and takes no `-D` or `-I`, so
-the shaders include it by a relative path that resolves from their `shaders/` for both; a
-module's shaders include the core's headers, `core/shaders/*.hlsli`, the same way, and
-a header never includes another, since vkd3d looks a nested `#include` up from the
-working directory):
+`SampleLevel`, `SampleGrad`, HLSL 2021's `select`), and `dxc` writes two forms of it:
+the SPIR-V for `gpu`'s Vulkan backend (`-spirv`, Vulkan 1.1, which
+`tools/shaderc/hlsl-rs.sh` puts through `spirv-val`) and the DXIL for its Direct3D 12
+one (below). There is no third: the Direct3D 9 bytecode that vkd3d wrote (`d3dbc`, with
+`d3dbc-fix.py` and `d3dbc-slots.py` to make Windows' own Direct3D 9 take it) went with
+the Direct3D 9 backend in render3d 1.0.0, and with it the vkd3d fetch, the 4096-slot
+rewrite and the `:long` and `:dxc` marks of an entries line. What the measurements in
+the changelog say about shaders on Windows' Direct3D 9 is history. The source keeps what
+that route taught it, because the rules cost nothing under dxc: loops of a fixed count
+and branch-free bodies (`step`/`lerp`/`select`), constants at fixed registers.
+`gpu/shaders/compat.hlsli`, at the root because both plugins include it, holds the few
+places the two forms part (dxc predefines `__hlsl_dx_compiler`, and `__spirv__` when it
+writes SPIR-V); a module's shaders include the core's headers, `core/shaders/*.hlsli`,
+by a relative path:
 
-- **Constants keep their Direct3D 9 registers**: `CREG(n)` is `register(cn)` for vkd3d,
-  which places a cbuffer member by it and ignores `packoffset`, and `packoffset(cn)`
-  for dxc. So the Rust code sets the same registers as before, and in SPIR-V a member
-  sits at byte 16 n of its buffer (`-fvk-use-dx-layout`): each stage's buffer is its
-  register file. dxc wants a cbuffer's members in rising order, and refuses two that
-  overlap; entry points of one file that use one register for different things have a
-  cbuffer each.
-- **Samplers keep their stages, though vkd3d does not**: for shader model 1-3 it makes
-  each texture/sampler pair a combined sampler named `<sampler>+<texture>` and gives the
-  pairs s0, s1, ... in order, whatever the source declares (any `register()` on either
-  is dropped). `tools/shaderc/d3dbc-slots.py` puts each pair back on the stage the source names
-  (`register(tn)` on the texture and `register(sn)` on its sampler, which must agree),
-  in the code and the constant table, so the Rust code binds textures as before.
-- **VPOS**: a pixel shader's `SV_Position` is the pixel's centre in Vulkan and its
-  corner (VPOS, whole numbers) in Direct3D 9, where vkd3d reads it as VPOS.
-  `d3d9_vpos()` gives the corner on both. vkd3d declares a float4 `SV_Position` as
-  `vPos.xyzw`, which Windows refuses (the mask has to be `.x`, `.y` or `.xy`), so
-  `tools/shaderc/d3dbc-fix.py` narrows it to `.xy`, and refuses a shader that reads its z or w.
-- **`select`** is a macro over `?:` for vkd3d, which has the vector `?:` and no
-  `select`; dxc refuses a vector `?:` under HLSL 2021.
-- **0 x infinity is NaN on SPIR-V and DXIL, and 0 in Direct3D 9's shaders** (DXVK
-  emulates the legacy rule). So a branch-free shader that evaluates every kind and
-  keeps one must `select` it, never weight each by 0 or 1 and add them up: a kind run
-  on another kind's parameters may reach an infinity, and its 0 weight then turns the
-  pixel to NaN, which an additive blend carries into the frame as black. The ordnance
-  module's fx shader did that until 0.26.1: the auto-assimilator's emitter flare (a
-  flare quad, whose cone term divided by the flare's zero streak colour and overflowed
-  an `exp` past the cone's outline) drew as an opaque black square on Vulkan and
-  Direct3D 12 and right on Direct3D 9 (`testbench/scenarios/render3d-cone-emitter.md`).
-
-The d3dbc this writes is the d3dbc the old sources wrote: the code token for token,
-the constant table's sampler names aside, and in five pixel shaders (`fire_ps`,
-`ps_cloak`, `ps_holo`, `neb_ps`, `vol_ps`) the `dcl` of vPos before the texture
-coordinates' instead of after.
+- **Constants keep their registers**: `CREG(n)` is `packoffset(cn)`, so the Rust code
+  sets registers, and in SPIR-V a member sits at byte 16 n of its buffer
+  (`-fvk-use-dx-layout`): each stage's buffer is its register file. dxc wants a
+  cbuffer's members in rising order, and refuses two that overlap; entry points of one
+  file that use one register for different things have a cbuffer each.
+- **Samplers keep their stages**: `register(tn)` on the texture and `register(sn)` on
+  its sampler, both marked `STAGE(n)`, which is the combined image sampler of set 1,
+  binding n in SPIR-V and the registers as declared in DXIL.
+- **VPOS**: a pixel shader's `SV_Position` is the pixel's centre; `d3d9_vpos()` gives
+  the corner, whole numbers, as the shaders were written for.
+- **0 x infinity is NaN on SPIR-V and DXIL** (the Direct3D 9 shaders took the legacy
+  rule). So a branch-free shader that evaluates every kind and keeps one must `select`
+  it, never weight each by 0 or 1 and add them up: a kind run on another kind's
+  parameters may reach an infinity, and its 0 weight then turns the pixel to NaN, which
+  an additive blend carries into the frame as black. The ordnance module's fx shader
+  did that until 0.26.1: the auto-assimilator's emitter flare (a flare quad, whose cone
+  term divided by the flare's zero streak colour and overflowed an `exp` past the
+  cone's outline) drew as an opaque black square
+  (`testbench/scenarios/render3d-cone-emitter.md`).
 
 **SPIR-V's layout**, for the backend that will draw with it: every cbuffer of a vertex
 shader is `register(b0)` (set 0, binding 0) and of a pixel shader `register(b1)` (set 0,
 binding 1); several cbuffers of one stage alias that binding, which Vulkan allows. A
 texture and its sampler are one combined image sampler (`STAGE(n)`: set 1, binding n,
-the Direct3D 9 stage). Vertex shaders are compiled with `-fvk-invert-y`, so clip space
-is Direct3D 9's (y up) under a viewport of positive height; window coordinates, and so
-the winding a triangle is culled by, come out as Direct3D 9's. Interface locations are
+the stage a shader names). Vertex shaders are compiled with `-fvk-invert-y`, so clip space
+is Direct3D's (y up) under a viewport of positive height; window coordinates, and so
+the winding a triangle is culled by, come out as Direct3D's. Interface locations are
 dxc's: each struct member in declaration order, unused ones included, so a vertex
 shader's outputs and the pixel shader's inputs agree wherever both use one struct.
-Direct3D 9's half-pixel offset (pixel centres on whole coordinates) is the caller's:
-DXVK moves the viewport by half a pixel, and the UI's `VP.zw` holds it.
+Direct3D 9's half-pixel offset (pixel centres on whole coordinates) is the caller's, and
+only in the comparison mode `PixelCentres=d3d9`: the UI's `VP.zw` holds it.
 
 **DXIL**, for Direct3D 12, from the same sources: `tools/shaderc/hlsl-rs.sh` writes it into
 `<crate>/src/shaders/<name>_dxil.rs` with dxc too, but a pinned release, DirectXShaderCompiler
@@ -268,8 +169,8 @@ cbuffers of a stage alias its one register on purpose, some overlapping in it (o
 entry point's `c0` is not another's). So the source is preprocessed once (`dxc -P`)
 and `tools/shaderc/dxil-spaces.py` puts the k-th cbuffer at `register(bN)` in space k: a stage's
 register file is bound at b0 (vertex) or b1 (pixel) in every space 0..k, and each
-module's `CB_SPACES` says how many (at most 8, which it checks). The d3dbc and SPIR-V
-are untouched by it: they compile the source as it is.
+module's `CB_SPACES` says how many (at most 8, which it checks). The SPIR-V
+is untouched by it: it compiles the source as it is.
 
 Two more things are DXIL's alone, both for `gpu`'s Direct3D 12 backend
 (`gpu/README.md`, "The Direct3D 12 backend"):
@@ -279,25 +180,23 @@ Two more things are DXIL's alone, both for `gpu`'s Direct3D 12 backend
   ghosts' `PS_GHOST`) is marked `:at` on its entries line, and `tools/shaderc/dxil-alpha.py` adds
   `<entry>__alpha_test` beside it in the DXIL source: the entry called, then the
   fragment discarded by the interval gpu passes at b2. It is `SYMBOL_AT_DXIL`, the
-  fourth name in `gpu::code!`. The mark changes nothing in the d3dbc or the SPIR-V.
+  fourth name in `gpu::code!`. The mark changes nothing in the SPIR-V.
 - **Stage linkage by register.** Direct3D 12 links a pixel shader's inputs to its
   vertex shader's outputs by register, as dxc packs each signature in declaration
-  order; Direct3D 9 and Vulkan go by semantic. A pixel shader whose inputs leave out the
+  order; Vulkan goes by semantic. A pixel shader whose inputs leave out the
   position its vertex shader writes first (the post passes) or take it last (the sky's
   quad shaders), or whose input struct is another (the ghosts'), takes the position
   first in DXIL alone: `DXIL_POS`, `DXIL_POS_FIRST`, `DXIL_POS_MEMBER`
   (`gpu/shaders/compat.hlsli`).
 
-**Entries dxc alone compiles.** Compute shaders, and pixel shaders that read storage
-buffers, cannot be Direct3D 9's: an entry marked `:dxc` on the entries line has no
-d3dbc (`SYMBOL` is an empty array) and its SPIR-V and DXIL as any other. Its code,
-and every declaration only it reads, sits under `#ifdef __hlsl_dx_compiler`, so vkd3d,
-which compiles the file as it stands, sees the same tokens as before and writes the
-same d3dbc. The clustered lights' twins (`ps_hull_cl`, `ps_bump_cl`, `ps_rock_cl`, the
-planets' `*_ps_cl`) are such entries: each sets a static `cl_on` and calls its plain
-twin, whose light loop takes the cluster's lights when it is set; in the plain entry
-`cl_on` is a constant false and dxc folds it away (their SPIR-V and DXIL are as long
-as before).
+**Entries only some forms can run.** Compute shaders, and pixel shaders that read
+storage buffers, are `cs_5_0` entries or sit under `#ifdef __hlsl_dx_compiler`, which dxc
+predefines, so the guard is true in every form there is (it was the line vkd3d, which
+wrote the Direct3D 9 bytecode and is gone, was kept from). The clustered lights' twins
+(`ps_hull_cl`, `ps_bump_cl`, `ps_rock_cl`, the planets' `*_ps_cl`) are such entries:
+each sets a static `cl_on` and calls its plain twin, whose light loop takes the
+cluster's lights when it is set; in the plain entry `cl_on` is a constant false and dxc
+folds it away (their SPIR-V and DXIL are as long as before).
 
 ## `Render3D.ini`
 
@@ -518,41 +417,43 @@ each view is a rectangle of it (`camera+0x1b0`, four floats in back-buffer pixel
    next.
 
 Every tap is clamped to the view's rectangle, so neither view bleeds into the other's
-glow. The device's state is captured into a state block before the passes and put back
-after, and the engine's own target and depth are bound again, so the engine (and
-d3d8to9, which keeps its own record of what is bound) sees what it left.
+glow. The engine's own target and depth are bound again after the passes, so the engine
+sees what it left.
 
 **Through `gpu`.** Everything render3d draws goes through `gpu` (`gpu/README.md`),
 the interface shared with `UI.asi`: the targets, the scene pass and the passes after
 it, and every module's draws, each through a `gpu::Cmd` (`gfx::cmd()`) with pipelines
 made once per combination of states (`gfx::Pipes`), dynamic geometry in the frame's
-rings, and the scene's models in static buffers. No module calls Direct3D 9; the frame's
-glue in `frame/` still reads the engine's device (its transforms, its viewport, its
-`Reset` and `DestroyRenderSurfaces`) on Direct3D 9; on Vulkan and Direct3D 12 Display8
-answers them itself (below). The scene pass
+rings, and the scene's models in static buffers. No module calls the engine's device; the frame's
+glue in `frame/` hooks its `Reset` and `DestroyRenderSurfaces`, and Display8 answers its
+transforms and viewport itself (below). The scene pass
 is begun before the body and stays bound while the engine draws into it; a module that
 draws into a target of its own (a bake, the shadow map, the nebulae's march) begins
 the view's pass again after it (`gfx::view_pass`), with the viewport the engine had
 set. Stock's black line along the view's right column and bottom row is cleared in it
 after the body (`frame::black_lines`).
 
-**The first row and column.** DXVK offsets a Direct3D 9 viewport by half a pixel, so
-with MSAA half the samples of the view's first row and column are never drawn. The final pass reads those pixels from their neighbours instead, which does what
-`MSAA.asi`'s edge fill did without the frame's delay. On Vulkan (below) there is no
-offset and no such fill, and the post passes' quads do not move by half a pixel
-(`gpu::Gpu::half_pixel`).
+**The first row and column.** In the comparison mode `PixelCentres=d3d9` the viewport is
+offset by half a pixel, as DXVK offset a Direct3D 9 one, so with MSAA half the samples
+of the view's first row and column are never drawn; the final pass reads those pixels
+from their neighbours instead. Otherwise there is no offset and no such fill, and the
+post passes' quads do not move by half a pixel (`gpu::Gpu::half_pixel`).
 
-**On Vulkan.** In Display8's stub mode with `Backend=vulkan` the same frame records into
+**On Vulkan.** In Display8's stub mode with `Backend=vulkan` the frame records into
 Display8's command buffer through `gpu`'s Vulkan backend (`gpu/README.md`): the engine's
 back buffer and depth are Display8's images, the view's transforms and viewport
 Display8's record of the engine's calls (`engine_transform`, `engine_viewport`), the
 fog's textures Display8's mirrors (`gfx::engine_texture`), and every pipeline is made
-from the SPIR-V compiled beside each shader's d3dbc. The frame is told a new device by
+from the SPIR-V compiled from each shader. The frame is told a new device by
 `gpu::Gpu::engine_id`, which on Vulkan never changes; `Reset` and
 `DestroyRenderSurfaces` find nothing to let go of. The menu scene's viewport is handed
 to the pass rather than set on the engine's device, so the modules there read the
 engine's own. **On Direct3D 12** (`Backend=d3d12`) it is the same, through `gpu`'s
-Direct3D 12 backend and the DXIL beside each shader ("One source, two compilers", above).
+Direct3D 12 backend and the DXIL beside each shader ("One source, two forms", above).
+**Without Display8's device** (`Backend=none`, the bail-out to the system's d3d8, or a
+Display8 of another contract) render3d stands down: `gpu` is stood down
+(`Backend::None`), the log says `frame: standing down: no Vulkan or Direct3D 12 device`
+once, and the engine draws the 3D view.
 
 **Reset.** Every target is in the default pool and must be gone before the device
 resets. Slot 14 of the d3d8 device's vtable (`Reset`) is chained, as `Lighting.asi`
@@ -564,29 +465,17 @@ the new device's `Reset` and hands the device to every module, which makes its
 resources again; scenario `render3d-mode-switch` checks it, switching to
 800x600 in a running battle.
 
-**Letting go of the device.** Under DXVK that is enough. Under native Direct3D 9 it
-is not: every object holds its device, so whatever render3d still held kept the shell's
-device alive, and the engine's `CreateDevice` for the mission's display failed ("Fatal
-error in Direct3D. Please reboot." from `SetActiveDisplay`). The display change goes
-through `ST3D_DeviceDirectX8::DestroyRenderSurfaces` (slot 28 of its vtable, 0x6bc6ac),
-which releases the device in `DestroyDevice`; render3d chains that slot and first lets go
-of everything on the device (`frame::forget`): what a `Reset` drops, the sky's noise
-volume, and every object `gpu` made (`Gpu::release_device`: it keeps them all in one
-registry for this, and makes each again from its description at its next use). The
-posed hulls of the last views and the ghosts' queue go too: they hold models, and a
-model holds its vertex and index buffers (missing them left 49 of each, and the mission
-did not start). `gpu`'s raw layer (`gpu::d3d9::raw`) keeps a tally of every object made or handed out and not yet
-released; the hook logs what is left by kind ("still held after letting go"), which is
-how those were found, and unbinds every texture, stream and shader before the engine
-releases the device. It
-holds the d3d9 device across the engine's release and logs how many references are
-left: 0 means it is gone. `UI.asi` does the same (`ui/src/engine/device.rs`); when it
-is in the chain after render3d, render3d's count includes the UI's one reference.
-
-**Without Direct3D 9.** The d3d9 device is asked for behind the game's d3d8 one
-(the d3d8to9 chain). Under DXVK's own d3d8, or when the targets cannot be made, the
-body runs as stock. An `A16B16G16R16F` target with MSAA falls back to one without, then
-to 8 bits, and the log says which.
+**Letting go of the device.** The display change goes through
+`ST3D_DeviceDirectX8::DestroyRenderSurfaces` (slot 28 of its vtable, 0x6bc6ac), which
+releases the device in `DestroyDevice`; render3d chains that slot and first lets go of
+everything it made for the device (`frame::forget`): the targets, the post passes, every
+module's resources, the sky's noise volume. The posed hulls of the last views and the
+ghosts' queue go too: they hold models, and a model holds its vertex and index buffers.
+Display8's devices are not lost with the engine's, so nothing of this is needed for the
+device to go (it was, under native Direct3D 9, where every object held its device and
+the engine's next `CreateDevice` failed with "Fatal error in Direct3D"); it keeps the
+next frame from drawing with what was made for the old one. `UI.asi` does the same
+(`ui/src/engine/device.rs`).
 
 **`MSAA`, `HDR` and the tone map are live** (0.42.0). `Render3D_SettingsChanged` reads
 `[Render3D]` again and swaps the whole `Config` in (`config::reload`; the old one is
@@ -1514,7 +1403,7 @@ supersedes `Sky.asi` (it stands down while that plugin is loaded). In stock's or
      viewport carrying each corner's world ray (from the inverse of view x projection,
      far point minus near point, which is affine in screen position), sampling a cube
      baked once per recipe. The bake is on the GPU only: each face is drawn by the
-     `bake_*_ps` chain (five passes, "Shaders on Windows") at twice its edge
+     `bake_*_ps` chain (five passes) at twice its edge
      (Sky.asi's texel mapping, edge texels on the edges), then `down_ps` averages each 2x2 with one bilinear tap into the face of a
      half-float cube render target. The cube is in the default pool: dropped before a
      `Reset`, baked again after. The gas is saturated as before; the recipe's stars are

@@ -27,7 +27,6 @@ mod user32;
 #[rustfmt::skip]
 #[allow(dead_code)]
 mod shaders {
-    pub mod probe;
     pub mod probe_spv;
 }
 

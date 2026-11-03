@@ -8,7 +8,6 @@ use super::recipe::{NCONST, Recipe};
 use r3d_core::gfx::{self, Pipes};
 use crate::log;
 use crate::rt;
-use crate::shaders::sky::*;
 use crate::shaders::sky_spv::*;
 use crate::shaders::sky_dxil::*;
 use alloc::string::String;
@@ -44,7 +43,7 @@ pub static QUAD_LAYOUT: [VertexAttr; 2] = [attr(0, AttrFormat::Float3, Semantic:
 /// A pipeline of `sky_vs` and `ps` over a `QuadVert` strip, writing a target of `fmt`
 /// whole: no depth, no blending.
 pub fn quad_desc(ps: gpu::Code, fmt: Format) -> PipelineDesc {
-    PipelineDesc::new(gpu::code!(VS_SKY, VS_SKY_SPV, VS_SKY_DXIL), ps, &QUAD_LAYOUT, 24, Topology::TriangleStrip, fmt)
+    PipelineDesc::new(gpu::code!(VS_SKY_SPV, VS_SKY_DXIL), ps, &QUAD_LAYOUT, 24, Topology::TriangleStrip, fmt)
 }
 
 /// Draws a quad of `QuadVert`s, a strip.
@@ -68,7 +67,7 @@ pub struct Baker {
 }
 
 /// The chain's pixel shaders, in order.
-const BAKE_PS: [gpu::Code; 5] = [gpu::code!(PS_BAKE_WARP, PS_BAKE_WARP_SPV, PS_BAKE_WARP_DXIL), gpu::code!(PS_BAKE_FIELD, PS_BAKE_FIELD_SPV, PS_BAKE_FIELD_DXIL), gpu::code!(PS_BAKE_GAS, PS_BAKE_GAS_SPV, PS_BAKE_GAS_DXIL), gpu::code!(PS_BAKE_STARS, PS_BAKE_STARS_SPV, PS_BAKE_STARS_DXIL), gpu::code!(PS_BAKE_END, PS_BAKE_END_SPV, PS_BAKE_END_DXIL)];
+const BAKE_PS: [gpu::Code; 5] = [gpu::code!(PS_BAKE_WARP_SPV, PS_BAKE_WARP_DXIL), gpu::code!(PS_BAKE_FIELD_SPV, PS_BAKE_FIELD_DXIL), gpu::code!(PS_BAKE_GAS_SPV, PS_BAKE_GAS_DXIL), gpu::code!(PS_BAKE_STARS_SPV, PS_BAKE_STARS_DXIL), gpu::code!(PS_BAKE_END_SPV, PS_BAKE_END_DXIL)];
 
 impl Baker {
     pub const fn new() -> Baker {
@@ -119,7 +118,7 @@ impl Baker {
             for fmt in [Format::Rgba16F, Format::Rgb10A2, Format::Bgra8] {
                 let c = g.texture(TextureDesc::cube(s, 1, fmt, Usage::RENDER_TARGET | Usage::SAMPLED | Usage::COPY_SRC), Contents::None);
                 if c.ready(g) {
-                    log!("sky: cube {}x{} in format {}", s, s, gpu::d3d9::format_code(fmt));
+                    log!("sky: cube {}x{} in format {}", s, s, gpu::format_code(fmt));
                     self.cube = Some(c);
                     break;
                 }
@@ -128,7 +127,7 @@ impl Baker {
         }
         let Some(cube) = self.cube.clone() else { return false };
         let fmt = cube.desc().format;
-        let fc = gpu::d3d9::format_code(fmt) as u64;
+        let fc = gpu::format_code(fmt) as u64;
         // Targets 0: the warp, then the stars of the first two slabs; 1: the field; 2: the gas.
         let spec: [(usize, &'static [usize], Option<usize>); 5] =
             [(0, &[], Some(0)), (1, &[0], Some(1)), (2, &[0, 1], Some(2)), (3, &[2], Some(0)), (4, &[2, 0], None)];
@@ -136,10 +135,10 @@ impl Baker {
             .iter()
             .map(|&(i, _, to)| {
                 let f = if to.is_some() { gpu::chain::FORMAT } else { fmt };
-                self.pipes.own((i as u64) << 16 | gpu::d3d9::format_code(f) as u64, || quad_desc(BAKE_PS[i], f))
+                self.pipes.own((i as u64) << 16 | gpu::format_code(f) as u64, || quad_desc(BAKE_PS[i], f))
             })
             .collect();
-        let down = self.pipes.own(9 << 16 | fc, || quad_desc(gpu::code!(PS_DOWN, PS_DOWN_SPV, PS_DOWN_DXIL), fmt));
+        let down = self.pipes.own(9 << 16 | fc, || quad_desc(gpu::code!(PS_DOWN_SPV, PS_DOWN_DXIL), fmt));
         if !pls.iter().chain(core::iter::once(&down)).all(|p| p.ready(g)) {
             return false;
         }

@@ -554,7 +554,7 @@ impl<'a> Cmd<'a> {
             return None;
         }
         unsafe { core::ptr::copy_nonoverlapping(src, a.cpu, n as usize) };
-        Some(Span { buf: core::ptr::null_mut(), vk: a.buffer, first: a.offset / stride, count: n / stride, stride })
+        Some(Span { vk: a.buffer, first: a.offset / stride, count: n / stride, stride })
     }
 
     pub fn vertices<T: Copy>(&mut self, data: &[T]) -> Option<Span> {
@@ -572,7 +572,7 @@ impl<'a> Cmd<'a> {
         if h == vk::Buffer::null() || stride == 0 {
             return None;
         }
-        Some(Span { buf: core::ptr::null_mut(), vk: vk::Handle::as_raw(h), first: 0, count: b.0.desc.size / stride, stride })
+        Some(Span { vk: vk::Handle::as_raw(h), first: 0, count: b.0.desc.size / stride, stride })
     }
 
     /// Makes the command buffer agree with the state for a draw (the module doc). None:

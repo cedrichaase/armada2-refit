@@ -43,9 +43,8 @@
 //!   their major (`display8v1_*` for major 1), so a plugin of another major finds none
 //!   of them rather than misreading them, and `display8_abi` says why.
 //!
-//! A plugin whose major is not Display8's stands down (Direct3D 9 only, as with no
-//! Display8; on Display8's own Vulkan or Direct3D 12 it draws nothing and the engine's
-//! draws pass through), and both sides log both versions. The contract before 1.0 had
+//! A plugin whose major is not Display8's stands down (as with no Display8: it draws
+//! nothing and the engine's draws pass through), and both sides log both versions. The contract before 1.0 had
 //! no handshake and unversioned names (`display8v1_backend`, `display8v1_vk`, ...): a plugin
 //! of that time finds nothing here, and a plugin of now that finds those names and no
 //! `display8_abi` is on a Display8 too old for it.
@@ -109,10 +108,6 @@
 //! is closed at the next call into Display8 that records or hands the frame over
 //! (`display8v1_vk_frame`, `display8v1_vk_mirror`, `display8v1_vk_flush`, `display8v1_vk_pass`),
 //! so a recorder still never finds one open.
-//!
-//! **Direct3D 9** (`Backend=d3d9`, and forward mode): none of the above; the plugins
-//! reach the device as before (`QueryInterface(IID_IDirect3DDevice9)` on the engine's
-//! device) and keep their own `Frame`s, which on Direct3D 9 are trivial.
 //!
 //! **Direct3D 12** (Display8 `Mode=stub`, `Backend=d3d12`), shaped the same way. Display8
 //! makes the device (feature level 11_0, the default adapter) and one direct queue, owns
@@ -333,7 +328,7 @@ pub unsafe fn write<T: Sized8>(out: *mut T, v: &T) {
 }
 
 pub const BACKEND_NONE: u32 = 0;
-pub const BACKEND_D3D9: u32 = 1;
+// 1 was Direct3D 9: Display8 has not answered it since its forward mode was removed, and the plugins no longer ask.
 pub const BACKEND_VULKAN: u32 = 2;
 pub const BACKEND_D3D12: u32 = 3;
 

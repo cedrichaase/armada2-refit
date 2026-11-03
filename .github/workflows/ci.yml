@@ -172,9 +172,8 @@ jobs:
         run: python3 tools/engine/lint.py
 
   # Every generated shader file rebuilt from its HLSL with the pinned compilers, and a
-  # difference from the committed file (or its stamp) fails the job: d3dbc by vkd3d-compiler
-  # 1.19 (tools/shaderc/fetch-vkd3d.sh, built from the release tarball by sha256), SPIR-V and
-  # DXIL by dxc 1.9.2609 (tools/shaderc/fetch-dxc.sh, by sha256); then gpu's SPIR-V patches
+  # difference from the committed file (or its stamp) fails the job: SPIR-V and DXIL by
+  # dxc 1.9.2609 (tools/shaderc/fetch-dxc.sh, by sha256); then gpu's SPIR-V patches
   # and links on every module (gpu/spirv-selftest.sh). tools/shaderc/verify-generated.sh.
   shaders:
     runs-on: ubuntu-24.04
@@ -185,18 +184,15 @@ jobs:
       - name: Build tools and spirv-val
         run: |
           sudo apt-get update -qq
-          # libjson-perl and libvulkan-dev: vkd3d's configure (it links -lvulkan; the runner image no
-          # longer ships it); spirv-tools: spirv-val.
-          sudo apt-get install -y -qq build-essential flex bison pkg-config libjson-perl libvulkan-dev spirv-tools curl
+          # spirv-tools: spirv-val.
+          sudo apt-get install -y -qq spirv-tools curl
       - name: The pinned compilers, cached by their scripts
         uses: actions/cache@v5
         with:
           path: .a2data/tools
-          key: shader-compilers-${{ hashFiles('tools/shaderc/fetch-dxc.sh', 'tools/shaderc/fetch-vkd3d.sh') }}
-      - name: Fetch dxc and vkd3d-compiler
-        run: |
-          tools/shaderc/fetch-dxc.sh
-          tools/shaderc/fetch-vkd3d.sh
+          key: shader-compilers-${{ hashFiles('tools/shaderc/fetch-dxc.sh') }}
+      - name: Fetch dxc
+        run: tools/shaderc/fetch-dxc.sh
       - name: Rebuild every shader and compare with the committed files
         run: tools/shaderc/verify-generated.sh
       - name: Show the difference

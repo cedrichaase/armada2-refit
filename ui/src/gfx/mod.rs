@@ -3,10 +3,8 @@
 //! few calls as its textures and clip rectangles allow, all with one pipeline
 //! (shaders/ui.hlsl).
 //!
-//! `gpu` puts the engine's device state back after the frame (d3d8to9 keeps its own
-//! record of what the game bound, platform/D3D9.md), and makes every texture again
+//! `gpu` puts the engine's device state back after the frame, and makes every texture again
 //! after a `Reset` or on a new device, from what was registered here.
-use crate::shaders::ui::{PS_UI, VS_UI};
 use crate::shaders::ui_spv::{PS_UI_SPV, VS_UI_SPV};
 use crate::shaders::ui_dxil::{PS_UI_DXIL, VS_UI_DXIL};
 use alloc::vec::Vec;
@@ -577,7 +575,7 @@ fn display_export(name: &str) -> usize {
 }
 
 /// The UI's `gpu` context (each plugin keeps its own) and its frame. Its backend is
-/// Direct3D 9, or Vulkan when Display8 draws on it (gpu/README.md).
+/// Display8's, Vulkan or Direct3D 12; with none it is stood down (gpu/README.md).
 static mut GPU: gpu::Gpu = gpu::Gpu::with_display(log_line, display_export);
 static mut FRAME: gpu::Frame = gpu::Frame::new();
 /// The pipeline, and the back buffer's format it was made for.
@@ -593,14 +591,13 @@ pub fn gpu() -> &'static gpu::Gpu {
 /// Display8's device epoch `attach` last saw.
 static mut EPOCH: Option<u32> = None;
 
-/// The game's device, attached to `gpu`: the Direct3D 9 one behind the engine's, or
-/// Display8's Vulkan device; None without either (DXVK's own d3d8, GOG's build). The
-/// stock front end re-creates the device at every switch between the shell's display
-/// and the game's: on Direct3D 9 `gpu` lets go of everything made on the old one (what
-/// we hold keeps a device alive), and the new one's `Reset` and `Present` are chained.
+/// The game's device, attached to `gpu`: Display8's Vulkan or Direct3D 12 device; None
+/// without one (Display8 stood down to the system's Direct3D 8). The stock front end
+/// re-creates the device at every switch between the shell's display and the game's:
+/// the new one's `Reset` and `Present` are chained.
 pub fn attach() -> Option<gpu::Attached> {
     let dev8 = crate::engine::d3d8_device();
-    let a = gpu().attach_engine(dev8)?;
+    let a = gpu().attach_engine()?;
     // A new device or a `Reset` is Display8's epoch moving on; without it, the device.
     let fresh = match gpu().device_epoch() {
         Some(e) => {
@@ -615,17 +612,6 @@ pub fn attach() -> Option<gpu::Attached> {
     Some(a)
 }
 
-/// Before the engine releases its device: `gpu` lets go of everything the UI made on
-/// it, in every pool, and of the engine's textures it holds (`engine::device`).
-pub fn forget() {
-    gpu().release_device();
-}
-
-/// Before a `Reset`: `gpu` lets go of what is in the default pool and the state block.
-pub fn reset() {
-    gpu().before_reset();
-}
-
 /// The additive pipeline (`Draw::quad_additive`): the same shaders, light added to the
 /// frame (source alpha times colour, plus what is there), as the engine draws its
 /// additive effects.
@@ -636,7 +622,7 @@ fn pipeline_additive(target: Format) -> Option<&'static gpu::Pipeline> {
     unsafe {
         if PIPE_ADD.as_ref().is_none_or(|(f, _)| *f != target) {
             let stride = core::mem::size_of::<Vertex>() as u32;
-            let mut d = PipelineDesc::new(gpu::code!(VS_UI, VS_UI_SPV, VS_UI_DXIL), gpu::code!(PS_UI, PS_UI_SPV, PS_UI_DXIL), &LAYOUT, stride, Topology::TriangleList, target);
+            let mut d = PipelineDesc::new(gpu::code!(VS_UI_SPV, VS_UI_DXIL), gpu::code!(PS_UI_SPV, PS_UI_DXIL), &LAYOUT, stride, Topology::TriangleList, target);
             d.blend = Some(Blend {
                 color: BlendEq { src: Factor::SrcAlpha, dst: Factor::One, op: BlendOp::Add },
                 alpha: Some(BlendEq { src: Factor::Zero, dst: Factor::One, op: BlendOp::Add }),
@@ -654,7 +640,7 @@ fn pipeline(dev: usize, target: Format) -> Option<&'static gpu::Pipeline> {
     unsafe {
         if PIPE.as_ref().is_none_or(|(f, _)| *f != target) {
             let stride = core::mem::size_of::<Vertex>() as u32;
-            let mut d = PipelineDesc::new(gpu::code!(VS_UI, VS_UI_SPV, VS_UI_DXIL), gpu::code!(PS_UI, PS_UI_SPV, PS_UI_DXIL), &LAYOUT, stride, Topology::TriangleList, target);
+            let mut d = PipelineDesc::new(gpu::code!(VS_UI_SPV, VS_UI_DXIL), gpu::code!(PS_UI_SPV, PS_UI_DXIL), &LAYOUT, stride, Topology::TriangleList, target);
             // Straight alpha over the frame; the target's alpha gathers coverage.
             d.blend = Some(Blend {
                 color: BlendEq { src: Factor::SrcAlpha, dst: Factor::InvSrcAlpha, op: BlendOp::Add },
@@ -686,7 +672,7 @@ static mut BLIND: u32 = 0;
 const BLIND_FRAMES: u32 = 30;
 
 /// Whether the UI draws: false after `BLIND_FRAMES` frames in a row with no device or
-/// back buffer to draw on (no Direct3D 9 device behind the engine's, or a Display8 whose
+/// back buffer to draw on (no Display8 device behind the engine's, or a Display8 whose
 /// contract this `gpu` does not talk). Then it claims nothing (`crate::claims`) and
 /// takes no stock component, so the engine's own draws stand in.
 pub fn drawing() -> bool {

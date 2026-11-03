@@ -354,13 +354,6 @@ fn log_facts(when: &str) {
     if let Some(m) = dev8::display_mode(dev) {
         log!("shell: {}: display mode {}x{} @{} format {}", when, m.width, m.height, m.refresh, m.format);
     }
-    match dev8::present_params9(dev) {
-        Some(p) => log!(
-            "shell: {}: d3d9 swap chain {}x{} x{} windowed {} swap effect {} interval {:#x} window {:#x}",
-            when, p.bb_width, p.bb_height, p.bb_count, p.windowed, p.swap_effect, p.interval, p.window
-        ),
-        None => log!("shell: {}: no d3d9 device behind the game's (not d3d8to9)", when),
-    }
 }
 
 /// Runs a screen of our own in the shell until `f` returns Some, and returns that

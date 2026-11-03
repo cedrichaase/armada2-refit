@@ -9,7 +9,7 @@
 //! - **The picture.** `m_mapSprite`'s texture, which `CacheMap` fills with the map's
 //!   features (nebulae, asteroids, ...) whenever `g_cachedMapNeedsUpdate` asks, from the
 //!   panel's always-step, so it stays current with the stock `Render` skipped. We draw
-//!   that texture (its Direct3D 9 texture, as render3d reads the fog's) over our square.
+//!   that texture (its Display8 mirror, as render3d reads the fog's) over our square.
 //! - **Fog and shroud.** `Scanner::m_fog` / `m_shroud`: a grid of one `u32` per scan
 //!   cell (`+0x4`), `+0xc` wide and `+0x10` tall, each a mask of the teams that see (or
 //!   have seen) the cell. A cell is clear for the player when it shares a bit with
@@ -812,7 +812,7 @@ pub fn functions_stock() -> bool {
 /// The texture behind an `ST3D_Texture`, to sample, and its size: its per-device
 /// texture (at the texture's device list, indexed by the device index of Storm3D), whose
 /// Direct3D 8 texture is the `IDirect3DTexture8`, which `gpu` makes a texture of
-/// (d3d8to9's `IDirect3DTexture9` behind it, or Display8's Vulkan mirror;
+/// (Display8's mirror of it;
 /// render3d/README.md reads the fog's the same way).
 pub fn engine_texture(st3d_tex: usize) -> Option<(gpu::Texture, u32, u32)> {
     if st3d_tex == 0 {

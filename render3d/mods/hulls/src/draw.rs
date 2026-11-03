@@ -5,7 +5,6 @@ use r3d_core::frame::steps::View;
 use r3d_core::gfx::{self, Pipes};
 use r3d_core::math::{v3, M34, V3};
 use r3d_core::scene::{self, Blend, Model};
-use crate::shaders::hulls::*;
 use crate::shaders::hulls_spv::*;
 use crate::shaders::hulls_dxil::*;
 use r3d_core::assets;
@@ -259,13 +258,13 @@ pub struct Drawer {
 
 /// The hull's pixel shaders (`Drawer::pipe`).
 const PS_LIST: [gpu::Code; 7] = [
-    gpu::code!(PS_HULL, PS_HULL_SPV, PS_HULL_DXIL),
-    gpu::code!(PS_BUMP, PS_BUMP_SPV, PS_BUMP_DXIL),
-    gpu::code!(PS_CLOAK, PS_CLOAK_SPV, PS_CLOAK_DXIL),
-    gpu::code!(PS_GHOST, PS_GHOST_SPV, PS_GHOST_DXIL),
-    gpu::code!(PS_HOLO, PS_HOLO_SPV, PS_HOLO_DXIL),
-    gpu::code!(PS_HULL_CL, PS_HULL_CL_SPV, PS_HULL_CL_DXIL),
-    gpu::code!(PS_BUMP_CL, PS_BUMP_CL_SPV, PS_BUMP_CL_DXIL),
+    gpu::code!(PS_HULL_SPV, PS_HULL_DXIL),
+    gpu::code!(PS_BUMP_SPV, PS_BUMP_DXIL),
+    gpu::code!(PS_CLOAK_SPV, PS_CLOAK_DXIL),
+    gpu::code!(PS_GHOST_SPV, PS_GHOST_DXIL),
+    gpu::code!(PS_HOLO_SPV, PS_HOLO_DXIL),
+    gpu::code!(PS_HULL_CL_SPV, PS_HULL_CL_DXIL),
+    gpu::code!(PS_BUMP_CL_SPV, PS_BUMP_CL_DXIL),
 ];
 const S_HULL: usize = 0;
 const S_BUMP: usize = 1;
@@ -310,7 +309,7 @@ impl Drawer {
             Mode::Ghost | Mode::Holo => 4,
         };
         self.pipes.view((ps as u64 * 8 + m) * 4 + cull as u64, || {
-            let mut d = PipelineDesc::new(gpu::code!(VS_HULL, VS_HULL_SPV, VS_HULL_DXIL), PS_LIST[ps], &scene::VERTEX, 32, Topology::TriangleList, Format::Unknown);
+            let mut d = PipelineDesc::new(gpu::code!(VS_HULL_SPV, VS_HULL_DXIL), PS_LIST[ps], &scene::VERTEX, 32, Topology::TriangleList, Format::Unknown);
             d.cull = cull;
             let (blend, write, mask) = match m {
                 0 => (None, true, 0xf),

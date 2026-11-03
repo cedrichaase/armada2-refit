@@ -1,4 +1,4 @@
-// entries: vs_ff:vs_3_0:VS_FF:dxc vs_bump:vs_3_0:VS_BUMP:dxc ps_ff:ps_3_0:PS_FF:dxc
+// entries: vs_ff:vs_3_0:VS_FF vs_bump:vs_3_0:VS_BUMP ps_ff:ps_3_0:PS_FF
 // Passthrough (README.md, "Passthrough"): the engine's own Direct3D 8 draws, drawn by
 // Display8 the way Direct3D 8's fixed function draws them. One vertex shader for both
 // kinds of vertex the engine sends (pre-transformed screen positions, and positions in

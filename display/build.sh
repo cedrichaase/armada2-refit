@@ -4,9 +4,8 @@
 # (.cargo/config.toml), as render3d/build.sh builds Render3D.asi.
 #
 # Shaders first, as ui/build.sh does: each shaders/<name>.hlsl names its entry points
-# on its first line and is compiled by tools/shaderc/hlsl-rs.sh into src/shaders/<name>.rs
-# (Direct3D 9 bytecode), <name>_spv.rs (SPIR-V) and <name>_dxil.rs (DXIL), committed
-# with stamps.
+# on its first line and is compiled by tools/shaderc/hlsl-rs.sh into
+# src/shaders/<name>_spv.rs (SPIR-V) and <name>_dxil.rs (DXIL), committed with stamps.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -22,8 +21,8 @@ for f in "$here"/shaders/*.hlsl; do
     entries=$(sed -n '1s#^// entries:##p' "$f")
     [ -n "$entries" ] || { echo "display: $f has no '// entries:' first line" >&2; exit 1; }
     # shellcheck disable=SC2086
-    "$here/../tools/shaderc/hlsl-rs.sh" --fix "$here/src/shaders/$name.rs" "$f" $entries
-    mods="$mods$name ${name}_spv ${name}_dxil "
+    "$here/../tools/shaderc/hlsl-rs.sh" "$here/src/shaders/$name.rs" "$f" $entries
+    mods="$mods${name}_spv ${name}_dxil "
 done
 # Temp files of this run's own, beside their targets so each mv is a rename: several
 # installs of one checkout can run at once (a2test -j).
