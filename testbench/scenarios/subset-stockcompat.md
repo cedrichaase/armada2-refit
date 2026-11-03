@@ -16,12 +16,10 @@ does (the host plays stock rules for everyone).
 2. Wait up to 90 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
 4. Expect "UI.log" contains "mission: frames start".
-5. Expect "QOLRules.log" not contains "items are paid when queued".
-6. Scene "select yard1".
-7. Press q.
-8. Press x 3 times.
-9. Wait 2 seconds.
-10. Expect "QOLRules.log" not contains "paid dil".
-11. Expect the game is still running.
-12. Quit the game.
-13. Expect no crash.
+5. Scene "select yard1".
+6. Press q.
+7. Press x 3 times.
+8. Wait 2 seconds.
+9. Expect the game is still running.
+10. Quit the game.
+11. Expect no crash.

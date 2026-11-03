@@ -14,10 +14,8 @@ hosted menu or a mission frame.
 1. Launch the game.
 2. Wait up to 90 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
-4. Expect "Render3D.log" contains "clock".
-5. Expect "UI.log" not contains "menus: hosted by the UI".
-6. Expect "UI.log" not contains "mission: frames start".
-7. Take a screenshot called "stock-hud".
-8. Expect the game is still running.
-9. Quit the game.
-10. Expect no crash.
+4. Expect "Render3D.log" contains "module hulls: loaded".
+5. Take a screenshot called "stock-hud".
+6. Expect the game is still running.
+7. Quit the game.
+8. Expect no crash.

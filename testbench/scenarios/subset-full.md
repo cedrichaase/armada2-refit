@@ -15,7 +15,7 @@ with `Layers:`.
 1. Launch the game.
 2. Wait up to 90 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
-4. Expect "Render3D.log" contains "clock".
+4. Expect "Render3D.log" contains "module hulls: loaded".
 5. Expect "UI.log" contains "mission: frames start".
 6. Expect "UI.log" contains "bar: ours".
 7. Expect "QOLRules.log" contains "items are paid when queued".
