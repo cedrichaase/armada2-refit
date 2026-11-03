@@ -44,6 +44,7 @@ bash "$root/ui/build.sh"               >/dev/null
 bash "$root/hud/build.sh"              >/dev/null
 bash "$root/menus/build.sh"            >/dev/null
 bash "$root/qol/build.sh"              >/dev/null
+bash "$root/rules/build.sh"            >/dev/null
 bash "$root/grid/build.sh"             >/dev/null
 bash "$root/online/build.sh"           >/dev/null
 bash "$root/cutscenes/binkproxy/build.sh" >/dev/null
@@ -63,7 +64,7 @@ cp "$root/ui/build/UI.asi"                  "$root/ui/UI.ini"                   
 cp "$root/hud/build/HUD.asi"                "$root/hud/HUD.ini"                 "$d/game/"
 cp "$root/menus/build/Menus.asi"            "$root/menus/Menus.ini"             "$d/game/"
 cp "$root/qol/build/QOL.asi"                "$root/qol/QOL.ini"                 "$d/game/"
-cp "$root/qol/build/QOLRules.asi"           "$root/qol/QOLRules.ini"            "$d/game/"
+cp "$root/rules/build/QOLRules.asi"         "$root/rules/QOLRules.ini"          "$d/game/"
 cp "$root/grid/build/GridLayout.asi"        "$root/grid/GridLayout.ini"         "$d/game/"
 cp "$root/online/build/Online.asi"          "$root/online/Online.ini"           "$d/game/"
 cp "$root/cutscenes/binkproxy/build/binkw32.dll" "$root/cutscenes/binkproxy/BinkProxy.ini" "$d/game/"
@@ -135,8 +136,9 @@ WHAT GOES IN (game/, copied beside Armada2.exe)
                                                bar as a grid of position keys
   QOL.asi      + QOL.ini        qol $(version "$root/qol/CHANGELOG.md")        quality of life that stock players can play
                                                against: right-drag pan speed, control groups
-  QOLRules.asi + QOLRules.ini   qol             pay for an item when it is queued; against
-                                               the computer only, stands down online
+  QOLRules.asi + QOLRules.ini   rules $(version "$root/rules/CHANGELOG.md")      pay for an item when it is queued; every player
+                                               of a network game needs it, or the game plays
+                                               stock rules
   Online.asi   + Online.ini     online $(version "$root/online/CHANGELOG.md")     online multiplayer under Wine/Proton too: the
                                                Internet - Online entry, join codes, no port
                                                forwarding (the project's server, c20e.de)
@@ -270,7 +272,7 @@ json.dump({
     # The systems below install only from a package that names them (Package.for_system).
     'windows': {'script': 'install.ps1', 'uninstall': '-Uninstall', 'progress': 'A2_PROGRESS'},
     'macos': {'script': 'install.sh', 'uninstall': '--uninstall', 'progress': 'A2_PROGRESS'},
-    'steps': ['verify', 'prereqs', 'chain', 'display', 'render3d', 'ui', 'qol', 'models',
+    'steps': ['verify', 'prereqs', 'chain', 'display', 'render3d', 'ui', 'qol', 'rules', 'models',
               'online', 'cutscenes', 'renderer', 'bloom', 'done'],
     'layers': [
         layer('prereqs', 'Widescreen patch', '1.0', ['vendor/STA2WidescreenPatch/*'],
@@ -294,9 +296,12 @@ json.dump({
               'the HUD, the menus, the loading screen and the cursor redrawn at any aspect ratio, '
               'the button bar as a grid of position keys', 'd3d8to9'),
         layer('qol', 'Quality of life', '$(version "$root/qol/CHANGELOG.md")',
-              ['game/QOL.asi', 'game/QOL.ini', 'game/QOLRules.asi', 'game/QOLRules.ini'],
-              'right-drag pan speed, bigger selections and control groups; plays against stock players. '
-              'Pay on queue against the computer'),
+              ['game/QOL.asi', 'game/QOL.ini'],
+              'right-drag pan speed, bigger selections and control groups; plays against stock players'),
+        layer('rules', 'Rules', '$(version "$root/rules/CHANGELOG.md")',
+              ['game/QOLRules.asi', 'game/QOLRules.ini'],
+              'pay for an item when it is queued; every player of a network game needs it, '
+              'and a game with anyone lacking it plays stock rules'),
         layer('models', 'Models', '$(version "$root/models/CHANGELOG.md")', ['models/*'],
               'moons, asteroids, selection bubble and hulls smoothed from your own files'),
         layer('online', 'Online', '$(version "$root/online/CHANGELOG.md")', ['game/Online.asi', 'game/Online.ini'],

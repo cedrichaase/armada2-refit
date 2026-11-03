@@ -1,10 +1,10 @@
-# QOLRules.asi's symbols in Armada2.exe 1.1 (GOG): what qol/rules.c reads and patches of the exe, each
-# entry tied to the hook that uses it. The findings are in qol/README.md, "Hooks" (QOL-7).
+# QOLRules.asi's symbols in Armada2.exe 1.1 (GOG): what rules/rules.c reads and patches of the exe, each
+# entry tied to the hook that uses it. The findings are in rules/README.md, "Hooks" (QOL-7).
 schema = 1
 plugin = "qolrules"
-readme = "qol/README.md"
+readme = "rules/README.md"
 lang = "c"
-out = "qol/rules_engine_syms.h"
+out = "rules/engine_syms.h"
 
 [hook.pay_on_queue]
 doc = "An item is paid when queued: nine entry hooks and the queue call in Handle_New_Command"

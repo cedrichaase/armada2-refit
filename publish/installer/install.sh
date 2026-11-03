@@ -549,7 +549,9 @@ else
 fi
 step qol "quality of life"
 put QOL.asi; put QOL.ini
-# Pay on queue; against the computer only, it stands down in a network game.
+step rules "rules"
+# Pay on queue: every player of a network game needs it (a game with anyone lacking it
+# plays stock rules); against the computer only, it stands down in other transports.
 put QOLRules.asi; put QOLRules.ini
 step models "models"
 if [ -n "$PY" ]; then

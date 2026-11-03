@@ -13,7 +13,7 @@ $P = (Get-ChildItem -LiteralPath $T -Directory -Filter "armada2-refit-*").FullNa
 $D3d8to9 = Join-Path $PSScriptRoot "..\..\platform\vendor\d3d8to9-1.16.0\d3d8.dll"
 $D3d8to9Sha = "122928cfe225c25d30decf7184a5d37e490cecf3b58256ba3206c7e1853f8ab8"
 # install.sh's ::step ids, in order (manifest.json's "steps").
-$Steps = "verify prereqs chain display render3d ui qol models online cutscenes renderer bloom done"
+$Steps = "verify prereqs chain display render3d ui qol rules models online cutscenes renderer bloom done"
 function Check([string]$what, $ok) {   # $ok untyped: a [bool] parameter refuses strings
     if ($ok) { Write-Host "ok    $what" } else { throw "FAIL  $what" }
 }

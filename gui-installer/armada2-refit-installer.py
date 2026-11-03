@@ -49,7 +49,7 @@ import urllib.error
 import urllib.request
 import zipfile
 
-INSTALLER_VERSION = '2.4.0'
+INSTALLER_VERSION = '2.4.1'
 SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, ::step and ::error lines
 REPO = 'cedrichaase/armada2-refit'
 API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'
@@ -93,7 +93,7 @@ else:
 # the entries for those stay so such a package still installs. 'bloom' set up a vkBasalt
 # bloom before 13.0.0, and from then on takes it out (Render3D.asi blooms the 3D view).
 # 'display' (Display8 in front of the chain) from 13.35.0.
-STEPS = ['verify', 'prereqs', 'chain', 'display', 'render3d', 'ui', 'hud', 'menus', 'qol', 'grid',
+STEPS = ['verify', 'prereqs', 'chain', 'display', 'render3d', 'ui', 'hud', 'menus', 'qol', 'rules', 'grid',
          'models', 'lighting', 'sky', 'online', 'msaa', 'cutscenes', 'renderer', 'bloom', 'done']
 STATUS = {
     'fetch': 'Checking for releases',
@@ -106,6 +106,7 @@ STATUS = {
     'hud': 'Installing the HUD',
     'menus': 'Installing the menus',
     'qol': 'Installing quality of life',
+    'rules': 'Installing the rules',
     'lighting': 'Installing lighting',
     'sky': 'Installing the sky',
     'online': 'Installing online play',

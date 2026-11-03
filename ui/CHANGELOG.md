@@ -4,6 +4,11 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.34.0 — 2026-11-03
+
+### Added
+- The Refit screen's Multiplayer tab shows one note row, "Pay on queue is not installed: network games you join play stock rules", when `QOLRules_Settings` is absent (contract C7; the rules layer is left out). Installed, not yet seen in game.
+
 ## 0.33.1 — 2026-11-03
 
 ### Changed

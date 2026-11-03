@@ -4,6 +4,13 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 2.4.1 — 2026-11-03
+
+Reads package schemas 0 and 1, unchanged.
+
+### Added
+- `rules` in `STEPS` and `STATUS` (the release scripts print `::step rules` after `qol`). Installed, not yet seen in game.
+
 ## 2.4.0 — 2026-11-02
 
 Reads package schemas 0 and 1, unchanged.

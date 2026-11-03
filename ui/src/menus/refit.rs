@@ -299,6 +299,11 @@ fn body(ui: &mut Ui, inner: R) {
             }
         }
     }
+    // Without the rules layer (no QOLRules_Settings table) a game with anyone else plays
+    // stock rules, and the PayOnQueue row is not there to say why (contract C7).
+    if s.tab == TAB_MULTIPLAYER && !settings::tables().iter().any(|tb| tb.plugin == "QOLRules") {
+        lines.push(String::from("Pay on queue is not installed: network games you join play stock rules"));
+    }
     let note_rects: Vec<R> = lines
         .iter()
         .map(|_| {

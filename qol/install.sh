@@ -5,9 +5,11 @@
 #   install.sh --pan-speed X    install and set PanSpeed=X (1 = leave right-drag alone)
 #   install.sh --remove         take it out again
 #
-# An existing QOL.ini / QOLRules.ini is merged (tools/ini-merge.py), never overwritten.
-# Adds QOL.asi, QOL.ini, QOLRules.asi, QOLRules.ini and (at run time) their logs, and nothing else; the exe is
+# An existing QOL.ini is merged (tools/ini-merge.py), never overwritten.
+# Adds QOL.asi, QOL.ini and (at run time) QOL.log, and nothing else; the exe is
 # patched in memory only, so removing those files is a complete uninstall.
+#
+# QOLRules.asi is the rules layer's (rules/install.sh), not installed or removed here.
 #
 # RTS_CFG.h must stay stock: network games compare its CRC (qol/README.md). If its
 # FASTSCROLL_COEFFICIENT differs from the stock .a2neb-backup beside it -- a hand edit,
@@ -33,8 +35,7 @@ done
 [ -d "$GAME" ] || { echo "game directory not found: $GAME" >&2; exit 1; }
 
 if [ "$remove" = 1 ]; then
-    rm -f "$GAME/QOL.asi" "$GAME/QOL.ini" "$GAME/QOL.log" \
-          "$GAME/QOLRules.asi" "$GAME/QOLRules.ini" "$GAME/QOLRules.log"
+    rm -f "$GAME/QOL.asi" "$GAME/QOL.ini" "$GAME/QOL.log"
     echo "removed QOL from $GAME"
     exit 0
 fi
@@ -49,18 +50,12 @@ if [ -f "$GAME/QOL.ini" ]; then
 else
     cp "$here/QOL.ini" "$GAME/QOL.ini"
 fi
-cp "$here/build/QOLRules.asi" "$GAME/QOLRules.asi"
-if [ -f "$GAME/QOLRules.ini" ]; then
-    python3 "$here/../tools/ini-merge.py" "$here/QOLRules.ini" "$GAME/QOLRules.ini"
-else
-    cp "$here/QOLRules.ini" "$GAME/QOLRules.ini"
-fi
 if [ -n "$pan" ]; then
     sed -i "s/^PanSpeed=.*/PanSpeed=$pan/" "$GAME/QOL.ini"
 fi
 
-rm -f "$GAME/QOL.log" "$GAME/QOLRules.log"
+rm -f "$GAME/QOL.log"
 echo "installed into $GAME:"
-ls -l "$GAME/QOL.asi" "$GAME/QOL.ini" "$GAME/QOLRules.asi" "$GAME/QOLRules.ini"
+ls -l "$GAME/QOL.asi" "$GAME/QOL.ini"
 grep '^PanSpeed=' "$GAME/QOL.ini"
 echo "after a launch:  %LOCALAPPDATA%\\armada2-refit\\logs\\QOL.log  (in the Wine prefix: drive_c/users/<user>/AppData/Local/armada2-refit/logs/)"

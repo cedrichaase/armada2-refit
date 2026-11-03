@@ -68,8 +68,8 @@
 #define A2_FLTUSED
 #include "../csdk/a2asi.h"
 #include "../csdk/a2engine.h"
-#include "rules_settings_table.h"
-#include "rules_engine_syms.h"
+#include "settings_table.h"
+#include "engine_syms.h"
 
 /* ---- Producer layout and the engine's own functions (Armada2.exe, patch 1.1) */
 
