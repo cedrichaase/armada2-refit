@@ -168,7 +168,7 @@ Each is one function in `theme.rs`, given its rectangle and a `State` (hover eas
 ## Screens
 
 - **The menu backdrop.** A screen of ours in the front end draws `theme::backdrop`:
-  the widescreen menu plate the menus layer builds (`menus/BACKDROPS.md`), read at run
+  the widescreen menu plate the menus layer builds (`menus/BACKDROPS.md`, which moves under `ui/backdrops/` with the scripts), read at run
   time from the game's `Menus/mainbkgr.bmp`, where `menus/install-plates.sh` installs
   it, scaled to cover the screen and darkened toward the bottom (the panels sit
   there). It is an asset in `$A2_DATA`, never in the repository; **without it** (no

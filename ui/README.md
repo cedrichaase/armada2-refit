@@ -241,7 +241,7 @@ again.
 
 ## The cursor
 
-`engine/cursor.rs`. hud/README.md has how the engine draws its cursor; what the UI
+`engine/cursor.rs`. `HUD.md`, "The references the stock HUD is drawn against", has how the engine draws its cursor; what the UI
 uses of it:
 
 - **Which cursor the engine wants.** Each frame the HUD components pick a cursor
@@ -295,7 +295,7 @@ uses of it:
     hotspot in texels of the 32x32 sprite) and each texture is read from `Textures/RGB/`
     with `gfx`'s TGA decoder. Black is the colour key (`@skip=(0,0,0)`), made
     transparent when the texture is registered. If a texture has a `.a2neb-backup`
-    beside it (hud/README.md: `cursor-aspect.py` squashed the art once), that one is read,
+    beside it (an earlier file-based fix squashed the art once, `HUD.md`, "The references the stock HUD is drawn against"), that one is read,
     so the stock art is what is drawn whatever state the files are in. Frames are
     stepped once a second through the strip; the engine's own timing (`tex_anim.spr`'s
     `offset N 1.0 step`) was not measured.
@@ -303,7 +303,7 @@ uses of it:
     at its own size on a 1080-line screen), snapped to a whole multiple of the art when
     within 20% of one, so the texels land on the pixel grid; the hotspot is the
     sprite's `@origin` scaled the same way, so the click point is exact. The engine's own
-    cursor is stretched by its 800x600 reference (hud/README.md); ours is square at any
+    cursor is stretched by its 800x600 reference (`HUD.md`, same section); ours is square at any
     aspect and at the back buffer's resolution.
   - **In a front-end screen of ours Windows' arrow is hidden** (`shell::hide_os_cursor`,
     the window's `WM_SETCURSOR` answer) for as long as the screen runs. The same holds
@@ -320,7 +320,7 @@ uses of it:
 
 ### What the shell is, as far as Direct3D goes
 
-The shell's menus are GDI dialogs (`menus/README.md`), but the engine's Direct3D device
+The shell's menus are GDI dialogs (`MENUS.md`, "What the shell is, in the engine"), but the engine's Direct3D device
 lives through all of them. `do_smain` runs the shell. It puts Storm3D on its *shell
 display* (`ST3D_GraphicsEngine::SetActiveDisplay(3)`), calls the device's
 `FlipToGDISurface` so GDI can draw on the window, and then loops on
@@ -396,7 +396,7 @@ out: `virtual_setup_exception stack overflow` after `dispatch_user_callback` in
 (`render3d-mode-switch`, which failed the same way on `main`). Any procedure chain
 over a window DXVK hooks has this shape; a patch at the engine's own answer has none.
 A screen that starts with no
-keyboard focus (Wine leaves it `NULL` after an embedded menu, `menus/README.md`) puts
+keyboard focus (Wine leaves it `NULL` after an embedded menu, `MENUS.md`, "What the shell is, in the engine") puts
 it on the 3D window.
 
 The hook is one call: `DispatchDialog`'s `call Show_Credits` at `0x606bd4`, checked to
@@ -588,10 +588,10 @@ Display8's never registers either.
 ### The engine's cursor, square
 
 `engine/cursor.rs`, `install_square`, made when the mission hook goes in unless
-`HUD.asi` is loaded or `hud/cursor-aspect.py`'s squashed art is installed (its
+`HUD.asi` is loaded or the old squashed cursor art is installed (its
 `Curs_Move.tga.a2neb-backup`). The engine draws its cursor under the 2D scale it sets
-to the back buffer over 800 x 600 on each axis (hud/README.md, "HUD.asi", the
-cursors), so on a wide screen it is wide. The synchronous path's one draw (the
+to the back buffer over 800 x 600 on each axis (`HUD.md`, "The references the
+stock HUD is drawn against", the cursors), so on a wide screen it is wide. The synchronous path's one draw (the
 `call ST3D_Sprite::DrawScaled2D` at 0x6246fa in `RefreshDisplay`) goes through the
 probe ("The cursor"), which, for that draw only, sets the x scale to the y scale and moves the
 position the engine computed so the hotspot (`ST3D_Sprite+0x30`) stays on the
@@ -719,7 +719,7 @@ not sample it.
 (kept as they are), the frame's vertices and indices written once into `gpu`'s rings,
 and one indexed draw per run. `gpu` captures the device's state before the frame's
 first change and puts it back after (d3d8to9 keeps its own record of what the game
-bound, `platform/D3D9.md`), with the block render3d records: once a frame, not per
+bound), with the block render3d records: once a frame, not per
 draw. Positions are in back-buffer pixels and move half a pixel on the way to clip
 space on Direct3D 9 (`gpu::Gpu::half_pixel`; none on Vulkan, whose pixel centres are
 at the half), so a rectangle with whole-number edges covers whole pixels exactly.

@@ -7,7 +7,7 @@ Timeout: 10 min
 
 `GridLayout.asi` is no longer installed by `./install` (the UI's bar has the grid, `ui-hud-bar.md`); the setup puts it back with `HUD.asi` and the UI's HUD off (`[HUD] Enable=0`), the stock HUD it was made for: it places itself by the stock info panel and minimap, which beside the UI's panels would not be where they are drawn (`ui/README.md`, "A part switched back to stock").
 
-`grid/README.md`. With `GridLayout.asi` installed the bar is a 5x3 grid, a key per
+`ui/HUD.md`, "The button bar", and `qol/README.md`, QOL-1. With `GridLayout.asi` installed the bar is a 5x3 grid, a key per
 cell (QWERT / ASDFG / ZXCVB; T cancel, G back), and the bar's stock keys do nothing.
 The match is Instant Action on Warzone as the Borg, whose start is the same every time:
 at 1920x1080 an Assembler sits at 960,388 and the Nexus at 1130,470, which is why this

@@ -3728,13 +3728,13 @@ history.
 | textures | 1.0.0 | [`textures/CHANGELOG.md`](textures/CHANGELOG.md) |
 | models | 1.0.0 | [`models/CHANGELOG.md`](models/CHANGELOG.md) |
 | hud | 1.0.0 | [`hud/CHANGELOG.md`](hud/CHANGELOG.md) |
-| font | 1.0.0 | [`font/CHANGELOG.md`](font/CHANGELOG.md) |
+| font | 1.0.0 | `font/CHANGELOG.md` (removed) |
 | menus | 1.0.0 | [`menus/CHANGELOG.md`](menus/CHANGELOG.md) |
-| msaa | 1.0.0 | [`msaa/CHANGELOG.md`](msaa/CHANGELOG.md) |
+| msaa | 1.0.0 | `msaa/CHANGELOG.md` (removed) |
 | cutscenes | 1.0.0 | [`cutscenes/CHANGELOG.md`](cutscenes/CHANGELOG.md) |
-| postfx | 1.0.0 | [`postfx/CHANGELOG.md`](postfx/CHANGELOG.md) |
+| postfx | 1.0.0 | `postfx/CHANGELOG.md` (removed) |
 | platform | 1.0.0 | [`platform/CHANGELOG.md`](platform/CHANGELOG.md) |
-| gameplay | 1.0.0 | [`gameplay/CHANGELOG.md`](gameplay/CHANGELOG.md) |
+| gameplay | 1.0.0 | `gameplay/CHANGELOG.md` (removed) |
 
 Every layer that `a2mod` switches is installed and confirmed in game at this release.
 

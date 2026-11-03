@@ -32,7 +32,7 @@ to stock").
 The in-mission HUD is a list of `DisplayInterface` components. Each is a global object
 that adds itself to one or more views' simulate and render lists when it is
 constructed (`AddView`), reads its rectangles from the GUI config in `PostLoad`
-(`DisplayInterface::LoadRectangle`, hud/README.md), and then runs three separate
+(`DisplayInterface::LoadRectangle`; "The references the stock HUD is drawn against"), and then runs three separate
 steps every frame:
 
 - **simulate** (`DisplayInterface::SimulateAll` from `Program::DisplayInputProcess`):
@@ -49,7 +49,7 @@ steps every frame:
   visible component, `HiddenRender` for a hidden one, in list order.
 
 Every rectangle is in the 1600 x 1200 space the GUI config is converted into, which
-the engine scales to the back buffer per axis (hud/README.md). A component's own
+the engine scales to the back buffer per axis ("The references the stock HUD is drawn against"). A component's own
 rectangle is at `+0x04` (left, top, right, bottom, inclusive), its hidden flag at
 `+0x16`, its cursor at `+0x24`.
 
@@ -148,22 +148,149 @@ a video; the unit view's frame follows.
 **Taking a panel.** `engine::hud::set_taken(at, by_pointer, on)`: a component by its
 address, or (the bar) by the global that points to it, read when asked.
 
+## The references the stock HUD is drawn against
+
+These are the measured facts about where the engine's 2D drawing gets its scale. The
+UI reads the stock rectangles and draws its own panels, so what matters is what a
+rectangle means, which panels it leaves to the engine, and the three corrections that
+HUD.asi once made for those (the engine's cursor, below; the other two matter only to
+stock panels the UI has not taken). They were derived and measured on the retired
+HUD plugin and its file-based predecessors, which are gone.
+
+**The layout canvas.** `misc/gui_<race>.cfg` declares `screenWidth = 1600` and
+`screenHeight = 1200`, and every four-number rectangle in `gui_interface.cfg` and
+`gui_glob16x12.cfg` is an absolute position in it (356 entries, none past x 1600 or
+y 1215). The engine converts each rectangle at read time (`ParameterDB::Get` of a
+`DBRectangle`, `mConvertRectangle` at `0x535ad0`) from the declared canvas into the
+fixed 1600 x 1200 space of `cfgSCREEN_WIDTH` and `cfgSCREEN_HEIGHT` (`RTS_CFG.h`; 33
+readers in the exe, the font's draw path among them, so that value is never changed to
+fix a canvas), and that space is scaled to the back buffer **per axis**. At 3440x1440
+the two factors are 2.15 and 1.20, which is the 1.79 stretch of stock on a wide screen;
+at 4:3 they are equal. Only the `<name>PanelArea` keys place things on the screen;
+everything else is relative to its panel, so a layout that wants another aspect moves
+those keys and nothing inside a panel. Each of the 15 panel classes reads its rectangles
+once, in `PostLoad` (`DisplayInterface::LoadRectangle`), and keeps them until the next
+mission: a layout is fixed per mission unless every panel is rebuilt.
+
+- **Rounding in the conversion.** `Get` rounds x, y, w and h separately, so two tiles
+  that abut in the canvas can leave a unit between them in the 1600 space. It is
+  invisible at the stock canvas (1600 x 1200 converts to itself).
+- **Two scalars are not on the canvas.** `popupPaletteXA` and `popupPaletteXB` in
+  `gui_glob16x12.cfg` are bare numbers that the palette code reads against a hard-coded
+  1600, not the declared canvas (measured to sub-pixel accuracy at 3440x1440: the
+  palette's left edge at 763.25 against 426 for a canvas model). The vertical pair is
+  not affected. Stock's `XA` is 355 against the info panel's 360, 5 canvas units off its
+  left edge: invisible at 4:3, a 6.8 px step on a 1056 px panel.
+- **The bridge display** is a full-screen 1600 x 1200 backdrop of six tiles with sprites
+  placed against it; it cannot be widened without stretching the art and stays stock
+  (pillarboxed left).
+- **Changing the aspect in a mission.** A canvas edit does nothing for panels already
+  loaded. The game rebuilds them only between missions (`CleanupAll`, `InitAll`,
+  `PostLoadAll`, which also reloads the GUI database); running that cycle by hand in a
+  mission has costs. `cOverViewImp::Cleanup` empties the ten unit groups;
+  `MapRadar`'s cycle frees the sensor grids and so resets the fog of war
+  (`Scanner::CleanupGrids`, `InitializeGrids`, `Terrain_Geometry::PostLoad`);
+  `CinematicView::Cleanup` ends a cinematic and deletes its camera, which only `Init`
+  makes again (leaving it out crashed the next frame in `CinematicView::Render`);
+  `ObjectivesDisplay::Cleanup` empties the briefing and forgets the file it read, which
+  `PostLoad` needs. The panels of ours lay out every frame, so none of this applies to
+  them; it is the reason the minimap and the objectives stay the engine's.
+
+**Sprite edges (seams).** `ST3D_Sprite::DrawScaled2D` snaps a sprite's position, not its
+size, to `floor(v) + 0.25` of a screen pixel when the sprite carries flag `0x80` (UI
+sprites; the bar's buttons lack it and are not snapped). With a fractional scale
+(1024x768, 16:10, 16:9 and wider) a quad ending at `x + w` can stop short of its
+neighbour's snapped start and leave a column of the 3D view showing through: the
+briefing panel's 5 x 4 grid of 256 x 256 sprites showed lines at every aspect but 4:3
+and 800x600 or 1600x1200. With MSAA on a second line appears: a quad that starts a
+quarter pixel into pixel `n` covers some of its samples, the pixel is shaded once at
+its centre, outside the quad, where the texture coordinate has wrapped to the sprite's
+far edge. A sprite whose edges are at `floor(v) + 0.5`, a pixel boundary, has neither.
+Every engine-drawn tiled sprite that remains (the minimap's frame, the briefing, the
+stock panels a toggle in `[HUD]` leaves to the engine) can show it; the lines are one
+pixel outside a sprite and about 7 levels darker than the fog. The faint olive grid
+behind the briefing text is the map grid showing through the panel (alpha 217), and the
+white lines in the minimap are the camera's outline; neither is a seam.
+
+**The engine's font.** `Final4_<size>` atlases (sizes 10, 12, 13, 15, 16, 19, 20, 24;
+`Textures/RGB/FontFinal4_*`: white RGB, glyphs in the alpha plane, per-glyph offsets
+and advances in `Sprites/FontFinal4_<size>.spr`) are authored for a **1280 x 1024**
+tier. The font path scales glyph quads by back buffer over 1280 x 1024 whatever the
+canvas says (`ST3D_Font+0x28` horizontal and `+0x2c` vertical, set by
+`FontNewScreenWidth` on every mode change; fonts are made in one place,
+`cFontSet::Load`, and only the three MetaFonts draw). On a wide screen that is
+2.6875 across against 1.40625 down at 3440x1440, so stock text is 1.91 times too wide.
+The vertical factor is stock's own: text is 17 percent taller than the layout
+coordinates imply at every aspect, and that is not a defect. The engine rounds each
+glyph's advance up to a whole screen pixel, so a line runs a few percent over the sum
+of the advance tables. Where the stock font is still drawn (stock panels, the
+unreplaced ones), the way to fit it is the scale (`+0x28 = +0x2c * 1.25 * H / W`),
+which condenses glyphs and spacing together and keeps every texel; resampling the atlas
+to fewer texels and point-sampling it back up (`@tmaterial=font`, no filtering) was
+tried as files, at the cost of horizontal texels (a glyph of 28 texels described
+by 15). A "crisper" variant that kept one texel per
+stroke won every static metric and looked worse in game, so the font's look is judged in
+the game, not by those numbers.
+
+**The cursors.** A third reference, a hard-coded **800 x 600**: the device keeps the
+scale pair `[device+0x18]` and `[device+0x1c]` (W/800 and H/600) and the cursor is its
+source texels times that pair (4.30 against 2.40 at 3440x1440, ratio 1.79, measured on
+`Curs_Move` and `Curs_24`'s `c_select`, both square sources). No texture change buys
+sharpness (more texels draw a bigger cursor at the same density) and no `.spr` number
+reaches it: rewriting `cursor.spr`'s `W`, `U` and `@referenceWidth` together fixes only
+the map-plane part of the selected-ship cursor, which is drawn from the `.spr`'s
+`W H`. Two paths draw the rest, chosen by `[device+0xe0]` (`SetSynchronousCursor`):
+clear, `SetCursor` (`0x625c90`) allocates a Direct3D hardware cursor texture at
+`texW * [+0x18]` by `texH * [+0x1c]` and `UpdateCursor` (`0x625b00`) copies 1:1;
+set, which is the one taken under DXVK, `SetCursor` makes no
+hardware cursor and `RefreshDisplay` (`0x624630`) draws the sprite as a 2D quad after
+setting the global 2D scale (`0x7ad6e8`) to that pair and not restoring it (the scale is
+also set by `ST3D_Camera::SetViewport` and `ResizeViewportToExtents`, and every 2D draw
+and the font read it). The correction is in the draw: for that one draw the x scale
+becomes the y scale and the position is re-expressed so the hotspot stays on the
+pointer, then the scale is put back (README.md, "The engine's cursor, square"). The
+alternative, squashing the art about each `@origin` hotspot (32 to 18 texels), makes
+the cursor coarser, and doing both would square it twice. `CursorA.tga` is unused.
+
 ## The button bar
 
-`hud/bar.rs` (the panel) over `engine/palette.rs` (the reads and the press), with the
-grid of `grid/README.md`, which it supersedes: `[HUD] Bar=1` is the grid and its keys
-without `GridLayout.asi`, and **stands down while `GridLayout.asi` is loaded** (the
-two would wrap the same call; UI.log says "GridLayout.asi is loaded and owns the
-bar").
+`hud/bar.rs` (the panel) over `engine/palette.rs` (the reads and the press): a 5x3
+grid of position keys, `[HUD] Bar=1`, the keys QOL's. The retired `GridLayout.asi`
+did the same; the UI **stands down while it is loaded** (the two would wrap the same
+call; UI.log says "GridLayout.asi is loaded and owns the bar"). Its `[Cells]` section
+(one button moved to another key by name) has no counterpart here; and the palette's
+mode switch (X in stock, `toggle_popup`) has no key while the grid is on, the HUD's
+palette button still switches it.
+
+**The stock layout, for what the grid replaces.** The bar is `PopupPaletteImp`
+(`g_pPopupPalette`, `0x763c00`) with 21 `ControlButton`s at `+0x28`. Stock fills them by
+a 3 x 7 slot plan: a command goes to slot `row * [+0x7c] + col` from its
+`preferredPosition` (the command's `CommandInfoClass` holds it at `+0x1b0`), then the
+build items follow in `buildItemN` order (`mSetupCommandInfoClassButtons`, `0x4fcfc0`);
+the used slots are packed to the front, capped at columns times rows of the mode in
+use and the k-th gets the cell `(k % columns, k / columns)`. In the bottom-bar mode
+(A) rows count up from the bottom, which is why stock's construction menu puts ten
+buildings on the bottom row and the other three above them. The columns and rows are
+the bar's fields: `+0xa0` / `+0xa4` for mode A (`staticPaletteWidthA` / `HeightA`,
+10 x 3), `+0xa8` / `+0xac` for B, `+0x7c` / `+0x80` floating (`paletteWidth` /
+`Height`, 3 x 7), copied to `+0xb0` / `+0xb4` for the mode in use (`SetPaletteMode`,
+`0x4fbdd0`). **`+0x7c` is also the slot plan's width: a bar re-laid by changing it lost
+buttons** (recrew and transport were overwritten by the fixed menu buttons), so a
+layout of ours never touches the bar's own, it only reads the buttons after `Update`
+and places them itself. The longest menu in the game is the construction ship's build
+list, 13 items, 15 with cancel and back: exactly the grid.
 
 **What it reads.** The stock bar's `Update` still decides the buttons: its 21
-`ControlButton`s at `+0x28`, shown when `IsValid` (vtable +0x1c). Each button's kind
-and name are grid/README.md's (`CommandInfoClass` at `+0x88`, else `ModeInfo` at
-`+0x84`), its state at `+0x34` (0 disabled, 2 active: the alert level in force and
+`ControlButton`s at `+0x28`, shown when `IsValid` (vtable +0x1c). A button is
+named by its `CommandInfoClass` (`+0x88`, its `buttonName` inline at `+0x20`) or else
+by a `ModeInfo` (`+0x84`) whose kind (`+0x04`) is 1 a build item (ODF name at
+`[+0x0c]+0x7c`), 2 a special weapon (`[+0x10]+0x208`, named by `cPrjID::GetName`,
+`0x65dce0`) or 3 a fixed button (`+0x14` indexes: back, order, build, research,
+evolve, trade, form, aiMenu, close). Its state at `+0x34` (0 disabled, 2 active: the alert level in force and
 the like). The menu open is `+0x124`, the palette mode `+0x110`; the bar is hidden
 with `+0x16`, and the whole HUD with the info panel's (`ingame::hud_hidden`).
 
-**The cells** are grid.c's assignment, ported: cancel on T and back/close on G in every
+**The cells:** cancel on T and back/close on G in every
 menu; at the top level the build/research/evolve opener first in the top row, the other
 menus after it, special weapons along the bottom, commands in the middle; in a submenu
 each command at its `preferredPosition` (a three-column plan, so the AI menu is a 3x3);
@@ -554,7 +681,7 @@ n)`), so the chat names only the last. A click on the name goes to the next stat
 stock. The tooltips are the game's (`GUI_MM_ALL_SHIPS_VISIBLE`, ...).
 
 **HUD.asi** re-lays the stock `MapRadar` out after a display mode change
-(hud/README.md, "Re-layout"); ours reads no stock rectangle but the stock radar's
+("The references the stock HUD is drawn against", the mode change in a mission); ours reads no stock rectangle but the stock radar's
 width, to scale a ping, so that keeps working. The button bar (`hud/bar.rs`) still
 places itself by the stock radar's rectangle (`MapRadar+0x04`), which ours covers at
 the default size.

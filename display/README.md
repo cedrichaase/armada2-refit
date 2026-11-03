@@ -217,7 +217,7 @@ same kind takes it over, which is sound because ours holds nothing but the point
 **`QueryInterface` for anything that is not Direct3D 8's goes to the real object.**
 That is how the plugins reach Direct3D 9 through the engine's objects
 (`IID_IDirect3DDevice9` on the device; `IID_IDirect3DTexture9` on the minimap's and the
-fog's textures), as they did on d3d8to9 itself (`platform/D3D9.md`).
+fog's textures), as they did on d3d8to9 itself.
 
 **The plugins chain slots of our device's vtable** (`Reset`, `Present`: `ui/src/engine/device.rs`,
 `render3d/src/frame/mod.rs`) with `VirtualProtect` and a write, as they did on
@@ -455,6 +455,14 @@ pointer's clip. The keys are `[Window]` in `Display8.ini` (`settings.toml`; ever
   opened at (the stub's, or what the real chain opened); false before. The UI reads it
   for its log line of what the shell runs at; a plugin falls back to measuring the
   desktop when the export is absent.
+
+**One OS window.** The game is meant to be one window from launch to exit. Every shell
+menu is a `WS_POPUP` dialog owned by the 3D window, which Wine turns into a second X11
+window that Hyprland tiles and focuses like a new application (the menu is visible while
+input stays with the other window); the UI's host makes each dialog a hidden child of the
+3D window instead (`ui/MENUS.md`, "What the shell is, in the engine"). The Wine virtual
+desktop would also give one window but DXVK cannot set a display mode inside it, so it
+stays off. A stub window that covers the screen at the desktop's mode needs neither.
 
 `MoveWindow` and `SetWindowPos` in the exe's imports stay the UI's, for the hosted
 dialogs (`user32.rs` leaves them alone). Without Display8 nothing raises the shell
@@ -778,7 +786,7 @@ the swap chain's image, submits and presents.
   any error, it creates them plainly. `gpu` logs `pipeline library: N loaded, M stored`
   (at each power of two), Display8 the file's size read and written.
 - **Samplers as DXVK makes them.** On Direct3D 9 the game's `dxvk.conf` (the renderer
-  layer, `renderer/README.md`) has DXVK give every linear sampler 16x anisotropy and
+  layer) has DXVK give every linear sampler 16x anisotropy and
   every sampler with mips a LOD bias of -0.5. Display8 reads the same keys
   (`d3d9.samplerAnisotropy`, `d3d9.samplerLodBias`, `d3d9.clampNegativeLodBias`) and
   hands them to `gpu` (`VkDevice8::sampler_anisotropy`, `sampler_lod_bias`), so the two

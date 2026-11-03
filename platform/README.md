@@ -5,8 +5,9 @@ DXVK's `d3d8.dll`/`d3d9.dll`, the Ultimate ASI Loader (`winmm.dll`) and
 `STA2WidescreenPatch.asi`, run through Heroic and Proton on Arch + Hyprland. The d3d8
 section matters to anything touching the renderer.
 
-The HUD layout and cursors are in `hud/README.md`; renderer settings and anti-aliasing
-(the Tiers) in `renderer/README.md`; the menus in `menus/README.md`. The version
+The HUD layout and cursors are in `ui/HUD.md`; renderer settings and anti-aliasing
+are render3d's and Display8's (`render3d/README.md`, `display/README.md`); the menus are
+the UI's (`ui/MENUS.md`). The version
 resource every plugin we build carries is `versioninfo/` (its `README.md`); it is part
 of the build and installs nothing of its own.
 
@@ -243,7 +244,7 @@ turns into a second X11 window that Hyprland tiles and focuses like a new applic
 
 **Fix: `Menus.asi` with `Embed=1`** (the default it ships with) re-creates each
 menu as a child of the game window, so the game is one OS window from launch to exit.
-See `menus/README.md`, "One window: `Embed=1`".
+See `ui/MENUS.md`, "What the shell is, in the engine" (the UI's host does what `Embed=1` did).
 
 **The Wine virtual desktop must stay off.** It also puts everything in one window
 (`"Desktop"="Default"` under `[Software\\Wine\\Explorer]` in `<prefix>/pfx/user.reg`),

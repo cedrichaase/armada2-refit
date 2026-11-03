@@ -8,8 +8,7 @@ through the two plugins, and their changelogs say so.
 It exists for the display plan: the game's d3d8 device becomes a null stub of ours
 (Display8, `display/`), and render3d and the UI draw the whole frame on Vulkan, then
 Direct3D 12. The interface is shaped for those two and implemented on three backends:
-**Direct3D 9**, the device behind the game's d3d8 one (crosire's d3d8to9,
-`platform/D3D9.md`, or Display8's own in its stub mode), **Vulkan**, Display8's
+**Direct3D 9**, the device behind the game's d3d8 one (crosire's d3d8to9, or Display8's own in its stub mode), **Vulkan**, Display8's
 device in its stub mode with `Backend=vulkan` ("The Vulkan backend" below), and
 **Direct3D 12**, Display8's with `Backend=d3d12` ("The Direct3D 12 backend"). Which one
 draws is decided at run time, by what Display8 says; the modules see one interface.
@@ -426,7 +425,7 @@ it and `half_pixel` 0.5 (`VkDevice8::features`, `FEATURE_D3D9_CENTRES`).
 ### Samplers as DXVK makes them
 
 On Direct3D 9 the frame is filtered as the game's `dxvk.conf` has DXVK make every
-sampler (`renderer/README.md`): 16x anisotropy in place of every linear filter, and a
+sampler (`dxvk.conf`; `display/README.md`, "Samplers as DXVK makes them"): 16x anisotropy in place of every linear filter, and a
 LOD bias of -0.5 on every sampler with mips. The plugins never ask for either; DXVK
 adds them. So on Vulkan Display8 reads the same keys and hands them over
 (`VkDevice8::sampler_anisotropy`, `sampler_lod_bias`), and `Gpu::sampler` makes each

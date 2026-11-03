@@ -166,7 +166,7 @@ By the target that owns it. `./a2tex list` shows them all; each target's
 
 ### 21 — cursor -- deliberate pixel art, magnified by the engine
 
-**No.** Non-square, hand-placed pixels. The engine magnifies the cursor itself by a constant (`[device+0x18]`), so more texels only draw a bigger cursor at the same density; resampling buys nothing and loses the pixel art. `HUD.asi` fixes their aspect in code (`hud/README.md`).
+**No.** Non-square, hand-placed pixels. The engine magnifies the cursor itself by a constant (`[device+0x18]`), so more texels only draw a bigger cursor at the same density; resampling buys nothing and loses the pixel art. The UI squares their aspect in code (`ui/HUD.md`).
 
 `Curs_24`, `Curs_Attk`, `Curs_Guard`, `Curs_Move`, `Curs_NoAnim`, `Curs_NoAttk`, `Curs_NoSpecWp`, `Curs_NoTransAttack`, `Curs_Patrl`, `Curs_Rally`, `Curs_SpecWp`, `Curs_Trans`, `Curs_transattack`, `Curs_worm`, `Curs_wrmin`, `Curs_wrmout`, `CursorA`, `curs_mining`, `curs_noanim2`, `curs_repair`, `curs_warp`
 

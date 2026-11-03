@@ -533,7 +533,7 @@ left: 0 means it is gone. `UI.asi` does the same (`ui/src/engine/device.rs`); wh
 is in the chain after render3d, render3d's count includes the UI's one reference.
 
 **Without Direct3D 9.** The d3d9 device is asked for behind the game's d3d8 one
-(`platform/D3D9.md`). Under DXVK's own d3d8, or when the targets cannot be made, the
+(the d3d8to9 chain). Under DXVK's own d3d8, or when the targets cannot be made, the
 body runs as stock. An `A16B16G16R16F` target with MSAA falls back to one without, then
 to 8 bits, and the log says which.
 

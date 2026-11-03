@@ -41,7 +41,7 @@ player with the UI plays a player without it.
 
 ## 3. The HUD, a panel at a time
 
-Each `DisplayInterface` panel (`hud/README.md`) replaced by one of ours, behind a
+Each `DisplayInterface` panel (`HUD.md`) replaced by one of ours, behind a
 switch, the stock panel's `Render` skipped while ours draws. Likely order: the button
 bar (where `GridLayout.asi` already owns the logic), the info panel, the selection,
 resources and messages, then the minimap. `HUD.asi`'s canvas, font and seam fixes stop
@@ -116,7 +116,7 @@ and their pictures and clicks are separate steps.
   `STYLE.md`. No `gui_*.cfg` rectangle is read, except for what the engine needs to
   hit-test where we have not taken over.
 - **HUD.asi and GridLayout.asi are superseded panel by panel.** The UI's button bar has
-  the grid keys of its own (`grid/README.md` is the behaviour to match). The UI takes
+  the grid keys of its own (`HUD.md`, "The button bar", is the behaviour). The UI takes
   the bar only while `GridLayout.asi` is not loaded. When the UI owns every panel, the
   install takes `HUD.asi` and `GridLayout.asi` out.
 
@@ -130,7 +130,7 @@ screen follows it.
 ## What this exposes of Armada2.exe
 
 A UI of our own reads much more of the engine's state than today's plugins patch
-(`hud/README.md`, "Engine findings" in `publish/README.md`). It stays within hard rule
+(`HUD.md`, "Engine findings" in `publish/README.md`). It stays within hard rule
 9 by construction:
 
 - **Every address and offset lives in `src/engine/`**, one file per area, each with
@@ -145,7 +145,7 @@ A UI of our own reads much more of the engine's state than today's plugins patch
 
 ## Not decided yet
 
-- Our own cursor (the mission's is the engine's sprite, `hud/README.md`).
+- Our own cursor (the mission's is the engine's sprite, `HUD.md`).
 - Text entry (IME, the game's own chat box).
 - Whether `HUD.asi`'s fixes stay for panels we have not replaced, or the stock panels
   are hidden as a whole once enough are ours.
