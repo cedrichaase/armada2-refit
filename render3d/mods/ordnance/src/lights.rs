@@ -35,7 +35,7 @@ use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use r3d_core::engine::light::{FN_NEW, FN_POINT_LIGHT, FN_REGISTER_LIGHT};
+use r3d_core::engine::light::{fn_new, fn_point_light, fn_register_light};
 
 pub struct Lights {
     pool: Vec<usize>,
@@ -134,12 +134,12 @@ impl Lights {
     fn light(&mut self, n: usize) -> usize {
         while self.pool.len() <= n {
             let l = unsafe {
-                let new: unsafe extern "C" fn(u32) -> usize = core::mem::transmute(FN_NEW);
+                let new: unsafe extern "C" fn(u32) -> usize = core::mem::transmute(fn_new());
                 let l = new(0x138);
                 if l == 0 {
                     return 0;
                 }
-                let ctor: unsafe extern "thiscall" fn(usize, usize, usize, *const u8) = core::mem::transmute(FN_POINT_LIGHT);
+                let ctor: unsafe extern "thiscall" fn(usize, usize, usize, *const u8) = core::mem::transmute(fn_point_light());
                 ctor(l, 0, 0, b"ordnance\0".as_ptr());
                 l
             };
@@ -160,7 +160,7 @@ impl Lights {
             core::ptr::write_unaligned((l + 0x104) as *mut f32, range.max(0.01));
             let m = M34 { p: pos, ..M34::IDENTITY };
             let c = [col.x, col.y, col.z, 1.0f32];
-            let f: unsafe extern "thiscall" fn(usize, usize, *const f32, *const M34) = core::mem::transmute(FN_REGISTER_LIGHT);
+            let f: unsafe extern "thiscall" fn(usize, usize, *const f32, *const M34) = core::mem::transmute(fn_register_light());
             f(engine::storm3d(), l, c.as_ptr(), &m);
         }
     }

@@ -171,7 +171,7 @@ impl Models {
             return false;
         }
         let db = hooks::instance_database(inst);
-        if db == 0 || engine::vtable(db) != game::VT_DATABASE {
+        if db == 0 || engine::vtable(db) != game::vt_database() {
             return false;
         }
         let odf = hooks::ord_odf(ord);

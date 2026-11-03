@@ -10,6 +10,14 @@ out = "render3d/mods/ordnance/src/syms.rs"
 doc = "What the ordnance module reads of the engine: its objects, lists, globals and calls"
 rows = ["Modules.ordnance"]
 
+[hook."ordnance.warp"]
+doc = "Notes stock's warp flash sprite for our flash, and runs the effects' update call"
+rows = ["Modules.ordnance"]
+
+[hook."ordnance.shots"]
+doc = "Takes slot 11 (Entity::Render) of a shot class the engine submits, to draw its model"
+rows = ["Modules.ordnance"]
+
 
 [[sym]]
 id = "fn_obj_even_if_destroyed"
@@ -41,7 +49,7 @@ symbol = "Entity::Render"
 kind = "fn"
 addr = 0x4cfda0
 check = "55 8b ec 56 8b f1 57 8b"
-used_by = ["ordnance.reads"]
+used_by = ["ordnance.shots"]
 
 [[sym]]
 id = "fn_entity_get"
@@ -130,7 +138,8 @@ kind = "call"
 addr = 0x598423
 target = "fn_warp"
 in = "Armada_RenderAllOurStuff"
-used_by = ["ordnance.reads"]
+chain = true
+used_by = ["ordnance.warp"]
 
 [[sym]]
 id = "fn_warp"
@@ -138,7 +147,7 @@ symbol = "RenderWarpSpriteEffects"
 kind = "fn"
 addr = 0x59c560
 check = "55 8b ec 56 8b 35 0c 3d"
-used_by = ["ordnance.reads"]
+used_by = ["ordnance.warp"]
 
 [[sym]]
 id = "site_warp_sprite"
@@ -147,7 +156,7 @@ kind = "call"
 addr = 0x59cc6b
 target = "drawscaled3d"
 in = "WarpSpriteEffect::Render"
-used_by = ["ordnance.reads"]
+used_by = ["ordnance.warp"]
 
 [[sym]]
 id = "drawscaled3d"
@@ -155,7 +164,7 @@ symbol = "ST3D_Sprite::DrawScaled3D"
 kind = "fn"
 addr = 0x63aa60
 check = "55 8b ec 83 ec 08 8b 45"
-used_by = ["ordnance.reads"]
+used_by = ["ordnance.warp"]
 
 [[sym]]
 id = "fn_prj_odf"
@@ -188,7 +197,7 @@ used_by = ["ordnance.reads"]
 
 [[sym]]
 id = "ordnance_head"
-symbol = "TODO"
+symbol = "(unnamed) ordnance list head node"
 kind = "global"
 addr = 0x771fac
 used_by = ["ordnance.reads"]

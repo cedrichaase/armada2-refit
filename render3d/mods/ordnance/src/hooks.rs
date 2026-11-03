@@ -47,12 +47,10 @@ pub(crate) fn sub_srt() -> usize { at(sym::SUB_SRT) } // ShieldRemovingTorpedo
 pub(crate) fn sub_chain() -> usize { at(sym::SUB_CHAIN) } // ChainPulsar: its sprite, and its emitter node's Render
 
 // The warp flash: the call to ST3D_Sprite::DrawScaled3D in WarpSpriteEffect::Render.
-pub(crate) fn site_warp_sprite() -> usize { at(sym::SITE_WARP_SPRITE) }
-use r3d_core::engine::sprite::FN_DRAW_SCALED_3D as FN_DRAW_SCALED;
-use crate::syms::sym;
+use crate::syms::{hook as hk, sym, TABLE};
 
 /// An engine address of the profile: 0 unless the hook that uses it is ready.
-pub(crate) fn at(s: a2engine::Sym) -> usize { crate::syms::TABLE.engine().addr(s) }
+pub(crate) fn at(s: a2engine::Sym) -> usize { TABLE.engine().addr(s) }
 pub(crate) fn site_warp() -> usize { at(sym::SITE_WARP) } // RenderWarpSpriteEffects(cam), cdecl, in the body
 pub(crate) fn fn_warp() -> usize { at(sym::FN_WARP) }
 
@@ -121,6 +119,8 @@ static mut GATE: Option<Gate> = None;
 static mut HOOKS: Option<Hooks> = None;
 static mut PREV_WARP_SPRITE: Prev = Prev(0);
 static mut WARP_HOOKED: bool = false;
+/// The per-class slot hook is ready (`ordnance.shots`): slots may be taken.
+static mut SHOTS_OK: bool = false;
 /// The warp flash is ours this view (`Warp.On`): else the engine's sprite is drawn.
 static mut WARP_ON: bool = false;
 /// Flashes noted by the warp hook in this view: (effect, position).
@@ -208,19 +208,28 @@ unsafe extern "thiscall" fn ord_render(ord: usize, cam: usize) {
 /// The module's hooks, once (its first switch-on): the warp flash's sprite call. The
 /// per-class slots are taken when a class is first met (`take_class_slot`), through the
 /// same registry handle, which is kept here.
-pub fn install(h: &Hooks) {
+pub fn install(h: &mut Hooks) {
+    if !h.ready(&TABLE, hk::ORDNANCE_READS) {
+        h.stand_down("the engine's reads are not stock");
+        return;
+    }
     unsafe {
         GATE = Some(h.gate());
         HOOKS = Some(Hooks::for_module(h.owner(), "ordnance", h.gate()));
+        SHOTS_OK = h.ready(&TABLE, hk::ORDNANCE_SHOTS);
     }
     let owner = h.owner();
     #[allow(static_mut_refs)]
     let Some(hooks) = (unsafe { HOOKS.as_mut() }) else { return };
+    if !h.ready(&TABLE, hk::ORDNANCE_WARP) {
+        crate::log!("ordnance: the warp flash's site is not stock's, the engine draws it");
+        return;
+    }
     let warp = Hook {
         owner,
         used_by: "the warp flash",
         kind: Kind::Call,
-        site: Site { symbol: "WarpSpriteEffect::Render", addr: site_warp_sprite(), expect: FN_DRAW_SCALED },
+        site: Site::of(&TABLE, sym::SITE_WARP_SPRITE),
         to: warp_sprite as *const () as usize,
         chain: false,
     };
@@ -245,6 +254,9 @@ pub fn take_class_slot(ord: usize) -> bool {
     let slots = unsafe { &mut CLASS_SLOTS };
     if slots.iter().any(|(t, _)| *t == vt) {
         return true;
+    }
+    if !unsafe { SHOTS_OK } {
+        return false;
     }
     let Some(hooks) = (unsafe { HOOKS.as_mut() }) else { return false };
     let hook = Hook {
@@ -416,16 +428,28 @@ pub enum StockSubmit {
 }
 
 pub fn stock_submit(ord: usize) -> Option<StockSubmit> {
-    Some(match submit_addr(ord) {
-        sub_phaser() => StockSubmit::Phaser,
-        sub_pulse() => StockSubmit::Pulse,
-        sub_photon() => StockSubmit::Photon,
-        sub_plasma() => StockSubmit::Plasma,
-        sub_poleron() => StockSubmit::Poleron,
-        sub_artillery() => StockSubmit::Artillery,
-        sub_srt() => StockSubmit::Srt,
-        sub_chain() => StockSubmit::Chain,
-        _ => return None,
+    let a = submit_addr(ord);
+    if a == 0 {
+        return None;
+    }
+    Some(if a == sub_phaser() {
+        StockSubmit::Phaser
+    } else if a == sub_pulse() {
+        StockSubmit::Pulse
+    } else if a == sub_photon() {
+        StockSubmit::Photon
+    } else if a == sub_plasma() {
+        StockSubmit::Plasma
+    } else if a == sub_poleron() {
+        StockSubmit::Poleron
+    } else if a == sub_artillery() {
+        StockSubmit::Artillery
+    } else if a == sub_srt() {
+        StockSubmit::Srt
+    } else if a == sub_chain() {
+        StockSubmit::Chain
+    } else {
+        return None;
     })
 }
 
