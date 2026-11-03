@@ -57,20 +57,6 @@ label = "Warp on long moves"
 help = "A move on the map goes to warp when the ships that can warp are farther than this from the point you click. Off leaves moves as in stock."
 
 [[row]]
-name = "viewdistance"
-section = "QOL"
-key = "ViewDistance"
-kind = "enum"
-default = "1000000"
-values = ["0", "4000", "8000", "20000", "1000000"]
-labels = ["Stock", "4000", "8000", "20000", "Whole map"]
-apply = "mission"
-scope = "local"
-tab = "gameplay"
-label = "View distance"
-help = "How far the view reaches before ships, planets and nebulae fade out. The camera's far plane changes with the next mission."
-
-[[row]]
 name = "maxselection"
 section = "QOL"
 key = "MaxSelection"

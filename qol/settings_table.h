@@ -22,23 +22,18 @@ static const A2Setting QOL_SETTINGS[] = {
       "QOL.ini", "QOL", "WarpDistance", "1100", "0|600|1100|1700|3000", "Off|600|1100|1700|3000",
       "Warp on long moves",
       "A move on the map goes to warp when the ships that can warp are farther than this from the point you click. Off leaves moves as in stock.", NULLPTR },
-    { sizeof(A2Setting), A2SET_KIND_ENUM, A2SET_APPLY_MISSION, A2SET_SCOPE_LOCAL, A2SET_TAB_GAMEPLAY, 0,
-      "QOL.ini", "QOL", "ViewDistance", "1000000", "0|4000|8000|20000|1000000", "Stock|4000|8000|20000|Whole map",
-      "View distance",
-      "How far the view reaches before ships, planets and nebulae fade out. The camera's far plane changes with the next mission.", NULLPTR },
     { sizeof(A2Setting), A2SET_KIND_ENUM, A2SET_APPLY_RESTART, A2SET_SCOPE_LOCAL, A2SET_TAB_GAMEPLAY, A2SET_FLAG_ADVANCED,
       "QOL.ini", "QOL", "MaxSelection", "40", "16|40|80|120", "Stock (16)|40|80|120",
       "Largest selection",
       "How many objects a selection and a control group can hold. Takes effect when the game is started.", NULLPTR },
 };
-#define QOL_SETTINGS_COUNT 6
+#define QOL_SETTINGS_COUNT 5
 
 #define QOL_ROW_PANSPEED (&QOL_SETTINGS[0])
 #define QOL_ROW_SHIFTADDSTOGROUP (&QOL_SETTINGS[1])
 #define QOL_ROW_STATIONGROUPS (&QOL_SETTINGS[2])
 #define QOL_ROW_WARPDISTANCE (&QOL_SETTINGS[3])
-#define QOL_ROW_VIEWDISTANCE (&QOL_SETTINGS[4])
-#define QOL_ROW_MAXSELECTION (&QOL_SETTINGS[5])
+#define QOL_ROW_MAXSELECTION (&QOL_SETTINGS[4])
 
 /* The table, for the UI's settings hub (count may be NULL). */
 __declspec(dllexport) const A2Setting *__cdecl QOL_Settings(UINT *count)

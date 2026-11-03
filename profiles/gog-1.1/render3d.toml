@@ -20,6 +20,10 @@ doc = "The calls inside the stock body that the renderer's steps replace one by 
 [hook."frame.destroy"]
 doc = "DestroyRenderSurfaces chained, so the renderer lets go of the device before the engine does"
 
+[hook."view.distance"]
+doc = "The far plane and object culling raised to [View] Distance, at the end of RTS_Configure's ART_CFG parse"
+rows = ["View.Distance"]
+
 [[sym]]
 id = "sound2d"
 symbol = "AudioSound2D::AudioSound2D"
@@ -589,3 +593,26 @@ addr = 0x4e60f6
 target = "body"
 in = "CinematicView::RenderView"
 used_by = ["frame.seam"]
+
+[[sym]]
+id = "view_site"
+symbol = "RTS_Configure"
+kind = "patch"
+addr = 0x491bef
+check = "8b 0d c0 ca 6f 00 89 15 fc 3c 77 00 8d 55 f0 89 0d c4 ca 6f 00"
+in = "RTS_Configure"
+used_by = ["view.distance"]
+
+[[sym]]
+id = "view_far_plane"
+symbol = "FAR_CLIPPING_PLANE"
+kind = "global"
+addr = 0x6fcab0
+used_by = ["view.distance"]
+
+[[sym]]
+id = "view_cull_dist"
+symbol = "cfgOBJECT_CULLING_DISTANCE"
+kind = "global"
+addr = 0x6fcac0
+used_by = ["view.distance"]

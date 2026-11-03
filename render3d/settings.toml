@@ -35,6 +35,21 @@ label = "HDR and bloom"
 help = "Draw the 3D view in half floats, so bright light blooms. Off draws an 8-bit view."
 
 [[row]]
+name = "view_distance"
+section = "View"
+key = "Distance"
+kind = "enum"
+default = "1000000"
+values = ["0", "4000", "8000", "20000", "1000000"]
+labels = ["Stock", "4000", "8000", "20000", "Whole map"]
+apply = "mission"
+scope = "local"
+tab = "graphics"
+label = "View distance"
+help = "How far the view reaches before ships, planets and nebulae fade out. The camera's far plane changes with the next mission."
+moved_from = "QOL.QOL.ViewDistance"
+
+[[row]]
 name = "modules_hulls"
 section = "Modules"
 key = "hulls"

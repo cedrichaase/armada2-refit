@@ -57,7 +57,7 @@ Status values: **idea** (not investigated), **scoped** (approach known, nothing 
 | [QOL-6](#qol-6-production-spread-across-a-group-of-buildings) | Production spread across a group of buildings | `QOL.asi`, `StationGroups=` | Construction ships | **done** for stations (`QOL.asi`), bench |
 | [QOL-7](#qol-7-pay-when-queuing-refund-on-cancel) | Pay when queuing, refund on cancel | `QOLRules.asi`, `PayOnQueue=` | — | **built**, now the [`rules/`](../rules/README.md) layer |
 | [QOL-8](#qol-8-long-moves-on-the-map-go-to-warp) | Long moves on the map go to warp | `QOL.asi`, `WarpDistance=` | A stock peer in a network game | **done** (`QOL.asi`), bench |
-| [QOL-9](#qol-9-the-view-reaches-across-the-map) | The view reaches across the map | `QOL.asi`, `ViewDistance=` | — | **done** (`QOL.asi`) |
+| [QOL-9](#qol-9-the-view-reaches-across-the-map) | The view reaches across the map | `Render3D.asi`, `[View] Distance=` | — | **done**, render3d's since qol 2.2.0 |
 
 ## Settings live
 
@@ -78,7 +78,6 @@ patch that is in but switched off.
 | `ShiftAddsToGroup` | live | `group_stub` tests the flag; the one byte that moves Shift's old meaning to Alt is written back or forth |
 | `StationGroups` | live | every station hook tests the flag (`sel_pre`, `bind_pre`, `producer_group`, `one_kind`, `focus_stub`) and takes the stock path when it is 0. Groups that already hold stations keep them |
 | `WarpDistance` | live | `warp_pre` already read the distance; 0 does what stock's Alt block did |
-| `ViewDistance` | mission | the two ART_CFG.h values are kept as parsed and re-raised on a change (and the copy a mission script restores from); the far plane is read when the mission's camera is made |
 | `MaxSelection` | restart | the selection array is moved at start; a bigger or smaller one is never re-applied |
 
 `PayOnQueue`, the one row the players must agree on, is `QOLRules.asi`'s, in
@@ -101,7 +100,6 @@ variable and then of the global; field offsets are spliced in with `A2_STR(QOL_F
 | Hook | Setting | Entries | Without it |
 |---|---|---|---|
 | `qol.pan_speed` | `PanSpeed` | the parse's 25-byte pattern (`patch`) and the coefficient (`global`) | right-drag as stock |
-| `qol.view_distance` | `ViewDistance` | the load that copies the culling distance (`patch`), the far plane and the culling distance (`global`s) | view as stock |
 | `qol.shift_group` | `ShiftAddsToGroup` | the Control test and the centre test in `mCheckGroupSelect` (`patch`), `mBindGroup` (`fn`), three continue points (`label`), the three modifier globals | number keys as stock |
 | `qol.selection` | `MaxSelection` | `cOverViewImp` (`global`), its 31 selection-array sites and 3 caps (`patch`, each with the bytes it replaces) | selection of 16 |
 | `qol.special_select` | `MaxSelection` | the five special-weapon array sequences (`patch`) and three continue points | selection of 16 (it is moved only with this hook) |
@@ -564,35 +562,7 @@ closest zooms, a move across the screen stays an ordinary one.
 
 ## QOL-9: The view reaches across the map
 
-**Today.** Zoomed out, or with the camera tilted towards the horizon, everything past
-about 2500 units fades to nothing: ships, stations, planets, asteroids, nebulae. The
-map is still there, explored and in sight; the engine just stops drawing it.
-
-**Why.** Two values in `ART_CFG.h` end the view. `cfgOBJECT_CULLING_DISTANCE` (2800,
-at 0x6fcac0) is the one that shows: `GameObjectInstance::ComputeFadeOut` (0x4d5a20)
-fades an object from 0.9 of it to all of it, by its distance from the camera with the
-vertical scaled by a quarter, and for some classes scaled by the object's radius, and
-every instance type's own `ComputeFadeOut` goes through it: `CraftInstance`,
-`PlanetInstance`, `AsteroidInstance`, `CocoonInstance`, `PlaceHolderInstance` and
-`NebulaInstance` (0x4a5680, which darkens its additive glow by the fade rather than
-fading the instance). `DistanceCull` (0x4d5bb0) culls asteroid fields, Evolvers and
-building effects with the same distance, and `Ordnance::RenderAll` reads it too.
-`FAR_CLIPPING_PLANE` (20000, at 0x6fcab0) is the far plane `PresetView::Init` gives
-the game camera; `ST3D_Camera::CheckSphereVisibility` (0x619300) rejects a sphere past
-it, and the projection clips there.
-
-**What `QOL.asi` does.** `RTS_Configure` parses both keys (a missing key keeps the
-compiled default) and then, at 0x491bef, loads the culling distance to copy it to
-0x6fcac4, the value a mission script's `RestoreObjectCullingDistance` puts back after
-its own `SetObjectCullingDistance`. That load becomes `call view_stub; nop`: the stub
-raises both values to at least `ViewDistance` and loads `ecx` as the `mov` did, so the
-copy carries the raised value too. Both values are only ever read to draw, so a stock
-player can play a player with it. Fog and shroud are decided elsewhere
-(`GameObject::CanUserSee`), so what they hide stays hidden. The cineractive sequences
-swap in their own far plane (`CINERACTIVE_FAR_CLIPPING_PLANE`) and restore this one,
-and are left alone.
-
-**Cost.** More is drawn on a wide view. The near plane stays at 20, so the depth
-buffer's precision at a given distance hardly changes with the far plane. render3d's
-shadow map is fitted around every hull it draws, so far-off ships on a wide view make
-its texels coarser, as a big battle already does.
+Moved to render3d in qol 2.2.0: the key is `[View] Distance` in `Render3D.ini` and the
+findings are in [`render3d/README.md`](../render3d/README.md#view-distance). `QOL.ini`'s
+old `ViewDistance=` is carried over by `tools/settings/move-keys.py` and the release
+installers.

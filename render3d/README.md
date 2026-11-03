@@ -316,6 +316,12 @@ as before).
 | `Timing` | 0 | 1: CPU and GPU time per view and step in the log (below); with `Enable=0`, the engine's own view timed |
 | `TimingEvery` | 5 | seconds between timing reports |
 
+**`[View]`** ("View distance" below):
+
+| Key | Default | |
+|---|---|---|
+| `Distance` | 1000000 | the far plane and the object culling distance are raised to at least this; 0: stock (20000 and 2800). Takes effect with the next mission |
+
 **`[Lights]`**, the clustered lights ("Clustered lights" below; Vulkan and Direct3D 12):
 
 | Key | Default | |
@@ -363,6 +369,51 @@ stands down beside the old plugin that draws the part. `particles`, `effects`,
 `ordnance`, `specials` and `overlays` draw nothing in the menu scene, so at 0 they are
 simply off. A stock look in the menu would need the engine to draw SODs in the shell,
 which it never does.
+
+## View distance
+
+`[View] Distance` (default 1000000; 0 leaves the view stock; 4000, 8000 and 20000 are
+steps between) makes the view reach across the map. It was `QOL.asi`'s `ViewDistance=`
+(QOL-9) and moved here with `moved_from = "QOL.QOL.ViewDistance"`, because the core
+already owns the far plane and the culling distance the sky and the hulls read. The row
+is MISSION: the far plane is read when a mission's camera is made.
+
+**Today.** Zoomed out, or with the camera tilted towards the horizon, everything past
+about 2500 units fades to nothing: ships, stations, planets, asteroids, nebulae. The
+map is still there, explored and in sight; the engine just stops drawing it.
+
+**Why.** Two values in `ART_CFG.h` end the view. `cfgOBJECT_CULLING_DISTANCE` (2800)
+is the one that shows: `GameObjectInstance::ComputeFadeOut` fades an object from 0.9 of
+it to all of it, by its distance from the camera with the vertical scaled by a quarter,
+and for some classes scaled by the object's radius, and every instance type's own
+`ComputeFadeOut` goes through it (craft, planets, asteroids, cocoons, placeholders, and
+the nebulae, whose additive glow is darkened by the fade rather than the instance).
+`DistanceCull` culls asteroid fields, Evolvers and building effects with the same
+distance, and `Ordnance::RenderAll` reads it too. `FAR_CLIPPING_PLANE` (20000) is the
+far plane `PresetView::Init` gives the game camera; `ST3D_Camera::CheckSphereVisibility`
+rejects a sphere past it, and the projection clips there.
+
+**What the core does** (`core/src/engine/viewdist.rs`, hook `view.distance`).
+`RTS_Configure` parses both keys (a missing key keeps the compiled default) and then, at
+the site `view_site`, loads the culling distance to copy it to the word after it, the
+value a mission script's `RestoreObjectCullingDistance` puts back after its own
+`SetObjectCullingDistance`. That load becomes `call stub; nop`: the stub keeps both
+values as parsed, raises both to at least the distance, and loads `ecx` as the `mov`
+did, so the copy carries the raised value too. A change while the game runs stores the
+raised values again, from the ones kept, and only where a script has not moved them
+since. Both values are only ever read to draw, so this stays compatible with stock
+players. Fog and shroud are decided elsewhere (`GameObject::CanUserSee`), so what they
+hide stays hidden. The cineractive sequences swap in their own far plane and restore
+this one, and are left alone.
+
+The patch is made when render3d runs; with `Enable=0` the engine's view is stock. The
+profile's hook `view.distance` must be ready (the 21 bytes at the site are checked), or
+nothing is patched and the settings note says so.
+
+**Cost.** More is drawn on a wide view. The near plane stays at 20, so the depth
+buffer's precision at a given distance hardly changes with the far plane. The shadow map
+is fitted around every hull drawn, so far-off ships on a wide view make its texels
+coarser, as a big battle already does.
 
 ## Timing
 

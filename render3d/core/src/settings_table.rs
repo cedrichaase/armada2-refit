@@ -4,7 +4,7 @@
 #![allow(dead_code)]
 use crate::rt::settings::*;
 
-pub static SETTINGS: [Setting; 10] = [
+pub static SETTINGS: [Setting; 11] = [
     Setting {
         size: ROW_SIZE,
         kind: KIND_ENUM,
@@ -38,6 +38,23 @@ pub static SETTINGS: [Setting; 10] = [
         label: c"HDR and bloom".as_ptr(),
         help: c"Draw the 3D view in half floats, so bright light blooms. Off draws an 8-bit view.".as_ptr(),
         moved_from: core::ptr::null(),
+    },
+    Setting {
+        size: ROW_SIZE,
+        kind: KIND_ENUM,
+        apply: APPLY_MISSION,
+        scope: SCOPE_LOCAL,
+        tab: TAB_GRAPHICS,
+        flags: 0,
+        file: c"Render3D.ini".as_ptr(),
+        section: c"View".as_ptr(),
+        key: c"Distance".as_ptr(),
+        def: c"1000000".as_ptr(),
+        values: c"0|4000|8000|20000|1000000".as_ptr(),
+        value_labels: c"Stock|4000|8000|20000|Whole map".as_ptr(),
+        label: c"View distance".as_ptr(),
+        help: c"How far the view reaches before ships, planets and nebulae fade out. The camera's far plane changes with the next mission.".as_ptr(),
+        moved_from: c"QOL.QOL.ViewDistance".as_ptr(),
     },
     Setting {
         size: ROW_SIZE,
@@ -179,11 +196,12 @@ pub static SETTINGS: [Setting; 10] = [
 
 pub const MSAA: &Setting = &SETTINGS[0];
 pub const HDR: &Setting = &SETTINGS[1];
-pub const MODULES_HULLS: &Setting = &SETTINGS[2];
-pub const MODULES_SKY: &Setting = &SETTINGS[3];
-pub const MODULES_PARTICLES: &Setting = &SETTINGS[4];
-pub const MODULES_EFFECTS: &Setting = &SETTINGS[5];
-pub const MODULES_ORDNANCE: &Setting = &SETTINGS[6];
-pub const MODULES_SPECIALS: &Setting = &SETTINGS[7];
-pub const MODULES_WORLD: &Setting = &SETTINGS[8];
-pub const MODULES_OVERLAYS: &Setting = &SETTINGS[9];
+pub const VIEW_DISTANCE: &Setting = &SETTINGS[2];
+pub const MODULES_HULLS: &Setting = &SETTINGS[3];
+pub const MODULES_SKY: &Setting = &SETTINGS[4];
+pub const MODULES_PARTICLES: &Setting = &SETTINGS[5];
+pub const MODULES_EFFECTS: &Setting = &SETTINGS[6];
+pub const MODULES_ORDNANCE: &Setting = &SETTINGS[7];
+pub const MODULES_SPECIALS: &Setting = &SETTINGS[8];
+pub const MODULES_WORLD: &Setting = &SETTINGS[9];
+pub const MODULES_OVERLAYS: &Setting = &SETTINGS[10];

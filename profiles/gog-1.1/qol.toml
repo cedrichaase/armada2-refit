@@ -11,10 +11,6 @@ out = "qol/engine_syms.h"
 doc = "The right-drag pan factor, stored over the parsed FASTSCROLL_COEFFICIENT"
 rows = ["QOL.PanSpeed"]
 
-[hook.view_distance]
-doc = "The far plane and object culling raised to ViewDistance"
-rows = ["QOL.ViewDistance"]
-
 [hook.shift_group]
 doc = "Shift+number adds the selection to a group; Alt+number selects and centres"
 rows = ["QOL.ShiftAddsToGroup"]
@@ -50,29 +46,6 @@ symbol = "FASTSCROLL_COEFFICIENT"
 kind = "global"
 addr = 0x70fbb4
 used_by = ["pan_speed"]
-
-[[sym]]
-id = "view_site"
-symbol = "RTS_Configure"
-kind = "patch"
-addr = 0x491bef
-check = "8b 0d c0 ca 6f 00 89 15 fc 3c 77 00 8d 55 f0 89 0d c4 ca 6f 00"
-in = "RTS_Configure"
-used_by = ["view_distance"]
-
-[[sym]]
-id = "far_plane"
-symbol = "FAR_CLIPPING_PLANE"
-kind = "global"
-addr = 0x6fcab0
-used_by = ["view_distance"]
-
-[[sym]]
-id = "cull_dist"
-symbol = "cfgOBJECT_CULLING_DISTANCE"
-kind = "global"
-addr = 0x6fcac0
-used_by = ["view_distance"]
 
 [[sym]]
 id = "group_bind"
