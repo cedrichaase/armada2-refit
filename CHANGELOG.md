@@ -5,6 +5,14 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.74.0 — 2026-11-03
+
+Layers: render3d 0.41.0, testbench 3.93.0.
+
+### Changed
+- render3d: effects and sky on the module layers; `Modules.effects` is live; sky
+  recipes moved to `render3d/content/sky/`. Installed, not yet seen in game.
+
 ## 13.72.0 — 2026-11-03
 
 Layers: render3d 0.39.0, testbench 3.91.0.

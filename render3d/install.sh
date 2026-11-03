@@ -27,7 +27,7 @@ remove_recipes() {
     for f in "$here"/surfaces/*.ini; do rm -f "$GAME/Surfaces/$(basename "$f")"; done
     for f in "$here"/nebulae/*.ini; do rm -f "$GAME/Nebulae/$(basename "$f")"; done
     # Sky.asi's copies of the sky recipes, which would shadow the built-in ones.
-    for f in "$here"/skies/*.ini; do rm -f "$GAME/Sky/$(basename "$f")"; done
+    for f in "$here"/content/sky/*.ini; do rm -f "$GAME/Sky/$(basename "$f")"; done
     rmdir "$GAME/Surfaces" "$GAME/Nebulae" "$GAME/Sky" 2>/dev/null || true
 }
 

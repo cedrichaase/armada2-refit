@@ -3,7 +3,7 @@
 //! sprite nodes (the suns). Additive, as stock draws them, with the brightest texels
 //! lifted a little past white so a star's or a sun's core blooms.
 use crate::assets;
-use crate::engine::{field, rd};
+use super::hooks;
 use crate::math::{M4, V3, v3};
 use crate::rt;
 use crate::shaders::sky::VS_SPRITE;
@@ -112,9 +112,6 @@ pub fn sprite_desc(ps: gpu::Code) -> PipelineDesc {
 
 // ---- the starfield ------------------------------------------------------------------
 
-/// `g_starfield`: the `Starfield` the map's starfield ODF built (null when none).
-const G_STARFIELD: usize = 0x773d04;
-
 /// The starfield's sprites by `ST3D_Sprite*`, as found in the sprite table by the name
 /// the engine keeps (every `ST3D_DatabaseElement` holds its name at +0x8).
 #[derive(Default)]
@@ -130,8 +127,7 @@ impl Starfield {
     /// a random distance and turn about the starfield's centre), so they show parallax
     /// as stock's do. Returns the number of stars.
     pub fn gather(&mut self, b: &mut Batch, lift: f32) -> usize {
-        let sf = unsafe { rd::<usize>(G_STARFIELD) };
-        let root = field(sf, 4);
+        let root = hooks::starfield_root(hooks::starfield());
         if root == 0 {
             return 0;
         }
@@ -149,12 +145,12 @@ impl Starfield {
             }
             // `OctTree_Node`: its objects (+0x30) and its children (+0x3c), each a
             // `std::list` of `auto_ptr`s, whose pointer sits at node +0xc.
-            each_in(field(node, 0x30), |star| {
+            hooks::each_in(hooks::node_objects(node), |star| {
                 if self.star(b, star, lift) {
                     n += 1;
                 }
             });
-            each_in(field(node, 0x3c), |child| stack.push(child));
+            hooks::each_in(hooks::node_children(node), |child| stack.push(child));
         }
         if !self.said {
             self.said = true;
@@ -167,12 +163,12 @@ impl Starfield {
     /// four corners in world space, which `OctTree_Node::Render` hands to
     /// `ST3D_Sprite::DrawQuad` as they are.
     fn star(&mut self, b: &mut Batch, star: usize, lift: f32) -> bool {
-        let sp = field(star, 0);
+        let sp = hooks::star_sprite(star);
         if sp == 0 {
             return false;
         }
         let info = self.sprites.entry(sp).or_insert_with(|| {
-            let name = unsafe { rt::cstr_at(field(sp, 8) as *const u8, 64) };
+            let name = hooks::sprite_name(sp);
             let i = sprite_info(name);
             match &i {
                 None => crate::log!("sky: starfield sprite {:?} not in the sprite table", name),
@@ -181,31 +177,14 @@ impl Starfield {
             i
         });
         let Some(info) = info.as_ref() else { return false };
-        let c: [V3; 4] = unsafe { rd(star + 0xc) };
+        let c = hooks::star_corners(star);
         // The sprite's colour (`ST3D_Sprite+0x24`, white unless the table sets one).
-        let col: [f32; 3] = unsafe { rd(sp + 0x24) };
+        let col = hooks::sprite_colour(sp);
         // Only the point stars are lifted past white: the big blobs and clusters
         // (`blobby`, `starcluster`) are gas, and lifted they glowed over the sky.
-        let lift = if info.texture.eq_ignore_ascii_case("mstars") { lift } else { 0.0 };
+        let lift = if info.texture.eq_ignore_ascii_case(super::content::POINT_STARS) { lift } else { 0.0 };
         b.quad(info, c, [col[0], col[1], col[2], lift]);
         true
-    }
-}
-
-/// Each element of a VC6 `std::list<auto_ptr<T>>` given its head node.
-fn each_in(head: usize, mut f: impl FnMut(usize)) {
-    if head == 0 {
-        return;
-    }
-    let mut n = field(head, 0);
-    let mut guard = 0;
-    while n != head && n != 0 && guard < 100_000 {
-        let v = field(n, 0xc);
-        if v != 0 {
-            f(v);
-        }
-        n = field(n, 0);
-        guard += 1;
     }
 }
 

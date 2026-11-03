@@ -88,7 +88,7 @@ pub static SETTINGS: [Setting; 10] = [
     Setting {
         size: ROW_SIZE,
         kind: KIND_BOOL,
-        apply: APPLY_RESTART,
+        apply: APPLY_LIVE,
         scope: SCOPE_LOCAL,
         tab: TAB_GRAPHICS,
         flags: 0,
@@ -99,7 +99,7 @@ pub static SETTINGS: [Setting; 10] = [
         values: core::ptr::null(),
         value_labels: core::ptr::null(),
         label: c"Effects".as_ptr(),
-        help: c"render3d draws explosions, shields, repair and debris. Off hands them back to the game.".as_ptr(),
+        help: c"render3d draws explosions, shields, repair and debris. Off hands them back to the game. Effects already in flight finish in the look they started with.".as_ptr(),
     },
     Setting {
         size: ROW_SIZE,

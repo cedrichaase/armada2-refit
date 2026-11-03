@@ -23,8 +23,9 @@
 //! its first 0.15 s, then down with the square of the time left; full out to its
 //! entity's bounding radius (the explosion's entity `+4`, its bounding sphere at
 //! `+0x34`, radius `+0x40`; at least 40 units), gone at `LightRange` radii.
-use super::{ff, hash32, Cam, LightPool, Sec};
-use crate::engine::{self, field, obj};
+use super::hooks::explosions as hk;
+use super::{blank, hash32, Cam, LightPool, Sec};
+use crate::engine::obj;
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::log;
@@ -34,13 +35,6 @@ use crate::shaders::effects_explosions_spv::*;
 use crate::shaders::effects_explosions_dxil::*;
 use alloc::vec::Vec;
 use gpu::{Address, Block, Contents, Filter, Format, MipFilter, Sampler, Texture, TextureDesc, Topology, Usage};
-
-const EXPLOSION_HEAD: usize = 0x7367c4;
-const VT_FIREBALL: usize = 0x6afbd4;
-const VT_SHOCKWAVE: usize = 0x6afdac;
-const FN_SHOCK_RADIUS: usize = 0x467730;
-const SLOT_VISIBLE: usize = 2;
-const SLOT_SUBMIT: usize = 15;
 
 struct Set {
     rings: bool,
@@ -69,6 +63,8 @@ struct Set {
 
 pub struct Explosions {
     pub on: bool,
+    /// `Enable=` (and no plugin of its own): the part wants to run.
+    pub want: bool,
     pub light_on: bool,
     s: Set,
     /// What `ExplosionFeature` handed us in this view: (explosion, is a ring).
@@ -83,8 +79,23 @@ pub struct Explosions {
 
 impl Explosions {
     pub fn new() -> Explosions {
-        let c = Sec::new("Explosions");
-        let s = Set {
+        let c = Sec::with(blank(), "Explosions");
+        Explosions {
+            on: false,
+            want: false,
+            light_on: false,
+            s: Self::read(&c),
+            notes: Vec::new(),
+            vol: None,
+            vol_failed: false,
+            pipes: Pipes::new(),
+            lights: LightPool::new(b"explosion\0"),
+            logged: 0,
+        }
+    }
+
+    fn read(c: &Sec) -> Set {
+        Set {
             rings: c.i("Rings", 1) != 0,
             bright: c.f("Brightness", 1.0),
             size: c.f("Size", 1.0).max(0.1),
@@ -111,18 +122,15 @@ impl Explosions {
             light_col: c.v3("LightColour", [1.0, 0.62, 0.28]),
             light_bright: c.f("LightBrightness", 4.0),
             light_range: c.f("LightRange", 10.0),
-        };
-        Explosions {
-            on: c.i("Enable", 1) != 0,
-            light_on: c.i("Light", 1) != 0,
-            s,
-            notes: Vec::new(),
-            vol: None,
-            vol_failed: false,
-            pipes: Pipes::new(),
-            lights: LightPool::new(b"explosion\0"),
-            logged: 0,
         }
+    }
+
+    /// `[Explosions]`: the part's switches and its look.
+    pub fn configure(&mut self, ini: &crate::rt::Ini) {
+        let c = Sec::of(ini, "Explosions");
+        self.want = c.i("Enable", 1) != 0;
+        self.light_on = c.i("Light", 1) != 0;
+        self.s = Self::read(&c);
     }
 
     pub fn reset(&mut self) {
@@ -133,24 +141,22 @@ impl Explosions {
     pub fn feature(&mut self, v: &View) -> bool {
         let rings = self.s.rings;
         let mut notes = core::mem::take(&mut self.notes);
-        for_each_explosion(|e| unsafe {
-            let vt = engine::vtable(e);
-            let vis: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(field(vt, SLOT_VISIBLE * 4));
-            if vis(e) == 0 {
+        hk::each(|e| {
+            let (fireball, shock) = (hk::is_fireball(e), hk::is_shockwave(e));
+            if !hk::visible(e) {
                 return;
             }
             // A special weapon's wave with a recipe is the ordnance module's
             // (`[Wave.<odf>]`); every other shockwave gets the ring.
-            if vt == VT_SHOCKWAVE && crate::core_services::wave().is_some_and(|w| w.draw_wave(e, v)) {
+            if shock && crate::core_services::wave().is_some_and(|w| w.draw_wave(e, v)) {
                 return;
             }
-            if vt == VT_FIREBALL || (vt == VT_SHOCKWAVE && rings) {
+            if fireball || (shock && rings) {
                 if !notes.iter().any(|n| n.0 == e) {
-                    notes.push((e, vt == VT_SHOCKWAVE));
+                    notes.push((e, shock));
                 }
             } else {
-                let submit: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(vt, SLOT_SUBMIT * 4));
-                submit(e, v.cam);
+                hk::submit(e, v.cam);
             }
         });
         self.notes = notes;
@@ -167,18 +173,13 @@ impl Explosions {
         }
         let mut n = 0;
         let mut list = Vec::new();
-        for_each_explosion(|e| {
-            if engine::vtable(e) == VT_FIREBALL {
+        hk::each(|e| {
+            if hk::is_fireball(e) {
                 list.push(e);
             }
         });
         for e in list {
-            let cls = field(e, 0x30);
-            let len = ff(cls, 0x4c);
-            let left = ff(e, 0xa8);
-            if cls == 0 || !(len > 0.0) || !(left > 0.0) {
-                continue;
-            }
+            let Some((len, left)) = hk::light_life(e) else { continue };
             let age = len - left;
             let k = if age < 0.15 {
                 age / 0.15
@@ -186,8 +187,7 @@ impl Explosions {
                 let k = left / (len - 0.15).max(0.01);
                 if k > 1.0 { 1.0 } else { k * k }
             };
-            let ent = field(e, 4);
-            let br = if ent != 0 { ff(ent, 0x40) } else { 0.0 };
+            let br = hk::body_radius(e);
             let r = if br > 40.0 { br } else { 40.0 };
             let pos = obj::transform(e).p;
             let col = self.s.light_col * (self.s.light_bright * k);
@@ -233,7 +233,7 @@ impl Explosions {
         }
         let alive: Vec<usize> = {
             let mut l = Vec::new();
-            for_each_explosion(|e| l.push(e));
+            hk::each(|e| l.push(e));
             l
         };
         let _ = v;
@@ -271,10 +271,7 @@ impl Explosions {
             k[11] = [s.hdr, s.hdr_from, 0.0, 0.0];
             let rq;
             if !ring {
-                let cls = field(e, 0x30);
-                let mut r0 = ff(e, 0x34);
-                let mut life = if cls != 0 { ff(cls, 0x4c) } else { 2.5 };
-                let left = ff(e, 0xa8);
+                let (mut r0, mut life, left) = hk::fireball(e);
                 if !(r0 > 0.5 && r0 < 5000.0) {
                     r0 = 30.0;
                 }
@@ -310,15 +307,8 @@ impl Explosions {
                     continue;
                 }
             } else {
-                let cls = field(e, 0x30);
-                let r: f32 = unsafe {
-                    let f: unsafe extern "thiscall" fn(usize) -> f32 = core::mem::transmute(FN_SHOCK_RADIUS);
-                    f(e)
-                };
-                let mx = ff(e, 0x50);
-                let age = ff(e, 0x4c);
-                let fade = if cls != 0 { ff(cls, 0xe0) } else { 0.3 };
-                if !(mx > 0.5) || !(r > 0.0) || cls == 0 {
+                let hk::Shock { has_class, radius: r, max: mx, age, fade } = hk::shockwave(e);
+                if !(mx > 0.5) || !(r > 0.0) || !has_class {
                     continue;
                 }
                 let mut v1 = 1.0;
@@ -336,7 +326,7 @@ impl Explosions {
                 let nl = up.len();
                 k[8] = if nl < 1e-4 { [0.0, 1.0, 0.0, r] } else { [up.x / nl, up.y / nl, up.z / nl, r] };
                 k[9] = [s.ring_width, s.ring_bright * v1, mx, frac_of(h) * 8.0];
-                let col = super::rv3(cls + 0xd0);
+                let col = hk::shock_colour(e);
                 k[10] = [col.x, col.y, col.z, s.ring_break];
                 rq = r * 1.03;
                 if !cmd.set_pipeline(&p_ring) {
@@ -352,22 +342,6 @@ impl Explosions {
     }
 }
 
-
-/// Calls `f` with every live explosion, in the list's order.
-pub fn for_each_explosion(mut f: impl FnMut(usize)) {
-    let head = unsafe { engine::rd::<usize>(EXPLOSION_HEAD) };
-    if head == 0 {
-        return;
-    }
-    let mut n = field(head, 0);
-    let mut guard = 0;
-    while n != 0 && n != head && guard < 100_000 {
-        let next = field(n, 0);
-        f(field(n, 8));
-        n = next;
-        guard += 1;
-    }
-}
 
 fn hash_pos(p: V3) -> u32 {
     let mut h = 0x811c9dc5u32;

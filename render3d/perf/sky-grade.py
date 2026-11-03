@@ -189,7 +189,7 @@ def main():
     dump, only = args[0], set(args[1:])
     write = '--write' in sys.argv
     for r in sorted(os.listdir(dump)):
-        recipe = os.path.join(HERE, '..', 'skies', r + '.ini')
+        recipe = os.path.join(HERE, '..', 'content', 'sky', r + '.ini')
         if not os.path.exists(recipe) or (only and r not in only):
             continue
         if r == 'mbgblue' and 'mbg02' in os.listdir(dump) and (not only or 'mbg02' in only):
@@ -232,7 +232,7 @@ def main():
         if write:
             write_grade(recipe, g, c)
             if r == 'mbg02':
-                write_grade(os.path.join(HERE, '..', 'skies', 'mbgblue.ini'), g, c)
+                write_grade(os.path.join(HERE, '..', 'content', 'sky', 'mbgblue.ini'), g, c)
 
 
 if __name__ == '__main__':

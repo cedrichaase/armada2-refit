@@ -102,7 +102,10 @@ pub fn installed() -> &'static [Installed] {
     unsafe { &INSTALLED }
 }
 
-/// An owner's view of the registry: its id, name and gate, given to its `hooks()`.
+/// An owner's view of the registry: its id, name and gate, given to its `hooks()`. A
+/// module may keep a copy (`Clone`) to install at its first frame instead, when other
+/// plugins have loaded and checked the sites they patch themselves (effects).
+#[derive(Clone)]
 pub struct Hooks {
     owner: ModuleId,
     name: &'static str,

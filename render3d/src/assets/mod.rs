@@ -150,6 +150,15 @@ pub fn odf(name: &str) -> Option<Rc<Odf>> {
     v
 }
 
+/// An ODF file name without its extension (any case); the name as it is if it has none.
+/// The one strip for what the engine's `GetOdfName` returns.
+pub fn odf_stem(name: &str) -> &str {
+    match name.len().checked_sub(4) {
+        Some(n) if name.is_char_boundary(n) && name[n..].eq_ignore_ascii_case(".odf") => &name[..n],
+        _ => name,
+    }
+}
+
 /// The SOD an ODF's objects draw, lower case and without extension: its `baseName`
 /// when it sets one (`kmartok` draws `kbattle`, `kprison` draws `kbase`), else its own
 /// name. Every SOD looked up for a game object goes through this; `ScaleSOD` and the

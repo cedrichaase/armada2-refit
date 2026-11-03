@@ -93,41 +93,54 @@ pub fn get() -> Option<&'static Config> {
 /// One section of an ini, read key by key with the caller's defaults (README.md,
 /// "Modules and settings": each module reads every section it owns through this, in its
 /// `configure`). Keys with a settings row are read through the row instead.
-pub struct Section(&'static str, Ini);
+pub struct Section<'a>(&'static str, Source<'a>);
 
-impl Section {
+/// The ini a section reads: its own handle on a file, or the one `configure` was given.
+enum Source<'a> {
+    Own(Ini),
+    Given(&'a Ini),
+}
+
+impl<'a> Section<'a> {
     /// A section of `Render3D.ini`.
-    pub fn new(name: &'static str) -> Section {
-        Section(name, ini())
+    pub fn new(name: &'static str) -> Section<'static> {
+        Section(name, Source::Own(ini()))
     }
     /// A section of another ini.
-    pub fn with(ini: Ini, name: &'static str) -> Section {
-        Section(name, ini)
+    pub fn with(ini: Ini, name: &'static str) -> Section<'static> {
+        Section(name, Source::Own(ini))
+    }
+    /// A section of an ini already open: what a module's `configure` was given.
+    pub fn of(ini: &'a Ini, name: &'static str) -> Section<'a> {
+        Section(name, Source::Given(ini))
     }
     /// The ini it reads (for sections named at run time).
     pub fn ini(&self) -> &Ini {
-        &self.1
+        match &self.1 {
+            Source::Own(i) => i,
+            Source::Given(i) => i,
+        }
     }
     pub fn f(&self, key: &str, def: f32) -> f32 {
-        self.1.float(self.0, key, def)
+        self.ini().float(self.0, key, def)
     }
     pub fn i(&self, key: &str, def: i32) -> i32 {
-        self.1.int(self.0, key, def)
+        self.ini().int(self.0, key, def)
     }
     /// A colour as `r,g,b` in 0..255, returned in 0..1.
     pub fn rgb(&self, key: &str, def: [f32; 3]) -> V3 {
-        let c = self.1.floats(self.0, key, def);
+        let c = self.ini().floats(self.0, key, def);
         v3(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
     }
     /// Three plain floats.
     pub fn v3(&self, key: &str, def: [f32; 3]) -> V3 {
-        let c = self.1.floats(self.0, key, def);
+        let c = self.ini().floats(self.0, key, def);
         v3(c[0], c[1], c[2])
     }
     pub fn pair(&self, key: &str, def: [f32; 2]) -> [f32; 2] {
-        self.1.floats(self.0, key, def)
+        self.ini().floats(self.0, key, def)
     }
     pub fn s(&self, key: &str) -> Option<alloc::string::String> {
-        self.1.string(self.0, key)
+        self.ini().string(self.0, key)
     }
 }
