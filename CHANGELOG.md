@@ -5,6 +5,21 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.91.0 — 2026-11-03
+
+Layers: testbench 3.99.0.
+
+### Added
+- `layers.toml`, the layer registry: one `[[layer]]` per layer (id, name, dir, install, remove, files, replaces, backups, select, requires, scope, games, steps, summary) and the release's `::step` order; `rules` is registered on qol's folder and installer until it has its own.
+- `tools/layers.py` (`--list`, `--resolve [--only|--without] [--commands]`, `--files`, `--json`, `--check`), its only reader, and `tools/layers-selftest.py`; CI's publishable job runs both. `--check` fails when a2mod, `install.sh`'s and `install.ps1`'s `::step` ids, `package.sh`'s manifest `steps` or the GUI installer's `STEPS`/`STATUS` disagree with the registry.
+- `./install --only a,b`, `--without a,b` and `--list`: a selectable layer not selected is taken out with its `remove`; plain `./install` is every core and `on` layer.
+
+### Changed
+- `./install` runs the registry's commands and now installs Online.asi (the online layer) as well.
+- `a2mod` takes its layers, added files and backup suffixes from the registry: `stock` now sets Online.asi/.ini aside (it was left live), `status` gains `rules` and `online` rows, and every entry of an existing snapshot is re-filed by the registry when read (QOLRules.* from qol to rules; the per-part plugins under `parts`, MenuScale.* under `menuscale`). The snapshot layout is unchanged.
+
+Installed, not yet seen in game
+
 ## 13.86.2 — 2026-11-03
 
 Layers: testbench 3.98.2.

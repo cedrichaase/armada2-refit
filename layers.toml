@@ -1,0 +1,309 @@
+# The layer registry: every layer of this project, once. tools/layers.py is its only
+# reader; ./install, a2mod and the test bench (--layers, `Layers:`) take the layer list
+# from it, and `tools/layers.py --check` (CI) fails when the release scripts' ::step ids,
+# publish/package.sh's steps or the GUI installer's STATUS keys disagree with it.
+#
+# One [[layer]] per layer, in install order (./install runs them top to bottom):
+#
+#   id, name, dir   the id the tools use, a name for people, the folder it lives in
+#   install         the command ./install runs (a string, or a list run in order), from
+#                   the repository root; remove takes the layer out again
+#   files           what a2mod files under this layer: files ./install ADDS to the game
+#                   directory (relative to it; globs allowed, the name matched without
+#                   regard to case)
+#   replaces        stock files the layer changes in place, beside a .a2neb-backup: a2mod
+#                   finds them by the backup and files each under the layer whose pattern
+#                   is most specific (Textures/RGB/Curs_* before Textures/RGB/*)
+#   backups         backup suffixes of the layer's own: every file with one is its
+#   select          core     always installed, not offered (platform, display, renderer)
+#                   on       offered, on by default
+#                   off      offered, off by default
+#                   legacy   installed only by the release's d3d9-less fallback
+#                   retired  never installed; only recognised (a2mod files a stale copy
+#                            under it, and the installers take it out)
+#   requires        ids this layer needs; ./install --only adds them, --without refuses
+#                   to take one out from under a layer that needs it
+#   scope           local    stays on this player's machine
+#                   match    every player of a network game must run it
+#   games           the games it is for (PLAN-ARMADA1.md, PLAN-FLEETOPS.md)
+#   steps           the release scripts' ::step ids it installs under (publish/installer)
+#   summary         one sentence, for the installers
+#
+# A selectable layer (on or off) that a run of ./install does not select is taken out
+# with its remove. ./install keeps no memory of the selection.
+
+schema = 1
+
+[release]
+# The ::step ids publish/installer/install.sh and install.ps1 print, in order, and
+# publish/package.sh's manifest `steps`. `own` are the steps of no layer; `extra` the
+# ones printed outside that order (--uninstall).
+steps = ['verify', 'prereqs', 'chain', 'display', 'render3d', 'ui', 'qol', 'models',
+         'online', 'cutscenes', 'renderer', 'bloom', 'done']
+own = ['verify', 'done']
+extra = ['uninstall']
+
+# ---------------------------------------------------------------- core
+
+[[layer]]
+id = 'platform'
+name = 'Platform'
+dir = 'platform'
+install = 'python3 platform/d3d8-chain.py --upgrade'
+remove = 'python3 platform/d3d8-chain.py --revert'
+files = []
+select = 'core'
+requires = []
+scope = 'local'
+games = ['armada2']
+steps = ['prereqs', 'chain']
+summary = "the Direct3D chain (crosire's d3d8to9 on DXVK's d3d9), the widescreen patch and the ASI loader; a2mod never switches it"
+
+[[layer]]
+id = 'display'
+name = 'Display8'
+dir = 'display'
+install = 'display/install'
+remove = 'display/install --remove'
+files = ['d3d8_real.dll', 'Display8.ini']
+backups = ['.a2display-backup']
+select = 'core'
+requires = ['platform']
+scope = 'local'
+games = ['armada2']
+steps = ['display']
+summary = "the game's Direct3D 8, ours, in front of the real chain"
+
+[[layer]]
+id = 'renderer'
+name = 'Renderer'
+dir = 'renderer'
+install = 'renderer/renderer-config.sh --stage 3'
+remove = 'renderer/renderer-config.sh --remove'
+files = ['dxvk.conf']
+select = 'core'
+requires = []
+scope = 'local'
+games = ['armada2']
+steps = ['renderer']
+summary = '16x anisotropic filtering, LOD bias, seamless cube maps (read by DXVK)'
+
+# ---------------------------------------------------------------- selectable
+
+[[layer]]
+id = 'qol'
+name = 'Quality of life'
+dir = 'qol'
+install = 'qol/install.sh'
+remove = 'qol/install.sh --remove'
+files = ['QOL.asi', 'QOL.ini']
+select = 'on'
+requires = []
+scope = 'local'
+games = ['armada2']
+steps = ['qol']
+summary = 'right-drag pan speed, bigger selections and control groups; plays against stock players'
+
+# Shares qol's folder and installer until it has its own (rules/, phase 9 W-RULES):
+# until then qol/install.sh puts both in, so --without rules takes QOLRules out only
+# when qol goes too.
+[[layer]]
+id = 'rules'
+name = 'Rules'
+dir = 'qol'
+install = 'qol/install.sh'
+remove = 'qol/install.sh --remove'
+files = ['QOLRules.asi', 'QOLRules.ini']
+select = 'on'
+requires = []
+scope = 'match'
+games = ['armada2']
+steps = ['qol']
+summary = 'pay for an item when it is queued; against the computer only, it stands down online'
+
+[[layer]]
+id = 'online'
+name = 'Online'
+dir = 'online'
+install = 'online/install.sh'
+remove = 'online/install.sh --remove'
+files = ['Online.asi', 'Online.ini']
+select = 'on'
+requires = []
+scope = 'match'
+games = ['armada2']
+steps = ['online']
+summary = 'online multiplayer that works under Wine/Proton: the Internet - Online entry, join codes, no port forwarding'
+
+[[layer]]
+id = 'textures'
+name = 'Textures'
+dir = 'textures'
+install = './a2tex install'
+remove = './a2tex revert all'
+files = []
+replaces = ['Textures/RGB/*']
+select = 'on'
+requires = []
+scope = 'local'
+games = ['armada2']
+steps = []
+summary = 'remastered textures built from your own game files with ./a2tex; a release cannot carry them'
+
+[[layer]]
+id = 'models'
+name = 'Models'
+dir = 'models'
+install = 'models/install.sh'
+remove = 'models/install.sh --remove'
+files = []
+replaces = ['SOD/*']
+select = 'on'
+requires = []
+scope = 'local'
+games = ['armada2']
+steps = ['models']
+summary = 'moons, asteroids, selection bubble and hulls smoothed from your own files'
+
+[[layer]]
+id = 'cutscenes'
+name = 'Cutscene player'
+dir = 'cutscenes'
+install = 'cutscenes/binkproxy/install.sh'
+remove = 'cutscenes/binkproxy/install.sh --remove'
+# Movies count only beside a <Name>.bik of the same name (a2mod).
+files = ['binkw32_orig.dll', 'BinkProxy.ini', 'animations/*.mp4', 'animations/*.wav']
+replaces = ['binkw32.dll']
+select = 'on'
+requires = []
+scope = 'local'
+games = ['armada2']
+steps = ['cutscenes']
+summary = 'launch reels full screen and AV1 movie replacements; the stock binkw32.dll is kept'
+
+[[layer]]
+id = 'render3d'
+name = '3D view'
+dir = 'render3d'
+install = 'render3d/install.sh'
+remove = 'render3d/install.sh --remove'
+files = ['Render3D.asi', 'Render3D.ini', 'Surfaces/*.ini', 'Nebulae/*.ini']
+select = 'on'
+requires = ['display']
+scope = 'local'
+games = ['armada2']
+steps = ['render3d']
+summary = 'the 3D view through a renderer of our own: HDR, anti-aliasing, bloom, lit hulls with shadows, skies, effects, planets and nebulae'
+
+# The menu backdrop plates are built by menus/backdrop.sh and filed under menus (a2mod),
+# but go in with the UI, which draws them behind the main menu.
+[[layer]]
+id = 'ui'
+name = 'HUD and menus'
+dir = 'ui'
+install = ['menus/install-plates.sh', 'ui/install.sh']
+remove = ['ui/install.sh --remove', 'menus/install-plates.sh --remove']
+files = ['UI.asi', 'UI.ini']
+select = 'on'
+requires = ['display']
+scope = 'local'
+games = ['armada2']
+steps = ['ui']
+summary = 'the HUD, the menus, the loading screen and the cursor redrawn at any aspect ratio'
+
+# ---------------------------------------------------------------- legacy: what the release
+# installs in the UI's place where Display8 has no Direct3D 9 behind it
+
+[[layer]]
+id = 'hud'
+name = 'HUD (legacy)'
+dir = 'hud'
+install = 'hud/install.sh'
+remove = 'hud/install.sh --remove'
+files = ['HUD.asi', 'HUD.ini']
+# Before hud 2.0.0: the file-based fixes (ui-widescreen, ui-font-condense, cursor-aspect).
+replaces = ['misc/*', 'Textures/RGB/Curs_*']
+backups = ['.a2font-backup']
+select = 'legacy'
+requires = []
+scope = 'local'
+games = ['armada2']
+steps = ['ui']
+summary = 'in-game HUD, font and cursors at any aspect'
+
+[[layer]]
+id = 'menus'
+name = 'Menus (legacy)'
+dir = 'menus'
+install = 'menus/install.sh'
+remove = 'menus/install.sh --remove'
+files = ['Menus.asi', 'Menus.ini', 'Menus/*.bmp']
+select = 'legacy'
+requires = []
+scope = 'local'
+games = ['armada2']
+steps = ['ui']
+summary = 'the shell menus scaled to fill the screen'
+
+[[layer]]
+id = 'grid'
+name = 'Grid keys (legacy)'
+dir = 'grid'
+install = 'grid/install.sh'
+remove = 'grid/install.sh --remove'
+files = ['GridLayout.asi', 'GridLayout.ini']
+select = 'legacy'
+requires = []
+scope = 'local'
+games = ['armada2']
+steps = ['ui']
+summary = 'the button bar as a 5x3 grid of position keys'
+
+# ---------------------------------------------------------------- retired: recognised only
+
+# The per-part plugins render3d replaced (render3d 0.2.0; Planets in models 5.0.0), and
+# Sky.asi's recipes. render3d/install.sh and the release scripts take them out.
+[[layer]]
+id = 'parts'
+name = 'Per-part plugins (retired)'
+dir = 'render3d'
+files = ['MSAA.asi', 'MSAA.ini', 'Lighting.asi', 'Lighting.ini', 'Sky.asi', 'Sky.ini',
+         'Nebulae.asi', 'Nebulae.ini', 'Surfaces.asi', 'Surfaces.ini',
+         'Explosions.asi', 'Explosions.ini', 'Shields.asi', 'Shields.ini',
+         'Repair.asi', 'Repair.ini', 'Venting.asi', 'Venting.ini',
+         'Specials.asi', 'Specials.ini', 'Fog.asi', 'Fog.ini', 'Planets.asi', 'Planets.ini',
+         'Sky/*.ini']
+select = 'retired'
+requires = []
+scope = 'local'
+games = ['armada2']
+steps = []
+summary = 'the plugins that drew parts of the 3D view one at a time, before Render3D.asi'
+
+# Menus.asi before menus 2.0.0. menus/install.sh, ui/supersede.sh and the release scripts
+# take it out.
+[[layer]]
+id = 'menuscale'
+name = 'MenuScale (retired)'
+dir = 'menus'
+files = ['MenuScale.asi', 'MenuScale.ini', 'MenuScale/*.bmp']
+select = 'retired'
+requires = []
+scope = 'local'
+games = ['armada2']
+steps = []
+summary = 'the menus plugin before it was Menus.asi'
+
+# The vkBasalt bloom before 13.0.0, outside the game directory: ./install and the
+# release scripts (step bloom) take it out.
+[[layer]]
+id = 'vkbasalt'
+name = 'vkBasalt bloom (retired)'
+dir = 'renderer'
+files = []
+select = 'retired'
+requires = []
+scope = 'local'
+games = ['armada2']
+steps = ['bloom']
+summary = 'the per-user vkBasalt bloom, replaced by Render3D.asi'

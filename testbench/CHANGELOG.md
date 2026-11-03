@@ -5,6 +5,16 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.99.0 — 2026-11-03
+
+### Added
+- `--layers a,b` on `a2test session start` and `a2test run`, and the scenario header `Layers: a b`: each `--install` checkout runs `./install --only` them into a clone from stock (this checkout's when none is given); the run's flag overrides the header. The session log's `layers=`, each case's `result.json` and its report heading record them.
+
+### Changed
+- The stock cache's key also hashes `layers.toml` and `tools/layers.py`, since what `a2mod stock` sets aside is the registry's.
+
+Installed, not yet seen in game
+
 ## 3.98.2 — 2026-11-03
 
 ### Fixed

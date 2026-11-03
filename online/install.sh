@@ -8,7 +8,7 @@
 # NetworkManager.dll is patched in memory only.  Removing the three files is a
 # complete uninstall, so there is no backup to keep.
 #
-# Not run by ./install yet: not seen in game.  Internet - Online runs on our
+# Run by ./install (the online layer, layers.toml).  Internet - Online runs on our
 # own transport and finds players through Server= (c20e.de by default); the
 # other connection types stay on Wine's builtin dpnet.dll, which cannot host
 # (README.md).

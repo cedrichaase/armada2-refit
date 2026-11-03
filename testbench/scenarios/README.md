@@ -29,6 +29,10 @@ Sheet: 1 ship, 6 ships, 30 ships          (shot names: <scenario>/sheet.png in t
                                            a row per case and a column per shot)
 Clock: bench                              (the plugins' animation clock on the simulation's
                                            time: ../README.md, "A frame that repeats")
+Layers: display render3d                  (only these of layers.toml: ./install --only them
+                                           into a clone from stock, this checkout's unless
+                                           --install names others; `a2test run --layers`
+                                           overrides it. ../README.md, "Installing a subset")
 Timeout: 12 min
 
 Any prose is description.

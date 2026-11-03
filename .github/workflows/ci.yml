@@ -51,6 +51,8 @@ jobs:
             publish/check.sh "$c" || fail=1
           done
           exit $fail
+      - name: The layer registry against a2mod, the release scripts and the GUI (tools/layers.py --check)
+        run: python3 tools/layers.py --check && python3 tools/layers-selftest.py
 
   # render3d builds Render3D.asi from Rust (no_std, i686-pc-windows-msvc, lld-link) and
   # tests its asset readers on the host (the tests that need a game install skip).

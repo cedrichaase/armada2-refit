@@ -15,6 +15,7 @@ against it. Each run leaves a report with screenshots, logs and every verdict.
 
     ./a2test session start --res 16:10       # a live session to drive by hand; prints its ID
     ./a2test session start --install .       # this checkout's ./install, from stock
+    ./a2test session start --install . --layers display,render3d   # ... only these layers (layers.toml)
     ./a2test session start --res 800x600 --mod stock --stock-shell embed   # the stock baseline, menus clickable
     ./a2test session start --assets none --install .   # as a release installs it: no textures, plates, movies
     A2_DATA=$(mktemp -d) ./a2test session start --install .   # ... as without any assets
@@ -123,7 +124,7 @@ a separate track and the mix is made in the edit (`films/README.md`, "Sound").
 | Stage | What | Why this way |
 |---|---|---|
 | clone | `cp -a --reflink=always` of the game (4.5 GB) and the prefix (558 MB) into `~/.cache/a2test/sessions/<id>/`. A case that starts from stock (`Mod: stock`, `--install`, `--assets none`) copies the game from the stock cache instead (below) | btrfs: 0.7 s and no space. Must be the same filesystem as the game |
-| prepare | `ARMADA.PRF` line 5 set to the resolution, then `ui/install.sh` with `A2_GAME=<clone>`: this checkout's `UI.asi` in, and what it supersedes taken out (`HUD.asi`, `GridLayout.asi`, `Menus.asi`, the file-based HUD fixes: `ui/README.md`, "Installing"). For `Mod: stock`, `a2mod stock` on the clone instead. With `--install PATH` (repeatable), `a2mod stock` and then each `PATH/install` in order, so the case shows exactly those checkouts; the log's `installs=` names each one's commit (`-dirty` if uncommitted). The `a2mod stock` comes done from the stock cache, and `prepare.log` carries its output from when the entry was made | `UI.asi` takes no resolution, so every case runs the same install: a pass at every aspect is what it claims |
+| prepare | `ARMADA.PRF` line 5 set to the resolution, then `ui/install.sh` with `A2_GAME=<clone>`: this checkout's `UI.asi` in, and what it supersedes taken out (`HUD.asi`, `GridLayout.asi`, `Menus.asi`, the file-based HUD fixes: `ui/README.md`, "Installing"). For `Mod: stock`, `a2mod stock` on the clone instead. With `--install PATH` (repeatable), `a2mod stock` and then each `PATH/install` in order (with `--only` the `--layers`, below), so the case shows exactly those checkouts; the log's `installs=` names each one's commit (`-dirty` if uncommitted). The `a2mod stock` comes done from the stock cache, and `prepare.log` carries its output from when the entry was made | `UI.asi` takes no resolution, so every case runs the same install: a pass at every aspect is what it claims |
 | display | `sway` with `WLR_BACKENDS=headless`, one output at exactly the resolution, `xwayland force` | the game gets the same Xwayland path it has under Hyprland, and nothing appears on the desktop |
 | input | `input/a2input`: a wlr virtual pointer and virtual keyboard on sway's seat, fed through a FIFO | see "Input" |
 | game | `umu_run.py` with Heroic's environment, the clone as `WINEPREFIX`/`STEAM_COMPAT_DATA_PATH`; silent: `winepulse.drv=d;winealsa.drv=d` | see "Traps" |
@@ -194,6 +195,19 @@ its pointer's enter and leave, locks and confinements; large, so for short runs)
 (`scene/README.md`, "Marks"), `Stems.log` and `Stems.ini`, the clone's `ARMADA.PRF`,
 `Menus.ini`, `Render3D.ini` and `dxvk.conf`, `exception.txt` if the game crashed, and
 anything new in the game's `Logs/`.
+
+### Installing a subset
+
+`--layers display,render3d` (`a2test session start`, `a2test run`) and a scenario's
+`Layers: display render3d` install only those layers of the registry (`layers.toml`;
+`./install --list` names them): each `--install` checkout runs `./install --only` them,
+into a clone that starts from stock, this checkout's when no `--install` is given. The
+core layers (platform, display, renderer) are always in, a layer's requirements are
+added, and a layer not named is taken out with its `remove`, a no-op on a clone from
+stock. `a2test run --layers` overrides a scenario's `Layers:`; neither goes with
+`Mod: stock`. The session log's `layers=` and each case's `result.json` and report
+heading record the selection. A checkout from before the registry has no `--only`, so
+its `./install` fails the prepare step.
 
 ## Audio stems
 
