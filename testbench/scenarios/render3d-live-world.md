@@ -81,8 +81,11 @@ scene is `render3d-live-world-nebula`.
 62. Wait up to 20 seconds for the logs the next steps expect.
 63. Expect "Render3D.log" contains "Overlays.Selection=0"
 64. Wait 3 seconds.
-65. Overlay --unset Render3D.Overlays:Fog Render3D.Overlays:Grid Render3D.Overlays:Selection Render3D.Overlays:Ghosts
-66. Wait 3 seconds.
-67. Take a screenshot called "showcase".
-68. Expect the shot "showcase" matches the baseline "roundD-base-port-showcase" within rmse 0.
-69. Expect no crash.
+65. Overlay --unset Render3D.Overlays:Fog
+66. Overlay --unset Render3D.Overlays:Grid
+67. Overlay --unset Render3D.Overlays:Selection
+68. Overlay --unset Render3D.Overlays:Ghosts
+69. Wait 3 seconds.
+70. Take a screenshot called "showcase".
+71. Expect the shot "showcase" matches the baseline "roundD-base-port-showcase" within rmse 0.
+72. Expect no crash.
