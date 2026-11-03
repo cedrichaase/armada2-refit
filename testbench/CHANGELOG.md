@@ -5,6 +5,11 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 4.0.3 — 2026-11-03
+
+### Fixed
+- `gui-installer/test.sh` expectations for the package without the Direct3D 9 chain (root 15.6.2). Installed, not yet seen in game.
+
 ## 4.0.2 — 2026-11-03
 
 ### Fixed

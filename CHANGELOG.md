@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.2 — 2026-11-03
+
+Layers: testbench 4.0.3.
+
+### Fixed
+- `gui-installer/test.sh`: the pre-14.3.0 package section gives the old installer the chain and legacy plugin stand-ins 15.6.0 removed from the package, and the older-install section re-points `retire.txt` at its stand-in `d3d9.dll`, since an unknown `d3d9.dll` is no longer touched. Installed, not yet seen in game.
+
 ## 15.6.1 — 2026-11-03
 
 Layers: testbench 4.0.2.
