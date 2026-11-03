@@ -39,7 +39,7 @@ LAYERS = {'menus': ('Menus.asi', 'Menus.ini'),
           'grid': ('GridLayout.asi', 'GridLayout.ini')}
 # what a tag's archive needs to build them: the plugins, the C base, the version resource
 PATHS = ['menus', 'hud', 'grid', 'csdk', 'platform/versioninfo', 'platform/vendor/d3d8to9-1.16.0',
-         'platform/vendor/dxvk-3.1.1', 'LICENSE', 'CHANGELOG.md', 'a2env.sh', 'a2env.py']
+         'platform/vendor/dxvk-3.1.1', 'textures/tools', 'textures/lib', 'LICENSE', 'CHANGELOG.md', 'a2env.sh', 'a2env.py']
 EMBED_INI = ('; written by the Armada II test bench: stock shell, embedded only\r\n'
              '[Menus]\r\nMode=1\r\nDesignWidth=800\r\nDesignHeight=600\r\nIntegerScale=1\r\n'
              'Smooth=0\r\nRaiseShellMode=0\r\nEmbed=1\r\nEscapeReturns=0\r\nUnderlay=0\r\n'
@@ -80,7 +80,7 @@ def ensure(tag=TAG, say=print):
         shutil.copy2(tmp / 'platform/vendor/dxvk-3.1.1/d3d9.dll', stage / 'chain/d3d9.dll')
         # the hud scripts, to apply to a clone (the build products stay out)
         tree = stage / 'tree'
-        for p in ('hud', 'a2env.sh', 'a2env.py'):
+        for p in ('hud', 'textures/tools', 'textures/lib', 'a2env.sh', 'a2env.py'):
             src = tmp / p
             if src.is_dir():
                 shutil.copytree(src, tree / p, ignore=shutil.ignore_patterns('build', '*.c', '*.def'))

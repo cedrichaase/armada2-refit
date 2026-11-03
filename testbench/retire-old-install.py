@@ -32,8 +32,15 @@ IGNORE_NAMES = ('RefitPlayer.ini', 'UIPlayer.ini', 'ARMADA.PRF', 'exception.txt'
 
 
 def sha(path):
-    h = hashlib.sha256()
+    """sha256 of a file; of a PE file we build (`.asi`, `.dll`) with the header's
+    TimeDateStamp zeroed, since two builds of one source differ in the linker's clock."""
     with open(path, 'rb') as f:
+        head = f.read(1 << 20)
+        if path.suffix in ('.asi', '.dll') and head[:2] == b'MZ' and len(head) > 0x40:
+            pe = int.from_bytes(head[0x3c:0x40], 'little')
+            if head[pe:pe + 4] == b'PE\0\0' and pe + 12 <= len(head):
+                head = head[:pe + 8] + b'\0\0\0\0' + head[pe + 12:]
+        h = hashlib.sha256(head)
         for chunk in iter(lambda: f.read(1 << 20), b''):
             h.update(chunk)
     return h.hexdigest()
@@ -41,7 +48,8 @@ def sha(path):
 
 def snapshot(game):
     files = [p for p in game.rglob('*') if p.is_file() and not p.is_symlink()]
-    files = [p for p in files if p.name not in IGNORE_NAMES and not p.name.endswith(IGNORE_SUFFIX)]
+    files = [p for p in files if p.name not in IGNORE_NAMES and not p.name.endswith(IGNORE_SUFFIX)
+             and '.a2mod' not in p.relative_to(game).parts]
     with concurrent.futures.ThreadPoolExecutor(8) as pool:
         digests = list(pool.map(sha, files))
     return {str(p.relative_to(game)): d for p, d in zip(files, digests)}
@@ -72,6 +80,10 @@ def main():
         say('FAIL the seed did not put an old install in')
         return finish(game, out, 1)
 
+    # The clone came from the stock cache, so a2mod holds it in stock, and retire.sh leaves
+    # the file-based fixes' backups alone then (retire/hud-files.py). A player's old install
+    # is not held: take the state away, as an install that never saw a2mod has none.
+    (game / '.a2mod' / 'state.json').unlink(missing_ok=True)
     data = work / 'no-assets' if st.get('assets') == 'none' else config.DATA
     data.mkdir(exist_ok=True)
     env = dict(os.environ, A2_GAME=str(game), A2_GAME_DIR=str(game), A2_DATA=str(data),
@@ -95,6 +107,9 @@ def main():
     for n in sorted(set(a) | set(b)):
         if n in CHAIN:
             continue
+        if n not in b and n.endswith(('.a2neb-backup', '.a2font-backup')) \
+                and n.rsplit('.', 1)[0] in a and a.get(n.rsplit('.', 1)[0]) == b.get(n.rsplit('.', 1)[0]):
+            continue        # a2mod's own backup of a stock file, dropped beside a file now stock again
         if n not in b:
             bad.append(f'missing after the install: {n}')
         elif n not in a:
@@ -102,7 +117,7 @@ def main():
         elif a[n] != b[n]:
             bad.append(f'differs from the refit install: {n}')
     for n in CHAIN:
-        if n in b and n in seeded and b[n] != seeded[n]:
+        if n in b and b[n] not in (seeded.get(n), a.get(n)):
             bad.append(f'chain file changed, neither left nor removed: {n}')
         say(f'  chain class {n}: ' + ('left in place' if n in b else 'removed'))
     if (game / 'MenuScale').exists():
