@@ -27,9 +27,12 @@
 //!
 //! The clock is the sim clock (`View::time`): the effect stops while the game is
 //! paused, as every cosmetic simulation of render3d does.
-use super::{object_of, rnd, Cam, LightPool, Sec};
+use super::content::{FAC_DEF, FAC_KEY, NFAC, SITE_NAME};
+use super::hooks::shields as hk;
+use super::hooks::object_of;
+use super::{blank, rnd, Cam, LightPool, Sec};
 use gpu::{Blend, Block, Cmd, Topology};
-use crate::engine::{self, field, field_u8, hook, obj, rd};
+use crate::engine::obj;
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::log;
@@ -39,31 +42,6 @@ use crate::shaders::effects_shields_spv::*;
 use crate::shaders::effects_shields_dxil::*;
 use alloc::string::String;
 use alloc::vec::Vec;
-
-const SHIELD_LIST: usize = 0x736de8;
-const SHIELD_NIL: usize = 0x736e38;
-const SHIELD_LOGICAL_DB: usize = 0x736ddc;
-const SHIELD_MATERIAL: usize = 0x736e2c; // what ShieldEffect::Render hands DrawShield
-const FN_DRAWSHIELD: usize = 0x474070;
-const FN_CREATE_HIT: usize = 0x4743b0;
-const SHIELD_TYPE_NAMES: usize = 0x6b00e0;
-const FN_GET_SHIELD_TYPE: usize = 0x474720;
-const HIT_SITES: [usize; 4] = [0x58bb95, 0x58cad8, 0x58d502, 0x58dd65];
-const SITE_NAME: [&str; 4] = ["beam", "shot", "mine", "missile"];
-
-const HIT_MODEL: usize = 0x7c;
-const HIT_MODEL_RADIUS: usize = 0x40;
-const HIT_SCALE: usize = 0x28;
-const HIT_LEFT: usize = 0x84;
-const HIT_TIMED: usize = 0x88;
-const HIT_HANDLE: usize = 0x8c;
-const HIT_XFORM: usize = 0x90;
-const HIT_SHIELDS: usize = 0xc0;
-
-const NFAC: usize = 7;
-const FAC_KEY: [&str; NFAC] = ["Federation", "Klingon", "Romulan", "Borg", "Cardassian", "Species8472", "Other"];
-const FAC_DEF: [[f32; 3]; NFAC] =
-    [[90.0, 170.0, 255.0], [12.0, 255.0, 6.0], [90.0, 255.0, 130.0], [110.0, 255.0, 120.0], [255.0, 200.0, 80.0], [255.0, 140.0, 40.0], [140.0, 200.0, 255.0]];
 
 #[derive(Clone, Copy, PartialEq)]
 enum ColMode {
@@ -302,74 +280,12 @@ struct Down {
     st: [Strike; 6],
 }
 
-// ---- the weapons: which one made a hit -------------------------------------------
-
-#[derive(Clone, Copy)]
-struct Made {
-    id: i32,
-    site: usize,
-    damage: f32,
-}
-
-const NMADE: usize = 64;
-static mut MADE: [Made; NMADE] = [Made { id: -1, site: 0, damage: -1.0 }; NMADE];
-static mut MADE_NEXT: usize = 0;
-static mut PREV_CREATE: [usize; 4] = [0; 4];
-static mut SH_ORD: usize = 0;
-static mut SH_SITE: usize = 0;
-
-unsafe extern "C" fn shield_hit(o: usize, m: *const f32, ty: i32, dur: f32, flags: i32) -> i32 {
-    unsafe {
-        let (site, ord) = (SH_SITE, SH_ORD);
-        if site > 3 || PREV_CREATE[site] == 0 {
-            return -1;
-        }
-        let f: unsafe extern "C" fn(usize, *const f32, i32, f32, i32) -> i32 = core::mem::transmute(PREV_CREATE[site]);
-        let id = f(o, m, ty, dur, flags);
-        if id >= 0 && ord != 0 {
-            let cls = field(ord, 0x34);
-            let mut dmg = -1.0f32;
-            if cls != 0 {
-                dmg = rd::<f32>(cls + 0xa8 + 0x14);
-                if !(dmg >= 0.0 && dmg < 100000.0) {
-                    dmg = -1.0;
-                }
-            }
-            MADE[MADE_NEXT] = Made { id, site, damage: dmg };
-            MADE_NEXT = (MADE_NEXT + 1) % NMADE;
-        }
-        id
-    }
-}
-
-macro_rules! thunk {
-    ($name:ident, $n:literal) => {
-        #[unsafe(naked)]
-        unsafe extern "C" fn $name() {
-            core::arch::naked_asm!(
-                "mov dword ptr [{ord}], ebx",
-                concat!("mov dword ptr [{site}], ", $n),
-                "jmp {f}",
-                ord = sym SH_ORD,
-                site = sym SH_SITE,
-                f = sym shield_hit,
-            )
-        }
-    };
-}
-thunk!(thunk0, 0);
-thunk!(thunk1, 1);
-thunk!(thunk2, 2);
-thunk!(thunk3, 3);
-
-fn made_of(id: i32) -> Option<Made> {
-    unsafe { (*core::ptr::addr_of!(MADE)).iter().copied().find(|m| m.id == id) }
-}
-
 // ---- the module part ---------------------------------------------------------------
 
 pub struct Shields {
     pub on: bool,
+    /// `Enable=` (and no plugin of its own): the part wants to run.
+    pub want: bool,
     s: Set,
     shells: Vec<Shell>,
     shells_db: usize,
@@ -387,14 +303,28 @@ pub struct Shields {
     logged_hits: u32,
     logged_downs: u32,
     said_first: bool,
-    ini: Sec,
+    /// The special weapons' recipes (`[Shell.<name>]`), read in `configure` by the
+    /// shell type's index in the engine's table.
+    recipes: Vec<Option<Recipe>>,
+}
+
+/// A shell's `[Shell.<name>]`: what the ini says, before the engine's models are known.
+struct Recipe {
+    name: String,
+    on: bool,
+    col: V3,
+    bright: f32,
+    lattice: f32,
+    spot: f32,
+    ring: f32,
 }
 
 impl Shields {
     pub fn new() -> Shields {
-        let c = Sec::new("Shields");
+        let c = Sec::with(blank(), "Shields");
         Shields {
-            on: c.i("Enable", 1) != 0,
+            on: false,
+            want: false,
             s: Set::read(&c),
             shells: Vec::new(),
             shells_db: usize::MAX,
@@ -410,75 +340,73 @@ impl Shields {
             logged_hits: 0,
             logged_downs: 0,
             said_first: false,
-            ini: c,
+            recipes: Vec::new(),
         }
     }
 
-    /// The four weapon calls of `CreateShieldHit`, chained through the thunks.
-    pub fn install(&mut self) {
-        let thunks: [usize; 4] = [thunk0 as *const () as usize, thunk1 as *const () as usize, thunk2 as *const () as usize, thunk3 as *const () as usize];
-        let mut names = String::new();
-        for i in 0..4 {
-            let Some(prev) = hook::call_target(HIT_SITES[i]) else { continue };
-            if hook::patch_call(HIT_SITES[i], prev, thunks[i]) {
-                unsafe { PREV_CREATE[i] = prev };
-                names.push(' ');
-                names.push_str(SITE_NAME[i]);
-                if prev != FN_CREATE_HIT {
-                    names.push_str("(chained)");
+    /// `[Shields]` and the `[Shell.<name>]` of each special weapon's shell type (their
+    /// names are in the engine's table, which is static data).
+    pub fn configure(&mut self, ini: &crate::rt::Ini) {
+        let c = Sec::of(ini, "Shields");
+        self.want = c.i("Enable", 1) != 0;
+        self.s = Set::read(&c);
+        self.recipes = (0..8).map(|_| None).collect();
+        if hk::names_ok() {
+            for k in 0..8 {
+                let Some(name) = hk::type_name(k) else { break };
+                if k < 2 {
+                    continue;
                 }
+                let mut sect = String::from("Shell.");
+                sect.push_str(name);
+                let (dc, db, dl, ds, dr) = default_shell(name, &self.s);
+                let col = ini.floats(&sect, "Colour", dc);
+                self.recipes[k] = Some(Recipe {
+                    name: String::from(name),
+                    on: ini.int(&sect, "On", default_shell_on(name) as i32) != 0,
+                    col: v3(col[0] / 255.0, col[1] / 255.0, col[2] / 255.0),
+                    bright: ini.float(&sect, "Brightness", db),
+                    lattice: ini.float(&sect, "Lattice", dl),
+                    spot: ini.float(&sect, "Spot", ds),
+                    ring: ini.float(&sect, "Ring", dr),
+                });
             }
         }
-        log!("effects: shields: the weapons' hits noted at:{}", names);
+        // Read again, from the new recipes, at the next hit.
+        self.shells.clear();
     }
 
     fn db(k: usize) -> usize {
-        let db = unsafe { rd::<usize>(SHIELD_LOGICAL_DB) };
-        if db == 0 { 0 } else { field(db, k * 4) }
+        hk::db(k)
     }
 
     /// The special weapons' shells: their names from the engine's table, their recipes
     /// from `[Shell.<name>]`.
     fn read_shells(&mut self) {
-        let names_ok = unsafe { rd::<usize>(FN_GET_SHIELD_TYPE + 4) } == SHIELD_TYPE_NAMES;
         self.shells = (0..8).map(|_| Shell::default()).collect();
         self.shells_db = Self::db(2);
         let mut said = String::new();
-        let mut table_end = false;
         for k in 0..8 {
             let model = Self::db(k);
             self.shells[k].model = model;
-            if !names_ok || table_end {
-                continue;
-            }
-            let p = unsafe { rd::<usize>(SHIELD_TYPE_NAMES + k * 4) };
-            if p == 0 {
-                table_end = true;
-                continue;
-            }
             if k < 2 || model == 0 {
                 continue;
             }
-            let name = String::from(unsafe { crate::rt::cstr_at(p as *const u8, 31) });
-            let mut sect = String::from("Shell.");
-            sect.push_str(&name);
-            let ini = self.ini.ini();
-            let on = ini.int(&sect, "On", default_shell_on(&name) as i32) != 0 && self.s.shells;
-            let (dc, db, dl, ds, dr) = default_shell(&name, &self.s);
-            let col = ini.floats(&sect, "Colour", dc);
+            let Some(r) = self.recipes.get(k).and_then(|r| r.as_ref()) else { continue };
+            let on = r.on && self.s.shells;
             let sh = &mut self.shells[k];
             sh.on = on;
-            sh.col = v3(col[0] / 255.0, col[1] / 255.0, col[2] / 255.0);
-            sh.bright = ini.float(&sect, "Brightness", db);
-            sh.lattice = ini.float(&sect, "Lattice", dl);
-            sh.spot = ini.float(&sect, "Spot", ds);
-            sh.ring = ini.float(&sect, "Ring", dr);
+            sh.col = r.col;
+            sh.bright = r.bright;
+            sh.lattice = r.lattice;
+            sh.spot = r.spot;
+            sh.ring = r.ring;
             said.push(' ');
-            said.push_str(&name);
+            said.push_str(&r.name);
             if on {
                 said.push_str(" (ours)");
             }
-            sh.name = name;
+            sh.name = r.name.clone();
         }
         log!("effects: shields: special weapons' shells:{}", said);
     }
@@ -498,7 +426,7 @@ impl Shields {
     }
 
     fn ours(&mut self, hit: usize) -> bool {
-        let model = field(hit, HIT_MODEL);
+        let model = hk::hit_model(hit);
         if self.hit_type(model).is_some() {
             return true;
         }
@@ -508,16 +436,12 @@ impl Shields {
     /// `ShieldEffect::Render` in the engine's place.
     pub fn feature(&mut self, v: &View) -> bool {
         let mut hits = Vec::new();
-        walk(|_, sh| hits.push(sh));
-        let mat = unsafe { rd::<usize>(SHIELD_MATERIAL) };
+        hk::walk(|_, sh| hits.push(sh));
         for sh in hits {
             if sh == 0 || self.ours(sh) {
                 continue;
             }
-            unsafe {
-                let f: unsafe extern "thiscall" fn(usize, usize, usize) = core::mem::transmute(FN_DRAWSHIELD);
-                f(sh, v.cam, mat);
-            }
+            hk::draw_hit(sh, v.cam);
         }
         true
     }
@@ -535,17 +459,17 @@ impl Shields {
             d.seen = false;
         }
         let mut list = Vec::new();
-        walk(|id, sh| list.push((id, sh)));
+        hk::walk(|id, sh| list.push((id, sh)));
         for (id, sh) in list {
             if sh == 0 {
                 continue;
             }
-            let handle = field(sh, HIT_HANDLE) as i32;
+            let handle = hk::hit_handle(sh);
             let o = object_of(handle);
             if o == 0 {
                 continue;
             }
-            let model = field(sh, HIT_MODEL);
+            let model = hk::hit_model(sh);
             if model1 != 0 && model == model1 {
                 let idx = self.downs.iter().position(|d| d.handle == handle);
                 let idx = match idx {
@@ -554,7 +478,7 @@ impl Shields {
                         self.downs.push(Down { handle, seen: false, birth: now, death: -1.0, st: [Strike::default(); 6] });
                         if self.logged_downs < 6 {
                             self.logged_downs += 1;
-                            log!("effects: shields down on {} (hit {}, {})", obj::odf_name(o), id, if field_u8(sh, HIT_TIMED) != 0 { "timed" } else { "untimed" });
+                            log!("effects: shields down on {} (hit {}, {})", obj::odf_name(o), id, if hk::hit_timed(sh) { "timed" } else { "untimed" });
                         }
                         Some(self.downs.len() - 1)
                     }
@@ -578,7 +502,7 @@ impl Shields {
             let idx = match self.hits.iter().position(|h| h.id == id) {
                 Some(i) => Some(i),
                 None if self.hits.len() < 256 => {
-                    let m = made_of(id);
+                    let m = hk::made_of(id);
                     let dmg = if ty == 0 { m.filter(|m| m.damage >= 0.0).map_or(self.s.damage_ref, |m| m.damage) } else { self.s.damage_ref };
                     let strength = libm::sqrtf(dmg / self.s.damage_ref).clamp(self.s.strength_min, self.s.strength_max);
                     let site = if ty != 0 { 0 } else { m.map_or(1, |m| m.site) };
@@ -588,8 +512,8 @@ impl Shields {
                         log!(
                             "effects: shield hit {} on {} by a {}, damage {:.1} -> strength {:.2}; at {:.2} {:.2} {:.2}; stock {:.2} s{}, shields {:.2}",
                             id, obj::odf_name(o), SITE_NAME[site & 3], dmg, strength, dir.x, dir.y, dir.z,
-                            engine::field_f32(sh, HIT_LEFT), if field_u8(sh, HIT_TIMED) != 0 { " left" } else { ", untimed" },
-                            engine::field_f32(sh, HIT_SHIELDS)
+                            hk::hit_left(sh), if hk::hit_timed(sh) { " left" } else { ", untimed" },
+                            hk::hit_shields(sh)
                         );
                     }
                     Some(self.hits.len() - 1)
@@ -736,7 +660,7 @@ impl Shields {
             }
             let Some((a, t, r)) = ship_xform(o) else { continue };
             let (col, bright) = self.look(o, h.ty, now);
-            let mut br = engine::field_f32(field(o, 4), 0x40);
+            let mut br = hk::object_radius(o);
             if !(br > 0.01) {
                 br = r;
             }
@@ -793,7 +717,7 @@ impl Shields {
             if best * lv < 0.01 {
                 continue;
             }
-            let mut br = engine::field_f32(field(o, 4), 0x40);
+            let mut br = hk::object_radius(o);
             if !(br > 0.01) {
                 br = r;
             }
@@ -905,7 +829,7 @@ impl Shields {
         if lvl < s.flicker_below {
             let weak = (s.flicker_below - lvl) / s.flicker_below;
             let tick = (now * s.flicker_rate as f64) as i64 as u32;
-            let r1 = (super::hash32(tick.wrapping_mul(2654435761).wrapping_add(field(o, 0x28) as u32)) & 0xffff) as f32 / 65535.0;
+            let r1 = (super::hash32(tick.wrapping_mul(2654435761).wrapping_add(hk::object_key(o))) & 0xffff) as f32 / 65535.0;
             bright *= 1.0 - s.flicker * weak * r1;
         }
         (col, bright)
@@ -913,11 +837,11 @@ impl Shields {
 
     /// The shields' level (0..1) of a ship, 1 for a shell.
     fn level(o: usize, ty: usize) -> f32 {
-        if ty == 0 && field(o, 0x14) & 8 != 0 {
-            let (cur, max) = (engine::field_f32(o, 0x1c8), engine::field_f32(o, 0x1cc));
-            if max > 0.05 { (cur / max).clamp(0.0, 1.0) } else { 0.0 }
-        } else {
-            1.0
+        match (ty, hk::level(o)) {
+            (0, Some((cur, max))) => {
+                if max > 0.05 { (cur / max).clamp(0.0, 1.0) } else { 0.0 }
+            }
+            _ => 1.0,
         }
     }
 
@@ -1019,38 +943,6 @@ fn default_shell(name: &str, s: &Set) -> ([f32; 3], f32, f32, f32, f32) {
     }
 }
 
-/// Walks `m_shieldList` in order (as `ShieldEffect::Render` does): (id, ShieldHit).
-fn walk(mut f: impl FnMut(i32, usize)) {
-    let head = unsafe { rd::<usize>(SHIELD_LIST + 4) };
-    let nil = unsafe { rd::<usize>(SHIELD_NIL) };
-    if head == 0 || nil == 0 {
-        return;
-    }
-    let mut node = field(head, 0); // the leftmost: begin()
-    let mut guard = 0;
-    while node != 0 && node != head && guard < 4096 {
-        guard += 1;
-        f(field(node, 0xc) as i32, field(node, 0x14));
-        // the in-order successor
-        let mut next = field(node, 8);
-        if next != nil {
-            while field(next, 0) != nil {
-                next = field(next, 0);
-            }
-            node = next;
-        } else {
-            let mut p = field(node, 4);
-            while node == field(p, 8) {
-                node = p;
-                p = field(p, 4);
-            }
-            if field(node, 8) != p {
-                node = p;
-            }
-        }
-    }
-}
-
 fn inv3(a: &[f32; 9]) -> Option<[f32; 9]> {
     let det = a[0] * (a[4] * a[8] - a[5] * a[7]) - a[1] * (a[3] * a[8] - a[5] * a[6]) + a[2] * (a[3] * a[7] - a[4] * a[6]);
     if det.abs() < 1e-12 {
@@ -1073,9 +965,10 @@ fn inv3(a: &[f32; 9]) -> Option<[f32; 9]> {
 /// The hit's direction in shield space from its shell's transform (H S', H the hit's
 /// frame, S' the shield-to-object 3x3 with its diagonal over the model's radius).
 fn hit_dir(sh: usize, o: usize) -> Option<V3> {
-    let s3: [f32; 9] = unsafe { rd(field(o, 0x40) + 0x38) };
-    let x: [f32; 9] = unsafe { rd(sh + HIT_XFORM) };
-    let r = engine::field_f32(sh, HIT_MODEL_RADIUS);
+    let s12 = hk::shield_xform(o);
+    let s3: [f32; 9] = [s12[0], s12[1], s12[2], s12[3], s12[4], s12[5], s12[6], s12[7], s12[8]];
+    let x = hk::hit_xform(sh);
+    let r = hk::hit_model_radius(sh);
     if !(r > 1e-6) {
         return None;
     }
@@ -1084,7 +977,7 @@ fn hit_dir(sh: usize, o: usize) -> Option<V3> {
     a[4] /= r;
     a[8] /= r;
     let b = inv3(&a)?;
-    let sc = engine::field_f32(sh, HIT_SCALE + 8);
+    let sc = hk::hit_scale_z(sh);
     let vv = [x[6] * sc, x[7] * sc, x[8] * sc];
     let d = v3(
         vv[0] * b[0] + vv[1] * b[3] + vv[2] * b[6],
@@ -1101,13 +994,10 @@ fn hit_dir(sh: usize, o: usize) -> Option<V3> {
 /// A ship's shield ellipsoid in the world: w = u A + t for u on the unit sphere (A's
 /// rows returned), and its mean radius (the cube root of its volume factor).
 pub fn ship_xform(o: usize) -> Option<([V3; 3], V3, f32)> {
-    let inst = field(o, 4);
-    let s3: [f32; 12] = unsafe { rd(field(o, 0x40) + 0x38) };
-    let tm: [f32; 12] = unsafe { rd(inst + 0x44) };
-    let mut sc = [1.0f32; 3];
-    if field_u8(inst, 0x74) != 0 {
-        sc = unsafe { rd(inst + 0x28) };
-    }
+    let inst = hk::object_instance(o);
+    let s3 = hk::shield_xform(o);
+    let tm = super::hooks::instance_matrix12(inst);
+    let sc = hk::instance_scale(inst);
     let trow = |i: usize| v3(tm[i * 3], tm[i * 3 + 1], tm[i * 3 + 2]);
     let tr = [trow(0), trow(1), trow(2)];
     let tp = v3(tm[9], tm[10], tm[11]);

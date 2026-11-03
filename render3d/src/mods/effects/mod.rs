@@ -27,16 +27,21 @@
 pub mod bees;
 pub mod chunks;
 pub mod construction;
+pub mod content;
 pub mod explosions;
+pub mod hooks;
 pub mod repair;
 pub mod shields;
 pub mod sparks;
 pub mod weldfx;
 
 use super::{Module, Step};
-use crate::engine::{self, field, hook};
+use crate::core_hooks::Hooks;
+use crate::core_module::Changes;
 use crate::frame::steps::View;
 use crate::log;
+use crate::rt::Ini;
+use hooks::{construction as hk_construction, Feature};
 
 /// Positions alone (the fireballs' and the shields' quads and spheres).
 pub static XYZ: [gpu::VertexAttr; 1] = [gpu::attr(0, gpu::AttrFormat::Float3, gpu::Semantic::Position, 0)];
@@ -53,28 +58,14 @@ pub use crate::gfx::fx::fx_desc;
 pub const PREMUL: gpu::Blend =
     gpu::Blend { color: gpu::BlendEq { src: gpu::Factor::One, dst: gpu::Factor::InvSrcAlpha, op: gpu::BlendOp::Add }, alpha: None };
 
-const SITE_CHUNKS: usize = 0x598446; // ST3D_GraphicsEngine::RenderChunks(), thiscall
-const FN_CHUNKS: usize = 0x62d470;
-const VT_EXPLOSION_FEATURE: usize = 0x6afb30;
-const VT_SHIELD_EFFECT: usize = 0x6b0134;
-const VT_NODE_PARTICLE: usize = 0x6b001c;
-
-const FN_ENTITY_GET: usize = 0x4cfff0; // Entity::Get(int handle), static, cdecl
-
-/// A live game object by handle, as the plugins took one: `Entity::Get`, a game
-/// object (flags bit 2), with an instance and a class. 0 if not.
-pub fn object_of(handle: i32) -> usize {
-    let f: unsafe extern "C" fn(i32) -> usize = unsafe { core::mem::transmute(FN_ENTITY_GET) };
-    let o = unsafe { f(handle) };
-    if o == 0 || field(o, 0x14) & 4 == 0 || field(o, 4) == 0 || field(o, 0x40) == 0 {
-        return 0;
-    }
-    o
-}
-
 pub use crate::math::rand::{hash32, rnd};
+pub use hooks::object_of;
 
-pub use crate::engine::{ff, rv3};
+/// An ini that holds nothing: what a part's `new()` reads its defaults from, before
+/// `configure` gives it the real one.
+pub fn blank() -> Ini {
+    Ini::open_plain("")
+}
 
 /// This module's media (`scene::media`): a fireball's light to the gas
 /// (`[Nebulae] LitExplosion=`), and a weld's, a bee's or a shields-down discharge's, a
@@ -87,6 +78,11 @@ pub use crate::scene::lights::Pool as LightPool;
 /// Settings from `Render3D.ini`, one section per part (`config::Section`).
 pub use crate::config::Section as Sec;
 
+/// Which parts' hooks went in (`Effects::hk`).
+const HK_SHIELDS: u8 = 1;
+const HK_REPAIR: u8 = 2;
+const HK_DEBRIS: u8 = 4;
+
 pub struct Effects {
     ex: explosions::Explosions,
     sh: shields::Shields,
@@ -96,7 +92,11 @@ pub struct Effects {
     bees: bees::Bees,
     sp: sparks::SparkFx,
     fx: weldfx::Fx,
+    /// `hooks()` ran, and which parts' hooks are in (`HK_*`).
     hooked: bool,
+    /// The hooks handle kept for `device()`.
+    later: Option<Hooks>,
+    hk: u8,
     /// Bench A/B (`[Construction] ABTest=1`): while `Render3D.construction-off` exists in
     /// the game directory, construction, the bees and the sparks are the engine's.
     ab: bool,
@@ -116,7 +116,9 @@ impl Effects {
             sp: sparks::SparkFx::new(),
             fx: weldfx::Fx::new(),
             hooked: false,
-            ab: crate::config::ini().int("Construction", "ABTest", 0) != 0,
+            later: None,
+            hk: 0,
+            ab: false,
             ab_off: false,
             ab_checked: 0.0,
         }
@@ -129,13 +131,22 @@ impl Default for Effects {
     }
 }
 
-/// The engine's own `RenderChunks`, through its call site (a plugin chained there
-/// runs too).
-fn engine_chunks() {
-    let f = hook::call_target(SITE_CHUNKS).unwrap_or(FN_CHUNKS);
-    unsafe {
-        let r: unsafe extern "thiscall" fn(usize) = core::mem::transmute(f);
-        r(engine::storm3d());
+impl Effects {
+    /// What runs now: each part when it wants to (its `Enable`, and no plugin of its
+    /// own loaded) and, for the parts with hooks, when their hooks are in. The
+    /// statics the detours read follow.
+    fn refresh(&mut self) {
+        self.ex.on = self.ex.want;
+        self.sh.on = self.sh.want && self.hk & HK_SHIELDS != 0;
+        self.rp.on = self.rp.want && self.hk & HK_REPAIR != 0;
+        self.ch.on = self.ch.want && self.hk & HK_DEBRIS != 0;
+        self.co.on = self.co.want;
+        self.bees.on = self.bees.want;
+        // The sparks take over the particles only where repair's thunk is in place.
+        self.sp.on = self.sp.want && hooks::repair::hooked();
+        repair::Repair::set_taking(self.rp.on);
+        chunks::set_active(self.ch.on);
+        sparks::set_taking(self.sp.on && !self.ab_off);
     }
 }
 
@@ -152,40 +163,83 @@ impl Module for Effects {
     fn rows(&self) -> &'static [crate::rt::settings::Setting] {
         &[]
     }
-    fn configure(&mut self, _ini: &crate::rt::Ini, _said: &mut crate::core_module::Changes) {}
-    fn device(&mut self) {
-        if self.hooked {
-            return;
-        }
-        self.hooked = true;
-        // Each part stands down beside the plugin it ports.
+    /// `[Explosions]`, `[Shields]` (and the `[Shell.<name>]` recipes), `[Repair]`,
+    /// `[Debris]`, `[Construction]`, `[Bees]` and `[Sparks]`, one part each; each part
+    /// stands down while its plugin is loaded, so an install that still has the plugin
+    /// keeps its look.
+    fn configure(&mut self, ini: &Ini, _said: &mut Changes) {
+        self.ex.configure(ini);
+        self.sh.configure(ini);
+        self.rp.configure(ini);
+        self.ch.configure(ini);
+        self.co.configure(ini);
+        self.bees.configure(ini);
+        self.sp.configure(ini);
+        self.ab = ini.int("Construction", "ABTest", 0) != 0;
         let loaded = |p: &str| {
             let l = crate::plugin_loaded(p);
-            if l {
+            if l && !self.hooked {
                 log!("effects: {} is loaded: it keeps drawing its part", p);
             }
             l
         };
-        self.ex.on = self.ex.on && !loaded("Explosions.asi");
-        self.ex.light_on = self.ex.light_on && !crate::plugin_loaded("Lighting.asi");
-        self.sh.on = self.sh.on && !loaded("Shields.asi");
-        self.rp.on = self.rp.on && !loaded("Repair.asi");
-        if self.sh.on {
-            self.sh.install();
+        let (ex, li, sh, rp) = (loaded("Explosions.asi"), loaded("Lighting.asi"), loaded("Shields.asi"), loaded("Repair.asi"));
+        self.ex.want = self.ex.want && !ex;
+        self.ex.light_on = self.ex.light_on && !li;
+        self.sh.want = self.sh.want && !sh;
+        self.rp.want = self.rp.want && !rp;
+        self.refresh();
+    }
+    /// The module's first switch-on: its hooks are put in at its first frame
+    /// (`device()`), not now. Other plugins check the stock bytes of the sites they
+    /// patch themselves when they load, which can be after this one (the bench's
+    /// `Scene.asi` is one: it reads the shield hit sites), and the hooks chain onto
+    /// whatever is there, as they always did.
+    fn hooks(&mut self, h: &mut Hooks) {
+        hooks::keep_gate(h);
+        self.later = Some(h.clone());
+    }
+    /// The hooks of the parts that want them, once, at the first frame the module has a
+    /// device; the sparks need repair's.
+    fn device(&mut self) {
+        let Some(mut h) = self.later.take() else { return };
+        let h = &mut h;
+        self.hooked = true;
+        if self.sh.want {
+            hooks::shields::install(h);
+            self.hk |= HK_SHIELDS;
         }
-        if self.rp.on {
-            self.rp.install();
+        if self.rp.want && hooks::repair::install(h) {
+            self.hk |= HK_REPAIR;
         }
-        if self.ch.on {
-            self.ch.install();
+        if self.ch.want && hooks::chunks::install(h) {
+            self.hk |= HK_DEBRIS;
         }
-        if self.sp.on {
-            self.sp.install();
+        if self.sp.want && hooks::repair::hooked() == false {
+            log!("effects: sparks: NodeParticleEffect's draw is not hooked (repair off): stock sparks");
         }
+        self.refresh();
         log!(
             "effects: explosions {}, explosion light {}, shields {}, repair {}, debris {}, construction {}, bees {}, sparks {}",
             self.ex.on, self.ex.light_on, self.sh.on, self.rp.on, self.ch.on, self.co.on, self.bees.on, self.sp.on
         );
+    }
+    fn on(&mut self) {
+        self.refresh();
+    }
+    /// Switched off live: the debris goes (the engine's draws take over through the
+    /// hooks' gate).
+    fn off(&mut self) {
+        // The debris is our own simulation and goes; what the other parts hold (the
+        // shield hits' births, the welds and construction edges noted) is keyed to the
+        // engine's own records, which live on while the engine draws them, so it stays
+        // and a switch-on picks the effects up where they are.
+        self.ex.notes.clear();
+        self.sp.clear();
+        self.ch.clear();
+        self.bees.clear();
+        chunks::set_active(false);
+        repair::Repair::set_taking(false);
     }
     fn reset(&mut self) {
         self.ex.reset();
@@ -228,18 +282,18 @@ impl Module for Effects {
     /// its `Render` (0x4a3790) draws nothing; the station is `BuildingEffect`'s, drawn in
     /// `feature()`. Taken here so the object loop leaves nothing of it to the engine.
     fn object(&mut self, o: usize, _v: &View) -> bool {
-        self.co.on && !self.ab_off && field(engine::vtable(o), 11 * 4) == construction::FN_CONSTRUCTION_OBJECT_RENDER
+        self.co.on && !self.ab_off && hk_construction::is_construction_object(o)
     }
     fn feature(&mut self, f: usize, v: &View) -> bool {
-        match engine::vtable(f) {
-            VT_EXPLOSION_FEATURE if self.ex.on => self.ex.feature(v),
-            VT_SHIELD_EFFECT if self.sh.on => self.sh.feature(v),
+        match hooks::feature_kind(f) {
+            Feature::Explosion if self.ex.on => self.ex.feature(v),
+            Feature::Shield if self.sh.on => self.sh.feature(v),
             // The engine's Render draws every other spark; the welds are skipped there
-            // (repair.rs) and drawn by us at Step::Chunks.
-            VT_NODE_PARTICLE => false,
-            construction::VT_BUILDING if self.co.on && !self.ab_off => self.co.feature(v),
-            bees::VT_WORKER_BEE if self.bees.on && !self.ab_off => self.bees.feature(f, false, v),
-            bees::VT_DRONE_COLONY if self.bees.on && !self.ab_off => self.bees.feature(f, true, v),
+            // (hooks.rs) and drawn by us at Step::Chunks.
+            Feature::NodeParticle => false,
+            Feature::Building if self.co.on && !self.ab_off => self.co.feature(v),
+            Feature::WorkerBee if self.bees.on && !self.ab_off => self.bees.feature(f, false, v),
+            Feature::DroneColony if self.bees.on && !self.ab_off => self.bees.feature(f, true, v),
             _ => false,
         }
     }
@@ -255,7 +309,7 @@ impl Module for Effects {
         // The engine's chunks (construction's, and a plugin's work chained there).
         {
             let _z = crate::timing::zone("effects: engine chunks");
-            engine_chunks();
+            hooks::engine_chunks();
         }
         if let Some(c) = Cam::of(v) {
             if self.ex.on {

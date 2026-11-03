@@ -17,9 +17,9 @@
 //!
 //! A particle: position from `Entity::GetWorldPosition(ST3D_Node *)` (0x4cff70) at its
 //! hardpoint, or +0x10 in the object's frame; size +0x2c, age +0x34, life +0x38.
-use super::{object_of, rnd, Cam, LightPool, Sec};
+use super::hooks::{nodes, object_of};
+use super::{blank, rnd, Cam, LightPool, Sec};
 use gpu::{Blend, Block, Topology};
-use crate::engine::{self, field, hook, rd};
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::log;
@@ -28,22 +28,6 @@ use crate::shaders::effects_repair::*;
 use crate::shaders::effects_repair_spv::*;
 use crate::shaders::effects_repair_dxil::*;
 use alloc::vec::Vec;
-
-const SITE_ADD: usize = 0x4c90c0;
-const FN_ADD: usize = 0x4733c0;
-const SITE_SPRITE: usize = 0x473767;
-use crate::engine::sprite::FN_DRAW_SCALED_3D as FN_SPRITE;
-const NP_LIST: usize = 0x736cfc;
-const NP_COUNT: usize = 0x736d00;
-const FN_WORLD_POS: usize = 0x4cff70;
-
-const P_HANDLE: usize = 0x08;
-const P_NODE: usize = 0x0c;
-const P_LOCAL: usize = 0x10;
-const P_SPRITE: usize = 0x1c;
-const P_SIZE: usize = 0x2c;
-const P_AGE: usize = 0x34;
-const P_LIFE: usize = 0x38;
 
 #[derive(Clone, Copy)]
 struct Weld {
@@ -56,81 +40,52 @@ struct Weld {
 
 impl Weld {
     fn matches(&self, node: usize) -> bool {
-        self.node == node && field(node, P_HANDLE) as i32 == self.handle && field(node, P_NODE) == self.hp && field(node, P_SPRITE) == self.sprite
+        self.node == node && nodes::handle(node) == self.handle && nodes::hardpoint(node) == self.hp && nodes::sprite(node) == self.sprite
     }
 }
 
 static mut WELDS: Vec<Weld> = Vec::new();
 static mut MADE: u32 = 0;
-static mut PREV_ADD: usize = 0;
-static mut PREV_SPRITE: usize = 0;
-static mut RP_NODE: usize = 0;
-/// The welds are ours: the engine's sprite for them is skipped.
-static mut DRAWING: bool = false;
+/// The welds are ours: new ones are noted and the engine's sprite for them is skipped
+/// (the part is on and its hooks are in).
+static mut TAKING: bool = false;
 
 #[allow(static_mut_refs)]
 fn welds() -> &'static mut Vec<Weld> {
     unsafe { &mut WELDS }
 }
 
-unsafe extern "C" fn hook_add(name: *const u8, colour: *const f32, o: usize, hp: usize, size: f32, life: f32) {
+/// The engine added a particle that is a weld (`hooks.rs`'s detour of `AddParticle`
+/// found it the new tail of the list): noted with what identifies it, so a node freed
+/// and reused by another effect is not taken for it.
+pub fn weld_added(node: usize, o: usize, hp: usize, size: f32, life: f32) {
     unsafe {
-        let before = rd::<u32>(NP_COUNT);
-        let f: unsafe extern "C" fn(*const u8, *const f32, usize, usize, f32, f32) = core::mem::transmute(PREV_ADD);
-        f(name, colour, o, hp, size, life);
-        let head = rd::<usize>(NP_LIST);
-        if head == 0 || rd::<u32>(NP_COUNT) != before.wrapping_add(1) || !DRAWING {
-            return;
-        }
-        let node = field(head, 4); // the new tail
-        if node == 0 || node == head || welds().len() >= 256 {
+        if welds().len() >= 256 {
             return;
         }
         MADE = MADE.wrapping_add(1);
         welds().push(Weld {
             node,
-            handle: field(node, P_HANDLE) as i32,
-            hp: field(node, P_NODE),
-            sprite: field(node, P_SPRITE),
+            handle: nodes::handle(node),
+            hp: nodes::hardpoint(node),
+            sprite: nodes::sprite(node),
             seed: super::hash32(MADE.wrapping_mul(2654435761).wrapping_add(if crate::clock::bench() { 0 } else { node as u32 })),
         });
+        let _ = hp;
         if MADE <= 8 {
-            log!("effects: weld on {}, size {:.2}, life {:.2}{}", crate::engine::obj::odf_name(o), size, life, if hp != 0 { ", at a hardpoint" } else { "" });
+            log!("effects: weld on {}, size {:.2}, life {:.2}{}", crate::engine::obj::odf_name(o), size, life, if nodes::hardpoint(node) != 0 { ", at a hardpoint" } else { "" });
         }
     }
+}
+
+/// Whether the welds are ours now (their hooks are in and the part is on).
+pub fn taking() -> bool {
+    unsafe { TAKING }
 }
 
 /// Whether the particle node is a weld of ours (for the sparks, which draw the rest).
 pub fn is_weld(node: usize) -> bool {
     welds().iter().any(|w| w.matches(node))
-}
-
-/// Whether the engine's draw of `NodeParticleEffect`'s sprites goes through our thunk
-/// (the sparks can only take them over then).
-pub fn hooked() -> bool {
-    unsafe { DRAWING }
-}
-
-unsafe extern "thiscall" fn repair_sprite(sprite: usize, cam: usize, pos: *const f32, size: f32) {
-    unsafe {
-        let node = RP_NODE;
-        if DRAWING && node != 0 && (super::sparks::takes() || welds().iter().any(|w| w.matches(node))) {
-            return;
-        }
-        let f: unsafe extern "thiscall" fn(usize, usize, *const f32, f32) = core::mem::transmute(PREV_SPRITE);
-        f(sprite, cam, pos, size);
-    }
-}
-
-/// `NodeParticleEffect::Render` holds the particle's node in `esi` at the call.
-#[unsafe(naked)]
-unsafe extern "C" fn sprite_thunk() {
-    core::arch::naked_asm!(
-        "mov dword ptr [{node}], esi",
-        "jmp {f}",
-        node = sym RP_NODE,
-        f = sym repair_sprite,
-    )
 }
 
 struct Set {
@@ -187,6 +142,8 @@ struct Vert {
 
 pub struct Repair {
     pub on: bool,
+    /// `Enable=` (and no plugin of its own): the part wants to run.
+    pub want: bool,
     s: Set,
     pipes: Pipes,
     lights: LightPool,
@@ -196,12 +153,22 @@ pub struct Repair {
 
 impl Repair {
     pub fn new() -> Repair {
-        let c = Sec::new("Repair");
+        let c = Sec::with(blank(), "Repair");
+        Repair {
+            on: false,
+            want: false,
+            s: Self::read(&c),
+            pipes: Pipes::new(),
+            lights: LightPool::new(b"weld\0"),
+            quads: Vec::new(),
+            said_first: false,
+        }
+    }
+
+    fn read(c: &Sec) -> Set {
         let life = c.pair("SparkLife", [0.25, 0.8]);
         let l0 = life[0].max(0.02);
-        Repair {
-            on: c.i("Enable", 1) != 0,
-            s: Set {
+        Set {
                 sparks: c.i("Sparks", 20).clamp(0, 48) as usize,
                 brightness: c.f("Brightness", 1.5),
                 arc_share: c.f("ArcTime", 0.7).clamp(0.05, 1.0),
@@ -231,60 +198,26 @@ impl Repair {
                 light_reach: c.f("LightReach", 0.5),
                 light_lift: c.f("LightLift", 0.06),
                 pull: c.f("Pull", 2.0),
-            },
-            pipes: Pipes::new(),
-            lights: LightPool::new(b"weld\0"),
-            quads: Vec::new(),
-            said_first: false,
         }
     }
 
-    /// The `AddParticle` call in `Craft::RepairSystem` and the `DrawScaled3D` call in
-    /// `NodeParticleEffect::Render`, chained.
-    pub fn install(&mut self) {
-        unsafe {
-            let ok_list = rd::<usize>(0x473677) == NP_LIST;
-            let (Some(add), Some(spr)) = (hook::call_target(SITE_ADD), hook::call_target(SITE_SPRITE)) else {
-                log!("effects: repair: the call sites are not calls here: stock sparks");
-                self.on = false;
-                return;
-            };
-            if !ok_list {
-                log!("effects: repair: NodeParticleEffect::Render differs: stock sparks");
-                self.on = false;
-                return;
-            }
-            if hook::patch_call(SITE_ADD, add, hook_add as *const () as usize) {
-                PREV_ADD = add;
-            }
-            if hook::patch_call(SITE_SPRITE, spr, sprite_thunk as *const () as usize) {
-                PREV_SPRITE = spr;
-            }
-            log!(
-                "effects: repair: AddParticle{} and DrawScaled3D{} hooked",
-                if add != FN_ADD { " (chained)" } else { "" },
-                if spr != FN_SPRITE { " (chained)" } else { "" }
-            );
-            DRAWING = PREV_ADD != 0 && PREV_SPRITE != 0;
-            if !DRAWING {
-                self.on = false;
-            }
-        }
+    /// `[Repair]`.
+    pub fn configure(&mut self, ini: &crate::rt::Ini) {
+        let c = Sec::of(ini, "Repair");
+        self.want = c.i("Enable", 1) != 0;
+        self.s = Self::read(&c);
+    }
+
+    /// Whether the welds are ours: the part is on and the hooks are in (set by the
+    /// module, `Effects::refresh`).
+    pub fn set_taking(on: bool) {
+        unsafe { TAKING = on };
     }
 
     /// Drop the welds whose particle the engine has erased.
     fn gather(&self) {
-        let head = unsafe { rd::<usize>(NP_LIST) };
         let mut live = Vec::new();
-        if head != 0 {
-            let mut n = field(head, 0);
-            let mut guard = 0;
-            while n != 0 && n != head && guard < 1024 {
-                live.push(n);
-                n = field(n, 0);
-                guard += 1;
-            }
-        }
+        nodes::each(|n| live.push(n));
         welds().retain(|w| live.iter().any(|&n| w.matches(n)));
     }
 
@@ -293,26 +226,21 @@ impl Repair {
         if o == 0 {
             return None;
         }
-        let inst = field(o, 4);
-        let tm: [f32; 12] = unsafe { rd(inst + 0x44) };
+        let inst = crate::engine::obj::instance(o);
+        let tm = super::hooks::instance_matrix12(inst);
         let tr = [v3(tm[0], tm[1], tm[2]), v3(tm[3], tm[4], tm[5]), v3(tm[6], tm[7], tm[8])];
         let tp = v3(tm[9], tm[10], tm[11]);
         let p = if w.hp != 0 {
-            let mut out = V3::ZERO;
-            unsafe {
-                let f: unsafe extern "thiscall" fn(usize, *mut V3, usize) -> *mut V3 = core::mem::transmute(FN_WORLD_POS);
-                f(o, &mut out, w.hp);
-            }
-            out
+            nodes::world_pos(o, w.hp)
         } else {
-            let l = super::rv3(w.node + P_LOCAL);
+            let l = nodes::local(w.node);
             tr[0] * l.x + tr[1] * l.y + tr[2] * l.z + tp
         };
-        let mut r = engine::field_f32(inst, 0x40);
+        let mut r = super::hooks::instance_radius(inst);
         if !(r > 0.01) {
             r = 50.0;
         }
-        let mut life = engine::field_f32(w.node, P_LIFE);
+        let mut life = nodes::life(w.node);
         if !(life > 0.01) {
             life = 1.0;
         }
@@ -332,7 +260,7 @@ impl Repair {
             None => p - tp,
         };
         let n = if n.len() < 1e-6 { v3(0.0, 1.0, 0.0) } else { n.norm() };
-        Some(Place { p, n, r, size: engine::field_f32(w.node, P_SIZE), age: engine::field_f32(w.node, P_AGE), life, o, seed: w.seed })
+        Some(Place { p, n, r, size: nodes::size(w.node), age: nodes::age(w.node), life, o, seed: w.seed })
     }
 
     fn arc_now(&self, pl: &Place, now: f64) -> f32 {

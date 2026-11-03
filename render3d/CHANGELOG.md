@@ -4,6 +4,34 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.41.0 — 2026-11-03
+
+### Changed
+- effects and sky on the module layers: every engine read and hook of effects is in
+  `effects/hooks.rs` (sub-modules per part) and of sky in `sky/hooks.rs`, tables in
+  `content.rs` (effects: `SITE_NAME`, `FAC_KEY`, `FAC_DEF`; sky: the built-in recipes,
+  now `include_str!`d from `render3d/content/sky/`, moved from `render3d/skies/`, and
+  the point-star texture), `render3d/lint-layers.sh --strict src/mods/effects src/mods/sky`
+  is 0, and effects left `NOT_YET_LIVE`. `Modules.effects` is `apply = "live"`.
+- effects' hooks go through the registry, behind the module's gate, and chain: the
+  debris' `Fragment` calls (the Evolver's four cocoon sites no longer call a constant),
+  the repair welds' two calls and the shield hits' four (a passive tap). They are put in
+  at the module's first frame (`device()`), as before, not at load: other plugins
+  check the stock bytes of those sites when they load (the bench's `Scene.asi` does).
+  Debris is taken only while the gate is open (its flag was never cleared); each
+  part's switch is decided in `configure`, not latched at `device()`. A flip off drops
+  the debris in flight and leaves the other parts' records, which the engine keeps.
+- `configure` reads effects' sections (`[Explosions]`, `[Shields]` with the
+  `[Shell.<name>]` recipes read once from the engine's table of shell names,
+  `[Repair]`, `[Debris]`, `[Construction]`, `[Bees]`, `[Sparks]`) and sky's `[Sky]`;
+  `[Sky]` is read at load and at every settings change, no longer every 60 views.
+  `config::Section` can borrow the ini `configure` was given (`Section::of`).
+- sky: `formats_changed` drops the view pipelines and keeps the baked cube.
+- `assets::odf_stem`, the one `.odf` strip, for effects' two.
+- `render3d/install.sh` and `perf/sky-*.py` read the sky recipes from `content/sky/`.
+
+Installed, not yet seen in game.
+
 ## 0.39.0 — 2026-11-03
 
 ### Changed

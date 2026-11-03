@@ -29,25 +29,19 @@
 //!
 //! The simulation runs on the sim clock (`View::time`), once per frame however many
 //! views draw, so it stops while the game is paused.
-use super::Sec;
+use super::hooks::chunks as hk;
+use super::{blank, Sec};
 
-use crate::engine::{self, hook, obj};
+use crate::engine::{self, obj};
+use crate::log;
 use crate::frame::steps::View;
 use crate::gfx;
-use crate::log;
 use crate::math::{cosf, sinf, sqrtf, v3, Lcg, M34, V3};
 use crate::scene::{self, pose, Blend, Group, Model, Part, Params};
 use alloc::collections::VecDeque;
 use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
-
-const SITE_EXPLODE_FRAGMENT: usize = 0x4c6bfc; // in Craft::Explode: call ST3D_Instance::Fragment
-const FN_FRAGMENT: usize = 0x62eb20;
-const SITE_BUILD_FRAGMENT: usize = 0x46a0f1; // in BuildingEffect::SafeDestroyConstruction: the same call
-const FN_CLASS_ODF: usize = 0x4ce370; // GameObjectClass::GetOdfName(), thiscall
-/// The Evolver's four calls of `Fragment` on its cocoon.
-const SITES_COCOON: [usize; 4] = [0x4b07b4, 0x4b0872, 0x4b0914, 0x4b09b4];
 
 /// A dying craft waiting to be broken up (at the next `Step::Chunks`, with a device).
 struct Pending {
@@ -61,9 +55,8 @@ struct Pending {
 }
 
 static mut PENDING: Vec<Pending> = Vec::new();
+/// The part is on and its hooks are in: the dying craft are ours (not the engine's).
 static mut ACTIVE: bool = false;
-static mut PREV_FRAGMENT: usize = 0;
-static mut PREV_BUILD_FRAGMENT: usize = 0;
 static mut LAST_EYE: V3 = V3::ZERO;
 
 #[allow(static_mut_refs)]
@@ -82,7 +75,9 @@ fn object_of_instance(inst: usize) -> usize {
     found
 }
 
-unsafe extern "thiscall" fn hook_fragment(inst: usize, colour: *const f32, vel: usize, smoking: u32, faces: i32, attractor: usize) {
+/// A dying craft (`Craft::Explode`'s call of `Fragment`, from `hooks.rs`): noted for
+/// our own chunks when its SOD is one we can read. False: the engine breaks it up.
+pub fn note_craft(inst: usize, faces: i32, team: V3) -> bool {
     unsafe {
         if ACTIVE && faces < 0 && pending().len() < 64 {
             let o = object_of_instance(inst);
@@ -93,75 +88,60 @@ unsafe extern "thiscall" fn hook_fragment(inst: usize, colour: *const f32, vel: 
                 world.r[0] = world.r[0] * s.x;
                 world.r[1] = world.r[1] * s.y;
                 world.r[2] = world.r[2] * s.z;
-                let team = if colour.is_null() { v3(1.0, 1.0, 1.0) } else { v3(*colour, *colour.add(1), *colour.add(2)) };
                 pending().push(Pending { sod: crate::assets::sod_of(name), world, clock: pose::Clock::of_instance(inst, engine::sim_time()), team, faces: None });
-                return;
+                return true;
             }
         }
-        let f: unsafe extern "thiscall" fn(usize, *const f32, usize, u32, i32, usize) = core::mem::transmute(PREV_FRAGMENT);
-        f(inst, colour, vel, smoking, faces, attractor);
+        false
     }
 }
 
-/// The Evolver's cocoon breaking up (faces -1, the whole of it).
-unsafe extern "thiscall" fn hook_fragment_cocoon(inst: usize, colour: *const f32, vel: usize, smoking: u32, faces: i32, attractor: usize) {
+/// The Evolver's cocoon breaking up (faces -1, the whole of it): the cocoon
+/// (`CocoonInstance`, of `8472_cocoon.sod`) at its instance's transform and scale.
+pub fn note_cocoon(inst: usize, faces: i32, team: V3) -> bool {
     unsafe {
-        let hulls = crate::engine::instance::VT_COCOON;
-        let db = engine::field(inst, 0x80);
-        if ACTIVE
-            && faces < 0
-            && pending().len() < 64
-            && engine::vtable(inst) == hulls
-            && db != 0
-            && db == engine::rd::<usize>(crate::engine::instance::COCOON_DB)
-            && crate::assets::sod("8472_cocoon").is_some()
-        {
+        if ACTIVE && faces < 0 && pending().len() < 64 && hk::is_cocoon(inst) && crate::assets::sod("8472_cocoon").is_some() {
             let s = crate::scene::instance::instance_scale(inst);
-            let mut world = engine::field_m34(inst, 0x44);
+            let mut world = super::hooks::instance_world(inst);
             world.r[0] = world.r[0] * s.x;
             world.r[1] = world.r[1] * s.y;
             world.r[2] = world.r[2] * s.z;
-            let team = if colour.is_null() { v3(1.0, 1.0, 1.0) } else { v3(*colour, *colour.add(1), *colour.add(2)) };
             pending().push(Pending { sod: String::from("8472_cocoon"), world, clock: pose::Clock::of_instance(inst, engine::sim_time()), team, faces: None });
-            return;
+            return true;
         }
-        let f: unsafe extern "thiscall" fn(usize, *const f32, usize, u32, i32, usize) = core::mem::transmute(FN_FRAGMENT);
-        f(inst, colour, vel, smoking, faces, attractor);
+        false
     }
 }
 
 /// A construction cancelled or destroyed (`BuildingEffect::SafeDestroyConstruction`):
-/// the instance is the one embedded in the construction's `Info` (`+0x20`), its class at
-/// the `Info`'s `+0xd0`, and `faces` the faces built so far, which are the ones that
-/// break.
-unsafe extern "thiscall" fn hook_build_fragment(inst: usize, colour: *const f32, vel: usize, smoking: u32, faces: i32, attractor: usize) {
+/// `faces` the faces built so far, which are the ones that break.
+pub fn note_building(inst: usize, faces: i32, team: V3) -> bool {
     unsafe {
-        if ACTIVE && faces > 0 && pending().len() < 64 && inst > 0x20 {
-            let class = engine::field(inst - 0x20, 0xd0);
-            let name = if class != 0 {
-                let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(FN_CLASS_ODF);
-                let s = crate::rt::cstr_at(f(class), 260);
-                match s.len().checked_sub(4) {
-                    Some(n) if s.is_char_boundary(n) && s[n..].eq_ignore_ascii_case(".odf") => &s[..n],
-                    _ => s,
-                }
-            } else {
-                ""
-            };
+        if ACTIVE && faces > 0 && pending().len() < 64 {
+            let name = hk::building_odf(inst);
             if !name.is_empty() && crate::assets::sod(&crate::assets::sod_of(name)).is_some() {
                 let s = crate::scene::instance::instance_scale(inst) * scale_sod(name);
-                let mut world = engine::field_m34(inst, 0x44);
+                let mut world = super::hooks::instance_world(inst);
                 world.r[0] = world.r[0] * s.x;
                 world.r[1] = world.r[1] * s.y;
                 world.r[2] = world.r[2] * s.z;
-                let team = if colour.is_null() { v3(1.0, 1.0, 1.0) } else { v3(*colour, *colour.add(1), *colour.add(2)) };
                 pending().push(Pending { sod: crate::assets::sod_of(name), world, clock: pose::Clock::of_instance(inst, engine::sim_time()), team, faces: Some(faces as usize) });
-                return;
+                return true;
             }
         }
-        let f: unsafe extern "thiscall" fn(usize, *const f32, usize, u32, i32, usize) = core::mem::transmute(PREV_BUILD_FRAGMENT);
-        f(inst, colour, vel, smoking, faces, attractor);
+        false
     }
+}
+
+/// Whether the dying craft are ours (set by the module when the part is on and its
+/// hooks are in; cleared with the module's gate, so the engine breaks them up again).
+pub fn set_active(on: bool) {
+    unsafe { ACTIVE = on };
+}
+
+/// Forgets the craft waiting to be broken up (the module is switched off).
+pub fn drop_pending() {
+    pending().clear();
 }
 
 fn scale_sod(odf: &str) -> f32 {
@@ -192,6 +172,8 @@ struct Set {
 
 pub struct Chunks {
     pub on: bool,
+    /// `Enable=`: the part wants to run.
+    pub want: bool,
     s: Set,
     chunks: VecDeque<Chunk>,
     rng: Lcg,
@@ -201,17 +183,11 @@ pub struct Chunks {
 
 impl Chunks {
     pub fn new() -> Chunks {
-        let c = Sec::new("Debris");
+        let c = Sec::with(blank(), "Debris");
         Chunks {
-            on: c.i("Enable", 1) != 0,
-            s: Set {
-                size_factor: c.f("SizeFactor", 0.5).max(0.05),
-                life: c.f("Lifetime", 4.0),
-                life_dev: c.f("LifetimeDeviation", 2.0),
-                max_vel: c.f("MaxVelocity", 90.0),
-                max_spin: c.f("MaxAngularVelocity", 4.0),
-                max_chunks: c.i("MaxChunks", 1500).max(1) as usize,
-            },
+            on: false,
+            want: false,
+            s: Self::read(&c),
             chunks: VecDeque::new(),
             rng: Lcg(crate::clock::seed() | 1),
             last: -1.0,
@@ -219,32 +195,30 @@ impl Chunks {
         }
     }
 
-    pub fn install(&mut self) {
-        let Some(prev) = hook::call_target(SITE_EXPLODE_FRAGMENT) else {
-            log!("effects: debris: Craft::Explode does not call Fragment here: the engine's chunks");
-            self.on = false;
-            return;
-        };
-        if hook::patch_call(SITE_EXPLODE_FRAGMENT, prev, hook_fragment as *const () as usize) {
-            unsafe {
-                PREV_FRAGMENT = prev;
-                ACTIVE = true;
-            }
-            log!("effects: debris: Craft::Explode's Fragment{} hooked: our own chunks", if prev != FN_FRAGMENT { " (chained)" } else { "" });
-            let n = SITES_COCOON.iter().filter(|&&s| hook::patch_call(s, FN_FRAGMENT, hook_fragment_cocoon as *const () as usize)).count();
-            log!("effects: debris: {} of the Evolver's {} cocoon Fragment calls ours", n, SITES_COCOON.len());
-        } else {
-            self.on = false;
-            return;
+    fn read(c: &Sec) -> Set {
+        Set {
+            size_factor: c.f("SizeFactor", 0.5).max(0.05),
+            life: c.f("Lifetime", 4.0),
+            life_dev: c.f("LifetimeDeviation", 2.0),
+            max_vel: c.f("MaxVelocity", 90.0),
+            max_spin: c.f("MaxAngularVelocity", 4.0),
+            max_chunks: c.i("MaxChunks", 1500).max(1) as usize,
         }
-        if let Some(prev) = hook::call_target(SITE_BUILD_FRAGMENT) {
-            if hook::patch_call(SITE_BUILD_FRAGMENT, prev, hook_build_fragment as *const () as usize) {
-                unsafe { PREV_BUILD_FRAGMENT = prev };
-                log!("effects: debris: a cancelled construction's Fragment{} hooked: our own chunks", if prev != FN_FRAGMENT { " (chained)" } else { "" });
-            }
-        } else {
-            log!("effects: debris: SafeDestroyConstruction does not call Fragment here: the engine's chunks for it");
-        }
+    }
+
+    /// `[Debris]`.
+    pub fn configure(&mut self, ini: &crate::rt::Ini) {
+        let c = Sec::of(ini, "Debris");
+        self.want = c.i("Enable", 1) != 0;
+        self.s = Self::read(&c);
+    }
+
+    /// Switched off: the chunks in flight and the craft waiting go (the engine breaks
+    /// the next one up itself).
+    pub fn clear(&mut self) {
+        self.chunks.clear();
+        self.last = -1.0;
+        drop_pending();
     }
 
     pub fn reset(&mut self) {
