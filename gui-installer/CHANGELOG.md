@@ -4,6 +4,24 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 3.0.0 — 2026-11-03
+
+Reads package schemas 0 and 1, unchanged: the package without the Direct3D chain adds step ids and `when` values, which is additive, and an older package still reads and previews (its manifest's own `steps` and layers are used, and `RETIRED_STEPS` words the removed ones).
+
+### Changed
+- `STEPS` is `verify, prereqs, display, retire, render3d, ui, qol, rules, models, online, cutscenes, bloom, done`; `retire` ("Taking out what earlier versions installed") is new. A manifest without `steps` (a schema-0 zip) gets `LEGACY_STEPS`, the old list.
+- The Direct3D diagnosis is one question: `inspect` keeps `display8` (is `d3d8.dll` Display8) and `ours_d3d8` (Display8 will go in: the slot empty, GOG's, the old vendored d3d8to9, a DXVK d3d8, or Display8). `layer_verdict`: `when=d3d8` and `display8` are skipped with "your own d3d8.dll stays" when the file is the player's own; any `when` an older package uses previews as "will install".
+- The launch override is exactly `winmm=n,b;d3d8=n,b`, never `d3d9=n,b`. Heroic's config and the Wine prefix's registry (macOS) drop a `d3d9=n,b` an older install wrote when everything else there is ours (`ours_d3d9`); with the player's own overrides the entry is left whole. Undo gives it back.
+- The bug report: the Direct3D section is "Display8 and loader", names the old chain's leftovers (`d3d9.dll`, a vendored d3d8to9, a refit `dxvk.conf`) as retired and taken out by a re-install, and finds UI.asi or Render3D.asi without Display8 as `d3d8.dll`. The old d3d8to9 and DXVK d3d9 hashes stay in `KNOWN_FILES`, marked retired.
+- `display8_backend` reads Display8 1.0.0's `bail-out: <why>; the game draws through <path>; the plugins stand down` line ("Display8 bailed out: ..."); the older patterns stay.
+- `test.sh`, `test-macos.sh` and `test-windows.ps1` expect Display8 alone in `d3d8.dll`, no `d3d9.dll`, `d3d8_real.dll` or `dxvk.conf` and no `d3d9` override. `test.sh` also installs over an older install's Heroic entry (d3d9 out, and back on uninstall) and runs the 2.5.0 installer (`a2ede51`) against the new package.
+
+### Removed
+- The `chain`, `renderer`, `hud`, `menus`, `grid`, `lighting`, `sky` and `msaa` entries of `STEPS`/`STATUS` (kept as `RETIRED_STEPS`, for older packages), the `dxvk`, `d3d8to9`, `after_*`, `foreign_conf` and `d3d9` facts, the "older HUD and menus" and "per vertex" notes, and the "per pixel needs d3d8to9" heads-up.
+
+### Added
+- Self-tests: facts and verdicts for an empty slot, GOG's `d3d8.dll`, the old vendored d3d8to9 with a `d3d9.dll`, a DXVK d3d8, Display8 and the player's own; a 14.x-shaped manifest (the `chain` step, the `renderer` layer, the old `when`s) parsing and previewing; the d3d9 override removal in Heroic and the registry; the bail-out line. Installed, not yet seen in game.
+
 ## 2.5.0 — 2026-11-03
 
 Reads package schemas 0 and 1, unchanged; reads the 14.3.0 package's `layers/<id>/` layout and its optional manifest keys.

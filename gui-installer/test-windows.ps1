@@ -93,7 +93,8 @@ New-Item -ItemType Directory $G | Out-Null
 function G([string]$n) { Join-Path $G $n }
 Set-Content (G "Armada2.exe") "exe"
 Set-Content (G "binkw32.dll") "stockbink"
-Set-Content (G "d3d8.dll") "gogd3d8to9"     # none of GOG's, DXVK's or d3d8to9: left as it is
+# No d3d8.dll: Display8 goes in alone (the package has no Direct3D chain; a d3d8.dll that is the
+# player's own is left as it is, and UI.asi and Render3D.asi with it).
 $before = Snap $G
 $cache = Join-Path $env:LOCALAPPDATA "armada2-refit\installer\cache\releases"
 New-Item -ItemType Directory $cache | Out-Null
@@ -103,9 +104,12 @@ $r = Run @("--list")
 Check "--list sees release $pver in the cache" (($r.Code -eq 0) -and (Has $r.Out "  $pver *"))
 $r = Run @("--package", $Zip, "--game", $G)
 Check "--package exits 0" ($r.Code -eq 0)
-foreach ($n in "HUD.asi", "Menus.asi", "QOL.asi", "Online.asi", "winmm.dll") {
+foreach ($n in "UI.asi", "Render3D.asi", "QOL.asi", "Online.asi", "winmm.dll", "d3d8.dll") {
     Check $n (Test-Path -LiteralPath (G $n))
 }
+Check "Display8 is d3d8.dll, with no d3d9.dll or d3d8_real.dll behind it" (
+    ((Get-Content -Raw -LiteralPath (G "d3d8.dll")) -like "*Display8 stopped the game*") -and
+    -not (Test-Path -LiteralPath (G "d3d9.dll")) -and -not (Test-Path -LiteralPath (G "d3d8_real.dll")))
 Check "the cutscene player left out (A2_SKIP=cutscenes)" (((Text (G "binkw32.dll")) -eq "stockbink") -and
     -not (Test-Path -LiteralPath (G "binkw32_orig.dll")) -and -not (Test-Path -LiteralPath (G "BinkProxy.ini")))
 Check "progress from install.ps1's ::step lines" ((Has $r.Err "*Installing the HUD*") -and (Has $r.Err "*Installing online play*"))

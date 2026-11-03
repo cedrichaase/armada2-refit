@@ -49,7 +49,7 @@ import urllib.error
 import urllib.request
 import zipfile
 
-INSTALLER_VERSION = '2.5.0'
+INSTALLER_VERSION = '3.0.0'
 SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, ::step and ::error lines
 REPO = 'cedrichaase/armada2-refit'
 API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'
@@ -87,42 +87,51 @@ else:
     SETTINGS = os.path.join(XDG_CONFIG, 'armada2-refit', 'installer.json')
 
 
-# The install.sh stages, in order, and what the window says during each. Packages before
-# the per-part plugins were removed also name 'lighting', 'sky' and 'msaa', and packages
-# before Render3D.asi and UI.asi 'hud', 'menus' and 'grid' (their manifest lists them);
-# the entries for those stay so such a package still installs. 'bloom' set up a vkBasalt
-# bloom before 13.0.0, and from then on takes it out (Render3D.asi blooms the 3D view).
-# 'display' (Display8 in front of the chain) from 13.35.0.
-STEPS = ['verify', 'prereqs', 'chain', 'display', 'render3d', 'ui', 'hud', 'menus', 'qol', 'rules', 'grid',
-         'models', 'lighting', 'sky', 'online', 'msaa', 'cutscenes', 'renderer', 'bloom', 'done']
+# The install.sh stages, in order, and what the window says during each. A package's own
+# manifest lists the steps it prints (`m.get('steps', LEGACY_STEPS)`), so an older package
+# keeps its own list; RETIRED_STEPS below keeps their sentences readable.
+# 'display' (Display8) from 13.35.0; 'retire' (taking out what earlier versions put in,
+# the old Direct3D chain among it) from the package without the chain (installer 3.0.0).
+STEPS = ['verify', 'prereqs', 'display', 'retire', 'render3d', 'ui', 'qol', 'rules',
+         'models', 'online', 'cutscenes', 'bloom', 'done']
 STATUS = {
     'fetch': 'Checking for releases',
     'download': 'Downloading release {version}',
     'unpack': 'Unpacking the package',
     'verify': 'Verifying the package',
     'prereqs': 'Installing the widescreen patch and plugin loader',
+    'display': 'Installing Display8',
+    'retire': 'Taking out what earlier versions installed',
     'render3d': 'Installing the 3D view',
     'ui': 'Installing the HUD and the menus',
-    'hud': 'Installing the HUD',
-    'menus': 'Installing the menus',
     'qol': 'Installing quality of life',
     'rules': 'Installing the rules',
-    'lighting': 'Installing lighting',
-    'sky': 'Installing the sky',
+    'models': 'Rewriting the models',
     'online': 'Installing online play',
-    'msaa': 'Installing anti-aliasing',
     'cutscenes': 'Skipping the cutscene player',
-    'renderer': 'Configuring the renderer',
     'bloom': 'Taking out the old bloom',
     'done': 'Finishing up',
     'launcher': 'Writing the launch settings',
-    'chain': 'Setting up the Direct3D chain',
-    'display': 'Installing Display8',
-    'grid': 'Installing the grid keys',
-    'models': 'Rewriting the models',
     'uninstall': 'Removing the mod',
     'restore': 'Restoring the launch settings',
 }
+# RETIRED: steps only packages before 3.0.0's package (14.x and older) print. Their
+# manifests list them, and STATUS.get(step, step) must still say something readable.
+RETIRED_STEPS = {
+    'chain': 'Setting up the Direct3D chain',
+    'hud': 'Installing the HUD',
+    'menus': 'Installing the menus',
+    'grid': 'Installing the grid keys',
+    'renderer': 'Configuring the renderer',
+    'lighting': 'Installing lighting',
+    'sky': 'Installing the sky',
+    'msaa': 'Installing anti-aliasing',
+}
+STATUS.update({k: v for k, v in RETIRED_STEPS.items() if k not in STATUS})
+# The stages of a package whose manifest names none (schema 0, built from its README).
+LEGACY_STEPS = ['verify', 'prereqs', 'chain', 'display', 'render3d', 'ui', 'hud', 'menus', 'qol',
+                'rules', 'grid', 'models', 'lighting', 'sky', 'online', 'msaa', 'cutscenes',
+                'renderer', 'bloom', 'done']
 # Zips of schema 0 print no ::step lines; their install.sh output marks the stages.
 LEGACY_MARKS = [('prerequisites:', 'prereqs'), ('  HUD.asi', 'hud'), ('  Menus.asi', 'menus'),
                 ('  QOL.asi', 'qol'), ('  Lighting.asi', 'lighting'), ('  Online.asi', 'online'),
@@ -594,6 +603,9 @@ def prefix_plan(pre, wanted):
         for dll, mode in split_overrides(v).items():
             if dll.lower() not in have:
                 changes.append(dict(key=dll, old=None, new=reg_mode(mode)))
+        # An old install's d3d9 value goes when the rest of the section is only ours.
+        if ours_d3d9(have):
+            changes.append(dict(key='d3d9', old=have['d3d9'], new=None, remove=True))
     return changes, conflicts
 
 
@@ -616,9 +628,22 @@ def prefix_apply(pre, changes, undo=False):
                 lines.pop()
             lines += ['', f'[{REG_KEY}] {int(time.time())}']
             sec = (len(lines) - 1, len(lines))
-        lines[sec[1]:sec[1]] = [f'"{c["key"]}"="{c["new"]}"' for c in changes]
+        gone = [c for c in changes if c.get('remove')]
+        for c in gone:          # the value of ours that is no longer needed
+            for i in range(sec[0] + 1, sec[1]):
+                m = REG_VALUE.match(lines[i])
+                if m and m.group(1).lower() == c['key'].lower():
+                    del lines[i]
+                    sec = (sec[0], sec[1] - 1)
+                    break
+        lines[sec[1]:sec[1]] = [f'"{c["key"]}"="{c["new"]}"' for c in changes
+                                if not c.get('remove')]
         done = list(changes)
     elif sec is not None:
+        removed = [c for c in changes if c.get('remove')]
+        restore = [f'"{c["key"]}"="{c["old"]}"' for c in removed]
+        changes = [c for c in changes if not c.get('remove')]
+        done = list(removed)
         keep = []
         for l in lines[sec[0] + 1:sec[1]]:
             m = REG_VALUE.match(l)
@@ -628,6 +653,7 @@ def prefix_apply(pre, changes, undo=False):
                 done.append(c)
             else:
                 keep.append(l)
+        keep += restore         # a value of ours that the install took out comes back
         if any(REG_VALUE.match(l) for l in keep):
             lines[sec[0] + 1:sec[1]] = keep
         else:                   # the section held only ours: it goes, with its blank line
@@ -700,43 +726,29 @@ GOG_D3D8_SHA = '735dbb81a5fa0368c6436349fc5bf97a9ae15daeb6829dfe95a17704294e6719
 
 
 def inspect(game):
-    """What install.sh will find in the game directory -- the same tests it makes."""
+    """What install.sh will find in the game directory -- the same tests it makes. The
+    Direct3D diagnosis is one question: is Display8 in d3d8.dll, or will the scripts put it
+    there (the slot empty, GOG's, the old vendored d3d8to9, a DXVK d3d8, or Display8 of an
+    older build)? Any other d3d8.dll is the player's own and stays."""
     p = lambda n: os.path.join(game, n)
-    # The chain's d3d8.dll: d3d8_real.dll behind Display8, as the scripts' chain step
-    # sees it once Display8 has stepped aside (with none behind it, no d3d8.dll at all).
-    display8 = is_display8(p('d3d8.dll'))
-    d8 = p('d3d8_real.dll') if display8 else p('d3d8.dll')
-    d3d8to9 = os.path.isfile(d8) and sha256(d8) == D3D8TO9_SHA
-    dxvk = is_dxvk(d8) or (d3d8to9 and is_dxvk(p('d3d9.dll')))
-    conf = p('dxvk.conf')
-    foreign_conf = os.path.isfile(conf) and \
-        'generated by tools/renderer-config.sh' not in open(conf, errors='replace').read()
+    d8 = p('d3d8.dll')
+    display8 = is_display8(d8)
+    ours_d3d8 = display8 or not os.path.exists(d8) or (
+        os.path.isfile(d8) and (sha256(d8) in (GOG_D3D8_SHA, D3D8TO9_SHA) or is_dxvk(d8)))
     state = load_json(p(STATE_FILE))
     installed = state.get('version') if isinstance(state, dict) else None
     if not installed and (os.path.exists(p('HUD.asi')) or os.path.exists(p('UI.asi'))):
         installed = '?'
-    # What the scripts' chain step will leave (install.sh, install.ps1): crosire's d3d8to9
-    # goes in over no d3d8.dll or GOG's, and over DXVK's except on Windows, where a DXVK
-    # d3d8.dll was put there by hand and stays; on Linux not past a d3d9.dll that is not
-    # DXVK's, and with DXVK's d3d9 put in behind it. On a Mac, never DXVK's d3d9.
-    d9 = p('d3d9.dll')
-    d8_ok = d3d8to9 or not os.path.exists(d8) or \
-        (os.path.isfile(d8) and sha256(d8) == GOG_D3D8_SHA) or \
-        (is_dxvk(d8) and SYSTEM != 'windows')
-    if SYSTEM == 'linux' and os.path.exists(d9) and not is_dxvk(d9):
-        d8_ok = False
-    after_d3d8to9 = d8_ok or d3d8to9
-    after_dxvk = dxvk if not d8_ok else \
-        (SYSTEM == 'linux' or (SYSTEM == 'windows' and is_dxvk(d9)))
-    return dict(dxvk=dxvk, d3d8to9=d3d8to9, foreign_conf=foreign_conf, display8=display8,
-                after_d3d8to9=after_d3d8to9, after_dxvk=after_dxvk,
+    return dict(display8=display8, ours_d3d8=ours_d3d8,
                 prereqs=os.path.exists(p('STA2WidescreenPatch.asi')),
-                d3d9=os.path.exists(p('d3d9.dll')), installed=installed,
+                installed=installed,
                 state=state if isinstance(state, dict) else None)
 
 
 def layer_verdict(layer, facts):
-    """(will it go in, why) for one manifest layer on this game."""
+    """(will it go in, why) for one manifest layer on this game. A `when` an older
+    package uses (d3d8to9, dxvk, dxvk.conf, display8 in front of d3d8to9) is read
+    conservatively: it says nothing about the chain, and the layer previews as installing."""
     when = layer.get('when', 'always')
     if layer['id'] in EXCLUDED:
         return None, 'not available yet'
@@ -744,28 +756,13 @@ def layer_verdict(layer, facts):
         return None, 'Render3D.asi blooms the 3D view itself now'
     if when == 'missing' and facts['prereqs']:
         return True, 'already there'
-    if layer['id'] == 'msaa' and SYSTEM == 'macos':
-        return False, 'not on macOS — needs DXVK, which Direct3D 9 on a Mac cannot use'
-    if when == 'dxvk' and not facts.get('after_dxvk', facts['dxvk']):
-        return False, 'skipped — needs DXVK in the game folder'
-    if when == 'dxvk.conf' and SYSTEM == 'macos':
-        return False, 'not on macOS — only DXVK reads it'
-    if when == 'dxvk.conf' and facts['foreign_conf']:
-        return False, 'skipped — your own dxvk.conf stays'
-    d3d8to9 = facts.get('after_d3d8to9', facts['d3d8to9'])
-    # Display8 goes in front of d3d8to9 only.
-    if when == 'display8' and not d3d8to9:
-        return False, 'skipped — goes in front of d3d8to9 only'
-    # Render3D.asi and UI.asi draw on the Direct3D 9 device behind d3d8to9; without it the
-    # scripts leave the 3D view to the engine, and put the older HUD, menus and grid in.
-    if when == 'd3d8to9' and not d3d8to9 and layer['id'] == 'render3d':
-        return False, 'skipped — needs d3d8to9 as d3d8.dll'
-    if when == 'd3d8to9' and not d3d8to9:
-        return True, 'will install · the older HUD and menus, without d3d8to9'
-    if layer['id'] == 'lighting' and not d3d8to9:
-        return True, 'will install · per vertex'
-    if layer['id'] == 'sky' and not d3d8to9:
-        return True, 'will install · stock sky without d3d8to9'
+    # Display8 goes into d3d8.dll unless that file is the player's own.
+    if when == 'd3d8' and not facts['ours_d3d8']:
+        return False, 'skipped — your own d3d8.dll stays'
+    # Render3D.asi and UI.asi draw through Display8; with the player's own d3d8.dll they
+    # are left out and the game keeps its own look.
+    if when == 'display8' and not facts['ours_d3d8']:
+        return False, 'skipped — needs Display8 (your own d3d8.dll stays)'
     return True, 'will install'
 
 
@@ -774,7 +771,7 @@ def launch_env(facts, package=None):
     where the game folder's DLLs load first anyway."""
     if SYSTEM == 'windows':
         return {}
-    return {'WINEDLLOVERRIDES': 'winmm=n,b;d3d8=n,b' + (';d3d9=n,b' if facts['d3d9'] else '')}
+    return {'WINEDLLOVERRIDES': 'winmm=n,b;d3d8=n,b'}
 
 
 def unproxy(game, log=print):
@@ -806,9 +803,9 @@ def unproxy(game, log=print):
 # The files of the Direct3D chain and the loader that a release puts in, by hash
 # (platform/vendor/*/SOURCE.txt), and GOG's own d3d8.dll.
 KNOWN_FILES = {
-    D3D8TO9_SHA: "crosire's d3d8to9 1.16.0, the refit's",
+    D3D8TO9_SHA: "crosire's d3d8to9 1.16.0, the refit's -- retired, a re-install takes it out",
     GOG_D3D8_SHA: "GOG's own d3d8to9 build, as the game ships it",
-    '265888c31ca78dffa290c39cb7e50bfb02762590e41927906e46fb32f01497fa': "DXVK 3.1.1's d3d9, the refit's",
+    '265888c31ca78dffa290c39cb7e50bfb02762590e41927906e46fb32f01497fa': "DXVK 3.1.1's d3d9, the refit's -- retired, a re-install takes it out",
     'baba99929487b005bb9b168acfd852550055f22e5f1059c9032765209bb185e5': 'Ultimate ASI Loader 4.68, the refit\'s',
     '193828b15b8cdba84617dd9a359b555302132a35bbaa6fd3143fdb99442343c5': 'STA2WidescreenPatch 1.0, the refit\'s',
 }
@@ -1040,6 +1037,7 @@ def display8_backend(lines):
     asked = m.group(1).lower()
     out = []
     standdown = re.search(r'Mode=stub: (.*?); forward mode instead', text)
+    bail = re.search(r'bail-out: (.*?); the game draws through (.*?); the plugins stand down', text)
     chosen = re.findall(r'stub: the backend is (\w+)(?:, after (.+?) could not start)?\s*$',
                         text, re.M)
     order = re.search(r'stub mode on (.+?)(?:, with the validation layer)?\s*$', text, re.M)
@@ -1047,7 +1045,10 @@ def display8_backend(lines):
     falls = re.findall(r'stub: (\w[\w ]*?) could not start: (.+?)(?:; falling back to (.+?))?\s*$',
                        text, re.M)
     failed = '; '.join(f'{n}: {r}' for n, r, _ in falls)
-    if standdown:
+    if bail:
+        out.append(f'Display8 bailed out: {bail.group(1)}; the game ran on the system\'s '
+                   'Direct3D 8 and the plugins stood down.')
+    elif standdown:
         out.append('Display8 is in forward mode (Mode=stub was asked, then stood down: '
                    f'{standdown.group(1)}); the real chain draws, no backend was chosen.')
     elif asked == 'stub' and chosen:
@@ -1225,7 +1226,7 @@ def diagnose(game, error=None):
 
     # ---- the Direct3D chain and the loader
     w('')
-    w('Direct3D chain and loader:')
+    w('Display8 and loader:')
     d8 = has.get('d3d8.dll')
     d8_what = identify(p(d8)) if d8 else 'none'
     for n in ('d3d8.dll', 'd3d8_real.dll', 'd3d9.dll', 'winmm.dll', 'binkw32.dll',
@@ -1240,6 +1241,14 @@ def diagnose(game, error=None):
     for n in names:
         if n.lower().endswith(('.dll.gog-backup', '.dll.a2chain-backup', '.dll.a2neb-backup')):
             w(f'  {n}: {identify(p(n))}')
+    # The old chain's files, left by an earlier version: a re-install takes them out.
+    left = []
+    if d8 is not None and sha256_or(p(d8)) == D3D8TO9_SHA:
+        left.append('d3d8.dll is the old vendored d3d8to9')
+    if 'd3d9.dll' in has:
+        left.append('d3d9.dll')
+    if 'd3d8_real.dll' in has and sha256_or(p(has['d3d8_real.dll'])) == D3D8TO9_SHA:
+        left.append('d3d8_real.dll is the old vendored d3d8to9')
     if 'dxvk.conf' in has:
         try:
             ours = 'generated by tools/renderer-config.sh' in open(p(has['dxvk.conf']),
@@ -1247,10 +1256,12 @@ def diagnose(game, error=None):
         except OSError:
             ours = False
         w('  dxvk.conf: ' + ("the refit's" if ours else "not the refit's"))
-    d3d8to9 = d8 is not None and sha256_or(p(d8)) == D3D8TO9_SHA
-    # Display8 in front of d3d8to9 gives the plugins a device too.
-    if d8 is not None and 'Display8' in d8_what and 'd3d8_real.dll' in has:
-        d3d8to9 = sha256_or(p(has['d3d8_real.dll'])) == D3D8TO9_SHA
+        if ours:
+            left.append("dxvk.conf (the refit's)")
+    if left:
+        w('  left over from the old Direct3D chain (retired, a re-install takes it out): '
+          + ', '.join(left))
+    has_display8 = d8 is not None and 'Display8' in d8_what
 
     # ---- the plugins
     w('')
@@ -1361,17 +1372,17 @@ def diagnose(game, error=None):
     if asis and 'winmm.dll' not in has:
         findings.append('No winmm.dll (the ASI loader): no plugin loads.')
     draws_d3d9 = [s for s in ('ui', 'render3d') if s in stems]
-    if draws_d3d9 and not d3d8to9:
+    if draws_d3d9 and not has_display8:
         both = ' and '.join(n + '.asi' for n in ('UI', 'Render3D') if n.lower() in draws_d3d9)
         findings.append(f'{both} installed, but d3d8.dll is {d8_what.split(" (")[0]}, not '
-                        "crosire's d3d8to9: they get no Direct3D 9 device and stand down. "
+                        'Display8: they need Display8 as d3d8.dll and stand down. '
                         'Install again.')
         if d8 and sha256_or(p(d8)) == GOG_D3D8_SHA and installed:
             findings.append("GOG's d3d8.dll is back since the install, perhaps from a GOG "
                             'Galaxy "verify / repair".')
         if d8 and 'DXVK' in d8_what and g and g.heroic:
             findings.append("DXVK's d3d8.dll is in the game folder: Heroic's \"Auto install "
-                            'DXVK\" or a DXVK put in by hand replaced d3d8to9.')
+                            'DXVK\" or a DXVK put in by hand replaced Display8.')
     if 'ui' in stems and any(s.lower() in stems for s in LEGACY_UI):
         findings.append('UI.asi and the plugins it supersedes (' +
                         ', '.join(s + '.asi' for s in LEGACY_UI if s.lower() in stems) +
@@ -1504,6 +1515,18 @@ def split_overrides(v):
     return out
 
 
+def ours_d3d9(have):
+    """Whether `have` (a {dll: mode} of overrides) holds the d3d9=n,b an install before the
+    package without the Direct3D chain wrote, and nothing but ours beside it
+    (winmm=n,b, d3d8=n,b): then it is ours to take out. Any other override of the
+    player's keeps the whole entry as it is."""
+    norm = lambda m: m.replace(' ', '').lower()
+    low = {k.lstrip('*').lower(): norm(v) for k, v in have.items()}
+    return (low.get('d3d9') in ('n,b', 'native,builtin')
+            and all(k == 'd3d9' or (k in ('winmm', 'd3d8') and v in ('n,b', 'native,builtin'))
+                    for k, v in low.items()))
+
+
 def heroic_plan(heroic, wanted):
     """(changes, conflicts) to give the game `wanted` in Heroic's config. A DLL override
     already there is kept and the missing ones added; any other variable already set to
@@ -1519,7 +1542,17 @@ def heroic_plan(heroic, wanted):
         old = env.get(k)
         if k == 'WINEDLLOVERRIDES' and old:
             have = split_overrides(old)
-            add = [f'{d}={m}' for d, m in split_overrides(v).items() if d not in have]
+            ours = split_overrides(v)
+            # An old install's d3d9=n,b goes when everything else there is ours too; with
+            # any other override of the player's, the entry stays whole.
+            drop = ours_d3d9(have)
+            if drop:
+                kept = {d: m for d, m in have.items() if d != 'd3d9'}
+                add = [f'{d}={m}' for d, m in ours.items() if d not in kept]
+                new = ';'.join([f'{d}={m}' for d, m in kept.items()] + add)
+                changes.append(dict(key=k, old=old, new=new))
+                continue
+            add = [f'{d}={m}' for d, m in ours.items() if d not in have]
             if add:
                 changes.append(dict(key=k, old=old, new=';'.join([old.rstrip(';')] + add)))
         elif old is None:
@@ -1887,7 +1920,7 @@ class Package:
         self.schema = int(m.get('schema', 0))
         self.version = m.get('version', '?')
         self.layers = m.get('layers', [])
-        self.steps = m.get('steps', STEPS)
+        self.steps = m.get('steps', LEGACY_STEPS)
 
     def parts(self):
         """The layers the player may leave out, from the manifest's optional `select`
@@ -1949,7 +1982,7 @@ class Package:
         for l in layers:
             l['summary'] = re.sub(r'\s*--\s*', ' — ', l['summary']).rstrip(',')
         return dict(schema=0, version=m.group(1) if m else '?',
-                    commit=m.group(2) if m else '', layers=layers, steps=STEPS)
+                    commit=m.group(2) if m else '', layers=layers, steps=LEGACY_STEPS)
 
     def unpack(self, dest):
         """Into dest/, refusing any member that would land outside it. When an earlier
@@ -2320,6 +2353,88 @@ def cli(argv):
     return 0
 
 
+def selftest_chain(t, check):
+    """The Direct3D diagnosis: is Display8 in d3d8.dll, or will the scripts put it there."""
+    g = globals()
+    real = g['GOG_D3D8_SHA'], g['D3D8TO9_SHA']
+    cases = {}
+
+    def game(name, files):
+        d = os.path.join(t, 'chain-' + name)
+        os.makedirs(d)
+        for n, data in files.items():
+            with open(os.path.join(d, n), 'wb') as fh:
+                fh.write(data)
+        return d
+    cases['empty'] = game('empty', {'Armada2.exe': b'x'})
+    cases['gog'] = game('gog', {'Armada2.exe': b'x', 'd3d8.dll': b'gog build'})
+    cases['vendored'] = game('vendored', {'Armada2.exe': b'x', 'd3d8.dll': b'crosire',
+                                          'd3d9.dll': b'dxvk d3d9'})
+    cases['dxvk'] = game('dxvk', {'Armada2.exe': b'x', 'd3d8.dll': b'MZ dxvk d3d8'})
+    cases['display8'] = game('display8', {'Armada2.exe': b'x',
+                                          'd3d8.dll': b'MZ ' + DISPLAY8_MARK})
+    cases['own'] = game('own', {'Armada2.exe': b'x', 'd3d8.dll': b"someone else's"})
+    try:
+        g['GOG_D3D8_SHA'] = sha256(os.path.join(cases['gog'], 'd3d8.dll'))
+        g['D3D8TO9_SHA'] = sha256(os.path.join(cases['vendored'], 'd3d8.dll'))
+        disp = dict(id='display', when='d3d8')
+        r3d = dict(id='render3d', when='display8')
+        ui = dict(id='ui', when='display8')
+        for name, d in cases.items():
+            f = inspect(d)
+            goes = name != 'own'
+            check(f['ours_d3d8'] == goes and f['display8'] == (name == 'display8'),
+                  f'facts: {name}: Display8 {"goes in" if goes else "is not put in"}')
+            check(all(layer_verdict(l, f)[0] == goes for l in (disp, r3d, ui)),
+                  f'verdict: {name}: display, render3d and ui '
+                  + ('install' if goes else 'are skipped'))
+        f = inspect(cases['own'])
+        check(layer_verdict(disp, f)[1] == 'skipped \u2014 your own d3d8.dll stays'
+              and layer_verdict(r3d, f)[1] == 'skipped \u2014 needs Display8 (your own d3d8.dll stays)',
+              'verdict: the player\'s own d3d8.dll is said')
+        check(launch_env(f).get('WINEDLLOVERRIDES', 'winmm=n,b;d3d8=n,b') == 'winmm=n,b;d3d8=n,b'
+              and 'd3d9' not in str(launch_env(inspect(cases['vendored']))),
+              'launch: the override has no d3d9, even over the old chain')
+    finally:
+        g['GOG_D3D8_SHA'], g['D3D8TO9_SHA'] = real
+
+
+def selftest_old_manifest(t, check):
+    """A 14.x-shaped manifest (the chain step, the renderer layer, the old `when`s) reads,
+    previews and says its steps without a KeyError."""
+    man = dict(schema=1, version='14.9.0',
+               steps=['verify', 'prereqs', 'chain', 'display', 'render3d', 'ui', 'hud', 'menus',
+                      'qol', 'rules', 'grid', 'models', 'online', 'cutscenes', 'renderer',
+                      'bloom', 'done'],
+               layers=[dict(id='prereqs', name='Widescreen patch', when='missing'),
+                       dict(id='chain', name='Direct3D chain', when='always'),
+                       dict(id='display', name='Display8', when='display8'),
+                       dict(id='render3d', name='3D view', when='d3d8to9'),
+                       dict(id='ui', name='HUD', when='d3d8to9'),
+                       dict(id='msaa', name='Anti-aliasing', when='dxvk'),
+                       dict(id='renderer', name='Renderer', when='dxvk.conf')],
+               linux={}, windows={}, macos={})
+    z = os.path.join(t, 'armada2-refit-14.9.0.zip')
+    with zipfile.ZipFile(z, 'w') as zf:
+        zf.writestr('armada2-refit-14.9.0/install.sh', '#!/bin/sh\n')
+        zf.writestr('armada2-refit-14.9.0/manifest.json', json.dumps(man))
+    p = Package(z)
+    d = os.path.join(t, 'chain-vendored')
+    facts = inspect(d)
+    try:
+        verdicts = [layer_verdict(l, facts) for l in p.layers]
+        said = [STATUS.get(st, st) for st in p.steps]
+        ok = len(verdicts) == len(p.layers) and all(v[0] is not None or v[1] for v in verdicts)
+    except KeyError:
+        ok, said = False, []
+    check(p.schema == 1 and ok and p.steps == man['steps'] and all(said)
+          and STATUS['chain'] == RETIRED_STEPS['chain'] and 'Taking out' in STATUS['retire'],
+          'old manifest: the chain step and the renderer layer parse, preview and are worded')
+    check(all(k in STATUS for k in RETIRED_STEPS) and 'chain' not in STEPS
+          and 'renderer' not in STEPS and 'retire' in STEPS,
+          'steps: the retired ids are worded, and gone from the current list')
+
+
 def selftest():
     """The parts that need neither a display nor the network."""
     ok = True
@@ -2352,6 +2467,30 @@ def selftest():
         env = {e['key']: e['value'] for e in load_json(h.config)[GOG_APP]['enviromentOptions']}
         check(env == {'WINEDLLOVERRIDES': 'winmm=n,b', 'DXVK_HUD': '0'},
               'undo: back to what it was')
+        # An older install's d3d9=n,b: taken out when the rest is only ours, kept with the
+        # player's own overrides.
+        want9 = {'WINEDLLOVERRIDES': 'winmm=n,b;d3d8=n,b'}
+        for old, new in (('winmm=n,b;d3d8=n,b;d3d9=n,b', 'winmm=n,b;d3d8=n,b'),
+                         ('winmm=n,b;d3d9=n,b', 'winmm=n,b;d3d8=n,b'),
+                         ('winmm=n,b;d3d8=n,b;d3d9=n,b;xaudio2_8=n', None),
+                         ('d3d9=n,b', 'd3d8=n,b;winmm=n,b'),
+                         ('d3d9=b;winmm=n,b', None)):
+            save_json(h.config, {GOG_APP: {'enviromentOptions': [
+                {'key': 'WINEDLLOVERRIDES', 'value': old}]}, 'version': 'v0'})
+            ch, _ = heroic_plan(h, want9)
+            got = ch[0]['new'] if ch else None
+            if new is None and 'xaudio2' in old:
+                check(not ch, 'plan: d3d9 stays whole beside the player\'s own overrides')
+            elif new is None:
+                check(got is not None and 'd3d9=b' in got, 'plan: a d3d9 that is not ours stays')
+            else:
+                check(split_overrides(got) == split_overrides(new) and 'd3d9' not in got,
+                      f'plan: our d3d9 comes out of {old}')
+            if ch and 'd3d9' not in got:
+                heroic_apply(h, ch)
+                heroic_apply(h, ch, undo=True)
+                back = load_json(h.config)[GOG_APP]['enviromentOptions'][0]['value']
+                check(back == old, 'undo: the d3d9 entry is back as it was')
         check(heroic_plan(Heroic(t, '123', False), want)[0] is None,
               'plan: no settings file is reported, not created')
 
@@ -2368,6 +2507,7 @@ def selftest():
         check(p.schema == 0 and p.version == '11.4.0', 'legacy zip: schema 0, version from README')
         check([l['id'] for l in p.layers] == ['prereqs', 'hud', 'msaa', 'renderer'],
               'legacy zip: layers from README')
+        selftest_old_manifest(t, check)
         nw, nh = NEBULA_SIZE
         neb = nebula_pixels(7)
         alpha = neb[3::4]
@@ -2406,6 +2546,27 @@ def selftest():
         check(open(reg, newline='').read() == stock, 'prefix: undo leaves user.reg as it was')
         check(prefix_plan(WinePrefix(os.path.join(t, 'none'), 'Wine'), want)[0] is None,
               'prefix: no registry is reported, not created')
+        # An older install's d3d9 value in the registry: out with it, and back on undo.
+        with open(reg, 'w', newline='') as f:
+            f.write(stock.replace('"*d3d8"="builtin"\n', '"*d3d8"="builtin"\n\n'
+                    '[Software\\\\Wine\\\\AppDefaults\\\\Armada2.exe\\\\DllOverrides] 1\n'
+                    '"d3d8"="native,builtin"\n"d3d9"="native,builtin"\n"winmm"="native,builtin"\n'))
+        before9 = open(reg, newline='').read()
+        ch9, _ = prefix_plan(pre, want)
+        check([c['key'] for c in ch9] == ['d3d9'] and ch9[0].get('remove'),
+              'prefix: our d3d9 value is planned out')
+        prefix_apply(pre, ch9)
+        lines = read_reg(reg)
+        check(reg_values(lines, reg_section(lines)) ==
+              {'winmm': 'native,builtin', 'd3d8': 'native,builtin'}, 'prefix: d3d9 removed')
+        prefix_apply(pre, ch9, undo=True)
+        lines = read_reg(reg)
+        check('d3d9' in reg_values(lines, reg_section(lines)), 'prefix: undo puts d3d9 back')
+        with open(reg, 'w', newline='') as f:
+            f.write(before9.replace('"winmm"=', '"xaudio2_8"="native"\n"winmm"='))
+        check(prefix_plan(pre, want)[0] == [], 'prefix: with another override, d3d9 stays')
+        with open(reg, 'w', newline='') as f:
+            f.write(stock)
         check(reg_mode('n,b') == 'native,builtin' and reg_mode('n') == 'native', 'prefix: modes')
         check(prefix_of(os.path.join(t, 'drive_c', 'GOG Games', 'Armada')) is not None and
               os.path.realpath(prefix_of(os.path.join(t, 'drive_c', 'x')).root) == os.path.realpath(t),
@@ -2433,32 +2594,22 @@ def selftest():
             with open(os.path.join(mock, n), 'w') as f:
                 f.write(data)
         rep = diagnose(mock)
-        check('no Direct3D 9 device' in rep and 'scene off' in rep and 'Alice' not in rep
+        check('needs Display8' in rep.replace('they need Display8', 'needs Display8')
+              and 'scene off' in rep and 'Alice' not in rep
               and 'ASI loader): no plugin loads' not in rep,
-              'report: a d3d8.dll that is not d3d8to9 is named, and why the scene is off')
-        # Display8 in front of the chain: the chain's d3d8.dll is d3d8_real.dll behind it.
-        # (Display8 holds the word "dxvk" too.) The mock d3d8to9 is given the real one's
-        # role by its hash, for this check only.
-        global D3D8TO9_SHA
+              'report: a d3d8.dll that is not Display8 is named, and why the scene is off')
         with open(os.path.join(mock, 'd3d8.dll'), 'wb') as f:
             f.write(b'MZ dxvk ' + DISPLAY8_MARK + b': a bug in d3d8.dll.')
-        with open(os.path.join(mock, 'd3d8_real.dll'), 'w') as f:
-            f.write('crosire')
-        real, D3D8TO9_SHA = D3D8TO9_SHA, sha256(os.path.join(mock, 'd3d8_real.dll'))
-        try:
-            facts = inspect(mock)
-            d8layer = dict(id='display', when='display8')
-            check(facts['display8'] and facts['d3d8to9'] and facts['after_d3d8to9']
-                  and not facts['dxvk'] and layer_verdict(d8layer, facts)[0],
-                  'Display8 in front of d3d8to9: the chain is d3d8to9, and Display8 goes in')
-            rep = diagnose(mock)
-            check("Display8, the refit's" in rep and 'no Direct3D 9 device' not in rep,
-                  'report: Display8 is named, and it gives the plugins a device')
-        finally:
-            D3D8TO9_SHA = real
-        facts = inspect(mock)
-        check(facts['display8'] and not facts['d3d8to9'] and not facts['dxvk'],
-              'Display8 in front of another d3d8.dll: not d3d8to9, not DXVK')
+        rep = diagnose(mock)
+        check("Display8, the refit's" in rep and 'they need Display8' not in rep
+              and 'left over from the old Direct3D chain' not in rep,
+              'report: Display8 is named, and no finding about the plugins')
+        with open(os.path.join(mock, 'd3d9.dll'), 'w') as f:
+            f.write('old dxvk')
+        check('left over from the old Direct3D chain (retired, a re-install takes it out): d3d9.dll'
+              in diagnose(mock), 'report: the old chain\'s leftovers are named as retired')
+        os.remove(os.path.join(mock, 'd3d9.dll'))
+        selftest_chain(t, check)
         # Display8.log's mode and backend, in the findings.
         with open(os.path.join(mock, 'Display8.log'), 'w') as f:
             f.write('Display8 0.9.0 -- game dir C:\\g; mode stub; the real chain: x\n'
@@ -2511,6 +2662,11 @@ def selftest():
         check('forward mode' in d8b([h.replace('stub', 'forward')])[0]
               and 'stood down: HUD.asi is loaded' in d8b([h, 'Mode=stub: HUD.asi is loaded; forward mode instead'])[0]
               and 'no start line' in d8b(['x'])[0], 'display8: forward, stood down, no log')
+        bail = d8b([h, 'bail-out: no Vulkan or Direct3D 12 device; the game draws through '
+                       'the system\'s d3d8.dll; the plugins stand down'])[0]
+        check(bail.startswith('Display8 bailed out: no Vulkan or Direct3D 12 device;')
+              and "ran on the system's Direct3D 8 and the plugins stood down" in bail,
+              'display8: the bail-out line (display 1.0.0)')
         # Parts: the layers a manifest marks select on/off, the choice kept in the state file.
         parts = [dict(id='render3d', name='3D view', select='on', requires=['display'],
                       scope='local', summary='x'),
@@ -3421,8 +3577,6 @@ def run_gui():
                     if not yes:
                         notes.append(f'{l["name"]}: {why[len("skipped — "):]}'
                                      if why.startswith('skipped — ') else f'{l["name"]}: {why}')
-                    elif 'per vertex' in why:
-                        notes.append(f'{l["name"]}: per vertex; per pixel needs d3d8to9')
             for n in notes:
                 self.heads_up.append(lab(n, ('heads-up', 'warn'), xalign=0.5, wrap=True,
                                          justify=Gtk.Justification.CENTER, margin_start=8,
@@ -4635,8 +4789,7 @@ def run_tk():
                 ok, why = layer_verdict(l, f)
                 if ok:
                     yes.append(l['name'])
-                    if 'per vertex' in why:
-                        notes.append(f'{l["name"]}: per vertex; per pixel needs d3d8to9')
+                    pass
                 else:
                     why = why[len('skipped — '):] if why.startswith('skipped — ') else why
                     notes.append(f'{l["name"]}: {why}')

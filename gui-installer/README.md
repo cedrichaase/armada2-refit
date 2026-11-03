@@ -45,8 +45,9 @@ Keys: F5 refresh, Ctrl+Enter install, Ctrl+L the log.
    the chosen one is fetched straight away (checked against GitHub's sha256 digest) to
    show what it holds.
 3. **Says what will not go in**, on this machine, in a line each under the card: the same
-   tests `install.sh` makes (DXVK in the game directory for MSAA, d3d8to9 for per-pixel
-   lighting, a `dxvk.conf` of the player's own; `layer_verdict` in the script). There is
+   tests `install.sh` makes (one question about Direct3D: is Display8 in `d3d8.dll`, or
+   will the script put it there, or is `d3d8.dll` the player's own and stays, with the
+   3D view and the HUD left out; `layer_verdict` in the script). There is
    no layer table: what installs is the release's business. **Textures and the cutscene
    player are not installed from here** (`EXCLUDED`): a release cannot carry textures,
    and the cutscene player is held back for now.
@@ -103,18 +104,22 @@ a layer or a step is not a new schema: unknown ids are shown and counted as they
 | `linux` | `script` (`install.sh`), `uninstall` (its flag), `progress` (the variable) |
 | `windows`, `macos` | the same for those systems (`install.ps1`, `-Uninstall`; `install.sh`). The Windows and macOS installers install only a package that has its entry (`Package.for_system`): before 11.20.0, `install.ps1` printed no progress and `install.sh` did not run on a Mac. Adding them was not a new schema, since the Linux installer reads such a package as before |
 | `steps` | the `::step` ids `install.sh` prints, in order: the progress bar's denominator |
-| `layers[]` | `id`, `name`, `version`, `files`, `summary`, `when`; from 14.3.0 also the optional `dir` (the package folder), `select` (`core`, `on`, `off`, `legacy`), `requires`, `scope` (`local` or `match`) and `games`, from `tools/layers.py --json` (a reader that does not know them ignores them; with `select` on or off the window offers the layer in its Parts list). `when`: `always`, `missing` (prerequisites), `dxvk`, `dxvk.conf`, `d3d8to9` (Render3D, UI: needs d3d8to9 as `d3d8.dll` after the chain step, or behind Display8), from 13.35.0 `display8` (Display8: in front of d3d8to9 only; on macOS on Direct3D 9); before 13.0.0 also `vkbasalt` (bloom), which the window no longer lists |
+| `layers[]` | `id`, `name`, `version`, `files`, `summary`, `when`; from 14.3.0 also the optional `dir` (the package folder), `select` (`core`, `on`, `off`, `legacy`), `requires`, `scope` (`local` or `match`) and `games`, from `tools/layers.py --json` (a reader that does not know them ignores them; with `select` on or off the window offers the layer in its Parts list). `when`: `always`, `missing` (prerequisites), from the package without the Direct3D chain (installer 3.0.0) `d3d8` (Display8: goes into `d3d8.dll` unless that file is the player's own) and `display8` (Render3D, UI: need Display8 as `d3d8.dll`; with the player's own they are skipped and the game keeps its own look, there is no older-HUD fallback); in older packages also `dxvk`, `dxvk.conf`, `d3d8to9` and (13.35.0 to 15.x) `display8` in front of d3d8to9, which the installer now reads conservatively (any `when` it does not know previews as "will install" and claims nothing about the chain); before 13.0.0 also `vkbasalt` (bloom), which the window no longer lists. The package without the chain has the layers `prereqs, display, render3d, ui, qol, rules, models, online, cutscenes`: no `chain`, no `renderer` |
 | `moved[]` | from 14.3.0, optional: `from_file`, `from_section`, `from_key`, `to_file`, `to_section`, `to_key`, `default`: settings that moved between files, applied by the scripts (`moved.txt`) |
 | `not_included[]` | `id`, `name`, `summary`: shown as not available (textures) |
 
 ## Progress
 
 `install.sh` and `install.ps1` with `A2_PROGRESS=1` print `::step <id> <what>` as each
-stage starts (`verify`, `prereqs`, `chain`, `display` (from 13.35.0), `render3d`, `ui`, `qol`, `models`,
-`online`, `cutscenes`, `renderer`, `bloom` (taking out the vkBasalt or ReShade bloom
-of a package before 13.0.0, which set it up), `done`; `uninstall`; before 12.24.0 `hud`,
-`menus` and `grid` in place of `render3d` and `ui`, and before 12.0.0 also `lighting`,
-`sky` and `msaa`). The window maps the ids to its status line
+stage starts (`STEPS`: `verify`, `prereqs`, `display`, `retire` (taking out what earlier
+versions installed: the old chain's d3d8to9, `d3d9.dll` and `d3d8_real.dll`, a marked
+`dxvk.conf` whose sampler values go into `Display8.ini` first, the legacy HUD, menus and
+grid plugins, the per-part plugins), `render3d`, `ui`, `qol`, `rules`, `models`, `online`,
+`cutscenes`, `bloom` (taking out the vkBasalt or ReShade bloom of a package before 13.0.0),
+`done`; `uninstall`). Packages before the one without the Direct3D chain also print `chain`
+and `renderer`, before 12.24.0 `hud`, `menus` and `grid` in place of `render3d` and `ui`, and
+before 12.0.0 `lighting`, `sky` and `msaa`: `RETIRED_STEPS` keeps their sentences, and the
+progress bar counts the steps the manifest itself lists. The window maps the ids to its status line
 (`STATUS` in the script: "Refitting the HUD", "Installing lighting"…) and fills its
 segmented bar: download 0–30 %, unpack, the script's steps 35–92 %, Heroic, done. A
 schema-0 zip's stages are recognised from the lines it prints (`LEGACY_MARKS`).
@@ -225,8 +230,10 @@ draws nothing, and it already knows the game folder, the launcher and the releas
 
 - **Files by hash, never the files.** `d3d8.dll`, `d3d9.dll`, `winmm.dll` and
   `binkw32.dll` are named by sha256 against what a release puts in (`KNOWN_FILES`, from
-  `platform/vendor/*/SOURCE.txt`, and GOG's own `d3d8.dll`), else by what they say of
-  themselves (Display8, ours, by its panic message, with `d3d8_real.dll` behind it; DXVK,
+  `platform/vendor/*/SOURCE.txt`, and GOG's own `d3d8.dll`; the old chain's d3d8to9 and
+  DXVK d3d9 stay in the table, marked retired, so leftovers are recognised and the report
+  says a re-install takes them out), else by what they say of
+  themselves (Display8, ours, by its panic message; DXVK,
   Wine's builtin, dgVoodoo). Asking a player to post the DLL itself
   could mean posting GOG's or Microsoft's, which may not be redistributed; the hash says
   as much. Every `.asi` is checked against the release named in the state file, read from
@@ -237,8 +244,8 @@ draws nothing, and it already knows the game folder, the launcher and the releas
   scene went (`LOG_KEY`, each shape once, digits aside) and the tail. QOL's logs append
   across launches; their tail is the last one.
 - **Findings come first**: the causes known so far, each tested on the files and the whole
-  logs. Among them: UI.asi or Render3D.asi without crosire's d3d8to9 (no Direct3D 9
-  device, so both stand down; GOG's `d3d8.dll` back after a Galaxy repair, or DXVK's put
+  logs. Among them: UI.asi or Render3D.asi without Display8 as `d3d8.dll` (they need
+  it and stand down; GOG's `d3d8.dll` back after a Galaxy repair, or DXVK's put
   in by Heroic), the launcher not loading the folder's `winmm`/`d3d8`, UI.asi beside the
   plugins it supersedes, and `Menus.asi` drawing without a widescreen plate, which
   shows black at the sides of the main menu (the release carries no plates). First of
@@ -252,7 +259,9 @@ draws nothing, and it already knows the game folder, the launcher and the releas
   It parses the lines `Display8 <ver> -- game dir ...; mode M`, `Backend=auto: on P: ...`,
   `stub mode on ...`, `stub: the backend is B[, after X could not start]`,
   `stub: X could not start: why; falling back to Y` and `Mode=stub: ...; forward mode
-  instead`; the same code serves all three systems. **Where the logs are**: every plugin's
+  instead` and, from display 1.0.0, `bail-out: <why>; the game draws through <path>; the
+  plugins stand down` (said as "Display8 bailed out: <why>; the game ran on the system's
+  Direct3D 8 and the plugins stood down"); the old patterns stay for old logs. The same code serves all three systems. **Where the logs are**: every plugin's
   log, `Display8.log` included, is written to `%LOCALAPPDATA%\armada2-refit\logs\` since
   13.50.0 (in the Wine prefix's `drive_c/users/<user>/AppData/Local/...` on Linux and macOS),
   not into the game folder, which GOG puts under `C:\Program Files`, where Windows would
@@ -318,8 +327,8 @@ The core is the same on all three systems (`SYSTEM`); what differs:
 |---|---|---|
 | The game | GOG's own install: the folder in GOG's registry entry (`HKLM\SOFTWARE\[WOW6432Node\]GOG.com\Games\1174788223`, `gog_registry_dirs`), else the usual folders on every drive | inside a Wine prefix (`mac_prefixes`): CrossOver bottles (`~/Library/Application Support/CrossOver/Bottles`), Whisky's, Sikarugir / Kegworks / Wineskin / Porting Kit wrappers (the prefix inside the `.app`), `~/.wine` and the like |
 | The script | `install.ps1` through `powershell.exe -ExecutionPolicy Bypass -File`, no console window | `install.sh` through `/bin/bash` (3.2, BSD tools) |
-| The chain | crosire's d3d8to9 on Windows' own Direct3D 9, with Display8 in front (stub mode, `Backend=auto`); a DXVK `d3d8.dll` the player put there stays, without Display8 | d3d8to9 on the prefix's own Direct3D 9 (wined3d, or a Sikarugir wrapper's D9VK): DXVK's `d3d9.dll` cannot run on a Mac, so no MSAA or `dxvk.conf`; Display8 in front on `Backend=auto`, Vulkan on MoltenVK first |
-| Launch settings | none: the game folder's DLLs load first | the DLL overrides, written into the prefix's `user.reg` under `AppDefaults\Armada2.exe\DllOverrides` (the game's alone, not the bottle's) |
+| Direct3D | Display8 as `d3d8.dll` (empty slot, GOG's, the old chain's or a DXVK d3d8, or an older Display8), drawing on Vulkan or Direct3D 12 itself; the player's own `d3d8.dll` stays, without UI and Render3D | the same, on the prefix's Wine; no `d3d9.dll`, no DXVK |
+| Launch settings | none: the game folder's DLLs load first | the DLL overrides (`winmm=n,b;d3d8=n,b`, never `d3d9`), written into the prefix's `user.reg` under `AppDefaults\Armada2.exe\DllOverrides` (the game's alone, not the bottle's); a `d3d9` value an older install wrote is removed when the rest of the section is only ours |
 | Launch game | the exe | the prefix's Wine: CrossOver's `wine --bottle <name>`, a wrapper's own, Whisky's, else Gcenx's or Homebrew's |
 | Cache, settings | `%LOCALAPPDATA%\armada2-refit\installer\cache`, `%APPDATA%\armada2-refit\installer.json` | `~/Library/Caches/armada2-refit/installer`, `~/Library/Application Support/armada2-refit/installer.json` |
 

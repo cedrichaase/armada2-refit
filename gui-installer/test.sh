@@ -19,7 +19,7 @@ check () { if eval "$1"; then echo "ok    $1"; else echo "FAIL  $1" >&2; exit 1;
 "${run[@]}" --selftest
 
 G="$T/Games/Heroic/Star Trek Armada II"; mkdir -p "$G"
-echo exe > "$G/Armada2.exe"; echo stockbink > "$G/binkw32.dll"; echo gogd3d8to9 > "$G/d3d8.dll"
+echo exe > "$G/Armada2.exe"; echo stockbink > "$G/binkw32.dll"
 H="$XDG_CONFIG_HOME/heroic"; mkdir -p "$H/gog_store" "$H/GamesConfig"
 printf '{"installed":[{"appName":"1174788223","install_path":"%s","platform":"windows"}]}\n' "$G" \
     > "$H/gog_store/installed.json"
@@ -50,6 +50,10 @@ check '[ "$(cat "$G/binkw32.dll")" = stockbink ] && [ ! -e "$G/binkw32_orig.dll"
 check 'grep -q "Skipping the cutscene player" "$T/err" && grep -q "Installing the HUD" "$T/err"'
 check 'grep -q "\"version\": \"$ver\"" "$G/armada2-refit-installed.json"'
 check 'grep -q "winmm=n,b;d3d8=n,b" "$H/GamesConfig/1174788223.json"'
+# The package without the Direct3D chain: Display8 in d3d8.dll, no d3d9, nothing behind it.
+check '! grep -q d3d9 "$H/GamesConfig/1174788223.json"'
+check 'grep -q "Display8 stopped the game" "$G/d3d8.dll" && [ ! -e "$G/d3d9.dll" ] && [ ! -e "$G/d3d8_real.dll" ] && [ ! -e "$G/dxvk.conf" ]'
+check 'grep -q "Taking out what earlier versions installed" "$T/err" && ! grep -q "Direct3D chain" "$T/err"'
 check '[ -e "$H/GamesConfig/1174788223.json.a2refit-backup" ]'
 
 echo "== the bug report on what went in"
@@ -124,6 +128,34 @@ PY
     check 'grep -q "\"version\": \"$ver\"" "$O2/armada2-refit-installed.json"'
 else
     echo "(skipped: $oldref is not in this clone's history)"
+fi
+
+echo "== the GUI of 2.5.0 (a2ede51) on this package: it parses, previews and names the steps"
+if [ -n "$root" ] && git -C "$root" cat-file -e a2ede51:gui-installer/armada2-refit-installer.py 2>/dev/null; then
+    mkdir -p "$T/oldgui2"
+    git -C "$root" show a2ede51:gui-installer/armada2-refit-installer.py > "$T/oldgui2/installer.py"
+    python3 -I - "$T/oldgui2/installer.py" "$zip" "$T/oldgui2" <<'PY'
+import importlib.util, os, sys
+spec = importlib.util.spec_from_file_location('oldinst', sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+pkg = m.Package(sys.argv[2])
+game = os.path.join(sys.argv[3], 'game'); os.makedirs(game)
+open(os.path.join(game, 'Armada2.exe'), 'w').write('x')
+facts = m.inspect(game)
+ids = [l['id'] for l in pkg.layers]
+verdicts = [m.layer_verdict(l, facts) for l in pkg.layers]
+steps = [m.STATUS.get(s, s) for s in pkg.steps]
+env = m.launch_env(facts)
+ok = pkg.schema == 1 and 'chain' not in ids and 'renderer' not in ids and 'retire' in pkg.steps \
+    and len(verdicts) == len(ids) and all(steps) and 'WINEDLLOVERRIDES' in env
+print(('ok    ' if ok else 'FAIL  ') + f'old GUI reads the new manifest: layers {ids}, steps {pkg.steps}')
+sys.exit(0 if ok else 1)
+PY
+    O3="$T/Games/oldgui2"; mkdir -p "$O3"; echo exe > "$O3/Armada2.exe"; echo stockbink > "$O3/binkw32.dll"
+    python3 "$T/oldgui2/installer.py" --package "$zip" --game "$O3" --no-launcher > "$T/out" 2> "$T/err"
+    check '[ -e "$O3/QOL.asi" ] && grep -q "\"version\": \"$ver\"" "$O3/armada2-refit-installed.json"'
+else
+    echo "(skipped: a2ede51 is not in this clone's history)"
 fi
 
 echo "== a package file an antivirus took: the window's words, every file named"
@@ -206,10 +238,26 @@ sys.exit(0 if ok else 1)
 PY
 fi
 
-echo "== a game with no d3d8.dll: d3d8to9 with Display8 in front of it, and out again"
+echo "== the game of an older install: Heroic's d3d9 of ours out, the old chain's files taken out"
+A="$T/Games/oldchain"; mkdir -p "$A"; echo exe > "$A/Armada2.exe"; echo stockbink > "$A/binkw32.dll"
+echo dxvk-d3d9 > "$A/d3d9.dll"; echo "dxvk conf" > "$A/dxvk.conf"
+printf '{"1174788223":{"enviromentOptions":[{"key":"WINEDLLOVERRIDES","value":"winmm=n,b;d3d8=n,b;d3d9=n,b"}]},"version":"v0","explicit":true}\n' \
+    > "$H/GamesConfig/1174788223.json"
+printf '{"installed":[{"appName":"1174788223","install_path":"%s","platform":"windows"}]}\n' "$A" \
+    > "$H/gog_store/installed.json"
+"${run[@]}" --package "$zip" --game "$A" > "$T/out" 2> "$T/err"
+check '! grep -q d3d9 "$H/GamesConfig/1174788223.json" && grep -q "winmm=n,b;d3d8=n,b" "$H/GamesConfig/1174788223.json"'
+check '[ ! -e "$A/d3d9.dll" ] && grep -q "Display8 stopped the game" "$A/d3d8.dll"'
+"${run[@]}" --uninstall --game "$A" > "$T/out" 2> "$T/err"
+check 'grep -q "d3d9=n,b" "$H/GamesConfig/1174788223.json"'   # undo gives the player's entry back
+cp "$T/heroic-before.json" "$H/GamesConfig/1174788223.json"
+printf '{"installed":[{"appName":"1174788223","install_path":"%s","platform":"windows"}]}\n' "$G" \
+    > "$H/gog_store/installed.json"
+
+echo "== a game with no d3d8.dll: Display8 alone in d3d8.dll, and out again"
 N="$T/Games/nod3d8"; mkdir -p "$N"; echo exe > "$N/Armada2.exe"; echo stockbink > "$N/binkw32.dll"
 "${run[@]}" --package "$zip" --game "$N" --no-launcher > "$T/out" 2> "$T/err"
-check 'grep -q "Display8 stopped the game" "$N/d3d8.dll" && [ -e "$N/d3d8_real.dll" ] && [ -e "$N/Display8.ini" ] && [ -e "$N/UI.asi" ]'
+check 'grep -q "Display8 stopped the game" "$N/d3d8.dll" && [ ! -e "$N/d3d8_real.dll" ] && [ ! -e "$N/d3d9.dll" ] && [ -e "$N/Display8.ini" ] && [ -e "$N/UI.asi" ]'
 check 'grep -q "Installing Display8" "$T/err"'
 "${run[@]}" --uninstall --game "$N" --no-launcher > "$T/out" 2> "$T/err"
 check '[ ! -e "$N/d3d8.dll" ] && [ ! -e "$N/d3d8_real.dll" ] && [ ! -e "$N/Display8.ini" ] && [ ! -e "$N/UI.asi" ]'

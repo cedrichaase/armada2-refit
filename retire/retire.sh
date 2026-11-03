@@ -5,8 +5,10 @@
 #   retire.sh [--check] [--chain] [<game dir>]
 #
 #   --check   list what would be done and touch nothing
-#   --chain   also take out the Direct3D chain's files (known.txt, chain-*): left alone
-#             until Display8 no longer stands on them
+#   --chain   also take out the Direct3D chain's files (known.txt, chain-*): the vendored
+#             d3d8to9 as d3d8_real.dll, DXVK's d3d9.dll and a marked dxvk.conf, which
+#             nothing reads since display 1.0.0; the dxvk.conf's sampler values are carried
+#             into Display8.ini [Samplers] first
 #
 # Called by ./install (before the layers' installers) and mirrored by the release
 # installers; `a2mod refit` points at it when it restores a retired layer's files. Each
@@ -40,6 +42,16 @@ out() {   # path -- remove a file, or say so under --check
     local p="$1" rel="${1#"$game"/}"
     [ -e "$p" ] || return 0
     if [ "$check" = 1 ]; then echo "retire: would remove $rel"; else rm -rf "$p"; echo "retire: removed $rel"; fi
+}
+# A marked dxvk.conf's sampler values into Display8.ini [Samplers], before it goes. Without a
+# Display8.ini a stub at Defaults=1 is merged and taken away again when the merge changed
+# nothing (display/install writes the file later, from the shipped one).
+carry_samplers() {
+    local ini="$game/Display8.ini" shipped="$here/../display/Display8.ini" made=0
+    [ -f "$shipped" ] || return 0
+    if [ ! -f "$ini" ]; then printf "[Display8]\nDefaults=1\n" > "$ini"; made=1; fi
+    python3 "$here/../tools/ini-merge.py" "$shipped" "$ini" | sed 's/^/retire: /' || true
+    if [ "$made" = 1 ] && cmp -s "$shipped" "$ini"; then rm -f "$ini"; fi
 }
 rmdir_if_empty() { if [ "$check" = 0 ]; then rmdir "$1" 2>/dev/null || true; fi; }
 
@@ -92,6 +104,9 @@ while IFS= read -r line || [ -n "$line" ]; do
         chain-marker)
             f="$1"; shift
             if [ "$chain" = 1 ] && [ -f "$game/$f" ] && grep -qF "$*" "$game/$f"; then
+                # dxvk.conf: its sampler values go into Display8.ini [Samplers] first
+                # (tools/ini-merge.py, Defaults 3, which reads the dxvk.conf beside it).
+                if [ "$f" = dxvk.conf ] && [ "$check" = 0 ]; then carry_samplers; fi
                 out "$game/$f"
             fi ;;
         *) echo "retire: known.txt: unknown entry kind $kind" >&2; exit 1 ;;

@@ -13,7 +13,7 @@ set -euo pipefail
 GAME="$A2_GAME" PREFIX="$A2_PREFIX" PROTON="$A2_PROTON"
 
 export WINEPREFIX="$PREFIX/pfx"
-export WINEDLLOVERRIDES="${WINEDLLOVERRIDES:-winmm=n,b;d3d8=n,b;d3d9=n,b}"
+export WINEDLLOVERRIDES="${WINEDLLOVERRIDES:-winmm=n,b;d3d8=n,b}"
 export WINEDEBUG="${WINEDEBUG:--all}"
 
 # Armada2.exe carries its own switch table (found in the binary):
