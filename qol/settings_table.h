@@ -30,8 +30,12 @@ static const A2Setting QOL_SETTINGS[] = {
       "QOL.ini", "QOL", "MaxSelection", "40", "16|40|80|120", "Stock (16)|40|80|120",
       "Largest selection",
       "How many objects a selection and a control group can hold. Takes effect when the game is started.", NULLPTR },
+    { sizeof(A2Setting), A2SET_KIND_BOOL, A2SET_APPLY_LIVE, A2SET_SCOPE_LOCAL, A2SET_TAB_INTERFACE, 0,
+      "QOL.ini", "QOL", "BarKeys", "1", NULLPTR, NULLPTR,
+      "Grid keys",
+      "The command bar's keys are the grid's, by position: Q W E R T / A S D F G / Z X C V B. Off keeps the game's own keys. Needs the Refit command bar.", "UI.HUD.BarKeys" },
 };
-#define QOL_SETTINGS_COUNT 6
+#define QOL_SETTINGS_COUNT 7
 
 #define QOL_ROW_PANSPEED (&QOL_SETTINGS[0])
 #define QOL_ROW_SHIFTADDSTOGROUP (&QOL_SETTINGS[1])
@@ -39,6 +43,7 @@ static const A2Setting QOL_SETTINGS[] = {
 #define QOL_ROW_WARPDISTANCE (&QOL_SETTINGS[3])
 #define QOL_ROW_VIEWDISTANCE (&QOL_SETTINGS[4])
 #define QOL_ROW_MAXSELECTION (&QOL_SETTINGS[5])
+#define QOL_ROW_BARKEYS (&QOL_SETTINGS[6])
 
 /* The table, for the UI's settings hub (count may be NULL). */
 __declspec(dllexport) const A2Setting *__cdecl QOL_Settings(UINT *count)

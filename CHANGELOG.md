@@ -18,6 +18,13 @@ Layers: gui-installer 2.5.0, testbench 3.102.0.
 ### Changed
 - Every shipped plugin ini is merged into the player's (keys added, values kept, `Defaults=` upgrades and retired defaults as `tools/ini-merge.py`), never replaced with a `.ini.bak` copy; `UI.ini`'s upgrades and `Render3D.ini`'s retired defaults join Display8.ini's in the awk and PowerShell merges. `RefitPlayer.ini` is still never touched. `install.ps1` was only syntax-read here, not run. Installed, not yet seen in game.
 
+## 14.2.0 — 2026-11-03
+
+Layers: qol 2.1.0, ui 1.1.0, testbench 3.101.0.
+
+### Changed
+- Phase 9 W-BAR (contract C4): the command bar's position keys move from UI.asi to QOL.asi (`qol/bar.c`); the UI keeps the layout and drawing of the bar and its labels. `[HUD] BarKeys` becomes `[QOL] BarKeys` (`moved_from`). `csdk/def/{kernel32,user32}.def` gain the imports QOL's key scan needs. Installed, not yet seen in game.
+
 ## 14.1.0 — 2026-11-03
 
 Layers: display 0.18.0, ui 1.0.0, cutscenes 2.7.0.

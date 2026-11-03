@@ -4,7 +4,7 @@
 #![allow(dead_code)]
 use crate::rt::settings::*;
 
-pub static SETTINGS: [Setting; 19] = [
+pub static SETTINGS: [Setting; 18] = [
     Setting {
         size: ROW_SIZE,
         kind: KIND_BOOL,
@@ -122,23 +122,6 @@ pub static SETTINGS: [Setting; 19] = [
         value_labels: core::ptr::null(),
         label: c"Command bar".as_ptr(),
         help: c"The button bar as a grid with a key per cell. Off gives the game's bar back.".as_ptr(),
-        moved_from: core::ptr::null(),
-    },
-    Setting {
-        size: ROW_SIZE,
-        kind: KIND_BOOL,
-        apply: APPLY_LIVE,
-        scope: SCOPE_LOCAL,
-        tab: TAB_INTERFACE,
-        flags: 0,
-        file: c"UI.ini".as_ptr(),
-        section: c"HUD".as_ptr(),
-        key: c"BarKeys".as_ptr(),
-        def: c"1".as_ptr(),
-        values: core::ptr::null(),
-        value_labels: core::ptr::null(),
-        label: c"Grid keys".as_ptr(),
-        help: c"The bar's keys are the grid's, by position. Off keeps the game's own keys.".as_ptr(),
         moved_from: core::ptr::null(),
     },
     Setting {
@@ -337,18 +320,17 @@ pub const HUD_SELECTION: &Setting = &SETTINGS[3];
 pub const HUD_UNITVIEW: &Setting = &SETTINGS[4];
 pub const HUD_TOOLTIPS: &Setting = &SETTINGS[5];
 pub const HUD_BAR: &Setting = &SETTINGS[6];
-pub const HUD_BARKEYS: &Setting = &SETTINGS[7];
-pub const HUD_BARLABELS: &Setting = &SETTINGS[8];
-pub const HUD_ICONS: &Setting = &SETTINGS[9];
-pub const HUD_SELECTIONGAUGES: &Setting = &SETTINGS[10];
-pub const HUD_INFOCAMERA: &Setting = &SETTINGS[11];
-pub const UI_CURSOR: &Setting = &SETTINGS[12];
-pub const UI_THEME: &Setting = &SETTINGS[13];
-pub const MENUS_ENABLE: &Setting = &SETTINGS[14];
-pub const MENUS_SCENE: &Setting = &SETTINGS[15];
-pub const MENUS_CREDITS: &Setting = &SETTINGS[16];
-pub const LOADING_ENABLE: &Setting = &SETTINGS[17];
-pub const HUD_BARHIDDEN: &Setting = &SETTINGS[18];
+pub const HUD_BARLABELS: &Setting = &SETTINGS[7];
+pub const HUD_ICONS: &Setting = &SETTINGS[8];
+pub const HUD_SELECTIONGAUGES: &Setting = &SETTINGS[9];
+pub const HUD_INFOCAMERA: &Setting = &SETTINGS[10];
+pub const UI_CURSOR: &Setting = &SETTINGS[11];
+pub const UI_THEME: &Setting = &SETTINGS[12];
+pub const MENUS_ENABLE: &Setting = &SETTINGS[13];
+pub const MENUS_SCENE: &Setting = &SETTINGS[14];
+pub const MENUS_CREDITS: &Setting = &SETTINGS[15];
+pub const LOADING_ENABLE: &Setting = &SETTINGS[16];
+pub const HUD_BARHIDDEN: &Setting = &SETTINGS[17];
 
 /// The table, for the UI's settings hub (`count` may be NULL).
 #[unsafe(no_mangle)]

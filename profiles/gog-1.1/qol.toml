@@ -35,6 +35,10 @@ rows = ["QOL.StationGroups"]
 doc = "Long moves on the map go to warp"
 rows = ["QOL.WarpDistance"]
 
+[hook.bar_keys]
+doc = "The bar's keyboard step wrapped for the position keys; a button pressed with its click"
+rows = ["QOL.BarKeys"]
+
 [[sym]]
 id = "pan_site"
 symbol = "RTS_Configure"
@@ -1034,3 +1038,140 @@ symbol = "cOverViewImp action: carried bit"
 kind = "value"
 value = 16384
 used_by = ["warp"]
+
+[[sym]]
+id = "bk_toggles"
+symbol = "PopupPaletteImp::Init menu toggles"
+kind = "global"
+addr = 0x763d3c
+used_by = ["bar_keys"]
+
+[[sym]]
+id = "bk_process_keys"
+symbol = "PopupPaletteImp::mProcessKeyboardInput"
+kind = "fn"
+addr = 0x4fb5b0
+used_by = ["bar_keys"]
+
+[[sym]]
+id = "bk_keys_call"
+symbol = "PopupPaletteImp::Update"
+kind = "call"
+addr = 0x4fb56a
+target = "bk_process_keys"
+in = "PopupPaletteImp::Update"
+used_by = ["bar_keys"]
+
+[[sym]]
+id = "bk_key_commands"
+symbol = "PopupPaletteImp"
+kind = "field"
+struct = "PopupPaletteImp"
+offset = 0xcc
+type = "i32"
+used_by = ["bar_keys"]
+
+[[sym]]
+id = "bk_key_builds"
+symbol = "PopupPaletteImp"
+kind = "field"
+struct = "PopupPaletteImp"
+offset = 0xd8
+type = "i32"
+used_by = ["bar_keys"]
+
+[[sym]]
+id = "bk_key_weapons"
+symbol = "PopupPaletteImp"
+kind = "field"
+struct = "PopupPaletteImp"
+offset = 0xe4
+type = "i32"
+used_by = ["bar_keys"]
+
+[[sym]]
+id = "bk_n_toggles"
+symbol = "palette_n_toggles"
+kind = "value"
+value = 6
+used_by = ["bar_keys"]
+
+[[sym]]
+id = "bk_btn_state"
+symbol = "ControlButton"
+kind = "field"
+struct = "ControlButton"
+offset = 0x34
+type = "u32"
+used_by = ["bar_keys"]
+
+[[sym]]
+id = "bk_vt_press"
+symbol = "ControlButton vtable (button press)"
+kind = "field"
+struct = "ControlButton vtable (button press)"
+offset = 0x20
+type = "ptr"
+used_by = ["bar_keys"]
+
+[[sym]]
+id = "bk_text_input"
+symbol = "TextInput_IsActive"
+kind = "fn"
+addr = 0x65f120
+check = "a1 bc 0f 7b 00"
+used_by = ["bar_keys"]
+
+[[sym]]
+id = "bk_is_playing_video"
+symbol = "CinematicView::IsPlayingVideo"
+kind = "fn"
+addr = 0x4e6350
+check = "8b 51 24 33 c0"
+used_by = ["bar_keys"]
+
+[[sym]]
+id = "bk_cinematic_view"
+symbol = "g_cinematicView"
+kind = "global"
+addr = 0x763758
+used_by = ["bar_keys"]
+
+[[sym]]
+id = "bk_click_sound"
+symbol = "StandardButton::s_buttonClickSound"
+kind = "global"
+addr = 0x764854
+used_by = ["bar_keys"]
+
+[[sym]]
+id = "bk_operator_new"
+symbol = "operator new"
+kind = "fn"
+addr = 0x652710
+check = "55 8b ec a1"
+used_by = ["bar_keys"]
+
+[[sym]]
+id = "bk_sound2d"
+symbol = "AudioSound2D::AudioSound2D"
+kind = "fn"
+addr = 0x45fc50
+check = "55 8b ec 6a ff"
+used_by = ["bar_keys"]
+
+[[sym]]
+id = "bk_sound2d_bytes"
+symbol = "AudioSound2D"
+kind = "value"
+value = 0x1c
+unit = "bytes"
+used_by = ["bar_keys"]
+
+[[sym]]
+id = "bk_button_press"
+symbol = "ControlButton::mButtonPressFunction"
+kind = "fn"
+addr = 0x4e69e0
+check = "8b c1 56 8b 90"
+used_by = ["bar_keys"]

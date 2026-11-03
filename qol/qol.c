@@ -250,6 +250,8 @@ static void logline(const char *s)
     a2_append_line(g_logpath, s);
 }
 
+#include "bar.c"
+
 /* ---- the pan-speed hook ----------------------------------------------- */
 
 float g_panSpeed = 1.0f;     /* the factor; 1 leaves the parsed value as it is */
@@ -1175,6 +1177,8 @@ static void gate(const char *what, int on, int ok)
  * hooks of the row); asked on the game thread. */
 __declspec(dllexport) const char *__cdecl QOL_SettingsNote(const A2Setting *row)
 {
+    if (row && g_barGrid && row->key[0] == 'B' && row->key[3] == 'K')   /* BarKeys */
+        return "GridLayout.asi owns the command bar's keys while it is installed";
     return row ? a2e_note_for(row->section, row->key) : a2e_note_plugin();
 }
 
@@ -1214,6 +1218,13 @@ __declspec(dllexport) void __cdecl QOL_SettingsChanged(void)
         g_stations = on;
         changed(m, &n, "StationGroups", on ? "1" : "0");
         if (!g_stationsOk) gate("StationGroups", 0, 0);
+    }
+
+    on = a2_set_int(&g_ini, QOL_ROW_BARKEYS) != 0;
+    if (on != g_barKeys) {
+        g_barKeys = on;
+        changed(m, &n, "BarKeys", on ? "1" : "0");
+        if (!g_barOk) gate("BarKeys", 0, 0);
     }
 
     a2_set_str(&g_ini, QOL_ROW_WARPDISTANCE, val, sizeof val);
@@ -1261,6 +1272,7 @@ static void startup(void)
     g_rdyWarp = a2e_ready(QOL_H_WARP);
     g_rdySpec = a2e_ready(QOL_H_SPECIAL_SELECT);
     g_rdySel = a2e_ready(QOL_H_SELECTION);
+    g_rdyBar = a2e_ready(QOL_H_BAR_KEYS);
     a2_set_str(&g_ini, QOL_ROW_PANSPEED, val, sizeof val);
     f = pan_factor(val, &ok);
     g_panSpeed = f;
@@ -1340,6 +1352,23 @@ static void startup(void)
     }
     logline(b);
     if (g_viewDistance <= 0.0f) gate("ViewDistance", 0, g_viewOk);
+
+    g_barGrid = GetModuleHandleA("GridLayout.asi") != NULLPTR;
+    g_barKeys = a2_set_int(&g_ini, QOL_ROW_BARKEYS) != 0;
+    g_barOk = patch_bar();
+    b[0] = 0;
+    s_cat(b, "--- QOL BarKeys=");
+    s_cat(b, g_barKeys ? "1" : "0");
+    if (!g_barKeys) {
+        s_cat(b, "  (the bar's keys left as in stock)");
+    } else if (g_barOk) {
+        s_cat(b, "  -> Q W E R T / A S D F G / Z X C V B press the Refit bar's cells, patched");
+        if (g_barGrid) s_cat(b, "; GridLayout.asi is loaded, so they stand down");
+    } else {
+        not_patched(b, QOL_H_BAR_KEYS);
+    }
+    logline(b);
+    if (!g_barKeys) gate("BarKeys", 0, g_barOk);
 
     k = (int)a2_set_int(&g_ini, QOL_ROW_MAXSELECTION);
     b[0] = 0;

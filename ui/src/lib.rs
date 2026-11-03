@@ -122,7 +122,7 @@ fn startup() {
 /// owns the bar. NULL for the plugin as a whole and for any other row.
 #[unsafe(no_mangle)]
 pub extern "C" fn UI_SettingsNote(row: *const rt::settings::Setting) -> *const u8 {
-    use settings_table::{HUD_BAR, HUD_BARHIDDEN, HUD_BARKEYS, HUD_BARLABELS, HUD_ENABLE};
+    use settings_table::{HUD_BAR, HUD_BARHIDDEN, HUD_BARLABELS, HUD_ENABLE};
     if row.is_null() {
         // The plugin as a whole: an Armada2.exe Refit does not know.
         return syms::note_plugin().unwrap_or(core::ptr::null());
@@ -147,13 +147,28 @@ pub extern "C" fn UI_SettingsNote(row: *const rt::settings::Setting) -> *const u
             return why.as_ptr();
         }
     }
-    if core::ptr::eq(r, HUD_BAR) || core::ptr::eq(r, HUD_BARKEYS) || core::ptr::eq(r, HUD_BARLABELS) {
+    if core::ptr::eq(r, HUD_BAR) || core::ptr::eq(r, HUD_BARLABELS) {
         let grid = unsafe { rt::win::GetModuleHandleA(c"GridLayout.asi".as_ptr() as *const u8) };
         if !grid.is_null() {
             return b"The command bar is GridLayout.asi's while it is installed\0".as_ptr();
         }
     }
     core::ptr::null()
+}
+
+/// `UI_BarCell` (qol/bar.c, QOL-1): the stock button in cell 0..14 of the bar's menu now
+/// shown, or NULL when the cell is empty or the bar is not drawn. QOL's position keys
+/// work only while this gives a cell.
+#[unsafe(no_mangle)]
+pub extern "C" fn UI_BarCell(cell: u32) -> usize {
+    hud::bar::cell_button(cell)
+}
+
+/// `UI_BarStep` (qol/bar.c): the bar's update has run; QOL calls it on the game's thread
+/// after the stock keyboard step, so the UI's clicks are pressed with this update's buttons.
+#[unsafe(no_mangle)]
+pub extern "C" fn UI_BarStep(palette: usize) {
+    hud::bar::step_from_qol(palette);
 }
 
 #[unsafe(no_mangle)]

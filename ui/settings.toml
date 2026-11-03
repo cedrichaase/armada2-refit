@@ -87,18 +87,6 @@ label = "Command bar"
 help = "The button bar as a grid with a key per cell. Off gives the game's bar back."
 
 [[row]]
-name = "hud_barkeys"
-section = "HUD"
-key = "BarKeys"
-kind = "bool"
-default = "1"
-apply = "live"
-scope = "local"
-tab = "interface"
-label = "Grid keys"
-help = "The bar's keys are the grid's, by position. Off keeps the game's own keys."
-
-[[row]]
 name = "hud_barlabels"
 section = "HUD"
 key = "BarLabels"

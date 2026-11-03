@@ -28,10 +28,6 @@ doc = "The message, objectives, pause and replay boxes read and their buttons to
 doc = "The button bar's slots, buttons, command and mode names, icon sprites and tooltips"
 rows = ["HUD.Bar", "HUD.BarLabels", "HUD.Icons"]
 
-[hook."hud.barkeys"]
-doc = "PopupPaletteImp::Update's call of mProcessKeyboardInput wrapped for the bar's keys"
-rows = ["HUD.BarKeys"]
-
 [hook."hud.reads_overlay"]
 doc = "The selected and pointed units, their boxes, gauges and systems, as SelectionDisplay reads them"
 rows = ["HUD.Selection", "HUD.SelectionGauges"]
@@ -467,13 +463,6 @@ used_by = ["hud.reads_popups"]
 # ---- palette.rs: the button bar ------------------------------------------------------
 
 [[sym]]
-id = "palette_toggles"
-symbol = "PopupPaletteImp::Init menu toggles"
-kind = "global"
-addr = 0x763d3c
-used_by = ["hud.barkeys"]
-
-[[sym]]
 id = "palette_mode_names"
 symbol = "ModeInfo fixed-button names"
 kind = "global"
@@ -520,30 +509,6 @@ check = "55 8b ec 8b 45 08"
 used_by = ["hud.reads_bar"]
 
 [[sym]]
-id = "palette_button_press"
-symbol = "ControlButton::mButtonPressFunction"
-kind = "fn"
-addr = 0x4e69e0
-check = "8b c1 56 8b 90"
-used_by = ["hud.reads_bar"]
-
-[[sym]]
-id = "palette_process_keys"
-symbol = "PopupPaletteImp::mProcessKeyboardInput"
-kind = "fn"
-addr = 0x4fb5b0
-used_by = ["hud.barkeys"]
-
-[[sym]]
-id = "palette_keys_call"
-symbol = "PopupPaletteImp::Update"
-kind = "call"
-addr = 0x4fb56a
-target = "palette_process_keys"
-in = "PopupPaletteImp::Update"
-used_by = ["hud.barkeys"]
-
-[[sym]]
 id = "palette_slots"
 symbol = "PopupPaletteImp"
 kind = "field"
@@ -569,33 +534,6 @@ struct = "PopupPaletteImp"
 offset = 0x124
 type = "u32"
 used_by = ["hud.reads_bar"]
-
-[[sym]]
-id = "palette_key_commands"
-symbol = "PopupPaletteImp"
-kind = "field"
-struct = "PopupPaletteImp"
-offset = 0xcc
-type = "i32"
-used_by = ["hud.barkeys"]
-
-[[sym]]
-id = "palette_key_builds"
-symbol = "PopupPaletteImp"
-kind = "field"
-struct = "PopupPaletteImp"
-offset = 0xd8
-type = "i32"
-used_by = ["hud.barkeys"]
-
-[[sym]]
-id = "palette_key_weapons"
-symbol = "PopupPaletteImp"
-kind = "field"
-struct = "PopupPaletteImp"
-offset = 0xe4
-type = "i32"
-used_by = ["hud.barkeys"]
 
 [[sym]]
 id = "palette_btn_state"
@@ -747,13 +685,6 @@ symbol = "palette_n_slots"
 kind = "value"
 value = 21
 used_by = ["hud.reads_bar"]
-
-[[sym]]
-id = "palette_n_toggles"
-symbol = "palette_n_toggles"
-kind = "value"
-value = 6
-used_by = ["hud.barkeys"]
 
 [[sym]]
 id = "palette_names_stride"

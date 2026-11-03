@@ -4,6 +4,12 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 1.1.0 — 2026-11-03
+
+### Changed
+- The bar's keys moved to QOL.asi (`qol/bar.c`, QOL-1): `[HUD] BarKeys` and its row leave `UI.ini` and the Refit screen's table (`QOL.QOL.BarKeys` takes it over, `moved_from = "UI.HUD.BarKeys"`; an overlay value is moved at the first frame). The call patch of `mProcessKeyboardInput`, the hotkey-table and menu-toggle handling, the key scan and `hud.barkeys` with its seven profile entries are gone from `engine/palette.rs`, `hud/bar.rs` and `ui.hud.toml`. The UI keeps the layout, the drawing and the clicks.
+- New exports `UI_BarCell(cell)` (the stock button in a cell, NULL when the bar is not drawn) and `UI_BarStep(palette)` (QOL's keyboard-step wrap tells the UI the bar's update has run; until the first step, or without QOL, the UI takes it in its frame). The labels are `QOL_BarLabel(cell)`'s, drawn with `[HUD] BarLabels=1`; the tooltips drop stock's hotkey while it names one. `UI.log` no longer logs `bar: key ...` (QOL.log does). `settings::find_export` finds an export by name. Installed, not yet seen in game.
+
 ## 1.0.0 — 2026-11-03
 
 MAJOR: keys move out of `UI.ini`.
@@ -472,6 +478,7 @@ Confirmed in game 2026-10-19.
   where the engine would draw one.
 
 Confirmed in game 2026-10-30.
+
 ## 0.13.1 — 2026-10-18
 
 ### Changed

@@ -576,7 +576,7 @@ Display8's never registers either.
 | `HUD.asi` seams (sprite edges on pixel boundaries) | only the stock panels above still draw tiled sprites |
 | `HUD.asi` re-layout after a mode change | nothing to do: our panels lay out every frame, the stock canvas is the same at every mode |
 | `HUD.asi` cursor (square at any aspect) | ours with `Cursor=1`; with `Cursor=0` (or where ours cannot hide the engine's), `engine::cursor::install_square` makes HUD.asi's two changes (below) |
-| `GridLayout.asi` (the bar as a grid of position keys) | `[HUD] Bar`, `BarKeys` (`HUD.md`, "The button bar"). `GridLayout.ini`'s `[Cells]` has no counterpart yet |
+| `GridLayout.asi` (the bar as a grid of position keys) | `[HUD] Bar` for the layout and drawing; the keys are QOL.asi's (`QOL.ini` `BarKeys`, `qol/bar.c`; `HUD.md`, "The button bar"). `GridLayout.ini`'s `[Cells]` has no counterpart yet |
 | `Menus.asi` display mode raised | the menu host raises it (`MENUS.md`, "The display") |
 | `Menus.asi` scaling, mouse mapping | the menus are drawn by us, and the pointer sent to each dialog in its design place |
 | `Menus.asi` `Embed=1` (one window) | every hosted dialog is a hidden child of the 3D window; the game is one window throughout |
@@ -614,7 +614,7 @@ is checked to be stock. `UI.log`: "cursor: the engine's cursor is kept square".
 | `[UI] Theme` | auto | the look (`STYLE.md`): `auto` is the player's race in a mission and the shell's theme elsewhere; or `shell`, `federation`, `klingon`, `romulan`, `cardassian`, `borg`, `species8472` everywhere |
 | `[Demo] Mission`, `Shell`, `Loading` | 0 | the demonstration panel in that context (`Shell`: with the widget gallery) |
 | `[Demo] Style` | 0 | the style gallery (`STYLE.md`) in place of the demos: every theme and widget state in the front end (the Credits' place) and over a mission, the loading look on the loading screen |
-| `[HUD] Enable`, `Bar`, `BarKeys`, `BarLabels` | 1, 1, 1, 1 | the HUD's panels of ours, one key per panel ([`HUD.md`](HUD.md)), every one on |
+| `[HUD] Enable`, `Bar`, `BarLabels` | 1, 1, 1 | the HUD's panels of ours, one key per panel ([`HUD.md`](HUD.md)), every one on |
 | `[HUD] Overview`, `Fade`, `UnitVideo` | 1, 1, 1 | the engine's last draws in a mission drawn by us: the drag box, height posts, order ring and placement markers, the scripts' fade, the unit view's video (`HUD.md`, "The engine's last draws") |
 | `[HUD] SystemIcons`, `ShotScenes`, `MinimapCursor`, `FrameRate` | 1, 1, 1, 1 | what the stock overlay and minimap drew that ours left out, and the frame rate: the pointed unit's damaged systems, the shot director's scenes on the minimap in the tactical view, the action cursor over the minimap, `FRAMERATE_DISPLAY`'s text (`HUD.md`, "What the stock overlay and minimap drew that ours left out") |
 | `[HUD] Placement` | 1 | with `Overview=1`, a placement's markers (the footprint, the cells other objects take) in the theme; 0 with the engine's sprites (`HUD.md`, "The placement markers") |
@@ -661,9 +661,9 @@ patch was installed for keeps its start value. By apply class:
 
 - **LIVE**: `HUD.Minimap`, `Info`, `Tooltips` (`hud::apply_live` gives the stock panel
   back or takes it over; the minimap's click hook goes in at the start whatever the key,
-  so it can come back), `BarKeys` (`palette::set_stock_keys_off`), `BarLabels`, `Icons`,
+  so it can come back), `BarLabels`, `Icons`,
   `SelectionGauges`, `InfoCamera`, `UI.Cursor`, `UI.Theme` (read per frame). Shown
-  on the bench: `Minimap` at the same frame, `Theme`; `Info`, `Tooltips`, `BarKeys`
+  on the bench: `Minimap` at the same frame, `Theme`; `Info`, `Tooltips`
   not yet driven.
 - **MISSION**: `Menus.Scene` (read when a screen asks for the scene), `HUD.BarHidden`
   (applied at the next HUD frame).

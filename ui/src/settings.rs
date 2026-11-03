@@ -224,6 +224,19 @@ fn notify() -> String {
     told
 }
 
+/// The address of an export of any loaded module, or 0: a plugin is found by what it
+/// exports, never by its file name. A few microseconds; ask when needed, not every frame.
+pub fn find_export(name: &str) -> usize {
+    let mut mods: Vec<HANDLE> = alloc::vec![core::ptr::null_mut(); 512];
+    let mut needed = 0u32;
+    if unsafe { K32EnumProcessModules(GetCurrentProcess(), mods.as_mut_ptr(), (mods.len() * 4) as u32, &mut needed) } == 0 {
+        return 0;
+    }
+    mods.truncate((needed as usize / 4).min(mods.len()));
+    let c = rt::cstr(name);
+    mods.iter().map(|&m| unsafe { GetProcAddress(m, c.as_ptr()) }).find(|&f| f != 0).unwrap_or(0)
+}
+
 fn module_name(m: HANDLE) -> String {
     let mut buf = [0u8; 300];
     let n = unsafe { GetModuleFileNameA(m, buf.as_mut_ptr(), buf.len() as u32) } as usize;

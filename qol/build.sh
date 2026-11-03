@@ -14,7 +14,9 @@ mkdir -p "$out"
 exec 9>"$out/.build.lock"
 flock 9
 
-llvm-dlltool -m i386 --kill-at -d "$here/../csdk/def/kernel32.def" -l "$out/kernel32.lib"
+for lib in kernel32 user32; do
+    llvm-dlltool -m i386 --kill-at -d "$here/../csdk/def/$lib.def" -l "$out/$lib.lib"
+done
 
 clang --target=i386-pc-windows-msvc \
       -O2 -Wall -Wextra \
@@ -30,7 +32,7 @@ clang --target=i386-pc-windows-msvc \
 
 lld-link /dll /machine:x86 /nodefaultlib /entry:DllMain@12 \
          /out:"$out/QOL.asi" \
-         "$out/qol.obj" "$out/QOL.res" "$out/kernel32.lib"
+         "$out/qol.obj" "$out/QOL.res" "$out/kernel32.lib" "$out/user32.lib"
 
 echo "built $out/QOL.asi"
 objdump -f "$out/QOL.asi" | sed -n '2,4p'

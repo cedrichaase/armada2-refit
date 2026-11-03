@@ -10,8 +10,7 @@ anything is patched or called.
     [HUD]
     Enable=1      ; 0: the HUD is stock whatever the panel keys say
     Bar=1         ; the button bar is ours (below)
-    BarKeys=1     ; with it, the grid's keys; 0 keeps stock's bar keys
-    BarLabels=1   ; the key in each button's corner
+    BarLabels=1   ; the key in each button's corner (QOL names it: QOL.ini BarKeys=)
     Icons=1       ; our flat icons on the bar's and top-right buttons (0: the game's)
     Info=1        ; the info panel is ours (below); InfoCamera=1 its close-up,
                   ; InfoScale=1.3 its size
@@ -199,24 +198,26 @@ mode `in|out` and the "construct the virtual base" flag, as the game calls it;
 `str()` at 0x7b7db0; the whole-object destructor at 0x7b7ea8), and frees it the same
 way. The short text shows after 0.35 s, the verbose one after 1.5 s. The strings mark a
 hotkey's letter with `^` and name stock's hotkey in `<...>`, which does nothing while
-the grid's keys are on: both are dropped.
+QOL's grid keys are on (`QOL_BarLabel(0)` gives a label): both are dropped.
 
 **A press** is what releasing a click does in `StandardButton::Simulate`: nothing if
 the button is disabled, else the click sound (unless a video plays) and the button's
 press function (vtable +0x20, `ControlButton::mButtonPressFunction`), which hands the
-command (`CheckCanExecute`) or the mode to the bar. Clicks and keys are both pressed
-in the bar's keyboard step (the call of `mProcessKeyboardInput` at 0x4fb56a in
-`Update`, wrapped as GridLayout.asi wrapped it), so they act at the moment stock's
-would, on buttons of this update. A click is queued by the UI frame and dropped if no
-keyboard step takes it within three frames (the step runs only when something of the
-player's is selected and the game is not paused). The stock click's lock of the cursor
-while the button is held is not reproduced: ours never owns the mouse.
+command (`CheckCanExecute`) or the mode to the bar. A click is queued by the UI frame
+and pressed in the bar's update, which QOL's wrap of the keyboard step tells the UI of
+(`UI_BarStep`, "The keys are QOL's" below); it is dropped if no update takes it within
+three frames (the update runs only when something of the player's is selected and the
+game is not paused). Until QOL's first step, or without `QOL.asi`, the UI takes that
+step in its own frame. The stock click's lock of the cursor while the button is held is
+not reproduced: ours never owns the mouse.
 
-**Keys** are grid/README.md's, by scancode (`GetAsyncKeyState` on the virtual key
-`MapVirtualKeyA` gives for each), nothing while chat has the keyboard
-(`TextInput_IsActive`), Ctrl or Alt is held, or the game is not the foreground window.
-With `BarKeys=1` stock's bar keys do nothing: the three hotkey tables' counts are
-emptied for the stock call and put back, and the six menu toggles point at a zero.
+**The keys are QOL's** (`qol/bar.c`, `qol/README.md` "QOL-1"), since phase 9. The UI
+keeps the layout (`assign`, `place`) and the drawing; it exports `UI_BarCell(cell)`,
+the stock button in cell 0..14 of the menu now shown (NULL when the cell is empty or
+the bar is not drawn), and `UI_BarStep(palette)`; QOL exports `QOL_BarLabel(cell)`,
+the key's letter, and the UI draws it when `[HUD] BarLabels=1`. Both sides find the
+other's export by name in the loaded modules. With no refit bar (no `UI.asi`, or
+`[HUD] Bar=0`) QOL's keys stand down and the stock bar keys run.
 
 **Sounds.** The rollover sound when the pointer enters an enabled button, the click
 sound on a press: `AudioSound2D` objects made with the game's `operator new`, named by
@@ -231,8 +232,7 @@ the selection. Without a minimap of ours the rectangles are the stock components
 info panel.
 
 **Log.** Each layout once per change ("bar: menu=2 mode=1 | Q=bbase ... T=cancel
-G=back", `(off)` for a disabled button), each press ("bar: click build", "bar: key
-S=bmining").
+G=back", `(off)` for a disabled button), each click ("bar: click build"); QOL.log names each key ("bar: key S").
 
 ### Seen on the bench
 
@@ -1328,7 +1328,6 @@ down is explained on are named in the profile.
 | `ui.hud.reads_calls` | `TextInput_IsActive` and `CinematicView::IsPlayingVideo` (`fn`, checked), `g_cinematicView` | keys are not held back for the chat line; a click sounds during a video |
 | `ui.hud.reads_popups` | the message, objectives, pause and replay boxes, their press functions, `IsGamePausedAtAll` and `ObjectivesDisplay::FocusSimulate` (`fn`, checked) | no box of ours ("Messages and objectives", "Pause and replay") |
 | `ui.hud.reads_bar` (`HUD.Bar`, `HUD.BarLabels`, `HUD.Icons`) | the bar's slots, mode and menu, the `ControlButton` / `CommandInfoClass` / `ModeInfo` fields, the `ButtonName` pair, `cPrjID::GetName`, `FindElement` and `ControlButton::mButtonPressFunction` (`fn`, checked), the sprite database | no button is described or drawn |
-| `ui.hud.barkeys` (`HUD.BarKeys`) | the call of `mProcessKeyboardInput` in `PopupPaletteImp::Update` (patched), the hotkey counts, the six menu toggles | the bar's keys are the engine's |
 | `ui.hud.reads_overlay` (`HUD.Selection`, `HUD.SelectionGauges`) | `GameObject::objectList`, the object / craft / `SelectionDisplay` fields, `ComputeContainerRect` and `__RTDynamicCast` (`fn`, checked), `currentCamera`, the virtual viewport, `SystemOrder` | no overlay of ours |
 | `ui.hud.bubbles` | `RenderSelectionEffects` (patched, its first byte) | the engine's 3D bubbles stay |
 | `ui.hud.reads_overlay_text` | `overlayText`, its map's `_Nil` and the message fields | no overlay messages of ours |

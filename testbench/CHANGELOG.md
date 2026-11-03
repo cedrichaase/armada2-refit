@@ -10,6 +10,14 @@ versions". Newest first. The why is in [`README.md`](README.md).
 ### Added
 - `subset-full`, `subset-stockcompat`, `subset-visuals`, `subset-display-render3d`, `subset-display-ui` and `subset-display`: one game each, a mission with `Layers:` (none for the full release), checked on the plugins' logs (phase 9 W-PKG). Installed, not yet seen in game.
 
+## 3.101.0 — 2026-11-03
+
+### Added
+- Scenarios `qol-bar-keys` (the position keys through QOL, live `BarKeys`), `qol-bar-keys-stock` (`Layers: qol`: no refit bar, the keys stand down, the stock key works) and `ui-settings-moved-bar` (`Overlay: UI.HUD:BarKeys=0` is moved to `[QOL.QOL]`).
+
+### Changed
+- `engine-syms` expects the new symbol counts (UI hud 169, QOL 133). `ui-hud-bar` and `qol-refused-advisor` expect the key presses in `QOL.log` (`bar: key S`), not `UI.log`. Installed, not yet seen in game.
+
 ## 3.100.0 — 2026-11-03
 
 ### Added
