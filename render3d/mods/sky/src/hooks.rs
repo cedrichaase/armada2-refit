@@ -17,10 +17,10 @@
 use r3d_core::engine::{self, field, field_m34, field_u8, rd};
 use r3d_core::math::{M34, V3};
 use alloc::string::String;
-use crate::syms::sym;
+use crate::syms::{sym, TABLE};
 
 /// An engine address of the profile: 0 unless the hook that uses it is ready.
-pub(crate) fn at(s: a2engine::Sym) -> usize { crate::syms::TABLE.engine().addr(s) }
+pub(crate) fn at(s: a2engine::Sym) -> usize { TABLE.engine().addr(s) }
 
 /// The map's background name, lower-cased, as `Starfield_Load_Background_Geometry`
 /// keeps it: `<name>.sod` (a cube model) or a bare prefix (six faces `<prefix>0..5`).

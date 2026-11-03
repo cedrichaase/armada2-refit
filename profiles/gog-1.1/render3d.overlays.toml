@@ -10,6 +10,10 @@ out = "render3d/mods/overlays/src/syms.rs"
 doc = "What the overlays module reads of the engine: its objects, lists, globals and calls"
 rows = ["Modules.overlays"]
 
+[hook."overlays.posts"]
+doc = "The height posts: DrawHeightPost's five call sites re-pointed to our own anti-aliased lines"
+rows = ["Modules.overlays"]
+
 
 [[sym]]
 id = "fn_footprints"
@@ -124,12 +128,20 @@ check = "55 8b ec 83 ec 1c 53 56"
 used_by = ["overlays.reads"]
 
 [[sym]]
+id = "fn_user_team"
+symbol = "Transport::getUserTeam"
+kind = "fn"
+addr = 0x5578b0
+check = "56 8b f1 57 8b 4e 30 e8"
+used_by = ["overlays.reads"]
+
+[[sym]]
 id = "fn_height_post"
 symbol = "DrawHeightPost"
 kind = "fn"
 addr = 0x593840
 check = "55 8b ec 83 ec 18 8b 4d"
-used_by = ["overlays.reads"]
+used_by = ["overlays.reads", "overlays.posts"]
 
 [[sym]]
 id = "fn_render_selection"
@@ -183,7 +195,7 @@ used_by = ["overlays.reads"]
 
 [[sym]]
 id = "ghost_nodes"
-symbol = "TODO"
+symbol = "(unnamed) Ghost::ghostList head"
 kind = "global"
 addr = 0x736c94
 used_by = ["overlays.reads"]
@@ -239,7 +251,7 @@ used_by = ["overlays.reads"]
 
 [[sym]]
 id = "terrain_y"
-symbol = "TODO"
+symbol = "(unnamed) height posts plane"
 kind = "global"
 addr = 0x77215c
 used_by = ["overlays.reads"]
@@ -253,7 +265,7 @@ used_by = ["overlays.reads"]
 
 [[sym]]
 id = "buckets"
-symbol = "TODO"
+symbol = "(unnamed) selection entry buckets"
 kind = "global"
 addr = 0x773c8c
 used_by = ["overlays.reads"]
@@ -278,3 +290,48 @@ symbol = "ST3D_Colour_Red"
 kind = "global"
 addr = 0x7a8f78
 used_by = ["overlays.reads"]
+
+[[sym]]
+id = "site_post0"
+symbol = "PlaceholderFeature::sRenderInternal"
+kind = "call"
+addr = 0x473bbc
+target = "fn_height_post"
+in = "PlaceholderFeature::sRenderInternal"
+used_by = ["overlays.posts"]
+
+[[sym]]
+id = "site_post1"
+symbol = "cOverViewImp::mNormalModeRender"
+kind = "call"
+addr = 0x522080
+target = "fn_height_post"
+in = "cOverViewImp::mNormalModeRender"
+used_by = ["overlays.posts"]
+
+[[sym]]
+id = "site_post2"
+symbol = "cOverViewImp::mRenderWhere"
+kind = "call"
+addr = 0x5222fd
+target = "fn_height_post"
+in = "cOverViewImp::mRenderWhere"
+used_by = ["overlays.posts"]
+
+[[sym]]
+id = "site_post3"
+symbol = "cOverViewImp::mDrawPosts"
+kind = "call"
+addr = 0x524c02
+target = "fn_height_post"
+in = "cOverViewImp::mDrawPosts"
+used_by = ["overlays.posts"]
+
+[[sym]]
+id = "site_post4"
+symbol = "cOverViewImp::mDrawPost"
+kind = "call"
+addr = 0x524c2d
+target = "fn_height_post"
+in = "cOverViewImp::mDrawPost"
+used_by = ["overlays.posts"]

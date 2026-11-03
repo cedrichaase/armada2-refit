@@ -19,6 +19,7 @@ pub mod content;
 pub mod hooks;
 pub mod recipe;
 pub mod sprites;
+mod syms;
 
 use r3d_core::module::{Module, Step};
 use r3d_core::engine::{self, obj};
@@ -572,6 +573,12 @@ impl Sky {
 }
 
 impl Module for Sky {
+    /// The sky installs no hook; this checks the engine's reads are stock's.
+    fn hooks(&mut self, h: &mut r3d_core::hooks::Hooks) {
+        if !h.ready(&syms::TABLE, syms::hook::SKY_READS) {
+            h.stand_down("the engine's reads are not stock");
+        }
+    }
     fn name(&self) -> &'static str {
         "sky"
     }
@@ -661,7 +668,7 @@ impl Module for Sky {
         let _zo = r3d_core::timing::zone("sky: object list");
         let edit = hooks::edit_mode();
         let mut list: Vec<usize> = Vec::new();
-        engine::for_each_in_list(engine::OBJECT_LIST, |o| {
+        engine::for_each_in_list(engine::object_list(), |o| {
             if hooks::background_object(o, edit) {
                 list.push(o);
             }

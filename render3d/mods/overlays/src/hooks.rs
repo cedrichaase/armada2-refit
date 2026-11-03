@@ -12,10 +12,10 @@ use r3d_core::hooks::{Gate, Hook, Hooks, Kind, Site};
 use r3d_core::engine::{self, field, field_f32, field_u8, rd, storm3d};
 use r3d_core::math::{M34, V3};
 use crate::rt;
-use crate::syms::sym;
+use crate::syms::{hook, sym, TABLE};
 
 /// An engine address of the profile: 0 unless the hook that uses it is ready.
-pub(crate) fn at(s: a2engine::Sym) -> usize { crate::syms::TABLE.engine().addr(s) }
+pub(crate) fn at(s: a2engine::Sym) -> usize { TABLE.engine().addr(s) }
 
 // ---- the terrain step ---------------------------------------------------------------
 
@@ -103,7 +103,7 @@ pub fn selection_brightness() -> f32 {
 pub fn user_team() -> i32 {
     unsafe {
         let t = rd::<usize>(g_transport());
-        if t == 0 { -1 } else { core::mem::transmute::<usize, unsafe extern "thiscall" fn(usize) -> i32>(0x5578b0)(t) }
+        if t == 0 { -1 } else { core::mem::transmute::<usize, unsafe extern "thiscall" fn(usize) -> i32>(at(sym::FN_USER_TEAM))(t) }
     }
 }
 
@@ -163,7 +163,7 @@ pub fn scan_dims(shroud: bool) -> (i32, i32) {
 // ---- the height posts (the one hook) --------------------------------------------------
 
 pub(crate) fn fn_height_post() -> usize { at(sym::FN_HEIGHT_POST) }
-const SITES: [usize; 5] = [0x473bbc, 0x522080, 0x5222fd, 0x524c02, 0x524c2d];
+const SITES: [a2engine::Sym; 5] = [sym::SITE_POST0, sym::SITE_POST1, sym::SITE_POST2, sym::SITE_POST3, sym::SITE_POST4];
 pub(crate) fn terrain_y_addr() -> usize { at(sym::TERRAIN_Y) }
 pub(crate) fn green() -> usize { at(sym::GREEN) }
 pub(crate) fn red() -> usize { at(sym::RED) }
@@ -193,6 +193,9 @@ pub fn draw_engine_post(pos: *const V3, cam: usize) {
 /// is not stock's is logged and left to the engine. Returns how many are ours.
 pub fn install_posts(h: &mut Hooks) -> usize {
     unsafe { GATE = Some(h.gate()) };
+    if !h.ready(&TABLE, hook::OVERLAYS_POSTS) {
+        return 0;
+    }
     let owner = h.owner();
     let mut n = 0;
     for s in SITES {
@@ -200,7 +203,7 @@ pub fn install_posts(h: &mut Hooks) -> usize {
             owner,
             used_by: "height posts",
             kind: Kind::Call,
-            site: Site { symbol: "DrawHeightPost", addr: s, expect: fn_height_post() },
+            site: Site::of(&TABLE, s),
             to: hook_post as *const () as usize,
             chain: false,
         };

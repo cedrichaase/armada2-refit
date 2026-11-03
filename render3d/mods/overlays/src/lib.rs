@@ -33,6 +33,7 @@ mod grid;
 mod pivot;
 mod posts;
 mod selection;
+mod syms;
 
 use r3d_core::module::{Module, Step};
 use r3d_core::engine;
@@ -194,6 +195,10 @@ impl Module for Overlays {
     }
     /// The height posts' five calls, at the first enable; gated by the module's flag.
     fn hooks(&mut self, h: &mut r3d_core::hooks::Hooks) {
+        if !h.ready(&syms::TABLE, syms::hook::OVERLAYS_READS) {
+            h.stand_down("the engine's reads are not stock");
+            return;
+        }
         self.posts.install(h);
     }
     /// Switched off live: the posts noted in a view are dropped; the hook hands its
@@ -239,8 +244,8 @@ impl Module for Overlays {
             return false;
         }
         match vt {
-            hooks::vt_ghost() => self.ghosts.ghosts(f, v),
-            hooks::vt_placeholder() => self.ghosts.placeholder(f, v),
+            x if x != 0 && x == hooks::vt_ghost() => self.ghosts.ghosts(f, v),
+            x if x != 0 && x == hooks::vt_placeholder() => self.ghosts.placeholder(f, v),
             _ => false,
         }
     }
