@@ -32,9 +32,10 @@ use super::content::NAMES;
 /// Which look an effect takes, by its class.
 pub fn kind(vt: usize) -> Option<usize> {
     match vt {
-        vt_change_team() => Some(0),
-        vt_drain() => Some(1),
-        vt_crew_disruption() => Some(2),
+        0 => None,
+        v if v == vt_change_team() => Some(0),
+        v if v == vt_drain() => Some(1),
+        v if v == vt_crew_disruption() => Some(2),
         _ => None,
     }
 }

@@ -82,7 +82,7 @@ used_by = ["specials.reads"]
 
 [[sym]]
 id = "effect_head"
-symbol = "TODO"
+symbol = "(unnamed) special effects list head"
 kind = "global"
 addr = 0x7a8c0c
 used_by = ["specials.reads"]

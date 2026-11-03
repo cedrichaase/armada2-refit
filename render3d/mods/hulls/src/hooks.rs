@@ -10,15 +10,14 @@
 //! reading as before.
 use r3d_core::engine::{self, field, field_f32, field_u8, rd, vtable};
 use r3d_core::math::{v3, M34, V3};
-pub use r3d_core::engine::instance::{
 use crate::syms::sym;
+pub use r3d_core::engine::instance::{
+    class_node, crew_fire, detail_level, element_name, frustum_test, instance_byte, instance_class, instance_scale, is_craft_instance, lights_hidden,
+    render_fn, set_on_screen, station_node, team_colour, team_colours_on, cocoon_db, fn_mining_render, fn_rig_render, fn_shipyard_render, vt_cocoon, vt_database, DAMAGE_NODES,
+};
 
 /// An engine address of the profile: 0 unless the hook that uses it is ready.
 pub(crate) fn at(s: a2engine::Sym) -> usize { crate::syms::TABLE.engine().addr(s) }
-    class_node, crew_fire, detail_level, element_name, frustum_test, instance_byte, instance_class, instance_scale, is_craft_instance, lights_hidden,
-    render_fn, set_on_screen, station_node, team_colour, team_colours_on, COCOON_DB, DAMAGE_NODES, FN_MINING_RENDER, FN_RIG_RENDER, FN_SHIPYARD_RENDER,
-    VT_COCOON, VT_DATABASE,
-};
 
 /// Slot 11 of a class's vtable, `Render(ST3D_Camera*)`, for the classes we draw.
 pub fn fn_go_render() -> usize { at(sym::FN_GO_RENDER) } // GameObject::Render
@@ -73,7 +72,7 @@ pub fn cloak(o: usize) -> (u32, f32, f32) {
 
 /// The player's team (`Entity::GetUserTeam`, 0x4d0060, cdecl), as QOL.asi asks it.
 pub fn user_team() -> i32 {
-    unsafe { core::mem::transmute::<usize, unsafe extern "C" fn() -> i32>(0x4d0060)() }
+    unsafe { core::mem::transmute::<usize, unsafe extern "C" fn() -> i32>(at(sym::FN_USER_TEAM))() }
 }
 
 /// Whether the object is the player's own: its team (`+0xec`) is the player's.
@@ -115,13 +114,13 @@ pub fn billboard_effect(o: usize) -> Option<&'static str> {
 pub fn wave_lights(o: usize, craft: bool) -> [usize; 5] {
     let mut out = [0usize; 5];
     unsafe {
-        for (i, f) in [0x611b60usize, 0x611440, 0x611710, 0x610370].iter().enumerate() {
-            let g: unsafe extern "C" fn(usize) -> usize = core::mem::transmute(*f);
+        for (i, f) in [sym::FN_WEAPON_ENHANCER_WAVE, sym::FN_SENSOR_SCRAMBLER_WAVE, sym::FN_SPEED_ENHANCER_WAVE, sym::FN_PSIONIC_WAVE].iter().enumerate() {
+            let g: unsafe extern "C" fn(usize) -> usize = core::mem::transmute(at(*f));
             out[i] = g(o);
         }
     }
     if craft && field_f32(o, 0x240) > 0.0 {
-        out[4] = unsafe { rd::<usize>(0x740b84) };
+        out[4] = unsafe { rd::<usize>(at(sym::WAVE_LIGHT_WHITE)) };
     }
     out
 }
@@ -153,7 +152,7 @@ pub fn wave(w: usize) -> Option<Wave> {
 pub fn far_fade(inst: usize) -> Option<f32> {
     let mut f = 1.0f32;
     let r = unsafe {
-        let g: unsafe extern "thiscall" fn(usize, *mut f32) -> u8 = core::mem::transmute(0x4d5a20usize);
+        let g: unsafe extern "thiscall" fn(usize, *mut f32) -> u8 = core::mem::transmute(at(sym::FN_FAR_FADE));
         g(inst, &mut f)
     };
     if r != 0 { Some(f) } else { None }
@@ -162,7 +161,7 @@ pub fn far_fade(inst: usize) -> Option<f32> {
 /// Whether near fades are on for this pass (`Storm3D+0xe8`, `SetNearFadeOut`), and not
 /// in one of stock's two cases without one (`View_Record` mode 2; the byte 0x7637b5).
 pub fn near_fade_on() -> bool {
-    field(engine::storm3d(), 0xe8) != 0 && unsafe { rd::<u32>(0x76b610) } != 2 && unsafe { rd::<u8>(0x7637b5) } == 0
+    field(engine::storm3d(), 0xe8) != 0 && unsafe { rd::<u32>(at(sym::VIEW_RECORD_MODE)) } != 2 && unsafe { rd::<u8>(at(sym::NEAR_FADE_FLAG)) } == 0
 }
 
 /// The class's visible database (`GameObjectClass+0x1dc`).
@@ -180,7 +179,7 @@ pub fn hologram(o: usize) -> usize {
 /// answer is the object's on-screen byte.
 pub fn render_hologram(o: usize, h: usize) {
     unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(0x60f730usize);
+        let f: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(at(sym::FN_RENDER_HOLOGRAM));
         let v = f(h);
         core::ptr::write_volatile((o + 0x25) as *mut u8, v);
     }
@@ -195,13 +194,13 @@ pub fn suppressed(o: usize) -> bool {
 /// `PlaceholderFeature::sRenderInternal` before the rig, for the player's own team.
 pub fn rig_placeholder(o: usize) {
     unsafe {
-        let user: unsafe extern "C" fn() -> i32 = core::mem::transmute(0x4d0060usize);
+        let user: unsafe extern "C" fn() -> i32 = core::mem::transmute(at(sym::FN_USER_TEAM));
         if field(o, 0xec) as i32 != user() {
             return;
         }
         let mut item = field(o, 0x254);
         if item == 0 {
-            let f: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(0x4b7b40usize);
+            let f: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(at(sym::FN_NEXT_BUILD_ITEM));
             item = f(o);
         }
         let busy: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(field(vtable(o), 0x138));
@@ -212,12 +211,12 @@ pub fn rig_placeholder(o: usize) {
         if ok(item) == 0 {
             return;
         }
-        let colour: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(0x4d4fe0usize);
+        let colour: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(at(sym::FN_GET_COLOUR));
         let c = colour(o);
         let mut m = [0u8; 0x30];
         let place: unsafe extern "thiscall" fn(usize, *mut u8) -> usize = core::mem::transmute(field(vtable(o), 0x188));
         let mp = place(o, m.as_mut_ptr());
-        let draw: unsafe extern "C" fn(usize, usize, usize) = core::mem::transmute(0x473aa0usize);
+        let draw: unsafe extern "C" fn(usize, usize, usize) = core::mem::transmute(at(sym::FN_PLACEHOLDER_RENDER));
         draw(item, mp, c);
     }
 }
@@ -230,8 +229,8 @@ pub fn scrap_glow(o: usize) -> Option<V3> {
         return None;
     }
     unsafe {
-        let total: unsafe extern "thiscall" fn(usize) -> f32 = core::mem::transmute(0x4d6820usize);
-        let max: unsafe extern "thiscall" fn(usize) -> f32 = core::mem::transmute(0x4cf1f0usize);
+        let total: unsafe extern "thiscall" fn(usize) -> f32 = core::mem::transmute(at(sym::FN_RESOURCE_TOTAL));
+        let max: unsafe extern "thiscall" fn(usize) -> f32 = core::mem::transmute(at(sym::FN_RESOURCE_MAX));
         let t = total(r);
         let m = max(field(r, 4));
         let f = if m > 0.0 { t / m } else { 0.0 };
@@ -250,7 +249,7 @@ pub fn class_odf(class: usize) -> &'static str {
         return "";
     }
     unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(0x4ce370usize);
+        let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(at(sym::FN_CLASS_ODF));
         let p = f(class);
         if p.is_null() {
             return "";
@@ -267,7 +266,7 @@ pub fn class_odf(class: usize) -> &'static str {
 /// eye with the height counted a quarter, against `cfgOBJECT_CULLING_DISTANCE`
 /// (0x6fcac0). Computed, not called, where there is no instance to call it on.
 pub fn distance_culled(pos: V3, eye: V3) -> bool {
-    let limit = unsafe { rd::<f32>(0x6fcac0) };
+    let limit = unsafe { rd::<f32>(at(sym::CULLING_DISTANCE)) };
     let d = pos - eye;
     d.x * d.x + d.y * d.y / 16.0 + d.z * d.z > limit * limit
 }
@@ -300,9 +299,9 @@ pub fn evolution(o: usize) -> f32 {
 /// (`ApplyScaleEffects`, 0x599760). The same writes stock makes every frame.
 pub fn cocoon_scale_effects(c: usize) {
     unsafe {
-        let create: unsafe extern "thiscall" fn(usize) = core::mem::transmute(0x4d5eb0usize);
+        let create: unsafe extern "thiscall" fn(usize) = core::mem::transmute(at(sym::FN_STRATEGIC_SCALE));
         create(c);
-        let apply: unsafe extern "C" fn(usize, usize) = core::mem::transmute(0x599760usize);
+        let apply: unsafe extern "C" fn(usize, usize) = core::mem::transmute(at(sym::FN_APPLY_SCALE));
         apply(c, field(c, 0x94));
     }
 }
@@ -313,7 +312,7 @@ pub fn cocoon_scale_effects(c: usize) {
 pub fn cocoon_fade(c: usize) -> f32 {
     let mut f = 1.0f32;
     let r = unsafe {
-        let g: unsafe extern "thiscall" fn(usize, *mut f32) -> u8 = core::mem::transmute(0x4b1320usize);
+        let g: unsafe extern "thiscall" fn(usize, *mut f32) -> u8 = core::mem::transmute(at(sym::FN_COCOON_FADE));
         g(c, &mut f)
     };
     if r != 0 && f.is_finite() { f.clamp(0.0, 1.0) } else { 1.0 }
@@ -333,13 +332,13 @@ pub fn instance_render(inst: usize, cam: usize) -> bool {
 /// stand, the colour). None while there is none.
 pub fn rig_placeholder_of(o: usize) -> Option<(usize, M34, V3)> {
     unsafe {
-        let user: unsafe extern "C" fn() -> i32 = core::mem::transmute(0x4d0060usize);
+        let user: unsafe extern "C" fn() -> i32 = core::mem::transmute(at(sym::FN_USER_TEAM));
         if field(o, 0xec) as i32 != user() {
             return None;
         }
         let mut item = field(o, 0x254);
         if item == 0 {
-            let f: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(0x4b7b40usize);
+            let f: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(at(sym::FN_NEXT_BUILD_ITEM));
             item = f(o);
         }
         let busy: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(field(vtable(o), 0x138));
@@ -350,7 +349,7 @@ pub fn rig_placeholder_of(o: usize) -> Option<(usize, M34, V3)> {
         if ok(item) == 0 {
             return None;
         }
-        let colour: unsafe extern "thiscall" fn(usize) -> *const V3 = core::mem::transmute(0x4d4fe0usize);
+        let colour: unsafe extern "thiscall" fn(usize) -> *const V3 = core::mem::transmute(at(sym::FN_GET_COLOUR));
         let c = colour(o);
         let c = if c.is_null() { v3(1.0, 1.0, 1.0) } else { core::ptr::read_unaligned(c) };
         let mut m = [0u8; 0x30];
@@ -424,7 +423,7 @@ pub fn cargo_markings(o: usize, sod: &a2fmt::sod::Sod) -> alloc::vec::Vec<(alloc
 
 /// The engine's 2 pi (`0x7913bc`), or Rust's when it is not a sane value.
 pub fn two_pi() -> f32 {
-    let t = unsafe { rd::<f32>(0x7913bc) };
+    let t = unsafe { rd::<f32>(at(sym::TWO_PI)) };
     if t.is_finite() && t > 0.1 { t } else { core::f32::consts::TAU }
 }
 
@@ -438,7 +437,7 @@ pub fn fades_on() -> bool {
 /// (`0x70444c`, `0x704450`, `0x704454`). 1 when it does not fade.
 pub fn stock_near_fade(inst: usize) -> f32 {
     let q = field_f32(inst, 0x40) / field_f32(inst, 0x8c).max(1e-3);
-    let (minf, maxf, maxa) = unsafe { (rd::<f32>(0x70444c), rd::<f32>(0x704450), rd::<f32>(0x704454)) };
+    let (minf, maxf, maxa) = unsafe { (rd::<f32>(at(sym::FADE_MIN_FOV)), rd::<f32>(at(sym::FADE_MAX_FOV)), rd::<f32>(at(sym::FADE_MAX))) };
     if !(q > minf) || !(maxf > minf) {
         return 1.0;
     }
@@ -507,7 +506,7 @@ pub fn cocoon_position(c: usize) -> V3 {
 /// the engine keeps for `8472_cocoon.sod`.
 pub fn is_known_cocoon(c: usize) -> bool {
     let db = field(c, 0x80);
-    engine::vtable(c) == VT_COCOON && db != 0 && engine::vtable(db) == VT_DATABASE && db == unsafe { rd::<usize>(COCOON_DB) }
+    engine::vtable(c) == vt_cocoon() && db != 0 && engine::vtable(db) == vt_database() && db == unsafe { rd::<usize>(cocoon_db()) }
 }
 
 /// The cocoon's ramp (`+0x98`, 0..1 over the first third of the evolution).
@@ -535,7 +534,7 @@ pub fn class_borg_node(class: usize) -> Option<&'static str> {
 /// Whether a class is a `CraftClass` (its node fields are where `class_effect_nodes`
 /// reads them): `DisableSpecialNodes` (vtable slot 7) is `CraftClass`'s (0x4bfdf0).
 pub fn is_craft_class(class: usize) -> bool {
-    field(engine::vtable(class), 7 * 4) == 0x4bfdf0
+    field(engine::vtable(class), 7 * 4) == at(sym::FN_CRAFT_CLASS_DISABLE_NODES)
 }
 
 /// The planets in the object list (`vtable 0x6b2b3c`), as the shadow map's occluders:
@@ -544,7 +543,7 @@ pub fn is_craft_class(class: usize) -> bool {
 pub fn planet_spheres(max: usize) -> alloc::vec::Vec<[f32; 4]> {
     pub(crate) fn vt_planet() -> usize { at(sym::VT_PLANET) }
     let mut out = alloc::vec::Vec::new();
-    engine::for_each_in_list(engine::OBJECT_LIST, |o| {
+    engine::for_each_in_list(engine::object_list(), |o| {
         if out.len() >= max || o == 0 || engine::vtable(o) != vt_planet() {
             return;
         }

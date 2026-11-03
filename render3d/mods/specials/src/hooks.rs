@@ -54,9 +54,10 @@ pub enum RenderKind {
 /// The class of an effect's `Render` (vtable slot 0).
 pub fn render_kind(e: usize) -> RenderKind {
     match field(engine::vtable(e), 0) {
-        fn_render_base() => RenderKind::Base,
-        fn_render_timed() => RenderKind::Timed,
-        fn_render_change_team() => RenderKind::ChangeTeam,
+        0 => RenderKind::Other,
+        f if f == fn_render_base() => RenderKind::Base,
+        f if f == fn_render_timed() => RenderKind::Timed,
+        f if f == fn_render_change_team() => RenderKind::ChangeTeam,
         _ => RenderKind::Other,
     }
 }

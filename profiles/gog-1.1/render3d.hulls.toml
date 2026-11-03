@@ -79,3 +79,195 @@ symbol = "ResourceComponent::s_ResourceColor"
 kind = "global"
 addr = 0x764664
 used_by = ["hulls.reads"]
+[[sym]]
+id = "fn_weapon_enhancer_wave"
+symbol = "GetWeaponEnhancerWaveLight"
+kind = "fn"
+addr = 0x611b60
+check = "55 8b ec 83 ec 18 56 57"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_sensor_scrambler_wave"
+symbol = "GetSensorScramblerWaveLight"
+kind = "fn"
+addr = 0x611440
+check = "55 8b ec 83 ec 18 56 57"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_speed_enhancer_wave"
+symbol = "GetSpeedEnhancerWaveLight"
+kind = "fn"
+addr = 0x611710
+check = "55 8b ec 83 ec 18 56 57"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_psionic_wave"
+symbol = "GetPsionicInsanityWaveLight"
+kind = "fn"
+addr = 0x610370
+check = "55 8b ec 83 ec 18 56 57"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_far_fade"
+symbol = "GameObjectInstance::ComputeFadeOut"
+kind = "fn"
+addr = 0x4d5a20
+check = "55 8b ec 51 a1 c0 ca 6f"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_render_hologram"
+symbol = "TimedHoloEffect::RenderHologram"
+kind = "fn"
+addr = 0x60f730
+check = "56 8b f1 8b 86 b4 00 00"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_user_team"
+symbol = "Entity::GetUserTeam"
+kind = "fn"
+addr = 0x4d0060
+check = "8b 0d d4 b8 76 00 e9 45"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_next_build_item"
+symbol = "Producer::GetNextBuildItem"
+kind = "fn"
+addr = 0x4b7b40
+check = "8b 91 70 02 00 00 85 d2"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_get_colour"
+symbol = "GameObject::GetColor"
+kind = "fn"
+addr = 0x4d4fe0
+check = "8b 81 ec 00 00 00 50 e8"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_placeholder_render"
+symbol = "PlaceholderFeature::sRenderInternal"
+kind = "fn"
+addr = 0x473aa0
+check = "55 8b ec 6a ff 68 2b b5"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_resource_total"
+symbol = "ResourceInterface::GetTotalValue"
+kind = "fn"
+addr = 0x4d6820
+check = "8b 41 1c b9 06 00 00 00"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_resource_max"
+symbol = "ResourceInterfaceClass::GetTotalMaxValue"
+kind = "fn"
+addr = 0x4cf1f0
+check = "8b 41 08 b9 06 00 00 00"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_class_odf"
+symbol = "GameObjectClass::GetOdfName"
+kind = "fn"
+addr = 0x4ce370
+check = "8b 89 cc 01 00 00 e9 25"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_strategic_scale"
+symbol = "GameObjectInstance::CreateStrategicViewScaleEffect"
+kind = "fn"
+addr = 0x4d5eb0
+check = "55 8b ec 83 ec 0c d9 41"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_apply_scale"
+symbol = "ApplyScaleEffects"
+kind = "fn"
+addr = 0x599760
+check = "55 8b ec 83 ec 0c 8b 45"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_cocoon_fade"
+symbol = "CocoonInstance::ComputeFadeOut"
+kind = "fn"
+addr = 0x4b1320
+check = "55 8b ec 56 8b 75 08 57"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_craft_class_disable_nodes"
+symbol = "CraftClass::DisableSpecialNodes"
+kind = "fn"
+addr = 0x4bfdf0
+check = "56 8b f1 e8 38 d1 00 00"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "wave_light_white"
+symbol = "(unnamed) white wave light pointer"
+kind = "global"
+addr = 0x740b84
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "view_record_mode"
+symbol = "View_Record"
+kind = "global"
+addr = 0x76b610
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "near_fade_flag"
+symbol = "(unnamed) near fade exemption byte"
+kind = "global"
+addr = 0x7637b5
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "two_pi"
+symbol = "(unnamed) two pi constant"
+kind = "global"
+addr = 0x7913bc
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "culling_distance"
+symbol = "cfgOBJECT_CULLING_DISTANCE"
+kind = "global"
+addr = 0x6fcac0
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fade_min_fov"
+symbol = "cfgFADE_OUT_MIN_FOV"
+kind = "global"
+addr = 0x70444c
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fade_max_fov"
+symbol = "cfgFADE_OUT_MAX_FOV"
+kind = "global"
+addr = 0x704450
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fade_max"
+symbol = "cfgFADE_OUT_MAX"
+kind = "global"
+addr = 0x704454
+used_by = ["hulls.reads"]
+
