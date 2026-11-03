@@ -15,7 +15,7 @@ Reads package schemas 0 and 1, unchanged.
   the file; `test.sh` seeds one and asserts it is byte-identical after install, report and
   uninstall.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 2.3.0 — 2026-10-30
 

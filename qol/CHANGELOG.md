@@ -34,7 +34,7 @@ versions". Newest first. Details, and the planned changes, are in
 - `PanSpeed`'s code default was 1 where the shipped `QOL.ini` says 2.5: with the key missing
   the plugin left right-drag alone. The table's 2.5 is the default now.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 1.8.0 — 2026-10-30
 

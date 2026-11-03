@@ -29,7 +29,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
   (`mouse_live` honoured `in_overlay` first), so a question drawn over the Refit page
   and an open dropdown's list take the click alone.
 
-Installed, not yet seen in game
+Confirmed in game 2026-11-03
 
 ## 0.30.1 — 2026-11-02
 
@@ -37,7 +37,7 @@ Installed, not yet seen in game
 - Overlay values read by the first `config::load` (before the log is open) are logged
   once the log is open (`settings: RefitPlayer.ini [...] ... overrides ...`).
 
-Installed, not yet seen in game
+Confirmed in game 2026-11-03
 
 ## 0.30.0 — 2026-11-02
 
@@ -51,7 +51,7 @@ Installed, not yet seen in game
   (`hud::apply_live`). The minimap's click hook is now installed whether or not
   `Minimap=1` at the start.
 
-Installed, not yet seen in game
+Confirmed in game 2026-11-03
 
 ## 0.29.0 — 2026-11-02
 
@@ -71,7 +71,7 @@ Installed, not yet seen in game
   existing `UIPlayer.ini` is migrated once: a non-zero `[HUD] BarHidden` is carried
   over and the file is renamed `UIPlayer.ini.migrated`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 0.28.1 — 2026-10-30
 

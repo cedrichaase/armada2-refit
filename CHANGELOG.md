@@ -14,7 +14,7 @@ Layers: testbench 3.85.0.
   the `refit` screen in `testbench/ui.json`, lock steps in `multiplayer-two-players`, ten
   entries in `ui-menus-dialogs`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 13.61.0 — 2026-11-02
 
@@ -24,7 +24,7 @@ Layers: render3d 0.36.0.
 - render3d: `Render3D_SettingsNote`, the stand-down notes for the Refit screen; the
   crate's version corrected to match its changelog.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 13.60.0 — 2026-11-02
 
@@ -36,6 +36,9 @@ Layers: ui 0.31.0.
   `<Plugin>_SettingsNote` export (C5 amendment, `tools/settings/README.md`) with its
   `NoteFn` (`crates/a2rt`) and `A2SettingsNoteFn` (`csdk/a2asi.h`); UI exports
   `UI_SettingsNote`. The Redrawn menus row is ADVANCED.
+
+Confirmed in game 2026-11-03.
+
 ## 13.59.1 — 2026-11-02
 
 Layers: ui 0.30.1, testbench 3.84.0.
@@ -46,7 +49,7 @@ Layers: ui 0.30.1, testbench 3.84.0.
   logged (`overlay::note`), so it is logged on the next read; UI.asi reads once more
   after opening its log.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 13.59.0 — 2026-11-02
 
@@ -57,7 +60,7 @@ Layers: ui 0.30.0.
   info panel, tooltips, grid keys, icons, cursor and theme change while playing, from
   `RefitPlayer.ini`; scenario `ui-settings-live`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 13.58.1 — 2026-11-02
 
@@ -68,7 +71,7 @@ Layers: testbench 3.83.1.
   `World.Surfaces` and `Modules.sky`; `qol-settings-live` uses the `Overlay` step too
   (testbench 3.83.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 13.58.0 — 2026-11-02
 
@@ -78,7 +81,7 @@ Layers: testbench 3.83.0.
 - Scenario step `Overlay ...`: a live `RefitPlayer.ini` flip in a running game, unattended
   (testbench 3.83.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 13.57.0 — 2026-11-02
 
@@ -92,7 +95,7 @@ Layers: gui-installer 2.4.0.
 - Docs: `ui/MENUS.md` says a setting of ours goes only to the overlay; layout-table rows
   for `crates/a2ini` and `tools/settings` in `CLAUDE.md`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 13.56.0 — 2026-11-02
 
@@ -103,7 +106,7 @@ Layers: online 0.9.0, cutscenes 2.5.0.
   their settings tables (`Online_Settings`: `Entry`; `BinkProxy_Settings`:
   `ReplaceMovies`, live, re-read at each movie open).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 13.55.0 — 2026-11-02
 
@@ -118,7 +121,7 @@ Layers: qol 1.9.0, testbench 3.82.0.
 ### Fixed
 - `QOL.asi`'s `PanSpeed` code default is 2.5, as shipped, not 1.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 13.54.0 — 2026-11-02
 
@@ -128,7 +131,7 @@ Layers: render3d 0.35.0, testbench 3.81.0.
 - render3d's settings table and live paths (render3d 0.35.0); scenario
   `render3d-settings-live` (testbench 3.81.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 13.53.0 — 2026-11-02
 
@@ -138,7 +141,7 @@ Layers: testbench 3.80.0.
 - Bench side of the `RefitPlayer.ini` overlay: clones start without it, a scenario
   `Overlay:` header, `a2test drive overlay` for live flips (testbench 3.80.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 13.52.0 — 2026-11-02
 
@@ -160,7 +163,7 @@ Layers: display 0.16.0, render3d 0.34.0, ui 0.29.0, testbench 3.79.0.
 - CI: `cargo test` of a2ini, and a `settings` job (`selftest.sh`, `gen.py --check`,
   `lint.py`).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 13.51.3 — 2026-10-30
 

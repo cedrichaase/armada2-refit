@@ -16,7 +16,7 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 - `Cargo.toml` and `Cargo.lock` said 0.16.3 while this changelog said 0.35.0 (the log
   line `Render3D <version>` read the old one); now 0.36.0.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 0.35.0 — 2026-11-02
 
@@ -38,7 +38,7 @@ Installed, not yet seen in game.
 - The height-post hook is installed whether or not `HeightPosts` is on (it hands every
   call to the engine's while off).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 0.34.0 — 2026-11-02
 
@@ -49,7 +49,7 @@ Installed, not yet seen in game.
   line in Render3D.log for each value it supplies. Read at load as the ini is; applied
   live from 0.35.0. Without the file nothing changes.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 0.33.1 — 2026-10-30
 

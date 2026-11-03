@@ -16,7 +16,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - `multiplayer-two-players` checks the lock on *Pay when queued* in the running match;
   `ui-menus-dialogs` expects `Refit` among the in-mission Options' (now ten) entries.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 3.84.0 — 2026-11-02
 
@@ -25,7 +25,7 @@ Installed, not yet seen in game.
   `Overlay:` (written before launch) never reached the game; it no longer does, and
   `collect_logs` keeps the file. `overlay_selftest.py` checks both.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 3.83.1 — 2026-11-02
 
@@ -34,7 +34,7 @@ Installed, not yet seen in game.
   against their `roundC-main-port-showcase-*` baselines. `qol-settings-live`: the manual
   `Overlay "..."` notes became the `Overlay` step.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 3.83.0 — 2026-11-02
 
@@ -43,19 +43,19 @@ Installed, not yet seen in game.
   `a2test drive overlay` for scenarios (same function), an action so later log waits see
   only lines since it; so live-flip scenarios run unattended. Selftest extended.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 3.82.0 — 2026-11-02
 
 ### Added
 - Scenario `ui-settings-live` (overlay before launch: minimap off, Klingon theme).
 
-Installed, not yet seen in game
+Confirmed in game 2026-11-03
 - Scenario `qol-settings-live`: `ShiftAddsToGroup`, `StationGroups`, `PanSpeed`, `WarpDistance`
   and `ViewDistance` flipped through `RefitPlayer.ini` in a running mission; checked by
   QOL.log's `settings: applied` lines and by what the groups hold.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 3.81.0 — 2026-11-02
 
@@ -63,7 +63,7 @@ Installed, not yet seen in game.
 - Scenario `render3d-settings-live`: module and surface flips in a paused game by
   `drive overlay`, compared with the `roundC-main-port-showcase*` baselines.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 3.80.0 — 2026-11-02
 
@@ -78,7 +78,7 @@ Installed, not yet seen in game.
   in `UI.log` and fails clearly without one.
 - `bench/overlay_selftest.py`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 3.79.0 — 2026-11-02
 
@@ -92,7 +92,7 @@ Installed, not yet seen in game.
 - `ui-hud-bar-after-cinematic` and `operating/menus-host.md` name `RefitPlayer.ini`'s
   `[UI.HUD] BarHidden` in place of `UIPlayer.ini`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-11-03.
 
 ## 3.78.3 — 2026-10-30
 
