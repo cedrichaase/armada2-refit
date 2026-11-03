@@ -16,6 +16,7 @@ pub mod anim;
 pub mod camera;
 pub mod instance;
 pub mod lights;
+pub mod scene_lights;
 pub mod media;
 pub mod pose;
 pub mod sprites;

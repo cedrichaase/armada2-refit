@@ -911,10 +911,10 @@ key. Render3D.log says `settings: N rows exported (M the core's)`.
 
 | Owner | Sections |
 |---|---|
-| core | `[Render3D]` (`Enable`, `Log`, `MSAA`, `HDR`, `Bloom*`, `Exposure`, `Shoulder`, `Inset`, `Steps`, `Timing*`), `[Modules]`, `[Bench]` (`Clock`), `[Lights]`: the cluster keys (`Clustered`, `ClusterTile`, `ClusterSlices`, `ClusterLights`, `ClusterPerColour`), the scene lights' data type and their application (`scene/lights.rs`; the keys are hulls') |
+| core | `[Render3D]` (`Enable`, `Log`, `MSAA`, `HDR`, `Bloom*`, `Exposure`, `Shoulder`, `Inset`, `Steps`, `Timing*`), `[Modules]`, `[Bench]` (`Clock`), `[Lights]`: the cluster keys (`Clustered`, `ClusterTile`, `ClusterSlices`, `ClusterLights`, `ClusterPerColour`), the scene lights' keys (`Replace`, `KeyColour`, `KeyAxis`, `FillColour`, `FillAxis`, `SkyLight`; `scene/scene_lights.rs`, the hulls module's until 0.43.0: they light every module, so they must not depend on hulls being built in), their data type and their application (`scene/lights.rs`) |
 | world | `[World]` (the planets', rocks' and nebulae's switches and keys: there is no `[Planets]` or `[Rocks]` section), `[Nebulae]`; the recipe files' `[Surface]` and `[Nebula]` |
 | particles | `[Particles]` |
-| hulls | `[Hulls]` (the `Borg*` look keys with it); the `[Lights]` scene keys (`Replace`, `KeyColour`, `KeyAxis`, `FillColour`, `FillAxis`, `SkyLight`), read by its `configure` in `hulls/scene_lights.rs` and handed to the core through `services::scene_lights()` |
+| hulls | `[Hulls]` (the `Borg*` look keys with it) |
 | effects | `[Bees]`, `[Construction]`, `[Debris]`, `[Repair]`, `[Sparks]`, `[Explosions]`, `[Shields]`, `[Shell.<name>]` |
 | ordnance | `[Warp]`, `[Ordnance.<odf>]`, `[Model.<odf>]`, `[Wave.<odf>]` (over the built-in `content/ordnance/ordnance.ini`); the `[Lights]` beam keys (`Beam*`, `ConeSpot`, read by its `configure` in `ordnance/lights.rs`, `Beam`) |
 | specials | `[Specials]` |
@@ -1932,11 +1932,11 @@ the module reads of an object and its instance, behind named accessors (it was
 and it draws `GameObject::Render` by returning true there, so with it off the engine's
 own draw stands as stock (`Modules.hulls` is live, checked by `render3d-live-hulls`).
 `content.rs` holds its names of the game's data (SOD nodes, the cocoon's SOD, the
-scrap glow's sprite) and stock's resource colours. `scene_lights.rs` reads the scene
-keys and answers the core's `SceneLightSource`: the `Lighting.asi` test is made at the
-first gather (every plugin is loaded by then, not at load), and the replacement goes on
-with the module at 0, since the other modules light by it. `configure` reads `[Hulls]`
-and the scene keys at load and at every settings change; `Reload=1` and `ABTest` (the
+scrap glow's sprite) and stock's resource colours. The scene keys are the core's
+(`core/src/scene/scene_lights.rs`, the `SceneLightSource` the core registers itself): the
+`Lighting.asi` test is made at the first gather (every plugin is loaded by then, not at
+load), and the replacement goes on with the module at 0 or not built in, since the other
+modules light by it. `configure` reads `[Hulls]` at load and at every settings change; `Reload=1` and `ABTest` (the
 bench) work as before. The module has no settings row of its own beyond
 `Modules.hulls`. `Style`/`set_style` stay in `scene/lights.rs`: they are a light's
 semantics for the cluster pass, set by effects and ordnance, and no hulls code reads or

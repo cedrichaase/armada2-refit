@@ -38,7 +38,6 @@ pub mod content;
 pub mod hooks;
 pub mod look;
 mod draw;
-mod scene_lights;
 mod shadow;
 mod sprites;
 
@@ -568,15 +567,13 @@ impl Module for Hulls {
     fn rows(&self) -> &'static [crate::rt::settings::Setting] {
         &[]
     }
-    /// `[Hulls]` (the look, `Borg*` included) and the scene lights in `[Lights]`
-    /// (`scene_lights.rs`), at load and at every settings change.
+    /// `[Hulls]` (the look, `Borg*` included), at load and at every settings change. The
+    /// scene lights in `[Lights]` are the core's (`r3d_core::scene::scene_lights`).
     fn configure(&mut self, ini: &crate::rt::Ini, _said: &mut r3d_core::module::Changes) {
         self.look = Some(look::load(ini));
-        scene_lights::configure(ini);
     }
     fn provide(&mut self, id: r3d_core::module::ModuleId, s: &mut r3d_core::services::Services) {
         s.hulls(id, &PROVIDER);
-        s.scene_lights(&scene_lights::PROVIDER);
     }
     /// `[Modules] hulls=0`: the menu scene's ships stay ours. The front end has no game
     /// objects and the engine draws nothing there (Display8.log: 0 engine draws in

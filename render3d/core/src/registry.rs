@@ -190,6 +190,10 @@ pub fn init() {
         let flag: &'static AtomicBool = Box::leak(Box::new(AtomicBool::new(on)));
         mods.push(Entry { m, id: ModuleId(i as u8), flag, row, forget: false, hooked: false, failed: false, down: false, dev: 0 });
     }
+    // The scene lights are the core's (`scene::scene_lights`): every module sees them,
+    // whichever modules are built in.
+    crate::services::services_mut().scene_lights(&crate::scene::scene_lights::PROVIDER);
+    crate::scene::scene_lights::configure(&ini);
     for e in mods.iter_mut() {
         e.m.provide(e.id, crate::services::services_mut());
     }
@@ -534,6 +538,7 @@ pub fn any() -> bool {
 pub fn apply_settings() -> alloc::string::String {
     let ini = crate::config::ini();
     let mut parts = Changes::default();
+    crate::scene::scene_lights::configure(&ini);
     for e in all().iter_mut() {
         if !e.down {
             e.m.configure(&ini, &mut parts);

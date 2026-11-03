@@ -19,6 +19,9 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   since the core draws them. Every generated shader array is word for word as before.
 - `tools/settings`: the core's rows are generated into `core/src/settings_table.rs`
   (`rows_in = "core"`); `Render3D_Settings` is the cdylib's.
+- The `[Lights]` scene keys (`Replace`, `KeyColour`, `KeyAxis`, `FillColour`,
+  `FillAxis`, `SkyLight`) are read by the core (`scene/scene_lights.rs`, was the hulls
+  module's): they light every module, so a build without hulls keeps them.
 
 ### Added
 - One Cargo feature per module, all on by default (the DLL that ships has every one):
