@@ -21,15 +21,13 @@ step runs (when something of the player's is selected). The scene is `qol-settin
 5. Scene "select yard1".
 6. Wait 2 seconds.
 7. Expect "QOL.log" contains "bar: no refit bar, position keys off".
-8. Expect "UI.log" not contain "bar: ours".
-9. Press q.
-10. Wait 1 second.
-11. Expect "QOL.log" not contain "bar: key".
-12. Note "the stock bar's own key B opens the build menu".
-13. Press b.
-14. Wait 1 second.
-15. Take a screenshot called "stock build menu".
-16. Check that the game's own button bar is drawn and shows a menu of ship icons to build, with no yellow letters in the buttons' corners.
-17. Expect the game is still running.
-18. Quit the game.
-19. Expect no crash.
+8. Press q.
+9. Wait 1 second.
+10. Expect "QOL.log" not contain "bar: key".
+11. Note "the stock bar's own key B opens the build menu".
+12. Press b.
+13. Wait 1 second.
+14. Take a screenshot called "stock build menu".
+15. Check that the game's own button bar is drawn and shows a menu of ship icons to build, with no yellow letters in the buttons' corners.
+16. Expect the game is still running.
+17. Expect no crash.

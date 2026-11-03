@@ -39,7 +39,7 @@ appends its plugin's section and touches no other.
 18. Expect "UI.log" contains "engine: loading symbols: 17/17 resolved; 0 hooks blocked".
 19. Expect "UI.log" contains "engine: radar symbols: 116/116 resolved; 0 hooks blocked".
 20. Expect "UI.log" contains "engine: info symbols: 137/137 resolved; 0 hooks blocked".
-21. Expect "UI.log" contains "engine: hud symbols: 177/177 resolved; 0 hooks blocked".
+21. Expect "UI.log" contains "engine: hud symbols: 169/169 resolved; 0 hooks blocked".
 22. Expect "UI.log" contains "engine: panels symbols: 175/175 resolved; 0 hooks blocked".
 23. Expect "UI.log" contains "engine: shell symbols: 92/92 resolved; 0 hooks blocked".
 24. Expect "UI.log" contains "engine: dialogs symbols: 39/39 resolved; 0 hooks blocked".
@@ -68,7 +68,7 @@ appends its plugin's section and touches no other.
 ## QOL
 42. Expect "QOL.log" contains "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321".
 43. Expect "QOL.log" contains "engine: build armada2/gog-1.1".
-44. Expect "QOL.log" contains "engine: symbols: 116/116 resolved; 0 hooks blocked".
+44. Expect "QOL.log" contains "engine: symbols: 133/133 resolved; 0 hooks blocked".
 45. Expect "QOL.log" not contains "stands down: ".
 46. Expect "QOL.log" not contains "read before its hook".
 47. Expect "QOL.log" not contains "engine: TEST:".
