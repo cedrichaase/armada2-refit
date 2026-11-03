@@ -62,6 +62,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         sections: 0xa1a8a321,
         image_base: 0x400000,
         n_resolved: 15,
+        content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x626bf0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x51, 0x14, 0x53, 0x56, 0x57, 0x8b, 0x0a, 0x3b, 0xca], mask: &[], section: "", count: 0, value: 0 }, // find_display_mode
             a2engine::Entry { present: true, addr: 0x62c4e0, end: 0x0, target: 0x0, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shell_display_find

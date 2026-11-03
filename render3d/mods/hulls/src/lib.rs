@@ -371,8 +371,8 @@ impl Hulls {
         hooks::cocoon_scale_effects(c);
         let ours = hooks::is_known_cocoon(c);
         let place = hooks::instance_matrix(c);
-        let p = if ours {
-            self.pose_extra(v, content::COCOON_SOD, &place, hooks::instance_scale(c), pose::Clock::of_instance(c, v.time), None, 0, false)
+        let p = if ours && !content::get().cocoon_sod.is_empty() {
+            self.pose_extra(v, content::get().cocoon_sod, &place, hooks::instance_scale(c), pose::Clock::of_instance(c, v.time), None, 0, false)
         } else {
             None
         };
@@ -497,11 +497,11 @@ fn placeholder(v: &View, class: usize, place: &M34, colour: V3, blocked: bool) -
 /// Borg node hidden (a craft class), `lights` too when asked, `hardpoints` always.
 fn clean(model: &Model, class: usize, no_lights: bool, p: &mut pose::Pose) {
     let sod = &model.sod;
-    if let Some(i) = sod.find(content::HARDPOINTS_NODE) {
+    if let Some(i) = sod.find(content::get().hardpoints_node) {
         hide(sod, i, &mut p.shown, true);
     }
     if no_lights || hooks::detail_level() == 0 {
-        if let Some(i) = content::LIGHTS_NODES.iter().find_map(|n| sod.find(n)) {
+        if let Some(i) = content::get().lights_nodes.iter().find_map(|n| sod.find(n)) {
             hide(sod, i, &mut p.shown, true);
         }
     }
@@ -525,14 +525,14 @@ fn clean(model: &Model, class: usize, no_lights: bool, p: &mut pose::Pose) {
 /// `weapons`, `shield`, `shields`, `sensors`, `crew`, `damage`) and the `borg` node.
 fn clean_named(model: &Model, p: &mut pose::Pose) {
     let sod = &model.sod;
-    for n in content::DAMAGE_PARENT_NODES {
+    for n in content::get().damage_parent_nodes {
         if let Some(i) = sod.find(n) {
             for &c in &sod.nodes[i].children {
                 hide(sod, c, &mut p.shown, true);
             }
         }
     }
-    if let Some(i) = sod.find(content::BORG_NODE) {
+    if let Some(i) = sod.find(content::get().borg_node) {
         hide(sod, i, &mut p.shown, true);
     }
 }

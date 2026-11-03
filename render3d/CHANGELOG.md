@@ -4,6 +4,16 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.45.0 — 2026-11-03
+
+### Changed
+- The modules' built-in tables of game names (`content.rs` of effects, hulls, ordnance, overlays,
+  particles, sky, specials and world) are per content set, chosen by `content::get()` from
+  `Engine::content()` (phase 8f, `profiles/gog-1.1/content.toml`); the `stock` set is the
+  tables as they were, so the look is unchanged. A build with no set gets no built-in names or
+  recipes and the engine's own look. `overlays` now compiles its `content.rs`. Installed, not
+  yet seen in game.
+
 ## 0.44.1 — 2026-11-03
 
 ### Changed

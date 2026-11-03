@@ -1,0 +1,11 @@
+# Which content set each plugin reads on this build (phase 8f; crates/a2engine/README.md,
+# "Content"). A set is the plugin's own tables of the game's content names (ODFs,
+# sprites, nodes, factions, recipes), chosen in its `content.rs` by `Engine::content()`.
+# A plugin or plugin file (`render3d.hulls`) not named here takes build.toml's `content`;
+# a child build (Fleet Ops) inherits this file's entries and overrides by naming them;
+# `none` gives a plugin no set, and it then has no built-in names: the engine's own look.
+schema = 1
+
+[set]
+render3d = "stock"
+ui = "stock"

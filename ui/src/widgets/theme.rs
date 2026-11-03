@@ -24,31 +24,22 @@ pub enum Race {
 impl Race {
     pub const ALL: [Race; 6] = [Race::Federation, Race::Klingon, Race::Romulan, Race::Cardassian, Race::Borg, Race::Species8472];
 
+    /// Its place in `ALL`, which is the order of the content set's race list.
+    pub fn index(self) -> usize {
+        Race::ALL.iter().position(|r| *r == self).unwrap_or(0)
+    }
+
+    /// The race's name in the content set ("" when the build's set has no races).
     pub fn name(self) -> &'static str {
-        match self {
-            Race::Federation => "Federation",
-            Race::Klingon => "Klingon",
-            Race::Romulan => "Romulan",
-            Race::Cardassian => "Cardassian",
-            Race::Borg => "Borg",
-            Race::Species8472 => "Species 8472",
-        }
+        crate::content::get().races.get(self.index()).map_or("", |r| r.name)
     }
 
     /// From a name as `[UI] Theme=` or the game spells it (`federation`, `fed`,
-    /// `kli`, `bor`, `species8472`, `8472`, ...), any case.
+    /// `kli`, `bor`, `species8472`, `8472`, ...), any case; the content set's aliases.
     pub fn from_name(s: &str) -> Option<Race> {
         let l = crate::rt::lower(s.trim());
-        let l = l.as_str();
-        Some(match l {
-            "federation" | "fed" => Race::Federation,
-            "klingon" | "kli" | "kling" => Race::Klingon,
-            "romulan" | "rom" => Race::Romulan,
-            "cardassian" | "card" | "car" => Race::Cardassian,
-            "borg" | "bor" => Race::Borg,
-            "species8472" | "species 8472" | "8472" | "species" => Race::Species8472,
-            _ => return None,
-        })
+        let races = crate::content::get().races;
+        Race::ALL.iter().copied().find(|r| races.get(r.index()).is_some_and(|n| n.aliases.contains(&l.as_str())))
     }
 }
 

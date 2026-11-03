@@ -34,7 +34,6 @@ pub fn resource_panel() -> usize {
 /// colour the stock panel writes the amount in (from the GUI config).
 
 /// `eResource`, as `g_eResourceToString` names them.
-pub const NAMES: [&str; 6] = ["Crew", "Officers", "Dilithium", "Latinum", "Metal", "Biomatter"];
 pub const CREW: u32 = 0;
 pub const OFFICERS: u32 = 1;
 

@@ -39,6 +39,7 @@ CONST_KINDS = {'field', 'value'}
 FIELD_TYPES = {'u8', 'u16', 'u32', 'i32', 'f32', 'ptr', 'v3', 'm34'}
 MAX_CHECK = 32
 NONE = 0xffff
+CONTENT_NONE = 'none'
 
 
 class ProfileError(Exception):
@@ -109,10 +110,30 @@ class Build:
         self.disable = list(data.get('disable') or [])
         self.parent = None
         self.files = {}             # file name -> PluginFile
+        cp = os.path.join(self.dir, 'content.toml')
+        self.content_data = read_toml(cp) if os.path.exists(cp) else {}
+        self.content_path = cp
 
     @property
     def key(self):
         return f'{self.game}/{self.name}'
+
+    def content_for(self, fname):
+        """The content set the plugin file `fname` reads in this build, '' for none
+        (phase 8f): the nearest build's `content.toml` entry for the file (`render3d.hulls`)
+        or the plugin (`render3d`), else the nearest `content` of a build.toml. A set
+        named `none` is no set."""
+        stem = fname[:-5] if fname.endswith('.toml') else fname
+        plugin = stem.split('.')[0]
+        for b in reversed(self.chain()):
+            m = b.content_data.get('set') or {}
+            for k in (stem, plugin):
+                if k in m:
+                    return '' if m[k] == CONTENT_NONE else m[k]
+        for b in reversed(self.chain()):
+            if 'content' in b.data:
+                return '' if b.data['content'] == CONTENT_NONE else b.data['content']
+        return ''
 
     def chain(self):
         """This build and its ancestors, root first."""

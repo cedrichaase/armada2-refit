@@ -4,6 +4,9 @@
 //! tuned without a build; else the one the module built in (`builtin`, its
 //! `include_str!`s), so nothing needs to be installed for the look.
 //!
+//! A module registers its content set's recipes (`content::get()`, README.md, "Content
+//! sets"); a build with no set registers none.
+//!
 //! Staged in the one crate until the crates are split (`core/` then).
 use crate::rt;
 use alloc::string::String;

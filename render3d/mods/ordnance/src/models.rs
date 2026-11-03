@@ -125,7 +125,7 @@ impl Models {
         let stem = hooks::stem(odf);
         if !self.kinds.contains_key(&stem) {
             let k = assets::odf(&stem).and_then(|o| o.get_str("shotGeometry").map(String::from)).and_then(|g| {
-                let sod = crate::rt::lower(g.trim_end_matches(content::SOD_EXTS[0]).trim_end_matches(content::SOD_EXTS[1]));
+                let sod = crate::rt::lower(content::get().strip_sod_ext(&g));
                 let s = assets::sod(&sod)?;
                 let emitters = s.nodes.iter().any(|n| matches!(n.kind, NodeKind::Emitter { .. }));
                 let look = self.looks.get(&stem).cloned().unwrap_or_else(|| self.plain.clone());

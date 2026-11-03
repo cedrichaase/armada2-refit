@@ -24,7 +24,7 @@ impl<'a> Settings<'a> {
         let mut base: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
         let mut order = Vec::new();
         let mut cur = String::new();
-        r3d_core::recipes::builtin("ordnance", &super::content::RECIPES);
+        r3d_core::recipes::builtin("ordnance", super::content::get().recipes);
         let text = r3d_core::recipes::text("ordnance", "ordnance").map_or(String::new(), |r| r.text);
         for line in text.lines() {
             let l = line.trim();

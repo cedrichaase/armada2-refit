@@ -1436,7 +1436,7 @@ Scenario `render3d-specialfx`.
 
 The hooks are put in at the module's first frame (`device()`), not at load: other plugins check the stock bytes of these sites when they load, and the bench's `Scene.asi` reads the shield sites. With the gate shut, or a part off, every detour hands the call to what was there, so the engine breaks craft up and draws welds and particles itself. The explosion, shield, bee and construction draws need no hook (`feature()` and `object()`); the registry hands them back.
 
-**Content** (`effects/content.rs`): the weapons' names for the shield taps and the faction keys and colours of `[Shields]`.
+**Content** (`effects/content.rs`): the weapons' names for the shield taps and the faction keys, colours and ODF initials of `[Shields]`.
 
 **Settings**: `Modules.effects` (live) is the only row. A flip off drops the debris in flight; the shield hits, welds and construction edges are keyed to the engine's own records and stay, so a flip on picks them up where they are. Effects already in flight finish in the look they started with.
 
@@ -2728,6 +2728,19 @@ The module reads its parts again at every settings change (`configure`): the row
 planets' and rocks' looks, the light keys. A part is ours when its row is on and no old
 plugin has it; `off()` stops the ghost hiding and the planets' glows, and the next view
 lets go of the GPU objects.
+
+#### Content sets
+
+Every module keeps its built-in tables of the game's names in its `content.rs`, one `Content`
+value per set (`STOCK`, and an empty `NONE`), and `content::get()` picks the one
+`profiles/<build>/content.toml` gives this build (`Engine::content()`,
+`crates/a2engine/README.md`, "Content"). A Fleet Ops build adds a set with its own names
+(`by_set`) and names it in its `content.toml`, without a code change elsewhere; a build with
+no set gets `NONE`: no faction keys (shields colour by stock's level), no node or sprite
+names (a clean model shows everything; no vent or pulsar emitter), no recipes (no special
+weapon is told; skies, surfaces and nebulae are the engine's own), no selection model. The
+modules register their set's recipes with `r3d_core::recipes::builtin`, and the game
+directory's files still win. Each name is tied to its user in the module's section.
 
 #### world: Content
 
