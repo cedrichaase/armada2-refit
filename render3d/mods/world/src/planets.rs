@@ -27,7 +27,7 @@ use gpu::{
     MipFilter, Pipeline, PipelineDesc, Sampler, Semantic, Texture, Topology, VertexAttr,
 };
 
-pub use super::hooks::VT_PLANET;
+pub use super::hooks::vt_planet;
 
 const PI: f32 = core::f32::consts::PI;
 /// Our sphere: segments of longitude per quarter turn, and of the polar angle pole to

@@ -17,32 +17,36 @@
 use r3d_core::engine::{self, field, field_m34, field_u8, rd};
 use r3d_core::math::{M34, V3};
 use alloc::string::String;
+use crate::syms::sym;
+
+/// An engine address of the profile: 0 unless the hook that uses it is ready.
+pub(crate) fn at(s: a2engine::Sym) -> usize { crate::syms::TABLE.engine().addr(s) }
 
 /// The map's background name, lower-cased, as `Starfield_Load_Background_Geometry`
 /// keeps it: `<name>.sod` (a cube model) or a bare prefix (six faces `<prefix>0..5`).
-const BG_NAME: usize = 0x738538;
+pub(crate) fn bg_name() -> usize { at(sym::BG_NAME) }
 /// `g_background_geometry_db`: the sky's database; stock draws the sky only with one.
-const G_BG_DB: usize = 0x7720fc;
+pub(crate) fn g_bg_db() -> usize { at(sym::G_BG_DB) }
 /// `g_starfield`.
-const G_STARFIELD: usize = 0x773d04;
+pub(crate) fn g_starfield() -> usize { at(sym::G_STARFIELD) }
 /// `STAR_FAR_CLIP_PLANE` and `FAR_CLIPPING_PLANE` (`ART_CFG.h`; QOL may scale the
 /// second in memory): the camera's far plane during the background, and after.
-const STAR_FAR: usize = 0x6fcac8;
-const FAR_PLANE: usize = 0x6fcab0;
+pub(crate) fn star_far_addr() -> usize { at(sym::STAR_FAR) }
+pub(crate) fn far_plane_addr() -> usize { at(sym::FAR_PLANE) }
 /// `Starfield_Load_Background_Geometry(char*)`, cdecl: a new background (bench only).
-const FN_LOAD_BG: usize = 0x590c30;
-const FN_SET_FAR: usize = 0x6198a0; // ST3D_Camera::SetFarPlane(float), thiscall
+pub(crate) fn fn_load_bg() -> usize { at(sym::FN_LOAD_BG) }
+pub(crate) fn fn_set_far() -> usize { at(sym::FN_SET_FAR) } // ST3D_Camera::SetFarPlane(float), thiscall
 /// `UserProfile*`; its byte +0x84 is edit mode (`Program::Toggle_Edit_Mode`).
-const USER_PROFILE: usize = 0x76b5ac;
+pub(crate) fn user_profile() -> usize { at(sym::USER_PROFILE) }
 /// The class's `hidden` flag (`dlight` has it): not drawn outside edit mode.
 const CLASS_HIDDEN: usize = 0x19c;
 /// Object flags: a background object, drawn here and skipped by the object loop.
 const OBJ_BACKGROUND: u32 = 0x10000;
-const FN_GO_RENDER: usize = 0x4d54e0; // GameObject::Render, slot 11 of the classes that keep it
+pub(crate) fn fn_go_render() -> usize { at(sym::FN_GO_RENDER) } // GameObject::Render, slot 11 of the classes that keep it
 const SLOT_RENDER: usize = 11;
-const VT_DATABASE: usize = 0x6bc56c; // a plain ST3D_Database
+pub(crate) fn vt_database() -> usize { at(sym::VT_DATABASE) } // a plain ST3D_Database
 /// The background instance (`g_background_instance`), whose turn and scale are its own.
-const BG_INSTANCE: usize = 0x772068;
+pub(crate) fn bg_instance() -> usize { at(sym::BG_INSTANCE) }
 /// `ST3D_GraphicsEngine+0x104`: the detail configuration, whose byte +0x2c equal to 2
 /// turns the sky off (`Background_Render`'s own test).
 const S3D_DETAIL: usize = 0x104;
@@ -62,17 +66,17 @@ unsafe fn this1(f: usize, this: usize, a: usize) {
 
 /// The map's background name.
 pub fn background_name() -> String {
-    unsafe { String::from(crate::rt::cstr_at(BG_NAME as *const u8, 64)) }
+    unsafe { String::from(crate::rt::cstr_at(bg_name() as *const u8, 64)) }
 }
 
 /// Whether the map has a sky database (stock draws the sky only with one).
 pub fn has_sky_db() -> bool {
-    unsafe { rd::<usize>(G_BG_DB) != 0 }
+    unsafe { rd::<usize>(g_bg_db()) != 0 }
 }
 
 /// `g_starfield` (0: the map has none).
 pub fn starfield() -> usize {
-    unsafe { rd::<usize>(G_STARFIELD) }
+    unsafe { rd::<usize>(g_starfield()) }
 }
 
 /// The starfield's octree root.
@@ -123,21 +127,21 @@ pub fn each_in(head: usize, mut f: impl FnMut(usize)) {
 
 /// The far plane during the background, and the one after.
 pub fn star_far() -> f32 {
-    unsafe { rd(STAR_FAR) }
+    unsafe { rd(star_far_addr()) }
 }
 pub fn far_plane() -> f32 {
-    unsafe { rd(FAR_PLANE) }
+    unsafe { rd(far_plane_addr()) }
 }
 
 /// `ST3D_Camera::SetFarPlane`.
 pub fn set_far(cam: usize, far: f32) {
-    unsafe { core::mem::transmute::<usize, unsafe extern "thiscall" fn(usize, f32)>(FN_SET_FAR)(cam, far) }
+    unsafe { core::mem::transmute::<usize, unsafe extern "thiscall" fn(usize, f32)>(fn_set_far())(cam, far) }
 }
 
 /// A background to load in place of the map's (bench only).
 pub fn load_background(name: &str) {
     let mut c = crate::rt::cstr(name);
-    unsafe { core::mem::transmute::<usize, unsafe extern "C" fn(*mut u8)>(FN_LOAD_BG)(c.as_mut_ptr()) };
+    unsafe { core::mem::transmute::<usize, unsafe extern "C" fn(*mut u8)>(fn_load_bg())(c.as_mut_ptr()) };
 }
 
 /// Whether the view's render state draws the sky (`Background_Render`'s own test: the
@@ -154,12 +158,12 @@ pub fn stars_on(rs: usize) -> bool {
 
 /// Edit mode (the map editor), in which hidden background objects show.
 pub fn edit_mode() -> bool {
-    field_u8(unsafe { rd::<usize>(USER_PROFILE) }, 0x84) != 0
+    field_u8(unsafe { rd::<usize>(user_profile()) }, 0x84) != 0
 }
 
 /// The background instance's transform.
 pub fn background_instance() -> M34 {
-    field_m34(BG_INSTANCE, 0x44)
+    field_m34(bg_instance(), 0x44)
 }
 
 /// Whether an object is a background object that shows (not hidden, unless the editor
@@ -171,7 +175,7 @@ pub fn background_object(o: usize, edit: bool) -> bool {
 /// Whether the object's `Render` is the plain `GameObject::Render` (slot 11), the one
 /// the module draws in its place.
 pub fn plain_render(o: usize) -> bool {
-    field(engine::vtable(o), SLOT_RENDER * 4) == FN_GO_RENDER
+    field(engine::vtable(o), SLOT_RENDER * 4) == fn_go_render()
 }
 
 /// The engine's own `Render` of a background object.
@@ -182,7 +186,7 @@ pub fn engine_render(o: usize, cam: usize) {
 /// Whether an instance draws a plain `ST3D_Database` (the module reads its SOD itself).
 pub fn plain_database(inst: usize) -> bool {
     let db = field(inst, 0x80);
-    db != 0 && engine::vtable(db) == VT_DATABASE
+    db != 0 && engine::vtable(db) == vt_database()
 }
 
 /// An instance's scale (`+0x28`) as the background objects use it: read as it is, with

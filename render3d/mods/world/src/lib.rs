@@ -322,10 +322,10 @@ impl Module for World {
             return false;
         }
         let ours = match engine::vtable(o) {
-            hooks::VT_PLANET if self.on_planets => self.planets.draw(o, v, &mut self.surfaces),
-            hooks::VT_SCRAP if self.on_rocks => self.rocks.draw_scrap(o, v, &mut self.surfaces),
-            hooks::VT_ASTEROID_FIELD if self.on_rocks => self.rocks.draw_field(o, v, &mut self.surfaces),
-            hooks::VT_NEBULA | hooks::VT_LATINUM if self.on_nebulae => self.nebulae.object(o, v),
+            hooks::vt_planet() if self.on_planets => self.planets.draw(o, v, &mut self.surfaces),
+            hooks::vt_scrap() if self.on_rocks => self.rocks.draw_scrap(o, v, &mut self.surfaces),
+            hooks::vt_asteroid_field() if self.on_rocks => self.rocks.draw_field(o, v, &mut self.surfaces),
+            hooks::vt_nebula() | hooks::vt_latinum() if self.on_nebulae => self.nebulae.object(o, v),
             _ => false,
         };
         if ours {

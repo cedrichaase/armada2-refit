@@ -32,7 +32,7 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
 use alloc::vec::Vec;
 use hooks::{effect_name, RenderKind};
-pub use hooks::{VT_CHANGE_TEAM, VT_CREW_DISRUPTION, VT_DRAIN};
+pub use hooks::{vt_change_team, vt_crew_disruption, vt_drain};
 
 /// One effect drawn this frame, for the looks.
 #[derive(Clone, Copy)]

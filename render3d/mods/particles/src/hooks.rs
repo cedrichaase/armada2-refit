@@ -23,13 +23,17 @@ use alloc::collections::BTreeSet;
 use alloc::vec::Vec;
 
 use r3d_core::engine::DX8_VTABLE as VT_DEVICE_DX8;
+use crate::syms::sym;
+
+/// An engine address of the profile: 0 unless the hook that uses it is ready.
+pub(crate) fn at(s: a2engine::Sym) -> usize { crate::syms::TABLE.engine().addr(s) }
 const SLOT_RENDER_PARTICLE: usize = 50;
-const FN_RENDER_PARTICLE: usize = 0x6262f0;
+pub(crate) fn fn_render_particle() -> usize { at(sym::FN_RENDER_PARTICLE) }
 const ENG_CURRENT_INSTANCE: usize = 0x100;
 
-const SITE_BILLBOARD: usize = 0x4d544c; // GameObject::RenderInternal: call RenderSpriteNodeEffect
-const FN_EFFECT: usize = 0x62ebd0; // ST3D_Instance::RenderSpriteNodeEffect(nd, size, pull), thiscall
-const FN_SPHERE: usize = 0x4cfd70; // Entity::GetBoundingSphere() const, thiscall: centre, radius
+pub(crate) fn site_billboard() -> usize { at(sym::SITE_BILLBOARD) } // GameObject::RenderInternal: call RenderSpriteNodeEffect
+pub(crate) fn fn_effect() -> usize { at(sym::FN_EFFECT) } // ST3D_Instance::RenderSpriteNodeEffect(nd, size, pull), thiscall
+pub(crate) fn fn_sphere() -> usize { at(sym::FN_SPHERE) } // Entity::GetBoundingSphere() const, thiscall: centre, radius
 const OBJ_EFFECT: usize = 0x3c;
 
 /// The damage systems' bytes in a craft instance, in `content::SYSTEMS`' order. A node is
@@ -37,26 +41,26 @@ const OBJ_EFFECT: usize = 0x3c;
 /// it is (`CraftInstance::RenderInternal` 0x4cb0e0).
 const SYSTEM_BYTES: [usize; 6] = [0x9c, 0x9d, 0x9e, 0x9f, 0xa0, 0xa1];
 const SYSTEM_BORG: usize = 5;
-const VT_CRAFT_INSTANCE: usize = 0x6b3e2c;
+pub(crate) fn vt_craft_instance() -> usize { at(sym::VT_CRAFT_INSTANCE) }
 /// `CraftInstance::Update(const GameObject*)` (0x4cb390): the systems into the bytes.
 const SLOT_UPDATE: usize = 14;
-const ORDNANCE_LIST: usize = 0x771fa8; // Ordnance::ordnanceList, a std::list (head node at +4)
-const VT_CHAIN_PULSAR: usize = 0x6b7c74;
-const VT_MANHEIM: usize = 0x6b89fc;
+pub(crate) fn ordnance_list() -> usize { at(sym::ORDNANCE_LIST) } // Ordnance::ordnanceList, a std::list (head node at +4)
+pub(crate) fn vt_chain_pulsar() -> usize { at(sym::VT_CHAIN_PULSAR) }
+pub(crate) fn vt_manheim() -> usize { at(sym::VT_MANHEIM) }
 const CHAIN_EMITTER: usize = 0xdc; // ChainPulsar: the free emitter (`crpulsar`)
 const MANHEIM_EMITTER: usize = 0xd4; // ManheimEffect: its free emitter (`gemini`)
 /// `Freighter` (vtable 0x6b26a8): the resource carried (`+0x25c`, an `eResource`: 3 is
 /// latinum, 6 none), the amount (`+0x258`) and the class's capacities, one float per
 /// resource (`+0x254`, a pointer).
-const VT_FREIGHTER: usize = 0x6b26a8;
+pub(crate) fn vt_freighter() -> usize { at(sym::VT_FREIGHTER) }
 const FREIGHTER_CAPACITY: usize = 0x254;
 const FREIGHTER_AMOUNT: usize = 0x258;
 const FREIGHTER_KIND: usize = 0x25c;
 const RESOURCE_LATINUM: usize = 3;
 
-pub const VT_NEBULA: usize = 0x6b148c;
-pub const VT_LATINUM: usize = 0x6b132c;
-const FN_FADE_OUT: usize = 0x4d5a20; // GameObjectInstance::ComputeFadeOut(float&) const, thiscall
+pub fn vt_nebula() -> usize { at(sym::VT_NEBULA) }
+pub fn vt_latinum() -> usize { at(sym::VT_LATINUM) }
+pub(crate) fn fn_fade_out() -> usize { at(sym::FN_FADE_OUT) } // GameObjectInstance::ComputeFadeOut(float&) const, thiscall
 const NEB_HIDDEN: usize = 0x1b0;
 const NEB_INTENSITY: usize = 0x1d0;
 
@@ -118,7 +122,7 @@ pub fn install(h: &mut Hooks) {
         owner,
         used_by: "particles' draw of an owned object's particles",
         kind: Kind::Slot { vt: VT_DEVICE_DX8, slot: SLOT_RENDER_PARTICLE },
-        site: Site { symbol: "ST3D_DeviceDirectX8::RenderParticle", addr: VT_DEVICE_DX8, expect: FN_RENDER_PARTICLE },
+        site: Site { symbol: "ST3D_DeviceDirectX8::RenderParticle", addr: VT_DEVICE_DX8, expect: fn_render_particle() },
         to: render_particle as *const () as usize,
         chain: true,
     };
@@ -130,7 +134,7 @@ pub fn install(h: &mut Hooks) {
         owner,
         used_by: "particles' billboard effects",
         kind: Kind::Call,
-        site: Site { symbol: "GameObject::RenderInternal", addr: SITE_BILLBOARD, expect: FN_EFFECT },
+        site: Site { symbol: "GameObject::RenderInternal", addr: site_billboard(), expect: fn_effect() },
         to: billboard_stub as *const () as usize,
         chain: false,
     };
@@ -192,13 +196,13 @@ pub fn instance_radius(inst: usize) -> f32 {
 }
 
 pub fn is_freighter(o: usize) -> bool {
-    engine::vtable(o) == VT_FREIGHTER
+    engine::vtable(o) == vt_freighter()
 }
 
 /// The latinum spray's rate: `cargo / capacity` while the hold carries latinum, else 0,
 /// as `Freighter::RenderInternal` sets it. Reads only.
 pub fn cargo_rate(o: usize) -> f32 {
-    if o == 0 || engine::vtable(o) != VT_FREIGHTER || field(o, FREIGHTER_KIND) != RESOURCE_LATINUM {
+    if o == 0 || engine::vtable(o) != vt_freighter() || field(o, FREIGHTER_KIND) != RESOURCE_LATINUM {
         return 0.0;
     }
     let caps = field(o, FREIGHTER_CAPACITY);
@@ -221,7 +225,7 @@ pub fn cargo_rate(o: usize) -> f32 {
 /// never gets it, so it is called here, through the vtable (the bench's Scene.asi wraps
 /// it). It only reads the craft.
 pub fn hidden_systems(o: usize, inst: usize) -> u8 {
-    if engine::vtable(inst) != VT_CRAFT_INSTANCE {
+    if engine::vtable(inst) != vt_craft_instance() {
         return 0;
     }
     unsafe {
@@ -247,7 +251,7 @@ pub fn hidden_systems(o: usize, inst: usize) -> u8 {
 /// the Manheim effect's, with the emitter's name.
 pub fn free_emitter_shots() -> Vec<(usize, &'static str)> {
     let mut ords = Vec::new();
-    let head = field(ORDNANCE_LIST, 4);
+    let head = field(ordnance_list(), 4);
     if head != 0 {
         let mut n = field(head, 0);
         let mut guard = 0;
@@ -256,8 +260,8 @@ pub fn free_emitter_shots() -> Vec<(usize, &'static str)> {
             let o = field(n, 8);
             n = field(n, 0);
             match engine::vtable(o) {
-                VT_CHAIN_PULSAR if field(o, CHAIN_EMITTER) != 0 => ords.push((o, content::CHAIN_EMITTER)),
-                VT_MANHEIM if field(o, MANHEIM_EMITTER) != 0 => ords.push((o, content::MANHEIM_EMITTER)),
+                vt_chain_pulsar() if field(o, CHAIN_EMITTER) != 0 => ords.push((o, content::CHAIN_EMITTER)),
+                vt_manheim() if field(o, MANHEIM_EMITTER) != 0 => ords.push((o, content::MANHEIM_EMITTER)),
                 _ => {}
             }
         }
@@ -282,7 +286,7 @@ pub fn billboard_effect(o: usize) -> Option<&'static str> {
 /// `Entity::GetBoundingSphere`: centre and radius.
 pub fn bounding_sphere(o: usize) -> Option<(V3, f32)> {
     let s: [f32; 4] = unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> *const [f32; 4] = core::mem::transmute(FN_SPHERE);
+        let f: unsafe extern "thiscall" fn(usize) -> *const [f32; 4] = core::mem::transmute(fn_sphere());
         let p = f(o);
         if p.is_null() {
             return None;
@@ -297,11 +301,11 @@ pub fn bounding_sphere(o: usize) -> Option<(V3, f32)> {
 /// Whether an object is a nebula or a latinum cloud, whose puffs we draw.
 pub fn is_nebula_class(o: usize) -> bool {
     let vt = engine::vtable(o);
-    vt == VT_NEBULA || vt == VT_LATINUM
+    vt == vt_nebula() || vt == vt_latinum()
 }
 
 pub fn is_nebula(o: usize) -> bool {
-    engine::vtable(o) == VT_NEBULA
+    engine::vtable(o) == vt_nebula()
 }
 
 /// `Nebula::Render`'s hidden flag.
@@ -316,6 +320,6 @@ pub fn nebula_intensity(o: usize) -> f32 {
 /// `ComputeFadeOut` of a nebula's instance: Some(factor) while the eye is near enough.
 pub fn nebula_fade(inst: usize) -> Option<f32> {
     let mut f = 1.0f32;
-    let near: unsafe extern "thiscall" fn(usize, *mut f32) -> u8 = unsafe { core::mem::transmute(FN_FADE_OUT) };
+    let near: unsafe extern "thiscall" fn(usize, *mut f32) -> u8 = unsafe { core::mem::transmute(fn_fade_out()) };
     if unsafe { near(inst, &mut f) } != 0 { Some(f) } else { None }
 }

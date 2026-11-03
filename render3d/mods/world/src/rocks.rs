@@ -36,7 +36,7 @@ use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-pub use super::hooks::{VT_ASTEROID_FIELD, VT_SCRAP};
+pub use super::hooks::{vt_asteroid_field, vt_scrap};
 
 /// What a part of a model is to us.
 #[derive(Clone, Copy, PartialEq)]

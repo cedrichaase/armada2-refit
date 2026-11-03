@@ -1,0 +1,81 @@
+# Render3D.asi's symbols in Armada2.exe 1.1 (GOG): module "hulls" (render3d/mods/hulls/src).
+# Each entry is tied to the hook that uses it; the findings are in render3d/README.md, "Hooks".
+schema = 1
+plugin = "render3d"
+readme = "render3d/README.md"
+lang = "rust"
+out = "render3d/mods/hulls/src/syms.rs"
+
+[hook."hulls.reads"]
+doc = "What the hulls module reads of the engine: its objects, lists, globals and calls"
+rows = ["Modules.hulls"]
+
+
+[[sym]]
+id = "fn_scrap_render"
+symbol = "Scrap::Render"
+kind = "fn"
+addr = 0x4a58e0
+check = "55 8b ec 83 ec 14 a0 d4"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_evolver_ri"
+symbol = "Evolver::RenderInternal"
+kind = "fn"
+addr = 0x4b1170
+check = "55 8b ec 53 56 8b f1 32"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_freighter_ri"
+symbol = "Freighter::RenderInternal"
+kind = "fn"
+addr = 0x4b22c0
+check = "55 8b ec 56 8b f1 e8 35"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_craft_ri"
+symbol = "Craft::RenderInternal"
+kind = "fn"
+addr = 0x4c8630
+check = "55 8b ec 6a ff 68 ed df"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_go_ri"
+symbol = "GameObject::RenderInternal"
+kind = "fn"
+addr = 0x4d52b0
+check = "55 8b ec 6a ff 68 34 e4"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_go_render"
+symbol = "GameObject::Render"
+kind = "fn"
+addr = 0x4d54e0
+check = "55 8b ec 56 8b f1 8a 46"
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "vt_freighter"
+symbol = "Freighter"
+kind = "vtable"
+addr = 0x6b26a8
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "vt_planet"
+symbol = "Planet"
+kind = "vtable"
+addr = 0x6b2b3c
+used_by = ["hulls.reads"]
+
+[[sym]]
+id = "resource_colours"
+symbol = "ResourceComponent::s_ResourceColor"
+kind = "global"
+addr = 0x764664
+used_by = ["hulls.reads"]

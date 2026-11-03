@@ -160,13 +160,13 @@ impl Default for Hulls {
 fn our_class(o: usize, look: &Look) -> bool {
     let r = hooks::render_fn(o);
     let ok = match r {
-        hooks::FN_GO_RENDER | hooks::FN_SHIPYARD_RENDER | hooks::FN_MINING_RENDER | hooks::FN_RIG_RENDER => true,
-        hooks::FN_SCRAP_RENDER => look.scrap,
+        hooks::fn_go_render() | hooks::FN_SHIPYARD_RENDER | hooks::FN_MINING_RENDER | hooks::FN_RIG_RENDER => true,
+        hooks::fn_scrap_render() => look.scrap,
         _ => false,
     };
     ok && match hooks::render_internal_fn(o) {
-        hooks::FN_GO_RI | hooks::FN_CRAFT_RI | hooks::FN_FREIGHTER_RI => true,
-        hooks::FN_EVOLVER_RI => look.evolver,
+        hooks::fn_go_ri() | hooks::fn_craft_ri() | hooks::fn_freighter_ri() => true,
+        hooks::fn_evolver_ri() => look.evolver,
         _ => false,
     }
 }
@@ -174,7 +174,7 @@ fn our_class(o: usize, look: &Look) -> bool {
 /// The `RenderInternal`s that are or end in `Craft::RenderInternal` (the warp stretch,
 /// the white wave light).
 fn craft_ri(o: usize) -> bool {
-    matches!(hooks::render_internal_fn(o), hooks::FN_CRAFT_RI | hooks::FN_FREIGHTER_RI | hooks::FN_EVOLVER_RI)
+    matches!(hooks::render_internal_fn(o), hooks::fn_craft_ri() | hooks::fn_freighter_ri() | hooks::fn_evolver_ri())
 }
 
 impl Hulls {
@@ -254,7 +254,7 @@ impl Hulls {
             None
         };
         let waves = draw::waves_of(o, craft && craft_ri(o), v.time);
-        let glow = if hooks::render_fn(o) == hooks::FN_SCRAP_RENDER { hooks::scrap_glow(o) } else { None };
+        let glow = if hooks::render_fn(o) == hooks::fn_scrap_render() { hooks::scrap_glow(o) } else { None };
         let cargo = hooks::cargo_markings(o, &model.sod);
         Some(Posed {
             obj: o,
@@ -693,7 +693,7 @@ impl Module for Hulls {
         let key = v.key();
         // Evolver::RenderInternal: the cocoon first; past a third of the evolution
         // only the cocoon.
-        if hooks::render_internal_fn(o) == hooks::FN_EVOLVER_RI && !obj::expired(o) && obj::can_user_see(o) {
+        if hooks::render_internal_fn(o) == hooks::fn_evolver_ri() && !obj::expired(o) && obj::can_user_see(o) {
             let c = hooks::cocoon(o);
             if c != 0 {
                 hooks::instance_update(o);

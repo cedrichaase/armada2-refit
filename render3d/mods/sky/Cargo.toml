@@ -13,4 +13,5 @@ path = "src/lib.rs"
 [dependencies]
 r3d-core = { path = "../../core" }
 a2fmt = { path = "../../../crates/a2fmt" }
+a2engine = { path = "../../../crates/a2engine" }
 gpu = { path = "../../../gpu" }

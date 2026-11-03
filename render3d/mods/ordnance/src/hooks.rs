@@ -23,39 +23,43 @@ use r3d_core::frame::steps::View;
 use r3d_core::math::{M34, V3};
 use alloc::vec::Vec;
 
-const FN_ENTITY_GET: usize = 0x4cfff0; // Entity::Get(int handle), cdecl
-const FN_OBJ_EVEN_IF_DESTROYED: usize = 0x42bfa0; // GameObject::GetObjEvenIfDestroyed(int), cdecl
-const FN_PRJ_ODF: usize = 0x6593a0; // cPrjID::GetOdfName() const, thiscall: char*
-const FN_TRANSFORM: usize = 0x4cfd50; // Entity::GetTransform() const, thiscall: Matrix34*
-const FN_ODF_NAME: usize = 0x4d5620; // GameObject::GetOdfName() const, thiscall
-const FN_SHOCK_RADIUS: usize = 0x467730; // ShockwaveExplosion::GetCurrentRadius() const, thiscall
+pub(crate) fn fn_entity_get() -> usize { at(sym::FN_ENTITY_GET) } // Entity::Get(int handle), cdecl
+pub(crate) fn fn_obj_even_if_destroyed() -> usize { at(sym::FN_OBJ_EVEN_IF_DESTROYED) } // GameObject::GetObjEvenIfDestroyed(int), cdecl
+pub(crate) fn fn_prj_odf() -> usize { at(sym::FN_PRJ_ODF) } // cPrjID::GetOdfName() const, thiscall: char*
+pub(crate) fn fn_transform() -> usize { at(sym::FN_TRANSFORM) } // Entity::GetTransform() const, thiscall: Matrix34*
+pub(crate) fn fn_odf_name() -> usize { at(sym::FN_ODF_NAME) } // GameObject::GetOdfName() const, thiscall
+pub(crate) fn fn_shock_radius() -> usize { at(sym::FN_SHOCK_RADIUS) } // ShockwaveExplosion::GetCurrentRadius() const, thiscall
 
 /// The live ordnance: `Ordnance::ordnanceList` (a `std::list` at 0x771fa8, its head
 /// node's pointer at +4), each node's +8 the ordnance.
-const ORDNANCE_HEAD: usize = 0x771fac;
-const CULL_DISTANCE: usize = 0x6fcac0; // cfgOBJECT_CULLING_DISTANCE, f32
+pub(crate) fn ordnance_head() -> usize { at(sym::ORDNANCE_HEAD) }
+pub(crate) fn cull_distance() -> usize { at(sym::CULL_DISTANCE) } // cfgOBJECT_CULLING_DISTANCE, f32
 const SLOT_SUBMIT: usize = 0x5c; // Ordnance vtable: Submit(ST3D_Camera*)
 
 // Stock's Submit functions this module draws in their place (`StockSubmit`).
-const SUB_PHASER: usize = 0x57edc0;
-const SUB_PULSE: usize = 0x581cb0;
-const SUB_PHOTON: usize = 0x57f100;
-const SUB_PLASMA: usize = 0x57f580;
-const SUB_POLERON: usize = 0x5800d0;
-const SUB_ARTILLERY: usize = 0x5730a0;
-const SUB_SRT: usize = 0x5853b0; // ShieldRemovingTorpedo
-const SUB_CHAIN: usize = 0x574f20; // ChainPulsar: its sprite, and its emitter node's Render
+pub(crate) fn sub_phaser() -> usize { at(sym::SUB_PHASER) }
+pub(crate) fn sub_pulse() -> usize { at(sym::SUB_PULSE) }
+pub(crate) fn sub_photon() -> usize { at(sym::SUB_PHOTON) }
+pub(crate) fn sub_plasma() -> usize { at(sym::SUB_PLASMA) }
+pub(crate) fn sub_poleron() -> usize { at(sym::SUB_POLERON) }
+pub(crate) fn sub_artillery() -> usize { at(sym::SUB_ARTILLERY) }
+pub(crate) fn sub_srt() -> usize { at(sym::SUB_SRT) } // ShieldRemovingTorpedo
+pub(crate) fn sub_chain() -> usize { at(sym::SUB_CHAIN) } // ChainPulsar: its sprite, and its emitter node's Render
 
 // The warp flash: the call to ST3D_Sprite::DrawScaled3D in WarpSpriteEffect::Render.
-const SITE_WARP_SPRITE: usize = 0x59cc6b;
+pub(crate) fn site_warp_sprite() -> usize { at(sym::SITE_WARP_SPRITE) }
 use r3d_core::engine::sprite::FN_DRAW_SCALED_3D as FN_DRAW_SCALED;
-const SITE_WARP: usize = 0x598423; // RenderWarpSpriteEffects(cam), cdecl, in the body
-const FN_WARP: usize = 0x59c560;
+use crate::syms::sym;
+
+/// An engine address of the profile: 0 unless the hook that uses it is ready.
+pub(crate) fn at(s: a2engine::Sym) -> usize { crate::syms::TABLE.engine().addr(s) }
+pub(crate) fn site_warp() -> usize { at(sym::SITE_WARP) } // RenderWarpSpriteEffects(cam), cdecl, in the body
+pub(crate) fn fn_warp() -> usize { at(sym::FN_WARP) }
 
 /// `Entity::Render(ST3D_Camera*)`, slot 11 of every ordnance vtable: the instance's
 /// frustum test (instance slot 3), the on-screen byte +0x25, the instance's draw
 /// (instance slot 5).
-const FN_ENTITY_RENDER: usize = 0x4cfda0;
+pub(crate) fn fn_entity_render() -> usize { at(sym::FN_ENTITY_RENDER) }
 const SLOT_RENDER: usize = 11;
 
 // An ordnance object (a shot): its class, instance, owner and target handles, the ends
@@ -85,8 +89,8 @@ const SPRITE_COLOUR: usize = 0x24;
 // A point light: its ODF colour; the registry (Storm3D+0x60): record +0 the light, +4 its colour.
 const LIGHT_COLOUR: usize = 0xf4;
 const REGISTRY: usize = 0x60;
-const VT_POINT: usize = 0x6bc8ac;
-const VT_PHASER: usize = 0x6b8ee4;
+pub(crate) fn vt_point() -> usize { at(sym::VT_POINT) }
+pub(crate) fn vt_phaser() -> usize { at(sym::VT_PHASER) }
 // A phaser: two state bytes (spent, firing).
 const PHASER_SPENT: usize = 0x27;
 const PHASER_FIRING: usize = 0x24;
@@ -195,7 +199,7 @@ unsafe extern "thiscall" fn ord_render(ord: usize, cam: usize) {
             }
         }
         let vt = vtable(ord);
-        let prev = CLASS_SLOTS.iter().find(|(t, _)| *t == vt).map_or(FN_ENTITY_RENDER, |(_, p)| p.addr());
+        let prev = CLASS_SLOTS.iter().find(|(t, _)| *t == vt).map_or(fn_entity_render(), |(_, p)| p.addr());
         let f: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(prev);
         f(ord, cam);
     }
@@ -216,7 +220,7 @@ pub fn install(h: &Hooks) {
         owner,
         used_by: "the warp flash",
         kind: Kind::Call,
-        site: Site { symbol: "WarpSpriteEffect::Render", addr: SITE_WARP_SPRITE, expect: FN_DRAW_SCALED },
+        site: Site { symbol: "WarpSpriteEffect::Render", addr: site_warp_sprite(), expect: FN_DRAW_SCALED },
         to: warp_sprite as *const () as usize,
         chain: false,
     };
@@ -247,7 +251,7 @@ pub fn take_class_slot(ord: usize) -> bool {
         owner: hooks.owner(),
         used_by: "the shots' models",
         kind: Kind::Slot { vt, slot: SLOT_RENDER },
-        site: Site { symbol: "Entity::Render", addr: vt, expect: FN_ENTITY_RENDER },
+        site: Site { symbol: "Entity::Render", addr: vt, expect: fn_entity_render() },
         to: ord_render as *const () as usize,
         chain: false,
     };
@@ -265,7 +269,7 @@ pub fn take_class_slot(ord: usize) -> bool {
 /// plugin's chained onto it); the effects it moves and removes are noted by the hook.
 pub fn run_warp(cam: usize) {
     unsafe {
-        let f: unsafe extern "C" fn(usize) = core::mem::transmute(hook::call_target(SITE_WARP).unwrap_or(FN_WARP));
+        let f: unsafe extern "C" fn(usize) = core::mem::transmute(hook::call_target(site_warp()).unwrap_or(fn_warp()));
         f(cam);
     }
 }
@@ -286,10 +290,10 @@ pub fn noted() -> Vec<(usize, V3)> {
 
 /// Calls `f` with each live ordnance, re-reading the list's head as `RenderAll` does.
 pub fn for_each_ordnance(mut f: impl FnMut(usize)) {
-    let mut node = field(unsafe { rd::<usize>(ORDNANCE_HEAD) }, 0);
+    let mut node = field(unsafe { rd::<usize>(ordnance_head()) }, 0);
     let mut guard = 0;
     loop {
-        let head = unsafe { rd::<usize>(ORDNANCE_HEAD) };
+        let head = unsafe { rd::<usize>(ordnance_head()) };
         if node == 0 || node == head || guard > 100_000 {
             break;
         }
@@ -302,14 +306,14 @@ pub fn for_each_ordnance(mut f: impl FnMut(usize)) {
 
 pub fn entity_get(handle: i32) -> usize {
     unsafe {
-        let f: unsafe extern "C" fn(i32) -> usize = core::mem::transmute(FN_ENTITY_GET);
+        let f: unsafe extern "C" fn(i32) -> usize = core::mem::transmute(fn_entity_get());
         f(handle)
     }
 }
 
 pub fn obj_even_if_destroyed(handle: i32) -> usize {
     unsafe {
-        let f: unsafe extern "C" fn(i32) -> usize = core::mem::transmute(FN_OBJ_EVEN_IF_DESTROYED);
+        let f: unsafe extern "C" fn(i32) -> usize = core::mem::transmute(fn_obj_even_if_destroyed());
         f(handle)
     }
 }
@@ -345,7 +349,7 @@ pub fn camera_position(cam: usize) -> V3 {
 /// An entity's transform (`Entity::GetTransform`): position at +0x24.
 pub fn transform(e: usize) -> M34 {
     unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> *const M34 = core::mem::transmute(FN_TRANSFORM);
+        let f: unsafe extern "thiscall" fn(usize) -> *const M34 = core::mem::transmute(fn_transform());
         let p = f(e);
         if p.is_null() { M34::IDENTITY } else { core::ptr::read_unaligned(p) }
     }
@@ -357,7 +361,7 @@ pub fn prj_odf(prj: usize) -> &'static str {
         return "";
     }
     unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(FN_PRJ_ODF);
+        let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(fn_prj_odf());
         crate::rt::cstr_at(f(prj), 260)
     }
 }
@@ -372,7 +376,7 @@ pub fn odf_name(o: usize) -> &'static str {
         return "";
     }
     unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(FN_ODF_NAME);
+        let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(fn_odf_name());
         crate::rt::cstr_at(f(o), 260)
     }
 }
@@ -413,14 +417,14 @@ pub enum StockSubmit {
 
 pub fn stock_submit(ord: usize) -> Option<StockSubmit> {
     Some(match submit_addr(ord) {
-        SUB_PHASER => StockSubmit::Phaser,
-        SUB_PULSE => StockSubmit::Pulse,
-        SUB_PHOTON => StockSubmit::Photon,
-        SUB_PLASMA => StockSubmit::Plasma,
-        SUB_POLERON => StockSubmit::Poleron,
-        SUB_ARTILLERY => StockSubmit::Artillery,
-        SUB_SRT => StockSubmit::Srt,
-        SUB_CHAIN => StockSubmit::Chain,
+        sub_phaser() => StockSubmit::Phaser,
+        sub_pulse() => StockSubmit::Pulse,
+        sub_photon() => StockSubmit::Photon,
+        sub_plasma() => StockSubmit::Plasma,
+        sub_poleron() => StockSubmit::Poleron,
+        sub_artillery() => StockSubmit::Artillery,
+        sub_srt() => StockSubmit::Srt,
+        sub_chain() => StockSubmit::Chain,
         _ => return None,
     })
 }
@@ -500,7 +504,7 @@ pub fn mark_on_screen(ord: usize) {
 pub fn shot_point_light(ord: usize) -> usize {
     let cls = shot_class(ord);
     let l = if cls != 0 { field(cls, CLASS_LIGHT) } else { 0 };
-    if l != 0 && vtable(l) == VT_POINT { l } else { 0 }
+    if l != 0 && vtable(l) == vt_point() { l } else { 0 }
 }
 
 pub fn class_sprite(cls: usize) -> usize {
@@ -525,7 +529,7 @@ pub fn class_width(cls: usize) -> f32 {
 }
 
 pub fn is_phaser(o: usize) -> bool {
-    vtable(o) == VT_PHASER
+    vtable(o) == vt_phaser()
 }
 
 /// A phaser beam that is firing and not spent.
@@ -563,7 +567,7 @@ pub fn shot_parties(ord: usize) -> (usize, usize) {
 /// Whether `RenderAll` submits the shot: its owner or its target is seen, or it is
 /// within the culling distance of the eye and seen.
 pub fn shot_shown(ord: usize, owner: usize, target: usize, eye: V3) -> bool {
-    let cull = unsafe { rd::<f32>(CULL_DISTANCE) };
+    let cull = unsafe { rd::<f32>(cull_distance()) };
     let seen = |o: usize| o != 0 && field_u8(o, OBJ_HIDDEN) == 0 && can_see(o);
     seen(owner) || seen(target) || ((eye - transform(ord).p).len() <= cull && can_see(ord))
 }
@@ -637,7 +641,7 @@ pub fn wave_odf(expl: usize) -> &'static str {
 pub fn wave_state(ex: usize) -> (f32, f32, f32) {
     let cls = field(ex, WAVE_CLASS);
     let rad = unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> f32 = core::mem::transmute(FN_SHOCK_RADIUS);
+        let f: unsafe extern "thiscall" fn(usize) -> f32 = core::mem::transmute(fn_shock_radius());
         f(ex)
     };
     let end = field_f32(ex, WAVE_END);

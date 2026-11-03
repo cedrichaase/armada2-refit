@@ -10,7 +10,7 @@
 //!
 //! The hull is the hulls module's pose of the affected object (`hulls::posed`); an
 //! object it does not draw (or a cloaked one) gets no layer.
-use super::{Fx, VT_CHANGE_TEAM, VT_CREW_DISRUPTION, VT_DRAIN};
+use super::{Fx, vt_change_team, vt_crew_disruption, vt_drain};
 use super::hooks;
 use gpu::{Blend, Block, Compare, Cull, Depth, Format, Pipeline, PipelineDesc, Topology};
 use r3d_core::frame::steps::View;
@@ -32,9 +32,9 @@ use super::content::NAMES;
 /// Which look an effect takes, by its class.
 pub fn kind(vt: usize) -> Option<usize> {
     match vt {
-        VT_CHANGE_TEAM => Some(0),
-        VT_DRAIN => Some(1),
-        VT_CREW_DISRUPTION => Some(2),
+        vt_change_team() => Some(0),
+        vt_drain() => Some(1),
+        vt_crew_disruption() => Some(2),
         _ => None,
     }
 }

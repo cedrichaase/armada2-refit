@@ -1,0 +1,280 @@
+# Render3D.asi's symbols in Armada2.exe 1.1 (GOG): module "overlays" (render3d/mods/overlays/src).
+# Each entry is tied to the hook that uses it; the findings are in render3d/README.md, "Hooks".
+schema = 1
+plugin = "render3d"
+readme = "render3d/README.md"
+lang = "rust"
+out = "render3d/mods/overlays/src/syms.rs"
+
+[hook."overlays.reads"]
+doc = "What the overlays module reads of the engine: its objects, lists, globals and calls"
+rows = ["Modules.overlays"]
+
+
+[[sym]]
+id = "fn_footprints"
+symbol = "PlaceholderFeature::RenderFootprints"
+kind = "fn"
+addr = 0x473930
+check = "55 8b ec 83 ec 3c 53 8b"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "fn_team_get"
+symbol = "Team::GetTeam"
+kind = "fn"
+addr = 0x496340
+check = "55 8b ec 8b 45 08 8b 04"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "fn_class_odf"
+symbol = "GameObjectClass::GetOdfName"
+kind = "fn"
+addr = 0x4ce370
+check = "8b 89 cc 01 00 00 e9 25"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "fn_scale_factor"
+symbol = "Entity::GetScaleFactor"
+kind = "fn"
+addr = 0x4cff40
+check = "8b 41 04 83 c0 28 c3 90"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "fn_is_scaled"
+symbol = "Entity::IsScaled"
+kind = "fn"
+addr = 0x4cff60
+check = "8b 41 04 8a 40 74 c3 90"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "fn_entity_get"
+symbol = "Entity::Get"
+kind = "fn"
+addr = 0x4cfff0
+check = "55 8b ec 8b 4d 08 8b c1"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "fn_relation"
+symbol = "GameObject::GetTeamRelation"
+kind = "fn"
+addr = 0x4d1080
+check = "55 8b ec 8b 45 08 8b 89"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "fn_distance_cull"
+symbol = "GameObjectInstance::DistanceCull"
+kind = "fn"
+addr = 0x4d5bb0
+check = "55 8b ec 83 ec 18 8b 45"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "fn_render"
+symbol = "TacticalCamera::Render"
+kind = "fn"
+addr = 0x4e5260
+check = "55 8b ec 8a 45 0c 84 c0"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "fn_grid_visible"
+symbol = "GridVisible"
+kind = "fn"
+addr = 0x51e180
+check = "a1 10 b6 76 00 8d 04 40"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "fn_is_fog"
+symbol = "GameSetup::isFog"
+kind = "fn"
+addr = 0x5462f0
+check = "8b 41 10 8a 80 af 00 00"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "fn_is_shroud"
+symbol = "GameSetup::isShroud"
+kind = "fn"
+addr = 0x546300
+check = "8b 41 10 8a 80 b0 00 00"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "fn_get_game_setup"
+symbol = "Transport::getGameSetup"
+kind = "fn"
+addr = 0x557940
+check = "8b 41 30 c3 90 90 90 90"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "fn_draw_grid"
+symbol = "Terrain_Geometry::DrawGrid"
+kind = "fn"
+addr = 0x593480
+check = "55 8b ec 83 ec 1c 53 56"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "fn_height_post"
+symbol = "DrawHeightPost"
+kind = "fn"
+addr = 0x593840
+check = "55 8b ec 83 ec 18 8b 4d"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "fn_render_selection"
+symbol = "RenderSelectionEffects"
+kind = "fn"
+addr = 0x599900
+check = "55 8b ec a1 08 d5 7a 00"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "vt_instance"
+symbol = "ST3D_Instance"
+kind = "vtable"
+addr = 0x6aff14
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "vt_ghost"
+symbol = "Ghost"
+kind = "vtable"
+addr = 0x6aff8c
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "vt_placeholder"
+symbol = "PlaceholderFeature"
+kind = "vtable"
+addr = 0x6b005c
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "vt_tactical_camera"
+symbol = "TacticalCamera"
+kind = "vtable"
+addr = 0x6b46c0
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "vt_database"
+symbol = "ST3D_Database"
+kind = "vtable"
+addr = 0x6bc56c
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "grid_size"
+symbol = "GRID_SIZE"
+kind = "global"
+addr = 0x71a78c
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ghost_nodes"
+symbol = "TODO"
+kind = "global"
+addr = 0x736c94
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "placeholder"
+symbol = "placeholderFeature"
+kind = "global"
+addr = 0x736d50
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "scan_fog"
+symbol = "Scanner::m_fog"
+kind = "global"
+addr = 0x738a54
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "scan_shroud"
+symbol = "Scanner::m_shroud"
+kind = "global"
+addr = 0x738a58
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "user_profile"
+symbol = "UserProfile"
+kind = "global"
+addr = 0x76b5ac
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "view_record"
+symbol = "View_Record"
+kind = "global"
+addr = 0x76b610
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "g_transport"
+symbol = "g_transport"
+kind = "global"
+addr = 0x76b8d4
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "g_terrain"
+symbol = "g_terrain_geometry"
+kind = "global"
+addr = 0x772140
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "terrain_y"
+symbol = "TODO"
+kind = "global"
+addr = 0x77215c
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "terrain_initialized"
+symbol = "Terrain_Geometry::m_initialized"
+kind = "global"
+addr = 0x772180
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "buckets"
+symbol = "TODO"
+kind = "global"
+addr = 0x773c8c
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "dark_orange"
+symbol = "ST3D_Colour_Dark_Orange"
+kind = "global"
+addr = 0x7a8ee8
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "green"
+symbol = "ST3D_Colour_Green"
+kind = "global"
+addr = 0x7a8f68
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "red"
+symbol = "ST3D_Colour_Red"
+kind = "global"
+addr = 0x7a8f78
+used_by = ["overlays.reads"]

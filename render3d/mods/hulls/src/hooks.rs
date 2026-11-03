@@ -11,19 +11,23 @@
 use r3d_core::engine::{self, field, field_f32, field_u8, rd, vtable};
 use r3d_core::math::{v3, M34, V3};
 pub use r3d_core::engine::instance::{
+use crate::syms::sym;
+
+/// An engine address of the profile: 0 unless the hook that uses it is ready.
+pub(crate) fn at(s: a2engine::Sym) -> usize { crate::syms::TABLE.engine().addr(s) }
     class_node, crew_fire, detail_level, element_name, frustum_test, instance_byte, instance_class, instance_scale, is_craft_instance, lights_hidden,
     render_fn, set_on_screen, station_node, team_colour, team_colours_on, COCOON_DB, DAMAGE_NODES, FN_MINING_RENDER, FN_RIG_RENDER, FN_SHIPYARD_RENDER,
     VT_COCOON, VT_DATABASE,
 };
 
 /// Slot 11 of a class's vtable, `Render(ST3D_Camera*)`, for the classes we draw.
-pub const FN_GO_RENDER: usize = 0x4d54e0; // GameObject::Render
-pub const FN_SCRAP_RENDER: usize = 0x4a58e0; // Scrap::Render (dilithium moons, comets)
+pub fn fn_go_render() -> usize { at(sym::FN_GO_RENDER) } // GameObject::Render
+pub fn fn_scrap_render() -> usize { at(sym::FN_SCRAP_RENDER) } // Scrap::Render (dilithium moons, comets)
 /// Slot 22, `RenderInternal(ST3D_Camera*)`.
-pub const FN_GO_RI: usize = 0x4d52b0; // GameObject::RenderInternal
-pub const FN_CRAFT_RI: usize = 0x4c8630; // Craft::RenderInternal
-pub const FN_FREIGHTER_RI: usize = 0x4b22c0; // Freighter::RenderInternal
-pub const FN_EVOLVER_RI: usize = 0x4b1170; // Evolver::RenderInternal
+pub fn fn_go_ri() -> usize { at(sym::FN_GO_RI) } // GameObject::RenderInternal
+pub fn fn_craft_ri() -> usize { at(sym::FN_CRAFT_RI) } // Craft::RenderInternal
+pub fn fn_freighter_ri() -> usize { at(sym::FN_FREIGHTER_RI) } // Freighter::RenderInternal
+pub fn fn_evolver_ri() -> usize { at(sym::FN_EVOLVER_RI) } // Evolver::RenderInternal
 
 
 /// The class's `RenderInternal` (slot 22).
@@ -363,10 +367,10 @@ pub fn rig_placeholder_of(o: usize) -> Option<(usize, M34, V3)> {
 /// resource carried (`+0x25c`, an `eResource`: crew, officers, dilithium, latinum,
 /// metal, biomatter; 6 none), the amount (`+0x258`) and the class's capacities, a float
 /// per resource (`+0x254`, a pointer).
-const VT_FREIGHTER: usize = 0x6b26a8;
+pub(crate) fn vt_freighter() -> usize { at(sym::VT_FREIGHTER) }
 /// `ResourceComponent::s_ResourceColor`: a pointer per resource to its colour (three
 /// floats), made by `InitResourceComponents`; stock's values when it has not run.
-const RESOURCE_COLOURS: usize = 0x764664;
+pub(crate) fn resource_colours() -> usize { at(sym::RESOURCE_COLOURS) }
 
 /// A freighter's cargo markings, as `Freighter::UpdateDilithiumMarkings` (0x4b1fa0)
 /// sets them before each draw: every mesh among the children of the SOD's `ore` node
@@ -380,7 +384,7 @@ const RESOURCE_COLOURS: usize = 0x764664;
 pub fn cargo_markings(o: usize, sod: &a2fmt::sod::Sod) -> alloc::vec::Vec<(alloc::string::String, V3)> {
     use a2fmt::sod::NodeKind;
     let mut out: alloc::vec::Vec<(alloc::string::String, V3)> = alloc::vec::Vec::new();
-    if o == 0 || vtable(o) != VT_FREIGHTER {
+    if o == 0 || vtable(o) != vt_freighter() {
         return out;
     }
     let Some(ore) = sod.find(super::content::ORE_NODE) else { return out };
@@ -390,7 +394,7 @@ pub fn cargo_markings(o: usize, sod: &a2fmt::sod::Sod) -> alloc::vec::Vec<(alloc
     let (fill, colour) = if kind < 6 && caps != 0 {
         let cap = field_f32(caps, kind * 4);
         let fill = if cap > 0.0 && amount.is_finite() { amount / cap * 100.0 } else { 0.0 };
-        let p = field(RESOURCE_COLOURS, kind * 4);
+        let p = field(resource_colours(), kind * 4);
         let c = if p != 0 { unsafe { rd::<[f32; 3]>(p) } } else { super::content::RESOURCE_COLOURS_STOCK[kind] };
         (fill, v3(c[0], c[1], c[2]))
     } else {
@@ -538,10 +542,10 @@ pub fn is_craft_class(class: usize) -> bool {
 /// (centre, radius) of each, from the instance's sphere (`+0x34`, `+0x40`) and the
 /// translation of its placement (`+0x44` + `0x24`), at most `max`.
 pub fn planet_spheres(max: usize) -> alloc::vec::Vec<[f32; 4]> {
-    const VT_PLANET: usize = 0x6b2b3c;
+    pub(crate) fn vt_planet() -> usize { at(sym::VT_PLANET) }
     let mut out = alloc::vec::Vec::new();
     engine::for_each_in_list(engine::OBJECT_LIST, |o| {
-        if out.len() >= max || o == 0 || engine::vtable(o) != VT_PLANET {
+        if out.len() >= max || o == 0 || engine::vtable(o) != vt_planet() {
             return;
         }
         let inst = field(o, 4);

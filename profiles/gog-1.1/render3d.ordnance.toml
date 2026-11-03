@@ -1,0 +1,194 @@
+# Render3D.asi's symbols in Armada2.exe 1.1 (GOG): module "ordnance" (render3d/mods/ordnance/src).
+# Each entry is tied to the hook that uses it; the findings are in render3d/README.md, "Hooks".
+schema = 1
+plugin = "render3d"
+readme = "render3d/README.md"
+lang = "rust"
+out = "render3d/mods/ordnance/src/syms.rs"
+
+[hook."ordnance.reads"]
+doc = "What the ordnance module reads of the engine: its objects, lists, globals and calls"
+rows = ["Modules.ordnance"]
+
+
+[[sym]]
+id = "fn_obj_even_if_destroyed"
+symbol = "GameObject::GetObjEvenIfDestroyed"
+kind = "fn"
+addr = 0x42bfa0
+check = "55 8b ec 8b 45 08 50 e8"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "fn_shock_radius"
+symbol = "ShockwaveExplosion::GetCurrentRadius"
+kind = "fn"
+addr = 0x467730
+check = "8b 41 30 8b 50 34 d9 02"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "fn_transform"
+symbol = "Entity::GetTransform"
+kind = "fn"
+addr = 0x4cfd50
+check = "8b 41 04 83 c0 44 c3 90"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "fn_entity_render"
+symbol = "Entity::Render"
+kind = "fn"
+addr = 0x4cfda0
+check = "55 8b ec 56 8b f1 57 8b"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "fn_entity_get"
+symbol = "Entity::Get"
+kind = "fn"
+addr = 0x4cfff0
+check = "55 8b ec 8b 4d 08 8b c1"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "fn_odf_name"
+symbol = "GameObject::GetOdfName"
+kind = "fn"
+addr = 0x4d5620
+check = "8b 49 40 e9 48 8d ff ff"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "sub_artillery"
+symbol = "Artillery::Submit"
+kind = "fn"
+addr = 0x5730a0
+check = "55 8b ec 56 8b f1 8b 4e"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "sub_chain"
+symbol = "ChainPulsar::Submit"
+kind = "fn"
+addr = 0x574f20
+check = "55 8b ec 56 8b f1 e8 25"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "sub_phaser"
+symbol = "Phaser::Submit"
+kind = "fn"
+addr = 0x57edc0
+check = "55 8b ec 51 56 8b f1 8b"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "sub_photon"
+symbol = "PhotonTorpedo::Submit"
+kind = "fn"
+addr = 0x57f100
+check = "55 8b ec 56 8b f1 8b 4e"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "sub_plasma"
+symbol = "PlasmaCannon::Submit"
+kind = "fn"
+addr = 0x57f580
+check = "55 8b ec 56 8b f1 e8 c5"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "sub_poleron"
+symbol = "PoleronTorpedo::Submit"
+kind = "fn"
+addr = 0x5800d0
+check = "55 8b ec 56 8b f1 8b 4e"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "sub_pulse"
+symbol = "PulsePhaser::Submit"
+kind = "fn"
+addr = 0x581cb0
+check = "55 8b ec 83 ec 20 56 8b"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "sub_srt"
+symbol = "ShieldRemovingTorpedo::Submit"
+kind = "fn"
+addr = 0x5853b0
+check = "55 8b ec 56 8b f1 8b 4e"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "site_warp"
+symbol = "Armada_RenderAllOurStuff"
+kind = "call"
+addr = 0x598423
+target = "fn_warp"
+in = "Armada_RenderAllOurStuff"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "fn_warp"
+symbol = "RenderWarpSpriteEffects"
+kind = "fn"
+addr = 0x59c560
+check = "55 8b ec 56 8b 35 0c 3d"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "site_warp_sprite"
+symbol = "WarpSpriteEffect::Render"
+kind = "call"
+addr = 0x59cc6b
+target = "drawscaled3d"
+in = "WarpSpriteEffect::Render"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "drawscaled3d"
+symbol = "ST3D_Sprite::DrawScaled3D"
+kind = "fn"
+addr = 0x63aa60
+check = "55 8b ec 83 ec 08 8b 45"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "fn_prj_odf"
+symbol = "cPrjID::GetOdfName"
+kind = "fn"
+addr = 0x6593a0
+check = "8b 01 85 c0 75 06 b8 dc"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "vt_phaser"
+symbol = "Phaser"
+kind = "vtable"
+addr = 0x6b8ee4
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "vt_point"
+symbol = "ST3D_Point_Light"
+kind = "vtable"
+addr = 0x6bc8ac
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "cull_distance"
+symbol = "cfgOBJECT_CULLING_DISTANCE"
+kind = "global"
+addr = 0x6fcac0
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "ordnance_head"
+symbol = "TODO"
+kind = "global"
+addr = 0x771fac
+used_by = ["ordnance.reads"]

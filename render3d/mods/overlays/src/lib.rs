@@ -107,7 +107,7 @@ impl Overlays {
     /// `Terrain_Geometry::Render`, as stock runs it, with the grid and the two layers
     /// ours. False to leave the whole step to the engine.
     fn terrain(&mut self, v: &View) -> bool {
-        let tg = hooks::G_TERRAIN;
+        let tg = hooks::g_terrain();
         if !hooks::terrain_initialized() {
             // The engine's first call makes its meshes and finds its textures.
             return false;
@@ -232,15 +232,15 @@ impl Module for Overlays {
     }
     fn feature(&mut self, f: usize, v: &View) -> bool {
         let vt = engine::vtable(f);
-        if vt == hooks::VT_TACTICAL_CAMERA {
+        if vt == hooks::vt_tactical_camera() {
             return self.pivot.feature(f, v);
         }
         if !self.s.ghosts {
             return false;
         }
         match vt {
-            hooks::VT_GHOST => self.ghosts.ghosts(f, v),
-            hooks::VT_PLACEHOLDER => self.ghosts.placeholder(f, v),
+            hooks::vt_ghost() => self.ghosts.ghosts(f, v),
+            hooks::vt_placeholder() => self.ghosts.placeholder(f, v),
             _ => false,
         }
     }
