@@ -151,6 +151,42 @@ fn made(hr: i32, out: P, what: &'static str) -> Result<P, &'static str> {
     Ok(out)
 }
 
+/// Whether Direct3D 12 can start, asked at `Direct3DCreate8` before the window exists
+/// (the bail-out, `bail.rs`): `d3d12.dll` and `dxgi.dll` with their entry points, a DXGI
+/// factory, and `D3D12CreateDevice` at feature level 11_0 asked without making the device
+/// (no out pointer: S_FALSE when it would succeed). The swap chain is the start's.
+pub fn probe() -> Result<(), &'static str> {
+    let d3d12 = unsafe { LoadLibraryA(c"d3d12.dll".as_ptr() as *const u8) };
+    if d3d12.is_null() {
+        return Err("no d3d12.dll");
+    }
+    let dxgi = unsafe { LoadLibraryA(c"dxgi.dll".as_ptr() as *const u8) };
+    if dxgi.is_null() {
+        return Err("no dxgi.dll");
+    }
+    let (create_device, create_factory) = (proc(d3d12, c"D3D12CreateDevice"), proc(dxgi, c"CreateDXGIFactory1"));
+    if create_device == 0 || proc(d3d12, c"D3D12SerializeRootSignature") == 0 {
+        return Err("d3d12.dll has no D3D12CreateDevice or D3D12SerializeRootSignature");
+    }
+    if create_factory == 0 {
+        return Err("dxgi.dll has no CreateDXGIFactory1");
+    }
+    let create: unsafe extern "system" fn(*const crate::com::Guid, *mut P) -> i32 = unsafe { core::mem::transmute(create_factory) };
+    let mut factory: P = core::ptr::null_mut();
+    let hr = unsafe { create(&IID_DXGI_FACTORY2, &mut factory) };
+    if hr < 0 || factory.is_null() {
+        return Err("no DXGI factory (IDXGIFactory2)");
+    }
+    release(factory);
+    let create_device: unsafe extern "system" fn(P, u32, *const crate::com::Guid, *mut P) -> i32 = unsafe { core::mem::transmute(create_device) };
+    let hr = unsafe { create_device(core::ptr::null_mut(), FEATURE_LEVEL_11_0, &IID_DEVICE, core::ptr::null_mut()) };
+    if hr < 0 {
+        log!("d3d12: probe: D3D12CreateDevice at feature level 11_0: {:#x}", hr as u32);
+        return Err("no device at feature level 11_0");
+    }
+    Ok(())
+}
+
 impl Dx {
     /// Opens Direct3D 12 on `hwnd`, `w` x `h`; `interval` is the engine's presentation
     /// interval (0 and 1: wait for the vertical blank; IMMEDIATE: don't).

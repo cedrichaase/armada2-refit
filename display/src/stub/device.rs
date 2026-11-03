@@ -1,7 +1,7 @@
 //! The stub's `IDirect3DDevice8`: accepts everything, draws nothing. It keeps the state
-//! the engine sets, for its own `Get*` calls, and passes on to the Direct3D 9 device what
-//! the plugins read of it there: the transforms, the viewport, `Clear`, `BeginScene` and
-//! `EndScene`. `Present` presents the Direct3D 9 device (`super::present`).
+//! the engine sets, for its own `Get*` calls and for what the plugins read of it through
+//! `gpu/src/display.rs` (the transforms, the viewport); `Clear` and `BeginScene` reach the
+//! backend's frame. `Present` presents the backend's swap chain (`super::present`).
 use super::d3d::{CAPS, D3DERR_INVALIDCALL};
 use super::obj::{self, Body, SObj};
 use super::res;
@@ -175,10 +175,6 @@ fn dev(this: *mut SObj) -> &'static mut Dev {
     }
 }
 
-fn d9() -> *mut c_void {
-    super::dev9()
-}
-
 fn hold(p: *mut SObj) -> P {
     if !p.is_null() {
         obj::add_ref(p);
@@ -218,8 +214,7 @@ unsafe extern "system" fn test_cooperative_level(_this: *mut SObj) -> HRESULT {
 }
 unsafe extern "system" fn get_available_texture_mem(_this: *mut SObj) -> u32 {
     trace::call(frame!(), Kind::Device, 4);
-    let d = d9();
-    if d.is_null() { 512 << 20 } else { vcall!(d, 4, fn() -> u32,) }
+    512 << 20
 }
 ok!(5 resource_manager_discard_bytes(n: u32));
 
@@ -452,17 +447,15 @@ unsafe extern "system" fn begin_scene(this: *mut SObj) -> HRESULT {
     }
     super::flush_mirrors();
     dev(this).in_scene = true;
-    let d = d9();
-    if d.is_null() { S_OK } else { vcall!(d, 41, fn() -> HRESULT,) }
+    S_OK
 }
 unsafe extern "system" fn end_scene(this: *mut SObj) -> HRESULT {
     trace::call(frame!(), Kind::Device, 35);
     dev(this).in_scene = false;
-    let d = d9();
-    if d.is_null() { S_OK } else { vcall!(d, 42, fn() -> HRESULT,) }
+    S_OK
 }
 
-/// `Clear` reaches the Direct3D 9 device when the engine clears its own back buffer
+/// `Clear` reaches the backend's frame when the engine clears its own back buffer
 /// and depth: render3d draws into what it cleared.
 unsafe extern "system" fn clear(this: *mut SObj, n: u32, rects: P, flags: u32, color: u32, z: f32, stencil: u32) -> HRESULT {
     trace::call(frame!(), Kind::Device, 36);
@@ -482,17 +475,9 @@ unsafe extern "system" fn clear(this: *mut SObj, n: u32, rects: P, flags: u32, c
         let vp = dv.viewport;
         let f = if dv.zbuffer.is_null() { flags & 1 } else { flags };
         x.clear(list, [vp[0], vp[1], vp[2], vp[3]], f, color, z);
-        return S_OK;
     }
-    let d = d9();
-    if d.is_null() {
-        return S_OK;
-    }
-    let mut f = flags;
-    if dv.zbuffer.is_null() {
-        f &= !6;
-    }
-    vcall!(d, 43, fn(u32, P, u32, u32, f32, u32) -> HRESULT, n, rects, f, color, z, stencil)
+    let _ = stencil;
+    S_OK
 }
 
 unsafe extern "system" fn set_transform(this: *mut SObj, state: u32, m: *const [f32; 16]) -> HRESULT {
@@ -505,10 +490,6 @@ unsafe extern "system" fn set_transform(this: *mut SObj, state: u32, m: *const [
     match dv.transforms.iter_mut().find(|t| t.0 == state) {
         Some(t) => t.1 = mm,
         None => dv.transforms.push((state, mm)),
-    }
-    let d = d9();
-    if !d.is_null() {
-        vcall!(d, 44, fn(u32, *const [f32; 16]) -> HRESULT, state, m);
     }
     S_OK
 }
@@ -544,10 +525,6 @@ unsafe extern "system" fn set_viewport(this: *mut SObj, vp: *const [u32; 6]) -> 
         return D3DERR_INVALIDCALL;
     }
     dev(this).viewport = unsafe { *vp };
-    let d = d9();
-    if !d.is_null() {
-        vcall!(d, 47, fn(*const [u32; 6]) -> HRESULT, vp);
-    }
     S_OK
 }
 unsafe extern "system" fn get_viewport(this: *mut SObj, vp: *mut [u32; 6]) -> HRESULT {

@@ -120,11 +120,11 @@ check 'cmp -s "$P/layers/display/d3d8.dll" "$G/d3d8.dll" && [ "$(sum "$G/d3d8_re
 check 'grep -q "d3d8.dll: crosire.s d3d8to9 already" "$T/out" && cmp -s "$P/layers/ui/UI.asi" "$G/UI.asi"'
 # the step after the chain's, before the plugins'
 check '[ "$(grep "^::step" "$T/out" | sed -n "3,5p" | cut -d" " -f2 | tr "\n" " ")" = "chain display render3d " ]'
-# the old defaults moved (the shipped Defaults=2), the player's own values kept, every
-# missing key added, each once
-check 'grep -qx "Mode=stub" "$G/Display8.ini" && grep -q "Display8.ini: \[display8\] Mode forward -> stub (defaults 2)" "$T/out"'
-check 'grep -qx "VSync=0" "$G/Display8.ini" && grep -qx "Drop2D=1" "$G/Display8.ini" && grep -qx "Defaults=2" "$G/Display8.ini"'
-check 'grep -qx "Real=auto" "$G/Display8.ini" && grep -qx "Frames=3" "$G/Display8.ini" && [ "$(grep -c "^Backend=" "$G/Display8.ini")" = 1 ]'
+# the old defaults moved (Defaults=2), then the retired keys dropped (Defaults=3: Mode,
+# Real, the d3d9 token), the player's own values kept, every missing key added, each once
+check '! grep -q "^Mode=" "$G/Display8.ini" && ! grep -q "^Real=" "$G/Display8.ini"'
+check 'grep -qx "VSync=0" "$G/Display8.ini" && grep -qx "Drop2D=1" "$G/Display8.ini" && grep -qx "Defaults=3" "$G/Display8.ini"'
+check 'grep -qx "Frames=3" "$G/Display8.ini" && [ "$(grep -c "^Backend=" "$G/Display8.ini")" = 1 ]'
 check 'grep -qx "Backend=auto" "$G/Display8.ini"'
 cp "$G/Display8.ini" "$T/d8.ini"
 "$P/install.sh" "$G" > "$T/out"

@@ -1,10 +1,10 @@
-//! Display8: Star Trek: Armada II's `d3d8.dll`, ours. In forward mode it
-//! stands in front of the real chain (`d3d8_real.dll`: crosire's d3d8to9, then DXVK's or
-//! Windows' d3d9) and passes every call through, tracing it on the bench (`Trace=1`),
-//! dropping the engine's draws by category (`[Drop]`), and telling the plugins of the
-//! device's comings and goings (`api.rs`). In stub mode (`stub/`, the default) the engine draws
-//! nothing, and render3d and the UI draw the whole frame on a device of ours: Direct3D 9,
-//! Vulkan (`vk/`) or Direct3D 12 (`dx12/`). See README.md beside this crate.
+//! Display8: Star Trek: Armada II's `d3d8.dll`, ours. The engine gets Direct3D 8
+//! objects of ours (`stub/`) that draw nothing themselves, and render3d and the UI draw
+//! the whole frame on a device of Display8's own, on Vulkan (`vk/`) or Direct3D 12
+//! (`dx12/`); the engine's own draws are drawn by the passthrough (`passthrough/`). On
+//! the bench it traces every call (`Trace=1`) and drops the engine's draws by category
+//! (`[Drop]`). When it cannot draw the game itself, the game gets the system's own
+//! Direct3D 8 and the plugins stand down (`bail.rs`). See README.md beside this crate.
 #![no_std]
 #![allow(clippy::missing_safety_doc, static_mut_refs)]
 
@@ -19,6 +19,7 @@ pub use a2rt::{log, sfmt};
 #[rustfmt::skip]
 pub mod shaders;
 pub mod api;
+pub mod bail;
 pub mod claims;
 pub mod com;
 pub mod d3d8;
@@ -46,23 +47,19 @@ static HEAP: rt::mem::Heap = rt::mem::Heap;
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
     log!("PANIC: {}", info);
-    rt::log_str("Display8 stopped the game: a bug in d3d8.dll. Take it out (or put d3d8_real.dll back as d3d8.dll) to play without it.");
+    rt::log_str("Display8 stopped the game: a bug in d3d8.dll. Set [Display8] Backend=none in Display8.ini (or take d3d8.dll out) to play without it.");
     unsafe { ExitProcess(3) }
 }
 
 struct Config {
     log: bool,
     trace: bool,
-    real: alloc::string::String,
 }
 
 static mut CONFIG: Option<Config> = None;
-static mut REAL: HANDLE = core::ptr::null_mut();
-/// `Mode=stub` asked for; whether it runs is decided at `Direct3DCreate8`.
-static mut STUB_ASKED: bool = false;
 /// `Backend=`: the backends the stub tries, in order, at the engine's first
 /// `CreateDevice` (`auto` by default, as the shipped `Display8.ini`; README.md,
-/// "Choosing a backend").
+/// "Choosing a backend"). Empty: `Backend=none`, the bail-out.
 static mut ORDER: alloc::vec::Vec<stub::Backend> = alloc::vec::Vec::new();
 /// `FailBackend=`: backends that fail on purpose once made (a test bench clone only).
 static mut FAIL: alloc::vec::Vec<stub::Backend> = alloc::vec::Vec::new();
@@ -71,7 +68,8 @@ static mut VALIDATE: bool = false;
 /// empty: a discrete one first (README.md, "Vulkan").
 static mut VK_DEVICE: alloc::string::String = alloc::string::String::new();
 
-/// `PixelCentres=d3d9`: on Vulkan, the plugins draw with Direct3D 9's pixel centres.
+/// `PixelCentres=d3d9`: the plugins draw with Direct3D 9's pixel centres (a convention,
+/// not the backend: kept for comparing frames with old ones).
 static mut D3D9_CENTRES: bool = false;
 
 pub fn d3d9_centres() -> bool {
@@ -92,45 +90,20 @@ pub fn present_interval(asked: u32, windowed: bool) -> u32 {
     if unsafe { VSYNC } || windowed { asked } else { INTERVAL_IMMEDIATE }
 }
 
-/// The plugins' samplers on Vulkan and Direct3D 12 and the passthrough's (renderer/README.md):
-/// anisotropy (-1: not set) and LOD bias (0 when not set). Each of `Display8.ini`'s
-/// `[Samplers]` keys `Anisotropy`, `LodBias` and `ClampNegativeLodBias` is the value when it
-/// is set and not `auto`; `auto` (the shipped value) leaves the key to the game's
-/// `dxvk.conf`, which says what DXVK makes of every sampler on Direct3D 9
-/// (`d3d9.samplerAnisotropy`, `d3d9.samplerLodBias`, `d3d9.clampNegativeLodBias`), so the
-/// backends' pictures agree. A negative bias is held at 0 while the clamp holds (DXVK's
-/// default). One log line says where each value came from.
+/// The plugins' samplers and the passthrough's (README.md, "Samplers"): anisotropy and
+/// LOD bias, from `Display8.ini`'s `[Samplers]` keys `Anisotropy`, `LodBias` and
+/// `ClampNegativeLodBias`. `auto` (the shipped value) or no key is the default: 16, -0.5
+/// and no clamp, what the game's `dxvk.conf` (stage 3) had DXVK make of every sampler on
+/// Direct3D 9 before 15.0.0, so the pictures agree. A negative bias is held at 0 while the
+/// clamp holds. One log line says where each value came from.
 pub fn dxvk_samplers() -> (i32, f32) {
     let ini = rt::Ini::open(&rt::game_path("Display8.ini"));
     let own = |key: &str| ini.string("Samplers", key).filter(|v| !v.is_empty() && !v.eq_ignore_ascii_case("auto"));
     let (o_aniso, o_bias, o_clamp) = (own("Anisotropy"), own("LodBias"), own("ClampNegativeLodBias"));
-    let (mut aniso, mut bias, mut clamp) = (-1i32, 0f32, true);
-    if o_aniso.is_none() || o_bias.is_none() || o_clamp.is_none() {
-        let text = rt::read_file(&rt::game_path("dxvk.conf")).unwrap_or_default();
-        let text = alloc::string::String::from_utf8_lossy(&text);
-        for line in text.lines() {
-            let line = line.split('#').next().unwrap_or("");
-            let Some((k, v)) = line.split_once('=') else { continue };
-            let (k, v) = (k.trim(), v.trim());
-            if k.eq_ignore_ascii_case("d3d9.samplerAnisotropy") {
-                aniso = rt::parse_f32(v).map_or(-1, |f| f as i32);
-            } else if k.eq_ignore_ascii_case("d3d9.samplerLodBias") {
-                bias = rt::parse_f32(v).unwrap_or(0.0);
-            } else if k.eq_ignore_ascii_case("d3d9.clampNegativeLodBias") {
-                clamp = !v.eq_ignore_ascii_case("false");
-            }
-        }
-    }
-    if let Some(v) = &o_aniso {
-        aniso = rt::parse_f32(v).map_or(-1, |f| f as i32);
-    }
-    if let Some(v) = &o_bias {
-        bias = rt::parse_f32(v).unwrap_or(0.0);
-    }
-    if let Some(v) = &o_clamp {
-        clamp = !(v == "0" || v.eq_ignore_ascii_case("false"));
-    }
-    let from = |o: &Option<alloc::string::String>| if o.is_some() { "Display8.ini" } else { "dxvk.conf" };
+    let aniso = o_aniso.as_deref().map_or(16, |v| rt::parse_f32(v).map_or(-1, |f| f as i32));
+    let mut bias = o_bias.as_deref().map_or(-0.5, |v| rt::parse_f32(v).unwrap_or(0.0));
+    let clamp = o_clamp.as_deref().is_some_and(|v| !(v == "0" || v.eq_ignore_ascii_case("false")));
+    let from = |o: &Option<alloc::string::String>| if o.is_some() { "Display8.ini" } else { "default" };
     log!("samplers: Anisotropy={} ({}), LodBias={} ({}), ClampNegativeLodBias={} ({})",
         aniso, from(&o_aniso), bias, from(&o_bias), clamp as i32, from(&o_clamp));
     if clamp && bias < 0.0 {
@@ -175,81 +148,82 @@ fn platform() -> &'static str {
     }
 }
 
-/// `Backend=auto`'s order: Vulkan, then Direct3D 12, then Direct3D 9, on every system (the
-/// user's decision of 2026-10-23, over the display plan's Direct3D 12 first on Windows).
+/// `Backend=auto`'s order: Vulkan, then Direct3D 12, on every system (the user's
+/// decision of 2026-10-23, over the display plan's Direct3D 12 first on Windows).
 /// `platform` is only logged.
 fn auto_order(_platform: &str) -> alloc::vec::Vec<stub::Backend> {
     use stub::Backend::*;
-    alloc::vec![Vulkan, D3d12, D3d9]
+    alloc::vec![Vulkan, D3d12]
 }
 
-/// `Backend=`: `auto`, one backend, or a list (`d3d12,vulkan`), tried in that order;
-/// Direct3D 9 is always the last, named or not, so that a backend that cannot start never
-/// fails the game. Unknown names are logged and skipped.
+/// `Backend=`: `auto`, `vulkan`, `d3d12`, `none`, or a list (`d3d12,vulkan`), tried in
+/// that order; when none of them starts, the bail-out (`bail.rs`). `none` ends the list:
+/// nothing after it is tried, and `Backend=none` is the bail-out at once. The retired
+/// `d3d9` (display 1.0.0) is skipped, as is any unknown name; a list left empty is
+/// `auto`.
 fn backends(value: &str) -> alloc::vec::Vec<stub::Backend> {
     let mut order = alloc::vec::Vec::new();
+    let mut named = false;
     for word in value.split(',').map(str::trim).filter(|w| !w.is_empty()) {
+        if word.eq_ignore_ascii_case("none") {
+            log!("Backend=none: {}the bail-out (the system's Direct3D 8)", if order.is_empty() { "" } else { "then " });
+            return order;
+        }
         let more = if word.eq_ignore_ascii_case("auto") {
             let p = platform();
             let o = auto_order(p);
             log!("Backend=auto: on {}: {}", p, stub::names(&o));
             o
+        } else if word.eq_ignore_ascii_case("d3d9") {
+            log!("settings: Backend token d3d9 retired (Direct3D 9 removed)");
+            continue;
         } else {
             match stub::Backend::parse(word) {
                 Some(b) => alloc::vec![b],
                 None => {
-                    log!("Backend={}: not a backend of this version (auto, d3d9, vulkan, d3d12); skipped", word);
-                    alloc::vec::Vec::new()
+                    log!("Backend={}: not a backend of this version (auto, vulkan, d3d12, none); skipped", word);
+                    continue;
                 }
             }
         };
+        named = true;
         for b in more {
             if !order.contains(&b) {
                 order.push(b);
             }
         }
     }
-    // Direct3D 9 last: what every system has while d3d9 lives.
-    order.retain(|&b| b != stub::Backend::D3d9);
-    order.push(stub::Backend::D3d9);
+    if !named {
+        let p = platform();
+        order = auto_order(p);
+        log!("Backend= names no backend: auto, on {}: {}", p, stub::names(&order));
+    }
     order
-}
-
-#[allow(non_snake_case)]
-fn STUB_ASKED_NOW() -> bool {
-    unsafe { STUB_ASKED }
 }
 
 /// The plugins that change what the engine draws, which in stub mode would draw
 /// nothing (README.md, "Stub mode"): with any loaded, the stub stands down.
 const ENGINE_PLUGINS: [&str; 3] = ["HUD.asi", "GridLayout.asi", "Menus.asi"];
 
-fn stub_allowed() -> bool {
-    for p in ENGINE_PLUGINS {
-        if !unsafe { GetModuleHandleA(rt::cstr(p).as_ptr()) }.is_null() {
-            log!("Mode=stub: {} is loaded and changes what the engine draws, which the stub drops; forward mode instead", p);
-            return false;
-        }
-    }
-    true
+fn engine_plugin() -> Option<&'static str> {
+    ENGINE_PLUGINS.into_iter().find(|p| !unsafe { GetModuleHandleA(rt::cstr(p).as_ptr()) }.is_null())
 }
 
 /// The stub offers one mode, so it needs `display.modes` (stub/modes.rs): without it the
 /// engine's own requests find no mode, the shell's display opens on none and the game
 /// dies of a stack overflow before its first `CreateDevice` (measured with
 /// `A2EngineTest.ini` `Mismatch=display.modes`, README.md, "Hooks"). So on a build this
-/// Display8 does not know, or with that hook stood down, the game gets the old chain.
-fn stub_modes() -> bool {
+/// Display8 does not know, or with that hook stood down, the bail-out (p8-e7): why, or
+/// None when the stub can run.
+fn stub_modes() -> Option<&'static str> {
     let e = engine();
-    let ready = e.ready(engine_syms::hook::MODES).is_ok();
     if e.build().is_none() {
-        log!("engine: unknown build: Display8 forwards to the old chain");
-        return false;
+        return Some("engine: unknown build");
     }
-    if !ready {
-        log!("Mode=stub: without display.modes the stub could open no display; forward mode instead");
+    if e.ready(engine_syms::hook::MODES).is_err() {
+        return Some("without display.modes the stub could open no display");
     }
-    ready
+    None
 }
 
 fn engine_log(line: &str) {
@@ -277,27 +251,27 @@ fn startup() {
             // auto: on in a test bench clone, which is where the inventory is wanted.
             _ => bench_clone(),
         },
-        real: real_path(ini.string("Display8", "Real").filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("auto"))),
     };
     rt::log_open("Display8.log", cfg.log || cfg.trace);
-    let mode = ini.string("Display8", "Mode").unwrap_or_else(|| alloc::string::String::from("stub"));
-    log!("Display8 {} -- game dir {}; mode {}; the real chain: {}", env!("CARGO_PKG_VERSION"), rt::game_dir(), mode, cfg.real);
+    log!("Display8 {} -- game dir {}", env!("CARGO_PKG_VERSION"), rt::game_dir());
     // The identity line, the build line and the symbols summary (crates/a2engine).
     a2engine::init(&engine_syms::TABLE, engine_log);
-    unsafe { STUB_ASKED = mode.eq_ignore_ascii_case("stub") };
+    // Retired in display 1.0.0 (forward mode and Direct3D 9 went): read past, said once.
+    if let Some(m) = ini.string("Display8", "Mode") {
+        log!("settings: Mode={} retired (forward mode removed); ignored", m);
+    }
+    if ini.string("Display8", "Real").is_some() {
+        log!("settings: Real= retired (forward mode removed); ignored");
+    }
     let backend = ini.string("Display8", "Backend").unwrap_or_else(|| alloc::string::String::from("auto"));
     let fail = ini.string("Display8", "FailBackend").unwrap_or_default();
     unsafe {
-        if STUB_ASKED {
-            ORDER = backends(&backend);
-        } else {
-            ORDER = alloc::vec![stub::Backend::D3d9];
-        }
+        ORDER = backends(&backend);
         for word in fail.split(',').map(str::trim).filter(|w| !w.is_empty()) {
             match stub::Backend::parse(word) {
                 Some(b) if bench_clone() => FAIL.push(b),
                 Some(_) => log!("FailBackend={}: for the test bench only; ignored outside a bench clone", word),
-                None => log!("FailBackend={}: not a backend (d3d9, vulkan, d3d12); ignored", word),
+                None => log!("FailBackend={}: not a backend (vulkan, d3d12); ignored", word),
             }
         }
         if !FAIL.is_empty() {
@@ -311,18 +285,12 @@ fn startup() {
             log!("VSync=0: frames are presented without waiting for the vertical blank");
         }
     }
-    if STUB_ASKED_NOW() {
-        log!("stub mode on {}{}", stub::names(unsafe { &ORDER }), if unsafe { VALIDATE } { ", with the validation layer" } else { "" });
-    }
-    if !mode.eq_ignore_ascii_case("forward") && !mode.eq_ignore_ascii_case("stub") {
-        log!("Mode={}: not a mode of this version (forward, stub); forward it is", mode);
+    if !unsafe { ORDER.is_empty() } {
+        log!("stub on {}{}", stub::names(unsafe { &ORDER }), if unsafe { VALIDATE } { ", with the validation layer" } else { "" });
     }
     unsafe { CONFIG = Some(cfg) };
-    d3d8::install();
     drop::load(&ini);
-    if STUB_ASKED_NOW() {
-        passthrough::configure(&ini);
-    }
+    passthrough::configure(&ini);
     detail::configure(&ini);
     window::configure(&ini);
     if config().trace {
@@ -331,73 +299,63 @@ fn startup() {
     }
 }
 
-/// The real chain's `d3d8.dll`: `Real=` (a name in the game directory, or a full
-/// path), else `d3d8_real.dll` beside the exe if there is one (what `display/install`
-/// puts there), else the system's own (`GetSystemDirectory`: SysWOW64 for a 32-bit
-/// process on 64-bit Windows, Wine's builtin under Wine).
-fn real_path(set: Option<alloc::string::String>) -> alloc::string::String {
-    if let Some(s) = set {
-        return if s.contains(':') || s.starts_with('\\') { s } else { rt::game_path(&s) };
+/// Why the stub cannot run, or None: `Backend=none`, a build or hook it needs missing, a
+/// legacy plugin loaded, or no backend of the order that can start (the probes). The
+/// probes drop what cannot start from the order.
+fn bail_reason() -> Option<alloc::string::String> {
+    if unsafe { ORDER.is_empty() } {
+        return Some(alloc::string::String::from("Backend=none"));
     }
-    let local = rt::game_path("d3d8_real.dll");
-    if rt::file_exists(&local) {
-        return local;
+    if let Some(p) = engine_plugin() {
+        return Some(sfmt!("{} is loaded and changes what the engine draws, which the stub drops", p));
     }
-    let mut buf = [0u8; 300];
-    let n = unsafe { GetSystemDirectoryA(buf.as_mut_ptr(), 280) } as usize;
-    let mut s = alloc::string::String::from(core::str::from_utf8(&buf[..n.min(280)]).unwrap_or("C:\\windows\\system32"));
-    s.push_str("\\d3d8.dll");
-    s
-}
-
-/// The real chain's `d3d8.dll`, loaded on first use (not in `DllMain`).
-fn real() -> HANDLE {
+    if let Some(why) = stub_modes() {
+        return Some(alloc::string::String::from(why));
+    }
+    let mut failed = alloc::string::String::new();
     unsafe {
-        if REAL.is_null() {
-            let p = rt::cstr(&config().real);
-            REAL = LoadLibraryA(p.as_ptr());
-            if REAL.is_null() {
-                log!("cannot load {}: no Direct3D for the game", config().real);
+        ORDER.retain(|&b| {
+            let r = match b {
+                stub::Backend::Vulkan => vk::probe(),
+                stub::Backend::D3d12 => dx12::probe(),
+            };
+            match r {
+                Ok(()) => log!("probe: {} can start", b.name()),
+                Err(e) => {
+                    log!("probe: {} cannot start: {}", b.name(), e);
+                    if !failed.is_empty() {
+                        failed.push_str(", ");
+                    }
+                    failed.push_str(&sfmt!("{}: {}", b.name(), e));
+                }
             }
+            r.is_ok()
+        });
+        if ORDER.is_empty() {
+            return Some(sfmt!("no backend can start ({})", failed));
         }
-        REAL
     }
-}
-
-fn real_proc(name: &str) -> usize {
-    let m = real();
-    if m.is_null() {
-        return 0;
-    }
-    let c = rt::cstr(name);
-    unsafe { GetProcAddress(m, c.as_ptr()) }
+    None
 }
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Direct3DCreate8(sdk: u32) -> *mut c_void {
-    if unsafe { STUB_ASKED } && stub_allowed() && stub_modes() {
-        if let Some(d) = stub::start(unsafe { ORDER.clone() }, unsafe { VALIDATE }) {
+    bail::note_sdk(sdk);
+    if let Some(why) = bail_reason() {
+        return bail::early(sdk, &why);
+    }
+    match stub::start(unsafe { ORDER.clone() }, unsafe { VALIDATE }) {
+        Some(d) => {
             log!("Direct3DCreate8({}) -> the stub: the engine draws nothing from here", sdk);
-            return d;
+            d
         }
-        log!("Mode=stub: the stub could not start on {}; forward mode instead", stub::names(unsafe { &ORDER }));
+        None => bail::early(sdk, "the stub could not start"),
     }
-    // Forward mode: the engine's mode lookups are still answered for the shell and the
-    // intro (stub/modes.rs), by the real chain's own list.
-    stub::modes::install();
-    let f = real_proc("Direct3DCreate8");
-    if f == 0 {
-        return core::ptr::null_mut();
-    }
-    let f: unsafe extern "system" fn(u32) -> *mut c_void = unsafe { core::mem::transmute(f) };
-    let d3d = unsafe { f(sdk) };
-    log!("Direct3DCreate8({}) -> {:#x}", sdk, d3d as *const () as usize);
-    com::wrap(d3d, com::Kind::D3D, com::Role::Plain) as *mut c_void
 }
 
 #[unsafe(no_mangle)]
 pub extern "system" fn ValidatePixelShader(a: *const u32, b: *const u32, c: i32, d: *mut c_void) -> i32 {
-    match real_proc("ValidatePixelShader") {
+    match bail::proc("ValidatePixelShader") {
         0 => -1,
         f => unsafe { core::mem::transmute::<usize, unsafe extern "system" fn(*const u32, *const u32, i32, *mut c_void) -> i32>(f)(a, b, c, d) },
     }
@@ -405,7 +363,7 @@ pub extern "system" fn ValidatePixelShader(a: *const u32, b: *const u32, c: i32,
 
 #[unsafe(no_mangle)]
 pub extern "system" fn ValidateVertexShader(a: *const u32, b: *const u32, c: *const u32, d: i32, e: *mut c_void) -> i32 {
-    match real_proc("ValidateVertexShader") {
+    match bail::proc("ValidateVertexShader") {
         0 => -1,
         f => unsafe {
             core::mem::transmute::<usize, unsafe extern "system" fn(*const u32, *const u32, *const u32, i32, *mut c_void) -> i32>(f)(a, b, c, d, e)
@@ -415,7 +373,7 @@ pub extern "system" fn ValidateVertexShader(a: *const u32, b: *const u32, c: *co
 
 #[unsafe(no_mangle)]
 pub extern "system" fn DebugSetMute() {
-    if let f @ 1.. = real_proc("DebugSetMute") {
+    if let f @ 1.. = bail::proc("DebugSetMute") {
         unsafe { core::mem::transmute::<usize, unsafe extern "system" fn()>(f)() }
     }
 }
@@ -427,7 +385,6 @@ pub extern "system" fn DllMain(_module: HANDLE, reason: u32, _reserved: *mut u8)
         0 => {
             if config().trace {
                 trace::write_inventory();
-                log!("exit: {} objects of ours alive", com::live());
             }
         }
         _ => {}

@@ -5,7 +5,7 @@ use super::get;
 use crate::stub::obj::SObj;
 use crate::stub::Backend;
 use core::ffi::c_void;
-use gpu::display::{VkAlloc8, VkDevice8, VkFrame8, VkImage8, BACKEND_D3D12, BACKEND_D3D9, BACKEND_NONE, BACKEND_VULKAN};
+use gpu::display::{VkAlloc8, VkDevice8, VkFrame8, VkImage8, BACKEND_D3D12, BACKEND_NONE, BACKEND_VULKAN};
 
 /// The backend the stub's device was made on, and none before it exists (the engine's
 /// first `CreateDevice`, where `Backend=`'s order is tried): a plugin is never told a
@@ -16,7 +16,6 @@ pub extern "C" fn display8v1_backend() -> u32 {
     match crate::stub::made() {
         Some(Backend::Vulkan) => BACKEND_VULKAN,
         Some(Backend::D3d12) => BACKEND_D3D12,
-        Some(Backend::D3d9) => BACKEND_D3D9,
         None => BACKEND_NONE,
     }
 }

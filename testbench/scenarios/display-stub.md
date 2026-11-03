@@ -11,8 +11,8 @@ stub mode (`display/bench-mode.sh`): the engine's Direct3D 8 is ours and draws
 nothing, and render3d and the UI draw the whole frame on Display8's own device, the
 one `Backend=` chooses (`display/README.md`, "Stub mode", "Choosing a backend"):
 `auto` as shipped, which runs on the GPU (`--vulkan-device lavapipe` for
-the CPU); `display/stub-scenario.sh display-stub stub Backend=d3d9` for
-Direct3D 9. `display-inventory`'s way through the
+the CPU); `display/stub-scenario.sh display-stub stub Backend=d3d12` for
+Direct3D 12. `display-inventory`'s way through the
 game: the intro movies, the menus, a campaign mission from its loading screen and
 cinematic, save and load, an Instant Action match won, Options, the Credits and Exit,
 each stage marked as a context so the inventory says what the engine still asked for.

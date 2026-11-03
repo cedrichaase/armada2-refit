@@ -89,16 +89,16 @@ size as the 640x480, 15 fps stock `.bik`**, plus an 11.9 MB WAV.
 decoded frames match the original MD5 for MD5.
 
 `BinkProxy.ini` switches each part off separately (`ReplaceMovies`, `UseUI`,
-`RaiseIntroMode`, `FitIntro`) and can pin the intro mode (`IntroWidth` and
-`IntroHeight`). `BinkProxy.log` records every open and close, with decode
+`FitIntro`). `BinkProxy.log` records every open and close, with decode
 timing and a count of late frames.
 
-**The intro's mode is Display8's** (cutscenes 2.7.0): with a Display8 as `d3d8.dll` (it
-exports `display8_abi`) the proxy leaves the intro's two mode lookups alone and logs
-`intro: Display8 raises the mode`; Display8 raises them inside its own lookup
-(`[Window] RaiseIntro`, `display/README.md`, "Window and display mode"), so
-`IntroWidth` and `IntroHeight` then do nothing. `RaiseIntroMode=1` is the fallback for
-any other `d3d8.dll`, until Display8 is required.
+**The intro's mode is Display8's** (cutscenes 3.0.0): Display8 raises `PlayIntroMovie`'s
+hard-coded 640x480 inside its own mode lookups (`[Window] RaiseIntro`,
+`display/README.md`, "Window and display mode"), and this proxy only fits each frame to
+the size it finds. The proxy's own `RaiseIntroMode`, `IntroWidth` and `IntroHeight` keys
+and the byte patch behind them are gone. Without Display8 as `d3d8.dll` (no
+`display8_abi` export) the intro's mode stays stock, and the log says
+`intro: stock mode (no Display8)` once.
 
 `ReplaceMovies` is a settings row (`settings.toml`, exported as `BinkProxy_Settings`, LIVE,
 tab Movies) and is read again at each `BinkOpen`, so `[BinkProxy.BinkProxy] ReplaceMovies=0`
