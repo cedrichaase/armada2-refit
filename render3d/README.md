@@ -830,7 +830,8 @@ and `Overlays.*`.
 Checked on the bench at RMSE 0: live `hulls=0`, `sky=0` and `World.Surfaces=0` against
 the baselines of the same keys at load (`testbench/scenarios/render3d-settings-live.md`),
 and `Modules.world=0` and `Modules.overlays=0` against `-world0` and `-overlays0` on the
-showcase and the nebula scene, each flipped back to the base
+showcase, each flipped back to the base (in the nebula scene the flip is not exact, rmse 20 off and
+1.2 back on: the engine's nebula light simulation did not run in the ticks before the pause)
 (`render3d-live-world.md`, `render3d-live-world-nebula.md`).
 
 **The rows are split per module.** `render3d/settings.toml` holds the core's: `MSAA`,

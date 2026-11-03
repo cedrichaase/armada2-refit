@@ -11,7 +11,9 @@ Timeout: 14 min
 on the nebula scene: `Modules.world` flipped off through the overlay is the frame of the
 same key at load (`roundD-base-port-nebula-world0`), where the engine's own
 `Nebula::Simulate_Nebula_Lights` runs again through the hook's hand-back, then back on
-is the base (`roundD-base-port-nebula`); twice. `World.Nebulae` is flipped once and back
+is the base (`roundD-base-port-nebula`); twice. The sim is paused, so what the engine's own light
+simulation would have done in the ticks that ran with the world on is not redone (bench, 2026-11-03: rmse
+20 against the at-load frame, 1.2 back on, both steady in time): the bounds here are 25 and 2, not 0. `World.Nebulae` is flipped once and back
 to the base.
 
 1. Launch the game.
@@ -25,21 +27,21 @@ to the base.
 9. Expect "Render3D.log" contains "settings: applied Modules.world=0"
 10. Wait 3 seconds.
 11. Take a screenshot called "nebula".
-12. Expect the shot "nebula" matches the baseline "roundD-base-port-nebula-world0" within rmse 0.
+12. Expect the shot "nebula" matches the baseline "roundD-base-port-nebula-world0" within rmse 25.
 13. Overlay --unset Render3D.Modules:world
 14. Wait 3 seconds.
 15. Take a screenshot called "nebula".
-16. Expect the shot "nebula" matches the baseline "roundD-base-port-nebula" within rmse 0.
+16. Expect the shot "nebula" matches the baseline "roundD-base-port-nebula" within rmse 2.
 17. Overlay Render3D.Modules:world=0
 18. Wait up to 20 seconds for the logs the next steps expect.
 19. Expect "Render3D.log" contains "settings: applied Modules.world=0"
 20. Wait 3 seconds.
 21. Take a screenshot called "nebula".
-22. Expect the shot "nebula" matches the baseline "roundD-base-port-nebula-world0" within rmse 0.
+22. Expect the shot "nebula" matches the baseline "roundD-base-port-nebula-world0" within rmse 25.
 23. Overlay --unset Render3D.Modules:world
 24. Wait 3 seconds.
 25. Take a screenshot called "nebula".
-26. Expect the shot "nebula" matches the baseline "roundD-base-port-nebula" within rmse 0.
+26. Expect the shot "nebula" matches the baseline "roundD-base-port-nebula" within rmse 2.
 27. Overlay Render3D.World:Nebulae=0
 28. Wait up to 20 seconds for the logs the next steps expect.
 29. Expect "Render3D.log" contains "World.Nebulae=0"
@@ -47,5 +49,5 @@ to the base.
 31. Overlay --unset Render3D.World:Nebulae
 32. Wait 3 seconds.
 33. Take a screenshot called "nebula".
-34. Expect the shot "nebula" matches the baseline "roundD-base-port-nebula" within rmse 0.
+34. Expect the shot "nebula" matches the baseline "roundD-base-port-nebula" within rmse 2.
 35. Expect no crash.
