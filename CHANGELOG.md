@@ -5,6 +5,15 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.83.0 — 2026-11-03
+
+Layers: cutscenes 2.6.0.
+
+### Changed
+- Phase 8d: the C plugins move onto the symbol profiles, one commit each. binkproxy first (`profiles/gog-1.1/binkproxy.toml`, `BinkProxy_SettingsNote`).
+
+Installed, not yet seen in game
+
 ## 13.81.1 — 2026-11-03
 
 Layers: testbench 3.97.1.
