@@ -4,6 +4,16 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.18.0 — 2026-11-03
+
+### Added
+- `[Window]` in `Display8.ini` and the first `display/settings.toml` (`Display8_Settings`, three rows, all `NO_ROW`): `Native`, `KeepClip` and `RaiseIntro`, the first two moved from `UI.ini`'s `[UI]` (`moved_from`, which the UI hub and `./install` carry over). Display8 is now the only plugin that changes a display-mode request, the game's window or the pointer's clip (`display/README.md`, "Window and display mode").
+- The shell's 800x600x16 request is raised to the desktop's mode while a plugin claims the new `CLAIM_MENUS`, and the intro's 640x480 under `RaiseIntro=1`, both inside the engine's mode lookups (`stub/modes.rs`, no byte patch), in forward mode too. `Native` is Display8's hook at the call of `InitializeGraphicsSystem` (hook `display.native`). `KeepClip` runs at `Present` (hook `display.keepclip`).
+- Contract 1.3 (`gpu/src/display.rs`): `CLAIM_MENUS` and the export `display8v1_mode`, the mode the device was opened at. The profile gets the entries the moved code reads.
+
+Installed, not yet seen in game
+
+
 ## 0.17.0 — 2026-11-03
 
 ### Changed

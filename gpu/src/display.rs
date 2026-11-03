@@ -90,6 +90,18 @@
 //! `CLAIM_SELECTION` (the UI's `[HUD] SelectionBubbles=0`), in place of reading an
 //! engine byte the UI patched.
 //!
+//! **Window and display mode** (contract 1.3, display 0.18.0; ROADMAP phase 9). Display8
+//! is the only plugin that changes a display-mode request of the engine, the game's
+//! window or the pointer's clip (`[Window]` in `Display8.ini`). Two additions:
+//!
+//! | Export | Signature | What |
+//! |---|---|---|
+//! | `display8v1_mode` | `fn(w: *mut u32, h: *mut u32) -> bool` | the display mode the shell and the game run at, once the device exists (the stub's mode, or the mode the real chain opened); false before, and `w`, `h` untouched. A plugin falls back to measuring the desktop when it is absent (minor below 3) |
+//!
+//! and `CLAIM_MENUS`, which asks Display8 to raise the shell's own 800x600x16 request to
+//! the desktop's mode while a plugin that hosts the shell's menus at the screen's size
+//! claims it (Display8 asks the claim when the engine makes the request).
+//!
 //! **Passthrough** (display/README.md, "Passthrough"): in stub mode Display8 draws the
 //! engine's own Direct3D 8 draws on Vulkan, between the plugins' `Cmd`s, into the pass a
 //! plugin published at its last `Cmd`'s end (render3d's scene pass while its body runs),
@@ -154,13 +166,17 @@ use core::ffi::c_void;
 pub const ABI_MAJOR: u32 = 1;
 /// The contract's minor version: what of the major's additions this side knows. 1:
 /// display 0.13.0, the claims (`display8v1_register`, `display8v1_claims`). 2: display
-/// 0.15.0, `Dx12Device8::pipeline_library`.
-pub const ABI_MINOR: u32 = 2;
+/// 0.15.0, `Dx12Device8::pipeline_library`. 3: display 0.18.0, `CLAIM_MENUS` and
+/// `display8v1_mode`.
+pub const ABI_MINOR: u32 = 3;
 
 /// `display8v1_register` (contract 1.1).
 pub type RegisterFn = extern "C" fn(plugin: *const Plugin8) -> u32;
 /// `display8v1_claims` (contract 1.1).
 pub type ClaimsFn = extern "C" fn(except: u32) -> u32;
+/// `display8v1_mode` (contract 1.3): the display mode the game runs at, through `w`
+/// and `h`; false until the engine has opened its display (see "Window and display mode").
+pub type ModeFn = extern "C" fn(w: *mut u32, h: *mut u32) -> bool;
 /// A plugin's claims callback: the `CLAIM_*` it draws now.
 pub type ClaimsCallback = extern "C" fn() -> u32;
 
@@ -188,9 +204,13 @@ pub const CLAIM_LOADING: u32 = 1 << 17;
 pub const CLAIM_CREDITS: u32 = 1 << 18;
 /// The mouse cursor (the UI's `[UI] Cursor`).
 pub const CLAIM_CURSOR: u32 = 1 << 19;
+/// The shell's menus (contract 1.3): the plugin hosts the shell's dialogs at the screen's
+/// size, so Display8 raises the front end's own 800x600 request to the desktop's mode.
+/// It is a request and not a category of draws: Display8 never drops anything for it.
+pub const CLAIM_MENUS: u32 = 1 << 20;
 
 /// The claims' names, for the logs: (bit, name).
-pub const CLAIM_NAMES: [(u32, &str); 13] = [
+pub const CLAIM_NAMES: [(u32, &str); 14] = [
     (CLAIM_SKY, "sky"),
     (CLAIM_HULLS, "hulls"),
     (CLAIM_WORLD, "world"),
@@ -204,6 +224,7 @@ pub const CLAIM_NAMES: [(u32, &str); 13] = [
     (CLAIM_LOADING, "loading"),
     (CLAIM_CREDITS, "credits"),
     (CLAIM_CURSOR, "cursor"),
+    (CLAIM_MENUS, "menus"),
 ];
 
 /// A plugin, as it registers (`display8v1_register`, contract 1.1): handed in, read
@@ -404,6 +425,8 @@ pub struct Display8 {
     /// Contract 1.1 (display 0.13.0): None on a Display8 of minor 0.
     pub register: Option<RegisterFn>,
     pub claims: Option<ClaimsFn>,
+    /// Contract 1.3 (display 0.18.0): None on a Display8 of minor 2 or less.
+    pub mode: Option<ModeFn>,
 }
 
 /// Why `Display8::load` found nothing to draw through. Each is logged apart: no
@@ -484,6 +507,7 @@ impl Display8 {
                 vk_pass: Some(core::mem::transmute::<usize, extern "C" fn(u32, *const VkPass8)>(f("display8v1_vk_pass")?)),
                 register: if minor >= 1 { Some(core::mem::transmute::<usize, RegisterFn>(f("display8v1_register")?)) } else { None },
                 claims: if minor >= 1 { Some(core::mem::transmute::<usize, ClaimsFn>(f("display8v1_claims")?)) } else { None },
+                mode: if minor >= 3 { Some(core::mem::transmute::<usize, ModeFn>(f("display8v1_mode")?)) } else { None },
             })
         }
     }

@@ -227,6 +227,16 @@ impl Gpu {
         true
     }
 
+    /// The display mode the game runs at, as Display8 says it (`display8v1_mode`, contract
+    /// 1.3): None without a Display8 of that contract, or before the engine has opened
+    /// its display. The caller falls back to measuring the desktop.
+    pub fn display_mode(&self) -> Option<(u32, u32)> {
+        let lookup = self.lookup?;
+        let f = self.display(lookup)?.mode?;
+        let (mut w, mut h) = (0u32, 0u32);
+        if f(&mut w, &mut h) && w > 0 && h > 0 { Some((w, h)) } else { None }
+    }
+
     /// What the other plugins registered with Display8 claim now (`CLAIM_*`). None when
     /// this plugin is not registered (no Display8 of contract 1.1): the caller does what
     /// it did before claims.

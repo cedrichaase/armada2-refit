@@ -1027,6 +1027,15 @@ static int patch_intro_mode(int w, int h)
     return hits;
 }
 
+/* Whether the game's d3d8.dll is Display8: it exports the contract's handshake. The
+ * name is the system's slot for Direct3D 8, not a plugin's file. Every import of the exe
+ * is mapped before any DllMain runs, so the module is there to ask. */
+static int display8_raises(void)
+{
+    HMODULE m = GetModuleHandleA("d3d8.dll");
+    return m != 0 && GetProcAddress(m, "display8_abi") != 0;
+}
+
 BOOL WINAPI DllMain(HANDLE inst, DWORD reason, void *res)
 {
     char m[200];
@@ -1058,7 +1067,12 @@ BOOL WINAPI DllMain(HANDLE inst, DWORD reason, void *res)
     m[0] = 0;
     s_cat(m, "--- BinkProxy loaded: replace="); s_num(m, g_replace);
     s_cat(m, " fit="); s_num(m, g_fit);
-    if (g_raise && w >= 640 && h >= 480) {
+    if (g_raise && display8_raises()) {
+        /* Display8 (d3d8.dll with the contract's handshake) raises the intro's mode
+         * itself, in its mode lookups ([Window] RaiseIntro); this stays the fallback
+         * for a d3d8.dll that is not Display8's. */
+        s_cat(m, " intro: Display8 raises the mode");
+    } else if (g_raise && w >= 640 && h >= 480) {
         int hits = patch_intro_mode(w, h);
         s_cat(m, " intro mode -> "); s_num(m, w); s_cat(m, "x"); s_num(m, h);
         s_cat(m, " ("); s_num(m, hits); s_cat(m, "/2 sites)");

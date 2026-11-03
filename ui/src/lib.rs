@@ -88,11 +88,8 @@ fn startup() {
     claims::register();
     // Each context stands down on its own: a hook that is not stock leaves that part
     // of the game as it was, and the others still work.
-    if config::get().native {
-        log!("display: {}", if engine::display::install() { "a stock mode becomes the desktop's" } else { "the call is not stock: the game's mode is as set" });
-        // The intro's 640x480 is not in Display8's mode list (one mode, the desktop's).
-        engine::intro::raise_mode();
-    }
+    // The display mode (the profile's, the shell's, the intro's) and the pointer's clip
+    // are Display8's (`[Window]` in Display8.ini).
     if config::get().movies {
         engine::intro::route_frames();
     }

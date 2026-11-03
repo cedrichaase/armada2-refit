@@ -5,6 +5,17 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.100.0 — 2026-11-03
+
+### Added
+- Scenarios `display-window` (the shell and intro raised by Display8, `KeepClip`, forward and stub, and without the UI through `--layers`) and `ui-settings-moved` (an old `[UI] Native` in `UI.ini` and `[UI.UI] KeepClip` in `RefitPlayer.ini` move to Display8's `[Window]`, once), with `display/bench-moved.sh` as its setup.
+
+### Changed
+- `ui-pointer-bar` and `display-movie-no-proxy` read Display8.log for the clip and the intro's mode (they moved there).
+
+Installed, not yet seen in game
+
+
 ## 3.99.0 — 2026-11-03
 
 ### Added

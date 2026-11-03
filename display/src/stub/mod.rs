@@ -138,6 +138,11 @@ static mut STUB: Option<Stub> = None;
 /// Mirrors whose levels changed off the device's thread, to bring up to date.
 static PENDING: AtomicU32 = AtomicU32::new(0);
 
+/// Whether stub mode has started (the stub is the engine's `IDirect3D8`).
+pub fn active() -> bool {
+    unsafe { STUB.is_some() }
+}
+
 #[allow(static_mut_refs)]
 pub fn stub() -> &'static mut Stub {
     unsafe { STUB.as_mut().expect("stub not started") }
@@ -265,6 +270,7 @@ pub fn ensure_device(hwnd: *mut c_void, flags: u32, depth: u32, interval: u32) -
         SetWindowPos(hwnd, core::ptr::null_mut(), 0, 0, w as i32, h as i32, 0x0020 | 0x0040); // FRAMECHANGED | SHOWWINDOW
     }
     s.hwnd = hwnd;
+    crate::window::device_opened(hwnd, w, h);
     s.main_thread = unsafe { GetCurrentThreadId() };
     crate::trace::MAIN_THREAD.store(s.main_thread, Ordering::Relaxed);
     let mut failed: Vec<Backend> = Vec::new();

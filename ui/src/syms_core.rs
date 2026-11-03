@@ -14,29 +14,24 @@ pub mod sym {
     pub const CORE_SITE_CURSOR_DRAW: a2engine::Sym = a2engine::Sym(16);
     pub const CORE_SCALE_2D: a2engine::Sym = a2engine::Sym(17);
     pub const CORE_SITE_HW_SCALE: a2engine::Sym = a2engine::Sym(19);
-    pub const CORE_INIT_GRAPHICS: a2engine::Sym = a2engine::Sym(20);
-    pub const CORE_SITE_INIT_GRAPHICS: a2engine::Sym = a2engine::Sym(21);
-    pub const CORE_USER_PROFILE: a2engine::Sym = a2engine::Sym(22);
-    pub const CORE_INTRO_MODE32: a2engine::Sym = a2engine::Sym(30);
-    pub const CORE_INTRO_MODE16: a2engine::Sym = a2engine::Sym(31);
-    pub const CORE_BINK_COPY_SITE: a2engine::Sym = a2engine::Sym(36);
-    pub const CORE_BINK_COPY_IMPORT: a2engine::Sym = a2engine::Sym(37);
-    pub const CORE_PROCESS_KEYS: a2engine::Sym = a2engine::Sym(38);
-    pub const CORE_SITE_KEYS: a2engine::Sym = a2engine::Sym(39);
-    pub const CORE_SITE_KEYS_PEEK: a2engine::Sym = a2engine::Sym(40);
-    pub const CORE_PROCESS_MOUSE: a2engine::Sym = a2engine::Sym(41);
-    pub const CORE_SITE_MOUSE: a2engine::Sym = a2engine::Sym(42);
-    pub const CORE_SITE_MOUSE_PEEK: a2engine::Sym = a2engine::Sym(43);
-    pub const CORE_GET_WINDOW_HANDLE: a2engine::Sym = a2engine::Sym(44);
-    pub const CORE_DESTROY_RENDER_SURFACES: a2engine::Sym = a2engine::Sym(45);
-    pub const CORE_SLOT_DESTROY: a2engine::Sym = a2engine::Sym(46);
-    pub const CORE_MOUSE_BUTTONS: a2engine::Sym = a2engine::Sym(47);
-    pub const CORE_MOUSE_HELD: a2engine::Sym = a2engine::Sym(48);
-    pub const CORE_IMP_SS_CTOR: a2engine::Sym = a2engine::Sym(49);
-    pub const CORE_IMP_SS_STR: a2engine::Sym = a2engine::Sym(50);
-    pub const CORE_IMP_SS_DTOR: a2engine::Sym = a2engine::Sym(51);
-    pub const CORE_IMP_STR_DTOR: a2engine::Sym = a2engine::Sym(52);
-    pub const CORE_SIM_TIME: a2engine::Sym = a2engine::Sym(53);
+    pub const CORE_BINK_COPY_SITE: a2engine::Sym = a2engine::Sym(20);
+    pub const CORE_BINK_COPY_IMPORT: a2engine::Sym = a2engine::Sym(21);
+    pub const CORE_PROCESS_KEYS: a2engine::Sym = a2engine::Sym(22);
+    pub const CORE_SITE_KEYS: a2engine::Sym = a2engine::Sym(23);
+    pub const CORE_SITE_KEYS_PEEK: a2engine::Sym = a2engine::Sym(24);
+    pub const CORE_PROCESS_MOUSE: a2engine::Sym = a2engine::Sym(25);
+    pub const CORE_SITE_MOUSE: a2engine::Sym = a2engine::Sym(26);
+    pub const CORE_SITE_MOUSE_PEEK: a2engine::Sym = a2engine::Sym(27);
+    pub const CORE_GET_WINDOW_HANDLE: a2engine::Sym = a2engine::Sym(28);
+    pub const CORE_DESTROY_RENDER_SURFACES: a2engine::Sym = a2engine::Sym(29);
+    pub const CORE_SLOT_DESTROY: a2engine::Sym = a2engine::Sym(30);
+    pub const CORE_MOUSE_BUTTONS: a2engine::Sym = a2engine::Sym(31);
+    pub const CORE_MOUSE_HELD: a2engine::Sym = a2engine::Sym(32);
+    pub const CORE_IMP_SS_CTOR: a2engine::Sym = a2engine::Sym(33);
+    pub const CORE_IMP_SS_STR: a2engine::Sym = a2engine::Sym(34);
+    pub const CORE_IMP_SS_DTOR: a2engine::Sym = a2engine::Sym(35);
+    pub const CORE_IMP_STR_DTOR: a2engine::Sym = a2engine::Sym(36);
+    pub const CORE_SIM_TIME: a2engine::Sym = a2engine::Sym(37);
 }
 
 pub mod hook {
@@ -45,17 +40,14 @@ pub mod hook {
     pub const CORE_CURSOR: a2engine::HookId = a2engine::HookId(2);
     pub const CORE_CURSOR_PROBE: a2engine::HookId = a2engine::HookId(3);
     pub const CORE_CURSOR_SQUARE: a2engine::HookId = a2engine::HookId(4);
-    pub const CORE_DISPLAY: a2engine::HookId = a2engine::HookId(5);
-    pub const CORE_INTRO_MODE32: a2engine::HookId = a2engine::HookId(6);
-    pub const CORE_INTRO_MODE16: a2engine::HookId = a2engine::HookId(7);
-    pub const CORE_INTRO_FRAMES: a2engine::HookId = a2engine::HookId(8);
-    pub const CORE_INPUT: a2engine::HookId = a2engine::HookId(9);
-    pub const CORE_WINDOW: a2engine::HookId = a2engine::HookId(10);
-    pub const CORE_DEVICE: a2engine::HookId = a2engine::HookId(11);
-    pub const CORE_READS_MOUSE: a2engine::HookId = a2engine::HookId(12);
-    pub const CORE_READS_MSVC: a2engine::HookId = a2engine::HookId(13);
-    pub const CORE_READS_CLOCK: a2engine::HookId = a2engine::HookId(14);
-    pub const CORE_READS_HUD_HIDDEN: a2engine::HookId = a2engine::HookId(15);
+    pub const CORE_INTRO_FRAMES: a2engine::HookId = a2engine::HookId(5);
+    pub const CORE_INPUT: a2engine::HookId = a2engine::HookId(6);
+    pub const CORE_WINDOW: a2engine::HookId = a2engine::HookId(7);
+    pub const CORE_DEVICE: a2engine::HookId = a2engine::HookId(8);
+    pub const CORE_READS_MOUSE: a2engine::HookId = a2engine::HookId(9);
+    pub const CORE_READS_MSVC: a2engine::HookId = a2engine::HookId(10);
+    pub const CORE_READS_CLOCK: a2engine::HookId = a2engine::HookId(11);
+    pub const CORE_READS_HUD_HIDDEN: a2engine::HookId = a2engine::HookId(12);
 }
 
 pub mod field {
@@ -67,20 +59,9 @@ pub mod field {
     pub const CORE_DX8_SYNCHRONOUS: usize = 0xe0;
     pub const CORE_ELEMENT_NAME: usize = 0x8;
     pub const CORE_SPRITE_ORIGIN_X: usize = 0x30;
-    pub const CORE_PROFILE_MODE_W: usize = 0x50;
-    pub const CORE_PROFILE_MODE_H: usize = 0x54;
-    pub const CORE_PROFILE_MODE_BPP: usize = 0x58;
 }
 
 pub mod value {
-    pub const CORE_DEFAULT_MODE_W: i32 = 800;
-    pub const CORE_DEFAULT_MODE_H: i32 = 600;
-    pub const CORE_GOG_MODE_W: i32 = 1024;
-    pub const CORE_GOG_MODE_H: i32 = 768;
-    pub const CORE_INTRO_WIDTH: i32 = 640;
-    pub const CORE_INTRO_HEIGHT: i32 = 480;
-    pub const CORE_INTRO_DEPTH32: i32 = 32;
-    pub const CORE_INTRO_DEPTH16: i32 = 16;
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
@@ -104,22 +85,6 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "core_scale_2d", symbol: "ST3D_Sprite::m_scale_factor_2d", kind: a2engine::Kind::Global },
     a2engine::SymDef { id: "core_sprite_origin_x", symbol: "ST3D_Sprite", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "core_site_hw_scale", symbol: "ST3D_DeviceDirectX8::SetCursor", kind: a2engine::Kind::Patch },
-    a2engine::SymDef { id: "core_init_graphics", symbol: "GameConfiguration::InitializeGraphicsSystem", kind: a2engine::Kind::Fn },
-    a2engine::SymDef { id: "core_site_init_graphics", symbol: "GameConfiguration::InitializeGraphicsSystem", kind: a2engine::Kind::Call },
-    a2engine::SymDef { id: "core_user_profile", symbol: "UserProfile", kind: a2engine::Kind::Global },
-    a2engine::SymDef { id: "core_profile_mode_w", symbol: "GraphicsSettings", kind: a2engine::Kind::Field },
-    a2engine::SymDef { id: "core_profile_mode_h", symbol: "GraphicsSettings", kind: a2engine::Kind::Field },
-    a2engine::SymDef { id: "core_profile_mode_bpp", symbol: "GraphicsSettings", kind: a2engine::Kind::Field },
-    a2engine::SymDef { id: "core_default_mode_w", symbol: "GraphicsSettings", kind: a2engine::Kind::Value },
-    a2engine::SymDef { id: "core_default_mode_h", symbol: "GraphicsSettings", kind: a2engine::Kind::Value },
-    a2engine::SymDef { id: "core_gog_mode_w", symbol: "GraphicsSettings", kind: a2engine::Kind::Value },
-    a2engine::SymDef { id: "core_gog_mode_h", symbol: "GraphicsSettings", kind: a2engine::Kind::Value },
-    a2engine::SymDef { id: "core_intro_mode32", symbol: "Program::PlayIntroMovie", kind: a2engine::Kind::Patch },
-    a2engine::SymDef { id: "core_intro_mode16", symbol: "Program::PlayIntroMovie", kind: a2engine::Kind::Patch },
-    a2engine::SymDef { id: "core_intro_width", symbol: "Program::PlayIntroMovie", kind: a2engine::Kind::Value },
-    a2engine::SymDef { id: "core_intro_height", symbol: "Program::PlayIntroMovie", kind: a2engine::Kind::Value },
-    a2engine::SymDef { id: "core_intro_depth32", symbol: "Program::PlayIntroMovie", kind: a2engine::Kind::Value },
-    a2engine::SymDef { id: "core_intro_depth16", symbol: "Program::PlayIntroMovie", kind: a2engine::Kind::Value },
     a2engine::SymDef { id: "core_bink_copy_site", symbol: "NextBinkFrame", kind: a2engine::Kind::Patch },
     a2engine::SymDef { id: "core_bink_copy_import", symbol: "__imp__BinkCopyToBuffer@28", kind: a2engine::Kind::Global },
     a2engine::SymDef { id: "core_process_keys", symbol: "ProcessKeyboardMessages", kind: a2engine::Kind::Fn },
@@ -146,16 +111,13 @@ pub const HOOKS: &[a2engine::HookDef] = &[
     a2engine::HookDef { id: "ui.core.cursor", run_unknown: false, rows: &["UI.Cursor"], syms: &[2, 9, 10, 11, 12, 13, 14] },
     a2engine::HookDef { id: "ui.core.cursor_probe", run_unknown: false, rows: &["UI.Cursor"], syms: &[15, 16, 17, 18] },
     a2engine::HookDef { id: "ui.core.cursor_square", run_unknown: false, rows: &["UI.Cursor"], syms: &[15, 19] },
-    a2engine::HookDef { id: "ui.core.display", run_unknown: false, rows: &[], syms: &[20, 21, 22, 23, 24, 25, 26, 27, 28, 29] },
-    a2engine::HookDef { id: "ui.core.intro_mode32", run_unknown: false, rows: &[], syms: &[30, 32, 33, 34] },
-    a2engine::HookDef { id: "ui.core.intro_mode16", run_unknown: false, rows: &[], syms: &[31, 32, 33, 35] },
-    a2engine::HookDef { id: "ui.core.intro_frames", run_unknown: false, rows: &[], syms: &[36, 37] },
-    a2engine::HookDef { id: "ui.core.input", run_unknown: false, rows: &[], syms: &[38, 39, 40, 41, 42, 43] },
-    a2engine::HookDef { id: "ui.core.window", run_unknown: false, rows: &[], syms: &[44] },
-    a2engine::HookDef { id: "ui.core.device", run_unknown: false, rows: &[], syms: &[3, 9, 45, 46] },
-    a2engine::HookDef { id: "ui.core.reads_mouse", run_unknown: false, rows: &[], syms: &[47, 48] },
-    a2engine::HookDef { id: "ui.core.reads_msvc", run_unknown: false, rows: &[], syms: &[49, 50, 51, 52] },
-    a2engine::HookDef { id: "ui.core.reads_clock", run_unknown: false, rows: &[], syms: &[53] },
+    a2engine::HookDef { id: "ui.core.intro_frames", run_unknown: false, rows: &[], syms: &[20, 21] },
+    a2engine::HookDef { id: "ui.core.input", run_unknown: false, rows: &[], syms: &[22, 23, 24, 25, 26, 27] },
+    a2engine::HookDef { id: "ui.core.window", run_unknown: false, rows: &[], syms: &[28] },
+    a2engine::HookDef { id: "ui.core.device", run_unknown: false, rows: &[], syms: &[3, 9, 29, 30] },
+    a2engine::HookDef { id: "ui.core.reads_mouse", run_unknown: false, rows: &[], syms: &[31, 32] },
+    a2engine::HookDef { id: "ui.core.reads_msvc", run_unknown: false, rows: &[], syms: &[33, 34, 35, 36] },
+    a2engine::HookDef { id: "ui.core.reads_clock", run_unknown: false, rows: &[], syms: &[37] },
     a2engine::HookDef { id: "ui.core.reads_hud_hidden", run_unknown: false, rows: &[], syms: &[8] },
 ];
 
@@ -167,7 +129,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 54,
+        n_resolved: 38,
         entries: &[
             a2engine::Entry { present: true, addr: 0x7ad508, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_storm3d
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 192 }, // core_storm3d_device_index
@@ -189,33 +151,17 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x7ad6e8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_scale_2d
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 48 }, // core_sprite_origin_x
             a2engine::Entry { present: true, addr: 0x625dd9, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xd8, 0x4e, 0x18], mask: &[], section: "", count: 0, value: 0 }, // core_site_hw_scale
-            a2engine::Entry { present: true, addr: 0x53e420, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_init_graphics
-            a2engine::Entry { present: true, addr: 0x484169, end: 0x0, target: 0x14, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_site_init_graphics
-            a2engine::Entry { present: true, addr: 0x76b5ac, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_user_profile
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 80 }, // core_profile_mode_w
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 84 }, // core_profile_mode_h
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 88 }, // core_profile_mode_bpp
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 800 }, // core_default_mode_w
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 600 }, // core_default_mode_h
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1024 }, // core_gog_mode_w
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 768 }, // core_gog_mode_h
-            a2engine::Entry { present: true, addr: 0x4861bf, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x6a, 0x20, 0x68, 0xe0, 0x01, 0x00, 0x00, 0x68, 0x80, 0x02, 0x00, 0x00], mask: &[], section: "", count: 0, value: 0 }, // core_intro_mode32
-            a2engine::Entry { present: true, addr: 0x4861e6, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x6a, 0x10, 0x68, 0xe0, 0x01, 0x00, 0x00, 0x68, 0x80, 0x02, 0x00, 0x00], mask: &[], section: "", count: 0, value: 0 }, // core_intro_mode16
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 640 }, // core_intro_width
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 480 }, // core_intro_height
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // core_intro_depth32
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // core_intro_depth16
             a2engine::Entry { present: true, addr: 0x4638af, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xff, 0x15, 0xa0, 0x82, 0x7b, 0x00], mask: &[], section: "", count: 0, value: 0 }, // core_bink_copy_site
             a2engine::Entry { present: true, addr: 0x7b82a0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_bink_copy_import
             a2engine::Entry { present: true, addr: 0x4dd670, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_process_keys
-            a2engine::Entry { present: true, addr: 0x488869, end: 0x0, target: 0x26, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_site_keys
+            a2engine::Entry { present: true, addr: 0x488869, end: 0x0, target: 0x16, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_site_keys
             a2engine::Entry { present: true, addr: 0x4dd709, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xff, 0x15, 0xd4, 0x81, 0x7b, 0x00], mask: &[], section: "", count: 0, value: 0 }, // core_site_keys_peek
             a2engine::Entry { present: true, addr: 0x4de250, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_process_mouse
-            a2engine::Entry { present: true, addr: 0x488952, end: 0x0, target: 0x29, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_site_mouse
+            a2engine::Entry { present: true, addr: 0x488952, end: 0x0, target: 0x19, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_site_mouse
             a2engine::Entry { present: true, addr: 0x4de260, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x1d, 0xd4, 0x81, 0x7b, 0x00], mask: &[], section: "", count: 0, value: 0 }, // core_site_mouse_peek
             a2engine::Entry { present: true, addr: 0x62bc70, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_get_window_handle
             a2engine::Entry { present: true, addr: 0x624760, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_destroy_render_surfaces
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x2d, vtable: 0x9, index: 28, chain: true, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_slot_destroy
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x1d, vtable: 0x9, index: 28, chain: true, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_slot_destroy
             a2engine::Entry { present: true, addr: 0x763308, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_mouse_buttons
             a2engine::Entry { present: true, addr: 0x763350, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_mouse_held
             a2engine::Entry { present: true, addr: 0x7b7c58, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_imp_ss_ctor
@@ -229,10 +175,10 @@ pub const BUILDS: &[a2engine::Build] = &[
     },
 ];
 
-static HOOK_STATE: [core::sync::atomic::AtomicU64; 16] = [const { core::sync::atomic::AtomicU64::new(0) }; 16];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 54] = [const { core::sync::atomic::AtomicU8::new(0) }; 54];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 54] = [const { core::sync::atomic::AtomicUsize::new(0) }; 54];
-static NOTES: [a2engine::Note; 16] = [const { a2engine::Note::new() }; 16];
+static HOOK_STATE: [core::sync::atomic::AtomicU64; 13] = [const { core::sync::atomic::AtomicU64::new(0) }; 13];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 38] = [const { core::sync::atomic::AtomicU8::new(0) }; 38];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 38] = [const { core::sync::atomic::AtomicUsize::new(0) }; 38];
+static NOTES: [a2engine::Note; 13] = [const { a2engine::Note::new() }; 13];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 
 pub static TABLE: a2engine::Table = a2engine::Table {

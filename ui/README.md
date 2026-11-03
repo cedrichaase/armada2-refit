@@ -229,20 +229,10 @@ Xwayland (24.1) sources:
   and without the X grab. Everywhere else the full-screen window covers the screen and
   there is nowhere to leave to, which is why it is the top rows.
 
-`[UI] KeepClip=1` (on as shipped; `input::keep_clip`, `engine/mouse.rs` for the engine's
-state) does what Wine does when the keyboard comes back, from the game's own thread: in
-a mission under Wine (`wine_get_version` in ntdll), at most every 500 ms and only on a
-frame where the pointer moved, while the game's window is the foreground and active one
-and the engine has no button down and no pan holding the pointer, it reads the clip
-rectangle with `GetClipCursor` and hands it back to `ClipCursor`. Wine then clips to
-the full-screen window again (`clip_fullscreen_window`), which Xwayland turns back into
-a lock as soon as the pointer is over the game. Wine itself declines when the window
-does not cover its monitor or the X input focus is another program's
-(`grab_clipping_window`), so the pointer is never held while another window has the
-keyboard; and since only motion of the game's own pointer triggers it, a pointer over
-another window does nothing. On Windows nothing is done. With `PointerLog=1` the first
-re-clip is logged ("pointer: Wine's clip asked for again"). `ui-pointer-bar` takes
-three such screenshots with a bar up and walks into it after each (testbench).
+`KeepClip` is Display8's since ui 1.0.0 (`[Window] KeepClip=1` in `Display8.ini`; the
+mechanism, the thresholds and what was measured are in `display/README.md`, "Window and
+display mode"). `ui-pointer-bar` takes three screenshots with a bar up and walks into it
+after each (testbench).
 
 What a player can do meanwhile, on their side: hide the bar while playing (Omarchy:
 Super+Shift+Space), which parks it off the screen; or, once the cursor has gone wrong,
@@ -345,8 +335,8 @@ desktop size. When the mode the new display wants differs from the current one,
 When the two modes are the same, it does nothing at all. **So the `IDirect3DDevice8` can
 change whenever the shell and the 3D display switch.** In stock (an 800x600 shell
 under a bigger game resolution) it changes on every switch. With Menus.asi and the game
-at desktop resolution it does not, which `[UI] Native` arranges from the first launch
-(`src/engine/display.rs`: a stock mode in the profile becomes the desktop's before
+at desktop resolution it does not, which Display8's `[Window] Native` arranges from the
+first launch (a stock mode in the profile becomes the desktop's before
 `InitializeGraphicsSystem` opens the device). Anything that keeps resources must check
 `engine::d3d8_device()` every frame and drop what it made on an old device.
 
@@ -879,10 +869,9 @@ re-creates the device at the mode it found. The stub offers one mode, the deskto
 (`display/README.md`, "Stub mode"), so the lookup came back empty and
 `ST3D_DeviceDirectX8::CreateDevice` read the missing mode (an access violation at
 0x623607, seen on Windows 2026-10-25). The proxy never let it happen: it raises both
-lookups to the desktop's size from its DllMain. `UI.asi` now does the same with `[UI]
-Native=1`, keeping the depth stock asks for. Armada2.exe imports `binkw32.dll`, so the
-proxy is loaded and has patched the sites before any ASI; the UI then finds them not
-stock and leaves them.
+lookups to the desktop's size from its DllMain. Since ui 1.0.0 Display8 does it (`[Window]
+RaiseIntro=1`, inside its mode lookups: `display/README.md`, "Window and display mode");
+the UI patches nothing of the intro's mode.
 
 The frames then reach the screen without the proxy too. The back-buffer overload of
 `NextBinkFrame` (0x4637f0, the one `PlayMovie` uses) copies each frame with the

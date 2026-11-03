@@ -27,9 +27,6 @@ pub fn frame(ctx: Context) {
     crate::settings::frame(ctx);
     crate::gfx::frame(|w, h, draw| {
         crate::input::poll(w, h);
-        if ctx == Context::Mission {
-            crate::input::keep_clip();
-        }
         let mut ui = crate::widgets::Ui::begin(draw, w, h, crate::input::state());
         ui.theme = crate::widgets::Theme::for_context(ctx);
         crate::app::run(ctx, &mut ui);

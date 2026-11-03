@@ -1,0 +1,49 @@
+# The Display8 settings the Refit screen lists (A2SET_ABI 1.1; tools/settings/README.md).
+# Edit here, then run tools/settings/gen.py: it writes src/settings_table.rs.
+# Display8 has no row on the screen yet (the renderer is an open decision): every row is
+# NO_ROW, so the table is the keys' declaration, the defaults the code reads through,
+# and the `moved_from` of the two keys that came from UI.ini.
+plugin = "Display8"
+file = "Display8.ini"
+shipped = "display/Display8.ini"
+
+[[row]]
+name = "window_native"
+section = "Window"
+key = "Native"
+kind = "bool"
+default = "1"
+apply = "restart"
+scope = "local"
+tab = "none"
+label = "Desktop resolution"
+help = "While the game's display mode is still a stock one it runs at the desktop's instead."
+flags = ["no_row"]
+moved_from = "UI.UI.Native"
+
+[[row]]
+name = "window_keepclip"
+section = "Window"
+key = "KeepClip"
+kind = "bool"
+default = "1"
+apply = "restart"
+scope = "local"
+tab = "none"
+label = "Keep the pointer clip"
+help = "Under Wine, put the pointer clip back while the pointer moves in the game."
+flags = ["no_row"]
+moved_from = "UI.UI.KeepClip"
+
+[[row]]
+name = "window_raiseintro"
+section = "Window"
+key = "RaiseIntro"
+kind = "bool"
+default = "1"
+apply = "restart"
+scope = "local"
+tab = "none"
+label = "Intro at the desktop's resolution"
+help = "The launch reels and the intro run at the desktop's mode instead of 640x480."
+flags = ["no_row"]

@@ -93,6 +93,12 @@ pub extern "C" fn display8v1_claims(except: u32) -> u32 {
     all
 }
 
+/// Whether a plugin claims `CLAIM_MENUS` now: the front end's mode request asks it
+/// (`stub/modes.rs`), when the engine makes the request. Nothing is logged.
+pub fn menus() -> bool {
+    regs().iter().any(|r| r.claims.is_some_and(|f| f() & gpu::display::CLAIM_MENUS != 0))
+}
+
 /// Every plugin's claims now, logged when a plugin's change: what passthrough routes by
 /// (`passthrough::begin_scene`).
 pub fn ask() -> u32 {

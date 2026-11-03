@@ -5,6 +5,14 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 14.1.0 — 2026-11-03
+
+Layers: display 0.18.0, ui 1.0.0, cutscenes 2.7.0.
+
+### Changed
+- Window and display mode go to Display8 (phase 9, C3): `[UI] Native` and `[UI] KeepClip` become `[Window]` of `Display8.ini` (first use of `moved_from`), the shell's and the intro's mode raises move out of the UI into Display8's mode lookups (the UI's menu host claims the new `CLAIM_MENUS`; contract 1.3 adds it and `display8v1_mode`), and the cutscene proxy keeps its raise only when `d3d8.dll` is not Display8. testbench 3.100.0. Installed, not yet seen in game.
+
+
 ## 13.92.0 — 2026-11-03
 
 Layers: ui 0.33.0, render3d 0.44.1, qol 1.10.1, online 0.10.1, cutscenes 2.6.1.

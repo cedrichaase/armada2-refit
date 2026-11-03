@@ -4,6 +4,12 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`binkproxy/README.md`](binkproxy/README.md).
 
+## 2.7.0 — 2026-11-03
+
+### Changed
+- BinkProxy leaves the intro's mode lookups to Display8 when `d3d8.dll` exports `display8_abi` (log `intro: Display8 raises the mode`); `RaiseIntroMode=1` is the fallback for any other `d3d8.dll`, until Display8 is required. `IntroWidth` and `IntroHeight` apply only to that fallback. Installed, not yet seen in game.
+
+
 ## 2.6.1 — 2026-11-03
 
 ### Changed

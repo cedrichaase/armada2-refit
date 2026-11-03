@@ -19,12 +19,19 @@
 //! lookup first, and when it finds nothing, the listed mode of the stub's size. The
 //! other callers (the adapter's enumeration, which uses the lookup to skip a mode it
 //! has already listed, and Graphics Settings, which offers what is listed) keep the
-//! exact lookup. Only in stub mode: the real chain lists the stock modes.
+//! exact lookup.
 //!
-//! The UI raises the shell's mode and the profile's to the desktop's by patching the
-//! pushes before two of these calls and the call of `InitializeGraphicsSystem`, so with
-//! it the lookup matches and this answers what the engine's would; the two never write
-//! the same bytes.
+//! **The raise** (`[Window]`, `window.rs`; ROADMAP phase 9): the same six calls are where
+//! the shell's and the intro's modes are raised to the desktop's, in forward mode too (the
+//! calls are then re-pointed from `Direct3DCreate8`, and the lookup is the real chain's
+//! alone). The front end's 800x600x16 (the first two calls) is raised while a plugin
+//! claims `CLAIM_MENUS` (the UI's menu host, which draws the shell's dialogs at the
+//! screen's size), the intro's 640x480 (the last two) under `RaiseIntro=1`: the request
+//! is replaced by the desktop's size at 32 bits before the lookup, and the engine's own
+//! request is the fallback when that mode is not listed. The UI and the cutscene proxy
+//! used to patch the pushes before these calls instead; with Display8 the engine's
+//! pushes stay stock, and a patched push (the proxy's, without Display8's raise, or
+//! `Menus.asi`'s) simply asks for the desktop's mode itself and matches.
 use crate::engine_syms::{hook, sym, value};
 use crate::log;
 use crate::rt::hook as patch;
@@ -43,11 +50,12 @@ type Find = unsafe extern "thiscall" fn(usize, i32, i32, i32) -> usize;
 
 static mut DONE: bool = false;
 static mut LOGGED: u32 = 0;
+static mut RAISED: u32 = 0;
 /// `FindDisplayMode`, as the engine's own lookup is called from ours.
 static mut REAL: usize = 0;
 
-/// Re-points the six calls (once; at the stub's `Direct3DCreate8`, before the engine
-/// enumerates or asks for a mode), when `display.modes` is ready: `FindDisplayMode`'s
+/// Re-points the six calls (once; at `Direct3DCreate8`, before the engine enumerates or
+/// asks for a mode), when `display.modes` is ready: `FindDisplayMode`'s
 /// first bytes are stock and each call calls it.
 pub fn install() {
     unsafe {
@@ -72,7 +80,11 @@ pub fn install() {
             log!("stub: the call at {:#x} ({}) could not be written: its mode request is left alone", site, what);
         }
     }
-    log!("stub: the engine's own mode requests ({} of 6 calls) get the one mode offered when theirs is not listed", n);
+    if super::active() {
+        log!("stub: the engine's own mode requests ({} of 6 calls) get the one mode offered when theirs is not listed", n);
+    } else {
+        log!("window: the engine's own mode requests ({} of 6 calls) are raised to the desktop's where asked", n);
+    }
 }
 
 /// The front end's own request (`SetActiveDisplay_Internal`'s hard-coded mode), named
@@ -83,8 +95,26 @@ fn front_end(w: i32, h: i32, bpp: i32) -> bool {
 
 unsafe extern "thiscall" fn find(dev: usize, w: i32, h: i32, bpp: i32) -> usize {
     let real: Find = unsafe { core::mem::transmute(REAL) };
+    if dev != 0 {
+        if let Some((rw, rh, rb)) = crate::window::raise(w, h, bpp, crate::claims::menus) {
+            let m = unsafe { real(dev, rw, rh, rb) };
+            unsafe {
+                if m != 0 && RAISED < 8 {
+                    RAISED += 1;
+                    if front_end(w, h, bpp) {
+                        log!("window: shell mode raised to {}x{} (MENUS claimed); the engine asked for {}x{}x{}", rw, rh, w, h, bpp);
+                    } else {
+                        log!("window: intro mode raised to {}x{}; the engine asked for {}x{}x{}", rw, rh, w, h, bpp);
+                    }
+                }
+            }
+            if m != 0 {
+                return m;
+            }
+        }
+    }
     let m = unsafe { real(dev, w, h, bpp) };
-    if m != 0 || dev == 0 {
+    if m != 0 || dev == 0 || !super::active() {
         return m;
     }
     let want = super::stub().mode;

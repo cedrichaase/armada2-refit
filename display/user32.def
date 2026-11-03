@@ -6,3 +6,8 @@ SetWindowPos@28
 GetClientRect@8
 GetSystemMetrics@4
 MonitorFromPoint@12
+GetCursorPos@4
+GetForegroundWindow@0
+GetActiveWindow@0
+GetClipCursor@4
+ClipCursor@4
