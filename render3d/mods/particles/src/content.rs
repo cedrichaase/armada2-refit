@@ -28,8 +28,10 @@ pub static STOCK: Content = Content {
 pub static NONE: Content =
     Content { systems: &[], vent_sprites: ["", ""], chain_emitter: "", manheim_emitter: "", sod_ext: "" };
 
-/// The set this build reads.
+/// The set this build reads (starting the module's table if nothing has yet).
 pub fn get() -> &'static Content {
+    // The table starts at its first use: a recipe is read before any hook of the module.
+    r3d_core::engine::start_table("particles", &crate::syms::TABLE);
     match crate::syms::TABLE.engine().content() {
         Some(id) => by_set(id),
         None => &NONE,

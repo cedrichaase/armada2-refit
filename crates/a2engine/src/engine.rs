@@ -578,6 +578,12 @@ impl Engine {
         Ok(())
     }
 
+    /// Whether a hook that uses the symbol is ready, without the warning `addr` logs when
+    /// it is not: for a read that may come before the hook does (a settings load).
+    pub fn resolved(&self, s: Sym) -> bool {
+        self.t().rt.flags.get(s.0 as usize).is_some_and(|f| f.load(Acquire) & READY != 0)
+    }
+
     /// The symbol's address (relocated), offset or value: 0 unless a hook that uses it
     /// is ready (logged once: `engine: <id> read before its hook was ready`).
     pub fn addr(&self, s: Sym) -> usize {
