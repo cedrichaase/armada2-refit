@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.11 — 2026-11-03
+
+Layers: testbench 4.1.2.
+
+### Fixed
+- `ui-menus-options` expects the stub's single desktop display mode. Installed, not yet seen in game.
+
 ## 15.6.9 — 2026-11-03
 
 Layers: ui 2.2.1, testbench 4.1.1.

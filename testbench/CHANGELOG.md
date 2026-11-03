@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 4.1.2 — 2026-11-03
+
+### Fixed
+- Scenario `ui-menus-options`: the display mode list holds the one mode Display8's stub
+  offers, the desktop's; steps 22 to 26 expect "1280x720x32" (not "800x600x32"), choose that
+  entry and expect the adapter row back. No other scenario expected a mode list.
+  Installed, not yet seen in game.
+
 ## 4.1.1 — 2026-11-03
 
 ### Added
