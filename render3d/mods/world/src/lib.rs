@@ -33,6 +33,8 @@ pub mod planets;
 pub mod recipes;
 pub mod rocks;
 pub mod surfaces;
+#[allow(dead_code)]
+mod syms;
 
 /// `Render3D.ini` as it is now, for `[World] Reload=1` (once a second, between settings
 /// changes).
@@ -321,12 +323,19 @@ impl Module for World {
         if !self.enable {
             return false;
         }
-        let ours = match engine::vtable(o) {
-            hooks::vt_planet() if self.on_planets => self.planets.draw(o, v, &mut self.surfaces),
-            hooks::vt_scrap() if self.on_rocks => self.rocks.draw_scrap(o, v, &mut self.surfaces),
-            hooks::vt_asteroid_field() if self.on_rocks => self.rocks.draw_field(o, v, &mut self.surfaces),
-            hooks::vt_nebula() | hooks::vt_latinum() if self.on_nebulae => self.nebulae.object(o, v),
-            _ => false,
+        let vt = engine::vtable(o);
+        let ours = if vt == 0 {
+            false
+        } else if vt == hooks::vt_planet() && self.on_planets {
+            self.planets.draw(o, v, &mut self.surfaces)
+        } else if vt == hooks::vt_scrap() && self.on_rocks {
+            self.rocks.draw_scrap(o, v, &mut self.surfaces)
+        } else if vt == hooks::vt_asteroid_field() && self.on_rocks {
+            self.rocks.draw_field(o, v, &mut self.surfaces)
+        } else if (vt == hooks::vt_nebula() || vt == hooks::vt_latinum()) && self.on_nebulae {
+            self.nebulae.object(o, v)
+        } else {
+            false
         };
         if ours {
             mark_on_screen(o, v);

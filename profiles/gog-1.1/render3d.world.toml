@@ -10,6 +10,18 @@ out = "render3d/mods/world/src/syms.rs"
 doc = "What the world module reads of the engine: its objects, lists, globals and calls"
 rows = ["Modules.world"]
 
+[hook."world.lights"]
+doc = "Re-points Nebula::Simulate's call of its light update, so the nebulae's lights are ours"
+rows = ["Modules.world"]
+
+[hook."world.cull"]
+doc = "Wraps the nebula instance's FrustumTest (vtable slot 3), the nebulae's cull"
+rows = ["Modules.world"]
+
+[hook."world.ghosts"]
+doc = "Wraps GameObjectSpirit::Render (vtable slot 3), which hides a fogged nebula's billboards"
+rows = ["Modules.world"]
+
 
 [[sym]]
 id = "site_nebula_lights"
@@ -18,7 +30,7 @@ kind = "call"
 addr = 0x4a4a7a
 target = "fn_nebula_lights"
 in = "Nebula::Simulate"
-used_by = ["world.reads"]
+used_by = ["world.lights"]
 
 [[sym]]
 id = "fn_nebula_lights"
@@ -26,7 +38,7 @@ symbol = "Nebula::Simulate_Nebula_Lights"
 kind = "fn"
 addr = 0x4a5160
 check = "55 8b ec 83 ec 14 56 8b"
-used_by = ["world.reads"]
+used_by = ["world.lights"]
 
 [[sym]]
 id = "fn_res_max"
@@ -66,7 +78,7 @@ symbol = "GameObjectSpirit::Render"
 kind = "fn"
 addr = 0x4d5f70
 check = "55 8b ec 56 8b f1 57 8b"
-used_by = ["world.reads"]
+used_by = ["world.ghosts"]
 
 [[sym]]
 id = "fn_res_value"
@@ -82,11 +94,11 @@ symbol = "ST3D_Instance::FrustumTest"
 kind = "fn"
 addr = 0x62e990
 check = "55 8b ec 83 ec 40 8a 41"
-used_by = ["world.reads"]
+used_by = ["world.cull"]
 
 [[sym]]
 id = "asteroid_names"
-symbol = "TODO"
+symbol = "(unnamed) asteroid model name table"
 kind = "global"
 addr = 0x6b07e8
 used_by = ["world.reads"]
@@ -110,7 +122,7 @@ id = "vt_nebula_instance"
 symbol = "NebulaInstance"
 kind = "vtable"
 addr = 0x6b1448
-used_by = ["world.reads"]
+used_by = ["world.cull"]
 
 [[sym]]
 id = "vt_nebula"
@@ -131,7 +143,7 @@ id = "vt_spirit"
 symbol = "GameObjectSpirit"
 kind = "vtable"
 addr = 0x6b1ca4
-used_by = ["world.reads"]
+used_by = ["world.ghosts"]
 
 [[sym]]
 id = "vt_planet"
@@ -188,3 +200,21 @@ symbol = "Nebula::nebulaList"
 kind = "global"
 addr = 0x73b1bc
 used_by = ["world.reads"]
+
+[[sym]]
+id = "slot_nebula_frustum"
+symbol = "NebulaInstance::FrustumTest"
+kind = "slot"
+vtable = "vt_nebula_instance"
+index = 3
+target = "fn_frustum_test"
+used_by = ["world.cull"]
+
+[[sym]]
+id = "slot_spirit_render"
+symbol = "GameObjectSpirit::Render"
+kind = "slot"
+vtable = "vt_spirit"
+index = 3
+target = "fn_spirit_render"
+used_by = ["world.ghosts"]

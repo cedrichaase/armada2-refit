@@ -10,21 +10,18 @@ use r3d_core::engine::{self, field, field_f32, field_m34, field_u8, light, obj, 
 use r3d_core::math::{v3, M34, V3};
 use crate::{log, rt};
 use alloc::vec::Vec;
-use crate::syms::sym;
+use crate::syms::{hook as hk, sym, TABLE};
 
 /// An engine address of the profile: 0 unless the hook that uses it is ready.
-pub(crate) fn at(s: a2engine::Sym) -> usize { crate::syms::TABLE.engine().addr(s) }
+pub(crate) fn at(s: a2engine::Sym) -> usize { TABLE.engine().addr(s) }
 
 // ---- the nebulae's lights ---------------------------------------------------------
 
 /// The call to `Nebula::Simulate_Nebula_Lights` inside `Nebula::Simulate`.
-pub(crate) fn site_nebula_lights() -> usize { at(sym::SITE_NEBULA_LIGHTS) }
-pub(crate) fn fn_nebula_lights() -> usize { at(sym::FN_NEBULA_LIGHTS) } // Nebula::Simulate_Nebula_Lights(float), thiscall
 pub(crate) fn fn_entity_transform() -> usize { at(sym::FN_ENTITY_TRANSFORM) } // Entity::GetTransform() const, thiscall
 /// `NebulaInstance`'s vtable; slot 3 is `ST3D_Instance::FrustumTest(cam)`.
 pub(crate) fn vt_nebula_instance() -> usize { at(sym::VT_NEBULA_INSTANCE) }
 const SLOT_FRUSTUM: usize = 3;
-pub(crate) fn fn_frustum_test() -> usize { at(sym::FN_FRUSTUM_TEST) }
 
 // ---- the nebulae --------------------------------------------------------------------
 
@@ -34,7 +31,6 @@ pub(crate) fn nebula_list() -> usize { at(sym::NEBULA_LIST) } // Nebula::nebulaL
 pub(crate) fn ghost_list() -> usize { at(sym::GHOST_LIST) } // Ghost::ghostList, std::list<Spirit *>
 pub(crate) fn vt_spirit() -> usize { at(sym::VT_SPIRIT) }
 const SLOT_SPIRIT_RENDER: usize = 3;
-pub(crate) fn fn_spirit_render() -> usize { at(sym::FN_SPIRIT_RENDER) }
 pub(crate) fn fn_entity_get() -> usize { at(sym::FN_ENTITY_GET) } // Entity::Get(int handle), cdecl
 
 // ---- the planets ----------------------------------------------------------------------
@@ -75,14 +71,18 @@ fn open() -> bool {
 /// lights and cull are ours (no `Lighting.asi`); `spirit`: the ghosts' `Render` is
 /// wrapped (no `Nebulae.asi`). A site that is not stock's is logged and left as it is.
 pub fn install(h: &mut Hooks, lights: bool, spirit: bool) {
+    if !h.ready(&TABLE, hk::WORLD_READS) {
+        h.stand_down("the engine's reads are not stock");
+        return;
+    }
     unsafe { GATE = Some(h.gate()) };
     let owner = h.owner();
-    if lights {
+    if lights && h.ready(&TABLE, hk::WORLD_LIGHTS) {
         let hook = Hook {
             owner,
             used_by: "nebula lights",
             kind: Kind::Call,
-            site: Site { symbol: "Nebula::Simulate", addr: site_nebula_lights(), expect: fn_nebula_lights() },
+            site: Site::of(&TABLE, sym::SITE_NEBULA_LIGHTS),
             to: nebula_lights as *const () as usize,
             chain: false,
         };
@@ -91,11 +91,15 @@ pub fn install(h: &mut Hooks, lights: bool, spirit: bool) {
         } else {
             log!("world: lights: Nebula::Simulate's light call is not stock's: the nebulae's lights stay as they are");
         }
+    } else if lights {
+        log!("world: lights: Nebula::Simulate's light call is not stock's: the nebulae's lights stay as they are");
+    }
+    if lights && h.ready(&TABLE, hk::WORLD_CULL) {
         let hook = Hook {
             owner,
             used_by: "nebula cull",
             kind: Kind::Slot { vt: vt_nebula_instance(), slot: SLOT_FRUSTUM },
-            site: Site { symbol: "NebulaInstance::FrustumTest", addr: vt_nebula_instance(), expect: fn_frustum_test() },
+            site: Site { addr: vt_nebula_instance(), ..Site::of(&TABLE, sym::SLOT_NEBULA_FRUSTUM) },
             to: nebula_frustum as *const () as usize,
             chain: false,
         };
@@ -104,13 +108,15 @@ pub fn install(h: &mut Hooks, lights: bool, spirit: bool) {
         } else {
             log!("world: lights: NebulaInstance's frustum test is not stock's: stock's nebula cull");
         }
+    } else if lights {
+        log!("world: lights: NebulaInstance's frustum test is not stock's: stock's nebula cull");
     }
-    if spirit {
+    if spirit && h.ready(&TABLE, hk::WORLD_GHOSTS) {
         let hook = Hook {
             owner,
             used_by: "nebula ghosts",
             kind: Kind::Slot { vt: vt_spirit(), slot: SLOT_SPIRIT_RENDER },
-            site: Site { symbol: "GameObjectSpirit::Render", addr: vt_spirit(), expect: fn_spirit_render() },
+            site: Site { addr: vt_spirit(), ..Site::of(&TABLE, sym::SLOT_SPIRIT_RENDER) },
             to: hook_spirit as *const () as usize,
             chain: false,
         };
@@ -120,6 +126,8 @@ pub fn install(h: &mut Hooks, lights: bool, spirit: bool) {
         } else {
             log!("world: nebulae: the ghosts' Render is not stock's: a fogged nebula keeps its billboards");
         }
+    } else if spirit {
+        log!("world: nebulae: the ghosts' Render is not stock's: a fogged nebula keeps its billboards");
     }
 }
 

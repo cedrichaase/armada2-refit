@@ -1119,7 +1119,7 @@ impl Nebulae {
         let mut any = false;
         hooks::each_nebula(|o| any |= self.gather_one(o));
         let mut lat = Vec::new();
-        engine::for_each_in_list(engine::OBJECT_LIST, |o| {
+        engine::for_each_in_list(engine::object_list(), |o| {
             if o != 0 && engine::vtable(o) == vt_latinum() {
                 lat.push(o);
             }
