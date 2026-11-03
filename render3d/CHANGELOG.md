@@ -4,6 +4,29 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.44.0 — 2026-11-03
+
+### Added
+- Render3D.asi on its engine profile (phase 8e): `profiles/gog-1.1/render3d.toml` (core and
+  frame) and `render3d.<module>.toml` per module, with the generated `syms.rs` in
+  `core/src/` and each module crate. Every address of `Armada2.exe` is a profile entry read
+  through `at(sym::X)`; `Hooks::ready` checks a hook's entries before its owner reads or
+  writes, `Site::of` builds a hook's site from the profile. Hooks: `core.reads`,
+  `frame.seam`, `frame.steps`, `frame.destroy`, and per module `<m>.reads` plus
+  `effects.{repair,shields,debris}`, `ordnance.{warp,shots}`, `overlays.posts`,
+  `particles.{particle,billboard}`, `world.{lights,cull,ghosts}` (README, "Hooks").
+- Render3D.log names the executable and the build (`engine: ...`, `engine: <part> symbols: N/M`).
+- A hook that stands down feeds `Render3D_SettingsNote`; an unknown `Armada2.exe`, or a
+  core or seam hook not ready, stands render3d down whole; a module not ready is left to
+  the engine (forcing `render3d.hulls.*` equals `[Modules] hulls=0`).
+
+### Changed
+- The core's 87 engine reads outside the glue moved into `core/src/engine/` (`view.rs`);
+  `lint-layers.sh` rule 1 is strict for the core and the modules (CI).
+- The engine's addresses that were `pub const` in `r3d_core::engine` are lowercase fns.
+- Effects' debris hooks are all-or-none (the cancelled-construction site was optional).
+- Installed, not yet seen in game
+
 ## 0.43.0 — 2026-11-03
 
 ### Changed

@@ -1,6 +1,6 @@
 [package]
 name = "r3d-effects"
-version = "0.43.0"
+version = "0.44.0"
 edition = "2024"
 publish = false
 description = "render3d's effects module: explosions, shields, repair, construction, sparks and debris"

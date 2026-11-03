@@ -5,6 +5,13 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.98.3 — 2026-11-03
+
+### Changed
+- `engine-syms` gains the Render3D section; `engine-unknown-build` expects Render3D to stand
+  down; `engine-mismatch-hulls` is no longer pending (RMSE 0 against `roundD-base-port-showcase-hulls0`).
+- Installed, not yet seen in game
+
 ## 3.98.2 — 2026-11-03
 
 ### Fixed

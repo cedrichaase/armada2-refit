@@ -1,6 +1,6 @@
 [package]
 name = "r3d-world"
-version = "0.43.0"
+version = "0.44.0"
 edition = "2024"
 publish = false
 description = "render3d's world module: planets, moons, asteroids, surfaces and nebulae"

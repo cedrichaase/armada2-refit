@@ -1,6 +1,6 @@
 [package]
 name = "r3d-core"
-version = "0.43.0"
+version = "0.44.0"
 edition = "2024"
 publish = false
 description = "render3d's renderer core: frame, gfx, scene, assets, the shared engine glue, the menu scene, the module interface, registry, hooks, services and recipes"

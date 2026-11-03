@@ -16,7 +16,7 @@ intro-mode scan, from phase 8d; it makes no log line here until the C plugins mo
 The shell is the stock one (4:3, centred in the window with black sides; the Instant
 Action cube is clicked in screen pixels), then a skirmish loads and ticks.
 
-The plugins on a profile at this point are Display8 and UI.asi. Each later package of
+The plugins on a profile at this point are Display8, UI.asi and Render3D.asi. Each later package of
 phase 8 (the C plugins, render3d) appends its plugin's section here: `engine: unknown
 build`, its note, no `installed` hook line, no `read before its hook`.
 
@@ -49,6 +49,12 @@ build`, its note, no `installed` hook line, no `read before its hook`.
 25. Expect "UI.log" not contains "hud: panels of ours".
 26. Expect "UI.log" not contains "installed".
 27. Expect "Display8.log" not contains "installed".
-28. Expect the game is still running.
-29. Quit the game.
-30. Expect no crash.
+28. Expect "Render3D.log" contains "engine: unknown build".
+29. Expect "Render3D.log" contains "stands down".
+30. Expect "Render3D.log" not contains "engine: build armada2/gog-1.1".
+31. Expect "Render3D.log" not contains "installed".
+32. Expect "Render3D.log" not contains "read before its hook".
+33. Expect "Render3D.log" not contains "PANIC".
+34. Expect the game is still running.
+35. Quit the game.
+36. Expect no crash.

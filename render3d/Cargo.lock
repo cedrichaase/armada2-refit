@@ -46,7 +46,7 @@ checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
 name = "r3d-core"
-version = "0.43.0"
+version = "0.44.0"
 dependencies = [
  "a2engine",
  "a2fmt",
@@ -58,7 +58,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-effects"
-version = "0.43.0"
+version = "0.44.0"
 dependencies = [
  "a2engine",
  "a2fmt",
@@ -69,7 +69,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-hulls"
-version = "0.43.0"
+version = "0.44.0"
 dependencies = [
  "a2engine",
  "a2fmt",
@@ -80,7 +80,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-ordnance"
-version = "0.43.0"
+version = "0.44.0"
 dependencies = [
  "a2engine",
  "a2fmt",
@@ -90,7 +90,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-overlays"
-version = "0.43.0"
+version = "0.44.0"
 dependencies = [
  "a2engine",
  "gpu",
@@ -100,7 +100,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-particles"
-version = "0.43.0"
+version = "0.44.0"
 dependencies = [
  "a2engine",
  "a2fmt",
@@ -111,7 +111,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-sky"
-version = "0.43.0"
+version = "0.44.0"
 dependencies = [
  "a2engine",
  "a2fmt",
@@ -121,7 +121,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-specials"
-version = "0.43.0"
+version = "0.44.0"
 dependencies = [
  "a2engine",
  "gpu",
@@ -131,7 +131,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-world"
-version = "0.43.0"
+version = "0.44.0"
 dependencies = [
  "a2engine",
  "a2fmt",
@@ -142,7 +142,7 @@ dependencies = [
 
 [[package]]
 name = "render3d"
-version = "0.43.0"
+version = "0.44.0"
 dependencies = [
  "r3d-core",
  "r3d-effects",

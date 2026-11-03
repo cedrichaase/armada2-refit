@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.87.0 — 2026-11-03
+
+Layers: render3d 0.44.0, testbench 3.98.3.
+
+### Added
+- Phase 8e: render3d on its symbol profiles (see `render3d/CHANGELOG.md`).
+
+### Changed
+- `tools/engine/negative.sh` picks, for a render3d module, an entry no other module's file holds.
+- CI holds the core and the modules to `lint-layers.sh` rule 1.
+- Installed, not yet seen in game
+
 ## 13.86.2 — 2026-11-03
 
 Layers: testbench 3.98.2.
