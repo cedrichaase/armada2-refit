@@ -17,7 +17,7 @@
 //!   again.
 //! - **Textures** are the stub's mirrors (`mirror::passthrough`), made at a texture's
 //!   first draw with every level; samplers by the stage's state, made as DXVK makes them
-//!   under the game's `dxvk.conf` (anisotropy, LOD bias), as the forward chain does.
+//!   under `Display8.ini`'s `[Samplers]` or else the game's `dxvk.conf` (anisotropy, LOD bias), as the forward chain does.
 use super::{get, Img, Vk};
 use crate::passthrough::state::{self, Layout, PipeState, PS_AT, PS_BYTES, VS_BYTES};
 use crate::passthrough::{fixed, say, Draw};

@@ -39,6 +39,14 @@ because a key DXVK does not recognise is silently ignored:
     renderer/renderer-config.sh --remove     # delete dxvk.conf, full revert
     renderer/renderer-config.sh --print --stage 3   # the file on stdout; the release zip's copy
 
+- **Display8 and `dxvk.conf`.** DXVK reads `dxvk.conf` only on Direct3D 9. On Vulkan and
+  Direct3D 12 Display8 gives the plugins' and the passthrough's samplers the same filtering
+  and, since display 0.21.0, from its own `Display8.ini` `[Samplers]` (`Anisotropy`,
+  `LodBias`, `ClampNegativeLodBias`): a value there wins, and `auto` (shipped) reads the
+  key from this file's `d3d9.*` keys. So Display8 no longer needs `dxvk.conf` once
+  `[Samplers]` names the values; this layer still writes it for Direct3D 9, and for
+  players whose `[Samplers]` stay `auto`.
+
 - **`d3d9.samplerAnisotropy = 16`** (stage 1). Without it the game gets whatever a 2001
   renderer requests, which is likely none. In a top-down RTS every hull
   and every planet is drawn at a steep angle to the camera, so all of it is sampled with

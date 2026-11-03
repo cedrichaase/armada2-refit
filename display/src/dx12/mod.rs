@@ -223,7 +223,7 @@ impl Dx {
         }
 
         let samplers = crate::dxvk_samplers();
-        log!("d3d12: the plugins' samplers as dxvk.conf has DXVK make them: anisotropy {}, LOD bias {}", samplers.0, samplers.1);
+        log!("d3d12: the plugins' samplers: anisotropy {}, LOD bias {}", samplers.0, samplers.1);
         if crate::d3d9_centres() {
             log!("d3d12: PixelCentres=d3d9: the plugins draw with Direct3D 9's pixel centres (for comparing)");
         }

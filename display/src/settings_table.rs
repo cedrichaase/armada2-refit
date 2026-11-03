@@ -4,7 +4,7 @@
 #![allow(dead_code)]
 use crate::rt::settings::*;
 
-pub static SETTINGS: [Setting; 3] = [
+pub static SETTINGS: [Setting; 6] = [
     Setting {
         size: ROW_SIZE,
         kind: KIND_BOOL,
@@ -56,11 +56,65 @@ pub static SETTINGS: [Setting; 3] = [
         help: c"The launch reels and the intro run at the desktop's mode instead of 640x480.".as_ptr(),
         moved_from: core::ptr::null(),
     },
+    Setting {
+        size: ROW_SIZE,
+        kind: KIND_ENUM,
+        apply: APPLY_RESTART,
+        scope: SCOPE_LOCAL,
+        tab: TAB_NONE,
+        flags: FLAG_NO_ROW | FLAG_ADVANCED,
+        file: c"Display8.ini".as_ptr(),
+        section: c"Samplers".as_ptr(),
+        key: c"Anisotropy".as_ptr(),
+        def: c"auto".as_ptr(),
+        values: c"auto|1|2|4|8|16".as_ptr(),
+        value_labels: c"As dxvk.conf|1x|2x|4x|8x|16x".as_ptr(),
+        label: c"Anisotropic filtering".as_ptr(),
+        help: c"Anisotropy of the plugins' samplers on Vulkan and Direct3D 12. auto: as dxvk.conf has DXVK make them.".as_ptr(),
+        moved_from: core::ptr::null(),
+    },
+    Setting {
+        size: ROW_SIZE,
+        kind: KIND_ENUM,
+        apply: APPLY_RESTART,
+        scope: SCOPE_LOCAL,
+        tab: TAB_NONE,
+        flags: FLAG_NO_ROW | FLAG_ADVANCED,
+        file: c"Display8.ini".as_ptr(),
+        section: c"Samplers".as_ptr(),
+        key: c"LodBias".as_ptr(),
+        def: c"auto".as_ptr(),
+        values: c"auto|0|-0.25|-0.5|-0.75|-1".as_ptr(),
+        value_labels: c"As dxvk.conf|0|-0.25|-0.5|-0.75|-1".as_ptr(),
+        label: c"Mip LOD bias".as_ptr(),
+        help: c"Mip level bias of the plugins' samplers. auto: as dxvk.conf. A negative value counts only when the clamp is off.".as_ptr(),
+        moved_from: core::ptr::null(),
+    },
+    Setting {
+        size: ROW_SIZE,
+        kind: KIND_ENUM,
+        apply: APPLY_RESTART,
+        scope: SCOPE_LOCAL,
+        tab: TAB_NONE,
+        flags: FLAG_NO_ROW | FLAG_ADVANCED,
+        file: c"Display8.ini".as_ptr(),
+        section: c"Samplers".as_ptr(),
+        key: c"ClampNegativeLodBias".as_ptr(),
+        def: c"auto".as_ptr(),
+        values: c"auto|1|0".as_ptr(),
+        value_labels: c"As dxvk.conf|On|Off".as_ptr(),
+        label: c"Clamp negative LOD bias".as_ptr(),
+        help: c"1 holds a negative LOD bias at 0, as DXVK does by default. auto: as dxvk.conf.".as_ptr(),
+        moved_from: core::ptr::null(),
+    },
 ];
 
 pub const WINDOW_NATIVE: &Setting = &SETTINGS[0];
 pub const WINDOW_KEEPCLIP: &Setting = &SETTINGS[1];
 pub const WINDOW_RAISEINTRO: &Setting = &SETTINGS[2];
+pub const SAMPLERS_ANISOTROPY: &Setting = &SETTINGS[3];
+pub const SAMPLERS_LODBIAS: &Setting = &SETTINGS[4];
+pub const SAMPLERS_CLAMP: &Setting = &SETTINGS[5];
 
 /// The table, for the UI's settings hub (`count` may be NULL).
 #[unsafe(no_mangle)]

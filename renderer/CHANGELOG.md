@@ -6,6 +6,13 @@ folder was `postfx/` before 2.0.0 and also held a **bloom** layer (vkBasalt, bui
 2.0.0 are that folder's. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The tables behind the numbers are in [`README.md`](README.md).
 
+## 2.0.2 — 2026-11-03
+
+### Changed
+- `dxvk.conf` is no longer the only place the sampler settings live: Display8 takes `Anisotropy`, `LodBias` and `ClampNegativeLodBias` from `Display8.ini [Samplers]` on Vulkan and Direct3D 12, `auto` reading this file's `d3d9.*` keys. This layer writes the same file as before.
+
+Installed, not yet seen in game.
+
 ## 2.0.1 — 2026-10-23
 
 ### Fixed

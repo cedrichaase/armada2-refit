@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 14.13.0 — 2026-11-03
+
+Layers: display 0.21.0, renderer 2.0.2.
+
+### Added
+- `Display8.ini [Samplers]` (`Anisotropy`, `LodBias`, `ClampNegativeLodBias`, default `auto` = `dxvk.conf`'s values) for the plugins' and the passthrough's samplers on Vulkan and Direct3D 12.
+
+Pre-release: Direct3D 12 passthrough confirmed on Linux only, not yet on native Windows.
+Installed, not yet seen in game.
+
 ## 14.11.0 — 2026-11-03
 
 Layers: display 0.20.0, testbench 3.104.0.

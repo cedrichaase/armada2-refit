@@ -92,26 +92,47 @@ pub fn present_interval(asked: u32, windowed: bool) -> u32 {
     if unsafe { VSYNC } || windowed { asked } else { INTERVAL_IMMEDIATE }
 }
 
-/// What the game's `dxvk.conf` makes of every sampler on Direct3D 9 (renderer/README.md):
-/// `d3d9.samplerAnisotropy` (-1 when not set) and `d3d9.samplerLodBias` (0 when not set;
-/// held at 0 or above when `d3d9.clampNegativeLodBias` is true, DXVK's default). On
-/// Vulkan the plugins' samplers are given the same, so the two backends' pictures agree.
+/// The plugins' samplers on Vulkan and Direct3D 12 and the passthrough's (renderer/README.md):
+/// anisotropy (-1: not set) and LOD bias (0 when not set). Each of `Display8.ini`'s
+/// `[Samplers]` keys `Anisotropy`, `LodBias` and `ClampNegativeLodBias` is the value when it
+/// is set and not `auto`; `auto` (the shipped value) leaves the key to the game's
+/// `dxvk.conf`, which says what DXVK makes of every sampler on Direct3D 9
+/// (`d3d9.samplerAnisotropy`, `d3d9.samplerLodBias`, `d3d9.clampNegativeLodBias`), so the
+/// backends' pictures agree. A negative bias is held at 0 while the clamp holds (DXVK's
+/// default). One log line says where each value came from.
 pub fn dxvk_samplers() -> (i32, f32) {
-    let text = rt::read_file(&rt::game_path("dxvk.conf")).unwrap_or_default();
-    let text = alloc::string::String::from_utf8_lossy(&text);
+    let ini = rt::Ini::open(&rt::game_path("Display8.ini"));
+    let own = |key: &str| ini.string("Samplers", key).filter(|v| !v.is_empty() && !v.eq_ignore_ascii_case("auto"));
+    let (o_aniso, o_bias, o_clamp) = (own("Anisotropy"), own("LodBias"), own("ClampNegativeLodBias"));
     let (mut aniso, mut bias, mut clamp) = (-1i32, 0f32, true);
-    for line in text.lines() {
-        let line = line.split('#').next().unwrap_or("");
-        let Some((k, v)) = line.split_once('=') else { continue };
-        let (k, v) = (k.trim(), v.trim());
-        if k.eq_ignore_ascii_case("d3d9.samplerAnisotropy") {
-            aniso = rt::parse_f32(v).map_or(-1, |f| f as i32);
-        } else if k.eq_ignore_ascii_case("d3d9.samplerLodBias") {
-            bias = rt::parse_f32(v).unwrap_or(0.0);
-        } else if k.eq_ignore_ascii_case("d3d9.clampNegativeLodBias") {
-            clamp = !v.eq_ignore_ascii_case("false");
+    if o_aniso.is_none() || o_bias.is_none() || o_clamp.is_none() {
+        let text = rt::read_file(&rt::game_path("dxvk.conf")).unwrap_or_default();
+        let text = alloc::string::String::from_utf8_lossy(&text);
+        for line in text.lines() {
+            let line = line.split('#').next().unwrap_or("");
+            let Some((k, v)) = line.split_once('=') else { continue };
+            let (k, v) = (k.trim(), v.trim());
+            if k.eq_ignore_ascii_case("d3d9.samplerAnisotropy") {
+                aniso = rt::parse_f32(v).map_or(-1, |f| f as i32);
+            } else if k.eq_ignore_ascii_case("d3d9.samplerLodBias") {
+                bias = rt::parse_f32(v).unwrap_or(0.0);
+            } else if k.eq_ignore_ascii_case("d3d9.clampNegativeLodBias") {
+                clamp = !v.eq_ignore_ascii_case("false");
+            }
         }
     }
+    if let Some(v) = &o_aniso {
+        aniso = rt::parse_f32(v).map_or(-1, |f| f as i32);
+    }
+    if let Some(v) = &o_bias {
+        bias = rt::parse_f32(v).unwrap_or(0.0);
+    }
+    if let Some(v) = &o_clamp {
+        clamp = !(v == "0" || v.eq_ignore_ascii_case("false"));
+    }
+    let from = |o: &Option<alloc::string::String>| if o.is_some() { "Display8.ini" } else { "dxvk.conf" };
+    log!("samplers: Anisotropy={} ({}), LodBias={} ({}), ClampNegativeLodBias={} ({})",
+        aniso, from(&o_aniso), bias, from(&o_bias), clamp as i32, from(&o_clamp));
     if clamp && bias < 0.0 {
         bias = 0.0;
     }
