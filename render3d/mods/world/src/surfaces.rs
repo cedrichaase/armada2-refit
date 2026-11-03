@@ -147,7 +147,7 @@ impl Surfaces {
 fn entry<'a>(entries: &'a mut BTreeMap<String, Entry>, reload: bool, name: &str) -> &'a mut Entry {
     let now = rt::now();
     let e = entries.entry(rt::lower(name)).or_insert_with(|| {
-        let found = recipes::find("surfaces", content::SURFACES, name);
+        let found = recipes::find("surfaces", content::get().surfaces, name);
         let recipe = found.as_ref().map(|f| read_recipe(&f.text));
         let bytes = found.map(|f| f.bytes);
         log!("world: surface {}: {}", name, if recipe.is_some() { "made from its recipe" } else { "no recipe, the stock texture" });
@@ -155,7 +155,7 @@ fn entry<'a>(entries: &'a mut BTreeMap<String, Entry>, reload: bool, name: &str)
     });
     if reload && now - e.checked > 0.5 {
         e.checked = now;
-        let found = recipes::find("surfaces", content::SURFACES, &e.name);
+        let found = recipes::find("surfaces", content::get().surfaces, &e.name);
         let bytes = found.as_ref().map(|f| f.bytes.clone());
         if bytes != e.bytes {
             e.recipe = found.as_ref().map(|f| read_recipe(&f.text));

@@ -61,9 +61,9 @@ fn scene_fn() -> Option<SceneFn> {
 /// The specs dim it under their windows (`theme::backdrop`).
 fn scene_for(screen: &str) -> Option<&'static core::ffi::CStr> {
     match screen {
-        "main menu" => Some(c"main"),
-        "single player" => Some(unsafe { CHOICE }.unwrap_or(c"federation")),
-        _ => Some(unsafe { LAST_VIEW }.unwrap_or(c"main")),
+        "main menu" => crate::content::get().main_scene,
+        "single player" => unsafe { CHOICE }.or(crate::content::get().first_campaign_scene),
+        _ => unsafe { LAST_VIEW }.or(crate::content::get().main_scene),
     }
 }
 

@@ -33,6 +33,12 @@ against (`set`, a directory of `fixtures/sets/`), optionally `base` (where it is
     note_for <Section.Key> <text|->
     note_plugin <text|->
 
+Besides the transcripts a fixture may carry `[content]`, the content set the table
+resolves to (`none` for no set), checked by Python (`profiles.Build.content_for`) and by
+Rust (`Engine::content()`); `07-content-none.toml` is the child build `b3`, which gives
+`p` no set and `s` another (`sets/basic/b3/content.toml`), and 01 to 03 expect `stock`
+and, on the unknown timestamp, `none`.
+
 They cover stock, an unknown timestamp, stock's timestamp with another image size and
 no build for it, a child build with `[[changed]]` (one hook verified), `[[disable]]`, an
 overridden and an added entry (the Roots shape), a chained call (and one in a hook that

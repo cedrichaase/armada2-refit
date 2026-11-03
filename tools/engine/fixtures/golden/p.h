@@ -136,9 +136,32 @@ static const A2EBlock p_b1_blocked[] = {
     {1, "One::chainer", "is off in b2: b2 has its own", "Stands down: off in b2: b2 has its own"},
     {0xffff, 0, 0, 0}
 };
+static const A2E_U8 p_b2_c0[] = {0x55, 0x8b, 0xec, 0x83, 0xec, 0x10};
+static const A2E_U8 p_b2_c2[] = {0x90, 0x90, 0x90, 0x90, 0x90};
+static const A2E_U8 p_b2_c12[] = {0x55, 0x89, 0xe5};
+static const A2EEntry p_b2_entries[] = {
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x401000, 0x0, 0, p_b2_c0, 0, ""}, /* f1 */
+    {1, 0, 0x0, 0xffff, 0, 0, 0, 0x401200, 0x0, 0, 0, 0, ""}, /* c1 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 5, 0x401300, 0x0, 0, p_b2_c2, 0, ""}, /* pt */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x401305, 0x0, 0, 0, 0, ""}, /* l1 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x404010, 0x0, 0, 0, 0, ""}, /* g1 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 28, 0, 0, ""}, /* fd */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 640, 0, 0, ""}, /* v1 */
+    {1, 1, 0x0, 0xffff, 0, 0, 0, 0x401210, 0x0, 0, 0, 0, ""}, /* c2 */
+    {1, 0, 0x0, 0xffff, 0, 0, 0, 0x401220, 0x0, 0, 0, 0, ""}, /* c3 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x403000, 0x0, 0, 0, 0, ""}, /* vt */
+    {1, 0, 0x0, 0x9, 1, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* s1 */
+    {1, 0, 0x0, 0x9, 2, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* s2 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 3, 0x401100, 0x0, 0, p_b2_c12, 0, ""}, /* f2 */
+    {0},
+};
+static const A2EBlock p_b2_blocked[] = {
+    {0xffff, 0, 0, 0}
+};
 static const A2EBuild p_builds[] = {
     {"b1", "test/b1", 0x5eed0001, 0x6000, 0x777d215e, 0x400000, p_b0_entries, p_b0_blocked, 0, 13},
     {"b2", "test/b2", 0x5eed0001, 0x7000, 0xa56c4602, 0x400000, p_b1_entries, p_b1_blocked, 2, 7},
+    {"b3", "test/b3", 0x5eed0001, 0x8000, 0x756db512, 0x400000, p_b2_entries, p_b2_blocked, 0, 13},
 };
 
 static A2E_U8 p_hook_state[6];
@@ -148,7 +171,7 @@ static char p_notes[6][A2E_NOTE_MAX + 1];
 
 static const A2ETable P_ENGINE = {
     "test", "p",
-    p_syms, 14, p_hooks, 6, p_builds, 2, 0,
+    p_syms, 14, p_hooks, 6, p_builds, 3, 0,
     p_vars, p_hook_state, p_sym_flags, p_sym_addr, p_notes
 };
 

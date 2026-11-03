@@ -98,6 +98,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         sections: 0xa1a8a321,
         image_base: 0x400000,
         n_resolved: 34,
+        content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x4a58e0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x14, 0xa0, 0xd4], mask: &[], section: "", count: 0, value: 0 }, // fn_scrap_render
             a2engine::Entry { present: true, addr: 0x4b1170, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x53, 0x56, 0x8b, 0xf1, 0x32], mask: &[], section: "", count: 0, value: 0 }, // fn_evolver_ri

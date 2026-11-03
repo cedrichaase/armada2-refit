@@ -27,7 +27,7 @@
 //!
 //! The clock is the sim clock (`View::time`): the effect stops while the game is
 //! paused, as every cosmetic simulation of render3d does.
-use super::content::{FAC_DEF, FAC_KEY, NFAC, SITE_NAME};
+use super::content;
 use super::hooks::shields as hk;
 use super::hooks::object_of;
 use super::{blank, rnd, Cam, LightPool, Sec};
@@ -96,13 +96,13 @@ struct Set {
     rays: f32,
     ray_length: f32,
     ray_sharp: f32,
-    ray_fac: [bool; NFAC],
+    ray_fac: Vec<bool>,
     hit_light: f32,
     hit_light_white: f32,
     hit_light_reach: f32,
     hit_light_power: f32,
     hit_lights: usize,
-    fac: [V3; NFAC],
+    fac: Vec<V3>,
     fixed: V3,
     low: V3,
     down: bool,
@@ -138,16 +138,12 @@ impl Set {
     fn read(c: &Sec) -> Set {
         let mode = c.s("ColourMode").unwrap_or_default().to_ascii_lowercase();
         let pattern = c.s("Pattern").unwrap_or_default().to_ascii_lowercase();
-        let mut fac = [V3::ZERO; NFAC];
-        for i in 0..NFAC {
-            fac[i] = c.rgb(FAC_KEY[i], FAC_DEF[i]);
-        }
+        let facs = content::get().factions;
+        let fac: Vec<V3> = facs.iter().map(|f| c.rgb(f.key, f.colour)).collect();
         let down_time_min = c.f("DownStrikeMin", 0.12).max(0.02);
         let ray_list = c.s("RayFactions").unwrap_or_else(|| String::from("Klingon")).to_ascii_lowercase();
-        let mut ray_fac = [false; NFAC];
-        for (i, f) in ray_fac.iter_mut().enumerate() {
-            *f = ray_list.split([',', ' ']).any(|w| w.trim() == FAC_KEY[i].to_ascii_lowercase());
-        }
+        let ray_fac: Vec<bool> =
+            facs.iter().map(|f| ray_list.split([',', ' ']).any(|w| w.trim() == f.key.to_ascii_lowercase())).collect();
         Set {
             colour_mode: if mode.starts_with('s') { ColMode::Stock } else if mode.starts_with("fi") { ColMode::Fixed } else { ColMode::Faction },
             pattern: if pattern.starts_with('c') { 2.0 } else if pattern.starts_with('h') { 1.0 } else { 0.0 },
@@ -511,7 +507,7 @@ impl Shields {
                         self.logged_hits += 1;
                         log!(
                             "effects: shield hit {} on {} by a {}, damage {:.1} -> strength {:.2}; at {:.2} {:.2} {:.2}; stock {:.2} s{}, shields {:.2}",
-                            id, obj::odf_name(o), SITE_NAME[site & 3], dmg, strength, dir.x, dir.y, dir.z,
+                            id, obj::odf_name(o), content::get().site_name(site & 3), dmg, strength, dir.x, dir.y, dir.z,
                             hk::hit_left(sh), if hk::hit_timed(sh) { " left" } else { ", untimed" },
                             hk::hit_shields(sh)
                         );
@@ -812,12 +808,15 @@ impl Shields {
     fn look(&self, o: usize, ty: usize, now: f64) -> (V3, f32) {
         let s = &self.s;
         let mut lvl = Self::level(o, 0);
+        // A set with no factions gives the faction mode nothing to key by: stock's colour.
+        let by_faction = if s.colour_mode == ColMode::Faction { fac_of(o).and_then(|i| s.fac.get(i)) } else { None };
+        let stock_col = s.colour_mode == ColMode::Stock || (s.colour_mode == ColMode::Faction && by_faction.is_none());
         let mut col = match s.colour_mode {
-            ColMode::Stock => v3(1.0 - lvl, lvl, 0.0),
+            _ if stock_col => v3(1.0 - lvl, lvl, 0.0),
             ColMode::Fixed => s.fixed,
-            ColMode::Faction => s.fac[fac_of(o)],
+            _ => *by_faction.unwrap_or(&V3::ZERO),
         };
-        if s.colour_mode != ColMode::Stock {
+        if !stock_col {
             col = col + (s.low - col) * (s.low_shift * (1.0 - lvl));
         }
         let mut bright = s.brightness * (s.weak_level + (1.0 - s.weak_level) * lvl);
@@ -871,7 +870,7 @@ impl Shields {
         pc[4] = [s.hex_cells, s.hex_line, w as f32, (s.crackle + (1.0 - lvl) * 0.5).clamp(0.0, 1.0)];
         pc[5] = [s.core, s.pattern, s.ring_lattice, s.edge];
         pc[6] = [s.mist, s.mist_share, s.mist_contrast, 1.0 / s.mist_reach];
-        let rays = if ty == 0 && !whole && s.ray_fac[fac_of(o)] { s.rays } else { 0.0 };
+        let rays = if ty == 0 && !whole && fac_of(o).and_then(|i| s.ray_fac.get(i).copied()).unwrap_or(false) { s.rays } else { 0.0 };
         pc[7] = [rays, 1.0 / s.ray_length, s.ray_sharp, 0.0];
         // the mist's drift: slow, along a fixed slant, wrapped every 2000 s
         let dt = (now - libm::floor(now / 2000.0) * 2000.0) as f32 * s.mist_drift;
@@ -1031,18 +1030,9 @@ fn ship_vsconst(cmd: &mut Cmd, a: &[V3; 3], t: V3) {
     cmd.vs_block(Block::new(4, vc.as_flattened()));
 }
 
-fn fac_of(o: usize) -> usize {
-    let n = obj::odf_name(o);
-    let Some(c) = n.bytes().next() else { return 6 };
-    match c.to_ascii_lowercase() {
-        b'8' => 5,
-        b'f' => 0,
-        b'k' => 1,
-        b'r' => 2,
-        b'b' => 3,
-        b'c' => 4,
-        _ => 6,
-    }
+/// The faction of a ship, by its ODF name, in the content set's list.
+fn fac_of(o: usize) -> Option<usize> {
+    content::get().faction_of(&obj::odf_name(o))
 }
 
 /// The unit sphere, a triangle list: 18 rings by 36 meridians.

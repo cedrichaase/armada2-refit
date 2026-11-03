@@ -25,6 +25,7 @@ use r3d_core::{dump, log, rt, sfmt};
 
 #[rustfmt::skip]
 pub mod shaders;
+mod content;
 mod fog;
 pub mod hooks;
 pub mod settings_table;

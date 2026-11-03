@@ -43,6 +43,18 @@ Layers: testbench 3.99.0.
 
 Installed, not yet seen in game
 
+## 13.88.0 — 2026-11-03
+
+Layers: render3d 0.45.0, ui 0.33.1.
+
+### Added
+- Phase 8f: the content profile. `profiles/gog-1.1/content.toml` and `build.toml`'s `content`
+  give each plugin a content set; `Engine::content()` (a2engine) returns it, gen.py writes
+  it into each table's `Build`, lint.py checks the file, and the tools' fixtures cover a
+  build with no set (`tools/engine/fixtures/07-content-none.toml`, lint cases 28 and 29).
+  render3d's modules and the UI choose their tables of game names by it. Installed, not
+  yet seen in game.
+
 ## 13.87.0 — 2026-11-03
 
 Layers: render3d 0.44.0, testbench 3.98.3.

@@ -60,6 +60,20 @@ def expected(d, t):
     return list((d.get('expect') or {}).get(t.plugin, []))
 
 
+def content_expect(d, t):
+    """The content set the fixture expects of this table ('none' for no set), or None
+    when the fixture does not say."""
+    return (d.get('content') or {}).get(t.plugin)
+
+
+def py_content(d, t):
+    exe = pe.Exe(mkpe.build(d['image']), d.get('base'))
+    eng = resolve.Engine(t, exe, d.get('test_ini'))
+    if eng.bi is None:
+        return 'none'
+    return eng.build['build'].content_for(t.fname) or 'none'
+
+
 def report(impl, name, plugin, want, got):
     if want == got:
         return True
@@ -78,6 +92,9 @@ def run_py(fx):
     for name, _, d, ts in fx:
         for t in ts:
             ok &= report('py', name, t.plugin, expected(d, t), py_transcript(d, t))
+            want = content_expect(d, t)
+            if want is not None:
+                ok &= report('py content', name, t.plugin, [want], [py_content(d, t)])
     return ok
 
 
@@ -152,6 +169,7 @@ def rust_module(fx, tmp):
             cases.append(
                 f'    Case {{ name: {rs_str(name + " " + t.plugin)}, table: &{m}::TABLE, image: {rs_str(img)}, base: {base:#x}, '
                 f'test_ini: {ini}, addr: &[{", ".join(rs_str(a) for a in addr)}], note_for: &[{", ".join(rs_str(n) for n in nf)}], '
+                f'content: {rs_str(content_expect(d, t) or "?")}, '
                 f'expect: &[{", ".join(rs_str(x) for x in expected(d, t))}] }},')
     o += ['', 'pub const CASES: &[Case] = &['] + cases + ['];', '']
     return '\n'.join(o)

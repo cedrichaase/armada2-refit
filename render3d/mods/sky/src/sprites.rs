@@ -182,7 +182,7 @@ impl Starfield {
         let col = hooks::sprite_colour(sp);
         // Only the point stars are lifted past white: the big blobs and clusters
         // (`blobby`, `starcluster`) are gas, and lifted they glowed over the sky.
-        let lift = if info.texture.eq_ignore_ascii_case(super::content::POINT_STARS) { lift } else { 0.0 };
+        let lift = if info.texture.eq_ignore_ascii_case(super::content::get().point_stars) { lift } else { 0.0 };
         b.quad(info, c, [col[0], col[1], col[2], lift]);
         true
     }
