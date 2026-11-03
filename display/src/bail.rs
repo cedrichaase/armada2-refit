@@ -93,6 +93,14 @@ pub fn early(sdk: u32, why: &str) -> P {
     d
 }
 
+/// A `Direct3DCreate8` after a late bail-out: the system's `IDirect3D8` itself. The
+/// stub's vtables stay the forward `late` made of them.
+pub fn again(sdk: u32) -> P {
+    let d = create(sdk);
+    log!("Direct3DCreate8({}) after the bail-out -> the system's {:#x}", sdk, d as usize);
+    d
+}
+
 /// The late bail-out, from the stub's `CreateDevice`: the stub's `IDirect3D8` forwards
 /// to the system's from now on, and the engine's `CreateDevice` is the system's.
 pub fn late(adapter: u32, dt: u32, hwnd: P, flags: u32, pp: *mut crate::d3d8::PresentParams, out: *mut P) -> HRESULT {

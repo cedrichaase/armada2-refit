@@ -19,7 +19,7 @@ pub extern "C" fn display8v1_dx12_frame() -> *const Dx12Frame8 {
     match get() {
         Some(d) => {
             crate::stub::flush_mirrors();
-            d.frame() as *const Dx12Frame8
+            d.frame().map_or(core::ptr::null(), |f| f as *const Dx12Frame8)
         }
         None => core::ptr::null(),
     }

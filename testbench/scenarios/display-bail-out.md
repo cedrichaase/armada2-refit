@@ -12,8 +12,11 @@ Run with `--install .`. `Backend=none` (display 1.0.0) takes the bail-out at
 down and the game is the stock one. It is what a player gets when neither Vulkan nor
 Direct3D 12 can start, and the way to see it outside the bench: set
 `[Display8.Display8] Backend=none` in `RefitPlayer.ini`. With the UI standing down the shell
-is the stock one, 800x600 at the screen's top left, so the Instant Action cube is
-clicked in screen pixels.
+is the stock one, in its own 800x600 mode (display 1.0.4: not raised, since the UI's
+menu host claims the menus but refuses every dialog without a device, and a raised mode
+put the stock shell in a corner of the screen). The bench shows that mode pillarboxed
+at 4:3 in the 1280x720 output, so the Instant Action cube is clicked where it is drawn
+there, in screen pixels.
 
     ./a2test run display-bail-out --install . -j 1
 
@@ -40,17 +43,18 @@ clicked in screen pixels.
 19. Wait 3 seconds.
 20. Take a screenshot called "main menu".
 21. Check that the screenshot shows the main menu of Star Trek: Armada II (Single Player, Instant Action, Multiplayer, Options ...), not a black or garbled screen.
+22. Expect "Display8.log" not contain "shell mode raised".
 ## Mission
-22. Click at 640,90.
-23. Wait for "GAME SETUP".
-24. Wait 2 seconds.
-25. Click "LAUNCH".
-26. Wait 60 seconds.
-27. Take a screenshot called "match".
-28. Check that the screenshot shows a space battle map of Star Trek: Armada II drawn by the game (stars, ships or stations, and the game's own interface), not a black or garbled screen and not a second copy of the interface drawn over the game's.
-29. Expect "Render3D.log" not contain "frame: targets".
-30. Expect "UI.log" contains "runs stock: no ".
-31. Expect "Display8.log" not contain "PANIC".
-32. Expect the game is still running.
-33. Quit the game.
-34. Expect no crash.
+23. Click at 930,110.
+24. Wait for "GAME SETUP".
+25. Wait 2 seconds.
+26. Click "LAUNCH".
+27. Wait 60 seconds.
+28. Take a screenshot called "match".
+29. Check that the screenshot shows a space battle map of Star Trek: Armada II drawn by the game (stars, ships or stations, and the game's own interface), not a black or garbled screen and not a second copy of the interface drawn over the game's.
+30. Expect "Render3D.log" not contain "frame: targets".
+31. Expect "UI.log" contains "runs stock: no ".
+32. Expect "Display8.log" not contain "PANIC".
+33. Expect the game is still running.
+34. Quit the game.
+35. Expect no crash.

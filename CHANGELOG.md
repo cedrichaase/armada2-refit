@@ -19,6 +19,13 @@ Layers: qol 2.2.2, rules 1.0.2, render3d 1.0.3.
 ### Fixed
 - Review fixes in the plugins: the pan coefficient read behind its patch check, the grid's menu-toggle keys restored when it is turned off live, pay-on-queue in a network game following the announcement, the effects module's sprite drops limited to render3d's own views, and instruction listings in comments turned to prose. Installed, not yet seen in game.
 
+## 15.6.13 — 2026-11-04
+
+Layers: display 1.0.4, testbench 4.1.7.
+
+### Fixed
+- Display8: the Vulkan flush's failed submit no longer hangs the next frame, a part-made Vulkan swap chain holds no destroyed handles, a Direct3D 12 fence timeout no longer resets or frees what the GPU may be using, a second `Direct3DCreate8` keeps the late bail-out's forward, and the shell's mode is not raised after a bail-out (`display-bail-out` checks it). Installed, not yet seen in game.
+
 ## 15.6.12 — 2026-11-03
 
 Layers: cutscenes 3.0.1, rules 1.0.1, online 0.11.1, ui 2.2.3, testbench 4.1.3.
