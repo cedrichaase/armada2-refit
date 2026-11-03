@@ -2,7 +2,7 @@
 
 Resolutions: 1280x720
 Mod: refit
-Setup: tools/settings/bench-overlay.sh --into UIPlayer.ini HUD:BarHidden=1 ui/bench-asi.sh --no-grid
+Setup: tools/settings/bench-overlay.sh --into UIPlayer.ini HUD:BarHidden=1 ui/bench-asi.sh
 Timeout: 12 min
 
 `tools/settings/README.md`, "The overlay", and `ui/HUD.md`, "The button bar". Until ui

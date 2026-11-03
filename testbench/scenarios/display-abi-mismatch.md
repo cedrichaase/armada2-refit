@@ -30,7 +30,8 @@ Since display 0.18.0 the shell's 800x600 request is raised by Display8, not by t
 (`[Window]`); display 0.11.0's stub offers the desktop's mode alone, so the engine
 would fail to create its device (a Wine stack overflow before the menu) with no one to
 raise it. A player who mixes files like this needs what raised it before: in
-**olddisplay** `display/bench-abi.sh` puts Menus.asi back (`ui/bench-legacy.sh menus`),
+**olddisplay** `display/bench-abi.sh` puts Menus.asi back (built from the last tag that has it,
+`testbench/bench/legacy.py`),
 which raises the mode and scales the shell to the screen, the UI's menus standing
 down beside it; the cube is then at 930,100. Menus.asi also changes what the engine draws,
 which the old stub drops, so that Display8 falls back to forward mode and the UI's HUD draws on

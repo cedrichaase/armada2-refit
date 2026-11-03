@@ -2,7 +2,7 @@
 
 Resolutions: 1680x720
 Mod: refit
-Setup: ui/bench-asi.sh --no-grid
+Setup: ui/bench-asi.sh
 Timeout: 15 min
 
 `ui/HUD.md`, "The trade status and the team message", "The info panel" (the queue

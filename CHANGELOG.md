@@ -5,6 +5,15 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.4.0 — 2026-11-03
+
+Layers: testbench 4.0.0.
+
+### Changed
+- The bench without the legacy plugins: Menus.asi (stock shell, old Display8) and the old install come from a build of the last tag that has them, cached in `$A2_DATA`; the scenarios of the retired plugins and of forward mode are deleted; new `retire-old-install`. Details in `testbench/CHANGELOG.md`.
+
+Installed, not yet seen in game
+
 ## 15.2.0 — 2026-11-03
 
 Layers: hud 3.0.0, grid 2.0.0, menus 5.0.0, ui 2.1.0, models 5.1.0, textures 2.2.0, platform 3.7.0.

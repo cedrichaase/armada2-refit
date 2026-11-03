@@ -4,8 +4,8 @@
 the game with a real (virtual) mouse and keyboard, and checks plain-text scenarios
 against it. Each run leaves a report with screenshots, logs and every verdict.
 
-    ./a2test run main-menu hud font          # scenarios in testbench/scenarios/
-    ./a2test run main-menu --res 16:9,21:9   # override the resolutions
+    ./a2test run no-assets font          # scenarios in testbench/scenarios/
+    ./a2test run no-assets --res 16:9,21:9   # override the resolutions
     ./a2test run admirals-log --vnc          # ... and watch it (view-only VNC)
     ./a2test watch                           # the bench dashboard: http://127.0.0.1:5950/
     ./a2test watch --install-desktop         # ... in the app launcher, from the main checkout
@@ -186,7 +186,7 @@ that reads a log by path must glob the prefix (see `gpu/replay.sh`, `render3d/pe
 The launch deletes the previous logs in both places.
 
 Logs gathered per case (into the case's `logs/`, from wherever they were): `wine.log` (umu, Proton, Wine; `A2TEST_WINEDEBUG` sets
-channels, `trace+cursor` for Wine's pointer clip), `Menus.log`, `Render3D.log`, `BinkProxy.log`, `D3DTrace.log` (`d3dtrace/`), `D3D9Probe.log` (`d3d9probe/`), `Armada2_d3d9.log` and
+channels, `trace+cursor` for Wine's pointer clip), `Menus.log`, `Render3D.log`, `BinkProxy.log`, `Armada2_d3d9.log` (DXVK's, from an old chain only) and
 `xalia_dxgi.log` (DXVK), `sway.log` (with `A2TEST_XWAYLAND_DEBUG=1` in the
 environment of `session start` or `run`, every Wayland request and event of Xwayland's:
 its pointer's enter and leave, locks and confinements; large, so for short runs),
@@ -374,7 +374,7 @@ stem held `Mfed300.wav`, the voice stem `a2_fed01_intro.wav`, and the effects st
   look (`ui.json`'s `skip`), so the briefing is up seconds after the load instead of
   ~70 s later. For anything that only needs *a map*, launch
   straight into one (`Launch: -nointro a2_borg01`): a bare argument is a mission name
-  (see `menus/run-wine.sh`), and the HUD is up in ~30 s.
+  (see `platform/run-wine.sh`), and the HUD is up in ~30 s.
 - **A direct map launch deals a random faction.** One run drew the Federation,
   Cardassian and Romulan HUDs across its cases, and their panels have different shapes
   (the Federation's minimap panel is about half as wide as the Romulan's). A comparison
@@ -388,7 +388,7 @@ stem held `Mfed300.wav`, the voice stem `a2_fed01_intro.wav`, and the effects st
 - **`a2test drive` used to drive the newest active session on the machine**, and every
   case of an `a2test run` counts as one. With another job running scenarios, a `drive`
   after your own `session start` went to *that* job's game (2026-09-27: an Escape and two
-  clicks landed in a `hud-mode-switch` case), and a bare `session stop` terminated a
+  clicks landed in another job's case), and a bare `session stop` terminated a
   parallel job's session (2026-10-05). That is why `session stop` now requires an ID and
   `drive` refuses to choose among several ("Which session a command acts on").
 - **The briefing's OK button did not take a click** in one session, though Esc did.
@@ -551,8 +551,7 @@ picks the globs, so one file runs variants side by side (`engine-mismatch`: `dis
 `radar`). A `Players:` list is one game each, so the variants that need a third or fourth
 game are their own files, pending the packages that put their plugin on a profile:
 `engine-mismatch-hulls` (render3d, 8e) and `engine-mismatch-cplugins` (QOL, rules, Online,
-8d). The Display8 shell under a forced `display.modes` is not the engine's: the forward
-chain draws UI.asi's menus.
+8d). The Display8 shell under a forced `display.modes` is not the engine's.
 
 ## Frame dumps
 
@@ -902,6 +901,25 @@ starts a game takes a **slot** first, from one queue shared by the whole machine
 
 `python3 testbench/bench/slots_selftest.py` checks all of it with dummy processes
 and no game.
+
+## The legacy plugins
+
+`HUD.asi`, `GridLayout.asi` and `Menus.asi` left the repository in 15.2.0 (`retire/` takes
+them out of an old install). The bench still needs them in three places, so
+`bench/legacy.py` builds them once from the last tag that has them (`v13.51.3`: `git
+archive` of `menus hud grid csdk` into a scratch directory, never a worktree) and caches
+them in `$A2_DATA/bench/legacy/<tag>/`, with the tag's `hud/` scripts and the vendored
+chain DLLs. It is our code, compiled; nothing of the game is in it.
+
+- `Stock shell: embed` (a stock reference case): `Menus.asi` with `Embed=1` and nothing
+  else, so the stock menus take clicks (`session.embed_stock_shell`).
+- `display/bench-abi.sh old-display`: the old Display8 forwards, and needs `Menus.asi` to
+  raise the shell's 800x600 mode (`legacy.py install <game> menus`). A clone with a
+  `d3d9.dll` of its own gets the `d3d9=n,b` override; no other clone has one.
+- `retire-old-install`: `testbench/scenarios/retire-old-install.sh` (its `Setup:`) seeds
+  an old install (`legacy.py seed`), runs `./install` and compares with the stock clone.
+
+`python3 testbench/bench/legacy.py ensure|install|embed|seed` is the whole interface.
 
 ## Requirements
 

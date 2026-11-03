@@ -2,7 +2,7 @@
 
 Resolutions: 1280x720
 Mod: refit
-Setup: ui/bench-asi.sh --no-grid HUD.Resources=1 HUD.Buttons=1 HUD.Messages=1 HUD.Pause=1 HUD.Replay=1 HUD.Overlay=1 HUD.Chat=1
+Setup: ui/bench-asi.sh HUD.Resources=1 HUD.Buttons=1 HUD.Messages=1 HUD.Pause=1 HUD.Replay=1 HUD.Overlay=1 HUD.Chat=1
 Timeout: 12 min
 
 `ui/HUD.md`, "The resources, the buttons, the boxes, the overlay and the chat". With

@@ -31,7 +31,7 @@ import uuid
 import time
 from pathlib import Path
 
-from . import config, jobs, slots, stockcache
+from . import config, jobs, legacy, slots, stockcache
 from .log import Log
 
 
@@ -543,6 +543,15 @@ class Session:
             set_prf_volumes(self.game_dir / 'ARMADA.PRF', vols)
             self.log.action('ARMADA.PRF volumes: ' + ', '.join(f'{c} {v}' for c, v in sorted(vols.items())))
 
+    def dll_overrides(self):
+        """The overrides the game launches with. Since display 1.0.0 nothing in the chain
+        needs Direct3D 9; a clone that carries a `d3d9.dll` of its own (the old Display8 of
+        `display/bench-abi.sh old-display`, which forwards to DXVK) gets its override."""
+        o = config.DLL_OVERRIDES
+        if (self.game_dir / 'd3d9.dll').exists():
+            o += ';d3d9=n,b'
+        return o
+
     def embed_stock_shell(self):
         """Stock, except that the menus are one window with the game (menus/README.md,
         "One window"). Without Embed each menu is its own X11 window and injected clicks
@@ -550,16 +559,9 @@ class Session:
         (2026-09-26). Menus.asi goes back with nothing else on: no scaling, the stock
         800x600 shell mode, no backdrops, stock Esc. The HUD, font and cursors, which the
         stock baseline exists for, stay stock."""
-        # Built from this checkout: ./install no longer puts Menus.asi into the user's
-        # install (the UI hosts the menus), so it cannot be copied from there.
-        subprocess.run(['bash', str(config.REPO / 'menus/build.sh')], check=True,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        shutil.copy2(config.REPO / 'menus/build/Menus.asi', self.game_dir / 'Menus.asi')
-        (self.game_dir / 'Menus.ini').write_text(
-            '; written by the Armada II test bench: stock shell, embedded only\r\n'
-            '[Menus]\r\nMode=1\r\nDesignWidth=800\r\nDesignHeight=600\r\nIntegerScale=1\r\n'
-            'Smooth=0\r\nRaiseShellMode=0\r\nEmbed=1\r\nEscapeReturns=0\r\nUnderlay=0\r\n'
-            'Log=1\r\nTrace=0\r\nBackdrops=0\r\n')
+        # Built from the last tag that has menus/ and cached in $A2_DATA (bench/legacy.py):
+        # the layer left the repository in 15.2.0 and ./install no longer puts it in.
+        legacy.embed(self.game_dir)
         self.log.action('stock shell embedded: Menus.asi with Embed=1 and nothing else, so menus take clicks')
 
     # ------------------------------------------------------------------ display
@@ -914,7 +916,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             raise GameError('the game is already running in this session')
         g = self.game_dir
         for name in ('Menus.log', 'HUD.log', 'QOL.log', 'QOLRules.log', 'GridLayout.log',
-                     'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Scene.marks', 'Armada2_d3d9.log',
+                     'BinkProxy.log', 'Scene.log', 'Scene.marks', 'Armada2_d3d9.log',
                      'Render3D.log', 'Stems.log', 'UI.log', 'Online.log',
                      'Display8.log', 'Display8.inventory.tsv', 'Display8.mark'):
             for d in self.log_dirs:
@@ -934,7 +936,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             STEAM_COMPAT_CLIENT_INSTALL_PATH=str(config.HOME / '.local/share/.steam/steam'),
             STEAM_COMPAT_APP_ID='0', SteamAppId='0', SteamGameId='a2test',
             UMU_RUNTIME_UPDATE='0',
-            WINEDLLOVERRIDES=config.DLL_OVERRIDES,
+            WINEDLLOVERRIDES=self.dll_overrides(),
             WINEDEBUG=os.environ.get('A2TEST_WINEDEBUG', '-all,err+all'),
             WINE_FULLSCREEN_FSR='0',
             DXVK_LOG_PATH=str(logs), DXVK_LOG_LEVEL='info',
@@ -954,7 +956,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             sink = self.start_null_sink()
             if self.s.get('stems'):
                 self.start_stems()
-            env['WINEDLLOVERRIDES'] = config.DLL_OVERRIDES + ';winealsa.drv=d;wineoss.drv=d'
+            env['WINEDLLOVERRIDES'] = self.dll_overrides() + ';winealsa.drv=d;wineoss.drv=d'
             route_wine_audio(self.prefix_dir / 'pfx' / 'user.reg', sink)
         env.update(vulkan_env(g, self.dir / 'logs'))
         # a marker the watchdog can match whatever pid namespace the game ends up in
@@ -1160,7 +1162,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         after launch.  Latching onto one of those made the game "stop running" 2-8 s in,
         every time, while it went on running unwatched (and outlived its teardown).
         Wine names the process `Armada2.exe` under umu but `Main` elsewhere
-        (menus/stop-game.sh), so the name is not used either."""
+        (platform/stop-game.sh), so the name is not used either."""
         out = []
         pfx = str(self.prefix_dir).encode()
         for d in glob.glob('/proc/[0-9]*'):
@@ -1303,7 +1305,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
     def collect_logs(self):
         dst = self.dir / 'logs'
         g = self.game_dir
-        for name in ('Menus.log', 'HUD.log', 'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Scene.marks',
+        for name in ('Menus.log', 'HUD.log', 'BinkProxy.log', 'Scene.log', 'Scene.marks', 'RetireCheck.log',
                      'RefitPlayer.ini', 'Scene.ini', 'ARMADA.PRF',
                      'Stems.log', 'Stems.ini',
                      'Menus.ini', 'HUD.ini', 'QOL.log', 'QOL.ini', 'QOLRules.log', 'QOLRules.ini', 'GridLayout.log',

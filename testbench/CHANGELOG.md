@@ -5,6 +5,26 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 4.0.0 — 2026-11-03
+
+MAJOR: `--no-grid` is no longer passed, `ui/bench-legacy.sh` and the Direct3D 9 probes are no longer used, and the `-forward` scenarios are gone.
+
+### Added
+- `bench/legacy.py`: builds HUD, GridLayout and Menus once from the last tag that has them (`v13.51.3`, `git archive` into a scratch directory) and caches them in `$A2_DATA/bench/legacy/<tag>/`, with the tag's `hud/` scripts and the vendored chain DLLs. `ensure`, `install`, `embed` and `seed` on the command line.
+- `retire-old-install` (and its `Setup:` script `retire-old-install.py`): an old install (the three plugins and inis, the hud scripts' edits and backups, the d3d8to9 and DXVK files, a marked `dxvk.conf`, the twelve per-part plugins, `MenuScale`, the loading screen's backups) over a refit clone, then `./install`; every file must hash as before, the chain class left or removed. `Assets: none`.
+
+### Changed
+- `Stock shell: embed` copies Menus.asi from the cache (was `menus/build.sh` of the checkout, which is gone). `display/bench-abi.sh old-display` takes Menus.asi from it too.
+- `DLL_OVERRIDES` is `winmm=n,b;d3d8=n,b`: a clone that carries its own `d3d9.dll` (the old Display8 of `display-abi-mismatch`) gets `d3d9=n,b` added at launch.
+- Scenarios and notes drop `--no-grid` (twelve `ui-*` scenarios, `operating/`); `render3d-pivot` and `ui-leftovers-2` run on the stub (`bench-mode.sh stub`, were `forward`). `menus/run-wine.sh` and `menus/stop-game.sh` are `platform/` in the README, `admirals-log` and `session.py`. `GAMEPLAY.md` and `operating/ui-switchon.md` say the grid and the legacy plugins are retired.
+
+### Removed
+- `d3d9probe/` and `d3dtrace/` (and their log names in `session.py`).
+- The scenarios that tested the retired plugins themselves, which the `ui-hud-*` and `ui-menus-*` scenarios cover on the UI: `escape-menu`, `game-setup-labels`, `main-menu`, `hud`, `hud-mode-switch`, `grid-layout`. `stock-control` stays (a stock case, `Stock shell: embed` from the cache).
+- `display-passthrough-forward`, `display-passthrough-all-forward`, `display-passthrough-nebula-forward` (the `p10-fwd-*` baselines they recorded are frozen), and `render3d-mode-switch` and `display-inventory-modes` (a display mode switched in the middle of a mission: the stub offers one mode, so nothing is left to switch).
+
+Installed, not yet seen in game
+
 ## 3.106.0 — 2026-11-03
 
 ### Added

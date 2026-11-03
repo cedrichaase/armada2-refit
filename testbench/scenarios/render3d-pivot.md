@@ -3,7 +3,7 @@
 Resolutions: 1280x720
 Mod: refit
 Launch: -nointro a2_borg01
-Setup: display/bench-mode.sh forward fog
+Setup: display/bench-mode.sh stub fog
 Timeout: 8 min
 
 `render3d/README.md`, "overlays" (the pivot marker). Run it on a checkout, with
