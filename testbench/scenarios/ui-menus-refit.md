@@ -52,10 +52,10 @@ Refit, so `Ships` is not switched on again here; the clone is discarded.)
 18. Expect "Now" is visible.
 19. Take a screenshot called "refit graphics".
 ## Graphics
-20. Hover over 270,277.
+20. Hover over 270,313.
 21. Wait 1 second.
 22. Expect "Applies at once." is visible.
-23. Click at 270,277.
+23. Click at 270,313.
 24. Wait 2 seconds.
 25. Expect "UI.log" contains "refit: [Render3D.Modules] sky 1 -> 0 (now)".
 26. Expect "Render3D.log" contains "settings: applied Modules.sky=0".
@@ -139,7 +139,7 @@ Refit, so `Ships` is not switched on again here; the clone is discarded.)
 99. Wait 2 seconds.
 100. Expect "2x" is visible.
 101. Take a screenshot called "refit after relaunch".
-102. Click at 270,277.
+102. Click at 270,313.
 103. Wait 2 seconds.
 104. Click at 538,176.
 105. Wait 1 second.
@@ -190,7 +190,7 @@ Refit, so `Ships` is not switched on again here; the clone is discarded.)
 149. Expect "UI.log" not contain "locked in a network game".
 150. Click "Graphics".
 151. Wait 1 second.
-152. Click at 270,241.
+152. Click at 270,277.
 153. Wait 2 seconds.
 154. Expect "UI.log" contains "refit: [Render3D.Modules] hulls 1 -> 0 (now)".
 155. Press Escape.
