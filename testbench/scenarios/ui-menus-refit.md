@@ -74,15 +74,15 @@ Refit, so `Ships` is not switched on again here; the clone is discarded.)
 38. Click "Interface".
 39. Wait 1 second.
 40. Take a screenshot called "refit interface".
-41. Click at 938,356.
+41. Click at 938,284.
 42. Wait 1 second.
-43. Click at 871,545.
+43. Click at 871,473.
 44. Wait 2 seconds.
 45. Expect "UI.log" contains "refit: [UI.UI] Theme auto -> borg (now)".
 46. Take a screenshot called "refit borg".
-47. Click at 938,356.
+47. Click at 938,284.
 48. Wait 1 second.
-49. Click at 871,385.
+49. Click at 871,313.
 50. Wait 2 seconds.
 51. Expect "UI.log" contains "refit: [UI.UI] Theme borg -> auto (now)".
 52. Expect "RefitPlayer.ini" not contain "Theme=".
