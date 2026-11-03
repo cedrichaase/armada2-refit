@@ -14,10 +14,10 @@
 //! the flush as an anti-aliased line of a fixed pixel width (`shaders/overlays.hlsl`,
 //! `vs_line`/`ps_line`), depth-tested, not written; otherwise the engine's is called.
 use gpu::{attr, AttrFormat, Blend, Block, Compare, Depth, Format, PipelineDesc, Semantic, Topology, VertexAttr};
-use crate::engine::{hook, rd};
+use super::hooks;
+use crate::log;
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
-use crate::log;
 use crate::rt::settings;
 use super::settings_table::OVERLAYS_HEIGHTPOSTS;
 use crate::math::V3;
@@ -25,12 +25,6 @@ use crate::shaders::overlays::*;
 use crate::shaders::overlays_spv::*;
 use crate::shaders::overlays_dxil::*;
 use alloc::vec::Vec;
-
-const FN_HEIGHT_POST: usize = 0x593840;
-const SITES: [usize; 5] = [0x473bbc, 0x522080, 0x5222fd, 0x524c02, 0x524c2d];
-const TERRAIN_Y: usize = 0x77215c;
-const GREEN: usize = 0x7a8f68;
-const RED: usize = 0x7a8f78;
 
 /// The posts noted in the view being drawn: (top, the plane's height).
 static mut POSTS: Vec<(V3, f32)> = Vec::new();
@@ -41,14 +35,18 @@ fn posts() -> &'static mut Vec<(V3, f32)> {
     unsafe { &mut POSTS }
 }
 
-unsafe extern "C" fn hook_post(pos: *const V3, cam: usize) {
-    unsafe {
-        if IN_VIEW && !pos.is_null() && posts().len() < 4096 {
-            posts().push((core::ptr::read_unaligned(pos), rd::<f32>(TERRAIN_Y)));
-            return;
-        }
-        let f: unsafe extern "C" fn(*const V3, usize) = core::mem::transmute(FN_HEIGHT_POST);
-        f(pos, cam);
+/// Whether a view of ours is collecting posts (the detour in `hooks.rs` asks).
+pub fn in_view() -> bool {
+    unsafe { IN_VIEW }
+}
+
+/// A post noted by the detour; false when the view's list is full (the engine draws it).
+pub fn note_raw(top: V3) -> bool {
+    if posts().len() < 4096 {
+        posts().push((top, hooks::terrain_y()));
+        true
+    } else {
+        false
     }
 }
 
@@ -60,7 +58,7 @@ pub fn note(pos: V3) -> bool {
             return false;
         }
         if posts().len() < 4096 {
-            posts().push((pos, rd::<f32>(TERRAIN_Y)));
+            posts().push((pos, hooks::terrain_y()));
         }
     }
     true
@@ -108,23 +106,16 @@ impl Posts {
         }
     }
 
-    /// Re-points the engine's calls (once).
-    pub fn install(&mut self) {
-        // Installed whether or not `HeightPosts` is on, so the key can be switched live:
-        // while it is off the hook hands every call to the engine's (`IN_VIEW`).
+    /// Installs the engine's five calls (once, at the module's first enable): ours while
+    /// the module is on, the engine's own when it is off or `HeightPosts` is. Installed
+    /// whether or not `HeightPosts` is on, so the key can be switched live (`IN_VIEW`).
+    pub fn install(&mut self, h: &mut crate::core_hooks::Hooks) {
         if self.hooked {
             return;
         }
         self.hooked = true;
-        let mut n = 0;
-        for s in SITES {
-            if hook::patch_call(s, FN_HEIGHT_POST, hook_post as *const () as usize) {
-                n += 1;
-            } else {
-                log!("overlays: the height post's call at {:#x} is not stock's: the engine draws it", s);
-            }
-        }
-        log!("overlays: height posts: {} of {} calls ours", n, SITES.len());
+        let n = hooks::install_posts(h);
+        crate::log!("overlays: height posts: {} of 5 calls ours", n);
     }
 
     pub fn reset(&mut self) {
@@ -154,8 +145,7 @@ impl Posts {
         if ps.is_empty() {
             return;
         }
-        let green: [f32; 3] = unsafe { rd(GREEN) };
-        let red: [f32; 3] = unsafe { rd(RED) };
+        let (green, red) = hooks::post_colours();
         let mut vs: Vec<Vtx> = Vec::with_capacity(ps.len() * 6);
         for &(top, y) in &ps {
             let c = if y < top.y { green } else { red };

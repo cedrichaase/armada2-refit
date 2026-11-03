@@ -823,17 +823,16 @@ every module's `configure`, then every module's flag. A module switched off
 gets `off()` and lets go of its GPU objects at the next view; one switched on gets its
 `hooks()` the first time, then `on()`, and its `device()` at its next view if it missed
 this device. A module whose hooks are not yet gated by its flag (`NOT_YET_LIVE` in
-`mods/mod.rs`: world, effects, overlays) refuses a live change of
-its flag, logged `settings: Modules.<m> changes at the next launch (hooks not yet live)`,
-and its row stays `apply = "restart"`: effects (shields, repair, debris, sparks), the
-nebula hooks of world and the height posts of overlays install
-engine hooks that do not yet hand back to their predecessor. The live rows today are
-`Modules.hulls/sky/specials/particles/ordnance`, `World.Surfaces`, `Nebulae.Lit` and
-`Overlays.*`.
+`mods/mod.rs`, empty now that every module hands back) refuses a live change of
+its flag, logged `settings: Modules.<m> changes at the next launch (hooks not yet live)`.
+Every `Modules.*` row is live, as are `World.Planets/Rocks/Nebulae/Surfaces`, `Nebulae.Lit`
+and `Overlays.*`.
 Checked on the bench at RMSE 0: live `hulls=0`, `sky=0` and `World.Surfaces=0` against
-the baselines of the same keys at load (`testbench/scenarios/render3d-settings-live.md`).
-The other live rows (`specials`, `Nebulae.Lit`, `Overlays.*`) use the same mechanism and
-were not each flipped on the bench.
+the baselines of the same keys at load (`testbench/scenarios/render3d-settings-live.md`),
+and `Modules.world=0` and `Modules.overlays=0` against `-world0` and `-overlays0` on the
+showcase, each flipped back to the base (in the nebula scene the flip is not exact, rmse 20 off and
+1.2 back on: the engine's nebula light simulation did not run in the ticks before the pause)
+(`render3d-live-world.md`, `render3d-live-world-nebula.md`).
 
 **The rows are split per module.** `render3d/settings.toml` holds the core's: `MSAA`,
 `HDR` and the eight `Modules.*`. A module with rows has a fragment beside its code,
@@ -1667,6 +1666,35 @@ drawing nothing in the tactical view.
 | `PivotGlow` | 0.35 | the halo's opacity (0: none) |
 | `PivotColour`, `PivotBrightness` | 0.64 0.36 0.35, 1.6 | its colour (stock's rose) and the factor on it |
 
+#### overlays: Hooks
+
+`src/mods/overlays/hooks.rs` holds every address and field offset the module reads of
+the engine, behind named accessors, and its one hook. The step bodies (the terrain, the
+selection bubbles), the two features (`Ghost`, `PlaceholderFeature`) and the pivot
+marker's feature are reached through the frame's dispatch and patch nothing: while the
+module is off they run as stock.
+
+| Hook | Site | Used for | Gate shut |
+|---|---|---|---|
+| `DrawHeightPost` | the five calls (the build ghost's, and the overview's `mNormalModeRender`, `mRenderWhere`, `mDrawPosts` and its one-point helper) | the height posts, noted for the view and drawn as anti-aliased lines | the call that was there (`Prev`): the engine's one-pixel line |
+
+It is installed at the first switch-on, whether or not `HeightPosts` is on, so the key
+can be switched live: the detour notes a post only while one of our views is running
+(`IN_VIEW`, which `HeightPosts=0` and a module that is off keep false). A site that is not
+stock's is logged and left to the engine.
+
+#### overlays: Content
+
+`content.rs` holds the selection bubble's model name. The module has no recipe.
+
+#### overlays: Settings
+
+`[Overlays]`, read by `configure` at load and at every settings change (`Fog`, `Grid`,
+`Selection`, `Ghosts`, `HeightPosts`, `Pivot`, each a live row, and the keys without a
+row: the fog's filter and thresholds, the posts' and the pivot's looks). `Modules.overlays`
+is live: off, the engine draws the fog, the grid, the bubbles, the ghosts, the posts
+and the pivot marker, and the hook above hands every call back.
+
 #### Hooks, content and settings
 
 **Hooks** (`ordnance/hooks.rs`, the only file of the module that names an address; installed
@@ -2233,8 +2261,9 @@ the user are kept. Each part stands down while a stale copy of the plugin that d
 is loaded: the planets beside `Lighting.asi`, the moons and asteroids beside
 `Lighting.asi` or `Surfaces.asi`, the gas beside `Nebulae.asi`, the lights beside
 `Lighting.asi`. The recipes live in this folder: `content/sky/` (built into the plugin),
-`surfaces/` and `nebulae/` (copied by `install.sh` into the game's `Surfaces\` and
-`Nebulae\`, where an edited copy is re-read while the game runs); see "Recipes" below. Settings in `[World]` (the parts: `Planets`, `Rocks`, `Nebulae`,
+`content/surfaces/` and `content/nebulae/` (copied by `install.sh` into the game's
+`Surfaces\` and `Nebulae\`, where an edited copy is re-read while the game runs, and
+built into the plugin too: "Content" below); see "Recipes" below. Settings in `[World]` (the parts: `Planets`, `Rocks`, `Nebulae`,
 `Surfaces`; the planet look under `Lighting.ini`'s names: `PlanetAmbient`, `PlanetDusk`,
 `PlanetWrap`, `PlanetFill`, `PlanetSun`, `PlanetHaze*`, `PlanetGlint*`, `CityLights`,
 `CityLightColour`, `PlanetHalo*`, `PlanetGhost`; the rocks' `RockAmbient`, `RockSpecular*`,
@@ -2568,3 +2597,47 @@ Motion: `Flow`, `FlowScale`, `FlowSpeed`, `Swirl`, `SwirlScale`, `SwirlPeriod`. 
 light (`KeyShare`), scattered forward (`Scatter`); dimming self-lit gas by a fraction
 left the shafts invisible except in a difference image, and they show looking towards
 the Key.
+
+#### world: Hooks
+
+`src/mods/world/hooks.rs` holds every address, call site, vtable slot and field offset
+of the module, behind named accessors, and its three detours. They install through
+`core_hooks` at the module's first switch-on (not at the first frame): at load for a
+module that is on, at the first live switch-on for one that was off. Each detour starts
+with the module's gate and hands the call to the `Prev` it replaced while the gate is
+shut, so a module switched off live puts the engine's code back in charge.
+
+| Hook | Site | Used for | Gate shut |
+|---|---|---|---|
+| `Nebula::Simulate_Nebula_Lights` | the call inside `Nebula::Simulate` | the nebulae's lights: the class's glow times `NebulaBrightness`, steady, in the recipe's hue, the falloff times `NebulaRange`, lit hulls only (`own_glow`) | the engine's own call (it registered a colour that came out black frame after frame) |
+| `NebulaInstance::FrustumTest` | slot 3 of the nebula instance's vtable | a nebula is on screen while its sphere times `NebulaCull` is, so a nebula beside a zoomed-in ship keeps its light | stock's test, the sphere unscaled |
+| `GameObjectSpirit::Render` | slot 3 of the ghost spirit's vtable | a fogged nebula whose class is drawn as gas draws no billboards | the engine's `Render` |
+
+The first two are ours unless `Lighting.asi` is loaded (it has the lights); the third
+unless `Nebulae.asi` draws the gas (`BesidePlugins=1`, bench only, installs them beside the
+plugins). The planets, moons and asteroids are not hooked: they are drawn in
+`GameObject::Render`'s place through the frame's object loop, so while the module is off
+the engine's `Render` runs. A planet's glow light is an ordinary point light registered
+in `lights()`.
+
+The module reads its parts again at every settings change (`configure`): the rows
+`World.Planets`, `Rocks`, `Nebulae` and `Surfaces`, `Nebulae.Lit`, the nebulae's keys, the
+planets' and rocks' looks, the light keys. A part is ours when its row is on and no old
+plugin has it; `off()` stops the ghost hiding and the planets' glows, and the next view
+lets go of the GPU objects.
+
+#### world: Content
+
+`content.rs` holds the built-in recipes (`include_str!` of `render3d/content/surfaces/` and
+`render3d/content/nebulae/`, by lower-cased name) and the moons' glow material. A recipe is
+read through `core_recipes`: the game directory's `Surfaces\<texture>.ini` or
+`Nebulae\<odf>.ini` first (`install.sh` copies the same files there, where an edited copy
+is read again while the game runs), else the one built in, so the look needs nothing
+installed.
+
+#### world: Settings
+
+`[World]` and `[Nebulae]`, as above, read by `configure` and, with `[World] Reload=1`,
+again every second for the keys without a row. The rows `Modules.world`,
+`World.Planets`, `World.Rocks`, `World.Nebulae`, `World.Surfaces` and `Nebulae.Lit` are live
+(`render3d-live-world.md`).

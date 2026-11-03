@@ -41,8 +41,6 @@ use alloc::vec::Vec;
 /// flag: a live change of their `[Modules]` row is refused (logged) and applies at the
 /// next launch. One line per module; each is taken out when its hooks hand back.
 const NOT_YET_LIVE: &[&str] = &[
-    "world",
-    "overlays",
 ];
 
 /// Every module built in, one line each (the crates' features choose them later).

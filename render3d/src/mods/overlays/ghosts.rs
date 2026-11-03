@@ -25,7 +25,7 @@
 //! which draws it as stock fades it, with its height post (render3d/README.md, "The
 //! build ghost").
 use gpu::{AlphaTest, Blend as GBlend, Block, Compare, Cull, Depth, Format, Pipeline, PipelineDesc, Topology};
-use crate::engine::{self, field, field_f32, rd, storm3d};
+use super::hooks::{self, class_odf};
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::math::{v3, M34, V3};
@@ -42,15 +42,6 @@ use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-const GHOST_NODES: usize = 0x736c94;
-const FN_TEAM_GET: usize = 0x496340; // Team::GetTeam(int), cdecl: Team&
-const FN_CLASS_ODF: usize = 0x4ce370; // GameObjectClass::GetOdfName, thiscall
-const FN_DISTANCE_CULL: usize = 0x4d5bb0; // GameObjectInstance::DistanceCull(eye, pos), thiscall
-const VT_DATABASE: usize = 0x6bc56c;
-const SPIRIT_RENDER: usize = 0xc; // Spirit vtable: Render(ST3D_Camera*)
-const S3D_MATERIAL: usize = 0xa8; // Storm3D: the lighting material in place of every mesh's
-const S3D_ALPHA: usize = 0x4;
-const S3D_TEAM: usize = 0x34;
 /// What stock's ghost pass leaves at `Storm3D+0x4` (0.5): not an opacity on an opaque
 /// mesh, but on an `additive` one the scale of what it adds. Measured on the bench
 /// (`SCENE=fog-blackhole`): stock's fogged black hole adds 0.49 of what the seen one does.
@@ -74,20 +65,6 @@ pub struct Ghosts {
     /// The classes whose first ghost has been logged.
     said: Vec<String>,
     said_build: u32,
-}
-
-fn class_odf(class: usize) -> &'static str {
-    if class == 0 {
-        return "";
-    }
-    unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(FN_CLASS_ODF);
-        let s = crate::rt::cstr_at(f(class), 260);
-        match s.len().checked_sub(4) {
-            Some(n) if s.is_char_boundary(n) && s[n..].eq_ignore_ascii_case(".odf") => &s[..n],
-            _ => s,
-        }
-    }
 }
 
 fn sane_scale(s: V3) -> V3 {
@@ -121,48 +98,27 @@ impl Ghosts {
 
     /// `Ghost::Render`: every spirit in the list. Always true (the feature is ours).
     pub fn ghosts(&mut self, g: usize, v: &View) -> bool {
-        if super::view_record() == 2 || super::editor() {
+        if hooks::view_record() == 2 || hooks::editor() {
             return true;
         }
-        let mat = field(g, 0x24);
-        let (amb, diff) = if mat == 0 { (v3(0.1, 0.1, 0.1), v3(0.1, 0.1, 0.1)) } else { unsafe { (rd::<V3>(mat + 0x18), rd::<V3>(mat + 0x24)) } };
-        let factor = field_f32(g, 0x28);
-        let s3d = storm3d();
+        let (mat, amb, diff) = hooks::ghost_material(g);
+        let factor = hooks::ghost_factor(g);
         let mut fallback = false;
-        let head = unsafe { rd::<usize>(GHOST_NODES) };
-        if head == 0 {
-            return true;
-        }
-        let mut n = field(head, 0);
-        let mut guard = 0;
-        while n != head && n != 0 && guard < 100_000 {
-            guard += 1;
-            let sp = field(n, 8);
-            n = field(n, 0);
-            if sp == 0 {
-                continue;
-            }
-            let team = unsafe { core::mem::transmute::<usize, unsafe extern "C" fn(i32) -> usize>(FN_TEAM_GET)(field(sp, 0xc) as i32) };
-            let tint = if team == 0 { V3::ZERO } else { unsafe { rd::<V3>(team + 8) } } * factor;
+        let found = hooks::each_spirit(|sp, team| {
+            let tint = team * factor;
             // A planet's: on the world module's sphere, as the planet itself.
             if crate::core_services::ghost().is_some_and(|g| g.planet_ghost(sp, v)) || self.ghost(sp, v, tint, amb, diff) {
-                continue;
+                return;
             }
             // Not a plain SOD: the spirit's own Render, under stock's state.
-            unsafe {
-                core::ptr::write_unaligned((s3d + S3D_MATERIAL) as *mut usize, mat);
-                core::ptr::write_unaligned((s3d + S3D_ALPHA) as *mut f32, GHOST_ADDITIVE);
-                core::ptr::write_unaligned((s3d + S3D_TEAM) as *mut V3, tint);
-                let r: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(engine::vtable(sp), SPIRIT_RENDER));
-                r(sp, v.cam);
-            }
+            hooks::render_spirit(sp, v.cam, mat, GHOST_ADDITIVE, tint);
             fallback = true;
+        });
+        if !found {
+            return true;
         }
         if fallback {
-            unsafe {
-                core::ptr::write_unaligned((s3d + S3D_ALPHA) as *mut f32, 1.0);
-                core::ptr::write_unaligned((s3d + S3D_MATERIAL) as *mut usize, 0);
-            }
+            hooks::end_spirits();
         }
         self.draw_queue(v);
         true
@@ -170,27 +126,19 @@ impl Ghosts {
 
     /// One spirit drawn here; false if it is not a plain SOD (the caller falls back).
     fn ghost(&mut self, sp: usize, v: &View, tint: V3, amb: V3, diff: V3) -> bool {
-        let inst = field(sp, 0x10);
-        let db = field(inst, 0x80);
-        if inst == 0 || db == 0 || engine::vtable(db) != VT_DATABASE {
-            return false;
-        }
-        let name = class_odf(field(sp, 4));
+        let Some((inst, class)) = hooks::spirit_instance(sp) else { return false };
+        let name = class_odf(class);
         if name.is_empty() {
             return false;
         }
         let Some(model) = scene::model(&crate::assets::sod_of(name)) else { return false };
-        let pos: V3 = unsafe { rd(inst + 0x68) };
+        let pos = hooks::instance_origin(inst);
         // GameObjectSpirit::Render's cull (it writes only the spirit's own instance).
-        let culled = unsafe {
-            let f: unsafe extern "thiscall" fn(usize, *const V3, *const V3) -> u8 = core::mem::transmute(FN_DISTANCE_CULL);
-            f(inst, &v.eye, &pos) != 0
-        };
-        if culled {
+        if hooks::distance_culled(inst, &v.eye, &pos) {
             return true;
         }
-        let s = sane_scale(unsafe { rd::<V3>(inst + 0x28) }) * self.scale_sod(name);
-        let mut world: M34 = unsafe { rd(inst + 0x44) };
+        let s = sane_scale(hooks::instance_scale(inst)) * self.scale_sod(name);
+        let mut world = hooks::instance_world(inst);
         world.r[0] = world.r[0] * s.x;
         world.r[1] = world.r[1] * s.y;
         world.r[2] = world.r[2] * s.z;
@@ -219,15 +167,10 @@ impl Ghosts {
         if !v.main {
             return true;
         }
-        let class = field(f, 0x34);
+        let (class, place, colour, blocked) = hooks::placeholder(f);
         if class == 0 {
             return true;
         }
-        let place: M34 = unsafe { rd(f + 0x38) };
-        let colour: V3 = unsafe { rd(f + 0x68) };
-        // `+0x74`: the placement is clear; while it is not, stock lights the ghost with
-        // the dark red ambient at 0x736d40 in place of the scene's.
-        let blocked = engine::field_u8(f, 0x74) == 0;
         if self.said_build < 2 {
             self.said_build += 1;
             log!("overlays: build ghost of class {:#x} ('{}'), blocked {}", class, class_odf(class), blocked);

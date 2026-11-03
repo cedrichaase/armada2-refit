@@ -24,8 +24,8 @@ OLD="MSAA Lighting Sky Nebulae Surfaces Explosions Shields Repair Venting Specia
 
 remove_recipes() {
     local f
-    for f in "$here"/surfaces/*.ini; do rm -f "$GAME/Surfaces/$(basename "$f")"; done
-    for f in "$here"/nebulae/*.ini; do rm -f "$GAME/Nebulae/$(basename "$f")"; done
+    for f in "$here"/content/surfaces/*.ini; do rm -f "$GAME/Surfaces/$(basename "$f")"; done
+    for f in "$here"/content/nebulae/*.ini; do rm -f "$GAME/Nebulae/$(basename "$f")"; done
     # Sky.asi's copies of the sky recipes, which would shadow the built-in ones.
     for f in "$here"/content/sky/*.ini; do rm -f "$GAME/Sky/$(basename "$f")"; done
     rmdir "$GAME/Surfaces" "$GAME/Nebulae" "$GAME/Sky" 2>/dev/null || true
@@ -70,8 +70,8 @@ done
 
 remove_recipes
 mkdir -p "$GAME/Surfaces" "$GAME/Nebulae"
-cp "$here"/surfaces/*.ini "$GAME/Surfaces/"
-cp "$here"/nebulae/*.ini "$GAME/Nebulae/"
+cp "$here"/content/surfaces/*.ini "$GAME/Surfaces/"
+cp "$here"/content/nebulae/*.ini "$GAME/Nebulae/"
 
 rm -f "$GAME/Render3D.log"
 echo "installed into $GAME: Render3D.asi, Render3D.ini and the recipes${removed:+; took out the old$removed}"

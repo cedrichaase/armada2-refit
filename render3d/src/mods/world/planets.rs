@@ -8,7 +8,9 @@
 //! textures' layout, which `GroundMesh::mSetUVs` gives (README, "Planets"), and which
 //! our sphere carries in its vertices, so the stock gore textures land where they did.
 use super::surfaces::{self, Surfaces};
-use crate::engine::{self, field, field_f32, field_u8, obj, rd};
+use super::hooks;
+use crate::engine::obj;
+use crate::rt::Ini;
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::math::{self, M34, V3, v3};
@@ -24,13 +26,7 @@ use gpu::{
     MipFilter, Pipeline, PipelineDesc, Sampler, Semantic, Texture, Topology, VertexAttr,
 };
 
-pub const VT_PLANET: usize = 0x6b2b3c;
-const VT_PLANET_DB: usize = 0x6bab74;
-/// `PlanetInstance`: the instance a planet's fog-of-war spirit carries a copy of.
-const VT_PLANET_INSTANCE: usize = 0x6b2ce4;
-const FN_DISTANCE_CULL: usize = 0x4d5bb0; // GameObjectInstance::DistanceCull(eye, pos), thiscall
-/// cfgPOP_HEAVY: the population a colony's city map is full at (RTS_CFG.h).
-const POP_HEAVY: usize = 0x70213c;
+pub use super::hooks::VT_PLANET;
 
 const PI: f32 = core::f32::consts::PI;
 /// Our sphere: segments of longitude per quarter turn, and of the polar angle pole to
@@ -166,8 +162,7 @@ struct Look {
 }
 
 impl Look {
-    fn read() -> Look {
-        let ini = crate::config::ini();
+    fn read(ini: &Ini) -> Look {
         let s = "World";
         let hc = ini.floats(s, "PlanetHazeColour", [-1.0, 0.0, 0.0]);
         Look {
@@ -235,16 +230,21 @@ pub struct Planets {
 }
 
 impl Planets {
-    pub fn new() -> Planets {
+    pub fn new(ini: &Ini) -> Planets {
         Planets {
             spheres: None,
             pipes: Pipes::new(),
-            look: Look::read(),
+            look: Look::read(ini),
             ground_mean: BTreeMap::new(),
             cities: BTreeMap::new(),
             said: 0,
             cl: false,
         }
+    }
+
+    /// `[World]`'s planet keys, read again.
+    pub fn configure(&mut self, ini: &Ini) {
+        self.look = Look::read(ini);
     }
 
     /// The pipeline of pixel shader `ps` (`P_*`) blending as `mode` says: the sphere,
@@ -330,20 +330,17 @@ impl Planets {
         if cls == 0 {
             return [0.5; 3];
         }
-        let ground = unsafe { rt::cstr_at((cls + 0x4bc) as *const u8, 16) };
-        let atmo = unsafe { rt::cstr_at((cls + 0x4ac) as *const u8, 16) };
+        let (ground, atmo) = hooks::planet_textures(cls);
         self.ground_colour(ground, atmo)
     }
 
     /// The planet's city picture for hemisphere `h`, made again when its population moves.
     fn city(&mut self, o: usize, race: usize, h: usize, frame: u32) -> Option<Texture> {
-        let arr = field(race, 0x514 + h * 4);
-        let (w, hh) = (field(arr, 0) as u32, field(arr, 4) as u32);
-        let data = field(arr, 8);
+        let (arr, w, hh, data) = hooks::city_array(race, h);
         if arr == 0 || data == 0 || w == 0 || hh == 0 || w > 1024 || hh > 1024 {
             return None;
         }
-        let pop = field_f32(o, 0x2c8);
+        let pop = hooks::planet_population(o);
         let key = (o, h);
         if let Some(c) = self.cities.get(&key) {
             if c.w == w && c.h == hh && (c.pop == pop || frame.wrapping_sub(c.frame) < 30) {
@@ -354,13 +351,13 @@ impl Planets {
         // race's +0x470 and P the population over cfgPOP_HEAVY (0x70213c, set from
         // RTS_CFG.h at load: 25000 in the exe's data is not what the game runs with)
         // plus 1 / k.
-        let k = field_f32(race, 0x470);
-        let heavy = unsafe { rd::<i32>(POP_HEAVY) }.max(1) as f32;
+        let k = hooks::race_city_k(race);
+        let heavy = hooks::pop_heavy().max(1) as f32;
         let p = pop / heavy + if k != 0.0 { 1.0 / k } else { 0.0 };
         let mut px = Vec::with_capacity((w * hh * 4) as usize);
         for y in 0..hh {
             for x in 0..w {
-                let v: f32 = unsafe { rd(data + ((w * y + x) * 4) as usize) };
+                let v = hooks::city_value(data, (w * y + x) as usize);
                 let c = math::saturate((p - v) * k);
                 let a = (0.4 * c * 255.9) as u8;
                 px.extend_from_slice(&[255, 255, 255, a]);
@@ -381,8 +378,8 @@ impl Planets {
     /// Draws a planet in place of `GameObject::Render`; false leaves it to the engine.
     pub fn draw(&mut self, o: usize, v: &View, surf: &mut Surfaces) -> bool {
         let inst = obj::instance(o);
-        let db = field(inst, 0x80);
-        if db == 0 || engine::vtable(db) != VT_PLANET_DB {
+        let db = hooks::instance_db(inst);
+        if !hooks::is_planet_db(db) {
             return false;
         }
         if obj::expired(o) || !obj::can_user_see(o) {
@@ -390,12 +387,12 @@ impl Planets {
         }
         // PlanetInstance::RenderInternal draws only while the planet's flags (+0x14)
         // have bit 2 and its byte +0x113 is clear.
-        if obj::flags(o) & 4 == 0 || field_u8(o, 0x113) != 0 {
+        if hooks::planet_hidden(o) {
             return true;
         }
-        let race = field(o, 0x2c4);
-        let tint = if race != 0 { Self::race_tint(obj::class(o), race, field_f32(o, 0x2c8)) } else { [1.0; 3] };
-        let people = if race != 0 && field_u8(race, 0x452) != 0 { Some((o, race)) } else { None };
+        let race = hooks::planet_race(o);
+        let tint = if race != 0 { Self::race_tint(obj::class(o), race, hooks::planet_population(o)) } else { [1.0; 3] };
+        let people = if race != 0 && hooks::race_has_people(race) { Some((o, race)) } else { None };
         self.draw_instance(v, surf, obj::class(o), inst, db, obj::transform(o), tint, people, 1.0)
     }
 
@@ -405,25 +402,13 @@ impl Planets {
     /// bright as the planet seen), without the race's tint or cities, which live on the
     /// object. False if it is not a planet's (the caller leaves it to the engine).
     pub fn draw_ghost(&mut self, sp: usize, v: &View, surf: &mut Surfaces) -> bool {
-        let inst = field(sp, 0x10);
-        if inst == 0 || engine::vtable(inst) != VT_PLANET_INSTANCE {
-            return false;
-        }
-        let db = field(inst, 0x80);
-        let cls = field(sp, 4);
-        if db == 0 || cls == 0 || engine::vtable(db) != VT_PLANET_DB {
-            return false;
-        }
+        let Some((inst, cls, db)) = hooks::planet_spirit(sp) else { return false };
         // GameObjectSpirit::Render's cull (it writes only the spirit's own instance).
-        let pos: V3 = unsafe { rd(inst + 0x68) };
-        let culled = unsafe {
-            let f: unsafe extern "thiscall" fn(usize, *const V3, *const V3) -> u8 = core::mem::transmute(FN_DISTANCE_CULL);
-            f(inst, &v.eye, &pos) != 0
-        };
-        if culled {
+        let pos = hooks::instance_origin(inst);
+        if hooks::distance_culled(inst, &v.eye, &pos) {
             return true;
         }
-        let world: M34 = unsafe { rd(inst + 0x44) };
+        let world = hooks::instance_world(inst);
         let exposure = self.look.ghost;
         self.note(7, "a fog-of-war ghost");
         self.draw_instance(v, surf, cls, inst, db, world, [1.0; 3], None, exposure)
@@ -433,14 +418,10 @@ impl Planets {
     /// the population nears the class's maximum.
     fn race_tint(cls: usize, race: usize, pop: f32) -> [f32; 3] {
         let mut tint = [1.0f32; 3];
-        let lvl = unsafe { rd::<i32>(cls + 0x490) };
-        let maxpop = match lvl {
-            1..=4 => (unsafe { rd::<i32>(0x702130 + (lvl as usize - 1) * 4) }) as f32,
-            _ => 0.0,
-        };
+        let maxpop = hooks::class_max_population(cls);
         if maxpop > 0.0 {
             let p = pop / maxpop;
-            let rt_: [f32; 3] = unsafe { rd(race + 0x464) };
+            let rt_ = hooks::race_colour(race);
             for i in 0..3 {
                 tint[i] = (1.0 - p) + p * rt_[i];
             }
@@ -455,30 +436,26 @@ impl Planets {
             self.note(0, "the sphere could not be made: the engine draws planets");
             return false;
         }
-        let ground = unsafe { rt::cstr_at((cls + 0x4bc) as *const u8, 16) };
-        let atmo = unsafe { rt::cstr_at((cls + 0x4ac) as *const u8, 16) };
-        let (h0, h1, shell) = (field(db, 0xa8), field(db, 0xac), field(db, 0xb0));
-        let rg = if h0 != 0 { field_f32(h0, 0x150) } else { 0.0 };
-        let rs = if shell != 0 { field_f32(shell, 0x150) } else { 0.0 };
+        let (ground, atmo) = hooks::planet_textures(cls);
+        let parts = hooks::planet_parts(cls, inst, db);
 
         // The atmosphere turns about the planet's axis (SetAtmosphereParameters: a yaw of
         // minus the instance's +0xb4 times the database's +0xa4), and its turbulence runs
         // on the instance's own clock (+0xb8).
-        let yaw = -field_f32(inst, 0xb4) * field_f32(db, 0xa4);
+        let yaw = parts.yaw;
         let (sy, cy) = (math::sinf(yaw), math::cosf(yaw));
         let yawm = M34 { r: [v3(cy, 0.0, -sy), v3(0.0, 1.0, 0.0), v3(sy, 0.0, cy)], p: V3::ZERO };
         let shell_world = yawm.then(&world);
-        let turb_t = field_f32(inst, 0xb8);
-        let turb = field_f32(cls, 0x4cc) > 0.0;
+        let (turb_t, turb) = (parts.turb_t, parts.turb);
 
         let b = Body {
             ground,
             atmo,
             world,
             shell_world,
-            ground_r: if h0 != 0 { rg } else { 0.0 },
-            ground_r2: if h1 != 0 { field_f32(h1, 0x150) } else { 0.0 },
-            shell_r: if shell != 0 { rs } else { 0.0 },
+            ground_r: parts.ground_r,
+            ground_r2: parts.ground_r2,
+            shell_r: parts.shell_r,
             turb,
             turb_t,
             tint,

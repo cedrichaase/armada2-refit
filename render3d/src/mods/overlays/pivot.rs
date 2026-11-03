@@ -14,7 +14,7 @@
 //! camera turns about it. Taken only while the feature's `Render` is stock's (the slot
 //! and its bytes), else the engine's draws it.
 use super::posts::{self, Vtx};
-use crate::engine::{self, field, rd};
+use super::hooks;
 use crate::frame::steps::View;
 use crate::gfx::Pipes;
 use crate::log;
@@ -22,21 +22,6 @@ use crate::rt::settings;
 use super::settings_table::OVERLAYS_PIVOT;
 use crate::math::{v3, V3};
 use alloc::vec::Vec;
-
-/// `TacticalCamera`'s vtable and its `Render(ST3D_Camera*, bool)` (slot 8, `+0x20`).
-pub const VT_TACTICAL_CAMERA: usize = 0x6b46c0;
-const FN_RENDER: usize = 0x4e5260;
-/// `TacticalCamera::Render` as stock has it, to its `ret 8`.
-const RENDER_BYTES: [u8; 54] = [
-    0x55, 0x8b, 0xec, 0x8a, 0x45, 0x0c, 0x84, 0xc0, 0x74, 0x28, 0x8b, 0x81, 0xe0, 0x00, 0x00, 0x00, 0x85, 0xc0,
-    0x74, 0x1e, 0x8a, 0x91, 0xe4, 0x00, 0x00, 0x00, 0x84, 0xd2, 0x74, 0x14, 0x83, 0x3d, 0x10, 0xb6, 0x76, 0x00,
-    0x01, 0x75, 0x0b, 0x8b, 0x4d, 0x08, 0x8b, 0x10, 0x51, 0x8b, 0xc8, 0xff, 0x52, 0x18, 0x5d, 0xc2, 0x08, 0x00,
-];
-/// `ST3D_Instance`'s vtable: the marker must be a plain instance.
-const VT_INSTANCE: usize = 0x6aff14;
-const CAM_MARKER: usize = 0xe0;
-const CAM_FREE: usize = 0xe4;
-const INST_ORIGIN: usize = 0x68;
 
 pub struct Pivot {
     pub on: bool,
@@ -75,8 +60,7 @@ impl Pivot {
     /// Whether `TacticalCamera::Render` is stock's, checked once.
     fn is_stock(&mut self) -> bool {
         *self.stock.get_or_insert_with(|| {
-            let ok = field(VT_TACTICAL_CAMERA, 0x20) == FN_RENDER
-                && unsafe { core::slice::from_raw_parts(FN_RENDER as *const u8, RENDER_BYTES.len()) } == RENDER_BYTES;
+            let ok = hooks::tactical_render_is_stock();
             if ok {
                 log!("overlays: pivot marker: ours");
             } else {
@@ -91,15 +75,15 @@ impl Pivot {
         if !self.on || !self.is_stock() {
             return false;
         }
-        let inst = field(f, CAM_MARKER);
-        if !v.main || inst == 0 || engine::field_u8(f, CAM_FREE) == 0 || super::view_record() != 1 {
+        let inst = hooks::camera_marker(f);
+        if !v.main || inst == 0 || !hooks::camera_free(f) || hooks::view_record() != 1 {
             // Stock draws nothing either.
             return true;
         }
-        if engine::vtable(inst) != VT_INSTANCE {
+        if !hooks::is_plain_instance(inst) {
             return false;
         }
-        let o: V3 = unsafe { rd(inst + INST_ORIGIN) };
+        let o = hooks::instance_origin(inst);
         if !self.said {
             self.said = true;
             log!("overlays: pivot marker drawn at {:.0},{:.0},{:.0}", o.x, o.y, o.z);

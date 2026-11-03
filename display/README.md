@@ -521,7 +521,7 @@ and move through the passthrough exactly as on the forward chain and in stock, b
 - with the refit's textures the same motion changes 1.01 per 2 ticks, 39% more: the
   upscaled `Mnebula5` (`textures/targets/Mnebula5`, `blend=35`) carries finer, sharper
   detail than stock's, and that detail is what is seen to swim. With render3d on, the
-  cerulean class is its marched volume (`render3d/nebulae/mnebula10.ini`), not these
+  cerulean class is its marched volume (`render3d/content/nebulae/mnebula10.ini`), not these
   puffs.
 
 No unsupported state is used by those draws (no texture transform, no generated

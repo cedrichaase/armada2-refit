@@ -10,6 +10,8 @@
 //! (100-200 ms a recipe). Cloud drift runs on the sim clock.
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
+use super::content;
+use super::recipes::{self, Text};
 use crate::rt::{self, settings, Ini};
 use super::settings_table::WORLD_SURFACES;
 use crate::shaders::world_surface::*;
@@ -51,7 +53,7 @@ struct Recipe {
 }
 
 struct Entry {
-    path: String,
+    name: String,
     /// The recipe file's bytes when it was read, to notice an edit.
     bytes: Option<Vec<u8>>,
     recipe: Option<Recipe>,
@@ -74,15 +76,14 @@ pub struct Surfaces {
 }
 
 impl Surfaces {
-    pub fn new() -> Surfaces {
-        let ini = crate::config::ini();
+    pub fn new(ini: &Ini) -> Surfaces {
         Surfaces {
             entries: BTreeMap::new(),
             pipes: Pipes::new(),
             face: ini.int("World", "SurfaceFace", 1024).clamp(64, 4096) as u32,
             cloud_face: ini.int("World", "CloudFace", 512).clamp(32, 2048) as u32,
             reload: ini.int("World", "Reload", 1) != 0,
-            enable: settings::on(&ini, WORLD_SURFACES),
+            enable: settings::on(ini, WORLD_SURFACES),
         }
     }
 
@@ -145,23 +146,22 @@ impl Surfaces {
 fn entry<'a>(entries: &'a mut BTreeMap<String, Entry>, reload: bool, name: &str) -> &'a mut Entry {
     let now = rt::now();
     let e = entries.entry(rt::lower(name)).or_insert_with(|| {
-        let mut path = rt::game_path("Surfaces\\");
-        path.push_str(name);
-        path.push_str(".ini");
-        let bytes = rt::read_file(&path);
-        let recipe = bytes.as_ref().map(|_| read_recipe(&path));
+        let found = recipes::find("surfaces", content::SURFACES, name);
+        let recipe = found.as_ref().map(|f| read_recipe(&f.text));
+        let bytes = found.map(|f| f.bytes);
         log!("world: surface {}: {}", name, if recipe.is_some() { "made from its recipe" } else { "no recipe, the stock texture" });
-        Entry { path, bytes, recipe, checked: now, baked: None, failed: false }
+        Entry { name: String::from(name), bytes, recipe, checked: now, baked: None, failed: false }
     });
     if reload && now - e.checked > 0.5 {
         e.checked = now;
-        let bytes = rt::read_file(&e.path);
+        let found = recipes::find("surfaces", content::SURFACES, &e.name);
+        let bytes = found.as_ref().map(|f| f.bytes.clone());
         if bytes != e.bytes {
-            e.recipe = bytes.as_ref().map(|_| read_recipe(&e.path));
+            e.recipe = found.as_ref().map(|f| read_recipe(&f.text));
             e.bytes = bytes;
             e.baked = None;
             e.failed = false;
-            log!("world: recipe {} read again", e.path);
+            log!("world: recipe {} read again", e.name);
         }
     }
     e
@@ -170,31 +170,31 @@ fn entry<'a>(entries: &'a mut BTreeMap<String, Entry>, reload: bool, name: &str)
 // ---- recipes ------------------------------------------------------------------------
 
 /// `n` numbers under `key`, or None unless all of them are there.
-fn vals(ini: &Ini, key: &str, n: usize) -> Option<Vec<f32>> {
+fn vals(ini: &Text, key: &str, n: usize) -> Option<Vec<f32>> {
     let s = ini.string("Surface", key)?;
     let v: Vec<f32> = s.split([',', ' ', '\t']).filter(|p| !p.is_empty()).filter_map(rt::parse_f32).collect();
     if v.len() >= n { Some(v[..n].to_vec()) } else { None }
 }
 
-fn one(ini: &Ini, key: &str, def: f32) -> f32 {
+fn one(ini: &Text, key: &str, def: f32) -> f32 {
     vals(ini, key, 1).map_or(def, |v| v[0])
 }
 
-fn four(ini: &Ini, key: &str, def: [f32; 4]) -> ([f32; 4], bool) {
+fn four(ini: &Text, key: &str, def: [f32; 4]) -> ([f32; 4], bool) {
     match vals(ini, key, 4) {
         Some(v) => ([v[0], v[1], v[2], v[3]], true),
         None => (def, false),
     }
 }
 
-fn rgb(ini: &Ini, key: &str, def: [f32; 3]) -> [f32; 4] {
+fn rgb(ini: &Text, key: &str, def: [f32; 3]) -> [f32; 4] {
     let v = vals(ini, key, 3).map_or(def, |v| [v[0], v[1], v[2]]);
     [v[0] / 255.0, v[1] / 255.0, v[2] / 255.0, 0.0]
 }
 
 /// Ramp1..Ramp6 (or Alt1..): "height r g b". A stop left out repeats the one before it,
 /// a little higher. Returns how many were given.
-fn ramp(ini: &Ini, prefix: &str, r: &mut [[f32; 4]]) -> usize {
+fn ramp(ini: &Text, prefix: &str, r: &mut [[f32; 4]]) -> usize {
     let mut n = 0;
     for i in 0..6 {
         let key = super::name(prefix, "", Some(i + 1));
@@ -220,8 +220,7 @@ fn yaw_pitch(yaw: f32, pitch: f32) -> [f32; 3] {
 }
 
 /// As Surfaces.asi read a recipe: the keys of render3d/README.md, "Recipes".
-fn read_recipe(path: &str) -> Recipe {
-    let f = Ini::open(path);
+fn read_recipe(f: &Text) -> Recipe {
     let mut k = [[0.0f32; 4]; NCONST];
     let kind = f.string("Surface", "Kind").unwrap_or_default();
     let seed = one(&f, "Seed", 1.0).abs();

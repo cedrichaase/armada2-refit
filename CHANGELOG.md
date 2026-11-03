@@ -13,6 +13,21 @@ Layers: render3d 0.41.0, testbench 3.93.0.
 - render3d: effects and sky on the module layers; `Modules.effects` is live; sky
   recipes moved to `render3d/content/sky/`. Installed, not yet seen in game.
 
+## 13.73.0 — 2026-11-03
+
+Layers: render3d 0.40.0, testbench 3.92.0.
+
+### Changed
+- render3d: world and overlays onto the module layers (`hooks.rs`, `content.rs`,
+  `configure`), their hooks behind the module gates, `Modules.world`, `Modules.overlays`
+  and `World.Planets/Rocks/Nebulae` live; the surfaces' and nebulae's recipes moved to
+  `render3d/content/` and are built in. No change to what is drawn. Installed, not yet
+  seen in game
+- `render3d/install.sh`, `publish/package.sh`: the recipes' new source paths.
+
+### Added
+- testbench: scenarios `render3d-live-world` and `render3d-live-world-nebula`.
+
 ## 13.72.0 — 2026-11-03
 
 Layers: render3d 0.39.0, testbench 3.91.0.

@@ -32,6 +32,35 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
 Installed, not yet seen in game.
 
+## 0.40.0 — 2026-11-03
+
+### Changed
+- world and overlays onto the module layers (phase 7, W-B): `world/hooks.rs` and
+  `overlays/hooks.rs` hold every engine address, call, slot and field read behind named
+  accessors; `lint-layers.sh --strict src/mods/world src/mods/overlays` is clean.
+  Their built-in names and recipes are in `content.rs`; `configure` reads `[World]`,
+  `[Nebulae]` and `[Overlays]` (no `config::ini()` call is left in either directory).
+- world's three hooks (the nebulae's lights, the nebula frustum test, the ghosts'
+  `Render`) and overlays' five `DrawHeightPost` calls install through `core_hooks` at the
+  module's first switch-on (not in `settle`), each behind the module's gate. The
+  nebulae's light hook, which replaces `Nebula::Simulate_Nebula_Lights` whole, now calls
+  the previous target while the gate is shut or `NebulaLights=0`; the frustum scale is 1
+  when it is shut.
+- `Modules.world`, `Modules.overlays`, `World.Planets`, `World.Rocks` and `World.Nebulae`
+  are live rows (`apply = "live"`); `NOT_YET_LIVE` loses world and overlays. `off()` stops
+  the ghosts' hiding, the planets' glows and the height posts' collecting.
+- The surfaces' and nebulae's recipes moved to `render3d/content/surfaces/` and
+  `render3d/content/nebulae/` (the game-side `Surfaces\` and `Nebulae\` are the same) and
+  are built into the plugin too, read through `core_recipes`: the game directory's copy
+  wins, else the built-in one. `render3d/install.sh` and `publish/package.sh` read the
+  new paths. New dependency: `a2ini` (the recipes' parser).
+- No change to what is drawn: the base's frames at RMSE 0 (see the scenarios below).
+
+### Added
+- Scenarios `render3d-live-world` and `render3d-live-world-nebula` (testbench 3.92.0).
+
+Installed, not yet seen in game
+
 ## 0.39.0 — 2026-11-03
 
 ### Changed

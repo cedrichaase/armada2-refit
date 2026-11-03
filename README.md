@@ -208,7 +208,7 @@ d3d8to9 also needs the Visual C++ 2015–2022 (x86) and DirectX end-user runtime
 
 | Layer | Install | Why DXVK |
 |---|---|---|
-| 3D renderer | `render3d/build/Render3D.asi`, `render3d/Render3D.ini`, its recipes (`render3d/content/sky/` built in; `render3d/surfaces/` and `render3d/nebulae/` into `Surfaces` and `Nebulae` folders beside it) | Draws the 3D view through Direct3D 9 behind the game's d3d8, so it needs DXVK and crosire's d3d8to9 (below); under DXVK's own d3d8 the engine draws the view. Replaces the earlier `MSAA.asi`, `Lighting.asi`, `Sky.asi` and the other per-part plugins; `render3d/install.sh` takes any of them out ([`render3d/README.md`](render3d/README.md)) |
+| 3D renderer | `render3d/build/Render3D.asi`, `render3d/Render3D.ini`, its recipes (`render3d/content/sky/` built in; `render3d/content/surfaces/` and `render3d/content/nebulae/` into `Surfaces` and `Nebulae` folders beside it) | Draws the 3D view through Direct3D 9 behind the game's d3d8, so it needs DXVK and crosire's d3d8to9 (below); under DXVK's own d3d8 the engine draws the view. Replaces the earlier `MSAA.asi`, `Lighting.asi`, `Sky.asi` and the other per-part plugins; `render3d/install.sh` takes any of them out ([`render3d/README.md`](render3d/README.md)) |
 | Renderer | `renderer/renderer-config.sh --stage 3` writes `dxvk.conf` | Only DXVK reads the file. Anisotropic filtering, LOD bias and seamless cube maps. The release zip has it ready, in `game/` |
 
 Bloom is `Render3D.asi`'s. A vkBasalt or ReShade bloom set up by an earlier version

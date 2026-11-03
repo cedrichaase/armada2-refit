@@ -12,7 +12,7 @@
 //! a cubic filter and draws its edge as a smoothstep never narrower than about a pixel;
 //! the shroud is blended so that edge shows. The textures are never resized: there is
 //! nothing finer to put in them, and resizing them froze the game (`UImid`).
-use crate::engine::{field, field_f32, rd};
+use super::hooks;
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use gpu::{
@@ -25,8 +25,6 @@ use crate::shaders::overlays::*;
 use crate::shaders::overlays_spv::*;
 use crate::shaders::overlays_dxil::*;
 
-const SCAN_FOG: usize = 0x738a54;
-const SCAN_SHROUD: usize = 0x738a58;
 const FOG_OPACITY: f32 = 0.7;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -97,11 +95,11 @@ impl Fog {
 
     /// Draws one layer over the map. `tg` is `g_terrain_geometry`.
     pub fn draw(&mut self, v: &View, tg: usize, layer: Layer, s: &Settings) {
-        let (tex_off, grid_ptr, edge) = match layer {
-            Layer::Fog => (0x34, SCAN_FOG, s.fog),
-            Layer::Shroud => (0x38, SCAN_SHROUD, s.shroud),
+        let (shroud, edge) = match layer {
+            Layer::Fog => (false, s.fog),
+            Layer::Shroud => (true, s.shroud),
         };
-        let Some(tex) = gfx::engine_texture(field(tg, tex_off)) else {
+        let Some(tex) = gfx::engine_texture(hooks::layer_texture(tg, shroud)) else {
             if !self.said_fail {
                 self.said_fail = true;
                 log!("overlays: the fog's or shroud's texture has no Direct3D 9 texture behind it; that layer is not drawn");
@@ -110,8 +108,7 @@ impl Fog {
         };
         let d = tex.desc();
         let n = d.width;
-        let grid = unsafe { rd::<usize>(grid_ptr) };
-        let (gw, gh) = (field(grid, 0xc) as i32, field(grid, 0x10) as i32);
+        let (gw, gh) = hooks::scan_dims(shroud);
         if n < 4 || n != d.height || gw < 1 || gh < 1 || gw > n as i32 || gh > n as i32 {
             if !self.said_fail {
                 self.said_fail = true;
@@ -124,7 +121,7 @@ impl Fog {
         // The quad: the map's rectangle at the grid's height, its UVs as
         // `Terrain_Geometry::SetVertexPositions` makes them (the map centred in the
         // texture's unit square, square texels, v running against z).
-        let (mx0, mz0, mx1, mz1, y) = (field_f32(tg, 0x4), field_f32(tg, 0xc), field_f32(tg, 0x10), field_f32(tg, 0x18), field_f32(tg, 0x1c));
+        let (mx0, mz0, mx1, mz1, y) = hooks::terrain_rect(tg);
         let (w, h) = (mx1 - mx0, mz1 - mz0);
         let size = w.max(h);
         if !(size > 0.0) {

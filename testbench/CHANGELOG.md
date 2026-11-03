@@ -13,6 +13,15 @@ versions". Newest first. The why is in [`README.md`](README.md).
 
 Installed, not yet seen in game.
 
+## 3.92.0 — 2026-11-03
+
+### Added
+- Scenarios `render3d-live-world` (the showcase, `Modules.world` and `Modules.overlays`
+  switched off and on through the overlay, each frame at RMSE 0 against the same key at
+  load; `World.Planets/Rocks/Nebulae` and `Overlays.*` flipped and back) and
+  `render3d-live-world-nebula` (the nebula scene, the nebulae's light hook handing back
+  to the engine's). Installed, not yet seen in game
+
 ## 3.91.0 — 2026-11-03
 
 ### Added

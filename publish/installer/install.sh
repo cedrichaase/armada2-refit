@@ -121,7 +121,7 @@ old_bloom_out() {
     fi
 }
 
-# Render3D.asi's recipes (render3d/surfaces, render3d/nebulae): Surfaces/ and Nebulae/
+# Render3D.asi's recipes (render3d/content/surfaces, render3d/content/nebulae): Surfaces/ and Nebulae/
 # in the game directory, only the files of these names; anything else there is the
 # player's.
 RECIPES="Surfaces Nebulae"
