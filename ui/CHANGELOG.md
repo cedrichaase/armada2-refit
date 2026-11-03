@@ -9,6 +9,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
 ### Fixed
 - Refit screen: Reset on a tab also removes the tab's advanced rows' keys when "Show advanced" is off; the Movies tab entry is gone from the tab list; the settings hub no longer looks for `BinkProxy_Settings` (it logged the export missing at every start).
 - A press on a slider now gives it the keyboard focus (it never took it, so its Left/Right steps were unreachable by mouse). A key step on a stock shell slider moves it at least one value: `widgets::Ui::slider_step`, used by `shell_slider`. A range under 20 (Graphics Detail, 0..4) rounded the twentieth back to where it stood.
+- Overlay writes (`RefitPlayer.ini`) retry the rename 8 x 50 ms while a reader holds the file (`a2rt::move_file`, root 15.6.15).
 
 Installed, not yet seen in game.
 

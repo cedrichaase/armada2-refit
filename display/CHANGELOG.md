@@ -12,6 +12,7 @@ in [`README.md`](README.md).
 - Direct3D 12: a fence not reached after six 5 s waits (or with the device removed) marks the device lost; `begin` no longer resets the allocator and list or runs the deferred frees the GPU may still be using, `display8v1_dx12_frame` answers null, and `flush` stops there (`Dx12::wait`, `Dx12::ready`).
 - A second `Direct3DCreate8` no longer starts the stub again: after a late bail-out it gets the system's `IDirect3D8` (the stub's vtable stays the forward), and while the stub runs another `IDirect3D8` of the stub's (`bail::again`, `stub::another`).
 - After a bail-out (`Backend=none` included) the shell's 800x600 request is no longer raised to the desktop's for the UI's menu host, which refuses every dialog without a device: the stock shell fills the screen again (`stub/modes.rs`).
+- Overlay writes (`RefitPlayer.ini`) retry the rename 8 x 50 ms while a reader holds the file (`a2rt::move_file`, root 15.6.15).
 
 Installed, not yet seen in game.
 
