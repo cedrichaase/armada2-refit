@@ -37,7 +37,7 @@ if m == 'ordnance':
 text = text.replace('hulls0', m + '0')
 text = text.replace('"modules not built in: hulls"', f'"modules not built in: {m}"')
 text = text.replace('"module hulls:"', f'"module {m}:"')
-text = text.replace('"settings: 20 rows exported (9 the core\'s)"', f'"settings: {total} rows exported ({core_n} the core\'s)"')
+text = re.sub(r'"settings: \d+ rows exported \(\d+ the core\'s\)"', f'"settings: {total} rows exported ({core_n} the core\'s)"', text)
 text = re.sub(r'^# (.*)$', lambda t: f'# (without {m}) ' + t.group(1), text, count=1, flags=re.M)
 open(out, 'w').write(text)
 EOF

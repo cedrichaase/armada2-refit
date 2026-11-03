@@ -5,6 +5,11 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 4.0.4 — 2026-11-03
+
+### Fixed
+- `render3d-build-subset` and `render3d/subset-scenario.sh`: the exported settings row count is 22 (11 the core's), not 20 (9) (root 15.6.3). Installed, not yet seen in game.
+
 ## 4.0.3 — 2026-11-03
 
 ### Fixed

@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.3 — 2026-11-03
+
+Layers: testbench 4.0.4.
+
+### Fixed
+- `render3d-build-subset` expects `settings: 22 rows exported (11 the core's)` (the View.Distance rows made it 20 and 9); `render3d/subset-scenario.sh` rewrites that line with a pattern instead of the old literal. Installed, not yet seen in game.
+
 ## 15.6.2 — 2026-11-03
 
 Layers: testbench 4.0.3.
