@@ -87,10 +87,11 @@ jobs:
         run: CARGO="$(command -v cargo)" ui/build.sh
       - name: Build Display8 (d3d8.dll)
         run: CARGO="$(command -v cargo)" display/build.sh
-      - name: render3d's layer rules (report; cross and byname strict over every module)
+      - name: render3d's layer rules (report; every rule strict over the module crates, cross and byname over the core too)
         run: |
           render3d/lint-layers.sh
-          render3d/lint-layers.sh --strict src/mods --rules cross,byname
+          render3d/lint-layers.sh --strict mods
+          render3d/lint-layers.sh --strict core mods --rules cross,byname
       - name: render3d on the host (the light word, scene::media)
         run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path render3d/hosttest/Cargo.toml
       - name: a2fmt on the host
@@ -99,6 +100,38 @@ jobs:
         run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path crates/a2engine/Cargo.toml
       - name: a2ini on the host (the overlay's edit against tools/settings/fixtures)
         run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path crates/a2ini/Cargo.toml
+
+  # Render3D.asi with each module left out (render3d/build.sh --features, README.md,
+  # "Crates"): every module is a crate that depends on r3d-core alone, so each subset
+  # must build. The DLL that ships is the full build above; no bench here.
+  render3d-subsets:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        without: [world, particles, hulls, effects, ordnance, specials, sky, overlays]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install lld-link, llvm-dlltool and llvm-rc
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lld llvm
+          bin=$(ls -d /usr/lib/llvm-*/bin | sort -V | tail -1)
+          test -x "$bin/llvm-rc" && test -x "$bin/llvm-dlltool"
+          echo "$bin" >> "$GITHUB_PATH"
+      - name: Rust with the 32-bit Windows target
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup target add i686-pc-windows-msvc
+          lld="$(rustc --print sysroot)/lib/rustlib/x86_64-unknown-linux-gnu/bin/rust-lld"
+          mkdir -p "$RUNNER_TEMP/lld"
+          ln -s "$lld" "$RUNNER_TEMP/lld/lld-link"
+          echo "$RUNNER_TEMP/lld" >> "$GITHUB_PATH"
+      - name: Build Render3D.asi without ${{ matrix.without }}
+        run: |
+          all="world particles hulls effects ordnance specials sky overlays"
+          features=$(printf '%s\n' $all | grep -vx '${{ matrix.without }}' | paste -sd, -)
+          CARGO="$(command -v cargo)" render3d/build.sh --features "$features"
 
   # The settings descriptors (tools/settings/README.md): overlay.py, gen.py and lint.py
   # against their fixtures, every generated table and the row's definition in a2rt and

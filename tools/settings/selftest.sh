@@ -43,8 +43,8 @@ order="$(python3 - "$r3d" <<'PY'
 import os, re, sys
 r3d = sys.argv[1]
 mods = []
-for m in sorted(os.listdir(os.path.join(r3d, 'src', 'mods'))):
-    f = os.path.join(r3d, 'src', 'mods', m, 'mod.rs')
+for m in sorted(os.listdir(os.path.join(r3d, 'mods'))):
+    f = os.path.join(r3d, 'mods', m, 'src', 'lib.rs')
     if os.path.isfile(f):
         g = re.search(r'fn priority\(&self\) -> i32 \{\s*(-?\d+)\s*\}', open(f).read())
         if g:

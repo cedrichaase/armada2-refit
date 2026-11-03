@@ -1,9 +1,12 @@
 plugin = "Render3D"
 file = "Render3D.ini"
 shipped = "render3d/Render3D.ini"
-# The core's rows; each module's are in its fragment, src/mods/<m>/settings.toml
+# The core's rows; each module's are in its fragment, mods/<m>/settings.toml
 # (tools/settings/README.md, "Fragments"). [Lights] is split by key between owners.
 shared_sections = ["Lights"]
+# The rows are r3d-core's (core/src/settings_table.rs); the cdylib (src/lib.rs) exports
+# Render3D_Settings: the core's rows, then each built-in module's.
+rows_in = "core"
 
 [[row]]
 name = "msaa"

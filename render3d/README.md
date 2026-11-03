@@ -2,7 +2,7 @@
 
 `Render3D.asi` takes over the engine's 3D view: both calls of `Armada_RenderAllOurStuff`
 (0x598110) come to it, so the scene is drawn into render3d's own targets and put into
-the back buffer by render3d. It is written in `no_std` Rust (`src/`), and the plan, its
+the back buffer by render3d. It is written in `no_std` Rust, as crates ("Crates"), and the plan, its
 milestones and every change to it are in [`PLAN.md`](PLAN.md).
 
 What it does today:
@@ -26,7 +26,7 @@ What it does today:
   `Shields.asi`, `Repair.asi`, `Venting.asi`, `Specials.asi`, `Fog.asi` and
   `Planets.asi`. Their looks are ported here, with the findings the code needs written
   beside each hook below. A module stands down while a stale copy of its old plugin is
-  loaded (`SUPERSEDED` in `src/lib.rs`), and `install.sh` takes any such copy out.
+  loaded (`SUPERSEDED` in `core/src/lib.rs`), and `install.sh` takes any such copy out.
 - **New, beyond the plugins:** bloom by energy (explosions' cores, weapon cores, star
   cores), MSAA on render3d's own targets, and shadows from this frame's hulls (the
   plugin's were the last frame's).
@@ -53,11 +53,54 @@ uses `~/.cargo/bin/cargo` first, since a distribution's cargo has no such target
 crate links with `/nodefaultlib`, `kernel32` its only import (an import library made by
 `llvm-dlltool --kill-at` from `kernel32.def` in `build.rs`), and brings its own
 allocator, memory functions and stack probe (`crates/a2rt`, shared with the UI and
-Display8). Shaders are HLSL in
-`shaders/`, compiled by `tools/shaderc/hlsl-rs.sh` with `vkd3d-compiler` into `src/shaders/<name>.rs`
-and with `dxc` into SPIR-V in `src/shaders/<name>_spv.rs` and DXIL in
-`src/shaders/<name>_dxil.rs` ("One source, two compilers"), all committed with a stamp
+Display8). Shaders are HLSL in each
+crate's `shaders/` ("Crates"), compiled by `tools/shaderc/hlsl-rs.sh` with `vkd3d-compiler` into `<crate>/src/shaders/<name>.rs`
+and with `dxc` into SPIR-V in `<crate>/src/shaders/<name>_spv.rs` and DXIL in
+`<crate>/src/shaders/<name>_dxil.rs` ("One source, two compilers"), all committed with a stamp
 so a machine without the compilers builds as long as they are current.
+
+### Crates
+
+render3d is a Cargo workspace of ten crates, one DLL:
+
+| Crate | Where | What |
+|---|---|---|
+| `render3d` (cdylib) | `src/lib.rs` | `Render3D.asi`: `DllMain`, the allocator, the panic handler, the exports (`Render3D_Settings`, `Render3D_SettingsNote`, `Render3D_SettingsChanged`) and the list of modules built in, one line per Cargo feature |
+| `r3d-core` | `core/` | the renderer core: the frame, gfx, scene, assets, the shared engine glue (`core/src/engine/`), the menu scene, the module interface (`module`), its registry (`registry`), `hooks`, `services`, `recipes`, the particles' feed (`particles`), the configuration, clock and timing, the core's settings table; its shaders `sod`, `clusters`, `post` and `sprites` (stock's sprites, which ordnance's shots and effects' sparks queue) |
+| `r3d-<m>` | `mods/<m>/` | one module (world, particles, hulls, effects, ordnance, specials, sky, overlays): `src/lib.rs` (its `Module`), `src/hooks.rs` (its engine glue), `src/content.rs` (its built-in tables), its other sources, its `shaders/`, and its settings fragment (`settings.toml`, generated into `src/settings_table.rs`) |
+
+Recipes are data in `content/<kind>/`, `include_str!`'d by the crate that reads them.
+
+- **A module depends on r3d-core and on no other module** (the cross rule of
+  `lint-layers.sh` reads every module's `Cargo.toml` too). What one module draws for
+  another goes through `r3d_core::services`, the particles' feed through
+  `r3d_core::particles`. Besides the core a module may use the shared crates below it
+  (`gpu`, `a2fmt`, `a2ini`, `libm`); the runtime is the core's (`crate::rt`, `log!`,
+  `sfmt!`, re-exported at each module's root).
+- **Each static lives in one crate**; state shared between crates is the core's.
+- **Features.** The cdylib has one feature per module, all on by default, and
+  `build.sh` builds that: the DLL that ships has every module. `build.sh --features
+  hulls,sky` builds only those, into `build/subset/Render3D.asi` (its own target
+  directory, `target-subset/`), a source build for modders and the bench; there are no
+  per-module DLLs. CI builds the full set and each module left out.
+- **A module not built in** is not in the DLL: the registry never has it, so the
+  engine draws its part in a mission exactly as with `[Modules] <m>=0` at load
+  (`render3d-build-subset`), and `Render3D_Settings` has none of its rows: neither its
+  fragment's nor its `[Modules]` row. Render3D.log says `modules not built in: ...`.
+  The menu scene is the exception: without hulls, sky or world built in there are no
+  ships, sky or planet in the front end, since nothing else draws them, whereas
+  `<m>=0` keeps the menu's part (`in_menu`).
+- **On the bench**, `render3d/bench-asi.sh [--without LIST | --features LIST]` builds
+  this working copy's DLL (full or a subset) into a clone from a scenario's `Setup:`
+  line, then runs the setup after it; `render3d/subset-scenario.sh <m>` writes
+  `render3d-build-subset`'s variant for another module.
+- **Shaders.** `build.sh` compiles each crate's `shaders/*.hlsl` into that crate's
+  `src/shaders/` (a module's with `hlsl-rs.sh --headers core/shaders`, so the core's
+  headers are in its stamps); `tools/shaderc/verify-generated.sh` and
+  `gpu/spirv-selftest.sh` go over every crate.
+- **Settings.** The plugin table stays `render3d/settings.toml`; its rows are generated
+  into the core (`rows_in = "core"`, `tools/settings/README.md`), and the cdylib
+  defines the export. Fragments stay under it, one per module crate.
 
 ### Shaders on Windows
 
@@ -98,7 +141,7 @@ card:
    craters 3891), and shortening it would change what it draws.
 
 So **a bake longer than 4096 slots is a chain of passes** (`gpu/src/chain.rs`,
-`shaders/chain.hlsli`): each pass works out part of the function at its texel and
+`core/shaders/chain.hlsli`): each pass works out part of the function at its texel and
 hands it to the next through a float32 target. The sky is the warp, the field, the
 gas, two slabs of the star lattice, and the last slab put together. A planet's height
 is the warp, the ground, the mountains with the first slab of craters, two more crater
@@ -157,7 +200,10 @@ writes the d3dbc as before and `dxc` (`-spirv`, Vulkan 1.1) the SPIR-V, which
 `tools/shaderc/hlsl-rs.sh` puts through `spirv-val`. `gpu/shaders/compat.hlsli`, at the root because
 both plugins include it, holds the few places the two compilers part (dxc predefines
 `__hlsl_dx_compiler`; vkd3d defines nothing to tell it by, and takes no `-D` or `-I`, so
-the shaders include it by a relative path that resolves from `shaders/` for both):
+the shaders include it by a relative path that resolves from their `shaders/` for both; a
+module's shaders include the core's headers, `core/shaders/*.hlsli`, the same way, and
+a header never includes another, since vkd3d looks a nested `#include` up from the
+working directory):
 
 - **Constants keep their Direct3D 9 registers**: `CREG(n)` is `register(cn)` for vkd3d,
   which places a cbuffer member by it and ignores `packoffset`, and `packoffset(cn)`
@@ -207,7 +253,7 @@ Direct3D 9's half-pixel offset (pixel centres on whole coordinates) is the calle
 DXVK moves the viewport by half a pixel, and the UI's `VP.zw` holds it.
 
 **DXIL**, for Direct3D 12, from the same sources: `tools/shaderc/hlsl-rs.sh` writes it into
-`src/shaders/<name>_dxil.rs` with dxc too, but a pinned release, DirectXShaderCompiler
+`<crate>/src/shaders/<name>_dxil.rs` with dxc too, but a pinned release, DirectXShaderCompiler
 v1.9.2609, which `tools/shaderc/fetch-dxc.sh` fetches into `$A2_DATA/tools/` by version
 and sha256 the first time a DXIL file is stale (`DXC=` names another copy of the same
 release; the version is checked). Arch's dxc 1.10 asserts writing DXIL, and what one
@@ -320,7 +366,7 @@ which it never does.
 
 ## Timing
 
-`Timing=1` (`src/timing.rs`) times each view as a run of marks: the seam, our targets,
+`Timing=1` (`core/src/timing.rs`) times each view as a run of marks: the seam, our targets,
 each step of the body (`setup` is the lights, the distance cull, the modules' lights
 and the scene layer's shadow map; then `background`, `terrain`, `objects`, `ordnance`,
 `specials`, `features`, `warp`, `hud prep`, `chunks`, `particles`, `translucent`,
@@ -340,7 +386,7 @@ the plugins render3d replaces, that measures them the same way: the comparison i
 
 ## The animation clock
 
-`[Bench] Clock=` (`src/clock.rs`) decides what time every animation of render3d's own
+`[Bench] Clock=` (`core/src/clock.rs`) decides what time every animation of render3d's own
 runs on. **`Clock=wall`** (the default, the player's) is the wall clock, as it always
 was: a paused game still flickers, pulses and blinks. **`Clock=bench`** is for the test
 bench (`a2test --clock bench`, `testbench/README.md`, "A frame that repeats"): two
@@ -561,7 +607,7 @@ the UI's presented frame (the scene has no HUD).
 
 ## The menu scene
 
-`src/menu/`, the map in `content/menu/map.ini`: a map of render3d's own behind the front end's
+`core/src/menu/`, the map in `content/menu/map.ini`: a map of render3d's own behind the front end's
 main menu and campaign selection, every scene on it under one sun. A Federation fleet
 in orbit over a class M planet, a starbase beside it, Klingon ships before a Metreon
 nebula far out on one side, a Borg fusion cube and the queen's Diamond in a Mutara nebula
@@ -715,7 +761,7 @@ time it is posed (`hulls: menu scene:`). Keys:
 ## Claims
 
 render3d registers with Display8 at load (contract 1.1, `gpu::Gpu::register`, once its
-frame seam is in; `display/README.md`, "Claims") with `mods::claims`, which says what it
+frame seam is in; `display/README.md`, "Claims") with `registry::claims`, which says what it
 draws now: the OR of every running module's `Module::claims()`. Each claims its own
 category (`sky`, `hulls`, `world`, `particles`, `effects`, `ordnance`, `specials`), and
 `overlays` claims `fog` and `selection` as `[Overlays] Fog` and `Selection` say. A module at 0 (kept for the menu scene only), one standing down
@@ -731,8 +777,8 @@ claims is asked through `gpu::Gpu::claimed_by_others`: the selection bubbles
 
 ### Module interface
 
-A module is one `Module` (`src/core_module.rs`, version 2), made at load and kept in
-the registry (`src/mods/mod.rs`) in `priority()` order: world 10, particles 20, hulls
+A module is one `Module` (`core/src/module.rs`, version 2), made at load and kept in
+the registry (`core/src/registry.rs`) in `priority()` order: world 10, particles 20, hulls
 30, effects 40, ordnance 50, specials 60, sky 70, overlays 80 (two modules never share
 one; `init` asserts it). The first module whose `step`, `object` or `feature` returns
 true draws that part; a part none takes is the engine's. Besides the per-view calls
@@ -744,22 +790,22 @@ true draws that part; a part none takes is the engine's. Besides the per-view ca
 |---|---|
 | `name()` | its `[Modules]` key and log prefix |
 | `priority()` | dispatch order, ascending |
-| `claims()` | the `gpu::display::CLAIM_*` it draws while it runs; `mods::claims` is the OR over running modules ("Claims") |
+| `claims()` | the `gpu::display::CLAIM_*` it draws while it runs; `registry::claims` is the OR over running modules ("Claims") |
 | `rows()` | its settings rows, its fragment's `ROWS` (below); `&[]` if none |
 | `configure(ini, said)` | reads every section it owns, at load and at every `Render3D_SettingsChanged`, whether it runs or not; notes what changed for the log line |
 | `superseded()` | the old plugin it stands down beside |
 | `in_menu()` | has a part in the menu scene, so it keeps its device while off |
-| `provide(id, services)` | registers what it draws for the others (`core_services`), under its own id, once, at init |
-| `hooks(h)` | installs its hooks through `core_hooks` (below), once, at its first switch-on |
+| `provide(id, services)` | registers what it draws for the others (`r3d_core::services`), under its own id, once, at init |
+| `hooks(h)` | installs its hooks through `r3d_core::hooks` (below), once, at its first switch-on |
 | `on()` / `off()` | switched on (load or live, after `hooks`) / switched off live (drop the cosmetic state; `forget` follows at the next view) |
 
 The registry holds each module's on flag (an `AtomicBool`, which is also its hooks'
 gate) and its `ModuleId` (its index, stable within a run: a module that stands down
-keeps its place). `mods::running(name)` and `enabled(name)` remain for logging only:
-module code asks for a capability (`core_services::hulls()` and so on, `Some` only while
+keeps its place). `registry::running(name)` and `enabled(name)` remain for logging only:
+module code asks for a capability (`services::hulls()` and so on, `Some` only while
 the provider runs), never for another module by name (`lint-layers.sh`, rule 3).
 
-**Hooks** (`src/core_hooks.rs`). Every patch of `Armada2.exe` goes through
+**Hooks** (`core/src/hooks.rs`). Every patch of `Armada2.exe` goes through
 `Hooks::install(Hook { owner, used_by, kind, site, to, chain })`. A `Site` is the
 function's name in the game's map, its address and what stock has there (`expect`: the
 call's target, or the slot's value; 0 for a slot of an object outside the executable,
@@ -777,7 +823,7 @@ not switched on. The frame's own hooks (the two seams of `Armada_RenderAllOurStu
 `DestroyRenderSurfaces` and the device's `Reset`) are the core's, behind a gate that is
 always open (`Enable=0` installs none).
 
-**Services** (`src/core_services.rs`): `HullDraw` (hulls: `draw_instance`,
+**Services** (`core/src/services.rs`): `HullDraw` (hulls: `draw_instance`,
 `draws_plain_sod`, `placeholder`, `shadow_map`), `WaveDraw` (ordnance's shockwave),
 `PostDraw` (overlays' height posts) and `GhostDraw` (world's planet ghost). A consumer
 that gets `None` hands the object or effect back to the engine, as it did when the
@@ -785,14 +831,14 @@ provider was not running: the bees and construction draw nothing of their own wi
 hulls, a shockwave is the explosions' own ring without ordnance, a build ghost's height
 post is the engine's `DrawHeightPost` without overlays, and a fog-of-war planet ghost is
 overlays' own sphere without world. Two asks are not tied to "running": the nebulae's
-shadow map (`core_services::hulls_any()`) is lent to the menu scene's gas while hulls
-only keeps the menu's part, as before, and `core_services::volumes()` tells the
+shadow map (`services::hulls_any()`) is lent to the menu scene's gas while hulls
+only keeps the menu's part, as before, and `services::volumes()` tells the
 particles module that world draws the nebulae.
 
-**Shared helpers** (the cross-module paths are gone: `lint-layers.sh --strict src/mods
+**Shared helpers** (the cross-module paths are gone: `lint-layers.sh --strict mods
 --rules cross,byname` passes and CI holds it). What other modules used to take from the
 hulls, effects, ordnance and particles modules lives in the core, and takes the engine
-reads from `src/engine/`:
+reads from `core/src/engine/`:
 
 | Helper | Where |
 |---|---|
@@ -805,16 +851,16 @@ reads from `src/engine/`:
 | `hash32` / `rnd` (render-side only, never `g_random`) | `math::rand` |
 | the ini section reader (`Sec`) | `config::Section` |
 | the stock sprites' batch (`Sprites`) | `scene::sprites` (reads in `engine::sprite`) |
-| the particles' feed | `core_particles`: producers push, the particles module takes the queue at its translucent step and at the end of the view; `live()` is false without it |
+| the particles' feed | `r3d_core::particles`: producers push, the particles module takes the queue at its translucent step and at the end of the view; `live()` is false without it |
 
-**Recipes** (`src/core_recipes.rs`): `core_recipes::text(kind, name)` finds a recipe in
+**Recipes** (`core/src/recipes.rs`): `recipes::text(kind, name)` finds a recipe in
 the game directory (`Sky\<name>.ini`, `Surfaces\`, `Nebulae\`, `Menu\`) first, then the
-one a module built in (`core_recipes::builtin(kind, &[(name, include_str!(..))])`).
+one a module built in (`recipes::builtin(kind, &[(name, include_str!(..))])`).
 The sky's recipes, the menu's `map.ini` and the built-in `ordnance.ini` (whose sections
 `Render3D.ini` overrides one by one, ordnance's own rule) are read through it.
 
 **Layers.** The engine's addresses, call sites, vtable slots and field reads belong in
-`src/engine/` (the core's glue) or a module's own `src/mods/<m>/hooks.rs`; a module's
+`core/src/engine/` (the core's glue) or a module's own `mods/<m>/src/hooks.rs`; a module's
 built-in tables of game data names in its `content.rs`; its recipe files under
 `render3d/content/`. `render3d/lint-layers.sh` counts what is still elsewhere (report
 mode; `--strict DIR...` fails on any hit under those directories, as the modules are
@@ -826,7 +872,7 @@ keeps).
 Every module is made at load and has an `on` flag from `[Modules]` (and the overlay,
 `RefitPlayer.ini`), read through the core's row `Modules.<name>`. Dispatch (`lights`,
 `begin_view`, `step`, `object`, `feature`, `end_view`) skips a module that is off, and
-`mods::running(name)` is false, so the engine's draw of that part runs (through
+`registry::running(name)` is false, so the engine's draw of that part runs (through
 Display8's passthrough). The menu scene's calls (`device`, `reset`, `menu*`) still reach
 `hulls`, `sky` and `world` while off (`Module::in_menu`), since nothing could hand the
 front end's scene back; `hulls` clears the menu's shadow map and posed ships at each
@@ -850,9 +896,9 @@ showcase, each flipped back to the base (in the nebula scene the flip is not exa
 
 **The rows are split per module.** `render3d/settings.toml` holds the core's: `MSAA`,
 `HDR` and the eight `Modules.*`. A module with rows has a fragment beside its code,
-`src/mods/<m>/settings.toml` (`module = "<m>"`, `tools/settings/README.md`,
+`mods/<m>/settings.toml` (`module = "<m>"`, `tools/settings/README.md`,
 "Fragments"; today world's `World.*` and `Nebulae.Lit`, and overlays' `Overlays.*`),
-generated into `src/mods/<m>/settings_table.rs` (`ROWS`, one constant per row). Its
+generated into `mods/<m>/src/settings_table.rs` (`ROWS`, one constant per row). Its
 `rows()` returns them. `Render3D_Settings` returns one contiguous table, built at load
 (`lib.rs`, `settings_rows`): the core's rows, then each built-in module's in priority
 order, copied (a module not built in has none, and with `Enable=0`, when no module is
@@ -865,10 +911,10 @@ key. Render3D.log says `settings: N rows exported (M the core's)`.
 
 | Owner | Sections |
 |---|---|
-| core | `[Render3D]` (`Enable`, `Log`, `MSAA`, `HDR`, `Bloom*`, `Exposure`, `Shoulder`, `Inset`, `Steps`, `Timing*`), `[Modules]`, `[Bench]` (`Clock`), `[Lights]`: the cluster keys (`Clustered`, `ClusterTile`, `ClusterSlices`, `ClusterLights`, `ClusterPerColour`), the scene lights' data type and their application (`scene/lights.rs`; the keys are hulls') |
+| core | `[Render3D]` (`Enable`, `Log`, `MSAA`, `HDR`, `Bloom*`, `Exposure`, `Shoulder`, `Inset`, `Steps`, `Timing*`), `[Modules]`, `[Bench]` (`Clock`), `[Lights]`: the cluster keys (`Clustered`, `ClusterTile`, `ClusterSlices`, `ClusterLights`, `ClusterPerColour`), the scene lights' keys (`Replace`, `KeyColour`, `KeyAxis`, `FillColour`, `FillAxis`, `SkyLight`; `scene/scene_lights.rs`, the hulls module's until 0.43.0: they light every module, so they must not depend on hulls being built in), their data type and their application (`scene/lights.rs`) |
 | world | `[World]` (the planets', rocks' and nebulae's switches and keys: there is no `[Planets]` or `[Rocks]` section), `[Nebulae]`; the recipe files' `[Surface]` and `[Nebula]` |
 | particles | `[Particles]` |
-| hulls | `[Hulls]` (the `Borg*` look keys with it); the `[Lights]` scene keys (`Replace`, `KeyColour`, `KeyAxis`, `FillColour`, `FillAxis`, `SkyLight`), read by its `configure` in `hulls/scene_lights.rs` and handed to the core through `core_services::scene_lights()` |
+| hulls | `[Hulls]` (the `Borg*` look keys with it) |
 | effects | `[Bees]`, `[Construction]`, `[Debris]`, `[Repair]`, `[Sparks]`, `[Explosions]`, `[Shields]`, `[Shell.<name>]` |
 | ordnance | `[Warp]`, `[Ordnance.<odf>]`, `[Model.<odf>]`, `[Wave.<odf>]` (over the built-in `content/ordnance/ordnance.ini`); the `[Lights]` beam keys (`Beam*`, `ConeSpot`, read by its `configure` in `ordnance/lights.rs`, `Beam`) |
 | specials | `[Specials]` |
@@ -885,7 +931,7 @@ stand-down draws exactly as before. It only reads, into one static buffer.
 
 ### effects
 
-`src/mods/effects/`, on by default. The game features that are effects, hull debris,
+`mods/effects/src/`, on by default. The game features that are effects, hull debris,
 and their lights; it ports `Explosions.asi`, `Shields.asi` and `Repair.asi`, whose
 looks were settled with the user (kept as they were; the settings keep the plugins'
 keys, in `Render3D.ini` sections `[Explosions]`, `[Shields]`, `[Repair]` and
@@ -971,7 +1017,7 @@ vtable 0x6b2630, of the database at 0x73fccc) at its instance's transform and sc
   its instance the one embedded in the construction (class at its `Info`'s `+0xd0`,
   named by `GameObjectClass::GetOdfName` 0x4ce370), only the faces built so far (the
   call's face count) breaking, in the SOD's order.
-- **Construction** (`construction.rs`, `weldfx.rs`, `shaders/effects_construction.hlsl`).
+- **Construction** (`construction.rs`, `weldfx.rs`, `mods/effects/shaders/effects_construction.hlsl`).
   `BuildingEffect` (vtable 0x6afe4c) taken through `feature()`, in place of
   `BuildingEffect::Render` (0x469660). Stock: `BuildingEffect::m_list` (a `std::map`,
   head node at 0x736bd4, `_Nil` at 0x736c1c, node `+0x14` the `Info`) holds a
@@ -1083,7 +1129,7 @@ out would change the game. A submitted shot is then drawn by, in turn:
 
 1. a **recipe** by its ODF (the class +0x34 keeps its `cPrjID` at +0x150,
    `cPrjID::GetOdfName` 0x6593a0): `Specials.asi`'s beams, bolts and fields, ported
-   unchanged (`fx.rs`, `fx_ps` in `shaders/ordnance.hlsl`), on the sim clock;
+   unchanged (`fx.rs`, `fx_ps` in `mods/ordnance/shaders/ordnance.hlsl`), on the sim clock;
 2. **stock's own look, drawn by us** (`sprite.rs`), for the classes whose `Submit`
    (vtable +0x5c) is `Phaser` 0x57edc0, `PulsePhaser` 0x581cb0, `PhotonTorpedo`
    0x57f100, `PlasmaCannon` 0x57f580, `PoleronTorpedo` 0x5800d0, `Artillery` 0x5730a0
@@ -1258,7 +1304,7 @@ looks. `configure` reads `[Specials]` at load and at every settings change (`Rel
 reads it again every 120 frames, as before). `Modules.specials` is live, checked by
 `render3d-live-hulls` (pixels) and `render3d-live-specials` (off at load, on live).
 
-`src/mods/specials/`, `shaders/specials.hlsl`, on by default (`[Modules] specials=0`
+`mods/specials/src/`, `mods/specials/shaders/specials.hlsl`, on by default (`[Modules] specials=0`
 leaves it to the engine). `Step::Specials`: the special-object effects, which stock
 draws in `SpecialObjectEffect::RenderAll` (0x60be90, called at 0x598372).
 
@@ -1334,7 +1380,7 @@ Scenario `render3d-specialfx`.
 
 #### effects: Hooks, Content, Settings
 
-**Hooks** (`effects/hooks.rs`; each part installs its own when its `Enable` is on and no plugin of its own is loaded, all through `core_hooks`, behind the module's gate, chained onto what is there):
+**Hooks** (`effects/hooks.rs`; each part installs its own when its `Enable` is on and no plugin of its own is loaded, all through `r3d_core::hooks`, behind the module's gate, chained onto what is there):
 
 | Symbol | Kind | What it is for |
 |---|---|---|
@@ -1503,7 +1549,7 @@ from stock, and look at it: the measure is blind to a value-noise lattice (hence
 
 ### overlays
 
-`src/mods/overlays/`, `shaders/overlays.hlsl`; on unless `[Modules] overlays=0`, and
+`mods/overlays/src/`, `mods/overlays/shaders/overlays.hlsl`; on unless `[Modules] overlays=0`, and
 standing down while `Fog.asi` is loaded (it supersedes it). It draws what the engine
 draws over and about the map rather than as objects, and nothing it does is written
 where the simulation reads. Settings in `Render3D.ini`, `[Overlays]`.
@@ -1620,7 +1666,7 @@ sprite; clear: `invalid_build`, and stock lights the ghost with the dark red amb
 0x736d40 in place of the scene's). With the hulls module off or `[Hulls] BuildGhost=0`
 the feature is the engine's.
 
-**Height posts** (`posts.rs`, `vs_line`/`ps_line` in `shaders/overlays.hlsl`).
+**Height posts** (`posts.rs`, `vs_line`/`ps_line` in `mods/overlays/shaders/overlays.hlsl`).
 `DrawHeightPost(const Vector3&, ST3D_Camera*)` (0x593840, cdecl) draws a line from a
 point straight to the grid's plane (`Terrain_Geometry+0x1c`, 0x77215c), in
 `ST3D_Colour_Green` (0x7a8f68) when the point is above it and `ST3D_Colour_Red`
@@ -1682,7 +1728,7 @@ drawing nothing in the tactical view.
 
 #### overlays: Hooks
 
-`src/mods/overlays/hooks.rs` holds every address and field offset the module reads of
+`mods/overlays/src/hooks.rs` holds every address and field offset the module reads of
 the engine, behind named accessors, and its one hook. The step bodies (the terrain, the
 selection bubbles), the two features (`Ghost`, `PlaceholderFeature`) and the pivot
 marker's feature are reached through the frame's dispatch and patch nothing: while the
@@ -1712,7 +1758,7 @@ and the pivot marker, and the hook above hands every call back.
 #### Hooks, content and settings
 
 **Hooks** (`ordnance/hooks.rs`, the only file of the module that names an address; installed
-through `core_hooks` behind the module's flag, so a module switched off hands every call to
+through `r3d_core::hooks` behind the module's flag, so a module switched off hands every call to
 what was there before, and `hooks: ordnance <used_by> at <symbol> installed` says which):
 
 | Symbol | Kind | What it does |
@@ -1729,7 +1775,7 @@ on.
 
 **Content.** The special weapons' recipes, the models' looks and `[Warp]` are
 `render3d/content/ordnance/ordnance.ini`, compiled in through `ordnance/content.rs` and
-`core_recipes` (kind `ordnance`, no game directory); a section or key of the same name in
+`r3d_core::recipes` (kind `ordnance`, no game directory); a section or key of the same name in
 `Render3D.ini` overrides it. Nothing is installed.
 
 **Settings.** `configure` reads `[Ordnance]`, `[Ordnance.<odf>]`, `[Model.<odf>]`,
@@ -1745,7 +1791,7 @@ and flashes in flight are the engine's from then on, and a switch-on starts them
 
 #### particles
 
-`src/mods/particles/`, `shaders/particles*.hlsl`, on by default; stands down while
+`mods/particles/src/`, `mods/particles/shaders/particles*.hlsl`, on by default; stands down while
 `Venting.asi` is loaded. Our own particle simulation and drawing in place of the
 engine's, after `spec-particles.md` in the notes; ports `Venting.asi`'s look for the
 vents (the look settled with the user, and the settings keep its keys, in
@@ -1849,7 +1895,7 @@ vents (the look settled with the user, and the settings keep its keys, in
 #### Hooks, content and settings
 
 **Hooks** (`particles/hooks.rs`, the only file of the module that names an address;
-installed through `core_hooks` at the module's first switch-on, behind its flag):
+installed through `r3d_core::hooks` at the module's first switch-on, behind its flag):
 
 | Symbol | Kind | What it does |
 |---|---|---|
@@ -1872,7 +1918,7 @@ and vtables are in `hooks.rs`.
 module has no rows of its own; its switch is `Modules.particles`, live. Switched off,
 `off()` drops the simulation, the owned set and the feed queue the other modules filled,
 so a switch-on starts clean: particles in flight at the switch end with it, and the
-engine's draw is back at once. `core_particles::live()` is false while it is off, so the
+engine's draw is back at once. `particles::live()` is false while it is off, so the
 modules that feed it (ordnance's models, effects, specials) hand their emitters to the
 engine.
 
@@ -1886,17 +1932,17 @@ the module reads of an object and its instance, behind named accessors (it was
 and it draws `GameObject::Render` by returning true there, so with it off the engine's
 own draw stands as stock (`Modules.hulls` is live, checked by `render3d-live-hulls`).
 `content.rs` holds its names of the game's data (SOD nodes, the cocoon's SOD, the
-scrap glow's sprite) and stock's resource colours. `scene_lights.rs` reads the scene
-keys and answers the core's `SceneLightSource`: the `Lighting.asi` test is made at the
-first gather (every plugin is loaded by then, not at load), and the replacement goes on
-with the module at 0, since the other modules light by it. `configure` reads `[Hulls]`
-and the scene keys at load and at every settings change; `Reload=1` and `ABTest` (the
+scrap glow's sprite) and stock's resource colours. The scene keys are the core's
+(`core/src/scene/scene_lights.rs`, the `SceneLightSource` the core registers itself): the
+`Lighting.asi` test is made at the first gather (every plugin is loaded by then, not at
+load), and the replacement goes on with the module at 0 or not built in, since the other
+modules light by it. `configure` reads `[Hulls]` at load and at every settings change; `Reload=1` and `ABTest` (the
 bench) work as before. The module has no settings row of its own beyond
 `Modules.hulls`. `Style`/`set_style` stay in `scene/lights.rs`: they are a light's
 semantics for the cluster pass, set by effects and ordnance, and no hulls code reads or
 sets them.
 
-`src/mods/hulls/`, `shaders/hulls.hlsl`, on by default; supersedes `Lighting.asi`'s
+`mods/hulls/src/`, `mods/hulls/shaders/hulls.hlsl`, on by default; supersedes `Lighting.asi`'s
 hull path (and stands down while a stale `Lighting.asi` is loaded). Settings in `[Hulls]`
 (Lighting.asi's keys and settled values: `Ambient`, `Specular`, `SpecularPower`,
 `RimLight`, `RimPower`, `HullSun`, `HighlightKnee`, `SelfIllumination`, the `Borg*`
@@ -2006,8 +2052,8 @@ soft light to Direct3D mirrored through the draw's origin); the shaders here tak
 point light where it is and turn the normal round instead (`scene::NORMAL_SIGN`), so no
 mirroring is needed.
 
-**Clustered lights** (`scene/clusters.rs`, `shaders/clusters.hlsl`,
-`shaders/clustered.hlsli`; `[Lights] Clustered=1`, Vulkan and Direct3D 12 only). Per
+**Clustered lights** (`scene/clusters.rs`, `core/shaders/clusters.hlsl`,
+`core/shaders/clustered.hlsli`; `[Lights] Clustered=1`, Vulkan and Direct3D 12 only). Per
 mesh, the strongest twelve lights pop as a volley passes, and a light that falls on
 one end of a station counts for the whole of it. So on a backend with compute every
 light of the view lights every pixel it reaches, hulls, planets, moons and asteroids
@@ -2265,7 +2311,7 @@ limited draw shows the inside of a part-built station.
 
 ### world
 
-`src/mods/world/`, `shaders/world_*.hlsl`, on by default, registered first (it takes
+`mods/world/src/`, `mods/world/shaders/world_*.hlsl`, on by default, registered first (it takes
 the nebulae and the moons before `particles` and `hulls` see them). The objects whose
 class overrides `Render` and draws a world of its own: planets, the dilithium moons,
 asteroid fields, nebulae. It ports `Surfaces.asi` (the recipes, `Surfaces\<texture>.ini`),
@@ -2614,9 +2660,9 @@ the Key.
 
 #### world: Hooks
 
-`src/mods/world/hooks.rs` holds every address, call site, vtable slot and field offset
+`mods/world/src/hooks.rs` holds every address, call site, vtable slot and field offset
 of the module, behind named accessors, and its three detours. They install through
-`core_hooks` at the module's first switch-on (not at the first frame): at load for a
+`r3d_core::hooks` at the module's first switch-on (not at the first frame): at load for a
 module that is on, at the first live switch-on for one that was off. Each detour starts
 with the module's gate and hands the call to the `Prev` it replaced while the gate is
 shut, so a module switched off live puts the engine's code back in charge.
@@ -2644,7 +2690,7 @@ lets go of the GPU objects.
 
 `content.rs` holds the built-in recipes (`include_str!` of `render3d/content/surfaces/` and
 `render3d/content/nebulae/`, by lower-cased name) and the moons' glow material. A recipe is
-read through `core_recipes`: the game directory's `Surfaces\<texture>.ini` or
+read through `r3d_core::recipes`: the game directory's `Surfaces\<texture>.ini` or
 `Nebulae\<odf>.ini` first (`install.sh` copies the same files there, where an edited copy
 is read again while the game runs), else the one built in, so the look needs nothing
 installed.

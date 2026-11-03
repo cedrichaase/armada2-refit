@@ -102,7 +102,7 @@ Background and measurements live outside the repo, in
 - 2026-11-03: **the shared helpers are in the core** (render3d 0.37.1). `Posed` and the
   per-view cache moved into `scene::pose` with `Warp` and `Waves` as plain data (their
   constructors are free functions of the hulls module). The particles' feed is a queue
-  the core owns (`core_particles`), taken at the particles module's translucent step and
+  the core owns (`r3d_core::particles`), taken at the particles module's translucent step and
   at the end of the view, which is when the same feeds were simulated before.
   `draws_plain_sod` and `instance_visibility` read the engine only, so they are core
   functions (the trait method is kept and calls the same function). The nebulae's
@@ -131,14 +131,14 @@ Background and measurements live outside the repo, in
   features one by one.
 - 2026-11-02: **the split into core, modules and content begins** (ROADMAP phase 7).
   The contracts are in code, staged in the one crate until the crates are split:
-  `Module` version 2 (`src/core_module.rs`: `priority`, `claims`, `rows`, `configure`,
+  `Module` version 2 (`core/src/module.rs`: `priority`, `claims`, `rows`, `configure`,
   `provide`, `hooks`, `on`, `off`, `formats_changed`), the hook registry
-  (`src/core_hooks.rs`, with the frame's own hooks on it), the services' traits
-  (`src/core_services.rs`), the recipe lookup (`src/core_recipes.rs`) and
+  (`core/src/hooks.rs`, with the frame's own hooks on it), the services' traits
+  (`core/src/services.rs`), the recipe lookup (`core/src/recipes.rs`) and
   `config::Section`. The registry orders by priority instead of a name list, keeps
   stood-down modules in place, and reads every flag at each settings change (the
   modules whose hooks do not hand back yet refuse, logged). The settings rows are split
-  into per-module fragments (`src/mods/<m>/settings.toml`) and exported as one table.
+  into per-module fragments (`mods/<m>/settings.toml`) and exported as one table.
   `lint-layers.sh` counts what is still in the wrong layer. README.md, "Module
   interface". Nothing draws differently.
 
@@ -170,7 +170,7 @@ What every module uses, rather than writing its own:
 - `engine`, `engine::obj`: addresses and reads of the engine's state. **Never write
   anything the simulation reads**, never draw from `g_random` (0x7b0fac).
 - Shaders: `shaders/<name>.hlsl` with an `// entries:` first line; `build.sh` compiles
-  it into `src/shaders/<name>.rs`. vkd3d unrolls loops and has no `tex3Dlod`; keep
+  it into `<crate>/src/shaders/<name>.rs`. vkd3d unrolls loops and has no `tex3Dlod`; keep
   branches out of loops.
 
 Rules for a module:

@@ -82,6 +82,18 @@ Layers: display 0.16.1, ui 0.31.1, qol 1.9.1, online 0.9.1, cutscenes 2.5.1, tes
 
 Installed, not yet seen in game
 
+## 13.76.0 — 2026-11-03
+
+Layers: render3d 0.43.0, testbench 3.95.0.
+
+### Changed
+- render3d: split into crates, a thin cdylib with one Cargo feature per module,
+  `r3d-core` and one `r3d-<m>` crate per module (`build.sh --features`,
+  `bench-asi.sh`); CI builds the full set and each module left out
+  (`render3d-subsets`), and holds every module crate to all of `lint-layers.sh`'s
+  rules. `tools/settings/gen.py` takes `rows_in`; `tools/shaderc/hlsl-rs.sh` takes
+  `--headers`. Installed, not yet seen in game.
+
 ## 13.75.0 — 2026-11-03
 
 Layers: render3d 0.42.0, testbench 3.94.0.

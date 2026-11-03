@@ -55,7 +55,7 @@ rustc -O --edition 2021 -o "$tmp/t" "$tmp/main.rs" 2>&1 | grep -v '^$' || true
 python3 - "$repo" "$tmp" <<'EOF'
 import re, struct, sys, glob, os
 repo, tmp = sys.argv[1], sys.argv[2]
-for f in sorted(glob.glob(repo + '/render3d/src/shaders/*_spv.rs') + glob.glob(repo + '/ui/src/shaders/*_spv.rs')):
+for f in sorted(glob.glob(repo + '/render3d/core/src/shaders/*_spv.rs') + glob.glob(repo + '/render3d/mods/*/src/shaders/*_spv.rs') + glob.glob(repo + '/ui/src/shaders/*_spv.rs')):
     base = os.path.basename(f)[:-3]
     for m in re.finditer(r'pub static (\w+)_SPV: \[u32; \d+\] = \[ // (\w+), (\w)s_6_0(.*?)\];', open(f).read(), re.S):
         ws = [int(x, 16) for x in re.findall(r'0x[0-9a-f]+', m.group(4))]
