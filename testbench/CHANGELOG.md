@@ -5,6 +5,11 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 4.1.7 — 2026-11-04
+
+### Changed
+- Scenario `display-bail-out` expects the shell's mode not raised after the bail-out (`shell mode raised` absent from `Display8.log`, display 1.0.4). Installed, not yet seen in game.
+
 ## 4.1.3 — 2026-11-03
 
 ### Changed
