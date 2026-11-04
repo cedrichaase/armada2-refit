@@ -109,7 +109,6 @@ struct Dev {
     fence: P,
     event: HANDLE,
     value: u64,
-    #[allow(dead_code)]
     info: P,
 }
 
@@ -198,7 +197,14 @@ fn srv(d: P, res: P, format: u32, cpu: usize) {
     vcall!(d, slot::DEV_CREATE_SHADER_RESOURCE_VIEW, fn(P, *const SrvDesc, usize) -> (), res, &sd, cpu);
 }
 
+/// A transition, skipped when the resource is already in that state: a barrier whose
+/// before and after agree is invalid, and the runtime then fails the list's Close with
+/// E_INVALIDARG (WARP did, on frame 0's first uploads; vkd3d-proton lets it pass).
+/// Display8's own `barrier` (`dx12/mod.rs`) skips it the same way.
 fn barrier(l: P, res: P, before: u32, after: u32) {
+    if before == after {
+        return;
+    }
     let b = [Barrier { ty: BARRIER_TYPE_TRANSITION, flags: 0, resource: res, subresource: ALL_SUBRESOURCES, before, after }];
     vcall!(l, slot::LIST_RESOURCE_BARRIER, fn(u32, *const Barrier) -> (), 1, b.as_ptr());
 }
@@ -719,6 +725,8 @@ fn probe() -> Result<(), (String, String)> {
         barrier(l, r.color, STATE_PIXEL_SHADER_RESOURCE, STATE_RENDER_TARGET);
         let hr = vcall!(l, slot::LIST_CLOSE, fn() -> i32,);
         if hr < 0 {
+            // With the debug layer on (--debug), its messages say what was invalid.
+            messages(d.info);
             return Err((String::from("frames"), fmt(format_args!("frame {}: the command list did not close: {:#010x}", f, hr as u32))));
         }
         let ls = [l];
@@ -726,6 +734,7 @@ fn probe() -> Result<(), (String, String)> {
         let hr = vcall!(swap, slot::SWAP_PRESENT, fn(u32, u32) -> i32, 0, 0);
         if hr < 0 {
             let why = vcall!(dev, slot::DEV_GET_DEVICE_REMOVED_REASON, fn() -> i32,);
+            messages(d.info);
             return Err((String::from("frames"), fmt(format_args!("frame {}: Present {:#010x} (device removed reason {:#010x})", f, hr as u32, why as u32))));
         }
         done[s] = d.signal();

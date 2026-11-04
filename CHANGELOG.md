@@ -12,6 +12,13 @@ Layers: gui-installer 3.0.2.
 ### Fixed
 - CI, Windows: `publish/installer/test.ps1` builds the sky recipes the retire step must take out from the repository's shipped copies (as `test.sh` does) instead of a placeholder no hash knows, and expects an edited one to stay; `.gitattributes` keeps `render3d/content/sky/*.ini` byte-exact on Windows checkouts. `gui-installer/test-windows.ps1` expects `layers\qol\QOL.asi`, not `game\`. The `vulkan-probe-windows` job fetches the Vulkan runtime components of the pinned SDK 1.4.363.0 (`latest`, 1.4.363.1, ships none). Installed, not yet seen in game.
 
+## 15.6.18 — 2026-11-04
+
+Layers: display 1.0.5.
+
+### Fixed
+- CI's Direct3D 12 gate (d12probe on WARP): the probe no longer records a same-state barrier on its first frame, which failed the command list's `Close` with `E_INVALIDARG`; a failed `Close` or `Present` lists the debug layer's messages. Installed, not yet seen in game.
+
 ## 15.6.17 — 2026-11-04
 
 Layers: gui-installer 3.0.1.

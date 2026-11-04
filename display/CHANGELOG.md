@@ -4,6 +4,14 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 1.0.5 — 2026-11-04
+
+### Fixed
+- d12probe 0.1.1: frame 0 no longer records a transition whose before and after states are both `COPY_DEST` (the first uploads of the ramp and the white texel); the probe's `barrier` skips such a barrier as Display8's own does. WARP failed the list's `Close` with `E_INVALIDARG` on it (CI run 41880254572, jobs d3d12-probe and gates-windows); vkd3d-proton let it pass. Display8 itself is unchanged.
+- d12probe: a failed `Close` or `Present` lists the debug layer's messages first (with `--debug`), so the failure names what was invalid.
+
+Installed, not yet seen in game.
+
 ## 1.0.4 — 2026-11-04
 
 ### Fixed
