@@ -89,10 +89,100 @@ pub mod hook {
 
 pub mod field {
     #![allow(non_snake_case)]
+    #[inline(always)] pub fn S3D_DEVICE_INDEX() -> usize { super::TABLE.engine().field(a2engine::Sym(75)) }
+    #[inline(always)] pub fn S3D_DEVICES() -> usize { super::TABLE.engine().field(a2engine::Sym(76)) }
+    #[inline(always)] pub fn DEV_D3D8() -> usize { super::TABLE.engine().field(a2engine::Sym(77)) }
+    #[inline(always)] pub fn LIST_HEAD() -> usize { super::TABLE.engine().field(a2engine::Sym(78)) }
+    #[inline(always)] pub fn LIST_NEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(79)) }
+    #[inline(always)] pub fn LIST_VALUE() -> usize { super::TABLE.engine().field(a2engine::Sym(80)) }
+    #[inline(always)] pub fn VECTOR_BEGIN() -> usize { super::TABLE.engine().field(a2engine::Sym(81)) }
+    #[inline(always)] pub fn VECTOR_END() -> usize { super::TABLE.engine().field(a2engine::Sym(82)) }
+    #[inline(always)] pub fn VT_DEV_CLEAR_DEPTH() -> usize { super::TABLE.engine().field(a2engine::Sym(83)) }
+    #[inline(always)] pub fn VT_DEV_FLUSH() -> usize { super::TABLE.engine().field(a2engine::Sym(84)) }
+    #[inline(always)] pub fn VT_OBJ_RENDER() -> usize { super::TABLE.engine().field(a2engine::Sym(85)) }
+    #[inline(always)] pub fn VT_INST_IS_CRAFT() -> usize { super::TABLE.engine().field(a2engine::Sym(86)) }
+    #[inline(always)] pub fn VT_INST_FRUSTUM() -> usize { super::TABLE.engine().field(a2engine::Sym(87)) }
+    #[inline(always)] pub fn VT_OBJ_CAN_SEE() -> usize { super::TABLE.engine().field(a2engine::Sym(88)) }
+    #[inline(always)] pub fn INST_SCALE_SET() -> usize { super::TABLE.engine().field(a2engine::Sym(89)) }
+    #[inline(always)] pub fn INST_SCALE() -> usize { super::TABLE.engine().field(a2engine::Sym(90)) }
+    #[inline(always)] pub fn OBJ_ON_SCREEN() -> usize { super::TABLE.engine().field(a2engine::Sym(91)) }
+    #[inline(always)] pub fn OBJ_PLAYER() -> usize { super::TABLE.engine().field(a2engine::Sym(92)) }
+    #[inline(always)] pub fn PLAYER_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(93)) }
+    #[inline(always)] pub fn OBJ_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(94)) }
+    #[inline(always)] pub fn TEAM_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(95)) }
+    #[inline(always)] pub fn S3D_TEAM_COLOURS() -> usize { super::TABLE.engine().field(a2engine::Sym(97)) }
+    #[inline(always)] pub fn ELEM_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(98)) }
+    #[inline(always)] pub fn INST_DATABASE() -> usize { super::TABLE.engine().field(a2engine::Sym(99)) }
+    #[inline(always)] pub fn S3D_CONFIG() -> usize { super::TABLE.engine().field(a2engine::Sym(100)) }
+    #[inline(always)] pub fn CFG_DETAIL() -> usize { super::TABLE.engine().field(a2engine::Sym(101)) }
+    #[inline(always)] pub fn CFG_LOD_DISTANCES() -> usize { super::TABLE.engine().field(a2engine::Sym(102)) }
+    #[inline(always)] pub fn INST_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(103)) }
+    #[inline(always)] pub fn CLASS_NODE_SHIELDS() -> usize { super::TABLE.engine().field(a2engine::Sym(104)) }
+    #[inline(always)] pub fn CLASS_NODE_ENGINES() -> usize { super::TABLE.engine().field(a2engine::Sym(105)) }
+    #[inline(always)] pub fn CLASS_NODE_TARGET() -> usize { super::TABLE.engine().field(a2engine::Sym(106)) }
+    #[inline(always)] pub fn CLASS_NODE_SENSORS() -> usize { super::TABLE.engine().field(a2engine::Sym(107)) }
+    #[inline(always)] pub fn CLASS_NODE_LIFE() -> usize { super::TABLE.engine().field(a2engine::Sym(108)) }
+    #[inline(always)] pub fn INST_DOWN_SHIELDS() -> usize { super::TABLE.engine().field(a2engine::Sym(109)) }
+    #[inline(always)] pub fn INST_DOWN_ENGINES() -> usize { super::TABLE.engine().field(a2engine::Sym(110)) }
+    #[inline(always)] pub fn INST_DOWN_TARGET() -> usize { super::TABLE.engine().field(a2engine::Sym(111)) }
+    #[inline(always)] pub fn INST_DOWN_SENSORS() -> usize { super::TABLE.engine().field(a2engine::Sym(112)) }
+    #[inline(always)] pub fn INST_DOWN_LIFE() -> usize { super::TABLE.engine().field(a2engine::Sym(113)) }
+    #[inline(always)] pub fn INST_CREW_FIRE() -> usize { super::TABLE.engine().field(a2engine::Sym(114)) }
+    #[inline(always)] pub fn INST_LIGHTS_HIDDEN() -> usize { super::TABLE.engine().field(a2engine::Sym(115)) }
+    #[inline(always)] pub fn OBJ_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(116)) }
+    #[inline(always)] pub fn SHIPYARD_BUILD_NODE() -> usize { super::TABLE.engine().field(a2engine::Sym(117)) }
+    #[inline(always)] pub fn SHIPYARD_BUILDING() -> usize { super::TABLE.engine().field(a2engine::Sym(118)) }
+    #[inline(always)] pub fn MINING_DOCK_NODE() -> usize { super::TABLE.engine().field(a2engine::Sym(119)) }
+    #[inline(always)] pub fn MINING_DOCKED() -> usize { super::TABLE.engine().field(a2engine::Sym(120)) }
+    #[inline(always)] pub fn OBJ_INSTANCE() -> usize { super::TABLE.engine().field(a2engine::Sym(121)) }
+    #[inline(always)] pub fn OBJ_FLAGS() -> usize { super::TABLE.engine().field(a2engine::Sym(122)) }
+    #[inline(always)] pub fn OBJ_EXPIRED() -> usize { super::TABLE.engine().field(a2engine::Sym(123)) }
+    #[inline(always)] pub fn INST_CULL_DISTANCE() -> usize { super::TABLE.engine().field(a2engine::Sym(124)) }
+    #[inline(always)] pub fn INST_DISTANCE() -> usize { super::TABLE.engine().field(a2engine::Sym(125)) }
+    #[inline(always)] pub fn LIGHT_START() -> usize { super::TABLE.engine().field(a2engine::Sym(127)) }
+    #[inline(always)] pub fn LIGHT_RANGE() -> usize { super::TABLE.engine().field(a2engine::Sym(128)) }
+    #[inline(always)] pub fn SPRITE_TEXTURE() -> usize { super::TABLE.engine().field(a2engine::Sym(130)) }
+    #[inline(always)] pub fn SPRITE_FLAGS() -> usize { super::TABLE.engine().field(a2engine::Sym(131)) }
+    #[inline(always)] pub fn SPRITE_RECT() -> usize { super::TABLE.engine().field(a2engine::Sym(132)) }
+    #[inline(always)] pub fn SPRITE_MATERIAL() -> usize { super::TABLE.engine().field(a2engine::Sym(133)) }
+    #[inline(always)] pub fn MAT_SRC_BLEND() -> usize { super::TABLE.engine().field(a2engine::Sym(134)) }
+    #[inline(always)] pub fn MAT_DST_BLEND() -> usize { super::TABLE.engine().field(a2engine::Sym(135)) }
+    #[inline(always)] pub fn SPRITE_TILE_U() -> usize { super::TABLE.engine().field(a2engine::Sym(136)) }
+    #[inline(always)] pub fn S3D_BRIGHTNESS() -> usize { super::TABLE.engine().field(a2engine::Sym(137)) }
+    #[inline(always)] pub fn DEV_TRANSPARENCY() -> usize { super::TABLE.engine().field(a2engine::Sym(138)) }
+    #[inline(always)] pub fn S3D_CURRENT_INSTANCE() -> usize { super::TABLE.engine().field(a2engine::Sym(139)) }
+    #[inline(always)] pub fn ENTITY_HANDLE() -> usize { super::TABLE.engine().field(a2engine::Sym(140)) }
+    #[inline(always)] pub fn TEX_DEVICE_TEXTURES() -> usize { super::TABLE.engine().field(a2engine::Sym(141)) }
+    #[inline(always)] pub fn DEVTEX_D3D8() -> usize { super::TABLE.engine().field(a2engine::Sym(142)) }
+    #[inline(always)] pub fn CAM_VIEWPORT() -> usize { super::TABLE.engine().field(a2engine::Sym(143)) }
+    #[inline(always)] pub fn CAM_EYE() -> usize { super::TABLE.engine().field(a2engine::Sym(144)) }
+    #[inline(always)] pub fn CINEMATIC_CAMERA() -> usize { super::TABLE.engine().field(a2engine::Sym(145)) }
+    #[inline(always)] pub fn S3D_AMBIENT() -> usize { super::TABLE.engine().field(a2engine::Sym(146)) }
+    #[inline(always)] pub fn OBJ_CULLED() -> usize { super::TABLE.engine().field(a2engine::Sym(147)) }
+    #[inline(always)] pub fn FEATURE_FLAGS() -> usize { super::TABLE.engine().field(a2engine::Sym(148)) }
+    #[inline(always)] pub fn VT_FEATURE_RENDER() -> usize { super::TABLE.engine().field(a2engine::Sym(149)) }
+    #[inline(always)] pub fn S3D_LIGHTS() -> usize { super::TABLE.engine().field(a2engine::Sym(150)) }
+    #[inline(always)] pub fn LIGHT_REC_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(151)) }
+    #[inline(always)] pub fn LIGHT_REC_MATRIX() -> usize { super::TABLE.engine().field(a2engine::Sym(152)) }
+    #[inline(always)] pub fn INST_FLAGS() -> usize { super::TABLE.engine().field(a2engine::Sym(153)) }
+    #[inline(always)] pub fn INST_ANIMATING() -> usize { super::TABLE.engine().field(a2engine::Sym(154)) }
+    #[inline(always)] pub fn INST_ANIM_START() -> usize { super::TABLE.engine().field(a2engine::Sym(155)) }
+    #[inline(always)] pub fn RS_TERRAIN() -> usize { super::TABLE.engine().field(a2engine::Sym(156)) }
+    #[inline(always)] pub fn RS_BACKGROUND_A() -> usize { super::TABLE.engine().field(a2engine::Sym(157)) }
+    #[inline(always)] pub fn RS_BACKGROUND_B() -> usize { super::TABLE.engine().field(a2engine::Sym(158)) }
+    #[inline(always)] pub fn RS_ORDNANCE() -> usize { super::TABLE.engine().field(a2engine::Sym(159)) }
+    #[inline(always)] pub fn S3D_PARTICLE_LIST() -> usize { super::TABLE.engine().field(a2engine::Sym(160)) }
+    #[inline(always)] pub fn CLASS_NODE_CREW() -> usize { super::TABLE.engine().field(a2engine::Sym(161)) }
+    #[inline(always)] pub fn CLASS_NODE_BORG() -> usize { super::TABLE.engine().field(a2engine::Sym(162)) }
+    #[inline(always)] pub fn INST_ASSIMILATED() -> usize { super::TABLE.engine().field(a2engine::Sym(163)) }
+    #[inline(always)] pub fn LIGHT_REC_LIGHT() -> usize { super::TABLE.engine().field(a2engine::Sym(164)) }
 }
 
 pub mod value {
     #![allow(non_snake_case)]
+    #[inline(always)] pub fn TEAM_LIST_LEN() -> i32 { super::TABLE.engine().value(a2engine::Sym(96)) }
+    #[inline(always)] pub fn POINT_LIGHT_BYTES() -> i32 { super::TABLE.engine().value(a2engine::Sym(126)) }
+    #[inline(always)] pub fn SOUND2D_BYTES() -> i32 { super::TABLE.engine().value(a2engine::Sym(129)) }
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
@@ -171,10 +261,100 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "view_site", symbol: "RTS_Configure", kind: a2engine::Kind::Patch },
     a2engine::SymDef { id: "view_far_plane", symbol: "FAR_CLIPPING_PLANE", kind: a2engine::Kind::Global },
     a2engine::SymDef { id: "view_cull_dist", symbol: "cfgOBJECT_CULLING_DISTANCE", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "s3d_device_index", symbol: "ST3D_GraphicsEngine::current device index", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "s3d_devices", symbol: "ST3D_GraphicsEngine::device table", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "dev_d3d8", symbol: "ST3D_DeviceDirectX8::IDirect3DDevice8", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "list_head", symbol: "std::list head node", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "list_next", symbol: "std::list node next", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "list_value", symbol: "std::list node value", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "vector_begin", symbol: "std::vector begin", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "vector_end", symbol: "std::vector end", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "vt_dev_clear_depth", symbol: "ST3D_Device::ClearDepthBuffer slot", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "vt_dev_flush", symbol: "ST3D_Device::Flush slot", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "vt_obj_render", symbol: "GameObject::Render slot", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "vt_inst_is_craft", symbol: "GameObjectInstance::IsCraftInstance slot", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "vt_inst_frustum", symbol: "ST3D_Instance frustum test slot", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "vt_obj_can_see", symbol: "GameObject::CanUserSee slot", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "inst_scale_set", symbol: "GameObjectInstance::scale is set", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "inst_scale", symbol: "GameObjectInstance::scale", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "obj_on_screen", symbol: "Entity::on screen", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "obj_player", symbol: "GameObject::player", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "player_colour", symbol: "Player::colour", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "obj_team", symbol: "GameObject::team number", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "team_colour", symbol: "Team::colour", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "team_list_len", symbol: "Team::s_pTeamList length", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "s3d_team_colours", symbol: "ST3D_GraphicsEngine::team colours on", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "elem_name", symbol: "ST3D_DatabaseElement::name", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "inst_database", symbol: "GameObjectInstance::database", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "s3d_config", symbol: "ST3D_GraphicsEngine::configuration", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "cfg_detail", symbol: "ST3D_GraphicsEngine_Configuration::detail level", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "cfg_lod_distances", symbol: "ST3D_GraphicsEngine_Configuration::LOD distances", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "inst_class", symbol: "GameObjectInstance::class", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "class_node_shields", symbol: "CraftClass::shields damage node", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "class_node_engines", symbol: "CraftClass::engines damage node", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "class_node_target", symbol: "CraftClass::targeting damage node", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "class_node_sensors", symbol: "CraftClass::sensors damage node", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "class_node_life", symbol: "CraftClass::life support damage node", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "inst_down_shields", symbol: "CraftInstance::shields damage byte", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "inst_down_engines", symbol: "CraftInstance::engines damage byte", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "inst_down_target", symbol: "CraftInstance::targeting damage byte", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "inst_down_sensors", symbol: "CraftInstance::sensors damage byte", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "inst_down_life", symbol: "CraftInstance::life support damage byte", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "inst_crew_fire", symbol: "CraftInstance::crew fire level", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "inst_lights_hidden", symbol: "GameObjectInstance::lights node hidden", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "obj_class", symbol: "GameObject::class", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "shipyard_build_node", symbol: "ShipyardClass::node shown while building", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "shipyard_building", symbol: "Shipyard::ship being built", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "mining_dock_node", symbol: "MiningStationClass::node shown while docked", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "mining_docked", symbol: "MiningStation::docking freighter", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "obj_instance", symbol: "GameObject::instance", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "obj_flags", symbol: "GameObject::flags", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "obj_expired", symbol: "GameObject::expired", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "inst_cull_distance", symbol: "ST3D_Instance::weighted distance", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "inst_distance", symbol: "ST3D_Instance::distance", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "point_light_bytes", symbol: "ST3D_Point_Light size", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "light_start", symbol: "ST3D_Point_Light::start", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "light_range", symbol: "ST3D_Point_Light::range", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "sound2d_bytes", symbol: "AudioSound2D size", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "sprite_texture", symbol: "ST3D_Sprite::texture", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "sprite_flags", symbol: "ST3D_Sprite::flags", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "sprite_rect", symbol: "ST3D_Sprite::rectangle", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "sprite_material", symbol: "ST3D_Sprite::material", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "mat_src_blend", symbol: "ST3D_Material::source blend", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "mat_dst_blend", symbol: "ST3D_Material::destination blend", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "sprite_tile_u", symbol: "ST3D_Sprite::tile width", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "s3d_brightness", symbol: "ST3D_GraphicsEngine::brightness", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "dev_transparency", symbol: "ST3D_Device::transparency", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "s3d_current_instance", symbol: "ST3D_GraphicsEngine::instance being drawn", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "entity_handle", symbol: "Entity::handle", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "tex_device_textures", symbol: "ST3D_Texture::per-device textures", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "devtex_d3d8", symbol: "ST3D_DeviceTexture::IDirect3DTexture8", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "cam_viewport", symbol: "ST3D_Camera::viewport rectangle", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "cam_eye", symbol: "ST3D_Camera::eye", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "cinematic_camera", symbol: "CinematicView::camera", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "s3d_ambient", symbol: "ST3D_GraphicsEngine::ambient colour", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "obj_culled", symbol: "GameObject::culled this view", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "feature_flags", symbol: "GameFeature::flags", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "vt_feature_render", symbol: "GameFeature::Render slot", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "s3d_lights", symbol: "ST3D_GraphicsEngine::light registry", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "light_rec_colour", symbol: "light registry record colour", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "light_rec_matrix", symbol: "light registry record matrix", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "inst_flags", symbol: "ST3D_Instance::flags", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "inst_animating", symbol: "ST3D_Instance::animating", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "inst_anim_start", symbol: "ST3D_Instance::animation start", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "rs_terrain", symbol: "Armada_RenderAllOurStuff state: draw terrain", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "rs_background_a", symbol: "Armada_RenderAllOurStuff state: background argument 1", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "rs_background_b", symbol: "Armada_RenderAllOurStuff state: background argument 2", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "rs_ordnance", symbol: "Armada_RenderAllOurStuff state: draw ordnance", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "s3d_particle_list", symbol: "ST3D_GraphicsEngine::global particle list", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "class_node_crew", symbol: "CraftClass::crew fire node", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "class_node_borg", symbol: "CraftClass::assimilation node", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "inst_assimilated", symbol: "CraftInstance::assimilated byte", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "light_rec_light", symbol: "light registry record light", kind: a2engine::Kind::Field },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
-    a2engine::HookDef { id: "render3d.core.reads", run_unknown: false, rows: &[], syms: &[0, 3, 4, 5, 6, 7, 33, 36, 40, 41, 42, 43, 44, 45, 47, 48, 51, 52, 53, 54, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69] },
+    a2engine::HookDef { id: "render3d.core.reads", run_unknown: false, rows: &[], syms: &[0, 3, 4, 5, 6, 7, 33, 36, 40, 41, 42, 43, 44, 45, 47, 48, 51, 52, 53, 54, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164] },
     a2engine::HookDef { id: "render3d.frame.seam", run_unknown: false, rows: &[], syms: &[15, 70, 71] },
     a2engine::HookDef { id: "render3d.frame.steps", run_unknown: false, rows: &[], syms: &[1, 2, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 35, 37, 38, 39, 49, 50, 55, 56, 57] },
     a2engine::HookDef { id: "render3d.frame.destroy", run_unknown: false, rows: &[], syms: &[34, 46] },
@@ -189,7 +369,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 75,
+        n_resolved: 165,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x45fc50, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x8a, 0xad], mask: &[], section: "", count: 0, value: 0 }, // sound2d
@@ -267,6 +447,96 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x491bef, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x0d, 0xc0, 0xca, 0x6f, 0x00, 0x89, 0x15, 0xfc, 0x3c, 0x77, 0x00, 0x8d, 0x55, 0xf0, 0x89, 0x0d, 0xc4, 0xca, 0x6f, 0x00], mask: &[], section: "", count: 0, value: 0 }, // view_site
             a2engine::Entry { present: true, addr: 0x6fcab0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // view_far_plane
             a2engine::Entry { present: true, addr: 0x6fcac0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // view_cull_dist
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 192 }, // s3d_device_index
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 204 }, // s3d_devices
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 144 }, // dev_d3d8
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // list_head
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // list_next
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // list_value
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // vector_begin
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // vector_end
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 44 }, // vt_dev_clear_depth
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // vt_dev_flush
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 44 }, // vt_obj_render
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // vt_inst_is_craft
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 12 }, // vt_inst_frustum
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // vt_obj_can_see
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 116 }, // inst_scale_set
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // inst_scale
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 37 }, // obj_on_screen
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 252 }, // obj_player
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1140 }, // player_colour
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 236 }, // obj_team
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // team_colour
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // team_list_len
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // s3d_team_colours
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // elem_name
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 128 }, // inst_database
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 260 }, // s3d_config
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // cfg_detail
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 48 }, // cfg_lod_distances
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 152 }, // inst_class
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1036 }, // class_node_shields
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1048 }, // class_node_engines
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1040 }, // class_node_target
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1044 }, // class_node_sensors
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1052 }, // class_node_life
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 156 }, // inst_down_shields
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 157 }, // inst_down_engines
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 158 }, // inst_down_target
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 159 }, // inst_down_sensors
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 160 }, // inst_down_life
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 164 }, // inst_crew_fire
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 144 }, // inst_lights_hidden
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // obj_class
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1188 }, // shipyard_build_node
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 696 }, // shipyard_building
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1200 }, // mining_dock_node
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 688 }, // mining_docked
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // obj_instance
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 20 }, // obj_flags
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 39 }, // obj_expired
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 136 }, // inst_cull_distance
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 140 }, // inst_distance
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 312 }, // point_light_bytes
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 256 }, // light_start
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 260 }, // light_range
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 28 }, // sound2d_bytes
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 88 }, // sprite_texture
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 80 }, // sprite_flags
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // sprite_rect
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 84 }, // sprite_material
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 28 }, // mat_src_blend
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // mat_dst_blend
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // sprite_tile_u
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // s3d_brightness
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 72 }, // dev_transparency
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 256 }, // s3d_current_instance
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // entity_handle
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // tex_device_textures
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // devtex_d3d8
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 432 }, // cam_viewport
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 228 }, // cam_eye
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 44 }, // cinematic_camera
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // s3d_ambient
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 387 }, // obj_culled
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // feature_flags
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // vt_feature_render
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 96 }, // s3d_lights
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // light_rec_colour
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // light_rec_matrix
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 12 }, // inst_flags
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 118 }, // inst_animating
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 24 }, // inst_anim_start
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // rs_terrain
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // rs_background_a
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // rs_background_b
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 12 }, // rs_ordnance
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 104 }, // s3d_particle_list
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1032 }, // class_node_crew
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1056 }, // class_node_borg
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 161 }, // inst_assimilated
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // light_rec_light
         ],
         blocked: &[
         ],
@@ -274,8 +544,8 @@ pub const BUILDS: &[a2engine::Build] = &[
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 5] = [const { core::sync::atomic::AtomicU64::new(0) }; 5];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 75] = [const { core::sync::atomic::AtomicU8::new(0) }; 75];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 75] = [const { core::sync::atomic::AtomicUsize::new(0) }; 75];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 165] = [const { core::sync::atomic::AtomicU8::new(0) }; 165];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 165] = [const { core::sync::atomic::AtomicUsize::new(0) }; 165];
 static NOTES: [a2engine::Note; 5] = [const { a2engine::Note::new() }; 5];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 

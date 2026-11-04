@@ -616,3 +616,810 @@ symbol = "cfgOBJECT_CULLING_DISTANCE"
 kind = "global"
 addr = 0x6fcac0
 used_by = ["view.distance"]
+
+[[sym]]
+id = "s3d_device_index"
+symbol = "ST3D_GraphicsEngine::current device index"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 0xc0
+type = "u32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "s3d_devices"
+symbol = "ST3D_GraphicsEngine::device table"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 0xcc
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "dev_d3d8"
+symbol = "ST3D_DeviceDirectX8::IDirect3DDevice8"
+kind = "field"
+struct = "ST3D_DeviceDirectX8"
+offset = 0x90
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "list_head"
+symbol = "std::list head node"
+kind = "field"
+struct = "std::list"
+offset = 0x4
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "list_next"
+symbol = "std::list node next"
+kind = "field"
+struct = "std::list node"
+offset = 0x0
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "list_value"
+symbol = "std::list node value"
+kind = "field"
+struct = "std::list node"
+offset = 0x8
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "vector_begin"
+symbol = "std::vector begin"
+kind = "field"
+struct = "std::vector"
+offset = 0x4
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "vector_end"
+symbol = "std::vector end"
+kind = "field"
+struct = "std::vector"
+offset = 0x8
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "vt_dev_clear_depth"
+symbol = "ST3D_Device::ClearDepthBuffer slot"
+kind = "field"
+struct = "ST3D_Device vftable"
+offset = 0x2c
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "vt_dev_flush"
+symbol = "ST3D_Device::Flush slot"
+kind = "field"
+struct = "ST3D_Device vftable"
+offset = 0x38
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "vt_obj_render"
+symbol = "GameObject::Render slot"
+kind = "field"
+struct = "GameObject vftable"
+offset = 0x2c
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "vt_inst_is_craft"
+symbol = "GameObjectInstance::IsCraftInstance slot"
+kind = "field"
+struct = "GameObjectInstance vftable"
+offset = 0x28
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "vt_inst_frustum"
+symbol = "ST3D_Instance frustum test slot"
+kind = "field"
+struct = "ST3D_Instance vftable"
+offset = 0xc
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "vt_obj_can_see"
+symbol = "GameObject::CanUserSee slot"
+kind = "field"
+struct = "GameObject vftable"
+offset = 0x8
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "inst_scale_set"
+symbol = "GameObjectInstance::scale is set"
+kind = "field"
+struct = "GameObjectInstance"
+offset = 0x74
+type = "u8"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "inst_scale"
+symbol = "GameObjectInstance::scale"
+kind = "field"
+struct = "GameObjectInstance"
+offset = 0x28
+type = "v3"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "obj_on_screen"
+symbol = "Entity::on screen"
+kind = "field"
+struct = "Entity"
+offset = 0x25
+type = "u8"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "obj_player"
+symbol = "GameObject::player"
+kind = "field"
+struct = "GameObject"
+offset = 0xfc
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "player_colour"
+symbol = "Player::colour"
+kind = "field"
+struct = "Player"
+offset = 0x474
+type = "v3"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "obj_team"
+symbol = "GameObject::team number"
+kind = "field"
+struct = "GameObject"
+offset = 0xec
+type = "i32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "team_colour"
+symbol = "Team::colour"
+kind = "field"
+struct = "Team"
+offset = 0x8
+type = "v3"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "team_list_len"
+symbol = "Team::s_pTeamList length"
+kind = "value"
+value = 0x20
+unit = "entries"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "s3d_team_colours"
+symbol = "ST3D_GraphicsEngine::team colours on"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 0x40
+type = "u8"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "elem_name"
+symbol = "ST3D_DatabaseElement::name"
+kind = "field"
+struct = "ST3D_DatabaseElement"
+offset = 0x8
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "inst_database"
+symbol = "GameObjectInstance::database"
+kind = "field"
+struct = "GameObjectInstance"
+offset = 0x80
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "s3d_config"
+symbol = "ST3D_GraphicsEngine::configuration"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 0x104
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "cfg_detail"
+symbol = "ST3D_GraphicsEngine_Configuration::detail level"
+kind = "field"
+struct = "ST3D_GraphicsEngine_Configuration"
+offset = 0x40
+type = "u32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "cfg_lod_distances"
+symbol = "ST3D_GraphicsEngine_Configuration::LOD distances"
+kind = "field"
+struct = "ST3D_GraphicsEngine_Configuration"
+offset = 0x30
+type = "f32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "inst_class"
+symbol = "GameObjectInstance::class"
+kind = "field"
+struct = "GameObjectInstance"
+offset = 0x98
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "class_node_shields"
+symbol = "CraftClass::shields damage node"
+kind = "field"
+struct = "CraftClass"
+offset = 0x40c
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "class_node_engines"
+symbol = "CraftClass::engines damage node"
+kind = "field"
+struct = "CraftClass"
+offset = 0x418
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "class_node_target"
+symbol = "CraftClass::targeting damage node"
+kind = "field"
+struct = "CraftClass"
+offset = 0x410
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "class_node_sensors"
+symbol = "CraftClass::sensors damage node"
+kind = "field"
+struct = "CraftClass"
+offset = 0x414
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "class_node_life"
+symbol = "CraftClass::life support damage node"
+kind = "field"
+struct = "CraftClass"
+offset = 0x41c
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "inst_down_shields"
+symbol = "CraftInstance::shields damage byte"
+kind = "field"
+struct = "CraftInstance"
+offset = 0x9c
+type = "u8"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "inst_down_engines"
+symbol = "CraftInstance::engines damage byte"
+kind = "field"
+struct = "CraftInstance"
+offset = 0x9d
+type = "u8"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "inst_down_target"
+symbol = "CraftInstance::targeting damage byte"
+kind = "field"
+struct = "CraftInstance"
+offset = 0x9e
+type = "u8"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "inst_down_sensors"
+symbol = "CraftInstance::sensors damage byte"
+kind = "field"
+struct = "CraftInstance"
+offset = 0x9f
+type = "u8"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "inst_down_life"
+symbol = "CraftInstance::life support damage byte"
+kind = "field"
+struct = "CraftInstance"
+offset = 0xa0
+type = "u8"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "inst_crew_fire"
+symbol = "CraftInstance::crew fire level"
+kind = "field"
+struct = "CraftInstance"
+offset = 0xa4
+type = "f32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "inst_lights_hidden"
+symbol = "GameObjectInstance::lights node hidden"
+kind = "field"
+struct = "GameObjectInstance"
+offset = 0x90
+type = "u8"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "obj_class"
+symbol = "GameObject::class"
+kind = "field"
+struct = "GameObject"
+offset = 0x40
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "shipyard_build_node"
+symbol = "ShipyardClass::node shown while building"
+kind = "field"
+struct = "ShipyardClass"
+offset = 0x4a4
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "shipyard_building"
+symbol = "Shipyard::ship being built"
+kind = "field"
+struct = "Shipyard"
+offset = 0x2b8
+type = "u32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "mining_dock_node"
+symbol = "MiningStationClass::node shown while docked"
+kind = "field"
+struct = "MiningStationClass"
+offset = 0x4b0
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "mining_docked"
+symbol = "MiningStation::docking freighter"
+kind = "field"
+struct = "MiningStation"
+offset = 0x2b0
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "obj_instance"
+symbol = "GameObject::instance"
+kind = "field"
+struct = "GameObject"
+offset = 0x4
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "obj_flags"
+symbol = "GameObject::flags"
+kind = "field"
+struct = "GameObject"
+offset = 0x14
+type = "u32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "obj_expired"
+symbol = "GameObject::expired"
+kind = "field"
+struct = "GameObject"
+offset = 0x27
+type = "u8"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "inst_cull_distance"
+symbol = "ST3D_Instance::weighted distance"
+kind = "field"
+struct = "ST3D_Instance"
+offset = 0x88
+type = "f32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "inst_distance"
+symbol = "ST3D_Instance::distance"
+kind = "field"
+struct = "ST3D_Instance"
+offset = 0x8c
+type = "f32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "point_light_bytes"
+symbol = "ST3D_Point_Light size"
+kind = "value"
+value = 0x138
+unit = "bytes"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "light_start"
+symbol = "ST3D_Point_Light::start"
+kind = "field"
+struct = "ST3D_Point_Light"
+offset = 0x100
+type = "f32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "light_range"
+symbol = "ST3D_Point_Light::range"
+kind = "field"
+struct = "ST3D_Point_Light"
+offset = 0x104
+type = "f32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "sound2d_bytes"
+symbol = "AudioSound2D size"
+kind = "value"
+value = 0x1c
+unit = "bytes"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "sprite_texture"
+symbol = "ST3D_Sprite::texture"
+kind = "field"
+struct = "ST3D_Sprite"
+offset = 0x58
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "sprite_flags"
+symbol = "ST3D_Sprite::flags"
+kind = "field"
+struct = "ST3D_Sprite"
+offset = 0x50
+type = "u8"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "sprite_rect"
+symbol = "ST3D_Sprite::rectangle"
+kind = "field"
+struct = "ST3D_Sprite"
+offset = 0x38
+type = "f32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "sprite_material"
+symbol = "ST3D_Sprite::material"
+kind = "field"
+struct = "ST3D_Sprite"
+offset = 0x54
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "mat_src_blend"
+symbol = "ST3D_Material::source blend"
+kind = "field"
+struct = "ST3D_Material"
+offset = 0x1c
+type = "u32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "mat_dst_blend"
+symbol = "ST3D_Material::destination blend"
+kind = "field"
+struct = "ST3D_Material"
+offset = 0x20
+type = "u32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "sprite_tile_u"
+symbol = "ST3D_Sprite::tile width"
+kind = "field"
+struct = "ST3D_Sprite"
+offset = 0x40
+type = "f32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "s3d_brightness"
+symbol = "ST3D_GraphicsEngine::brightness"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 0x4
+type = "f32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "dev_transparency"
+symbol = "ST3D_Device::transparency"
+kind = "field"
+struct = "ST3D_Device"
+offset = 0x48
+type = "f32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "s3d_current_instance"
+symbol = "ST3D_GraphicsEngine::instance being drawn"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 0x100
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "entity_handle"
+symbol = "Entity::handle"
+kind = "field"
+struct = "Entity"
+offset = 0x28
+type = "u32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "tex_device_textures"
+symbol = "ST3D_Texture::per-device textures"
+kind = "field"
+struct = "ST3D_Texture"
+offset = 0x40
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "devtex_d3d8"
+symbol = "ST3D_DeviceTexture::IDirect3DTexture8"
+kind = "field"
+struct = "ST3D_DeviceTexture"
+offset = 0x4
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "cam_viewport"
+symbol = "ST3D_Camera::viewport rectangle"
+kind = "field"
+struct = "ST3D_Camera"
+offset = 0x1b0
+type = "f32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "cam_eye"
+symbol = "ST3D_Camera::eye"
+kind = "field"
+struct = "ST3D_Camera"
+offset = 0xe4
+type = "v3"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "cinematic_camera"
+symbol = "CinematicView::camera"
+kind = "field"
+struct = "CinematicView"
+offset = 0x2c
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "s3d_ambient"
+symbol = "ST3D_GraphicsEngine::ambient colour"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 0x28
+type = "v3"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "obj_culled"
+symbol = "GameObject::culled this view"
+kind = "field"
+struct = "GameObject"
+offset = 0x183
+type = "u8"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "feature_flags"
+symbol = "GameFeature::flags"
+kind = "field"
+struct = "GameFeature"
+offset = 0x20
+type = "u8"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "vt_feature_render"
+symbol = "GameFeature::Render slot"
+kind = "field"
+struct = "GameFeature vftable"
+offset = 0x20
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "s3d_lights"
+symbol = "ST3D_GraphicsEngine::light registry"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 0x60
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "light_rec_colour"
+symbol = "light registry record colour"
+kind = "field"
+struct = "ST3D_LightRecord"
+offset = 0x4
+type = "v3"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "light_rec_matrix"
+symbol = "light registry record matrix"
+kind = "field"
+struct = "ST3D_LightRecord"
+offset = 0x10
+type = "m34"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "inst_flags"
+symbol = "ST3D_Instance::flags"
+kind = "field"
+struct = "ST3D_Instance"
+offset = 0xc
+type = "u32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "inst_animating"
+symbol = "ST3D_Instance::animating"
+kind = "field"
+struct = "ST3D_Instance"
+offset = 0x76
+type = "u8"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "inst_anim_start"
+symbol = "ST3D_Instance::animation start"
+kind = "field"
+struct = "ST3D_Instance"
+offset = 0x18
+type = "f32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "rs_terrain"
+symbol = "Armada_RenderAllOurStuff state: draw terrain"
+kind = "field"
+struct = "RenderState"
+offset = 0x0
+type = "u32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "rs_background_a"
+symbol = "Armada_RenderAllOurStuff state: background argument 1"
+kind = "field"
+struct = "RenderState"
+offset = 0x4
+type = "u32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "rs_background_b"
+symbol = "Armada_RenderAllOurStuff state: background argument 2"
+kind = "field"
+struct = "RenderState"
+offset = 0x8
+type = "u32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "rs_ordnance"
+symbol = "Armada_RenderAllOurStuff state: draw ordnance"
+kind = "field"
+struct = "RenderState"
+offset = 0xc
+type = "u32"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "s3d_particle_list"
+symbol = "ST3D_GraphicsEngine::global particle list"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 0x68
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "class_node_crew"
+symbol = "CraftClass::crew fire node"
+kind = "field"
+struct = "CraftClass"
+offset = 0x408
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "class_node_borg"
+symbol = "CraftClass::assimilation node"
+kind = "field"
+struct = "CraftClass"
+offset = 0x420
+type = "ptr"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "inst_assimilated"
+symbol = "CraftInstance::assimilated byte"
+kind = "field"
+struct = "CraftInstance"
+offset = 0xa1
+type = "u8"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "light_rec_light"
+symbol = "light registry record light"
+kind = "field"
+struct = "ST3D_LightRecord"
+offset = 0x0
+type = "ptr"
+used_by = ["core.reads"]

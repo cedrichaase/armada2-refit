@@ -7,7 +7,7 @@
 use super::{field, field_f32, field_u8, rd, storm3d};
 use crate::math::{v3, V3};
 use crate::engine::at;
-use crate::syms::sym;
+use crate::syms::{field as off, sym, value};
 
 /// A plain `ST3D_Database`'s vtable.
 pub fn vt_database() -> usize { at(sym::VT_DATABASE) }
@@ -23,7 +23,7 @@ pub fn cocoon_db() -> usize { at(sym::COCOON_DB) }
 
 /// The class's `Render` (slot 11).
 pub fn render_fn(o: usize) -> usize {
-    field(super::vtable(o), 11 * 4)
+    field(super::vtable(o), off::VT_OBJ_RENDER())
 }
 
 /// A craft instance (`GameObjectInstance::IsCraftInstance`, instance slot 10).
@@ -32,7 +32,7 @@ pub fn is_craft_instance(inst: usize) -> bool {
         return false;
     }
     unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(field(super::vtable(inst), 10 * 4));
+        let f: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(field(super::vtable(inst), off::VT_INST_IS_CRAFT()));
         f(inst) != 0
     }
 }
@@ -45,15 +45,15 @@ pub fn frustum_test(inst: usize, cam: usize) -> bool {
         return false;
     }
     unsafe {
-        let f: unsafe extern "thiscall" fn(usize, usize) -> u8 = core::mem::transmute(field(super::vtable(inst), 3 * 4));
+        let f: unsafe extern "thiscall" fn(usize, usize) -> u8 = core::mem::transmute(field(super::vtable(inst), off::VT_INST_FRUSTUM()));
         f(inst, cam) != 0
     }
 }
 
 /// The instance's scale: `+0x28` while `+0x74` says one is set (`ApplyScaleEffects`).
 pub fn instance_scale(inst: usize) -> V3 {
-    if inst != 0 && field_u8(inst, 0x74) != 0 {
-        unsafe { rd::<V3>(inst + 0x28) }
+    if inst != 0 && field_u8(inst, off::INST_SCALE_SET()) != 0 {
+        unsafe { rd::<V3>(inst + off::INST_SCALE()) }
     } else {
         v3(1.0, 1.0, 1.0)
     }
@@ -61,7 +61,7 @@ pub fn instance_scale(inst: usize) -> V3 {
 
 /// The on-screen byte `Entity::Render` sets when the frustum test passes.
 pub fn set_on_screen(o: usize) {
-    unsafe { core::ptr::write_volatile((o + 0x25) as *mut u8, 1) };
+    unsafe { core::ptr::write_volatile((o + off::OBJ_ON_SCREEN()) as *mut u8, 1) };
 }
 
 /// The team colour `GameObject::RenderInternal` hands the engine (`Storm3D+0x34`):
@@ -79,14 +79,14 @@ pub fn team_colour(o: usize) -> V3 {
         } else {
             0
         };
-        let p = field(o, 0xfc);
+        let p = field(o, off::OBJ_PLAYER());
         if gt == 2 && p != 0 {
-            return rd::<V3>(p + 0x474);
+            return rd::<V3>(p + off::PLAYER_COLOUR());
         }
         // Team::GetTeam reads Team::s_pTeamList unchecked.
-        let i = field(o, 0xec) as i32;
-        let team = if (0..32).contains(&i) { rd::<usize>(at(sym::TEAM_LIST) + 4 * i as usize) } else { 0 };
-        if team == 0 { v3(1.0, 1.0, 1.0) } else { rd::<V3>(team + 8) }
+        let i = field(o, off::OBJ_TEAM()) as i32;
+        let team = if (0..value::TEAM_LIST_LEN()).contains(&i) { rd::<usize>(at(sym::TEAM_LIST) + 4 * i as usize) } else { 0 };
+        if team == 0 { v3(1.0, 1.0, 1.0) } else { rd::<V3>(team + off::TEAM_COLOUR()) }
     }
 }
 
@@ -94,12 +94,12 @@ pub fn team_colour(o: usize) -> V3 {
 /// `ST3D_Workspace::SetLightingMaterial` asks before it gives a `team*` material the
 /// team's colour).
 pub fn team_colours_on() -> bool {
-    field_u8(storm3d(), 0x40) != 0
+    field_u8(storm3d(), off::S3D_TEAM_COLOURS()) != 0
 }
 
 /// The name of an engine database element (`+0x8`).
 pub fn element_name(e: usize) -> Option<&'static str> {
-    let p = field(e, 8);
+    let p = field(e, off::ELEM_NAME());
     if p == 0 {
         return None;
     }
@@ -110,18 +110,18 @@ pub fn element_name(e: usize) -> Option<&'static str> {
 /// Whether the object's instance draws a plain `ST3D_Database` (a SOD as it is, not a
 /// planet's or another special database).
 pub fn draws_plain_sod(o: usize) -> bool {
-    let db = field(super::obj::instance(o), 0x80);
+    let db = field(super::obj::instance(o), off::INST_DATABASE());
     db != 0 && super::vtable(db) == vt_database()
 }
 
 /// The engine's detail level (`ST3D_GraphicsEngine_Configuration+0x40`).
 pub fn detail_level() -> u32 {
-    field(field(storm3d(), 0x104), 0x40) as u32
+    field(field(storm3d(), off::S3D_CONFIG()), off::CFG_DETAIL()) as u32
 }
 
 /// The instance's class (`GameObjectInstance+0x98`), for crafts the `CraftClass`.
 pub fn instance_class(inst: usize) -> usize {
-    field(inst, 0x98)
+    field(inst, off::INST_CLASS())
 }
 
 /// Every damaged-system node of a craft's class with the instance byte that hides it
@@ -129,27 +129,49 @@ pub fn instance_class(inst: usize) -> usize {
 /// `+0x40c`/`+0x9c`, engines `+0x418`/`+0x9d`, target `+0x410`/`+0x9e`, sensors
 /// `+0x414`/`+0x9f`, life `+0x41c`/`+0xa0`. A byte that is not 0 hides the node's
 /// subtree.
-pub const DAMAGE_NODES: [(usize, usize); 5] = [(0x40c, 0x9c), (0x418, 0x9d), (0x410, 0x9e), (0x414, 0x9f), (0x41c, 0xa0)];
-
-/// The class's element at `off` (a `CraftClass` node field: the damage nodes, the
-/// `crew` node at `+0x408`, the `borg` node at `+0x420`).
-pub fn class_node(class: usize, off: usize) -> usize {
-    field(class, off)
+pub fn damage_nodes() -> [(usize, usize); 5] {
+    [
+        (off::CLASS_NODE_SHIELDS(), off::INST_DOWN_SHIELDS()),
+        (off::CLASS_NODE_ENGINES(), off::INST_DOWN_ENGINES()),
+        (off::CLASS_NODE_TARGET(), off::INST_DOWN_TARGET()),
+        (off::CLASS_NODE_SENSORS(), off::INST_DOWN_SENSORS()),
+        (off::CLASS_NODE_LIFE(), off::INST_DOWN_LIFE()),
+    ]
 }
 
-/// The instance's byte at `off` (a damage byte of `DAMAGE_NODES`, `+0xa1` assimilated).
-pub fn instance_byte(inst: usize, off: usize) -> u8 {
-    field_u8(inst, off)
+/// The class's element at `at` (a `CraftClass` node field of `damage_nodes`).
+pub fn class_node(class: usize, at: usize) -> usize {
+    field(class, at)
+}
+
+/// The class's `crew` node (`+0x408`), whose children the crew fires show.
+pub fn crew_node(class: usize) -> usize {
+    field(class, off::CLASS_NODE_CREW())
+}
+
+/// The class's `borg` node (`+0x420`), shown only while the craft is assimilated.
+pub fn borg_node(class: usize) -> usize {
+    field(class, off::CLASS_NODE_BORG())
+}
+
+/// The instance's byte at `at` (a damage byte of `damage_nodes`).
+pub fn instance_byte(inst: usize, at: usize) -> u8 {
+    field_u8(inst, at)
+}
+
+/// Whether the craft is assimilated (`+0xa1`).
+pub fn assimilated(inst: usize) -> bool {
+    field_u8(inst, off::INST_ASSIMILATED()) != 0
 }
 
 /// The crew-fire level (`CraftInstance+0xa4`).
 pub fn crew_fire(inst: usize) -> f32 {
-    field_f32(inst, 0xa4)
+    field_f32(inst, off::INST_CREW_FIRE())
 }
 
 /// `+0x90`: the instance hides its `lights` node.
 pub fn lights_hidden(inst: usize) -> bool {
-    field_u8(inst, 0x90) != 0
+    field_u8(inst, off::INST_LIGHTS_HIDDEN()) != 0
 }
 
 /// A node of the engine's own database, for the per-class nodes the stations show or
@@ -157,18 +179,18 @@ pub fn lights_hidden(inst: usize) -> bool {
 /// not `NO_ENTITY`; `MiningStation::Render`: `class+0x4b0`, shown while a freighter is
 /// docked).
 pub fn station_node(o: usize) -> Option<(usize, bool)> {
-    let class = field(o, 0x40);
+    let class = field(o, off::OBJ_CLASS());
     match render_fn(o) {
         f if f != 0 && f == fn_shipyard_render() => {
-            let n = field(class, 0x4a4);
+            let n = field(class, off::SHIPYARD_BUILD_NODE());
             let none = unsafe { rd::<usize>(at(sym::NO_ENTITY)) };
-            Some((n, field(o, 0x2b8) == none))
+            Some((n, field(o, off::SHIPYARD_BUILDING()) == none))
         }
         f if f != 0 && f == fn_mining_render() => {
-            let n = field(class, 0x4b0);
+            let n = field(class, off::MINING_DOCK_NODE());
             let docked = unsafe {
                 let f: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(at(sym::FN_IS_SHIP_DOCKED));
-                f(field(o, 0x2b0)) != 0
+                f(field(o, off::MINING_DOCKED())) != 0
             };
             Some((n, !docked))
         }

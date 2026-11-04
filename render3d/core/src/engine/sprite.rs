@@ -22,7 +22,7 @@ use super::{field, field_f32, field_u8, rd, st3d_device, storm3d};
 use crate::math::V3;
 use alloc::string::String;
 use crate::engine::at;
-use crate::syms::sym;
+use crate::syms::{field as off, sym};
 
 /// `ST3D_Sprite::DrawScaled3D`, the square facing the camera.
 pub fn fn_draw_scaled_3d() -> usize { at(sym::FN_DRAW_SCALED_3D) }
@@ -52,15 +52,15 @@ pub struct Look {
 
 /// The sprite's look now: texture, rectangle (after its animation), blend, flags.
 pub fn look(sprite: usize) -> Option<Look> {
-    let tex = field(sprite, 0x58);
-    let name = unsafe { crate::rt::cstr_at(field(tex, 8) as *const u8, 260) };
+    let tex = field(sprite, off::SPRITE_TEXTURE());
+    let name = unsafe { crate::rt::cstr_at(field(tex, off::ELEM_NAME()) as *const u8, 260) };
     if name.is_empty() {
         return None;
     }
     // The file name without a path or an extension.
     let base = name.rsplit(['\\', '/']).next().unwrap_or(name);
     let stem = base.split('.').next().unwrap_or(base);
-    let flags = field_u8(sprite, 0x50);
+    let flags = field_u8(sprite, off::SPRITE_FLAGS());
     if flags & 0x10 == 0 {
         unsafe {
             let f: unsafe extern "thiscall" fn(usize) = core::mem::transmute(fn_animate());
@@ -76,9 +76,9 @@ pub fn look(sprite: usize) -> Option<Look> {
         }
     }
     let off: [f32; 2] = unsafe { rd(tex_offset()) };
-    let r: [f32; 4] = unsafe { rd(sprite + 0x38) };
-    let mat = field(sprite, 0x54);
-    let (mut src, mut dst) = (field(mat, 0x1c) as u32, field(mat, 0x20) as u32);
+    let r: [f32; 4] = unsafe { rd(sprite + off::SPRITE_RECT()) };
+    let mat = field(sprite, off::SPRITE_MATERIAL());
+    let (mut src, mut dst) = (field(mat, off::MAT_SRC_BLEND()) as u32, field(mat, off::MAT_DST_BLEND()) as u32);
     if mat == 0 || !(1..=13).contains(&src) || !(1..=13).contains(&dst) {
         src = BLEND_ONE;
         dst = BLEND_ONE;
@@ -88,22 +88,22 @@ pub fn look(sprite: usize) -> Option<Look> {
 
 /// The width of one repeat of a tiled sprite (`@tile_u`, `+0x40`).
 pub fn tile_width(sprite: usize) -> f32 {
-    field_f32(sprite, 0x40)
+    field_f32(sprite, off::SPRITE_TILE_U())
 }
 
 /// The vertex colour stock gives a sprite: its colour times the engine's brightness,
 /// the device's transparency as alpha.
 pub fn colour(col: V3) -> [f32; 4] {
-    let b = field_f32(storm3d(), 4);
-    let a = field_f32(st3d_device(), 0x48);
+    let b = field_f32(storm3d(), off::S3D_BRIGHTNESS());
+    let a = field_f32(st3d_device(), off::DEV_TRANSPARENCY());
     let c = |x: f32| (x * b).clamp(0.0, 1.0);
     [c(col.x), c(col.y), c(col.z), a.clamp(0.0, 1.0)]
 }
 
 /// The scale of the instance being drawn (Storm3D +0x100, its +0x28), when it is not 1.
 pub fn draw_scale() -> Option<f32> {
-    let inst = field(storm3d(), 0x100);
-    let k = field_f32(inst, 0x28);
+    let inst = field(storm3d(), off::S3D_CURRENT_INSTANCE());
+    let k = field_f32(inst, off::INST_SCALE());
     (inst != 0 && k != 1.0).then_some(k)
 }
 

@@ -13,7 +13,7 @@ use r3d_core::math::{v3, M34, V3};
 use crate::syms::sym;
 pub use r3d_core::engine::instance::{
     class_node, crew_fire, detail_level, element_name, frustum_test, instance_byte, instance_class, instance_scale, is_craft_instance, lights_hidden,
-    render_fn, set_on_screen, station_node, team_colour, team_colours_on, cocoon_db, fn_mining_render, fn_rig_render, fn_shipyard_render, vt_cocoon, vt_database, DAMAGE_NODES,
+    render_fn, set_on_screen, station_node, team_colour, team_colours_on, cocoon_db, fn_mining_render, fn_rig_render, fn_shipyard_render, vt_cocoon, vt_database, damage_nodes, crew_node, borg_node,
 };
 
 /// An engine address of the profile: 0 unless the hook that uses it is ready.
@@ -515,20 +515,20 @@ pub fn cocoon_ramp(c: usize) -> f32 {
 }
 
 /// The nodes of a craft class whose children are the engine's damage and crew-fire
-/// effects (the class's damage node names, `DAMAGE_NODES`, and the crew-fire one at
+/// effects (the class's damage node names, `damage_nodes`, and the crew-fire one at
 /// `+0x408`): hidden when a model is shown clean.
 pub fn class_effect_nodes(class: usize) -> alloc::vec::Vec<&'static str> {
-    DAMAGE_NODES
+    damage_nodes()
         .iter()
-        .copied()
-        .chain([(0x408usize, 0usize)])
-        .filter_map(|(cf, _)| element_name(field(class, cf)))
+        .map(|&(cf, _)| field(class, cf))
+        .chain([crew_node(class)])
+        .filter_map(element_name)
         .collect()
 }
 
 /// The name of a craft class's Borg node (`+0x420`).
 pub fn class_borg_node(class: usize) -> Option<&'static str> {
-    element_name(field(class, 0x420))
+    element_name(borg_node(class))
 }
 
 /// Whether a class is a `CraftClass` (its node fields are where `class_effect_nodes`

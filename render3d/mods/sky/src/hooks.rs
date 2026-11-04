@@ -200,9 +200,9 @@ pub fn instance_scale(inst: usize) -> V3 {
 pub fn finish(st3d: usize, cam: usize) {
     unsafe {
         let dvt = engine::vtable(st3d);
-        this0(field(dvt, engine::DEV_FLUSH), st3d);
+        this0(field(dvt, engine::dev_flush()), st3d);
         set_far(cam, far_plane());
         let r: [f32; 4] = rd(cam + CAM_RECT);
-        this1(field(dvt, engine::DEV_CLEAR_DEPTH), st3d, r.as_ptr() as usize);
+        this1(field(dvt, engine::dev_clear_depth()), st3d, r.as_ptr() as usize);
     }
 }

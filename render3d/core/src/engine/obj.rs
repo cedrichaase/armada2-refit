@@ -5,12 +5,11 @@ use crate::math::M34;
 
 pub(crate) fn fn_transform() -> usize { at(sym::FN_TRANSFORM) } // Entity::GetTransform() const, thiscall: Matrix34*
 pub(crate) fn fn_odf_name() -> usize { at(sym::FN_ODF_NAME) } // GameObject::GetOdfName() const, thiscall: char*
-const SLOT_CAN_SEE: usize = 2; // GameObject::CanUserSee() const
 
 /// `GameObject::objectList`, every object the object loop visits.
 pub use super::object_list;
 use crate::engine::at;
-use crate::syms::sym;
+use crate::syms::{field as off, sym};
 
 /// The object's world transform (`Entity::GetTransform`).
 pub fn transform(o: usize) -> M34 {
@@ -47,29 +46,29 @@ pub fn can_user_see(o: usize) -> bool {
         return false;
     }
     unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(field(vtable(o), SLOT_CAN_SEE * 4));
+        let f: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(field(vtable(o), off::VT_OBJ_CAN_SEE()));
         f(o) != 0
     }
 }
 
 /// The object's instance (`GameObjectInstance`, an `ST3D_Instance`): `+0x4`.
 pub fn instance(o: usize) -> usize {
-    field(o, 4)
+    field(o, off::OBJ_INSTANCE())
 }
 
 /// The object's flags word (`+0x14`; 0x10000 = background object).
 pub fn flags(o: usize) -> u32 {
-    field(o, 0x14) as u32
+    field(o, off::OBJ_FLAGS()) as u32
 }
 
 /// Expired or hidden (`+0x27`): stock's `Render` draws nothing.
 pub fn expired(o: usize) -> bool {
-    field_u8(o, 0x27) != 0
+    field_u8(o, off::OBJ_EXPIRED()) != 0
 }
 
 /// The class object (`+0x40`).
 pub fn class(o: usize) -> usize {
-    field(o, 0x40)
+    field(o, off::OBJ_CLASS())
 }
 
 /// The vtable, which tells the C++ class apart (`body-map.md` lists the ones that
@@ -84,5 +83,5 @@ pub fn instance_distances(inst: usize) -> (f32, f32) {
     if inst == 0 {
         return (0.0, 0.0);
     }
-    unsafe { (rd::<f32>(inst + 0x88), rd::<f32>(inst + 0x8c)) }
+    unsafe { (rd::<f32>(inst + off::INST_CULL_DISTANCE()), rd::<f32>(inst + off::INST_DISTANCE())) }
 }

@@ -13,7 +13,7 @@ pub use view::{slot, entity_handle};
 
 use crate::math::{M34, V3};
 use core::ffi::c_void;
-use crate::syms::sym;
+use crate::syms::{field as off, sym};
 
 /// An engine address of the profile: 0 unless the hook that uses it is ready.
 pub(crate) fn at(s: a2engine::Sym) -> usize { crate::syms::TABLE.engine().addr(s) }
@@ -82,9 +82,9 @@ pub fn d3d8_device() -> *mut c_void {
     if s == 0 {
         return core::ptr::null_mut();
     }
-    let idx = field(s, 0xc0);
-    let dev = field(s + 0xcc, idx * 4);
-    field(dev, 0x90) as *mut c_void
+    let idx = field(s, off::S3D_DEVICE_INDEX());
+    let dev = field(s + off::S3D_DEVICES(), idx * 4);
+    field(dev, off::DEV_D3D8()) as *mut c_void
 }
 
 /// The ST3D device object (`ST3D_DeviceDirectX8`).
@@ -93,8 +93,8 @@ pub fn st3d_device() -> usize {
     if s == 0 {
         return 0;
     }
-    let idx = field(s, 0xc0);
-    field(s + 0xcc, idx * 4)
+    let idx = field(s, off::S3D_DEVICE_INDEX());
+    field(s + off::S3D_DEVICES(), idx * 4)
 }
 
 // ---- clock ----------------------------------------------------------------------
@@ -107,7 +107,7 @@ pub fn sim_time() -> f32 {
 // ---- lists ----------------------------------------------------------------------
 
 /// `GameObject::objectList` 0x761084: `std::list*`, head node `+4`, each node `+8`
-/// the object (`plugins.md` §3).
+/// the object (`plugins.md` §3; the profile's `list_*`).
 pub fn object_list() -> usize { at(sym::OBJECT_LIST) }
 
 /// Walks a VC6 `std::list` whose pointer sits at `list_ptr_addr`, calling `f` with
@@ -117,15 +117,16 @@ pub fn for_each_in_list(list_ptr_addr: usize, mut f: impl FnMut(usize)) {
     if list == 0 {
         return;
     }
-    let head = field(list, 4);
+    let (next, value) = (off::LIST_NEXT(), off::LIST_VALUE());
+    let head = field(list, off::LIST_HEAD());
     if head == 0 {
         return;
     }
-    let mut n = field(head, 0);
+    let mut n = field(head, next);
     let mut guard = 0;
     while n != head && n != 0 && guard < 1_000_000 {
-        f(field(n, 8));
-        n = field(n, 0);
+        f(field(n, value));
+        n = field(n, next);
         guard += 1;
     }
 }
@@ -140,7 +141,7 @@ pub fn for_each_feature(mut f: impl FnMut(usize)) {
     if v == 0 {
         return;
     }
-    let (mut p, end) = (field(v, 4), field(v, 8));
+    let (mut p, end) = (field(v, off::VECTOR_BEGIN()), field(v, off::VECTOR_END()));
     let mut guard = 0;
     while p != 0 && p < end && guard < 100_000 {
         f(field(p, 0));
@@ -154,8 +155,8 @@ pub fn for_each_feature(mut f: impl FnMut(usize)) {
 pub fn dx8_vtable() -> usize { at(sym::DX8_VTABLE) }
 
 /// `ST3D_Device` vtable offsets: `ClearDepthBuffer(ST3D_Rect*)` and `Flush()`.
-pub const DEV_CLEAR_DEPTH: usize = 0x2c;
-pub const DEV_FLUSH: usize = 0x38;
+pub fn dev_clear_depth() -> usize { off::VT_DEV_CLEAR_DEPTH() }
+pub fn dev_flush() -> usize { off::VT_DEV_FLUSH() }
 
 /// Reads an `f32` field (the effects' short name for `field_f32`).
 pub fn ff(base: usize, off: usize) -> f32 {

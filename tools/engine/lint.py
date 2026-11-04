@@ -20,7 +20,7 @@ with each file's `out` resolved against DIR (the selftest's fixtures do).
     tables; `unknown = "run"` only when every entry of the hook is a scan.
  3. Code <-> profile, both ways, by tokens in the plugin's non-generated sources, comments
     stripped, strings kept (C asm strings matter): Rust `sym::X`, `hook::X`, `field::X`,
-    `value::X`; C `<P>_S_X`, `<P>_H_X`, `<P>_F_X`, `<P>_V_X`, `_a2s_<p>_<id>`, `_a2f_<p>_<id>`. Every token is
+    `value::X` (or the module under an alias, `use crate::syms::{field as off}`, `off::X`); C `<P>_S_X`, `<P>_H_X`, `<P>_F_X`, `<P>_V_X`, `_a2s_<p>_<id>`, `_a2f_<p>_<id>`. Every token is
     defined; every entry and hook is used (an entry that is the call/jmp/slot target or the
     vtable of a used entry counts as used).
  4. No engine address in those sources: any hex literal inside a build's image range fails,
@@ -766,6 +766,10 @@ def tokens(s, lang, members):
     if lang == 'rust':
         for m in re.finditer(r'\b(sym|hook|field|value)::([A-Z][A-Z0-9_]*)\b', s):
             yield s.count('\n', 0, m.start()) + 1, (None, m.group(1)), m.group(2)
+        # a module imported under another name (`use crate::syms::{field as off}`)
+        for a in re.finditer(r'\b(sym|hook|field|value)\s+as\s+([a-z_][a-z0-9_]*)\b', s):
+            for m in re.finditer(r'(?<![\w:])' + a.group(2) + r'::([A-Z][A-Z0-9_]*)\b', s):
+                yield s.count('\n', 0, m.start()) + 1, (None, a.group(1)), m.group(1)
         return
     for _, rf in members:
         p = rf.plugin
