@@ -12,6 +12,7 @@ release zip carries.
     python3 armada2-refit-installer.py --install [VERSION] [--game DIR] [--no-launcher]
     python3 armada2-refit-installer.py --package ZIP --game DIR
     python3 armada2-refit-installer.py --uninstall [--game DIR]
+    python3 armada2-refit-installer.py --setup-mac [SETUP_EXE]   # macOS, no game yet
     python3 armada2-refit-installer.py --selftest
 
 The command line runs the same `Job` as the window and needs no GTK, which is how
@@ -331,7 +332,7 @@ The core is the same on all three systems (`SYSTEM`); what differs:
 | The script | `install.ps1` through `powershell.exe -ExecutionPolicy Bypass -File`, no console window | `install.sh` through `/bin/bash` (3.2, BSD tools) |
 | Direct3D | Display8 as `d3d8.dll` (empty slot, GOG's, the old chain's or a DXVK d3d8, or an older Display8), drawing on Vulkan or Direct3D 12 itself; the player's own `d3d8.dll` stays, without UI and Render3D | the same, on the prefix's Wine; no `d3d9.dll`, no DXVK |
 | Launch settings | none: the game folder's DLLs load first | the DLL overrides (`winmm=n,b;d3d8=n,b`, never `d3d9`), written into the prefix's `user.reg` under `AppDefaults\Armada2.exe\DllOverrides` (the game's alone, not the bottle's); a `d3d9` value an older install wrote is removed when the rest of the section is only ours |
-| Launch game | the exe | the prefix's Wine: CrossOver's `wine --bottle <name>`, a wrapper's own, Whisky's, else Gcenx's or Homebrew's |
+| Launch game | the exe | the prefix's Wine: CrossOver's `wine --bottle <name>`, a wrapper whose program is `Armada2.exe` opened as a double click opens it (`wrapper_runs_game`: its own Wine started bare runs nothing), another wrapper's own Wine (with the wrapper's `Frameworks` on `DYLD_FALLBACK_LIBRARY_PATH`, `wrapper_env`), Whisky's, else Gcenx's or Homebrew's |
 | Cache, settings | `%LOCALAPPDATA%\armada2-refit\installer\cache`, `%APPDATA%\armada2-refit\installer.json` | `~/Library/Caches/armada2-refit/installer`, `~/Library/Application Support/armada2-refit/installer.json` |
 
 **The registry, on macOS** (`prefix_plan`, `prefix_apply`). Only the overrides the game
@@ -349,13 +350,63 @@ frozen program runs a `.py` given as its first argument (`run_python`), and the 
 `A2_PYTHON` to itself; both scripts use `A2_PYTHON` when it is set. An exception there
 goes to stderr, never to a dialog that would stall the script.
 
-**Which stack on a Mac.** Recommended: **CrossOver 26** (CodeWeavers, paid; Wine 11, rated
-"Runs Great" for Armada II). Free: **Sikarugir** (the former Kegworks) or **Gcenx's**
-macOS Wine builds. Whisky was discontinued in 2025, and Homebrew's `wine-stable` cask is
+**Which stack on a Mac.** The window sets the game up in a **Sikarugir** wrapper itself
+(below), free. It was confirmed in game at 2.2.0 (2026-10-28, Apple M1, macOS 27; Rosetta 2 already there); the port onto 3.x (3.1.0) is not seen yet. **CrossOver 26** (CodeWeavers, paid; Wine 11, rated
+"Runs Great" for Armada II) works too: the game installed into a bottle is found like
+any other. **Gcenx's** macOS Wine builds are the third way. Whisky was discontinued in 2025, and Homebrew's `wine-stable` cask is
 disabled. Every Wine on Apple Silicon runs under Rosetta 2, which Apple keeps fully
 through macOS 27 and then only "for older unmaintained gaming titles"; whether Wine
 stays inside that is not announced. The window's own text for this is `MAC_HOWTO` in the
 script, its only copy (and `WINDOWS_HOWTO` for getting the game on Windows).
+
+### Setting the game up on a Mac
+
+With no game found on macOS, the window's button is **Set up Armada II** (`--setup-mac`
+on the command line), enabled once GOG's Windows offline installer is in `~/Downloads`
+(`find_setup_exe`: `setup_star_trek*armada*.exe`, the newest; the window says whether it
+found one). GOG's installer cannot be fetched for the player: it needs their GOG
+account, so `MAC_HOWTO` says where in the GOG library it is. After a yes to a dialog
+that lists what follows, `Job.setup_mac` does what Sikarugir Creator and the wrapper's
+*Install Software* would make the player click through:
+
+1. **Rosetta 2**, if `/Library/Apple/usr/share/rosetta/rosetta` is missing:
+   `softwareupdate --install-rosetta --agree-to-license` (the dialog says it agrees to
+   Apple's licence). Every Wine on Apple Silicon runs under it.
+2. **Sikarugir's template and engine** from Sikarugir's own GitHub releases, pinned by
+   URL, size and sha256 (`SIKARUGIR_TEMPLATE`: `Template-1.0.24`, `SIKARUGIR_ENGINE`:
+   `WS12WineSikarugir11.0_1`, Wine 11 in new-style WoW64), cached in
+   `~/Library/Caches/armada2-refit/installer/sikarugir/`. They are fetched, never
+   shipped: the template and its launcher are not under the LGPL, and the refit
+   carries neither.
+3. **The wrapper**, built in `~/Applications/Sikarugir/.armada-ii-setup` and renamed to
+   `Armada II.app` only once the game is in it, so a setup that stops leaves no wrapper
+   for the search to find. It is what Creator makes, checked file by file against a
+   Creator-made one: the template unpacked, the engine's `wswine.bundle` as
+   `Contents/SharedSupport/wine`, and three Info.plist keys (`wrapper_plist`:
+   `CFBundleIdentifier`, `CFBundleName`, `Program Name and Path`, the exe in
+   `drive_c`); the rest of the template's settings stay, D9VK on among them. The setup
+   writes no `d3d9` or DXVK setting of its own: the overrides are the installer's usual
+   `winmm=n,b;d3d8=n,b` (`prefix_plan`), and Display8 picks its own backend.
+4. **The prefix**, by the wrapper's own launcher, as Creator makes it:
+   `Contents/MacOS/wineskinlauncher WSS-wineprefixcreate` (Sikarugir's environment and
+   its default registry, which a bare `wineboot` lacks). The launcher is one binary
+   under three names (`Sikarugir`, `launcher`, `wineskinlauncher`); the `sikarugir
+   create-prefix` / `run` usage in its strings is not answered inside a wrapper. It may
+   return before Wine is done, so `_wait_wine` waits until no process of the wrapper's
+   Wine is left. The engine carries Wine Mono and Gecko, so nothing asks to download
+   them.
+5. **The game**: GOG's installer is Inno Setup's, run `/VERYSILENT /SUPPRESSMSGBOXES
+   /NORESTART /SP-` into GOG's own default folder, `C:\GOG Games\Star Trek Armada II`.
+   The launcher passes flags only to the wrapper's own program, so for this one run
+   `Program Name and Path` is a copy of the installer at `C:\a2refit-setup\setup.exe`
+   (an APFS clone, `cp -c`) and `Program Flags` Inno's; the launcher is started without
+   arguments, and the copy goes and `Armada2.exe` becomes the program again afterwards.
+   No `Armada2.exe` there is an error that names the installer.
+
+The window then finds the game in the new wrapper and installs the chosen release into
+it as usual (the DLL overrides into its `user.reg`). The player starts it with
+`~/Applications/Sikarugir/Armada II.app` or **Launch game**, which opens that wrapper. The app itself stays
+unnotarised: its first launch still needs *Open Anyway*.
 
 ### The window on Windows and macOS
 
@@ -364,7 +415,9 @@ library), in `run_tk()`. Everything is drawn on a single Canvas — the sky, the
 translucent card, the buttons and the pickers — since a Tk widget is opaque and would
 cut a box out of the sky. The card, buttons and fields are antialiased rounded
 rectangles with an alpha channel, built as PNGs in Python (`rounded_rows`, `tk_png`) and
-blended by Tk over the canvas; the pickers open a menu.
+blended by Tk over the canvas; the pickers open a menu on Windows, and on macOS a list
+drawn on the canvas too (`open_picker`): Tk's native popup menu (8.6.16), posted from a
+click on the canvas, left the whole window deaf to the mouse there until it was killed.
 
 The sky is `Sky` redone for a Canvas: the same `nebula_pixels`, composited over the
 gradient and scaled to the window height in a thread (`nebula_rgb`, a third of a second),
