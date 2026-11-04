@@ -146,7 +146,11 @@ armada2-refit-installer-windows.exe, armada2-refit-installer-macos.zip (an app) 
 Linux AppImage. It downloads this package and runs the script below. By hand:
   Windows:          double-click install.bat (or: install.bat "C:\path\to\the game")
   Linux, Proton:    ./install.sh "/path/to/the game"
-  macOS, CrossOver or another Wine:
+  macOS:            no game yet? The macOS app's "Set up Armada II" puts GOG's Windows
+                    offline installer for the game (from Downloads) into a free
+                    Sikarugir wrapper, then installs this. Step by step: PLAYING.md,
+                    "On a Mac, step by step", in the repository.
+  macOS, the game already in CrossOver or another Wine:
                     /bin/bash install.sh "/path/to/the game" (in the bottle's drive_c)
 Each installs what can work on this machine and says what it skipped and why. Every
 layer that is a choice can be left out: --without qol,rules (install.bat -Without

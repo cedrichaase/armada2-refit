@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.22 — 2026-11-04
+
+Layers: gui-installer 3.1.1.
+
+### Fixed
+- gui-installer: the Mac setup asks for Rosetta 2 only on Apple Silicon, so it no longer stops on an Intel Mac. Installed, not yet seen in game.
+
+### Changed
+- gui-installer: the Mac's no-game text links `PLAYING.md`'s new "On a Mac, step by step" (issue #18: the known working configuration, getting GOG's installer, *Open Anyway*, the setup, CrossOver, what to do when the setup stops, the logs and removal). The release zip's `README.txt` names the Mac setup. Installed, not yet seen in game.
+
 ## 15.6.21 — 2026-11-04
 
 Layers: gui-installer 3.1.0.
