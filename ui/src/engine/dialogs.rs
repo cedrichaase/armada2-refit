@@ -1024,7 +1024,7 @@ fn pump(top: HWND) -> Option<i32> {
             let mouse = (WM_MOUSEMOVE..=WM_MOUSELAST).contains(&m.message);
             if (key || mouse) && in_hosted(m.hwnd) {
                 if key {
-                    crate::input::note_message(m.message, m.wparam);
+                    crate::input::note_message(m.message, m.wparam, m.lparam);
                     // IsDialogMessageA translates the key itself: a TranslateMessage here
                     // too typed every character twice.
                     if crate::menus::wants_keys() {
@@ -1063,8 +1063,13 @@ fn pump(top: HWND) -> Option<i32> {
             // system key (no window holds the focus) is its, noted as the plain key it is,
             // and is not Return to Game.
             if m.message == WM_SYSKEYDOWN && m.wparam as u8 == VK_ESCAPE && m.lparam & (1 << 29) == 0 && m.lparam & (1 << 30) == 0 && crate::menus::wants_keys() {
-                crate::input::note_message(WM_KEYDOWN, m.wparam);
+                crate::input::note_message(WM_KEYDOWN, m.wparam, m.lparam);
                 continue;
+            }
+            // A system key (an Alt combination, F10) is a press the Keys tab can bind,
+            // whether or not the window procedure passes it on to the engine's handler.
+            if m.message == WM_SYSKEYDOWN {
+                crate::input::note_press(m.message, m.lparam);
             }
             if escape(&m, top, cfg.menus_escape) {
                 continue;

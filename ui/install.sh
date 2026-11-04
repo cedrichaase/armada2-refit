@@ -6,7 +6,9 @@
 #
 # Adds UI.asi, UI.ini and (at run time) UI.log: every hook is made in memory, so
 # removing the files gives the stock game back: --remove deletes UI.asi, UI.ini and UI.log,
-# so it takes the player's UI.ini with it. An install keeps an existing UI.ini: a key the
+# so it takes the player's UI.ini with it. The one stock file the UI changes is the key
+# map, Input.map, when the player rebinds a key on the Refit screen's Keys tab (beside
+# Input.map.a2neb-backup); --remove puts the stock one back. An install keeps an existing UI.ini: a key the
 # shipped file has and theirs lacks is added in its own section, and a part a newer
 # set of defaults switched on is switched on where theirs still holds the old default
 # (tools/ini-merge.py). The plugins the UI replaced (HUD.asi, GridLayout.asi, Menus.asi)
@@ -30,6 +32,13 @@ done
 
 if [ "$remove" = 1 ]; then
     rm -f "$GAME/UI.asi" "$GAME/UI.ini" "$GAME/UI.log"
+    # The key map the Refit screen's Keys tab rewrote (MENUS.md, "The Keys tab").
+    for f in Input.map misc/Input.map; do
+        if [ -f "$GAME/$f.a2neb-backup" ]; then
+            mv -f "$GAME/$f.a2neb-backup" "$GAME/$f"
+            echo "stock $f back"
+        fi
+    done
     echo "removed UI.asi from $GAME"
     exit 0
 fi

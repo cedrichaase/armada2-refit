@@ -142,6 +142,14 @@ Alt. A button released outside the window after a press the engine did not see s
 up (nothing captured the mouse), so `poll` also asks `GetAsyncKeyState` and releases a
 button the hardware says is up.
 
+**Presses by position** (`Input::presses`, `note_press`), for the Keys tab to bind a key
+the way the engine's key map names it: each key down or system key down that is not an
+auto-repeat, as its scancode with lParam's extended bit (`0x100`) and the modifiers held
+then. Noted at the same four points, and by the dialog host's loop for a system key
+(`WM_SYSKEYDOWN`: Alt combinations, F10), whichever the message passes; one message seen
+twice (same lParam and message in a row) is noted once. `keys.rs` is the Keys tab's model
+and `Input.map`'s writer (`MENUS.md`, "The Keys tab").
+
 ## Focus and the pointer
 
 `[UI] PointerLog=1` (off as shipped; `input::diagnose`, `engine/mouse.rs`) logs, in

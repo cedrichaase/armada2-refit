@@ -567,7 +567,7 @@ screen.
 ## The Refit screen
 
 `menus/refit.rs`: every setting of every plugin that exports a settings table
-(`tools/settings/README.md`), as rows on three tabs (Graphics, Interface, Gameplay; a tab with no row is not shown, which is why Movies and Multiplayer are gone: cutscenes 3.0.1, Pay when queued on Gameplay, Online entry on Interface), in **a modal of ours over the hosted Options dialog**. It is not a
+(`tools/settings/README.md`), as rows on three tabs (Graphics, Interface, Gameplay; a tab with no row is not shown, which is why Movies and Multiplayer are gone: cutscenes 3.0.1, Pay when queued on Gameplay, Online entry on Interface), and the game's keys on a fourth, **Keys** ([below](#the-keys-tab)), in **a modal of ours over the hosted Options dialog**. It is not a
 shell screen of its own: the in-mission Options runs inside the dialog host's loop, which
 is the only thing that presents while a mission's menu is up, and the modal drawn by the
 host's frame (`menus::frame`, after the dialog stack, before the frame's claim) works the
@@ -609,6 +609,72 @@ same in the shell and in a mission with the stock dialog still running under it.
   (now|next mission|restart)`, `... could not be written`, `... locked in a network
   game`, `refit: <Tab> reset (n keys removed)`, `refit: <Plugin>: <note>`, `refit:
   menus off asked; yes|no`.
+
+### The Keys tab
+
+`menus/refit_keys.rs` draws it; `keys.rs` is the model and the only writer. The issue it
+answers is that Armada II's keys could be changed only by editing `Input.map` by hand, and
+could be found only by reading it: the tab lists every key by what it does, and rebinds one
+by pressing the new key.
+
+- **What it lists.** Every block of the game's `Input.map` that is on the keyboard (the
+  file's format: `crates/a2fmt/README.md`, "Input.map"), under the file's own sections,
+  renamed for people (`Camera navigation` is *Camera*, `Orders menu, corresponds to
+  buttons` is *Bar: orders*) and grouped by its `###` headings. A row's label is the
+  comment above its block, else its name in words; the help strip gives the rest of the
+  comment, the action's name in the file and stock's key. `pauseGame` and `mainMenu` stand
+  among the editor's keys in the file and are listed under *General*. The editor's and the
+  developers' section shows with *Show advanced*. A category with the player's keys in it
+  has a dot. Above the list, **Command bar grid**: QOL.asi's fifteen position keys
+  (`QOL_BarKeyName(cell)`, `qol/README.md`, "QOL-1"), shown when QOL.asi has that export.
+- **The bar's own keys.** The *Bar:* categories are the keys of the command bar's menus,
+  orders, builds and special weapons. While QOL's grid keys are on (`[QOL] BarKeys`, the
+  Interface tab's *Grid keys*) they do nothing, so their rows are dimmed under a line that
+  says so, and they are not counted as clashes; with the grid keys off the grid's rows are.
+- **Search** (the field at the top right) filters every category at once, by label, help,
+  the action's name or the key's spelling (`ctrl+s`).
+- **Clashes.** A row whose key a press shares with another listed key (the same key, no
+  modifier one needs held and the other needs released, `Binding::overlaps`) names them
+  under its label, *Same key as: ...*. Stock has such pairs on purpose (a key that does
+  one thing in a menu and another on the map, the saves of a network game and a lone
+  one), so this informs and refuses nothing.
+- **Rebinding.** A click on a row opens a box over the page that waits for a press. The
+  press is read by position (`input::note_press`: the key message's scancode and its
+  extended bit, with Control, Shift and Alt as held, auto-repeats left out, and system
+  keys, Alt combinations and F10, included, noted by the dialog host's loop as well as by
+  the window procedure's hooks, once). A key the key map does not name
+  (`a2fmt::inputmap::KEYS`) is refused with a line in the box; a modifier alone waits for
+  its key. Esc cancels; *Stock key* puts stock's back. A block marked by the engine
+  (`*Esc`, Main menu), one with two keys or with the mouse is shown and cannot be changed.
+  Esc on the tab first cancels a capture and then leaves the search field before it closes
+  the modal.
+- **Where it is kept.** The choice goes into the overlay like every setting,
+  `RefitPlayer.ini [UI.Keys] <action>=Control+Shift+F1` (only the held modifiers are
+  written; stock's own key removes the line), and `[QOL.Keys] CellN=<key>` for the grid.
+  Then `keys::sync` makes `Input.map` the stock text with each chosen block's lines
+  replaced (`InputMap::rewrite`: every other byte is kept): the first time a key differs
+  the stock file is kept as `Input.map.a2neb-backup`, and with no choice left it goes back
+  and the backup goes. A modifier the stock block leaves open stays open unless the new
+  key holds it, so the number keys' group blocks keep answering Ctrl+number. `sync` runs
+  at UI.asi's start (`keys::start`, from `DllMain`, before the engine reads the key map),
+  when the tab opens (a hand edit of the overlay) and after every change. The stock text
+  is the backup's when there is one: a hand edit of `Input.map` while a backup stands is
+  overwritten.
+- **When it applies.** The engine reads `Input.map` when it starts, so a change of the
+  map's keys applies when the game is started again: the row shows *Restart needed* while
+  its key differs from the one the file held at this start. The grid's keys are QOL's and
+  apply at once (the hub calls `QOL_SettingsChanged`).
+- **Reset tab** asks, then removes every `[UI.Keys]` and `[QOL.Keys]` key of the overlay.
+- **`a2mod` and the uninstall.** The `ui` layer `replaces` `Input.map`, so `a2mod stock`
+  puts the stock file back and `refit` the player's; `ui/install.sh --remove` and the
+  release's uninstall restore it from the backup. Without UI.asi the rewritten file stays
+  and plays as it is: the keys are the player's.
+- **Log lines** (UI.log): `keys: Input.map (stock): 519 actions, 497 rebindable, 0 of
+  yours` at start, `keys: Input.map written: n keys of yours, the stock file in
+  Input.map.a2neb-backup`, `keys: Input.map is stock again (no key of yours); the backup
+  is gone`, `refit: keys: press a key for <action>`, `keys: <action> <old> -> <new>
+  (restart)`, `keys: grid CellN <old> -> <new>`, `refit: keys: capture cancelled`,
+  `refit: Keys reset (n keys removed)`.
 
 ## The Options family
 

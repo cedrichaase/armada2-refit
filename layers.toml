@@ -187,6 +187,8 @@ dir = 'ui'
 install = ['ui/backdrops/install-plates.sh', 'ui/install.sh']
 remove = ['ui/install.sh --remove', 'ui/backdrops/install-plates.sh --remove']
 files = ['UI.asi', 'UI.ini', 'Menus/*.bmp']
+# The key map, rewritten in game by the Refit screen's Keys tab (ui/MENUS.md, "The Keys tab").
+replaces = ['Input.map', 'misc/Input.map']
 select = 'on'
 requires = ['display']
 scope = 'local'

@@ -131,7 +131,9 @@ the UI's Refit screen lists every table it finds. The full contract is
   `a2_ini_open` and `a2_set_int/str` from `a2asi.h`. The only writer is `UI.asi`
   (`a2rt::overlay::set`), through `a2ini::edit`, which keeps the file's lines byte for
   byte. A menu of ours never writes a game setting (`ARMADA.PRF`, `RTS_CFG.h`);
-  settings of ours go to the overlay only.
+  settings of ours go to the overlay only. The one game file the UI writes is the key
+  map, `Input.map`, from the overlay's `[UI.Keys]`, beside a backup of the stock file
+  (`ui/MENUS.md`, "The Keys tab"; the format and its rewriter are `a2fmt::inputmap`).
 - **Moving a key** between files: give the row `moved_from = "Stem.Section.Key"`. The
   hub moves the overlay's value; `./install` (`move-keys.py`) and the release scripts
   (`moved.txt`) move the plugin inis'.

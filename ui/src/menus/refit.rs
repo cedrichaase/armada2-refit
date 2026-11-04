@@ -1,6 +1,6 @@
 //! The Refit screen: every setting of every plugin that has a settings table, as rows on
-//! five tabs, in a modal of ours over the hosted Options dialog (MENUS.md, "The Refit
-//! screen"). The stock Options dialog keeps running under it; the modal owns the keys
+//! its tabs, and the game's keys on the Keys tab (`refit_keys.rs`), in a modal of ours
+//! over the hosted Options dialog (MENUS.md, "The Refit screen"). The stock Options dialog keeps running under it; the modal owns the keys
 //! (`menus::wants_keys`), so no Enter or Esc reaches it.
 //!
 //! The rows come from the settings hub (`settings::tables`); every change goes through
@@ -19,11 +19,15 @@ use crate::{log, sfmt};
 use alloc::string::String;
 use alloc::vec::Vec;
 
+/// The Keys tab: no settings row has it; its page is `refit_keys`.
+const TAB_KEYS: u8 = 100;
+
 /// The tabs, in the order they stand.
-const TABS: [(u8, &str); 4] = [
+const TABS: [(u8, &str); 5] = [
     (TAB_GRAPHICS, "Graphics"),
     (TAB_INTERFACE, "Interface"),
     (TAB_GAMEPLAY, "Gameplay"),
+    (TAB_KEYS, "Keys"),
     (TAB_MULTIPLAYER, "Multiplayer"),
 ];
 
@@ -46,6 +50,8 @@ struct St {
     open: Option<HWND>,
     /// The tab chosen last (kept for the session).
     tab: u8,
+    /// The tab of the last frame (the Keys tab reads the player's keys when it opens).
+    shown_tab: u8,
     advanced: bool,
     confirm: Confirm,
     ask: *const Setting,
@@ -64,6 +70,7 @@ struct St {
 static mut S: St = St {
     open: None,
     tab: TAB_GRAPHICS,
+    shown_tab: 0,
     advanced: false,
     confirm: Confirm::None,
     ask: core::ptr::null(),
@@ -87,7 +94,7 @@ fn shown(r: &Setting) -> bool {
 
 /// Whether the screen has a row to show at all (the entry in Options needs one).
 pub fn available() -> bool {
-    settings::tables().iter().any(|t| t.rows.iter().any(|r| shown(r)))
+    settings::tables().iter().any(|t| t.rows.iter().any(|r| shown(r))) || super::refit_keys::available()
 }
 
 pub fn is_open() -> bool {
@@ -104,6 +111,12 @@ fn tab_name(id: u8) -> &'static str {
 }
 
 fn tab_count(id: u8) -> usize {
+    if id == TAB_KEYS {
+        if !super::refit_keys::available() {
+            return 0;
+        }
+        return crate::keys::map().map_or(0, |m| m.entries.len()) + if crate::keys::has_grid() { crate::keys::CELLS } else { 0 };
+    }
     settings::tables().iter().map(|t| t.rows.iter().filter(|r| shown(r) && r.tab == id).count()).sum()
 }
 
@@ -114,6 +127,7 @@ pub fn open(host: HWND) {
     s.confirm = Confirm::None;
     s.done = false;
     s.notes_at = 0.0;
+    s.shown_tab = 0;
     refresh_notes(0.0);
     let mut counts = String::new();
     for &(id, name) in TABS.iter() {
@@ -210,6 +224,8 @@ pub fn frame(ui: &mut Ui, stack: &[&'static Slot]) {
             // The dropdown closes with this Esc.
         } else if s.confirm != Confirm::None {
             answer(ui, false);
+        } else if s.tab == TAB_KEYS && super::refit_keys::takes_escape() {
+            super::refit_keys::escape(ui);
         } else {
             close(Some(ui), "closed");
         }
@@ -266,6 +282,12 @@ fn body(ui: &mut Ui, inner: R) {
     if !ids.contains(&s.tab) {
         s.tab = ids[0];
     }
+    if s.tab != s.shown_tab {
+        s.shown_tab = s.tab;
+        if s.tab == TAB_KEYS {
+            super::refit_keys::opened();
+        }
+    }
     let live = s.confirm == Confirm::None;
     // The banner: RESTART rows whose value differs from the start.
     let mut pend = String::new();
@@ -321,8 +343,13 @@ fn body(ui: &mut Ui, inner: R) {
         for (r, l) in note_rects.iter().zip(lines.iter()) {
             ui.text_in(*r, l, t.small_size, Align::Left, t.warn, Weight::Regular);
         }
-        page_rows(ui, page);
-        help_strip(ui, help);
+        if s.tab == TAB_KEYS {
+            super::refit_keys::page(ui, page, s.advanced);
+            keys_help(ui, help);
+        } else {
+            page_rows(ui, page);
+            help_strip(ui, help);
+        }
         if !pend.is_empty() {
             ui.text_in(banner, &sfmt!("Restart the game to apply: {}", pend), t.text_size, Align::Left, t.warn, Weight::Bold);
         }
@@ -608,6 +635,20 @@ fn help_strip(ui: &mut Ui, r: R) {
     ui.draw.pop_clip();
 }
 
+/// The help strip on the Keys tab.
+fn keys_help(ui: &mut Ui, r: R) {
+    let t = ui.theme;
+    ui.draw.rect(r, t.row_alt);
+    let (text, dim) = match super::refit_keys::help() {
+        Some(h) => (h, false),
+        None => (String::from("A click on a key binds it to the next key you press. Keys of the game's Input.map apply when the game is started again; the grid's at once. Choices are written to RefitPlayer.ini."), true),
+    };
+    let p = ui.u(10.0);
+    ui.draw.push_clip(r);
+    ui.draw.text_wrapped(&text, ui.u(t.small_size), r.w - 2.0 * p, r.x + p, r.y + ui.u(5.0), if dim { t.text_dim } else { t.text }, Weight::Regular);
+    ui.draw.pop_clip();
+}
+
 fn foot_row(ui: &mut Ui, f: R) {
     let t = ui.theme;
     let s = st();
@@ -640,6 +681,7 @@ fn confirm_box(ui: &mut Ui, inner: R) {
     ui.panel(r);
     let p = ui.u(20.0);
     let text = match s.confirm {
+        Confirm::Reset if s.tab == TAB_KEYS => String::from("Remove your keys from RefitPlayer.ini? The game's own keys apply again when it is started next, the grid's at once."),
         Confirm::Reset => String::from("Remove your choices on this tab from RefitPlayer.ini? The ini files' settings apply again."),
         _ => String::from("The Refit screen is part of the redrawn menus. To get them back, delete the line Enable=0 under [UI.Menus] in RefitPlayer.ini in the game folder. Switch them off?"),
     };
@@ -664,6 +706,11 @@ fn answer(ui: &mut Ui, yes: bool) {
     match what {
         Confirm::Reset => {
             if !yes {
+                return;
+            }
+            if s.tab == TAB_KEYS {
+                let n = super::refit_keys::reset();
+                log!("refit: {} reset ({} keys removed)", tab_name(s.tab), n);
                 return;
             }
             // Reset covers the tab's advanced rows too, shown or not.

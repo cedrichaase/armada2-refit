@@ -4,6 +4,16 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 2.3.0 — 2026-11-04
+
+### Added
+- The Refit screen's **Keys** tab (`menus/refit_keys.rs`; issue #26): every keyboard key of the game's `Input.map` listed by what it does, under the file's sections (General, Saving, Interface, Camera, Selection, the command bar's menus, orders, builds and special weapons; the editor's with *Show advanced*), with a search field, the clashes named on each row ("Same key as: ..."), and a rebind by clicking a row and pressing the new key (with Ctrl, Shift or Alt; Esc cancels, *Stock key* puts stock's back). The command bar's grid keys (QOL.asi's `[Keys]`, `QOL_BarKeyName`) are listed and rebound on the same tab, live. The bar's own keys are dimmed while the grid keys are on.
+- `keys.rs`: the choices are kept in the overlay (`RefitPlayer.ini [UI.Keys] <action>=<keys>`, `[QOL.Keys] CellN`) and written into `Input.map` (the stock file kept as `Input.map.a2neb-backup` on the first change, restored when no choice is left) at start, before the engine reads it, when the tab opens and after each change; a change of `Input.map` applies at the next start (*Restart needed*). Log lines `keys: ...`.
+- `input.rs`: key presses by position (`Input::presses`, `note_press`: scancode, extended bit and held modifiers, system keys included); `note_message` takes the lParam.
+- `install.sh --remove` puts the stock `Input.map` back from its backup; the `ui` layer `replaces` `Input.map` (`a2mod`).
+
+Installed, not yet seen in game.
+
 ## 2.2.4 — 2026-11-04
 
 ### Fixed

@@ -3,7 +3,7 @@ name = "a2fmt"
 version = "0.1.0"
 edition = "2024"
 publish = false
-description = "Readers for Star Trek: Armada II's asset formats (SOD, TGA, .spr, ODF), no_std"
+description = "Readers for Star Trek: Armada II's asset formats (SOD, TGA, .spr, ODF, Input.map), no_std"
 license = "MIT"
 
 [lib]

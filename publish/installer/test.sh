@@ -278,7 +278,10 @@ echo "== uninstall: what it added goes, what changed since stays"
 echo mine > "$G/UltimateASILoader-license.txt"
 echo log > "$G/Display8.log"
 echo "[Sky]" > "$G/Sky/myown.ini"   # a recipe of the player's own stays
+echo stockkeys > "$G/Input.map.a2neb-backup"; echo mykeys > "$G/Input.map"   # the Keys tab's rewrite
 "$P/install.sh" --uninstall "$G" > "$T/out"
+check '[ "$(cat "$G/Input.map")" = stockkeys ] && [ ! -e "$G/Input.map.a2neb-backup" ]'
+rm -f "$G/Input.map"
 check '[ "$(cat "$G/binkw32.dll")" = stockbink ]'
 check '[ ! -e "$G/binkw32_orig.dll" ] && [ ! -e "$G/binkw32.dll.a2neb-backup" ]'
 check '[ -z "$(ls "$G" | grep -E "\.(asi|log)$|^dxvk\.conf$|^BinkProxy|^(HUD|Menus|GridLayout|QOL|Online|UI|Render3D)\.ini$")" ]'

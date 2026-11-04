@@ -13,6 +13,15 @@
  *                                              now, with this update's buttons)
  *   const char *__cdecl QOL_BarLabel(unsigned cell)   this file: the cell's key, or NULL
  *                                              when the keys are off or stood down
+ *   const char *__cdecl QOL_BarKeyName(unsigned cell) this file: the cell's key by its
+ *                                              Input.map name ([Keys] CellN), on or off;
+ *                                              NULL past the last cell.  The Refit screen's
+ *                                              Keys tab lists and rebinds them
+ *
+ * Which key presses which cell is [Keys] Cell1..Cell15 in QOL.ini (RefitPlayer.ini
+ * [QOL.Keys] in front of it), each a key by its name in the game's Input.map, read at
+ * start and again by QOL_SettingsChanged.  A name this file does not know keeps the
+ * cell's default and says so in the log.
  *
  * The keys work only while UI_BarCell exists and gives a cell (the UI's bar is drawn).
  * Otherwise they stand down: the stock bar keys run unchanged, the stock look and
@@ -36,11 +45,40 @@ __declspec(dllimport) DWORD __stdcall GetWindowThreadProcessId(void *, DWORD *);
 __declspec(dllimport) short __stdcall GetAsyncKeyState(int);
 __declspec(dllimport) UINT  __stdcall MapVirtualKeyA(UINT, UINT);
 
-/* Set-1 scancodes, row by row: positions on any layout. */
-static const BYTE k_barScan[BAR_CELLS] = { 0x10, 0x11, 0x12, 0x13, 0x14, 0x1e, 0x1f, 0x20,
-                                           0x21, 0x22, 0x2c, 0x2d, 0x2e, 0x2f, 0x30 };
-static const char *const k_barLabel[BAR_CELLS] = { "Q", "W", "E", "R", "T", "A", "S", "D",
-                                                   "F", "G", "Z", "X", "C", "V", "B" };
+/* The keys a cell may take: a key by its Input.map name, its set-1 scancode (a position
+ * on any layout) and its label on the button.  The keys of a2fmt::inputmap::KEYS
+ * (crates/a2fmt/src/inputmap.rs) that are not extended and that a press of the grid can
+ * use: no Esc, Pause or modifiers.  Keep the two tables' names and scancodes the same. */
+typedef struct { const char *name; BYTE scan; const char *label; } BarKey;
+static const BarKey k_keys[] = {
+    { "One", 0x02, "1" }, { "Two", 0x03, "2" }, { "Three", 0x04, "3" }, { "Four", 0x05, "4" },
+    { "Five", 0x06, "5" }, { "Six", 0x07, "6" }, { "Seven", 0x08, "7" }, { "Eight", 0x09, "8" },
+    { "Nine", 0x0a, "9" }, { "Zero", 0x0b, "0" }, { "Minus", 0x0c, "-" }, { "Equal", 0x0d, "=" },
+    { "Backspace", 0x0e, "Bksp" }, { "Tab", 0x0f, "Tab" },
+    { "Q", 0x10, "Q" }, { "W", 0x11, "W" }, { "E", 0x12, "E" }, { "R", 0x13, "R" },
+    { "T", 0x14, "T" }, { "Y", 0x15, "Y" }, { "U", 0x16, "U" }, { "I", 0x17, "I" },
+    { "O", 0x18, "O" }, { "P", 0x19, "P" }, { "LeftBracket", 0x1a, "[" },
+    { "RightBracket", 0x1b, "]" }, { "Enter", 0x1c, "Enter" },
+    { "A", 0x1e, "A" }, { "S", 0x1f, "S" }, { "D", 0x20, "D" }, { "F", 0x21, "F" },
+    { "G", 0x22, "G" }, { "H", 0x23, "H" }, { "J", 0x24, "J" }, { "K", 0x25, "K" },
+    { "L", 0x26, "L" }, { "BackQuote", 0x29, "`" }, { "BackSlash", 0x2b, "\\" },
+    { "Z", 0x2c, "Z" }, { "X", 0x2d, "X" }, { "C", 0x2e, "C" }, { "V", 0x2f, "V" },
+    { "B", 0x30, "B" }, { "N", 0x31, "N" }, { "M", 0x32, "M" }, { "Comma", 0x33, "," },
+    { "Period", 0x34, "." }, { "Slash", 0x35, "/" }, { "Space", 0x39, "Space" },
+    { "CAPSLock", 0x3a, "Caps" },
+    { "F1", 0x3b, "F1" }, { "F2", 0x3c, "F2" }, { "F3", 0x3d, "F3" }, { "F4", 0x3e, "F4" },
+    { "F5", 0x3f, "F5" }, { "F6", 0x40, "F6" }, { "F7", 0x41, "F7" }, { "F8", 0x42, "F8" },
+    { "F9", 0x43, "F9" }, { "F10", 0x44, "F10" }, { "F11", 0x57, "F11" }, { "F12", 0x58, "F12" },
+    { "Home", 0x47, "N7" }, { "UpArrow", 0x48, "N8" }, { "PageUp", 0x49, "N9" },
+    { "GreyMinus", 0x4a, "N-" }, { "LeftArrow", 0x4b, "N4" }, { "Keypad5", 0x4c, "N5" },
+    { "RightArrow", 0x4d, "N6" }, { "GreyPlus", 0x4e, "N+" }, { "End", 0x4f, "N1" },
+    { "DownArrow", 0x50, "N2" }, { "PageDown", 0x51, "N3" },
+};
+#define BAR_NKEYS ((int)(sizeof k_keys / sizeof k_keys[0]))
+
+/* Each cell's key by default, row by row: Q W E R T / A S D F G / Z X C V B. */
+static const char *const k_barDefault[BAR_CELLS] = { "Q", "W", "E", "R", "T", "A", "S", "D",
+                                                     "F", "G", "Z", "X", "C", "V", "B" };
 
 static int  g_rdyBar;               /* the bar_keys hook is ready */
 static int  g_barOk;                /* the call is patched */
@@ -48,6 +86,7 @@ int         g_barKeys;              /* BarKeys */
 static int  g_barState = -1;        /* the last decision logged: 1 keys on, 0 off */
 static int  g_barZero;
 static BYTE g_barVk[BAR_CELLS];
+static const BarKey *g_barKey[BAR_CELLS];   /* each cell's key ([Keys] CellN) */
 static int  g_barDown[BAR_CELLS];
 static UiBarCellFn g_uiCell;
 static UiBarStepFn g_uiStep;
@@ -99,11 +138,93 @@ static int bar_active(void)
     return on;
 }
 
+/* ---- which key presses which cell ----------------------------------------- */
+
+static int bar_eqi(const char *a, const char *b)
+{
+    for (; *a && *b; a++, b++) {
+        char x = *a, y = *b;
+        if (x >= 'a' && x <= 'z') x = (char)(x - 32);
+        if (y >= 'a' && y <= 'z') y = (char)(y - 32);
+        if (x != y) return 0;
+    }
+    return *a == *b;
+}
+
+static const BarKey *bar_key_named(const char *name)
+{
+    int i;
+    for (i = 0; i < BAR_NKEYS; i++)
+        if (bar_eqi(k_keys[i].name, name)) return &k_keys[i];
+    return NULLPTR;
+}
+
+/* Reads [Keys] Cell1..Cell15 (the overlay first); 1 when a cell's key changed.  At
+ * start (`first`) the keys are logged in one line; later each change is.  The virtual
+ * keys GetAsyncKeyState reads are the scancodes' on this keyboard's layout. */
+static int bar_read_keys(int first)
+{
+    int c, any = 0;
+    char line[400];
+    line[0] = 0;
+    s_cat(line, "bar: keys");
+    for (c = 0; c < BAR_CELLS; c++) {
+        char key[12], val[32];
+        const BarKey *k;
+        key[0] = 0;
+        s_cat(key, "Cell");
+        s_num(key, c + 1);
+        a2_ini_str(&g_ini, "Keys", key, k_barDefault[c], val, sizeof val);
+        k = bar_key_named(val);
+        if (!k) {
+            char m[120];
+            m[0] = 0;
+            s_cat(m, "bar: [Keys] ");
+            s_cat(m, key);
+            s_cat(m, "=");
+            s_cat(m, val);
+            s_cat(m, " is not a key the grid can use; ");
+            s_cat(m, k_barDefault[c]);
+            s_cat(m, " kept");
+            logline(m);
+            k = bar_key_named(k_barDefault[c]);
+        }
+        if (k != g_barKey[c]) {
+            if (!first) {
+                char m[80];
+                m[0] = 0;
+                s_cat(m, "bar: ");
+                s_cat(m, key);
+                s_cat(m, " ");
+                s_cat(m, g_barKey[c] ? g_barKey[c]->name : "-");
+                s_cat(m, " -> ");
+                s_cat(m, k->name);
+                logline(m);
+            }
+            g_barKey[c] = k;
+            g_barVk[c] = (BYTE)MapVirtualKeyA(k->scan, 1);
+            g_barDown[c] = 1;   /* a key held while it is bound does not press at once */
+            any = 1;
+        }
+        s_cat(line, c % 5 ? " " : (c ? " / " : " "));
+        s_cat(line, k->name);
+    }
+    if (first) logline(line);
+    return any;
+}
+
 /* QOL_BarLabel: the UI asks for each cell it draws. */
 __declspec(dllexport) const char *__cdecl QOL_BarLabel(UINT cell)
 {
-    if (!g_barOk || bar_why() || cell >= BAR_CELLS) return NULLPTR;
-    return k_barLabel[cell];
+    if (!g_barOk || bar_why() || cell >= BAR_CELLS || !g_barKey[cell]) return NULLPTR;
+    return g_barKey[cell]->label;
+}
+
+/* QOL_BarKeyName: the Refit screen's Keys tab asks; on or off. */
+__declspec(dllexport) const char *__cdecl QOL_BarKeyName(UINT cell)
+{
+    if (cell >= BAR_CELLS || !g_barKey[cell]) return NULLPTR;
+    return g_barKey[cell]->name;
 }
 
 /* ---- pressing a button ---------------------------------------------------- */
@@ -171,7 +292,7 @@ static void bar_scan(void)
             char m[64];
             m[0] = 0;
             s_cat(m, "bar: key ");
-            s_cat(m, k_barLabel[hit]);
+            s_cat(m, g_barKey[hit]->name);
             if (*(DWORD *)(b + QOL_F_BK_BTN_STATE) == 0) s_cat(m, " (disabled)");
             logline(m);
             bar_press(b);
@@ -210,9 +331,8 @@ static void __thiscall bar_keys_hook(BYTE *p, int crafts)
 
 static int patch_bar(void)
 {
-    UINT c;
     if (!g_rdyBar) return 0;
     (void)a2e_addr(QOL_S_BK_BUTTON_PRESS);   /* what a button's press slot leads to: checked with the hook */
-    for (c = 0; c < BAR_CELLS; c++) g_barVk[c] = (BYTE)MapVirtualKeyA(k_barScan[c], 1);
+    bar_read_keys(1);
     return a2_write_call(a2e_addr(QOL_S_BK_KEYS_CALL), bar_keys_hook, 5);
 }

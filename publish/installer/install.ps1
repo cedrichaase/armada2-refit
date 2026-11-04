@@ -337,6 +337,13 @@ if ($Uninstall) {
         else { Say "  the models left as they are: needs Python 3 (py or python) to put them back" }
     }
     Remove-Proxy
+    # The game's key map, which the Refit screen's Keys tab rewrites (ui/MENUS.md, "The
+    # Keys tab"): the stock one back from its backup.
+    foreach ($f in "Input.map", "misc\Input.map") {
+        if (Test-Path -LiteralPath (G "$f.a2neb-backup")) {
+            Move-Item -LiteralPath (G "$f.a2neb-backup") (G $f) -Force; Say "  ${f}: the stock keys back"
+        }
+    }
     # The prerequisites, newest record first; a file changed since is left, and said so.
     if (Test-Path -LiteralPath $Manifest) {
         $records = @(Get-Content -LiteralPath $Manifest)

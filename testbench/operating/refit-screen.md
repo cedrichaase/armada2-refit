@@ -47,13 +47,19 @@ It needs the redrawn menus (`[Menus] Enable=1`, the shipped default); with `Spec
   on the screen until it is clicked. A tab with no visible row is left out, so the tab
   counts in `opened` differ with the plugins installed. A plugin that stood down shows
   `refit: Render3D: <note>` in UI.log.
+- **The Keys tab** (`ui/MENUS.md`, "The Keys tab"; `scenarios/ui-refit-keys.md`): click
+  categories and rows by label (`Camera`, `Zoom camera in`, `Command bar grid`, `Top row,
+  3rd button`), then `Press F6` while the box reads `Press the new key for`. Grep UI.log
+  `keys: <action> <old> -> <new> (restart)` and `RefitPlayer.ini` `[UI.Keys]`; the grid's
+  `bar: CellN ...` is in QOL.log. Its places at 1280x720 are not measured yet.
 - **Passthrough check**: with `Ships` off, the engine draws the ships (stock look, no
   per-pixel lights, no bloom); that is a judged step, since a pixel baseline cannot say it.
 
 ## Screen places at 1280x720
 
 The modal is 800x547, centred. Tab text and the title read in upper case. Tabs at y=138:
-Graphics x=323, Interface 470, Gameplay 621 (three tabs since 15.6.12). Foot at y=611:
+Graphics x=323, Interface 470, Gameplay 621 (three tabs since 15.6.12), and Keys after Gameplay since
+15.7.0 (not measured; click it by label). Foot at y=611:
 Reset tab 315, Show advanced 449 (box 399), Done 965. Rows from y=169, 36 px apart; left
 column labels at x=261, right at x=661; switches at x=575 / 975, drop-downs at x=538 / 938.
 Graphics: Anti-aliasing 169 (box at 538,176), HDR and bloom 205, Ships 241, Sky 277.

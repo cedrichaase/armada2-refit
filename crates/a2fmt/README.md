@@ -1,7 +1,8 @@
 # a2fmt
 
 Readers for Star Trek: Armada II's asset formats, for the renderers in `render3d/` and `ui/`:
-SOD models, TGA textures and their mip chains, `.spr` sprite tables and ODFs.
+SOD models, TGA textures and their mip chains, `.spr` sprite tables and ODFs, and the key
+map `Input.map`, read and rewritten.
 `no_std` with `alloc`, one dependency (`libm`). Nothing here opens a file: callers pass
 bytes, and for formats that include other files, a closure that fetches them by name.
 No parser panics on bad input (a test feeds damaged copies of real files to all four).
@@ -109,3 +110,43 @@ values continued on following lines that hold no `=` (name lists). A few files h
 `[Section]` headers, which lookups ignore. A file's own keys win over its includes,
 searched in order, depth first; a key written twice in one file takes the later value
 (stock has 45 such repeats; which one the engine keeps is not established).
+
+## Input.map (`inputmap`)
+
+The engine's key map, in the game folder, read by `Armada2.exe` when it starts; the UI's
+Keys tab reads it and rewrites it (`ui/MENUS.md`, "The Keys tab"). What follows was
+established by reading the file the GOG release ships, not the engine's parser, so it
+says what the file does and what the module relies on.
+
+- **Lines.** Plain text, CRLF or LF. A line whose first non-blank character is `#` is a
+  comment; blank lines separate paragraphs. A block is a line `name {`, one binding line
+  per input, and a line `}`. A block put out of use is commented out line by line.
+- **Binding lines.** `+ keyboard F1`: a sign, a device and an input, separated by tabs
+  or spaces (the shipped file mixes both). `+` means the input is held, `-` that it is
+  not. The three modifiers have blocks of their own (`control`, `shift`, `alt`) and are
+  named in a block as `Control`, `Shift` and `Alt`; a modifier a block does not name may
+  be either (the number keys' group blocks name none, so Ctrl+number reaches the same
+  action, which reads the modifiers itself: `qol/README.md`, QOL-4). A block may hold two
+  keys (the debugging chords) or the mouse (`mouse LeftBtn`, `mouse HorizPos`).
+- **Key names** are positions, by the US layout's legends: `A`, `One`, `F1`,
+  `LeftBracket`, `BackQuote`, `CAPSLock`. The keypad's keys are named by what they do with
+  Num Lock off (`Home` is keypad 7, `UpArrow` keypad 8, `Keypad5`, `PageDown` keypad 3)
+  and the separate cluster's by `Grey` (`GreyHome`, `GreyUpArrow`, `GreyDelete`); the
+  keypad's minus and plus are `GreyMinus` and `GreyPlus`, its Enter `KeypadEnter`. Stock's
+  AI menu lays its three-by-three grid of alerts and autonomies on the keypad, which is
+  what pins the keypad names down. `KEYS` maps each name to its set-1 scancode (plus
+  `0x100` when extended, as a key message's lParam reports it); the letters, digits and
+  function keys the file never names follow its pattern. Names that cannot be told from
+  the file (the cluster's Page Up and Page Down, `;`, `'`) are not offered.
+- **A marked key.** Main menu's key is written `*Esc`. What the mark means to the engine
+  is not known, so such a block is listed and never rewritten.
+- **Comments as documentation.** The comment paragraph directly above a block says what
+  the action does (`# Zoom camera in`); a comment line framed by `#`s under a line of
+  `#`s is a section banner (`# Camera navigation #`); a line starting `##` or `###` heads
+  a group within it (`### Federation shipyard`). `InputMap::parse` keeps all three.
+- **Rewriting.** `InputMap::rewrite` replaces a block's body (the lines between `name {`
+  and `}`) and keeps every other byte, line ends included. A new body is the key, each
+  modifier the binding holds as `+`, and each other modifier the old block named as `-`;
+  one the old block left open stays open (`Action::body_for`). A stock test
+  (`tests/stock.rs`, `inputmap_stock`) parses the installed file and its backup, checks
+  every key name it holds is in `KEYS`, and rebinds every block and back.

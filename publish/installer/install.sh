@@ -278,6 +278,13 @@ if [ "$action" = uninstall ]; then
         echo "  the models back to stock:"; sods --revert
     fi
     unproxy
+    # The game's key map, which the Refit screen's Keys tab rewrites (ui/MENUS.md, "The
+    # Keys tab"): the stock one back from its backup.
+    for f in Input.map misc/Input.map; do
+        if [ -f "$game/$f.a2neb-backup" ]; then
+            mv -f "$game/$f.a2neb-backup" "$game/$f"; echo "  $f: the stock keys back"
+        fi
+    done
     # The prerequisites, newest record first; a file changed since is left, and said so.
     if [ -f "$MANIFEST" ]; then
         reverse_lines "$MANIFEST" | while read -r f sum; do

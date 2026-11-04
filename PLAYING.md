@@ -88,7 +88,8 @@ You can also switch most of these off **without reinstalling**, from the Refit s
 ## The Refit screen
 
 In the main menu or in a mission: **Options**, then **Refit settings**. It lists every setting
-of every Refit plugin that is installed, on three tabs: Graphics, Interface and Gameplay. A click anywhere on an on/off row toggles it; a row with
+of every Refit plugin that is installed, on three tabs: Graphics, Interface and Gameplay,
+and the game's keys on a fourth, **Keys** (below). A click anywhere on an on/off row toggles it; a row with
 several values opens a list. *Show advanced* adds the rows meant for tuning or trouble.
 *Reset tab* removes your choices on that tab and goes back to the shipped defaults
 (it asks first). *Done* or Esc closes the screen.
@@ -107,7 +108,32 @@ A row drawn dimmed with a line of text means that part is not running right now 
 why ("Stands down: ... is not stock in this Armada2.exe", or a plugin that is not
 loaded). Your choice is kept and applies when the part runs.
 
-The screen only ever writes one file, `RefitPlayer.ini`.
+The screen keeps your choices in one file, `RefitPlayer.ini`; the Keys tab also writes
+the game's key map, `Input.map` (below).
+
+### Keys
+
+The **Keys** tab lists every key of the game by what it does, in groups (General,
+Saving, Interface, Camera, Selection, and the command bar's menus, orders, builds and
+special weapons), with a search field for finding one by name or by key (`ctrl+s`).
+A row that shares its key with another names it ("Same key as: ..."). To change a key,
+click its row and press the new key, with Ctrl, Shift or Alt held for a combination; Esc
+cancels and *Stock key* puts the game's own back. A changed key has a dot.
+
+- **The game's keys** (everything but the grid) are kept in the game's own key map,
+  `Input.map`, which the game reads when it starts: a change applies **when the game is
+  started again**, and the row says *Restart needed* until then. The first change keeps
+  the original file beside it as `Input.map.a2neb-backup`; with every key back to stock
+  the original returns and the backup goes. Your choices are also in `RefitPlayer.ini`,
+  under `[UI.Keys]`, so a reinstall keeps them.
+- **Command bar grid** is the 5x3 grid of keys that press the command bar's buttons by
+  their place (Q W E R T / A S D F G / Z X C V B). A change applies at once. The grid's
+  keys take no Ctrl or Alt.
+- With **Grid keys** on (Interface tab), the command bar's own keys (the *Bar:* groups)
+  do nothing and are drawn dimmed; switch Grid keys off to use them.
+- Main menu (Esc) and the few keys that are combinations of two keys or of the mouse are
+  listed but cannot be changed. *Show advanced* adds the editor's and the developers'
+  keys. *Reset tab* puts every key back.
 
 ### `RefitPlayer.ini`
 
@@ -263,6 +289,7 @@ antivirus holds).
 | A plugin is missing after install, or the installer cannot copy one | Antivirus. See the README section linked above |
 | The Refit screen's row is dimmed with a note | That part is not running; the note says why. Your choice is kept |
 | A change in Refit has no effect | Check its badge: *Next mission* and *Restart* rows apply later |
+| A key changed on the Keys tab does nothing | The game reads its keys when it starts: restart it. A key under *Bar:* does nothing while Grid keys are on (Interface tab). `UI.log` says what was written (`keys: ...`) |
 | Joiners cannot connect | Check `Online.log` on both sides: it says whether the direct path or the relay was used. A host with `Server=` emptied in `Online.ini` needs the address |
 | The game feels different in a network game | *Pay when queued* is on for that game (see "Multiplayer") |
 | A different edition of the game (Fleet Operations: Roots, Armada 1) | Not supported yet; the plugins run as stock on a build they do not know. Both are planned ([`PLAN-FLEETOPS.md`](PLAN-FLEETOPS.md), [`PLAN-ARMADA1.md`](PLAN-ARMADA1.md)) |
@@ -278,6 +305,8 @@ removes everything that release installed, and nothing it did not put there. It:
 - takes out the plugins and their `.ini` files from the game folder, with any log an
   earlier version wrote there;
 - puts back GOG's `d3d8.dll` from `d3d8.dll.gog-backup` and the stock `binkw32.dll`;
+- puts the game's own keys back (`Input.map` from `Input.map.a2neb-backup`, if you
+  changed a key on the Keys tab);
 - takes out the loader and widescreen patch only if it added them;
 - on Linux and macOS, takes its changes back out of Heroic's settings or the bottle's
   registry, and only the values that are still as it left them.

@@ -14,6 +14,7 @@ pub mod backdrop;
 pub mod generic;
 pub mod model;
 pub mod refit;
+pub mod refit_keys;
 pub mod scene;
 pub mod screens;
 

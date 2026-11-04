@@ -43,6 +43,11 @@ pub struct Input {
     /// `nchars` of them are valid.
     pub chars: [char; MAX_KEYS],
     pub nchars: u8,
+    /// Key presses since the last poll by position, auto-repeats left out, system keys
+    /// (Alt combinations, F10) included: `scan_of` and `mods_of` read each. For binding a
+    /// key (the Refit screen's Keys tab); `npresses` of them are valid.
+    pub presses: [u16; MAX_KEYS],
+    pub npresses: u8,
     /// Modifiers held now.
     pub shift: bool,
     pub ctrl: bool,
@@ -58,10 +63,24 @@ impl Input {
     pub fn chars(&self) -> &[char] {
         &self.chars[..self.nchars as usize]
     }
+    /// The key presses of this frame (`presses`).
+    pub fn presses(&self) -> &[u16] {
+        &self.presses[..self.npresses as usize]
+    }
     /// Whether virtual key `vk` went down this frame.
     pub fn key_pressed(&self, vk: u8) -> bool {
         self.keys().contains(&vk)
     }
+}
+
+/// A press's set-1 scancode, `0x100` added for an extended key (lParam bit 24).
+pub fn scan_of(p: u16) -> u16 {
+    p & 0x1ff
+}
+
+/// The modifiers held at a press: Control, Shift, Alt.
+pub fn mods_of(p: u16) -> [bool; 3] {
+    [p & 0x1000 != 0, p & 0x2000 != 0, p & 0x4000 != 0]
 }
 
 // ---- Armada2.exe ------------------------------------------------------------------
@@ -81,6 +100,7 @@ impl Input {
 const WM_KEYDOWN: u32 = 0x100;
 const WM_KEYUP: u32 = 0x101;
 const WM_CHAR: u32 = 0x102;
+const WM_SYSKEYDOWN: u32 = 0x104;
 const WM_LBUTTONDOWN: u32 = 0x201;
 const WM_MBUTTONDBLCLK: u32 = 0x209;
 const WM_MOUSEWHEEL: u32 = 0x20a;
@@ -105,6 +125,11 @@ struct Raw {
     nkeys: u8,
     chars: [char; MAX_KEYS],
     nchars: u8,
+    presses: [u16; MAX_KEYS],
+    npresses: u8,
+    /// The lParam and message of the press recorded last, so that one message seen at two
+    /// points (the dialog host's loop and the window procedure) is recorded once.
+    last_press: (isize, u32),
     /// A button whose down the engine was not given, so its up is not given either.
     eaten_button: [bool; 3],
     /// Likewise for keys, by virtual-key code.
@@ -124,6 +149,9 @@ static mut RAW: Raw = Raw {
     nkeys: 0,
     chars: ['\0'; MAX_KEYS],
     nchars: 0,
+    presses: [0; MAX_KEYS],
+    npresses: 0,
+    last_press: (0, 0),
     eaten_button: [false; 3],
     eaten_key: [0; 8],
     capture_mouse: false,
@@ -142,6 +170,8 @@ static mut STATE: Input = Input {
     nkeys: 0,
     chars: ['\0'; MAX_KEYS],
     nchars: 0,
+    presses: [0; MAX_KEYS],
+    npresses: 0,
     shift: false,
     ctrl: false,
     alt: false,
@@ -232,11 +262,40 @@ fn key_bit(vk: usize) -> (usize, u32) {
     (vk / 32 & 7, 1 << (vk % 32))
 }
 
+/// Records a key press by position (`Input::presses`): a key down or system key down
+/// that is not an auto-repeat (lParam bit 30), with the modifiers held.
+pub fn note_press(msg: u32, lp: isize) {
+    if (msg != WM_KEYDOWN && msg != WM_SYSKEYDOWN) || lp & (1 << 30) != 0 {
+        return;
+    }
+    let r = raw();
+    if r.last_press == (lp, msg) && r.npresses > 0 {
+        return;
+    }
+    r.last_press = (lp, msg);
+    let held = |vk| unsafe { GetKeyState(vk) } as u16 & 0x8000 != 0;
+    let mut p = ((lp >> 16) & 0xff) as u16 | if lp & (1 << 24) != 0 { 0x100 } else { 0 };
+    if held(VK_CONTROL) {
+        p |= 0x1000;
+    }
+    if held(VK_SHIFT) {
+        p |= 0x2000;
+    }
+    if held(VK_MENU) || msg == WM_SYSKEYDOWN && lp & (1 << 29) != 0 {
+        p |= 0x4000;
+    }
+    if (r.npresses as usize) < MAX_KEYS {
+        r.presses[r.npresses as usize] = p;
+        r.npresses += 1;
+    }
+}
+
 /// Records a keyboard message; true when the engine must not see it. Only plain key
 /// downs and characters are kept from it: the system keys (Alt combinations, F10)
 /// always reach it, so Alt+F4 and Alt+Tab work whatever the UI has focus on, and a
 /// key's up is kept only when its down was.
-fn key_message(msg: u32, wp: usize) -> bool {
+fn key_message(msg: u32, wp: usize, lp: isize) -> bool {
+    note_press(msg, lp);
     let r = raw();
     let capture = unsafe { HOSTING } || (r.capture_keys && live(r));
     match msg {
@@ -273,7 +332,7 @@ fn key_message(msg: u32, wp: usize) -> bool {
 
 /// In place of `WindowProc`'s call of `ProcessKeyboardMessages`.
 unsafe extern "C" fn keys_message(msg: u32, wp: usize, lp: isize) {
-    if key_message(msg, wp) {
+    if key_message(msg, wp, lp) {
         return;
     }
     let stock: unsafe extern "C" fn(u32, usize, isize) = unsafe { core::mem::transmute(eng().addr(sym::CORE_PROCESS_KEYS)) };
@@ -289,8 +348,8 @@ unsafe extern "system" fn keys_peek(m: *mut Msg, w: HWND, min: u32, max: u32, re
         if got == 0 {
             return 0;
         }
-        let (msg, wp) = unsafe { ((*m).message, (*m).wparam) };
-        if !key_message(msg, wp) {
+        let (msg, wp, lp) = unsafe { ((*m).message, (*m).wparam, (*m).lparam) };
+        if !key_message(msg, wp, lp) {
             return got;
         }
         if msg == WM_KEYDOWN {
@@ -444,6 +503,8 @@ pub fn poll(w: u32, h: u32) {
         nkeys: r.nkeys,
         chars: r.chars,
         nchars: r.nchars,
+        presses: r.presses,
+        npresses: r.npresses,
         shift: held(VK_SHIFT),
         ctrl: held(VK_CONTROL),
         alt: held(VK_MENU),
@@ -454,6 +515,7 @@ pub fn poll(w: u32, h: u32) {
     r.wheel = 0;
     r.nkeys = 0;
     r.nchars = 0;
+    r.npresses = 0;
     unsafe { STATE = s };
 }
 
@@ -478,11 +540,11 @@ pub fn set_hosting(on: bool) {
 
 /// Records a mouse or keyboard message for the UI that never reaches the window
 /// procedure hooks (the dialog host's pump takes it off the queue itself).
-pub fn note_message(msg: u32, wp: usize) {
+pub fn note_message(msg: u32, wp: usize, lp: isize) {
     if (WM_LBUTTONDOWN..=WM_MOUSEWHEEL).contains(&msg) {
         mouse_message(msg, wp);
     } else {
-        key_message(msg, wp);
+        key_message(msg, wp, lp);
     }
 }
 

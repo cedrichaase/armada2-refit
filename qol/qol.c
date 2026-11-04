@@ -1141,6 +1141,8 @@ __declspec(dllexport) void __cdecl QOL_SettingsChanged(void)
         if (!g_barOk) gate("BarKeys", 0, 0);
     }
 
+    if (bar_read_keys(0)) changed(m, &n, "Keys", "(the grid's keys)");
+
     a2_set_str(&g_ini, QOL_ROW_WARPDISTANCE, val, sizeof val);
     f = s_parse(val);
     if (f < 0.0f) f = 0.0f;
@@ -1248,7 +1250,7 @@ static void startup(void)
     if (!g_barKeys) {
         s_cat(b, "  (the bar's keys left as in stock)");
     } else if (g_barOk) {
-        s_cat(b, "  -> Q W E R T / A S D F G / Z X C V B press the Refit bar's cells, patched");
+        s_cat(b, "  -> the grid's keys ([Keys]) press the Refit bar's cells, patched");
     } else {
         not_patched(b, QOL_H_BAR_KEYS);
     }

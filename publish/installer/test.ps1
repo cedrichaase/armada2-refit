@@ -344,6 +344,7 @@ Write-Host "== uninstall: what it added goes, what changed since stays"
 Set-Content (G "UltimateASILoader-license.txt") "mine"
 Set-Content (G "Sky\myown.ini") "[Sky]"   # a recipe of the player's own stays
 Set-Content (G "Display8.log") "log"
+Set-Content (G "Input.map.a2neb-backup") "stockkeys"; Set-Content (G "Input.map") "mykeys"   # the Keys tab's rewrite
 Remove-Item -LiteralPath (G "d3d8.dll.a2chain-backup") -ErrorAction SilentlyContinue   # the DXVK one kept above; GOG's goes back, this one is the player's to delete
 Remove-Item -LiteralPath $PyLog -ErrorAction SilentlyContinue   # earlier passes (-Without models) logged reverts too
 $env:A2_PROGRESS = "1"
@@ -357,6 +358,8 @@ Check "the player's own recipe left" ((@(Get-ChildItem (G "Sky")).Name -join ","
 Check "Render3D's recipes out, the player's own left" (((@(Get-ChildItem (G "Surfaces")).Name -join ",") -eq "myown.ini") -and
     -not (Test-Path (G "Nebulae")))
 Check "binkw32.dll is stock again" ((Text (G "binkw32.dll")) -eq "stockbink")
+Check "Input.map is stock again" (((Text (G "Input.map")) -eq "stockkeys") -and -not (Test-Path (G "Input.map.a2neb-backup")))
+Remove-Item -LiteralPath (G "Input.map")
 Check "no binkw32 copies" (-not (Test-Path (G "binkw32_orig.dll")) -and -not (Test-Path (G "binkw32.dll.a2neb-backup")))
 foreach ($n in "Render3D", "UI", "HUD", "Menus", "QOL", "QOLRules", "GridLayout", "Online") {
     foreach ($e in ".asi", ".ini", ".log") { Check "$n$e removed" (-not (Test-Path (G "$n$e"))) }

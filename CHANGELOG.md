@@ -5,6 +5,15 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.7.0 — 2026-11-04
+
+Layers: ui 2.3.0, qol 2.3.0, testbench 4.2.0.
+
+### Added
+- Keybinds configurable in game (issue #26): the Refit screen's **Keys** tab lists every key of the game's `Input.map` by what it does, searchable, with clashes named, and rebinds one by pressing the new key; the command bar's grid keys are rebound there too (QOL's new `[Keys] Cell1..15`, live). Choices go into `RefitPlayer.ini` (`[UI.Keys]`, `[QOL.Keys]`) and `Input.map` (beside `Input.map.a2neb-backup`; applies at the next start). ui 2.3.0, qol 2.3.0. Installed, not yet seen in game.
+- `a2fmt::inputmap` (crates/a2fmt): the reader and rewriter of `Input.map`, its key names and scancodes, host-tested, with a stock test of the installed file. The `ui` layer `replaces` `Input.map` (`layers.toml`, `a2mod`); the release's uninstall (`install.sh`, `install.ps1`) puts the stock one back. Installed, not yet seen in game.
+- testbench 4.2.0: scenario `ui-refit-keys`.
+
 ## 15.6.21 — 2026-11-04
 
 Layers: gui-installer 3.1.0.

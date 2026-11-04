@@ -710,3 +710,48 @@ fn damaged_files_never_panic() {
     }
     println!("damaged inputs survived: {runs}");
 }
+
+/// `Input.map` (and its backup, when the UI has rewritten it): every block parses, every
+/// key a block names is one `inputmap::KEYS` knows (or a modifier, or the mouse's), the
+/// rewrite with no change gives the text back, and rebinding every rebindable block to
+/// F1 and back reproduces each binding.
+#[test]
+fn inputmap_stock() {
+    use a2fmt::inputmap::{self, InputMap};
+    let game = game_or_skip!();
+    let mut seen = 0;
+    for name in ["Input.map", "Input.map.a2neb-backup"] {
+        let path = game.join(name);
+        let Ok(bytes) = fs::read(&path) else { continue };
+        seen += 1;
+        let text: String = bytes.iter().map(|&b| b as char).collect();
+        let m = InputMap::parse(&text);
+        assert!(m.actions.len() > 100, "{}: only {} blocks", name, m.actions.len());
+        assert_eq!(m.rewrite(&text, &[]), text);
+        let mut unknown = BTreeSet::new();
+        for a in &m.actions {
+            for l in &a.lines {
+                let k = l.input.trim_start_matches('*');
+                if l.device.eq_ignore_ascii_case("keyboard") && !inputmap::is_modifier(k) && inputmap::key_by_name(k).is_none() {
+                    unknown.insert(l.input.clone());
+                }
+            }
+        }
+        assert!(unknown.is_empty(), "{}: keys not in inputmap::KEYS: {:?}", name, unknown);
+        let f1 = inputmap::Binding::read("F1").unwrap();
+        let all: Vec<(&str, &inputmap::Binding)> = m.actions.iter().filter(|a| a.rebindable()).map(|a| (a.name.as_str(), &f1)).collect();
+        let moved = m.rewrite(&text, &all);
+        let n = InputMap::parse(&moved);
+        assert_eq!(n.actions.len(), m.actions.len());
+        let back: Vec<(String, inputmap::Binding)> = m.actions.iter().filter(|a| a.rebindable()).map(|a| (a.name.clone(), a.binding().unwrap())).collect();
+        let refs: Vec<(&str, &inputmap::Binding)> = back.iter().map(|(a, b)| (a.as_str(), b)).collect();
+        let again = InputMap::parse(&n.rewrite(&moved, &refs));
+        for a in m.actions.iter().filter(|a| a.rebindable()) {
+            assert_eq!(again.find(&a.name).unwrap().binding(), a.binding(), "{}: {}", name, a.name);
+        }
+        eprintln!("{}: {} blocks, {} rebindable", name, m.actions.len(), all.len());
+    }
+    if seen == 0 {
+        eprintln!("NOTE: no Input.map in {}", game.display());
+    }
+}

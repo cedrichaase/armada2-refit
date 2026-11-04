@@ -129,7 +129,8 @@ variable and then of the global; field offsets are spliced in with `A2_STR(QOL_F
 - **No game files in the repository** (hard rule 8). `Input.map` and `RTS_CFG.h` are
   game files. A change to them ships as a script that edits the player's own copy, with
   a backup and `--revert`, the way the retired `ui-widescreen.py` edited `misc/gui_*.cfg`.
-  It never ships as a modified copy of the file.
+  It never ships as a modified copy of the file. The UI's Keys tab does this for
+  `Input.map` in game (`ui/MENUS.md`, "The Keys tab").
 - **Which plugin.** See "Two plugins" above; each idea below says which.
 
 ---
@@ -161,9 +162,16 @@ button of that cell", and which button sits in which cell is the UI's layout.
   pointers (a global array that `Init` fills: popup, build, orders, trade, AI,
   formations) point at a zero for good. Nothing outside the bar reads them. The bar's
   vtable is never patched.
-- **The keys** are scancodes (Q W E R T / A S D F G / Z X C V B), turned into virtual
-  keys with `MapVirtualKeyA` and read with `GetAsyncKeyState`, so they are positions on
-  any layout. A key goes down once. Nothing happens while chat has the keyboard
+- **The keys** are scancodes (Q W E R T / A S D F G / Z X C V B by default), turned into
+  virtual keys with `MapVirtualKeyA` and read with `GetAsyncKeyState`, so they are
+  positions on any layout. A key goes down once. Which key presses which cell is
+  `[Keys] Cell1`..`Cell15` in `QOL.ini` (row by row, `Cell1` top left), each a key by its
+  name in the game's `Input.map` (`a2fmt::inputmap::KEYS`; `bar.c` holds the subset that is
+  not extended, with each one's scancode and its label on the button), read at start and
+  again by `QOL_SettingsChanged`. The Refit screen's Keys tab rebinds them
+  (`[QOL.Keys]` in `RefitPlayer.ini`, `ui/MENUS.md`, "The Keys tab"); a name the grid
+  cannot use keeps the cell's default (`bar: [Keys] Cell3=... is not a key the grid can
+  use`), and a change is logged (`bar: Cell3 E -> F1`). Nothing happens while chat has the keyboard
   (`TextInput_IsActive`), Ctrl or Alt is held, or the game is not the foreground window.
 - **A press** is what releasing a click does: nothing for a disabled button, else the
   click (a fire-and-forget `AudioSound2D` made with the game's `operator new`, named by
@@ -172,7 +180,8 @@ button of that cell", and which button sits in which cell is the UI's layout.
   (`a2_find_export`; UI.asi loads after this plugin, so the lookup repeats until it
   succeeds): the UI's `UI_BarCell(cell)` (the stock button in cell 0..14, or NULL),
   the UI's `UI_BarStep(palette)` and this plugin's `QOL_BarLabel(cell)` (the key's
-  letter, NULL while the keys are off). **The keys work only while `UI_BarCell`
+  label, NULL while the keys are off) and `QOL_BarKeyName(cell)` (the key's `Input.map`
+  name whether the keys are on or off, for the Keys tab). **The keys work only while `UI_BarCell`
   exists and gives a cell**, i.e. while the UI's bar is drawn; otherwise
   they stand down with `bar: no refit bar, position keys off` in `QOL.log` and the stock
   bar keys run.

@@ -5,6 +5,16 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 4.2.0 — 2026-11-04
+
+### Added
+- Scenario `ui-refit-keys`: the Refit screen's Keys tab (search, a rebind of `Input.map`'s Zoom camera in to F6 kept across a relaunch, a grid key rebound live, Reset tab). Not yet run on the bench.
+
+### Changed
+- Scenario `qol-bar-keys` expects QOL's new `--- QOL BarKeys=1` line (qol 2.3.0).
+
+Installed, not yet seen in game.
+
 ## 4.1.5 — 2026-11-04
 
 ### Fixed

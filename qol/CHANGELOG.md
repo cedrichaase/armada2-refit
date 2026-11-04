@@ -5,6 +5,17 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 2.3.0 — 2026-11-04
+
+### Added
+- `[Keys] Cell1`..`Cell15` in `QOL.ini` (shipped Q W E R T / A S D F G / Z X C V B): which key presses which cell of the command bar's grid, each a key by its `Input.map` name; read at start and by `QOL_SettingsChanged` (live; the Refit screen's Keys tab writes `[QOL.Keys]`). A name the grid cannot use keeps the cell's default and is logged. `QOL.log`: `bar: keys Q W E R T / ...` at start, `bar: Cell3 E -> F1` on a change, `bar: key <name>` on a press.
+- Export `QOL_BarKeyName(cell)`: a cell's key by its `Input.map` name, whether the grid keys are on or off. `QOL_BarLabel` gives the key's label on the button.
+
+### Changed
+- The `--- QOL BarKeys=1` line reads `-> the grid's keys ([Keys]) press the Refit bar's cells, patched`.
+
+Installed, not yet seen in game.
+
 ## 2.2.2 — 2026-11-04
 
 ### Fixed
