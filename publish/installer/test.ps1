@@ -68,7 +68,11 @@ foreach ($n in "MSAA", "Planets", "Lighting", "Sky", "Fog", "Specials") {
     Set-Content (G "$n.asi") "old"; Set-Content (G "$n.ini") "old"
 }
 New-Item -ItemType Directory (G "Sky") | Out-Null
-Set-Content (G "Sky\mbgaqu.ini") "old"; Set-Content (G "Sky\myown.ini") "[Sky]"
+# ...and Sky.asi's recipes: a shipped copy goes, one the player edited stays (retire.txt's
+# glob-hash knows the shipped ones by hash, so the copies are the repository's own bytes).
+$skyd = Join-Path $PSScriptRoot "..\..\render3d\content\sky"
+Copy-Item (Join-Path $skyd "mbgaqu.ini") (G "Sky\mbgaqu.ini"); Set-Content (G "Sky\myown.ini") "[Sky]"
+[IO.File]::WriteAllBytes((G "Sky\mbgred.ini"), [byte[]]((Get-Content -LiteralPath (Join-Path $skyd "mbgred.ini") -Encoding Byte) + [Text.Encoding]::ASCII.GetBytes("`n; mine`n")))
 
 # ...and the legacy plugins UI.asi replaced: retired.
 foreach ($n in "HUD", "Menus", "GridLayout", "MenuScale") {
@@ -113,7 +117,9 @@ foreach ($n in "HUD", "Menus", "GridLayout", "MenuScale") {
     Check "$n.asi + $n.ini retired" (-not (Test-Path (G "$n.asi")) -and -not (Test-Path (G "$n.ini")))
 }
 Check "retired said so" ((Has $out "  retired HUD.asi") -and (Has $out "  retired Sky\mbgaqu.ini"))
-Check "the player's own recipe left, Sky.asi's gone" ((@(Get-ChildItem (G "Sky")).Name -join ",") -eq "myown.ini")
+Check "the player's own recipe left, Sky.asi's gone" (((@(Get-ChildItem (G "Sky")).Name -join ",") -eq "mbgred.ini,myown.ini") -and
+    (Select-String -Quiet -SimpleMatch "; mine" (G "Sky\mbgred.ini")))
+Remove-Item -LiteralPath (G "Sky\mbgred.ini")
 foreach ($n in "QOL", "QOLRules", "Online") {
     Check "$n.asi + $n.ini" ((Test-Path (G "$n.asi")) -and (Test-Path (G "$n.ini")))
 }
@@ -231,7 +237,8 @@ $out = Install @($G)
 $env:A2_PROGRESS = $null
 Check "prerequisites already installed" (Has $out "*STA2WidescreenPatch: already installed")
 Check "DXVK's d3d8.dll replaced by Display8, GOG's copy kept" (((Sha (G "d3d8.dll")) -eq (Sha (Join-Path $P "layers\display\d3d8.dll"))) -and
-    ((Text (G "d3d8.dll.gog-backup")) -eq "gogd3d8to9") -and (Has $out "  d3d8.dll: the old chain's, replaced"))
+    ((Text (G "d3d8.dll.gog-backup")) -eq "gogd3d8to9") -and (Has $out "  d3d8.dll: not one we know, replaced*") -and
+    ((Text (G "d3d8.dll.a2chain-backup")) -eq "dxvk"))
 Check "the display step, then the retire step, then the plugins'" ((@($out | Where-Object { $_ -like "::step *" } |
     ForEach-Object { ($_ -split " ")[1] } | Select-Object -Skip 2 -First 3) -join " ") -eq "display retire render3d")
 Check "no chain or renderer step" (-not (Has $out "::step chain*") -and -not (Has $out "::step renderer*"))
@@ -337,10 +344,13 @@ Write-Host "== uninstall: what it added goes, what changed since stays"
 Set-Content (G "UltimateASILoader-license.txt") "mine"
 Set-Content (G "Sky\myown.ini") "[Sky]"   # a recipe of the player's own stays
 Set-Content (G "Display8.log") "log"
+Remove-Item -LiteralPath (G "d3d8.dll.a2chain-backup") -ErrorAction SilentlyContinue   # the DXVK one kept above; GOG's goes back, this one is the player's to delete
+Remove-Item -LiteralPath $PyLog -ErrorAction SilentlyContinue   # earlier passes (-Without models) logged reverts too
 $env:A2_PROGRESS = "1"
 $out = Install @("-Uninstall", $G)
 $env:A2_PROGRESS = $null
 Check "::step uninstall, and only that" ((@($out | Where-Object { $_ -like "::step *" }) -join "|") -eq "::step uninstall taking the mod out")
+if (Test-Path -LiteralPath $PyLog) { Get-Content -LiteralPath $PyLog | Out-Host }
 Check "the SOD rewrites reverted" ((@(Get-Content -LiteralPath $PyLog | Where-Object { $_ -like "*--revert" }).Count -eq 4))
 Remove-Item -LiteralPath $PyLog
 Check "the player's own recipe left" ((@(Get-ChildItem (G "Sky")).Name -join ",") -eq "myown.ini")

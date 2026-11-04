@@ -100,17 +100,13 @@ the game on `Backend=auto` (Vulkan on MoltenVK) and zips the reports and logs
 (`tools/gates/GATES.txt`, "Gate M"). CI attaches the script and `vkprobe.exe` to the
 `native-gates-<commit>` artifact.
 
-### CI spike: macos-15 (phase 10 X3)
+### CI spike: macos-15 (phase 10 X3), removed
 
-CI job `mac-probe` is a timeboxed, non-blocking spike: does a GitHub macOS arm64 runner
-have a Metal device at all (`system_profiler SPDisplaysDataType`, `MTLCopyAllDevices`)?
-If it has none the job says so in its summary and ends green (the GitHub-hosted arm64
-runners are virtual machines; their images document no GPU). If it has one, the job
-installs a Wine and MoltenVK from Homebrew and runs `vkprobe.exe` under new-style
-WoW64 on it. **Result: not yet known** — the job was written without a Mac or a
-runner to try it on; the first CI run's summary decides. If the answer is "no Metal
-device" (or the Wine route cannot be made to work within two hours of effort), delete
-the job and record the reason here; Gate M stays the user's.
+CI job `mac-probe` was a non-blocking spike: run `vkprobe.exe` under Wine on MoltenVK
+on a GitHub macOS arm64 runner. It was removed on 2026-11-04 without a result. Homebrew
+disabled its `wine-stable` cask, the `gcenx/wine` tap no longer carries a Wine, and the
+user chose to drop the job rather than keep chasing a Wine for the runner. Gate M
+(`tools/gates/GATES.txt`) stays the user's, on a real Mac.
 
 ## Building
 

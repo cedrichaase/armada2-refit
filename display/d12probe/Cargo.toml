@@ -1,6 +1,6 @@
 [package]
 name = "d12probe"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 publish = false
 description = "d12probe: does Direct3D 12 work for Display8 in this 32-bit process? (README.md)"

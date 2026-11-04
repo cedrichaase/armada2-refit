@@ -5,6 +5,39 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.21 — 2026-11-04
+
+Layers: gui-installer 3.1.0.
+
+### Fixed
+- CI: the `d3d12-probe` job takes the Agility SDK's 32-bit `D3D12Core.dll` and `d3d12SDKLayers.dll` from `build/native/bin/win32/` (the package has no `x86` folder). The `vulkan-probe-windows` job registers lavapipe's ICD in the 32-bit registry (`HKLM\SOFTWARE\Khronos\Vulkan\Drivers`), since the Vulkan loader ignores `VK_DRIVER_FILES` in an elevated process, and prints the loader's debug output. `publish/installer/test.ps1` expects what `install.sh` and `test.sh` do of a DXVK `d3d8.dll` (kept as `d3d8.dll.a2chain-backup`, "not one we know, replaced"). Its uninstall check counts only the uninstall's own `--revert` calls of the model scripts.
+
+- gui-installer: on Linux the Game row's title and path keep their width when the game's name is long; the drop-downs ellipsize their own text (`capped_dropdown`). Installed, not yet seen in game.
+
+### Removed
+- CI: the `mac-probe` spike job (vkprobe under Wine on MoltenVK on a macOS runner): no Wine for the runner was left to install. Gate M stays a check on a real Mac (`display/vkprobe/README.md`). Installed, not yet seen in game.
+
+## 15.6.20 — 2026-11-04
+
+Layers: gui-installer 3.1.0.
+
+### Added
+- gui-installer: on macOS, **Set up Armada II** puts the game into a Sikarugir wrapper of its own from GOG's offline installer in Downloads (Rosetta 2, Sikarugir's template and engine, the prefix, GOG's installer run silently), then installs the refit into it; `--setup-mac` on the command line. **Launch game** opens a wrapper whose program is the game, and the macOS pickers are drawn in the window. From PR #21 (`5477ac7`, `cd520b2`, `3239c25`, `c96259e`), written at gui-installer 2.2.0 and confirmed in game then, now on 3.x. Installed, not yet seen in game.
+
+## 15.6.19 — 2026-11-04
+
+Layers: gui-installer 3.0.2.
+
+### Fixed
+- CI, Windows: `publish/installer/test.ps1` builds the sky recipes the retire step must take out from the repository's shipped copies (as `test.sh` does) instead of a placeholder no hash knows, and expects an edited one to stay; `.gitattributes` keeps `render3d/content/sky/*.ini` byte-exact on Windows checkouts. `gui-installer/test-windows.ps1` expects `layers\qol\QOL.asi`, not `game\`. The `vulkan-probe-windows` job fetches the Vulkan runtime components of the pinned SDK 1.4.363.0 (`latest`, 1.4.363.1, ships none). Installed, not yet seen in game.
+
+## 15.6.18 — 2026-11-04
+
+Layers: display 1.0.5.
+
+### Fixed
+- CI's Direct3D 12 gate (d12probe on WARP): the probe no longer records a same-state barrier on its first frame, which failed the command list's `Close` with `E_INVALIDARG`; a failed `Close` or `Present` lists the debug layer's messages. Installed, not yet seen in game.
+
 ## 15.6.17 — 2026-11-04
 
 Layers: gui-installer 3.0.1.

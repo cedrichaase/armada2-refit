@@ -35,6 +35,7 @@ import hashlib
 import json
 import math        # noqa: F401  program runs as Python (run_python), so they are bundled
 import os
+import plistlib
 import re
 import shutil
 import sqlite3
@@ -49,7 +50,7 @@ import urllib.error
 import urllib.request
 import zipfile
 
-INSTALLER_VERSION = '3.0.1'
+INSTALLER_VERSION = '3.1.0'
 SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, ::step and ::error lines
 REPO = 'cedrichaase/armada2-refit'
 API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'
@@ -114,6 +115,12 @@ STATUS = {
     'launcher': 'Writing the launch settings',
     'uninstall': 'Removing the mod',
     'restore': 'Restoring the launch settings',
+    # Setting the game up on a Mac (Job.setup_mac).
+    'rosetta': 'Installing Rosetta 2',
+    'sikarugir': 'Downloading Sikarugir',
+    'wrapper': 'Building the Sikarugir wrapper',
+    'prefix': 'Making the Wine prefix',
+    'game': "Installing Armada II with GOG's installer",
 }
 # RETIRED: steps only packages before 3.0.0's package (14.x and older) print. Their
 # manifests list them, and STATUS.get(step, step) must still say something readable.
@@ -530,7 +537,7 @@ def prefix_wine(pre):
         for w in ('Contents/SharedSupport/wine/bin/wine', 'Contents/SharedSupport/wine/bin/wine64',
                   'Contents/Resources/wine/bin/wine'):
             if os.path.isfile(os.path.join(pre.bundle, w)):
-                return [os.path.join(pre.bundle, w)], {'WINEPREFIX': pre.root}
+                return [os.path.join(pre.bundle, w)], wrapper_env(pre.bundle, pre.root)
     if pre.kind == 'Whisky':
         w = os.path.expanduser('~/Library/Application Support/com.isaacmarovitz.Whisky/'
                                'Libraries/Wine/bin/wine64')
@@ -540,6 +547,107 @@ def prefix_wine(pre):
         if w and os.path.isfile(w):
             return [w], {'WINEPREFIX': pre.root}
     return None
+
+
+def wrapper_runs_game(bundle):
+    """Whether a wrapper's launcher starts the game itself: its program (Info.plist's
+    `Program Name and Path`) is Armada2.exe."""
+    try:
+        with open(os.path.join(bundle, 'Contents', 'Info.plist'), 'rb') as f:
+            exe = plistlib.load(f).get('Program Name and Path') or ''
+    except (OSError, ValueError, plistlib.InvalidFileException):
+        return False
+    return exe.replace('\\', '/').rsplit('/', 1)[-1].lower() == 'armada2.exe'
+
+
+def wrapper_env(bundle, prefix):
+    """What a wrapper's own Wine needs started outside the wrapper's launcher: the prefix,
+    and the wrapper's libraries (Sikarugir's wineserver finds libinotify only through
+    them, and stops before anything runs without)."""
+    env = {'WINEPREFIX': prefix}
+    fw = os.path.join(bundle, 'Contents', 'Frameworks')
+    if os.path.isdir(fw):
+        env['DYLD_FALLBACK_LIBRARY_PATH'] = fw + ':/usr/lib'
+    return env
+
+
+# ------------------------------------------------------------------ macOS: setting the game up
+
+# What Sikarugir Creator does by hand, done here (README.md, "Setting the game up on a
+# Mac"): Sikarugir's wrapper template with a Wine engine inside, both fetched from
+# Sikarugir's own releases at setup time (neither is ours to ship), pinned by digest; the
+# prefix made, GOG's offline installer run in it silently, and the wrapper pointed at the
+# game. (url, sha256, size)
+SIKARUGIR_TEMPLATE = ('https://github.com/Sikarugir-App/Template/releases/download/v1.0/'
+                      'Template-1.0.24.tar.xz',
+                      '4b5f89eeb9ef139936bdfad33d9b420b05ea4597cb7d63376674f7a8e171321c',
+                      96198448)
+SIKARUGIR_ENGINE = ('https://github.com/Sikarugir-App/Engines/releases/download/v1.0/'
+                    'WS12WineSikarugir11.0_1.tar.xz',
+                    '67e29fb3d74f363af39c69ba11f9b13a79812c5db07cf4748672658e4a200a0e',
+                    167322744)
+SIKARUGIR = 'https://github.com/Sikarugir-App/Sikarugir'
+WRAPPER_HOME = os.path.join(HOME, 'Applications', 'Sikarugir')
+WRAPPER_APP = os.path.join(WRAPPER_HOME, 'Armada II.app')
+GAME_IN_PREFIX = ('GOG Games', 'Star Trek Armada II')     # where the setup puts the game
+DOWNLOADS = os.path.join(HOME, 'Downloads')
+GOG_LIBRARY = 'https://www.gog.com/account'
+SETUP_GLOB = 'setup_star_trek*armada*.exe'    # GOG's offline installer, as GOG names it
+ROSETTA = '/Library/Apple/usr/share/rosetta/rosetta'
+
+
+def find_setup_exe(where=DOWNLOADS):
+    """GOG's offline installer for the game in `where`, the newest if there are several."""
+    try:
+        hits = [os.path.join(where, n) for n in os.listdir(where)
+                if fnmatch.fnmatch(n.lower(), SETUP_GLOB)]
+    except OSError:
+        return None
+    hits = [h for h in hits if os.path.isfile(h)]
+    return max(hits, key=os.path.getmtime) if hits else None
+
+
+def wrapper_plist(path, name, exe, flags=''):
+    """A wrapper template's Info.plist made the game's, as Creator does: its own bundle id
+    and name, and the program its launcher starts (a path in drive_c) with its flags."""
+    with open(path, 'rb') as f:
+        pl = plistlib.load(f)
+    pl['CFBundleIdentifier'] = 'com.sikarugir.' + re.sub(r'[^A-Za-z0-9]', '', name)
+    pl['CFBundleName'] = name
+    pl['Program Name and Path'] = exe
+    pl['Program Flags'] = flags
+    with open(path, 'wb') as f:
+        plistlib.dump(pl, f)
+
+
+def fetch_checked(url, digest, size, dest, progress=None):
+    """`url` into `dest` unless it is there already with `digest` (sha256); else a
+    download, checked before it takes the name."""
+    if os.path.isfile(dest) and sha256(dest) == digest:
+        return dest
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(dest), suffix='.part')
+    try:
+        h = hashlib.sha256()
+        with os.fdopen(fd, 'wb') as f, http_get(url, timeout=30) as r:
+            got = 0
+            while True:
+                chunk = r.read(256 << 10)
+                if not chunk:
+                    break
+                f.write(chunk)
+                h.update(chunk)
+                got += len(chunk)
+                if progress:
+                    progress(got)
+        if h.hexdigest() != digest:
+            raise RuntimeError(f'the download of {os.path.basename(dest)} is damaged '
+                               '(checksum) — try again')
+        os.replace(tmp, dest)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+    return dest
 
 
 # The overrides go under AppDefaults\Armada2.exe, so they apply to the game alone and
@@ -671,9 +779,11 @@ def prefix_apply(pre, changes, undo=False):
 
 
 def launch_game_native(game, env_add=None):
-    """Start the game without Heroic: the exe itself on Windows, through the prefix's
-    Wine on macOS (with the launch variables in its environment too, should the
-    registry not have them). False when there is no way to."""
+    """Start the game without Heroic: the exe itself on Windows; on macOS a wrapper whose
+    program is the game as a double click starts it (its launcher sets up the Wine it
+    carries, which started bare runs nothing), else through the prefix's Wine (with the
+    launch variables in its environment too, should the registry not have them). False
+    when there is no way to."""
     try:
         exe = next((os.path.join(game.path, n) for n in os.listdir(game.path)
                     if n.lower() == 'armada2.exe'), None)
@@ -685,6 +795,10 @@ def launch_game_native(game, env_add=None):
         if SYSTEM == 'windows':
             subprocess.Popen([exe], cwd=game.path, close_fds=True,
                              creationflags=0x00000008 | 0x00000200)   # DETACHED, NEW_GROUP
+            return True
+        if game.prefix and game.prefix.bundle and wrapper_runs_game(game.prefix.bundle):
+            subprocess.Popen(['/usr/bin/open', game.prefix.bundle], stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL, start_new_session=True)
             return True
         w = prefix_wine(game.prefix) if game.prefix else None
         if not w:
@@ -2130,6 +2244,127 @@ class Job:
             raise RuntimeError(tail[0])      # a schema-0 zip, or a failure with no code
         return out
 
+    def _run(self, argv, env=None):
+        """A command whose output goes into the log; its exit code."""
+        self.log('$ ' + ' '.join(argv))
+        proc = subprocess.Popen(argv, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                text=True, encoding='utf-8', errors='replace')
+        for line in proc.stdout:
+            self.log(line.rstrip('\n'))
+        return proc.wait()
+
+    def _wait_wine(self, contents, limit=1800):
+        """Until no process of the wrapper's Wine (at `contents`) runs any more: its
+        wineserver lasts as long as anything in the prefix does, and a few seconds more.
+        Waits up to 15 s for one to start, in case the launcher returned first."""
+        mark = os.path.join(contents, 'SharedSupport', 'wine') + '/'
+        t0, seen = time.time(), False
+        while time.time() - t0 < limit:
+            busy = any(mark in cmd for _, cmd in processes())
+            seen = seen or busy
+            if not busy and (seen or time.time() - t0 > 15):
+                return
+            time.sleep(1)
+        raise RuntimeError(f'Wine in the new wrapper was still busy after {limit // 60} minutes')
+
+    def setup_mac(self, setup):
+        """Armada II from GOG's offline installer `setup` into a Sikarugir wrapper of our own
+        (WRAPPER_APP), as Sikarugir Creator and the wrapper's Install Software would make
+        it; Rosetta 2 first if it is missing. Returns the game folder."""
+        if os.path.exists(WRAPPER_APP):
+            raise RuntimeError(f'{short(WRAPPER_APP)} is there already, without the game in '
+                               'it — move it to the Bin and set up again')
+        if not os.path.exists(ROSETTA):
+            # Every Wine on Apple Silicon runs under it.
+            self.report(0.01, 'rosetta', None)
+            self._run(['/usr/sbin/softwareupdate', '--install-rosetta', '--agree-to-license'])
+            if not os.path.exists(ROSETTA):
+                raise RuntimeError('Rosetta 2 could not be installed — install it from a '
+                                   'terminal (softwareupdate --install-rosetta), then set up '
+                                   'again')
+        parts = (SIKARUGIR_TEMPLATE, SIKARUGIR_ENGINE)
+        total, before, tars = sum(p[2] for p in parts), 0, []
+        for url, digest, size in parts:
+            def dl(got, before=before):
+                self.report(0.02 + 0.38 * (before + got) / total, 'sikarugir',
+                            dict(version='', detail=f'{human(before + got)} / {human(total)}'))
+            tars.append(fetch_checked(url, digest, size,
+                                      os.path.join(CACHE, 'sikarugir', url.rsplit('/', 1)[1]), dl))
+            before += size
+
+        # Built beside where it goes, under a name no wrapper search takes for an .app, and
+        # renamed into place once the game is in it: a setup that stops leaves no wrapper.
+        work = os.path.join(WRAPPER_HOME, '.armada-ii-setup')
+        server = None
+        try:
+            self.report(0.42, 'wrapper', None)
+            clear_dir(work)
+            os.makedirs(work)
+            for t in tars:
+                if self._run(['/usr/bin/tar', '-xJf', t, '-C', work]) != 0:
+                    raise RuntimeError(f'{os.path.basename(t)} could not be unpacked')
+            app = next((os.path.join(work, n) for n in os.listdir(work)
+                        if n.startswith('Template-') and n.endswith('.app')), None)
+            engine = os.path.join(work, 'wswine.bundle')
+            if not app or not os.path.isfile(os.path.join(engine, 'bin', 'wine')):
+                raise RuntimeError('the Sikarugir template or engine is not as expected')
+            contents = os.path.join(app, 'Contents')
+            shared = os.path.join(contents, 'SharedSupport')
+            os.rename(engine, os.path.join(shared, 'wine'))
+            plist = os.path.join(contents, 'Info.plist')
+            exe_in_c = '/' + '/'.join(GAME_IN_PREFIX) + '/Armada2.exe'
+            wrapper_plist(plist, 'Armada II', exe_in_c)
+            prefix = os.path.join(shared, 'prefix')
+            if not os.path.lexists(os.path.join(contents, 'drive_c')):
+                os.symlink('SharedSupport/prefix/drive_c', os.path.join(contents, 'drive_c'))
+
+            # The wrapper's own launcher runs Wine, as Creator and Install Software do: it
+            # sets up Sikarugir's environment and the prefix's default registry, which a
+            # bare wineboot lacks. It may return before Wine is done (_wait_wine).
+            launcher = os.path.join(contents, 'MacOS', 'wineskinlauncher')
+            server = os.path.join(shared, 'wine', 'bin', 'wineserver')
+            env = dict(host_env(), **wrapper_env(app, prefix))
+            self.report(0.50, 'prefix', None)
+            code = self._run([launcher, 'WSS-wineprefixcreate'], host_env())
+            self._wait_wine(contents, limit=600)
+            if not os.path.isdir(os.path.join(prefix, 'drive_c', 'windows')):
+                raise RuntimeError(f'Wine could not make its prefix in the wrapper (exit {code})')
+
+            # GOG's installers are Inno Setup's, run silently into GOG's own default
+            # folder, GAME_IN_PREFIX. The launcher takes flags only for the wrapper's own
+            # program, so for this one run that is a copy of the installer under a plain
+            # name in drive_c (an APFS clone, no space taken), with Inno's flags; then the
+            # game.
+            self.report(0.60, 'game', None)
+            stage = os.path.join(prefix, 'drive_c', 'a2refit-setup')
+            os.makedirs(stage, exist_ok=True)
+            copy = os.path.join(stage, 'setup.exe')
+            if subprocess.run(['/bin/cp', '-c', setup, copy]).returncode != 0:
+                shutil.copyfile(setup, copy)
+            wrapper_plist(plist, 'Armada II', '/a2refit-setup/setup.exe',
+                          '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-')
+            code = self._run([os.path.join(contents, 'MacOS', 'launcher')], host_env())
+            self._wait_wine(contents)
+            clear_dir(stage)
+            wrapper_plist(plist, 'Armada II', exe_in_c)
+            game = os.path.join(prefix, 'drive_c', *GAME_IN_PREFIX)
+            if not exe_in(game):
+                win = 'C:\\' + '\\'.join(GAME_IN_PREFIX)
+                raise RuntimeError(f"GOG's installer did not install the game in {win} (exit "
+                                   f'{code}) — is {os.path.basename(setup)} the Windows '
+                                   'offline installer of Star Trek: Armada II?')
+            server = None
+            os.rename(app, WRAPPER_APP)
+        except BaseException:
+            if server and os.path.isfile(server):
+                self._run([server, '-k'], env)
+            raise
+        finally:
+            clear_dir(work)
+        self.log(f'set up: {WRAPPER_APP}')
+        return os.path.join(WRAPPER_APP, 'Contents', 'SharedSupport', 'prefix', 'drive_c',
+                            *GAME_IN_PREFIX)
+
     def install(self, rel, zip_path, game, launcher=True, skip=None):
         """rel may be None when installing a local zip. skip: the ids of the parts to leave
         out (parts of the package only); None keeps the choice of the last install."""
@@ -2290,6 +2525,10 @@ def cli(argv):
                     help='parts to leave out (the package\'s select on/off layers)')
     ap.add_argument('--all', action='store_true',
                     help='every part, forgetting an earlier choice')
+    ap.add_argument('--setup-mac', nargs='?', const='', metavar='SETUP_EXE',
+                    help="macOS: set the game up in a Sikarugir wrapper from GOG's offline "
+                         'installer (the one in ~/Downloads if none is given), then install '
+                         'the newest release into it (or --install VERSION)')
     ap.add_argument('--check-version')
     ap.add_argument('--selftest', action='store_true')
     ap.add_argument('--report', action='store_true',
@@ -2325,7 +2564,17 @@ def cli(argv):
     if a.report:
         print(diagnose(game))
         return 0
-    if not game or not exe_in(game):
+    setup = None
+    if a.setup_mac is not None:
+        setup = a.setup_mac or find_setup_exe()
+        if SYSTEM != 'macos':
+            print('--setup-mac is for macOS', file=sys.stderr)
+            return 1
+        if not setup or not os.path.isfile(setup):
+            print(f"no GOG offline installer in {short(DOWNLOADS)} -- download it from your GOG "
+                  f'library ({GOG_LIBRARY}), or pass its path', file=sys.stderr)
+            return 1
+    elif not game or not exe_in(game):
         print('no Armada II found -- pass --game DIR', file=sys.stderr)
         return 1
     last = [None]
@@ -2344,7 +2593,17 @@ def cli(argv):
     if a.without:
         skip = {w for w in re.split(r'[,\s]+', a.without) if w}
     try:
-        if a.uninstall:
+        if setup:
+            rels = releases()
+            rel = next((r for r in rels if r.version == a.install), None) if a.install \
+                else default_release(rels)
+            if not rel:
+                print(f'no release {a.install or "to install -- check the connection"}',
+                      file=sys.stderr)
+                return 1
+            game = job.setup_mac(setup)
+            job.install(rel, None, game, launcher=not a.no_launcher, skip=skip)
+        elif a.uninstall:
             job.uninstall(releases(), game)
         elif a.package:
             job.install(None, a.package, game, launcher=not a.no_launcher, skip=skip)
@@ -2764,6 +3023,50 @@ def selftest():
             if fam == 'fedora' and os.path.exists('/run/ostree-booted'):
                 continue
             check(distro_family(osr) == fam, f'distro: {osr} is {fam}')
+
+    # Setting the game up on a Mac: the parts that need no Wine.
+    with tempfile.TemporaryDirectory() as t:
+        dl = os.path.join(t, 'Downloads')
+        os.makedirs(dl)
+        check(find_setup_exe(dl) is None, 'setup: no installer in an empty Downloads')
+        for n, age in (('armada2-refit-installer-windows.exe', 0),
+                       ('setup_star_trektm_armada_ii_1.1_(41234).exe', 200),
+                       ('setup_star_trektm_armada_ii_1.1_rdna_fix_(52907).exe', 100)):
+            with open(os.path.join(dl, n), 'w') as f:
+                f.write('MZ')
+            os.utime(os.path.join(dl, n), (time.time() - age, time.time() - age))
+        check(os.path.basename(find_setup_exe(dl) or '') ==
+              'setup_star_trektm_armada_ii_1.1_rdna_fix_(52907).exe',
+              "setup: GOG's installer found, the newest of two, not the refit's own exe")
+        app = os.path.join(t, 'Armada II.app')
+        os.makedirs(os.path.join(app, 'Contents', 'Frameworks'))
+        plist = os.path.join(app, 'Contents', 'Info.plist')
+        with open(plist, 'wb') as f:
+            plistlib.dump({'CFBundleIdentifier': 'com.SikarugirNavyWrapper.Sikarugir',
+                           'CFBundleName': 'SikarugirNavyWrapper', 'D9VK': 1,
+                           'Program Name and Path': '/nothing.exe'}, f)
+        wrapper_plist(plist, 'Armada II', '/GOG Games/Star Trek Armada II/Armada2.exe')
+        with open(plist, 'rb') as f:
+            pl = plistlib.load(f)
+        check(pl['CFBundleIdentifier'] == 'com.sikarugir.ArmadaII' and pl['CFBundleName'] ==
+              'Armada II' and pl['Program Name and Path'].endswith('/Armada2.exe') and
+              pl['D9VK'] == 1, "setup: the template's Info.plist made the game's, the rest kept")
+        check(wrapper_runs_game(app), 'wrapper: its program is the game, so Launch game opens it')
+        wrapper_plist(plist, 'Armada II', '/a2refit-setup/setup.exe', '/VERYSILENT')
+        check(not wrapper_runs_game(app) and not wrapper_runs_game(t),
+              'wrapper: another program, or no wrapper, is not the game')
+        wrapper_plist(plist, 'Armada II', '/GOG Games/Star Trek Armada II/Armada2.exe')
+        pre = os.path.join(app, 'Contents', 'SharedSupport', 'prefix')
+        env = wrapper_env(app, pre)
+        check(env['WINEPREFIX'] == pre and env['DYLD_FALLBACK_LIBRARY_PATH'].startswith(
+              os.path.join(app, 'Contents', 'Frameworks') + ':'),
+              "wrapper: its Wine gets the prefix and the wrapper's libraries")
+        os.makedirs(os.path.join(app, 'Contents', 'SharedSupport', 'wine', 'bin'))
+        with open(os.path.join(app, 'Contents', 'SharedSupport', 'wine', 'bin', 'wine'), 'w'):
+            pass
+        w = prefix_wine(WinePrefix(pre, 'Wrapper', bundle=app))
+        check(bool(w) and 'DYLD_FALLBACK_LIBRARY_PATH' in w[1],
+              "wrapper: Launch game starts its Wine with the wrapper's libraries")
     return 0 if ok else 1
 
 
@@ -2877,7 +3180,7 @@ def run_gui():
     import gi
     gi.require_version('Gtk', '4.0')
     gi.require_version('Adw', '1')
-    from gi.repository import Adw, Gdk, Gio, GLib, Gtk
+    from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Pango
     import math
     import random
 
@@ -3097,6 +3400,25 @@ def run_gui():
             cr.arc(x, y, r, 0, 6.2832)
             cr.fill()
 
+    def capped_dropdown(max_chars):
+        """A drop-down whose width is capped: its items are labels that ellipsize (the middle,
+        so the end of "Heroic (Flatpak) · GOG — Star Trek Armada II" survives). Stock, a
+        drop-down asks for the width of its longest item, and an Adw.ActionRow gives a suffix
+        what it asks for before its title, so a long game name squeezed "Game" to a letter a
+        line."""
+        def setup(_f, item):
+            item.set_child(Gtk.Label(xalign=0, ellipsize=Pango.EllipsizeMode.MIDDLE,
+                                     max_width_chars=max_chars, width_chars=8))
+
+        def bind(_f, item):
+            text = item.get_item().get_string()
+            item.get_child().set_label(text)
+            item.get_child().set_tooltip_text(text)     # the whole name, where it is cut
+        factory = Gtk.SignalListItemFactory()
+        factory.connect('setup', setup)
+        factory.connect('bind', bind)
+        return Gtk.DropDown(valign=Gtk.Align.CENTER, factory=factory)
+
     class Window(Adw.ApplicationWindow):
         def __init__(self, app):
             super().__init__(application=app, title='Armada II Refit',
@@ -3145,7 +3467,7 @@ def run_gui():
             card.append(rows)
 
             self.row_game = Adw.ActionRow(title='Game', subtitle_lines=2)
-            self.dd_game = Gtk.DropDown(valign=Gtk.Align.CENTER)
+            self.dd_game = capped_dropdown(30)
             self.dd_game.connect('notify::selected', lambda *_: self.on_game())
             browse = Gtk.Button(icon_name='folder-open-symbolic', valign=Gtk.Align.CENTER,
                                 tooltip_text='Choose the folder holding Armada2.exe')
@@ -3156,7 +3478,7 @@ def run_gui():
             rows.append(self.row_game)
 
             self.row_rel = Adw.ActionRow(title='Version', subtitle_lines=2)
-            self.dd_rel = Gtk.DropDown(valign=Gtk.Align.CENTER)
+            self.dd_rel = capped_dropdown(20)
             self.dd_rel.connect('notify::selected', lambda *_: self.on_release())
             self.row_rel.add_suffix(self.dd_rel)
             rows.append(self.row_rel)
@@ -3833,18 +4155,24 @@ WINDOWS_HOWTO = dict(
             [('GOG Galaxy', 'https://www.gog.com/galaxy'), ('The game on GOG', GOG_PAGE)]),
            ('Installed somewhere else? Browse to the folder that holds Armada2.exe.', [])],
     notes=[])
+# On macOS the window also says whether it found the installer (MAC_FOUND, MAC_MISSING).
 MAC_HOWTO = dict(
     title='On a Mac, Armada II runs in Wine',
-    steps=[('CrossOver 26 (paid, CodeWeavers; Armada II rated Runs Great) — create a bottle, '
-            'install the GOG offline installer into it, then Refresh.',
-            [('CrossOver', 'https://www.codeweavers.com/crossover'),
-             ('The game on GOG', GOG_PAGE)]),
-           ("Free: Sikarugir (the former Kegworks) wrapper, or Wine from Gcenx's macOS builds.",
-            [('Sikarugir', 'https://github.com/Sikarugir-App/Sikarugir'),
-             ("Gcenx's Wine builds", 'https://github.com/Gcenx/macOS_Wine_builds')])],
-    notes=["Direct3D 8 and 9 run through Wine's own wined3d on a Mac, so leave CrossOver's "
-           'graphics backend on its default for this game: D3DMetal, DXVK and DXMT only cover '
-           'Direct3D 10 to 12.'])
+    steps=[('Download the Windows offline installer from your GOG library into Downloads: '
+            'open Star Trek: Armada II there, and under "Download offline backup game '
+            'installers" take the Windows one (setup_star_trek…armada_ii….exe).',
+            [('Your GOG library', GOG_LIBRARY), ('The game on GOG', GOG_PAGE)]),
+           ('Press Set up Armada II. It makes a free Sikarugir wrapper (Wine) in '
+            '~/Applications/Sikarugir, installs the game into it with that installer, then '
+            'the refit. Sikarugir is downloaded from GitHub, and Rosetta 2 installed if it '
+            'is missing.',
+            [('Sikarugir', SIKARUGIR)])],
+    notes=['Using CrossOver instead? Install the game into a bottle with the same installer, '
+           'then Refresh. Direct3D 8 and 9 run through Wine\'s own wined3d on a Mac, so leave '
+           'its graphics backend on its default for this game: D3DMetal, DXVK and DXMT only '
+           'cover Direct3D 10 to 12.'])
+MAC_FOUND = 'Found in Downloads: {name}'
+MAC_MISSING = 'No installer in Downloads yet. Refresh once it is there.'
 
 SKY_TOP, SKY_BOTTOM = (4, 6, 13), (8, 10, 22)      # the gradient, as Sky.build_nebula's
 
@@ -3990,6 +4318,8 @@ def run_tk():
     PANEL = ((16, 20, 31, 0.78), (255, 255, 255, 0.09))
     FIELD = ((0, 0, 0, 0.28), (255, 255, 255, 0.13))
     FIELD_HOT = ((0, 0, 0, 0.28), (245, 168, 73, 0.75))
+    PICKER = ((20, 25, 39, 0.97), (255, 255, 255, 0.13))       # the canvas picker (macOS)
+    PICKER_ROW = ((245, 168, 73, 0.22), None)
     AMBER_RGB, AMBER_LIGHT_RGB = (232, 146, 47), (245, 168, 73)
     BUTTONS = {     # kind: ((fill, edge), (hover fill, edge), text)
         'primary': (((*AMBER_RGB, 1.0), (*AMBER_LIGHT_RGB, 1.0)),
@@ -4349,6 +4679,7 @@ def run_tk():
             self.games, self.gi, self.releases, self.ri = [], 0, [], 0
             self.package, self.facts = None, None
             self.skip, self.parts_key = set(), None
+            self.setup_exe = None       # macOS, no game: GOG's offline installer in Downloads
             self.busy, self.user_picked, self.check_error = False, False, None
             self.rel_note = None
             self.status, self.status_kind = '', ''
@@ -4641,6 +4972,7 @@ def run_tk():
         # ---------------------------------------------------------- the game
         def load_games(self, select=None):
             self.games = find_games()
+            self.setup_exe = find_setup_exe() if SYSTEM == 'macos' else None
             last = select or settings().get('game')
             if last and exe_in(last) and not any(
                     os.path.realpath(g.path) == os.path.realpath(last) for g in self.games):
@@ -4836,6 +5168,10 @@ def run_tk():
             g, r, p, f = self.game(), self.release(), self.package, self.facts
             inst = f and f['installed']
             ok = bool(g and r and (p is None or p.supported()) and (p or r.url))
+            if not g and SYSTEM == 'macos':
+                # No game yet: set it up from GOG's offline installer, then install.
+                ok = bool(self.setup_exe and r and (p is None or p.supported()) and (p or r.url))
+                return 'Set up Armada II', True, ok and not self.busy, False, False
             label = 'Install'
             if r and inst:
                 label = ('Reinstall' if inst == r.version else 'Install' if inst == '?' else
@@ -4885,8 +5221,49 @@ def run_tk():
             if self.size:
                 self.layout()
 
+        def open_picker(self, labels, current, pick, x, y):
+            """The game and version pickers on macOS, drawn on the canvas: Tk's native
+            popup menu, posted from a click on the canvas, leaves the whole window deaf to
+            the mouse there (Tk 8.6.16), until it is killed. A click on a row picks it,
+            anywhere else (or Escape) closes it; a new layout closes it too."""
+            cv = self.cv
+            self.close_picker()
+            W, H = self.size
+            rh = F_SUB.metrics('linespace') + px(12)
+            w = max(F_SUB.measure(l) for l in labels) + px(48)
+            h = rh * len(labels) + px(8)
+            x, y = max(px(8), min(x, W - w - px(8))), max(px(8), min(y, H - h - px(8)))
+            # Over the whole window, see-through: the click outside lands here, not on
+            # what is under it. (A canvas image takes clicks on all of its box.)
+            veil = photo_png(W, H, [bytes(W * 4)] * H)
+            self.picker_imgs = [veil]
+            v = cv.create_image(0, 0, anchor='nw', image=veil, tags=('pick',))
+            cv.tag_bind(v, '<Button-1>', lambda e: self.close_picker())
+            cv.create_image(x, y, anchor='nw', image=shape(w, h, px(9), PICKER), tags=('pick',))
+            for i, label in enumerate(labels):
+                t = f'pick{i}'
+                ry = y + px(4) + i * rh
+                row = cv.create_image(x + px(4), ry, anchor='nw', tags=('pick', t))
+                hot = shape(w - px(8), rh, px(6), PICKER_ROW)
+                if i == current:
+                    cv.create_text(x + px(16), ry + rh // 2, text='✓', font=F_SUB,
+                                   fill=AMBER_LIGHT, anchor='center', tags=('pick', t))
+                cv.create_text(x + px(30), ry + rh // 2, text=label, font=F_SUB, fill=FG,
+                               anchor='w', tags=('pick', t))
+                cv.tag_bind(t, '<Enter>', lambda e, r=row, h_=hot: cv.itemconfigure(r, image=h_))
+                cv.tag_bind(t, '<Leave>', lambda e, r=row: cv.itemconfigure(r, image=''))
+                cv.tag_bind(t, '<Button-1>', lambda e, i=i: (self.close_picker(), pick(i)))
+            cv.configure(cursor='')
+            root.bind('<Escape>', lambda e: self.close_picker())
+
+        def close_picker(self):
+            self.cv.delete('pick')
+            self.picker_imgs = []
+            root.unbind('<Escape>')
+
         def layout(self):
             cv = self.cv
+            self.close_picker()
             cv.delete('ui')
             cv.configure(cursor='')
             if len(shapes) > 48:        # sizes the window had; nothing shows them now
@@ -4968,6 +5345,8 @@ def run_tk():
 
             def popup(labels, current, pick):
                 def show(x, y):
+                    if SYSTEM == 'macos':
+                        return self.open_picker(labels, current, pick, x, y + px(2))
                     m = tk.Menu(root, tearoff=0, bg='#141927', fg=FG, activebackground=AMBER,
                                 activeforeground=AMBER_INK, selectcolor=AMBER_LIGHT,
                                 relief='flat', bd=px(1), font=F_SUB)
@@ -5075,6 +5454,11 @@ def run_tk():
                     if links:
                         yy = bottom(item) + px(4)
                     yy += px(6)
+                if SYSTEM == 'macos':
+                    found = self.setup_exe
+                    t = text(ix0, yy, MAC_FOUND.format(name=os.path.basename(found)) if found
+                             else MAC_MISSING, F_SUB, OK if found else WARN, width=ix1 - ix0)
+                    yy = bottom(t) + px(8)
                 for n in how['notes']:
                     t = text(ix0, yy, n, F_SMALL, DIM, width=ix1 - ix0)
                     yy = bottom(t) + px(6)
@@ -5208,6 +5592,8 @@ def run_tk():
 
         def on_install(self):
             g, r = self.game(), self.release()
+            if not g and SYSTEM == 'macos':
+                return self.on_setup()
             if not g or not r or self.busy or not self.actions()[2]:
                 return
             if game_running():
@@ -5243,6 +5629,38 @@ def run_tk():
                 self.on_game()
             skip = set(self.skip)
             self.in_thread(lambda: self.job().install(r, None, g.path, skip=skip), done)
+
+        def on_setup(self):
+            """macOS: the game into a Sikarugir wrapper of our own, then the refit into it."""
+            setup, r = self.setup_exe, self.release()
+            if not setup or not r or self.busy or not self.actions()[2]:
+                return
+            mb = (SIKARUGIR_TEMPLATE[2] + SIKARUGIR_ENGINE[2]) // 1000000
+            rosetta = '' if os.path.exists(ROSETTA) else \
+                "\n• install Rosetta 2, which Wine needs, agreeing to Apple's licence for it"
+            if not messagebox.askyesno(
+                    'Set up Armada II',
+                    f'This will:{rosetta}\n'
+                    f'• download Sikarugir\'s wrapper and Wine engine from GitHub ({mb} MB)\n'
+                    f'• make {short(WRAPPER_APP)}\n'
+                    f'• install the game into it with {os.path.basename(setup)}\n'
+                    f'• then install Refit {r.version} into it\n\n'
+                    'It takes a few minutes. Afterwards, start the game with Armada II in '
+                    f'{short(WRAPPER_HOME)}, or with Launch game here.', parent=root):
+                return
+            self.busy = True
+            self.sky.set_warp(True)
+            self.bar.set(0)
+            self.status, self.status_kind = '', ''
+            self.log(f'== set up the game from {setup}')
+            self.update_all()
+
+            def done(game):
+                self.busy = False
+                self.sky.set_warp(False)
+                self.load_games(select=game)
+                self.on_install()
+            self.in_thread(lambda: self.job().setup_mac(setup), done)
 
         def on_launch(self):
             g = self.game()

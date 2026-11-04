@@ -11,9 +11,9 @@
 # "Release packages". On main and on dispatch, every program in the release is also
 # scanned on VirusTotal, report only, and the reports attached to the release
 # (publish/README.md, "VirusTotal").
-# The native probes (d12probe on WARP with the D3D12 debug layer, vkprobe on lavapipe, a
-# macOS spike) and the gates kit artifact: jobs probes, d3d12-probe, vulkan-probe-windows,
-# gates-windows, mac-probe (display/d12probe/README.md, tools/gates/GATES.txt).
+# The native probes (d12probe on WARP with the D3D12 debug layer, vkprobe on lavapipe)
+# and the gates kit artifact: jobs probes, d3d12-probe, vulkan-probe-windows,
+# gates-windows (display/d12probe/README.md, tools/gates/GATES.txt).
 name: CI
 
 on:
@@ -431,8 +431,8 @@ jobs:
           }
           Expand-Archive "$dir/sdk.zip" "$dir/x" -Force
           New-Item -ItemType Directory -Force gates/D3D12 | Out-Null
-          Copy-Item "$dir/x/build/native/bin/x86/D3D12Core.dll" gates/D3D12/
-          Copy-Item "$dir/x/build/native/bin/x86/d3d12SDKLayers.dll" gates/D3D12/
+          Copy-Item "$dir/x/build/native/bin/win32/D3D12Core.dll" gates/D3D12/
+          Copy-Item "$dir/x/build/native/bin/win32/d3d12SDKLayers.dll" gates/D3D12/
           # 1.616.1 is SDK version 616.
           "AGILITY=$($ver.Split('.')[1])" | Out-File -Append -Encoding ascii $env:GITHUB_ENV
           Write-Host "Agility SDK $ver"
@@ -477,7 +477,7 @@ jobs:
           Write-Host "ICD: $($json.FullName)"
           $loader = Get-ChildItem "$dir/mesa" -Recurse -Filter 'vulkan-1.dll' | Where-Object { $_.FullName -match 'x86' -and $_.FullName -notmatch 'x64' } | Select-Object -First 1
           if (-not $loader) {
-            Invoke-WebRequest 'https://sdk.lunarg.com/sdk/download/latest/windows/vulkan-runtime-components.zip' -OutFile "$dir/rt.zip"
+            Invoke-WebRequest 'https://sdk.lunarg.com/sdk/download/1.4.363.0/windows/vulkan-runtime-components.zip' -OutFile "$dir/rt.zip"
             Expand-Archive "$dir/rt.zip" "$dir/rt" -Force
             $loader = Get-ChildItem "$dir/rt" -Recurse -Filter 'vulkan-1.dll' | Where-Object { $_.FullName -match 'x86' } | Select-Object -First 1
           }
@@ -488,7 +488,16 @@ jobs:
       - name: vkprobe on lavapipe
         shell: pwsh
         run: |
-          $p = Start-Process gates/vkprobe.exe -PassThru -Wait -WorkingDirectory gates
+          # The loader ignores VK_DRIVER_FILES in an elevated process (the runner's user is an
+          # administrator): register the ICD where it looks, in the 32-bit registry view.
+          reg add 'HKLM\SOFTWARE\Khronos\Vulkan\Drivers' /v $env:VK_DRIVER_FILES /t REG_DWORD /d 0 /f /reg:32
+          Write-Host "VK_DRIVER_FILES=$env:VK_DRIVER_FILES"
+          Get-ChildItem gates/lvp | ForEach-Object { Write-Host "  $($_.Name) $($_.Length)" }
+          Get-Content $env:VK_DRIVER_FILES
+          $env:VK_LOADER_DEBUG = 'error,warn,driver'
+          $p = Start-Process gates/vkprobe.exe -PassThru -Wait -WorkingDirectory gates -RedirectStandardError gates/vkloader.txt
+          Write-Host '== loader debug =='
+          Get-Content gates/vkloader.txt -ErrorAction SilentlyContinue | Select-Object -First 60
           Get-Content gates/vkprobe.txt
           if ($p.ExitCode -ne 0) { throw "vkprobe exited $($p.ExitCode)" }
       - uses: actions/upload-artifact@v7
@@ -521,49 +530,6 @@ jobs:
           if ($out -notmatch 'GATE probe-d3d12: PASS') { throw 'the d3d12 probe did not pass through the gate script' }
           if ($out -notmatch 'GATE zip: SKIP') { throw 'the WhatIf run did not reach its end' }
           if (Test-Path (Join-Path $game 'RefitPlayer.ini')) { throw 'WhatIf wrote RefitPlayer.ini' }
-
-  # A timeboxed spike (display/vkprobe/README.md, "CI spike"): does this runner have a
-  # Metal device, and if so does vkprobe run under Wine on MoltenVK? Non-blocking; it
-  # ends green with the reason in its summary when there is no Metal device.
-  mac-probe:
-    needs: probes
-    runs-on: macos-15
-    timeout-minutes: 25
-    continue-on-error: true
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          name: native-gates-${{ github.sha }}
-          path: gates
-      - name: A Metal device?
-        id: metal
-        run: |
-          system_profiler SPDisplaysDataType || true
-          cat > "$RUNNER_TEMP/m.swift" <<'EOF'
-          import Metal
-          let d = MTLCopyAllDevices()
-          print("metal devices: \(d.count)")
-          for x in d { print(x.name) }
-          exit(d.isEmpty ? 1 : 0)
-          EOF
-          if swiftc "$RUNNER_TEMP/m.swift" -o "$RUNNER_TEMP/m" && "$RUNNER_TEMP/m"; then
-            echo "metal=yes" >> "$GITHUB_OUTPUT"
-          else
-            echo "metal=no" >> "$GITHUB_OUTPUT"
-            echo "mac-probe: no Metal device on this runner; the spike is dropped (Gate M stays the user's)." | tee -a "$GITHUB_STEP_SUMMARY"
-          fi
-      - name: vkprobe under Wine on MoltenVK
-        if: steps.metal.outputs.metal == 'yes'
-        run: |
-          brew install --cask --no-quarantine gcenx/wine/wine-stable || brew install --cask wine-stable
-          brew install molten-vk vulkan-loader
-          export WINEPREFIX="$RUNNER_TEMP/pfx" WINEARCH=wow64 WINEDEBUG=-all
-          export VK_ICD_FILENAMES="$(brew --prefix)/etc/vulkan/icd.d/MoltenVK_icd.json"
-          wine="$(command -v wine64 || command -v wine || ls /Applications/Wine*/Contents/Resources/wine/bin/wine64 | head -1)"
-          cd gates
-          timeout 300 "$wine" vkprobe.exe || true
-          cat vkprobe.txt | tee -a "$GITHUB_STEP_SUMMARY"
-          head -1 vkprobe.txt | grep -q 'VERDICT: Vulkan works for Display8'
 
   # Every PE in the release zip and the Windows installer, scanned on VirusTotal
   # (publish/virustotal.py): report only. On pushes to main and on dispatch, never on every

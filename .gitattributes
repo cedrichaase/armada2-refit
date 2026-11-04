@@ -1,0 +1,2 @@
+# The retire step knows the shipped sky recipes by hash: keep their bytes (no CRLF on Windows checkouts).
+render3d/content/sky/*.ini -text
