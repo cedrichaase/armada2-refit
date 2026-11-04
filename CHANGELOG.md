@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.18 — 2026-11-04
+
+Layers: display 1.0.5.
+
+### Fixed
+- CI's Direct3D 12 gate (d12probe on WARP): the probe no longer records a same-state barrier on its first frame, which failed the command list's `Close` with `E_INVALIDARG`; a failed `Close` or `Present` lists the debug layer's messages. Installed, not yet seen in game.
+
 ## 15.6.17 — 2026-11-04
 
 Layers: gui-installer 3.0.1.
