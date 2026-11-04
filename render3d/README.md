@@ -549,9 +549,12 @@ the UI's presented frame (the scene has no HUD).
 
 `core/src/menu/`, the map in `content/menu/map.ini`: a map of render3d's own behind the front end's
 main menu and campaign selection, every scene on it under one sun. A Federation fleet
-in orbit over a class M planet, a starbase beside it, Klingon ships before a Metreon
-nebula far out on one side, a Borg fusion cube and the queen's Diamond in a Mutara nebula
-on the other. `UI.asi`
+in orbit over a class M planet, with a shipyard and a research station beyond it, a
+starbase beside it, Klingon ships and a Klingon starbase before a Metreon nebula far out
+on one side, a Borg fusion cube, a tactical cube, spheres, an assimilator, the queen's
+Diamond and a Borg starbase in a Mutara nebula on the other. The menus' column covers the
+left of the screen, so each view keeps its ships centre-right, and the cameras sit close
+to the ships' plane, seeing the hulls from the side rather than from above. `UI.asi`
 asks for a **view** of it by name (`[Menus] Scene=1`, ui/MENUS.md, "The menu scene")
 through render3d's export `Render3D_MenuScene(name, x, y, w, h)`: inside its own
 scene, with the back buffer bound, it gets the view drawn into that rectangle and draws
