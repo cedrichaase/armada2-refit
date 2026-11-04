@@ -49,7 +49,7 @@ import urllib.error
 import urllib.request
 import zipfile
 
-INSTALLER_VERSION = '3.0.0'
+INSTALLER_VERSION = '3.0.1'
 SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, ::step and ::error lines
 REPO = 'cedrichaase/armada2-refit'
 API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'
@@ -1562,6 +1562,25 @@ def heroic_plan(heroic, wanted):
     return changes, conflicts
 
 
+def merge_changes(prev, done):
+    """The undo record after an install: `prev` (the state file's) with `done` (this
+    install's) folded in. Per key the EARLIEST `old` is kept, since that is what the
+    player had before any install of ours: a later install sees our own earlier value as
+    the old one and must not record it, or uninstall puts it back. A removal (the
+    prefix's d3d9) that cancels an earlier add of ours drops that add as well."""
+    out = list(prev)
+    for d in done:
+        i = next((j for j, c in enumerate(out)
+                  if c['key'].lower() == d['key'].lower()), None)
+        if i is None:
+            out.append(d)
+        elif d.get('remove') and out[i].get('old') is None and not out[i].get('remove'):
+            del out[i]
+        else:
+            out[i] = dict(d, old=out[i]['old'])
+    return out
+
+
 # What installs before 13.0.0 set for the vkBasalt bloom they put in.
 OLD_BLOOM_ENV = ('ENABLE_VKBASALT', 'VKBASALT_CONFIG_FILE')
 
@@ -2178,9 +2197,8 @@ class Job:
                                  'restart it to be sure it reads these')
                 done = heroic_apply(g.heroic, changes)
                 prev = (state['heroic'] or {}).get('changes', [])
-                keys = {c['key'] for c in done}
                 state['heroic'] = dict(config=g.heroic.config, app=g.heroic.app,
-                                       changes=[c for c in prev if c['key'] not in keys] + done)
+                                       changes=merge_changes(prev, done))
                 for c in done:
                     self.log(f'Heroic: {c["key"]}={c["new"]}')
         elif launcher and g and g.prefix and wanted:
@@ -2194,9 +2212,8 @@ class Job:
             elif changes is not None:
                 done = prefix_apply(g.prefix, changes)
                 prev = (state['prefix'] or {}).get('changes', [])
-                keys = {c['key'] for c in done}
                 state['prefix'] = dict(userreg=g.prefix.userreg, label=g.prefix.label(),
-                                       changes=[c for c in prev if c['key'] not in keys] + done)
+                                       changes=merge_changes(prev, done))
                 for c in done:
                     self.log(f'{g.prefix.label()}: DllOverrides {c["key"]}={c["new"]}')
         for n in notes:

@@ -165,6 +165,94 @@ else
     echo "(skipped: a2ede51 is not in this clone's history)"
 fi
 
+echo "== the GUI of 2.3.0 (9a5e70a, the released one, tag v13.51.3) on this package: it parses and installs"
+rel23=9a5e70a
+if [ -n "$root" ] && git -C "$root" cat-file -e "$rel23:gui-installer/armada2-refit-installer.py" 2>/dev/null; then
+    mkdir -p "$T/oldgui3"
+    git -C "$root" show "$rel23:gui-installer/armada2-refit-installer.py" > "$T/oldgui3/installer.py"
+    python3 -I - "$T/oldgui3/installer.py" "$zip" "$T/oldgui3" <<'PY'
+import importlib.util, os, sys
+spec = importlib.util.spec_from_file_location('oldinst', sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+pkg = m.Package(sys.argv[2])
+game = os.path.join(sys.argv[3], 'game'); os.makedirs(game)
+open(os.path.join(game, 'Armada2.exe'), 'w').write('x')
+facts = m.inspect(game)
+verdicts = [m.layer_verdict(l, facts) for l in pkg.layers]
+ok = m.INSTALLER_VERSION == '2.3.0' and pkg.schema == 1 and len(verdicts) == len(pkg.layers) \
+    and 'WINEDLLOVERRIDES' in m.launch_env(facts)
+print(('ok    ' if ok else 'FAIL  ') + f'GUI 2.3.0 reads the new manifest: {len(pkg.layers)} layers')
+sys.exit(0 if ok else 1)
+PY
+    O4="$T/Games/oldgui3"; mkdir -p "$O4"; echo exe > "$O4/Armada2.exe"; echo stockbink > "$O4/binkw32.dll"
+    python3 "$T/oldgui3/installer.py" --package "$zip" --game "$O4" --no-launcher > "$T/out" 2> "$T/err"
+    check '[ -e "$O4/QOL.asi" ] && grep -q "\"version\": \"$ver\"" "$O4/armada2-refit-installed.json"'
+else
+    echo "(skipped: $rel23 is not in this clone's history)"
+fi
+
+echo "== installed by GUI 2.3.0 (d3d9=n,b recorded with no old value), upgraded, uninstalled: back to unset"
+# 2.3.0 wrote winmm=n,b;d3d8=n,b;d3d9=n,b and recorded old: None. The new GUI drops d3d9 and
+# records the entry as it found it; the merge must keep the earliest old, or uninstall
+# restores the 2.3.0 value instead of taking the variable out.
+U="$T/Games/from230"; mkdir -p "$U"; echo exe > "$U/Armada2.exe"; echo stockbink > "$U/binkw32.dll"
+printf '{"installed":[{"appName":"1174788223","install_path":"%s","platform":"windows"}]}\n' "$U" \
+    > "$H/gog_store/installed.json"
+printf '{"1174788223":{"enviromentOptions":[]},"version":"v0","explicit":true}\n' \
+    > "$H/GamesConfig/1174788223.json"
+cp "$H/GamesConfig/1174788223.json" "$T/heroic-unset.json"
+"${run[@]}" --package "$zip" --game "$U" --no-launcher > "$T/out" 2> "$T/err"
+python3 - "$U/armada2-refit-installed.json" "$H/GamesConfig/1174788223.json" "$H/GamesConfig/1174788223.json.a2refit-backup" "$U" <<'PY'
+import json, sys
+state, cfg, bak, game = sys.argv[1:5]
+old = 'winmm=n,b;d3d8=n,b;d3d9=n,b'
+s = json.load(open(state))
+s['installer'] = '2.3.0'
+s['heroic'] = dict(config=cfg, app='1174788223',
+                   changes=[dict(key='WINEDLLOVERRIDES', old=None, new=old)])
+json.dump(s, open(state, 'w'), indent=2)
+c = json.load(open(cfg))
+c['1174788223']['enviromentOptions'] = [dict(key='WINEDLLOVERRIDES', value=old)]
+json.dump(c, open(cfg, 'w'), indent=2)
+PY
+"${run[@]}" --package "$zip" --game "$U" > "$T/out" 2> "$T/err"
+check '! grep -q d3d9 "$H/GamesConfig/1174788223.json" && grep -q "winmm=n,b;d3d8=n,b" "$H/GamesConfig/1174788223.json"'
+check 'python3 -c "import json,sys; c=json.load(open(sys.argv[1]))[\"heroic\"][\"changes\"]; sys.exit(not (len(c)==1 and c[0][\"old\"] is None and c[0][\"new\"]==\"winmm=n,b;d3d8=n,b\"))" "$U/armada2-refit-installed.json"'
+"${run[@]}" --uninstall --game "$U" > "$T/out" 2> "$T/err"
+check 'python3 -c "import json,sys; a,b=(json.load(open(f)) for f in sys.argv[1:]); a=a[\"1174788223\"].get(\"enviromentOptions\"); b=b[\"1174788223\"].get(\"enviromentOptions\"); sys.exit(a!=b)" "$H/GamesConfig/1174788223.json" "$T/heroic-unset.json"'
+check '! grep -q WINEDLLOVERRIDES "$H/GamesConfig/1174788223.json"'
+cp "$T/heroic-before.json" "$H/GamesConfig/1174788223.json"
+printf '{"installed":[{"appName":"1174788223","install_path":"%s","platform":"windows"}]}\n' "$G" \
+    > "$H/gog_store/installed.json"
+
+echo "== the same on macOS: the prefix's registry, d3d9 added by 2.3.0, removed by the new GUI, undone"
+if [ -z "${A2_INSTALLER_APPIMAGE:-}" ]; then
+python3 - "$gui" "$T" <<'PY'
+import importlib.util, os, shutil, sys
+spec = importlib.util.spec_from_file_location('inst', sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+root = os.path.join(sys.argv[2], 'prefix'); os.makedirs(root)
+reg = os.path.join(root, 'user.reg')
+open(reg, 'w').write('WINE REGISTRY Version 2\n\n[Software\\\\Wine\\\\Mac Driver] 1\n"A"="b"\n')
+before = open(reg).read()
+pre = m.WinePrefix(root, 'Wine')
+# GUI 2.3.0: winmm, d3d8 and d3d9 added, each recorded with old None.
+ch, _ = m.prefix_plan(pre, {'WINEDLLOVERRIDES': 'winmm=n,b;d3d8=n,b;d3d9=n,b'})
+state = m.merge_changes([], m.prefix_apply(pre, ch))
+# The new GUI: wants winmm and d3d8 only, takes out the d3d9 of ours.
+ch, _ = m.prefix_plan(pre, {'WINEDLLOVERRIDES': 'winmm=n,b;d3d8=n,b'})
+done = m.prefix_apply(pre, ch)
+state = m.merge_changes(state, done)
+ok = [c['key'] for c in done] == ['d3d9'] and sorted(c['key'] for c in state) == ['d3d8', 'winmm'] \
+    and '"d3d9"' not in open(reg).read()
+# Uninstall: what is left of the record goes, the registry is as it was.
+m.prefix_apply(pre, state, undo=True)
+ok = ok and open(reg).read() == before
+print(('ok    ' if ok else 'FAIL  ') + 'prefix: d3d9 add and removal cancel, uninstall leaves the registry as it was')
+sys.exit(0 if ok else 1)
+PY
+fi
+
 echo "== a package file an antivirus took: the window's words, every file named"
 python3 - "$zip" "$T/av.zip" <<'PY'
 import sys, zipfile

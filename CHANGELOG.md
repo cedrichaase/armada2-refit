@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.17 — 2026-11-04
+
+Layers: gui-installer 3.0.1.
+
+### Fixed
+- Graphical installer: uninstall after an upgrade from 2.3.0 unsets Heroic's `WINEDLLOVERRIDES` (and the macOS prefix's DllOverrides) instead of restoring 2.3.0's `d3d9=n,b` value; `test.sh` pins the released 2.3.0 and covers it. The package README says the d3d9 clean-up is the installer's from 3.0.1. Installed, not yet seen in game.
+
 ## 15.6.16 — 2026-11-04
 
 Layers: ui 2.2.4, testbench 4.1.5.

@@ -4,6 +4,16 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 3.0.1 — 2026-11-04
+
+Reads package schemas 0 and 1, unchanged.
+
+### Fixed
+- Uninstall after an upgrade over 2.3.0: the undo record of Heroic's `WINEDLLOVERRIDES` (and the prefix's registry on macOS) is merged per key keeping the earliest `old`, and a prefix removal (`d3d9`) cancels the add of ours it undoes. Before, the upgrade replaced 2.3.0's record (`old: None`) with one whose `old` was 2.3.0's own value, so uninstall put `winmm=n,b;d3d8=n,b;d3d9=n,b` back instead of unsetting it (`merge_changes`).
+
+### Added
+- `test.sh`: the released GUI 2.3.0 (`9a5e70a`, tag v13.51.3) is pinned like 2.4.1 and 2.5.0 (reads the new manifest, installs the package); a game installed by 2.3.0, upgraded and uninstalled gets Heroic's override back to unset, and the same for the prefix's registry. Installed, not yet seen in game.
+
 ## 3.0.0 — 2026-11-03
 
 Reads package schemas 0 and 1, unchanged: the package without the Direct3D chain adds step ids and `when` values, which is additive, and an older package still reads and previews (its manifest's own `steps` and layers are used, and `RETIRED_STEPS` words the removed ones).
