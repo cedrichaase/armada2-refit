@@ -114,6 +114,18 @@ pub fn draws_plain_sod(o: usize) -> bool {
     db != 0 && super::vtable(db) == vt_database()
 }
 
+/// The engine's graphics configuration (`ST3D_GraphicsEngine_Configuration`, Storm3D
+/// `+0x104`).
+pub fn graphics_config() -> usize {
+    field(storm3d(), off::S3D_CONFIG())
+}
+
+/// An instance's scale (`+0x28`) as it is, with no test of the flag the scale effects
+/// set (the background objects').
+pub fn raw_scale(inst: usize) -> V3 {
+    if inst == 0 { v3(1.0, 1.0, 1.0) } else { unsafe { rd::<V3>(inst + off::INST_SCALE()) } }
+}
+
 /// The engine's detail level (`ST3D_GraphicsEngine_Configuration+0x40`).
 pub fn detail_level() -> u32 {
     field(field(storm3d(), off::S3D_CONFIG()), off::CFG_DETAIL()) as u32

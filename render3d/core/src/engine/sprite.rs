@@ -86,6 +86,11 @@ pub fn look(sprite: usize) -> Option<Look> {
     Some(Look { texture: String::from(stem), rect: [off[0] + r[0], off[1] + r[1], r[2], r[3]], src, dst, flags })
 }
 
+/// The sprite's own colour (`+0x24`).
+pub fn sprite_colour(sprite: usize) -> [f32; 3] {
+    unsafe { rd(sprite + off::SPRITE_COLOUR()) }
+}
+
 /// The width of one repeat of a tiled sprite (`@tile_u`, `+0x40`).
 pub fn tile_width(sprite: usize) -> f32 {
     field_f32(sprite, off::SPRITE_TILE_U())

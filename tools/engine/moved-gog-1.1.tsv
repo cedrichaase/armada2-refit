@@ -103,3 +103,14 @@ render3d.particles.toml	pt_neb_hidden	0x1b0	render3d/mods/particles/src/hooks.rs
 render3d.particles.toml	pt_neb_intensity	0x1d0	render3d/mods/particles/src/hooks.rs
 render3d.particles.toml	pt_inst_radius	0x40	render3d/mods/particles/src/hooks.rs
 render3d.particles.toml	pt_class_database	0x1dc	render3d/mods/particles/src/hooks.rs
+render3d.toml	sprite_colour	0x24	render3d/mods/sky/src/hooks.rs
+render3d.sky.toml	sky_class_hidden	0x19c	render3d/mods/sky/src/hooks.rs
+render3d.sky.toml	sky_detail	0x2c	render3d/mods/sky/src/hooks.rs
+render3d.sky.toml	sky_starfield_root	0x4	render3d/mods/sky/src/hooks.rs
+render3d.sky.toml	sky_node_objects	0x30	render3d/mods/sky/src/hooks.rs
+render3d.sky.toml	sky_node_children	0x3c	render3d/mods/sky/src/hooks.rs
+render3d.sky.toml	sky_star_sprite	0x0	render3d/mods/sky/src/hooks.rs
+render3d.sky.toml	sky_star_corners	0xc	render3d/mods/sky/src/hooks.rs
+render3d.sky.toml	sky_auto_ptr	0xc	render3d/mods/sky/src/hooks.rs
+render3d.sky.toml	sky_edit_mode	0x84	render3d/mods/sky/src/hooks.rs
+render3d.sky.toml	sky_bg_transform	0x44	render3d/mods/sky/src/hooks.rs

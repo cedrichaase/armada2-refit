@@ -1423,3 +1423,12 @@ struct = "ST3D_LightRecord"
 offset = 0x0
 type = "ptr"
 used_by = ["core.reads"]
+
+[[sym]]
+id = "sprite_colour"
+symbol = "ST3D_Sprite::colour"
+kind = "field"
+struct = "ST3D_Sprite"
+offset = 0x24
+type = "v3"
+used_by = ["core.reads"]

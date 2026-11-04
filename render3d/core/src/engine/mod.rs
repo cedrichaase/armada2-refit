@@ -116,6 +116,22 @@ pub fn for_each_in_list(list_ptr_addr: usize, f: impl FnMut(usize)) {
     for_each_in_list_at(unsafe { rd::<usize>(list_ptr_addr) }, f)
 }
 
+/// Calls `f` with each node of the VC6 `std::list` whose head node is `head` (for a
+/// list whose element sits elsewhere in its node than `list_value`).
+pub fn for_each_list_node(head: usize, mut f: impl FnMut(usize)) {
+    if head == 0 {
+        return;
+    }
+    let next = off::LIST_NEXT();
+    let mut n = field(head, next);
+    let mut guard = 0;
+    while n != head && n != 0 && guard < 100_000 {
+        f(n);
+        n = field(n, next);
+        guard += 1;
+    }
+}
+
 /// Walks the VC6 `std::list` at `list` (the list itself, as `Ordnance::ordnanceList`
 /// is: head node `+4`), calling `f` with each element value.
 pub fn for_each_in_list_at(list: usize, mut f: impl FnMut(usize)) {

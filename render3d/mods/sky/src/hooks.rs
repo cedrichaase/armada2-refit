@@ -17,7 +17,7 @@
 use r3d_core::engine::{self, field, field_m34, field_u8, rd};
 use r3d_core::math::{M34, V3};
 use alloc::string::String;
-use crate::syms::{sym, TABLE};
+use crate::syms::{field as off, sym, TABLE};
 
 /// An engine address of the profile: 0 unless the hook that uses it is ready.
 pub(crate) fn at(s: a2engine::Sym) -> usize { TABLE.engine().addr(s) }
@@ -38,24 +38,16 @@ pub(crate) fn fn_load_bg() -> usize { at(sym::FN_LOAD_BG) }
 pub(crate) fn fn_set_far() -> usize { at(sym::FN_SET_FAR) } // ST3D_Camera::SetFarPlane(float), thiscall
 /// `UserProfile*`; its byte +0x84 is edit mode (`Program::Toggle_Edit_Mode`).
 pub(crate) fn user_profile() -> usize { at(sym::USER_PROFILE) }
-/// The class's `hidden` flag (`dlight` has it): not drawn outside edit mode.
-const CLASS_HIDDEN: usize = 0x19c;
-/// Object flags: a background object, drawn here and skipped by the object loop.
+/// Object flags: a background object, drawn here and skipped by the object loop. A
+/// class's `hidden` flag (`+0x19c`, `dlight` has it): not drawn outside edit mode.
 const OBJ_BACKGROUND: u32 = 0x10000;
 pub(crate) fn fn_go_render() -> usize { at(sym::FN_GO_RENDER) } // GameObject::Render, slot 11 of the classes that keep it
-const SLOT_RENDER: usize = 11;
 pub(crate) fn vt_database() -> usize { at(sym::VT_DATABASE) } // a plain ST3D_Database
 /// The background instance (`g_background_instance`), whose turn and scale are its own.
 pub(crate) fn bg_instance() -> usize { at(sym::BG_INSTANCE) }
-/// `ST3D_GraphicsEngine+0x104`: the detail configuration, whose byte +0x2c equal to 2
-/// turns the sky off (`Background_Render`'s own test).
-const S3D_DETAIL: usize = 0x104;
-const DETAIL_SKY: usize = 0x2c;
-/// The `RenderState` bytes `Background_Render` reads: the sky, and the stars.
-const RS_SKY: usize = 4;
-const RS_STARS: usize = 8;
-/// The camera's clip rectangle (`+0x1b0`, four floats) the depth is cleared over.
-const CAM_RECT: usize = 0x1b0;
+// The detail configuration (Storm3D `+0x104`), whose byte `+0x2c` equal to 2 turns the
+// sky off (`Background_Render`'s own test); the render state's sky and stars bytes are
+// the background's two arguments (the core's `render_state`).
 
 unsafe fn this0(f: usize, this: usize) {
     unsafe { core::mem::transmute::<usize, unsafe extern "thiscall" fn(usize)>(f)(this) }
@@ -81,48 +73,42 @@ pub fn starfield() -> usize {
 
 /// The starfield's octree root.
 pub fn starfield_root(sf: usize) -> usize {
-    field(sf, 4)
+    field(sf, off::SKY_STARFIELD_ROOT())
 }
 
 /// An octree node's objects (a `std::list` head) and its children's.
 pub fn node_objects(node: usize) -> usize {
-    field(node, 0x30)
+    field(node, off::SKY_NODE_OBJECTS())
 }
 pub fn node_children(node: usize) -> usize {
-    field(node, 0x3c)
+    field(node, off::SKY_NODE_CHILDREN())
 }
 
 /// One `Starfield` star (`mCreateStarSprite`): its `ST3D_Sprite*`, its four corners in
 /// world space, and (of the sprite) its name and colour.
 pub fn star_sprite(star: usize) -> usize {
-    field(star, 0)
+    field(star, off::SKY_STAR_SPRITE())
 }
 pub fn star_corners(star: usize) -> [V3; 4] {
-    unsafe { rd(star + 0xc) }
+    unsafe { rd(star + off::SKY_STAR_CORNERS()) }
 }
 pub fn sprite_name(sp: usize) -> &'static str {
-    unsafe { crate::rt::cstr_at(field(sp, 8) as *const u8, 64) }
+    engine::instance::element_name(sp).unwrap_or("")
 }
 pub fn sprite_colour(sp: usize) -> [f32; 3] {
-    unsafe { rd(sp + 0x24) }
+    engine::sprite::sprite_colour(sp)
 }
 
 /// Each element of a VC6 `std::list<auto_ptr<T>>` given its head node (the pointer
 /// sits at node +0xc).
 pub fn each_in(head: usize, mut f: impl FnMut(usize)) {
-    if head == 0 {
-        return;
-    }
-    let mut n = field(head, 0);
-    let mut guard = 0;
-    while n != head && n != 0 && guard < 100_000 {
-        let v = field(n, 0xc);
+    let at = off::SKY_AUTO_PTR();
+    engine::for_each_list_node(head, |n| {
+        let v = field(n, at);
         if v != 0 {
             f(v);
         }
-        n = field(n, 0);
-        guard += 1;
-    }
+    });
 }
 
 /// The far plane during the background, and the one after.
@@ -147,52 +133,52 @@ pub fn load_background(name: &str) {
 /// Whether the view's render state draws the sky (`Background_Render`'s own test: the
 /// state's byte and the detail configuration).
 pub fn sky_on(rs: usize) -> bool {
-    let cfg3d = field(engine::storm3d(), S3D_DETAIL);
-    field(rs, RS_SKY) != 0 && field(cfg3d, DETAIL_SKY) != 2
+    let cfg3d = engine::instance::graphics_config();
+    engine::view::render_state(rs).background.0 && field(cfg3d, off::SKY_DETAIL()) != 2
 }
 
 /// Whether the view's render state draws the stars.
 pub fn stars_on(rs: usize) -> bool {
-    field(rs, RS_STARS) != 0
+    engine::view::render_state(rs).background.1
 }
 
 /// Edit mode (the map editor), in which hidden background objects show.
 pub fn edit_mode() -> bool {
-    field_u8(unsafe { rd::<usize>(user_profile()) }, 0x84) != 0
+    field_u8(unsafe { rd::<usize>(user_profile()) }, off::SKY_EDIT_MODE()) != 0
 }
 
 /// The background instance's transform.
 pub fn background_instance() -> M34 {
-    field_m34(bg_instance(), 0x44)
+    field_m34(bg_instance(), off::SKY_BG_TRANSFORM())
 }
 
 /// Whether an object is a background object that shows (not hidden, unless the editor
 /// is on).
 pub fn background_object(o: usize, edit: bool) -> bool {
-    o != 0 && engine::obj::flags(o) & OBJ_BACKGROUND != 0 && (edit || field_u8(engine::obj::class(o), CLASS_HIDDEN) == 0)
+    o != 0 && engine::obj::flags(o) & OBJ_BACKGROUND != 0 && (edit || field_u8(engine::obj::class(o), off::SKY_CLASS_HIDDEN()) == 0)
 }
 
 /// Whether the object's `Render` is the plain `GameObject::Render` (slot 11), the one
 /// the module draws in its place.
 pub fn plain_render(o: usize) -> bool {
-    field(engine::vtable(o), SLOT_RENDER * 4) == fn_go_render()
+    engine::instance::render_fn(o) == fn_go_render()
 }
 
 /// The engine's own `Render` of a background object.
 pub fn engine_render(o: usize, cam: usize) {
-    unsafe { this1(field(engine::vtable(o), SLOT_RENDER * 4), o, cam) };
+    unsafe { this1(engine::instance::render_fn(o), o, cam) };
 }
 
 /// Whether an instance draws a plain `ST3D_Database` (the module reads its SOD itself).
 pub fn plain_database(inst: usize) -> bool {
-    let db = field(inst, 0x80);
+    let db = engine::instance::instance_database(inst);
     db != 0 && engine::vtable(db) == vt_database()
 }
 
 /// An instance's scale (`+0x28`) as the background objects use it: read as it is, with
 /// no test of the flag the scale effects set.
 pub fn instance_scale(inst: usize) -> V3 {
-    if inst == 0 { V3 { x: 1.0, y: 1.0, z: 1.0 } } else { unsafe { rd::<V3>(inst + 0x28) } }
+    engine::instance::raw_scale(inst)
 }
 
 /// The end of `Background_Render`: the device's batch is flushed, the far plane put
@@ -202,7 +188,7 @@ pub fn finish(st3d: usize, cam: usize) {
         let dvt = engine::vtable(st3d);
         this0(field(dvt, engine::dev_flush()), st3d);
         set_far(cam, far_plane());
-        let r: [f32; 4] = rd(cam + CAM_RECT);
+        let r: [f32; 4] = engine::view::cam_viewport(cam);
         this1(field(dvt, engine::dev_clear_depth()), st3d, r.as_ptr() as usize);
     }
 }

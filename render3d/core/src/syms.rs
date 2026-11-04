@@ -176,6 +176,7 @@ pub mod field {
     #[inline(always)] pub fn CLASS_NODE_BORG() -> usize { super::TABLE.engine().field(a2engine::Sym(162)) }
     #[inline(always)] pub fn INST_ASSIMILATED() -> usize { super::TABLE.engine().field(a2engine::Sym(163)) }
     #[inline(always)] pub fn LIGHT_REC_LIGHT() -> usize { super::TABLE.engine().field(a2engine::Sym(164)) }
+    #[inline(always)] pub fn SPRITE_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(165)) }
 }
 
 pub mod value {
@@ -351,10 +352,11 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "class_node_borg", symbol: "CraftClass::assimilation node", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "inst_assimilated", symbol: "CraftInstance::assimilated byte", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "light_rec_light", symbol: "light registry record light", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "sprite_colour", symbol: "ST3D_Sprite::colour", kind: a2engine::Kind::Field },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
-    a2engine::HookDef { id: "render3d.core.reads", run_unknown: false, rows: &[], syms: &[0, 3, 4, 5, 6, 7, 33, 36, 40, 41, 42, 43, 44, 45, 47, 48, 51, 52, 53, 54, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164] },
+    a2engine::HookDef { id: "render3d.core.reads", run_unknown: false, rows: &[], syms: &[0, 3, 4, 5, 6, 7, 33, 36, 40, 41, 42, 43, 44, 45, 47, 48, 51, 52, 53, 54, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165] },
     a2engine::HookDef { id: "render3d.frame.seam", run_unknown: false, rows: &[], syms: &[15, 70, 71] },
     a2engine::HookDef { id: "render3d.frame.steps", run_unknown: false, rows: &[], syms: &[1, 2, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 35, 37, 38, 39, 49, 50, 55, 56, 57] },
     a2engine::HookDef { id: "render3d.frame.destroy", run_unknown: false, rows: &[], syms: &[34, 46] },
@@ -369,7 +371,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 165,
+        n_resolved: 166,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x45fc50, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x8a, 0xad], mask: &[], section: "", count: 0, value: 0 }, // sound2d
@@ -537,6 +539,7 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1056 }, // class_node_borg
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 161 }, // inst_assimilated
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // light_rec_light
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 36 }, // sprite_colour
         ],
         blocked: &[
         ],
@@ -544,8 +547,8 @@ pub const BUILDS: &[a2engine::Build] = &[
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 5] = [const { core::sync::atomic::AtomicU64::new(0) }; 5];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 165] = [const { core::sync::atomic::AtomicU8::new(0) }; 165];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 165] = [const { core::sync::atomic::AtomicUsize::new(0) }; 165];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 166] = [const { core::sync::atomic::AtomicU8::new(0) }; 166];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 166] = [const { core::sync::atomic::AtomicUsize::new(0) }; 166];
 static NOTES: [a2engine::Note; 5] = [const { a2engine::Note::new() }; 5];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 
