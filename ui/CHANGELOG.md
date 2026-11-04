@@ -4,6 +4,13 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 2.3.0 — 2026-11-04
+
+### Added
+- Campaign selection: a campaign not yet open (issue #13) is greyed, with a padlock after its name and, on hover, "Finish the <campaign> to unlock"; the faction's view is shown locked through render3d's new `Render3D_MenuLocked` (`menus/locks.rs`, `menus/scene.rs`, `single_player.rs`). The lock is read from `save\shell.set` at the bytes `[Menus] CampaignProgress=` names (default `0,1,2,3`, **a guess, not measured**); a click still goes to the stock panel. `[Menus] CampaignLocks=0` turns it off. UI.log: `menus: campaign progress`.
+
+Installed, not yet seen in game.
+
 ## 2.2.4 — 2026-11-04
 
 ### Fixed

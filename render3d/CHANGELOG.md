@@ -4,6 +4,13 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 1.1.0 — 2026-11-04
+
+### Added
+- The menu scene: `Render3D_MenuLocked(names)`, the views whose campaigns are locked (UI.asi's campaign selection, issue #13). A locked view's group keeps its ships cloaked with `LockedCloak=1` and puts each ship at its `LockedAt=`; the built-in map keeps the Klingons cloaked and sinks the Borg cube and the Diamond into the Mutara gas (positions not yet tuned on the bench). Render3D.log: `menu: locked views`.
+
+Installed, not yet seen in game.
+
 ## 1.0.4 — 2026-11-04
 
 ### Fixed

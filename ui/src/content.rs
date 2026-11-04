@@ -24,6 +24,11 @@ pub struct Campaign {
     pub scene: &'static CStr,
     /// The emblem: a race icon's cell in `allrace` (84 px cells of 256), or None.
     pub emblem: Option<(u32, u32)>,
+    /// The card (this list's index) whose campaign must be finished before this one
+    /// opens (`menus::locks`), or None: always open.
+    pub requires: Option<usize>,
+    /// How many missions the campaign has: finished when its progress counter reaches it.
+    pub missions: u8,
 }
 
 pub struct Content {
@@ -49,10 +54,10 @@ pub static STOCK: Content = Content {
     ],
     resources: &["Crew", "Officers", "Dilithium", "Latinum", "Metal", "Biomatter"],
     campaigns: &[
-        Campaign { name: "Tutorials", key: "tutorial", scene: c"tutorials", emblem: None },
-        Campaign { name: "Federation Campaign", key: "federation", scene: c"federation", emblem: Some((0, 0)) },
-        Campaign { name: "Klingon Campaign", key: "klingon", scene: c"klingon", emblem: Some((84, 0)) },
-        Campaign { name: "Borg Campaign", key: "borg", scene: c"borg", emblem: Some((84, 84)) },
+        Campaign { name: "Tutorials", key: "tutorial", scene: c"tutorials", emblem: None, requires: None, missions: 6 },
+        Campaign { name: "Federation Campaign", key: "federation", scene: c"federation", emblem: Some((0, 0)), requires: None, missions: 10 },
+        Campaign { name: "Klingon Campaign", key: "klingon", scene: c"klingon", emblem: Some((84, 0)), requires: Some(1), missions: 10 },
+        Campaign { name: "Borg Campaign", key: "borg", scene: c"borg", emblem: Some((84, 84)), requires: Some(2), missions: 10 },
     ],
     tour: &[c"main", c"federation", c"klingon", c"tutorials", c"borg"],
     main_scene: Some(c"main"),

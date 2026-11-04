@@ -14,11 +14,46 @@
 //! each campaign its faction's emblem (the HUD's race icons, `allrace` in
 //! `gui_global.spr`; for the tutorials Starfleet Academy's patch, drawn) and its name,
 //! and pointing at one moves the camera to its scene (`scene::choose`).
+//!
+//! A campaign not yet open (`menus::locks`) is greyed, with a padlock after its name, and
+//! pointing at it says what opens it ("Finish the Federation Campaign to unlock"); its
+//! scene still shows, locked (render3d). A click still goes to the stock panel: the lock
+//! is read from a layout not yet measured, and the stock screen has the last word.
 use crate::gfx::{fade, Tex, R};
 use crate::menus::screens::kit;
 use crate::menus::{actions, Screen};
 use crate::rt::win::{HWND, WM_MOUSEMOVE};
 use crate::widgets::{theme, Align, Ui};
+use alloc::string::String;
+
+/// What opens card `i`, while it is locked: "Finish the <name> to unlock".
+fn lock_hint(i: usize, names: &[&str; 4]) -> Option<String> {
+    let req = crate::menus::locks::locked(i)?;
+    Some(crate::sfmt!("Finish the {} to unlock", names.get(req).copied().unwrap_or("")))
+}
+
+/// A padlock in `r` (its height sets its size): a rounded body and its shackle.
+fn padlock(ui: &mut Ui, r: R, c: crate::gfx::Color) {
+    let h = r.h;
+    let bw = h * 0.78;
+    let x = r.x;
+    let body = R::new(x, r.y + h * 0.42, bw, h * 0.58);
+    ui.draw.rect_round(body, h * 0.08, c);
+    let lw = (h * 0.12).max(1.5);
+    let (cx, sw) = (x + bw * 0.5, bw * 0.30);
+    let (top, base) = (r.y + h * 0.04 + lw * 0.5, r.y + h * 0.44);
+    let mid = top + sw;
+    // Two legs and a half circle of six segments over them.
+    ui.draw.line((cx - sw, base), (cx - sw, mid), lw, c);
+    ui.draw.line((cx + sw, base), (cx + sw, mid), lw, c);
+    let mut last = (cx - sw, mid);
+    for k in 1..=6 {
+        let a = core::f32::consts::PI * (1.0 - k as f32 / 6.0);
+        let p = (cx + sw * libm::cosf(a), mid - sw * libm::sinf(a));
+        ui.draw.line(last, p, lw, c);
+        last = p;
+    }
+}
 
 /// A card: the stock panel's art (design rectangle) and a point inside the stock panel
 /// to click. Its name, key, view and emblem are the content set's (`content.rs`,
@@ -128,12 +163,31 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
         theme::panel(ui, r);
         let (bar, rest) = r.take_top(ui.u(46.0));
         let name = names[i];
-        ui.text_in(bar.inset(ui.u(8.0)), name, t.heading_size, Align::Left, if hot { t.accent } else { t.title }, crate::gfx::Weight::Bold);
+        let hint = lock_hint(i, &names);
+        let lock = hint.is_some();
+        let col = if lock {
+            crate::gfx::mix(t.text_off, t.text, 0.3 * st.hot)
+        } else if hot {
+            t.accent
+        } else {
+            t.title
+        };
+        let tw = ui.text_in(bar.inset(ui.u(8.0)), name, t.heading_size, Align::Left, col, crate::gfx::Weight::Bold);
+        if lock {
+            let ph = ui.u(20.0);
+            padlock(ui, R::new(bar.x + ui.u(8.0) + tw + ui.u(12.0), bar.y + (bar.h - ph) * 0.5, ph, ph), col);
+        }
         let art = kit::contain(rest.inset(ui.u(8.0)), card.art);
-        s.mirror_part(ui, card.art, art, 0xffffffff);
+        // A locked campaign's picture, dimmed.
+        s.mirror_part(ui, card.art, art, if lock { 0xff606060 } else { 0xffffffff });
         ui.draw.frame(art, 1.0, fade(t.panel_edge, 0.8));
+        if let Some(h) = hint.as_deref().filter(|_| st.hot > 0.01) {
+            let hb = R::new(art.x, art.bottom() - ui.u(40.0), art.w, ui.u(40.0));
+            ui.draw.rect(hb, fade(0xff000000, 0.7 * st.hot));
+            ui.text_in(hb, h, t.text_size, Align::Centre, fade(t.text, st.hot), crate::gfx::Weight::Bold);
+        }
         if st.hot > 0.01 {
-            ui.draw.frame(r, ui.u(2.0).max(1.0), fade(t.accent, st.hot));
+            ui.draw.frame(r, ui.u(2.0).max(1.0), fade(if lock { t.text_off } else { t.accent }, st.hot));
         }
         if hot {
             hover = i as i32;
@@ -225,12 +279,18 @@ fn over_scene(ui: &mut Ui, s: &Screen, names: &[&str; 4], foot: &[&crate::menus:
         let st = theme::State::of(ui, id, hot, held);
         let here = shown.is_some_and(|v| v == crate::content::get().campaigns[i].scene) || (shown.is_none() && i == 1);
         let k = st.hot.max(if here { 0.45 } else { 0.0 });
+        let hint = lock_hint(i, names);
+        let lock = hint.is_some();
+        // A locked campaign's bar is grey, not the accent: it is pointed at, not offered.
+        let bar = if lock { t.text_off } else { t.accent };
         if k > 0.01 {
-            ui.draw.rect_hgrad(r, fade(t.accent, 0.26 * st.hot), fade(t.accent, 0.0));
-            ui.draw.rect(R::new(r.x, r.y + ui.u(10.0), ui.u(4.0).max(2.0), r.h - ui.u(20.0)), fade(t.accent, k));
+            ui.draw.rect_hgrad(r, fade(bar, 0.26 * st.hot), fade(bar, 0.0));
+            ui.draw.rect(R::new(r.x, r.y + ui.u(10.0), ui.u(4.0).max(2.0), r.h - ui.u(20.0)), fade(bar, k));
         }
         let c = if !live {
             t.text_off
+        } else if lock {
+            crate::gfx::mix(t.text_off, t.text, 0.25 + 0.25 * k)
         } else if held {
             t.accent
         } else {
@@ -241,7 +301,18 @@ fn over_scene(ui: &mut Ui, s: &Screen, names: &[&str; 4], foot: &[&crate::menus:
         emblem(ui, i, R::new(r.x + ui.u(20.0) + nudge, r.y + (r.h - is) * 0.5, is, is), c);
         let name = names[i];
         let tr = R::new(r.x + ui.u(20.0) + is + ui.u(18.0) + nudge, r.y, r.w - is - ui.u(44.0), r.h);
-        ui.text_in(tr, name, 24.0, Align::Left, c, Weight::Bold);
+        // Locked and pointed at: the name moves up and what opens it shows below.
+        let hk = if lock { st.hot } else { 0.0 };
+        let name_r = R::new(tr.x, tr.y - ui.u(11.0) * hk, tr.w, tr.h);
+        let tw = ui.text_in(name_r, name, 24.0, Align::Left, c, Weight::Bold);
+        if let Some(h) = hint.as_deref() {
+            let ph = ui.u(18.0);
+            padlock(ui, R::new(tr.x + tw + ui.u(12.0), name_r.y + (name_r.h - ph) * 0.5, ph, ph), c);
+            if hk > 0.01 {
+                let hr = R::new(tr.x, tr.y + ui.u(15.0), tr.w, tr.h);
+                ui.text_in(hr, h, 15.0, Align::Left, fade(t.text, 0.85 * hk), Weight::Regular);
+            }
+        }
         if hot {
             hover = i as i32;
             crate::menus::scene::choose(crate::content::get().campaigns[i].scene);

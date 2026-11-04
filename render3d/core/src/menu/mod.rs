@@ -231,6 +231,9 @@ struct Group {
     /// game's sound system finds by name; default the Klingon cloak's `offSound`,
     /// `clkdisen.wav`; empty for none).
     cloak_sound: String,
+    /// While a view of this group is locked (`Render3D_MenuLocked`: its campaign not
+    /// yet open), its ships stay cloaked (`LockedCloak=1`).
+    locked_cloak: bool,
     /// The tunnel's tint when this group departs (`WarpColour=`).
     warp_colour: V3,
 }
@@ -257,6 +260,9 @@ struct ShipDef {
     team: Option<V3>,
     /// Goes to warp when its group departs (`Warp=0`: a station stays).
     warp: bool,
+    /// Where it sits while its group's view is locked (`LockedAt=`, the group's frame);
+    /// None: where it always sits.
+    locked_at: Option<V3>,
 }
 
 impl ShipDef {
@@ -419,6 +425,7 @@ impl Map {
             cloak_time: 1.0,
             cloak_stagger: 0.0,
             cloak_sound: String::new(),
+            locked_cloak: false,
             warp_colour: v3(0.45, 0.62, 1.0),
         }];
         for (sec, _) in &t.sections {
@@ -432,6 +439,7 @@ impl Map {
                 cloak_time: t.f(sec, "cloaktime", 2.5).max(0.05),
                 cloak_stagger: t.f(sec, "cloakstagger", 0.5).max(0.0),
                 cloak_sound: t.get(sec, "cloaksound").map_or_else(|| String::from("clkdisen.wav"), String::from),
+                locked_cloak: t.f(sec, "lockedcloak", 0.0) != 0.0,
                 warp_colour: t.v(sec, "warpcolour", v3(0.45, 0.62, 1.0)),
             });
         }
@@ -462,6 +470,7 @@ impl Map {
                 phase: t.f(sec, "phase", ships.len() as f32 * 1.7),
                 team,
                 warp: t.f(sec, "warp", 1.0) != 0.0,
+                locked_at: t.get(sec, "lockedat").map(|_| t.v(sec, "lockedat", V3::ZERO)),
             });
         }
         let mut gas = Vec::new();
@@ -592,12 +601,23 @@ impl Map {
         (v.eye + d, v.target + d * 0.3)
     }
 
+    /// The groups a locked view looks at (`Render3D_MenuLocked`), by index.
+    fn locked_groups(&self, locked: &[String]) -> Vec<bool> {
+        let mut out = alloc::vec![false; self.groups.len()];
+        for v in self.views.iter().filter(|v| locked.iter().any(|l| *l == v.name)) {
+            out[v.group] = true;
+        }
+        out
+    }
+
     /// The scene posed at `t` seconds; `cloak(group, nth)` says how far a ship of a
-    /// decloaking group is back (None: whole).
-    fn shot(&self, t: f32, cloak: impl Fn(&Group, usize) -> Option<f32>, dep: Option<&Departure>) -> Shot {
+    /// decloaking group is back (None: whole). A ship of a group in `locked` sits at its
+    /// `LockedAt=` and, in a group with `LockedCloak=1`, stays cloaked.
+    fn shot(&self, t: f32, cloak: impl Fn(&Group, usize) -> Option<f32>, dep: Option<&Departure>, locked: &[bool]) -> Shot {
         let mut ships = Vec::new();
         for (si, s) in self.ships.iter().enumerate() {
             let g = &self.groups[s.group];
+            let lk = locked.get(s.group).copied().unwrap_or(false);
             // Each ship bobs and rolls a little on a period of its own.
             let ph = s.phase + t * 0.21;
             let bob = v3(0.0, math::sinf(ph) * 1.5, math::sinf(ph * 0.7) * 0.8) * s.bob;
@@ -611,7 +631,7 @@ impl Map {
             w.r[0] = w.r[0] * s.scale;
             w.r[1] = w.r[1] * s.scale;
             w.r[2] = w.r[2] * s.scale;
-            w.p = g.place(s.at) + bob;
+            w.p = g.place(if lk { s.locked_at.unwrap_or(s.at) } else { s.at }) + bob;
             // Departing: impulse along the way out, the warp stretch over the ramp,
             // then gone (its flash).
             let (mut warp, mut gone) = (None, None);
@@ -626,7 +646,7 @@ impl Map {
                     warp = Some((b, 1.0 + wd.stretch * b * b, d.dir));
                 }
             }
-            ships.push(ShipAt { sod: s.sod.clone(), world: w, team: s.team, cloak: cloak(g, s.nth), warp, gone });
+            ships.push(ShipAt { sod: s.sod.clone(), world: w, team: s.team, cloak: if lk && g.locked_cloak { Some(0.0) } else { cloak(g, s.nth) }, warp, gone });
         }
         // The orbit: the planet turns about its axis, and the sky with the fleet's orbit.
         let orbit = -self.orbit_rate * t;
@@ -725,6 +745,8 @@ struct State {
     warp: Option<(f64, Option<(V3, V3, f32)>)>,
     /// Each ship's cloak in the last frame (`ShipAt::cloak`), to hear a decloak begin.
     cloaks: Vec<Option<f32>>,
+    /// The views whose campaigns are locked (`Render3D_MenuLocked`), lower case.
+    locked: Vec<String>,
 }
 
 static mut STATE: State = State {
@@ -740,6 +762,7 @@ static mut STATE: State = State {
     said: 0,
     warp: None,
     cloaks: Vec::new(),
+    locked: Vec::new(),
 };
 
 #[allow(static_mut_refs)]
@@ -886,7 +909,9 @@ pub fn draw(name: &str, rect: PRect, depart: bool) -> bool {
         s.cam = Some((eye, at, fov));
     }
     let (view, prev, since, blend) = (s.view.as_str(), s.prev.as_str(), s.since, m.blend);
-    let shot = m.shot(t, |g, nth| cloak_of(g, nth, view, prev, since, now, blend), dep.as_ref().map(|d| &d.0));
+    // A departure leaves as the scene is: a mission is loading, so its campaign is open.
+    let locked = if dep.is_some() { Vec::new() } else { m.locked_groups(&s.locked) };
+    let shot = m.shot(t, |g, nth| cloak_of(g, nth, view, prev, since, now, blend), dep.as_ref().map(|d| &d.0), &locked);
     decloak_sounds(m, &shot, &mut s.cloaks);
     let lights = Lights { dirs: alloc::vec![m.key, m.fill], points: Vec::new() };
     let planet = m.planet.as_ref().map(|p| (p.6, p.2));
@@ -958,4 +983,20 @@ pub extern "C" fn Render3D_MenuWarp(name: *const u8, x: u32, y: u32, w: u32, h: 
     }
     let n = rt::lower(unsafe { rt::cstr_at(name, 32) });
     draw(&n, PRect { x, y, w, h }, true) as u32
+}
+
+/// `UI.asi`'s call: the views whose campaigns are locked, as a NUL-terminated list of
+/// names separated by commas ("" or null: none). It holds until the next call. A
+/// locked view's group keeps its ships cloaked (`LockedCloak=1`) and its ships at their
+/// `LockedAt=`. Always 1.
+#[unsafe(no_mangle)]
+pub extern "C" fn Render3D_MenuLocked(names: *const u8) -> u32 {
+    let list = if names.is_null() { String::new() } else { rt::lower(unsafe { rt::cstr_at(names, 256) }) };
+    let new: Vec<String> = list.split(',').map(str::trim).filter(|n| !n.is_empty()).map(String::from).collect();
+    let s = st();
+    if s.locked != new {
+        log!("menu: locked views: {}", if list.trim().is_empty() { "none" } else { list.as_str() });
+        s.locked = new;
+    }
+    1
 }

@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.7.0 — 2026-11-04
+
+Layers: ui 2.3.0, render3d 1.1.0.
+
+### Added
+- Locked campaigns shown on the campaign selection (issue #13): greyed with a padlock and a hint of what opens them, the Klingon and Borg scenes shown locked (`[Menus] CampaignLocks`, `CampaignProgress`; `Render3D_MenuLocked`, `LockedCloak`, `LockedAt`). The progress layout of `save\shell.set` is a guess still to be measured. Installed, not yet seen in game.
+
 ## 15.6.21 — 2026-11-04
 
 Layers: gui-installer 3.1.0.

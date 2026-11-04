@@ -609,6 +609,15 @@ game's `operator new` at priority 8, as `ShellButton::SetButtonMode` makes its h
 sound), so the player's effects volume applies; it is a sound, not a simulation write,
 and plays only in the menu scene.
 
+**Locked campaigns.** `UI.asi` names the views whose campaigns the player has not yet
+opened through a third export, `Render3D_MenuLocked(names)` (a comma-separated list,
+held until the next call; Render3D.log: `menu: locked views: <list>`;
+ui/MENUS.md, "The menu scene"). Every group a locked view looks at is locked: its
+ships sit at their `LockedAt=` (where they always sit, without one), and with
+`LockedCloak=1` they stay cloaked, so neither decloak nor sound plays. The built-in map
+keeps the Klingons cloaked and sinks the Borg cube and the Diamond into the Mutara gas.
+A departure ignores the list (a mission is loading, so its campaign is open).
+
 **The departure.** While a mission loads from the campaign selection, `UI.asi` asks for
 the view under its loading screen through the second export,
 `Render3D_MenuWarp(name, x, y, w, h)` (ui/LOADING.md, "Over the menu scene"). The first
@@ -689,11 +698,13 @@ time it is posed (`hulls: menu scene:`). Keys:
 | `[Group.<name>]` | `At`, `Yaw` | the group's place on the map and its turn about +y in degrees |
 | | `CloakView`, `CloakDelay`, `CloakTime`, `CloakStagger`, `CloakSound` | the view whose arrival decloaks its ships; the seconds before the first starts (`Blend` x 0.7), each takes (2.5), between one and the next (0.5); the sound each makes as it begins (`clkdisen.wav`; empty for none) |
 | | `WarpColour` | the tunnel's tint when the group departs (0.45,0.62,1) |
+| | `LockedCloak` | 1: its ships stay cloaked while a view of the group is locked (`Render3D_MenuLocked`) |
 | `[View.<name>]` | `Group`, `Eye`, `Target`, `Fov` | in the group's frame; vertical field in degrees |
 | | `Sway`, `SwayPeriod` | the drift's amplitude and period |
 | | `WarpEye`, `WarpTarget` | the camera a departure from the view swings to, in the group's frame (default: behind the departing ships, looking the way they go) |
 | `[Ship.<name>]` | `Group`, `Odf`, `At`, `Yaw`, `Scale`, `Bob`, `Phase`, `Team` | its group; the ship's ODF (its `baseName` and `ScaleSOD`), its place in the group, a turn in degrees, a scale on top of `ScaleSOD`, how much it bobs, its phase, a team colour for its `team*` groups |
 | | `Warp` | 0: stays when its group departs (a station) |
+| | `LockedAt` | its place in the group while the group's view is locked (default: `At`) |
 | `[Nebula.<name>]` | `Group`, `Odf`, `At`, `Size`, `Spacing`, `Jitter`, `Seed` | its group; a nebula ODF with a gas recipe; the field's centre (its plane's height is its y); half extents in x and z; the grid's step (the radius x 1.2) and jitter (0.35); the seed |
 | | `Radius` | the class's radius (the ODF's `effectRadius`, else 300) |
 | | `KeyShare`, `Scatter`, `Opacity`, `Brightness` | over the recipe's, for the menu's class only (one set per class: the first field of the class that sets a key) |
