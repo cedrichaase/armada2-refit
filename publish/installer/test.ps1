@@ -68,7 +68,11 @@ foreach ($n in "MSAA", "Planets", "Lighting", "Sky", "Fog", "Specials") {
     Set-Content (G "$n.asi") "old"; Set-Content (G "$n.ini") "old"
 }
 New-Item -ItemType Directory (G "Sky") | Out-Null
-Set-Content (G "Sky\mbgaqu.ini") "old"; Set-Content (G "Sky\myown.ini") "[Sky]"
+# ...and Sky.asi's recipes: a shipped copy goes, one the player edited stays (retire.txt's
+# glob-hash knows the shipped ones by hash, so the copies are the repository's own bytes).
+$skyd = Join-Path $PSScriptRoot "..\..\render3d\content\sky"
+Copy-Item (Join-Path $skyd "mbgaqu.ini") (G "Sky\mbgaqu.ini"); Set-Content (G "Sky\myown.ini") "[Sky]"
+[IO.File]::WriteAllBytes((G "Sky\mbgred.ini"), [byte[]]((Get-Content -LiteralPath (Join-Path $skyd "mbgred.ini") -Encoding Byte) + [Text.Encoding]::ASCII.GetBytes("`n; mine`n")))
 
 # ...and the legacy plugins UI.asi replaced: retired.
 foreach ($n in "HUD", "Menus", "GridLayout", "MenuScale") {
@@ -113,7 +117,9 @@ foreach ($n in "HUD", "Menus", "GridLayout", "MenuScale") {
     Check "$n.asi + $n.ini retired" (-not (Test-Path (G "$n.asi")) -and -not (Test-Path (G "$n.ini")))
 }
 Check "retired said so" ((Has $out "  retired HUD.asi") -and (Has $out "  retired Sky\mbgaqu.ini"))
-Check "the player's own recipe left, Sky.asi's gone" ((@(Get-ChildItem (G "Sky")).Name -join ",") -eq "myown.ini")
+Check "the player's own recipe left, Sky.asi's gone" (((@(Get-ChildItem (G "Sky")).Name -join ",") -eq "mbgred.ini,myown.ini") -and
+    (Select-String -Quiet -SimpleMatch "; mine" (G "Sky\mbgred.ini")))
+Remove-Item -LiteralPath (G "Sky\mbgred.ini")
 foreach ($n in "QOL", "QOLRules", "Online") {
     Check "$n.asi + $n.ini" ((Test-Path (G "$n.asi")) -and (Test-Path (G "$n.ini")))
 }

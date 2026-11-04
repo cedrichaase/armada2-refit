@@ -4,6 +4,13 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 3.0.2 — 2026-11-04
+
+Reads package schemas 0 and 1, unchanged.
+
+### Fixed
+- `test-windows.ps1` looked for the package's plugins under `game\` (the layout before 14.3.0); it now looks under `layers\qol\` (the first unpack, the second beside it, the installed hash, the stripped member and the `::error av-missing` path). The installer itself is unchanged; the version is bumped only so the frozen exe and this heading agree. Installed, not yet seen in game.
+
 ## 3.0.1 — 2026-11-04
 
 Reads package schemas 0 and 1, unchanged.

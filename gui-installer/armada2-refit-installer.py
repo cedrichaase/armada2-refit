@@ -49,7 +49,7 @@ import urllib.error
 import urllib.request
 import zipfile
 
-INSTALLER_VERSION = '3.0.1'
+INSTALLER_VERSION = '3.0.2'
 SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, ::step and ::error lines
 REPO = 'cedrichaase/armada2-refit'
 API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'

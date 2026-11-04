@@ -477,7 +477,7 @@ jobs:
           Write-Host "ICD: $($json.FullName)"
           $loader = Get-ChildItem "$dir/mesa" -Recurse -Filter 'vulkan-1.dll' | Where-Object { $_.FullName -match 'x86' -and $_.FullName -notmatch 'x64' } | Select-Object -First 1
           if (-not $loader) {
-            Invoke-WebRequest 'https://sdk.lunarg.com/sdk/download/latest/windows/vulkan-runtime-components.zip' -OutFile "$dir/rt.zip"
+            Invoke-WebRequest 'https://sdk.lunarg.com/sdk/download/1.4.363.0/windows/vulkan-runtime-components.zip' -OutFile "$dir/rt.zip"
             Expand-Archive "$dir/rt.zip" "$dir/rt" -Force
             $loader = Get-ChildItem "$dir/rt" -Recurse -Filter 'vulkan-1.dll' | Where-Object { $_.FullName -match 'x86' } | Select-Object -First 1
           }
