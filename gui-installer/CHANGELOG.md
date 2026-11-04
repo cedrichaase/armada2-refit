@@ -17,6 +17,7 @@ Brings in PR #21 (written at 2.2.0, confirmed in game then on an Apple M1, macOS
 ### Fixed
 - macOS: **Launch game** in a Sikarugir (or Kegworks, Wineskin) wrapper whose program is `Armada2.exe` opens the wrapper, as a double click does (`wrapper_runs_game`): its Wine started bare ran nothing. Any other wrapper's Wine gets the wrapper's `Frameworks` on `DYLD_FALLBACK_LIBRARY_PATH` (`wrapper_env`). `5477ac7`, `c96259e`
 - macOS: the game and version pickers are lists drawn in the window (`open_picker`); Tk's native popup menu left the whole window unresponsive. `3239c25`
+- Linux (GTK): a long game name ("Heroic (Flatpak) · GOG — Star Trek Armada II") no longer squeezes the **Game** row's title to a letter a line and its path to nothing. The drop-downs of Game and Version are `capped_dropdown`: items are labels that ellipsize in the middle, with a maximum width and the whole name as a tooltip, so the drop-down gives way and not the title. The Tk window already clips the field to a fixed width.
 
 Installed, not yet seen in game.
 

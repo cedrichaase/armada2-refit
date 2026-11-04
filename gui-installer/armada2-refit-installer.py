@@ -3180,7 +3180,7 @@ def run_gui():
     import gi
     gi.require_version('Gtk', '4.0')
     gi.require_version('Adw', '1')
-    from gi.repository import Adw, Gdk, Gio, GLib, Gtk
+    from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Pango
     import math
     import random
 
@@ -3400,6 +3400,25 @@ def run_gui():
             cr.arc(x, y, r, 0, 6.2832)
             cr.fill()
 
+    def capped_dropdown(max_chars):
+        """A drop-down whose width is capped: its items are labels that ellipsize (the middle,
+        so the end of "Heroic (Flatpak) · GOG — Star Trek Armada II" survives). Stock, a
+        drop-down asks for the width of its longest item, and an Adw.ActionRow gives a suffix
+        what it asks for before its title, so a long game name squeezed "Game" to a letter a
+        line."""
+        def setup(_f, item):
+            item.set_child(Gtk.Label(xalign=0, ellipsize=Pango.EllipsizeMode.MIDDLE,
+                                     max_width_chars=max_chars, width_chars=8))
+
+        def bind(_f, item):
+            text = item.get_item().get_string()
+            item.get_child().set_label(text)
+            item.get_child().set_tooltip_text(text)     # the whole name, where it is cut
+        factory = Gtk.SignalListItemFactory()
+        factory.connect('setup', setup)
+        factory.connect('bind', bind)
+        return Gtk.DropDown(valign=Gtk.Align.CENTER, factory=factory)
+
     class Window(Adw.ApplicationWindow):
         def __init__(self, app):
             super().__init__(application=app, title='Armada II Refit',
@@ -3448,7 +3467,7 @@ def run_gui():
             card.append(rows)
 
             self.row_game = Adw.ActionRow(title='Game', subtitle_lines=2)
-            self.dd_game = Gtk.DropDown(valign=Gtk.Align.CENTER)
+            self.dd_game = capped_dropdown(30)
             self.dd_game.connect('notify::selected', lambda *_: self.on_game())
             browse = Gtk.Button(icon_name='folder-open-symbolic', valign=Gtk.Align.CENTER,
                                 tooltip_text='Choose the folder holding Armada2.exe')
@@ -3459,7 +3478,7 @@ def run_gui():
             rows.append(self.row_game)
 
             self.row_rel = Adw.ActionRow(title='Version', subtitle_lines=2)
-            self.dd_rel = Gtk.DropDown(valign=Gtk.Align.CENTER)
+            self.dd_rel = capped_dropdown(20)
             self.dd_rel.connect('notify::selected', lambda *_: self.on_release())
             self.row_rel.add_suffix(self.dd_rel)
             rows.append(self.row_rel)

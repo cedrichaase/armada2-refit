@@ -7,10 +7,12 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 
 ## 15.6.21 — 2026-11-04
 
-Layers: none (CI only).
+Layers: gui-installer 3.1.0.
 
 ### Fixed
 - CI: the `d3d12-probe` job takes the Agility SDK's 32-bit `D3D12Core.dll` and `d3d12SDKLayers.dll` from `build/native/bin/win32/` (the package has no `x86` folder). The `vulkan-probe-windows` job registers lavapipe's ICD in the 32-bit registry (`HKLM\SOFTWARE\Khronos\Vulkan\Drivers`), since the Vulkan loader ignores `VK_DRIVER_FILES` in an elevated process, and prints the loader's debug output. `publish/installer/test.ps1` expects what `install.sh` and `test.sh` do of a DXVK `d3d8.dll` (kept as `d3d8.dll.a2chain-backup`, "not one we know, replaced"). Its uninstall check counts only the uninstall's own `--revert` calls of the model scripts.
+
+- gui-installer: on Linux the Game row's title and path keep their width when the game's name is long; the drop-downs ellipsize their own text (`capped_dropdown`). Installed, not yet seen in game.
 
 ### Removed
 - CI: the `mac-probe` spike job (vkprobe under Wine on MoltenVK on a macOS runner): no Wine for the runner was left to install. Gate M stays a check on a real Mac (`display/vkprobe/README.md`). Installed, not yet seen in game.
