@@ -11,9 +11,9 @@
 # "Release packages". On main and on dispatch, every program in the release is also
 # scanned on VirusTotal, report only, and the reports attached to the release
 # (publish/README.md, "VirusTotal").
-# The native probes (d12probe on WARP with the D3D12 debug layer, vkprobe on lavapipe, a
-# macOS spike) and the gates kit artifact: jobs probes, d3d12-probe, vulkan-probe-windows,
-# gates-windows, mac-probe (display/d12probe/README.md, tools/gates/GATES.txt).
+# The native probes (d12probe on WARP with the D3D12 debug layer, vkprobe on lavapipe)
+# and the gates kit artifact: jobs probes, d3d12-probe, vulkan-probe-windows,
+# gates-windows (display/d12probe/README.md, tools/gates/GATES.txt).
 name: CI
 
 on:
@@ -530,66 +530,6 @@ jobs:
           if ($out -notmatch 'GATE probe-d3d12: PASS') { throw 'the d3d12 probe did not pass through the gate script' }
           if ($out -notmatch 'GATE zip: SKIP') { throw 'the WhatIf run did not reach its end' }
           if (Test-Path (Join-Path $game 'RefitPlayer.ini')) { throw 'WhatIf wrote RefitPlayer.ini' }
-
-  # A timeboxed spike (display/vkprobe/README.md, "CI spike"): does this runner have a
-  # Metal device, and if so does vkprobe run under Wine on MoltenVK? Non-blocking; it
-  # ends green with the reason in its summary when there is no Metal device.
-  mac-probe:
-    needs: probes
-    runs-on: macos-15
-    timeout-minutes: 25
-    continue-on-error: true
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          name: native-gates-${{ github.sha }}
-          path: gates
-      - name: A Metal device?
-        id: metal
-        run: |
-          system_profiler SPDisplaysDataType || true
-          cat > "$RUNNER_TEMP/m.swift" <<'EOF'
-          import Metal
-          let d = MTLCopyAllDevices()
-          print("metal devices: \(d.count)")
-          for x in d { print(x.name) }
-          exit(d.isEmpty ? 1 : 0)
-          EOF
-          if swiftc "$RUNNER_TEMP/m.swift" -o "$RUNNER_TEMP/m" && "$RUNNER_TEMP/m"; then
-            echo "metal=yes" >> "$GITHUB_OUTPUT"
-          else
-            echo "metal=no" >> "$GITHUB_OUTPUT"
-            echo "mac-probe: no Metal device on this runner; the spike is dropped (Gate M stays the user's)." | tee -a "$GITHUB_STEP_SUMMARY"
-          fi
-      - name: vkprobe under Wine on MoltenVK
-        if: steps.metal.outputs.metal == 'yes'
-        run: |
-          # Homebrew disabled core's wine-stable cask and dropped --no-quarantine, and the
-          # gcenx tap ships only game-porting-toolkit: a pinned Gcenx build instead
-          # (Gcenx/macOS_Wine_builds 11.20, wine-devel, x86_64, new wow64: one `wine`
-          # runs 32-bit PE code). It bundles MoltenVK and the Vulkan loader.
-          WINE_URL=https://github.com/Gcenx/macOS_Wine_builds/releases/download/11.20/wine-devel-11.20-osx64.tar.xz
-          WINE_SHA256=33bbe09ac5d867d75d6d3aef23b66d25ff81cb62c33bc3f405c138bbf7195ad7
-          mkdir "$RUNNER_TEMP/wine"
-          curl -fsSL -o "$RUNNER_TEMP/wine.tar.xz" "$WINE_URL"
-          echo "$WINE_SHA256  $RUNNER_TEMP/wine.tar.xz" | shasum -a 256 -c -
-          tar -xf "$RUNNER_TEMP/wine.tar.xz" -C "$RUNNER_TEMP/wine"
-          xattr -dr com.apple.quarantine "$RUNNER_TEMP/wine" 2>/dev/null || true
-          # An x86_64 Wine on an arm64 runner runs under Rosetta 2.
-          if [ "$(uname -m)" = arm64 ]; then
-            softwareupdate --install-rosetta --agree-to-license || true
-          fi
-          wroot=$(echo "$RUNNER_TEMP"/wine/Wine*.app/Contents/Resources/wine)
-          export PATH="$wroot/bin:$PATH"
-          export WINEPREFIX="$RUNNER_TEMP/pfx" WINEARCH=wow64 WINEDEBUG=-all
-          export VK_ICD_FILENAMES="$wroot/share/vulkan/icd.d/MoltenVK_icd.json"
-          wine="$wroot/bin/wine"
-          "$wine" --version
-          timeout 300 "$wine" wineboot --init || true
-          cd gates
-          timeout 300 "$wine" vkprobe.exe || true
-          cat vkprobe.txt | tee -a "$GITHUB_STEP_SUMMARY"
-          head -1 vkprobe.txt | grep -q 'VERDICT: Vulkan works for Display8'
 
   # Every PE in the release zip and the Windows installer, scanned on VirusTotal
   # (publish/virustotal.py): report only. On pushes to main and on dispatch, never on every
