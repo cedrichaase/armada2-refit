@@ -237,7 +237,8 @@ $out = Install @($G)
 $env:A2_PROGRESS = $null
 Check "prerequisites already installed" (Has $out "*STA2WidescreenPatch: already installed")
 Check "DXVK's d3d8.dll replaced by Display8, GOG's copy kept" (((Sha (G "d3d8.dll")) -eq (Sha (Join-Path $P "layers\display\d3d8.dll"))) -and
-    ((Text (G "d3d8.dll.gog-backup")) -eq "gogd3d8to9") -and (Has $out "  d3d8.dll: the old chain's, replaced"))
+    ((Text (G "d3d8.dll.gog-backup")) -eq "gogd3d8to9") -and (Has $out "  d3d8.dll: not one we know, replaced*") -and
+    ((Text (G "d3d8.dll.a2chain-backup")) -eq "dxvk"))
 Check "the display step, then the retire step, then the plugins'" ((@($out | Where-Object { $_ -like "::step *" } |
     ForEach-Object { ($_ -split " ")[1] } | Select-Object -Skip 2 -First 3) -join " ") -eq "display retire render3d")
 Check "no chain or renderer step" (-not (Has $out "::step chain*") -and -not (Has $out "::step renderer*"))
