@@ -564,7 +564,11 @@ jobs:
       - name: vkprobe under Wine on MoltenVK
         if: steps.metal.outputs.metal == 'yes'
         run: |
-          brew install --cask --no-quarantine gcenx/wine/wine-stable || brew install --cask wine-stable
+          # Homebrew dropped --no-quarantine and disabled core's wine-stable (Gatekeeper):
+          # the gcenx tap's cask, its quarantine flag cleared by hand.
+          brew tap gcenx/wine
+          brew install --cask gcenx/wine/wine-stable
+          xattr -dr com.apple.quarantine /Applications/Wine*.app 2>/dev/null || true
           brew install molten-vk vulkan-loader
           export WINEPREFIX="$RUNNER_TEMP/pfx" WINEARCH=wow64 WINEDEBUG=-all
           export VK_ICD_FILENAMES="$(brew --prefix)/etc/vulkan/icd.d/MoltenVK_icd.json"
