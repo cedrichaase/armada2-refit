@@ -344,10 +344,12 @@ Write-Host "== uninstall: what it added goes, what changed since stays"
 Set-Content (G "UltimateASILoader-license.txt") "mine"
 Set-Content (G "Sky\myown.ini") "[Sky]"   # a recipe of the player's own stays
 Set-Content (G "Display8.log") "log"
+Remove-Item -LiteralPath $PyLog -ErrorAction SilentlyContinue   # earlier passes (-Without models) logged reverts too
 $env:A2_PROGRESS = "1"
 $out = Install @("-Uninstall", $G)
 $env:A2_PROGRESS = $null
 Check "::step uninstall, and only that" ((@($out | Where-Object { $_ -like "::step *" }) -join "|") -eq "::step uninstall taking the mod out")
+if (Test-Path -LiteralPath $PyLog) { Get-Content -LiteralPath $PyLog | Out-Host }
 Check "the SOD rewrites reverted" ((@(Get-Content -LiteralPath $PyLog | Where-Object { $_ -like "*--revert" }).Count -eq 4))
 Remove-Item -LiteralPath $PyLog
 Check "the player's own recipe left" ((@(Get-ChildItem (G "Sky")).Name -join ",") -eq "myown.ini")
