@@ -194,7 +194,8 @@ WHAT EARLIER VERSIONS INSTALLED, TAKEN OUT (retire.txt)    platform $(version "$
   of your own is never touched), a dxvk.conf we wrote (its sampler values go into
   Display8.ini [Samplers] first), HUD.asi, Menus.asi, GridLayout.asi, the per-part plugins
   Render3D.asi replaced, and the file-based HUD fixes of the old hud layer (put back from
-  their backups). Heroic's WINEDLLOVERRIDES loses d3d9=n,b (the graphical installer does it).
+  their backups). Heroic's WINEDLLOVERRIDES loses d3d9=n,b, but only through the
+  graphical installer 3.0.1 or later; these scripts and older installers leave it.
 
 THE 3D VIEW
   Render3D.asi replaces the per-part plugins of earlier packages (lighting, sky,
