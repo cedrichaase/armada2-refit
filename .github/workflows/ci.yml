@@ -564,15 +564,28 @@ jobs:
       - name: vkprobe under Wine on MoltenVK
         if: steps.metal.outputs.metal == 'yes'
         run: |
-          # Homebrew dropped --no-quarantine and disabled core's wine-stable (Gatekeeper):
-          # the gcenx tap's cask, its quarantine flag cleared by hand.
-          brew tap gcenx/wine
-          brew install --cask gcenx/wine/wine-stable
-          xattr -dr com.apple.quarantine /Applications/Wine*.app 2>/dev/null || true
-          brew install molten-vk vulkan-loader
+          # Homebrew disabled core's wine-stable cask and dropped --no-quarantine, and the
+          # gcenx tap ships only game-porting-toolkit: a pinned Gcenx build instead
+          # (Gcenx/macOS_Wine_builds 11.20, wine-devel, x86_64, new wow64: one `wine`
+          # runs 32-bit PE code). It bundles MoltenVK and the Vulkan loader.
+          WINE_URL=https://github.com/Gcenx/macOS_Wine_builds/releases/download/11.20/wine-devel-11.20-osx64.tar.xz
+          WINE_SHA256=33bbe09ac5d867d75d6d3aef23b66d25ff81cb62c33bc3f405c138bbf7195ad7
+          mkdir "$RUNNER_TEMP/wine"
+          curl -fsSL -o "$RUNNER_TEMP/wine.tar.xz" "$WINE_URL"
+          echo "$WINE_SHA256  $RUNNER_TEMP/wine.tar.xz" | shasum -a 256 -c -
+          tar -xf "$RUNNER_TEMP/wine.tar.xz" -C "$RUNNER_TEMP/wine"
+          xattr -dr com.apple.quarantine "$RUNNER_TEMP/wine" 2>/dev/null || true
+          # An x86_64 Wine on an arm64 runner runs under Rosetta 2.
+          if [ "$(uname -m)" = arm64 ]; then
+            softwareupdate --install-rosetta --agree-to-license || true
+          fi
+          wroot=$(echo "$RUNNER_TEMP"/wine/Wine*.app/Contents/Resources/wine)
+          export PATH="$wroot/bin:$PATH"
           export WINEPREFIX="$RUNNER_TEMP/pfx" WINEARCH=wow64 WINEDEBUG=-all
-          export VK_ICD_FILENAMES="$(brew --prefix)/etc/vulkan/icd.d/MoltenVK_icd.json"
-          wine="$(command -v wine64 || command -v wine || ls /Applications/Wine*/Contents/Resources/wine/bin/wine64 | head -1)"
+          export VK_ICD_FILENAMES="$wroot/share/vulkan/icd.d/MoltenVK_icd.json"
+          wine="$wroot/bin/wine"
+          "$wine" --version
+          timeout 300 "$wine" wineboot --init || true
           cd gates
           timeout 300 "$wine" vkprobe.exe || true
           cat vkprobe.txt | tee -a "$GITHUB_STEP_SUMMARY"
