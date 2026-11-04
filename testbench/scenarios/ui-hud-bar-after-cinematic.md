@@ -2,11 +2,11 @@
 
 Resolutions: 1280x720
 Mod: refit
-Setup: ui/bench-asi.sh --no-grid
+Setup: ui/bench-asi.sh
 Timeout: 12 min
 
-`ui/HUD.md`, "The button bar". Game Settings' "Command Bar" (`UIPlayer.ini`
-`[HUD] BarHidden`, Shown when there is no file) is applied once per mission by
+`ui/HUD.md`, "The button bar". Game Settings' "Command Bar" (`RefitPlayer.ini`
+`[UI.HUD] BarHidden`, Shown when the overlay has no such key) is applied once per mission by
 pressing the stock palette toggle when the palette mode (`+0x110`: 1 the bar, 0 the
 floating palette) disagrees with it. Until ui 0.13.3 it compared the component's
 hidden flag (`+0x16`) instead, which the engine also sets under a mission's opening
@@ -17,7 +17,7 @@ this run proves the mode is read and the bar comes up after a cinematic, and UI.
 records the mode and flag found. The first Federation mission opens on a cinematic;
 Space skips it. Run it with `--install .` so the clone has the UI's chain.
 
-The bench clone has no `UIPlayer.ini`, so the setting is Shown. After the briefing
+The bench clone has no `RefitPlayer.ini`, so the setting is Shown. After the briefing
 the fleet is selected with a box over the middle of the screen, and the bar must
 show its buttons.
 

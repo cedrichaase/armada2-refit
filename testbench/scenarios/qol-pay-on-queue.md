@@ -6,7 +6,7 @@ Launch: -nointro a2_borg01
 Setup: testbench/scene/bench-setup.sh stations
 Timeout: 8 min
 
-`qol/README.md`, QOL-7. Run it on a checkout: `./a2test run qol-pay-on-queue --install .`.
+`rules/README.md`, QOL-7. Run it on a checkout: `./a2test run qol-pay-on-queue --install .`.
 The scene is the `stations` one (`yard1`, a shipyard, with the bank the mission starts
 with: 3500 dilithium, 750 crew). Press `q` opens the yard's build menu; in it `x` queues the
 Federation's big ship (225 dilithium, 250 crew, 8 officers) and `t` cancels the last

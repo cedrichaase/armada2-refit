@@ -1,0 +1,33 @@
+//! The animation clock (`[Bench] Clock=`, README.md "The animation clock").
+//!
+//! Everything that moves on screen and is not simulated by the engine reads its time
+//! from `anim_now()`, never from `rt::now()`, and every cosmetic random sequence takes
+//! its seed from `seed()`. `rt::now()` stays for what is not seen: timing logs, how
+//! often a file is looked at again, a cache's age.
+//!
+//! `Clock=wall` (the default) is the player's: animations run on the wall clock, as
+//! they always did, and a paused game still flickers and pulses. `Clock=bench` is the
+//! test bench's: `anim_now()` is the simulation's time (`Get_Time`), so a paused
+//! simulation freezes every animation, a seed is a fixed number, and the frame-to-frame
+//! sequences (the nebulae's `Temporal=` jitter) settle on one picture while the clock
+//! stands. Two sessions of one scene paused at one tick then draw the same frame.
+pub use crate::rt::clock::{bench, seed};
+
+/// Reads `[Bench] Clock=` once, at start (`rt::clock`).
+pub fn load() {
+    crate::rt::clock::load(&crate::config::ini(), "animations on the simulation's time, fixed seeds, the nebulae's frames settle while it stands");
+}
+
+/// Seconds, for anything that moves on screen: the wall clock, or under the bench
+/// clock the simulation's time (which stands while the game is paused).
+pub fn anim_now() -> f64 {
+    crate::rt::clock::anim_now(|| crate::engine::sim_time() as f64)
+}
+
+/// What a per-object cosmetic seed is made from: the object's address under the wall
+/// clock (as always), and under the bench clock its handle (+0x28 of every `Entity`,
+/// given out in order as objects are made), shifted to where an address's bits are: the
+/// heap's addresses differ from launch to launch, the handles do not.
+pub fn entity_key(e: usize) -> usize {
+    if bench() && e != 0 { crate::engine::entity_handle(e) << 4 } else { e }
+}

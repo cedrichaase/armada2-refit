@@ -1,0 +1,191 @@
+//! Render3D.ini, read once at start (and again on `Reload=1` when a module asks).
+use crate::math::{v3, V3};
+use crate::rt::{self, settings, Ini};
+use crate::settings_table::{HDR, MSAA};
+use alloc::boxed::Box;
+use core::sync::atomic::{AtomicPtr, Ordering};
+
+#[derive(Clone, Debug)]
+pub struct Config {
+    pub enable: bool,
+    pub log: bool,
+    /// MSAA samples on our HDR target (0, 2, 4, 8).
+    pub msaa: u32,
+    /// HDR target; 0 draws into an 8-bit target (for comparison).
+    pub hdr: bool,
+    pub bloom: f32,
+    pub bloom_threshold: f32,
+    /// Width of the threshold's soft knee.
+    pub bloom_knee: f32,
+    pub exposure: f32,
+    /// Where the tone map's shoulder starts, in stock's white (1.0).
+    pub shoulder: f32,
+    /// Draw the inset (action camera) through us; 0 leaves it to the engine.
+    pub inset: bool,
+    /// 1: the body runs as our sequence of steps (modules take some over); 0: the
+    /// engine's whole body runs, into our target.
+    pub steps: bool,
+    /// Log CPU and GPU time per view and step (`timing.rs`); with `Enable=0` the
+    /// engine's own body is timed instead.
+    pub timing: bool,
+    /// Seconds between timing reports.
+    pub timing_every: f32,
+}
+
+impl Default for Config {
+    fn default() -> Config {
+        Config {
+            enable: true,
+            log: true,
+            msaa: 4,
+            hdr: true,
+            bloom: 0.12,
+            bloom_threshold: 1.0,
+            bloom_knee: 0.5,
+            exposure: 1.0,
+            shoulder: 0.8,
+            inset: true,
+            steps: true,
+            timing: false,
+            timing_every: 5.0,
+        }
+    }
+}
+
+pub fn ini() -> Ini {
+    Ini::open(&rt::game_path("Render3D.ini"))
+}
+
+pub fn load() -> Config {
+    let ini = ini();
+    let d = Config::default();
+    Config {
+        enable: ini.int("Render3D", "Enable", d.enable as i32) != 0,
+        log: ini.int("Render3D", "Log", d.log as i32) != 0,
+        msaa: settings::int(&ini, MSAA).clamp(0, 8) as u32,
+        hdr: settings::on(&ini, HDR),
+        bloom: ini.float("Render3D", "Bloom", d.bloom),
+        bloom_threshold: ini.float("Render3D", "BloomThreshold", d.bloom_threshold),
+        bloom_knee: ini.float("Render3D", "BloomKnee", d.bloom_knee),
+        exposure: ini.float("Render3D", "Exposure", d.exposure),
+        shoulder: ini.float("Render3D", "Shoulder", d.shoulder),
+        inset: ini.int("Render3D", "Inset", d.inset as i32) != 0,
+        steps: ini.int("Render3D", "Steps", d.steps as i32) != 0,
+        timing: ini.int("Render3D", "Timing", d.timing as i32) != 0,
+        timing_every: ini.float("Render3D", "TimingEvery", d.timing_every),
+    }
+}
+
+static CFG: AtomicPtr<Config> = AtomicPtr::new(core::ptr::null_mut());
+
+pub fn set(c: Config) {
+    let old = CFG.swap(Box::into_raw(Box::new(c)), Ordering::AcqRel);
+    // The old one is leaked on purpose: a reader may still hold it this frame.
+    let _ = old;
+}
+
+/// `Render3D_SettingsChanged`: reads `[Render3D]` again and swaps the configuration in.
+/// `Enable`, `Log` and `Timing` are latched at load and stay as they were. Returns what
+/// changed for the settings log line (`Render3D.MSAA=0`, ...), and whether the scene
+/// target's format or samples did (`frame::formats_changed` is then owed). None when
+/// stood down.
+pub fn reload() -> Option<(alloc::string::String, bool)> {
+    let old = get()?;
+    let mut n = load();
+    n.enable = old.enable;
+    n.log = old.log;
+    n.timing = old.timing;
+    n.timing_every = old.timing_every;
+    let mut said = alloc::string::String::new();
+    let mut note = |k: &str, v: &dyn core::fmt::Display| {
+        if !said.is_empty() {
+            said.push_str(", ");
+        }
+        said.push_str(&crate::sfmt!("Render3D.{}={}", k, v));
+    };
+    if n.msaa != old.msaa {
+        note("MSAA", &n.msaa);
+    }
+    if n.hdr != old.hdr {
+        note("HDR", &(n.hdr as u32));
+    }
+    if n.bloom != old.bloom {
+        note("Bloom", &n.bloom);
+    }
+    if n.bloom_threshold != old.bloom_threshold {
+        note("BloomThreshold", &n.bloom_threshold);
+    }
+    if n.bloom_knee != old.bloom_knee {
+        note("BloomKnee", &n.bloom_knee);
+    }
+    if n.exposure != old.exposure {
+        note("Exposure", &n.exposure);
+    }
+    if n.shoulder != old.shoulder {
+        note("Shoulder", &n.shoulder);
+    }
+    let formats = n.msaa != old.msaa || n.hdr != old.hdr;
+    set(n);
+    Some((said, formats))
+}
+
+/// The configuration; None when the plugin stood down.
+pub fn get() -> Option<&'static Config> {
+    let p = CFG.load(Ordering::Acquire);
+    if p.is_null() { None } else { Some(unsafe { &*p }) }
+}
+
+/// One section of an ini, read key by key with the caller's defaults (README.md,
+/// "Modules and settings": each module reads every section it owns through this, in its
+/// `configure`). Keys with a settings row are read through the row instead.
+pub struct Section<'a>(&'static str, Source<'a>);
+
+/// The ini a section reads: its own handle on a file, or the one `configure` was given.
+enum Source<'a> {
+    Own(Ini),
+    Given(&'a Ini),
+}
+
+impl<'a> Section<'a> {
+    /// A section of `Render3D.ini`.
+    pub fn new(name: &'static str) -> Section<'static> {
+        Section(name, Source::Own(ini()))
+    }
+    /// A section of another ini.
+    pub fn with(ini: Ini, name: &'static str) -> Section<'static> {
+        Section(name, Source::Own(ini))
+    }
+    /// A section of an ini already open: what a module's `configure` was given.
+    pub fn of(ini: &'a Ini, name: &'static str) -> Section<'a> {
+        Section(name, Source::Given(ini))
+    }
+    /// The ini it reads (for sections named at run time).
+    pub fn ini(&self) -> &Ini {
+        match &self.1 {
+            Source::Own(i) => i,
+            Source::Given(i) => i,
+        }
+    }
+    pub fn f(&self, key: &str, def: f32) -> f32 {
+        self.ini().float(self.0, key, def)
+    }
+    pub fn i(&self, key: &str, def: i32) -> i32 {
+        self.ini().int(self.0, key, def)
+    }
+    /// A colour as `r,g,b` in 0..255, returned in 0..1.
+    pub fn rgb(&self, key: &str, def: [f32; 3]) -> V3 {
+        let c = self.ini().floats(self.0, key, def);
+        v3(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
+    }
+    /// Three plain floats.
+    pub fn v3(&self, key: &str, def: [f32; 3]) -> V3 {
+        let c = self.ini().floats(self.0, key, def);
+        v3(c[0], c[1], c[2])
+    }
+    pub fn pair(&self, key: &str, def: [f32; 2]) -> [f32; 2] {
+        self.ini().floats(self.0, key, def)
+    }
+    pub fn s(&self, key: &str) -> Option<alloc::string::String> {
+        self.ini().string(self.0, key)
+    }
+}

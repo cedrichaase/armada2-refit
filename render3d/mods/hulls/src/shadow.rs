@@ -1,0 +1,260 @@
+//! Shadows from this frame's hulls: at the start of each view, every hull that can
+//! throw a shadow into it is drawn into a depth map from the Key, before any step
+//! draws. `Lighting.asi` could only use the last frame's hulls (it saw them only as the
+//! engine drew them), and looked each draw up where it had been; here nothing lags.
+//! The map is fitted round those hulls, its width in steps of 2^(1/4) and its centre
+//! snapped to whole texels so a shadow's edge does not crawl as the camera moves.
+//!
+//! The planets cast no shadow into the map: the hull shader tests up to eight of them
+//! as spheres (`planets()`), as `Lighting.asi` did.
+use super::look::Look;
+use super::{draw, Posed};
+use r3d_core::frame::steps::View;
+use r3d_core::gfx::{self, Pipes};
+use r3d_core::math::{v3, V3};
+use r3d_core::scene::{self, Blend};
+use crate::shaders::hulls_spv::*;
+use crate::shaders::hulls_dxil::*;
+use crate::log;
+use alloc::collections::BTreeMap;
+use gpu::{Block, ColorTarget, Contents, Depth, DepthTarget, Format, Load, Pass, PipelineDesc, Texture, TextureDesc, Topology, Usage};
+
+/// The shadow map of the view being drawn: the core's `ShadowRef`, which other modules
+/// (the nebulae) sample.
+pub type ShadowMap = r3d_core::services::ShadowRef;
+
+static mut CURRENT: Option<ShadowMap> = None;
+static mut PLANETS: [[f32; 4]; 8] = [[0.0; 4]; 8];
+static mut SUN: V3 = v3(0.0, 1.0, 0.0);
+
+#[allow(static_mut_refs)]
+pub fn current() -> Option<ShadowMap> {
+    unsafe { CURRENT.clone() }
+}
+
+pub fn clear_current() {
+    unsafe { CURRENT = None };
+}
+
+/// The planets the shader tests (centre, radius) and the direction towards the Key.
+pub fn planets() -> ([[f32; 4]; 8], V3) {
+    unsafe { (PLANETS, SUN) }
+}
+
+pub struct Shadow {
+    pipes: Pipes,
+    /// The map and its depth buffer, and their size.
+    target: Option<(Texture, Texture, u32)>,
+    /// The casters and meshes last logged.
+    said: (usize, usize),
+    failed: bool,
+}
+
+impl Shadow {
+    pub fn new() -> Shadow {
+        Shadow { pipes: Pipes::new(), target: None, said: (0, 0), failed: false }
+    }
+
+    /// Before a `Reset`: the map is a target, which loses what it holds.
+    pub fn reset(&mut self) {
+        self.target = None;
+        self.failed = false;
+        clear_current();
+    }
+
+    fn targets(&mut self, size: u32) -> Option<(Texture, Texture)> {
+        if self.target.as_ref().is_none_or(|t| t.2 != size) && !self.failed {
+            self.target = None;
+            let g = gfx::gpu();
+            let tex = g.texture(TextureDesc::d2(size, size, Format::R32F, Usage::RENDER_TARGET | Usage::SAMPLED), Contents::None);
+            let depth = g.texture(TextureDesc::d2(size, size, Format::D24X8, Usage::DEPTH), Contents::None);
+            if tex.ready(g) && depth.ready(g) {
+                self.target = Some((tex, depth, size));
+                log!("hulls: shadow map {}x{}", size, size);
+            } else {
+                log!("hulls: no shadow map ({}x{} R32F)", size, size);
+                self.failed = true;
+            }
+        }
+        self.target.as_ref().map(|t| (t.0.clone(), t.1.clone()))
+    }
+
+    /// Draws the view's shadow map from its posed hulls, and finds its planets.
+    /// The shadow map of a view's hulls; `planets` (centre and radius each) in place of
+    /// the engine's planets where there are none (the menu scene).
+    pub fn render(&mut self, v: &View, look: &Look, posed: &BTreeMap<usize, Posed>, _d: &mut draw::Drawer, planets: Option<&[[f32; 4]]>) {
+        clear_current();
+        let ls = scene::lights();
+        let Some(key) = ls.key() else { return };
+        let to_key = -key.dir;
+        unsafe { SUN = to_key };
+        match planets {
+            Some(list) => {
+                let mut out = [[0.0f32; 4]; 8];
+                for (o, p) in out.iter_mut().zip(list) {
+                    *o = *p;
+                }
+                unsafe { PLANETS = out };
+            }
+            None => self.find_planets(),
+        }
+        // Casters: the hulls whose sphere, stretched back towards the Key, reaches the
+        // view (a hull just outside it can still shade one inside).
+        let vp = v.view.mul(&v.proj);
+        let mut casters: alloc::vec::Vec<&Posed> = alloc::vec::Vec::new();
+        for p in posed.values() {
+            if let Some((_, vis, _)) = p.cloak {
+                if vis < 0.5 {
+                    continue;
+                }
+            }
+            if in_view(&vp, p.centre, p.radius * 2.0) || in_view(&vp, p.centre + to_key * (p.radius * 4.0), p.radius * 3.0) {
+                casters.push(p);
+            }
+        }
+        if casters.is_empty() {
+            return;
+        }
+        // The map's frame: u, v across the Key, w along its travel.
+        let w = key.dir;
+        let a = if w.y.abs() < 0.9 { v3(0.0, 1.0, 0.0) } else { v3(1.0, 0.0, 0.0) };
+        let u = a.cross(w).norm();
+        let vv = w.cross(u).norm();
+        let (mut lo, mut hi) = (v3(f32::MAX, f32::MAX, f32::MAX), v3(f32::MIN, f32::MIN, f32::MIN));
+        for p in &casters {
+            let c = v3(p.centre.dot(u), p.centre.dot(vv), p.centre.dot(w));
+            let r = p.radius;
+            lo = v3(lo.x.min(c.x - r), lo.y.min(c.y - r), lo.z.min(c.z - r));
+            hi = v3(hi.x.max(c.x + r), hi.y.max(c.y + r), hi.z.max(c.z + r));
+        }
+        let size = look.shadow_size;
+        let ext = (hi.x - lo.x).max(hi.y - lo.y).max(1.0) * 1.02;
+        // The width in steps of 2^(1/4), the centre on whole texels.
+        let step = libm::ceilf(libm::log2f(ext) * 4.0) / 4.0;
+        let width = libm::exp2f(step);
+        let texel_w = width / size as f32;
+        let cu = libm::floorf((lo.x + hi.x) * 0.5 / texel_w) * texel_w;
+        let cv = libm::floorf((lo.y + hi.y) * 0.5 / texel_w) * texel_w;
+        let (z0, z1) = (lo.z - 1.0, hi.z + 1.0);
+        let range = (z1 - z0).max(1.0);
+        let rows = [
+            [u.x / width, u.y / width, u.z / width, 0.5 - cu / width],
+            [-vv.x / width, -vv.y / width, -vv.z / width, 0.5 + cv / width],
+            [w.x / range, w.y / range, w.z / range, -z0 / range],
+        ];
+        let Some((tex, depth)) = self.targets(size) else { return };
+        // Depth tested and written, no culling, every channel; into the map's R32F and
+        // its depth buffer, one sample.
+        let pipe = self.pipes.own(0, || {
+            let mut d = PipelineDesc::new(gpu::code!(VS_DEPTH_SPV, VS_DEPTH_DXIL), gpu::code!(PS_DEPTH_SPV, PS_DEPTH_DXIL), &scene::VERTEX, 32, Topology::TriangleList, Format::R32F);
+            d.depth = Depth::TEST_WRITE;
+            d.depth_format = Some(Format::D24X8);
+            d
+        });
+        if !pipe.ready(gfx::gpu()) {
+            return;
+        }
+        let Some(mut cmd) = gfx::cmd() else { return };
+        let cmd = &mut cmd;
+        let vp0 = gfx::gpu().engine_viewport();
+        // Depth 1 (no hull) everywhere; R32F clears from the colour's red.
+        let colors = [ColorTarget::new(&tex, Load::Clear([1.0; 4]))];
+        if !cmd.begin_pass(&Pass { colors: &colors, depth: Some(DepthTarget { texture: &depth, load: Load::Clear(1.0) }), area: None }) {
+            return;
+        }
+        cmd.set_pipeline(&pipe);
+        let mut vk = [0.0f32; 4 * 10];
+        for r in 0..3 {
+            vk[8 + r * 4..12 + r * 4].copy_from_slice(&rows[r]);
+        }
+        cmd.vs_block(Block::new(17, &[1.0 / size as f32, 0.0, 0.0, 0.0]));
+        // The cut-out meshes' textures (their alpha only).
+        cmd.set_sampler(0, &scene::SAMPLER);
+        let mut parts = 0;
+        for p in &casters {
+            let mut k = vk;
+            if let Some(wp) = p.warp {
+                k[0..4].copy_from_slice(&[wp.n.x, wp.n.y, wp.n.z, wp.d]);
+                k[4..8].copy_from_slice(&[wp.s1, wp.o, 1.0, 0.0]);
+            }
+            cmd.vs_block(Block::new(8, &k[..20]));
+            // The faces the instance draws (construction); a model that is no
+            // instance's (the menu scene) draws them all.
+            let limit = super::hooks::face_limit(p.inst);
+            let mut faces_left: i64 = if limit >= 0 { limit as i64 } else { i64::MAX };
+            for part in &p.model.parts {
+                if part.blend != Blend::Opaque || !p.pose.shown.get(part.node).copied().unwrap_or(false) {
+                    continue;
+                }
+                // Cut-out meshes (a `default` mesh with a group that is not
+                // self-illuminating) cast what the hull pass draws of them: their
+                // texture is bound and those groups cut out at alpha 0.5 as `ps_hull`
+                // does (left out entirely, as Lighting.asi left alpha-tested draws, half
+                // a Borg fusion cube cast nothing).
+                let default_mat = p.model.sod.nodes[part.node].mesh().is_some_and(|ms| ms.texture_material.eq_ignore_ascii_case("default"));
+                let cut = default_mat && part.groups.iter().any(|g| !g.self_illum);
+                if faces_left <= 0 {
+                    break;
+                }
+                let t = if cut { part.texture.as_deref().and_then(r3d_core::assets::texture) } else { None };
+                cmd.bind_texture(0, t.as_ref(), &scene::SAMPLER);
+                let world = p.pose.world[part.node];
+                cmd.vs_block(Block::new(0, world.to_m4().transpose().as_floats()));
+                for g in &part.groups {
+                    let tris = (g.tris as i64).min(faces_left) as u32;
+                    if tris == 0 {
+                        break;
+                    }
+                    cmd.ps_block(Block::new(0, &[if cut && !g.self_illum && t.is_some() { 1.0 } else { 0.0 }, 0.0, 0.0, 0.0]));
+                    faces_left -= tris as i64;
+                    part.draw(cmd, g.start, tris);
+                }
+                parts += 1;
+            }
+        }
+        cmd.bind_texture(0, None, &scene::SAMPLER);
+        cmd.end_pass();
+        gfx::view_pass(cmd, v, vp0);
+        let texel = 1.0 / size as f32;
+        unsafe {
+            CURRENT = Some(ShadowMap {
+                tex,
+                rows,
+                texel,
+                bias: 0.5 * texel_w / range,
+                normal_offset: texel_w,
+                to_key,
+                width,
+                range,
+            });
+        }
+        // In a mission once; in the menu scene whenever it changes (a scene of another view).
+        let menu = planets.is_some();
+        if (menu && self.said != (casters.len(), parts)) || self.said == (0, 0) {
+            self.said = (casters.len(), parts);
+            log!("hulls: shadow map of {} hulls ({} meshes), {:.0} units wide, {:.3} a texel", casters.len(), parts, width, texel_w);
+        }
+    }
+
+    fn find_planets(&mut self) {
+        let mut out = [[0.0f32; 4]; 8];
+        for (slot, s) in out.iter_mut().zip(super::hooks::planet_spheres(8)) {
+            *slot = s;
+        }
+        unsafe { PLANETS = out };
+    }
+}
+
+/// Whether a sphere is (nearly) in the view: its centre through view x projection
+/// against the clip volume, grown by its radius.
+pub(super) fn in_view(vp: &r3d_core::math::M4, c: V3, r: f32) -> bool {
+    let q = vp.transform([c.x, c.y, c.z, 1.0]);
+    let w = q[3];
+    if w + r < 0.0 {
+        return false;
+    }
+    // Clip coordinates scale with w; a radius r spans about r times the projection's
+    // scale, which is under 3 for any sane field of view.
+    let m = r * 3.0;
+    q[0].abs() <= w + m && q[1].abs() <= w + m
+}

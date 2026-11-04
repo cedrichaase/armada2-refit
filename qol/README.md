@@ -15,7 +15,7 @@ version, and whether it has been seen in game is in [`CHANGELOG.md`](CHANGELOG.m
     qol/install.sh --remove         take it out (QOL.asi, QOL.ini, QOL.log)
     qol/rts-cfg-check.py [--fix]    is RTS_CFG.h stock where QOL.asi needs it to be?
 
-**Where the log is.** `QOL.log` (and `QOLRules.log`) is in `%LOCALAPPDATA%\armada2-refit\logs\` (the Wine prefix's, under Proton), beside Display8's pipeline cache; the game directory only if that is unset or not writable. The first line says where. Written by `a2_log_path()` in `csdk/a2asi.h`; an uninstall leaves the folder.
+**Where the log is.** `QOL.log` is in `%LOCALAPPDATA%\armada2-refit\logs\` (the Wine prefix's, under Proton), beside Display8's pipeline cache; the game directory only if that is unset or not writable. The first line says where. Written by `a2_log_path()` in `csdk/a2asi.h`; an uninstall leaves the folder.
 
 `./install` runs `qol/install.sh`; `./a2mod stock` / `refit` switches `QOL.asi` and
 `QOL.ini` like the other plugins.
@@ -28,8 +28,8 @@ network game simulates, and the two cannot ship in one plugin:
 - **`QOL.asi` — stock-compatible.** The camera, the keys, which ordinary command a key
   press turns into. A player with it can join a player without it, and nothing they
   simulate differs. Installed by default. QOL-2 to 6 and QOL-8 belong here. QOL-1 became
-  a plugin of its own, `GridLayout.asi` (`grid/`), so it can be switched separately.
-- **A rules plugin (`QOLRules.asi`, not built yet) — every player needs it.** Changes to
+  a plugin of its own, `GridLayout.asi` (retired), and is now the UI's bar with this plugin's keys.
+- **A rules plugin (`QOLRules.asi`, the `rules/` layer since qol 2.0.0) — every player needs it.** Changes to
   what the game *does* with a command: when the bank is charged, what a group can
   hold if that travels over the network. Every node must run it with the same settings,
   so it needs a check when a network game is set up (the `online/` layer is the place)
@@ -49,15 +49,65 @@ Status values: **idea** (not investigated), **scoped** (approach known, nothing 
 
 | ID | Idea | Surface | First step | Status |
 |---|---|---|---|---|
-| [QOL-1](#qol-1-grid-hotkeys-for-the-button-bar) | Grid hotkeys for the button bar | `GridLayout.asi` (`grid/`) | — | **done** ([`grid/`](../grid/README.md)) |
+| [QOL-1](#qol-1-grid-hotkeys-for-the-button-bar) | Grid hotkeys for the button bar | `GridLayout.asi` (retired) | — | **done** ([`ui/HUD.md`](../ui/HUD.md)) |
 | [QOL-2](#qol-2-configurable-right-drag-pan-speed) | Configurable right-drag pan speed | `QOL.asi`, `PanSpeed=` | A slider in the options screen | **done** (`QOL.asi`); slider open |
 | [QOL-3](#qol-3-larger-control-groups) | Larger control groups | `QOL.asi`, `MaxSelection=` | A count on the selection panel; a stock peer in a network game | **done** (`QOL.asi`), bench |
 | [QOL-4](#qol-4-shiftnumber-adds-to-a-group) | Shift+number adds to a group | `QOL.asi`, `ShiftAddsToGroup=` | — | **done** (`QOL.asi`), bench |
 | [QOL-5](#qol-5-buildings-in-control-groups) | Buildings in control groups | `QOL.asi`, `StationGroups=` | — | **done** (`QOL.asi`), bench |
 | [QOL-6](#qol-6-production-spread-across-a-group-of-buildings) | Production spread across a group of buildings | `QOL.asi`, `StationGroups=` | Construction ships | **done** for stations (`QOL.asi`), bench |
-| [QOL-7](#qol-7-pay-when-queuing-refund-on-cancel) | Pay when queuing, refund on cancel | `QOLRules.asi`, `PayOnQueue=` | — | **in progress** (`QOLRules.asi`): bench for pay, refusal, cancel; single player only |
+| [QOL-7](#qol-7-pay-when-queuing-refund-on-cancel) | Pay when queuing, refund on cancel | `QOLRules.asi`, `PayOnQueue=` | — | **built**, now the [`rules/`](../rules/README.md) layer |
 | [QOL-8](#qol-8-long-moves-on-the-map-go-to-warp) | Long moves on the map go to warp | `QOL.asi`, `WarpDistance=` | A stock peer in a network game | **done** (`QOL.asi`), bench |
-| [QOL-9](#qol-9-the-view-reaches-across-the-map) | The view reaches across the map | `QOL.asi`, `ViewDistance=` | — | **done** (`QOL.asi`) |
+| [QOL-9](#qol-9-the-view-reaches-across-the-map) | The view reaches across the map | `Render3D.asi`, `[View] Distance=` | — | **done**, render3d's since qol 2.2.0 |
+
+## Settings live
+
+`QOL.asi` describes its keys to the Refit screen (`settings.toml`, turned into
+`settings_table.h` by `tools/settings/gen.py`; contract: `tools/settings/README.md`) and read them through those
+rows, `RefitPlayer.ini` in front of the plugin's ini. The code never holds a default of its
+own: it was a `PanSpeed` of 1 in the code against 2.5 shipped, and the table's 2.5 won.
+
+**The patches stay installed and are gated.** A key at 0 used to leave its patch out; now
+the patch goes in whenever its site bytes match and the patched code reads a flag, so
+`QOL_SettingsChanged` (called by UI.asi's hub on the game thread after the overlay
+changes) can flip it. The log keeps the lines it always had and adds `gate:` lines for a
+patch that is in but switched off.
+
+| Key | Apply | How it flips |
+|---|---|---|
+| `PanSpeed` | live | the stub keeps the value `RTS_CFG.h` gave (`g_panOrig`) next to the factor; a change stores `orig x factor` again. 1 is a factor of 1: the store is unchanged |
+| `ShiftAddsToGroup` | live | `group_stub` tests the flag; the one byte that moves Shift's old meaning to Alt is written back or forth |
+| `StationGroups` | live | every station hook tests the flag (`sel_pre`, `bind_pre`, `producer_group`, `one_kind`, `focus_stub`) and takes the stock path when it is 0. Groups that already hold stations keep them |
+| `WarpDistance` | live | `warp_pre` already read the distance; 0 does what stock's Alt block did |
+| `MaxSelection` | restart | the selection array is moved at start; a bigger or smaller one is never re-applied |
+
+`PayOnQueue`, the one row the players must agree on, is `QOLRules.asi`'s, in
+[`rules/`](../rules/README.md).
+
+## Hooks: what the plugins read of Armada2.exe
+
+Every address, field offset and signature of `QOL.asi` is in the symbol profile
+`profiles/<build>/qol.toml` (`profiles/gog-1.1/` for GOG's 1.1), generated into
+`engine_syms.h` by `tools/engine/gen.py`
+(`crates/a2engine/README.md`). A feature is a **hook**: its entries are checked in memory
+by `a2e_ready` before the plugin writes anything, and a hook that fails stands down on its
+own, with the reason in the log (`engine: <hook> stands down: ...`), on the feature's
+`--- QOL` line (`NOT PATCHED: ...`) and in `QOL_SettingsNote`
+for the settings screen. All hooks are asked first, before the first patch, because
+patches change bytes another hook's check reads. Each asm stub continues through a
+resolved variable (`pushl _a2s_qol_<id>; ret`), and reads a global as a load of the
+variable and then of the global; field offsets are spliced in with `A2_STR(QOL_F_...)`.
+
+| Hook | Setting | Entries | Without it |
+|---|---|---|---|
+| `qol.pan_speed` | `PanSpeed` | the parse's 25-byte pattern (`patch`) and the coefficient (`global`) | right-drag as stock |
+| `qol.shift_group` | `ShiftAddsToGroup` | the Control test and the centre test in `mCheckGroupSelect` (`patch`), `mBindGroup` (`fn`), three continue points (`label`), the three modifier globals | number keys as stock |
+| `qol.selection` | `MaxSelection` | `cOverViewImp` (`global`), its 31 selection-array sites and 3 caps (`patch`, each with the bytes it replaces) | selection of 16 |
+| `qol.special_select` | `MaxSelection` | the five special-weapon array sequences (`patch`) and three continue points | selection of 16 (it is moved only with this hook) |
+| `qol.stations` | `StationGroups` | the eight stub sites (`patch`/`fn`), nine continue points, the engine functions and RTTI the stations code calls, and the object fields | stations as stock |
+| `qol.bar_keys` | `BarKeys` | the call of `mProcessKeyboardInput` in `PopupPaletteImp::Update` (`call`) and that function, the three hotkey counts and the six menu toggles, a button's state and press slot, and the click's sound (`operator new`, the `AudioSound2D` constructor, the click-sound global), `TextInput_IsActive`, `CinematicView::IsPlayingVideo` | position keys off, stock's bar keys |
+| `qol.warp` | `WarpDistance` | the Alt block (`patch`) and its continue point, the warp globals and functions | moves as stock |
+
+`MaxSelection` needs both of its hooks; the log names the one that failed.
 
 ## Things that apply to all of them
 
@@ -78,7 +128,7 @@ Status values: **idea** (not investigated), **scoped** (approach known, nothing 
   game, so the AI plays by it too (see QOL-7).
 - **No game files in the repository** (hard rule 8). `Input.map` and `RTS_CFG.h` are
   game files. A change to them ships as a script that edits the player's own copy, with
-  a backup and `--revert`, the way `hud/ui-widescreen.py` edits `misc/gui_*.cfg`.
+  a backup and `--revert`, the way the retired `ui-widescreen.py` edited `misc/gui_*.cfg`.
   It never ships as a modified copy of the file.
 - **Which plugin.** See "Two plugins" above; each idea below says which.
 
@@ -86,9 +136,46 @@ Status values: **idea** (not investigated), **scoped** (approach known, nothing 
 
 ## QOL-1: Grid hotkeys for the button bar
 
-*Done, as a plugin of its own: [`grid/`](../grid/README.md), `GridLayout.asi`, so it can be
-switched on and off by itself. Stock-compatible. What follows is the plan as it was
-written; the README there has what was built and why.*
+*Done. First as `GridLayout.asi` (retired), then drawn by the UI
+(`UI.asi`, [`ui/HUD.md`](../ui/HUD.md)); since phase 9 the keys are this plugin's
+(`BarKeys=` in `QOL.ini`, `bar.c`) and the UI keeps the layout and the drawing.
+Stock-compatible: a key sends the ordinary command its button sends. What follows
+the next section is the plan as it was written.*
+
+### What `bar.c` does, and what it reads
+
+The stock bar (`PopupPaletteImp`) keeps running: its `Update` works out which buttons the
+selection and the open menu show, and a press goes through the button's own press slot
+(vtable `+0x20`), which hands its command or mode to the bar. So a key is "press the
+button of that cell", and which button sits in which cell is the UI's layout.
+
+- **The wrap.** The call of `mProcessKeyboardInput` in `Update` (made when something of
+  the player's is selected and the game is not paused) is re-pointed at a function of
+  ours that calls the stock one, then `UI_BarStep` (the UI presses its queued clicks and
+  takes the layout of this update's buttons), then reads the keys. The wrap checks the
+  call's target first (`a2e_ready`).
+- **Stock's keys are global per selection**, not per open menu (F5 builds from the top
+  level whatever menu is open). With the grid's keys on, the three hotkey tables'
+  counts (commands `+0xcc`, build items `+0xd8`, special weapons `+0xe4`) are set to
+  zero for the stock call and put back after, and the six menu toggles' control
+  pointers (a global array that `Init` fills: popup, build, orders, trade, AI,
+  formations) point at a zero for good. Nothing outside the bar reads them. The bar's
+  vtable is never patched.
+- **The keys** are scancodes (Q W E R T / A S D F G / Z X C V B), turned into virtual
+  keys with `MapVirtualKeyA` and read with `GetAsyncKeyState`, so they are positions on
+  any layout. A key goes down once. Nothing happens while chat has the keyboard
+  (`TextInput_IsActive`), Ctrl or Alt is held, or the game is not the foreground window.
+- **A press** is what releasing a click does: nothing for a disabled button, else the
+  click (a fire-and-forget `AudioSound2D` made with the game's `operator new`, named by
+  `StandardButton::s_buttonClickSound`, unless a video plays) and the press slot.
+- **The two plugins meet at three exports**, each found by name in the loaded modules
+  (`a2_find_export`; UI.asi loads after this plugin, so the lookup repeats until it
+  succeeds): the UI's `UI_BarCell(cell)` (the stock button in cell 0..14, or NULL),
+  the UI's `UI_BarStep(palette)` and this plugin's `QOL_BarLabel(cell)` (the key's
+  letter, NULL while the keys are off). **The keys work only while `UI_BarCell`
+  exists and gives a cell**, i.e. while the UI's bar is drawn; otherwise
+  they stand down with `bar: no refit bar, position keys off` in `QOL.log` and the stock
+  bar keys run.
 
 **Problem.** The button bar's hotkeys are hard to use without looking. Each building's
 build menu binds its items to `F1`–`F12` by slot. The menus themselves sit on letters
@@ -114,8 +201,8 @@ may need no code at all.
    with `B` then the F-keys.
 2. **Grid layout of the palette.** The floating button palette (`X`, `popupPalette*`
    in `misc/gui_*.cfg`) could be laid out as a 5×3 grid instead of a bar, with each
-   button labelled with its key. This is HUD work (`hud/`), and the palette's width keys
-   are already special-cased there (`popupPaletteXA`/`XB`).
+   button labelled with its key. This is HUD work (`ui/HUD.md`), and the palette's width keys
+   are special-cased there (`popupPaletteXA`/`XB`, "The references the stock HUD is drawn against").
 3. **Labels.** Show the grid key on each button, not only in the tooltip.
 
 **Open questions.** Are `Input.map` bindings global or scoped to the open menu? How many
@@ -182,8 +269,8 @@ alone, with a warning if the file still differs from stock.
 
 **Still open.**
 
-1. **The slider.** The options screen is a shell menu, a Win32 dialog that `Menus.asi`
-   already hooks (`menus/README.md`). A new slider means a new control on that dialog,
+1. **The slider.** The options screen is a shell menu, a Win32 dialog that the UI's menu
+   host already hosts (`ui/MENUS.md`). A new slider means a new control on that dialog,
    saved with the other options (`ARMADA.PRF`, which carries no network check), and read
    by `QOL.asi` in place of `PanSpeed=`. The fallback is to apply the mouse scroll
    speed slider's value to right-drag too.
@@ -438,148 +525,7 @@ remaining* rather than item count was not asked for; count is predictable.
 
 ## QOL-7: Pay when queuing, refund on cancel
 
-*Rules plugin: every player needs it.*
-
-**Problem.** Anything can be queued at any time. The cost is checked only when the queue
-reaches that item. The check then fails, and the advisor's voice-over announces it,
-often several times in a row. Construction ships do the same with queued structures.
-
-**Wanted (decided 2026-10-03).** Resources leave the bank **the moment an item is
-queued**, not when it starts building. An order the bank can't cover is refused right
-away, so the queue only ever holds what is already paid for. **Cancelling a queued
-item refunds its cost in full.** This is rule B ("stock minus what is already queued")
-taken all the way: there is nothing to reserve, because the bank already shows what's
-left. Rule A, which checks only the current stock, was rejected because five queued
-items can still stall at the third.
-
-**What it takes.**
-
-- **Charge on enqueue.** When a player's order adds an item to a queue (shipyards,
-  research, construction ships), check the bank against that item's cost. If it falls
-  short, drop the order. Otherwise subtract the cost and queue the item.
-- **Don't charge twice.** The game charges an item when it *starts* building, and that
-  charge has to stop for items we have already paid for. The same goes for the game's
-  start-of-build cost check and its voice-over: an item that was paid on enqueue can't
-  fail it.
-- **Refund on cancel: always 100%.** Cancelling refunds the item's whole cost, whether
-  it is still waiting or already in progress. Stock already refunds an in-progress
-  item in full (per the user, 2026-10-03), so that path stays as it is. Only the
-  waiting items, which stock never charged, need our refund. Check on the bench that
-  stock's refund matches what we charged, including crew and officers, so nothing is
-  refunded twice or missed.
-- **Refund on destruction.** When a building is destroyed, everything in its queue is
-  refunded in full, the item in progress included. The same applies when a
-  construction ship with queued structures is destroyed.
-- **Refund on capture or assimilation.** The old owner gets its whole queue back,
-  exactly as if the building had been destroyed. The new owner takes the building over
-  with an empty queue (decided 2026-10-03).
-- **Officers and crew are part of the check.** An order is refused if the player is
-  short of officers or crew, counted the same way as the resources: what's free, minus
-  what's already queued. Crew is a quantity in the bank, so it is charged on enqueue and
-  refunded like the rest. Officers are a cap, not a stock, so each queued item takes its
-  share of the cap when it is queued and gives it back on cancel or destruction.
-  (This is the reading of "checked before". Confirm it when it is built.)
-- **Spreading orders (QOL-6) needs no extra rule.** Each order is charged when it is
-  placed, whichever building it goes to.
-
-**Feedback.** At first: no voice-over. Since issue #1 (qol 1.6.2) a refused order says
-so the way stock says a stalled build does, with the same advisor line, once per click
-at most and only to the player refused (see "The advisor on a refused order" below).
-Never a window of our own.
-
-**Multiplayer: this one is not client-side.** Every peer simulates the bank. If only one
-side charges on enqueue, the banks drift apart and the game desyncs. So the charge,
-the refund and the start-of-build exception must run identically on every machine,
-from the order as it arrives. That means every player in a game needs the plugin,
-and the game has to refuse to start, or fall back to stock rules, when one doesn't
-have it. The `online/` layer is the natural place to agree on this when a game is set
-up. Single player and skirmish against the AI don't have this problem.
-
-**The AI.** It queues through the same objects. The simplest rule is that it plays by
-the same rule (charged on enqueue). That is fair, and it is deterministic as long as
-every peer runs the plugin. Exempting it would mean telling its orders apart from a
-player's. Measure whether the AI's build planning breaks when the bank drops early.
-It may hold back a queue it would otherwise build in time.
-
-**Saves change (decided).** Every queued item carries an "already paid" mark, and the
-save has to hold it. Without it, a load either charges again when the item starts, or
-builds it for free. The new save layout must be designed so that:
-
-- a refit save loaded under `./a2mod stock` is refused cleanly, or loads with the
-  queues emptied and refunded. It must never load into a wrong bank;
-- a stock save loaded in refit treats its queues as unpaid, under stock rules, and is
-  charged as each item starts, as it would have been;
-- the mark goes in a place the stock loader ignores or rejects predictably. Measure
-  how the stock loader reacts to extra data before choosing.
-
-This makes the layer's eventual changelog a MAJOR version on the day it ships, because
-saves made with it need it to load.
-
-**Done when.** With 500 dilithium and an item costing 300, the first order drops the
-bank to 200 and the second is refused. Cancelling the first restores 500. The
-voice-over never plays during a normal build-up on the bench. A two-player bench game
-with nine orders and three cancels ends with both peers showing the same bank.
-Destroying a yard with three paid items returns all three costs, and so does losing it
-to capture or assimilation, which leaves the new owner an empty queue. An order with too few
-officers is refused. A save made mid-queue loads with the same bank and queues, and
-nothing is charged a second time.
-
----
-
-## QOL-7: built (qol 1.5.0)
-
-Where it stands. `QOLRules.asi` (`qol/rules.c`; its header comment holds the derivation)
-charges at the build order's `PushBuildQueueItem` call and marks the item paid in bit 30
-of its id; `StartBuild` gives a paid head back and lets stock charge it again (net zero,
-no advisor); Pop, CancelBuild, ActDelete, ClearBuildQueue and ClearTeam give paid items
-back; Save/Load carry the marks in the producer's id counter. A destroyed producer is
-refunded through ClearTeam, which `GameObject::Cleanup` always calls and which zeroes the
-item in progress, so it is refunded once; DestroyShip is not hooked (it would refund again,
-and a craft that cannot die passes through it on every fatal hit). The officers of the
-item in progress are stock's to return there when `mRemoveConstructionEffect` does
-(qol 1.6.1). Measured on the bench: stock's crew refund is clamped to a cap (`AddCrew`),
-so crew is put back directly; a start's give-back needs the same.
-
-Network games: `online/peer.c` agrees the rules (`R_RULES`: joiners report, the host
-answers with whether everyone has the plugin; `QOLRules_Network`), and the plugin latches
-the answer, until the next game opens (`Program::GameOpenPreLoad`). Only *Internet –
-Online* has it; other transports stand down.
-
-### The advisor on a refused order (issue #1, qol 1.6.2)
-
-Stock's only word that the bank is short comes from `Producer::StartBuild` (0x4b8180)
-when it fails: it tests the bank in the order dilithium (with the `EPSILON` margin),
-officers (cost above `Team::GetOfficerVacancies`), crew, latinum, metal, biomatter, and
-at the first shortfall calls `ComputerVoice::Say(Topic, GameObject *, const Race *)`
-(0x45d8c0, `__cdecl`) with the producer and a null race, topic 9, 10, 0x36, 0x37 or 0x38
-for dilithium, crew, latinum, metal and biomatter. For officers it asks the team's race
-(`Team` +0x244) for `Race::GetInsufficentOfficerEventId` (0x48c120, `__thiscall`) and
-passes that to the int overload, `ComputerVoice::Say(int, GameObject *, const Race *)`
-(0x45db20). Under `PayOnQueue` a refused order never reaches `StartBuild`, so `h_push`
-dropped it in silence; it now makes the same call for the same first shortfall
-(`short_of` keeps `StartBuild`'s order, so the line is the one stock would have
-spoken). `voice_ok()` checks, before anything is called, that `StartBuild` still pushes
-topic 9 at 0x4b826c and calls the three functions at 0x4b826e, 0x4b829a and 0x4b82a0;
-if not, refusals stay silent and the startup line says so.
-
-Why this is safe on every node: both `Say`s end in `GameEvent::TriggerEvent(GameObject *,
-const Race *)` (0x479b70), which plays only when the object's team is
-`Entity::GetUserTeam()` (unless the event is flagged for everyone), and not again within
-the event's own interval, timed with `Get_TimeLocal` (wall clock). The sound is picked
-with `g_asyncRandom` in `GameEvent::mTriggerRaceSound`; the rest is the chat line and
-minimap mark the event carries. Nothing the simulation reads changes and `g_random` is
-not drawn, so `Handle_New_Command` running on every node of a network game speaks only
-on the machine of the player refused, and repeated clicks are held back by the same
-gates as stock's. Measured on the bench (Instant Action, Federation, `--stems voice`):
-stock, with a build stalled on dilithium, spoke once in 100 s, and once more per order
-added to the stalled queue (three orders 0.15 s apart: one line; 0.5 s apart: two; 2 s
-apart: three); the plugin, refusing for crew, spoke one line for three orders 0.15 s
-apart and three for three 0.5 s apart -- the same, within the timing of the clicks. Each call writes an `advisor:` line in
-`QOLRules.log` naming the topic (-1 for officers) and whether the team is the local one.
-
-Not done: destruction, capture and save/load paths are built but not bench-tested; a
-refit save with paid items loaded in stock loses what was paid; construction ships and
-the AI's own orders (if it bypasses the command) are untested.
+Moved to the `rules/` layer (rules 1.0.0, qol 2.0.0): [`rules/README.md`](../rules/README.md#qol-7-pay-when-queuing-refund-on-cancel). `QOLRules.asi` is no longer part of this layer.
 
 ---
 
@@ -654,35 +600,7 @@ closest zooms, a move across the screen stays an ordinary one.
 
 ## QOL-9: The view reaches across the map
 
-**Today.** Zoomed out, or with the camera tilted towards the horizon, everything past
-about 2500 units fades to nothing: ships, stations, planets, asteroids, nebulae. The
-map is still there, explored and in sight; the engine just stops drawing it.
-
-**Why.** Two values in `ART_CFG.h` end the view. `cfgOBJECT_CULLING_DISTANCE` (2800,
-at 0x6fcac0) is the one that shows: `GameObjectInstance::ComputeFadeOut` (0x4d5a20)
-fades an object from 0.9 of it to all of it, by its distance from the camera with the
-vertical scaled by a quarter, and for some classes scaled by the object's radius, and
-every instance type's own `ComputeFadeOut` goes through it: `CraftInstance`,
-`PlanetInstance`, `AsteroidInstance`, `CocoonInstance`, `PlaceHolderInstance` and
-`NebulaInstance` (0x4a5680, which darkens its additive glow by the fade rather than
-fading the instance). `DistanceCull` (0x4d5bb0) culls asteroid fields, Evolvers and
-building effects with the same distance, and `Ordnance::RenderAll` reads it too.
-`FAR_CLIPPING_PLANE` (20000, at 0x6fcab0) is the far plane `PresetView::Init` gives
-the game camera; `ST3D_Camera::CheckSphereVisibility` (0x619300) rejects a sphere past
-it, and the projection clips there.
-
-**What `QOL.asi` does.** `RTS_Configure` parses both keys (a missing key keeps the
-compiled default) and then, at 0x491bef, loads the culling distance to copy it to
-0x6fcac4, the value a mission script's `RestoreObjectCullingDistance` puts back after
-its own `SetObjectCullingDistance`. That load becomes `call view_stub; nop`: the stub
-raises both values to at least `ViewDistance` and loads `ecx` as the `mov` did, so the
-copy carries the raised value too. Both values are only ever read to draw, so a stock
-player can play a player with it. Fog and shroud are decided elsewhere
-(`GameObject::CanUserSee`), so what they hide stays hidden. The cineractive sequences
-swap in their own far plane (`CINERACTIVE_FAR_CLIPPING_PLANE`) and restore this one,
-and are left alone.
-
-**Cost.** More is drawn on a wide view. The near plane stays at 20, so the depth
-buffer's precision at a given distance hardly changes with the far plane. render3d's
-shadow map is fitted around every hull it draws, so far-off ships on a wide view make
-its texels coarser, as a big battle already does.
+Moved to render3d in qol 2.2.0: the key is `[View] Distance` in `Render3D.ini` and the
+findings are in [`render3d/README.md`](../render3d/README.md#view-distance). `QOL.ini`'s
+old `ViewDistance=` is carried over by `tools/settings/move-keys.py` and the release
+installers.

@@ -10,8 +10,7 @@ anything is patched or called.
     [HUD]
     Enable=1      ; 0: the HUD is stock whatever the panel keys say
     Bar=1         ; the button bar is ours (below)
-    BarKeys=1     ; with it, the grid's keys; 0 keeps stock's bar keys
-    BarLabels=1   ; the key in each button's corner
+    BarLabels=1   ; the key in each button's corner (QOL names it: QOL.ini BarKeys=)
     Icons=1       ; our flat icons on the bar's and top-right buttons (0: the game's)
     Info=1        ; the info panel is ours (below); InfoCamera=1 its close-up,
                   ; InfoScale=1.3 its size
@@ -24,7 +23,7 @@ anything is patched or called.
                   ; the wait for the others' loads (below, "Comms, ...")
 
 Every panel key defaults to 1: with the shipped `UI.ini` the whole HUD is ours, and
-`ui/install.sh` takes `HUD.asi` and `GridLayout.asi` out (README.md, "Installing").
+`retire/retire.sh` (run by `./install`) takes `HUD.asi` and `GridLayout.asi` out of an old install (README.md, "Installing").
 A panel at 0 is the stock one, on the stock canvas (README.md, "A part switched back
 to stock").
 
@@ -33,7 +32,7 @@ to stock").
 The in-mission HUD is a list of `DisplayInterface` components. Each is a global object
 that adds itself to one or more views' simulate and render lists when it is
 constructed (`AddView`), reads its rectangles from the GUI config in `PostLoad`
-(`DisplayInterface::LoadRectangle`, hud/README.md), and then runs three separate
+(`DisplayInterface::LoadRectangle`; "The references the stock HUD is drawn against"), and then runs three separate
 steps every frame:
 
 - **simulate** (`DisplayInterface::SimulateAll` from `Program::DisplayInputProcess`):
@@ -50,14 +49,14 @@ steps every frame:
   visible component, `HiddenRender` for a hidden one, in list order.
 
 Every rectangle is in the 1600 x 1200 space the GUI config is converted into, which
-the engine scales to the back buffer per axis (hud/README.md). A component's own
+the engine scales to the back buffer per axis ("The references the stock HUD is drawn against"). A component's own
 rectangle is at `+0x04` (left, top, right, bottom, inclusive), its hidden flag at
 `+0x16`, its cursor at `+0x24`.
 
 ### The inventory
 
 The render list of a Borg Instant Action at 1280x720, as `UI.log` lists it at the
-start of each mission ("hud: 18 components, in drawing order"), with `HUD.asi`'s
+start of each mission ("hud: 18 components, in drawing order"), with the retired `HUD.asi`'s
 canvas: `OverviewImp, SelectionDisplay, CinematicView, ShipDisplay, EditMenu,
 MapRadar, ResourcePanel, ReplayPanel, PopupPalette, MessageDisplay, CommDisplay,
 OverlayText, ObjectivesDisplay, DropPlayerBox, LoadPercentBox, PauseBox, ButtonPanel,
@@ -90,7 +89,7 @@ mission frame draws them itself after `RenderAll` (`ChatDisplay::Render`,
 
 ### The order to take them over
 
-1. **The button bar** (done): the logic is the stock bar's, `GridLayout.asi` already
+1. **The button bar** (done): the logic is the stock bar's, `GridLayout.asi` (retired) already
    knew it, and every press goes through one function.
 2. **The info panel (`ShipDisplay`)** (done): the bar is placed against it, and it
    is the panel players read most.
@@ -102,15 +101,15 @@ mission frame draws them itself after `RenderAll` (`ChatDisplay::Render`,
    camera, the move order), last.
 7. **Comms and the drop box**: multiplayer state, with the menus' multiplayer screens.
 
-When every panel is ours, `HUD.asi`'s canvas edit, font and seams matter to nothing we
-draw, and the install takes `HUD.asi` and `GridLayout.asi` out (PLAN.md).
+Every panel is ours now: `HUD.asi`'s canvas edit, font and seams matter to nothing we
+draw, and `HUD.asi` and `GridLayout.asi` are gone (PLAN.md; `retire/`).
 
 ## The panel switch
 
 `engine/hud.rs`. Two walks over the component list make a panel visible and give it
 the mouse; each is patched at the one instruction where it calls into a component,
 by a `mov ecx, esi; call <ours>` in the same seven bytes, checked to be stock first.
-No vtable is changed (`HUD.asi` recognises the bar by the `PostLoad` in its vtable).
+No vtable is changed.
 
 | Site | What is there | What ours does |
 |---|---|---|
@@ -149,22 +148,148 @@ a video; the unit view's frame follows.
 **Taking a panel.** `engine::hud::set_taken(at, by_pointer, on)`: a component by its
 address, or (the bar) by the global that points to it, read when asked.
 
+## The references the stock HUD is drawn against
+
+These are the measured facts about where the engine's 2D drawing gets its scale. The
+UI reads the stock rectangles and draws its own panels, so what matters is what a
+rectangle means, which panels it leaves to the engine, and the three corrections that
+HUD.asi once made for those (the engine's cursor, below; the other two matter only to
+stock panels the UI has not taken). They were derived and measured on the retired
+HUD plugin and its file-based predecessors, which are gone.
+
+**The layout canvas.** `misc/gui_<race>.cfg` declares `screenWidth = 1600` and
+`screenHeight = 1200`, and every four-number rectangle in `gui_interface.cfg` and
+`gui_glob16x12.cfg` is an absolute position in it (356 entries, none past x 1600 or
+y 1215). The engine converts each rectangle at read time (`ParameterDB::Get` of a
+`DBRectangle`, `mConvertRectangle` at `0x535ad0`) from the declared canvas into the
+fixed 1600 x 1200 space of `cfgSCREEN_WIDTH` and `cfgSCREEN_HEIGHT` (`RTS_CFG.h`; 33
+readers in the exe, the font's draw path among them, so that value is never changed to
+fix a canvas), and that space is scaled to the back buffer **per axis**. At 3440x1440
+the two factors are 2.15 and 1.20, which is the 1.79 stretch of stock on a wide screen;
+at 4:3 they are equal. Only the `<name>PanelArea` keys place things on the screen;
+everything else is relative to its panel, so a layout that wants another aspect moves
+those keys and nothing inside a panel. Each of the 15 panel classes reads its rectangles
+once, in `PostLoad` (`DisplayInterface::LoadRectangle`), and keeps them until the next
+mission: a layout is fixed per mission unless every panel is rebuilt.
+
+- **Rounding in the conversion.** `Get` rounds x, y, w and h separately, so two tiles
+  that abut in the canvas can leave a unit between them in the 1600 space. It is
+  invisible at the stock canvas (1600 x 1200 converts to itself).
+- **Two scalars are not on the canvas.** `popupPaletteXA` and `popupPaletteXB` in
+  `gui_glob16x12.cfg` are bare numbers that the palette code reads against a hard-coded
+  1600, not the declared canvas (measured to sub-pixel accuracy at 3440x1440: the
+  palette's left edge at 763.25 against 426 for a canvas model). The vertical pair is
+  not affected. Stock's `XA` is 355 against the info panel's 360, 5 canvas units off its
+  left edge: invisible at 4:3, a 6.8 px step on a 1056 px panel.
+- **The bridge display** is a full-screen 1600 x 1200 backdrop of six tiles with sprites
+  placed against it; it cannot be widened without stretching the art and stays stock
+  (pillarboxed left).
+- **Changing the aspect in a mission.** A canvas edit does nothing for panels already
+  loaded. The game rebuilds them only between missions (`CleanupAll`, `InitAll`,
+  `PostLoadAll`, which also reloads the GUI database); running that cycle by hand in a
+  mission has costs. `cOverViewImp::Cleanup` empties the ten unit groups;
+  `MapRadar`'s cycle frees the sensor grids and so resets the fog of war
+  (`Scanner::CleanupGrids`, `InitializeGrids`, `Terrain_Geometry::PostLoad`);
+  `CinematicView::Cleanup` ends a cinematic and deletes its camera, which only `Init`
+  makes again (leaving it out crashed the next frame in `CinematicView::Render`);
+  `ObjectivesDisplay::Cleanup` empties the briefing and forgets the file it read, which
+  `PostLoad` needs. The panels of ours lay out every frame, so none of this applies to
+  them; it is the reason the minimap and the objectives stay the engine's.
+
+**Sprite edges (seams).** `ST3D_Sprite::DrawScaled2D` snaps a sprite's position, not its
+size, to `floor(v) + 0.25` of a screen pixel when the sprite carries flag `0x80` (UI
+sprites; the bar's buttons lack it and are not snapped). With a fractional scale
+(1024x768, 16:10, 16:9 and wider) a quad ending at `x + w` can stop short of its
+neighbour's snapped start and leave a column of the 3D view showing through: the
+briefing panel's 5 x 4 grid of 256 x 256 sprites showed lines at every aspect but 4:3
+and 800x600 or 1600x1200. With MSAA on a second line appears: a quad that starts a
+quarter pixel into pixel `n` covers some of its samples, the pixel is shaded once at
+its centre, outside the quad, where the texture coordinate has wrapped to the sprite's
+far edge. A sprite whose edges are at `floor(v) + 0.5`, a pixel boundary, has neither.
+Every engine-drawn tiled sprite that remains (the minimap's frame, the briefing, the
+stock panels a toggle in `[HUD]` leaves to the engine) can show it; the lines are one
+pixel outside a sprite and about 7 levels darker than the fog. The faint olive grid
+behind the briefing text is the map grid showing through the panel (alpha 217), and the
+white lines in the minimap are the camera's outline; neither is a seam.
+
+**The engine's font.** `Final4_<size>` atlases (sizes 10, 12, 13, 15, 16, 19, 20, 24;
+`Textures/RGB/FontFinal4_*`: white RGB, glyphs in the alpha plane, per-glyph offsets
+and advances in `Sprites/FontFinal4_<size>.spr`) are authored for a **1280 x 1024**
+tier. The font path scales glyph quads by back buffer over 1280 x 1024 whatever the
+canvas says (`ST3D_Font+0x28` horizontal and `+0x2c` vertical, set by
+`FontNewScreenWidth` on every mode change; fonts are made in one place,
+`cFontSet::Load`, and only the three MetaFonts draw). On a wide screen that is
+2.6875 across against 1.40625 down at 3440x1440, so stock text is 1.91 times too wide.
+The vertical factor is stock's own: text is 17 percent taller than the layout
+coordinates imply at every aspect, and that is not a defect. The engine rounds each
+glyph's advance up to a whole screen pixel, so a line runs a few percent over the sum
+of the advance tables. Where the stock font is still drawn (stock panels, the
+unreplaced ones), the way to fit it is the scale (`+0x28 = +0x2c * 1.25 * H / W`),
+which condenses glyphs and spacing together and keeps every texel; resampling the atlas
+to fewer texels and point-sampling it back up (`@tmaterial=font`, no filtering) was
+tried as files, at the cost of horizontal texels (a glyph of 28 texels described
+by 15). A "crisper" variant that kept one texel per
+stroke won every static metric and looked worse in game, so the font's look is judged in
+the game, not by those numbers.
+
+**The cursors.** A third reference, a hard-coded **800 x 600**: the device keeps the
+scale pair `[device+0x18]` and `[device+0x1c]` (W/800 and H/600) and the cursor is its
+source texels times that pair (4.30 against 2.40 at 3440x1440, ratio 1.79, measured on
+`Curs_Move` and `Curs_24`'s `c_select`, both square sources). No texture change buys
+sharpness (more texels draw a bigger cursor at the same density) and no `.spr` number
+reaches it: rewriting `cursor.spr`'s `W`, `U` and `@referenceWidth` together fixes only
+the map-plane part of the selected-ship cursor, which is drawn from the `.spr`'s
+`W H`. Two paths draw the rest, chosen by `[device+0xe0]` (`SetSynchronousCursor`):
+clear, `SetCursor` (`0x625c90`) allocates a Direct3D hardware cursor texture at
+`texW * [+0x18]` by `texH * [+0x1c]` and `UpdateCursor` (`0x625b00`) copies 1:1;
+set, which is the one taken on the device the game gets now (and was under DXVK), `SetCursor` makes no
+hardware cursor and `RefreshDisplay` (`0x624630`) draws the sprite as a 2D quad after
+setting the global 2D scale (`0x7ad6e8`) to that pair and not restoring it (the scale is
+also set by `ST3D_Camera::SetViewport` and `ResizeViewportToExtents`, and every 2D draw
+and the font read it). The correction is in the draw: for that one draw the x scale
+becomes the y scale and the position is re-expressed so the hotspot stays on the
+pointer, then the scale is put back (README.md, "The engine's cursor, square"). The
+alternative, squashing the art about each `@origin` hotspot (32 to 18 texels), makes
+the cursor coarser, and doing both would square it twice. `CursorA.tga` is unused.
+
 ## The button bar
 
-`hud/bar.rs` (the panel) over `engine/palette.rs` (the reads and the press), with the
-grid of `grid/README.md`, which it supersedes: `[HUD] Bar=1` is the grid and its keys
-without `GridLayout.asi`, and **stands down while `GridLayout.asi` is loaded** (the
-two would wrap the same call; UI.log says "GridLayout.asi is loaded and owns the
-bar").
+`hud/bar.rs` (the panel) over `engine/palette.rs` (the reads and the press): a 5x3
+grid of position keys, `[HUD] Bar=1`, the keys QOL's. The retired `GridLayout.asi`
+did the same. Its `[Cells]` section (one button moved to another key by name) has no
+counterpart here (the plugin is gone, so no one has it any more); and the palette's
+mode switch (X in stock, `toggle_popup`) has no key while the grid is on, the HUD's
+palette button still switches it.
+
+**The stock layout, for what the grid replaces.** The bar is `PopupPaletteImp`
+(`g_pPopupPalette`, `0x763c00`) with 21 `ControlButton`s at `+0x28`. Stock fills them by
+a 3 x 7 slot plan: a command goes to slot `row * [+0x7c] + col` from its
+`preferredPosition` (the command's `CommandInfoClass` holds it at `+0x1b0`), then the
+build items follow in `buildItemN` order (`mSetupCommandInfoClassButtons`, `0x4fcfc0`);
+the used slots are packed to the front, capped at columns times rows of the mode in
+use and the k-th gets the cell `(k % columns, k / columns)`. In the bottom-bar mode
+(A) rows count up from the bottom, which is why stock's construction menu puts ten
+buildings on the bottom row and the other three above them. The columns and rows are
+the bar's fields: `+0xa0` / `+0xa4` for mode A (`staticPaletteWidthA` / `HeightA`,
+10 x 3), `+0xa8` / `+0xac` for B, `+0x7c` / `+0x80` floating (`paletteWidth` /
+`Height`, 3 x 7), copied to `+0xb0` / `+0xb4` for the mode in use (`SetPaletteMode`,
+`0x4fbdd0`). **`+0x7c` is also the slot plan's width: a bar re-laid by changing it lost
+buttons** (recrew and transport were overwritten by the fixed menu buttons), so a
+layout of ours never touches the bar's own, it only reads the buttons after `Update`
+and places them itself. The longest menu in the game is the construction ship's build
+list, 13 items, 15 with cancel and back: exactly the grid.
 
 **What it reads.** The stock bar's `Update` still decides the buttons: its 21
-`ControlButton`s at `+0x28`, shown when `IsValid` (vtable +0x1c). Each button's kind
-and name are grid/README.md's (`CommandInfoClass` at `+0x88`, else `ModeInfo` at
-`+0x84`), its state at `+0x34` (0 disabled, 2 active: the alert level in force and
+`ControlButton`s at `+0x28`, shown when `IsValid` (vtable +0x1c). A button is
+named by its `CommandInfoClass` (`+0x88`, its `buttonName` inline at `+0x20`) or else
+by a `ModeInfo` (`+0x84`) whose kind (`+0x04`) is 1 a build item (ODF name at
+`[+0x0c]+0x7c`), 2 a special weapon (`[+0x10]+0x208`, named by `cPrjID::GetName`,
+`0x65dce0`) or 3 a fixed button (`+0x14` indexes: back, order, build, research,
+evolve, trade, form, aiMenu, close). Its state at `+0x34` (0 disabled, 2 active: the alert level in force and
 the like). The menu open is `+0x124`, the palette mode `+0x110`; the bar is hidden
 with `+0x16`, and the whole HUD with the info panel's (`ingame::hud_hidden`).
 
-**The cells** are grid.c's assignment, ported: cancel on T and back/close on G in every
+**The cells:** cancel on T and back/close on G in every
 menu; at the top level the build/research/evolve opener first in the top row, the other
 menus after it, special weapons along the bottom, commands in the middle; in a submenu
 each command at its `preferredPosition` (a three-column plan, so the AI menu is a 3x3);
@@ -199,24 +324,26 @@ mode `in|out` and the "construct the virtual base" flag, as the game calls it;
 `str()` at 0x7b7db0; the whole-object destructor at 0x7b7ea8), and frees it the same
 way. The short text shows after 0.35 s, the verbose one after 1.5 s. The strings mark a
 hotkey's letter with `^` and name stock's hotkey in `<...>`, which does nothing while
-the grid's keys are on: both are dropped.
+QOL's grid keys are on (`QOL_BarLabel(0)` gives a label): both are dropped.
 
 **A press** is what releasing a click does in `StandardButton::Simulate`: nothing if
 the button is disabled, else the click sound (unless a video plays) and the button's
 press function (vtable +0x20, `ControlButton::mButtonPressFunction`), which hands the
-command (`CheckCanExecute`) or the mode to the bar. Clicks and keys are both pressed
-in the bar's keyboard step (the call of `mProcessKeyboardInput` at 0x4fb56a in
-`Update`, wrapped as GridLayout.asi wrapped it), so they act at the moment stock's
-would, on buttons of this update. A click is queued by the UI frame and dropped if no
-keyboard step takes it within three frames (the step runs only when something of the
-player's is selected and the game is not paused). The stock click's lock of the cursor
-while the button is held is not reproduced: ours never owns the mouse.
+command (`CheckCanExecute`) or the mode to the bar. A click is queued by the UI frame
+and pressed in the bar's update, which QOL's wrap of the keyboard step tells the UI of
+(`UI_BarStep`, "The keys are QOL's" below); it is dropped if no update takes it within
+three frames (the update runs only when something of the player's is selected and the
+game is not paused). Until QOL's first step, or without `QOL.asi`, the UI takes that
+step in its own frame. The stock click's lock of the cursor while the button is held is
+not reproduced: ours never owns the mouse.
 
-**Keys** are grid/README.md's, by scancode (`GetAsyncKeyState` on the virtual key
-`MapVirtualKeyA` gives for each), nothing while chat has the keyboard
-(`TextInput_IsActive`), Ctrl or Alt is held, or the game is not the foreground window.
-With `BarKeys=1` stock's bar keys do nothing: the three hotkey tables' counts are
-emptied for the stock call and put back, and the six menu toggles point at a zero.
+**The keys are QOL's** (`qol/bar.c`, `qol/README.md` "QOL-1"), since phase 9. The UI
+keeps the layout (`assign`, `place`) and the drawing; it exports `UI_BarCell(cell)`,
+the stock button in cell 0..14 of the menu now shown (NULL when the cell is empty or
+the bar is not drawn), and `UI_BarStep(palette)`; QOL exports `QOL_BarLabel(cell)`,
+the key's letter, and the UI draws it when `[HUD] BarLabels=1`. Both sides find the
+other's export by name in the loaded modules. With no refit bar (no `UI.asi`, or
+`[HUD] Bar=0`) QOL's keys stand down and the stock bar keys run.
 
 **Sounds.** The rollover sound when the pointer enters an enabled button, the click
 sound on a press: `AudioSound2D` objects made with the game's `operator new`, named by
@@ -231,13 +358,11 @@ the selection. Without a minimap of ours the rectangles are the stock components
 info panel.
 
 **Log.** Each layout once per change ("bar: menu=2 mode=1 | Q=bbase ... T=cancel
-G=back", `(off)` for a disabled button), each press ("bar: click build", "bar: key
-S=bmining").
+G=back", `(off)` for a disabled button), each click ("bar: click build"); QOL.log names each key ("bar: key S").
 
 ### Seen on the bench
 
-2026-10-16, Instant Action as the Borg at 1280x720 (`ui/bench-asi.sh --no-grid
-HUD.Bar=1`): the bar drew as a 5x3 grid of the game's icons above the info panel, the
+2026-10-16, Instant Action as the Borg at 1280x720 (`ui/bench-asi.sh HUD.Bar=1`): the bar drew as a 5x3 grid of the game's icons above the info panel, the
 stock bar did not draw; a click on build opened the build list (13 items, cancel on T,
 back on G), S started a mining station's placement and a click placed it; W opened
 orders (W=repair E=superRepair A=patrol S=scout Z=guard X=decom G=back), R the AI menu
@@ -553,9 +678,9 @@ pressed as many times as it takes, all at the next step (`radar::queue_filter(st
 n)`), so the chat names only the last. A click on the name goes to the next state, as
 stock. The tooltips are the game's (`GUI_MM_ALL_SHIPS_VISIBLE`, ...).
 
-**HUD.asi** re-lays the stock `MapRadar` out after a display mode change
-(hud/README.md, "Re-layout"); ours reads no stock rectangle but the stock radar's
-width, to scale a ping, so that keeps working. The button bar (`hud/bar.rs`) still
+**The retired HUD.asi** re-laid the stock `MapRadar` out after a display mode change
+("The references the stock HUD is drawn against", the mode change in a mission); the stock radar is left on its canvas now, and ours reads no stock rectangle but the stock radar's
+width, to scale a ping, which that does not disturb. The button bar (`hud/bar.rs`) still
 places itself by the stock radar's rectangle (`MapRadar+0x04`), which ours covers at
 the default size.
 
@@ -812,8 +937,9 @@ which works whether "show more" is set or not, so the menu button always shows.
 player saw do nothing; the palette toggle is Game Settings' "Command Bar" (MENUS.md,
 "The Options family"), and with both gone "more" uncovered only the menu button.
 
-**The bar's shown or hidden state is the player's** (`prefs.rs`, `UIPlayer.ini`'s
-`[HUD] BarHidden`, written by Game Settings): at the first mission frame in which the
+**The bar's shown or hidden state is the player's** (`prefs.rs`, `RefitPlayer.ini`'s
+`[UI.HUD] BarHidden`, written by Game Settings through the overlay's writer,
+`tools/settings/README.md`): at the first mission frame in which the
 HUD shows and the bar is in the view's render list, and at the next one after the
 setting changes, `hud::apply_bar_pref` compares the palette mode
 (`PopupPaletteImp+0x110`) with it and, when they differ, queues a press of the stock
@@ -825,9 +951,11 @@ draws: "hidden" is mode 0. **Never compare the component's hidden flag** (`+0x16
 reasons too (on the bench it was set with the mode at 0 under the first Federation
 mission's opening cinematic); compared, a "Shown" pressed the toggle with the bar
 already up and took it away for the mission (ui 0.13.3,
-`testbench/scenarios/ui-hud-bar-after-cinematic.md`). `UIPlayer.ini` is the player's
+`testbench/scenarios/ui-hud-bar-after-cinematic.md`). `RefitPlayer.ini` is the player's
 file: no install ships or writes it, so a reinstall (which writes `UI.ini`) keeps the
-choice.
+choice. Until ui 0.29.0 the key was `[HUD] BarHidden` of `UIPlayer.ini`; the settings
+hub carries a non-zero one over once and renames the old file `UIPlayer.ini.migrated`
+(`testbench/scenarios/ui-settings-migrate.md`).
 
 ### Messages and objectives (`MessageDisplay`, `ObjectivesDisplay`)
 
@@ -1280,6 +1408,80 @@ when the camera's pivot is off the units, so render3d takes it (render3d 0.30.0)
 overlays module draws a ring of its own in its place (`render3d/README.md`,
 "overlays", the pivot marker; `[Overlays] Pivot=0` gives it back to the engine).
 
+### Hooks of the panels (`ui.panels.*`)
+
+What `src/engine/{buttons,selection,chat,resources,topbar,trade,sound,race,comm}.rs` read
+and call of `Armada2.exe` is in the symbol profile `profiles/gog-1.1/ui.panels.toml`,
+generated into `src/syms_panels.rs` (`crates/a2engine/README.md`). Each hook is checked
+before anything is written or read, and stands down alone with `engine: <hook> stands
+down: <symbol> <why>`; the findings above (the fields, the press functions, the vtables)
+are the entries. A `fn` with a byte `check` is entered or called; a press function with
+none is only compared with a button's `+0x5c` or a vtable slot.
+
+| Hook | Entries | Without it |
+|---|---|---|
+| `ui.panels.buttons` | `StandardButton::mButtonPressFunction` and `Localized_Strings::Localize` (`fn`, entry bytes checked), `g_string`, the `StandardButton` / `ObjectivesText` fields | no press, label or localised text of ours (every panel below needs it) |
+| `ui.panels.toggle_press` | `ToggleButton::mButtonPressFunction` (`fn`, checked): the comm panel's toggles and colour buttons | a toggle is not pressed; the comm panel stays stock |
+| `ui.panels.presses` | `Entity::ResetVisibility` and its call in `Program::DisplayInputProcess` (patched: a press of ours is made at the simulate pass, "The button bar") | presses are made in the UI's frame |
+| `ui.panels.reads_selection` (`HUD.Info`, `HUD.Selection`) | `g_pOverView`, the overview's vtable slots `+0x94` / `+0x98`, `Entity::Get`, `Entity::GetUserTeam` (`fn`, checked) | no selection, no user team |
+| `ui.panels.reads_warp` (`HUD.Minimap`) | `g_allowWarp`, `g_transport`, `Transport::getGameSetup` and `GameSetup::isAllowWarpSpeed` (`fn`, checked), the object, craft and control fields | the minimap's move cursor is the engine's |
+| `ui.panels.resources` | `Team::GetTeam` and `Team::GetResource` (`fn`, checked) | no resource amounts |
+| `ui.panels.topbar` | `g_resourcePanel`, `g_buttonPanel`, `ResourceComponent::s_ResourceColor`, `CursorInterface::m_tooltipState`, `Team::GetMaxOfficers` (checked), the eight `ButtonPanel` press functions, the panels' fields | the resource panel and the top-right buttons stay stock |
+| `ui.panels.chat` | `g_chat_display`, the text-input region list (`g_random+0x10`), `ChatDisplay::RemoveExpiredText` (checked), `TextInput_Update` and its call in `Armada_RenderFrame` (patched), the region fields and flags | chat lines and the text entry stay stock |
+| `ui.panels.trade` | `Team::RenderUserTeamData` (checked) and its call in `Armada_RenderFrame` (patched), `Team::s_showTradesToTeam`, `s_pTeamList`, `s_teamMessage`, the team fields | the trade status and the team message stay stock |
+| `ui.panels.sound` | `operator new` and `AudioSound2D::AudioSound2D` (`fn`, checked), the two button sound names, the `ShellButton` sound fields | no click or hover sound of ours |
+| `ui.panels.reads_race` | `Race::s_missionRace`, the race's name field | the HUD's theme is the shell's |
+| `ui.panels.comm` | `commDisplay`, `dropPlayerBox`, `loadPercentageBox` and their vtables, `CommBar`'s, the two `GetInformation` slots of `DropPlayerText` / `LoadPercentageText` (`slot`, checked to hold their own), the buttons' callbacks, every field read | the comm panel, the drop box and the load wait stay stock |
+
+### Hooks of the HUD's engine side (`ui.hud.*`)
+
+What `src/engine/{hud,popups,palette,overlay,overlay_text,leftovers}.rs` patch, read and
+call of `Armada2.exe` is in `profiles/gog-1.1/ui.hud.toml`, generated into
+`src/syms_hud.rs`. The findings above (the panel switch's two calls, the components'
+fields, the bar's slots, the overlay's object walk, the boxes' press functions, each
+last draw's call site) are its entries. Each hook is checked before anything is written
+or read and stands down alone (`engine: <hook> stands down: <symbol> <why>`): the patched
+ones leave the stock draw or key, the `reads_` ones read nothing and return their
+empty value, so the panel that needs them stays the engine's. The settings rows a stand
+down is explained on are named in the profile.
+
+| Hook | Entries | Without it |
+|---|---|---|
+| `ui.hud.panels` (`HUD.Minimap`, `HUD.Info`, `HUD.Bar`, `HUD.UnitView`) | the call of a component's `Render` in `DisplayInterface::RenderAll` and of its `CursorOver` in `CursorInterface::RefreshOwner` (patched, 7 bytes each, "The panel switch"), `iCursor` and its owner / sprite fields | no panel of ours is taken over |
+| `ui.hud.tooltips` (`HUD.Tooltips`) | `iCursor+0x34` / `+0x38`, `CursorInterface::m_tooltipState` | the engine draws its tooltips at the pointer |
+| `ui.hud.reads_components` | `g_pPopupPalette`, `shipDisplay`, `mapRadar`, `DisplayInterface::s_pRenderList`, `View_Record`, the `DisplayInterface` rectangle / hidden fields and `GetName` slot | no component is found, hidden or placed |
+| `ui.hud.reads_calls` | `TextInput_IsActive` and `CinematicView::IsPlayingVideo` (`fn`, checked), `g_cinematicView` | keys are not held back for the chat line; a click sounds during a video |
+| `ui.hud.reads_popups` | the message, objectives, pause and replay boxes, their press functions, `IsGamePausedAtAll` and `ObjectivesDisplay::FocusSimulate` (`fn`, checked) | no box of ours ("Messages and objectives", "Pause and replay") |
+| `ui.hud.reads_bar` (`HUD.Bar`, `HUD.BarLabels`, `HUD.Icons`) | the bar's slots, mode and menu, the `ControlButton` / `CommandInfoClass` / `ModeInfo` fields, the `ButtonName` pair, `cPrjID::GetName`, `FindElement` and `ControlButton::mButtonPressFunction` (`fn`, checked), the sprite database | no button is described or drawn |
+| `ui.hud.reads_overlay` (`HUD.Selection`, `HUD.SelectionGauges`) | `GameObject::objectList`, the object / craft / `SelectionDisplay` fields, `ComputeContainerRect` and `__RTDynamicCast` (`fn`, checked), `currentCamera`, the virtual viewport, `SystemOrder` | no overlay of ours |
+| `ui.hud.bubbles` | `RenderSelectionEffects` (patched, its first byte) | the engine's 3D bubbles stay |
+| `ui.hud.reads_overlay_text` | `overlayText`, its map's `_Nil` and the message fields | no overlay messages of ours |
+| `ui.hud.drag_box` | the call of `DrawWireframeRectangle` in `cOverViewImp::mNormalModeRender` (patched) | the engine draws the drag box |
+| `ui.hud.height_posts` | the call of `ClipAndRenderLine` in `DrawHeightPost` (patched) | the engine draws the height posts |
+| `ui.hud.order_ring` | the calls of `ST3D_Sprite::DrawQuad` in `mRenderGridFX` and `mRenderWhere` (patched), `GetTexture` and `DemandLoad` (`fn`, checked) | the engine draws the order ring |
+| `ui.hud.footprints` | the three `DrawQuad` calls in `PlaceholderFeature::RenderFootprints` (patched, all or none), the same two functions | the engine draws the build footprints |
+| `ui.hud.fade` | the two draws of `ScreenFade::Render` (patched, 5 and 7 bytes) | the engine draws the fade |
+| `ui.hud.video` | the two callers of `BinkThread::BlitToBlackBackground` and its three draws (patched), `GetTexture` (`fn`, checked), the video's size | the engine draws the unit view's and the comm videos |
+| `ui.hud.frame_rate` | the two prints in `Armada_RenderFrame` (patched, both or none), `FrameStats::GetSlotName` / `GetTimeAvg` (`fn`, checked), `FRAMERATE_DISPLAY` | the engine prints the frame rate |
+
+### Hooks of the info panel, minimap, unit view and close-up (`ui.hud.*`)
+
+What `src/engine/{info,radar,unitview,closeup}.rs` read and call of `Armada2.exe` is in
+`profiles/gog-1.1/ui.info.toml` and `ui.radar.toml`, generated into `src/syms_info.rs`
+and `src/syms_radar.rs`. A hook is checked before anything is written or read and
+stands down alone, with its row's note in Settings; the findings above (the panel's
+children, the vtable slots, the radar's globals) are the entries, and every struct
+offset is a `field`. A slot is checked to hold the function it names; a `fn` with bytes
+is entered or called.
+
+| Hook | Entries | Without it |
+|---|---|---|
+| `ui.hud.info` (`HUD.Info`) | `shipDisplay`, `ShipDisplay::DetermineSelectedDisplayType`, `Craft::mComputeRepairLeft`, `Producer::GetBuildQueue`, `GameObject::GetSlowEffect` / `GetLineOfSightEffect`, `Localized_Strings::Localize` and `__RTDynamicCast` (`fn`, entry bytes checked), the type descriptors it casts with, `Entity::NO_ENTITY`, `gCameraManager`, `g_pCommandShift`, the panel's children and the objects' fields | the info panel stays stock |
+| `ui.hud.unitview` (`HUD.UnitView`) | `g_cinematicView`, `CinematicView::Render` (checked) and `StandardBackground::Render`, held by their vtables' slots, the three rectangles and the frame pointer | the unit view keeps its stock place and frame |
+| `ui.hud.closeup` (`HUD.InfoCamera`) | `Armada_Camera`'s constructor, `ST3D_Camera::SetViewport` / `SetNearPlane` / `SetFarPlane`, `ST3D_GraphicsEngine::SetCurrentCamera` (checked), `SetTransform` in `Armada_Camera`'s vtable, `operator new`, the action camera's `Render_Stuff`, `DisplayInterface::currentCamera`, the entity and object lists, and the action camera's call of `Armada_RenderAllOurStuff` in `CinematicView::RenderView` (a `call`, `chain`: render3d re-points it, and the close-up goes through it) | the wireframe shows |
+| `ui.hud.radar` (`HUD.Minimap`) | `mapRadar` and the radar's sprites, filters and fog (`g_terrain`, `Scanner::m_fog`, `m_shroud`), `RadarComponent::ConvertWorldToSquareNormal` / `ConvertSquareNormalToWorld`, `Entity::GetTeamsVisibleToUser` and its call in `MapRadar::AlwaysGameSimulate` (patched: the clicks are made there), the team and filter functions, `ActionMode::GetAction`, `CameraManager::SnapToNearestVisible`, `ST3D_Camera::ProjectScreenPointToWorldRay`, `cOverViewImp`'s slots `+0xbc` / `+0xc8` and `PopupPaletteImp`'s `+0xa4` (checked to hold their functions), the object, class and camera fields | the minimap stays stock |
+| `ui.hud.radar_cursor` (`HUD.Minimap`) | `cOverViewImp::SetCursorAiAction` (`fn`, checked) and the two reads of its cursor table (`label`, checked), the table, the entry layout | the cursor over the minimap is the engine's |
+
 ## Not done
 
 - Every panel after the info panel (the order above).
@@ -1287,8 +1489,7 @@ overlays module draws a ring of its own in its place (`render3d/README.md`,
   bench, nor a Shift-click on a group icon, the slowed and spy icons, or the
   verbose tooltips' wording at length. Stock's wireframe and system colours are
   re-made in the theme's status colours rather than copied.
-- `GridLayout.ini`'s `[Cells]` (moving one button to another key) has no `UI.ini`
-  counterpart yet; nor the trade buttons' exchange-rate label and the percentage some
+- The trade buttons' exchange-rate label and the percentage some
   commands draw on their button (`ControlButton::Render` draws both as text).
 - A stock click on a palette button locks the cursor to the bar while held, and the
   bar's `PreSimulate` sends the bar back to the top level when a click lands outside it

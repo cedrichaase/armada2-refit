@@ -4,6 +4,63 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 3.0.1 — 2026-11-04
+
+Reads package schemas 0 and 1, unchanged.
+
+### Fixed
+- Uninstall after an upgrade over 2.3.0: the undo record of Heroic's `WINEDLLOVERRIDES` (and the prefix's registry on macOS) is merged per key keeping the earliest `old`, and a prefix removal (`d3d9`) cancels the add of ours it undoes. Before, the upgrade replaced 2.3.0's record (`old: None`) with one whose `old` was 2.3.0's own value, so uninstall put `winmm=n,b;d3d8=n,b;d3d9=n,b` back instead of unsetting it (`merge_changes`).
+
+### Added
+- `test.sh`: the released GUI 2.3.0 (`9a5e70a`, tag v13.51.3) is pinned like 2.4.1 and 2.5.0 (reads the new manifest, installs the package); a game installed by 2.3.0, upgraded and uninstalled gets Heroic's override back to unset, and the same for the prefix's registry. Installed, not yet seen in game.
+
+## 3.0.0 — 2026-11-03
+
+Reads package schemas 0 and 1, unchanged: the package without the Direct3D chain adds step ids and `when` values, which is additive, and an older package still reads and previews (its manifest's own `steps` and layers are used, and `RETIRED_STEPS` words the removed ones).
+
+### Changed
+- `STEPS` is `verify, prereqs, display, retire, render3d, ui, qol, rules, models, online, cutscenes, bloom, done`; `retire` ("Taking out what earlier versions installed") is new. A manifest without `steps` (a schema-0 zip) gets `LEGACY_STEPS`, the old list.
+- The Direct3D diagnosis is one question: `inspect` keeps `display8` (is `d3d8.dll` Display8) and `ours_d3d8` (Display8 will go in: the slot empty, GOG's, the old vendored d3d8to9, a DXVK d3d8, or Display8). `layer_verdict`: `when=d3d8` and `display8` are skipped with "your own d3d8.dll stays" when the file is the player's own; any `when` an older package uses previews as "will install".
+- The launch override is exactly `winmm=n,b;d3d8=n,b`, never `d3d9=n,b`. Heroic's config and the Wine prefix's registry (macOS) drop a `d3d9=n,b` an older install wrote when everything else there is ours (`ours_d3d9`); with the player's own overrides the entry is left whole. Undo gives it back.
+- The bug report: the Direct3D section is "Display8 and loader", names the old chain's leftovers (`d3d9.dll`, a vendored d3d8to9, a refit `dxvk.conf`) as retired and taken out by a re-install, and finds UI.asi or Render3D.asi without Display8 as `d3d8.dll`. The old d3d8to9 and DXVK d3d9 hashes stay in `KNOWN_FILES`, marked retired.
+- `display8_backend` reads Display8 1.0.0's `bail-out: <why>; the game draws through <path>; the plugins stand down` line ("Display8 bailed out: ..."); the older patterns stay.
+- `test.sh`, `test-macos.sh` and `test-windows.ps1` expect Display8 alone in `d3d8.dll`, no `d3d9.dll`, `d3d8_real.dll` or `dxvk.conf` and no `d3d9` override. `test.sh` also installs over an older install's Heroic entry (d3d9 out, and back on uninstall) and runs the 2.5.0 installer (`a2ede51`) against the new package.
+
+### Removed
+- The `chain`, `renderer`, `hud`, `menus`, `grid`, `lighting`, `sky` and `msaa` entries of `STEPS`/`STATUS` (kept as `RETIRED_STEPS`, for older packages), the `dxvk`, `d3d8to9`, `after_*`, `foreign_conf` and `d3d9` facts, the "older HUD and menus" and "per vertex" notes, and the "per pixel needs d3d8to9" heads-up.
+
+### Added
+- Self-tests: facts and verdicts for an empty slot, GOG's `d3d8.dll`, the old vendored d3d8to9 with a `d3d9.dll`, a DXVK d3d8, Display8 and the player's own; a 14.x-shaped manifest (the `chain` step, the `renderer` layer, the old `when`s) parsing and previewing; the d3d9 override removal in Heroic and the registry; the bail-out line. Installed, not yet seen in game.
+
+## 2.5.0 — 2026-11-03
+
+Reads package schemas 0 and 1, unchanged; reads the 14.3.0 package's `layers/<id>/` layout and its optional manifest keys.
+
+### Added
+- A "Parts" list (GTK: an expander of check rows; Tk: ticks under the card) built from the manifest's layers whose `select` is `on` or `off`, with `requires` and the layer's summary greyed beneath (the rules part says every player of a network game needs it). All parts are ticked by default, `off` layers excepted; unticking a part unticks those that need it. The choice goes to the scripts as `A2_SKIP` beside `EXCLUDED`, and is kept in `armada2-refit-installed.json` (`skip`) across upgrades. A package without `select` (before 14.3.0) offers no choice.
+- `--without ID,ID` and `--all` on the command line (`--package`, `--install`).
+- The bug report finds a release's files under `layers/<id>/` (or `game/` in an older one). Installed, not yet seen in game.
+
+## 2.4.1 — 2026-11-03
+
+Reads package schemas 0 and 1, unchanged.
+
+### Added
+- `rules` in `STEPS` and `STATUS` (the release scripts print `::step rules` after `qol`). Installed, not yet seen in game.
+
+## 2.4.0 — 2026-11-02
+
+Reads package schemas 0 and 1, unchanged.
+
+### Added
+- The bug report gains "Player settings (RefitPlayer.ini)": the file's key lines from the
+  game folder and, on Windows, from `%LOCALAPPDATA%\VirtualStore\<game folder without its
+  drive>` (`overlay_files`, `overlay_report`; selftest checks). The installer never writes
+  the file; `test.sh` seeds one and asserts it is byte-identical after install, report and
+  uninstall.
+
+Confirmed in game 2026-11-03.
+
 ## 2.3.0 — 2026-10-30
 
 Reads package schemas 0 and 1, unchanged.

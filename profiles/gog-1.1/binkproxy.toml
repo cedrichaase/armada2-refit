@@ -1,0 +1,49 @@
+# BinkProxy's symbols in Armada2.exe 1.1 (GOG): what cutscenes/binkproxy reads of the exe,
+# each entry tied to the hook that uses it. The findings are in cutscenes/binkproxy/README.md.
+schema = 1
+plugin = "binkproxy"
+readme = "cutscenes/binkproxy/README.md"
+lang = "c"
+out = "cutscenes/binkproxy/engine_syms.h"
+
+[hook.intro_copy]
+doc = "BinkCopyToBuffer trusts the intro's caller frame to find the back buffer's size"
+
+# ---- binkproxy.intro_copy: the one call site whose frame is read ---------------------
+
+[[sym]]
+id = "intro_copy_ret"
+symbol = "NextBinkFrame"
+kind = "label"
+addr = 0x4638b5
+check = "8b f0 8b 45 14 50 8b 08"
+in = "NextBinkFrame"
+used_by = ["intro_copy"]
+
+# The back buffer's D3DSURFACE_DESC in that frame, as distances below the saved EBP.
+[[sym]]
+id = "intro_desc_format"
+symbol = "NextBinkFrame"
+kind = "field"
+struct = "NextBinkFrame frame"
+offset = 0x28
+type = "u32"
+used_by = ["intro_copy"]
+
+[[sym]]
+id = "intro_desc_width"
+symbol = "NextBinkFrame"
+kind = "field"
+struct = "NextBinkFrame frame"
+offset = 0x10
+type = "u32"
+used_by = ["intro_copy"]
+
+[[sym]]
+id = "intro_desc_height"
+symbol = "NextBinkFrame"
+kind = "field"
+struct = "NextBinkFrame frame"
+offset = 0x0c
+type = "u32"
+used_by = ["intro_copy"]

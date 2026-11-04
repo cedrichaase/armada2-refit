@@ -16,7 +16,7 @@ from a 256px stock file to a 1024px plate *is* the plate.)
 
 | | Here | Why |
 |---|---|---|
-| `HUD.asi`, `Menus.asi` — their C source, and `Render3D.asi`'s Rust | yes | our code. It patches the game at run time and ships none of it; the byte arrays in the sources are short instruction signatures, checked before each patch |
+| the C plugins' source (`QOL.asi`, `QOLRules.asi`, `Online.asi`, the cutscene proxy), and the Rust of `Render3D.asi`, `UI.asi` and Display8 | yes | our code. It patches the game at run time and ships none of it; the byte arrays in the sources are short instruction signatures, checked before each patch |
 | the Python and shell tooling, `.ini`/`.conf` files | yes | ours |
 | docs and changelogs | yes | ours. They quote the odd config line, which is commentary, and name functions and addresses from `armada2.map` — see "Engine findings" below |
 | `armada2.map`, disassembly or decompilation listings, hex dumps of game code | **no** | the game's own code, or a mechanical translation of it. `check.sh` refuses `*.map` |
@@ -34,7 +34,7 @@ that is `STA2WidescreenPatch` 1.0 (MIT) with the Ultimate ASI Loader 4.68 it bun
 | Third-party | Licence | Here |
 |---|---|---|
 | `STA2WidescreenPatch` 1.0, Ultimate ASI Loader 4.68 | MIT | vendored; in the zip |
-| DXVK | zlib | not yet: whether the installers should use it is open (below) |
+| DXVK | zlib | no: not used since 15.6.0 (Display8 draws on Vulkan and Direct3D 12 itself); its builds left `platform/vendor/` and only their hashes stay, in the retire table |
 
 `CREDITS.txt` in the zip names each author, licence and source.
 
@@ -71,7 +71,7 @@ position, not legal advice):
   takes a deliberate `git add -f`.
 - **`.gitignore`** also ignores every data directory a checkout from before `A2_DATA`
   may still have (`textures/targets/*/*/`, `cutscenes/movies/*/*/`,
-  `menus/backdrops/*/`, `textures/.scratch/`).
+  `ui/backdrops/*/`, `textures/.scratch/`).
 - **`publish/check.sh [-C <repo>] [<commit>]`** fails on any **binary** file in the
   index (or the commit), on any game format by extension, and on any path inside those
   data directories or the old `archive/` and `promo/`. No publishable file here is
@@ -84,7 +84,7 @@ every commit. The texture, model, cutscene and backdrop work joined it in one co
 without its history, which is full of stock art. So not every cited hash resolves here:
 
 - Hashes in the `textures/`, `models/` and `cutscenes/` changelogs, and `927f993` in the
-  root changelog and `79695b2`, `8a3562c` and `d3e1ccb` in `menus/CHANGELOG.md`, are in
+  root changelog and `79695b2`, `8a3562c` and `d3e1ccb` in the retired menus layer's changelog (`retire/history/menus-CHANGELOG.md`), are in
   that unfiltered history, which is not published and does not resolve here.
 - Every other hash resolves in this repository.
 
@@ -102,44 +102,51 @@ without its history, which is full of stock art. So not every cited hash resolve
 Separate from the repository. **`publish/package.sh [<out-dir>]`** builds the plugins
 and writes `armada2-refit-<version>.zip`:
 
-- `game/`: what goes beside `Armada2.exe`, which is `Render3D.asi`, `UI.asi`, `QOL.asi`,
-  `QOLRules.asi`, `Online.asi` and `binkw32.dll`, each with its `.ini`, Render3D's
-  recipes in `game/Surfaces/` and `game/Nebulae/`, and `dxvk.conf` at stage 3
-  (`renderer/renderer-config.sh --print`). `Render3D.asi` and `UI.asi` need a device to
-  draw on behind `d3d8.dll`, so the installers put them in only where `d3d8.dll` is
-  crosire's d3d8to9 after the chain step, or Display8 in front of it (below), taking out `HUD.asi`, `Menus.asi` and
-  `GridLayout.asi` as `ui/supersede.sh` does; elsewhere those three, also in `game/`, go
-  in instead and the 3D view stays the engine's. Either way the installers take out the
-  per-part plugins (`MSAA`, `Planets`, `Lighting`, `Sky` and the rest) that earlier
-  packages put in, with the `Sky` recipes they copied. `package.sh` needs rustup's
+- `layers/<id>/`, one folder per layer, whose files are copied beside `Armada2.exe`
+  (14.3.0 on; `game/` and `display/` before it): `render3d` (`Render3D.asi`, its `.ini`
+  and the recipes in `Surfaces/` and `Nebulae/`), `ui` (`UI.asi`), `qol`, `rules`
+  (`QOLRules.asi`), `online`, `cutscenes` (`binkw32.dll` and `BinkProxy.ini`), `display`
+  (Display8, below). There is no `renderer/` (`dxvk.conf`) and no `chain/` (crosire's
+  d3d8to9 and DXVK 3.1.1's `d3d9.dll`) from 15.6.0: Display8 stands on neither. `Render3D.asi` and
+  `UI.asi` draw on Display8's device, so the installers put them in only where Display8 is
+  the game's `d3d8.dll`; with a `d3d8.dll` of the player's own neither goes in and the game
+  keeps its own look (`HUD.asi`, `Menus.asi` and `GridLayout.asi` are not in the package any
+  more). The **retire** step takes out what earlier versions installed and nothing
+  installs now, from `retire.txt` (baked from `retire/known.txt` by `package.sh`; the same
+  table `retire/retire.sh` reads): those three plugins and the per-part plugins (`MSAA`,
+  `Planets`, `Lighting`, `Sky` and the rest) with the `Sky` recipes they copied;
+  `retire/hud-files.py` puts the hud 2.x file fixes back; the chain's `d3d8_real.dll` and
+  `d3d9.dll` go **by hash** (the vendored builds' sha256, which stay in the table after the
+  binaries left `platform/vendor/`), and a `dxvk.conf` by our marker, after the display
+  step has carried its sampler values into `Display8.ini [Samplers]`. A file that is none of
+  these is the player's and stays. `package.sh` needs rustup's
   cargo with the `i686-pc-windows-msvc` target for the two Rust plugins;
-- `chain/`: crosire's d3d8to9 (`d3d8.dll`) and DXVK 3.1.1's `d3d9.dll`, from
-  `platform/vendor/`. `install.sh` puts them in unless a `d3d8.dll` or `d3d9.dll` there is
-  none of GOG's, DXVK's or these; a DXVK `d3d9.dll` already there stays. What it
-  replaces is kept (`d3d8.dll.gog-backup`, else `.a2chain-backup`), recorded with the
-  prerequisites, and put back by `--uninstall`. `install.ps1` puts only `d3d8.dll` in
-  (Windows' own Direct3D 9 is behind it) and leaves a DXVK `d3d8.dll` the player put
-  there; `install.sh` on macOS puts only `d3d8.dll` in too, on Wine's wined3d, since
-  DXVK cannot run Direct3D 9 on a Mac (D3DMetal, DXMT and CrossOver's DXVK cover
-  Direct3D 10 to 12), and skips `dxvk.conf` there;
+- `sdk/`: `a2asi.h`, `a2engine.h`, `def/` (the import definitions) and `MODDING.txt`
+  (`publish/MODDING.txt`): what a mod needs to be built on the same base. The source stays
+  at the release tag in the repository; nothing is published to crates.io;
+- `layers.txt` and `moved.txt`, baked by `package.sh` for the scripts, which have no
+  Python: `layers.txt` is `tools/layers.py`'s id, `select`, `requires` and `scope` per
+  layer, and `moved.txt` the settings that moved between files (a settings row's
+  `moved_from`: from file, section, key, to file, section, key, the new default), also
+  the manifest's `moved[]`;
 - `display/`: Display8 (`display/build/d3d8.dll`, `display/build.sh`) and its
-  `Display8.ini` as shipped (`Mode=stub`, `Backend=auto`, `VSync=1`). After the chain
-  step, where `d3d8.dll` is crosire's d3d8to9, both installers put it in as
-  `display/install` does (`display/README.md`, "Installing"): d3d8to9 moves behind it as
-  `d3d8_real.dll`, and `Display8.ini` is copied if missing, else merged as
+  `Display8.ini` as shipped (`Backend=auto`, `VSync=1`). Both installers put it in the
+  `d3d8.dll` slot when that is empty, GOG's (kept once as `d3d8.dll.gog-backup`, and put back
+  by `--uninstall`), the old chain's d3d8to9 or a DXVK `d3d8.dll` (replaced), or an older
+  Display8; any other `d3d8.dll` is the player's own and stays, and Display8, `Render3D.asi`
+  and `UI.asi` stay out. `Display8.ini` is copied if missing, else merged as
   `tools/ini-merge.py` merges it (the missing keys added, the player's values kept, the
-  `Defaults=` upgrade applied), in awk and in PowerShell, since neither may assume
-  Python; keep their upgrade tables (`DISPLAY_UPGRADES`, `$DisplayUpgrades`) in step
+  `Defaults=` upgrade applied; Defaults 3 drops `Mode`, `Real` and the `d3d9` token and
+  carries a marked `dxvk.conf`'s sampler values into `[Samplers]`, with a stub at
+  `Defaults=1` when there is no `Display8.ini` yet), in awk and in PowerShell, since neither may assume
+  Python; keep their upgrade tables (`INI_UPGRADES`, `$DisplayUpgrades`) in step
   with `ini-merge.py`'s. On macOS too it goes in as shipped, on `Backend=auto`: Vulkan
   on MoltenVK under a 32-bit process works there (`display/README.md`, "Will Vulkan work
-  on a Mac?"), and Direct3D 9 comes last. A chain left as it is gets no Display8. Display8 is known by content (the
-  panic message every build carries; it also holds the word "dxvk", so that is asked
-  first), never by hash. Each run first takes it out of the slot, putting
-  `d3d8_real.dll` back as `d3d8.dll`, so the chain step sees the chain as before and a
-  re-run simply updates it; `--uninstall` does the same first, then takes out
-  `Display8.ini`, its logs and trace files (and on Windows its Vulkan pipeline cache in
-  `%LOCALAPPDATA%\armada2-refit\`), so the chain's own records then put back what was
-  there before;
+  on a Mac?"), and the system's own `d3d8.dll` draws the game if it cannot start. Display8 is known
+  by content (the panic message every build carries), never by hash. `--uninstall` takes it
+  out of the slot (an older Display8's `d3d8_real.dll`, if it is not the vendored d3d8to9, goes
+  back in), then `Display8.ini`, its logs and trace files (and on Windows its Vulkan pipeline
+  cache in `%LOCALAPPDATA%\armada2-refit\`), then puts `d3d8.dll.gog-backup` back;
 - `models/` and `a2env.py`: `moon-sod.py`, `select-sod.py`, `hull-sod.py`,
   `asteroid-sod.py`, run by
   `install.sh` with python3 on the player's own SODs (`--revert` on `--uninstall`);
@@ -157,8 +164,9 @@ and writes `armada2-refit-<version>.zip`:
   lets those two install a package.
 
 `install.sh` and `install.ps1` read three variables the GUI sets: `A2_PROGRESS=1` prints
-`::step <id>` as each stage starts, `A2_SKIP=cutscenes` leaves the Bink proxy out (and
-puts back a stock `binkw32.dll` an earlier install replaced), and `A2_PYTHON` names the
+`::step <id>` as each stage starts, `A2_SKIP="cutscenes qol ..."` leaves those layers out
+(see "Per-layer selection" below; `cutscenes` also puts back a stock `binkw32.dll` an
+earlier install replaced), and `A2_PYTHON` names the
 program that runs the SOD scripts (the frozen installer itself on Windows and macOS).
 With `A2_PROGRESS=1` a failure they understand is also named as `::error <code> <path>`,
 one line per file, before the sentence for a person (`av-locked`, `av-missing`,
@@ -188,10 +196,31 @@ and names what it skipped. They do the same on both systems:
   3D view itself: the vkBasalt config folder `install.sh` wrote (by its marker), and on
   Windows `A2Bloom.ini` with the `ReShadePreset.ini` copy of it, if it is still that
   copy. vkBasalt or ReShade themselves are the player's and stay;
-- write `dxvk.conf` only over one that carries `renderer-config.sh`'s marker;
-- keep a changed `.ini` as `.ini.bak` (`Display8.ini` is merged instead, above);
+- take out a `dxvk.conf` only when it carries `renderer-config.sh`'s marker, and a `d3d9.dll` or `d3d8_real.dll` only by the vendored builds' hash (retire step);
+- merge every shipped `.ini` into the player's, never replace it (keys added, values kept; a `.ini.bak` copy is no longer made, 14.3.0), and never touch `RefitPlayer.ini`;
 - with `--uninstall` / `-Uninstall`, put all of it back. A prerequisite file goes only
   if its hash still matches the record, so nothing replaced since is removed.
+
+### Per-layer selection
+
+Every layer whose `select` is `on` or `off` in `layers.toml` (qol, rules, online,
+cutscenes, models, render3d, ui) can be left out: `./install.sh --without qol,rules`,
+`install.bat -Without qol,rules` or `A2_SKIP="qol rules"`; a core layer (the platform,
+Display8) or an unknown id is refused. A layer left out is taken out when an
+earlier install left it, its plugin, `.ini` and log with it (the cutscene player as
+`unproxy` does, the models as `--revert` does). The choice is written to
+`armada2-refit-layers.txt` in the game directory (`without <id>` lines): a plain re-run,
+an upgrade, keeps it, `--all` / `-All` forgets it, and uninstall deletes it. The GUI
+installer builds its "Parts" list from the same manifest keys and passes the choice as
+`A2_SKIP`. The `rules` layer is ticked by default; a player without it plays stock rules,
+and a network game of players with and without it plays stock rules (`rules/README.md`).
+
+The scripts merge an `.ini` with the repository's `tools/ini-merge.py` logic, without
+Python: `INI_UPGRADES` / `$IniUpgrades` carry its `UPGRADES` (Display8.ini's and UI.ini's
+`Defaults=`) and `ini_retired` / `Get-Retired` its `RETIRED`; keep them in step. After the
+merge they apply `moved.txt`, as the repository's `./install` does with
+`tools/settings/move-keys.py`. `install.ps1` has been read for syntax only here: no
+PowerShell runs on the development machine, so `test.ps1` is CI's.
 
 `publish/installer/test.sh` and `test.ps1` run them against a mock game of placeholder
 files, so they prove the file handling, not that anything loads.
@@ -226,7 +255,7 @@ CI measures it on every release, so a detection is seen before players meet it, 
 anyone who meets one can look up our files' scans.
 
 **The scan** (`publish/virustotal.py`, CI job `virustotal`) takes every PE in the
-release zip (`game/`, `chain/` and `vendor/`, matched by extension and `MZ` header, never
+release zip (`layers/` and `vendor/`, matched by extension and `MZ` header, never
 by name, so a plugin that is added or merged is followed without an edit) and
 `armada2-refit-installer-windows.exe`. It looks each hash up first, which costs no upload
 and covers the vendored DLLs, uploads the rest and polls their analyses (30 minutes at
@@ -289,12 +318,12 @@ by hand. Web forms and Microsoft's portal (it needs an account) stay manual.
 
 ### Next
 
-**Open: DXVK.** Bundling it is allowed (zlib), and the installers could put it in the
-game directory in place of GOG's `d3d8.dll`, which would make `dxvk.conf` apply. Not decided yet. On Linux the launcher settings
-(`WINEDLLOVERRIDES`) are still the player's job; `install.sh`
-prints them. What stands in the way:
+**DXVK is out** (15.6.0): Display8 draws on Vulkan and Direct3D 12 itself, so the package
+carries no DXVK, no d3d8to9 and no `dxvk.conf`, and the launcher setting is
+`WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b`, which `install.sh` prints. What stands in the way:
 
-- **No plugin checks which `Armada2.exe` it is in.** Each should verify the exe and stand
-  down on any other build rather than patch the wrong bytes.
+- **Other builds of `Armada2.exe`.** The plugins check their hooks against the symbol
+  profile of the build (`profiles/gog-1.1/`) and stand down on any other rather than
+  patch the wrong bytes; only the GOG 1.1 profile exists.
 - **Untested**: Windows 11, a desktop other than Hyprland, and running without the
   widescreen patch.

@@ -38,46 +38,41 @@
 //! render targets, which `gpu` lets go of before a device `Reset` and before the engine
 //! releases its device; the picture is dropped then too (`device.rs`), as its contents
 //! are lost.
-use super::{field, hook, rd, storm3d};
+use super::{field, hook as patch, rd, storm3d};
 use crate::gfx::Tex;
+use crate::syms_info::{field, hook, sym, value, TABLE};
 use gpu::{Contents, Filter, Format, Rect, TextureDesc, Usage};
 
-/// `operator new(size_t)`, cdecl: the game's heap.
-const OPERATOR_NEW: usize = 0x652710;
-/// `Armada_Camera::Armada_Camera(ST3D_Database*, ST3D_Node*, char*)`, thiscall.
-const CAMERA_CTOR: usize = 0x590a10;
-const CAMERA_SIZE: usize = 0x288;
-/// The action camera's `Render_Stuff`, which `CinematicView::Init` gives its camera.
-const INSET_RENDER_STUFF: usize = 0x7637b8;
-const CAM_RENDER_STUFF: usize = 0x284;
-const CAM_FOV: usize = 0x1a8;
-/// `ST3D_Camera::SetNearPlane` / `SetFarPlane` (float), `SetViewport(const ST3D_Rect&)`.
-const SET_NEAR: usize = 0x6198c0;
-const SET_FAR: usize = 0x6198a0;
-const SET_VIEWPORT: usize = 0x61a550;
-/// `ST3D_Camera::SetTransform(const Matrix34&)`, its vtable slot.
-const SET_TRANSFORM: usize = 0x619500;
-const VT_SET_TRANSFORM: usize = 0x14;
-const ARMADA_CAMERA_VT: usize = 0x6baa54;
-/// `ST3D_GraphicsEngine::SetCurrentCamera(ST3D_Camera*)`, thiscall: the old one.
-const SET_CURRENT_CAMERA: usize = 0x62c2d0;
-/// `Armada_RenderAllOurStuff`, and the action camera's call of it.
-const BODY: usize = 0x598110;
-const SITE_INSET: usize = 0x4e60f6;
-/// `DisplayInterface::currentCamera`.
-const DI_CURRENT_CAMERA: usize = 0x765010;
-/// `Entity`'s list (its head node; `Entity::ResetVisibility` walks it) and on-screen byte.
-const ENTITY_LIST: usize = 0x76104c;
-const ENTITY_DRAWN: usize = 0x25;
-/// `GameObject::objectList` (a list object: its head node at `+4`), the distance cull.
-const OBJECT_LIST: usize = 0x761084;
-const OBJECT_CULLED: usize = 0x183;
-/// The entity's instance (`+0x04`): its bounding sphere (`+0x34`, centre and radius)
-/// and transform (`+0x44`, rows right, up, front, position), as `Entity::
-/// GetBoundingSphere` and `GetTransform` return them.
-const ENTITY_INSTANCE: usize = 0x04;
-const INST_SPHERE: usize = 0x34;
-const INST_TRANSFORM: usize = 0x44;
+fn eng() -> &'static a2engine::Engine {
+    TABLE.engine()
+}
+
+/// An engine address of the profile: 0 (and nothing to read) unless the close-up's hook
+/// is ready.
+fn at(s: a2engine::Sym) -> usize {
+    eng().addr(s)
+}
+
+/// The vtable slot of `ST3D_Camera::SetTransform` is checked by the hook, never read
+/// here (the camera's own vtable is read, `VT_SET_TRANSFORM`).
+#[allow(dead_code)]
+const CHECKED: [a2engine::Sym; 1] = [sym::CLOSEUP_SLOT_SET_TRANSFORM];
+
+/// `Armada_Camera`: its size (the game's `operator new`, cdecl, the heap), the
+/// `Render_Stuff` pointer and the field of view.
+const CAMERA_SIZE: usize = value::CLOSEUP_CAMERA_SIZE as usize;
+const CAM_RENDER_STUFF: usize = field::CLOSEUP_CAM_RENDER_STUFF;
+const CAM_FOV: usize = field::CLOSEUP_CAM_FOV;
+/// `ST3D_Camera::SetTransform(const Matrix34&)`, its vtable slot (`+0x14`).
+const VT_SET_TRANSFORM: usize = field::CLOSEUP_VT_SET_TRANSFORM;
+/// `Entity`'s on-screen byte and `GameObject`'s distance cull.
+const ENTITY_DRAWN: usize = field::CLOSEUP_ENTITY_DRAWN;
+const OBJECT_CULLED: usize = field::CLOSEUP_OBJECT_CULLED;
+/// The entity's instance: its bounding sphere and transform (rows right, up, front,
+/// position), as `Entity::GetBoundingSphere` and `GetTransform` return them.
+const ENTITY_INSTANCE: usize = field::CLOSEUP_ENTITY_INSTANCE;
+const INST_SPHERE: usize = field::CLOSEUP_INST_SPHERE;
+const INST_TRANSFORM: usize = field::CLOSEUP_INST_TRANSFORM;
 
 struct Pics {
     w: u32,
@@ -130,21 +125,27 @@ pub fn available() -> bool {
     if st().failed {
         return false;
     }
-    match hook::call_target(SITE_INSET) {
-        Some(t) if t != BODY => {}
-        _ => return false,
-    }
     static mut STOCK: Option<bool> = None;
-    unsafe { *STOCK.get_or_insert_with(functions_stock) }
+    if !unsafe { *STOCK.get_or_insert_with(functions_stock) } {
+        return false;
+    }
+    // render3d has re-pointed the action camera's call (the profile lets a chained call
+    // through; stock's own call to the body means no render3d there).
+    inset_body().is_some()
+}
+
+/// Where the action camera's call goes now, when it is not the engine's own body (render3d's
+/// draw); None while the hook is not ready or the call is stock's.
+fn inset_body() -> Option<usize> {
+    let (site, body) = (at(sym::CLOSEUP_SITE_INSET), at(sym::CLOSEUP_BODY));
+    if site == 0 || body == 0 {
+        return None;
+    }
+    patch::call_target(site).filter(|&t| t != body)
 }
 
 fn functions_stock() -> bool {
-    let ok = unsafe { rd::<usize>(ARMADA_CAMERA_VT + VT_SET_TRANSFORM) == SET_TRANSFORM }
-        && super::starts(CAMERA_CTOR, &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x10])
-        && super::starts(SET_VIEWPORT, &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x08])
-        && super::starts(SET_CURRENT_CAMERA, &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x14])
-        && super::starts(SET_NEAR, &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x89, 0x81, 0xa0, 0x01])
-        && super::starts(SET_FAR, &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x89, 0x81, 0xa4, 0x01]);
+    let ok = eng().ready(hook::HUD_CLOSEUP).is_ok();
     crate::log!("closeup: {}", if ok { "available" } else { "a function is not stock: the wireframe stays" });
     ok
 }
@@ -179,7 +180,7 @@ pub fn render() {
     if obj == 0 || r[2] < 8 || r[3] < 8 || !super::info::still_single(obj) {
         return;
     }
-    let Some(body) = hook::call_target(SITE_INSET).filter(|&t| t != BODY) else { return };
+    let Some(body) = inset_body() else { return };
     if crate::gfx::attach().is_none() {
         return;
     }
@@ -252,15 +253,20 @@ pub fn release() {
 fn make_camera() -> bool {
     static NAME: &[u8] = b"InfoCloseup\0";
     unsafe {
-        let new: unsafe extern "C" fn(usize) -> usize = core::mem::transmute(OPERATOR_NEW);
+        let (new_at, ctor_at, stuff) = (at(sym::CLOSEUP_OPERATOR_NEW), at(sym::CLOSEUP_CAMERA_CTOR), at(sym::CLOSEUP_INSET_RENDER_STUFF));
+        if new_at == 0 || ctor_at == 0 || stuff == 0 {
+            st().failed = true;
+            return false;
+        }
+        let new: unsafe extern "C" fn(usize) -> usize = core::mem::transmute(new_at);
         let p = new(CAMERA_SIZE);
         if p == 0 {
             st().failed = true;
             return false;
         }
-        let ctor: unsafe extern "thiscall" fn(usize, usize, usize, *const u8) -> usize = core::mem::transmute(CAMERA_CTOR);
+        let ctor: unsafe extern "thiscall" fn(usize, usize, usize, *const u8) -> usize = core::mem::transmute(ctor_at);
         let cam = ctor(p, 0, 0, NAME.as_ptr());
-        *((cam + CAM_RENDER_STUFF) as *mut usize) = INSET_RENDER_STUFF;
+        *((cam + CAM_RENDER_STUFF) as *mut usize) = stuff;
         st().cam = cam;
         crate::log!("closeup: camera made at {:#x}", cam);
     }
@@ -375,26 +381,36 @@ fn save_bytes(head: usize, off: usize, out: &mut alloc::vec::Vec<(usize, u8)>) {
 
 unsafe fn draw_view(cam: usize, body: usize, r: [i32; 4], m: &([f32; 12], f32, f32)) {
     let mut kept = alloc::vec::Vec::new();
-    save_bytes(unsafe { rd::<usize>(ENTITY_LIST) }, ENTITY_DRAWN, &mut kept);
-    save_bytes(field(unsafe { rd::<usize>(OBJECT_LIST) }, 4), OBJECT_CULLED, &mut kept);
+    let (entity_list, object_list, di_at) = (at(sym::CLOSEUP_ENTITY_LIST), at(sym::CLOSEUP_OBJECT_LIST), at(sym::CLOSEUP_DI_CURRENT_CAMERA));
+    let (cur_at, vp_at, near_at, far_at) = (
+        at(sym::CLOSEUP_SET_CURRENT_CAMERA),
+        at(sym::CLOSEUP_SET_VIEWPORT),
+        at(sym::CLOSEUP_SET_NEAR),
+        at(sym::CLOSEUP_SET_FAR),
+    );
+    if entity_list == 0 || object_list == 0 || di_at == 0 || cur_at == 0 || vp_at == 0 || near_at == 0 || far_at == 0 {
+        return;
+    }
+    save_bytes(unsafe { rd::<usize>(entity_list) }, ENTITY_DRAWN, &mut kept);
+    save_bytes(field(unsafe { rd::<usize>(object_list) }, 4), OBJECT_CULLED, &mut kept);
     unsafe {
-        let di_cam = rd::<usize>(DI_CURRENT_CAMERA);
+        let di_cam = rd::<usize>(di_at);
         let eng = storm3d();
-        let set_cur: unsafe extern "thiscall" fn(usize, usize) -> usize = core::mem::transmute(SET_CURRENT_CAMERA);
+        let set_cur: unsafe extern "thiscall" fn(usize, usize) -> usize = core::mem::transmute(cur_at);
         let old = set_cur(eng, cam);
         let vp = [r[0] as f32, r[1] as f32, r[2] as f32, r[3] as f32];
-        let set_vp: unsafe extern "thiscall" fn(usize, *const f32) = core::mem::transmute(SET_VIEWPORT);
+        let set_vp: unsafe extern "thiscall" fn(usize, *const f32) = core::mem::transmute(vp_at);
         set_vp(cam, vp.as_ptr());
-        let plane: unsafe extern "thiscall" fn(usize, f32) = core::mem::transmute(SET_NEAR);
+        let plane: unsafe extern "thiscall" fn(usize, f32) = core::mem::transmute(near_at);
         plane(cam, m.1);
-        let plane: unsafe extern "thiscall" fn(usize, f32) = core::mem::transmute(SET_FAR);
+        let plane: unsafe extern "thiscall" fn(usize, f32) = core::mem::transmute(far_at);
         plane(cam, m.2);
         let set_tf: unsafe extern "thiscall" fn(usize, *const f32) = core::mem::transmute(rd::<usize>(rd::<usize>(cam) + VT_SET_TRANSFORM));
         set_tf(cam, m.0.as_ptr());
         let f: unsafe extern "C" fn(usize, usize, u32) = core::mem::transmute(body);
         f(cam, rd::<usize>(cam + CAM_RENDER_STUFF), 0);
         set_cur(eng, old);
-        *(DI_CURRENT_CAMERA as *mut usize) = di_cam;
+        *(di_at as *mut usize) = di_cam;
         for (a, v) in kept {
             *(a as *mut u8) = v;
         }

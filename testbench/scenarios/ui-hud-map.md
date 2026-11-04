@@ -2,7 +2,7 @@
 
 Resolutions: 1280x720
 Mod: refit
-Setup: ui/bench-asi.sh --no-grid HUD.Minimap=1 HUD.Selection=1 HUD.UnitView=1
+Setup: ui/bench-asi.sh HUD.Minimap=1 HUD.Selection=1 HUD.UnitView=1
 Timeout: 12 min
 
 `ui/HUD.md`, "The minimap", "The selection overlay" and "The unit view". With

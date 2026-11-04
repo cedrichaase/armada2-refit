@@ -126,6 +126,14 @@ fn card(ui: &mut Ui, r: R, i: usize) {
         };
         theme::tab(ui, tr, n, st);
     }
+    // Status badges (the Refit screen's rows): plain, active, dimmed.
+    let br = s.row(ui.u(22.0));
+    let mut x = br.x;
+    for (word, st) in [("Now", State::default()), ("Restart needed", State::fixed(0.0, false, true, false)), ("Locked", State::fixed(0.0, false, false, true))] {
+        let w = theme::status_badge_w(ui, word);
+        theme::status_badge(ui, R::new(x, br.y, w, br.h), word, st);
+        x += w + ui.u(6.0);
+    }
     // A tooltip, at the card's bottom right.
     let tip = "Tooltip: hull 100%";
     let (w, h) = theme::tooltip_size(ui, tip, inner.w);

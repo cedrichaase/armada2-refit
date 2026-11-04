@@ -19,47 +19,21 @@
 //! `DeleteRegisteredLights` call: everything of the engine's has been drawn, and the
 //! scene is still open.
 use super::dev8::{self, Dev8};
-use super::{hook, rd, starts};
+use super::{hook as patch, rd};
+use crate::syms_loading::{hook, sym, TABLE};
 use crate::log;
 use crate::surface::Context;
 use alloc::string::String;
 use gpu::vcall;
 
-/// `RenderLoopAssetLoadStatusUpdate`'s call of `ST3D_GraphicsEngine::
-/// DeleteRegisteredLights()` (thiscall), between its `Flush` and its `EndScene`.
-const SITE_LIGHTS: usize = 0x598f53;
-const FN_DELETE_LIGHTS: usize = 0x62d2e0;
-/// The `EndScene` (device vtable `+0x34`) that follows the site.
-const SITE_END_SCENE: usize = 0x598fa0;
-/// `LoadBarComputeFraction()`: `1 - s_fractionRemaining`. Its code is checked; the
-/// fraction is read straight from the variable.
-const FN_LOAD_FRACTION: usize = 0x601ce0;
-/// `s_fractionRemaining` (float): 1 at `LoadBarStart`, falling towards 0.
-const FRACTION_REMAINING: usize = 0x7a8828;
-/// `Armada_AssetLoadStatusVisible` (bool): the loading screen is up, from the splash
-/// shown to the splash killed.
-const STATUS_VISIBLE: usize = 0x773be4;
-/// `LoadBarNext(eLoadBarType, const char* format, ...)`'s call of
-/// `RenderLoopAssetLoadStatusUpdate(const char*)` (cdecl, one argument, popped by the
-/// caller), with the step's text formatted.
-const SITE_STATUS: usize = 0x6019eb;
-const FN_STATUS_UPDATE: usize = 0x598ba0;
-/// `Program::GameDoOne`'s call of `RenderLoop_Show_Splash_Screen()` (cdecl): the one
-/// place a load's splash goes up.
-const SITE_SPLASH: usize = 0x4871ad;
-const FN_SHOW_SPLASH: usize = 0x598ff0;
-/// `HandleMessageQueue()`, cdecl: the engine's own pump, as its status update drains
-/// the queue (for `[Loading] Hold` only).
-const FN_HANDLE_MESSAGE_QUEUE: usize = 0x488730;
-/// Inside a loading step: `ST3D_GraphicsEngine::LoadDatabase(name, path, scale)`
-/// (thiscall, a SOD read and built), called by `FindLogicalDatabase` (twice) and
-/// `FindVisibleDatabase`; `ST3D_Texture::LoadPixelData(level)` (thiscall, a texture's
-/// pixels read), called once, by `DemandLoad`. A step that builds a ship's class loads
-/// its SODs and textures through them, and was the longest wait on the screen.
-const SITES_LOAD_DB: [usize; 3] = [0x62cf2a, 0x62cf44, 0x62cf79];
-const FN_LOAD_DB: usize = 0x62ccd0;
-const SITE_LOAD_PIXELS: usize = 0x6426e2;
-const FN_LOAD_PIXELS: usize = 0x6434b0;
+fn eng() -> &'static a2engine::Engine {
+    TABLE.engine()
+}
+
+/// An address of the engine, 0 unless the hook that uses it is ready.
+fn addr(s: a2engine::Sym) -> usize {
+    eng().addr(s)
+}
 
 /// Frames of ours are held to this many a second, so presenting them costs the load
 /// little: a present can wait for the display.
@@ -120,36 +94,38 @@ pub fn own() -> bool {
 }
 
 pub fn install(own: bool) -> bool {
-    let fraction_sig: [u8; 12] = [0xd9, 0x05, 0x18, 0xe2, 0x6a, 0x00, 0xd8, 0x25, 0x28, 0x88, 0x7a, 0x00];
-    if unsafe { core::slice::from_raw_parts(FN_LOAD_FRACTION as *const u8, 12) } != fraction_sig {
-        log!("loading: LoadBarComputeFraction is not stock; standing down");
+    if eng().ready(hook::LOADING_OVERLAY).is_err() {
         return false;
     }
-    if unsafe { core::slice::from_raw_parts(SITE_END_SCENE as *const u8, 3) } != [0xff, 0x50, 0x34] {
-        log!("loading: no EndScene after the hook site; standing down");
-        return false;
-    }
-    if !hook::patch_call(SITE_LIGHTS, FN_DELETE_LIGHTS, loading_frame as *const () as usize) {
-        log!("loading: the call at {:#x} is not stock; standing down", SITE_LIGHTS);
+    // `LoadBarComputeFraction` and the `EndScene` after the site are checked by `ready`.
+    log!(
+        "loading: hook at {:#x} (EndScene at {:#x}, fraction from {:#x})",
+        addr(sym::LOADING_LIGHTS_SITE),
+        addr(sym::LOADING_END_SCENE_SITE),
+        addr(sym::LOADING_LOAD_FRACTION)
+    );
+    if !patch::patch_call(addr(sym::LOADING_LIGHTS_SITE), addr(sym::LOADING_DELETE_LIGHTS), loading_frame as *const () as usize) {
+        log!("loading: the call at {:#x} is not stock; standing down", addr(sym::LOADING_LIGHTS_SITE));
         return false;
     }
     if own {
         // Both functions are only called on (and the screen of ours is only drawn
         // with a load's details) when both sites are stock.
-        let ok = starts(FN_STATUS_UPDATE, &[0x55, 0x8b, 0xec, 0x81, 0xec, 0x88, 0x00, 0x00, 0x00])
-            && starts(FN_SHOW_SPLASH, &[0x55, 0x8b, 0xec, 0x6a, 0xff])
-            && hook::call_target(SITE_STATUS) == Some(FN_STATUS_UPDATE)
-            && hook::call_target(SITE_SPLASH) == Some(FN_SHOW_SPLASH)
-            && hook::patch_call(SITE_SPLASH, FN_SHOW_SPLASH, splash_shown as *const () as usize)
-            && hook::patch_call(SITE_STATUS, FN_STATUS_UPDATE, status_update as *const () as usize);
+        let ok = eng().ready(hook::LOADING_OWN).is_ok()
+            && patch::patch_call(addr(sym::LOADING_SPLASH_SITE), addr(sym::LOADING_SHOW_SPLASH), splash_shown as *const () as usize)
+            && patch::patch_call(addr(sym::LOADING_STATUS_SITE), addr(sym::LOADING_STATUS_UPDATE), status_update as *const () as usize);
         st().own = ok;
         if ok {
-            // Frames inside a step: each site stands down on its own when not stock.
+            // Frames inside a step: each group stands down on its own when not stock.
             let mut inner = 0;
-            for site in SITES_LOAD_DB {
-                inner += hook::patch_call(site, FN_LOAD_DB, load_db as *const () as usize) as u32;
+            if eng().ready(hook::LOADING_INNER_DB).is_ok() {
+                for site in [sym::LOADING_LOAD_DB_SITE_LOGICAL_A, sym::LOADING_LOAD_DB_SITE_LOGICAL_B, sym::LOADING_LOAD_DB_SITE_VISIBLE] {
+                    inner += patch::patch_call(addr(site), addr(sym::LOADING_LOAD_DB), load_db as *const () as usize) as u32;
+                }
             }
-            inner += hook::patch_call(SITE_LOAD_PIXELS, FN_LOAD_PIXELS, load_pixels as *const () as usize) as u32;
+            if eng().ready(hook::LOADING_INNER_PIXELS).is_ok() {
+                inner += patch::patch_call(addr(sym::LOADING_LOAD_PIXELS_SITE), addr(sym::LOADING_LOAD_PIXELS), load_pixels as *const () as usize) as u32;
+            }
             log!("loading: frames inside a step after each SOD and texture loaded ({} of 4 sites)", inner);
         }
         log!(
@@ -163,7 +139,7 @@ pub fn install(own: bool) -> bool {
 /// In place of `DeleteRegisteredLights` in a loading-screen frame: the engine's call,
 /// then ours.
 extern "thiscall" fn loading_frame(storm3d: usize) {
-    unsafe { core::mem::transmute::<usize, extern "thiscall" fn(usize)>(FN_DELETE_LIGHTS)(storm3d) };
+    unsafe { core::mem::transmute::<usize, extern "thiscall" fn(usize)>(addr(sym::LOADING_DELETE_LIGHTS))(storm3d) };
     let s = st();
     s.frames += 1;
     s.engine_frames += 1;
@@ -208,7 +184,7 @@ fn gap_reset(s: &mut State) {
 /// In place of `RenderLoop_Show_Splash_Screen`: the engine's splash, then the screen of
 /// ours is told a load has begun.
 extern "C" fn splash_shown() {
-    unsafe { core::mem::transmute::<usize, extern "C" fn()>(FN_SHOW_SPLASH)() };
+    unsafe { core::mem::transmute::<usize, extern "C" fn()>(addr(sym::LOADING_SHOW_SPLASH))() };
     let s = st();
     s.engine_frames = 0;
     s.own_frames = 0;
@@ -252,7 +228,7 @@ extern "C" fn status_update(text: *const u8) {
         }
     }
     let before = s.engine_frames;
-    unsafe { core::mem::transmute::<usize, extern "C" fn(*const u8)>(FN_STATUS_UPDATE)(text) };
+    unsafe { core::mem::transmute::<usize, extern "C" fn(*const u8)>(addr(sym::LOADING_STATUS_UPDATE))(text) };
     let now = crate::rt::now();
     s.last_step = now;
     // Not before the engine's first frame of the load, which puts the 3D display up.
@@ -266,8 +242,11 @@ extern "C" fn status_update(text: *const u8) {
         s.held = true;
         log!("loading: holding at {:.0}% for {:.0} s ([Loading] Hold)", progress().unwrap_or(0.0) * 100.0, hold);
         let until = now + hold;
+        let pump = if eng().ready(hook::LOADING_READS_PUMP).is_ok() { addr(sym::LOADING_HANDLE_MESSAGE_QUEUE) } else { 0 };
         while crate::rt::now() < until {
-            unsafe { core::mem::transmute::<usize, extern "C" fn()>(FN_HANDLE_MESSAGE_QUEUE)() };
+            if pump != 0 {
+                unsafe { core::mem::transmute::<usize, extern "C" fn()>(pump)() };
+            }
             own_frame(crate::rt::now());
             unsafe { crate::rt::win::Sleep((1000.0 / OWN_FPS) as u32) };
         }
@@ -290,7 +269,7 @@ extern "C" fn status_update(text: *const u8) {
 
 /// In place of `LoadDatabase`: the engine's load, then a frame of ours if it is due.
 extern "thiscall" fn load_db(engine: usize, name: usize, path: usize, scale: f32) -> usize {
-    let r = unsafe { core::mem::transmute::<usize, extern "thiscall" fn(usize, usize, usize, f32) -> usize>(FN_LOAD_DB)(engine, name, path, scale) };
+    let r = unsafe { core::mem::transmute::<usize, extern "thiscall" fn(usize, usize, usize, f32) -> usize>(addr(sym::LOADING_LOAD_DB))(engine, name, path, scale) };
     st().gap_db += 1;
     inner_frame();
     r
@@ -298,7 +277,7 @@ extern "thiscall" fn load_db(engine: usize, name: usize, path: usize, scale: f32
 
 /// In place of `LoadPixelData`: the engine's load, then a frame of ours if it is due.
 extern "thiscall" fn load_pixels(texture: usize, level: i32) -> u32 {
-    let r = unsafe { core::mem::transmute::<usize, extern "thiscall" fn(usize, i32) -> u32>(FN_LOAD_PIXELS)(texture, level) };
+    let r = unsafe { core::mem::transmute::<usize, extern "thiscall" fn(usize, i32) -> u32>(addr(sym::LOADING_LOAD_PIXELS))(texture, level) };
     st().gap_px += 1;
     inner_frame();
     r
@@ -369,11 +348,14 @@ fn own_frame(now: f64) {
 
 /// How far the current load has got, 0..1; None when no load is running.
 pub fn progress() -> Option<f32> {
+    if eng().ready(hook::LOADING_READS_PROGRESS).is_err() {
+        return None;
+    }
     unsafe {
-        if !rd::<bool>(STATUS_VISIBLE) {
+        if !rd::<bool>(addr(sym::LOADING_STATUS_VISIBLE)) {
             return None;
         }
-        Some((1.0 - rd::<f32>(FRACTION_REMAINING)).clamp(0.0, 1.0))
+        Some((1.0 - rd::<f32>(addr(sym::LOADING_FRACTION_REMAINING))).clamp(0.0, 1.0))
     }
 }
 

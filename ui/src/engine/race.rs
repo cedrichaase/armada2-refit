@@ -7,25 +7,33 @@
 //! is drawn in. A race's name (`Race+0x14`, from its `name` key: `federation`, `borg`,
 //! ...) also names its emblem sprite (`<name>_icon`).
 use super::rd;
+use crate::syms_panels::{field, hook, sym, TABLE};
 use crate::widgets::Race;
 
-const MISSION_RACE: usize = 0x737cc0;
-const RACE_NAME: usize = 0x14;
+
+/// `Race::s_missionRace`, or 0 while its hook is not ready.
+fn mission_race_ptr() -> usize {
+    let e = TABLE.engine();
+    if e.ready(hook::PANELS_READS_RACE).is_err() {
+        return 0;
+    }
+    unsafe { rd::<usize>(e.addr(sym::PANELS_MISSION_RACE)) }
+}
 
 /// The mission's race's name, empty outside a mission.
 pub fn mission_race_name() -> &'static str {
-    let r = unsafe { rd::<usize>(MISSION_RACE) };
+    let r = mission_race_ptr();
     if r == 0 {
         return "";
     }
-    unsafe { super::hud::cstr_static((r + RACE_NAME) as *const u8) }
+    unsafe { super::hud::cstr_static((r + field::PANELS_RACE_NAME) as *const u8) }
 }
 
 static mut LAST: usize = 0;
 
 /// The mission's race, as a theme knows it; logged once per change.
 pub fn mission_race() -> Option<Race> {
-    let r = unsafe { rd::<usize>(MISSION_RACE) };
+    let r = mission_race_ptr();
     if r == 0 {
         return None;
     }

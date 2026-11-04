@@ -35,6 +35,10 @@ static mut MINIMAP: bool = false;
 static mut SELECTION: bool = false;
 static mut UNIT_VIEW: bool = false;
 static mut TOOLTIPS: bool = false;
+/// What the start found possible, for the panels `apply_live` switches while playing:
+/// the minimap's click hook is in, the info panel's engine functions are stock.
+static mut MINIMAP_CAP: bool = false;
+static mut INFO_CAP: bool = false;
 
 /// Whether the selection overlay is ours (`[HUD] Selection=1`, its functions stock).
 pub fn selection_ours() -> bool {
@@ -42,70 +46,91 @@ pub fn selection_ours() -> bool {
 }
 
 /// Patches what the panels switched on in UI.ini need; each stands down on its own.
+/// Why the HUD stood down at the start, for `UI_SettingsNote`: 0 it runs, 1 `Enable=0`,
+/// 2 no panel on, 3 an engine function not stock, 4 the hook could not be installed.
+pub static mut STOOD_DOWN: u8 = 0;
+
 pub fn install() -> bool {
     let cfg = &crate::config::get().hud;
     if !cfg.enable {
         crate::log!("hud: Enable=0, the HUD is stock");
+        unsafe { STOOD_DOWN = 1 };
         return false;
     }
     if !cfg.bar && !cfg.info && !cfg.minimap && !cfg.selection && !cfg.unit_view && !cfg.tooltips && !panels::any(cfg) && !comm::any(cfg) {
         crate::log!("hud: no panel switched on, the HUD is stock");
+        unsafe { STOOD_DOWN = 2 };
         return false;
     }
     if !hud::functions_stock() || !engine::sound::functions_stock() || !engine::msvc::available() {
         crate::log!("hud: an engine function is not stock, the HUD stays stock");
+        unsafe { STOOD_DOWN = 3 };
         return false;
     }
     if !hud::install() {
+        unsafe { STOOD_DOWN = 4 };
         return false;
     }
     map_panels(cfg);
     if cfg.bar {
-        let grid = unsafe { crate::rt::win::GetModuleHandleA(c"GridLayout.asi".as_ptr() as *const u8) };
-        if !grid.is_null() {
-            crate::log!("bar: GridLayout.asi is loaded and owns the bar: ours stands down");
-        } else if bar::install() {
-            hud::set_taken(hud::PALETTE_PTR, true, true);
+        if bar::install() {
+            hud::set_taken(hud::palette_ptr(), true, true);
             unsafe { BAR = true };
-            crate::log!("bar: ours, keys {}", if cfg.bar_keys { "QWERT/ASDFG/ZXCVB by position" } else { "stock" });
+            crate::log!("bar: ours, its keys are QOL's");
         } else {
             crate::log!("bar: stays stock");
         }
     }
-    if cfg.info {
-        if engine::info::functions_stock() {
-            hud::set_taken(hud::SHIP_DISPLAY, false, true);
-            unsafe { INFO = true };
-            crate::log!("info: ours");
-        } else {
-            crate::log!("info: an engine function is not stock, the info panel stays stock");
-        }
-    }
+    unsafe { INFO_CAP = engine::info::functions_stock() };
     panels::install(cfg);
     comm::install(cfg);
-    if cfg.tooltips {
-        hud::take_tooltips(true);
-        unsafe { TOOLTIPS = true };
-        crate::log!("tooltips: ours");
-    }
+    apply_live(cfg);
     true
 }
+
+/// Switches the panels that can change while playing (the minimap, the info panel, the
+/// tooltips) to what `cfg` says, and the bar's key mode; logs each change. At the start
+/// it is the install; `UI_SettingsChanged` calls it again.
+#[allow(static_mut_refs)]
+pub fn apply_live(cfg: &crate::config::Hud) {
+    unsafe {
+        let want = cfg.minimap && MINIMAP_CAP;
+        if want != MINIMAP {
+            hud::set_taken(engine::radar::map_radar(), false, want);
+            MINIMAP = want;
+            crate::log!("minimap: {}", if want { "ours" } else { "stock" });
+        } else if cfg.minimap && !MINIMAP_CAP && !MINIMAP_LOGGED {
+            crate::log!("minimap: stays stock");
+        }
+        MINIMAP_LOGGED = true;
+        let want = cfg.info && INFO_CAP;
+        if want != INFO {
+            hud::set_taken(hud::ship_display(), false, want);
+            INFO = want;
+            crate::log!("info: {}", if want { "ours" } else { "stock" });
+        } else if cfg.info && !INFO_CAP && !INFO_LOGGED {
+            crate::log!("info: an engine function is not stock, the info panel stays stock");
+        }
+        INFO_LOGGED = true;
+        if cfg.tooltips != TOOLTIPS {
+            hud::take_tooltips(cfg.tooltips);
+            TOOLTIPS = cfg.tooltips;
+            crate::log!("tooltips: {}", if cfg.tooltips { "ours" } else { "stock" });
+        }
+    }
+}
+static mut MINIMAP_LOGGED: bool = false;
+static mut INFO_LOGGED: bool = false;
 
 /// The minimap, the selection overlay and the unit view's frame (minimap.rs,
 /// overlay.rs, unitview.rs).
 fn map_panels(cfg: &crate::config::Hud) {
-    if cfg.minimap {
-        if engine::radar::functions_stock() && minimap::install() {
-            hud::set_taken(engine::radar::MAP_RADAR, false, true);
-            unsafe { MINIMAP = true };
-            crate::log!("minimap: ours");
-        } else {
-            crate::log!("minimap: stays stock");
-        }
-    }
+    // The minimap is switched in `apply_live`; its click hook goes in whether or not the
+    // key is on at the start, so the key can be turned on while playing.
+    unsafe { MINIMAP_CAP = engine::radar::functions_stock() && minimap::install() };
     if cfg.selection {
         if engine::overlay::functions_stock() && engine::radar::functions_stock() {
-            hud::set_taken(engine::overlay::SELECTION_DISPLAY, false, true);
+            hud::set_taken(engine::overlay::selection_display(), false, true);
             unsafe { SELECTION = true };
             crate::log!("selection: ours, gauges {}", if cfg.selection_gauges { "on the selection" } else { "as stock" });
             if !cfg.selection_bubbles {
@@ -138,7 +163,7 @@ fn map_panels(cfg: &crate::config::Hud) {
 /// The minimap's map square, when the minimap is ours and shows: a move ordered there
 /// is the radar's (`cursor::draw` shows the warp or move cursor over it).
 pub fn minimap_square(ui: &Ui) -> Option<crate::gfx::R> {
-    if unsafe { !MINIMAP } || engine::ingame::hud_hidden() || hud::hidden(engine::radar::MAP_RADAR) {
+    if unsafe { !MINIMAP } || engine::ingame::hud_hidden() || hud::hidden(engine::radar::map_radar()) {
         return None;
     }
     Some(minimap::place(ui).2)
@@ -147,13 +172,13 @@ pub fn minimap_square(ui: &Ui) -> Option<crate::gfx::R> {
 /// The minimap's rectangle in pixels while it shows: ours, else the stock radar's (on
 /// the stock canvas, stretched without HUD.asi).
 pub fn minimap_rect(ui: &Ui) -> Option<[f32; 4]> {
-    if hud::hidden(hud::MAP_RADAR) {
+    if hud::hidden(hud::map_radar()) {
         None
     } else if unsafe { MINIMAP } {
         let (o, _, _) = minimap::place(ui);
         Some([o.x, o.y, o.right(), o.bottom()])
     } else {
-        hud::panel_rect(hud::MAP_RADAR, ui.w, ui.h)
+        hud::panel_rect(hud::map_radar(), ui.w, ui.h)
     }
 }
 

@@ -1,18 +1,18 @@
-//! The interface's objects, on the backend the plugins draw on: Direct3D 9 (`d3d9`,
-//! the device behind the game's d3d8 one, or Display8's own in stub mode), Vulkan
-//! (`vulkan`, Display8's device in stub mode with `Backend=vulkan`) or Direct3D 12
-//! (`dx12`, with `Backend=d3d12`). Which one is chosen at run time, once, by what
-//! Display8 says (`display8v1_backend`), after the contract's handshake
-//! (`display8_abi`, gpu/src/display.rs, "Versions"): with no Display8, one too old or of
-//! another major (each logged apart), or one that says Direct3D 9, it is Direct3D 9 as
-//! before. Each object is an enum of the backends' own,
-//! and every call goes to the one it was made on.
-use crate::d3d9::raw::Device as Dev;
-use crate::display::{Display8, Display8Dx12, Refused, ABI_MAJOR, ABI_MINOR, BACKEND_D3D12, BACKEND_D3D9, BACKEND_VULKAN};
+//! The interface's objects, on the backend the plugins draw on: Vulkan (`vulkan`,
+//! Display8's device with `Backend=vulkan`) or Direct3D 12 (`dx12`, with
+//! `Backend=d3d12`). Which one is chosen at run time, once, by what Display8 says
+//! (`display8v1_backend`), after the contract's handshake (`display8_abi`,
+//! gpu/src/display.rs, "Versions"): with no Display8, one too old or of another major
+//! (each logged apart), or one whose device cannot be opened, the interface is **stood
+//! down**: `backend()` is `Backend::None`, every object made is an inert one of the
+//! Vulkan backend's (never ready), nothing is drawn, and the plugin leaves the engine's
+//! draws as they are. Each object is an enum of the backends' own, and every call goes
+//! to the one it was made on.
+use crate::display::{Display8, Display8Dx12, Refused, ABI_MAJOR, ABI_MINOR, BACKEND_D3D12, BACKEND_VULKAN};
 use crate::frame::{Frame, Span};
 use crate::pixels::Mapped;
 use crate::types::*;
-use crate::{d3d9, dx12, vulkan};
+use crate::{dx12, vulkan};
 use crate::record::wire::*;
 use crate::record::Recorder;
 use core::cell::Cell;
@@ -21,14 +21,16 @@ use core::ffi::c_void;
 pub type Log = fn(core::fmt::Arguments);
 
 const UNDECIDED: u8 = 0;
-const D3D9: u8 = 1;
+/// Stood down: no backend to draw on, for good.
+const NONE: u8 = 1;
 const VULKAN: u8 = 2;
 const D3D12: u8 = 3;
 
 /// Which backend the objects are made on.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Backend {
-    D3d9,
+    /// Stood down (or not yet decided): nothing is drawn.
+    None,
     Vulkan,
     D3d12,
 }
@@ -43,7 +45,6 @@ pub struct Attached {
 
 pub struct Gpu {
     log: Log,
-    d9: d3d9::Gpu,
     vk: vulkan::Gpu,
     dx: dx12::Gpu,
     lookup: Option<fn(&str) -> usize>,
@@ -54,7 +55,7 @@ pub struct Gpu {
     early: Cell<bool>,
     /// Display8's exports, looked up once.
     disp: Cell<Option<Display8>>,
-    /// `Display8::load` refused (logged once): Direct3D 9 for good.
+    /// `Display8::load` refused (logged once): stood down for good.
     no_display: Cell<bool>,
     /// This plugin's id with Display8 (`display8v1_register`), 0 while not registered.
     reg_id: Cell<u32>,
@@ -65,9 +66,9 @@ pub struct Gpu {
 }
 
 impl Gpu {
-    /// Direct3D 9 only (no Display8 is asked).
+    /// Stood down from the start (no Display8 is asked).
     pub const fn new(log: Log) -> Gpu {
-        Gpu { log, d9: d3d9::Gpu::new(log), vk: vulkan::Gpu::new(log), dx: dx12::Gpu::new(log), lookup: None, mode: Cell::new(D3D9), seen: Cell::new(0), early: Cell::new(false), disp: Cell::new(None), no_display: Cell::new(false), reg_id: Cell::new(0), epoch_fn: Cell::new(0), rec: Recorder::new(log) }
+        Gpu { log, vk: vulkan::Gpu::new(log), dx: dx12::Gpu::new(log), lookup: None, mode: Cell::new(NONE), seen: Cell::new(0), early: Cell::new(false), disp: Cell::new(None), no_display: Cell::new(false), reg_id: Cell::new(0), epoch_fn: Cell::new(0), rec: Recorder::new(log) }
     }
 
     /// On the backend Display8 says, through `lookup` (the plugin's `GetProcAddress` on
@@ -76,10 +77,11 @@ impl Gpu {
         Self::on_display_of(log, lookup, false)
     }
 
-    /// As `with_display`, publishing the pass now to Display8 at each `Cmd`'s end on
-    /// Vulkan, so that the engine's draws Display8 passes through land in it
-    /// (gpu/src/display.rs, "Passthrough"): render3d's, whose scene pass the draws it
-    /// hands back to the engine belong in.
+    /// As `with_display`, publishing the pass now to Display8 at each `Cmd`'s end, on
+    /// Vulkan (`display8v1_vk_pass`) and on Direct3D 12 (`display8v1_dx12_pass`,
+    /// contract 1.4), so that the engine's draws Display8 passes through land in it
+    /// (gpu/src/display.rs, "Passthrough", "Pass publishing on Direct3D 12"): render3d's,
+    /// whose scene pass the draws it hands back to the engine belong in.
     pub const fn with_display_publishing(log: Log, lookup: fn(&str) -> usize) -> Gpu {
         Self::on_display_of(log, lookup, true)
     }
@@ -87,9 +89,8 @@ impl Gpu {
     const fn on_display_of(log: Log, lookup: fn(&str) -> usize, publish: bool) -> Gpu {
         Gpu {
             log,
-            d9: d3d9::Gpu::new(log),
             vk: if publish { vulkan::Gpu::publishing(log) } else { vulkan::Gpu::new(log) },
-            dx: dx12::Gpu::new(log),
+            dx: if publish { dx12::Gpu::publishing(log) } else { dx12::Gpu::new(log) },
             lookup: Some(lookup),
             mode: Cell::new(UNDECIDED),
             seen: Cell::new(0),
@@ -127,15 +128,13 @@ impl Gpu {
             return m;
         }
         let Some(lookup) = self.lookup else {
-            self.mode.set(D3D9);
-            return D3D9;
+            self.mode.set(NONE);
+            return NONE;
         };
         let Some(d) = self.display(lookup) else {
-            // Direct3D 9 for good: the d3d9 path as with no Display8, which on
-            // Display8's own Vulkan or Direct3D 12 draws nothing (the engine's draws
-            // pass through there).
-            self.mode.set(D3D9);
-            return D3D9;
+            // Stood down for good: nothing is drawn (the engine's draws pass through).
+            self.mode.set(NONE);
+            return NONE;
         };
         match (d.backend)() {
             BACKEND_VULKAN => {
@@ -144,15 +143,15 @@ impl Gpu {
                     VULKAN
                 } else {
                     (self.log)(format_args!("gpu: Display8 is on Vulkan and this plugin could not open it: nothing is drawn"));
-                    self.mode.set(D3D9);
-                    D3D9
+                    self.mode.set(NONE);
+                    NONE
                 }
             }
             BACKEND_D3D12 => {
                 let Some(x) = Display8Dx12::load(lookup) else {
                     (self.log)(format_args!("gpu: Display8 is on Direct3D 12 but has no Direct3D 12 exports: nothing is drawn"));
-                    self.mode.set(D3D9);
-                    return D3D9;
+                    self.mode.set(NONE);
+                    return NONE;
                 };
                 match self.dx.init(d, x) {
                     Some(true) => {
@@ -161,19 +160,15 @@ impl Gpu {
                     }
                     Some(false) => {
                         (self.log)(format_args!("gpu: Display8 is on Direct3D 12 and this plugin could not open it: nothing is drawn"));
-                        self.mode.set(D3D9);
-                        D3D9
+                        self.mode.set(NONE);
+                        NONE
                     }
                     // Its device is not made yet: asked again next time.
                     None => UNDECIDED,
                 }
             }
-            BACKEND_D3D9 => {
-                self.mode.set(D3D9);
-                D3D9
-            }
-            // Not decided yet (before the engine's Direct3DCreate8): Direct3D 9's answer
-            // for now, asked again next time.
+            // Not decided yet (before the engine's first CreateDevice): asked again next
+            // time.
             _ => UNDECIDED,
         }
     }
@@ -227,6 +222,16 @@ impl Gpu {
         true
     }
 
+    /// The display mode the game runs at, as Display8 says it (`display8v1_mode`, contract
+    /// 1.3): None without a Display8 of that contract, or before the engine has opened
+    /// its display. The caller falls back to measuring the desktop.
+    pub fn display_mode(&self) -> Option<(u32, u32)> {
+        let lookup = self.lookup?;
+        let f = self.display(lookup)?.mode?;
+        let (mut w, mut h) = (0u32, 0u32);
+        if f(&mut w, &mut h) && w > 0 && h > 0 { Some((w, h)) } else { None }
+    }
+
     /// What the other plugins registered with Display8 claim now (`CLAIM_*`). None when
     /// this plugin is not registered (no Display8 of contract 1.1): the caller does what
     /// it did before claims.
@@ -244,39 +249,41 @@ impl Gpu {
     fn refused(&self, why: Refused) {
         let me = crate::VERSION;
         match why {
-            Refused::NoDisplay8 => (self.log)(format_args!("gpu {} (contract {}.{}): no Display8 (the game's d3d8.dll is another chain's): Direct3D 9", me, ABI_MAJOR, ABI_MINOR)),
+            Refused::NoDisplay8 => (self.log)(format_args!("gpu {} (contract {}.{}): no Display8 (the game's d3d8.dll is another chain's): this plugin stands down and draws nothing", me, ABI_MAJOR, ABI_MINOR)),
             Refused::TooOld(v) => (self.log)(format_args!(
-                "gpu {} (contract {}.{}): Display8 {} is too old for this plugin (no contract handshake, display8_abi; it needs Display8 0.12.0 or later): this plugin stands down to Direct3D 9 only, and on Display8's own Vulkan or Direct3D 12 draws nothing. Install d3d8.dll, Render3D.asi and UI.asi from one release",
+                "gpu {} (contract {}.{}): Display8 {} is too old for this plugin (no contract handshake, display8_abi; it needs Display8 0.12.0 or later): this plugin stands down and draws nothing. Install d3d8.dll, Render3D.asi and UI.asi from one release",
                 me, ABI_MAJOR, ABI_MINOR, v.unwrap_or("(no version)")
             )),
             Refused::Major(ma, mi, v) => (self.log)(format_args!(
-                "gpu {} (contract {}.{}): Display8 {} has contract {}.{}, another major: this plugin stands down to Direct3D 9 only, and on Display8's own Vulkan or Direct3D 12 draws nothing. Install d3d8.dll, Render3D.asi and UI.asi from one release",
+                "gpu {} (contract {}.{}): Display8 {} has contract {}.{}, another major: this plugin stands down and draws nothing. Install d3d8.dll, Render3D.asi and UI.asi from one release",
                 me, ABI_MAJOR, ABI_MINOR, v.unwrap_or("?"), ma, mi
             )),
-            Refused::Missing(n) => (self.log)(format_args!("gpu {} (contract {}.{}): Display8 shakes hands at contract {}.x but has no {}: a broken build; this plugin stands down to Direct3D 9 only", me, ABI_MAJOR, ABI_MINOR, ABI_MAJOR, n)),
+            Refused::Missing(n) => (self.log)(format_args!("gpu {} (contract {}.{}): Display8 shakes hands at contract {}.x but has no {}: a broken build; this plugin stands down and draws nothing", me, ABI_MAJOR, ABI_MINOR, ABI_MAJOR, n)),
         }
     }
 
-    /// The engine has a device: Display8 has said by now if it ever will (forward mode
-    /// never does), so an undecided backend is Direct3D 9 from here on.
+    /// The engine has a device: Display8 has said by now if it ever will, so an
+    /// undecided backend is stood down from here on.
     fn settle(&self) -> u8 {
         let m = self.mode();
         if m == UNDECIDED {
-            self.mode.set(D3D9);
-            return D3D9;
+            self.mode.set(NONE);
+            (self.log)(format_args!("gpu {}: Display8 names no backend (it stood down to the system's Direct3D 8, or its device is not made): this plugin stands down and draws nothing", crate::VERSION));
+            return NONE;
         }
         m
     }
 
-    /// The backend to make an object on: Direct3D 9 while Display8 has not said (an
-    /// object made then draws only if it says Direct3D 9; logged once).
+    /// The backend to make an object on: Vulkan's while Display8 has not said (an
+    /// object is lazy, made on the device at its first use, so it draws if Display8
+    /// says Vulkan and is inert otherwise; logged once).
     fn make_on(&self) -> u8 {
         match self.mode() {
             UNDECIDED => {
                 if !self.early.replace(true) {
-                    (self.log)(format_args!("gpu: an object is made before Display8 has said which backend draws: made for Direct3D 9"));
+                    (self.log)(format_args!("gpu: an object is made before Display8 has said which backend draws: made as Vulkan's, inert unless Display8 says Vulkan"));
                 }
-                D3D9
+                VULKAN
             }
             m => m,
         }
@@ -286,7 +293,7 @@ impl Gpu {
         match self.mode() {
             VULKAN => Backend::Vulkan,
             D3D12 => Backend::D3d12,
-            _ => Backend::D3d9,
+            _ => Backend::None,
         }
     }
 
@@ -294,8 +301,8 @@ impl Gpu {
         self.mode() == VULKAN
     }
 
-    /// Whether the plugins draw on Display8's own device (Vulkan or Direct3D 12), not a
-    /// Direct3D 9 one: the engine's targets, viewport and transforms are Display8's.
+    /// Whether the plugins draw on Display8's own device (Vulkan or Direct3D 12): the
+    /// engine's targets, viewport and transforms are Display8's. False: stood down.
     pub fn on_display(&self) -> bool {
         matches!(self.mode(), VULKAN | D3D12)
     }
@@ -305,7 +312,7 @@ impl Gpu {
         match self.mode() {
             VULKAN => "Vulkan",
             D3D12 => "Direct3D 12",
-            _ => "d3d9",
+            _ => "none",
         }
     }
 
@@ -325,45 +332,32 @@ impl Gpu {
         self.rec.present(&self.vk)
     }
 
-    /// The Direct3D 9 backend (the plugins' engine glue that is Direct3D 9's alone).
-    pub fn d3d9(&self) -> &d3d9::Gpu {
-        &self.d9
-    }
-
-    /// Half a pixel where the backend puts pixel centres on whole coordinates
-    /// (Direct3D 9, and Vulkan or Direct3D 12 in the comparison mode), 0 where they are
-    /// at the half (a caller that maps pixels to clip space adds it, as the UI's `VP`
+    /// Half a pixel where the backend puts pixel centres on whole coordinates (Vulkan
+    /// or Direct3D 12 in the comparison mode, `PixelCentres=d3d9`), 0 where they are at
+    /// the half (a caller that maps pixels to clip space adds it, as the UI's `VP`
     /// does).
     pub fn half_pixel(&self) -> f32 {
         match self.mode() {
             VULKAN if !self.vk.d3d9_centres() => 0.0,
             D3D12 if !self.dx.d3d9_centres() => 0.0,
-            _ => 0.5,
+            VULKAN | D3D12 => 0.5,
+            _ => 0.0,
         }
     }
 
     // -- the engine's device --
 
-    /// The engine's device, every frame: Direct3D 9's behind `dev8` (attached, as
-    /// `attach_d3d8`), or Display8's Vulkan or Direct3D 12 device. None: nothing to draw
-    /// on.
-    pub fn attach_engine(&self, dev8: *mut c_void) -> Option<Attached> {
-        if dev8.is_null() && !self.on_display() {
-            return None;
-        }
-        if let Some(id) = self.display_id() {
-            let id = id?;
-            let new = self.seen.get() != id;
-            self.seen.set(id);
-            return Some(Attached { id, new });
-        }
-        let d = Dev::from_d3d8(dev8)?;
-        let new = self.d9.attach(d);
-        Some(Attached { id: d.p() as usize, new })
+    /// The engine's device, every frame: Display8's Vulkan or Direct3D 12 device. None:
+    /// nothing to draw on (stood down, or the device is not ready).
+    pub fn attach_engine(&self) -> Option<Attached> {
+        let id = self.display_id()??;
+        let new = self.seen.get() != id;
+        self.seen.set(id);
+        Some(Attached { id, new })
     }
 
     /// Some on Display8's device (its identity, None while it cannot be drawn on); None
-    /// on Direct3D 9.
+    /// when stood down.
     fn display_id(&self) -> Option<Option<usize>> {
         match self.settle() {
             VULKAN => Some(self.vk.ready().then_some(self as *const Gpu as usize)),
@@ -374,40 +368,8 @@ impl Gpu {
 
     /// The engine's device's identity, without attaching it: what `attach_engine`'s
     /// `id` will be (to let go of what was made for another first).
-    pub fn engine_id(&self, dev8: *mut c_void) -> Option<usize> {
-        if dev8.is_null() && !self.on_display() {
-            return None;
-        }
-        if let Some(id) = self.display_id() {
-            return id;
-        }
-        Dev::from_d3d8(dev8).map(|d| d.p() as usize)
-    }
-
-    /// Direct3D 9: the device to draw on (`d3d9::Gpu::attach`).
-    pub fn attach(&self, dev: Dev) -> bool {
-        !self.on_display() && self.d9.attach(dev)
-    }
-
-    pub fn attach_d3d8(&self, dev8: *mut c_void) -> Option<Dev> {
-        if self.on_display() {
-            return None;
-        }
-        self.d9.attach_d3d8(dev8)
-    }
-
-    /// Before the device's `Reset` (Direct3D 9; Display8's devices are never lost).
-    pub fn before_reset(&self) {
-        if !self.on_display() {
-            self.d9.before_reset();
-        }
-    }
-
-    /// Before the engine releases its device (Direct3D 9; nothing on Display8's).
-    pub fn release_device(&self) {
-        if !self.on_display() {
-            self.d9.release_device();
-        }
+    pub fn engine_id(&self) -> Option<usize> {
+        self.display_id()?
     }
 
     // -- resources --
@@ -415,9 +377,8 @@ impl Gpu {
     pub fn texture(&self, desc: TextureDesc, contents: Contents) -> Texture {
         let blob = self.rec().map(|r| r.blob(contents.bytes()));
         let t = match self.make_on() {
-            VULKAN => Texture::Vk(self.vk.texture(desc, contents)),
             D3D12 => Texture::Dx(self.dx.texture(desc, contents)),
-            _ => Texture::D9(self.d9.texture(desc, contents)),
+            _ => Texture::Vk(self.vk.texture(desc, contents)),
         };
         if let (Some(r), Some(b)) = (self.rec(), blob) {
             r.texture_new(&t, &desc, b);
@@ -425,16 +386,8 @@ impl Gpu {
         t
     }
 
-    pub fn wrap_d3d9_texture(&self, tex: d3d9::raw::Com) -> Texture {
-        Texture::D9(self.d9.wrap_d3d9_texture(tex))
-    }
-
-    pub fn wrap_d3d9_surface(&self, surf: d3d9::raw::Com) -> Texture {
-        Texture::D9(self.d9.wrap_d3d9_surface(surf))
-    }
-
-    /// An engine texture (an `IDirect3DTexture8` the engine made) to sample: d3d8to9's
-    /// (or Display8's) Direct3D 9 texture behind it, or Display8's mirror of it.
+    /// An engine texture (an `IDirect3DTexture8` the engine made) to sample: Display8's
+    /// mirror of it.
     pub fn engine_texture(&self, tex8: *mut c_void) -> Option<Texture> {
         if tex8.is_null() {
             return None;
@@ -454,52 +407,44 @@ impl Gpu {
         match self.mode() {
             VULKAN => self.vk.engine_texture(tex8).map(Texture::Vk),
             D3D12 => self.dx.engine_texture(tex8).map(Texture::Dx),
-            _ => {
-                let t9 = d3d9::raw::query(tex8, &d3d9::raw::IID_TEXTURE9)?;
-                Some(self.wrap_d3d9_texture(t9))
-            }
+            _ => None,
         }
     }
 
     pub fn engine_target(&self) -> Option<Texture> {
         match self.mode() {
-            VULKAN => self.vk.engine_target().map(Texture::Vk),
             D3D12 => self.dx.engine_target().map(Texture::Dx),
-            _ => self.d9.engine_target().map(Texture::D9),
+            _ => self.vk.engine_target().map(Texture::Vk),
         }
     }
 
     pub fn engine_depth(&self) -> Option<Texture> {
         match self.mode() {
-            VULKAN => self.vk.engine_depth().map(Texture::Vk),
             D3D12 => self.dx.engine_depth().map(Texture::Dx),
-            _ => self.d9.engine_depth().map(Texture::D9),
+            _ => self.vk.engine_depth().map(Texture::Vk),
         }
     }
 
     /// The viewport the engine has set.
     pub fn engine_viewport(&self) -> Option<Viewport> {
         match self.mode() {
-            VULKAN => vulkan::engine_viewport(&self.vk),
             D3D12 => dx12::engine_viewport(&self.dx),
-            _ => self.d9.engine_viewport(),
+            _ => vulkan::engine_viewport(&self.vk),
         }
     }
 
     /// A transform the engine has set (`D3DTRANSFORMSTATETYPE`), as Direct3D sets it.
     pub fn engine_transform(&self, state: u32) -> Option<[[f32; 4]; 4]> {
         match self.mode() {
-            VULKAN => vulkan::engine_transform(&self.vk, state),
             D3D12 => dx12::engine_transform(&self.dx, state),
-            _ => Some(self.d9.device()?.get_transform(state)),
+            _ => vulkan::engine_transform(&self.vk, state),
         }
     }
 
     pub fn buffer(&self, desc: BufferDesc, data: &[u8]) -> Buffer {
         let b = match self.make_on() {
-            VULKAN => Buffer::Vk(self.vk.buffer(desc, data)),
             D3D12 => Buffer::Dx(self.dx.buffer(desc, data)),
-            _ => Buffer::D9(self.d9.buffer(desc, data)),
+            _ => Buffer::Vk(self.vk.buffer(desc, data)),
         };
         if let Some(r) = self.rec() {
             r.buffer_new(&b, &desc, data);
@@ -509,9 +454,8 @@ impl Gpu {
 
     pub fn buffer_transient(&self, desc: BufferDesc, data: &[u8]) -> Buffer {
         let b = match self.make_on() {
-            VULKAN => Buffer::Vk(self.vk.buffer_transient(desc, data)),
             D3D12 => Buffer::Dx(self.dx.buffer_transient(desc, data)),
-            _ => Buffer::D9(self.d9.buffer_transient(desc, data)),
+            _ => Buffer::Vk(self.vk.buffer_transient(desc, data)),
         };
         if let Some(r) = self.rec() {
             r.buffer_new(&b, &desc, data);
@@ -520,8 +464,8 @@ impl Gpu {
     }
 
     /// Whether compute and storage are there (`Cmd::dispatch`, `Gpu::storage`, storage
-    /// images): on Vulkan and Direct3D 12; never on Direct3D 9, where every storage
-    /// object is an empty one and every dispatch does nothing.
+    /// images): on Vulkan and Direct3D 12; stood down, every storage object is an empty one
+    /// and every dispatch does nothing.
     pub fn compute(&self) -> bool {
         match self.mode() {
             VULKAN => self.vk.compute(),
@@ -530,7 +474,7 @@ impl Gpu {
         }
     }
 
-    /// A storage buffer (`StorageDesc`); an empty one on Direct3D 9.
+    /// A storage buffer (`StorageDesc`); an empty one when stood down.
     pub fn storage(&self, desc: StorageDesc) -> Storage {
         let s = match self.make_on() {
             VULKAN => Storage::Vk(self.vk.storage(desc)),
@@ -543,7 +487,7 @@ impl Gpu {
         s
     }
 
-    /// A compute pipeline; an empty one on Direct3D 9 (never ready).
+    /// A compute pipeline; an empty one when stood down (never ready).
     pub fn compute_pipeline(&self, desc: ComputeDesc) -> ComputePipeline {
         match self.make_on() {
             VULKAN => ComputePipeline::Vk(self.vk.compute_pipeline(desc)),
@@ -554,17 +498,15 @@ impl Gpu {
 
     pub fn timer(&self, n: usize) -> Timer {
         match self.make_on() {
-            VULKAN => Timer::Vk(self.vk.timer(n)),
             D3D12 => Timer::Dx(self.dx.timer(n)),
-            _ => Timer::D9(self.d9.timer(n)),
+            _ => Timer::Vk(self.vk.timer(n)),
         }
     }
 
     pub fn pipeline(&self, desc: PipelineDesc) -> Pipeline {
         match self.make_on() {
-            VULKAN => Pipeline::Vk(self.vk.pipeline(desc)),
             D3D12 => Pipeline::Dx(self.dx.pipeline(desc)),
-            _ => Pipeline::D9(self.d9.pipeline(desc)),
+            _ => Pipeline::Vk(self.vk.pipeline(desc)),
         }
     }
 
@@ -573,9 +515,8 @@ impl Gpu {
     pub fn begin<'a>(&'a self, frame: &'a mut Frame) -> Option<Cmd<'a>> {
         let fp = frame as *const Frame;
         let inner = match self.mode() {
-            VULKAN => CmdInner::Vk(self.vk.begin(frame)?),
             D3D12 => CmdInner::Dx(self.dx.begin(frame)?),
-            _ => CmdInner::D9(self.d9.begin(frame)?),
+            _ => CmdInner::Vk(self.vk.begin(frame)?),
         };
         let rid = self.rec.begin(&self.vk, self.mode() == VULKAN, self as *const Gpu as usize, fp);
         Some(Cmd { gpu: self, inner, rid })
@@ -587,15 +528,13 @@ impl Gpu {
 
     pub fn read_back_layer<R>(&self, tex: &Texture, layer: u32, f: impl FnOnce(&Mapped) -> R) -> Result<R, &'static str> {
         match tex {
-            Texture::D9(t) => self.d9.read_back_layer(t, layer, f),
             Texture::Vk(t) => self.vk.read_back_layer(t, layer, f),
             Texture::Dx(t) => self.dx.read_back_layer(t, layer, f),
         }
     }
 
-    /// The frame presented last at `w` x `h`, as `Bgra8` on Direct3D 9; on Display8's
-    /// devices the engine's back buffer as it is now (before the gamma ramp), as `Bgrx8`.
-    pub fn read_front_buffer<R>(&self, w: u32, h: u32, f: impl FnOnce(&Mapped) -> R) -> Result<R, i32> {
+    /// The engine's back buffer as it is now (before the gamma ramp), as `Bgrx8`.
+    pub fn read_front_buffer<R>(&self, _w: u32, _h: u32, f: impl FnOnce(&Mapped) -> R) -> Result<R, i32> {
         match self.mode() {
             VULKAN => {
                 let t = self.vk.engine_target().ok_or(-1)?;
@@ -605,7 +544,7 @@ impl Gpu {
                 let t = self.dx.engine_target().ok_or(-1)?;
                 self.dx.read_back_layer(&t, 0, f).map_err(|_| -1)
             }
-            _ => self.d9.read_front_buffer(w, h, f),
+            _ => Err(-1),
         }
     }
 }
@@ -616,7 +555,6 @@ impl Gpu {
 /// is dropped.
 #[derive(Clone)]
 pub enum Texture {
-    D9(d3d9::Texture),
     Vk(vulkan::Texture),
     Dx(dx12::Texture),
 }
@@ -624,7 +562,6 @@ pub enum Texture {
 macro_rules! each {
     ($s:expr, $t:ident => $e:expr) => {
         match $s {
-            Texture::D9($t) => $e,
             Texture::Vk($t) => $e,
             Texture::Dx($t) => $e,
         }
@@ -643,7 +580,6 @@ impl Texture {
     /// Makes it on the device now: false if the device cannot.
     pub fn ready(&self, gpu: &Gpu) -> bool {
         match self {
-            Texture::D9(t) => t.ready(&gpu.d9),
             Texture::Vk(t) => t.ready(&gpu.vk),
             Texture::Dx(t) => t.ready(&gpu.dx),
         }
@@ -658,17 +594,9 @@ impl Texture {
 
     pub fn same(&self, o: &Texture) -> bool {
         match (self, o) {
-            (Texture::D9(a), Texture::D9(b)) => a.same(b),
             (Texture::Vk(a), Texture::Vk(b)) => a.same(b),
             (Texture::Dx(a), Texture::Dx(b)) => a.same(b),
             _ => false,
-        }
-    }
-
-    pub(crate) fn d9(&self) -> Option<&d3d9::Texture> {
-        match self {
-            Texture::D9(t) => Some(t),
-            _ => None,
         }
     }
 
@@ -689,7 +617,6 @@ impl Texture {
 
 #[derive(Clone)]
 pub enum Buffer {
-    D9(d3d9::Buffer),
     Vk(vulkan::Buffer),
     Dx(dx12::Buffer),
 }
@@ -697,7 +624,6 @@ pub enum Buffer {
 impl Buffer {
     pub fn desc(&self) -> BufferDesc {
         match self {
-            Buffer::D9(b) => b.desc(),
             Buffer::Vk(b) => b.desc(),
             Buffer::Dx(b) => b.desc(),
         }
@@ -706,7 +632,6 @@ impl Buffer {
 
 #[derive(Clone)]
 pub enum Pipeline {
-    D9(d3d9::Pipeline),
     Vk(vulkan::Pipeline),
     Dx(dx12::Pipeline),
 }
@@ -714,7 +639,6 @@ pub enum Pipeline {
 impl Pipeline {
     pub fn desc(&self) -> &PipelineDesc {
         match self {
-            Pipeline::D9(p) => p.desc(),
             Pipeline::Vk(p) => p.desc(),
             Pipeline::Dx(p) => p.desc(),
         }
@@ -722,14 +646,13 @@ impl Pipeline {
 
     pub fn ready(&self, gpu: &Gpu) -> bool {
         match self {
-            Pipeline::D9(p) => p.ready(&gpu.d9),
             Pipeline::Vk(p) => p.ready(&gpu.vk),
             Pipeline::Dx(p) => p.ready(&gpu.dx),
         }
     }
 }
 
-/// A storage buffer (`Gpu::storage`). Clones share it. `None` on Direct3D 9.
+/// A storage buffer (`Gpu::storage`). Clones share it. `None` when stood down.
 #[derive(Clone)]
 pub enum Storage {
     None,
@@ -761,7 +684,7 @@ impl Storage {
     }
 }
 
-/// A compute pipeline (`Gpu::compute_pipeline`). `None` on Direct3D 9.
+/// A compute pipeline (`Gpu::compute_pipeline`). `None` when stood down.
 #[derive(Clone)]
 pub enum ComputePipeline {
     None,
@@ -770,7 +693,7 @@ pub enum ComputePipeline {
 }
 
 impl ComputePipeline {
-    /// Made on the device now: false if it cannot be (or on Direct3D 9).
+    /// Made on the device now: false if it cannot be (or when stood down).
     pub fn ready(&self, gpu: &Gpu) -> bool {
         match self {
             ComputePipeline::None => false,
@@ -782,7 +705,6 @@ impl ComputePipeline {
 
 #[derive(Clone)]
 pub enum Timer {
-    D9(d3d9::Timer),
     Vk(vulkan::Timer),
     Dx(dx12::Timer),
 }
@@ -790,7 +712,6 @@ pub enum Timer {
 impl Timer {
     pub fn begin(&self, gpu: &Gpu) -> bool {
         match self {
-            Timer::D9(t) => t.begin(&gpu.d9),
             Timer::Vk(t) => t.begin(&gpu.vk),
             Timer::Dx(t) => t.begin(&gpu.dx),
         }
@@ -798,7 +719,6 @@ impl Timer {
 
     pub fn stamp(&self, gpu: &Gpu, i: usize) {
         match self {
-            Timer::D9(t) => t.stamp(&gpu.d9, i),
             Timer::Vk(t) => t.stamp(&gpu.vk, i),
             Timer::Dx(t) => t.stamp(&gpu.dx, i),
         }
@@ -806,7 +726,6 @@ impl Timer {
 
     pub fn end(&self, gpu: &Gpu) {
         match self {
-            Timer::D9(t) => t.end(&gpu.d9),
             Timer::Vk(t) => t.end(&gpu.vk),
             Timer::Dx(t) => t.end(&gpu.dx),
         }
@@ -814,7 +733,6 @@ impl Timer {
 
     pub fn read(&self, gpu: &Gpu, out: &mut [u64]) -> Option<TimerResult> {
         match self {
-            Timer::D9(t) => t.read(&gpu.d9, out),
             Timer::Vk(t) => t.read(&gpu.vk, out),
             Timer::Dx(t) => t.read(&gpu.dx, out),
         }
@@ -824,12 +742,11 @@ impl Timer {
 // ---- recording ------------------------------------------------------------------------
 
 enum CmdInner<'a> {
-    D9(d3d9::Cmd<'a>),
     Vk(vulkan::Cmd<'a>),
     Dx(dx12::Cmd<'a>),
 }
 
-/// Commands recorded into a frame (`Gpu::begin`): applied at once on Direct3D 9, into
+/// Commands recorded into a frame (`Gpu::begin`): recorded into
 /// Display8's command buffer or list on Vulkan or Direct3D 12. Either way the engine
 /// finds its state as it left it when the `Cmd` is dropped.
 pub struct Cmd<'a> {
@@ -879,7 +796,6 @@ macro_rules! rec {
 macro_rules! all {
     ($s:expr, $c:ident => $e:expr) => {
         match &mut $s.inner {
-            CmdInner::D9($c) => $e,
             CmdInner::Vk($c) => $e,
             CmdInner::Dx($c) => $e,
         }
@@ -949,7 +865,6 @@ impl<'a> Cmd<'a> {
             });
         }
         match (&mut self.inner, p) {
-            (CmdInner::D9(c), Pipeline::D9(p)) => c.set_pipeline(p),
             (CmdInner::Vk(c), Pipeline::Vk(p)) => c.set_pipeline(p),
             (CmdInner::Dx(c), Pipeline::Dx(p)) => c.set_pipeline(p),
             _ => false,
@@ -971,7 +886,6 @@ impl<'a> Cmd<'a> {
             })
         });
         match &mut self.inner {
-            CmdInner::D9(c) => c.bind_texture(slot, t.and_then(|t| t.d9()), s),
             CmdInner::Vk(c) => c.bind_texture(slot, t.and_then(|t| t.vk()), s),
             CmdInner::Dx(c) => c.bind_texture(slot, t.and_then(|t| t.dx()), s),
         }
@@ -1004,7 +918,7 @@ impl<'a> Cmd<'a> {
         }
     }
 
-    // -- storage and compute (nothing on Direct3D 9) --
+    // -- storage and compute (nothing when stood down) --
 
     /// A read-only storage buffer at `slot` (`STORAGE(n)`: t16 + n), for draws and
     /// dispatches.
@@ -1016,7 +930,6 @@ impl<'a> Cmd<'a> {
             })
         });
         match &mut self.inner {
-            CmdInner::D9(_) => {}
             CmdInner::Vk(c) => c.bind_storage(slot, s.and_then(|s| s.vk())),
             CmdInner::Dx(c) => c.bind_storage(slot, s.and_then(|s| s.dx())),
         }
@@ -1031,7 +944,6 @@ impl<'a> Cmd<'a> {
             })
         });
         match &mut self.inner {
-            CmdInner::D9(_) => {}
             CmdInner::Vk(c) => c.bind_storage_rw(slot, s.and_then(|s| s.vk())),
             CmdInner::Dx(c) => c.bind_storage_rw(slot, s.and_then(|s| s.dx())),
         }
@@ -1047,7 +959,6 @@ impl<'a> Cmd<'a> {
             })
         });
         match &mut self.inner {
-            CmdInner::D9(_) => {}
             CmdInner::Vk(c) => c.bind_storage_image(slot, t.and_then(|t| t.vk())),
             CmdInner::Dx(c) => c.bind_storage_image(slot, t.and_then(|t| t.dx())),
         }
@@ -1059,7 +970,6 @@ impl<'a> Cmd<'a> {
             w.u32(c).u32(b.base).floats(b.data);
         }));
         match &mut self.inner {
-            CmdInner::D9(_) => {}
             CmdInner::Vk(c) => c.cs_block(b),
             CmdInner::Dx(c) => c.cs_block(b),
         }
@@ -1107,7 +1017,6 @@ impl<'a> Cmd<'a> {
             w.u32(c);
         }));
         match &mut self.inner {
-            CmdInner::D9(_) => {}
             CmdInner::Vk(c) => c.barrier(),
             CmdInner::Dx(c) => c.barrier(),
         }
@@ -1158,7 +1067,6 @@ impl<'a> Cmd<'a> {
             })
         });
         match (&mut self.inner, b) {
-            (CmdInner::D9(c), Buffer::D9(b)) => c.draw_buffer(b, stride, first, count),
             (CmdInner::Vk(c), Buffer::Vk(b)) => c.draw_buffer(b, stride, first, count),
             (CmdInner::Dx(c), Buffer::Dx(b)) => c.draw_buffer(b, stride, first, count),
             _ => {}
@@ -1169,7 +1077,6 @@ impl<'a> Cmd<'a> {
         let mut id = 0;
         rec!(self, |r, vk, c| id = r.buf(vk, b));
         let got = match (&mut self.inner, b) {
-            (CmdInner::D9(c), Buffer::D9(b)) => c.span_of(b, stride),
             (CmdInner::Vk(c), Buffer::Vk(b)) => c.span_of(b, stride),
             (CmdInner::Dx(c), Buffer::Dx(b)) => c.span_of(b, stride),
             _ => None,
@@ -1186,7 +1093,6 @@ impl<'a> Cmd<'a> {
             })
         });
         match (&mut self.inner, t) {
-            (CmdInner::D9(c), Texture::D9(t)) => c.generate_mips(t),
             (CmdInner::Vk(c), Texture::Vk(t)) => c.generate_mips(t),
             (CmdInner::Dx(c), Texture::Dx(t)) => c.generate_mips(t),
             _ => {}
@@ -1201,7 +1107,6 @@ impl<'a> Cmd<'a> {
             })
         });
         match (&mut self.inner, src, dst) {
-            (CmdInner::D9(c), Texture::D9(s), Texture::D9(d)) => c.resolve_depth(s, d),
             (CmdInner::Vk(c), Texture::Vk(s), Texture::Vk(d)) => c.resolve_depth(s, d),
             (CmdInner::Dx(c), Texture::Dx(s), Texture::Dx(d)) => c.resolve_depth(s, d),
             _ => false,
@@ -1216,7 +1121,6 @@ impl<'a> Cmd<'a> {
             })
         });
         match (&mut self.inner, src, dst) {
-            (CmdInner::D9(c), Texture::D9(s), Texture::D9(d)) => c.resolve(s, d, rc),
             (CmdInner::Vk(c), Texture::Vk(s), Texture::Vk(d)) => c.resolve(s, d, rc),
             (CmdInner::Dx(c), Texture::Dx(s), Texture::Dx(d)) => c.resolve(s, d, rc),
             _ => {}
@@ -1231,7 +1135,6 @@ impl<'a> Cmd<'a> {
             })
         });
         match (&mut self.inner, src, dst) {
-            (CmdInner::D9(c), Texture::D9(s), Texture::D9(d)) => c.copy(s, sr, d, dr, f),
             (CmdInner::Vk(c), Texture::Vk(s), Texture::Vk(d)) => c.copy(s, sr, d, dr, f),
             (CmdInner::Dx(c), Texture::Dx(s), Texture::Dx(d)) => c.copy(s, sr, d, dr, f),
             _ => false,

@@ -1,0 +1,12 @@
+schema = 1
+plugin = "toy"
+
+[[sym]]
+id = "update_fn"
+addr = 0x401110
+
+[[sym]]
+id = "new_fn"
+symbol = "Toy::Added"
+kind = "fn"
+used_by = ["speed"]

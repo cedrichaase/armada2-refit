@@ -1,0 +1,85 @@
+# The QOL.asi settings the Refit screen lists (A2SET_ABI 1.0; tools/settings/README.md).
+# Edit here, then run tools/settings/gen.py: it writes settings_table.h.
+plugin = "QOL"
+file = "QOL.ini"
+shipped = "qol/QOL.ini"
+
+[[row]]
+name = "panspeed"
+section = "QOL"
+key = "PanSpeed"
+kind = "enum"
+default = "2.5"
+values = ["1", "1.5", "2", "2.5", "3", "4"]
+labels = ["Stock", "1.5x", "2x", "2.5x", "3x", "4x"]
+apply = "live"
+scope = "local"
+tab = "gameplay"
+label = "Right-drag pan speed"
+help = "How fast the camera pans while you drag with the right button, as a multiple of stock. Other players are not affected."
+
+[[row]]
+name = "shiftaddstogroup"
+section = "QOL"
+key = "ShiftAddsToGroup"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "gameplay"
+label = "Shift+number adds to group"
+help = "Shift+number adds the selection to that control group; Alt+number selects it and centres the camera, as Shift did in stock."
+
+[[row]]
+name = "stationgroups"
+section = "QOL"
+key = "StationGroups"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "gameplay"
+label = "Stations in control groups"
+help = "Stations of one kind can be selected together and kept in one control group, with one build menu for all of them."
+
+[[row]]
+name = "warpdistance"
+section = "QOL"
+key = "WarpDistance"
+kind = "enum"
+default = "1100"
+values = ["0", "600", "1100", "1700", "3000"]
+labels = ["Off", "600", "1100", "1700", "3000"]
+apply = "live"
+scope = "local"
+tab = "gameplay"
+label = "Warp on long moves"
+help = "A move on the map goes to warp when the ships that can warp are farther than this from the point you click. Off leaves moves as in stock."
+
+[[row]]
+name = "maxselection"
+section = "QOL"
+key = "MaxSelection"
+kind = "enum"
+default = "40"
+values = ["16", "40", "80", "120"]
+labels = ["Stock (16)", "40", "80", "120"]
+apply = "restart"
+scope = "local"
+tab = "gameplay"
+label = "Largest selection"
+help = "How many objects a selection and a control group can hold. Takes effect when the game is started."
+flags = ["advanced"]
+
+[[row]]
+name = "barkeys"
+section = "QOL"
+key = "BarKeys"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "interface"
+label = "Grid keys"
+help = "The command bar's keys are the grid's, by position: Q W E R T / A S D F G / Z X C V B. Off keeps the game's own keys. Needs the Refit command bar."
+moved_from = "UI.HUD.BarKeys"

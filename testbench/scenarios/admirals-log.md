@@ -7,7 +7,7 @@ Launch: -nointro a2_borg01
 Regression test for menus 2.0.1. The log's tab panes are embedded as its children, so
 they close with it. Its owner-drawn buttons (tabs, Save, Done) are scaled with the
 screen instead of drawing 1:1 in the top-left corner. The game is launched straight into
-the `a2_borg01` map (a bare argument is a mission name; see `menus/run-wine.sh`), which
+the `a2_borg01` map (a bare argument is a mission name; see `platform/run-wine.sh`), which
 skips the menus and the campaign cinematic.
 
 1. Launch the game.

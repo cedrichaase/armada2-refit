@@ -11,8 +11,9 @@ Armada II plays every movie through RAD's Bink 1, via ten functions in
 2. **Full-screen launch reels.** `Program::PlayIntroMovie` switches to a
    hard-coded **640x480** display mode for the four launch reels (Activision,
    Paramount, Mad Doc, Intro), and `NextBinkFrame` copies each frame **1:1 into
-   the locked back buffer at (0,0)**. The replacement raises that mode to the
-   desktop size at load, and scales every reel to fit, centred, bars black. That
+   the locked back buffer at (0,0)**. Display8 raises that mode to the
+   desktop size (since cutscenes 3.0.0; "The intro's mode is Display8's" below), and
+   the proxy scales every reel to fit, centred, bars black. That
    applies to the three logo reels too: they stay real Bink, decoded into a
    scratch buffer and scaled from there.
 
@@ -89,9 +90,22 @@ size as the 640x480, 15 fps stock `.bik`**, plus an 11.9 MB WAV.
 decoded frames match the original MD5 for MD5.
 
 `BinkProxy.ini` switches each part off separately (`ReplaceMovies`, `UseUI`,
-`RaiseIntroMode`, `FitIntro`) and can pin the intro mode (`IntroWidth` and
-`IntroHeight`). `BinkProxy.log` records every open and close, with decode
+`FitIntro`). `BinkProxy.log` records every open and close, with decode
 timing and a count of late frames.
+
+**The intro's mode is Display8's** (cutscenes 3.0.0): Display8 raises `PlayIntroMovie`'s
+hard-coded 640x480 inside its own mode lookups (`[Window] RaiseIntro`,
+`display/README.md`, "Window and display mode"), and this proxy only fits each frame to
+the size it finds. The proxy's own `RaiseIntroMode`, `IntroWidth` and `IntroHeight` keys
+and the byte patch behind them are gone. Without Display8 as `d3d8.dll` (no
+`display8_abi` export) the intro's mode stays stock, and the log says
+`intro: stock mode (no Display8)` once.
+
+`ReplaceMovies` is not a Refit settings row (the Movies tab was removed in 3.0.1, since no
+replacement movies are shipped) and the plugin exports no settings table. It is still read
+through the overlay and again at each `BinkOpen`, so `[BinkProxy.BinkProxy] ReplaceMovies=0`
+in `RefitPlayer.ini` gives the next movie opened as its stock `.bik`; one already playing
+finishes as it began. Every other key is read once at load, through the overlay.
 
 ## Why AV1 and a separate WAV: measured, not chosen
 
@@ -135,17 +149,28 @@ for anything 720 lines or taller.
 - **Back buffer size:** `NextBinkFrame` (`0x4637f0`) reads the back buffer's
   `D3DSURFACE_DESC` at `[ebp-0x28]` and calls `BinkCopyToBuffer` from
   `0x4638af`. The DLL reads Width (`-0x10`) and Height (`-0x0c`) from that
-  frame only when its return address is exactly `0x4638b5` and the values are
-  sane. That's why `build.sh` keeps frame pointers.
+  frame only when its return address is exactly the profile's `intro_copy_ret`
+  and the values are sane. That's why `build.sh` keeps frame pointers.
 - **Pixel formats:** A8R8G8B8, X8R8G8B8, R5G6B5 and X1R5G5B5 map to Bink
   surface types 5, 3, 10 and 9. All four are handled.
 - **Sound system:** `AudioManager::Open` passes the address of
   `BinkOpenDirectSound`, read out of the import table rather than called, into
   `BinkSetSoundSystem`. That address is the replacement's own, so it is
   swapped for the real one on the way through.
-- **Mode patch sites:** `push 32/480/640` and the 16-bit fallback, both in
-  `PlayIntroMovie`. Each signature occurs once in the file. The bare 640/480
-  push pair also occurs a third time elsewhere, and is left alone.
+
+## Hooks
+
+What the proxy reads of `Armada2.exe` is in `profiles/<build>/binkproxy.toml`
+(`profiles/gog-1.1/` for GOG's 1.1), generated into `engine_syms.h` by
+`tools/engine/gen.py` (`crates/a2engine/README.md`). It logs the identity, the build
+and the symbol summary after its version line.
+
+| Hook | Entries | Used by | Without it |
+|---|---|---|---|
+| `binkproxy.intro_copy` | the return address of the `BinkCopyToBuffer` call in `NextBinkFrame` (a `label`, its first 8 bytes checked) and the three distances of the `D3DSURFACE_DESC` fields below the frame's EBP (`field`) | `intro_backbuffer` | the intro is copied 1:1 at its own size, not fitted |
+
+BinkProxy exports no settings table or note since 3.0.1: `ReplaceMovies` is read from
+`BinkProxy.ini` and the overlay (`[BinkProxy.BinkProxy]`) at each movie open.
 
 ## Testing without the game
 
@@ -172,8 +197,12 @@ both of these hold. On another, `BinkProxy.log` says which failed:
   and last row) and logged as `back buffer not writable; frame skipped`. If
   that line appears, the reels play black, and the fix belongs in whatever
   plugin changed the back buffer, not here.
-- **The raised mode has to be found.** `FindDisplayMode` has to list the
-  desktop size. Menus.asi depends on the same thing for the shell.
+- **The raised mode has to be found.** `FindDisplayMode`
+  (`ST3D_DisplayDevice`, `0x626bf0`) looks a mode up by exact width, height and depth in
+  the modes the adapter lists, so a raised request finds nothing unless the desktop's
+  size is listed. Display8 lists the desktop's mode alone and re-points the six calls
+  that ask for a mode of their own at its lookup (`display/README.md`, "The engine's
+  hard-coded modes"); the shell's 800x600x16 depends on the same thing.
 
 ## Not yet tried
 

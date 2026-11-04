@@ -92,6 +92,26 @@ window did.
 The probe touches nothing outside its own window and file: it installs nothing, writes
 no setting, and leaves the bottle as it was.
 
+### Sikarugir, in the gates kit
+
+`tools/gates/gate-macos.sh "<wrapper>.app" "<game dir>"` does the above unattended: it
+finds the wrapper's Wine and prefix, runs `vkprobe.exe` and expects its VERDICT, plays
+the game on `Backend=auto` (Vulkan on MoltenVK) and zips the reports and logs
+(`tools/gates/GATES.txt`, "Gate M"). CI attaches the script and `vkprobe.exe` to the
+`native-gates-<commit>` artifact.
+
+### CI spike: macos-15 (phase 10 X3)
+
+CI job `mac-probe` is a timeboxed, non-blocking spike: does a GitHub macOS arm64 runner
+have a Metal device at all (`system_profiler SPDisplaysDataType`, `MTLCopyAllDevices`)?
+If it has none the job says so in its summary and ends green (the GitHub-hosted arm64
+runners are virtual machines; their images document no GPU). If it has one, the job
+installs a Wine and MoltenVK from Homebrew and runs `vkprobe.exe` under new-style
+WoW64 on it. **Result: not yet known** — the job was written without a Mac or a
+runner to try it on; the first CI run's summary decides. If the answer is "no Metal
+device" (or the Wine route cannot be made to work within two hours of effort), delete
+the job and record the reason here; Gate M stays the user's.
+
 ## Building
 
     display/vkprobe/build.sh      # -> display/vkprobe/build/vkprobe.exe
@@ -100,8 +120,7 @@ Like Display8 (`display/build.sh`): rustup's `i686-pc-windows-msvc` target, `lld
 no C runtime (`crates/a2rt/src/mem.rs` and `win.rs` are shared, not copied), kernel32
 and user32 through import libraries `build.rs` makes with `llvm-dlltool`, and a
 version resource. The shaders are `shaders/probe.hlsl`, compiled by
-`tools/shaderc/hlsl-rs.sh` (dxc to SPIR-V, validated by `spirv-val`; vkd3d's Direct3D 9
-bytecode is made too, and unused) into `src/shaders/`, committed with their stamps.
+`tools/shaderc/hlsl-rs.sh` (dxc to SPIR-V, validated by `spirv-val`, and to DXIL) into `src/shaders/`, committed with their stamps.
 
 ## Running it here
 

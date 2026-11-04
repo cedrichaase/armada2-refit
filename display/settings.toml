@@ -1,0 +1,94 @@
+# The Display8 settings the Refit screen lists (A2SET_ABI 1.1; tools/settings/README.md).
+# Edit here, then run tools/settings/gen.py: it writes src/settings_table.rs.
+# Display8 has no row on the screen yet (the renderer is an open decision): every row is
+# NO_ROW, so the table is the keys' declaration, the defaults the code reads through,
+# and the `moved_from` of the two keys that came from UI.ini.
+plugin = "Display8"
+file = "Display8.ini"
+shipped = "display/Display8.ini"
+
+[[row]]
+name = "window_native"
+section = "Window"
+key = "Native"
+kind = "bool"
+default = "1"
+apply = "restart"
+scope = "local"
+tab = "none"
+label = "Desktop resolution"
+help = "While the game's display mode is still a stock one it runs at the desktop's instead."
+flags = ["no_row"]
+moved_from = "UI.UI.Native"
+
+[[row]]
+name = "window_keepclip"
+section = "Window"
+key = "KeepClip"
+kind = "bool"
+default = "1"
+apply = "restart"
+scope = "local"
+tab = "none"
+label = "Keep the pointer clip"
+help = "Under Wine, put the pointer clip back while the pointer moves in the game."
+flags = ["no_row"]
+moved_from = "UI.UI.KeepClip"
+
+[[row]]
+name = "window_raiseintro"
+section = "Window"
+key = "RaiseIntro"
+kind = "bool"
+default = "1"
+apply = "restart"
+scope = "local"
+tab = "none"
+label = "Intro at the desktop's resolution"
+help = "The launch reels and the intro run at the desktop's mode instead of 640x480."
+flags = ["no_row"]
+
+[[row]]
+name = "samplers_anisotropy"
+section = "Samplers"
+key = "Anisotropy"
+kind = "enum"
+default = "16"
+values = ["16", "1", "2", "4", "8", "auto"]
+labels = ["16x", "1x", "2x", "4x", "8x", "Default (16x)"]
+apply = "restart"
+scope = "local"
+tab = "none"
+label = "Anisotropic filtering"
+help = "Anisotropy of the plugins' samplers on Vulkan and Direct3D 12. auto: the default, 16."
+flags = ["no_row", "advanced"]
+
+[[row]]
+name = "samplers_lodbias"
+section = "Samplers"
+key = "LodBias"
+kind = "enum"
+default = "-0.5"
+values = ["-0.5", "0", "-0.25", "-0.75", "-1", "auto"]
+labels = ["-0.5", "0", "-0.25", "-0.75", "-1", "Default (-0.5)"]
+apply = "restart"
+scope = "local"
+tab = "none"
+label = "Mip LOD bias"
+help = "Mip level bias of the plugins' samplers. auto: the default, -0.5. A negative value counts only when the clamp is off."
+flags = ["no_row", "advanced"]
+
+[[row]]
+name = "samplers_clamp"
+section = "Samplers"
+key = "ClampNegativeLodBias"
+kind = "enum"
+default = "0"
+values = ["0", "1", "auto"]
+labels = ["Off", "On", "Default (off)"]
+apply = "restart"
+scope = "local"
+tab = "none"
+label = "Clamp negative LOD bias"
+help = "1 holds a negative LOD bias at 0. auto: the default, off."
+flags = ["no_row", "advanced"]

@@ -57,12 +57,16 @@ def a2mod_path():
 
 
 def fingerprint(game=None, a2mod=None):
-    """The key: the install's tree by lstat, and the a2mod that makes the entry."""
+    """The key: the install's tree by lstat, and the a2mod that makes the entry, with the
+    layer registry it reads (what a2mod sets aside is the registry's)."""
     game = Path(game or config.GAME)
     a2mod = Path(a2mod or a2mod_path())
     h = hashlib.sha256()
     h.update(f'a2test stock cache v{KEY_VERSION}\n'.encode())
     h.update(hashlib.sha256(a2mod.read_bytes()).hexdigest().encode() + b'\n')
+    for f in (a2mod.parent / 'layers.toml', a2mod.parent / 'tools' / 'layers.py'):
+        if f.is_file():
+            h.update(hashlib.sha256(f.read_bytes()).hexdigest().encode() + b'\n')
     n = 0
     for dirpath, dirs, files in os.walk(game):
         dirs.sort()

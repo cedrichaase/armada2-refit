@@ -4,6 +4,48 @@
 8 with a transport of our own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 and versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.11.1 — 2026-11-03
+
+### Changed
+- The `Entry` row moves from the Multiplayer tab to Interface (`tab = "interface"`), beside the other menu rows; key and section unchanged. Installed, not yet seen in game.
+
+## 0.11.0 — 2026-11-03
+
+### Changed
+- The rules handshake finds QOLRules through `a2_find_export` (`QOLRules_Wanted`, `_Network`, `_Reset`) instead of `GetModuleHandleA("QOLRules.asi")`: by what the plugin exports, not by its file name. The protocol (`R_RULES`) is unchanged. Installed, not yet seen in game.
+
+## 0.10.1 — 2026-11-03
+
+### Changed
+- `online/settings_table.h` is regenerated at A2SET_ABI 1.1 (48-byte rows). Nothing else changes. Installed, not yet seen in game.
+
+## 0.10.0 — 2026-11-03
+
+### Added
+- Online is on the symbol profile (`profiles/gog-1.1/online.toml`, hook `online.entry`; phase 8d): the menu entry's nine addresses, data addresses and six signatures are checked whole before any is written, and stand down with a reason.
+- `Online_SettingsNote` export (the engine's note for the `Entry` row and the plugin).
+
+### Changed
+- No address literal is left in `online.c`; the stubs jump through `a2s_online_*`. `peer.c` is untouched.
+
+Installed, not yet seen in game
+
+## 0.9.1 — 2026-11-03
+
+### Added
+- Online.log logs the identity line after the log-location line (`csdk/a2engine.h`). Changes no behaviour.
+
+Installed, not yet seen in game
+
+## 0.9.0 — 2026-11-02
+
+### Added
+- `Online.asi` reads `Online.ini` through the player's overlay `RefitPlayer.ini`
+  (`[Online.Online]`). `Entry` is a settings row (`settings.toml`, the `Online_Settings`
+  export, RESTART, tab Multiplayer).
+
+Confirmed in game 2026-11-03.
+
 ## 0.8.0 — 2026-10-30
 
 ### Changed

@@ -39,7 +39,7 @@ checkout and worktree builds from and into the same one, and nothing in it is ev
 committed: it holds the game's own art and what is made from it.
 
 Paths in this document are from the repository root unless they are plainly inside a
-target. The HUD, font and cursor scripts are in `hud/`; the loading-screen geometry is
+target. The HUD, font and cursor scripts were in `hud/` (retired in 15.0.0: `UI.asi` draws the HUD, `retire/README.md`); the loading-screen geometry is
 in `models/`.
 
 Four layers per target, all in its work directory, and the order matters:
@@ -100,8 +100,8 @@ needs editing — `target.conf` already carries the right flags for every nebula
 | `mips` | number of hand-authored mip levels the stock texture has, or `auto` to take the depth per texture from stock. The build emits the whole chain, each level exactly half the previous, spelled as stock spells it (`mip_name()`). **Required** for any texture with a chain — `install` refuses the base otherwise |
 | `alphafilter` | the resize filter for the alpha plate (default `Lanczos`). `Mitchell` where Lanczos ringing on a sparse mask drifts the alpha mean — `fedpod10` is the case (`FedSmall`, `BorgPlain`, `XenoLit64`) |
 | `fit` | `match` (default) matches each channel to its stock file; `none` resizes only, for tiles that are a third of a wider picture rather than their namesake (`LOADING`) |
-| `panel` | the width, in model units, of the widened loading-screen model this art is cut for; `a2tex install` writes `SOD/logo.SOD` to match (`LOADING` only) |
-| `upscaler` | which paid upscaler `models/loading-panel.sh` uses (`bria`, or `pruna` for the project default) |
+| `panel` | retired with the `LOADING` target (textures 2.2.0): the width of the widened loading-screen model the art was cut for |
+| `upscaler` | retired with `models/loading-panel.sh` (textures 2.2.0): which paid upscaler the loading panel used |
 | `keepcolour` | puff only: skip the greyscale conversion. `Mnebula2` is the one stock puff with its own colour |
 | `fill` | puff only: percent of the quadrant the subject occupies (default 92) |
 | `sheet` | `GxP`: pack the units into GxG contact sheets with a P-pixel gutter and upscale the sheet, then slice back. A quality setting before a cost one — the app's `megapixels` is an integer, so a lone 64px icon gets a 16x lift at the 1MP floor where a 512px sheet of 49 gets 4x |
@@ -135,7 +135,7 @@ install), and `INVENTORY.md` for what is done, what could be and what should not
 | UI | icons 64→256 via contact sheets, panels at 256. `UImid` is `install=no` — see the crash section |
 | hulls and stations | every faction, at 1024 with rebuilt chains; hull alpha goes through the upscaler (`alpha=ai`) at `blend=70`, not the usual 35 — the Sovereign section has why |
 | weapons, effects, props, map features | the final run; see `INVENTORY.md` for what was left and why |
-| loading screen | `LOADING`, shipped with `SOD/logo.SOD` (the `models` layer) |
+| loading screen | `LOADING` and `SOD/logo.SOD`: retired in textures 2.2.0 (`retire/` restores an old install) |
 
 Four things cost a crash, a freeze or a visible artifact, and each one is written up
 below rather than only fixed: **a UI sprite over 256x256 crashes the game**, **doubling
@@ -457,7 +457,7 @@ is not what the eye sees. Size the *face*, not the atlas:
 
 `size=` in `target.conf` sets it. **A 4096x4096 atlas — a 48 MB
 uncompressed TGA — loads and renders fine**, confirmed in game under both wined3d and
-DXVK: this engine reads the dimensions from the TGA header and does not care how large
+DXVK (the chain until 15.0.0; the same on Display8's Vulkan device): this engine reads the dimensions from the TGA header and does not care how large
 they are, at least up to 4096. The rejected candidates are in
 `$A2_DATA/archive/mbg02-candidates/`.
 
@@ -1056,7 +1056,7 @@ Channel means match stock on all sixteen and R-G deviation comes out at or sligh
 
 ## The UI: 544 textures, and why they went up in sheets
 
-**The stretch had to be fixed first** — see `hud/README.md`. Upscaling a UI drawn through a
+**The stretch had to be fixed first** — see `ui/HUD.md`, "The references the stock HUD is drawn against". Upscaling a UI drawn through a
 1600x1200 canvas stretched 1.79x sideways would have been sharpening the wrong picture.
 
 `Sprites/gui_*.spr` and `cursor.spr` resolve to 569 distinct textures. Almost all of
@@ -1141,13 +1141,12 @@ the bug, not a lesser version of it. The three UI targets declare `maxsize=256`.
 - **20 cursors** — not upscaled. Deliberate pixel art, and the strips are non-square
   (so `fit()` would square them). They are not drawn at native pixel size: at 3440x1440
   a 32x32 frame draws at ~138x77 screen px, because the cursor code scales against a
-  hard-coded 800x600, so they come out 1.79x too wide like everything else. `HUD.asi`
-  corrects that at run time (`hud/cursor-aspect.py` is its derivation and never
-  installed beside it). **An AI upscale cannot help them**, read out of the binary:
+  hard-coded 800x600, so they come out 1.79x too wide like everything else. `UI.asi`
+  draws the cursor itself (`HUD.asi` corrected it at run time until 15.0.0; the old file-based squash is gone). **An AI upscale cannot help them**, read out of the binary:
   `SetCursor` allocates the cursor texture at `texW * [device+0x18]` by
   `texH * [device+0x1c]`, so the engine magnifies it itself by a constant, and more
   source texels just draws a bigger cursor at the same density. The lever for sharpness
-  is code, not art. Derivation, and the two draw paths, are in `hud/README.md`.
+  is code, not art. Derivation, and the two draw paths, are in `ui/HUD.md`, "The references the stock HUD is drawn against".
 - **`colors`** — an 8x8 colour lookup table. Interpolating it blends the cells.
 - **`logos`** — Activision, Bink, GameSpy and Mad Doc trademarks, on a splash screen
   shown once. Invented shapes where there is a right answer, for no gain.
@@ -1393,8 +1392,8 @@ the plate and takes the fix with it. The order is `upscale-stock.sh
 Even at 70 the gain is real but modest, and that is the honest ceiling. The upscaler
 cleans and sharpens; it does not manufacture structure that was never in 256x256. The
 larger lever is not the texture at all — the saucer is viewed at a steep oblique angle,
-which is precisely where **anisotropic filtering** decides sharpness. That is the
-renderer layer's `dxvk.conf` (`d3d9.samplerAnisotropy = 16`, `renderer/README.md`), which
+which is precisely where **anisotropic filtering** decides sharpness. That is
+Display8's `[Samplers]` (`display/README.md`; the renderer layer's `dxvk.conf`, `d3d9.samplerAnisotropy = 16`, did it until 15.0.0), which
 sharpens every oblique surface in the game at once.
 
 ## The Federation hull class, after the Sovereign
@@ -1575,9 +1574,9 @@ What is actually known:
   `int ST3D_PRELOAD_TEXTURES = 1;`, alongside `GameOpenPreLoad() took %d seconds.` in
   the executable. So there **is** a preload pass — but it runs per game, against what
   that game needs, not across the whole directory.
-- The renderer is the d3d8 → d3d9 → DXVK chain from `platform/README.md`, so textures live in
+- The renderer is Display8's Vulkan or Direct3D 12 device (`display/README.md`; until 15.0.0 the d3d8 → d3d9 → DXVK chain), so textures live in
   **VRAM**, which on this machine is 8 GB (Navi 10). The 32-bit address space holds
-  DXVK's bookkeeping and staging, not the texture bodies.
+  the driver's bookkeeping and staging, not the texture bodies.
 - The disk total is well past 2 GB and nothing has fallen over.
 
 So the ceiling is **unmeasured**, and the disk total is a poor proxy for it — an upper
@@ -1694,6 +1693,10 @@ alpha a flat 255). The camera fits that to the screen **height**: at 3440x1440 i
 x 646..2792, measured off `$A2_DATA/promo/before.mp4`, and the MBG02 skybox shows either side.
 Because it is a model texture, hard rule 4's 256 ceiling does not apply; the tiles go
 to 1024.
+
+**Retired in textures 2.2.0 / models 5.1.0: the `LOADING` target, `logo-sod.py` and
+`loading-panel.sh` are gone (the UI draws the loading screen; `retire/retire.sh` restores an
+old install). What follows is the record of what they did and measured.**
 
 Widening is a geometry change **and** new art, never one alone. `models/logo-sod.py`
 scales the quads' x coordinates to `panel=` units in `textures/targets/LOADING/target.conf`

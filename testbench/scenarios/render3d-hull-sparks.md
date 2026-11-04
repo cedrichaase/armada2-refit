@@ -3,6 +3,7 @@
 Resolutions: 1280x720
 Mod: refit
 Launch: -nointro a2_borg01
+Clock: bench
 Setup: display/bench-mode.sh stub Backend=vulkan nebula-battle Seed=7
 Timeout: 10 min
 

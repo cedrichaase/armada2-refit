@@ -23,7 +23,7 @@ compositor's and the game's pointers part at every screenshot), moves it up into
 bar, 600 pixels along it and down again: a pointer the bar took would come back to the
 game 600 pixels from where the game's cursor stopped, which `PointerLog` logs as a jump.
 
-With `[UI] KeepClip=1` (shipped) UI.asi asks Wine for its clip again while the pointer
+With `[Window] KeepClip=1` (Display8.ini, shipped; was `[UI]` until ui 1.0.0) Display8 asks Wine for its clip again while the pointer
 moves; the scenario checks that it does and that the pointer stays the game's. The
 bench does not show the escape itself (2026-10-23): sway gives an overlay bar the
 pointer over a full-screen window, but in eleven such screenshots and two window round
@@ -59,7 +59,7 @@ player's compositor.
 26. Move the mouse to 900,300.
 27. Take a screenshot called "after".
 28. Hide the bar.
-29. Expect "UI.log" contains "pointer: Wine's clip asked for again".
+29. Expect "Display8.log" contains "window: the pointer's clip put back".
 30. Expect "UI.log" not contain "pointer: jumped".
 31. Expect the game is still running.
 32. Check that the shot "after" shows one mouse cursor over the map, in the right half of the screen.

@@ -298,24 +298,15 @@ install)
       cp "$f" "$dst"; echo "installed ${dst##*/}  ($t)"
       [ -n "${TEXW[$f]:-}" ] && TEXW[$dst]=${TEXW[$f]} || unset 'TEXW[$dst]'
     done
-    # panel=N: the target's art is cut for a model widened to N units (LOADING and
-    # SOD/logo.SOD). Art and geometry are one change -- the wide art on the stock quads
-    # is squashed to 3:2, the stock art on the wide quads is stretched -- so they are
-    # installed together, and reverted together below.
-    pn=$(conf "$t" panel "")
-    [ -n "$pn" ] && "$REPO/models/logo-sod.py" --width "$pn"
   done
   rm -f "$IFACE" ;;
 revert)
   shift
   if [ "${1:-all}" = all ]; then
     for b in "$TEX"/*$BAK; do [ -e "$b" ] || continue; cp "$b" "${b%$BAK}"; echo "reverted $(basename "${b%$BAK}")"; done
-    # The widened loading panel's model, which must never outlive its art -- see panel=.
-    "$REPO/models/logo-sod.py" --revert
   else
     need_stock "$@"
     for t in "$@"; do
-      [ -n "$(conf "$t" panel "")" ] && "$REPO/models/logo-sod.py" --revert
       for f in "$DATA/$t/stock"/*; do
       [ -e "$f" ] || continue; a=$(basename "$f"); b="$TEX/$a$BAK"
       [ -f "$b" ] && { cp "$b" "$TEX/$a"; echo "reverted $a"; }

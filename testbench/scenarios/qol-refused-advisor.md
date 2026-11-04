@@ -25,7 +25,7 @@ starbase is at about 835,250 at 1280x720, whatever the start position and the zo
 before it (measured over three starts, zoomed in and out). Every step after the click
 is tied to the selection and to the local player: `UI.log` names the selected builder
 ("info: Builder Starbase") and the bar's layout for it, then each key the bar takes
-("bar: key Q=build", "bar: key Q=fconst", the construction ship); `QOLRules.log` writes
+(the layouts "Q=build", "Q=fconst" for the construction ship; QOL.log names each key, "bar: key Q"); `QOLRules.log` writes
 each payment with the bank after it, and the local bank is the one that goes from 3500
 dilithium to 3250 and 3000 by construction ships; the advisor line names the local team,
 and `UI.log` the event's chat line. The side list is opened by clicking player 1's Side field.
@@ -59,12 +59,12 @@ and `UI.log` the event's chat line. The side list is opened by clicking player 1
 27. Take a screenshot called "selected".
 28. Press q.
 29. Wait up to 5 seconds for the logs the next steps expect.
-30. Expect "UI.log" contains "bar: key Q=build".
+30. Expect "QOL.log" contains "bar: key Q".
 31. Expect "UI.log" contains "bar: menu=2 mode=1 | Q=fconst".
 32. Note "ten more q: about eight construction ships are paid, the rest are refused for crew".
 33. Press q 10 times.
 34. Wait up to 10 seconds for the logs the next steps expect.
-35. Expect "UI.log" contains "bar: key Q=fconst".
+35. Expect "QOL.log" contains "bar: key Q".
 36. Expect "QOLRules.log" contains "paid dil 250 met 0 lat 0 bio 0 crew 150 off 2; bank dil 3250".
 37. Expect "QOLRules.log" contains "paid dil 250 met 0 lat 0 bio 0 crew 150 off 2; bank dil 3000".
 38. Expect "QOLRules.log" contains "refused (crew) dil 250 met 0 lat 0 bio 0 crew 150 off 2".

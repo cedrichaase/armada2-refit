@@ -4,28 +4,35 @@
 #
 #   ./install.sh [<game dir>]               install
 #   ./install.sh --uninstall [<game dir>]   take all of it out again
+#   ./install.sh --without qol,rules [<game dir>]
+#                                           leave layers out (also A2_SKIP="qol rules")
+#   ./install.sh --all [<game dir>]         every layer again, forgetting an earlier choice
 #
-# No choices to make: what can work here is installed, the rest is skipped and says why.
+# What can work here is installed, the rest is skipped and says why. The layers that are a
+# choice are layers.txt's (select on or off); --without / A2_SKIP names those to leave out
+# (and takes them out when an earlier install left them), and the choice is remembered in
+# armada2-refit-layers.txt in the game directory: a plain re-run, an upgrade, keeps it.
+# Shipped .ini files are merged into the player's (their values stay), never replaced;
+# RefitPlayer.ini, the Refit screen's overlay, is never touched.
 # First the prerequisites (prereqs.txt: the ASI loader with STA2WidescreenPatch), bundled
-# in vendor/, each file only if missing. Then the Direct3D chain the repository's ./install
-# sets up (chain/): crosire's d3d8to9 as d3d8.dll on DXVK's d3d9.dll, so dxvk.conf has
-# DXVK under it. In front of it Display8 (display/), the game's d3d8.dll of ours, with
-# d3d8to9 behind it as d3d8_real.dll: in stub mode, as shipped, the engine draws
-# nothing and Render3D.asi (the 3D view) and UI.asi (the HUD, the menus and the loading
-# screen) draw the whole frame on Display8's own device, the first that starts of
-# Vulkan, Direct3D 12 and Direct3D 9. Where the chain is left as it is, Display8 stays
-# out, the UI's place is taken by the plugins it supersedes (HUD.asi, Menus.asi,
-# GridLayout.asi) and the 3D view stays the engine's. The models are rewritten from the
+# in vendor/, each file only if missing. Then Display8 (display/), the game's d3d8.dll of
+# ours: it draws on Vulkan or Direct3D 12 itself, and when neither can start it hands the
+# game the system's own d3d8.dll. Render3D.asi (the 3D view) and UI.asi (the HUD, the menus
+# and the loading screen) draw the whole frame on Display8's device. Nothing stands behind
+# it: no d3d8to9, no DXVK, no dxvk.conf (since 15.6.0; the sampler settings are Display8.ini
+# [Samplers]). Where d3d8.dll is a file of the player's own, Display8 stays out, and so do
+# Render3D.asi and UI.asi: the game keeps its own look. Then the retire step takes out
+# what earlier versions installed and nothing installs now (retire/known.txt, baked as
+# retire.txt): the old chain's d3d8to9 and DXVK, a marked dxvk.conf, HUD.asi, Menus.asi,
+# GridLayout.asi and the per-part plugins. The models are rewritten from the
 # player's own SOD files with python3. Textures,
 # the menu backdrops and the replacement movies are built from the game's own art, so a
 # release cannot carry them.
 #
-# On macOS DXVK's d3d9.dll cannot run, so d3d8to9 goes in on the prefix's own d3d9
-# (Wine's wined3d, or a Sikarugir wrapper's D9VK), and dxvk.conf is skipped; Display8
-# goes in on Backend=auto as everywhere: Vulkan on MoltenVK first, which works under a
-# 32-bit process there (display/README.md, "Will Vulkan work on a Mac?"), and Direct3D
-# 9 last if it cannot start. The script keeps to the /bin/bash 3.2 and BSD tools a Mac
-# ships.
+# On macOS Display8 goes in on Backend=auto as everywhere: Vulkan on MoltenVK first, which
+# works under a 32-bit process there (display/README.md, "Will Vulkan work on a Mac?"), and
+# the system's own Direct3D 8 if it cannot start. The script keeps to the /bin/bash 3.2 and
+# BSD tools a Mac ships.
 #
 # The game directory is the one holding Armada2.exe: the argument, else this folder's
 # parent if the package was unzipped into the game, else $A2_GAME, else (macOS) the GOG
@@ -44,7 +51,7 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-action=install game=""
+action=install game="" without="" all=0
 mac=0; [ "$(uname -s)" = Darwin ] && mac=1
 
 # Portable to a Mac: no sha256sum there (shasum -a 256), no tac, a BSD sed.
@@ -68,6 +75,10 @@ reverse_lines() { awk '{ l[NR] = $0 } END { for (i = NR; i > 0; i--) print l[i] 
 while [ $# -gt 0 ]; do
     case "$1" in
         --uninstall) action=uninstall ;;
+        --all)       all=1 ;;
+        --without)   shift; [ $# -gt 0 ] || { echo "--without needs a list of layers" >&2; exit 2; }
+                     without="$without,$1" ;;
+        --without=*) without="$without,${1#--without=}" ;;
         -h|--help)   sed -n '2,/^set -e/p' "$0" | grep '^#' | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*)          echo "unknown option: $1" >&2; exit 2 ;;
         *)           game="$1" ;;
@@ -96,24 +107,11 @@ fi
 # Where packages before 13.0.0 put a vkBasalt bloom; Render3D.asi blooms the 3D view
 # itself now, so it is only ever taken out.
 BLOOM="${XDG_DATA_HOME:-$HOME/.local/share}/armada2-refit-bloom"
-DXVK_MARKER="# generated by tools/renderer-config.sh"   # dxvk.conf files we wrote
 BLOOM_MARKER="# written by armada2-refit install.sh"
 
 MANIFEST="$game/armada2-refit-prereqs.txt"   # what the prerequisites step added
 
 step() { [ "${A2_PROGRESS:-}" != 1 ] || echo "::step $*"; }
-# The per-part plugins earlier packages and installs put in, replaced by Render3D.asi:
-# taken out, in every case (a module of Render3D.asi stands down beside its old plugin).
-OLD_PLUGINS="MSAA Planets Lighting Sky Nebulae Surfaces Explosions Shields Repair Venting Specials Fog"
-old_plugins_out() {
-    local n
-    for n in $OLD_PLUGINS; do rm -f "$game/$n.asi" "$game/$n.ini" "$game/$n.log"; done
-    # Sky.asi's recipes (one per sky name, mbg*.ini); anything else there is the player's.
-    if [ -d "$game/Sky" ]; then
-        rm -f "$game/Sky"/mbg*.ini
-        rmdir "$game/Sky" 2>/dev/null || true
-    fi
-}
 old_bloom_out() {
     if [ -f "$BLOOM/vkBasalt.conf" ] && grep -qF "$BLOOM_MARKER" "$BLOOM/vkBasalt.conf"; then
         rm -rf "$BLOOM"
@@ -121,7 +119,7 @@ old_bloom_out() {
     fi
 }
 
-# Render3D.asi's recipes (render3d/surfaces, render3d/nebulae): Surfaces/ and Nebulae/
+# Render3D.asi's recipes (render3d/content/surfaces, render3d/content/nebulae): Surfaces/ and Nebulae/
 # in the game directory, only the files of these names; anything else there is the
 # player's.
 RECIPES="Surfaces Nebulae"
@@ -129,23 +127,75 @@ recipes_out() {
     local d f
     for d in $RECIPES; do
         [ -d "$game/$d" ] || continue
-        for f in "$here/game/$d"/*.ini; do
+        for f in "$here/layers/render3d/$d"/*.ini; do
             [ -e "$f" ] && rm -f "$game/$d/$(basename "$f")"
         done
         rmdir "$game/$d" 2>/dev/null || true
     done
 }
-# The plugins UI.asi takes the place of (ui/supersede.sh), and Menus.asi's old name.
-LEGACY_UI="HUD Menus MenuScale GridLayout"
-legacy_ui_out() {
-    local n
-    for n in $LEGACY_UI; do rm -f "$game/$n.asi" "$game/$n.ini" "$game/$n.log"; done
+# What earlier versions installed and nothing installs now: retire.txt, retire/known.txt
+# without its comments, one entry a line (retire/README.md has the kinds). Each entry is
+# recognised by what it is -- a plugin by name, the chain's binaries by hash, dxvk.conf by
+# our marker -- so a file of the player's own stays. The vkBasalt bloom is the bloom step's.
+RETIRED=0
+retire_rm() {   # a file in the game directory
+    if [ -e "$1" ]; then
+        rm -f "${1:?}"
+        echo "  retired ${1#"$game"/}"; RETIRED=1
+    fi
+}
+manifest_drop() {   # a file name recorded for --uninstall that is gone now
+    if [ -f "$MANIFEST" ]; then
+        grep -v "^$1 " "$MANIFEST" > "$MANIFEST.tmp" || true
+        mv -f "$MANIFEST.tmp" "$MANIFEST"
+    fi
+}
+retire_table() {
+    local line kind n e d f marker
+    [ -f "$here/retire.txt" ] || return 0
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in ''|'#'*) continue ;; esac
+        set -f; set -- $line; set +f
+        kind="$1"; shift
+        case "$kind" in
+            plugin)     for n in "$@"; do for e in asi ini log; do retire_rm "$game/$n.$e"; done; done ;;
+            plugin-dir) for d in "$@"; do
+                            [ -d "$game/$d" ] || continue
+                            for f in "$game/$d"/*.bmp; do [ -e "$f" ] && retire_rm "$f"; done
+                            rmdir "${game:?}/${d:?}" 2>/dev/null || true
+                        done ;;
+            glob)       d="$1"; [ -d "$game/$d" ] || continue
+                        for f in "$game/$d"/$2; do [ -e "$f" ] && retire_rm "$f"; done
+                        rmdir "${game:?}/${d:?}" 2>/dev/null || true ;;
+            glob-hash)  d="$1"; [ -d "$game/$d" ] || continue
+                        local gp="$2" h k; shift 2
+                        for f in "$game/$d"/$gp; do
+                            [ -f "$f" ] || continue
+                            h="$(sha256 "$f")"
+                            for k in "$@"; do if [ "$h" = "$k" ]; then retire_rm "$f"; break; fi; done
+                        done
+                        rmdir "${game:?}/${d:?}" 2>/dev/null || true ;;
+            file)       retire_rm "$game/$1" ;;
+            hud-files)  # The file-based HUD fixes of hud 2.x, put back from their backups.
+                        if [ -n "${PY:-}" ] && [ -f "$here/retire/hud-files.py" ]; then
+                            "$PY" "$here/retire/hud-files.py" "$game" 2>&1 | sed 's/^/  /' || true
+                        fi ;;
+            chain-hash) f="$game/$1"
+                        if [ -f "$f" ] && [ "$(sha256 "$f")" = "$2" ]; then
+                            retire_rm "$f"; manifest_drop "$1"
+                        fi ;;
+            chain-marker)
+                        f="$game/$1"; shift; marker="$*"
+                        if [ -f "$f" ] && grep -qF "$marker" "$f"; then retire_rm "$f"; fi ;;
+            *)          ;;   # bloom (the bloom step's), and kinds a newer table adds
+        esac
+    done < "$here/retire.txt"
 }
 
 is_proxy() { grep -q 'BinkProxy' "$1" 2>/dev/null; }
-# A2_SKIP="cutscenes ..." leaves those parts out -- the GUI installer does not install the
-# cutscene player yet. Only cutscenes can be skipped so far.
-skipped() { case " ${A2_SKIP:-} " in *" $1 "*) return 0 ;; esac; return 1; }
+# The layers left out (the selection below sets SKIP): " qol rules ".
+SKIP=" "
+skipped() { case "$SKIP" in *" $1 "*) return 0 ;; esac; return 1; }
 # The proxy out again, the stock binkw32.dll back.
 unproxy() {
     if is_proxy "$game/binkw32.dll"; then
@@ -168,34 +218,32 @@ is_display8() { [ -f "$1" ] && grep -qa "Display8 stopped the game" "$1"; }
 # %LOCALAPPDATA%\armada2-refit\logs: an uninstall leaves that folder (the bug report
 # reads it); the names here are what older builds wrote beside the exe.
 DISPLAY_FILES="Display8.ini Display8.log Display8.inventory.tsv Display8.inventory.tmp Display8.mark Display8.go"
-# Display8 out of the d3d8 slot, and the chain's d3d8.dll it stood in front of
-# (d3d8_real.dll) back in it. With --all, its settings and logs go too.
+# Display8 out of the d3d8 slot. An older Display8 stood in front of a d3d8_real.dll: one
+# that is not the vendored d3d8to9 (retire.txt takes that one out) is put back in the slot.
+# With --all, its settings and logs go too.
 display_out() {
     if is_display8 "$game/d3d8.dll"; then
         rm -f "$game/d3d8.dll"
-        if [ -f "$game/d3d8_real.dll" ]; then mv -f "$game/d3d8_real.dll" "$game/d3d8.dll"; fi
+        if [ -f "$game/d3d8_real.dll" ] && ! is_d3d8to9 "$game/d3d8_real.dll"; then
+            mv -f "$game/d3d8_real.dll" "$game/d3d8.dll"
+        fi
     fi
     if [ "${1:-}" = --all ]; then
         local n
         for n in $DISPLAY_FILES; do rm -f "$game/$n"; done
-        # The repository's display/install leaves these: a2mod's copy of the chain, and
-        # d3d8to9 behind a Display8 since taken out by hand.
-        rm -f "$game/d3d8.dll.a2display-backup"
-        if is_d3d8to9 "$game/d3d8_real.dll"; then rm -f "$game/d3d8_real.dll"; fi
     fi
     return 0
 }
 # DXVK by content, never by name: GOG puts a d3d8.dll there too.
 is_dxvk() { grep -a -q -i 'dxvk' "$1" 2>/dev/null; }
-# crosire's d3d8to9 1.16.0, as the repository's ./install places it (platform/vendor/), by hash.
+# crosire's d3d8to9 1.16.0, the old chain's (retire/known.txt), by hash.
 D3D8TO9_SHA=122928cfe225c25d30decf7184a5d37e490cecf3b58256ba3206c7e1853f8ab8
 is_d3d8to9() { [ -f "$1" ] && [ "$(sha256 "$1")" = "$D3D8TO9_SHA" ]; }
-# DXVK in the chain: its own d3d8, or d3d8to9 in front of its d3d9.
-# GOG's own d3d8.dll (its d3d8to9 build), as the release ships it. Kept as
+# GOG's own d3d8.dll (its d3d8to9 build), as the game ships it. Kept as
 # d3d8.dll.gog-backup, the name platform/d3d8-chain.py gives it, when replaced.
 GOG_D3D8_SHA=735dbb81a5fa0368c6436349fc5bf97a9ae15daeb6829dfe95a17704294e6719
 is_gog_d3d8() { [ -f "$1" ] && [ "$(sha256 "$1")" = "$GOG_D3D8_SHA" ]; }
-CHAIN_BACKUP=.a2chain-backup   # any other d3d8.dll / d3d9.dll the chain step replaced
+CHAIN_BACKUP=.a2chain-backup   # any other d3d8.dll / d3d9.dll an install before 15.6.0 replaced
 # The SOD rewrites (models/): Python, with the game they work on. $A2_PYTHON (a path,
 # perhaps with spaces: the GUI installer's frozen program runs "<it> script.py args" as
 # python would), else python3. On a Mac without the Command Line Tools, /usr/bin/python3
@@ -219,21 +267,17 @@ sods() {   # --install | --revert
 
 if [ "$action" = uninstall ]; then
     step uninstall "taking the mod out"
-    # Display8 first: d3d8.dll is the chain's again, so the records below hold for it.
     display_out --all
     for n in Render3D UI QOL QOLRules Online; do
         rm -f "$game/$n.asi" "$game/$n.ini" "$game/$n.log"
     done
-    legacy_ui_out
+    rm -f "$game/armada2-refit-layers.txt"   # the remembered choice of layers
+    retire_table
     recipes_out
-    old_plugins_out
     if [ -n "$PY" ] && [ -d "$here/models" ]; then
         echo "  the models back to stock:"; sods --revert
     fi
     unproxy
-    if [ -f "$game/dxvk.conf" ] && grep -qF "$DXVK_MARKER" "$game/dxvk.conf"; then
-        rm -f "$game/dxvk.conf"
-    fi
     # The prerequisites, newest record first; a file changed since is left, and said so.
     if [ -f "$MANIFEST" ]; then
         reverse_lines "$MANIFEST" | while read -r f sum; do
@@ -245,15 +289,19 @@ if [ "$action" = uninstall ]; then
         done
         rm -f "$MANIFEST"
     fi
-    # What the chain step replaced, back where it took it out.
+    # What an install replaced, back where it took it out: GOG's d3d8.dll (kept as
+    # d3d8.dll.gog-backup), and what installs before 15.6.0 kept as .a2chain-backup.
     for f in d3d8.dll d3d9.dll; do
         [ -e "$game/$f" ] && continue
         if [ "$f" = d3d8.dll ] && [ -f "$game/d3d8.dll.gog-backup" ]; then
             mv -f "$game/d3d8.dll.gog-backup" "$game/d3d8.dll"
         elif [ -f "$game/$f$CHAIN_BACKUP" ]; then
             mv -f "$game/$f$CHAIN_BACKUP" "$game/$f"
+        elif [ "$f" = d3d8.dll ] && [ -f "$game/d3d8.dll.a2display-backup" ]; then
+            mv -f "$game/d3d8.dll.a2display-backup" "$game/d3d8.dll"
         fi
     done
+    rm -f "$game/d3d8.dll.a2display-backup"
     old_bloom_out
     echo "uninstalled from $game"
     exit 0
@@ -292,6 +340,42 @@ quarantine and history." "${damaged[@]}"
 fi
 echo "installing into $game"
 
+# ------------------------------------------------------------------ the layers to install
+
+# layers.txt (tools/layers.py, baked by package.sh): id, select, requires, scope. A layer
+# can be left out when its select is on or off; core ones are the Direct3D chain's and
+# Display8's, and the legacy and retired ones are not a choice.
+LAYERS_FILE="$game/armada2-refit-layers.txt"
+layer_select() { awk -F'\t' -v id="$1" '$1 == id { print $2 }' "$here/layers.txt"; }
+want=""
+if [ "$all" = 0 ]; then
+    for w in $(echo "${A2_SKIP:-} $without" | tr ',' ' '); do want="$want $w"; done
+fi
+if [ -n "${want// /}" ]; then
+    for w in $want; do
+        sel="$(layer_select "$w")"
+        case "$sel" in
+            on|off) case "$SKIP" in *" $w "*) ;; *) SKIP="$SKIP$w " ;; esac ;;
+            "")     echo "unknown layer: $w (layers.txt lists them)" >&2; exit 2 ;;
+            *)      echo "layer $w is not a choice (select $sel): it cannot be left out" >&2; exit 2 ;;
+        esac
+    done
+elif [ "$all" = 0 ] && [ -f "$LAYERS_FILE" ]; then
+    # An earlier choice, kept across the upgrade.
+    while read -r kw w _ || [ -n "$kw" ]; do
+        if [ "$kw" = without ] && [ -n "$w" ]; then
+            case "$(layer_select "$w")" in on|off) SKIP="$SKIP$w " ;; esac
+        fi
+    done < "$LAYERS_FILE"
+    [ "$SKIP" = " " ] || echo "keeping your earlier choice: without${SKIP% } (--all for every layer)"
+fi
+if [ "$SKIP" = " " ]; then
+    rm -f "$LAYERS_FILE"
+else
+    { echo "# armada2-refit: layers left out of the install; --all brings them back"
+      for w in $SKIP; do echo "without $w"; done; } > "$LAYERS_FILE"
+fi
+
 # ------------------------------------------------------------------ prerequisites
 
 # The ASI loader and STA2WidescreenPatch (prereqs.txt), in vendor/<name>/ because their
@@ -323,81 +407,46 @@ prereq() {   # name|version|author|licence|page|files
     echo "      from $page"
 }
 
+# A2EngineTest.ini is the bench's fault injection (crates/a2engine/README.md); no package
+# ships it, and a stray one would stand hooks down: taken out, in every case.
+rm -f "$game/A2EngineTest.ini"
+
 step prereqs "prerequisites"
 echo "prerequisites:"
 while IFS= read -r line || [ -n "$line" ]; do
     if [ -n "$line" ]; then prereq "$line"; fi
 done < "$here/prereqs.txt"
 
-# ------------------------------------------------------------------ the Direct3D chain
-
-# As the repository's ./install has it (platform/README.md): crosire's d3d8to9 as d3d8.dll,
-# on DXVK's d3d9.dll. A
-# d3d9.dll that is DXVK already (Proton's, say) stays. GOG's d3d8.dll, or DXVK's, is
-# replaced and kept; a d3d8.dll or d3d9.dll that is anything else is someone's own
-# choice, and the chain is then left as it is. What goes in is recorded in $MANIFEST like
-# the prerequisites, so --uninstall takes it out, unchanged only, and puts the old back.
-chain_put() {   # d3d8.dll | d3d9.dll
-    local f="$game/$1"
-    if [ -e "$f" ]; then
-        if [ "$1" = d3d8.dll ] && is_gog_d3d8 "$f"; then
-            [ -e "$f.gog-backup" ] || cp -p "$f" "$f.gog-backup"
-        else
-            [ -e "$f$CHAIN_BACKUP" ] || cp -p "$f" "$f$CHAIN_BACKUP"
-        fi
-        rm -f "$f"
-    fi
-    copy_into "$here/chain/$1" "$f"; record "$1"
-}
-
-step chain "Direct3D chain"
-echo "Direct3D chain:"
-d8="$game/d3d8.dll" d9="$game/d3d9.dll"
-# Display8 from an earlier install steps aside while the chain is looked at: d3d8.dll is
-# the chain's again (its d3d8_real.dll), and the display step puts Display8 back in front.
-display_out
-# On a Mac, never DXVK's d3d9.dll: Wine's own is behind d3d8to9. One an earlier install
-# put in (recorded with chain/d3d9.dll's hash) comes out again, and out of $MANIFEST.
-if [ "$mac" = 1 ] && [ -f "$d9" ] && [ -f "$MANIFEST" ] \
-   && grep -qxF "d3d9.dll $(sha256 "$here/chain/d3d9.dll")" "$MANIFEST" \
-   && [ "$(sha256 "$d9")" = "$(sha256 "$here/chain/d3d9.dll")" ]; then
-    rm -f "$d9"
-    grep -v '^d3d9\.dll ' "$MANIFEST" > "$MANIFEST.tmp" || true
-    mv -f "$MANIFEST.tmp" "$MANIFEST"
-    echo "  d3d9.dll: took out the DXVK one an earlier install put in"
-fi
-if [ -e "$d8" ] && ! is_d3d8to9 "$d8" && ! is_gog_d3d8 "$d8" && ! is_dxvk "$d8"; then
-    echo "  left as it is: d3d8.dll is none of GOG's, DXVK's or crosire's d3d8to9"
-elif [ -e "$d9" ] && ! is_dxvk "$d9"; then
-    echo "  left as it is: d3d9.dll is not DXVK's"
-else
-    if is_d3d8to9 "$d8"; then echo "  d3d8.dll: crosire's d3d8to9 already"
-    else chain_put d3d8.dll; echo "  d3d8.dll: crosire's d3d8to9 1.16.0 -- BSD-2-Clause"; fi
-    if [ -e "$d9" ] && [ "$mac" = 1 ]; then
-        echo "  d3d9.dll: DXVK's, not ours, left as it is -- it cannot run Direct3D 9 on a Mac;"
-        echo "  take it out to have Wine's own"
-    elif [ -e "$d9" ]; then echo "  d3d9.dll: DXVK already"
-    elif [ "$mac" = 1 ]; then echo "  d3d9.dll: Wine's own (wined3d) -- DXVK cannot run Direct3D 9 on a Mac"
-    else chain_put d3d9.dll; echo "  d3d9.dll: DXVK 3.1.1 -- zlib/libpng"; fi
-fi
-
 # ------------------------------------------------------------------ Display8
 
-# Display8 (display/) in front of crosire's d3d8to9, as the repository's display/install
-# puts it: d3d8to9 behind it as d3d8_real.dll, which it loads by full path (no override
-# needed), and Display8.ini written if missing, else merged. Only in front of d3d8to9: a
-# chain left as it is stays the player's whole. Re-run, Display8 is replaced (the chain
-# step took it out) and Display8.ini merged again.
+# Display8 (display/), the game's d3d8.dll of ours, as the repository's display/install
+# puts it, and Display8.ini written if missing, else merged. It goes into the d3d8.dll slot
+# when that is empty, GOG's (kept as d3d8.dll.gog-backup: --uninstall puts it back), the
+# old chain's d3d8to9 or a DXVK d3d8 (both retired), or an older Display8; a d3d8.dll that
+# is anything else is the player's own and stays, and Display8, Render3D.asi and UI.asi
+# stay out. Re-run, Display8 is replaced and Display8.ini merged again.
 #
 # The merge is tools/ini-merge.py's, without Python: every key the shipped file has and the
 # player's lacks is added, in its section, and the player's values stay -- except that a
 # value still at an older set's default moves to the new one (Defaults=, numbered in the
-# shipped file). DISPLAY_UPGRADES is tools/ini-merge.py's table for Display8.ini, one
-# "<section with Defaults=> <n> <section> <key> <old value>", separated by ";"; keep them in step.
-DISPLAY_UPGRADES="display8 2 display8 mode forward;display8 2 display8 backend d3d9"
-ini_merge() {   # shipped installed upgrades
+# shipped file). INI_UPGRADES is tools/ini-merge.py's UPGRADES (Display8.ini's and UI.ini's
+# Defaults 2), one "<section with Defaults=> <n> <section> <key> <old value>", separated by
+# ";"; ini_retired is its RETIRED (a key whose meaning changed: its old default is
+# replaced wherever it still holds it). Keep them in step. Every shipped .ini goes through
+# this, never over the player's (put, below).
+# Display8.ini's Defaults 3 is code in each (not a table row): ini_merge's awk, Merge-Ini.
+INI_UPGRADES="display8 2 display8 mode forward;display8 2 display8 backend d3d9;ui 2 ui cursor 0;ui 2 menus enable 0;ui 2 loading enable 0"
+for k in bar info minimap selection unitview resources buttons messages pause replay overlay chat comm dropplayer loadwait; do
+    INI_UPGRADES="$INI_UPGRADES;ui 2 hud $k 0"
+done
+ini_retired() {   # installed file name -> "<section> <key> <old value>;..."
+    case "$(echo "$1" | tr 'A-Z' 'a-z')" in
+        render3d.ini) echo "lights beamlight 1.0;lights beamreach 40;nebulae litexplosion 0.75" ;;
+    esac
+}
+ini_merge() {   # shipped installed upgrades retired
     local new="$2.a2merge"
-    awk -v label="$(basename "$2")" -v up="$3" -v out="$new" '
+    awk -v label="$(basename "$2")" -v up="$3" -v ret="${4:-}" -v out="$new" -v dxvk="$(dirname "$2")/dxvk.conf" '
     function trim(s) { sub(/^[ \t\r]+/, "", s); sub(/[ \t\r]+$/, "", s); return s }
     function secname(l) {
         if (l !~ /^[ \t]*\[[^]]+\]/) return ""
@@ -442,6 +491,69 @@ ini_merge() {   # shipped installed upgrades
                 printf "  %s: [%s] %s %s -> %s (defaults %d)\n", label, f[3], name, f[5], sval[sk], un
             }
         }
+        nr = split(ret, R, ";")
+        for (u = 1; u <= nr; u++) {
+            if (split(R[u], f, " ") < 3) continue
+            sk = f[1] SUBSEP f[2]
+            if ((sk in hidx) && (sk in sval) && hval[sk] == f[3] && hval[sk] != sval[sk]) {
+                i = hidx[sk]; name = nameof(L[i])
+                L[i] = name "=" sval[sk]
+                printf "  %s: [%s] %s %s -> %s\n", label, f[1], name, f[3], sval[sk]
+            }
+        }
+        # Defaults 3 of Display8.ini (tools/ini-merge.py, display8_defaults3): Mode and Real go,
+        # `d3d9` goes from Backend= (nothing left: the shipped value), and the sampler keys of a marked dxvk.conf
+        # go into [Samplers] where the player set none (the shipped line the add
+        # step below writes is replaced by the carried value).
+        if (dsec == "display8" && haven < 3 && 3 <= shipn) {
+            nm = split("mode real", DK, " ")
+            for (u = 1; u <= nm; u++) {
+                sk = "display8" SUBSEP DK[u]
+                if (sk in hidx) {
+                    printf "  %s: [display8] %s dropped (defaults 3)\n", label, nameof(L[hidx[sk]])
+                    gone[hidx[sk]] = 1; delete hidx[sk]
+                }
+            }
+            sk = "display8" SUBSEP "backend"
+            if (sk in hidx) {
+                i = hidx[sk]; cur = valof(L[i]); nt = split(cur, T, ","); kept = ""; nkept = 0; dropped = 0
+                for (u = 1; u <= nt; u++) {
+                    t = trim(T[u]); if (t == "") continue
+                    if (tolower(t) == "d3d9") { dropped = 1; continue }
+                    kept = kept (nkept ? "," : "") t; nkept++
+                }
+                if (dropped) {
+                    if (kept == "") kept = (sk in sval) ? sval[sk] : "auto"
+                    printf "  %s: [display8] Backend %s -> %s (defaults 3)\n", label, cur, kept
+                    L[i] = nameof(L[i]) "=" kept
+                }
+            }
+            ok = 0
+            while ((getline dl < dxvk) > 0) {
+                sub(/\r$/, "", dl)
+                if (trim(dl) == "# generated by tools/renderer-config.sh") ok = 1
+                else if (dl !~ /^[ \t]*#/ && dl ~ /^[ \t]*[A-Za-z0-9_.]+[ \t]*=/) { dk = tolower(keyof(dl)); dv = valof(dl); sub(/[ \t].*$/, "", dv); dconf[dk] = dv }
+            }
+            close(dxvk)
+            if (ok) {
+                nd = split("d3d9.sampleranisotropy anisotropy d3d9.samplerlodbias lodbias d3d9.clampnegativelodbias clampnegativelodbias", DM, " ")
+                for (u = 1; u < nd; u += 2) {
+                    if (!(DM[u] in dconf)) continue
+                    key = DM[u + 1]; v = dconf[DM[u]]
+                    if (key == "clampnegativelodbias") { if (tolower(v) == "true") v = "1"; else if (tolower(v) == "false") v = "0" }
+                    sk = "samplers" SUBSEP key
+                    ship = (sk in sval) ? sval[sk] : "auto"
+                    if ((v ~ /^-?[0-9.]+$/ && ship ~ /^-?[0-9.]+$/) ? (v + 0 == ship + 0) : (tolower(v) == tolower(ship))) continue
+                    if (sk in hidx) {
+                        if (tolower(hval[sk]) != "auto") continue
+                        i = hidx[sk]; L[i] = nameof(L[i]) "=" v
+                    } else {
+                        for (j = 1; j <= nk["samplers"]; j++) if (skk["samplers", j] == key) skl["samplers", j] = substr(skl["samplers", j], 1, index(skl["samplers", j], "=")) v
+                    }
+                    printf "  %s: [samplers] %s -> %s (from dxvk.conf, defaults 3)\n", label, key, v
+                }
+            }
+        }
         if (((dsec SUBSEP "defaults") in hidx) && haven < shipn) {
             i = hidx[dsec SUBSEP "defaults"]; L[i] = nameof(L[i]) "=" shipn
         }
@@ -467,88 +579,189 @@ ini_merge() {   # shipped installed upgrades
                 for (j = 1; j <= cnt; j++) L[++n] = miss[j]
             }
         }
-        for (i = 1; i <= n; i++) print L[i] > out
+        for (i = 1; i <= n; i++) if (!(i in gone)) print L[i] > out
         close(out)
     }' "$1" "$2"
-    mv -f "$new" "$2"
+    # Nothing to add (line ends aside): the player's file stays byte for byte.
+    if cmp -s <(tr -d '\r' < "$2") "$new"; then rm -f "$new"; else mv -f "$new" "$2"; fi
+}
+# One key of an installed .ini, by an awk of its own: ini_op get|set|del FILE SECTION KEY
+# [VALUE]. get prints the value (a ; comment dropped) and fails when the key is absent;
+# set replaces the key's first line, else adds it after the last line of its section (the
+# section is added at the end if missing); del removes every line of the key.
+ini_op() {
+    local op="$1" f="$2"
+    awk -v op="$op" -v rsec="$3" -v rkey="$4" -v val="${5:-}" -v out="$f.a2edit" '
+    function trim(s) { sub(/^[ \t\r]+/, "", s); sub(/[ \t\r]+$/, "", s); return s }
+    { sub(/\r$/, ""); n++; L[n] = $0 }
+    END {
+        sec = tolower(rsec); key = tolower(rkey); cur = ""; insec = 0; last = 0; first = 0
+        for (i = 1; i <= n; i++) {
+            t = trim(L[i])
+            if (t ~ /^\[/) {
+                s = t; sub(/^\[/, "", s); sub(/\].*$/, "", s); cur = tolower(trim(s))
+                if (cur == sec) { insec = 1; last = i }
+                continue
+            }
+            if (cur != sec) continue
+            if (t != "") last = i
+            if (t !~ /^[;#]/ && t ~ /=/) {
+                nm = t; sub(/=.*$/, "", nm)
+                if (tolower(trim(nm)) == key) {
+                    if (!first) {
+                        first = i; v = t; sub(/^[^=]*=/, "", v); sub(/;.*$/, "", v); v = trim(v)
+                    }
+                    if (op == "del") drop[i] = 1
+                }
+            }
+        }
+        if (op == "get") { if (first) { print v; exit 0 } exit 1 }
+        if (op == "set") {
+            if (first) { nm = L[first]; sub(/=.*$/, "", nm); L[first] = nm "=" val }
+            else if (insec) { for (i = n; i > last; i--) L[i + 1] = L[i]; L[last + 1] = rkey "=" val; n++ }
+            else { L[++n] = ""; L[++n] = "[" rsec "]"; L[++n] = rkey "=" val }
+        }
+        for (i = 1; i <= n; i++) if (!(i in drop)) print L[i] > out
+        close(out)
+    }' "$f" && { [ "$op" = get ] || mv -f "$f.a2edit" "$f"; }
+}
+lc() { echo "$1" | tr 'A-Z' 'a-z'; }
+# Settings that moved from one file to another (moved.txt, baked by package.sh from the
+# settings tables): a value other than the new default goes to the new key, and the old key
+# is removed either way -- tools/settings/move-keys.py's job in the repository's ./install.
+apply_moved() {
+    [ -s "$here/moved.txt" ] || return 0
+    local ff fs fk tf ts tk def v nv
+    while IFS=$'\t' read -r ff fs fk tf ts tk def || [ -n "$ff" ]; do
+        [ -n "$ff" ] && [ -f "$game/$ff" ] || continue
+        v="$(ini_op get "$game/$ff" "$fs" "$fk")" || continue
+        # The one rule (tools/settings/README.md, "Moved keys"): a new key the player set
+        # (present, not empty, not the default) wins; else the old value moves if it is not
+        # the default; the old key goes either way.
+        nv=""; if [ -f "$game/$tf" ]; then nv="$(ini_op get "$game/$tf" "$ts" "$tk")" || nv=""; fi
+        if [ -n "$nv" ] && [ "$(lc "$nv")" != "$(lc "$def")" ]; then
+            echo "  $ff [$fs] $fk=$v dropped ($tf [$ts] $tk=$nv is set already)"
+        elif [ "$(lc "$v")" != "$(lc "$def")" ]; then
+            if [ ! -f "$game/$tf" ]; then
+                echo "  $tf is not there; $ff [$fs] $fk=$v stays"; continue
+            fi
+            ini_op set "$game/$tf" "$ts" "$tk" "$v"
+            echo "  moved $ff [$fs] $fk=$v to $tf [$ts] $tk"
+        fi
+        ini_op del "$game/$ff" "$fs" "$fk"
+    done < "$here/moved.txt"
 }
 
 step display "Display8"
-if is_d3d8to9 "$game/d3d8.dll"; then
-    # The new one beside it first: a copy that fails leaves the chain as it was.
-    copy_into "$here/display/d3d8.dll" "$game/d3d8.dll.a2display-new"
-    mv -f "$game/d3d8.dll" "$game/d3d8_real.dll"
-    mv -f "$game/d3d8.dll.a2display-new" "$game/d3d8.dll"
-    echo "  d3d8.dll: Display8, with crosire's d3d8to9 behind it as d3d8_real.dll"
+d8="$game/d3d8.dll"
+if [ -e "$d8" ] && ! is_display8 "$d8" && ! is_gog_d3d8 "$d8" && ! is_d3d8to9 "$d8" && ! is_dxvk "$d8"; then
+    echo "  Display8 skipped: d3d8.dll is none of GOG's, the old chain's or ours -- yours stays"
+else
+    if is_gog_d3d8 "$d8"; then
+        [ -e "$d8.gog-backup" ] || cp -p "$d8" "$d8.gog-backup"
+    elif ! is_display8 "$d8" && ! is_d3d8to9 "$d8" && [ -e "$d8" ]; then
+        # A d3d8.dll whose hash we do not know (a DXVK's, the player's own build of it) is
+        # kept; the uninstall puts it back.
+        [ -e "$d8$CHAIN_BACKUP" ] || cp -p "$d8" "$d8$CHAIN_BACKUP"
+        echo "  d3d8.dll: not one we know, replaced (the old one is d3d8.dll$CHAIN_BACKUP)"
+    elif ! is_display8 "$d8" && [ -e "$d8" ]; then
+        echo "  d3d8.dll: the old chain's, replaced"
+    fi
+    # The new one beside it first: a copy that fails leaves the slot as it was.
+    copy_into "$here/layers/display/d3d8.dll" "$game/d3d8.dll.a2display-new"
+    mv -f "$game/d3d8.dll.a2display-new" "$d8"
+    manifest_drop d3d8.dll   # an install before 15.6.0 recorded the d3d8to9 it put here
+    echo "  d3d8.dll: Display8 (on Vulkan or Direct3D 12; the system's own d3d8.dll if neither starts)"
+    if [ ! -f "$game/Display8.ini" ] && [ -f "$game/dxvk.conf" ] && grep -qF "# generated by tools/renderer-config.sh" "$game/dxvk.conf"; then
+        # A dxvk.conf of ours with no Display8.ini beside it: merge into a stub at Defaults=1
+        # so its sampler values are carried (retire.txt takes the dxvk.conf out after).
+        printf '[Display8]\nDefaults=1\n' > "$game/Display8.ini"
+    fi
     if [ -f "$game/Display8.ini" ]; then
-        ini_merge "$here/display/Display8.ini" "$game/Display8.ini" "$DISPLAY_UPGRADES"
+        ini_merge "$here/layers/display/Display8.ini" "$game/Display8.ini" "$INI_UPGRADES"
         echo "  Display8.ini (yours, brought up to date)"
     else
-        copy_into "$here/display/Display8.ini" "$game/Display8.ini"
+        copy_into "$here/layers/display/Display8.ini" "$game/Display8.ini"
         echo "  Display8.ini"
     fi
-else
-    echo "  Display8 skipped: it goes in front of crosire's d3d8to9, and d3d8.dll is not that"
 fi
+step retire "taking out what earlier versions installed"
+echo "retired:"
+retire_table
+[ "$RETIRED" = 1 ] || echo "  nothing to take out"
 
 echo "the mod:"
 
 # ------------------------------------------------------------------ plugins
 
-# A changed .ini is kept beside the new one, as <name>.ini.bak.
-put() {   # file -- copy from the package into the game directory
-    local f="$1" d="$game/$1"
-    if [ -f "$d" ] && [ "${f##*.}" = ini ] && ! cmp -s "$here/game/$f" "$d"; then
-        cp -p "$d" "$d.bak"; echo "  kept your old $f as $f.bak"
+# A file of a layer into the game directory. An .ini the player has is merged with the
+# shipped one (ini_merge: the keys it lacks are added, the values stay), never replaced.
+put() {   # layer file
+    local src="$here/layers/$1/$2" d="$game/$2"
+    if [ -f "$d" ] && [ "${2##*.}" = ini ]; then
+        ini_merge "$src" "$d" "$INI_UPGRADES" "$(ini_retired "$2")"
+        echo "  $2 (yours, brought up to date)"
+        return 0
     fi
-    copy_into "$here/game/$f" "$d"
-    echo "  $f"
+    copy_into "$src" "$d"
+    echo "  $2"
+}
+# A layer left out is taken out when an earlier install left it.
+layer_out() {   # name... -- each plugin with its ini and log
+    local n
+    for n in "$@"; do
+        rm -f "${game:?}/${n:?}.asi" "${game:?}/${n:?}.ini" "${game:?}/${n:?}.log"
+    done
 }
 
-# Render3D.asi and UI.asi need what the chain and display steps put in: Display8 in
-# front of crosire's d3d8to9, which gives them its own device (stub mode) or stands in
-# front of d3d8to9's (forward mode), or d3d8to9 alone, which gives them a Direct3D 9
-# device. Without either each would stand down to stock.
-d3d9=0
-if is_d3d8to9 "$game/d3d8.dll" \
-   || { is_display8 "$game/d3d8.dll" && is_d3d8to9 "$game/d3d8_real.dll"; }; then
-    d3d9=1
-fi
+# Render3D.asi and UI.asi draw on Display8's device: without Display8 as d3d8.dll each would
+# stand down to stock.
+display8=0
+if is_display8 "$game/d3d8.dll"; then display8=1; fi
 
-old_plugins_out   # earlier packages' per-part plugins: Render3D.asi's modules replace them
 step render3d "the 3D view"
-if [ "$d3d9" = 1 ]; then
-    put Render3D.asi; put Render3D.ini
+if skipped render3d; then
+    layer_out Render3D; recipes_out
+    echo "  the 3D view left out (you chose to)"
+elif [ "$display8" = 1 ]; then
+    put render3d Render3D.asi; put render3d Render3D.ini
     recipes_out
     for d in $RECIPES; do
         mkdir -p "$game/$d"
-        for f in "$here/game/$d"/*.ini; do copy_into "$f" "$game/$d/$(basename "$f")"; done
-        echo "  $d/ ($(ls "$here/game/$d" | wc -l | tr -d ' ') recipes)"
+        for f in "$here/layers/render3d/$d"/*.ini; do copy_into "$f" "$game/$d/$(basename "$f")"; done
+        echo "  $d/ ($(ls "$here/layers/render3d/$d" | wc -l | tr -d ' ') recipes)"
     done
 else
-    rm -f "$game/Render3D.asi" "$game/Render3D.ini" "$game/Render3D.log"; recipes_out
-    echo "  Render3D.asi skipped: it needs crosire's d3d8to9 as d3d8.dll -- the 3D view stays the engine's"
+    layer_out Render3D; recipes_out
+    echo "  Render3D.asi skipped: it needs Display8 as d3d8.dll -- the 3D view stays the engine's"
 fi
 step ui "the HUD and the menus"
-if [ "$d3d9" = 1 ]; then
-    legacy_ui_out   # UI.asi takes their place; each would stand down against the other
-    put UI.asi; put UI.ini
+if skipped ui; then
+    layer_out UI
+    echo "  the HUD and menus left out (you chose to)"
+elif [ "$display8" = 1 ]; then
+    put ui UI.asi; put ui UI.ini
 else
-    # The UI cannot draw: the plugins it supersedes keep the HUD and menus widescreen.
-    rm -f "$game/UI.asi" "$game/UI.ini" "$game/UI.log" "$game/MenuScale.asi" "$game/MenuScale.ini"
-    echo "  UI.asi skipped: it needs crosire's d3d8to9 as d3d8.dll -- the older plugins instead:"
-    put HUD.asi; put HUD.ini
-    put Menus.asi; put Menus.ini
-    put GridLayout.asi
-    # The player's [Cells] choices survive a reinstall; only a missing file is replaced.
-    if [ -e "$game/GridLayout.ini" ]; then echo "  GridLayout.ini (yours, kept)"; else put GridLayout.ini; fi
+    # The UI cannot draw, and there is no older plugin to fall back on: the game keeps its own.
+    layer_out UI
+    echo "  UI.asi skipped: it needs Display8 as d3d8.dll -- the HUD and menus stay the engine's"
 fi
 step qol "quality of life"
-put QOL.asi; put QOL.ini
-# Pay on queue; against the computer only, it stands down in a network game.
-put QOLRules.asi; put QOLRules.ini
+if skipped qol; then layer_out QOL; echo "  quality of life left out (you chose to)"
+else put qol QOL.asi; put qol QOL.ini; fi
+step rules "rules"
+# Pay on queue: every player of a network game needs it (a game with anyone lacking it
+# plays stock rules); against the computer only, it stands down in other transports.
+if skipped rules; then layer_out QOLRules; echo "  rules left out (you chose to)"
+else put rules QOLRules.asi; put rules QOLRules.ini; fi
 step models "models"
-if [ -n "$PY" ]; then
+if skipped models; then
+    if [ -n "$PY" ] && [ -d "$here/models" ]; then
+        echo "  the models back to stock (you chose to leave them out):"; sods --revert
+    else
+        echo "  models left out (you chose to)"
+    fi
+elif [ -n "$PY" ]; then
     echo "  the moons, the selection bubble, the hulls and the asteroids, from your own SOD files:"
     sods --install
 else
@@ -556,12 +769,13 @@ else
 fi
 # Internet - Online, on our own transport: Wine's dpnet.dll cannot host.
 step online "online multiplayer"
-put Online.asi; put Online.ini
+if skipped online; then layer_out Online; echo "  online multiplayer left out (you chose to)"
+else put online Online.asi; put online Online.ini; fi
 
 step cutscenes "cutscene player"
 if skipped cutscenes; then
     unproxy   # one an earlier install put in goes too
-    echo "  cutscene player skipped (A2_SKIP)"
+    echo "  cutscene player skipped (left out)"
 else
     # The proxy forwards every call to the stock DLL as binkw32_orig.dll.
     if ! is_proxy "$game/binkw32.dll"; then
@@ -570,21 +784,11 @@ else
         cp -p "$game/binkw32.dll" "$game/binkw32_orig.dll"
     fi
     [ -f "$game/binkw32_orig.dll" ] || { echo "binkw32.dll is the proxy but binkw32_orig.dll is missing" >&2; exit 1; }
-    put binkw32.dll; put BinkProxy.ini
+    put cutscenes binkw32.dll; put cutscenes BinkProxy.ini
 fi
 
-step renderer "renderer settings"
-if [ "$mac" = 1 ]; then
-    # Only DXVK reads it; one of ours from an earlier install goes.
-    if [ -f "$game/dxvk.conf" ] && grep -qF "$DXVK_MARKER" "$game/dxvk.conf"; then
-        rm -f "$game/dxvk.conf"
-    fi
-    echo "  dxvk.conf skipped: only DXVK reads it, and a Mac has no DXVK for Direct3D 9"
-elif [ -f "$game/dxvk.conf" ] && ! grep -qF "$DXVK_MARKER" "$game/dxvk.conf"; then
-    echo "  dxvk.conf skipped: there is one already that this package did not write"
-else
-    put dxvk.conf
-fi
+# Settings that moved between files since the version the player had.
+apply_moved
 
 # ------------------------------------------------------------------ old bloom
 
@@ -597,8 +801,7 @@ old_bloom_out
 
 step done "done"
 # Wine prefers its own builtin DLLs; these make it load the game directory's.
-overrides="winmm=n,b;d3d8=n,b"
-if [ -e "$game/d3d9.dll" ]; then overrides="$overrides;d3d9=n,b"; fi
+overrides="winmm=n,b;d3d8=n,b"   # no d3d9 since 15.6.0: nothing of ours is on that slot
 # The GUI installer reads every line of the form "    NAME=value" as a launcher variable;
 # print no other line in that shape.
 echo

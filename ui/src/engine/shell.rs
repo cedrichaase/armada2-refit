@@ -10,66 +10,48 @@
 //! names the next screen in `g_shellMode`. `run_screen` does the same around a
 //! closure, and `[Demo] Shell=1` puts the demo screen in the Credits' place.
 use super::dev8::{self, Dev8};
-use super::{field, hook, rd, storm3d};
+use super::{field, hook as patcher, rd, storm3d};
 use crate::rt::win::*;
 use crate::log;
 use crate::surface::Context;
 
-/// `DispatchDialog`'s call of `Show_Credits` (the shell mode 30 case).
-const SITE_CREDITS: usize = 0x606bd4;
-/// `Show_Credits()`, cdecl.
-const FN_SHOW_CREDITS: usize = 0x5913a0;
+use crate::syms_shell::{field, hook, sym, value, TABLE};
+
+fn eng() -> &'static a2engine::Engine {
+    TABLE.engine()
+}
 
 /// `ST3D_GraphicsEngine::SetActiveDisplay(ST3D_DisplayType)`, thiscall: 2 is the 3D
-/// display (the game's resolution), 3 the shell's (800x600 stock, or what Menus.asi
-/// raises it to).
-const FN_SET_ACTIVE_DISPLAY: usize = 0x62c6d0;
-const DISPLAY_3D: u32 = 2;
-const DISPLAY_SHELL: u32 = 3;
-/// `ST3D_GraphicsEngine::ClearDeviceDisplays(const ST3D_Colour&)`, thiscall.
-const FN_CLEAR_DEVICE_DISPLAYS: usize = 0x62d880;
-/// `ST3D_Colour_Black`.
-const COLOUR_BLACK: usize = 0x7a8f98;
-/// `ST3D_GraphicsEngine::GetWindowHandle()`, thiscall: the 3D window.
-const FN_GET_WINDOW_HANDLE: usize = 0x62bc70;
-/// `HandleMessageQueue()`, cdecl: the engine's own pump.
-const FN_HANDLE_MESSAGE_QUEUE: usize = 0x488730;
-/// `ST3D_DeviceDirectX8::TestCooperativeLevel()`, thiscall: resets a lost device.
-const FN_ST3D_TEST_COOP: usize = 0x623c70;
-/// `ST3D_DeviceDirectX8`'s vtable, and its `FlipToGDISurface` slot.
-const VT_ST3D_DX8: usize = 0x6bc6ac;
-const SLOT_FLIP_TO_GDI: usize = 0x6c / 4;
-/// `SetCurrentBackground(HWND, ShellBitmap*)`, cdecl.
-const FN_SET_CURRENT_BACKGROUND: usize = 0x6083f0;
-/// `ShellBitmap::ShellBitmap(const char*, int, int)`, thiscall; the object is 0x30 bytes.
-const FN_SHELL_BITMAP: usize = 0x5a3960;
-const SHELL_BITMAP_SIZE: usize = 0x30;
-/// `operator new(size_t)`, cdecl: the game's heap, which `ShellBitmap`'s deleting
-/// destructor frees into.
-const FN_NEW: usize = 0x652710;
-/// `ALL_BLACK_8_BY_6_BACKGROUND`: the name of the plain black shell background.
-const ALL_BLACK_BACKGROUND: usize = 0x727fd0;
-/// `g_shellMode`: the screen `do_smain`'s loop dispatches next (1: main menu).
-const SHELL_MODE: usize = 0x7a8980;
-const SHELL_MODE_MAIN_MENU: i32 = 1;
-/// `ExitCode`: where the engine's pump keeps a `WM_QUIT`'s code.
-pub(crate) const EXIT_CODE: usize = 0x737bb0;
-/// `star_trek` (the `Program`): its first byte lets Alt+Tab and Alt+Esc through to
-/// Windows, as `HandleMessageQueue` reads it.
-pub(crate) const PROGRAM: usize = 0x737b30;
+/// display (the game's resolution), 3 the shell's (800x600 stock, or what Display8
+/// raises it to for the menu host).
+const DISPLAY_3D: u32 = value::SHELL_DISPLAY_3D as u32;
+const DISPLAY_SHELL: u32 = value::SHELL_DISPLAY_SHELL as u32;
+const SHELL_MODE_MAIN_MENU: i32 = value::SHELL_MODE_MAIN_MENU;
 
-/// Each function is checked by its first bytes before anything calls it.
-const SIGS: &[(usize, &[u8])] = &[
-    (FN_SHOW_CREDITS, &[0x55, 0x8b, 0xec, 0x6a, 0xff]),
-    (FN_SET_ACTIVE_DISPLAY, &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x1c]),
-    (FN_CLEAR_DEVICE_DISPLAYS, &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x18]),
-    (FN_GET_WINDOW_HANDLE, &[0x8b, 0x89, 0xcc, 0x00, 0x00, 0x00]),
-    (FN_HANDLE_MESSAGE_QUEUE, &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x1c]),
-    (FN_ST3D_TEST_COOP, &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x08]),
-    (FN_SET_CURRENT_BACKGROUND, &[0x55, 0x8b, 0xec, 0x51]),
-    (FN_SHELL_BITMAP, &[0x55, 0x8b, 0xec, 0x6a, 0xff]),
-    (FN_NEW, &[0x55, 0x8b, 0xec]),
-];
+/// `ExitCode`'s address, where the engine's pump keeps a `WM_QUIT`'s code; 0 when the
+/// shell's device reads did not become ready.
+pub(crate) fn exit_code_addr() -> usize {
+    if eng().ready(hook::SHELL_READS_DEVICE).is_err() {
+        return 0;
+    }
+    eng().addr(sym::SHELL_EXIT_CODE)
+}
+
+/// `star_trek` (the `Program`)'s address: its first byte lets Alt+Tab and Alt+Esc
+/// through to Windows, as `HandleMessageQueue` reads it; 0 when not ready.
+pub(crate) fn program_addr() -> usize {
+    if eng().ready(hook::SHELL_READS_DEVICE).is_err() {
+        return 0;
+    }
+    eng().addr(sym::SHELL_PROGRAM)
+}
+
+/// Whether the Alt+Tab / Alt+Esc keys are kept from Windows (the program does not allow
+/// them), as `HandleMessageQueue` decides.
+fn keep_alt_keys() -> bool {
+    let p = program_addr();
+    p == 0 || unsafe { rd::<u8>(p) } == 0
+}
 
 /// What `run_screen` returns when the game was asked to quit while it ran (the
 /// `WM_QUIT` is posted again, so the shell sees it too).
@@ -84,24 +66,19 @@ pub fn credits_ours() -> bool {
     unsafe { CREDITS }
 }
 
-/// Patches the hooks; false (and nothing patched) when a site is not stock.
+/// Patches the hooks; false (and nothing patched) when the engine stands the hook down.
 pub fn install() -> bool {
-    for &(at, sig) in SIGS {
-        if unsafe { core::slice::from_raw_parts(at as *const u8, sig.len()) } != sig {
-            log!("shell: {:#x} is not stock; standing down", at);
-            return false;
-        }
-    }
-    if hook::call_target(SITE_CREDITS) != Some(FN_SHOW_CREDITS) {
-        log!("shell: the Credits call at {:#x} is not stock; standing down", SITE_CREDITS);
+    if eng().ready(hook::SHELL_SCREENS).is_err() || eng().ready(hook::SHELL_READS_DEVICE).is_err() {
         return false;
     }
+    let site = eng().addr(sym::SHELL_CREDITS_SITE);
+    let show = eng().addr(sym::SHELL_SHOW_CREDITS);
     unsafe { READY = true };
     if crate::config::get().demo_shell || crate::config::get().demo_style {
         // The demo takes the Credits' place (below).
     } else if crate::config::get().credits {
-        if !hook::patch_call(SITE_CREDITS, FN_SHOW_CREDITS, crate::credits::show as *const () as usize) {
-            log!("shell: could not patch {:#x}", SITE_CREDITS);
+        if !patcher::patch_call(site, show, crate::credits::show as *const () as usize) {
+            log!("shell: could not patch {:#x}", site);
             return false;
         }
         unsafe { CREDITS = true };
@@ -109,8 +86,8 @@ pub fn install() -> bool {
         return true;
     }
     if crate::config::get().demo_shell || crate::config::get().demo_style {
-        if !hook::patch_call(SITE_CREDITS, FN_SHOW_CREDITS, demo_credits as *const () as usize) {
-            log!("shell: could not patch {:#x}", SITE_CREDITS);
+        if !patcher::patch_call(site, show, demo_credits as *const () as usize) {
+            log!("shell: could not patch {:#x}", site);
             return false;
         }
         log!("shell: [Demo] Shell=1 -- Credits shows the demo screen");
@@ -146,29 +123,33 @@ fn set_active_display(t: u32) -> u32 {
     if s == 0 {
         return 1;
     }
-    unsafe { this1(FN_SET_ACTIVE_DISPLAY, s, t as usize) as u32 }
+    unsafe { this1(eng().addr(sym::SHELL_SET_ACTIVE_DISPLAY), s, t as usize) as u32 }
 }
 
 /// The current `ST3D_DeviceDirectX8` (Storm3D `+0xc0` into the table at `+0xcc`), or 0
 /// if it is not one.
 pub(crate) fn st3d_device() -> usize {
+    if eng().ready(hook::SHELL_READS_DEVICE).is_err() {
+        return 0;
+    }
     let s = storm3d();
-    let d = field(s + 0xcc, field(s, 0xc0) * 4);
-    if d != 0 && field(d, 0) == VT_ST3D_DX8 { d } else { 0 }
+    let d = field(s + field::SHELL_STORM3D_DEVICES, field(s, field::SHELL_STORM3D_DEVICE_INDEX) * 4);
+    if d != 0 && field(d, 0) == eng().addr(sym::SHELL_DX8_VTABLE) { d } else { 0 }
 }
 
 fn window() -> HWND {
     let s = storm3d();
-    if s == 0 || field(s, 0xcc) == 0 {
+    if s == 0 || field(s, field::SHELL_STORM3D_DEVICES) == 0 {
         return core::ptr::null_mut();
     }
-    unsafe { this0(FN_GET_WINDOW_HANDLE, s) as HWND }
+    unsafe { this0(eng().addr(sym::SHELL_GET_WINDOW_HANDLE), s) as HWND }
 }
 
 fn flip_to_gdi() {
     let d = st3d_device();
-    if d != 0 {
-        unsafe { this0(field(VT_ST3D_DX8, SLOT_FLIP_TO_GDI * 4), d) };
+    let slot = eng().addr(sym::SHELL_DX8_FLIP_TO_GDI);
+    if d != 0 && slot != 0 {
+        unsafe { this0(field(slot, 0), d) };
     }
 }
 
@@ -217,7 +198,7 @@ fn pump(p: &mut Pumped) -> Option<i32> {
             }
             // HandleMessageQueue keeps Alt+Tab and Alt+Esc from Windows unless the
             // program allows it.
-            if m.message == WM_SYSKEYDOWN && (m.wparam == 0x09 || m.wparam == 0x1b) && rd::<u8>(PROGRAM) == 0 {
+            if m.message == WM_SYSKEYDOWN && (m.wparam == 0x09 || m.wparam == 0x1b) && keep_alt_keys() {
                 continue;
             }
             TranslateMessage(&m);
@@ -238,10 +219,6 @@ fn pump(p: &mut Pumped) -> Option<i32> {
 // own "before", and the two called each other until the stack ran out. So the engine's
 // own answer is changed instead, at the one `call [SetCursor]` in its `WM_SETCURSOR`
 // case.
-/// In `WindowProc`, the `WM_SETCURSOR` case: `push 0` then this `call [SetCursor]`.
-const SITE_WM_SETCURSOR: usize = 0x488883;
-/// `call dword ptr [__imp__SetCursor@4]`.
-const STOCK_WM_SETCURSOR: [u8; 6] = [0xff, 0x15, 0xa8, 0x81, 0x7b, 0x00];
 static mut ARROW: HANDLE = core::ptr::null_mut();
 static mut ARROW_ON: bool = false;
 static mut OS_CURSOR_HIDDEN: bool = false;
@@ -254,12 +231,19 @@ fn patch_wm_setcursor() -> bool {
         if SETCURSOR_PATCHED {
             return true;
         }
-        let at = SITE_WM_SETCURSOR;
+        if eng().ready(hook::SHELL_CURSOR).is_err() {
+            return false;
+        }
+        // In `WindowProc`, the `WM_SETCURSOR` case: `push 0` then a `call [SetCursor]`,
+        // replaced by a call of ours (`ready` checked what is there).
+        let at = eng().addr(sym::SHELL_WM_SETCURSOR);
         let rel = (wm_setcursor as *const () as usize as i64 - (at as i64 + 5)) as i32;
         let mut new = [0xe8u8, 0, 0, 0, 0, 0x90];
         new[1..5].copy_from_slice(&rel.to_le_bytes());
-        if !hook::patch_bytes(at, &STOCK_WM_SETCURSOR, &new) {
-            log!("shell: WindowProc's WM_SETCURSOR at {:#x} is not stock: the 3D window keeps no cursor", at);
+        let mut stock = [0u8; 6];
+        core::ptr::copy_nonoverlapping(at as *const u8, stock.as_mut_ptr(), 6);
+        if !patcher::patch_bytes(at, &stock, &new) {
+            log!("shell: could not patch WindowProc's WM_SETCURSOR at {:#x}: the 3D window keeps no cursor", at);
             return false;
         }
         SETCURSOR_PATCHED = true;
@@ -327,7 +311,7 @@ pub(crate) fn arrow_cursor(w: HWND, on: bool) {
 /// can be reset.
 pub(crate) fn test_cooperative(st: usize) {
     if unsafe { READY } && st != 0 {
-        unsafe { this0(FN_ST3D_TEST_COOP, st) };
+        unsafe { this0(eng().addr(sym::SHELL_ST3D_TEST_COOP), st) };
     }
 }
 
@@ -347,18 +331,19 @@ fn log_facts(when: &str) {
     let mut cr = WinRect::default();
     let style = if w.is_null() { 0 } else { unsafe { GetClientRect(w, &mut cr); GetWindowLongA(w, GWL_STYLE) } };
     log!(
-        "shell: {}: Storm3D {:#x} display {} device[{}] {:#x} (dx8 class: {}) d3d8 {:p} window {:p} client {}x{} style {:#x}",
+        "shell: {}: Storm3D {:#x} display {} device[{}] {:#x} (dx8 class: {}) d3d8 {:p} window {:p} client {}x{} style {:#x}; Display8 says the mode is {:?}",
         when,
         s,
-        field(s, 0x10c),
-        field(s, 0xc0),
-        field(s + 0xcc, field(s, 0xc0) * 4),
+        field(s, field::SHELL_STORM3D_DISPLAY),
+        field(s, field::SHELL_STORM3D_DEVICE_INDEX),
+        field(s + field::SHELL_STORM3D_DEVICES, field(s, field::SHELL_STORM3D_DEVICE_INDEX) * 4),
         st3d_device() != 0,
         dev,
         w,
         cr.right - cr.left,
         cr.bottom - cr.top,
-        style as u32
+        style as u32,
+        crate::gfx::gpu().display_mode()
     );
     if dev.is_null() {
         return;
@@ -368,13 +353,6 @@ fn log_facts(when: &str) {
     }
     if let Some(m) = dev8::display_mode(dev) {
         log!("shell: {}: display mode {}x{} @{} format {}", when, m.width, m.height, m.refresh, m.format);
-    }
-    match dev8::present_params9(dev) {
-        Some(p) => log!(
-            "shell: {}: d3d9 swap chain {}x{} x{} windowed {} swap effect {} interval {:#x} window {:#x}",
-            when, p.bb_width, p.bb_height, p.bb_count, p.windowed, p.swap_effect, p.interval, p.window
-        ),
-        None => log!("shell: {}: no d3d9 device behind the game's (not d3d8to9)", when),
     }
 }
 
@@ -427,7 +405,10 @@ pub fn run_screen_under(under: &mut dyn FnMut(u32, u32), f: &mut dyn FnMut(&Pump
         let mut p = Pumped::default();
         if let Some(code) = pump(&mut p) {
             unsafe {
-                core::ptr::write_unaligned(EXIT_CODE as *mut i32, code);
+                let ec = exit_code_addr();
+                if ec != 0 {
+                    core::ptr::write_unaligned(ec as *mut i32, code);
+                }
                 PostQuitMessage(code);
             }
             log!("shell: WM_QUIT ({}) during a screen of ours", code);
@@ -440,7 +421,7 @@ pub fn run_screen_under(under: &mut dyn FnMut(u32, u32), f: &mut dyn FnMut(&Pump
         let st = st3d_device();
         let mut done = None;
         if !dev.is_null() && st != 0 {
-            unsafe { this0(FN_ST3D_TEST_COOP, st) };
+            unsafe { this0(eng().addr(sym::SHELL_ST3D_TEST_COOP), st) };
             if dev8::test_cooperative_level(dev) < 0 {
                 lost += 1;
                 done = f(&p);
@@ -477,7 +458,7 @@ pub fn run_screen_under(under: &mut dyn FnMut(u32, u32), f: &mut dyn FnMut(&Pump
     log!("shell: screen of ours done ({}) after {} frames, {} lost", result, frames, lost);
     unsubclass();
     let s = storm3d();
-    unsafe { this1(FN_CLEAR_DEVICE_DISPLAYS, s, COLOUR_BLACK) };
+    unsafe { this1(eng().addr(sym::SHELL_CLEAR_DEVICE_DISPLAYS), s, eng().addr(sym::SHELL_COLOUR_BLACK)) };
     set_shell_display_and(result)
 }
 
@@ -486,7 +467,7 @@ pub fn run_screen_under(under: &mut dyn FnMut(u32, u32), f: &mut dyn FnMut(&Pump
 fn set_shell_display_and(r: i32) -> i32 {
     set_active_display(DISPLAY_SHELL);
     flip_to_gdi();
-    unsafe { cdecl0(FN_HANDLE_MESSAGE_QUEUE) };
+    unsafe { cdecl0(eng().addr(sym::SHELL_HANDLE_MESSAGE_QUEUE)) };
     log_facts("back in the shell");
     r
 }
@@ -495,14 +476,17 @@ fn set_shell_display_and(r: i32) -> i32 {
 /// with `ALL_BLACK_8_BY_6_BACKGROUND`), so the next menu opens over black as it does
 /// after the stock Credits.
 fn black_background() {
+    if !unsafe { READY } {
+        return;
+    }
     let w = window();
     unsafe {
-        let bmp = cdecl1(FN_NEW, SHELL_BITMAP_SIZE);
+        let bmp = cdecl1(eng().addr(sym::SHELL_NEW), value::SHELL_BITMAP_SIZE as usize);
         if bmp == 0 {
             return;
         }
-        this3(FN_SHELL_BITMAP, bmp, rd::<usize>(ALL_BLACK_BACKGROUND), 0, 0);
-        cdecl2(FN_SET_CURRENT_BACKGROUND, w as usize, bmp);
+        this3(eng().addr(sym::SHELL_SHELL_BITMAP), bmp, rd::<usize>(eng().addr(sym::SHELL_ALL_BLACK_BACKGROUND)), 0, 0);
+        cdecl2(eng().addr(sym::SHELL_SET_CURRENT_BACKGROUND), w as usize, bmp);
         // Its deleting destructor, vtable slot 0, with the delete flag.
         this1(field(field(bmp, 0), 0), bmp, 1);
     }
@@ -531,6 +515,9 @@ extern "C" fn demo_credits() {
 /// leave and the main menu next, as the stock Credits do.
 pub fn leave_to_main_menu() {
     black_background();
-    unsafe { core::ptr::write_unaligned(SHELL_MODE as *mut i32, SHELL_MODE_MAIN_MENU) };
+    let mode = eng().addr(sym::SHELL_MODE);
+    if mode != 0 {
+        unsafe { core::ptr::write_unaligned(mode as *mut i32, SHELL_MODE_MAIN_MENU) };
+    }
 }
 

@@ -242,6 +242,8 @@ pub fn widgets(ui: &mut Ui, s: &Screen) {
 /// What a slider is dragged to, between its press and its release: (the scroll bar,
 /// the value). The stock bar takes a click, so the click is sent when the player lets go.
 static mut DRAG: (usize, f32) = (0, 0.0);
+/// The value last sent to a bar (its key), until the bar's own value is seen to match.
+static mut SENT: (usize, i32) = (0, 0);
 
 /// A stock `ShellScrollBar` as our slider over `track` (the screen rectangle of its
 /// track). The bar takes a click at a point of the track and sets itself from where it
@@ -253,8 +255,14 @@ pub fn shell_slider(ui: &mut Ui, s: &Screen, c: &Control, track: R, id: &str) {
         return;
     }
     let drag = unsafe { DRAG.0 == c.key };
+    if unsafe { SENT.0 == c.key && SENT.1 == c.pos } {
+        unsafe { SENT = (0, 0) };
+        crate::log!("menus: scroll bar read back at {} of {}..{}", c.pos, c.range.0, c.range.1);
+    }
     let mut v = if drag { unsafe { DRAG.1 } } else { c.pos as f32 };
-    let changed = ui.slider(track, id, &mut v, lo, hi);
+    // A key steps a twentieth of the range, at least one value: a range under 20 would
+    // otherwise round back to where it stood.
+    let changed = ui.slider_step(track, id, &mut v, lo, hi, ((hi - lo) / 20.0).max(1.0));
     if !s.top {
         return;
     }
@@ -277,16 +285,37 @@ pub fn shell_slider(ui: &mut Ui, s: &Screen, c: &Control, track: R, id: &str) {
 
 /// Sets a stock scroll bar to `v` with a click at the point of its track that maps to
 /// it (the bar maps the point's distance along the track, over the track's length plus
-/// one, onto its range).
+/// one, onto its range). The track's last pixel maps to the high end minus one at best,
+/// and the point that would map to the high end lies past the track, on the far arrow
+/// button or beyond the bar, so the high end is reached with a click at the last pixel
+/// of the track and one on the far arrow button, which steps the value up by one
+/// (graphics detail could not be set back to its top before).
 pub fn click_scroll(s: &Screen, c: &Control, v: i32) {
     let (lo, hi) = c.range;
+    unsafe { SENT = (c.key, v) };
+    crate::log!("menus: scroll bar set to {} of {}..{}", v, lo, hi);
     let n = (hi - lo).max(1);
-    let along = ((v - lo) * (c.track.1 + 1) * 2 + (c.track.1 + 1)) / (2 * n);
-    let (x, y) = if c.horizontal {
-        (c.track.0 + along, c.rect[1] + c.rect[3] / 2)
-    } else {
-        (c.rect[0] + c.rect[2] / 2, c.track.0 + along)
+    let len = c.track.1;
+    let at = |along: i32| -> (i32, i32) {
+        if c.horizontal {
+            (c.track.0 + along, c.rect[1] + c.rect[3] / 2)
+        } else {
+            (c.rect[0] + c.rect[2] / 2, c.track.0 + along)
+        }
     };
+    if v >= hi {
+        let (x, y) = at(len.max(1) - 1);
+        s.click(x, y);
+        let (x, y) = if c.horizontal {
+            (c.rect[0] + c.rect[2] - 3, c.rect[1] + c.rect[3] / 2)
+        } else {
+            (c.rect[0] + c.rect[2] / 2, c.rect[1] + c.rect[3] - 3)
+        };
+        s.click(x, y);
+        return;
+    }
+    let along = ((v - lo) * (len + 1) * 2 + (len + 1)) / (2 * n);
+    let (x, y) = at(along.min(len.max(1) - 1));
     s.click(x, y);
 }
 

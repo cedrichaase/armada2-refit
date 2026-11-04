@@ -4,6 +4,132 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 1.0.4 — 2026-11-04
+
+### Fixed
+- Vulkan: a failed `vkQueueSubmit` in `display8v1_vk_flush` gives the slot a fresh signalled fence (as `end_frame` does) and begins the command buffer again, so the next `begin` on the slot no longer waits for ever and the frame stays one being recorded (`Vk::flush`).
+- Vulkan: `make_swapchain` takes the old images' views, framebuffers and semaphores out of its lists as it destroys them, and frees what one image made before a failure, so a failure part way never leaves a destroyed handle to be used or destroyed twice; `present` makes the swap chain again before acquiring while it is incomplete. A changed surface format destroys the old present render pass.
+- Direct3D 12: a fence not reached after six 5 s waits (or with the device removed) marks the device lost; `begin` no longer resets the allocator and list or runs the deferred frees the GPU may still be using, `display8v1_dx12_frame` answers null, and `flush` stops there (`Dx12::wait`, `Dx12::ready`).
+- A second `Direct3DCreate8` no longer starts the stub again: after a late bail-out it gets the system's `IDirect3D8` (the stub's vtable stays the forward), and while the stub runs another `IDirect3D8` of the stub's (`bail::again`, `stub::another`).
+- After a bail-out (`Backend=none` included) the shell's 800x600 request is no longer raised to the desktop's for the UI's menu host, which refuses every dialog without a device: the stock shell fills the screen again (`stub/modes.rs`).
+- Overlay writes (`RefitPlayer.ini`) retry the rename 8 x 50 ms while a reader holds the file (`a2rt::move_file`, root 15.6.15).
+
+Installed, not yet seen in game.
+
+## 1.0.3 — 2026-11-03
+
+### Fixed
+- Vulkan: a spent descriptor pool no longer freezes the picture (PR #23 by bmh129, ported from 0.15.3 and 0.15.4 onto the 1.0 code). A frame that could not be presented was left open, so its pool was never reset and every later frame failed the same way, ending in `vulkan: no swap chain image (TIMEOUT)`. The present pass takes its two sets from a pool of its own per slot (`Slot::ppool`), everything that can fail comes before the image is acquired, and a frame that still cannot be presented is ended unshown (`Vk::abandon`, logged as `vulkan: frame N not presented (...)`).
+- An abandoned frame returns true (the frame is dropped, the device is fine): it was `D3DERR_DEVICELOST`, and the stub's `Reset` rebuilt every plugin over one skipped frame.
+- Vulkan: `Vk::end_frame` ends a frame for `present` and `abandon` alike. A failed `vkEndCommandBuffer` leaves the fence alone and submits nothing; a failed `vkQueueSubmit` gives the slot a fresh signalled fence; `abandon` saves the pipeline cache every `cache::EVERY` frames as `present` does.
+- Vulkan: the frame pool's `COMBINED_IMAGE_SAMPLER` count is 65536, so its 16384 sets cover 4096 of gpu's 16-sampler texture sets (it was 2048).
+- Direct3D 12: the present pass's upload ring and descriptors come before the barriers, and a frame that cannot get them is ended unshown (`Dx12::abandon`, logged as `d3d12: frame N not presented (...)`), where it stayed open and froze every later frame.
+- Built on `gpu` 2.0.1.
+
+Installed, not yet seen in game.
+
+## 1.0.2 — 2026-11-03
+
+### Fixed
+- Below the top Graphics Detail, every texture the engine drew through the passthrough was white (the nebulae left to the engine as hard-edged flat squares; the fog's texture without a mirror for the overlays): the stub's `CheckDeviceFormat` said yes to R5G6B5, X1R5G5B5, A1R5G5B5 and A4R4G4B4 (and A8, L8, A8L8, DXT), which the engine asks for first below the top detail, and no mirror holds them. It now takes A8R8G8B8 and X8R8G8B8 alone as textures, so the engine creates them 32-bit at every detail (`stub/d3d.rs`, `texture_format_ok`).
+
+### Changed
+- A texture the passthrough draws white is logged once per format in `Display8.log`, tracer or not (`passthrough: a texture of format N ... drawn with a white one`).
+
+Installed, not yet seen in game.
+
+## 1.0.1 — 2026-11-03
+
+### Removed
+- The d3dbc form of the shaders (`src/shaders/ff.rs`, `present.rs`), unused since 1.0.0;
+  the stamps of the SPIR-V and DXIL moved (their code did not). `build.sh` no longer
+  passes `--fix`. The contract's `BACKEND_D3D9` is retired in `gpu/src/display.rs`
+  (Display8 never answers it).
+
+Installed, not yet seen in game.
+
+## 1.0.0 — 2026-11-03
+
+### Added
+- The bail-out (phase 11 R1): when Display8 cannot draw the game it hands the engine the system's own `d3d8.dll` (`GetSystemDirectoryA`), never a `d3d8_real.dll`, and `display8v1_backend` answers none, so the plugins stand down (`bail.rs`). Early at `Direct3DCreate8` (`Backend=none`, an unknown build, a stood-down `display.modes`, a legacy plugin loaded, or both probes failing: `vk::probe`, `dx12::probe`); late at the engine's first `CreateDevice` when every backend fails there (the stub's `IDirect3D8` becomes a 16-method forward of the system's). Logged `bail-out: <why>; the game draws through <path>; the plugins stand down`.
+- `Backend=none`: the bail-out on purpose (the stock renderer); `none` ends a list.
+
+### Changed
+- `[Samplers]` is read from `Display8.ini` alone, shipped `Anisotropy=16`, `LodBias=-0.5`, `ClampNegativeLodBias=0` (`auto` is the same); `dxvk.conf` is no longer read. `Defaults=3` (`tools/ini-merge.py`) carries a marked `dxvk.conf`'s differing values into `[Samplers]`.
+- `display/install` moves no chain behind Display8 any more (no `d3d8_real.dll`); `--remove` puts back the backup, else an old `d3d8_real.dll`.
+- The tracer, `[Drop]` and the detail capture run on the stub's device; `display/bench-mode.sh` takes `stub` only (`forward` runs as the stub, with a warning) and can write the retired `Mode=`/`Real=` for `display-retired-keys`.
+- `display/bench-abi.sh old-display` puts the old Display8's chain (d3d8to9 as `d3d8_real.dll`, DXVK's `d3d9.dll`) into the clone itself, from the old commit's `platform/vendor`.
+
+### Removed
+- Forward mode: `Mode=` and `Real=` (read past, logged `settings: Mode=forward retired`), the forward wrappers (`d3d8/device.rs`, `direct3d.rs`, `resource.rs`, `com.rs`'s registry, `pass!`/`unknown!`/`draw!`).
+- Direct3D 9: `Backend=d3d9` (the token is skipped, logged `settings: Backend token d3d9 retired (Direct3D 9 removed)`; a list left empty is `auto`), the Direct3D 9 device, its mirrors and the QI for `IDirect3DDevice9`/`IDirect3DTexture9`, the gamma pass (`stub/gamma.rs`); `display8v1_backend` never answers `BACKEND_D3D9`.
+
+Installed, not yet seen in game.
+
+## 0.21.0 — 2026-11-03
+
+### Added
+- `Display8.ini [Samplers]` (phase 10 X2): `Anisotropy`, `LodBias` and `ClampNegativeLodBias`, rows in `settings.toml` (no screen row, advanced). A value that is not `auto` is what the plugins' samplers on Vulkan and Direct3D 12 and the passthrough's (`vk/pass.rs`, `dx12/pass.rs` through `passthrough/state.rs`) take; the shipped `auto` reads that key from the game's `dxvk.conf`, as before. `Display8.log` says which: `samplers: Anisotropy=16 (Display8.ini)` or `(dxvk.conf)`. `Defaults=` is not bumped; the merge adds the section and keeps the player's values.
+
+Installed, not yet seen in game.
+
+## 0.20.0 — 2026-11-03
+
+### Added
+- Passthrough on Direct3D 12 (phase 10 X1; `src/dx12/pass.rs`): the engine's own draws are recorded onto the frame's list as `vk/pass.rs` records them on Vulkan, into the pass render3d published last in the frame (`exports::published`, by its own `rtv`/`dsv`, formats and sample count) or else the engine's targets. One root signature (the vertex block as root CBVs at b0 spaces 0 and 1, the pixel block at b1, tables of t0-t1 and s0-s1), pipelines by the target's formats and samples, topology, vertex layout, blend, depth and cull, a defaults record as instance data in slot 1, a white texture, mirrors for the engine's textures (`mirror::passthrough`), per-stage samplers as DXVK makes them. Nothing is assumed set that a plugin's `Cmd` may have changed and nothing is recorded while one is alive: `pass::forget` at each plugin `Cmd` event and flush.
+- `display/hosttest`: host tests of `passthrough/state.rs` (`cargo test --release --target x86_64-unknown-linux-gnu --manifest-path display/hosttest/Cargo.toml`).
+
+### Changed
+- `src/passthrough.rs` is `src/passthrough/{mod.rs,state.rs}`: `state.rs` holds the API-neutral translation that sat in `vk/pass.rs` (layouts, constant blocks, blend/depth/cull/topology keys, sampler parameters, attributes, viewport clamp, notes on state not drawn as Direct3D 8 would); the Vulkan frame is unchanged (RMSE 0 against the base).
+- The once-log "passed through on Vulkan only" is gone: a stub on Direct3D 9 still drops the engine's draws and says so. `Passthrough=` logs "Vulkan and Direct3D 12".
+
+Installed, not yet seen in game
+
+## 0.19.0 — 2026-11-03
+
+### Added
+- Contract 1.4 (`gpu/src/display.rs`, "Pass publishing on Direct3D 12"; gpu 1.3.0): the export `display8v1_dx12_pass(event, pass)` and `Dx12Pass8`, the Direct3D 12 twin of `display8v1_vk_pass`. Display8 keeps the pass published last for the frame (`dx12/exports.rs`, `published()`, forgotten at `Present`) and counts the `Cmd`s alive (`cmd_alive()`), for the passthrough on Direct3D 12 (phase 10 X1); nothing draws into it yet. `Display8.log` logs `dx12: pass published WxH xN` once for each kind of pass (on the bench render3d's 4x scene pass and a 1x pass, each frame). The rebind rule: Display8 sets no descriptor heaps but its own, and gpu binds everything again after any call into Display8.
+
+Installed, not yet seen in game
+
+## 0.18.0 — 2026-11-03
+
+### Added
+- `[Window]` in `Display8.ini` and the first `display/settings.toml` (`Display8_Settings`, three rows, all `NO_ROW`): `Native`, `KeepClip` and `RaiseIntro`, the first two moved from `UI.ini`'s `[UI]` (`moved_from`, which the UI hub and `./install` carry over). Display8 is now the only plugin that changes a display-mode request, the game's window or the pointer's clip (`display/README.md`, "Window and display mode").
+- The shell's 800x600x16 request is raised to the desktop's mode while a plugin claims the new `CLAIM_MENUS`, and the intro's 640x480 under `RaiseIntro=1`, both inside the engine's mode lookups (`stub/modes.rs`, no byte patch), in forward mode too. `Native` is Display8's hook at the call of `InitializeGraphicsSystem` (hook `display.native`). `KeepClip` runs at `Present` (hook `display.keepclip`).
+- Contract 1.3 (`gpu/src/display.rs`): `CLAIM_MENUS` and the export `display8v1_mode`, the mode the device was opened at. The profile gets the entries the moved code reads.
+
+Installed, not yet seen in game
+
+
+## 0.17.0 — 2026-11-03
+
+### Changed
+- On the symbol profile (`profiles/gog-1.1/display.toml`, generated `src/engine_syms.rs`): hooks `display.modes` (FindDisplayMode, its six calls, the front end's 800x600x16 as `value` entries) and `display.drop` (the `[Drop]` and claimed-scene code ranges). No address is left in the sources. Display8.log logs the build line and `engine: symbols: 15/15 resolved; 0 hooks blocked` after the identity line.
+- `display.modes` is now all or nothing: if FindDisplayMode or any of its six calls is not stock, none is written.
+
+### Added
+- On a build it does not know, or with `display.modes` standing down, Display8 forwards to the old chain instead of starting the stub (`engine: unknown build: Display8 forwards to the old chain`): measured, the stub cannot open a display without its mode hook. `display.drop` standing down drops nothing and claims no scene of the engine's.
+
+Installed, not yet seen in game
+
+## 0.16.1 — 2026-11-03
+
+### Added
+- Display8.log logs `engine: Armada2.exe timestamp 0x…, image size 0x…, sections 0x…` (the executable's identity: `crates/a2engine`, `csdk/a2engine.h`) right after its start-up line. Changes no behaviour. `trace::exe_range` reads the module through the same PE reader.
+
+Installed, not yet seen in game
+
+## 0.16.0 — 2026-11-02
+
+### Added
+- `Display8.ini`'s keys may now come from the player's overlay, `RefitPlayer.ini`
+  (`[Display8.<Section>]`, read first; the a2rt overlay lookup,
+  `tools/settings/README.md`), with a `settings: RefitPlayer.ini [...]` line in
+  Display8.log for each value it supplies. Without the file nothing changes.
+
+Confirmed in game 2026-11-03.
+
 ## 0.15.2 — 2026-10-30
 
 ### Fixed

@@ -3,7 +3,7 @@
 Resolutions: 1920x1080
 Mod: refit
 Launch: -nointro a2_borg01
-Setup: ui/bench-asi.sh --no-grid --scene fog HUD.Minimap=1 HUD.Selection=1 HUD.UnitView=1
+Setup: ui/bench-asi.sh --scene fog HUD.Minimap=1 HUD.Selection=1 HUD.UnitView=1
 Timeout: 10 min
 
 `ui/HUD.md`, "The selection overlay" and "The minimap". The scene is `fog`

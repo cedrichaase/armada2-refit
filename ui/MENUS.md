@@ -19,10 +19,155 @@ Three parts, each in its own file:
 | actions | `src/menus/actions.rs` | what the UI does to a dialog, run after the frame |
 | the backdrop | `src/menus/backdrop.rs` | the mission, dimmed, under the in-mission menus |
 
-**Menus.asi is superseded, not run alongside.** If `Menus.asi` (or `MenuScale.asi`) is
-loaded, the menu part stands down at startup and the shell runs as Menus.asi makes it.
-It also stands down if any of the user32 imports it hooks is not user32's own (another
-plugin hooked it first). `ui/bench-asi.sh --menus` takes Menus.asi out of a bench clone.
+**Menus.asi is gone.** The menu part stands down at startup if any of the user32
+imports it hooks is not user32's own (another plugin hooked it first). `retire/retire.sh`
+takes `Menus.asi` out of an old install.
+
+## What the shell is, in the engine
+
+The facts about the stock front end that the host below is built on, measured on the
+retired `Menus.asi` (which scaled and embedded the shell itself) and kept here because
+the host meets every one of them.
+
+**A fixed-pixel GDI shell on a fixed mode.** Every menu (main menu, Options, load and
+save, campaign select, multiplayer) is a Win32 dialog drawn with GDI at hard-coded
+coordinates from 800x600 8-bit BMPs in `bitmaps/`. `Armada2.exe` imports `BitBlt` and
+no `StretchBlt` or `SetWorldTransform`, and the shell never touches Direct3D, so no
+`gui_*.cfg` (the in-game HUD's canvas) or renderer setting can scale it. And the
+engine asks for **800x600x16 while the menus are up**: `GetSystemMetrics` answers 800 at
+the main menu and the game window is 800x600 at 0,0, so a stock shell *fills a small
+screen* and there is nowhere to scale into. The request is
+`ST3D_GraphicsEngine::SetActiveDisplay_Internal`'s call of `FindDisplayMode` with 800,
+600 and 16; raising it is Display8's (`display/README.md`, "The engine's hard-coded
+modes" and "Window and display mode"), and with it the host draws the dialogs at the
+screen's size.
+
+**Every shell screen is a modal dialog.** `DialogBoxParamA` has 36 call sites in the exe
+against 2 for `CreateDialogParamA`, and a modal dialog is pumped by user32's own loop,
+which hands nothing to a message-loop hook: a `GetMessage` or `PeekMessage` hook scaled
+the picture and left every click and hover on the stock 800x600 position. Whatever maps
+the pointer has to sit in front of each dialog's procedure. Only class `#32770` windows
+are dialogs; the 3D window, gameplay, the HUD and the Bink videos are not.
+
+**One OS window needs the dialogs to be children.** Every menu, the in-mission ones
+included, is `DialogBoxParamA(shell_hInstance, id, <3D window>, proc, lp)` with a
+`WS_POPUP` template (all of them but one); `do_escapeMenu` is the main menu's template
+(291). An owned popup is a second top-level window, which under Wine is a second X11
+window that Hyprland tiles and focuses like a new application (two visible top-level
+windows, both re-tiled when Options opened, injected clicks mostly lost). The Wine
+virtual desktop would also give one window, but a display mode cannot be set inside it (DXVK could not; Display8's Vulkan or Direct3D 12 swap chain has no mode to set either),
+so it stays off. The remedy is the `WS_POPUP` to `WS_CHILD` rewrite of the template (the
+host's `CreateDialogIndirectParamA`); a child brings these, each measured:
+
+- **Input.** `DialogBox` disables its owner before the dialog exists (Wine does it for a
+  `WS_CHILD` template too) and hit-testing never enters a disabled window; the top-level
+  is re-enabled at `WM_INITDIALOG`, and modality is kept by a `WH_GETMESSAGE` filter that
+  turns input aimed outside the innermost menu into `WM_NULL`.
+- **Z-order.** Wine walks a modal dialog's owner up to the top level, so a menu opened
+  from a menu (Options to Graphics Settings, template 1) is a *sibling* of the first and
+  is created below it, clipped away by `WS_CLIPSIBLINGS`: each is raised at
+  `WM_INITDIALOG`.
+- **Geometry and owner.** The shell positions menus in screen coordinates through
+  `GetWindow(hDlg, GW_OWNER)`, which a child lacks: answer it with the owner the game
+  asked for and convert to parent-client coordinates just before the real `MoveWindow`
+  or `SetWindowPos`. A full-screen menu is pinned to (0,0), since it covers the game
+  window; taking the game window's screen position and converting back put the main menu
+  at x=21000 on one player's NixOS / GE-Proton10-32 install (not reproduced elsewhere).
+  A full-screen menu is sized once, so it must follow its parent's client area when the
+  window is resized (Hyprland does it when the game drops fullscreen).
+- **Keyboard focus.** The game reads keys only as `WM_KEYDOWN` / `UP` on the 3D window
+  (`ProcessKeyboardMessages`), which must hold the focus. A popup gives it back by
+  re-activating its owner when it closes; a child deactivates nothing and Wine leaves the
+  focus `NULL`, so every keystroke is dropped (Esc opened the in-mission menu once and
+  never again, HUD clicks still worked). Put the focus back where it was when the menu
+  returns, which also sends the `WM_SETFOCUS` on which the game runs
+  `ClearKeyboardState`.
+- **The cursor.** The 3D window's `WindowProc` answers every `WM_SETCURSOR` with
+  `SetCursor(NULL)` (`0x488881`) so the sprite cursor can show in play; a child's
+  `DefWindowProc` asks its parent first, so the arrow vanishes over every menu unless the
+  class cursor of the window under the pointer is set.
+
+**Esc in the in-mission menu.** `EscapeMenuDlgProc` (`0x5cddb0`) has no `WM_COMMAND`
+case, so the `IDCANCEL` a dialog makes of Esc is ignored: stock Esc opens the menu and
+does nothing inside it. Closing it from the keyboard is a left click on Return to Game
+(x 5, y 568, 172x22 at 800x600) sent to its procedure, which runs the same sound, result
+code and `EndDialog` as the mouse.
+
+**The Admiral's Log builds real windows.** `AdmiralsLogDlgProc` (`0x5e22c0`) is a
+full-screen `DialogBoxParamA(0x880)` that in its `WM_INITDIALOG` creates eight tab panes
+with `CreateDialogParamA` (template `0x123`, a bare `WS_POPUP`, at `0x5e3c04`) placed in
+screen coordinates, and the player list, eight tabs, Save and Done as
+`WS_CHILD | WS_VISIBLE | BS_OWNERDRAW` buttons (`CreateWindowExA` at `0x5e394e` and
+`0x5e3b7b`; the Ships and Battles panes add more, `0x5f7e4f`, `0x5e9b63`). **The game
+never destroys the panes**: it relies on an owned popup dying with its owner, which
+breaks once the log is a child (a popup's owner is always a top-level window), so they
+outlived the log and sat over every later menu. The buttons are not drawn through the
+parent's DC; their pixels come from the parent's `WM_DRAWITEM`, which draws only through
+`DRAWITEMSTRUCT.hDC` and `.rcItem`. **A stock bug a memory DC exposes:** the tab and
+Save/Done helper (`0x5e93a0`) ends by selecting the memory DC's original 1x1 bitmap into
+`dis->hDC` (`0x5e94d7`) instead of back into its memory DC. Into a window DC that fails
+harmlessly; into a DC that holds the design surface it swaps the surface out after the
+drawing landed and the buttons come out plain grey. The player-list helper (`0x5e9510`)
+does not do this.
+
+**Edit boxes draw themselves.** The text fields (the player name on Multiplayer
+Connection, template 2162, an `Edit` 399x32 at design 208,171; Save Game's name, 476x28
+at 176,551) and the in-mission Technology Tree are real `Edit` windows: the shell draws
+only their frame into the dialog. The game places the name field twice (first elsewhere,
+then into the frame by `MoveWindow` in design coordinates). The fonts are MS Sans Serif
+-11 for the name field, Arial -11 for Save Game and a raster Courier of height 29 for the
+Technology Tree, whose ASCII branches line up only in a fixed pitch. A raster face does
+not scale (asked for -26 at 3440x1440, MS Sans Serif came back at its largest bitmap),
+so a scaled field asks for *Microsoft Sans Serif* (the same metrics, TrueType,
+`OUT_TT_ONLY_PRECIS`) and the Technology Tree for *Courier New* with
+`FIXED_PITCH | FF_MODERN`, given the raster font's own `tmAveCharWidth` because Courier
+New is narrower at the same height (about 6.6 design px a character against 8). Colour
+needs nothing: `Screen::ControlColorEdit` (`0x5a3360`) answers `WM_CTLCOLOREDIT` on the
+dialog, and the dialog has `WS_CLIPCHILDREN`.
+
+**`GetDC` and `ReleaseDC` do not pair.** `ShellButton::UpdateButton` (`0x5a4a10`) takes
+`GetDC(hDlg)`, draws the button and falls into eight NOPs at `0x5a4adb` where its
+`ReleaseDC` call used to be, so every button redraw leaks the DC. Nothing may wait for a
+release: a stack of DCs presented when the outermost comes back is pinned at the first
+leak (Options showed its background and no buttons), and after eight leaks the game is
+handed real DCs and draws 1:1 in the corner on every `ShellButton` screen. A host hands
+out a surface of its own at `GetDC` and presents on a timer, not on release.
+
+**The shell's anti-flicker underlay.** `SetCurrentBackground` (`0x6083f0`) keeps an
+800x600 copy of each screen's background (the stock BMP, or a `BitBlt` snapshot of the
+dialog, black if taken before the dialog drew) and draws it onto the **3D window**, the
+dialogs' parent, at 0,0 through `DrawTransparentBitmap` (`0x608100`); `SnapShotBackground`
+(`0x608530`) draws it there again on every dialog's close path, just before
+`CleanCurrentBackground`. At 800x600 the parent already held the next screen; scaled,
+that draw is a 1:1 flash in the corner for 100 to 120 ms between two menus (main menu to
+single player: 2 frames of the first, 4 of bare background; the way back 7 of black).
+Seven sites read the copy to restore the background under a button, so it is still made;
+only the two draws onto the parent must go nowhere.
+
+**Wine's window surface.** A menu that is a child of the 3D window draws into that
+window's Wine window surface, which is pushed to the screen only when a drawing call ends
+more than about 50 ms after the first one still pending or when the thread goes idle, and
+under the 3D window the idle push did not come (inferred, not traced into Wine). Whatever
+a menu drew last in a shorter burst stayed off screen: Options' version label "1.1" (the
+last thing `EscapeMenuDlgProc` draws, by `TextLabel::DrawLabelText`, `0x5a77e0`) and the
+Manual IP field, black until clicked. Reading a pixel back through the menu's DC is a
+drawing call and forces the push.
+
+**Labels run past their rectangles.** Every shell label is one `DrawTextExA` from
+`ShellButton::DrawLabelText` with `DT_SINGLELINE | DT_VCENTER | DT_NOCLIP`, so text wider
+than its rectangle is drawn on past it, and nearly every label in the shell does so
+harmlessly ("Resources: Normal" is 101 px in 87). On Game Setup (template 2096: Instant
+Action and every multiplayer setup) "Shroud Off, Fog Off" and "Random Placement" run over
+the minimap frame's left border (x 618 to 621) at 800x600 in stock; the rectangles cannot
+say where a label must stop, the art does. The face is Arial Bold (`ShellFonts`, cell
+heights 8 to 20), which Proton maps to Liberation Sans with Arial's metrics. The minimap
+preview stays blank while Minimap Hidden is set: a game rule, one-way, host-only.
+
+**Command-line switches.** `Armada2.exe` has its own switch table (`-nointro`, `-edit`,
+`-window`, `-res`, `-bpp` and others). The leading `-` or `/` is required, or the token
+is taken as the mission name and the game starts a match on a mission that does not
+exist (a HUD with no map). `-nointro` skips `Intro.bik` and the three logo reels; a game
+started on a `.bzn` quits when the mission ends, since there is no shell to return to.
 
 ## The dialog host
 
@@ -38,8 +183,7 @@ as stock.
 
 - **Created hidden, as a child of the 3D window.** The template is copied and its
   pop-up styling (`WS_POPUP`, `WS_VISIBLE`, the caption, the modal frame) replaced by
-  `WS_CHILD`, and it is made with `CreateDialogIndirectParamA` (menus/README.md, "One
-  window", is the same rewrite; this one also drops `WS_VISIBLE`). Our procedure sits in
+  `WS_CHILD`, and it is made with `CreateDialogIndirectParamA` ("What the shell is, in the engine", "One OS window", is the same rewrite; this one also drops `WS_VISIBLE`). Our procedure sits in
   front of the game's: the first message (`WM_SETFONT` or `WM_INITDIALOG`) names the
   window, so even what the game does inside `WM_INITDIALOG` (an `EndDialog`, a
   `GetDC`) finds it hosted.
@@ -58,8 +202,8 @@ as stock.
   with what is drawn.
 - **It draws into a surface of its own.** `GetDC` and `BeginPaint` on a hosted dialog
   return an 800x600 32-bit DIB section's memory DC; `ReleaseDC` and `EndPaint` of it do
-  nothing (the shell never pairs them anyway: menus/README.md, "GetDC and ReleaseDC do
-  not pair up"). Everything a screen draws, its background, the `ShellButton`s, the
+  nothing (the shell never pairs them anyway: "What the shell is, in the engine", `GetDC` and `ReleaseDC` do
+  not pair). Everything a screen draws, its background, the `ShellButton`s, the
   labels, the Bink animations, lands there. While a dialog is hosted, `GetDC` of the 3D
   window returns a scratch DC: the shell's background underlay (`SetCurrentBackground`
   and `SnapShotBackground` drawing onto the 3D window) is drawn into nothing.
@@ -75,7 +219,7 @@ as stock.
   back; Game Setup then drew its player rows against the wrong one.
 - **Its DC is not trusted to hold its bitmap.** The shell selects bitmaps of its own
   into the DCs it is handed and does not always put ours back (Game Setup's paint left
-  our surface's bitmap selected in a DC of its own, and the menus/README.md "stock bug"
+  our surface's bitmap selected in a DC of its own, and the "stock bug" of "What the shell is, in the engine"
   does the same through `WM_DRAWITEM`). So the surface's bitmap is selected back
   whenever its DC is handed out, and the host reads a surface by its bits (after
   `GdiFlush`), never through its DC: a `BitBlt` from our DC read a stale bitmap while
@@ -113,7 +257,7 @@ Each pass, about 60 a second:
    the DC they are given, and the dialog's `WM_CTLCOLOR*` and `WM_DRAWITEM` answers draw
    into it. After each print the surface's bitmap is selected back: a stock helper of
    the Admiral's Log selects the 1x1 default bitmap into whatever DC `WM_DRAWITEM`
-   hands it (menus/README.md, "A stock bug the memory DC exposes").
+   hands it ("What the shell is, in the engine", the Admiral's Log).
 5. **Draw a frame** through the game's device, as `engine/shell.rs`'s `run_screen`
    does: the device read again, the engine's `TestCooperativeLevel`, `BeginScene`, a
    full viewport, clear to black, `surface::frame(Context::Menus)`, `EndScene`,
@@ -140,23 +284,35 @@ it after `Present`.
 
 A dialog runs through user32 as before, with a line in `UI.log`, when: its procedure is
 not in the shell's code (0x5a0000–0x610000: the map editor's dialogs are not screens);
-there is no 3D window or no Direct3D 9 device behind the game's (DXVK's own d3d8); its
+there is no 3D window or no Vulkan or Direct3D 12 device behind the game's (Display8 bailed out); its
 owner is a window the UI does not host; its template cannot be read; or the hidden
 dialog could not be made. With the shell's mode raised (below) a stock dialog then draws
-800x600 in the corner, as stock does without Menus.asi, but it works.
+800x600 in the corner, as stock does, but it works.
 
 ### The display
 
 `do_smain` runs the shell on Storm3D's shell display (`SetActiveDisplay(3)`), and
 `DispatchDialog` (0x6066c0) puts that display up again and calls `FlipToGDISurface`
 before every screen. Its mode is a hard-coded 800x600x16 (`SetActiveDisplay_Internal`'s
-two `push 16; push 600; push 800`, at 0x62c4d4 and 0x62c633). The host raises both to
-the desktop's size at 32 bits, at DllMain, as Menus.asi's `RaiseShellMode` does
-(menus/README.md, item 1). The hosted dialogs then draw on the shell display's own
+two `push 16; push 600; push 800`, at 0x62c4d4 and 0x62c633). Display8 raises both to
+the desktop's size at 32 bits (since display 0.18.0, while the host claims the menus;
+`display/README.md`, "Window and display mode"; the UI patched the two pushes itself
+before, as the retired Menus.asi's `RaiseShellMode` did; "What the shell is, in the
+engine"). The hosted dialogs then draw on the shell display's own
 device, at the screen's resolution, without switching displays: when the game runs at
 the desktop's resolution the shell and the 3D display have the same mode and the
 device is never re-created (`README.md`, "What the shell is, as far as Direct3D goes").
 The in-mission menus run on the 3D display that is already up.
+
+### Hooks (the engine profile)
+
+The host's engine findings are in `profiles/gog-1.1/ui.dialogs.toml`; `install` makes
+both hooks ready before it patches anything and stands down with the engine's reason.
+
+| Hook | What it needs of `Armada2.exe` |
+|---|---|
+| `ui.dialogs.shell_mode` | the two `push 16; push 600; push 800` of `SetActiveDisplay_Internal` (bytes checked, then raised to the desktop's size), and the front end's 800x600x16 as values; feeds `Menus.Enable` |
+| `ui.dialogs.reads_screens` | the 32 shell dialog procedures by address, which name a hosted screen (`screen_name`) and pick the in-mission menu's Esc handling, and the shell's code range that bounds what is hosted; feeds `Menus.Enable` |
 
 ### The in-mission menus
 
@@ -189,15 +345,33 @@ the 3D window, or on a hosted edit the player clicked into. Typing reaches a sto
 either way (above, and "Driving window controls" below).
 
 **A focus left nowhere.** After a mission's load Wine had no window with the keyboard
-focus (menus/README.md, "Keyboard focus", saw the same after an embedded menu), and
+focus ("What the shell is, in the engine", keyboard focus, saw the same after an embedded menu), and
 with no focus the active window gets every key as `WM_SYSKEYDOWN`: the in-mission
 menu never saw its Esc. The first hosted dialog puts the focus on the 3D window when
 it finds none, and an Esc without Alt counts as Esc whichever way it comes.
 
+## The shell's hooks (the engine profile)
+
+What the screens of ours, the widget finder, the game-setup getters and the `ComboBox`
+reads need of `Armada2.exe` is in `profiles/gog-1.1/ui.shell.toml` (`engine/shell.rs`,
+`shellui.rs`, `shellcombo.rs`, `setup.rs`). `install` makes the hooks it uses ready
+before it writes anything and stands down with the engine's reason; the reads answer
+nothing (None, an empty list, 0) while their hook is not ready.
+
+| Hook | What it needs of `Armada2.exe` |
+|---|---|
+| `ui.shell.screens` | `DispatchDialog`'s call of `Show_Credits` (re-pointed at the Credits of ours, or at the demo screen), and the functions a screen of ours calls between two shell screens: `SetActiveDisplay` (2 the 3D display, 3 the shell's), `ClearDeviceDisplays` with `ST3D_Colour_Black`, `GetWindowHandle`, `HandleMessageQueue`, `TestCooperativeLevel`, `SetCurrentBackground`, `ShellBitmap`'s constructor (0x30 bytes, from `operator new`) with `ALL_BLACK_8_BY_6_BACKGROUND`, and `g_shellMode` (1: main menu); feeds `Menus.Credits` |
+| `ui.shell.reads_device` | Storm3D's display, device index and device table (+0x10c, +0xc0, +0xcc), `ST3D_DeviceDirectX8`'s vtable (to tell the device) and its `FlipToGDISurface` slot, `ExitCode` (a `WM_QUIT`'s code) and the `star_trek` `Program`'s first byte (lets Alt+Tab through); read by the screens, the dialog host and the loading screen |
+| `ui.shell.cursor` | the one `call [SetCursor]` in `WindowProc`'s `WM_SETCURSOR` case, bytes checked, replaced by a call of ours; the arrow over a screen of ours or a hosted dialog |
+| `ui.shell.widgets` | `Shell::Widget`'s constructor, re-pointed (its bytes checked) at one that stores the same two fields and remembers the object, and `Shell::Widget`'s vtable; feeds `Menus.Enable` |
+| `ui.shell.reads_widgets` | the vtables of the shell's button, toggle, cycle, selection box, scroll bar, label, `ComboBox`, `GameSelectionSlot` and `PlayerListButton` classes, the two virtuals (`UpdateButton`, `TextLabel::Draw`) that tell a class by its slot, the `.rdata` range a vtable pointer must lie in, and every field read by offset |
+| `ui.shell.reads_combo` | a `ComboBox`'s item count, item height, pull-down rectangle, hidden combo window and direction (the table in `shellcombo.rs`) |
+| `ui.shell.reads_setup` | `g_transport` and the `Transport` / `GameSetup` getters (map, title, slots, race, team, name, vacancy), `RaceRandom` and `Race::FindInstantActionSlot`, with the `Transport` virtuals asked by vtable offset; the loading screen's mission details and the Refit screen's network test |
+
 ## The shell's widgets
 
 Most screens are not made of windows. The main menu, Options, Game Setup and nearly
-every other screen draw `ShellButton`s into the dialog (menus/README.md, "The Admiral's
+every other screen draw `ShellButton`s into the dialog ("What the shell is, in the engine", "The Admiral's
 Log") and hit-test them themselves. A `ShellButton` is a `Shell::Widget`: a C++ object
 holding the dialog it draws into, its rectangle, its bitmaps, its label and its state.
 There is no list of them anywhere: each screen keeps its own in globals.
@@ -237,7 +411,10 @@ range's span over the length plus one, and a release on an arrow button steps it
 screen's procedure reads the value with `GetValue`. So a slider of ours draws its own
 drag from the model's value and, when the player lets go, sends **one click at the
 point of the track that maps to the value** (`generic::click_scroll`); a key step is
-one click at once. The stock click sound plays once per change, not per pixel.
+one click at once. The stock click sound plays once per change, not per pixel. The top of
+the range is the exception: the point that maps to it lies past the track, so a click on
+the track reaches at most the top minus one and the top takes a further click on the far
+arrow button (`click_scroll`; before 2.2.1 a slider could not be set back to its top).
 
 **What is read**, each offset from the method that writes it:
 
@@ -336,8 +513,8 @@ Every dialog without a spec, `[Menus] Generic`:
   with `EM_GETLIMITTEXT`, and notifies its parent itself); a list's or combo's choice
   is `Action::Select`; a `ShellScrollBar` is a slider (above).
 
-**The design area** is 800x600 fitted into the back buffer as Menus.asi fits it: the
-full height, centred, at 4:3. `UI.log` logs it as Menus.asi logs its own
+**The design area** is 800x600 fitted into the back buffer as the retired Menus.asi fitted it: the
+full height, centred, at 4:3. `UI.log` logs it as Menus.asi logged its own
 (`menus: MoveWindow 800x600 @0,0 -> 960x720 @160,0 ...`), and the bench reads either log
 to map a scenario's design coordinates to the screen (`testbench/bench/scenario.py`,
 `design_to_screen`), so the existing scenarios' `Click at design X,Y` steps and
@@ -368,7 +545,9 @@ widget and acts on it the stock way (`kit::button`, `cycle`, `combo`, `edit`, `l
    - act through the stock controls only: `s.click_control(c)` for a shell button or a
      window button, `actions::push(Action::Select { .. })` for a list or combo,
      `Action::Key` for typing into an edit. Never write a setting yourself: the stock
-     procedure's handler does, and so the screen keeps doing what it did;
+     procedure's handler does, and so the screen keeps doing what it did. A setting of
+     ours (a Refit choice, not an engine one) goes only to the overlay `RefitPlayer.ini`,
+     through `crate::settings::set_row`, never to a plugin's ini or the engine's files;
    - keep the art where it carries information with `s.mirror_part(ui, design_rect,
      screen_rect, tint)`: a map preview, a portrait, the screen's own background
      (the main menu fades it behind its buttons);
@@ -385,6 +564,52 @@ widget and acts on it the stock way (`kit::button`, `cycle`, `combo`, `edit`, `l
 `[Menus] Specs=0` draws every screen generically, for comparing a spec with the stock
 screen.
 
+## The Refit screen
+
+`menus/refit.rs`: every setting of every plugin that exports a settings table
+(`tools/settings/README.md`), as rows on three tabs (Graphics, Interface, Gameplay; a tab with no row is not shown, which is why Movies and Multiplayer are gone: cutscenes 3.0.1, Pay when queued on Gameplay, Online entry on Interface), in **a modal of ours over the hosted Options dialog**. It is not a
+shell screen of its own: the in-mission Options runs inside the dialog host's loop, which
+is the only thing that presents while a mission's menu is up, and the modal drawn by the
+host's frame (`menus::frame`, after the dialog stack, before the frame's claim) works the
+same in the shell and in a mission with the stock dialog still running under it.
+
+- **Life.** The Options spec's **Refit settings** button calls `refit::open(host)` (with the
+  shell's click sound). The modal closes on Done, on Esc, when its host leaves
+  `dialogs::stack()` (`menus::closed`; log `refit: closed (Options ended)`) and when a
+  dialog opens above its host (`refit: closed (a dialog opened over Options)`), so that a
+  network box takes the input as stock would. While it is open the Options spec is drawn
+  inert (`inert_unless`).
+- **Keys.** `Ui::modal` claims the keyboard every frame, so `menus::wants_keys()` is
+  true and `pump` sends neither Enter nor Esc to the stock dialog (IDOK, IDCANCEL, Return
+  to Game). The last branch of `pump` used to call `escape` without asking; an Esc that
+  arrives as a `WM_SYSKEYDOWN` at the game window (a focus left nowhere) is now noted as
+  the plain key for the modal and goes no further. Esc closes an open dropdown, then an
+  open question, then the modal; the first Esc after it has closed is stock's again
+  (shell: IDCANCEL; mission: Return to Game). On close `ui.blur()`.
+- **Rows** come from `settings::tables()` in `EXPORTS` order, left out when `FLAG_NO_ROW`,
+  `TAB_NONE`, refused by the hub or a plugin that is absent; `FLAG_ADVANCED` rows show
+  with "Show advanced" (session only). Two columns when one does not hold the page; a
+  scroll area only if two do not (not needed at 1280x720 today). A click anywhere on a
+  BOOL row toggles it; on an ENUM row's label it opens the dropdown. Every change is
+  `settings::set_row`; the screen writes nothing else (`RefitPlayer.ini` only).
+- **Badges**: apply class (`Now`, `Next mission`, `Restart`), replaced by `Restart needed`
+  or `Next mission` drawn active when the value differs from the one at the hub's start
+  (RESTART) or at the start of this mission (MISSION, in a mission), `Must match` on a
+  SCOPE_MATCH row, `Locked` with the control disabled. A must-match row is locked over a
+  mission when `engine::setup::network_game()` is true or unreadable.
+- **Notes**: `<Plugin>_SettingsNote` (optional export) says a part is not running now;
+  a plugin-wide note is a line under the tabs, a row note replaces the help (dimmed) and
+  the row is drawn dimmed but stays switchable. Asked when the screen opens and once a
+  second.
+- **Redrawn menus off** (an ADVANCED row) asks first, since it takes this screen with it.
+- **Reset tab** asks, then removes the overlay keys of the tab's visible rows
+  (`settings::remove_many`, the plugins told once).
+- **Log lines** (UI.log; the bench reads these words): `refit: opened in the shell|a
+  mission (Graphics 19, ...)`, `refit: closed`, `refit: [Render3D.Modules] sky 1 -> 0
+  (now|next mission|restart)`, `... could not be written`, `... locked in a network
+  game`, `refit: <Tab> reset (n keys removed)`, `refit: <Plugin>: <note>`, `refit:
+  menus off asked; yes|no`.
+
 ## The Options family
 
 Options (`options.rs`), Game, Graphics and Sound Settings (`game_settings.rs`,
@@ -400,12 +625,14 @@ the bar's track, a combo choice is below. **Every word is the stock control's ow
 - **Game Settings' "Command Bar"** is the one row of ours on a stock settings screen
   (`form::draw_with`, `form::Own`): the button bar shown or hidden, the toggle that was
   the top-right palette button in a mission (HUD.md, "The top-right buttons"). It is a
-  setting of the UI's, not the game's, so it is kept in `UIPlayer.ini` (`prefs.rs`)
-  and its words are ours; a click plays the shell's click sound (`cornrclk.wav`).
+  setting of the UI's, not the game's, so it is kept in the player's overlay,
+  `RefitPlayer.ini` (`[UI.HUD] BarHidden`, `prefs.rs`), and its words are ours; a click plays the shell's click sound (`cornrclk.wav`).
 - **Options**: the stock buttons in the order they stand on the stock screen (y, then
-  x), in one column; the one at the foot (Previous Menu, Return to Game: a button in the
+  x), in one column, with one entry of ours, **Refit settings** (the Refit screen,
+  below), directly under Game Settings; the one at the foot (Previous Menu, Return to Game: a button in the
   bottom-left corner, `common::is_footer`) is the window's footer. In a mission there
-  are nine entries; from the main menu three. The window's title is the stock label at
+  are nine stock entries (ten with Refit); from the main menu three (four). The entry is
+  drawn only by this spec, and not when the settings hub found no row to show. The window's title is the stock label at
   the top ("OPTIONS"); the version is the small label at the bottom.
 - **The settings form** (`form.rs`) finds what belongs together by place, not text: the
   stock screens put a caption 16 to 30 pixels above the control it names, so each
@@ -599,7 +826,7 @@ scenario gets there (`testbench/ui.json` has the named targets).
 | `do_helpWindow` | 0x885 | help | the lobby's help | Internet lobby -> Help | text | the text window |
 | `do_licenseAgreement` | 0x885 | licence agreement | first start only | not reached | text | the text window |
 | `do_oneButton`, `do_yesNo` | 0x73 | message, yes or no | confirmations (Exit, abort, errors) | main menu -> Exit | text, buttons | none |
-| `do_TechTreeWindow` | 0x131 | technology tree | in a mission | the in-mission menu | an `Edit` in Courier (menus/README.md, "Edit boxes") | none: drawn from the edit's text (spec: `tech_tree.rs`) |
+| `do_TechTreeWindow` | 0x131 | technology tree | in a mission | the in-mission menu | an `Edit` in Courier ("What the shell is, in the engine", edit boxes) | none: drawn from the edit's text (spec: `tech_tree.rs`) |
 | `do_admiralsLog` | 0x880 | admiral's log | score after a mission, or from Options | end of a mission | 8 owner-drawn tab buttons, player list, 8 panes (`CreateDialogParamA` 0x123, `ScreenInformation`) | the seven graph/list panes; Score is drawn from labels (spec: `admirals_log.rs`) |
 | `Shell::Screen::Show` | (varies) | shell screen | voice options, command-line host/join | not on the bench | `Shell::Screen` widgets | — |
 
@@ -731,7 +958,7 @@ a Mutara nebula with the queen's Diamond (`render3d/README.md`, "The menu scene"
 - **How it is asked for.** `Render3D_MenuScene(name, x, y, w, h)`, a render3d
   export, looked up once with `GetModuleHandleA("Render3D.asi")` and
   `GetProcAddress`. It draws into the whole back buffer and returns 1, or 0 when it
-  cannot (no Render3D.asi, render3d stood down, no such view, no Direct3D 9 device);
+  cannot (no Render3D.asi, render3d stood down, no such view, no device);
   the frame then goes on as without it.
 - **The specs over it** ask `scene::shown()`. The main menu (`over_scene`) draws none
   of the stock screen's art and **passes no input to it**: off the column a click does
@@ -774,7 +1001,7 @@ a Mutara nebula with the queen's Diamond (`render3d/README.md`, "The menu scene"
 ## Testing
 
 `ui/bench-asi.sh --menus` (a scenario's `Setup:` line) puts `UI.asi` in a bench clone
-with `[Menus] Enable=1` and takes Menus.asi out. `testbench/operating/menus-host.md`
+with `[Menus] Enable=1`. `testbench/operating/menus-host.md`
 has where things are and how to look inside a hosted dialog (`Menus.Trace=1` dumps the
 hidden surfaces).
 
@@ -786,6 +1013,11 @@ hidden surfaces).
   opened again, and still off; Sound Settings' Music Volume slider and Unit Speech, the
   screen opened again; Game Settings' Game Difficulty stepped; back to the main menu;
   quit.
+- `ui-menus-slider-max.md`: Graphics Detail set to its least and back to its most (the
+  stock bar's top lies past its track: `click_scroll`), read back from UI.log.
+- `ui-menus-refit.md`: the Refit screen (`testbench/operating/refit-screen.md`): the
+  tabs, a row of each kind written and logged, Esc closing only the modal, in the shell
+  and in a mission.
 - `ui-menus-dialogs.md`: the in-mission Options (nine entries), Abort Mission's and
   Exit to Windows' questions answered No, Sound Settings from the mission, Save Game's
   message and its O.K., Return to Game.
@@ -840,7 +1072,7 @@ hidden surfaces).
   of the UI's own is not drawn.
 - **A display mode other than the desktop's** for the game: the shell is raised to the
   desktop size, so a game at another resolution re-creates the device at every switch
-  between the shell and a mission (as with Menus.asi); not measured.
+  between the shell and a mission (as it did with Menus.asi); not measured.
 
 ## The Credits
 

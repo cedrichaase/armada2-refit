@@ -1,7 +1,8 @@
 //! The plugins' own runtime, one copy for Display8 (`d3d8.dll`), `Render3D.asi` and
 //! `UI.asi`: allocator, memory functions, Win32, log, ini, files, the animation clock's
-//! switch, the patching of `Armada2.exe` in memory (`hook`) and frame dumps (`dump`,
-//! feature `dump`). Everything above it is ordinary `core` + `alloc` Rust. Each plugin
+//! switch, the patching of `Armada2.exe` in memory (`hook`), frame dumps (`dump`,
+//! feature `dump`), the settings descriptors (`settings`) and the player's overlay in
+//! front of every ini of the game directory (`Ini`, `overlay`). Everything above it is ordinary `core` + `alloc` Rust. Each plugin
 //! reaches it as its own `rt` (`pub mod rt { pub use a2rt::*; }`), with `log!` and
 //! `sfmt!` re-exported at its root, and keeps its own statics: an rlib is linked into
 //! each DLL separately, so each has its own log, game directory and ini cache.
@@ -21,6 +22,8 @@ pub mod clock;
 pub mod dump;
 pub mod hook;
 pub mod mem;
+pub mod overlay;
+pub mod settings;
 pub mod win;
 
 use alloc::string::String;
@@ -78,6 +81,12 @@ pub fn log_dir() -> Option<String> {
     }
     d.push_str("\\logs");
     create_dir(&d).then_some(d)
+}
+
+/// Whether `log!` has a file to write to (an overlay value read before it is open is
+/// noted again by the next read, not marked as logged).
+pub(crate) fn log_is_open() -> bool {
+    LOG_ON.load(Ordering::Relaxed) && !LOG_FILE.load(Ordering::Relaxed).is_null()
 }
 
 fn open_log(path: &str) -> HANDLE {
@@ -204,7 +213,17 @@ pub fn write_file(path: &str, data: &[u8]) -> bool {
 /// file or the new one, never half of one.
 pub fn move_file(from: &str, to: &str) -> bool {
     let (f, t) = (cstr(from), cstr(to));
-    unsafe { MoveFileExA(f.as_ptr(), t.as_ptr(), 1) != 0 }
+    // A reader that holds the target open (the sharing violation of a file being read)
+    // fails the move for a moment: retry, bounded at 8 x 50 ms.
+    for i in 0..8 {
+        if unsafe { MoveFileExA(f.as_ptr(), t.as_ptr(), 1) } != 0 {
+            return true;
+        }
+        if i < 7 {
+            unsafe { Sleep(50) };
+        }
+    }
+    false
 }
 
 /// Deletes a file; false if it could not be.
@@ -330,31 +349,68 @@ pub fn now() -> f64 {
 }
 
 /// An ini file (path absolute), read as `GetPrivateProfile*` reads one (`ini_cache`).
-/// Every getter goes through `lookup`, the one place a value is found, so a layer in
-/// front of the file (the settings overlay, ROADMAP.md Phase 5) goes there alone.
+/// Every getter goes through `lookup`, the one place a value is found.
+///
+/// An ini directly in the game directory has the player's overlay in front of it
+/// (`RefitPlayer.ini`, tools/settings/README.md): a key is looked up in the overlay's
+/// `[<Stem>.<Section>]` first (`<Stem>`: the file's name without `.ini`), then in the
+/// file. `open_plain` reads the file alone.
 pub struct Ini {
     path: Vec<u8>,
+    /// The overlay's section prefix ("Render3D"), or None: no overlay.
+    stem: Option<String>,
+    /// The file's name as given ("Render3D.ini"), for the log line.
+    name: String,
 }
 
 impl Ini {
     pub fn open(path: &str) -> Ini {
-        Ini { path: cstr(path) }
+        let (dir, name) = match path.rfind(['\\', '/']) {
+            Some(i) => (&path[..i + 1], &path[i + 1..]),
+            None => ("", path),
+        };
+        let stem = (!game_dir().is_empty()
+            && same_path(dir, game_dir())
+            && name.len() > 4
+            && name[name.len() - 4..].eq_ignore_ascii_case(".ini")
+            && !name.eq_ignore_ascii_case(overlay::FILE)
+            && !name.eq_ignore_ascii_case(overlay::OLD_FILE))
+        .then(|| String::from(&name[..name.len() - 4]));
+        Ini { path: cstr(path), stem, name: String::from(name) }
+    }
+    /// The file alone, without the overlay (the overlay's writer; recipe files).
+    pub fn open_plain(path: &str) -> Ini {
+        let mut i = Ini::open(path);
+        i.stem = None;
+        i
+    }
+    /// The overlay's section prefix of this file ("Render3D"), if it has an overlay.
+    pub fn stem(&self) -> Option<&str> {
+        self.stem.as_deref()
     }
     pub fn exists(&self) -> bool {
         file_exists(core::str::from_utf8(&self.path[..self.path.len() - 1]).unwrap_or(""))
     }
-    /// The value of `key` in `[sec]` as written, or None when there is none.
+    /// The value of `key` in `[sec]` as written, or None when there is none: the
+    /// overlay's when it holds one that is not empty, else the file's.
     fn lookup(&self, sec: &str, key: &str) -> Option<String> {
+        if let Some(stem) = &self.stem {
+            let osec = sfmt!("{}.{}", stem, sec);
+            if let Some(v) = ini_cache::value(&overlay::path_c(), &osec, key) {
+                let shown = strip_value(&v);
+                if !shown.is_empty() {
+                    overlay::note(&osec, key, shown, &self.name, || {
+                        ini_cache::value(&self.path, sec, key).map(|m| String::from(strip_value(&m)))
+                    });
+                    return Some(v);
+                }
+            }
+        }
         ini_cache::value(&self.path, sec, key)
     }
     pub fn string(&self, sec: &str, key: &str) -> Option<String> {
         let v = self.lookup(sec, key)?;
-        // Strip a trailing ; comment and whitespace.
-        let t = match v.find(';') {
-            Some(c) => &v[..c],
-            None => &v[..],
-        };
-        Some(String::from(t.trim()))
+        Some(String::from(strip_value(&v)))
     }
     pub fn int(&self, sec: &str, key: &str, def: i32) -> i32 {
         self.string(sec, key).and_then(|s| parse_i32(&s)).unwrap_or(def)
@@ -376,18 +432,43 @@ impl Ini {
             }
         }
     }
+    /// The file's own sections, never the overlay's.
     pub fn sections(&self) -> Vec<String> {
         ini_cache::sections(&self.path)
     }
+}
+
+/// Two directories, the same without regard to case or slash direction.
+fn same_path(a: &str, b: &str) -> bool {
+    let n = |c: u8| if c == b'/' { b'\\' } else { c.to_ascii_lowercase() };
+    a.len() == b.len() && a.bytes().zip(b.bytes()).all(|(x, y)| n(x) == n(y))
+}
+
+/// A value as `Ini::string` gives it: a trailing `;` comment and whitespace dropped.
+fn strip_value(v: &str) -> &str {
+    match v.find(';') {
+        Some(c) => v[..c].trim(),
+        None => v.trim(),
+    }
+}
+
+/// Marks every cached ini stale, so that the next lookup in each looks at its file
+/// again (`<Plugin>_SettingsChanged`, after the overlay was written).
+pub fn ini_refresh_all() {
+    ini_cache::refresh_all();
+}
+
+/// The write time and size of a file, None when it is missing (what `ini_cache` reads
+/// a file again on; the UI's settings hub watches the overlay by it).
+pub fn file_stamp(path: &str) -> Option<([u32; 2], u32)> {
+    ini_cache::stamp(&cstr(path))
 }
 
 /// Ini files read once and kept parsed, read again only when the file's write time or
 /// size changes (looked at no more than twice a second). Wine's `GetPrivateProfile*`
 /// opens and parses the whole file on every call, which made the modules' periodic
 /// re-reads of their settings cost tens of milliseconds a time (README.md, "Timing").
-/// The rules are `GetPrivateProfileString`'s: names without case, a section written twice
-/// read as one, the first of a repeated key winning, surrounding whitespace and one pair
-/// of quotes dropped.
+/// The parser is `a2ini::parse_into`, with `GetPrivateProfileString`'s rules.
 mod ini_cache {
     use super::win::*;
     use alloc::string::String;
@@ -397,15 +478,12 @@ mod ini_cache {
         path: Vec<u8>,
         stamp: Option<([u32; 2], u32)>,
         checked: f64,
-        /// Section names in file order (as written), and (section, key, value) with the
-        /// names lower-cased.
-        sections: Vec<String>,
-        entries: Vec<(String, String, String)>,
+        parsed: a2ini::Parsed,
     }
 
     static mut FILES: Vec<File> = Vec::new();
 
-    fn stamp(path: &[u8]) -> Option<([u32; 2], u32)> {
+    pub fn stamp(path: &[u8]) -> Option<([u32; 2], u32)> {
         let mut d: FindData = unsafe { core::mem::zeroed() };
         let h = unsafe { FindFirstFileA(path.as_ptr(), &mut d) };
         if h == INVALID_HANDLE {
@@ -416,35 +494,10 @@ mod ini_cache {
     }
 
     fn parse(f: &mut File) {
-        f.sections.clear();
-        f.entries.clear();
         let name = core::str::from_utf8(&f.path[..f.path.len().saturating_sub(1)]).unwrap_or("");
-        let Some(bytes) = super::read_file(name) else { return };
-        let text = String::from_utf8_lossy(&bytes);
-        let mut sec = String::new();
-        for line in text.lines() {
-            let l = line.trim();
-            if l.is_empty() || l.starts_with(';') {
-                continue;
-            }
-            if let Some(rest) = l.strip_prefix('[') {
-                let s = rest.split(']').next().unwrap_or("").trim();
-                sec = s.to_ascii_lowercase();
-                if !f.sections.iter().any(|x| x.eq_ignore_ascii_case(s)) {
-                    f.sections.push(String::from(s));
-                }
-                continue;
-            }
-            let Some(eq) = l.find('=') else { continue };
-            let key = l[..eq].trim().to_ascii_lowercase();
-            if key.is_empty() || f.entries.iter().any(|e| e.0 == sec && e.1 == key) {
-                continue;
-            }
-            let mut v = l[eq + 1..].trim();
-            if v.len() >= 2 && ((v.starts_with('"') && v.ends_with('"')) || (v.starts_with('\'') && v.ends_with('\''))) {
-                v = &v[1..v.len() - 1];
-            }
-            f.entries.push((sec.clone(), key, String::from(v)));
+        match super::read_file(name) {
+            Some(bytes) => a2ini::parse_into(&String::from_utf8_lossy(&bytes), &mut f.parsed),
+            None => f.parsed.clear(),
         }
     }
 
@@ -455,7 +508,7 @@ mod ini_cache {
         let i = match files.iter().position(|f| f.path == path) {
             Some(i) => i,
             None => {
-                files.push(File { path: path.to_vec(), stamp: None, checked: f64::NEG_INFINITY, sections: Vec::new(), entries: Vec::new() });
+                files.push(File { path: path.to_vec(), stamp: None, checked: f64::NEG_INFINITY, parsed: a2ini::Parsed::default() });
                 files.len() - 1
             }
         };
@@ -463,7 +516,7 @@ mod ini_cache {
         if now - f.checked >= 0.5 {
             f.checked = now;
             let s = stamp(path);
-            if s != f.stamp || s.is_none() && !f.entries.is_empty() {
+            if s != f.stamp || s.is_none() && !f.parsed.entries.is_empty() {
                 f.stamp = s;
                 parse(f);
             }
@@ -472,15 +525,18 @@ mod ini_cache {
     }
 
     pub fn value(path: &[u8], sec: &str, key: &str) -> Option<String> {
-        let f = file(path);
-        f.entries
-            .iter()
-            .find(|e| e.0.eq_ignore_ascii_case(sec) && e.1.eq_ignore_ascii_case(key))
-            .map(|e| e.2.clone())
+        file(path).parsed.value(sec, key).map(String::from)
     }
 
     pub fn sections(path: &[u8]) -> Vec<String> {
-        file(path).sections.clone()
+        file(path).parsed.sections.clone()
+    }
+
+    #[allow(static_mut_refs)]
+    pub fn refresh_all() {
+        for f in unsafe { FILES.iter_mut() } {
+            f.checked = f64::NEG_INFINITY;
+        }
     }
 }
 

@@ -5,6 +5,15 @@ into `Textures/RGB/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 versions". Newest first. The reasoning behind each change is in [`README.md`](README.md),
 not here.
 
+## 2.2.0 — 2026-11-03
+
+### Removed
+- The `LOADING` target and the `panel=` and `upscaler=` keys it used, with the
+  `logo-sod.py` calls in `a2tex install` and `revert` (models 5.1.0). `retire/retire.sh`
+  restores `LOADING1..6` from their `.a2neb-backup`; `./a2tex revert all` still does too.
+
+Installed, not yet seen in game.
+
 ## 2.1.1 — 2026-10-04
 
 ### Fixed

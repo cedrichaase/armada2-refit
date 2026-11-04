@@ -1,0 +1,15 @@
+# A synthetic root build (tools/engine/fixtures/01-stock.toml's image).
+schema = 1
+game = "test"
+build = "b1"
+label = "Fixture build 1"
+exe = ["Test.exe"]
+inherits = ""
+content = "stock"
+
+[pe]
+timestamp = 0x5eed0001
+image_size = 0x6000
+sections = 0x777d215e
+image_base = 0x400000
+code = [0x401000, 0x403000]

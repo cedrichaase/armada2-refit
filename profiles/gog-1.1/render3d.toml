@@ -1,0 +1,618 @@
+# Render3D.asi's core symbols in Armada2.exe 1.1 (GOG): the frame's seam and the engine reads
+# every module shares (render3d/core/src/engine/**). One file per module beside it
+# (render3d.<module>.toml), so a module's symbols leave with its crate. Each entry is tied to
+# the hook that uses it; the findings are in render3d/README.md, "Hooks".
+schema = 1
+plugin = "render3d"
+readme = "render3d/README.md"
+lang = "rust"
+out = "render3d/core/src/syms.rs"
+
+[hook."core.reads"]
+doc = "The engine state every module shares: the object, light and feature lists, instances, sprites, sound"
+
+[hook."frame.seam"]
+doc = "Armada_RenderAllOurStuff, called from two places: both re-pointed at the renderer's body"
+
+[hook."frame.steps"]
+doc = "The calls inside the stock body that the renderer's steps replace one by one"
+
+[hook."frame.destroy"]
+doc = "DestroyRenderSurfaces chained, so the renderer lets go of the device before the engine does"
+
+[hook."view.distance"]
+doc = "The far plane and object culling raised to [View] Distance, at the end of RTS_Configure's ART_CFG parse"
+rows = ["View.Distance"]
+
+[[sym]]
+id = "sound2d"
+symbol = "AudioSound2D::AudioSound2D"
+kind = "fn"
+addr = 0x45fc50
+check = "55 8b ec 6a ff 68 8a ad"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "fn_features"
+symbol = "GameFeature_RenderAll"
+kind = "fn"
+addr = 0x46e4b0
+check = "55 8b ec 56 57 8b 3d 84"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "fn_cull_nebula"
+symbol = "Nebula::sCullOccludedNebula"
+kind = "fn"
+addr = 0x4a52c0
+check = "55 8b ec 83 ec 24 a1 bc"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "fn_rig_render"
+symbol = "ConstructionRig::Render"
+kind = "fn"
+addr = 0x4af9b0
+check = "55 8b ec 83 ec 30 56 8b"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "fn_mining_render"
+symbol = "MiningStation::Render"
+kind = "fn"
+addr = 0x4b44a0
+check = "55 8b ec 51 56 8b f1 8b"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "fn_shipyard_render"
+symbol = "Shipyard::Render"
+kind = "fn"
+addr = 0x4bb900
+check = "55 8b ec 51 8b 81 b8 02"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "fn_transform"
+symbol = "Entity::GetTransform"
+kind = "fn"
+addr = 0x4cfd50
+check = "8b 41 04 83 c0 44 c3 90"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "fn_odf_name"
+symbol = "GameObject::GetOdfName"
+kind = "fn"
+addr = 0x4d5620
+check = "8b 49 40 e9 48 8d ff ff"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "fn_ui_pre"
+symbol = "DisplayInterface::PreRenderAll"
+kind = "fn"
+addr = 0x51ab60
+check = "55 8b ec a1 08 d5 7a 00"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "fn_ord_pre"
+symbol = "Ordnance::PreRenderAll"
+kind = "fn"
+addr = 0x58e4f0
+check = "55 8b ec 83 ec 0c 8b 0d"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "fn_ord_render"
+symbol = "Ordnance::RenderAll"
+kind = "fn"
+addr = 0x58e580
+check = "55 8b ec 83 ec 08 a1 ac"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "fn_update_viewport"
+symbol = "Armada_Camera::UpdateViewport"
+kind = "fn"
+addr = 0x590a40
+check = "a1 08 d5 7a 00 56 8b f1"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "fn_background"
+symbol = "Background_Render"
+kind = "fn"
+addr = 0x590d90
+check = "55 8b ec 83 ec 10 a1 08"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "fn_terrain"
+symbol = "Terrain_Geometry::Render"
+kind = "fn"
+addr = 0x593200
+check = "55 8b ec 83 ec 08 a0 80"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "fn_prerender"
+symbol = "GameObject_PreRenderAll"
+kind = "fn"
+addr = 0x597f30
+check = "55 8b ec 51 a1 84 10 76"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "body"
+symbol = "Armada_RenderAllOurStuff"
+kind = "fn"
+addr = 0x598110
+check = "55 8b ec 6a ff 68 f0 5c"
+used_by = ["frame.seam"]
+
+[[sym]]
+id = "site_prerender"
+symbol = "Armada_RenderAllOurStuff"
+kind = "call"
+addr = 0x598193
+target = "fn_prerender"
+in = "Armada_RenderAllOurStuff"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "site_ord_pre"
+symbol = "Armada_RenderAllOurStuff"
+kind = "call"
+addr = 0x598199
+target = "fn_ord_pre"
+in = "Armada_RenderAllOurStuff"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "site_background"
+symbol = "Armada_RenderAllOurStuff"
+kind = "call"
+addr = 0x5981e6
+target = "fn_background"
+in = "Armada_RenderAllOurStuff"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "site_terrain"
+symbol = "Armada_RenderAllOurStuff"
+kind = "call"
+addr = 0x5981fa
+target = "fn_terrain"
+in = "Armada_RenderAllOurStuff"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "site_cull_nebula"
+symbol = "Armada_RenderAllOurStuff"
+kind = "call"
+addr = 0x59826c
+target = "fn_cull_nebula"
+in = "Armada_RenderAllOurStuff"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "site_ord_render"
+symbol = "Armada_RenderAllOurStuff"
+kind = "call"
+addr = 0x598319
+target = "fn_ord_render"
+in = "Armada_RenderAllOurStuff"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "site_special"
+symbol = "Armada_RenderAllOurStuff"
+kind = "call"
+addr = 0x598372
+target = "fn_special"
+in = "Armada_RenderAllOurStuff"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "site_features"
+symbol = "Armada_RenderAllOurStuff"
+kind = "call"
+addr = 0x5983cc
+target = "fn_features"
+in = "Armada_RenderAllOurStuff"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "site_warp"
+symbol = "Armada_RenderAllOurStuff"
+kind = "call"
+addr = 0x598423
+target = "fn_warp"
+in = "Armada_RenderAllOurStuff"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "site_ui_pre"
+symbol = "Armada_RenderAllOurStuff"
+kind = "call"
+addr = 0x598438
+target = "fn_ui_pre"
+in = "Armada_RenderAllOurStuff"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "site_chunks"
+symbol = "Armada_RenderAllOurStuff"
+kind = "call"
+addr = 0x598446
+target = "fn_chunks"
+in = "Armada_RenderAllOurStuff"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "site_particles"
+symbol = "Armada_RenderAllOurStuff"
+kind = "call"
+addr = 0x598455
+target = "fn_particles"
+in = "Armada_RenderAllOurStuff"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "site_selection"
+symbol = "Armada_RenderAllOurStuff"
+kind = "call"
+addr = 0x5984c0
+target = "fn_selection"
+in = "Armada_RenderAllOurStuff"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "site_del_lights"
+symbol = "Armada_RenderAllOurStuff"
+kind = "call"
+addr = 0x5985b5
+target = "fn_del_lights"
+in = "Armada_RenderAllOurStuff"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "fn_selection"
+symbol = "RenderSelectionEffects"
+kind = "fn"
+addr = 0x599900
+check = "55 8b ec a1 08 d5 7a 00"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "fn_warp"
+symbol = "RenderWarpSpriteEffects"
+kind = "fn"
+addr = 0x59c560
+check = "55 8b ec 56 8b 35 0c 3d"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "fn_special"
+symbol = "SpecialObjectEffect::RenderAll"
+kind = "fn"
+addr = 0x60be90
+check = "55 8b ec a1 0c 8c 7a 00"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "fn_cam_pos"
+symbol = "ST3D_Camera::GetPosition"
+kind = "fn"
+addr = 0x6194d0
+check = "8d 81 e4 00 00 00 c3 90"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "destroy"
+symbol = "ST3D_DeviceDirectX8::DestroyRenderSurfaces"
+kind = "fn"
+addr = 0x624760
+check = "56 8b f1 8b 0d 08 d5 7a"
+used_by = ["frame.destroy"]
+
+[[sym]]
+id = "fn_near_fade"
+symbol = "ST3D_GraphicsEngine::SetNearFadeOut"
+kind = "fn"
+addr = 0x62b770
+check = "55 8b ec 8b 55 08 8b 81"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "fn_register_light"
+symbol = "ST3D_GraphicsEngine::RegisterLight"
+kind = "fn"
+addr = 0x62d250
+check = "55 8b ec 53 56 8b 75 08"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "fn_del_lights"
+symbol = "ST3D_GraphicsEngine::DeleteRegisteredLights"
+kind = "fn"
+addr = 0x62d2e0
+check = "55 8b ec 51 53 8b d9 56"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "fn_particles"
+symbol = "ST3D_GraphicsEngine::RenderParticleList"
+kind = "fn"
+addr = 0x62d420
+check = "55 8b ec a1 08 d5 7a 00"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "fn_chunks"
+symbol = "ST3D_GraphicsEngine::RenderChunks"
+kind = "fn"
+addr = 0x62d470
+check = "8b 89 08 01 00 00 e9 55"
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "fn_point_light"
+symbol = "ST3D_Point_Light::ST3D_Point_Light"
+kind = "fn"
+addr = 0x62f240
+check = "55 8b ec 8b 45 10 8b 55"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "fn_animate"
+symbol = "ST3D_Sprite::Animate"
+kind = "fn"
+addr = 0x63a580
+check = "56 57 8b f9 f6 47 50 10"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "fn_draw_scaled_3d"
+symbol = "ST3D_Sprite::DrawScaled3D"
+kind = "fn"
+addr = 0x63aa60
+check = "55 8b ec 83 ec 08 8b 45"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "fn_new"
+symbol = "operator new"
+kind = "fn"
+addr = 0x652710
+check = "55 8b ec a1 00 ec 7a 00"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "vt_cocoon"
+symbol = "CocoonInstance"
+kind = "vtable"
+addr = 0x6b2630
+used_by = ["core.reads"]
+
+[[sym]]
+id = "vt_database"
+symbol = "ST3D_Database"
+kind = "vtable"
+addr = 0x6bc56c
+used_by = ["core.reads"]
+
+[[sym]]
+id = "dx8_vtable"
+symbol = "ST3D_DeviceDirectX8"
+kind = "vtable"
+addr = 0x6bc6ac
+used_by = ["frame.destroy"]
+
+[[sym]]
+id = "vt_point"
+symbol = "ST3D_Point_Light"
+kind = "vtable"
+addr = 0x6bc8ac
+used_by = ["core.reads"]
+
+[[sym]]
+id = "vt_directional"
+symbol = "ST3D_Directional_Light"
+kind = "vtable"
+addr = 0x6bc8fc
+used_by = ["core.reads"]
+
+[[sym]]
+id = "cfg_fade_out"
+symbol = "cfgFADE_OUT_ENABLED"
+kind = "global"
+addr = 0x71a9c8
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "g_credits"
+symbol = "g_credits_instance"
+kind = "global"
+addr = 0x735dc0
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "feature_list"
+symbol = "GameFeature::features"
+kind = "global"
+addr = 0x736c84
+used_by = ["core.reads"]
+
+[[sym]]
+id = "cocoon_db"
+symbol = "(unnamed) the Evolver cocoon's database"
+kind = "global"
+addr = 0x73fccc
+used_by = ["core.reads"]
+
+[[sym]]
+id = "object_list"
+symbol = "GameObject::objectList"
+kind = "global"
+addr = 0x761084
+used_by = ["core.reads"]
+
+[[sym]]
+id = "cinematic_view"
+symbol = "g_cinematicView"
+kind = "global"
+addr = 0x763758
+used_by = ["core.reads"]
+
+[[sym]]
+id = "view_mode"
+symbol = "View_Record"
+kind = "global"
+addr = 0x76b610
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "g_terrain"
+symbol = "g_terrain_geometry"
+kind = "global"
+addr = 0x772140
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "g_ambient"
+symbol = "g_ambient"
+kind = "global"
+addr = 0x773ba8
+used_by = ["frame.steps"]
+
+[[sym]]
+id = "anim_time"
+symbol = "ST3D_AnimationChannel::m_elapsed_time"
+kind = "global"
+addr = 0x7a8e74
+used_by = ["core.reads"]
+
+[[sym]]
+id = "storm3d"
+symbol = "Storm3D"
+kind = "global"
+addr = 0x7ad508
+used_by = ["core.reads"]
+
+[[sym]]
+id = "tex_offset"
+symbol = "ST3D_Sprite::m_texture_coordinate_offset"
+kind = "global"
+addr = 0x7ad6d0
+used_by = ["core.reads"]
+
+[[sym]]
+id = "fn_get_game_setup"
+symbol = "Transport::getGameSetup"
+kind = "fn"
+addr = 0x557940
+check = "8b 41 30 c3 90 90 90 90"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "fn_get_game_type"
+symbol = "GameSetup::getGameType"
+kind = "fn"
+addr = 0x5464c0
+check = "8b 41 10 8a 88 e0 00 00"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "fn_is_ship_docked"
+symbol = "ResourceTransferInterface::IsShipDocked"
+kind = "fn"
+addr = 0x4d7020
+check = "8b 49 04 8b 15 d8 41 6b"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "fn_draw_height_post"
+symbol = "DrawHeightPost"
+kind = "fn"
+addr = 0x593840
+check = "55 8b ec 83 ec 18 8b 4d"
+used_by = ["core.reads"]
+
+[[sym]]
+id = "g_transport"
+symbol = "g_transport"
+kind = "global"
+addr = 0x76b8d4
+used_by = ["core.reads"]
+
+[[sym]]
+id = "team_list"
+symbol = "Team::s_pTeamList"
+kind = "global"
+addr = 0x738db0
+used_by = ["core.reads"]
+
+[[sym]]
+id = "no_entity"
+symbol = "Entity::NO_ENTITY"
+kind = "global"
+addr = 0x6b41d8
+used_by = ["core.reads"]
+
+[[sym]]
+id = "background_name"
+symbol = "STARFIELD_GEOMETRY_NAME"
+kind = "global"
+addr = 0x738538
+used_by = ["core.reads"]
+
+[[sym]]
+id = "sim_time"
+symbol = "(unnamed) simulation time, seconds"
+kind = "global"
+addr = 0x7b0fc8
+used_by = ["core.reads"]
+
+[[sym]]
+id = "site_seam_frame"
+symbol = "Armada_RenderFrame"
+kind = "call"
+addr = 0x59886e
+target = "body"
+in = "Armada_RenderFrame"
+used_by = ["frame.seam"]
+
+[[sym]]
+id = "site_seam_view"
+symbol = "CinematicView::RenderView"
+kind = "call"
+addr = 0x4e60f6
+target = "body"
+in = "CinematicView::RenderView"
+used_by = ["frame.seam"]
+
+[[sym]]
+id = "view_site"
+symbol = "RTS_Configure"
+kind = "patch"
+addr = 0x491bef
+check = "8b 0d c0 ca 6f 00 89 15 fc 3c 77 00 8d 55 f0 89 0d c4 ca 6f 00"
+in = "RTS_Configure"
+used_by = ["view.distance"]
+
+[[sym]]
+id = "view_far_plane"
+symbol = "FAR_CLIPPING_PLANE"
+kind = "global"
+addr = 0x6fcab0
+used_by = ["view.distance"]
+
+[[sym]]
+id = "view_cull_dist"
+symbol = "cfgOBJECT_CULLING_DISTANCE"
+kind = "global"
+addr = 0x6fcac0
+used_by = ["view.distance"]

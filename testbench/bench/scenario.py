@@ -54,7 +54,9 @@ class Scenario:
     assets: str = ''               # 'none': install this checkout with an empty A2_DATA
     players: list = field(default_factory=list)   # ['host', 'joiner']: one game each
     setup: str = ''                # a script run on each clone before launch
+    overlay: str = ''              # `Section:Key=value` words written to RefitPlayer.ini before launch
     clock: str = ''                # 'bench': the plugins' animation clock on the simulation's time
+    layers: list = field(default_factory=list)    # `Layers: display render3d`: ./install --only these
     sheet: list = field(default_factory=list)     # shot names: a contact sheet, cases x shots
     description: str = ''
     steps: list = field(default_factory=list)
@@ -95,7 +97,7 @@ def case_dirname(res, mod, scn_mod):
     return config.res_name(res) + ('' if mod == scn_mod else f'-{mod}')
 
 
-HEADER = re.compile(r'^(resolutions?|aspects?|mod|launch|reference|timeout|stock shell|assets?|players?|setup|sheet|clock)'
+HEADER = re.compile(r'^(resolutions?|aspects?|mod|launch|reference|timeout|stock shell|assets?|players?|setup|overlay|sheet|clock|layers?)'
                     r'\s*:\s*(.+)$', re.I)
 STEP = re.compile(r'^\s*(?:\d+[.)]|[-*])\s+(.+?)\s*$')
 
@@ -162,7 +164,9 @@ def parse(path):
                     assets=hdr.get('asset', '').strip().lower(),
                     players=[w.lower() for w in re.split(r'[,\s]+', hdr.get('player', '')) if w],
                     setup=hdr.get('setup', '').strip('` '),
+                    overlay=hdr.get('overlay', '').strip('` '),
                     clock=hdr.get('clock', '').strip().lower(),
+                    layers=[w for w in re.split(r'[,\s]+', hdr.get('layer', '').strip('` ')) if w],
                     sheet=[w.strip().strip('"“”') for w in hdr.get('sheet', '').split(',') if w.strip()])
 
 
@@ -473,6 +477,20 @@ def s_press(c, m):
         c.sess.key(m.group('key'))
         time.sleep(0.15)
     return None
+
+
+@step(r'^overlay (?P<words>.+)$')
+def s_overlay(c, m):
+    """`Overlay Render3D.Modules:hulls=0 UI.HUD:Minimap=0` / `Overlay --unset Render3D.Modules:hulls`:
+    `a2test drive overlay` in a scenario (Session.drive_overlay): writes RefitPlayer.ini in
+    the running game and waits up to 5 s for the hub's `settings: RefitPlayer.ini changed`."""
+    try:
+        ok, text = c.sess.drive_overlay(m.group('words').split())
+    except GameError as e:
+        raise StepFailed(str(e))
+    if not ok:
+        raise StepFailed(text)
+    return text
 
 
 @step(r'^(?:scroll|turn|roll) the (?:mouse )?wheel (?P<dir>up|down)(?: (?P<n>\d+) (?:times|notches?))?$')
@@ -1099,7 +1117,7 @@ def s_judge(c, m):
 
 # The steps that act on the game: a log wait reads what was written after the last one.
 ACTIONS = {s_launch, s_quit, s_stop, s_click_at, s_click_text, s_click_named, s_drag, s_move, s_press,
-           s_wheel, s_type, s_type_address, s_type_from_log, s_scene, s_scene_answer}
+           s_wheel, s_overlay, s_type, s_type_address, s_type_from_log, s_scene, s_scene_answer}
 
 
 # ---------------------------------------------------------------------- one case
@@ -1141,7 +1159,9 @@ class Case:
                               record=self.opts.get('record'), audio=self.opts.get('audio'),
                               keep=self.opts.get('keep'), label=label,
                               installs=self.opts.get('installs') if self.mod == 'refit' else None, slot=slot,
-                              clock=self.opts.get('clock') or self.scn.clock or None)
+                              clock=self.opts.get('clock') or self.scn.clock or None,
+                              layers=(self.opts.get('layers') or self.scn.layers or None)
+                              if self.mod == 'refit' else None)
 
     def _bring_up(self, sess, player=None):
         sess.clone()
@@ -1149,6 +1169,8 @@ class Case:
         sess.start_display()
         if self.scn.setup:
             self.run_setup(sess)
+        if self.scn.overlay:
+            sess.set_overlay(self.scn.overlay.split())
         if sess.s.get('vnc_port'):
             self.say(f'    VNC{f" ({player})" if player else ""}: vncviewer localhost:{sess.s["vnc_port"]}')
 
@@ -1254,7 +1276,11 @@ class Case:
         (self.dir / 'result.json').write_text(json.dumps(dict(
             case=self.name, scenario=self.scn.title, file=str(self.scn.path), resolution=config.res_name(self.res),
             aspect=config.aspect_name(self.res), mod=self.mod, status=status,
-            duration=round(self.duration, 1), steps=self.results), indent=1))
+            duration=round(self.duration, 1),
+            exe=next((x.s['exe'] for x in ([self.sess] if self.sess else []) + list(self.sessions.values()) if x.s.get('exe')), None),
+            layers=next((x.s['layers'] for x in ([self.sess] if self.sess else []) + list(self.sessions.values())
+                         if x.s.get('layers')), None),
+            steps=self.results), indent=1))
         return status
 
     def run_step(self, text):

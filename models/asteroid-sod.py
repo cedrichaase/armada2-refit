@@ -22,7 +22,7 @@ of sharp ones up to 138; at the default --crease 55 the sharpest sixth of them s
 drawn on their own curve on both sides, so a rock keeps its broken ridges and its faces
 between them turn round. No triangle folds over at any crease up to 70. The surface
 detail is not geometry: render3d's world module bakes it from its recipes
-(render3d/surfaces/Master1.ini, Master2.ini) and lights it per pixel.
+(render3d/content/surfaces/Master1.ini, Master2.ini) and lights it per pixel.
 
 The models are drawn from the engine's static vertex buffers, as stock draws asteroid
 fields, so the cost is the triangles: --split 4 makes 576 to 1,600 a rock. Master.SOD is

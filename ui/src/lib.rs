@@ -15,6 +15,7 @@ pub mod claims;
 pub mod clipboard;
 pub mod clock;
 pub mod config;
+pub mod content;
 pub mod credits;
 pub mod cursor;
 pub mod engine;
@@ -28,10 +29,29 @@ pub mod math;
 pub mod menus;
 pub mod movie;
 pub mod prefs;
+pub mod settings;
+mod settings_table;
 #[rustfmt::skip]
 pub mod shaders;
 pub mod style;
 pub mod surface;
+pub mod syms;
+#[rustfmt::skip]
+pub mod syms_core;
+#[rustfmt::skip]
+pub mod syms_dialogs;
+#[rustfmt::skip]
+pub mod syms_hud;
+#[rustfmt::skip]
+pub mod syms_info;
+#[rustfmt::skip]
+pub mod syms_loading;
+#[rustfmt::skip]
+pub mod syms_panels;
+#[rustfmt::skip]
+pub mod syms_radar;
+#[rustfmt::skip]
+pub mod syms_shell;
 pub mod text;
 pub mod widgets;
 
@@ -51,23 +71,26 @@ fn startup() {
     rt::init();
     let cfg = config::load();
     rt::log_open("UI.log", cfg.log);
+    // The overlay's values read by `load` came before the log was open and were not
+    // noted (a2rt `overlay::note`): read once more, from the cache, so the log has them.
+    let _ = config::load();
     clock::load();
     log!("UI {} -- game dir {}", env!("CARGO_PKG_VERSION"), rt::game_dir());
+    // The identity, the build and each part's symbols summary (crates/a2engine).
+    syms::init();
     if !cfg.enable {
         log!("Enable=0: standing down");
         return;
     }
     config::set(cfg);
+    config::remember();
     // With Display8 (contract 1.1) the parts' claims route its passthrough: registered
     // before any part is patched (README.md, "Claims").
     claims::register();
     // Each context stands down on its own: a hook that is not stock leaves that part
     // of the game as it was, and the others still work.
-    if config::get().native {
-        log!("display: {}", if engine::display::install() { "a stock mode becomes the desktop's" } else { "the call is not stock: the game's mode is as set" });
-        // The intro's 640x480 is not in Display8's mode list (one mode, the desktop's).
-        engine::intro::raise_mode();
-    }
+    // The display mode (the profile's, the shell's, the intro's) and the pointer's clip
+    // are Display8's (`[Window]` in Display8.ini).
     if config::get().movies {
         engine::intro::route_frames();
     }
@@ -92,6 +115,53 @@ fn startup() {
     if config::get().menus {
         log!("menus: {}", if engine::dialogs::install() { "hosted by the UI" } else { "standing down: the shell runs stock" });
     }
+}
+
+/// `UI_SettingsNote` (tools/settings/README.md, C5): why a row's part is not running now.
+/// The HUD's rows while the HUD stood down. NULL for the plugin as a whole and for any other row.
+#[unsafe(no_mangle)]
+pub extern "C" fn UI_SettingsNote(row: *const rt::settings::Setting) -> *const u8 {
+    use settings_table::{HUD_BARHIDDEN, HUD_ENABLE};
+    if row.is_null() {
+        // The plugin as a whole: an Armada2.exe Refit does not know.
+        return syms::note_plugin().unwrap_or(core::ptr::null());
+    }
+    let r = unsafe { &*row };
+    // Why a hook that feeds this row stood down, in the engine's own words.
+    if let Some(n) = syms::note_for(r.section(), r.key()) {
+        return n;
+    }
+    if core::ptr::eq(r, HUD_ENABLE) || core::ptr::eq(r, HUD_BARHIDDEN) {
+        return core::ptr::null();
+    }
+    if r.section() == "HUD" {
+        let why: &'static [u8] = match unsafe { hud::STOOD_DOWN } {
+            1 => b"The HUD is switched off (Enable=0): the game's own HUD is drawn\0",
+            2 => b"No HUD panel is switched on: the game's own HUD is drawn\0",
+            3 => b"An engine function is not stock: the game's own HUD is drawn\0",
+            4 => b"The HUD could not be installed: the game's own HUD is drawn\0",
+            _ => b"\0",
+        };
+        if why[0] != 0 {
+            return why.as_ptr();
+        }
+    }
+    core::ptr::null()
+}
+
+/// `UI_BarCell` (qol/bar.c, QOL-1): the stock button in cell 0..14 of the bar's menu now
+/// shown, or NULL when the cell is empty or the bar is not drawn. QOL's position keys
+/// work only while this gives a cell.
+#[unsafe(no_mangle)]
+pub extern "C" fn UI_BarCell(cell: u32) -> usize {
+    hud::bar::cell_button(cell)
+}
+
+/// `UI_BarStep` (qol/bar.c): the bar's update has run; QOL calls it on the game's thread
+/// after the stock keyboard step, so the UI's clicks are pressed with this update's buttons.
+#[unsafe(no_mangle)]
+pub extern "C" fn UI_BarStep(palette: usize) {
+    hud::bar::step_from_qol(palette);
 }
 
 #[unsafe(no_mangle)]

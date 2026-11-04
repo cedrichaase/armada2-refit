@@ -4,8 +4,8 @@
 the game with a real (virtual) mouse and keyboard, and checks plain-text scenarios
 against it. Each run leaves a report with screenshots, logs and every verdict.
 
-    ./a2test run main-menu hud font          # scenarios in testbench/scenarios/
-    ./a2test run main-menu --res 16:9,21:9   # override the resolutions
+    ./a2test run no-assets font          # scenarios in testbench/scenarios/
+    ./a2test run no-assets --res 16:9,21:9   # override the resolutions
     ./a2test run admirals-log --vnc          # ... and watch it (view-only VNC)
     ./a2test watch                           # the bench dashboard: http://127.0.0.1:5950/
     ./a2test watch --install-desktop         # ... in the app launcher, from the main checkout
@@ -15,6 +15,7 @@ against it. Each run leaves a report with screenshots, logs and every verdict.
 
     ./a2test session start --res 16:10       # a live session to drive by hand; prints its ID
     ./a2test session start --install .       # this checkout's ./install, from stock
+    ./a2test session start --install . --layers display,render3d   # ... only these layers (layers.toml)
     ./a2test session start --res 800x600 --mod stock --stock-shell embed   # the stock baseline, menus clickable
     ./a2test session start --assets none --install .   # as a release installs it: no textures, plates, movies
     A2_DATA=$(mktemp -d) ./a2test session start --install .   # ... as without any assets
@@ -92,6 +93,27 @@ scene file (`SCENE=planet|nebula|firing`). A free camera can be moved while the 
 runs: `a2test drive scene "orbit ship 120 20 250"`. `--install testbench/scene`; see
 `scene/README.md`.
 
+**The player's overlay** (`RefitPlayer.ini`, `tools/settings/README.md`): every clone
+starts with **no** `RefitPlayer.ini`, `RefitPlayer.ini.tmp`, `UIPlayer.ini` or
+`UIPlayer.ini.migrated` (deleted in `prepare`, logged `overlay emptied`), so the user's
+own choices never reach a bench game; `collect_logs` keeps the clone's `RefitPlayer.ini`
+in the run's `logs/`. Keys come back in three ways, all written with
+`tools/settings/overlay.py` (the edit `UI.asi` makes), the section spelled as in the
+overlay (`<Stem>.<Section>`):
+
+- a scenario's header **`Overlay: Render3D.Modules:sky=0 UI.HUD:Minimap=0`**, written
+  after `Setup:` and before the launch (`scenarios/README.md`); `a2test check` shows it;
+- **`./a2test drive --session ID overlay Render3D.World:Surfaces=0`** in a running game,
+  and `... overlay --unset Render3D.World:Surfaces`. It then waits up to 5 s for the hub's
+  `settings: RefitPlayer.ini changed` in `UI.log` and fails, saying so, when there is none
+  (no `UI.asi` in the clone, or the hub is not running); a game that is not running only
+  has the file written;
+- `Setup: tools/settings/bench-overlay.sh ...`, which still works and also runs a scene
+  or script after it.
+
+`python3 testbench/bench/overlay_selftest.py` checks the header, the emptying and
+`drive overlay` against a fake clone.
+
 **Sound by category** (`--mute`, `--stems`; "Audio stems" below): a session can set
 the game's music, voice, effects and interface volumes to 0 in its clone, and can play
 music, voice and the interface on silent sinks of their own, so a take records each as
@@ -102,7 +124,7 @@ a separate track and the mix is made in the edit (`films/README.md`, "Sound").
 | Stage | What | Why this way |
 |---|---|---|
 | clone | `cp -a --reflink=always` of the game (4.5 GB) and the prefix (558 MB) into `~/.cache/a2test/sessions/<id>/`. A case that starts from stock (`Mod: stock`, `--install`, `--assets none`) copies the game from the stock cache instead (below) | btrfs: 0.7 s and no space. Must be the same filesystem as the game |
-| prepare | `ARMADA.PRF` line 5 set to the resolution, then `ui/install.sh` with `A2_GAME=<clone>`: this checkout's `UI.asi` in, and what it supersedes taken out (`HUD.asi`, `GridLayout.asi`, `Menus.asi`, the file-based HUD fixes: `ui/README.md`, "Installing"). For `Mod: stock`, `a2mod stock` on the clone instead. With `--install PATH` (repeatable), `a2mod stock` and then each `PATH/install` in order, so the case shows exactly those checkouts; the log's `installs=` names each one's commit (`-dirty` if uncommitted). The `a2mod stock` comes done from the stock cache, and `prepare.log` carries its output from when the entry was made | `UI.asi` takes no resolution, so every case runs the same install: a pass at every aspect is what it claims |
+| prepare | `ARMADA.PRF` line 5 set to the resolution, then `ui/install.sh` with `A2_GAME=<clone>`: this checkout's `UI.asi` in (the legacy plugins it replaced are gone from the repository; an old install's are `retire/`'s to take out: `ui/README.md`, "Installing", and "The legacy plugins" below). For `Mod: stock`, `a2mod stock` on the clone instead. With `--install PATH` (repeatable), `a2mod stock` and then each `PATH/install` in order (with `--only` the `--layers`, below), so the case shows exactly those checkouts; the log's `installs=` names each one's commit (`-dirty` if uncommitted). The `a2mod stock` comes done from the stock cache, and `prepare.log` carries its output from when the entry was made | `UI.asi` takes no resolution, so every case runs the same install: a pass at every aspect is what it claims |
 | display | `sway` with `WLR_BACKENDS=headless`, one output at exactly the resolution, `xwayland force` | the game gets the same Xwayland path it has under Hyprland, and nothing appears on the desktop |
 | input | `input/a2input`: a wlr virtual pointer and virtual keyboard on sway's seat, fed through a FIFO | see "Input" |
 | game | `umu_run.py` with Heroic's environment, the clone as `WINEPREFIX`/`STEAM_COMPAT_DATA_PATH`; silent: `winepulse.drv=d;winealsa.drv=d` | see "Traps" |
@@ -119,7 +141,7 @@ cache, since it is the game's own files; never a checkout or `A2_DATA`), and eve
 stock-start session takes a reflink copy of that (0.7 s). `bench/stockcache.py`.
 
 - **What stock is** here is exactly what `a2mod stock` makes of the install: what
-  `a2mod` deliberately leaves (DXVK and the d3d8 chain behind Display8, the ASI loader,
+  `a2mod` deliberately leaves (the ASI loader,
   the widescreen patch, `ARMADA.PRF`, `RTS_CFG.h`) is the user's, as before. Measured:
   a fresh clone with `a2mod stock` and a copy from the cache are the same over all
   10,734 entries by type, mode, size, mtime and sha256, except `.a2mod/state.json`'s
@@ -128,7 +150,7 @@ stock-start session takes a reflink copy of that (0.7 s). `bench/stockcache.py`.
   every entry), the hash of the `a2mod` the bench runs from, and a version of the cache's
   own logic. ctime cannot be set from user space, so anything that changes the install
   (the user playing, which writes `ARMADA.PRF` and the plugins' logs; `./install`;
-  `a2mod`; Heroic or DXVK replacing a DLL) makes a new key, and the next stock session
+  `a2mod`; Heroic replacing a DLL) makes a new key, and the next stock session
   builds a new entry. Taking it costs 0.3 s. It is taken again after a build, and an
   entry is not kept if the install changed meanwhile (that session then falls back to
   `a2mod stock` on its own clone).
@@ -164,15 +186,27 @@ that reads a log by path must glob the prefix (see `gpu/replay.sh`, `render3d/pe
 The launch deletes the previous logs in both places.
 
 Logs gathered per case (into the case's `logs/`, from wherever they were): `wine.log` (umu, Proton, Wine; `A2TEST_WINEDEBUG` sets
-channels, `trace+cursor` for Wine's pointer clip), `Menus.log`, `Render3D.log`, `BinkProxy.log`, `D3DTrace.log` (`d3dtrace/`), `D3D9Probe.log` (`d3d9probe/`), `Armada2_d3d9.log` and
-`xalia_dxgi.log` (DXVK), `sway.log` (with `A2TEST_XWAYLAND_DEBUG=1` in the
+channels, `trace+cursor` for Wine's pointer clip), `UI.log`, `Render3D.log`, `Display8.log`, `BinkProxy.log` (and `Menus.log`, `HUD.log`, `Armada2_d3d9.log`, `xalia_dxgi.log` from an old install seeded by `legacy.py`), `sway.log` (with `A2TEST_XWAYLAND_DEBUG=1` in the
 environment of `session start` or `run`, every Wayland request and event of Xwayland's:
 its pointer's enter and leave, locks and confinements; large, so for short runs),
 `bar.log` (`Show a bar ...`), `input.log`, `prepare.log`,
 `launch-env.txt` (the exact environment and argv), `Scene.log` and `Scene.marks`
 (`scene/README.md`, "Marks"), `Stems.log` and `Stems.ini`, the clone's `ARMADA.PRF`,
-`Menus.ini`, `Render3D.ini` and `dxvk.conf`, `exception.txt` if the game crashed, and
+`UI.ini`, `Display8.ini`, `Render3D.ini` (and a legacy install's `Menus.ini`, `dxvk.conf`), `exception.txt` if the game crashed, and
 anything new in the game's `Logs/`.
+
+### Installing a subset
+
+`--layers display,render3d` (`a2test session start`, `a2test run`) and a scenario's
+`Layers: display render3d` install only those layers of the registry (`layers.toml`;
+`./install --list` names them): each `--install` checkout runs `./install --only` them,
+into a clone that starts from stock, this checkout's when no `--install` is given. The
+core layers (platform, display, renderer) are always in, a layer's requirements are
+added, and a layer not named is taken out with its `remove`, a no-op on a clone from
+stock. `a2test run --layers` overrides a scenario's `Layers:`; neither goes with
+`Mod: stock`. The session log's `layers=` and each case's `result.json` and report
+heading record the selection. A checkout from before the registry has no `--only`, so
+its `./install` fails the prepare step.
 
 ## Audio stems
 
@@ -190,6 +224,13 @@ full; the rest of the line is not volumes):
 **`--mute music,voice`** sets those volumes to 0 in the clone's `ARMADA.PRF` before the
 game starts; the user's install keeps its own. This is what the user did by hand on
 2026-10-17 to film mission intros without their narration and music, as a bench option.
+
+**Graphics Detail is the player's too**: a clone inherits the user's `ARMADA.PRF`, and
+with it the Graphics Detail slider (line 5, field 6, 0 to 4), which changes the
+engine's texture formats, levels of detail, starfield and first mip level loaded
+(`display/README.md`, "Texture formats"). A scenario that depends on it sets it:
+`Setup: testbench/bench-detail.sh <0-4> [the rest of the setup]`
+(`render3d-nebula-detail` runs at 2).
 
 **`--stems music,voice`** records them apart. The engine plays every sound through one
 DirectSound device, and Wine mixes all of a device's buffers into one output stream, so
@@ -302,7 +343,7 @@ stem held `Mfed300.wav`, the voice stem `a2_fed01_intro.wav`, and the effects st
 - **Menu buttons are the pictures.** The labels ("SINGLE PLAYER") are painted into the
   background and take no clicks; the emblem above them does. Named targets in
   `ui.json` are the pictures, in 800x600 design space. They are mapped to the screen
-  with the transform Menus.asi logs (`MoveWindow 800x600 @0,0 -> WxH @X,Y`).
+  with the transform the menu host (`UI.asi`) logs (`MoveWindow 800x600 @0,0 -> WxH @X,Y`).
 - **OCR is a scene-text model, not tesseract.** Tesseract reads documents, dark on
   light; game text is every colour on every ground. It needed three preprocessing
   passes (as-is, background subtracted, adaptive threshold) and upscaling tuned per
@@ -339,7 +380,7 @@ stem held `Mfed300.wav`, the voice stem `a2_fed01_intro.wav`, and the effects st
   look (`ui.json`'s `skip`), so the briefing is up seconds after the load instead of
   ~70 s later. For anything that only needs *a map*, launch
   straight into one (`Launch: -nointro a2_borg01`): a bare argument is a mission name
-  (see `menus/run-wine.sh`), and the HUD is up in ~30 s.
+  (see `platform/run-wine.sh`), and the HUD is up in ~30 s.
 - **A direct map launch deals a random faction.** One run drew the Federation,
   Cardassian and Romulan HUDs across its cases, and their panels have different shapes
   (the Federation's minimap panel is about half as wide as the Romulan's). A comparison
@@ -353,7 +394,7 @@ stem held `Mfed300.wav`, the voice stem `a2_fed01_intro.wav`, and the effects st
 - **`a2test drive` used to drive the newest active session on the machine**, and every
   case of an `a2test run` counts as one. With another job running scenarios, a `drive`
   after your own `session start` went to *that* job's game (2026-09-27: an Escape and two
-  clicks landed in a `hud-mode-switch` case), and a bare `session stop` terminated a
+  clicks landed in another job's case), and a bare `session stop` terminated a
   parallel job's session (2026-10-05). That is why `session stop` now requires an ID and
   `drive` refuses to choose among several ("Which session a command acts on").
 - **The briefing's OK button did not take a click** in one session, though Esc did.
@@ -476,6 +517,48 @@ posts, a hologram, the Evolver, a survey of what no module draws).
   the first one. A note is a line in the session's log like any drive command; it
   touches nothing in the game.
 
+## Which executable ran
+
+At session start the bench reads the clone's `Armada2.exe` and records
+`exe: {name, sha256, timestamp, image_size, sections}` in `session.json`, notes it in
+the session log, and copies it into each case's `result.json` and the run's `report.md`.
+`timestamp`, `image_size` and `sections` are the executable's identity, as the plugins
+read it from memory and log it (`engine: Armada2.exe timestamp 0x…, image size 0x…,
+sections 0x…`; `crates/a2engine/src/pe.rs` is the reader, `bench/session.py`
+`exe_identity` its offline twin), so a log line and a report can be compared by eye. The
+sha256 is the bench's alone: plugins never hash the file, and it is not a run-time key
+(`profiles/gog-1.1/build.toml` lists it as information). `Expect "Display8.log" contains
+"engine: Armada2.exe timestamp 0x3c4c76bd"` checks a plugin logged it.
+
+### The symbol profiles, offline and on the bench
+
+`./a2test syms [--exe PATH] [--build B] [--plugin P] [--record] [--json]` (`bench/syms.py`)
+checks `profiles/` against an executable file, read only (default `$A2_GAME/Armada2.exe`):
+it identifies the build, then runs every plugin table's hooks through the resolver of
+`tools/engine/resolve.py` (the algorithm the plugins run, so the same stand-down reasons),
+mapping addresses to file offsets through the sections. It prints each table's
+`symbols: N/M` line, each hook `ready` or its reason, and the total. `--build` forces a
+build's profile onto the exe (the wrong-profile test), `--record` appends the exe's
+sha256 to `[[known]]` of the matched build (it refuses an unknown one; the line is
+information, never a key), `--json` prints the same as data. It cannot see what changes
+at run time (FleetOpsHook, the widescreen `.asi`): the plugin's own log is for that.
+`tools/engine/negative.sh` runs it on scratch copies of the exe (timestamp changed,
+one checked entry changed per plugin file, a forced child build, `--record`): offline,
+no game running.
+
+The bench's negative cases use two `Setup:` scripts of `tools/engine/`, which chain to
+the next script as `display/bench-mode.sh` does. `bench-exe.sh stamp` flips one bit of
+the PE timestamp of the clone's `Armada2.exe` (written beside it and moved over its name,
+so the install's file is never written even if the clone shares its blocks):
+`engine-unknown-build`. `bench-mismatch.sh <globs>|by-player` writes the clone's
+`A2EngineTest.ini` (`[Test] Mismatch=<globs>`, `*` only): the hooks named stand down as
+a failed check would, on a stock exe. With `by-player` the scenario's `Players:` name
+picks the globs, so one file runs variants side by side (`engine-mismatch`: `display`,
+`radar`). A `Players:` list is one game each, so the variants that need a third or fourth
+game are their own files, pending the packages that put their plugin on a profile:
+`engine-mismatch-hulls` (render3d, 8e) and `engine-mismatch-cplugins` (QOL, rules, Online,
+8d). The Display8 shell under a forced `display.modes` is not the engine's.
+
 ## Frame dumps
 
     ./a2test drive --session ID dump NAME      # or a scenario step: Dump the frame called "NAME"
@@ -511,7 +594,7 @@ would do it) lifts the frame. So compare dumps with dumps, and shots with shots.
 ## Recording a frame of gpu calls
 
     ./a2test drive --session ID record NAME    # one frame of render3d's and the UI's calls
-    gpu/replay.sh NAME                         # drawn again with no game: vulkan, d3d9
+    gpu/replay.sh NAME                         # drawn again with no game: vulkan
     ./a2test baseline diff $A2_DATA/replays/NAME/game.ppm $A2_DATA/replays/NAME/replay-vulkan.ppm
 
 `record` (`bench/record.py`) writes the trigger `Gpu.record` (the name and a time, so
@@ -519,16 +602,14 @@ each request is new) and waits up to 180 s for every installed plugin to write i
 stream and the UI to dump the frame it recorded, then moves the recording from the
 clone's `Dumps\NAME\` into `$A2_DATA/replays/NAME/` (a time is added when that exists),
 with `game.ppm` (the frame as the game presented it), the clone's `Display8.ini`,
-`dxvk.conf`, `Render3D.ini` and `UI.ini` (the replay draws with the same Display8
+`Render3D.ini` and `UI.ini` (the replay draws with the same Display8
 settings) and `meta.json` (the session, its installs, the time). It prints each
 plugin's sidecar: records, snapshots, and what could not be read back. A recording holds
 the game's textures, so it lives in `A2_DATA`, never in a checkout.
 
 The plugins record only on Display8's **Vulkan backend** (`display/bench-mode.sh stub
 Backend=vulkan PixelCentres=d3d9 ...`, which puts the game on lavapipe); on another
-backend `record` fails, saying so. It was proven on a paused mission scene. To compare the replay on
-Direct3D 9 with the others, record with render3d's `[Lights] Clustered=0` in the clone's
-`Render3D.ini`: clustered lights are compute, which Direct3D 9 does not have. What is
+backend `record` fails, saying so. It was proven on a paused mission scene. What is
 recorded, how it replays and what it cannot hold: `gpu/README.md`, "Record and replay".
 The replays run on lavapipe with the validation layer, never on the GPU, and need no
 session: `gpu/replay.sh` brings up a headless display of its own.
@@ -582,8 +663,8 @@ under it are named by stem; a scenario or run directory holding one case; any ot
 directory of images; a session ID, live or ended; or a baseline's name. `record` adds
 to a baseline and refuses to replace a shot it holds unless given `--force`.
 
-**Vulkan on the bench.** A game whose clone's `Display8.ini` says `Mode=stub` and
-`Backend=vulkan` runs on the user's GPU (the one DXVK uses) with the Khronos validation
+**Vulkan on the bench.** A game whose clone's `Display8.ini` says
+`Backend=vulkan` runs on the user's GPU with the Khronos validation
 layer on (`bench/session.py`, `vulkan_env`: `VK_INSTANCE_LAYERS`; `display/bench-mode.sh`
 adds `Validate=1`), so errors are caught before they can hang the GPU. Flags of
 `session start`, `run` and `drive`-less runs: `--vulkan-device lavapipe` (or
@@ -591,8 +672,8 @@ adds `Validate=1`), so errors are caught before they can hang the GPU. Flags of
 (`VK_DRIVER_FILES`, `VK_ICD_FILENAMES`, `Device=llvmpipe`); `--no-validate` (or
 `A2TEST_VULKAN_VALIDATE=0`) drops the layer, for timing runs. Keep 1280x720 and stop
 sessions promptly: a GPU hang has crashed the desktop. Judge a lavapipe run against a baseline taken
-on the GPU (`pre-gpu-*`), not against `Backend=d3d9` on lavapipe: DXVK on lavapipe
-draws the port scenes visibly differently from DXVK on the GPU (`port-nebula` at RMSE
+on the GPU (`p10-vk-*`, which replaced `pre-gpu-*`), not against a run on another driver: the retired Direct3D 9 path on lavapipe
+drew the port scenes visibly differently from the GPU's (`port-nebula` at RMSE
 25.8, `port-firing` 7.0), while render3d on Vulkan on lavapipe is within 1 to 2 of the
 GPU's (`gpu/README.md`, "Measured"). A whole campaign mission does not load on
 lavapipe on either backend (32-bit address space, likely); on the GPU it does.
@@ -824,6 +905,26 @@ starts a game takes a **slot** first, from one queue shared by the whole machine
 
 `python3 testbench/bench/slots_selftest.py` checks all of it with dummy processes
 and no game.
+
+## The legacy plugins
+
+`HUD.asi`, `GridLayout.asi` and `Menus.asi` left the repository in 15.2.0, and the Direct3D 9
+chain and `dxvk.conf` in 15.6.0 (`retire/` takes them out of an old install). The bench
+still needs the plugins in three places, so
+`bench/legacy.py` builds them once from the last tag that has them (`v13.51.3`: `git
+archive` of `menus hud grid csdk` into a scratch directory, never a worktree) and caches
+them in `$A2_DATA/bench/legacy/<tag>/`, with the tag's `hud/` scripts and the vendored
+chain DLLs. It is our code, compiled; nothing of the game is in it.
+
+- `Stock shell: embed` (a stock reference case): `Menus.asi` with `Embed=1` and nothing
+  else, so the stock menus take clicks (`session.embed_stock_shell`).
+- `display/bench-abi.sh old-display`: the old Display8 forwards, and needs `Menus.asi` to
+  raise the shell's 800x600 mode (`legacy.py install <game> menus`). A clone with a
+  `d3d9.dll` of its own gets the `d3d9=n,b` override; no other clone has one.
+- `retire-old-install`: `testbench/scenarios/retire-old-install.sh` (its `Setup:`) seeds
+  an old install (`legacy.py seed`), runs `./install` and compares with the stock clone.
+
+`python3 testbench/bench/legacy.py ensure|install|embed|seed` is the whole interface.
 
 ## Requirements
 

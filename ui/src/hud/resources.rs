@@ -28,13 +28,13 @@ fn names(now: f64, shown: &[(u32, usize)]) -> &'static [(usize, String, String)]
             // "Crew: 1200/3250": the name is the first line up to its colon.
             let first = tip.lines().next().unwrap_or("");
             let first = String::from(first.split(':').next().unwrap_or("").trim());
-            let name = if first.is_empty() || first.len() > 24 { String::from(topbar::NAMES[r as usize]) } else { first };
+            let name = if first.is_empty() || first.len() > 24 { String::from(crate::content::get().resource(r as usize)) } else { first };
             n.names.push((c, name, tip));
         }
         if !same {
             let mut line = String::new();
             for (i, &(r, _)) in shown.iter().enumerate() {
-                line.push_str(&crate::sfmt!(" {}={}({})", topbar::NAMES[r as usize], topbar::amount_text(r), n.names[i].1));
+                line.push_str(&crate::sfmt!(" {}={}({})", crate::content::get().resource(r as usize), topbar::amount_text(r), n.names[i].1));
             }
             crate::log!("resources:{}", line);
         }
@@ -50,7 +50,7 @@ const ORDER: [u32; 6] = [2, 4, 3, 5, 0, 1];
 pub fn run(ui: &mut Ui) {
     let mut shown = topbar::shown();
     shown.sort_by_key(|&(r, _)| ORDER.iter().position(|&o| o == r).unwrap_or(6));
-    if shown.is_empty() || crate::engine::hud::hidden(topbar::RESOURCE_PANEL) {
+    if shown.is_empty() || crate::engine::hud::hidden(topbar::resource_panel()) {
         return;
     }
     let names = names(crate::rt::now(), &shown);

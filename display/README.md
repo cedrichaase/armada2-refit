@@ -6,23 +6,28 @@ Rust like render3d and the UI. The aim (the plan in the user's `plans/`) is that
 engine ends up drawing nothing: Display8 gives it a device that accepts everything, and
 `Render3D.asi` and `UI.asi` draw the whole frame on Vulkan or Direct3D 12 directly.
 
-    Mode=forward  Armada2.exe -> d3d8.dll (Display8) -> d3d8_real.dll (crosire's d3d8to9) -> d3d9.dll (DXVK; Windows' own)
-    Mode=stub     Armada2.exe -> d3d8.dll (Display8, draws nothing) -> Display8's own device: d3d9.dll, vulkan-1.dll or d3d12.dll
+    Armada2.exe -> d3d8.dll (Display8, draws nothing) -> Display8's own device: vulkan-1.dll or d3d12.dll
+    the bail-out: Armada2.exe -> d3d8.dll (Display8) -> the system's own d3d8.dll (Windows', or Wine's builtin)
+
+Display8 has no Direct3D 9 and passes no call to a chain of Direct3D 8 wrappers (until
+display 1.0.0 it could do both). When it cannot draw the game itself it hands the game
+the system's own Direct3D 8 and the plugins stand down ("The bail-out").
 
 ## Status
 
-**Two modes, the stub by default (since display 0.8.0).** `./install` puts Display8 in
-(`display/install`), `a2mod` switches it as the `display` layer, and
-`platform/d3d8-chain.py` switches the chain behind it. In **stub mode** (`Mode=stub`,
-shipped; "Stub mode" below) the real chain is never loaded, and render3d and the UI
-draw the whole frame on a device of Display8's own: the first that starts of Vulkan,
-Direct3D 12 and Direct3D 9 (`Backend=auto`, shipped; "Choosing a backend"), or the one
-`Backend=` names ("Backends"). The user confirmed Vulkan in game on 2026-10-23 and made
-this the default. In **forward mode** (`Mode=forward`, the default until display 0.7.0)
-it stands in front of the real chain and passes every call through; on the test bench
-it traces every call (`Trace=auto`: on in an `a2test` clone). A `Display8.ini` with
-neither key falls back to forward and d3d9 in the code; the shipped file names both.
-The release package carries it too, from 13.35.0 ("Installing", below).
+**One mode, the stub (since display 1.0.0).** `./install` puts Display8 in
+(`display/install`) and `a2mod` switches it as the `display` layer. The engine gets
+devices of ours that draw nothing, and render3d and the UI draw the whole frame on a
+device of Display8's own: the first that starts of Vulkan and Direct3D 12
+(`Backend=auto`, shipped; "Choosing a backend"), or the one `Backend=` names
+("Backends"). When neither can start, or with `Backend=none`, the game draws through the
+system's Direct3D 8 and the plugins stand down ("The bail-out"). The user confirmed
+Vulkan in game on 2026-10-23 and made the stub the default (display 0.8.0). Forward
+mode (every call passed to a chain behind Display8), `Mode=` and `Real=`, and the
+Direct3D 9 backend (`Backend=d3d9`) were removed in 1.0.0; a player's ini that still
+has them is read past and says so in the log ("Choosing a backend"). On the test bench
+the tracer is on (`Trace=auto`: on in an `a2test` clone). The release package carries it
+too, from 13.35.0 ("Installing", below).
 
     ./a2test session start --res 1280x720 --install .
 
@@ -33,50 +38,50 @@ The release package carries it too, from 13.35.0 ("Installing", below).
 | File | What |
 |---|---|
 | `d3d8.dll` | Display8 |
-| `d3d8_real.dll` | the `d3d8.dll` that was there: crosire's d3d8to9 after `./install`'s platform step. Display8 loads it (`Real=auto`) and passes every call to it |
-| `d3d8.dll.a2display-backup` | the same file again: what `a2mod stock` copies back into `d3d8.dll`. Stock is the stock chain's binary, not ours passing through |
+| `d3d8.dll.a2display-backup` | the `d3d8.dll` that was there before, if any (made the first time a `d3d8.dll` that is not ours is found): what `a2mod stock` and `--remove` copy back into `d3d8.dll` |
 | `Display8.ini` | the settings; a key the player's copy lacks is added (`tools/ini-merge.py`), and a value that still holds an older shipped default is moved to the new one (below) |
+
+Nothing stands behind Display8 any more: the installer moves no chain to `d3d8_real.dll`
+(until display 1.0.0 it did, and Display8 loaded it). A `d3d8_real.dll` an older install
+left is not read; the retire step of `./install` takes it out, and `--remove` puts it
+back as `d3d8.dll` if no backup is there and retire has not run.
 
 **When the shipped defaults change**, an install must not keep the old ones by
 accident nor undo a player's choice. `Defaults=` numbers the set a file holds (as
 `UI.ini`'s does), and `tools/ini-merge.py` brings a copy with an older number (or none: 1)
 up to the new one: each key the newer set changed moves to its new value only where it
 still holds the old default. Defaults 2 (display 0.8.0) is `Mode=stub`,
-`Backend=auto`, where 1 was `forward` and `d3d9`: a game installed with display 0.7.0 or
-earlier comes to the stub on `auto`, and a game whose `Backend=vulkan` (or any value
-other than d3d9) was set by hand keeps it, its `Mode=forward` moved to stub. A player
-who had chosen `forward` or `d3d9` before their default changed is moved too; the merge
-cannot tell that choice from the old default, and prints each key it moves.
-Since 0.12.0 the code's defaults are the shipped file's (`Mode=stub`, `Backend=auto`,
-`Passthrough=1`), so a `Display8.ini` without those keys, or none at all, runs as
-shipped.
+`Backend=auto`, where 1 was `forward` and `d3d9`. Defaults 3 (display 1.0.0) drops
+`Mode` and `Real` and the `d3d9` token from `Backend=` (an emptied list becomes the
+shipped `auto`), and carries the sampler keys of a `dxvk.conf` that bears
+`renderer-config.sh`'s marker into `[Samplers]` where the player set none and the value
+differs from the shipped one ("Samplers"); Display8 reads no `dxvk.conf` after that.
+The merge prints each key it moves. The code's defaults are the shipped file's
+(`Backend=auto`, `Passthrough=1`), so a `Display8.ini` without those keys, or none at
+all, runs as shipped.
 
-With no `d3d8.dll` in the game directory (the system's is the chain), Display8 goes in
-alone and loads the system's own (`GetSystemDirectory`: SysWOW64 on 64-bit Windows,
-Wine's builtin under Wine). Run again, the installer replaces only `d3d8.dll`.
+With no `d3d8.dll` in the game directory (the system's is the one), Display8 goes in
+alone; its bail-out loads the system's own (`GetSystemDirectory`: SysWOW64 on 64-bit
+Windows, Wine's builtin under Wine). Run again, the installer replaces only `d3d8.dll`.
 `d3d8-chain.py` knows Display8 by the panic message every build carries, not by a hash
-(ours changes with every build); behind it, the chain's slot is `d3d8_real.dll`, and
-every switch there rewrites the backup with it, so `a2mod stock` restores the chain in
-use.
+(ours changes with every build).
 
 Wine loads the game directory's `d3d8.dll` because of the `d3d8=n,b` override
-(`platform/README.md`); `d3d8_real.dll` is loaded by full path, so it needs none.
+(`platform/README.md`).
 
 **The release package** (`publish/README.md`, "Release packages") carries Display8 in
 `display/` with the shipped `Display8.ini`, and its installers (`install.sh`,
-`install.ps1`) put it in the same way, with two differences. They put it only in front
-of crosire's d3d8to9 after their chain step (a chain left as the player's gets none),
-and they make no `d3d8.dll.a2display-backup`, since there is no `a2mod` in a release.
-They merge `Display8.ini` without Python, in awk and in PowerShell, by `ini-merge.py`'s
-rules and upgrade table. On macOS too `Display8.ini` goes in as shipped, on
-`Backend=auto`: Vulkan on MoltenVK under a 32-bit process works there ("Will Vulkan work
-on a Mac?"), and Direct3D 9 (Wine's wined3d, or a wrapper's D9VK) comes last if it
-cannot start.
+`install.ps1`) put it in the same way, with one difference: they make no
+`d3d8.dll.a2display-backup`, since there is no `a2mod` in a release. They merge
+`Display8.ini` without Python, in awk and in PowerShell, by `ini-merge.py`'s rules and
+upgrade table. On macOS too `Display8.ini` goes in as shipped, on `Backend=auto`: Vulkan
+on MoltenVK under a 32-bit process works there ("Will Vulkan work on a Mac?"), and if it
+cannot start the game draws through the system's Direct3D 8 ("The bail-out").
 Nothing in Display8 is Wine-specific (`platform()` only names the system in the log), so
-on Windows the stub runs on the GPU vendor's Vulkan, Direct3D 12 or Windows' own
-Direct3D 9; it has not been seen there yet. `--uninstall` puts d3d8to9 back as `d3d8.dll`
-and takes out what `display/install --remove` takes out (on Windows also
-`Display8.pipelines` and `Display8.d3d12pipelines`).
+on Windows the stub runs on the GPU vendor's Vulkan or Direct3D 12; it has not been seen
+there yet. `--uninstall` puts the backed-up `d3d8.dll` back and takes out what
+`display/install --remove` takes out (on Windows also `Display8.pipelines` and
+`Display8.d3d12pipelines`).
 
 ## What the plugins can ask of it
 
@@ -92,15 +97,45 @@ as before:
 | `display8_frame()` | frames presented so far |
 | `display8_abi(caller_major, caller_minor, caller, &major, &minor)` | the contract's handshake (since 0.12.0): Display8's contract version, the plugin's logged beside it ("Versions of the contract" below) |
 | `display8v1_register(&plugin)`, `display8v1_claims(except)` | the claims (since 0.13.0, contract 1.1): a plugin registers at load with a callback saying what it draws now, and asks what the others claim ("Claims" below) |
-| `display8v1_backend()` | what the plugins draw on: Direct3D 9, Vulkan, Direct3D 12 or none (`gpu/src/display.rs`, `BACKEND_*`) |
+| `display8v1_backend()` | what the plugins draw on: Vulkan, Direct3D 12 or none (`gpu/src/display.rs`, `BACKEND_*`). None until the device is made, and for good after the bail-out, when the plugins stand down ("The bail-out") |
 | `display8v1_vk*`, `display8v1_dx12*`, `display8v1_engine_viewport`, `display8v1_engine_transform` | stub mode on Vulkan and Direct3D 12: the device, the frame, the upload ring, deferred frees, the engine's targets and mirrors, a flush, and the engine's state the plugins read. The contract is `gpu/src/display.rs` (its doc comment is the specification); `src/vk/exports.rs` and `src/dx12/exports.rs` implement it |
+| `display8v1_vk_pass(event, &pass)`, `display8v1_dx12_pass(event, &pass)` | a plugin's `Cmd` begins or ends, or ends with its pass published (render3d's scene pass), for the passthrough to draw into; on Direct3D 12 since 0.19.0 (contract 1.4, below) |
 
-The first five are the forward mode's (`src/api.rs`), unversioned: plain scalars, the
-same in every release. render3d (`frame::begin`) and the
-UI (`gfx::attach`) tell a new device or a `Reset` by `display8_device_epoch`
-(`gpu::Gpu::device_epoch`, resolved once); on a `d3d8.dll` without it they compare the
-Direct3D 9 device behind the engine's (`gpu::Gpu::engine_id`) as before, until the
-Direct3D 9 backend goes (the display plan's last phase).
+The first five (`src/api.rs`) are unversioned: plain scalars, the same in every release.
+render3d (`frame::begin`) and the UI (`gfx::attach`) tell a new device or a `Reset` by
+`display8_device_epoch` (`gpu::Gpu::device_epoch`, resolved once).
+
+### The pass on Direct3D 12 (contract 1.4)
+
+Since 0.19.0 a plugin publishes its pass on Direct3D 12 as on Vulkan, through
+`display8v1_dx12_pass(event, pass)` (`gpu/src/display.rs`, "Pass publishing on
+Direct3D 12", is the specification):
+
+- **Events** as `display8v1_vk_pass`'s: `PASS_ENTER` (0) when a plugin's outermost
+  `Cmd` begins, `PASS_LEAVE` (1) when it ends, `PASS_PUBLISH` (2) when it ends with
+  `pass` its pass now. `PASS_PUBLISH` is a leave with a pass, not a second event;
+  `pass` is null for the other two. Only render3d publishes; the UI enters and leaves.
+- **`Dx12Pass8`**, read within its `size`: `colour` and `depth` (`Dx12Image8`, a null
+  `resource` is none; `format` the view's `DXGI_FORMAT`, `state` as below), `rtv` and
+  `dsv` (the `D3D12_CPU_DESCRIPTOR_HANDLE`s a draw sets with `OMSetRenderTargets`, in
+  the plugin's heaps that are not shader-visible; `rtv` is the published layer's view),
+  `samples`, `width` and `height`.
+- **Kept for the frame**: the pass published last, with the frame it came in
+  (`src/dx12/exports.rs`, `published()`), and forgotten at the engine's `Present`, when
+  the frame's index moves on. Whether a `Cmd` is alive is `cmd_alive()`: Display8
+  records nothing into the list then. Each kind of pass (size, samples, depth) is logged once, the first eight:
+  `dx12: pass published 1280x720 x4 with depth (frame 412)`.
+- **States**: whenever no `Cmd` is alive the published colour is in `RENDER_TARGET` and
+  the depth in `DEPTH_WRITE`. Display8 draws into them so and leaves them so; it never
+  samples, copies or transitions them.
+- **The rebind rule**: Display8 may set anything on the list between `Cmd`s but the
+  descriptor heaps (it sets only its own two, at the frame's start and after a flush);
+  `gpu` binds everything again at its next `Cmd`. While a `Cmd` is alive, nothing
+  Display8 does in a call (the frame, the ring, descriptors, mirrors, targets) binds
+  anything on the list; a mirror's update is a copy and its barriers.
+
+The passthrough does not draw into it yet (phase 10 X1): with 0.19.0 the engine's
+draws on Direct3D 12 are dropped, as before.
 
 ## Versions of the contract
 
@@ -128,9 +163,9 @@ What each side does with a mismatch, and logs:
 | Files | What happens | The log |
 |---|---|---|
 | plugins and Display8 of one major | the handshake agrees; the plugins draw on the backend Display8 says | `Render3D.log`/`UI.log`: `gpu 1.0.0 (contract 1.0): Display8 0.12.0 (contract 1.0)`; `Display8.log`: `contract: UI.asi asks for 1.0; Display8's is 1.0: drawn through` |
-| no Display8 (another chain's `d3d8.dll`: crosire's d3d8to9, DXVK's, Wine's) | Direct3D 9, as ever | `gpu ...: no Display8 (the game's d3d8.dll is another chain's): Direct3D 9` |
-| plugins newer than Display8 (a Display8 before 0.12.0) | `gpu` finds unversioned exports and no `display8_abi`: it stands down to Direct3D 9 only, which on Display8's own Vulkan or Direct3D 12 draws nothing | `gpu ...: Display8 0.11.0 is too old for this plugin (no contract handshake ...)` |
-| plugins older than Display8 (built before 0.12.0) | they look for `display8_backend` and find nothing: Direct3D 9 only, nothing drawn on Vulkan or Direct3D 12 | `Display8.log`, in stub mode 300 frames into the first mission (such a plugin calls nothing of Display8's, so it is told by not having asked): `contract: Render3D.asi is loaded and has not asked for the contract ...` |
+| no Display8 (another `d3d8.dll`: crosire's d3d8to9, DXVK's, Wine's) | the plugins stand down and draw nothing (there is no Direct3D 9 to fall back to since gpu 2.0.0) | `gpu ...: no Display8 (the game's d3d8.dll is another chain's): this plugin stands down and draws nothing` |
+| plugins newer than Display8 (a Display8 before 0.12.0) | `gpu` finds unversioned exports and no `display8_abi`: it stands down and draws nothing | `gpu ...: Display8 0.11.0 is too old for this plugin (no contract handshake ...)` |
+| plugins older than Display8 (built before 0.12.0) | they look for `display8_backend` and find nothing: nothing drawn on Vulkan or Direct3D 12 | `Display8.log`, in stub mode 300 frames into the first mission (such a plugin calls nothing of Display8's, so it is told by not having asked): `contract: Render3D.asi is loaded and has not asked for the contract ...` |
 | another major either way | as above, both sides | `gpu ...: Display8 ... has contract 2.0, another major ...`; `Display8.log`: `... another major: it finds none of this Display8's exports and stands down` |
 
 On Vulkan the engine's own draws pass through where the plugins draw nothing
@@ -139,7 +174,8 @@ On Vulkan the engine's own draws pass through where the plugins draw nothing
 render3d 0.31.0 and UI 0.26.0 were the last release that had to ship together; from
 there a release of one may meet the others of the same major.
 `testbench/scenarios/display-abi-mismatch.md` runs both directions against 13.42.4
-(`bench-abi.sh`).
+(`bench-abi.sh`). Display8 0.11.0 beside the current plugins needs the retired `Menus.asi` back
+(the shell's mode raise is Display8's since 0.18.0), which `bench-abi.sh` adds.
 
 ## Claims
 
@@ -158,7 +194,7 @@ The categories are `gpu::display::CLAIM_*`. A plugin claims only what it draws n
 | Plugin | Claims | Not claimed |
 |---|---|---|
 | render3d | each module running (`sky`, `hulls`, `world`, `particles`, `effects`, `ordnance`, `specials`), `fog` and `selection` by `[Overlays] Fog` and `Selection` | a module at 0 (or kept for the menu scene only), one standing down beside its old plugin, everything before its first frame, and everything when its frame seam is not stock |
-| UI | `hud` (its panels are in), `selection` (`[HUD] SelectionBubbles=0`, its brackets marking the selection), `loading` (`[Loading] Enable=1`, the screen of ours), `credits` (`[Menus] Credits=1`), `cursor` (while it keeps the engine's cursor from drawing: at the present where its own is drawn) | a part at 0; everything while it cannot draw (`gfx::drawing`: 30 frames in a row with no device) |
+| UI | `menus` (the menu host runs: Display8 raises the shell's mode, "Window and display mode"; not a draw, so it holds when the UI cannot draw), `hud` (its panels are in), `selection` (`[HUD] SelectionBubbles=0`, its brackets marking the selection), `loading` (`[Loading] Enable=1`, the screen of ours), `credits` (`[Menus] Credits=1`), `cursor` (while it keeps the engine's cursor from drawing: at the present where its own is drawn) | a part at 0; everything while it cannot draw (`gfx::drawing`: 30 frames in a row with no device) |
 
 A plugin that stood down because of the contract (another major, a Display8 too old)
 never registers, and one built before 1.1 has nothing to register with: either claims
@@ -186,9 +222,8 @@ reading of the `ret` the UI puts in `RenderSelectionEffects`, which it reads onl
 `d3d8.dll` without claims (`render3d/src/mods/overlays/selection.rs`). Nothing looks up
 a plugin by its DLL name for routing any more.
 
-Claims are asked in forward mode too (for `display8v1_claims`), but route nothing
-there: forward mode draws every call it is given, as before. `display-claims` checks
-three games on the stub: nothing claimed, the UI, and render3d at `sky=0`.
+`display-claims` checks three games on the stub: nothing claimed, the UI, and render3d
+at `sky=0`.
 
 **Display8 alone.** With no `UI.asi` and no `Render3D.asi` nothing registers, and in
 stub mode passthrough draws the whole game as the engine issues it: the stock menus,
@@ -200,29 +235,25 @@ why that needs Display8 to answer the engine's own mode requests). `display-clai
 
 **An object of ours for every interface.** `IDirect3D8`, the device, the swap chain,
 the three kinds of texture, surfaces, volumes, vertex and index buffers: each is a
-vtable of ours (`src/d3d8/`) and the real object it stands for (`src/com.rs`). Every
-method sits in its slot with its exact `__stdcall` argument list, from Wine's
-`include/d3d8.h`; one argument too many or too few unbalances the caller's stack. A
-method that takes an object swaps ours for the real one (`SetTexture`,
-`SetRenderTarget`, `CopyRects`, ...), and one that hands an object back wraps it
-(`CreateTexture`, `GetBackBuffer`, `GetSurfaceLevel`, `GetContainer`, ...).
+vtable of ours (`src/stub/`) over memory of ours; `src/d3d8/` holds Direct3D 8's
+structures and method names and `src/com.rs` the COM vocabulary they share (GUIDs, the
+kinds of object, the roles). Every method sits in its slot with its exact `__stdcall`
+argument list, from Wine's `include/d3d8.h`; one argument too many or too few unbalances
+the caller's stack.
 
-**One object of ours per real object.** A registry maps each real pointer to ours, so
-`GetTexture` hands back the very pointer the engine set. The reference count is the real
-object's: `AddRef` and `Release` pass through, and ours is freed when the real one
-reports 0. In Direct3D 9 a texture's surface shares its texture's count, so a surface
-of ours may outlive its real one; a later real object at the same address and of the
-same kind takes it over, which is sound because ours holds nothing but the pointer.
-
-**`QueryInterface` for anything that is not Direct3D 8's goes to the real object.**
-That is how the plugins reach Direct3D 9 through the engine's objects
-(`IID_IDirect3DDevice9` on the device; `IID_IDirect3DTexture9` on the minimap's and the
-fog's textures), as they did on d3d8to9 itself (`platform/D3D9.md`).
+**`QueryInterface` answers an object's own interfaces and nothing else.** A plugin does
+not reach Direct3D 9 through the engine's objects any more (until display 1.0.0 it did,
+by `IID_IDirect3DDevice9` on the device and `IID_IDirect3DTexture9` on a texture): it
+asks Display8 for its device and a texture's mirror through the exports of
+`gpu/src/display.rs`.
 
 **The plugins chain slots of our device's vtable** (`Reset`, `Present`: `ui/src/engine/device.rs`,
-`render3d/src/frame/mod.rs`) with `VirtualProtect` and a write, as they did on
-d3d8to9's. The vtables are therefore mutable statics, filled at start-up, and nothing in
-Display8 calls its own methods through them.
+`render3d/src/frame/mod.rs`) with `VirtualProtect` and a write. The vtables are therefore
+mutable statics, filled at start-up, and nothing in Display8 calls its own methods
+through them.
+
+**The bail-out is the exception to all of it**: the engine then holds the system's
+objects, not ours ("The bail-out").
 
 ## Callers
 
@@ -241,19 +272,22 @@ never go into this repository (hard rule 9).
 
 ## The inventory
 
-With `Trace=1` in `Display8.ini`:
+The tracer counts the calls the engine makes on the stub's objects, as it counted them on
+the real chain's until display 1.0.0 (`display-inventory`, `display-engine-draws` and
+`display-drop` run on the stub). After a bail-out the engine holds the system's objects
+and nothing is counted. With `Trace=1` in `Display8.ini`:
 
 - **`Display8.inventory.tsv`**, beside the exe, rewritten every two seconds of
   presenting and at each new context: a row per context, interface, method and callers,
   with the calls, the frames they fell in, and how many came from a thread other than
   the device's. `#` lines at the end give each context's frames, engine draws and time
-  spent in the real `Present`.
+  spent in `Present`.
 - **`Display8.log`** (in `%LOCALAPPDATA%\armada2-refit\logs\` since display 0.14.0, the game directory if that is unset or not writable; its first line says where): each distinct line once per context: the answers the engine
   branches on (`ANSWER`: caps, formats, modes, `ValidateDevice`), the present
   parameters of every `CreateDevice` and `Reset`, gamma ramps (`GAMMA`), every lock
-  (`LOCK`) and read-back (`READBACK`), render targets, the plugins' queries for
-  Direct3D 9 (`QI`), and the `user32`/`gdi32` calls that read the mode or move the mouse
-  (`MODE`, `MOUSE`, `WINDOW`: `src/user32.rs`, hooked in the exe's import table).
+  (`LOCK`) and read-back (`READBACK`), render targets, the queries for interfaces the
+  object does not answer (`QI`), and the `user32`/`gdi32` calls that read the mode or move
+  the mouse (`MODE`, `MOUSE`, `WINDOW`: `src/user32.rs`, hooked in the exe's import table).
 - **Contexts** are labels the bench sets: `Mark the display context "mission"` writes
   `Display8.mark`, read at most four times a second at `Present` and at every
   `CreateDevice` and `Reset`, then deleted. Before the first mark the context is
@@ -261,10 +295,43 @@ With `Trace=1` in `Display8.ini`:
 - **`Expect the engine to draw nothing in "mission"`** reads the inventory: no `Draw*`
   on the device whose caller is in `Armada2.exe`, in that context.
 
+## Hooks
+
+What Display8 reads of `Armada2.exe` is in its symbol profile,
+`profiles/<build>/display.toml` (`profiles/gog-1.1/` for GOG's 1.1), generated into
+`src/engine_syms.rs` by `tools/engine/gen.py`; the format and the resolver are
+`crates/a2engine/README.md`. At start Display8 logs the executable's identity, the
+build it recognises and the summary:
+
+    engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321
+    engine: build armada2/gog-1.1
+    engine: symbols: 29/29 resolved; 0 hooks blocked
+
+| Hook | Entries | Used by | Without it |
+|---|---|---|---|
+| `display.modes` | `ST3D_DisplayDevice::FindDisplayMode` (`fn`, its first 13 bytes checked), its six calls (`call`, each checked to call it), and the front end's 800x600x16 request (`value`) | `stub/modes.rs` ("The engine's hard-coded modes"); the stub's start in `lib.rs` | no stub: the bail-out |
+| `display.native` | `GameConfiguration::InitializeGraphicsSystem` (`fn`) and its call in `WinMain` (`call`, checked), `UserProfile` (`global`), the profile's mode fields at +0x50, +0x54, +0x58 and the two stock modes (`value`) | `window.rs`: `[Window] Native` ("Window and display mode") | the profile's mode is as set |
+| `display.keepclip` | the mouse driver's button bits and the flag that says the pointer is held for a pan (`global`; read only) | `window.rs`: `[Window] KeepClip` | the clip is put back regardless of a held button |
+| `display.drop` | the code ranges of `RenderLoopAssetLoadStatusUpdate`, the Credits (`Credits3D.obj`, from its first function `SpriteWithLocation::Render`), `ST3D_DeviceDirectX8::RefreshDisplay` and the two workspaces' `Submit` (`fn` with `end`; nothing is written, so nothing is checked) | `drop.rs`: `[Drop]` ("Drop switches"), and the scene a `BeginScene` begins for the claims (`passthrough.rs`) and the contract's mission check (`api.rs`) | nothing is dropped and no scene of the engine's is claimed: the engine draws its own loading screen, Credits and cursor |
+
+The tracer's caller names (`trace.rs`) are not a hook: they are addresses read off the
+stack against the identity's image range, and mean the same on any build.
+
+**On a build Display8 does not know** (`engine: unknown build`, or `display.modes`
+standing down) the stub does not start: the game gets the system's Direct3D 8 and the
+plugins stand down (`bail-out: engine: unknown build; ...`, "The bail-out"). Measured on
+the bench 2026-11-03 with `A2EngineTest.ini` `Mismatch=display.modes` on the stock exe
+and no `UI.asi` (what an unknown build leaves, since the UI stands down there too): the
+stub started, the engine's own mode requests found no mode, and the game died of a stack
+overflow right after `CheckDeviceType`, as before 0.15.1. So the stub with passthrough
+is not an option without the mode hook. The bench's `A2EngineTest.ini`
+(`[Test] Mismatch=<globs>`) makes chosen hooks stand down on the stock exe as a failed
+check would; `./install` deletes it.
+
 ## Drop switches
 
-`[Drop]` in `Display8.ini` (`src/drop.rs`): the engine's draws, accepted and not passed
-on. Read again every 60 presents, so one session can shoot a frame with and without.
+`[Drop]` in `Display8.ini` (`src/drop.rs`): the engine's draws on the stub, accepted and not
+passed on. Read again every 60 presents, so one session can shoot a frame with and without.
 
 | Key | Drops |
 |---|---|
@@ -274,7 +341,7 @@ on. Read again every 60 presents, so one session can shoot a frame with and with
 | `Callers=0x..., 0x...` | any draw with one of these return addresses on its call chain |
 
 A draw is the engine's when its immediate caller is in `Armada2.exe`; the plugins draw
-through Direct3D 9 and never pass here. With the refit installed and every category's
+through `gpu` and never pass here. With the refit installed and every category's
 work taken over, the game must look the same with the switch on: that is how each
 context is proved done before the stub drops everything.
 
@@ -291,16 +358,17 @@ context is proved done before the stub drops everything.
 
 ## Stub mode
 
-`Mode=stub` (`src/stub/`): the real chain is never loaded. The engine gets an
+The stub (`src/stub/`), the only mode since display 1.0.0: the engine gets an
 `IDirect3D8` and devices of ours that accept everything and draw nothing, and Display8
-makes a Direct3D 9 device of its own (`d3d9.dll` as the loader finds it: DXVK's beside
-the exe under Proton, Windows' own) on the game's window. render3d and the UI find it
-exactly as they found d3d8to9's, through `QueryInterface(IID_IDirect3DDevice9)` on the
-engine's device, and draw the whole frame on it.
+makes a device of its own, on Vulkan or Direct3D 12 ("Backends"), on the game's window.
+render3d and the UI find it through the exports of `gpu/src/display.rs` and draw the
+whole frame on it. The answers the engine's `IDirect3D8` gives (caps, formats, modes) are
+those DXVK behind crosire's d3d8to9 gave on the bench in phase 0 (the chain since removed) (`stub/d3d.rs`), so the
+engine takes the code paths it took there.
 
-- **One Direct3D 9 device for the game's life**, made at the engine's first
-  `CreateDevice`. Its later `CreateDevice`s and `Reset`s get a new device object of
-  ours on the same Direct3D 9 device, or nothing at all.
+- **One device for the game's life**, made at the engine's first `CreateDevice`. Its
+  later `CreateDevice`s and `Reset`s get a new device object of ours on the same device,
+  or nothing at all.
 - **One display mode: the desktop's.** The engine is offered only that one (X8R8G8B8,
   the adapter's refresh), so it draws at the size the swap chain has and no mouse
   coordinate needs translating (phase 0 found the engine reads the mouse only through
@@ -308,19 +376,19 @@ engine's device, and draw the whole frame on it.
   borderless one covering the screen, and the swap chain is windowed on it.
 - **The engine's hard-coded modes get the one mode** (`src/stub/modes.rs`, since
   0.15.1; below).
-- **What the plugins read of the engine's state reaches the Direct3D 9 device**: the
+- **What the plugins read of the engine's state reaches the device**: the
   transforms (render3d reads the view and the projection), the viewport, `Clear` of the
   engine's own back buffer and depth, `BeginScene` and `EndScene`. Everything else is
   kept for the engine's own `Get*` and goes nowhere.
 - **Resources are memory.** A texture's levels, a surface's pixels and a buffer's bytes
   live in Display8, and a lock hands out a pointer into them, as the managed pool's
   system copy did. Draws are counted (the inventory), and dropped, or drawn by the
-  passthrough on Vulkan ("Passthrough").
-- **The mirror table.** A texture a plugin asks for as Direct3D 9 (the radar's two
-  scan-grid sprites, phase 0's only ones; the unit view's Bink frame) is made there
-  once with every level and brought up to date when the engine unlocks a level, at
-  once on the device's thread, else at the next `BeginScene` or `Present`
-  (`BinkThread` writes from its own).
+  passthrough ("Passthrough").
+- **The mirror table.** A texture a plugin samples (the radar's two scan-grid sprites,
+  phase 0's only ones; the unit view's Bink frame) is made on the device once with every
+  level (`display8v1_vk_mirror`, the Direct3D 12 twin) and brought up to date when the
+  engine unlocks a level, at once on the device's thread, else at the next `BeginScene`
+  or `Present` (`BinkThread` writes from its own).
 - **The back buffer's pixels** (the movie path locks it and writes each frame) go into
   the frame when it is unlocked, as on a real device, so what is drawn after lands on
   top: the UI draws each movie frame at the `Present` that follows, and the cutscene
@@ -328,23 +396,17 @@ engine's device, and draw the whole frame on it.
   display 0.6.1), the untouched buffer covered the UI's frame, and every movie played
   black with its sound, on every backend. An unlock off the device's thread waits for
   `Present`. `display-movie` checks it.
-- **The gamma ramp in the last pass** (`src/stub/gamma.rs`, `shaders/present.hlsl`): a
-  windowed swap chain ignores `SetGammaRamp`, and on the real chain the ramp the engine
-  sets at start-up lifts every frame (DXVK's presenter applies it: 2 to 3, 80 to 90).
-  So the back buffer is copied and drawn back through a 256x1 lookup. Measured on the
-  showcase frame against the real chain's screen: the frames the plugins render are the
-  same to the last pixel (RMSE 0: scene, bloom levels, presented frame), and the screen
-  differs by at most 1/255 (RMSE 0.28): DXVK's mapping of a ramp value to 8 bits is none
-  of rounding (64 values of 256 per channel off by one), truncating ramp/257 (142),
-  interpolating half a texel back (13) or the high byte (13, what is used).
-- **Stands down** to forward mode when `HUD.asi`, `GridLayout.asi` or `Menus.asi` is
-  loaded (each changes what the engine draws, which the stub drops; `GridLayout.asi`
-  would leave no button bar at all, since the UI's stands down beside it), or, on
-  `Backend=d3d9`, when Direct3D 9 cannot be made. The log says which. A Vulkan or
-  Direct3D 12 device is made at the engine's first `CreateDevice`, after the choice
-  between the modes is past: if it cannot be made, the next backend is tried there,
-  Direct3D 9 last ("Choosing a backend"), and that `CreateDevice` fails only when none
-  starts.
+- **The gamma ramp in the last pass** (`shaders/present.hlsl`, in each backend's
+  present): a windowed swap chain ignores `SetGammaRamp`, and the ramp the engine sets at
+  start-up lifts every frame (2 to 3, 80 to 90). So the back buffer is drawn into the
+  swap chain through a 256x1 lookup of the ramp.
+- **Does not start** (the bail-out, "The bail-out") when a stale `HUD.asi`, `GridLayout.asi` or
+  `Menus.asi` (retired plugins an old install left; `retire/` takes them out) is loaded (each changes what the engine draws, which the stub drops;
+  `GridLayout.asi` would leave no button bar at all, since the UI's stands down beside
+  it), on a build or with a `display.modes` hook that is not stock, with `Backend=none`,
+  and when no backend of the order can start. A device is made at the engine's first
+  `CreateDevice`: if the backend cannot be made there, the next is tried, and when none
+  starts the bail-out is taken there, late ("Choosing a backend").
 
 ### The engine's hard-coded modes
 
@@ -361,12 +423,13 @@ was opened on no mode, which failed, and the game died of a stack overflow befor
 engine's first `CreateDevice` (seen on the bench 2026-10-30: Wine's log says
 `stack overflow`, `Display8.log` ends at `CheckDeviceType`). Until 0.15.1 only the
 UI's `raise_shell_mode` (`[Menus] Enable=1`) kept it from happening, by making the
-shell's request the desktop's; forward mode lists the real modes and never had it.
+shell's request the desktop's.
 
-Display8 re-points those six calls, in stub mode, at a lookup of its own
+Display8 re-points those six calls at a lookup of its own
 (`modes::find`): the engine's first, and when it finds nothing, the listed mode of the
-stub's size. Each call and `FindDisplayMode`'s first bytes are checked before anything
-is written; one that is not stock is left alone and logged. The lookup's other callers
+stub's size. The six calls and `FindDisplayMode`'s first bytes are one hook, `display.modes`
+("Hooks", below): all are checked before anything is written, and if one is not stock
+none is written and the stub is not started (the bail-out). The lookup's other callers
 keep the exact match: the adapter's enumeration, which uses it to skip a mode it has
 listed already, and Graphics Settings, which offers what is listed (the one mode).
 `Display8.log` says what was asked and given:
@@ -374,10 +437,8 @@ listed already, and Graphics Settings, which offers what is listed (the one mode
     stub: the engine's own mode requests (6 of 6 calls) get the one mode offered when theirs is not listed
     stub: the engine asks for 800x600x16, not listed: given the one mode, 1280x720x32
 
-The UI's raises are untouched and never write the same bytes: they patch the pushes
-before two of these calls and the call of `InitializeGraphicsSystem` (`0x484169`), so
-with the UI the lookup matches at once and Display8's answer is the engine's. No
-claim or contract change was needed.
+Since 0.18.0 the same six calls are also where the shell's and the intro's modes are
+raised ("Window and display mode"); the UI no longer patches anything of the kind.
 
 **What the stock shell looks like then** (Display8 alone, 1280x720 on the bench): the
 game's window covers the screen from the first `CreateDevice`, and the GDI menus draw
@@ -387,27 +448,75 @@ coordinates (main menu, Single Player, the campaign's Select Mission), and a mis
 then opens at the desktop's size, drawn by the engine through passthrough. Scaling the
 shell into the window is the UI's (`ui/MENUS.md`).
 
-`display/bench-mode.sh stub` sets the mode in a bench clone from a scenario's `Setup:`;
-`display-stub` walks the whole game on it.
+### Window and display mode
+
+Since 0.18.0 (contract 1.3; ROADMAP phase 9, C3) Display8 is the only plugin that
+changes a display-mode request of the engine, the game's top-level window or the
+pointer's clip. The keys are `[Window]` in `Display8.ini` (`settings.toml`; every row is
+`NO_ROW`, none on the Refit screen), and the first three moved there from `UI.ini`'s
+`[UI]` (`Native`, `KeepClip`) and the cutscene proxy's own raise:
+
+- **The shell** (`SetActiveDisplay_Internal`'s 800x600x16, the calls at `0x62c4e0` and
+  `0x62c643`) is raised to the desktop's size at 32 bits while a plugin claims
+  `CLAIM_MENUS`, asked when the engine makes the request (`claims::menus`). The UI claims
+  it while its menu host runs (`[Menus] Enable=1`, no stale `Menus.asi`); the host draws the
+  shell's dialogs at the screen's size, so a shell at 800x600 would be wrong for it. The
+  raise is done inside the lookup (`modes::find`: the request is replaced before the
+  engine's own lookup is called, and the engine's request is the fallback). The UI used
+  to patch the two pushes before these calls instead; this needed no byte patch because
+  the engine goes on with the mode the lookup returned.
+- **The intro** (`PlayIntroMovie`'s 640x480 at 32 bits and then 16, the calls at
+  `0x4861da` and `0x4861f2`) is raised the same way under `RaiseIntro=1` (shipped 1). Display8's `RaiseIntro` is the
+  intro's only owner: the cutscene proxy's own `RaiseIntroMode=` went in cutscenes 3.0.0,
+  and its `Fit` only fits each frame to the screen it is given.
+- **`Native`**: `display.native`, a stock profile mode (800x600 with no `ARMADA.PRF`,
+  GOG's 1024x768) becomes the desktop's before `InitializeGraphicsSystem`; a mode chosen
+  in Graphics Settings is kept.
+- **`KeepClip`** (`display.keepclip`): under Wine, at each `Present` (every scene,
+  not only the mission), Wine's clip is handed to `ClipCursor` again at most
+  every 500 ms, on a frame where the pointer moved, while the game's window is the
+  foreground and active one and the engine has no button down and is not holding the
+  pointer for a pan.
+- **`display8v1_mode(&w, &h)`** (contract 1.3) tells a plugin the mode the device was
+  opened at (the stub's); false before. The UI reads it
+  for its log line of what the shell runs at; a plugin falls back to measuring the
+  desktop when the export is absent.
+
+**One OS window.** The game is meant to be one window from launch to exit. Every shell
+menu is a `WS_POPUP` dialog owned by the 3D window, which Wine turns into a second X11
+window that Hyprland tiles and focuses like a new application (the menu is visible while
+input stays with the other window); the UI's host makes each dialog a hidden child of the
+3D window instead (`ui/MENUS.md`, "What the shell is, in the engine"). The Wine virtual
+desktop would also give one window but a device of ours cannot set a display mode inside it (nor could DXVK), so it
+stays off. A stub window that covers the screen at the desktop's mode needs neither.
+
+`MoveWindow` and `SetWindowPos` in the exe's imports stay the UI's, for the hosted
+dialogs (`user32.rs` leaves them alone). Without Display8 nothing raises the shell
+(UI no longer does), so it stays at the stock 800x600: fail safe. The bench checks:
+`display-window`, `ui-settings-moved`, `display-movie`, `ui-menus-refit`.
+
+`display/bench-mode.sh stub` sets Display8's keys in a bench clone from a scenario's
+`Setup:` (the word `forward` is still accepted, runs the stub and says so);
+`display-stub` walks the whole game on the stub.
 
 ## Passthrough
 
 `Passthrough=1` in `Display8.ini` (shipped, since the GPU runs below passed, and the
-code's default too since 0.12.0; `0` drops every engine draw, as before): in stub mode on Vulkan the engine's own Direct3D 8 draws are
+code's default too since 0.12.0; `0` drops every engine draw, as before): on Vulkan, and since 0.20.0 on Direct3D 12, the engine's own Direct3D 8 draws are
 drawn after all, on Display8's device, the way Direct3D 8's fixed function draws them
-(`src/passthrough.rs`, `src/vk/pass.rs`, `shaders/ff.hlsl`). It is ROADMAP phase 4's
+(`src/passthrough/`, `src/vk/pass.rs`, `src/dx12/pass.rs`, `shaders/ff.hlsl`). It is ROADMAP phase 4's
 first slice (4a, 4b, most of 4c, 4d, 4e and 4f on Vulkan). Without it, whatever render3d
-or the UI does not draw itself vanishes in stub mode: a module switched off
+or the UI does not draw itself vanishes: a module switched off
 (`[Modules] hulls=0`), a SOD render3d hands back (one that does not load, a hologram's
 class that is not a plain database), an effect class it does not know, specials with
 no particle art, construction and the bees without the hulls module, a HUD part the UI
-has not taken. With it, each shows as stock, as on the forward chain.
+has not taken. With it, each shows as stock, as it did on the forward chain (DXVK, until display 1.0.0; history).
 
 **Which draws.** Every draw on the stub's device is the engine's (the plugins draw
 through `gpu`), so routing is simple: every one is drawn, except
 
-- what `[Drop]` names (the same switches as in forward mode, so a category can still be
-  A/B'd: `Drop3D=1` drops the hand-backs again);
+- what `[Drop]` names (so a category can still be A/B'd: `Drop3D=1` drops the hand-backs
+  again);
 - the scenes a plugin claims to draw over ("Claims"): the loading loop's while the UI's
   loading screen is up (`CLAIM_LOADING`), the stock Credits' and the cursor's. Without
   the UI, with its part at 0 or with a UI that stood down, the engine's loading screen
@@ -423,8 +532,9 @@ Since 0.13.0 the plugins' claims are this routing ("Claims"): no DLL is looked u
 name.
 
 **Where it lands.** In the frame's command buffer, at the moment the engine makes it,
-between the plugins' recorders: the same order as on Direct3D 9, where a plugin's targets
-stay bound after its `Cmd` and the engine's draws land in them. On Vulkan a plugin's
+between the plugins' recorders: the order the engine's draws had on Direct3D 9 (until
+display 1.0.0), where a plugin's targets stayed bound after its `Cmd` and the engine's
+draws landed in them. On Vulkan a plugin's
 pass ends with its `Cmd`, so render3d's `gpu` **publishes** its pass now at each of its
 `Cmd`s' ends (`display8_vk_pass`, `PASS_PUBLISH`; `gpu::Gpu::with_display_publishing`),
 every attachment put in its attachment layout first. While its body runs that is the
@@ -459,7 +569,7 @@ reordered, so the engine's back-to-front translucent order stands.
 | blend | `ALPHABLENDENABLE`, `SRCBLEND`, `DESTBLEND` (`BOTH*` as Direct3D's), `BLENDOP`, `COLORWRITEENABLE`; on the engine's back buffer, which is X8R8G8B8, a destination alpha reads one |
 | depth | `ZENABLE`, `ZWRITEENABLE`, `ZFUNC`; off without a depth surface or attachment. `ZBIAS` is logged once and left out |
 | cull | `CULLMODE` as gpu has it (the vertex shader turns y over): `CW` is Vulkan's back face with a counter-clockwise front |
-| samplers | per stage: address, filters, mip filter, `MAXANISOTROPY`, `MIPMAPLODBIAS`, `MAXMIPLEVEL`, made as DXVK makes them under the game's `dxvk.conf` (the forced anisotropy and LOD bias), as the forward chain draws them |
+| samplers | per stage: address, filters, mip filter, `MAXANISOTROPY`, `MIPMAPLODBIAS`, `MAXMIPLEVEL`, made as DXVK made them under the game's `dxvk.conf` (the forced anisotropy and LOD bias), now `[Samplers]` ("Samplers") |
 | fog | never enabled by the engine (the stock traces); logged once if it ever is |
 | fans | lists (a portability device has no fans) |
 
@@ -471,8 +581,23 @@ table's: every engine texture a draw reads is mirrored at its first draw, with e
 level, and kept up to date as the engine writes it by lock; one over 256 KB goes up
 through a staging buffer of its own, let go of with the frame, so a mission's hull
 textures arriving at once do not grow the upload ring, whose chunks live as long as the
-device. A texture of another format than A8R8G8B8 and X8R8G8B8 (none seen), a cube or a
-volume, is drawn with white and logged once.
+device. A texture of another format than A8R8G8B8 and X8R8G8B8, a cube or a volume, is
+drawn with white and logged once; the stub offers the engine no other texture format,
+so none should arrive.
+
+**Texture formats.** `CheckDeviceFormat` says yes to A8R8G8B8 and X8R8G8B8 alone as
+textures (`stub/d3d.rs`, `texture_format_ok`), because a mirror holds no other. The
+engine chooses its texture formats in `ST3D_DeviceDirectX8::SelectTextureFormats`
+(0x625f80) by asking in an order its graphics detail sets (`ST3D_GraphicsEngine_Configuration`
++0x40, the Graphics Detail slider, `ARMADA.PRF` line 5, field 6): at the top detail
+X8R8G8B8 and A8R8G8B8 come first; below it R5G6B5, X1R5G5B5, A4R4G4B4 and A1R5G5B5 do.
+Until display 1.0.2 the stub also said yes to the 16-bit formats (a list from when stub
+mode drew on a Direct3D 9 device), so below the top detail every engine texture was
+created 16-bit and drawn white: the nebulae left to the engine (`[World] Nebulae=0`)
+were flat squares, and the fog's texture had no mirror for the overlays
+(`render3d-nebula-detail`). Refused, the engine falls through to the two 32-bit formats
+at every detail; the detail still sets the levels of detail, the starfield and the
+first level of a texture's chain it loads (`ST3D_GraphicsEngine::GetLargestMipMapToUse`).
 
 **The engine's one vertex shader** (ROADMAP 4d) is the Borg hulls' bump pass. Display8
 keeps every vertex shader's declaration and function tokens at `CreateVertexShader`, the
@@ -499,8 +624,56 @@ around its lights (seen in game on *Strange Bedfellows* with every render3d modu
 lines logged "once" are the tracer's: outside the bench, with `Trace=auto`, a player's
 log does not have them.)
 
-**What is not done yet**: Direct3D 12 and the stub's Direct3D 9 (phase 10; the
-latter is to go). Specular lighting, spot cones, texture transforms, a third stage and
+**On Direct3D 12** (0.20.0, phase 10 X1; `src/dx12/pass.rs`). The routing is the same
+code (`src/passthrough/mod.rs`), and so is every translation of the engine's state to
+what a pipeline and its constants hold: `src/passthrough/state.rs` names no API type,
+and `display/hosttest` (`cargo test --release --target x86_64-unknown-linux-gnu
+--manifest-path display/hosttest/Cargo.toml`) tests it on the host. Where Direct3D 8
+and Direct3D 12 number a thing alike (blend factors and operations, comparison
+functions, primitive topologies) the number is Direct3D's. What differs:
+
+- **No render pass is open between draws.** A draw sets what differs from what is set
+  (root signature, pipeline, targets, viewport and scissor, topology, root arguments,
+  vertex and index buffers) and draws. What it assumes set is forgotten whenever someone
+  else may have recorded: a plugin's `Cmd` begins or ends (`display8v1_dx12_pass`), a
+  `display8v1_dx12_flush`, a new frame (`pass::forget`). Display8 never sets descriptor
+  heaps (the frame's two are set when it begins; it takes descriptors from their ranges
+  as the plugins do), never samples, copies or changes the state of the pass it draws
+  into, and while a `Cmd` is alive records nothing (a mirror's update is copies and
+  barriers, which bind nothing: `gpu/src/display.rs`, "The rebind rule").
+- **Where it lands**: `exports::published()`, the pass a plugin published in this frame
+  (render3d publishes two kinds each frame, its 4x scene pass with depth while its body
+  runs, then a 1x pass with depth; the last published is the one), by its own `rtv` and
+  `dsv`, its formats and sample count in the pipeline's key; a published colour that is
+  Display8's own colour target is the engine's targets, as on Vulkan.
+- **One root signature**: the vertex block as a root CBV at b0 in space 0 (`vs_ff`) and
+  in space 1 (`vs_bump`; the DXIL's `CB_SPACES`), the pixel block as one at b1, a table
+  of t0 and t1 and a table of s0 and s1. The blocks are written once per change into the
+  frame's ring at 256 alignment (the pixel block at `PS_AT`).
+- **Pipelines** are made on first use (no library yet), keyed by the target's formats
+  and sample count, topology type, vertex layout, blend, depth and cull. The destination
+  alpha of the engine's back buffer reads one, as on Vulkan; blend factors that read
+  colour become the alpha ones for the alpha channel (Direct3D 12 refuses colour factors
+  there, Vulkan reads the same component). Cull follows Direct3D 8's clockwise culling
+  with a clockwise front face. What the vertices lack comes from a 48-byte defaults record
+  in the frame's ring, in slot 1 as **instance data** read by the draw's one instance:
+  a vertex stream of stride 0 is not asked for.
+- **Samplers** are made in the frame's sampler heap, one pair per distinct pair of stage
+  states in a frame, by `state::sampler_params` (DXVK's way, the values of
+  `[Samplers]`: a linear filter anisotropic at the forced amount, the forced bias added
+  where there are mips); **textures** are the stub's mirrors (a view copied into the
+  frame's range, one table per distinct pair) or a 1x1 white one.
+
+Measured on the bench (2026-11-03, 1280x720, the GPU): `display-passthrough-d3d12`
+against Vulkan's frame RMSE 0.48 (`roundD-base-display-passthrough`; the plan's
+tolerance is 1.0), the showcase with `sky=0` and `hulls=0` against the same on Vulkan
+0.48, the nebula scene against the forward chain's baseline 0.9 (inside the scenario's
+1.5), `display-passthrough-all` (every module off, a Borg mission with the bump
+passes) and the stock front end through a campaign mission, save and load, Instant
+Action and the Credits (`display-stub`) with no `device removed`. The Vulkan frames are
+unchanged (RMSE 0 against the base).
+
+**What is not done yet**: a pipeline library for these pipelines. Specular lighting, spot cones, texture transforms, a third stage and
 `ZBIAS` are not drawn, each logged once when the engine uses it; none was seen in the
 stock traces.
 
@@ -521,7 +694,7 @@ and move through the passthrough exactly as on the forward chain and in stock, b
 - with the refit's textures the same motion changes 1.01 per 2 ticks, 39% more: the
   upscaled `Mnebula5` (`textures/targets/Mnebula5`, `blend=35`) carries finer, sharper
   detail than stock's, and that detail is what is seen to swim. With render3d on, the
-  cerulean class is its marched volume (`render3d/nebulae/mnebula10.ini`), not these
+  cerulean class is its marched volume (`render3d/content/nebulae/mnebula10.ini`), not these
   puffs.
 
 No unsupported state is used by those draws (no texture transform, no generated
@@ -566,47 +739,50 @@ once, in the shell, into its own targets.
 The game has no frame limit of its own: the only cap is the vertical blank. The engine
 makes its device with `D3DPRESENT_INTERVAL_DEFAULT` (`interval 0x0` in the log), which
 every backend reads as "wait for the vertical blank", so the frame rate is held to the
-display's refresh rate: Vulkan presents FIFO, Direct3D 12 at sync interval 1, Direct3D 9
-and the real chain at interval one. (The two `Sleep`s in the engine's own loop are not
+display's refresh rate: Vulkan presents FIFO, Direct3D 12 at sync interval 1. (The two `Sleep`s in the engine's own loop are not
 a limit: `Program::GameDoOne` sleeps once, and `Transport::DoGameCycleDelay` sleeps only
 for a delay that is 0 in an ordinary game.)
 
 **`VSync=0`** in `Display8.ini` gives the device `D3DPRESENT_INTERVAL_IMMEDIATE`
-instead, at the engine's `CreateDevice` (and, forward, at its `Reset`), so frames are
-presented as fast as they are drawn: on Vulkan the surface's mailbox mode, else
-immediate (tearing); on Direct3D 12 sync interval 0; on Direct3D 9 and the real chain
-(DXVK) the immediate interval. `Display8.log` says so at start, and the swap chain's
-line names the present mode (Vulkan's 1 is mailbox, 0 immediate, 2 FIFO). A windowed
-device of the real chain keeps the engine's interval, since Direct3D 8 takes only the
-default there; the game runs full screen. The shipped value is `VSync=1`.
+instead, at the engine's `CreateDevice`, so frames are presented as fast as they are
+drawn: on Vulkan the surface's mailbox mode, else immediate (tearing); on Direct3D 12
+sync interval 0. `Display8.log` says so at start, and the swap chain's line names the
+present mode (Vulkan's 1 is mailbox, 0 immediate, 2 FIFO). After a bail-out the setting
+is not read: the system's device keeps the engine's interval. The shipped value is
+`VSync=1`.
 
 ## Backends
 
-`Backend=` in `Display8.ini` says what the stub draws on: `d3d9` (above, the default),
-`vulkan` (`src/vk/`), `d3d12` (`src/dx12/`), or `auto` (below). On `vulkan` and `d3d12` no `d3d9.dll` is loaded
-at all: Display8 owns the device, the swap chain and the frame, and render3d's and the
+`Backend=` in `Display8.ini` says what the stub draws on: `vulkan` (`src/vk/`), `d3d12`
+(`src/dx12/`), `auto` (below) or `none` (the bail-out, "The bail-out"). No `d3d9.dll` is
+loaded: Display8 owns the device, the swap chain and the frame, and render3d's and the
 UI's `gpu` record into that frame through the plain C exports of
 `gpu/src/display.rs`, the contract both sides build against (its doc comment is the
 specification). `gpu` has a backend for each (`gpu/README.md`, "The Vulkan backend",
-"The Direct3D 12 backend"), so on `vulkan` and `d3d12` render3d and the UI draw the
-whole frame as on `d3d9`. What Display8 draws itself is the engine's `Clear`s, the
+"The Direct3D 12 backend"). What Display8 draws itself is the engine's `Clear`s, the
 movie frames the engine writes into the back buffer by lock, and the last pass through
 the gamma ramp. `Validate=1` asks for the Vulkan validation layer or Direct3D 12's
 debug layer, where the system has one.
 
 ### Choosing a backend
 
-`Backend=` is an order, tried at the engine's first `CreateDevice`
-(`stub::ensure_device`), with **Direct3D 9 always last**, named or not: a backend that
-cannot start never fails the game while d3d9 lives.
+`Backend=` is an order, probed at `Direct3DCreate8` and tried at the engine's first
+`CreateDevice` (`stub::ensure_device`). When nothing in it starts, the bail-out follows
+("The bail-out"): the game still runs, on the system's Direct3D 8, without the plugins.
 
 | `Backend=` | Tried |
 |---|---|
-| `d3d9` | Direct3D 9, opened at `Direct3DCreate8` as before |
-| `vulkan` | Vulkan, then Direct3D 9 |
-| `d3d12` | Direct3D 12, then Direct3D 9 |
-| `auto` (shipped) | Vulkan, then Direct3D 12, then Direct3D 9, on every system |
-| a list, `d3d12,vulkan` | in that order, then Direct3D 9 |
+| `vulkan` | Vulkan, then the bail-out |
+| `d3d12` | Direct3D 12, then the bail-out |
+| `auto` (shipped) | Vulkan, then Direct3D 12, then the bail-out, on every system |
+| a list, `d3d12,vulkan` | in that order, then the bail-out |
+| `none` | the bail-out at once; also ends a list (`vulkan,none` tries Vulkan only) |
+
+**Retired values.** `d3d9` was a backend until display 1.0.0. As a token in a list it is
+skipped and logged once (`settings: Backend token d3d9 retired (Direct3D 9 removed)`); a
+list left empty by that is `auto`. An unknown word is skipped with a line in the log, and
+a value that names nothing is `auto`. `PixelCentres=d3d9` stays: it is a pixel-centre
+convention for the plugins, not a backend.
 
 `auto`'s order is the user's (2026-10-23), not the display plan's (phase 6 had Direct3D
 12 first on Windows and none under Wine): Vulkan is the backend confirmed in game first.
@@ -618,15 +794,13 @@ reaches it ("Will Vulkan work on a Mac?"); if the device or its mapped ring cann
 made there, the next backend is what follows.
 
 - **The engine sees one thing whatever is chosen**: the desktop's mode is offered at
-  `Direct3DCreate8` from the system (`GetSystemMetrics`) when the order does not start
-  with Direct3D 9, and a Direct3D 9 that comes last is opened only when its turn comes
-  (no `d3d9.dll` is loaded on Vulkan or Direct3D 12); the engine keeps the mode it was
-  offered.
+  `Direct3DCreate8` from the system (`GetSystemMetrics`); the engine keeps the mode it
+  was offered.
 - **A backend that fails is taken down whole** before the next is tried
   (`Vk::destroy`, `Dx::destroy`, and the partial instance and surface before them): a
   Vulkan surface or swap chain left on the game's window keeps another from being made
   on it.
-- **`display8_backend` answers only once the device is made** (`stub::made`), and none
+- **`display8v1_backend` answers only once the device is made** (`stub::made`), and none
   before: a plugin is never told a backend that a fallback then leaves. `gpu` asks
   again while the answer is none and opens its backend at the first frame, after the
   engine's `CreateDevice` has returned (`gpu/src/api.rs`). Until display 0.7.0 Vulkan
@@ -634,25 +808,26 @@ made there, the next backend is what follows.
   bench, and `gpu` could not have opened Vulkan then anyway (no device yet).
 - **The log says each step**, in `Display8.log`:
 
-      Backend=auto: on Linux: vulkan, then d3d12, then d3d9
-      stub mode on vulkan, then d3d12, then d3d9
-      stub: trying Vulkan (1 of 3)
+      Backend=auto: on Linux: vulkan, then d3d12
+      probe: vulkan can start
+      probe: d3d12 can start
+      stub mode on vulkan, then d3d12
+      stub: trying Vulkan (1 of 2)
       stub: Vulkan could not start: <why>; falling back to Direct3D 12
-      stub: trying Direct3D 12 (2 of 3)
+      stub: trying Direct3D 12 (2 of 2)
       stub: the backend is Direct3D 12, after vulkan could not start
 
-  and with nothing able to start, `stub: no backend could start (...)`, and the engine's
-  `CreateDevice` fails as it did before.
+  and with nothing able to start, the `bail-out:` line ("The bail-out").
 - **`FailBackend=` (the test bench only)** makes the named backends (`vulkan`, `d3d12`,
-  `d3d9`, a list) fail on purpose once everything is made, so that the teardown is
-  exercised too. Honoured only in a bench clone (a game directory under
+  a list) fail on purpose once everything is made, so that the teardown is
+  exercised too, and the late bail-out when all of them are named. Honoured only in a bench clone (a game directory under
   `a2test\sessions\`) and ignored with a line in the log anywhere else; it is not in the
   shipped `Display8.ini`, and `display/bench-mode.sh` adds it to a clone's. The
   `display-fallback` scenario uses it.
 
 ### Vulkan
 
-`Backend=vulkan` (`src/vk/`): no Direct3D 9 at all. Display8 opens `vulkan-1.dll` and
+`Backend=vulkan` (`src/vk/`). Display8 opens `vulkan-1.dll` and
 makes the instance and device (Vulkan 1.1, one queue family that draws and presents,
 `VK_KHR_swapchain`; anisotropic filtering where the device has it), a swap chain on the
 game's window, an offscreen `B8G8R8A8` colour image and a `D16` depth image standing for
@@ -664,15 +839,22 @@ at the engine's `Present` Display8 draws the colour image through the gamma ramp
 the swap chain's image, submits and presents.
 
 - **The backend is said once the device is made** ("Choosing a backend"):
-  `display8_backend` answers Vulkan from the engine's first `CreateDevice` on. If
+  `display8v1_backend` answers Vulkan from the engine's first `CreateDevice` on. If
   Vulkan cannot start there, the next backend in `Backend=`'s order is tried.
 - **The engine's targets** are in their attachment layouts between recorders, the
   mirrors in `SHADER_READ_ONLY`; whoever changes one puts it back. The depth image is
   sampled and copied too (render3d's depth resolve, the dumps).
 - **`display8_vk_flush`** submits what the frame has recorded and waits, then begins the
   same command buffer again (its pool reset): a plugin's read-back (the frame dumps).
-- **Mirrors** are the engine textures a plugin samples (`display8_vk_mirror`), as the
-  Direct3D 9 mirror table has them, brought up to date when the frame is asked for.
+  A failed submit gives the slot a fresh signalled fence, as a failed frame does, and
+  the command buffer is begun again all the same, so the frame stays open and the next
+  `begin` on the slot does not wait for ever.
+- **A swap chain made again** destroys the old images' views, framebuffers and
+  semaphores as it takes them out of its lists, so a failure part way leaves the lists
+  short, never holding a destroyed handle; `present` makes it again before it acquires
+  an image while the lists do not cover every image.
+- **Mirrors** are the engine textures a plugin samples (`display8_vk_mirror`), brought
+  up to date when the frame is asked for (the stub's mirror table, "Stub mode").
   They can be copied from (`TRANSFER_SRC`), so a recorded frame (`gpu/README.md`,
   "Record and replay") reads back the mirrors it samples as they were.
 - **The physical device** is chosen by type: discrete, then integrated, virtual, other,
@@ -682,7 +864,7 @@ the swap chain's image, submits and presents.
   `--vulkan-device lavapipe`: `llvmpipe`, Mesa's CPU Vulkan); **`Validate=1`** the Khronos validation layer, its
   warnings and errors in `Display8.log` (`vulkan 0x...:`); **`PixelCentres=d3d9`**
   Direct3D 9's pixel centres for the plugins (`gpu/README.md`, "Pixel centres"), for
-  comparing with `Backend=d3d9` pixel for pixel.
+  comparing with frames made on Direct3D 9 before display 1.0.0 pixel for pixel.
 
 - **The pipeline cache is kept on disk**, in `%LOCALAPPDATA%\armada2-refit\Display8.pipelines`
   (`src/vk/cache.rs`), not the game directory: GOG installs into `Program Files`,
@@ -703,13 +885,7 @@ the swap chain's image, submits and presents.
   loads them from it by a name hashed from the whole description; with no library, or on
   any error, it creates them plainly. `gpu` logs `pipeline library: N loaded, M stored`
   (at each power of two), Display8 the file's size read and written.
-- **Samplers as DXVK makes them.** On Direct3D 9 the game's `dxvk.conf` (the renderer
-  layer, `renderer/README.md`) has DXVK give every linear sampler 16x anisotropy and
-  every sampler with mips a LOD bias of -0.5. Display8 reads the same keys
-  (`d3d9.samplerAnisotropy`, `d3d9.samplerLodBias`, `d3d9.clampNegativeLodBias`) and
-  hands them to `gpu` (`VkDevice8::sampler_anisotropy`, `sampler_lod_bias`), so the two
-  backends filter alike. Without it every hull read a level blurrier on Vulkan. Vulkan's cube maps are always seamless, as
-  `d3d9.seamlessCubes = True` makes DXVK's.
+- **Samplers** (`[Samplers]`, below).
 
 On the bench every Vulkan game runs on the GPU (the one DXVK uses) with the layer on
 (display 0.9.1): the game's environment gets `VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation`
@@ -722,6 +898,23 @@ bench's environment on; pressure-vessel honours both) and `Device=llvmpipe`, so 
 an environment that lost the variables cannot reach the GPU; a frame takes seconds
 there and its time means nothing. `--no-validate` (`A2TEST_VULKAN_VALIDATE=0`) drops
 the layer, for timing runs. `Display8.log` names the device (`vulkan: chose ...`).
+
+### Samplers
+
+Under DXVK the game's `dxvk.conf` (the renderer layer) gave every linear sampler 16x
+anisotropy and every sampler with mips a LOD bias of -0.5 (`d3d9.samplerAnisotropy`,
+`d3d9.samplerLodBias`, `d3d9.clampNegativeLodBias`). Without the same on Vulkan every
+hull read a level blurrier. Since 0.21.0 `Display8.ini`'s `[Samplers]` (`Anisotropy`,
+`LodBias`, `ClampNegativeLodBias`; rows in `settings.toml`, no screen row, advanced)
+names the values for the plugins' samplers on Vulkan and on Direct3D 12 and for the
+passthrough's (`crate::dxvk_samplers` feeds all three; Display8 hands them to `gpu` as
+`VkDevice8::sampler_anisotropy`, `sampler_lod_bias`). Since 1.0.0 `[Samplers]` is the
+only source and `dxvk.conf` is not read: the shipped values are 16, -0.5 and 0, and
+`auto` (or no key) is the same. `Display8.log` says where each came from
+(`samplers: Anisotropy=16 (default)` or `(Display8.ini)`). A player's `dxvk.conf` values
+carry over once, when the install brings `Display8.ini` to `Defaults=3`
+("Installing"). Vulkan's cube maps are always seamless, as `d3d9.seamlessCubes = True`
+made DXVK's.
 
 ### Direct3D 12
 
@@ -751,15 +944,19 @@ the layer, for timing runs. `Display8.log` names the device (`vulkan: chose ...`
 - The last pass is `shaders/present.hlsl` as DXIL (`src/shaders/present_dxil.rs`), with
   a root signature of four root constants (b0) and a table of the frame and the ramp
   (t0, t1) under two static point samplers.
-- A device that is removed is logged with its reason, and nothing is drawn after.
-- **The backend is said once the device is made**, as on Vulkan: `display8_backend`
+- A device that is removed is logged with its reason, and nothing is drawn after. A
+  fence that is not reached in six waits of 5 s, or with the device removed, makes the
+  device lost the same way: the slot's allocator, list and deferred frees are left as
+  they are (the GPU may still be using them), no frame begins, and
+  `display8v1_dx12_frame` answers null.
+- **The backend is said once the device is made**, as on Vulkan: `display8v1_backend`
   answers Direct3D 12 from the engine's first `CreateDevice` on, and `gpu` opens its
   backend then (`display8_dx12` is null before).
 - **`display8_dx12_flush`** closes the frame's list, submits it, waits for its fence and
   opens the same list again (its allocator reset, the heaps set again): a plugin's
   read-back (the frame dumps, render3d's nebula bake). The frame's ring, descriptors and
   deferred calls stay as they are.
-- **`PixelCentres=d3d9`** and the samplers as the game's `dxvk.conf` has DXVK make them,
+- **`PixelCentres=d3d9`** and the samplers of `[Samplers]`,
   as on Vulkan: `Dx12Device8::features` (`FEATURE_D3D9_CENTRES`; anisotropy is always
   there), `sampler_anisotropy`, `sampler_lod_bias`.
 
@@ -782,6 +979,66 @@ through the back buffer, the gamma pass and the flip-model swap chain, and a mis
 presents past frame 1000 and opens the in-mission menu. With render3d and the UI
 drawing on it: `gpu/README.md`, "The Direct3D 12 backend", "Measured".
 
+## The bail-out
+
+Display8 draws the game itself only when it can. When it cannot, the game gets the
+system's own `d3d8.dll` and draws as stock, and `Render3D.asi` and `UI.asi` stand down
+(`display8v1_backend` answers none, so `gpu` opens no backend). The game is not lost for
+want of a Vulkan or Direct3D 12 driver; it loses the refit's look. The system's DLL is
+found with `GetSystemDirectoryA` (SysWOW64 under WoW64): Windows' own, or Wine's builtin.
+Display8 loads it by that full path and never a `d3d8_real.dll` (until display 1.0.0 it
+loaded that and passed every call to it).
+
+**Early**, at `Direct3DCreate8`, before the window exists: the engine gets the system's
+`IDirect3D8` itself, unwrapped, and every later call goes straight to it. The reasons:
+
+- `Backend=none`, in `RefitPlayer.ini` (`[Display8.Display8]`) or `Display8.ini`: the
+  way to play with the stock renderer, or to test this path.
+- An unknown build, or a `display.modes` hook that stands down ("Hooks": the stub could
+  open no display on it). This is what used to forward to the old chain.
+- A stale `HUD.asi`, `GridLayout.asi` or `Menus.asi` (retired; `retire/` takes them out) is loaded: each changes what the engine
+  draws, which the stub drops.
+- Both probes fail. A probe asks whether a backend can start without making the device.
+  Vulkan (`vk::probe`): `vulkan-1.dll` loads, an instance with the surface extensions
+  makes, and a physical device with a graphics queue exists, named as `Device=` says if it
+  says. Direct3D 12 (`dx12::probe`): `d3d12.dll` and `dxgi.dll` load with their entry
+  points, a DXGI factory makes, and `D3D12CreateDevice` at feature level 11_0, asked with
+  a null out pointer, says it would succeed. A probe that fails drops its backend from the
+  order, so with one failed the other is tried alone; the log has `probe: vulkan cannot
+  start: <why>`. Whether the device presents on the window is the start's to find out,
+  at the engine's first `CreateDevice`.
+
+Where `display.modes` is ready the intro's mode raise ("Window and display mode") is
+still installed, answered from the system's own list of modes. The shell's is not
+raised after a bail-out, though the UI's menu host claims the menus from load: with no
+device the host refuses every dialog, and a stock shell draws 800x600, so it keeps its
+800x600 mode and fills the screen as stock does.
+
+A second `Direct3DCreate8` never starts the stub again (starting it reinstalls the
+stub's methods over the forward a late bail-out made, and begins a new stub over the
+one whose device exists): after a late bail-out it gets the system's `IDirect3D8`, while
+the stub runs another `IDirect3D8` of the stub's.
+
+**Late**, at the engine's first `CreateDevice`, when every backend of the order failed
+there (a swap chain the probe could not foresee, or `FailBackend=` on the bench): the
+stub's `IDirect3D8` has made it too far to be taken back, so its 16 methods become a thin
+forward to the system's `IDirect3D8`, and the engine gets the system's device itself.
+The engine's own `CreateDevice` is the system's, with its parameters.
+
+In both, the exports `ValidatePixelShader`, `ValidateVertexShader` and `DebugSetMute` go
+to the system's `d3d8.dll`, and `Display8.log` has one line:
+
+    bail-out: <why>; the game draws through C:\windows\syswow64\d3d8.dll; the plugins stand down
+
+Nothing of Display8 is on the path after it: no tracer, no `[Drop]`, no `VSync=`, no
+passthrough. If the system has no `d3d8.dll` to load, the log says `bail-out: cannot
+load ...: no Direct3D for the game`.
+
+To test it: `Backend=none` (`[Display8.Display8]` in `RefitPlayer.ini`, or `Display8.ini`)
+runs the early path; the bench scenario `display-bail-out` checks it. `display-fallback`
+(`FailBackend=vulkan,d3d12`) runs the late one. Once the plugins have stood down the game
+shows stock art through the stock chain, so a picture of it is a stock picture.
+
 ## Will Vulkan work on a Mac?
 
 `vkprobe/` is a small 32-bit program that does what the Vulkan backend does (a mapped
@@ -793,7 +1050,8 @@ run it on a Mac, and what it showed here: `vkprobe/README.md`.
 **Seen in game on a Mac (2026-10-28):** Apple M1, macOS 27.0.1, a Sikarugir wrapper on
 `WS12WineSikarugir11.0_1` (Wine 11, new-style WoW64). Display8 on `Backend=vulkan` made
 its device on MoltenVK (`vulkan: physical device Apple M1`, Vulkan 1.4), and the menu
-scene drew with Render3D's nebulae baked at full size. On `Backend=d3d9` the same scene
+scene drew with Render3D's nebulae baked at full size. On `Backend=d3d9` (since removed) the same scene
 crashed there. The wrapper's D9VK, under d3d8to9, emulates the nebulae's RESZ depth
 resolve, and Metal aborts on a pipeline with `MTLPixelFormatDepth16Unorm` as colour
-target 0 (issue #19). So Direct3D 9 is the fallback on a Mac, not the first choice.
+target 0 (issue #19). That is why Direct3D 9 was only the fallback on a Mac, and why the
+fallback is now the bail-out ("The bail-out"), where the plugins draw nothing.

@@ -1,0 +1,5 @@
+; mine
+[UI.HUD]
+Minimap=0
+BarHidden=0 ; old
+Tooltips=1

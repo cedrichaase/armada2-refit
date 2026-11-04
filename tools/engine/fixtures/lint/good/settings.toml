@@ -1,0 +1,8 @@
+plugin = "Toy"
+file = "Toy.ini"
+shipped = "Toy.ini"
+
+[[row]]
+name = "speed"
+section = "Toy"
+key = "Speed"

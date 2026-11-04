@@ -60,14 +60,14 @@ Class names differ per faction; read them off the tooltip. Seen for the **Borg**
 
 - **Selecting** a unit (left click on it) shows its **action bar**: square icons in a row
   just above the info panel (y≈778, from x≈600, about 75 px apart). With
-  `GridLayout.asi` installed (grid layer, on in refit) the bar is instead a 5x3 grid of
+  the UI's bar (`UI.asi`, `[HUD] Bar=1`, on in refit; it replaced `GridLayout.asi`) the bar is instead a 5x3 grid of
   labelled buttons, and at 16:9 and wider it sits at the bottom between the minimap and
   the info panel, which moves right. Its keys are by position (QWERT / ASDFG / ZXCVB;
-  T cancel, G back); `GridLayout.log` lists what each menu put on which key, which is
+  T cancel, G back); the key of each button is printed on it, which is
   quicker than reading icons.
 - **Stock bar keys work without the menu open**: with only an Assembler's top level
   showing, F5 starts placing a Processing Node. B opens the build menu, C orders, N AI,
-  F formations. With `GridLayout.asi` these are all off, and Q opens the build menu.
+  F formations. With the UI's bar these are all off, and Q opens the build menu.
 - For the Assembler the **4th** icon (x≈823) opens the **build menu**. It replaces the bar
   with structure icons; dark ones are not available yet. The arrow in the row above goes
   back.

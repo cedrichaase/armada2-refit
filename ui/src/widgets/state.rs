@@ -100,6 +100,10 @@ impl<'a> Ui<'a> {
     /// Whether the pointer at `p` reaches a widget now: not under an occluder and
     /// inside the input clip, unless this is the overlay layer's own input.
     pub(super) fn mouse_live(&self, p: (f32, f32)) -> bool {
+        // `inert_unless` sees no pointer, even inside a modal's body (which is in_overlay).
+        if self.x.inert {
+            return false;
+        }
         if self.x.in_overlay {
             return true;
         }

@@ -40,8 +40,8 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     let t = ui.theme;
     // Behind: the stock screen, faded, so its art and animations still show.
     ui.draw.rect_vgrad(screen, 0xff03060c, 0xff09121f);
-    // On a screen wider than 4:3, the widescreen plate of the same art (Menus.asi's,
-    // installed by menus/install-plates.sh) behind it at the same fade, so the art
+    // On a screen wider than 4:3, the widescreen plate of the same art (installed by
+    // ui/backdrops/install-plates.sh) behind it at the same fade, so the art
     // fills the width: the plate is the stock picture in its middle, widened.
     // Only the sides: the middle is the mirror, which carries the animations.
     let area = s.fit.area();

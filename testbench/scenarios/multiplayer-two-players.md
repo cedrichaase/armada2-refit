@@ -16,7 +16,10 @@ takes three presses: the host asks, the joiner confirms, the host launches. A
 multiplayer match starts with 999999 of each resource (9999999 for Species 8, the one
 counter it has), which is what the HUD is waited for by. The joiner quits first, so
 neither game is left with a "player left" dialog. Names are typed in lower case
-(scenarios/multiplayer-name.md says why).
+(scenarios/multiplayer-name.md says why). After the match has started the host opens the
+Refit screen (Esc, Refit, Gameplay): *Pay when queued* is a must-match row and so reads
+`Locked` in a network mission, and a click on it writes nothing (`ui/MENUS.md`, "The Refit
+screen"); Esc closes only the Refit screen and Return to Game goes back to the match.
 
 1. Launch the game.
 2. Wait for the main menu.
@@ -66,10 +69,27 @@ neither game is left with a "player left" dialog. Names are typed in lower case
 46. Host: Wait up to 180 seconds for "999999".
 47. Joiner: Wait up to 60 seconds for "999999".
 48. Host: Wait 30 seconds.
-49. Expect the game is still running.
-50. Take a screenshot called "match".
-51. Host: Expect "Online.log" contains "INDICATE_CONNECT".
-52. Joiner: Expect "Online.log" contains "CONNECT_COMPLETE".
-53. Joiner: Quit the game.
-54. Host: Quit the game.
-55. Expect no crash.
+49. Host: Press Escape.
+50. Host: Wait 3 seconds.
+51. Host: Click "Refit settings".
+52. Host: Wait 2 seconds.
+53. Host: Click "Gameplay".
+54. Host: Wait 1 second.
+55. Host: Expect "Locked" is visible.
+56. Host: Take a screenshot called "refit locked".
+57. Host: Click "Pay when queued".
+58. Host: Wait 2 seconds.
+59. Host: Expect "UI.log" contains "refit: [QOLRules.Rules] PayOnQueue locked in a network game".
+60. Host: Expect "UI.log" not contain "PayOnQueue=0 written".
+61. Host: Press Escape.
+62. Host: Wait 1 second.
+63. Host: Expect "Return to Game" is visible.
+64. Host: Click "Return to Game".
+65. Host: Wait 2 seconds.
+66. Expect the game is still running.
+67. Take a screenshot called "match".
+68. Host: Expect "Online.log" contains "INDICATE_CONNECT".
+69. Joiner: Expect "Online.log" contains "CONNECT_COMPLETE".
+70. Joiner: Quit the game.
+71. Host: Quit the game.
+72. Expect no crash.

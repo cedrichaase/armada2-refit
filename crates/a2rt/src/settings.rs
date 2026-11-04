@@ -1,0 +1,143 @@
+//! The settings descriptors, contract A2SET_ABI 1.1 (tools/settings/README.md): the row
+//! of a `<Plugin>_Settings` table and the readers a plugin reads its keys through. The
+//! row is written by hand here and in `csdk/a2asi.h`; each plugin's table is generated
+//! from its `settings.toml` by `tools/settings/gen.py` into `settings_table.rs` (or `.h`).
+//!
+//! A plugin reads a row's key only through its row, `on(&ini, ROW)` / `int` / `float`
+//! / `value`, so the code's default is the table's by construction. The value comes
+//! from the overlay first (`RefitPlayer.ini`, `Ini::lookup`), then the plugin's ini,
+//! then the row's `def`.
+use crate::Ini;
+use alloc::string::String;
+use core::ffi::c_char;
+
+/// The settings ABI: A2SET_ABI 1.1.
+pub const ABI: &str = "1.1";
+
+/// One row of a `<Plugin>_Settings` table: C ABI, 48 bytes on i686 in version 1.1
+/// (`moved_from` appended at 44; a reader steps by `size` and reads it only when
+/// `size` >= 48, `moved_from()`).
+#[repr(C)]
+pub struct Setting {
+    pub size: u32,
+    pub kind: u8,
+    pub apply: u8,
+    pub scope: u8,
+    pub tab: u8,
+    pub flags: u32,
+    pub file: *const c_char,
+    pub section: *const c_char,
+    pub key: *const c_char,
+    pub def: *const c_char,
+    pub values: *const c_char,
+    pub value_labels: *const c_char,
+    pub label: *const c_char,
+    pub help: *const c_char,
+    pub moved_from: *const c_char,
+}
+
+// The rows are static, read-only and live as long as the DLL.
+unsafe impl Sync for Setting {}
+
+/// `size` as built: what readers step by.
+pub const ROW_SIZE: u32 = core::mem::size_of::<Setting>() as u32;
+/// The smallest `size` a reader accepts (version 1.0's row).
+pub const MIN_ROW_SIZE: u32 = 44;
+
+pub const KIND_BOOL: u8 = 1;
+pub const KIND_ENUM: u8 = 2;
+pub const APPLY_LIVE: u8 = 1;
+pub const APPLY_MISSION: u8 = 2;
+pub const APPLY_RESTART: u8 = 3;
+pub const SCOPE_LOCAL: u8 = 1;
+pub const SCOPE_MATCH: u8 = 2;
+pub const TAB_NONE: u8 = 0;
+pub const TAB_GRAPHICS: u8 = 1;
+pub const TAB_INTERFACE: u8 = 2;
+pub const TAB_GAMEPLAY: u8 = 3;
+pub const TAB_MULTIPLAYER: u8 = 4;
+pub const TAB_MOVIES: u8 = 5;
+pub const FLAG_ADVANCED: u32 = 1;
+pub const FLAG_NOT_SHIPPED: u32 = 2;
+pub const FLAG_NO_ROW: u32 = 4;
+
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::size_of::<Setting>() == 48);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(Setting, file) == 12);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(Setting, help) == 40);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(Setting, moved_from) == 44);
+
+/// `<Plugin>_SettingsNote` (optional export, tools/settings/README.md C5): the note on a
+/// row of the plugin's own table (`row` NULL: on the plugin as a whole), or NULL.
+pub type NoteFn = extern "C" fn(*const Setting) -> *const u8;
+
+/// A row's string field (NULL reads as "").
+fn s(p: *const c_char) -> &'static str {
+    unsafe { crate::cstr_at(p as *const u8, 4096) }
+}
+
+impl Setting {
+    pub fn file(&self) -> &'static str {
+        s(self.file)
+    }
+    pub fn section(&self) -> &'static str {
+        s(self.section)
+    }
+    pub fn key(&self) -> &'static str {
+        s(self.key)
+    }
+    pub fn def(&self) -> &'static str {
+        s(self.def)
+    }
+    /// The values an ENUM takes, `|`-separated; a BOOL's are "0|1".
+    pub fn values(&self) -> &'static str {
+        if self.values.is_null() && self.kind == KIND_BOOL { "0|1" } else { s(self.values) }
+    }
+    /// The labels of `values`; a BOOL's are "Off|On".
+    pub fn value_labels(&self) -> &'static str {
+        if self.value_labels.is_null() && self.kind == KIND_BOOL { "Off|On" } else { s(self.value_labels) }
+    }
+    pub fn label(&self) -> &'static str {
+        s(self.label)
+    }
+    pub fn help(&self) -> &'static str {
+        s(self.help)
+    }
+    /// `Stem.Section.Key` this row's value is moved from (1.1), or "" for none and for
+    /// a table of version 1.0 rows, which are too short to hold the field.
+    pub fn moved_from(&self) -> &'static str {
+        if self.size >= 48 { s(self.moved_from) } else { "" }
+    }
+}
+
+/// The plugin's ini of a row (`file` in the game directory), with the overlay in front.
+pub fn ini(row: &Setting) -> Ini {
+    Ini::open(&crate::game_path(row.file()))
+}
+
+/// The value of a row as the plugin reads it: the overlay's, else the ini's, else
+/// `def`. An empty value counts as absent.
+pub fn value(ini: &Ini, row: &Setting) -> String {
+    match ini.string(row.section(), row.key()) {
+        Some(v) if !v.is_empty() => v,
+        _ => String::from(row.def()),
+    }
+}
+
+/// An integer row (`parse_i32`, the default's value when it does not parse).
+pub fn int(ini: &Ini, row: &Setting) -> i32 {
+    crate::parse_i32(&value(ini, row)).or_else(|| crate::parse_i32(row.def())).unwrap_or(0)
+}
+
+/// A number row (`parse_f32`, the default's value when it does not parse).
+pub fn float(ini: &Ini, row: &Setting) -> f32 {
+    crate::parse_f32(&value(ini, row)).or_else(|| crate::parse_f32(row.def())).unwrap_or(0.0)
+}
+
+/// A BOOL row: on when its value parses as a non-zero integer.
+pub fn on(ini: &Ini, row: &Setting) -> bool {
+    int(ini, row) != 0
+}

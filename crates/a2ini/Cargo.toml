@@ -1,0 +1,21 @@
+[package]
+name = "a2ini"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Ini text for the plugins: the parser of a2rt::Ini and the settings overlay's edit, no_std"
+license = "MIT"
+
+[lib]
+name = "a2ini"
+path = "src/lib.rs"
+
+# The host tool (tools/settings/host.sh builds it): the edit for the bench, the GUI
+# installer and the installers' key moves. The library stays no_std.
+[features]
+std = []
+
+[[bin]]
+name = "a2ini"
+path = "src/main.rs"
+required-features = ["std"]

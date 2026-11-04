@@ -1,12 +1,13 @@
-# Platform — Heroic, Proton and the renderer chain
+# Platform — Heroic, Proton and the d3d8 slot
 
 The part of the setup every other layer stands on, and the part `a2mod` never switches:
-DXVK's `d3d8.dll`/`d3d9.dll`, the Ultimate ASI Loader (`winmm.dll`) and
-`STA2WidescreenPatch.asi`, run through Heroic and Proton on Arch + Hyprland. The d3d8
-section matters to anything touching the renderer.
+the game's `d3d8.dll` slot (Display8's; nothing stands behind it since 4.0.0), the
+Ultimate ASI Loader (`winmm.dll`) and `STA2WidescreenPatch.asi`, run through Heroic and
+Proton on Arch + Hyprland. The d3d8 section matters to anything touching the renderer.
 
-The HUD layout and cursors are in `hud/README.md`; renderer settings and anti-aliasing
-(the Tiers) in `renderer/README.md`; the menus in `menus/README.md`. The version
+The HUD layout and cursors are in `ui/HUD.md`; renderer settings and anti-aliasing
+are render3d's and Display8's (`render3d/README.md`, `display/README.md`); the menus are
+the UI's (`ui/MENUS.md`). The version
 resource every plugin we build carries is `versioninfo/` (its `README.md`); it is part
 of the build and installs nothing of its own.
 
@@ -28,12 +29,13 @@ closed, or the change is silently lost.
 
 The environment the game runs with:
 
-    WINEDLLOVERRIDES = winmm=n,b;d3d8=n,b;d3d9=n,b
+    WINEDLLOVERRIDES = winmm=n,b;d3d8=n,b
 
-with `autoInstallDxvk` false. `n,b` = native first, then builtin. Wine searches the
-application directory before the system directory, so this is what makes Wine load the
-game-directory `winmm.dll` (the ASI loader), `d3d8.dll` and `d3d9.dll` (DXVK) instead of
-its own. `platform/d3d8-chain.py` owns the `d3d9` entry and `autoInstallDxvk` (below).
+`n,b` = native first, then builtin. Wine searches the application directory before the
+system directory, so this is what makes Wine load the game-directory `winmm.dll` (the ASI
+loader) and `d3d8.dll` (Display8) instead of its own. Until 15.6.0 it also held `d3d9=n,b`
+and `autoInstallDxvk` was false, for the chain DXVK's `d3d9.dll` was in; `platform/d3d8-chain.py
+--retire` takes the `d3d9` entry out (below), and `autoInstallDxvk` is left as the player has it.
 
 ## Launch time
 
@@ -107,130 +109,89 @@ directly into `ARMADA.PRF`, line 5:
 **The file contains an embedded NUL byte** — use binary-safe tooling, not `sed`. The
 game rewrites the file on exit and the resolution persists.
 
-## The d3d8 chain
+## The d3d8 slot
 
-**What `./install` leaves** (on Linux, from the DXVK chain below):
-
-    Armada2.exe
-      -> <game dir>/d3d8.dll          Display8 (display/), Mode=forward: passes every call on
-      -> <game dir>/d3d8_real.dll     crosire's d3d8to9 (vendored; --upgrade, below)
-      -> <game dir>/d3d9.dll          DXVK d3d9
-      -> Vulkan
-
-The platform step (`d3d8-chain.py --upgrade`) puts d3d8to9 in the slot, then
-`display/install` moves it behind Display8 as `d3d8_real.dll`. `d3d8-chain.py` acts on
-`d3d8_real.dll` whenever Display8 is in front (it knows Display8 by the message every
-build carries), so everything below about the slot holds for the file behind it. With
-`Mode=stub` in `Display8.ini` none of this is loaded: Display8 makes a device of its own
-(Direct3D 9 through the game directory's `d3d9.dll`, Vulkan or Direct3D 12) and the
-engine draws nothing (`display/README.md`). Forward mode is the default until a stub
-backend has been confirmed in game; until then the chain below stays required.
-
-The base chain, from which `--upgrade` starts: DXVK and Vulkan. Confirmed in game at
-3440x1440, with every key in `dxvk.conf` applied and no errors in DXVK's log:
+**What `./install` leaves** (platform 4.0.0; before it, a d3d8to9 chain on DXVK):
 
     Armada2.exe
-      -> <game dir>/d3d8.dll          DXVK d3d8
-      -> <game dir>/d3d9.dll          DXVK d3d9
-      -> Vulkan
+      -> <game dir>/d3d8.dll          Display8 (display/): draws on Vulkan or Direct3D 12 itself
+      -> (bail-out) the system's d3d8.dll, found with GetSystemDirectory: Wine's builtin
 
-Four parts, all required together:
+Nothing stands behind Display8: no `d3d8_real.dll`, no `d3d9.dll`, no DXVK. Its Vulkan and
+Direct3D 12 devices are its own, and when neither can start the game draws through the
+system's own `d3d8.dll` without the plugins (`display/README.md`, "The bail-out"). The
+`d3d9=n,b` override is not needed either; the override that remains is
+`WINEDLLOVERRIDES = winmm=n,b;d3d8=n,b`, so that Wine loads the game directory's ASI loader
+and Display8 first (Wine searches the application directory before the system directory).
 
-| part | value | why |
-|---|---|---|
-| `GAME/d3d8.dll` | DXVK d3d8 | the prefix is not durable — Proton restores it from symlinks |
-| `GAME/d3d9.dll` | DXVK d3d9 | DXVK's d3d8 imports `d3d9.dll` by name |
-| `WINEDLLOVERRIDES` | `winmm=n,b;d3d8=n,b;d3d9=n,b` | without the d3d9 entry Wine resolves it to builtin WineD3D |
-| Wine virtual desktop | **off** | inside it DXVK's `ChangeDisplaySettingsEx` fails and the game falls back to 640x480 |
+**What was here before, and why it went.** Until 15.6.0 the slot held crosire's d3d8to9
+(vendored in `vendor/d3d8to9-1.16.0/`), behind Display8 as `d3d8_real.dll`, on DXVK 3.1.1's
+`d3d9.dll` (`vendor/dxvk-3.1.1/`), because Render3D and the UI drew through the Direct3D 9
+device behind it (`D3D9.md`, `d3d9/d3d9dev.h`, `d3d9/hlsl.sh`) and `dxvk.conf` set the
+sampler filtering. Display 1.0.0 and gpu removed Direct3D 9; the sampler settings are
+`Display8.ini [Samplers]`; the vendored binaries, `D3D9.md`, `d3d9/` and `dxvk-logging.py`
+(DXVK's own logs and HUD, which nothing in the chain could now show) are deleted. Their
+hashes stay in `retire/known.txt` so that an old install is recognised.
 
-`platform/d3d8-chain.py` sets and identifies it:
+`platform/d3d8-chain.py` identifies and retires what is left:
 
-    platform/d3d8-chain.py --status      identify the live chain, every link by hash
-    platform/d3d8-chain.py --use dxvk    DXVK d3d8 -> DXVK d3d9 -> Vulkan
-    platform/d3d8-chain.py --use d3d8to9 crosire's d3d8to9 (vendored) -> DXVK d3d9 -> Vulkan
-    platform/d3d8-chain.py --use gog     GOG d3d8to9 -> DXVK d3d9 -> Vulkan
-    platform/d3d8-chain.py --use wine    Wine's builtin d3d8 -> wined3d -> OpenGL
-    platform/d3d8-chain.py --revert      the GOG release as shipped, Heroic managing DXVK again
-    platform/d3d8-chain.py --upgrade     what ./install runs: DXVK's chain -> the d3d8to9 one
+    platform/d3d8-chain.py --status     identify the live slot, every link by hash
+    platform/d3d8-chain.py --retire     what ./install runs: take the retired chain out of the game directory
+    platform/d3d8-chain.py --retire --heroic   and `d3d9=n,b` out of Heroic's overrides (Heroic closed)
+    platform/d3d8-chain.py --revert     the GOG release as shipped, Heroic managing DXVK again
 
-`--use` keeps GOG's `d3d8.dll` as `d3d8.dll.gog-backup` the first time it replaces it
-(it knows GOG's file by hash), sets the `d3d9=n,b` override for DXVK and GOG and
-`autoInstallDxvk` false, so it needs Heroic closed; it refuses before touching anything
-rather than half-applying, and refuses outright to replace a `d3d8.dll` it cannot
-identify. `--revert` puts GOG's `d3d8.dll` back, removes the game-directory `d3d9.dll`
-and the override, and turns `autoInstallDxvk` back on.
+`--retire` removes from the game directory, each only when its **hash** says it is ours: the
+vendored d3d8to9 as `d3d8.dll` (GOG's `d3d8.dll`, which an install kept as
+`d3d8.dll.gog-backup`, returns in its place; with none kept the slot is empty and the
+system's is the game's), DXVK 3.1.1's `d3d9.dll`, a `d3d8_real.dll` that is the vendored
+d3d8to9, and `d3d8.dll.a2display-backup` when it holds the retired chain (it becomes GOG's
+file, else it goes: that is what `a2mod stock` puts back). With `--heroic` it also takes
+`d3d9=n,b` out of Heroic's `WINEDLLOVERRIDES` **only when the rest of the entry is ours**
+(`winmm=n,b` and `d3d8=n,b`); a player's own overrides are theirs, and the entry is left
+whole with a note. `./install` leaves Heroic alone (it runs in bench clones too, and the
+config is the player's), so the entry is a one-time `--heroic` run with Heroic closed (a
+leftover `d3d9=n,b` is harmless: the game directory has no `d3d9.dll` for it to find); the
+graphical installer does it for a player. With Heroic open or no config there is a note and
+nothing changes. `retire/retire.sh --chain` removes the same
+files for the other installers and also a marked `dxvk.conf`, after carrying its sampler
+values into `Display8.ini [Samplers]`. A file that is none of these is the player's and
+stays. `--use` and `--upgrade` are gone; asking for them says so.
 
-### What can sit in the d3d8 slot
-
-Two different things want to be the game directory's `d3d8.dll`, and with neither
-there the prefix's is used:
-
-- **GOG's** `d3d8.dll` (1101824) is a full **d3d8to9 translator** — it implements
-  Direct3D 8 on top of Direct3D 9.
-- **DXVK's** `d3d8.dll` (~1.66 MB) implements Direct3D 8 on Vulkan through its own d3d9.
-- **Wine's builtin** `d3d8.dll` (320548), in the prefix, talks to `wined3d` directly and
-  never loads `d3d9.dll`, so a DXVK d3d9 in the prefix is not reached from it.
-
-A plugin can reach Direct3D 9, and with it shaders, only through a translator that
-answers `QueryInterface(IDirect3DDevice9)`. Measured on the bench, crosire's current
-d3d8to9 release does; neither DXVK's d3d8 nor GOG's build does. The spike and the plan
-built on it are in [`D3D9.md`](D3D9.md). That release is vendored in
-`vendor/d3d8to9-1.16.0/` and `--use d3d8to9` puts it in the slot; `d3d9/d3d9dev.h` is
-what a plugin includes to draw through the device behind it, and `d3d9/hlsl.sh` builds
-its shaders.
-
-**`./install` puts the translator in place** (`--upgrade`, since platform 3.2.0) when the
-game directory holds exactly the DXVK chain: DXVK's d3d8 on DXVK's d3d9. The two chains
-differ only in the game directory's `d3d8.dll`; both need the `d3d9` override and
-`autoInstallDxvk` off, which the DXVK chain already has. So the step swaps that one file
-and never touches Heroic's config: it runs with Heroic open, and in a test-bench clone.
-Any other chain (GOG's, Wine's, a `d3d8.dll` of the player's own) is left as it is and
-named. `--use dxvk` goes back. The release zip's `install.sh` does the same with its own
-copies, d3d8to9 and DXVK 3.1.1's d3d9 (`vendor/dxvk-3.1.1/`), since it cannot know
-which Proton the player runs; it also replaces GOG's `d3d8.dll`, kept as
-`d3d8.dll.gog-backup` (`publish/README.md`). Then, as `./install` does, it puts Display8
-(`display/`) in front of that d3d8to9, which moves behind it as `d3d8_real.dll`; the
-release chain is then the one `display/README.md` draws, in stub mode as shipped.
-
-The GOG release as shipped, which `--revert` returns to, is GOG's translator on the
-prefix's d3d9 — Heroic's DXVK while `autoInstallDxvk` is on, else Wine's:
+`--revert` returns to the GOG release as shipped: GOG's translator in `d3d8.dll`, no
+game-directory `d3d9.dll`, the `d3d9` override out, `autoInstallDxvk` back on:
 
     Armada2.exe
       -> <game dir>/d3d8.dll      GOG d3d8to9           1101824
       -> syswow64/d3d9.dll        Heroic's DXVK d3d9, or Wine builtin -> wined3d
 
+### What stock means for `d3d8.dll`
+
+`a2mod stock` puts back whatever `display/install` found in the slot when it first put
+Display8 there (`d3d8.dll.a2display-backup`): GOG's translator on a GOG install that never
+had the chain, and **no file at all** when the slot was empty, in which case Display8's
+`d3d8.dll` is set aside with nothing in its place and the game runs on the system's, as it
+does after the bail-out. `a2mod` files Display8's `d3d8.dll` under the `display` layer by
+content (the message every build carries), so a clone that holds GOG's file alone is never
+mistaken for ours. The snapshot layout is unchanged.
+
 ### Traps
 
-- **Never identify a DLL in this chain by size.** `syswow64/d3d8.dll` at 320548 bytes
+- **Never identify a DLL in this slot by size.** `syswow64/d3d8.dll` at 320548 bytes
   was once recorded as "DXVK's exact size"; it is byte-identical to *Wine's builtin*,
   and on the strength of that the game ran through wined3d/OpenGL while every
-  `dxvk.conf` key was silently ignored and the DXVK HUD never appeared. DXVK's d3d8 is
+  `dxvk.conf` key was silently ignored and the DXVK HUD never appeared (history: those
+  were the chain's tools until 4.0.0; the trap is the same for any DLL in this slot). DXVK's d3d8 is
   ~1.66 MB (Proton's 1658894, Heroic's 3.1.1 1687566). `d3d8-chain.py` hashes each link
   against the candidates actually present on the machine and names what it found,
   reporting `UNKNOWN` rather than guessing.
-- **The prefix is not a durable place for DXVK.** Proton's `default_pfx` holds
+- **The prefix is not a durable place for a DLL.** Proton's `default_pfx` holds
   `syswow64/d3d8.dll` and `d3d9.dll` as **symlinks** to its own Wine builtins and
-  restores them on prefix sync — a DXVK `d3d8` written there was Wine's builtin again
-  after one launch, with `autoInstallDxvk` already false. The game directory is durable:
-  nothing manages it, and Wine searches it first.
+  restores them on prefix sync. The game directory is durable: nothing manages it, and
+  Wine searches it first.
 - **`autoInstallDxvk` true redeploys Heroic's DXVK into the prefix on every launch** —
   `d3d8.dll`, `d3d9.dll`, `d3d11.dll` and `dxgi.dll` sharing one mtime is the sign. That
-  is it working as designed, not a regression.
-- **The `d3d9=n,b` override is load-bearing, not diagnostic.** `dxvk-logging.py
-  --diagnose` also adds it, but the logging tool only ever adds; `d3d8-chain.py` owns
-  removing it, so switching diagnostics off cannot break the chain.
-
-### When a renderer setting seems to do nothing
-
-Separate "the setting was ignored" from "the setting is subtle" before judging it.
-`platform/dxvk-logging.py --diagnose` answers it in one launch: no DXVK HUD means DXVK is
-not in the chain; no `Armada2_d3d9.log` means its d3d9 never loaded; a key missing from
-`--check`'s "Effective configuration" was never read from `dxvk.conf`. If the log shows
-
-    err:   D3D9: EnterFullscreenMode: Failed to change display mode
-    err:   D3D9: Failed to set initial fullscreen state
-
-and the game sits at 640x480, the Wine virtual desktop is on (below).
+  is it working as designed. It matters only to the bail-out's look (the system's
+  Direct3D 8 on the prefix's Direct3D 9), never to Display8's own devices.
 
 ## Hyprland / window management
 
@@ -241,15 +202,15 @@ kept snapping back to a black fullscreen frame.
 **Cause:** every menu, the in-game Options included, is a `WS_POPUP` dialog, which Wine
 turns into a second X11 window that Hyprland tiles and focuses like a new application.
 
-**Fix: `Menus.asi` with `Embed=1`** (the default it ships with) re-creates each
-menu as a child of the game window, so the game is one OS window from launch to exit.
-See `menus/README.md`, "One window: `Embed=1`".
+**Fix: the UI's menu host** (`UI.asi`, `[Menus]`) re-creates each menu as a child of the
+game window, so the game is one OS window from launch to exit. See `ui/MENUS.md`, "What the
+shell is, in the engine". (Until 15.0.0 `Menus.asi` did this with `Embed=1`.)
 
 **The Wine virtual desktop must stay off.** It also puts everything in one window
 (`"Desktop"="Default"` under `[Software\\Wine\\Explorer]` in `<prefix>/pfx/user.reg`),
-but it is incompatible with DXVK: inside it `ChangeDisplaySettingsEx` fails and the game
-falls back to 640x480. Do not turn it on to fix a window problem; fix the window in
-`menus.c`.
+but it is incompatible with a Vulkan or Direct3D 12 device of our own (as it was with
+DXVK): inside it `ChangeDisplaySettingsEx` fails and the game falls back to 640x480. Do not
+turn it on to fix a window problem; fix the window in the UI's menu host (`ui/`).
 
 To check it is off (a fresh prefix never has it):
 
@@ -273,7 +234,7 @@ edit.
   Startup videos played fine, so Bink itself worked; the hypothesis was a D3D8 device
   reset on the transition from live 3D to fullscreen video. It produced no diagnostics
   at all — `Logs/` empty, no coredump, no MadExcept report, no Heroic session log — and
-  it has not been retested under DXVK or `binkproxy`.
+  it has not been retested under Display8 or `binkproxy`.
 
 ## Campaign progress format
 
@@ -306,7 +267,7 @@ ten each for Federation, Klingon and Borg.
 
       ps -eo pid=,args= | awk '/Armada2\.exe/ { print $1 }'
 
-  **`menus/stop-game.sh` does this properly** — it also kills the Wine helpers
+  **`platform/stop-game.sh` does this properly** — it also kills the Wine helpers
   for this prefix only (matched by `WINEPREFIX` out of `/proc/<pid>/environ`, so an
   unrelated Wine app cannot be caught in it), and drops stale PipeWire nodes, which
   outlive the process, stay in state `running`, and keep playing. Killing the processes
@@ -321,8 +282,8 @@ ten each for Federation, Klingon and Borg.
 
 ## Verification recipes
 
-    # what implements d3d8 right now? by hash, never by size. Heroic's DXVK builds
-    # (tools/dxvk/dxvk-*/) are recognised from the native and the Flatpak Heroic
+    # what is in the d3d8 slot right now? by hash, never by size. Heroic's DXVK builds
+    # (tools/dxvk/dxvk-*/) are still recognised, from the native and the Flatpak Heroic
     platform/d3d8-chain.py --status
 
     # did Heroic redeploy DXVK into the prefix? these four sharing an mtime means yes
@@ -331,14 +292,11 @@ ten each for Federation, Klingon and Borg.
     # what does the exe actually import?
     objdump -p Armada2.exe | grep -i 'DLL Name'
 
-    # current overrides, without opening Heroic
-    python3 platform/dxvk-logging.py --status
-
     # is the game really running?  NOT `pgrep -x Armada2.exe` -- Wine calls it "Main"
     ps -eo pid=,args= | awk '/Armada2\.exe/ { print $1 }'
 
     # stop it, its Wine session, and any stale audio node it left behind
-    menus/stop-game.sh
+    platform/stop-game.sh
 
-    # did Menus.asi load, and what did it patch?
-    cat "<game dir>/Menus.log"
+    # did the UI's menu host start, and what did it hook?
+    cat "<game dir>/UI.log"

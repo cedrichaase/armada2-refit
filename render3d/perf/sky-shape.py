@@ -220,7 +220,7 @@ def space(kv):
 def fit(game, r, write):
     """coordinate descent over space() for the recipe r, each point baked by the running
     game (Sky\\<r>.ini, Dump=1) and measured against stock"""
-    recipe = os.path.join(HERE, '..', 'skies', r + '.ini')
+    recipe = os.path.join(HERE, '..', 'content', 'sky', r + '.ini')
     text = open(recipe).read()
     kv = dict(l.strip().split('=', 1) for l in text.splitlines() if '=' in l and not l.startswith(';'))
     sp = stock_profile(r)
@@ -283,7 +283,7 @@ def fit(game, r, write):
     if write:
         keys = {k: f'{v:.3g}' for k, v in p.items()}
         for name in [r] + (['mbgblue'] if r == 'mbg02' else []):
-            path = os.path.join(HERE, '..', 'skies', name + '.ini')
+            path = os.path.join(HERE, '..', 'content', 'sky', name + '.ini')
             new = set_keys(open(path).read(), keys)   # read before opening to write: that truncates
             open(path, 'w').write(new)
 
@@ -298,7 +298,7 @@ def main():
         sys.exit(__doc__)
     if '--fit' in sys.argv:
         game, only = args[0], args[1:]
-        names = only or sorted(f[:-4] for f in os.listdir(os.path.join(HERE, '..', 'skies')) if f.endswith('.ini'))
+        names = only or sorted(f[:-4] for f in os.listdir(os.path.join(HERE, '..', 'content', 'sky')) if f.endswith('.ini'))
         ini_set(os.path.join(game, 'Render3D.ini'), 'Sky', {'Dump': 1, 'Face': RES, 'Reload': 1})
         os.makedirs(os.path.join(game, 'Sky'), exist_ok=True)
         for r in names:

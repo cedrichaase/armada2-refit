@@ -1,0 +1,1482 @@
+# UI.asi's symbols in Armada2.exe 1.1 (GOG): part "hud" (the HUD's engine side:
+# ui/src/engine/{hud,popups,palette,overlay,overlay_text,leftovers}.rs). Each entry is
+# tied to the hook that uses it; the findings are in ui/HUD.md, "Hooks".
+schema = 1
+plugin = "ui"
+readme = "ui/HUD.md"
+lang = "rust"
+out = "ui/src/syms_hud.rs"
+
+[hook."hud.panels"]
+doc = "The panel switch: RenderAll's Render call and RefreshOwner's CursorOver call re-pointed"
+rows = ["HUD.Minimap", "HUD.Info", "HUD.Bar", "HUD.UnitView"]
+
+[hook."hud.tooltips"]
+doc = "The engine's tooltips at the pointer read and hidden from CursorInterface::Render"
+rows = ["HUD.Tooltips"]
+
+[hook."hud.reads_components"]
+doc = "The HUD components (bar, info panel, minimap), their rectangles, flags and render lists"
+
+[hook."hud.reads_calls"]
+doc = "TextInput_IsActive and CinematicView::IsPlayingVideo called for the keys and click sounds"
+
+[hook."hud.reads_popups"]
+doc = "The message, objectives, pause and replay boxes read and their buttons told by press function"
+
+[hook."hud.reads_bar"]
+doc = "The button bar's slots, buttons, command and mode names, icon sprites and tooltips"
+rows = ["HUD.Bar", "HUD.BarLabels", "HUD.Icons"]
+
+[hook."hud.reads_overlay"]
+doc = "The selected and pointed units, their boxes, gauges and systems, as SelectionDisplay reads them"
+rows = ["HUD.Selection", "HUD.SelectionGauges"]
+
+[hook."hud.bubbles"]
+doc = "RenderSelectionEffects returns at once: the engine's 3D selection bubbles off"
+
+[hook."hud.reads_overlay_text"]
+doc = "OverlayText's timed messages read from its std::map"
+
+[hook."hud.drag_box"]
+doc = "The drag box's DrawWireframeRectangle call, recorded and drawn by the UI"
+
+[hook."hud.height_posts"]
+doc = "DrawHeightPost's ClipAndRenderLine call, recorded and drawn by the UI"
+
+[hook."hud.order_ring"]
+doc = "The order ring's and the move point's DrawQuad calls, recorded and drawn by the UI"
+
+[hook."hud.footprints"]
+doc = "RenderFootprints' three DrawQuad calls, recorded and drawn by the UI"
+
+[hook."hud.fade"]
+doc = "ScreenFade::Render's two DrawClippedRectangle calls, recorded and drawn by the UI"
+
+[hook."hud.video"]
+doc = "The in-mission Bink's blit callers and three draws, recorded and drawn by the UI"
+
+[hook."hud.frame_rate"]
+doc = "Armada_RenderFrame's frame-rate prints, recorded and drawn by the UI"
+
+# ---- hud.rs: the components and the panel switch -------------------------------------
+
+[[sym]]
+id = "hud_palette_ptr"
+symbol = "g_pPopupPalette"
+kind = "global"
+addr = 0x763c00
+used_by = ["hud.reads_components", "hud.panels"]
+
+[[sym]]
+id = "hud_ship_display"
+symbol = "shipDisplay"
+kind = "global"
+addr = 0x763968
+used_by = ["hud.reads_components"]
+
+[[sym]]
+id = "hud_map_radar"
+symbol = "mapRadar"
+kind = "global"
+addr = 0x763810
+used_by = ["hud.reads_components"]
+
+[[sym]]
+id = "hud_cursor"
+symbol = "iCursor"
+kind = "global"
+addr = 0x7643a8
+used_by = ["hud.panels", "hud.tooltips"]
+
+[[sym]]
+id = "hud_render_lists"
+symbol = "DisplayInterface::s_pRenderList"
+kind = "global"
+addr = 0x764fd8
+used_by = ["hud.reads_components"]
+
+[[sym]]
+id = "hud_view_record"
+symbol = "View_Record"
+kind = "global"
+addr = 0x76b610
+used_by = ["hud.reads_components"]
+
+[[sym]]
+id = "hud_tooltip_state"
+symbol = "CursorInterface::m_tooltipState"
+kind = "global"
+addr = 0x764484
+used_by = ["hud.tooltips"]
+
+[[sym]]
+id = "hud_cinematic_view"
+symbol = "g_cinematicView"
+kind = "global"
+addr = 0x763758
+used_by = ["hud.panels", "hud.reads_calls", "hud.reads_overlay"]
+
+[[sym]]
+id = "hud_render_call"
+symbol = "DisplayInterface::RenderAll"
+kind = "patch"
+addr = 0x51abf7
+check = "8b 16 8b ce ff 52 58"
+in = "DisplayInterface::RenderAll"
+used_by = ["hud.panels"]
+
+[[sym]]
+id = "hud_owner_call"
+symbol = "CursorInterface::RefreshOwner"
+kind = "patch"
+addr = 0x505316
+check = "8b ce 8b 16 ff 52 70"
+in = "CursorInterface::RefreshOwner"
+used_by = ["hud.panels"]
+
+[[sym]]
+id = "hud_text_input_active"
+symbol = "TextInput_IsActive"
+kind = "fn"
+addr = 0x65f120
+check = "a1 bc 0f 7b 00"
+used_by = ["hud.reads_calls"]
+
+[[sym]]
+id = "hud_is_playing_video"
+symbol = "CinematicView::IsPlayingVideo"
+kind = "fn"
+addr = 0x4e6350
+check = "8b 51 24 33 c0"
+used_by = ["hud.reads_calls"]
+
+[[sym]]
+id = "hud_di_rect"
+symbol = "DisplayInterface"
+kind = "field"
+struct = "DisplayInterface"
+offset = 0x4
+type = "i32"
+used_by = ["hud.reads_components"]
+
+[[sym]]
+id = "hud_di_hidden"
+symbol = "DisplayInterface"
+kind = "field"
+struct = "DisplayInterface"
+offset = 0x16
+type = "u8"
+used_by = ["hud.reads_components", "hud.panels"]
+
+[[sym]]
+id = "hud_di_cursor"
+symbol = "DisplayInterface"
+kind = "field"
+struct = "DisplayInterface"
+offset = 0x24
+type = "ptr"
+used_by = ["hud.panels"]
+
+[[sym]]
+id = "hud_vt_name"
+symbol = "DisplayInterface vtable (GetName)"
+kind = "field"
+struct = "DisplayInterface vtable (GetName)"
+offset = 0x18
+type = "ptr"
+used_by = ["hud.reads_components"]
+
+[[sym]]
+id = "hud_vt_render"
+symbol = "DisplayInterface vtable (Render)"
+kind = "field"
+struct = "DisplayInterface vtable (Render)"
+offset = 0x58
+type = "ptr"
+used_by = ["hud.panels", "hud.tooltips"]
+
+[[sym]]
+id = "hud_vt_cursor_over"
+symbol = "DisplayInterface vtable (CursorOver)"
+kind = "field"
+struct = "DisplayInterface vtable (CursorOver)"
+offset = 0x70
+type = "ptr"
+used_by = ["hud.panels"]
+
+[[sym]]
+id = "hud_cursor_owner"
+symbol = "CursorInterface"
+kind = "field"
+struct = "CursorInterface"
+offset = 0x24
+type = "ptr"
+used_by = ["hud.panels"]
+
+[[sym]]
+id = "hud_cursor_sprite"
+symbol = "CursorInterface"
+kind = "field"
+struct = "CursorInterface"
+offset = 0x2c
+type = "ptr"
+used_by = ["hud.panels"]
+
+[[sym]]
+id = "hud_cursor_tip"
+symbol = "CursorInterface"
+kind = "field"
+struct = "CursorInterface"
+offset = 0x34
+type = "ptr"
+used_by = ["hud.tooltips"]
+
+[[sym]]
+id = "hud_cursor_tip_verbose"
+symbol = "CursorInterface"
+kind = "field"
+struct = "CursorInterface"
+offset = 0x38
+type = "ptr"
+used_by = ["hud.tooltips"]
+
+# ---- popups.rs: the boxes ------------------------------------------------------------
+
+[[sym]]
+id = "popups_message"
+symbol = "g_messageDisplay"
+kind = "global"
+addr = 0x764d68
+used_by = ["hud.reads_popups", "hud.panels"]
+
+[[sym]]
+id = "popups_objectives"
+symbol = "g_objectivesDisplay"
+kind = "global"
+addr = 0x7648a8
+used_by = ["hud.reads_popups", "hud.panels"]
+
+[[sym]]
+id = "popups_pause"
+symbol = "pauseBox"
+kind = "global"
+addr = 0x764d18
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_replay"
+symbol = "g_replayPanel"
+kind = "global"
+addr = 0x763e30
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_msg_unpause"
+symbol = "MessageDisplay::mUnpauseCallback"
+kind = "fn"
+addr = 0x518620
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_obj_unpause"
+symbol = "ObjectivesDisplay::mUnpauseCallback"
+kind = "fn"
+addr = 0x50df20
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_pause_unpause"
+symbol = "PauseBox::UnpauseCallback"
+kind = "fn"
+addr = 0x517990
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_replay_press_0"
+symbol = "ReplayPanel::RestartPlayback"
+kind = "fn"
+addr = 0x5002b0
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_replay_press_1"
+symbol = "ReplayPanel::PauseReplay"
+kind = "fn"
+addr = 0x5002e0
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_replay_press_2"
+symbol = "ReplayPanel::SlowPlayback"
+kind = "fn"
+addr = 0x500310
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_replay_press_3"
+symbol = "ReplayPanel::NormalPlayback"
+kind = "fn"
+addr = 0x500340
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_replay_press_4"
+symbol = "ReplayPanel::FastPlayback"
+kind = "fn"
+addr = 0x500370
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_is_game_paused"
+symbol = "IsGamePausedAtAll"
+kind = "fn"
+addr = 0x489bf0
+check = "a0 d9 7b 73 00"
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_obj_focus_simulate"
+symbol = "ObjectivesDisplay::FocusSimulate"
+kind = "fn"
+addr = 0x50d280
+check = "56 8b f1 b9"
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_msg_title"
+symbol = "MessageDisplay"
+kind = "field"
+struct = "MessageDisplay"
+offset = 0x28
+type = "ptr"
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_msg_body"
+symbol = "MessageDisplay"
+kind = "field"
+struct = "MessageDisplay"
+offset = 0x2c
+type = "ptr"
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_msg_ok"
+symbol = "MessageDisplay"
+kind = "field"
+struct = "MessageDisplay"
+offset = 0x34
+type = "ptr"
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_obj_summary_header"
+symbol = "ObjectivesDisplay"
+kind = "field"
+struct = "ObjectivesDisplay"
+offset = 0x28
+type = "ptr"
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_obj_title"
+symbol = "ObjectivesDisplay"
+kind = "field"
+struct = "ObjectivesDisplay"
+offset = 0x2c
+type = "ptr"
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_obj_briefing"
+symbol = "ObjectivesDisplay"
+kind = "field"
+struct = "ObjectivesDisplay"
+offset = 0x30
+type = "ptr"
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_obj_header"
+symbol = "ObjectivesDisplay"
+kind = "field"
+struct = "ObjectivesDisplay"
+offset = 0x34
+type = "ptr"
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_obj_lines"
+symbol = "ObjectivesDisplay"
+kind = "field"
+struct = "ObjectivesDisplay"
+offset = 0x3c
+type = "ptr"
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_obj_done"
+symbol = "ObjectivesDisplay"
+kind = "field"
+struct = "ObjectivesDisplay"
+offset = 0x5c
+type = "ptr"
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_obj_ok"
+symbol = "ObjectivesDisplay"
+kind = "field"
+struct = "ObjectivesDisplay"
+offset = 0x70
+type = "ptr"
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_vt_focus_simulate"
+symbol = "ObjectivesDisplay vtable (FocusSimulate)"
+kind = "field"
+struct = "ObjectivesDisplay vtable (FocusSimulate)"
+offset = 0x44
+type = "ptr"
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_pause_button"
+symbol = "PauseBox"
+kind = "field"
+struct = "PauseBox"
+offset = 0x30
+type = "ptr"
+used_by = ["hud.reads_popups"]
+
+[[sym]]
+id = "popups_replay_buttons"
+symbol = "ReplayPanel"
+kind = "field"
+struct = "ReplayPanel"
+offset = 0x2c
+type = "ptr"
+used_by = ["hud.reads_popups"]
+
+# ---- palette.rs: the button bar ------------------------------------------------------
+
+[[sym]]
+id = "palette_mode_names"
+symbol = "ModeInfo fixed-button names"
+kind = "global"
+addr = 0x709f68
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_sprite_db"
+symbol = "DisplayInterface::m_spriteDatabase"
+kind = "global"
+addr = 0x765030
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_prj_get_name"
+symbol = "cPrjID::GetName"
+kind = "fn"
+addr = 0x65dce0
+check = "55 8b ec 56 57"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_cmd_button_name"
+symbol = "CommandInfoClass::ButtonName"
+kind = "fn"
+addr = 0x519780
+check = "55 8b ec 83 ec 08"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_mode_button_name"
+symbol = "ModeInfo::ButtonName"
+kind = "fn"
+addr = 0x4e7950
+check = "55 8b ec 83 ec 48"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_find_element"
+symbol = "ST3D_Database::FindElement"
+kind = "fn"
+addr = 0x620750
+check = "55 8b ec 8b 45 08"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_slots"
+symbol = "PopupPaletteImp"
+kind = "field"
+struct = "PopupPaletteImp"
+offset = 0x28
+type = "ptr"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_mode"
+symbol = "PopupPaletteImp"
+kind = "field"
+struct = "PopupPaletteImp"
+offset = 0x110
+type = "u32"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_menu"
+symbol = "PopupPaletteImp"
+kind = "field"
+struct = "PopupPaletteImp"
+offset = 0x124
+type = "u32"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_btn_state"
+symbol = "ControlButton"
+kind = "field"
+struct = "ControlButton"
+offset = 0x34
+type = "u32"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_btn_sprite"
+symbol = "ControlButton"
+kind = "field"
+struct = "ControlButton"
+offset = 0x2c
+type = "ptr"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_btn_mode"
+symbol = "ControlButton"
+kind = "field"
+struct = "ControlButton"
+offset = 0x84
+type = "ptr"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_btn_command"
+symbol = "ControlButton"
+kind = "field"
+struct = "ControlButton"
+offset = 0x88
+type = "ptr"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_vt_tooltip"
+symbol = "ControlButton vtable (GetTooltip)"
+kind = "field"
+struct = "ControlButton vtable (GetTooltip)"
+offset = 0x0
+type = "ptr"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_vt_verbose"
+symbol = "ControlButton vtable (GetVerboseTooltip)"
+kind = "field"
+struct = "ControlButton vtable (GetVerboseTooltip)"
+offset = 0x4
+type = "ptr"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_vt_is_valid"
+symbol = "ControlButton vtable (IsValid)"
+kind = "field"
+struct = "ControlButton vtable (IsValid)"
+offset = 0x1c
+type = "ptr"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_vt_press"
+symbol = "ControlButton vtable (button press)"
+kind = "field"
+struct = "ControlButton vtable (button press)"
+offset = 0x20
+type = "ptr"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_cmd_name"
+symbol = "CommandInfoClass"
+kind = "field"
+struct = "CommandInfoClass"
+offset = 0x20
+type = "u8"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_cmd_pos"
+symbol = "CommandInfoClass"
+kind = "field"
+struct = "CommandInfoClass"
+offset = 0x1b0
+type = "i32"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_mode_kind"
+symbol = "ModeInfo"
+kind = "field"
+struct = "ModeInfo"
+offset = 0x4
+type = "u32"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_mode_class"
+symbol = "ModeInfo"
+kind = "field"
+struct = "ModeInfo"
+offset = 0xc
+type = "ptr"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_class_odf"
+symbol = "ModeInfo build item class"
+kind = "field"
+struct = "ModeInfo build item class"
+offset = 0x7c
+type = "ptr"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_mode_weapon"
+symbol = "ModeInfo"
+kind = "field"
+struct = "ModeInfo"
+offset = 0x10
+type = "ptr"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_weapon_prjid"
+symbol = "ModeInfo special weapon class"
+kind = "field"
+struct = "ModeInfo special weapon class"
+offset = 0x208
+type = "ptr"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_mode_index"
+symbol = "ModeInfo"
+kind = "field"
+struct = "ModeInfo"
+offset = 0x14
+type = "u32"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_n_slots"
+symbol = "palette_n_slots"
+kind = "value"
+value = 21
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_names_stride"
+symbol = "palette_names_stride"
+kind = "value"
+value = 16
+unit = "bytes"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_names_count"
+symbol = "palette_names_count"
+kind = "value"
+value = 9
+used_by = ["hud.reads_bar"]
+
+# ---- overlay.rs: the selection overlay -----------------------------------------------
+
+[[sym]]
+id = "overlay_selection_display"
+symbol = "selectionDisplay"
+kind = "global"
+addr = 0x7645b0
+used_by = ["hud.reads_overlay", "hud.panels"]
+
+[[sym]]
+id = "overlay_object_list"
+symbol = "GameObject::objectList"
+kind = "global"
+addr = 0x761084
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_current_camera"
+symbol = "DisplayInterface::currentCamera"
+kind = "global"
+addr = 0x765010
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_virtual_viewport"
+symbol = "DisplayInterface::s_pVirtualViewport"
+kind = "global"
+addr = 0x765004
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_system_order"
+symbol = "SystemOrder"
+kind = "global"
+addr = 0x70dce0
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_td_game_object_class"
+symbol = "GameObjectClass type descriptor"
+kind = "rtti"
+addr = 0x6eee98
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_td_craft_class"
+symbol = "CraftClass type descriptor"
+kind = "rtti"
+addr = 0x6eee08
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_rt_dynamic_cast"
+symbol = "__RTDynamicCast"
+kind = "fn"
+addr = 0x6731a0
+check = "ff 25"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_container_rect"
+symbol = "SelectionDisplay::ComputeContainerRect"
+kind = "fn"
+addr = 0x5081b0
+check = "55 8b ec 83 ec 74 53 8b 5d 08"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_render_selection"
+symbol = "RenderSelectionEffects"
+kind = "patch"
+addr = 0x599900
+check = "55 8b ec a1 08 d5 7a 00"
+in = "RenderSelectionEffects"
+used_by = ["hud.bubbles"]
+
+[[sym]]
+id = "overlay_sd_pointed"
+symbol = "SelectionDisplay"
+kind = "field"
+struct = "SelectionDisplay"
+offset = 0x7c
+type = "ptr"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_sd_team"
+symbol = "SelectionDisplay"
+kind = "field"
+struct = "SelectionDisplay"
+offset = 0x88
+type = "i32"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_sd_fade"
+symbol = "SelectionDisplay"
+kind = "field"
+struct = "SelectionDisplay"
+offset = 0x8c
+type = "f32"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_sd_repair_icons"
+symbol = "SelectionDisplay"
+kind = "field"
+struct = "SelectionDisplay"
+offset = 0x54
+type = "ptr"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_ri_sprite"
+symbol = "RepairIcon"
+kind = "field"
+struct = "RepairIcon"
+offset = 0x34
+type = "ptr"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_ri_flash"
+symbol = "RepairIcon"
+kind = "field"
+struct = "RepairIcon"
+offset = 0x40
+type = "u8"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_obj_flags"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x14
+type = "u8"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_obj_drawn"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x25
+type = "u8"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_obj_class"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x40
+type = "ptr"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_obj_team"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0xec
+type = "i32"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_obj_selected"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x10e
+type = "u8"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_obj_removed"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x113
+type = "u8"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_obj_group"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x120
+type = "i32"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_obj_hull"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x158
+type = "f32"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_obj_hull_max"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x160
+type = "f32"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_obj_special"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x164
+type = "f32"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_obj_special_max"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x168
+type = "f32"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_craft_shield"
+symbol = "Craft"
+kind = "field"
+struct = "Craft"
+offset = 0x1c8
+type = "f32"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_craft_shield_max"
+symbol = "Craft"
+kind = "field"
+struct = "Craft"
+offset = 0x1cc
+type = "f32"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_craft_systems"
+symbol = "Craft"
+kind = "field"
+struct = "Craft"
+offset = 0x1e0
+type = "ptr"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_craft_show_all"
+symbol = "Craft"
+kind = "field"
+struct = "Craft"
+offset = 0x1bf
+type = "u8"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_system_hidden"
+symbol = "Craft system record"
+kind = "field"
+struct = "Craft system record"
+offset = 0x0
+type = "u8"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_system_size"
+symbol = "Craft system record"
+kind = "field"
+struct = "Craft system record"
+offset = 0x4
+type = "i32"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_system_now"
+symbol = "Craft system record (a double)"
+kind = "field"
+struct = "Craft system record (a double)"
+offset = 0x18
+type = "u32"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_vt_can_user_see"
+symbol = "GameObject vtable (CanUserSee)"
+kind = "field"
+struct = "GameObject vtable (CanUserSee)"
+offset = 0x8
+type = "ptr"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_vt_class_name"
+symbol = "GameObject vtable (GetClassDisplayName)"
+kind = "field"
+struct = "GameObject vtable (GetClassDisplayName)"
+offset = 0x70
+type = "ptr"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_cls_station"
+symbol = "CraftClass"
+kind = "field"
+struct = "CraftClass"
+offset = 0x20d
+type = "u8"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_s3d_camera"
+symbol = "ST3D_GraphicsEngine"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 0xfc
+type = "ptr"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_flag_craft"
+symbol = "overlay_flag_craft"
+kind = "value"
+value = 8
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_system_stride"
+symbol = "overlay_system_stride"
+kind = "value"
+value = 48
+unit = "bytes"
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_system_count"
+symbol = "overlay_system_count"
+kind = "value"
+value = 5
+used_by = ["hud.reads_overlay"]
+
+[[sym]]
+id = "overlay_group_count"
+symbol = "overlay_group_count"
+kind = "value"
+value = 10
+used_by = ["hud.reads_overlay"]
+
+# ---- overlay_text.rs: the timed messages ---------------------------------------------
+
+[[sym]]
+id = "otext_overlay"
+symbol = "overlayText"
+kind = "global"
+addr = 0x764488
+used_by = ["hud.reads_overlay_text", "hud.panels"]
+
+[[sym]]
+id = "otext_nil"
+symbol = "std::map _Nil of OverlayText"
+kind = "global"
+addr = 0x7644c4
+used_by = ["hud.reads_overlay_text"]
+
+[[sym]]
+id = "otext_map_head"
+symbol = "OverlayText"
+kind = "field"
+struct = "OverlayText"
+offset = 0x28
+type = "ptr"
+used_by = ["hud.reads_overlay_text"]
+
+[[sym]]
+id = "otext_node_key"
+symbol = "map node"
+kind = "field"
+struct = "map node"
+offset = 0xc
+type = "i32"
+used_by = ["hud.reads_overlay_text"]
+
+[[sym]]
+id = "otext_node_value"
+symbol = "map node"
+kind = "field"
+struct = "map node"
+offset = 0x14
+type = "ptr"
+used_by = ["hud.reads_overlay_text"]
+
+[[sym]]
+id = "otext_point"
+symbol = "SingleOverlayText"
+kind = "field"
+struct = "SingleOverlayText"
+offset = 0x58
+type = "i32"
+used_by = ["hud.reads_overlay_text"]
+
+[[sym]]
+id = "otext_justify"
+symbol = "SingleOverlayText"
+kind = "field"
+struct = "SingleOverlayText"
+offset = 0x68
+type = "i32"
+used_by = ["hud.reads_overlay_text"]
+
+[[sym]]
+id = "otext_text"
+symbol = "SingleOverlayText"
+kind = "field"
+struct = "SingleOverlayText"
+offset = 0x88
+type = "ptr"
+used_by = ["hud.reads_overlay_text"]
+
+[[sym]]
+id = "otext_colour"
+symbol = "SingleOverlayText"
+kind = "field"
+struct = "SingleOverlayText"
+offset = 0x94
+type = "f32"
+used_by = ["hud.reads_overlay_text"]
+
+[[sym]]
+id = "otext_fade"
+symbol = "SingleOverlayText"
+kind = "field"
+struct = "SingleOverlayText"
+offset = 0xa0
+type = "f32"
+used_by = ["hud.reads_overlay_text"]
+
+# ---- leftovers.rs: the engine's last draws -------------------------------------------
+
+[[sym]]
+id = "lo_wireframe_rect"
+symbol = "ST3D_Device::DrawWireframeRectangle"
+kind = "fn"
+addr = 0x6212b0
+used_by = ["hud.drag_box"]
+
+[[sym]]
+id = "lo_drag_box_call"
+symbol = "cOverViewImp::mNormalModeRender"
+kind = "call"
+addr = 0x52220a
+target = "lo_wireframe_rect"
+in = "cOverViewImp::mNormalModeRender"
+used_by = ["hud.drag_box"]
+
+[[sym]]
+id = "lo_clip_and_render_line"
+symbol = "ST3D_Camera::ClipAndRenderLine"
+kind = "fn"
+addr = 0x618590
+used_by = ["hud.height_posts"]
+
+[[sym]]
+id = "lo_height_post_call"
+symbol = "DrawHeightPost"
+kind = "call"
+addr = 0x5938a0
+target = "lo_clip_and_render_line"
+in = "DrawHeightPost"
+used_by = ["hud.height_posts"]
+
+[[sym]]
+id = "lo_sprite_draw_quad"
+symbol = "ST3D_Sprite::DrawQuad"
+kind = "fn"
+addr = 0x63a7c0
+used_by = ["hud.order_ring", "hud.footprints"]
+
+[[sym]]
+id = "lo_demand_load"
+symbol = "ST3D_Texture::DemandLoad"
+kind = "fn"
+addr = 0x642610
+check = "55 8b ec 6a ff 68"
+used_by = ["hud.order_ring", "hud.footprints"]
+
+[[sym]]
+id = "lo_sprite_texture"
+symbol = "ST3D_Sprite::GetTexture"
+kind = "fn"
+addr = 0x63b150
+check = "8b 41 58 c3"
+used_by = ["hud.order_ring", "hud.footprints", "hud.video"]
+
+[[sym]]
+id = "lo_grid_fx_call"
+symbol = "cOverViewImp::mRenderGridFX"
+kind = "call"
+addr = 0x522537
+target = "lo_sprite_draw_quad"
+in = "cOverViewImp::mRenderGridFX"
+used_by = ["hud.order_ring"]
+
+[[sym]]
+id = "lo_where_call"
+symbol = "cOverViewImp::mRenderWhere"
+kind = "call"
+addr = 0x5222f0
+target = "lo_sprite_draw_quad"
+in = "cOverViewImp::mRenderWhere"
+used_by = ["hud.order_ring"]
+
+[[sym]]
+id = "lo_footprint_cell_call"
+symbol = "PlaceholderFeature::RenderFootprints"
+kind = "call"
+addr = 0x473a05
+target = "lo_sprite_draw_quad"
+in = "PlaceholderFeature::RenderFootprints"
+used_by = ["hud.footprints"]
+
+[[sym]]
+id = "lo_footprint_clear_call"
+symbol = "PlaceholderFeature::RenderFootprints"
+kind = "call"
+addr = 0x473a77
+target = "lo_sprite_draw_quad"
+in = "PlaceholderFeature::RenderFootprints"
+used_by = ["hud.footprints"]
+
+[[sym]]
+id = "lo_footprint_blocked_call"
+symbol = "PlaceholderFeature::RenderFootprints"
+kind = "call"
+addr = 0x473a8e
+target = "lo_sprite_draw_quad"
+in = "PlaceholderFeature::RenderFootprints"
+used_by = ["hud.footprints"]
+
+[[sym]]
+id = "lo_fade_white"
+symbol = "ScreenFade::Render"
+kind = "patch"
+addr = 0x5076cc
+check = "8b cf ff 52 1c"
+in = "ScreenFade::Render"
+used_by = ["hud.fade"]
+
+[[sym]]
+id = "lo_fade_black"
+symbol = "ScreenFade::Render"
+kind = "patch"
+addr = 0x507704
+check = "8d 45 ec 50 ff 52 1c"
+in = "ScreenFade::Render"
+used_by = ["hud.fade"]
+
+[[sym]]
+id = "lo_blit"
+symbol = "BinkThread::BlitToBlackBackground"
+kind = "fn"
+addr = 0x464350
+used_by = ["hud.video"]
+
+[[sym]]
+id = "lo_blit_render_call"
+symbol = "CinematicView::Render"
+kind = "call"
+addr = 0x4e5da5
+target = "lo_blit"
+in = "CinematicView::Render"
+used_by = ["hud.video"]
+
+[[sym]]
+id = "lo_blit_update_call"
+symbol = "CinematicView::mUpdateVideo"
+kind = "call"
+addr = 0x4e6153
+target = "lo_blit"
+in = "CinematicView::mUpdateVideo"
+used_by = ["hud.video"]
+
+[[sym]]
+id = "lo_draw_rectangle"
+symbol = "ST3D_Device::DrawRectangle"
+kind = "fn"
+addr = 0x621200
+used_by = ["hud.video"]
+
+[[sym]]
+id = "lo_video_bar_call_a"
+symbol = "BinkThread::BlitToBlackBackground"
+kind = "call"
+addr = 0x46457c
+target = "lo_draw_rectangle"
+in = "BinkThread::BlitToBlackBackground"
+used_by = ["hud.video"]
+
+[[sym]]
+id = "lo_video_bar_call_b"
+symbol = "BinkThread::BlitToBlackBackground"
+kind = "call"
+addr = 0x4645cd
+target = "lo_draw_rectangle"
+in = "BinkThread::BlitToBlackBackground"
+used_by = ["hud.video"]
+
+[[sym]]
+id = "lo_draw_scaled_2d"
+symbol = "ST3D_Sprite::DrawScaled2D"
+kind = "fn"
+addr = 0x63ada0
+used_by = ["hud.video"]
+
+[[sym]]
+id = "lo_video_sprite_call"
+symbol = "BinkThread::BlitToBlackBackground"
+kind = "call"
+addr = 0x464656
+target = "lo_draw_scaled_2d"
+in = "BinkThread::BlitToBlackBackground"
+used_by = ["hud.video"]
+
+[[sym]]
+id = "lo_bink_width"
+symbol = "BinkThread::s_width"
+kind = "global"
+addr = 0x736770
+used_by = ["hud.video"]
+
+[[sym]]
+id = "lo_bink_height"
+symbol = "BinkThread::s_height"
+kind = "global"
+addr = 0x736774
+used_by = ["hud.video"]
+
+[[sym]]
+id = "lo_print_string"
+symbol = "ST3D_Font::PrintString"
+kind = "fn"
+addr = 0x628890
+used_by = ["hud.frame_rate"]
+
+[[sym]]
+id = "lo_display_frame_rate"
+symbol = "Armada_DisplayFrameRate"
+kind = "fn"
+addr = 0x599300
+used_by = ["hud.frame_rate"]
+
+[[sym]]
+id = "lo_fps_tri_call"
+symbol = "Armada_RenderFrame"
+kind = "call"
+addr = 0x5989a6
+target = "lo_print_string"
+in = "Armada_RenderFrame"
+used_by = ["hud.frame_rate"]
+
+[[sym]]
+id = "lo_fps_call"
+symbol = "Armada_RenderFrame"
+kind = "call"
+addr = 0x5989b0
+target = "lo_display_frame_rate"
+in = "Armada_RenderFrame"
+used_by = ["hud.frame_rate"]
+
+[[sym]]
+id = "lo_framerate_display"
+symbol = "FRAMERATE_DISPLAY"
+kind = "global"
+addr = 0x6fc8a8
+used_by = ["hud.frame_rate"]
+
+[[sym]]
+id = "lo_slot_name"
+symbol = "FrameStats::GetSlotName"
+kind = "fn"
+addr = 0x653950
+check = "55 8b ec 8b 45 08 8b 0d 30 ec 7a 00"
+used_by = ["hud.frame_rate"]
+
+[[sym]]
+id = "lo_time_avg"
+symbol = "FrameStats::GetTimeAvg"
+kind = "fn"
+addr = 0x653990
+check = "55 8b ec dd 05"
+used_by = ["hud.frame_rate"]
+
+[[sym]]
+id = "lo_slot_count"
+symbol = "FrameStats::sm_nameArray"
+kind = "global"
+addr = 0x7aec38
+used_by = ["hud.frame_rate"]
+
+[[sym]]
+id = "lo_sprite_colour"
+symbol = "ST3D_Sprite"
+kind = "field"
+struct = "ST3D_Sprite"
+offset = 0x24
+type = "f32"
+used_by = ["hud.order_ring", "hud.footprints"]
+
+[[sym]]
+id = "lo_fade_alpha"
+symbol = "ST3D_TextureMaterial"
+kind = "field"
+struct = "ST3D_TextureMaterial"
+offset = 0x24
+type = "f32"
+used_by = ["hud.fade"]
+
+[[sym]]
+id = "lo_cam_projection"
+symbol = "ST3D_Camera"
+kind = "field"
+struct = "ST3D_Camera"
+offset = 0x160
+type = "m34"
+used_by = ["hud.height_posts", "hud.order_ring", "hud.footprints"]
+
+[[sym]]
+id = "lo_cam_viewport"
+symbol = "ST3D_Camera"
+kind = "field"
+struct = "ST3D_Camera"
+offset = 0x1b0
+type = "f32"
+used_by = ["hud.drag_box", "hud.height_posts", "hud.order_ring", "hud.footprints"]
+
+[[sym]]
+id = "lo_s3d_camera"
+symbol = "ST3D_GraphicsEngine"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 0xfc
+type = "ptr"
+used_by = ["hud.drag_box"]
+
+[[sym]]
+id = "lo_s3d_device"
+symbol = "ST3D_GraphicsEngine"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 0xc0
+type = "u32"
+used_by = ["hud.order_ring", "hud.footprints"]
+
+[[sym]]
+id = "lo_s3d_fps"
+symbol = "ST3D_GraphicsEngine"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 0x88
+type = "f32"
+used_by = ["hud.frame_rate"]
+
+[[sym]]
+id = "lo_s3d_total_fps"
+symbol = "ST3D_GraphicsEngine"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 0x80
+type = "f32"
+used_by = ["hud.frame_rate"]
+

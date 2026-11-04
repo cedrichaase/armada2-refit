@@ -1,0 +1,12 @@
+[package]
+name = "display-hosttest"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Host tests of Display8's pure parts (the passthrough's state.rs)"
+license = "MIT"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]

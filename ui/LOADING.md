@@ -12,13 +12,13 @@ frames. The look is decided in `STYLE.md` ("Screens"); the hooks it draws from a
 
 The screen is drawn edge to edge and opaque, so whatever the engine drew under it
 never shows: the skybox (`mbg02`), the logo model and the stock bar. **A player without
-the widened `logo.SOD` (the models layer's `LOADING` target, `models/README.md`) gets
+the widened `logo.SOD` (the `LOADING` target, retired in models 5.1.0) gets
 the same screen**, since nothing of the logo is seen. The engine still loads and draws
 the logo scene at each 5% (its frames are the only ones it presents, and they come from
 the same function that pumps the message queue and reports the load's progress to the
-other players, so it is called, not replaced). With `[Loading] Enable=1` the `LOADING`
-target and `logo-sod.py` therefore change nothing on screen; they still matter to a
-player with the UI's loading screen off, and to the moment before the first frame of
+other players, so it is called, not replaced). With `[Loading] Enable=1` the widened
+logo model (retired with `logo-sod.py`) changed nothing on screen anyway; it only mattered
+to a player with the UI's loading screen off, and to the moment before the first frame of
 ours (below).
 
 **Frames of ours.** `LoadBarNext` calls `RenderLoopAssetLoadStatusUpdate` once per
@@ -131,6 +131,22 @@ the screen needs no asset of this project):
 **What the load is doing**: the step's text is the engine's (`Constructing 'fgalaxy'`,
 `Tech Tree Computed`, a sprite's name), so the screen says it in the player's words by
 its first word or two (`src/loading.rs`, `doing`).
+
+## Hooks
+
+What `src/engine/loading.rs` reads of `Armada2.exe` is in the symbol profile
+`profiles/gog-1.1/ui.loading.toml`, generated into `src/syms_loading.rs`
+(`crates/a2engine/README.md`). Each hook is checked before anything is written, and
+stands down alone with a line `engine: <hook> stands down: <symbol> <why>`.
+
+| Hook | Entries | Without it |
+|---|---|---|
+| `ui.loading.overlay` | `LoadBarComputeFraction` (`fn`, its code checked), `ST3D_GraphicsEngine::DeleteRegisteredLights` and the call of it in `RenderLoopAssetLoadStatusUpdate` (patched: the UI is drawn in its place, with the scene still open), and the `EndScene` that follows (`label`, 3 bytes checked) | no UI over the engine's loading frame |
+| `ui.loading.own` (`Loading.Enable`) | `RenderLoopAssetLoadStatusUpdate` and `RenderLoop_Show_Splash_Screen` (`fn`, entry bytes checked), their calls in `LoadBarNext` and `Program::GameDoOne` (patched) | no screen of ours: the engine's frames only |
+| `ui.loading.inner_db` (`Loading.Enable`) | `ST3D_GraphicsEngine::LoadDatabase` and its three calls in `FindLogicalDatabase` (twice) and `FindVisibleDatabase` (patched) | no frame after a SOD inside a step |
+| `ui.loading.inner_pixels` (`Loading.Enable`) | `ST3D_Texture::LoadPixelData` and its call in `DemandLoad` (patched) | no frame after a texture inside a step |
+| `ui.loading.reads_progress` | `s_fractionRemaining` and `Armada_AssetLoadStatusVisible` (`global`, read) | no progress: the screen shows none |
+| `ui.loading.reads_pump` | `HandleMessageQueue` (`fn`, called) | `[Loading] Hold` (bench only) does not pump the queue |
 
 ## Seen on the bench
 

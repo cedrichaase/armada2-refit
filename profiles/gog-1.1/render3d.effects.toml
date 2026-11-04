@@ -1,0 +1,454 @@
+# Render3D.asi's symbols in Armada2.exe 1.1 (GOG): module "effects" (render3d/mods/effects/src).
+# Each entry is tied to the hook that uses it; the findings are in render3d/README.md, "Hooks".
+schema = 1
+plugin = "render3d"
+readme = "render3d/README.md"
+lang = "rust"
+out = "render3d/mods/effects/src/syms.rs"
+
+[hook."effects.reads"]
+doc = "What the effects module reads of the engine: its objects, lists, globals and calls"
+rows = ["Modules.effects"]
+
+[hook."effects.repair"]
+doc = "The weld sparks: Craft::RepairSystem's AddParticle call and NodeParticleEffect::Render's sprite call"
+rows = ["Modules.effects"]
+
+[hook."effects.shields"]
+doc = "The four weapon calls of CreateShieldHit, noted to know which weapon made a hit"
+rows = ["Modules.effects"]
+
+[hook."effects.debris"]
+doc = "The calls of Fragment (a dying craft, the Evolver's cocoon, a cancelled construction) drawn as our chunks"
+rows = ["Modules.effects"]
+
+
+[[sym]]
+id = "fn_shock_radius"
+symbol = "ShockwaveExplosion::GetCurrentRadius"
+kind = "fn"
+addr = 0x467730
+check = "8b 41 30 8b 50 34 d9 02"
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "site_build_fragment"
+symbol = "BuildingEffect::SafeDestroyConstruction"
+kind = "call"
+addr = 0x46a0f1
+target = "fn_fragment"
+in = "BuildingEffect::SafeDestroyConstruction"
+chain = true
+used_by = ["effects.debris"]
+
+[[sym]]
+id = "fn_add"
+symbol = "NodeParticleEffect::AddParticle"
+kind = "fn"
+addr = 0x4733c0
+check = "55 8b ec 83 ec 34 56 8b"
+used_by = ["effects.reads", "effects.repair"]
+
+[[sym]]
+id = "site_list_check"
+symbol = "NodeParticleEffect::Render"
+kind = "label"
+addr = 0x473677
+in = "NodeParticleEffect::Render"
+check = "fc 6c 73 00"
+used_by = ["effects.repair"]
+
+[[sym]]
+id = "site_sprite"
+symbol = "NodeParticleEffect::Render"
+kind = "call"
+addr = 0x473767
+target = "drawscaled3d"
+in = "NodeParticleEffect::Render"
+chain = true
+used_by = ["effects.repair"]
+
+[[sym]]
+id = "fn_drawshield"
+symbol = "ShieldHit::DrawShield"
+kind = "fn"
+addr = 0x474070
+check = "55 8b ec 6a ff 68 5a b5"
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "fn_create_hit"
+symbol = "ShieldEffect::CreateShieldHit"
+kind = "fn"
+addr = 0x4743b0
+check = "55 8b ec 6a ff 68 87 b5"
+used_by = ["effects.reads", "effects.shields"]
+
+[[sym]]
+id = "fn_get_shield_type"
+symbol = "ShieldEffect::GetShieldType"
+kind = "fn"
+addr = 0x474720
+check = "55 8b ec a1 e0 00 6b 00"
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "fn_construction_object_render"
+symbol = "ConstructionObject::Render"
+kind = "fn"
+addr = 0x4a3790
+check = "c2 04 00 90 90 90 90 90"
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "fn_get_co"
+symbol = "ConstructionRig::GetConstructionObject"
+kind = "fn"
+addr = 0x4afe80
+check = "8b 89 b4 02 00 00 51 e8"
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "site_explode_fragment"
+symbol = "Craft::Explode"
+kind = "call"
+addr = 0x4c6bfc
+target = "fn_fragment"
+in = "Craft::Explode"
+chain = true
+used_by = ["effects.debris"]
+
+[[sym]]
+id = "site_add"
+symbol = "Craft::RepairSystem"
+kind = "call"
+addr = 0x4c90c0
+target = "fn_add"
+in = "Craft::RepairSystem"
+chain = true
+used_by = ["effects.repair"]
+
+[[sym]]
+id = "fn_class_odf"
+symbol = "GameObjectClass::GetOdfName"
+kind = "fn"
+addr = 0x4ce370
+check = "8b 89 cc 01 00 00 e9 25"
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "fn_world_pos"
+symbol = "Entity::GetWorldPosition"
+kind = "fn"
+addr = 0x4cff70
+check = "55 8b ec 8b 45 0c 8b 49"
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "fn_entity_get"
+symbol = "Entity::Get"
+kind = "fn"
+addr = 0x4cfff0
+check = "55 8b ec 8b 4d 08 8b c1"
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "fn_teams_visible"
+symbol = "Entity::GetTeamsVisibleToUser"
+kind = "fn"
+addr = 0x4d0070
+check = "8b 0d d4 b8 76 00 e8 35"
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "fn_team_colour"
+symbol = "GameObject::GetTeamColor"
+kind = "fn"
+addr = 0x4d5000
+check = "56 8b f1 8b 0d d4 b8 76"
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "fn_distance_cull"
+symbol = "GameObjectInstance::DistanceCull"
+kind = "fn"
+addr = 0x4d5bb0
+check = "55 8b ec 83 ec 18 8b 45"
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "site_chunks"
+symbol = "Armada_RenderAllOurStuff"
+kind = "call"
+addr = 0x598446
+target = "fn_chunks"
+in = "Armada_RenderAllOurStuff"
+chain = true
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "fn_scale_effects"
+symbol = "ApplyScaleEffects"
+kind = "fn"
+addr = 0x599760
+check = "55 8b ec 83 ec 0c 8b 45"
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "fn_chunks"
+symbol = "ST3D_GraphicsEngine::RenderChunks"
+kind = "fn"
+addr = 0x62d470
+check = "8b 89 08 01 00 00 e9 55"
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "fn_face_limit"
+symbol = "ST3D_Instance::SetRenderFaceLimit"
+kind = "fn"
+addr = 0x62ea80
+check = "55 8b ec 8b 45 08 89 41"
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "fn_fragment"
+symbol = "ST3D_Instance::Fragment"
+kind = "fn"
+addr = 0x62eb20
+check = "55 8b ec 53 57 8b f9 8b"
+used_by = ["effects.reads", "effects.debris"]
+
+[[sym]]
+id = "drawscaled3d"
+symbol = "ST3D_Sprite::DrawScaled3D"
+kind = "fn"
+addr = 0x63aa60
+check = "55 8b ec 83 ec 08 8b 45"
+used_by = ["effects.reads", "effects.repair"]
+
+[[sym]]
+id = "vt_explosion_feature"
+symbol = "ExplosionFeature"
+kind = "vtable"
+addr = 0x6afb30
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "vt_fireball"
+symbol = "FireballExplosion"
+kind = "vtable"
+addr = 0x6afbd4
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "vt_shockwave"
+symbol = "ShockwaveExplosion"
+kind = "vtable"
+addr = 0x6afdac
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "vt_building"
+symbol = "BuildingEffect"
+kind = "vtable"
+addr = 0x6afe4c
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "vt_drone_colony"
+symbol = "DroneColony"
+kind = "vtable"
+addr = 0x6afe98
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "vt_node_particle"
+symbol = "NodeParticleEffect"
+kind = "vtable"
+addr = 0x6b001c
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "shield_type_names"
+symbol = "(unnamed) shield type name table"
+kind = "global"
+addr = 0x6b00e0
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "vt_shield_effect"
+symbol = "ShieldEffect"
+kind = "vtable"
+addr = 0x6b0134
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "vt_worker_bee"
+symbol = "WorkerBee"
+kind = "vtable"
+addr = 0x6b017c
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "explosion_head"
+symbol = "(unnamed) explosion list head"
+kind = "global"
+addr = 0x7367c4
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "bee_nil"
+symbol = "BeeColony::$$CBHVBee::HU?$pair::?$_Tree::_Nil"
+kind = "global"
+addr = 0x736bc4
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "be_head"
+symbol = "(unnamed) BuildingEffect list head"
+kind = "global"
+addr = 0x736bd4
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "be_nil"
+symbol = "BuildingEffect::VInfo::$$CBHV?$auto_ptr::HU?$pair::?$_Tree::_Nil"
+kind = "global"
+addr = 0x736c1c
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "list"
+symbol = "(unnamed) NodeParticleEffect particle list head"
+kind = "global"
+addr = 0x736cfc
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "count"
+symbol = "(unnamed) particle list count"
+kind = "global"
+addr = 0x736d00
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "shield_logical_db"
+symbol = "ShieldEffect::m_logical_db"
+kind = "global"
+addr = 0x736ddc
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "shield_list"
+symbol = "ShieldEffect::m_shieldList"
+kind = "global"
+addr = 0x736de8
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "shield_material"
+symbol = "ShieldEffect::m_shield_lighting_material"
+kind = "global"
+addr = 0x736e2c
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "shield_nil"
+symbol = "VShieldHit::$$CBHV?$auto_ptr::HU?$pair::?$_Tree::_Nil"
+kind = "global"
+addr = 0x736e38
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "user_profile"
+symbol = "UserProfile"
+kind = "global"
+addr = 0x76b5ac
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "view_record"
+symbol = "View_Record"
+kind = "global"
+addr = 0x76b610
+used_by = ["effects.reads"]
+
+[[sym]]
+id = "site_hit_0"
+symbol = "Beam::Simulate"
+kind = "call"
+addr = 0x58bb95
+target = "fn_create_hit"
+in = "Beam::Simulate"
+chain = true
+used_by = ["effects.shields"]
+
+[[sym]]
+id = "site_hit_1"
+symbol = "Bullet::Simulate"
+kind = "call"
+addr = 0x58cad8
+target = "fn_create_hit"
+in = "Bullet::Simulate"
+chain = true
+used_by = ["effects.shields"]
+
+[[sym]]
+id = "site_hit_2"
+symbol = "Mine::mMoveTowardsTarget"
+kind = "call"
+addr = 0x58d502
+target = "fn_create_hit"
+in = "Mine::mMoveTowardsTarget"
+chain = true
+used_by = ["effects.shields"]
+
+[[sym]]
+id = "site_hit_3"
+symbol = "Missile::Simulate"
+kind = "call"
+addr = 0x58dd65
+target = "fn_create_hit"
+in = "Missile::Simulate"
+chain = true
+used_by = ["effects.shields"]
+
+[[sym]]
+id = "site_cocoon_0"
+symbol = "Evolver::mDoRemoveConstructionEffect"
+kind = "call"
+addr = 0x4b07b4
+target = "fn_fragment"
+in = "Evolver::mDoRemoveConstructionEffect"
+chain = true
+used_by = ["effects.debris"]
+
+[[sym]]
+id = "site_cocoon_1"
+symbol = "Evolver::mRemoveConstructionEffect"
+kind = "call"
+addr = 0x4b0872
+target = "fn_fragment"
+in = "Evolver::mRemoveConstructionEffect"
+chain = true
+used_by = ["effects.debris"]
+
+[[sym]]
+id = "site_cocoon_2"
+symbol = "Evolver::mCancelConstructionEffect"
+kind = "call"
+addr = 0x4b0914
+target = "fn_fragment"
+in = "Evolver::mCancelConstructionEffect"
+chain = true
+used_by = ["effects.debris"]
+
+[[sym]]
+id = "site_cocoon_3"
+symbol = "Evolver::mStopConstructionEffect"
+kind = "call"
+addr = 0x4b09b4
+target = "fn_fragment"
+in = "Evolver::mStopConstructionEffect"
+chain = true
+used_by = ["effects.debris"]

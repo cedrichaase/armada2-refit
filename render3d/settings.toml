@@ -1,0 +1,148 @@
+plugin = "Render3D"
+file = "Render3D.ini"
+shipped = "render3d/Render3D.ini"
+# The core's rows; each module's are in its fragment, mods/<m>/settings.toml
+# (tools/settings/README.md, "Fragments"). [Lights] is split by key between owners.
+shared_sections = ["Lights"]
+# The rows are r3d-core's (core/src/settings_table.rs); the cdylib (src/lib.rs) exports
+# Render3D_Settings: the core's rows, then each built-in module's.
+rows_in = "core"
+
+[[row]]
+name = "msaa"
+section = "Render3D"
+key = "MSAA"
+kind = "enum"
+default = "4"
+values = ["0", "2", "4", "8"]
+labels = ["Off", "2x", "4x", "8x"]
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "Anti-aliasing"
+help = "Samples per pixel on the 3D view. Higher is smoother and costs more GPU time."
+
+[[row]]
+name = "hdr"
+section = "Render3D"
+key = "HDR"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "HDR and bloom"
+help = "Draw the 3D view in half floats, so bright light blooms. Off draws an 8-bit view."
+
+[[row]]
+name = "view_distance"
+section = "View"
+key = "Distance"
+kind = "enum"
+default = "1000000"
+values = ["0", "4000", "8000", "20000", "1000000"]
+labels = ["Stock", "4000", "8000", "20000", "Whole map"]
+apply = "mission"
+scope = "local"
+tab = "graphics"
+label = "View distance"
+help = "How far the view reaches before ships, planets and nebulae fade out. The camera's far plane changes with the next mission."
+moved_from = "QOL.QOL.ViewDistance"
+
+[[row]]
+name = "modules_hulls"
+section = "Modules"
+key = "hulls"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "Ships"
+help = "render3d draws the ships. Off hands them back to the game, with its own look."
+
+[[row]]
+name = "modules_sky"
+section = "Modules"
+key = "sky"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "Sky"
+help = "render3d draws the sky. Off hands it back to the game."
+
+[[row]]
+name = "modules_particles"
+section = "Modules"
+key = "particles"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "Particles"
+help = "render3d draws particles, smoke and venting. Off hands them back to the game."
+
+[[row]]
+name = "modules_effects"
+section = "Modules"
+key = "effects"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "Effects"
+help = "render3d draws explosions, shields, repair and debris. Off hands them back to the game. Effects already in flight finish in the look they started with."
+
+[[row]]
+name = "modules_ordnance"
+section = "Modules"
+key = "ordnance"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "Weapons"
+help = "render3d draws beams, torpedoes and shots. Off hands them back to the game."
+
+[[row]]
+name = "modules_specials"
+section = "Modules"
+key = "specials"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "Special weapons"
+help = "render3d draws the special weapons' effects. Off hands them back to the game."
+
+[[row]]
+name = "modules_world"
+section = "Modules"
+key = "world"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "Planets, rocks and gas"
+help = "render3d draws planets, moons, asteroids and nebulae."
+flags = ["no_row"]
+
+[[row]]
+name = "modules_overlays"
+section = "Modules"
+key = "overlays"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "Overlays"
+help = "render3d draws the fog of war, grid, selection and ghosts."
+flags = ["no_row"]

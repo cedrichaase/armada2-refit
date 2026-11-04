@@ -25,16 +25,18 @@
 //!   mapped for good; chunks added when a frame needs more) and the callbacks deferred
 //!   until its fence value has passed. A frame is begun at the first call that needs it
 //!   after a `Present`, and ended, submitted and presented at the next.
+pub mod build;
 pub mod cache;
 pub mod exports;
 pub mod mirror;
+pub mod pass;
 pub mod raw;
 
 use crate::log;
 use crate::rt::win::{CloseHandle, CreateEventA, GetProcAddress, LoadLibraryA, WaitForSingleObject, HANDLE};
-use crate::shaders::present_dxil::{PS_GAMMA_DXIL, VS_PRESENT_DXIL};
 use alloc::vec::Vec;
 use core::ffi::c_void;
+use core::sync::atomic::{AtomicU32, Ordering};
 use gpu::display::{Dx12Alloc8, Dx12Descriptors8, Dx12Device8, Dx12Frame8, Dx12Image8};
 use raw::*;
 
@@ -47,6 +49,8 @@ const FRAME_SAMPLERS: u32 = 1024;
 /// Views of Display8's own resources (targets, ramp, mirrors), not shader-visible.
 const OWN_VIEWS: u32 = 1024;
 const SWAP_BUFFERS: u32 = 2;
+/// How many 5 s waits a fence gets before the device is treated as gone (`wait`).
+const WAIT_STEPS: u32 = 6;
 
 pub struct Img {
     pub res: P,
@@ -130,6 +134,8 @@ pub struct Dx {
     lost: bool,
 }
 
+/// Frames `abandon` ended without presenting them, for the log.
+static ABANDONED: AtomicU32 = AtomicU32::new(0);
 static mut DX: Option<Dx> = None;
 
 #[allow(static_mut_refs)]
@@ -148,6 +154,42 @@ fn made(hr: i32, out: P, what: &'static str) -> Result<P, &'static str> {
         return Err(what);
     }
     Ok(out)
+}
+
+/// Whether Direct3D 12 can start, asked at `Direct3DCreate8` before the window exists
+/// (the bail-out, `bail.rs`): `d3d12.dll` and `dxgi.dll` with their entry points, a DXGI
+/// factory, and `D3D12CreateDevice` at feature level 11_0 asked without making the device
+/// (no out pointer: S_FALSE when it would succeed). The swap chain is the start's.
+pub fn probe() -> Result<(), &'static str> {
+    let d3d12 = unsafe { LoadLibraryA(c"d3d12.dll".as_ptr() as *const u8) };
+    if d3d12.is_null() {
+        return Err("no d3d12.dll");
+    }
+    let dxgi = unsafe { LoadLibraryA(c"dxgi.dll".as_ptr() as *const u8) };
+    if dxgi.is_null() {
+        return Err("no dxgi.dll");
+    }
+    let (create_device, create_factory) = (proc(d3d12, c"D3D12CreateDevice"), proc(dxgi, c"CreateDXGIFactory1"));
+    if create_device == 0 || proc(d3d12, c"D3D12SerializeRootSignature") == 0 {
+        return Err("d3d12.dll has no D3D12CreateDevice or D3D12SerializeRootSignature");
+    }
+    if create_factory == 0 {
+        return Err("dxgi.dll has no CreateDXGIFactory1");
+    }
+    let create: unsafe extern "system" fn(*const crate::com::Guid, *mut P) -> i32 = unsafe { core::mem::transmute(create_factory) };
+    let mut factory: P = core::ptr::null_mut();
+    let hr = unsafe { create(&IID_DXGI_FACTORY2, &mut factory) };
+    if hr < 0 || factory.is_null() {
+        return Err("no DXGI factory (IDXGIFactory2)");
+    }
+    release(factory);
+    let create_device: unsafe extern "system" fn(P, u32, *const crate::com::Guid, *mut P) -> i32 = unsafe { core::mem::transmute(create_device) };
+    let hr = unsafe { create_device(core::ptr::null_mut(), FEATURE_LEVEL_11_0, &IID_DEVICE, core::ptr::null_mut()) };
+    if hr < 0 {
+        log!("d3d12: probe: D3D12CreateDevice at feature level 11_0: {:#x}", hr as u32);
+        return Err("no device at feature level 11_0");
+    }
+    Ok(())
 }
 
 impl Dx {
@@ -222,7 +264,7 @@ impl Dx {
         }
 
         let samplers = crate::dxvk_samplers();
-        log!("d3d12: the plugins' samplers as dxvk.conf has DXVK make them: anisotropy {}, LOD bias {}", samplers.0, samplers.1);
+        log!("d3d12: the plugins' samplers: anisotropy {}, LOD bias {}", samplers.0, samplers.1);
         if crate::d3d9_centres() {
             log!("d3d12: PixelCentres=d3d9: the plugins draw with Direct3D 9's pixel centres (for comparing)");
         }
@@ -514,113 +556,29 @@ impl Dx {
     }
 
     fn make_pipeline(&mut self, serialize: usize) -> Result<(), &'static str> {
-        // b0: the vertex shader's register file, four root constants (the half-pixel
-        // shift, nought here); t0, t1: the frame and the ramp; s0, s1: point, clamped.
-        let range = [DescriptorRange { ty: DESCRIPTOR_RANGE_TYPE_SRV, count: 2, base_register: 0, space: 0, offset_in_table: 0 }];
-        let params = [
-            RootParameter { ty: ROOT_PARAMETER_TYPE_32BIT_CONSTANTS, a: 0, b: 0, c: 4, visibility: SHADER_VISIBILITY_VERTEX },
-            RootParameter { ty: ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, a: 1, b: range.as_ptr() as usize, c: 0, visibility: SHADER_VISIBILITY_PIXEL },
-        ];
-        let sampler = |register| StaticSampler {
-            filter: FILTER_MIN_MAG_MIP_POINT,
-            address_u: TEXTURE_ADDRESS_MODE_CLAMP,
-            address_v: TEXTURE_ADDRESS_MODE_CLAMP,
-            address_w: TEXTURE_ADDRESS_MODE_CLAMP,
-            mip_lod_bias: 0.0,
-            max_anisotropy: 1,
-            comparison: COMPARISON_FUNC_ALWAYS,
-            border: STATIC_BORDER_COLOR_OPAQUE_BLACK,
-            min_lod: 0.0,
-            max_lod: 0.0,
-            register,
-            space: 0,
-            visibility: SHADER_VISIBILITY_PIXEL,
-        };
-        let samplers = [sampler(0), sampler(1)];
-        let desc = RootSignatureDesc {
-            count: params.len() as u32,
-            params: params.as_ptr(),
-            samplers_count: samplers.len() as u32,
-            samplers: samplers.as_ptr(),
-            flags: ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
-        };
-        let serialize: unsafe extern "system" fn(*const RootSignatureDesc, u32, *mut P, *mut P) -> i32 = unsafe { core::mem::transmute(serialize) };
-        let (mut blob, mut err): (P, P) = (core::ptr::null_mut(), core::ptr::null_mut());
-        let hr = unsafe { serialize(&desc, ROOT_SIGNATURE_VERSION_1_0, &mut blob, &mut err) };
-        if hr < 0 || blob.is_null() {
-            if !err.is_null() {
-                let msg = vcall!(err, slot::BLOB_GET_BUFFER_POINTER, fn() -> *const u8,);
-                log!("d3d12: D3D12SerializeRootSignature: {}", unsafe { crate::rt::cstr_at(msg, 1000) });
+        let note = |m: &str| log!("d3d12: D3D12SerializeRootSignature: {}", m);
+        self.root = build::present_root(self.dev, serialize, &note).map_err(|e| e.0)?;
+        let (dev, lib, root) = (self.dev, self.lib, self.root);
+        let (hr, pso) = build::present_desc(root, |pd| {
+            let mut pso: P = core::ptr::null_mut();
+            // Through the library when it has the present pass (stored under this name, the
+            // pass being fixed for a given Display8; the library checks the description).
+            let name: Vec<u16> = "Display8.present\0".encode_utf16().collect();
+            let mut hr = -1;
+            if !lib.is_null() {
+                hr = vcall!(lib, slot::LIB_LOAD_GRAPHICS_PIPELINE, fn(*const u16, *const GraphicsPipelineDesc, *const crate::com::Guid, *mut P) -> i32, name.as_ptr(), pd, &IID_PIPELINE_STATE, &mut pso);
+                if hr < 0 {
+                    pso = core::ptr::null_mut();
+                }
             }
-            release(err);
-            return Err("D3D12SerializeRootSignature failed");
-        }
-        release(err);
-        let (ptr, len) = (vcall!(blob, slot::BLOB_GET_BUFFER_POINTER, fn() -> *const c_void,), vcall!(blob, slot::BLOB_GET_BUFFER_SIZE, fn() -> usize,));
-        let mut root: P = core::ptr::null_mut();
-        let hr = vcall!(self.dev, slot::DEV_CREATE_ROOT_SIGNATURE, fn(u32, *const c_void, usize, *const crate::com::Guid, *mut P) -> i32, 0, ptr, len, &IID_ROOT_SIGNATURE, &mut root);
-        release(blob);
-        self.root = made(hr, root, "CreateRootSignature")?;
-
-        let inputs = [
-            InputElement { semantic: c"POSITION".as_ptr() as *const u8, index: 0, format: FORMAT_R32G32_FLOAT, slot: 0, offset: 0, class: INPUT_CLASSIFICATION_PER_VERTEX_DATA, step_rate: 0 },
-            InputElement { semantic: c"TEXCOORD".as_ptr() as *const u8, index: 0, format: FORMAT_R32G32_FLOAT, slot: 0, offset: 8, class: INPUT_CLASSIFICATION_PER_VERTEX_DATA, step_rate: 0 },
-        ];
-        let mut blend = BlendDesc::default();
-        blend.targets[0] = RenderTargetBlend {
-            src: BLEND_ONE,
-            dst: BLEND_ZERO,
-            op: BLEND_OP_ADD,
-            src_alpha: BLEND_ONE,
-            dst_alpha: BLEND_ZERO,
-            op_alpha: BLEND_OP_ADD,
-            logic_op: LOGIC_OP_NOOP,
-            write_mask: COLOR_WRITE_ENABLE_ALL,
-            ..Default::default()
-        };
-        let keep = StencilOpDesc { fail: STENCIL_OP_KEEP, depth_fail: STENCIL_OP_KEEP, pass: STENCIL_OP_KEEP, func: COMPARISON_FUNC_ALWAYS };
-        let mut formats = [FORMAT_UNKNOWN; 8];
-        formats[0] = FORMAT_B8G8R8A8_UNORM;
-        let pd = GraphicsPipelineDesc {
-            root: self.root,
-            vs: ShaderBytecode::of(&VS_PRESENT_DXIL),
-            ps: ShaderBytecode::of(&PS_GAMMA_DXIL),
-            ds: ShaderBytecode::NONE,
-            hs: ShaderBytecode::NONE,
-            gs: ShaderBytecode::NONE,
-            stream_output: StreamOutputDesc { decl: core::ptr::null(), entries: 0, strides: core::ptr::null(), nstrides: 0, rasterized_stream: 0 },
-            blend,
-            sample_mask: u32::MAX,
-            rasterizer: RasterizerDesc { fill: FILL_MODE_SOLID, cull: CULL_MODE_NONE, depth_clip: 1, ..Default::default() },
-            depth_stencil: DepthStencilDesc { depth: 0, write_mask: 0, func: COMPARISON_FUNC_ALWAYS, front: keep, back: keep, ..Default::default() },
-            input_layout: InputLayoutDesc { elements: inputs.as_ptr(), count: inputs.len() as u32 },
-            strip_cut: 0,
-            topology: PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
-            num_targets: 1,
-            formats,
-            dsv_format: FORMAT_UNKNOWN,
-            sample: SampleDesc { count: 1, quality: 0 },
-            node_mask: 0,
-            cached: CachedPso { blob: core::ptr::null(), len: 0 },
-            flags: 0,
-        };
-        let mut pso: P = core::ptr::null_mut();
-        // Through the library when it has the present pass (stored under this name, the
-        // pass being fixed for a given Display8; the library checks the description).
-        let name: Vec<u16> = "Display8.present\0".encode_utf16().collect();
-        let mut hr = -1;
-        if !self.lib.is_null() {
-            hr = vcall!(self.lib, slot::LIB_LOAD_GRAPHICS_PIPELINE, fn(*const u16, *const GraphicsPipelineDesc, *const crate::com::Guid, *mut P) -> i32, name.as_ptr(), &pd, &IID_PIPELINE_STATE, &mut pso);
             if hr < 0 {
-                pso = core::ptr::null_mut();
+                hr = vcall!(dev, slot::DEV_CREATE_GRAPHICS_PIPELINE_STATE, fn(*const GraphicsPipelineDesc, *const crate::com::Guid, *mut P) -> i32, pd, &IID_PIPELINE_STATE, &mut pso);
+                if hr >= 0 && !pso.is_null() && !lib.is_null() {
+                    cache::store(lib, &name, pso);
+                }
             }
-        }
-        if hr < 0 {
-            hr = vcall!(self.dev, slot::DEV_CREATE_GRAPHICS_PIPELINE_STATE, fn(*const GraphicsPipelineDesc, *const crate::com::Guid, *mut P) -> i32, &pd, &IID_PIPELINE_STATE, &mut pso);
-            if hr >= 0 && !pso.is_null() && !self.lib.is_null() {
-                cache::store(self.lib, &name, pso);
-            }
-        }
+            (hr, pso)
+        });
         self.pso = made(hr, pso, "CreateGraphicsPipelineState (the present pass)")?;
         Ok(())
     }
@@ -675,27 +633,63 @@ impl Dx {
         self.slots[self.slot].list
     }
 
-    /// The frame now, begun if no frame is being recorded.
-    pub fn frame(&mut self) -> &Dx12Frame8 {
+    /// The frame now, begun if no frame is being recorded; None once the device is
+    /// gone (`wait`), when there is no list a plugin may record into.
+    pub fn frame(&mut self) -> Option<&Dx12Frame8> {
+        if !self.ready() {
+            return None;
+        }
+        Some(&self.frame_out)
+    }
+
+    /// Whether a frame is being recorded, beginning one if none is: false once the
+    /// device is gone.
+    fn ready(&mut self) -> bool {
         if !self.recording {
             self.begin();
         }
-        &self.frame_out
+        self.recording
     }
 
-    fn wait(&self, value: u64) {
-        if value == 0 || vcall!(self.fence, slot::FENCE_GET_COMPLETED_VALUE, fn() -> u64,) >= value {
-            return;
+    /// Waits until the GPU has reached `value` on the fence. False when it has not and
+    /// will not: the device was removed, or it has not answered for `WAIT_STEPS` waits of
+    /// 5 s (a device that stops answering does not hang the game for good). The device
+    /// is then marked lost, and nothing the GPU may still be using is reset or freed.
+    fn wait(&mut self, value: u64) -> bool {
+        let reached = |d: &Self| value == 0 || vcall!(d.fence, slot::FENCE_GET_COMPLETED_VALUE, fn() -> u64,) >= value;
+        if reached(self) {
+            return true;
+        }
+        if self.lost {
+            return false;
         }
         if vcall!(self.fence, slot::FENCE_SET_EVENT_ON_COMPLETION, fn(u64, HANDLE) -> i32, value, self.fence_event) >= 0 {
-            // A device that stops answering does not hang the game for good.
-            unsafe { WaitForSingleObject(self.fence_event, 5000) };
+            for _ in 0..WAIT_STEPS {
+                unsafe { WaitForSingleObject(self.fence_event, 5000) };
+                if reached(self) {
+                    return true;
+                }
+                if vcall!(self.dev, slot::DEV_GET_DEVICE_REMOVED_REASON, fn() -> i32,) < 0 {
+                    break;
+                }
+            }
         }
+        if reached(self) {
+            return true;
+        }
+        let why = vcall!(self.dev, slot::DEV_GET_DEVICE_REMOVED_REASON, fn() -> i32,);
+        log!("d3d12: the GPU did not reach fence value {} (removed reason {:#x}); the device is treated as gone, nothing is drawn from here", value, why as u32);
+        self.lost = true;
+        false
     }
 
     fn begin(&mut self) {
         let done = self.slots[self.slot].done;
-        self.wait(done);
+        if !self.wait(done) {
+            // The slot's list, allocator and deferred frees may still be in the GPU's
+            // hands: they are left as they are (and leak), and no frame is begun.
+            return;
+        }
         let s = &mut self.slots[self.slot];
         for (f, arg) in s.deferred.drain(..) {
             f(arg);
@@ -734,8 +728,8 @@ impl Dx {
 
     /// Space in the frame's upload ring.
     pub fn alloc(&mut self, bytes: u32, align: u32) -> Option<Dx12Alloc8> {
-        if !self.recording {
-            self.begin();
+        if !self.ready() {
+            return None;
         }
         let align = align.max(4) as u64;
         let need = bytes as u64;
@@ -773,8 +767,8 @@ impl Dx {
 
     /// `count` descriptors in a shader-visible heap (`HEAP_*`), for the frame now.
     pub fn descriptors(&mut self, heap: u32, count: u32) -> Option<Dx12Descriptors8> {
-        if !self.recording {
-            self.begin();
+        if !self.ready() {
+            return None;
         }
         let s = &mut self.slots[self.slot];
         let (per, at, cpu, gpu, inc) = if heap == gpu::display::HEAP_SAMPLER {
@@ -798,8 +792,8 @@ impl Dx {
 
     /// The engine's `Clear` of its targets: rectangles (none: the whole viewport).
     pub fn clear(&mut self, rects: &[[i32; 4]], viewport: [u32; 4], flags: u32, color: u32, z: f32) {
-        if !self.recording {
-            self.begin();
+        if !self.ready() {
+            return;
         }
         let (w, h) = (self.color.w as i32, self.color.h as i32);
         let vr = [viewport[0] as i32, viewport[1] as i32, (viewport[0] + viewport[2]) as i32, (viewport[1] + viewport[3]) as i32];
@@ -828,8 +822,8 @@ impl Dx {
     /// the ring: a mirror's level, the ramp, the engine's back buffer written by lock.
     /// The level goes from state `from` to `to`.
     pub fn upload(&mut self, res: P, format: u32, level: u32, w: u32, h: u32, src: &[u8], pitch: u32, bpp: u32, from: u32, to: u32) -> bool {
-        if !self.recording {
-            self.begin();
+        if !self.ready() {
+            return false;
         }
         let row = w * bpp;
         let rp = row.div_ceil(TEXTURE_DATA_PITCH_ALIGNMENT) * TEXTURE_DATA_PITCH_ALIGNMENT;
@@ -861,13 +855,14 @@ impl Dx {
     }
 
     /// The engine's `Present`: the last pass into the swap chain's buffer, then submit
-    /// and present. False: the device is gone.
+    /// and present. False: the device is gone; a frame that could not be presented is
+    /// ended unshown and still returns true.
     pub fn present(&mut self) -> bool {
         if self.lost {
             return false;
         }
-        if !self.recording {
-            self.begin();
+        if !self.ready() {
+            return false;
         }
         if self.stale {
             self.stale = false;
@@ -882,6 +877,13 @@ impl Dx {
                 self.ramp.state = STATE_SHADER_RESOURCE;
             }
         }
+        // Everything that can fail comes before the frame's last pass is recorded, and a
+        // frame that cannot be presented is still ended (`abandon`): a frame left open
+        // never resets its ring or descriptors, and every frame after it fails the same way.
+        let quad: [f32; 16] = [-1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, -1.0, -1.0, 0.0, 1.0, 1.0, -1.0, 1.0, 1.0];
+        let (Some(va), Some(table)) = (self.alloc(64, 16), self.descriptors(gpu::display::HEAP_CBV_SRV_UAV, 2)) else {
+            return self.abandon("no room in the upload ring or the descriptor heap");
+        };
         let l = self.list();
         let bb = vcall!(self.swap, slot::SWAP_GET_CURRENT_BACK_BUFFER_INDEX, fn() -> u32,) as usize % self.sc_buffers.len();
         let target = self.sc_buffers[bb];
@@ -889,10 +891,6 @@ impl Dx {
         let color = self.color.res;
         self.barrier(color, ALL_SUBRESOURCES, STATE_RENDER_TARGET, STATE_PIXEL_SHADER_RESOURCE);
         self.barrier(target, ALL_SUBRESOURCES, STATE_PRESENT, STATE_RENDER_TARGET);
-        let quad: [f32; 16] = [-1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, -1.0, -1.0, 0.0, 1.0, 1.0, -1.0, 1.0, 1.0];
-        let (Some(va), Some(table)) = (self.alloc(64, 16), self.descriptors(gpu::display::HEAP_CBV_SRV_UAV, 2)) else {
-            return false;
-        };
         unsafe { core::ptr::copy_nonoverlapping(quad.as_ptr() as *const u8, va.cpu, 64) };
         vcall!(self.dev, slot::DEV_COPY_DESCRIPTORS_SIMPLE, fn(u32, usize, usize, u32) -> (), 1, table.cpu, self.color.srv, DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
         vcall!(self.dev, slot::DEV_COPY_DESCRIPTORS_SIMPLE, fn(u32, usize, usize, u32) -> (), 1, table.cpu + self.inc[0] as usize, self.ramp.srv, DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -912,22 +910,7 @@ impl Dx {
         vcall!(l, slot::LIST_DRAW_INSTANCED, fn(u32, u32, u32, u32) -> (), 4, 1, 0, 0);
         self.barrier(target, ALL_SUBRESOURCES, STATE_RENDER_TARGET, STATE_PRESENT);
         self.barrier(color, ALL_SUBRESOURCES, STATE_PIXEL_SHADER_RESOURCE, STATE_RENDER_TARGET);
-        let hr = vcall!(l, slot::LIST_CLOSE, fn() -> i32,);
-        if hr < 0 {
-            log!("d3d12: the frame's command list did not close: {:#x}", hr as u32);
-        }
-        let lists = [l];
-        vcall!(self.queue, slot::QUEUE_EXECUTE_COMMAND_LISTS, fn(u32, *const P) -> (), 1, lists.as_ptr());
-        let hr = vcall!(self.swap, slot::SWAP_PRESENT, fn(u32, u32) -> i32, self.sync_interval, 0);
-        self.fence_value += 1;
-        vcall!(self.queue, slot::QUEUE_SIGNAL, fn(P, u64) -> i32, self.fence, self.fence_value);
-        self.slots[self.slot].done = self.fence_value;
-        self.recording = false;
-        self.slot = (self.slot + 1) % SLOTS;
-        self.index += 1;
-        if self.index % cache::EVERY == 0 {
-            self.lib_saved = cache::save(self.lib, &self.lib_id, self.lib_saved);
-        }
+        let hr = self.end_frame(true);
         if hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET {
             let why = vcall!(self.dev, slot::DEV_GET_DEVICE_REMOVED_REASON, fn() -> i32,);
             log!("d3d12: the device is gone ({:#x}, reason {:#x}); nothing is drawn from here", hr as u32, why as u32);
@@ -940,6 +923,42 @@ impl Dx {
             log!("d3d12: frame {} presented", self.index);
         }
         true
+    }
+
+    /// Ends a frame that cannot be presented: its commands are executed without a
+    /// `Present` and its fence is signalled, so the next frame begins on the next slot
+    /// with its ring and descriptors reset. The frame is lost, the device is fine, so
+    /// this returns true: the game goes on drawing.
+    fn abandon(&mut self, why: &str) -> bool {
+        let n = ABANDONED.fetch_add(1, Ordering::Relaxed) + 1;
+        if n <= 8 || n % 600 == 0 {
+            log!("d3d12: frame {} not presented ({}); {} so far", self.index, why, n);
+        }
+        self.end_frame(false);
+        true
+    }
+
+    /// Closes and executes the slot's list, presents it when `show`, signals the fence
+    /// for the slot and moves on to the next slot. Returns `Present`'s result (0 unshown).
+    fn end_frame(&mut self, show: bool) -> i32 {
+        let l = self.list();
+        let hr = vcall!(l, slot::LIST_CLOSE, fn() -> i32,);
+        if hr < 0 {
+            log!("d3d12: the frame's command list did not close: {:#x}", hr as u32);
+        }
+        let lists = [l];
+        vcall!(self.queue, slot::QUEUE_EXECUTE_COMMAND_LISTS, fn(u32, *const P) -> (), 1, lists.as_ptr());
+        let hr = if show { vcall!(self.swap, slot::SWAP_PRESENT, fn(u32, u32) -> i32, self.sync_interval, 0) } else { 0 };
+        self.fence_value += 1;
+        vcall!(self.queue, slot::QUEUE_SIGNAL, fn(P, u64) -> i32, self.fence, self.fence_value);
+        self.slots[self.slot].done = self.fence_value;
+        self.recording = false;
+        self.slot = (self.slot + 1) % SLOTS;
+        self.index += 1;
+        if self.index % cache::EVERY == 0 {
+            self.lib_saved = cache::save(self.lib, &self.lib_id, self.lib_saved);
+        }
+        hr
     }
 
     /// Submits what the frame now has recorded, waits for it, and opens the same list
@@ -963,11 +982,17 @@ impl Dx {
         vcall!(self.queue, slot::QUEUE_EXECUTE_COMMAND_LISTS, fn(u32, *const P) -> (), 1, lists.as_ptr());
         self.fence_value += 1;
         vcall!(self.queue, slot::QUEUE_SIGNAL, fn(P, u64) -> i32, self.fence, self.fence_value);
-        self.wait(self.fence_value);
+        if !self.wait(self.fence_value) {
+            // The list is still the GPU's: it is not reset, and the frame ends here.
+            self.recording = false;
+            return false;
+        }
         vcall!(alloc, slot::ALLOC_RESET, fn() -> i32,);
         vcall!(l, slot::LIST_RESET, fn(P, P) -> i32, alloc, core::ptr::null_mut());
         let heaps = [self.views_heap, self.samplers_heap];
         vcall!(l, slot::LIST_SET_DESCRIPTOR_HEAPS, fn(u32, *const P) -> (), 2, heaps.as_ptr());
+        // A list reset has nothing set on it.
+        pass::forget();
         true
     }
 

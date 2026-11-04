@@ -4,6 +4,386 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 1.0.4 — 2026-11-04
+
+### Fixed
+- `a2rt::move_file` (the settings overlay's rename) retries a failed move 8 x 50 ms; `Sleep` joins `kernel32.def`.
+- `install.sh` (and `--remove`) no longer deletes `Sky\<name>.ini` by the names of the shipped recipes: a sky recipe of the player's own, the override the README documents, survives. The old Sky.asi copies are taken out by hash, by `retire/retire.sh` (platform 4.0.1). Installed, not yet seen in game.
+
+## 1.0.3 — 2026-11-04
+
+### Fixed
+- effects: the engine's weld and spark sprites are dropped only while one of render3d's own views runs (`begin_view` to `end_view`), not whenever the module is on: with `Inset=0` the engine-drawn inset lost them. Debris taken over at the explosion (`Craft::Explode`) is simulation-time and still ours only; the inset with `Inset=0` shows none of it.
+- Comments in `qol/` and `ui/src/engine/` list no instruction sequences (hard rule 9).
+
+Installed, not yet seen in game.
+
+## 1.0.2 — 2026-11-03
+
+### Fixed
+- Built on `gpu` 2.0.1 (PR #23 by bmh129 and its review): on Vulkan a frame that spends Display8's descriptor pool, or the storage sets' pool, goes on in pools of gpu's own (a chain per frame slot, up to 64 pools) instead of dropping its draws and dispatches; a frame that found the pool spent goes straight to gpu's own pools, and the chain grows only on a spent or fragmented pool. The spent-pool log line names the Vulkan error.
+
+Installed, not yet seen in game.
+
+## 1.0.1 — 2026-11-03
+
+### Changed
+- `Render3D.ini`: the `[Modules]` comment says every module row is read again while the
+  game runs (it listed only some). Comment only; no behaviour changes.
+
+Installed, not yet seen in game.
+
+## 1.0.0 — 2026-11-03
+
+MAJOR: Render3D.asi no longer runs without Display8. With no Display8 of its contract,
+one that has stood down to the system's Direct3D 8 (`Backend=none`) or a device it
+cannot open, `gpu` is stood down and render3d leaves the 3D view to the engine; it
+logs `frame: standing down: no Vulkan or Direct3D 12 device behind the engine's` once.
+
+### Removed
+- The Direct3D 9 path: `gpu::d3d9` (gpu 2.0.0), the engine glue that reached the
+  game's d3d9 device (`Device::from_d3d8`, the raw COM tally, the unbinding in the
+  `DestroyRenderSurfaces` hook, the menu scene's `SetViewport`), `gfx::reset` and
+  `gfx::forget`. The `Reset` and `DestroyRenderSurfaces` hooks stay and drop what the
+  modules made.
+- The d3dbc form of every shader: `<crate>/src/shaders/<name>.rs` (vkd3d's bytecode) is
+  gone; the shaders are `<name>_spv.rs` and `<name>_dxil.rs`, byte for byte the SPIR-V
+  and DXIL they were (only the stamps moved). `gpu::code!` takes two names, three with
+  `_AT_DXIL`. `tools/shaderc`: `d3dbc-fix.py`, `d3dbc-slots.py`, `fetch-vkd3d.sh`, the
+  vkd3d step of `hlsl-rs.sh` and `verify-generated.sh`, `--fix`, and the `:long` and
+  `:dxc` marks of an entries line (CI's `shaders` job needs dxc and spirv-val only).
+
+### Changed
+- `gpu::Gpu::attach_engine` and `engine_id` take no device; `gpu::format_code` replaces
+  `gpu::d3d9::format_code` (same numbers, so logs and keys read as before).
+
+Installed, not yet seen in game. Pixel gate: `port-showcase`, `port-nebula` and
+`port-firing` against `roundD-base-*` at RMSE 0 (run 20261103-145601), `display-passthrough` at RMSE 0 against `p10-vk` and
+`display-passthrough-d3d12` at 0.479 (run 20261103-151214); `display-bail-out` and
+`display-fallback` show the stand-down lines; `render3d-settings-live`, `ui-menus-refit` and
+`no-assets` pass (run 20261103-151336).
+
+## 0.47.0 — 2026-11-03
+
+### Added
+- Publishes its scene pass on Direct3D 12 too (gpu 1.3.0, contract 1.4: `display8v1_dx12_pass`, PASS_ENTER at each `Cmd`'s start, PASS_PUBLISH with the pass at its end), as on Vulkan, for Display8's passthrough there. Against a Display8 of contract 1.3 or older it publishes nothing, as before. The picture is unchanged. Installed, not yet seen in game.
+
+## 0.46.0 — 2026-11-03
+
+### Added
+- `View.Distance` (`[View] Distance`, `Render3D.ini`; ENUM, applies with the next mission, LOCAL, `moved_from = "QOL.QOL.ViewDistance"`) and the profile hook `view.distance`: `core/src/engine/viewdist.rs` raises the far plane and the object culling distance after ART_CFG.h's parse, live through `Render3D_SettingsChanged`. With `Enable=0` the patch is not installed (QOL's was). W-VIEW. Installed, not yet seen in game.
+
+## 0.45.0 — 2026-11-03
+
+### Changed
+- The modules' built-in tables of game names (`content.rs` of effects, hulls, ordnance, overlays,
+  particles, sky, specials and world) are per content set, chosen by `content::get()` from
+  `Engine::content()` (phase 8f, `profiles/gog-1.1/content.toml`); the `stock` set is the
+  tables as they were, so the look is unchanged. A build with no set gets no built-in names or
+  recipes and the engine's own look. `overlays` now compiles its `content.rs`. Installed, not
+  yet seen in game.
+
+## 0.44.1 — 2026-11-03
+
+### Changed
+- `Render3D_Settings` and the modules' settings tables are regenerated at A2SET_ABI 1.1 (48-byte rows; `moved_from` NULL on every row). Nothing else changes. Installed, not yet seen in game.
+
+## 0.44.0 — 2026-11-03
+
+### Added
+- Render3D.asi on its engine profile (phase 8e): `profiles/gog-1.1/render3d.toml` (core and
+  frame) and `render3d.<module>.toml` per module, with the generated `syms.rs` in
+  `core/src/` and each module crate. Every address of `Armada2.exe` is a profile entry read
+  through `at(sym::X)`; `Hooks::ready` checks a hook's entries before its owner reads or
+  writes, `Site::of` builds a hook's site from the profile. Hooks: `core.reads`,
+  `frame.seam`, `frame.steps`, `frame.destroy`, and per module `<m>.reads` plus
+  `effects.{repair,shields,debris}`, `ordnance.{warp,shots}`, `overlays.posts`,
+  `particles.{particle,billboard}`, `world.{lights,cull,ghosts}` (README, "Hooks").
+- Render3D.log names the executable and the build (`engine: ...`, `engine: <part> symbols: N/M`).
+- A hook that stands down feeds `Render3D_SettingsNote`; an unknown `Armada2.exe`, or a
+  core or seam hook not ready, stands render3d down whole; a module not ready is left to
+  the engine (forcing `render3d.hulls.*` equals `[Modules] hulls=0`).
+
+### Changed
+- The core's 87 engine reads outside the glue moved into `core/src/engine/` (`view.rs`);
+  `lint-layers.sh` rule 1 is strict for the core and the modules (CI).
+- The engine's addresses that were `pub const` in `r3d_core::engine` are lowercase fns.
+- Effects' debris hooks are all-or-none (the cancelled-construction site was optional).
+- Installed, not yet seen in game
+
+## 0.43.0 — 2026-11-03
+
+### Changed
+- The crates (README.md, "Crates"): render3d is a workspace of a thin cdylib
+  (`render3d`: DllMain, allocator, panic handler, exports), `r3d-core` (`core/`: frame,
+  gfx, scene, assets, the shared engine glue, the menu scene, `module`, `registry`,
+  `hooks`, `services`, `recipes`, `particles`) and one `r3d-<m>` crate per module
+  (`mods/<m>/`), each depending on the core and on no other module. The staging names
+  `core_module`, `core_hooks`, `core_services`, `core_recipes` and `core_particles` are
+  `r3d_core::module`, `hooks`, `services`, `recipes` and `particles`; the registry is
+  `r3d_core::registry`. Each crate compiles its own `shaders/`; stock's sprite shaders
+  (`vs_sprite`/`ps_sprite`) moved from `ordnance.hlsl` into the core's `sprites.hlsl`,
+  since the core draws them. Every generated shader array is word for word as before.
+- `tools/settings`: the core's rows are generated into `core/src/settings_table.rs`
+  (`rows_in = "core"`); `Render3D_Settings` is the cdylib's.
+- The `[Lights]` scene keys (`Replace`, `KeyColour`, `KeyAxis`, `FillColour`,
+  `FillAxis`, `SkyLight`) are read by the core (`scene/scene_lights.rs`, was the hulls
+  module's): they light every module, so a build without hulls keeps them.
+
+### Added
+- One Cargo feature per module, all on by default (the DLL that ships has every one):
+  `build.sh --features hulls,sky` builds a subset into `build/subset/Render3D.asi`. A
+  module not built in has no rows in `Render3D_Settings` (neither its fragment's nor
+  its `[Modules]` row), and Render3D.log says `modules not built in: ...`.
+- `bench-asi.sh` (a clone's Render3D.asi from this working copy, full or
+  `--without`/`--features`, from a `Setup:` line) and `subset-scenario.sh`
+  (`render3d-build-subset`'s variant for another module).
+
+Installed, not yet seen in game.
+
+
+### Changed
+- The frame: `MSAA` and `HDR` are `apply = "live"`. `Render3D_SettingsChanged` swaps a
+  new `Config` in (`config::reload`) and, when either moved, `frame::formats_changed`
+  drops the scene targets and post passes and calls every present module's
+  `formats_changed`; the next view makes them again. `Bloom`, `BloomThreshold`,
+  `BloomKnee`, `Exposure` and `Shoulder` follow live as well. The settings log line
+  names them (`Render3D.MSAA=0`).
+- The menu scene's map recipe moved from `render3d/menus/map.ini` to
+  `render3d/content/menu/map.ini` (still built in; `Menu\map.ini` in the game
+  directory still takes precedence). `install.sh` takes every recipe from
+  `render3d/content/`.
+
+Installed, not yet seen in game.
+
+## 0.41.0 — 2026-11-03
+
+### Changed
+- effects and sky on the module layers: every engine read and hook of effects is in
+  `effects/hooks.rs` (sub-modules per part) and of sky in `sky/hooks.rs`, tables in
+  `content.rs` (effects: `SITE_NAME`, `FAC_KEY`, `FAC_DEF`; sky: the built-in recipes,
+  now `include_str!`d from `render3d/content/sky/`, moved from `render3d/skies/`, and
+  the point-star texture), `render3d/lint-layers.sh --strict src/mods/effects src/mods/sky`
+  is 0, and effects left `NOT_YET_LIVE`. `Modules.effects` is `apply = "live"`.
+- effects' hooks go through the registry, behind the module's gate, and chain: the
+  debris' `Fragment` calls (the Evolver's four cocoon sites no longer call a constant),
+  the repair welds' two calls and the shield hits' four (a passive tap). They are put in
+  at the module's first frame (`device()`), as before, not at load: other plugins
+  check the stock bytes of those sites when they load (the bench's `Scene.asi` does).
+  Debris is taken only while the gate is open (its flag was never cleared); each
+  part's switch is decided in `configure`, not latched at `device()`. A flip off drops
+  the debris in flight and leaves the other parts' records, which the engine keeps.
+- `configure` reads effects' sections (`[Explosions]`, `[Shields]` with the
+  `[Shell.<name>]` recipes read once from the engine's table of shell names,
+  `[Repair]`, `[Debris]`, `[Construction]`, `[Bees]`, `[Sparks]`) and sky's `[Sky]`;
+  `[Sky]` is read at load and at every settings change, no longer every 60 views.
+  `config::Section` can borrow the ini `configure` was given (`Section::of`).
+- sky: `formats_changed` drops the view pipelines and keeps the baked cube.
+- `assets::odf_stem`, the one `.odf` strip, for effects' two.
+- `render3d/install.sh` and `perf/sky-*.py` read the sky recipes from `content/sky/`.
+
+Installed, not yet seen in game.
+
+## 0.40.0 — 2026-11-03
+
+### Changed
+- world and overlays onto the module layers (phase 7, W-B): `world/hooks.rs` and
+  `overlays/hooks.rs` hold every engine address, call, slot and field read behind named
+  accessors; `lint-layers.sh --strict src/mods/world src/mods/overlays` is clean.
+  Their built-in names and recipes are in `content.rs`; `configure` reads `[World]`,
+  `[Nebulae]` and `[Overlays]` (no `config::ini()` call is left in either directory).
+- world's three hooks (the nebulae's lights, the nebula frustum test, the ghosts'
+  `Render`) and overlays' five `DrawHeightPost` calls install through `core_hooks` at the
+  module's first switch-on (not in `settle`), each behind the module's gate. The
+  nebulae's light hook, which replaces `Nebula::Simulate_Nebula_Lights` whole, now calls
+  the previous target while the gate is shut or `NebulaLights=0`; the frustum scale is 1
+  when it is shut.
+- `Modules.world`, `Modules.overlays`, `World.Planets`, `World.Rocks` and `World.Nebulae`
+  are live rows (`apply = "live"`); `NOT_YET_LIVE` loses world and overlays. `off()` stops
+  the ghosts' hiding, the planets' glows and the height posts' collecting.
+- The surfaces' and nebulae's recipes moved to `render3d/content/surfaces/` and
+  `render3d/content/nebulae/` (the game-side `Surfaces\` and `Nebulae\` are the same) and
+  are built into the plugin too, read through `core_recipes`: the game directory's copy
+  wins, else the built-in one. `render3d/install.sh` and `publish/package.sh` read the
+  new paths. New dependency: `a2ini` (the recipes' parser).
+- No change to what is drawn: the base's frames at RMSE 0 (see the scenarios below).
+
+### Added
+- Scenarios `render3d-live-world` and `render3d-live-world-nebula` (testbench 3.92.0).
+
+Installed, not yet seen in game
+
+## 0.39.0 — 2026-11-03
+
+### Changed
+- particles and ordnance on the hook registry (module interface v2): every engine
+  read and hook of the two modules is in `particles/hooks.rs` and `ordnance/hooks.rs`
+  (`ordnance/eng.rs` became the latter), `render3d/lint-layers.sh --strict` is 0 for
+  both directories, and the two left `NOT_YET_LIVE`. `Modules.particles` and
+  `Modules.ordnance` are `apply = "live"`: a flip off hands every particle, shot, wave
+  and warp flash back to the engine, and a flip on takes them again. Their hooks go in at the
+  module's first switch-on behind its gate (particles' no longer from its first
+  `lights()`), and call what was there before, never a constant: the billboard
+  effects' call, the warp flash's sprite (its `Prev` was seeded with the constant) and
+  the per-class `Entity::Render` slots (taken lazily through the registry, each with
+  its own `Prev`). The warp flash's hook goes in whatever `[Warp] Enable` says and
+  hands on while it is 0 (read again with the settings).
+- `configure` reads `[Particles]` and ordnance's sections (`[Ordnance]`,
+  `[Ordnance.<odf>]`, `[Model.<odf>]`, `[Wave.<odf>]`, `[Warp]`, the `[Lights]` beam
+  keys) at load and at every settings change; a change that leaves the recipes as they
+  were drops nothing. `off()` clears particles' simulation, owned set, drop count and
+  feed queue, and ordnance's flashes, effect ages, muzzles and class choices.
+- Built-in tables in `content.rs` (the damage systems' node names, the vent sprites,
+  the two free emitters; ordnance's recipes, now `render3d/content/ordnance/ordnance.ini`
+  with `git mv`). The nebula puffs ask `core_recipes` whether a nebula has a recipe.
+- If the billboard effects' call is not stock's, particles no longer draws them over
+  the engine's own.
+
+## 0.38.0 — 2026-11-03
+
+### Changed
+- hulls and specials onto the module layers (phase 7, W-A): `hulls/game.rs` is
+  `hooks.rs` (every engine read behind a named accessor, including the instance's
+  fade, face limit and sphere, the cocoon, the class effect nodes and the planets the
+  shadow map sees), `specials/hooks.rs` holds the effect list's reads; their built-in
+  names and tables are in `content.rs`. `configure` reads `[Hulls]` and `[Specials]`
+  (`look::load(&Ini)`), and `render3d/lint-layers.sh --strict src/mods/hulls
+  src/mods/specials` is clean.
+- The scene lights' keys (`[Lights]` `Replace`, `KeyColour`, `KeyAxis`, `FillColour`,
+  `FillAxis`, `SkyLight`) and the `Lighting.asi` test moved from `scene/lights.rs` to
+  the hulls module (`scene_lights.rs`); the core applies them through the new
+  `core_services::SceneLightSource`, as before whether the hulls module runs or not.
+  `SceneConfig` stays in `scene/lights.rs`, with `Style`.
+- No change to what is drawn: the base's frames at RMSE 0 (`port-showcase`,
+  `port-firing`, hulls and specials off at load and live). `Modules.hulls` and
+  `Modules.specials` were live already.
+
+### Added
+- `specials::off()` drops the per-effect ages. Scenarios `render3d-live-hulls` and
+  `render3d-live-specials` (testbench 3.90.0).
+
+Installed, not yet seen in game
+
+## 0.37.2 — 2026-11-03
+
+### Changed
+- Light semantics as data (`scene/media.rs`): what a light is to the nebulae's gas is a
+  registered medium (`lights::register_medium`, `set_medium`, `scene::add_point(..,
+  medium)`, `Pool::register_in`) in place of the `Gas` enum, `set_gas` and
+  `SPARK_POINT`; effects names `fireball` and `spark`, ordnance `bolt`, world
+  `own_glow`. Each slot is fixed by the gas's response, so the packed word is
+  unchanged; `render3d/hosttest` asserts it on the host (in CI) and pins the shaders'
+  falloff, which is untouched.
+- The planets' day side is a generic light flag (`FLAG_SHARE`, the same bit) that
+  world sets; `is_day_side` is world's. The beam keys (`[Lights] Beam*`, `ConeSpot`,
+  same names and defaults) are read by ordnance's `configure` and passed per light
+  (`clusters::LineParams`, `SpotParams`); the core keeps the cluster keys. The sky
+  light's read of the map's background name moved to `engine::light`. No change to what
+  is drawn.
+
+Installed, not yet seen in game
+
+## 0.37.1 — 2026-11-03
+
+### Changed
+- The helpers other modules took from the hulls, effects, ordnance and particles
+  modules moved into the core, with no change to what is drawn: `scene::instance`,
+  `scene::anim`, the posed objects in `scene::pose`, `scene::camera`,
+  `scene::lights::Pool`, `scene::sprites`, `gfx::fx`, `math::rand`, `core_particles`
+  (the particles' feed queue), and their engine reads in `engine::{instance, light,
+  sprite}`. The four duplicate address groups (`RegisterLight` and its two neighbours,
+  the DX8 device vtable, `DrawScaled3D`, the device's clear-depth and flush slots) are
+  one constant each.
+- hulls, ordnance, overlays and world register their draws as services
+  (`HullDraw`, `WaveDraw`, `PostDraw`, `GhostDraw`); effects, ordnance, specials and
+  overlays ask `core_services` in place of `crate::mods::<other>` and
+  `running("hulls")`. hulls' `ShadowMap` is an alias of `core_services::ShadowRef`.
+- `lint-layers.sh --rules cross,byname` (with `--strict`), run over every module in CI.
+  Cross-module paths 41 -> 0, by-name asks 7 -> 0, engine reads 909 -> 835.
+
+Installed, not yet seen in game
+
+## 0.37.0 — 2026-11-02
+
+### Added
+- The module interface, version 2 (`src/core_module.rs`): every module answers
+  `priority`, `claims`, `rows` and `configure`, and may answer `provide`, `hooks`,
+  `on`, `off` and `formats_changed`. The registry orders by priority (world 10 ...
+  overlays 80, as before) in place of a name list, and `mods::claims` is the OR of the
+  running modules' `claims()`.
+- The hook registry (`src/core_hooks.rs`: `Site`, `Hook`, `Hooks::install`, `Prev`,
+  `Gate`), which checks a call site or vtable slot against stock before writing and logs
+  `hooks: <owner> <used by> at <symbol> (0x..) installed`. The frame's seams,
+  `DestroyRenderSurfaces` and the device's `Reset` go through it.
+- The services' traits (`src/core_services.rs`: `HullDraw`, `WaveDraw`, `PostDraw`,
+  `GhostDraw`), the recipe lookup (`src/core_recipes.rs`; the sky's recipes, the menu's
+  `map.ini` and the built-in `ordnance.ini` are read through it) and `config::Section`
+  (effects' `Sec`, re-exported).
+- Per-module settings fragments: world's rows in `src/mods/world/settings.toml`,
+  overlays' in `src/mods/overlays/settings.toml`; `Render3D_Settings` returns the
+  core's rows and then each module's, one table in the same order as before (21 rows).
+  Render3D.log: `settings: N rows exported`.
+- `lint-layers.sh`, which counts engine reads, cross-module paths, modules asked for by
+  name and content names outside their layer (report mode; `--strict DIR...`).
+
+### Changed
+- Every module's `[Modules]` flag is read at each settings change. One whose hooks do
+  not hand back yet (world, particles, effects, ordnance, overlays) refuses the change,
+  logged `settings: Modules.<m> changes at the next launch (hooks not yet live)`.
+- A module that stands down beside its superseded plugin keeps its place in the
+  registry (it is never dispatched); a module switched on after its device was made
+  gets its `device()` at its next view.
+- With `Enable=0` only the core's ten rows are exported (no module is made).
+
+Installed, not yet seen in game.
+
+## 0.36.0 — 2026-11-02
+
+### Added
+- `Render3D_SettingsNote`, the optional settings export that says why a part is not
+  running: a plugin-wide note when Render3D stood down (`Enable=0`, a seam that is not
+  stock, no usable device) and, on a module's row, "Stands down while <Plugin>.asi is
+  loaded". NULL when nothing is wrong.
+
+### Fixed
+- `Cargo.toml` and `Cargo.lock` said 0.16.3 while this changelog said 0.35.0 (the log
+  line `Render3D <version>` read the old one); now 0.36.0.
+
+Confirmed in game 2026-11-03.
+
+## 0.35.0 — 2026-11-02
+
+### Added
+- `settings.toml` and the generated `Render3D_Settings` table (`MSAA`, `HDR`, the eight
+  `[Modules]` flags, `World.Planets/Rocks/Nebulae/Surfaces`, `Nebulae.Lit`,
+  `Overlays.Fog/Grid/Selection/Ghosts/HeightPosts/Pivot`); the code reads those keys
+  through their rows. `Render3D_SettingsChanged` re-reads the live rows.
+- The shipped `Render3D.ini` has `[Modules]` with every module at 1.
+- Live without a restart: `Modules.hulls`, `.sky`, `.specials`, `World.Surfaces`,
+  `Nebulae.Lit` and the six `Overlays` keys. The others (`particles`, `effects`,
+  `ordnance`, `world`, `overlays`, `World.Planets/Rocks/Nebulae`, `MSAA`, `HDR`) are
+  latched at load: their engine hooks are installed once.
+
+### Changed
+- Every module is made at load behind an `on` flag, in place of the `MenuOnly`
+  wrappers; a module that is off is skipped by dispatch and is not `running()`, and one
+  without a menu-scene part and off at load is given no device, so installs nothing as before.
+- The height-post hook is installed whether or not `HeightPosts` is on (it hands every
+  call to the engine's while off).
+
+Confirmed in game 2026-11-03.
+
+## 0.34.0 — 2026-11-02
+
+### Added
+- `Render3D.ini`'s keys may now come from the player's overlay, `RefitPlayer.ini`
+  (`[Render3D.<Section>]`, e.g. `[Render3D.Modules] sky=0`, read first; the a2rt
+  overlay lookup, `tools/settings/README.md`), with a `settings: RefitPlayer.ini [...]`
+  line in Render3D.log for each value it supplies. Read at load as the ini is; applied
+  live from 0.35.0. Without the file nothing changes.
+
+Confirmed in game 2026-11-03.
+
 ## 0.33.1 — 2026-10-30
 
 ### Changed

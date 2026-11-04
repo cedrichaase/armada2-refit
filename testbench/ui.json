@@ -29,6 +29,11 @@
       "aliases": ["in-mission menu", "in-game menu", "options menu", "pause menu", "in-mission options"],
       "text": ["Graphics Settings", "Exit to Windows"]
     },
+    "refit": {
+      "aliases": ["refit screen"],
+      "text": ["Graphics", "Interface"],
+      "_note": "the Refit screen (ui/MENUS.md, 'The Refit screen'): a modal of ours over the hosted Options dialog, whose tab strip reads Graphics, Interface, Gameplay"
+    },
     "admiral's log": {
       "aliases": ["admirals log", "log", "score"],
       "text": ["GAME POINTS", "MILITARY"]

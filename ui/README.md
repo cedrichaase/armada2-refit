@@ -1,7 +1,7 @@
 # UI — the runtime for a HUD, menus and loading screen of our own
 
 `UI.asi` redraws the game's HUD, front-end menus and loading screen in our own code
-(`PLAN.md`): a 2D renderer on the game's Direct3D 9 device, text, widgets, input with
+(`PLAN.md`): a 2D renderer on the device Display8 hands out (Vulkan or Direct3D 12), text, widgets, input with
 capture, and a hook into each of the three places the UI draws, with the HUD's panels
 (`HUD.md`) and the menus (`MENUS.md`) taken over on top of them. **With the shipped
 `UI.ini` every part is on**: the HUD's panels, the menus, the loading screen and the
@@ -53,9 +53,8 @@ Why that site:
   mission and freed when it ends, and the call is skipped while there is none. The front
   end and the loading screen draw through other paths and never reach it.
 - **No other plugin is there.** render3d patches the two `Armada_RenderAllOurStuff`
-  calls and the steps inside that body; HUD.asi wraps `RefreshDisplay`'s cursor draw
-  (0x6246fa) and `SimulateAll` in `DisplayInputProcess`; GridLayout.asi and QOL.asi
-  patch inside the HUD's panels. The hook checks the call still goes to
+  calls and the steps inside that body; QOL.asi patches inside the HUD's panels (the
+  retired HUD.asi wrapped `RefreshDisplay`'s cursor draw, 0x6246fa, and `SimulateAll`). The hook checks the call still goes to
   `ChatDisplay::Render` and stands down otherwise.
 - The other candidates were worse: the `EndScene` and `RefreshDisplay` calls are
   indirect (through the device's vtable), so a hook there needs the vtable and fires in
@@ -229,20 +228,10 @@ Xwayland (24.1) sources:
   and without the X grab. Everywhere else the full-screen window covers the screen and
   there is nowhere to leave to, which is why it is the top rows.
 
-`[UI] KeepClip=1` (on as shipped; `input::keep_clip`, `engine/mouse.rs` for the engine's
-state) does what Wine does when the keyboard comes back, from the game's own thread: in
-a mission under Wine (`wine_get_version` in ntdll), at most every 500 ms and only on a
-frame where the pointer moved, while the game's window is the foreground and active one
-and the engine has no button down and no pan holding the pointer, it reads the clip
-rectangle with `GetClipCursor` and hands it back to `ClipCursor`. Wine then clips to
-the full-screen window again (`clip_fullscreen_window`), which Xwayland turns back into
-a lock as soon as the pointer is over the game. Wine itself declines when the window
-does not cover its monitor or the X input focus is another program's
-(`grab_clipping_window`), so the pointer is never held while another window has the
-keyboard; and since only motion of the game's own pointer triggers it, a pointer over
-another window does nothing. On Windows nothing is done. With `PointerLog=1` the first
-re-clip is logged ("pointer: Wine's clip asked for again"). `ui-pointer-bar` takes
-three such screenshots with a bar up and walks into it after each (testbench).
+`KeepClip` is Display8's since ui 1.0.0 (`[Window] KeepClip=1` in `Display8.ini`; the
+mechanism, the thresholds and what was measured are in `display/README.md`, "Window and
+display mode"). `ui-pointer-bar` takes three screenshots with a bar up and walks into it
+after each (testbench).
 
 What a player can do meanwhile, on their side: hide the bar while playing (Omarchy:
 Super+Shift+Space), which parks it off the screen; or, once the cursor has gone wrong,
@@ -251,7 +240,7 @@ again.
 
 ## The cursor
 
-`engine/cursor.rs`. hud/README.md has how the engine draws its cursor; what the UI
+`engine/cursor.rs`. `HUD.md`, "The references the stock HUD is drawn against", has how the engine draws its cursor; what the UI
 uses of it:
 
 - **Which cursor the engine wants.** Each frame the HUD components pick a cursor
@@ -263,7 +252,7 @@ uses of it:
   is a Storm3D database element, so its name, the one `cursor.spr` gives it, is at
   `+0x8`. `cursor::shape()` reads it; by the mission hook this frame's choice has
   reached the device.
-- **Hiding it.** Under DXVK the cursor is the synchronous one (`+0xe0` set):
+- **Hiding it.** On the device the game gets now (Display8's; DXVK's before 15.0.0) the cursor is the synchronous one (`+0xe0` set):
   `RefreshDisplay` draws the sprite at `+0x60` in a scene of its own just before it
   presents, and draws none when `+0x60` is empty. `cursor::hide_this_frame()` makes the
   next `RefreshDisplay` run with `+0x60` emptied and put back after, through a wrap of
@@ -272,14 +261,14 @@ uses of it:
   so the UI calls it every frame it draws a cursor of its own. Calling the device's
   `SetCursor(NULL)` instead would also hide it, but `SetCursor` frees and rebuilds the
   cursor's texture whenever the sprite changes, every frame. With a hardware cursor
-  (`+0xe0` clear, not seen under DXVK) the wrap has no effect; `cursor::synchronous()`
+  (`+0xe0` clear, never seen since the bench ran DXVK) the wrap has no effect; `cursor::synchronous()`
   says which.
 - **Whether the engine would show it** (`cursor::install_probe`). Another plugin can
   hide the engine's cursor by wrapping `RefreshDisplay`'s one `DrawScaled2D` call
   (0x6246fa) and skipping it: Scene.asi's `Cursor=0` and `cursor off`
   (testbench/scene/README.md), which patches it once the scene is built and chains to
   whatever the call went to. The UI wraps the same call when it loads (the probe,
-  chaining to stock or to HUD.asi's wrap), so Scene.asi's wrap comes before it. Each
+  chaining to stock), so Scene.asi's wrap comes before it. Each
   present with a cursor sprite notes whether the draw got as far as the probe:
   `engine_shows()` is false while something before it skips it, and then the UI draws
   no cursor either (`cursor: Mission draws none`). It follows a change a present late.
@@ -305,7 +294,7 @@ uses of it:
     hotspot in texels of the 32x32 sprite) and each texture is read from `Textures/RGB/`
     with `gfx`'s TGA decoder. Black is the colour key (`@skip=(0,0,0)`), made
     transparent when the texture is registered. If a texture has a `.a2neb-backup`
-    beside it (hud/README.md: `cursor-aspect.py` squashed the art once), that one is read,
+    beside it (an earlier file-based fix squashed the art once, `HUD.md`, "The references the stock HUD is drawn against"), that one is read,
     so the stock art is what is drawn whatever state the files are in. Frames are
     stepped once a second through the strip; the engine's own timing (`tex_anim.spr`'s
     `offset N 1.0 step`) was not measured.
@@ -313,7 +302,7 @@ uses of it:
     at its own size on a 1080-line screen), snapped to a whole multiple of the art when
     within 20% of one, so the texels land on the pixel grid; the hotspot is the
     sprite's `@origin` scaled the same way, so the click point is exact. The engine's own
-    cursor is stretched by its 800x600 reference (hud/README.md); ours is square at any
+    cursor is stretched by its 800x600 reference (`HUD.md`, same section); ours is square at any
     aspect and at the back buffer's resolution.
   - **In a front-end screen of ours Windows' arrow is hidden** (`shell::hide_os_cursor`,
     the window's `WM_SETCURSOR` answer) for as long as the screen runs. The same holds
@@ -330,7 +319,7 @@ uses of it:
 
 ### What the shell is, as far as Direct3D goes
 
-The shell's menus are GDI dialogs (`menus/README.md`), but the engine's Direct3D device
+The shell's menus are GDI dialogs (`MENUS.md`, "What the shell is, in the engine"), but the engine's Direct3D device
 lives through all of them. `do_smain` runs the shell. It puts Storm3D on its *shell
 display* (`ST3D_GraphicsEngine::SetActiveDisplay(3)`), calls the device's
 `FlipToGDISurface` so GDI can draw on the window, and then loops on
@@ -339,14 +328,14 @@ display* (`ST3D_GraphicsEngine::SetActiveDisplay(3)`), calls the device's
 (1 is the main menu).
 
 `SetActiveDisplay` takes a display type: 2 is the 3D display at the game's own
-resolution, 3 the shell's. The shell asks for 800x600x16, which Menus.asi raises to the
-desktop size. When the mode the new display wants differs from the current one,
+resolution, 3 the shell's. The shell asks for 800x600x16, which Display8 raises to the
+desktop size (until 15.0.0 `Menus.asi` did). When the mode the new display wants differs from the current one,
 `ST3D_Device::ChangeDisplayMode` destroys the Direct3D device and creates a new one.
 When the two modes are the same, it does nothing at all. **So the `IDirect3DDevice8` can
 change whenever the shell and the 3D display switch.** In stock (an 800x600 shell
-under a bigger game resolution) it changes on every switch. With Menus.asi and the game
-at desktop resolution it does not, which `[UI] Native` arranges from the first launch
-(`src/engine/display.rs`: a stock mode in the profile becomes the desktop's before
+under a bigger game resolution) it changes on every switch. With the shell raised to the desktop size and the game
+at desktop resolution it does not, which Display8's `[Window] Native` arranges from the
+first launch (a stock mode in the profile becomes the desktop's before
 `InitializeGraphicsSystem` opens the device). Anything that keeps resources must check
 `engine::d3d8_device()` every frame and drop what it made on an old device.
 
@@ -365,7 +354,7 @@ device. At the end it sets a black shell background (`SetCurrentBackground` with
 (`ClearDeviceDisplays`), puts the shell display back, calls `FlipToGDISurface`, drains
 the queue through `HandleMessageQueue`, and sets `g_shellMode` to 1. `run_screen` does
 exactly that around a closure, so a screen of ours leaves the shell as the engine's own
-3D screen does. The screen is not a dialog, so Menus.asi's `DialogBoxParamA` hook,
+3D screen does. The screen is not a dialog, so the menu host's `DialogBoxParamA` hook,
 subclasses and modality filter never see it.
 
 Each frame, `run_screen`:
@@ -393,9 +382,9 @@ passes the engine's "none" on.
 
 **Never subclass the 3D window.** Up to ui 0.15 the arrow came from a subclass of the
 window procedure (`SetWindowLongA(GWL_WNDPROC)`), installed the first time a dialog
-was hosted. DXVK hooks the window procedure of a full-screen device's window too, and
-when the device goes it puts the old procedure back only if its own is still on top,
-else it just forgets the window. So with the subclass made over the first device's
+was hosted. DXVK (the renderer then) hooked the window procedure of a full-screen device's window too, and
+when the device went it put the old procedure back only if its own was still on top,
+else it just forgot the window. So with the subclass made over the first device's
 hook, the engine's second `CreateDevice` (a display mode chosen in Graphics Settings
 in the middle of a mission) hooked the window again and took the subclass as the
 procedure before its own; the subclass's "previous procedure" was DXVK's hook. The
@@ -404,9 +393,9 @@ first message after the new device (the `UpdateWindow` in
 out: `virtual_setup_exception stack overflow` after `dispatch_user_callback` in
 `wine.log`, the last Display8 lines the new device's `CreateVertexBuffer`
 (`render3d-mode-switch`, which failed the same way on `main`). Any procedure chain
-over a window DXVK hooks has this shape; a patch at the engine's own answer has none.
+over a window another layer hooks has this shape; a patch at the engine's own answer has none.
 A screen that starts with no
-keyboard focus (Wine leaves it `NULL` after an embedded menu, `menus/README.md`) puts
+keyboard focus (Wine leaves it `NULL` after an embedded menu, `MENUS.md`, "What the shell is, in the engine") puts
 it on the 3D window.
 
 The hook is one call: `DispatchDialog`'s `call Show_Credits` at `0x606bd4`, checked to
@@ -422,12 +411,12 @@ it does not. It returns to the main menu over black, as the Credits do.
 
 ### Facts measured on the bench
 
-On the bench (2026-10-16, 1280x720, `./install` with Menus.asi `Embed=1`, UI.log):
+On the bench (2026-10-16, 1280x720, `./install` with the then Menus.asi `Embed=1`, UI.log):
 
 - At the main menu, the shell display is up (Storm3D's display type 3) and the device
   exists: one `ST3D_DeviceDirectX8` on the 3D window. Its back buffer is 1280x720
   X8R8G8B8, it is **not windowed** (fullscreen, flip swap effect, default present
-  interval), and the window's client area is 1280x720. Menus.asi raises the shell mode
+  interval), and the window's client area is 1280x720. the shell mode is raised
   to the desktop size, and the game's resolution is the same, so switching to the 3D
   display changed nothing: same device, same back buffer, same mode.
   `engine::d3d8_device()` is valid in the shell.
@@ -465,7 +454,7 @@ draws over the logo, the bar and the skybox, on every frame the loading screen p
 and on no other. Before patching, the site is checked to call stock and the `EndScene`
 after it (`call [eax+0x34]`) is checked to be where it should be. A mismatch makes the
 loading part stand down. The widened `logo.sod` changes only geometry and art, not this
-code, and HUD.asi does not touch the function.
+code, and the retired HUD.asi did not touch the function.
 
 **Progress** (`loading::progress()`) is `1 - s_fractionRemaining`, the value
 `LoadBarComputeFraction` (`0x601ce0`, checked by its bytes) returns and the bar is
@@ -491,33 +480,36 @@ normally afterwards.
     ui/build.sh                                   # -> ui/build/UI.asi
     ui/bench-asi.sh <state.json> --demo mission,shell,loading [UI.Scale=1.5]
 
-`build.sh` compiles `shaders/*.hlsl` with `tools/shaderc/hlsl-rs.sh` (the generated
-`src/shaders/*.rs` is committed and stamped, so a machine without `vkd3d-compiler`
+`build.sh` compiles `shaders/*.hlsl` with `tools/shaderc/hlsl-rs.sh` (SPIR-V and DXIL; the generated
+`src/shaders/*.rs` is committed and stamped, so a machine without `dxc`
 builds) and the font atlas from the vendored TTFs (`src/text/`), then the DLL.
 `bench-asi.sh` copies `UI.asi` and `UI.ini` into a bench session's clone and sets the
 keys it is given; it is what a scenario's `Setup:` line runs.
 
 ### Installing
 
-`ui/install.sh` copies `UI.asi`, merges `UI.ini` into the player's (`tools/ini-merge.py`:
-their values stay, a key they lack is added) and then runs `supersede.sh`, which
-takes out of the game directory the plugins whose places the parts switched on take:
+`ui/install.sh` copies `UI.asi` and merges `UI.ini` into the player's (`tools/ini-merge.py`:
+their values stay, a key they lack is added). The plugins `UI.asi` replaced -- `HUD.asi`,
+`GridLayout.asi`, `Menus.asi` (and `MenuScale.asi`) -- and the file-based HUD fixes of hud 2.x
+are taken out by `retire/retire.sh`, which `./install` runs before the first layer installs
+(`retire/README.md`); the plates in `Menus/` stay, the UI's menus draw them
+(`ui/backdrops/install-plates.sh`, in `./install`). The layers `hud`, `grid` and `menus`
+are gone from the repository (their last changelogs are `retire/history/`); `a2mod` still
+files their files, as retired rows. `ui/bench-asi.sh` runs `retire.sh` on a bench clone too,
+so a clone of an install from before still tests the UI alone. The UI has no stand-down
+for the old plugins since ui 2.2.0: they are gone, and a copy `retire.sh` missed would
+hook the same sites as the UI does.
 
-| Part on in the installed `UI.ini` | Taken out | How |
-|---|---|---|
-| `[HUD] Enable=1` with any panel on | `HUD.asi`, and the file-based HUD fixes put back to stock | `hud/install.sh --remove`, `hud/revert-files.sh` (the UI reads the stock rectangles, font and cursor art) |
-| `[HUD] Enable=1` and `Bar=1` | `GridLayout.asi` | `grid/install.sh --remove` |
-| `[Menus] Enable=1` | `Menus.asi` (and `MenuScale.asi`), with their `.ini` and `.log` | the plates in `Menus/` stay: the UI's menus draw them (`menus/install-plates.sh`, still in `./install`) |
-
-`./install` no longer runs `hud/install.sh`, `grid/install.sh` or `menus/install.sh`.
-The three layers stay in the repository: they describe the stock HUD and shell the
-UI works on, their findings are what several hooks here rest on, and a player who
-switches a part back to stock can put the old plugin back by hand (`supersede.sh`
-leaves a plugin alone while the part that supersedes it is off). Each pair also
-stands down against the other at run time: the UI's bar while `GridLayout.asi` is
-loaded, its menus while `Menus.asi` or `MenuScale.asi` is, and its square cursor
-(below) while `HUD.asi` is. `ui/bench-asi.sh` runs `supersede.sh` on a bench clone too,
-so a clone of an install from before still tests the UI alone.
+**The overlay's retired keys** (`settings.rs`, `RETIRED`). The hub is the overlay's only
+writer, so at its first frame it removes what Direct3D 9's and the forward mode's removal
+left in `RefitPlayer.ini`: the token `d3d9` of `[Display8.Display8] Backend` (a list like
+`d3d9,vulkan` keeps `vulkan`; the key goes when nothing is left), and `Mode` and `Real`.
+Each is logged once (`settings: RefitPlayer.ini [Display8.Display8] Backend=d3d9 retired;
+removed`) and the plugins are told. Display8 skips the same values on its own read side,
+so a file the hub has not yet cleaned (no UI) behaves the same. The table has no row
+for a list value: `Backend` has no descriptor, so no validation of the rest of the list
+(`d3d12,vulkan`) is the hub's; Display8 parses it. The bench flags of the deleted
+plugins wrote no `Render3D.*` or `UI.*` key, so there are no others.
 
 **Upgrading an install.** Up to ui 0.3 every part shipped off (`0`), so a player's
 `UI.ini` from then holds 0 for each. `[UI] Defaults` numbers the shipped defaults (2:
@@ -528,9 +520,8 @@ it. So `./install` over an older install gives the UI's parts, and a part a play
 switched on or set otherwise stays as they set it.
 
 `a2mod stock` puts `UI.asi` and `UI.ini` aside with the rest (the `ui` layer), and
-the plates under `menus`: the stock game has neither `HUD.asi` nor `Menus.asi`, so
-nothing else changes. An older install that still has the superseded plugins is
-snapshot as it is.
+the plates (`Menus/*.bmp`, filed under this layer): the stock game has none of the retired
+plugins, so nothing else changes.
 
 ### A part switched back to stock
 
@@ -539,21 +530,15 @@ that the old plugins are not installed:
 
 - **A `[HUD]` panel at 0** is the stock panel, on the stock 1600 x 1200 canvas that
   the engine scales to the screen per axis: on a wide screen it is stretched (the
-  minimap, the info panel and the bar wider than tall, their text wide), as without
-  `HUD.asi`. The panels of ours lay themselves out around what they read of it (the
-  bar is placed against the stock minimap's rectangle when ours is off). For the
-  stretch to be corrected, `hud/install.sh` puts `HUD.asi` back; with `[HUD] Enable=0`
-  the whole HUD is stock and `HUD.asi` corrects it as before. Not tested on the bench
-  with a mix of panels of ours and `HUD.asi`'s canvas.
-- **`[HUD] Bar=0`** is the stock bar with stock's keys; `grid/install.sh` gives the
-  grid back through `GridLayout.asi`, which places it against the stock info panel and
-  minimap: beside ours (drawn elsewhere) it lands in the wrong place, so it belongs
-  with `[HUD] Enable=0` and `HUD.asi` (as `grid-layout.md` sets it up).
+  minimap, the info panel and the bar wider than tall, their text wide), as in the stock game. The panels of ours lay themselves out around what they read of it (the
+  bar is placed against the stock minimap's rectangle when ours is off). With
+  `[HUD] Enable=0` the whole HUD is stock; nothing corrects the stretch.
+- **`[HUD] Bar=0`** is the stock bar with stock's keys; the bar's keys
+  are then stock's too.
 - **`[HUD] UnitView=0`** leaves the unit view where the stock canvas puts it (the
   bottom right, 350 x 384 canvas units: wide on a wide screen), with its stock frame.
 - **`[Menus] Enable=0`** gives the stock GDI menus: the shell's 800 x 600 display mode,
-  every menu its own window under Wine. `menus/install.sh` gives the scaled, embedded
-  shell back through `Menus.asi`.
+  every menu its own window under Wine.
 - **`[Loading] Enable=0`** is the engine's logo scene and bar (the widened `logo.SOD`
   if `models/` installed it).
 - **`[UI] Cursor=0`** is the engine's cursor, kept square by the UI (below).
@@ -577,7 +562,7 @@ a row with no device or back buffer (`gfx::drawing`; logged), the HUD switch
 engine's HUD comes through instead of vanishing. A UI of another contract than
 Display8's never registers either.
 
-### What the old plugins did, and where it is now
+### What the retired plugins did, and where it is now (history)
 
 | Plugin, part | Now |
 |---|---|
@@ -586,22 +571,21 @@ Display8's never registers either.
 | `HUD.asi` seams (sprite edges on pixel boundaries) | only the stock panels above still draw tiled sprites |
 | `HUD.asi` re-layout after a mode change | nothing to do: our panels lay out every frame, the stock canvas is the same at every mode |
 | `HUD.asi` cursor (square at any aspect) | ours with `Cursor=1`; with `Cursor=0` (or where ours cannot hide the engine's), `engine::cursor::install_square` makes HUD.asi's two changes (below) |
-| `GridLayout.asi` (the bar as a grid of position keys) | `[HUD] Bar`, `BarKeys` (`HUD.md`, "The button bar"). `GridLayout.ini`'s `[Cells]` has no counterpart yet |
-| `Menus.asi` display mode raised | the menu host raises it (`MENUS.md`, "The display") |
+| `GridLayout.asi` (the bar as a grid of position keys) | `[HUD] Bar` for the layout and drawing; the keys are QOL.asi's (`QOL.ini` `BarKeys`, `qol/bar.c`; `HUD.md`, "The button bar"). `GridLayout.ini`'s `[Cells]` has no counterpart yet |
+| `Menus.asi` display mode raised | Display8 raises it (`display/README.md`, "Window and display mode"; `MENUS.md`, "The display") |
 | `Menus.asi` scaling, mouse mapping | the menus are drawn by us, and the pointer sent to each dialog in its design place |
 | `Menus.asi` `Embed=1` (one window) | every hosted dialog is a hidden child of the 3D window; the game is one window throughout |
 | `Menus.asi` `EscapeReturns` | `[Menus] EscapeReturns` |
 | `Menus.asi` `Underlay=0` (the 1:1 flash between menus) | while a dialog is hosted, the shell's paint onto the 3D window goes into a scratch DC |
-| `Menus.asi` backdrops (the plates) | drawn by the UI's menus behind the main menu; installed by `menus/install-plates.sh` |
+| `Menus.asi` backdrops (the plates) | drawn by the UI's menus behind the main menu; installed by `ui/backdrops/install-plates.sh` |
 | `Menus.asi` `[Labels]` (labels kept off the art) | the spec screens draw labels of their own; a mirrored screen shows the stock overrun |
 
 ### The engine's cursor, square
 
 `engine/cursor.rs`, `install_square`, made when the mission hook goes in unless
-`HUD.asi` is loaded or `hud/cursor-aspect.py`'s squashed art is installed (its
-`Curs_Move.tga.a2neb-backup`). The engine draws its cursor under the 2D scale it sets
-to the back buffer over 800 x 600 on each axis (hud/README.md, "HUD.asi", the
-cursors), so on a wide screen it is wide. The synchronous path's one draw (the
+the probe on `DrawScaled2D` finds it not stock. The engine draws its cursor under the 2D scale it sets
+to the back buffer over 800 x 600 on each axis (`HUD.md`, "The references the
+stock HUD is drawn against", the cursors), so on a wide screen it is wide. The synchronous path's one draw (the
 `call ST3D_Sprite::DrawScaled2D` at 0x6246fa in `RefreshDisplay`) goes through the
 probe ("The cursor"), which, for that draw only, sets the x scale to the y scale and moves the
 position the engine computed so the hotspot (`ST3D_Sprite+0x30`) stays on the
@@ -624,21 +608,64 @@ is checked to be stock. `UI.log`: "cursor: the engine's cursor is kept square".
 | `[UI] Theme` | auto | the look (`STYLE.md`): `auto` is the player's race in a mission and the shell's theme elsewhere; or `shell`, `federation`, `klingon`, `romulan`, `cardassian`, `borg`, `species8472` everywhere |
 | `[Demo] Mission`, `Shell`, `Loading` | 0 | the demonstration panel in that context (`Shell`: with the widget gallery) |
 | `[Demo] Style` | 0 | the style gallery (`STYLE.md`) in place of the demos: every theme and widget state in the front end (the Credits' place) and over a mission, the loading look on the loading screen |
-| `[HUD] Enable`, `Bar`, `BarKeys`, `BarLabels` | 1, 1, 1, 1 | the HUD's panels of ours, one key per panel ([`HUD.md`](HUD.md)), every one on |
+| `[HUD] Enable`, `Bar`, `BarLabels` | 1, 1, 1 | the HUD's panels of ours, one key per panel ([`HUD.md`](HUD.md)), every one on |
 | `[HUD] Overview`, `Fade`, `UnitVideo` | 1, 1, 1 | the engine's last draws in a mission drawn by us: the drag box, height posts, order ring and placement markers, the scripts' fade, the unit view's video (`HUD.md`, "The engine's last draws") |
 | `[HUD] SystemIcons`, `ShotScenes`, `MinimapCursor`, `FrameRate` | 1, 1, 1, 1 | what the stock overlay and minimap drew that ours left out, and the frame rate: the pointed unit's damaged systems, the shot director's scenes on the minimap in the tactical view, the action cursor over the minimap, `FRAMERATE_DISPLAY`'s text (`HUD.md`, "What the stock overlay and minimap drew that ours left out") |
 | `[HUD] Placement` | 1 | with `Overview=1`, a placement's markers (the footprint, the cells other objects take) in the theme; 0 with the engine's sprites (`HUD.md`, "The placement markers") |
 | `[HUD] UnitView`, `UnitViewSize` | 1, 260 | the unit view placed by us, a square of that many units at the bottom right, in our frame (`HUD.md`, "The unit view") |
-| `[Menus] Enable` | 1 | the UI hosts the shell's dialogs (`MENUS.md`); stands down while Menus.asi is loaded |
+| `[Menus] Enable` | 1 | the UI hosts the shell's dialogs (`MENUS.md`); stands down on a build it does not know |
 | `[Menus] Generic` | mirror | a screen without a spec: `mirror` (as the game paints it) or `widgets` (its controls as ours) |
 | `[Menus] Specs` | 1 | 0: no screen spec, every screen generic |
 | `[Menus] EscapeReturns` | 1 | Esc in the in-mission menu is Return to Game |
 | `[Menus] Scene` | 1 | the front end's screens over render3d's 3D scene (`MENUS.md`, "The menu scene"); without Render3D.asi, as before |
 | `[Menus] Credits` | 1 | the Credits are ours, over the menu scene (`MENUS.md`, "The Credits"); 0: the game's |
 
-What the player sets on a screen of ours is not in `UI.ini` but in `UIPlayer.ini` beside
-it (`prefs.rs`), a file no install ships or writes, so a reinstall keeps it: `[HUD]
-BarHidden` (Game Settings' "Command Bar", `HUD.md`, "The top-right buttons").
+What the player sets on a screen of ours is not in `UI.ini` but in the player's overlay,
+`RefitPlayer.ini` beside it (`tools/settings/README.md`), a file no install ships or
+writes, so a reinstall keeps it: `[UI.HUD] BarHidden` (Game Settings' "Command Bar",
+`prefs.rs`, `HUD.md`, "The top-right buttons"). Every key of every ini in the game
+directory is read overlay first; `settings.rs` is the settings hub, which finds each
+plugin's `<Plugin>_Settings` table and tells the plugins when the overlay changes.
+
+### The Refit screen and `network_game()`
+
+The Refit screen (`menus/refit.rs`, `MENUS.md`) is drawn by the menu host. It needs one
+finding of the engine, in `engine/setup.rs`: `network_game()` says whether a mission is a
+network game, by `g_transport`'s virtual `IsSinglePlayer` (vtable +0x18) and
+`IsInstantAction` (+0x10), both called only after that file's signature checks have
+passed. Instant Action's transport answers "not single player" too, as a network one
+does, so it is asked first and answers false. No transport, or a getter that is not stock,
+gives None, and the screen locks the must-match rows to be safe. The hub
+(`settings.rs`) keeps each row's value at its start and at the start of the current
+mission (the first mission frame after the shell or a loading screen) for the "pending"
+badges, finds the optional `<Plugin>_SettingsNote` next to `_SettingsChanged`, and
+writes nothing but through `set_row` / `remove_many`. `UI_SettingsNote` gives the HUD
+rows a note while the HUD stood down (`hud::STOOD_DOWN`).
+
+### Settings
+
+`settings.toml` is the table of the keys a player may set (19 rows, tab Interface),
+exported as `UI_Settings` (`src/settings_table.rs` is generated: `python3
+tools/settings/gen.py`). `UI_SettingsChanged`, called by the hub after the overlay changes
+(`config.rs`), reads `UI.ini` and the overlay again and swaps the configuration whole
+(`config::CONFIG`, an `AtomicPtr`): a reader takes it each frame. Only the keys read
+every frame, or switched by `hud::apply_live`, are taken from the new read; every key a
+patch was installed for keeps its start value. By apply class:
+
+- **LIVE**: `HUD.Minimap`, `Info`, `Tooltips` (`hud::apply_live` gives the stock panel
+  back or takes it over; the minimap's click hook goes in at the start whatever the key,
+  so it can come back), `BarLabels`, `Icons`,
+  `SelectionGauges`, `InfoCamera`, `UI.Cursor`, `UI.Theme` (read per frame). Shown
+  on the bench: `Minimap` at the same frame, `Theme`; `Info`, `Tooltips`
+  not yet driven.
+- **MISSION**: `Menus.Scene` (read when a screen asks for the scene), `HUD.BarHidden`
+  (applied at the next HUD frame).
+- **RESTART**: `HUD.Enable`, `Selection`, `UnitView`, `Bar`, `Menus.Enable`, `Credits`,
+  `Loading.Enable`: each installs or skips a patch at load.
+
+Log: `settings: applied HUD.Minimap=0`, or `settings: re-read, nothing changed`, and for
+a MISSION or RESTART row `settings: <Section.Key=v> (next mission or restart)`.
+
 | `[Menus] Trace` | 0 | UI.log: each hosted dialog's messages of note, its actions, and its surfaces as `UI-dlg<depth>-*.bmp` every 5 s |
 | `[Menus] Host` | 1 | 0 (with `Trace=1`): the dialogs run stock and are only traced, for comparing |
 | `[Loading] Enable` | 1 | the loading screen of ours (`LOADING.md`) in place of the engine's logo scene and bar |
@@ -676,7 +703,7 @@ antialiased over one pixel, so corners are smooth at any radius without a textur
 the style's *shape* (`src/gfx/fx.rs`, `STYLE.md`): each corner rounded or chamfered,
 filled or stroked, soft-edged for glows and shadows, an LCARS elbow's cut-out, stripes.
 The pixel shader weights the kinds with `step()` rather than branching on them, as
-vkd3d needs (`render3d/README.md`). A new draw call starts only when the texture or the
+the shader compilers' unrolling wants (`render3d/README.md`). A new draw call starts only when the texture or the
 clip rectangle changes; solid quads take whatever texture the run has, since they do
 not sample it.
 
@@ -684,11 +711,11 @@ not sample it.
 (`gpu/README.md`): one pipeline, a pass into the engine's own back buffer and depth
 (kept as they are), the frame's vertices and indices written once into `gpu`'s rings,
 and one indexed draw per run. `gpu` captures the device's state before the frame's
-first change and puts it back after (d3d8to9 keeps its own record of what the game
-bound, `platform/D3D9.md`), with the block render3d records: once a frame, not per
+first change and puts it back after (Display8 keeps its own record of what the game
+bound), with the block render3d records: once a frame, not per
 draw. Positions are in back-buffer pixels and move half a pixel on the way to clip
-space on Direct3D 9 (`gpu::Gpu::half_pixel`; none on Vulkan, whose pixel centres are
-at the half), so a rectangle with whole-number edges covers whole pixels exactly.
+space only in the comparison mode that puts pixel centres on whole coordinates
+(`gpu::Gpu::half_pixel`; none otherwise, as the centres are at the half), so a rectangle with whole-number edges covers whole pixels exactly.
 
 **On Vulkan and Direct3D 12** (Display8's stub mode with `Backend=vulkan` or `d3d12`)
 the same calls record into Display8's frame (`gpu/README.md`, "The Vulkan backend",
@@ -705,7 +732,7 @@ a `gpu::Texture`, which keeps them and is made on the device the first time it d
 there, and again after a `Reset` or on another device. `engine/device.rs` tells `gpu`
 when the device resets or goes (`gfx::reset`, `gfx::forget`).
 
-**Without a Direct3D 9, Vulkan or Direct3D 12 device** (DXVK's own d3d8, GOG's d3d8to9) `surface::frame` returns
+**Without a Vulkan or Direct3D 12 device** (Display8 bailed out to the system d3d8) `surface::frame` returns
 at once and the game draws as stock.
 
 ## Text (`src/text/`)
@@ -835,10 +862,9 @@ re-creates the device at the mode it found. The stub offers one mode, the deskto
 (`display/README.md`, "Stub mode"), so the lookup came back empty and
 `ST3D_DeviceDirectX8::CreateDevice` read the missing mode (an access violation at
 0x623607, seen on Windows 2026-10-25). The proxy never let it happen: it raises both
-lookups to the desktop's size from its DllMain. `UI.asi` now does the same with `[UI]
-Native=1`, keeping the depth stock asks for. Armada2.exe imports `binkw32.dll`, so the
-proxy is loaded and has patched the sites before any ASI; the UI then finds them not
-stock and leaves them.
+lookups to the desktop's size from its DllMain. Since ui 1.0.0 Display8 does it (`[Window]
+RaiseIntro=1`, inside its mode lookups: `display/README.md`, "Window and display mode");
+the UI patches nothing of the intro's mode.
 
 The frames then reach the screen without the proxy too. The back-buffer overload of
 `NextBinkFrame` (0x4637f0, the one `PlayMovie` uses) copies each frame with the
@@ -875,8 +901,49 @@ trigger every 30 presents, so without one it costs a counter and one
 render3d): `GetRenderTargetData` into a system-memory copy (through a plain target
 first if the back buffer is multisampled), converted a row at a time; it changes no
 state of the device. A format it has no conversion for is logged and skipped. Without
-a Direct3D 9 device behind the game's (DXVK's own d3d8) nothing is read, and the
+a Vulkan or Direct3D 12 device behind the game's (Display8 bailed out) nothing is read, and the
 sidecar says so.
+
+## Content
+
+The names of the game's races (display names and the aliases `[UI] Theme=` and the game
+spell), resources, the single player screen's four campaigns (card names, the words that
+match the stock labels, the view of the map behind each, the emblem's cell in `allrace`) and
+the credits tour's views are `src/content.rs`, one `Content` per set, chosen by
+`Engine::content()` of the UI's core table (`crates/a2engine/README.md`, "Content"). Users:
+`widgets::theme::Race::{name, from_name}` (the loading screen, the HUD race log, the theme),
+`hud/resources.rs`, `credits.rs` (the tour), `menus/scene.rs` and `menus/screens/single_player.rs`.
+A build with no set has no races (no theme of its own for the HUD's race), no resources
+names, no tour and no main-menu view, and the single player screen stands down to the
+engine's. The widget gallery's sample lists are demo text, not game data.
+
+## Hooks (engine profile): core
+
+`profiles/gog-1.1/ui.core.toml` holds every address, call site, vtable slot, global and
+struct offset of `src/engine/{mod,ingame,display,intro,device,mouse,cursor,msvc}.rs`,
+`src/input.rs` and `src/clock.rs`, and `src/syms_core.rs` is generated from it. Each hook
+calls `ready` before it writes anything and stands down, with the engine's reason in
+`UI.log`, when a site is not stock; reads of engine memory from other parts go through
+`engine::storm3d()` and the helpers here, which return 0 / false / None when their hook
+is not ready. The findings each hook rests on are in the sections named in the table.
+
+| Hook | What it patches or reads, and why it needs the finding |
+|---|---|
+| `ui.core.storm3d` | The `Storm3D` global and its device table (index at +0xc0, devices from +0xcc, the d3d8 device at the `ST3D_DeviceDirectX8`'s +0x90): how every part finds the engine's device. Read lazily, so a part never reads address 0 |
+| `ui.core.mission` | The `call ChatDisplay::Render` in `Armada_RenderFrame`, after which the mission frame is drawn ("The mission frame"), and `ST3D_TrifanBuffer::Flush` on the device's trifan buffer (+0xe4), which flushes the HUD's batched quads first |
+| `ui.core.reads_hud_hidden` | `shipDisplay`'s hidden flag (+0x16): set by `DisplayInterface::SetInterfaceState` in every mode that hides the HUD |
+| `ui.core.cursor` | Slot 26 of `ST3D_DeviceDirectX8`'s vtable, `RefreshDisplay`, wrapped to empty the device's cursor sprite (+0x60) for one present ("The cursor"); +0xe0 says whether the cursor is the synchronous one |
+| `ui.core.cursor_probe` | The `DrawScaled2D` call in `RefreshDisplay` that draws the synchronous cursor, chained to whatever it called (another plugin's wrap); the global 2D scale and the sprite's hotspot (+0x30) |
+| `ui.core.cursor_square` | `SetCursor`'s `fmuls` of the hardware cursor width, its displacement moved from the x scale to the y scale ("The engine's cursor, square") |
+| `ui.core.display` | `GameConfiguration::InitializeGraphicsSystem`'s call in `WinMain`, with the profile (`UserProfile`) mode at +0x50, +0x54 and +0x58 and the two modes a profile holds when the player never chose one |
+| `ui.core.intro_mode32`, `ui.core.intro_mode16` | The pushes of `Program::PlayIntroMovie`'s two 640x480 mode lookups ("The intro without the cutscene proxy"); each is a hook of its own, as each was patched alone |
+| `ui.core.intro_frames` | `NextBinkFrame`'s `call [__imp__BinkCopyToBuffer@28]` and the import's slot, to route the movie's frames to the UI |
+| `ui.core.input` | `WindowProc`'s calls of `ProcessKeyboardMessages` and `ProcessMouseMessages`, and the `PeekMessageA` drains inside them ("Input and capture") |
+| `ui.core.window` | `ST3D_GraphicsEngine::GetWindowHandle`, thiscall on `Storm3D`, for the game window |
+| `ui.core.device` | `DestroyRenderSurfaces` (slot 28 of the device's vtable), chained: another plugin's wrap is kept; the d3d8 device at +0x90 is held across the engine's release |
+| `ui.core.reads_mouse` | `MouseDriver`'s button bits and the flag `g_bMousePosLocked` ("Focus and the pointer") |
+| `ui.core.reads_msvc` | Four `msvcp60.dll` import slots (`basic_stringstream`'s constructor, `str`, destructor and `basic_string`'s destructor), so the stream is made and freed by the library the engine's code expects |
+| `ui.core.reads_clock` | `Get_Time`'s float, the simulation's time for `Clock=bench` ("The animation clock") |
 
 ## Testing
 

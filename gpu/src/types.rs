@@ -435,48 +435,47 @@ pub const fn attr(offset: u16, format: AttrFormat, semantic: Semantic, index: u8
     VertexAttr { offset, format, semantic, index }
 }
 
-/// Shader code for each backend a pipeline may be made on: Direct3D 9's bytecode
-/// (vkd3d's d3dbc), SPIR-V (dxc's) and DXIL (the pinned dxc's, signed), compiled from
-/// one HLSL source (render3d/README.md, "One source, two compilers"). `dxil_at` is a
+/// Shader code for each backend a pipeline may be made on: SPIR-V (dxc's) and DXIL (the
+/// pinned dxc's, signed), compiled from one HLSL source (render3d/README.md, "One source,
+/// two forms"). `dxil_at` is a
 /// pixel shader's alpha-tested twin (an entry marked `:at`, `tools/shaderc/dxil-alpha.py`):
 /// Direct3D 12 has no alpha test, so a pipeline with one draws with the twin. Empty
 /// where a form was not built.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Code {
-    pub d3d9: &'static [u32],
     pub spirv: &'static [u32],
     pub dxil: &'static [u32],
     pub dxil_at: &'static [u32],
 }
 
 impl Code {
-    /// The same shader as d3dbc and as SPIR-V (`SYMBOL` and `SYMBOL_SPV`), no DXIL.
-    pub const fn new(d3d9: &'static [u32], spirv: &'static [u32]) -> Code {
-        Code { d3d9, spirv, dxil: &[], dxil_at: &[] }
+    /// The SPIR-V (`SYMBOL_SPV`), no DXIL.
+    pub const fn new(spirv: &'static [u32]) -> Code {
+        Code { spirv, dxil: &[], dxil_at: &[] }
     }
     /// With its DXIL (`SYMBOL_DXIL`).
-    pub const fn with_dxil(d3d9: &'static [u32], spirv: &'static [u32], dxil: &'static [u32]) -> Code {
-        Code { d3d9, spirv, dxil, dxil_at: &[] }
+    pub const fn with_dxil(spirv: &'static [u32], dxil: &'static [u32]) -> Code {
+        Code { spirv, dxil, dxil_at: &[] }
     }
     /// With its DXIL and its alpha-tested twin (`SYMBOL_AT_DXIL`).
-    pub const fn with_dxil_at(d3d9: &'static [u32], spirv: &'static [u32], dxil: &'static [u32], dxil_at: &'static [u32]) -> Code {
-        Code { d3d9, spirv, dxil, dxil_at }
+    pub const fn with_dxil_at(spirv: &'static [u32], dxil: &'static [u32], dxil_at: &'static [u32]) -> Code {
+        Code { spirv, dxil, dxil_at }
     }
 }
 
-/// A shader's forms from the generated statics (`shaders/<name>.rs`, `<name>_spv.rs`,
-/// `<name>_dxil.rs`), all in scope: `code!(PS_X, PS_X_SPV, PS_X_DXIL)`, and
+/// A shader's forms from the generated statics (`shaders/<name>_spv.rs`,
+/// `<name>_dxil.rs`), all in scope: `code!(PS_X_SPV, PS_X_DXIL)`, and
 /// `PS_X_AT_DXIL` after them for a pixel shader drawn with an alpha test.
 #[macro_export]
 macro_rules! code {
-    ($d3d9:ident, $spirv:ident) => {
-        $crate::Code::new(&$d3d9, &$spirv)
+    ($spirv:ident) => {
+        $crate::Code::new(&$spirv)
     };
-    ($d3d9:ident, $spirv:ident, $dxil:ident) => {
-        $crate::Code::with_dxil(&$d3d9, &$spirv, &$dxil)
+    ($spirv:ident, $dxil:ident) => {
+        $crate::Code::with_dxil(&$spirv, &$dxil)
     };
-    ($d3d9:ident, $spirv:ident, $dxil:ident, $at:ident) => {
-        $crate::Code::with_dxil_at(&$d3d9, &$spirv, &$dxil, &$at)
+    ($spirv:ident, $dxil:ident, $at:ident) => {
+        $crate::Code::with_dxil_at(&$spirv, &$dxil, &$at)
     };
 }
 
@@ -695,3 +694,35 @@ pub struct TimerResult {
     /// Ticks per second.
     pub frequency: u64,
 }
+
+/// A format's number in the logs, the dumps' sidecars and the pipelines' cache keys: the
+/// `D3DFORMAT` value it was named by (the interface's formats are Direct3D's, and every
+/// log line and key written before Direct3D 9 was removed keeps its meaning).
+pub fn format_code(f: Format) -> u32 {
+    match f {
+        Format::Unknown => 0,
+        Format::Bgra8 => 21,
+        Format::Bgrx8 => 22,
+        Format::B5G6R5 => 23,
+        Format::Bgr10A2 => 35,
+        Format::Rgb10A2 => 31,
+        Format::R8 => 50,
+        Format::A8 => 28,
+        Format::R16F => 111,
+        Format::Rg16F => 112,
+        Format::Rgba16F => 113,
+        Format::R32F => 114,
+        Format::Rg32F => 115,
+        Format::Rgba32F => 116,
+        Format::D16 => 80,
+        Format::D24S8 => 75,
+        Format::D24X8 => 77,
+        Format::D32 => 71,
+        Format::D15S1 => 73,
+        Format::D24X4S4 => 79,
+    }
+}
+
+/// `engine_transform`'s states, as Direct3D numbers them.
+pub const TS_VIEW: u32 = 2;
+pub const TS_PROJECTION: u32 = 3;

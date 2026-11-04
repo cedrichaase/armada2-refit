@@ -1,0 +1,53 @@
+Armada II Refit -- building a mod on the same base
+===================================================
+
+This folder is the SDK of the release package: the headers our C plugins are built on,
+and the import definitions they link with. The source of every layer stays in the
+repository at the release tag (https://github.com/cedrichaase/armada2-refit, tag
+vX.Y.Z of this package); nothing here is published as a library, and nothing is on
+crates.io.
+
+The fuller guide (contracts, symbol and content profiles, render3d recipes, what may be
+published) is MODDING.md at the root of the repository, at this release's tag:
+https://github.com/cedrichaase/armada2-refit/blob/main/MODDING.md
+
+What is here
+  a2asi.h      header-only, no CRT: Win32 types and imports, string and log helpers,
+               signature checks and VirtualProtect patching (a2_sig_is, a2_poke,
+               a2_write_call, a2_write_jmp), a2_find_export() to reach another
+               plugin's export, and the settings ABI (A2SET_ABI 1.1): the table a
+               plugin exports as <Plugin>_Settings, which the Refit screen lists.
+  a2engine.h   which executable is this: the identity of the main module, and the
+               profile resolver a plugin checks before it patches anything.
+  def/         one set of import-library .def files (kernel32, user32, winmm, ole32,
+               ws2_32): the union of what the plugins call.
+
+Building a plugin (a 32-bit Windows DLL named *.asi, on Linux or macOS)
+  There is no MSVC and no MinGW in this recipe: clang, lld-link and llvm-dlltool are
+  enough.
+    llvm-dlltool -m i386 --kill-at -d def/kernel32.def -l kernel32.lib
+    clang --target=i386-pc-windows-msvc -O2 -ffreestanding -fno-builtin \
+          -fno-stack-protector -mno-stack-arg-probe -c myplugin.c -o myplugin.obj
+    lld-link /dll /machine:x86 /nodefaultlib /entry:DllMain@12 \
+          /out:MyPlugin.asi myplugin.obj kernel32.lib
+  --kill-at matters: the .def files carry decorated names, the real DLLs export plain
+  ones. qol/build.sh in the repository is the worked example.
+
+Where it goes
+  Beside Armada2.exe, as <Name>.asi with an optional <Name>.ini. The Ultimate ASI Loader
+  (winmm.dll, in vendor/) loads every *.asi. A plugin that does not recognise
+  Armada2.exe must patch nothing and say so in its log (a2engine.h).
+
+Rules of the road
+  - A plugin that changes what every node of a network game simulates must be
+    required of every player. Put such a rule in its own layer, like rules/ here, never
+    in a plugin that stock players can play against.
+  - Settings: export <Plugin>_Settings so the Refit screen shows your keys; the
+    layout and the tool that writes the table are tools/settings/README.md in the
+    repository.
+  - Do not edit RTS_CFG.h: network games compare a CRC of it.
+  - Nothing of the game's own files belongs in anything you publish.
+
+The installers (install.sh, install.ps1) know our layers only; a plugin of yours goes
+in by hand, or beside ours in the game directory. They never touch a file they did
+not put there.

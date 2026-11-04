@@ -1,0 +1,374 @@
+# UI.asi's symbols in Armada2.exe 1.1 (GOG): part "core" -- the Storm3D global and device
+# offsets, the mission frame, the engine's cursor, the display mode, the intro, the message
+# hooks, the device's coming and going, and the few engine globals read by the other parts.
+# Each entry is tied to the hook that uses it; the findings are in ui/README.md, "Hooks
+# (engine profile): core".
+schema = 1
+plugin = "ui"
+readme = "ui/README.md"
+lang = "rust"
+out = "ui/src/syms_core.rs"
+
+[hook."core.storm3d"]
+doc = "The Storm3D global and the device it holds, which every part reads to find the engine's device"
+
+[hook."core.mission"]
+doc = "A mission's frame: the call of ChatDisplay::Render after which the UI draws"
+
+[hook."core.cursor"]
+doc = "RefreshDisplay wrapped through the device's vtable, to hide the engine's cursor for a frame"
+rows = ["UI.Cursor"]
+
+[hook."core.cursor_probe"]
+doc = "RefreshDisplay's draw of the synchronous cursor watched, to see whether it is reached"
+rows = ["UI.Cursor"]
+
+[hook."core.cursor_square"]
+doc = "SetCursor's hardware cursor width and the synchronous draw kept square at any aspect"
+rows = ["UI.Cursor"]
+
+[hook."core.intro_frames"]
+doc = "NextBinkFrame's BinkCopyToBuffer call re-pointed, so the UI draws the movie's frames"
+
+[hook."core.input"]
+doc = "WindowProc's keyboard and mouse message calls and their PeekMessage drains"
+
+[hook."core.window"]
+doc = "GetWindowHandle called on Storm3D, for the game window"
+
+[hook."core.device"]
+doc = "DestroyRenderSurfaces chained, so the UI lets go of the device with the engine"
+
+[hook."core.reads_mouse"]
+doc = "The mouse driver's button bits and held-pointer flag, read for the focus diagnostics"
+
+[hook."core.reads_msvc"]
+doc = "The msvcp60 imports the engine's stringstream and string functions are called with"
+
+[hook."core.reads_clock"]
+doc = "Get_Time's float, read for the bench clock"
+
+[hook."core.reads_hud_hidden"]
+doc = "The HUD's ship display hidden flag, read to know when the engine hides its HUD"
+
+# ---- core.storm3d (engine/mod.rs) -------------------------------------------------
+
+[[sym]]
+id = "core_storm3d"
+symbol = "Storm3D"
+kind = "global"
+addr = 0x7ad508
+used_by = ["core.storm3d"]
+
+[[sym]]
+id = "core_storm3d_device_index"
+symbol = "ST3D_GraphicsEngine"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 0xc0
+type = "u32"
+used_by = ["core.storm3d"]
+
+[[sym]]
+id = "core_storm3d_devices"
+symbol = "ST3D_GraphicsEngine"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 0xcc
+type = "ptr"
+used_by = ["core.storm3d", "core.mission", "core.cursor"]
+
+[[sym]]
+id = "core_dx8_d3d8_device"
+symbol = "ST3D_DeviceDirectX8"
+kind = "field"
+struct = "ST3D_DeviceDirectX8"
+offset = 0x90
+type = "ptr"
+used_by = ["core.storm3d", "core.device"]
+
+# ---- core.mission (engine/ingame.rs) ----------------------------------------------
+
+[[sym]]
+id = "core_chat_render"
+symbol = "ChatDisplay::Render"
+kind = "fn"
+addr = 0x51d3c0
+used_by = ["core.mission"]
+
+[[sym]]
+id = "core_site_chat"
+symbol = "ChatDisplay::Render"
+kind = "call"
+addr = 0x598a16
+target = "core_chat_render"
+in = "Armada_RenderFrame"
+used_by = ["core.mission"]
+
+[[sym]]
+id = "core_trifan_flush"
+symbol = "ST3D_TrifanBuffer::Flush"
+kind = "fn"
+addr = 0x621a90
+used_by = ["core.mission"]
+
+[[sym]]
+id = "core_dx8_trifan"
+symbol = "ST3D_DeviceDirectX8"
+kind = "field"
+struct = "ST3D_DeviceDirectX8"
+offset = 0xe4
+type = "u32"
+used_by = ["core.mission"]
+
+[[sym]]
+id = "core_ship_display_hidden"
+symbol = "shipDisplay"
+kind = "global"
+addr = 0x76397e
+used_by = ["core.reads_hud_hidden"]
+
+# ---- core.cursor, cursor_probe, cursor_square (engine/cursor.rs) ------------------
+
+[[sym]]
+id = "core_dx8_vtable"
+symbol = "ST3D_DeviceDirectX8::`vftable'"
+kind = "vtable"
+addr = 0x6bc6ac
+used_by = ["core.cursor", "core.device"]
+
+[[sym]]
+id = "core_refresh_display"
+symbol = "ST3D_DeviceDirectX8::RefreshDisplay"
+kind = "fn"
+addr = 0x624630
+used_by = ["core.cursor"]
+
+[[sym]]
+id = "core_slot_refresh"
+symbol = "ST3D_DeviceDirectX8::RefreshDisplay"
+kind = "slot"
+vtable = "core_dx8_vtable"
+index = 26
+target = "core_refresh_display"
+used_by = ["core.cursor"]
+
+[[sym]]
+id = "core_dx8_cursor"
+symbol = "ST3D_DeviceDirectX8"
+kind = "field"
+struct = "ST3D_DeviceDirectX8"
+offset = 0x60
+type = "ptr"
+used_by = ["core.cursor"]
+
+[[sym]]
+id = "core_dx8_synchronous"
+symbol = "ST3D_DeviceDirectX8"
+kind = "field"
+struct = "ST3D_DeviceDirectX8"
+offset = 0xe0
+type = "u8"
+used_by = ["core.cursor"]
+
+[[sym]]
+id = "core_element_name"
+symbol = "ST3D_DatabaseElement"
+kind = "field"
+struct = "ST3D_DatabaseElement"
+offset = 0x8
+type = "ptr"
+used_by = ["core.cursor"]
+
+[[sym]]
+id = "core_draw_scaled_2d"
+symbol = "ST3D_Sprite::DrawScaled2D"
+kind = "fn"
+addr = 0x63ada0
+used_by = ["core.cursor_probe", "core.cursor_square"]
+
+[[sym]]
+id = "core_site_cursor_draw"
+symbol = "ST3D_Sprite::DrawScaled2D"
+kind = "call"
+addr = 0x6246fa
+target = "core_draw_scaled_2d"
+in = "ST3D_DeviceDirectX8::RefreshDisplay"
+chain = true
+used_by = ["core.cursor_probe"]
+
+[[sym]]
+id = "core_scale_2d"
+symbol = "ST3D_Sprite::m_scale_factor_2d"
+kind = "global"
+addr = 0x7ad6e8
+used_by = ["core.cursor_probe"]
+
+[[sym]]
+id = "core_sprite_origin_x"
+symbol = "ST3D_Sprite"
+kind = "field"
+struct = "ST3D_Sprite"
+offset = 0x30
+type = "f32"
+used_by = ["core.cursor_probe"]
+
+[[sym]]
+id = "core_site_hw_scale"
+symbol = "ST3D_DeviceDirectX8::SetCursor"
+kind = "patch"
+addr = 0x625dd9
+in = "ST3D_DeviceDirectX8::SetCursor"
+check = "d8 4e 18"
+used_by = ["core.cursor_square"]
+
+# ---- core.intro_frames (engine/intro.rs) --------------
+
+[[sym]]
+id = "core_bink_copy_site"
+symbol = "NextBinkFrame"
+kind = "patch"
+addr = 0x4638af
+in = "NextBinkFrame"
+check = "ff 15 a0 82 7b 00"
+used_by = ["core.intro_frames"]
+
+[[sym]]
+id = "core_bink_copy_import"
+symbol = "__imp__BinkCopyToBuffer@28"
+kind = "global"
+addr = 0x7b82a0
+used_by = ["core.intro_frames"]
+
+# ---- core.input, core.window (input.rs) -------------------------------------------
+
+[[sym]]
+id = "core_process_keys"
+symbol = "ProcessKeyboardMessages"
+kind = "fn"
+addr = 0x4dd670
+used_by = ["core.input"]
+
+[[sym]]
+id = "core_site_keys"
+symbol = "ProcessKeyboardMessages"
+kind = "call"
+addr = 0x488869
+target = "core_process_keys"
+in = "WindowProc"
+used_by = ["core.input"]
+
+[[sym]]
+id = "core_site_keys_peek"
+symbol = "ProcessKeyboardMessages"
+kind = "patch"
+addr = 0x4dd709
+in = "ProcessKeyboardMessages"
+check = "ff 15 d4 81 7b 00"
+used_by = ["core.input"]
+
+[[sym]]
+id = "core_process_mouse"
+symbol = "ProcessMouseMessages"
+kind = "fn"
+addr = 0x4de250
+used_by = ["core.input"]
+
+[[sym]]
+id = "core_site_mouse"
+symbol = "ProcessMouseMessages"
+kind = "call"
+addr = 0x488952
+target = "core_process_mouse"
+in = "WindowProc"
+used_by = ["core.input"]
+
+[[sym]]
+id = "core_site_mouse_peek"
+symbol = "ProcessMouseMessages"
+kind = "patch"
+addr = 0x4de260
+in = "ProcessMouseMessages"
+check = "8b 1d d4 81 7b 00"
+used_by = ["core.input"]
+
+[[sym]]
+id = "core_get_window_handle"
+symbol = "ST3D_GraphicsEngine::GetWindowHandle"
+kind = "fn"
+addr = 0x62bc70
+used_by = ["core.window"]
+
+# ---- core.device (engine/device.rs) -----------------------------------------------
+
+[[sym]]
+id = "core_destroy_render_surfaces"
+symbol = "ST3D_DeviceDirectX8::DestroyRenderSurfaces"
+kind = "fn"
+addr = 0x624760
+used_by = ["core.device"]
+
+[[sym]]
+id = "core_slot_destroy"
+symbol = "ST3D_DeviceDirectX8::DestroyRenderSurfaces"
+kind = "slot"
+vtable = "core_dx8_vtable"
+index = 28
+target = "core_destroy_render_surfaces"
+chain = true
+used_by = ["core.device"]
+
+# ---- core.reads_mouse (engine/mouse.rs) -------------------------------------------
+
+[[sym]]
+id = "core_mouse_buttons"
+symbol = "MouseDriver button bits"
+kind = "global"
+addr = 0x763308
+used_by = ["core.reads_mouse"]
+
+[[sym]]
+id = "core_mouse_held"
+symbol = "g_bMousePosLocked"
+kind = "global"
+addr = 0x763350
+used_by = ["core.reads_mouse"]
+
+# ---- core.reads_msvc (engine/msvc.rs) ---------------------------------------------
+
+[[sym]]
+id = "core_imp_ss_ctor"
+symbol = "__imp_basic_stringstream::basic_stringstream"
+kind = "global"
+addr = 0x7b7c58
+used_by = ["core.reads_msvc"]
+
+[[sym]]
+id = "core_imp_ss_str"
+symbol = "__imp_basic_stringstream::str"
+kind = "global"
+addr = 0x7b7db0
+used_by = ["core.reads_msvc"]
+
+[[sym]]
+id = "core_imp_ss_dtor"
+symbol = "__imp_basic_stringstream::_D"
+kind = "global"
+addr = 0x7b7ea8
+used_by = ["core.reads_msvc"]
+
+[[sym]]
+id = "core_imp_str_dtor"
+symbol = "__imp_basic_string::~basic_string"
+kind = "global"
+addr = 0x7b7dc0
+used_by = ["core.reads_msvc"]
+
+# ---- core.reads_clock (clock.rs) --------------------------------------------------
+
+[[sym]]
+id = "core_sim_time"
+symbol = "Get_Time"
+kind = "global"
+addr = 0x7b0fc8
+used_by = ["core.reads_clock"]

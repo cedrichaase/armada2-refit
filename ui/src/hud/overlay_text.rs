@@ -9,11 +9,11 @@ use crate::widgets::Ui;
 static mut LAST_KEY: i32 = i32::MIN;
 
 pub fn run(ui: &mut Ui) {
-    if hud::hidden(overlay::OVERLAY) {
+    if hud::hidden(overlay::overlay()) {
         return;
     }
     let lines = overlay::lines();
-    let origin = hud::panel_rect(overlay::OVERLAY, ui.w, ui.h).map_or((0.0, 0.0), |r| (r[0], r[1]));
+    let origin = hud::panel_rect(overlay::overlay(), ui.w, ui.h).map_or((0.0, 0.0), |r| (r[0], r[1]));
     let (sx, sy) = (ui.w / 1600.0, ui.h / 1200.0);
     let t = ui.theme;
     let px = ui.u(t.title_size);

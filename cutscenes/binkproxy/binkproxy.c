@@ -12,9 +12,9 @@
  *
  *   2. FULL-SCREEN LAUNCH REELS.  Program::PlayIntroMovie switches to a
  *      hard-coded 640x480 display mode, and NextBinkFrame copies each frame
- *      1:1 into the locked back buffer at (0,0).  This DLL raises that mode
- *      to the desktop size at load, and when a copy comes from that call site
- *      it scales the frame to fit the back buffer, centred, bars black.  That
+ *      1:1 into the locked back buffer at (0,0).  Display8 raises that mode
+ *      to the desktop size, and when a copy comes from that call site
+ *      this DLL scales the frame to fit the back buffer, centred, bars black.  That
  *      applies to real Bink reels too: they are decoded into a scratch buffer
  *      first and scaled from there.
  *
@@ -32,6 +32,8 @@
 
 #define A2_FLTUSED
 #include "../../csdk/a2asi.h"
+#include "../../csdk/a2engine.h"
+#include "engine_syms.h"
 
 typedef long long           LONGLONG;
 typedef unsigned long long  ULONGLONG;
@@ -96,8 +98,8 @@ void *memcpy(void *d, const void *s, unsigned n)
 /* ---- small string helpers ------------------------------------------------ */
 /* ---- config and log, both beside Armada2.exe ------------------------------ */
 static char g_dir[260];
-static char g_ini[280];
-static int  g_log = 1, g_replace = 1, g_raise = 1, g_fit = 1;
+static A2Ini g_bi;                 /* BinkProxy.ini with the overlay in front */
+static int  g_log = 1, g_replace = 1, g_fit = 1;
 
 static char g_logpath[320];
 
@@ -780,11 +782,12 @@ static void plain_blit(const BYTE *src, int sw, int sh, BYTE *dst, int pitch, in
 }
 
 /* ---- the intro call site ------------------------------------------------------
- * NextBinkFrame (0x4637f0) calls BinkCopyToBuffer from 0x4638af with the back
- * buffer locked; its D3DSURFACE_DESC is at [ebp-0x28] of that frame: Format
- * at -0x28, Width at -0x10, Height at -0x0c.  Only trusted when our return
- * address is exactly that site and the values are sane.                     */
-#define INTRO_COPY_RET 0x4638b5
+ * NextBinkFrame calls BinkCopyToBuffer from one site with the back buffer locked;
+ * its D3DSURFACE_DESC lies in that frame (Format, Width, Height at the distances the
+ * profile names, below the saved EBP).  Only trusted when our return address is
+ * exactly that site and the values are sane; binkproxy.intro_copy (the profile) says
+ * whether this build's site is the stock one.                               */
+static int g_introCopy;   /* a2e_ready(binkproxy.intro_copy), asked once at load */
 
 /* Not a Bink flag.  cutscenes/binkproxy/binktest.c sets it to exercise the
  * fit-to-back-buffer path outside the game: destination = pitch/bpp x destH. */
@@ -793,10 +796,10 @@ static void plain_blit(const BYTE *src, int sw, int sh, BYTE *dst, int pitch, in
 static int intro_backbuffer(void *ret, BYTE *callerEbp, DWORD pitch, int *w, int *h)
 {
     DWORD fmt, bw, bh;
-    if ((ULONG_PTR)ret != INTRO_COPY_RET || !callerEbp) return 0;
-    fmt = *(DWORD *)(callerEbp - 0x28);
-    bw  = *(DWORD *)(callerEbp - 0x10);
-    bh  = *(DWORD *)(callerEbp - 0x0c);
+    if (!g_introCopy || (ULONG_PTR)ret != a2s_binkproxy_intro_copy_ret || !callerEbp) return 0;
+    fmt = *(DWORD *)(callerEbp - BINKPROXY_F_INTRO_DESC_FORMAT);
+    bw  = *(DWORD *)(callerEbp - BINKPROXY_F_INTRO_DESC_WIDTH);
+    bh  = *(DWORD *)(callerEbp - BINKPROXY_F_INTRO_DESC_HEIGHT);
     if (fmt < 21 || fmt > 24) return 0;
     if (bw < 320 || bh < 200 || bw > MAX_W || bh > 8192) return 0;
     if (pitch < bw * (fmt <= 22 ? 4 : 2)) return 0;
@@ -834,10 +837,12 @@ static int ui_movie(const BYTE *bgrx, int w, int h, int pitch)
 }
 
 /* ---- exports ------------------------------------------------------------------- */
+
 EXPORT void *WINAPI BinkOpen(const char *name, DWORD flags)
 {
     Movie *mv;
     char m[300];
+    g_replace = (int)a2_ini_int(&g_bi, "BinkProxy", "ReplaceMovies", 1);   /* read at each open */
     if (g_replace && name && (mv = open_replacement(name))) return mv->bink;
     if (!real_load()) return NULLPTR;
     m[0] = 0; s_cat(m, "bink "); if (name && s_len(name) < 200) s_cat(m, name);
@@ -975,96 +980,41 @@ EXPORT int WINAPI BinkCopyToBuffer(void *bink, void *dest, DWORD pitch, DWORD de
     return 0;
 }
 
-/* ---- load-time: config, and the intro display mode --------------------------- */
-typedef struct { int len, at; BYTE sig[20]; } ModeSite;
-
-/* Both sites are in Program::PlayIntroMovie and each signature occurs exactly
- * once in Armada2.exe (the bare 640/480 push pair occurs a third time
- * elsewhere, which this must not touch).  `at` is the offset of the push-bpp. */
-static const ModeSite k_sites[2] = {
-    /* push 32; push 480; push 640; mov edi,[eax+0x104] */
-    { 18, 0, { 0x6A, 0x20, 0x68, 0xE0, 0x01, 0x00, 0x00, 0x68, 0x80, 0x02, 0x00, 0x00,
-               0x8B, 0xB8, 0x04, 0x01, 0x00, 0x00 } },
-    /* mov ecx,[edi+0x1c]; push 16; push 480; push 640; call */
-    { 16, 3, { 0x8B, 0x4F, 0x1C, 0x6A, 0x10, 0x68, 0xE0, 0x01, 0x00, 0x00,
-               0x68, 0x80, 0x02, 0x00, 0x00, 0xE8 } },
-};
-
-static int patch_intro_mode(int w, int h)
+/* ---- load-time: config -------------------------------------------------------- */
+/* Whether the game's d3d8.dll is Display8: it exports the contract's handshake. The
+ * name is the system's slot for Direct3D 8, not a plugin's file. Every import of the exe
+ * is mapped before any DllMain runs, so the module is there to ask. */
+static int display8_raises(void)
 {
-    BYTE *base = (BYTE *)GetModuleHandleA(NULLPTR);
-    DWORD pe, va, vs, old;
-    BYTE *nt, *sec;
-    int nsec, optsz, i, n, hits = 0;
-    if (!base) return 0;
-    pe = *(DWORD *)(base + 0x3C);
-    nt = base + pe;
-    nsec = *(WORD *)(nt + 6);
-    optsz = *(WORD *)(nt + 20);
-    sec = nt + 24 + optsz;
-    for (i = 0; i < nsec; i++, sec += 40) {
-        BYTE *p, *end;
-        if (sec[0] != '.' || sec[1] != 't' || sec[2] != 'e' || sec[3] != 'x') continue;
-        va = *(DWORD *)(sec + 12);
-        vs = *(DWORD *)(sec + 8);
-        end = base + va + vs;
-        for (n = 0; n < 2; n++) {
-            const ModeSite *m = &k_sites[n];
-            for (p = base + va; p + m->len <= end; p++) {
-                int k;
-                for (k = 0; k < m->len && p[k] == m->sig[k]; k++) ;
-                if (k != m->len) continue;
-                {
-                    BYTE *q = p + m->at;        /* push bpp (2 bytes), push h, push w */
-                    if (!VirtualProtect(q, 12, PAGE_EXECUTE_READWRITE, &old)) continue;
-                    *(DWORD *)(q + 3) = (DWORD)h;
-                    *(DWORD *)(q + 8) = (DWORD)w;
-                    VirtualProtect(q, 12, old, &old);
-                    FlushInstructionCache(GetCurrentProcess(), q, 12);
-                    hits++;
-                    break;
-                }
-            }
-        }
-    }
-    return hits;
+    HMODULE m = GetModuleHandleA("d3d8.dll");
+    return m != 0 && GetProcAddress(m, "display8_abi") != 0;
 }
 
 BOOL WINAPI DllMain(HANDLE inst, DWORD reason, void *res)
 {
     char m[200];
-    int i, w, h;
+    int i;
     (void)inst; (void)res;
     if (reason != 1) return 1;
 
     a2_exe_dir(g_dir, sizeof g_dir);
-    s_cpy(g_ini, g_dir); s_cat(g_ini, "BinkProxy.ini");
+    a2_ini_open(&g_bi, "BinkProxy.ini", logline);
 
-    g_log     = (int)GetPrivateProfileIntA("BinkProxy", "Log",            1, g_ini);
-    g_replace = (int)GetPrivateProfileIntA("BinkProxy", "ReplaceMovies",  1, g_ini);
-    g_raise   = (int)GetPrivateProfileIntA("BinkProxy", "RaiseIntroMode", 1, g_ini);
-    g_fit     = (int)GetPrivateProfileIntA("BinkProxy", "FitIntro",       1, g_ini);
-    g_useUi   = (int)GetPrivateProfileIntA("BinkProxy", "UseUI",          1, g_ini);
-    w         = (int)GetPrivateProfileIntA("BinkProxy", "IntroWidth",     0, g_ini);
-    h         = (int)GetPrivateProfileIntA("BinkProxy", "IntroHeight",    0, g_ini);
-
-    /* At DllMain time no mode change has happened yet, so this is the desktop
-     * (the same observation Menus.asi relies on). */
-    if (w < 640) w = GetSystemMetrics(SM_CXSCREEN);
-    if (h < 480) h = GetSystemMetrics(SM_CYSCREEN);
+    g_log     = (int)a2_ini_int(&g_bi, "BinkProxy", "Log",            1);
+    g_replace = (int)a2_ini_int(&g_bi, "BinkProxy", "ReplaceMovies", 1);
+    g_fit     = (int)a2_ini_int(&g_bi, "BinkProxy", "FitIntro",       1);
+    g_useUi   = (int)a2_ini_int(&g_bi, "BinkProxy", "UseUI",          1);
 
     for (i = 0; i < MAX_W; i++) g_black[i] = 0xFF000000;
+
+    a2e_init(&BINKPROXY_ENGINE, logline);
+    g_introCopy = a2e_ready(BINKPROXY_H_INTRO_COPY);
 
     m[0] = 0;
     s_cat(m, "--- BinkProxy loaded: replace="); s_num(m, g_replace);
     s_cat(m, " fit="); s_num(m, g_fit);
-    if (g_raise && w >= 640 && h >= 480) {
-        int hits = patch_intro_mode(w, h);
-        s_cat(m, " intro mode -> "); s_num(m, w); s_cat(m, "x"); s_num(m, h);
-        s_cat(m, " ("); s_num(m, hits); s_cat(m, "/2 sites)");
-    } else {
-        s_cat(m, " intro mode left at 640x480");
-    }
     logline(m);
+    /* The intro's mode is Display8's ([Window] RaiseIntro); without it the intro stays stock. */
+    if (!display8_raises()) logline("intro: stock mode (no Display8)");
     return 1;
 }

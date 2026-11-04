@@ -1,6 +1,6 @@
 [package]
 name = "render3d"
-version = "0.16.3"
+version = "1.0.4"
 edition = "2024"
 publish = false
 description = "Render3D.asi: Star Trek: Armada II's 3D view drawn by our own renderer"
@@ -11,11 +11,35 @@ name = "render3d"
 crate-type = ["cdylib"]
 path = "src/lib.rs"
 
+# The crates (README.md, "Crates"): this cdylib, r3d-core, and one crate per module that
+# depends on the core and on no other module.
+[workspace]
+members = [".", "core", "mods/*"]
+exclude = ["hosttest"]
+
+# One feature per module, all on by default: the DLL that ships has every one, and
+# `build.sh --features hulls,sky` builds a subset (a source build; no per-module DLLs).
+[features]
+default = ["world", "particles", "hulls", "effects", "ordnance", "specials", "sky", "overlays"]
+world = ["dep:r3d-world"]
+particles = ["dep:r3d-particles"]
+hulls = ["dep:r3d-hulls"]
+effects = ["dep:r3d-effects"]
+ordnance = ["dep:r3d-ordnance"]
+specials = ["dep:r3d-specials"]
+sky = ["dep:r3d-sky"]
+overlays = ["dep:r3d-overlays"]
+
 [dependencies]
-libm = "0.2"
-a2fmt = { path = "../crates/a2fmt" }
-a2rt = { path = "../crates/a2rt", features = ["dump"] }
-gpu = { path = "../gpu" }
+r3d-core = { path = "core" }
+r3d-world = { path = "mods/world", optional = true }
+r3d-particles = { path = "mods/particles", optional = true }
+r3d-hulls = { path = "mods/hulls", optional = true }
+r3d-effects = { path = "mods/effects", optional = true }
+r3d-ordnance = { path = "mods/ordnance", optional = true }
+r3d-specials = { path = "mods/specials", optional = true }
+r3d-sky = { path = "mods/sky", optional = true }
+r3d-overlays = { path = "mods/overlays", optional = true }
 
 [profile.release]
 panic = "abort"

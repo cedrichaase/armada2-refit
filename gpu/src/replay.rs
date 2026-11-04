@@ -529,8 +529,8 @@ impl Replay {
                 let (codes, layout, mut d) = r.pipe_desc();
                 let st = &mut self.streams[s];
                 let c = |i: usize| Self::code(st, codes[i]);
-                d.vs = Code::with_dxil_at(c(0), c(1), c(2), c(3));
-                d.ps = Code::with_dxil_at(c(4), c(5), c(6), c(7));
+                d.vs = Code::with_dxil_at(c(1), c(2), c(3));
+                d.ps = Code::with_dxil_at(c(5), c(6), c(7));
                 d.layout = Box::leak(layout.into_boxed_slice());
                 let p = st.gpu.pipeline(d);
                 st.pipes.insert(id, p);
@@ -540,7 +540,7 @@ impl Replay {
                 let codes = [r.u32(), r.u32(), r.u32(), r.u32()];
                 let st = &mut self.streams[s];
                 let c = |i: usize| Self::code(st, codes[i]);
-                let p = st.gpu.compute_pipeline(ComputeDesc { cs: Code::with_dxil_at(c(0), c(1), c(2), c(3)) });
+                let p = st.gpu.compute_pipeline(ComputeDesc { cs: Code::with_dxil_at(c(1), c(2), c(3)) });
                 st.cpipes.insert(id, p);
             }
             OP_FRAME_NEXT => {

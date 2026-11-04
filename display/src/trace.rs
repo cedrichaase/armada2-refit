@@ -17,7 +17,7 @@
 //!   than the device's. Answers and arguments worth seeing once (caps, formats, modes,
 //!   present parameters, gamma ramps, locks, the plugins' queries) go into
 //!   `Display8.log`, each distinct line once.
-use crate::com::{Guid, HRESULT, Kind, Obj};
+use crate::com::Kind;
 use crate::rt::win::*;
 use crate::{log, sfmt};
 use alloc::collections::BTreeSet;
@@ -110,12 +110,10 @@ pub fn start() {
 
 /// `Armada2.exe`'s image in memory, past its headers: where its code is.
 pub fn exe_range() -> (usize, usize) {
-    let base = unsafe { GetModuleHandleA(core::ptr::null()) } as usize;
-    let size = unsafe {
-        let nt = base + *((base + 0x3c) as *const u32) as usize;
-        *((nt + 0x50) as *const u32) as usize // OptionalHeader.SizeOfImage
-    };
-    (base + 0x1000, base + size)
+    match a2engine::pe::this_process() {
+        Some(id) => (id.base + 0x1000, id.base + id.image_size as usize),
+        None => (0, 0),
+    }
 }
 
 /// State setters and getters, called thousands of times a frame: only their
@@ -355,24 +353,6 @@ pub fn chain(fp: usize) -> String {
         t.push_str(&place(a));
     }
     t
-}
-
-/// A `QueryInterface` for something not ours: a plugin reaching Direct3D 9 through
-/// an engine object (the mirror table of phase 0, item 4).
-pub fn query_seen(fp: usize, this: *mut Obj, iid: &Guid, hr: HRESULT) {
-    if !ON.load(Ordering::Relaxed) {
-        return;
-    }
-    let o = unsafe { &*this };
-    once(&sfmt!(
-        "QI {}{} {} for {} -> {:#x} by {}",
-        o.kind.name(),
-        o.role.name(),
-        crate::d3d8::describe(this),
-        iid,
-        hr as u32,
-        caller(fp)
-    ));
 }
 
 /// The context's index, made if new.

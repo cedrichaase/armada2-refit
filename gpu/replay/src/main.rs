@@ -26,7 +26,6 @@ mod window;
 #[rustfmt::skip]
 #[allow(dead_code)]
 mod shaders {
-    pub mod blit;
     pub mod blit_dxil;
     pub mod blit_spv;
 }
@@ -225,7 +224,7 @@ fn run() -> bool {
     let mut gpus: Vec<&'static gpu::Gpu> = Vec::new();
     for n in &names {
         let g: &'static gpu::Gpu = alloc::boxed::Box::leak(alloc::boxed::Box::new(gpu::Gpu::with_display(log, lookup)));
-        if g.attach_engine(dev).is_none() {
+        if g.attach_engine().is_none() {
             say!("stream {}: the gpu interface could not attach to the device ({})", n, g.backend_name());
             return false;
         }
@@ -234,8 +233,8 @@ fn run() -> bool {
     say!("replaying on {}{}", gpus[0].backend_name(), if h.d3d9_centres { " (recorded with Direct3D 9's pixel centres)" } else { "" });
     // The blit a snapshot goes into a target with (shaders/blit.hlsl).
     let blit = (
-        gpu::Code::with_dxil(&shaders::blit::VS_BLIT, &shaders::blit_spv::VS_BLIT_SPV, &shaders::blit_dxil::VS_BLIT_DXIL),
-        gpu::Code::with_dxil(&shaders::blit::PS_BLIT, &shaders::blit_spv::PS_BLIT_SPV, &shaders::blit_dxil::PS_BLIT_DXIL),
+        gpu::Code::with_dxil(&shaders::blit_spv::VS_BLIT_SPV, &shaders::blit_dxil::VS_BLIT_DXIL),
+        gpu::Code::with_dxil(&shaders::blit_spv::PS_BLIT_SPV, &shaders::blit_dxil::PS_BLIT_DXIL),
     );
     let mut rp = match gpu::replay::Replay::new(log, data, &gpus, Some(blit)) {
         Ok(r) => r,

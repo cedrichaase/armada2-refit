@@ -1,0 +1,42 @@
+# What retire/retire.sh takes out of a game directory, and how it recognises it. One entry a
+# line, fields separated by spaces; '#' starts a comment. The release scripts keep their own
+# copy of the table in awk and PowerShell (publish/package.sh bakes this file as retire.txt);
+# the binaries' hashes stay here after they leave platform/vendor/.
+#
+#   plugin <Name>...        <Name>.asi, .ini and .log
+#   plugin-dir <Dir>        <Dir>/*.bmp, then the folder if it is empty (MenuScale's plates)
+#   glob <Dir> <pattern>    <Dir>/<pattern>, then the folder if it is empty
+#   glob-hash <Dir> <pattern> <sha256>...
+#                           like glob, but only the files whose hash is one of the listed: every
+#                           version of the sky recipes any release shipped (a Sky\<name>.ini the
+#                           player edited is theirs and stays)
+#   file <name>             a file of the game directory the project's tooling alone wrote
+#   hud-files               put back from backups (hud-files.py): the misc/ UI configs, the
+#                           cursors, the font atlases, SOD/logo.SOD and the LOADING textures
+#   bloom                   the per-user vkBasalt bloom, outside the game directory
+#   chain-hash <file> <sha256> <what>
+#                           removed only when its hash is the vendored build's (class chain)
+#   chain-marker <file> <marker>
+#                           removed only when it carries our marker line (class chain)
+#
+# The chain class is taken out only with --chain, which ./install and the release installers
+# pass since platform 4.0.0 (Display8 no longer stands on d3d8to9 as d3d8_real.dll or on
+# DXVK's d3d9). The binaries left platform/vendor/ then; these hashes are what is left of them.
+
+# The legacy plugins, replaced by UI.asi (the plates in Menus/ stay: the UI draws them).
+plugin HUD GridLayout Menus MenuScale
+plugin-dir MenuScale
+
+# The per-part plugins render3d replaced (render3d 0.2.0; Planets in models 5.0.0).
+plugin MSAA Lighting Sky Nebulae Surfaces Explosions Shields Repair Venting Specials Fog Planets
+glob-hash Sky mbg*.ini 00058900fd41b59d20f0ce898bc7fae10f4a28d93f0a941d333922b58838c408 013d9c91ec149f1d4bc107681859d4fbbfe10d304c86eae06c02a95e618ccf0c 06d9ac24c7f94f3847341fc2d8e757cc39f97d2cdfa1fdc56de4f551c675e38b 199df5ff353dc323440bca76f202d7f56c638338822bd47dbd8bd7809aebab19 1b3b7f116f844c3285e7c236cdda1979a0ed6952ee7f9138b853794d1f950a36 1c49a6073a5f0213fde58dda145daf9b8b7d86a39ed99a5467cc7bf40c27bd76 1edd7e8d77e2bf4ec3b52117aa671095029313e9bac69c120267a500af4f23f3 23562d976e3c280e396d1e62b767991ff23032369d23bccd76145892b6a01b92 2427dfcd84da1ed5d91b6712eba5501f6f0ad902faaeeb9152dcddd953ac90e8 26322cb000da44eadbeb4129744c2360eda3955966e1cfee7d18edf51ba5da99 26b9006ed461481dd0b499fd9407f971f0d0d8012ad8f9832c446b7a6e2082cc 2d103edeea17f3094fde27b0b1e2763d8d7cbf07a31ae531328553fe5cd8aad2 2d8370a6febde83ff9ca7bf18c132a1b0e01bae5b5dbe532523b5732298666ef 34c3a91610fad65b68dd78d90944c0273a92b7587c6115c4acf5d21f65e6e2b1 37974622920928ba07cf0eb06e8166ef9da7157625241398a56ab6e0b9dbacf6 382b285b41af85d17fc4f9305ea26bee7f1b022893883d8df2d1b9ce3a85c5e4 3b5cd2d7f604ea5f8079bf72b77287f6e8323ea336b0b1b676ba5498d19c4d56 3cb922000dfaf084d17ce078a69616a8b14c077afdbe7fd81501ee424ba657c5 458a7d5a20d1c9acf5a7e7553877ac214262bd909f0ab1e53a0756a0572cfbae 47f813e61812a1356bf1979af5b2c2a3ea1f1c344f297f8465a0d755afc12f9a 50c3111c90ae325c3bc987593f8734ef406c12aefe66346f1935837af0bca784 517a88a2c0a2873374493a74b2ac39a0cad46e4fe8947d830e19bd5558fa2312 51ce6954d1d4d8e3a43330ae5d7c3f9f72bf1527d7f10e56a123cd99386f7bc1 5419ffa0a7c2e6c4e2f36d3d202350defdf91bb7cc43b594ef065ec3557e63f9 54cd3dda97e02616b71408d30310d7644444914270d2867021339ae06e8689d2 55fc362f1905c34a5ecf0f9343a31af73ba5ded7aa5c0fcf9faef3df8d2a0719 5783eaebf56a3fb0df1623410736a7477079476f98ee6f25d36054a88661646f 586ce410367b43247bb862827c7742ec153d44b5014f02bfe8155857bd6bd33d 5aa25b4207e371a37c9e423bda8175b0717de59ba539b3e29079f9cf4bf6aa8e 603db0c913c2e9abd86aa007d319194f773149d2466d01b958034329e392e4f3 6073f84838366944493c3fdcde0070244e4dd14dbf99cf757017c9110c0cd12b 6348f1d19fcb535ddfaa48f82b864e49bd37e78ec2026f04e4361df15b101760 64d6222ba2228c884f39b458c917e33fe426395aafca5574560cbb8d2fa563a1 673d2b74f04c7844e90cf4b69892b3e75a9d8a66de93834cde2fb3c204532efd 67de724709150418781d00193e9dab6f4342522c35a46d0f28c2d539f10d0b2d 6a34cd7a076ab6664f58d59fd5a9236940e911fe33a881a2850908092a695ac5 6b948a7e029b2cc06fb647838df506ebca706dc4e7debde3246cdab62aa2e399 7138d26beddda9ba57126b87311c1e21bf9c0a30c023aefa081666413d1fa3ea 716681d8b060dff7ce95df7308e703c52c5d5e540c78aaef1b15dca01bcb25b3 72d4d0e1486cb5a4443f80c53e2d266737b77732dcfc50c42dddfaa3f3fba5b3 81c4078d8f9a0da86737a6fce240287a752c5d1a1bfa3d250572e44019360105 8c64b7b36e86bd4f09ecb051e3c147ecc03565e49b8c90fd9ec52123caad9a55 8c75c06eae3e7a37794df9f51c346c4786456ec256024be4cc49f910dd4c363e 8e4844e9ff666c05502d9827f50dcb38a8394b871db65627f012b738a5afd98b 98d4f4087d8edd5ca9daa65975ea8e124a7328b3a968120e3bffe865944c13bb 9a3f3ac75231ccd261f208d24ce839807e316c8c805666786d2a1cdf7e696a9c 9ab329640df00af0b72113c052ad99d79de9d8a9f2bfca4c5ac9a0ed4a99c0ea 9eb9aed72d60971b0039431ca48dee8a1b908e84e5372d7e747a0d07b451ff1b a163ca15e0e65cf424e323677dd6db93c3568dc689071bfe70533fb99a7596bc a5ad9357319ede93534e27802a2ec27a7760da6571523d98302a7ee281794362 a79ca452490ddf2330c507a14969ac38a5d49b1f1a4ba7c8845122436855ef88 a916696d76fb20b4f92b791f2dc9791a077434b1353f3fc315d5a5228cb4b950 aa43bb64c694d0a057c55599ca94f6e1ff050e96d1b0a09852c1ddd2c5174319 abeb224ae3c9b00b9e28a21a55f4878d5c5cb2b142692fdc465d22efb973f9f1 af34cb1fbd15faf9e215615dbb34f55dbb44be05a73df877d0b3d5fc1a3ac96d b7d454414a017232939f4b4ffc2465d362cc553708f625c492baeaf78270dbf6 b9ad3277ef18a2576563f1e4c79d1123749198d9dc76e14465f117e321b5ff2f bbdbd24864a924e8b2cc447667c4b88e147f119cc3476e94df468a57645a3821 bc99ecb080111db0443066df4cba6a8ccfdf2b3e657f734ccd34c99c99994cbe c16c91afc3e02b2c1044bf430379b9504f0730464351dac078089569ff787dc2 c397188e7edffe8fcc44a85be2424fcdf27cce6ce167173443d6a133ed455b6d c5af043e515255ce8148e4dda1dda78b03ec6ce3ecf990643a01430bd88a0b12 c642da3423cc04462897bd1c714cac04bdb2e5ad11538462cd650acbfce53b9b c793e9402313bbbf7bb8ce1063fc7d4cbddb216b1de761217fe39c14c7ae95d2 cae708496e0399941b7b5455f543b4c82a60ff8fbda6e8ef61cdbd394f74f0e4 ce8295278cbbe7151fbecb5d273608a273fd1ae7993b44ba7faff0ce6ab857f1 d2f00a22f0fa2504211ed2f7689e1614a96784ac38a930ba71589e9d1f15c0fb d769fe1e89e0586e125a432604dd70b2a3cbb696fe9c58e68625b0a096ab3e68 d9d12f77e2ce3c12f862c206d18096873642ccd5c337c04b07b66f115dba538c dc94f6d283b1a0c6d85003cc3c0874c2060fd6061da45395bf8e43569698c8b7 dd41412a9b16bbd7cea13fcc275272499541d3a1d845ee55a4d210baebe5b398 ddadc3b3e99a8e607335faa81dcc9f42225da8551d436772a220106d5d556836 e0dbe39717c94599895d4feb2ae38b1e7275a5c00d04c2f0d96344dac60561c2 e3782cd209987b906ed6bb8048a58a2d44d1d3959e749ab517577d57b92dea00 e562c5835217c6b3bbf666cfdaa809eee47b2541fd9c5e3216ce03eb87f9687b e7493d57029343729d171a31c73cf2edc6464cd14944c06cae678ce698817c86 e7602acdd08a1c64c9ed4dcd3a6a84d9eb5ac7ce5140225cb9c70c2fd1788157 e873a3778d41a94b4092005f014d8916cdf1a30c618ae611032e8bff18983596 ecc90439359cd12ef823126592bb25af468b7c18034d3c5d7123191069525277 f33f0de959288f55468e39cd087d600b50cd1daceede5b7af5d017e3ee2b0cea f629958fe3ff40bc661b0ad770a92e4a91f54df8c5d6e3d51bc53790619103b7 f7a2af5759688a78ee8da4861a532ec71dae5c4ff57e20b8f946600d78bfd133 f8e17f3f0f9d391284328d035824f3e3d31f589e57295add85148fa6c613d419 fd2ab36dc5057d45eea80ca649ec53f7ec323154cb286339e28388bd93ede729
+
+# Written by the bench's fault injection, never shipped.
+file A2EngineTest.ini
+
+hud-files
+bloom
+
+chain-hash d3d8_real.dll 122928cfe225c25d30decf7184a5d37e490cecf3b58256ba3206c7e1853f8ab8 d3d8to9-1.16.0
+chain-hash d3d9.dll 265888c31ca78dffa290c39cb7e50bfb02762590e41927906e46fb32f01497fa dxvk-3.1.1
+chain-marker dxvk.conf # generated by tools/renderer-config.sh

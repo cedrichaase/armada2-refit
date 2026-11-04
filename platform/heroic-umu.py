@@ -32,7 +32,7 @@ ENV = {
     'UMU_HTTP_RETRIES': '0',
 }
 
-_spec = importlib.util.spec_from_file_location('dxvk_logging', os.path.join(HERE, 'dxvk-logging.py'))
+_spec = importlib.util.spec_from_file_location('d3d8_chain', os.path.join(HERE, 'd3d8-chain.py'))
 heroic = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(heroic)
 

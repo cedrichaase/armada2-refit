@@ -82,11 +82,11 @@ check 'grep -q "^  $pver " "$T/out"'
 echo "== install from the package, with the bottle's DLL overrides"
 "$X" --package "$zip" --game "$G" > "$T/out" 2> "$T/err" || { tail -30 "$T/out" "$T/err"; exit 1; }
 check '[ -e "$G/QOL.asi" ] && [ -e "$G/Online.asi" ] && [ -e "$G/winmm.dll" ]'
-# No d3d8.dll in the bottle: d3d8to9 goes in (on wined3d), and with it the UI and the
-# 3D view in place of HUD.asi.
+# No d3d8.dll in the bottle: Display8 goes in alone (no Direct3D chain behind it), and with
+# it the UI and the 3D view.
 check '[ -e "$G/UI.asi" ] && [ -e "$G/Render3D.asi" ] && [ -d "$G/Surfaces" ] && [ ! -e "$G/HUD.asi" ]'
-# Display8 in front of it, on Backend=auto as shipped.
-check 'grep -q "Display8 stopped the game" "$G/d3d8.dll" && [ -e "$G/d3d8_real.dll" ] && grep -qx "Backend=auto" "$G/Display8.ini"'
+# Display8 as d3d8.dll, on Backend=auto as shipped.
+check 'grep -q "Display8 stopped the game" "$G/d3d8.dll" && [ ! -e "$G/d3d8_real.dll" ] && grep -qx "Backend=auto" "$G/Display8.ini"'
 check 'grep -q "Installing Display8" "$T/err"'
 check '[ ! -e "$G/d3d9.dll" ]'
 check '[ "$(cat "$G/binkw32.dll")" = stockbink ] && [ ! -e "$G/binkw32_orig.dll" ] && [ ! -e "$G/BinkProxy.ini" ]'
@@ -95,6 +95,7 @@ check '! grep -q -e Traceback -e ModuleNotFoundError "$T/out" "$T/err"'
 check 'grep -q "\"version\": \"$pver\"" "$G/armada2-refit-installed.json"'
 check 'grep -qF "[Software\\\\Wine\\\\AppDefaults\\\\Armada2.exe\\\\DllOverrides]" "$B/user.reg"'
 check 'grep -qxF "\"winmm\"=\"native,builtin\"" "$B/user.reg" && grep -qxF "\"d3d8\"=\"native,builtin\"" "$B/user.reg"'
+check '! grep -qi "\"d3d9\"" "$B/user.reg"'   # no d3d9 override, ours or anything
 check 'grep -qxF "\"*d3d8\"=\"builtin\"" "$B/user.reg"'
 check '[ -e "$B/user.reg.a2refit-backup" ]'
 

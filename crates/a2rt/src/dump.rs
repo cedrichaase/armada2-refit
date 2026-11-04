@@ -9,13 +9,12 @@
 //! `<name>-<frame>-<what>.pfm|.ppm`, and a sidecar `<name>-<frame>-<plugin>.txt`
 //! lists them with the frame number, each target's size, format and samples.
 //!
-//! A target is read back through `gpu` (`Gpu::read_back`: on Direct3D 9 copied with
-//! `GetRenderTargetData` into a system-memory surface of its size and format, a
-//! multisampled one resolved with `StretchRect` first) and converted row by row on the
+//! A target is read back through `gpu` (`Gpu::read_back`: copied into a host-visible buffer, a
+//! multisampled one resolved first) and converted row by row on the
 //! CPU, so nothing of the device's state changes. A format with no conversion
 //! (`gpu::Format::readable`) is logged and skipped.
 use crate as rt;
-use gpu::d3d9::format_code;
+use gpu::format_code;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt::Write;
@@ -83,7 +82,7 @@ pub struct Dump {
     skipped: u32,
 }
 
-/// The sidecar's samples: 0 for a target of one, as Direct3D 9 counts them.
+/// The sidecar's samples: 0 for a target of one, as the sidecars have always counted them.
 fn ms(samples: u32) -> u32 {
     if samples > 1 { samples } else { 0 }
 }

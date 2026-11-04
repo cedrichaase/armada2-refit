@@ -16,19 +16,22 @@ the game keeps running), so everything needed to reattach is in session.json.
 import datetime
 import fcntl
 import glob
+import hashlib
 import itertools
 import json
 import os
 import re
 import shutil
 import signal
+import struct
 import subprocess
+import sys
 import threading
 import uuid
 import time
 from pathlib import Path
 
-from . import config, jobs, slots, stockcache
+from . import config, jobs, legacy, slots, stockcache
 from .log import Log
 
 
@@ -102,6 +105,42 @@ def _group_has_members(pgid):
 
 class GameError(Exception):
     pass
+
+
+def exe_identity(path):
+    """`exe: {name, sha256, timestamp, image_size, sections}` of the executable at path
+    (phase 8, contract P1; crates/a2engine/src/pe.rs is the run-time twin and its
+    fixtures pin the same fingerprint). The hex strings are what the plugins log
+    (`engine: Armada2.exe timestamp 0x.., image size 0x.., sections 0x..`); the sha256
+    is the bench's alone, never a run-time key. None parts if the file is not a PE."""
+    path = Path(path)
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        head = f.read(0x2000)
+        h.update(head)
+        for chunk in iter(lambda: f.read(1 << 20), b''):
+            h.update(chunk)
+    out = dict(name=path.name, sha256=h.hexdigest(), timestamp=None, image_size=None, sections=None)
+    try:
+        nt = struct.unpack_from('<I', head, 0x3c)[0]
+        if head[:2] != b'MZ' or head[nt:nt + 4] != b'PE\0\0':
+            return out
+        count, ts = struct.unpack_from('<HI', head, nt + 6)
+        opt_size = struct.unpack_from('<H', head, nt + 20)[0]
+        opt = nt + 24
+        size = struct.unpack_from('<I', head, opt + 56)[0]
+        fnv = 0x811c9dc5
+        for i in range(count):
+            at = opt + opt_size + i * 40
+            name = head[at:at + 8]
+            vsize, va, raw = struct.unpack_from('<III', head, at + 8)
+            for chunk in (name, struct.pack('<III', va, vsize, raw)):
+                for b in chunk:
+                    fnv = ((fnv ^ b) * 0x01000193) & 0xffffffff
+        out.update(timestamp=f'{ts:#010x}', image_size=f'{size:#x}', sections=f'{fnv:#010x}')
+    except (struct.error, IndexError):
+        pass
+    return out
 
 
 def checkout_provenance(path):
@@ -214,20 +253,20 @@ class Session:
     @classmethod
     def create(cls, artifacts_dir, res, mod='refit', vnc=False, record=False,
                audio=False, keep=False, label='', stock_shell=None, installs=None, assets=None, slot=None,
-               mute=None, stems=None, clock=None):
+               mute=None, stems=None, clock=None, layers=None):
         """`slot`: a game slot already taken for this session (several at once for a
         multi-player case, or handed down in A2_SLOT_FD); without one, waits for a slot here."""
         slot = slot or slots.adopt_from_env() or slots.acquire(label or 'session')[0]
         try:
             return cls._create(artifacts_dir, res, mod, vnc, record, audio, keep, label, stock_shell,
-                               installs, assets, slot, mute, stems, clock)
+                               installs, assets, slot, mute, stems, clock, layers)
         except BaseException:
             slot.release()
             raise
 
     @classmethod
     def _create(cls, artifacts_dir, res, mod, vnc, record, audio, keep, label, stock_shell, installs, assets, slot,
-                mute=None, stems=None, clock=None):
+                mute=None, stems=None, clock=None, layers=None):
         # timestamp and pid alone collide when a run starts cases in parallel threads
         with _SID_LOCK:
             n = next(_SID_SEQ)
@@ -239,7 +278,12 @@ class Session:
         # assets='none': the game as someone without a texture pack gets it -- A2_DATA is
         # an empty directory, and this checkout's ./install runs into the clone unless
         # --install names others.
-        if assets == 'none' and mod == 'refit' and not installs:
+        # layers: only these of the registry's (layers.toml) -- `./install --only`, into a
+        # clone that starts from stock; this checkout's unless --install names others.
+        layers = [w for x in (layers or []) for w in re.split(r'[,\s]+', x) if w]
+        if layers and mod != 'refit':
+            raise GameError('--layers selects what ./install puts in; it cannot go with --mod stock')
+        if (assets == 'none' or layers) and mod == 'refit' and not installs:
             installs = [config.REPO]
         installs = [checkout_provenance(p) for p in (installs or [])]
         # The plugins' animation clock (`[Bench] Clock=`): --clock, a scenario's `Clock:`,
@@ -248,7 +292,7 @@ class Session:
         if clock not in CLOCKS:
             raise GameError(f'clock {clock!r}: one of {", ".join(CLOCKS)}')
         state = dict(id=sid, dir=str(artifacts_dir), work=str(work), res=list(res), mod=mod, stock_shell=stock_shell,
-                     installs=installs, assets=assets,
+                     installs=installs, assets=assets, layers=layers or None,
                      mute=sorted(mute or []), stems=sorted(stems or []), clock=clock,
                      vnc=vnc, record=record, audio=audio, keep=keep, label=label,
                      created=now(), pids={}, env={}, shots=0, game_started=None,
@@ -268,6 +312,7 @@ class Session:
                       **({'mute': ', '.join(sorted(mute))} if mute else {}),
                       **({'stems': ', '.join(sorted(stems))} if stems else {}),
                       **({'clock': clock} if clock != 'wall' else {}),
+                      **({'layers': ','.join(layers)} if layers else {}),
                       **({'installs': [f"{i['path']} @ {i['describe']}" for i in installs]} if installs else {}))
         return sess
 
@@ -338,6 +383,12 @@ class Session:
             if r.returncode:
                 raise GameError(f'reflink clone of {src} failed (must be btrfs, same '
                                 f'filesystem as {config.CACHE}): {r.stderr.strip()}')
+        exe = self.game_dir / 'Armada2.exe'
+        if exe.is_file():
+            self.s['exe'] = exe_identity(exe)
+            e = self.s['exe']
+            self.log.action(f"Armada2.exe sha256 {e['sha256']}; timestamp {e['timestamp']}, image size "
+                            f"{e['image_size']}, sections {e['sections']}")
         exc = self.game_dir / 'exception.txt'
         self.s['exception_mtime'] = exc.stat().st_mtime if exc.exists() else None
         self.save()
@@ -376,7 +427,9 @@ class Session:
             # the user's install happens to carry -- then each checkout's ./install, in
             # the order given, into the clone. So what the case shows is those commits
             # and nothing else, and the report names them.
-            steps = stock + [[str(Path(i['path']) / 'install')] for i in installs]
+            # With layers, each runs `--only` them (./install takes the others out).
+            only = ['--only', ','.join(self.s['layers'])] if self.s.get('layers') else []
+            steps = stock + [[str(Path(i['path']) / 'install')] + only for i in installs]
         else:
             # The user's install with this checkout's UI.asi: the UI lays the HUD, menus
             # and cursor out at run time for whatever mode is set, so the install takes
@@ -403,8 +456,66 @@ class Session:
                 self.log.action(f'prepare: {name} {" ".join(cmd[1:])}', detail='logs/prepare.log')
         if self.s['mod'] == 'stock' and self.s.get('stock_shell') == 'embed':
             self.embed_stock_shell()
+        self.empty_overlay()
         self.set_volumes()
         self.set_clock()
+
+    # the player's files the plugins read in front of their inis (tools/settings/README.md)
+    OVERLAY_FILES = ('RefitPlayer.ini', 'RefitPlayer.ini.tmp', 'UIPlayer.ini', 'UIPlayer.ini.migrated')
+
+    def empty_overlay(self):
+        """Every clone starts with no `RefitPlayer.ini` (and no `UIPlayer.ini`): the user's
+        own choices must never reach a bench game. A scenario's `Overlay:` writes it again."""
+        gone = []
+        for name in self.OVERLAY_FILES:
+            f = self.game_dir / name
+            if f.exists() or f.is_symlink():
+                f.unlink()
+                gone.append(name)
+        self.log.action('overlay emptied' + (f' (removed {", ".join(gone)})' if gone else ''))
+
+    def set_overlay(self, words):
+        """Writes `Section:Key=value` words (and `--unset Section:Key`) into the clone's
+        RefitPlayer.ini with tools/settings/overlay.py, the edit UI.asi makes. Returns
+        (ok, what overlay.py said)."""
+        words = list(words)
+        for i, w in enumerate(words):
+            if w == '--unset':
+                continue
+            if i and words[i - 1] == '--unset':
+                continue
+            if ':' not in w or '=' not in w:
+                raise GameError(f'overlay word {w!r}: want Section:Key=value (or --unset Section:Key), '
+                                'the section spelled as in the overlay, e.g. Render3D.World:Surfaces=0')
+        r = subprocess.run([sys.executable, str(config.REPO / 'tools/settings/overlay.py'),
+                            str(self.game_dir / 'RefitPlayer.ini'), *words],
+                           capture_output=True, text=True)
+        out = ((r.stdout or '') + (r.stderr or '')).strip()
+        if r.returncode:
+            raise GameError(f'overlay {" ".join(words)} failed: {out}')
+        self.log.action(f'overlay: {" ".join(words)}', detail=out or None)
+        return out
+
+    def drive_overlay(self, words):
+        """`a2test drive overlay ...` in a running game: writes the overlay, then waits up to
+        5 s for the hub in UI.asi to log `settings: RefitPlayer.ini changed` (it notices the
+        file's stamp). Fails clearly when the game has no UI to notice."""
+        key = 'settings: RefitPlayer.ini changed'
+        before = (self.game_log('UI.log') or '').count(key)
+        self.set_overlay(words)
+        if not self.running():
+            return True, 'written; the game is not running (it reads the file at start)'
+        if self.game_log('UI.log') is None:
+            return False, ('written, but this clone has no UI.asi / UI.log: nothing in the game '
+                           'watches RefitPlayer.ini for a change (it is read at start)')
+        end = time.time() + 5
+        while time.time() < end:
+            body = self.game_log('UI.log') or ''
+            if body.count(key) > before:
+                line = [l for l in body.splitlines() if key in l][-1].strip()
+                return True, line
+            time.sleep(0.2)
+        return False, f'written, but UI.log shows no "{key}" within 5 s (is the hub running? see drive log UI.log)'
 
     def set_clock(self):
         """`--clock bench`: `[Bench] Clock=bench` in the clone's Render3D.ini and UI.ini, so
@@ -432,6 +543,15 @@ class Session:
             set_prf_volumes(self.game_dir / 'ARMADA.PRF', vols)
             self.log.action('ARMADA.PRF volumes: ' + ', '.join(f'{c} {v}' for c, v in sorted(vols.items())))
 
+    def dll_overrides(self):
+        """The overrides the game launches with. Since display 1.0.0 nothing in the chain
+        needs Direct3D 9; a clone that carries a `d3d9.dll` of its own (the old Display8 of
+        `display/bench-abi.sh old-display`, which forwards to DXVK) gets its override."""
+        o = config.DLL_OVERRIDES
+        if (self.game_dir / 'd3d9.dll').exists():
+            o += ';d3d9=n,b'
+        return o
+
     def embed_stock_shell(self):
         """Stock, except that the menus are one window with the game (menus/README.md,
         "One window"). Without Embed each menu is its own X11 window and injected clicks
@@ -439,16 +559,9 @@ class Session:
         (2026-09-26). Menus.asi goes back with nothing else on: no scaling, the stock
         800x600 shell mode, no backdrops, stock Esc. The HUD, font and cursors, which the
         stock baseline exists for, stay stock."""
-        # Built from this checkout: ./install no longer puts Menus.asi into the user's
-        # install (the UI hosts the menus), so it cannot be copied from there.
-        subprocess.run(['bash', str(config.REPO / 'menus/build.sh')], check=True,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        shutil.copy2(config.REPO / 'menus/build/Menus.asi', self.game_dir / 'Menus.asi')
-        (self.game_dir / 'Menus.ini').write_text(
-            '; written by the Armada II test bench: stock shell, embedded only\r\n'
-            '[Menus]\r\nMode=1\r\nDesignWidth=800\r\nDesignHeight=600\r\nIntegerScale=1\r\n'
-            'Smooth=0\r\nRaiseShellMode=0\r\nEmbed=1\r\nEscapeReturns=0\r\nUnderlay=0\r\n'
-            'Log=1\r\nTrace=0\r\nBackdrops=0\r\n')
+        # Built from the last tag that has menus/ and cached in $A2_DATA (bench/legacy.py):
+        # the layer left the repository in 15.2.0 and ./install no longer puts it in.
+        legacy.embed(self.game_dir)
         self.log.action('stock shell embedded: Menus.asi with Embed=1 and nothing else, so menus take clicks')
 
     # ------------------------------------------------------------------ display
@@ -803,7 +916,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             raise GameError('the game is already running in this session')
         g = self.game_dir
         for name in ('Menus.log', 'HUD.log', 'QOL.log', 'QOLRules.log', 'GridLayout.log',
-                     'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Scene.marks', 'Armada2_d3d9.log',
+                     'BinkProxy.log', 'Scene.log', 'Scene.marks', 'Armada2_d3d9.log',
                      'Render3D.log', 'Stems.log', 'UI.log', 'Online.log',
                      'Display8.log', 'Display8.inventory.tsv', 'Display8.mark'):
             for d in self.log_dirs:
@@ -823,7 +936,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             STEAM_COMPAT_CLIENT_INSTALL_PATH=str(config.HOME / '.local/share/.steam/steam'),
             STEAM_COMPAT_APP_ID='0', SteamAppId='0', SteamGameId='a2test',
             UMU_RUNTIME_UPDATE='0',
-            WINEDLLOVERRIDES=config.DLL_OVERRIDES,
+            WINEDLLOVERRIDES=self.dll_overrides(),
             WINEDEBUG=os.environ.get('A2TEST_WINEDEBUG', '-all,err+all'),
             WINE_FULLSCREEN_FSR='0',
             DXVK_LOG_PATH=str(logs), DXVK_LOG_LEVEL='info',
@@ -843,7 +956,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             sink = self.start_null_sink()
             if self.s.get('stems'):
                 self.start_stems()
-            env['WINEDLLOVERRIDES'] = config.DLL_OVERRIDES + ';winealsa.drv=d;wineoss.drv=d'
+            env['WINEDLLOVERRIDES'] = self.dll_overrides() + ';winealsa.drv=d;wineoss.drv=d'
             route_wine_audio(self.prefix_dir / 'pfx' / 'user.reg', sink)
         env.update(vulkan_env(g, self.dir / 'logs'))
         # a marker the watchdog can match whatever pid namespace the game ends up in
@@ -1049,7 +1162,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         after launch.  Latching onto one of those made the game "stop running" 2-8 s in,
         every time, while it went on running unwatched (and outlived its teardown).
         Wine names the process `Armada2.exe` under umu but `Main` elsewhere
-        (menus/stop-game.sh), so the name is not used either."""
+        (platform/stop-game.sh), so the name is not used either."""
         out = []
         pfx = str(self.prefix_dir).encode()
         for d in glob.glob('/proc/[0-9]*'):
@@ -1192,8 +1305,8 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
     def collect_logs(self):
         dst = self.dir / 'logs'
         g = self.game_dir
-        for name in ('Menus.log', 'HUD.log', 'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Scene.marks',
-                     'Scene.ini', 'ARMADA.PRF',
+        for name in ('Menus.log', 'HUD.log', 'BinkProxy.log', 'Scene.log', 'Scene.marks', 'RetireCheck.log',
+                     'RefitPlayer.ini', 'Scene.ini', 'ARMADA.PRF',
                      'Stems.log', 'Stems.ini',
                      'Menus.ini', 'HUD.ini', 'QOL.log', 'QOL.ini', 'QOLRules.log', 'QOLRules.ini', 'GridLayout.log',
                      'GridLayout.ini', 'dxvk.conf', 'Online.log',

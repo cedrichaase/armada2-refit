@@ -5,6 +5,399 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 4.1.5 — 2026-11-04
+
+### Fixed
+- `bench/legacy.py`: the tag build of the legacy plugins is made under a file lock, so parallel sessions no longer race on the cache directory.
+- `a2test syms` exits 1 for a build no profile knows (it exited 0 unless `--record`).
+- `ui-whole-game` checks `shell: hooked` and no `standing down` in UI.log (the two `... is loaded` checks could no longer fail); `ui-menus-slider-max` steps Graphics Detail with a key from the top (reads back 3).
+
+Installed, not yet seen in game.
+
+## 4.1.4 — 2026-11-04
+
+### Changed
+- Scenario `display-bail-out` expects the shell's mode not raised after the bail-out (`shell mode raised` absent from `Display8.log`, display 1.0.4). Installed, not yet seen in game.
+
+## 4.1.3 — 2026-11-03
+
+### Changed
+- Scenarios `ui-menus-refit` (three tabs; Movies and Multiplayer not visible; Must match checked on Gameplay) and `multiplayer-two-players` (the lock is checked on Gameplay); `operating/refit-screen.md` and `ui.json` updated. Installed, not yet seen in game.
+
+## 4.1.2 — 2026-11-03
+
+### Fixed
+- Scenario `ui-menus-options`: the display mode list holds the one mode Display8's stub
+  offers, the desktop's; steps 22 to 26 expect "1280x720x32" (not "800x600x32"), choose that
+  entry and expect the adapter row back. No other scenario expected a mode list.
+  Installed, not yet seen in game.
+
+## 4.1.1 — 2026-11-03
+
+### Added
+- Scenario `ui-menus-slider-max`: Graphics Detail to its least and back to its most, read back
+  from UI.log.
+
+### Changed
+- Scenarios and operating notes click the Options entry as "Refit settings".
+  Installed, not yet seen in game.
+
+## 4.1.0 — 2026-11-03
+
+### Added
+- `testbench/bench-detail.sh <0-4>`: a `Setup:` script that sets the clone's Graphics Detail (`ARMADA.PRF` line 5, fields 6 and 10), then runs the rest of the setup.
+- Scene `nebula-detail` (six nebula classes from above) and scenario `render3d-nebula-detail`: the engine's nebula puffs at Graphics Detail 2 through Display8's passthrough; expects the 16-bit texture formats refused and nothing drawn white (root 15.6.8).
+
+Installed, not yet seen in game.
+
+## 4.0.6 — 2026-11-03
+
+### Fixed
+- `display-window` step 14: the intro raise is read from the absence of BinkProxy's stock-mode line (root 15.6.5). Installed, not yet seen in game.
+
+## 4.0.5 — 2026-11-03
+
+### Fixed
+- `engine-syms` expects BinkProxy at 4/4 symbols resolved (root 15.6.4). Installed, not yet seen in game.
+
+## 4.0.4 — 2026-11-03
+
+### Fixed
+- `render3d-build-subset` and `render3d/subset-scenario.sh`: the exported settings row count without a module is 21 (10 the core's), not 20 (9) (root 15.6.3). Installed, not yet seen in game.
+
+## 4.0.3 — 2026-11-03
+
+### Fixed
+- `gui-installer/test.sh` expectations for the package without the Direct3D 9 chain (root 15.6.2). Installed, not yet seen in game.
+
+## 4.0.2 — 2026-11-03
+
+### Fixed
+- `tools/layers-selftest.py` expects the core layers without the retired `renderer` (root 15.6.1). Installed, not yet seen in game.
+
+## 4.0.1 — 2026-11-03
+
+### Changed
+- `retire-old-install` expects the chain class (`d3d8_real.dll`, `d3d9.dll`, `dxvk.conf`) removed, not left or removed: `./install` passes `retire.sh --chain` (root 15.6.0).
+
+Installed, not yet seen in game
+
+## 4.0.0 — 2026-11-03
+
+MAJOR: `--no-grid` is no longer passed, `ui/bench-legacy.sh` and the Direct3D 9 probes are no longer used, and the `-forward` scenarios are gone.
+
+### Added
+- `bench/legacy.py`: builds HUD, GridLayout and Menus once from the last tag that has them (`v13.51.3`, `git archive` into a scratch directory) and caches them in `$A2_DATA/bench/legacy/<tag>/`, with the tag's `hud/` scripts and the vendored chain DLLs. `ensure`, `install`, `embed` and `seed` on the command line.
+- `retire-old-install` (and its `Setup:` script `retire-old-install.py`): an old install (the three plugins and inis, the hud scripts' edits and backups, the d3d8to9 and DXVK files, a marked `dxvk.conf`, the twelve per-part plugins, `MenuScale`, the loading screen's backups) over a refit clone, then `./install`; every file must hash as before, the chain class left or removed. `Assets: none`.
+
+### Changed
+- `Stock shell: embed` copies Menus.asi from the cache (was `menus/build.sh` of the checkout, which is gone). `display/bench-abi.sh old-display` takes Menus.asi from it too.
+- `DLL_OVERRIDES` is `winmm=n,b;d3d8=n,b`: a clone that carries its own `d3d9.dll` (the old Display8 of `display-abi-mismatch`) gets `d3d9=n,b` added at launch.
+- `display-abi-mismatch` step 17 expects the old Display8's `mode forward` (0.11.0's default; the "forward mode instead" fallback text is gone).
+- Scenarios and notes drop `--no-grid` (twelve `ui-*` scenarios, `operating/`); `render3d-pivot` and `ui-leftovers-2` run on the stub (`bench-mode.sh stub`, were `forward`). `menus/run-wine.sh` and `menus/stop-game.sh` are `platform/` in the README, `admirals-log` and `session.py`. `GAMEPLAY.md` and `operating/ui-switchon.md` say the grid and the legacy plugins are retired.
+
+### Removed
+- `d3d9probe/` and `d3dtrace/` (and their log names in `session.py`).
+- The scenarios that tested the retired plugins themselves, which the `ui-hud-*` and `ui-menus-*` scenarios cover on the UI: `escape-menu`, `game-setup-labels`, `main-menu`, `hud`, `hud-mode-switch`, `grid-layout`. `stock-control` stays (a stock case, `Stock shell: embed` from the cache).
+- `display-passthrough-forward`, `display-passthrough-all-forward`, `display-passthrough-nebula-forward` (the `p10-fwd-*` baselines they recorded are frozen), and `render3d-mode-switch` and `display-inventory-modes` (a display mode switched in the middle of a mission: the stub offers one mode, so nothing is left to switch).
+
+Installed, not yet seen in game
+
+## 3.106.0 — 2026-11-03
+
+### Added
+- `display-bail-out`: `Backend=none`, the stock game through the system's Direct3D 8 with the plugins standing down.
+- `display-retired-keys` (Direct3D 12: `Backend=d3d12,d3d9`, `Mode=forward`, `Real=` read past) and `display-retired-keys-overlay` (the overlay's `[Display8.Display8] Backend=d3d9`: auto, Vulkan).
+
+### Changed
+- `display-fallback`: Vulkan and Direct3D 12 fail at the first `CreateDevice`, then the late bail-out (was Direct3D 9); the stock shell's cube clicked in screen pixels.
+- `engine-unknown-build` and `engine-mismatch`: Display8 takes the bail-out (was the forward chain).
+- `display-inventory`, `display-engine-draws`, `display-drop`: on the stub (forward mode went); `display-stub`, `display-movie`: the Direct3D 9 and forward variants replaced by Direct3D 12.
+
+Installed, not yet seen in game.
+
+## 3.105.0 — 2026-11-03
+
+### Added
+- Frozen baselines in `$A2_DATA/baselines` (assets, never in git), recorded on round-e 4084eb4 at 1280x720: `p10-fwd-display-passthrough`, `-all`, `-nebula` (the forward chain), `p10-vk-` of those three plus `port-showcase`, `port-nebula`, `port-firing`, `ui-hud-bar`, `ui-menus-scene` (the GPU's Vulkan stub), and `p10-d12-port-showcase`, `-port-nebula`, `-port-firing` (Direct3D 12, every module on).
+
+### Changed
+- `display-passthrough` and `display-passthrough-nebula` compare against `p10-vk-*` (RMSE 0) and, the nebula, against `p10-fwd-display-passthrough-nebula` (RMSE 1.5) instead of a live forward run; `display-passthrough-d3d12` compares against `p10-vk-display-passthrough` (RMSE 1.0). The three `*-forward` scenarios are marked "reference recorder; phase 11 deletes", and `display-passthrough-nebula-forward` no longer records a baseline on every run. `display-passthrough-all` documents that the live mission is not repeatable (no whole-frame step). `port-showcase` names the frozen references; the lavapipe sentence of the README and "Baselines" point at `p10-vk-*` in place of `pre-gpu-*`.
+
+Installed, not yet seen in game.
+
+## 3.104.0 — 2026-11-03
+
+### Added
+- `display-passthrough-d3d12`: `display-passthrough` on `Backend=d3d12` (hulls module off; the engine's ships drawn by Display8 into render3d's published pass), the one paused frame a change to `dx12/pass.rs` runs first. Installed, not yet seen in game.
+
+## 3.103.1 — 2026-11-03
+
+### Fixed
+- `display-abi-mismatch`, olddisplay half: since display 0.18.0 moved the shell's mode raise from the UI to Display8, Display 0.11.0's one-mode stub left the engine with no 800x600 mode and Wine overflowed the stack before the menu. `display/bench-abi.sh` now puts Menus.asi back beside the old Display8 (`ui/bench-legacy.sh menus`); the scenario clicks the cube at 930,100 there and expects the forward-mode fallback. Installed, not yet seen in game.
+
+## 3.103.0 — 2026-11-03
+
+### Added
+- `render3d-view-distance`: the log of `View.Distance`'s patch and the live overlay change (W-VIEW). Installed, not yet seen in game.
+
+### Changed
+- `qol-settings-live` no longer flips `ViewDistance` (moved to render3d). Installed, not yet seen in game.
+
+## 3.102.0 — 2026-11-03
+
+### Added
+- `subset-full`, `subset-stockcompat`, `subset-visuals`, `subset-display-render3d`, `subset-display-ui` and `subset-display`: one game each, a mission with `Layers:` (none for the full release), checked on the plugins' logs (phase 9 W-PKG). Installed, not yet seen in game.
+
+## 3.101.0 — 2026-11-03
+
+### Added
+- Scenarios `qol-bar-keys` (the position keys through QOL, live `BarKeys`), `qol-bar-keys-stock` (`Layers: qol`: no refit bar, the keys stand down, the stock key works) and `ui-settings-moved-bar` (`Overlay: UI.HUD:BarKeys=0` is moved to `[QOL.QOL]`).
+
+### Changed
+- `engine-syms` expects the new symbol counts (UI hud 169, QOL 133). `ui-hud-bar` and `qol-refused-advisor` expect the key presses in `QOL.log` (`bar: key S`), not `UI.log`. Installed, not yet seen in game.
+
+## 3.100.0 — 2026-11-03
+
+### Added
+- Scenarios `display-window` (the shell and intro raised by Display8, `KeepClip`, forward and stub, and without the UI through `--layers`) and `ui-settings-moved` (an old `[UI] Native` in `UI.ini` and `[UI.UI] KeepClip` in `RefitPlayer.ini` move to Display8's `[Window]`, once), with `display/bench-moved.sh` as its setup.
+
+### Changed
+- `ui-pointer-bar` and `display-movie-no-proxy` read Display8.log for the clip and the intro's mode (they moved there).
+
+Installed, not yet seen in game
+
+## 3.99.1 — 2026-11-03
+
+### Changed
+- `multiplayer-online-rules-mixed` keeps `online/bench-asi.sh --no-rules joiner` (`Layers:` applies to a whole run, not to one player); the QOL-7 references of the rules scenarios point at `rules/README.md`. Installed, not yet seen in game.
+
+## 3.99.0 — 2026-11-03
+
+### Added
+- `--layers a,b` on `a2test session start` and `a2test run`, and the scenario header `Layers: a b`: each `--install` checkout runs `./install --only` them into a clone from stock (this checkout's when none is given); the run's flag overrides the header. The session log's `layers=`, each case's `result.json` and its report heading record them.
+
+### Changed
+- The stock cache's key also hashes `layers.toml` and `tools/layers.py`, since what `a2mod stock` sets aside is the registry's.
+
+Installed, not yet seen in game
+
+## 3.98.3 — 2026-11-03
+
+### Changed
+- `engine-syms` gains the Render3D section; `engine-unknown-build` expects Render3D to stand
+  down; `engine-mismatch-hulls` is no longer pending (RMSE 0 against `roundD-base-port-showcase-hulls0`).
+- Installed, not yet seen in game
+
+## 3.98.2 — 2026-11-03
+
+### Fixed
+- `ui-hud-panels` follows the UI's five top-right buttons (help, palette and "show more" were removed in ui 0.25.0): it expects `resources: Dilithium=` and `buttons: menu comm idle view objectives(off)` and clicks idle at 1189,27 instead of "more" (it failed the same way on the pre-phase-8 base).
+- `ui-loading` waits up to 90 s for the logs and for `mission: frames start` before the "match" shot (the 25 s `[Loading] Hold` ends at 51% and the load goes on; the fixed 25 s was too short, also on the base).
+- Installed, not yet seen in game
+
+## 3.98.1 — 2026-11-03
+
+### Fixed
+- `engine-mismatch-cplugins` is no longer pending: its TEST-line step matches the log's ", " separator, and its frame step allows rmse 2.5 (the minimap's view-frustum lines differ while QOL's `view_distance` stands down; nothing else does).
+
+Installed, not yet seen in game
+
+## 3.98.0 — 2026-11-03
+
+### Added
+- `./a2test syms [--exe PATH] [--build B] [--plugin P] [--record] [--json]` (`bench/syms.py`): the symbol profiles checked offline against an executable, each hook ready or its stand-down reason, `symbols: N/M`; `--record` appends the sha256 to the matched build's `[[known]]`.
+- `tools/engine/negative.sh`: the offline negative tests on scratch copies of the exe (timestamp, one changed entry per plugin file, forced child build, `--record`); also a step of `tools/engine/selftest.sh`.
+- Setup scripts `tools/engine/bench-exe.sh stamp` (the clone's exe with a changed PE timestamp) and `bench-mismatch.sh` (the clone's `A2EngineTest.ini`, globs or by player).
+- Scenarios `engine-unknown-build` (every plugin on a profile stands down on an unknown build, the stock game plays) and `engine-mismatch` (`Players: display, radar`: Display8 forwards under a forced `display.modes`; `ui.hud.radar` gives the stock minimap and the Minimap row's note). `engine-mismatch-hulls` (render3d, RMSE 0 against `roundD-base-port-showcase-hulls0`) and `engine-mismatch-cplugins` are written and pending phases 8e and 8d.
+
+### Fixed
+- `tools/settings/gen.py` (so `lint.py` and `gen.py --check`) skips every `tools/<tool>/fixtures/` tree, not only the settings tool's own: the engine tool's good lint fixture failed CI's settings job.
+
+Installed, not yet seen in game
+
+## 3.97.3 — 2026-11-03
+
+### Added
+- `engine-syms` has BinkProxy, Online, QOL and QOLRules sections (identity, build, `symbols: N/M`, no stand-down); its `Setup:` also puts Online.asi in the clone (`online/bench-asi.sh`).
+- `qol-big-selection` and its scene `qol-bigselect`: twenty Galaxy class ships firing at a cube, all selected with the HUD on, a group of twenty bound and recalled (a selection over 16 with special weapons in combat, CLAUDE.md qol).
+
+Installed, not yet seen in game.
+
+## 3.97.2 — 2026-11-03
+
+### Added
+- Scenario `engine-syms`: UI section (the build recognised, every part's `symbols: N/N resolved; 0 hooks blocked`, no stand-down, no early read).
+
+Installed, not yet seen in game
+
+## 3.97.1 — 2026-11-03
+
+### Fixed
+- `engine-syms` waits a fixed 60 seconds after the launch instead of for the `passthrough: the engine's first draw` line: a wait reads only lines written after the last action, and the line was already written by the time the launch step returned.
+
+Installed, not yet seen in game
+
+## 3.97.0 — 2026-11-03
+
+### Added
+- Scenario `engine-syms` (Display8 section): the build recognised, `symbols: 15/15 resolved; 0 hooks blocked`, no hook standing down and no symbol read before its hook. Later phase 8 packages append their plugins' sections.
+
+Installed, not yet seen in game
+
+## 3.96.0 — 2026-11-03
+
+### Added
+- The executable's identity is recorded: `session.json` and each case's `result.json` (and the report) carry `exe: {name, sha256, timestamp, image_size, sections}`, read from the clone's `Armada2.exe` at session start (`bench/session.py`, `exe_identity`), and the session log notes it.
+
+Installed, not yet seen in game
+
+## 3.95.0 — 2026-11-03
+
+### Added
+- Scenario `render3d-build-subset`: Render3D.asi built without hulls
+  (`render3d/bench-asi.sh --without hulls`) on the paused showcase, at RMSE 0 against
+  `roundD-base-port-showcase-hulls0`, with its rows and its `modules not built in` line;
+  `render3d/subset-scenario.sh <m>` writes the variants for the other modules.
+
+Installed, not yet seen in game.
+
+## 3.94.0 — 2026-11-03
+
+### Added
+- Scenario `render3d-live-msaa` (`MSAA` 4 to 0, 8, 4 and `HDR` 1 to 0 to 1 on the paused
+  showcase, each at RMSE 0 against the baseline of the same key at load).
+
+### Changed
+- `ui-menus-refit`: the Anti-aliasing step is a live row now (`Now`, no restart banner).
+- `Clock: bench` for `render3d-cone-emitter`, `-hulls-extras`, `-hull-sparks`,
+  `-specialfx` and `-planet-ghost`, so two launches draw the same picture.
+
+Installed, not yet seen in game.
+
+## 3.93.0 — 2026-11-03
+
+### Added
+- Scenario `render3d-live-effects` (the effects module switched off live at RMSE 0
+  against `roundD-base-port-showcase-effects0`, on again against the base, off again).
+
+Installed, not yet seen in game.
+
+## 3.92.0 — 2026-11-03
+
+### Added
+- Scenarios `render3d-live-world` (the showcase, `Modules.world` and `Modules.overlays`
+  switched off and on through the overlay, each frame at RMSE 0 against the same key at
+  load; `World.Planets/Rocks/Nebulae` and `Overlays.*` flipped and back) and
+  `render3d-live-world-nebula` (the nebula scene, the nebulae's light hook handing back
+  to the engine's). Installed, not yet seen in game
+
+## 3.91.0 — 2026-11-03
+
+### Added
+- Scenarios `render3d-live-particles` (the module switched off live at RMSE 0 against
+  its load-time baseline, on again, off again) and `render3d-live-ordnance` (the same
+  flips on the firing scene, checked by the log and a running game).
+
+Installed, not yet seen in game.
+
+## 3.90.0 — 2026-11-03
+
+### Added
+- Scenarios `render3d-live-hulls` (the showcase, `Modules.hulls` and `Modules.specials`
+  switched off and on through the overlay, each frame at RMSE 0 against the same key at
+  load) and `render3d-live-specials` (off at load, switched on live, a fresh effect is
+  drawn by the module). Installed, not yet seen in game
+
+## 3.85.0 — 2026-11-02
+
+### Added
+- Scenario `ui-menus-refit` (the Refit screen in the shell, across a relaunch and in a
+  mission) and the recipe `operating/refit-screen.md`; `ui.json` screen `refit`
+  (`Wait for the refit screen`).
+
+### Changed
+- `multiplayer-two-players` checks the lock on *Pay when queued* in the running match;
+  `ui-menus-dialogs` expects `Refit` among the in-mission Options' (now ten) entries.
+
+Confirmed in game 2026-11-03.
+
+## 3.84.0 — 2026-11-02
+
+### Fixed
+- `Session.launch` deleted `RefitPlayer.ini` with the plugins' logs, so a scenario's
+  `Overlay:` (written before launch) never reached the game; it no longer does, and
+  `collect_logs` keeps the file. `overlay_selftest.py` checks both.
+
+Confirmed in game 2026-11-03.
+
+## 3.83.1 — 2026-11-02
+
+### Changed
+- `render3d-settings-live`: `Overlay` steps, plus `World.Surfaces=0` and `Modules.sky=0`
+  against their `roundC-main-port-showcase-*` baselines. `qol-settings-live`: the manual
+  `Overlay "..."` notes became the `Overlay` step.
+
+Confirmed in game 2026-11-03.
+
+## 3.83.0 — 2026-11-02
+
+### Added
+- Scenario step `Overlay Section.Name:Key=value ...` / `Overlay --unset Section.Name:Key`:
+  `a2test drive overlay` for scenarios (same function), an action so later log waits see
+  only lines since it; so live-flip scenarios run unattended. Selftest extended.
+
+Confirmed in game 2026-11-03.
+
+## 3.82.0 — 2026-11-02
+
+### Added
+- Scenario `ui-settings-live` (overlay before launch: minimap off, Klingon theme).
+
+Confirmed in game 2026-11-03
+- Scenario `qol-settings-live`: `ShiftAddsToGroup`, `StationGroups`, `PanSpeed`, `WarpDistance`
+  and `ViewDistance` flipped through `RefitPlayer.ini` in a running mission; checked by
+  QOL.log's `settings: applied` lines and by what the groups hold.
+
+Confirmed in game 2026-11-03.
+
+## 3.81.0 — 2026-11-02
+
+### Added
+- Scenario `render3d-settings-live`: module and surface flips in a paused game by
+  `drive overlay`, compared with the `roundC-main-port-showcase*` baselines.
+
+Confirmed in game 2026-11-03.
+
+## 3.80.0 — 2026-11-02
+
+### Added
+- Every clone starts with `RefitPlayer.ini`, `RefitPlayer.ini.tmp`, `UIPlayer.ini` and
+  `UIPlayer.ini.migrated` deleted (`overlay emptied` in the log); `collect_logs` keeps
+  `RefitPlayer.ini`.
+- Scenario header `Overlay: Render3D.Modules:sky=0 UI.HUD:Minimap=0`, written with
+  `tools/settings/overlay.py` after `Setup:` and before launch; `a2test check` shows it.
+- `a2test drive --session ID overlay WORD... [--unset Section:Key]`: the same edit in a
+  running game, then waits up to 5 s for the hub's `settings: RefitPlayer.ini changed`
+  in `UI.log` and fails clearly without one.
+- `bench/overlay_selftest.py`.
+
+Confirmed in game 2026-11-03.
+
+## 3.79.0 — 2026-11-02
+
+### Added
+- Scenario `ui-settings-migrate`: an old `UIPlayer.ini` with `BarHidden=1` is migrated
+  into `RefitPlayer.ini` at the first frame, renamed `.migrated`, and the bar stays
+  hidden in the first Federation mission. Overlay keys for any scenario's `Setup:`
+  come from `tools/settings/bench-overlay.sh` (`Render3D.Modules:sky=0`).
+
+### Changed
+- `ui-hud-bar-after-cinematic` and `operating/menus-host.md` name `RefitPlayer.ini`'s
+  `[UI.HUD] BarHidden` in place of `UIPlayer.ini`.
+
+Confirmed in game 2026-11-03.
+
 ## 3.78.3 — 2026-10-30
 
 ### Added
@@ -320,6 +713,7 @@ Confirmed in game 2026-10-30.
 ### Added
 - `display-movie`: the launch reels and the intro on screen (a 4:3 picture between
   bars, not a black frame), through the UI; on the stub with `display/stub-scenario.sh`.
+
 ## 3.53.0 — 2026-10-23
 
 ### Added

@@ -13,8 +13,6 @@ use alloc::vec::Vec;
 use core::ffi::c_void;
 use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
-pub const IID_DEVICE9: Guid = Guid { d1: 0xd0223b96, d2: 0xbf7a, d3: 0x43fd, d4: [0x92, 0xbd, 0xa4, 0x3b, 0x0d, 0x82, 0xb9, 0xeb] };
-pub const IID_TEXTURE9: Guid = Guid { d1: 0x85c31227, d2: 0x3de5, d3: 0x4f00, d4: [0x9b, 0x3a, 0xf1, 0x1a, 0xc3, 0x8c, 0x18, 0xb5] };
 
 /// The stub's vtables, one per kind, separate from forward mode's (`com::VTABLES`) and
 /// as patchable: the plugins chain the device's `Reset` and `Present`.
@@ -62,8 +60,6 @@ pub struct Tex {
     pub levels: Vec<Level>,
     pub lod: u32,
     pub priority: u32,
-    /// The Direct3D 9 texture a plugin asked for (one reference ours), or null.
-    pub mirror: *mut c_void,
     /// A level written since the mirror was last brought up to date (bit per level).
     pub dirty: AtomicU32,
     /// The Vulkan mirror (`vk::mirror`): a boxed image, or 0.
@@ -208,16 +204,12 @@ fn free(o: *mut SObj) {
                     drop(unsafe { Box::from_raw(l.child) });
                 }
             }
-            if !t.mirror.is_null() {
-                super::forget_mirror(o, t.mirror);
-                vcall!(t.mirror, 2, fn() -> u32,);
-            }
             if t.vk != 0 {
-                super::forget_mirror(o, core::ptr::null_mut());
+                super::forget_mirror(o);
                 crate::vk::mirror::forget(t.vk);
             }
             if t.dx12 != 0 {
-                super::forget_mirror(o, core::ptr::null_mut());
+                super::forget_mirror(o);
                 crate::dx12::mirror::forget(t.dx12);
             }
         }
@@ -233,8 +225,8 @@ fn free(o: *mut SObj) {
     }
 }
 
-/// `QueryInterface` on a stub object: its own interfaces; the device's Direct3D 9
-/// device and a texture's mirror for the plugins (README.md, "Stub mode").
+/// `QueryInterface` on a stub object: its own interfaces, nothing else (the plugins
+/// reach the device and a texture's mirror through `gpu/src/display.rs`).
 pub fn query(o: *mut SObj, iid: *const Guid, out: *mut *mut c_void) -> HRESULT {
     if iid.is_null() || out.is_null() {
         return E_POINTER;
@@ -245,22 +237,6 @@ pub fn query(o: *mut SObj, iid: *const Guid, out: *mut *mut c_void) -> HRESULT {
         add_ref(o);
         unsafe { *out = o as *mut c_void };
         return S_OK;
-    }
-    if kind == Kind::Device && id == IID_DEVICE9 {
-        let d = super::dev9();
-        if !d.is_null() {
-            vcall!(d, 1, fn() -> u32,);
-            unsafe { *out = d };
-            return S_OK;
-        }
-    }
-    if kind == Kind::Texture && id == IID_TEXTURE9 {
-        let m = super::mirror(o);
-        if !m.is_null() {
-            vcall!(m, 1, fn() -> u32,);
-            unsafe { *out = m };
-            return S_OK;
-        }
     }
     unsafe { *out = core::ptr::null_mut() };
     E_NOINTERFACE

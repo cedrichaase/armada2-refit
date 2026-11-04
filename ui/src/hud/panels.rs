@@ -45,15 +45,15 @@ pub fn install(c: &Hud) {
         flag
     };
     engine::buttons::install_presses();
-    o.resources = take(c.resources, topbar::RESOURCE_PANEL, "ResourcePanel");
-    o.buttons = take(c.buttons, topbar::BUTTON_PANEL, "ButtonPanel");
-    o.messages = take(c.messages, popups::MESSAGE, "MessageDisplay") | take(c.messages, popups::OBJECTIVES, "ObjectivesDisplay");
+    o.resources = take(c.resources, topbar::resource_panel(), "ResourcePanel");
+    o.buttons = take(c.buttons, topbar::button_panel(), "ButtonPanel");
+    o.messages = take(c.messages, popups::message_box(), "MessageDisplay") | take(c.messages, popups::objectives_box(), "ObjectivesDisplay");
     if o.messages {
         engine::buttons::set_each_pass(popups::objectives_keys);
     }
-    o.pause = take(c.pause, popups::PAUSE, "PauseBox");
-    o.replay = take(c.replay, popups::REPLAY, "ReplayPanel");
-    o.overlay = take(c.overlay, engine::overlay_text::OVERLAY, "OverlayText");
+    o.pause = take(c.pause, popups::pause_box(), "PauseBox");
+    o.replay = take(c.replay, popups::replay_box(), "ReplayPanel");
+    o.overlay = take(c.overlay, engine::overlay_text::overlay(), "OverlayText");
     if c.chat {
         if engine::chat::install() {
             engine::chat::set_taken(true);

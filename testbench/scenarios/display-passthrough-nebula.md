@@ -7,8 +7,9 @@ Clock: bench
 Setup: display/bench-mode.sh stub Passthrough=1 render3d/bench-ini.sh Modules:world=0 Modules:particles=0 Modules:hulls=0 Modules:effects=0 Modules:ordnance=0 Modules:specials=0 Modules:sky=0 Modules:overlays=0 nebula-cerulean Seed=7 Step=16 Pause=200
 Timeout: 15 min
 
-Run with `--install .`, after `display-passthrough-nebula-forward`, whose baseline
-`passthrough-nebula` it is compared against (`display/README.md`, "Passthrough",
+Run with `--install .`. It is compared against the frozen baselines `p10-fwd-display-passthrough-nebula`
+(the forward chain, recorded by `display-passthrough-nebula-forward`, a reference recorder) and
+`p10-vk-display-passthrough-nebula` (this scenario on the GPU's Vulkan; phase 10 X4) (`display/README.md`, "Passthrough",
 "Map nebulae"). Display8 in stub mode with `Passthrough=1` and every render3d module
 off: the engine draws the cerulean nebula's puffs (`mnebula10`, `Mnebula5`) and
 Display8 draws them on Vulkan. Each frame, at ticks 200, 202 and 220, matches the
@@ -16,6 +17,12 @@ forward chain's at the same tick, so the puffs stand and move exactly as there; 
 paused frame stands still. Measured 2026-10-30: RMSE 0.93/255 against the forward
 frame (additive blending's last bit over the gas, the ship's edges), the frame-to-frame
 change over 2 ticks 1.24 forward, 1.24 here.
+
+On Direct3D 12 (display 0.20.0, phase 10 X1) the variant is `display/stub-scenario.sh
+display-passthrough-nebula stub Backend=d3d12` (RMSE 0.9 against the forward chain's
+baseline, inside this scenario's 1.5), after `display-passthrough-d3d12` has passed.
+Steps 20 to 22 (RMSE 0 against Vulkan's own frames) are for Vulkan; on Direct3D 12 the
+bound against `p10-vk-` is RMSE 1.0 (phase 10 plan, X-C5).
 
 1. Launch the game.
 2. Wait up to 600 seconds for "Scene.log" to say "paused at tick".
@@ -33,11 +40,14 @@ change over 2 ticks 1.24 forward, 1.24 here.
 14. Wait up to 60 seconds for "Scene.log" to say "paused at tick 220".
 15. Wait 3 seconds.
 16. Take a screenshot called "t220".
-17. Expect the screenshot "t200" matches baseline "passthrough-nebula" within RMSE 1.5 with at most 1% of pixels over 4.
-18. Expect the screenshot "t202" matches baseline "passthrough-nebula" within RMSE 1.5 with at most 1% of pixels over 4.
-19. Expect the screenshot "t220" matches baseline "passthrough-nebula" within RMSE 1.5 with at most 1% of pixels over 4.
-20. Expect "Display8.log" contains "passthrough: the engine's first draw".
-21. Expect "Display8.log" not contain "PASSTHROUGH a texture transform".
-22. Expect "Display8.log" not contain "PASSTHROUGH generated texture coordinates".
-23. Expect "Display8.log" not contain "vulkan 0x".
-24. Expect no crash.
+17. Expect the screenshot "t200" matches baseline "p10-fwd-display-passthrough-nebula" within RMSE 1.5 with at most 1% of pixels over 4.
+18. Expect the screenshot "t202" matches baseline "p10-fwd-display-passthrough-nebula" within RMSE 1.5 with at most 1% of pixels over 4.
+19. Expect the screenshot "t220" matches baseline "p10-fwd-display-passthrough-nebula" within RMSE 1.5 with at most 1% of pixels over 4.
+20. Expect the screenshot "t200" matches baseline "p10-vk-display-passthrough-nebula" within RMSE 0.
+21. Expect the screenshot "t202" matches baseline "p10-vk-display-passthrough-nebula" within RMSE 0.
+22. Expect the screenshot "t220" matches baseline "p10-vk-display-passthrough-nebula" within RMSE 0.
+23. Expect "Display8.log" contains "passthrough: the engine's first draw".
+24. Expect "Display8.log" not contain "PASSTHROUGH a texture transform".
+25. Expect "Display8.log" not contain "PASSTHROUGH generated texture coordinates".
+26. Expect "Display8.log" not contain "vulkan 0x".
+27. Expect no crash.

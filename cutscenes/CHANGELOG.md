@@ -4,6 +4,62 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`binkproxy/README.md`](binkproxy/README.md).
 
+## 3.0.1 — 2026-11-03
+
+### Removed
+- The Refit screen's Movies tab: `settings.toml`, `settings_table.h` and the exports `BinkProxy_Settings`, `BinkProxy_SettingsNote` and `BinkProxy_SettingsChanged` are gone, since no replacement movies are shipped. `ReplaceMovies` is still read from `BinkProxy.ini` and the overlay (`[BinkProxy.BinkProxy]`) at each movie open; the launch reels are still scaled full screen.
+
+A patch and not a major, by the table in CLAUDE.md: the exports were added after the last release (cutscenes 2.4.0, root 13.51.3 has none of them) and were read only by UI.asi, whose settings hub this release no longer asks for them; no release carried a UI.asi that reads them beside a BinkProxy without them.
+
+Installed, not yet seen in game.
+
+## 3.0.0 — 2026-11-03
+
+### Removed
+- `RaiseIntroMode` (with `IntroWidth` and `IntroHeight`): the key and the code that raised `PlayIntroMovie`'s 640x480 push pair. Display8 is the only owner of the intro's mode (`[Window] RaiseIntro`). Without Display8 the intro stays stock and BinkProxy logs `intro: stock mode (no Display8)` once.
+- The `binkproxy.intro_mode` hook and its two scans in `profiles/gog-1.1/binkproxy.toml` (`engine_syms.h` regenerated).
+
+Installed, not yet seen in game.
+
+## 2.7.0 — 2026-11-03
+
+### Changed
+- BinkProxy leaves the intro's mode lookups to Display8 when `d3d8.dll` exports `display8_abi` (log `intro: Display8 raises the mode`); `RaiseIntroMode=1` is the fallback for any other `d3d8.dll`, until Display8 is required. `IntroWidth` and `IntroHeight` apply only to that fallback. Installed, not yet seen in game.
+
+
+## 2.6.1 — 2026-11-03
+
+### Changed
+- `binkproxy/settings_table.h` is regenerated at A2SET_ABI 1.1 (48-byte rows). Nothing else changes. Installed, not yet seen in game.
+
+## 2.6.0 — 2026-11-03
+
+### Added
+- BinkProxy is on the symbol profile (`profiles/gog-1.1/binkproxy.toml`, hooks `binkproxy.intro_mode` and `binkproxy.intro_copy`; phase 8d): the intro-mode signature scans run on any build, the intro's back-buffer read stands down with a reason when the call site is not stock.
+- `BinkProxy_SettingsNote` export (the engine's notes for the settings screen).
+
+### Changed
+- No address literal is left in `binkproxy.c`; the intro-mode patch reads the scans' matches instead of walking `.text` itself.
+
+Installed, not yet seen in game
+
+## 2.5.1 — 2026-11-03
+
+### Added
+- BinkProxy.log logs the identity line before its `loaded` line (`csdk/a2engine.h`). Changes no behaviour.
+
+Installed, not yet seen in game
+
+## 2.5.0 — 2026-11-02
+
+### Added
+- `binkw32.dll` reads `BinkProxy.ini` through the player's overlay `RefitPlayer.ini`
+  (`[BinkProxy.BinkProxy]`). `ReplaceMovies` is a settings row (`settings.toml`, the
+  `BinkProxy_Settings` export, LIVE) read again at each movie open; `BinkProxy_SettingsChanged`
+  is exported for the UI's hub.
+
+Confirmed in game 2026-11-03.
+
 ## 2.4.0 — 2026-10-30
 
 ### Changed

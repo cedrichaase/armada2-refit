@@ -2,10 +2,12 @@
 
 The game's 3D geometry, where the refit changes it:
 
-- **The loading screen**, `SOD/logo.SOD`, widened to fill a wide screen
-  (`logo-sod.py`, with its art from `loading-panel.sh`). It ships with the `LOADING`
-  texture target, and `a2tex install`/`revert` move the two together. The reasoning is
-  in `textures/README.md`, in the loading-screen section.
+- **The loading screen** is not here any more: `SOD/logo.SOD` was widened by `logo-sod.py`
+  (with its art from `loading-panel.sh`) together with the `LOADING` texture target, and
+  both were retired in models 5.1.0 / textures 2.2.0, since the UI draws the loading screen
+  and Display8's stub drops the engine's scene. `retire/retire.sh` puts a widened
+  `logo.SOD` and the `LOADING` textures back from their backups. The measurements are in
+  `textures/README.md`, in the loading-screen section.
 - **Planets** are not here: their shape is not in their SOD, and they are drawn on a
   sphere of render3d's own (`render3d/README.md`, world module). What was learned
   before that is below, under "Planets".
@@ -89,8 +91,9 @@ trade in game. `--glow` smooths the shell too.
 
 That was judged without `d3d9.cachedWriteOnlyBuffers`. Before postfx 1.1.1 (now renderer), the CPU
 path read back every vertex it wrote from a buffer DXVK keeps in GPU memory, which made
-it far slower than its triangle count suggests (`renderer/README.md`, "Reading back a
-dynamic vertex buffer"). The shell's cost with that key set has not been measured.
+it far slower than its triangle count suggests: a blended draw goes down the CPU path
+(`RenderInternalNonVB`), and under DXVK it read back every vertex it wrote from a
+buffer kept in GPU memory, which `d3d9.cachedWriteOnlyBuffers` avoids. The shell's cost with that key set has not been measured.
 
 ## The selection bubble
 
@@ -98,8 +101,8 @@ dynamic vertex buffer"). The shell's cost with that key set has not been measure
 
 The translucent ellipse around each selected ship shows its polygon: a run of straight
 segments around the rim, with corners, and flat facets in its shading. It is
-`SelectionEffect`, an instance of `SOD/select.sod` scaled to the ship's shield ellipse
-(`renderer/README.md`, "Reading back a dynamic vertex buffer"). The model is a 3ds Max
+`SelectionEffect`, an instance of `SOD/select.sod` scaled to the ship's shield ellipse (the
+cost of selecting many ships was this effect's CPU-path draw, above). The model is a 3ds Max
 GeoSphere at frequency 4: 162 vertices, 320 triangles, about 20 segments around a great
 circle, every vertex at radius 89.943 about the origin. Like the moons, and unlike the
 planets, the engine draws the mesh the SOD stores.
@@ -123,8 +126,7 @@ is 2.
 
 The bubble is blended, so it goes down the CPU path (`RenderInternalNonVB`), as the
 moons' glow shell does, and its cost grows with the face count. With
-`d3d9.cachedWriteOnlyBuffers`, 30 selected stock bubbles took 0.60–0.81 ms
-(`renderer/README.md`). Four times the faces suggests about 3 ms at 30 selected. That is
+`d3d9.cachedWriteOnlyBuffers`, 30 selected stock bubbles took 0.60–0.81 ms. Four times the faces suggests about 3 ms at 30 selected. That is
 an estimate from that measurement, not a measurement of its own.
 
 ## Rounder hulls
@@ -174,7 +176,7 @@ meet at a median of 22 to 39 degrees with a tail of sharp edges up to 138, and a
 `--crease 55` the sharpest sixth stay edges: broken ridges with rounded faces between.
 No patch folds over (a triangle turned against the stock face it was cut from) at any
 crease up to 70; at 90 two do on `Master7`. The surface detail is not geometry: it is
-render3d's recipes `Master1` and `Master2` (`render3d/surfaces/`), lit per pixel by its
+render3d's recipes `Master1` and `Master2` (`render3d/content/surfaces/`), lit per pixel by its
 hulls module (`render3d/README.md`, world module).
 
 `Master6` is the one model whose node matrix is a mirror and whose triangles are wound

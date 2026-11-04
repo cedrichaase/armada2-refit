@@ -47,7 +47,7 @@ pub fn install(c: &Hud) {
         }
         flag
     };
-    let on = (take(c.comm, comm::COMM, "CommDisplay"), take(c.drop_player, comm::DROP, "DropPlayerBox"), take(c.load_wait, comm::LOAD, "LoadPercentageBox"));
+    let on = (take(c.comm, comm::comm_panel(), "CommDisplay"), take(c.drop_player, comm::drop_panel(), "DropPlayerBox"), take(c.load_wait, comm::load_panel(), "LoadPercentageBox"));
     unsafe { ON = on };
 }
 

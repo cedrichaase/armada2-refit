@@ -1,0 +1,127 @@
+# Render3D.asi's symbols in Armada2.exe 1.1 (GOG): module "particles" (render3d/mods/particles/src).
+# Each entry is tied to the hook that uses it; the findings are in render3d/README.md, "Hooks".
+schema = 1
+plugin = "render3d"
+readme = "render3d/README.md"
+lang = "rust"
+out = "render3d/mods/particles/src/syms.rs"
+
+[hook."particles.reads"]
+doc = "What the particles module reads of the engine: its objects, lists, globals and calls"
+rows = ["Modules.particles"]
+
+[hook."particles.particle"]
+doc = "Drops the engine's draw of an owned object's particles (the slot RenderParticle)"
+rows = ["Modules.particles"]
+
+[hook."particles.billboard"]
+doc = "Skips the engine's billboard effect call of an object while our view runs"
+rows = ["Modules.particles"]
+
+
+[[sym]]
+id = "fn_sphere"
+symbol = "Entity::GetBoundingSphere"
+kind = "fn"
+addr = 0x4cfd70
+check = "8b 41 04 83 c0 34 c3 90"
+used_by = ["particles.reads"]
+
+[[sym]]
+id = "site_billboard"
+symbol = "GameObject::RenderInternal"
+kind = "call"
+addr = 0x4d544c
+target = "fn_effect"
+in = "GameObject::RenderInternal"
+used_by = ["particles.billboard"]
+
+[[sym]]
+id = "fn_fade_out"
+symbol = "GameObjectInstance::ComputeFadeOut"
+kind = "fn"
+addr = 0x4d5a20
+check = "55 8b ec 51 a1 c0 ca 6f"
+used_by = ["particles.reads"]
+
+[[sym]]
+id = "fn_render_particle"
+symbol = "ST3D_DeviceDirectX8::RenderParticle"
+kind = "fn"
+addr = 0x6262f0
+check = "55 8b ec 83 ec 08 53 56"
+used_by = ["particles.particle"]
+
+[[sym]]
+id = "fn_effect"
+symbol = "ST3D_Instance::RenderSpriteNodeEffect"
+kind = "fn"
+addr = 0x62ebd0
+check = "55 8b ec 83 ec 40 a1 08"
+used_by = ["particles.billboard"]
+
+[[sym]]
+id = "vt_latinum"
+symbol = "LatinumNebula"
+kind = "vtable"
+addr = 0x6b132c
+used_by = ["particles.reads"]
+
+[[sym]]
+id = "vt_nebula"
+symbol = "Nebula"
+kind = "vtable"
+addr = 0x6b148c
+used_by = ["particles.reads"]
+
+[[sym]]
+id = "vt_freighter"
+symbol = "Freighter"
+kind = "vtable"
+addr = 0x6b26a8
+used_by = ["particles.reads"]
+
+[[sym]]
+id = "vt_craft_instance"
+symbol = "CraftInstance"
+kind = "vtable"
+addr = 0x6b3e2c
+used_by = ["particles.reads"]
+
+[[sym]]
+id = "vt_chain_pulsar"
+symbol = "ChainPulsar"
+kind = "vtable"
+addr = 0x6b7c74
+used_by = ["particles.reads"]
+
+[[sym]]
+id = "vt_manheim"
+symbol = "ManheimEffect"
+kind = "vtable"
+addr = 0x6b89fc
+used_by = ["particles.reads"]
+
+[[sym]]
+id = "ordnance_list"
+symbol = "Ordnance::ordnanceList"
+kind = "global"
+addr = 0x771fa8
+used_by = ["particles.reads"]
+
+[[sym]]
+id = "vt_device_dx8"
+symbol = "ST3D_DeviceDirectX8"
+kind = "vtable"
+addr = 0x6bc6ac
+used_by = ["particles.particle"]
+
+[[sym]]
+id = "slot_render_particle"
+symbol = "ST3D_DeviceDirectX8::RenderParticle"
+kind = "slot"
+vtable = "vt_device_dx8"
+index = 50
+target = "fn_render_particle"
+chain = true
+used_by = ["particles.particle"]

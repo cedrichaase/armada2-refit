@@ -14,7 +14,8 @@
 //! capture keeps from the engine. This works wherever the 3D window gets messages: in
 //! a mission, and in a screen of ours in the front end (`engine::shell`). Pointer
 //! position is read with `GetCursorPos`, as the engine itself does.
-use crate::engine::{self, hook};
+use crate::engine::{self, eng, hook as patch};
+use crate::syms_core::{field, hook, sym};
 use crate::rt::win::*;
 
 /// How many keys and characters one frame records; more in one frame are dropped.
@@ -65,26 +66,15 @@ impl Input {
 
 // ---- Armada2.exe ------------------------------------------------------------------
 
-/// In `WindowProc`: `call ProcessKeyboardMessages(msg, wParam, lParam)`, cdecl.
-const SITE_KEYS: usize = 0x488869;
-/// `ProcessKeyboardMessages`: stores key downs for the game and updates the key state,
-/// then drains the queue's other keyboard messages.
-const PROCESS_KEYS: usize = 0x4dd670;
-/// In `ProcessKeyboardMessages`: `call [__imp__PeekMessageA]`, the drain.
-const SITE_KEYS_PEEK: usize = 0x4dd709;
-const SITE_KEYS_PEEK_STOCK: [u8; 6] = [0xff, 0x15, 0xd4, 0x81, 0x7b, 0x00];
-/// In `WindowProc`: `call ProcessMouseMessages(hwnd, msg, wParam, lParam)`, cdecl.
-const SITE_MOUSE: usize = 0x488952;
-/// `ProcessMouseMessages`: posts the message to the input thread (in a mission), drains
-/// the queue's other mouse messages the same way, and captures the mouse for the window
-/// while a button is down.
-const PROCESS_MOUSE: usize = 0x4de250;
-/// In `ProcessMouseMessages`: `mov ebx, [__imp__PeekMessageA]`, the function it drains
-/// with (`call ebx`).
-const SITE_MOUSE_PEEK: usize = 0x4de260;
-const SITE_MOUSE_PEEK_STOCK: [u8; 6] = [0x8b, 0x1d, 0xd4, 0x81, 0x7b, 0x00];
-/// `ST3D_GraphicsEngine::GetWindowHandle`, thiscall on `Storm3D`.
-const GET_WINDOW_HANDLE: usize = 0x62bc70;
+// The profile's (`ui.core.toml`, hooks `core.input` and `core.window`): in `WindowProc`,
+// `call ProcessKeyboardMessages(msg, wParam, lParam)`, cdecl; `ProcessKeyboardMessages`,
+// which stores key downs for the game and updates the key state, then drains the queue's
+// other keyboard messages, with `call [__imp__PeekMessageA]` at the drain; in `WindowProc`,
+// `call ProcessMouseMessages(hwnd, msg, wParam, lParam)`, cdecl; `ProcessMouseMessages`,
+// which posts the message to the input thread (in a mission), drains the queue's other
+// mouse messages the same way, and captures the mouse for the window while a button is
+// down, with `mov ebx, [__imp__PeekMessageA]` at the function it drains with (`call ebx`);
+// and `ST3D_GraphicsEngine::GetWindowHandle`, thiscall on `Storm3D`.
 
 // ---- Win32 ------------------------------------------------------------------------
 
@@ -171,26 +161,26 @@ fn raw() -> &'static mut Raw {
 /// stock: then the UI still reads the pointer, but cannot keep input from the engine
 /// and sees no buttons or keys.
 pub fn install() -> bool {
-    if hook::call_target(SITE_KEYS) != Some(PROCESS_KEYS) || hook::call_target(SITE_MOUSE) != Some(PROCESS_MOUSE) {
-        crate::log!("input: WindowProc's calls of ProcessKeyboardMessages and ProcessMouseMessages are not stock: standing down");
+    if eng().ready(hook::CORE_INPUT).is_err() {
+        crate::log!("input: standing down");
         return false;
     }
-    let stock = |at: usize, b: &[u8]| unsafe { core::slice::from_raw_parts(at as *const u8, b.len()) == b };
-    if !stock(SITE_KEYS_PEEK, &SITE_KEYS_PEEK_STOCK) || !stock(SITE_MOUSE_PEEK, &SITE_MOUSE_PEEK_STOCK) {
-        crate::log!("input: ProcessKeyboardMessages or ProcessMouseMessages is not stock: standing down");
-        return false;
-    }
+    let (site_keys, site_mouse) = (eng().addr(sym::CORE_SITE_KEYS), eng().addr(sym::CORE_SITE_MOUSE));
+    let (peek_keys, peek_mouse) = (eng().addr(sym::CORE_SITE_KEYS_PEEK), eng().addr(sym::CORE_SITE_MOUSE_PEEK));
+    // The six bytes at each drain, which the profile's check has just read.
+    let six = |at: usize| -> [u8; 6] { unsafe { core::ptr::read_unaligned(at as *const [u8; 6]) } };
+    let (keys_stock, mouse_stock) = (six(peek_keys), six(peek_mouse));
     // `call [imp]` -> `call rel32; nop`, and `mov ebx, [imp]` -> `mov ebx, imm32; nop`.
     let peek = keys_peek as *const () as usize;
-    let rel = (peek as i64 - (SITE_KEYS_PEEK as i64 + 5)) as i32;
+    let rel = (peek as i64 - (peek_keys as i64 + 5)) as i32;
     let mut call = [0xe8u8, 0, 0, 0, 0, 0x90];
     call[1..5].copy_from_slice(&rel.to_le_bytes());
     let mut mov = [0xbbu8, 0, 0, 0, 0, 0x90];
     mov[1..5].copy_from_slice(&(mouse_peek as *const () as usize as u32).to_le_bytes());
-    let ok = hook::patch_bytes(SITE_KEYS_PEEK, &SITE_KEYS_PEEK_STOCK, &call)
-        && hook::patch_bytes(SITE_MOUSE_PEEK, &SITE_MOUSE_PEEK_STOCK, &mov)
-        && hook::patch_call(SITE_KEYS, PROCESS_KEYS, keys_message as *const () as usize)
-        && hook::patch_call(SITE_MOUSE, PROCESS_MOUSE, mouse_messages as *const () as usize);
+    let ok = patch::patch_bytes(peek_keys, &keys_stock, &call)
+        && patch::patch_bytes(peek_mouse, &mouse_stock, &mov)
+        && patch::patch_call(site_keys, eng().addr(sym::CORE_PROCESS_KEYS), keys_message as *const () as usize)
+        && patch::patch_call(site_mouse, eng().addr(sym::CORE_PROCESS_MOUSE), mouse_messages as *const () as usize);
     unsafe { INSTALLED = ok };
     ok
 }
@@ -286,7 +276,7 @@ unsafe extern "C" fn keys_message(msg: u32, wp: usize, lp: isize) {
     if key_message(msg, wp) {
         return;
     }
-    let stock: unsafe extern "C" fn(u32, usize, isize) = unsafe { core::mem::transmute(PROCESS_KEYS) };
+    let stock: unsafe extern "C" fn(u32, usize, isize) = unsafe { core::mem::transmute(eng().addr(sym::CORE_PROCESS_KEYS)) };
     unsafe { stock(msg, wp, lp) };
 }
 
@@ -314,7 +304,7 @@ unsafe extern "C" fn mouse_messages(w: HWND, msg: u32, wp: usize, lp: isize) {
     if mouse_message(msg, wp) {
         return;
     }
-    let stock: unsafe extern "C" fn(HWND, u32, usize, isize) = unsafe { core::mem::transmute(PROCESS_MOUSE) };
+    let stock: unsafe extern "C" fn(HWND, u32, usize, isize) = unsafe { core::mem::transmute(eng().addr(sym::CORE_PROCESS_MOUSE)) };
     unsafe { stock(w, msg, wp, lp) };
 }
 
@@ -337,10 +327,10 @@ unsafe extern "system" fn mouse_peek(m: *mut Msg, w: HWND, min: u32, max: u32, r
 /// The game window, as the engine names it.
 pub fn window() -> HWND {
     let s = engine::storm3d();
-    if s == 0 || engine::field(s, 0xcc) == 0 {
+    if s == 0 || engine::field(s, field::CORE_STORM3D_DEVICES) == 0 || eng().ready(hook::CORE_WINDOW).is_err() {
         return core::ptr::null_mut();
     }
-    let f: unsafe extern "thiscall" fn(usize) -> HWND = unsafe { core::mem::transmute(GET_WINDOW_HANDLE) };
+    let f: unsafe extern "thiscall" fn(usize) -> HWND = unsafe { core::mem::transmute(eng().addr(sym::CORE_GET_WINDOW_HANDLE)) };
     unsafe { f(s) }
 }
 
@@ -407,87 +397,6 @@ fn diagnose(hwnd: HWND, screen: Option<(i32, i32)>) {
     }
     d.last = screen;
     d.held = held;
-}
-
-/// How often, at most, `keep_clip` asks Wine for its clip again, in milliseconds.
-const KEEP_CLIP_MS: u32 = 500;
-
-struct Clip {
-    /// Whether the game runs under Wine: None until asked.
-    wine: Option<bool>,
-    /// The pointer at the last frame, and when the clip was last asked for.
-    last: Option<(i32, i32)>,
-    tick: u32,
-    /// How many times it was asked for, for the log.
-    count: u32,
-}
-
-static mut CLIP: Clip = Clip { wine: None, last: None, tick: 0, count: 0 };
-
-fn on_wine() -> bool {
-    let ntdll = unsafe { GetModuleHandleA(c"ntdll.dll".as_ptr() as *const u8) };
-    !ntdll.is_null() && unsafe { GetProcAddress(ntdll, c"wine_get_version".as_ptr() as *const u8) } != 0
-}
-
-/// `[UI] KeepClip=1` (README.md, "Focus and the pointer"): in a mission, puts Wine's
-/// pointer clip back as Wine itself does when the keyboard comes back
-/// (`reapply_cursor_clipping`): the clip rectangle it has, handed to `ClipCursor`
-/// again. For a full-screen window that rectangle is the whole screen, and Wine
-/// answers it by clipping the pointer to the window again (`clip_fullscreen_window`)
-/// if the window covers its monitor and is the foreground one and the X input focus
-/// is the game's, and by nothing otherwise. A screenshot's overlay takes the
-/// keyboard and Wine lets go of its clip; when the keyboard comes back Wine does
-/// not always clip again, and an unclipped pointer can move onto a desktop bar at
-/// the top of the screen, which takes it from the game.
-///
-/// Asked at most every `KEEP_CLIP_MS`, on a frame where the pointer has moved, while
-/// the game's window is the foreground and active one and the engine neither holds
-/// the pointer for a pan nor has a button down. Called once per mission frame.
-pub fn keep_clip() {
-    if !crate::config::try_get().is_some_and(|c| c.keep_clip) {
-        return;
-    }
-    let c = unsafe { &mut *core::ptr::addr_of_mut!(CLIP) };
-    if !*c.wine.get_or_insert_with(on_wine) {
-        return;
-    }
-    let hwnd = window();
-    if hwnd.is_null() {
-        return;
-    }
-    let mut p = Point::default();
-    if unsafe { GetCursorPos(&mut p) } == 0 {
-        return;
-    }
-    let moved = c.last.is_some_and(|l| l != (p.x, p.y));
-    c.last = Some((p.x, p.y));
-    let now = unsafe { GetTickCount() };
-    if !moved || now.wrapping_sub(c.tick) < KEEP_CLIP_MS {
-        return;
-    }
-    if unsafe { GetForegroundWindow() != hwnd || GetActiveWindow() != hwnd } {
-        return;
-    }
-    if engine::mouse::held() || engine::mouse::buttons() != 0 {
-        return;
-    }
-    let mut r = WinRect::default();
-    if unsafe { GetClipCursor(&mut r) } == 0 {
-        return;
-    }
-    unsafe { ClipCursor(&r) };
-    c.tick = now;
-    c.count += 1;
-    if c.count == 1 && crate::config::try_get().is_some_and(|c| c.pointer_log) {
-        crate::log!(
-            "pointer: Wine's clip asked for again ({},{} {},{}), every {} ms at most while the pointer moves",
-            r.left,
-            r.top,
-            r.right,
-            r.bottom,
-            KEEP_CLIP_MS
-        );
-    }
 }
 
 /// Reads this frame's input. `w`, `h`: the back buffer's size.

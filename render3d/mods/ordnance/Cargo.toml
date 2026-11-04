@@ -1,0 +1,17 @@
+[package]
+name = "r3d-ordnance"
+version = "0.45.0"
+edition = "2024"
+publish = false
+description = "render3d's ordnance module: the shots, beams, warp and the ordnance models"
+license = "MIT"
+
+[lib]
+name = "r3d_ordnance"
+path = "src/lib.rs"
+
+[dependencies]
+r3d-core = { path = "../../core" }
+a2fmt = { path = "../../../crates/a2fmt" }
+a2engine = { path = "../../../crates/a2engine" }
+gpu = { path = "../../../gpu" }

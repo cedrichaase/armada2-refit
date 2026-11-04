@@ -1,0 +1,92 @@
+# Render3D.asi's symbols in Armada2.exe 1.1 (GOG): module "sky" (render3d/mods/sky/src).
+# Each entry is tied to the hook that uses it; the findings are in render3d/README.md, "Hooks".
+schema = 1
+plugin = "render3d"
+readme = "render3d/README.md"
+lang = "rust"
+out = "render3d/mods/sky/src/syms.rs"
+
+[hook."sky.reads"]
+doc = "What the sky module reads of the engine: its objects, lists, globals and calls"
+rows = ["Modules.sky"]
+
+
+[[sym]]
+id = "fn_go_render"
+symbol = "GameObject::Render"
+kind = "fn"
+addr = 0x4d54e0
+check = "55 8b ec 56 8b f1 8a 46"
+used_by = ["sky.reads"]
+
+[[sym]]
+id = "fn_load_bg"
+symbol = "Starfield_Load_Background_Geometry"
+kind = "fn"
+addr = 0x590c30
+check = "55 8b ec 56 8b 35 fc 20"
+used_by = ["sky.reads"]
+
+[[sym]]
+id = "fn_set_far"
+symbol = "ST3D_Camera::SetFarPlane"
+kind = "fn"
+addr = 0x6198a0
+check = "55 8b ec 8b 45 08 89 81"
+used_by = ["sky.reads"]
+
+[[sym]]
+id = "vt_database"
+symbol = "ST3D_Database"
+kind = "vtable"
+addr = 0x6bc56c
+used_by = ["sky.reads"]
+
+[[sym]]
+id = "far_plane"
+symbol = "FAR_CLIPPING_PLANE"
+kind = "global"
+addr = 0x6fcab0
+used_by = ["sky.reads"]
+
+[[sym]]
+id = "star_far"
+symbol = "STAR_FAR_CLIP_PLANE"
+kind = "global"
+addr = 0x6fcac8
+used_by = ["sky.reads"]
+
+[[sym]]
+id = "bg_name"
+symbol = "STARFIELD_GEOMETRY_NAME"
+kind = "global"
+addr = 0x738538
+used_by = ["sky.reads"]
+
+[[sym]]
+id = "user_profile"
+symbol = "UserProfile"
+kind = "global"
+addr = 0x76b5ac
+used_by = ["sky.reads"]
+
+[[sym]]
+id = "bg_instance"
+symbol = "g_background_instance"
+kind = "global"
+addr = 0x772068
+used_by = ["sky.reads"]
+
+[[sym]]
+id = "g_bg_db"
+symbol = "g_background_geometry_db"
+kind = "global"
+addr = 0x7720fc
+used_by = ["sky.reads"]
+
+[[sym]]
+id = "g_starfield"
+symbol = "g_starfield"
+kind = "global"
+addr = 0x773d04
+used_by = ["sky.reads"]

@@ -23,21 +23,26 @@ a time, and every fix can be undone.
   notes on what the engine actually does, with the dead ends included. They should be
   useful to anyone modding this game or others like it.
 
+## Where to read next
+
+- [`PLAYING.md`](PLAYING.md): for players: installing, the Refit screen, `RefitPlayer.ini`, multiplayer, the graphics backend, logs and troubleshooting, uninstalling.
+- [`MODDING.md`](MODDING.md): for modders: the plugin contracts, symbol and content profiles, building plugins, and what may be published.
+
 ## Features
 
 | | |
 |---|---|
-| **Stretch-free HUD** | `HUD.asi` lays out the in-game HUD, font and cursors correctly at any aspect ratio (16:9, 21:9, 32:9), from the display mode the game actually sets |
-| **Full-screen menus** | `Menus.asi` scales the 800x600 shell menus to fill the screen and draws them inside the game window, with optional widescreen backdrops (black sides without them) |
-| **Our own 3D renderer** | `Render3D.asi` takes over the 3D view and draws it into a half-float, multisampled target, bloomed by energy and tone-mapped into the back buffer, with modules of its own for every category: ships and stations lit per pixel by a warm key, a dim blue fill and a faint sky light, with shadows and light from nebulae, planets, explosions and weapons; each map's sky computed in a shader from a recipe, with no cube seams; planets and the dilithium moon made from recipes (relief, craters, oceans, ice, clouds, a night side); every nebula as a cloud of gas you can fly through; fireballs and shockwaves, shield hits, repair welding, venting plasma, the warp flash and the special weapons drawn by shaders; and the fog of war and the shroud with smooth edges. It replaces the earlier per-part plugins (MSAA, lighting, sky, nebulae, surfaces, explosions, shields, repair, venting, specials, fog, planets). Needs crosire's d3d8to9 (which `./install` sets up); without it the engine draws the 3D view. Built from the repository; not in the release zip yet ([`render3d/README.md`](render3d/README.md)) |
-| **Renderer tuning** | anisotropic filtering, LOD bias and seamless cube maps through `dxvk.conf` |
+| **Stretch-free HUD** | `UI.asi` draws the in-game HUD, its font and the cursors correctly at any aspect ratio (16:9, 21:9, 32:9), from the display mode the game actually sets ([`ui/HUD.md`](ui/HUD.md)) |
+| **Full-screen menus** | `UI.asi` hosts the shell menus and draws them at any size inside the game window, with optional widescreen backdrops (black sides without them; [`ui/MENUS.md`](ui/MENUS.md)) |
+| **Our own 3D renderer** | `Render3D.asi` takes over the 3D view and draws it into a half-float, multisampled target, bloomed by energy and tone-mapped into the back buffer, with modules of its own for every category: ships and stations lit per pixel by a warm key, a dim blue fill and a faint sky light, with shadows and light from nebulae, planets, explosions and weapons; each map's sky computed in a shader from a recipe, with no cube seams; planets and the dilithium moon made from recipes (relief, craters, oceans, ice, clouds, a night side); every nebula as a cloud of gas you can fly through; fireballs and shockwaves, shield hits, repair welding, venting plasma, the warp flash and the special weapons drawn by shaders; and the fog of war and the shroud with smooth edges. It replaces the earlier per-part plugins (MSAA, lighting, sky, nebulae, surfaces, explosions, shields, repair, venting, specials, fog, planets). It draws through Display8 (below), on Vulkan or Direct3D 12 ([`render3d/README.md`](render3d/README.md)) |
+| **Our own Direct3D 8** | `Display8` is the game's `d3d8.dll`, ours: it draws on Vulkan or Direct3D 12, whichever starts first, with nothing behind it (no d3d8to9, no DXVK), and hands the game the system's `d3d8.dll` when neither starts. Anisotropic filtering and LOD bias are `Display8.ini`'s `[Samplers]` ([`display/README.md`](display/README.md)) |
 | **Quality of life, stock-compatible** | `QOL.asi`: faster right-drag panning, `Shift+number` adds to a control group, selections and groups beyond 16 ships (40 by default), stations in control groups with one build menu for several, and long moves on the map going to warp as minimap moves do. Everything stays on your machine, so you can still play against unmodded players |
-| **Grid hotkeys** | `GridLayout.asi` lays the button bar out as a 5x3 grid with one key per cell by keyboard position (`QWERT`/`ASDFG`/`ZXCVB`), labelled on the buttons and placed between the minimap and the info panel on wide screens |
+| **Grid hotkeys** | `UI.asi`'s button bar lays the bar out as a 5x3 grid with one key per cell by keyboard position (`QWERT`/`ASDFG`/`ZXCVB`), labelled on the buttons and placed between the minimap and the info panel on wide screens |
 | **Smoother geometry** | the dilithium moons and the asteroids are smoothed, and the selection bubble is round instead of a visible polygon (SOD rewrites from your own stock files, `models/install.sh`) |
 | **Texture replacement** | `./a2tex`, a pipeline for replacement textures, whether upscaled, generated or drawn by hand. It checks each one against the engine's format rules (bit depth, mip chains, size limits), installs it with a backup, and packs a set so others can install it. There are 84 recipes so far: skyboxes, nebulae, planets, UI and ship hulls |
 | **Video replacement** | a replacement `binkw32.dll` that plays the launch reels full screen and plays AV1 replacements in place of the original Bink movies, plus a pipeline to build them |
 | **Widened loading screen** | the 3D loading-screen model, rebuilt for widescreen |
-| **Online multiplayer** *(in progress)* | multiplayer under Proton is broken (Wine stubs DirectPlay). `Online.asi` adds *Internet – Online*, which runs on its own UDP transport with join codes, hole punching and a relay through a self-hostable server. In the release zip; not part of `./install` yet ([`online/README.md`](online/README.md)) |
+| **Online multiplayer** *(in progress)* | multiplayer under Proton is broken (Wine stubs DirectPlay). `Online.asi` adds *Internet – Online*, which runs on its own UDP transport with join codes, hole punching and a relay through a self-hostable server. In the release zip and in `./install` ([`online/README.md`](online/README.md)) |
 | **One switch** | `./a2mod stock` / `refit` flips every layer at once for before/after comparisons |
 | **Headless test bench** | `./a2test` runs the game on a copy of the install on a virtual display at any resolution, and takes screenshots and runs regression scenarios |
 
@@ -52,7 +57,7 @@ repository.
 
 Every layer works without assets. With nothing built, the asset layers install nothing
 and the game keeps its own art, while the HUD, menus, the renderer, quality of life
-and grid still apply.
+and grid (`UI.asi`, `Render3D.asi`, `QOL.asi`) still apply.
 [`textures/PACKS.md`](textures/PACKS.md) is the short path to building your own
 texture pack.
 
@@ -70,9 +75,10 @@ are missing, and its `CREDITS.txt` says where they come from.
 **The platform:** developed and tested on Linux (Arch, Hyprland), with the game run
 through [Heroic](https://heroicgameslauncher.com/) and Proton:
 
-- [DXVK](https://github.com/doitsujin/dxvk)'s `d3d8.dll` and `d3d9.dll` in the game
-  directory, so the game renders through Vulkan. The renderer settings depend on it.
-  `platform/d3d8-chain.py --use dxvk` sets it up.
+- A Vulkan or Direct3D 12 driver. Display8, the game's `d3d8.dll` of ours, draws on
+  one of them itself: no DXVK, no d3d8to9, no Direct3D 9 (under Wine and Proton,
+  Vulkan). The installers put it in; `platform/d3d8-chain.py --retire` takes an earlier
+  version's chain out.
 - For building: `clang`, `lld-link` and `llvm-dlltool` for the plugins (no MSVC or
   mingw needed), ImageMagick 7, Python 3 and `ffmpeg`.
 - Optional, for generative upscaling:
@@ -80,7 +86,7 @@ through [Heroic](https://heroicgameslauncher.com/) and Proton:
   everything else runs without it.
 
 [`platform/README.md`](platform/README.md) covers the full setup: Heroic's DLL
-overrides, the d3d8 chain, setting the resolution, and window management under Hyprland.
+overrides, the d3d8 slot, setting the resolution, and window management under Hyprland.
 
 ## Quick start
 
@@ -135,14 +141,13 @@ together what helps with an issue.
 
 **Which files are ours:** everything in the release zip's `game/` folder that ends in
 `.asi`, and `binkw32.dll` (the cutscene player), which is today `Render3D.asi`,
-`UI.asi`, `QOL.asi`, `QOLRules.asi`, `Online.asi`, `HUD.asi`, `Menus.asi`,
-`GridLayout.asi`; the zip's `display/d3d8.dll` (Display8, the game's Direct3D 8 of
-ours, which the installers put in front of d3d8to9); and the installer itself
+`UI.asi`, `QOL.asi`, `QOLRules.asi`, `Online.asi` (and, from earlier versions, `HUD.asi`, `Menus.asi`,
+`GridLayout.asi`, which the installers take out); the zip's `display/d3d8.dll` (Display8, the game's Direct3D 8 of
+ours); and the installer itself
 (`armada2-refit-installer-windows.exe`).
 The others are third-party and unmodified: `winmm.dll` (the Ultimate ASI Loader),
-`STA2WidescreenPatch.asi`, `chain/d3d8.dll` (crosire's d3d8to9, `d3d8_real.dll` in the
-game folder once Display8 stands in front of it) and `d3d9.dll` (DXVK), credited
-in the zip's `CREDITS.txt`. The zip's `SHA256SUMS` holds every file's hash. Each release's notes carry a VirusTotal
+`STA2WidescreenPatch.asi`, credited in the zip's `CREDITS.txt`. (Earlier zips also carried
+crosire's d3d8to9 and DXVK's `d3d9.dll`; the installers take those out of a game.) The zip's `SHA256SUMS` holds every file's hash. Each release's notes carry a VirusTotal
 scan link per file, so you can see what the scanners make of each one before you trust
 it.
 
@@ -171,8 +176,8 @@ The layers are grouped from "copy a file, works anywhere" to "needs a specific s
 **Building.** The plugins are 32-bit Windows DLLs, built with `clang` + `lld-link` +
 `llvm-dlltool` by each folder's `build.sh`, which writes to `<folder>/build/`.
 **Prebuilt**, the zip on each
-[release](https://github.com/cedrichaase/armada2-refit/releases) has `HUD.asi`,
-`Menus.asi`, `QOL.asi`, `Online.asi` and the Bink proxy with their `.ini` files and `dxvk.conf` (`GridLayout.asi` and `Render3D.asi` are built from the repository). It also has installers that do this
+[release](https://github.com/cedrichaase/armada2-refit/releases) has `UI.asi`,
+`Render3D.asi`, `QOL.asi`, `Online.asi` and the Bink proxy with their `.ini` files, and Display8 with `Display8.ini`. It also has installers that do this
 section for you: `install.sh` on Linux and macOS, `install.bat` on Windows (`README.txt`
 in the zip), and the graphical installers for all three, which leave the Bink proxy out
 for now. `publish/package.sh` builds the same zip locally.
@@ -189,30 +194,30 @@ loads and nothing reports an error. On Windows no override is needed.
 
 | Layer | Copy | Notes |
 |---|---|---|
-| HUD | `hud/build/HUD.asi`, `hud/HUD.ini` | Don't also run `hud/ui-widescreen.py`, `ui-font-condense.py` or `cursor-aspect.py`; they are its file-based predecessors. Handles both cursor paths: D3D8's hardware cursor and the sprite path DXVK takes |
 | Quality of life | `qol/build/QOL.asi`, `qol/QOL.ini` | Right-drag pan speed (`PanSpeed=`, default 2.5x), `Shift+number` adds to a group (`ShiftAddsToGroup=`), selections beyond 16 (`MaxSelection=`, default 40), stations in control groups (`StationGroups=`), long map moves at warp (`WarpDistance=`, default 1100). Leave `RTS_CFG.h` stock: network games compare it, and the plugin scales the value in memory ([`qol/README.md`](qol/README.md)) |
-| Grid hotkeys | `grid/build/GridLayout.asi`, `grid/GridLayout.ini` | The button bar as a 5x3 grid, one key per cell by position (`QWERT`/`ASDFG`/`ZXCVB`; T cancel, G back). Replaces the bar's stock keys; delete the `.asi` to get them back ([`grid/README.md`](grid/README.md)) |
-| Menus | `menus/build/Menus.asi`, `menus/Menus.ini` | GDI only, so the renderer doesn't matter. Delete any old `MenuScale.asi`. Without backdrop plates it draws black sides |
 | Cutscenes (launch reels) | `cutscenes/binkproxy/build/binkw32.dll`, `BinkProxy.ini` | First rename the stock `binkw32.dll` to `binkw32_orig.dll`, because the proxy forwards to it. With no `.mp4` beside a `.bik` it only scales the launch reels to full screen. Replacement movies are AV1 through Media Foundation: under Proton that works (GStreamer + dav1d), and on Windows it presumably needs the AV1 Video Extension |
 
 Uninstall by deleting the files you copied (plus the `.log` each one writes), and for
 the Bink proxy by renaming `binkw32_orig.dll` back.
 
-### 2. Needs DXVK as the game's renderer
+### 2. Display8, the game's Direct3D 8
 
-DXVK's `d3d9.dll` goes in the game directory, with a `d3d8.dll` in front of it: crosire's
-d3d8to9 (`platform/vendor/d3d8to9-1.16.0/`, which lets `Render3D.asi` use shaders) or
-DXVK's own d3d8. Under Wine/Proton add `d3d8=n,b;d3d9=n,b` (`platform/d3d8-chain.py
---use d3d8to9`, or `--use dxvk`; `./install` moves the DXVK chain to d3d8to9). On Windows
-d3d8to9 also needs the Visual C++ 2015–2022 (x86) and DirectX end-user runtimes.
+`Render3D.asi` and `UI.asi` draw through Display8: `display/build/d3d8.dll` and
+`display/Display8.ini` go in the game directory as `d3d8.dll` (GOG's, if any, kept as
+`d3d8.dll.gog-backup`). It draws on Vulkan or Direct3D 12 itself, so there is no DXVK, no
+d3d8to9 and no `d3d9.dll` to set up, and nothing to configure for it beyond Wine's
+`winmm=n,b;d3d8=n,b` overrides ([`display/README.md`](display/README.md)). A leftover chain
+from an earlier version is taken out by `platform/d3d8-chain.py --retire` and by the
+release installers (`retire/`).
 
-| Layer | Install | Why DXVK |
+| Layer | Install | Notes |
 |---|---|---|
-| 3D renderer | `render3d/build/Render3D.asi`, `render3d/Render3D.ini`, its recipes (`render3d/skies/` built in; `render3d/surfaces/` and `render3d/nebulae/` into `Surfaces` and `Nebulae` folders beside it) | Draws the 3D view through Direct3D 9 behind the game's d3d8, so it needs DXVK and crosire's d3d8to9 (below); under DXVK's own d3d8 the engine draws the view. Replaces the earlier `MSAA.asi`, `Lighting.asi`, `Sky.asi` and the other per-part plugins; `render3d/install.sh` takes any of them out ([`render3d/README.md`](render3d/README.md)) |
-| Renderer | `renderer/renderer-config.sh --stage 3` writes `dxvk.conf` | Only DXVK reads the file. Anisotropic filtering, LOD bias and seamless cube maps. The release zip has it ready, in `game/` |
+| Display8 | `display/build/d3d8.dll`, `display/Display8.ini` | Backend, VSync and the sampler settings (`[Samplers]`: anisotropy, LOD bias) |
+| 3D renderer | `render3d/build/Render3D.asi`, `render3d/Render3D.ini`, its recipes (`render3d/content/sky/` built in; `render3d/content/surfaces/` and `render3d/content/nebulae/` into `Surfaces` and `Nebulae` folders beside it) | Needs Display8. Replaces the earlier `MSAA.asi`, `Lighting.asi`, `Sky.asi` and the other per-part plugins; `render3d/install.sh` takes any of them out ([`render3d/README.md`](render3d/README.md)) |
+| UI | `ui/build/UI.asi`, `ui/UI.ini` | The HUD, the menus and the button bar; needs Display8 ([`ui/README.md`](ui/README.md)) |
 
 Bloom is `Render3D.asi`'s. A vkBasalt or ReShade bloom set up by an earlier version
-(`postfx/`, before 13.0.0) is taken out by `./install` and by the release installers,
+(before 13.0.0) is taken out by `./install` and by the release installers,
 since both would bloom the frame twice.
 
 The helper scripts (`./install`, `./a2mod`, the per-layer `install.sh`) are bash and
@@ -226,12 +231,12 @@ The mod is a stack of independent layers, each in its own folder with its own RE
 
 | Folder | Layer | What it changes |
 |---|---|---|
-| [`hud/`](hud/README.md) | hud | `HUD.asi`: the in-game HUD layout, font and cursors undistorted at any aspect, at run time |
-| [`menus/`](menus/README.md) | menus | `Menus.asi`: the 800x600 shell menus scaled to fill the screen, embedded in the game window, with outpainted backdrops ([`BACKDROPS.md`](menus/BACKDROPS.md) builds them) |
+| [`retire/`](retire/README.md) | (root) | `retire.sh`: takes out of a game what earlier versions installed and nothing installs now (`HUD.asi`, `GridLayout.asi`, `Menus.asi`, the per-part plugins, the file-based HUD fixes, the vkBasalt bloom, the Direct3D 9 chain and `dxvk.conf`) |
+| [`display/`](display/README.md) | display | `Display8`, the game's `d3d8.dll`: Vulkan or Direct3D 12 behind the engine's Direct3D 8, or the system's `d3d8.dll` when neither starts |
+| [`ui/`](ui/README.md) | ui | `UI.asi`: the HUD, the menus, the button bar and the Refit screen; `RefitPlayer.ini` is written only by it |
+| [`rules/`](rules/README.md) | rules | `QOLRules.asi`: gameplay rules that every player of a network game must run |
 | [`qol/`](qol/README.md) | qol | `QOL.asi`: gameplay quality of life that stays compatible with stock players (right-drag pan speed, `Shift+number` adds to a group, selections and groups beyond 16, stations in groups with one build menu, long moves at warp), and the plan for the rest |
-| [`grid/`](grid/README.md) | grid | `GridLayout.asi`: the button bar as a fixed 5x3 grid with one key per cell, by keyboard position, labelled on the buttons |
 | [`render3d/`](render3d/README.md) | render3d | `Render3D.asi`: the 3D view through a renderer of our own, in Rust. Half-float multisampled target with bloom by energy, and modules for hulls (scene lights, shadows), sky, particles, ordnance, effects (explosions, shields, repair, venting, warp), planets, moons, asteroids and nebulae, and fog and selection. Replaced the per-part plugins |
-| [`renderer/`](renderer/README.md) | renderer | `dxvk.conf`: anisotropic filtering, LOD bias, seamless cube maps |
 | [`textures/`](textures/README.md) | textures | the texture pipeline, `./a2tex`: 84 targets (skyboxes, nebulae, planets, UI, hulls), each a recipe for one set of replacement textures |
 | [`models/`](models/README.md) | models | the smoothed dilithium moons and asteroids, the round selection bubble, and the loading-screen model, widened with its `LOADING` art. The planets' sphere is render3d's |
 | [`cutscenes/`](cutscenes/binkproxy/README.md) | cutscenes | `binkproxy`, a `binkw32.dll` that plays launch reels full screen and AV1 replacements in place of `.bik` movies, and the movie pipeline |
@@ -241,10 +246,10 @@ nothing:
 
 | Folder | What it is |
 |---|---|
-| [`platform/`](platform/README.md) | Heroic and Proton, the DXVK d3d8 chain, the ASI loader, the widescreen patch |
+| [`platform/`](platform/README.md) | Heroic and Proton, the d3d8 slot, the ASI loader, the widescreen patch |
 | [`testbench/`](testbench/README.md) | `./a2test`: the game headless at any resolution, scenarios, reports |
 | [`publish/`](publish/README.md) | what this repository may contain, and the check that enforces it |
-| [`online/`](online/README.md) | online multiplayer without port forwarding, in progress: `Online.asi` adds *Internet – Online*, which runs the game on its own UDP transport, with join codes, hole punching and a relay through a self-hostable server (`online/server/`; the public one is `c20e.de`); not part of `./install` |
+| [`online/`](online/README.md) | online multiplayer without port forwarding, in progress: `Online.asi` adds *Internet – Online*, which runs the game on its own UDP transport, with join codes, hole punching and a relay through a self-hostable server (`online/server/`; the public one is `c20e.de`) |
 
 ## Entry points
 
@@ -254,8 +259,8 @@ nothing:
     ./a2test ...                            the game headless, for testing (testbench/)
     ./a2env.sh                              print where the game, prefix, Proton and assets are
 
-Each layer installs and removes itself with its own script: `install.sh` in `hud/`,
-`menus/`, `qol/`, `grid/`, `models/`, `render3d/` and `cutscenes/binkproxy/`, `a2tex install`/`revert` for textures, or
+Each layer installs and removes itself with its own script: `install.sh` in `ui/`,
+`qol/`, `rules/`, `online/`, `models/`, `render3d/` and `cutscenes/binkproxy/`, `a2tex install`/`revert` for textures, or
 a `--revert` flag on the Python tools. The layer's README has the details.
 
 ## Versions

@@ -1,0 +1,17 @@
+# The QOLRules.asi settings the Refit screen lists (A2SET_ABI 1.0; tools/settings/README.md).
+# Edit here, then run tools/settings/gen.py: it writes settings_table.h.
+plugin = "QOLRules"
+file = "QOLRules.ini"
+shipped = "rules/QOLRules.ini"
+
+[[row]]
+name = "payonqueue"
+section = "Rules"
+key = "PayOnQueue"
+kind = "bool"
+default = "1"
+apply = "mission"
+scope = "match"
+tab = "gameplay"
+label = "Pay when queued"
+help = "An item is paid for the moment it is queued, not when it starts. Every player in a network game must have the same setting."

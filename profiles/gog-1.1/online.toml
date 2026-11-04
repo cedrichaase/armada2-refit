@@ -1,0 +1,127 @@
+# Online.asi's symbols in Armada2.exe 1.1 (GOG): what online/online.c reads and patches of
+# the exe, each entry tied to the hook that uses it. The findings are in online/README.md,
+# "The menu entry". peer.c (our DirectPlay) reads nothing of the exe.
+schema = 1
+plugin = "online"
+readme = "online/README.md"
+lang = "c"
+out = "online/engine_syms.h"
+
+[hook.entry]
+doc = "The Internet - Online button in IPX's place, and the notices in the chat boxes (all or none)"
+rows = ["Online.Entry"]
+
+# ---- the three patches of the connection screen ------------------------------------
+
+[[sym]]
+id = "read_label"
+symbol = "read_text_label"
+kind = "patch"
+addr = 0x4d9a30
+check = "55 8b ec a0 68 13 76 00"
+in = "read_text_label"
+used_by = ["entry"]
+
+[[sym]]
+id = "click"
+symbol = "MultiplayerConnectionDlgProc"
+kind = "patch"
+addr = 0x5bfd01
+check = "8b 5d 14 8b 0d a0 30 7a 00"
+in = "MultiplayerConnectionDlgProc"
+used_by = ["entry"]
+
+[[sym]]
+id = "click_back"
+symbol = "MultiplayerConnectionDlgProc"
+kind = "label"
+addr = 0x5bfd0a
+check = "8b fb 81 e3 ff ff 00 00"
+in = "MultiplayerConnectionDlgProc"
+used_by = ["entry"]
+
+# the object the click's ecx is loaded from (unnamed in the map)
+[[sym]]
+id = "click_object"
+symbol = "MultiplayerConnectionDlgProc click object"
+kind = "global"
+addr = 0x7a30a0
+used_by = ["entry"]
+
+[[sym]]
+id = "ipx_pressed"
+symbol = "MultiplayerConnectionDlgProc"
+kind = "patch"
+addr = 0x5bff9b
+check = "a1 00 2d 7a 00 8b 4d 08"
+in = "MultiplayerConnectionDlgProc"
+used_by = ["entry"]
+
+[[sym]]
+id = "manual_dialog"
+symbol = "MultiplayerConnectionDlgProc"
+kind = "label"
+addr = 0x5c00b6
+check = "8b 4d 08 51 e8 21 6b ff ff"
+in = "MultiplayerConnectionDlgProc"
+used_by = ["entry"]
+
+# ---- the chat boxes -------------------------------------------------------------------
+
+[[sym]]
+id = "chat_init"
+symbol = "Chat::Init"
+kind = "fn"
+addr = 0x5a9890
+check = "55 8b ec 8b 45 08 c6 41 04 00"
+used_by = ["entry"]
+
+[[sym]]
+id = "chat_append"
+symbol = "Chat::Append"
+kind = "fn"
+addr = 0x5a98b0
+check = "55 8b ec 81 ec 00 04 00 00 8b 4d 0c"
+used_by = ["entry"]
+
+[[sym]]
+id = "chat_room"
+symbol = "chatRoom"
+kind = "global"
+addr = 0x79df50
+used_by = ["entry"]
+
+[[sym]]
+id = "chat_game"
+symbol = "chatGame"
+kind = "global"
+addr = 0x79b838
+used_by = ["entry"]
+
+[[sym]]
+id = "room_init"
+symbol = "InternetGameDlgProc"
+kind = "patch"
+addr = 0x5b2ff2
+check = "b9 50 df 79 00 e8 94 68 ff ff"
+in = "InternetGameDlgProc"
+used_by = ["entry"]
+
+[[sym]]
+id = "game_init"
+symbol = "MultiplayerSetupDlgProc"
+kind = "patch"
+addr = 0x5c5395
+check = "b9 38 b8 79 00 e8 f1 44 fe ff"
+in = "MultiplayerSetupDlgProc"
+used_by = ["entry"]
+
+# the edit control Chat::Init was given
+[[sym]]
+id = "chat_hwnd"
+symbol = "Chat"
+kind = "field"
+struct = "Chat"
+offset = 0x2714
+type = "ptr"
+used_by = ["entry"]

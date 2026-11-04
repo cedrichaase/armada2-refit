@@ -2,7 +2,7 @@
 
 Resolutions: 1280x720
 Mod: refit
-Setup: ui/bench-asi.sh --no-grid HUD.Bar=1
+Setup: ui/bench-asi.sh HUD.Bar=1
 Timeout: 12 min
 
 `ui/HUD.md`, "The button bar". With `[HUD] Bar=1` the UI draws the bar itself, as a
@@ -10,7 +10,7 @@ Timeout: 12 min
 position; T cancel, G back), and the stock bar keeps running underneath but neither
 draws nor takes the mouse. `GridLayout.asi` owns the same call the UI's keys need, so
 the setup takes it out of the clone (an `--install` of `./install` puts it in); with it
-loaded the UI's bar stands down. Run with `--install <checkout>` or without: the
+loaded the UI's bar stands down. The keys are QOL.asi's: run with `--install <checkout>`; the
 prepare step does not install the grid.
 
 The match is `_enter-instant-action.md`'s: Borg, Warzone. Where the start view puts the
@@ -34,7 +34,7 @@ default since ui-switchon) and the Assembler selected, the top-left cell (Q) is 
 about 250,598 and S (Transport) at 295,643; the Nexus's AI menu is opened by its key,
 E.
 `UI.log` names each layout ("bar: menu=0 ... | Q=build ...") and each press ("bar:
-click build", "bar: key S=bmining"), and the placement's footprint, which the UI draws
+click build"; QOL.log names each key, "bar: key S"), and the placement's footprint, which the UI draws
 in the engine's place, in the theme ("placement: footprint ...", HUD.md, "The
 placement markers"; with Display8's stub nothing else would draw it). A click on the bar is the
 UI's, so the Assembler stays selected through it (capture).
@@ -65,7 +65,7 @@ UI's, so the Assembler stays selected through it (capture).
 24. Press s.
 25. Move the mouse to 450,450.
 26. Wait 1 second.
-27. Expect "UI.log" contains "bar: key S=bmining".
+27. Expect "QOL.log" contains "bar: key S".
 28. Expect "UI.log" contains "placement: footprint".
 29. Take a screenshot called "placing".
 30. Check that a placement is shown in the 3D view: a translucent ghost of the station near 450,450, on a footprint drawn on the map's plane, a large square with a glowing outline, either red and hatched with diagonal stripes (the place blocked) or green with thicker brackets at its corners (clear), with small amber square tiles, or red ones with an X, on the cells the base's stations take; at this zoom the footprint can run off the screen's edges.
@@ -77,20 +77,20 @@ UI's, so the Assembler stays selected through it (capture).
 36. Expect "UI.log" contains "Q=build W=order E=aiMenu A=recrew S=transport D=rally".
 37. Press w.
 38. Wait 1 second.
-39. Expect "UI.log" contains "bar: key W=order".
+39. Expect "QOL.log" contains "bar: key W".
 40. Press g.
 41. Wait 1 second.
-42. Expect "UI.log" contains "bar: key G=back".
+42. Expect "QOL.log" contains "bar: key G".
 43. Press e.
 44. Wait 1 second.
-45. Expect "UI.log" contains "bar: key E=aiMenu".
+45. Expect "QOL.log" contains "bar: key E".
 46. Press g.
 47. Wait 1 second.
 48. Press Return.
 49. Type "vvv".
 50. Press Return.
 51. Wait 1 second.
-52. Expect "UI.log" not contain "key V".
+52. Expect "QOL.log" not contain "bar: key V".
 53. Expect the game is still running.
 54. Quit the game.
 55. Expect no crash.

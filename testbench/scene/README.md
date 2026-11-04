@@ -36,6 +36,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `planet` | a Galaxy class beside a class M planet (`pb_clssm`) | 2026-10-04 |
 | `nebula` | a Galaxy class at the edge of the Mutara nebula (`mnebula8`) | 2026-10-04 |
 | `nebula-cerulean` | a Galaxy class (`ship`, engines off) at the edge of a Big Cerulean Nebula (`mnebula10`): the engine's map puffs (`Mnebula5`, tinted blue) when render3d's world and particles modules are off. For the passthrough's nebula against the forward chain (`scenarios/display-passthrough-nebula.md`) | 2026-10-30 |
+| `nebula-detail` | six nebula classes seen from above (`n6`, `n7`, `n8`, `n9`, `n10`, `n12`: mnebula6 to 10 and mnebula12) around a Galaxy class (`ship`, engines off). For the nebulae at a Graphics Detail below the top (`scenarios/render3d-nebula-detail.md`) | 2026-11-03 |
 | `nebula-battle` | a fight inside the Mutara nebula: two Borg cubes (`cube1`, `cube2`) that do not fire back and eight ships (`sov`, `galaxy`, `gal2`, `ente2`, `martok`, `negh`, `card`, `rom`) firing torpedoes, pulses and phasers at them, everyone immortal and healed, engines off; `kill sov` blows one up in the gas. For render3d's light inside the nebulae (`render3d/README.md`, "Nebulae"; `scenarios/render3d-nebula-lit.md`) | 2026-10-23 |
 | `firing` | a Galaxy class firing at a Borg cube (`bbattle1`) without moving, for as long as the session runs: its engines are off; the cube cannot die, is healed every tick and has its weapons off | 2026-10-04, still firing after a minute |
 | `beam-pass` | a Galaxy class (`shooter`) firing its phasers at a Borg cube (`target`, immortal, healed, weapons off) 420 units ahead, past a parked destroyer (`bystander`, engines and weapons off) 45 units to one side of the line of fire and an asteroid field (`rocks`) on the other; the camera looks side on at the middle of the line. For render3d's phaser beams as line lights (`render3d/README.md`, "Clustered lights"; `scenarios/render3d-beam-light.md`) | 2026-10-23 |
@@ -292,8 +293,8 @@ inert, and `Scene.log` says so.
   A dead end that shaped this: patching `TacticalCamera::UpdateCamera`'s slot in
   `TacticalCamera`'s vtable did nothing, because the camera in use is not that class.
 - **Cursor: the one `ST3D_Sprite::DrawScaled2D` call in `RefreshDisplay`** (0x6246fa),
-  which draws the cursor under DXVK. `HUD.asi` wraps the same call ("Cursors" in
-  `hud/README.md`). So `Scene.asi` patches it only once the scene is built, by when
+  which draws the cursor under DXVK. `HUD.asi` wraps the same call (`ui/HUD.md`, "The references the stock HUD
+  is drawn against", the cursors). So `Scene.asi` patches it only once the scene is built, by when
   `HUD.asi` has long since loaded, and chains to whatever the call went to. With the
   cursor off, the draw is skipped. Clicks still land where the pointer is. `UI.asi`
   wraps the same call when it loads, behind Scene.asi's wrap, and draws no cursor of

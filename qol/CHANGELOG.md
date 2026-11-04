@@ -5,6 +5,90 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 2.2.2 — 2026-11-04
+
+### Fixed
+- `QOL_SettingsChanged` no longer reads the pan coefficient when the pan site is not patched (`g_panOk`), so a changed `PanSpeed` on a different exe does not read an unmapped address.
+- Turning the grid's position keys off live puts the six menu-toggle pointers back (`bar.c`): they were pointed at a zero for good, so stock's menu keys stayed dead until a restart. They are now swapped only around the stock call.
+
+Installed, not yet seen in game.
+
+## 2.2.1 — 2026-11-03
+
+### Removed
+- The `GridLayout.asi` stand-down of the bar's position keys (`bar.c`, `qol.c`, the `BarKeys`
+  settings note, the log suffix): the plugin is gone (`retire/retire.sh` takes it out of an
+  old install). Installed, not yet seen in game.
+
+## 2.2.0 — 2026-11-03
+
+### Removed
+- `ViewDistance` (key, hook `view.distance`, settings row and code) moves to render3d's `View.Distance` (render3d 0.46.0); a player's value is carried over by `tools/settings/move-keys.py`. A removed key is normally MAJOR; MINOR here by the phase 9 plan (one MAJOR per layer per round, the `moved_from` migration). W-VIEW. Installed, not yet seen in game.
+
+## 2.1.0 — 2026-11-03
+
+### Added
+- `BarKeys=` (`[QOL] BarKeys`, shipped 1; a live row on the Interface tab, "Grid keys", `moved_from = "UI.HUD.BarKeys"`): the command bar's position keys (Q W E R T / A S D F G / Z X C V B) are QOL's now (`bar.c`, hook `qol.bar_keys`, its entries moved from the UI's profile). QOL wraps the bar's keyboard step, empties the stock key tables around the stock call, reads the keys and presses the button of that cell with the click. The layout and drawing stay the UI's: the plugins meet at `UI_BarCell`, `UI_BarStep` (UI.asi) and `QOL_BarLabel` (this plugin), found by name. Without the Refit bar (no UI.asi, `[HUD] Bar=0`) or with `GridLayout.asi` loaded the keys stand down (`bar: no refit bar, position keys off`) and the stock bar keys work. `QOL.log` names each key (`bar: key Q`). `build.sh` links `user32`. Installed, not yet seen in game.
+
+## 2.0.0 — 2026-11-03
+
+### Removed
+- `QOLRules.asi` leaves the layer (MAJOR): it is the `rules` layer now (`rules/`). `qol/install.sh` no longer installs or removes `QOLRules.asi`, `QOLRules.ini` and `QOLRules.log` (`rules/install.sh` does), `qol/build.sh` no longer builds it, and QOL-7's README section moved to `rules/README.md`. `./install` installs both as before. Installed, not yet seen in game.
+
+## 1.10.1 — 2026-11-03
+
+### Changed
+- `qol/settings_table.h` and `rules_settings_table.h` are regenerated at A2SET_ABI 1.1 (48-byte rows). Nothing else changes. Installed, not yet seen in game.
+
+## 1.10.0 — 2026-11-03
+
+### Added
+- QOL and QOLRules are on the symbol profiles (`profiles/gog-1.1/qol.toml`, `qolrules.toml`; phase 8d). Hooks `qol.pan_speed`, `view_distance`, `shift_group`, `selection`, `special_select`, `stations`, `warp` and `qolrules.pay_on_queue`, `advisor` are checked before any write; one that fails stands down alone, with its reason on the feature's log line.
+- `QOL_SettingsNote` and `QOLRules_SettingsNote` exports (the engine's notes for the settings screen).
+
+### Changed
+- No address literal is left in `qol.c` or `rules.c`: every stub continues through `a2s_qol_*` / `a2s_qolrules_*`. `NOT PATCHED: site bytes differ` became the engine's reason. `Shift+N`'s old meaning moves to Alt+N by writing the whole 4-byte address of `g_pCommandAlt` (it patched its low byte). The `gate:` lines are unchanged.
+
+Installed, not yet seen in game
+
+## 1.9.1 — 2026-11-03
+
+### Added
+- QOL.log and QOLRules.log each log the identity line after the log-location line (`csdk/a2engine.h`). Changes no behaviour.
+
+Installed, not yet seen in game
+
+## 1.9.0 — 2026-11-02
+
+### Added
+- Settings descriptors (A2SET_ABI 1.0): `QOL_Settings` (`settings.toml`, six rows on the
+  Gameplay tab: `PanSpeed`, `ShiftAddsToGroup`, `StationGroups`, `WarpDistance`, `ViewDistance`,
+  `MaxSelection`) and `QOLRules_Settings` (`rules.settings.toml`, `PayOnQueue`: default 1,
+  must match in a network game), with the generated `settings_table.h` and
+  `rules_settings_table.h`.
+- `QOL_SettingsChanged` and `QOLRules_SettingsChanged`, called by UI.asi's settings hub after
+  `RefitPlayer.ini` changes. QOL.log gets `settings: applied QOL.<Key>=<v>` (or `settings:
+  re-read, nothing changed`) and a `gate:` line for each patch installed but switched off.
+- Scenario `qol-settings-live` (testbench).
+
+### Changed
+- Every ini read of `QOL.asi` and `QOLRules.asi` goes through the `a2_ini_*` / `a2_set_*`
+  helpers, so `RefitPlayer.ini` (`[QOL.QOL]`, `[QOLRules.Rules]`) is read in front of
+  `QOL.ini` and `QOLRules.ini`. A row's default is the table's.
+- The patches stay installed whatever the keys say, behind flags the patched code reads, so
+  `PanSpeed` (re-scaled from the value `RTS_CFG.h` gave, kept), `ShiftAddsToGroup`,
+  `StationGroups`, `WarpDistance` and `ViewDistance` apply live (`ViewDistance`'s far plane
+  at the next mission). `MaxSelection` stays a restart. `PayOnQueue`'s hooks stay installed too;
+  a change takes hold when the next game starts (`Program::GameOpenPreLoad`), never mid-game,
+  and `QOLRules_Wanted` follows the new value at once. With the keys at 0 and at the shipped
+  values the game behaves as before.
+
+### Fixed
+- `PanSpeed`'s code default was 1 where the shipped `QOL.ini` says 2.5: with the key missing
+  the plugin left right-drag alone. The table's 2.5 is the default now.
+
+Confirmed in game 2026-11-03.
+
 ## 1.8.0 — 2026-10-30
 
 ### Changed

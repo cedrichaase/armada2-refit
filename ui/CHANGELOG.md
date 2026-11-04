@@ -4,6 +4,233 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 2.2.4 — 2026-11-04
+
+### Fixed
+- Refit screen: Reset on a tab also removes the tab's advanced rows' keys when "Show advanced" is off; the Movies tab entry is gone from the tab list; the settings hub no longer looks for `BinkProxy_Settings` (it logged the export missing at every start).
+- A press on a slider now gives it the keyboard focus (it never took it, so its Left/Right steps were unreachable by mouse). A key step on a stock shell slider moves it at least one value: `widgets::Ui::slider_step`, used by `shell_slider`. A range under 20 (Graphics Detail, 0..4) rounded the twentieth back to where it stood.
+- Overlay writes (`RefitPlayer.ini`) retry the rename 8 x 50 ms while a reader holds the file (`a2rt::move_file`, root 15.6.15).
+
+Installed, not yet seen in game.
+
+## 2.2.3 — 2026-11-03
+
+### Changed
+- The Refit screen's plugin-wide note "Pay on queue is not installed" shows on the Gameplay tab (where `PayOnQueue` now stands), not Multiplayer. A tab with no row is not shown, so Movies and Multiplayer are gone from the strip (rows moved by cutscenes 3.0.1, rules 1.0.1, online 0.11.1). Installed, not yet seen in game.
+
+## 2.2.2 — 2026-11-03
+
+### Fixed
+- Built on `gpu` 2.0.1 (PR #23 by bmh129 and its review): on Vulkan a frame that spends Display8's descriptor pool goes on in pools of gpu's own instead of dropping its draws; a frame that found the pool spent goes straight to gpu's own pools, and the chain grows only on a spent or fragmented pool. The spent-pool log line names the Vulkan error.
+
+Installed, not yet seen in game.
+
+## 2.2.1 — 2026-11-03
+
+### Changed
+- Options: the Refit entry is labelled "Refit settings" and stands directly under "Game
+  Settings" (shell and mission), no longer after a separator at the foot (`screens/options.rs`).
+
+### Fixed
+- A stock slider could not be set to the top of its range (Graphics Detail, once lowered,
+  stayed low): the stock bar maps a click only up to its range's top minus one, so
+  `generic::click_scroll` sends the high end as a click at the track's last pixel and one on
+  the far arrow button. The UI logs `menus: scroll bar set to N of lo..hi` and `... read back
+  at N ...`. Scenario `ui-menus-slider-max`. Installed, not yet seen in game.
+
+## 2.2.0 — 2026-11-03
+
+### Added
+- The hub's retire table for the overlay (`settings.rs`, `RETIRED`): at its first frame it
+  takes the token `d3d9` out of `[Display8.Display8] Backend` in `RefitPlayer.ini` (the key
+  goes when nothing is left; `d3d9,vulkan` keeps `vulkan`) and removes `Mode` and `Real`, each
+  logged once (`settings: RefitPlayer.ini [Display8.Display8] Backend=d3d9 retired; removed`),
+  then tells the plugins. Display8 skips the same values on its read side. The bench flags of
+  the deleted plugins wrote no `Render3D.*` or `UI.*` key, so the table has no others.
+  Scenario `ui-settings-retired`.
+
+### Removed
+- Every stand-down for the retired plugins: the bar while `GridLayout.asi` is loaded (and its
+  settings note), the menu host while `Menus.asi` or `MenuScale.asi` is, the square engine
+  cursor while `HUD.asi` is or while `hud/cursor-aspect.py`'s squashed art is installed.
+  `retire/retire.sh` takes those plugins and that art out of an old install.
+- `bench-asi.sh --no-grid` (and `bench-hud-info.sh` passing it); `--menus` no longer takes
+  `Menus.asi` out of the clone; `bench-legacy.sh`.
+
+### Changed
+- README, HUD.md, MENUS.md, `UI.ini` comments and the Rust comments no longer describe
+  Direct3D 9, `menus/install-plates.sh` (now `ui/backdrops/install-plates.sh`),
+  `hud/cursor-aspect.py` or the old plugins' stand-downs as live.
+
+Installed, not yet seen in game
+
+## 2.1.0 — 2026-11-03
+
+### Added
+- `ui/backdrops/`: the menu backdrop pipeline moved here from `menus/` (`backdrop.sh`,
+  the `*.conf` recipes, `BACKDROPS.md`, `install-plates.sh`, which `./install` runs and
+  `a2mod` files under this layer as `Menus/*.bmp`). The plates and the recipes are
+  unchanged.
+
+### Changed
+- `install.sh` no longer runs `supersede.sh`, which is gone: `retire/retire.sh` takes
+  `HUD.asi`, `GridLayout.asi` and `Menus.asi` out (`./install` runs it first).
+  `bench-asi.sh` calls it on a bench clone; `bench-legacy.sh` stops with a message (the plugins it built are gone; the bench takes them from a cached tag build).
+
+Installed, not yet seen in game.
+
+## 2.0.0 — 2026-11-03
+
+MAJOR: no Direct3D 9 device path. With no Display8 device behind the game's d3d8
+(`Backend=none`, a Display8 of another contract) the UI stands down as before (`runs
+stock: no Vulkan or Direct3D 12 device to draw with`, `ui: no device to draw with`).
+
+### Removed
+- What reached the game's Direct3D 9 device: the swap-chain facts in the shell log
+  (`dev8::present_params9`), the dump of the back buffer through a wrapped d3d9
+  surface, the unbinding and the live-object tally in the `DestroyRenderSurfaces` and
+  `Reset` hooks, `gfx::forget` and `gfx::reset` (gpu 2.0.0). The hooks stay and let go
+  of the close-up's pictures.
+- The d3dbc form of the UI's shaders (`ui.rs`); `ui_spv.rs` and `ui_dxil.rs` are as
+  they were.
+
+### Changed
+- The Graphics tab's `Drawn on` line names the backend `gpu` reports (Vulkan or
+  Direct3D 12).
+
+Installed, not yet seen in game.
+
+## 1.1.1 — 2026-11-03
+
+### Changed
+- Rebuilt on gpu 1.3.0 (contract 1.4): on Direct3D 12 the UI's `Cmd`s now tell Display8 PASS_ENTER and PASS_LEAVE (it publishes no pass). Nothing else changes. Installed, not yet seen in game.
+
+## 1.1.0 — 2026-11-03
+
+### Changed
+- The bar's keys moved to QOL.asi (`qol/bar.c`, QOL-1): `[HUD] BarKeys` and its row leave `UI.ini` and the Refit screen's table (`QOL.QOL.BarKeys` takes it over, `moved_from = "UI.HUD.BarKeys"`; an overlay value is moved at the first frame). The call patch of `mProcessKeyboardInput`, the hotkey-table and menu-toggle handling, the key scan and `hud.barkeys` with its seven profile entries are gone from `engine/palette.rs`, `hud/bar.rs` and `ui.hud.toml`. The UI keeps the layout, the drawing and the clicks.
+- New exports `UI_BarCell(cell)` (the stock button in a cell, NULL when the bar is not drawn) and `UI_BarStep(palette)` (QOL's keyboard-step wrap tells the UI the bar's update has run; until the first step, or without QOL, the UI takes it in its frame). The labels are `QOL_BarLabel(cell)`'s, drawn with `[HUD] BarLabels=1`; the tooltips drop stock's hotkey while it names one. `UI.log` no longer logs `bar: key ...` (QOL.log does). `settings::find_export` finds an export by name. Installed, not yet seen in game.
+
+## 1.0.0 — 2026-11-03
+
+MAJOR: keys move out of `UI.ini`.
+
+### Removed
+- `[UI] Native` and `[UI] KeepClip` (now `[Window]` of `Display8.ini`; a value changed by hand is carried over by `./install` and, in `RefitPlayer.ini`, by the settings hub, once). The shell-mode raise (`dialogs::raise_shell_mode`) and the intro-mode raise (`intro::raise_mode`) are Display8's; `engine/display.rs` is gone, with the profile's `core.display`, `core.intro_mode32`, `core.intro_mode16` and `dialogs.shell_mode` hooks. Without Display8 the UI no longer raises anything and the shell stays at the stock 800x600.
+
+### Added
+- The settings hub reads `Display8_Settings`. The menu host claims `CLAIM_MENUS` (contract 1.3) while it runs, which is what asks Display8 to raise the shell's mode. `shell:` facts log what `display8v1_mode` says.
+
+Installed, not yet seen in game
+
+## 0.34.0 — 2026-11-03
+
+### Added
+- The Refit screen's Multiplayer tab shows one note row, "Pay on queue is not installed: network games you join play stock rules", when `QOLRules_Settings` is absent (contract C7; the rules layer is left out). Installed, not yet seen in game.
+
+## 0.33.1 — 2026-11-03
+
+### Changed
+- The UI's built-in tables of game names (races and their aliases, resource names, the single
+  player campaigns, the credits tour and menu views) moved to `src/content.rs`, per content
+  set, chosen by `Engine::content()` (phase 8f). The `stock` set is the tables as they were. A
+  build with no set has no races, resources or views, and the single player screen stands down
+  to the engine's. Installed, not yet seen in game.
+
+## 0.33.0 — 2026-11-03
+
+### Added
+- The settings hub moves keys (C2): at its first frame, for every loaded row with `moved_from` whose old key is in `RefitPlayer.ini`, the value goes to the row's own `[<Stem>.<Section>]` key (the new key wins when both are there, the old one is removed), logged as `settings: RefitPlayer.ini [UI.HUD] BarKeys moved to [QOL.QOL] BarKeys`, and the plugins are told. Rows of 44 bytes (A2SET_ABI 1.0) have none. `UI_Settings` is regenerated at ABI 1.1. Installed, not yet seen in game.
+
+## 0.32.0 — 2026-11-03
+
+### Changed
+- UI.asi runs on the symbol profile (`profiles/gog-1.1/ui.<part>.toml`, eight parts: core, loading, radar, info, hud, panels, shell, dialogs; generated `src/syms_<part>.rs`). Every engine address, call site, slot, global, offset and mode value in `src/` comes from it; each hook calls `ready` before it writes and stands down with the engine's reason (`engine: ui.<hook> stands down: <symbol> <why>`). On a build Refit does not know every hook stands down and the game runs stock.
+- `UI_SettingsNote` gives the engine's note for a row whose hook stood down, and the plugin note for a build Refit does not know.
+- UI.log: the identity and build lines once, then one `engine: <part> symbols: N/M resolved; H hooks blocked` line per part.
+- A radar/info/panels/hud stand-down is now per hook (the ring's two sites, a last draw, a panel family go together; before, some sites could be patched alone).
+
+### Fixed
+- `Cargo.toml` carries the real version (was 0.1.0), so UI.log's version line is right.
+
+Installed, not yet seen in game
+
+## 0.31.1 — 2026-11-03
+
+### Added
+- UI.log logs `engine: Armada2.exe timestamp 0x…, image size 0x…, sections 0x…` (the executable's identity: `crates/a2engine`, `csdk/a2engine.h`) right after its start-up line. Changes no behaviour.
+
+Installed, not yet seen in game
+
+## 0.31.0 — 2026-11-02
+
+### Added
+- The Refit screen (`menus/refit.rs`): a modal of ours over the hosted Options dialog,
+  opened by a **Refit** entry under the stock buttons of Options (shell and mission).
+  Five tabs of rows from the settings hub, badges (`theme::status_badge`: Now, Next
+  mission, Restart, Restart needed, Must match, Locked), a help strip, a restart banner,
+  Reset tab (asks first), Show advanced, a "Drawn on <backend>" line; every change is
+  `settings::set_row`; UI.log `refit:` lines.
+- Hub: `Table.note` (`<Plugin>_SettingsNote`, optional), the values at start and at the
+  start of the mission, `pending`, `locked`, `overlay_holds`, `value`, `remove_many`;
+  `engine::setup::network_game()`.
+- `UI_SettingsNote` export: notes on the HUD rows while the HUD stood down and on the
+  command bar's rows while GridLayout.asi owns the bar.
+
+### Changed
+- `Menus.Enable` ("Redrawn menus") is an ADVANCED row; the Refit screen asks before
+  switching it off, since the screen goes with the menus.
+- `pump`: an Esc arriving as a system key while a widget of ours holds the keyboard is
+  noted for the UI and no longer clicks Return to Game.
+- The gallery shows the status badges.
+- `Ui::inert_unless` now also hides the pointer from widgets inside a modal's body
+  (`mouse_live` honoured `in_overlay` first), so a question drawn over the Refit page
+  and an open dropdown's list take the click alone.
+
+Confirmed in game 2026-11-03
+
+## 0.30.1 — 2026-11-02
+
+### Fixed
+- Overlay values read by the first `config::load` (before the log is open) are logged
+  once the log is open (`settings: RefitPlayer.ini [...] ... overrides ...`).
+
+Confirmed in game 2026-11-03
+
+## 0.30.0 — 2026-11-02
+
+### Added
+- `settings.toml` and the generated `settings_table.rs`: `UI_Settings` exports 19 rows
+  (the HUD panels, `UI.Cursor`, `UI.Theme`, the menu and loading keys, `HUD.BarHidden`
+  as a hidden row); `config.rs` and `prefs.rs` read their keys through the rows.
+- `UI_SettingsChanged`: the configuration is swappable at run time (`config::reload`),
+  and `HUD.Minimap`, `Info`, `Tooltips`, `BarKeys`, `BarLabels`, `Icons`,
+  `SelectionGauges`, `InfoCamera`, `UI.Cursor` and `UI.Theme` apply while playing
+  (`hud::apply_live`). The minimap's click hook is now installed whether or not
+  `Minimap=1` at the start.
+
+Confirmed in game 2026-11-03
+
+## 0.29.0 — 2026-11-02
+
+### Added
+- `UI.ini`'s keys may now come from the player's overlay, `RefitPlayer.ini`
+  (`[UI.<Section>]`, read first; the a2rt overlay lookup, `tools/settings/README.md`),
+  with a `settings: RefitPlayer.ini [...]` line in UI.log for each value it supplies.
+- The settings hub (`src/settings.rs`): at the first frame it finds every loaded
+  plugin's `<Plugin>_Settings` table and `_SettingsChanged` by export name (UI.log
+  `settings: <Export> in <module>, N rows` / `settings: no <Export>`); once a second it
+  looks at the overlay and tells the plugins when it changed
+  (`settings: RefitPlayer.ini changed; told ...`).
+
+### Changed
+- Game Settings' "Command Bar" is kept in the overlay as `[UI.HUD] BarHidden`, written
+  by `a2rt::overlay` (no more `WritePrivateProfileString`); Shown removes the key. An
+  existing `UIPlayer.ini` is migrated once: a non-zero `[HUD] BarHidden` is carried
+  over and the file is renamed `UIPlayer.ini.migrated`.
+
+Confirmed in game 2026-11-03.
+
 ## 0.28.1 — 2026-10-30
 
 ### Changed
@@ -352,6 +579,7 @@ Confirmed in game 2026-10-19.
   where the engine would draw one.
 
 Confirmed in game 2026-10-30.
+
 ## 0.13.1 — 2026-10-18
 
 ### Changed

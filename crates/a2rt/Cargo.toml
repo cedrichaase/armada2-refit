@@ -3,7 +3,7 @@ name = "a2rt"
 version = "0.1.0"
 edition = "2024"
 publish = false
-description = "The plugins' runtime (Display8, Render3D.asi, UI.asi): allocator, Win32, log, ini, files, clock, in-memory patching, frame dumps; no_std"
+description = "The plugins' runtime (Display8, Render3D.asi, UI.asi): allocator, Win32, log, ini (with the settings overlay), settings descriptors, files, clock, in-memory patching, frame dumps; no_std"
 license = "MIT"
 
 [lib]
@@ -15,4 +15,5 @@ path = "src/lib.rs"
 dump = ["dep:gpu"]
 
 [dependencies]
+a2ini = { path = "../a2ini" }
 gpu = { path = "../../gpu", optional = true }

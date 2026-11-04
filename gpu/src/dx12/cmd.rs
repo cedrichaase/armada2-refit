@@ -162,7 +162,7 @@ impl<'a> Cmd<'a> {
 
     // -- passes --
 
-    /// Begins a pass (see `d3d9::Cmd::begin_pass` for what the interface promises): the
+    /// Begins a pass (the interface promises what gpu/README.md says of the pass now): the
     /// targets made, the pass the pass now, its viewport its area, a clear done at once
     /// inside the area (every colour target with the first's colour, as Direct3D 9's
     /// `Clear`). `DontCare` keeps the contents, as Direct3D 9 does.
@@ -485,7 +485,7 @@ impl<'a> Cmd<'a> {
         }
         unsafe { core::ptr::copy_nonoverlapping(src, a.cpu, n as usize) };
         // `vk` is the buffer's GPU address, `first` the element there.
-        Some(Span { buf: core::ptr::null_mut(), vk: a.gpu - a.offset as u64, first: a.offset / stride, count: n / stride, stride })
+        Some(Span { vk: a.gpu - a.offset as u64, first: a.offset / stride, count: n / stride, stride })
     }
 
     pub fn vertices<T: Copy>(&mut self, data: &[T]) -> Option<Span> {
@@ -503,7 +503,7 @@ impl<'a> Cmd<'a> {
         if a == 0 || stride == 0 {
             return None;
         }
-        Some(Span { buf: core::ptr::null_mut(), vk: a, first: 0, count: b.0.desc.size / stride, stride })
+        Some(Span { vk: a, first: 0, count: b.0.desc.size / stride, stride })
     }
 
     /// Makes the list agree with the state for a draw (the module doc). None: nothing

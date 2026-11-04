@@ -21,13 +21,12 @@ pub enum Context {
 /// Called on the game's thread, inside a scene (between BeginScene and EndScene),
 /// with the back buffer as render target 0. Saves and restores every device state it
 /// touches, so the engine's next call finds the device as it left it. Does nothing
-/// without a Direct3D 9 device behind the game's (DXVK's own d3d8, GOG's d3d8to9).
+/// without a Display8 device behind the game's (it stood down to the system's d3d8).
 pub fn frame(ctx: Context) {
+    // The settings hub: its tables at the first frame, the overlay's stamp once a second.
+    crate::settings::frame(ctx);
     crate::gfx::frame(|w, h, draw| {
         crate::input::poll(w, h);
-        if ctx == Context::Mission {
-            crate::input::keep_clip();
-        }
         let mut ui = crate::widgets::Ui::begin(draw, w, h, crate::input::state());
         ui.theme = crate::widgets::Theme::for_context(ctx);
         crate::app::run(ctx, &mut ui);

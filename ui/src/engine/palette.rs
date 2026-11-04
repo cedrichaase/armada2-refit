@@ -1,5 +1,5 @@
 //! The button bar (`PopupPaletteImp`, `g_pPopupPalette`): what it shows, pressing its
-//! buttons, and its keys. Read by `hud::bar` (HUD.md, "The button bar").
+//! buttons. Read by `hud::bar` (HUD.md, "The button bar").
 //!
 //! The bar's `Update` (in its `AlwaysGameSimulate`) works out the buttons for what is
 //! selected and the menu open (`mUpdateButtonsAndPosition`), and keeps them in 21
@@ -7,74 +7,62 @@
 //! says so, which is when `Render` draws it. Each holds a `CommandInfoClass` (`+0x88`)
 //! or a `ModeInfo` (`+0x84`), its state (`+0x34`: 0 disabled, 2 active, else normal)
 //! and, once drawn, its icon sprite (`+0x2c`, looked up by the name the command or
-//! mode gives: `ControlButton::Render`). The rest is grid/README.md's: the names, the
-//! hotkey tables, the menu toggles and the press.
-use super::{field, rd};
+//! mode gives: `ControlButton::Render`). Its keys are QOL's (`qol/bar.c`).
+use super::{field as peek, rd};
+use crate::syms_hud::{field, hook, sym, value, TABLE};
+
+fn eng() -> &'static a2engine::Engine {
+    TABLE.engine()
+}
+
+/// The address of `s` when the bar can be read (`hud.reads_bar`), else 0.
+fn a(s: a2engine::Sym) -> usize {
+    if eng().ready(hook::HUD_READS_BAR).is_ok() { eng().addr(s) } else { 0 }
+}
 use alloc::string::String;
 
-/// `PopupPaletteImp+0x28`: `ControlButton *[21]`.
-const SLOTS: usize = 0x28;
-pub const N_SLOTS: usize = 21;
-/// `+0x110`: the palette mode (1 the bar, 2 the build-locked bar, else floating);
-/// `+0x124`: the menu shown (`eMenuType`: 0 the top level, 1 orders, 2..4 build,
-/// evolve, research, 8 the top level again after a menu closed).
-const MODE: usize = 0x110;
-const MENU: usize = 0x124;
-/// The hotkey tables' counts (commands `+0xcc`, build items `+0xd8`, special weapons
-/// `+0xe4`), which `mProcessKeyboardInput` walks.
-const KEY_COUNTS: [usize; 3] = [0xcc, 0xd8, 0xe4];
-/// `Init` keeps six menu toggles' control pointers here (popup, build, orders, trade,
-/// AI, formations).
-const TOGGLES: usize = 0x763d3c;
-const N_TOGGLES: usize = 6;
+// `PopupPaletteImp+0x28` holds `ControlButton *[21]`; `+0x110` is the palette mode (1 the
+// bar, 2 the build-locked bar, else floating) and `+0x124` the menu shown (`eMenuType`:
+// 0 the top level, 1 orders, 2..4 build, evolve, research, 8 the top level again after a
+// menu closed). The hotkey tables' counts (commands `+0xcc`, build items `+0xd8`,
+// special weapons `+0xe4`) and the six menu toggles are what the bar's keys walk, and are
+// QOL's now (`qol/bar.c`, "QOL-1").
+pub const N_SLOTS: usize = value::PALETTE_N_SLOTS as usize;
 
-/// `ControlButton`.
-const BTN_STATE: usize = 0x34;
-const BTN_SPRITE: usize = 0x2c;
-const BTN_MODE: usize = 0x84;
-const BTN_COMMAND: usize = 0x88;
-const VT_TOOLTIP: usize = 0x00;
-const VT_VERBOSE: usize = 0x04;
-const VT_IS_VALID: usize = 0x1c;
-const VT_PRESS: usize = 0x20;
+// `ControlButton`: its state `+0x34` (0 disabled, 2 active, else normal), its icon sprite
+// `+0x2c`, a `ModeInfo` `+0x84` or `CommandInfoClass` `+0x88`; vtable slots GetTooltip
+// (+0), GetVerboseTooltip (+4), IsValid (+0x1c) and the press (+0x20).
+//
+// `CommandInfoClass`: its `buttonName` inline at `+0x20`, `preferredPosition` (column,
+// row) at `+0x1b0`. `ModeInfo`: its kind at `+0x04` (1 a build item, its class at `+0x0c`
+// with the ODF name at `+0x7c`; 2 a special weapon, the weapon class at `+0x10` with its
+// `cPrjID` at `+0x208`; 3 a fixed button, `+0x14` indexing the names in a global table,
+// 16 bytes apart).
+//
+// `CommandInfoClass::ButtonName(std::string &) const` and `ModeInfo::ButtonName` give the
+// name of the button's sprite; `DisplayInterface::m_spriteDatabase` and
+// `ST3D_Database::FindElement(name, class)` find it.
 
-/// `CommandInfoClass`: its `buttonName` inline at `+0x20`, `preferredPosition` (column,
-/// row) at `+0x1b0`.
-const CMD_NAME: usize = 0x20;
-const CMD_POS: usize = 0x1b0;
-/// `ModeInfo`: its kind at `+0x04` (1 a build item, its class at `+0x0c` with the ODF
-/// name at `+0x7c`; 2 a special weapon, the weapon class at `+0x10` with its `cPrjID`
-/// at `+0x208`; 3 a fixed button, `+0x14` indexing the names at `MODE_NAMES`).
-const MODE_KIND: usize = 0x04;
-const MODE_NAMES: usize = 0x709f68;
-const PRJ_GET_NAME: usize = 0x65dce0;
-
-/// `CommandInfoClass::ButtonName(std::string &) const` and `ModeInfo::ButtonName`:
-/// the name of the button's sprite.
-const CMD_BUTTON_NAME: usize = 0x519780;
-const MODE_BUTTON_NAME: usize = 0x4e7950;
-/// `DisplayInterface::m_spriteDatabase` and `ST3D_Database::FindElement(name, class)`.
-const SPRITE_DB: usize = 0x765030;
-const FIND_ELEMENT: usize = 0x620750;
-
-/// `ControlButton::mButtonPressFunction` (ControlButton's vtable `+0x20`).
-const CONTROL_BUTTON_PRESS: usize = 0x4e69e0;
+/// Whether the bar can be read (`hud.reads_bar`).
+pub fn readable() -> bool {
+    eng().ready(hook::HUD_READS_BAR).is_ok()
+}
 
 pub fn palette() -> usize {
     super::hud::palette()
 }
 
 pub fn mode(p: usize) -> u32 {
-    if p == 0 { 0 } else { unsafe { rd(p + MODE) } }
+    if p == 0 { 0 } else { unsafe { rd(p + field::PALETTE_MODE) } }
 }
 
 pub fn menu(p: usize) -> u32 {
-    if p == 0 { 0 } else { unsafe { rd(p + MENU) } }
+    if p == 0 { 0 } else { unsafe { rd(p + field::PALETTE_MENU) } }
 }
 
 /// The `i`-th of the bar's 21 buttons (0 if there is none).
 pub fn slot(p: usize, i: usize) -> usize {
-    if i >= N_SLOTS { 0 } else { field(p, SLOTS + 4 * i) }
+    if i >= N_SLOTS { 0 } else { peek(p, field::PALETTE_SLOTS + 4 * i) }
 }
 
 /// Whether the button is shown (`IsValid`).
@@ -82,13 +70,13 @@ pub fn valid(b: usize) -> bool {
     if b == 0 {
         return false;
     }
-    let f: unsafe extern "thiscall" fn(usize) -> bool = unsafe { core::mem::transmute(rd::<usize>(rd::<usize>(b) + VT_IS_VALID)) };
+    let f: unsafe extern "thiscall" fn(usize) -> bool = unsafe { core::mem::transmute(rd::<usize>(rd::<usize>(b) + field::PALETTE_VT_IS_VALID)) };
     unsafe { f(b) }
 }
 
 /// 0: disabled (a click does nothing); 2: active (the alert level in force, ...).
 pub fn state(b: usize) -> u32 {
-    if b == 0 { 0 } else { unsafe { rd(b + BTN_STATE) } }
+    if b == 0 { 0 } else { unsafe { rd(b + field::PALETTE_BTN_STATE) } }
 }
 
 /// The button's icon sprite. `ControlButton::Render` looks it up each time it draws:
@@ -97,15 +85,18 @@ pub fn state(b: usize) -> u32 {
 /// `StandardButton::SetImages` does). The stock bar no longer draws, so we look it up
 /// the same way, once per name. 0 when the button names no sprite.
 pub fn sprite(b: usize) -> usize {
-    let cmd = field(b, BTN_COMMAND);
-    let mode = field(b, BTN_MODE);
+    let cmd = peek(b, field::PALETTE_BTN_COMMAND);
+    let mode = peek(b, field::PALETTE_BTN_MODE);
     let (obj, f) = if cmd != 0 {
-        (cmd, CMD_BUTTON_NAME)
+        (cmd, a(sym::PALETTE_CMD_BUTTON_NAME))
     } else if mode != 0 {
-        (mode, MODE_BUTTON_NAME)
+        (mode, a(sym::PALETTE_MODE_BUTTON_NAME))
     } else {
-        return field(b, BTN_SPRITE);
+        return peek(b, field::PALETTE_BTN_SPRITE);
     };
+    if f == 0 {
+        return 0;
+    }
     let Some(name) = super::msvc::with_string(|s| unsafe {
         let g: unsafe extern "thiscall" fn(usize, usize) -> bool = core::mem::transmute(f);
         g(obj, s);
@@ -122,7 +113,11 @@ static mut SPRITES_DB: usize = 0;
 #[allow(static_mut_refs)]
 pub fn find_sprite(name: &str) -> usize {
     unsafe {
-        let db = rd::<usize>(SPRITE_DB);
+        let (db_at, find_at) = (a(sym::PALETTE_SPRITE_DB), a(sym::PALETTE_FIND_ELEMENT));
+        if db_at == 0 || find_at == 0 {
+            return 0;
+        }
+        let db = rd::<usize>(db_at);
         if db == 0 {
             return 0;
         }
@@ -135,7 +130,7 @@ pub fn find_sprite(name: &str) -> usize {
             return *sp;
         }
         let c = crate::rt::cstr(name);
-        let find: unsafe extern "thiscall" fn(usize, *const u8, u32) -> usize = core::mem::transmute(FIND_ELEMENT);
+        let find: unsafe extern "thiscall" fn(usize, *const u8, u32) -> usize = core::mem::transmute(find_at);
         let sp = find(db, c.as_ptr(), 0);
         cache.push((String::from(name), sp));
         sp
@@ -161,39 +156,46 @@ pub struct Desc {
 
 pub fn describe(b: usize) -> Desc {
     let mut d = Desc { kind: Kind::None, name: String::new(), pos: None };
-    let cmd = field(b, BTN_COMMAND);
-    let mode = field(b, BTN_MODE);
+    let cmd = peek(b, field::PALETTE_BTN_COMMAND);
+    let mode = peek(b, field::PALETTE_BTN_MODE);
+    if eng().ready(hook::HUD_READS_BAR).is_err() {
+        return d;
+    }
     unsafe {
         if cmd != 0 {
             d.kind = Kind::Command;
-            d.name.push_str(super::hud::cstr_static((cmd + CMD_NAME) as *const u8));
-            let p: [i32; 2] = rd(cmd + CMD_POS);
+            d.name.push_str(super::hud::cstr_static((cmd + field::PALETTE_CMD_NAME) as *const u8));
+            let p: [i32; 2] = rd(cmd + field::PALETTE_CMD_POS);
             d.pos = Some((p[0], p[1]));
             return d;
         }
         if mode == 0 {
             return d;
         }
-        match rd::<u32>(mode + MODE_KIND) {
+        match rd::<u32>(mode + field::PALETTE_MODE_KIND) {
             1 => {
                 d.kind = Kind::Build;
-                d.name.push_str(super::hud::cstr_static(field(field(mode, 0x0c), 0x7c) as *const u8));
+                d.name.push_str(super::hud::cstr_static(peek(peek(mode, field::PALETTE_MODE_CLASS), field::PALETTE_CLASS_ODF) as *const u8));
             }
             2 => {
                 d.kind = Kind::Weapon;
-                let id = field(field(mode, 0x10), 0x208);
+                let id = peek(peek(mode, field::PALETTE_MODE_WEAPON), field::PALETTE_WEAPON_PRJID);
                 if id != 0 {
                     let mut buf = [0u8; 80];
-                    let f: unsafe extern "thiscall" fn(usize, *mut u8) = core::mem::transmute(PRJ_GET_NAME);
-                    f(id, buf.as_mut_ptr());
-                    d.name.push_str(super::hud::cstr_static(buf.as_ptr()));
+                    let get_name = a(sym::PALETTE_PRJ_GET_NAME);
+                    if get_name != 0 {
+                        let f: unsafe extern "thiscall" fn(usize, *mut u8) = core::mem::transmute(get_name);
+                        f(id, buf.as_mut_ptr());
+                        d.name.push_str(super::hud::cstr_static(buf.as_ptr()));
+                    }
                 }
             }
             3 => {
                 d.kind = Kind::Menu;
-                let i = rd::<u32>(mode + 0x14) as usize;
-                if i < 9 {
-                    d.name.push_str(super::hud::cstr_static(rd::<usize>(MODE_NAMES + 16 * i) as *const u8));
+                let i = rd::<u32>(mode + field::PALETTE_MODE_INDEX) as usize;
+                let names = a(sym::PALETTE_MODE_NAMES);
+                if names != 0 && i < value::PALETTE_NAMES_COUNT as usize {
+                    d.name.push_str(super::hud::cstr_static(rd::<usize>(names + value::PALETTE_NAMES_STRIDE as usize * i) as *const u8));
                 }
             }
             _ => {}
@@ -205,10 +207,10 @@ pub fn describe(b: usize) -> Desc {
 /// The button's tooltip as the game words it (`ControlButton::GetTooltip`, or the
 /// longer `GetVerboseTooltip`): the command's name and hotkey, a build item's cost.
 pub fn tooltip(b: usize, verbose: bool) -> Option<String> {
-    if b == 0 || !super::msvc::available() {
+    if b == 0 || !super::msvc::available() || eng().ready(hook::HUD_READS_BAR).is_err() {
         return None;
     }
-    let slot = if verbose { VT_VERBOSE } else { VT_TOOLTIP };
+    let slot = if verbose { field::PALETTE_VT_VERBOSE } else { field::PALETTE_VT_TOOLTIP };
     super::msvc::with_stringstream(|ss| unsafe {
         let f: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(rd::<usize>(rd::<usize>(b) + slot));
         f(b, ss)
@@ -219,73 +221,13 @@ pub fn tooltip(b: usize, verbose: bool) -> Option<String> {
 /// nothing if it is disabled, else the click sound, unless a video plays, and the
 /// button's press function, which hands its command or mode to the bar.
 pub fn press(b: usize) -> bool {
-    if b == 0 || state(b) == 0 {
+    if b == 0 || state(b) == 0 || eng().ready(hook::HUD_READS_BAR).is_err() {
         return false;
     }
     if !super::hud::video_playing() {
         super::sound::click();
     }
-    let f: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(rd::<usize>(rd::<usize>(b) + VT_PRESS)) };
+    let f: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(rd::<usize>(rd::<usize>(b) + field::PALETTE_VT_PRESS)) };
     unsafe { f(b) };
     true
-}
-
-// ---- the keys ----------------------------------------------------------------------
-
-/// In `PopupPaletteImp::Update`: `call mProcessKeyboardInput`, made when something of
-/// the player's is selected and the game is not paused.
-const SITE_KEYS: usize = 0x4fb56a;
-const PROCESS_KEYS: usize = 0x4fb5b0;
-
-static mut STOCK_KEYS_OFF: bool = false;
-static mut ON_KEYS: Option<fn(usize)> = None;
-static ZERO: i32 = 0;
-
-/// Wraps the bar's keyboard step: with `stock_keys_off`, stock's bar keys do nothing
-/// (the three hotkey tables are emptied for the stock call and put back, and the six
-/// menu toggles point at a zero), and `on_keys` runs after it, on the game's thread in
-/// the bar's own update. False, with nothing written, when the site is not stock (it
-/// is not while GridLayout.asi is loaded: it wraps the same call).
-pub fn install_keys(stock_keys_off: bool, on_keys: fn(usize)) -> bool {
-    if super::hook::call_target(SITE_KEYS) != Some(PROCESS_KEYS) {
-        crate::log!("bar: the bar's keyboard call is not stock (GridLayout.asi?)");
-        return false;
-    }
-    if !super::starts(CONTROL_BUTTON_PRESS, &[0x8b, 0xc1, 0x56, 0x8b, 0x90])
-        || !super::starts(PRJ_GET_NAME, &[0x55, 0x8b, 0xec, 0x56, 0x57])
-        || !super::starts(CMD_BUTTON_NAME, &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x08])
-        || !super::starts(MODE_BUTTON_NAME, &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x48])
-        || !super::starts(FIND_ELEMENT, &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08])
-    {
-        return false;
-    }
-    unsafe {
-        STOCK_KEYS_OFF = stock_keys_off;
-        ON_KEYS = Some(on_keys);
-    }
-    super::hook::patch_call(SITE_KEYS, PROCESS_KEYS, process_keys as *const () as usize)
-}
-
-unsafe extern "thiscall" fn process_keys(p: usize, crafts: usize) {
-    let stock: unsafe extern "thiscall" fn(usize, usize) = unsafe { core::mem::transmute(PROCESS_KEYS) };
-    unsafe {
-        if STOCK_KEYS_OFF {
-            for i in 0..N_TOGGLES {
-                *((TOGGLES + 4 * i) as *mut *const i32) = &ZERO;
-            }
-            let saved = KEY_COUNTS.map(|o| rd::<i32>(p + o));
-            for o in KEY_COUNTS {
-                *((p + o) as *mut i32) = 0;
-            }
-            stock(p, crafts);
-            for (o, v) in KEY_COUNTS.iter().zip(saved) {
-                *((p + o) as *mut i32) = v;
-            }
-        } else {
-            stock(p, crafts);
-        }
-        if let Some(f) = ON_KEYS {
-            f(p);
-        }
-    }
 }

@@ -28,6 +28,8 @@ a2test -- run Armada II headless and test it end to end
       --no-claude                      judged steps become REVIEW, agent steps fail
       --install PATH                   refit cases: stock, then PATH/install, in
                                        order; repeatable (see session start)
+      --layers A,B                     refit cases: only these layers (layers.toml),
+                                       ./install --only; overrides a scenario's Layers:
       --tolerance 0.05                 allowed stretch for the measured checks
   a2test check SCENARIO...             parse only: show how each step would run
   a2test list                          scenarios in testbench/scenarios/
@@ -36,6 +38,8 @@ a2test -- run Armada II headless and test it end to end
                        [--vnc] [--no-launch]
       --install PATH                   start from stock, then run PATH/install into the
                                        clone; repeat to stack checkouts (public, private)
+      --layers A,B                     only these layers: ./install --only A,B (this
+                                       checkout's when no --install is given)
       --note "TEXT"                    the session's first intent (as drive note)
   a2test session stop ID [--keep] [--graceful]
                                        end session ID (terminated; --graceful: through its
@@ -73,8 +77,19 @@ a2test -- run Armada II headless and test it end to end
   a2test drive note "TEXT"             say what you are doing now (the session's intent on
                                        the dashboard); again whenever it changes
   a2test drive running | log NAME | launch [ARGS] | quit
+  a2test drive overlay WORD...         set (Render3D.World:Surfaces=0) or remove (--unset
+                                       Render3D.World:Surfaces) a key of RefitPlayer.ini in the
+                                       running game; waits for UI.asi's hub to log the change
   a2test drive scene "CMD" ["CMD" ...]  commands to Scene.asi (testbench/scene/README.md),
                                        e.g. "orbit ship 30 15 900", "camera rts", "query"
+
+  a2test syms [--exe PATH] [--build B] [--plugin P] [--record] [--json]
+                                       the symbol profiles (profiles/) checked offline against
+                                       an Armada2.exe (default $A2_GAME's, only read): the
+                                       build, `symbols: N/M resolved`, each hook ready or its
+                                       stand-down reason; --build forces a profile (the
+                                       wrong-profile test); --record appends the exe's sha256
+                                       to [[known]] of the matched build
 
   a2test baseline record NAME --from SRC... [--shot S]... [--force]
                                        keep shots (PNG, PPM, PFM) as $A2_DATA/baselines/NAME;
@@ -147,6 +162,9 @@ def main(argv=None):
             except stockcache.StockCacheError as e:
                 print(f'a2test: {e}', file=sys.stderr)
                 return 1
+        if cmd == 'syms':
+            from . import syms
+            return syms.main(rest)
         if cmd == 'baseline':
             from . import baseline
             return baseline.main(rest)
@@ -174,6 +192,9 @@ def cmd_run(argv):
     ap.add_argument('--tolerance', type=float, default=0.05)
     ap.add_argument('--out')
     ap.add_argument('--install', action='append', default=[], metavar='PATH')
+    ap.add_argument('--layers', metavar='A,B',
+                    help='only these layers (layers.toml): ./install --only, into a clone from stock; '
+                         'overrides a scenario\'s Layers:')
     ap.add_argument('--vulkan-device', choices=['gpu', 'lavapipe'], default=None,
                     help='where Backend=vulkan draws: gpu (default; A2TEST_VULKAN_DEVICE) or lavapipe, the CPU')
     ap.add_argument('--no-validate', action='store_true',
@@ -200,7 +221,8 @@ def cmd_run(argv):
                 command='a2test run ' + ' '.join(shlex.quote(x) for x in argv), repo=str(config.REPO))
     stop = threading.Event()
     opts = dict(vnc=a.vnc, record=a.record, audio=a.audio, keep=a.keep, no_claude=a.no_claude,
-                tolerance=a.tolerance, stop=stop, tag=a.jobs > 1, installs=a.install, clock=a.clock)
+                tolerance=a.tolerance, stop=stop, tag=a.jobs > 1, installs=a.install, clock=a.clock,
+                layers=[a.layers] if a.layers else None)
     print(f'run {run_id} -> {run_dir}', flush=True)
     # Each scenario's reference case runs first, so every other case has something to
     # compare with; once it is done, that scenario's other cases join the queue. Up to
@@ -328,7 +350,8 @@ def cmd_check(argv):
         print(f'{scn.title}\n  resolutions: {", ".join(config.res_name(r) + " (" + config.aspect_name(r) + ")" for r in scn.resolutions)}'
               f'\n  mod: {scn.mod}   launch: {scn.launch}   reference: {scn.reference}' +
               (f'\n  players: {", ".join(scn.players)}' if scn.players else '') +
-              (f'   setup: {scn.setup}' if scn.setup else ''))
+              (f'   setup: {scn.setup}' if scn.setup else '') +
+              (f'\n  overlay: {scn.overlay}' if scn.overlay else ''))
         for i, st in enumerate(scn.steps, 1):
             m = re.match(r'^\s*(\w+)\s*:\s*(.+)$', st)
             t = normalise(m.group(2) if m and m.group(1).lower() in scn.players else st)
@@ -430,6 +453,8 @@ def cmd_session(argv):
         ap.add_argument('--note', default='', metavar='TEXT',
                         help='what this session is for: its first intent, as `drive note` (the dashboard shows it)')
         ap.add_argument('--install', action='append', default=[], metavar='PATH')
+        ap.add_argument('--layers', metavar='A,B',
+                        help='only these layers (layers.toml): ./install --only, into a clone from stock')
         ap.add_argument('--stock-shell', choices=['embed'], default=None)
         ap.add_argument('--assets', choices=['none'], default=None,
                         help='none: install into the clone from an empty A2_DATA (no textures, plates, movies)')
@@ -457,8 +482,8 @@ def cmd_session(argv):
             ap.error('--assets none goes with --mod refit')
         if a.stock_shell and a.mod != 'stock':
             ap.error('--stock-shell goes with --mod stock')
-        if a.install and a.mod == 'stock':
-            ap.error('--install builds a refit state; it cannot go with --mod stock')
+        if (a.install or a.layers) and a.mod == 'stock':
+            ap.error('--install and --layers build a refit state; they cannot go with --mod stock')
         res = config.parse_res(a.res)
         sid = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
         d = config.RESULTS / f'session-{sid}' / re.sub(r'[^A-Za-z0-9_.-]+', '-', a.label) / config.res_name(res)
@@ -476,7 +501,8 @@ def cmd_session(argv):
         try:
             s = Session.create(d, res, mod=a.mod, vnc=a.vnc, record=a.record, audio=a.audio, keep=a.keep,
                                label=a.label, installs=a.install, stock_shell=a.stock_shell,
-                               assets=a.assets, mute=mute, stems=stems, clock=a.clock)
+                               assets=a.assets, mute=mute, stems=stems, clock=a.clock,
+                               layers=[a.layers] if a.layers else None)
         except BaseException as e:
             if own:
                 jobs.finish(jid, 'start-failed', f'no session: {e}'.splitlines()[0][:300])
@@ -723,6 +749,14 @@ def cmd_drive(argv):
     elif sub == 'launch':
         s.launch(' '.join(rest) or '-nointro')
         print(f'launched, pid {s.game_pid()}')
+    elif sub == 'overlay':
+        if not rest:
+            raise GameError('overlay what? a2test drive --session ID overlay Render3D.World:Surfaces=0 '
+                            '[--unset Render3D.World:Surfaces]')
+        ok, text = s.drive_overlay(rest)
+        log.action(f'overlay {" ".join(rest)}', status='ok' if ok else 'fail', detail=text)
+        print(text)
+        return 0 if ok else 1
     elif sub == 'quit':
         r = _adhoc_step(s, 'Quit the game')
         print(f'{r["status"]}: {r.get("detail") or ""}')

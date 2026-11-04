@@ -4,17 +4,17 @@
 #
 #   tools/shaderc/verify-generated.sh
 #
-# What it covers: render3d/, ui/ and display/ (src/shaders/*.rs, *_spv.rs, *_dxil.rs, by
-# tools/shaderc/hlsl-rs.sh exactly as each build.sh calls it) and gpu's own (gpu/vk-shaders.sh
+# What it covers: render3d's crates (render3d/core/ and each render3d/mods/<m>/), ui/ and
+# display/ (<crate>/src/shaders/*_spv.rs, *_dxil.rs, by tools/shaderc/hlsl-rs.sh
+# exactly as each build.sh calls it; a render3d module's with --headers render3d/core/shaders) and gpu's own (gpu/vk-shaders.sh
 # to src/vulkan/shaders.rs, gpu/dx12-shaders.sh to src/dx12/shaders.rs). The generated
 # files are deleted first, so a stamp that still matches cannot hide a compiler whose
 # output has changed; then every SPIR-V module is put through spirv-val on its own
 # (hlsl-rs.sh checks each as it writes it; gpu/spirv-selftest.sh checks the links and
 # patches gpu makes).
 #
-# The compilers are the pinned ones: dxc 1.9.2609 (fetch-dxc.sh) first on PATH, so it
-# writes the SPIR-V as well as the DXIL, and vkd3d-compiler 1.19 (fetch-vkd3d.sh), which
-# is built if the one on PATH is not that version. Needs git, spirv-val and python3.
+# The compiler is the pinned one: dxc 1.9.2609 (fetch-dxc.sh) first on PATH, so it
+# writes the SPIR-V as well as the DXIL. Needs git, spirv-val and python3.
 # Leaves the tree as it found it only if the files match; on a difference it leaves the
 # regenerated files for `git diff`.
 set -euo pipefail
@@ -26,24 +26,29 @@ command -v spirv-val >/dev/null || { echo "verify-generated: no spirv-val (Ubunt
 
 dxc_dir=$(dirname "$("$here/fetch-dxc.sh")")
 PATH="$dxc_dir:$PATH"
-command -v vkd3d-compiler >/dev/null && vkd3d-compiler --version 2>&1 | grep -qF "vkd3d-shader 1.19 (git 5c355b596)" ||
-    PATH="$("$here/fetch-vkd3d.sh"):$PATH"
-echo "verify-generated: $(vkd3d-compiler --version 2>&1 | head -1)"
 echo "verify-generated: dxc $(dxc --version 2>&1 | head -1)"
 
+# The crates with shaders of their own: <crate>/shaders/*.hlsl into <crate>/src/shaders/.
+crates=(render3d/core render3d/mods/* ui display)
+gen=()
+for c in "${crates[@]}"; do [ -d "$c/shaders" ] && gen+=("$c/src/shaders"); done
+
 # The tree must be clean where it matters, or a difference could not be told from an edit.
-if ! git diff --quiet -- render3d/src/shaders ui/src/shaders display/src/shaders gpu/src; then
+if ! git diff --quiet -- "${gen[@]}" gpu/src; then
     echo "verify-generated: generated shader files have uncommitted changes; commit or revert them first" >&2
     exit 1
 fi
 
-for layer in render3d ui display; do
-    rm -f "$layer"/src/shaders/*.rs
-    : > "$layer/src/shaders/mod.rs"
+for d in "${gen[@]}"; do
+    rm -f "$d"/*.rs
+    : > "$d/mod.rs"
 done
 rm -f gpu/src/vulkan/shaders.rs gpu/src/dx12/shaders.rs
 
-for layer in render3d ui display; do
+for layer in "${crates[@]}"; do
+    [ -d "$layer/shaders" ] || continue
+    headers=()
+    case $layer in render3d/mods/*) headers=(--headers render3d/core/shaders) ;; esac
     mods=""
     for f in "$layer"/shaders/*.hlsl; do
         [ -e "$f" ] || continue
@@ -51,8 +56,8 @@ for layer in render3d ui display; do
         entries=$(sed -n '1s#^// entries:##p' "$f")
         [ -n "$entries" ] || { echo "verify-generated: $f has no '// entries:' first line" >&2; exit 1; }
         # shellcheck disable=SC2086
-        tools/shaderc/hlsl-rs.sh --fix "$layer/src/shaders/$name.rs" "$f" $entries
-        mods="$mods$name ${name}_spv ${name}_dxil "
+        tools/shaderc/hlsl-rs.sh "${headers[@]}" "$layer/src/shaders/$name.rs" "$f" $entries
+        mods="$mods${name}_spv ${name}_dxil "
     done
     # mod.rs as each build.sh writes it.
     {
@@ -68,7 +73,7 @@ gpu/dx12-shaders.sh
 n=0
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
-for f in render3d/src/shaders/*_spv.rs ui/src/shaders/*_spv.rs display/src/shaders/*_spv.rs gpu/src/vulkan/shaders.rs; do
+for f in ${gen[@]/%//*_spv.rs} gpu/src/vulkan/shaders.rs; do
     python3 -I - "$f" "$tmp" <<'EOF'
 import re, struct, sys, os
 f, tmp = sys.argv[1:3]
@@ -84,10 +89,10 @@ for s in "$tmp"/*.spv; do
 done
 echo "verify-generated: $n SPIR-V modules pass spirv-val"
 
-if git status --porcelain -- render3d/src/shaders ui/src/shaders display/src/shaders gpu/src | grep -q .; then
+if git status --porcelain -- "${gen[@]}" gpu/src | grep -q .; then
     echo "verify-generated: the regenerated files differ from the committed ones:" >&2
-    git status --short -- render3d/src/shaders ui/src/shaders display/src/shaders gpu/src >&2
-    git diff --stat -- render3d/src/shaders ui/src/shaders display/src/shaders gpu/src >&2
+    git status --short -- "${gen[@]}" gpu/src >&2
+    git diff --stat -- "${gen[@]}" gpu/src >&2
     exit 1
 fi
 echo "verify-generated: every generated shader file reproduces byte for byte"

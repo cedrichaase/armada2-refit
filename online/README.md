@@ -15,7 +15,7 @@ at `c20e.de` unless changed), the host gets a join code and players type it to j
 directly where the routers allow it, through the server's relay where not. With
 `Server=` empty, players join by address as on a LAN. The server is
 `server/a2online-server.py`. Every other connection type keeps the game's DirectPlay,
-traced but unchanged. `./install` does not install it yet.
+traced but unchanged. `./install` installs it (`online/install.sh`, the `online` layer of the registry, `layers.toml`), and `./a2mod` switches it with the other layers (online 0.11.0).
 
 **Seen in game (2026-10-03):** a player's own install joined a bench game on the same
 machine by join code, through the public server at `c20e.de`, and played the match. That confirms the menu entry, the transport, the join code and the default
@@ -154,8 +154,21 @@ own on top of the game's. LAN (TCP/IP) and Manual IP stay as they were.
 | `0x5bfd01` | the screen's `WM_LBUTTONUP` case | `stub_click` | clears the online flag on every click, so no other button inherits it |
 | `0x5bff9b` | the IPX branch, its button just drawn pressed | `stub_ipx` | sets the flag and continues at `0x5c00b6`, the Manual IP branch after its own button: same frame, same stack depth, and that path sets every register it reads |
 
-Each site is checked against the bytes it replaces, and if any differs none is patched
-(`Online.log` says so). `Entry=0` in `Online.ini` leaves the screen stock.
+Every address is in the symbol profile, `profiles/<build>/online.toml`, generated into
+`engine_syms.h` (`crates/a2engine/README.md`), and the stubs jump through the resolved
+variables `a2s_online_*`. One hook, **`online.entry`**, feeds the row `Online.Entry`: the
+six patch sites with the bytes they replace (a `patch` each), the two continue points
+(`label`s), `Chat::Init` and `Chat::Append` (`fn`s with their first bytes), the two chat
+boxes and the click's object (`global`s) and the edit-control offset in `Chat` (`field`).
+They are checked as a whole before anything is written: if any differs on a build, none is
+patched, `Online.log` says `engine: online.entry stands down: ...` and the menu line says
+why, and `Online_SettingsNote` gives the same reason to the settings screen.
+Without the hook the IPX button and the chat boxes stay stock. (Before the profile, each
+site was checked against the bytes it replaces and `Online.log` said the exe was not
+the 1.1 this was made for.) `Entry=0` in `Online.ini` leaves the screen stock. `Entry` is a settings row (`settings.toml`,
+exported as `Online_Settings`, RESTART, tab Interface), so `[Online.Online] Entry=0` in
+`RefitPlayer.ini` does the same; every key of `Online.ini` is read through the overlay
+(`tools/settings/README.md`) and the override is logged to `Online.log`.
 
 The entry then runs the Manual IP flow (a blank field hosts, a join code or an address
 joins), and the flag makes `NetworkManager.dll` get our transport instead of DirectPlay
@@ -214,6 +227,16 @@ What the bench showed on the way, each now built in:
 `Loss=N` in `Online.ini` drops N% of the datagrams a game sends, on purpose, for testing
 on one machine, where nothing is ever lost. With `Loss=10` on both sides a match sent
 about 960 datagrams each way, dropped about 100, resent 65 and 92, and played on.
+
+### The rules handshake (the `rules` layer)
+
+Joiners report whether they run `QOLRules.asi` with `PayOnQueue` on, and the host answers
+every player with whether all of them do (`R_RULES` in `peer.c`); the plugin latches the
+answer when the next game opens. The plugin is found by its exports (`QOLRules_Wanted`,
+`QOLRules_Network`, `QOLRules_Reset`) through `a2_find_export` in `csdk/a2asi.h`, a walk
+over the loaded modules, never by the file name. A player without the `rules` layer
+reports none, so the game plays stock rules for everyone; nobody desyncs (`rules/README.md`,
+"Must-match").
 
 ## The server and join codes (milestone 2)
 

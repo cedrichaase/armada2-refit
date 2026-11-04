@@ -24,31 +24,22 @@ pub enum Race {
 impl Race {
     pub const ALL: [Race; 6] = [Race::Federation, Race::Klingon, Race::Romulan, Race::Cardassian, Race::Borg, Race::Species8472];
 
+    /// Its place in `ALL`, which is the order of the content set's race list.
+    pub fn index(self) -> usize {
+        Race::ALL.iter().position(|r| *r == self).unwrap_or(0)
+    }
+
+    /// The race's name in the content set ("" when the build's set has no races).
     pub fn name(self) -> &'static str {
-        match self {
-            Race::Federation => "Federation",
-            Race::Klingon => "Klingon",
-            Race::Romulan => "Romulan",
-            Race::Cardassian => "Cardassian",
-            Race::Borg => "Borg",
-            Race::Species8472 => "Species 8472",
-        }
+        crate::content::get().races.get(self.index()).map_or("", |r| r.name)
     }
 
     /// From a name as `[UI] Theme=` or the game spells it (`federation`, `fed`,
-    /// `kli`, `bor`, `species8472`, `8472`, ...), any case.
+    /// `kli`, `bor`, `species8472`, `8472`, ...), any case; the content set's aliases.
     pub fn from_name(s: &str) -> Option<Race> {
         let l = crate::rt::lower(s.trim());
-        let l = l.as_str();
-        Some(match l {
-            "federation" | "fed" => Race::Federation,
-            "klingon" | "kli" | "kling" => Race::Klingon,
-            "romulan" | "rom" => Race::Romulan,
-            "cardassian" | "card" | "car" => Race::Cardassian,
-            "borg" | "bor" => Race::Borg,
-            "species8472" | "species 8472" | "8472" | "species" => Race::Species8472,
-            _ => return None,
-        })
+        let races = crate::content::get().races;
+        Race::ALL.iter().copied().find(|r| races.get(r.index()).is_some_and(|n| n.aliases.contains(&l.as_str())))
     }
 }
 
@@ -825,6 +816,31 @@ pub fn badge(ui: &mut Ui, r: R, s: &str, off: bool) {
     ui.text_in(r, s, t.micro_size, Align::Centre, col, Weight::Bold);
 }
 
+/// A status badge on a settings row (the Refit screen): a small plate with a word on it,
+/// "Now", "Restart needed", "Must match". `st.on` draws it active (a change waiting to
+/// apply), `st.off` dimmed. Its width for a word is `status_badge_w`. (`badge` above is
+/// the HUD bar's key letter.)
+pub fn status_badge(ui: &mut Ui, r: R, s: &str, st: State) {
+    let t = ui.theme;
+    let c = if t.form == Form::Lcars { Corners::pill(r) } else { t.px(ui, t.small) };
+    let (fill, edge, col) = if st.off {
+        (fade(t.track, 0.5), fade(t.button_edge, 0.4), t.text_off)
+    } else if st.on {
+        (fade(t.accent, 0.85), t.accent, t.text_on)
+    } else {
+        (fade(t.track, 0.9), fade(t.button_edge, 0.8), t.text_dim)
+    };
+    ui.draw.fill(r, c, fill);
+    ui.draw.stroke(r, c, hair(ui), edge);
+    ui.text_in(r, s, t.micro_size, Align::Centre, col, Weight::Bold);
+}
+
+/// The width a status badge for `s` takes.
+pub fn status_badge_w(ui: &Ui, s: &str) -> f32 {
+    let (w, _) = crate::text::measure_with(crate::text::font_bold(), s, ui.u(ui.theme.micro_size));
+    w + ui.u(ui.theme.pad)
+}
+
 /// A heading inside a panel.
 pub fn heading(ui: &mut Ui, r: R, s: &str) {
     let t = ui.theme;
@@ -1248,7 +1264,7 @@ pub fn tooltip(ui: &mut Ui, r: R, s: &str, alpha: f32) {
 
 static mut PLATE: Option<Option<crate::gfx::Tex>> = None;
 
-/// The menu plate (`Menus/mainbkgr.bmp`, installed by menus/install-plates.sh), loaded
+/// The menu plate (`Menus/mainbkgr.bmp`, installed by ui/backdrops/install-plates.sh), loaded
 /// on first use; None when it is not installed.
 #[allow(static_mut_refs)]
 pub fn plate() -> Option<crate::gfx::Tex> {

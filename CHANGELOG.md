@@ -5,6 +5,743 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.17 — 2026-11-04
+
+Layers: gui-installer 3.0.1.
+
+### Fixed
+- Graphical installer: uninstall after an upgrade from 2.3.0 unsets Heroic's `WINEDLLOVERRIDES` (and the macOS prefix's DllOverrides) instead of restoring 2.3.0's `d3d9=n,b` value; `test.sh` pins the released 2.3.0 and covers it. The package README says the d3d9 clean-up is the installer's from 3.0.1. Installed, not yet seen in game.
+
+## 15.6.16 — 2026-11-04
+
+Layers: ui 2.2.4, testbench 4.1.5.
+
+### Fixed
+- Round-f review, misc: the Refit screen's Reset covers the tab's advanced rows, a key step moves an integer slider of fewer than twenty values by one, the settings hub no longer looks for `BinkProxy_Settings`, `ui/install.sh`'s header says what `--remove` deletes, status lines backfilled (15.6.0, 15.2.0). cutscenes 3.0.1 stays a patch (see its entry). Installed, not yet seen in game.
+
+## 15.6.15 — 2026-11-04
+
+Layers: platform 4.0.1, render3d 1.0.4 (and the `a2rt` retry in display 1.0.4 and ui 2.2.4).
+
+### Fixed
+- Round-f review, installers: a player's own `Sky\<name>.ini` survives retire and `render3d/install.sh` (hash match only); `retire.sh --chain` keeps `dxvk.conf` when its samplers could not be carried; the release installers back up an unknown `d3d8.dll`; `./install` builds Display8 before it retires the old chain, so a failed build leaves the game as it was; one precedence rule in every settings mover (the player's new value wins), documented in `tools/settings/README.md`; `a2ini` ignores a UTF-8 BOM before the first section (no duplicate section on edit), treats `Key=` as no value in `rename`, and retries the rename over a file a reader holds; the overlay write's `a2rt::move_file` retries 8 x 50 ms (Sleep added to the render3d and display import lists); `a2mod refit` no longer needs `--force` after `platform --retire` took the `d3d8.dll` backup. Installed, not yet seen in game.
+
+## 15.6.14 — 2026-11-04
+
+Layers: qol 2.2.2, rules 1.0.2, render3d 1.0.3.
+
+### Fixed
+- Review fixes in the plugins: the pan coefficient read behind its patch check, the grid's menu-toggle keys restored when it is turned off live, pay-on-queue in a network game following the announcement, the effects module's sprite drops limited to render3d's own views, and instruction listings in comments turned to prose. Installed, not yet seen in game.
+
+## 15.6.13 — 2026-11-04
+
+Layers: display 1.0.4, testbench 4.1.4.
+
+### Fixed
+- Display8: the Vulkan flush's failed submit no longer hangs the next frame, a part-made Vulkan swap chain holds no destroyed handles, a Direct3D 12 fence timeout no longer resets or frees what the GPU may be using, a second `Direct3DCreate8` keeps the late bail-out's forward, and the shell's mode is not raised after a bail-out (`display-bail-out` checks it). Installed, not yet seen in game.
+
+## 15.6.12 — 2026-11-03
+
+Layers: cutscenes 3.0.1, rules 1.0.1, online 0.11.1, ui 2.2.3, testbench 4.1.3.
+
+### Changed
+- The Refit screen loses its Movies tab (BinkProxy exports no settings table; `ReplaceMovies` still works from the ini) and its Multiplayer tab: *Pay when queued* is on Gameplay (hint kept), the Online entry on Interface. Installed, not yet seen in game.
+
+## 15.6.11 — 2026-11-03
+
+Layers: testbench 4.1.2.
+
+### Fixed
+- `ui-menus-options` expects the stub's single desktop display mode. Installed, not yet seen in game.
+
+## 15.6.10 — 2026-11-03
+
+Layers: display 1.0.3, render3d 1.0.2, ui 2.2.2 (`gpu` 2.0.1).
+
+### Fixed
+- Vulkan (Display8 in stub mode): the picture froze for good as a mission with many nebulae began ("Along the Neutral Zone"), the game and its sound running on. The frame's descriptor pool was spent, the present pass could not get its sets, and the frame was never ended. The present pass has a pool of its own, a frame that cannot be presented is ended unshown, and gpu goes on in pools of its own once Display8's is spent. Fix by bmh129 (PR #23), ported from 13.51.4 onto the 15.6 code.
+- Vulkan and Direct3D 12: a frame that cannot be presented is ended unshown and reported as a dropped frame, not a lost device (the plugins no longer rebuild everything over it). One routine ends a frame for both outcomes: a failed `vkEndCommandBuffer` or `vkQueueSubmit` no longer leaves the slot's fence unsignalled, and the pipeline cache is saved on an abandoned frame too. Direct3D 12: the present pass's upload and descriptors are taken before anything is recorded, as on Vulkan. Vulkan: Display8's descriptor pool takes 4096 texture sets a frame, not 2048; gpu stops asking a pool it found spent, and grows its chain only on a spent or fragmented pool.
+
+Installed, not yet seen in game.
+
+## 15.6.9 — 2026-11-03
+
+Layers: ui 2.2.1, testbench 4.1.1.
+
+### Changed
+- The Refit entry of Options is "Refit settings", directly under Game Settings (PLAYING.md,
+  scenarios and operating notes follow).
+
+### Fixed
+- Graphics Detail (and any stock slider) can be set back to its maximum in the redrawn menus.
+  Installed, not yet seen in game.
+
+## 15.6.8 — 2026-11-03
+
+Layers: display 1.0.2, testbench 4.1.0.
+
+### Fixed
+- Nebulae drawn as flat squares below the top Graphics Detail: Display8's stub offered
+  the engine 16-bit texture formats no mirror can hold, so every engine texture was
+  drawn white; it now offers A8R8G8B8 and X8R8G8B8 alone.
+
+### Added
+- `testbench/bench-detail.sh`, scene `nebula-detail`, scenario `render3d-nebula-detail`.
+
+Installed, not yet seen in game.
+
+## 15.6.6 — 2026-11-03
+
+Layers: render3d 1.0.1.
+
+### Changed
+- `render3d/Render3D.ini`: the `[Modules]` comment now says every module row is live.
+  Docs corrected beside it (render3d's eight modules, the profile as the home of the
+  UI's addresses, the backdrop and settings notes).
+
+Installed, not yet seen in game.
+
+## 15.6.5 — 2026-11-03
+
+Layers: testbench 4.0.6.
+
+### Fixed
+- `display-window` step 14 expects BinkProxy not to log `intro: stock mode (no Display8)` instead of the `Display8 raises the mode` line it stopped writing in cutscenes 3.0.0. Installed, not yet seen in game.
+
+## 15.6.4 — 2026-11-03
+
+Layers: testbench 4.0.5.
+
+### Fixed
+- `engine-syms` expects BinkProxy's `symbols: 4/4 resolved`, not 6/6: the `binkproxy.intro_mode` hook and its two scans went in cutscenes 3.0.0. Installed, not yet seen in game.
+
+## 15.6.3 — 2026-11-03
+
+Layers: testbench 4.0.4.
+
+### Fixed
+- `render3d-build-subset` expects `settings: 21 rows exported (10 the core's)` (the View.Distance row made it 20 and 9); `render3d/subset-scenario.sh` rewrites that line with a pattern instead of the old literal. Installed, not yet seen in game.
+
+## 15.6.2 — 2026-11-03
+
+Layers: testbench 4.0.3.
+
+### Fixed
+- `gui-installer/test.sh`: the pre-14.3.0 package section gives the old installer the chain and legacy plugin stand-ins 15.6.0 removed from the package, and the older-install section re-points `retire.txt` at its stand-in `d3d9.dll`, since an unknown `d3d9.dll` is no longer touched. Installed, not yet seen in game.
+
+## 15.6.1 — 2026-11-03
+
+Layers: testbench 4.0.2.
+
+### Fixed
+- `tools/layers-selftest.py` no longer lists the retired `renderer` layer among the core layers the default and `--only` resolve to. Installed, not yet seen in game.
+
+## 15.6.0 — 2026-11-03
+
+Layers: platform 4.0.0, renderer 3.0.0 (retired), gui-installer 3.0.0, testbench 4.0.1.
+
+### Removed
+- The Direct3D 9 chain from the repository, the release package and the installers (phase 11, C1): `platform/vendor/d3d8to9-1.16.0` and `dxvk-3.1.1`, `D3D9.md`, `d3d9/`, `dxvk-logging.py`, `d3d8-chain.py --use` and `--upgrade`; the package has no `chain/` and no `layers/renderer/dxvk.conf`; the `chain` and `renderer` release steps; `renderer/` (its changelog is `retire/history/renderer-CHANGELOG.md`, and `renderer` stays a retired row in `layers.toml`). `WINEDLLOVERRIDES` is `winmm=n,b;d3d8=n,b` everywhere (`platform/run-wine.sh` too).
+
+### Added
+- The release step `retire` (after `display`): `install.sh` and `install.ps1` read `retire.txt` (baked from `retire/known.txt`) and take out the legacy plugins, the chain's `d3d8_real.dll` and `d3d9.dll` by hash and a marked `dxvk.conf` by its marker, whose sampler values go into `Display8.ini [Samplers]` first (the merge's Defaults 3, with a stub when there is no `Display8.ini`). Display8 goes into the `d3d8.dll` slot when it is empty, GOG's (kept as `d3d8.dll.gog-backup`, put back by `--uninstall`), the old chain's or an older Display8; a `d3d8.dll` of the player's own stays and so do `Render3D.asi` and `UI.asi`. Installer tests: a 14.x-shaped game directory (old chain, marked `dxvk.conf` with an edited LodBias, legacy plugins) upgrades cleanly with `RefitPlayer.ini` byte-identical, and uninstall puts GOG's `d3d8.dll` back.
+- `./install` passes `retire/retire.sh --chain`, which carries a marked `dxvk.conf`'s samplers into `Display8.ini` before removing it (`retire/selftest.sh` checks it); `platform/d3d8-chain.py --retire` (platform step) takes the retired chain's slot files out, `--retire --heroic` also `d3d9=n,b` from Heroic's overrides.
+
+### Changed
+- `a2mod`: Display8's `d3d8.dll` is filed under the display layer by content when no `.a2display-backup` sits beside it, so `a2mod stock` on a game whose slot was empty sets Display8 aside and the game runs on the system's `d3d8.dll`; with a backup (GOG's) it is put back as before. The snapshot layout is unchanged.
+- `testbench/retire-old-install.py` now requires the chain class (`d3d8_real.dll`, `d3d9.dll`, `dxvk.conf`) to be removed.
+
+Installed, not yet seen in game.
+
+## 15.5.0 — 2026-11-03
+
+Layers: ui 2.2.0, qol 2.2.1.
+
+### Changed
+- The UI and QOL without the legacy plugins: no stand-down for `HUD.asi`, `GridLayout.asi`,
+  `Menus.asi` or the squashed cursor art; `ui/bench-legacy.sh` and `bench-asi.sh --no-grid`
+  gone. The UI's settings hub removes the retired `Backend` token `d3d9`, `Mode` and `Real`
+  from the overlay (logged once). Display8's check for those plugins in `ENGINE_PLUGINS`
+  stays (a safety net, no change). Details in `ui/CHANGELOG.md` and `qol/CHANGELOG.md`.
+
+Installed, not yet seen in game
+
+## 15.4.0 — 2026-11-03
+
+Layers: testbench 4.0.0.
+
+### Changed
+- The bench without the legacy plugins: Menus.asi (stock shell, old Display8) and the old install come from a build of the last tag that has them, cached in `$A2_DATA`; the scenarios of the retired plugins and of forward mode are deleted; new `retire-old-install`. Details in `testbench/CHANGELOG.md`.
+
+Installed, not yet seen in game
+
+## 15.2.0 — 2026-11-03
+
+Layers: hud 3.0.0, grid 2.0.0, menus 5.0.0, ui 2.1.0, models 5.1.0, textures 2.2.0, platform 3.7.0.
+
+### Added
+- `retire/`: `retire.sh [--check] [--chain] [<game dir>]` takes out of a game what earlier
+  versions installed and nothing installs now, by `retire/known.txt`: `HUD.asi`,
+  `GridLayout.asi`, `Menus.asi` and `MenuScale`, the twelve per-part plugins and their `Sky/`
+  recipes, `A2EngineTest.ini`, the per-user vkBasalt bloom; and, with `hud-files.py`, puts
+  the file-based HUD fixes of hud 2.x (`misc/gui_*.cfg`, the cursors, the `FontFinal4_*`
+  atlases and metrics from `.a2font-backup`) and the widened loading screen (`SOD/logo.SOD`,
+  `LOADING1..6`) back from their backups. The Direct3D chain's files (`d3d8_real.dll`,
+  `d3d9.dll`, a marked `dxvk.conf`) are in the table by hash and marker but taken out only
+  with `--chain`, which nothing passes yet. `retire/selftest.sh` checks it on a mock game
+  directory.
+- `retire.txt` in the release package (`known.txt` without comments) and `retire/hud-files.py`,
+  which `install.sh` and `install.ps1` run when they take the legacy plugins out.
+
+### Changed
+- `./install` runs `retire.sh` before the first layer installs (it took the vkBasalt bloom out
+  itself); `render3d/install.sh` runs it for the per-part plugins; `ui/bench-asi.sh` for a
+  bench clone. `ui/supersede.sh` and `hud/revert-files.sh` are gone.
+- `layers.toml`: `hud`, `menus` and `grid` are `retired` rows (`dir = 'retire'`), the
+  `legacy` select value is gone, the `ui` layer files `Menus/*.bmp`. `a2mod status` marks
+  retired rows; `a2mod refit` says when a snapshot holds retired files and points at
+  `retire.sh` instead of `menus/install.sh`.
+- The release package has no `layers/legacy/` and no HUD, Menus or GridLayout build: where
+  `UI.asi` cannot draw, the installers leave the game's own HUD and menus and take any old
+  copy of the three out (`publish/package.sh`, `install.sh`, `install.ps1`, their tests).
+
+### Removed
+- `hud/`, `grid/` and `menus/` (their last changelogs are `retire/history/`), the
+  `LOADING` texture target with `models/logo-sod.py`, `models/loading-panel.sh` and the
+  `panel=` lines of `a2tex`. `ui/bench-legacy.sh` stays but stops with a message.
+
+Installed, not yet seen in game.
+
+## 15.1.0 — 2026-11-03
+
+Layers: render3d 1.0.0, ui 2.0.0, display 1.0.1 (gpu 2.0.0, not a layer).
+
+Round F, phase 11 R2: gpu, render3d and the shader toolchain without Direct3D 9. `gpu::d3d9`
+and the Direct3D 9 path of render3d and the UI are gone, and so is the d3dbc form of every
+shader with `tools/shaderc/d3dbc-fix.py`, `d3dbc-slots.py` and `fetch-vkd3d.sh`: CI's
+`shaders` job rebuilds the SPIR-V and DXIL with dxc and checks them with spirv-val.
+`gpu/replay.sh` has no `d3d9` backend. MAJOR for render3d (no longer runs without Display8)
+and the UI (no Direct3D 9 device path). Docs: `gpu/README.md`, `render3d/README.md`
+("One source, two forms"), `platform/D3D9.md` marked historical. Installed, not yet seen
+in game.
+
+## 15.0.0 — 2026-11-03
+
+Layers: display 1.0.0, cutscenes 3.0.0, testbench 3.106.0.
+
+Round F opens (phase 11 R1). MAJOR: the install/revert contract changes (Display8 moves no chain behind itself) and keys and values are removed.
+
+### Added
+- Display8's bail-out: when neither Vulkan nor Direct3D 12 can start (or on an unknown build, a stood-down `display.modes`, a legacy plugin), the game gets the system's own `d3d8.dll` and the plugins stand down; `Backend=none` takes it on purpose (display 1.0.0).
+- `display-bail-out`, `display-retired-keys` and `display-retired-keys-overlay` scenarios (testbench 3.106.0).
+
+### Changed
+- `display-fallback`, `engine-unknown-build` and `engine-mismatch` end in the bail-out; `display-inventory`, `display-engine-draws` and `display-drop` run on the stub (testbench 3.106.0).
+- `tools/ini-merge.py` `Defaults=3` for `Display8.ini` (drops `Mode`, `Real` and `d3d9` tokens; carries a marked `dxvk.conf`'s sampler keys into `[Samplers]`), mirrored in `publish/installer/install.sh` and `install.ps1`.
+
+### Removed
+- Display8's forward mode and Direct3D 9 (`Mode=`, `Real=`, `Backend=d3d9`, read past with a log line); `[Samplers]` no longer reads `dxvk.conf` (display 1.0.0).
+- binkproxy's `RaiseIntroMode`, `IntroWidth`, `IntroHeight` and its `intro_mode` hook: Display8 alone raises the intro's mode (cutscenes 3.0.0).
+
+Installed, not yet seen in game.
+
+## 14.14.0 — 2026-11-03
+
+Layers: testbench 3.105.0.
+
+### Added
+- Frozen `p10-fwd-*`, `p10-vk-*` and `p10-d12-*` baselines in `$A2_DATA/baselines` (phase 10 X4), so phase 11 can delete forward mode, the d3d9 path and the legacy plugins; the passthrough scenarios compare against them (testbench 3.105.0).
+
+Pre-release: Direct3D 12 passthrough confirmed on Linux only, not yet on native Windows.
+Installed, not yet seen in game.
+
+## 14.13.0 — 2026-11-03
+
+Layers: display 0.21.0, renderer 2.0.2.
+
+### Added
+- `Display8.ini [Samplers]` (`Anisotropy`, `LodBias`, `ClampNegativeLodBias`, default `auto` = `dxvk.conf`'s values) for the plugins' and the passthrough's samplers on Vulkan and Direct3D 12.
+
+Pre-release: Direct3D 12 passthrough confirmed on Linux only, not yet on native Windows.
+Installed, not yet seen in game.
+
+## 14.12.0 — 2026-11-03
+
+Layers: none (installs nothing: `d12probe`, `tools/gates`, CI).
+
+### Added
+- `display/d12probe` (phase 10 X3): `d12probe.exe`, `vkprobe`'s Direct3D 12 sister. It builds Display8's present and passthrough root signatures and pipelines by Display8's own code, draws 300 frames through a flip-model swap chain and an 8 MB mapped upload ring, reads seven pixels back and prints a `VERDICT`; `--warp`, `--debug` and `--agility <version> <folder>` (the debug layer from the Agility SDK, which CI downloads and never keeps). `run-wine.sh` runs it once under Wine on vkd3d-proton.
+- CI: jobs `probes` (builds both probes, Display8's host tests, the gates kit), `d3d12-probe` (windows-2025, WARP, and WARP with the debug layer; blocking), `vulkan-probe-windows` (lavapipe; non-blocking), `gates-windows` (`gate-windows.ps1 -WhatIf` against a mock game), `mac-probe` (a timeboxed macOS spike; non-blocking), and the artifact `native-gates-<commit>`. The release waits for `probes`, `d3d12-probe` and `gates-windows`.
+- `tools/gates/`: `gate-windows.ps1` (gate W, five steps) and `gate-macos.sh` (gate M, a Sikarugir wrapper) with `GATES.txt`, the user's short checklists.
+
+### Changed
+- Display8's root signatures and pipeline descriptions (present pass, passthrough) moved into `display/src/dx12/build.rs` so the probe can include them; no change in behaviour (display's version is not bumped).
+
+Installed, not yet seen in game. The CI jobs are untried until the first run on a branch push.
+Pre-release: Direct3D 12 passthrough confirmed on Linux only, not yet on native Windows.
+
+## 14.11.0 — 2026-11-03
+
+Layers: display 0.20.0, testbench 3.104.0.
+
+### Added
+- Passthrough on Direct3D 12 (phase 10 X1): the engine's draws drawn by Display8 on `Backend=d3d12` as on Vulkan, into render3d's published pass (`dx12/pass.rs`), with the neutral `passthrough/state.rs` host-tested (`display/hosttest`). A module switched off, a SOD handed back or a HUD part not taken shows as stock on Direct3D 12 too. See display's changelog. Installed, not yet seen in game.
+- Pre-release: Direct3D 12 passthrough confirmed on Linux only, not yet on native Windows.
+
+## 14.10.1 — 2026-11-03
+
+Layers: testbench 3.103.1.
+
+### Fixed
+- `display-abi-mismatch` olddisplay half brought up to date after display 0.18.0 (bench setup and scenario only; no plugin change). Installed, not yet seen in game.
+
+## 14.10.0 — 2026-11-03
+
+Layers: display 0.19.0, render3d 0.47.0, ui 1.1.1 (gpu 1.3.0).
+
+### Added
+- Contract 1.4, pass publishing on Direct3D 12 (phase 10 X0, X-C1): `display8v1_dx12_pass` and `Dx12Pass8` in `gpu/src/display.rs`, published by render3d as on Vulkan, kept by Display8 for its passthrough (X1), and the rebind rule (gpu binds everything again after any call into Display8; Display8 sets no heaps but its own). See the layers' changelogs. Installed, not yet seen in game.
+
+## 14.4.0 — 2026-11-03
+
+Layers: render3d 0.46.0, qol 2.2.0, testbench 3.103.0.
+
+### Changed
+- View distance moves from QOL to render3d (`View.Distance`, W-VIEW); see the layers' changelogs. Installed, not yet seen in game.
+
+## 14.3.0 — 2026-11-03
+
+Layers: gui-installer 2.5.0, testbench 3.102.0.
+
+### Added
+- The release package, contract C6 (phase 9 W-PKG; package schema stays 1): one folder per layer, `layers/<id>/` (display, render3d with its recipes, ui, qol, rules, online, cutscenes, renderer, and `legacy` for HUD, Menus and GridLayout) in place of `game/` and `display/`; `sdk/` (`a2asi.h`, `a2engine.h`, `def/`, `MODDING.txt`: the headers a mod is built on; the source stays at the release tag, nothing goes to crates.io); `layers.txt` and `moved.txt`, baked by `package.sh` from `tools/layers.py` and the settings tables. The manifest's `layers[]` gain optional `dir`, `select`, `requires`, `scope` and `games`, and the manifest a top-level `moved[]`.
+- Per-layer selection in `install.sh` and `install.ps1`: `--without a,b` / `-Without`, `A2_SKIP` and `--all` / `-All` for every layer whose `select` is `on` or `off`; a layer left out is taken out when an earlier install left it; the choice is remembered in `armada2-refit-layers.txt` (a plain re-run keeps it, `--all` resets it, uninstall deletes it).
+- The scripts apply `moved.txt` after the merge (a value other than the new default goes to the new key, the old key goes either way).
+- Six `subset-*` bench scenarios (testbench).
+
+### Changed
+- Every shipped plugin ini is merged into the player's (keys added, values kept, `Defaults=` upgrades and retired defaults as `tools/ini-merge.py`), never replaced with a `.ini.bak` copy; `UI.ini`'s upgrades and `Render3D.ini`'s retired defaults join Display8.ini's in the awk and PowerShell merges. `RefitPlayer.ini` is still never touched. `install.ps1` was only syntax-read here, not run. Installed, not yet seen in game.
+
+## 14.2.0 — 2026-11-03
+
+Layers: qol 2.1.0, ui 1.1.0, testbench 3.101.0.
+
+### Changed
+- Phase 9 W-BAR (contract C4): the command bar's position keys move from UI.asi to QOL.asi (`qol/bar.c`); the UI keeps the layout and drawing of the bar and its labels. `[HUD] BarKeys` becomes `[QOL] BarKeys` (`moved_from`). `csdk/def/{kernel32,user32}.def` gain the imports QOL's key scan needs. Installed, not yet seen in game.
+
+## 14.1.0 — 2026-11-03
+
+Layers: display 0.18.0, ui 1.0.0, cutscenes 2.7.0.
+
+### Changed
+- Window and display mode go to Display8 (phase 9, C3): `[UI] Native` and `[UI] KeepClip` become `[Window]` of `Display8.ini` (first use of `moved_from`), the shell's and the intro's mode raises move out of the UI into Display8's mode lookups (the UI's menu host claims the new `CLAIM_MENUS`; contract 1.3 adds it and `display8v1_mode`), and the cutscene proxy keeps its raise only when `d3d8.dll` is not Display8. testbench 3.100.0. Installed, not yet seen in game.
+
+## 14.0.0 — 2026-11-03
+
+Layers: qol 2.0.0, rules 1.0.0, online 0.11.0, ui 0.34.0, gui-installer 2.4.1, testbench 3.99.1.
+
+### Added
+- The `rules` layer (`rules/`, phase 9 W-RULES): QOLRules.asi leaves `qol/` with its source, settings table, symbol profile output and ini, and gets its own `build.sh`, `install.sh`, README and changelog. File names, exports and the `[QOLRules.Rules]` overlay section are unchanged. `layers.toml`: `rules` is `dir = 'rules'` with its own install and remove, step `rules` after `qol`; the release scripts print `::step rules`, `package.sh` builds it and lists it in the manifest as a layer of its own, and the GUI installer has the step.
+- `a2_find_export(name)` in `csdk/a2asi.h` (module enumeration); `K32EnumProcessModules` in `csdk/def/kernel32.def`.
+
+### Changed
+- Contract C7: Online asks for `QOLRules_Wanted` / `_Network` / `_Reset` by export, not by DLL name. A player without the layer reports no rules and the host plays stock for everyone (the protocol is unchanged). The Refit screen's Multiplayer tab says so when `QOLRules_Settings` is absent.
+- `PayOnQueue` ships on and the installers select the layer by default. Installed, not yet seen in game.
+
+## 13.92.0 — 2026-11-03
+
+Layers: ui 0.33.0, render3d 0.44.1, qol 1.10.1, online 0.10.1, cutscenes 2.6.1.
+
+### Added
+- Moved keys (contract C2, A2SET_ABI 1.1): a settings row may carry `moved_from = "<Stem>.<Section>.<Key>"`. The row grows to 48 bytes; readers step by its size and read the field only from 48. The UI hub moves a player's overlay value to the new key at its first frame; `tools/settings/move-keys.py`, which `./install` runs after every layer, moves it in plugin inis. No shipped row uses it yet (W-DISP, W-BAR and W-VIEW do).
+- `a2ini` host tool (`crates/a2ini`, feature `std`; `get`, `edit`, `unset`, `rename`), built by `tools/settings/host.sh` into the ignored `tools/settings/build/`; `a2ini::rename` with its own fixtures (`tools/settings/fixtures/rename/`).
+
+### Changed
+- The settings machinery is cut down with behaviour unchanged: `gen.py` no longer writes GENERATED regions into `crates/a2rt/src/settings.rs` and `csdk/a2asi.h` (the row is written by hand once per language, beside its size and offset asserts); `overlay.py` is a wrapper over `a2ini` (its Python edit is gone, CLI unchanged); `lint.py` drops the literal-read rule; the bad-table fixture folders became one `fixtures/bad-cases.toml`. Every generated `settings_table` is regenerated at ABI 1.1. Installed, not yet seen in game.
+
+## 13.91.0 — 2026-11-03
+
+Layers: testbench 3.99.0.
+
+### Added
+- `layers.toml`, the layer registry: one `[[layer]]` per layer (id, name, dir, install, remove, files, replaces, backups, select, requires, scope, games, steps, summary) and the release's `::step` order; `rules` is registered on qol's folder and installer until it has its own.
+- `tools/layers.py` (`--list`, `--resolve [--only|--without] [--commands]`, `--files`, `--json`, `--check`), its only reader, and `tools/layers-selftest.py`; CI's publishable job runs both. `--check` fails when a2mod, `install.sh`'s and `install.ps1`'s `::step` ids, `package.sh`'s manifest `steps` or the GUI installer's `STEPS`/`STATUS` disagree with the registry.
+- `./install --only a,b`, `--without a,b` and `--list`: a selectable layer not selected is taken out with its `remove`; plain `./install` is every core and `on` layer.
+
+### Changed
+- `./install` runs the registry's commands and now installs Online.asi (the online layer) as well.
+- `a2mod` takes its layers, added files and backup suffixes from the registry: `stock` now sets Online.asi/.ini aside (it was left live), `status` gains `rules` and `online` rows, and every entry of an existing snapshot is re-filed by the registry when read (QOLRules.* from qol to rules; the per-part plugins under `parts`, MenuScale.* under `menuscale`). The snapshot layout is unchanged.
+
+Installed, not yet seen in game
+
+## 13.88.0 — 2026-11-03
+
+Layers: render3d 0.45.0, ui 0.33.1.
+
+### Added
+- Phase 8f: the content profile. `profiles/gog-1.1/content.toml` and `build.toml`'s `content`
+  give each plugin a content set; `Engine::content()` (a2engine) returns it, gen.py writes
+  it into each table's `Build`, lint.py checks the file, and the tools' fixtures cover a
+  build with no set (`tools/engine/fixtures/07-content-none.toml`, lint cases 28 and 29).
+  render3d's modules and the UI choose their tables of game names by it. Installed, not
+  yet seen in game.
+
+## 13.87.0 — 2026-11-03
+
+Layers: render3d 0.44.0, testbench 3.98.3.
+
+### Added
+- Phase 8e: render3d on its symbol profiles (see `render3d/CHANGELOG.md`).
+
+### Changed
+- `tools/engine/negative.sh` picks, for a render3d module, an entry no other module's file holds.
+- CI holds the core and the modules to `lint-layers.sh` rule 1.
+- Installed, not yet seen in game
+
+## 13.86.2 — 2026-11-03
+
+Layers: testbench 3.98.2.
+
+### Fixed
+- `ui-hud-panels` and `ui-loading` scenarios corrected (stale button list, fixed wait); not phase 8 regressions.
+- Installed, not yet seen in game
+
+## 13.86.1 — 2026-11-03
+
+Layers: testbench 3.98.1.
+
+### Fixed
+- Integration of phase 8: `engine-mismatch-cplugins` un-pended (see `testbench/CHANGELOG.md`).
+
+Installed, not yet seen in game
+
+## 13.86.0 — 2026-11-03
+
+Layers: testbench 3.98.0.
+
+### Added
+- Phase 8g: `./a2test syms`, `tools/engine/negative.sh`, the bench scripts `bench-exe.sh` and `bench-mismatch.sh` and the scenarios `engine-unknown-build` and `engine-mismatch` (+ two pending variants); see `testbench/CHANGELOG.md`.
+
+### Fixed
+- The settings tools' walk skips every tool's fixture tree (CI's settings job failed on the engine tool's lint fixture).
+
+Installed, not yet seen in game
+
+## 13.83.0 — 2026-11-03
+
+Layers: cutscenes 2.6.0, online 0.10.0, qol 1.10.0, testbench 3.97.3.
+
+### Changed
+- Phase 8d: the C plugins move onto the symbol profiles, one commit each. binkproxy (`profiles/gog-1.1/binkproxy.toml`, `BinkProxy_SettingsNote`), Online (`online.toml`, `Online_SettingsNote`), then QOL and QOLRules (`qol.toml`, `qolrules.toml`, `QOL_SettingsNote`, `QOLRules_SettingsNote`).
+
+Installed, not yet seen in game
+
+## 13.82.0 — 2026-11-03
+
+Layers: ui 0.32.0, testbench 3.97.2.
+
+### Changed
+- Phase 8c: UI.asi on its symbol profile (`profiles/gog-1.1/ui.*.toml`); see `ui/CHANGELOG.md`.
+
+Installed, not yet seen in game
+
+## 13.81.1 — 2026-11-03
+
+Layers: testbench 3.97.1.
+
+### Fixed
+- The release installers (`publish/installer/install.sh`, `install.ps1`) delete `A2EngineTest.ini` from the game directory after verifying the package, as `./install` does.
+- `engine-syms` no longer waits for a log line that was written before the wait began (testbench 3.97.1).
+
+Installed, not yet seen in game
+
+## 13.81.0 — 2026-11-03
+
+Layers: display 0.17.0, testbench 3.97.0.
+
+### Added
+- Phase 8b, symbol profiles (contracts P2–P8): the format (`profiles/<build>/build.toml`, `<plugin>[.<part>].toml`; `crates/a2engine/README.md`), `profiles/gog-1.1/display.toml`, and `tools/engine/`: `gen.py` (Rust and C tables, `--check`), `lint.py` (rules 1–6; `--publish` in `publish/check.sh`), `resolve.py`, `annotate.py`, `mkpe.py`, `fixtures.py`, `ctest.c`, `selftest.sh` (CI job `engine`).
+- The resolver in three implementations proven on the same synthetic-image fixtures: `crates/a2engine` (`table`, `engine`: `init`, `ready`, `addr`, `range`, `site`, the notes), `csdk/a2engine.h` (`a2e_init`, `a2e_ready`, `a2e_addr`, ...), `tools/engine/resolve.py`.
+- `A2EngineTest.ini` (`[Test] Mismatch=<globs>`), the bench's fault injection: the hooks it names stand down as a failed check would. `./install` deletes it.
+
+Installed, not yet seen in game
+
+## 13.80.0 — 2026-11-03
+
+Layers: display 0.16.1, ui 0.31.1, qol 1.9.1, online 0.9.1, cutscenes 2.5.1, testbench 3.96.0.
+
+### Added
+- Phase 8a, executable identity (contract P1): `crates/a2engine` (`no_std`, host-tested on synthetic PE images, with a C twin test) and `csdk/a2engine.h`. Every plugin except Render3D logs the identical `engine:` line; the bench records the exe's sha256 and identity. Changes no behaviour. Render3D's line comes with phase 8e.
+
+Installed, not yet seen in game
+
+## 13.76.0 — 2026-11-03
+
+Layers: render3d 0.43.0, testbench 3.95.0.
+
+### Changed
+- render3d: split into crates, a thin cdylib with one Cargo feature per module,
+  `r3d-core` and one `r3d-<m>` crate per module (`build.sh --features`,
+  `bench-asi.sh`); CI builds the full set and each module left out
+  (`render3d-subsets`), and holds every module crate to all of `lint-layers.sh`'s
+  rules. `tools/settings/gen.py` takes `rows_in`; `tools/shaderc/hlsl-rs.sh` takes
+  `--headers`. Installed, not yet seen in game.
+
+## 13.75.0 — 2026-11-03
+
+Layers: render3d 0.42.0, testbench 3.94.0.
+
+### Changed
+- render3d: the frame on the new layers: `MSAA` and `HDR` are live (the scene target is
+  made again at the next view); the menu scene's map recipe moved to
+  `render3d/content/menu/`. Installed, not yet seen in game.
+
+## 13.74.0 — 2026-11-03
+
+Layers: render3d 0.41.0, testbench 3.93.0.
+
+### Changed
+- render3d: effects and sky on the module layers; `Modules.effects` is live; sky
+  recipes moved to `render3d/content/sky/`. Installed, not yet seen in game.
+
+## 13.73.0 — 2026-11-03
+
+Layers: render3d 0.40.0, testbench 3.92.0.
+
+### Changed
+- render3d: world and overlays onto the module layers (`hooks.rs`, `content.rs`,
+  `configure`), their hooks behind the module gates, `Modules.world`, `Modules.overlays`
+  and `World.Planets/Rocks/Nebulae` live; the surfaces' and nebulae's recipes moved to
+  `render3d/content/` and are built in. No change to what is drawn. Installed, not yet
+  seen in game
+- `render3d/install.sh`, `publish/package.sh`: the recipes' new source paths.
+
+### Added
+- testbench: scenarios `render3d-live-world` and `render3d-live-world-nebula`.
+
+## 13.72.0 — 2026-11-03
+
+Layers: render3d 0.39.0, testbench 3.91.0.
+
+### Changed
+- render3d: particles and ordnance on the hook registry and live (`Modules.particles`,
+  `Modules.ordnance`), with their hooks, content and settings reads in their own files;
+  the chain bugs of their hooks fixed (they called a constant, not what was there
+  before). `ordnance.ini` moved to `render3d/content/ordnance/`. No change to what is
+  drawn. Installed, not yet seen in game
+
+### Added
+- testbench: scenarios `render3d-live-particles` and `render3d-live-ordnance`.
+
+## 13.71.0 — 2026-11-03
+
+Layers: render3d 0.38.0, testbench 3.90.0.
+
+### Changed
+- render3d: hulls and specials onto the module layers (`hooks.rs`, `content.rs`,
+  `configure`); the scene lights' keys and the `Lighting.asi` test moved to the hulls
+  module. No change to what is drawn. Installed, not yet seen in game
+
+### Added
+- testbench: scenarios `render3d-live-hulls` (hulls and specials flipped live against
+  their off-at-load frames) and `render3d-live-specials`.
+
+## 13.70.2 — 2026-11-03
+
+Layers: render3d 0.37.2.
+
+### Changed
+- render3d: light semantics as data: the gas kinds are registered media packed into the
+  same bits, the planets' day side a generic flag world sets, the beam constants set by
+  ordnance under the same `[Lights]` keys. A host test of the packed word runs in CI.
+  No change to what is drawn. Installed, not yet seen in game
+
+## 13.70.1 — 2026-11-03
+
+Layers: render3d 0.37.1.
+
+### Changed
+- render3d: the cross-module helpers lifted into the core and the hulls', ordnance's,
+  overlays' and world's draws offered as services; no module reaches into another any
+  more (`lint-layers.sh --strict src/mods --rules cross,byname`, held in CI). No change
+  to what is drawn. Installed, not yet seen in game
+
+## 13.70.0 — 2026-11-02
+
+Layers: render3d 0.37.0.
+
+### Added
+- render3d: the contracts of the split into core, modules and content, in code: the
+  module interface v2, the hook registry (the frame's hooks on it), the services'
+  traits, the recipe lookup, per-module settings fragments exported as one table, and
+  `render3d/lint-layers.sh` (report mode, run in CI).
+- tools/settings: fragments (`module = "<m>"`, a module's rows beside its code, written
+  to `settings_table.rs` with `ROWS`; the plugin's export then returns
+  `crate::settings_rows()`), `shared_sections`, `gen.py --rows`, lint rule 7 (one owning
+  table per section), and their fixtures in `selftest.sh`.
+
+Installed, not yet seen in game.
+
+## 13.62.0 — 2026-11-02
+
+Layers: testbench 3.85.0.
+
+### Added
+- Bench side of the Refit screen: scenario `ui-menus-refit`, `operating/refit-screen.md`,
+  the `refit` screen in `testbench/ui.json`, lock steps in `multiplayer-two-players`, ten
+  entries in `ui-menus-dialogs`.
+
+Confirmed in game 2026-11-03.
+
+## 13.61.0 — 2026-11-02
+
+Layers: render3d 0.36.0.
+
+### Added
+- render3d: `Render3D_SettingsNote`, the stand-down notes for the Refit screen; the
+  crate's version corrected to match its changelog.
+
+Confirmed in game 2026-11-03.
+
+## 13.60.0 — 2026-11-02
+
+Layers: ui 0.31.0.
+
+### Added
+- The Refit screen in UI.asi (ROADMAP Phase 6): a modal over the hosted Options dialog
+  with tabs, rows, badges, help, a restart banner and Reset tab; the optional
+  `<Plugin>_SettingsNote` export (C5 amendment, `tools/settings/README.md`) with its
+  `NoteFn` (`crates/a2rt`) and `A2SettingsNoteFn` (`csdk/a2asi.h`); UI exports
+  `UI_SettingsNote`. The Redrawn menus row is ADVANCED.
+
+Confirmed in game 2026-11-03.
+
+## 13.59.1 — 2026-11-02
+
+Layers: ui 0.30.1, testbench 3.84.0.
+
+### Fixed
+- The bench's launch no longer deletes the clone's `RefitPlayer.ini` (`Overlay:` header
+  reached no game). a2rt: an overlay value read before the log is open is not marked as
+  logged (`overlay::note`), so it is logged on the next read; UI.asi reads once more
+  after opening its log.
+
+Confirmed in game 2026-11-03.
+
+## 13.59.0 — 2026-11-02
+
+Layers: ui 0.30.0.
+
+### Added
+- UI.asi's settings table (`UI_Settings`) and `UI_SettingsChanged`: the HUD's minimap,
+  info panel, tooltips, grid keys, icons, cursor and theme change while playing, from
+  `RefitPlayer.ini`; scenario `ui-settings-live`.
+
+Confirmed in game 2026-11-03.
+
+## 13.58.1 — 2026-11-02
+
+Layers: testbench 3.83.1.
+
+### Changed
+- `render3d-settings-live` runs unattended with the `Overlay` step and also flips
+  `World.Surfaces` and `Modules.sky`; `qol-settings-live` uses the `Overlay` step too
+  (testbench 3.83.1).
+
+Confirmed in game 2026-11-03.
+
+## 13.58.0 — 2026-11-02
+
+Layers: testbench 3.83.0.
+
+### Added
+- Scenario step `Overlay ...`: a live `RefitPlayer.ini` flip in a running game, unattended
+  (testbench 3.83.0).
+
+Confirmed in game 2026-11-03.
+
+## 13.57.0 — 2026-11-02
+
+Layers: gui-installer 2.4.0.
+
+### Added
+- The GUI installer's bug report lists `RefitPlayer.ini` (game folder, and Windows
+  VirtualStore), and the installer tests (`gui-installer/test.sh`,
+  `publish/installer/test.sh` and `.ps1`) seed one and assert it is byte-identical after
+  install, upgrade and uninstall.
+- Docs: `ui/MENUS.md` says a setting of ours goes only to the overlay; layout-table rows
+  for `crates/a2ini` and `tools/settings` in `CLAUDE.md`.
+
+Confirmed in game 2026-11-03.
+
+## 13.56.0 — 2026-11-02
+
+Layers: online 0.9.0, cutscenes 2.5.0.
+
+### Added
+- `Online.asi` and `binkw32.dll` read their inis through `RefitPlayer.ini` and export
+  their settings tables (`Online_Settings`: `Entry`; `BinkProxy_Settings`:
+  `ReplaceMovies`, live, re-read at each movie open).
+
+Confirmed in game 2026-11-03.
+
+## 13.55.0 — 2026-11-02
+
+Layers: qol 1.9.0, testbench 3.82.0.
+
+### Added
+- QOL.asi and QOLRules.asi describe their settings (`QOL_Settings`, `QOLRules_Settings`),
+  read them with `RefitPlayer.ini` in front, and apply the live ones when the overlay
+  changes (`QOL_SettingsChanged`, `QOLRules_SettingsChanged`); `PayOnQueue` is a must-match
+  row and takes hold at the next game. Scenario `qol-settings-live`.
+
+### Fixed
+- `QOL.asi`'s `PanSpeed` code default is 2.5, as shipped, not 1.
+
+Confirmed in game 2026-11-03.
+
+## 13.54.0 — 2026-11-02
+
+Layers: render3d 0.35.0, testbench 3.81.0.
+
+### Added
+- render3d's settings table and live paths (render3d 0.35.0); scenario
+  `render3d-settings-live` (testbench 3.81.0).
+
+Confirmed in game 2026-11-03.
+
+## 13.53.0 — 2026-11-02
+
+Layers: testbench 3.80.0.
+
+### Added
+- Bench side of the `RefitPlayer.ini` overlay: clones start without it, a scenario
+  `Overlay:` header, `a2test drive overlay` for live flips (testbench 3.80.0).
+
+Confirmed in game 2026-11-03.
+
+## 13.52.0 — 2026-11-02
+
+Layers: display 0.16.0, render3d 0.34.0, ui 0.29.0, testbench 3.79.0.
+
+### Added
+- The settings contracts in code (ROADMAP.md Phase 5, A2SET_ABI 1.0,
+  `tools/settings/README.md`): the player's overlay `RefitPlayer.ini` in the game
+  directory, read in front of every ini there by `a2rt::Ini` (Display8, Render3D.asi,
+  UI.asi) and by the new `a2_ini_*` / `a2_set_*` helpers of `csdk/a2asi.h`, with a
+  `settings: RefitPlayer.ini [...]` log line for each value it supplies.
+- `crates/a2ini`: the ini parser (moved out of `a2rt`) and `edit`, the overlay's
+  line-keeping writer, `no_std` and host-tested on `tools/settings/fixtures/`.
+- `tools/settings/`: `gen.py` (the descriptor row's schema; writes the row's definition
+  into `crates/a2rt/src/settings.rs` and `csdk/a2asi.h` and each layer's
+  `settings_table.rs` / `.h` from its `settings.toml`), `lint.py`, `overlay.py` (the
+  same edit for the bench and the GUI installer), `selftest.sh` and
+  `bench-overlay.sh`; no layer has a table yet.
+- CI: `cargo test` of a2ini, and a `settings` job (`selftest.sh`, `gen.py --check`,
+  `lint.py`).
+
+Confirmed in game 2026-11-03.
+
 ## 13.51.3 — 2026-10-30
 
 Layers: testbench 3.78.3.
@@ -1077,6 +1814,7 @@ Layers: ui 0.13.2, testbench 3.35.1.
   cursor, as in stock.
 
 Confirmed in game 2026-10-30.
+
 ## 12.34.1 — 2026-10-18
 
 Layers: render3d 0.15.1, ui 0.13.1.
@@ -3293,14 +4031,14 @@ history.
 |---|---|---|
 | textures | 1.0.0 | [`textures/CHANGELOG.md`](textures/CHANGELOG.md) |
 | models | 1.0.0 | [`models/CHANGELOG.md`](models/CHANGELOG.md) |
-| hud | 1.0.0 | [`hud/CHANGELOG.md`](hud/CHANGELOG.md) |
-| font | 1.0.0 | [`font/CHANGELOG.md`](font/CHANGELOG.md) |
-| menus | 1.0.0 | [`menus/CHANGELOG.md`](menus/CHANGELOG.md) |
-| msaa | 1.0.0 | [`msaa/CHANGELOG.md`](msaa/CHANGELOG.md) |
+| hud | 1.0.0 | [`retire/history/hud-CHANGELOG.md`](retire/history/hud-CHANGELOG.md) |
+| font | 1.0.0 | `font/CHANGELOG.md` (removed) |
+| menus | 1.0.0 | [`retire/history/menus-CHANGELOG.md`](retire/history/menus-CHANGELOG.md) |
+| msaa | 1.0.0 | `msaa/CHANGELOG.md` (removed) |
 | cutscenes | 1.0.0 | [`cutscenes/CHANGELOG.md`](cutscenes/CHANGELOG.md) |
-| postfx | 1.0.0 | [`postfx/CHANGELOG.md`](postfx/CHANGELOG.md) |
+| postfx | 1.0.0 | `postfx/CHANGELOG.md` (removed) |
 | platform | 1.0.0 | [`platform/CHANGELOG.md`](platform/CHANGELOG.md) |
-| gameplay | 1.0.0 | [`gameplay/CHANGELOG.md`](gameplay/CHANGELOG.md) |
+| gameplay | 1.0.0 | `gameplay/CHANGELOG.md` (removed) |
 
 Every layer that `a2mod` switches is installed and confirmed in game at this release.
 

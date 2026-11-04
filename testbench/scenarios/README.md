@@ -18,10 +18,21 @@ Players: host, joiner                     (one game per player; see "Several pla
 Setup: online/bench-asi.sh --loss 10      (a script of this repo, run on each clone
                                            before launch, with its session state file
                                            and then any words after the script's name)
+Overlay: Render3D.Modules:sky=0 UI.HUD:Minimap=0
+                                          (keys written to the clone's RefitPlayer.ini before
+                                           launch, after Setup:; every clone starts without
+                                           one. Words are Section:Key=value with the section
+                                           spelled as in the overlay, <Stem>.<Section>. Grep
+                                           the plugin's log for `settings: RefitPlayer.ini [`.
+                                           In a running game: `a2test drive overlay`)
 Sheet: 1 ship, 6 ships, 30 ships          (shot names: <scenario>/sheet.png in the run,
                                            a row per case and a column per shot)
 Clock: bench                              (the plugins' animation clock on the simulation's
                                            time: ../README.md, "A frame that repeats")
+Layers: display render3d                  (only these of layers.toml: ./install --only them
+                                           into a clone from stock, this checkout's unless
+                                           --install names others; `a2test run --layers`
+                                           overrides it. ../README.md, "Installing a subset")
 Timeout: 12 min
 
 Any prose is description.
@@ -60,6 +71,7 @@ each phase has got. Without headings it makes one phase per screenshot.
 | `Type what follows "TEXT" in "LOG" of PLAYER` | the word after TEXT on the last line of that player's log that has it (`of PLAYER` left out: this game's), waiting up to 30 s for it: how a joiner types the host's join code |
 | `Take a screenshot called "NAME"` | kept in the report; same-named shots are compared across resolutions |
 | `Dump the frame called "NAME"` | Render3D.asi's targets (PFM) and UI.asi's presented frame (PPM), read back inside the game, into `dumps/NAME/` with PNG previews (`../README.md`, "Frame dumps"); fails when no plugin dumped |
+| `Overlay Render3D.Modules:hulls=0 UI.HUD:Minimap=0` / `Overlay --unset Render3D.Modules:hulls` | `a2test drive overlay` as a step: writes `RefitPlayer.ini` in the running game (`tools/settings/overlay.py`), then waits up to 5 s for UI.asi's `settings: RefitPlayer.ini changed` in `UI.log`; fails without it. It is an action, so a log wait or `Expect` after it sees only lines written since. The `Overlay:` header does the same before launch |
 | `Note "TEXT"` | a line in the log |
 | `Mark the display context "NAME"` | Display8's calls from here on count under that context (`Display8.mark`; `../../display/README.md`, "The inventory"); fails without Display8 installed |
 | `Wait up to 240 seconds for "Scene.log" to say "TEXT"` | polls a log beside `Armada2.exe` for a line with TEXT written since the last action (a launch, click, key, typing, drag or Scene command; each launch deletes the old logs), and goes on as soon as one is. At the time limit a line from before that action passes; none at all is a failed check |
@@ -191,8 +203,18 @@ Frames kept in `$A2_DATA/baselines/<B>/` and compared pixel for pixel
 
 A missing baseline, or a baseline without that shot, fails the step and names the step
 or command that records it. A baseline holds one size of frame: a scenario run at
-several resolutions needs a baseline per resolution (`"pre-gpu-720"`), or the
+several resolutions needs a baseline per resolution (`"p10-vk-port-showcase-720"`), or the
 comparison fails on the size.
+
+**Frozen baselines of phase 10** (`$A2_DATA/baselines`, never in git; provenance in each
+`meta.json`): `p10-fwd-<scenario>` is the forward chain on the GPU (`display-passthrough`,
+`-all`, `-nebula`; frozen: the `*-forward` scenarios that recorded them went with forward
+mode in testbench 4.0.0); `p10-vk-<scenario>` is the GPU's Vulkan stub
+(those three plus `port-showcase`, `port-nebula`, `port-firing`, `ui-hud-bar`,
+`ui-menus-scene`) and the gate after every package, RMSE 0; `p10-d12-<scenario>` is
+Direct3D 12 with every module on (`port-showcase`, `port-nebula`, `port-firing`). They
+replaced the live forward runs and `pre-gpu-*`. A variant is made with `display/stub-scenario.sh
+<scenario> stub Backend=vulkan|d3d12`; re-record only with `--force`, on purpose.
 
 ## Judged and delegated steps
 

@@ -21,14 +21,19 @@ pub const CAPS: [u32; 53] = [
     0x07030700, 0x0000003f, 0x0000003f, 0x0000003f, 0x00004000, 0x00004000, 0x00002000, 0x00002000, 0x00002000,
     0x00000010, 0x501502f9, 0xc7000000, 0xc7000000, 0x47000000, 0x47000000, 0x00000000, 0x000000ff, 0x00100008,
     0x03ffffff, 0x00000008, 0x00000008, 0x0000017b, 0x00000008, 0x00000006, 0x00000004, 0x00000000, 0x45ffff00,
-    0x00555555, 0x00ffffff, 0x00000010, 0x000001fc, 0xfffe0101, 0x00000100, 0xffff0104, 0x7f7fffff,
+    0x00555555, 0x00ffffff, 0x00000010, 0x000001fc, 0xfffe0101, 0x00000100, 0xffff0104, 0x7f7fffff, // not an address
 ];
 
-/// Formats the stub takes as textures (`CheckDeviceFormat`): what the engine asked for
-/// and the chain said yes to (A8R8G8B8, X8R8G8B8), and the rest it may ask that any
-/// card has. R8G8B8 (20) is refused, as DXVK refused it.
+/// Formats the stub takes as textures (`CheckDeviceFormat`): A8R8G8B8 and X8R8G8B8, the
+/// two a mirror holds (`vk/mirror.rs`, `dx12/mirror.rs`), and no other. The engine picks
+/// its texture formats by asking in an order its graphics detail sets
+/// (`ST3D_DeviceDirectX8::SelectTextureFormats`): below the top detail it asks for
+/// R5G6B5, X1R5G5B5, A4R4G4B4 and A1R5G5B5 first, and a yes to those drew every engine
+/// texture white (the nebulae's puffs as flat squares). Refused, it falls through to
+/// the two above at every detail (README.md, "Texture formats"). R8G8B8 (20) is refused
+/// too, as DXVK refused it.
 fn texture_format_ok(fmt: u32) -> bool {
-    matches!(fmt, 21 | 22 | 23 | 24 | 25 | 26 | 28 | 50 | 51 | 0x3154_5844 | 0x3254_5844 | 0x3354_5844 | 0x3454_5844 | 0x3554_5844)
+    matches!(fmt, 21 | 22)
 }
 
 unsafe extern "system" fn qi(this: *mut SObj, iid: *const Guid, out: *mut *mut c_void) -> HRESULT {
@@ -52,25 +57,19 @@ unsafe extern "system" fn get_adapter_count(_this: *mut SObj) -> u32 {
     1
 }
 
-/// `D3DADAPTER_IDENTIFIER8` from Direct3D 9's: the same fields without `DeviceName[32]`.
+/// `D3DADAPTER_IDENTIFIER8`: laid out as Direct3D 9's without its `DeviceName[32]`.
 unsafe extern "system" fn get_adapter_identifier(_this: *mut SObj, adapter: u32, flags: u32, id: *mut u8) -> HRESULT {
     trace::call(frame!(), Kind::D3D, 5);
     if adapter != 0 || id.is_null() {
         return D3DERR_INVALIDCALL;
     }
+    let _ = flags;
     let mut id9 = [0u8; 1100];
-    if stub().d3d9.is_null() {
-        // On Vulkan there is no Direct3D 9 to ask before the device exists: a name of
-        // our own, and no vendor (nothing in the engine was seen to read it, phase 0).
-        let name = b"Armada II Refit (Display8 on Vulkan)";
-        id9[512..512 + name.len()].copy_from_slice(name);
-        id9[..8].copy_from_slice(b"d3d8.dll");
-    } else {
-        let hr = vcall!(stub().d3d9, 5, fn(u32, u32, *mut u8) -> HRESULT, 0, flags, id9.as_mut_ptr());
-        if hr < 0 {
-            return hr;
-        }
-    }
+    // There is no adapter to ask before the device exists: a name of our own, and no
+    // vendor (nothing in the engine was seen to read it, phase 0).
+    let name = b"Armada II Refit (Display8 on Vulkan)";
+    id9[512..512 + name.len()].copy_from_slice(name);
+    id9[..8].copy_from_slice(b"d3d8.dll");
     unsafe {
         core::ptr::copy_nonoverlapping(id9.as_ptr(), id, 1024);
         core::ptr::copy_nonoverlapping(id9.as_ptr().add(1056), id.add(1024), 1100 - 1056);
@@ -144,12 +143,9 @@ unsafe extern "system" fn get_device_caps(_this: *mut SObj, _adapter: u32, _dt: 
     S_OK
 }
 
-unsafe extern "system" fn get_adapter_monitor(_this: *mut SObj, adapter: u32) -> usize {
+unsafe extern "system" fn get_adapter_monitor(_this: *mut SObj, _adapter: u32) -> usize {
     trace::call(frame!(), Kind::D3D, 14);
-    if stub().d3d9.is_null() {
-        return super::primary_monitor();
-    }
-    vcall!(stub().d3d9, 15, fn(u32) -> usize, adapter)
+    super::primary_monitor()
 }
 
 unsafe extern "system" fn create_device(
@@ -172,7 +168,8 @@ unsafe extern "system" fn create_device(
     let depth = if asked.auto_depth != 0 { asked.depth_format } else { 0 };
     // The stub's own device is windowed whatever the engine asks, so any interval holds.
     if !super::ensure_device(window, flags, depth, crate::present_interval(asked.interval, false)) {
-        return D3DERR_NOTAVAILABLE;
+        // No backend could start: the system's Direct3D 8 from here (bail.rs).
+        return crate::bail::late(adapter, dt, hwnd, flags, pp, out);
     }
     let dev = super::device::make(asked);
     unsafe { *out = dev as *mut c_void };

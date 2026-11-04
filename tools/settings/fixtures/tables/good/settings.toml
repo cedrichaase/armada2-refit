@@ -1,0 +1,69 @@
+plugin = "Good"
+file = "Good.ini"
+shipped = "tools/settings/fixtures/tables/good/Good.ini"
+
+[[row]]
+name = "good_enable"
+section = "Good"
+key = "Enable"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "Good thing"
+help = "Turns the good thing on."
+
+[[row]]
+name = "good_mode"
+section = "Good"
+key = "Mode"
+kind = "enum"
+default = "4"
+values = ["0", "2", "4", "8"]
+labels = ["Off", "2x", "4x", "8x"]
+apply = "restart"
+scope = "local"
+tab = "graphics"
+label = "Mode"
+help = "How many."
+flags = ["advanced"]
+
+[[row]]
+name = "good_theme"
+section = "Good"
+key = "Theme"
+kind = "enum"
+default = "dark"
+values = ["dark", "light"]
+labels = ["Dark", "Light \"quoted\""]
+apply = "mission"
+scope = "match"
+tab = "interface"
+label = "Theme"
+help = ""
+
+[[row]]
+name = "world_surfaces"
+section = "World"
+key = "Surfaces"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "Planet and asteroid surfaces"
+help = ""
+
+[[row]]
+name = "hud_barhidden"
+section = "HUD"
+key = "BarHidden"
+kind = "bool"
+default = "0"
+apply = "mission"
+scope = "local"
+tab = "interface"
+label = "Command bar hidden"
+help = ""
+flags = ["no_row", "not_shipped"]

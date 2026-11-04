@@ -1,0 +1,533 @@
+# QOLRules.asi's symbols in Armada2.exe 1.1 (GOG): what rules/rules.c reads and patches of the exe, each
+# entry tied to the hook that uses it. The findings are in rules/README.md, "Hooks" (QOL-7).
+schema = 1
+plugin = "qolrules"
+readme = "rules/README.md"
+lang = "c"
+out = "rules/engine_syms.h"
+
+[hook.pay_on_queue]
+doc = "An item is paid when queued: nine entry hooks and the queue call in Handle_New_Command"
+rows = ["Rules.PayOnQueue"]
+
+[hook.advisor]
+doc = "A refused order speaks stock's advisor line: StartBuild's own Say calls, checked"
+rows = ["Rules.PayOnQueue"]
+
+[[sym]]
+id = "entry_start"
+symbol = "Producer::StartBuild"
+kind = "fn"
+addr = 0x4b8180
+check = "55 8b ec 83 ec 14"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "entry_pop"
+symbol = "Producer::PopBuildQueueItem"
+kind = "fn"
+addr = 0x4b79b0
+check = "53 56 8b f1 33 db"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "entry_actdel"
+symbol = "Producer::ActDeleteBuildQueueItem"
+kind = "fn"
+addr = 0x4b7a60
+check = "55 8b ec 53 56"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "entry_cancel"
+symbol = "Producer::CancelBuild"
+kind = "fn"
+addr = 0x4b84b0
+check = "55 8b ec 51 53 56"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "entry_clearq"
+symbol = "Producer::ClearBuildQueue"
+kind = "fn"
+addr = 0x4b78c0
+check = "53 56 8b f1 33 db"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "entry_clearteam"
+symbol = "Producer::ClearTeam"
+kind = "fn"
+addr = 0x4b7790
+check = "56 8b f1 8b 06"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "entry_save"
+symbol = "Producer::Save"
+kind = "fn"
+addr = 0x4b8aa0
+check = "55 8b ec 83 ec 08"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "entry_load"
+symbol = "Producer::Load"
+kind = "fn"
+addr = 0x4b88d0
+check = "55 8b ec 83 ec 10"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "entry_open"
+symbol = "Program::GameOpenPreLoad"
+kind = "fn"
+addr = 0x4846a0
+check = "55 8b ec 6a ff"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "push_item"
+symbol = "Producer::PushBuildQueueItem"
+kind = "fn"
+addr = 0x4b7930
+check = "55 8b ec 56 8b f1"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "push_call"
+symbol = "CraftProcess::Handle_New_Command"
+kind = "call"
+addr = 0x431532
+target = "push_item"
+in = "CraftProcess::Handle_New_Command"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "cost_dil"
+symbol = "GameObjectClass::Get_Dilithium_Cost"
+kind = "fn"
+addr = 0x4cddc0
+check = "55 8b ec 51 53 8b"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "cost_lat"
+symbol = "GameObjectClass::Get_Latinum_Cost"
+kind = "fn"
+addr = 0x4cde90
+check = "55 8b ec 53 56 57"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "cost_met"
+symbol = "GameObjectClass::Get_Metal_Cost"
+kind = "fn"
+addr = 0x4cdfa0
+check = "55 8b ec 51 53 8b"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "cost_bio"
+symbol = "GameObjectClass::Get_Biomatter_Cost"
+kind = "fn"
+addr = 0x4ce070
+check = "55 8b ec 51 53 8b"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "cost_off"
+symbol = "GameObjectClass::Get_Officer_Cost"
+kind = "fn"
+addr = 0x4ce140
+check = "55 8b ec 8b 45 08"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "cost_crew"
+symbol = "GameObjectClass::Get_Crew_Cost"
+kind = "fn"
+addr = 0x4ce160
+check = "8b 81 84 00 00 00"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "add_dil"
+symbol = "Team::AddDilithium"
+kind = "fn"
+addr = 0x496e30
+check = "55 8b ec 83 ec 08"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "add_lat"
+symbol = "Team::AddLatinum"
+kind = "fn"
+addr = 0x496f20
+check = "55 8b ec 83 ec 08"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "add_met"
+symbol = "Team::AddMetal"
+kind = "fn"
+addr = 0x497010
+check = "55 8b ec 83 ec 08"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "add_bio"
+symbol = "Team::AddBiomatter"
+kind = "fn"
+addr = 0x496d40
+check = "55 8b ec 83 ec 08"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "add_crew"
+symbol = "Team::AddCrew"
+kind = "fn"
+addr = 0x4974b0
+check = "55 8b ec 57 8b f9"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "enlist"
+symbol = "Team::EnlistOfficers"
+kind = "fn"
+addr = 0x498870
+check = "55 8b ec 8b 45 08"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "discharge"
+symbol = "Team::DischargeOfficers"
+kind = "fn"
+addr = 0x498890
+check = "55 8b ec 8b 45 08"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "vacancies"
+symbol = "Team::GetOfficerVacancies"
+kind = "fn"
+addr = 0x497580
+check = "56 8b f1 8b 8e 44"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "remove_effect"
+symbol = "Producer::mRemoveConstructionEffect"
+kind = "fn"
+addr = 0x4b7700
+check = "56 8b f1 57 8b 86"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "transport"
+symbol = "g_transport"
+kind = "global"
+addr = 0x76b8d4
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "vt_local"
+symbol = "TransportLocal"
+kind = "vtable"
+addr = 0x6b6d8c
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "vt_local_instant"
+symbol = "TransportLocalInstantAction"
+kind = "vtable"
+addr = 0x6b6eb8
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "epsilon"
+symbol = "__real@8@3ffe8000000000000000"
+kind = "global"
+addr = 0x6ae228
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "say_topic"
+symbol = "ComputerVoice::Say"
+kind = "fn"
+addr = 0x45d8c0
+check = "55 8b ec a1 10 b6"
+used_by = ["advisor"]
+
+[[sym]]
+id = "say_event"
+symbol = "ComputerVoice::Say"
+kind = "fn"
+addr = 0x45db20
+check = "55 8b ec 83 3d 10"
+used_by = ["advisor"]
+
+[[sym]]
+id = "officer_event"
+symbol = "Race::GetInsufficentOfficerEventId"
+kind = "fn"
+addr = 0x48c120
+check = "81 c1 5c 05 00 00"
+used_by = ["advisor"]
+
+[[sym]]
+id = "user_team"
+symbol = "Entity::GetUserTeam"
+kind = "fn"
+addr = 0x4d0060
+check = "8b 0d d4 b8 76 00"
+used_by = ["advisor"]
+
+[[sym]]
+id = "voice_topic"
+symbol = "Producer::StartBuild"
+kind = "label"
+addr = 0x4b826c
+check = "6a 09"
+in = "Producer::StartBuild"
+used_by = ["advisor"]
+
+[[sym]]
+id = "voice_say_topic"
+symbol = "Producer::StartBuild"
+kind = "call"
+addr = 0x4b826e
+target = "say_topic"
+in = "Producer::StartBuild"
+used_by = ["advisor"]
+
+[[sym]]
+id = "voice_officer"
+symbol = "Producer::StartBuild"
+kind = "call"
+addr = 0x4b829a
+target = "officer_event"
+in = "Producer::StartBuild"
+used_by = ["advisor"]
+
+[[sym]]
+id = "voice_say_event"
+symbol = "Producer::StartBuild"
+kind = "call"
+addr = 0x4b82a0
+target = "say_event"
+in = "Producer::StartBuild"
+used_by = ["advisor"]
+
+[[sym]]
+id = "p_teamidx"
+symbol = "Producer"
+kind = "field"
+struct = "Producer"
+offset = 0xec
+type = "i32"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "p_team"
+symbol = "Producer"
+kind = "field"
+struct = "Producer"
+offset = 0xf0
+type = "ptr"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "p_cur"
+symbol = "Producer"
+kind = "field"
+struct = "Producer"
+offset = 0x254
+type = "ptr"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "p_head"
+symbol = "Producer"
+kind = "field"
+struct = "Producer"
+offset = 0x270
+type = "ptr"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "p_count"
+symbol = "Producer"
+kind = "field"
+struct = "Producer"
+offset = 0x274
+type = "i32"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "p_curid"
+symbol = "Producer"
+kind = "field"
+struct = "Producer"
+offset = 0x2a0
+type = "i32"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "p_nextid"
+symbol = "Producer"
+kind = "field"
+struct = "Producer"
+offset = 0x2a8
+type = "i32"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "p_effect"
+symbol = "Producer"
+kind = "field"
+struct = "Producer"
+offset = 0x268
+type = "i32"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "vt_is_busy"
+symbol = "Producer vtable"
+kind = "field"
+struct = "Producer vtable"
+offset = 0x138
+type = "u32"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "vt_remove_effect"
+symbol = "Producer vtable"
+kind = "field"
+struct = "Producer vtable"
+offset = 0x170
+type = "u32"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "it_next"
+symbol = "BuildQueueItem"
+kind = "field"
+struct = "BuildQueueItem"
+offset = 0x8
+type = "ptr"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "it_id"
+symbol = "BuildQueueItem"
+kind = "field"
+struct = "BuildQueueItem"
+offset = 0xc
+type = "i32"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "t_bank"
+symbol = "Team"
+kind = "field"
+struct = "Team"
+offset = 0x16c
+type = "i32"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "t_dil"
+symbol = "Team"
+kind = "field"
+struct = "Team"
+offset = 0x28
+type = "f32"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "t_met"
+symbol = "Team"
+kind = "field"
+struct = "Team"
+offset = 0xc0
+type = "f32"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "t_lat"
+symbol = "Team"
+kind = "field"
+struct = "Team"
+offset = 0x74
+type = "f32"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "t_bio"
+symbol = "Team"
+kind = "field"
+struct = "Team"
+offset = 0x168
+type = "f32"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "t_crew"
+symbol = "Team"
+kind = "field"
+struct = "Team"
+offset = 0x10c
+type = "f32"
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "t_race"
+symbol = "Team"
+kind = "field"
+struct = "Team"
+offset = 0x244
+type = "ptr"
+used_by = ["advisor"]
+
+[[sym]]
+id = "q_max"
+symbol = "Producer build queue length"
+kind = "value"
+value = 10
+used_by = ["pay_on_queue"]
+
+[[sym]]
+id = "topic_dil"
+symbol = "ComputerVoice Topic InsufficientDilithium"
+kind = "value"
+value = 9
+used_by = ["advisor"]
+
+[[sym]]
+id = "topic_crew"
+symbol = "ComputerVoice Topic InsufficientCrew"
+kind = "value"
+value = 10
+used_by = ["advisor"]
+
+[[sym]]
+id = "topic_lat"
+symbol = "ComputerVoice Topic InsufficientLatinum"
+kind = "value"
+value = 54
+used_by = ["advisor"]
+
+[[sym]]
+id = "topic_met"
+symbol = "ComputerVoice Topic InsufficientMetal"
+kind = "value"
+value = 55
+used_by = ["advisor"]
+
+[[sym]]
+id = "topic_bio"
+symbol = "ComputerVoice Topic InsufficientBiomatter"
+kind = "value"
+value = 56
+used_by = ["advisor"]

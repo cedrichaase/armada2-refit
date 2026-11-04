@@ -36,3 +36,4 @@ CreateFileMappingA@24
 MapViewOfFile@20
 GetCurrentProcessId@0
 GetEnvironmentVariableA@12
+Sleep@4

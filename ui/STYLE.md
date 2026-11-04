@@ -11,8 +11,8 @@ tokens live in `src/widgets/theme.rs` (`Theme`), the drawing primitives in
 256-pixel panel sheets (`fedui0..5`, `klingUI0..5`, `romUI*`, `cardUI*`, `borgUI*`,
 `speciesUI0..6`), cut into nine-slices and laid out on a 1600x1200 canvas
 (`gui_<race>.cfg`). At 1080 lines and above they are magnified two to three times, so
-their bevels and rivets go soft, and their shapes are fixed to the 4:3 layout `HUD.asi`
-has to correct. The menus are 800x600 GDI bitmaps. Neither can be extended: a new
+their bevels and rivets go soft, and their shapes are fixed to the 4:3 layout the retired `HUD.asi`
+corrected. The menus are 800x600 GDI bitmaps. Neither can be extended: a new
 panel would need new art in the same style at the same resolution.
 
 So every frame, edge, button and bar is drawn by our renderer from a few numbers
@@ -26,7 +26,7 @@ aspect, any size, extensible by code. What the game's art is kept for is what ca
 | Build and special-weapon icons (the square button art) | they identify a unit or a weapon; 64 px art, drawn inside our buttons, never stretched past 2x. The **command** icons are ours (below, "Icons") |
 | Race emblems (the Federation delta, the Klingon trefoil, ...) | identity; drawn as images inside our frames |
 | Cursor shapes (`cursor.spr`) | the cursor's shape says which order a click gives (`README.md`, "The cursor"); `src/cursor.rs` draws the engine's art sharp |
-| The menu plates (`Menus/mainbkgr.bmp`, built by `menus/backdrop.sh`) | the front end's backdrop (below) |
+| The menu plates (`Menus/mainbkgr.bmp`, built by `ui/backdrops/backdrop.sh`) | the front end's backdrop (below) |
 
 Not kept: the panel sheets, the GDI button and frame bitmaps, the bitmap font (the
 UI's text is Noto Sans Condensed, `README.md`, "Text").
@@ -159,12 +159,17 @@ Each is one function in `theme.rs`, given its rectangle and a `State` (hover eas
 - **Tooltip** (`theme::tooltip`): small text on `tip` with a hairline `tip_edge` and a
   shadow; LCARS black with a lavender cap.
 - **Separator**, **heading**, **dropdown arrow**: as their names say.
+- **Status badge** (`theme::status_badge`, width `status_badge_w`): a small plate with
+  one word on it in `micro_size`, bold, from tokens only (`track`, `button_edge`,
+  `text_dim`; active in `accent` with `text_on`; dimmed with `text_off`). It states a
+  fact about a row of the Refit screen (Now, Restart needed, Must match, Locked); not
+  to be confused with `theme::badge`, the HUD bar's key letter.
 
 ## Screens
 
 - **The menu backdrop.** A screen of ours in the front end draws `theme::backdrop`:
-  the widescreen menu plate the menus layer builds (`menus/BACKDROPS.md`), read at run
-  time from the game's `Menus/mainbkgr.bmp`, where `menus/install-plates.sh` installs
+  the widescreen menu plate (`ui/backdrops/BACKDROPS.md`), read at run
+  time from the game's `Menus/mainbkgr.bmp`, where `ui/backdrops/install-plates.sh` installs
   it, scaled to cover the screen and darkened toward the bottom (the panels sit
   there). It is an asset in `$A2_DATA`, never in the repository; **without it** (no
   plate built) the screen is a dark blue gradient with a fixed field of faint stars,
@@ -189,6 +194,12 @@ Each is one function in `theme.rs`, given its rectangle and a `State` (hover eas
   presented between the engine's 5% steps. The engine's logo scene and bar are covered,
   so the widened `logo.SOD` is not needed for it. With `Enable=0` the engine's screen
   stays, and `[Demo] Style=1` still shows the earlier band over it.
+- **The Refit screen** (`menus/refit.rs`, MENUS.md) is a modal over the Options dialog in
+  the menus' theme (`Theme::for_context(Context::Menus)`, so a live `UI.Theme` restyles
+  it): a tab strip, a page of rows in one or two columns (label over its badges at the
+  left, the control at the right, a dot at the left edge when the overlay holds the key),
+  a help strip two lines tall, a banner in `warn` when a restart is pending, and a foot
+  (Reset tab, Show advanced, Done).
 - **The HUD** takes the player's race's theme. Its panels are anchored to the screen
   edges (`Anchor`) at any aspect, translucent, the 3D view showing through.
 
@@ -268,7 +279,7 @@ mirrored to any corner), and optional stripes at any angle. Everything is comput
 from the pixel's offset to the box's centre, so one quad draws it at any size,
 antialiased over one pixel; glows, inner glows and shadows are the same shape with a
 wide soft edge. The corners and parts are chosen with `step`/`lerp`, no branches
-(vkd3d, `render3d/README.md`). Three float4s per vertex carry the parameters, so the
+(the shader compilers unroll and dislike branches, `render3d/README.md`). Three float4s per vertex carry the parameters, so the
 vertex is 84 bytes; a whole frame of UI is still a few draw calls.
 
 ## The gallery

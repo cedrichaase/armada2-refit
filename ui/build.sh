@@ -5,12 +5,9 @@
 #
 # Shaders first: each shaders/<name>.hlsl names its entry points on its first line,
 #   // entries: <entry>:<profile>:<SYMBOL> ...
-# and is compiled by tools/shaderc/hlsl-rs.sh into src/shaders/<name>.rs, Direct3D 9
-# bytecode from vkd3d, src/shaders/<name>_spv.rs, SPIR-V from dxc, and
-# src/shaders/<name>_dxil.rs, DXIL from the pinned dxc (committed, with stamps, so a
-# machine without the compilers builds as long as they are current), with
-# --fix: Windows' own Direct3D 9 refuses vkd3d's bytecode as it is (render3d/README.md,
-# "Shaders on Windows").
+# and is compiled by tools/shaderc/hlsl-rs.sh into src/shaders/<name>_spv.rs, SPIR-V
+# from dxc, and src/shaders/<name>_dxil.rs, DXIL from the pinned dxc (committed, with
+# stamps, so a machine without the compilers builds as long as they are current).
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,8 +23,8 @@ for f in "$here"/shaders/*.hlsl; do
     entries=$(sed -n '1s#^// entries:##p' "$f")
     [ -n "$entries" ] || { echo "ui: $f has no '// entries:' first line" >&2; exit 1; }
     # shellcheck disable=SC2086
-    "$here/../tools/shaderc/hlsl-rs.sh" --fix "$here/src/shaders/$name.rs" "$f" $entries
-    mods="$mods$name ${name}_spv ${name}_dxil "
+    "$here/../tools/shaderc/hlsl-rs.sh" "$here/src/shaders/$name.rs" "$f" $entries
+    mods="$mods${name}_spv ${name}_dxil "
 done
 # Temp files of this run's own, beside their targets so each mv is a rename: several
 # installs of one checkout can run at once (a2test -j). A fixed name (mod.rs.new) let

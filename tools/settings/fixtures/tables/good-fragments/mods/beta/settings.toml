@@ -1,0 +1,27 @@
+plugin = "Frag"
+file = "Frag.ini"
+module = "beta"
+
+[[row]]
+name = "beta_on"
+section = "Beta"
+key = "On"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "beta_on"
+help = ""
+
+[[row]]
+name = "shared_b"
+section = "Shared"
+key = "B"
+kind = "bool"
+default = "1"
+apply = "live"
+scope = "local"
+tab = "graphics"
+label = "shared_b"
+help = ""

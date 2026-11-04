@@ -5,7 +5,7 @@
 //! last pointed at (`choose`), the Federation's at first, and render3d moves the camera
 //! over. The screen specs then draw over it (`shown`) in place of the stock screen's art.
 //!
-//! Without Render3D.asi, or when it draws nothing (no Direct3D 9 device, its scene
+//! Without Render3D.asi, or when it draws nothing (no Display8 device, its scene
 //! switched off), `shown` is false and the specs draw what they drew before.
 //!
 //! **The departure.** A mission loaded while the scene is up (from the campaign
@@ -61,9 +61,9 @@ fn scene_fn() -> Option<SceneFn> {
 /// The specs dim it under their windows (`theme::backdrop`).
 fn scene_for(screen: &str) -> Option<&'static core::ffi::CStr> {
     match screen {
-        "main menu" => Some(c"main"),
-        "single player" => Some(unsafe { CHOICE }.unwrap_or(c"federation")),
-        _ => Some(unsafe { LAST_VIEW }.unwrap_or(c"main")),
+        "main menu" => crate::content::get().main_scene,
+        "single player" => unsafe { CHOICE }.or(crate::content::get().first_campaign_scene),
+        _ => unsafe { LAST_VIEW }.or(crate::content::get().main_scene),
     }
 }
 

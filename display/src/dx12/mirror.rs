@@ -12,13 +12,30 @@ use alloc::boxed::Box;
 use core::sync::atomic::Ordering;
 use gpu::display::Dx12Image8;
 
-/// The texture's mirror, made at the first ask with every level.
+/// The texture's mirror, made at the first ask with every level (a plugin's).
 pub fn image(o: *mut SObj) -> Option<Dx12Image8> {
+    make(o, true)
+}
+
+/// The same for the passthrough (`pass.rs`): every texture the engine draws with, so
+/// only their count is logged. Made and brought up to date by copies and barriers on
+/// the frame's list, which bind nothing, so between two draws is as good as anywhere.
+pub fn passthrough(o: *mut SObj) -> Option<Dx12Image8> {
+    make(o, false)
+}
+
+static mut PASSED: u32 = 0;
+
+fn make(o: *mut SObj, plugin: bool) -> Option<Dx12Image8> {
     let d = get()?;
     let t = unsafe { (*o).tex() };
     if t.dx12 == 0 {
         if t.faces != 1 || !matches!(t.format, 21 | 22) {
-            log!("d3d12: no mirror for a texture of format {} ({} faces)", t.format, t.faces);
+            if plugin {
+                log!("d3d12: no mirror for a texture of format {} ({} faces)", t.format, t.faces);
+            } else {
+                crate::stub::drawn_white(t.format, t.faces);
+            }
             return None;
         }
         let l0 = &t.levels[0];
@@ -33,7 +50,17 @@ pub fn image(o: *mut SObj) -> Option<Dx12Image8> {
         t.dx12 = Box::into_raw(Box::new(img)) as usize;
         t.dirty.store(u32::MAX, Ordering::Relaxed);
         crate::stub::stub().mirrors.push(o);
-        log!("d3d12: mirrored a {}x{} texture of format {} for a plugin", l0.w, l0.h, t.format);
+        if plugin {
+            log!("d3d12: mirrored a {}x{} texture of format {} for a plugin", l0.w, l0.h, t.format);
+        } else {
+            let n = unsafe {
+                PASSED += 1;
+                PASSED
+            };
+            if n.is_power_of_two() {
+                log!("d3d12: {} textures mirrored for the passthrough", n);
+            }
+        }
         update(o);
     }
     Some(unsafe { &*(t.dx12 as *const Img) }.info())
@@ -43,7 +70,8 @@ pub fn image(o: *mut SObj) -> Option<Dx12Image8> {
 pub fn update(o: *mut SObj) {
     let Some(d) = get() else { return };
     let t = unsafe { (*o).tex() };
-    if t.dx12 == 0 {
+    // A lost device has no list to record into (`Dx::wait`); the levels stay dirty.
+    if t.dx12 == 0 || d.lost {
         return;
     }
     let dirty = t.dirty.swap(0, Ordering::AcqRel);

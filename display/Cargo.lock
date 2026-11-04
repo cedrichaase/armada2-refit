@@ -3,8 +3,19 @@
 version = 4
 
 [[package]]
+name = "a2engine"
+version = "0.1.0"
+
+[[package]]
+name = "a2ini"
+version = "0.1.0"
+
+[[package]]
 name = "a2rt"
 version = "0.1.0"
+dependencies = [
+ "a2ini",
+]
 
 [[package]]
 name = "ash"
@@ -14,8 +25,9 @@ checksum = "0bb44936d800fea8f016d7f2311c6a4f97aebd5dc86f09906139ec848cf3a46f"
 
 [[package]]
 name = "display"
-version = "0.15.2"
+version = "1.0.4"
 dependencies = [
+ "a2engine",
  "a2rt",
  "ash",
  "gpu",
@@ -23,7 +35,7 @@ dependencies = [
 
 [[package]]
 name = "gpu"
-version = "1.2.0"
+version = "2.0.1"
 dependencies = [
  "ash",
 ]
