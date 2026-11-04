@@ -5,6 +5,14 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 2.2.2 — 2026-11-04
+
+### Fixed
+- `QOL_SettingsChanged` no longer reads the pan coefficient when the pan site is not patched (`g_panOk`), so a changed `PanSpeed` on a different exe does not read an unmapped address.
+- Turning the grid's position keys off live puts the six menu-toggle pointers back (`bar.c`): they were pointed at a zero for good, so stock's menu keys stayed dead until a restart. They are now swapped only around the stock call.
+
+Installed, not yet seen in game.
+
 ## 2.2.1 — 2026-11-03
 
 ### Removed

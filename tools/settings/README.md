@@ -283,15 +283,24 @@ value, and each has one mover:
 
 - **The overlay**: at its first frame the hub (`ui/src/settings.rs`) checks each loaded
   table's rows, size 48 or more. For every `moved_from` key present in `RefitPlayer.ini`
-  it moves the value to the row's own `[<Stem>.<Section>] Key` (`a2ini::rename`; when
-  both are present the new key wins and the old one is deleted), logs
+  it moves the value to the row's own `[<Stem>.<Section>] Key` (`a2ini::rename`; the
+  precedence rule below), logs
   `settings: RefitPlayer.ini [UI.HUD] BarKeys moved to [QOL.QOL] BarKeys` and tells the
   plugins. The UI stays the overlay's one writer. Without `UI.asi` an old overlay key is
   ignored and the shipped value applies.
 - **The plugin inis**: `./install` runs `move-keys.py <game dir>` after every layer. When
-  the old file holds the old key, a value other than the row's default goes to the row's
-  file and key, and the old key is removed either way; one line per key. The release
-  scripts do the same from `moved.txt`, which `publish/package.sh` bakes from these tables.
+  the old file holds the old key, the precedence rule below decides, and the old key is
+  removed either way; one line per key. The release scripts (`install.sh`, `install.ps1`)
+  do the same from `moved.txt`, which `publish/package.sh` bakes from these tables.
+
+**One precedence rule, in every mover** (`move-keys.py`, the two release scripts,
+`a2ini::rename`): the player's values are kept. A key counts as *set by the player* when
+it is present with a non-empty value that is not the row's default (in the overlay,
+which holds nothing but the player's choices, when it is present with a value). Then:
+the new key, if set by the player, wins and the old one is only removed; otherwise the
+old key's value moves when it is set by the player (not the default) and replaces an
+empty or default new one; the old key is removed either way. An empty `Key=` is no
+choice: it neither moves nor holds a place.
 
 Both are idempotent: the old key is gone after the first run.
 

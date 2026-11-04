@@ -4,6 +4,13 @@
 refund on cancel: QOL-7). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 1.0.2 — 2026-11-04
+
+### Fixed
+- A network game's rules follow what the online layer announced on connect (`QOLRules_Network`), not the setting as it is when the game opens: switching `PayOnQueue` off after connecting left this player queuing stock while the peers paid on queue, and the games diverged. A local game still reads the setting.
+
+Installed, not yet seen in game.
+
 ## 1.0.1 — 2026-11-03
 
 ### Changed

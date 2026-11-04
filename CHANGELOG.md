@@ -5,6 +5,34 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.16 — 2026-11-04
+
+Layers: ui 2.2.4, testbench 4.1.5.
+
+### Fixed
+- Round-f review, misc: the Refit screen's Reset covers the tab's advanced rows, a key step moves an integer slider of fewer than twenty values by one, the settings hub no longer looks for `BinkProxy_Settings`, `ui/install.sh`'s header says what `--remove` deletes, status lines backfilled (15.6.0, 15.2.0). cutscenes 3.0.1 stays a patch (see its entry). Installed, not yet seen in game.
+
+## 15.6.15 — 2026-11-04
+
+Layers: platform 4.0.1, render3d 1.0.4 (and the `a2rt` retry in display 1.0.4 and ui 2.2.4).
+
+### Fixed
+- Round-f review, installers: a player's own `Sky\<name>.ini` survives retire and `render3d/install.sh` (hash match only); `retire.sh --chain` keeps `dxvk.conf` when its samplers could not be carried; the release installers back up an unknown `d3d8.dll`; `./install` builds Display8 before it retires the old chain, so a failed build leaves the game as it was; one precedence rule in every settings mover (the player's new value wins), documented in `tools/settings/README.md`; `a2ini` ignores a UTF-8 BOM before the first section (no duplicate section on edit), treats `Key=` as no value in `rename`, and retries the rename over a file a reader holds; the overlay write's `a2rt::move_file` retries 8 x 50 ms (Sleep added to the render3d and display import lists); `a2mod refit` no longer needs `--force` after `platform --retire` took the `d3d8.dll` backup. Installed, not yet seen in game.
+
+## 15.6.14 — 2026-11-04
+
+Layers: qol 2.2.2, rules 1.0.2, render3d 1.0.3.
+
+### Fixed
+- Review fixes in the plugins: the pan coefficient read behind its patch check, the grid's menu-toggle keys restored when it is turned off live, pay-on-queue in a network game following the announcement, the effects module's sprite drops limited to render3d's own views, and instruction listings in comments turned to prose. Installed, not yet seen in game.
+
+## 15.6.13 — 2026-11-04
+
+Layers: display 1.0.4, testbench 4.1.4.
+
+### Fixed
+- Display8: the Vulkan flush's failed submit no longer hangs the next frame, a part-made Vulkan swap chain holds no destroyed handles, a Direct3D 12 fence timeout no longer resets or frees what the GPU may be using, a second `Direct3DCreate8` keeps the late bail-out's forward, and the shell's mode is not raised after a bail-out (`display-bail-out` checks it). Installed, not yet seen in game.
+
 ## 15.6.12 — 2026-11-03
 
 Layers: cutscenes 3.0.1, rules 1.0.1, online 0.11.1, ui 2.2.3, testbench 4.1.3.
@@ -116,6 +144,8 @@ Layers: platform 4.0.0, renderer 3.0.0 (retired), gui-installer 3.0.0, testbench
 - `a2mod`: Display8's `d3d8.dll` is filed under the display layer by content when no `.a2display-backup` sits beside it, so `a2mod stock` on a game whose slot was empty sets Display8 aside and the game runs on the system's `d3d8.dll`; with a backup (GOG's) it is put back as before. The snapshot layout is unchanged.
 - `testbench/retire-old-install.py` now requires the chain class (`d3d8_real.dll`, `d3d9.dll`, `dxvk.conf`) to be removed.
 
+Installed, not yet seen in game.
+
 ## 15.5.0 — 2026-11-03
 
 Layers: ui 2.2.0, qol 2.2.1.
@@ -172,6 +202,8 @@ Layers: hud 3.0.0, grid 2.0.0, menus 5.0.0, ui 2.1.0, models 5.1.0, textures 2.2
 - `hud/`, `grid/` and `menus/` (their last changelogs are `retire/history/`), the
   `LOADING` texture target with `models/logo-sod.py`, `models/loading-panel.sh` and the
   `panel=` lines of `a2tex`. `ui/bench-legacy.sh` stays but stops with a message.
+
+Installed, not yet seen in game.
 
 ## 15.1.0 — 2026-11-03
 

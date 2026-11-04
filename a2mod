@@ -251,11 +251,14 @@ def is_mod(path, e):
 def is_stock(path, e):
     if e['kind'] == 'added':
         return not os.path.exists(path)
-    if not os.path.exists(path):
-        return False
     bak = os.path.join(GAME, e['backup'])
     if not os.path.exists(bak):
-        return False   # the backup went (retire/retire.sh drops one beside a stock file)
+        # The backup went: platform/d3d8-chain.py --retire and retire/retire.sh drop one that
+        # held the retired chain. What stock means for the file is then whatever is not the
+        # modded file: nothing, or the GOG copy put in its place; `refit` needs no --force.
+        return not os.path.exists(path) or not is_mod(path, e)
+    if not os.path.exists(path):
+        return False
     return os.path.getsize(path) == os.path.getsize(bak) and sha(path) == sha(bak)
 
 

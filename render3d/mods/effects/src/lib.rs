@@ -255,6 +255,7 @@ impl Module for Effects {
         self.bees.clear();
         chunks::set_active(false);
         repair::Repair::set_taking(false);
+        hooks::set_in_view(false);
     }
     fn reset(&mut self) {
         self.ex.reset();
@@ -277,7 +278,11 @@ impl Module for Effects {
             }
         }
     }
+    fn end_view(&mut self, _v: &View) {
+        hooks::set_in_view(false);
+    }
     fn begin_view(&mut self, _v: &View) {
+        hooks::set_in_view(true);
         self.ex.notes.clear();
         self.bees.begin_view();
         if self.ab {

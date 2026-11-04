@@ -4,6 +4,20 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 1.0.4 — 2026-11-04
+
+### Fixed
+- `a2rt::move_file` (the settings overlay's rename) retries a failed move 8 x 50 ms; `Sleep` joins `kernel32.def`.
+- `install.sh` (and `--remove`) no longer deletes `Sky\<name>.ini` by the names of the shipped recipes: a sky recipe of the player's own, the override the README documents, survives. The old Sky.asi copies are taken out by hash, by `retire/retire.sh` (platform 4.0.1). Installed, not yet seen in game.
+
+## 1.0.3 — 2026-11-04
+
+### Fixed
+- effects: the engine's weld and spark sprites are dropped only while one of render3d's own views runs (`begin_view` to `end_view`), not whenever the module is on: with `Inset=0` the engine-drawn inset lost them. Debris taken over at the explosion (`Craft::Explode`) is simulation-time and still ours only; the inset with `Inset=0` shows none of it.
+- Comments in `qol/` and `ui/src/engine/` list no instruction sequences (hard rule 9).
+
+Installed, not yet seen in game.
+
 ## 1.0.2 — 2026-11-03
 
 ### Fixed

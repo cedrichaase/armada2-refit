@@ -20,6 +20,7 @@ It is our own code, compiled; nothing of the game is in it (hard rule 8).
     python3 testbench/bench/legacy.py seed <game dir> [--res WxH]
                                                   an old install, over a stock game dir
 """
+import fcntl
 import os
 import shutil
 import subprocess
@@ -58,6 +59,16 @@ def ensure(tag=TAG, say=print):
     d = cache_dir(tag)
     if (d / '.done').exists():
         return d
+    # Parallel sessions: one builds, the others wait on the lock and then find it done.
+    d.parent.mkdir(parents=True, exist_ok=True)
+    with open(d.with_name(d.name + '.lock'), 'w') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if (d / '.done').exists():
+            return d
+        return _build(d, tag, say)
+
+
+def _build(d, tag, say):
     say(f'legacy: building HUD, GridLayout and Menus of {tag} into {d} (once)')
     with tempfile.TemporaryDirectory(prefix='a2legacy-') as tmp:
         tmp = Path(tmp)

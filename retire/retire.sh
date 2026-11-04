@@ -47,11 +47,13 @@ out() {   # path -- remove a file, or say so under --check
 # Display8.ini a stub at Defaults=1 is merged and taken away again when the merge changed
 # nothing (display/install writes the file later, from the shipped one).
 carry_samplers() {
-    local ini="$game/Display8.ini" shipped="$here/../display/Display8.ini" made=0
-    [ -f "$shipped" ] || return 0
+    local ini="$game/Display8.ini" shipped="$here/../display/Display8.ini" made=0 rc=0
+    [ -f "$shipped" ] || return 1
     if [ ! -f "$ini" ]; then printf "[Display8]\nDefaults=1\n" > "$ini"; made=1; fi
-    python3 "$here/../tools/ini-merge.py" "$shipped" "$ini" | sed 's/^/retire: /' || true
-    if [ "$made" = 1 ] && cmp -s "$shipped" "$ini"; then rm -f "$ini"; fi
+    # pipefail: the merge's status, not sed's. When it failed the values are not carried over.
+    python3 "$here/../tools/ini-merge.py" "$shipped" "$ini" | sed 's/^/retire: /' || rc=1
+    if [ "$made" = 1 ] && { [ "$rc" = 1 ] || cmp -s "$shipped" "$ini"; }; then rm -f "$ini"; fi
+    return $rc
 }
 rmdir_if_empty() { if [ "$check" = 0 ]; then rmdir "$1" 2>/dev/null || true; fi; }
 
@@ -76,6 +78,17 @@ while IFS= read -r line || [ -n "$line" ]; do
             for f in "$game/$1"/$2; do [ -e "$f" ] && out "$f"; done
             set -f
             rmdir_if_empty "$game/$1" ;;
+        glob-hash)
+            [ -d "$game/$1" ] || continue
+            gdir="$1"; gpat="$2"; shift 2
+            set +f
+            for f in "$game/$gdir"/$gpat; do
+                [ -f "$f" ] || continue
+                h="$(sha "$f")"
+                for k in "$@"; do if [ "$h" = "$k" ]; then out "$f"; break; fi; done
+            done
+            set -f
+            rmdir_if_empty "$game/$gdir" ;;
         file)
             out "$game/$1" ;;
         hud-files)
@@ -106,7 +119,11 @@ while IFS= read -r line || [ -n "$line" ]; do
             if [ "$chain" = 1 ] && [ -f "$game/$f" ] && grep -qF "$*" "$game/$f"; then
                 # dxvk.conf: its sampler values go into Display8.ini [Samplers] first
                 # (tools/ini-merge.py, Defaults 3, which reads the dxvk.conf beside it).
-                if [ "$f" = dxvk.conf ] && [ "$check" = 0 ]; then carry_samplers; fi
+                # A carry that failed keeps the dxvk.conf: its values are not lost with it.
+                if [ "$f" = dxvk.conf ] && [ "$check" = 0 ] && ! carry_samplers; then
+                    echo "retire: dxvk.conf stays: its sampler values could not be carried into Display8.ini" >&2
+                    continue
+                fi
                 out "$game/$f"
             fi ;;
         *) echo "retire: known.txt: unknown entry kind $kind" >&2; exit 1 ;;

@@ -71,6 +71,13 @@ echo "== layers: $(python3 "$layers" --resolve "${sel[@]}" | tr '\n' ' ')"
 # on and a dxvk.conf we wrote (its sampler values go into Display8.ini first).
 retire() { bash "$here/retire/retire.sh" --chain "$A2_GAME"; }
 
+# Display8 is built before anything is retired: the retire step takes out the d3d8_real.dll
+# an older Display8 stood in front of, so a build that failed after it would leave that
+# Display8 with nothing behind it. A failed build here stops with the game as it was.
+case "$plan" in
+    *"display/install"*) echo "== build display"; bash "$here/display/build.sh" >/dev/null ;;
+esac
+
 retired=0
 while IFS=$'\t' read -r -u 3 verb id cmd; do
     [ -n "$verb" ] || continue

@@ -213,7 +213,17 @@ pub fn write_file(path: &str, data: &[u8]) -> bool {
 /// file or the new one, never half of one.
 pub fn move_file(from: &str, to: &str) -> bool {
     let (f, t) = (cstr(from), cstr(to));
-    unsafe { MoveFileExA(f.as_ptr(), t.as_ptr(), 1) != 0 }
+    // A reader that holds the target open (the sharing violation of a file being read)
+    // fails the move for a moment: retry, bounded at 8 x 50 ms.
+    for i in 0..8 {
+        if unsafe { MoveFileExA(f.as_ptr(), t.as_ptr(), 1) } != 0 {
+            return true;
+        }
+        if i < 7 {
+            unsafe { Sleep(50) };
+        }
+    }
+    false
 }
 
 /// Deletes a file; false if it could not be.

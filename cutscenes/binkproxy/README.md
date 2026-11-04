@@ -169,8 +169,8 @@ and the symbol summary after its version line.
 |---|---|---|---|
 | `binkproxy.intro_copy` | the return address of the `BinkCopyToBuffer` call in `NextBinkFrame` (a `label`, its first 8 bytes checked) and the three distances of the `D3DSURFACE_DESC` fields below the frame's EBP (`field`) | `intro_backbuffer` | the intro is copied 1:1 at its own size, not fitted |
 
-`BinkProxy_SettingsNote` (settings, C5) returns the engine's note for a row or the
-plugin; neither hook feeds a row of its own.
+BinkProxy exports no settings table or note since 3.0.1: `ReplaceMovies` is read from
+`BinkProxy.ini` and the overlay (`[BinkProxy.BinkProxy]`) at each movie open.
 
 ## Testing without the game
 

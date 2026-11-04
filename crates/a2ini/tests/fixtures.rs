@@ -104,3 +104,12 @@ fn parse_reads_as_get_private_profile() {
     assert_eq!(p.value("A", "x"), Some("3"));
     assert_eq!(p.sections, ["A", "B"]);
 }
+
+#[test]
+fn parse_skips_a_byte_order_mark() {
+    for bom in ["\u{feff}", "\u{ef}\u{bb}\u{bf}"] {
+        let p = a2ini::parse(&format!("{bom}[UI]\r\nA=1\r\n"));
+        assert_eq!(p.value("ui", "a"), Some("1"));
+        assert_eq!(p.sections, ["UI"]);
+    }
+}

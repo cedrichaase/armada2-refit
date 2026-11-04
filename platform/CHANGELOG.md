@@ -6,6 +6,16 @@ patch, and the Heroic/Proton setup, with the tools that manage them (`d3d8-chain
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. Details are in
 [`README.md`](README.md).
 
+## 4.0.1 — 2026-11-04
+
+### Fixed
+- `retire/`: `known.txt`'s `glob Sky mbg*.ini` is a new `glob-hash` entry (every version of the sky recipes any release shipped, by sha256), so a `Sky\<name>.ini` the player edited or made is not deleted; `retire.sh`, `install.sh` and `install.ps1` read the kind (an older installer skips an unknown kind).
+- `retire.sh --chain` keeps a marked `dxvk.conf` when carrying its sampler values into `Display8.ini` failed (the merge's own status was lost to a `|| true`), and says so.
+- The release installers (`install.sh`, `install.ps1`) keep a `d3d8.dll` they do not know by hash (a DXVK's, or the player's build of it) as `d3d8.dll.a2chain-backup` before putting Display8 in; the uninstall already restores that name.
+- Moved settings keys follow one precedence rule in `move-keys.py` and both release scripts (`tools/settings/README.md`, "Moved keys"): the player's value in the new file wins; the old value moves only over an empty or default one.
+
+Installed, not yet seen in game.
+
 ## 4.0.0 — 2026-11-03
 
 MAJOR: the vendored chain and `d3d8-chain.py --use` / `--upgrade` are gone.

@@ -340,6 +340,16 @@ fn bail_reason() -> Option<alloc::string::String> {
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Direct3DCreate8(sdk: u32) -> *mut c_void {
+    // A second call never starts the stub again: `stub::start` would put the stub's
+    // methods back into the `IDirect3D8` vtable a late bail-out made a forward of, and
+    // begin a new `Stub` over the one whose device exists.
+    if bail::taken() && stub::active() {
+        return bail::again(sdk);
+    }
+    if stub::active() {
+        log!("Direct3DCreate8({}) again -> another of the stub's", sdk);
+        return stub::another();
+    }
     bail::note_sdk(sdk);
     if let Some(why) = bail_reason() {
         return bail::early(sdk, &why);

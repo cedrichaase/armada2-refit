@@ -70,7 +70,8 @@ fn make(o: *mut SObj, plugin: bool) -> Option<Dx12Image8> {
 pub fn update(o: *mut SObj) {
     let Some(d) = get() else { return };
     let t = unsafe { (*o).tex() };
-    if t.dx12 == 0 {
+    // A lost device has no list to record into (`Dx::wait`); the levels stay dirty.
+    if t.dx12 == 0 || d.lost {
         return;
     }
     let dirty = t.dirty.swap(0, Ordering::AcqRel);

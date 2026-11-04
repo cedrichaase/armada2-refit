@@ -171,5 +171,24 @@ else
     bad "move-keys.py"; cat "$tmp/move.log"
 fi
 
+# The one precedence rule: a new key the player set (present, not empty, not the default)
+# wins over the old one; an empty or default new key gives way to a non-default old value.
+printf '[OSec]\nOKey=5\n' > "$mv/game/Old.ini"; printf '[Sec]\nKey=7\n' > "$mv/game/New.ini"
+python3 "$here/move-keys.py" --repo "$mv/repo" "$mv/game" >"$tmp/move3.log"
+if [ "$(python3 "$here/overlay.py" --get "$mv/game/New.ini" Sec:Key)" = 7 ] \
+        && ! python3 "$here/overlay.py" --get "$mv/game/Old.ini" OSec:OKey >/dev/null \
+        && grep -q 'is set already' "$tmp/move3.log"; then
+    ok "move-keys.py (the player's new value wins over the old key)"
+else
+    bad "move-keys.py precedence (new set)"; cat "$tmp/move3.log"
+fi
+printf '[OSec]\nOKey=5\n' > "$mv/game/Old.ini"; printf '[Sec]\nKey=\n' > "$mv/game/New.ini"
+python3 "$here/move-keys.py" --repo "$mv/repo" "$mv/game" >"$tmp/move4.log"
+if [ "$(python3 "$here/overlay.py" --get "$mv/game/New.ini" Sec:Key)" = 5 ]; then
+    ok "move-keys.py (an empty new key gives way)"
+else
+    bad "move-keys.py precedence (new empty)"; cat "$tmp/move4.log"
+fi
+
 [ "$fail" = 0 ] && echo "tools/settings/selftest.sh: all pass" || echo "tools/settings/selftest.sh: FAILED"
 exit "$fail"
