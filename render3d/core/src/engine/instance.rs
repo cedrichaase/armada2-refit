@@ -61,7 +61,13 @@ pub fn instance_scale(inst: usize) -> V3 {
 
 /// The on-screen byte `Entity::Render` sets when the frustum test passes.
 pub fn set_on_screen(o: usize) {
-    unsafe { core::ptr::write_volatile((o + off::OBJ_ON_SCREEN()) as *mut u8, 1) };
+    write_on_screen(o, 1);
+}
+
+/// Writes the on-screen byte (`+0x25`), as `GameObject::RenderInternal` writes the
+/// answer of its frustum test or of a hologram's draw.
+pub fn write_on_screen(o: usize, v: u8) {
+    unsafe { core::ptr::write_volatile((o + off::OBJ_ON_SCREEN()) as *mut u8, v) };
 }
 
 /// The team colour `GameObject::RenderInternal` hands the engine (`Storm3D+0x34`):

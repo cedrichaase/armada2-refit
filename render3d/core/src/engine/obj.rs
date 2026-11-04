@@ -66,6 +66,16 @@ pub fn expired(o: usize) -> bool {
     field_u8(o, off::OBJ_EXPIRED()) != 0
 }
 
+/// The team number (`+0xec`).
+pub fn team(o: usize) -> i32 {
+    field(o, off::OBJ_TEAM()) as i32
+}
+
+/// Distance-culled for this view (`+0x183`, written by `PreRenderAll`).
+pub fn culled(o: usize) -> bool {
+    field_u8(o, off::OBJ_CULLED()) != 0
+}
+
 /// The class object (`+0x40`).
 pub fn class(o: usize) -> usize {
     field(o, off::OBJ_CLASS())
