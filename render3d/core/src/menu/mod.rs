@@ -786,18 +786,28 @@ fn cloak_of(g: &Group, nth: usize, view: &str, prev: &str, since: f64, now: f64,
     Some(0.0)
 }
 
-/// Each ship whose decloak began this frame (fully cloaked in the last frame, part of
-/// it back in this one) is heard: its group's `CloakSound`, as the game plays a
-/// cloaking device's `offSound` when a ship decloaks. A 2D sound of the game's own
+/// A group's decloak is heard once: when its first ship's decloak begins (fully
+/// cloaked in the last frame, part of it back in this one) while every other ship of
+/// the group was still hidden, its group's `CloakSound` plays, as the game plays a
+/// cloaking device's `offSound` when a ship decloaks. The ships after it, staggered,
+/// decloak silently (one sound per ship was too much). A 2D sound of the game's own
 /// sound system (`AudioSound2D`, as the shell's buttons play theirs), so the player's
 /// effects volume applies. Nothing on the first frame of a visit, when there is no
 /// last frame to compare with.
 fn decloak_sounds(m: &Map, shot: &Shot, last: &mut Vec<Option<f32>>) {
     if last.len() == shot.ships.len() {
+        let hidden = |k: Option<f32>| matches!(k, Some(k) if k <= 0.0);
+        // Whether a ship of each group was already back (or heard) in the last frame.
+        let mut heard: Vec<bool> = m.groups.iter().map(|_| false).collect();
+        for (i, d) in m.ships.iter().enumerate() {
+            if !hidden(last[i]) {
+                heard[d.group] = true;
+            }
+        }
         for (i, (s, d)) in shot.ships.iter().zip(m.ships.iter()).enumerate() {
-            let was_hidden = matches!(last[i], Some(k) if k <= 0.0);
             let back = s.cloak.is_none_or(|k| k > 0.0);
-            if was_hidden && back {
+            if hidden(last[i]) && back && !heard[d.group] {
+                heard[d.group] = true;
                 let snd = &m.groups[d.group].cloak_sound;
                 if !snd.is_empty() {
                     crate::engine::sound::play_2d(snd);

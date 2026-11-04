@@ -4,6 +4,11 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 1.0.5 — 2026-11-04
+
+### Fixed
+- Menu scene: a decloaking group's `CloakSound` plays once per arrival, as its first ship's decloak begins, not once per ship (the Klingon campaign view played four uncloak sounds; issue #12). Installed, not yet seen in game.
+
 ## 1.0.4 — 2026-11-04
 
 ### Fixed

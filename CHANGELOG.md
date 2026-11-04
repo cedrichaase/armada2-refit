@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.22 — 2026-11-04
+
+Layers: render3d 1.0.5.
+
+### Fixed
+- render3d: the campaign menu's Klingon ships uncloak with one sound, not one each (issue #12). Installed, not yet seen in game.
+
 ## 15.6.21 — 2026-11-04
 
 Layers: gui-installer 3.1.0.
