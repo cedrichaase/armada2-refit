@@ -91,3 +91,15 @@ render3d.toml	class_node_crew	0x408	render3d/core/src/scene/instance.rs
 render3d.toml	class_node_borg	0x420	render3d/core/src/scene/instance.rs
 render3d.toml	inst_assimilated	0xa1	render3d/core/src/scene/instance.rs
 render3d.toml	light_rec_light	0x0	render3d/core/src/engine/view.rs
+render3d.particles.toml	pt_obj_effect	0x3c	render3d/mods/particles/src/hooks.rs
+render3d.particles.toml	pt_vt_craft_update	0x38	render3d/mods/particles/src/hooks.rs
+render3d.particles.toml	pt_chain_emitter	0xdc	render3d/mods/particles/src/hooks.rs
+render3d.particles.toml	pt_manheim_emitter	0xd4	render3d/mods/particles/src/hooks.rs
+render3d.particles.toml	pt_freighter_capacity	0x254	render3d/mods/particles/src/hooks.rs
+render3d.particles.toml	pt_freighter_amount	0x258	render3d/mods/particles/src/hooks.rs
+render3d.particles.toml	pt_freighter_kind	0x25c	render3d/mods/particles/src/hooks.rs
+render3d.particles.toml	pt_resource_latinum	0x3	render3d/mods/particles/src/hooks.rs
+render3d.particles.toml	pt_neb_hidden	0x1b0	render3d/mods/particles/src/hooks.rs
+render3d.particles.toml	pt_neb_intensity	0x1d0	render3d/mods/particles/src/hooks.rs
+render3d.particles.toml	pt_inst_radius	0x40	render3d/mods/particles/src/hooks.rs
+render3d.particles.toml	pt_class_database	0x1dc	render3d/mods/particles/src/hooks.rs

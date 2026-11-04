@@ -9,6 +9,7 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 ### Changed
 - Engine fields and values come from the matched build at run time (`field::X()`, `value::X()`, crates/a2engine `Engine::field`/`value`), no longer compile-time consts of `gog-1.1`: a build whose structs differ gets its own offsets, and a hook whose field the build lacks stands down (PLAN-ARCHITECTURE.md, AR-3).
 - core: the struct offsets, vtable offsets and sizes the core reads (`core/src/engine/**`, the render state and particle list of `frame/steps.rs`, the crew and Borg nodes of `scene/instance.rs`) are `field` and `value` entries of `profiles/gog-1.1/render3d.toml` (90, `core.reads`), read through `field::X()`; `DAMAGE_NODES` becomes `damage_nodes()`, `DEV_CLEAR_DEPTH`/`DEV_FLUSH` `dev_clear_depth()`/`dev_flush()`, `render_state_flag` `render_state`.
+- particles: its struct offsets and the latinum resource id are `pt_*` entries of `render3d.particles.toml` (12, `particles.reads`); the offsets it shared with the core (the current instance, the entity handle, an instance's class and database, the system bytes, a list's layout, an element's name) are read through the core's helpers (`for_each_in_list_at`, `system_bytes`, `current_instance`), and the vents' engine lights through `light::new_point_light` and `set_reach`.
 
 Installed, not yet seen in game.
 

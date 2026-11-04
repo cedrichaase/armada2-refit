@@ -112,8 +112,13 @@ pub fn object_list() -> usize { at(sym::OBJECT_LIST) }
 
 /// Walks a VC6 `std::list` whose pointer sits at `list_ptr_addr`, calling `f` with
 /// each element value (the pointer stored at node `+8`).
-pub fn for_each_in_list(list_ptr_addr: usize, mut f: impl FnMut(usize)) {
-    let list = unsafe { rd::<usize>(list_ptr_addr) };
+pub fn for_each_in_list(list_ptr_addr: usize, f: impl FnMut(usize)) {
+    for_each_in_list_at(unsafe { rd::<usize>(list_ptr_addr) }, f)
+}
+
+/// Walks the VC6 `std::list` at `list` (the list itself, as `Ordnance::ordnanceList`
+/// is: head node `+4`), calling `f` with each element value.
+pub fn for_each_in_list_at(list: usize, mut f: impl FnMut(usize)) {
     if list == 0 {
         return;
     }

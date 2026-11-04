@@ -119,6 +119,11 @@ pub fn detail_level() -> u32 {
     field(field(storm3d(), off::S3D_CONFIG()), off::CFG_DETAIL()) as u32
 }
 
+/// The database the instance draws (`GameObjectInstance+0x80`).
+pub fn instance_database(inst: usize) -> usize {
+    field(inst, off::INST_DATABASE())
+}
+
 /// The instance's class (`GameObjectInstance+0x98`), for crafts the `CraftClass`.
 pub fn instance_class(inst: usize) -> usize {
     field(inst, off::INST_CLASS())
@@ -157,6 +162,13 @@ pub fn borg_node(class: usize) -> usize {
 /// The instance's byte at `at` (a damage byte of `damage_nodes`).
 pub fn instance_byte(inst: usize, at: usize) -> u8 {
     field_u8(inst, at)
+}
+
+/// A craft instance's six system bytes, in `damage_nodes`' order and then the
+/// assimilated byte (`CraftInstance::Update` writes them).
+pub fn system_bytes() -> [usize; 6] {
+    let d = damage_nodes();
+    [d[0].1, d[1].1, d[2].1, d[3].1, d[4].1, off::INST_ASSIMILATED()]
 }
 
 /// Whether the craft is assimilated (`+0xa1`).

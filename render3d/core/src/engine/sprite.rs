@@ -100,6 +100,11 @@ pub fn colour(col: V3) -> [f32; 4] {
     [c(col.x), c(col.y), c(col.z), a.clamp(0.0, 1.0)]
 }
 
+/// The instance the engine is drawing (Storm3D +0x100), 0 for none (the global list).
+pub fn current_instance() -> usize {
+    field(storm3d(), off::S3D_CURRENT_INSTANCE())
+}
+
 /// The scale of the instance being drawn (Storm3D +0x100, its +0x28), when it is not 1.
 pub fn draw_scale() -> Option<f32> {
     let inst = field(storm3d(), off::S3D_CURRENT_INSTANCE());

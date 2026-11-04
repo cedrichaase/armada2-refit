@@ -125,3 +125,109 @@ index = 50
 target = "fn_render_particle"
 chain = true
 used_by = ["particles.particle"]
+
+[[sym]]
+id = "pt_obj_effect"
+symbol = "GameObject::billboard effect"
+kind = "field"
+struct = "GameObject"
+offset = 0x3c
+type = "ptr"
+used_by = ["particles.reads"]
+
+[[sym]]
+id = "pt_vt_craft_update"
+symbol = "CraftInstance::Update slot"
+kind = "field"
+struct = "CraftInstance vftable"
+offset = 0x38
+type = "ptr"
+used_by = ["particles.reads"]
+
+[[sym]]
+id = "pt_chain_emitter"
+symbol = "ChainPulsar::free emitter"
+kind = "field"
+struct = "ChainPulsar"
+offset = 0xdc
+type = "ptr"
+used_by = ["particles.reads"]
+
+[[sym]]
+id = "pt_manheim_emitter"
+symbol = "ManheimEffect::free emitter"
+kind = "field"
+struct = "ManheimEffect"
+offset = 0xd4
+type = "ptr"
+used_by = ["particles.reads"]
+
+[[sym]]
+id = "pt_freighter_capacity"
+symbol = "Freighter::class capacities"
+kind = "field"
+struct = "Freighter"
+offset = 0x254
+type = "ptr"
+used_by = ["particles.reads"]
+
+[[sym]]
+id = "pt_freighter_amount"
+symbol = "Freighter::amount carried"
+kind = "field"
+struct = "Freighter"
+offset = 0x258
+type = "f32"
+used_by = ["particles.reads"]
+
+[[sym]]
+id = "pt_freighter_kind"
+symbol = "Freighter::resource carried"
+kind = "field"
+struct = "Freighter"
+offset = 0x25c
+type = "u32"
+used_by = ["particles.reads"]
+
+[[sym]]
+id = "pt_resource_latinum"
+symbol = "eResource latinum"
+kind = "value"
+value = 0x3
+used_by = ["particles.reads"]
+
+[[sym]]
+id = "pt_neb_hidden"
+symbol = "Nebula::hidden"
+kind = "field"
+struct = "Nebula"
+offset = 0x1b0
+type = "u8"
+used_by = ["particles.reads"]
+
+[[sym]]
+id = "pt_neb_intensity"
+symbol = "Nebula::intensity"
+kind = "field"
+struct = "Nebula"
+offset = 0x1d0
+type = "f32"
+used_by = ["particles.reads"]
+
+[[sym]]
+id = "pt_inst_radius"
+symbol = "ST3D_Instance::radius"
+kind = "field"
+struct = "ST3D_Instance"
+offset = 0x40
+type = "f32"
+used_by = ["particles.reads"]
+
+[[sym]]
+id = "pt_class_database"
+symbol = "CraftClass::main database"
+kind = "field"
+struct = "CraftClass"
+offset = 0x1dc
+type = "ptr"
+used_by = ["particles.reads"]
