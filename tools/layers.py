@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The layer registry's one reader (layers.toml, at the repository root).
 
-    tools/layers.py --list                        the layers: id, select, requires, scope
+    tools/layers.py --list                        the game's layers: id, select, requires, scope
     tools/layers.py --resolve [--only a,b] [--without a,b]
                                                   the layers a run installs, one id a line:
                                                   every core and `on` layer by default;
@@ -16,7 +16,14 @@
     tools/layers.py --json                        the registry as JSON (publish/package.sh)
     tools/layers.py --check                       the registry against a2mod, the release
                                                   scripts' ::step ids, package.sh's steps
-                                                  and the GUI installer's STEPS and STATUS
+                                                  and the GUI installer's STEPS and STATUS,
+                                                  and against the game descriptors
+                                                  (games/<id>.toml)
+    --game ID                                     the game (default: A2_PROFILE, else the
+                                                  default descriptor; a2env.py): --list and
+                                                  --resolve offer only the layers its
+                                                  descriptor lists, and a game that is not
+                                                  offered is refused
 
 A refused selection (an unknown id, a layer that is not offered, a requirement taken out)
 exits 2 with the reason. Python 3.11 or newer (tomllib); nothing outside the standard
@@ -24,6 +31,7 @@ library, so a2mod and the bench import it as a module (`load`, `resolve`, `class
 """
 import ast
 import fnmatch
+import glob
 import importlib.machinery
 import importlib.util
 import json
@@ -33,6 +41,8 @@ import sys
 import tomllib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+import a2env  # noqa: E402  (the game descriptors: games/<id>.toml)
 REGISTRY = os.path.join(ROOT, 'layers.toml')
 SELECTS = ('core', 'on', 'off', 'retired')
 SCOPES = ('local', 'match')
@@ -72,14 +82,34 @@ def _ids(s):
     return [w for w in re.split(r'[,\s]+', s or '') if w]
 
 
-def resolve(reg, only=None, without=None):
-    """The ids a run installs, in registry order. `only`/`without`: lists of ids, or None."""
+def game_layers(game=None):
+    """(id, the layer ids its descriptor offers) of a game (default: a2env's, the chosen
+    one); Refused for an unknown game."""
+    gid = game or a2env.GAME_ID
+    try:
+        desc = a2env.load(gid)
+    except a2env.GameError as e:
+        raise Refused(str(e))
+    return gid, desc
+
+
+def resolve(reg, only=None, without=None, game=None):
+    """The ids a run installs, in registry order. `only`/`without`: lists of ids, or None.
+    `game`: the game's id (default: the chosen one); only the layers its descriptor
+    offers are installed, and a game not offered is refused."""
+    gid, desc = game_layers(game)
+    if not desc.get('offered'):
+        raise Refused(f'{gid}: not offered yet (games/{gid}.toml)')
+    mine = set(desc.get('layers', []))
     ids = by_id(reg)
-    offered = [lay['id'] for lay in reg['layer'] if lay['select'] in ('on', 'off')]
-    core = [lay['id'] for lay in reg['layer'] if lay['select'] == 'core']
+    offered = [lay['id'] for lay in reg['layer'] if lay['select'] in ('on', 'off') and lay['id'] in mine]
+    core = [lay['id'] for lay in reg['layer'] if lay['select'] == 'core' and lay['id'] in mine]
     for i in (only or []) + (without or []):
         if i not in ids:
             raise Refused(f'{i}: no such layer (tools/layers.py --list)')
+    for i in only or []:
+        if ids[i]['select'] != 'retired' and i not in mine:
+            raise Refused(f'{i}: not a layer of {gid} (games/{gid}.toml)')
     for i in only or []:
         if ids[i]['select'] == 'retired':
             raise Refused(f'{i}: a {ids[i]["select"]} layer, not offered')
@@ -108,11 +138,12 @@ def resolve(reg, only=None, without=None):
     return [lay['id'] for lay in reg['layer'] if lay['id'] in want]
 
 
-def commands(reg, selected):
-    """(verb, id, command) for ./install: the removes of every offered layer left out,
-    then the installs of the selected, in registry order. A command two layers share
-    (rules on qol's installer) runs once, and is not removed while a selected layer
+def commands(reg, selected, game=None):
+    """(verb, id, command) for ./install: the removes of every offered layer of the game
+    left out, then the installs of the selected, in registry order. A command two layers
+    share (rules on qol's installer) runs once, and is not removed while a selected layer
     installs it."""
+    mine = set(game_layers(game)[1].get('layers', []))
     ids = by_id(reg)
     sel = set(selected)
     inst = [(i, c) for i in selected for c in ids[i]['install']]
@@ -121,7 +152,7 @@ def commands(reg, selected):
     keep = {c for i in selected for c in ids[i]['remove']}
     out, seen = [], set()
     for lay in reg['layer']:
-        if lay['select'] in ('on', 'off') and lay['id'] not in sel:
+        if lay['select'] in ('on', 'off') and lay['id'] not in sel and lay['id'] in mine:
             for c in lay['remove']:
                 if c in keep or c in seen:
                     continue
@@ -253,10 +284,12 @@ def _check_a2mod(reg, errs):
         errs.append(f'a2mod: ADDED has {len(m.ADDED)} patterns, the registry {len(added)}')
     if tuple(m.BACKUPS) != backup_suffixes(reg):
         errs.append(f'a2mod: BACKUPS {m.BACKUPS} is not the registry\'s {backup_suffixes(reg)}')
-    # What a2mod would file a few known files under.
-    for rel, suffix, i in [('Textures/RGB/Mnebula4.tga', BACKUP, 'textures'),
-                           ('Textures/RGB/Curs_Arrow.tga', BACKUP, 'hud'),
-                           ('Textures/RGB/FontFinal4_12.tga', '.a2font-backup', 'hud'),
+    # What a2mod would file a few known files under (the textures where the default
+    # game keeps them).
+    tex = a2env.load(a2env.default_id())['assets']['textures'][0]
+    for rel, suffix, i in [(f'{tex}/Mnebula4.tga', BACKUP, 'textures'),
+                           (f'{tex}/Curs_Arrow.tga', BACKUP, 'hud'),
+                           (f'{tex}/FontFinal4_12.tga', '.a2font-backup', 'hud'),
                            ('misc/gui_fed.cfg', BACKUP, 'hud'),
                            ('SOD/logo.SOD', BACKUP, 'models'),
                            ('binkw32.dll', BACKUP, 'cutscenes'),
@@ -311,10 +344,94 @@ def _check_release(reg, errs):
         errs.append(f'gui-installer: STEPS {gsteps} does not hold [release] steps {want} in order')
 
 
+# The game descriptors (games/README.md): what every one must hold, and its type.
+GAME_FIELDS = {
+    'schema': int, 'id': str, 'label': str, 'offered': bool, 'default': bool, 'layers': list,
+    'exe.names': list, 'exe.data_dir': str,
+    'install.heroic': list, 'install.gog': list, 'install.folder': str, 'install.prefix': str,
+    'settings.kind': str, 'settings.file': str, 'settings.keep': list,
+    'display.shell': list, 'display.hud_canvas': list,
+    'assets.textures': list, 'paths.stem': str,
+}
+SETTINGS_KINDS = ('armada-prf', 'fo-settings-xml')
+
+
+def _field(d, dotted):
+    for k in dotted.split('.'):
+        if not isinstance(d, dict) or k not in d:
+            return None
+        d = d[k]
+    return d
+
+
+def _check_games(reg, errs):
+    """Every `games` entry names a descriptor, every descriptor's layers exist and list
+    it back, one descriptor is the default, the profiles' builds name a descriptor and
+    one of its executables, and a2env's built-in fallback is the default descriptor."""
+    gids = a2env.game_ids()
+    descs = {}
+    for g in gids:
+        d = a2env.load(g)
+        descs[g] = d
+        for f, typ in GAME_FIELDS.items():
+            v = _field(d, f)
+            if not isinstance(v, typ):
+                errs.append(f'games/{g}.toml: {f} is missing or not a {typ.__name__}')
+        if d.get('id') != g:
+            errs.append(f'games/{g}.toml: id {d.get("id")!r} is not its file name')
+        if _field(d, 'settings.kind') not in SETTINGS_KINDS:
+            errs.append(f'games/{g}.toml: settings.kind is none of {", ".join(SETTINGS_KINDS)}')
+        for f in ('display.shell', 'display.hud_canvas'):
+            v = _field(d, f)
+            if isinstance(v, list) and not (len(v) == 2 and all(isinstance(x, int) and x > 0 for x in v)):
+                errs.append(f'games/{g}.toml: {f} is not [width, height]')
+        if not _field(d, 'exe.names'):
+            errs.append(f'games/{g}.toml: exe.names is empty')
+    defaults = [g for g, d in descs.items() if d.get('default')]
+    if len(defaults) != 1:
+        errs.append(f'games/: {len(defaults)} descriptors are marked default, not one')
+    ids = by_id(reg)
+    for lay in reg.get('layer', []):
+        for g in lay.get('games', []):
+            if g not in descs:
+                errs.append(f'{lay["id"]}: games names {g}, which has no games/{g}.toml')
+            elif lay['select'] != 'retired' and lay['id'] not in descs[g].get('layers', []):
+                errs.append(f'{lay["id"]}: games names {g}, whose descriptor does not offer it')
+    for g, d in descs.items():
+        for i in d.get('layers', []):
+            if i not in ids:
+                errs.append(f'games/{g}.toml: layer {i}: no such layer')
+            elif ids[i]['select'] == 'retired':
+                errs.append(f'games/{g}.toml: layer {i} is retired')
+            elif g not in ids[i].get('games', []):
+                errs.append(f'games/{g}.toml: layer {i} does not list {g} in its games')
+    # The engine profiles: each build belongs to a described game, by one of its exes.
+    for bt in sorted(glob.glob(os.path.join(ROOT, 'profiles', '*', 'build.toml'))):
+        with open(bt, 'rb') as fh:
+            b = tomllib.load(fh)
+        rel = os.path.relpath(bt, ROOT)
+        d = descs.get(b.get('game'))
+        if d is None:
+            errs.append(f'{rel}: game {b.get("game")!r} has no games/<id>.toml')
+            continue
+        for x in b.get('exe', []):
+            if x not in (_field(d, 'exe.names') or []):
+                errs.append(f'{rel}: exe {x} is not one of games/{b["game"]}.toml exe.names')
+    # a2env's fallback, for the release package that ships a2env.py without games/.
+    if len(defaults) == 1:
+        d = descs[defaults[0]]
+        for f in ('id', 'label', 'offered', 'default', 'exe.names', 'exe.data_dir',
+                  'install.folder', 'install.prefix', 'paths.stem'):
+            if _field(a2env._BUILTIN, f) != _field(d, f):
+                errs.append(f'a2env.py: _BUILTIN {f} {_field(a2env._BUILTIN, f)!r} is not '
+                            f'games/{defaults[0]}.toml\'s {_field(d, f)!r}')
+
+
 def check(reg):
     errs = []
     _check_registry(reg, errs)
     if not errs:
+        _check_games(reg, errs)
         _check_a2mod(reg, errs)
         _check_release(reg, errs)
     return errs
@@ -322,9 +439,13 @@ def check(reg):
 
 # --- the command line -------------------------------------------------------------------
 
-def _table(reg):
+def _table(reg, game=None):
+    gid = game_layers(game)[0]
     rows = [(lay['id'], lay['select'], ','.join(lay['requires']) or '-', lay['scope'],
-             lay['summary']) for lay in reg['layer']]
+             lay['summary']) for lay in reg['layer'] if gid in lay['games']]
+    if not rows:
+        print(f'{gid}: no layers yet (games/{gid}.toml)')
+        return
     w = [max(len(r[k]) for r in rows) for k in range(4)]
     for r in rows:
         print('  '.join(r[k].ljust(w[k]) for k in range(4)) + '  ' + r[4])
@@ -342,13 +463,20 @@ def main(argv):
     ap.add_argument('--only', metavar='A,B')
     ap.add_argument('--without', metavar='A,B')
     ap.add_argument('--commands', action='store_true')
+    ap.add_argument('--game', metavar='ID', help='the game (games/<id>.toml); default A2_PROFILE')
     ap.add_argument('--registry', default=REGISTRY, help=argparse.SUPPRESS)
     a = ap.parse_args(argv)
+    if a.game is not None and not (a.list or a.resolve):
+        ap.error('--game goes with --list and --resolve')
     if (a.only is not None or a.without is not None or a.commands) and not a.resolve:
         ap.error('--only, --without and --commands go with --resolve')
     reg = load(a.registry)
     if a.list:
-        _table(reg)
+        try:
+            _table(reg, a.game)
+        except Refused as e:
+            print(f'refused: {e}', file=sys.stderr)
+            sys.exit(2)
     elif a.json:
         json.dump({'schema': reg['schema'], 'release': reg['release'], 'layers': reg['layer']},
                   sys.stdout, indent=1)
@@ -367,17 +495,17 @@ def main(argv):
             print('layers:', e, file=sys.stderr)
         if errs:
             sys.exit(1)
-        print(f'layers: {len(reg["layer"])} layers; a2mod, install.sh, install.ps1, package.sh '
-              f'and the GUI installer agree')
+        print(f'layers: {len(reg["layer"])} layers, {len(a2env.game_ids())} games; a2mod, '
+              f'install.sh, install.ps1, package.sh, the GUI installer and games/ agree')
     else:
         try:
             sel = resolve(reg, _ids(a.only) if a.only is not None else None,
-                          _ids(a.without) if a.without is not None else None)
+                          _ids(a.without) if a.without is not None else None, a.game)
         except Refused as e:
             print(f'refused: {e}', file=sys.stderr)
             sys.exit(2)
         if a.commands:
-            for verb, i, c in commands(reg, sel):
+            for verb, i, c in commands(reg, sel, a.game):
                 print(f'{verb}\t{i}\t{c}')
         else:
             print('\n'.join(sel))

@@ -19,6 +19,16 @@ Every plugin logs, right after its version line:
     engine: build armada2/gog-1.1                (or: engine: unknown build)
     engine: symbols: 15/15 resolved; 0 hooks blocked
 
+**The executable's name** in these lines and in the notes is not a literal of the
+resolver: it is the matched build's `exe` (the first of `build.toml`'s list, which
+`gen.py` emits as `Build.exe`), or, when no build matches, the process's own module file
+name (`GetModuleFileNameA`, read through `Image::name`; `a2e_start`'s `module` in C), or
+`exe` when there is none (a buffer). The line keeps its shape, `engine: <exe> timestamp
+...`, so the bench and the tools that read it work for any game; plugins that log it once
+over several tables recognise it with `a2engine::is_identity_line`. `Engine::exe()` gives
+the name and `Engine::game()` the table's game (`armada2`), which names its descriptor in
+[`games/`](../../games/README.md).
+
 ## The profiles
 
 A profile is keyed by **(game, build)**. Armada II's are in `profiles/<build>/` at the
@@ -45,7 +55,7 @@ schema = 1
 game = "armada2"
 build = "gog-1.1"
 label = "Star Trek: Armada II 1.1 (GOG)"
-exe = ["Armada2.exe"]
+exe = ["Armada2.exe"]             # one of games/<game>.toml exe.names; the first is logged
 inherits = ""                     # or another build of the same game
 content = "stock"
 [pe]
@@ -204,10 +214,11 @@ with *why* one of `is not stock (bytes differ)`, `calls something else`, `is cha
 (`engine: <hook>: <symbol> at 0x.. calls 0x.. (chained)`) only when the hook is ready.
 
 **Notes** (at most 120 characters): `Stands down: <symbol> is not stock in this
-Armada2.exe`, `Stands down: <symbol> is changed by <build>, not yet verified`,
+<exe>`, `Stands down: <symbol> is changed by <build>, not yet verified`,
 `Stands down: off in <build>: <why>`, `Stands down: <symbol>: test mismatch
-(A2EngineTest.ini)`, and for a whole plugin on an unknown build `This Armada2.exe is a
-build Refit does not know: it runs stock`.
+(A2EngineTest.ini)`, and for a whole plugin on an unknown build `This <exe> is a
+build Refit does not know: it runs stock`, `<exe>` named as in the identity line
+(`Armada2.exe` on Armada II).
 
 ### The test mismatch file
 

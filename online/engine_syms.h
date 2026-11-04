@@ -95,7 +95,7 @@ static const A2EBlock online_b0_blocked[] = {
     {0xffff, 0, 0, 0}
 };
 static const A2EBuild online_builds[] = {
-    {"gog-1.1", "armada2/gog-1.1", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, online_b0_entries, online_b0_blocked, 0, 13},
+    {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, online_b0_entries, online_b0_blocked, 0, 13},
 };
 
 static A2E_U8 online_hook_state[1];

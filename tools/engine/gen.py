@@ -140,6 +140,7 @@ def emit_rs(t):
         o.append('    a2engine::Build {')
         o.append(f'        name: "{esc(bb.name)}",')
         o.append(f'        key: "{esc(bb.key)}",')
+        o.append(f'        exe: "{esc(bb.exe)}",')
         o.append(f'        timestamp: {p.get("timestamp", 0):#x},')
         o.append(f'        image_size: {p.get("image_size", 0):#x},')
         o.append(f'        sections: {p.get("sections", 0):#010x},')
@@ -266,7 +267,7 @@ def emit_c(t):
     for bi, b in enumerate(t.builds):
         bb = b['build']
         pe_ = bb.pe
-        o.append(f'    {{"{esc(bb.name)}", "{esc(bb.key)}", 0x{pe_.get("timestamp", 0):x}, 0x{pe_.get("image_size", 0):x}, '
+        o.append(f'    {{"{esc(bb.name)}", "{esc(bb.key)}", "{esc(bb.exe)}", 0x{pe_.get("timestamp", 0):x}, 0x{pe_.get("image_size", 0):x}, '
                  f'0x{pe_.get("sections", 0):08x}, 0x{pe_.get("image_base", 0):x}, {p}_b{bi}_entries, {p}_b{bi}_blocked, '
                  f'{len(b["blocked"])}, {n_resolved(t, b)}}},')
     nh, ns = len(t.hooks), len(t.sym_ids)

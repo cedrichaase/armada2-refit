@@ -23,7 +23,8 @@ The format, the generated code and the resolver are described in
 `fixtures/NN-name.toml`: a synthetic image (`[image]`: timestamp, image base and size,
 sections, and the bytes, calls and words memory holds), the profile set it is resolved
 against (`set`, a directory of `fixtures/sets/`), optionally `base` (where it is mapped),
-`test_ini`, `addr` (symbol ids queried after the readies) and `note_for` rows, and
+`module` (the process's module file name, which an unknown build is logged under;
+default `Fixture.exe`, while a matched build is logged under its `exe`), `test_ini`, `addr` (symbol ids queried after the readies) and `note_for` rows, and
 `[expect]`: per plugin table, the transcript every resolver prints:
 
     <init's log lines>

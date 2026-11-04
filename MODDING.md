@@ -145,7 +145,11 @@ a C header. The format, the resolver and the lints are described in
 [`tools/engine/README.md`](tools/engine/README.md).
 
 - A profile is keyed by **(game, build)**. Armada II's are in `profiles/<build>/`
-  (`gog-1.1` today); another game's would be in `<game>/profiles/<build>/`.
+  (`gog-1.1` today); another game's would be in `<game>/profiles/<build>/`. The game is
+  one of [`games/`](games/README.md)'s descriptors (`games/<id>.toml`), which the tools
+  read for its executable, its folders, its settings file and the layers on offer; a
+  build's `exe` must be one of its descriptor's `exe.names`
+  (`tools/layers.py --check`).
 - A build is recognised by three numbers read from the process's own PE headers: the
   timestamp, the image size and a fingerprint of the section table. All three must
   match; the timestamp alone is never the key (Fleet Operations: Roots shares stock's).
@@ -154,7 +158,9 @@ a C header. The format, the resolver and the lints are described in
   **entries** (function, call, jmp, slot, label, patch, scan, vtable, global, field,
   value), each tied by `used_by` to a hook. A `check` signature is at most 32 bytes.
 - **At start-up** the plugin identifies the executable, picks the profile, relocates,
-  and logs `engine: build armada2/gog-1.1` and `symbols: N/M resolved; H hooks blocked`.
+  and logs `engine: <exe> timestamp ...` (the executable named by the build's
+  `build.toml` `exe`, or on an unknown build by the process's own file name),
+  `engine: build armada2/gog-1.1` and `symbols: N/M resolved; H hooks blocked`.
   Before a hook writes anything, `ready(hook)` checks its entries in live memory. A
   hook that fails stands down alone and logs `engine: <hook> stands down: <symbol> <why>`;
   the rest of the plugin runs. On an unknown build only hooks that resolve by scan, and
@@ -163,7 +169,7 @@ a C header. The format, the resolver and the lints are described in
 **How a new build gets a profile.**
 
 1. Identify it. Start the game with any plugin of ours and read the log's
-   `engine: Armada2.exe timestamp ..., image size ..., sections ...` line, or run
+   `engine: <exe> timestamp ..., image size ..., sections ...` line, or run
    `./a2test syms --exe <path>` on the file, read only. It says `unknown build` and lists
    the hooks that stood down.
 2. Make `profiles/<build>/build.toml` with that identity. If the build is another

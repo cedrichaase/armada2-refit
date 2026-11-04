@@ -111,6 +111,9 @@ pub struct Build {
     pub name: &'static str,
     /// `armada2/gog-1.1`.
     pub key: &'static str,
+    /// The executable's name (build.toml's first `exe`, `Armada2.exe`): what the
+    /// identity line and the notes name in this build.
+    pub exe: &'static str,
     pub timestamp: u32,
     pub image_size: u32,
     pub sections: u32,
@@ -182,6 +185,10 @@ pub struct Runtime {
     pub(crate) base: AtomicUsize,
     pub(crate) mem: UnsafeCell<Option<&'static dyn crate::pe::Image>>,
     pub(crate) log: UnsafeCell<Option<fn(&str)>>,
+    /// The executable's name as logged (the build's, else the module's), and the plugin
+    /// note that names it; written in `init`.
+    pub(crate) exe: Note,
+    pub(crate) plugin_note: Note,
 }
 
 // `mem` and `log` are written once, in `init`, before `build` is published.
@@ -205,6 +212,8 @@ impl Runtime {
             base: AtomicUsize::new(0),
             mem: UnsafeCell::new(None),
             log: UnsafeCell::new(None),
+            exe: Note::new(),
+            plugin_note: Note::new(),
         }
     }
 }

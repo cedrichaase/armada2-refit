@@ -184,17 +184,14 @@ fn started() -> &'static [(&'static str, &'static a2engine::Table)] {
 }
 
 /// The resolvers log the identity, the build and the test line once per table; render3d
-/// logs the identity itself (`start`), the core table its build, summary and test line,
-/// and each module's table only its own summary, named.
+/// logs the core table's (the identity line names the executable by its build, else by
+/// the module's name), and each module's table only its own summary, named.
 fn table_log(s: &str) {
-    if s.starts_with("engine: Armada2.exe") {
-        return;
-    }
     if STARTING_CORE.load(Ordering::Relaxed) {
         crate::log!("{}", s);
     } else if let Some(rest) = s.strip_prefix("engine: symbols:") {
         crate::log!("engine: {} symbols:{}", unsafe { STARTING }, rest);
-    } else if !(s.starts_with("engine: build ") || s == "engine: unknown build" || s.starts_with("engine: TEST:")) {
+    } else if !(a2engine::is_identity_line(s) || s.starts_with("engine: build ") || s == "engine: unknown build" || s.starts_with("engine: TEST:")) {
         crate::log!("{}", s);
     }
 }

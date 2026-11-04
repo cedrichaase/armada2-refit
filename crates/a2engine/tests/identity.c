@@ -44,15 +44,19 @@ int main(void)
     unsigned char img[1024];
     unsigned len = build(img, 0x3c4c76bd, 0x3fa000, stock, 4, 0x10b);
     A2Identity id;
-    char line[120];
+    char line[160];
 
     CHECK(a2e_parse(img, len, 0, &id));
     CHECK(id.timestamp == 0x3c4c76bd);
     CHECK(id.image_size == 0x3fa000);
     CHECK(id.sections == 0xa6b2c1cf);
     CHECK(id.code_lo == 0x1000 && id.code_hi == 0x1000 + 0x2ad000);
-    a2e_line(line, &id);
+    a2e_line(line, "Armada2.exe", &id);
     CHECK(strcmp(line, "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa6b2c1cf") == 0);
+    a2e_line(line, "ArmadaL.exe", &id);    /* the name is the build's or the module's */
+    CHECK(strcmp(line, "engine: ArmadaL.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa6b2c1cf") == 0);
+    a2e_line(line, 0, &id);
+    CHECK(strcmp(line, "engine: exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa6b2c1cf") == 0);
 
     CHECK(!a2e_parse(img, 0x3f, 0, &id));
     CHECK(!a2e_parse(img, 0x90, 0, &id));

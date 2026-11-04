@@ -5,6 +5,22 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.7.0 — 2026-11-04
+
+Layers: display 1.0.6, ui 2.2.5, render3d 1.0.5, qol 2.2.3, rules 1.0.3, online 0.11.2, cutscenes 3.0.2, testbench 4.2.0.
+
+### Added
+- `games/`: one descriptor per game (`games/<id>.toml`; `games/README.md`): the label, executables and data folder, Heroic and GOG ids, default folder and prefix names, settings file kind, shell resolution and HUD canvas, texture roots, data directory stem and the layers on offer. `armada2.toml` is the default; `fo-roots.toml` is a stub, `offered = false`, whose paths resolve (`Data/ArmadaL.exe`).
+- `A2_PROFILE` and `--game <id>` choose the game in `a2env.py`, `a2env.sh`, `a2mod`, `./install`, `./a2test` and `tools/layers.py`; the default is `armada2`, which resolves the same paths as before. `a2env` also gives `A2_PROFILE` and `A2_EXE`, and the config file takes a `[<id>]` section per other game. `python3 a2env.py --list` lists the games.
+- `tools/layers.py --check` checks the descriptors: every `games` entry names one, every descriptor's layers exist and list it back, one is the default, every `profiles/*/build.toml` names a described game and one of its executables, and `a2env.py`'s built-in default (for the release package, which ships `a2env.py` alone) matches its descriptor.
+
+### Changed
+- `a2env.sh` takes its values from `a2env.py` (`--sh`), so the two are no longer kept in step by hand; the environment variables and `~/.config/armada2-refit.conf` work as before.
+- `tools/layers.py --resolve` and `./install` offer only the chosen game's layers and refuse a game that is not offered; `a2mod` reads the executable to look for and the player's files it never switches (`ARMADA.PRF`, `RTS_CFG.h`) from the descriptor.
+- The resolver (`crates/a2engine`, `csdk/a2engine.h`, `tools/engine/resolve.py`) has no `Armada2.exe` literal: the identity line (`engine: <exe> timestamp ...`) and the notes name the matched build's `exe`, which `tools/engine/gen.py` now emits into each table (`Build.exe`), or the process's module file name on an unknown build. `a2engine::is_identity_line`, `Engine::exe()` and `Engine::game()` are new; the fixtures gain a `module`. The generated tables are regenerated.
+
+Installed, not yet seen in game.
+
 ## 15.6.21 — 2026-11-04
 
 Layers: gui-installer 3.1.0.

@@ -32,7 +32,7 @@ word = [
 
 [expect]
 p = [
-  "engine: Armada2.exe timestamp 0x5eed0001, image size 0x6800, sections 0x777d215e",
+  "engine: Fixture.exe timestamp 0x5eed0001, image size 0x6800, sections 0x777d215e",
   "engine: unknown build",
   "engine: symbols: 0/14 resolved; 0 hooks blocked",
   "engine: p.fnhook stands down: One::f1 unknown build",
@@ -47,16 +47,16 @@ p = [
   "ready p.wrongslot fail",
   "engine: p.badcheck stands down: One::f2 unknown build",
   "ready p.badcheck fail",
-  "note p.fnhook This Armada2.exe is a build Refit does not know: it runs stock",
-  "note p.chained This Armada2.exe is a build Refit does not know: it runs stock",
-  "note p.wrongcall This Armada2.exe is a build Refit does not know: it runs stock",
-  "note p.slothook This Armada2.exe is a build Refit does not know: it runs stock",
-  "note p.wrongslot This Armada2.exe is a build Refit does not know: it runs stock",
-  "note p.badcheck This Armada2.exe is a build Refit does not know: it runs stock",
-  "note_plugin This Armada2.exe is a build Refit does not know: it runs stock",
+  "note p.fnhook This Fixture.exe is a build Refit does not know: it runs stock",
+  "note p.chained This Fixture.exe is a build Refit does not know: it runs stock",
+  "note p.wrongcall This Fixture.exe is a build Refit does not know: it runs stock",
+  "note p.slothook This Fixture.exe is a build Refit does not know: it runs stock",
+  "note p.wrongslot This Fixture.exe is a build Refit does not know: it runs stock",
+  "note p.badcheck This Fixture.exe is a build Refit does not know: it runs stock",
+  "note_plugin This Fixture.exe is a build Refit does not know: it runs stock",
 ]
 s = [
-  "engine: Armada2.exe timestamp 0x5eed0001, image size 0x6800, sections 0x777d215e",
+  "engine: Fixture.exe timestamp 0x5eed0001, image size 0x6800, sections 0x777d215e",
   "engine: unknown build",
   "engine: symbols: 3/3 resolved; 0 hooks blocked",
   "ready s.scan1 ok",
@@ -64,7 +64,7 @@ s = [
   "ready s.scan0 fail",
   "engine: s.scan2 stands down: Two::twice is found 2 times, not 1",
   "ready s.scan2 fail",
-  "note s.scan0 Stands down: Two::missing is not stock in this Armada2.exe",
-  "note s.scan2 Stands down: Two::twice is not stock in this Armada2.exe",
-  "note_plugin This Armada2.exe is a build Refit does not know: it runs stock",
+  "note s.scan0 Stands down: Two::missing is not stock in this Fixture.exe",
+  "note s.scan2 Stands down: Two::twice is not stock in this Fixture.exe",
+  "note_plugin This Fixture.exe is a build Refit does not know: it runs stock",
 ]

@@ -346,7 +346,7 @@ static const A2EBlock qolrules_b0_blocked[] = {
     {0xffff, 0, 0, 0}
 };
 static const A2EBuild qolrules_builds[] = {
-    {"gog-1.1", "armada2/gog-1.1", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qolrules_b0_entries, qolrules_b0_blocked, 0, 63},
+    {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qolrules_b0_entries, qolrules_b0_blocked, 0, 63},
 };
 
 static A2E_U8 qolrules_hook_state[2];

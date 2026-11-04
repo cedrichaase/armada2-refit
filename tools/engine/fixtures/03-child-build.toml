@@ -40,7 +40,7 @@ s = "stock"
 
 [expect]
 p = [
-  "engine: Armada2.exe timestamp 0x5eed0001, image size 0x7000, sections 0xa56c4602",
+  "engine: Test.exe timestamp 0x5eed0001, image size 0x7000, sections 0xa56c4602",
   "engine: build test/b2",
   "engine: symbols: 7/14 resolved; 2 hooks blocked",
   "engine: p.fnhook stands down: One::caller is changed by b2 (not yet verified)",
@@ -57,13 +57,13 @@ p = [
   "addr f2 0x401100",
   "note p.fnhook Stands down: One::caller is changed by b2, not yet verified",
   "note p.chained Stands down: off in b2: b2 has its own",
-  "note p.wrongcall Stands down: One::caller is not stock in this Armada2.exe",
-  "note p.wrongslot Stands down: One::vftable is not stock in this Armada2.exe",
+  "note p.wrongcall Stands down: One::caller is not stock in this Test.exe",
+  "note p.wrongslot Stands down: One::vftable is not stock in this Test.exe",
   "note_for Graphics.Thing -",
   "note_plugin -",
 ]
 s = [
-  "engine: Armada2.exe timestamp 0x5eed0001, image size 0x7000, sections 0xa56c4602",
+  "engine: Test.exe timestamp 0x5eed0001, image size 0x7000, sections 0xa56c4602",
   "engine: build test/b2",
   "engine: symbols: 3/3 resolved; 0 hooks blocked",
   "ready s.scan1 ok",
@@ -71,8 +71,8 @@ s = [
   "ready s.scan0 fail",
   "engine: s.scan2 stands down: Two::twice is found 2 times, not 1",
   "ready s.scan2 fail",
-  "note s.scan0 Stands down: Two::missing is not stock in this Armada2.exe",
-  "note s.scan2 Stands down: Two::twice is not stock in this Armada2.exe",
+  "note s.scan0 Stands down: Two::missing is not stock in this Test.exe",
+  "note s.scan2 Stands down: Two::twice is not stock in this Test.exe",
   "note_for Graphics.Thing -",
   "note_plugin -",
 ]

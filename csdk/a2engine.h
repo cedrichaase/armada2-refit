@@ -67,7 +67,7 @@ typedef struct A2EEntry {
 typedef struct A2EBlock { A2E_U16 hook; const char *symbol, *why, *note; } A2EBlock;
 
 typedef struct A2EBuild {
-    const char *name, *key;
+    const char *name, *key, *exe;      /* exe: build.toml's first `exe`, for the log */
     A2E_U32 timestamp, image_size, sections, image_base;
     const A2EEntry *entries;
     const A2EBlock *blocked;
@@ -159,9 +159,10 @@ static inline int a2e_parse(const A2E_U8 *img, A2E_U32 avail, A2E_U32 base, A2Id
     return 1;
 }
 
-/* "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0x<fnv>":
- * the line every plugin logs right after its version line, the same in all of them.
- * out needs 100 bytes. */
+/* "engine: <exe> timestamp 0x3c4c76bd, image size 0x3fa000, sections 0x<fnv>": the
+ * line every plugin logs right after its version line, the same in all of them. <exe> is
+ * the matched build's executable (build.toml `exe`), else the process's module file
+ * name (a2e_module_name).  out needs 100 bytes plus the name's length (at most 63). */
 static inline void a2e_hex(char *d, A2E_U32 v, int digits)
 {
     int i, shift;
@@ -175,12 +176,15 @@ static inline void a2e_hex(char *d, A2E_U32 v, int digits)
     *d = 0;
 }
 
-static inline void a2e_line(char *out, const A2Identity *id)
+static inline void a2e_line(char *out, const char *exe, const A2Identity *id)
 {
-    static const char a[] = "engine: Armada2.exe timestamp ", b[] = ", image size ", c[] = ", sections ";
+    static const char a[] = "engine: ", a2[] = " timestamp ", b[] = ", image size ", c[] = ", sections ";
     char *d = out;
     const char *s;
+    int n = 0;
     for (s = a; *s; s++) *d++ = *s;
+    for (s = exe && *exe ? exe : "exe"; *s && n < 63; s++, n++) *d++ = *s;
+    for (s = a2; *s; s++) *d++ = *s;
     a2e_hex(d, id->timestamp, 8); while (*d) d++;
     for (s = b; *s; s++) *d++ = *s;
     a2e_hex(d, id->image_size, 0); while (*d) d++;
@@ -194,7 +198,10 @@ static inline void a2e_line(char *out, const A2Identity *id)
  * and tools/engine/resolve.py, proven on tools/engine/fixtures/.  One table per DLL,
  * kept in the statics below (the header is included once per plugin).
  * ==================================================================================== */
-#define A2E_PLUGIN_NOTE "This Armada2.exe is a build Refit does not know: it runs stock"
+/* The plugin's note on an unknown build: "This <exe> is a build Refit does not know: it
+ * runs stock", <exe> as in the identity line. */
+#define A2E_PLUGIN_NOTE_A "This "
+#define A2E_PLUGIN_NOTE_B " is a build Refit does not know: it runs stock"
 #define A2E_TEST_WHY    "test mismatch (A2EngineTest.ini)"
 
 enum { A2E_W_NOT_STOCK = 1, A2E_W_CALLS = 2, A2E_W_BLOCKED = 3, A2E_W_UNKNOWN = 5,
@@ -212,6 +219,8 @@ static A2E_U32         a2e_size, a2e_base, a2e_delta, a2e_clo, a2e_chi;
 static int             a2e_bi = -1;              /* the matched build, or -1 */
 static char            a2e_gl[512];              /* the test globs, NUL-separated */
 static int             a2e_ng;
+static char            a2e_exe[64];              /* the executable's name, as logged */
+static char            a2e_pnote[A2E_NOTE_MAX + 1];   /* the plugin note */
 
 static inline void a2e_ap(A2ELine *l, const char *s)
 {
@@ -233,6 +242,17 @@ static inline void a2e_apd(A2ELine *l, A2E_U32 v)
     do { t[n++] = (char)('0' + v % 10); v /= 10; } while (v);
     while (n && l->n < (int)sizeof l->b - 1) l->b[l->n++] = t[--n];
     l->b[l->n] = 0;
+}
+
+/* d = a, b, c and e (each may be NULL), cut at A2E_NOTE_MAX. */
+static inline void a2e_cat_note(char *d, const char *a, const char *b, const char *c, const char *e)
+{
+    const char *p[4];
+    int n = 0, i;
+    p[0] = a; p[1] = b; p[2] = c; p[3] = e;
+    for (i = 0; i < 4; i++)
+        while (p[i] && *p[i] && n < A2E_NOTE_MAX) d[n++] = *p[i]++;
+    d[n] = 0;
 }
 
 static inline void a2e_say(const A2ELine *l) { if (a2e_logf) a2e_logf(l->b); }
@@ -463,10 +483,12 @@ static inline int a2e_check(const A2EHookDef *h, A2E_U32 k, A2E_U32 *out, A2EErr
 }
 
 /* Starts the resolver of t on a mapped image: mem[0] is the byte at virtual address
- * base, size bytes are readable; test_ini is an A2EngineTest.ini's text or NULL.  Logs
- * the identity, build and summary lines (and the TEST line).  1 if a build matched. */
+ * base, size bytes are readable; test_ini is an A2EngineTest.ini's text or NULL; module
+ * the process's module file name (no directory) or NULL, named in the log and the notes
+ * when no build matches.  Logs the identity, build and summary lines (and the TEST
+ * line).  1 if a build matched. */
 static inline int a2e_start(const A2ETable *t, a2_logfn log, const A2E_U8 *mem, A2E_U32 base,
-                            A2E_U32 size, const char *test_ini)
+                            A2E_U32 size, const char *test_ini, const char *module)
 {
     A2Identity id;
     A2ELine l;
@@ -479,7 +501,6 @@ static inline int a2e_start(const A2ETable *t, a2_logfn log, const A2E_U8 *mem, 
     l.n = 0; l.b[0] = 0;
     ok = a2e_parse(mem, size, base, &id);
     if (ok) {
-        a2e_line(l.b, &id);
         a2e_clo = id.code_lo; a2e_chi = id.code_hi;
         for (i = 0; i < t->n_builds; i++) {
             const A2EBuild *b = &t->builds[i];
@@ -488,7 +509,16 @@ static inline int a2e_start(const A2ETable *t, a2_logfn log, const A2E_U8 *mem, 
                 break;
             }
         }
-    } else a2e_ap(&l, "engine: Armada2.exe identity unreadable");
+    }
+    {   /* the executable's name: the build's, else the module's, else "exe" */
+        const char *x = (a2e_bi >= 0 && t->builds[a2e_bi].exe && t->builds[a2e_bi].exe[0])
+                        ? t->builds[a2e_bi].exe : (module && *module ? module : "exe");
+        for (i = 0; x[i] && i < sizeof a2e_exe - 1; i++) a2e_exe[i] = x[i];
+        a2e_exe[i] = 0;
+    }
+    a2e_cat_note(a2e_pnote, A2E_PLUGIN_NOTE_A, a2e_exe, A2E_PLUGIN_NOTE_B, 0);
+    if (ok) a2e_line(l.b, a2e_exe, &id);
+    else { a2e_ap(&l, "engine: "); a2e_ap(&l, a2e_exe); a2e_ap(&l, " identity unreadable"); }
     a2e_say(&l);
     l.n = 0; l.b[0] = 0;
     if (a2e_bi >= 0) {
@@ -521,15 +551,9 @@ static inline int a2e_start(const A2ETable *t, a2_logfn log, const A2E_U8 *mem, 
     return a2e_bi >= 0;
 }
 
-static inline void a2e_set_note(A2E_U32 hook, const char *a, const char *b, const char *c)
+static inline void a2e_set_note(A2E_U32 hook, const char *a, const char *b, const char *c, const char *e)
 {
-    char *d = a2e_t->notes[hook];
-    const char *p[3];
-    int n = 0, i;
-    p[0] = a; p[1] = b; p[2] = c;
-    for (i = 0; i < 3; i++)
-        while (p[i] && *p[i] && n < A2E_NOTE_MAX) d[n++] = *p[i]++;
-    d[n] = 0;
+    a2e_cat_note(a2e_t->notes[hook], a, b, c, e);
 }
 
 /* 1 if hook may run; else 0, its stand-down logged once.  Every entry is checked, in
@@ -575,15 +599,15 @@ static inline int a2e_ready(A2E_U32 hook)
         if (fail.why == A2E_W_BLOCKED) {
             const A2EBlock *bl = &a2e_t->builds[a2e_bi].blocked[fail.aux];
             a2e_ap(&l, bl->symbol); a2e_ap(&l, " "); a2e_ap(&l, bl->why);
-            a2e_set_note(hook, bl->note, 0, 0);
+            a2e_set_note(hook, bl->note, 0, 0, 0);
         } else {
             a2e_ap(&l, fsym); a2e_ap(&l, " ");
             if (fail.why == A2E_W_UNKNOWN) {
                 a2e_ap(&l, "unknown build");
-                a2e_set_note(hook, A2E_PLUGIN_NOTE, 0, 0);
+                a2e_set_note(hook, a2e_pnote, 0, 0, 0);
             } else if (fail.why == A2E_W_TEST) {
                 a2e_ap(&l, A2E_TEST_WHY);
-                a2e_set_note(hook, "Stands down: ", fsym, ": " A2E_TEST_WHY);
+                a2e_set_note(hook, "Stands down: ", fsym, ": " A2E_TEST_WHY, 0);
             } else {
                 if (fail.why == A2E_W_NOT_STOCK) a2e_ap(&l, "is not stock (bytes differ)");
                 else if (fail.why == A2E_W_CALLS) a2e_ap(&l, "calls something else");
@@ -594,7 +618,7 @@ static inline int a2e_ready(A2E_U32 hook)
                     a2e_ap(&l, "is found "); a2e_apd(&l, fail.aux); a2e_ap(&l, " times, not ");
                     a2e_apd(&l, a2e_entry(fail.sym)->count);
                 }
-                a2e_set_note(hook, "Stands down: ", fsym, " is not stock in this Armada2.exe");
+                a2e_set_note(hook, "Stands down: ", fsym, " is not stock in this ", a2e_exe);
             }
         }
         a2e_say(&l);
@@ -648,7 +672,7 @@ static inline const char *a2e_note(A2E_U32 hook)
 /* The plugin's note on an unknown build, else NULL. */
 static inline const char *a2e_note_plugin(void)
 {
-    return (a2e_t && a2e_bi < 0) ? A2E_PLUGIN_NOTE : 0;
+    return (a2e_t && a2e_bi < 0) ? a2e_pnote : 0;
 }
 
 /* The note of the first hook feeding the row `section.key` that stood down; the plugin's
@@ -679,32 +703,46 @@ static inline int a2e_identify(A2Identity *id)
     return a2e_parse(base, 0x1000, (A2E_U32)base, id);   /* the header page is always mapped */
 }
 
-/* Logs the identity line through the plugin's own logline-style function. */
+/* The process's module file name, without its directory, into out (cap bytes). */
+static inline void a2e_module_name(char *out, int cap)
+{
+    char path[300];
+    int n = (int)GetModuleFileNameA(NULLPTR, path, 260), i, from = 0, k = 0;
+    if (n < 0) n = 0;
+    for (i = 0; i < n; i++) if (path[i] == '\\' || path[i] == '/') from = i + 1;
+    for (i = from; i < n && k < cap - 1; i++) out[k++] = path[i];
+    out[k] = 0;
+}
+
+/* Logs the identity line through the plugin's own logline-style function, the exe named
+ * by the module's file name (a2e_init's line names the matched build's). */
 static inline void a2e_log(void (*logline)(const char *))
 {
     A2Identity id;
-    char b[120];
-    if (a2e_identify(&id)) a2e_line(b, &id);
-    else { b[0] = 0; s_cat(b, "engine: Armada2.exe identity unreadable"); }
+    char b[180], name[64];
+    a2e_module_name(name, sizeof name);
+    if (a2e_identify(&id)) a2e_line(b, name, &id);
+    else { b[0] = 0; s_cat(b, "engine: "); s_cat(b, name[0] ? name : "exe"); s_cat(b, " identity unreadable"); }
     logline(b);
 }
 
 __declspec(dllimport) BOOL __stdcall ReadFile(HANDLE, void *, DWORD, DWORD *, void *);
 
-/* Starts the resolver of t on this process's Armada2.exe, reading A2EngineTest.ini
+/* Starts the resolver of t on this process's executable, reading A2EngineTest.ini
  * beside it if there is one (the bench's fault injection).  1 if a build matched. */
 static inline int a2e_init(const A2ETable *t, a2_logfn log)
 {
     const A2E_U8 *base = (const A2E_U8 *)GetModuleHandleA(NULLPTR);
     A2Identity id;
-    char path[300], ini[1024];
+    char path[300], ini[1024], name[64];
     HANDLE h;
     DWORD got = 0;
     int n, i, slash = -1;
     ini[0] = 0;
+    a2e_module_name(name, sizeof name);
     if (!base || !a2e_parse(base, 0x1000, (A2E_U32)base, &id)) {
         static const A2E_U8 none[1] = {0};
-        return a2e_start(t, log, none, 0, 0, 0);        /* logs "identity unreadable" */
+        return a2e_start(t, log, none, 0, 0, 0, name);  /* logs "identity unreadable" */
     }
     n = (int)GetModuleFileNameA(NULLPTR, path, 260);
     for (i = 0; i < n; i++) if (path[i] == '\\' || path[i] == '/') slash = i;
@@ -718,7 +756,7 @@ static inline int a2e_init(const A2ETable *t, a2_logfn log)
             ini[got] = 0;
         }
     }
-    return a2e_start(t, log, base, (A2E_U32)base, id.image_size, ini[0] ? ini : 0);
+    return a2e_start(t, log, base, (A2E_U32)base, id.image_size, ini[0] ? ini : 0, name);
 }
 #endif
 

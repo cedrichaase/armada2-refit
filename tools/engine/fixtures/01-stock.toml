@@ -37,7 +37,7 @@ s = "stock"
 
 [expect]
 p = [
-  "engine: Armada2.exe timestamp 0x5eed0001, image size 0x6000, sections 0x777d215e",
+  "engine: Test.exe timestamp 0x5eed0001, image size 0x6000, sections 0x777d215e",
   "engine: build test/b1",
   "engine: symbols: 13/14 resolved; 0 hooks blocked",
   "ready p.fnhook ok",
@@ -54,15 +54,15 @@ p = [
   "engine: f2 read before its hook was ready",
   "addr f2 0x0",
   "addr g1 0x404010",
-  "note p.wrongcall Stands down: One::caller is not stock in this Armada2.exe",
-  "note p.wrongslot Stands down: One::vftable is not stock in this Armada2.exe",
-  "note p.badcheck Stands down: One::f2 is not stock in this Armada2.exe",
-  "note_for Graphics.Thing Stands down: One::f2 is not stock in this Armada2.exe",
+  "note p.wrongcall Stands down: One::caller is not stock in this Test.exe",
+  "note p.wrongslot Stands down: One::vftable is not stock in this Test.exe",
+  "note p.badcheck Stands down: One::f2 is not stock in this Test.exe",
+  "note_for Graphics.Thing Stands down: One::f2 is not stock in this Test.exe",
   "note_for Graphics.Other -",
   "note_plugin -",
 ]
 s = [
-  "engine: Armada2.exe timestamp 0x5eed0001, image size 0x6000, sections 0x777d215e",
+  "engine: Test.exe timestamp 0x5eed0001, image size 0x6000, sections 0x777d215e",
   "engine: build test/b1",
   "engine: symbols: 3/3 resolved; 0 hooks blocked",
   "ready s.scan1 ok",
@@ -70,8 +70,8 @@ s = [
   "ready s.scan0 fail",
   "engine: s.scan2 stands down: Two::twice is found 2 times, not 1",
   "ready s.scan2 fail",
-  "note s.scan0 Stands down: Two::missing is not stock in this Armada2.exe",
-  "note s.scan2 Stands down: Two::twice is not stock in this Armada2.exe",
+  "note s.scan0 Stands down: Two::missing is not stock in this Test.exe",
+  "note s.scan2 Stands down: Two::twice is not stock in this Test.exe",
   "note_for Graphics.Thing -",
   "note_for Graphics.Other -",
   "note_plugin -",
