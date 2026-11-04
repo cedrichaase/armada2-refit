@@ -4,6 +4,11 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 1.1.0 — 2026-11-04
+
+### Added
+- The menu scene shows campaign progress (issue 15): `Campaign=`, `From=`, `Until=` on a `[Ship.*]` or `[Nebula.*]` (`Campaign=` also on a `[Group.*]`) put it on the map only at that many missions complete; `[Progress] Default=` and `[Progress] <campaign>=` in `map.ini`; the export `Render3D_MenuProgress(campaign, done)`, which re-reads the map on a change. The built-in map grows the Federation fleet (freighters, `fmining`, `fyard`, a second Sovereign and Akira), starts the Klingon scene with two Birds of Prey and gives the Borg cube spheres and assimilated hulls as each campaign goes on; `Default=6` keeps the earlier look for a campaign not told of. Draft: placements reckoned, not yet seen on the bench. Installed, not yet seen in game.
+
 ## 1.0.4 — 2026-11-04
 
 ### Fixed

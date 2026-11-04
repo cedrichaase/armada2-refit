@@ -4,6 +4,11 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 2.3.0 — 2026-11-04
+
+### Added
+- Campaign progress for the menu scene (issue 15, `menus::progress`): each campaign's missions complete, from the rows of its stock mission list and, with the new `[Menus] ProgressBytes` (empty as shipped: the offsets are not measured), from `save\shell.set`, told to render3d through `Render3D_MenuProgress` before each scene frame. Installed, not yet seen in game.
+
 ## 2.2.4 — 2026-11-04
 
 ### Fixed

@@ -644,6 +644,26 @@ The departure keeps the map's clock and the scene's passes; it only poses the
 departing ships and moves the camera, so the frame costs what a menu frame does, plus
 one full-screen pass.
 
+**Campaign progress** (issue 15). A ship or gas field can belong to a campaign's
+progress: `Campaign=` names the campaign (on the section, or once on its group), and it
+is on the map from `From=` missions of that campaign complete (0) until `Until=`
+(never). The built-in map grows each campaign's scene: the Federation fleet gains
+freighters, a mining station, a shipyard and at the end a second Sovereign with an
+Akira; the Klingon scene starts with two Birds of Prey and gains its cruisers, the
+Negh'Var and at the end a fleet; the Borg cube is alone at first and gains spheres,
+the queen's Diamond and the hulls it has assimilated (drawn as their own hulls: there is
+no assimilated look yet). Since the main menu's view is the Federation fleet's, the
+Federation's progress shows there too. `UI.asi` says how far each campaign has got
+through a third export, `Render3D_MenuProgress(campaign, done)` (ui/MENUS.md,
+"Campaign progress"); a change re-reads the map at the next frame, as an edit does, so
+a decloaking group's stagger counts only the ships shown. `[Progress] Default=` is the
+count of a campaign nobody has told of (the built-in map's 6 keeps its look from before
+progress counted), and `[Progress] <campaign>=N` forces a count, to tune a stage on the
+bench with a `Menu\map.ini` copy. Render3D.log lists each campaign's count and where it
+came from as the map is read (`menu:   progress <campaign>: ...`), and each change
+told (`menu: progress <campaign>: N missions complete`). The new placements are
+reckoned, not yet seen on the bench.
+
 **The gas.** A `[Nebula.*]` field lays a nebula class's centres on a jittered grid over
 an ellipse in its group's frame, as a map's nebula is laid out, and the world module
 draws them as that class's gas from its recipe in `nebulae/`. The menu's classes are
@@ -686,7 +706,9 @@ time it is posed (`hulls: menu scene:`). Keys:
 | | `Flash`, `FlashTime` | a flash's half size times the ship's radius (2.2), and its seconds (0.45) |
 | `[Planet]` | `Class` | the planet class's ODF (`PB_CLSSM`); none: no planet |
 | | `Radius`, `At`, `Axis`, `Spin`, `Clouds`, `Orbit` | its radius, its centre, its pole, how much faster than `Orbit` its ground turns, the clouds' extra turn, the orbit's radians a second (the sky's turn is `SkyTurn`) |
+| `[Progress]` | `Default`, `<campaign>` | the missions complete of a campaign UI.asi has not told of (0; the map's 6); a count forced for one campaign |
 | `[Group.<name>]` | `At`, `Yaw` | the group's place on the map and its turn about +y in degrees |
+| | `Campaign` | the campaign whose progress its ships and gas follow, unless they name their own |
 | | `CloakView`, `CloakDelay`, `CloakTime`, `CloakStagger`, `CloakSound` | the view whose arrival decloaks its ships; the seconds before the first starts (`Blend` x 0.7), each takes (2.5), between one and the next (0.5); the sound each makes as it begins (`clkdisen.wav`; empty for none) |
 | | `WarpColour` | the tunnel's tint when the group departs (0.45,0.62,1) |
 | `[View.<name>]` | `Group`, `Eye`, `Target`, `Fov` | in the group's frame; vertical field in degrees |
@@ -694,6 +716,7 @@ time it is posed (`hulls: menu scene:`). Keys:
 | | `WarpEye`, `WarpTarget` | the camera a departure from the view swings to, in the group's frame (default: behind the departing ships, looking the way they go) |
 | `[Ship.<name>]` | `Group`, `Odf`, `At`, `Yaw`, `Scale`, `Bob`, `Phase`, `Team` | its group; the ship's ODF (its `baseName` and `ScaleSOD`), its place in the group, a turn in degrees, a scale on top of `ScaleSOD`, how much it bobs, its phase, a team colour for its `team*` groups |
 | | `Warp` | 0: stays when its group departs (a station) |
+| `[Ship.*]`, `[Nebula.*]` | `Campaign`, `From`, `Until` | on the map only while `From` <= the campaign's missions complete < `Until` (0; never) |
 | `[Nebula.<name>]` | `Group`, `Odf`, `At`, `Size`, `Spacing`, `Jitter`, `Seed` | its group; a nebula ODF with a gas recipe; the field's centre (its plane's height is its y); half extents in x and z; the grid's step (the radius x 1.2) and jitter (0.35); the seed |
 | | `Radius` | the class's radius (the ODF's `effectRadius`, else 300) |
 | | `KeyShare`, `Scatter`, `Opacity`, `Brightness` | over the recipe's, for the menu's class only (one set per class: the first field of the class that sets a key) |

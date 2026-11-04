@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.7.0 — 2026-11-04
+
+Layers: render3d 1.1.0, ui 2.3.0.
+
+### Added
+- The menu scene shows campaign progress (issue 15): the UI tells render3d each campaign's missions complete (`Render3D_MenuProgress`), and the map's ships and gas with `Campaign=`/`From=`/`Until=` come and go with it; `[Progress]` in `map.ini`, `[Menus] ProgressBytes` in `UI.ini`. Installed, not yet seen in game.
+
 ## 15.6.21 — 2026-11-04
 
 Layers: gui-installer 3.1.0.

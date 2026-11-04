@@ -13,6 +13,7 @@ pub mod actions;
 pub mod backdrop;
 pub mod generic;
 pub mod model;
+pub mod progress;
 pub mod refit;
 pub mod scene;
 pub mod screens;

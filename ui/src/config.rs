@@ -49,6 +49,9 @@ pub struct Config {
     /// `[Menus] Scene`: the main menu and the campaign selection stand over render3d's
     /// 3D scene (`menus::scene`), when render3d draws it.
     pub menus_scene: bool,
+    /// `[Menus] ProgressBytes`: where each campaign's counter is in `save\shell.set`
+    /// (`federation:<offset>,...`; empty: the file is not read), `menus::progress`.
+    pub menus_progress_bytes: alloc::string::String,
     /// `[Menus] Credits`: the Credits are ours (`crate::credits`), over the menu scene.
     pub credits: bool,
     pub hud: Hud,
@@ -202,6 +205,7 @@ pub fn load() -> Config {
         menus_trace: ini.int("Menus", "Trace", 0) != 0,
         menus_host: ini.int("Menus", "Host", 1) != 0,
         menus_scene: on(&ini, MENUS_SCENE),
+        menus_progress_bytes: ini.string("Menus", "ProgressBytes").unwrap_or_default(),
         credits: on(&ini, MENUS_CREDITS),
         loading: on(&ini, LOADING_ENABLE),
         loading_hold: ini.float("Loading", "Hold", 0.0).clamp(0.0, 600.0),

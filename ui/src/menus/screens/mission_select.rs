@@ -27,6 +27,10 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     if foot.len() != 2 || rows.is_empty() {
         return false;
     }
+    // The rows are the missions reached: the campaign pointed at has one fewer done.
+    if let Some(c) = crate::menus::scene::chosen().or(crate::content::get().first_campaign_scene).and_then(|c| c.to_str().ok()) {
+        crate::menus::progress::saw_missions(c, rows.len());
+    }
     let t = ui.theme;
     let title = kit::labels(s).into_iter().find(|c| c.visible && !c.text.is_empty()).map_or("Select Mission", |c| c.text.as_str());
 
