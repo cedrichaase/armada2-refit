@@ -1031,6 +1031,7 @@ static void build_paths(void)
     char path[320];
     g_logpath[0] = 0;
     if (!a2_exe_dir(path, sizeof path)) return;
+    if (s_len(path) + 7 >= (int)sizeof g_logpath) return;   /* no room: no log */
     s_cat(g_logpath, path); s_cat(g_logpath, "QOL.log");
 }
 

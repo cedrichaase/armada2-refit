@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.22 — 2026-11-04
+
+Layers: cutscenes 3.0.2, qol 2.2.3, rules 1.0.3, online 0.11.2.
+
+### Fixed
+- cutscenes: the proxy finds UI.asi's `ui_present_movie` at each movie's open until it is found, and a movie with no duration no longer commits an hour of audio up front.
+- qol: the log path is length-checked before `QOL.log` is appended.
+- csdk/a2asi.h: `s_num` prints the most negative long correctly (rules and online recompiled with it, no other change).
+Installed, not yet seen in game.
+
 ## 15.6.21 — 2026-11-04
 
 Layers: gui-installer 3.1.0.

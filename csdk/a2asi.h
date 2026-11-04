@@ -102,9 +102,10 @@ static inline void s_num(char *d, long v)
 {
     char t[16];
     int  n = 0, neg = 0, k = s_len(d);
-    if (v < 0) { neg = 1; v = -v; }
-    if (!v) t[n++] = '0';
-    while (v) { t[n++] = (char)('0' + (v % 10)); v /= 10; }
+    unsigned long u = (unsigned long)v;   /* unsigned, so LONG_MIN negates safely */
+    if (v < 0) { neg = 1; u = 0UL - u; }
+    if (!u) t[n++] = '0';
+    while (u) { t[n++] = (char)('0' + (u % 10)); u /= 10; }
     if (neg) d[k++] = '-';
     while (n) d[k++] = t[--n];
     d[k] = 0;
