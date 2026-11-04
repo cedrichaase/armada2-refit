@@ -344,6 +344,7 @@ Write-Host "== uninstall: what it added goes, what changed since stays"
 Set-Content (G "UltimateASILoader-license.txt") "mine"
 Set-Content (G "Sky\myown.ini") "[Sky]"   # a recipe of the player's own stays
 Set-Content (G "Display8.log") "log"
+Remove-Item -LiteralPath (G "d3d8.dll.a2chain-backup") -ErrorAction SilentlyContinue   # the DXVK one kept above; GOG's goes back, this one is the player's to delete
 Remove-Item -LiteralPath $PyLog -ErrorAction SilentlyContinue   # earlier passes (-Without models) logged reverts too
 $env:A2_PROGRESS = "1"
 $out = Install @("-Uninstall", $G)
