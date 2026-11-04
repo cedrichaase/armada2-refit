@@ -132,6 +132,11 @@ pub fn for_each_list_node(head: usize, mut f: impl FnMut(usize)) {
     }
 }
 
+/// The element value a list node holds (`+8`).
+pub fn list_node_value(node: usize) -> usize {
+    field(node, off::LIST_VALUE())
+}
+
 /// Walks the VC6 `std::list` at `list` (the list itself, as `Ordnance::ordnanceList`
 /// is: head node `+4`), calling `f` with each element value.
 pub fn for_each_in_list_at(list: usize, mut f: impl FnMut(usize)) {

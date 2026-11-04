@@ -114,3 +114,15 @@ render3d.sky.toml	sky_star_corners	0xc	render3d/mods/sky/src/hooks.rs
 render3d.sky.toml	sky_auto_ptr	0xc	render3d/mods/sky/src/hooks.rs
 render3d.sky.toml	sky_edit_mode	0x84	render3d/mods/sky/src/hooks.rs
 render3d.sky.toml	sky_bg_transform	0x44	render3d/mods/sky/src/hooks.rs
+render3d.specials.toml	sp_effect_object	0x8	render3d/mods/specials/src/hooks.rs
+render3d.specials.toml	sp_effect_instance	0x2c	render3d/mods/specials/src/hooks.rs
+render3d.specials.toml	sp_effect_database	0xac	render3d/mods/specials/src/hooks.rs
+render3d.specials.toml	sp_effect_target	0xb0	render3d/mods/specials/src/hooks.rs
+render3d.specials.toml	sp_effect_node	0xc8	render3d/mods/specials/src/hooks.rs
+render3d.specials.toml	sp_effect_time_left	0x28	render3d/mods/specials/src/hooks.rs
+render3d.specials.toml	sp_effect_dead	0xc	render3d/mods/specials/src/hooks.rs
+render3d.specials.toml	sp_effect_weapon_class	0x4	render3d/mods/specials/src/hooks.rs
+render3d.specials.toml	sp_weapon_ordnance	0x18	render3d/mods/specials/src/hooks.rs
+render3d.specials.toml	sp_ordnance_prj	0x150	render3d/mods/specials/src/hooks.rs
+render3d.specials.toml	sp_vt_render	0x0	render3d/mods/specials/src/hooks.rs
+render3d.specials.toml	sp_inst_radius	0x40	render3d/mods/specials/src/hooks.rs
