@@ -4,6 +4,13 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 1.1.0 — 2026-11-04
+
+### Changed
+- Engine fields and values come from the matched build at run time (`field::X()`, `value::X()`), no longer compile-time consts of `gog-1.1` (PLAN-ARCHITECTURE.md, AR-3).
+
+Installed, not yet seen in game.
+
 ## 1.0.5 — 2026-11-04
 
 ### Fixed

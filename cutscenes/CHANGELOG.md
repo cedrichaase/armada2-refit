@@ -4,6 +4,13 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`binkproxy/README.md`](binkproxy/README.md).
 
+## 3.1.0 — 2026-11-04
+
+### Changed
+- binkproxy: engine fields are the matched build's, filled at start-up (`BINKPROXY_F_*`), no longer compile-time per game (PLAN-ARCHITECTURE.md, AR-3).
+
+Installed, not yet seen in game.
+
 ## 3.0.1 — 2026-11-03
 
 ### Removed

@@ -20,7 +20,7 @@ with each file's `out` resolved against DIR (the selftest's fixtures do).
     tables; `unknown = "run"` only when every entry of the hook is a scan.
  3. Code <-> profile, both ways, by tokens in the plugin's non-generated sources, comments
     stripped, strings kept (C asm strings matter): Rust `sym::X`, `hook::X`, `field::X`,
-    `value::X`; C `<P>_S_X`, `<P>_H_X`, `<P>_F_X`, `<P>_V_X`, `_a2s_<p>_<id>`. Every token is
+    `value::X`; C `<P>_S_X`, `<P>_H_X`, `<P>_F_X`, `<P>_V_X`, `_a2s_<p>_<id>`, `_a2f_<p>_<id>`. Every token is
     defined; every entry and hook is used (an entry that is the call/jmp/slot target or the
     vtable of a used entry counts as used).
  4. No engine address in those sources: any hex literal inside a build's image range fails,
@@ -30,7 +30,8 @@ with each file's `out` resolved against DIR (the selftest's fixtures do).
  5. Inheritance and marks: a child overrides only what its ancestors have (same kind) or adds
     complete entries; marks only in an inheriting build; every [[changed]] `fn` matches an
     entry (as `symbol` or `in`) of that build; every `verified` and `disable` glob matches a
-    hook of the game; fields and values of a `lang = "c"` file are never overridden (FO-3).
+    hook of the game. A child may move a field or change a value (any `lang`): fields and
+    values are resolved per build at run time.
  6. `gen.py --check`: the generated files are up to date.
 
 Sources of a Rust file: the `.rs` files under the directory of its `out`; of a C file: the
@@ -60,7 +61,6 @@ BUILD_KEYS = {'schema', 'game', 'build', 'label', 'exe', 'inherits', 'content', 
 PE_KEYS = ['timestamp', 'image_size', 'sections', 'image_base', 'code']
 FILE_KEYS = {'schema', 'plugin', 'readme', 'lang', 'out', 'hook', 'sym'}
 HOOK_KEYS = {'doc', 'rows', 'unknown'}
-CONST_KEYS = {'field': 'offset', 'value': 'value'}
 
 
 def isint(v):
@@ -554,16 +554,6 @@ def rule5(games, R):
                             miss += [k for k in KINDS[s['kind']][0] if k not in s]
                         if miss:
                             R.add(f'{f.rel()}: sym {sid}', f'is new in {b.name} and must be complete; missing {", ".join(miss)}')
-        # C fields and values are compile-time per game (FO-3)
-        for fname, rf in gs.files.items():
-            if rf.lang != 'c':
-                continue
-            base = flatp(gs, fname, gs.root)
-            for b in gs.builds[1:]:
-                for sid, (e, ew) in flatp(gs, fname, b).items():
-                    k = e.get('kind')
-                    if k in CONST_KEYS and sid in base and base[sid][0].get(CONST_KEYS[k]) != e.get(CONST_KEYS[k]):
-                        R.add(f'{ew}: sym {sid}', f'{k} differs in {b.name}; the fields and values of a C plugin are compile-time per game, so a build that changes one is FO-3\'s')
 
 
 # ---- sources: rules 3 and 4 ----------------------------------------------------------
@@ -714,10 +704,10 @@ def rules34(games, R, src_root):
                 for k, (gs, rf, dd, ids) in enumerate(defs):
                     if lang == 'c' and tok_class[0] != rf.plugin:
                         continue
-                    cls = tok_class[1]
-                    if name in dd[cls]:
-                        used[k][cls].add(name)
-                        hit = True
+                    for cls in (('field', 'value') if tok_class[1] == 'fieldvalue' else (tok_class[1],)):
+                        if name in dd[cls]:
+                            used[k][cls].add(name)
+                            hit = True
                 if not hit:
                     tag = f'{tok_class[1]}::{name}' if lang == 'rust' else name
                     owner = members[0][1].rel() if not multi else 'any of ' + ', '.join(m[1].name for m in members)
@@ -785,6 +775,8 @@ def tokens(s, lang, members):
             yield s.count('\n', 0, m.start()) + 1, (p, cls), m.group(2)
         for m in re.finditer(r'(?<![A-Za-z0-9])_?a2s_' + re.escape(p.replace('.', '_')) + r'_([a-z][a-z0-9_]*)', s):
             yield s.count('\n', 0, m.start()) + 1, (p, 'sym'), upper(m.group(1))
+        for m in re.finditer(r'(?<![A-Za-z0-9])_?a2f_' + re.escape(p.replace('.', '_')) + r'_([a-z][a-z0-9_]*)', s):
+            yield s.count('\n', 0, m.start()) + 1, (p, 'fieldvalue'), upper(m.group(1))
 
 
 # ---- driver --------------------------------------------------------------------------

@@ -13,7 +13,8 @@ and Rust (crates/a2engine, `cargo test --features fixtures`).
 A fixture: `set` (a directory of fixtures/sets/), `[image]` (mkpe.py), optional `base`
 (where the image is mapped; default its ImageBase), `test_ini` (an A2EngineTest.ini's
 text), `addr` (symbol ids queried after the readies, those of each table), `note_for`
-(`Section.Key` rows), and `[expect]` with one transcript per plugin.
+(`Section.Key` rows), `field` (field and value ids whose per-build offset or value is
+queried after the addrs), and `[expect]` with one transcript per plugin.
 """
 import glob
 import os
@@ -50,10 +51,14 @@ def queries(d, t):
     return [a for a in d.get('addr', []) if a in t.sym_ids], list(d.get('note_for', []))
 
 
+def field_queries(d, t):
+    return [a for a in d.get('field', []) if a in t.sym_ids]
+
+
 def py_transcript(d, t):
     exe = pe.Exe(mkpe.build(d['image']), d.get('base'))
     addr, nf = queries(d, t)
-    return resolve.transcript(t, exe, d.get('test_ini'), addr, nf)
+    return resolve.transcript(t, exe, d.get('test_ini'), addr, nf, field=field_queries(d, t))
 
 
 def expected(d, t):
@@ -137,6 +142,8 @@ def run_c(fx, tmp):
             args = [exe, img, ini, f'{base:x}']
             for a in addr:
                 args += ['addr', a]
+            for a in field_queries(d, t):
+                args += ['field', a]
             for n in nf:
                 args += ['note_for', n]
             r = subprocess.run(args, capture_output=True, text=True)
@@ -168,7 +175,8 @@ def rust_module(fx, tmp):
             ini = 'None' if d.get('test_ini') is None else f'Some({rs_str(d["test_ini"])})'
             cases.append(
                 f'    Case {{ name: {rs_str(name + " " + t.plugin)}, table: &{m}::TABLE, image: {rs_str(img)}, base: {base:#x}, '
-                f'test_ini: {ini}, addr: &[{", ".join(rs_str(a) for a in addr)}], note_for: &[{", ".join(rs_str(n) for n in nf)}], '
+                f'test_ini: {ini}, addr: &[{", ".join(rs_str(a) for a in addr)}], '
+                f'field: &[{", ".join(rs_str(a) for a in field_queries(d, t))}], note_for: &[{", ".join(rs_str(n) for n in nf)}], '
                 f'content: {rs_str(content_expect(d, t) or "?")}, '
                 f'expect: &[{", ".join(rs_str(x) for x in expected(d, t))}] }},')
     o += ['', 'pub const CASES: &[Case] = &['] + cases + ['];', '']

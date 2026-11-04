@@ -44,12 +44,15 @@ fn eng() -> &'static a2engine::Engine {
 }
 
 /// The design space every shell screen is laid out in (the front end's mode).
-pub const DESIGN_W: i32 = value::DIALOGS_FRONT_END_WIDTH;
-pub const DESIGN_H: i32 = value::DIALOGS_FRONT_END_HEIGHT;
+#[inline(always)]
+pub fn design_w() -> i32 { value::DIALOGS_FRONT_END_WIDTH() }
+#[inline(always)]
+pub fn design_h() -> i32 { value::DIALOGS_FRONT_END_HEIGHT() }
 
 /// The shell's code: only dialog procedures in it are hosted (the map editor's dialogs
 /// are not shell screens).
-const SHELL_CODE: (usize, usize) = (value::DIALOGS_SHELL_CODE_START as usize, value::DIALOGS_SHELL_CODE_END as usize);
+#[inline(always)]
+fn shell_code() -> (usize, usize) { (value::DIALOGS_SHELL_CODE_START() as usize, value::DIALOGS_SHELL_CODE_END() as usize) }
 /// `EscapeMenuDlgProc`, the in-mission menu, and its Return to Game button's centre in
 /// design coordinates (x 5, y 568, 172x22: menus/README.md, "Esc").
 const ESCAPE_RETURN_AT: (i32, i32) = (91, 579);
@@ -116,7 +119,7 @@ impl Surface {
     const NONE: Surface = Surface { dc: core::ptr::null_mut(), bmp: core::ptr::null_mut(), old: core::ptr::null_mut(), bits: core::ptr::null_mut() };
 
     fn make() -> Surface {
-        let bi = BitmapInfoHeader { size: 40, width: DESIGN_W, height: -DESIGN_H, planes: 1, bit_count: 32, ..Default::default() };
+        let bi = BitmapInfoHeader { size: 40, width: design_w(), height: -design_h(), planes: 1, bit_count: 32, ..Default::default() };
         unsafe {
             let dc = CreateCompatibleDC(core::ptr::null_mut());
             if dc.is_null() {
@@ -129,7 +132,7 @@ impl Surface {
                 return Surface::NONE;
             }
             let old = SelectObject(dc, bmp);
-            PatBlt(dc, 0, 0, DESIGN_W, DESIGN_H, BLACKNESS);
+            PatBlt(dc, 0, 0, design_w(), design_h(), BLACKNESS);
             Surface { dc, bmp, old, bits }
         }
     }
@@ -511,7 +514,7 @@ unsafe extern "system" fn host_proc(h: HWND, msg: u32, wp: usize, lp: isize) -> 
             p.erase = true;
             let mut r = WinRect::default();
             unsafe { GetClientRect(h, &mut r) };
-            p.rect = WinRect { left: 0, top: 0, right: r.right.min(DESIGN_W), bottom: r.bottom.min(DESIGN_H) };
+            p.rect = WinRect { left: 0, top: 0, right: r.right.min(design_w()), bottom: r.bottom.min(design_h()) };
             *free = p;
             free
         }
@@ -541,7 +544,7 @@ fn refuse(proc_: usize, owner: HWND) -> Option<&'static str> {
     if !ready() || !crate::config::get().menus {
         return Some("menus off");
     }
-    if proc_ < SHELL_CODE.0 || proc_ >= SHELL_CODE.1 {
+    if proc_ < shell_code().0 || proc_ >= shell_code().1 {
         return Some("not a shell screen");
     }
     let game = crate::input::window();
@@ -754,7 +757,7 @@ fn paint_pending() {
 
 /// The depth of the innermost full-screen dialog: everything below it is hidden.
 pub fn covered_below() -> u32 {
-    stack().iter().filter(|s| s.w() >= DESIGN_W && s.h() >= DESIGN_H).map(|s| s.depth).max().unwrap_or(0)
+    stack().iter().filter(|s| s.w() >= design_w() && s.h() >= design_h()).map(|s| s.depth).max().unwrap_or(0)
 }
 
 /// The depth of the modal dialog a pane is in.
@@ -792,8 +795,8 @@ fn place(h: HWND, x: i32, y: i32, w: i32, ht: i32, have_pos: bool, have_size: bo
         nx = p.x;
         ny = p.y;
     }
-    if have_size && (w > DESIGN_W || ht > DESIGN_H) {
-        return WinRect { left: 0, top: 0, right: DESIGN_W, bottom: DESIGN_H };
+    if have_size && (w > design_w() || ht > design_h()) {
+        return WinRect { left: 0, top: 0, right: design_w(), bottom: design_h() };
     }
     WinRect { left: nx, top: ny, right: nx + nw, bottom: ny + nh }
 }
@@ -928,7 +931,7 @@ fn compose_all() {
         // own bitmaps into the DCs it is handed, and Game Setup's paint left our
         // surface's bitmap selected in a DC of its own, so a `BitBlt` from our DC read
         // a stale bitmap while the surface itself was current.
-        copy_bits(&s.frame, 0, 0, &s.surface, DESIGN_W, DESIGN_H);
+        copy_bits(&s.frame, 0, 0, &s.surface, design_w(), design_h());
         s.frame.reselect();
         compose_into(s.hwnd, &s.frame, 0, 0);
     }
@@ -940,14 +943,14 @@ fn compose_all() {
 fn copy_bits(dst: &Surface, x: i32, y: i32, src: &Surface, w: i32, h: i32) {
     unsafe { GdiFlush() };
     let (x0, y0) = (x.max(0), y.max(0));
-    let (x1, y1) = ((x + w).min(DESIGN_W), (y + h).min(DESIGN_H));
+    let (x1, y1) = ((x + w).min(design_w()), (y + h).min(design_h()));
     if x1 <= x0 || y1 <= y0 {
         return;
     }
     let row = (x1 - x0) as usize * 4;
     for yy in y0..y1 {
-        let s = ((yy - y) * DESIGN_W + (x0 - x)) as usize * 4;
-        let d = (yy * DESIGN_W + x0) as usize * 4;
+        let s = ((yy - y) * design_w() + (x0 - x)) as usize * 4;
+        let d = (yy * design_w() + x0) as usize * 4;
         unsafe { core::ptr::copy(src.bits.add(s), dst.bits.add(d), row) };
     }
 }
@@ -1225,7 +1228,7 @@ fn dump(s: &Surface, name: &str) {
     if !s.ok() {
         return;
     }
-    let (w, h) = (DESIGN_W as u32, DESIGN_H as u32);
+    let (w, h) = (design_w() as u32, design_h() as u32);
     let size = w * h * 4;
     let mut v: Vec<u8> = Vec::with_capacity(54 + size as usize);
     v.extend_from_slice(b"BM");

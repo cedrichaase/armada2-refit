@@ -1,5 +1,6 @@
 # The timestamp of no build: every hook is "unknown build" but the scans that run.
 set = "basic"
+field = ["fd", "fx"]
 note_for = ["Graphics.Thing"]
 
 [image]
@@ -38,7 +39,7 @@ s = "none"
 p = [
   "engine: Armada2.exe timestamp 0x5eed0099, image size 0x6000, sections 0x777d215e",
   "engine: unknown build",
-  "engine: symbols: 0/14 resolved; 0 hooks blocked",
+  "engine: symbols: 0/15 resolved; 0 hooks blocked",
   "engine: p.fnhook stands down: One::f1 unknown build",
   "ready p.fnhook fail",
   "engine: p.chained stands down: One::chainer unknown build",
@@ -51,12 +52,17 @@ p = [
   "ready p.wrongslot fail",
   "engine: p.badcheck stands down: One::f2 unknown build",
   "ready p.badcheck fail",
+  "engine: p.fieldhook stands down: One unknown build",
+  "ready p.fieldhook fail",
+  "field fd 0x1c",
+  "field fx 0x0",
   "note p.fnhook This Armada2.exe is a build Refit does not know: it runs stock",
   "note p.chained This Armada2.exe is a build Refit does not know: it runs stock",
   "note p.wrongcall This Armada2.exe is a build Refit does not know: it runs stock",
   "note p.slothook This Armada2.exe is a build Refit does not know: it runs stock",
   "note p.wrongslot This Armada2.exe is a build Refit does not know: it runs stock",
   "note p.badcheck This Armada2.exe is a build Refit does not know: it runs stock",
+  "note p.fieldhook This Armada2.exe is a build Refit does not know: it runs stock",
   "note_for Graphics.Thing This Armada2.exe is a build Refit does not know: it runs stock",
   "note_plugin This Armada2.exe is a build Refit does not know: it runs stock",
 ]

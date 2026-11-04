@@ -502,8 +502,8 @@ fn players(ui: &mut Ui, l: &Load, r: R) {
         ui.text_in(name_r, &p.name, t.text_size, Align::Left, col, if p.local { Weight::Bold } else { Weight::Regular });
         let race = p.race.and_then(Race::from_name).map_or("Random", |r| r.name());
         ui.text_in(name_r, race, t.small_size, Align::Right, t.text_dim, Weight::Regular);
-        if let Some(fr) = fr
-            && let Some(f) = fr[p.slot]
+        if let Some(fr) = &fr
+            && let Some(f) = fr.get(p.slot).copied().flatten()
         {
             theme::bar(ui, R::new(nx, row.y + ui.u(40.0), row.right() - nx, ui.u(6.0)), f, Some(if f >= 1.0 { t.good } else { t.fill }));
         }

@@ -88,9 +88,11 @@ pub mod hook {
 }
 
 pub mod field {
+    #![allow(non_snake_case)]
 }
 
 pub mod value {
+    #![allow(non_snake_case)]
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[

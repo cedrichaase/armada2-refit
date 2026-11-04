@@ -116,9 +116,9 @@ generator flattens every build, so the run-time code has no inheritance logic. M
 accumulate down the chain. A hook is **blocked** in a build, with its reason computed
 by the generator, when one of its entries is or sits `in` a `[[changed]]` function and
 the hook is not in that mark's `verified`, or a `[[disable]]` glob matches it. A
-verified hook runs and makes its checks as usual. Fields and values used by a
-`lang = "c"` file are compile-time per game and may not be overridden (FO-3); in Rust
-they are consts while every build agrees.
+verified hook runs and makes its checks as usual. A child build may override a `field`'s
+`offset` or a `value`'s `value` like any other entry, in Rust and C plugins alike:
+fields and values are resolved per build at run time ("Fields and values").
 
 Globs: `*` matches any run of characters, everything else itself, over the whole id.
 
@@ -154,16 +154,35 @@ win over any set. `Engine::resolved(sym)` is the quiet twin of `addr` (no warnin
 ```rust
 pub mod sym   { pub const FIND_DISPLAY_MODE: a2engine::Sym = a2engine::Sym(0); ... }
 pub mod hook  { pub const MODES: a2engine::HookId = a2engine::HookId(0); ... }
-pub mod field { pub const CRAFT_TEAM: usize = 0x..; }
-pub mod value { pub const FRONT_END_WIDTH: i32 = 800; }
-pub const SYMS, HOOKS, BUILDS;    // consts: a value-parity assert can read them
+pub mod field { pub fn CRAFT_TEAM() -> usize { TABLE.engine().field(Sym(k)) } }
+pub mod value { pub fn FRONT_END_WIDTH() -> i32 { TABLE.engine().value(Sym(k)) } }
+pub const SYMS, HOOKS, BUILDS;
 pub static TABLE: a2engine::Table;
 ```
 
 C (`<dir>/engine_syms.h`, included once after `a2engine.h`): `<P>_S_<ID>`,
-`<P>_H_<HOOK>`, `<P>_F_<ID>`, `<P>_V_<ID>`, a resolved variable
-`A2E_U32 a2s_<p>_<id>` per address entry (filled when its hook is ready, so an asm stub
-can jump through `_a2s_<p>_<id>`), and `static const A2ETable <P>_ENGINE`.
+`<P>_H_<HOOK>`, a resolved variable `A2E_U32 a2s_<p>_<id>` per address entry (filled
+when its hook is ready, so an asm stub can jump through `_a2s_<p>_<id>`), a variable
+`A2E_U32 a2f_<p>_<id>` per field and value (the build's offset or value, below) with
+`<P>_F_<ID>` and `<P>_V_<ID>` reading it as an `int`, and
+`static const A2ETable <P>_ENGINE`.
+
+### Fields and values
+
+A `field`'s offset and a `value` are the matched build's, read at run time, never a
+compile-time constant: a build whose structs differ (another game, a patch) gets its own
+offsets from its profile, and a child build overrides one by id. In Rust `field::X()`
+and `value::X()` are a load and an index into the matched build's entries
+(`Engine::field`, `Engine::value`); in C `<P>_F_X` reads `a2f_<p>_<x>`, which
+`a2e_start` fills from the matched build (`a2e_field(k)` is the same read), so an asm
+stub reads a field as `movl _a2f_<p>_<x>, %eax` and then `(%ebx,%eax)`. Before `init`
+and on an unknown build they are the root build's (no hook of ours runs there but the
+scans, so nothing of ours reads them); in a build that has no such field they are 0, and
+every hook whose `used_by` names it stands down (`has no address in <build>`). They are
+not tied to a hook's readiness: code that reads many fields of many objects reads each
+accessor once, outside the loop. A frame local of a patched function, read by a stub
+that runs inside it, is a `value` with `unit = "ebp"`, its offset from `ebp`
+(negative values are written in decimal: TOML has no negative hex).
 
 ## The resolver
 
@@ -174,12 +193,13 @@ e.build()          // Some("armada2/gog-1.1") or None
 e.code()           // the identity's first executable section, as mapped
 e.ready(hook::MODES)   // Ok(()) or Err(StandDown), checked once and cached
 e.addr(sym::X)     // relocated; 0 (logged once) unless a hook using it is ready
+e.field(Sym(k)) / e.value(Sym(k))   // the build's offset or value (field::X() calls it)
 e.range(sym::X)    // a fn with `end`
 e.site(sym::X)     // (symbol, site, expected target) for render3d's core_hooks::Site
 e.note(hook) / e.note_for(section, key) / e.note_plugin()   // SettingsNote texts
 ```
 
-C: `a2e_init(&QOL_ENGINE, log)`, `a2e_ready(QOL_H_X)`, `a2e_addr(QOL_S_X)`,
+C: `a2e_init(&QOL_ENGINE, log)`, `a2e_ready(QOL_H_X)`, `a2e_addr(QOL_S_X)`, `a2e_field(k)`,
 `a2e_build()`, `a2e_note(...)`, `a2e_note_for(...)`, `a2e_note_plugin()`,
 `a2e_code(&lo, &hi)`, `a2e_call_target(at, &dest)`; the host core is `a2e_start` (the
 image as a buffer), compiled with `A2E_HOST`.
@@ -221,6 +241,8 @@ It is the bench's: nothing ships it, and `./install` deletes it.
 
 `tools/engine/selftest.sh` (CI job `engine`): the three resolvers on every fixture
 (`tools/engine/README.md`, "Fixtures"; synthetic PE images written at test time, no game
-file), gen's golden output, and lint. `cargo test` here runs the identity tests; with
+file), gen's golden output, and lint. `cargo test` here runs the identity tests, `tests/fields.rs` (a child build that moves
+a field, an unknown build reading the root's) and its C twin (`tests/identity.c`, run by
+`tests/c_twin.rs`); with
 `--features fixtures` and `A2E_FIXTURES_RS` (what `tools/engine/fixtures.py run rs`
 sets) it runs the resolver fixtures too.

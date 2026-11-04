@@ -90,7 +90,7 @@ pub fn install() {
 /// The front end's own request (`SetActiveDisplay_Internal`'s hard-coded mode), named
 /// in the log when it is answered.
 fn front_end(w: i32, h: i32, bpp: i32) -> bool {
-    (w, h, bpp) == (value::FRONT_END_WIDTH, value::FRONT_END_HEIGHT, value::FRONT_END_DEPTH)
+    (w, h, bpp) == (value::FRONT_END_WIDTH(), value::FRONT_END_HEIGHT(), value::FRONT_END_DEPTH())
 }
 
 unsafe extern "thiscall" fn find(dev: usize, w: i32, h: i32, bpp: i32) -> usize {

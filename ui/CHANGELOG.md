@@ -4,6 +4,13 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 2.3.0 — 2026-11-04
+
+### Changed
+- Engine fields and values come from the matched build at run time (`field::X()`, `value::X()`), no longer compile-time consts of `gog-1.1`; the per-system wireframe sprites, the builder's queue, the setup's load fractions and the overlay's system order are sized by the build's counts at run time (`Vec`), and the repair ids are looked up per system (PLAN-ARCHITECTURE.md, AR-3).
+
+Installed, not yet seen in game.
+
 ## 2.2.4 — 2026-11-04
 
 ### Fixed

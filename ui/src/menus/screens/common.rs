@@ -6,7 +6,7 @@
 //! as `TextLabel`s and the choices as `ShellButton`s, so a spec finds them by place
 //! (a label above a button names it) rather than by text: the text is the game's own,
 //! localised, and is never written here.
-use crate::engine::dialogs::DESIGN_W;
+use crate::engine::dialogs::design_w;
 use crate::engine::shellui::Kind;
 use crate::menus::model::{Control, What};
 use crate::menus::{actions, backdrop, Screen};
@@ -37,7 +37,7 @@ pub fn is_footer(c: &Control) -> bool {
 /// dimmed picture (already drawn by the menus' backdrop) for one over a mission, a
 /// dimming for a dialog smaller than the screen over another.
 pub fn backdrop_for(ui: &mut Ui, s: &Screen) {
-    if s.model.rect[2] >= DESIGN_W && !backdrop::over_mission() {
+    if s.model.rect[2] >= design_w() && !backdrop::over_mission() {
         let r = ui.screen();
         theme::backdrop(ui, r);
     } else {

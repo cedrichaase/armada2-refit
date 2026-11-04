@@ -88,7 +88,7 @@ pub fn map_radar() -> usize {
 }
 
 pub fn radar() -> usize {
-    field(map_radar(), field::RADAR_MR_RADAR)
+    field(map_radar(), field::RADAR_MR_RADAR())
 }
 
 /// The world's (x, z) to the radar's unit square (u right, v down).
@@ -136,13 +136,13 @@ fn inside(p: [f32; 3]) -> bool {
 /// The map's picture: the Direct3D 8 texture `CacheMap` draws into, and the warp
 /// suppression layer over it.
 pub fn map_texture() -> usize {
-    field(ptr_of(sym::RADAR_MAP_SPRITE), field::RADAR_SPRITE_TEXTURE)
+    field(ptr_of(sym::RADAR_MAP_SPRITE), field::RADAR_SPRITE_TEXTURE())
 }
 pub fn warp_texture() -> usize {
-    field(ptr_of(sym::RADAR_WARP_SPRITE), field::RADAR_SPRITE_TEXTURE)
+    field(ptr_of(sym::RADAR_WARP_SPRITE), field::RADAR_SPRITE_TEXTURE())
 }
 pub fn background_sprite(r: usize) -> usize {
-    field(r, field::RADAR_RC_BACKGROUND)
+    field(r, field::RADAR_RC_BACKGROUND())
 }
 
 fn rd_ptr(a: usize) -> usize {
@@ -151,11 +151,11 @@ fn rd_ptr(a: usize) -> usize {
 
 /// The fog layer's texture size, in which the scan grid is centred.
 pub fn fog_texture_size() -> (u32, u32) {
-    let t = field(ptr_of(sym::RADAR_FOG_SPRITE), field::RADAR_SPRITE_TEXTURE);
+    let t = field(ptr_of(sym::RADAR_FOG_SPRITE), field::RADAR_SPRITE_TEXTURE());
     if t == 0 {
         return (0, 0);
     }
-    unsafe { (rd::<u32>(t + field::RADAR_TEX_W), rd::<u32>(t + field::RADAR_TEX_H)) }
+    unsafe { (rd::<u32>(t + field::RADAR_TEX_W()), rd::<u32>(t + field::RADAR_TEX_H())) }
 }
 
 /// A scan grid: its size and cells (one team mask each, row by row).
@@ -171,8 +171,8 @@ fn grid(s: a2engine::Sym) -> Option<Grid> {
         return None;
     }
     unsafe {
-        let (w, h) = (rd::<i32>(g + field::RADAR_GRID_W), rd::<i32>(g + field::RADAR_GRID_H));
-        let p = rd::<usize>(g + field::RADAR_GRID_CELLS);
+        let (w, h) = (rd::<i32>(g + field::RADAR_GRID_W()), rd::<i32>(g + field::RADAR_GRID_H()));
+        let p = rd::<usize>(g + field::RADAR_GRID_CELLS());
         if p == 0 || !(1..=4096).contains(&w) || !(1..=4096).contains(&h) {
             return None;
         }
@@ -208,7 +208,7 @@ fn game_setup() -> usize {
 
 fn editor() -> bool {
     let p = ptr_of(sym::RADAR_USER_PROFILE);
-    p != 0 && unsafe { rd::<u8>(p + field::RADAR_UP_EDITOR) } != 0
+    p != 0 && unsafe { rd::<u8>(p + field::RADAR_UP_EDITOR()) } != 0
 }
 
 /// Whether the game has fog of war and shroud, as `RadarComponent::Render` asks.
@@ -248,8 +248,8 @@ pub fn filters() -> (u32, u32) {
 pub fn filter_sprites() -> (usize, usize) {
     let m = map_radar();
     (
-        field(field(m, field::RADAR_MR_SHIP_BUTTON), field::RADAR_BTN_SPRITE),
-        field(field(m, field::RADAR_MR_STATION_BUTTON), field::RADAR_BTN_SPRITE),
+        field(field(m, field::RADAR_MR_SHIP_BUTTON()), field::RADAR_BTN_SPRITE()),
+        field(field(m, field::RADAR_MR_STATION_BUTTON()), field::RADAR_BTN_SPRITE()),
     )
 }
 
@@ -305,7 +305,7 @@ pub fn team_colour(team: i32) -> [f32; 3] {
     if t == 0 {
         return [0.7, 0.7, 0.7];
     }
-    unsafe { rd(t + field::RADAR_TEAM_COLOUR) }
+    unsafe { rd(t + field::RADAR_TEAM_COLOUR()) }
 }
 
 /// How a team stands to the player: 0 the player's own, 1 an ally, 2 an enemy, 3
@@ -334,11 +334,11 @@ pub fn relation(team: i32) -> u8 {
 
 fn passes_filter(cls: usize, team: i32, filters: (u32, u32), user: usize) -> bool {
     let vt = rd_ptr(cls);
-    let is_craft: unsafe extern "thiscall" fn(usize) -> bool = unsafe { core::mem::transmute(rd::<usize>(vt + field::RADAR_VT_IS_CRAFT_CLASS)) };
+    let is_craft: unsafe extern "thiscall" fn(usize) -> bool = unsafe { core::mem::transmute(rd::<usize>(vt + field::RADAR_VT_IS_CRAFT_CLASS())) };
     if !unsafe { is_craft(cls) } || cast(cls, sym::RADAR_TD_PLANET_CLASS) != 0 {
         return true;
     }
-    let station = unsafe { rd::<u8>(cls + field::RADAR_CLS_STATION) } != 0;
+    let station = unsafe { rd::<u8>(cls + field::RADAR_CLS_STATION()) } != 0;
     let f = if station { filters.1 } else { filters.0 };
     let test = match f {
         1 => at(sym::RADAR_IS_ALLY),
@@ -354,17 +354,17 @@ fn passes_filter(cls: usize, team: i32, filters: (u32, u32), user: usize) -> boo
 }
 
 fn blip(r: usize, cls: usize, pos: [f32; 3], team: i32, ghost: bool, selected: bool, filters: (u32, u32), user: usize) -> Option<Blip> {
-    if cls == 0 || unsafe { rd::<u32>(cls + field::RADAR_CLS_OFF_RADAR) } != 0 || !inside(pos) {
+    if cls == 0 || unsafe { rd::<u32>(cls + field::RADAR_CLS_OFF_RADAR()) } != 0 || !inside(pos) {
         return None;
     }
     if !passes_filter(cls, team, filters, user) {
         return None;
     }
     let craft = cast(cls, sym::RADAR_TD_CRAFT_CLASS);
-    let station = craft != 0 && unsafe { rd::<u8>(craft + field::RADAR_CLS_STATION) } != 0;
-    let has_size = unsafe { rd::<u8>(cls + field::RADAR_CLS_HAS_MAP_SIZE) } != 0;
+    let station = craft != 0 && unsafe { rd::<u8>(craft + field::RADAR_CLS_STATION()) } != 0;
+    let has_size = unsafe { rd::<u8>(cls + field::RADAR_CLS_HAS_MAP_SIZE()) } != 0;
     let size = if has_size {
-        let f: unsafe extern "thiscall" fn(usize) -> i32 = unsafe { core::mem::transmute(rd::<usize>(rd_ptr(cls) + field::RADAR_VT_MAP_SIZE)) };
+        let f: unsafe extern "thiscall" fn(usize) -> i32 = unsafe { core::mem::transmute(rd::<usize>(rd_ptr(cls) + field::RADAR_VT_MAP_SIZE())) };
         unsafe { f(cls) as f32 }
     } else if craft != 0 {
         if station { 3.0 } else { 2.0 }
@@ -378,7 +378,7 @@ fn blip(r: usize, cls: usize, pos: [f32; 3], team: i32, ghost: bool, selected: b
         team,
         kind: if craft == 0 { Kind::Other } else if station { Kind::Station } else { Kind::Ship },
         size,
-        sprite: field(cls, field::RADAR_CLS_RADAR_SPRITE),
+        sprite: field(cls, field::RADAR_CLS_RADAR_SPRITE()),
         ghost,
         selected,
         colour: team_colour(team),
@@ -402,10 +402,10 @@ pub fn blips(r: usize) -> Vec<Blip> {
             while n != head && n != 0 && guard < 8192 {
                 let s = field(n, 8);
                 if s != 0 {
-                    let pf: unsafe extern "thiscall" fn(usize) -> *const [f32; 3] = core::mem::transmute(rd::<usize>(rd_ptr(s) + field::RADAR_VT_SPIRIT_POS));
+                    let pf: unsafe extern "thiscall" fn(usize) -> *const [f32; 3] = core::mem::transmute(rd::<usize>(rd_ptr(s) + field::RADAR_VT_SPIRIT_POS()));
                     let p = pf(s);
                     if !p.is_null() {
-                        if let Some(b) = blip(r, field(s, field::RADAR_SPIRIT_CLASS), *p, rd::<i32>(s + field::RADAR_SPIRIT_TEAM), true, false, filters, user) {
+                        if let Some(b) = blip(r, field(s, field::RADAR_SPIRIT_CLASS()), *p, rd::<i32>(s + field::RADAR_SPIRIT_TEAM()), true, false, filters, user) {
                             out.push(b);
                         }
                     }
@@ -424,21 +424,21 @@ pub fn blips(r: usize) -> Vec<Blip> {
             let o = field(n, 8);
             n = rd::<usize>(n);
             guard += 1;
-            if o == 0 || rd::<u8>(o + field::RADAR_OBJ_REMOVED) != 0 {
+            if o == 0 || rd::<u8>(o + field::RADAR_OBJ_REMOVED()) != 0 {
                 continue;
             }
-            let see: unsafe extern "thiscall" fn(usize) -> bool = core::mem::transmute(rd::<usize>(rd_ptr(o) + field::RADAR_VT_CAN_USER_SEE));
+            let see: unsafe extern "thiscall" fn(usize) -> bool = core::mem::transmute(rd::<usize>(rd_ptr(o) + field::RADAR_VT_CAN_USER_SEE()));
             if !see(o) {
                 continue;
             }
-            let pos: [f32; 3] = rd(o + field::RADAR_OBJ_POS);
+            let pos: [f32; 3] = rd(o + field::RADAR_OBJ_POS());
             if let Some(b) = blip(
                 r,
-                field(o, field::RADAR_OBJ_CLASS),
+                field(o, field::RADAR_OBJ_CLASS()),
                 pos,
-                rd::<i32>(o + field::RADAR_OBJ_TEAM),
+                rd::<i32>(o + field::RADAR_OBJ_TEAM()),
                 false,
-                rd::<u8>(o + field::RADAR_OBJ_SELECTED) != 0,
+                rd::<u8>(o + field::RADAR_OBJ_SELECTED()) != 0,
                 filters,
                 user,
             ) {
@@ -461,7 +461,7 @@ pub struct Mark {
 
 pub fn marks(r: usize) -> Vec<Mark> {
     let mut out = Vec::new();
-    let head = field(r, field::RADAR_RC_MARKS);
+    let head = field(r, field::RADAR_RC_MARKS());
     if head == 0 {
         return out;
     }
@@ -472,7 +472,7 @@ pub fn marks(r: usize) -> Vec<Mark> {
             let m = n + 8;
             let p: [f32; 3] = rd(m);
             let (u, v) = to_square(r, p);
-            out.push(Mark { u, v, radius: rd::<i32>(m + field::RADAR_MARK_RADIUS) as f32 + 1.0, colour: rd(m + field::RADAR_MARK_COLOUR) });
+            out.push(Mark { u, v, radius: rd::<i32>(m + field::RADAR_MARK_RADIUS()) as f32 + 1.0, colour: rd(m + field::RADAR_MARK_COLOUR()) });
             n = rd::<usize>(n);
             guard += 1;
         }
@@ -481,7 +481,7 @@ pub fn marks(r: usize) -> Vec<Mark> {
 }
 
 pub fn camera() -> usize {
-    field(super::storm3d(), field::RADAR_S3D_CAMERA)
+    field(super::storm3d(), field::RADAR_S3D_CAMERA())
 }
 
 /// What the main camera sees of the map, in the unit square: its viewport's corners
@@ -496,9 +496,9 @@ pub fn view_outline(r: usize) -> Option<[(f32, f32); 4]> {
     let t = terrain();
     let y = (t[1] + t[4]) * 0.5;
     unsafe {
-        let vp: [f32; 4] = rd(cam + field::RADAR_CAM_VIEWPORT);
-        let (near, far) = (rd::<f32>(cam + field::RADAR_CAM_NEAR), rd::<f32>(cam + field::RADAR_CAM_FAR));
-        let pos: [f32; 3] = rd(cam + field::RADAR_CAM_POS);
+        let vp: [f32; 4] = rd(cam + field::RADAR_CAM_VIEWPORT());
+        let (near, far) = (rd::<f32>(cam + field::RADAR_CAM_NEAR()), rd::<f32>(cam + field::RADAR_CAM_FAR()));
+        let pos: [f32; 3] = rd(cam + field::RADAR_CAM_POS());
         if vp[2] <= 0.0 || vp[3] <= 0.0 {
             return None;
         }
@@ -528,8 +528,8 @@ pub fn tactical_camera(r: usize) -> Option<((f32, f32), (f32, f32))> {
         return None;
     }
     unsafe {
-        let eye = [rd::<f32>(tc + field::RADAR_TC_EYE_X), 0.0, rd::<f32>(tc + field::RADAR_TC_EYE_Z)];
-        let centre = [rd::<f32>(tc + field::RADAR_TC_CENTRE_X), 0.0, rd::<f32>(tc + field::RADAR_TC_CENTRE_Z)];
+        let eye = [rd::<f32>(tc + field::RADAR_TC_EYE_X()), 0.0, rd::<f32>(tc + field::RADAR_TC_EYE_Z())];
+        let centre = [rd::<f32>(tc + field::RADAR_TC_CENTRE_X()), 0.0, rd::<f32>(tc + field::RADAR_TC_CENTRE_Z())];
         if !eye.iter().chain(centre.iter()).all(|v| v.is_finite()) {
             return None;
         }
@@ -553,19 +553,19 @@ pub fn shot_scenes(r: usize) -> Vec<((f32, f32), f32)> {
     if view() != 1 || r == 0 || sd == 0 || vt == 0 || unsafe { rd::<usize>(sd) } != vt {
         return out;
     }
-    let side: f32 = unsafe { rd(r + field::RADAR_RC_SIDE) };
+    let side: f32 = unsafe { rd(r + field::RADAR_RC_SIDE()) };
     if !(side.is_finite() && side > 0.0) {
         return out;
     }
-    let head = field(sd, field::RADAR_SD_SCENES);
+    let head = field(sd, field::RADAR_SD_SCENES());
     if head == 0 {
         return out;
     }
     let mut n = field(head, 0);
     while n != head && n != 0 && out.len() < 64 {
         let s = n + 8;
-        let c: [f32; 3] = unsafe { rd(s + field::RADAR_SCENE_CENTRE) };
-        let rad: f32 = unsafe { rd(s + field::RADAR_SCENE_RADIUS) };
+        let c: [f32; 3] = unsafe { rd(s + field::RADAR_SCENE_CENTRE()) };
+        let rad: f32 = unsafe { rd(s + field::RADAR_SCENE_RADIUS()) };
         if c.iter().all(|v| v.is_finite()) && rad.is_finite() && rad > 0.0 {
             out.push((to_square(r, c), rad / side));
         }
@@ -594,7 +594,7 @@ static mut FILTER_PRESS: (u8, u8) = (0, 0);
 /// The command button is the right one, unless the player swapped the buttons.
 pub fn buttons_swapped() -> bool {
     let p = ptr_of(sym::RADAR_USER_PROFILE);
-    p != 0 && unsafe { rd::<u8>(p + field::RADAR_UP_SWAPPED) } != 0
+    p != 0 && unsafe { rd::<u8>(p + field::RADAR_UP_SWAPPED()) } != 0
 }
 
 pub fn selection_count() -> i32 {
@@ -602,7 +602,7 @@ pub fn selection_count() -> i32 {
     if o == 0 {
         return 0;
     }
-    let f: unsafe extern "thiscall" fn(usize) -> i32 = unsafe { core::mem::transmute(rd::<usize>(rd_ptr(o) + field::RADAR_VT_SELECT_NUM)) };
+    let f: unsafe extern "thiscall" fn(usize) -> i32 = unsafe { core::mem::transmute(rd::<usize>(rd_ptr(o) + field::RADAR_VT_SELECT_NUM())) };
     unsafe { f(o) }
 }
 
@@ -671,13 +671,13 @@ extern "C" fn teams_visible_step() -> u32 {
         for _ in 0..s {
             if nf != 0 {
                 let f: unsafe extern "C" fn(usize) = core::mem::transmute(nf);
-                f(field(m, field::RADAR_MR_SHIP_BUTTON));
+                f(field(m, field::RADAR_MR_SHIP_BUTTON()));
             }
         }
         for _ in 0..st {
             if ns != 0 {
                 let f: unsafe extern "C" fn(usize) = core::mem::transmute(ns);
-                f(field(m, field::RADAR_MR_STATION_BUTTON));
+                f(field(m, field::RADAR_MR_STATION_BUTTON()));
             }
         }
     }
@@ -707,7 +707,7 @@ unsafe fn act(p: Pending) {
                 return;
             }
             unsafe {
-                let mv: unsafe extern "thiscall" fn(usize, *mut f32) = core::mem::transmute(rd::<usize>(rd_ptr(cam) + field::RADAR_VT_CAMERA_MOVE));
+                let mv: unsafe extern "thiscall" fn(usize, *mut f32) = core::mem::transmute(rd::<usize>(rd_ptr(cam) + field::RADAR_VT_CAMERA_MOVE()));
                 mv(cam, pos.as_mut_ptr());
                 let snap_at = at(sym::RADAR_TACTICAL_SNAP);
                 if snap && !alt_held() && snap_fn != 0 && snap_at != 0 {
@@ -728,16 +728,16 @@ unsafe fn act(p: Pending) {
                 let get: unsafe extern "C" fn(*mut u32, usize, *const f32, usize) -> *mut u32 = core::mem::transmute(get_at);
                 let mut action = 0u32;
                 get(&mut action, 0, pos.as_ptr(), 0);
-                if action & value::RADAR_ACTION_MASK as u32 == value::RADAR_ACTION_MOVE as u32 && !alt_held() {
-                    action = (action & value::RADAR_ACTION_CANNOT as u32) | value::RADAR_ACTION_GO_WARP as u32;
+                if action & value::RADAR_ACTION_MASK() as u32 == value::RADAR_ACTION_MOVE() as u32 && !alt_held() {
+                    action = (action & value::RADAR_ACTION_CANNOT() as u32) | value::RADAR_ACTION_GO_WARP() as u32;
                     let mut cur = [0f32; 3];
-                    let wc: unsafe extern "thiscall" fn(usize, *mut f32) -> *mut f32 = core::mem::transmute(rd::<usize>(rd_ptr(o) + field::RADAR_VT_WHERE_CURSOR));
+                    let wc: unsafe extern "thiscall" fn(usize, *mut f32) -> *mut f32 = core::mem::transmute(rd::<usize>(rd_ptr(o) + field::RADAR_VT_WHERE_CURSOR()));
                     wc(o, cur.as_mut_ptr());
                     pos[1] = cur[1];
                 }
-                let set: unsafe extern "thiscall" fn(usize, u32) = core::mem::transmute(rd::<usize>(rd_ptr(o) + field::RADAR_VT_SET_CURSOR_ACTION));
+                let set: unsafe extern "thiscall" fn(usize, u32) = core::mem::transmute(rd::<usize>(rd_ptr(o) + field::RADAR_VT_SET_CURSOR_ACTION()));
                 set(o, action);
-                let bc: unsafe extern "thiscall" fn(usize, u32, *const f32, usize) -> bool = core::mem::transmute(rd::<usize>(rd_ptr(pal) + field::RADAR_VT_BROADCAST));
+                let bc: unsafe extern "thiscall" fn(usize, u32, *const f32, usize) -> bool = core::mem::transmute(rd::<usize>(rd_ptr(pal) + field::RADAR_VT_BROADCAST()));
                 let ok = bc(pal, action, pos.as_ptr(), 0);
                 crate::log!("minimap: order {:#x} at {:.0},{:.0}{}", action, pos[0], pos[2], if ok { "" } else { " (refused)" });
             }
@@ -772,17 +772,17 @@ pub fn action_cursor(r: usize, u: f32, v: f32) -> Option<(u32, &'static str)> {
         let get: unsafe extern "C" fn(*mut u32, usize, *const f32, usize) -> *mut u32 = core::mem::transmute(get_at);
         get(&mut action, 0, pos.as_ptr(), 0);
     }
-    if action & value::RADAR_ACTION_MASK as u32 == value::RADAR_ACTION_MOVE as u32 && !alt_held() {
-        action = (action & value::RADAR_ACTION_CANNOT as u32) | value::RADAR_ACTION_GO_WARP as u32;
+    if action & value::RADAR_ACTION_MASK() as u32 == value::RADAR_ACTION_MOVE() as u32 && !alt_held() {
+        action = (action & value::RADAR_ACTION_CANNOT() as u32) | value::RADAR_ACTION_GO_WARP() as u32;
     }
-    let i = action & value::RADAR_ACTION_MASK as u32;
-    if i >= value::RADAR_ACTION_CURSORS_N as u32 {
+    let i = action & value::RADAR_ACTION_MASK() as u32;
+    if i >= value::RADAR_ACTION_CURSORS_N() as u32 {
         return None;
     }
-    let entry = table + value::RADAR_ACTION_CURSOR_STRIDE as usize * i as usize;
-    let mut sprite = field(entry, if action & value::RADAR_ACTION_CANNOT as u32 != 0 { field::RADAR_AC_CANNOT } else { field::RADAR_AC_CURSOR });
+    let entry = table + value::RADAR_ACTION_CURSOR_STRIDE() as usize * i as usize;
+    let mut sprite = field(entry, if action & value::RADAR_ACTION_CANNOT() as u32 != 0 { field::RADAR_AC_CANNOT() } else { field::RADAR_AC_CURSOR() });
     if sprite == 0 {
-        sprite = field(table, field::RADAR_AC_CURSOR);
+        sprite = field(table, field::RADAR_AC_CURSOR());
     }
     let name = super::cursor::element_name(sprite)?;
     Some((action, name))
@@ -818,13 +818,13 @@ pub fn engine_texture(st3d_tex: usize) -> Option<(gpu::Texture, u32, u32)> {
     if st3d_tex == 0 {
         return None;
     }
-    let idx = field(super::storm3d(), field::RADAR_S3D_DEVICE_INDEX);
+    let idx = field(super::storm3d(), field::RADAR_S3D_DEVICE_INDEX());
     if idx > 8 {
         return None;
     }
-    let t8 = field(field(st3d_tex, field::RADAR_TEX_DEVICES + idx * 4), field::RADAR_DEVTEX_D3D8);
+    let t8 = field(field(st3d_tex, field::RADAR_TEX_DEVICES() + idx * 4), field::RADAR_DEVTEX_D3D8());
     let c = crate::gfx::gpu().engine_texture(t8 as *mut core::ffi::c_void)?;
-    let (w, h) = unsafe { (rd::<u32>(st3d_tex + field::RADAR_TEX_W), rd::<u32>(st3d_tex + field::RADAR_TEX_H)) };
+    let (w, h) = unsafe { (rd::<u32>(st3d_tex + field::RADAR_TEX_W()), rd::<u32>(st3d_tex + field::RADAR_TEX_H())) };
     Some((c, w, h))
 }
 

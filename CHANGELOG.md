@@ -5,6 +5,15 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.7.0 — 2026-11-04
+
+Layers: render3d 1.1.0, ui 2.3.0, display 1.1.0, qol 2.3.0, rules 1.1.0, online 0.12.0, cutscenes 3.1.0.
+
+### Changed
+- Profiles: `field` and `value` entries are resolved per build at run time, as addresses are (PLAN-ARCHITECTURE.md, AR-3, finding F3). `tools/engine/gen.py` emits a cheap accessor per entry in Rust (`field::X()`, `value::X()`) and a variable per entry in C (`a2f_<p>_<id>`, behind `<P>_F_X` and `<P>_V_X`), filled from the matched build at start-up; a hook whose field the build lacks stands down, as for a missing symbol. A child build may move a field or change a value in any plugin (the C-only FO-3 lint rule is gone). `crates/a2engine` gains `Engine::field`/`value`, `csdk/a2engine.h` `a2e_field`; the fixtures gain a child build that moves a field, which the three resolvers agree on.
+
+Installed, not yet seen in game.
+
 ## 15.6.21 — 2026-11-04
 
 Layers: gui-installer 3.1.0.

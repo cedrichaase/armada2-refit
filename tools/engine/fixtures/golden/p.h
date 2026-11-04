@@ -8,8 +8,8 @@
 #define P_S_PT 2
 #define P_S_L1 3
 #define P_S_G1 4
-#define P_F_FD 0x1c
-#define P_V_V1 640
+#define P_F_FD ((int)a2f_p_fd)
+#define P_V_V1 ((int)a2f_p_v1)
 #define P_S_C2 7
 #define P_S_C3 8
 #define P_S_VT 9
@@ -17,12 +17,14 @@
 #define P_S_S2 11
 #define P_S_F2 12
 #define P_S_N1 13
+#define P_F_FX ((int)a2f_p_fx)
 #define P_H_FNHOOK 0
 #define P_H_CHAINED 1
 #define P_H_WRONGCALL 2
 #define P_H_SLOTHOOK 3
 #define P_H_WRONGSLOT 4
 #define P_H_BADCHECK 5
+#define P_H_FIELDHOOK 6
 
 A2E_U32 a2s_p_f1 __attribute__((used));
 A2E_U32 a2s_p_c1 __attribute__((used));
@@ -36,6 +38,9 @@ A2E_U32 a2s_p_s1 __attribute__((used));
 A2E_U32 a2s_p_s2 __attribute__((used));
 A2E_U32 a2s_p_f2 __attribute__((used));
 A2E_U32 a2s_p_n1 __attribute__((used));
+A2E_U32 a2f_p_fd __attribute__((used)) = (A2E_U32)0x1c;
+A2E_U32 a2f_p_v1 __attribute__((used)) = (A2E_U32)640;
+A2E_U32 a2f_p_fx __attribute__((used)) = (A2E_U32)0x0;
 
 static A2E_U32 *const p_vars[] = {
     &a2s_p_f1,
@@ -43,8 +48,8 @@ static A2E_U32 *const p_vars[] = {
     &a2s_p_pt,
     &a2s_p_l1,
     &a2s_p_g1,
-    0,
-    0,
+    &a2f_p_fd,
+    &a2f_p_v1,
     &a2s_p_c2,
     &a2s_p_c3,
     &a2s_p_vt,
@@ -52,6 +57,7 @@ static A2E_U32 *const p_vars[] = {
     &a2s_p_s2,
     &a2s_p_f2,
     &a2s_p_n1,
+    &a2f_p_fx,
 };
 
 static const A2ESymDef p_syms[] = {
@@ -69,6 +75,7 @@ static const A2ESymDef p_syms[] = {
     {"s2", "One::vftable", 3},
     {"f2", "One::f2", 0},
     {"n1", "g_new", 8},
+    {"fx", "One", 10},
 };
 static const char *const p_h0_rows[] = {"Graphics.Other", 0};
 static const A2E_U16 p_h0_syms[] = {0, 1, 2, 3, 4, 5, 6, 0};
@@ -82,6 +89,8 @@ static const char *const p_h4_rows[] = {0};
 static const A2E_U16 p_h4_syms[] = {9, 11, 0};
 static const char *const p_h5_rows[] = {"Graphics.Thing", 0};
 static const A2E_U16 p_h5_syms[] = {12, 13, 0};
+static const char *const p_h6_rows[] = {0};
+static const A2E_U16 p_h6_syms[] = {14, 0};
 static const A2EHookDef p_hooks[] = {
     {"p.fnhook", 0, p_h0_rows, 1, p_h0_syms, 7},
     {"p.chained", 0, p_h1_rows, 0, p_h1_syms, 1},
@@ -89,6 +98,7 @@ static const A2EHookDef p_hooks[] = {
     {"p.slothook", 0, p_h3_rows, 0, p_h3_syms, 2},
     {"p.wrongslot", 0, p_h4_rows, 0, p_h4_syms, 2},
     {"p.badcheck", 0, p_h5_rows, 1, p_h5_syms, 2},
+    {"p.fieldhook", 0, p_h6_rows, 0, p_h6_syms, 1},
 };
 static const A2E_U8 p_b0_c0[] = {0x55, 0x8b, 0xec, 0x83, 0xec, 0x10};
 static const A2E_U8 p_b0_c2[] = {0x90, 0x90, 0x90, 0x90, 0x90};
@@ -108,6 +118,7 @@ static const A2EEntry p_b0_entries[] = {
     {1, 0, 0x0, 0x9, 2, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* s2 */
     {1, 0, 0xffff, 0xffff, 0, 0, 3, 0x401100, 0x0, 0, p_b0_c12, 0, ""}, /* f2 */
     {0},
+    {0},
 };
 static const A2EBlock p_b0_blocked[] = {
     {0xffff, 0, 0, 0}
@@ -121,7 +132,7 @@ static const A2EEntry p_b1_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 5, 0x401300, 0x0, 0, p_b1_c2, 0, ""}, /* pt */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x401305, 0x0, 0, 0, 0, ""}, /* l1 */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x404010, 0x0, 0, 0, 0, ""}, /* g1 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 28, 0, 0, ""}, /* fd */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 32, 0, 0, ""}, /* fd */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 640, 0, 0, ""}, /* v1 */
     {1, 1, 0x0, 0xffff, 0, 0, 0, 0x401210, 0x0, 0, 0, 0, ""}, /* c2 */
     {1, 0, 0x0, 0xffff, 0, 0, 0, 0x401220, 0x0, 0, 0, 0, ""}, /* c3 */
@@ -130,6 +141,7 @@ static const A2EEntry p_b1_entries[] = {
     {1, 0, 0x0, 0x9, 2, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* s2 */
     {1, 0, 0xffff, 0xffff, 0, 0, 3, 0x401100, 0x0, 0, p_b1_c12, 0, ""}, /* f2 */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x406000, 0x0, 0, 0, 0, ""}, /* n1 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 48, 0, 0, ""}, /* fx */
 };
 static const A2EBlock p_b1_blocked[] = {
     {0, "One::caller", "is changed by b2 (not yet verified)", "Stands down: One::caller is changed by b2, not yet verified"},
@@ -154,24 +166,25 @@ static const A2EEntry p_b2_entries[] = {
     {1, 0, 0x0, 0x9, 2, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* s2 */
     {1, 0, 0xffff, 0xffff, 0, 0, 3, 0x401100, 0x0, 0, p_b2_c12, 0, ""}, /* f2 */
     {0},
+    {0},
 };
 static const A2EBlock p_b2_blocked[] = {
     {0xffff, 0, 0, 0}
 };
 static const A2EBuild p_builds[] = {
     {"b1", "test/b1", 0x5eed0001, 0x6000, 0x777d215e, 0x400000, p_b0_entries, p_b0_blocked, 0, 13},
-    {"b2", "test/b2", 0x5eed0001, 0x7000, 0xa56c4602, 0x400000, p_b1_entries, p_b1_blocked, 2, 7},
+    {"b2", "test/b2", 0x5eed0001, 0x7000, 0xa56c4602, 0x400000, p_b1_entries, p_b1_blocked, 2, 8},
     {"b3", "test/b3", 0x5eed0001, 0x8000, 0x756db512, 0x400000, p_b2_entries, p_b2_blocked, 0, 13},
 };
 
-static A2E_U8 p_hook_state[6];
-static A2E_U8 p_sym_flags[14];
-static A2E_U32 p_sym_addr[14];
-static char p_notes[6][A2E_NOTE_MAX + 1];
+static A2E_U8 p_hook_state[7];
+static A2E_U8 p_sym_flags[15];
+static A2E_U32 p_sym_addr[15];
+static char p_notes[7][A2E_NOTE_MAX + 1];
 
 static const A2ETable P_ENGINE = {
     "test", "p",
-    p_syms, 14, p_hooks, 6, p_builds, 3, 0,
+    p_syms, 15, p_hooks, 7, p_builds, 3, 0,
     p_vars, p_hook_state, p_sym_flags, p_sym_addr, p_notes
 };
 

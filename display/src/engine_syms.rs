@@ -29,21 +29,23 @@ pub mod hook {
 }
 
 pub mod field {
-    pub const PROFILE_MODE_W: usize = 0x50;
-    pub const PROFILE_MODE_H: usize = 0x54;
-    pub const PROFILE_MODE_BPP: usize = 0x58;
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn PROFILE_MODE_W() -> usize { super::TABLE.engine().field(a2engine::Sym(15)) }
+    #[inline(always)] pub fn PROFILE_MODE_H() -> usize { super::TABLE.engine().field(a2engine::Sym(16)) }
+    #[inline(always)] pub fn PROFILE_MODE_BPP() -> usize { super::TABLE.engine().field(a2engine::Sym(17)) }
 }
 
 pub mod value {
-    pub const FRONT_END_WIDTH: i32 = 800;
-    pub const FRONT_END_HEIGHT: i32 = 600;
-    pub const FRONT_END_DEPTH: i32 = 16;
-    pub const INTRO_WIDTH: i32 = 640;
-    pub const INTRO_HEIGHT: i32 = 480;
-    pub const DEFAULT_MODE_W: i32 = 800;
-    pub const DEFAULT_MODE_H: i32 = 600;
-    pub const GOG_MODE_W: i32 = 1024;
-    pub const GOG_MODE_H: i32 = 768;
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn FRONT_END_WIDTH() -> i32 { super::TABLE.engine().value(a2engine::Sym(7)) }
+    #[inline(always)] pub fn FRONT_END_HEIGHT() -> i32 { super::TABLE.engine().value(a2engine::Sym(8)) }
+    #[inline(always)] pub fn FRONT_END_DEPTH() -> i32 { super::TABLE.engine().value(a2engine::Sym(9)) }
+    #[inline(always)] pub fn INTRO_WIDTH() -> i32 { super::TABLE.engine().value(a2engine::Sym(10)) }
+    #[inline(always)] pub fn INTRO_HEIGHT() -> i32 { super::TABLE.engine().value(a2engine::Sym(11)) }
+    #[inline(always)] pub fn DEFAULT_MODE_W() -> i32 { super::TABLE.engine().value(a2engine::Sym(18)) }
+    #[inline(always)] pub fn DEFAULT_MODE_H() -> i32 { super::TABLE.engine().value(a2engine::Sym(19)) }
+    #[inline(always)] pub fn GOG_MODE_W() -> i32 { super::TABLE.engine().value(a2engine::Sym(20)) }
+    #[inline(always)] pub fn GOG_MODE_H() -> i32 { super::TABLE.engine().value(a2engine::Sym(21)) }
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[

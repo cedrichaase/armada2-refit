@@ -1,5 +1,6 @@
 # Stock: the image is build b1, every hook checked in memory.
 set = "basic"
+field = ["fd", "v1", "fx"]
 addr = ["f1", "f2", "g1"]
 note_for = ["Graphics.Thing", "Graphics.Other"]
 
@@ -39,7 +40,7 @@ s = "stock"
 p = [
   "engine: Armada2.exe timestamp 0x5eed0001, image size 0x6000, sections 0x777d215e",
   "engine: build test/b1",
-  "engine: symbols: 13/14 resolved; 0 hooks blocked",
+  "engine: symbols: 13/15 resolved; 0 hooks blocked",
   "ready p.fnhook ok",
   "engine: p.chained: One::chainer at 0x401210 calls 0x7ff00000 (chained)",
   "ready p.chained ok",
@@ -50,13 +51,19 @@ p = [
   "ready p.wrongslot fail",
   "engine: p.badcheck stands down: One::f2 is not stock (bytes differ)",
   "ready p.badcheck fail",
+  "engine: p.fieldhook stands down: One has no address in b1",
+  "ready p.fieldhook fail",
   "addr f1 0x401000",
   "engine: f2 read before its hook was ready",
   "addr f2 0x0",
   "addr g1 0x404010",
+  "field fd 0x1c",
+  "field v1 0x280",
+  "field fx 0x0",
   "note p.wrongcall Stands down: One::caller is not stock in this Armada2.exe",
   "note p.wrongslot Stands down: One::vftable is not stock in this Armada2.exe",
   "note p.badcheck Stands down: One::f2 is not stock in this Armada2.exe",
+  "note p.fieldhook Stands down: One is not stock in this Armada2.exe",
   "note_for Graphics.Thing Stands down: One::f2 is not stock in this Armada2.exe",
   "note_for Graphics.Other -",
   "note_plugin -",

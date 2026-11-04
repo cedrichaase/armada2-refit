@@ -24,11 +24,16 @@ use alloc::vec::Vec;
 
 use crate::syms_shell::{field, hook, TABLE};
 
-const COUNT: usize = field::SHELLCOMBO_COUNT;
-const ITEM_H: usize = field::SHELLCOMBO_ITEM_H;
-const PULL: usize = field::SHELLCOMBO_PULL;
-const COMBO: usize = field::SHELLCOMBO_COMBO;
-const DOWN: usize = field::SHELLCOMBO_DOWN;
+#[inline(always)]
+fn off_count() -> usize { field::SHELLCOMBO_COUNT() }
+#[inline(always)]
+fn item_h() -> usize { field::SHELLCOMBO_ITEM_H() }
+#[inline(always)]
+fn off_pull() -> usize { field::SHELLCOMBO_PULL() }
+#[inline(always)]
+fn off_combo() -> usize { field::SHELLCOMBO_COMBO() }
+#[inline(always)]
+fn off_down() -> usize { field::SHELLCOMBO_DOWN() }
 
 /// Whether the engine lets the `ComboBox` reads run (its fields are compile-time; the
 /// hook is the one place that names them in the profile).
@@ -46,7 +51,7 @@ pub fn combo(obj: usize) -> Option<HWND> {
     if !ready() {
         return None;
     }
-    let h = rd::<usize>(obj + COMBO) as HWND;
+    let h = rd::<usize>(obj + off_combo()) as HWND;
     if h.is_null() || unsafe { IsWindow(h) } == 0 {
         return None;
     }
@@ -83,13 +88,13 @@ pub fn item_point(obj: usize, i: i32) -> Option<(i32, i32)> {
     if !ready() {
         return None;
     }
-    let count: i32 = rd(obj + COUNT);
-    let h: i32 = rd(obj + ITEM_H);
+    let count: i32 = rd(obj + off_count());
+    let h: i32 = rd(obj + item_h());
     if i < 0 || i >= count || !(4..=64).contains(&h) {
         return None;
     }
-    let (l, t, r, _b) = (rd::<i32>(obj + PULL), rd::<i32>(obj + PULL + 4), rd::<i32>(obj + PULL + 8), rd::<i32>(obj + PULL + 12));
-    let down = rd::<u8>(obj + DOWN) != 0;
+    let (l, t, r, _b) = (rd::<i32>(obj + off_pull()), rd::<i32>(obj + off_pull() + 4), rd::<i32>(obj + off_pull() + 8), rd::<i32>(obj + off_pull() + 12));
+    let down = rd::<u8>(obj + off_down()) != 0;
     let row = if down { i + 1 } else { i };
     Some(((l + r) / 2, t + row * h + h / 2))
 }

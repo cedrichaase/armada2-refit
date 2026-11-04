@@ -41,18 +41,18 @@ def header(t, c=False):
     return f'/* {line} */' if c else f'// {line}'
 
 
-def consts(t):
-    """{id: value} for fields and values, refusing builds that disagree (FO-3)."""
+def root_values(t):
+    """{id: the root build's offset or value} for fields and values: what the C header's
+    variables start with, before the resolver has picked a build. Every build's own value
+    is in its entries (`value`): fields and values are resolved per build at run time."""
     out = {}
     for k, sid in enumerate(t.sym_ids):
         kind = t.kind(k)
         if kind not in profiles.CONST_KINDS:
             continue
         key = 'offset' if kind == 'field' else 'value'
-        vals = {b['entries'][k][key] for b in t.builds if b['entries'][k] is not None}
-        if len(vals) > 1:
-            raise ProfileError(f'{t.file.rel()}: {sid} differs between builds: run-time fields and values are FO-3\'s')
-        out[sid] = vals.pop()
+        e = t.builds[0]['entries'][k]
+        out[sid] = e[key] if e is not None else 0
     return out
 
 
@@ -105,7 +105,6 @@ def rs_bytes(b):
 
 def emit_rs(t):
     o = [header(t), '//! The symbol table of `' + t.plugin + '` (crates/a2engine/README.md).', '']
-    cs = consts(t)
     o.append('pub mod sym {')
     for k, sid in enumerate(t.sym_ids):
         if t.kind(k) not in profiles.CONST_KINDS:
@@ -113,14 +112,16 @@ def emit_rs(t):
     o += ['}', '', 'pub mod hook {']
     for h, name in enumerate(t.hooks):
         o.append(f'    pub const {upper(name)}: a2engine::HookId = a2engine::HookId({h});')
-    o += ['}', '', 'pub mod field {']
+    # Fields and values are the matched build's, read at run time (README.md, "Fields
+    # and values"): a cheap accessor each, never a const.
+    o += ['}', '', 'pub mod field {', '    #![allow(non_snake_case)]']
     for k, sid in enumerate(t.sym_ids):
         if t.kind(k) == 'field':
-            o.append(f'    pub const {upper(sid)}: usize = {cs[sid]:#x};')
-    o += ['}', '', 'pub mod value {']
+            o.append(f'    #[inline(always)] pub fn {upper(sid)}() -> usize {{ super::TABLE.engine().field(a2engine::Sym({k})) }}')
+    o += ['}', '', 'pub mod value {', '    #![allow(non_snake_case)]']
     for k, sid in enumerate(t.sym_ids):
         if t.kind(k) == 'value':
-            o.append(f'    pub const {upper(sid)}: i32 = {cs[sid]};')
+            o.append(f'    #[inline(always)] pub fn {upper(sid)}() -> i32 {{ super::TABLE.engine().value(a2engine::Sym({k})) }}')
     o += ['}', '']
     o.append('pub const SYMS: &[a2engine::SymDef] = &[')
     for k, sid in enumerate(t.sym_ids):
@@ -196,16 +197,16 @@ def c_bytes(name, b):
 def emit_c(t):
     p, P = t.plugin, upper(t.plugin)
     guard = f'{P}_ENGINE_SYMS_H'
-    cs = consts(t)
+    cs = root_values(t)
     o = [header(t, c=True),
          f'/* The symbol table of {p} (crates/a2engine/README.md); included once, after a2engine.h. */',
          f'#ifndef {guard}', f'#define {guard}', '']
     for k, sid in enumerate(t.sym_ids):
         kind = t.kind(k)
         if kind == 'field':
-            o.append(f'#define {P}_F_{upper(sid)} 0x{cs[sid]:x}')
+            o.append(f'#define {P}_F_{upper(sid)} ((int)a2f_{p}_{sid})')
         elif kind == 'value':
-            o.append(f'#define {P}_V_{upper(sid)} {cs[sid]}')
+            o.append(f'#define {P}_V_{upper(sid)} ((int)a2f_{p}_{sid})')
         else:
             o.append(f'#define {P}_S_{upper(sid)} {k}')
     for h, name in enumerate(t.hooks):
@@ -214,10 +215,17 @@ def emit_c(t):
     for k, sid in enumerate(t.sym_ids):
         if t.kind(k) not in profiles.CONST_KINDS:
             o.append(f'A2E_U32 a2s_{p}_{sid} __attribute__((used));')
+    # A field's offset or a value, the matched build's once a2e_start has run (the root
+    # build's before; 0 where the build has none): an asm stub reads `_a2f_<p>_<id>`.
+    for k, sid in enumerate(t.sym_ids):
+        if t.kind(k) in profiles.CONST_KINDS:
+            v = cs[sid]
+            lit = f'0x{v:x}' if t.kind(k) == 'field' and v >= 0 else str(v)
+            o.append(f'A2E_U32 a2f_{p}_{sid} __attribute__((used)) = (A2E_U32){lit};')
     o.append('')
     o.append(f'static A2E_U32 *const {p}_vars[] = {{')
     for k, sid in enumerate(t.sym_ids):
-        o.append(f'    0,' if t.kind(k) in profiles.CONST_KINDS else f'    &a2s_{p}_{sid},')
+        o.append(f'    &a2f_{p}_{sid},' if t.kind(k) in profiles.CONST_KINDS else f'    &a2s_{p}_{sid},')
     o += ['};', '', f'static const A2ESymDef {p}_syms[] = {{']
     for k, sid in enumerate(t.sym_ids):
         d = t.defs[sid]

@@ -15,7 +15,7 @@
 #define ONLINE_S_CHAT_GAME 9
 #define ONLINE_S_ROOM_INIT 10
 #define ONLINE_S_GAME_INIT 11
-#define ONLINE_F_CHAT_HWND 0x2714
+#define ONLINE_F_CHAT_HWND ((int)a2f_online_chat_hwnd)
 #define ONLINE_H_ENTRY 0
 
 A2E_U32 a2s_online_read_label __attribute__((used));
@@ -30,6 +30,7 @@ A2E_U32 a2s_online_chat_room __attribute__((used));
 A2E_U32 a2s_online_chat_game __attribute__((used));
 A2E_U32 a2s_online_room_init __attribute__((used));
 A2E_U32 a2s_online_game_init __attribute__((used));
+A2E_U32 a2f_online_chat_hwnd __attribute__((used)) = (A2E_U32)0x2714;
 
 static A2E_U32 *const online_vars[] = {
     &a2s_online_read_label,
@@ -44,7 +45,7 @@ static A2E_U32 *const online_vars[] = {
     &a2s_online_chat_game,
     &a2s_online_room_init,
     &a2s_online_game_init,
-    0,
+    &a2f_online_chat_hwnd,
 };
 
 static const A2ESymDef online_syms[] = {

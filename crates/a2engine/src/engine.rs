@@ -601,6 +601,30 @@ impl Engine {
         0
     }
 
+    /// A `field`'s offset in this build (README.md, "Fields and values"): what the
+    /// generated `field::X()` returns. On an unknown build, and before `init`, the root
+    /// build's (only scan hooks run there, so no hook of ours reads it); 0 when this build
+    /// has no such field (every hook that uses it stands down). Not tied to a hook's
+    /// readiness, so a read in a hot path costs one load and an index.
+    #[inline]
+    pub fn field(&self, s: Sym) -> usize {
+        self.value(s) as usize
+    }
+
+    /// A `value`'s value in this build, as `field` (the generated `value::X()`).
+    #[inline]
+    pub fn value(&self, s: Sym) -> i32 {
+        let t = self.t();
+        let b = match t.rt.build.load(Acquire) {
+            0 | 1 => 0,
+            b => b as usize - 2,
+        };
+        match t.builds.get(b).and_then(|b| b.entries.get(s.0 as usize)) {
+            Some(e) if e.present => e.value,
+            _ => 0,
+        }
+    }
+
     /// A `fn` with an `end`: its range, relocated; (0, 0) unless ready.
     pub fn range(&self, s: Sym) -> (usize, usize) {
         let a = self.addr(s);

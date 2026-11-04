@@ -4,6 +4,13 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 1.1.0 — 2026-11-04
+
+### Changed
+- Engine fields and values come from the matched build at run time (`field::X()`, `value::X()`, crates/a2engine `Engine::field`/`value`), no longer compile-time consts of `gog-1.1`: a build whose structs differ gets its own offsets, and a hook whose field the build lacks stands down (PLAN-ARCHITECTURE.md, AR-3).
+
+Installed, not yet seen in game.
+
 ## 1.0.4 — 2026-11-04
 
 ### Fixed

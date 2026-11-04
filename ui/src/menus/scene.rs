@@ -76,7 +76,7 @@ fn wanted() -> Option<(&'static core::ffi::CStr, SceneFn)> {
         return None;
     }
     let all = crate::engine::dialogs::stack();
-    let full = all.iter().rposition(|s| s.w() >= crate::engine::dialogs::DESIGN_W && s.h() >= crate::engine::dialogs::DESIGN_H)?;
+    let full = all.iter().rposition(|s| s.w() >= crate::engine::dialogs::design_w() && s.h() >= crate::engine::dialogs::design_h())?;
     let screen = crate::engine::dialogs::screen_name(all[full].proc_addr);
     if screen != "single player" {
         // Each visit to the campaign selection starts at the Federation's view.

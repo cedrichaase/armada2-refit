@@ -4,18 +4,21 @@
 #define BINKPROXY_ENGINE_SYMS_H
 
 #define BINKPROXY_S_INTRO_COPY_RET 0
-#define BINKPROXY_F_INTRO_DESC_FORMAT 0x28
-#define BINKPROXY_F_INTRO_DESC_WIDTH 0x10
-#define BINKPROXY_F_INTRO_DESC_HEIGHT 0xc
+#define BINKPROXY_F_INTRO_DESC_FORMAT ((int)a2f_binkproxy_intro_desc_format)
+#define BINKPROXY_F_INTRO_DESC_WIDTH ((int)a2f_binkproxy_intro_desc_width)
+#define BINKPROXY_F_INTRO_DESC_HEIGHT ((int)a2f_binkproxy_intro_desc_height)
 #define BINKPROXY_H_INTRO_COPY 0
 
 A2E_U32 a2s_binkproxy_intro_copy_ret __attribute__((used));
+A2E_U32 a2f_binkproxy_intro_desc_format __attribute__((used)) = (A2E_U32)0x28;
+A2E_U32 a2f_binkproxy_intro_desc_width __attribute__((used)) = (A2E_U32)0x10;
+A2E_U32 a2f_binkproxy_intro_desc_height __attribute__((used)) = (A2E_U32)0xc;
 
 static A2E_U32 *const binkproxy_vars[] = {
     &a2s_binkproxy_intro_copy_ret,
-    0,
-    0,
-    0,
+    &a2f_binkproxy_intro_desc_format,
+    &a2f_binkproxy_intro_desc_width,
+    &a2f_binkproxy_intro_desc_height,
 };
 
 static const A2ESymDef binkproxy_syms[] = {

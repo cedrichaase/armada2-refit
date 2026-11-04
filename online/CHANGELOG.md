@@ -4,6 +4,13 @@
 8 with a transport of our own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 and versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.12.0 — 2026-11-04
+
+### Changed
+- Engine fields and values are the matched build's, filled at start-up (`ONLINE_F_*`), no longer compile-time per game (PLAN-ARCHITECTURE.md, AR-3).
+
+Installed, not yet seen in game.
+
 ## 0.11.1 — 2026-11-03
 
 ### Changed

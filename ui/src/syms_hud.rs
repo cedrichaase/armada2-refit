@@ -100,102 +100,104 @@ pub mod hook {
 }
 
 pub mod field {
-    pub const HUD_DI_RECT: usize = 0x4;
-    pub const HUD_DI_HIDDEN: usize = 0x16;
-    pub const HUD_DI_CURSOR: usize = 0x24;
-    pub const HUD_VT_NAME: usize = 0x18;
-    pub const HUD_VT_RENDER: usize = 0x58;
-    pub const HUD_VT_CURSOR_OVER: usize = 0x70;
-    pub const HUD_CURSOR_OWNER: usize = 0x24;
-    pub const HUD_CURSOR_SPRITE: usize = 0x2c;
-    pub const HUD_CURSOR_TIP: usize = 0x34;
-    pub const HUD_CURSOR_TIP_VERBOSE: usize = 0x38;
-    pub const POPUPS_MSG_TITLE: usize = 0x28;
-    pub const POPUPS_MSG_BODY: usize = 0x2c;
-    pub const POPUPS_MSG_OK: usize = 0x34;
-    pub const POPUPS_OBJ_SUMMARY_HEADER: usize = 0x28;
-    pub const POPUPS_OBJ_TITLE: usize = 0x2c;
-    pub const POPUPS_OBJ_BRIEFING: usize = 0x30;
-    pub const POPUPS_OBJ_HEADER: usize = 0x34;
-    pub const POPUPS_OBJ_LINES: usize = 0x3c;
-    pub const POPUPS_OBJ_DONE: usize = 0x5c;
-    pub const POPUPS_OBJ_OK: usize = 0x70;
-    pub const POPUPS_VT_FOCUS_SIMULATE: usize = 0x44;
-    pub const POPUPS_PAUSE_BUTTON: usize = 0x30;
-    pub const POPUPS_REPLAY_BUTTONS: usize = 0x2c;
-    pub const PALETTE_SLOTS: usize = 0x28;
-    pub const PALETTE_MODE: usize = 0x110;
-    pub const PALETTE_MENU: usize = 0x124;
-    pub const PALETTE_BTN_STATE: usize = 0x34;
-    pub const PALETTE_BTN_SPRITE: usize = 0x2c;
-    pub const PALETTE_BTN_MODE: usize = 0x84;
-    pub const PALETTE_BTN_COMMAND: usize = 0x88;
-    pub const PALETTE_VT_TOOLTIP: usize = 0x0;
-    pub const PALETTE_VT_VERBOSE: usize = 0x4;
-    pub const PALETTE_VT_IS_VALID: usize = 0x1c;
-    pub const PALETTE_VT_PRESS: usize = 0x20;
-    pub const PALETTE_CMD_NAME: usize = 0x20;
-    pub const PALETTE_CMD_POS: usize = 0x1b0;
-    pub const PALETTE_MODE_KIND: usize = 0x4;
-    pub const PALETTE_MODE_CLASS: usize = 0xc;
-    pub const PALETTE_CLASS_ODF: usize = 0x7c;
-    pub const PALETTE_MODE_WEAPON: usize = 0x10;
-    pub const PALETTE_WEAPON_PRJID: usize = 0x208;
-    pub const PALETTE_MODE_INDEX: usize = 0x14;
-    pub const OVERLAY_SD_POINTED: usize = 0x7c;
-    pub const OVERLAY_SD_TEAM: usize = 0x88;
-    pub const OVERLAY_SD_FADE: usize = 0x8c;
-    pub const OVERLAY_SD_REPAIR_ICONS: usize = 0x54;
-    pub const OVERLAY_RI_SPRITE: usize = 0x34;
-    pub const OVERLAY_RI_FLASH: usize = 0x40;
-    pub const OVERLAY_OBJ_FLAGS: usize = 0x14;
-    pub const OVERLAY_OBJ_DRAWN: usize = 0x25;
-    pub const OVERLAY_OBJ_CLASS: usize = 0x40;
-    pub const OVERLAY_OBJ_TEAM: usize = 0xec;
-    pub const OVERLAY_OBJ_SELECTED: usize = 0x10e;
-    pub const OVERLAY_OBJ_REMOVED: usize = 0x113;
-    pub const OVERLAY_OBJ_GROUP: usize = 0x120;
-    pub const OVERLAY_OBJ_HULL: usize = 0x158;
-    pub const OVERLAY_OBJ_HULL_MAX: usize = 0x160;
-    pub const OVERLAY_OBJ_SPECIAL: usize = 0x164;
-    pub const OVERLAY_OBJ_SPECIAL_MAX: usize = 0x168;
-    pub const OVERLAY_CRAFT_SHIELD: usize = 0x1c8;
-    pub const OVERLAY_CRAFT_SHIELD_MAX: usize = 0x1cc;
-    pub const OVERLAY_CRAFT_SYSTEMS: usize = 0x1e0;
-    pub const OVERLAY_CRAFT_SHOW_ALL: usize = 0x1bf;
-    pub const OVERLAY_SYSTEM_HIDDEN: usize = 0x0;
-    pub const OVERLAY_SYSTEM_SIZE: usize = 0x4;
-    pub const OVERLAY_SYSTEM_NOW: usize = 0x18;
-    pub const OVERLAY_VT_CAN_USER_SEE: usize = 0x8;
-    pub const OVERLAY_VT_CLASS_NAME: usize = 0x70;
-    pub const OVERLAY_CLS_STATION: usize = 0x20d;
-    pub const OVERLAY_S3D_CAMERA: usize = 0xfc;
-    pub const OTEXT_MAP_HEAD: usize = 0x28;
-    pub const OTEXT_NODE_KEY: usize = 0xc;
-    pub const OTEXT_NODE_VALUE: usize = 0x14;
-    pub const OTEXT_POINT: usize = 0x58;
-    pub const OTEXT_JUSTIFY: usize = 0x68;
-    pub const OTEXT_TEXT: usize = 0x88;
-    pub const OTEXT_COLOUR: usize = 0x94;
-    pub const OTEXT_FADE: usize = 0xa0;
-    pub const LO_SPRITE_COLOUR: usize = 0x24;
-    pub const LO_FADE_ALPHA: usize = 0x24;
-    pub const LO_CAM_PROJECTION: usize = 0x160;
-    pub const LO_CAM_VIEWPORT: usize = 0x1b0;
-    pub const LO_S3D_CAMERA: usize = 0xfc;
-    pub const LO_S3D_DEVICE: usize = 0xc0;
-    pub const LO_S3D_FPS: usize = 0x88;
-    pub const LO_S3D_TOTAL_FPS: usize = 0x80;
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn HUD_DI_RECT() -> usize { super::TABLE.engine().field(a2engine::Sym(12)) }
+    #[inline(always)] pub fn HUD_DI_HIDDEN() -> usize { super::TABLE.engine().field(a2engine::Sym(13)) }
+    #[inline(always)] pub fn HUD_DI_CURSOR() -> usize { super::TABLE.engine().field(a2engine::Sym(14)) }
+    #[inline(always)] pub fn HUD_VT_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(15)) }
+    #[inline(always)] pub fn HUD_VT_RENDER() -> usize { super::TABLE.engine().field(a2engine::Sym(16)) }
+    #[inline(always)] pub fn HUD_VT_CURSOR_OVER() -> usize { super::TABLE.engine().field(a2engine::Sym(17)) }
+    #[inline(always)] pub fn HUD_CURSOR_OWNER() -> usize { super::TABLE.engine().field(a2engine::Sym(18)) }
+    #[inline(always)] pub fn HUD_CURSOR_SPRITE() -> usize { super::TABLE.engine().field(a2engine::Sym(19)) }
+    #[inline(always)] pub fn HUD_CURSOR_TIP() -> usize { super::TABLE.engine().field(a2engine::Sym(20)) }
+    #[inline(always)] pub fn HUD_CURSOR_TIP_VERBOSE() -> usize { super::TABLE.engine().field(a2engine::Sym(21)) }
+    #[inline(always)] pub fn POPUPS_MSG_TITLE() -> usize { super::TABLE.engine().field(a2engine::Sym(36)) }
+    #[inline(always)] pub fn POPUPS_MSG_BODY() -> usize { super::TABLE.engine().field(a2engine::Sym(37)) }
+    #[inline(always)] pub fn POPUPS_MSG_OK() -> usize { super::TABLE.engine().field(a2engine::Sym(38)) }
+    #[inline(always)] pub fn POPUPS_OBJ_SUMMARY_HEADER() -> usize { super::TABLE.engine().field(a2engine::Sym(39)) }
+    #[inline(always)] pub fn POPUPS_OBJ_TITLE() -> usize { super::TABLE.engine().field(a2engine::Sym(40)) }
+    #[inline(always)] pub fn POPUPS_OBJ_BRIEFING() -> usize { super::TABLE.engine().field(a2engine::Sym(41)) }
+    #[inline(always)] pub fn POPUPS_OBJ_HEADER() -> usize { super::TABLE.engine().field(a2engine::Sym(42)) }
+    #[inline(always)] pub fn POPUPS_OBJ_LINES() -> usize { super::TABLE.engine().field(a2engine::Sym(43)) }
+    #[inline(always)] pub fn POPUPS_OBJ_DONE() -> usize { super::TABLE.engine().field(a2engine::Sym(44)) }
+    #[inline(always)] pub fn POPUPS_OBJ_OK() -> usize { super::TABLE.engine().field(a2engine::Sym(45)) }
+    #[inline(always)] pub fn POPUPS_VT_FOCUS_SIMULATE() -> usize { super::TABLE.engine().field(a2engine::Sym(46)) }
+    #[inline(always)] pub fn POPUPS_PAUSE_BUTTON() -> usize { super::TABLE.engine().field(a2engine::Sym(47)) }
+    #[inline(always)] pub fn POPUPS_REPLAY_BUTTONS() -> usize { super::TABLE.engine().field(a2engine::Sym(48)) }
+    #[inline(always)] pub fn PALETTE_SLOTS() -> usize { super::TABLE.engine().field(a2engine::Sym(55)) }
+    #[inline(always)] pub fn PALETTE_MODE() -> usize { super::TABLE.engine().field(a2engine::Sym(56)) }
+    #[inline(always)] pub fn PALETTE_MENU() -> usize { super::TABLE.engine().field(a2engine::Sym(57)) }
+    #[inline(always)] pub fn PALETTE_BTN_STATE() -> usize { super::TABLE.engine().field(a2engine::Sym(58)) }
+    #[inline(always)] pub fn PALETTE_BTN_SPRITE() -> usize { super::TABLE.engine().field(a2engine::Sym(59)) }
+    #[inline(always)] pub fn PALETTE_BTN_MODE() -> usize { super::TABLE.engine().field(a2engine::Sym(60)) }
+    #[inline(always)] pub fn PALETTE_BTN_COMMAND() -> usize { super::TABLE.engine().field(a2engine::Sym(61)) }
+    #[inline(always)] pub fn PALETTE_VT_TOOLTIP() -> usize { super::TABLE.engine().field(a2engine::Sym(62)) }
+    #[inline(always)] pub fn PALETTE_VT_VERBOSE() -> usize { super::TABLE.engine().field(a2engine::Sym(63)) }
+    #[inline(always)] pub fn PALETTE_VT_IS_VALID() -> usize { super::TABLE.engine().field(a2engine::Sym(64)) }
+    #[inline(always)] pub fn PALETTE_VT_PRESS() -> usize { super::TABLE.engine().field(a2engine::Sym(65)) }
+    #[inline(always)] pub fn PALETTE_CMD_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(66)) }
+    #[inline(always)] pub fn PALETTE_CMD_POS() -> usize { super::TABLE.engine().field(a2engine::Sym(67)) }
+    #[inline(always)] pub fn PALETTE_MODE_KIND() -> usize { super::TABLE.engine().field(a2engine::Sym(68)) }
+    #[inline(always)] pub fn PALETTE_MODE_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(69)) }
+    #[inline(always)] pub fn PALETTE_CLASS_ODF() -> usize { super::TABLE.engine().field(a2engine::Sym(70)) }
+    #[inline(always)] pub fn PALETTE_MODE_WEAPON() -> usize { super::TABLE.engine().field(a2engine::Sym(71)) }
+    #[inline(always)] pub fn PALETTE_WEAPON_PRJID() -> usize { super::TABLE.engine().field(a2engine::Sym(72)) }
+    #[inline(always)] pub fn PALETTE_MODE_INDEX() -> usize { super::TABLE.engine().field(a2engine::Sym(73)) }
+    #[inline(always)] pub fn OVERLAY_SD_POINTED() -> usize { super::TABLE.engine().field(a2engine::Sym(87)) }
+    #[inline(always)] pub fn OVERLAY_SD_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(88)) }
+    #[inline(always)] pub fn OVERLAY_SD_FADE() -> usize { super::TABLE.engine().field(a2engine::Sym(89)) }
+    #[inline(always)] pub fn OVERLAY_SD_REPAIR_ICONS() -> usize { super::TABLE.engine().field(a2engine::Sym(90)) }
+    #[inline(always)] pub fn OVERLAY_RI_SPRITE() -> usize { super::TABLE.engine().field(a2engine::Sym(91)) }
+    #[inline(always)] pub fn OVERLAY_RI_FLASH() -> usize { super::TABLE.engine().field(a2engine::Sym(92)) }
+    #[inline(always)] pub fn OVERLAY_OBJ_FLAGS() -> usize { super::TABLE.engine().field(a2engine::Sym(93)) }
+    #[inline(always)] pub fn OVERLAY_OBJ_DRAWN() -> usize { super::TABLE.engine().field(a2engine::Sym(94)) }
+    #[inline(always)] pub fn OVERLAY_OBJ_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(95)) }
+    #[inline(always)] pub fn OVERLAY_OBJ_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(96)) }
+    #[inline(always)] pub fn OVERLAY_OBJ_SELECTED() -> usize { super::TABLE.engine().field(a2engine::Sym(97)) }
+    #[inline(always)] pub fn OVERLAY_OBJ_REMOVED() -> usize { super::TABLE.engine().field(a2engine::Sym(98)) }
+    #[inline(always)] pub fn OVERLAY_OBJ_GROUP() -> usize { super::TABLE.engine().field(a2engine::Sym(99)) }
+    #[inline(always)] pub fn OVERLAY_OBJ_HULL() -> usize { super::TABLE.engine().field(a2engine::Sym(100)) }
+    #[inline(always)] pub fn OVERLAY_OBJ_HULL_MAX() -> usize { super::TABLE.engine().field(a2engine::Sym(101)) }
+    #[inline(always)] pub fn OVERLAY_OBJ_SPECIAL() -> usize { super::TABLE.engine().field(a2engine::Sym(102)) }
+    #[inline(always)] pub fn OVERLAY_OBJ_SPECIAL_MAX() -> usize { super::TABLE.engine().field(a2engine::Sym(103)) }
+    #[inline(always)] pub fn OVERLAY_CRAFT_SHIELD() -> usize { super::TABLE.engine().field(a2engine::Sym(104)) }
+    #[inline(always)] pub fn OVERLAY_CRAFT_SHIELD_MAX() -> usize { super::TABLE.engine().field(a2engine::Sym(105)) }
+    #[inline(always)] pub fn OVERLAY_CRAFT_SYSTEMS() -> usize { super::TABLE.engine().field(a2engine::Sym(106)) }
+    #[inline(always)] pub fn OVERLAY_CRAFT_SHOW_ALL() -> usize { super::TABLE.engine().field(a2engine::Sym(107)) }
+    #[inline(always)] pub fn OVERLAY_SYSTEM_HIDDEN() -> usize { super::TABLE.engine().field(a2engine::Sym(108)) }
+    #[inline(always)] pub fn OVERLAY_SYSTEM_SIZE() -> usize { super::TABLE.engine().field(a2engine::Sym(109)) }
+    #[inline(always)] pub fn OVERLAY_SYSTEM_NOW() -> usize { super::TABLE.engine().field(a2engine::Sym(110)) }
+    #[inline(always)] pub fn OVERLAY_VT_CAN_USER_SEE() -> usize { super::TABLE.engine().field(a2engine::Sym(111)) }
+    #[inline(always)] pub fn OVERLAY_VT_CLASS_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(112)) }
+    #[inline(always)] pub fn OVERLAY_CLS_STATION() -> usize { super::TABLE.engine().field(a2engine::Sym(113)) }
+    #[inline(always)] pub fn OVERLAY_S3D_CAMERA() -> usize { super::TABLE.engine().field(a2engine::Sym(114)) }
+    #[inline(always)] pub fn OTEXT_MAP_HEAD() -> usize { super::TABLE.engine().field(a2engine::Sym(121)) }
+    #[inline(always)] pub fn OTEXT_NODE_KEY() -> usize { super::TABLE.engine().field(a2engine::Sym(122)) }
+    #[inline(always)] pub fn OTEXT_NODE_VALUE() -> usize { super::TABLE.engine().field(a2engine::Sym(123)) }
+    #[inline(always)] pub fn OTEXT_POINT() -> usize { super::TABLE.engine().field(a2engine::Sym(124)) }
+    #[inline(always)] pub fn OTEXT_JUSTIFY() -> usize { super::TABLE.engine().field(a2engine::Sym(125)) }
+    #[inline(always)] pub fn OTEXT_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(126)) }
+    #[inline(always)] pub fn OTEXT_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(127)) }
+    #[inline(always)] pub fn OTEXT_FADE() -> usize { super::TABLE.engine().field(a2engine::Sym(128)) }
+    #[inline(always)] pub fn LO_SPRITE_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(161)) }
+    #[inline(always)] pub fn LO_FADE_ALPHA() -> usize { super::TABLE.engine().field(a2engine::Sym(162)) }
+    #[inline(always)] pub fn LO_CAM_PROJECTION() -> usize { super::TABLE.engine().field(a2engine::Sym(163)) }
+    #[inline(always)] pub fn LO_CAM_VIEWPORT() -> usize { super::TABLE.engine().field(a2engine::Sym(164)) }
+    #[inline(always)] pub fn LO_S3D_CAMERA() -> usize { super::TABLE.engine().field(a2engine::Sym(165)) }
+    #[inline(always)] pub fn LO_S3D_DEVICE() -> usize { super::TABLE.engine().field(a2engine::Sym(166)) }
+    #[inline(always)] pub fn LO_S3D_FPS() -> usize { super::TABLE.engine().field(a2engine::Sym(167)) }
+    #[inline(always)] pub fn LO_S3D_TOTAL_FPS() -> usize { super::TABLE.engine().field(a2engine::Sym(168)) }
 }
 
 pub mod value {
-    pub const PALETTE_N_SLOTS: i32 = 21;
-    pub const PALETTE_NAMES_STRIDE: i32 = 16;
-    pub const PALETTE_NAMES_COUNT: i32 = 9;
-    pub const OVERLAY_FLAG_CRAFT: i32 = 8;
-    pub const OVERLAY_SYSTEM_STRIDE: i32 = 48;
-    pub const OVERLAY_SYSTEM_COUNT: i32 = 5;
-    pub const OVERLAY_GROUP_COUNT: i32 = 10;
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn PALETTE_N_SLOTS() -> i32 { super::TABLE.engine().value(a2engine::Sym(74)) }
+    #[inline(always)] pub fn PALETTE_NAMES_STRIDE() -> i32 { super::TABLE.engine().value(a2engine::Sym(75)) }
+    #[inline(always)] pub fn PALETTE_NAMES_COUNT() -> i32 { super::TABLE.engine().value(a2engine::Sym(76)) }
+    #[inline(always)] pub fn OVERLAY_FLAG_CRAFT() -> i32 { super::TABLE.engine().value(a2engine::Sym(115)) }
+    #[inline(always)] pub fn OVERLAY_SYSTEM_STRIDE() -> i32 { super::TABLE.engine().value(a2engine::Sym(116)) }
+    #[inline(always)] pub fn OVERLAY_SYSTEM_COUNT() -> i32 { super::TABLE.engine().value(a2engine::Sym(117)) }
+    #[inline(always)] pub fn OVERLAY_GROUP_COUNT() -> i32 { super::TABLE.engine().value(a2engine::Sym(118)) }
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[

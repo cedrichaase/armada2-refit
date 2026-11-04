@@ -51,17 +51,19 @@ pub mod hook {
 }
 
 pub mod field {
-    pub const CORE_STORM3D_DEVICE_INDEX: usize = 0xc0;
-    pub const CORE_STORM3D_DEVICES: usize = 0xcc;
-    pub const CORE_DX8_D3D8_DEVICE: usize = 0x90;
-    pub const CORE_DX8_TRIFAN: usize = 0xe4;
-    pub const CORE_DX8_CURSOR: usize = 0x60;
-    pub const CORE_DX8_SYNCHRONOUS: usize = 0xe0;
-    pub const CORE_ELEMENT_NAME: usize = 0x8;
-    pub const CORE_SPRITE_ORIGIN_X: usize = 0x30;
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn CORE_STORM3D_DEVICE_INDEX() -> usize { super::TABLE.engine().field(a2engine::Sym(1)) }
+    #[inline(always)] pub fn CORE_STORM3D_DEVICES() -> usize { super::TABLE.engine().field(a2engine::Sym(2)) }
+    #[inline(always)] pub fn CORE_DX8_D3D8_DEVICE() -> usize { super::TABLE.engine().field(a2engine::Sym(3)) }
+    #[inline(always)] pub fn CORE_DX8_TRIFAN() -> usize { super::TABLE.engine().field(a2engine::Sym(7)) }
+    #[inline(always)] pub fn CORE_DX8_CURSOR() -> usize { super::TABLE.engine().field(a2engine::Sym(12)) }
+    #[inline(always)] pub fn CORE_DX8_SYNCHRONOUS() -> usize { super::TABLE.engine().field(a2engine::Sym(13)) }
+    #[inline(always)] pub fn CORE_ELEMENT_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(14)) }
+    #[inline(always)] pub fn CORE_SPRITE_ORIGIN_X() -> usize { super::TABLE.engine().field(a2engine::Sym(18)) }
 }
 
 pub mod value {
+    #![allow(non_snake_case)]
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
