@@ -100,7 +100,8 @@ without its history, which is full of stock art. So not every cited hash resolve
 ## Release packages
 
 Separate from the repository. **`publish/package.sh [<out-dir>]`** builds the plugins
-and writes `armada2-refit-<version>.zip`:
+and writes `armada2-refit-<version>.zip` (with `--stub`, `armada2-refit-<version>-stub.zip`
+from placeholder plugins, for the installer tests only):
 
 - `layers/<id>/`, one folder per layer, whose files are copied beside `Armada2.exe`
   (14.3.0 on; `game/` and `display/` before it): `render3d` (`Render3D.asi`, its `.ini`
@@ -224,13 +225,18 @@ PowerShell runs on the development machine, so `test.ps1` is CI's.
 
 `publish/installer/test.sh` and `test.ps1` run them against a mock game of placeholder
 files, so they prove the file handling, not that anything loads.
+`publish/installer/equiv.sh` runs `install.sh`, `install.ps1` (pwsh) and the repository's
+`./install` into copies of one mock game and compares what each leaves, file by file and
+ini key by key, and the three ini mergers on shared fixtures; `package.sh --stub` stages a
+package for it from placeholder plugins ([`installer/README.md`](installer/README.md),
+"Equivalence").
 
 **CI** (`.github/workflows/ci.yml`) runs on every push and pull request:
 
 - `check.sh` on each new commit, so a binary or a game file fails the push;
 - `package.sh`, with the zip kept as a workflow artifact, named by commit, and both
   installers run against a mock game: `test.sh` on Linux, `test.ps1` on a Windows
-  runner;
+  runner, and against each other: `equiv.sh` (job `installer-equivalence`);
 - the GUI installer built three ways, each tested against a mock game: the AppImage
   (ubuntu-24.04), a portable `.exe` (windows-2025, `gui-installer/test-windows.ps1`) and
   a universal2 `.app` (macos-15, `gui-installer/test-macos.sh`, after

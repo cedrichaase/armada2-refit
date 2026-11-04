@@ -5,6 +5,11 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 2.2.3 — 2026-11-04
+
+### Fixed
+- `qol/install.sh` no longer stops `./install` when the player's `QOL.ini` spells the key `PanSpeed = 7` (spaces around `=`) or has none: the closing `grep '^PanSpeed='` failed under `set -e`. It had only passed because `tools/ini-merge.py` added a second `PanSpeed=` line, fixed in the same commit. Found by `publish/installer/equiv.sh`. The plugin and `QOL.ini` are unchanged. CI only.
+
 ## 2.2.2 — 2026-11-04
 
 ### Fixed

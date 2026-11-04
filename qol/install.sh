@@ -57,5 +57,5 @@ fi
 rm -f "$GAME/QOL.log"
 echo "installed into $GAME:"
 ls -l "$GAME/QOL.asi" "$GAME/QOL.ini"
-grep '^PanSpeed=' "$GAME/QOL.ini"
+grep -i '^[[:space:]]*PanSpeed[[:space:]]*=' "$GAME/QOL.ini" || echo "PanSpeed: not set (QOL.asi's default)"
 echo "after a launch:  %LOCALAPPDATA%\\armada2-refit\\logs\\QOL.log  (in the Wine prefix: drive_c/users/<user>/AppData/Local/armada2-refit/logs/)"
