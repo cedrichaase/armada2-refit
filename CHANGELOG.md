@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.21 — 2026-11-04
+
+Layers: none (CI only).
+
+### Fixed
+- CI: the `d3d12-probe` job takes the Agility SDK's 32-bit `D3D12Core.dll` and `d3d12SDKLayers.dll` from `build/native/bin/win32/` (the package has no `x86` folder). The `vulkan-probe-windows` job prints the ICD, its folder and the Vulkan loader's debug output, to find why lavapipe is not offered. Installed, not yet seen in game.
+
 ## 15.6.20 — 2026-11-04
 
 Layers: gui-installer 3.1.0.

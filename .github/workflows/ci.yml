@@ -431,8 +431,8 @@ jobs:
           }
           Expand-Archive "$dir/sdk.zip" "$dir/x" -Force
           New-Item -ItemType Directory -Force gates/D3D12 | Out-Null
-          Copy-Item "$dir/x/build/native/bin/x86/D3D12Core.dll" gates/D3D12/
-          Copy-Item "$dir/x/build/native/bin/x86/d3d12SDKLayers.dll" gates/D3D12/
+          Copy-Item "$dir/x/build/native/bin/win32/D3D12Core.dll" gates/D3D12/
+          Copy-Item "$dir/x/build/native/bin/win32/d3d12SDKLayers.dll" gates/D3D12/
           # 1.616.1 is SDK version 616.
           "AGILITY=$($ver.Split('.')[1])" | Out-File -Append -Encoding ascii $env:GITHUB_ENV
           Write-Host "Agility SDK $ver"
@@ -488,7 +488,13 @@ jobs:
       - name: vkprobe on lavapipe
         shell: pwsh
         run: |
-          $p = Start-Process gates/vkprobe.exe -PassThru -Wait -WorkingDirectory gates
+          Write-Host "VK_DRIVER_FILES=$env:VK_DRIVER_FILES"
+          Get-ChildItem gates/lvp | ForEach-Object { Write-Host "  $($_.Name) $($_.Length)" }
+          Get-Content $env:VK_DRIVER_FILES
+          $env:VK_LOADER_DEBUG = 'error,warn,driver'
+          $p = Start-Process gates/vkprobe.exe -PassThru -Wait -WorkingDirectory gates -RedirectStandardError gates/vkloader.txt
+          Write-Host '== loader debug =='
+          Get-Content gates/vkloader.txt -ErrorAction SilentlyContinue | Select-Object -First 60
           Get-Content gates/vkprobe.txt
           if ($p.ExitCode -ne 0) { throw "vkprobe exited $($p.ExitCode)" }
       - uses: actions/upload-artifact@v7
