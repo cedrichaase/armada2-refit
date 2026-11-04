@@ -5,6 +5,15 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.22 — 2026-11-04
+
+Layers: models 5.1.1.
+
+### Fixed
+- `install.sh` (`ini_merge`): a player's Display8.ini below Defaults 3 that has `Mode=`/`Real=` and a section before `[Display8]` missing a shipped key lost its `[Display8]` header and `Defaults=` line instead of Mode/Real (the dropped lines were skipped by number after the key insertion had moved them). They are now removed before the insertion. Installed, not yet seen in game.
+- `a2env.sh` reads a last config line with no trailing newline and drops a trailing `\r`, as `a2env.py` does, so the shell and Python halves of `./install` pick the same game folder. Installed, not yet seen in game.
+- `tools/ini-merge.py` reads and writes the player's ini as latin-1 (bytes kept; a cp1252 comment no longer aborts the layer installer), and takes `Defaults=2 ; note` as 2, a non-number as 0 with a message. Installed, not yet seen in game.
+
 ## 15.6.21 — 2026-11-04
 
 Layers: gui-installer 3.1.0.

@@ -69,7 +69,7 @@ def manifest():
 
 def path(name):
     """The installed file, whichever case its extension has."""
-    hits = [p for p in glob.glob(os.path.join(SODDIR, name + '.*'))
+    hits = [p for p in glob.glob(os.path.join(glob.escape(SODDIR), glob.escape(name) + '.*'))
             if os.path.splitext(p)[1].lower() == '.sod']
     if len(hits) != 1:
         sys.exit(f'{name}: expected one .sod in {SODDIR}, found {len(hits)}')
@@ -466,7 +466,7 @@ def main():
     names = a.only or sorted(pins)
     if a.manifest:
         names = a.only or sorted(os.path.splitext(os.path.basename(p))[0]
-                                 for p in glob.glob(os.path.join(SODDIR, '*.[sS][oO][dD]')))
+                                 for p in glob.glob(os.path.join(glob.escape(SODDIR), '*.[sS][oO][dD]')))
         with open(MANIFEST, 'w') as fh:
             fh.write('# stock sha256 of each hull model hull-sod.py rounds (GOG patch 1.1)\n')
             for nme in names:

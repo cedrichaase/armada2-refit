@@ -57,7 +57,7 @@ DXVK_SAMPLERS = (('d3d9.sampleranisotropy', 'anisotropy'),
 def dxvk_samplers(path):
     """{[Samplers] key (lower case): value} of the game's marked dxvk.conf, else {}."""
     try:
-        text = open(path).read()
+        text = open(path, encoding='latin-1').read()
     except OSError:
         return {}
     if not any(l.strip() == DXVK_MARKER for l in text.splitlines()):
@@ -168,17 +168,27 @@ def values(lines):
 args = sys.argv[1:]
 before_comments = '--before-comments' in args
 args = [a for a in args if a != '--before-comments']
-shipped_text = open(args[0]).read()
+# latin-1 maps every byte to one character, so a player's cp1252 comment survives the rewrite.
+shipped_text = open(args[0], encoding='latin-1').read()
 new = parse(shipped_text)
-lines = open(args[1]).read().splitlines()
+lines = open(args[1], encoding='latin-1').read().splitlines()
 
 # The defaults' upgrade, before any key is added.
 ship_vals = values(shipped_text.splitlines())
 have_vals = values(lines)
 dsec = next((s for (s, k) in ship_vals if k == 'defaults'), None)
 label = args[1].replace('\\', '/').rsplit('/', 1)[-1]
-ship_n = int(ship_vals.get((dsec, 'defaults'), (0, '1'))[1] or 1)
-have_n = int(have_vals.get((dsec, 'defaults'), (0, '1'))[1] or 1)
+def defaults_n(vals, what):
+    """The leading integer of Defaults= (`2 ; note` is 2); anything else counts as 0."""
+    v = vals.get((dsec, 'defaults'), (0, '1'))[1] or '1'
+    m = re.match(r'\s*(\d+)', v)
+    if not m:
+        print(f'  {label}: Defaults={v!r} is not a number, taken as 0 ({what})')
+    return int(m.group(1)) if m else 0
+
+
+ship_n = defaults_n(ship_vals, 'shipped')
+have_n = defaults_n(have_vals, 'installed')
 upgrades = UPGRADES.get(dsec, {})
 for n in sorted(upgrades):
     if not have_n < n <= ship_n:
@@ -244,4 +254,4 @@ for sec, body in new.items():
     else:
         name = next(l for l in shipped_text.splitlines() if l.strip().lower() == '[' + sec + ']')
         lines += ['', name] + missing
-open(args[1], 'w').write('\n'.join(lines) + '\n')
+open(args[1], 'w', encoding='latin-1').write('\n'.join(lines) + '\n')
