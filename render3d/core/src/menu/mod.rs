@@ -810,6 +810,10 @@ fn decloak_sounds(m: &Map, shot: &Shot, last: &mut Vec<Option<f32>>) {
                 heard[d.group] = true;
                 let snd = &m.groups[d.group].cloak_sound;
                 if !snd.is_empty() {
+                    // Counted, so a bench can tell one per arrival from two.
+                    static HEARD: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+                    let n = HEARD.fetch_add(1, core::sync::atomic::Ordering::Relaxed) + 1;
+                    log!("menu: decloak sound {} {} (group {})", n, snd, m.groups[d.group].name);
                     crate::engine::sound::play_2d(snd);
                 }
             }
