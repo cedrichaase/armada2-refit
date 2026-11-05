@@ -505,6 +505,11 @@ posts, a hologram, the Evolver, a survey of what no module draws).
   second, then select); a `special` fired in the second its shooter spawned answers
   "fired" but does nothing (wait 2 s); button-bar clicks need a second between them.
   `answers "fired"` also matches "NOT fired": check `", fired"`.
+- **A key cannot be held.** Wine under Xwayland lets a held key go at once: `a2input`'s
+  `keydown` (and `xdotool keydown` on the session's display) reach the game as one tap
+  (a held arrow scrolls one step; a held Tab is never seen held). A scene command that
+  sets what the engine reads stands in where a step needs a key held:
+  `Scene "waypoint-key on"` for Tab's move paths (`render3d-move-paths.md`).
 - **Escape during placement opens the OPTIONS menu**, not a cancel, and `Scene.asi`
   stops reading commands until "Return to Game" is clicked.
 - **Agent sandboxes** may refuse shell lines that mix variables with `sed`, loops of

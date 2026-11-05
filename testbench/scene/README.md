@@ -159,6 +159,7 @@ answer and fails if a command did.
 | `vent <name> <system \| all> on\|off` | as the `Vent` key, one system at a time (or all five) |
 | `colonize <planet> [<population> \| full \| off] [team]` | make a planet a grown colony of a team (default `full` and team 1), without a colony ship: it changes hands, gets a full garrison, and its cities show at once at that population, clamped to the class's maximum. The cities are the team's race's (`cityTextureName`: `ECFR` for the Federation and Romulans, `ECNA`, `BORG`); team 1 on `a2_borg01` is the Federation. `off` makes it neutral again with no population. The planet stays colonised (seen on the bench for several minutes); a population set below the maximum grows as any colony's does |
 | `center <name>` | centre the RTS camera on an object |
+| `waypoint-key on\|off` | the waypoint key (`enter_waypoint`, Tab) held or let go: right-clicks while it is on sketch a move path, `off` sends it (`render3d/README.md`, "overlays", Move paths). The overview's pointer to the binding's state (`cOverViewImp+0x30c`) is pointed at Scene.asi's own while on, since the bench cannot hold a key: Wine under Xwayland lets a held key go at once (a held arrow scrolls one step) |
 | `pause`, `resume` | the game's own pause (`PauseSimulation`); `pause` answers `paused at tick N`, the ticks since the scene was built |
 | `pause-at <tick>` | pause when that many ticks have passed since the scene was built, as `Pause=` does; refused when that tick has gone |
 | `tick` | the ticks since the scene was built |

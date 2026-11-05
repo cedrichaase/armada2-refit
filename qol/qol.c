@@ -1026,6 +1026,8 @@ static int patch_selection(int max)
 
 /* ---- startup ---------------------------------------------------------- */
 
+#include "waypoints.c"
+
 static void build_paths(void)
 {
     char path[320];
@@ -1142,6 +1144,13 @@ __declspec(dllexport) void __cdecl QOL_SettingsChanged(void)
         if (!g_barOk) gate("BarKeys", 0, 0);
     }
 
+    on = a2_set_int(&g_ini, QOL_ROW_PATHSTARTSATONCE) != 0;
+    if (on != g_pathStart) {
+        g_pathStart = on;
+        changed(m, &n, "PathStartsAtOnce", on ? "1" : "0");
+        if (!g_pathsOk) gate("PathStartsAtOnce", 0, 0);
+    }
+
     a2_set_str(&g_ini, QOL_ROW_WARPDISTANCE, val, sizeof val);
     f = s_parse(val);
     if (f < 0.0f) f = 0.0f;
@@ -1177,6 +1186,7 @@ static void startup(void)
     g_rdySpec = a2e_ready(QOL_H_SPECIAL_SELECT);
     g_rdySel = a2e_ready(QOL_H_SELECTION);
     g_rdyBar = a2e_ready(QOL_H_BAR_KEYS);
+    g_rdyPaths = a2e_ready(QOL_H_MOVE_PATHS);
     a2_set_str(&g_ini, QOL_ROW_PANSPEED, val, sizeof val);
     f = pan_factor(val, &ok);
     g_panSpeed = f;
@@ -1255,6 +1265,21 @@ static void startup(void)
     }
     logline(b);
     if (!g_barKeys) gate("BarKeys", 0, g_barOk);
+
+    g_pathStart = a2_set_int(&g_ini, QOL_ROW_PATHSTARTSATONCE) != 0;
+    g_pathsOk = patch_paths();
+    b[0] = 0;
+    s_cat(b, "--- QOL PathStartsAtOnce=");
+    s_cat(b, g_pathStart ? "1" : "0");
+    if (!g_pathStart) {
+        s_cat(b, "  (a sketched path is sent when the key is let go, as in stock)");
+    } else if (g_pathsOk) {
+        s_cat(b, "  -> a path sketched with the waypoint key is sent at each point, patched");
+    } else {
+        not_patched(b, QOL_H_MOVE_PATHS);
+    }
+    logline(b);
+    if (!g_pathStart) gate("PathStartsAtOnce", 0, g_pathsOk);
 
     k = (int)a2_set_int(&g_ini, QOL_ROW_MAXSELECTION);
     b[0] = 0;

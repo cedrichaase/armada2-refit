@@ -215,6 +215,8 @@ int _fltused = 0;   /* floats without the CRT */
 #define OBJECT_HANDLE    0x28u
 #define ENTITY_GET       0x4cfff0u   /* Entity::Get(handle), cdecl */
 #define OVERVIEW         ((void *)0x768e40u)   /* the one cOverViewImp */
+static int  g_waypoint_key;    /* `waypoint-key`: the state the overview reads while held */
+static int *g_waypoint_orig;   /* the binding's own state, put back when let go */
 #define OV_SELECT        0x90u       /* vtable: Select(obj, type, clear first, ...) */
 #define OV_SELECT_NUM    0x94u       /* vtable: GetSelectNum() */
 #define OV_SELECT_LIST   0x98u       /* vtable: GetSelectList(), the ids */
@@ -1885,6 +1887,25 @@ static void run_command(char *line)
         if (!(o = find_obj(t[1]))) { logline("  ! no such object"); return; }
         ((SiHandleFn)SI_CENTER_CAMERA)(SI_INSTANCE, o->handle);
         logline("  ok");
+        return;
+    }
+    if (s_eq(t[0], "waypoint-key") && n >= 2) {
+        /* The waypoint key (`enter_waypoint`, Tab) held or let go, for a move path: the
+         * overview reads the binding's live state through the pointer at +0x30c, which
+         * is pointed at an int of ours while held.  The bench cannot hold a key: Wine
+         * under Xwayland sees a held key let go at once. */
+        int **slot = (int **)((char *)OVERVIEW + 0x30c);
+        if (!*slot) { logline("  ! the overview has not bound the waypoint key yet"); return; }
+        if (s_eq(t[1], "on")) {
+            if (*slot != &g_waypoint_key) g_waypoint_orig = *slot;
+            g_waypoint_key = 1;
+            *slot = &g_waypoint_key;
+            logline("  ok: waypoint key held");
+        } else {
+            g_waypoint_key = 0;
+            if (*slot == &g_waypoint_key && g_waypoint_orig) *slot = g_waypoint_orig;
+            logline("  ok: waypoint key let go");
+        }
         return;
     }
     if (s_eq(t[0], "pause"))  { pause_now("  ");  return; }

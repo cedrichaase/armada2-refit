@@ -9,7 +9,8 @@
 //!   ghost) (`ghosts`).
 //!
 //! - the height posts (`DrawHeightPost`, `posts`), as anti-aliased lines;
-//! - the tactical camera's pivot marker (the feature `TacticalCamera`, `pivot`).
+//! - the tactical camera's pivot marker (the feature `TacticalCamera`, `pivot`);
+//! - the move paths, the sketched one and each ship's until flown (`paths`).
 //!
 //! What it does not take stays the engine's: the shroud's `TreeGrid` path and the build
 //! footprints' sprites are called through.
@@ -31,6 +32,7 @@ pub mod hooks;
 pub mod settings_table;
 mod ghosts;
 mod grid;
+mod paths;
 mod pivot;
 mod posts;
 mod selection;
@@ -41,7 +43,7 @@ use r3d_core::engine;
 use r3d_core::frame::steps::View;
 use crate::rt::settings;
 use crate::rt::Ini;
-use settings_table::{OVERLAYS_FOG, OVERLAYS_GHOSTS, OVERLAYS_GRID, OVERLAYS_HEIGHTPOSTS, OVERLAYS_PIVOT, OVERLAYS_SELECTION};
+use settings_table::{OVERLAYS_FOG, OVERLAYS_GHOSTS, OVERLAYS_GRID, OVERLAYS_HEIGHTPOSTS, OVERLAYS_MOVEPATHS, OVERLAYS_PIVOT, OVERLAYS_SELECTION};
 
 /// Settings from `Render3D.ini`, `[Overlays]`.
 pub struct Settings {
@@ -71,6 +73,7 @@ pub struct Overlays {
     ghosts: ghosts::Ghosts,
     posts: posts::Posts,
     pivot: pivot::Pivot,
+    paths: paths::Paths,
 }
 
 /// `[Overlays] Fog` and `Selection` of the module made (`mods::claims`).
@@ -101,7 +104,8 @@ impl Default for Overlays {
         let posts = posts::Posts::new(&ini);
         let pivot = pivot::Pivot::new(&ini);
         log!("overlays: pivot marker {}", pivot.on as u8);
-        Overlays { s, fog: fog::Fog::new(), grid: grid::Grid::new(), sel: selection::Selection::new(), ghosts: ghosts::Ghosts::new(), posts, pivot }
+        let paths = paths::Paths::new(&ini);
+        Overlays { s, fog: fog::Fog::new(), grid: grid::Grid::new(), sel: selection::Selection::new(), ghosts: ghosts::Ghosts::new(), posts, pivot, paths }
     }
 }
 
@@ -193,14 +197,20 @@ impl Module for Overlays {
         if self.pivot.set_on(pv) {
             note("Pivot", pv);
         }
+        let mp = settings::on(ini, OVERLAYS_MOVEPATHS);
+        if self.paths.set_on(mp) {
+            note("MovePaths", mp);
+        }
     }
-    /// The height posts' five calls, at the first enable; gated by the module's flag.
+    /// The height posts' five calls and stock's sketch line, at the first enable;
+    /// gated by the module's flag.
     fn hooks(&mut self, h: &mut r3d_core::hooks::Hooks) {
         if !h.ready(&syms::TABLE, syms::hook::OVERLAYS_READS) {
             h.stand_down("the engine's reads are not stock");
             return;
         }
         self.posts.install(h);
+        self.paths.install(h);
     }
     /// Switched off live: the posts noted in a view are dropped; the hook hands its
     /// calls to the engine through its gate.
@@ -214,6 +224,7 @@ impl Module for Overlays {
         self.grid.reset();
         self.fog.reset();
         self.posts.reset();
+        self.paths.reset();
         // The queued ghosts hold their models, and the models their buffers, which are
         // in the default pool.
         self.ghosts.begin_view();
@@ -231,6 +242,7 @@ impl Module for Overlays {
             Step::Selection if self.s.selection => self.sel.draw(v),
             Step::Translucent => {
                 self.posts.draw(v);
+                self.paths.draw_all(v);
                 false
             }
             _ => false,

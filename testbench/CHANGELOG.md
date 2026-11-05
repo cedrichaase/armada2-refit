@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 4.2.0 — 2026-11-05
+
+### Added
+- Scene.asi: `waypoint-key on|off`, the waypoint key (Tab, `enter_waypoint`) held or let go, by pointing the overview's pointer to the binding's state (`cOverViewImp+0x30c`) at its own: the bench cannot hold a key (Wine under Xwayland lets it go at once; README, "Operating the game").
+- Scenario `render3d-move-paths`: a three-point Tab path, the ship under way from the first point, the dots drawn until flown (issue #17).
+
+Installed, not yet seen in game.
+
 ## 4.1.6 — 2026-11-05
 
 ### Changed

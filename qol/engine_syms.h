@@ -133,13 +133,26 @@
 #define QOL_S_BK_SOUND2D 127
 #define QOL_V_BK_SOUND2D_BYTES 28
 #define QOL_S_BK_BUTTON_PRESS 129
+#define QOL_S_MP_ADD_POINT 130
+#define QOL_S_MP_ADD_CALL 131
+#define QOL_S_MP_FIRST_CALL 132
+#define QOL_S_MP_QUEUE 133
+#define QOL_S_MP_RELEASE_CALL 134
+#define QOL_F_MP_GO_PROCESS 0x44
+#define QOL_F_MP_PROC_COMMAND 0x38
+#define QOL_F_MP_PROC_PATH 0x88
+#define QOL_F_MP_PROC_POINT 0x12c
+#define QOL_V_MP_ACT_QUEUED 16384
+#define QOL_V_MP_PACKET_MAX 508
+#define QOL_V_MP_CMD_PATROL 26
 #define QOL_H_PAN_SPEED 0
 #define QOL_H_SHIFT_GROUP 1
 #define QOL_H_SELECTION 2
 #define QOL_H_SPECIAL_SELECT 3
 #define QOL_H_STATIONS 4
 #define QOL_H_WARP 5
-#define QOL_H_BAR_KEYS 6
+#define QOL_H_MOVE_PATHS 6
+#define QOL_H_BAR_KEYS 7
 
 A2E_U32 a2s_qol_pan_site __attribute__((used));
 A2E_U32 a2s_qol_fastscroll __attribute__((used));
@@ -236,6 +249,11 @@ A2E_U32 a2s_qol_bk_click_sound __attribute__((used));
 A2E_U32 a2s_qol_bk_operator_new __attribute__((used));
 A2E_U32 a2s_qol_bk_sound2d __attribute__((used));
 A2E_U32 a2s_qol_bk_button_press __attribute__((used));
+A2E_U32 a2s_qol_mp_add_point __attribute__((used));
+A2E_U32 a2s_qol_mp_add_call __attribute__((used));
+A2E_U32 a2s_qol_mp_first_call __attribute__((used));
+A2E_U32 a2s_qol_mp_queue __attribute__((used));
+A2E_U32 a2s_qol_mp_release_call __attribute__((used));
 
 static A2E_U32 *const qol_vars[] = {
     &a2s_qol_pan_site,
@@ -368,6 +386,18 @@ static A2E_U32 *const qol_vars[] = {
     &a2s_qol_bk_sound2d,
     0,
     &a2s_qol_bk_button_press,
+    &a2s_qol_mp_add_point,
+    &a2s_qol_mp_add_call,
+    &a2s_qol_mp_first_call,
+    &a2s_qol_mp_queue,
+    &a2s_qol_mp_release_call,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
 };
 
 static const A2ESymDef qol_syms[] = {
@@ -501,6 +531,18 @@ static const A2ESymDef qol_syms[] = {
     {"bk_sound2d", "AudioSound2D::AudioSound2D", 0},
     {"bk_sound2d_bytes", "AudioSound2D", 11},
     {"bk_button_press", "ControlButton::mButtonPressFunction", 0},
+    {"mp_add_point", "cOverViewImp::mAddPathPoint", 0},
+    {"mp_add_call", "cOverViewImp::mNormalModeRightClick", 1},
+    {"mp_first_call", "cOverViewImp::mNormalModeRightClick", 1},
+    {"mp_queue", "GameObject::QueueCommand", 0},
+    {"mp_release_call", "cOverViewImp::mProcessWaypoints", 1},
+    {"mp_go_process", "GameObject", 10},
+    {"mp_proc_command", "CraftProcess", 10},
+    {"mp_proc_path", "CraftProcess", 10},
+    {"mp_proc_point", "CraftProcess", 10},
+    {"mp_act_queued", "cOverViewImp action flag: no order on release", 11},
+    {"mp_packet_max", "NetOrderObjectsWhatPath: the largest packet QueueCommand sends", 11},
+    {"mp_cmd_patrol", "AiCommand PATROL", 11},
 };
 static const char *const qol_h0_rows[] = {"QOL.PanSpeed", 0};
 static const A2E_U16 qol_h0_syms[] = {0, 1, 0};
@@ -514,8 +556,10 @@ static const char *const qol_h4_rows[] = {"QOL.StationGroups", 0};
 static const A2E_U16 qol_h4_syms[] = {7, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 85, 87, 88, 91, 92, 93, 94, 95, 96, 97, 99, 100, 101, 102, 103, 109, 110, 0};
 static const char *const qol_h5_rows[] = {"QOL.WarpDistance", 0};
 static const A2E_U16 qol_h5_syms[] = {6, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 89, 90, 91, 92, 94, 96, 98, 104, 105, 106, 107, 108, 111, 112, 0};
-static const char *const qol_h6_rows[] = {"QOL.BarKeys", 0};
-static const A2E_U16 qol_h6_syms[] = {113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 0};
+static const char *const qol_h6_rows[] = {"QOL.PathStartsAtOnce", 0};
+static const A2E_U16 qol_h6_syms[] = {11, 74, 75, 85, 89, 91, 92, 96, 107, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 0};
+static const char *const qol_h7_rows[] = {"QOL.BarKeys", 0};
+static const A2E_U16 qol_h7_syms[] = {113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 0};
 static const A2EHookDef qol_hooks[] = {
     {"qol.pan_speed", 0, qol_h0_rows, 1, qol_h0_syms, 2},
     {"qol.shift_group", 0, qol_h1_rows, 1, qol_h1_syms, 9},
@@ -523,7 +567,8 @@ static const A2EHookDef qol_hooks[] = {
     {"qol.special_select", 0, qol_h3_rows, 1, qol_h3_syms, 8},
     {"qol.stations", 0, qol_h4_rows, 1, qol_h4_syms, 43},
     {"qol.warp", 0, qol_h5_rows, 1, qol_h5_syms, 27},
-    {"qol.bar_keys", 0, qol_h6_rows, 1, qol_h6_syms, 17},
+    {"qol.move_paths", 0, qol_h6_rows, 1, qol_h6_syms, 21},
+    {"qol.bar_keys", 0, qol_h7_rows, 1, qol_h7_syms, 17},
 };
 static const A2E_U8 qol_b0_c0[] = {0x68, 0xcc, 0xd7, 0x6f, 0x00, 0xe8, 0x00, 0x6c, 0x1c, 0x00, 0x8b, 0x45, 0xf0, 0x85, 0xc0, 0x75, 0x08, 0xd9, 0x1d, 0xb4, 0xfb, 0x70, 0x00, 0xeb, 0x02};
 static const A2E_U8 qol_b0_c2[] = {0x8b, 0x15, 0x3c, 0x13, 0x76, 0x00, 0x83, 0x3a, 0x00, 0x74, 0x1c, 0xa1, 0x40, 0x13, 0x76, 0x00};
@@ -606,6 +651,8 @@ static const A2E_U8 qol_b0_c123[] = {0x8b, 0x51, 0x24, 0x33, 0xc0};
 static const A2E_U8 qol_b0_c126[] = {0x55, 0x8b, 0xec, 0xa1};
 static const A2E_U8 qol_b0_c127[] = {0x55, 0x8b, 0xec, 0x6a, 0xff};
 static const A2E_U8 qol_b0_c129[] = {0x8b, 0xc1, 0x56, 0x8b, 0x90};
+static const A2E_U8 qol_b0_c130[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x02, 0x14};
+static const A2E_U8 qol_b0_c133[] = {0x55, 0x8b, 0xec, 0x64, 0xa1, 0x00, 0x00, 0x00};
 static const A2EEntry qol_b0_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 25, 0x491766, 0x0, 0, qol_b0_c0, 0, ""}, /* pan_site */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x70fbb4, 0x0, 0, 0, 0, ""}, /* fastscroll */
@@ -737,22 +784,34 @@ static const A2EEntry qol_b0_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 5, 0x45fc50, 0x0, 0, qol_b0_c127, 0, ""}, /* bk_sound2d */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 28, 0, 0, ""}, /* bk_sound2d_bytes */
     {1, 0, 0xffff, 0xffff, 0, 0, 5, 0x4e69e0, 0x0, 0, qol_b0_c129, 0, ""}, /* bk_button_press */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x5255b0, 0x0, 0, qol_b0_c130, 0, ""}, /* mp_add_point */
+    {1, 0, 0x82, 0xffff, 0, 0, 0, 0x5229e3, 0x0, 0, 0, 0, ""}, /* mp_add_call */
+    {1, 0, 0x82, 0xffff, 0, 0, 0, 0x5229ff, 0x0, 0, 0, 0, ""}, /* mp_first_call */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4380, 0x0, 0, qol_b0_c133, 0, ""}, /* mp_queue */
+    {1, 0, 0x85, 0xffff, 0, 0, 0, 0x522bba, 0x0, 0, 0, 0, ""}, /* mp_release_call */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 68, 0, 0, ""}, /* mp_go_process */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 56, 0, 0, ""}, /* mp_proc_command */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 136, 0, 0, ""}, /* mp_proc_path */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 300, 0, 0, ""}, /* mp_proc_point */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 16384, 0, 0, ""}, /* mp_act_queued */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 508, 0, 0, ""}, /* mp_packet_max */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 26, 0, 0, ""}, /* mp_cmd_patrol */
 };
 static const A2EBlock qol_b0_blocked[] = {
     {0xffff, 0, 0, 0}
 };
 static const A2EBuild qol_builds[] = {
-    {"gog-1.1", "armada2/gog-1.1", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qol_b0_entries, qol_b0_blocked, 0, 130},
+    {"gog-1.1", "armada2/gog-1.1", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qol_b0_entries, qol_b0_blocked, 0, 142},
 };
 
-static A2E_U8 qol_hook_state[7];
-static A2E_U8 qol_sym_flags[130];
-static A2E_U32 qol_sym_addr[130];
-static char qol_notes[7][A2E_NOTE_MAX + 1];
+static A2E_U8 qol_hook_state[8];
+static A2E_U8 qol_sym_flags[142];
+static A2E_U32 qol_sym_addr[142];
+static char qol_notes[8][A2E_NOTE_MAX + 1];
 
 static const A2ETable QOL_ENGINE = {
     "armada2", "qol",
-    qol_syms, 130, qol_hooks, 7, qol_builds, 1, 0,
+    qol_syms, 142, qol_hooks, 8, qol_builds, 1, 0,
     qol_vars, qol_hook_state, qol_sym_flags, qol_sym_addr, qol_notes
 };
 
