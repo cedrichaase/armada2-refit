@@ -425,8 +425,16 @@ pub fn poll(w: u32, h: u32) {
     }
     // A button released outside the window when the engine did not capture the mouse
     // (because it never saw the down) sends us no up: ask the hardware.
+    // GetAsyncKeyState reports the physical buttons while the button messages are
+    // logical: with the buttons swapped (left-handed setting) ask for the other one.
+    let swapped = unsafe { GetSystemMetrics(SM_SWAPBUTTON) } != 0;
     for b in 0..3 {
-        if r.down[b] && unsafe { GetAsyncKeyState(VK_BUTTON[b]) } as u16 & 0x8000 == 0 {
+        let vk = match (b, swapped) {
+            (0, true) => VK_BUTTON[1],
+            (1, true) => VK_BUTTON[0],
+            _ => VK_BUTTON[b],
+        };
+        if r.down[b] && unsafe { GetAsyncKeyState(vk) } as u16 & 0x8000 == 0 {
             r.down[b] = false;
             r.released[b] = true;
             r.eaten_button[b] = false;

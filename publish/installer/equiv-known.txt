@@ -1,0 +1,45 @@
+# What the installers are known to do differently, for equiv.sh (equiv-diff.py reads it).
+# One difference a line: <pair> <scenario glob> <path glob> <how> <reason>
+#   pair     sh-ps: install.sh and install.ps1; sh-repo: install.sh and the repository's ./install
+#   scenario <scenario>/<step>, as equiv.sh prints it (repo-<scenario>/<step> for ./install)
+#   how      any: the path may differ in any way; comments: only in its comment lines
+# A line here is a decision, not a silencer: say why the difference is right, or why it
+# is left for now. equiv.sh notes a line no comparison needed.
+
+# The remembered choice of layers names each script's own flag in its comment (--all, -All).
+sh-ps    *    armada2-refit-layers.txt    comments    the comment names --all or -All, each script its own flag
+# The pre-13.0.0 bloom: on Windows a ReShade preset in the game folder (A2Bloom.ini, and
+# ReShadePreset.ini while it is still that copy), elsewhere vkBasalt files outside it. Each
+# script takes out its own system's; a Linux or macOS game never had the Windows preset.
+sh-ps    upgrade/*    A2Bloom.ini    any    Windows' old bloom preset; install.sh takes out the vkBasalt one instead, outside the game folder
+sh-ps    upgrade/*    ReShadePreset.ini    any    the copy of A2Bloom.ini, as above
+
+# install.sh and the repository's ./install (repo-<scenario>/<step>).
+# ./install installs no prerequisites: the ASI loader and the widescreen patch are the
+# platform layer's, set up by hand on a development machine (platform/README.md).
+sh-repo  repo-*    winmm.dll                         any    the prerequisites are the release's; ./install leaves the platform's to the developer
+sh-repo  repo-*    STA2WidescreenPatch.asi           any    as above
+sh-repo  repo-*    UltimateASILoader-license.txt     any    as above
+sh-repo  repo-*    armada2-refit-prereqs.txt         any    the release's record of the prerequisites it added
+# GOG's d3d8.dll is kept under two names: d3d8.dll.gog-backup by the release scripts (the
+# name platform/d3d8-chain.py gives it), d3d8.dll.a2display-backup by display/install (what
+# a2mod stock puts back). The release's --uninstall restores either; display/install
+# --remove only its own. One name is AR-9's (one installer core).
+sh-repo  repo-*    d3d8.dll.gog-backup               any    GOG's d3d8.dll, kept under the release's name; AR-9 makes it one
+sh-repo  repo-*    d3d8.dll.a2display-backup         any    GOG's d3d8.dll, kept under display/install's name; AR-9 makes it one
+# ./install keeps no memory of a choice of layers (its --help says so): the release
+# scripts write and honour armada2-refit-layers.txt, so an old install's "without rules"
+# leaves the rules out of a release upgrade and not out of ./install.
+sh-repo  repo-*    armada2-refit-layers.txt          any    the release scripts' remembered choice; ./install has none
+sh-repo  repo-upgrade/*    QOLRules.*                any    the old install's remembered "without rules", which ./install does not read
+# A d3d8.dll that is none of GOG's, the old chain's or ours is the player's own: the release
+# scripts leave it, and with it Display8, Render3D.asi and UI.asi out. display/install
+# replaces any d3d8.dll (keeping it as d3d8.dll.a2display-backup), so ./install puts all
+# three in. Left for AR-9, whose one core decides this once; ./install runs on development
+# installs, which hold GOG's d3d8.dll.
+sh-repo  repo-own-d3d8/*   d3d8.dll                  any    ./install replaces a d3d8.dll of the player's own; the release scripts keep it (AR-9)
+sh-repo  repo-own-d3d8/*   Display8.ini              any    as above: Display8 goes in only through ./install
+sh-repo  repo-own-d3d8/*   Render3D.*                any    as above: Render3D.asi needs Display8
+sh-repo  repo-own-d3d8/*   UI.*                      any    as above: UI.asi needs Display8
+sh-repo  repo-own-d3d8/*   Surfaces*                 any    as above: Render3D.asi's recipes
+sh-repo  repo-own-d3d8/*   Nebulae*                  any    as above: Render3D.asi's recipes

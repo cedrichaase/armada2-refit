@@ -4,6 +4,16 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 1.0.6 — 2026-11-05
+
+### Fixed
+- Menu scene: a decloaking group's `CloakSound` plays once per arrival, as its first ship's decloak begins, not once per ship (the Klingon campaign view played four uncloak sounds; issue #12); each one played logs `menu: decloak sound N <wav> (group <name>)`, and `render3d-menu-decloak-sound` checks one per arrival. Confirmed in game 2026-11-05.
+
+## 1.0.5 — 2026-11-04
+
+### Fixed
+- Links the a2fmt that no longer panics on a TGA header whose size overflows, or hangs on self-including sprite tables (root 15.6.27). Installed, not yet seen in game.
+
 ## 1.0.4 — 2026-11-04
 
 ### Fixed

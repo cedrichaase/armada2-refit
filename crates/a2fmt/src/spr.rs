@@ -262,11 +262,31 @@ struct State {
     reference: [Option<f32>; 2],
     material: String,
     skip: Skip,
+    /// Lower-cased names of the files being read, root first: an `@include` of one of
+    /// them is a loop and is skipped.
+    stack: Vec<String>,
+    /// Files still allowed to be opened by `@include` in this load.
+    includes_left: u32,
 }
+
+/// Most files one [`SpriteTable::load`] opens through `@include`. Stock needs a few
+/// dozen; the cap stops a file tree that includes the same files over and over from
+/// costing exponential time.
+const MAX_INCLUDES: u32 = 512;
+
+/// Most keys an `@animation` may declare. Stock uses a handful (a 4x4 flipbook is 16);
+/// without a cap a typo'd count makes `auto_offsets` allocate gigabytes.
+pub const MAX_KEYS: u32 = 4096;
 
 impl Default for State {
     fn default() -> Self {
-        State { reference: [None, None], material: String::new(), skip: Skip::Unset }
+        State {
+            reference: [None, None],
+            material: String::new(),
+            skip: Skip::Unset,
+            stack: Vec::new(),
+            includes_left: MAX_INCLUDES,
+        }
     }
 }
 
@@ -303,7 +323,10 @@ impl SpriteTable {
         let mut t = SpriteTable::default();
         let mut st = State::default();
         match fetch(root) {
-            Some(d) => t.parse_into(&d, root, &mut st, &mut fetch, 0),
+            Some(d) => {
+                st.stack.push(root.to_ascii_lowercase());
+                t.parse_into(&d, root, &mut st, &mut fetch, 0)
+            }
             None => t.missing_includes.push(String::from(root)),
         }
         t
@@ -369,8 +392,22 @@ impl SpriteTable {
                             self.warn(file, lno, "@include nested too deep");
                             continue;
                         }
+                        let lower = name.to_ascii_lowercase();
+                        if st.stack.contains(&lower) {
+                            self.warn(file, lno, "@include loops back to a file being read");
+                            continue;
+                        }
+                        if st.includes_left == 0 {
+                            self.warn(file, lno, "too many @includes (limit reached)");
+                            continue;
+                        }
+                        st.includes_left -= 1;
                         match fetch(name) {
-                            Some(d) => self.parse_into(&d, name, st, fetch, depth + 1),
+                            Some(d) => {
+                                st.stack.push(lower);
+                                self.parse_into(&d, name, st, fetch, depth + 1);
+                                st.stack.pop();
+                            }
                             None => self.missing_includes.push(name.clone()),
                         }
                     }
@@ -529,7 +566,11 @@ impl SpriteTable {
                 return i - 1;
             }
         };
-        let key_count = def.get(1).and_then(|t| parse_i32(t)).unwrap_or(0).max(0) as u32;
+        let mut key_count = def.get(1).and_then(|t| parse_i32(t)).unwrap_or(0).max(0) as u32;
+        if key_count > MAX_KEYS {
+            self.warn(file, lno, "@animation key count too large (clamped)");
+            key_count = MAX_KEYS;
+        }
         let length = def.get(2).and_then(|t| parse_f32(t)).unwrap_or(0.0);
         let interp = match def.get(3).map(|t| t.to_ascii_lowercase()) {
             Some(t) if t == "linear" => Interp::Linear,
@@ -722,6 +763,7 @@ impl SpriteTable {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::format;
 
     const SAMPLE: &str = "sprite_table\r\n\
 @reference=64\r\n\
@@ -774,6 +816,48 @@ particle_count=30\r\n\
         assert_eq!(e.emitter_type, EmitterType::Cloud);
         assert_eq!(e.particle_count, 30);
         assert_eq!(e.sprite.as_deref(), Some("ventplas"));
+    }
+
+    #[test]
+    fn include_loops_and_fanout_are_bounded() {
+        // A file that includes itself four times: a loop, skipped at once.
+        let t = SpriteTable::load("a.spr", |_| {
+            Some(b"x y 0 0 1 1\n@include a.spr\n@include a.spr\n@include a.spr\n@include a.spr\n".to_vec())
+        });
+        assert_eq!(t.sprites.len(), 1);
+        // A chain where each file includes the next twice is not a loop but doubles per
+        // level; the total-include budget ends it.
+        let mut opened = 0u32;
+        let t = SpriteTable::load("f0.spr", |n| {
+            opened += 1;
+            let k: u32 = n[1..n.len() - 4].parse().ok()?;
+            Some(alloc_chain(k + 1))
+        });
+        assert!(opened <= MAX_INCLUDES + 1, "opened {opened}");
+        assert!(t.warnings.iter().any(|w| w.message.contains("too many")));
+    }
+
+    fn alloc_chain(next: u32) -> Vec<u8> {
+        format!("@include f{next}.spr\n@include f{next}.spr\n").into_bytes()
+    }
+
+    #[test]
+    fn same_file_twice_is_allowed() {
+        let t = SpriteTable::load("r.spr", |n| match n {
+            "r.spr" => Some(b"@include a.spr\n@include a.spr\n".to_vec()),
+            "a.spr" => Some(b"a y 0 0 1 1\n".to_vec()),
+            _ => None,
+        });
+        assert_eq!(t.sprites.len(), 2);
+    }
+
+    #[test]
+    fn huge_key_count_is_clamped() {
+        let t = SpriteTable::parse(b"@animation x\noffset 2000000000 1 step\n@auto=row\n@keyframes\n");
+        let a = t.animation("x").unwrap();
+        assert_eq!(a.key_count, MAX_KEYS);
+        assert_eq!(a.auto_offsets().len(), MAX_KEYS as usize);
+        assert!(t.warnings.iter().any(|w| w.message.contains("clamped")));
     }
 
     #[test]

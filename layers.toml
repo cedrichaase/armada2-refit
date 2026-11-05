@@ -15,7 +15,7 @@
 #                   finds them by the backup and files each under the layer whose pattern
 #                   is most specific (Textures/RGB/Curs_* before Textures/RGB/*)
 #   backups         backup suffixes of the layer's own: every file with one is its
-#   select          core     always installed, not offered (platform, display, renderer)
+#   select          core     always installed, not offered (platform, display)
 #                   on       offered, on by default
 #                   off      offered, off by default
 #                   retired  never installed; only recognised (a2mod files a stale copy

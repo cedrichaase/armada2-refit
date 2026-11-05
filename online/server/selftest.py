@@ -46,7 +46,56 @@ def recv(s, kind):
         return None
 
 
+def unit_tests():
+    """The server's own bookkeeping, driven in-process with a fake transport."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('a2srv', HERE / 'a2online-server.py')
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    lines = []
+    m.log = lambda *a: lines.append(a)
+    sent = []
+
+    class T:
+        def sendto(self, d, a):
+            sent.append((d, a))
+
+    S = m.Server()
+    S.transport = T()
+    hello = lambda kind: MAGIC + bytes([kind]) + b'\0' * 10
+
+    for n in range(100):                      # kinds nobody answers take no endpoint
+        S.datagram_received(MAGIC + b'\x99', ('10.0.0.1', 1000 + n))
+        S.datagram_received(MAGIC + bytes([SV_HOSTED]), ('10.0.0.1', 1000 + n))
+    check(not S.by_addr, 'junk and unanswered kinds create no endpoint')
+
+    for n in range(100):
+        S.datagram_received(hello(SV_JOIN), ('10.0.0.2', 1000 + n))
+    check(len(S.by_addr) == m.MAX_ENDPOINTS_PER_IP and S.per_ip['10.0.0.2'] == m.MAX_ENDPOINTS_PER_IP,
+          f'100 ports from one address: {len(S.by_addr)} endpoints (cap {m.MAX_ENDPOINTS_PER_IP})')
+    for ep in S.by_addr.values():
+        ep.seen -= m.ENDPOINT_IDLE + 1
+    S.sweep()
+    check(not S.by_addr and not S.per_ip, 'expired endpoints are forgotten, per-address count included')
+    for n in range(100):
+        S.datagram_received(hello(SV_JOIN), ('10.0.0.2', 2000 + n))
+    check(len(S.by_addr) == m.MAX_ENDPOINTS_PER_IP and S.per_ip['10.0.0.2'] == m.MAX_ENDPOINTS_PER_IP,
+          'the cap still holds, and is not stuck, after expiry and re-creation')
+
+    del lines[:], sent[:]
+    for tok in range(500):                    # 8 games, then refusals
+        S.datagram_received(MAGIC + bytes([SV_HOST]) + struct.pack('<I', tok) + LAN, ('10.0.0.3', 5000))
+    errors = [d for d, _ in sent if d[4] == SV_ERROR]
+    refused = [l for l in lines if 'refused' in l[0]]
+    check(len(S.games) == m.MAX_GAMES_PER_IP and len(errors) == 1 and len(refused) == 1,
+          f'500 hosts over the limit: {len(errors)} error reply, {len(refused)} log line (first one kept)')
+    S.refused_at['10.0.0.3'] -= m.ERROR_EVERY + 1
+    S.datagram_received(MAGIC + bytes([SV_HOST]) + struct.pack('<I', 999) + LAN, ('10.0.0.3', 5000))
+    check(len([d for d, _ in sent if d[4] == SV_ERROR]) == 2, 'a refusal is repeated once the interval has passed')
+
+
 def main():
+    unit_tests()
     probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     probe.bind(('127.0.0.1', 0))
     port = probe.getsockname()[1]

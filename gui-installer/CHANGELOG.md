@@ -4,6 +4,18 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 3.1.1 — 2026-11-04
+
+Reads package schemas 0 and 1, unchanged.
+
+### Fixed
+- macOS: **Set up Armada II** installs Rosetta 2 only on Apple Silicon (`needs_rosetta`, `sysctl hw.optional.arm64`); on an Intel Mac `softwareupdate --install-rosetta` fails, and the setup stopped there. The dialog's Rosetta line follows.
+
+### Changed
+- macOS: the no-game text (`MAC_HOWTO`) links the walk-through in `PLAYING.md`, "On a Mac, step by step" (`MAC_GUIDE`).
+
+Installed, not yet seen in game.
+
 ## 3.1.0 — 2026-11-04
 
 Reads package schemas 0 and 1, unchanged.

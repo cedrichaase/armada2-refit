@@ -18,18 +18,21 @@ Phases 7 to 11 describe the work as it was planned; where the text below says "w
 
 ## Where we are
 
-**Root 15.6.0 on `round-f`** (2026-11-03), the tip of a stack of branches: `round-c`
-(phases 5 and 6) under `round-d` (7 and 8), `round-e` (9 and 10) and `round-f` (11, and
-12 in progress). **`main` is at 13.51.3** (`015f50c`): phases 1 to 4 (rounds A and B, signed
-off in game) are on it; **nothing after them has been merged.**
+**`main` is at root 15.6.21** (2026-11-04). The round branches (`round-c` to `round-f`)
+have been merged into it, so phases 1 to 11 are all on `main`, with the Mac setup and
+the Windows CI fixes on top. What is still open is the user's final in-game check of the
+later rounds, recorded per entry in the changelogs ("Installed, not yet seen in game"),
+and gate W. This file used to say that `main` stood at 13.51.3 with nothing after phase
+4 merged. That was true until the round merges and is corrected here (2026-11-04).
 
 | Round | Phases | State |
 |---|---|---|
-| A, B | 1 passthrough on Vulkan, 2 open items, 3 shared libraries, 4 ABI and claims | **Done and on `main`**, signed off in game |
-| C | 5 settings, 6 the Refit screen | **Signed off in game 2026-11-03** ("simplify later"), recorded on `worktree-round-c` (`5c28635`); **waits for the user's merge to `main`** |
-| D | 7 render3d split, 8 symbol profiles | Implemented and merged into `round-e`; **waits for the user's final in-game check** |
-| E | 9 owners and the package, 10 Direct3D 12 and the platform gates | Implemented on `round-e` (root 14.14.0); waits for the final check. Gate W (native Windows) has not been run |
-| F | 11 remove Direct3D 9 and the legacy plugins, 12 docs | 11 implemented on `round-f` (root 15.6.0); 12: D3 (`PLAYING.md`, `MODDING.md`) merged, D1 (this file and `CLAUDE.md`) and D2 (the layer READMEs) in progress; waits for the final check |
+| A, B | 1 passthrough on Vulkan, 2 open items, 3 shared libraries, 4 ABI and claims | On `main`, signed off in game |
+| C | 5 settings, 6 the Refit screen | On `main`; signed off in game 2026-11-03 ("simplify later") |
+| D | 7 render3d split, 8 symbol profiles | On `main`; the user's final in-game check is outstanding |
+| E | 9 owners and the package, 10 Direct3D 12 and the platform gates | On `main`; final check outstanding; gate W (native Windows) not yet run |
+| F | 11 remove Direct3D 9 and the legacy plugins, 12 docs | On `main` (from root 15.6.0); final check outstanding; phase 12 in progress |
+| — | 13 architecture follow-ups (`PLAN-ARCHITECTURE.md`) | Planned 2026-11-04; AR-1 to AR-3 in progress on their own branches |
 
 What is built, at 15.6.0:
 
@@ -449,6 +452,27 @@ category switches as the routing of passthrough.
 | Estimate | Agent 6–11 h, of which 1–2 h move findings; 2–3 full regression passes on GPU Vulkan; round F, after two releases with `auto` as the default |
 | Risks | `GridLayout.ini [Cells]` has no UI counterpart; note the gap in `ui/README.md` rather than keep the plugin. **The stock front end over Vulkan, without `UI.asi`**, is a bench check, because most of it is already settled. The findings it reuses: (1) the shell asks for a fixed 800x600x16 mode, and Menus.asi, now the UI's menu host as well, raises that request to the desktop's size in memory, so the shell and the 3D display share one mode and the device is not re-created at each switch; (2) the stub offers the engine one mode, the desktop's, so no mode change happens on Vulkan at all, and the cursor and mouse need no translation; (3) `Embed=1`, and the UI's host after it, makes every dialog a child of the game window, so there is one OS window, with owner, z-order, input, focus and cursor each handled and measured; (4) while a GDI dialog is up the game thread sits in the dialog's modal loop and nothing presents, and only the intro movie and the Credits use the device in the shell; both already run on the stub (`display-stub`, intro to Exit; movies since display 0.6.1). **The check:** the stub on GPU Vulkan, with neither `UI.asi` nor `Menus.asi` loaded, through the main menu, Options and a nested screen, the Credits, a mission and its in-mission menu and back, with the cursor visible throughout. It runs with Phase 1's Display8-alone runs and again in this phase's acceptance. Stock's separate popup windows are stock behaviour and stay acceptable. If a stock dialog does not appear, Display8 takes over the shell-mode raise from the UI, which is code already written twice and a display concern anyway |
 
+### Phase 13 — Architecture follow-ups (planned)
+
+**Goal:** close the gaps between what the contracts promise and what the code does,
+before Fleet Operations: Roots and Armada 1 build on them, and make one install path out
+of three. The plan is `PLAN-ARCHITECTURE.md`, from the architecture review of
+2026-11-04. Its work packages, in order, are:
+
+1. AR-1: a behavioural equivalence test for the installers.
+2. AR-2: a game descriptor for the tooling, and no "Armada2.exe" in the shared
+   resolver. This is Fleet Operations' FO-1.
+3. AR-3: field offsets in the profiles, resolved per build at run time.
+4. AR-4: an engine boundary for the UI.
+5. AR-5: a file system layer in `a2fmt`.
+6. AR-6: content sets as data.
+7. AR-7: Display8 on `gpu`.
+8. AR-8: render3d's services as a registry.
+9. AR-9: one installer core.
+10. AR-10: the shipped inis as defaults only.
+
+FO-3 and every Armada 1 work package that reads engine structs wait on AR-3.
+
 ### Phase 12 — Documentation (in progress)
 
 **Status: in progress** on `round-f`; docs only, so no changelog entries. Done: `PLAYING.md`
@@ -470,6 +494,10 @@ rendering directly on Vulkan and Direct3D 12 through a `ddraw.dll` of its own
 ("Display7") on the `display8v1_*` contract, with no Direct3D 9 path
 (`PLAN-ARMADA1.md`). The shared code stays where it is; the tools gain a game profile
 (Fleet Operations' FO-1), and each game gets its own release tag and package.
+`PLAN-ARCHITECTURE.md` lists what the shared code still lacks for both ports. The
+largest gaps are the game descriptor (AR-2, which is FO-1), struct field offsets
+resolved per build (AR-3), the UI's engine boundary (AR-4) and a file system layer for
+`.zfs` and `.fpq` archives (AR-5).
 
 ## Dependencies
 
@@ -521,7 +549,10 @@ Who runs the native checks (decision 1) is answered by the kit: `tools/gates/` a
 
 What is genuinely open:
 
-1. **The phase 11 merge gate.** Round F reaches `main` only when (a) the user has played
+1. **The phase 11 merge gate.** Round F is on `main` now (root 15.6.0 onwards). The
+   gate below was the condition for that merge, and it has not been recorded here as
+   met. The user should either confirm it was waived or record when it passed. The gate
+   was: round F reaches `main` only when (a) the user has played
    the final check (the front end, a mission, the bail-out, `Backend=d3d12`), (b) gate W
    (the native Windows run of `tools/gates/gate-windows.ps1`) has passed, so the
    pre-release line can go, and (c) `Backend=auto` has been the default for two
