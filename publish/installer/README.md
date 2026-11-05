@@ -86,6 +86,10 @@ section (`--before-comments`); the keys and values are the same.
 - the macOS branch of `install.sh` (`test.sh` fakes `uname`);
 - the model rewrites on real SODs: a mock has none, so every installer finds nothing to
   do, and `./install`'s `models/install.sh`, which stops without them, is a no-op here;
+- the `a2ini` host tool's writer: `move-keys.py`, which `./install` runs last, edits
+  through it, and `tools/settings/host.sh` builds it with cargo, so a stand-in made of
+  `install.sh`'s `ini_op` takes its place (no toolchain needed; a `cargo` on `PATH` fails
+  the run). Which values move is compared; `crates/a2ini` is tested on its own fixtures;
 - `./install`'s builds (stand-ins) and its asset layers with assets built (textures, the
   menu plates, the movies: an empty `A2_DATA` here); `./install` has no uninstall to compare;
 - what Windows alone has: the GOG registry lookup, the Visual C++ runtime warning, the

@@ -255,13 +255,43 @@ if [ "$use_repo" = 1 ]; then
     # release scripts run the same model scripts, say they failed and go on, writing
     # nothing. So here it is a no-op, and the models are not compared (listed below).
     printf '#!/usr/bin/env bash\necho "models: not run by equiv.sh (no SODs in a mock game)"\n' > "$R/models/install.sh"
+    # tools/settings/move-keys.py, which ./install runs last, edits through the a2ini host
+    # tool, which tools/settings/host.sh builds with cargo. A stand-in takes its place:
+    # `a2ini edit FILE Sec:Key=value` and `a2ini unset FILE Sec:Key` by install.sh's own
+    # ini_op, cut out of the package's install.sh. So move-keys.py's decisions (which value
+    # moves, which is dropped) are compared, and a2ini's writer is not (listed below).
+    {
+        echo '#!/usr/bin/env bash'
+        echo 'set -euo pipefail'
+        awk '/^ini_op\(\) /{p=1} p{print} p&&/^}/{exit}' "$P/install.sh"
+        cat <<'A2INI'
+cmd="$1" f="$2"; shift 2
+for w in "$@"; do
+    [ "$w" != --unset ] || { cmd=unset; continue; }
+    sec="${w%%:*}" rest="${w#*:}"
+    case "$cmd" in
+        edit)  ini_op set "$f" "$sec" "${rest%%=*}" "${rest#*=}" ;;
+        unset) ini_op del "$f" "$sec" "$rest" ;;
+        *)     echo "a2ini stand-in: no $cmd" >&2; exit 2 ;;
+    esac
+done
+A2INI
+    } > "$T/a2ini"
+    chmod +x "$T/a2ini"
+    grep -q '^ini_op() ' "$T/a2ini" || { echo "could not cut ini_op out of install.sh" >&2; exit 1; }
+    printf '#!/usr/bin/env bash\necho "%s"\n' "$T/a2ini" > "$R/tools/settings/host.sh"
+    # And no cargo at all: a build this harness has not replaced fails loudly here, as on
+    # a CI runner without a default toolchain.
+    mkdir -p "$T/nocargo"
+    printf '#!/bin/sh\necho "equiv.sh: ./install reached cargo ($*): stand it in" >&2\nexit 1\n' > "$T/nocargo/cargo"
+    chmod +x "$T/nocargo/cargo"
     mkdir -p "$T/a2data" "$T/home"
     run_repo() {   # game action
         local sel=""
         case "$2" in install) ;; install:without=*) sel="--without ${2#install:without=}" ;;
                      *) echo "./install has no $2" >&2; return 2 ;; esac
         # shellcheck disable=SC2086
-        (cd "$R" && HOME="$T/home" A2_GAME="$1" A2_DATA="$T/a2data" A2_PREFIX="$T/prefix" ./install $sel) > "$T/out.repo" 2>&1
+        (cd "$R" && PATH="$T/nocargo:$PATH" HOME="$T/home" A2_GAME="$1" A2_DATA="$T/a2data" A2_PREFIX="$T/prefix" ./install $sel) > "$T/out.repo" 2>&1
     }
     repo_scenario() {   # name kind action...
         local name="$1" kind="$2" a rs rr; shift 2
@@ -285,6 +315,7 @@ if [ "$use_repo" = 1 ]; then
     repo_scenario empty-slot empty install
     skipped+=("./install's asset layers with assets built (textures, the menu plates, the movies): A2_DATA is empty here, so each is only seen installing nothing")
     skipped+=("./install's builds and its models layer: the build scripts are stand-ins that copy the package's plugins, and models/install.sh a no-op (it stops on a game without the stock SODs)")
+    skipped+=("the a2ini host tool's writer, which move-keys.py edits through: a stand-in (install.sh's ini_op) takes its place, so no cargo is needed; crates/a2ini is host-tested on tools/settings/fixtures")
     skipped+=("./install --uninstall: there is none; a2mod stock snapshots instead, a different contract")
 fi
 
