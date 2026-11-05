@@ -776,6 +776,19 @@ that part as stock; its note reaches the Refit screen through the row `Modules.<
 (`Render3D_SettingsNote`). On an unknown `Armada2.exe`, or when `core.reads` or
 `frame.seam` is not ready, render3d stands down whole. Engine reads live in
 `core/src/engine/**` and each module's `hooks.rs` (`lint-layers.sh`, rule 1, strict).
+**Struct offsets are the profile's too**: every field offset, vtable byte offset and
+engine size those files read is a `field` or `value` entry of the core's or the module's
+profile file (ids `<module prefix>_*`: `pt_`, `sky_`, `sp_`, `hl_`, `wd_`, `ov_`, `or_`,
+`ef_`), read at run time as `field::X()` (or the module under an alias,
+`use crate::syms::{field as off}`), the matched build's value, so a build whose structs
+differ gets its own and a field it lacks stands its hook down (`crates/a2engine/README.md`,
+"Fields and values"). An offset a module shares with the core (an object's instance,
+class, flags, team and on-screen byte, an instance's scale, clock and database, a list's
+or a sprite's layout, the light registry) is read through the core's helpers, never
+re-declared. Code that walks many objects reads its offsets once, outside the loop.
+`lint-layers.sh` rule 1 fails on a literal offset anywhere (`field(x, 0x..)`,
+`rd(x + 0x..)`, `(x + 0x..) as *`, `const X: usize = 0x..`), the glue included; the
+offsets written in comments here and in `hooks.rs` say where each was found.
 Render3D.log names the executable (`engine: <identity>`), the build and
 `engine: <part> symbols: N/M resolved`. Hook ids (`render3d.<id>`), what each gates and the
 finding it rests on:

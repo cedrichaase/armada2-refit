@@ -664,7 +664,9 @@ Two rules from them still bind:
   which also hands a hook back (the engine's own call runs) when the module is off or a
   symbol is unresolved; engine addresses, offsets and checks come from the symbol
   profile (`profiles/gog-1.1/render3d[.<module>].toml`), never from a literal in a
-  source. A hook whose symbols are not all resolved stands down and logs which one.
+  source: a struct offset is a `field` entry read at run time (`field::X()`, the
+  matched build's), and `lint-layers.sh` rule 1 fails on a literal one. A hook whose
+  symbols are not all resolved stands down and logs which one.
   Modules talk through capabilities and services, not by name; module order is an
   explicit priority.
 - **The seam is the two calls of `Armada_RenderAllOurStuff`.** If either site is not

@@ -8,7 +8,8 @@ The format, the generated code and the resolver are described in
 |---|---|
 | `profiles.py` | loads every profile set (`profiles/`, `*/profiles/`), flattens builds, computes blocks; shared by the others |
 | `gen.py` | writes every profile file's `out`; `--check`, `--emit FILE [--lang rust\|c]`, `--list-hooks PLUGIN`, `--profiles DIR...` |
-| `lint.py` | the validator (rules 1–6; `--publish` runs 1, 2 and 5 for `publish/check.sh`; `--selftest` on `fixtures/lint/`). A literal in a plugin source that is in the image's range but no address takes a `// not an address` comment; a migration's transitional const-asserts take `// value parity` |
+| `lint.py` | the validator (rules 1–6; `--publish` runs 1, 2 and 5 for `publish/check.sh`; `--selftest` on `fixtures/lint/`). A literal in a plugin source that is in the image's range but no address takes a `// not an address` comment; a migration's transitional const-asserts take `// value parity`. A literal struct offset fails too (C `p + 0x..` and asm `0x..(%reg)`; Rust `field(x, 0x..)`, `rd(x + 0x..)`, `(x + 0x..) as *`, `const X: usize = 0x..`), except on a line that says `PE header` (the module's own headers) or `not an offset` |
+| `moved.py` | AR-3's equivalence test: every offset and value moved out of a plugin's source (`moved-gog-1.1.tsv`, with the value the source had) resolves to it on `gog-1.1` |
 | `resolve.py` | the resolver in Python, offline on an exe file (`--exe`, `--build` to force a profile, `--base`, `--test-ini`); what `a2test syms` reports with |
 | `annotate.py` | checks each entry's `symbol` and `in` against `$A2_GAME/armada2.map`; prints names only, writes nothing |
 | `mkpe.py` | writes a fixture's synthetic PE image (`--identity` prints its three numbers, to put in the fixture set's `build.toml`) |
