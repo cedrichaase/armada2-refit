@@ -40,7 +40,7 @@ doc = "The bar's keyboard step wrapped for the position keys; a button pressed w
 rows = ["QOL.BarKeys"]
 
 [hook.rig_self]
-doc = "The construction ship is not a blocker of its own blueprint: the ghost's placement check is given the rig as the object to ignore"
+doc = "The construction ship does not block its own blueprint: the ghost's check ignores the rig"
 rows = ["QOL.RigIgnoresSelf"]
 
 [[sym]]
