@@ -44,7 +44,9 @@ versions", and the release steps are in `publish/README.md`, "Releasing".
 - **`status`** is the in-game status line, and is carried into the entry. It defaults to
   `Installed, not yet seen in game`. Write `Confirmed in game YYYY-MM-DD` once the user
   has seen it, or `none` for a change that installs nothing (CI, docs). A line starting
-  `Pre-release` holds the release back as a pre-release, like "not yet seen" does.
+  `Untested` (for example, not yet past the Windows gate) makes the release an untested
+  release, as "not yet seen" does. That is GitHub's *Pre-release* flag; it is not the
+  pre-release build of the latest main.
 - **The body** is one text for every layer listed. A layer that needs other words gets
   a changeset of its own. Sections are `### Added`, `### Changed`, `### Fixed` and
   `### Removed`. Text under no section is `### Changed`. Each item says *what* changed

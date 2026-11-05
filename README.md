@@ -273,7 +273,7 @@ versions it bundles. Changes are recorded as changesets
 ([`.changeset/README.md`](.changeset/README.md)), and a release, made by hand, turns
 them into versions and changelog entries
 ([`publish/README.md`](publish/README.md#releasing)). Between releases, the GUI
-installer's *Edge (latest main)* entry installs the newest `main`, untested.
+installer's *Pre-release (latest main)* entry installs the newest `main`, untested.
 
 `CLAUDE.md` is the working brief for Claude Code sessions in this repository.
 

@@ -179,8 +179,9 @@ derivations into a changeset, and do not copy status ("confirmed in game", dates
 accepted seeds) into this file: status belongs in the changeset and its entry.
 
 **In-game status goes in the changeset.** Its `status:` line, by default "Installed, not
-yet seen in game", ends the entry the release writes. A line starting "Pre-release" also
-keeps the release a pre-release. When the user confirms the change **before it is
+yet seen in game", ends the entry the release writes, and makes the release an
+**untested release** (GitHub's *Pre-release* flag). So does a line starting "Untested"
+(seen, but not past the Windows gate). When the user confirms the change **before it is
 released**, edit the changeset: `status: Confirmed in game YYYY-MM-DD`. When the user
 confirms it **after release**, replace "Installed, not yet seen in game" with
 `Confirmed in game YYYY-MM-DD` in the layer and root entries and do not bump. That is
@@ -188,12 +189,15 @@ the one permitted edit to a released entry. Don't keep both: an entry that still
 "not yet seen" after it has been seen is misleading. A rejection is not a status line.
 It is a new changeset that reverts the change, like the font's `--method runs`.
 
-**Releasing is manual** (`publish/README.md`, "Releasing"). The Release workflow's
-*prepare* step runs `changeset.py version` on main and opens the "Release X.Y.Z" pull
-request. Once it is merged, its *publish* step has CI build and publish vX.Y.Z. A push to
-main publishes only the **edge** pre-release (the latest main, untested, which the GUI
-installer offers but never picks for you). Never run `changeset.py version` on a work
-branch. Only a release branch does that.
+**Releasing** (`publish/README.md`, "Releasing"). The user starts it by hand: the
+Release workflow runs `changeset.py version --commit` on main and opens the pull request
+"Release X.Y.Z". **Merging that PR publishes vX.Y.Z.** CI recognises the merge by the
+release commit's `Release-Version` trailer, and no other push releases anything. Every
+push to main also publishes a **pre-release**, `vX.Y.Z-pre.N`, the build of the latest
+main (N is CI's run number; the newest five are kept). The GUI installer offers the
+newest last, as "Pre-release (latest main)", but never picks it for the player. Do not confuse it with an **untested release**, a
+`vX.Y.Z` not yet seen in game. Never run `changeset.py version` on a work branch: only
+the release branch does that.
 
 **Parallel worktrees** no longer clash over numbers: each branch adds its own changeset
 files, which merge without conflict, and no branch assigns a version. Name a changeset
@@ -222,8 +226,9 @@ again, finish in this order:
 2. **Merge into `main`** from the main checkout, with
    `git merge --no-ff <branch> -m "Merge <branch>: <what>"`. There are no version numbers
    to resolve: changesets merge side by side. Don't push unless the user asks. A push to
-   `main` publishes the edge pre-release, and no versioned release: releasing is the
-   user's call, through the Release workflow (`publish/README.md`, "Releasing").
+   `main` publishes the pre-release (the latest main), and no versioned release:
+   releasing is the user's call, through the Release workflow and its pull request
+   (`publish/README.md`, "Releasing").
 3. **Clean up.** Remove the worktree (`git worktree remove`) and delete its branch
    (`git branch -d`). Then do the same for any other worktree whose branch
    `git branch --merged main` lists. Use only the safe forms, never `--force` or
@@ -833,8 +838,9 @@ Two rules from them still bind:
   `p10-fwd-*`, the last from the forward chain that no longer exists).
 - **The native gates are CI's and the user's, not the bench's**: `display/d12probe/` and
   `display/vkprobe/` run in CI (WARP with the Direct3D 12 debug layer; lavapipe) and in
-  the kit `tools/gates/` attaches as `native-gates-<commit>`. A release carries a
-  "Pre-release" line until the user's Windows gate has passed.
+  the kit `tools/gates/` attaches as `native-gates-<commit>`. A release stays an untested
+  release (an "Untested" status line; "Pre-release" before 15.10.0) until the user's
+  Windows gate has passed.
 
 ### ui
 

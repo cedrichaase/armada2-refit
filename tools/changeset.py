@@ -14,7 +14,8 @@ consumed files.
     changeset.py add [--layers a,b --bump minor | --set a=minor ...] [--section Fixed]
                      [--status TEXT] [--name NAME] [-m TEXT]   (interactive without -m)
     changeset.py status [--json | --markdown | --next-root]
-    changeset.py version [--date YYYY-MM-DD] [--no-hash] [--dry-run]
+    changeset.py version [--date YYYY-MM-DD] [--no-hash] [--dry-run] [--commit]
+    changeset.py released RANGE   (the version a release commit in RANGE carries, if any)
     changeset.py check [--base REF [--allow-version-change]]
     changeset.py convert [--base REF] [--dry-run]   (hand-numbered entries -> changesets)
 
@@ -576,6 +577,39 @@ def convert(root, units, base, dry_run=False):
     return made, notes
 
 
+# ---------------------------------------------------------------- the release commit
+#
+# `version --commit` commits the release as "Release X.Y.Z" with the trailer
+# "Release-Version: X.Y.Z". CI publishes vX.Y.Z on a push to main exactly when that push
+# brings in such a commit for the root version main now has (`released`): merging the
+# release PR. A version changed by hand carries no trailer and publishes nothing.
+
+TRAILER = 'Release-Version'
+
+
+def commit_release(root, version):
+    msg = f'Release {version}\n\n{TRAILER}: {version}\n'
+    for args in (('add', '-A', '--', '.'), ('commit', '-q', '-m', msg)):
+        r = subprocess.run(['git', '-C', root, *args])
+        if r.returncode:
+            raise Refused(f'git {args[0]} failed')
+
+
+def released(root, rng):
+    """The root version, when RANGE (BEFORE..HEAD) brings it in through a release commit:
+    the root changelog's version differs from BEFORE's, and a commit in the range carries
+    the trailer for it. Else None."""
+    ver = vstr(current(root, load_units(root)[ROOT_ID]))
+    before = rng.split('..')[0]
+    old = git(root, 'show', f'{before}:CHANGELOG.md')
+    if old is not None and changelog_version(old) and vstr(changelog_version(old)) == ver:
+        return None
+    out = git(root, 'log', f'--format=%(trailers:key={TRAILER},valueonly)', rng)
+    if out is None:
+        return None
+    return ver if ver in {l.strip() for l in out.split('\n')} else None
+
+
 # ---------------------------------------------------------------- add
 
 def slug(text):
@@ -673,11 +707,15 @@ def main(argv=None):
     s.add_argument('--json', action='store_true')
     s.add_argument('--markdown', action='store_true')
     s.add_argument('--next-root', action='store_true',
-                   help="print only the root version the next release gets (the current one with none pending)")
+                   help="print only the root version the next release gets (the current one plus a patch with none pending)")
     v = sub.add_parser('version', help='consume the changesets into a release')
     v.add_argument('--date', default=datetime.date.today().isoformat())
     v.add_argument('--no-hash', action='store_true', help='cite no commit hashes')
     v.add_argument('--dry-run', action='store_true', help='print the plan, write nothing')
+    v.add_argument('--commit', action='store_true',
+                   help=f'commit it as "Release X.Y.Z" with the {TRAILER} trailer CI publishes on')
+    r = sub.add_parser('released', help='the version a release commit in RANGE brings to main')
+    r.add_argument('range', help='BEFORE..HEAD')
     c = sub.add_parser('check', help='lint the changesets and the version files')
     c.add_argument('--base', help='fail on a version changed by hand since this ref')
     c.add_argument('--allow-version-change', action='store_true', help='the release PR')
@@ -720,7 +758,9 @@ def main(argv=None):
                 raise Refused('\n'.join(errs))
             p = plan(root, units, cs)
             if args.next_root:
-                print(p[ROOT_ID]['next'] if p else vstr(current(root, units[ROOT_ID])))
+                # With nothing pending, the next is at least a patch: a pre-release
+                # X.Y.Z-pre.N must sort above the release X.Y.Z it follows.
+                print(p[ROOT_ID]['next'] if p else vstr(bumped(current(root, units[ROOT_ID]), 'patch')))
             elif args.json:
                 print(json.dumps(dict(plan=p, changesets=[c.name for c in cs]), indent=1))
             elif args.markdown:
@@ -736,7 +776,13 @@ def main(argv=None):
                 return 0
             p = apply(root, units, cs, args.date, hashes=not args.no_hash)
             print_plan(p, units)
+            if args.commit:
+                commit_release(root, p[ROOT_ID]['next'])
             print(p[ROOT_ID]['next'])
+        elif args.cmd == 'released':
+            v_ = released(root, args.range)
+            if v_:
+                print(v_)
         elif args.cmd == 'check':
             cs, errs = check(root, units, args.base, args.allow_version_change)
             for e in errs:

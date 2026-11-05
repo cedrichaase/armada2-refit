@@ -46,11 +46,13 @@ Three things to know before you click:
 
 - **The installer needs the game closed**, and Heroic closed when it writes Heroic's
   settings.
-- **Edge (latest main).** The installer's *Version* list ends with an *Edge* entry: the
-  newest build of the repository's `main`, rebuilt on every change and not seen in game.
-  It is never chosen for you; pick it to help test, or to live on the edge. To go back,
-  pick a release from the same list and install again (or `--install VERSION` from a
-  terminal; `--install edge` takes the edge build).
+- **Pre-release (latest main).** The installer's *Version* list ends with a
+  *Pre-release (latest main)* entry: the newest build of the repository's `main`,
+  rebuilt on every change and not seen in game. It is never chosen for you; pick it to
+  help test, or to live on the edge. A version marked *untested release* is a numbered
+  release that has not been seen in game yet; it is not chosen for you either. To go
+  back, pick a release from the same list and install again (or `--install VERSION`
+  from a terminal; `--install pre-release` takes the latest-main build).
 - **What it adds.** In the game folder: `Display8` (as `d3d8.dll`), the plugins
   (`UI.asi`, `Render3D.asi`, `QOL.asi`, `QOLRules.asi`, `Online.asi`), their `.ini`
   files, the ASI loader (`winmm.dll`) and the widescreen patch if they are missing,

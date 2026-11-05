@@ -1,27 +1,20 @@
-# Releasing, by hand (publish/README.md, "Releasing"). Run it from the Actions tab, on
-# main, in two steps:
+# Releasing (publish/README.md, "Releasing"). The one manual step: run this from the
+# Actions tab. It runs tools/changeset.py version --commit on main: every pending
+# changeset consumed, each layer's version, changelog entry and version files written,
+# the root entry listing the layer versions it bundles, committed as "Release X.Y.Z" with
+# the trailer "Release-Version: X.Y.Z". It pushes that to the branch release/next and
+# opens (or updates) the pull request "Release X.Y.Z", whose CI it starts. Review it
+# there: the status lines ("Installed, not yet seen in game", "Confirmed in game ...", a
+# line starting "Untested") decide whether vX.Y.Z is an untested release. Merging it
+# (a merge commit, or a rebase: not a squash, which drops the trailer) publishes vX.Y.Z:
+# ci.yml, jobs release-commit and release.
 #
-#   prepare  tools/changeset.py version on main: every pending changeset consumed, each
-#            layer's version, changelog entry and version files written, the root entry
-#            listing the layer versions it bundles. Pushed to the branch release/next and
-#            opened (or updated) as the pull request "Release X.Y.Z", whose CI it starts.
-#            Review it there: the status lines ("Installed, not yet seen in game" or
-#            "Confirmed in game") decide whether the release is a pre-release. Merge it.
-#   publish  after the merge: dispatches CI on main with `release` ticked, which builds,
-#            tests and publishes vX.Y.Z (ci.yml, job release). Refused when vX.Y.Z exists.
-#
-# Locally, prepare is `python3 tools/changeset.py version` on a branch, committed as
-# "Release X.Y.Z" and merged; publish is `gh workflow run ci.yml --ref main -f release=true`.
+# Locally, the same: `python3 tools/changeset.py version --commit` on a branch from main,
+# merged into main with git merge --no-ff and pushed.
 name: Release
 
 on:
   workflow_dispatch:
-    inputs:
-      step:
-        description: 'prepare: open the Release X.Y.Z pull request; publish: release the merged version'
-        type: choice
-        options: [prepare, publish]
-        default: prepare
 
 permissions:
   contents: read
@@ -32,7 +25,6 @@ concurrency:
 
 jobs:
   prepare:
-    if: inputs.step == 'prepare'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -56,19 +48,17 @@ jobs:
           if [ -z "$(python3 tools/changeset.py status --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["changesets"] and 1 or "")')" ]; then
             echo "::error::no pending changesets: nothing to release"; exit 1
           fi
-          python3 tools/changeset.py version --date "$(date -u +%Y-%m-%d)"
-          ver=$(sed -n 's/^## \([0-9][0-9.]*\) .*/\1/p' CHANGELOG.md | head -1)
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git switch -C release/next
-          git add -A
-          git commit -q -m "Release $ver"
+          python3 tools/changeset.py version --commit --date "$(date -u +%Y-%m-%d)"
+          ver=$(sed -n 's/^## \([0-9][0-9.]*\) .*/\1/p' CHANGELOG.md | head -1)
           git push -f origin release/next
           {
             printf 'The release of the pending changesets, made by `tools/changeset.py version` (the Release workflow, step prepare).\n\n'
             cat status.md
-            printf '\n**Before merging**: read the entries. A status line edited here ("Confirmed in game YYYY-MM-DD" in place of "Installed, not yet seen in game") decides whether v%s is a full release or a pre-release.\n\n' "$ver"
-            printf '**After merging**: run the Release workflow again with step **publish**.\n'
+            printf '\n**Before merging**: read the entries. A status line edited here ("Confirmed in game YYYY-MM-DD" in place of "Installed, not yet seen in game") decides whether v%s is a full release or an untested release.\n\n' "$ver"
+            printf '**Merging publishes v%s** (with a merge commit or a rebase, not a squash, which would drop the `Release-Version` trailer CI looks for).\n' "$ver"
           } > body.md
           if [ -n "$(gh pr list --head release/next --state open --json number --jq '.[].number')" ]; then
             gh pr edit release/next --title "Release $ver" --body-file body.md
@@ -79,24 +69,3 @@ jobs:
           # dispatched on the branch by hand.
           gh workflow run ci.yml --ref release/next
           echo "Release $ver: $(gh pr view release/next --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"
-
-  publish:
-    if: inputs.step == 'publish'
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      actions: write
-    env:
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: main
-      - name: Dispatch CI on main with release ticked
-        run: |
-          ver=$(sed -n 's/^## \([0-9][0-9.]*\) .*/\1/p' CHANGELOG.md | head -1)
-          if gh release view "v$ver" >/dev/null 2>&1; then
-            echo "::error::v$ver is released already: merge a Release pull request first"; exit 1
-          fi
-          gh workflow run ci.yml --ref main -f release=true
-          echo "CI dispatched on main ($(git rev-parse --short HEAD)) to publish v$ver: see the CI runs." >> "$GITHUB_STEP_SUMMARY"

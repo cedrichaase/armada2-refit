@@ -5,10 +5,11 @@ status: none
 ---
 
 ### Added
-- Changesets: `.changeset/` (format in its README, units in `config.toml`) and `tools/changeset.py` (`add`, `status`, `version`, `check`, `convert`), with `tools/changeset-selftest.py`. Versions and changelog entries are written only by `changeset.py version`; CI runs `check` (a pull request may not change a version by hand, the release PR `release/next` excepted).
-- The Release workflow (`.github/workflows/release.yml`): step `prepare` opens the "Release X.Y.Z" pull request from the pending changesets, step `publish` dispatches CI on main with `release` ticked.
-- The edge channel: CI job `edge` replaces the assets of the rolling pre-release `edge` on every push to main; `publish/package.sh` builds its zip with `A2_EDGE=1` as `<next>-edge.<commit>`.
+- Changesets: `.changeset/` (format in its README, units in `config.toml`) and `tools/changeset.py` (`add`, `status`, `version [--commit]`, `released`, `check`, `convert`), with `tools/changeset-selftest.py`. Versions and changelog entries are written only by `changeset.py version`. CI runs `check`: a pull request may not change a version by hand, except the release PR `release/next`.
+- The Release workflow (`.github/workflows/release.yml`) opens the "Release X.Y.Z" pull request from the pending changesets. Merging it publishes vX.Y.Z (CI jobs `release-commit` and `release`, on the commit's `Release-Version` trailer).
+- Pre-releases of the latest main: CI job `prerelease` publishes every push to main as the GitHub pre-release `vX.Y.Z-pre.N` (the next version, N the run number), keeping the newest five. `publish/package.sh` builds its zip with `A2_PRERELEASE=N`. `changeset.py status --next-root` gives the current version plus a patch when nothing is pending.
 
 ### Changed
-- A push to main no longer publishes a release when the root version changes: CI's `release` job runs only on a dispatch with `release` ticked, refuses an existing tag, and keeps the newest ten `vX.Y.Z` releases (never counting `edge`).
-- `CLAUDE.md` ("Changelogs and versions", "Finishing work"), `publish/README.md` ("Releasing", "The edge channel") and `README.md` describe the new flow.
+- A push to main publishes a release only when it merges the release PR. A version changed by hand releases nothing, and a dispatch with `release` ticked is the fallback. The `release` job refuses an existing tag and keeps the newest ten `vX.Y.Z` releases.
+- A versioned release not yet seen in game, or carrying a status line starting "Untested" (was "Pre-release"), is an "untested release": GitHub's prerelease flag.
+- `CLAUDE.md` ("Changelogs and versions", "Finishing work"), `publish/README.md` ("Releasing", "Pre-releases: the latest main") and `README.md` describe the new flow.

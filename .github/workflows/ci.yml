@@ -7,12 +7,13 @@
 # installer is also frozen with PyInstaller (gui-installer/pyinstaller/build.py) into a
 # portable .exe on Windows and a universal2 .app on macOS, each tested against a mock game
 # (gui-installer/test-windows.ps1, test-macos.sh); install.sh is run on macOS too.
-# Releasing is manual (publish/README.md, "Releasing"): the Release workflow
-# (release.yml) opens the "Release X.Y.Z" pull request from the pending changesets, and
-# once it is merged, dispatches this workflow on main with `release` ticked, which tags
-# vX.Y.Z and publishes a GitHub Release with the zip and the three installers. A push to
-# main publishes nothing of its own but the edge channel: the rolling pre-release `edge`
-# (job edge), the same packages built from the newest main. On main and on dispatch, every
+# Releasing (publish/README.md, "Releasing"): the Release workflow (release.yml), run by
+# hand, opens the "Release X.Y.Z" pull request from the pending changesets; the push to
+# main that merges it (a commit with the trailer Release-Version: X.Y.Z, job
+# release-commit) tags vX.Y.Z and publishes a GitHub Release with the zip and the three
+# installers. No other push releases; a dispatch on main with `release` ticked is the
+# fallback for a failed run. Every push to main also publishes a pre-release, a build of
+# the latest main, tagged vX.Y.Z-pre.N (job prerelease). On main and on dispatch, every
 # program in the release is also scanned on VirusTotal, report only, and the reports
 # attached to the release (publish/README.md, "VirusTotal").
 # The native probes (d12probe on WARP with the D3D12 debug layer, vkprobe on lavapipe)
@@ -27,7 +28,7 @@ on:
   workflow_dispatch:
     inputs:
       release:
-        description: 'Publish vX.Y.Z (the root CHANGELOG.md version) from main, if it is not released yet'
+        description: 'Publish vX.Y.Z (the root CHANGELOG.md version) from main, if it is not released yet (the fallback when the merge of the release PR did not)'
         type: boolean
         default: false
 
@@ -273,20 +274,20 @@ jobs:
             dist/*.zip
             dist/armada2-refit-installer.py
           if-no-files-found: error
-      # The edge channel's zip: the same build, versioned <next>-edge.<commit> (A2_EDGE=1),
-      # so it never shares a name with a release's. Only on main, where job edge
-      # publishes it.
-      - name: Package for the edge channel
+      # The pre-release's zip (the latest main): the same build, versioned <next>-pre.N,
+      # N this workflow's run number (A2_PRERELEASE=N): unique and rising without a race
+      # between two pushes. Only on main, where job prerelease publishes it.
+      - name: Package the pre-release (latest main)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           export CARGO="$(command -v cargo)"
-          zip=$(A2_EDGE=1 publish/package.sh dist-edge)
+          zip=$(A2_PRERELEASE="$GITHUB_RUN_NUMBER" publish/package.sh dist-pre)
           unzip -p "$zip" '*/manifest.json' | python3 -c 'import json,sys; m=json.load(sys.stdin); print(m["version"], m["commit"])'
       - uses: actions/upload-artifact@v7
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
-          name: armada2-refit-edge-${{ github.sha }}
-          path: dist-edge/*.zip
+          name: armada2-refit-pre-${{ github.sha }}
+          path: dist-pre/*.zip
           if-no-files-found: error
 
   appimage:
@@ -639,12 +640,39 @@ jobs:
             vt/virustotal.md
           if-no-files-found: ignore
 
-  # vX.Y.Z, by hand only: a dispatch on main with `release` ticked (the Release workflow's
-  # "publish" step does that). It refuses when vX.Y.Z is released already. The version
-  # comes from tools/changeset.py version, merged through the release PR.
+  # Is this push to main the merge of the release PR? Only when it brings in a commit
+  # with the trailer "Release-Version: X.Y.Z" (tools/changeset.py version --commit) for
+  # the root version main now has, which differs from the version before the push
+  # (tools/changeset.py released). A version changed by hand publishes nothing.
+  release-commit:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.find.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: find
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          v=""
+          if git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            v=$(python3 tools/changeset.py released "$BEFORE..HEAD")
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "release commit: ${v:-none}"
+
+  # vX.Y.Z, published by the merge of the release PR (release-commit), or by a dispatch on
+  # main with `release` ticked when that run failed. It refuses when vX.Y.Z is released
+  # already. The version comes from tools/changeset.py version, through the release PR.
   release:
-    needs: [publishable, package, appimage, windows-installer, windows-gui, macos-gui, probes, d3d12-probe, gates-windows]
-    if: github.event_name == 'workflow_dispatch' && inputs.release && github.ref == 'refs/heads/main'
+    needs: [publishable, package, appimage, windows-installer, windows-gui, macos-gui, probes, d3d12-probe, gates-windows, release-commit]
+    if: >-
+      always() && !cancelled() && !contains(needs.*.result, 'failure') && github.ref == 'refs/heads/main' &&
+      ((github.event_name == 'push' && needs.release-commit.outputs.version != '') ||
+       (github.event_name == 'workflow_dispatch' && inputs.release))
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -685,10 +713,12 @@ jobs:
             printf -- '- **By hand**: README.txt in the zip, and [Installing by hand](%s/%s/blob/%s/README.md#installing-by-hand-layer-by-layer).\n' \
               "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$tag"
           } >> notes.md
-          # An entry nobody has seen working in game yet ships as a pre-release, and so
-          # does one with a line starting "Pre-release" (seen, but not everywhere yet).
+          # An entry nobody has seen working in game yet ships as an untested release
+          # (GitHub's prerelease flag), and so does one with a line starting "Untested"
+          # (seen, but not everywhere yet, e.g. before the Windows gate; "Pre-release" in
+          # entries before 15.10.0).
           pre=()
-          grep -qiE 'not yet seen in game|^pre-release' notes.md && pre=(--prerelease)
+          grep -qiE 'not yet seen in game|^untested|^pre-release' notes.md && pre=(--prerelease)
           gh release create "$tag" "dist/armada2-refit-$VERSION.zip" dist/armada2-refit-installer.py \
             dist/armada2-refit-installer-x86_64.AppImage dist/armada2-refit-installer-windows.exe \
             dist/armada2-refit-installer-macos.zip --target "$GITHUB_SHA" \
@@ -696,8 +726,8 @@ jobs:
       - name: Keep only the newest ten releases
         run: |
           # Older releases are deleted; their tags stay, so changelogs and links that
-          # name a version still resolve. publish/README.md, "Release packages". The edge
-          # channel is not a release and is never counted or deleted.
+          # name a version still resolve. publish/README.md, "Release packages". Only
+          # vX.Y.Z tags are counted.
           gh release list --limit 1000 --json tagName,createdAt \
             --jq '[.[] | select(.tagName | test("^v[0-9]+[.][0-9]+[.][0-9]+$"))] | sort_by(.createdAt) | reverse | .[10:][] | .tagName' |
           while read -r tag; do
@@ -737,17 +767,19 @@ jobs:
             --assets "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$tag" > notes-vt.md
           gh release edit "$tag" --notes-file notes-vt.md
 
-  # The edge channel (publish/README.md, "The edge channel"): every push to main replaces
-  # the assets of one rolling pre-release, tag `edge`, with the packages built from that
-  # commit. Never "latest", never a vX.Y.Z: the GUI installer lists it last, as "Edge
-  # (latest main)", untested, and never picks it by default. The notes name the commit
-  # and the changesets not released yet. One run at a time, in push order.
-  edge:
-    needs: [publishable, package, appimage, windows-installer, windows-gui, macos-gui]
+  # Pre-releases (publish/README.md, "Pre-releases: the latest main"): every push to main
+  # publishes the build of that commit as a GitHub release tagged vX.Y.Z-pre.N (the next
+  # version as the pending changesets make it, N this run's number), with GitHub's
+  # prerelease flag and never "latest"; the notes name the commit and list the pending
+  # changesets. The newest five are kept, release and tag; the ten vX.Y.Z kept by job
+  # release are counted apart. The GUI installer lists the newest as "Pre-release (latest
+  # main)", never by default, and never takes one for a release. One run at a time.
+  prerelease:
+    needs: [publishable, package, appimage, windows-installer, windows-gui, macos-gui, installer-equivalence]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     concurrency:
-      group: edge
+      group: prerelease
       cancel-in-progress: false
     permissions:
       contents: write
@@ -755,11 +787,9 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
       - uses: actions/download-artifact@v8
         with:
-          name: armada2-refit-edge-${{ github.sha }}
+          name: armada2-refit-pre-${{ github.sha }}
           path: dist
       - uses: actions/download-artifact@v8
         with:
@@ -777,32 +807,35 @@ jobs:
         with:
           name: armada2-refit-installer-macos-${{ github.sha }}
           path: dist
-      - name: Replace the edge pre-release's packages
+      - name: Publish vX.Y.Z-pre.N
         run: |
           cp rel/armada2-refit-installer.py dist/
-          zip=$(cd dist && ls armada2-refit-*-edge.*.zip)
-          short=$(git rev-parse --short HEAD)
+          zip=$(cd dist && ls armada2-refit-*-pre.*.zip)
+          ver=${zip#armada2-refit-}; ver=${ver%.zip}
+          [[ "$ver" =~ ^[0-9]+\.[0-9]+\.[0-9]+-pre\.[0-9]+$ ]] || { echo "::error::$zip"; exit 1; }
+          tag="v$ver"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "$tag exists (a re-run): nothing to do"; exit 0
+          fi
+          short=$(git rev-parse --short=7 HEAD)
           {
-            printf '**Edge: the latest main, not a release.** Built from [`%s`](%s/%s/commit/%s) on %s. ' \
+            printf '**Pre-release: a build of the latest main, not a release.** Built from [`%s`](%s/%s/commit/%s) on %s. ' \
               "$short" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$(date -u +%Y-%m-%d)"
-            printf 'Nothing here has been seen in game: it is for testing, and for players who want to live on the edge. '
-            printf 'The GUI installer offers it as *Edge (latest main)*, never by default; any release takes you back.\n\n'
+            printf 'Nothing in it has been seen in game: it is for testing, and for players who want to live on the edge. '
+            printf 'The GUI installer offers the newest as *Pre-release (latest main)*, never by default; any release takes you back.\n\n'
             python3 tools/changeset.py status --markdown
           } > notes.md
-          if ! gh release view edge >/dev/null 2>&1; then
-            gh release create edge --target "$GITHUB_SHA" --prerelease --latest=false \
-              --title 'Edge (latest main)' --notes-file notes.md
-          fi
-          # The tag follows main (the release's target_commitish names the commit too).
-          gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/edge" -f sha="$GITHUB_SHA" -F force=true >/dev/null
-          gh release upload edge "dist/$zip" dist/armada2-refit-installer.py \
+          gh release create "$tag" "dist/$zip" dist/armada2-refit-installer.py \
             dist/armada2-refit-installer-x86_64.AppImage dist/armada2-refit-installer-windows.exe \
-            dist/armada2-refit-installer-macos.zip --clobber
-          # Then the older zips go: the installer expects exactly one.
-          gh release view edge --json assets --jq '.assets[].name' | while read -r a; do
-            case "$a" in
-              armada2-refit-*-edge.*.zip) [ "$a" = "$zip" ] || gh release delete-asset edge "$a" --yes ;;
-            esac
+            dist/armada2-refit-installer-macos.zip --target "$GITHUB_SHA" --prerelease --latest=false \
+            --title "Armada II Refit $ver (pre-release, latest main)" --notes-file notes.md
+      - name: Keep only the newest five pre-releases
+        run: |
+          # With their tags: a pre-release is never named in a changelog. vX.Y.Z releases
+          # are not counted here, nor these in job release's ten.
+          gh release list --limit 1000 --json tagName,createdAt \
+            --jq '[.[] | select(.tagName | test("^v[0-9]+[.][0-9]+[.][0-9]+-pre[.][0-9]+$"))] | sort_by(.createdAt) | reverse | .[5:][] | .tagName' |
+          while read -r tag; do
+            echo "deleting pre-release $tag and its tag"
+            gh release delete "$tag" --yes --cleanup-tag
           done
-          gh release edit edge --prerelease --latest=false --title 'Edge (latest main)' \
-            --target "$GITHUB_SHA" --notes-file notes.md

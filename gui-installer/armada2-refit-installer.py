@@ -157,8 +157,8 @@ LEGACY_LAYERS = {
 }
 
 def vtuple(v):
-    # Only the leading X.Y.Z: an edge version's `-edge.abc1234` suffix must not leak its
-    # sha digits into the tuple (15.10.0-edge.abc1234 sorts as 15.10.0).
+    # Only the leading X.Y.Z: a pre-release build's `-pre.abc1234` suffix must not leak its
+    # sha digits into the tuple (15.10.0-pre.abc1234 sorts as 15.10.0).
     m = re.match(r'\d+(?:\.\d+)*', v or '')
     return tuple(int(x) for x in m.group().split('.')) if m else (0,)
 
@@ -1861,15 +1861,17 @@ def explain(err, path=None):
 class Release:
     def __init__(self, version, **kw):
         self.version = version
-        self.prerelease = kw.get('prerelease', False)
+        # A versioned release GitHub flags as a pre-release: not yet seen in game. (Caches
+        # written before the rename say `prerelease`.)
+        self.untested = kw.get('untested', kw.get('prerelease', False))
         self.date = kw.get('date', '')
         self.url = kw.get('url')            # the zip on GitHub; None when only cached
         self.size = kw.get('size', 0)
         self.digest = kw.get('digest')      # 'sha256:...' as GitHub reports it
         self.installer_url = kw.get('installer_url')
         self.page = kw.get('page', RELEASES_PAGE)
-        self.edge = kw.get('edge', False)   # the rolling pre-release of main (tag `edge`)
-        self.commit = kw.get('commit', '')  # an edge build's short commit
+        self.pre = kw.get('pre', False)     # the pre-release build of the latest main
+        self.commit = kw.get('commit', '')  # its short commit
 
     @property
     def zip_name(self):
@@ -1883,10 +1885,10 @@ class Release:
         return os.path.isfile(self.cached)
 
     def to_json(self):
-        return dict(version=self.version, prerelease=self.prerelease, date=self.date,
+        return dict(version=self.version, untested=self.untested, date=self.date,
                     url=self.url, size=self.size, digest=self.digest,
                     installer_url=self.installer_url, page=self.page,
-                    edge=self.edge, commit=self.commit)
+                    pre=self.pre, commit=self.commit)
 
 
 def host_env():
@@ -1928,47 +1930,44 @@ def http_get(url, timeout=15):
     return urllib.request.urlopen(req, timeout=timeout, context=ssl_context())
 
 
-EDGE_ZIP = re.compile(r'armada2-refit-(\d+\.\d+\.\d+-edge\.([0-9a-f]{7,40}))\.zip$')
+PRE_ZIP = re.compile(r'armada2-refit-(\d+\.\d+\.\d+-pre\.\d+)\.zip$')
+PRE_TAG = re.compile(r'v(\d+)\.(\d+)\.(\d+)-pre\.(\d+)$')
 
 
 def parse_releases(data):
-    """Releases from the API's JSON: tags vX.Y.Z only, plus the one release tagged `edge`
-    (main's latest build, a rolling pre-release) as an extra entry, last in the list. Its
-    zip is named for its version and commit; its date is the zip's, since the release's
-    own does not move when the assets are replaced."""
-    out, edge = [], None
+    """Releases from the API's JSON: tags vX.Y.Z (untested when GitHub flags them), plus
+    the newest vX.Y.Z-pre.N -- CI's build of the latest main -- as one extra entry, last.
+    Any other tag is ignored."""
+    out, pre = [], None
     for rel in data:
         if rel.get('draft'):
             continue
         tag = rel.get('tag_name', '')
-        inst = [a for a in rel.get('assets', []) if a['name'] == INSTALLER_ASSET]
-        inst = inst[0]['browser_download_url'] if inst else None
-        if tag == 'edge':
-            for a in rel.get('assets', []):
-                m = EDGE_ZIP.match(a['name'])
-                if m and not edge:
-                    edge = Release(m.group(1), prerelease=True, edge=True, commit=m.group(2),
-                                   date=(a.get('updated_at') or rel.get('published_at') or '')[:10],
-                                   url=a['browser_download_url'], size=a.get('size', 0),
-                                   digest=a.get('digest'), page=rel.get('html_url', RELEASES_PAGE),
-                                   installer_url=inst)
-            continue
-        if not re.match(r'v\d+\.\d+\.\d+$', tag):
+        pm = PRE_TAG.match(tag)
+        if not pm and not re.match(r'v\d+\.\d+\.\d+$', tag):
             continue
         version = tag[1:]
         zips = [a for a in rel.get('assets', []) if a['name'] == f'armada2-refit-{version}.zip']
         if not zips:
             continue
-        out.append(Release(version, prerelease=bool(rel.get('prerelease')),
-                           date=(rel.get('published_at') or '')[:10],
-                           url=zips[0]['browser_download_url'], size=zips[0].get('size', 0),
-                           digest=zips[0].get('digest'), page=rel.get('html_url', RELEASES_PAGE),
-                           installer_url=inst))
-    return out + ([edge] if edge else [])
+        inst = [a for a in rel.get('assets', []) if a['name'] == INSTALLER_ASSET]
+        sha = rel.get('target_commitish') or ''
+        r = Release(version, untested=bool(rel.get('prerelease')) and not pm, pre=bool(pm),
+                    commit=sha[:7] if re.match(r'[0-9a-f]{40}$', sha) else '',
+                    date=(rel.get('published_at') or '')[:10],
+                    url=zips[0]['browser_download_url'], size=zips[0].get('size', 0),
+                    digest=zips[0].get('digest'), page=rel.get('html_url', RELEASES_PAGE),
+                    installer_url=inst[0]['browser_download_url'] if inst else None)
+        if not pm:
+            out.append(r)
+        elif not pre or vtuple(version) + (int(pm.group(4)),) > pre[0]:
+            pre = (vtuple(version) + (int(pm.group(4)),), r)
+    return out + ([pre[1]] if pre else [])
 
 
 def fetch_releases():
-    """The releases on GitHub, newest first, edge last; also writes the list to the cache."""
+    """The releases on GitHub, newest first, the pre-release build last; also writes the
+    list to the cache."""
     with http_get(API) as r:
         out = parse_releases(json.load(r))
     save_json(os.path.join(CACHE, 'releases.json'),
@@ -1988,41 +1987,48 @@ def merge_cached(rels):
     known = {r.version for r in rels}
     zips = sorted(glob.glob(os.path.join(CACHE, 'releases', 'armada2-refit-*.zip')),
                   key=os.path.getmtime, reverse=True)
-    have_edge = any(r.edge for r in rels)
+    have_pre = any(r.pre for r in rels)
     for z in zips:
         name = os.path.basename(z)
         m = re.match(r'armada2-refit-(\d+\.\d+\.\d+)\.zip$', name)
         if m and m.group(1) not in known:
             rels.append(Release(m.group(1), size=os.path.getsize(z)))
             known.add(m.group(1))
-        m = EDGE_ZIP.match(name)
-        # One edge entry at most: the list's, else the newest one kept.
-        if m and not have_edge:
-            rels.append(Release(m.group(1), prerelease=True, edge=True, commit=m.group(2),
+        m = PRE_ZIP.match(name)   # (newest first: the first is kept)
+        # One pre-release entry at most: the list's, else the newest one kept.
+        if m and not have_pre:
+            rels.append(Release(m.group(1), pre=True,
                                 date=time.strftime('%Y-%m-%d', time.localtime(os.path.getmtime(z))),
                                 size=os.path.getsize(z)))
-            have_edge = True
-    return sorted(rels, key=lambda r: (r.edge, [-x for x in vtuple(r.version)]))
+            have_pre = True
+    return sorted(rels, key=lambda r: (r.pre, [-x for x in vtuple(r.version)]))
 
 
 def default_release(rels):
-    """The newest full release; a pre-release (not yet seen in game) only when there is
-    nothing else; never edge (None when edge is all there is: it is picked on purpose)."""
-    rels = [r for r in rels if not r.edge]
-    full = [r for r in rels if not r.prerelease]
+    """The newest full release; an untested release (not yet seen in game) only when there
+    is nothing else; never the pre-release build (None when that is all there is: it is
+    picked on purpose)."""
+    rels = [r for r in rels if not r.pre]
+    full = [r for r in rels if not r.untested]
     return (full or rels or [None])[0]
 
 
 def find_release(rels, want):
-    """--install VERSION; `edge` is the edge build."""
-    return next((r for r in rels if (r.edge if want == 'edge' else r.version == want)), None)
+    """--install VERSION; `pre-release` is the build of the latest main."""
+    return next((r for r in rels if (r.pre if want == 'pre-release' else r.version == want)), None)
 
 
-def edge_label(r):
-    return f'Edge (latest main) · {r.commit}' + (f' · {r.date}' if r.date else '') + ' — untested'
+def pre_label(r):
+    return (f'Pre-release (latest main) · {r.version}' + (f' · {r.commit}' if r.commit else '')
+            + (f' · {r.date}' if r.date else '') + ' — untested')
 
 
-EDGE_NOTE = 'the latest main, not seen in game: for testing, or to live on the edge'
+def release_tags(r, newest):
+    """The bracketed tags of a versioned release in the list."""
+    return (['newest'] if r is newest else []) + (['untested release'] if r.untested else [])
+
+
+PRE_NOTE = 'the latest main, not seen in game: for testing, or to live on the edge'
 
 
 def download(rel, progress=None):
@@ -2052,8 +2058,8 @@ def download(rel, progress=None):
                                f'the download of {rel.version} is damaged (checksum)')
         Package(tmp)        # a zip we can read, with a package in it
         os.replace(tmp, rel.cached)
-        if rel.edge:        # an edge zip per commit: keep only this one
-            for z in glob.glob(os.path.join(os.path.dirname(rel.cached), 'armada2-refit-*-edge.*.zip')):
+        if rel.pre:         # a zip per commit: keep only this one
+            for z in glob.glob(os.path.join(os.path.dirname(rel.cached), 'armada2-refit-*-pre.*.zip')):
                 if z != rel.cached:
                     os.unlink(z)
     finally:
@@ -2632,10 +2638,10 @@ def cli(argv):
                   + f'  installed: {facts["installed"] or "no"}')
         print('releases:')
         for r in releases():
-            kind = 'edge' if r.edge else 'pre-release' if r.prerelease else 'release'
+            kind = 'pre-release' if r.pre else 'untested' if r.untested else 'release'
             print(f'  {r.version:10} {r.date:10} {kind:11}'
                   f' {"cached" if r.is_cached() else ""}'
-                  + (f'  commit {r.commit}, untested (--install edge)' if r.edge else ''))
+                  + (f'  untested (--install pre-release)' if r.pre else ''))
         return 0
     game = a.game or (games[0].path if games else None)
     if a.report:
@@ -2925,33 +2931,43 @@ def selftest():
               os.path.realpath(prefix_of(os.path.join(t, 'drive_c', 'x')).root) == os.path.realpath(t),
               'prefix: found above drive_c')
         check(vtuple('11.10.0') > vtuple('11.9.3'), 'versions sort as numbers')
-        check(vtuple('15.10.0-edge.abc1234') == (15, 10, 0) and
-              vtuple('15.10.0-edge.abc1234') > vtuple('15.9.0') and vtuple('x') == (0,),
-              'vtuple: an edge version is its X.Y.Z, the sha stays out')
-        # The release list: v-tags, a pre-release and the edge entry.
-        def api_rel(tag, pre=False, assets=(), **kw):
+        check(vtuple('15.10.0-pre.abc1234') == (15, 10, 0) and
+              vtuple('15.10.0-pre.abc1234') > vtuple('15.9.0') and vtuple('x') == (0,),
+              'vtuple: a pre-release build is its X.Y.Z, the sha stays out')
+        # The release list: v-tags, a flagged release, two builds of main, stray tags.
+        sha = 'abcdef1' + '0' * 33
+        def api_rel(tag, pre=False, sha=sha):
+            v = tag[1:]
             return dict(tag_name=tag, prerelease=pre, published_at='2026-10-01T00:00:00Z',
-                        assets=[dict(name=n, browser_download_url='https://x/' + n, size=1,
-                                     updated_at=kw.get('upd', '')) for n in assets])
-        edge_zip = 'armada2-refit-15.10.0-edge.abc1234.zip'
-        api = [api_rel('edge', True, [edge_zip], upd='2026-11-05T12:00:00Z'),
-               api_rel('v15.9.0', False, ['armada2-refit-15.9.0.zip']),
-               api_rel('v15.9.1-rc1', True, ['armada2-refit-15.9.1-rc1.zip']),
-               api_rel('v15.10.0', True, ['armada2-refit-15.10.0.zip']),
-               api_rel('v15.8.0', False, ['armada2-refit-15.8.0.zip'])]
+                        target_commitish=sha, assets=[dict(name=f'armada2-refit-{v}.zip',
+                        browser_download_url='https://x/' + v, size=1)])
+        api = [api_rel('v15.10.0-pre.9', True), api_rel('v15.9.0'), api_rel('edge', True),
+               api_rel('v15.10.0-pre.12', True, 'main'), api_rel('v15.9.1-rc1', True),
+               api_rel('v15.10.0', True), api_rel('v15.8.0')]
         rl = parse_releases(api)
-        check([r.version for r in rl] == ['15.9.0', '15.10.0', '15.8.0', '15.10.0-edge.abc1234'],
-              'releases: v-tags and the edge entry, nothing else')
+        check([r.version for r in rl] == ['15.9.0', '15.10.0', '15.8.0', '15.10.0-pre.12'],
+              'releases: v-tags, then only the newest build of main; other tags ignored')
+        check(rl[1].untested and not rl[0].untested and not rl[-1].untested,
+              'releases: GitHub\'s flag is `untested` on versions only')
+        check(Release(version='1', prerelease=True).untested and
+              Release(**rl[1].to_json()).untested, 'cache: old `prerelease` read as untested')
         e = rl[-1]
-        check(e.edge and e.commit == 'abc1234' and e.date == '2026-11-05' and e.prerelease
-              and e.zip_name == edge_zip, 'edge: commit, date from the zip, its own zip name')
-        check(default_release(rl).version == '15.9.0', 'default: the newest full release, not edge or a pre-release')
+        check(e.pre and e.commit == '' and e.zip_name == 'armada2-refit-15.10.0-pre.12.zip'
+              and parse_releases(api[:1])[0].commit == 'abcdef1'
+              and parse_releases(api[:1])[0].date == '2026-10-01',
+              'pre-release: commit from a sha target only, date, zip name')
+        check(vtuple('15.10.0-pre.12') == (15, 10, 0) and vtuple('x') == (0,),
+              'vtuple: the build number stays out')
+        check(default_release(rl).version == '15.9.0', 'default: the newest full release')
         check(default_release(rl[1:2] + [e]).version == '15.10.0' and default_release([e]) is None
-              and default_release([]) is None, 'default: never edge')
-        check(find_release(rl, 'edge') is e and find_release(rl, '15.8.0').version == '15.8.0',
-              'install: `edge` names the edge build')
-        check(Release(**e.to_json()).edge, 'edge survives the cache file')
-        check(' · abc1234 · 2026-11-05 — untested' in edge_label(e), 'edge label')
+              and default_release([]) is None, 'default: never the pre-release build')
+        check(find_release(rl, 'pre-release') is e and find_release(rl, '15.8.0').version == '15.8.0',
+              'install: `pre-release` names the build of the latest main')
+        check(Release(**e.to_json()).pre, 'pre-release survives the cache file')
+        e.commit, e.date = 'abcdef1', '2026-11-05'
+        check(pre_label(e) == 'Pre-release (latest main) · 15.10.0-pre.12 · abcdef1 · 2026-11-05 — untested',
+              'pre-release label')
+        check(release_tags(rl[1], rl[0]) == ['untested release'], 'untested release tag')
 
         # The bug report: nothing personal in it, and the findings it exists for.
         r = redact(f'{HOME}/x C:\\Users\\Alice\\A2 Z:\\home\\bob\\g /Users/carol/b '
@@ -3896,15 +3912,15 @@ def run_gui():
             newest = default_release(rels)
             labels = []
             for r in rels:
-                tags = ['newest'] if r is newest else []
-                if r.prerelease:
-                    tags.append('pre-release')
-                labels.append(edge_label(r) if r.edge else
+                tags = release_tags(r, newest)
+                labels.append(pre_label(r) if r.pre else
                               r.version + (f'  ({", ".join(tags)})' if tags else ''))
             self.updating = True
             self.dd_rel.set_model(Gtk.StringList.new(labels or ['No releases']))
             pick = cur_v or (newest.version if newest else None)
-            self.dd_rel.set_selected(next((i for i, r in enumerate(rels) if r.version == pick), 0))
+            # Nothing but the pre-release build: no pick (no selection, nothing to install).
+            self.dd_rel.set_selected(next((i for i, r in enumerate(rels) if r.version == pick),
+                                          Gtk.INVALID_LIST_POSITION if rels and not pick else 0))
             self.updating = False
             self.on_release(user=False)
 
@@ -3938,14 +3954,15 @@ def run_gui():
             r = self.release()
             self.package = None
             if not r:
-                self.row_rel.set_subtitle('Nothing to install yet. Check the connection and refresh.')
+                self.row_rel.set_subtitle('Pick a version.' if self.releases else
+                                          'Nothing to install yet. Check the connection and refresh.')
                 self.update_all()
                 return
-            sub = [r.date] if r.date and not r.edge else []
-            if r.edge:
-                sub.append(EDGE_NOTE)
-            elif r.prerelease:
-                sub.append('pre-release, not yet seen in game')
+            sub = [r.date] if r.date and not r.pre else []
+            if r.pre:
+                sub.append(PRE_NOTE)
+            elif r.untested:
+                sub.append('untested release: not yet seen in game')
             if r.is_cached():
                 self.read_package(r)
             elif r.url and not self.busy:
@@ -5124,15 +5141,15 @@ def run_tk():
             self.releases = rels
             newest = default_release(rels)
             pick = cur_v or (newest.version if newest else None)
-            self.ri = next((i for i, r in enumerate(rels) if r.version == pick), 0)
+            # Nothing but the pre-release build: no pick (release() is None, nothing installs).
+            self.ri = next((i for i, r in enumerate(rels) if r.version == pick),
+                           -1 if rels and not pick else 0)
             self.on_release(user=False)
 
         def release_label(self, r):
-            if r.edge:
-                return edge_label(r)
-            tags = ['newest'] if r is default_release(self.releases) else []
-            if r.prerelease:
-                tags.append('pre-release')
+            if r.pre:
+                return pre_label(r)
+            tags = release_tags(r, default_release(self.releases))
             return r.version + (f'  ({", ".join(tags)})' if tags else '')
 
         def refresh(self):
@@ -5576,22 +5593,22 @@ def run_tk():
             # Version.
             seps.append(y)
             if r:
-                bits = [r.date] if r.date and not r.edge else []
-                if r.edge:
-                    bits.append(EDGE_NOTE)
-                elif r.prerelease:
-                    bits.append('pre-release, not yet seen in game')
+                bits = [r.date] if r.date and not r.pre else []
+                if r.pre:
+                    bits.append(PRE_NOTE)
+                elif r.untested:
+                    bits.append('untested release: not yet seen in game')
                 if self.rel_note:
                     bits.append(self.rel_note)
                 if self.check_error and not r.url:
                     bits.append('no longer on GitHub')
                 sub = ' · '.join(bits)
             else:
-                sub = self.rel_note or ('Checking…' if self.busy else
+                sub = self.rel_note or ('Checking…' if self.busy else 'Pick a version.' if self.releases else
                                         'Nothing to install yet. Check the connection and refresh.')
             rw = px(210)
             y_end, yc = row(y, 'Version', sub, rw)
-            field(ix1 - rw, yc - fh // 2, rw, fh, self.release_label(r) if r else 'No releases',
+            field(ix1 - rw, yc - fh // 2, rw, fh, self.release_label(r) if r else 'Choose a version' if self.releases else 'No releases',
                   popup([self.release_label(x) for x in self.releases], self.ri,
                         self.pick_release), bool(self.releases) and not self.busy)
             y = y_end

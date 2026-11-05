@@ -183,8 +183,12 @@ def main():
     check(C.list_changesets(root) == [], 'the consumed changesets are deleted')
     check(not C.check(root, units)[1], 'check passes after version')
     check(C.plan(root, units, []) == {}, 'nothing pending: an empty plan')
+    before = rd_rev(root, 'HEAD')
     git(root, 'add', '-A')
-    git(root, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'Release 4.0.0')
+    git(root, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm',
+        'Release 4.0.0\n\nRelease-Version: 4.0.0')
+    check(C.released(root, f'{before}..HEAD') == '4.0.0', 'released: the release commit is found')
+    check(C.released(root, 'HEAD..HEAD') is None, 'released: nothing in an empty range')
 
     # ------------------------------------------------ check
     with open(os.path.join(root, 'tool/tool.py'), 'w') as fh:
@@ -215,6 +219,8 @@ def main():
     git(root, 'add', '-A')
     git(root, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'hand entries')
     before = {f: rd(root, f) for f in ('beta/CHANGELOG.md', 'alpha/CHANGELOG.md', 'CHANGELOG.md')}
+    check(C.released(root, 'main..HEAD') is None,
+          'released: a version changed by hand (no trailer) publishes nothing')
     e = C.check(root, units, base='main')[1]
     check(any('by hand' in x for x in e), 'check --base: a hand-numbered version is refused')
     check(not C.check(root, units, base='main', allow_version_change=True)[1],
@@ -258,6 +264,27 @@ def main():
     except C.Refused:
         check(True, 'add refuses an invalid bump')
 
+    # ------------------------------------------------ version --commit
+    r2 = fixture()
+    put(r2, 'x.md', '---\nlayers: [beta]\nbump: patch\n---\n\n- x\n')
+    head = rd_rev(r2, 'HEAD')
+    env = dict(os.environ, GIT_AUTHOR_NAME='t', GIT_AUTHOR_EMAIL='t@t',
+               GIT_COMMITTER_NAME='t', GIT_COMMITTER_EMAIL='t@t')
+    out = subprocess.run([sys.executable, os.path.join(HERE, 'changeset.py'), '--root', r2,
+                          'version', '--commit', '--date', '2026-05-05'],
+                         stdout=subprocess.PIPE, text=True, env=env)
+    msg = subprocess.run(['git', '-C', r2, 'log', '-1', '--format=%B'], stdout=subprocess.PIPE,
+                         text=True).stdout
+    check(out.returncode == 0 and msg.startswith('Release 3.4.6\n') and 'Release-Version: 3.4.6' in msg
+          and C.released(r2, f'{head}..HEAD') == '3.4.6'
+          and not subprocess.run(['git', '-C', r2, 'status', '--porcelain'], stdout=subprocess.PIPE,
+                                 text=True).stdout.strip(),
+          f'version --commit: one commit "Release 3.4.6" with its trailer: {msg!r}')
+    nr = subprocess.run([sys.executable, os.path.join(HERE, 'changeset.py'), '--root', r2,
+                         'status', '--next-root'], stdout=subprocess.PIPE, text=True).stdout.strip()
+    check(nr == '3.4.7', f'status --next-root with nothing pending: the current plus a patch ({nr})')
+    subprocess.run(['rm', '-rf', r2])
+
     # ------------------------------------------------ this repository
     repo = os.path.dirname(HERE)
     ru = C.load_units(repo)
@@ -272,6 +299,11 @@ def main():
         return 1
     print('\nall ok')
     return 0
+
+
+def rd_rev(root, rev):
+    return subprocess.run(['git', '-C', root, 'rev-parse', rev], stdout=subprocess.PIPE,
+                          text=True, check=True).stdout.strip()
 
 
 def rd_base(root, rel):
