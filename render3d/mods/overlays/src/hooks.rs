@@ -12,7 +12,8 @@ use r3d_core::hooks::{Gate, Hook, Hooks, Kind, Site};
 use r3d_core::engine::{self, field, field_f32, field_u8, rd, storm3d};
 use r3d_core::math::{M34, V3};
 use crate::rt;
-use crate::syms::{hook, sym, TABLE};
+use crate::syms::{field as off, hook, sym, value, TABLE};
+use r3d_core::engine::instance::{instance_database, raw_scale, team_rgb};
 
 /// An engine address of the profile: 0 unless the hook that uses it is ready.
 pub(crate) fn at(s: a2engine::Sym) -> usize { TABLE.engine().addr(s) }
@@ -72,7 +73,7 @@ pub fn is_shroud() -> bool {
 
 /// The map editor is on (`UserProfile+0x84`).
 pub fn editor() -> bool {
-    field_u8(unsafe { rd::<usize>(user_profile()) }, 0x84) != 0
+    field_u8(unsafe { rd::<usize>(user_profile()) }, off::OV_EDIT_MODE()) != 0
 }
 
 pub fn view_record() -> u32 {
@@ -86,17 +87,17 @@ pub fn terrain_initialized() -> bool {
 
 /// The profile's tactical shroud option (`+0x45`).
 pub fn tactical_shroud_option() -> u8 {
-    field_u8(unsafe { rd::<usize>(user_profile()) }, 0x45)
+    field_u8(unsafe { rd::<usize>(user_profile()) }, off::OV_TACTICAL_SHROUD())
 }
 
 /// Whether the terrain holds the shroud as a `TreeGrid` (`Terrain_Geometry+0x28`).
 pub fn shroud_tree_grid(tg: usize) -> bool {
-    field(tg, 0x28) != 0
+    field(tg, off::OV_TG_SHROUD_TREE()) != 0
 }
 
 /// The selection bubbles' brightness (`UserProfile+0x48`).
 pub fn selection_brightness() -> f32 {
-    field_f32(unsafe { rd::<usize>(user_profile()) }, 0x48)
+    field_f32(unsafe { rd::<usize>(user_profile()) }, off::OV_SELECTION_BRIGHTNESS())
 }
 
 /// The user's team (`Transport::getUserTeam`), -1 without a transport.
@@ -112,7 +113,7 @@ pub fn user_team() -> i32 {
 pub fn render_footprints(cam: usize, tg: usize) {
     unsafe {
         let f: unsafe extern "thiscall" fn(usize, usize, f32) = core::mem::transmute(fn_footprints());
-        f(placeholder_addr(), cam, field_f32(tg, 0x1c));
+        f(placeholder_addr(), cam, field_f32(tg, off::OV_TG_GRID_Y()));
     }
 }
 
@@ -132,12 +133,18 @@ pub fn draw_engine_grid(tg: usize, cam: usize) {
 /// The map's rectangle on the terrain: (x0, z0, x1, z1, grid height) (`+0x4`, `+0xc`,
 /// `+0x10`, `+0x18`, `+0x1c`).
 pub fn terrain_rect(tg: usize) -> (f32, f32, f32, f32, f32) {
-    (field_f32(tg, 0x4), field_f32(tg, 0xc), field_f32(tg, 0x10), field_f32(tg, 0x18), field_f32(tg, 0x1c))
+    (
+        field_f32(tg, off::OV_TG_X0()),
+        field_f32(tg, off::OV_TG_Z0()),
+        field_f32(tg, off::OV_TG_X1()),
+        field_f32(tg, off::OV_TG_Z1()),
+        field_f32(tg, off::OV_TG_GRID_Y()),
+    )
 }
 
 /// The grid's cell counts (`+0x20`, `+0x24`).
 pub fn terrain_cells(tg: usize) -> (i32, i32) {
-    (field(tg, 0x20) as i32, field(tg, 0x24) as i32)
+    (field(tg, off::OV_TG_CELLS_X()) as i32, field(tg, off::OV_TG_CELLS_Z()) as i32)
 }
 
 pub fn grid_step() -> f32 {
@@ -151,13 +158,13 @@ pub fn grid_colour() -> [f32; 3] {
 /// The engine's texture behind a layer: `Terrain_Geometry+0x34` the fog's, `+0x38` the
 /// shroud's.
 pub fn layer_texture(tg: usize, shroud: bool) -> usize {
-    field(tg, if shroud { 0x38 } else { 0x34 })
+    field(tg, if shroud { off::OV_TG_SHROUD_TEX() } else { off::OV_TG_FOG_TEX() })
 }
 
 /// The scanner grid under a layer: width `+0xc`, height `+0x10`.
 pub fn scan_dims(shroud: bool) -> (i32, i32) {
     let grid = unsafe { rd::<usize>(if shroud { scan_shroud() } else { scan_fog() }) };
-    (field(grid, 0xc) as i32, field(grid, 0x10) as i32)
+    (field(grid, off::OV_SCAN_W()) as i32, field(grid, off::OV_SCAN_H()) as i32)
 }
 
 // ---- the height posts (the one hook) --------------------------------------------------
@@ -239,8 +246,7 @@ pub fn entity(handle: usize) -> usize {
 
 /// An object's team colour (`+0xf0`, the team, `+8`).
 pub fn team_colour(o: usize) -> V3 {
-    let t = field(o, 0xf0);
-    if t == 0 { V3::ZERO } else { unsafe { rd::<V3>(t + 8) } }
+    team_rgb(field(o, off::OV_OBJ_TEAM_PTR()))
 }
 
 /// Another UI has put a `ret` in `RenderSelectionEffects` (it draws the selection).
@@ -250,12 +256,13 @@ pub fn selection_effects_returns() -> bool {
 
 /// Every selection entry of the engine's sixteen buckets.
 pub fn each_selection_entry(mut f: impl FnMut(usize)) {
-    for b in 0..16 {
+    let next_at = off::OV_SEL_NEXT();
+    for b in 0..value::OV_BUCKET_COUNT().max(0) as usize {
         let mut e = unsafe { rd::<usize>(buckets() + b * 4) };
         let mut guard = 0;
         while e != 0 && guard < 10000 {
             guard += 1;
-            let next = field(e, 0x9c);
+            let next = field(e, next_at);
             f(e);
             e = next;
         }
@@ -265,21 +272,21 @@ pub fn each_selection_entry(mut f: impl FnMut(usize)) {
 /// An entry's object handle (`+0x88`), flag bits (`+0x84`), pulse phase (`+0x8c`) and
 /// scale (`+0x90`).
 pub fn entry_handle(e: usize) -> usize {
-    field(e, 0x88)
+    field(e, off::OV_SEL_HANDLE())
 }
 pub fn entry_bits(e: usize) -> u32 {
-    field(e, 0x84) as u32
+    field(e, off::OV_SEL_BITS()) as u32
 }
 pub fn entry_phase(e: usize) -> f32 {
-    field_f32(e, 0x8c)
+    field_f32(e, off::OV_SEL_PHASE())
 }
 pub fn entry_scale(e: usize) -> V3 {
-    unsafe { rd(e + 0x90) }
+    unsafe { rd(e + off::OV_SEL_SCALE()) }
 }
 
 /// The craft's health measure the bubble pulses with (`+0x158`).
 pub fn object_pulse(o: usize) -> f32 {
-    field_f32(o, 0x158)
+    field_f32(o, off::OV_OBJ_PULSE())
 }
 
 /// `GameObject::GetTeamRelation(team)`.
@@ -307,26 +314,24 @@ pub(crate) fn fn_team_get() -> usize { at(sym::FN_TEAM_GET) } // Team::GetTeam(i
 pub(crate) fn fn_class_odf() -> usize { at(sym::FN_CLASS_ODF) } // GameObjectClass::GetOdfName, thiscall
 pub(crate) fn fn_distance_cull() -> usize { at(sym::FN_DISTANCE_CULL) } // GameObjectInstance::DistanceCull(eye, pos), thiscall
 pub(crate) fn vt_database() -> usize { at(sym::VT_DATABASE) }
-const SPIRIT_RENDER: usize = 0xc; // Spirit vtable: Render(ST3D_Camera*)
-const S3D_MATERIAL: usize = 0xa8; // Storm3D: the lighting material in place of every mesh's
-const S3D_ALPHA: usize = 0x4;
-const S3D_TEAM: usize = 0x34;
+// A spirit's `Render(ST3D_Camera*)` (vtable `+0xc`); Storm3D's lighting material in
+// place of every mesh's (`+0xa8`), its additive scale (`+0x4`) and team tint (`+0x34`).
 
 /// `Ghost+0x24`: the material every ghost mesh is lit with, and its ambient and
 /// diffuse (`+0x18`, `+0x24`); a ghost without one is lit dark grey.
 pub fn ghost_material(g: usize) -> (usize, V3, V3) {
-    let mat = field(g, 0x24);
+    let mat = field(g, off::OV_GHOST_MATERIAL());
     let (amb, diff) = if mat == 0 {
         (r3d_core::math::v3(0.1, 0.1, 0.1), r3d_core::math::v3(0.1, 0.1, 0.1))
     } else {
-        unsafe { (rd::<V3>(mat + 0x18), rd::<V3>(mat + 0x24)) }
+        unsafe { (rd::<V3>(mat + off::OV_MAT_AMBIENT()), rd::<V3>(mat + off::OV_MAT_DIFFUSE())) }
     };
     (mat, amb, diff)
 }
 
 /// `Ghost+0x28`: the tint's factor.
 pub fn ghost_factor(g: usize) -> f32 {
-    field_f32(g, 0x28)
+    field_f32(g, off::OV_GHOST_FACTOR())
 }
 
 /// Every spirit in `Ghost::ghostList`, with the team colour it is tinted with (times
@@ -336,18 +341,15 @@ pub fn each_spirit(mut f: impl FnMut(usize, V3)) -> bool {
     if head == 0 {
         return false;
     }
-    let mut n = field(head, 0);
-    let mut guard = 0;
-    while n != head && n != 0 && guard < 100_000 {
-        guard += 1;
-        let sp = field(n, 8);
-        n = field(n, 0);
+    let team_at = off::OV_SPIRIT_TEAM();
+    engine::for_each_list_node(head, |n| {
+        let sp = engine::list_node_value(n);
         if sp == 0 {
-            continue;
+            return;
         }
-        let team = unsafe { core::mem::transmute::<usize, unsafe extern "C" fn(i32) -> usize>(fn_team_get())(field(sp, 0xc) as i32) };
-        f(sp, if team == 0 { V3::ZERO } else { unsafe { rd::<V3>(team + 8) } });
-    }
+        let team = unsafe { core::mem::transmute::<usize, unsafe extern "C" fn(i32) -> usize>(fn_team_get())(field(sp, team_at) as i32) };
+        f(sp, team_rgb(team));
+    });
     true
 }
 
@@ -356,10 +358,10 @@ pub fn each_spirit(mut f: impl FnMut(usize, V3)) -> bool {
 pub fn render_spirit(sp: usize, cam: usize, mat: usize, additive: f32, tint: V3) {
     let s3d = storm3d();
     unsafe {
-        core::ptr::write_unaligned((s3d + S3D_MATERIAL) as *mut usize, mat);
-        core::ptr::write_unaligned((s3d + S3D_ALPHA) as *mut f32, additive);
-        core::ptr::write_unaligned((s3d + S3D_TEAM) as *mut V3, tint);
-        let r: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(engine::vtable(sp), SPIRIT_RENDER));
+        core::ptr::write_unaligned((s3d + off::OV_S3D_MATERIAL()) as *mut usize, mat);
+        core::ptr::write_unaligned((s3d + off::OV_S3D_ALPHA()) as *mut f32, additive);
+        core::ptr::write_unaligned((s3d + off::OV_S3D_TEAM()) as *mut V3, tint);
+        let r: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(engine::vtable(sp), off::OV_VT_SPIRIT_RENDER()));
         r(sp, cam);
     }
 }
@@ -368,20 +370,20 @@ pub fn render_spirit(sp: usize, cam: usize, mat: usize, additive: f32, tint: V3)
 pub fn end_spirits() {
     let s3d = storm3d();
     unsafe {
-        core::ptr::write_unaligned((s3d + S3D_ALPHA) as *mut f32, 1.0);
-        core::ptr::write_unaligned((s3d + S3D_MATERIAL) as *mut usize, 0);
+        core::ptr::write_unaligned((s3d + off::OV_S3D_ALPHA()) as *mut f32, 1.0);
+        core::ptr::write_unaligned((s3d + off::OV_S3D_MATERIAL()) as *mut usize, 0);
     }
 }
 
 /// A spirit that carries a plain SOD: (instance `+0x10`, class `+4`); None if its
 /// instance has no database of `VT_DATABASE`'s kind.
 pub fn spirit_instance(sp: usize) -> Option<(usize, usize)> {
-    let inst = field(sp, 0x10);
-    let db = field(inst, 0x80);
+    let inst = field(sp, off::OV_SPIRIT_INSTANCE());
+    let db = instance_database(inst);
     if inst == 0 || db == 0 || engine::vtable(db) != vt_database() {
         return None;
     }
-    Some((inst, field(sp, 4)))
+    Some((inst, field(sp, off::OV_SPIRIT_CLASS())))
 }
 
 /// A class's ODF name without its extension.
@@ -401,13 +403,13 @@ pub fn class_odf(class: usize) -> &'static str {
 
 /// The instance's origin (`+0x68`), scale (`+0x28`) and placement (`+0x44`).
 pub fn instance_origin(inst: usize) -> V3 {
-    unsafe { rd(inst + 0x68) }
+    unsafe { rd(inst + off::OV_INST_ORIGIN()) }
 }
 pub fn instance_scale(inst: usize) -> V3 {
-    unsafe { rd::<V3>(inst + 0x28) }
+    raw_scale(inst)
 }
 pub fn instance_world(inst: usize) -> M34 {
-    unsafe { rd(inst + 0x44) }
+    unsafe { rd(inst + off::OV_INST_MATRIX()) }
 }
 
 /// `GameObjectInstance::DistanceCull(eye, pos)`, as `GameObjectSpirit::Render` asks it.
@@ -421,7 +423,12 @@ pub fn distance_culled(inst: usize, eye: &V3, pos: &V3) -> bool {
 /// The station being placed (`PlaceholderFeature`): its class (`+0x34`), placement
 /// (`+0x38`), colour (`+0x68`) and whether the placement is blocked (`+0x74` clear).
 pub fn placeholder(f: usize) -> (usize, M34, V3, bool) {
-    (field(f, 0x34), unsafe { rd(f + 0x38) }, unsafe { rd(f + 0x68) }, field_u8(f, 0x74) == 0)
+    (
+        field(f, off::OV_PH_CLASS()),
+        unsafe { rd(f + off::OV_PH_MATRIX()) },
+        unsafe { rd(f + off::OV_PH_COLOUR()) },
+        field_u8(f, off::OV_PH_PLACEABLE()) == 0,
+    )
 }
 
 // ---- the pivot marker -----------------------------------------------------------------
@@ -437,22 +444,21 @@ const RENDER_BYTES: [u8; 54] = [
 ];
 /// `ST3D_Instance`'s vtable: the marker must be a plain instance.
 pub(crate) fn vt_instance() -> usize { at(sym::VT_INSTANCE) }
-const CAM_MARKER: usize = 0xe0;
-const CAM_FREE: usize = 0xe4;
+
 
 /// Whether `TacticalCamera::Render` is stock's (its slot and its bytes).
 pub fn tactical_render_is_stock() -> bool {
-    field(vt_tactical_camera(), 0x20) == fn_render() && unsafe { core::slice::from_raw_parts(fn_render() as *const u8, RENDER_BYTES.len()) } == RENDER_BYTES
+    field(vt_tactical_camera(), off::OV_VT_TCAM_RENDER()) == fn_render() && unsafe { core::slice::from_raw_parts(fn_render() as *const u8, RENDER_BYTES.len()) } == RENDER_BYTES
 }
 
 /// The camera's marker instance (`+0xe0`).
 pub fn camera_marker(f: usize) -> usize {
-    field(f, CAM_MARKER)
+    field(f, off::OV_CAM_MARKER())
 }
 
 /// Whether the camera has no entity to follow (`+0xe4`).
 pub fn camera_free(f: usize) -> bool {
-    field_u8(f, CAM_FREE) != 0
+    field_u8(f, off::OV_CAM_FREE()) != 0
 }
 
 /// Whether an instance is a plain `ST3D_Instance`.

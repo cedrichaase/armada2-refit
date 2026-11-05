@@ -96,6 +96,11 @@ pub fn team_colour(o: usize) -> V3 {
     }
 }
 
+/// A `Team`'s colour (`+8`), black for no team.
+pub fn team_rgb(team: usize) -> V3 {
+    if team == 0 { v3(0.0, 0.0, 0.0) } else { unsafe { rd::<V3>(team + off::TEAM_COLOUR()) } }
+}
+
 /// Whether the engine shows team colours at all (`Storm3D+0x40`, which
 /// `ST3D_Workspace::SetLightingMaterial` asks before it gives a `team*` material the
 /// team's colour).
