@@ -5,7 +5,10 @@
 #   1. engine   no address literal (0x400000..0x7fffff) and no `field*`/`rd` read outside
 #               the engine glue: core/src/engine/** and each module's
 #               mods/<m>/src/hooks.rs (and core/src/hooks.rs, the registry that checks
-#               the sites it patches)
+#               the sites it patches); and anywhere, the glue included, no literal
+#               struct offset (AR-3): `field*(x, 0x..)`, `rd(x + 0x..)`, `(x + 0x..) as *`
+#               or `const X: usize = 0x..`, which are the profile's `field` entries
+#               (a line that says `not an offset` is excused)
 #   2. cross    no path into another module's crate (`r3d_<other>::`) inside
 #               mods/<m>/, and no `r3d-<other>` dependency in its Cargo.toml: a module
 #               depends on r3d-core alone
@@ -56,6 +59,12 @@ FIELD = re.compile(r'(?<![\w.])(?:engine::)?(field|field_f32|field_u8|field_m34|
 CROSS = re.compile(r'\br3d_([a-z_]+)::')
 DEP = re.compile(r'^\s*r3d-([a-z_]+)\s*=', re.M)
 BYNAME = re.compile(r'(?<![\w])(?:r3d_core::registry::|registry::)?(running|enabled)\s*\(\s*"')
+OFFSET = re.compile(r'''(?x)
+    \bfield\w*\s*\(\s*[^,()]+(?:\([^()]*\))?[^,()]*,\s*0[xX][0-9a-fA-F]+\s*\)
+  | \b(?:rd|peek)\w*\s*(?:::\s*<[^>]*>)?\s*\([^()]*\+\s*0[xX][0-9a-fA-F]+\s*\)
+  | \+\s*0[xX][0-9a-fA-F]+\s*\)\s*as\s*\*
+  | \bconst\s+[A-Z][A-Z0-9_]*\s*:\s*usize\s*=\s*0[xX][0-9a-fA-F]+\s*;
+''')
 CONTENT = re.compile(r'"[^"\n]*\.(odf|sod|spr|tga)"', re.I)
 
 
@@ -103,6 +112,9 @@ for d, dirs, files in (w for src in roots for w in os.walk(src)):
         glue = is_glue(rel)
         for n, raw in enumerate(text.split('\n'), 1):
             line = strip_comments(raw)
+            if 'not an offset' not in raw:
+                for _ in OFFSET.finditer(line):
+                    hits['engine'].append((rel, n))
             if not glue:
                 for _ in ADDR.finditer(line):
                     hits['engine'].append((rel, n))
@@ -137,7 +149,7 @@ def area(rel):
     return rel
 
 
-names = {'engine': 'engine glue outside core/src/engine and hooks.rs', 'cross': 'another module\'s crate in a module',
+names = {'engine': 'engine glue outside core/src/engine and hooks.rs, or a literal struct offset', 'cross': 'another module\'s crate in a module',
          'byname': 'running/enabled by name in a module', 'content': 'content names outside content.rs (advisory)'}
 total = 0
 for r, hs in hits.items():

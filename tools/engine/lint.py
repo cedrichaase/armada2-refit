@@ -24,8 +24,11 @@ with each file's `out` resolved against DIR (the selftest's fixtures do).
     defined; every entry and hook is used (an entry that is the call/jmp/slot target or the
     vtable of a used entry counts as used).
  4. No engine address in those sources: any hex literal inside a build's image range fails,
-    unless its line carries a `// not an address` (or `/* not an address */`) comment. In C,
-    probable field offsets are printed as `advisory:` and never fail. `hud/`, `grid/` and
+    unless its line carries a `// not an address` (or `/* not an address */`) comment. A
+    literal struct offset fails too (AR-3): in C `p + 0x..` and an asm `0x..(%reg)` from
+    0x20 up, in Rust `field(x, 0x..)`, `rd(x + 0x..)`, `(x + 0x..) as *` and
+    `const X: usize = 0x..`; a line that parses the module's own PE header says
+    `PE header`, and a literal that is no offset says `not an offset`. `hud/`, `grid/` and
     `menus/` are skipped (no profile; superseded by UI.asi).
  5. Inheritance and marks: a child overrides only what its ancestors have (same kind) or adds
     complete entries; marks only in an inheriting build; every [[changed]] `fn` matches an
@@ -565,9 +568,11 @@ C_CHAR = re.compile(r"'(?:\\[^']*|[^\\'])'")
 
 
 def strip_comments(text, lang):
-    """(text with comments blanked, newlines kept; lines whose comment says 'not an address')."""
+    """(text with comments blanked, newlines kept; lines whose comment says 'not an address';
+    lines whose comment says 'PE header' or 'not an offset')."""
     out, i, n = [], 0, len(text)
     okl = set()
+    offl = set()
     rs = lang == 'rust'
 
     def blank(s):
@@ -579,6 +584,12 @@ def strip_comments(text, lang):
         if 'not an address' in s.lower() or 'value parity' in s.lower():
             l0 = text.count('\n', 0, start) + 1
             okl.update(range(l0, l0 + s.count('\n') + 1))
+        # `PE header`: the module's own headers parsed (not engine knowledge, AR-3);
+        # `not an offset`: a literal that is no struct offset (a Win32 flag, a size of
+        # our own). Both excuse rule 4's offset check only, never its address check.
+        if 'pe header' in s.lower() or 'not an offset' in s.lower():
+            l0 = text.count('\n', 0, start) + 1
+            offl.update(range(l0, l0 + s.count('\n') + 1))
 
     while i < n:
         c = text[i]
@@ -626,7 +637,7 @@ def strip_comments(text, lang):
         else:
             out.append(c)
             i += 1
-    return ''.join(out), okl
+    return ''.join(out), okl, offl
 
 
 def source_files(rf, src_root):
@@ -693,12 +704,12 @@ def rules34(games, R, src_root):
         srcs = source_files(members[0][1], src_root)
         stripped = []
         for p, t in srcs:
-            s, okl = strip_comments(t, lang)
-            stripped.append((p, s, okl))
+            s, okl, offl = strip_comments(t, lang)
+            stripped.append((p, s, okl, offl))
         defs = [(gs, rf) + defined_sets(gs, rf) for gs, rf in members]
         used = [{'sym': set(), 'hook': set(), 'field': set(), 'value': set()} for _ in members]
         multi = len(members) > 1
-        for p, s, okl in stripped:
+        for p, s, okl, _ in stripped:
             for ln, tok_class, name in tokens(s, lang, members):
                 hit = False
                 for k, (gs, rf, dd, ids) in enumerate(defs):
@@ -735,7 +746,7 @@ def rules34(games, R, src_root):
         ranges = []
         for gs, _ in members:
             ranges += addr_ranges(gs)
-        for p, s, okl in stripped:
+        for p, s, okl, offl in stripped:
             lit = re.compile(r'(?<![A-Za-z0-9_])0[xX]([0-9a-fA-F_]+)')
             for m in lit.finditer(s):
                 try:
@@ -747,19 +758,51 @@ def rules34(games, R, src_root):
                     continue
                 if any(lo <= v < hi for lo, hi in ranges):
                     R.add(f'{relp(p)}:{ln}', f'{m.group(0)} is an engine address in the image; use the profile (or say "// not an address")')
-            if lang == 'c':
-                adv = 0
-                for m in re.finditer(r'\+\s*(0[xX][0-9a-fA-F]{2,4})\b(?!\s*\()|\b(0[xX][0-9a-fA-F]{2,4})\(%', s):
-                    v = int(m.group(1) or m.group(2), 16)
-                    ln = s.count('\n', 0, m.start()) + 1
-                    if ln in okl or not (0x20 <= v < 0x10000) or any(lo <= v < hi for lo, hi in ranges):
-                        continue
-                    adv += 1
-                    if adv <= 5:
-                        R.advice.append(f'advisory: {relp(p)}:{ln}: {m.group(1) or m.group(2)} looks like a field offset')
-                if adv > 5:
-                    R.advice.append(f'advisory: {relp(p)}: {adv - 5} more probable field offsets')
+            # Struct offsets are the profile's too (AR-3): a literal offset read off a
+            # pointer fails, unless its line is the module's own PE header parsing
+            # (`PE header`) or says `not an offset`.
+            for m in offset_literals(s, lang):
+                ln = s.count('\n', 0, m.start()) + 1
+                if ln in okl or ln in offl:
+                    continue
+                if any(lo <= m.value < hi for lo, hi in ranges):
+                    continue
+                R.add(f'{relp(p)}:{ln}', f'{m.text} is a literal struct offset; make it a profile `field` (or say "PE header" / "not an offset")')
 
+
+class Lit:
+    def __init__(self, start, text, value):
+        self._start, self.text, self.value = start, text, value
+
+    def start(self):
+        return self._start
+
+
+# C: `p + 0x..` read off a pointer (not a call), and an asm operand `0x..(%reg)`, from
+# 0x20 up (smaller ones are an asm stub's own arguments and saved registers).
+C_OFFSET = re.compile(r'\+\s*(0[xX][0-9a-fA-F]{2,4})\b(?!\s*\()|\b(0[xX][0-9a-fA-F]{2,4})\(%')
+# Rust: `field(x, 0x..)`, `rd(x + 0x..)` (and `peek`), `(x + 0x..) as *`, and
+# `const X: usize = 0x..;`.
+RS_OFFSET = re.compile(r'''(?x)
+    \bfield\w*\s*\(\s*[^,()]+(?:\([^()]*\))?[^,()]*,\s*(0[xX][0-9a-fA-F]+)\s*\)
+  | \b(?:rd|peek)\w*\s*(?:::\s*<[^>]*>)?\s*\([^()]*\+\s*(0[xX][0-9a-fA-F]+)\s*\)
+  | \+\s*(0[xX][0-9a-fA-F]+)\s*\)\s*as\s*\*
+  | \bconst\s+[A-Z][A-Z0-9_]*\s*:\s*usize\s*=\s*(0[xX][0-9a-fA-F]+)\s*;
+''')
+
+
+def offset_literals(s, lang):
+    """Each literal struct offset in stripped source text (rule 4, AR-3)."""
+    if lang == 'c':
+        for m in C_OFFSET.finditer(s):
+            t = m.group(1) or m.group(2)
+            v = int(t, 16)
+            if 0x20 <= v < 0x10000:
+                yield Lit(m.start(), t, v)
+        return
+    for m in RS_OFFSET.finditer(s):
+        t = next(g for g in m.groups() if g)
+        yield Lit(m.start(), t, int(t, 16))
 
 def tokens(s, lang, members):
     """Yield (line, (plugin, class), NAME) for each profile token in stripped text."""

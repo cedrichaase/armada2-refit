@@ -303,8 +303,8 @@ pub fn in_hosted(h: HWND) -> bool {
 /// The address of the import-table slot through which Armada2.exe calls `dll!name`.
 fn iat_entry(dll: &str, name: &str) -> Option<usize> {
     let base = unsafe { GetModuleHandleA(core::ptr::null()) } as usize;
-    let pe = base + rd::<u32>(base + 0x3c) as usize;
-    let imports = rd::<u32>(pe + 0x80) as usize;
+    let pe = base + rd::<u32>(base + 0x3c) as usize; // PE header
+    let imports = rd::<u32>(pe + 0x80) as usize; // PE header
     if imports == 0 {
         return None;
     }

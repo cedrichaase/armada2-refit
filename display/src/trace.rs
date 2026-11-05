@@ -314,8 +314,8 @@ pub fn place(a: usize) -> String {
     let name = String::from(full.rsplit(['\\', '/']).next().unwrap_or(full));
     let size = unsafe {
         if n > 0 && *(base as *const u16) == 0x5a4d {
-            let nt = base + *((base + 0x3c) as *const u32) as usize;
-            *((nt + 0x50) as *const u32) as usize
+            let nt = base + *((base + 0x3c) as *const u32) as usize; // PE header
+            *((nt + 0x50) as *const u32) as usize // PE header
         } else {
             mi.size
         }
