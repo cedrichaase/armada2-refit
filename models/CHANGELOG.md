@@ -6,6 +6,11 @@ dilithium moons (`moon-sod.py`), the selection bubble (`select-sod.py`), the hul
 (`hull-sod.py`) and the asteroids (`asteroid-sod.py`); `Planets.asi` until 5.0.0. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 5.1.1 — 2026-11-04
+
+### Fixed
+- `moon-sod.py`, `hull-sod.py`, `select-sod.py` (and so `asteroid-sod.py`, which shares the hull path code): a game path containing `[`, `]`, `*` or `?` (`Armada II [GOG]`) no longer finds no model, so install and `--revert` work there. Installed, not yet seen in game.
+
 ## 5.1.0 — 2026-11-03
 
 ### Removed

@@ -45,6 +45,8 @@ MAX_ENDPOINTS_PER_IP = 64
 RELAY_RATE = 128 * 1024  # bytes/s per endpoint, sustained (a full 8-player game is well under 50 KB/s)
 RELAY_BURST = 256 * 1024
 MAX_DATAGRAM = 1400
+ERROR_EVERY = 5          # s between refusals (reply and log line) to one IP address: the first tells a
+                         # real client why, more would only be a log flood and a reflector
 LOOKUP_RATE = 2          # code lookups/s per IP address, sustained: a joiner asks every 0.5 s until answered
 LOOKUP_BURST = 10        # ... and at once; 31^6 codes cannot be tried at this pace
 
@@ -105,6 +107,8 @@ class Server(asyncio.DatagramProtocol):
         self.idle_exit = idle_exit
         self.last_packet = time.monotonic()
         self.transport = None
+        self.per_ip = {}            # ip -> number of endpoints, so the per-IP cap is O(1)
+        self.refused_at = {}        # ip -> when it was last sent (and logged) a refusal
         self.lookups = {}           # ip -> [tokens, last refill]: the lookup rate limit
         self.misses = 0             # unknown codes looked up, logged in sum by sweep()
         self.limited = 0            # lookups dropped by the rate limit, likewise
@@ -122,7 +126,7 @@ class Server(asyncio.DatagramProtocol):
         if ep:
             ep.seen = now
             return ep
-        if sum(1 for a in self.by_addr if a[0] == addr[0]) >= MAX_ENDPOINTS_PER_IP:
+        if self.per_ip.get(addr[0], 0) >= MAX_ENDPOINTS_PER_IP:
             return None
         while True:
             self.next_id = self.next_id % 0xfffffe + 1          # 24 bits: the client's 0.x.y.z
@@ -131,6 +135,7 @@ class Server(asyncio.DatagramProtocol):
         ep = Endpoint(self.next_id, addr, now)
         self.by_addr[addr] = ep
         self.by_id[ep.id] = ep
+        self.per_ip[addr[0]] = self.per_ip.get(addr[0], 0) + 1
         return ep
 
     def new_code(self):
@@ -147,6 +152,8 @@ class Server(asyncio.DatagramProtocol):
         if len(data) < 5 or data[:4] != MAGIC or len(data) > MAX_DATAGRAM:
             return
         kind, body = data[4], data[5:]
+        if kind not in (SV_HOST, SV_JOIN, SV_RELAY, SV_BYE):
+            return                  # nothing to answer: no endpoint for it to occupy
         ep = self.endpoint(addr, now)
         if not ep:
             return
@@ -241,6 +248,10 @@ class Server(asyncio.DatagramProtocol):
                 log(f'game {show_code(code)}: closed by its host ({g.joins} joins)')
 
     def error(self, ep, ref, text):
+        ip, now = ep.addr[0], time.monotonic()
+        if now - self.refused_at.get(ip, -ERROR_EVERY) < ERROR_EVERY:
+            return                  # already told this address; stay silent rather than reflect/log a flood
+        self.refused_at[ip] = now
         self.send(ep.addr, SV_ERROR, struct.pack('<I', ref) + text.encode()[:200])
         log(f'refused {ep.addr}: {text}')
 
@@ -256,12 +267,19 @@ class Server(asyncio.DatagramProtocol):
             if now - ep.seen > ENDPOINT_IDLE:
                 del self.by_addr[addr]
                 del self.by_id[ep.id]
+                if self.per_ip[addr[0]] > 1:
+                    self.per_ip[addr[0]] -= 1
+                else:
+                    del self.per_ip[addr[0]]
                 for pid in ep.peers:
                     other = self.by_id.get(pid)
                     if other:
                         other.peers.discard(ep.id)
                 if ep.relayed:
                     log(f'relay: {addr} (id {ep.id}) gone after {ep.relayed} bytes')
+        for ip, t in list(self.refused_at.items()):
+            if now - t >= ERROR_EVERY:
+                del self.refused_at[ip]
         for ip, (tokens, t) in list(self.lookups.items()):
             if tokens + (now - t) * LOOKUP_RATE >= LOOKUP_BURST:
                 del self.lookups[ip]

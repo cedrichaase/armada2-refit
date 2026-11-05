@@ -191,6 +191,7 @@ pub const BLACKNESS: u32 = 0x0000_0042;
 pub const RT_DIALOG: usize = 5;
 pub const SM_CXSCREEN: i32 = 0;
 pub const SM_CYSCREEN: i32 = 1;
+pub const SM_SWAPBUTTON: i32 = 23;
 pub const MEM_COMMIT: u32 = 0x1000;
 pub const VK_RETURN: u8 = 0x0d;
 pub const VK_ESCAPE: u8 = 0x1b;

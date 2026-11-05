@@ -17,8 +17,8 @@
 //!   a slot of an object outside `Armada2.exe` (the d3d8 device's), which no stock
 //!   value describes.
 //!
-//! Staged in the one crate until the crates are split (`core/` then). `a2rt::hook`'s
-//! primitives are unchanged; the checks are here.
+//! Lives in `r3d-core`, used by every module crate. `a2rt::hook`'s primitives are
+//! unchanged; the checks are here.
 use crate::module::ModuleId;
 use crate::engine::{self, hook};
 use crate::log;

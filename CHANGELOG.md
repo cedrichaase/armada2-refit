@@ -12,6 +12,93 @@ Layers: ui 2.3.0, render3d 1.1.0, testbench 4.1.6.
 ### Added
 - Locked campaigns shown on the campaign selection (issue #13): greyed with a padlock and a hint of what opens them, the Klingon and Borg scenes shown locked (`[Menus] CampaignLocks`; `Render3D_MenuLocked`, `LockedCloak`, `LockedAt`). The campaign progress format of `save\shell.set` and the game's unlock rule were measured on the bench (`platform/README.md`, "Campaign progress format"); the UI reads the progress in the game's memory (profile `ui.shell.reads_progress`). Scenario `ui-menus-locked`. Installed, not yet seen in game.
 
+## 15.7.3 — 2026-11-05
+
+Layers: display 1.0.7, ui 2.2.7, render3d 1.0.7.
+
+### Fixed
+- a2rt (display, ui, render3d): the game directory, `%LOCALAPPDATA%` and every file path now go through the wide Win32 calls (`GetModuleFileNameW`, `GetEnvironmentVariableW`, `CreateFileW`, `FindFirstFileW`, ...; `wstr` / `from_wide`; the imports join `kernel32.def`). With a non-ASCII install path (`C:\Users\Jörg\...`) the ANSI call's code-page bytes were not UTF-8, the game directory came out empty, `RefitPlayer.ini` was never consulted (every Refit-screen setting saved and ignored) and was written to a relative path, and the log folder was lost. Installed, not yet seen in game.
+
+- a2ini (`RefitPlayer.ini`'s parser and edit): the edit and the parser now agree on what a line is. A byte order mark only counts on the file's first line in both (the edit took one mid-file as a header), and whitespace is ASCII in both (the parser trimmed U+00A0 and other Unicode spaces, so `Scale<NBSP>=2` was a key the edit never matched and appended a duplicate). Host tests in `crates/a2ini/tests/agree.rs`; the differential fuzz shows no disagreement. Installed, not yet seen in game.
+
+## 15.7.2 — 2026-11-05
+
+Layers: display 1.0.6.
+
+### Fixed
+- display: a freed device releases its bound textures, streams and index buffer, and holds its render target and depth surface by reference (`Reset` restores the back buffer as target). Installed, not yet seen in game. Bench-verified.
+
+## 15.7.1 — 2026-11-05
+
+Layers: render3d 1.0.6.
+
+### Fixed
+- render3d: the campaign menu's Klingon ships uncloak with one sound, not one each (issue #12; the sound is logged, scenario `render3d-menu-decloak-sound`). Confirmed in game 2026-11-05.
+
+## 15.7.0 — 2026-11-04
+
+Layers: qol 2.2.4.
+
+### Added
+- `publish/installer/equiv.sh`: the installers' behavioural equivalence test (AR-1). `install.sh`, `install.ps1` (pwsh) and the repository's `./install` run into copies of one mock game, scenario by scenario (fresh, reinstall over a player's edits, layers left out and remembered, `--all`, an upgrade from a 14.x install with retired files and old ini keys, the four states of the `d3d8.dll` slot, uninstall), and the trees are compared after every step: paths, bytes, each `.ini` key by key, the `::step` lines and exit codes. Known differences are listed with their reasons in `equiv-known.txt`; what it cannot cover is printed and in `publish/installer/README.md`. CI only.
+- `publish/installer/equiv-ini.sh` and `tools/ini-merge-fixtures/`: one set of expected outputs that the Python, awk and PowerShell ini mergers must each write byte for byte (the awk and PowerShell cut out of the installers as shipped), and agreement on every shipped `.ini`. CI only.
+- `publish/package.sh --stub`: the release layout from placeholder plugins (`armada2-refit-<version>-stub.zip`), for the installer tests without a toolchain. Never a release. CI only.
+- CI: job `installer-equivalence` (ubuntu, pwsh) runs `equiv.sh` on the `package` job's zip. CI only.
+
+### Fixed
+- `tools/ini-merge.py` (the merge behind `./install`) now writes what `install.sh` and `install.ps1` write: a key the player spelled with spaces (`PanSpeed = 7`) is no longer added a second time; a file with nothing to add keeps its CRLF line ends instead of being rewritten; a retired default keeps the player's spelling of its key; and Display8.ini's carried `dxvk.conf` sampler keys go in where the shipped file has them, not first in `[Samplers]`. Installed, not yet seen in game.
+- qol 2.2.4: `qol/install.sh` no longer stops `./install` on a `QOL.ini` whose `PanSpeed` has spaces around `=`. CI only.
+
+## 15.6.27 — 2026-11-04
+
+Layers: ui 2.2.6, render3d 1.0.5.
+
+### Fixed
+- a2fmt: hostile files can no longer crash or hang the parsers. `tga::decode` sizes its buffers with checked multiplications (a 32768x32768 32-bit header wrapped `width * height * 4` to zero on the 32-bit build and then indexed an empty buffer: a panic, and the plugins abort on panic). `@animation` key counts are clamped to 4096 (`spr::MAX_KEYS`, with a warning), so `auto_offsets` cannot allocate gigabytes. `@include` in sprite tables skips a file that is already being read (a loop) and both sprite and ODF loads stop after a total include budget (512 and 1024 files), so a file that includes itself, or a chain of files each including the next twice, no longer costs exponential time. The budget, not "each file once", because the engine may legitimately include one file from two places. New host tests in `crates/a2fmt/tests/robust.rs`. Installed, not yet seen in game.
+
+## 15.6.26 — 2026-11-04
+
+Layers: ui 2.2.5.
+
+### Fixed
+- ui: widget slot storage is address-stable (a list's scroll offset could land in another widget's slot the first frame it needed a scrollbar), and the mouse-release poll honours swapped mouse buttons. Installed, not yet seen in game.
+
+## 15.6.25 — 2026-11-04
+
+Layers: online 0.11.3.
+
+### Fixed
+- Online relay server (`a2online-server.py`): no CPU exhaustion by many new source addresses (the per-address endpoint cap no longer scans all endpoints, and unanswered datagram kinds take no endpoint), and no log/reply flood from repeated over-limit `SV_HOST` (one refusal per address per 5 s). The deployed server needs a redeploy. Installed, not yet seen in game.
+
+## 15.6.24 — 2026-11-04
+
+Layers: gui-installer 3.1.1.
+
+### Fixed
+- gui-installer: the Mac setup asks for Rosetta 2 only on Apple Silicon, so it no longer stops on an Intel Mac. Installed, not yet seen in game.
+
+### Changed
+- gui-installer: the Mac's no-game text links `PLAYING.md`'s new "On a Mac, step by step" (issue #18: the known working configuration, getting GOG's installer, *Open Anyway*, the setup, CrossOver, what to do when the setup stops, the logs and removal). The release zip's `README.txt` names the Mac setup. Installed, not yet seen in game.
+
+## 15.6.23 — 2026-11-04
+
+Layers: cutscenes 3.0.2, qol 2.2.3, rules 1.0.3, online 0.11.2.
+
+### Fixed
+- cutscenes: the proxy finds UI.asi's `ui_present_movie` at each movie's open until it is found, and a movie with no duration no longer commits an hour of audio up front.
+- qol: the log path is length-checked before `QOL.log` is appended.
+- csdk/a2asi.h: `s_num` prints the most negative long correctly (rules and online recompiled with it, no other change).
+Installed, not yet seen in game.
+
+## 15.6.22 — 2026-11-04
+
+Layers: models 5.1.1.
+
+### Fixed
+- `install.sh` (`ini_merge`): a player's Display8.ini below Defaults 3 that has `Mode=`/`Real=` and a section before `[Display8]` missing a shipped key lost its `[Display8]` header and `Defaults=` line instead of Mode/Real (the dropped lines were skipped by number after the key insertion had moved them). They are now removed before the insertion. Installed, not yet seen in game.
+- `a2env.sh` reads a last config line with no trailing newline and drops a trailing `\r`, as `a2env.py` does, so the shell and Python halves of `./install` pick the same game folder. Installed, not yet seen in game.
+- `tools/ini-merge.py` reads and writes the player's ini as latin-1 (bytes kept; a cp1252 comment no longer aborts the layer installer), and takes `Defaults=2 ; note` as 2, a non-number as 0 with a message. Installed, not yet seen in game.
+
 ## 15.6.21 — 2026-11-04
 
 Layers: gui-installer 3.1.0.

@@ -153,6 +153,12 @@ a C header. The format, the resolver and the lints are described in
   **hooks** (each with a one-line description and the settings rows it feeds) and
   **entries** (function, call, jmp, slot, label, patch, scan, vtable, global, field,
   value), each tied by `used_by` to a hook. A `check` signature is at most 32 bytes.
+- **The limit today: offsets are compile-time.** Addresses are resolved per build at
+  run time, but `field` and `value` entries are generated as constants, so every build
+  of a game must agree on them. render3d still keeps most of its struct offsets in its
+  sources (its `hooks.rs` files) rather than in its profile. A build or game whose
+  structs differ, which Armada 1's do, needs both fixed first. That is
+  `PLAN-ARCHITECTURE.md`, AR-3.
 - **At start-up** the plugin identifies the executable, picks the profile, relocates,
   and logs `engine: build armada2/gog-1.1` and `symbols: N/M resolved; H hooks blocked`.
   Before a hook writes anything, `ready(hook)` checks its entries in live memory. A
@@ -202,6 +208,13 @@ content and settings are.
 
 - **A module depends on `r3d-core` and on no other module.** What one draws for another
   goes through `r3d_core::services`. `lint-layers.sh` enforces it.
+- **Adding a module** is compile-time only; there are no per-module DLLs. Make a crate
+  `mods/<name>/` on `r3d-core` (copy `mods/specials/`, the smallest). It gets a
+  `hooks.rs` for its engine reads, a `content.rs` for its names, a profile file
+  `profiles/<build>/render3d.<name>.toml` and a `settings.toml`. Then add an optional
+  dependency and a feature for it in `render3d/Cargo.toml`, and one `BuiltIn` line in
+  `render3d/src/lib.rs`. A service another module should use is a trait in
+  `core/src/services.rs`, a core change for now (AR-8).
 - **Features.** The cdylib has one Cargo feature per module, all on by default.
   `render3d/build.sh --features hulls,sky` builds a subset into `build/subset/`. A
   module that is not built in is not in the DLL; the engine draws its part, and its
@@ -369,4 +382,5 @@ the assets from the player's own copy of the game, the way `textures/PACKS.md` d
 - A renderer feature: a module in `render3d/mods/`, after the module interface section
   of its README.
 - A different build of the executable: a profile, per "How a new build gets a profile".
-- A different game: `PLAN-ARMADA1.md` for what moves with it and what does not.
+- A different game: `PLAN-ARMADA1.md` for what moves with it and what does not, and
+  `PLAN-ARCHITECTURE.md` for what the shared code still lacks.

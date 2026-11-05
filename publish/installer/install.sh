@@ -557,6 +557,14 @@ ini_merge() {   # shipped installed upgrades retired
         if (((dsec SUBSEP "defaults") in hidx) && haven < shipn) {
             i = hidx[dsec SUBSEP "defaults"]; L[i] = nameof(L[i]) "=" shipn
         }
+        # Take the dropped lines out now: the insertion below shifts line numbers, which a
+        # list of lines to skip afterwards would not follow.
+        if (length(gone)) {
+            m = 0
+            for (i = 1; i <= n; i++) if (!(i in gone)) L[++m] = L[i]
+            for (i = m + 1; i <= n; i++) delete L[i]
+            n = m; delete gone
+        }
         # Every key the player lacks, after the last line of its section (or the section
         # added at the end).
         for (s = 1; s <= ns; s++) {
@@ -579,7 +587,7 @@ ini_merge() {   # shipped installed upgrades retired
                 for (j = 1; j <= cnt; j++) L[++n] = miss[j]
             }
         }
-        for (i = 1; i <= n; i++) if (!(i in gone)) print L[i] > out
+        for (i = 1; i <= n; i++) print L[i] > out
         close(out)
     }' "$1" "$2"
     # Nothing to add (line ends aside): the player's file stays byte for byte.

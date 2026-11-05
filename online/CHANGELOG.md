@@ -4,6 +4,17 @@
 8 with a transport of our own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 and versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.11.3 — 2026-11-04
+
+### Fixed
+- `online/server/a2online-server.py`: the per-address endpoint cap is a counter instead of a scan of every endpoint, which made each datagram from a new source cost milliseconds at tens of thousands of endpoints; datagrams of a kind the server never answers no longer create an endpoint; a host over the games-per-address limit gets one refusal (reply and log line) per 5 s instead of one per datagram. The wire protocol is unchanged. Server-side only: the deployed server at c20e.de needs a redeploy by the maintainer. Installed, not yet seen in game.
+
+## 0.11.2 — 2026-11-04
+
+### Fixed
+- `s_num` (`csdk/a2asi.h`, compiled in) prints the most negative value correctly in log lines (an unsigned negate); no behaviour change otherwise.
+Installed, not yet seen in game.
+
 ## 0.11.1 — 2026-11-03
 
 ### Changed

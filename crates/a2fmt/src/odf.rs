@@ -132,7 +132,8 @@ impl Odf {
         F: FnMut(&str) -> Option<Vec<u8>>,
     {
         let mut stack: Vec<String> = Vec::new();
-        load_rec(name, &mut fetch, &mut stack).ok_or_else(|| Error::NotFound(String::from(name)))
+        let mut budget = MAX_INCLUDES;
+        load_rec(name, &mut fetch, &mut stack, &mut budget).ok_or_else(|| Error::NotFound(String::from(name)))
     }
 
     pub fn parse_single(name: &str, data: &[u8]) -> Odf {
@@ -216,10 +217,14 @@ impl Odf {
     }
 }
 
+/// Most files one [`Odf::load`] opens through includes (stock trees are a few dozen).
+const MAX_INCLUDES: u32 = 1024;
+
 fn load_rec(
     name: &str,
     fetch: &mut dyn FnMut(&str) -> Option<Vec<u8>>,
     stack: &mut Vec<String>,
+    budget: &mut u32,
 ) -> Option<Odf> {
     let data = fetch(name)?;
     let file = OdfFile::parse(&data);
@@ -232,7 +237,14 @@ fn load_rec(
             missing.push(inc.clone());
             continue;
         }
-        match load_rec(inc, fetch, stack) {
+        // Shared parents (a diamond) are legitimate, so this is a total budget rather than
+        // once-per-file; it stops a chain of files each including the next twice.
+        if *budget == 0 {
+            missing.push(inc.clone());
+            continue;
+        }
+        *budget -= 1;
+        match load_rec(inc, fetch, stack, budget) {
             Some(p) => parents.push(p),
             None => missing.push(inc.clone()),
         }

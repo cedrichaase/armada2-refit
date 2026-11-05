@@ -40,7 +40,7 @@ do the same from a terminal; the installer runs them for you
 |---|---|---|
 | Linux | `armada2-refit-installer-x86_64.AppImage` | Make it executable and run it. It carries GTK 4 and libadwaita. It finds the game in Heroic's list, Lutris and the usual Wine prefixes, and writes the DLL overrides into Heroic's settings for the game (a copy of the original is kept as `<file>.a2refit-backup`). If Heroic is running, it asks first. For another launcher it prints the text to copy. |
 | Windows | `armada2-refit-installer-windows.exe` | One portable file. GOG's install is found through its registry entry. It is not code-signed, so SmartScreen may ask: *More info*, then *Run anyway*. No launch options are needed. |
-| macOS | `armada2-refit-installer-macos.zip` | An app for Apple Silicon and Intel. The game runs in Wine: CrossOver 26 is the recommended way (paid), Sikarugir or Gcenx's Wine builds are free. Install the GOG game into a bottle first, then run the app; it writes the DLL overrides into that bottle's registry for the game only. The app is not notarised: *System Settings*, *Privacy & Security*, *Open Anyway*. |
+| macOS | `armada2-refit-installer-macos.zip` | An app for Apple Silicon and Intel. The game runs in Wine. With no game yet, the app sets it up for you from GOG's Windows offline installer in a free Sikarugir wrapper, then installs the refit; a game already in CrossOver or another wrapper is found as it is. The app is not notarised, so the first launch needs *Open Anyway*. Every step: [On a Mac, step by step](#on-a-mac-step-by-step). |
 
 Three things to know before you click:
 
@@ -84,6 +84,82 @@ same.
 
 You can also switch most of these off **without reinstalling**, from the Refit screen
 (next section): that gives the stock look for that one part, on any backend.
+
+### On a Mac, step by step
+
+Armada II is a Windows game, so on a Mac it runs in Wine. The installer app sets all of
+it up: you bring GOG's installer for the game, it does the rest.
+
+**Known working:** an Apple M1 on macOS 27.0.1, the game set up by the app in a
+Sikarugir wrapper (Wine 11, engine `WS12WineSikarugir11.0_1`), Display8 drawing on
+Vulkan through MoltenVK (`Display8.log`: `vulkan: physical device Apple M1`). Intel
+Macs and CrossOver are supported by the app but have not been seen in game by the
+project yet; if you play on one, a line in an issue saying how it went helps.
+
+**What you need:** the game in your GOG account, a connection to the internet, and a
+few GB free (the Wine engine and its wrapper alone are about 260 MB to download).
+
+1. **Get the installer app.** From the newest
+   [release](https://github.com/cedrichaase/armada2-refit/releases), download
+   `armada2-refit-installer-macos.zip` and open it; Finder unpacks
+   `Armada2 Refit Installer.app`. Move it to *Applications* if you like.
+2. **Open it the first time.** The app is not notarised by Apple, so the first double
+   click is refused. On macOS 15 and later: close that message, open *System Settings*,
+   *Privacy & Security*, scroll down to the line about the app and press *Open Anyway*,
+   then confirm. On older macOS: Control-click the app, *Open*, *Open*. (Or, in
+   Terminal: `xattr -dr com.apple.quarantine "Armada2 Refit Installer.app"`.) Later
+   launches open normally.
+3. **Download the game's Windows installer from GOG.** Sign in at
+   [gog.com](https://www.gog.com/account), open Star Trek: Armada II in your library,
+   and under *Download offline backup game installers* take the **Windows** one
+   (`setup_star_trek_armada_ii_….exe`). Leave it in your *Downloads* folder: that is
+   where the app looks. Not GOG Galaxy, and not a patch or extra.
+4. **Set up the game.** In the app, the *Game* row says it found none, and below it
+   *Found in Downloads:* with the installer's name (press *Refresh* if you downloaded it
+   after opening the app). Untick any part you do not want under *Parts*, then press
+   **Set up Armada II** and say yes to the list of what it will do. It then, on its own:
+   installs Rosetta 2 on Apple Silicon if it is missing (Apple's translator, which every
+   Wine on those Macs needs); downloads Sikarugir's wrapper and Wine engine from
+   GitHub; makes `~/Applications/Sikarugir/Armada II.app`; runs GOG's installer inside
+   it without any windows; and installs the refit into it, with the Wine settings the
+   plugins need. This takes a few minutes; the bar and the log (Cmd+L) show where it is.
+5. **Play.** Press **Launch game**, or open *Armada II* in `Applications/Sikarugir` in
+   your home folder (Finder: *Go*, *Home*). You can drag that one to the Dock. The
+   game's *Options* menu has a **Refit** entry when the plugins loaded.
+6. **Upgrade** later by opening the installer app again: it finds the game in its
+   wrapper and offers *Upgrade to* the newest release. Your settings and saved games
+   stay.
+
+**Already have the game in CrossOver, or in another wrapper** (Kegworks, Wineskin,
+Porting Kit, Whisky)? Open the app: it finds the game there and the button is
+*Install*. To put it into CrossOver, install it into a bottle with the same GOG
+installer (*Install a Windows Application*, then choose the `.exe`), then press
+*Refresh* in the app. Leave the bottle's graphics backend on its default for this game:
+D3DMetal, DXVK and DXMT only cover Direct3D 10 to 12, and Armada II is Direct3D 8.
+Quit the game and the bottle's programs before you install, or the Wine settings
+cannot be written (the app says so).
+
+**When the setup stops** it leaves no half-made wrapper behind, and says why:
+
+| The app says | What to do |
+|---|---|
+| *Set up Armada II* is greyed out | No installer in Downloads (step 3), or no release could be fetched: check the connection and press *Refresh* |
+| `Armada II.app is there already, without the game in it` | Move `~/Applications/Sikarugir/Armada II.app` to the Bin and set up again |
+| `Rosetta 2 could not be installed` | In Terminal: `softwareupdate --install-rosetta --agree-to-license`, then set up again |
+| `GOG's installer did not install the game` | The file in Downloads is not the Windows offline installer of the game (a Mac file, a patch, GOG Galaxy). Download the right one (step 3) |
+| The game starts but has no Refit entry | Wine was running while the app wrote its settings. Quit the game, press *Reinstall*; *Launch game* passes the settings anyway |
+
+The logs (see "The logs" below) are inside the wrapper: Control-click
+`Armada II.app`, *Show Package Contents*, then `Contents/SharedSupport/prefix/drive_c/users/`,
+your user, `AppData/Local/armada2-refit/logs/`. The installer's **Report** collects them
+for you.
+
+**Removing it.** *Uninstall* in the app takes the refit out and leaves the game. To
+remove the game too, move `~/Applications/Sikarugir/Armada II.app` to the Bin; your
+saved games are in the game's folder inside it (*Show Package Contents*, as for the
+logs, then `Contents/SharedSupport/prefix/drive_c/GOG Games/Star Trek Armada II`), so
+copy them out first if you want to keep them. The app's downloads are in `~/Library/Caches/armada2-refit/` and its settings in
+`~/Library/Application Support/armada2-refit/`.
 
 ## The Refit screen
 
