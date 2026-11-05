@@ -1711,10 +1711,55 @@ drawing nothing in the tactical view.
 | `PivotGlow` | 0.35 | the halo's opacity (0: none) |
 | `PivotColour`, `PivotBrightness` | 0.64 0.36 0.35, 1.6 | its colour (stock's rose) and the factor on it |
 
+**Move paths** (`paths.rs`, `vs_dots`/`ps_dots` in `mods/overlays/shaders/overlays.hlsl`;
+issue #17). Stock sketches a move path with the `enter_waypoint` binding held (Tab in
+`Input.map`; `cOverViewImp::Init` 0x51e4c0 keeps its live state's pointer at
+`cOverViewImp+0x30c`, the overview being the object at 0x768e40): each right-click
+(`mNormalModeRightClick` 0x5229a0) adds the map point under the cursor (`+0xa4`) to an
+`AiPath` at `+0x264` through `mAddPathPoint` (0x5255b0), and nothing is sent. Let go,
+`mProcessWaypoints` (0x522aa0, every frame from `mNormalModeInput`) sends the whole path
+as one order (`GameObject::QueueCommand` 0x4d4380, `NetOrderObjectsWhatPath`) and frees
+the sketch; with `[QOL] PathStartsAtOnce=1` it goes out at each point instead
+(`qol/README.md`, QOL-10). An `AiPath` holds its point count at `+0x0`, its `Vector3`s at
+`+0x4` and its type at `+0x8` (2: a patrol's loop). `GameObject::DeQueueCommand`
+(0x4d4650) gives every ship of the order a copy of its own; on the next tick the craft
+process (`GameObject+0x44`) takes it over in `Handle_New_Command`: the command at `+0x38`
+(GO, 4, for every kind of move; PATROL, 26), the path at `+0x88` and the index of the point
+it heads to at `+0x12c`, from 0. `Move_To_Formation` (0x436ad0) moves the index on as each
+point is reached (a patrol wraps it round); at the last one the ship stops and `STOP`
+releases the path (null). The ship stands at `GameObject+0xac` and its team is `+0xec`.
+Stock draws the sketch only while the key is held, at the end of `mNormalModeRender`
+(`mDrawPath` 0x525180, its call at 0x522247: a one-pixel green line with boxes at the
+points); a path being flown is never drawn.
+
+Ours, in `Step::Translucent` of the main view: for each ship of the player's team whose
+command is a move or a patrol with a path, a row of fine dots from the ship to the point
+it heads to and on through the rest (a patrol on round to that point again), and a
+bigger dot at each point. The dots are placed from the far end of each segment, every
+`MovePathSpacing` pixels, and interpolated in screen space, so they stay put on the map
+as the ship flies and are cut off behind it: the part flown is gone, and a point
+passed loses its dot. The ships of one order fly copies of the same points, so a
+segment or a point already drawn this frame is not drawn again. While the key is held
+the sketch is drawn the same way (stock's call of `mDrawPath` is re-pointed and draws
+nothing while ours are drawn), and for up to a second after it is let go, until a
+ship's copy ending at the same point has arrived over the network. Points are lifted a
+unit above where they were clicked, clear of the grid's lines; depth-tested (a hull in
+front hides them), not written, blended. Render3D.log says `move paths: N ship(s) on a
+path, M point(s) ahead, sketch K` whenever one of the three changes (the first 200).
+`render3d-move-paths` checks it with the QOL change.
+
+| Key (`[Overlays]`) | Default | |
+|---|---|---|
+| `MovePaths` | 1 | 0: no paths drawn; stock's line, while the key is held |
+| `MovePathColour`, `MovePathBrightness` | 0.55 1.0 0.55, 1 | the dots' colour (a light green) and the factor on it |
+| `MovePathOpacity` | 0.85 | the dots' opacity |
+| `MovePathDot`, `MovePathPoint` | 2.5, 6 | the dots' and the points' diameter, pixels at 1080 lines |
+| `MovePathSpacing` | 9 | from one dot to the next, pixels at 1080 lines |
+
 #### overlays: Hooks
 
 `mods/overlays/src/hooks.rs` holds every address and field offset the module reads of
-the engine, behind named accessors, and its one hook. The step bodies (the terrain, the
+the engine, behind named accessors, and its two hooks. The step bodies (the terrain, the
 selection bubbles), the two features (`Ghost`, `PlaceholderFeature`) and the pivot
 marker's feature are reached through the frame's dispatch and patch nothing: while the
 module is off they run as stock.
@@ -1722,11 +1767,16 @@ module is off they run as stock.
 | Hook | Site | Used for | Gate shut |
 |---|---|---|---|
 | `DrawHeightPost` | the five calls (the build ghost's, and the overview's `mNormalModeRender`, `mRenderWhere`, `mDrawPosts` and its one-point helper) | the height posts, noted for the view and drawn as anti-aliased lines | the call that was there (`Prev`): the engine's one-pixel line |
+| `mDrawPath` (`render3d.overlays.paths`) | `mNormalModeRender`'s call (0x522247), the sketch while the waypoint key is held | nothing drawn: the move paths draw the sketch | the call that was there: the engine's line |
 
 It is installed at the first switch-on, whether or not `HeightPosts` is on, so the key
 can be switched live: the detour notes a post only while one of our views is running
 (`IN_VIEW`, which `HeightPosts=0` and a module that is off keep false). A site that is not
 stock's is logged and left to the engine.
+`mDrawPath`'s call is re-pointed at the same time, whether or not `MovePaths` is on: its
+detour draws nothing while the paths are ours (`MovePaths=1`, the module on, every entry of
+`render3d.overlays.paths` resolved), else calls what was there. When the entries are not
+stock's no path is drawn and the engine keeps its line.
 
 #### overlays: Content
 
@@ -1735,10 +1785,10 @@ stock's is logged and left to the engine.
 #### overlays: Settings
 
 `[Overlays]`, read by `configure` at load and at every settings change (`Fog`, `Grid`,
-`Selection`, `Ghosts`, `HeightPosts`, `Pivot`, each a live row, and the keys without a
-row: the fog's filter and thresholds, the posts' and the pivot's looks). `Modules.overlays`
+`Selection`, `Ghosts`, `HeightPosts`, `Pivot`, `MovePaths`, each a live row, and the keys without a
+row: the fog's filter and thresholds, the posts', the pivot's and the paths' looks). `Modules.overlays`
 is live: off, the engine draws the fog, the grid, the bubbles, the ghosts, the posts
-and the pivot marker, and the hook above hands every call back.
+the pivot marker and the sketched move path (no path once let go), and the hooks above hand every call back.
 
 #### Hooks, content and settings
 

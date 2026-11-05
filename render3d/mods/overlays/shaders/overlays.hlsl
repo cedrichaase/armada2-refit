@@ -246,13 +246,17 @@ float4 ps_line(LO i) : SV_Target
 // so the dots stay put on the map while the near end (a ship) moves and the row is cut
 // off behind it. A segment of length 0 is one dot at its point (a path's points).
 //
-//   vertex c8 as vs_line; pixel c0: x the soft edge (pixels), y the dots' spacing
-//   (pixels, 0: one dot at b only)
+//   vertex c8 as vs_line (z: the dots' radius); pixel c0: x the soft edge (pixels),
+//   y the dots' spacing (pixels; 0: one dot at b only, else every spacing from b,
+//   b itself left out)
 
 struct DO {
     float4 pos : SV_Position;
-    float4 d   : TEXCOORD0;   // x: pixels from the centre line; y: half the width;
-                              // z: pixels along the segment, from b; w: its length
+    // Interpolated in screen space: the distances are in pixels, so a dot's spacing
+    // holds along a segment seen at a slant.
+    noperspective float4 d : TEXCOORD0;   // x: pixels from the centre line; y: half the
+                                          // width; z: pixels along the segment, from b;
+                                          // w: its length
     float4 col : TEXCOORD1;
 };
 
@@ -285,5 +289,7 @@ float4 ps_dots(DO i) : SV_Target
     float cover = saturate((i.d.y + 0.5 * l_ps.x - r) / max(l_ps.x, 1e-3));
     // No dot centred beyond a: the part of the path already flown is not drawn.
     cover *= step(c, i.d.w + 0.5);
+    // A row of dots leaves b itself to the point's own dot.
+    cover *= max(step(sp, 0.0), step(0.5, c));
     return float4(i.col.rgb, i.col.a * cover);
 }

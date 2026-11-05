@@ -5,6 +5,13 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 2.3.0 — 2026-11-05
+
+### Added
+- QOL-10, `PathStartsAtOnce=1` (a live row): a move path sketched with Tab is sent as stock's path order at each right-click, so the ships set off at the first point and take each new one as it comes; points every selected ship has passed are left out of the order sent again, and the release sends nothing more when the last send carried the whole path. Off: sent on release, as stock. The hook `qol.move_paths` (`waypoints.c`; the calls of `mAddPathPoint` and the release's `QueueCommand`). Issue #17.
+
+Installed, not yet seen in game.
+
 ## 2.2.4 — 2026-11-04
 
 ### Fixed

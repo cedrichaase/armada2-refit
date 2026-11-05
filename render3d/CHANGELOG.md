@@ -4,6 +4,13 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 1.1.0 — 2026-11-05
+
+### Added
+- Overlays: move paths (issue #17). Each of the player's ships on a move or patrol path shows it as a row of fine light-green dots from the ship through the points to come, a bigger dot at each point, until flown: the part flown is gone (`paths.rs`, `vs_dots`/`ps_dots`). The path sketched with Tab is drawn the same way while Tab is held and stays drawn after; stock's one-pixel sketch line (`mDrawPath`'s call in `mNormalModeRender`) is re-pointed and draws nothing while ours are drawn. `[Overlays] MovePaths` (a live row; 0: stock's line), `MovePathColour`, `MovePathBrightness`, `MovePathOpacity`, `MovePathDot`, `MovePathPoint`, `MovePathSpacing`. The hook `render3d.overlays.paths` and its entries in `profiles/gog-1.1/render3d.overlays.toml`; Render3D.log says `move paths: N ship(s) on a path, M point(s) ahead, sketch K`.
+
+Installed, not yet seen in game.
+
 ## 1.0.6 — 2026-11-05
 
 ### Fixed

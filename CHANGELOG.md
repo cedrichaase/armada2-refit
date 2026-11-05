@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.8.0 — 2026-11-05
+
+Layers: render3d 1.1.0, qol 2.3.0; testbench 4.2.0.
+
+### Added
+- Move paths (issue #17): a path sketched with Tab (right-clicks with Tab held) is drawn as fine light-green dots until the ships have flown it, the part flown gone (render3d, `[Overlays] MovePaths`), and the ships set off at the first point while Tab is still held (qol, `PathStartsAtOnce`), with the game's own path order. The key stays the `enter_waypoint` binding of `Input.map`; making it Shift is issue #26's.
+- testbench: Scene.asi's `waypoint-key on|off` (the bench cannot hold a key); scenario `render3d-move-paths`.
+
+Installed, not yet seen in game.
+
 ## 15.7.1 — 2026-11-05
 
 Layers: render3d 1.0.6.

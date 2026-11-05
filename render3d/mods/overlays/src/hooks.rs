@@ -459,3 +459,115 @@ pub fn camera_free(f: usize) -> bool {
 pub fn is_plain_instance(inst: usize) -> bool {
     engine::vtable(inst) == vt_instance()
 }
+
+// ---- the move paths -------------------------------------------------------------------
+
+use crate::syms::{field, value};
+
+/// A path's points (`AiPath`: `+0x0` the count, `+0x4` the `Vector3`s), at most 256.
+pub fn path_points(path: usize, out: &mut alloc::vec::Vec<V3>) {
+    out.clear();
+    if path == 0 {
+        return;
+    }
+    let n = field(path, field::PATH_COUNT) as i32;
+    let p = field(path, field::PATH_POINTS);
+    if n <= 0 || n > 256 || p == 0 {
+        return;
+    }
+    for i in 0..n as usize {
+        out.push(unsafe { rd::<V3>(p + i * 12) });
+    }
+}
+
+/// Whether the path is a patrol's loop (its type).
+pub fn path_is_loop(path: usize) -> bool {
+    path != 0 && field(path, field::PATH_TYPE) as i32 == value::PATH_PATROL
+}
+
+/// The waypoint key's live state (`cOverViewImp+0x30c`, the `enter_waypoint` binding):
+/// held or not; false before the overview has bound it.
+pub fn waypoint_key() -> bool {
+    let ov = at(sym::OVERVIEW);
+    let key = if ov == 0 { 0 } else { field(ov, field::OV_WAYPOINT_KEY) };
+    key != 0 && unsafe { rd::<i32>(key) } != 0
+}
+
+/// The path the player is sketching (`cOverViewImp+0x264`) while the waypoint key
+/// (`+0x30c`, the live state of the `enter_waypoint` binding) is held; 0 otherwise.
+pub fn sketch() -> usize {
+    if !waypoint_key() {
+        return 0;
+    }
+    field(at(sym::OVERVIEW), field::OV_ADD_PATH)
+}
+
+/// A ship of the player's team on a path: (where it is, its path, the point it flies
+/// to). The craft's process (`+0x44`) holds the path it follows (`+0x88`) and the
+/// index of the point it is heading to (`+0x12c`) while its command (`+0x38`) is a move
+/// or a patrol.
+pub fn ship_path(o: usize, team: i32) -> Option<(V3, usize, i32)> {
+    if o == 0 || r3d_core::engine::obj::flags(o) & 0xc != 0xc || field(o, field::OBJ_TEAM) as i32 != team {
+        return None;
+    }
+    let proc_ = field(o, field::OBJ_PROCESS);
+    if proc_ == 0 {
+        return None;
+    }
+    let cmd = field(proc_, field::PROC_COMMAND) as i32;
+    if cmd != value::CMD_GO && cmd != value::CMD_PATROL {
+        return None;
+    }
+    let path = field(proc_, field::PROC_PATH);
+    if path == 0 {
+        return None;
+    }
+    Some((unsafe { rd::<V3>(o + field::OBJ_POSITION) }, path, field(proc_, field::PROC_POINT) as i32))
+}
+
+static mut PATH_GATE: Option<Gate> = None;
+static mut PREV_DRAW_PATH: usize = 0;
+static mut PATHS_READY: bool = false;
+
+/// Whether the move paths' entries are all resolved (nothing of them is read before).
+pub fn paths_ready() -> bool {
+    unsafe { PATHS_READY }
+}
+
+/// Re-points stock's draw of the sketch (`mNormalModeRender`'s call of `mDrawPath`),
+/// once, at the first enable. False when the call is not stock's (the engine keeps
+/// drawing its line while the key is held).
+pub fn install_paths(h: &mut Hooks) -> bool {
+    unsafe { PATH_GATE = Some(h.gate()) };
+    if !h.ready(&TABLE, hook::OVERLAYS_PATHS) {
+        return false;
+    }
+    unsafe { PATHS_READY = true };
+    let hook = Hook {
+        owner: h.owner(),
+        used_by: "move paths",
+        kind: Kind::Call,
+        site: Site::of(&TABLE, sym::SITE_DRAW_PATH),
+        to: hook_draw_path as *const () as usize,
+        chain: false,
+    };
+    match h.install(hook) {
+        Some(p) => {
+            unsafe { PREV_DRAW_PATH = p.addr() };
+            true
+        }
+        None => false,
+    }
+}
+
+/// `cOverViewImp::mDrawPath(path, colour, n)`, re-pointed: nothing while ours are drawn
+/// (`paths::ours`), else the call that was there.
+unsafe extern "thiscall" fn hook_draw_path(ov: usize, path: usize, colour: usize, n: i32) {
+    if super::paths::ours() && unsafe { PATH_GATE.is_some_and(|g| g.open()) } {
+        return;
+    }
+    unsafe {
+        let f: unsafe extern "thiscall" fn(usize, usize, usize, i32) = core::mem::transmute(if PREV_DRAW_PATH != 0 { PREV_DRAW_PATH } else { at(sym::FN_DRAW_PATH) });
+        f(ov, path, colour, n);
+    }
+}
