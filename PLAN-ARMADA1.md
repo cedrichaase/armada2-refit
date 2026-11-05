@@ -125,7 +125,9 @@ Armada 1 profile switches them.
 Where a layer's code is mostly shared, the folder holds only what is Armada 1's (the
 profile, `hooks.rs`, recipes) and builds the shared crate; whether `render3d` and `ui`
 become a second crate beside the existing ones or a game feature of the same crate is
-for the phase 7 split to settle, not this plan. The bench stays `testbench/`, with
+for the phase 7 split to settle, not this plan. Phase 7 is done and did not settle it.
+`PLAN-ARCHITECTURE.md` ("A DLL per game") proposes a game feature of the same crates,
+which is still open for the user. The bench stays `testbench/`, with
 Armada 1's scenarios and staging recipes in a game subfolder. There is no `renderer/`
 (no DXVK) and no `hud/`, `grid/` or legacy `menus/` plugin: Armada 1 starts where
 ROADMAP phase 11 ends. Shared tools take paths as arguments and read the game and data
