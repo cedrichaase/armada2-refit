@@ -904,18 +904,37 @@ state of the device. A format it has no conversion for is logged and skipped. Wi
 a Vulkan or Direct3D 12 device behind the game's (Display8 bailed out) nothing is read, and the
 sidecar says so.
 
-## Content
+## Content sets
 
-The names of the game's races (display names and the aliases `[UI] Theme=` and the game
-spell), resources, the single player screen's four campaigns (card names, the words that
-match the stock labels, the view of the map behind each, the emblem's cell in `allrace`) and
-the credits tour's views are `src/content.rs`, one `Content` per set, chosen by
-`Engine::content()` of the UI's core table (`crates/a2engine/README.md`, "Content"). Users:
-`widgets::theme::Race::{name, from_name}` (the loading screen, the HUD race log, the theme),
-`hud/resources.rs`, `credits.rs` (the tour), `menus/scene.rs` and `menus/screens/single_player.rs`.
-A build with no set has no races (no theme of its own for the HUD's race), no resources
-names, no tour and no main-menu view, and the single player screen stands down to the
-engine's. The widget gallery's sample lists are demo text, not game data.
+The names of the game's races (display names, the theme's look for each and the aliases
+`[UI] Theme=` and the game spell), resources, the single player screen's four campaigns
+(card names, the words that match the stock labels, the view of the map behind each, the
+emblem's cell in the race icons, and the loading screen's map prefix and line for each),
+the credits tour's views, the game files the UI reads (the race icons, `Credits.txt` and
+the logos, the cursor sprites) and the widget gallery's sample lists are data: the content
+set's `ui/content/sets/<set>/ui.ini` (a set is a folder; `MODDING.md`, "Content sets").
+`build.rs` builds every `.ini` under `ui/content/` in (`src/content_sets.rs`), and
+`src/content.rs` parses, once, the table of the set `Engine::content()` of the UI's core
+table names (`crates/a2engine/README.md`, "Content"). Users:
+`widgets::theme::Race::{name, from_name, form}` (the loading screen, the HUD race log, the
+theme), `hud/resources.rs`, `credits.rs` (the tour, the text, the logos), `cursor.rs`,
+`loading.rs` (the kicker), `gallery.rs`, `menus/scene.rs` and
+`menus/screens/single_player.rs`.
+
+**The colours stay the theme's.** `widgets/theme.rs` keys its six race palettes by a look
+(`Form`: `lcars`, `blade`, `wing`, `arch`, `cube`, `organic`), and the set maps each race
+to one (`Theme = cube`); `Race` is a race's place in the set's list, so another game's
+races take the looks without a code change, and a race whose look the theme does not know
+draws in the shell's.
+
+A build with no set, or a set with no `ui.ini`, has no races (no theme of its own for the
+HUD's race), no resources names, no tour and no main-menu view, no credits text or cursor
+sprites (the engine's own), and the single player screen stands down to the engine's.
+`ui/lint-content.sh` (CI) fails on a game file's name or a stock race's name as a literal
+anywhere in `src/` but `content.rs`; an engine requirement stays with `// lint-allow(content):
+<reason>` (the shell's default button sounds in `engine/sound.rs`, which are
+`SetButtonMode`'s own). `render3d/hosttest` (`src/sets.rs`) holds the stock table to the
+constants and literals it replaced (ui 2.4.0).
 
 ## Hooks (engine profile): core
 

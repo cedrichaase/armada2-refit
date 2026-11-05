@@ -3,5 +3,12 @@
 version = 4
 
 [[package]]
+name = "a2ini"
+version = "0.1.0"
+
+[[package]]
 name = "render3d-hosttest"
 version = "0.1.0"
+dependencies = [
+ "a2ini",
+]

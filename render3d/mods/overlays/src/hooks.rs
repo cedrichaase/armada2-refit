@@ -393,6 +393,7 @@ pub fn class_odf(class: usize) -> &'static str {
         let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(fn_class_odf());
         let s = rt::cstr_at(f(class), 260);
         match s.len().checked_sub(4) {
+            // lint-allow(content): the engine names a class by its ODF file; the extension is the format's, not a set's.
             Some(n) if s.is_char_boundary(n) && s[n..].eq_ignore_ascii_case(".odf") => &s[..n],
             _ => s,
         }

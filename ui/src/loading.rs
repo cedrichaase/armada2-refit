@@ -83,14 +83,12 @@ fn kicker(map: &str, single: bool, ia: bool) -> String {
         return String::from("Multiplayer");
     }
     let m = crate::rt::lower(map);
-    let campaign = [("a2_fed", "Federation campaign"), ("a2_kling", "Klingon campaign"), ("a2_borg", "Borg campaign"), ("a2_tutorial", "Tutorial")]
-        .iter()
-        .find(|(p, _)| m.starts_with(p))
-        .map(|&(p, name)| (p, name));
+    // The campaigns' map prefixes and lines are the content set's (`[Campaign.*]`).
+    let campaign = crate::content::get().campaigns.iter().find(|c| !c.map.is_empty() && m.starts_with(c.map));
     match campaign {
-        Some((p, name)) => {
-            let n: u32 = m[p.len()..].chars().take_while(|c| c.is_ascii_digit()).fold(0, |a, c| a * 10 + c.to_digit(10).unwrap_or(0));
-            if n > 0 && p != "a2_tutorial" { crate::sfmt!("{}  ·  Mission {}", name, n) } else { String::from(name) }
+        Some(c) => {
+            let n: u32 = m[c.map.len()..].chars().take_while(|c| c.is_ascii_digit()).fold(0, |a, c| a * 10 + c.to_digit(10).unwrap_or(0));
+            if n > 0 && c.numbered { crate::sfmt!("{}  ·  Mission {}", c.kicker, n) } else { String::from(c.kicker) }
         }
         None => String::from("Mission"),
     }

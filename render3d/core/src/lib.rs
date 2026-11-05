@@ -17,6 +17,7 @@ pub mod assets;
 pub mod files;
 pub mod clock;
 pub mod config;
+pub mod content;
 pub mod hooks;
 pub mod module;
 pub mod particles;

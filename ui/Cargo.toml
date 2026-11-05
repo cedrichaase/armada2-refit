@@ -1,6 +1,6 @@
 [package]
 name = "ui"
-version = "2.3.0"
+version = "2.4.0"
 edition = "2024"
 publish = false
 description = "UI.asi: Star Trek: Armada II's HUD, menus and loading screen drawn by our own UI runtime"
@@ -15,6 +15,7 @@ path = "src/lib.rs"
 libm = "0.2"
 a2fmt = { path = "../crates/a2fmt" }
 a2engine = { path = "../crates/a2engine" }
+a2ini = { path = "../crates/a2ini" }
 a2rt = { path = "../crates/a2rt", features = ["dump"] }
 gpu = { path = "../gpu" }
 

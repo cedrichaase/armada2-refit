@@ -283,6 +283,7 @@ impl Planets {
     fn tex_mean(name: &str) -> Option<[f32; 3]> {
         let mut p = String::from("textures\\");
         p.push_str(name);
+        // lint-allow(content): the engine's texture files are TGA; the name comes from the planet.
         p.push_str(".tga");
         let img = a2fmt::tga::decode(&r3d_core::files::open(&p)?).ok()?;
         let (mut s, mut n) = ([0f64; 3], 0f64);

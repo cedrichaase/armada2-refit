@@ -62,6 +62,7 @@ version = "0.45.0"
 dependencies = [
  "a2engine",
  "a2fmt",
+ "a2ini",
  "gpu",
  "libm",
  "r3d-core",
@@ -73,6 +74,7 @@ version = "0.45.0"
 dependencies = [
  "a2engine",
  "a2fmt",
+ "a2ini",
  "gpu",
  "libm",
  "r3d-core",
@@ -84,6 +86,7 @@ version = "0.45.0"
 dependencies = [
  "a2engine",
  "a2fmt",
+ "a2ini",
  "gpu",
  "r3d-core",
 ]
@@ -93,6 +96,7 @@ name = "r3d-overlays"
 version = "0.45.0"
 dependencies = [
  "a2engine",
+ "a2ini",
  "gpu",
  "libm",
  "r3d-core",
@@ -104,6 +108,7 @@ version = "0.45.0"
 dependencies = [
  "a2engine",
  "a2fmt",
+ "a2ini",
  "gpu",
  "libm",
  "r3d-core",
@@ -115,6 +120,7 @@ version = "0.45.0"
 dependencies = [
  "a2engine",
  "a2fmt",
+ "a2ini",
  "gpu",
  "r3d-core",
 ]
@@ -124,6 +130,7 @@ name = "r3d-specials"
 version = "0.45.0"
 dependencies = [
  "a2engine",
+ "a2ini",
  "gpu",
  "libm",
  "r3d-core",
@@ -142,7 +149,7 @@ dependencies = [
 
 [[package]]
 name = "render3d"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "r3d-core",
  "r3d-effects",

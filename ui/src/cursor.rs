@@ -5,7 +5,8 @@
 //! while the engine would show none (`engine::cursor::engine_shows`). `[UI] Cursor=1`,
 //! the default (README.md, "The cursor").
 //!
-//! The sprites come from `Sprites/cursor.spr`, read at run time: each line names a
+//! The sprites come from the content set's `CursorSprites` (`Sprites/cursor.spr` in
+//! stock), read at run time: each line names a
 //! texture, a rectangle in it (in a reference size, so as fractions of the texture),
 //! how many frames of the strip it animates (`@anim=cursorNx1`) and its hotspot
 //! (`@origin`, in texels of the 32x32 sprite). The art is the stock art. Black is the colour key, as in the engine.
@@ -53,8 +54,9 @@ fn load_texture(file: &str) -> Option<Tex> {
 
 fn load() -> Vec<Def> {
     let mut defs = Vec::new();
-    let Some(data) = crate::files::open("Sprites/cursor.spr") else {
-        crate::log!("cursor: Sprites/cursor.spr not found");
+    let file = crate::content::get().files.cursor_sprites;
+    let Some(data) = (!file.is_empty()).then(|| crate::files::open(file)).flatten() else {
+        crate::log!("cursor: {} not found", file);
         return defs;
     };
     let text = String::from_utf8_lossy(&data).into_owned();
@@ -109,7 +111,7 @@ fn load() -> Vec<Def> {
             size: (w, h),
         });
     }
-    crate::log!("cursor: {} sprites from cursor.spr", defs.len());
+    crate::log!("cursor: {} sprites from {}", defs.len(), file.rsplit(['/', '\\']).next().unwrap_or(""));
     defs
 }
 
