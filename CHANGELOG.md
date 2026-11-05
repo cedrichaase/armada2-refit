@@ -5,16 +5,6 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
-## 15.10.0 — 2026-11-05
-
-Layers: qol 2.4.0, render3d 1.3.0, ui 2.4.0; testbench 4.3.0.
-
-### Added
-- qol: move queues (QOL-10, `PathStartsAtOnce`): Tab points append to each selected ship's queue, each leg keeps its own mode (go, warp, patrol), sent run by run as stock path orders; a player's order that replaces the ship's movement (Stop, a plain move, attack, ...) clears it. Exports `QOL_MoveQueueVersion`, `QOL_MoveQueue`, `QOL_MoveQueuePoint`. Installed, not yet seen in game.
-- ui: a minimap right-click with Tab held queues the point through QOL. Installed, not yet seen in game.
-- render3d: move paths drawn for selected ships only, from QOL's queue; a very light grey, finer line, the points keep their green under new `MovePoint*` keys. Installed, not yet seen in game.
-- testbench: scenarios `qol-move-queue` and the reworked `render3d-move-paths`. Installed, not yet seen in game.
-
 ## 15.9.2 — 2026-11-05
 
 Layers: online 0.11.4.
