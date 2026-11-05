@@ -6,11 +6,9 @@
 //! when the provider was not running: it hands the object or effect back to the
 //! engine.
 //!
-//! The traits are declared here; the providers and consumers move onto them in the
-//! next step (PLAN.md, "Changes to the plan"). No module depends on another module,
-//! only on these.
-//!
-//! Staged in the one crate until the crates are split (`core/` then).
+//! The traits are declared here and the module crates provide and consume them. No
+//! module depends on another module, only on these. The set of services is fixed in
+//! this file: a new capability is a core change (PLAN-ARCHITECTURE.md, AR-8).
 use crate::module::ModuleId;
 use crate::frame::steps::View;
 use crate::math::{M34, V3};
