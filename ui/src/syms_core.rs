@@ -60,6 +60,8 @@ pub mod field {
     #[inline(always)] pub fn CORE_DX8_SYNCHRONOUS() -> usize { super::TABLE.engine().field(a2engine::Sym(13)) }
     #[inline(always)] pub fn CORE_ELEMENT_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(14)) }
     #[inline(always)] pub fn CORE_SPRITE_ORIGIN_X() -> usize { super::TABLE.engine().field(a2engine::Sym(18)) }
+    #[inline(always)] pub fn CORE_SPRITE_UV() -> usize { super::TABLE.engine().field(a2engine::Sym(38)) }
+    #[inline(always)] pub fn CORE_SPRITE_TEXTURE() -> usize { super::TABLE.engine().field(a2engine::Sym(39)) }
 }
 
 pub mod value {
@@ -105,10 +107,12 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "core_imp_ss_dtor", symbol: "__imp_basic_stringstream::_D", kind: a2engine::Kind::Global },
     a2engine::SymDef { id: "core_imp_str_dtor", symbol: "__imp_basic_string::~basic_string", kind: a2engine::Kind::Global },
     a2engine::SymDef { id: "core_sim_time", symbol: "Get_Time", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "core_sprite_uv", symbol: "ST3D_Sprite::texture rectangle", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "core_sprite_texture", symbol: "ST3D_Sprite::texture", kind: a2engine::Kind::Field },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
-    a2engine::HookDef { id: "ui.core.storm3d", run_unknown: false, rows: &[], syms: &[0, 1, 2, 3] },
+    a2engine::HookDef { id: "ui.core.storm3d", run_unknown: false, rows: &[], syms: &[0, 1, 2, 3, 38, 39] },
     a2engine::HookDef { id: "ui.core.mission", run_unknown: false, rows: &[], syms: &[2, 4, 5, 6, 7] },
     a2engine::HookDef { id: "ui.core.cursor", run_unknown: false, rows: &["UI.Cursor"], syms: &[2, 9, 10, 11, 12, 13, 14] },
     a2engine::HookDef { id: "ui.core.cursor_probe", run_unknown: false, rows: &["UI.Cursor"], syms: &[15, 16, 17, 18] },
@@ -131,7 +135,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 38,
+        n_resolved: 40,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x7ad508, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_storm3d
@@ -172,6 +176,8 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x7b7ea8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_imp_ss_dtor
             a2engine::Entry { present: true, addr: 0x7b7dc0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_imp_str_dtor
             a2engine::Entry { present: true, addr: 0x7b0fc8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_sim_time
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // core_sprite_uv
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 88 }, // core_sprite_texture
         ],
         blocked: &[
         ],
@@ -179,8 +185,8 @@ pub const BUILDS: &[a2engine::Build] = &[
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 13] = [const { core::sync::atomic::AtomicU64::new(0) }; 13];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 38] = [const { core::sync::atomic::AtomicU8::new(0) }; 38];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 38] = [const { core::sync::atomic::AtomicUsize::new(0) }; 38];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 40] = [const { core::sync::atomic::AtomicU8::new(0) }; 40];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 40] = [const { core::sync::atomic::AtomicUsize::new(0) }; 40];
 static NOTES: [a2engine::Note; 13] = [const { a2engine::Note::new() }; 13];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 

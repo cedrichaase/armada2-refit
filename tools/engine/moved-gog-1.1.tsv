@@ -354,3 +354,13 @@ render3d.effects.toml	ef_edge_end	0x20	render3d/mods/effects/src/hooks.rs
 render3d.effects.toml	ef_edge_t	0x2c	render3d/mods/effects/src/hooks.rs
 render3d.effects.toml	ef_s3d_team	0x34	render3d/mods/effects/src/hooks.rs
 render3d.effects.toml	ef_be_node_info	0x14	render3d/mods/effects/src/hooks.rs
+ui.core.toml	core_sprite_uv	0x38	ui/src/engine/sprite.rs
+ui.core.toml	core_sprite_texture	0x58	ui/src/engine/sprite.rs
+ui.core.toml	core_element_name	0x8	ui/src/engine/sprite.rs
+qol.toml	cce_craft_array	-40	qol/qol.c
+qol.toml	cce_cancel_count	-32	qol/qol.c
+qol.toml	cce_cancel_index	-20	qol/qol.c
+qol.toml	cce_route_objects	-32	qol/qol.c
+qol.toml	cce_route_count	-24	qol/qol.c
+qol.toml	msw_read_local	-40	qol/qol.c
+qol.toml	cgs_group	-4	qol/qol.c
