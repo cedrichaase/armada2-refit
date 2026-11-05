@@ -59,6 +59,7 @@ Status values: **idea** (not investigated), **scoped** (approach known, nothing 
 | [QOL-8](#qol-8-long-moves-on-the-map-go-to-warp) | Long moves on the map go to warp | `QOL.asi`, `WarpDistance=` | A stock peer in a network game | **done** (`QOL.asi`), bench |
 | [QOL-9](#qol-9-the-view-reaches-across-the-map) | The view reaches across the map | `Render3D.asi`, `[View] Distance=` | — | **done**, render3d's since qol 2.2.0 |
 | [QOL-10](#qol-10-a-move-path-starts-at-its-first-point) | A move path starts at its first point | `QOL.asi`, `PathStartsAtOnce=` | The path key as a binding (issue #26) | **built** (`QOL.asi`), bench |
+| [QOL-11](#qol-11-a-construction-ship-does-not-block-its-own-blueprint) | A construction ship does not block its own blueprint | `QOL.asi`, `RigIgnoresSelf=` | Own, allied ships making way (issues #52, #53) | **built** (`QOL.asi`), bench |
 
 ## Settings live
 
@@ -80,6 +81,7 @@ patch that is in but switched off.
 | `StationGroups` | live | every station hook tests the flag (`sel_pre`, `bind_pre`, `producer_group`, `one_kind`, `focus_stub`) and takes the stock path when it is 0. Groups that already hold stations keep them |
 | `WarpDistance` | live | `warp_pre` already read the distance; 0 does what stock's Alt block did |
 | `PathStartsAtOnce` | live | the three calls stay re-pointed; at 0 a point sends nothing and the release sends as stock |
+| `RigIgnoresSelf` | live | the first stub sets what the check ignores to the rig, or to nothing at 0 (stock's own argument) |
 | `MaxSelection` | restart | the selection array is moved at start; a bigger or smaller one is never re-applied |
 
 `PayOnQueue`, the one row the players must agree on, is `QOLRules.asi`'s, in
@@ -109,6 +111,7 @@ variable and then of the global; field offsets are spliced in with `A2_STR(QOL_F
 | `qol.bar_keys` | `BarKeys` | the call of `mProcessKeyboardInput` in `PopupPaletteImp::Update` (`call`) and that function, the three hotkey counts and the six menu toggles, a button's state and press slot, and the click's sound (`operator new`, the `AudioSound2D` constructor, the click-sound global), `TextInput_IsActive`, `CinematicView::IsPlayingVideo` | position keys off, stock's bar keys |
 | `qol.warp` | `WarpDistance` | the Alt block (`patch`) and its continue point, the warp globals and functions | moves as stock |
 | `qol.move_paths` | `PathStartsAtOnce` | `mAddPathPoint`'s two calls in `mNormalModeRightClick` and `QueueCommand`'s in `mProcessWaypoints` (`call`), those two functions, the craft process's command, path and point fields, the action's no-order flag, the order's packet limit | paths sent on release, as stock |
+| `qol.rig_self` | `RigIgnoresSelf` | two patches in `ConstructionRig::GetAction` (`patch`, each with two continue points as `label`) and the two vtable slots the stubs call | the ghost as stock |
 
 `MaxSelection` needs both of its hooks; the log names the one that failed.
 
@@ -673,3 +676,60 @@ selection" on a left click, so the binding has to say +Shift and drop the -Shift
 was still held, the release sent nothing more, and the ship flew the three points and
 stopped. Not yet seen: a selection that has passed a point when the next is added (the
 order then starts further on), a patrol, a network game.
+
+## QOL-11: A construction ship does not block its own blueprint
+
+*`QOL.asi`, stock-compatible. Built: `RigIgnoresSelf=` (default 1, a live row; 0 leaves
+the ghost as stock). Issue #51, the first of three steps of #47; the next two (own ships
+make way, #52; allies too, a rules change, #53) are not built.*
+
+**Problem.** Placing a building with a construction ship selected often puts the
+blueprint over the ship itself, and the ghost turns red: the ship is in its own way.
+
+**Stock.** Each frame `cOverViewImp::Simulate` asks `ActionMode::GetAction` what a click
+at the cursor would do, and for a construction ship the answer is
+`ConstructionRig::GetAction` (0x4afa30): in build mode, over shroud the build is
+allowed, otherwise it calls the class's `CanPlaceHere` (vtable +0x8, `CraftClass`'s at
+0x4c01b0) with the position, **nothing to ignore** and the marking of blockers on. It
+answers BUILD (0x19), plus 0x4000 ("no order") when the spot is not free; the overview
+colours the ghost from that and `PopupPaletteImp::BroadcastCommand` sends nothing for a
+refused click. `CanPlaceHere` reaches `Station_Placement::Is_Clear_For_Placement`
+(0x494de0), which refuses the map edge, any blocked cell of the 50-unit placement grid
+(stations, sites, terrain) and then every object whose bounding sphere overlaps the
+footprint except the one it was told to ignore, the destroyed, background objects,
+stations (the grid has them) and most nebulae. There is no team test: own, allied and
+enemy ships block alike.
+
+The simulation is the other half, and it is more lenient: when a construction ship
+reaches its building spot, `CraftProcess::Build` (0x4355d0, the call at 0x4359b0) asks the
+same `CanPlaceHere` with **the rig as the object to ignore**, on every node, and builds if
+it says clear. A ship that stands on its own site is therefore no obstacle to the build:
+it is already inside the spot's distance and the order moves it out. Only the ghost made
+it one.
+
+**With `QOL.asi`.** `ConstructionRig::GetAction` is patched at two places. Its first
+instruction after the prologue is a virtual call on `this`, and `this` is lost a few
+instructions later (the register holding it takes the position), so the first stub
+(`rig_this_stub`, 8 bytes at 0x4afa37, which does what they did) stores `this` as the
+object to ignore, or nothing when the setting is 0. The second (`rig_check_stub`, the 13
+bytes at 0x4afa71 that load the class and make the `CanPlaceHere` call) makes the same
+call with that value where stock passes nothing, then hands the answer back to the
+unchanged code that follows. Nothing else changes: own warships, allies and enemies,
+the grid and the map edge still block, so the only new green ghost is one whose sole
+blocker is the constructing ship. The click now sends the ordinary BUILD, which every
+peer treats as any other; stock's arrival check, which already ignores the rig, finds
+the site clear. Both sites' bytes are checked first (`profiles/gog-1.1/qol.toml`, hook
+`qol.rig_self`), else the ghost stays stock and the log says why. `QOL.log` says
+`rig: the blueprint's spot is clear|blocked (...)` when the answer changes (at most 60
+lines), which the scenario waits on.
+
+**Why its own key and not `ClearBuildSite`.** The second step (own ships move out of the
+way, issue #52) is a bigger feature with its own risks (orders sent for the player, a
+held build) and will take `ClearBuildSite=`. This step is only the ghost's argument, so a
+player can keep it with that one off, and each row says what it does.
+
+**Several constructors.** The ghost is shown only with one object selected (stock) and
+the check ignores that one. The palette sends one BUILD per selected rig, so with
+several selected the others still count as blockers in the ghost: step 2 deals with it.
+
+**Seen on the bench:** `testbench/scenarios/qol-rig-ignores-self.md`.

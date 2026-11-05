@@ -34,8 +34,12 @@ static const A2Setting QOL_SETTINGS[] = {
       "QOL.ini", "QOL", "PathStartsAtOnce", "1", NULLPTR, NULLPTR,
       "Move paths start at once",
       "With Tab held, each right-click adds a point and the ships set off at the first, taking each new point as it comes. Off: they wait until Tab is let go, as in the game.", NULLPTR },
+    { sizeof(A2Setting), A2SET_KIND_BOOL, A2SET_APPLY_LIVE, A2SET_SCOPE_LOCAL, A2SET_TAB_GAMEPLAY, 0,
+      "QOL.ini", "QOL", "RigIgnoresSelf", "1", NULLPTR, NULLPTR,
+      "Construction ship may build over itself",
+      "A construction ship no longer blocks its own blueprint: the ghost stays green over it and the order is sent, and the ship moves out to build. Other ships, the grid and map edge still block.", NULLPTR },
 };
-#define QOL_SETTINGS_COUNT 7
+#define QOL_SETTINGS_COUNT 8
 
 #define QOL_ROW_PANSPEED (&QOL_SETTINGS[0])
 #define QOL_ROW_SHIFTADDSTOGROUP (&QOL_SETTINGS[1])
@@ -44,6 +48,7 @@ static const A2Setting QOL_SETTINGS[] = {
 #define QOL_ROW_MAXSELECTION (&QOL_SETTINGS[4])
 #define QOL_ROW_BARKEYS (&QOL_SETTINGS[5])
 #define QOL_ROW_PATHSTARTSATONCE (&QOL_SETTINGS[6])
+#define QOL_ROW_RIGIGNORESSELF (&QOL_SETTINGS[7])
 
 /* The table, for the UI's settings hub (count may be NULL). */
 __declspec(dllexport) const A2Setting *__cdecl QOL_Settings(UINT *count)
