@@ -8,7 +8,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 ## 4.1.6 — 2026-11-05
 
 ### Fixed
-- Scenarios `multiplayer-online-match`, `-loss`, `-code`, `-entry` and `multiplayer-two-players` click Game Setup's chat line at design 155,534 (it was 155,547, which fell just under the field in the UI's lobby, so typed chat went nowhere).
+- Scenarios `multiplayer-online-match`, `-loss`, `-code`, `-entry` and `multiplayer-two-players` click Game Setup's chat line at design 155,534 (it was 155,547, which fell just under the field in the UI's lobby, so typed chat went nowhere), and wait for the match's HUD by its "DILITHIUM" label: the "999999" counter the wait read is not on the UI's HUD (`multiplayer-two-players` likewise).
 
 Installed, not yet seen in game.
 

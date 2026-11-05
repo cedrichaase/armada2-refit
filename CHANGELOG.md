@@ -10,7 +10,7 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 Layers: testbench 4.1.6.
 
 ### Fixed
-- testbench: the online and two-player scenarios click Game Setup's chat line at design 155,534 (the UI's widescreen lobby moved it off 155,547). Installed, not yet seen in game.
+- testbench: the online and two-player scenarios click Game Setup's chat line at design 155,534 (the UI's widescreen lobby moved it off 155,547), and wait for the HUD's "DILITHIUM" label instead of "999999". Installed, not yet seen in game.
 
 ## 15.7.2 — 2026-11-05
 

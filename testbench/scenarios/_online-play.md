@@ -22,8 +22,8 @@ Follows `_online-setup.md` and the joiner typing where the game is.
 18. Joiner: Click "LAUNCH".
 19. Joiner: Wait 5 seconds.
 20. Host: Click "LAUNCH".
-21. Host: Wait up to 180 seconds for "999999".
-22. Joiner: Wait up to 60 seconds for "999999".
+21. Host: Wait up to 180 seconds for "DILITHIUM".
+22. Joiner: Wait up to 60 seconds for "DILITHIUM".
 23. Host: Wait 60 seconds.
 24. Expect the game is still running.
 25. Take a screenshot called "match".
