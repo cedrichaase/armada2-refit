@@ -39,6 +39,10 @@ rows = ["QOL.PathStartsAtOnce"]
 doc = "The bar's keyboard step wrapped for the position keys; a button pressed with its click"
 rows = ["QOL.BarKeys"]
 
+[hook.rig_self]
+doc = "The construction ship does not block its own blueprint: the ghost's check ignores the rig"
+rows = ["QOL.RigIgnoresSelf"]
+
 [[sym]]
 id = "pan_site"
 symbol = "RTS_Configure"
@@ -1252,3 +1256,57 @@ symbol = "AiCommand PATROL"
 kind = "value"
 value = 26
 used_by = ["move_paths"]
+
+[[sym]]
+id = "rs_this_site"
+symbol = "ConstructionRig::GetAction"
+kind = "patch"
+addr = 0x4afa37
+check = "8b 07 ff 90 38 01 00 00 8b 75 0c 84 c0 75 4b"
+in = "ConstructionRig::GetAction"
+used_by = ["rig_self"]
+
+[[sym]]
+id = "rs_this_cont"
+symbol = "ConstructionRig::GetAction"
+kind = "label"
+addr = 0x4afa3f
+check = "8b 75 0c 84 c0 75 4b"
+in = "ConstructionRig::GetAction"
+used_by = ["rig_self"]
+
+[[sym]]
+id = "rs_check_site"
+symbol = "ConstructionRig::GetAction"
+kind = "patch"
+addr = 0x4afa71
+check = "8b 4e 0c 6a 01 6a 00 57 8b 11 ff 52 08 84 c0 8b 45 08 74 e0"
+in = "ConstructionRig::GetAction"
+used_by = ["rig_self"]
+
+[[sym]]
+id = "rs_check_cont"
+symbol = "ConstructionRig::GetAction"
+kind = "label"
+addr = 0x4afa7e
+check = "84 c0 8b 45 08 74 e0"
+in = "ConstructionRig::GetAction"
+used_by = ["rig_self"]
+
+[[sym]]
+id = "rs_vt_check"
+symbol = "ConstructionRig vtable (the call that opens GetAction)"
+kind = "field"
+struct = "ConstructionRig vtable (the call that opens GetAction)"
+offset = 0x138
+type = "ptr"
+used_by = ["rig_self"]
+
+[[sym]]
+id = "rs_vt_can_place"
+symbol = "CraftClass vtable (CanPlaceHere)"
+kind = "field"
+struct = "CraftClass vtable (CanPlaceHere)"
+offset = 0x8
+type = "ptr"
+used_by = ["rig_self"]
