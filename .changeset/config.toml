@@ -1,0 +1,27 @@
+# tools/changeset.py's configuration (.changeset/README.md).
+#
+# The units with a version of their own besides the layers of layers.toml (which are
+# found there: every layer that is not retired and has a CHANGELOG.md) and the project
+# itself, `root`. A changeset names any of them.
+
+[[unit]]
+id = 'gui-installer'
+dir = 'gui-installer'
+
+[[unit]]
+id = 'testbench'
+dir = 'testbench'
+
+[[unit]]
+id = 'films'
+dir = 'films'
+
+# Where a version lives besides its CHANGELOG.md heading. <dir>/Cargo.toml's [package]
+# version and that package's entries in the Cargo.lock files are found by themselves;
+# anything else is listed here: a file and a regex whose group "v" is the version.
+# `changeset.py version` rewrites them, `changeset.py check` fails when one disagrees
+# with the changelog.
+
+[[version.gui-installer.version_files]]
+file = 'gui-installer/armada2-refit-installer.py'
+pattern = "(?m)^INSTALLER_VERSION = '(?P<v>[^']+)'"

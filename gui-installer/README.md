@@ -41,8 +41,18 @@ Keys: F5 refresh, Ctrl+Enter install, Ctrl+L the log.
 2. **Lists the releases** from the GitHub API at every launch and on **Refresh**. The
    list and every zip it fetches are cached in `~/.cache/armada2-refit/installer/`, so
    it works offline and keeps a release GitHub has since deleted (CI keeps only ten).
-   The default is the newest **full** release: a pre-release is an entry still "not yet
-   seen in game", and is offered but not chosen for you. A zip is about a megabyte, so
+   The default is the newest **full** release: one GitHub flags as a pre-release is an
+   *untested release* ("not yet seen in game"), offered but not chosen for you. Only tags
+   `vX.Y.Z` (and the builds below) count as releases; any other tag is ignored. CI also
+   publishes every push to `main` as a GitHub pre-release tagged `vX.Y.Z-pre.N` (N the CI
+   run number; the last three are kept). The newest of them, and only that one, is an extra
+   entry, always **last**: "Pre-release (latest main) · version · commit · date —
+   untested" (the commit is the first seven of the release's `target_commitish`, left
+   out when that is not a sha). It is never the default (`default_release` skips it; with
+   nothing else listed nothing is selected, so nothing installs without a pick). Its zip
+   is `armada2-refit-X.Y.Z-pre.N.zip` and the cache keeps only the newest one.
+   `--install pre-release` takes it; `--list` shows kinds `release`, `untested` and
+   `pre-release`. A zip is about a megabyte, so
    the chosen one is fetched straight away (checked against GitHub's sha256 digest) to
    show what it holds.
 3. **Says what will not go in**, on this machine, in a line each under the card: the same
@@ -474,7 +484,7 @@ rather than drawing wrong.
 
 `INSTALLER_VERSION` in the script is this layer's version. `CHANGELOG.md` heads it, and
 `publish/package.sh` refuses to package if the two differ. The schemas it reads are named
-in each entry. CI attaches the script to every release beside the zip, and puts a copy
+in each entry. `vtuple` reads a pre-release build's version (`15.10.0-pre.4182`) as its X.Y.Z. CI attaches the script to every release beside the zip, and puts a copy
 in the zip.
 
 ## Testing
