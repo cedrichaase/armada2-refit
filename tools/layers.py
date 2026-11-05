@@ -93,6 +93,13 @@ def game_layers(game=None):
     return gid, desc
 
 
+def game_ids(reg, gid):
+    """The ids of the layers that are the game's: those whose `games` names it. A registry
+    without `games` (the selftest's toy) is every game's. --check holds each descriptor's
+    `layers` to the same set."""
+    return {lay['id'] for lay in reg['layer'] if gid in lay.get('games', [gid])}
+
+
 def resolve(reg, only=None, without=None, game=None):
     """The ids a run installs, in registry order. `only`/`without`: lists of ids, or None.
     `game`: the game's id (default: the chosen one); only the layers its descriptor
@@ -100,7 +107,7 @@ def resolve(reg, only=None, without=None, game=None):
     gid, desc = game_layers(game)
     if not desc.get('offered'):
         raise Refused(f'{gid}: not offered yet (games/{gid}.toml)')
-    mine = set(desc.get('layers', []))
+    mine = game_ids(reg, gid)
     ids = by_id(reg)
     offered = [lay['id'] for lay in reg['layer'] if lay['select'] in ('on', 'off') and lay['id'] in mine]
     core = [lay['id'] for lay in reg['layer'] if lay['select'] == 'core' and lay['id'] in mine]
@@ -143,7 +150,7 @@ def commands(reg, selected, game=None):
     left out, then the installs of the selected, in registry order. A command two layers
     share (rules on qol's installer) runs once, and is not removed while a selected layer
     installs it."""
-    mine = set(game_layers(game)[1].get('layers', []))
+    mine = game_ids(reg, game_layers(game)[0])
     ids = by_id(reg)
     sel = set(selected)
     inst = [(i, c) for i in selected for c in ids[i]['install']]
@@ -403,6 +410,8 @@ def _check_games(reg, errs):
                 errs.append(f'games/{g}.toml: layer {i}: no such layer')
             elif ids[i]['select'] == 'retired':
                 errs.append(f'games/{g}.toml: layer {i} is retired')
+            elif g not in ids[i].get('games', []):
+                errs.append(f'games/{g}.toml: layer {i} does not name {g} in its games')
             elif g not in ids[i].get('games', []):
                 errs.append(f'games/{g}.toml: layer {i} does not list {g} in its games')
     # The engine profiles: each build belongs to a described game, by one of its exes.
