@@ -4,6 +4,12 @@
 refund on cancel: QOL-7). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 1.0.3 — 2026-11-04
+
+### Fixed
+- `s_num` (`csdk/a2asi.h`, compiled in) prints the most negative value correctly in log lines (an unsigned negate); no behaviour change otherwise.
+Installed, not yet seen in game.
+
 ## 1.0.2 — 2026-11-04
 
 ### Fixed

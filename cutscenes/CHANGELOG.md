@@ -4,6 +4,14 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`binkproxy/README.md`](binkproxy/README.md).
 
+## 3.0.2 — 2026-11-04
+
+### Fixed
+- The UI's `ui_present_movie` is looked up again at each movie's open until UI.asi is found (it was looked up once per process, so a first movie that started before the ASI loader had loaded UI.asi left every later movie copied into the back buffer); the log says so only when the answer changes.
+- A replacement movie with no duration in its file no longer commits an hour of audio (about 660 MB at 48 kHz stereo) up front: the buffer starts at 10 s and doubles as the decode needs, still capped at the hour.
+- `s_num` (`csdk/a2asi.h`) prints `-2147483648` correctly (an unsigned negate).
+Installed, not yet seen in game.
+
 ## 3.0.1 — 2026-11-03
 
 ### Removed

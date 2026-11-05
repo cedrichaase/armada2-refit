@@ -325,11 +325,11 @@ static void base_name(const char *path, char *out, int cap)
 
 /* Decode the whole audio track up front with its own reader: reading audio
  * through the video reader would make it buffer every video frame it skips. */
-static void load_audio(Movie *mv, const WCHAR *url, double seconds)
+static void load_audio(Movie *mv, const WCHAR *url, double seconds, int known)
 {
     COM rd = 0, mt = 0, cur = 0, s = 0, buf = 0;
     UINT ch = 0, rate = 0, bits = 0;
-    DWORD cap, idx, fl;
+    DWORD cap, maxCap, idx, fl;
     LONGLONG ts;
     char m[200];
 
@@ -347,7 +347,12 @@ static void load_audio(Movie *mv, const WCHAR *url, double seconds)
     ATTR_GET_U32(cur, &MF_MT_AUDIO_BITS_PER_SAMPLE, &bits);
     if (!ch || !rate || bits != 16) { logline("audio: unexpected format"); goto out; }
 
-    cap = (DWORD)((seconds + 2.0) * rate) * ch * 2;
+    /* A known duration sizes the buffer once.  Without one (no MF_PD_DURATION) it
+     * starts at 10 s and doubles as the decode needs it, up to the hour the frame
+     * count assumes, so a short movie never commits the hour's worth. */
+    maxCap = (DWORD)((seconds + 2.0) * rate) * ch * 2;
+    cap = known ? maxCap : (DWORD)(10.0 * rate) * ch * 2;
+    if (cap > maxCap) cap = maxCap;
     mv->pcm = valloc(cap);
     if (!mv->pcm) goto out;
     mv->pcmLen = 0;
@@ -357,6 +362,15 @@ static void load_audio(Movie *mv, const WCHAR *url, double seconds)
         if (SR_READ(rd, MF_SOURCE_READER_FIRST_AUDIO_STREAM, &idx, &fl, &ts, &s) < 0) break;
         if (s) {
             if (SAMPLE_CONTIG(s, &buf) >= 0 && BUF_LOCK(buf, &p, NULLPTR, &len) >= 0) {
+                while (mv->pcmLen + len > cap && cap < maxCap) {
+                    DWORD nc = cap > maxCap / 2 ? maxCap : cap * 2;
+                    BYTE *nb = valloc(nc);
+                    if (!nb) break;
+                    memcpy(nb, mv->pcm, mv->pcmLen);
+                    vfree(mv->pcm);
+                    mv->pcm = nb;
+                    cap = nc;
+                }
                 if (mv->pcmLen + len > cap) len = cap - mv->pcmLen;
                 memcpy(mv->pcm + mv->pcmLen, p, len);
                 mv->pcmLen += len;
@@ -438,6 +452,7 @@ static Movie *open_replacement(const char *bikname)
     UINT stride = 0;
     struct { WORD vt, r1, r2, r3; ULONGLONG v; } pv;
     double dur;
+    int durKnown;
     Movie *mv = NULLPTR;
     int i, n;
     DWORD a;
@@ -507,7 +522,8 @@ static Movie *open_replacement(const char *bikname)
     dur = 0;
     if (SR_PRESATTR(mv->reader, MF_SOURCE_READER_MEDIASOURCE, &MF_PD_DURATION, &pv) >= 0)
         dur = (double)pv.v / 1e7;
-    if (dur <= 0) dur = 3600;
+    durKnown = dur > 0;
+    if (!durKnown) dur = 3600;
 
     mv->frame = valloc((DWORD)(mv->w * mv->h * 4));
     if (!mv->frame) goto fail;
@@ -520,7 +536,7 @@ static Movie *open_replacement(const char *bikname)
     mv->bink[6] = 1000;
     mv->volume = 32768;
 
-    load_audio(mv, url, dur);
+    load_audio(mv, url, dur, durKnown);
     if (!mv->pcmLen) {
         vfree(mv->pcm);
         mv->pcm = NULLPTR;
@@ -819,16 +835,20 @@ static DWORD g_scratchSize;
  * keeps the copy. */
 typedef int (__cdecl *pUiMovie)(const BYTE *, int, int, int);
 static int g_useUi = 1;
+static int g_uiFresh = 1;   /* set at each movie open: look UI.asi up again */
 static int ui_movie(const BYTE *bgrx, int w, int h, int pitch)
 {
     static pUiMovie f;
-    static int looked, said;
+    static int said, told = -1;
     if (!g_useUi) return 0;
-    if (!looked) {
+    if (!f || g_uiFresh) {
         HMODULE ui = GetModuleHandleA("UI.asi");
         f = ui ? (pUiMovie)GetProcAddress(ui, "ui_present_movie") : (pUiMovie)NULLPTR;
-        looked = 1;
-        logline(f ? "UI.asi draws the full-screen frames" : "no UI.asi: frames copied into the back buffer");
+        g_uiFresh = 0;
+        if (told != (f != NULLPTR)) {   /* log only when the answer changes */
+            told = f != NULLPTR;
+            logline(f ? "UI.asi draws the full-screen frames" : "no UI.asi: frames copied into the back buffer");
+        }
     }
     if (!f) return 0;
     if (f(bgrx, w, h, pitch)) return 1;
@@ -843,6 +863,7 @@ EXPORT void *WINAPI BinkOpen(const char *name, DWORD flags)
     Movie *mv;
     char m[300];
     g_replace = (int)a2_ini_int(&g_bi, "BinkProxy", "ReplaceMovies", 1);   /* read at each open */
+    g_uiFresh = 1;
     if (g_replace && name && (mv = open_replacement(name))) return mv->bink;
     if (!real_load()) return NULLPTR;
     m[0] = 0; s_cat(m, "bink "); if (name && s_len(name) < 200) s_cat(m, name);
