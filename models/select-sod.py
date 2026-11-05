@@ -42,7 +42,7 @@ STOCK = '3501517a6a77152e3ff53f6295938532ef1b3cf2c70aa0454b58b06218ce5c28'  # GO
 
 def path():
     """The installed file, whichever case its extension has."""
-    hits = [p for p in glob.glob(os.path.join(SODDIR, NAME + '.*'))
+    hits = [p for p in glob.glob(os.path.join(glob.escape(SODDIR), glob.escape(NAME) + '.*'))
             if os.path.splitext(p)[1].lower() == '.sod']
     if len(hits) != 1:
         sys.exit(f'{NAME}: expected one .sod in {SODDIR}, found {len(hits)}')

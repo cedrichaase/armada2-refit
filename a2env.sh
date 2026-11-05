@@ -27,7 +27,8 @@ if [ -z "${A2_GAME:-}" ] && [ -n "${A2_GAME_DIR:-${A2_DIR:-}}" ]; then
 fi
 _a2_conf=${A2_CONF:-${XDG_CONFIG_HOME:-$HOME/.config}/armada2-refit.conf}
 if [ -f "$_a2_conf" ]; then
-  while IFS='=' read -r _a2_k _a2_v; do
+  while IFS='=' read -r _a2_k _a2_v || [ -n "$_a2_k" ]; do
+    _a2_v=${_a2_v%$'\r'}
     case "$_a2_k" in A2_GAME|A2_PREFIX|A2_HEROIC|A2_PROTON|A2_DATA) ;; *) continue ;; esac
     [ -n "${!_a2_k:-}" ] && continue
     _a2_v=${_a2_v/#\~/$HOME}; _a2_v=${_a2_v//\$HOME/$HOME}

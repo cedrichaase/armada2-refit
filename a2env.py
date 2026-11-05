@@ -45,7 +45,7 @@ def _conf():
     try:
         with open(path) as f:
             for line in f:
-                k, sep, v = line.rstrip('\n').partition('=')
+                k, sep, v = line.rstrip('\r\n').partition('=')
                 if sep and k in _DEFAULTS:
                     if v.startswith('~'):
                         v = _HOME + v[1:]
