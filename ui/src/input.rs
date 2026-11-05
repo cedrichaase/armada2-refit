@@ -14,8 +14,7 @@
 //! capture keeps from the engine. This works wherever the 3D window gets messages: in
 //! a mission, and in a screen of ours in the front end (`engine::shell`). Pointer
 //! position is read with `GetCursorPos`, as the engine itself does.
-use crate::engine::{self, eng, hook as patch};
-use crate::syms_core::{field, hook, sym};
+use crate::engine::api;
 use crate::rt::win::*;
 
 /// How many keys and characters one frame records; more in one frame are dropped.
@@ -161,26 +160,12 @@ fn raw() -> &'static mut Raw {
 /// stock: then the UI still reads the pointer, but cannot keep input from the engine
 /// and sees no buttons or keys.
 pub fn install() -> bool {
-    if eng().ready(hook::CORE_INPUT).is_err() {
-        crate::log!("input: standing down");
-        return false;
-    }
-    let (site_keys, site_mouse) = (eng().addr(sym::CORE_SITE_KEYS), eng().addr(sym::CORE_SITE_MOUSE));
-    let (peek_keys, peek_mouse) = (eng().addr(sym::CORE_SITE_KEYS_PEEK), eng().addr(sym::CORE_SITE_MOUSE_PEEK));
-    // The six bytes at each drain, which the profile's check has just read.
-    let six = |at: usize| -> [u8; 6] { unsafe { core::ptr::read_unaligned(at as *const [u8; 6]) } };
-    let (keys_stock, mouse_stock) = (six(peek_keys), six(peek_mouse));
-    // `call [imp]` -> `call rel32; nop`, and `mov ebx, [imp]` -> `mov ebx, imm32; nop`.
-    let peek = keys_peek as *const () as usize;
-    let rel = (peek as i64 - (peek_keys as i64 + 5)) as i32;
-    let mut call = [0xe8u8, 0, 0, 0, 0, 0x90];
-    call[1..5].copy_from_slice(&rel.to_le_bytes());
-    let mut mov = [0xbbu8, 0, 0, 0, 0, 0x90];
-    mov[1..5].copy_from_slice(&(mouse_peek as *const () as usize as u32).to_le_bytes());
-    let ok = patch::patch_bytes(peek_keys, &keys_stock, &call)
-        && patch::patch_bytes(peek_mouse, &mouse_stock, &mov)
-        && patch::patch_call(site_keys, eng().addr(sym::CORE_PROCESS_KEYS), keys_message as *const () as usize)
-        && patch::patch_call(site_mouse, eng().addr(sym::CORE_PROCESS_MOUSE), mouse_messages as *const () as usize);
+    let ok = api::input::install(
+        keys_message as *const () as usize,
+        keys_peek as *const () as usize,
+        mouse_messages as *const () as usize,
+        mouse_peek as *const () as usize,
+    );
     unsafe { INSTALLED = ok };
     ok
 }
@@ -276,8 +261,7 @@ unsafe extern "C" fn keys_message(msg: u32, wp: usize, lp: isize) {
     if key_message(msg, wp) {
         return;
     }
-    let stock: unsafe extern "C" fn(u32, usize, isize) = unsafe { core::mem::transmute(eng().addr(sym::CORE_PROCESS_KEYS)) };
-    unsafe { stock(msg, wp, lp) };
+    unsafe { api::input::process_keys(msg, wp, lp) };
 }
 
 /// In place of the `PeekMessageA` that `ProcessKeyboardMessages` drains the queue with:
@@ -304,8 +288,7 @@ unsafe extern "C" fn mouse_messages(w: HWND, msg: u32, wp: usize, lp: isize) {
     if mouse_message(msg, wp) {
         return;
     }
-    let stock: unsafe extern "C" fn(HWND, u32, usize, isize) = unsafe { core::mem::transmute(eng().addr(sym::CORE_PROCESS_MOUSE)) };
-    unsafe { stock(w, msg, wp, lp) };
+    unsafe { api::input::process_mouse(w, msg, wp, lp) };
 }
 
 /// In place of the `PeekMessageA` that `ProcessMouseMessages` drains the queue with:
@@ -326,12 +309,7 @@ unsafe extern "system" fn mouse_peek(m: *mut Msg, w: HWND, min: u32, max: u32, r
 
 /// The game window, as the engine names it.
 pub fn window() -> HWND {
-    let s = engine::storm3d();
-    if s == 0 || engine::field(s, field::CORE_STORM3D_DEVICES) == 0 || eng().ready(hook::CORE_WINDOW).is_err() {
-        return core::ptr::null_mut();
-    }
-    let f: unsafe extern "thiscall" fn(usize) -> HWND = unsafe { core::mem::transmute(eng().addr(sym::CORE_GET_WINDOW_HANDLE)) };
-    unsafe { f(s) }
+    api::input::window()
 }
 
 /// A move of the pointer between two frames longer than this, in pixels, is logged as a
@@ -368,7 +346,7 @@ fn diagnose(hwnd: HWND, screen: Option<(i32, i32)>) {
             | ((GetActiveWindow() == hwnd) as u32) << 1
             | ((GetFocus() == hwnd) as u32) << 2
     };
-    let held = engine::mouse::held();
+    let held = api::mouse::held();
     if d.lines < DIAG_LINES && d.has != Some(has) {
         d.lines += 1;
         let (x, y) = screen.unwrap_or((-1, -1));
@@ -380,7 +358,7 @@ fn diagnose(hwnd: HWND, screen: Option<(i32, i32)>) {
             yn(4),
             x,
             y,
-            engine::mouse::buttons(),
+            api::mouse::buttons(),
             if held { ", pointer held for a pan" } else { "" }
         );
     }
@@ -392,7 +370,7 @@ fn diagnose(hwnd: HWND, screen: Option<(i32, i32)>) {
         if !pan && d.lines < DIAG_LINES && ((x - x0).abs() > JUMP || (y - y0).abs() > JUMP) {
             d.lines += 1;
             crate::log!("pointer: jumped from {},{} to {},{} between two frames; engine buttons {:#x}", x0, y0, x, y,
-                engine::mouse::buttons());
+                api::mouse::buttons());
         }
     }
     d.last = screen;

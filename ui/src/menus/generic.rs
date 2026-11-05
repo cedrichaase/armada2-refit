@@ -12,8 +12,8 @@
 //!   background art are not controls, so a screen that relies on them needs a spec.
 use super::model::{Class, Control, What};
 use super::{actions, Screen};
-use crate::engine::dialogs;
-use crate::engine::shellui::Kind;
+use crate::engine::api::dialogs;
+use crate::engine::api::shellui::Kind;
 use crate::gfx::{fade, Weight, R};
 use crate::rt::win::*;
 use crate::widgets::{Align, FieldEvent, ListEvent, Ui};

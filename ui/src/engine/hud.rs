@@ -59,7 +59,7 @@ fn cursor() -> usize {
 }
 
 // `DisplayInterface+0x04` is the panel's rectangle, `{left, top, right, bottom}`,
-// inclusive, in the 1600 x 1200 space every HUD rectangle is converted into
+// inclusive, in the HUD canvas (`canvas::CANVAS`) space every HUD rectangle is converted into
 // (`cfgSCREEN_WIDTH` x `cfgSCREEN_HEIGHT`), which the engine scales to the back buffer
 // per axis; `+0x16` is hidden (`SetIsHidden`; `RenderAll` calls `HiddenRender`); `+0x24`
 // the cursor a panel shows while it owns the mouse. Vtable slots: `GetName` (+0x18),
@@ -74,7 +74,7 @@ pub fn palette() -> usize {
     if g == 0 { 0 } else { unsafe { rd::<usize>(g) } }
 }
 
-/// A panel's rectangle in back-buffer pixels: the 1600 x 1200 rectangle scaled per
+/// A panel's rectangle in back-buffer pixels: the HUD canvas (`canvas::CANVAS`) rectangle scaled per
 /// axis, as the engine draws it. (left, top, right, bottom), right and bottom exclusive.
 pub fn panel_rect(c: usize, w: f32, h: f32) -> Option<[f32; 4]> {
     if c == 0 {
@@ -84,7 +84,7 @@ pub fn panel_rect(c: usize, w: f32, h: f32) -> Option<[f32; 4]> {
     if r[2] <= r[0] || r[3] <= r[1] {
         return None;
     }
-    let (sx, sy) = (w / 1600.0, h / 1200.0);
+    let (sx, sy) = (w / super::canvas::CANVAS.0, h / super::canvas::CANVAS.1);
     Some([r[0] as f32 * sx, r[1] as f32 * sy, (r[2] + 1) as f32 * sx, (r[3] + 1) as f32 * sy])
 }
 
@@ -253,7 +253,7 @@ unsafe extern "thiscall" fn render_component(c: usize) {
 /// owner's tooltip once it has waited `s_tooltipDelay` / `s_verboseTooltipDelay`, NULL
 /// when there is none. `CursorInterface::Render` draws the verbose one while
 /// `m_tooltipState` is 0, else the short one, with `mDrawTooltip` at the pointer, 550
-/// units wide on the 1600 x 1200 canvas (stretched on a wide screen), and the verbose
+/// units wide on the HUD canvas (`canvas::CANVAS`) (stretched on a wide screen), and the verbose
 /// one's framing (`mDrawFramingElement`).
 // (`hud.tooltips`; `CursorInterface::m_tooltipState` is what the help button cycles, 0..2.)
 

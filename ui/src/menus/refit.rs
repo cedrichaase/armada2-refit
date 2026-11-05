@@ -7,7 +7,7 @@
 //! `settings::set_row` and nowhere else, so the hub is the only writer of
 //! `RefitPlayer.ini` and tells the plugins. The words of the log lines and of the
 //! badges are contracts the bench reads (`testbench/operating/refit-screen.md`).
-use crate::engine::dialogs::Slot;
+use crate::engine::api::dialogs::Slot;
 use crate::gfx::{Weight, R};
 use crate::rt::settings::*;
 use crate::rt::win::HWND;

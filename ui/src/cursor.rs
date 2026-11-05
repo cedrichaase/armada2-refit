@@ -156,13 +156,13 @@ fn note_shape(ctx: Context, name: &str) {
 /// stock is `c_warp` whatever is selected; ours is `c_warp` only while a selected
 /// ship of the player's can warp, and the move cursor while none can.
 fn minimap_cursor(sq: R, (mx, my): (f32, f32)) -> Option<&'static str> {
-    let warp = || if crate::engine::selection::warp_functions_stock() { crate::engine::selection::move_cursor() } else { None };
-    if !crate::config::get().hud.minimap_cursor || !crate::engine::radar::action_cursors_stock() {
+    let warp = || if crate::engine::api::selection::warp_functions_stock() { crate::engine::api::selection::move_cursor() } else { None };
+    if !crate::config::get().hud.minimap_cursor || !crate::engine::api::radar::action_cursors_stock() {
         return None;
     }
-    let r = crate::engine::radar::radar();
+    let r = crate::engine::api::radar::radar();
     let uv = (((mx - sq.x) / sq.w).clamp(0.0, 1.0), ((my - sq.y) / sq.h).clamp(0.0, 1.0));
-    let (action, name) = crate::engine::radar::action_cursor(r, uv.0, uv.1)?;
+    let (action, name) = crate::engine::api::radar::action_cursor(r, uv.0, uv.1)?;
     if action & 0xfff == 0x2b && action & 0x4000 == 0 {
         return warp().or(Some(name));
     }
@@ -178,22 +178,22 @@ pub fn draw(ctx: Context, ui: &mut Ui) {
     let name = match ctx {
         Context::Mission => {
             // Ours only where the engine's can be hidden, or there would be two.
-            if !crate::engine::cursor::installed() || !crate::engine::cursor::synchronous() {
+            if !crate::engine::api::cursor::installed() || !crate::engine::api::cursor::synchronous() {
                 return;
             }
             // Something before us skips the engine's draw of its cursor (Scene.asi's
             // `cursor off`): the engine would show none, so neither do we. The engine's
             // is still held back, so it cannot flash up for the frame it takes us to
             // see it shown again.
-            if !crate::engine::cursor::engine_shows() {
-                crate::engine::cursor::hide_this_frame();
+            if !crate::engine::api::cursor::engine_shows() {
+                crate::engine::api::cursor::hide_this_frame();
                 note_shape(ctx, "none (the engine's is held back)");
                 return;
             }
             // None: the engine shows no cursor (a right-drag); neither do we, unless a
             // box of ours wants the pointer (a mission's opening briefing: its stock box,
             // whose `Render` names the cursor, is not drawn).
-            let shape = match crate::engine::cursor::shape() {
+            let shape = match crate::engine::api::cursor::shape() {
                 Some(n) => n,
                 None if crate::hud::panels::box_shown() => "c_arrow",
                 None => return,
@@ -206,7 +206,7 @@ pub fn draw(ctx: Context, ui: &mut Ui) {
         // The loading screen: the arrow, only where the engine would show its own
         // cursor there (the bench showed whether it does).
         Context::Loading => {
-            if !crate::engine::cursor::engine_has_sprite() || !crate::engine::cursor::engine_shows() {
+            if !crate::engine::api::cursor::engine_has_sprite() || !crate::engine::api::cursor::engine_shows() {
                 note_shape(ctx, "none (the engine shows none)");
                 return;
             }
@@ -235,8 +235,8 @@ pub fn draw(ctx: Context, ui: &mut Ui) {
     }
     ui.draw.image_uv(d.tex, R::new(x, y, w, h), uv, 0xffffffff);
     match ctx {
-        Context::Mission => crate::engine::cursor::hide_this_frame(),
-        Context::Shell | Context::Menus => crate::engine::shell::hide_os_cursor(),
-        Context::Loading => crate::engine::cursor::hide_this_frame(),
+        Context::Mission => crate::engine::api::cursor::hide_this_frame(),
+        Context::Shell | Context::Menus => crate::engine::api::shell::hide_os_cursor(),
+        Context::Loading => crate::engine::api::cursor::hide_this_frame(),
     }
 }

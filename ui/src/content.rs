@@ -65,7 +65,7 @@ pub static NONE: Content =
 
 /// The set this build reads.
 pub fn get() -> &'static Content {
-    match crate::syms_core::TABLE.engine().content() {
+    match crate::engine::api::content_set() {
         Some(id) => by_set(id),
         None => &NONE,
     }

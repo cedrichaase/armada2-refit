@@ -134,7 +134,7 @@ pub fn under(w: u32, h: u32) -> bool {
 static mut SCENE: bool = false;
 
 /// What the screen's loop asks after each frame: Some when the Credits are done.
-pub fn step(p: &crate::engine::shell::Pumped) -> Option<i32> {
+pub fn step(p: &crate::engine::api::shell::Pumped) -> Option<i32> {
     let s = st();
     let now = crate::rt::now();
     let settled = now - s.started > 0.4;
@@ -247,7 +247,7 @@ pub extern "C" fn show() {
     s.started = now;
     unsafe { ON = true };
     crate::log!("credits: ours");
-    let r = crate::engine::shell::run_screen_under(
+    let r = crate::engine::api::shell::run_screen_under(
         &mut |w, h| {
             let drew = under(w, h);
             unsafe { SCENE = drew };
@@ -255,6 +255,6 @@ pub extern "C" fn show() {
         &mut |p| step(p),
     );
     unsafe { ON = false };
-    crate::engine::shell::leave_to_main_menu();
+    crate::engine::api::shell::leave_to_main_menu();
     crate::log!("credits: left ({}) at page {}", r, s.page + 1);
 }

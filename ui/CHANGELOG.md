@@ -4,6 +4,16 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 2.3.0 — 2026-11-05
+
+### Added
+- The engine boundary (AR-4, `PLAN-ARCHITECTURE.md`): `src/engine/api.rs` (`crate::engine::api`), the one facade the rest of the UI reaches the engine through; `hud/`, `menus/`, `app.rs`, `input.rs`, `clock.rs`, `content.rs`, `lib.rs` and the others import it alone. Input's site patches and stock calls moved to `engine/input.rs`, the simulation's clock read to `engine/clock.rs`.
+- `trait Panel` (`hud/panels.rs`): name, `[HUD]` key, the claimed component and its rectangle in canvas units, `with_hud`, `modal`, draw; the smaller panels are one table, `PANELS`, in place of the `take(...)` calls. `trait Screen` (`menus/screens/mod.rs`): the dialog's key and draw; `Spec` implements it, `SPECS` keeps its shape and `screens::find` returns the trait.
+- The HUD canvas once, `CANVAS` in `engine/canvas.rs` (`api::CANVAS`), read by `hud::panel_rect`, the unit view and the overlay messages.
+- `ui/lint-layers.sh`, run in CI: no path into the engine but `engine::api` outside `src/engine/`, no address literal there, the canvas nowhere but `canvas.rs`.
+
+No behaviour change intended: the order of the `panels: ... ours` log lines at a mission's start follows the table (draw order). Installed, not yet seen in game.
+
 ## 2.2.4 — 2026-11-04
 
 ### Fixed

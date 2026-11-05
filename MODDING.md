@@ -248,6 +248,31 @@ as long as they are current; CI (`verify-generated.sh`) fails on a stale one.
 `gpu/shaders/compat.hlsli` holds the few places the two forms part. Constants keep
 their registers and loops keep a fixed count and no branches.
 
+## The UI
+
+`UI.asi` draws the HUD, the menus and the loading screen ([`ui/README.md`](ui/README.md)).
+Like render3d it keeps the engine on one side of a line: everything it knows of
+`Armada2.exe` is in `ui/src/engine/` and the profile (`profiles/gog-1.1/ui.<part>.toml`),
+and the rest of the UI reaches it only through the facade `ui/src/engine/api.rs`
+(`crate::engine::api`). `ui/lint-layers.sh` enforces it in CI ([`ui/README.md`](ui/README.md#the-engine-boundary)).
+
+### Adding a HUD panel or menu screen
+
+- **A HUD panel** is a `Panel` (`ui/src/hud/panels.rs`): its name, its `[HUD]` key, the
+  stock component it takes over through the panel switch (whose rectangle it can read
+  in canvas units), whether it hides with the engine's HUD or takes the whole screen's
+  mouse, and its draw. Write it in `ui/src/hud/<name>.rs` and add it to `PANELS`; the
+  stock component keeps simulating, and the panel reads its state and presses its
+  buttons. Step by step: [`ui/HUD.md`](ui/HUD.md#adding-a-panel).
+- **A menu screen** is a `Screen` (`ui/src/menus/screens/mod.rs`): the key of the stock
+  dialog it lays out and its draw. Write it in `ui/src/menus/screens/<name>.rs` and add
+  a `Spec` to `SPECS`. The stock dialog still runs hidden underneath and a screen acts
+  only through its controls, so it never writes a setting. Step by step:
+  [`ui/MENUS.md`](ui/MENUS.md#writing-a-screen-spec).
+- **Either one** takes what it needs of the engine from `crate::engine::api`. A new
+  read goes in the right `ui/src/engine/<area>.rs` file with its finding documented,
+  and is then named in `api.rs`. The HUD canvas is `api::CANVAS`, never a literal.
+
 ## Building a plugin
 
 ### The SDK in the release zip

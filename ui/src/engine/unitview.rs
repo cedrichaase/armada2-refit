@@ -3,7 +3,7 @@
 //! `CinematicView` (`g_cinematicView`) keeps drawing itself: a second render of the
 //! scene, a Bink video, or its still picture. Where is read from the component's own
 //! fields every frame, all relative to its rectangle `+0x04` (left, top, right,
-//! bottom, inclusive, in the HUD's 1600 x 1200 space): `RenderView` (and the video)
+//! bottom, inclusive, in the HUD canvas, `canvas::CANVAS`): `RenderView` (and the video)
 //! take the view's rectangle as that corner plus `cinematicDisplayArea` at `+0x48`,
 //! converted to the screen by `DisplayInterface::ConvertRectangle`, and give it to
 //! the view's camera as its viewport; the still picture is drawn at the corner plus
@@ -18,6 +18,7 @@
 //! swapped for an inert object whose `Render` (vtable `+0x10`, the only call made on
 //! it there) does nothing, and put back after.
 use super::{field, rd};
+use super::canvas::CANVAS;
 use crate::syms_info::{field, hook, sym, TABLE};
 
 fn eng() -> &'static a2engine::Engine {
@@ -87,18 +88,18 @@ pub fn view_rect(w: f32, h: f32) -> Option<[f32; 4]> {
     if r <= l || b <= t {
         return None;
     }
-    let (sx, sy) = (w / 1600.0, h / 1200.0);
+    let (sx, sy) = (w / CANVAS.0, h / CANVAS.1);
     Some([l as f32 * sx, t as f32 * sy, (r + 1) as f32 * sx, (b + 1) as f32 * sy])
 }
 
 /// Places the view at `px` (left, top, right, bottom in back-buffer pixels of a `w` x
-/// `h` buffer): the three rectangles written in the 1600 x 1200 space, whole units
+/// `h` buffer): the three rectangles written in the HUD canvas (`canvas::CANVAS`) space, whole units
 /// covering the pixels.
 pub fn place(px: [f32; 4], w: f32, h: f32) {
     if !enabled() || w < 1.0 || h < 1.0 {
         return;
     }
-    let (sx, sy) = (1600.0 / w, 1200.0 / h);
+    let (sx, sy) = (CANVAS.0 / w, CANVAS.1 / h);
     let l = libm::floorf(px[0] * sx) as i32;
     let t = libm::floorf(px[1] * sy) as i32;
     let r = (libm::ceilf(px[2] * sx) as i32 - 1).max(l + 1);
@@ -115,7 +116,7 @@ pub fn place(px: [f32; 4], w: f32, h: f32) {
         let now = [l, t, r, b];
         if *core::ptr::addr_of!(LOGGED) != now {
             LOGGED = now;
-            crate::log!("unit view: placed at [{},{},{},{}] of 1600x1200 ({:.0},{:.0} {:.0}x{:.0} px)", l, t, r, b, px[0], px[1], px[2] - px[0], px[3] - px[1]);
+            crate::log!("unit view: placed at [{},{},{},{}] of {}x{} ({:.0},{:.0} {:.0}x{:.0} px)", l, t, r, b, CANVAS.0, CANVAS.1, px[0], px[1], px[2] - px[0], px[3] - px[1]);
         }
     }
 }

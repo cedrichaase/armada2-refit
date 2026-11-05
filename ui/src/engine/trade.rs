@@ -1,7 +1,7 @@
 //! The mission scripts' team texts (HUD.md, "The trade status and the team message"):
 //! `Team::RenderUserTeamData` (0x497df0), which the mission frame calls right after
 //! `DisplayInterface::RenderAll` (at 0x5988d0), prints two things a script asks for in
-//! the default font on the 1600 x 1200 canvas, so stretched on a wide screen:
+//! the default font on the HUD canvas (`canvas::CANVAS`), so stretched on a wide screen:
 //!
 //! - **the trade status**, while `Team::s_showTradesToTeam` (0x6fea10, set by the
 //!   script's `ShowTradesTo`) is a team from 2 to 8: `RenderResourcesSentToTeam` on the

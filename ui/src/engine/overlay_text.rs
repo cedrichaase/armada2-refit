@@ -7,7 +7,7 @@
 //! `AlwaysGameSimulate` fades each one (`+0xa0`, 0..1, up by the frame's time while
 //! `+0xa4` is set, down once `FadeMessage` clears it) and erases it when it has faded
 //! out (`IsValid`). A message's point is its rectangle's corner at `+0x58` (x, y, in
-//! the 1600 x 1200 space, from the panel's corner), its justification at `+0x68`, its
+//! the HUD canvas (`canvas::CANVAS`) space, from the panel's corner), its justification at `+0x68`, its
 //! text a `std::string` at `+0x84` (the characters' pointer at `+0x88`) and its colour
 //! at `+0x94`; `GetInformation` multiplies the colour by the fade.
 use super::{buttons, field as peek, rd};
@@ -34,7 +34,7 @@ const NODE_RIGHT: usize = 0x8;
 
 pub struct Line {
     pub key: i32,
-    /// The point in the 1600 x 1200 space.
+    /// The point in the HUD canvas (`canvas::CANVAS`) space.
     pub x: i32,
     pub y: i32,
     /// `eJustify`, as `AddMessage` was given it.

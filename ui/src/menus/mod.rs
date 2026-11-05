@@ -17,7 +17,7 @@ pub mod refit;
 pub mod scene;
 pub mod screens;
 
-use crate::engine::dialogs::{self, DESIGN_H, DESIGN_W};
+use crate::engine::api::dialogs::{self, DESIGN_H, DESIGN_W};
 use crate::gfx::{self, Tex, R};
 use crate::rt::win::HWND;
 use crate::widgets::Ui;
@@ -147,7 +147,7 @@ pub fn frame(ui: &mut Ui) {
         ui.scope(&crate::sfmt!("dlg{:p}", s.hwnd), |ui| ui.inert_unless(live, |ui| {
             if cfg.menus_specs {
                 if let Some(spec) = screens::find(m.screen) {
-                    if (spec.draw)(ui, &scr) {
+                    if spec.draw(ui, &scr) {
                         return;
                     }
                 }

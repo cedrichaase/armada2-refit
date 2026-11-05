@@ -75,9 +75,9 @@ fn wanted() -> Option<(&'static core::ffi::CStr, SceneFn)> {
     if !crate::config::get().menus_scene || super::backdrop::over_mission() {
         return None;
     }
-    let all = crate::engine::dialogs::stack();
-    let full = all.iter().rposition(|s| s.w() >= crate::engine::dialogs::DESIGN_W && s.h() >= crate::engine::dialogs::DESIGN_H)?;
-    let screen = crate::engine::dialogs::screen_name(all[full].proc_addr);
+    let all = crate::engine::api::dialogs::stack();
+    let full = all.iter().rposition(|s| s.w() >= crate::engine::api::dialogs::DESIGN_W && s.h() >= crate::engine::api::dialogs::DESIGN_H)?;
+    let screen = crate::engine::api::dialogs::screen_name(all[full].proc_addr);
     if screen != "single player" {
         // Each visit to the campaign selection starts at the Federation's view.
         unsafe { CHOICE = None };
