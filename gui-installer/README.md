@@ -357,7 +357,9 @@ any other. **Gcenx's** macOS Wine builds are the third way. Whisky was discontin
 disabled. Every Wine on Apple Silicon runs under Rosetta 2, which Apple keeps fully
 through macOS 27 and then only "for older unmaintained gaming titles"; whether Wine
 stays inside that is not announced. The window's own text for this is `MAC_HOWTO` in the
-script, its only copy (and `WINDOWS_HOWTO` for getting the game on Windows).
+script, its only copy (and `WINDOWS_HOWTO` for getting the game on Windows); it links
+the player's walk-through, [`PLAYING.md`](../PLAYING.md#on-a-mac-step-by-step), which
+must keep its heading.
 
 ### Setting the game up on a Mac
 
@@ -369,9 +371,11 @@ account, so `MAC_HOWTO` says where in the GOG library it is. After a yes to a di
 that lists what follows, `Job.setup_mac` does what Sikarugir Creator and the wrapper's
 *Install Software* would make the player click through:
 
-1. **Rosetta 2**, if `/Library/Apple/usr/share/rosetta/rosetta` is missing:
-   `softwareupdate --install-rosetta --agree-to-license` (the dialog says it agrees to
-   Apple's licence). Every Wine on Apple Silicon runs under it.
+1. **Rosetta 2**, on Apple Silicon (`sysctl hw.optional.arm64`, which reads 1 even
+   when the app itself runs translated) if `/Library/Apple/usr/share/rosetta/rosetta`
+   is missing: `softwareupdate --install-rosetta --agree-to-license` (the dialog says it
+   agrees to Apple's licence). Every Wine on Apple Silicon runs under it; an Intel Mac
+   runs the engine natively and cannot install Rosetta at all (`needs_rosetta`).
 2. **Sikarugir's template and engine** from Sikarugir's own GitHub releases, pinned by
    URL, size and sha256 (`SIKARUGIR_TEMPLATE`: `Template-1.0.24`, `SIKARUGIR_ENGINE`:
    `WS12WineSikarugir11.0_1`, Wine 11 in new-style WoW64), cached in

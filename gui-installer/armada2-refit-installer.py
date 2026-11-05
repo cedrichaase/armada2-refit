@@ -50,7 +50,7 @@ import urllib.error
 import urllib.request
 import zipfile
 
-INSTALLER_VERSION = '3.1.0'
+INSTALLER_VERSION = '3.1.1'
 SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, ::step and ::error lines
 REPO = 'cedrichaase/armada2-refit'
 API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'
@@ -594,6 +594,22 @@ DOWNLOADS = os.path.join(HOME, 'Downloads')
 GOG_LIBRARY = 'https://www.gog.com/account'
 SETUP_GLOB = 'setup_star_trek*armada*.exe'    # GOG's offline installer, as GOG names it
 ROSETTA = '/Library/Apple/usr/share/rosetta/rosetta'
+MAC_GUIDE = ('https://github.com/cedrichaase/armada2-refit/blob/main/PLAYING.md'
+             '#on-a-mac-step-by-step')
+
+
+def needs_rosetta():
+    """Rosetta 2 is missing on an Apple Silicon Mac. An Intel Mac runs Wine natively and
+    cannot install it (softwareupdate refuses), so it never needs it. hw.optional.arm64
+    is asked rather than the machine name, which reads x86_64 under Rosetta itself."""
+    if os.path.exists(ROSETTA):
+        return False
+    try:
+        out = subprocess.run(['/usr/sbin/sysctl', '-n', 'hw.optional.arm64'],
+                             capture_output=True, text=True).stdout.strip()
+    except OSError:
+        return False
+    return out == '1'
 
 
 def find_setup_exe(where=DOWNLOADS):
@@ -2274,7 +2290,7 @@ class Job:
         if os.path.exists(WRAPPER_APP):
             raise RuntimeError(f'{short(WRAPPER_APP)} is there already, without the game in '
                                'it — move it to the Bin and set up again')
-        if not os.path.exists(ROSETTA):
+        if needs_rosetta():
             # Every Wine on Apple Silicon runs under it.
             self.report(0.01, 'rosetta', None)
             self._run(['/usr/sbin/softwareupdate', '--install-rosetta', '--agree-to-license'])
@@ -4164,9 +4180,9 @@ MAC_HOWTO = dict(
             [('Your GOG library', GOG_LIBRARY), ('The game on GOG', GOG_PAGE)]),
            ('Press Set up Armada II. It makes a free Sikarugir wrapper (Wine) in '
             '~/Applications/Sikarugir, installs the game into it with that installer, then '
-            'the refit. Sikarugir is downloaded from GitHub, and Rosetta 2 installed if it '
-            'is missing.',
-            [('Sikarugir', SIKARUGIR)])],
+            'the refit. Sikarugir is downloaded from GitHub, and on Apple Silicon Rosetta 2 '
+            'installed if it is missing.',
+            [('Sikarugir', SIKARUGIR), ('Step by step', MAC_GUIDE)])],
     notes=['Using CrossOver instead? Install the game into a bottle with the same installer, '
            'then Refresh. Direct3D 8 and 9 run through Wine\'s own wined3d on a Mac, so leave '
            'its graphics backend on its default for this game: D3DMetal, DXVK and DXMT only '
@@ -5636,7 +5652,7 @@ def run_tk():
             if not setup or not r or self.busy or not self.actions()[2]:
                 return
             mb = (SIKARUGIR_TEMPLATE[2] + SIKARUGIR_ENGINE[2]) // 1000000
-            rosetta = '' if os.path.exists(ROSETTA) else \
+            rosetta = '' if not needs_rosetta() else \
                 "\n• install Rosetta 2, which Wine needs, agreeing to Apple's licence for it"
             if not messagebox.askyesno(
                     'Set up Armada II',
