@@ -5,13 +5,6 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
-## 15.10.0 — 2026-11-05
-
-Layers: qol 2.4.0.
-
-### Added
-- qol: `RigIgnoresSelf=1` (live row): the construction ship no longer blocks its own blueprint, so the ghost stays green over it and the order is sent (issue #51, step 1 of #47). Details in `qol/CHANGELOG.md` 2.4.0. Installed, not yet seen in game. Bench: `qol-rig-ignores-self` and `qol-settings-live` pass.
-
 ## 15.9.2 — 2026-11-05
 
 Layers: online 0.11.4.
