@@ -3,7 +3,8 @@
 out. a2env.sh takes its values from here, so the two cannot drift.
 
     import a2env; a2env.GAME, a2env.PREFIX, a2env.PROTON, a2env.DATA, a2env.HEROIC
-    a2env.GAME_ID, a2env.DESC (the game's descriptor), a2env.EXE, a2env.EXE_DIR
+    a2env.GAME_ID, a2env.DESC (the game's descriptor), a2env.EXE, a2env.EXE_DIR,
+    a2env.TEXTURES (the texture roots, absolute; a2tex installs into the first)
 
     python3 a2env.py [--game ID]        what this machine resolves to
     python3 a2env.py [--game ID] --sh   the same as `export` lines, for a2env.sh
@@ -35,7 +36,8 @@ holds another game's (`[fo-roots]` then `A2_GAME=...`). A2_GAME_DIR and A2_DIR, 
 names some scripts used before, are still read for A2_GAME.
 
 Derived, never read: A2_PROFILE (the game's id), A2_EXE (its executable,
-$A2_GAME/<data_dir>/<exe>). heroic_roots() lists every Heroic config directory present,
+$A2_GAME/<data_dir>/<exe>), A2_TEXTURES (its first texture root,
+$A2_GAME/<data_dir>/<[files] textures[0]>: Textures/RGB in Armada II). heroic_roots() lists every Heroic config directory present,
 for lookups that should know both. A script in a subdirectory imports this module with
 the repository root put on sys.path first. The release ships this file alone (no
 games/): it then resolves the default game from _BUILTIN below, which
@@ -64,6 +66,7 @@ _BUILTIN = {
     'schema': 1, 'id': 'armada2', 'label': 'Star Trek: Armada II', 'offered': True,
     'default': True,
     'exe': {'names': ['Armada2.exe'], 'data_dir': ''},
+    'files': {'textures': ['Textures/RGB']},
     'install': {'folder': 'Star Trek Armada II', 'prefix': 'Star Trek Armada II'},
     'paths': {'stem': 'armada2-refit'},
 }
@@ -170,7 +173,14 @@ def resolve(game_id=None):
     exe_dir = os.path.join(out['A2_GAME'], desc['exe']['data_dir']) if desc['exe']['data_dir'] \
         else out['A2_GAME']
     out['A2_EXE'] = os.path.join(exe_dir, desc['exe']['names'][0])
+    out['A2_TEXTURES'] = texture_roots(desc, exe_dir)[0]
     return out, desc
+
+
+def texture_roots(desc, exe_dir):
+    """The descriptor's texture roots ([files] textures, under data_dir), absolute and
+    in search order."""
+    return [os.path.join(exe_dir, *t.split('/')) for t in desc['files']['textures']]
 
 
 def take_game_arg(argv):
@@ -192,7 +202,7 @@ def use(game_id=None):
     """Resolves the game (default: the chosen one) into this module's globals, and sets
     A2_PROFILE in os.environ so that what the tool runs resolves the same game. Exits
     with the reason for an unknown game."""
-    global _R, DESC, GAME_ID, GAME, PREFIX, PROTON, DATA, HEROIC, EXE, EXE_DIR, EXE_NAME
+    global _R, DESC, GAME_ID, GAME, PREFIX, PROTON, DATA, HEROIC, EXE, EXE_DIR, EXE_NAME, TEXTURES
     try:
         _R, DESC = resolve(game_id)
     except GameError as e:
@@ -203,6 +213,7 @@ def use(game_id=None):
     EXE = _R['A2_EXE']
     EXE_DIR = os.path.dirname(EXE)
     EXE_NAME = os.path.basename(EXE)
+    TEXTURES = texture_roots(DESC, EXE_DIR)
     if game_id:
         os.environ['A2_PROFILE'] = game_id
 

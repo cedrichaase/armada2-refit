@@ -35,9 +35,16 @@ shell = [1200, 900]
 # Stock's until FO-6 measures Roots' own HUD.
 hud_canvas = [1600, 1200]
 
-[assets]
-# Roots packs its ODFs in ODF.fpq and mixes DDS with TGA (PLAN-ARCHITECTURE.md, F5).
-textures = ["Textures/RGB"]
+[files]
+# PLAN-FLEETOPS.md, "The install": the textures sit in Textures/ itself (no RGB/),
+# TGA and DDS mixed, and the ODFs are packed in ODF.fpq (odf/ is empty, but a loose file
+# there would still win). SOD/, Sprites/ and odf/ are assumed stock's until FO-0 sees them.
+textures = ["Textures"]
+texture_formats = ["tga", "dds"]
+sod = ["SOD"]
+sprites = ["Sprites"]
+odf = ["odf"]
+archives = [{ kind = "fpq", file = "ODF.fpq", at = "odf" }]
 
 [paths]
 # $A2_DATA stays shared between the games (PLAN-ARMADA1.md).

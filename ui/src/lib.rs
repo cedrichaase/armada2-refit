@@ -19,6 +19,7 @@ pub mod content;
 pub mod credits;
 pub mod cursor;
 pub mod engine;
+pub mod files;
 pub mod gallery;
 pub mod gfx;
 pub mod hud;

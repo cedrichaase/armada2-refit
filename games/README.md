@@ -20,7 +20,8 @@ marked `default = true` (armada2), so nothing changes for anyone who never sets 
 
 `a2env.py` is the one reader: it resolves `A2_GAME`, `A2_PREFIX` and `A2_DATA` from the
 descriptor's defaults (the environment and the config file still win), and adds
-`A2_PROFILE` and `A2_EXE`; `a2env.sh` takes its values from it. Another game's paths go in
+`A2_PROFILE`, `A2_EXE` and `A2_TEXTURES` (the first texture root); `a2env.sh` takes its
+values from it. Another game's paths go in
 a section of the config file:
 
     A2_GAME=/mnt/games/Star Trek Armada II
@@ -45,7 +46,10 @@ Top-level `A2_GAME` and `A2_PREFIX` are the default game's; top-level `A2_HEROIC
 | `settings.kind`, `settings.file` | the player's settings file and its format (`armada-prf`, `fo-settings-xml`) | the bench's adapter |
 | `settings.keep` | the player's own files `a2mod` never switches | `a2mod` |
 | `display.shell`, `display.hud_canvas` | the shell's resolution and the HUD's design canvas | the bench (`config.SHELL_RES`); the UI later (AR-4) |
-| `assets.textures` | where the textures are, under `data_dir` | `tools/layers.py --check`; `a2tex` and render3d later (AR-5) |
+| `files.textures` | the texture roots under `data_dir`, searched in order; `a2tex` installs into the first | `a2env.py` (`A2_TEXTURES`, `TEXTURES`), `a2tex`, `tools/layers.py`'s check of `a2mod`, render3d and the UI ("Files") |
+| `files.texture_formats` | the texture formats in them (`tga`, `dds`) | `tools/layers.py --check`; the DDS reader comes with FO-5 |
+| `files.sod`, `files.sprites`, `files.odf` | the folders of models, sprite tables and ODFs | render3d ("Files") |
+| `files.archives` | archives searched behind the folders, `{ kind = "fpq" \| "zfs", file, at }` | `tools/layers.py --check`; their readers come with FO-5 and A1-11 |
 | `paths.stem` | the data directory's name (`A2_DATA`'s default); shared by the games | `a2env.py` |
 
 `tools/layers.py --check` holds them together: every field present and typed, one
@@ -57,11 +61,29 @@ release package's `a2env.py` resolves without this folder) equal to the descript
 Nothing here is derived from the game's files (hard rule 8): names, folder names, ids and
 sizes from the plans.
 
+## Files
+
+`[files]` is the game's file layout as data. The plugins read the game's files through
+one file system, `a2fmt::vfs` (`crates/a2fmt/README.md`, "The file system"), by virtual
+folders: `textures`, `sod`, `sprites` and `odf`, each mounted from the folders `[files]`
+lists, in order. render3d adds its recipe override folders (`sky`, `surfaces`, `nebulae`,
+`menu`: `MODDING.md`, "Content recipes"), which are ours and the same for every game, and
+the UI mounts the game folder behind `textures`. The plugins cannot read this folder at
+run time, so each keeps the rows in a `LAYOUT` table (`render3d/core/src/files.rs`,
+`ui/src/files.rs`) marked with the game's id, and `tools/layers.py --check` fails when a
+row and the descriptor differ. Archives (`fpq`, `zfs`) mount behind the loose folders of
+the same virtual folder and serve nothing until their readers exist.
+
+`tools/layers.py --check` holds `[files]` to its shape too: the folder lists relative and
+non-empty, the formats known, each archive of a declared kind and mounted at one of the
+four folders.
+
 ## What does not read it yet
 
 The GUI installer (`gui-installer/`) and the release scripts (`publish/installer/`) keep
 their own discovery until AR-9 puts them on one installer core. A few literals remain
-where only Armada II is handled today: `Textures/RGB` in `./a2tex` and render3d's assets
-(AR-5), the UI's canvas (`ui/src/engine/hud.rs`, AR-4), Display8's trace line naming
+where only Armada II is handled today: the plugins' `LAYOUT` tables hold Armada II's rows
+only, until a second game's DLL chooses its layout (`PLAN-ARCHITECTURE.md`, "A DLL per
+game"); the UI's canvas (`ui/src/engine/hud.rs`, AR-4), Display8's trace line naming
 `Armada2.exe`, and the bench's `ARMADA.PRF` parsers, which only the `armada-prf` kind
 uses.

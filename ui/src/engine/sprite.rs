@@ -64,14 +64,14 @@ pub fn art(sprite: usize) -> Option<(Tex, [f32; 4])> {
     cache[i].tex.map(|t| (t, uv(sprite)))
 }
 
-/// `Textures/RGB/<name>`, either case of the extension, or the name as given.
+/// `textures\<name>` (`files`), either case of the extension, or the name as given.
 fn load(name: &str) -> Option<Tex> {
     let lower = crate::rt::lower(name);
     if lower.ends_with(".tga") {
-        return crate::gfx::load_tga(&crate::sfmt!("Textures\\RGB\\{}", name));
+        return crate::gfx::load_tga(&crate::sfmt!("textures\\{}", name));
     }
     for ext in [".tga", ".TGA"] {
-        if let Some(t) = crate::gfx::load_tga(&crate::sfmt!("Textures\\RGB\\{}{}", name, ext)) {
+        if let Some(t) = crate::gfx::load_tga(&crate::sfmt!("textures\\{}{}", name, ext)) {
             return Some(t);
         }
     }

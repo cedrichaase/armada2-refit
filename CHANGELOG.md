@@ -5,6 +5,22 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.8.0 — 2026-11-05
+
+Layers: render3d 1.1.0, ui 2.3.0, textures 2.3.0.
+
+### Added
+- `a2fmt::vfs` (`crates/a2fmt/README.md`, "The file system"): one file system over a game's files, `no_std`. `trait Vfs` (`open`, `exists`, `list`; case-insensitive, either slash), `Loose(root)` over an `Io` the caller supplies (`FnIo` from plain functions), `Layered` mounts searched by kind and mount order, a mount shadowing its folder in the root. `Fpq` and `Zfs` are declared and report `Unsupported` with a reason; an `Engine` source is documented as the planned fallback. Host tests on a temporary directory (`crates/a2fmt/tests/vfs.rs`).
+- `games/<id>.toml` `[files]` (replacing AR-2's `[assets]`): `textures`, `texture_formats`, `sod`, `sprites`, `odf` and `archives`. `fo-roots.toml` has Roots' layout: `Textures/`, TGA and DDS, `ODF.fpq` behind `odf`.
+- `a2env` gives `A2_TEXTURES` (the first texture root under the data folder) and `a2env.TEXTURES`; its built-in default carries `files.textures`.
+- `tools/layers.py --check` checks `[files]` (relative folders, known formats, archive kinds and mount folders) and holds render3d's and the UI's `LAYOUT` tables to the descriptor.
+
+### Changed
+- render3d and the UI read the game's files through `a2fmt::vfs` with Armada II's mount list; the same files are found in the same order (render3d 1.1.0, ui 2.3.0).
+- `./a2tex` takes the game's texture root from `A2_TEXTURES`, not a `Textures/RGB` literal (textures 2.3.0); `a2mod`'s and `tools/layers.py`'s texture paths come from the descriptor's `[files]`.
+
+Installed, not yet seen in game.
+
 ## 15.7.0 — 2026-11-04
 
 Layers: display 1.0.6, ui 2.2.5, render3d 1.0.5, qol 2.2.3, rules 1.0.3, online 0.11.2, cutscenes 3.0.2, testbench 4.2.0.

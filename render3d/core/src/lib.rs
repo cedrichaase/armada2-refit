@@ -14,6 +14,7 @@ pub mod rt {
 }
 pub use a2rt::{dump, log, sfmt};
 pub mod assets;
+pub mod files;
 pub mod clock;
 pub mod config;
 pub mod hooks;

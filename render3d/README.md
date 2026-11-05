@@ -843,6 +843,19 @@ one a module built in (`recipes::builtin(kind, &[(name, include_str!(..))])`).
 The sky's recipes, the menu's `map.ini` and the built-in `ordnance.ini` (whose sections
 `Render3D.ini` overrides one by one, ordnance's own rule) are read through it.
 
+**Files** (`core/src/files.rs`): every game file render3d reads (`assets`, `recipes`,
+the world module's texture means) goes through one `a2fmt::vfs` file system, built at the
+first lookup, by a virtual path: `textures\`, `sod\`, `sprites\`, `odf\` and the recipe
+override folders `sky\`, `surfaces\`, `nebulae\`, `menu\`. Its `LAYOUT` is the mount list,
+each virtual folder and the game-directory folders it searches in order (`Textures\RGB`,
+`SOD`, `Sprites`, `odf`, `Sky`, ...); the first four rows are `games/armada2.toml`'s
+`[files]`, which `tools/layers.py --check` holds them to. `assets` indexes each of its four
+folders once (every file under it, recursively, by lower-case name, the first found
+winning) and reads through the same file system, so the lookup is the one it was before
+the file system, case-insensitive as the engine's. An archive kind (`fpq`, `zfs`) would
+mount behind a folder and log why it serves nothing (`files: fpq ... no reader ...`);
+Armada II has none.
+
 **Layers.** The engine's addresses, call sites, vtable slots and field reads belong in
 `core/src/engine/` (the core's glue) or a module's own `mods/<m>/src/hooks.rs`; a module's
 built-in tables of game data names in its `content.rs`; its recipe files under

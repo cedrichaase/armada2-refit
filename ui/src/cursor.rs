@@ -39,9 +39,9 @@ fn parse_pair(s: &str) -> Option<(f32, f32)> {
 
 /// A texture of the cursor art, black keyed to transparent.
 fn load_texture(file: &str) -> Option<Tex> {
-    let base = crate::sfmt!("Textures/RGB/{}.tga", file);
+    let base = crate::sfmt!("textures/{}.tga", file);
     let backup = crate::sfmt!("{}.a2neb-backup", base);
-    let data = crate::rt::read_file(&crate::rt::game_path(&backup)).or_else(|| crate::rt::read_file(&crate::rt::game_path(&base)))?;
+    let data = crate::files::open(&backup).or_else(|| crate::files::open(&base))?;
     let mut img = a2fmt::tga::decode(&data).ok()?;
     for px in img.pixels.chunks_exact_mut(4) {
         if px[0] == 0 && px[1] == 0 && px[2] == 0 {
@@ -53,7 +53,7 @@ fn load_texture(file: &str) -> Option<Tex> {
 
 fn load() -> Vec<Def> {
     let mut defs = Vec::new();
-    let Some(data) = crate::rt::read_file(&crate::rt::game_path("Sprites/cursor.spr")) else {
+    let Some(data) = crate::files::open("Sprites/cursor.spr") else {
         crate::log!("cursor: Sprites/cursor.spr not found");
         return defs;
     };

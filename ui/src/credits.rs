@@ -51,7 +51,7 @@ pub fn active() -> bool {
 /// `Credits.txt` as pages. A page with no words is dropped.
 fn read_pages() -> Vec<Page> {
     let mut out = Vec::new();
-    let Some(data) = crate::rt::read_file(&crate::rt::game_path("Credits.txt")) else {
+    let Some(data) = crate::files::open("Credits.txt") else {
         crate::log!("credits: Credits.txt not found");
         return out;
     };
@@ -95,7 +95,7 @@ fn logos() -> Option<Tex> {
     let s = st();
     if s.logos.is_none() {
         let t = (|| {
-            let data = crate::rt::read_file(&crate::rt::game_path("Textures\\RGB\\logos.tga"))?;
+            let data = crate::files::open("textures\\logos.tga")?;
             let mut img = a2fmt::tga::decode(&data).ok()?;
             for px in img.pixels.chunks_exact_mut(4) {
                 let m = px[0].max(px[1]).max(px[2]);

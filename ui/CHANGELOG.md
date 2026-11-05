@@ -4,6 +4,13 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 2.3.0 — 2026-11-05
+
+### Changed
+- The game files the UI reads (textures, `Credits.txt`, `Sprites/cursor.spr`, the loading screen's `bzn`, objectives, sky faces and SOD, the menu plates) go through one `a2fmt::vfs` file system (`ui/src/files.rs`): `textures\` mounted from `Textures\RGB` (`LAYOUT`, held to `games/armada2.toml` `[files]`), the game folder behind it. The same files are read as before.
+
+Installed, not yet seen in game.
+
 ## 2.2.5 — 2026-11-04
 
 ### Changed
