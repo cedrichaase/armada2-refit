@@ -67,6 +67,7 @@ pub fn shell_hover(like: Option<usize>) {
     let own = like.filter(|&b| b != 0 && unsafe { rd::<u32>(b + field::PANELS_SB_HAS_SOUND) } != 0);
     match own {
         Some(b) => play_as(b + field::PANELS_SB_HOVER_SOUND, 0),
+        // lint-allow(content): the default SetButtonMode itself plays, the engine's, not a set's.
         None => play_as(c"cornron.wav".as_ptr() as usize, 0),
     }
 }
@@ -75,6 +76,7 @@ pub fn shell_hover(like: Option<usize>) {
 /// a control of ours that has no stock button to click.
 pub fn shell_click() {
     if functions_stock() {
+        // lint-allow(content): the click SetButtonMode itself plays, the engine's, not a set's.
         play_as(c"cornrclk.wav".as_ptr() as usize, 0);
     }
 }

@@ -283,6 +283,7 @@ impl Planets {
     fn tex_mean(name: &str) -> Option<[f32; 3]> {
         let mut p = rt::game_path("Textures\\RGB\\");
         p.push_str(name);
+        // lint-allow(content): the engine's texture files are TGA; the name comes from the planet.
         p.push_str(".tga");
         let img = a2fmt::tga::decode(&rt::read_file(&p)?).ok()?;
         let (mut s, mut n) = ([0f64; 3], 0f64);

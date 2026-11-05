@@ -4,6 +4,17 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 1.1.0 — 2026-11-05
+
+### Added
+- Content sets are data (AR-6, root 15.8.0): `render3d/content/sets/<set>/<module>.ini`, one ini table per module (`effects`, `hulls`, `ordnance`, `overlays`, `particles`, `sky`, `specials`, `world`), built into the core with every recipe of `render3d/content/` (`core/build.rs`, `r3d_core::content`) and parsed by each `content.rs` at first use (`a2ini::Table`). A set is a folder: a new one needs no code; a set with no table for a module is its empty table (`NONE`). The stock set reproduces the old constants exactly (`hosttest/src/sets.rs`).
+- effects' table names the Evolver's cocoon SOD (`CocoonSod`, was a literal in `chunks.rs`) and `[Shields] RayFactions=`'s default (`RayFactions = Klingon`, was in `shields.rs`); hulls' names the `[Hulls]` key prefix of the bump-mapped hulls' profile (`BumpProfile = Borg`: the `Borg*` keys as before; with no prefix those hulls take the hull profile).
+
+### Changed
+- `lint-layers.sh` rule 4 (content names outside `content.rs`) is strict and in CI with rules 1-3; an engine format literal stays with `// lint-allow(content): <reason>` (four, in overlays, sky and world).
+
+Installed, not yet seen in game.
+
 ## 1.0.5 — 2026-11-04
 
 ### Changed

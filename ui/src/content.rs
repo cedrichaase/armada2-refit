@@ -1,19 +1,29 @@
-//! The UI's built-in tables of game content (README.md, "Content"): the names of the
-//! game's races, resources and campaigns the screens and panels show or match, one set
-//! per content profile (`profiles/*/content.toml`). Data only. `get()` is the set this
-//! build reads; a build with no set gets `NONE`: no races, no resources and no
-//! campaigns, so the screens that need them stand down to the engine's own.
+//! The UI's built-in tables of game content (README.md, "Content sets"): the names of
+//! the game's races, resources, campaigns and files the screens and panels show or
+//! match, parsed at first use from the set's `ui.ini` (`ui/content/sets/<set>/`, built
+//! in by `build.rs`; the set is the one `profiles/<build>/content.toml` gives the UI).
+//! Data only. `get()` is the set this build reads; a build with no set, or a set with
+//! no `ui.ini`, gets `NONE`: no races, no resources, no campaigns and no files, so the
+//! screens that need them stand down to the engine's own.
+use a2ini::table::{find, floats, split_list, Table};
+use alloc::boxed::Box;
+use alloc::ffi::CString;
+use alloc::vec::Vec;
 use core::ffi::CStr;
 
-/// A race's names, in `widgets::theme::Race::ALL`'s order.
+/// A race's names (`[Race.*]`, in the set's order: `widgets::theme::Race`).
+#[derive(Debug, PartialEq)]
 pub struct RaceNames {
     /// As shown (`Species 8472`).
     pub name: &'static str,
+    /// The theme's look for it (`widgets::theme::Form::from_id`: `lcars`, `cube`, ...).
+    pub theme: &'static str,
     /// As `[UI] Theme=` or the game spells it (lower case): the first is the full name.
     pub aliases: &'static [&'static str],
 }
 
 /// A campaign card of the single player screen, in the card order.
+#[derive(Debug, PartialEq)]
 pub struct Campaign {
     /// The card's name, when the stock labels do not give one.
     pub name: &'static str,
@@ -22,10 +32,28 @@ pub struct Campaign {
     pub key: &'static str,
     /// The view of render3d's map behind the card.
     pub scene: &'static CStr,
-    /// The emblem: a race icon's cell in `allrace` (84 px cells of 256), or None.
+    /// The emblem: a race icon's cell in `Files::race_icons` (84 px cells of 256), or None.
     pub emblem: Option<(u32, u32)>,
+    /// The prefix of the campaign's map names (lower case), for the loading screen.
+    pub map: &'static str,
+    /// The loading screen's line for its maps, and whether the mission's number follows.
+    pub kicker: &'static str,
+    pub numbered: bool,
 }
 
+/// The game's files the UI reads, under the game directory ("" for none).
+#[derive(Debug, PartialEq)]
+pub struct Files {
+    /// The race icons of the campaign cards.
+    pub race_icons: &'static str,
+    /// The credits' text and logos.
+    pub credits: &'static str,
+    pub credits_logos: &'static str,
+    /// The cursor sprites.
+    pub cursor_sprites: &'static str,
+}
+
+#[derive(Debug, PartialEq)]
 pub struct Content {
     pub races: &'static [RaceNames],
     /// `eResource`, as `g_eResourceToString` names them.
@@ -36,46 +64,85 @@ pub struct Content {
     /// The view behind the main menu, and the single player screen's first.
     pub main_scene: Option<&'static CStr>,
     pub first_campaign_scene: Option<&'static CStr>,
+    pub files: Files,
+    /// The widget gallery's sample lists (`gallery.rs`).
+    pub gallery_ships: &'static [&'static str],
+    pub gallery_factions: &'static [&'static str],
 }
-
-pub static STOCK: Content = Content {
-    races: &[
-        RaceNames { name: "Federation", aliases: &["federation", "fed"] },
-        RaceNames { name: "Klingon", aliases: &["klingon", "kli", "kling"] },
-        RaceNames { name: "Romulan", aliases: &["romulan", "rom"] },
-        RaceNames { name: "Cardassian", aliases: &["cardassian", "card", "car"] },
-        RaceNames { name: "Borg", aliases: &["borg", "bor"] },
-        RaceNames { name: "Species 8472", aliases: &["species8472", "species 8472", "8472", "species"] },
-    ],
-    resources: &["Crew", "Officers", "Dilithium", "Latinum", "Metal", "Biomatter"],
-    campaigns: &[
-        Campaign { name: "Tutorials", key: "tutorial", scene: c"tutorials", emblem: None },
-        Campaign { name: "Federation Campaign", key: "federation", scene: c"federation", emblem: Some((0, 0)) },
-        Campaign { name: "Klingon Campaign", key: "klingon", scene: c"klingon", emblem: Some((84, 0)) },
-        Campaign { name: "Borg Campaign", key: "borg", scene: c"borg", emblem: Some((84, 84)) },
-    ],
-    tour: &[c"main", c"federation", c"klingon", c"tutorials", c"borg"],
-    main_scene: Some(c"main"),
-    first_campaign_scene: Some(c"federation"),
-};
 
 /// A build with no content set for the UI.
-pub static NONE: Content =
-    Content { races: &[], resources: &[], campaigns: &[], tour: &[], main_scene: None, first_campaign_scene: None };
+pub static NONE: Content = Content {
+    races: &[],
+    resources: &[],
+    campaigns: &[],
+    tour: &[],
+    main_scene: None,
+    first_campaign_scene: None,
+    files: Files { race_icons: "", credits: "", credits_logos: "", cursor_sprites: "" },
+    gallery_ships: &[],
+    gallery_factions: &[],
+};
 
-/// The set this build reads.
-pub fn get() -> &'static Content {
-    match crate::syms_core::TABLE.engine().content() {
-        Some(id) => by_set(id),
-        None => &NONE,
+/// A name as the engine's C string, made once and kept for the plugin's life.
+fn cstr(s: &str) -> &'static CStr {
+    let c = CString::new(s).unwrap_or_default();
+    Box::leak(c.into_boxed_c_str())
+}
+
+fn scene(s: &str) -> Option<&'static CStr> {
+    (!s.is_empty()).then(|| cstr(s))
+}
+
+/// A set's `ui.ini`.
+pub fn parse(text: &'static str) -> Content {
+    let t = Table::parse(text);
+    let races = t
+        .sections_under("Race.")
+        .map(|(_, es)| RaceNames {
+            name: find(es, "Name").unwrap_or(""),
+            theme: find(es, "Theme").unwrap_or(""),
+            aliases: split_list(find(es, "Aliases").unwrap_or("")).leak(),
+        })
+        .collect::<Vec<_>>();
+    let campaigns = t
+        .sections_under("Campaign.")
+        .map(|(_, es)| {
+            let e = floats(find(es, "Emblem").unwrap_or(""));
+            Campaign {
+                name: find(es, "Name").unwrap_or(""),
+                key: find(es, "Key").unwrap_or(""),
+                scene: cstr(find(es, "Scene").unwrap_or("")),
+                emblem: (e.len() >= 2).then(|| (e[0] as u32, e[1] as u32)),
+                map: find(es, "Map").unwrap_or(""),
+                kicker: find(es, "Kicker").unwrap_or(""),
+                numbered: find(es, "Numbered").is_some_and(|v| v.trim() == "1"),
+            }
+        })
+        .collect::<Vec<_>>();
+    Content {
+        races: races.leak(),
+        resources: t.list("Resources", "Names").leak(),
+        campaigns: campaigns.leak(),
+        tour: t.list("Scenes", "Tour").iter().map(|s| cstr(s)).collect::<Vec<_>>().leak(),
+        main_scene: scene(t.str("Scenes", "Main")),
+        first_campaign_scene: scene(t.str("Scenes", "FirstCampaign")),
+        files: Files {
+            race_icons: t.str("Files", "RaceIcons"),
+            credits: t.str("Files", "Credits"),
+            credits_logos: t.str("Files", "CreditsLogos"),
+            cursor_sprites: t.str("Files", "CursorSprites"),
+        },
+        gallery_ships: t.list("Gallery", "Ships").leak(),
+        gallery_factions: t.list("Gallery", "Factions").leak(),
     }
 }
 
-fn by_set(id: &str) -> &'static Content {
-    match id {
-        "stock" => &STOCK,
-        _ => &NONE,
-    }
+static CACHE: crate::content_sets::Cache<Content> = crate::content_sets::Cache::new();
+
+/// The set this build reads: its table parsed at first use; `NONE` while the build has
+/// no set for the UI.
+pub fn get() -> &'static Content {
+    CACHE.get(&crate::syms_core::TABLE, parse, &NONE)
 }
 
 impl Content {

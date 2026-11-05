@@ -5,6 +5,20 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.8.0 — 2026-11-05
+
+Layers: render3d 1.1.0, ui 2.3.0 (others as in 15.7.0).
+
+### Added
+- Content sets as data (AR-6, `PLAN-ARCHITECTURE.md` F6): a set is a folder, `render3d/content/sets/<set>/` and `ui/content/sets/<set>/`, of ini tables the plugins build in and parse; `by_set` is a folder lookup and adding a set needs no code (`MODDING.md`, "Content sets"). `a2ini::Table` reads a table borrowing from its text.
+- The game's names left in code (the cocoon SOD, the shields' default ray faction, the Borg key prefix, the UI's race, campaign and gallery lists and its game file names) moved into the sets; the UI's race colours stay in the theme, keyed by a look the set maps each race to.
+- `ui/lint-content.sh`, and render3d's rule 4 strict, in CI.
+
+### Changed
+- `tools/engine/lint.py`: a set named for a plugin with a `content.rs` must be a folder of its `content/sets/` (was: a `"<set>" =>` arm in the code); the fixture `29-content-set-not-chosen` is `29-content-set-no-folder`.
+
+Installed, not yet seen in game.
+
 ## 15.7.0 — 2026-11-04
 
 Layers: display 1.0.6, ui 2.2.5, render3d 1.0.5, qol 2.2.3, rules 1.0.3, online 0.11.2, cutscenes 3.0.2, testbench 4.2.0.

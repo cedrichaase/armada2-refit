@@ -51,8 +51,9 @@ pub fn active() -> bool {
 /// `Credits.txt` as pages. A page with no words is dropped.
 fn read_pages() -> Vec<Page> {
     let mut out = Vec::new();
-    let Some(data) = crate::rt::read_file(&crate::rt::game_path("Credits.txt")) else {
-        crate::log!("credits: Credits.txt not found");
+    let file = crate::content::get().files.credits;
+    let Some(data) = (!file.is_empty()).then(|| crate::rt::read_file(&crate::rt::game_path(file))).flatten() else {
+        crate::log!("credits: {} not found", file);
         return out;
     };
     let text = String::from_utf8_lossy(&data).into_owned();
@@ -85,7 +86,7 @@ fn read_pages() -> Vec<Page> {
         lines.push(String::from(l));
     }
     flush(&mut lines, hold, big, &mut out);
-    crate::log!("credits: {} pages from Credits.txt", out.len());
+    crate::log!("credits: {} pages from {}", out.len(), crate::content::get().files.credits.rsplit(['/', '\\']).next().unwrap_or(""));
     out
 }
 
@@ -95,7 +96,8 @@ fn logos() -> Option<Tex> {
     let s = st();
     if s.logos.is_none() {
         let t = (|| {
-            let data = crate::rt::read_file(&crate::rt::game_path("Textures\\RGB\\logos.tga"))?;
+            let file = crate::content::get().files.credits_logos;
+            let data = crate::rt::read_file(&crate::rt::game_path((!file.is_empty()).then_some(file)?))?;
             let mut img = a2fmt::tga::decode(&data).ok()?;
             for px in img.pixels.chunks_exact_mut(4) {
                 let m = px[0].max(px[1]).max(px[2]);
@@ -110,7 +112,11 @@ fn logos() -> Option<Tex> {
             }
             Some(crate::gfx::texture_bgra(img.width, img.height, img.pixels))
         })();
-        crate::log!("credits: logos {}", if t.is_some() { "from logos.tga" } else { "not found" });
+        if t.is_some() {
+            crate::log!("credits: logos from {}", crate::content::get().files.credits_logos.rsplit(['/', '\\']).next().unwrap_or(""));
+        } else {
+            crate::log!("credits: logos not found");
+        }
         s.logos = Some(t);
     }
     s.logos.flatten()

@@ -16,6 +16,7 @@ pub mod clipboard;
 pub mod clock;
 pub mod config;
 pub mod content;
+pub mod content_sets;
 pub mod credits;
 pub mod cursor;
 pub mod engine;

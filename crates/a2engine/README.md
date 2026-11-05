@@ -149,12 +149,15 @@ The nearest build's entry for the file, then for the plugin, wins; a build that 
 neither takes the nearest `content` of a `build.toml` up its `inherits` chain; the set
 `none` is no set. gen.py writes the resolved id into each table's `Build` (`content`),
 and `Engine::content()` returns it: `None` on an unknown build, before `init`, and for
-`none`. A plugin picks its tables by that id in its `content.rs` (`by_set`), and keeps
-an empty `NONE` for every other case: with no set it has no built-in names or recipes
-and the engine's own look shows through, as for a missing recipe. lint.py checks the
-file (`schema`, `[set]`, keys that are plugins or plugin files of the game) and that a
-Rust plugin with a `content.rs` beside its generated file chooses every set named for
-it (`"<set>" =>`). The game directory's files (`Sky\`, `Surfaces\`, `Nebulae\`) still
+`none`. A set is a folder of the plugin's data, not code: `render3d/content/sets/<set>/`
+(one ini table per module) and `ui/content/sets/<set>/` (`ui.ini`), built in at build
+time; a plugin's `content.rs` looks up the folder of that id (`by_set` is that lookup) and
+parses its table, and keeps an empty `NONE` for every other case: with no set, or a set
+with no table for it, it has no built-in names or recipes and the engine's own look shows
+through, as for a missing recipe (MODDING.md, "Content sets"). lint.py checks the file
+(`schema`, `[set]`, keys that are plugins or plugin files of the game) and that every
+set named for a Rust plugin with a `content.rs` beside its generated file is a folder of
+the nearest `content/sets/` above that `content.rs`. The game directory's files (`Sky\`, `Surfaces\`, `Nebulae\`) still
 win over any set. `Engine::resolved(sym)` is the quiet twin of `addr` (no warning when no hook is ready), for a read that may come before its hook (a settings load); a module's `content::get()` starts its own table at first use, since a recipe is read before any hook. C plugins carry no content (`csdk/a2engine.h` is unchanged).
 
 ## The generated code

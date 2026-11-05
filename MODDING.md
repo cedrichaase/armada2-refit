@@ -193,10 +193,44 @@ a C header. The format, the resolver and the lints are described in
 nodes, factions, recipes) are not addresses and are not tied to the executable. A
 build's `content` names the set its plugins read (`stock` for `gog-1.1`), a
 `content.toml` may map a plugin to another, and the generator hands the plugin its
-resolved set id. A Rust plugin picks its tables by that id (`by_set`) and keeps an empty
-one for every other case: a plugin with no content set has no built-in names or
-recipes and the engine's own look shows through. A file in the game folder still wins
+resolved set id. A set is a folder of data, not code ("Content sets" below): a plugin
+looks up the set's folder by that id and has no built-in names or recipes when there is
+none, and the engine's own look shows through. A file in the game folder still wins
 over any set.
+
+### Content sets
+
+A content set is a folder of small ini tables, one per plugin part:
+
+| Folder | Tables |
+|---|---|
+| `render3d/content/sets/<set>/` | `effects.ini`, `hulls.ini`, `ordnance.ini`, `overlays.ini`, `particles.ini`, `sky.ini`, `specials.ini`, `world.ini`: each module's names (nodes, sprites, SODs, faction keys and colours, the special effects' kinds) and the recipes it builds in, named by their file under `render3d/content/` |
+| `ui/content/sets/<set>/` | `ui.ini`: the races (with the theme's look for each), resources, campaign cards, the credits' and menus' views, the game files the UI reads and the widget gallery's lists |
+
+Every `.ini` under `render3d/content/` and `ui/content/` is built into the plugin
+(`render3d/core/build.rs`, `ui/build.rs`), so a set needs nothing installed; the modules
+parse their table once, at first use. A set with no table for a part is the empty table
+for it: that part has no names and draws the engine's own. `stock` is the set of
+`gog-1.1`; `games/fo-roots.toml` names no set yet, so Fleet Operations: Roots has none.
+
+To add a set:
+
+1. Copy the stock folders: `render3d/content/sets/stock/` to
+   `render3d/content/sets/<set>/` and `ui/content/sets/stock/` to `ui/content/sets/<set>/`.
+2. Edit the copies to the game's names. A recipe of the set's own goes in its folder
+   (`render3d/content/sets/<set>/sky/<name>.ini`) and its table names it by that path;
+   leave out a table, or a line, the game has no use for.
+3. Name the set in the build's profile: `content = "<set>"` in
+   `profiles/<build>/build.toml`, or per plugin or part in
+   `profiles/<build>/content.toml` (`[set] render3d = "<set>"`, `"render3d.hulls" = "<set>"`,
+   `ui = "<set>"`).
+4. `tools/engine/selftest.sh` (`lint.py` checks that every set a build names has its
+   folder), then build the plugins.
+
+No set is chosen in code: there is no `match` to extend. `render3d/lint-layers.sh` (rule 4)
+and `ui/lint-content.sh` keep the names out of the sources: a game file's or race's name
+as a literal outside a `content.rs` fails CI, unless it is the engine's own format or
+default, marked `// lint-allow(content): <reason>`.
 
 ## render3d
 
@@ -227,7 +261,8 @@ content and settings are.
 
 Skies, planet and moon surfaces, nebulae, ordnance and the menu scene are **recipes**:
 text in `render3d/content/<kind>/` (`sky/`, `surfaces/`, `nebulae/`, `ordnance/`,
-`menu/`), built into the module that reads them. A recipe in the game folder wins over
+`menu/`), built into the plugin; a content set's table names the ones its modules take
+("Content sets"). A recipe in the game folder wins over
 the built-in one of the same name:
 
 | Folder in the game directory | Replaces |

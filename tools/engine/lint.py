@@ -474,9 +474,12 @@ def rule2(games, R, rows_base, skip_fixtures):
 # ---- rule 5: inheritance and marks ---------------------------------------------------
 
 def rule6(games, R, src_root):
-    """Content sets (phase 8f): a build's `content.toml` is `schema = 1` and a `[set]`
-    table keyed by a plugin or a plugin file of its game; a set named for a plugin file
-    that has a `content.rs` beside its generated file must be chosen there (`"<set>" =>`)."""
+    """Content sets (phase 8f, AR-6): a build's `content.toml` is `schema = 1` and a
+    `[set]` table keyed by a plugin or a plugin file of its game; a set named for a
+    plugin file that has a `content.rs` beside its generated file must be a folder of
+    the plugin's `content/sets/` (the nearest one up from that `content.rs`:
+    `render3d/content/sets/<set>/`, `ui/content/sets/<set>/`), which is where its
+    `content.rs` reads its tables from."""
     for gs in games.values():
         stems = {n[:-5] for n in gs.files} | {f.plugin for f in gs.files.values()}
         for b in gs.builds:
@@ -506,10 +509,24 @@ def rule6(games, R, src_root):
                 cr = os.path.join(src_root, os.path.dirname(rf.out), 'content.rs')
                 if not os.path.exists(cr):
                     continue
-                with open(cr, encoding='utf-8', errors='replace') as fh:
-                    text = fh.read()
-                if f'"{sset}" =>' not in text:
-                    R.add(relp(b.path), f'{n}: content set {sset!r} is not chosen in {os.path.relpath(cr, src_root)}')
+                sets = sets_dir(os.path.dirname(cr), src_root)
+                if sets is None:
+                    R.add(relp(b.path), f'{n}: {os.path.relpath(cr, src_root)} has no content/sets folder above it')
+                elif not os.path.isdir(os.path.join(sets, sset)):
+                    R.add(relp(b.path), f'{n}: content set {sset!r} has no folder {os.path.relpath(os.path.join(sets, sset), src_root)}/')
+
+
+def sets_dir(d, src_root):
+    """The nearest `content/sets` folder at or above `d`, up to `src_root`, or None."""
+    top = os.path.abspath(src_root)
+    d = os.path.abspath(d)
+    while True:
+        c = os.path.join(d, 'content', 'sets')
+        if os.path.isdir(c):
+            return c
+        if d == top or os.path.dirname(d) == d:
+            return None
+        d = os.path.dirname(d)
 
 
 def rule5(games, R):

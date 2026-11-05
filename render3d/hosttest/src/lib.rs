@@ -6,8 +6,19 @@
 //! for the shaders is the one the old `Gas` enum and day-side flag gave, for every old
 //! kind with and without the day side, and the gas's march still reads the slots the
 //! table names.
+//!
+//! The content sets (`sets.rs`): each module's stock table, parsed from
+//! `render3d/content/sets/stock/`, and the UI's, from `ui/content/sets/stock/`, is the
+//! table it held as constants before.
 #[path = "../../core/src/scene/media.rs"]
 pub mod media;
+
+// The modules' `content.rs` (sets.rs) name the core as `r3d_core`: this crate
+// stands in for it.
+extern crate self as r3d_core;
+extern crate alloc;
+pub mod sets;
+pub use sets::{content, content_sets, syms, syms_core};
 
 #[cfg(test)]
 mod tests {

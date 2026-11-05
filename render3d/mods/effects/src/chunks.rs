@@ -97,16 +97,18 @@ pub fn note_craft(inst: usize, faces: i32, team: V3) -> bool {
 }
 
 /// The Evolver's cocoon breaking up (faces -1, the whole of it): the cocoon
-/// (`CocoonInstance`, of `8472_cocoon.sod`) at its instance's transform and scale.
+/// (`CocoonInstance`, of the set's cocoon SOD, `8472_cocoon` in stock) at its instance's
+/// transform and scale.
 pub fn note_cocoon(inst: usize, faces: i32, team: V3) -> bool {
     unsafe {
-        if ACTIVE && faces < 0 && pending().len() < 64 && hk::is_cocoon(inst) && r3d_core::assets::sod("8472_cocoon").is_some() {
+        let cocoon = super::content::get().cocoon_sod;
+        if ACTIVE && faces < 0 && pending().len() < 64 && !cocoon.is_empty() && hk::is_cocoon(inst) && r3d_core::assets::sod(cocoon).is_some() {
             let s = r3d_core::scene::instance::instance_scale(inst);
             let mut world = super::hooks::instance_world(inst);
             world.r[0] = world.r[0] * s.x;
             world.r[1] = world.r[1] * s.y;
             world.r[2] = world.r[2] * s.z;
-            pending().push(Pending { sod: String::from("8472_cocoon"), world, clock: pose::Clock::of_instance(inst, engine::sim_time()), team, faces: None });
+            pending().push(Pending { sod: String::from(cocoon), world, clock: pose::Clock::of_instance(inst, engine::sim_time()), team, faces: None });
             return true;
         }
         false

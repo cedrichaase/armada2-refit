@@ -4,6 +4,17 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 2.3.0 — 2026-11-05
+
+### Added
+- The UI's content set is data (AR-6, root 15.8.0): `ui/content/sets/<set>/ui.ini`, built in (`build.rs`, `src/content_sets.rs`) and parsed by `content.rs` at first use. Besides the races, resources, campaigns and views it held, it names the loading screen's campaign map prefixes and lines (were in `loading.rs`), the race icons (`allrace.tga`), `Credits.txt` and the logos, the cursor sprites (`cursor.spr`) and the widget gallery's lists. The stock set reproduces the old values exactly (`render3d/hosttest`); the log lines are as before.
+- `ui/lint-content.sh` (CI): no game file's or stock race's name as a literal in `src/` outside `content.rs`, but for marked engine defaults (`// lint-allow(content):`, the shell's button sounds).
+
+### Changed
+- `widgets/theme.rs` keys the six race palettes by a look (`Form`: `lcars`, `blade`, `wing`, `arch`, `cube`, `organic`); the set gives each race its look (`Theme =`), and `Race` is a race's place in the set's list. `Theme::all()` is the shell and each race of the set.
+
+Installed, not yet seen in game.
+
 ## 2.2.5 — 2026-11-04
 
 ### Changed

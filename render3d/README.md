@@ -845,11 +845,13 @@ The sky's recipes, the menu's `map.ini` and the built-in `ordnance.ini` (whose s
 
 **Layers.** The engine's addresses, call sites, vtable slots and field reads belong in
 `core/src/engine/` (the core's glue) or a module's own `mods/<m>/src/hooks.rs`; a module's
-built-in tables of game data names in its `content.rs`; its recipe files under
-`render3d/content/`. `render3d/lint-layers.sh` counts what is still elsewhere (report
-mode; `--strict DIR...` fails on any hit under those directories, as the modules are
-moved over; `--rules cross,byname` limits it to the two rules every module already
-keeps).
+game data names in its content set's table (`render3d/content/sets/<set>/<m>.ini`, read
+by its `content.rs`: "Content sets"); its recipe files under `render3d/content/`.
+`render3d/lint-layers.sh` counts what is elsewhere (report mode; `--strict DIR...` fails
+on any hit under those directories, rules 1-4: CI holds `core` and `mods` to it; `--rules
+cross,byname` limits it to those rules). A name rule 4 finds that is the engine's file
+format rather than a set's (`".odf"`, `".tga"` beside a name) stays with
+`// lint-allow(content): <reason>` on its line or the line above.
 
 ### Modules and settings
 
@@ -2672,12 +2674,22 @@ lets go of the GPU objects.
 
 #### Content sets
 
-Every module keeps its built-in tables of the game's names in its `content.rs`, one `Content`
-value per set (`STOCK`, and an empty `NONE`), and `content::get()` picks the one
-`profiles/<build>/content.toml` gives this build (`Engine::content()`,
-`crates/a2engine/README.md`, "Content"). A Fleet Ops build adds a set with its own names
-(`by_set`) and names it in its `content.toml`, without a code change elsewhere; a build with
-no set gets `NONE`: no faction keys (shields colour by stock's level), no node or sprite
+A content set is a folder, `render3d/content/sets/<set>/`, with one small ini table per
+module (`effects.ini`, `hulls.ini`, `ordnance.ini`, `overlays.ini`, `particles.ini`,
+`sky.ini`, `specials.ini`, `world.ini`): the game's names each module matches or draws
+(nodes, sprites, SODs, faction keys and colours, the kinds of special effects) and the
+recipes it builds in, named by their file under `render3d/content/` (`mbg02 =
+sky/mbg02.ini`; a set's own recipes can sit in its folder). `core/build.rs` builds every
+`.ini` under `render3d/content/` into the core (`include_str!`, `r3d_core::content::file`);
+a module's `content.rs` holds only the `Content` type, its `parse` (through
+`a2ini::Table`, which borrows from the built-in text) and an empty `NONE`, and
+`content::get()` parses, once, the table of the set `profiles/<build>/content.toml` gives
+this build (`Engine::content()`, `crates/a2engine/README.md`, "Content";
+`r3d_core::content::Cache`). So `by_set` is a folder lookup: a set with no table for a
+module is the empty table, and a new set (Fleet Ops) is a copy of `sets/stock/` named in
+its `content.toml`, with no code change (MODDING.md, "Content sets").
+`hosttest/src/sets.rs` holds the stock tables to what the modules held as constants
+before (render3d 1.1.0). A build with no set gets `NONE`: no faction keys (shields colour by stock's level), no node or sprite
 names (a clean model shows everything; no vent or pulsar emitter), no recipes (no special
 weapon is told; skies, surfaces and nebulae are the engine's own), no selection model. The
 modules register their set's recipes with `r3d_core::recipes::builtin`, and the game
@@ -2685,7 +2697,7 @@ directory's files still win. Each name is tied to its user in the module's secti
 
 #### world: Content
 
-`content.rs` holds the built-in recipes (`include_str!` of `render3d/content/surfaces/` and
+`world.ini` names the built-in recipes (files of `render3d/content/surfaces/` and
 `render3d/content/nebulae/`, by lower-cased name) and the moons' glow material. A recipe is
 read through `r3d_core::recipes`: the game directory's `Surfaces\<texture>.ini` or
 `Nebulae\<odf>.ini` first (`install.sh` copies the same files there, where an edited copy
