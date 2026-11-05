@@ -13,7 +13,7 @@ datagram in twenty on each side as well, so the transport's retransmission runs 
 the relay too.
 
 1. Include "_online-setup".
-2. Host: Wait up to 20 seconds for "Join code".
+2. Host: Wait up to 20 seconds for "Join".
 3. Joiner: Type what follows "join code" in "Online.log" of host.
 4. Include "_online-play".
 5. Joiner: Expect "Online.log" contains "through the relay".
