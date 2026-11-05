@@ -52,11 +52,11 @@ screen"); Esc closes only the Refit screen and Return to Game goes back to the m
 29. Joiner: Click "host's Game".
 30. Joiner: Click "Join Game".
 31. Joiner: Wait up to 30 seconds for "GAME SETUP".
-32. Joiner: Click at design 155,547.
+32. Joiner: Click at design 155,534.
 33. Joiner: Type "hello from joiner".
 34. Joiner: Press Return.
 35. Host: Wait up to 20 seconds for "hello from joiner".
-36. Host: Click at design 155,547.
+36. Host: Click at design 155,534.
 37. Host: Type "hello from host".
 38. Host: Press Return.
 39. Joiner: Wait up to 20 seconds for "hello from host".

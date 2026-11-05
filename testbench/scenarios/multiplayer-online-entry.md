@@ -49,11 +49,11 @@ the main menu or a mission's, and these are in the lobby.
 32. Joiner: Click "host's Game".
 33. Joiner: Click "Join Game".
 34. Joiner: Wait up to 30 seconds for "GAME SETUP".
-35. Joiner: Click at design 155,547.
+35. Joiner: Click at design 155,534.
 36. Joiner: Type "hello from joiner".
 37. Joiner: Press Return.
 38. Host: Wait up to 20 seconds for "hello from joiner".
-39. Host: Click at design 155,547.
+39. Host: Click at design 155,534.
 40. Host: Type "hello from host".
 41. Host: Press Return.
 42. Joiner: Wait up to 20 seconds for "hello from host".

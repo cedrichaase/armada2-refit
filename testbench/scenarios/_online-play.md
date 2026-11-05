@@ -8,11 +8,11 @@ Follows `_online-setup.md` and the joiner typing where the game is.
 4. Joiner: Click "host's Game".
 5. Joiner: Click "Join Game".
 6. Joiner: Wait up to 30 seconds for "GAME SETUP".
-7. Joiner: Click at design 155,547.
+7. Joiner: Click at design 155,534.
 8. Joiner: Type "hello from joiner".
 9. Joiner: Press Return.
 10. Host: Wait up to 20 seconds for "hello from joiner".
-11. Host: Click at design 155,547.
+11. Host: Click at design 155,534.
 12. Host: Type "hello from host".
 13. Host: Press Return.
 14. Joiner: Wait up to 20 seconds for "hello from host".

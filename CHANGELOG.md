@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.7.3 — 2026-11-05
+
+Layers: testbench 4.1.6.
+
+### Fixed
+- testbench: the online and two-player scenarios click Game Setup's chat line at design 155,534 (the UI's widescreen lobby moved it off 155,547). Installed, not yet seen in game.
+
 ## 15.7.2 — 2026-11-05
 
 Layers: display 1.0.6.
