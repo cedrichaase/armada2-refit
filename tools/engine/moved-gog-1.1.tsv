@@ -364,3 +364,11 @@ qol.toml	cce_route_objects	-32	qol/qol.c
 qol.toml	cce_route_count	-24	qol/qol.c
 qol.toml	msw_read_local	-40	qol/qol.c
 qol.toml	cgs_group	-4	qol/qol.c
+ui.hud.toml	otext_tree_left	0x0	ui/src/engine/overlay_text.rs
+ui.hud.toml	otext_tree_parent	0x4	ui/src/engine/overlay_text.rs
+ui.hud.toml	otext_tree_right	0x8	ui/src/engine/overlay_text.rs
+display.toml	dev_modes	0x14	display/src/stub/modes.rs
+display.toml	mode_node_value	0x8	display/src/stub/modes.rs
+display.toml	mode_width	0x0	display/src/stub/modes.rs
+display.toml	mode_height	0x4	display/src/stub/modes.rs
+display.toml	mode_bpp	0x8	display/src/stub/modes.rs

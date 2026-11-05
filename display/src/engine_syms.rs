@@ -33,6 +33,11 @@ pub mod field {
     #[inline(always)] pub fn PROFILE_MODE_W() -> usize { super::TABLE.engine().field(a2engine::Sym(15)) }
     #[inline(always)] pub fn PROFILE_MODE_H() -> usize { super::TABLE.engine().field(a2engine::Sym(16)) }
     #[inline(always)] pub fn PROFILE_MODE_BPP() -> usize { super::TABLE.engine().field(a2engine::Sym(17)) }
+    #[inline(always)] pub fn DEV_MODES() -> usize { super::TABLE.engine().field(a2engine::Sym(29)) }
+    #[inline(always)] pub fn MODE_NODE_VALUE() -> usize { super::TABLE.engine().field(a2engine::Sym(30)) }
+    #[inline(always)] pub fn MODE_WIDTH() -> usize { super::TABLE.engine().field(a2engine::Sym(31)) }
+    #[inline(always)] pub fn MODE_HEIGHT() -> usize { super::TABLE.engine().field(a2engine::Sym(32)) }
+    #[inline(always)] pub fn MODE_BPP() -> usize { super::TABLE.engine().field(a2engine::Sym(33)) }
 }
 
 pub mod value {
@@ -78,10 +83,15 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "refresh_display", symbol: "ST3D_DeviceDirectX8::RefreshDisplay", kind: a2engine::Kind::Fn },
     a2engine::SymDef { id: "submit_vb", symbol: "ST3D_WorkspaceDirectX8::Submit", kind: a2engine::Kind::Fn },
     a2engine::SymDef { id: "submit_non_vb", symbol: "ST3D_WorkspaceDirectX8NonVB::Submit", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "dev_modes", symbol: "ST3D_DisplayDevice::mode list", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "mode_node_value", symbol: "mode list node mode", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "mode_width", symbol: "ST3D_DisplayMode::width", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "mode_height", symbol: "ST3D_DisplayMode::height", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "mode_bpp", symbol: "ST3D_DisplayMode::bits per pixel", kind: a2engine::Kind::Field },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
-    a2engine::HookDef { id: "display.modes", run_unknown: false, rows: &[], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] },
+    a2engine::HookDef { id: "display.modes", run_unknown: false, rows: &[], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 29, 30, 31, 32, 33] },
     a2engine::HookDef { id: "display.drop", run_unknown: false, rows: &[], syms: &[24, 25, 26, 27, 28] },
     a2engine::HookDef { id: "display.native", run_unknown: false, rows: &[], syms: &[12, 13, 14, 15, 16, 17, 18, 19, 20, 21] },
     a2engine::HookDef { id: "display.keepclip", run_unknown: false, rows: &[], syms: &[22, 23] },
@@ -95,7 +105,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 29,
+        n_resolved: 34,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x626bf0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x51, 0x14, 0x53, 0x56, 0x57, 0x8b, 0x0a, 0x3b, 0xca], mask: &[], section: "", count: 0, value: 0 }, // find_display_mode
@@ -127,6 +137,11 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x624630, end: 0x624750, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // refresh_display
             a2engine::Entry { present: true, addr: 0x648af0, end: 0x648c30, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // submit_vb
             a2engine::Entry { present: true, addr: 0x648520, end: 0x6485d0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // submit_non_vb
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 20 }, // dev_modes
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // mode_node_value
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // mode_width
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // mode_height
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // mode_bpp
         ],
         blocked: &[
         ],
@@ -134,8 +149,8 @@ pub const BUILDS: &[a2engine::Build] = &[
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 4] = [const { core::sync::atomic::AtomicU64::new(0) }; 4];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 29] = [const { core::sync::atomic::AtomicU8::new(0) }; 29];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 29] = [const { core::sync::atomic::AtomicUsize::new(0) }; 29];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 34] = [const { core::sync::atomic::AtomicU8::new(0) }; 34];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 34] = [const { core::sync::atomic::AtomicUsize::new(0) }; 34];
 static NOTES: [a2engine::Note; 4] = [const { a2engine::Note::new() }; 4];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 

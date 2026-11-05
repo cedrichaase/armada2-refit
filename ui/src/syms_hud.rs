@@ -187,6 +187,9 @@ pub mod field {
     #[inline(always)] pub fn LO_S3D_DEVICE() -> usize { super::TABLE.engine().field(a2engine::Sym(166)) }
     #[inline(always)] pub fn LO_S3D_FPS() -> usize { super::TABLE.engine().field(a2engine::Sym(167)) }
     #[inline(always)] pub fn LO_S3D_TOTAL_FPS() -> usize { super::TABLE.engine().field(a2engine::Sym(168)) }
+    #[inline(always)] pub fn OTEXT_TREE_LEFT() -> usize { super::TABLE.engine().field(a2engine::Sym(169)) }
+    #[inline(always)] pub fn OTEXT_TREE_PARENT() -> usize { super::TABLE.engine().field(a2engine::Sym(170)) }
+    #[inline(always)] pub fn OTEXT_TREE_RIGHT() -> usize { super::TABLE.engine().field(a2engine::Sym(171)) }
 }
 
 pub mod value {
@@ -370,6 +373,9 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "lo_s3d_device", symbol: "ST3D_GraphicsEngine", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "lo_s3d_fps", symbol: "ST3D_GraphicsEngine", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "lo_s3d_total_fps", symbol: "ST3D_GraphicsEngine", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "otext_tree_left", symbol: "std::_Tree node left", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "otext_tree_parent", symbol: "std::_Tree node parent", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "otext_tree_right", symbol: "std::_Tree node right", kind: a2engine::Kind::Field },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
@@ -381,7 +387,7 @@ pub const HOOKS: &[a2engine::HookDef] = &[
     a2engine::HookDef { id: "ui.hud.reads_bar", run_unknown: false, rows: &["HUD.Bar", "HUD.BarLabels", "HUD.Icons"], syms: &[49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76] },
     a2engine::HookDef { id: "ui.hud.reads_overlay", run_unknown: false, rows: &["HUD.Selection", "HUD.SelectionGauges"], syms: &[7, 77, 78, 79, 80, 81, 82, 83, 84, 85, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118] },
     a2engine::HookDef { id: "ui.hud.bubbles", run_unknown: false, rows: &[], syms: &[86] },
-    a2engine::HookDef { id: "ui.hud.reads_overlay_text", run_unknown: false, rows: &[], syms: &[119, 120, 121, 122, 123, 124, 125, 126, 127, 128] },
+    a2engine::HookDef { id: "ui.hud.reads_overlay_text", run_unknown: false, rows: &[], syms: &[119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 169, 170, 171] },
     a2engine::HookDef { id: "ui.hud.drag_box", run_unknown: false, rows: &[], syms: &[129, 130, 164, 165] },
     a2engine::HookDef { id: "ui.hud.height_posts", run_unknown: false, rows: &[], syms: &[131, 132, 163, 164] },
     a2engine::HookDef { id: "ui.hud.order_ring", run_unknown: false, rows: &[], syms: &[133, 134, 135, 136, 137, 161, 163, 164, 166] },
@@ -399,7 +405,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 169,
+        n_resolved: 172,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x763c00, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_palette_ptr
@@ -571,6 +577,9 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 192 }, // lo_s3d_device
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 136 }, // lo_s3d_fps
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 128 }, // lo_s3d_total_fps
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // otext_tree_left
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // otext_tree_parent
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // otext_tree_right
         ],
         blocked: &[
         ],
@@ -578,8 +587,8 @@ pub const BUILDS: &[a2engine::Build] = &[
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 16] = [const { core::sync::atomic::AtomicU64::new(0) }; 16];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 169] = [const { core::sync::atomic::AtomicU8::new(0) }; 169];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 169] = [const { core::sync::atomic::AtomicUsize::new(0) }; 169];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 172] = [const { core::sync::atomic::AtomicU8::new(0) }; 172];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 172] = [const { core::sync::atomic::AtomicUsize::new(0) }; 172];
 static NOTES: [a2engine::Note; 16] = [const { a2engine::Note::new() }; 16];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 

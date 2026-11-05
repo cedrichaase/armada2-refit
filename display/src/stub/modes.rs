@@ -32,7 +32,7 @@
 //! used to patch the pushes before these calls instead; with Display8 the engine's
 //! pushes stay stock, and a patched push (the proxy's, without Display8's raise, or
 //! `Menus.asi`'s) simply asks for the desktop's mode itself and matches.
-use crate::engine_syms::{hook, sym, value};
+use crate::engine_syms::{field, hook, sym, value};
 use crate::log;
 use crate::rt::hook as patch;
 
@@ -123,14 +123,17 @@ unsafe extern "thiscall" fn find(dev: usize, w: i32, h: i32, bpp: i32) -> usize 
     }
     let want = super::stub().mode;
     let mut got = 0usize;
+    // The device's mode list (a `std::list`: next at `+0`, the mode at `+8`), each
+    // mode its width, height and depth.
+    let (w_at, h_at, b_at) = (field::MODE_WIDTH(), field::MODE_HEIGHT(), field::MODE_BPP());
     unsafe {
-        let head = *((dev + 0x14) as *const usize);
+        let head = *((dev + field::DEV_MODES()) as *const usize);
         if head != 0 {
             let mut node = *(head as *const usize);
             while node != head && node != 0 {
-                let mode = *((node + 8) as *const usize);
+                let mode = *((node + field::MODE_NODE_VALUE()) as *const usize);
                 if mode != 0 {
-                    let (mw, mh, mb) = (*(mode as *const i32), *((mode + 4) as *const i32), *((mode + 8) as *const i32));
+                    let (mw, mh, mb) = (*((mode + w_at) as *const i32), *((mode + h_at) as *const i32), *((mode + b_at) as *const i32));
                     if mw as u32 == want.width && mh as u32 == want.height && (got == 0 || mb == 32) {
                         got = mode;
                     }
@@ -143,7 +146,7 @@ unsafe extern "thiscall" fn find(dev: usize, w: i32, h: i32, bpp: i32) -> usize 
         if LOGGED < 16 {
             LOGGED += 1;
             if got != 0 {
-                let mb = *((got + 8) as *const i32);
+                let mb = *((got + b_at) as *const i32);
                 let whose = if front_end(w, h, bpp) { " (the front end's)" } else { "" };
                 log!("stub: the engine asks for {}x{}x{}{}, not listed: given the one mode, {}x{}x{}", w, h, bpp, whose, want.width, want.height, mb);
             } else {
