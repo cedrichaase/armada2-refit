@@ -242,6 +242,70 @@ def game_running():
     return any('armada2.exe' in cmd.lower() for _, cmd in processes())
 
 
+LAUNCH_MIN = 4.0        # s a launch shows as launching at least, so a quick start is seen
+LAUNCH_GIVE_UP = 60.0   # s to wait for the game's process before calling the launch failed
+LAUNCH_POLL = 1.5       # s between two looks at the process list
+
+
+class LaunchWatch:
+    """Where Launch game stands, for both windows: idle, launching (asked, the game's
+    process not seen yet, or seen for under LAUNCH_MIN), running (the game is up; the
+    button stays off until it exits). `begin` is the guard at the handler: it says yes
+    once, so a double click or a key repeat starts one game. `poll` looks at the process
+    list on a thread (tasklist and ps can take a while) and hands the answer to the
+    window's own thread through `post(fn, *args)`; `step` is the state machine."""
+    def __init__(self, clock=time.monotonic):
+        self.clock, self.state, self.t0, self.polling = clock, 'idle', 0.0, False
+
+    def begin(self):
+        if self.state != 'idle':
+            return False
+        self.state, self.t0 = 'launching', self.clock()
+        return True
+
+    def fail(self):
+        self.state = 'idle'
+
+    def already_running(self):
+        self.state = 'running'
+
+    def step(self, running):
+        """None, or 'running' (launch confirmed), 'timeout' (never seen), 'exited'."""
+        age = self.clock() - self.t0
+        if self.state == 'launching':
+            if running and age >= LAUNCH_MIN:
+                self.state = 'running'
+                return 'running'
+            if not running and age >= LAUNCH_GIVE_UP:
+                self.state = 'idle'
+                return 'timeout'
+        elif self.state == 'running' and not running:
+            self.state = 'idle'
+            return 'exited'
+        return None
+
+    def poll(self, post, then):
+        if self.polling or self.state == 'idle':
+            return
+        self.polling = True
+
+        def look():
+            r = game_running()
+            post(done, r)
+
+        def done(r):
+            self.polling = False
+            then(self.step(r))
+        threading.Thread(target=look, daemon=True).start()
+
+
+def launch_attempt(start):
+    """Run on a thread: 'already' if the game is up, else 'ok' or 'fail' by `start()`."""
+    if game_running():
+        return 'already'
+    return 'ok' if start() else 'fail'
+
+
 def heroic_running():
     return any(comm.lower().startswith('heroic') for comm, _ in processes())
 
@@ -2803,6 +2867,20 @@ def selftest():
         print(('ok    ' if cond else 'FAIL  ') + what)
         ok = ok and cond
 
+    now = [0.0]
+    w = LaunchWatch(lambda: now[0])
+    check(w.begin() and not w.begin(), 'launch: a second click while launching is refused')
+    check(w.step(True) is None and w.state == 'launching',
+          'launch: seen at once, it still shows as launching for the minimum')
+    now[0] = LAUNCH_MIN
+    check(w.step(True) == 'running' and not w.begin(), 'launch: running keeps the button off')
+    check(w.step(True) is None and w.step(False) == 'exited' and w.begin(),
+          'launch: the exit frees it again')
+    w.fail()
+    w.begin()
+    now[0] += LAUNCH_GIVE_UP
+    check(w.step(False) == 'timeout' and w.state == 'idle', 'launch: never seen, it gives up')
+
     with tempfile.TemporaryDirectory() as t:
         cfg = os.path.join(t, 'GamesConfig')
         os.makedirs(cfg)
@@ -3650,9 +3728,16 @@ def run_gui():
             self.b_install.set_size_request(190, 48)
             self.b_install.connect('clicked', lambda _b: self.on_install())
             pair.append(self.b_install)
-            self.b_launch = Gtk.Button(child=Adw.ButtonContent(
-                icon_name='media-playback-start-symbolic', label='Launch game'),
-                tooltip_text='Start Armada II through Heroic')
+            self.launch = LaunchWatch()
+            self.launch_idle = Adw.ButtonContent(
+                icon_name='media-playback-start-symbolic', label='Launch game')
+            self.launch_spin = Gtk.Spinner()
+            self.launch_lbl = Gtk.Label(label='Launching…')
+            self.launch_busy = Gtk.Box(spacing=8, halign=Gtk.Align.CENTER)
+            self.launch_busy.append(self.launch_spin)
+            self.launch_busy.append(self.launch_lbl)
+            self.b_launch = Gtk.Button(child=self.launch_idle,
+                                       tooltip_text='Start Armada II through Heroic')
             self.b_launch.add_css_class('pill')
             self.b_launch.set_size_request(190, 48)
             self.b_launch.connect('clicked', lambda _b: self.on_launch())
@@ -4140,7 +4225,7 @@ def run_gui():
             self.b_uninstall.set_visible(bool(g and inst))
             self.b_uninstall.set_sensitive(not self.busy)
             self.b_launch.set_visible(bool(g and g.heroic and inst))
-            self.b_launch.set_sensitive(not self.busy)
+            self.update_launch_button()
             label = 'Install'
             if r and inst:
                 label = ('Reinstall' if inst == r.version else 'Install' if inst == '?' else
@@ -4216,15 +4301,53 @@ def run_gui():
 
         def on_launch(self):
             g = self.game()
-            if not g or not g.heroic or self.busy:
+            if not g or not g.heroic or self.busy or not self.launch.begin():
                 return
-            if game_running():
+            self.update_launch_button()
+            self.in_thread(lambda: launch_attempt(lambda: launch_game(g.heroic)),
+                           lambda r: self.launch_started(r, g),
+                           lambda e: self.launch_failed(f'Could not start the game: {e}'))
+
+        def launch_started(self, r, g):
+            if r == 'already':
+                self.launch.already_running()
                 self.set_status('Armada II is already running.')
-                return
-            if launch_game(g.heroic):
+            elif r == 'ok':
                 self.set_status('Starting Armada II through Heroic…', 'ok')
             else:
-                self.open_uri(heroic_launch_uri(g.heroic))
+                self.open_uri(heroic_launch_uri(g.heroic))   # xdg-open is missing
+            self.update_launch_button()
+            self.launch_tick()
+
+        def launch_failed(self, msg):
+            self.launch.fail()
+            self.set_status(msg, 'err')
+            self.update_launch_button()
+
+        def launch_tick(self):
+            """Look at the game every LAUNCH_POLL seconds while a launch is under way."""
+            def then(ev):
+                if ev == 'running':
+                    self.set_status('Armada II is running.', 'ok')
+                elif ev == 'timeout':
+                    self.set_status('Armada II did not start. Check Heroic and try again.',
+                                    'err')
+                elif ev == 'exited':
+                    self.set_status('Armada II has closed.')
+                if ev:
+                    self.update_launch_button()
+                if self.launch.state != 'idle':
+                    GLib.timeout_add(int(LAUNCH_POLL * 1000), self.launch_tick)
+            self.launch.poll(GLib.idle_add, then)
+            return False
+
+        def update_launch_button(self):
+            st = self.launch.state
+            self.b_launch.set_sensitive(st == 'idle' and not self.busy)
+            self.b_launch.set_child(self.launch_idle if st == 'idle' else self.launch_busy)
+            self.launch_spin.set_visible(st == 'launching')
+            (self.launch_spin.start if st == 'launching' else self.launch_spin.stop)()
+            self.launch_lbl.set_label('Launching…' if st == 'launching' else 'Game running')
 
         def on_uninstall(self):
             g = self.game()
@@ -4817,6 +4940,7 @@ def run_tk():
             self.cv.pack(fill='both', expand=True)
             self.sky = Sky(self.cv)
             self.bar = Bar(self.cv)
+            self.launch, self.launch_arc = LaunchWatch(), None
             self.cv.bind('<Configure>', self.on_configure)
             root.bind('<F5>', lambda e: self.refresh())
             for k in ('Return', 'KP_Enter'):
@@ -4878,6 +5002,9 @@ def run_tk():
                 active = self.bar.busy()
                 if active:
                     self.bar.tick(dt)
+                if self.launch.state == 'launching' and self.launch_arc:
+                    self.cv.itemconfigure(self.launch_arc, start=-(t * 300) % 360)
+                    active = True
             except Exception:
                 self.bug()
             # About 30 frames a second; at warp and while the bar moves, about 60.
@@ -5671,8 +5798,21 @@ def run_tk():
             button(bx, y, bw, bh, label, 'primary' if primary else 'secondary',
                    self.on_install, can)
             if launch:
-                button(bx + bw + gap, y, bw, bh, '▶  Launch game',
-                       'secondary' if primary else 'primary', self.on_launch, not self.busy)
+                st = self.launch.state
+                t = button(bx + bw + gap, y, bw, bh,
+                           {'idle': '▶  Launch game', 'launching': 'Launching…',
+                            'running': 'Game running'}[st],
+                           'secondary' if primary else 'primary', self.on_launch,
+                           not self.busy and st == 'idle')
+                self.launch_arc = None
+                if st == 'launching':
+                    # A quiet arc turning beside the label (frame() moves it).
+                    x0_, _, _, y1_ = cv.bbox(t)
+                    r_ = px(7)
+                    self.launch_arc = cv.create_arc(
+                        x0_ - px(12) - 2 * r_, y + bh // 2 - r_, x0_ - px(12), y + bh // 2 + r_,
+                        start=0, extent=270, style='arc', width=max(2, px(2)),
+                        outline=AMBER_LIGHT, tags=('ui',))
             y += bh + px(14)
             links = ([('Uninstall', self.on_uninstall)] if uninst else []) + \
                 [('Refresh', self.refresh), ('Log', self.show_log), ('Report', self.show_report),
@@ -5792,19 +5932,45 @@ def run_tk():
 
         def on_launch(self):
             g = self.game()
-            if not g or self.busy:
-                return
-            if game_running():
-                self.set_status('Armada II is already running.')
+            if not g or self.busy or not self.launch.begin():
                 return
             env = ((self.facts or {}).get('state') or {}).get('launcher_env') or self.wanted_env()
-            if launch_game_native(g, env):
-                self.set_status('Starting Armada II…', 'ok')
-            elif g.prefix:
-                self.set_status(f'Could not start the game: no Wine found for '
-                                f'{g.prefix.label()}. Start it from there.', 'err')
-            else:
-                self.set_status('Could not start the game.', 'err')
+            self.set_status('Starting Armada II…', 'ok')
+            self.in_thread(lambda: launch_attempt(lambda: launch_game_native(g, env)),
+                           lambda r: self.launch_started(r, g),
+                           lambda e: self.launch_failed(f'Could not start the game: {e}'))
+
+        def launch_started(self, r, g):
+            if r == 'already':
+                self.launch.already_running()
+                self.set_status('Armada II is already running.')
+            elif r == 'fail':
+                self.launch.fail()
+                if g.prefix:
+                    self.set_status(f'Could not start the game: no Wine found for '
+                                    f'{g.prefix.label()}. Start it from there.', 'err')
+                else:
+                    self.set_status('Could not start the game.', 'err')
+                return
+            self.launch_tick()
+
+        def launch_failed(self, msg):
+            self.launch.fail()
+            self.set_status(msg, 'err')
+
+        def launch_tick(self):
+            """Look at the game every LAUNCH_POLL seconds while a launch is under way."""
+            def then(ev):
+                if ev == 'running':
+                    self.set_status('Armada II is running.', 'ok')
+                elif ev == 'timeout':
+                    self.set_status('Armada II did not start. Try again, or start it from '
+                                    'its own launcher.', 'err')
+                elif ev == 'exited':
+                    self.set_status('Armada II has closed.')
+                if self.launch.state != 'idle':
+                    root.after(int(LAUNCH_POLL * 1000), self.launch_tick)
+            self.launch.poll(self.post, then)
 
         def on_uninstall(self):
             g = self.game()
