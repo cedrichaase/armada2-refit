@@ -44,6 +44,7 @@ pub mod sym {
     pub const SETUP_GET_PLAYER_NAME: a2engine::Sym = a2engine::Sym(82);
     pub const SETUP_RACE_RANDOM: a2engine::Sym = a2engine::Sym(83);
     pub const SETUP_FIND_IA_RACE: a2engine::Sym = a2engine::Sym(84);
+    pub const PROGRESS_SETTINGS: a2engine::Sym = a2engine::Sym(92);
 }
 
 pub mod hook {
@@ -54,6 +55,7 @@ pub mod hook {
     pub const SHELL_READS_WIDGETS: a2engine::HookId = a2engine::HookId(4);
     pub const SHELL_READS_COMBO: a2engine::HookId = a2engine::HookId(5);
     pub const SHELL_READS_SETUP: a2engine::HookId = a2engine::HookId(6);
+    pub const SHELL_READS_PROGRESS: a2engine::HookId = a2engine::HookId(7);
 }
 
 pub mod field {
@@ -98,6 +100,9 @@ pub mod field {
     pub const SETUP_VT_GET_LOAD_PERCENTAGE: usize = 0x44;
     pub const SETUP_VT_IS_SEND_WORTHY: usize = 0x5c;
     pub const SETUP_RACE_NAME: usize = 0x14;
+    pub const PROGRESS_REACHED: usize = 0xd;
+    pub const PROGRESS_COMPLETE: usize = 0x11;
+    pub const PROGRESS_MISSIONS: usize = 0x15;
 }
 
 pub mod value {
@@ -205,6 +210,10 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "setup_vt_is_send_worthy", symbol: "Transport::IsSendWorthy", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "setup_race_name", symbol: "Race", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "setup_slots", symbol: "GameSetup", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "progress_settings", symbol: "g_shellSettings", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "progress_reached", symbol: "ShellSettings", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "progress_complete", symbol: "ShellSettings", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "progress_missions", symbol: "ShellSettings", kind: a2engine::Kind::Field },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
@@ -215,6 +224,7 @@ pub const HOOKS: &[a2engine::HookDef] = &[
     a2engine::HookDef { id: "ui.shell.reads_widgets", run_unknown: false, rows: &[], syms: &[26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67] },
     a2engine::HookDef { id: "ui.shell.reads_combo", run_unknown: false, rows: &[], syms: &[68, 69, 70, 71, 72] },
     a2engine::HookDef { id: "ui.shell.reads_setup", run_unknown: false, rows: &[], syms: &[73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91] },
+    a2engine::HookDef { id: "ui.shell.reads_progress", run_unknown: false, rows: &[], syms: &[92, 93, 94, 95] },
 ];
 
 pub const BUILDS: &[a2engine::Build] = &[
@@ -225,7 +235,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 92,
+        n_resolved: 96,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x5913a0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff], mask: &[], section: "", count: 0, value: 0 }, // shell_show_credits
@@ -320,16 +330,20 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 92 }, // setup_vt_is_send_worthy
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 20 }, // setup_race_name
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // setup_slots
+            a2engine::Entry { present: true, addr: 0x7a89a0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // progress_settings
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 13 }, // progress_reached
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 17 }, // progress_complete
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 21 }, // progress_missions
         ],
         blocked: &[
         ],
     },
 ];
 
-static HOOK_STATE: [core::sync::atomic::AtomicU64; 7] = [const { core::sync::atomic::AtomicU64::new(0) }; 7];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 92] = [const { core::sync::atomic::AtomicU8::new(0) }; 92];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 92] = [const { core::sync::atomic::AtomicUsize::new(0) }; 92];
-static NOTES: [a2engine::Note; 7] = [const { a2engine::Note::new() }; 7];
+static HOOK_STATE: [core::sync::atomic::AtomicU64; 8] = [const { core::sync::atomic::AtomicU64::new(0) }; 8];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 96] = [const { core::sync::atomic::AtomicU8::new(0) }; 96];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 96] = [const { core::sync::atomic::AtomicUsize::new(0) }; 96];
+static NOTES: [a2engine::Note; 8] = [const { a2engine::Note::new() }; 8];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 
 pub static TABLE: a2engine::Table = a2engine::Table {

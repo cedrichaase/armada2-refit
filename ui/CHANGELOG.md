@@ -4,6 +4,13 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 2.3.0 — 2026-11-05
+
+### Added
+- Campaign selection: a campaign not yet open (issue #13) is greyed, with a padlock after its name (the new `padlock` of the signed-distance icon atlas, `fontbake/src/icons.rs`) and, on hover, "Complete the <campaign> to unlock"; a click on it plays `[Menus] LockedSound` (new key, `mnu_back.wav`, the game's soft LCARS "back" chirp; empty for none; UI.log: `menus: locked campaign <key> clicked: sound <file>`); the 2x2 cards dim its picture and put the line across its foot; the faction's view is shown locked through render3d's new `Render3D_MenuLocked` (`menus/locks.rs`, `menus/scene.rs`, `single_player.rs`). The lock follows the game's own rule, measured on the bench: the Klingon campaign opens when the Federation one is complete, the Borg when the Klingon one is. The progress is read from the game's memory (`g_shellSettings`, new hook `ui.shell.reads_progress`), so a campaign won a moment ago opens at once, and from `save\shell.set` (bytes 4..7) without it. A click still goes to the stock panel. `[Menus] CampaignLocks=0` turns it off. UI.log: `menus: campaign progress from memory: ...`. `ui/bench-progress.sh` writes a progress into a bench clone, and in the clone only sets `ART_CFG.h`'s `GIVE_ALL_MISSIONS` to 0 and points the prefix's GOG install path at the clone (the single player screen read the real install's `save\shell.set` through it); scenario `ui-menus-locked`.
+
+Installed, not yet seen in game.
+
 ## 2.2.7 — 2026-11-05
 
 ### Fixed

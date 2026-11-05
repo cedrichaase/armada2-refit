@@ -26,6 +26,7 @@ pub mod palette;
 pub mod race;
 pub mod popups;
 pub mod overlay_text;
+pub mod progress;
 pub mod resources;
 pub mod selection;
 pub mod setup;

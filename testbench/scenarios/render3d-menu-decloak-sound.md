@@ -2,7 +2,7 @@
 
 Resolutions: 1280x720
 Mod: refit
-Setup: ui/bench-asi.sh --menus
+Setup: ui/bench-progress.sh 5=1 6=1
 Timeout: 12 min
 
 `render3d/README.md`, "The menu scene"; issue #12. The campaign menu's Klingon group
@@ -11,7 +11,10 @@ once per arrival, not once per ship. Nothing else shows the sound, so `Render3D.
 carries one line per sound played, numbered across the run: `menu: decloak sound N
 <wav> (group <name>)`. The first arrival must write number 1 and no number 2; leaving
 the view and coming back writes number 2 and no number 3. Whether it is *heard* is for a
-person: the bench has no audio.
+person: the bench has no audio. Run it with `--install .`; the clone's profile has the
+Federation and Klingon campaigns complete (`ui/bench-progress.sh 5=1 6=1`), so the
+Klingon view is open: while it is locked its ships stay cloaked and make no sound
+(`ui-menus-locked`).
 
 1. Launch the game.
 2. Wait for the main menu.
