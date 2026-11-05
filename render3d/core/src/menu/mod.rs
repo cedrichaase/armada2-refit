@@ -55,6 +55,9 @@ pub struct ShipAt {
     pub team: Option<V3>,
     /// Decloaking: how much of the hull is back, 0 (not there) to 1; None when whole.
     pub cloak: Option<f32>,
+    /// Held fully cloaked (a locked view's `LockedCloak=1`): drawn whole in the cloak's
+    /// glass, as the engine's state 2, where `cloak` at 0 alone means not there yet.
+    pub cloaked: bool,
     /// Going to warp: the hull's warp stretch (its ramp 0..1, the stretch S, the way it
     /// goes, map space); None when not.
     pub warp: Option<(f32, f32, V3)>,
@@ -232,8 +235,12 @@ struct Group {
     /// `clkdisen.wav`; empty for none).
     cloak_sound: String,
     /// While a view of this group is locked (`Render3D_MenuLocked`: its campaign not
-    /// yet open), its ships stay cloaked (`LockedCloak=1`).
+    /// yet open), its ships stay cloaked (`LockedCloak=1`): drawn whole in the cloak's
+    /// glass, as a fully cloaked hull is drawn in a mission, never decloaking or heard.
     locked_cloak: bool,
+    /// While locked, each ship of the group turned this much more about its own +y
+    /// (`LockedYaw=`, degrees), unless the ship gives its own.
+    locked_yaw: f32,
     /// The tunnel's tint when this group departs (`WarpColour=`).
     warp_colour: V3,
 }
@@ -263,6 +270,9 @@ struct ShipDef {
     /// Where it sits while its group's view is locked (`LockedAt=`, the group's frame);
     /// None: where it always sits.
     locked_at: Option<V3>,
+    /// Its yaw while its group's view is locked (`LockedYaw=`, degrees, as `Yaw=`);
+    /// None: its `Yaw=` turned by the group's `LockedYaw=`.
+    locked_yaw: Option<f32>,
 }
 
 impl ShipDef {
@@ -426,6 +436,7 @@ impl Map {
             cloak_stagger: 0.0,
             cloak_sound: String::new(),
             locked_cloak: false,
+            locked_yaw: 0.0,
             warp_colour: v3(0.45, 0.62, 1.0),
         }];
         for (sec, _) in &t.sections {
@@ -440,6 +451,7 @@ impl Map {
                 cloak_stagger: t.f(sec, "cloakstagger", 0.5).max(0.0),
                 cloak_sound: t.get(sec, "cloaksound").map_or_else(|| String::from("clkdisen.wav"), String::from),
                 locked_cloak: t.f(sec, "lockedcloak", 0.0) != 0.0,
+                locked_yaw: t.f(sec, "lockedyaw", 0.0) * DEG,
                 warp_colour: t.v(sec, "warpcolour", v3(0.45, 0.62, 1.0)),
             });
         }
@@ -471,6 +483,7 @@ impl Map {
                 team,
                 warp: t.f(sec, "warp", 1.0) != 0.0,
                 locked_at: t.get(sec, "lockedat").map(|_| t.v(sec, "lockedat", V3::ZERO)),
+                locked_yaw: t.get(sec, "lockedyaw").map(|_| t.f(sec, "lockedyaw", 0.0) * DEG),
             });
         }
         let mut gas = Vec::new();
@@ -612,7 +625,8 @@ impl Map {
 
     /// The scene posed at `t` seconds; `cloak(group, nth)` says how far a ship of a
     /// decloaking group is back (None: whole). A ship of a group in `locked` sits at its
-    /// `LockedAt=` and, in a group with `LockedCloak=1`, stays cloaked.
+    /// `LockedAt=`, turned to its `LockedYaw=`, and, in a group with `LockedCloak=1`, is
+    /// held cloaked (`ShipAt::cloaked`).
     fn shot(&self, t: f32, cloak: impl Fn(&Group, usize) -> Option<f32>, dep: Option<&Departure>, locked: &[bool]) -> Shot {
         let mut ships = Vec::new();
         for (si, s) in self.ships.iter().enumerate() {
@@ -623,7 +637,8 @@ impl Map {
             let bob = v3(0.0, math::sinf(ph) * 1.5, math::sinf(ph * 0.7) * 0.8) * s.bob;
             let roll = math::sinf(ph * 0.8 + 0.5) * 0.02 * s.bob;
             let pitch = math::sinf(ph * 0.6 + 1.3) * 0.012 * s.bob;
-            let yw = s.yaw + g.yaw;
+            let own = if lk { s.locked_yaw.unwrap_or(s.yaw + g.locked_yaw) } else { s.yaw };
+            let yw = own + g.yaw;
             let (sy, cy) = (math::sinf(yw), math::cosf(yw));
             let yaw = M34 { r: [v3(cy, 0.0, -sy), v3(0.0, 1.0, 0.0), v3(sy, 0.0, cy)], p: V3::ZERO };
             let m = rotation(v3(0.0, 0.0, 1.0), roll).then(&rotation(v3(1.0, 0.0, 0.0), pitch)).then(&yaw);
@@ -646,7 +661,9 @@ impl Map {
                     warp = Some((b, 1.0 + wd.stretch * b * b, d.dir));
                 }
             }
-            ships.push(ShipAt { sod: s.sod.clone(), world: w, team: s.team, cloak: if lk && g.locked_cloak { Some(0.0) } else { cloak(g, s.nth) }, warp, gone });
+            // Held cloaked: no hull back (so no decloak is heard), drawn in the glass.
+            let held = lk && g.locked_cloak;
+            ships.push(ShipAt { sod: s.sod.clone(), world: w, team: s.team, cloak: if held { Some(0.0) } else { cloak(g, s.nth) }, cloaked: held, warp, gone });
         }
         // The orbit: the planet turns about its axis, and the sky with the fleet's orbit.
         let orbit = -self.orbit_rate * t;

@@ -10,7 +10,7 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 Layers: ui 2.3.0, render3d 1.1.0, testbench 4.1.6.
 
 ### Added
-- Locked campaigns shown on the campaign selection (issue #13): greyed with a padlock and a hint of what opens them, the Klingon and Borg scenes shown locked (`[Menus] CampaignLocks`; `Render3D_MenuLocked`, `LockedCloak`, `LockedAt`). The campaign progress format of `save\shell.set` and the game's unlock rule were measured on the bench (`platform/README.md`, "Campaign progress format"); the UI reads the progress in the game's memory (profile `ui.shell.reads_progress`). Scenario `ui-menus-locked`. Installed, not yet seen in game.
+- Locked campaigns shown on the campaign selection (issue #13): greyed with a padlock and a hint of what opens them, the Klingon and Borg scenes shown locked (`[Menus] CampaignLocks`, `LockedSound`; `Render3D_MenuLocked`, `LockedCloak`, `LockedAt`, `LockedYaw`): "Complete the <campaign> to unlock" on hover, the padlock from the icon atlas, a soft "unavailable" chirp on a click, the Klingons held cloaked in render3d's cloak glass, the Borg cube turned to read as a cube. The campaign progress format of `save\shell.set` and the game's unlock rule were measured on the bench (`platform/README.md`, "Campaign progress format"); the UI reads the progress in the game's memory (profile `ui.shell.reads_progress`). Scenario `ui-menus-locked`. Installed, not yet seen in game.
 
 ## 15.7.3 — 2026-11-05
 

@@ -16,9 +16,10 @@
 //! and pointing at one moves the camera to its scene (`scene::choose`).
 //!
 //! A campaign not yet open (`menus::locks`) is greyed, with a padlock after its name, and
-//! pointing at it says what opens it ("Finish the Federation Campaign to unlock"); its
-//! scene still shows, locked (render3d). A click still goes to the stock panel, which
-//! has the last word (on a locked campaign it does nothing).
+//! pointing at it says what opens it ("Complete the Federation Campaign to unlock"); its
+//! scene still shows, locked (render3d). A click plays `[Menus] LockedSound` and still
+//! goes to the stock panel, which has the last word (on a locked campaign it does
+//! nothing).
 use crate::gfx::{fade, Tex, R};
 use crate::menus::screens::kit;
 use crate::menus::{actions, Screen};
@@ -26,33 +27,25 @@ use crate::rt::win::{HWND, WM_MOUSEMOVE};
 use crate::widgets::{theme, Align, Ui};
 use alloc::string::String;
 
-/// What opens card `i`, while it is locked: "Finish the <name> to unlock".
+/// What opens card `i`, while it is locked: "Complete the <name> to unlock".
 fn lock_hint(i: usize, names: &[&str; 4]) -> Option<String> {
     let req = crate::menus::locks::locked(i)?;
-    Some(crate::sfmt!("Finish the {} to unlock", names.get(req).copied().unwrap_or("")))
+    Some(crate::sfmt!("Complete the {} to unlock", names.get(req).copied().unwrap_or("")))
 }
 
-/// A padlock in `r` (its height sets its size): a rounded body and its shackle.
+/// A click on the locked card `i`: the "unavailable" sound (`[Menus] LockedSound`),
+/// logged, so a bench can tell it played (the bench has no audio).
+fn locked_click(i: usize) {
+    let snd = crate::config::get().locked_sound.clone();
+    let played = crate::engine::sound::shell_named(&snd);
+    let key = crate::content::get().campaigns.get(i).map_or("?", |c| c.key);
+    crate::log!("menus: locked campaign {} clicked: sound {}", key, if played { snd.as_str() } else { "none" });
+}
+
+/// A padlock in `r` (its height sets its size): the icon atlas's `padlock`
+/// (`ui/fontbake/src/icons.rs`), in the name's colour.
 fn padlock(ui: &mut Ui, r: R, c: crate::gfx::Color) {
-    let h = r.h;
-    let bw = h * 0.78;
-    let x = r.x;
-    let body = R::new(x, r.y + h * 0.42, bw, h * 0.58);
-    ui.draw.rect_round(body, h * 0.08, c);
-    let lw = (h * 0.12).max(1.5);
-    let (cx, sw) = (x + bw * 0.5, bw * 0.30);
-    let (top, base) = (r.y + h * 0.04 + lw * 0.5, r.y + h * 0.44);
-    let mid = top + sw;
-    // Two legs and a half circle of six segments over them.
-    ui.draw.line((cx - sw, base), (cx - sw, mid), lw, c);
-    ui.draw.line((cx + sw, base), (cx + sw, mid), lw, c);
-    let mut last = (cx - sw, mid);
-    for k in 1..=6 {
-        let a = core::f32::consts::PI * (1.0 - k as f32 / 6.0);
-        let p = (cx + sw * libm::cosf(a), mid - sw * libm::sinf(a));
-        ui.draw.line(last, p, lw, c);
-        last = p;
-    }
+    crate::icons::draw(&mut ui.draw, "padlock", r, 1.0, |_| c);
 }
 
 /// A card: the stock panel's art (design rectangle) and a point inside the stock panel
@@ -193,6 +186,9 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
             hover = i as i32;
         }
         if clicked {
+            if lock {
+                locked_click(i);
+            }
             s.click(card.at.0, card.at.1);
         }
     }
@@ -318,6 +314,9 @@ fn over_scene(ui: &mut Ui, s: &Screen, names: &[&str; 4], foot: &[&crate::menus:
             crate::menus::scene::choose(crate::content::get().campaigns[i].scene);
         }
         if clicked {
+            if lock {
+                locked_click(i);
+            }
             s.click(card.at.0, card.at.1);
         }
     }

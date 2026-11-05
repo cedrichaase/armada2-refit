@@ -52,6 +52,9 @@ pub struct Config {
     /// `[Menus] CampaignLocks`: the campaign selection shows which campaigns are not yet
     /// open (`menus::locks`).
     pub campaign_locks: bool,
+    /// `[Menus] LockedSound`: the sound a click on a locked campaign plays (a file the
+    /// game's sound system finds by name; empty: none).
+    pub locked_sound: alloc::string::String,
     /// `[Menus] Credits`: the Credits are ours (`crate::credits`), over the menu scene.
     pub credits: bool,
     pub hud: Hud,
@@ -207,6 +210,7 @@ pub fn load() -> Config {
         menus_scene: on(&ini, MENUS_SCENE),
         credits: on(&ini, MENUS_CREDITS),
         campaign_locks: ini.int("Menus", "CampaignLocks", 1) != 0,
+        locked_sound: alloc::string::String::from(ini.string("Menus", "LockedSound").as_deref().unwrap_or("mnu_back.wav").trim()),
         loading: on(&ini, LOADING_ENABLE),
         loading_hold: ini.float("Loading", "Hold", 0.0).clamp(0.0, 600.0),
     }

@@ -994,13 +994,19 @@ a Mutara nebula with the queen's Diamond (`render3d/README.md`, "The menu scene"
 - **Locked campaigns** (`src/menus/locks.rs`, `src/engine/progress.rs`, issue #13): the
   stock screen draws a campaign the player cannot play yet exactly as an open one, and a
   click on it does nothing (no mission list, no sound of its own). Ours greys it: its
-  name and emblem in the theme's off colour, a padlock after the name, a grey bar in
-  place of the accent, and on hover a line under the name, "Finish the <campaign> to
-  unlock" (in the 2x2 cards without the scene: the picture dimmed, the line across its
-  foot). The view still follows the pointer, and render3d shows it locked
-  (`Render3D_MenuLocked`, render3d/README.md, "The menu scene": the Klingons stay
-  cloaked, the cube and the Diamond sit down in the Mutara gas). A click still goes to
-  the stock panel, which decides; `CampaignLocks=0` turns the look off.
+  name and emblem in the theme's off colour, a padlock after the name (the icon atlas's
+  `padlock`, STYLE.md, "Icons"), a grey bar in place of the accent, and on hover a line
+  under the name, "Complete the <campaign> to unlock" (in the 2x2 cards without the
+  scene: the picture dimmed, the line across its foot). The view still follows the
+  pointer, and render3d shows it locked (`Render3D_MenuLocked`, render3d/README.md, "The
+  menu scene": the Klingons held cloaked, shimmering in the cloak's glass; the cube,
+  turned a corner towards the camera, and the Diamond sit down in the Mutara gas). A
+  click plays `[Menus] LockedSound` (`mnu_back.wav`, the game's own LCARS "back" chirp:
+  short, soft, falling at its end, and used by nothing else in the shell; the stock
+  panel plays nothing on a locked campaign, and its click sound, `cornrclk.wav`, would
+  say the click worked; empty for none; UI.log: `menus: locked campaign <key> clicked:
+  sound <file>`) and still goes to the stock panel, which decides; `CampaignLocks=0`
+  turns the look off.
 
   **What the game decides by, measured on the bench** (2026-11-05, by crafted
   `save\shell.set` files, a won mission, and the running game's memory read from outside;
