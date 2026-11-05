@@ -27,7 +27,7 @@
 #   manifest.json               what is in it, for the GUI installer (package schema 1)
 #   armada2-refit-installer.py  the GUI installer (gui-installer/), also written beside
 #                               the zip, so a release carries it as an asset of its own
-# <version> is the root CHANGELOG.md's newest entry. Only our own code goes in: no asset,
+# <version> is the root CHANGELOG.md's newest entry (with A2_EDGE=1, see below). Only our own code goes in: no asset,
 # nothing from the game, none of the test tools (probe.exe,
 # binktest.exe). CI runs this
 # on every push; see publish/README.md, "Release packages".
@@ -46,6 +46,12 @@ ver="$(version "$root/CHANGELOG.md")"
 gui="$root/gui-installer/armada2-refit-installer.py"   # the GUI installer
 [ -n "$ver" ] || { echo "no version in CHANGELOG.md" >&2; exit 1; }
 commit="$(git -C "$root" rev-parse --short HEAD)"
+# A2_EDGE=1: the edge channel's package (CI, on every push to main): the version is the
+# one the next release would get plus "-edge.<commit>", e.g. 15.10.0-edge.abc1234, so its
+# zip never shares a name with a release's (publish/README.md, "The edge channel").
+if [ "${A2_EDGE:-0}" = 1 ]; then
+    ver="$(python3 "$root/tools/changeset.py" status --next-root)-edge.$commit"
+fi
 
 name="armada2-refit-$ver"
 stage="$(mktemp -d)"

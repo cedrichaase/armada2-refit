@@ -7,11 +7,14 @@
 # installer is also frozen with PyInstaller (gui-installer/pyinstaller/build.py) into a
 # portable .exe on Windows and a universal2 .app on macOS, each tested against a mock game
 # (gui-installer/test-windows.ps1, test-macos.sh); install.sh is run on macOS too.
-# A push to main whose root CHANGELOG.md version has no release yet also tags vX.Y.Z and
-# publishes a GitHub Release with that zip and the three installers. publish/README.md,
-# "Release packages". On main and on dispatch, every program in the release is also
-# scanned on VirusTotal, report only, and the reports attached to the release
-# (publish/README.md, "VirusTotal").
+# Releasing is manual (publish/README.md, "Releasing"): the Release workflow
+# (release.yml) opens the "Release X.Y.Z" pull request from the pending changesets, and
+# once it is merged, dispatches this workflow on main with `release` ticked, which tags
+# vX.Y.Z and publishes a GitHub Release with the zip and the three installers. A push to
+# main publishes nothing of its own but the edge channel: the rolling pre-release `edge`
+# (job edge), the same packages built from the newest main. On main and on dispatch, every
+# program in the release is also scanned on VirusTotal, report only, and the reports
+# attached to the release (publish/README.md, "VirusTotal").
 # The native probes (d12probe on WARP with the D3D12 debug layer, vkprobe on lavapipe)
 # and the gates kit artifact: jobs probes, d3d12-probe, vulkan-probe-windows,
 # gates-windows (display/d12probe/README.md, tools/gates/GATES.txt).
@@ -22,6 +25,11 @@ on:
     branches: ['**']
   pull_request:
   workflow_dispatch:
+    inputs:
+      release:
+        description: 'Publish vX.Y.Z (the root CHANGELOG.md version) from main, if it is not released yet'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -59,6 +67,21 @@ jobs:
         run: python3 tools/doclinks.py
       - name: The layer registry against a2mod, the release scripts and the GUI (tools/layers.py --check)
         run: python3 tools/layers.py --check && python3 tools/layers-selftest.py
+      - name: The changesets, and every version file against its changelog (tools/changeset.py check)
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          python3 tools/changeset-selftest.py
+          # On a pull request, a version changed by hand is refused too: versions come
+          # from changesets, and only the release PR (branch release/next) assigns them.
+          args=()
+          if [ -n "$BASE" ]; then
+            args=(--base "$BASE")
+            [ "$HEAD_REF" = release/next ] && args+=(--allow-version-change)
+          fi
+          python3 tools/changeset.py check "${args[@]}"
+          python3 tools/changeset.py status
 
   # render3d builds Render3D.asi from Rust (no_std, i686-pc-windows-msvc, lld-link) and
   # tests its asset readers on the host (the tests that need a game install skip).
@@ -249,6 +272,21 @@ jobs:
           path: |
             dist/*.zip
             dist/armada2-refit-installer.py
+          if-no-files-found: error
+      # The edge channel's zip: the same build, versioned <next>-edge.<commit> (A2_EDGE=1),
+      # so it never shares a name with a release's. Only on main, where job edge
+      # publishes it.
+      - name: Package for the edge channel
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          export CARGO="$(command -v cargo)"
+          zip=$(A2_EDGE=1 publish/package.sh dist-edge)
+          unzip -p "$zip" '*/manifest.json' | python3 -c 'import json,sys; m=json.load(sys.stdin); print(m["version"], m["commit"])'
+      - uses: actions/upload-artifact@v7
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          name: armada2-refit-edge-${{ github.sha }}
+          path: dist-edge/*.zip
           if-no-files-found: error
 
   appimage:
@@ -601,9 +639,12 @@ jobs:
             vt/virustotal.md
           if-no-files-found: ignore
 
+  # vX.Y.Z, by hand only: a dispatch on main with `release` ticked (the Release workflow's
+  # "publish" step does that). It refuses when vX.Y.Z is released already. The version
+  # comes from tools/changeset.py version, merged through the release PR.
   release:
     needs: [publishable, package, appimage, windows-installer, windows-gui, macos-gui, probes, d3d12-probe, gates-windows]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && inputs.release && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -632,7 +673,7 @@ jobs:
         run: |
           tag="v$VERSION"
           if gh release view "$tag" >/dev/null 2>&1; then
-            echo "$tag is already released"; exit 0
+            echo "::error::$tag is already released: run the Release workflow's prepare step first"; exit 1
           fi
           # Notes: the root changelog's newest entry, without its heading.
           awk '/^## /{if (f) exit; f=1; next} f' CHANGELOG.md > notes.md
@@ -655,9 +696,10 @@ jobs:
       - name: Keep only the newest ten releases
         run: |
           # Older releases are deleted; their tags stay, so changelogs and links that
-          # name a version still resolve. publish/README.md, "Release packages".
+          # name a version still resolve. publish/README.md, "Release packages". The edge
+          # channel is not a release and is never counted or deleted.
           gh release list --limit 1000 --json tagName,createdAt \
-            --jq 'sort_by(.createdAt) | reverse | .[10:][] | .tagName' |
+            --jq '[.[] | select(.tagName | test("^v[0-9]+[.][0-9]+[.][0-9]+$"))] | sort_by(.createdAt) | reverse | .[10:][] | .tagName' |
           while read -r tag; do
             echo "deleting release $tag (tag kept)"
             gh release delete "$tag" --yes
@@ -694,3 +736,73 @@ jobs:
           python3 publish/virustotal.py notes vt/virustotal.json --splice notes.md \
             --assets "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$tag" > notes-vt.md
           gh release edit "$tag" --notes-file notes-vt.md
+
+  # The edge channel (publish/README.md, "The edge channel"): every push to main replaces
+  # the assets of one rolling pre-release, tag `edge`, with the packages built from that
+  # commit. Never "latest", never a vX.Y.Z: the GUI installer lists it last, as "Edge
+  # (latest main)", untested, and never picks it by default. The notes name the commit
+  # and the changesets not released yet. One run at a time, in push order.
+  edge:
+    needs: [publishable, package, appimage, windows-installer, windows-gui, macos-gui]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: edge
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v8
+        with:
+          name: armada2-refit-edge-${{ github.sha }}
+          path: dist
+      - uses: actions/download-artifact@v8
+        with:
+          name: armada2-refit-${{ github.sha }}
+          path: rel
+      - uses: actions/download-artifact@v8
+        with:
+          name: armada2-refit-installer-${{ github.sha }}
+          path: dist
+      - uses: actions/download-artifact@v8
+        with:
+          name: armada2-refit-installer-windows-${{ github.sha }}
+          path: dist
+      - uses: actions/download-artifact@v8
+        with:
+          name: armada2-refit-installer-macos-${{ github.sha }}
+          path: dist
+      - name: Replace the edge pre-release's packages
+        run: |
+          cp rel/armada2-refit-installer.py dist/
+          zip=$(cd dist && ls armada2-refit-*-edge.*.zip)
+          short=$(git rev-parse --short HEAD)
+          {
+            printf '**Edge: the latest main, not a release.** Built from [`%s`](%s/%s/commit/%s) on %s. ' \
+              "$short" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$(date -u +%Y-%m-%d)"
+            printf 'Nothing here has been seen in game: it is for testing, and for players who want to live on the edge. '
+            printf 'The GUI installer offers it as *Edge (latest main)*, never by default; any release takes you back.\n\n'
+            python3 tools/changeset.py status --markdown
+          } > notes.md
+          if ! gh release view edge >/dev/null 2>&1; then
+            gh release create edge --target "$GITHUB_SHA" --prerelease --latest=false \
+              --title 'Edge (latest main)' --notes-file notes.md
+          fi
+          # The tag follows main (the release's target_commitish names the commit too).
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/edge" -f sha="$GITHUB_SHA" -F force=true >/dev/null
+          gh release upload edge "dist/$zip" dist/armada2-refit-installer.py \
+            dist/armada2-refit-installer-x86_64.AppImage dist/armada2-refit-installer-windows.exe \
+            dist/armada2-refit-installer-macos.zip --clobber
+          # Then the older zips go: the installer expects exactly one.
+          gh release view edge --json assets --jq '.assets[].name' | while read -r a; do
+            case "$a" in
+              armada2-refit-*-edge.*.zip) [ "$a" = "$zip" ] || gh release delete-asset edge "$a" --yes ;;
+            esac
+          done
+          gh release edit edge --prerelease --latest=false --title 'Edge (latest main)' \
+            --target "$GITHUB_SHA" --notes-file notes.md

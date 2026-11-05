@@ -380,4 +380,27 @@ check '[ ! -e "$G/Online.asi" ] && [ ! -e "$G/QOL.asi" ]'
 check '[ "$(cat "$G/binkw32.dll")" = stockbink ]'
 check 'cmp -s "$T/RefitPlayer.ref" "$G/RefitPlayer.ini"'   # uninstall leaves it
 check 'python3 -c "import json,sys; a,b=(json.load(open(f)) for f in sys.argv[1:]); sys.exit(a!=b)" "$H/GamesConfig/1174788223.json" "$T/heroic-before.json"'
+echo "== the edge channel: listed, never the default, picked by name"
+E="$T/edge"; mkdir -p "$E"; cp "$zip" "$E/armada2-refit-99.0.0-edge.abc1234.zip"
+python3 - "$E" "$ver" <<'PY'
+import json, sys
+d, v = sys.argv[1:]
+def a(n): return dict(name=n, browser_download_url=f'file://{d}/{n}', size=1, updated_at='2026-11-05T12:00:00Z')
+json.dump([dict(tag_name='edge', prerelease=True, assets=[a('armada2-refit-99.0.0-edge.abc1234.zip')]),
+           dict(tag_name='v' + v, prerelease=False, published_at='2026-10-01T00:00:00Z',
+                assets=[a(f'armada2-refit-{v}.zip')])], open(d + '/api.json', 'w'))
+PY
+export A2_RELEASES_API="file://$E/api.json"
+"${run[@]}" --list > "$T/out" 2>/dev/null
+check 'grep -q "99.0.0-edge.abc1234 .* edge .*commit abc1234, untested" "$T/out" && grep -q "^  $ver .* release" "$T/out"'
+N="$T/Games/edge"; mkdir -p "$N"; echo exe > "$N/Armada2.exe"; echo stockbink > "$N/binkw32.dll"
+"${run[@]}" --install --game "$N" --no-launcher > "$T/out" 2> "$T/err"
+check 'grep -q "\"version\": \"$ver\"" "$N/armada2-refit-installed.json"'
+"${run[@]}" --uninstall --game "$N" --no-launcher > "$T/out" 2> "$T/err"
+"${run[@]}" --install edge --game "$N" --no-launcher > "$T/out" 2> "$T/err"
+check '[ -e "$N/armada2-refit-installed.json" ]'   # the stub zip's own manifest names the version
+check '[ -e "$XDG_CACHE_HOME/armada2-refit/installer/releases/armada2-refit-99.0.0-edge.abc1234.zip" ]'
+"${run[@]}" --uninstall --game "$N" --no-launcher > "$T/out" 2> "$T/err"
+unset A2_RELEASES_API
+
 echo "all passed"

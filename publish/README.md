@@ -241,17 +241,77 @@ package for it from placeholder plugins ([`installer/README.md`](installer/READM
   (ubuntu-24.04), a portable `.exe` (windows-2025, `gui-installer/test-windows.ps1`) and
   a universal2 `.app` (macos-15, `gui-installer/test-macos.sh`, after
   `publish/installer/test.sh` on macOS);
-- on `main` only, when the root version has no release yet: tag `vX.Y.Z` and publish a
-  GitHub Release with the zip, the GUI installer as a script, an AppImage, a Windows
-  `.exe` and a macOS app's zip, the changelog entry as its notes. An entry that still
-  says "not yet seen in game" goes out as a pre-release, and so does one with a line
-  starting "Pre-release" (confirmed on one system, not yet on another; the user makes
-  it a release on GitHub once it is). So **bumping the root version
-  and pushing `main` is what releases**; a push that does not bump it releases nothing.
-- after that, on every push to `main`: delete all but the newest ten releases. Their
-  tags stay, so a version named anywhere still resolves to its commit.
+- `tools/changeset.py check` and its self-test: every pending changeset names real
+  layers and a valid bump, every version file agrees with its changelog, and on a pull
+  request no version changed by hand (the release PR, branch `release/next`, excepted);
+- **on a dispatch on `main` with `release` ticked** (the Release workflow's *publish*
+  step; never on a push): tag `vX.Y.Z` and publish a GitHub Release with the zip, the GUI
+  installer as a script, an AppImage, a Windows `.exe` and a macOS app's zip, the root
+  changelog entry as its notes. It refuses when `vX.Y.Z` exists. An entry that still says
+  "not yet seen in game" goes out as a pre-release, and so does one with a line starting
+  "Pre-release" (confirmed on one system, not yet on another, e.g. before the user's
+  Windows gate; the user makes it a release on GitHub once it is). Then it deletes all
+  but the newest ten `vX.Y.Z` releases. Their tags stay, so a version named anywhere
+  still resolves to its commit. "Releasing" below has the whole flow;
+- **on every push to `main`: the edge channel** (job `edge`, "The edge channel" below);
 - on `main` and on dispatch: every program in the release scanned on VirusTotal, and the
   reports attached to the release (below).
+
+### Releasing
+
+Versions come from **changesets** (`.changeset/README.md`; `CLAUDE.md`, "Changelogs and
+versions"), never from hand edits, and a release is a decision made by hand. Nothing
+releases by itself: a push to `main` that changes a version publishes nothing.
+
+1. **See what is pending**: `python3 tools/changeset.py status` prints each layer's
+   current → next version and the changesets behind each bump. CI prints the same, and
+   the edge pre-release's notes show it as a table.
+2. **Prepare**: Actions → **Release** → *Run workflow*, step `prepare`
+   (`.github/workflows/release.yml`). It runs `tools/changeset.py version` on `main`:
+   each layer's entry and version files, the root entry with the `Layers:` line, the
+   changesets deleted. It pushes the result to the branch `release/next` and opens (or
+   updates) the pull request **"Release X.Y.Z"**, then dispatches CI on it, since a pull
+   request opened with the workflow's own token starts no workflow. Running it again
+   replaces the branch with a fresh version of `main`.
+3. **Review and merge** the pull request. This is the place to edit a status line:
+   "Confirmed in game YYYY-MM-DD" in place of "Installed, not yet seen in game" makes it
+   a full release, and a "Pre-release ..." line keeps it a pre-release.
+4. **Publish**: Release → *Run workflow*, step `publish`. It dispatches CI on `main`
+   with `release` ticked. CI builds and tests everything again, then the `release` job
+   publishes `vX.Y.Z`. The VirusTotal reports follow as before.
+
+**The release PR, not a commit to `main`**: the version step writes a dozen changelogs
+that deserve a read before they are published for good, and a pull request is where
+that read and the status edits happen. It also needs no token that can bypass branch
+protection. The workflow needs *Settings → Actions → General → Allow GitHub Actions to
+create and approve pull requests*. Without it, the prepare step pushes `release/next`
+and fails at `gh pr create`. Open the pull request by hand then.
+
+**Locally**, the same: `python3 tools/changeset.py version` on a branch from `main`
+(`--dry-run` shows the plan), commit as "Release X.Y.Z", merge it, then
+`gh workflow run release.yml -f step=publish` (or `gh workflow run ci.yml --ref main -f
+release=true`).
+
+### The edge channel
+
+Every push to `main` refreshes one rolling **pre-release, tagged `edge`** ("Edge (latest
+main)"), so main can be installed with the GUI installer without a release. This is
+for testing, and for players who want to live on the edge. CI job `edge`, after the
+package, installer and GUI jobs pass:
+
+- the zip is built again with `A2_EDGE=1` (`publish/package.sh`), versioned
+  `<next>-edge.<commit>`, e.g. `armada2-refit-15.10.0-edge.abc1234.zip`. `<next>` is
+  `tools/changeset.py status --next-root`, the version the next release would get. Its
+  name never matches a release's `armada2-refit-X.Y.Z.zip`, and its manifest carries
+  the same version and commit;
+- the `edge` tag is moved to the commit, the zip and the four installer assets are
+  uploaded over the old ones, and the older edge zip is deleted, so there is always
+  exactly one. The notes name the commit and date and list the unreleased changesets
+  (`changeset.py status --markdown`);
+- it is created `--prerelease --latest=false` and is never counted among the ten
+  releases kept. The GUI installer counts only tags `vX.Y.Z` as releases and lists edge
+  last, as "Edge (latest main) · commit · date — untested". It never picks edge by
+  default (`gui-installer/README.md`). The job runs one at a time, in push order.
 
 ### VirusTotal
 

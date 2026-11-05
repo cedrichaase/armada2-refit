@@ -42,7 +42,13 @@ Keys: F5 refresh, Ctrl+Enter install, Ctrl+L the log.
    list and every zip it fetches are cached in `~/.cache/armada2-refit/installer/`, so
    it works offline and keeps a release GitHub has since deleted (CI keeps only ten).
    The default is the newest **full** release: a pre-release is an entry still "not yet
-   seen in game", and is offered but not chosen for you. A zip is about a megabyte, so
+   seen in game", and is offered but not chosen for you. Only tags `vX.Y.Z` count as
+   releases. The one release tagged `edge`, CI's rolling pre-release of every push to
+   `main`, is an extra entry, always **last**, labelled "Edge (latest main) · commit ·
+   date — untested" and never the default (`default_release` skips it; with nothing but
+   edge on the list there is no default). Its zip is `armada2-refit-<X.Y.Z>-edge.<sha7>.zip`,
+   its date the zip's, and the cache keeps only the newest edge zip. `--install edge`
+   takes it, `--list` marks it. A zip is about a megabyte, so
    the chosen one is fetched straight away (checked against GitHub's sha256 digest) to
    show what it holds.
 3. **Says what will not go in**, on this machine, in a line each under the card: the same
@@ -465,7 +471,7 @@ rather than drawing wrong.
 
 `INSTALLER_VERSION` in the script is this layer's version. `CHANGELOG.md` heads it, and
 `publish/package.sh` refuses to package if the two differ. The schemas it reads are named
-in each entry. CI attaches the script to every release beside the zip, and puts a copy
+in each entry. `vtuple` reads an edge version (`15.10.0-edge.abc1234`) as its X.Y.Z. CI attaches the script to every release beside the zip, and puts a copy
 in the zip.
 
 ## Testing
