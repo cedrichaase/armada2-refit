@@ -4,6 +4,14 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 1.0.6 — 2026-11-04
+
+### Fixed
+- Device release: freeing a device now releases everything it held, not only its back buffer and depth surface: the textures bound with `SetTexture` (8 stages), the streams of `SetStreamSource` and the index buffer of `SetIndices`. Each shell/mission device re-creation leaked them and their GPU mirrors (`stub/obj.rs`).
+- Render target: the device now holds its current target and depth surface with references of its own (`SetRenderTarget` AddRefs the new and releases the old, the same surface set again included), so `GetRenderTarget` and `GetDepthStencilSurface` no longer hand out a surface the engine already released; `Reset` puts the back buffer and depth surface back as target and depth, as Direct3D does, so `Clear` and the passthrough (which skip a target that is not the back buffer) work again after a `Reset` with an engine target set (`stub/device.rs`). This changes COM refcounting.
+
+Installed, not yet seen in game.
+
 ## 1.0.5 — 2026-11-04
 
 ### Fixed

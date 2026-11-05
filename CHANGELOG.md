@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.22 — 2026-11-04
+
+Layers: display 1.0.6.
+
+### Fixed
+- display: a freed device releases its bound textures, streams and index buffer, and holds its render target and depth surface by reference (`Reset` restores the back buffer as target). Installed, not yet seen in game.
+
 ## 15.6.21 — 2026-11-04
 
 Layers: gui-installer 3.1.0.
