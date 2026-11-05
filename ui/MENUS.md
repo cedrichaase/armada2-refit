@@ -1008,6 +1008,24 @@ a Mutara nebula with the queen's Diamond (`render3d/README.md`, "The menu scene"
   sound <file>`) and still goes to the stock panel, which decides; `CampaignLocks=0`
   turns the look off.
 
+  **`GIVE_ALL_MISSIONS` opens everything.** `ART_CFG.h` carries `int GIVE_ALL_MISSIONS
+  = 1` in the GOG install this was measured on (every copy on the bench, back to
+  October, has it). While it is 1, `SingleDlgProc` calls
+  `ShellSettings::GiveAllMissions` each time the single player screen opens: every
+  counter goes to its last mission and every campaign is marked complete, in memory
+  (UI.log: `reached [5, 9, 9, 9], complete [1, 1, 1, 1]`), which the game then saves
+  as any progress. So with it nothing is locked, in the game or in our look; with 0
+  the progress is the player's own. (The same procedure gives all missions for a typed
+  code, the other caller.) `ui/bench-progress.sh` sets it to 0 in a bench clone; a
+  player who wants the campaigns to open in order sets it to 0 in their own
+  `ART_CFG.h`.
+
+  **A bench clone read the player's own `save\shell.set`.** The single player screen
+  opens `save\shell.set` under the install path of the prefix's GOG key
+  (`HKLM\Software\Wow6432Node\GOG.com\Games\1174788223`, `path`), not the working
+  directory, and a clone's prefix kept the real install's path (seen with inotify: the
+  real file opened, the clone's not). `ui/bench-progress.sh` points the key at the clone.
+
   **What the game decides by, measured on the bench** (2026-11-05, by crafted
   `save\shell.set` files, a won mission, and the running game's memory read from outside;
   platform/README.md, "Campaign progress format"): the file's first eight bytes are, per
