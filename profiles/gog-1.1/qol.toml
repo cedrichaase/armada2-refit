@@ -32,7 +32,7 @@ doc = "Long moves on the map go to warp"
 rows = ["QOL.WarpDistance"]
 
 [hook.move_paths]
-doc = "A path sketched with the waypoint key is sent as stock's path order at each point, not only on release"
+doc = "The move queue: waypoint-key points kept per ship, flown as stock path orders a run at a time; player orders end it"
 rows = ["QOL.PathStartsAtOnce"]
 
 [hook.bar_keys]
@@ -1205,14 +1205,6 @@ offset = 0x44
 type = "ptr"
 used_by = ["move_paths"]
 
-[[sym]]
-id = "mp_proc_command"
-symbol = "CraftProcess"
-kind = "field"
-struct = "CraftProcess"
-offset = 0x38
-type = "i32"
-used_by = ["move_paths"]
 
 [[sym]]
 id = "mp_proc_path"
@@ -1251,4 +1243,380 @@ id = "mp_cmd_patrol"
 symbol = "AiCommand PATROL"
 kind = "value"
 value = 26
+used_by = ["move_paths"]
+
+# GameObject::DeQueueCommand(AiCommand, bool)
+[[sym]]
+id = "mq_dq_what"
+symbol = "GameObject::DeQueueCommand"
+kind = "fn"
+addr = 0x4d4540
+check = "55 8b ec 8b 45 0c 8b 55"
+used_by = ["move_paths"]
+
+# GameObject::DeQueueCommand(AiCommand, GameObject *)
+[[sym]]
+id = "mq_dq_who"
+symbol = "GameObject::DeQueueCommand"
+kind = "fn"
+addr = 0x4d4560
+check = "55 8b ec 8b 45 0c 8b 55"
+used_by = ["move_paths"]
+
+# GameObject::DeQueueCommand(AiCommand, GameObject *, const Vector3 &)
+[[sym]]
+id = "mq_dq_who_where"
+symbol = "GameObject::DeQueueCommand"
+kind = "fn"
+addr = 0x4d4590
+check = "55 8b ec 8b 45 10 8b 55"
+used_by = ["move_paths"]
+
+# GameObject::DeQueueCommand(AiCommand, GameObject *, const Vector3 &, int)
+[[sym]]
+id = "mq_dq_who_where_param"
+symbol = "GameObject::DeQueueCommand"
+kind = "fn"
+addr = 0x4d45c0
+check = "55 8b ec 8b 45 14 8b 55"
+used_by = ["move_paths"]
+
+# GameObject::DeQueueCommand(AiCommand, const GameObjectClass *)
+[[sym]]
+id = "mq_dq_class"
+symbol = "GameObject::DeQueueCommand"
+kind = "fn"
+addr = 0x4d45f0
+check = "55 8b ec 8b 45 0c 8b 55"
+used_by = ["move_paths"]
+
+# GameObject::DeQueueCommand(AiCommand, const GameObjectClass *, const Vector3 &)
+[[sym]]
+id = "mq_dq_class_where"
+symbol = "GameObject::DeQueueCommand"
+kind = "fn"
+addr = 0x4d4610
+check = "55 8b ec 8b 45 10 8b 55"
+used_by = ["move_paths"]
+
+# GameObject::DeQueueCommand(AiCommand, long)
+[[sym]]
+id = "mq_dq_param"
+symbol = "GameObject::DeQueueCommand"
+kind = "fn"
+addr = 0x4d4630
+check = "55 8b ec 8b 45 0c 8b 55"
+used_by = ["move_paths"]
+
+# GameObject::DeQueueCommand(int, AiCommand, int, int *, int, const Vector3 *)
+[[sym]]
+id = "mq_dq_path"
+symbol = "GameObject::DeQueueCommand"
+kind = "fn"
+addr = 0x4d4650
+check = "55 8b ec 6a ff 68 0a e4"
+used_by = ["move_paths"]
+
+# GameObject::DeQueueCommand(AiCommand, const Vector3 &)
+[[sym]]
+id = "mq_dq_where"
+symbol = "GameObject::DeQueueCommand"
+kind = "fn"
+addr = 0x4d4820
+check = "55 8b ec 8b 45 0c 8b 55"
+used_by = ["move_paths"]
+
+# GameObject::DeQueueCommand(AiCommand, const Vector3 &, long)
+[[sym]]
+id = "mq_dq_where_param"
+symbol = "GameObject::DeQueueCommand"
+kind = "fn"
+addr = 0x4d4850
+check = "55 8b ec 8b 45 10 8b 55"
+used_by = ["move_paths"]
+
+# GameObject::DeQueueCommand(AiCommand, GameObject *, long)
+[[sym]]
+id = "mq_dq_who_param"
+symbol = "GameObject::DeQueueCommand"
+kind = "fn"
+addr = 0x4d4880
+check = "55 8b ec 8b 45 10 8b 55"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_go_broadcast"
+symbol = "FormationManager::Broadcast_Go_Command"
+kind = "fn"
+addr = 0x43b3e0
+check = "55 8b ec 6a ff 68 02 a4"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_form_formation"
+symbol = "FormationManager::FormFormation"
+kind = "fn"
+addr = 0x43b680
+check = "55 8b ec 6a ff 68 26 a4"
+used_by = ["move_paths"]
+
+# GameObject::SetCommand(AiCommand, const GameObject *, const Vector3 *, WeaponClass *, bool, vector *, vector *)
+[[sym]]
+id = "mq_set_special"
+symbol = "GameObject::SetCommand"
+kind = "fn"
+addr = 0x4d1d90
+check = "55 8b ec 64 a1 00 00 00"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_presim"
+symbol = "GameObject::PreSimulateAll"
+kind = "fn"
+addr = 0x4d48b0
+check = "55 8b ec a1 84 10 76 00"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_cmd_name"
+symbol = "AiCommandToName"
+kind = "fn"
+addr = 0x44e1c0
+check = "55 8b ec 8b 45 08 8b 04"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_what_call"
+symbol = "NetOrderWhat::Execute"
+kind = "call"
+addr = 0x55007f
+target = "mq_dq_what"
+in = "NetOrderWhat::Execute"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_what_on_call"
+symbol = "NetOrderWhatOn::Execute"
+kind = "call"
+addr = 0x5500f1
+target = "mq_dq_what"
+in = "NetOrderWhatOn::Execute"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_who_call"
+symbol = "NetOrderWhatWho::Execute"
+kind = "call"
+addr = 0x5502a6
+target = "mq_dq_who"
+in = "NetOrderWhatWho::Execute"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_who_where_call"
+symbol = "NetOrderWhatWhoWhere::Execute"
+kind = "call"
+addr = 0x55034a
+target = "mq_dq_who_where"
+in = "NetOrderWhatWhoWhere::Execute"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_who_where_param_call"
+symbol = "NetOrderWhatWhoWhereParam::Execute"
+kind = "call"
+addr = 0x5503ee
+target = "mq_dq_who_where_param"
+in = "NetOrderWhatWhoWhereParam::Execute"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_class_call"
+symbol = "NetOrderWhatClass::Execute"
+kind = "call"
+addr = 0x55017e
+target = "mq_dq_class"
+in = "NetOrderWhatClass::Execute"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_class_where_call"
+symbol = "NetOrderWhatClassWhere::Execute"
+kind = "call"
+addr = 0x550212
+target = "mq_dq_class_where"
+in = "NetOrderWhatClassWhere::Execute"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_param_call"
+symbol = "NetOrderWhatParam::Execute"
+kind = "call"
+addr = 0x550461
+target = "mq_dq_param"
+in = "NetOrderWhatParam::Execute"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_path_call"
+symbol = "NetOrderObjectsWhatPath::Execute"
+kind = "call"
+addr = 0x54f9ce
+target = "mq_dq_path"
+in = "NetOrderObjectsWhatPath::Execute"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_where_call"
+symbol = "NetOrderWhatWhere::Execute"
+kind = "call"
+addr = 0x5504d1
+target = "mq_dq_where"
+in = "NetOrderWhatWhere::Execute"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_where_param_call"
+symbol = "NetOrderWhatWhereParam::Execute"
+kind = "call"
+addr = 0x550545
+target = "mq_dq_where_param"
+in = "NetOrderWhatWhereParam::Execute"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_who_param_call"
+symbol = "NetOrderWhatWhoParam::Execute"
+kind = "call"
+addr = 0x5505da
+target = "mq_dq_who_param"
+in = "NetOrderWhatWhoParam::Execute"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_go_broadcast_call"
+symbol = "NetOrderMove::Execute"
+kind = "call"
+addr = 0x5521a5
+target = "mq_go_broadcast"
+in = "NetOrderMove::Execute"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_form_formation_call"
+symbol = "NetOrderFormFormation::Execute"
+kind = "call"
+addr = 0x5526f6
+target = "mq_form_formation"
+in = "NetOrderFormFormation::Execute"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_special_call"
+symbol = "NetOrderSpecialAttack::Execute"
+kind = "call"
+addr = 0x5518a0
+target = "mq_set_special"
+in = "NetOrderSpecialAttack::Execute"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_presim_call"
+symbol = "Simulate"
+kind = "call"
+addr = 0x483327
+target = "mq_presim"
+in = "Simulate"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_load_time"
+symbol = "g_finish_load_time"
+kind = "global"
+addr = 0x737bb8
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_ov_waypoint_key"
+symbol = "cOverViewImp"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0x30c
+type = "ptr"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_cmd_stop"
+symbol = "AiCommand STOP"
+kind = "value"
+value = 0x3
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_cmd_go_single"
+symbol = "AiCommand GO_SINGLE"
+kind = "value"
+value = 0x5
+used_by = ["move_paths"]
+
+
+[[sym]]
+id = "mq_cmd_form_formation"
+symbol = "AiCommand FORM_FORMATION"
+kind = "value"
+value = 0x20
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_cmd_go_warp_single"
+symbol = "AiCommand GO_WARP_SINGLE"
+kind = "value"
+value = 0x2c
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_keep_lo"
+symbol = "AiCommands 0-31 that leave a ship's movement alone: NONE, DEFAULT, SELECT, QUEUE, SET_RALLY_POINT, CANCEL_BUILD (19, 30), RED/YELLOW/GREEN_ALERT"
+kind = "value"
+value = 0x78090407
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_keep_hi"
+symbol = "AiCommands 32-63 that leave a ship's movement alone (bit n-32): BUY/SELL_RESOURCE, SET_FORMATION, SET_ATTACK_MODE, the six autonomy settings, CMD_SET_FORMATION_ORIENTATION"
+kind = "value"
+value = 0x4fe700
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_go_next_path"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x88
+type = "ptr"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_cmd_count"
+symbol = "AiCommandToName's table: the number of AiCommands"
+kind = "value"
+value = 57
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_ov_keys"
+symbol = "cOverViewImp::mProcessKeyboardInput"
+kind = "fn"
+addr = 0x525950
+check = "55 8b ec 6a ff 68 27 14"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_ov_keys_call"
+symbol = "cOverViewImp::Simulate"
+kind = "call"
+addr = 0x51ef2e
+target = "mq_ov_keys"
+in = "cOverViewImp::Simulate"
 used_by = ["move_paths"]

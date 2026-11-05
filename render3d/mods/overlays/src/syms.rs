@@ -58,6 +58,8 @@ pub mod hook {
 pub mod field {
     pub const OV_ADD_PATH: usize = 0x264;
     pub const OV_WAYPOINT_KEY: usize = 0x30c;
+    pub const OV_VT_SELECT_NUM: usize = 0x94;
+    pub const OV_VT_SELECT_LIST: usize = 0x98;
     pub const OBJ_PROCESS: usize = 0x44;
     pub const OBJ_POSITION: usize = 0xac;
     pub const OBJ_TEAM: usize = 0xec;
@@ -123,6 +125,8 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "overview", symbol: "cOverViewImp", kind: a2engine::Kind::Global },
     a2engine::SymDef { id: "ov_add_path", symbol: "cOverViewImp", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "ov_waypoint_key", symbol: "cOverViewImp", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ov_vt_select_num", symbol: "cOverViewImp::GetSelectNum", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ov_vt_select_list", symbol: "cOverViewImp::GetSelectList", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "obj_process", symbol: "GameObject", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "obj_position", symbol: "GameObject", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "obj_team", symbol: "GameObject", kind: a2engine::Kind::Field },
@@ -140,7 +144,7 @@ pub const SYMS: &[a2engine::SymDef] = &[
 pub const HOOKS: &[a2engine::HookDef] = &[
     a2engine::HookDef { id: "render3d.overlays.reads", run_unknown: false, rows: &["Modules.overlays"], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36] },
     a2engine::HookDef { id: "render3d.overlays.posts", run_unknown: false, rows: &["Modules.overlays"], syms: &[15, 37, 38, 39, 40, 41] },
-    a2engine::HookDef { id: "render3d.overlays.paths", run_unknown: false, rows: &["Overlays.MovePaths"], syms: &[42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58] },
+    a2engine::HookDef { id: "render3d.overlays.paths", run_unknown: false, rows: &["Overlays.MovePaths"], syms: &[42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60] },
 ];
 
 pub const BUILDS: &[a2engine::Build] = &[
@@ -151,7 +155,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 59,
+        n_resolved: 61,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x473930, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x3c, 0x53, 0x8b], mask: &[], section: "", count: 0, value: 0 }, // fn_footprints
@@ -201,6 +205,8 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x768e40, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // overview
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 612 }, // ov_add_path
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 780 }, // ov_waypoint_key
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 148 }, // ov_vt_select_num
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 152 }, // ov_vt_select_list
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 68 }, // obj_process
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 172 }, // obj_position
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 236 }, // obj_team
@@ -220,8 +226,8 @@ pub const BUILDS: &[a2engine::Build] = &[
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 3] = [const { core::sync::atomic::AtomicU64::new(0) }; 3];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 59] = [const { core::sync::atomic::AtomicU8::new(0) }; 59];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 59] = [const { core::sync::atomic::AtomicUsize::new(0) }; 59];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 61] = [const { core::sync::atomic::AtomicU8::new(0) }; 61];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 61] = [const { core::sync::atomic::AtomicUsize::new(0) }; 61];
 static NOTES: [a2engine::Note; 3] = [const { a2engine::Note::new() }; 3];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 

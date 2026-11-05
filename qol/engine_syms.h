@@ -139,12 +139,55 @@
 #define QOL_S_MP_QUEUE 133
 #define QOL_S_MP_RELEASE_CALL 134
 #define QOL_F_MP_GO_PROCESS 0x44
-#define QOL_F_MP_PROC_COMMAND 0x38
 #define QOL_F_MP_PROC_PATH 0x88
 #define QOL_F_MP_PROC_POINT 0x12c
 #define QOL_V_MP_ACT_QUEUED 16384
 #define QOL_V_MP_PACKET_MAX 508
 #define QOL_V_MP_CMD_PATROL 26
+#define QOL_S_MQ_DQ_WHAT 141
+#define QOL_S_MQ_DQ_WHO 142
+#define QOL_S_MQ_DQ_WHO_WHERE 143
+#define QOL_S_MQ_DQ_WHO_WHERE_PARAM 144
+#define QOL_S_MQ_DQ_CLASS 145
+#define QOL_S_MQ_DQ_CLASS_WHERE 146
+#define QOL_S_MQ_DQ_PARAM 147
+#define QOL_S_MQ_DQ_PATH 148
+#define QOL_S_MQ_DQ_WHERE 149
+#define QOL_S_MQ_DQ_WHERE_PARAM 150
+#define QOL_S_MQ_DQ_WHO_PARAM 151
+#define QOL_S_MQ_GO_BROADCAST 152
+#define QOL_S_MQ_FORM_FORMATION 153
+#define QOL_S_MQ_SET_SPECIAL 154
+#define QOL_S_MQ_PRESIM 155
+#define QOL_S_MQ_CMD_NAME 156
+#define QOL_S_MQ_WHAT_CALL 157
+#define QOL_S_MQ_WHAT_ON_CALL 158
+#define QOL_S_MQ_WHO_CALL 159
+#define QOL_S_MQ_WHO_WHERE_CALL 160
+#define QOL_S_MQ_WHO_WHERE_PARAM_CALL 161
+#define QOL_S_MQ_CLASS_CALL 162
+#define QOL_S_MQ_CLASS_WHERE_CALL 163
+#define QOL_S_MQ_PARAM_CALL 164
+#define QOL_S_MQ_PATH_CALL 165
+#define QOL_S_MQ_WHERE_CALL 166
+#define QOL_S_MQ_WHERE_PARAM_CALL 167
+#define QOL_S_MQ_WHO_PARAM_CALL 168
+#define QOL_S_MQ_GO_BROADCAST_CALL 169
+#define QOL_S_MQ_FORM_FORMATION_CALL 170
+#define QOL_S_MQ_SPECIAL_CALL 171
+#define QOL_S_MQ_PRESIM_CALL 172
+#define QOL_S_MQ_LOAD_TIME 173
+#define QOL_F_MQ_OV_WAYPOINT_KEY 0x30c
+#define QOL_V_MQ_CMD_STOP 3
+#define QOL_V_MQ_CMD_GO_SINGLE 5
+#define QOL_V_MQ_CMD_FORM_FORMATION 32
+#define QOL_V_MQ_CMD_GO_WARP_SINGLE 44
+#define QOL_V_MQ_KEEP_LO 2013856775
+#define QOL_V_MQ_KEEP_HI 5236480
+#define QOL_F_MQ_GO_NEXT_PATH 0x88
+#define QOL_V_MQ_CMD_COUNT 57
+#define QOL_S_MQ_OV_KEYS 183
+#define QOL_S_MQ_OV_KEYS_CALL 184
 #define QOL_H_PAN_SPEED 0
 #define QOL_H_SHIFT_GROUP 1
 #define QOL_H_SELECTION 2
@@ -254,6 +297,41 @@ A2E_U32 a2s_qol_mp_add_call __attribute__((used));
 A2E_U32 a2s_qol_mp_first_call __attribute__((used));
 A2E_U32 a2s_qol_mp_queue __attribute__((used));
 A2E_U32 a2s_qol_mp_release_call __attribute__((used));
+A2E_U32 a2s_qol_mq_dq_what __attribute__((used));
+A2E_U32 a2s_qol_mq_dq_who __attribute__((used));
+A2E_U32 a2s_qol_mq_dq_who_where __attribute__((used));
+A2E_U32 a2s_qol_mq_dq_who_where_param __attribute__((used));
+A2E_U32 a2s_qol_mq_dq_class __attribute__((used));
+A2E_U32 a2s_qol_mq_dq_class_where __attribute__((used));
+A2E_U32 a2s_qol_mq_dq_param __attribute__((used));
+A2E_U32 a2s_qol_mq_dq_path __attribute__((used));
+A2E_U32 a2s_qol_mq_dq_where __attribute__((used));
+A2E_U32 a2s_qol_mq_dq_where_param __attribute__((used));
+A2E_U32 a2s_qol_mq_dq_who_param __attribute__((used));
+A2E_U32 a2s_qol_mq_go_broadcast __attribute__((used));
+A2E_U32 a2s_qol_mq_form_formation __attribute__((used));
+A2E_U32 a2s_qol_mq_set_special __attribute__((used));
+A2E_U32 a2s_qol_mq_presim __attribute__((used));
+A2E_U32 a2s_qol_mq_cmd_name __attribute__((used));
+A2E_U32 a2s_qol_mq_what_call __attribute__((used));
+A2E_U32 a2s_qol_mq_what_on_call __attribute__((used));
+A2E_U32 a2s_qol_mq_who_call __attribute__((used));
+A2E_U32 a2s_qol_mq_who_where_call __attribute__((used));
+A2E_U32 a2s_qol_mq_who_where_param_call __attribute__((used));
+A2E_U32 a2s_qol_mq_class_call __attribute__((used));
+A2E_U32 a2s_qol_mq_class_where_call __attribute__((used));
+A2E_U32 a2s_qol_mq_param_call __attribute__((used));
+A2E_U32 a2s_qol_mq_path_call __attribute__((used));
+A2E_U32 a2s_qol_mq_where_call __attribute__((used));
+A2E_U32 a2s_qol_mq_where_param_call __attribute__((used));
+A2E_U32 a2s_qol_mq_who_param_call __attribute__((used));
+A2E_U32 a2s_qol_mq_go_broadcast_call __attribute__((used));
+A2E_U32 a2s_qol_mq_form_formation_call __attribute__((used));
+A2E_U32 a2s_qol_mq_special_call __attribute__((used));
+A2E_U32 a2s_qol_mq_presim_call __attribute__((used));
+A2E_U32 a2s_qol_mq_load_time __attribute__((used));
+A2E_U32 a2s_qol_mq_ov_keys __attribute__((used));
+A2E_U32 a2s_qol_mq_ov_keys_call __attribute__((used));
 
 static A2E_U32 *const qol_vars[] = {
     &a2s_qol_pan_site,
@@ -397,7 +475,50 @@ static A2E_U32 *const qol_vars[] = {
     0,
     0,
     0,
+    &a2s_qol_mq_dq_what,
+    &a2s_qol_mq_dq_who,
+    &a2s_qol_mq_dq_who_where,
+    &a2s_qol_mq_dq_who_where_param,
+    &a2s_qol_mq_dq_class,
+    &a2s_qol_mq_dq_class_where,
+    &a2s_qol_mq_dq_param,
+    &a2s_qol_mq_dq_path,
+    &a2s_qol_mq_dq_where,
+    &a2s_qol_mq_dq_where_param,
+    &a2s_qol_mq_dq_who_param,
+    &a2s_qol_mq_go_broadcast,
+    &a2s_qol_mq_form_formation,
+    &a2s_qol_mq_set_special,
+    &a2s_qol_mq_presim,
+    &a2s_qol_mq_cmd_name,
+    &a2s_qol_mq_what_call,
+    &a2s_qol_mq_what_on_call,
+    &a2s_qol_mq_who_call,
+    &a2s_qol_mq_who_where_call,
+    &a2s_qol_mq_who_where_param_call,
+    &a2s_qol_mq_class_call,
+    &a2s_qol_mq_class_where_call,
+    &a2s_qol_mq_param_call,
+    &a2s_qol_mq_path_call,
+    &a2s_qol_mq_where_call,
+    &a2s_qol_mq_where_param_call,
+    &a2s_qol_mq_who_param_call,
+    &a2s_qol_mq_go_broadcast_call,
+    &a2s_qol_mq_form_formation_call,
+    &a2s_qol_mq_special_call,
+    &a2s_qol_mq_presim_call,
+    &a2s_qol_mq_load_time,
     0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    &a2s_qol_mq_ov_keys,
+    &a2s_qol_mq_ov_keys_call,
 };
 
 static const A2ESymDef qol_syms[] = {
@@ -537,12 +658,55 @@ static const A2ESymDef qol_syms[] = {
     {"mp_queue", "GameObject::QueueCommand", 0},
     {"mp_release_call", "cOverViewImp::mProcessWaypoints", 1},
     {"mp_go_process", "GameObject", 10},
-    {"mp_proc_command", "CraftProcess", 10},
     {"mp_proc_path", "CraftProcess", 10},
     {"mp_proc_point", "CraftProcess", 10},
     {"mp_act_queued", "cOverViewImp action flag: no order on release", 11},
     {"mp_packet_max", "NetOrderObjectsWhatPath: the largest packet QueueCommand sends", 11},
     {"mp_cmd_patrol", "AiCommand PATROL", 11},
+    {"mq_dq_what", "GameObject::DeQueueCommand", 0},
+    {"mq_dq_who", "GameObject::DeQueueCommand", 0},
+    {"mq_dq_who_where", "GameObject::DeQueueCommand", 0},
+    {"mq_dq_who_where_param", "GameObject::DeQueueCommand", 0},
+    {"mq_dq_class", "GameObject::DeQueueCommand", 0},
+    {"mq_dq_class_where", "GameObject::DeQueueCommand", 0},
+    {"mq_dq_param", "GameObject::DeQueueCommand", 0},
+    {"mq_dq_path", "GameObject::DeQueueCommand", 0},
+    {"mq_dq_where", "GameObject::DeQueueCommand", 0},
+    {"mq_dq_where_param", "GameObject::DeQueueCommand", 0},
+    {"mq_dq_who_param", "GameObject::DeQueueCommand", 0},
+    {"mq_go_broadcast", "FormationManager::Broadcast_Go_Command", 0},
+    {"mq_form_formation", "FormationManager::FormFormation", 0},
+    {"mq_set_special", "GameObject::SetCommand", 0},
+    {"mq_presim", "GameObject::PreSimulateAll", 0},
+    {"mq_cmd_name", "AiCommandToName", 0},
+    {"mq_what_call", "NetOrderWhat::Execute", 1},
+    {"mq_what_on_call", "NetOrderWhatOn::Execute", 1},
+    {"mq_who_call", "NetOrderWhatWho::Execute", 1},
+    {"mq_who_where_call", "NetOrderWhatWhoWhere::Execute", 1},
+    {"mq_who_where_param_call", "NetOrderWhatWhoWhereParam::Execute", 1},
+    {"mq_class_call", "NetOrderWhatClass::Execute", 1},
+    {"mq_class_where_call", "NetOrderWhatClassWhere::Execute", 1},
+    {"mq_param_call", "NetOrderWhatParam::Execute", 1},
+    {"mq_path_call", "NetOrderObjectsWhatPath::Execute", 1},
+    {"mq_where_call", "NetOrderWhatWhere::Execute", 1},
+    {"mq_where_param_call", "NetOrderWhatWhereParam::Execute", 1},
+    {"mq_who_param_call", "NetOrderWhatWhoParam::Execute", 1},
+    {"mq_go_broadcast_call", "NetOrderMove::Execute", 1},
+    {"mq_form_formation_call", "NetOrderFormFormation::Execute", 1},
+    {"mq_special_call", "NetOrderSpecialAttack::Execute", 1},
+    {"mq_presim_call", "Simulate", 1},
+    {"mq_load_time", "g_finish_load_time", 8},
+    {"mq_ov_waypoint_key", "cOverViewImp", 10},
+    {"mq_cmd_stop", "AiCommand STOP", 11},
+    {"mq_cmd_go_single", "AiCommand GO_SINGLE", 11},
+    {"mq_cmd_form_formation", "AiCommand FORM_FORMATION", 11},
+    {"mq_cmd_go_warp_single", "AiCommand GO_WARP_SINGLE", 11},
+    {"mq_keep_lo", "AiCommands 0-31 that leave a ship's movement alone: NONE, DEFAULT, SELECT, QUEUE, SET_RALLY_POINT, CANCEL_BUILD (19, 30), RED/YELLOW/GREEN_ALERT", 11},
+    {"mq_keep_hi", "AiCommands 32-63 that leave a ship's movement alone (bit n-32): BUY/SELL_RESOURCE, SET_FORMATION, SET_ATTACK_MODE, the six autonomy settings, CMD_SET_FORMATION_ORIENTATION", 11},
+    {"mq_go_next_path", "GameObject", 10},
+    {"mq_cmd_count", "AiCommandToName's table: the number of AiCommands", 11},
+    {"mq_ov_keys", "cOverViewImp::mProcessKeyboardInput", 0},
+    {"mq_ov_keys_call", "cOverViewImp::Simulate", 1},
 };
 static const char *const qol_h0_rows[] = {"QOL.PanSpeed", 0};
 static const A2E_U16 qol_h0_syms[] = {0, 1, 0};
@@ -557,7 +721,7 @@ static const A2E_U16 qol_h4_syms[] = {7, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
 static const char *const qol_h5_rows[] = {"QOL.WarpDistance", 0};
 static const A2E_U16 qol_h5_syms[] = {6, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 89, 90, 91, 92, 94, 96, 98, 104, 105, 106, 107, 108, 111, 112, 0};
 static const char *const qol_h6_rows[] = {"QOL.PathStartsAtOnce", 0};
-static const A2E_U16 qol_h6_syms[] = {11, 74, 75, 85, 89, 91, 92, 96, 107, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 0};
+static const A2E_U16 qol_h6_syms[] = {11, 74, 75, 85, 89, 91, 92, 96, 107, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 0};
 static const char *const qol_h7_rows[] = {"QOL.BarKeys", 0};
 static const A2E_U16 qol_h7_syms[] = {113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 0};
 static const A2EHookDef qol_hooks[] = {
@@ -567,7 +731,7 @@ static const A2EHookDef qol_hooks[] = {
     {"qol.special_select", 0, qol_h3_rows, 1, qol_h3_syms, 8},
     {"qol.stations", 0, qol_h4_rows, 1, qol_h4_syms, 43},
     {"qol.warp", 0, qol_h5_rows, 1, qol_h5_syms, 27},
-    {"qol.move_paths", 0, qol_h6_rows, 1, qol_h6_syms, 21},
+    {"qol.move_paths", 0, qol_h6_rows, 1, qol_h6_syms, 64},
     {"qol.bar_keys", 0, qol_h7_rows, 1, qol_h7_syms, 17},
 };
 static const A2E_U8 qol_b0_c0[] = {0x68, 0xcc, 0xd7, 0x6f, 0x00, 0xe8, 0x00, 0x6c, 0x1c, 0x00, 0x8b, 0x45, 0xf0, 0x85, 0xc0, 0x75, 0x08, 0xd9, 0x1d, 0xb4, 0xfb, 0x70, 0x00, 0xeb, 0x02};
@@ -653,6 +817,23 @@ static const A2E_U8 qol_b0_c127[] = {0x55, 0x8b, 0xec, 0x6a, 0xff};
 static const A2E_U8 qol_b0_c129[] = {0x8b, 0xc1, 0x56, 0x8b, 0x90};
 static const A2E_U8 qol_b0_c130[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x02, 0x14};
 static const A2E_U8 qol_b0_c133[] = {0x55, 0x8b, 0xec, 0x64, 0xa1, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c141[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x55};
+static const A2E_U8 qol_b0_c142[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x55};
+static const A2E_U8 qol_b0_c143[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x10, 0x8b, 0x55};
+static const A2E_U8 qol_b0_c144[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x14, 0x8b, 0x55};
+static const A2E_U8 qol_b0_c145[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x55};
+static const A2E_U8 qol_b0_c146[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x10, 0x8b, 0x55};
+static const A2E_U8 qol_b0_c147[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x55};
+static const A2E_U8 qol_b0_c148[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x0a, 0xe4};
+static const A2E_U8 qol_b0_c149[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x55};
+static const A2E_U8 qol_b0_c150[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x10, 0x8b, 0x55};
+static const A2E_U8 qol_b0_c151[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x10, 0x8b, 0x55};
+static const A2E_U8 qol_b0_c152[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x02, 0xa4};
+static const A2E_U8 qol_b0_c153[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x26, 0xa4};
+static const A2E_U8 qol_b0_c154[] = {0x55, 0x8b, 0xec, 0x64, 0xa1, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c155[] = {0x55, 0x8b, 0xec, 0xa1, 0x84, 0x10, 0x76, 0x00};
+static const A2E_U8 qol_b0_c156[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x8b, 0x04};
+static const A2E_U8 qol_b0_c183[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x27, 0x14};
 static const A2EEntry qol_b0_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 25, 0x491766, 0x0, 0, qol_b0_c0, 0, ""}, /* pan_site */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x70fbb4, 0x0, 0, 0, 0, ""}, /* fastscroll */
@@ -790,28 +971,71 @@ static const A2EEntry qol_b0_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4380, 0x0, 0, qol_b0_c133, 0, ""}, /* mp_queue */
     {1, 0, 0x85, 0xffff, 0, 0, 0, 0x522bba, 0x0, 0, 0, 0, ""}, /* mp_release_call */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 68, 0, 0, ""}, /* mp_go_process */
-    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 56, 0, 0, ""}, /* mp_proc_command */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 136, 0, 0, ""}, /* mp_proc_path */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 300, 0, 0, ""}, /* mp_proc_point */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 16384, 0, 0, ""}, /* mp_act_queued */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 508, 0, 0, ""}, /* mp_packet_max */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 26, 0, 0, ""}, /* mp_cmd_patrol */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4540, 0x0, 0, qol_b0_c141, 0, ""}, /* mq_dq_what */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4560, 0x0, 0, qol_b0_c142, 0, ""}, /* mq_dq_who */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4590, 0x0, 0, qol_b0_c143, 0, ""}, /* mq_dq_who_where */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d45c0, 0x0, 0, qol_b0_c144, 0, ""}, /* mq_dq_who_where_param */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d45f0, 0x0, 0, qol_b0_c145, 0, ""}, /* mq_dq_class */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4610, 0x0, 0, qol_b0_c146, 0, ""}, /* mq_dq_class_where */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4630, 0x0, 0, qol_b0_c147, 0, ""}, /* mq_dq_param */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4650, 0x0, 0, qol_b0_c148, 0, ""}, /* mq_dq_path */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4820, 0x0, 0, qol_b0_c149, 0, ""}, /* mq_dq_where */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4850, 0x0, 0, qol_b0_c150, 0, ""}, /* mq_dq_where_param */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4880, 0x0, 0, qol_b0_c151, 0, ""}, /* mq_dq_who_param */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x43b3e0, 0x0, 0, qol_b0_c152, 0, ""}, /* mq_go_broadcast */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x43b680, 0x0, 0, qol_b0_c153, 0, ""}, /* mq_form_formation */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d1d90, 0x0, 0, qol_b0_c154, 0, ""}, /* mq_set_special */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d48b0, 0x0, 0, qol_b0_c155, 0, ""}, /* mq_presim */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x44e1c0, 0x0, 0, qol_b0_c156, 0, ""}, /* mq_cmd_name */
+    {1, 0, 0x8d, 0xffff, 0, 0, 0, 0x55007f, 0x0, 0, 0, 0, ""}, /* mq_what_call */
+    {1, 0, 0x8d, 0xffff, 0, 0, 0, 0x5500f1, 0x0, 0, 0, 0, ""}, /* mq_what_on_call */
+    {1, 0, 0x8e, 0xffff, 0, 0, 0, 0x5502a6, 0x0, 0, 0, 0, ""}, /* mq_who_call */
+    {1, 0, 0x8f, 0xffff, 0, 0, 0, 0x55034a, 0x0, 0, 0, 0, ""}, /* mq_who_where_call */
+    {1, 0, 0x90, 0xffff, 0, 0, 0, 0x5503ee, 0x0, 0, 0, 0, ""}, /* mq_who_where_param_call */
+    {1, 0, 0x91, 0xffff, 0, 0, 0, 0x55017e, 0x0, 0, 0, 0, ""}, /* mq_class_call */
+    {1, 0, 0x92, 0xffff, 0, 0, 0, 0x550212, 0x0, 0, 0, 0, ""}, /* mq_class_where_call */
+    {1, 0, 0x93, 0xffff, 0, 0, 0, 0x550461, 0x0, 0, 0, 0, ""}, /* mq_param_call */
+    {1, 0, 0x94, 0xffff, 0, 0, 0, 0x54f9ce, 0x0, 0, 0, 0, ""}, /* mq_path_call */
+    {1, 0, 0x95, 0xffff, 0, 0, 0, 0x5504d1, 0x0, 0, 0, 0, ""}, /* mq_where_call */
+    {1, 0, 0x96, 0xffff, 0, 0, 0, 0x550545, 0x0, 0, 0, 0, ""}, /* mq_where_param_call */
+    {1, 0, 0x97, 0xffff, 0, 0, 0, 0x5505da, 0x0, 0, 0, 0, ""}, /* mq_who_param_call */
+    {1, 0, 0x98, 0xffff, 0, 0, 0, 0x5521a5, 0x0, 0, 0, 0, ""}, /* mq_go_broadcast_call */
+    {1, 0, 0x99, 0xffff, 0, 0, 0, 0x5526f6, 0x0, 0, 0, 0, ""}, /* mq_form_formation_call */
+    {1, 0, 0x9a, 0xffff, 0, 0, 0, 0x5518a0, 0x0, 0, 0, 0, ""}, /* mq_special_call */
+    {1, 0, 0x9b, 0xffff, 0, 0, 0, 0x483327, 0x0, 0, 0, 0, ""}, /* mq_presim_call */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x737bb8, 0x0, 0, 0, 0, ""}, /* mq_load_time */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 780, 0, 0, ""}, /* mq_ov_waypoint_key */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 3, 0, 0, ""}, /* mq_cmd_stop */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 5, 0, 0, ""}, /* mq_cmd_go_single */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 32, 0, 0, ""}, /* mq_cmd_form_formation */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 44, 0, 0, ""}, /* mq_cmd_go_warp_single */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 2013856775, 0, 0, ""}, /* mq_keep_lo */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 5236480, 0, 0, ""}, /* mq_keep_hi */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 136, 0, 0, ""}, /* mq_go_next_path */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 57, 0, 0, ""}, /* mq_cmd_count */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x525950, 0x0, 0, qol_b0_c183, 0, ""}, /* mq_ov_keys */
+    {1, 0, 0xb7, 0xffff, 0, 0, 0, 0x51ef2e, 0x0, 0, 0, 0, ""}, /* mq_ov_keys_call */
 };
 static const A2EBlock qol_b0_blocked[] = {
     {0xffff, 0, 0, 0}
 };
 static const A2EBuild qol_builds[] = {
-    {"gog-1.1", "armada2/gog-1.1", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qol_b0_entries, qol_b0_blocked, 0, 142},
+    {"gog-1.1", "armada2/gog-1.1", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qol_b0_entries, qol_b0_blocked, 0, 185},
 };
 
 static A2E_U8 qol_hook_state[8];
-static A2E_U8 qol_sym_flags[142];
-static A2E_U32 qol_sym_addr[142];
+static A2E_U8 qol_sym_flags[185];
+static A2E_U32 qol_sym_addr[185];
 static char qol_notes[8][A2E_NOTE_MAX + 1];
 
 static const A2ETable QOL_ENGINE = {
     "armada2", "qol",
-    qol_syms, 142, qol_hooks, 8, qol_builds, 1, 0,
+    qol_syms, 185, qol_hooks, 8, qol_builds, 1, 0,
     qol_vars, qol_hook_state, qol_sym_flags, qol_sym_addr, qol_notes
 };
 

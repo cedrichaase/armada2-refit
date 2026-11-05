@@ -9,6 +9,7 @@ GetModuleHandleA@4
 VirtualProtect@16
 FlushInstructionCache@12
 GetCurrentProcess@0
+K32EnumProcessModules@16
 CreateFileA@28
 ReadFile@20
 WriteFile@20

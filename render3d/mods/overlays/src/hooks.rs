@@ -502,14 +502,49 @@ pub fn sketch() -> usize {
     field(at(sym::OVERVIEW), field::OV_ADD_PATH)
 }
 
+/// The overview's selected objects (`GetSelectNum`, `GetSelectList`: the entity ids,
+/// wherever QOL's `MaxSelection` keeps the array), as objects.
+pub fn selected_objects(out: &mut alloc::vec::Vec<usize>) {
+    out.clear();
+    let ov = at(sym::OVERVIEW);
+    if ov == 0 {
+        return;
+    }
+    let vt = engine::vtable(ov);
+    if vt == 0 {
+        return;
+    }
+    unsafe {
+        let num: unsafe extern "thiscall" fn(usize) -> i32 = core::mem::transmute(rd::<usize>(vt + field::OV_VT_SELECT_NUM));
+        let list: unsafe extern "thiscall" fn(usize) -> *const i32 = core::mem::transmute(rd::<usize>(vt + field::OV_VT_SELECT_LIST));
+        let n = num(ov);
+        let ids = list(ov);
+        if n <= 0 || n > 512 || ids.is_null() {
+            return;
+        }
+        for i in 0..n as usize {
+            let o = entity(core::ptr::read_unaligned(ids.add(i)) as usize);
+            if o != 0 {
+                out.push(o);
+            }
+        }
+    }
+}
+
+/// A ship of the player's team (a craft, flags `0xc`): where it is.
+pub fn ship_position(o: usize, team: i32) -> Option<V3> {
+    if o == 0 || r3d_core::engine::obj::flags(o) & 0xc != 0xc || field(o, field::OBJ_TEAM) as i32 != team {
+        return None;
+    }
+    Some(unsafe { rd::<V3>(o + field::OBJ_POSITION) })
+}
+
 /// A ship of the player's team on a path: (where it is, its path, the point it flies
 /// to). The craft's process (`+0x44`) holds the path it follows (`+0x88`) and the
 /// index of the point it is heading to (`+0x12c`) while its command (`+0x38`) is a move
 /// or a patrol.
 pub fn ship_path(o: usize, team: i32) -> Option<(V3, usize, i32)> {
-    if o == 0 || r3d_core::engine::obj::flags(o) & 0xc != 0xc || field(o, field::OBJ_TEAM) as i32 != team {
-        return None;
-    }
+    let pos = ship_position(o, team)?;
     let proc_ = field(o, field::OBJ_PROCESS);
     if proc_ == 0 {
         return None;
@@ -522,7 +557,7 @@ pub fn ship_path(o: usize, team: i32) -> Option<(V3, usize, i32)> {
     if path == 0 {
         return None;
     }
-    Some((unsafe { rd::<V3>(o + field::OBJ_POSITION) }, path, field(proc_, field::PROC_POINT) as i32))
+    Some((pos, path, field(proc_, field::PROC_POINT) as i32))
 }
 
 static mut PATH_GATE: Option<Gate> = None;

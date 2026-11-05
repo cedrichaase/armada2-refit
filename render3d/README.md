@@ -1753,29 +1753,57 @@ Stock draws the sketch only while the key is held, at the end of `mNormalModeRen
 (`mDrawPath` 0x525180, its call at 0x522247: a one-pixel green line with boxes at the
 points); a path being flown is never drawn.
 
-Ours, in `Step::Translucent` of the main view: for each ship of the player's team whose
-command is a move or a patrol with a path, a row of fine dots from the ship to the point
-it heads to and on through the rest (a patrol on round to that point again), and a
-bigger dot at each point. The dots are placed from the far end of each segment, every
-`MovePathSpacing` pixels, and interpolated in screen space, so they stay put on the map
-as the ship flies and are cut off behind it: the part flown is gone, and a point
-passed loses its dot. The ships of one order fly copies of the same points, so a
-segment or a point already drawn this frame is not drawn again. While the key is held
-the sketch is drawn the same way (stock's call of `mDrawPath` is re-pointed and draws
-nothing while ours are drawn), and for up to a second after it is let go, until a
-ship's copy ending at the same point has arrived over the network. Points are lifted a
-unit above where they were clicked, clear of the grid's lines; depth-tested (a hull in
-front hides them), not written, blended. Render3D.log says `move paths: N ship(s) on a
-path, M point(s) ahead, sketch K` whenever one of the three changes (the first 200).
-`render3d-move-paths` checks it with the QOL change.
+Ours, in `Step::Translucent` of the main view: for each **selected** ship of the player's
+team (the overview's `GetSelectNum` / `GetSelectList`, vtable `+0x94` / `+0x98`, entity
+ids turned into objects by `Entity::Get`; not the selection bubbles' effect hash, which
+also holds co-players' and hovered objects, and not the array at `+0xbc`, which QOL's
+`MaxSelection` moves, so a selection above 16 is read where it is) with a path, a row of
+fine dots from the ship to the point it heads to and on through the rest, and a bigger dot
+at each point. An unselected ship's path is not drawn. The dots are placed from the far
+end of each segment, every `MovePathSpacing` pixels, and interpolated in screen space, so
+they stay put on the map as the ship flies and are cut off behind it: the part flown is
+gone, and a point passed loses its dot. Ships of one order share points: a segment or a
+point already drawn this frame is not drawn again.
+
+*The source of the path.* When a loaded plugin (`QOL.asi`) exports the queue it keeps (the
+appended legs, per-leg warp), that queue is drawn: the exports are found by name among every
+loaded module's (`rt::find_export`, never by the file name), once, and again once a second
+until found (not every frame). The contract, cdecl:
+
+    int QOL_MoveQueueVersion(void);   /* 1; any other value: not used */
+    int QOL_MoveQueue(const void *ship, float *xyz, int *flags, int cap);
+
+`ship` is the `GameObject`; the call returns -1 when QOL keeps no queues, 0 when the ship
+has none, else the number of points (at most `cap`, 128 here), from the one the ship flies
+to now to the last, as xyz triples; `flags[i]` bit 0 is a warp leg (drawn as any other),
+bit 1 a point of a patrol run that loops back to that run's first point (a run is
+closed back to its first point). The line runs from the ship to point 0 and on. QOL adds
+each Tab-click at once, so with its queue live (the last call answered 0 or more) **no
+sketch is drawn**. Without the export, or when it answers -1, the engine's own path
+(`+0x88` / `+0x12c`, only paths that came from a sketch: an ordinary move is a path of
+one point and is not drawn) and the sketch are drawn as before, while the key is held and
+for up to a second after, until a ship's copy ending at the same point has arrived;
+the filter and the sketch are only the fallback's. Stock's call of `mDrawPath` is
+re-pointed and draws nothing while ours are drawn. Points are lifted a unit above where
+they were clicked, clear of the grid's lines; depth-tested (a hull in front hides them),
+not written, blended.
+
+Render3D.log (the first 200 lines): once `overlays: move paths: QOL's queue found
+(version 1)`, or `QOL's queue not found (the engine's paths, and the sketch)` (then looked
+for once a second without more lines) or `QOL's queue is version N: not used`; and, when
+one of the counts or the source changes, `overlays: move paths: N selected ship(s) on a
+path, M point(s) ahead (qol|engine|-), sketch K`. `render3d-move-paths` checks it with the
+QOL change.
 
 | Key (`[Overlays]`) | Default | |
 |---|---|---|
 | `MovePaths` | 1 | 0: no paths drawn; stock's line, while the key is held |
-| `MovePathColour`, `MovePathBrightness` | 0.55 1.0 0.55, 1 | the dots' colour (a light green) and the factor on it |
-| `MovePathOpacity` | 0.85 | the dots' opacity |
-| `MovePathDot`, `MovePathPoint` | 2.5, 6 | the dots' and the points' diameter, pixels at 1080 lines |
-| `MovePathSpacing` | 9 | from one dot to the next, pixels at 1080 lines |
+| `MovePathColour`, `MovePathBrightness` | 0.85 0.85 0.85, 1 | the line's colour (a very light grey) and the factor on it |
+| `MovePathOpacity` | 0.85 | the line's opacity |
+| `MovePathDot`, `MovePathSpacing` | 1.9, 8 | the line's dots' diameter and the distance from one to the next, pixels at 1080 lines |
+| `MovePointColour`, `MovePointBrightness` | 0.55 1.0 0.55, 1 | the points' colour (a light green) and the factor on it |
+| `MovePointOpacity` | 0.85 | the points' opacity |
+| `MovePathPoint` | 6 | the points' diameter, pixels at 1080 lines |
 
 #### overlays: Hooks
 
@@ -1788,7 +1816,7 @@ module is off they run as stock.
 | Hook | Site | Used for | Gate shut |
 |---|---|---|---|
 | `DrawHeightPost` | the five calls (the build ghost's, and the overview's `mNormalModeRender`, `mRenderWhere`, `mDrawPosts` and its one-point helper) | the height posts, noted for the view and drawn as anti-aliased lines | the call that was there (`Prev`): the engine's one-pixel line |
-| `mDrawPath` (`render3d.overlays.paths`) | `mNormalModeRender`'s call (0x522247), the sketch while the waypoint key is held | nothing drawn: the move paths draw the sketch | the call that was there: the engine's line |
+| `mDrawPath` (`render3d.overlays.paths`) | `mNormalModeRender`'s call (0x522247), the sketch while the waypoint key is held | nothing drawn: the move paths draw the sketch (or QOL's queue) | the call that was there: the engine's line |
 
 It is installed at the first switch-on, whether or not `HeightPosts` is on, so the key
 can be switched live: the detour notes a post only while one of our views is running

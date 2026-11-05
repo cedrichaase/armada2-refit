@@ -170,7 +170,6 @@ Installed, not yet seen in game. Pixel gate: `port-showcase`, `port-nebula` and
 
 Installed, not yet seen in game.
 
-
 ### Changed
 - The frame: `MSAA` and `HDR` are `apply = "live"`. `Render3D_SettingsChanged` swaps a
   new `Config` in (`config::reload`) and, when either moved, `frame::formats_changed`

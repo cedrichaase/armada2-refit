@@ -241,17 +241,102 @@ package for it from placeholder plugins ([`installer/README.md`](installer/READM
   (ubuntu-24.04), a portable `.exe` (windows-2025, `gui-installer/test-windows.ps1`) and
   a universal2 `.app` (macos-15, `gui-installer/test-macos.sh`, after
   `publish/installer/test.sh` on macOS);
-- on `main` only, when the root version has no release yet: tag `vX.Y.Z` and publish a
-  GitHub Release with the zip, the GUI installer as a script, an AppImage, a Windows
-  `.exe` and a macOS app's zip, the changelog entry as its notes. An entry that still
-  says "not yet seen in game" goes out as a pre-release, and so does one with a line
-  starting "Pre-release" (confirmed on one system, not yet on another; the user makes
-  it a release on GitHub once it is). So **bumping the root version
-  and pushing `main` is what releases**; a push that does not bump it releases nothing.
-- after that, on every push to `main`: delete all but the newest ten releases. Their
-  tags stay, so a version named anywhere still resolves to its commit.
+- `tools/changeset.py check` and its self-test: every pending changeset names real
+  layers and a valid bump, every version file agrees with its changelog, and on a pull
+  request no version changed by hand (the release PR, branch `release/next`, excepted);
+- **on the push to `main` that merges the release PR** (job `release-commit` finds its
+  `Release-Version: X.Y.Z` trailer; "Releasing" below), and on a dispatch on `main` with
+  `release` ticked as the fallback for a failed run: tag `vX.Y.Z` and publish a GitHub
+  Release with the zip, the GUI installer as a script, an AppImage, a Windows `.exe` and a
+  macOS app's zip, the root changelog entry as its notes. It refuses when `vX.Y.Z`
+  exists. An entry that still says "not yet seen in game" goes out as an **untested
+  release** (GitHub's *Pre-release* flag), and so does one with a line starting
+  "Untested" (confirmed on one system, not yet on another, e.g. before the user's Windows
+  gate; the user makes it a full release on GitHub once it is; entries before 15.10.0
+  wrote "Pre-release"). Then it deletes all but the newest ten `vX.Y.Z` releases. Their
+  tags stay, so a version named anywhere still resolves to its commit;
+- **on every push to `main`: a pre-release**, `vX.Y.Z-pre.N`, the build of the latest
+  main (job `prerelease`, "Pre-releases: the latest main" below);
 - on `main` and on dispatch: every program in the release scanned on VirusTotal, and the
   reports attached to the release (below).
+
+### Releasing
+
+Versions come from **changesets** (`.changeset/README.md`; `CLAUDE.md`, "Changelogs and
+versions"), never from hand edits. A release starts with one action by hand and is
+published by merging its pull request. No other push to `main` releases anything, a
+version changed by hand included.
+
+1. **See what is pending**: `python3 tools/changeset.py status` prints each layer's
+   current → next version and the changesets behind each bump. CI prints the same, and
+   every pre-release's notes list them.
+2. **Prepare**: Actions → **Release** → *Run workflow* (`.github/workflows/release.yml`).
+   It runs `tools/changeset.py version --commit` on `main`. That writes each layer's
+   entry and version files and the root entry with its `Layers:` line, deletes the
+   changesets, and commits it all as "Release X.Y.Z" with the trailer
+   `Release-Version: X.Y.Z`. The workflow pushes that to the branch `release/next`, opens
+   (or updates) the pull request **"Release X.Y.Z"**, and dispatches CI on it, since a
+   pull request opened with the workflow's own token starts no workflow. Running it again
+   replaces the branch with a fresh version of `main`.
+3. **Review**: this is the place to edit a status line. "Confirmed in game YYYY-MM-DD"
+   in place of "Installed, not yet seen in game" makes a full release, and an "Untested
+   ..." line keeps it an untested release.
+4. **Merge it with a merge commit or a rebase; do not squash.** A squash drops the
+   trailer. If it happens anyway, job `release-commit` fails with that message and
+   publishes nothing: use the fallback below. The push to `main` runs CI as usual. Job
+   `release-commit` runs `tools/changeset.py released BEFORE..HEAD`, which answers with
+   the version only when the root version changed in this push *and* a commit in it
+   carries the trailer for that version. Then job `release` publishes `vX.Y.Z` once
+   every build and test job has passed. The VirusTotal reports follow as before.
+
+**Fallback**: if that run failed (a flaky job, a squash that lost the trailer), re-run
+it, or dispatch CI on `main` with `release` ticked (`gh workflow run ci.yml --ref main -f
+release=true`). It publishes the root version `main` has, and refuses if it exists.
+
+**Why a release PR** and not a commit to `main`: the version step writes a dozen
+changelogs that deserve a read before they are published for good, and a pull request is
+where that read and the status edits happen. It also needs no token that can bypass
+branch protection. It needs *Settings → Actions → General → Allow GitHub Actions to
+create and approve pull requests*, which is on.
+
+**Locally**, the same: `python3 tools/changeset.py version --commit` on a branch from
+`main` (`--dry-run` shows the plan first), then `git merge --no-ff` it into `main` and
+push.
+
+### Pre-releases: the latest main
+
+Every push to `main` publishes a **pre-release**, a build of that commit, so the latest
+main can be installed with the GUI installer without a release. It is for testing, and
+for players who want to live on the edge. CI job `prerelease` runs after the package,
+installer and GUI jobs pass, one run at a time:
+
+- the zip is built again with `A2_PRERELEASE=N` (`publish/package.sh`), versioned
+  `<next>-pre.N`, e.g. `armada2-refit-15.10.0-pre.4182.zip`. `<next>` is
+  `tools/changeset.py status --next-root`: the version the pending changesets give, or
+  the current one plus a patch when none are pending, so a pre-release always sorts
+  above the release it follows (semver: `15.10.0-pre.4182` < `15.10.0`, and
+  `15.10.1-pre.4190` > `15.10.0`). **N is CI's run number** (`GITHUB_RUN_NUMBER`). It is
+  unique and rising, so two pushes in quick succession cannot claim the same tag, as a
+  counter per version read from the existing tags could. A re-run keeps its number and
+  finds its release already made;
+- it is published as the GitHub release **`vX.Y.Z-pre.N`**, tagged on the commit, with
+  GitHub's *Pre-release* flag and `--latest=false`, and with the zip and the four
+  installer assets. The notes name the commit and date and list the pending changesets
+  (`changeset.py status --markdown`);
+- the newest **three** are kept, and older ones are deleted with their tags (a
+  pre-release is never named in a changelog). The ten `vX.Y.Z` releases job `release`
+  keeps are counted apart: each pruning matches only its own tag pattern;
+- nothing takes a `-pre.N` tag for a release. The `release` job publishes only `v` plus
+  the root changelog's version, `changeset.py` reads versions from the changelogs, and
+  the GUI installer counts only `vX.Y.Z` tags as releases. It lists the newest `-pre.N`
+  last, as "Pre-release (latest main) · 15.10.0-pre.4182 · commit · date — untested",
+  and never picks it by default (`gui-installer/README.md`).
+
+**Two words, two things.** A *pre-release* (`vX.Y.Z-pre.N`) is always a build of the
+latest main. A versioned `vX.Y.Z` that is not yet seen in game, or not yet past the
+Windows gate, is an **untested release**: GitHub shows it with its *Pre-release* flag,
+like the pre-releases, but the installer and these docs call it "untested release".
+Neither is ever chosen for the player.
 
 ### VirusTotal
 
