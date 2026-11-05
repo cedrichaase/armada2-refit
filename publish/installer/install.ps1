@@ -538,7 +538,8 @@ foreach ($k in "bar", "info", "minimap", "selection", "unitview", "resources", "
 }
 function Get-Retired([string]$name) {
     if ($name.ToLower() -eq "render3d.ini") {
-        return @(@("lights", "beamlight", "1.0"), @("lights", "beamreach", "40"), @("nebulae", "litexplosion", "0.75"))
+        return @(@("lights", "beamlight", "1.0"), @("lights", "beamreach", "40"), @("nebulae", "litexplosion", "0.75"),
+                 @("overlays", "movepathcolour", "0.55 1.0 0.55"), @("overlays", "movepathdot", "2.5"), @("overlays", "movepathspacing", "9"))
     }
     @()
 }
