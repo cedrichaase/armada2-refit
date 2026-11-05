@@ -15,7 +15,7 @@ doc = "The height posts: DrawHeightPost's five call sites re-pointed to our own 
 rows = ["Modules.overlays"]
 
 [hook."overlays.paths"]
-doc = "The move paths: each ship's path and next point, the sketched path, stock's sketch line re-pointed"
+doc = "The move paths: the selection, each ship's path and next point, the sketched path, stock's sketch line re-pointed"
 rows = ["Overlays.MovePaths"]
 
 
@@ -379,6 +379,24 @@ symbol = "cOverViewImp"
 kind = "field"
 struct = "cOverViewImp"
 offset = 0x30c
+type = "ptr"
+used_by = ["overlays.paths"]
+
+[[sym]]
+id = "ov_vt_select_num"
+symbol = "cOverViewImp::GetSelectNum"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0x94
+type = "ptr"
+used_by = ["overlays.paths"]
+
+[[sym]]
+id = "ov_vt_select_list"
+symbol = "cOverViewImp::GetSelectList"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0x98
 type = "ptr"
 used_by = ["overlays.paths"]
 

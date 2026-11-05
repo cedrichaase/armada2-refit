@@ -1272,9 +1272,9 @@ static void startup(void)
     s_cat(b, "--- QOL PathStartsAtOnce=");
     s_cat(b, g_pathStart ? "1" : "0");
     if (!g_pathStart) {
-        s_cat(b, "  (a sketched path is sent when the key is let go, as in stock)");
+        s_cat(b, "  (a sketched path is sent when the key is let go, as in stock; no queues)");
     } else if (g_pathsOk) {
-        s_cat(b, "  -> a path sketched with the waypoint key is sent at each point, patched");
+        s_cat(b, "  -> move queues: Tab points (and minimap points) queued per ship, flown at once, patched");
     } else {
         not_patched(b, QOL_H_MOVE_PATHS);
     }

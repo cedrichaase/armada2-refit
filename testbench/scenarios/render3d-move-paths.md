@@ -28,22 +28,22 @@ one-pixel green line with its boxes.
 2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
 4. Expect "Render3D.log" contains "overlays: move paths 1, stock's sketch line ours".
-5. Expect "QOL.log" contains "a path sketched with the waypoint key is sent at each point, patched".
+5. Expect "QOL.log" contains "move queues: Tab points (and minimap points) queued per ship, flown at once, patched".
 6. Scene "select ship2".
 7. Expect scene "selection" answers "ship2".
 8. Move the mouse to 840,360.
 9. Scene "waypoint-key on".
 10. Right-click at 840,360.
-11. Wait up to 10 seconds for "QOL.log" to say "move paths: point 1 sent at once".
+11. Wait up to 10 seconds for "QOL.log" to say "move queue: run sent: go, 1 point(s) from point 1".
 12. Wait up to 10 seconds for "Render3D.log" to say "move paths: 1 ship(s) on a path, 1 point(s) ahead, sketch 1".
 13. Wait 1 seconds.
 14. Right-click at 840,200.
 15. Right-click at 520,200.
 16. Wait up to 10 seconds for "Render3D.log" to say "sketch 3".
-17. Expect "QOL.log" contains "move paths: point 3 sent at once".
+17. Expect "QOL.log" contains "move queue: appended point 3 (go)".
 18. Take a screenshot called "held".
 19. Scene "waypoint-key off".
-20. Wait up to 10 seconds for "QOL.log" to say "move paths: key let go, the path already sent".
+20. Wait up to 10 seconds for "QOL.log" to say "move queue: key let go, the points are queued already".
 21. Wait 1 seconds.
 22. Take a screenshot called "released".
 23. Wait 2 seconds.

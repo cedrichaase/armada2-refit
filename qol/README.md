@@ -58,7 +58,7 @@ Status values: **idea** (not investigated), **scoped** (approach known, nothing 
 | [QOL-7](#qol-7-pay-when-queuing-refund-on-cancel) | Pay when queuing, refund on cancel | `QOLRules.asi`, `PayOnQueue=` | — | **built**, now the [`rules/`](../rules/README.md) layer |
 | [QOL-8](#qol-8-long-moves-on-the-map-go-to-warp) | Long moves on the map go to warp | `QOL.asi`, `WarpDistance=` | A stock peer in a network game | **done** (`QOL.asi`), bench |
 | [QOL-9](#qol-9-the-view-reaches-across-the-map) | The view reaches across the map | `Render3D.asi`, `[View] Distance=` | — | **done**, render3d's since qol 2.2.0 |
-| [QOL-10](#qol-10-a-move-path-starts-at-its-first-point) | A move path starts at its first point | `QOL.asi`, `PathStartsAtOnce=` | The path key as a binding (issue #26) | **built** (`QOL.asi`), bench |
+| [QOL-10](#qol-10-move-queues) | Move queues: points appended with Tab, flown at once, each leg at its own warp | `QOL.asi`, `PathStartsAtOnce=` | The path key as a binding (issue #26) | **built** (`QOL.asi`), bench |
 
 ## Settings live
 
@@ -608,23 +608,81 @@ findings are in [`render3d/README.md`](../render3d/README.md#view-distance). `QO
 old `ViewDistance=` is carried over by `tools/settings/move-keys.py` and the release
 installers.
 
-## QOL-10: A move path starts at its first point
+## QOL-10: Move queues
 
-*`QOL.asi`, stock-compatible: stock's own path order, sent earlier. Built:
-`PathStartsAtOnce=` (default 1; 0 leaves paths as stock). Issue #17; the dots that show
-the path are render3d's (`render3d/README.md`, "overlays", Move paths).*
+*`QOL.asi`, stock-compatible: only stock's own path orders are sent. Built:
+`PathStartsAtOnce=` (default 1, a live row; 0 leaves paths as stock). Issue #17; the
+dots that show a queue are render3d's (`render3d/README.md`, "overlays", Move paths),
+read through `QOL_MoveQueue`.*
 
 **Problem.** Stock lets the player sketch a path: hold Tab and right-click points on the
 map, and the selection flies them one after another. Nothing moves until Tab is let go,
-so a long path leaves the ships idle while it is drawn.
+a new path replaces the one being flown, and the whole path is flown with the one
+command the cursor showed at the release (all at impulse or all at warp).
 
-**Wanted.** The ships set off at the first point and take each new point as it comes,
-with only ordinary orders, so stock players in the same game carry them out.
+**Wanted.** Points queued with Tab are flown at once, a point queued for ships already
+following a queue is added to the end of it, each leg is flown at the warp it was
+queued with, the minimap queues points like the 3D view, and the player's own orders
+end the queue, all with ordinary orders, so stock players in the same game carry them
+out.
 
-**Stock.** The key is the `enter_waypoint` binding of `Input.map` (+Tab, without Control,
-Shift or Alt). `cOverViewImp::Init` (0x51e4c0) asks `ControlsGetPointer` for it and keeps
-the pointer to its live state at `cOverViewImp+0x30c`; three places read it: the
-right-click, `mProcessWaypoints` and the sketch's draw. With it held,
+### The design
+
+**A queue belongs to the ships it was given to**: a list of points (the clicked map
+points, as the sketch holds them), each with the mode of its click (GO, GO_WARP or
+PATROL), and the ships flying it. A right-click with Tab held appends the point to the
+queue of every selected ship of the player's; selected ships with no queue start one
+together. When only some of a queue's ships are selected, those go on in a copy of the
+queue and only the copy gets the point. Stations and anything without a craft process
+are left out. At most 32 queues, 256 ships and 64 points per queue.
+
+**A run** is the longest stretch of legs of one mode. One path order carries one
+command, so a queue is flown a run at a time: QOL sends the stock path order (stock's
+`QueueCommand`, as the release does) for the run's points, and the ships fly them as any
+path. A point that extends the run being flown (same mode, the ships on the queue's last
+run) is sent at once: the order goes out again from the point each ship heads to now
+(ships at different points get one order each), so the ships take it without turning
+back; a point of another mode waits. When a ship reaches the end of its run it waits for
+the rest of its group, and the next run goes to all of them together as one order (a
+ship that lags more than 8 s of game time behind the first is left to follow on its own).
+The first point of a new queue is sent at once, so the ships are under way from the first
+click, as before.
+
+**Warp per leg.** A leg keeps the mode it was queued with. Alt makes a leg warp, a patrol
+click a patrol leg, and QOL-8 (`WarpDistance`) judges an appended leg by its own length,
+from the queue's last point, not by how far the ships are from the point now (a new
+queue's first leg is judged as QOL-8 judges any move). A minimap point keeps the minimap's
+rule: a move there is GO_WARP unless Alt is held (ui/HUD.md, "The minimap").
+
+**The packet.** `QueueCommand` drops a path order that would not fit its packet
+(`4 x (ships + 3 x points) + 10` above 0x1fc bytes) without a word. An order goes to at most
+40 ships (more get several orders), and a run longer than the packet takes is sent in
+parts: the first `(124 - ships) / 3` points, then the rest when the ships reach the end of
+the part (`next part sent`).
+
+**Patrol.** A patrol run loops while it is the queue's last run, as stock's patrol does:
+a patrol point appended to it joins the loop, sent again from the point each ship heads to
+with the loop turned to start there. A point of another mode appended after a patrol ends
+the loop: the ships finish the lap to the patrol's last point and go on to the next run.
+A loop longer than one order takes is cut to what fits.
+
+**What ends a queue.** Any order of the player's that replaces a ship's movement takes
+that ship out of its queue: stop, a plain move or warp, a path not of QOL's, attack,
+guard, follow, dock, repair, build, mine, colonize, a special weapon, forming a formation,
+and every other order except those that leave the movement alone: NONE, DEFAULT, SELECT,
+QUEUE, SET_RALLY_POINT, the two CANCEL_BUILDs, the RED/YELLOW/GREEN alerts, BUY/SELL
+RESOURCE, SET_FORMATION, SET_ATTACK_MODE, the six autonomy settings (special weapons and
+movement) and CMD_SET_FORMATION_ORIENTATION (the masks `mq_keep_lo` / `mq_keep_hi` of the
+profile). A ship destroyed, removed or given to another team leaves its queue
+(`ship gone`), and every queue is dropped when a game is loaded (`g_finish_load_time`
+changes) or `PathStartsAtOnce` goes to 0.
+
+### Stock, and the hooks (hook `qol.move_paths`)
+
+**The key and the sketch.** The key is the `enter_waypoint` binding of `Input.map` (+Tab,
+without Control, Shift or Alt). `cOverViewImp::Init` (0x51e4c0) asks `ControlsGetPointer`
+for it and keeps the pointer to its live state at `cOverViewImp+0x30c`; three places read
+it: the right-click, `mProcessWaypoints` and the sketch's draw. With it held,
 `mNormalModeRightClick` (0x5229a0) adds the map point under the cursor (`+0xa4`) to the
 path at `+0x264` through `mAddPathPoint` (0x5255b0; its call at 0x5229ff makes the path at
 the first point, the one at 0x5229e3 inserts after the last later) and sends nothing.
@@ -634,42 +692,125 @@ moved is read where it is) and, unless the action carries the flag 0x4000, calls
 `GameObject::QueueCommand(the action's command, ids, path)` (0x4d4380, cdecl; its call at
 0x522bba): the path order, `NetOrderObjectsWhatPath`, carrying the command the cursor
 shows (GO, GO_WARP with Alt or QOL-8, PATROL in patrol mode). It then frees the sketch.
-`QueueCommand` reads only the path's count and points, and drops the order silently when
-it would not fit its packet (`4 x (ships + 3 x points) + 10` above 0x1fc bytes: 16 ships
-and 36 points, 40 ships and 28). Every ship given the order flies a copy of its own: its
-craft process (`GameObject+0x44`) holds the command at `+0x38` (4 for every kind of move),
-the path at `+0x88` and the point it heads to at `+0x12c`, and a new path order replaces
-both, starting again at the first point. A double-click with the key held throws the
-sketch away unsent.
+`QueueCommand` reads only the path's count and points. A double-click with the key held
+throws the sketch away unsent.
+*Hooks:* the two calls of `mAddPathPoint` go to `mp_add_hook`, which lets it add the point
+(so the engine still draws the sketch while the key is held) and hands the point and the
+action's command to the queues (`mq_point`); the release's call of `QueueCommand` goes to
+`mp_release_hook`, which leaves it out when the sketch's points went to the queues.
 
-**With `QOL.asi`.** The two calls of `mAddPathPoint` go to `mp_add_hook`, which lets it add
-the point and then sends the order stock sends on release, for the sketch as it stands:
-the ships are under way from the first click. Sent again with every point, the order
-would turn a ship that has already passed the first points back to them, so the points
-every selected ship of the player's has passed are left out: each ship's copy says which
-sketch point it ends at and how far along it the ship is, and a ship whose path is gone
-(it stopped at the end of what was sent, more than 1.5 s after the first send) counts as
-having reached that end. A patrol is always sent whole. The release's call of
-`QueueCommand` goes to `mp_release_hook`, which leaves it out when the last send carried
-every point of the sketch (else it is stock's call: the key let go before a send fitted,
-or the action carries 0x4000). An order that would not fit the packet is not sent and
-waits for the release, as stock would. Each send is an ordinary order, so each ship
-acknowledges it by voice, once per point.
+**Orders are executed, not sent, on every machine.** Every order of a player is written
+into the outgoing `RoundBuffer` (0x76b888) by its sender (`QueueCommand`'s overloads, the
+bar's `mBroadcastCommand`, `mQueueSpecialWeaponCommand`) and carried out on every machine
+when the round is processed (`RoundBuffer::ProcessOrders`), each by its `Execute`. The
+`NetOrderWhat*::Execute`s are the only callers of the `GameObject::DeQueueCommand`
+overloads, which post the order as the ship's next command (its `AiCmdInfo` at
+`GameObject+0x7c`: the command at `+0x80`, a path at `+0x88`); the path order's static
+`DeQueueCommand` (0x4d4650; node, command, ids, points) checks the ship's owner
+(`+0xec`) against the node and builds each ship an `AiPath` of its own. A move of several
+ships from the bar is a `NetOrderMove`, whose `Execute` calls
+`FormationManager::Broadcast_Go_Command` (0x43b3e0; command, point, ids); forming a
+formation is `NetOrderFormFormation` → `FormationManager::FormFormation` (0x43b680; ids);
+a special weapon `NetOrderSpecialAttack` → `GameObject::SetCommand` (0x4d1d90). The
+ships' own AI and the scripts never go through these: they set the process's command
+directly (`GameObject::SetCommand` and the like), and so does `CraftProcess::Stop` when a
+ship arrives. So an order seen at one of these calls is a player's, which is how arrival
+and a player's Stop are told apart.
+*Hooks:* the 15 calls are re-pointed: `NetOrderWhat::Execute` (0x55007f),
+`NetOrderWhatOn` (0x5500f1), `WhatWho` (0x5502a6), `WhatWhoWhere` (0x55034a),
+`WhatWhoWhereParam` (0x5503ee), `WhatClass` (0x55017e), `WhatClassWhere` (0x550212),
+`WhatParam` (0x550461), `WhatWhere` (0x5504d1), `WhatWhereParam` (0x550545) and
+`WhatWhoParam` (0x5505da) to stubs that note the ship (`ecx`) and the command (the first
+argument) and go on to the engine's `DeQueueCommand`; the special attack's `SetCommand`
+(0x5518a0) likewise; `NetOrderMove`'s `Broadcast_Go_Command` (0x5521a5) and
+`NetOrderFormFormation`'s `FormFormation` (0x5526f6) to stubs that note the ids; and
+`NetOrderObjectsWhatPath::Execute`'s call of the static `DeQueueCommand` (0x54f9ce) to
+`mq_dq_path_hook`. A path order of QOL's own is known by its command, its point count and
+its first and last points (the last 32 sent are remembered); any other is a player's and
+ends the queue of each ship it names.
 
-**Open.** A network game against a stock player (it is stock's order, so it should
-simply be carried out). The double-click that throws a sketch away no longer stops the
-ships: they keep the path sent so far. The key itself: it is the `enter_waypoint`
-binding, so it can be rebound in `Input.map` today; issue #26 (key bindings in game) is
-the place for Shift. A binding there can rebind `enter_waypoint`, or point
-`cOverViewImp+0x30c` (written once per mission by `Init`, at 0x51e7f9) at a key state of
-its own: all three readers go through that pointer, so no code needs patching. Shift
-alone is taken without modifiers by `enter_waypoint` (`-Shift`) and means "add to the
-selection" on a left click, so the binding has to say +Shift and drop the -Shift.
+**Where a ship is on its path.** Each ship has a craft process (`GameObject+0x44`). When
+it takes a new command (`CraftProcess::Handle_New_Command`, 0x430000), a path order's
+`AiPath` moves from the object's next command (`+0x88`) to the process's `+0x88`, the
+very object, and the point it heads to (`+0x12c`) starts at 0; `Move_To_Formation`
+advances the index (skipping a point the ship is already at), and on arrival the process
+goes to STOP (command `+0x38` 3) with another path in `+0x88` (seen on the bench: never
+null, so only the pointer tells). So after the path hook has run
+the engine's `DeQueueCommand`, QOL keeps each ship's `AiPath` pointer from its `+0x88`;
+the ship is flying the order while its process's path is that pointer, and the queue
+point it heads to is the one that equals the path's point at the index (an engine point
+in between, a detour, keeps the last one found). When the pointer goes, the ship has
+reached the end of the order; an order executed whose path never shows (arrived at once,
+or refused) counts as flown after 1.5 s of game time, and one sent that never executes as
+given up after 8 s.
 
-**Seen on the bench (2026-11-05)**, `testbench/scenarios/render3d-move-paths.md` on the
-`warp` scene, one destroyer, three points a second apart with the key held (Scene.asi's
-`waypoint-key`, since the bench cannot hold a key): each right-click sent the order
-(`point N sent at once`), the ship was on its path from the first point while the key
-was still held, the release sent nothing more, and the ship flew the three points and
-stopped. Not yet seen: a selection that has passed a point when the next is added (the
-order then starts further on), a patrol, a network game.
+**The step and the clock.** The queues advance once a frame where the player's own
+input gives its orders: `cOverViewImp::Simulate`'s call of `mProcessKeyboardInput`
+(0x51ef2e) goes to `mq_ov_keys_hook`, which calls it and then steps the queues. A path
+order sent from inside the simulation step (after `GameObject::PreSimulateAll`, the first
+place tried) is written and never carried out: on the bench every next run sent from
+there stayed `POSTED` and the ships never moved, while the same order sent from the
+overview's step is executed within the round. The timers run on the simulation's clock:
+`GameObject::PreSimulateAll`'s call in `Simulate` (0x483327; static, the step's length in
+seconds, 0.1 on the bench) goes to `mq_presim_hook`, which adds it up, so a paused game's
+timers stand still. The clicks, the executors and the step are all on the game thread;
+nothing the simulation reads is written but by the stock orders sent.
+
+**The minimap.** Stock's minimap (`RadarComponent::Simulate`, 0x4e8a90) never touches the
+sketch: a command click there asks `ActionMode::GetAction` and hands the action to the
+bar's `BroadcastCommand`, a plain order, and the UI's minimap does the same from the
+panel's always-step (ui/HUD.md, "The minimap"). So with Tab held a minimap click would
+have been a plain move, which ends the queue. The UI now offers the click to
+`QOL_MoveQueuePoint(xyz, action)` first (found by name, `find_export`): with the waypoint
+key held (read through `cOverViewImp+0x30c`) and the queue on, QOL appends the point as a
+3D right-click would and returns 1, and the UI gives no order; else 0, and the UI's stock
+order goes out.
+
+**For render3d.** `QOL_MoveQueueVersion()` (1) and
+`QOL_MoveQueue(ship, xyz, flags, cap)`: for a `GameObject *`, -1 when QOL keeps no queues
+(`PathStartsAtOnce=0` or the hook stood down), 0 when the ship has none, else the number
+of points still ahead of it (at most `cap` written), from the one it heads to now; flag
+bit 0 a warp leg, bit 1 a leg of a patrol that loops back to its run's first point (a
+looping patrol is listed from the point the ship heads to, round the loop). Cheap: no
+allocation, no log.
+
+**`QOL.log`** (the first 400 lines of the queue):
+- `move queue: new queue K, ships S`
+- `move queue: appended point N (go|warp|patrol), queue K: M point(s), ships S` (M: the
+  points still ahead of the group's last ship)
+- `move queue: run sent: go|warp|patrol, P point(s) from point F, S ship(s), queue K`, and
+  `next run sent: ...` when a group goes on to the next run, `next part sent: ...` to the
+  rest of a run split for the packet; ` (split for the packet: R more later)` at the end
+  when it is split
+- `move queue: cleared for N ship(s): stop|move|warp|path|<order>` (`<order>` is
+  `AiCommandToName`'s, in lower case: `attack`, `guard`, `special_attack`, ...)
+- `move queue: ship gone, queue K: S ship(s) left`, `move queue: queue K done, S ship(s)`
+- `move queue: minimap point at x,z`, `move queue: key let go, the points are queued already`
+- `move queue: reset (a game was loaded | PathStartsAtOnce off)`, `move queue: simulation
+  step T ms` (once), `move queue: an order executed, its path never flown (...)`
+
+**Open.** A network game against a stock player (it is stock's order, so it should simply
+be carried out). Each send is an ordinary order, so each ship acknowledges it by voice,
+once per point. The double-click that throws a sketch away no longer stops the ships. The
+key itself: it is the `enter_waypoint` binding, so it can be rebound in `Input.map` today;
+issue #26 (key bindings in game) is the place for Shift. A binding there can rebind
+`enter_waypoint`, or point `cOverViewImp+0x30c` (written once per mission by `Init`, at
+0x51e7f9) at a key state of its own: all three readers and `QOL_MoveQueuePoint` go through
+that pointer. Shift alone is taken without modifiers by `enter_waypoint` (`-Shift`) and
+means "add to the selection" on a left click, so the binding has to say +Shift and drop
+the -Shift.
+
+**Seen on the bench (2026-11-05)**, on the `warp` scene, Tab held with Scene.asi's
+`waypoint-key`: `testbench/scenarios/qol-move-queue.md` passes (a point appended while the
+ship flies, sent again from point 2; a 3D point then a minimap point, the warp run sent
+when the ship reached the first and flown; a queue ended by the bar's Stop and one by a
+plain right-click; a point for one of two queued ships, which went on in a copy). By hand
+in sessions: two and three ships flying a queue together; a patrol of three points (the
+bar's Order > Patrol) looping, then a go point appended after it, sent when the ships
+reached the patrol's last point; a ship killed in a queue (`ship gone`). The diagnostics
+of the first sessions showed a ship's process taking the order's own `AiPath` and, on
+arrival, STOP with another path in its place; and that a next run sent from inside the
+simulation step was never executed (hence the overview's step). A Scene.asi `stop` (a
+script's order, not the player's) does not clear a queue: the ship's run counts as ended.
+Not yet seen: an attack or special weapon ending a queue, a run split for the packet, a
+network game, render3d drawing `QOL_MoveQueue`.

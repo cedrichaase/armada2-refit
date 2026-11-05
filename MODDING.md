@@ -318,6 +318,7 @@ so in its log. Rules for a plugin that sits next to ours:
   file locks the player out of games with stock players. Scale a value in memory after
   the parse instead.
 - Export `<Plugin>_Settings` so the Refit screen shows your keys.
+- **`QOL.asi` exports its move queue** for Render3D.asi's move paths (found by the export, in any loaded module, never by file name): `int QOL_MoveQueueVersion(void)` (1) and `int QOL_MoveQueue(const void *ship, float *xyz, int *flags, int cap)` (cdecl; -1 no queues, 0 none for the ship, else the points ahead, flags bit 0 a warp leg, bit 1 a patrol run looping to its first point). Contract in `render3d/README.md`, "Move paths".
 - **Separate rule changes from local ones.** Anything that changes what every machine
   simulates belongs in a plugin that is required of every player and is checked when a
   network game is set up (see `rules/README.md` for the protocol `Online.asi` speaks).

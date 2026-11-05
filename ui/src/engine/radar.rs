@@ -48,7 +48,9 @@
 //! click moves the camera and snaps it to the nearest visible object
 //! (`CameraManager::SnapToNearestVisible`). We make both from the panel's always-step
 //! (below), where stock makes them from its focus-step, so they act in the game's
-//! simulate and not in a frame being drawn.
+//! simulate and not in a frame being drawn. With QOL's waypoint key held (Tab), a
+//! command click is handed to `QOL_MoveQueuePoint` first, which adds the point to the
+//! selection's move queues (qol/README.md, QOL-10) and gives no order of its own.
 //!
 //! **The always-step hook.** `MapRadar::AlwaysGameSimulate` asks
 //! `Entity::GetTeamsVisibleToUser` once a game frame (0x4eb3b2); that call is
@@ -689,6 +691,19 @@ fn alt_held() -> bool {
     p != 0 && unsafe { rd::<i32>(p) } != 0
 }
 
+/// `QOL_MoveQueuePoint` (qol/README.md, QOL-10), found by name in whichever module has
+/// it, never by file name: true when QOL took the point for the selection's move queues
+/// (its waypoint key is held and its queue is on), so no order is to be given here.
+/// Looked up per click: clicks are rare and QOL may load after us.
+fn qol_queue_point(pos: &[f32; 3], action: u32) -> bool {
+    let f = crate::settings::find_export("QOL_MoveQueuePoint");
+    if f == 0 {
+        return false;
+    }
+    let f: extern "C" fn(*const f32, i32) -> i32 = unsafe { core::mem::transmute(f) };
+    f(pos.as_ptr(), action as i32) != 0
+}
+
 unsafe fn act(p: Pending) {
     let r = radar();
     if r == 0 {
@@ -734,6 +749,12 @@ unsafe fn act(p: Pending) {
                     let wc: unsafe extern "thiscall" fn(usize, *mut f32) -> *mut f32 = core::mem::transmute(rd::<usize>(rd_ptr(o) + field::RADAR_VT_WHERE_CURSOR));
                     wc(o, cur.as_mut_ptr());
                     pos[1] = cur[1];
+                }
+                // With the waypoint key held the point goes to QOL's move queue, as one in
+                // the 3D view does, and no order is given here.
+                if qol_queue_point(&pos, action) {
+                    crate::log!("minimap: point {:#x} at {:.0},{:.0} queued (QOL)", action, pos[0], pos[2]);
+                    return;
                 }
                 let set: unsafe extern "thiscall" fn(usize, u32) = core::mem::transmute(rd::<usize>(rd_ptr(o) + field::RADAR_VT_SET_CURSOR_ACTION));
                 set(o, action);
