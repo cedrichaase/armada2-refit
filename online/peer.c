@@ -184,6 +184,7 @@ typedef HRESULT (__stdcall *AddrAdd_t)(void *, const WCHAR *, const void *, DWOR
 #define WINDOW       64              /* out-of-order slots, and packets in flight */
 #define LOST_MS      15000
 #define PING_MS      1000
+#define STALL_MS     30000           /* the oldest unacked packet this old: it answers pings, not data */
 #define CONNECT_MS   10000
 #define PUNCH_MS     2500            /* how long both sides try to reach each other directly */
 #define PUNCH_EVERY  200
@@ -225,6 +226,7 @@ typedef struct {
     WCHAR name[NAME_CHARS];
     void *ctx;
     int   conn;                      /* host: the joiner's connection; -1 otherwise */
+    int   dying;                     /* its EV_DESTROY is queued: never queue a second */
 } Player;
 
 typedef struct Ev {
@@ -700,9 +702,9 @@ static void destroy_player(Peer *p, DPNID id, DWORD reason)
 {
     Player *pl = player_of(p, id);
     Ev *e;
-    if (!pl) return;
+    if (!pl || pl->dying) return;
     e = ev_new(EV_DESTROY, 0, 0);
-    if (e) { e->a = id; e->b = reason; ev_push(p, e); }
+    if (e) { pl->dying = 1; e->a = id; e->b = reason; ev_push(p, e); }
     /* the context goes with the event; the slot is freed once it is delivered */
 }
 
@@ -972,6 +974,13 @@ static void add_candidate(Peer *p, DWORD ip, WORD port)
     if (p->jn_n < 4) { p->jn_ip[p->jn_n] = ip; p->jn_port[p->jn_n] = port; p->jn_n++; }
 }
 
+static int same_code(const char *code, const BYTE *b)
+{
+    int i;
+    for (i = 0; i < 6; i++) if ((BYTE)code[i] != b[i]) return 0;
+    return 1;
+}
+
 static void on_server(Peer *p, const BYTE *b, int n, int type)
 {
     char t[200];
@@ -980,7 +989,7 @@ static void on_server(Peer *p, const BYTE *b, int n, int type)
     switch (type) {
     case SV_HOSTED:                          /* [token][code 6][public ip 4, port 2][our id] */
         if (p->role != ROLE_HOST || !p->sv_state || n < 20 || get32(b) != p->sv_token) break;
-        if (p->sv_state != 2 || !(p->code[0] == b[4] && p->code[5] == b[9])) {
+        if (p->sv_state != 2 || !same_code(p->code, b + 4)) {
             DWORD ip; WORD port;
             for (i = 0; i < 6; i++) p->code[i] = (char)b[4 + i];
             p->code[6] = 0;
@@ -1224,7 +1233,18 @@ static void on_packet(Peer *p, DWORD ip, WORD port, const BYTE *b, int n)
         }
         break;
     case P_DATA:
-        if (c) { on_data(p, c, b, n); if (c->used) send_ack(p, c); }
+        if (c) {
+            DWORD seq = n >= 4 ? get32(b) : 0;
+            int   fresh = c->expect == seq;       /* the next one in order */
+            on_data(p, c, b, n);
+            if (c->used) send_ack(p, c);
+            else if (fresh) {                     /* the message ended the connection (R_TERMINATE): */
+                BYTE a[16];                       /* still ack it, or the host resends it for 15 s */
+                int  k = hdr(a, P_ACK);
+                put32(a + k, seq + 1); put32(a + k + 4, 0);
+                raw_send(p, ip, port, a, k + 8);
+            }
+        }
         break;
     case P_ACK:
         if (c && n >= 8) on_ack(p, c, get32(b), get32(b + 4));
@@ -1258,7 +1278,7 @@ static void tick_server(Peer *p, DWORD now)
         if (p->sv_state == 1 && now - p->sv_start > LOOKUP_MS) {
             p->sv_next = now + 5000;
             if (!p->sv_warned) {
-                char t[200];
+                char t[256];
                 t[0] = 0; s_cat(t, "The online server "); s_cat(t, g_server);
                 s_cat(t, " does not answer: no join code. Players can still join by address.");
                 plog(p, t);
@@ -1276,7 +1296,7 @@ static void tick_server(Peer *p, DWORD now)
         }
     if (p->jn_state == 1 && (int)(now - p->jn_next) >= 0) {    /* joiner: look the code up */
         if (now - p->jn_start > LOOKUP_MS) {
-            char t[200];
+            char t[256];
             t[0] = 0; s_cat(t, "The online server "); s_cat(t, g_server); s_cat(t, " does not answer");
             plog(p, t);
             say(p, CHAT_ROOM, t, 0);
@@ -1336,6 +1356,13 @@ static void tick(Peer *p)
         Pkt  *k;
         if (!c->used || (!c->open && p->role != ROLE_HOST)) continue;
         if (now - c->last_rx > LOST_MS) { conn_lost(p, c, DPNDESTROYPLAYERREASON_CONNECTIONLOST); continue; }
+        if (c->unacked && now - c->unacked->first > STALL_MS) {
+            /* pings keep last_rx fresh, but nothing it gets is acked: it would be resent
+             * (and queued) for ever. The queue is in send order, so the head is the oldest. */
+            plog(p, "nothing acked for 30 s: dropping the connection");
+            conn_lost(p, c, DPNDESTROYPLAYERREASON_CONNECTIONLOST);
+            continue;
+        }
         if (p->role == ROLE_HOST && !c->open && (!c->unacked || now - c->kicked > LOST_MS)) {
             conn_free(c);                /* kicked, and told so (or not answering): gone */
             continue;
@@ -1742,7 +1769,7 @@ static HRESULT __stdcall n_EnumHosts(void *self, AppDesc *desc, void *host, void
     PEER(self);
     DWORD ip = 0; WORD port = 0;
     int   t;
-    char  b[160], code[8];
+    char  b[256], code[8];   /* Server= is up to 127 characters, and goes in */
     HRESULT hr;
     (void)device; (void)flags;
 
@@ -1900,7 +1927,7 @@ static HRESULT __stdcall n_Host(void *self, const AppDesc *desc, void **devs, DW
     MsgPlayer m;
     Player   *pl;
     HRESULT   hr;
-    char      b[160];
+    char      b[256];
     (void)devs; (void)ndevs; (void)sec; (void)cred; (void)flags;
 
     if (!p->handler) return DPNERR_UNINITIALIZED;
@@ -2156,11 +2183,24 @@ static HRESULT __stdcall n_TerminateSession(void *self, const void *data, DWORD 
 {
     PEER(self);
     BYTE m[8];
+    int  i;
     (void)data; (void)size; (void)flags;
     EnterCriticalSection(&p->cs);
     if (p->role != ROLE_HOST) { LeaveCriticalSection(&p->cs); return DPNERR_NOTHOST; }
     m[0] = R_TERMINATE; put32(m + 1, (DWORD)DPNERR_HOSTTERMINATEDSESSION);
     to_joiners(p, m, 5, 0);
+    /* end_session drops every connection and its resend queue, so a lost R_TERMINATE
+     * would never come again and the joiner would only time out (CONNECTIONLOST). Send
+     * what is still unacked (the R_TERMINATE, and anything before it that it waits
+     * for) twice more: a joiner drops the duplicates by sequence number. */
+    for (i = 0; i < MAX_CONNS; i++) {
+        Conn *c = &p->conns[i];
+        Pkt  *k;
+        int   pass;
+        if (!c->used || !c->open) continue;
+        for (pass = 0; pass < 2; pass++)
+            for (k = c->unacked; k; k = k->next) { raw_send(p, c->ip, c->port, k->data, k->len); p->stat_resent++; }
+    }
     end_session(p, DPNERR_HOSTTERMINATEDSESSION, DPNDESTROYPLAYERREASON_SESSIONTERMINATED);
     LeaveCriticalSection(&p->cs);
     return S_OK;
