@@ -269,7 +269,11 @@ a `--revert` flag on the Python tools. The layer's README has the details.
 
 Each layer folder has a `CHANGELOG.md` with its own semver version. The root
 [`CHANGELOG.md`](CHANGELOG.md) versions the mod as a whole and lists the layer
-versions it bundles.
+versions it bundles. Changes are recorded as changesets
+([`.changeset/README.md`](.changeset/README.md)), and a release, made by hand, turns
+them into versions and changelog entries
+([`publish/README.md`](publish/README.md#releasing)). Between releases, the GUI
+installer's *Pre-release (latest main)* entry installs the newest `main`, untested.
 
 `CLAUDE.md` is the working brief for Claude Code sessions in this repository.
 
