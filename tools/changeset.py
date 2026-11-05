@@ -646,7 +646,8 @@ def markdown(p, units, changesets):
             out.append(f'| {uid} | {e["current"]} | {e["next"]} | {e["bump"]} |')
     out += ['', '**Unreleased changesets**', '']
     for c in changesets:
-        first = next((l for l in c.body.split('\n') if l.strip() and not l.startswith('###')), '')
+        lines = [l for l in c.body.split('\n') if l.strip() and not l.startswith('###')]
+        first = next((l for l in lines if l.startswith('- ')), lines[0] if lines else '')
         first = first[2:] if first.startswith('- ') else first
         if len(first) > 160:
             first = first[:157] + '...'
