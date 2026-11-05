@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-# Build the plugins and zip them for a release.   publish/package.sh [<out-dir>]
+# Build the plugins and zip them for a release.   publish/package.sh [--stub] [<out-dir>]
+#
+# --stub builds nothing: every DLL and plugin is a placeholder of a few bytes carrying only
+# the marker the installers know it by (Display8's panic message, "BinkProxy"), and the zip
+# is armada2-refit-<version>-stub.zip. The layout is the real one, so the installer tests
+# (publish/installer/equiv.sh, test.sh) run without a Rust or clang toolchain. Never a release.
 #
 # Writes <out-dir>/armada2-refit-<version>.zip (default out-dir: dist/ under a fresh
 # mktemp -d, printed at the end):
@@ -29,6 +34,8 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+stub=0
+if [ "${1:-}" = --stub ]; then stub=1; shift; fi
 out="${1:-$(mktemp -d)/dist}"
 mkdir -p "$out"
 out="$(cd "$out" && pwd)"
@@ -40,31 +47,43 @@ gui="$root/gui-installer/armada2-refit-installer.py"   # the GUI installer
 [ -n "$ver" ] || { echo "no version in CHANGELOG.md" >&2; exit 1; }
 commit="$(git -C "$root" rev-parse --short HEAD)"
 
-# Render3D.asi and UI.asi are no_std Rust: rustup's cargo with the i686-pc-windows-msvc
-# target (render3d/build.sh says how to get it).
-bash "$root/render3d/build.sh"         >/dev/null
-bash "$root/ui/build.sh"               >/dev/null
-bash "$root/qol/build.sh"              >/dev/null
-bash "$root/rules/build.sh"            >/dev/null
-bash "$root/online/build.sh"           >/dev/null
-bash "$root/cutscenes/binkproxy/build.sh" >/dev/null
-bash "$root/display/build.sh"          >/dev/null
-
 name="armada2-refit-$ver"
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
+# built DIR FILE -- where the build of DIR (render3d, cutscenes/binkproxy, ...) put FILE.
+built() { echo "$root/$1/build/$2"; }
+if [ "$stub" = 1 ]; then
+    name="$name-stub"
+    mkdir -p "$stage/stubs"
+    built() { echo "$stage/stubs/$2"; }
+    for f in Render3D.asi UI.asi QOL.asi QOLRules.asi Online.asi; do
+        printf 'MZ stub %s, a placeholder for the installer tests\n' "$f" > "$stage/stubs/$f"
+    done
+    printf 'MZ stub binkw32.dll (BinkProxy), a placeholder for the installer tests\n' > "$stage/stubs/binkw32.dll"
+    printf 'MZ stub d3d8.dll: Display8 stopped the game, a placeholder for the installer tests\n' > "$stage/stubs/d3d8.dll"
+else
+    # Render3D.asi and UI.asi are no_std Rust: rustup's cargo with the i686-pc-windows-msvc
+    # target (render3d/build.sh says how to get it).
+    bash "$root/render3d/build.sh"         >/dev/null
+    bash "$root/ui/build.sh"               >/dev/null
+    bash "$root/qol/build.sh"              >/dev/null
+    bash "$root/rules/build.sh"            >/dev/null
+    bash "$root/online/build.sh"           >/dev/null
+    bash "$root/cutscenes/binkproxy/build.sh" >/dev/null
+    bash "$root/display/build.sh"          >/dev/null
+fi
 d="$stage/$name"
 L="$d/layers"
 mkdir -p "$L"/{display,render3d,ui,qol,rules,online,cutscenes} "$d/models" "$d/sdk"
-cp "$root/render3d/build/Render3D.asi"      "$root/render3d/Render3D.ini"       "$L/render3d/"
+cp "$(built render3d Render3D.asi)"      "$root/render3d/Render3D.ini"       "$L/render3d/"
 mkdir -p "$L/render3d/Surfaces" "$L/render3d/Nebulae"
 cp "$root/render3d/content/surfaces/"*.ini "$L/render3d/Surfaces/"
 cp "$root/render3d/content/nebulae/"*.ini  "$L/render3d/Nebulae/"
-cp "$root/ui/build/UI.asi"                  "$root/ui/UI.ini"                   "$L/ui/"
-cp "$root/qol/build/QOL.asi"                "$root/qol/QOL.ini"                 "$L/qol/"
-cp "$root/rules/build/QOLRules.asi"         "$root/rules/QOLRules.ini"          "$L/rules/"
-cp "$root/online/build/Online.asi"          "$root/online/Online.ini"           "$L/online/"
-cp "$root/cutscenes/binkproxy/build/binkw32.dll" "$root/cutscenes/binkproxy/BinkProxy.ini" "$L/cutscenes/"
+cp "$(built ui UI.asi)"                  "$root/ui/UI.ini"                   "$L/ui/"
+cp "$(built qol QOL.asi)"                "$root/qol/QOL.ini"                 "$L/qol/"
+cp "$(built rules QOLRules.asi)"         "$root/rules/QOLRules.ini"          "$L/rules/"
+cp "$(built online Online.asi)"          "$root/online/Online.ini"           "$L/online/"
+cp "$(built cutscenes/binkproxy binkw32.dll)" "$root/cutscenes/binkproxy/BinkProxy.ini" "$L/cutscenes/"
 cp "$root/publish/installer/install.sh" "$root/publish/installer/install.ps1" "$d/"
 # What the installers put in first, from platform/vendor/: its licence allows bundling.
 cp "$root/publish/installer/prereqs.txt" "$d/"
@@ -74,7 +93,7 @@ while IFS='|' read -r pname pver _; do
 done < "$root/publish/installer/prereqs.txt"
 # Display8, the game's d3d8.dll of ours, as display/install puts it. Not beside the plugins:
 # it takes the d3d8.dll slot, which the installers hand over with care.
-cp "$root/display/build/d3d8.dll" "$root/display/Display8.ini" "$L/display/"
+cp "$(built display d3d8.dll)" "$root/display/Display8.ini" "$L/display/"
 # The model rewrites: derived at install time from the player's own files, pinned by hash.
 cp "$root/models/moon-sod.py" "$root/models/select-sod.py" "$root/models/hull-sod.py" \
    "$root/models/hull-sod.sha256" "$root/models/asteroid-sod.py" "$d/models/"
@@ -119,15 +138,16 @@ for path in gen.walk_tables(root):
         print('\t'.join([stem + '.ini', sec, key, r['file'], r['section'], r['key'], r['def']]))
 PYEOF
 
-# Every binary must be a 32-bit PE: a host-arch object here would load nowhere.
-for f in "$L"/*/*.asi "$L"/*/*.dll "$d"/vendor/*/*.asi "$d"/vendor/*/*.dll; do
+# Every binary must be a 32-bit PE: a host-arch object here would load nowhere. (Not with
+# --stub: its placeholders are none.)
+[ "$stub" = 1 ] || for f in "$L"/*/*.asi "$L"/*/*.dll "$d"/vendor/*/*.asi "$d"/vendor/*/*.dll; do
     objdump -f "$f" | grep -q 'file format pei-i386' \
         || { echo "not a 32-bit PE: $f" >&2; exit 1; }
 done
 # ...and every one we build carries its version resource (platform/versioninfo/), which
 # Windows shows in Properties and antivirus heuristics look for. The vendored ones are
 # shipped as their authors built them.
-for f in "$L"/*/*.asi "$L"/*/*.dll; do
+[ "$stub" = 1 ] || for f in "$L"/*/*.asi "$L"/*/*.dll; do
     # (read whole, then grep: `grep -q` closing the pipe early made llvm-readobj fail
     # under pipefail, now and then, on a file that has the resource)
     res=$(llvm-readobj --coff-resources "$f") || res=
@@ -136,7 +156,8 @@ for f in "$L"/*/*.asi "$L"/*/*.dll; do
 done
 bash -n "$d/install.sh"
 
-cat > "$d/README.txt" <<EOF
+{ [ "$stub" = 0 ] || echo "A STUB PACKAGE: placeholder plugins for the installer tests (package.sh --stub). Not a release."
+cat <<EOF
 Armada II Refit $ver            built from commit $commit
 https://github.com/cedrichaase/armada2-refit
 
@@ -255,6 +276,7 @@ ANTIVIRUS
 Full notes: README.md in the repository, "Installing by hand, layer by layer".
 MIT licence (LICENSE). An unofficial fan project; nothing of the game is included.
 EOF
+} > "$d/README.txt"
 
 # Credits for everything the installers fetch, from the same lists they read.
 {

@@ -21,7 +21,11 @@ old default. A value the player changed stays. UI.ini's Defaults 2 switched ever
 of the UI on (the HUD's panels, the menus, the loading screen, the cursor), which were
 all 0 before (ui/README.md, "Installing"); Display8.ini's Defaults 2 made the stub on
 Backend=auto the default (display/README.md, "Installing"); its Defaults 3 drops Mode, Real
-and `d3d9` from Backend and carries a marked dxvk.conf's sampler keys into [Samplers]."""
+and `d3d9` from Backend and carries a marked dxvk.conf's sampler keys into [Samplers].
+
+The release scripts do the same in awk (publish/installer/install.sh) and PowerShell
+(install.ps1). All three must write the same bytes on tools/ini-merge-fixtures/:
+publish/installer/equiv-ini.sh checks it (publish/installer/README.md, "Equivalence")."""
 import re
 import sys
 
@@ -84,8 +88,9 @@ def same_number(a, b):
         return a.lower() == b.lower()
 
 
-def display8_defaults3(lines, have_vals, ship_vals, label, dxvk_path):
-    """Edits `lines` in place."""
+def display8_defaults3(lines, have_vals, ship_vals, label, dxvk_path, new):
+    """Edits `lines` in place, and in `new` (the shipped file's sections) the [Samplers]
+    lines the add step will write, as install.sh and install.ps1 do."""
     drop = set()
     for key in ('mode', 'real'):
         if ('display8', key) in have_vals:
@@ -97,12 +102,11 @@ def display8_defaults3(lines, have_vals, ship_vals, label, dxvk_path):
         toks = [t.strip() for t in v.split(',') if t.strip()]
         kept = [t for t in toks if t.lower() != 'd3d9']
         if len(kept) != len(toks):
-            new = ','.join(kept) if kept else ship_vals.get(('display8', 'backend'), (0, 'auto'))[1]
-            lines[i] = f'{KEY.match(lines[i]).group(1)}={new}'
-            print(f'  {label}: [display8] Backend {v} -> {new} (defaults 3)')
+            nv = ','.join(kept) if kept else ship_vals.get(('display8', 'backend'), (0, 'auto'))[1]
+            lines[i] = f'{KEY.match(lines[i]).group(1)}={nv}'
+            print(f'  {label}: [display8] Backend {v} -> {nv} (defaults 3)')
     names = {'anisotropy': 'Anisotropy', 'lodbias': 'LodBias',
              'clampnegativelodbias': 'ClampNegativeLodBias'}
-    added = []
     for key, v in dxvk_samplers(dxvk_path).items():
         ship = ship_vals.get(('samplers', key), (0, 'auto'))[1]
         if same_number(v, ship):
@@ -113,17 +117,15 @@ def display8_defaults3(lines, have_vals, ship_vals, label, dxvk_path):
                 continue
             lines[i] = f'{KEY.match(lines[i]).group(1)}={v}'
         else:
-            added.append(f'{names[key]}={v}')
+            body = new.get('samplers', [])
+            for j, l in enumerate(body):
+                m = KEY.match(l)
+                if m and not l.lstrip().startswith(';') and m.group(1).lower() == key:
+                    body[j] = f'{m.group(1)}={v}'
+                    break
         print(f'  {label}: [samplers] {names[key]} -> {v} (from dxvk.conf, defaults 3)')
     for i in sorted(drop, reverse=True):
         del lines[i]
-    if added:
-        at = next((j for j, l in enumerate(lines)
-                   if SEC.match(l) and SEC.match(l).group(1).lower() == 'samplers'), None)
-        if at is None:
-            lines += ['', '[Samplers]']
-            at = len(lines) - 1
-        lines[at + 1:at + 1] = added
 
 
 # installed file name (lower case) -> {(section, key): the old default}.
@@ -171,7 +173,8 @@ args = [a for a in args if a != '--before-comments']
 # latin-1 maps every byte to one character, so a player's cp1252 comment survives the rewrite.
 shipped_text = open(args[0], encoding='latin-1').read()
 new = parse(shipped_text)
-lines = open(args[1], encoding='latin-1').read().splitlines()
+installed_text = open(args[1], encoding='latin-1', newline='').read()
+lines = installed_text.splitlines()
 
 # The defaults' upgrade, before any key is added.
 ship_vals = values(shipped_text.splitlines())
@@ -196,7 +199,7 @@ for n in sorted(upgrades):
     if dsec == 'display8' and n == 3:
         import os
         display8_defaults3(lines, have_vals, ship_vals, label,
-                           os.path.join(os.path.dirname(os.path.abspath(args[1])), 'dxvk.conf'))
+                           os.path.join(os.path.dirname(os.path.abspath(args[1])), 'dxvk.conf'), new)
         have_vals = values(lines)
         continue
     for (sec, key), old in upgrades[n].items():
@@ -210,15 +213,10 @@ if (dsec, 'defaults') in have_vals and have_n < ship_n:
     i, _ = have_vals[(dsec, 'defaults')]
     lines[i] = f'{KEY.match(lines[i]).group(1)}={ship_n}'
 
-# Retired defaults: the shipped line replaces the old default's, as it is spelled there.
+# Retired defaults: the shipped value replaces the old default, under the key as the player
+# spells it.
 retired = RETIRED.get(label.lower(), {})
 if retired:
-    shipped_lines = {}
-    for sec, body in new.items():
-        for l in body:
-            m = re.match(r'^(\w+)=(.*)$', l)
-            if m:
-                shipped_lines[(sec, m.group(1).lower())] = l
     cur = None
     for i, l in enumerate(lines):
         m = SEC.match(l)
@@ -228,12 +226,14 @@ if retired:
         m = KEY.match(l)
         if m and cur is not None:
             k = (cur, m.group(1).lower())
-            if k in retired and m.group(2) == retired[k] and k in shipped_lines:
-                lines[i] = shipped_lines[k]
+            if k in retired and m.group(2) == retired[k] and k in ship_vals \
+                    and ship_vals[k][1] != retired[k]:
+                lines[i] = f'{m.group(1)}={ship_vals[k][1]}'
 
 have = parse('\n'.join(lines))
 for sec, body in new.items():
-    keys = {k.lower() for k in (re.match(r'^(\w+)=', l).group(1) for l in have.get(sec, []) if re.match(r'^(\w+)=', l))}
+    keys = {KEY.match(l).group(1).lower() for l in have.get(sec, [])
+            if KEY.match(l) and not l.lstrip().startswith(';')}
     missing = [l for l in body if re.match(r'^(\w+)=', l) and l.split('=')[0].lower() not in keys]
     if not missing:
         continue
@@ -254,4 +254,8 @@ for sec, body in new.items():
     else:
         name = next(l for l in shipped_text.splitlines() if l.strip().lower() == '[' + sec + ']')
         lines += ['', name] + missing
-open(args[1], 'w', encoding='latin-1').write('\n'.join(lines) + '\n')
+out = '\n'.join(lines) + '\n'
+# Nothing changed but the line ends: the player's file stays byte for byte, as in the
+# release scripts.
+if out != installed_text.replace('\r', ''):
+    open(args[1], 'w', encoding='latin-1', newline='\n').write(out)

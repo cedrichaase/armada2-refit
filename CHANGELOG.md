@@ -5,6 +5,20 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.7.0 — 2026-11-04
+
+Layers: qol 2.2.4.
+
+### Added
+- `publish/installer/equiv.sh`: the installers' behavioural equivalence test (AR-1). `install.sh`, `install.ps1` (pwsh) and the repository's `./install` run into copies of one mock game, scenario by scenario (fresh, reinstall over a player's edits, layers left out and remembered, `--all`, an upgrade from a 14.x install with retired files and old ini keys, the four states of the `d3d8.dll` slot, uninstall), and the trees are compared after every step: paths, bytes, each `.ini` key by key, the `::step` lines and exit codes. Known differences are listed with their reasons in `equiv-known.txt`; what it cannot cover is printed and in `publish/installer/README.md`. CI only.
+- `publish/installer/equiv-ini.sh` and `tools/ini-merge-fixtures/`: one set of expected outputs that the Python, awk and PowerShell ini mergers must each write byte for byte (the awk and PowerShell cut out of the installers as shipped), and agreement on every shipped `.ini`. CI only.
+- `publish/package.sh --stub`: the release layout from placeholder plugins (`armada2-refit-<version>-stub.zip`), for the installer tests without a toolchain. Never a release. CI only.
+- CI: job `installer-equivalence` (ubuntu, pwsh) runs `equiv.sh` on the `package` job's zip. CI only.
+
+### Fixed
+- `tools/ini-merge.py` (the merge behind `./install`) now writes what `install.sh` and `install.ps1` write: a key the player spelled with spaces (`PanSpeed = 7`) is no longer added a second time; a file with nothing to add keeps its CRLF line ends instead of being rewritten; a retired default keeps the player's spelling of its key; and Display8.ini's carried `dxvk.conf` sampler keys go in where the shipped file has them, not first in `[Samplers]`. Installed, not yet seen in game.
+- qol 2.2.4: `qol/install.sh` no longer stops `./install` on a `QOL.ini` whose `PanSpeed` has spaces around `=`. CI only.
+
 ## 15.6.27 — 2026-11-04
 
 Layers: ui 2.2.6, render3d 1.0.5.

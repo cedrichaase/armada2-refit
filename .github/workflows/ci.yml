@@ -1,6 +1,7 @@
 # Every push and pull request: check that the new commits are publishable, build the
 # release zip (publish/package.sh) kept as a workflow artifact, and run its installers
-# against a mock game on Linux and Windows (publish/installer/test.sh, test.ps1), and the
+# against a mock game on Linux and Windows (publish/installer/test.sh, test.ps1) and against
+# each other (publish/installer/equiv.sh, job installer-equivalence), and the
 # GUI installer's (gui-installer/test.sh), which is also built as an AppImage on
 # ubuntu-24.04, the oldest system it is meant to run on, and tested the same way. The GUI
 # installer is also frozen with PyInstaller (gui-installer/pyinstaller/build.py) into a
@@ -289,6 +290,26 @@ jobs:
       - name: install.ps1 against a mock game
         shell: powershell
         run: publish/installer/test.ps1 (Get-Item dist/*.zip).FullName
+
+  # The installers against each other (publish/installer/equiv.sh): install.sh and
+  # install.ps1 (pwsh) into two copies of a mock game, the repository's ./install into a
+  # third, the trees compared after every step (paths, bytes, each ini key by key), and the
+  # three ini mergers on tools/ini-merge-fixtures/. A difference not in equiv-known.txt fails.
+  installer-equivalence:
+    needs: package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: armada2-refit-${{ github.sha }}
+          path: dist
+      - name: install.sh, install.ps1 and ./install do the same (publish/installer/equiv.sh)
+        env:
+          A2_EQUIV_REQUIRE_PWSH: '1'
+        run: |
+          pwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
+          publish/installer/equiv.sh dist/*.zip
 
   # The GUI installer as one windowed .exe, which needs no Python on the machine: it also
   # runs the package's Python scripts (A2_PYTHON). PyInstaller is pinned in
