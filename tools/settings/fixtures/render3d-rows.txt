@@ -20,3 +20,4 @@ Overlays Selection
 Overlays Ghosts
 Overlays HeightPosts
 Overlays Pivot
+Overlays MovePaths
