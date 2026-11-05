@@ -32,6 +32,20 @@ pub struct FindData {
     pub alt_name: [u8; 14],
 }
 
+/// `WIN32_FIND_DATAW`.
+#[repr(C)]
+pub struct FindDataW {
+    pub attrs: u32,
+    pub created: [u32; 2],
+    pub accessed: [u32; 2],
+    pub written: [u32; 2],
+    pub size_high: u32,
+    pub size_low: u32,
+    pub reserved: [u32; 2],
+    pub name: [u16; 260],
+    pub alt_name: [u16; 14],
+}
+
 /// `MEMORY_BASIC_INFORMATION`, for telling which module an address is in.
 #[repr(C)]
 #[derive(Default)]
@@ -52,11 +66,13 @@ unsafe extern "system" {
     pub fn HeapReAlloc(heap: HANDLE, flags: u32, p: *mut u8, n: usize) -> *mut u8;
     pub fn GetProcessHeap() -> HANDLE;
     pub fn GetModuleFileNameA(module: HANDLE, buf: *mut u8, n: u32) -> u32;
+    pub fn GetModuleFileNameW(module: HANDLE, buf: *mut u16, n: u32) -> u32;
     pub fn GetModuleHandleA(name: *const u8) -> HANDLE;
     pub fn VirtualProtect(p: *mut u8, n: usize, prot: u32, old: *mut u32) -> i32;
     pub fn FlushInstructionCache(proc_: HANDLE, p: *const u8, n: usize) -> i32;
     pub fn GetCurrentProcess() -> HANDLE;
     pub fn CreateFileA(name: *const u8, access: u32, share: u32, sec: *mut u8, disp: u32, flags: u32, tmpl: HANDLE) -> HANDLE;
+    pub fn CreateFileW(name: *const u16, access: u32, share: u32, sec: *mut u8, disp: u32, flags: u32, tmpl: HANDLE) -> HANDLE;
     pub fn ReadFile(h: HANDLE, buf: *mut u8, n: u32, read: *mut u32, ov: *mut u8) -> i32;
     pub fn WriteFile(h: HANDLE, buf: *const u8, n: u32, written: *mut u32, ov: *mut u8) -> i32;
     pub fn SetFilePointer(h: HANDLE, lo: i32, hi: *mut i32, method: u32) -> u32;
@@ -68,6 +84,13 @@ unsafe extern "system" {
     pub fn GetEnvironmentVariableA(name: *const u8, buf: *mut u8, n: u32) -> u32;
     pub fn FindFirstFileA(pattern: *const u8, data: *mut FindData) -> HANDLE;
     pub fn FindNextFileA(h: HANDLE, data: *mut FindData) -> i32;
+    pub fn GetFileAttributesW(name: *const u16) -> u32;
+    pub fn CreateDirectoryW(name: *const u16, sec: *mut u8) -> i32;
+    pub fn DeleteFileW(name: *const u16) -> i32;
+    pub fn GetEnvironmentVariableW(name: *const u16, buf: *mut u16, n: u32) -> u32;
+    pub fn FindFirstFileW(pattern: *const u16, data: *mut FindDataW) -> HANDLE;
+    pub fn FindNextFileW(h: HANDLE, data: *mut FindDataW) -> i32;
+    pub fn MoveFileExW(from: *const u16, to: *const u16, flags: u32) -> i32;
     pub fn FindClose(h: HANDLE) -> i32;
     pub fn GetPrivateProfileIntA(sec: *const u8, key: *const u8, def: i32, file: *const u8) -> u32;
     pub fn GetPrivateProfileStringA(sec: *const u8, key: *const u8, def: *const u8, out: *mut u8, n: u32, file: *const u8) -> u32;

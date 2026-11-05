@@ -5,6 +5,15 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.7.3 — 2026-11-05
+
+Layers: display 1.0.7, ui 2.2.7, render3d 1.0.7.
+
+### Fixed
+- a2rt (display, ui, render3d): the game directory, `%LOCALAPPDATA%` and every file path now go through the wide Win32 calls (`GetModuleFileNameW`, `GetEnvironmentVariableW`, `CreateFileW`, `FindFirstFileW`, ...; `wstr` / `from_wide`; the imports join `kernel32.def`). With a non-ASCII install path (`C:\Users\Jörg\...`) the ANSI call's code-page bytes were not UTF-8, the game directory came out empty, `RefitPlayer.ini` was never consulted (every Refit-screen setting saved and ignored) and was written to a relative path, and the log folder was lost. Installed, not yet seen in game.
+
+- a2ini (`RefitPlayer.ini`'s parser and edit): the edit and the parser now agree on what a line is. A byte order mark only counts on the file's first line in both (the edit took one mid-file as a header), and whitespace is ASCII in both (the parser trimmed U+00A0 and other Unicode spaces, so `Scale<NBSP>=2` was a key the edit never matched and appended a duplicate). Host tests in `crates/a2ini/tests/agree.rs`; the differential fuzz shows no disagreement. Installed, not yet seen in game.
+
 ## 15.7.2 — 2026-11-05
 
 Layers: display 1.0.6.
