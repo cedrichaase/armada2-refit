@@ -10,7 +10,7 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 Layers: render3d 1.0.6.
 
 ### Fixed
-- render3d: the campaign menu's Klingon ships uncloak with one sound, not one each (issue #12; the sound is logged, scenario `render3d-menu-decloak-sound`). Installed, not yet seen in game.
+- render3d: the campaign menu's Klingon ships uncloak with one sound, not one each (issue #12; the sound is logged, scenario `render3d-menu-decloak-sound`). Confirmed in game 2026-11-05.
 
 ## 15.7.0 — 2026-11-04
 
