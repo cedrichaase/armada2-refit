@@ -99,10 +99,6 @@ pub fn start(version: &str, built: &'static [registry::BuiltIn]) {
     let cfg = config::load();
     rt::log_open("Render3D.log", cfg.log);
     log!("Render3D {} -- game dir {}", version, rt::game_dir());
-    match a2engine::pe::this_process() {
-        Some(id) => log!("engine: {}", id),
-        None => log!("engine: Armada2.exe identity unreadable"),
-    }
     engine::start_table("core", &syms::TABLE);
     let reads = hooks::Hooks::core().ready(&syms::TABLE, syms::hook::CORE_READS);
     registry::log_built_in();

@@ -159,9 +159,9 @@ static const A2EBlock p_b2_blocked[] = {
     {0xffff, 0, 0, 0}
 };
 static const A2EBuild p_builds[] = {
-    {"b1", "test/b1", 0x5eed0001, 0x6000, 0x777d215e, 0x400000, p_b0_entries, p_b0_blocked, 0, 13},
-    {"b2", "test/b2", 0x5eed0001, 0x7000, 0xa56c4602, 0x400000, p_b1_entries, p_b1_blocked, 2, 7},
-    {"b3", "test/b3", 0x5eed0001, 0x8000, 0x756db512, 0x400000, p_b2_entries, p_b2_blocked, 0, 13},
+    {"b1", "test/b1", "Test.exe", 0x5eed0001, 0x6000, 0x777d215e, 0x400000, p_b0_entries, p_b0_blocked, 0, 13},
+    {"b2", "test/b2", "Test.exe", 0x5eed0001, 0x7000, 0xa56c4602, 0x400000, p_b1_entries, p_b1_blocked, 2, 7},
+    {"b3", "test/b3", "Test.exe", 0x5eed0001, 0x8000, 0x756db512, 0x400000, p_b2_entries, p_b2_blocked, 0, 13},
 };
 
 static A2E_U8 p_hook_state[6];

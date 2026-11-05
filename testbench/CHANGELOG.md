@@ -5,6 +5,13 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 4.2.0 — 2026-11-04
+
+### Added
+- `./a2test --game <id>` (or `A2_PROFILE`): the game the bench runs, by its descriptor (`games/<id>.toml`). `bench/config.py` exposes `GAME_ID`, `EXE_NAME`, `EXE_REL`, `SETTINGS_KIND`, `SETTINGS_FILE` and `SHELL_RES`; a session launches and matches processes by the descriptor's executable (in its `data_dir`), and writes the settings file through the `armada-prf` adapter only (another kind is refused until it has one). `a2test syms` defaults to the game's executable and prints the identity line the resolver logs. With no game chosen everything is as before.
+
+Installed, not yet seen in game.
+
 ## 4.1.5 — 2026-11-04
 
 ### Fixed

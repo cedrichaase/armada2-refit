@@ -20,7 +20,8 @@ import pe  # noqa: E402
 import profiles  # noqa: E402
 
 NOTE_MAX = 120
-PLUGIN_NOTE = 'This Armada2.exe is a build Refit does not know: it runs stock'
+# `{exe}`: the matched build's executable (build.toml `exe`), else the module's name.
+PLUGIN_NOTE = 'This {exe} is a build Refit does not know: it runs stock'
 TEST_WHY = 'test mismatch (A2EngineTest.ini)'
 
 
@@ -60,7 +61,6 @@ class Engine:
         self.ready_syms = [False] * n_syms
         self.addrs = [0] * n_syms
         self.warned = [False] * n_syms
-        self.log(exe.line())
         self.bi = None
         for i, b in enumerate(table.builds):
             pe_ = b['build'].pe
@@ -71,6 +71,9 @@ class Engine:
             if hit:
                 self.bi = i
                 break
+        # The executable's name for the log and the notes: the build's, else the module's.
+        self.exe_name = (self.build['build'].exe if self.bi is not None else None) or exe.name or 'exe'
+        self.log(exe.line(self.exe_name))
         if self.bi is not None:
             b = self.build
             self.delta = (exe.base - b['build'].pe.get('image_base', 0)) & 0xffffffff
@@ -246,7 +249,7 @@ class Engine:
             return None
         sym, why = st[1], st[2]
         if why == 'unknown build':
-            return note_text(PLUGIN_NOTE)
+            return note_text(PLUGIN_NOTE.format(exe=self.exe_name))
         if why == TEST_WHY:
             return note_text(f'Stands down: {sym}: {why}')
         if why.startswith('is changed by '):
@@ -254,7 +257,7 @@ class Engine:
             return note_text(f'Stands down: {sym} is changed by {by}, not yet verified')
         if why.startswith('is off in '):
             return note_text(f'Stands down: {why[3:]}')
-        return note_text(f'Stands down: {sym} is not stock in this Armada2.exe')
+        return note_text(f'Stands down: {sym} is not stock in this {self.exe_name}')
 
     def note_for(self, section, key):
         row = f'{section}.{key}'
@@ -266,7 +269,7 @@ class Engine:
         return self.note_plugin() if self.bi is None else None
 
     def note_plugin(self):
-        return note_text(PLUGIN_NOTE) if self.bi is None else None
+        return note_text(PLUGIN_NOTE.format(exe=self.exe_name)) if self.bi is None else None
 
 
 def transcript(table, exe, test_ini=None, addr=(), note_for=(), force_build=None):
@@ -300,7 +303,7 @@ def main(argv):
     ap.add_argument('--profiles', nargs='*')
     a = ap.parse_args(argv)
     with open(a.exe, 'rb') as f:
-        exe = pe.Exe(f.read(), a.base)
+        exe = pe.Exe(f.read(), a.base, name=os.path.basename(a.exe))
     ini = open(a.test_ini).read() if a.test_ini else None
     games = profiles.load_game_sets(a.profiles if a.profiles else None)
     for t in profiles.tables(games):

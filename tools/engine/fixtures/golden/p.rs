@@ -63,6 +63,7 @@ pub const BUILDS: &[a2engine::Build] = &[
     a2engine::Build {
         name: "b1",
         key: "test/b1",
+        exe: "Test.exe",
         timestamp: 0x5eed0001,
         image_size: 0x6000,
         sections: 0x777d215e,
@@ -91,6 +92,7 @@ pub const BUILDS: &[a2engine::Build] = &[
     a2engine::Build {
         name: "b2",
         key: "test/b2",
+        exe: "Test.exe",
         timestamp: 0x5eed0001,
         image_size: 0x7000,
         sections: 0xa56c4602,
@@ -121,6 +123,7 @@ pub const BUILDS: &[a2engine::Build] = &[
     a2engine::Build {
         name: "b3",
         key: "test/b3",
+        exe: "Test.exe",
         timestamp: 0x5eed0001,
         image_size: 0x8000,
         sections: 0x756db512,
