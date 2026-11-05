@@ -666,4 +666,10 @@ its own: all three readers go through that pointer, so no code needs patching. S
 alone is taken without modifiers by `enter_waypoint` (`-Shift`) and means "add to the
 selection" on a left click, so the binding has to say +Shift and drop the -Shift.
 
-**Seen on the bench:** `testbench/scenarios/render3d-move-paths.md`.
+**Seen on the bench (2026-11-05)**, `testbench/scenarios/render3d-move-paths.md` on the
+`warp` scene, one destroyer, three points a second apart with the key held (Scene.asi's
+`waypoint-key`, since the bench cannot hold a key): each right-click sent the order
+(`point N sent at once`), the ship was on its path from the first point while the key
+was still held, the release sent nothing more, and the ship flew the three points and
+stopped. Not yet seen: a selection that has passed a point when the next is added (the
+order then starts further on), a patrol, a network game.
