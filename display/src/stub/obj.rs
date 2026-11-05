@@ -214,7 +214,18 @@ fn free(o: *mut SObj) {
             }
         }
         Body::Device(d) => {
-            for s in [d.back_buffer, d.depth] {
+            // The back buffer and depth surface, the device's current target and
+            // depth slots (each holds its own reference), and everything the engine
+            // bound with SetTexture, SetStreamSource and SetIndices.
+            let held = d.textures.iter().map(|t| *t as *mut SObj).chain(d.streams.iter().map(|s| s.0 as *mut SObj)).chain([
+                d.back_buffer,
+                d.depth,
+                d.target,
+                d.zbuffer,
+                d.stream0.0 as *mut SObj,
+                d.indices.0 as *mut SObj,
+            ]);
+            for s in held {
                 if !s.is_null() {
                     release(s);
                 }
