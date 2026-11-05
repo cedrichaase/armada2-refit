@@ -5,13 +5,6 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
-## 15.9.3 — 2026-11-05
-
-Layers: gui-installer 3.2.0.
-
-### Added
-- gui-installer: Launch game shows "Launching…" with a spinner, stays off while the game runs and refuses a second click (issue #48); details in `gui-installer/CHANGELOG.md` 3.2.0. Installed, not yet seen in game.
-
 ## 15.9.2 — 2026-11-05
 
 Layers: online 0.11.4.
