@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.22 — 2026-11-04
+
+Layers: ui 2.2.5.
+
+### Fixed
+- ui: widget slot storage is address-stable (a list's scroll offset could land in another widget's slot the first frame it needed a scrollbar), and the mouse-release poll honours swapped mouse buttons. Installed, not yet seen in game.
+
 ## 15.6.21 — 2026-11-04
 
 Layers: gui-installer 3.1.0.

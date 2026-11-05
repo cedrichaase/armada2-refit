@@ -10,14 +10,17 @@
 //! there. A modal occludes the whole screen and also keeps the keyboard from them.
 use super::{Id, Ui};
 use crate::gfx::R;
+use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 /// Kept between frames.
 pub(super) struct Persist {
     /// Four numbers per widget id, for whatever the widget needs (a caret, a scroll
-    /// offset, whether a dropdown is open).
-    slots: BTreeMap<u32, [f32; 4]>,
+    /// offset, whether a dropdown is open). Boxed so a slot never moves when another
+    /// is inserted (`Ui::slot` hands out references that outlive later `slot` calls),
+    /// and never removed, so none of them dangles.
+    slots: BTreeMap<u32, Box<[f32; 4]>>,
     pub focus: Option<Id>,
     /// Rectangles that cover what is below them: last frame's (read), this frame's
     /// (built).
@@ -66,8 +69,12 @@ pub(super) struct Frame {
 
 impl<'a> Ui<'a> {
     /// Four numbers kept for the widget `id` from frame to frame (zero at first).
+    ///
+    /// The reference stays valid across later `slot` calls for other ids (each slot is
+    /// its own allocation, and slots are never removed).
     pub fn slot(&self, id: Id) -> &'static mut [f32; 4] {
-        persist().slots.entry(id.0).or_insert([0.0; 4])
+        let b: &mut Box<[f32; 4]> = persist().slots.entry(id.0).or_insert_with(|| Box::new([0.0; 4]));
+        unsafe { &mut *(&mut **b as *mut [f32; 4]) }
     }
 
     /// Draws the overlay layer now (the frame's last widgets), so what follows, the

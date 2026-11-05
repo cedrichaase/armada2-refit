@@ -73,6 +73,7 @@ impl<'a> Ui<'a> {
             self.scrollbar(self.sub_id(id, "bar"), track, content_h, view.h, &mut sc);
         }
         sc = sc.clamp(0.0, (content_h - view.h).max(0.0));
+        let st = self.slot(id);
         st[0] = sc;
         self.claim(r);
         self.draw.push_clip(view);
