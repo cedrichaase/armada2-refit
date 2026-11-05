@@ -66,6 +66,75 @@ pub mod hook {
 
 pub mod field {
     #![allow(non_snake_case)]
+    #[inline(always)] pub fn EF_TREE_LEFT() -> usize { super::TABLE.engine().field(a2engine::Sym(53)) }
+    #[inline(always)] pub fn EF_TREE_PARENT() -> usize { super::TABLE.engine().field(a2engine::Sym(54)) }
+    #[inline(always)] pub fn EF_TREE_RIGHT() -> usize { super::TABLE.engine().field(a2engine::Sym(55)) }
+    #[inline(always)] pub fn EF_INST_MATRIX() -> usize { super::TABLE.engine().field(a2engine::Sym(56)) }
+    #[inline(always)] pub fn EF_INST_RADIUS() -> usize { super::TABLE.engine().field(a2engine::Sym(57)) }
+    #[inline(always)] pub fn EF_INST_ORIGIN() -> usize { super::TABLE.engine().field(a2engine::Sym(58)) }
+    #[inline(always)] pub fn EF_OBJ_HIDDEN() -> usize { super::TABLE.engine().field(a2engine::Sym(59)) }
+    #[inline(always)] pub fn EF_VT_INST_RENDER() -> usize { super::TABLE.engine().field(a2engine::Sym(60)) }
+    #[inline(always)] pub fn EF_EDIT_MODE() -> usize { super::TABLE.engine().field(a2engine::Sym(61)) }
+    #[inline(always)] pub fn EF_VT_EXPL_VISIBLE() -> usize { super::TABLE.engine().field(a2engine::Sym(62)) }
+    #[inline(always)] pub fn EF_VT_EXPL_SUBMIT() -> usize { super::TABLE.engine().field(a2engine::Sym(63)) }
+    #[inline(always)] pub fn EF_EXPL_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(64)) }
+    #[inline(always)] pub fn EF_EXPL_CLASS_LENGTH() -> usize { super::TABLE.engine().field(a2engine::Sym(65)) }
+    #[inline(always)] pub fn EF_EXPL_LEFT() -> usize { super::TABLE.engine().field(a2engine::Sym(66)) }
+    #[inline(always)] pub fn EF_EXPL_ENTITY() -> usize { super::TABLE.engine().field(a2engine::Sym(67)) }
+    #[inline(always)] pub fn EF_EXPL_BODY_RADIUS() -> usize { super::TABLE.engine().field(a2engine::Sym(68)) }
+    #[inline(always)] pub fn EF_EXPL_RADIUS() -> usize { super::TABLE.engine().field(a2engine::Sym(69)) }
+    #[inline(always)] pub fn EF_SHOCK_MAX() -> usize { super::TABLE.engine().field(a2engine::Sym(70)) }
+    #[inline(always)] pub fn EF_SHOCK_AGE() -> usize { super::TABLE.engine().field(a2engine::Sym(71)) }
+    #[inline(always)] pub fn EF_SHOCK_CLASS_FADE() -> usize { super::TABLE.engine().field(a2engine::Sym(72)) }
+    #[inline(always)] pub fn EF_SHOCK_CLASS_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(73)) }
+    #[inline(always)] pub fn EF_NP_HANDLE() -> usize { super::TABLE.engine().field(a2engine::Sym(74)) }
+    #[inline(always)] pub fn EF_NP_NODE() -> usize { super::TABLE.engine().field(a2engine::Sym(75)) }
+    #[inline(always)] pub fn EF_NP_LOCAL() -> usize { super::TABLE.engine().field(a2engine::Sym(76)) }
+    #[inline(always)] pub fn EF_NP_SPRITE() -> usize { super::TABLE.engine().field(a2engine::Sym(77)) }
+    #[inline(always)] pub fn EF_NP_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(78)) }
+    #[inline(always)] pub fn EF_NP_SIZE() -> usize { super::TABLE.engine().field(a2engine::Sym(79)) }
+    #[inline(always)] pub fn EF_NP_AGE() -> usize { super::TABLE.engine().field(a2engine::Sym(80)) }
+    #[inline(always)] pub fn EF_NP_LIFE() -> usize { super::TABLE.engine().field(a2engine::Sym(81)) }
+    #[inline(always)] pub fn EF_LIST_PREV() -> usize { super::TABLE.engine().field(a2engine::Sym(82)) }
+    #[inline(always)] pub fn EF_HIT_MODEL() -> usize { super::TABLE.engine().field(a2engine::Sym(83)) }
+    #[inline(always)] pub fn EF_HIT_MODEL_RADIUS() -> usize { super::TABLE.engine().field(a2engine::Sym(84)) }
+    #[inline(always)] pub fn EF_HIT_SCALE() -> usize { super::TABLE.engine().field(a2engine::Sym(85)) }
+    #[inline(always)] pub fn EF_HIT_LEFT() -> usize { super::TABLE.engine().field(a2engine::Sym(86)) }
+    #[inline(always)] pub fn EF_HIT_TIMED() -> usize { super::TABLE.engine().field(a2engine::Sym(87)) }
+    #[inline(always)] pub fn EF_HIT_HANDLE() -> usize { super::TABLE.engine().field(a2engine::Sym(88)) }
+    #[inline(always)] pub fn EF_HIT_XFORM() -> usize { super::TABLE.engine().field(a2engine::Sym(89)) }
+    #[inline(always)] pub fn EF_HIT_SHIELDS() -> usize { super::TABLE.engine().field(a2engine::Sym(90)) }
+    #[inline(always)] pub fn EF_MAP_HEAD() -> usize { super::TABLE.engine().field(a2engine::Sym(91)) }
+    #[inline(always)] pub fn EF_SHIELD_NODE_ID() -> usize { super::TABLE.engine().field(a2engine::Sym(92)) }
+    #[inline(always)] pub fn EF_SHIELD_NODE_HIT() -> usize { super::TABLE.engine().field(a2engine::Sym(93)) }
+    #[inline(always)] pub fn EF_SHOT_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(94)) }
+    #[inline(always)] pub fn EF_CLASS_DAMAGE() -> usize { super::TABLE.engine().field(a2engine::Sym(95)) }
+    #[inline(always)] pub fn EF_CLASS_SHIELD_XFORM() -> usize { super::TABLE.engine().field(a2engine::Sym(96)) }
+    #[inline(always)] pub fn EF_OBJ_SHIELDS() -> usize { super::TABLE.engine().field(a2engine::Sym(97)) }
+    #[inline(always)] pub fn EF_OBJ_SHIELDS_MAX() -> usize { super::TABLE.engine().field(a2engine::Sym(98)) }
+    #[inline(always)] pub fn EF_VT_COLONY_BEE_LIST() -> usize { super::TABLE.engine().field(a2engine::Sym(99)) }
+    #[inline(always)] pub fn EF_BEE_POS() -> usize { super::TABLE.engine().field(a2engine::Sym(100)) }
+    #[inline(always)] pub fn EF_BEE_WIDTH() -> usize { super::TABLE.engine().field(a2engine::Sym(101)) }
+    #[inline(always)] pub fn EF_BEE_STATE() -> usize { super::TABLE.engine().field(a2engine::Sym(102)) }
+    #[inline(always)] pub fn EF_BEE_SPOT() -> usize { super::TABLE.engine().field(a2engine::Sym(103)) }
+    #[inline(always)] pub fn EF_BEE_OWNER() -> usize { super::TABLE.engine().field(a2engine::Sym(104)) }
+    #[inline(always)] pub fn EF_BEE_NODE_VALUE() -> usize { super::TABLE.engine().field(a2engine::Sym(105)) }
+    #[inline(always)] pub fn EF_INFO_BUILDER() -> usize { super::TABLE.engine().field(a2engine::Sym(106)) }
+    #[inline(always)] pub fn EF_INFO_TEAMS() -> usize { super::TABLE.engine().field(a2engine::Sym(107)) }
+    #[inline(always)] pub fn EF_INFO_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(108)) }
+    #[inline(always)] pub fn EF_INFO_INST() -> usize { super::TABLE.engine().field(a2engine::Sym(109)) }
+    #[inline(always)] pub fn EF_INFO_SCALE_HANDLE() -> usize { super::TABLE.engine().field(a2engine::Sym(110)) }
+    #[inline(always)] pub fn EF_INFO_FACES_TOTAL() -> usize { super::TABLE.engine().field(a2engine::Sym(111)) }
+    #[inline(always)] pub fn EF_INFO_FACES() -> usize { super::TABLE.engine().field(a2engine::Sym(112)) }
+    #[inline(always)] pub fn EF_INFO_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(113)) }
+    #[inline(always)] pub fn EF_INFO_SPEED() -> usize { super::TABLE.engine().field(a2engine::Sym(114)) }
+    #[inline(always)] pub fn EF_INFO_RADIUS() -> usize { super::TABLE.engine().field(a2engine::Sym(115)) }
+    #[inline(always)] pub fn EF_INFO_EDGES() -> usize { super::TABLE.engine().field(a2engine::Sym(116)) }
+    #[inline(always)] pub fn EF_EDGE_START() -> usize { super::TABLE.engine().field(a2engine::Sym(117)) }
+    #[inline(always)] pub fn EF_EDGE_END() -> usize { super::TABLE.engine().field(a2engine::Sym(118)) }
+    #[inline(always)] pub fn EF_EDGE_T() -> usize { super::TABLE.engine().field(a2engine::Sym(119)) }
+    #[inline(always)] pub fn EF_S3D_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(120)) }
+    #[inline(always)] pub fn EF_BE_NODE_INFO() -> usize { super::TABLE.engine().field(a2engine::Sym(121)) }
 }
 
 pub mod value {
@@ -126,10 +195,79 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "site_cocoon_1", symbol: "Evolver::mRemoveConstructionEffect", kind: a2engine::Kind::Call },
     a2engine::SymDef { id: "site_cocoon_2", symbol: "Evolver::mCancelConstructionEffect", kind: a2engine::Kind::Call },
     a2engine::SymDef { id: "site_cocoon_3", symbol: "Evolver::mStopConstructionEffect", kind: a2engine::Kind::Call },
+    a2engine::SymDef { id: "ef_tree_left", symbol: "std::_Tree node left", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_tree_parent", symbol: "std::_Tree node parent", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_tree_right", symbol: "std::_Tree node right", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_inst_matrix", symbol: "ST3D_Instance::placement", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_inst_radius", symbol: "ST3D_Instance::radius", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_inst_origin", symbol: "ST3D_Instance::origin", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_obj_hidden", symbol: "GameObject::hidden from the player", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_vt_inst_render", symbol: "ST3D_Instance render slot 5", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_edit_mode", symbol: "UserProfile::edit mode", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_vt_expl_visible", symbol: "Explosion::IsVisible slot", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_vt_expl_submit", symbol: "Explosion submit slot", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_expl_class", symbol: "Explosion::class", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_expl_class_length", symbol: "ExplosionClass::length", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_expl_left", symbol: "Explosion::time left", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_expl_entity", symbol: "Explosion::body", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_expl_body_radius", symbol: "Explosion body radius", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_expl_radius", symbol: "Explosion::radius", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_shock_max", symbol: "ShockwaveExplosion::largest radius", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_shock_age", symbol: "ShockwaveExplosion::age", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_shock_class_fade", symbol: "ShockwaveExplosionClass::fade", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_shock_class_colour", symbol: "ShockwaveExplosionClass::colour", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_np_handle", symbol: "NodeParticleEffect particle object handle", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_np_node", symbol: "NodeParticleEffect particle hardpoint", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_np_local", symbol: "NodeParticleEffect particle position", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_np_sprite", symbol: "NodeParticleEffect particle sprite", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_np_colour", symbol: "NodeParticleEffect particle colour", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_np_size", symbol: "NodeParticleEffect particle size", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_np_age", symbol: "NodeParticleEffect particle age", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_np_life", symbol: "NodeParticleEffect particle life", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_list_prev", symbol: "std::list node previous", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_hit_model", symbol: "ShieldHit::model", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_hit_model_radius", symbol: "ShieldHit::model radius", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_hit_scale", symbol: "ShieldHit::scale", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_hit_left", symbol: "ShieldHit::time left", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_hit_timed", symbol: "ShieldHit::timed", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_hit_handle", symbol: "ShieldHit::object handle", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_hit_xform", symbol: "ShieldHit::frame", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_hit_shields", symbol: "ShieldHit::shields", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_map_head", symbol: "std::map header node", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_shield_node_id", symbol: "m_shieldList node id", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_shield_node_hit", symbol: "m_shieldList node hit", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_shot_class", symbol: "Ordnance::class", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_class_damage", symbol: "OrdnanceClass::damage", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_class_shield_xform", symbol: "CraftClass::shield transform", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_obj_shields", symbol: "Craft::shields now", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_obj_shields_max", symbol: "Craft::shields most", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_vt_colony_bee_list", symbol: "DroneColony::GetBeeList slot", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_bee_pos", symbol: "WorkerBee::position", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_bee_width", symbol: "WorkerBee::weld width", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_bee_state", symbol: "WorkerBee::state", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_bee_spot", symbol: "WorkerBee::weld spot", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_bee_owner", symbol: "WorkerBee::owner handle", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_bee_node_value", symbol: "bee multimap node value", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_info_builder", symbol: "BuildingEffect Info builder handle", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_info_teams", symbol: "BuildingEffect Info teams that see it", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_info_colour", symbol: "BuildingEffect Info colour", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_info_inst", symbol: "BuildingEffect Info instance", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_info_scale_handle", symbol: "BuildingEffect Info scale effect handle", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_info_faces_total", symbol: "BuildingEffect Info faces of the station", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_info_faces", symbol: "BuildingEffect Info faces built", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_info_class", symbol: "BuildingEffect Info class", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_info_speed", symbol: "BuildingEffect Info welding speed", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_info_radius", symbol: "BuildingEffect Info welding radius", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_info_edges", symbol: "BuildingEffect Info welding edges", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_edge_start", symbol: "welding edge start", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_edge_end", symbol: "welding edge end", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_edge_t", symbol: "welding edge progress", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_s3d_team", symbol: "ST3D_GraphicsEngine::team colour", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ef_be_node_info", symbol: "BuildingEffect m_list node Info", kind: a2engine::Kind::Field },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
-    a2engine::HookDef { id: "render3d.effects.reads", run_unknown: false, rows: &["Modules.effects"], syms: &[0, 2, 5, 6, 7, 8, 9, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44] },
+    a2engine::HookDef { id: "render3d.effects.reads", run_unknown: false, rows: &["Modules.effects"], syms: &[0, 2, 5, 6, 7, 8, 9, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121] },
     a2engine::HookDef { id: "render3d.effects.repair", run_unknown: false, rows: &["Modules.effects"], syms: &[2, 3, 4, 11, 23] },
     a2engine::HookDef { id: "render3d.effects.shields", run_unknown: false, rows: &["Modules.effects"], syms: &[6, 45, 46, 47, 48] },
     a2engine::HookDef { id: "render3d.effects.debris", run_unknown: false, rows: &["Modules.effects"], syms: &[1, 10, 22, 49, 50, 51, 52] },
@@ -143,7 +281,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 53,
+        n_resolved: 122,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x467730, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x30, 0x8b, 0x50, 0x34, 0xd9, 0x02], mask: &[], section: "", count: 0, value: 0 }, // fn_shock_radius
@@ -199,6 +337,75 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x4b0872, end: 0x0, target: 0x16, vtable: 0xffff, index: 0, chain: true, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_cocoon_1
             a2engine::Entry { present: true, addr: 0x4b0914, end: 0x0, target: 0x16, vtable: 0xffff, index: 0, chain: true, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_cocoon_2
             a2engine::Entry { present: true, addr: 0x4b09b4, end: 0x0, target: 0x16, vtable: 0xffff, index: 0, chain: true, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_cocoon_3
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // ef_tree_left
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // ef_tree_parent
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // ef_tree_right
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 68 }, // ef_inst_matrix
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // ef_inst_radius
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 104 }, // ef_inst_origin
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 275 }, // ef_obj_hidden
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 20 }, // ef_vt_inst_render
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 132 }, // ef_edit_mode
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // ef_vt_expl_visible
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 60 }, // ef_vt_expl_submit
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 48 }, // ef_expl_class
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 76 }, // ef_expl_class_length
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 168 }, // ef_expl_left
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // ef_expl_entity
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // ef_expl_body_radius
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 52 }, // ef_expl_radius
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 80 }, // ef_shock_max
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 76 }, // ef_shock_age
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 224 }, // ef_shock_class_fade
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 208 }, // ef_shock_class_colour
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // ef_np_handle
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 12 }, // ef_np_node
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // ef_np_local
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 28 }, // ef_np_sprite
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // ef_np_colour
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 44 }, // ef_np_size
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 52 }, // ef_np_age
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // ef_np_life
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // ef_list_prev
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 124 }, // ef_hit_model
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // ef_hit_model_radius
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // ef_hit_scale
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 132 }, // ef_hit_left
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 136 }, // ef_hit_timed
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 140 }, // ef_hit_handle
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 144 }, // ef_hit_xform
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 192 }, // ef_hit_shields
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // ef_map_head
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 12 }, // ef_shield_node_id
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 20 }, // ef_shield_node_hit
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 52 }, // ef_shot_class
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 188 }, // ef_class_damage
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // ef_class_shield_xform
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 456 }, // ef_obj_shields
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 460 }, // ef_obj_shields_max
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // ef_vt_colony_bee_list
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 104 }, // ef_bee_pos
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 136 }, // ef_bee_width
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 140 }, // ef_bee_state
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 172 }, // ef_bee_spot
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 188 }, // ef_bee_owner
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // ef_bee_node_value
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // ef_info_builder
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // ef_info_teams
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // ef_info_colour
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // ef_info_inst
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 180 }, // ef_info_scale_handle
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 200 }, // ef_info_faces_total
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 204 }, // ef_info_faces
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 208 }, // ef_info_class
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 224 }, // ef_info_speed
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 232 }, // ef_info_radius
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 256 }, // ef_info_edges
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 20 }, // ef_edge_start
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // ef_edge_end
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 44 }, // ef_edge_t
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 52 }, // ef_s3d_team
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 20 }, // ef_be_node_info
         ],
         blocked: &[
         ],
@@ -206,8 +413,8 @@ pub const BUILDS: &[a2engine::Build] = &[
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 4] = [const { core::sync::atomic::AtomicU64::new(0) }; 4];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 53] = [const { core::sync::atomic::AtomicU8::new(0) }; 53];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 53] = [const { core::sync::atomic::AtomicUsize::new(0) }; 53];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 122] = [const { core::sync::atomic::AtomicU8::new(0) }; 122];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 122] = [const { core::sync::atomic::AtomicUsize::new(0) }; 122];
 static NOTES: [a2engine::Note; 4] = [const { a2engine::Note::new() }; 4];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 
