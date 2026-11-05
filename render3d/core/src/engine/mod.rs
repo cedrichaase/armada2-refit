@@ -162,8 +162,14 @@ pub fn for_each_in_list_at(list: usize, mut f: impl FnMut(usize)) {
 pub fn feature_list() -> usize { at(sym::FEATURE_LIST) }
 
 /// Calls `f` with each game feature, in the vector's order.
-pub fn for_each_feature(mut f: impl FnMut(usize)) {
-    let v = unsafe { rd::<usize>(feature_list()) };
+pub fn for_each_feature(f: impl FnMut(usize)) {
+    for_each_in_vector(feature_list(), f)
+}
+
+/// Calls `f` with each element of the VC6 `std::vector<T*>` whose pointer sits at
+/// `vec_ptr_addr` (begin `+4`, end `+8`), in order.
+pub fn for_each_in_vector(vec_ptr_addr: usize, mut f: impl FnMut(usize)) {
+    let v = unsafe { rd::<usize>(vec_ptr_addr) };
     if v == 0 {
         return;
     }
