@@ -38,11 +38,16 @@ pub fn cinematic_view() -> usize {
 /// are checked by the hook to be stock; the code never reads them.
 #[allow(dead_code)]
 const CHECKED: [a2engine::Sym; 2] = [sym::UNITVIEW_SLOT_CV_RENDER, sym::UNITVIEW_SLOT_SB_RENDER];
-const VT_RENDER: usize = field::UNITVIEW_VT_RENDER;
-const CV_RECT: usize = field::UNITVIEW_CV_RECT;
-const CV_BACKGROUND_AREA: usize = field::UNITVIEW_CV_BACKGROUND_AREA;
-const CV_DISPLAY_AREA: usize = field::UNITVIEW_CV_DISPLAY_AREA;
-const CV_FRAME: usize = field::UNITVIEW_CV_FRAME;
+#[inline(always)]
+fn vt_render() -> usize { field::UNITVIEW_VT_RENDER() }
+#[inline(always)]
+fn cv_rect() -> usize { field::UNITVIEW_CV_RECT() }
+#[inline(always)]
+fn cv_background_area() -> usize { field::UNITVIEW_CV_BACKGROUND_AREA() }
+#[inline(always)]
+fn cv_display_area() -> usize { field::UNITVIEW_CV_DISPLAY_AREA() }
+#[inline(always)]
+fn cv_frame() -> usize { field::UNITVIEW_CV_FRAME() }
 
 static mut ON: bool = false;
 static mut INERT_VT: [usize; 32] = [0; 32];
@@ -81,8 +86,8 @@ pub fn view_rect(w: f32, h: f32) -> Option<[f32; 4]> {
     if c == 0 {
         return None;
     }
-    let p: [i32; 4] = unsafe { rd(c + CV_RECT) };
-    let a: [i32; 4] = unsafe { rd(c + CV_DISPLAY_AREA) };
+    let p: [i32; 4] = unsafe { rd(c + cv_rect()) };
+    let a: [i32; 4] = unsafe { rd(c + cv_display_area()) };
     let (l, t, r, b) = (p[0] + a[0], p[1] + a[1], p[0] + a[2], p[1] + a[3]);
     if r <= l || b <= t {
         return None;
@@ -108,10 +113,10 @@ pub fn place(px: [f32; 4], w: f32, h: f32) {
         return;
     }
     unsafe {
-        *((c + CV_RECT) as *mut [i32; 4]) = [l, t, r, b];
+        *((c + cv_rect()) as *mut [i32; 4]) = [l, t, r, b];
         let area = [0, 0, r - l, b - t];
-        *((c + CV_BACKGROUND_AREA) as *mut [i32; 4]) = area;
-        *((c + CV_DISPLAY_AREA) as *mut [i32; 4]) = area;
+        *((c + cv_background_area()) as *mut [i32; 4]) = area;
+        *((c + cv_display_area()) as *mut [i32; 4]) = area;
         let now = [l, t, r, b];
         if *core::ptr::addr_of!(LOGGED) != now {
             LOGGED = now;
@@ -124,8 +129,8 @@ pub fn place(px: [f32; 4], w: f32, h: f32) {
 /// in place of the component's `Render` while the placement is on).
 pub fn render(c: usize) {
     unsafe {
-        let render: unsafe extern "thiscall" fn(usize) = core::mem::transmute(rd::<usize>(rd::<usize>(c) + VT_RENDER));
-        let slot = (c + CV_FRAME) as *mut usize;
+        let render: unsafe extern "thiscall" fn(usize) = core::mem::transmute(rd::<usize>(rd::<usize>(c) + vt_render()));
+        let slot = (c + cv_frame()) as *mut usize;
         let frame = *slot;
         let sb_vtable = at(sym::UNITVIEW_SB_VTABLE);
         if frame == 0 || sb_vtable == 0 || field(frame, 0) != sb_vtable {

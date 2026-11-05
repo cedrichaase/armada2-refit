@@ -122,10 +122,9 @@
 /* Every engine address is the profile's (profiles/<build>/qol.toml, generated into
  * engine_syms.h): a site is a symbol id, its address read through a2e_addr, and every
  * hook is checked by a2e_ready before the first write.  The asm stubs continue and
- * read globals through the resolved variables a2s_qol_*, filled when the hook is ready;
- * the field offsets in asm are spliced in with A2_STR(QOL_F_...). */
-#define A2_XSTR(x) #x
-#define A2_STR(x)  A2_XSTR(x)
+ * read globals through the resolved variables a2s_qol_*, filled when the hook is ready,
+ * and field offsets and frame locals (from ebp) through a2f_qol_*, the build's own,
+ * filled at start-up: never a literal offset. */
 
 /* A patch site: the profile's symbol, how many bytes the patch overwrites and, within
  * them, where the changed part starts (byte counts, not addresses). */
@@ -322,7 +321,8 @@ __attribute__((naked)) void group_stub(void)
         "cmpl $0, (%eax)\n\t"
         "je 2f\n\t"
         "pushl $0\n\t"
-        "pushl -4(%ebp)\n\t"
+        "movl _a2f_qol_cgs_group, %eax\n\t"
+        "pushl (%ebp,%eax)\n\t"
         "movl %edi, %ecx\n\t"
         "call *_a2s_qol_bind_group\n\t"
         "jmp *_a2s_qol_group_done\n"
@@ -512,7 +512,8 @@ __attribute__((naked)) void sel_stub(void)
         "popal\n\t"
         "testl %eax, %eax\n\t"
         "jnz 1f\n\t"
-        "cmpl %edi, " A2_STR(QOL_F_OV_COUNT) "(%ebx)\n\t"
+        "movl _a2f_qol_ov_count, %eax\n\t"
+        "cmpl %edi, (%ebx,%eax)\n\t"
         "jne 2f\n\t"
         "pushl _a2s_qol_sel_cont_select\n\t"
         "ret\n"
@@ -554,13 +555,15 @@ __attribute__((naked)) void bind_stub(void)
 __attribute__((naked)) void focus_stub(void)
 {
     __asm__ __volatile__(
-        "leal " A2_STR(QOL_F_OV_SHIPGRP) "(%ecx,%eax,4), %ebx\n\t"
+        "leal (%ecx,%eax,4), %ebx\n\t"
+        "addl _a2f_qol_ov_shipgrp, %ebx\n\t"
         "cmpl $0, _g_stations\n\t"
         "je 1f\n\t"
         "movl (%ebx), %edx\n\t"
         "cmpl $0, (%edx)\n\t"
         "jne 1f\n\t"
-        "addl $(" A2_STR(QOL_F_OV_STNGRP) "-" A2_STR(QOL_F_OV_SHIPGRP) "), %ebx\n"
+        "addl _a2f_qol_ov_stngrp, %ebx\n\t"
+        "subl _a2f_qol_ov_shipgrp, %ebx\n"
         "1:\n\t"
         "pushl _a2s_qol_focus_cont\n\t"
         "ret\n\t");
@@ -687,7 +690,8 @@ __attribute__((naked)) void qsize_stub(void)
 {
     __asm__ __volatile__(
         "pushl %ecx\n\t"
-        "leal -0x28(%ebp), %eax\n\t"
+        "movl _a2f_qol_cce_craft_array, %eax\n\t"
+        "addl %ebp, %eax\n\t"
         "pushl %eax\n\t"
         "call _longest_queue\n\t"
         "addl $4, %esp\n\t"
@@ -707,14 +711,19 @@ __attribute__((naked)) void cancel_stub(void)
 {
     __asm__ __volatile__(
         "pushal\n\t"
-        "leal -0x28(%ebp), %eax\n\t"
+        "movl _a2f_qol_cce_craft_array, %eax\n\t"
+        "addl %ebp, %eax\n\t"
         "pushl %eax\n\t"
         "pushl %esi\n\t"
         "call _cancel_filter\n\t"
         "addl $8, %esp\n\t"
         "popal\n\t"
-        "movl -0x20(%ebp), %eax\n\t"
-        "movl $0, -0x14(%ebp)\n\t"
+        "movl _a2f_qol_cce_cancel_count, %eax\n\t"
+        "movl (%ebp,%eax), %eax\n\t"
+        "pushl %ecx\n\t"
+        "movl _a2f_qol_cce_cancel_index, %ecx\n\t"
+        "movl $0, (%ebp,%ecx)\n\t"
+        "popl %ecx\n\t"
         "testl %eax, %eax\n\t"
         "jle 1f\n\t"
         "pushl _a2s_qol_cancel_cont\n\t"
@@ -737,8 +746,10 @@ __attribute__((naked)) void enable_stub(void)
         "addl $4, %esp\n\t"
         "movl %eax, 20(%esp)\n\t"
         "popal\n\t"
-        "movl " A2_STR(QOL_F_BAR_X44) "(%edi), %ecx\n\t"
-        "movl " A2_STR(QOL_F_BAR_BUILD) "(%edi), %eax\n\t"
+        "movl _a2f_qol_bar_x44, %ecx\n\t"
+        "movl (%edi,%ecx), %ecx\n\t"
+        "movl _a2f_qol_bar_build, %eax\n\t"
+        "movl (%edi,%eax), %eax\n\t"
         "pushl _a2s_qol_enable_cont\n\t"
         "ret\n\t");
 }
@@ -751,9 +762,12 @@ __attribute__((naked)) void route_stub(void)
 {
     __asm__ __volatile__(
         "pushal\n\t"
-        "pushl " A2_STR(QOL_F_MODE_CLASS) "(%edi)\n\t"
-        "pushl -0x18(%ebp)\n\t"
-        "pushl -0x20(%ebp)\n\t"
+        "movl _a2f_qol_mode_class, %eax\n\t"
+        "pushl (%edi,%eax)\n\t"
+        "movl _a2f_qol_cce_route_count, %eax\n\t"
+        "pushl (%ebp,%eax)\n\t"
+        "movl _a2f_qol_cce_route_objects, %eax\n\t"
+        "pushl (%ebp,%eax)\n\t"
         "call _build_route\n\t"
         "addl $12, %esp\n\t"
         "popal\n\t"
@@ -938,7 +952,10 @@ __attribute__((naked)) void spec_read_stub(void)
 {
     __asm__ __volatile__(
         "movl $_g_spec_ships, %esi\n\t"
-        "movl %eax, -0x28(%ebp)\n\t"
+        "pushl %ecx\n\t"
+        "movl _a2f_qol_msw_read_local, %ecx\n\t"
+        "movl %eax, (%ebp,%ecx)\n\t"
+        "popl %ecx\n\t"
         "pushl _a2s_qol_spec_cont_read\n\t"
         "ret\n\t");
 }

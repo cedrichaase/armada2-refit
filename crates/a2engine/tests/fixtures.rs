@@ -15,6 +15,8 @@ pub struct Case {
     pub module: &'static str,
     pub test_ini: Option<&'static str>,
     pub addr: &'static [&'static str],
+    /// Field and value ids whose offset or value in the matched build is printed.
+    pub field: &'static [&'static str],
     pub note_for: &'static [&'static str],
     /// The content set expected ("none" for no set), "?" when the fixture does not say.
     pub content: &'static str,
@@ -95,6 +97,12 @@ fn transcript(c: &Case) -> Vec<String> {
         let k = t.syms.iter().position(|s| s.id == *id).expect("an addr query names a symbol");
         let v = e.addr(a2engine::Sym(k as u16));
         log(&format!("addr {} {:#x}", id, v));
+    }
+    for id in c.field {
+        let k = t.syms.iter().position(|s| s.id == *id).expect("a field query names a field");
+        let v = e.value(a2engine::Sym(k as u16)) as u32;
+        assert_eq!(e.field(a2engine::Sym(k as u16)), v as usize, "{}: field and value agree", c.name);
+        log(&format!("field {} {:#x}", id, v));
     }
     for (k, h) in t.hooks.iter().enumerate() {
         if let Some(n) = e.note(a2engine::HookId(k as u16)) {

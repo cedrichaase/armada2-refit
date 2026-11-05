@@ -4,6 +4,15 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 2.5.0 — 2026-11-05
+
+### Changed
+- Engine fields and values come from the matched build at run time (`field::X()`, `value::X()`), no longer compile-time consts of `gog-1.1`; the per-system wireframe sprites, the builder's queue, the setup's load fractions and the overlay's system order are sized by the build's counts at run time (`Vec`), and the repair ids are looked up per system (PLAN-ARCHITECTURE.md, AR-3).
+- `engine/sprite.rs` reads a sprite's name through the profiled `core_element_name` (its `ELEMENT_NAME` duplicated it), and its texture rectangle and texture through the new `core_sprite_uv` and `core_sprite_texture` of `ui.core.toml`.
+- `engine/overlay_text.rs` walks the message map's tree through new `ui.hud.toml` fields (`otext_tree_left`, `otext_tree_parent`, `otext_tree_right`), no longer its own `NODE_*` consts.
+
+Installed, not yet seen in game.
+
 ## 2.4.0 — 2026-11-05
 
 ### Added

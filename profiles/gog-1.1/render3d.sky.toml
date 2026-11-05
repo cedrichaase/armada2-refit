@@ -90,3 +90,93 @@ symbol = "g_starfield"
 kind = "global"
 addr = 0x773d04
 used_by = ["sky.reads"]
+
+[[sym]]
+id = "sky_class_hidden"
+symbol = "GameObjectClass::hidden"
+kind = "field"
+struct = "GameObjectClass"
+offset = 0x19c
+type = "u8"
+used_by = ["sky.reads"]
+
+[[sym]]
+id = "sky_detail"
+symbol = "ST3D_GraphicsEngine_Configuration::sky detail"
+kind = "field"
+struct = "ST3D_GraphicsEngine_Configuration"
+offset = 0x2c
+type = "u32"
+used_by = ["sky.reads"]
+
+[[sym]]
+id = "sky_starfield_root"
+symbol = "Starfield::octree root"
+kind = "field"
+struct = "Starfield"
+offset = 0x4
+type = "ptr"
+used_by = ["sky.reads"]
+
+[[sym]]
+id = "sky_node_objects"
+symbol = "Starfield octree node objects"
+kind = "field"
+struct = "Starfield octree node"
+offset = 0x30
+type = "ptr"
+used_by = ["sky.reads"]
+
+[[sym]]
+id = "sky_node_children"
+symbol = "Starfield octree node children"
+kind = "field"
+struct = "Starfield octree node"
+offset = 0x3c
+type = "ptr"
+used_by = ["sky.reads"]
+
+[[sym]]
+id = "sky_star_sprite"
+symbol = "Starfield star sprite"
+kind = "field"
+struct = "Starfield star"
+offset = 0x0
+type = "ptr"
+used_by = ["sky.reads"]
+
+[[sym]]
+id = "sky_star_corners"
+symbol = "Starfield star corners"
+kind = "field"
+struct = "Starfield star"
+offset = 0xc
+type = "v3"
+used_by = ["sky.reads"]
+
+[[sym]]
+id = "sky_auto_ptr"
+symbol = "std::list<auto_ptr> node pointer"
+kind = "field"
+struct = "std::list<auto_ptr> node"
+offset = 0xc
+type = "ptr"
+used_by = ["sky.reads"]
+
+[[sym]]
+id = "sky_edit_mode"
+symbol = "UserProfile::edit mode"
+kind = "field"
+struct = "UserProfile"
+offset = 0x84
+type = "u8"
+used_by = ["sky.reads"]
+
+[[sym]]
+id = "sky_bg_transform"
+symbol = "ST3D_Instance::transform"
+kind = "field"
+struct = "ST3D_Instance"
+offset = 0x44
+type = "m34"
+used_by = ["sky.reads"]

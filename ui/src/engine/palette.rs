@@ -27,7 +27,8 @@ use alloc::string::String;
 // menu closed). The hotkey tables' counts (commands `+0xcc`, build items `+0xd8`,
 // special weapons `+0xe4`) and the six menu toggles are what the bar's keys walk, and are
 // QOL's now (`qol/bar.c`, "QOL-1").
-pub const N_SLOTS: usize = value::PALETTE_N_SLOTS as usize;
+#[inline(always)]
+pub fn n_slots() -> usize { value::PALETTE_N_SLOTS() as usize }
 
 // `ControlButton`: its state `+0x34` (0 disabled, 2 active, else normal), its icon sprite
 // `+0x2c`, a `ModeInfo` `+0x84` or `CommandInfoClass` `+0x88`; vtable slots GetTooltip
@@ -53,16 +54,16 @@ pub fn palette() -> usize {
 }
 
 pub fn mode(p: usize) -> u32 {
-    if p == 0 { 0 } else { unsafe { rd(p + field::PALETTE_MODE) } }
+    if p == 0 { 0 } else { unsafe { rd(p + field::PALETTE_MODE()) } }
 }
 
 pub fn menu(p: usize) -> u32 {
-    if p == 0 { 0 } else { unsafe { rd(p + field::PALETTE_MENU) } }
+    if p == 0 { 0 } else { unsafe { rd(p + field::PALETTE_MENU()) } }
 }
 
 /// The `i`-th of the bar's 21 buttons (0 if there is none).
 pub fn slot(p: usize, i: usize) -> usize {
-    if i >= N_SLOTS { 0 } else { peek(p, field::PALETTE_SLOTS + 4 * i) }
+    if i >= n_slots() { 0 } else { peek(p, field::PALETTE_SLOTS() + 4 * i) }
 }
 
 /// Whether the button is shown (`IsValid`).
@@ -70,13 +71,13 @@ pub fn valid(b: usize) -> bool {
     if b == 0 {
         return false;
     }
-    let f: unsafe extern "thiscall" fn(usize) -> bool = unsafe { core::mem::transmute(rd::<usize>(rd::<usize>(b) + field::PALETTE_VT_IS_VALID)) };
+    let f: unsafe extern "thiscall" fn(usize) -> bool = unsafe { core::mem::transmute(rd::<usize>(rd::<usize>(b) + field::PALETTE_VT_IS_VALID())) };
     unsafe { f(b) }
 }
 
 /// 0: disabled (a click does nothing); 2: active (the alert level in force, ...).
 pub fn state(b: usize) -> u32 {
-    if b == 0 { 0 } else { unsafe { rd(b + field::PALETTE_BTN_STATE) } }
+    if b == 0 { 0 } else { unsafe { rd(b + field::PALETTE_BTN_STATE()) } }
 }
 
 /// The button's icon sprite. `ControlButton::Render` looks it up each time it draws:
@@ -85,14 +86,14 @@ pub fn state(b: usize) -> u32 {
 /// `StandardButton::SetImages` does). The stock bar no longer draws, so we look it up
 /// the same way, once per name. 0 when the button names no sprite.
 pub fn sprite(b: usize) -> usize {
-    let cmd = peek(b, field::PALETTE_BTN_COMMAND);
-    let mode = peek(b, field::PALETTE_BTN_MODE);
+    let cmd = peek(b, field::PALETTE_BTN_COMMAND());
+    let mode = peek(b, field::PALETTE_BTN_MODE());
     let (obj, f) = if cmd != 0 {
         (cmd, a(sym::PALETTE_CMD_BUTTON_NAME))
     } else if mode != 0 {
         (mode, a(sym::PALETTE_MODE_BUTTON_NAME))
     } else {
-        return peek(b, field::PALETTE_BTN_SPRITE);
+        return peek(b, field::PALETTE_BTN_SPRITE());
     };
     if f == 0 {
         return 0;
@@ -156,30 +157,30 @@ pub struct Desc {
 
 pub fn describe(b: usize) -> Desc {
     let mut d = Desc { kind: Kind::None, name: String::new(), pos: None };
-    let cmd = peek(b, field::PALETTE_BTN_COMMAND);
-    let mode = peek(b, field::PALETTE_BTN_MODE);
+    let cmd = peek(b, field::PALETTE_BTN_COMMAND());
+    let mode = peek(b, field::PALETTE_BTN_MODE());
     if eng().ready(hook::HUD_READS_BAR).is_err() {
         return d;
     }
     unsafe {
         if cmd != 0 {
             d.kind = Kind::Command;
-            d.name.push_str(super::hud::cstr_static((cmd + field::PALETTE_CMD_NAME) as *const u8));
-            let p: [i32; 2] = rd(cmd + field::PALETTE_CMD_POS);
+            d.name.push_str(super::hud::cstr_static((cmd + field::PALETTE_CMD_NAME()) as *const u8));
+            let p: [i32; 2] = rd(cmd + field::PALETTE_CMD_POS());
             d.pos = Some((p[0], p[1]));
             return d;
         }
         if mode == 0 {
             return d;
         }
-        match rd::<u32>(mode + field::PALETTE_MODE_KIND) {
+        match rd::<u32>(mode + field::PALETTE_MODE_KIND()) {
             1 => {
                 d.kind = Kind::Build;
-                d.name.push_str(super::hud::cstr_static(peek(peek(mode, field::PALETTE_MODE_CLASS), field::PALETTE_CLASS_ODF) as *const u8));
+                d.name.push_str(super::hud::cstr_static(peek(peek(mode, field::PALETTE_MODE_CLASS()), field::PALETTE_CLASS_ODF()) as *const u8));
             }
             2 => {
                 d.kind = Kind::Weapon;
-                let id = peek(peek(mode, field::PALETTE_MODE_WEAPON), field::PALETTE_WEAPON_PRJID);
+                let id = peek(peek(mode, field::PALETTE_MODE_WEAPON()), field::PALETTE_WEAPON_PRJID());
                 if id != 0 {
                     let mut buf = [0u8; 80];
                     let get_name = a(sym::PALETTE_PRJ_GET_NAME);
@@ -192,10 +193,10 @@ pub fn describe(b: usize) -> Desc {
             }
             3 => {
                 d.kind = Kind::Menu;
-                let i = rd::<u32>(mode + field::PALETTE_MODE_INDEX) as usize;
+                let i = rd::<u32>(mode + field::PALETTE_MODE_INDEX()) as usize;
                 let names = a(sym::PALETTE_MODE_NAMES);
-                if names != 0 && i < value::PALETTE_NAMES_COUNT as usize {
-                    d.name.push_str(super::hud::cstr_static(rd::<usize>(names + value::PALETTE_NAMES_STRIDE as usize * i) as *const u8));
+                if names != 0 && i < value::PALETTE_NAMES_COUNT() as usize {
+                    d.name.push_str(super::hud::cstr_static(rd::<usize>(names + value::PALETTE_NAMES_STRIDE() as usize * i) as *const u8));
                 }
             }
             _ => {}
@@ -210,7 +211,7 @@ pub fn tooltip(b: usize, verbose: bool) -> Option<String> {
     if b == 0 || !super::msvc::available() || eng().ready(hook::HUD_READS_BAR).is_err() {
         return None;
     }
-    let slot = if verbose { field::PALETTE_VT_VERBOSE } else { field::PALETTE_VT_TOOLTIP };
+    let slot = if verbose { field::PALETTE_VT_VERBOSE() } else { field::PALETTE_VT_TOOLTIP() };
     super::msvc::with_stringstream(|ss| unsafe {
         let f: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(rd::<usize>(rd::<usize>(b) + slot));
         f(b, ss)
@@ -227,7 +228,7 @@ pub fn press(b: usize) -> bool {
     if !super::hud::video_playing() {
         super::sound::click();
     }
-    let f: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(rd::<usize>(rd::<usize>(b) + field::PALETTE_VT_PRESS)) };
+    let f: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(rd::<usize>(rd::<usize>(b) + field::PALETTE_VT_PRESS())) };
     unsafe { f(b) };
     true
 }

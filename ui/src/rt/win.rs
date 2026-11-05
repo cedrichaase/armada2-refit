@@ -161,7 +161,7 @@ pub const WM_PRINT: u32 = 0x317;
 pub const WM_NULL: u32 = 0;
 pub const PRF_NONCLIENT: usize = 2;
 pub const PRF_CLIENT: usize = 4;
-pub const PRF_CHILDREN: usize = 0x10;
+pub const PRF_CHILDREN: usize = 0x10; // not an offset: a Win32 flag
 pub const MK_LBUTTON: usize = 1;
 pub const MK_RBUTTON: usize = 2;
 

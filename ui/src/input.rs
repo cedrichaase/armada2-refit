@@ -327,7 +327,7 @@ unsafe extern "system" fn mouse_peek(m: *mut Msg, w: HWND, min: u32, max: u32, r
 /// The game window, as the engine names it.
 pub fn window() -> HWND {
     let s = engine::storm3d();
-    if s == 0 || engine::field(s, field::CORE_STORM3D_DEVICES) == 0 || eng().ready(hook::CORE_WINDOW).is_err() {
+    if s == 0 || engine::field(s, field::CORE_STORM3D_DEVICES()) == 0 || eng().ready(hook::CORE_WINDOW).is_err() {
         return core::ptr::null_mut();
     }
     let f: unsafe extern "thiscall" fn(usize) -> HWND = unsafe { core::mem::transmute(eng().addr(sym::CORE_GET_WINDOW_HANDLE)) };

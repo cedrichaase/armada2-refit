@@ -185,6 +185,7 @@ static void bar_scan(void)
  * are emptied for the stock call and put back, and the six menu toggles point at a zero
  * for it and are put back after (stock's keys are global per selection, not per open menu).  After it, the UI takes
  * the update's layout and its clicks, and then the position keys are read. */
+#define BK_TOGGLES_MAX 16
 static void __thiscall bar_keys_hook(BYTE *p, int crafts)
 {
     BarKeysFn stock = (BarKeysFn)a2e_addr(QOL_S_BK_PROCESS_KEYS);
@@ -192,15 +193,19 @@ static void __thiscall bar_keys_hook(BYTE *p, int crafts)
     bar_find_ui();
     on = bar_active();
     if (on) {
-        static const DWORD offs[3] = { QOL_F_BK_KEY_COMMANDS, QOL_F_BK_KEY_BUILDS, QOL_F_BK_KEY_WEAPONS };
-        int  saved[3], i;
-        int *savedT[QOL_V_BK_N_TOGGLES];
+        /* The build's offsets and toggle count (resolved at start-up); at most
+         * BK_TOGGLES_MAX toggles are saved, the room on this stack. */
+        const DWORD offs[3] = { QOL_F_BK_KEY_COMMANDS, QOL_F_BK_KEY_BUILDS, QOL_F_BK_KEY_WEAPONS };
+        int  saved[3], i, nt = QOL_V_BK_N_TOGGLES;
+        int *savedT[BK_TOGGLES_MAX];
         int **toggles = (int **)a2e_addr(QOL_S_BK_TOGGLES);
-        for (i = 0; i < QOL_V_BK_N_TOGGLES; i++) { savedT[i] = toggles[i]; toggles[i] = &g_barZero; }
+        if (nt < 0) nt = 0;
+        if (nt > BK_TOGGLES_MAX) nt = BK_TOGGLES_MAX;
+        for (i = 0; i < nt; i++) { savedT[i] = toggles[i]; toggles[i] = &g_barZero; }
         for (i = 0; i < 3; i++) { saved[i] = *(int *)(p + offs[i]); *(int *)(p + offs[i]) = 0; }
         stock(p, crafts);
         for (i = 0; i < 3; i++) *(int *)(p + offs[i]) = saved[i];
-        for (i = 0; i < QOL_V_BK_N_TOGGLES; i++) toggles[i] = savedT[i];
+        for (i = 0; i < nt; i++) toggles[i] = savedT[i];
     } else {
         stock(p, crafts);
     }

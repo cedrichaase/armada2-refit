@@ -1148,3 +1148,62 @@ kind = "fn"
 addr = 0x4e69e0
 check = "8b c1 56 8b 90"
 used_by = ["bar_keys"]
+
+# Locals of the patched functions' own frames, read by the stubs that run inside them
+# (qol.c: qsize_stub, cancel_stub, route_stub, spec_read_stub): offsets from ebp.
+
+[[sym]]
+id = "cce_craft_array"
+symbol = "PopupPaletteImp::CheckCanExecute"
+kind = "value"
+value = -40      # -0x28
+unit = "ebp"
+used_by = ["stations"]
+
+[[sym]]
+id = "cce_cancel_count"
+symbol = "PopupPaletteImp::CheckCanExecute"
+kind = "value"
+value = -32      # -0x20
+unit = "ebp"
+used_by = ["stations"]
+
+[[sym]]
+id = "cce_cancel_index"
+symbol = "PopupPaletteImp::CheckCanExecute"
+kind = "value"
+value = -20      # -0x14
+unit = "ebp"
+used_by = ["stations"]
+
+[[sym]]
+id = "cce_route_objects"
+symbol = "PopupPaletteImp::CheckCanExecute"
+kind = "value"
+value = -32      # -0x20
+unit = "ebp"
+used_by = ["stations"]
+
+[[sym]]
+id = "cce_route_count"
+symbol = "PopupPaletteImp::CheckCanExecute"
+kind = "value"
+value = -24      # -0x18
+unit = "ebp"
+used_by = ["stations"]
+
+[[sym]]
+id = "msw_read_local"
+symbol = "PopupPaletteImp::mSetupSpecialWeapons"
+kind = "value"
+value = -40      # -0x28
+unit = "ebp"
+used_by = ["special_select"]
+
+[[sym]]
+id = "cgs_group"
+symbol = "cOverViewImp::mCheckGroupSelect"
+kind = "value"
+value = -4
+unit = "ebp"
+used_by = ["shift_group"]

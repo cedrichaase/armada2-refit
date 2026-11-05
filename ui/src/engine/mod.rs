@@ -92,7 +92,7 @@ pub fn d3d8_device() -> *mut c_void {
     if s == 0 {
         return core::ptr::null_mut();
     }
-    let idx = field(s, crate::syms_core::field::CORE_STORM3D_DEVICE_INDEX);
-    let dev = field(s + crate::syms_core::field::CORE_STORM3D_DEVICES, idx * 4);
-    field(dev, crate::syms_core::field::CORE_DX8_D3D8_DEVICE) as *mut c_void
+    let idx = field(s, crate::syms_core::field::CORE_STORM3D_DEVICE_INDEX());
+    let dev = field(s + crate::syms_core::field::CORE_STORM3D_DEVICES(), idx * 4);
+    field(dev, crate::syms_core::field::CORE_DX8_D3D8_DEVICE()) as *mut c_void
 }

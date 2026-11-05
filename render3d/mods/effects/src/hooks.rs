@@ -30,7 +30,7 @@
 use r3d_core::hooks::{Gate, Hook, Hooks, Kind, Prev, Site};
 use r3d_core::engine::{self, field, field_f32, field_m34, field_u8, field_v3, hook, obj, rd};
 use r3d_core::math::{M34, V3};
-use crate::syms::{sym, TABLE};
+use crate::syms::{field as off, sym, TABLE};
 
 /// An engine address of the profile: 0 unless the hook that uses it is ready.
 pub(crate) fn at(s: a2engine::Sym) -> usize { crate::syms::TABLE.engine().addr(s) }
@@ -69,7 +69,7 @@ pub fn object_of(handle: i32) -> usize {
     pub(crate) fn fn_entity_get() -> usize { at(sym::FN_ENTITY_GET) } // Entity::Get(int handle), static, cdecl
     let f: unsafe extern "C" fn(i32) -> usize = unsafe { core::mem::transmute(fn_entity_get()) };
     let o = unsafe { f(handle) };
-    if o == 0 || field(o, 0x14) & 4 == 0 || field(o, 4) == 0 || field(o, 0x40) == 0 {
+    if o == 0 || obj::flags(o) & 4 == 0 || obj::instance(o) == 0 || obj::class(o) == 0 {
         return 0;
     }
     o
@@ -81,25 +81,26 @@ pub fn tree_walk(head: usize, nil: usize, limit: u32, mut f: impl FnMut(usize)) 
     if head == 0 || nil == 0 {
         return;
     }
-    let mut node = field(head, 0); // the leftmost: begin()
+    let (left, parent, right) = (off::EF_TREE_LEFT(), off::EF_TREE_PARENT(), off::EF_TREE_RIGHT());
+    let mut node = field(head, left); // the leftmost: begin()
     let mut guard = 0;
     while node != 0 && node != head && guard < limit {
         guard += 1;
         f(node);
         // the in-order successor
-        let mut next = field(node, 8);
+        let mut next = field(node, right);
         if next != nil {
-            while field(next, 0) != nil {
-                next = field(next, 0);
+            while field(next, left) != nil {
+                next = field(next, left);
             }
             node = next;
         } else {
-            let mut p = field(node, 4);
-            while node == field(p, 8) {
+            let mut p = field(node, parent);
+            while node == field(p, right) {
                 node = p;
-                p = field(p, 4);
+                p = field(p, parent);
             }
-            if field(node, 8) != p {
+            if field(node, right) != p {
                 node = p;
             }
         }
@@ -108,43 +109,43 @@ pub fn tree_walk(head: usize, nil: usize, limit: u32, mut f: impl FnMut(usize)) 
 
 /// An instance's world transform (`+0x44`).
 pub fn instance_world(inst: usize) -> M34 {
-    field_m34(inst, 0x44)
+    field_m34(inst, off::EF_INST_MATRIX())
 }
 
 /// An instance's transform as twelve floats: three rows and the origin.
 pub fn instance_matrix12(inst: usize) -> [f32; 12] {
-    unsafe { rd(inst + 0x44) }
+    unsafe { rd(inst + off::EF_INST_MATRIX()) }
 }
 
 /// An instance's bounding radius.
 pub fn instance_radius(inst: usize) -> f32 {
-    field_f32(inst, 0x40)
+    field_f32(inst, off::EF_INST_RADIUS())
 }
 
 /// An instance's centre (`+0x68`).
 pub fn instance_centre(inst: usize) -> V3 {
-    field_v3(inst, 0x68)
+    field_v3(inst, off::EF_INST_ORIGIN())
 }
 
 /// An object's own radius through its instance (the shield effects' reach).
 pub fn object_radius(o: usize) -> f32 {
-    field_f32(field(o, 4), 0x40)
+    instance_radius(obj::instance(o))
 }
 
 /// An object's key (`+0x28`), a number that stays with it.
 pub fn object_key(o: usize) -> u32 {
-    field(o, 0x28) as u32
+    engine::entity_handle(o) as u32
 }
 
 /// An object is hidden from the player (`+0x113`).
 pub fn object_hidden(o: usize) -> bool {
-    field_u8(o, 0x113) != 0
+    field_u8(o, off::EF_OBJ_HIDDEN()) != 0
 }
 
 /// The engine's own `Render` of an instance (vtable slot 5), as stock makes it.
 pub fn engine_render(inst: usize, cam: usize) {
     unsafe {
-        let ri: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(engine::vtable(inst), 0x14));
+        let ri: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(engine::vtable(inst), off::EF_VT_INST_RENDER()));
         ri(inst, cam);
     }
 }
@@ -154,7 +155,7 @@ pub fn engine_render(inst: usize, cam: usize) {
 pub fn sees_all() -> bool {
     pub(crate) fn user_profile() -> usize { at(sym::USER_PROFILE) } // +0x84: the map editor is on
     pub(crate) fn view_record() -> usize { at(sym::VIEW_RECORD) }
-    unsafe { field_u8(rd::<usize>(user_profile()), 0x84) != 0 || rd::<u32>(view_record()) == 2 }
+    unsafe { field_u8(rd::<usize>(user_profile()), off::EF_EDIT_MODE()) != 0 || rd::<u32>(view_record()) == 2 }
 }
 
 /// A colour handed to a `Fragment` call: white for none.
@@ -214,8 +215,7 @@ pub mod explosions {
     pub(crate) fn vt_fireball() -> usize { at(sym::VT_FIREBALL) }
     pub(crate) fn vt_shockwave() -> usize { at(sym::VT_SHOCKWAVE) }
     pub(crate) fn fn_shock_radius() -> usize { at(sym::FN_SHOCK_RADIUS) }
-    const SLOT_VISIBLE: usize = 2;
-    const SLOT_SUBMIT: usize = 15;
+
 
     /// Calls `f` with every live explosion, in the list's order.
     pub fn each(mut f: impl FnMut(usize)) {
@@ -223,11 +223,11 @@ pub mod explosions {
         if head == 0 {
             return;
         }
-        let mut n = field(head, 0);
+        let mut n = engine::list_node_next(head);
         let mut guard = 0;
         while n != 0 && n != head && guard < 100_000 {
-            let next = field(n, 0);
-            f(field(n, 8));
+            let next = engine::list_node_next(n);
+            f(engine::list_node_value(n));
             n = next;
             guard += 1;
         }
@@ -244,7 +244,7 @@ pub mod explosions {
     /// The explosion class's `IsVisible` (slot 2).
     pub fn visible(e: usize) -> bool {
         unsafe {
-            let vis: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(field(engine::vtable(e), SLOT_VISIBLE * 4));
+            let vis: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(field(engine::vtable(e), off::EF_VT_EXPL_VISIBLE()));
             vis(e) != 0
         }
     }
@@ -252,7 +252,7 @@ pub mod explosions {
     /// The engine's own submit of an explosion (slot 15), as stock makes it.
     pub fn submit(e: usize, cam: usize) {
         unsafe {
-            let submit: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(engine::vtable(e), SLOT_SUBMIT * 4));
+            let submit: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(engine::vtable(e), off::EF_VT_EXPL_SUBMIT()));
             submit(e, cam);
         }
     }
@@ -260,9 +260,9 @@ pub mod explosions {
     /// A fireball's light: its class's length and the time left, None when it has no
     /// class or is out of time.
     pub fn light_life(e: usize) -> Option<(f32, f32)> {
-        let cls = field(e, 0x30);
-        let len = engine::ff(cls, 0x4c);
-        let left = engine::ff(e, 0xa8);
+        let cls = field(e, off::EF_EXPL_CLASS());
+        let len = engine::ff(cls, off::EF_EXPL_CLASS_LENGTH());
+        let left = engine::ff(e, off::EF_EXPL_LEFT());
         if cls == 0 || !(len > 0.0) || !(left > 0.0) {
             return None;
         }
@@ -271,17 +271,17 @@ pub mod explosions {
 
     /// The radius of the body an explosion is on (its entity's, `+0x40`), 0 if none.
     pub fn body_radius(e: usize) -> f32 {
-        let ent = field(e, 4);
-        if ent != 0 { engine::ff(ent, 0x40) } else { 0.0 }
+        let ent = field(e, off::EF_EXPL_ENTITY());
+        if ent != 0 { engine::ff(ent, off::EF_EXPL_BODY_RADIUS()) } else { 0.0 }
     }
 
     /// A fireball as drawn: its radius, its class's length (2.5 with no class) and the
     /// time left.
     pub fn fireball(e: usize) -> (f32, f32, f32) {
-        let cls = field(e, 0x30);
-        let r0 = engine::ff(e, 0x34);
-        let life = if cls != 0 { engine::ff(cls, 0x4c) } else { 2.5 };
-        (r0, life, engine::ff(e, 0xa8))
+        let cls = field(e, off::EF_EXPL_CLASS());
+        let r0 = engine::ff(e, off::EF_EXPL_RADIUS());
+        let life = if cls != 0 { engine::ff(cls, off::EF_EXPL_CLASS_LENGTH()) } else { 2.5 };
+        (r0, life, engine::ff(e, off::EF_EXPL_LEFT()))
     }
 
     /// A shockwave as drawn: whether it has a class, its radius now, its largest, its
@@ -295,7 +295,7 @@ pub mod explosions {
     }
 
     pub fn shockwave(e: usize) -> Shock {
-        let cls = field(e, 0x30);
+        let cls = field(e, off::EF_EXPL_CLASS());
         let radius: f32 = unsafe {
             let f: unsafe extern "thiscall" fn(usize) -> f32 = core::mem::transmute(fn_shock_radius());
             f(e)
@@ -303,15 +303,15 @@ pub mod explosions {
         Shock {
             has_class: cls != 0,
             radius,
-            max: engine::ff(e, 0x50),
-            age: engine::ff(e, 0x4c),
-            fade: if cls != 0 { engine::ff(cls, 0xe0) } else { 0.3 },
+            max: engine::ff(e, off::EF_SHOCK_MAX()),
+            age: engine::ff(e, off::EF_SHOCK_AGE()),
+            fade: if cls != 0 { engine::ff(cls, off::EF_SHOCK_CLASS_FADE()) } else { 0.3 },
         }
     }
 
     /// A shockwave's colour (its class's, `+0xd0`).
     pub fn shock_colour(e: usize) -> V3 {
-        engine::rv3(field(e, 0x30) + 0xd0)
+        engine::rv3(field(e, off::EF_EXPL_CLASS()) + off::EF_SHOCK_CLASS_COLOUR())
     }
 }
 
@@ -323,14 +323,6 @@ pub mod nodes {
     pub(crate) fn list() -> usize { at(sym::LIST) }
     pub(crate) fn count_addr() -> usize { at(sym::COUNT) }
     pub(crate) fn fn_world_pos() -> usize { at(sym::FN_WORLD_POS) } // Entity::GetWorldPosition(ST3D_Node*), thiscall
-    const P_HANDLE: usize = 0x08;
-    const P_NODE: usize = 0x0c;
-    const P_LOCAL: usize = 0x10;
-    const P_SPRITE: usize = 0x1c;
-    const P_COLOUR: usize = 0x20;
-    const P_SIZE: usize = 0x2c;
-    const P_AGE: usize = 0x34;
-    const P_LIFE: usize = 0x38;
 
     /// Calls `f` with every particle node, in the list's order.
     pub fn each(mut f: impl FnMut(usize)) {
@@ -338,12 +330,12 @@ pub mod nodes {
         if head == 0 {
             return;
         }
-        let mut n = field(head, 0);
+        let mut n = engine::list_node_next(head);
         let mut guard = 0;
         while n != 0 && n != head && guard < 1024 {
             guard += 1;
             let node = n;
-            n = field(n, 0);
+            n = engine::list_node_next(n);
             f(node);
         }
     }
@@ -358,34 +350,34 @@ pub mod nodes {
         if head == 0 {
             return None;
         }
-        let node = field(head, 4);
+        let node = field(head, off::EF_LIST_PREV());
         if node == 0 || node == head { None } else { Some(node) }
     }
 
     pub fn handle(node: usize) -> i32 {
-        field(node, P_HANDLE) as i32
+        field(node, off::EF_NP_HANDLE()) as i32
     }
     /// The hardpoint node it sits at (0: a point in the object's frame).
     pub fn hardpoint(node: usize) -> usize {
-        field(node, P_NODE)
+        field(node, off::EF_NP_NODE())
     }
     pub fn local(node: usize) -> V3 {
-        engine::rv3(node + P_LOCAL)
+        engine::rv3(node + off::EF_NP_LOCAL())
     }
     pub fn sprite(node: usize) -> usize {
-        field(node, P_SPRITE)
+        field(node, off::EF_NP_SPRITE())
     }
     pub fn colour(node: usize) -> [f32; 3] {
-        unsafe { rd(node + P_COLOUR) }
+        unsafe { rd(node + off::EF_NP_COLOUR()) }
     }
     pub fn size(node: usize) -> f32 {
-        field_f32(node, P_SIZE)
+        field_f32(node, off::EF_NP_SIZE())
     }
     pub fn age(node: usize) -> f32 {
-        field_f32(node, P_AGE)
+        field_f32(node, off::EF_NP_AGE())
     }
     pub fn life(node: usize) -> f32 {
-        field_f32(node, P_LIFE)
+        field_f32(node, off::EF_NP_LIFE())
     }
 
     /// `Entity::GetWorldPosition(ST3D_Node*)` of a hardpoint.
@@ -516,15 +508,6 @@ pub mod shields {
     pub(crate) fn fn_get_shield_type() -> usize { at(sym::FN_GET_SHIELD_TYPE) }
     const HIT_SITES: [a2engine::Sym; 4] = [sym::SITE_HIT_0, sym::SITE_HIT_1, sym::SITE_HIT_2, sym::SITE_HIT_3];
 
-    const HIT_MODEL: usize = 0x7c;
-    const HIT_MODEL_RADIUS: usize = 0x40;
-    const HIT_SCALE: usize = 0x28;
-    const HIT_LEFT: usize = 0x84;
-    const HIT_TIMED: usize = 0x88;
-    const HIT_HANDLE: usize = 0x8c;
-    const HIT_XFORM: usize = 0x90;
-    const HIT_SHIELDS: usize = 0xc0;
-
     /// A hit the weapons' calls made: its id, the weapon's site (0 beam, 1 shot, 2 mine,
     /// 3 missile) and its damage.
     #[derive(Clone, Copy)]
@@ -556,10 +539,10 @@ pub mod shields {
             let f: unsafe extern "C" fn(usize, *const f32, i32, f32, i32) -> i32 = core::mem::transmute(PREV_CREATE[site].addr());
             let id = f(o, m, ty, dur, flags);
             if id >= 0 && ord != 0 {
-                let cls = field(ord, 0x34);
+                let cls = field(ord, off::EF_SHOT_CLASS());
                 let mut dmg = -1.0f32;
                 if cls != 0 {
-                    dmg = rd::<f32>(cls + 0xa8 + 0x14);
+                    dmg = rd::<f32>(cls + off::EF_CLASS_DAMAGE());
                     if !(dmg >= 0.0 && dmg < 100000.0) {
                         dmg = -1.0;
                     }
@@ -623,9 +606,10 @@ pub mod shields {
 
     /// Walks `m_shieldList` in order (as `ShieldEffect::Render` does): (id, ShieldHit).
     pub fn walk(mut f: impl FnMut(i32, usize)) {
-        let head = unsafe { rd::<usize>(shield_list() + 4) };
+        let head = unsafe { rd::<usize>(shield_list() + off::EF_MAP_HEAD()) };
         let nil = unsafe { rd::<usize>(shield_nil()) };
-        tree_walk(head, nil, 4096, |node| f(field(node, 0xc) as i32, field(node, 0x14)));
+        let (id, hit) = (off::EF_SHIELD_NODE_ID(), off::EF_SHIELD_NODE_HIT());
+        tree_walk(head, nil, 4096, |node| f(field(node, id) as i32, field(node, hit)));
     }
 
     /// The `k`th model of the engine's shield database (0 if it is not loaded).
@@ -658,40 +642,40 @@ pub mod shields {
     }
 
     pub fn hit_model(sh: usize) -> usize {
-        field(sh, HIT_MODEL)
+        field(sh, off::EF_HIT_MODEL())
     }
     pub fn hit_handle(sh: usize) -> i32 {
-        field(sh, HIT_HANDLE) as i32
+        field(sh, off::EF_HIT_HANDLE()) as i32
     }
     pub fn hit_timed(sh: usize) -> bool {
-        field_u8(sh, HIT_TIMED) != 0
+        field_u8(sh, off::EF_HIT_TIMED()) != 0
     }
     pub fn hit_left(sh: usize) -> f32 {
-        field_f32(sh, HIT_LEFT)
+        field_f32(sh, off::EF_HIT_LEFT())
     }
     pub fn hit_shields(sh: usize) -> f32 {
-        field_f32(sh, HIT_SHIELDS)
+        field_f32(sh, off::EF_HIT_SHIELDS())
     }
     pub fn hit_model_radius(sh: usize) -> f32 {
-        field_f32(sh, HIT_MODEL_RADIUS)
+        field_f32(sh, off::EF_HIT_MODEL_RADIUS())
     }
     /// The hit's scale along its third axis.
     pub fn hit_scale_z(sh: usize) -> f32 {
-        field_f32(sh, HIT_SCALE + 8)
+        field_f32(sh, off::EF_HIT_SCALE() + 8)
     }
     /// The hit's frame (a 3x3).
     pub fn hit_xform(sh: usize) -> [f32; 9] {
-        unsafe { rd(sh + HIT_XFORM) }
+        unsafe { rd(sh + off::EF_HIT_XFORM()) }
     }
 
     /// The object's shield transform: a 3x3 and the offset (twelve floats).
     pub fn shield_xform(o: usize) -> [f32; 12] {
-        unsafe { rd(field(o, 0x40) + 0x38) }
+        unsafe { rd(obj::class(o) + off::EF_CLASS_SHIELD_XFORM()) }
     }
 
     /// The shields' level of a ship as (now, most): None when the object has none.
     pub fn level(o: usize) -> Option<(f32, f32)> {
-        if field(o, 0x14) & 8 != 0 { Some((field_f32(o, 0x1c8), field_f32(o, 0x1cc))) } else { None }
+        if obj::flags(o) & 8 != 0 { Some((field_f32(o, off::EF_OBJ_SHIELDS()), field_f32(o, off::EF_OBJ_SHIELDS_MAX()))) } else { None }
     }
 
     /// A ship's instance scale per axis, as `ApplyScaleEffects` set it.
@@ -760,17 +744,18 @@ pub mod chunks {
 
     /// Whether an instance is the Evolver's cocoon (its class and its database).
     pub fn is_cocoon(inst: usize) -> bool {
-        let db = field(inst, 0x80);
+        let db = engine::instance::instance_database(inst);
         vt_cocoon() != 0 && engine::vtable(inst) == vt_cocoon() && db != 0 && db == unsafe { rd::<usize>(cocoon_db()) }
     }
 
     /// The ODF name of the class a construction's `Info` (the instance at its `+0x20`)
     /// builds, without the extension; "" if it has none.
     pub fn building_odf(inst: usize) -> &'static str {
-        if inst <= 0x20 {
+        let embedded = off::EF_INFO_INST();
+        if inst <= embedded {
             return "";
         }
-        let class = field(inst - 0x20, 0xd0);
+        let class = field(inst - embedded, off::EF_INFO_CLASS());
         if class == 0 {
             return "";
         }
@@ -841,42 +826,36 @@ pub mod bees {
     use super::*;
 
     pub(crate) fn bee_nil() -> usize { at(sym::BEE_NIL) } // the bees' multimap's _Nil
-    const SLOT_BEE_LIST: usize = 0x40; // the colony's GetBeeList()
-
-    const B_POS: usize = 0x68;
-    const B_WIDTH: usize = 0x88;
-    const B_STATE: usize = 0x8c;
-    const B_SPOT: usize = 0xac;
-    const B_OWNER: usize = 0xbc;
     const STATE_WELDING: u32 = 4;
 
     /// The bee's owner object (0 if none).
     pub fn owner(bee: usize) -> usize {
-        object_of(field(bee, B_OWNER) as i32)
+        object_of(field(bee, off::EF_BEE_OWNER()) as i32)
     }
 
     /// The colony's bees, in order.
     pub fn walk(colony: usize, mut f: impl FnMut(usize)) {
         let list = unsafe {
-            let g: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(field(engine::vtable(colony), SLOT_BEE_LIST));
+            let g: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(field(engine::vtable(colony), off::EF_VT_COLONY_BEE_LIST()));
             g(colony)
         };
-        let head = field(list, 4);
+        let head = field(list, off::EF_MAP_HEAD());
         let nil = unsafe { rd::<usize>(bee_nil()) };
-        tree_walk(head, nil, 1024, |node| f(node + 0x10));
+        let value = off::EF_BEE_NODE_VALUE();
+        tree_walk(head, nil, 1024, |node| f(node + value));
     }
 
     pub fn welding(bee: usize) -> bool {
-        field(bee, B_STATE) as u32 == STATE_WELDING
+        field(bee, off::EF_BEE_STATE()) as u32 == STATE_WELDING
     }
     pub fn from(bee: usize) -> V3 {
-        field_v3(bee, B_POS)
+        field_v3(bee, off::EF_BEE_POS())
     }
     pub fn spot(bee: usize) -> V3 {
-        field_v3(bee, B_SPOT)
+        field_v3(bee, off::EF_BEE_SPOT())
     }
     pub fn width(bee: usize) -> f32 {
-        field_f32(bee, B_WIDTH)
+        field_f32(bee, off::EF_BEE_WIDTH())
     }
 }
 
@@ -890,22 +869,7 @@ pub mod construction {
     pub(crate) fn fn_construction_object_render() -> usize { at(sym::FN_CONSTRUCTION_OBJECT_RENDER) }
     pub(crate) fn be_head() -> usize { at(sym::BE_HEAD) } // BuildingEffect::m_list: its head node
     pub(crate) fn be_nil() -> usize { at(sym::BE_NIL) } // that tree's _Nil
-
-    const I_BUILDER: usize = 0x0; // the builder's handle
-    const I_TEAMS: usize = 0x4; // teams that see it
-    const I_COLOUR: usize = 0x8; // its colour at the start
-    const I_INST: usize = 0x20; // the station's instance (a CraftInstance)
-    const I_SCALE_HANDLE: usize = 0xb4; // the handle ApplyScaleEffects is asked for
-    const I_FACES_TOTAL: usize = 0xc8; // faces of the finished station
-    const I_FACES: usize = 0xcc; // faces built so far
-    const I_CLASS: usize = 0xd0; // the station's class
-    const I_SPEED: usize = 0xe0; // weldingSpeed: an edge's progress a second
-    const I_RADIUS: usize = 0xe8; // weldingRadius: the spark sprite's half size
-    const I_EDGES: usize = 0x100; // the welding edges' list head node
     // A welding edge's list node: start +0x14, end +0x20, progress +0x2c.
-    const E_START: usize = 0x14;
-    const E_END: usize = 0x20;
-    const E_T: usize = 0x2c;
 
     pub(crate) fn fn_teams_visible() -> usize { at(sym::FN_TEAMS_VISIBLE) } // Entity::GetTeamsVisibleToUser(), cdecl
     pub(crate) fn fn_distance_cull() -> usize { at(sym::FN_DISTANCE_CULL) } // GameObjectInstance::DistanceCull(eye, pos), thiscall
@@ -914,19 +878,19 @@ pub mod construction {
     pub(crate) fn fn_face_limit() -> usize { at(sym::FN_FACE_LIMIT) } // ST3D_Instance::SetRenderFaceLimit(int), thiscall
     pub(crate) fn fn_class_odf_addr() -> usize { at(sym::FN_CLASS_ODF) } // GameObjectClass::GetOdfName(), thiscall
     pub(crate) fn fn_get_co() -> usize { at(sym::FN_GET_CO) } // ConstructionRig::GetConstructionObject(), thiscall
-    const S3D_TEAM: usize = 0x34; // Storm3D: the team colour of the instance drawn
 
     /// The station under construction as an object: its `Render` draws nothing.
     pub fn is_construction_object(o: usize) -> bool {
-        fn_construction_object_render() != 0 && field(engine::vtable(o), 11 * 4) == fn_construction_object_render()
+        fn_construction_object_render() != 0 && engine::instance::render_fn(o) == fn_construction_object_render()
     }
 
     /// Walks `BuildingEffect::m_list` in order: each `Info`.
     pub fn each_info(mut f: impl FnMut(usize)) {
         let head = unsafe { rd::<usize>(be_head()) };
         let nil = unsafe { rd::<usize>(be_nil()) };
+        let at = off::EF_BE_NODE_INFO();
         tree_walk(head, nil, 1024, |node| {
-            let info = field(node, 0x14);
+            let info = field(node, at);
             if info != 0 {
                 f(info);
             }
@@ -935,7 +899,7 @@ pub mod construction {
 
     /// The builder object (0 if none).
     pub fn builder(info: usize) -> usize {
-        object_of(field(info, I_BUILDER) as i32)
+        object_of(field(info, off::EF_INFO_BUILDER()) as i32)
     }
     /// Whether a team that sees it is one the player sees.
     pub fn teams_seen(info: usize) -> bool {
@@ -943,49 +907,49 @@ pub mod construction {
             let f: unsafe extern "C" fn() -> u32 = core::mem::transmute(fn_teams_visible());
             f()
         };
-        teams & field(info, I_TEAMS) as u32 != 0
+        teams & field(info, off::EF_INFO_TEAMS()) as u32 != 0
     }
     pub fn faces(info: usize) -> i32 {
-        field(info, I_FACES) as i32
+        field(info, off::EF_INFO_FACES()) as i32
     }
     pub fn faces_total(info: usize) -> i32 {
-        field(info, I_FACES_TOTAL) as i32
+        field(info, off::EF_INFO_FACES_TOTAL()) as i32
     }
     pub fn speed(info: usize) -> f32 {
-        field_f32(info, I_SPEED)
+        field_f32(info, off::EF_INFO_SPEED())
     }
     pub fn welding_radius(info: usize) -> f32 {
-        field_f32(info, I_RADIUS)
+        field_f32(info, off::EF_INFO_RADIUS())
     }
     /// The station's instance (embedded in the `Info`).
     pub fn instance(info: usize) -> usize {
-        info + I_INST
+        info + off::EF_INFO_INST()
     }
     /// Its colour at the start.
     pub fn colour(info: usize) -> V3 {
-        field_v3(info, I_COLOUR)
+        field_v3(info, off::EF_INFO_COLOUR())
     }
     /// The head node of the welding edges' list (0: none).
     pub fn edges_head(info: usize) -> usize {
-        field(info, I_EDGES)
+        field(info, off::EF_INFO_EDGES())
     }
     /// The list node after `n`.
     pub fn edge_next(n: usize) -> usize {
-        field(n, 0)
+        engine::list_node_next(n)
     }
     pub fn edge_start(n: usize) -> V3 {
-        engine::rv3(n + E_START)
+        engine::rv3(n + off::EF_EDGE_START())
     }
     pub fn edge_end(n: usize) -> V3 {
-        engine::rv3(n + E_END)
+        engine::rv3(n + off::EF_EDGE_END())
     }
     pub fn edge_t(n: usize) -> f32 {
-        field_f32(n, E_T)
+        field_f32(n, off::EF_EDGE_T())
     }
 
     /// The ODF name of the class an `Info` builds, without the extension; "" if none.
     pub fn class_odf(info: usize) -> &'static str {
-        let class = field(info, I_CLASS);
+        let class = field(info, off::EF_INFO_CLASS());
         if class == 0 {
             return "";
         }
@@ -1022,7 +986,7 @@ pub mod construction {
     pub fn prepare(inst: usize, info: usize, faces: i32, cam: usize) -> bool {
         unsafe {
             let se: unsafe extern "C" fn(usize, usize) = core::mem::transmute(fn_scale_effects());
-            se(inst, field(info, I_SCALE_HANDLE));
+            se(inst, field(info, off::EF_INFO_SCALE_HANDLE()));
             let fl: unsafe extern "thiscall" fn(usize, i32) = core::mem::transmute(fn_face_limit());
             fl(inst, faces);
         }
@@ -1032,7 +996,7 @@ pub mod construction {
     /// The engine's own draw of the instance, as stock makes it (the team colour set
     /// for it first).
     pub fn engine_draw(inst: usize, colour: V3, cam: usize) {
-        unsafe { core::ptr::write_unaligned((engine::storm3d() + S3D_TEAM) as *mut V3, colour) };
+        unsafe { core::ptr::write_unaligned((engine::storm3d() + off::EF_S3D_TEAM()) as *mut V3, colour) };
         engine_render(inst, cam);
     }
 
@@ -1043,7 +1007,7 @@ pub mod construction {
                 let f: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(fn_get_co());
                 let co = f(builder);
                 if co != 0 {
-                    core::ptr::write_volatile((co + 0x25) as *mut u8, shown as u8);
+                    engine::instance::write_on_screen(co, shown as u8);
                 }
             }
         }

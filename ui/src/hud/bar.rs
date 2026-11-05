@@ -62,7 +62,7 @@ struct Item {
 /// `c`, 0 for an empty one.
 fn layout(p: usize, menu: u32) -> ([usize; CELLS], Vec<Item>) {
     let mut items = Vec::new();
-    for i in 0..palette::N_SLOTS {
+    for i in 0..palette::n_slots() {
         let b = palette::slot(p, i);
         if palette::valid(b) {
             items.push(Item { btn: b, desc: palette::describe(b) });

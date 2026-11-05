@@ -293,7 +293,7 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
     let gap = ui.u(t.gap);
     // Heights, top to bottom, in pixels.
     let head = ui.u(t.heading_size + 4.0) + if s.class.is_some() { ui.u(t.small_size + 2.0) } else { 0.0 };
-    let queue = if builder { info::queue(s.obj) } else { [(0, 0); info::QUEUE_LEN] };
+    let queue = if builder { info::queue(s.obj) } else { alloc::vec![(0, 0); info::queue_len()] };
     // Only what is queued is drawn: an idle builder has no queue row, and no
     // construction bar standing at 0%.
     let queued = queue.iter().filter(|q| q.0 != 0).count();

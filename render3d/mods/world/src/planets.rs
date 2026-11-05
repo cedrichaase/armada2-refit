@@ -562,7 +562,7 @@ impl Planets {
             // The cities, blended over the ground (pass 1 of ST3D_PlanetaryMaterial): the
             // race's development texture times the planet's own picture of its people.
             if let Some((o, race)) = b.people {
-                let rname = unsafe { rt::cstr_at((race + 0x452) as *const u8, 32) };
+                let rname = hooks::race_name(race);
                 let dtex = assets::texture(&super::name("PD_", rname, Some(h + 1)));
                 let ctex = self.city(o, race, h, v.frame);
                 if let (Some(d), Some(c)) = (dtex, ctex) {

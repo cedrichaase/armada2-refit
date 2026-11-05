@@ -241,6 +241,16 @@ class Engine:
             self.log(f'engine: {self.t.sym_ids[k]} read before its hook was ready')
         return 0
 
+    def field(self, k):
+        """A field's offset or a value in this build (the root build's on an unknown build;
+        0 where the build has none): crates/a2engine's `Engine::field`/`value`."""
+        if isinstance(k, str):
+            k = self.sym_index(k)
+        e = self.entries()[k]
+        if e is None:
+            return 0
+        return e['offset'] if e['kind'] == 'field' else e['value']
+
     def note(self, h):
         if isinstance(h, str):
             h = self.t.hook_ids.index(h)
@@ -272,7 +282,7 @@ class Engine:
         return note_text(PLUGIN_NOTE.format(exe=self.exe_name)) if self.bi is None else None
 
 
-def transcript(table, exe, test_ini=None, addr=(), note_for=(), force_build=None):
+def transcript(table, exe, test_ini=None, addr=(), note_for=(), force_build=None, field=()):
     """The fixture transcript (tools/engine/README.md, "Fixtures")."""
     eng = Engine(table, exe, test_ini, force_build=force_build)
     out = eng.lines
@@ -282,6 +292,9 @@ def transcript(table, exe, test_ini=None, addr=(), note_for=(), force_build=None
     for sid in addr:
         v = eng.addr(sid)
         out.append(f'addr {sid} 0x{v & 0xffffffff:x}')
+    for sid in field:
+        v = eng.field(sid)
+        out.append(f'field {sid} 0x{v & 0xffffffff:x}')
     for h, hid in enumerate(table.hook_ids):
         n = eng.note(h)
         if n is not None:

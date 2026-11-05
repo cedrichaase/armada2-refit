@@ -41,13 +41,15 @@ pub mod hook {
 }
 
 pub mod field {
+    #![allow(non_snake_case)]
 }
 
 pub mod value {
-    pub const DIALOGS_FRONT_END_WIDTH: i32 = 800;
-    pub const DIALOGS_FRONT_END_HEIGHT: i32 = 600;
-    pub const DIALOGS_SHELL_CODE_START: i32 = 5898240;
-    pub const DIALOGS_SHELL_CODE_END: i32 = 6356992;
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn DIALOGS_FRONT_END_WIDTH() -> i32 { super::TABLE.engine().value(a2engine::Sym(0)) }
+    #[inline(always)] pub fn DIALOGS_FRONT_END_HEIGHT() -> i32 { super::TABLE.engine().value(a2engine::Sym(1)) }
+    #[inline(always)] pub fn DIALOGS_SHELL_CODE_START() -> i32 { super::TABLE.engine().value(a2engine::Sym(2)) }
+    #[inline(always)] pub fn DIALOGS_SHELL_CODE_END() -> i32 { super::TABLE.engine().value(a2engine::Sym(3)) }
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[

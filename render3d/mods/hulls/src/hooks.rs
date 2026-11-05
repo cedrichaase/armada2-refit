@@ -10,10 +10,12 @@
 //! reading as before.
 use r3d_core::engine::{self, field, field_f32, field_u8, rd, vtable};
 use r3d_core::math::{v3, M34, V3};
-use crate::syms::sym;
+use crate::syms::{field as off, sym, value};
+use r3d_core::engine::obj;
+use r3d_core::engine::instance::{instance_database as core_instance_database, write_on_screen};
 pub use r3d_core::engine::instance::{
     class_node, crew_fire, detail_level, element_name, frustum_test, instance_byte, instance_class, instance_scale, is_craft_instance, lights_hidden,
-    render_fn, set_on_screen, station_node, team_colour, team_colours_on, cocoon_db, fn_mining_render, fn_rig_render, fn_shipyard_render, vt_cocoon, vt_database, DAMAGE_NODES,
+    render_fn, set_on_screen, station_node, team_colour, team_colours_on, cocoon_db, fn_mining_render, fn_rig_render, fn_shipyard_render, vt_cocoon, vt_database, damage_nodes, crew_node, borg_node,
 };
 
 /// An engine address of the profile: 0 unless the hook that uses it is ready.
@@ -31,7 +33,7 @@ pub fn fn_evolver_ri() -> usize { at(sym::FN_EVOLVER_RI) } // Evolver::RenderInt
 
 /// The class's `RenderInternal` (slot 22).
 pub fn render_internal_fn(o: usize) -> usize {
-    field(vtable(o), 22 * 4)
+    field(vtable(o), off::HL_VT_RENDER_INTERNAL())
 }
 
 /// `GameObject::Render` calls the instance's `Update(object)` (slot 14) before it
@@ -39,35 +41,35 @@ pub fn render_internal_fn(o: usize) -> usize {
 /// (`+0x9c..+0xa1`) and the crew-fire level (`+0xa4`) from the systems' state. It
 /// draws nothing; the module calls it as stock does, before it reads them.
 pub fn instance_update(o: usize) {
-    let inst = field(o, 4);
+    let inst = obj::instance(o);
     if inst == 0 {
         return;
     }
     unsafe {
-        let f: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(vtable(inst), 0x38));
+        let f: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(vtable(inst), off::HL_VT_INST_UPDATE()));
         f(inst, o);
     }
 }
 
 /// The instance's bounding sphere: centre (object space) `+0x34`, radius `+0x40`.
 pub fn instance_sphere(inst: usize) -> (V3, f32) {
-    (engine::field_v3(inst, 0x34), field_f32(inst, 0x40))
+    (engine::field_v3(inst, off::HL_INST_CENTRE()), field_f32(inst, off::HL_INST_RADIUS()))
 }
 
 /// The instance's placement (`+0x44`, a `Matrix34`), what its database is drawn with.
 pub fn instance_matrix(inst: usize) -> M34 {
-    engine::field_m34(inst, 0x44)
+    engine::field_m34(inst, off::HL_INST_MATRIX())
 }
 
 /// The cloaking device's state: (state, alpha, phase). State 0 visible, 1 cloaking,
 /// 2 cloaked, 3 decloaking (`CloakingDevice`, the craft's `+0x108`: `+0x3c`, `+0x44`,
 /// `+0x48`).
 pub fn cloak(o: usize) -> (u32, f32, f32) {
-    let d = field(o, 0x108);
+    let d = field(o, off::HL_OBJ_CLOAK());
     if d == 0 {
         return (0, 1.0, 0.0);
     }
-    (field(d, 0x3c) as u32, field_f32(d, 0x44), field_f32(d, 0x48))
+    (field(d, off::HL_CLOAK_STATE()) as u32, field_f32(d, off::HL_CLOAK_ALPHA()), field_f32(d, off::HL_CLOAK_PHASE()))
 }
 
 /// The player's team (`Entity::GetUserTeam`, 0x4d0060, cdecl), as QOL.asi asks it.
@@ -77,18 +79,18 @@ pub fn user_team() -> i32 {
 
 /// Whether the object is the player's own: its team (`+0xec`) is the player's.
 pub fn is_users(o: usize) -> bool {
-    o != 0 && field(o, 0xec) as i32 == user_team()
+    o != 0 && obj::team(o) == user_team()
 }
 
 /// The warp stretch for this draw (`Craft::RenderInternal`): (b, S, the motion in
 /// object space) while the craft's `+0x244` is above 0.
 pub fn warp(o: usize, world: &M34) -> Option<(f32, f32, V3)> {
-    let b = field_f32(o, 0x244);
+    let b = field_f32(o, off::HL_CRAFT_WARP_B());
     if !(b > 0.0) {
         return None;
     }
-    let s = field_f32(o, 0x248);
-    let vel = engine::field_v3(o, 0xdc);
+    let s = field_f32(o, off::HL_CRAFT_WARP_S());
+    let vel = engine::field_v3(o, off::HL_OBJ_VELOCITY());
     // The velocity taken into object space through the transform's axes, as the
     // engine does (dot with each row).
     let n = v3(world.r[0].norm().dot(vel), world.r[1].norm().dot(vel), world.r[2].norm().dot(vel));
@@ -101,7 +103,7 @@ pub fn warp(o: usize, world: &M34) -> Option<(f32, f32, V3)> {
 /// The billboard effect pinned to the object (`GameObject::SetBillboardEffect`, `+0x3c`,
 /// an `ST3D_SpriteNodeData`), by the name it carries.
 pub fn billboard_effect(o: usize) -> Option<&'static str> {
-    let nd = field(o, 0x3c);
+    let nd = field(o, off::HL_OBJ_EFFECT());
     if nd == 0 {
         return None;
     }
@@ -119,7 +121,7 @@ pub fn wave_lights(o: usize, craft: bool) -> [usize; 5] {
             out[i] = g(o);
         }
     }
-    if craft && field_f32(o, 0x240) > 0.0 {
+    if craft && field_f32(o, off::HL_CRAFT_WHITE_WAVE()) > 0.0 {
         out[4] = unsafe { rd::<usize>(at(sym::WAVE_LIGHT_WHITE)) };
     }
     out
@@ -140,10 +142,10 @@ pub fn wave(w: usize) -> Option<Wave> {
         return None;
     }
     Some(Wave {
-        colour: engine::field_v3(w, 0xf4),
-        wavelength: field_f32(w, 0x13c),
-        speed: field_f32(w, 0x140),
-        dir: engine::field_v3(w, 0x144),
+        colour: engine::field_v3(w, off::HL_WAVE_COLOUR()),
+        wavelength: field_f32(w, off::HL_WAVE_LENGTH()),
+        speed: field_f32(w, off::HL_WAVE_SPEED()),
+        dir: engine::field_v3(w, off::HL_WAVE_DIR()),
     })
 }
 
@@ -161,18 +163,18 @@ pub fn far_fade(inst: usize) -> Option<f32> {
 /// Whether near fades are on for this pass (`Storm3D+0xe8`, `SetNearFadeOut`), and not
 /// in one of stock's two cases without one (`View_Record` mode 2; the byte 0x7637b5).
 pub fn near_fade_on() -> bool {
-    field(engine::storm3d(), 0xe8) != 0 && unsafe { rd::<u32>(at(sym::VIEW_RECORD_MODE)) } != 2 && unsafe { rd::<u8>(at(sym::NEAR_FADE_FLAG)) } == 0
+    fades_on() && unsafe { rd::<u32>(at(sym::VIEW_RECORD_MODE)) } != 2 && unsafe { rd::<u8>(at(sym::NEAR_FADE_FLAG)) } == 0
 }
 
 /// The class's visible database (`GameObjectClass+0x1dc`).
 pub fn class_visible_db(o: usize) -> usize {
-    field(field(o, 0x40), 0x1dc)
+    field(obj::class(o), off::HL_CLASS_VISIBLE_DB())
 }
 
 
 /// A hologram (`+0x174`, `TimedHoloEffect`): the engine draws it.
 pub fn hologram(o: usize) -> usize {
-    field(o, 0x174)
+    field(o, off::HL_OBJ_HOLOGRAM())
 }
 
 /// `TimedHoloEffect::RenderHologram`, as `GameObject::RenderInternal` calls it; its
@@ -181,13 +183,13 @@ pub fn render_hologram(o: usize, h: usize) {
     unsafe {
         let f: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(at(sym::FN_RENDER_HOLOGRAM));
         let v = f(h);
-        core::ptr::write_volatile((o + 0x25) as *mut u8, v);
+        write_on_screen(o, v);
     }
 }
 
 /// `+0x26`: the object is not drawn (stock's `RenderInternal` skips it).
 pub fn suppressed(o: usize) -> bool {
-    field_u8(o, 0x26) != 0
+    field_u8(o, off::HL_OBJ_SUPPRESSED()) != 0
 }
 
 /// A construction rig's placeholder (`ConstructionRig::Render`): drawn by the engine's
@@ -195,44 +197,53 @@ pub fn suppressed(o: usize) -> bool {
 pub fn rig_placeholder(o: usize) {
     unsafe {
         let user: unsafe extern "C" fn() -> i32 = core::mem::transmute(at(sym::FN_USER_TEAM));
-        if field(o, 0xec) as i32 != user() {
+        if obj::team(o) != user() {
             return;
         }
-        let mut item = field(o, 0x254);
-        if item == 0 {
-            let f: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(at(sym::FN_NEXT_BUILD_ITEM));
-            item = f(o);
-        }
-        let busy: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(field(vtable(o), 0x138));
-        if busy(o) != 0 || item == 0 {
-            return;
-        }
-        let ok: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(field(vtable(item), 0x28));
-        if ok(item) == 0 {
-            return;
-        }
+        let Some(item) = rig_item(o) else { return };
         let colour: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(at(sym::FN_GET_COLOUR));
         let c = colour(o);
-        let mut m = [0u8; 0x30];
-        let place: unsafe extern "thiscall" fn(usize, *mut u8) -> usize = core::mem::transmute(field(vtable(o), 0x188));
+        let mut m = [0u8; core::mem::size_of::<M34>()];
+        let place: unsafe extern "thiscall" fn(usize, *mut u8) -> usize = core::mem::transmute(field(vtable(o), off::HL_VT_RIG_PLACE()));
         let mp = place(o, m.as_mut_ptr());
         let draw: unsafe extern "C" fn(usize, usize, usize) = core::mem::transmute(at(sym::FN_PLACEHOLDER_RENDER));
         draw(item, mp, c);
     }
 }
 
+/// The item a construction rig would build next, when it is not busy and the item can
+/// be placed (`ConstructionRig::Render`'s tests).
+unsafe fn rig_item(o: usize) -> Option<usize> {
+    unsafe {
+        let mut item = field(o, off::HL_RIG_BUILD_ITEM());
+        if item == 0 {
+            let f: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(at(sym::FN_NEXT_BUILD_ITEM));
+            item = f(o);
+        }
+        let busy: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(field(vtable(o), off::HL_VT_RIG_BUSY()));
+        if busy(o) != 0 || item == 0 {
+            return None;
+        }
+        let ok: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(field(vtable(item), off::HL_VT_ITEM_OK()));
+        if ok(item) == 0 {
+            return None;
+        }
+        Some(item)
+    }
+}
+
 /// A scrap object's glow (`Scrap::Render`): the `glowdmoon` sprite node's colour,
 /// (0, 0.5, 1) times the share of its resource left.
 pub fn scrap_glow(o: usize) -> Option<V3> {
-    let r = field(o, 0x17c);
-    if r == 0 || field_u8(r, 0x18) != 0 {
+    let r = field(o, off::HL_SCRAP_RESOURCE());
+    if r == 0 || field_u8(r, off::HL_RESOURCE_EMPTY()) != 0 {
         return None;
     }
     unsafe {
         let total: unsafe extern "thiscall" fn(usize) -> f32 = core::mem::transmute(at(sym::FN_RESOURCE_TOTAL));
         let max: unsafe extern "thiscall" fn(usize) -> f32 = core::mem::transmute(at(sym::FN_RESOURCE_MAX));
         let t = total(r);
-        let m = max(field(r, 4));
+        let m = max(field(r, off::HL_RESOURCE_CLASS()));
         let f = if m > 0.0 { t / m } else { 0.0 };
         Some(v3(0.0, 0.5, 1.0) * f)
     }
@@ -276,21 +287,21 @@ pub fn distance_culled(pos: V3, eye: V3) -> bool {
 /// class's visible database (`+0x1dc`), and `Simulate` puts it at the object's
 /// transform every tick.
 pub fn hologram_parts(h: usize) -> Option<(usize, usize)> {
-    let inst = field(h, 0xb4);
-    let class = field(h, 0xc4);
+    let inst = field(h, off::HL_HOLO_INSTANCE());
+    let class = field(h, off::HL_HOLO_CLASS());
     (inst != 0 && class != 0).then_some((inst, class))
 }
 
 /// The Evolver's cocoon (`Evolver+0x2ac`, a `CocoonInstance`, vtable 0x6b2630, of
 /// `8472_cocoon.sod`, whose database the engine keeps at 0x73fccc), while it evolves.
 pub fn cocoon(o: usize) -> usize {
-    field(o, 0x2ac)
+    field(o, off::HL_EVOLVER_COCOON())
 }
 
 /// How far the evolution has gone (`+0x2b0`, 0..1): past a third, only the cocoon is
 /// drawn (`Evolver::RenderInternal`, 0x4b1170).
 pub fn evolution(o: usize) -> f32 {
-    field_f32(o, 0x2b0)
+    field_f32(o, off::HL_EVOLVER_PROGRESS())
 }
 
 /// What `Evolver::RenderInternal` does to the cocoon before it draws it: the strategic
@@ -302,7 +313,7 @@ pub fn cocoon_scale_effects(c: usize) {
         let create: unsafe extern "thiscall" fn(usize) = core::mem::transmute(at(sym::FN_STRATEGIC_SCALE));
         create(c);
         let apply: unsafe extern "C" fn(usize, usize) = core::mem::transmute(at(sym::FN_APPLY_SCALE));
-        apply(c, field(c, 0x94));
+        apply(c, field(c, off::HL_INST_SCALE_HANDLE()));
     }
 }
 
@@ -322,7 +333,7 @@ pub fn cocoon_fade(c: usize) -> f32 {
 /// drew.
 pub fn instance_render(inst: usize, cam: usize) -> bool {
     unsafe {
-        let f: unsafe extern "thiscall" fn(usize, usize) -> u8 = core::mem::transmute(field(vtable(inst), 6 * 4));
+        let f: unsafe extern "thiscall" fn(usize, usize) -> u8 = core::mem::transmute(field(vtable(inst), off::HL_VT_INST_RENDER()));
         f(inst, cam) != 0
     }
 }
@@ -333,27 +344,15 @@ pub fn instance_render(inst: usize, cam: usize) -> bool {
 pub fn rig_placeholder_of(o: usize) -> Option<(usize, M34, V3)> {
     unsafe {
         let user: unsafe extern "C" fn() -> i32 = core::mem::transmute(at(sym::FN_USER_TEAM));
-        if field(o, 0xec) as i32 != user() {
+        if obj::team(o) != user() {
             return None;
         }
-        let mut item = field(o, 0x254);
-        if item == 0 {
-            let f: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(at(sym::FN_NEXT_BUILD_ITEM));
-            item = f(o);
-        }
-        let busy: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(field(vtable(o), 0x138));
-        if busy(o) != 0 || item == 0 {
-            return None;
-        }
-        let ok: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(field(vtable(item), 0x28));
-        if ok(item) == 0 {
-            return None;
-        }
+        let item = rig_item(o)?;
         let colour: unsafe extern "thiscall" fn(usize) -> *const V3 = core::mem::transmute(at(sym::FN_GET_COLOUR));
         let c = colour(o);
         let c = if c.is_null() { v3(1.0, 1.0, 1.0) } else { core::ptr::read_unaligned(c) };
-        let mut m = [0u8; 0x30];
-        let place: unsafe extern "thiscall" fn(usize, *mut u8) -> *const M34 = core::mem::transmute(field(vtable(o), 0x188));
+        let mut m = [0u8; core::mem::size_of::<M34>()];
+        let place: unsafe extern "thiscall" fn(usize, *mut u8) -> *const M34 = core::mem::transmute(field(vtable(o), off::HL_VT_RIG_PLACE()));
         let mp = place(o, m.as_mut_ptr());
         if mp.is_null() {
             return None;
@@ -387,10 +386,10 @@ pub fn cargo_markings(o: usize, sod: &a2fmt::sod::Sod) -> alloc::vec::Vec<(alloc
         return out;
     }
     let Some(ore) = sod.find(super::content::get().ore_node) else { return out };
-    let kind = field(o, 0x25c);
-    let amount = field_f32(o, 0x258);
-    let caps = field(o, 0x254);
-    let (fill, colour) = if kind < 6 && caps != 0 {
+    let kind = field(o, off::HL_FREIGHTER_KIND());
+    let amount = field_f32(o, off::HL_FREIGHTER_AMOUNT());
+    let caps = field(o, off::HL_FREIGHTER_CAPACITY());
+    let (fill, colour) = if kind < value::HL_RESOURCE_COUNT() as usize && caps != 0 {
         let cap = field_f32(caps, kind * 4);
         let fill = if cap > 0.0 && amount.is_finite() { amount / cap * 100.0 } else { 0.0 };
         let p = field(resource_colours(), kind * 4);
@@ -429,14 +428,14 @@ pub fn two_pi() -> f32 {
 
 /// Whether fades are on in this pass at all (`Storm3D+0xe8`, `SetNearFadeOut`).
 pub fn fades_on() -> bool {
-    field(engine::storm3d(), 0xe8) != 0
+    field(engine::storm3d(), off::HL_S3D_NEAR_FADE()) != 0
 }
 
 /// Stock's near fade of an instance (`GameObjectInstance::ComputeFadeOut`): its bounding
 /// sphere over the distance (`+0x40`, `+0x8c`) against the engine's three constants
 /// (`0x70444c`, `0x704450`, `0x704454`). 1 when it does not fade.
 pub fn stock_near_fade(inst: usize) -> f32 {
-    let q = field_f32(inst, 0x40) / field_f32(inst, 0x8c).max(1e-3);
+    let q = instance_radius(inst) / obj::instance_distances(inst).1.max(1e-3);
     let (minf, maxf, maxa) = unsafe { (rd::<f32>(at(sym::FADE_MIN_FOV)), rd::<f32>(at(sym::FADE_MAX_FOV)), rd::<f32>(at(sym::FADE_MAX))) };
     if !(q > minf) || !(maxf > minf) {
         return 1.0;
@@ -446,95 +445,95 @@ pub fn stock_near_fade(inst: usize) -> f32 {
 
 /// The instance's bounding radius (`+0x40`).
 pub fn instance_radius(inst: usize) -> f32 {
-    field_f32(inst, 0x40)
+    field_f32(inst, off::HL_INST_RADIUS())
 }
 
 /// Where the instance's placement has its origin (`+0x68`).
 pub fn instance_origin(inst: usize) -> V3 {
-    engine::field_v3(inst, 0x68)
+    engine::field_v3(inst, off::HL_INST_ORIGIN())
 }
 
 /// The faces the instance draws (`sm_faces_remaining`, `+0x10`: construction); -1 for no
 /// limit, and for no instance.
 pub fn face_limit(inst: usize) -> i32 {
-    if inst == 0 { -1 } else { field(inst, 0x10) as i32 }
+    if inst == 0 { -1 } else { field(inst, off::HL_INST_FACES()) as i32 }
 }
 
 /// The instance's database (`+0x80`).
 pub fn instance_database(inst: usize) -> usize {
-    field(inst, 0x80)
+    core_instance_database(inst)
 }
 
 /// The sim time the instance started at (`+0x18`).
 pub fn instance_start(inst: usize) -> f32 {
-    field_f32(inst, 0x18)
+    engine::view::instance_clock(inst).2
 }
 
 /// The instance's flags (`+0xc`).
 pub fn instance_flags(inst: usize) -> u32 {
-    field(inst, 0xc) as u32
+    engine::view::instance_clock(inst).0
 }
 
 /// A craft instance with the Borg assimilation byte set (`+0xa1`).
 pub fn assimilated(inst: usize) -> bool {
-    field_u8(inst, 0xa1) != 0
+    r3d_core::engine::instance::assimilated(inst)
 }
 
 /// Whether the object carries a cloaking device (`+0x108`).
 pub fn has_cloak(o: usize) -> bool {
-    field(o, 0x108) != 0
+    field(o, off::HL_OBJ_CLOAK()) != 0
 }
 
 /// The object loop's own filters: not a background object (flag `0x10000`), not
 /// distance-culled for this view (`+0x183`).
 pub fn in_loop(o: usize) -> bool {
-    o != 0 && engine::obj::flags(o) & 0x10000 == 0 && field_u8(o, 0x183) == 0
+    o != 0 && obj::flags(o) & 0x10000 == 0 && !obj::culled(o)
 }
 
 /// Writes the on-screen byte (`+0x25`) as `GameObject::RenderInternal` writes the answer
 /// of its frustum test.
 pub fn write_seen(o: usize, seen: bool) {
-    unsafe { core::ptr::write_volatile((o + 0x25) as *mut u8, seen as u8) };
+    write_on_screen(o, seen as u8);
 }
 
 /// The cocoon's position (`+0x68`).
 pub fn cocoon_position(c: usize) -> V3 {
-    engine::field_v3(c, 0x68)
+    instance_origin(c)
 }
 
 /// Whether an instance is the cocoon we know: a `CocoonInstance` on the plain database
 /// the engine keeps for `8472_cocoon.sod`.
 pub fn is_known_cocoon(c: usize) -> bool {
-    let db = field(c, 0x80);
+    let db = core_instance_database(c);
     engine::vtable(c) == vt_cocoon() && db != 0 && engine::vtable(db) == vt_database() && db == unsafe { rd::<usize>(cocoon_db()) }
 }
 
 /// The cocoon's ramp (`+0x98`, 0..1 over the first third of the evolution).
 pub fn cocoon_ramp(c: usize) -> f32 {
-    field_f32(c, 0x98)
+    field_f32(c, off::HL_COCOON_RAMP())
 }
 
 /// The nodes of a craft class whose children are the engine's damage and crew-fire
-/// effects (the class's damage node names, `DAMAGE_NODES`, and the crew-fire one at
+/// effects (the class's damage node names, `damage_nodes`, and the crew-fire one at
 /// `+0x408`): hidden when a model is shown clean.
 pub fn class_effect_nodes(class: usize) -> alloc::vec::Vec<&'static str> {
-    DAMAGE_NODES
+    damage_nodes()
         .iter()
-        .copied()
-        .chain([(0x408usize, 0usize)])
-        .filter_map(|(cf, _)| element_name(field(class, cf)))
+        .map(|&(cf, _)| field(class, cf))
+        .chain([crew_node(class)])
+        .filter_map(element_name)
         .collect()
 }
 
 /// The name of a craft class's Borg node (`+0x420`).
 pub fn class_borg_node(class: usize) -> Option<&'static str> {
-    element_name(field(class, 0x420))
+    element_name(borg_node(class))
 }
 
 /// Whether a class is a `CraftClass` (its node fields are where `class_effect_nodes`
 /// reads them): `DisableSpecialNodes` (vtable slot 7) is `CraftClass`'s (0x4bfdf0).
 pub fn is_craft_class(class: usize) -> bool {
-    field(engine::vtable(class), 7 * 4) == at(sym::FN_CRAFT_CLASS_DISABLE_NODES)
+    field(engine::vtable(class), off::HL_VT_CLASS_DISABLE_NODES()) == at(sym::FN_CRAFT_CLASS_DISABLE_NODES)
 }
 
 /// The planets in the object list (`vtable 0x6b2b3c`), as the shadow map's occluders:
@@ -543,17 +542,20 @@ pub fn is_craft_class(class: usize) -> bool {
 pub fn planet_spheres(max: usize) -> alloc::vec::Vec<[f32; 4]> {
     pub(crate) fn vt_planet() -> usize { at(sym::VT_PLANET) }
     let mut out = alloc::vec::Vec::new();
+    let (radius, centre, matrix) = (off::HL_INST_RADIUS(), off::HL_INST_CENTRE(), off::HL_INST_MATRIX());
+    let vt = vt_planet();
     engine::for_each_in_list(engine::object_list(), |o| {
-        if out.len() >= max || o == 0 || engine::vtable(o) != vt_planet() {
+        if out.len() >= max || o == 0 || engine::vtable(o) != vt {
             return;
         }
-        let inst = field(o, 4);
-        let r = field_f32(inst, 0x40);
+        let inst = obj::instance(o);
+        let r = field_f32(inst, radius);
         if !(r > 0.0) {
             return;
         }
-        let c = engine::field_v3(inst, 0x34);
-        let t = engine::field_v3(inst, 0x44 + 0x24);
+        let c = engine::field_v3(inst, centre);
+        // The placement's translation, after its three axes.
+        let t = engine::field_v3(inst, matrix + 3 * core::mem::size_of::<V3>());
         out.push([t.x + c.x, t.y + c.y, t.z + c.z, r]);
     });
     out

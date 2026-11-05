@@ -482,6 +482,29 @@ static inline int a2e_check(const A2EHookDef *h, A2E_U32 k, A2E_U32 *out, A2EErr
     return 1;
 }
 
+/* A field's offset or a value in the matched build (crates/a2engine/README.md, "Fields
+ * and values"): the root build's on an unknown build (or before a2e_start), 0 when the
+ * build has none (every hook that uses it stands down).  What <P>_F_<ID> and <P>_V_<ID>
+ * read, through the variables a2e_fields fills. */
+static inline int a2e_field(A2E_U32 k)
+{
+    const A2EEntry *e;
+    if (!a2e_t || k >= a2e_t->n_syms || !a2e_t->n_builds) return 0;
+    e = &a2e_t->builds[a2e_bi < 0 ? 0 : a2e_bi].entries[k];
+    return e->present ? e->value : 0;
+}
+
+/* Every field's and value's variable (a2f_<p>_<id>) from the matched build. */
+static inline void a2e_fields(void)
+{
+    A2E_U32 i;
+    for (i = 0; i < a2e_t->n_syms; i++) {
+        int kind = a2e_t->syms[i].kind;
+        if ((kind == A2E_K_FIELD || kind == A2E_K_VALUE) && a2e_t->vars[i])
+            *a2e_t->vars[i] = (A2E_U32)a2e_field(i);
+    }
+}
+
 /* Starts the resolver of t on a mapped image: mem[0] is the byte at virtual address
  * base, size bytes are readable; test_ini is an A2EngineTest.ini's text or NULL; module
  * the process's module file name (no directory) or NULL, named in the log and the notes
@@ -531,6 +554,7 @@ static inline int a2e_start(const A2ETable *t, a2_logfn log, const A2E_U8 *mem, 
         n = t->n_scan; h = 0;
     }
     a2e_say(&l);
+    a2e_fields();
     l.n = 0; l.b[0] = 0;
     a2e_ap(&l, "engine: symbols: "); a2e_apd(&l, n); a2e_ap(&l, "/"); a2e_apd(&l, t->n_syms);
     a2e_ap(&l, " resolved; "); a2e_apd(&l, h); a2e_ap(&l, " hooks blocked");

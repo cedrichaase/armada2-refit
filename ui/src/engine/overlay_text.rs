@@ -28,9 +28,6 @@ pub fn overlay() -> usize {
 // `+8`, the key at `+0xc`, the `auto_ptr`'s pointer at `+0x14`; the shared sentinel is
 // `_Nil`. A message: its point at `+0x58`, its justification at `+0x68`, its text at
 // `+0x88`, its colour at `+0x94`, its fade at `+0xa0`.
-const NODE_LEFT: usize = 0x0;
-const NODE_PARENT: usize = 0x4;
-const NODE_RIGHT: usize = 0x8;
 
 pub struct Line {
     pub key: i32,
@@ -52,11 +49,11 @@ pub fn lines() -> Vec<Line> {
         return v;
     }
     let nil = unsafe { rd::<usize>(eng().addr(sym::OTEXT_NIL)) };
-    let head = peek(o, field::OTEXT_MAP_HEAD);
+    let head = peek(o, field::OTEXT_MAP_HEAD());
     if head == 0 || nil == 0 {
         return v;
     }
-    let root = peek(head, NODE_PARENT);
+    let root = peek(head, field::OTEXT_TREE_PARENT());
     walk(root, nil, head, &mut v, 0);
     v
 }
@@ -65,19 +62,19 @@ fn walk(n: usize, nil: usize, head: usize, v: &mut Vec<Line>, depth: u32) {
     if n == 0 || n == nil || n == head || depth > 32 || v.len() >= 32 {
         return;
     }
-    walk(peek(n, NODE_LEFT), nil, head, v, depth + 1);
-    let t = peek(n, field::OTEXT_NODE_VALUE);
+    walk(peek(n, field::OTEXT_TREE_LEFT()), nil, head, v, depth + 1);
+    let t = peek(n, field::OTEXT_NODE_VALUE());
     if t != 0 {
-        let (x, y): (i32, i32) = unsafe { (rd(t + field::OTEXT_POINT), rd(t + field::OTEXT_POINT + 4)) };
+        let (x, y): (i32, i32) = unsafe { (rd(t + field::OTEXT_POINT()), rd(t + field::OTEXT_POINT() + 4)) };
         v.push(Line {
-            key: unsafe { rd(n + field::OTEXT_NODE_KEY) },
+            key: unsafe { rd(n + field::OTEXT_NODE_KEY()) },
             x,
             y,
-            justify: unsafe { rd(t + field::OTEXT_JUSTIFY) },
-            text: buttons::clean(&buttons::latin1(peek(t, field::OTEXT_TEXT), 512)),
-            colour: unsafe { rd(t + field::OTEXT_COLOUR) },
-            fade: unsafe { rd::<f32>(t + field::OTEXT_FADE) }.clamp(0.0, 1.0),
+            justify: unsafe { rd(t + field::OTEXT_JUSTIFY()) },
+            text: buttons::clean(&buttons::latin1(peek(t, field::OTEXT_TEXT()), 512)),
+            colour: unsafe { rd(t + field::OTEXT_COLOUR()) },
+            fade: unsafe { rd::<f32>(t + field::OTEXT_FADE()) }.clamp(0.0, 1.0),
         });
     }
-    walk(peek(n, NODE_RIGHT), nil, head, v, depth + 1);
+    walk(peek(n, field::OTEXT_TREE_RIGHT()), nil, head, v, depth + 1);
 }

@@ -65,70 +65,72 @@ pub mod hook {
 }
 
 pub mod field {
-    pub const RADAR_MR_RADAR: usize = 0x28;
-    pub const RADAR_MR_SHIP_BUTTON: usize = 0x2c;
-    pub const RADAR_MR_STATION_BUTTON: usize = 0x30;
-    pub const RADAR_BTN_SPRITE: usize = 0x2c;
-    pub const RADAR_RC_BACKGROUND: usize = 0x3c;
-    pub const RADAR_RC_MARKS: usize = 0x4c;
-    pub const RADAR_RC_SIDE: usize = 0x5c;
-    pub const RADAR_SPRITE_TEXTURE: usize = 0x58;
-    pub const RADAR_TEX_W: usize = 0x1c;
-    pub const RADAR_TEX_H: usize = 0x20;
-    pub const RADAR_TEX_DEVICES: usize = 0x40;
-    pub const RADAR_DEVTEX_D3D8: usize = 0x4;
-    pub const RADAR_S3D_DEVICE_INDEX: usize = 0xc0;
-    pub const RADAR_S3D_CAMERA: usize = 0xfc;
-    pub const RADAR_GRID_CELLS: usize = 0x4;
-    pub const RADAR_GRID_W: usize = 0xc;
-    pub const RADAR_GRID_H: usize = 0x10;
-    pub const RADAR_UP_SWAPPED: usize = 0x24;
-    pub const RADAR_UP_EDITOR: usize = 0x84;
-    pub const RADAR_OBJ_REMOVED: usize = 0x113;
-    pub const RADAR_OBJ_CLASS: usize = 0x40;
-    pub const RADAR_OBJ_POS: usize = 0xac;
-    pub const RADAR_OBJ_TEAM: usize = 0xec;
-    pub const RADAR_OBJ_SELECTED: usize = 0x10e;
-    pub const RADAR_VT_CAN_USER_SEE: usize = 0x8;
-    pub const RADAR_CLS_OFF_RADAR: usize = 0x18c;
-    pub const RADAR_CLS_RADAR_SPRITE: usize = 0x190;
-    pub const RADAR_CLS_HAS_MAP_SIZE: usize = 0x184;
-    pub const RADAR_CLS_STATION: usize = 0x20d;
-    pub const RADAR_VT_MAP_SIZE: usize = 0x24;
-    pub const RADAR_VT_IS_CRAFT_CLASS: usize = 0x28;
-    pub const RADAR_SPIRIT_CLASS: usize = 0x4;
-    pub const RADAR_SPIRIT_TEAM: usize = 0xc;
-    pub const RADAR_VT_SPIRIT_POS: usize = 0x10;
-    pub const RADAR_TEAM_COLOUR: usize = 0x14;
-    pub const RADAR_VT_SELECT_NUM: usize = 0x94;
-    pub const RADAR_VT_WHERE_CURSOR: usize = 0xbc;
-    pub const RADAR_VT_SET_CURSOR_ACTION: usize = 0xc8;
-    pub const RADAR_VT_BROADCAST: usize = 0xa4;
-    pub const RADAR_VT_CAMERA_MOVE: usize = 0x54;
-    pub const RADAR_CAM_NEAR: usize = 0x1a0;
-    pub const RADAR_CAM_FAR: usize = 0x1a4;
-    pub const RADAR_CAM_VIEWPORT: usize = 0x1b0;
-    pub const RADAR_CAM_POS: usize = 0xe4;
-    pub const RADAR_TC_EYE_X: usize = 0x8c;
-    pub const RADAR_TC_EYE_Z: usize = 0x94;
-    pub const RADAR_TC_CENTRE_X: usize = 0x98;
-    pub const RADAR_TC_CENTRE_Z: usize = 0xa0;
-    pub const RADAR_SD_SCENES: usize = 0x28;
-    pub const RADAR_SCENE_CENTRE: usize = 0xc;
-    pub const RADAR_SCENE_RADIUS: usize = 0x18;
-    pub const RADAR_MARK_RADIUS: usize = 0x1c;
-    pub const RADAR_MARK_COLOUR: usize = 0x20;
-    pub const RADAR_AC_CURSOR: usize = 0xc;
-    pub const RADAR_AC_CANNOT: usize = 0x10;
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn RADAR_MR_RADAR() -> usize { super::TABLE.engine().field(a2engine::Sym(55)) }
+    #[inline(always)] pub fn RADAR_MR_SHIP_BUTTON() -> usize { super::TABLE.engine().field(a2engine::Sym(56)) }
+    #[inline(always)] pub fn RADAR_MR_STATION_BUTTON() -> usize { super::TABLE.engine().field(a2engine::Sym(57)) }
+    #[inline(always)] pub fn RADAR_BTN_SPRITE() -> usize { super::TABLE.engine().field(a2engine::Sym(58)) }
+    #[inline(always)] pub fn RADAR_RC_BACKGROUND() -> usize { super::TABLE.engine().field(a2engine::Sym(59)) }
+    #[inline(always)] pub fn RADAR_RC_MARKS() -> usize { super::TABLE.engine().field(a2engine::Sym(60)) }
+    #[inline(always)] pub fn RADAR_RC_SIDE() -> usize { super::TABLE.engine().field(a2engine::Sym(61)) }
+    #[inline(always)] pub fn RADAR_SPRITE_TEXTURE() -> usize { super::TABLE.engine().field(a2engine::Sym(62)) }
+    #[inline(always)] pub fn RADAR_TEX_W() -> usize { super::TABLE.engine().field(a2engine::Sym(63)) }
+    #[inline(always)] pub fn RADAR_TEX_H() -> usize { super::TABLE.engine().field(a2engine::Sym(64)) }
+    #[inline(always)] pub fn RADAR_TEX_DEVICES() -> usize { super::TABLE.engine().field(a2engine::Sym(65)) }
+    #[inline(always)] pub fn RADAR_DEVTEX_D3D8() -> usize { super::TABLE.engine().field(a2engine::Sym(66)) }
+    #[inline(always)] pub fn RADAR_S3D_DEVICE_INDEX() -> usize { super::TABLE.engine().field(a2engine::Sym(67)) }
+    #[inline(always)] pub fn RADAR_S3D_CAMERA() -> usize { super::TABLE.engine().field(a2engine::Sym(68)) }
+    #[inline(always)] pub fn RADAR_GRID_CELLS() -> usize { super::TABLE.engine().field(a2engine::Sym(69)) }
+    #[inline(always)] pub fn RADAR_GRID_W() -> usize { super::TABLE.engine().field(a2engine::Sym(70)) }
+    #[inline(always)] pub fn RADAR_GRID_H() -> usize { super::TABLE.engine().field(a2engine::Sym(71)) }
+    #[inline(always)] pub fn RADAR_UP_SWAPPED() -> usize { super::TABLE.engine().field(a2engine::Sym(72)) }
+    #[inline(always)] pub fn RADAR_UP_EDITOR() -> usize { super::TABLE.engine().field(a2engine::Sym(73)) }
+    #[inline(always)] pub fn RADAR_OBJ_REMOVED() -> usize { super::TABLE.engine().field(a2engine::Sym(74)) }
+    #[inline(always)] pub fn RADAR_OBJ_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(75)) }
+    #[inline(always)] pub fn RADAR_OBJ_POS() -> usize { super::TABLE.engine().field(a2engine::Sym(76)) }
+    #[inline(always)] pub fn RADAR_OBJ_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(77)) }
+    #[inline(always)] pub fn RADAR_OBJ_SELECTED() -> usize { super::TABLE.engine().field(a2engine::Sym(78)) }
+    #[inline(always)] pub fn RADAR_VT_CAN_USER_SEE() -> usize { super::TABLE.engine().field(a2engine::Sym(79)) }
+    #[inline(always)] pub fn RADAR_CLS_OFF_RADAR() -> usize { super::TABLE.engine().field(a2engine::Sym(80)) }
+    #[inline(always)] pub fn RADAR_CLS_RADAR_SPRITE() -> usize { super::TABLE.engine().field(a2engine::Sym(81)) }
+    #[inline(always)] pub fn RADAR_CLS_HAS_MAP_SIZE() -> usize { super::TABLE.engine().field(a2engine::Sym(82)) }
+    #[inline(always)] pub fn RADAR_CLS_STATION() -> usize { super::TABLE.engine().field(a2engine::Sym(83)) }
+    #[inline(always)] pub fn RADAR_VT_MAP_SIZE() -> usize { super::TABLE.engine().field(a2engine::Sym(84)) }
+    #[inline(always)] pub fn RADAR_VT_IS_CRAFT_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(85)) }
+    #[inline(always)] pub fn RADAR_SPIRIT_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(86)) }
+    #[inline(always)] pub fn RADAR_SPIRIT_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(87)) }
+    #[inline(always)] pub fn RADAR_VT_SPIRIT_POS() -> usize { super::TABLE.engine().field(a2engine::Sym(88)) }
+    #[inline(always)] pub fn RADAR_TEAM_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(89)) }
+    #[inline(always)] pub fn RADAR_VT_SELECT_NUM() -> usize { super::TABLE.engine().field(a2engine::Sym(90)) }
+    #[inline(always)] pub fn RADAR_VT_WHERE_CURSOR() -> usize { super::TABLE.engine().field(a2engine::Sym(91)) }
+    #[inline(always)] pub fn RADAR_VT_SET_CURSOR_ACTION() -> usize { super::TABLE.engine().field(a2engine::Sym(92)) }
+    #[inline(always)] pub fn RADAR_VT_BROADCAST() -> usize { super::TABLE.engine().field(a2engine::Sym(93)) }
+    #[inline(always)] pub fn RADAR_VT_CAMERA_MOVE() -> usize { super::TABLE.engine().field(a2engine::Sym(94)) }
+    #[inline(always)] pub fn RADAR_CAM_NEAR() -> usize { super::TABLE.engine().field(a2engine::Sym(95)) }
+    #[inline(always)] pub fn RADAR_CAM_FAR() -> usize { super::TABLE.engine().field(a2engine::Sym(96)) }
+    #[inline(always)] pub fn RADAR_CAM_VIEWPORT() -> usize { super::TABLE.engine().field(a2engine::Sym(97)) }
+    #[inline(always)] pub fn RADAR_CAM_POS() -> usize { super::TABLE.engine().field(a2engine::Sym(98)) }
+    #[inline(always)] pub fn RADAR_TC_EYE_X() -> usize { super::TABLE.engine().field(a2engine::Sym(99)) }
+    #[inline(always)] pub fn RADAR_TC_EYE_Z() -> usize { super::TABLE.engine().field(a2engine::Sym(100)) }
+    #[inline(always)] pub fn RADAR_TC_CENTRE_X() -> usize { super::TABLE.engine().field(a2engine::Sym(101)) }
+    #[inline(always)] pub fn RADAR_TC_CENTRE_Z() -> usize { super::TABLE.engine().field(a2engine::Sym(102)) }
+    #[inline(always)] pub fn RADAR_SD_SCENES() -> usize { super::TABLE.engine().field(a2engine::Sym(103)) }
+    #[inline(always)] pub fn RADAR_SCENE_CENTRE() -> usize { super::TABLE.engine().field(a2engine::Sym(104)) }
+    #[inline(always)] pub fn RADAR_SCENE_RADIUS() -> usize { super::TABLE.engine().field(a2engine::Sym(105)) }
+    #[inline(always)] pub fn RADAR_MARK_RADIUS() -> usize { super::TABLE.engine().field(a2engine::Sym(106)) }
+    #[inline(always)] pub fn RADAR_MARK_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(107)) }
+    #[inline(always)] pub fn RADAR_AC_CURSOR() -> usize { super::TABLE.engine().field(a2engine::Sym(108)) }
+    #[inline(always)] pub fn RADAR_AC_CANNOT() -> usize { super::TABLE.engine().field(a2engine::Sym(109)) }
 }
 
 pub mod value {
-    pub const RADAR_ACTION_CURSOR_STRIDE: i32 = 20;
-    pub const RADAR_ACTION_CURSORS_N: i32 = 57;
-    pub const RADAR_ACTION_MASK: i32 = 4095;
-    pub const RADAR_ACTION_MOVE: i32 = 4;
-    pub const RADAR_ACTION_GO_WARP: i32 = 43;
-    pub const RADAR_ACTION_CANNOT: i32 = 16384;
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn RADAR_ACTION_CURSOR_STRIDE() -> i32 { super::TABLE.engine().value(a2engine::Sym(110)) }
+    #[inline(always)] pub fn RADAR_ACTION_CURSORS_N() -> i32 { super::TABLE.engine().value(a2engine::Sym(111)) }
+    #[inline(always)] pub fn RADAR_ACTION_MASK() -> i32 { super::TABLE.engine().value(a2engine::Sym(112)) }
+    #[inline(always)] pub fn RADAR_ACTION_MOVE() -> i32 { super::TABLE.engine().value(a2engine::Sym(113)) }
+    #[inline(always)] pub fn RADAR_ACTION_GO_WARP() -> i32 { super::TABLE.engine().value(a2engine::Sym(114)) }
+    #[inline(always)] pub fn RADAR_ACTION_CANNOT() -> i32 { super::TABLE.engine().value(a2engine::Sym(115)) }
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[

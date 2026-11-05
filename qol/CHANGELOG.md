@@ -5,6 +5,14 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 2.3.0 — 2026-11-05
+
+### Changed
+- Engine fields and values are the matched build's, filled at start-up (`QOL_F_*`, `QOL_V_*` read `a2f_qol_*`), no longer compile-time per game; the asm stubs read them through those variables instead of splicing literals (`A2_STR` is gone). The bar's menu toggles are saved for at most 16 (`BK_TOGGLES_MAX`), the build's count otherwise.
+- The patched functions' frame locals the stubs read (`CheckCanExecute`'s craft array, count, index and route locals, `mSetupSpecialWeapons`' read-back local, `mCheckGroupSelect`'s group number) are profile values (`cce_*`, `msw_read_local`, `cgs_group`, unit `ebp`), no longer literals in the asm (PLAN-ARCHITECTURE.md, AR-3).
+
+Installed, not yet seen in game.
+
 ## 2.2.5 — 2026-11-04
 
 ### Changed

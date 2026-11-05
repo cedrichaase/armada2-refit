@@ -157,6 +157,12 @@ a C header. The format, the resolver and the lints are described in
   **hooks** (each with a one-line description and the settings rows it feeds) and
   **entries** (function, call, jmp, slot, label, patch, scan, vtable, global, field,
   value), each tied by `used_by` to a hook. A `check` signature is at most 32 bytes.
+- **Struct offsets are per build too.** A `field` (a struct's offset) and a `value` (a
+  count, an id, a frame local's offset from `ebp`) are resolved at start-up like an
+  address: the code reads `field::X()` in Rust or `<P>_F_X` in C, never a literal, so a
+  build whose structs differ gets its own offsets from its profile, and a field the build
+  has no entry for makes the hooks that use it stand down. `tools/engine/lint.py` and
+  `render3d/lint-layers.sh` fail on a literal struct offset in a plugin's source.
 - **At start-up** the plugin identifies the executable, picks the profile, relocates,
   and logs `engine: <exe> timestamp ...` (the executable named by the build's
   `build.toml` `exe`, or on an unknown build by the process's own file name),
@@ -177,7 +183,7 @@ a C header. The format, the resolver and the lints are described in
    each function the build changes (with `how` and the hooks `verified` beside it) and
    `[[disable]]` globs for hooks that must not run. A hook that touches a changed
    function is **blocked** until someone verifies it; a child's entries override the
-   parent's by `id`.
+   parent's by `id`, a moved field included (`offset = 0x..` under the field's `id`).
 3. `tools/engine/gen.py --check` and `tools/engine/lint.py` validate it; `./a2test syms
    --exe <path> --build <build>` runs every hook's checks against the file and prints
    each `ready` or its reason. Fix by adding an override entry or disabling the hook,

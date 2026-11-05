@@ -24,9 +24,12 @@ fn eng() -> &'static a2engine::Engine {
 /// `ST3D_GraphicsEngine::SetActiveDisplay(ST3D_DisplayType)`, thiscall: 2 is the 3D
 /// display (the game's resolution), 3 the shell's (800x600 stock, or what Display8
 /// raises it to for the menu host).
-const DISPLAY_3D: u32 = value::SHELL_DISPLAY_3D as u32;
-const DISPLAY_SHELL: u32 = value::SHELL_DISPLAY_SHELL as u32;
-const SHELL_MODE_MAIN_MENU: i32 = value::SHELL_MODE_MAIN_MENU;
+#[inline(always)]
+fn display_3d() -> u32 { value::SHELL_DISPLAY_3D() as u32 }
+#[inline(always)]
+fn display_shell() -> u32 { value::SHELL_DISPLAY_SHELL() as u32 }
+#[inline(always)]
+fn shell_mode_main_menu() -> i32 { value::SHELL_MODE_MAIN_MENU() }
 
 /// `ExitCode`'s address, where the engine's pump keeps a `WM_QUIT`'s code; 0 when the
 /// shell's device reads did not become ready.
@@ -133,13 +136,13 @@ pub(crate) fn st3d_device() -> usize {
         return 0;
     }
     let s = storm3d();
-    let d = field(s + field::SHELL_STORM3D_DEVICES, field(s, field::SHELL_STORM3D_DEVICE_INDEX) * 4);
+    let d = field(s + field::SHELL_STORM3D_DEVICES(), field(s, field::SHELL_STORM3D_DEVICE_INDEX()) * 4);
     if d != 0 && field(d, 0) == eng().addr(sym::SHELL_DX8_VTABLE) { d } else { 0 }
 }
 
 fn window() -> HWND {
     let s = storm3d();
-    if s == 0 || field(s, field::SHELL_STORM3D_DEVICES) == 0 {
+    if s == 0 || field(s, field::SHELL_STORM3D_DEVICES()) == 0 {
         return core::ptr::null_mut();
     }
     unsafe { this0(eng().addr(sym::SHELL_GET_WINDOW_HANDLE), s) as HWND }
@@ -334,9 +337,9 @@ fn log_facts(when: &str) {
         "shell: {}: Storm3D {:#x} display {} device[{}] {:#x} (dx8 class: {}) d3d8 {:p} window {:p} client {}x{} style {:#x}; Display8 says the mode is {:?}",
         when,
         s,
-        field(s, field::SHELL_STORM3D_DISPLAY),
-        field(s, field::SHELL_STORM3D_DEVICE_INDEX),
-        field(s + field::SHELL_STORM3D_DEVICES, field(s, field::SHELL_STORM3D_DEVICE_INDEX) * 4),
+        field(s, field::SHELL_STORM3D_DISPLAY()),
+        field(s, field::SHELL_STORM3D_DEVICE_INDEX()),
+        field(s + field::SHELL_STORM3D_DEVICES(), field(s, field::SHELL_STORM3D_DEVICE_INDEX()) * 4),
         st3d_device() != 0,
         dev,
         w,
@@ -377,7 +380,7 @@ pub fn run_screen_under(under: &mut dyn FnMut(u32, u32), f: &mut dyn FnMut(&Pump
         return QUIT;
     }
     log_facts("shell display");
-    let err = set_active_display(DISPLAY_3D);
+    let err = set_active_display(display_3d());
     if err != 0 {
         log!("shell: SetActiveDisplay(3D) failed ({}); screen not shown", err);
         return set_shell_display_and(QUIT);
@@ -465,7 +468,7 @@ pub fn run_screen_under(under: &mut dyn FnMut(u32, u32), f: &mut dyn FnMut(&Pump
 /// The shell's display back, as the Credits leave it: `SetActiveDisplay(shell)`,
 /// `FlipToGDISurface` and a drain of the queue through the engine's own pump.
 fn set_shell_display_and(r: i32) -> i32 {
-    set_active_display(DISPLAY_SHELL);
+    set_active_display(display_shell());
     flip_to_gdi();
     unsafe { cdecl0(eng().addr(sym::SHELL_HANDLE_MESSAGE_QUEUE)) };
     log_facts("back in the shell");
@@ -481,7 +484,7 @@ fn black_background() {
     }
     let w = window();
     unsafe {
-        let bmp = cdecl1(eng().addr(sym::SHELL_NEW), value::SHELL_BITMAP_SIZE as usize);
+        let bmp = cdecl1(eng().addr(sym::SHELL_NEW), value::SHELL_BITMAP_SIZE() as usize);
         if bmp == 0 {
             return;
         }
@@ -508,7 +511,7 @@ extern "C" fn demo_credits() {
         }
     });
     leave_to_main_menu();
-    log!("shell: demo screen left ({}); g_shellMode = {}", r, SHELL_MODE_MAIN_MENU);
+    log!("shell: demo screen left ({}); g_shellMode = {}", r, shell_mode_main_menu());
 }
 
 /// After a screen of ours in the Credits' place: the black background the Credits
@@ -517,7 +520,7 @@ pub fn leave_to_main_menu() {
     black_background();
     let mode = eng().addr(sym::SHELL_MODE);
     if mode != 0 {
-        unsafe { core::ptr::write_unaligned(mode as *mut i32, SHELL_MODE_MAIN_MENU) };
+        unsafe { core::ptr::write_unaligned(mode as *mut i32, shell_mode_main_menu()) };
     }
 }
 

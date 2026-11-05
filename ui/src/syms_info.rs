@@ -51,106 +51,108 @@ pub mod hook {
 }
 
 pub mod field {
-    pub const INFO_SD_INFOBAR: usize = 0x70;
-    pub const INFO_SD_SYS_TEXT: usize = 0x74;
-    pub const INFO_SD_SYS_REPAIR: usize = 0xc4;
-    pub const INFO_SD_CREW_TEXT: usize = 0x88;
-    pub const INFO_SD_ENERGY_TEXT: usize = 0x8c;
-    pub const INFO_SD_CLASS_TEXT: usize = 0x90;
-    pub const INFO_SD_NAME_TEXT: usize = 0x94;
-    pub const INFO_SD_OFFICER_TEXT: usize = 0x98;
-    pub const INFO_SD_HULL_BAR: usize = 0xa0;
-    pub const INFO_SD_CARGO_BAR: usize = 0xa4;
-    pub const INFO_SD_METAL_BAR: usize = 0xa8;
-    pub const INFO_SD_WIREFRAME: usize = 0xac;
-    pub const INFO_SD_CONSTRUCTION_BAR: usize = 0xb0;
-    pub const INFO_SD_RESEARCH_TEXT: usize = 0xb4;
-    pub const INFO_SD_CARGO_TEXT: usize = 0xb8;
-    pub const INFO_SD_POPULATION_TEXT: usize = 0xbc;
-    pub const INFO_SD_PLANET_OWNER_TEXT: usize = 0xc0;
-    pub const INFO_SD_QUEUE: usize = 0x120;
-    pub const INFO_SD_CURRENT: usize = 0x1e8;
-    pub const INFO_SD_HOVER: usize = 0x1ec;
-    pub const INFO_IB_SHIELD_TEXT: usize = 0xc;
-    pub const INFO_IB_HULL_TEXT: usize = 0x10;
-    pub const INFO_BW_BUILDER: usize = 0x28;
-    pub const INFO_BW_CLASS: usize = 0x3c;
-    pub const INFO_VT_TOOLTIP: usize = 0x0;
-    pub const INFO_VT_VERBOSE: usize = 0x4;
-    pub const INFO_VT_SET_OBJECT: usize = 0x20;
-    pub const INFO_VT_INFORMATION: usize = 0x24;
-    pub const INFO_VT_LABEL: usize = 0x28;
-    pub const INFO_VT_CURRENT_COLOR: usize = 0x2c;
-    pub const INFO_VT_BAR_COLOR: usize = 0x20;
-    pub const INFO_VT_BAR_VALUE: usize = 0x24;
-    pub const INFO_TS_SPRITE: usize = 0x104;
-    pub const INFO_BAR_OBJECT: usize = 0x428;
-    pub const INFO_RI_OBJECT: usize = 0x28;
-    pub const INFO_RI_SYSTEM: usize = 0x2c;
-    pub const INFO_RI_REPAIR_ID: usize = 0x30;
-    pub const INFO_RI_SPRITE: usize = 0x34;
-    pub const INFO_RI_FLASH: usize = 0x40;
-    pub const INFO_WI_OBJECT: usize = 0x28;
-    pub const INFO_WI_FLASH: usize = 0x30;
-    pub const INFO_OBJ_FLAGS: usize = 0x14;
-    pub const INFO_OBJ_CLASS: usize = 0x40;
-    pub const INFO_CLASS_WIREFRAME: usize = 0x7c;
-    pub const INFO_CLASS_OFFICERS: usize = 0x88;
-    pub const INFO_CONSTRUCTING_CLASS: usize = 0x188;
-    pub const INFO_OBJ_CREW: usize = 0x1c4;
-    pub const INFO_OBJ_ENERGY: usize = 0x168;
-    pub const INFO_OBJ_STORE: usize = 0x17c;
-    pub const INFO_PLANET_SYSTEMS: usize = 0xec;
-    pub const INFO_OBJ_HEALTH: usize = 0x158;
-    pub const INFO_OBJ_RACE: usize = 0xfc;
-    pub const INFO_RACE_NAME: usize = 0x14;
-    pub const INFO_CRAFT_SHIELD: usize = 0x1c8;
-    pub const INFO_CRAFT_SHIELD_MAX: usize = 0x1cc;
-    pub const INFO_CRAFT_SYSTEMS: usize = 0x1e0;
-    pub const INFO_CRAFT_REPAIRS: usize = 0x30;
-    pub const INFO_SYS_OUT: usize = 0x1;
-    pub const INFO_SYS_REPAIR: usize = 0x28;
-    pub const INFO_REPAIR_ITEM_ID: usize = 0x10;
-    pub const INFO_OBJ_DESTROYED: usize = 0x113;
-    pub const INFO_VT_IS_PLANET: usize = 0xc;
-    pub const INFO_LOS_ORDNANCE: usize = 0x4;
-    pub const INFO_ORDNANCE_CLASS: usize = 0x18;
-    pub const INFO_VT_DELETE_QUEUE_ITEM: usize = 0x140;
-    pub const INFO_VT_SELECT: usize = 0x90;
-    pub const INFO_VT_SET_INTEREST_ENTITY: usize = 0x58;
-    pub const UNITVIEW_CV_RECT: usize = 0x4;
-    pub const UNITVIEW_CV_BACKGROUND_AREA: usize = 0x38;
-    pub const UNITVIEW_CV_DISPLAY_AREA: usize = 0x48;
-    pub const UNITVIEW_CV_FRAME: usize = 0x58;
-    pub const UNITVIEW_VT_RENDER: usize = 0x58;
-    pub const CLOSEUP_CAM_RENDER_STUFF: usize = 0x284;
-    pub const CLOSEUP_CAM_FOV: usize = 0x1a8;
-    pub const CLOSEUP_VT_SET_TRANSFORM: usize = 0x14;
-    pub const CLOSEUP_ENTITY_DRAWN: usize = 0x25;
-    pub const CLOSEUP_OBJECT_CULLED: usize = 0x183;
-    pub const CLOSEUP_ENTITY_INSTANCE: usize = 0x4;
-    pub const CLOSEUP_INST_SPHERE: usize = 0x34;
-    pub const CLOSEUP_INST_TRANSFORM: usize = 0x44;
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn INFO_SD_INFOBAR() -> usize { super::TABLE.engine().field(a2engine::Sym(18)) }
+    #[inline(always)] pub fn INFO_SD_SYS_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(19)) }
+    #[inline(always)] pub fn INFO_SD_SYS_REPAIR() -> usize { super::TABLE.engine().field(a2engine::Sym(20)) }
+    #[inline(always)] pub fn INFO_SD_CREW_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(21)) }
+    #[inline(always)] pub fn INFO_SD_ENERGY_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(22)) }
+    #[inline(always)] pub fn INFO_SD_CLASS_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(23)) }
+    #[inline(always)] pub fn INFO_SD_NAME_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(24)) }
+    #[inline(always)] pub fn INFO_SD_OFFICER_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(25)) }
+    #[inline(always)] pub fn INFO_SD_HULL_BAR() -> usize { super::TABLE.engine().field(a2engine::Sym(26)) }
+    #[inline(always)] pub fn INFO_SD_CARGO_BAR() -> usize { super::TABLE.engine().field(a2engine::Sym(27)) }
+    #[inline(always)] pub fn INFO_SD_METAL_BAR() -> usize { super::TABLE.engine().field(a2engine::Sym(28)) }
+    #[inline(always)] pub fn INFO_SD_WIREFRAME() -> usize { super::TABLE.engine().field(a2engine::Sym(29)) }
+    #[inline(always)] pub fn INFO_SD_CONSTRUCTION_BAR() -> usize { super::TABLE.engine().field(a2engine::Sym(30)) }
+    #[inline(always)] pub fn INFO_SD_RESEARCH_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(31)) }
+    #[inline(always)] pub fn INFO_SD_CARGO_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(32)) }
+    #[inline(always)] pub fn INFO_SD_POPULATION_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(33)) }
+    #[inline(always)] pub fn INFO_SD_PLANET_OWNER_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(34)) }
+    #[inline(always)] pub fn INFO_SD_QUEUE() -> usize { super::TABLE.engine().field(a2engine::Sym(35)) }
+    #[inline(always)] pub fn INFO_SD_CURRENT() -> usize { super::TABLE.engine().field(a2engine::Sym(36)) }
+    #[inline(always)] pub fn INFO_SD_HOVER() -> usize { super::TABLE.engine().field(a2engine::Sym(37)) }
+    #[inline(always)] pub fn INFO_IB_SHIELD_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(38)) }
+    #[inline(always)] pub fn INFO_IB_HULL_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(39)) }
+    #[inline(always)] pub fn INFO_BW_BUILDER() -> usize { super::TABLE.engine().field(a2engine::Sym(40)) }
+    #[inline(always)] pub fn INFO_BW_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(41)) }
+    #[inline(always)] pub fn INFO_VT_TOOLTIP() -> usize { super::TABLE.engine().field(a2engine::Sym(42)) }
+    #[inline(always)] pub fn INFO_VT_VERBOSE() -> usize { super::TABLE.engine().field(a2engine::Sym(43)) }
+    #[inline(always)] pub fn INFO_VT_SET_OBJECT() -> usize { super::TABLE.engine().field(a2engine::Sym(44)) }
+    #[inline(always)] pub fn INFO_VT_INFORMATION() -> usize { super::TABLE.engine().field(a2engine::Sym(45)) }
+    #[inline(always)] pub fn INFO_VT_LABEL() -> usize { super::TABLE.engine().field(a2engine::Sym(46)) }
+    #[inline(always)] pub fn INFO_VT_CURRENT_COLOR() -> usize { super::TABLE.engine().field(a2engine::Sym(47)) }
+    #[inline(always)] pub fn INFO_VT_BAR_COLOR() -> usize { super::TABLE.engine().field(a2engine::Sym(48)) }
+    #[inline(always)] pub fn INFO_VT_BAR_VALUE() -> usize { super::TABLE.engine().field(a2engine::Sym(49)) }
+    #[inline(always)] pub fn INFO_TS_SPRITE() -> usize { super::TABLE.engine().field(a2engine::Sym(50)) }
+    #[inline(always)] pub fn INFO_BAR_OBJECT() -> usize { super::TABLE.engine().field(a2engine::Sym(51)) }
+    #[inline(always)] pub fn INFO_RI_OBJECT() -> usize { super::TABLE.engine().field(a2engine::Sym(52)) }
+    #[inline(always)] pub fn INFO_RI_SYSTEM() -> usize { super::TABLE.engine().field(a2engine::Sym(53)) }
+    #[inline(always)] pub fn INFO_RI_REPAIR_ID() -> usize { super::TABLE.engine().field(a2engine::Sym(54)) }
+    #[inline(always)] pub fn INFO_RI_SPRITE() -> usize { super::TABLE.engine().field(a2engine::Sym(55)) }
+    #[inline(always)] pub fn INFO_RI_FLASH() -> usize { super::TABLE.engine().field(a2engine::Sym(56)) }
+    #[inline(always)] pub fn INFO_WI_OBJECT() -> usize { super::TABLE.engine().field(a2engine::Sym(57)) }
+    #[inline(always)] pub fn INFO_WI_FLASH() -> usize { super::TABLE.engine().field(a2engine::Sym(58)) }
+    #[inline(always)] pub fn INFO_OBJ_FLAGS() -> usize { super::TABLE.engine().field(a2engine::Sym(59)) }
+    #[inline(always)] pub fn INFO_OBJ_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(60)) }
+    #[inline(always)] pub fn INFO_CLASS_WIREFRAME() -> usize { super::TABLE.engine().field(a2engine::Sym(61)) }
+    #[inline(always)] pub fn INFO_CLASS_OFFICERS() -> usize { super::TABLE.engine().field(a2engine::Sym(62)) }
+    #[inline(always)] pub fn INFO_CONSTRUCTING_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(63)) }
+    #[inline(always)] pub fn INFO_OBJ_CREW() -> usize { super::TABLE.engine().field(a2engine::Sym(64)) }
+    #[inline(always)] pub fn INFO_OBJ_ENERGY() -> usize { super::TABLE.engine().field(a2engine::Sym(65)) }
+    #[inline(always)] pub fn INFO_OBJ_STORE() -> usize { super::TABLE.engine().field(a2engine::Sym(66)) }
+    #[inline(always)] pub fn INFO_PLANET_SYSTEMS() -> usize { super::TABLE.engine().field(a2engine::Sym(67)) }
+    #[inline(always)] pub fn INFO_OBJ_HEALTH() -> usize { super::TABLE.engine().field(a2engine::Sym(68)) }
+    #[inline(always)] pub fn INFO_OBJ_RACE() -> usize { super::TABLE.engine().field(a2engine::Sym(69)) }
+    #[inline(always)] pub fn INFO_RACE_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(70)) }
+    #[inline(always)] pub fn INFO_CRAFT_SHIELD() -> usize { super::TABLE.engine().field(a2engine::Sym(71)) }
+    #[inline(always)] pub fn INFO_CRAFT_SHIELD_MAX() -> usize { super::TABLE.engine().field(a2engine::Sym(72)) }
+    #[inline(always)] pub fn INFO_CRAFT_SYSTEMS() -> usize { super::TABLE.engine().field(a2engine::Sym(73)) }
+    #[inline(always)] pub fn INFO_CRAFT_REPAIRS() -> usize { super::TABLE.engine().field(a2engine::Sym(74)) }
+    #[inline(always)] pub fn INFO_SYS_OUT() -> usize { super::TABLE.engine().field(a2engine::Sym(75)) }
+    #[inline(always)] pub fn INFO_SYS_REPAIR() -> usize { super::TABLE.engine().field(a2engine::Sym(76)) }
+    #[inline(always)] pub fn INFO_REPAIR_ITEM_ID() -> usize { super::TABLE.engine().field(a2engine::Sym(77)) }
+    #[inline(always)] pub fn INFO_OBJ_DESTROYED() -> usize { super::TABLE.engine().field(a2engine::Sym(78)) }
+    #[inline(always)] pub fn INFO_VT_IS_PLANET() -> usize { super::TABLE.engine().field(a2engine::Sym(79)) }
+    #[inline(always)] pub fn INFO_LOS_ORDNANCE() -> usize { super::TABLE.engine().field(a2engine::Sym(80)) }
+    #[inline(always)] pub fn INFO_ORDNANCE_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(81)) }
+    #[inline(always)] pub fn INFO_VT_DELETE_QUEUE_ITEM() -> usize { super::TABLE.engine().field(a2engine::Sym(82)) }
+    #[inline(always)] pub fn INFO_VT_SELECT() -> usize { super::TABLE.engine().field(a2engine::Sym(83)) }
+    #[inline(always)] pub fn INFO_VT_SET_INTEREST_ENTITY() -> usize { super::TABLE.engine().field(a2engine::Sym(84)) }
+    #[inline(always)] pub fn UNITVIEW_CV_RECT() -> usize { super::TABLE.engine().field(a2engine::Sym(108)) }
+    #[inline(always)] pub fn UNITVIEW_CV_BACKGROUND_AREA() -> usize { super::TABLE.engine().field(a2engine::Sym(109)) }
+    #[inline(always)] pub fn UNITVIEW_CV_DISPLAY_AREA() -> usize { super::TABLE.engine().field(a2engine::Sym(110)) }
+    #[inline(always)] pub fn UNITVIEW_CV_FRAME() -> usize { super::TABLE.engine().field(a2engine::Sym(111)) }
+    #[inline(always)] pub fn UNITVIEW_VT_RENDER() -> usize { super::TABLE.engine().field(a2engine::Sym(112)) }
+    #[inline(always)] pub fn CLOSEUP_CAM_RENDER_STUFF() -> usize { super::TABLE.engine().field(a2engine::Sym(128)) }
+    #[inline(always)] pub fn CLOSEUP_CAM_FOV() -> usize { super::TABLE.engine().field(a2engine::Sym(129)) }
+    #[inline(always)] pub fn CLOSEUP_VT_SET_TRANSFORM() -> usize { super::TABLE.engine().field(a2engine::Sym(130)) }
+    #[inline(always)] pub fn CLOSEUP_ENTITY_DRAWN() -> usize { super::TABLE.engine().field(a2engine::Sym(131)) }
+    #[inline(always)] pub fn CLOSEUP_OBJECT_CULLED() -> usize { super::TABLE.engine().field(a2engine::Sym(132)) }
+    #[inline(always)] pub fn CLOSEUP_ENTITY_INSTANCE() -> usize { super::TABLE.engine().field(a2engine::Sym(133)) }
+    #[inline(always)] pub fn CLOSEUP_INST_SPHERE() -> usize { super::TABLE.engine().field(a2engine::Sym(134)) }
+    #[inline(always)] pub fn CLOSEUP_INST_TRANSFORM() -> usize { super::TABLE.engine().field(a2engine::Sym(135)) }
 }
 
 pub mod value {
-    pub const INFO_N_SYSTEMS: i32 = 5;
-    pub const INFO_QUEUE_LEN: i32 = 10;
-    pub const INFO_SYSTEM_BYTES: i32 = 48;
-    pub const INFO_F_GAME_OBJECT: i32 = 4;
-    pub const INFO_F_CRAFT: i32 = 8;
-    pub const INFO_F_PRODUCER: i32 = 32;
-    pub const INFO_F_CARGO: i32 = 128;
-    pub const INFO_F_CARGO2: i32 = -2147483648;
-    pub const INFO_F_NAMED: i32 = 16384;
-    pub const INFO_F_CONSTRUCTION: i32 = 262144;
-    pub const INFO_F_WHOLE: i32 = 1052672;
-    pub const INFO_REPAIR_ID_0: i32 = 3;
-    pub const INFO_REPAIR_ID_1: i32 = 2;
-    pub const INFO_REPAIR_ID_2: i32 = 1;
-    pub const INFO_REPAIR_ID_3: i32 = 5;
-    pub const INFO_REPAIR_ID_4: i32 = 6;
-    pub const CLOSEUP_CAMERA_SIZE: i32 = 648;
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn INFO_N_SYSTEMS() -> i32 { super::TABLE.engine().value(a2engine::Sym(85)) }
+    #[inline(always)] pub fn INFO_QUEUE_LEN() -> i32 { super::TABLE.engine().value(a2engine::Sym(86)) }
+    #[inline(always)] pub fn INFO_SYSTEM_BYTES() -> i32 { super::TABLE.engine().value(a2engine::Sym(87)) }
+    #[inline(always)] pub fn INFO_F_GAME_OBJECT() -> i32 { super::TABLE.engine().value(a2engine::Sym(88)) }
+    #[inline(always)] pub fn INFO_F_CRAFT() -> i32 { super::TABLE.engine().value(a2engine::Sym(89)) }
+    #[inline(always)] pub fn INFO_F_PRODUCER() -> i32 { super::TABLE.engine().value(a2engine::Sym(90)) }
+    #[inline(always)] pub fn INFO_F_CARGO() -> i32 { super::TABLE.engine().value(a2engine::Sym(91)) }
+    #[inline(always)] pub fn INFO_F_CARGO2() -> i32 { super::TABLE.engine().value(a2engine::Sym(92)) }
+    #[inline(always)] pub fn INFO_F_NAMED() -> i32 { super::TABLE.engine().value(a2engine::Sym(93)) }
+    #[inline(always)] pub fn INFO_F_CONSTRUCTION() -> i32 { super::TABLE.engine().value(a2engine::Sym(94)) }
+    #[inline(always)] pub fn INFO_F_WHOLE() -> i32 { super::TABLE.engine().value(a2engine::Sym(95)) }
+    #[inline(always)] pub fn INFO_REPAIR_ID_0() -> i32 { super::TABLE.engine().value(a2engine::Sym(96)) }
+    #[inline(always)] pub fn INFO_REPAIR_ID_1() -> i32 { super::TABLE.engine().value(a2engine::Sym(97)) }
+    #[inline(always)] pub fn INFO_REPAIR_ID_2() -> i32 { super::TABLE.engine().value(a2engine::Sym(98)) }
+    #[inline(always)] pub fn INFO_REPAIR_ID_3() -> i32 { super::TABLE.engine().value(a2engine::Sym(99)) }
+    #[inline(always)] pub fn INFO_REPAIR_ID_4() -> i32 { super::TABLE.engine().value(a2engine::Sym(100)) }
+    #[inline(always)] pub fn CLOSEUP_CAMERA_SIZE() -> i32 { super::TABLE.engine().value(a2engine::Sym(136)) }
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[

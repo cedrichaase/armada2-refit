@@ -88,51 +88,58 @@
 #define QOL_S_TRANSPORT 82
 #define QOL_S_GET_SETUP 83
 #define QOL_S_SETUP_ALLOWS_WARP 84
-#define QOL_F_OV_COUNT 0xb8
-#define QOL_F_OV_SEL 0xbc
-#define QOL_F_OV_SHIPGRP 0x14c
-#define QOL_F_OV_STNGRP 0x1c4
-#define QOL_F_OV_ACTION 0x3c
-#define QOL_F_OV_POINT 0xa4
-#define QOL_F_OV_VT_SELECT_LIST 0x98
-#define QOL_F_GO_FLAGS 0x14
-#define QOL_F_GO_ID 0x28
-#define QOL_F_GO_CLASS 0x40
-#define QOL_F_GO_DYING 0x113
-#define QOL_F_GO_TEAM 0xec
-#define QOL_F_GO_LABEL 0x120
-#define QOL_F_GO_POS 0xac
-#define QOL_F_CC_STATION 0x20d
-#define QOL_F_CI_COMMAND 0x1a0
-#define QOL_F_MODE_CLASS 0xc
-#define QOL_F_BAR_X44 0x44
-#define QOL_F_BAR_BUILD 0xf0
-#define QOL_F_CRAFT_CONTROL 0x1b0
-#define QOL_F_CTL_SPEED 0x8
-#define QOL_F_CTL_WARP 0xc
-#define QOL_V_CMD_GO 4
-#define QOL_V_CMD_GO_WARP 43
-#define QOL_V_CMD_BUILD 25
-#define QOL_V_CMD_CANCEL 19
-#define QOL_V_ACT_COMMAND 4095
-#define QOL_V_ACT_KEEP 16384
+#define QOL_F_OV_COUNT ((int)a2f_qol_ov_count)
+#define QOL_F_OV_SEL ((int)a2f_qol_ov_sel)
+#define QOL_F_OV_SHIPGRP ((int)a2f_qol_ov_shipgrp)
+#define QOL_F_OV_STNGRP ((int)a2f_qol_ov_stngrp)
+#define QOL_F_OV_ACTION ((int)a2f_qol_ov_action)
+#define QOL_F_OV_POINT ((int)a2f_qol_ov_point)
+#define QOL_F_OV_VT_SELECT_LIST ((int)a2f_qol_ov_vt_select_list)
+#define QOL_F_GO_FLAGS ((int)a2f_qol_go_flags)
+#define QOL_F_GO_ID ((int)a2f_qol_go_id)
+#define QOL_F_GO_CLASS ((int)a2f_qol_go_class)
+#define QOL_F_GO_DYING ((int)a2f_qol_go_dying)
+#define QOL_F_GO_TEAM ((int)a2f_qol_go_team)
+#define QOL_F_GO_LABEL ((int)a2f_qol_go_label)
+#define QOL_F_GO_POS ((int)a2f_qol_go_pos)
+#define QOL_F_CC_STATION ((int)a2f_qol_cc_station)
+#define QOL_F_CI_COMMAND ((int)a2f_qol_ci_command)
+#define QOL_F_MODE_CLASS ((int)a2f_qol_mode_class)
+#define QOL_F_BAR_X44 ((int)a2f_qol_bar_x44)
+#define QOL_F_BAR_BUILD ((int)a2f_qol_bar_build)
+#define QOL_F_CRAFT_CONTROL ((int)a2f_qol_craft_control)
+#define QOL_F_CTL_SPEED ((int)a2f_qol_ctl_speed)
+#define QOL_F_CTL_WARP ((int)a2f_qol_ctl_warp)
+#define QOL_V_CMD_GO ((int)a2f_qol_cmd_go)
+#define QOL_V_CMD_GO_WARP ((int)a2f_qol_cmd_go_warp)
+#define QOL_V_CMD_BUILD ((int)a2f_qol_cmd_build)
+#define QOL_V_CMD_CANCEL ((int)a2f_qol_cmd_cancel)
+#define QOL_V_ACT_COMMAND ((int)a2f_qol_act_command)
+#define QOL_V_ACT_KEEP ((int)a2f_qol_act_keep)
 #define QOL_S_BK_TOGGLES 113
 #define QOL_S_BK_PROCESS_KEYS 114
 #define QOL_S_BK_KEYS_CALL 115
-#define QOL_F_BK_KEY_COMMANDS 0xcc
-#define QOL_F_BK_KEY_BUILDS 0xd8
-#define QOL_F_BK_KEY_WEAPONS 0xe4
-#define QOL_V_BK_N_TOGGLES 6
-#define QOL_F_BK_BTN_STATE 0x34
-#define QOL_F_BK_VT_PRESS 0x20
+#define QOL_F_BK_KEY_COMMANDS ((int)a2f_qol_bk_key_commands)
+#define QOL_F_BK_KEY_BUILDS ((int)a2f_qol_bk_key_builds)
+#define QOL_F_BK_KEY_WEAPONS ((int)a2f_qol_bk_key_weapons)
+#define QOL_V_BK_N_TOGGLES ((int)a2f_qol_bk_n_toggles)
+#define QOL_F_BK_BTN_STATE ((int)a2f_qol_bk_btn_state)
+#define QOL_F_BK_VT_PRESS ((int)a2f_qol_bk_vt_press)
 #define QOL_S_BK_TEXT_INPUT 122
 #define QOL_S_BK_IS_PLAYING_VIDEO 123
 #define QOL_S_BK_CINEMATIC_VIEW 124
 #define QOL_S_BK_CLICK_SOUND 125
 #define QOL_S_BK_OPERATOR_NEW 126
 #define QOL_S_BK_SOUND2D 127
-#define QOL_V_BK_SOUND2D_BYTES 28
+#define QOL_V_BK_SOUND2D_BYTES ((int)a2f_qol_bk_sound2d_bytes)
 #define QOL_S_BK_BUTTON_PRESS 129
+#define QOL_V_CCE_CRAFT_ARRAY ((int)a2f_qol_cce_craft_array)
+#define QOL_V_CCE_CANCEL_COUNT ((int)a2f_qol_cce_cancel_count)
+#define QOL_V_CCE_CANCEL_INDEX ((int)a2f_qol_cce_cancel_index)
+#define QOL_V_CCE_ROUTE_OBJECTS ((int)a2f_qol_cce_route_objects)
+#define QOL_V_CCE_ROUTE_COUNT ((int)a2f_qol_cce_route_count)
+#define QOL_V_MSW_READ_LOCAL ((int)a2f_qol_msw_read_local)
+#define QOL_V_CGS_GROUP ((int)a2f_qol_cgs_group)
 #define QOL_H_PAN_SPEED 0
 #define QOL_H_SHIFT_GROUP 1
 #define QOL_H_SELECTION 2
@@ -236,6 +243,48 @@ A2E_U32 a2s_qol_bk_click_sound __attribute__((used));
 A2E_U32 a2s_qol_bk_operator_new __attribute__((used));
 A2E_U32 a2s_qol_bk_sound2d __attribute__((used));
 A2E_U32 a2s_qol_bk_button_press __attribute__((used));
+A2E_U32 a2f_qol_ov_count __attribute__((used)) = (A2E_U32)0xb8;
+A2E_U32 a2f_qol_ov_sel __attribute__((used)) = (A2E_U32)0xbc;
+A2E_U32 a2f_qol_ov_shipgrp __attribute__((used)) = (A2E_U32)0x14c;
+A2E_U32 a2f_qol_ov_stngrp __attribute__((used)) = (A2E_U32)0x1c4;
+A2E_U32 a2f_qol_ov_action __attribute__((used)) = (A2E_U32)0x3c;
+A2E_U32 a2f_qol_ov_point __attribute__((used)) = (A2E_U32)0xa4;
+A2E_U32 a2f_qol_ov_vt_select_list __attribute__((used)) = (A2E_U32)0x98;
+A2E_U32 a2f_qol_go_flags __attribute__((used)) = (A2E_U32)0x14;
+A2E_U32 a2f_qol_go_id __attribute__((used)) = (A2E_U32)0x28;
+A2E_U32 a2f_qol_go_class __attribute__((used)) = (A2E_U32)0x40;
+A2E_U32 a2f_qol_go_dying __attribute__((used)) = (A2E_U32)0x113;
+A2E_U32 a2f_qol_go_team __attribute__((used)) = (A2E_U32)0xec;
+A2E_U32 a2f_qol_go_label __attribute__((used)) = (A2E_U32)0x120;
+A2E_U32 a2f_qol_go_pos __attribute__((used)) = (A2E_U32)0xac;
+A2E_U32 a2f_qol_cc_station __attribute__((used)) = (A2E_U32)0x20d;
+A2E_U32 a2f_qol_ci_command __attribute__((used)) = (A2E_U32)0x1a0;
+A2E_U32 a2f_qol_mode_class __attribute__((used)) = (A2E_U32)0xc;
+A2E_U32 a2f_qol_bar_x44 __attribute__((used)) = (A2E_U32)0x44;
+A2E_U32 a2f_qol_bar_build __attribute__((used)) = (A2E_U32)0xf0;
+A2E_U32 a2f_qol_craft_control __attribute__((used)) = (A2E_U32)0x1b0;
+A2E_U32 a2f_qol_ctl_speed __attribute__((used)) = (A2E_U32)0x8;
+A2E_U32 a2f_qol_ctl_warp __attribute__((used)) = (A2E_U32)0xc;
+A2E_U32 a2f_qol_cmd_go __attribute__((used)) = (A2E_U32)4;
+A2E_U32 a2f_qol_cmd_go_warp __attribute__((used)) = (A2E_U32)43;
+A2E_U32 a2f_qol_cmd_build __attribute__((used)) = (A2E_U32)25;
+A2E_U32 a2f_qol_cmd_cancel __attribute__((used)) = (A2E_U32)19;
+A2E_U32 a2f_qol_act_command __attribute__((used)) = (A2E_U32)4095;
+A2E_U32 a2f_qol_act_keep __attribute__((used)) = (A2E_U32)16384;
+A2E_U32 a2f_qol_bk_key_commands __attribute__((used)) = (A2E_U32)0xcc;
+A2E_U32 a2f_qol_bk_key_builds __attribute__((used)) = (A2E_U32)0xd8;
+A2E_U32 a2f_qol_bk_key_weapons __attribute__((used)) = (A2E_U32)0xe4;
+A2E_U32 a2f_qol_bk_n_toggles __attribute__((used)) = (A2E_U32)6;
+A2E_U32 a2f_qol_bk_btn_state __attribute__((used)) = (A2E_U32)0x34;
+A2E_U32 a2f_qol_bk_vt_press __attribute__((used)) = (A2E_U32)0x20;
+A2E_U32 a2f_qol_bk_sound2d_bytes __attribute__((used)) = (A2E_U32)28;
+A2E_U32 a2f_qol_cce_craft_array __attribute__((used)) = (A2E_U32)-40;
+A2E_U32 a2f_qol_cce_cancel_count __attribute__((used)) = (A2E_U32)-32;
+A2E_U32 a2f_qol_cce_cancel_index __attribute__((used)) = (A2E_U32)-20;
+A2E_U32 a2f_qol_cce_route_objects __attribute__((used)) = (A2E_U32)-32;
+A2E_U32 a2f_qol_cce_route_count __attribute__((used)) = (A2E_U32)-24;
+A2E_U32 a2f_qol_msw_read_local __attribute__((used)) = (A2E_U32)-40;
+A2E_U32 a2f_qol_cgs_group __attribute__((used)) = (A2E_U32)-4;
 
 static A2E_U32 *const qol_vars[] = {
     &a2s_qol_pan_site,
@@ -323,51 +372,58 @@ static A2E_U32 *const qol_vars[] = {
     &a2s_qol_transport,
     &a2s_qol_get_setup,
     &a2s_qol_setup_allows_warp,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
+    &a2f_qol_ov_count,
+    &a2f_qol_ov_sel,
+    &a2f_qol_ov_shipgrp,
+    &a2f_qol_ov_stngrp,
+    &a2f_qol_ov_action,
+    &a2f_qol_ov_point,
+    &a2f_qol_ov_vt_select_list,
+    &a2f_qol_go_flags,
+    &a2f_qol_go_id,
+    &a2f_qol_go_class,
+    &a2f_qol_go_dying,
+    &a2f_qol_go_team,
+    &a2f_qol_go_label,
+    &a2f_qol_go_pos,
+    &a2f_qol_cc_station,
+    &a2f_qol_ci_command,
+    &a2f_qol_mode_class,
+    &a2f_qol_bar_x44,
+    &a2f_qol_bar_build,
+    &a2f_qol_craft_control,
+    &a2f_qol_ctl_speed,
+    &a2f_qol_ctl_warp,
+    &a2f_qol_cmd_go,
+    &a2f_qol_cmd_go_warp,
+    &a2f_qol_cmd_build,
+    &a2f_qol_cmd_cancel,
+    &a2f_qol_act_command,
+    &a2f_qol_act_keep,
     &a2s_qol_bk_toggles,
     &a2s_qol_bk_process_keys,
     &a2s_qol_bk_keys_call,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
+    &a2f_qol_bk_key_commands,
+    &a2f_qol_bk_key_builds,
+    &a2f_qol_bk_key_weapons,
+    &a2f_qol_bk_n_toggles,
+    &a2f_qol_bk_btn_state,
+    &a2f_qol_bk_vt_press,
     &a2s_qol_bk_text_input,
     &a2s_qol_bk_is_playing_video,
     &a2s_qol_bk_cinematic_view,
     &a2s_qol_bk_click_sound,
     &a2s_qol_bk_operator_new,
     &a2s_qol_bk_sound2d,
-    0,
+    &a2f_qol_bk_sound2d_bytes,
     &a2s_qol_bk_button_press,
+    &a2f_qol_cce_craft_array,
+    &a2f_qol_cce_cancel_count,
+    &a2f_qol_cce_cancel_index,
+    &a2f_qol_cce_route_objects,
+    &a2f_qol_cce_route_count,
+    &a2f_qol_msw_read_local,
+    &a2f_qol_cgs_group,
 };
 
 static const A2ESymDef qol_syms[] = {
@@ -501,27 +557,34 @@ static const A2ESymDef qol_syms[] = {
     {"bk_sound2d", "AudioSound2D::AudioSound2D", 0},
     {"bk_sound2d_bytes", "AudioSound2D", 11},
     {"bk_button_press", "ControlButton::mButtonPressFunction", 0},
+    {"cce_craft_array", "PopupPaletteImp::CheckCanExecute", 11},
+    {"cce_cancel_count", "PopupPaletteImp::CheckCanExecute", 11},
+    {"cce_cancel_index", "PopupPaletteImp::CheckCanExecute", 11},
+    {"cce_route_objects", "PopupPaletteImp::CheckCanExecute", 11},
+    {"cce_route_count", "PopupPaletteImp::CheckCanExecute", 11},
+    {"msw_read_local", "PopupPaletteImp::mSetupSpecialWeapons", 11},
+    {"cgs_group", "cOverViewImp::mCheckGroupSelect", 11},
 };
 static const char *const qol_h0_rows[] = {"QOL.PanSpeed", 0};
 static const A2E_U16 qol_h0_syms[] = {0, 1, 0};
 static const char *const qol_h1_rows[] = {"QOL.ShiftAddsToGroup", 0};
-static const A2E_U16 qol_h1_syms[] = {2, 3, 4, 5, 6, 7, 8, 9, 10, 0};
+static const A2E_U16 qol_h1_syms[] = {2, 3, 4, 5, 6, 7, 8, 9, 10, 136, 0};
 static const char *const qol_h2_rows[] = {"QOL.MaxSelection", 0};
 static const A2E_U16 qol_h2_syms[] = {11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 85, 86, 0};
 static const char *const qol_h3_rows[] = {"QOL.MaxSelection", 0};
-static const A2E_U16 qol_h3_syms[] = {46, 47, 48, 49, 50, 51, 52, 53, 0};
+static const A2E_U16 qol_h3_syms[] = {46, 47, 48, 49, 50, 51, 52, 53, 135, 0};
 static const char *const qol_h4_rows[] = {"QOL.StationGroups", 0};
-static const A2E_U16 qol_h4_syms[] = {7, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 85, 87, 88, 91, 92, 93, 94, 95, 96, 97, 99, 100, 101, 102, 103, 109, 110, 0};
+static const A2E_U16 qol_h4_syms[] = {7, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 85, 87, 88, 91, 92, 93, 94, 95, 96, 97, 99, 100, 101, 102, 103, 109, 110, 130, 131, 132, 133, 134, 0};
 static const char *const qol_h5_rows[] = {"QOL.WarpDistance", 0};
 static const A2E_U16 qol_h5_syms[] = {6, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 89, 90, 91, 92, 94, 96, 98, 104, 105, 106, 107, 108, 111, 112, 0};
 static const char *const qol_h6_rows[] = {"QOL.BarKeys", 0};
 static const A2E_U16 qol_h6_syms[] = {113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 0};
 static const A2EHookDef qol_hooks[] = {
     {"qol.pan_speed", 0, qol_h0_rows, 1, qol_h0_syms, 2},
-    {"qol.shift_group", 0, qol_h1_rows, 1, qol_h1_syms, 9},
+    {"qol.shift_group", 0, qol_h1_rows, 1, qol_h1_syms, 10},
     {"qol.selection", 0, qol_h2_rows, 1, qol_h2_syms, 37},
-    {"qol.special_select", 0, qol_h3_rows, 1, qol_h3_syms, 8},
-    {"qol.stations", 0, qol_h4_rows, 1, qol_h4_syms, 43},
+    {"qol.special_select", 0, qol_h3_rows, 1, qol_h3_syms, 9},
+    {"qol.stations", 0, qol_h4_rows, 1, qol_h4_syms, 48},
     {"qol.warp", 0, qol_h5_rows, 1, qol_h5_syms, 27},
     {"qol.bar_keys", 0, qol_h6_rows, 1, qol_h6_syms, 17},
 };
@@ -737,22 +800,29 @@ static const A2EEntry qol_b0_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 5, 0x45fc50, 0x0, 0, qol_b0_c127, 0, ""}, /* bk_sound2d */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 28, 0, 0, ""}, /* bk_sound2d_bytes */
     {1, 0, 0xffff, 0xffff, 0, 0, 5, 0x4e69e0, 0x0, 0, qol_b0_c129, 0, ""}, /* bk_button_press */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, -40, 0, 0, ""}, /* cce_craft_array */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, -32, 0, 0, ""}, /* cce_cancel_count */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, -20, 0, 0, ""}, /* cce_cancel_index */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, -32, 0, 0, ""}, /* cce_route_objects */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, -24, 0, 0, ""}, /* cce_route_count */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, -40, 0, 0, ""}, /* msw_read_local */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, -4, 0, 0, ""}, /* cgs_group */
 };
 static const A2EBlock qol_b0_blocked[] = {
     {0xffff, 0, 0, 0}
 };
 static const A2EBuild qol_builds[] = {
-    {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qol_b0_entries, qol_b0_blocked, 0, 130},
+    {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qol_b0_entries, qol_b0_blocked, 0, 137},
 };
 
 static A2E_U8 qol_hook_state[7];
-static A2E_U8 qol_sym_flags[130];
-static A2E_U32 qol_sym_addr[130];
+static A2E_U8 qol_sym_flags[137];
+static A2E_U32 qol_sym_addr[137];
 static char qol_notes[7][A2E_NOTE_MAX + 1];
 
 static const A2ETable QOL_ENGINE = {
     "armada2", "qol",
-    qol_syms, 130, qol_hooks, 7, qol_builds, 1, 0,
+    qol_syms, 137, qol_hooks, 7, qol_builds, 1, 0,
     qol_vars, qol_hook_state, qol_sym_flags, qol_sym_addr, qol_notes
 };
 

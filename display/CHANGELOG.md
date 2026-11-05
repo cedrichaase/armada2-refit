@@ -4,6 +4,14 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 1.1.0 — 2026-11-05
+
+### Changed
+- Engine fields and values come from the matched build at run time (`field::X()`, `value::X()`), no longer compile-time consts of `gog-1.1` (PLAN-ARCHITECTURE.md, AR-3).
+- The stub's walk of the engine's mode list (`stub/modes.rs`) reads the device's list and each mode's width, height and depth through new `display.toml` fields (`dev_modes`, `mode_node_value`, `mode_width`, `mode_height`, `mode_bpp`, hook `modes`), no longer literal offsets.
+
+Installed, not yet seen in game.
+
 ## 1.0.6 — 2026-11-04
 
 ### Changed

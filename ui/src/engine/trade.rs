@@ -102,15 +102,15 @@ pub fn trades() -> Option<Trades> {
         return None;
     }
     let sent = |base: usize| -> i64 { libm::floor(unsafe { rd::<f32>(from + base + 4 * to as usize) } as f64 + 0.5) as i64 };
-    let colour = if dest == 0 { 0xffffffff } else { buttons::colour(unsafe { rd(dest + field::PANELS_TEAM_COLOUR) }) };
+    let colour = if dest == 0 { 0xffffffff } else { buttons::colour(unsafe { rd(dest + field::PANELS_TEAM_COLOUR()) }) };
     Some(Trades {
         team: to,
         title: fill(c"TRADE_SENT_TO_TEAM", to as i64),
         colour,
         lines: [
-            (2, fill(c"TRADE_DILITHIUM_AMOUNT", sent(field::PANELS_SENT_DILITHIUM))),
-            (3, fill(c"TRADE_LATINUM_AMOUNT", sent(field::PANELS_SENT_LATINUM))),
-            (4, fill(c"TRADE_METAL_AMOUNT", sent(field::PANELS_SENT_METAL))),
+            (2, fill(c"TRADE_DILITHIUM_AMOUNT", sent(field::PANELS_SENT_DILITHIUM()))),
+            (3, fill(c"TRADE_LATINUM_AMOUNT", sent(field::PANELS_SENT_LATINUM()))),
+            (4, fill(c"TRADE_METAL_AMOUNT", sent(field::PANELS_SENT_METAL()))),
         ],
     })
 }

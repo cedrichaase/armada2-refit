@@ -372,3 +372,21 @@ symbol = "Get_Time"
 kind = "global"
 addr = 0x7b0fc8
 used_by = ["core.reads_clock"]
+
+[[sym]]
+id = "core_sprite_uv"
+symbol = "ST3D_Sprite::texture rectangle"
+kind = "field"
+struct = "ST3D_Sprite"
+offset = 0x38
+type = "f32"
+used_by = ["core.storm3d"]
+
+[[sym]]
+id = "core_sprite_texture"
+symbol = "ST3D_Sprite::texture"
+kind = "field"
+struct = "ST3D_Sprite"
+offset = 0x58
+type = "ptr"
+used_by = ["core.storm3d"]

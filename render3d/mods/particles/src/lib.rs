@@ -49,7 +49,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use draw::{Batch, Cam};
 
-use r3d_core::engine::light::{fn_new, fn_point_light, fn_register_light};
+use r3d_core::engine::light::{fn_register_light, new_point_light, set_reach};
 use r3d_core::engine::storm3d;
 const MAX_LIGHTS: usize = 16;
 /// Whether the vents' lights are also added to the scene layer's list by hand (see
@@ -147,21 +147,15 @@ impl Particles {
             let mut light = 0usize;
             if self.engine_lights && eng != 0 {
                 if n >= self.lights.len() {
-                    unsafe {
-                        let new: unsafe extern "C" fn(u32) -> usize = core::mem::transmute(fn_new());
-                        let l = new(0x138);
-                        if l == 0 {
-                            break;
-                        }
-                        let ctor: unsafe extern "thiscall" fn(usize, usize, usize, *const u8) -> usize = core::mem::transmute(fn_point_light());
-                        ctor(l, 0, 0, b"vent\0".as_ptr());
-                        self.lights.push(l);
+                    let l = new_point_light(b"vent\0");
+                    if l == 0 {
+                        break;
                     }
+                    self.lights.push(l);
                 }
                 light = self.lights[n];
+                set_reach(light, start, range);
                 unsafe {
-                    core::ptr::write_unaligned((light + 0x100) as *mut f32, start);
-                    core::ptr::write_unaligned((light + 0x104) as *mut f32, range);
                     let c = [col.x, col.y, col.z];
                     let m = M34 { r: [v3(1.0, 0.0, 0.0), v3(0.0, 1.0, 0.0), v3(0.0, 0.0, 1.0)], p: pos };
                     let reg: unsafe extern "thiscall" fn(usize, usize, *const f32, *const M34) = core::mem::transmute(fn_register_light());

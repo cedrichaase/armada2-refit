@@ -134,7 +134,7 @@ pub fn forward_input(ui: &mut Ui, s: &Screen) {
 pub fn mirrored(ui: &mut Ui, s: &Screen) {
     let r = s.fit.rect(s.model.rect);
     if let Some(t) = s.mirror {
-        let (w, h) = (s.model.rect[2] as f32 / dialogs::DESIGN_W as f32, s.model.rect[3] as f32 / dialogs::DESIGN_H as f32);
+        let (w, h) = (s.model.rect[2] as f32 / dialogs::design_w() as f32, s.model.rect[3] as f32 / dialogs::design_h() as f32);
         ui.draw.image_uv(t, r, [0.0, 0.0, w, h], 0xffffffff);
     }
     if s.top {
@@ -149,7 +149,7 @@ fn argb(c: u32) -> u32 {
 /// The dialog's controls as our widgets.
 pub fn widgets(ui: &mut Ui, s: &Screen) {
     let area = s.fit.rect(s.model.rect);
-    if s.model.rect[2] >= dialogs::DESIGN_W && !super::backdrop::over_mission() {
+    if s.model.rect[2] >= dialogs::design_w() && !super::backdrop::over_mission() {
         ui.draw.rect_vgrad(ui.screen(), 0xff04070d, 0xff0b1524);
     } else {
         ui.draw.rect_round(area, ui.u(8.0), 0xf0101a2a);
