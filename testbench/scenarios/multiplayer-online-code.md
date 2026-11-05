@@ -15,7 +15,7 @@ probes always get through, so this is the direct path, and
 `Online.log`; the chat line is checked by OCR.
 
 1. Include "_online-setup".
-2. Host: Wait up to 20 seconds for "Join code".
+2. Host: Wait up to 20 seconds for "Join".
 3. Host: Take a screenshot called "host lobby with code".
 4. Joiner: Type what follows "join code" in "Online.log" of host.
 5. Include "_online-play".
