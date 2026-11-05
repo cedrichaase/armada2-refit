@@ -209,6 +209,15 @@ the AppImage's libraries (GTK's URI launcher is only the fallback). The amber go
 whichever of the two there is to do: Install while something new is there, Launch once
 the button would only say Reinstall.
 
+A click is acknowledged at once and cannot be repeated. `LaunchWatch` is the state, the same
+in both windows: *launching* (the button off, "Launching…" with a spinner on GTK and a
+turning arc on Tk) until the game's process is seen (`game_running`: `/proc`, `tasklist`
+or `ps`, read on a thread every 1.5 s) and `LAUNCH_MIN` (4 s) have passed; *running*
+("Game running", still off) until the process is gone; then idle again. A launcher that
+fails, or a process not seen within `LAUNCH_GIVE_UP` (60 s), puts the button back and says
+so in the status line. `begin()` is the guard in the handler, so a double click or a key
+repeat starts one game.
+
 The progress bar (`EngineBar`) has an engine at its tip: a flickering amber glow and a
 short trail, drawn on an overlay 24 px high around the 4 px bar. The bar glides to each
 new fraction instead of jumping step to step, and the glow fades out once it is full.
