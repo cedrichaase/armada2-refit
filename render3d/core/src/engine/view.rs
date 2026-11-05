@@ -195,6 +195,29 @@ pub fn for_each_registered_light(mut f: impl FnMut(RegisteredLight)) -> bool {
     true
 }
 
+/// Calls `f(record, light)` for each record of the engine's light registry (Storm3D
+/// `+0x60`) this view.
+pub fn for_each_light_record(mut f: impl FnMut(usize, usize)) {
+    let head = field(storm3d(), off::S3D_LIGHTS());
+    if head == 0 {
+        return;
+    }
+    let (next, value, rec_light) = (off::LIST_NEXT(), off::LIST_VALUE(), off::LIGHT_REC_LIGHT());
+    let mut node = field(head, next);
+    let mut guard = 0;
+    while node != head && node != 0 && guard < 4096 {
+        guard += 1;
+        let rec = field(node, value);
+        node = field(node, next);
+        f(rec, field(rec, rec_light));
+    }
+}
+
+/// Sets a registry record's colour (`+4`): this view's, not the light's own.
+pub fn set_light_record_colour(rec: usize, c: V3) {
+    unsafe { core::ptr::write_unaligned((rec + off::LIGHT_REC_COLOUR()) as *mut V3, c) };
+}
+
 // ---- the pose ------------------------------------------------------------------
 
 /// An `ST3D_Instance`'s animation clock: flags (`+0xc`), whether it animates (`+0x76`)

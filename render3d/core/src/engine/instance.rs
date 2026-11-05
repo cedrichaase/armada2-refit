@@ -21,6 +21,11 @@ pub fn fn_rig_render() -> usize { at(sym::FN_RIG_RENDER) }
 pub fn vt_cocoon() -> usize { at(sym::VT_COCOON) }
 pub fn cocoon_db() -> usize { at(sym::COCOON_DB) }
 
+/// The slot of a class's `Render(ST3D_Camera*)` (11), for a hook of it.
+pub fn render_slot() -> usize {
+    off::VT_OBJ_RENDER() / 4
+}
+
 /// The class's `Render` (slot 11).
 pub fn render_fn(o: usize) -> usize {
     field(super::vtable(o), off::VT_OBJ_RENDER())

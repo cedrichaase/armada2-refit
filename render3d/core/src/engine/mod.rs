@@ -132,6 +132,11 @@ pub fn for_each_list_node(head: usize, mut f: impl FnMut(usize)) {
     }
 }
 
+/// The node after a list node (`+0`).
+pub fn list_node_next(node: usize) -> usize {
+    field(node, off::LIST_NEXT())
+}
+
 /// The element value a list node holds (`+8`).
 pub fn list_node_value(node: usize) -> usize {
     field(node, off::LIST_VALUE())

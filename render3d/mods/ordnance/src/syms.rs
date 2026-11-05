@@ -35,6 +35,36 @@ pub mod hook {
 
 pub mod field {
     #![allow(non_snake_case)]
+    #[inline(always)] pub fn OR_VT_SUBMIT() -> usize { super::TABLE.engine().field(a2engine::Sym(23)) }
+    #[inline(always)] pub fn OR_SHOT_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(24)) }
+    #[inline(always)] pub fn OR_SHOT_LEFT() -> usize { super::TABLE.engine().field(a2engine::Sym(25)) }
+    #[inline(always)] pub fn OR_SHOT_OWNER() -> usize { super::TABLE.engine().field(a2engine::Sym(26)) }
+    #[inline(always)] pub fn OR_SHOT_TARGET() -> usize { super::TABLE.engine().field(a2engine::Sym(27)) }
+    #[inline(always)] pub fn OR_SHOT_START() -> usize { super::TABLE.engine().field(a2engine::Sym(28)) }
+    #[inline(always)] pub fn OR_SHOT_END() -> usize { super::TABLE.engine().field(a2engine::Sym(29)) }
+    #[inline(always)] pub fn OR_SHOT_HUE() -> usize { super::TABLE.engine().field(a2engine::Sym(30)) }
+    #[inline(always)] pub fn OR_SHOT_HUE_B() -> usize { super::TABLE.engine().field(a2engine::Sym(31)) }
+    #[inline(always)] pub fn OR_SHOT_TINT() -> usize { super::TABLE.engine().field(a2engine::Sym(32)) }
+    #[inline(always)] pub fn OR_CLASS_LIGHT() -> usize { super::TABLE.engine().field(a2engine::Sym(33)) }
+    #[inline(always)] pub fn OR_CLASS_LIFE() -> usize { super::TABLE.engine().field(a2engine::Sym(34)) }
+    #[inline(always)] pub fn OR_CLASS_SPRITE() -> usize { super::TABLE.engine().field(a2engine::Sym(35)) }
+    #[inline(always)] pub fn OR_CLASS_LENGTH() -> usize { super::TABLE.engine().field(a2engine::Sym(36)) }
+    #[inline(always)] pub fn OR_CLASS_WIDTH() -> usize { super::TABLE.engine().field(a2engine::Sym(37)) }
+    #[inline(always)] pub fn OR_CLASS_PRJ() -> usize { super::TABLE.engine().field(a2engine::Sym(38)) }
+    #[inline(always)] pub fn OR_LIGHT_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(39)) }
+    #[inline(always)] pub fn OR_PHASER_SPENT() -> usize { super::TABLE.engine().field(a2engine::Sym(40)) }
+    #[inline(always)] pub fn OR_PHASER_FIRING() -> usize { super::TABLE.engine().field(a2engine::Sym(41)) }
+    #[inline(always)] pub fn OR_OBJ_GONE() -> usize { super::TABLE.engine().field(a2engine::Sym(42)) }
+    #[inline(always)] pub fn OR_OBJ_DEAD() -> usize { super::TABLE.engine().field(a2engine::Sym(43)) }
+    #[inline(always)] pub fn OR_OBJ_FORGET() -> usize { super::TABLE.engine().field(a2engine::Sym(44)) }
+    #[inline(always)] pub fn OR_OBJ_POS() -> usize { super::TABLE.engine().field(a2engine::Sym(45)) }
+    #[inline(always)] pub fn OR_OBJ_VEL() -> usize { super::TABLE.engine().field(a2engine::Sym(46)) }
+    #[inline(always)] pub fn OR_INST_RADIUS() -> usize { super::TABLE.engine().field(a2engine::Sym(47)) }
+    #[inline(always)] pub fn OR_EFFECT_DISTANCE() -> usize { super::TABLE.engine().field(a2engine::Sym(48)) }
+    #[inline(always)] pub fn OR_WAVE_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(49)) }
+    #[inline(always)] pub fn OR_WAVE_CLASS_PRJ() -> usize { super::TABLE.engine().field(a2engine::Sym(50)) }
+    #[inline(always)] pub fn OR_WAVE_CLASS_FADE() -> usize { super::TABLE.engine().field(a2engine::Sym(51)) }
+    #[inline(always)] pub fn OR_WAVE_END() -> usize { super::TABLE.engine().field(a2engine::Sym(52)) }
 }
 
 pub mod value {
@@ -65,10 +95,40 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "vt_point", symbol: "ST3D_Point_Light", kind: a2engine::Kind::Vtable },
     a2engine::SymDef { id: "cull_distance", symbol: "cfgOBJECT_CULLING_DISTANCE", kind: a2engine::Kind::Global },
     a2engine::SymDef { id: "ordnance_head", symbol: "(unnamed) ordnance list head node", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "or_vt_submit", symbol: "Ordnance::Submit slot", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_shot_class", symbol: "Ordnance::class", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_shot_left", symbol: "Ordnance::time left", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_shot_owner", symbol: "Ordnance::owner handle", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_shot_target", symbol: "Ordnance::target handle", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_shot_start", symbol: "Ordnance::start", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_shot_end", symbol: "Ordnance::end", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_shot_hue", symbol: "Ordnance::hue", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_shot_hue_b", symbol: "Ordnance::second hue", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_shot_tint", symbol: "Ordnance::tint", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_class_light", symbol: "OrdnanceClass::light", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_class_life", symbol: "OrdnanceClass::life span", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_class_sprite", symbol: "OrdnanceClass::sprite", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_class_length", symbol: "OrdnanceClass::length", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_class_width", symbol: "OrdnanceClass::width", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_class_prj", symbol: "OrdnanceClass::cPrjID", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_light_colour", symbol: "ST3D_Point_Light::colour", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_phaser_spent", symbol: "Phaser::spent", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_phaser_firing", symbol: "Phaser::firing", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_obj_gone", symbol: "GameObject::gone", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_obj_dead", symbol: "GameObject::dead", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_obj_forget", symbol: "GameObject::forget as target", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_obj_pos", symbol: "GameObject::position", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_obj_vel", symbol: "GameObject::velocity", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_inst_radius", symbol: "ST3D_Instance::radius", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_effect_distance", symbol: "WarpSpriteEffect::distance", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_wave_class", symbol: "ShockwaveExplosion::class", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_wave_class_prj", symbol: "ShockwaveExplosionClass::cPrjID", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_wave_class_fade", symbol: "ShockwaveExplosionClass::fade", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "or_wave_end", symbol: "ShockwaveExplosion::end radius", kind: a2engine::Kind::Field },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
-    a2engine::HookDef { id: "render3d.ordnance.reads", run_unknown: false, rows: &["Modules.ordnance"], syms: &[0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 18, 19, 20, 21, 22] },
+    a2engine::HookDef { id: "render3d.ordnance.reads", run_unknown: false, rows: &["Modules.ordnance"], syms: &[0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52] },
     a2engine::HookDef { id: "render3d.ordnance.warp", run_unknown: false, rows: &["Modules.ordnance"], syms: &[14, 15, 16, 17] },
     a2engine::HookDef { id: "render3d.ordnance.shots", run_unknown: false, rows: &["Modules.ordnance"], syms: &[3] },
 ];
@@ -81,7 +141,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 23,
+        n_resolved: 53,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x42bfa0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 0xe8], mask: &[], section: "", count: 0, value: 0 }, // fn_obj_even_if_destroyed
@@ -107,6 +167,36 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x6bc8ac, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // vt_point
             a2engine::Entry { present: true, addr: 0x6fcac0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // cull_distance
             a2engine::Entry { present: true, addr: 0x771fac, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // ordnance_head
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 92 }, // or_vt_submit
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 52 }, // or_shot_class
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 172 }, // or_shot_left
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 92 }, // or_shot_owner
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 96 }, // or_shot_target
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 188 }, // or_shot_start
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 200 }, // or_shot_end
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 208 }, // or_shot_hue
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 212 }, // or_shot_hue_b
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 240 }, // or_shot_tint
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // or_class_light
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 28 }, // or_class_life
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 300 }, // or_class_sprite
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 324 }, // or_class_length
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 328 }, // or_class_width
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 336 }, // or_class_prj
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 244 }, // or_light_colour
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 39 }, // or_phaser_spent
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 36 }, // or_phaser_firing
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 275 }, // or_obj_gone
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 274 }, // or_obj_dead
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 271 }, // or_obj_forget
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 172 }, // or_obj_pos
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 220 }, // or_obj_vel
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // or_inst_radius
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // or_effect_distance
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 48 }, // or_wave_class
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 36 }, // or_wave_class_prj
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 224 }, // or_wave_class_fade
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 80 }, // or_wave_end
         ],
         blocked: &[
         ],
@@ -114,8 +204,8 @@ pub const BUILDS: &[a2engine::Build] = &[
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 3] = [const { core::sync::atomic::AtomicU64::new(0) }; 3];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 23] = [const { core::sync::atomic::AtomicU8::new(0) }; 23];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 23] = [const { core::sync::atomic::AtomicUsize::new(0) }; 23];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 53] = [const { core::sync::atomic::AtomicU8::new(0) }; 53];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 53] = [const { core::sync::atomic::AtomicUsize::new(0) }; 53];
 static NOTES: [a2engine::Note; 3] = [const { a2engine::Note::new() }; 3];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 

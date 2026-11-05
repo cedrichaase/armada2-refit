@@ -86,6 +86,17 @@ pub fn look(sprite: usize) -> Option<Look> {
     Some(Look { texture: String::from(stem), rect: [off[0] + r[0], off[1] + r[1], r[2], r[3]], src, dst, flags })
 }
 
+/// The name of the sprite's texture (`+0x58`, named at `+8`), as the engine holds it.
+pub fn texture_name(sprite: usize) -> &'static str {
+    let tex = field(sprite, off::SPRITE_TEXTURE());
+    unsafe { crate::rt::cstr_at(field(tex, off::ELEM_NAME()) as *const u8, 260) }
+}
+
+/// The sprite's rectangle (`+0x38`: u, v, w, h), before its animation.
+pub fn rect(sprite: usize) -> [f32; 4] {
+    unsafe { rd(sprite + off::SPRITE_RECT()) }
+}
+
 /// The sprite's own colour (`+0x24`).
 pub fn sprite_colour(sprite: usize) -> [f32; 3] {
     unsafe { rd(sprite + off::SPRITE_COLOUR()) }
