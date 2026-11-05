@@ -126,7 +126,11 @@ pub fn decode(data: &[u8]) -> Result<Image, Error> {
         return Err(Error::Truncated);
     }
     let src = &data[start..];
-    let count = w * ht;
+    // Checked: on a 32-bit build a header like 32768x32768 wraps `count * 4` to zero and
+    // the pixel loop would then index past an empty buffer.
+    let count = w.checked_mul(ht).ok_or(Error::Truncated)?;
+    let file_len = count.checked_mul(bytes_pp).ok_or(Error::Truncated)?;
+    let out_len = count.checked_mul(4).ok_or(Error::Truncated)?;
 
     // Raw pixels in file order, still in the file's bytes per pixel.
     let raw: Vec<u8>;
@@ -136,33 +140,35 @@ pub fn decode(data: &[u8]) -> Result<Image, Error> {
         if count / 128 > src.len() {
             return Err(Error::Truncated);
         }
-        let mut out = Vec::with_capacity(count * bytes_pp);
+        let mut out = Vec::with_capacity(file_len);
         let mut i = 0;
-        while out.len() < count * bytes_pp {
+        while out.len() < file_len {
             let Some(&c) = src.get(i) else { return Err(Error::Truncated) };
             i += 1;
             let n = (c & 0x7f) as usize + 1;
             if c & 0x80 != 0 {
-                let px = src.get(i..i + bytes_pp).ok_or(Error::Truncated)?;
-                i += bytes_pp;
+                let end = i.checked_add(bytes_pp).ok_or(Error::Truncated)?;
+                let px = src.get(i..end).ok_or(Error::Truncated)?;
+                i = end;
                 for _ in 0..n {
                     out.extend_from_slice(px);
                 }
             } else {
-                let px = src.get(i..i + n * bytes_pp).ok_or(Error::Truncated)?;
-                i += n * bytes_pp;
+                let end = i.checked_add(n * bytes_pp).ok_or(Error::Truncated)?;
+                let px = src.get(i..end).ok_or(Error::Truncated)?;
+                i = end;
                 out.extend_from_slice(px);
             }
         }
         // A run may cross the image's end; the excess is dropped.
-        out.truncate(count * bytes_pp);
+        out.truncate(file_len);
         raw = out;
         &raw
     } else {
-        src.get(..count * bytes_pp).ok_or(Error::Truncated)?
+        src.get(..file_len).ok_or(Error::Truncated)?
     };
 
-    let mut pixels = alloc::vec![0u8; count * 4];
+    let mut pixels = alloc::vec![0u8; out_len];
     for fy in 0..ht {
         let y = if h.top_down() { fy } else { ht - 1 - fy };
         for fx in 0..w {
