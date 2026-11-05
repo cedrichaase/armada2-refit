@@ -622,8 +622,9 @@ and shimmer, no hull left, `CloakHullOthers`), never decloaking, so no sound pla
 (`ShipAt::cloaked`; a ship merely waiting to decloak is not drawn at all). The built-in
 map holds the Klingons cloaked, shapes shimmering in the Metreon gas, and sinks the
 Borg cube and the Diamond into the Mutara gas, the cube turned a corner towards the
-camera (`LockedYaw=55`; at its `Yaw=20` a face met the camera square on and it read as
-a flat tile).
+camera (`LockedYaw=70`, judged on the bench among 20..145: the left face catches the
+Key, the right one stays in shade and the bottom corner shows; at its `Yaw=20` a face
+met the camera square on and it read as a flat tile).
 A departure ignores the list (a mission is loading, so its campaign is open).
 
 **The departure.** While a mission loads from the campaign selection, `UI.asi` asks for

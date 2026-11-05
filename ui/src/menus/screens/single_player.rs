@@ -167,7 +167,7 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
         };
         let tw = ui.text_in(bar.inset(ui.u(8.0)), name, t.heading_size, Align::Left, col, crate::gfx::Weight::Bold);
         if lock {
-            let ph = ui.u(20.0);
+            let ph = ui.u(24.0);
             padlock(ui, R::new(bar.x + ui.u(8.0) + tw + ui.u(12.0), bar.y + (bar.h - ph) * 0.5, ph, ph), col);
         }
         let art = kit::contain(rest.inset(ui.u(8.0)), card.art);
@@ -302,7 +302,7 @@ fn over_scene(ui: &mut Ui, s: &Screen, names: &[&str; 4], foot: &[&crate::menus:
         let name_r = R::new(tr.x, tr.y - ui.u(11.0) * hk, tr.w, tr.h);
         let tw = ui.text_in(name_r, name, 24.0, Align::Left, c, Weight::Bold);
         if let Some(h) = hint.as_deref() {
-            let ph = ui.u(18.0);
+            let ph = ui.u(22.0);
             padlock(ui, R::new(tr.x + tw + ui.u(12.0), name_r.y + (name_r.h - ph) * 0.5, ph, ph), c);
             if hk > 0.01 {
                 let hr = R::new(tr.x, tr.y + ui.u(15.0), tr.w, tr.h);
