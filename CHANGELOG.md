@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.9.2 — 2026-11-05
+
+Layers: online 0.11.4.
+
+### Fixed
+- online: six bugs in `peer.c`: a duplicate DESTROY_PLAYER when the session ends with one pending, a stale join code when a new one shares its first and last character, stack overflows with a long `Server=`, a kicked or terminated joiner never acking the termination, an unreliable `TerminateSession`, and a connection that answers pings but never acks being resent for ever (dropped after 30 s). Details in `online/CHANGELOG.md` 0.11.4. Installed, not yet seen in game. Bench: multiplayer-online-match/loss/code pass.
+
 ## 15.9.1 — 2026-11-05
 
 Layers: testbench 4.2.1.

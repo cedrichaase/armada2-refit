@@ -4,6 +4,16 @@
 8 with a transport of our own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 and versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.11.4 — 2026-11-05
+
+### Fixed
+- `peer.c`: a player whose DESTROY_PLAYER is queued is marked, so a session ending before it is delivered no longer queues a second one for the same id (a joiner got two, the second with a null context; a host with `TerminateSession` after a lost connection likewise).
+- `peer.c`: a new join code from the server is detected by all six characters, not the first and last only.
+- `peer.c`: a long `Server=` (up to 127 characters) no longer overflows the stack buffers in `Host`, `EnumHosts` and the server-silent warnings.
+- `peer.c`: a joiner that is kicked or told the host ended the session now acks that last packet, so the host stops resending it for 15 s and takes a rejoin from the same address.
+- `peer.c`: `TerminateSession` sends what is still unacked (the termination) three times in all before the connections are dropped, so one lost datagram no longer turns the joiner's `HOSTTERMINATEDSESSION` into a 15 s `CONNECTIONLOST`.
+- `peer.c`: a connection whose oldest packet has gone unacked for 30 s (a peer that answers pings but never acks) is dropped as lost, instead of resending and queueing for ever. Installed, not yet seen in game. Bench: multiplayer-online-match/loss/code pass.
+
 ## 0.11.3 — 2026-11-04
 
 ### Fixed
