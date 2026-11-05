@@ -43,9 +43,20 @@ keep = ["ARMADA.PRF", "RTS_CFG.h"]
 shell = [800, 600]
 hud_canvas = [1600, 1200]
 
-[assets]
-# Where the game's textures are, relative to data_dir.
+[files]
+# The game's file layout under data_dir, as the tools and the plugins mount it
+# (a2fmt::vfs; games/README.md, "Files"). Each list is searched in order; a2tex installs
+# into the first texture root. render3d's and the UI's mount lists (files.rs) hold the
+# same rows, and tools/layers.py --check holds them equal.
 textures = ["Textures/RGB"]
+# The texture formats in them, lower case.
+texture_formats = ["tga"]
+sod = ["SOD"]
+sprites = ["Sprites"]
+odf = ["odf"]
+# Archives, searched behind the folders: { kind = "fpq" | "zfs", file = <under
+# data_dir>, at = <one of the folders above> }. No reader is written yet.
+archives = []
 
 [paths]
 # The data directory's name: ${XDG_DATA_HOME:-~/.local/share}/<stem> (A2_DATA's

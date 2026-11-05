@@ -4,8 +4,11 @@
 //! the process is not large-address-aware) and are dropped before a `Reset`.
 //!
 //! Names are looked up case-insensitively, as the engine (on Windows) does, through
-//! an index of each directory made once.
+//! an index of each directory made once. The directories are the file system's virtual
+//! folders (`files`, `LAYOUT`): `textures`, `sod`, `sprites` and `odf`, wherever the
+//! game keeps them.
 
+use crate::files;
 use crate::log;
 use crate::rt;
 use a2fmt::odf::Odf;
@@ -18,8 +21,8 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 
-/// Every file under a game directory (recursively), by lower-case file name, to its
-/// path relative to the game directory.
+/// Every file under a virtual folder (recursively), by lower-case file name, to its
+/// virtual path.
 struct DirIndex {
     files: BTreeMap<String, String>,
 }
@@ -34,7 +37,7 @@ impl DirIndex {
         self.files.get(&rt::lower(name)).map(|s| s.as_str())
     }
     fn read(&self, name: &str) -> Option<Vec<u8>> {
-        rt::read_file(&rt::game_path(self.path(name)?))
+        files::open(self.path(name)?)
     }
 }
 
@@ -42,12 +45,7 @@ fn walk(rel: &str, out: &mut BTreeMap<String, String>, depth: u32) {
     if depth > 6 {
         return;
     }
-    let mut pat = rt::game_path(rel);
-    pat.push_str("\\*");
-    for (name, dir) in rt::list_entries(&pat) {
-        if name == "." || name == ".." {
-            continue;
-        }
+    for files::Entry { name, dir } in files::list_dir(rel) {
         let mut p = String::from(rel);
         p.push('\\');
         p.push_str(&name);
@@ -81,13 +79,13 @@ fn store() -> &'static mut Store {
     unsafe {
         if STORE.is_none() {
             let t0 = rt::now();
-            let tex_dir = DirIndex::build("Textures\\RGB");
+            let tex_dir = DirIndex::build("textures");
             let tex_index = TexIndex::new(tex_dir.files.keys().cloned());
             let s = Store {
-                sod_dir: DirIndex::build("SOD"),
+                sod_dir: DirIndex::build("sod"),
                 tex_dir,
                 tex_index,
-                spr_dir: DirIndex::build("Sprites"),
+                spr_dir: DirIndex::build("sprites"),
                 odf_dir: DirIndex::build("odf"),
                 sods: BTreeMap::new(),
                 odfs: BTreeMap::new(),
@@ -204,7 +202,8 @@ pub fn image(name: &str) -> Option<tga::Image> {
     tga::decode(&s.tex_dir.read(&base)?).ok()
 }
 
-/// Whether a texture of that name exists (`Textures/RGB/<name>.tga`).
+/// Whether a texture of that name exists (`textures\<name>.tga`: `Textures/RGB` in
+/// Armada II).
 pub fn texture_exists(name: &str) -> bool {
     store().tex_index.find(name).is_some()
 }
@@ -216,7 +215,7 @@ fn tex_width(s: &mut Store, file: &str) -> Option<u32> {
     }
     let w = s.tex_dir.path(&key).and_then(|p| {
         // The header is all we need: 18 bytes.
-        let d = rt::read_file(&rt::game_path(p))?;
+        let d = files::open(p)?;
         tga::Header::parse(&d).ok().map(|h| h.width as u32)
     });
     s.widths.insert(key, w);

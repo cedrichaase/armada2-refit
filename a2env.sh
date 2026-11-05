@@ -13,6 +13,8 @@
 #               in a working tree
 #   A2_PROFILE  the game (games/<id>.toml)         armada2 (the descriptor marked default)
 #   A2_EXE      its executable (derived)           $A2_GAME/Armada2.exe
+#   A2_TEXTURES its first texture root (derived:   $A2_GAME/Textures/RGB
+#               the descriptor's [files] textures)
 #
 # Each is taken from, in order: the environment; the config file
 # ${XDG_CONFIG_HOME:-~/.config}/armada2-refit.conf (A2_CONF overrides), which holds
@@ -43,6 +45,6 @@ fi
 unset _a2_here _a2_args _a2_out
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
-  printf 'A2_GAME=%s\nA2_PREFIX=%s\nA2_HEROIC=%s\nA2_PROTON=%s\nA2_DATA=%s\nA2_PROFILE=%s\nA2_EXE=%s\n' \
-    "$A2_GAME" "$A2_PREFIX" "$A2_HEROIC" "$A2_PROTON" "$A2_DATA" "$A2_PROFILE" "$A2_EXE"
+  printf 'A2_GAME=%s\nA2_PREFIX=%s\nA2_HEROIC=%s\nA2_PROTON=%s\nA2_DATA=%s\nA2_PROFILE=%s\nA2_EXE=%s\nA2_TEXTURES=%s\n' \
+    "$A2_GAME" "$A2_PREFIX" "$A2_HEROIC" "$A2_PROTON" "$A2_DATA" "$A2_PROFILE" "$A2_EXE" "$A2_TEXTURES"
 fi

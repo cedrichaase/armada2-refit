@@ -237,6 +237,12 @@ the built-in one of the same name:
 | `Nebulae\<name>.ini` | a nebula's gas recipe |
 | `Menu\map.ini` | the main menu's scene |
 
+These folders are mounts of render3d's file system (`a2fmt::vfs`, the `LAYOUT` table in
+`render3d/core/src/files.rs`), like the game's texture roots and its `SOD`, `Sprites` and
+`odf` folders (`games/README.md`, "Files"): a recipe is looked up as `sky\<name>.ini`
+and the mount says which folder of the game directory that is. In Armada II each is the
+folder of that name, so a recipe file goes where it always did.
+
 A missing recipe means the engine's behaviour for that object, as a missing asset does.
 The format of each kind's keys is in the README, "Sky recipes", "world" and the other
 modules' sections; the shipped recipes in `render3d/content/` are the worked examples.

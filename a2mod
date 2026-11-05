@@ -27,7 +27,8 @@ WHAT COUNTS AS A CHANGE
 Every layer in the registry (layers.toml; `tools/layers.py --list`) names what it adds
 to the game directory (`files`) and which stock files it changes in place beside a
 backup (`replaces`, `backups`): Render3D.asi and its recipes for render3d, the
-Textures/RGB/*.a2neb-backup of a2tex for textures, SOD/*.a2neb-backup for models,
+*.a2neb-backup of a2tex in the game's texture root for textures (the descriptor's
+[files] textures, a2env.TEXTURES: Textures/RGB in Armada II), SOD/*.a2neb-backup for models,
 d3d8.dll.a2display-backup for display (stock puts back the d3d8.dll that was in the slot
 before Display8, GOG's; with none, Display8's d3d8.dll is set aside and the game runs on the
 system's own, which is stock), and so on.  Retired

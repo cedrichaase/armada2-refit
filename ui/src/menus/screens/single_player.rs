@@ -34,7 +34,7 @@ static mut ICONS: Option<Option<Tex>> = None;
 fn icons() -> Option<Tex> {
     unsafe {
         if ICONS.is_none() {
-            let t = crate::gfx::load_tga("Textures\\RGB\\allrace.tga");
+            let t = crate::gfx::load_tga("textures\\allrace.tga");
             crate::log!("menus: campaign emblems {}", if t.is_some() { "from allrace.tga" } else { "not found (allrace.tga): names only" });
             ICONS = Some(t);
         }

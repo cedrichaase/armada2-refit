@@ -293,7 +293,7 @@ def _check_a2mod(reg, errs):
         errs.append(f'a2mod: BACKUPS {m.BACKUPS} is not the registry\'s {backup_suffixes(reg)}')
     # What a2mod would file a few known files under (the textures where the default
     # game keeps them).
-    tex = a2env.load(a2env.default_id())['assets']['textures'][0]
+    tex = a2env.load(a2env.default_id())['files']['textures'][0]
     for rel, suffix, i in [(f'{tex}/Mnebula4.tga', BACKUP, 'textures'),
                            (f'{tex}/Curs_Arrow.tga', BACKUP, 'hud'),
                            (f'{tex}/FontFinal4_12.tga', '.a2font-backup', 'hud'),
@@ -358,9 +358,85 @@ GAME_FIELDS = {
     'install.heroic': list, 'install.gog': list, 'install.folder': str, 'install.prefix': str,
     'settings.kind': str, 'settings.file': str, 'settings.keep': list,
     'display.shell': list, 'display.hud_canvas': list,
-    'assets.textures': list, 'paths.stem': str,
+    'files.textures': list, 'files.texture_formats': list, 'files.sod': list,
+    'files.sprites': list, 'files.odf': list, 'files.archives': list, 'paths.stem': str,
 }
 SETTINGS_KINDS = ('armada-prf', 'fo-settings-xml')
+# [files]: the folder lists, the archive kinds a2fmt::vfs declares, the texture formats.
+FILE_DIRS = ('textures', 'sod', 'sprites', 'odf')
+ARCHIVE_KINDS = ('fpq', 'zfs')
+TEXTURE_FORMATS = ('tga', 'dds')
+# The plugins' mount lists (a2fmt::vfs), each a `LAYOUT` between `// files: layout <game>`
+# and `// files: end`, whose rows named in FILE_DIRS must be that game's [files].
+LAYOUTS = ('render3d/core/src/files.rs', 'ui/src/files.rs')
+
+
+def _check_files(gid, d, errs):
+    """[files]: non-empty lists of relative folders, known formats, archives of a known
+    kind mounted at one of the folders."""
+    f = d.get('files')
+    if not isinstance(f, dict):
+        return
+    for k in FILE_DIRS:
+        v = f.get(k)
+        if not isinstance(v, list):
+            continue
+        if not v:
+            errs.append(f'games/{gid}.toml: files.{k} is empty')
+        for p in v:
+            if not isinstance(p, str) or not p or p.startswith('/') or '\\' in p or '..' in p.split('/'):
+                errs.append(f'games/{gid}.toml: files.{k}: {p!r} is not a folder under data_dir '
+                            f'(relative, with /)')
+    for x in f.get('texture_formats') or []:
+        if x not in TEXTURE_FORMATS:
+            errs.append(f'games/{gid}.toml: files.texture_formats: {x!r} is none of '
+                        f'{", ".join(TEXTURE_FORMATS)}')
+    for a in f.get('archives') or []:
+        if not isinstance(a, dict) or set(a) != {'kind', 'file', 'at'}:
+            errs.append(f'games/{gid}.toml: files.archives: {a!r} is not {{kind, file, at}}')
+            continue
+        if a['kind'] not in ARCHIVE_KINDS:
+            errs.append(f'games/{gid}.toml: files.archives: kind {a["kind"]!r} is none of '
+                        f'{", ".join(ARCHIVE_KINDS)}')
+        if a['at'] not in FILE_DIRS:
+            errs.append(f'games/{gid}.toml: files.archives: at {a["at"]!r} is none of '
+                        f'{", ".join(FILE_DIRS)}')
+
+
+def _layout_rows(path):
+    """{game: {folder: [dirs]}} of a plugin's mount lists, the dirs with `/`."""
+    with open(os.path.join(ROOT, path), encoding='utf-8') as fh:
+        text = fh.read()
+    out = {}
+    for m in re.finditer(r'^// files: layout (\S+).*?$(.*?)^// files: end', text, re.M | re.S):
+        rows = {}
+        for r in re.finditer(r'\(\s*"([^"]*)"\s*,\s*&\[([^\]]*)\]\s*\)', m.group(2)):
+            rows[r.group(1)] = [s.replace('\\\\', '/') for s in re.findall(r'"([^"]*)"', r.group(2))]
+        out[m.group(1)] = rows
+    return out
+
+
+def _check_layouts(descs, errs):
+    for path in LAYOUTS:
+        try:
+            layouts = _layout_rows(path)
+        except OSError as e:
+            errs.append(f'{path}: {e}')
+            continue
+        if not layouts:
+            errs.append(f'{path}: no `// files: layout <game>` ... `// files: end` block')
+        for gid, rows in layouts.items():
+            d = descs.get(gid)
+            if d is None:
+                errs.append(f'{path}: layout {gid} has no games/{gid}.toml')
+                continue
+            for k, dirs in rows.items():
+                want = _field(d, f'files.{k}')
+                if k in FILE_DIRS and dirs != want:
+                    errs.append(f'{path}: {gid} mounts {k} at {dirs}, games/{gid}.toml '
+                                f'files.{k} is {want}')
+            if 'textures' not in rows:
+                errs.append(f'{path}: layout {gid} mounts no textures')
 
 
 def _field(d, dotted):
@@ -394,6 +470,7 @@ def _check_games(reg, errs):
                 errs.append(f'games/{g}.toml: {f} is not [width, height]')
         if not _field(d, 'exe.names'):
             errs.append(f'games/{g}.toml: exe.names is empty')
+        _check_files(g, d, errs)
     defaults = [g for g, d in descs.items() if d.get('default')]
     if len(defaults) != 1:
         errs.append(f'games/: {len(defaults)} descriptors are marked default, not one')
@@ -430,10 +507,11 @@ def _check_games(reg, errs):
     if len(defaults) == 1:
         d = descs[defaults[0]]
         for f in ('id', 'label', 'offered', 'default', 'exe.names', 'exe.data_dir',
-                  'install.folder', 'install.prefix', 'paths.stem'):
+                  'install.folder', 'install.prefix', 'files.textures', 'paths.stem'):
             if _field(a2env._BUILTIN, f) != _field(d, f):
                 errs.append(f'a2env.py: _BUILTIN {f} {_field(a2env._BUILTIN, f)!r} is not '
                             f'games/{defaults[0]}.toml\'s {_field(d, f)!r}')
+    _check_layouts(descs, errs)
 
 
 def check(reg):

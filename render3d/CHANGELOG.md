@@ -4,6 +4,16 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 1.1.0 — 2026-11-05
+
+### Added
+- `r3d_core::files`: one `a2fmt::vfs` file system over the game directory, with the mount list `LAYOUT` (`textures` = `Textures\RGB`, `sod`, `sprites`, `odf`, and the recipe override folders `Sky`, `Surfaces`, `Nebulae`, `Menu`), held to `games/armada2.toml` `[files]` by `tools/layers.py --check`. A mounted archive that serves nothing logs `files: <archive> at <folder>: <why>` (none in Armada II).
+
+### Changed
+- `assets` (SODs, textures and their chains, the sprite table, ODFs), `recipes` (only the read of the game folder's copy) and the world module's texture means open files through `files`, with no `Textures\RGB` literal left; stock finds the same files in the same order, and a recipe in the game folder still wins over the built-in one.
+
+Installed, not yet seen in game.
+
 ## 1.0.6 — 2026-11-04
 
 ### Changed
