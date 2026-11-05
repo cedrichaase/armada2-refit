@@ -37,7 +37,7 @@ Clicks by place (1280x720 only): the main menu's Single Player and the column's 
 12. Move the mouse to 220,426.
 13. Wait 6 seconds.
 14. Take a screenshot called "borg locked".
-15. Check that the Borg Campaign row is grey with a padlock and the line "Complete the Klingon Campaign to unlock", and the scene shows a dark Borg cube half hidden in purple gas, turned so that two of its sides show (it reads as a cube, not a flat square), with no large ship close to the camera.
+15. Check that the Borg Campaign row is grey with a padlock and the line "Complete the Klingon Campaign to unlock", and the scene shows a dark Borg cube half hidden in purple gas, turned a corner towards the camera (two faces meet down its middle, the left one darker, rather than one flat square face), with no large ship close to the camera.
 16. Click at 220,374.
 17. Wait 3 seconds.
 18. Expect "SELECT MISSION" is not visible.
