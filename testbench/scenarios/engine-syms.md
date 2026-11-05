@@ -41,7 +41,7 @@ appends its plugin's section and touches no other.
 20. Expect "UI.log" contains "engine: info symbols: 137/137 resolved; 0 hooks blocked".
 21. Expect "UI.log" contains "engine: hud symbols: 169/169 resolved; 0 hooks blocked".
 22. Expect "UI.log" contains "engine: panels symbols: 175/175 resolved; 0 hooks blocked".
-23. Expect "UI.log" contains "engine: shell symbols: 92/92 resolved; 0 hooks blocked".
+23. Expect "UI.log" contains "engine: shell symbols: 96/96 resolved; 0 hooks blocked".
 24. Expect "UI.log" contains "engine: dialogs symbols: 36/36 resolved; 0 hooks blocked".
 25. Expect "UI.log" not contains "stands down: ".
 26. Expect "UI.log" not contains "read before its hook".

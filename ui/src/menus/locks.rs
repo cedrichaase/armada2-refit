@@ -1,36 +1,40 @@
 //! Which campaigns of the campaign selection are locked: not yet open to the player,
-//! because the campaign before them is not finished (MENUS.md, "Locked campaigns").
+//! because the campaign before them is not complete (MENUS.md, "Locked campaigns").
 //!
-//! The stock screen does not show it: a locked campaign's panel looks and behaves as an
-//! open one's, so the state is read from the player's campaign progress,
-//! `save\shell.set`, whose bytes are progress counters (missions completed;
-//! platform/README.md, "Campaign progress format"). Which byte counts which campaign has
-//! **not been measured**: `[Menus] CampaignProgress=` gives the offset per card (the
-//! content set's order; -1 for none) and the default is a guess. A campaign that
-//! `requires` another is locked while that one's counter is below its mission count.
-//! With no `shell.set`, `CampaignLocks=0` or no offset for the campaign it needs,
-//! nothing is locked.
+//! The stock screen does not show it: a locked campaign's panel looks as an open one's,
+//! and a click on it does nothing. What the game decides by was measured on the bench
+//! (MENUS.md): per campaign, the furthest mission reached and a flag set when its last
+//! mission is won; the Klingon campaign opens once the Federation one is complete, the
+//! Borg once the Klingon one is. The counters do not open anything (a Federation counter
+//! at 10 left the Klingons shut). So a card whose campaign `requires` another is locked
+//! while that one's flag is 0.
 //!
-//! A lock is advice only: the entry is drawn greyed with a padlock and says on hover what
-//! opens it, render3d's scene shows the faction's view locked (`scene`), but a click
-//! still goes to the stock panel, so a wrong guess never keeps an open campaign shut.
+//! The progress is read from the game's memory (`engine::progress`), where a campaign
+//! won a moment ago is already complete; without it (the hook not ready, the object not
+//! plausible) from `save\shell.set`, the same bytes as the game last wrote them (bytes
+//! 0..3 reached, 4..7 complete). With neither, or `CampaignLocks=0`, nothing is locked.
 //!
-//! UI.log: `menus: campaign progress ...` each time the file is read, with its bytes
-//! and the locks, which is what the bench needs to measure the layout.
+//! A lock is drawn only: the entry is greyed with a padlock and says on hover what opens
+//! it, render3d's scene shows the faction's view locked (`scene`), and a click still goes
+//! to the stock panel, which decides.
+//!
+//! UI.log: `menus: campaign progress ...` each time what is read changes, with where it
+//! was read from, and the locks.
+use crate::engine::progress::Progress;
 use alloc::string::String;
 use alloc::vec::Vec;
 
 const FILE: &str = "save\\shell.set";
 
 struct State {
-    /// The file's stamp at the last read (None: missing), and when it was looked at.
-    stamp: Option<Option<([u32; 2], u32)>>,
+    /// The progress last read and where from (None: none), and when it was read.
+    last: Option<(Option<Progress>, &'static str)>,
     checked: f64,
     /// Per card of the content set: the card it waits for, when locked.
     locked: Vec<Option<usize>>,
 }
 
-static mut STATE: State = State { stamp: None, checked: 0.0, locked: Vec::new() };
+static mut STATE: State = State { last: None, checked: -1.0, locked: Vec::new() };
 
 #[allow(static_mut_refs)]
 fn st() -> &'static mut State {
@@ -60,48 +64,58 @@ pub fn locked_scenes() -> String {
     out
 }
 
-/// Reads the progress again when the file has changed (looked at once a second).
+/// `save\shell.set`'s first eight bytes, as the game last wrote them.
+fn from_file() -> Option<Progress> {
+    let b = crate::rt::read_file(&crate::rt::game_path(FILE))?;
+    if b.len() < 8 {
+        return None;
+    }
+    Some(Progress { reached: [b[0], b[1], b[2], b[3]], complete: [b[4], b[5], b[6], b[7]], missions: [0; 4] })
+}
+
+/// Reads the progress again (four times a second) and works the locks out when it changed.
 fn refresh() {
     let s = st();
     let now = crate::rt::now();
-    if s.stamp.is_some() && now - s.checked < 1.0 {
+    if s.last.is_some() && now - s.checked < 0.25 {
         return;
     }
     s.checked = now;
     let cfg = crate::config::get();
-    let path = crate::rt::game_path(FILE);
-    let stamp = crate::rt::file_stamp(&path);
-    if s.stamp == Some(stamp) {
+    let read = if !cfg.campaign_locks {
+        (None, "off (CampaignLocks=0)")
+    } else if let Some(p) = crate::engine::progress::read() {
+        (Some(p), "memory")
+    } else {
+        match from_file() {
+            Some(p) => (Some(p), FILE),
+            None => (None, "none: no progress in memory nor in save\\shell.set"),
+        }
+    };
+    if s.last == Some(read) {
         return;
     }
-    s.stamp = Some(stamp);
+    s.last = Some(read);
     let camps = crate::content::get().campaigns;
     s.locked = alloc::vec![None; camps.len()];
-    if !cfg.campaign_locks {
-        crate::log!("menus: campaign locks off (CampaignLocks=0)");
+    let Some(p) = read.0 else {
+        crate::log!("menus: campaign progress {}; every campaign shown open", read.1);
         return;
-    }
-    let Some(bytes) = stamp.and_then(|_| crate::rt::read_file(&path)) else {
-        crate::log!("menus: campaign progress: no {}, every campaign shown open", FILE);
-        return;
-    };
-    let counter = |card: usize| -> Option<u8> {
-        let off = *cfg.campaign_progress.get(card)?;
-        if off < 0 { None } else { bytes.get(off as usize).copied() }
     };
     let mut said = String::new();
     for (i, c) in camps.iter().enumerate() {
         let Some(req) = c.requires else { continue };
-        let Some(n) = counter(req) else { continue };
-        if n < camps[req].missions {
+        let Some(&done) = p.complete.get(req) else { continue };
+        if done == 0 {
             s.locked[i] = Some(req);
-            said.push_str(crate::sfmt!(" {} (waits for {}: {}/{})", c.key, camps[req].key, n, camps[req].missions).as_str());
+            said.push_str(crate::sfmt!(" {} (waits for {})", c.key, camps[req].key).as_str());
         }
     }
-    let mut dump = String::new();
-    for b in &bytes {
-        dump.push_str(crate::sfmt!("{} ", b).as_str());
-    }
-    crate::log!("menus: campaign progress ({}, {} bytes): {}", FILE, bytes.len(), dump.trim_end());
-    crate::log!("menus: campaign progress offsets {:?}; locked:{}", cfg.campaign_progress.as_slice(), if said.is_empty() { " none" } else { said.as_str() });
+    crate::log!(
+        "menus: campaign progress from {}: reached {:?}, complete {:?}; locked:{}",
+        read.1,
+        p.reached,
+        p.complete,
+        if said.is_empty() { " none" } else { said.as_str() }
+    );
 }

@@ -50,10 +50,8 @@ pub struct Config {
     /// 3D scene (`menus::scene`), when render3d draws it.
     pub menus_scene: bool,
     /// `[Menus] CampaignLocks`: the campaign selection shows which campaigns are not yet
-    /// open (`menus::locks`); `CampaignProgress`: the byte of `save\shell.set` that
-    /// counts each card's missions (the content set's order; -1 for none).
+    /// open (`menus::locks`).
     pub campaign_locks: bool,
-    pub campaign_progress: alloc::vec::Vec<i32>,
     /// `[Menus] Credits`: the Credits are ours (`crate::credits`), over the menu scene.
     pub credits: bool,
     pub hud: Hud,
@@ -145,9 +143,6 @@ pub struct Hud {
     pub layout_log: bool,
 }
 
-/// `[Menus] CampaignProgress`'s default: a guess, not yet measured (`menus::locks`).
-const DEFAULT_PROGRESS: &str = "0,1,2,3";
-
 pub fn load() -> Config {
     let ini = Ini::open(&rt::game_path("UI.ini"));
     Config {
@@ -212,12 +207,6 @@ pub fn load() -> Config {
         menus_scene: on(&ini, MENUS_SCENE),
         credits: on(&ini, MENUS_CREDITS),
         campaign_locks: ini.int("Menus", "CampaignLocks", 1) != 0,
-        campaign_progress: ini
-            .string("Menus", "CampaignProgress")
-            .unwrap_or_else(|| alloc::string::String::from(DEFAULT_PROGRESS))
-            .split(',')
-            .map(|v| rt::parse_i32(v).unwrap_or(-1))
-            .collect(),
         loading: on(&ini, LOADING_ENABLE),
         loading_hold: ini.float("Loading", "Hold", 0.0).clamp(0.0, 600.0),
     }

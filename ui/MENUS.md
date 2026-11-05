@@ -366,6 +366,7 @@ nothing (None, an empty list, 0) while their hook is not ready.
 | `ui.shell.widgets` | `Shell::Widget`'s constructor, re-pointed (its bytes checked) at one that stores the same two fields and remembers the object, and `Shell::Widget`'s vtable; feeds `Menus.Enable` |
 | `ui.shell.reads_widgets` | the vtables of the shell's button, toggle, cycle, selection box, scroll bar, label, `ComboBox`, `GameSelectionSlot` and `PlayerListButton` classes, the two virtuals (`UpdateButton`, `TextLabel::Draw`) that tell a class by its slot, the `.rdata` range a vtable pointer must lie in, and every field read by offset |
 | `ui.shell.reads_combo` | a `ComboBox`'s item count, item height, pull-down rectangle, hidden combo window and direction (the table in `shellcombo.rs`) |
+| `ui.shell.reads_progress` | `g_shellSettings`, read only: the campaigns' furthest missions (+0x0d), complete flags (+0x11) and mission counts (+0x15), four bytes each; the campaign selection's locks ("Locked campaigns") |
 | `ui.shell.reads_setup` | `g_transport` and the `Transport` / `GameSetup` getters (map, title, slots, race, team, name, vacancy), `RaceRandom` and `Race::FindInstantActionSlot`, with the `Transport` virtuals asked by vtable offset; the loading screen's mission details and the Refit screen's network test |
 
 ## The shell's widgets
@@ -990,22 +991,41 @@ a Mutara nebula with the queen's Diamond (`render3d/README.md`, "The menu scene"
   stock tutorial card shows, drawn as an outline round the Federation icon's delta.
   Without `allrace.tga` the names stand alone (UI.log: `menus: campaign emblems`).
   Without the scene the four cards draw in a 2x2 grid as before.
-- **Locked campaigns** (`src/menus/locks.rs`, issue #13): the stock screen draws a
-  campaign the player cannot play yet (the Klingons' before the Federation campaign is
-  finished, the Borg's before the Klingons') exactly as an open one. Ours greys it: its
+- **Locked campaigns** (`src/menus/locks.rs`, `src/engine/progress.rs`, issue #13): the
+  stock screen draws a campaign the player cannot play yet exactly as an open one, and a
+  click on it does nothing (no mission list, no sound of its own). Ours greys it: its
   name and emblem in the theme's off colour, a padlock after the name, a grey bar in
   place of the accent, and on hover a line under the name, "Finish the <campaign> to
   unlock" (in the 2x2 cards without the scene: the picture dimmed, the line across its
   foot). The view still follows the pointer, and render3d shows it locked
   (`Render3D_MenuLocked`, render3d/README.md, "The menu scene": the Klingons stay
-  cloaked, the cube and the Diamond sit down in the Mutara gas). **The lock is read
-  from `save\shell.set`, whose layout has not been measured**: `[Menus]
-  CampaignProgress` names the byte that counts each campaign's finished missions
-  (default `0,1,2,3`, a guess) and a campaign is locked while the one it follows counts
-  fewer than its ten. So a click still goes to the stock panel, which decides, and
-  `CampaignLocks=0` turns the look off. UI.log's `menus: campaign progress` lines give
-  the file's bytes and the locks each time it changes: finish a mission on the bench and
-  compare to find the real offsets.
+  cloaked, the cube and the Diamond sit down in the Mutara gas). A click still goes to
+  the stock panel, which decides; `CampaignLocks=0` turns the look off.
+
+  **What the game decides by, measured on the bench** (2026-11-05, by crafted
+  `save\shell.set` files, a won mission, and the running game's memory read from outside;
+  platform/README.md, "Campaign progress format"): the file's first eight bytes are, per
+  campaign in the order Tutorials, Federation, Klingon, Borg, the furthest mission
+  reached (0-based: a counter of `n` lists `n + 1` missions; winning the first Federation
+  mission took byte 1 from 0 to 1), then whether the campaign is complete (set when its
+  last mission is won; the counter stays at 9). **The Klingon campaign opens when byte 5
+  (the Federation complete) is set, the Borg when byte 6 (the Klingons complete) is**:
+  with only byte 5 set, the Klingon panel listed its first mission and the Borg's did
+  nothing; byte 6 alone, the reverse; the counters open nothing (byte 1 at 10, the
+  Klingons stayed shut). Byte 4 (the Tutorials complete) gates nothing: the Federation
+  campaign is always open. A new profile is all 0 but byte 11 (1), which none of this
+  reads.
+
+  **The UI reads it in memory, the file only when it must** (`ui.shell.reads_progress`):
+  the game writes `shell.set` when it exits and when a won mission moves a counter on,
+  so after the last Federation mission was won the Klingon panel opened at once while
+  the file still said otherwise until the game was left. `g_shellSettings` holds the
+  same eight bytes at +0x0d (counters) and +0x11 (complete), followed by each campaign's
+  mission count at +0x15 (6, 10, 10, 10); found by reading the object of that name in
+  a game started with a recognisable file. The UI takes it only when it looks like
+  progress (each counter below its count, each flag 0 or 1), and reads the file's bytes
+  0..7 otherwise. Read four times a second; UI.log: `menus: campaign progress from
+  memory: reached [...], complete [...]; locked: ...` each time it changes.
 - **A mission loaded over it departs from it**: the loading screen draws over the
   view that showed last, whose ships go to warp into render3d's tunnel
   (`LOADING.md`, "Over the menu scene"; `Render3D_MenuWarp`).

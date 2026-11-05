@@ -17,8 +17,8 @@
 //!
 //! A campaign not yet open (`menus::locks`) is greyed, with a padlock after its name, and
 //! pointing at it says what opens it ("Finish the Federation Campaign to unlock"); its
-//! scene still shows, locked (render3d). A click still goes to the stock panel: the lock
-//! is read from a layout not yet measured, and the stock screen has the last word.
+//! scene still shows, locked (render3d). A click still goes to the stock panel, which
+//! has the last word (on a locked campaign it does nothing).
 use crate::gfx::{fade, Tex, R};
 use crate::menus::screens::kit;
 use crate::menus::{actions, Screen};
@@ -310,7 +310,7 @@ fn over_scene(ui: &mut Ui, s: &Screen, names: &[&str; 4], foot: &[&crate::menus:
             padlock(ui, R::new(tr.x + tw + ui.u(12.0), name_r.y + (name_r.h - ph) * 0.5, ph, ph), c);
             if hk > 0.01 {
                 let hr = R::new(tr.x, tr.y + ui.u(15.0), tr.w, tr.h);
-                ui.text_in(hr, h, 15.0, Align::Left, fade(t.text, 0.85 * hk), Weight::Regular);
+                ui.text_in(hr, h, t.small_size, Align::Left, fade(t.text, 0.85 * hk), Weight::Regular);
             }
         }
         if hot {

@@ -5,12 +5,12 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
-## 15.7.0 — 2026-11-04
+## 15.8.0 — 2026-11-05
 
-Layers: ui 2.3.0, render3d 1.1.0.
+Layers: ui 2.3.0, render3d 1.1.0, testbench 4.1.6.
 
 ### Added
-- Locked campaigns shown on the campaign selection (issue #13): greyed with a padlock and a hint of what opens them, the Klingon and Borg scenes shown locked (`[Menus] CampaignLocks`, `CampaignProgress`; `Render3D_MenuLocked`, `LockedCloak`, `LockedAt`). The progress layout of `save\shell.set` is a guess still to be measured. Installed, not yet seen in game.
+- Locked campaigns shown on the campaign selection (issue #13): greyed with a padlock and a hint of what opens them, the Klingon and Borg scenes shown locked (`[Menus] CampaignLocks`; `Render3D_MenuLocked`, `LockedCloak`, `LockedAt`). The campaign progress format of `save\shell.set` and the game's unlock rule were measured on the bench (`platform/README.md`, "Campaign progress format"); the UI reads the progress in the game's memory (profile `ui.shell.reads_progress`). Scenario `ui-menus-locked`. Installed, not yet seen in game.
 
 ## 15.6.21 — 2026-11-04
 
