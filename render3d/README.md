@@ -579,7 +579,7 @@ the looks they give a mission:
 | (depth cleared) | | the ships and the gas are drawn on a projection of their own, 2 to 16000 |
 | `Ships` | hulls | `menu_begin` poses every ship of the map (finest level of detail, its animation looping, `hardpoints` and the damage, crew and Borg nodes hidden by name, as no class says which) and draws the shadow map from those in view, with the menu planet in place of the engine's; then the hull look, opaque, of the ships in view, and their running lights collected |
 | `Gas` | world | `Nebulae::draw_menu`: each `[Nebula.*]` field's nebulae as the class's gas, marched and lit by the Key with the ships' shadows, as a mission's; before the cloak, which bends a copy of what is behind a hull |
-| `Translucent` | hulls | additive meshes, decloaking hulls (the cloak's glass, as the engine's state 3) and sprite nodes, as at a mission's `Step::Translucent` |
+| `Translucent` | hulls | additive meshes, decloaking hulls (the cloak's glass, as the engine's state 3), hulls held cloaked (state 2) and sprite nodes, as at a mission's `Step::Translucent` |
 | `Warp` | sky | a departure's flashes (the stock `warp_sprite`) and its tunnel (`tunnel_ps`), below |
 
 **One map, one sun.** Every view looks at the same map: asking for another moves the
@@ -609,6 +609,23 @@ of the game's own sound system (`engine/sound.rs`: an `AudioSound2D` made with t
 game's `operator new` at priority 8, as `ShellButton::SetButtonMode` makes its hover
 sound), so the player's effects volume applies; it is a sound, not a simulation write,
 and plays only in the menu scene.
+
+**Locked campaigns.** `UI.asi` names the views whose campaigns the player has not yet
+opened through a third export, `Render3D_MenuLocked(names)` (a comma-separated list,
+held until the next call; Render3D.log: `menu: locked views: <list>`;
+ui/MENUS.md, "The menu scene"). Every group a locked view looks at is locked: its
+ships sit at their `LockedAt=` (where they always sit, without one), turned to their
+`LockedYaw=` (the ship's, else its `Yaw=` plus the group's), and with `LockedCloak=1`
+they are held cloaked: drawn whole in the cloak's glass, as the hulls draw a fully
+cloaked ship in a mission (the engine's state 2: refraction with the colour split, rim
+and shimmer, no hull left, `CloakHullOthers`), never decloaking, so no sound plays
+(`ShipAt::cloaked`; a ship merely waiting to decloak is not drawn at all). The built-in
+map holds the Klingons cloaked, shapes shimmering in the Metreon gas, and sinks the
+Borg cube and the Diamond into the Mutara gas, the cube turned a corner towards the
+camera (`LockedYaw=70`, judged on the bench among 20..145: the left face catches the
+Key, the right one stays in shade and the bottom corner shows; at its `Yaw=20` a face
+met the camera square on and it read as a flat tile).
+A departure ignores the list (a mission is loading, so its campaign is open).
 
 **The departure.** While a mission loads from the campaign selection, `UI.asi` asks for
 the view under its loading screen through the second export,
@@ -690,11 +707,15 @@ time it is posed (`hulls: menu scene:`). Keys:
 | `[Group.<name>]` | `At`, `Yaw` | the group's place on the map and its turn about +y in degrees |
 | | `CloakView`, `CloakDelay`, `CloakTime`, `CloakStagger`, `CloakSound` | the view whose arrival decloaks its ships; the seconds before the first starts (`Blend` x 0.7), each takes (2.5), between one and the next (0.5); the sound heard once as the group's first ship begins (`clkdisen.wav`; empty for none) |
 | | `WarpColour` | the tunnel's tint when the group departs (0.45,0.62,1) |
+| | `LockedCloak` | 1: its ships are held cloaked, drawn in the cloak's glass, while a view of the group is locked (`Render3D_MenuLocked`) |
+| | `LockedYaw` | degrees each of its ships turns by, on top of its `Yaw`, while the group's view is locked (0); a ship's own `LockedYaw` takes precedence |
 | `[View.<name>]` | `Group`, `Eye`, `Target`, `Fov` | in the group's frame; vertical field in degrees |
 | | `Sway`, `SwayPeriod` | the drift's amplitude and period |
 | | `WarpEye`, `WarpTarget` | the camera a departure from the view swings to, in the group's frame (default: behind the departing ships, looking the way they go) |
 | `[Ship.<name>]` | `Group`, `Odf`, `At`, `Yaw`, `Scale`, `Bob`, `Phase`, `Team` | its group; the ship's ODF (its `baseName` and `ScaleSOD`), its place in the group, a turn in degrees, a scale on top of `ScaleSOD`, how much it bobs, its phase, a team colour for its `team*` groups |
 | | `Warp` | 0: stays when its group departs (a station) |
+| | `LockedAt` | its place in the group while the group's view is locked (default: `At`) |
+| | `LockedYaw` | its turn in degrees while the group's view is locked, in place of `Yaw` (default: `Yaw` plus the group's `LockedYaw`) |
 | `[Nebula.<name>]` | `Group`, `Odf`, `At`, `Size`, `Spacing`, `Jitter`, `Seed` | its group; a nebula ODF with a gas recipe; the field's centre (its plane's height is its y); half extents in x and z; the grid's step (the radius x 1.2) and jitter (0.35); the seed |
 | | `Radius` | the class's radius (the ODF's `effectRadius`, else 300) |
 | | `KeyShare`, `Scatter`, `Opacity`, `Brightness` | over the recipe's, for the menu's class only (one set per class: the first field of the class that sets a key) |

@@ -8,6 +8,10 @@
 //! Without Render3D.asi, or when it draws nothing (no Display8 device, its scene
 //! switched off), `shown` is false and the specs draw what they drew before.
 //!
+//! **Locked campaigns** (`menus::locks`) are given to render3d's `Render3D_MenuLocked`
+//! before each frame of the scene, so a faction's view shows its campaign locked (the
+//! Klingons stay cloaked, the Borg sit deep in the gas); the Credits send none.
+//!
 //! **The departure.** A mission loaded while the scene is up (from the campaign
 //! selection, or a save from a screen over it) keeps it under the loading screen: the
 //! view that showed last is asked of render3d's `Render3D_MenuWarp`, whose ships go to
@@ -27,6 +31,33 @@ static mut VIEW: Option<&'static core::ffi::CStr> = None;
 static mut DEPART: Option<&'static core::ffi::CStr> = None;
 /// The departure drew under this loading frame.
 static mut DEPART_SHOWN: bool = false;
+/// render3d's `Render3D_MenuLocked`, looked up once, and the list last given it.
+static mut LOCKED_FN: Option<Option<LockedFn>> = None;
+static mut LOCKED_SENT: Option<alloc::string::String> = None;
+
+type LockedFn = unsafe extern "C" fn(*const u8) -> u32;
+
+/// Tells render3d which views' campaigns are locked (`menus::locks`), when that changed.
+/// An older render3d without the export draws every view open.
+#[allow(static_mut_refs)]
+fn send_locked(list: &str) {
+    unsafe {
+        if LOCKED_SENT.as_deref() == Some(list) {
+            return;
+        }
+        if LOCKED_FN.is_none() {
+            let m = GetModuleHandleA(c"Render3D.asi".as_ptr() as *const u8);
+            let p = if m.is_null() { 0 } else { GetProcAddress(m, c"Render3D_MenuLocked".as_ptr() as *const u8) };
+            LOCKED_FN = Some(if p == 0 { None } else { Some(core::mem::transmute::<usize, LockedFn>(p)) });
+        }
+        if let Some(Some(f)) = LOCKED_FN {
+            let c = crate::rt::cstr(list);
+            f(c.as_ptr());
+        }
+        LOCKED_SENT = Some(alloc::string::String::from(list));
+    }
+}
+
 /// The campaign selection's view, while it shows (None: the first, the Federation's).
 static mut CHOICE: Option<&'static core::ffi::CStr> = None;
 
@@ -94,6 +125,7 @@ pub fn draw(w: u32, h: u32) {
         note("");
         return;
     };
+    send_locked(&super::locks::locked_scenes());
     let drew = unsafe { f(name.as_ptr() as *const u8, 0, 0, w, h) } != 0;
     unsafe {
         SHOWN = drew;
@@ -125,6 +157,8 @@ fn note(name: &'static str) {
 /// Draws the view `name` of render3d's map into the whole back buffer, `w` x `h`, for
 /// a screen of ours (the Credits). False when it drew nothing.
 pub fn draw_view(name: &core::ffi::CStr, w: u32, h: u32) -> bool {
+    // The Credits tour every view as it is when the game is won: open.
+    send_locked("");
     match scene_fn() {
         Some(f) => unsafe { f(name.as_ptr() as *const u8, 0, 0, w, h) != 0 },
         None => false,

@@ -79,6 +79,23 @@ pub fn shell_click() {
     }
 }
 
+/// A shell sound by its file name (`sounds\effects`), as `shell_click` plays its own;
+/// nothing for an empty name. The name is copied into a buffer of ours that stays.
+pub fn shell_named(name: &str) -> bool {
+    static mut NAME: [u8; 64] = [0; 64];
+    let b = name.trim().as_bytes();
+    if b.is_empty() || b.len() >= 64 || !functions_stock() {
+        return false;
+    }
+    unsafe {
+        let buf = &mut *core::ptr::addr_of_mut!(NAME);
+        buf[..b.len()].copy_from_slice(b);
+        buf[b.len()] = 0;
+        play_as(buf.as_ptr() as usize, 0);
+    }
+    true
+}
+
 pub fn functions_stock() -> bool {
     eng().ready(hook::PANELS_SOUND).is_ok()
 }

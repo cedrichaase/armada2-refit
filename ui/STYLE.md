@@ -231,7 +231,9 @@ size. Each is named by the game sprite it stands in for (`b_stop`, `comm_button`
 the bar and the top-right buttons look the sprite's name up and fall back to the
 game's art. `cargo run --example icons --target x86_64-unknown-linux-gnu -- out.ppm`
 in `ui/fontbake` renders every icon at the bar's size and twice that, for looking at
-a change. Not ours: special weapons and build items (unit and weapon art).
+a change. Not ours: special weapons and build items (unit and weapon art). The menus
+draw from the same atlas where they need a symbol: the campaign selection's padlock
+(`padlock`, in the name's colour, MENUS.md, "Locked campaigns").
 
 ## The cursor
 

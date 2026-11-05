@@ -2,6 +2,7 @@
 
 Resolutions: 1280x720
 Mod: refit
+Setup: ui/bench-progress.sh 5=1 6=1
 Timeout: 12 min
 
 `ui/MENUS.md`, "The menu scene"; `render3d/README.md`, "The menu scene". Run it with
@@ -16,7 +17,9 @@ map: the starbase (Tutorials), the fleet (Federation), Klingon ships decloaking 
 a red Metreon nebula (Klingon), a Borg fusion cube casting its shadow through a purple
 Mutara nebula with the queen's Diamond up close (Borg). The column's places on the main menu are the old layout's, so
 `Click at 228,258` still opens Single Player; the named targets click the UI's labels
-(`ui.json`, `label`) while UI.log says the scene is on.
+(`ui.json`, `label`) while UI.log says the scene is on. The clone's profile has every
+campaign open (`ui/bench-progress.sh 5=1 6=1`): with the Klingon or Borg campaign
+locked the scene shows its view locked (`ui-menus-locked.md`).
 
 1. Launch the game.
 2. Wait for the main menu.
@@ -42,13 +45,15 @@ Mutara nebula with the queen's Diamond up close (Borg). The column's places on t
 22. Wait up to 8 seconds for the logs the next steps expect.
 23. Expect "Render3D.log" contains "menu: view klingon".
 24. Expect "Render3D.log" contains "hulls: menu scene: kbattle".
-25. Take a screenshot called "klingon".
-26. Check that Klingon Campaign is lit and the scene shows several dark green Klingon warships (a large one near the centre, two Birds of Prey with their wings down) in front of a red, cloudy nebula.
-27. Move the mouse to 220,426.
-28. Wait up to 5 seconds for the logs the next steps expect.
-29. Expect "Render3D.log" contains "menu: view borg".
-30. Take a screenshot called "borg".
-31. Check that Borg Campaign is lit and the scene shows a dark Borg cube floating in a purple, cloudy nebula, a large dark diamond-shaped Borg ship close to the camera below and left of the cube, and to the right of and below the cube a darker region of gas bounded by a straight edge running from the cube down to the right (the cube's shadow).
-32. Click the previous menu.
-33. Wait 3 seconds.
-34. Expect "SINGLE PLAYER" is visible.
+25. Wait 6 seconds.
+26. Take a screenshot called "klingon".
+27. Check that Klingon Campaign is lit and the scene shows several dark green Klingon warships (a large one near the centre, two Birds of Prey with their wings down) in front of a red, cloudy nebula.
+28. Move the mouse to 220,426.
+29. Wait up to 5 seconds for the logs the next steps expect.
+30. Expect "Render3D.log" contains "menu: view borg".
+31. Wait 4 seconds.
+32. Take a screenshot called "borg".
+33. Check that Borg Campaign is lit and the scene shows a dark Borg cube floating in a purple, cloudy nebula, a large dark diamond-shaped Borg ship close to the camera below and left of the cube, and to the right of and below the cube a darker region of gas bounded by a straight edge running from the cube down to the right (the cube's shadow).
+34. Click the previous menu.
+35. Wait 3 seconds.
+36. Expect "SINGLE PLAYER" is visible.

@@ -29,6 +29,9 @@ doc = "A ComboBox's pull-down count, item height, rectangle, hidden combo window
 [hook."shell.reads_setup"]
 doc = "The game setup and transport getters the loading screen and the Refit screen ask about the game"
 
+[hook."shell.reads_progress"]
+doc = "The campaign progress (g_shellSettings) the campaign selection reads to show which campaigns are locked, read only"
+
 # ---- shell.screens (shell.rs) ------------------------------------------------
 
 [[sym]]
@@ -798,3 +801,41 @@ symbol = "GameSetup"
 kind = "value"
 value = 8
 used_by = ["shell.reads_setup"]
+
+# ---- shell.reads_progress (progress.rs) --------------------------------------
+# The layout was measured on the bench against crafted save\shell.set files
+# (ui/MENUS.md, "Locked campaigns"): the file's bytes 0..7 sit at +0x0d of the object.
+
+[[sym]]
+id = "progress_settings"
+symbol = "g_shellSettings"
+kind = "global"
+addr = 0x7a89a0
+used_by = ["shell.reads_progress"]
+
+[[sym]]
+id = "progress_reached"
+symbol = "ShellSettings"
+kind = "field"
+struct = "ShellSettings"
+offset = 13
+type = "u8"
+used_by = ["shell.reads_progress"]
+
+[[sym]]
+id = "progress_complete"
+symbol = "ShellSettings"
+kind = "field"
+struct = "ShellSettings"
+offset = 17
+type = "u8"
+used_by = ["shell.reads_progress"]
+
+[[sym]]
+id = "progress_missions"
+symbol = "ShellSettings"
+kind = "field"
+struct = "ShellSettings"
+offset = 21
+type = "u8"
+used_by = ["shell.reads_progress"]

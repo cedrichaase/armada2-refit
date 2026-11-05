@@ -464,6 +464,11 @@ pub fn icons() -> Vec<Icon> {
     v.push(two("b_rally", u(vec![arrow(6.0, 6.0, 22.0, 22.0, 5.0, 12.0), arrow(58.0, 6.0, 42.0, 22.0, 5.0, 12.0), arrow(6.0, 58.0, 22.0, 42.0, 5.0, 12.0), arrow(58.0, 58.0, 42.0, 42.0, 5.0, 12.0)]), Role::Good, c(32.0, 32.0, 6.0)));
     // The flag (capture the flag).
     v.push(two("b_flag", seg(16.0, 8.0, 16.0, 58.0, 5.0), Role::Accent, grow(poly(&[(20.0, 10.0), (52.0, 14.0), (44.0, 22.0), (52.0, 32.0), (20.0, 30.0)]), 1.0)));
+    // A padlock (the campaign selection's locked campaigns): the body, its keyhole cut
+    // out, under the shackle.
+    let shackle = u(vec![arc(32.0, 22.0, 12.0, 180.0, 360.0, 6.0), seg(20.0, 22.0, 20.0, 31.0, 6.0), seg(44.0, 22.0, 44.0, 31.0, 6.0)]);
+    let body = sub(rr(12.0, 29.0, 52.0, 58.0, 5.0), u(vec![c(32.0, 40.0, 4.5), rr(30.0, 41.0, 34.0, 51.0, 1.5)]));
+    v.push(ink("padlock", u(vec![shackle, body])));
 
     // ---- alert levels and autonomy: a glyph and a meter -------------------------------
     // An alert: the status light in the level's colour, ringed.

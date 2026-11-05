@@ -238,14 +238,21 @@ edit.
 
 ## Campaign progress format
 
-`save/shell.set`, 78 bytes.
+`save/shell.set`, 78 bytes. Measured on the bench (2026-11-05) with crafted files, a won
+mission and the running game's memory; `ui/MENUS.md`, "Locked campaigns", has the
+evidence and the UI code that reads it.
 
-- Stock: all zeros except offset 11 = `0x01`.
-- Setting **all** bytes to `0x01` unlocked the first **two** missions of every campaign.
-- So the bytes are **progress counters** (value = missions completed), not booleans.
-  `0x09`/`0x0A` should open all ten.
-- Offset 11 is *not* the Federation counter — it held `1` while only mission 1 was
-  selectable.
+- Bytes 0..3: per campaign (Tutorials, Federation, Klingon, Borg) the furthest mission
+  reached, 0-based: a counter of `n` lists `n + 1` missions. Winning the first
+  Federation mission took byte 1 from 0 to 1; winning the last leaves it at 9.
+- Bytes 4..7: whether each campaign is complete (its last mission won). **The Klingon
+  campaign opens on byte 5, the Borg on byte 6**; the counters open nothing (byte 1 at
+  10 left the Klingons shut). The Federation campaign is always open.
+- Byte 11 is 1 in a new profile; nothing above depends on it.
+- Setting **all** bytes to `0x01` therefore opens every campaign with two missions each.
+- The game writes the file when it exits and when a won mission moves a counter on;
+  a campaign completed a moment ago is in memory (`g_shellSettings`) before it is in
+  the file.
 
 `mshell.set` in the game directory is the mission list: 40 entries, six tutorial plus
 ten each for Federation, Klingon and Borg.

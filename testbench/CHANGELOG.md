@@ -13,6 +13,13 @@ versions". Newest first. The why is in [`README.md`](README.md).
 
 Installed, not yet seen in game.
 
+## 4.1.6 — 2026-11-05
+
+### Changed
+- New scenario `ui-menus-locked` (issue #13): the locked Klingon and Borg rows on a new profile, then the Klingons opening as the last Federation mission is won. `ui-menus-scene` runs on a profile with every campaign open (`ui/bench-progress.sh 5=1 6=1`) and waits for the Klingon decloak and the Borg view to settle before its shots; `engine-syms` expects UI's 96 shell symbols. `ui-menus-locked` also checks the locked click's sound line, the Klingons held cloaked in the cloak's glass with no decloak sound, and the Borg cube's `LockedYaw`; `render3d-menu-decloak-sound` runs on a profile with the Klingons open (`ui/bench-progress.sh 5=1 6=1`, with `--install`).
+
+Installed, not yet seen in game.
+
 ## 4.1.5 — 2026-11-04
 
 ### Fixed
