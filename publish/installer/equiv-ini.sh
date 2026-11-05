@@ -36,7 +36,10 @@ fi
 # cut FILE START-REGEX END-REGEX -- the lines from the first START to the next END, both
 # included; fails when either is not there, so a renamed function stops the harness.
 cut() {
-    awk -v s="$2" -v e="$3" '!p && $0 ~ s { p = 1 } p { print } p && $0 ~ e { done = 1; exit } END { exit !done }' "$1"
+    # The patterns through the environment: -v would process their backslashes (gawk
+    # turns "\(" into "(", mawk does not).
+    CUT_S="$2" CUT_E="$3" awk '!p && $0 ~ ENVIRON["CUT_S"] { p = 1 } p { print } p && $0 ~ ENVIRON["CUT_E"] { done = 1; exit } END { exit !done }' "$1" \
+        || { echo "could not cut /$2/ out of $1" >&2; exit 1; }
 }
 {
     echo 'set -euo pipefail'
