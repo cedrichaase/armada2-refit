@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.22 — 2026-11-04
+
+Layers: online 0.11.2.
+
+### Fixed
+- Online relay server (`a2online-server.py`): no CPU exhaustion by many new source addresses (the per-address endpoint cap no longer scans all endpoints, and unanswered datagram kinds take no endpoint), and no log/reply flood from repeated over-limit `SV_HOST` (one refusal per address per 5 s). The deployed server needs a redeploy. Installed, not yet seen in game.
+
 ## 15.6.21 — 2026-11-04
 
 Layers: gui-installer 3.1.0.
