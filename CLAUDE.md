@@ -191,10 +191,10 @@ It is a new changeset that reverts the change, like the font's `--method runs`.
 
 **Releasing** (`publish/README.md`, "Releasing"). The user starts it by hand: the
 Release workflow runs `changeset.py version --commit` on main and opens the pull request
-"Release X.Y.Z". **Merging that PR publishes vX.Y.Z.** CI recognises the merge by the
+"Release X.Y.Z". **Merging that PR publishes vX.Y.Z** (with a merge commit or a rebase; do not squash). CI recognises the merge by the
 release commit's `Release-Version` trailer, and no other push releases anything. Every
 push to main also publishes a **pre-release**, `vX.Y.Z-pre.N`, the build of the latest
-main (N is CI's run number; the newest five are kept). The GUI installer offers the
+main (N is CI's run number; the newest three are kept). The GUI installer offers the
 newest last, as "Pre-release (latest main)", but never picks it for the player. Do not confuse it with an **untested release**, a
 `vX.Y.Z` not yet seen in game. Never run `changeset.py version` on a work branch: only
 the release branch does that.

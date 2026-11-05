@@ -45,7 +45,7 @@ Keys: F5 refresh, Ctrl+Enter install, Ctrl+L the log.
    *untested release* ("not yet seen in game"), offered but not chosen for you. Only tags
    `vX.Y.Z` (and the builds below) count as releases; any other tag is ignored. CI also
    publishes every push to `main` as a GitHub pre-release tagged `vX.Y.Z-pre.N` (N the CI
-   run number; the last five are kept). The newest of them, and only that one, is an extra
+   run number; the last three are kept). The newest of them, and only that one, is an extra
    entry, always **last**: "Pre-release (latest main) · version · commit · date —
    untested" (the commit is the first seven of the release's `target_commitish`, left
    out when that is not a sha). It is never the default (`default_release` skips it; with

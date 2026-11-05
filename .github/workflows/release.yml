@@ -58,7 +58,7 @@ jobs:
             printf 'The release of the pending changesets, made by `tools/changeset.py version` (the Release workflow, step prepare).\n\n'
             cat status.md
             printf '\n**Before merging**: read the entries. A status line edited here ("Confirmed in game YYYY-MM-DD" in place of "Installed, not yet seen in game") decides whether v%s is a full release or an untested release.\n\n' "$ver"
-            printf '**Merging publishes v%s** (with a merge commit or a rebase, not a squash, which would drop the `Release-Version` trailer CI looks for).\n' "$ver"
+            printf '**Merging publishes v%s.** Merge with a merge commit or rebase; do not squash: a squash drops the `Release-Version` trailer CI publishes on, and CI then fails and publishes nothing.\n' "$ver"
           } > body.md
           if [ -n "$(gh pr list --head release/next --state open --json number --jq '.[].number')" ]; then
             gh pr edit release/next --title "Release $ver" --body-file body.md

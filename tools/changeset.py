@@ -595,19 +595,30 @@ def commit_release(root, version):
             raise Refused(f'git {args[0]} failed')
 
 
+class Untrailed(Refused):
+    """The root version changed in the range, but no commit carries its trailer."""
+
+
 def released(root, rng):
     """The root version, when RANGE (BEFORE..HEAD) brings it in through a release commit:
     the root changelog's version differs from BEFORE's, and a commit in the range carries
-    the trailer for it. Else None."""
+    the trailer for it. None when the version did not change. Raises Untrailed when it
+    changed without the trailer: a squash-merged release PR (the squash dropped the
+    trailer) or a version changed by hand, which must not pass quietly."""
     ver = vstr(current(root, load_units(root)[ROOT_ID]))
     before = rng.split('..')[0]
     old = git(root, 'show', f'{before}:CHANGELOG.md')
     if old is not None and changelog_version(old) and vstr(changelog_version(old)) == ver:
         return None
     out = git(root, 'log', f'--format=%(trailers:key={TRAILER},valueonly)', rng)
-    if out is None:
-        return None
-    return ver if ver in {l.strip() for l in out.split('\n')} else None
+    if out is not None and ver in {l.strip() for l in out.split('\n')}:
+        return ver
+    raise Untrailed(
+        f'the root version became {ver} in {rng}, but no commit there carries '
+        f'"{TRAILER}: {ver}". Was the release PR squash-merged? Merge it with a merge commit '
+        f'or a rebase, never a squash. To publish {ver} now: dispatch CI on main with '
+        f'`release` ticked (gh workflow run ci.yml --ref main -f release=true). A version '
+        f'changed by hand is not a release: revert it and add a changeset.')
 
 
 # ---------------------------------------------------------------- add
@@ -780,7 +791,7 @@ def main(argv=None):
                 commit_release(root, p[ROOT_ID]['next'])
             print(p[ROOT_ID]['next'])
         elif args.cmd == 'released':
-            v_ = released(root, args.range)
+            v_ = released(root, args.range)   # Untrailed is a Refused: exit 1
             if v_:
                 print(v_)
         elif args.cmd == 'check':

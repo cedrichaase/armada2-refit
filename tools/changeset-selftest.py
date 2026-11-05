@@ -219,8 +219,12 @@ def main():
     git(root, 'add', '-A')
     git(root, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'hand entries')
     before = {f: rd(root, f) for f in ('beta/CHANGELOG.md', 'alpha/CHANGELOG.md', 'CHANGELOG.md')}
-    check(C.released(root, 'main..HEAD') is None,
-          'released: a version changed by hand (no trailer) publishes nothing')
+    try:
+        C.released(root, 'main..HEAD')
+        check(False, 'released: a version changed without the trailer fails loudly')
+    except C.Untrailed as e:
+        check('squash' in str(e) and 'release=true' in str(e),
+              'released: a version changed without the trailer (a squash, a hand edit) fails loudly')
     e = C.check(root, units, base='main')[1]
     check(any('by hand' in x for x in e), 'check --base: a hand-numbered version is refused')
     check(not C.check(root, units, base='main', allow_version_change=True)[1],

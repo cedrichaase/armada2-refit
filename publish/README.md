@@ -281,8 +281,9 @@ version changed by hand included.
 3. **Review**: this is the place to edit a status line. "Confirmed in game YYYY-MM-DD"
    in place of "Installed, not yet seen in game" makes a full release, and an "Untested
    ..." line keeps it an untested release.
-4. **Merge it** with a merge commit or a rebase. A squash may drop the trailer; if it
-   does, use the fallback below. The push to `main` runs CI as usual. Job
+4. **Merge it with a merge commit or a rebase; do not squash.** A squash drops the
+   trailer. If it happens anyway, job `release-commit` fails with that message and
+   publishes nothing: use the fallback below. The push to `main` runs CI as usual. Job
    `release-commit` runs `tools/changeset.py released BEFORE..HEAD`, which answers with
    the version only when the root version changed in this push *and* a commit in it
    carries the trailer for that version. Then job `release` publishes `vX.Y.Z` once
@@ -322,7 +323,7 @@ installer and GUI jobs pass, one run at a time:
   GitHub's *Pre-release* flag and `--latest=false`, and with the zip and the four
   installer assets. The notes name the commit and date and list the pending changesets
   (`changeset.py status --markdown`);
-- the newest **five** are kept, and older ones are deleted with their tags (a
+- the newest **three** are kept, and older ones are deleted with their tags (a
   pre-release is never named in a changelog). The ten `vX.Y.Z` releases job `release`
   keeps are counted apart: each pruning matches only its own tag pattern;
 - nothing takes a `-pre.N` tag for a release. The `release` job publishes only `v` plus

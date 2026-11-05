@@ -643,7 +643,9 @@ jobs:
   # Is this push to main the merge of the release PR? Only when it brings in a commit
   # with the trailer "Release-Version: X.Y.Z" (tools/changeset.py version --commit) for
   # the root version main now has, which differs from the version before the push
-  # (tools/changeset.py released). A version changed by hand publishes nothing.
+  # (tools/changeset.py released). A root version that changed without that trailer (a
+  # squash-merged release PR, or a version changed by hand) publishes nothing and fails
+  # this job, loudly, with what to do.
   release-commit:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
@@ -659,7 +661,10 @@ jobs:
         run: |
           v=""
           if git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
-            v=$(python3 tools/changeset.py released "$BEFORE..HEAD")
+            if ! v=$(python3 tools/changeset.py released "$BEFORE..HEAD" 2>err.txt); then
+              echo "::error title=No release published::$(cat err.txt)"
+              exit 1
+            fi
           fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
           echo "release commit: ${v:-none}"
@@ -771,7 +776,7 @@ jobs:
   # publishes the build of that commit as a GitHub release tagged vX.Y.Z-pre.N (the next
   # version as the pending changesets make it, N this run's number), with GitHub's
   # prerelease flag and never "latest"; the notes name the commit and list the pending
-  # changesets. The newest five are kept, release and tag; the ten vX.Y.Z kept by job
+  # changesets. The newest three are kept, release and tag; the ten vX.Y.Z kept by job
   # release are counted apart. The GUI installer lists the newest as "Pre-release (latest
   # main)", never by default, and never takes one for a release. One run at a time.
   prerelease:
@@ -829,12 +834,12 @@ jobs:
             dist/armada2-refit-installer-x86_64.AppImage dist/armada2-refit-installer-windows.exe \
             dist/armada2-refit-installer-macos.zip --target "$GITHUB_SHA" --prerelease --latest=false \
             --title "Armada II Refit $ver (pre-release, latest main)" --notes-file notes.md
-      - name: Keep only the newest five pre-releases
+      - name: Keep only the newest three pre-releases
         run: |
           # With their tags: a pre-release is never named in a changelog. vX.Y.Z releases
           # are not counted here, nor these in job release's ten.
           gh release list --limit 1000 --json tagName,createdAt \
-            --jq '[.[] | select(.tagName | test("^v[0-9]+[.][0-9]+[.][0-9]+-pre[.][0-9]+$"))] | sort_by(.createdAt) | reverse | .[5:][] | .tagName' |
+            --jq '[.[] | select(.tagName | test("^v[0-9]+[.][0-9]+[.][0-9]+-pre[.][0-9]+$"))] | sort_by(.createdAt) | reverse | .[3:][] | .tagName' |
           while read -r tag; do
             echo "deleting pre-release $tag and its tag"
             gh release delete "$tag" --yes --cleanup-tag
