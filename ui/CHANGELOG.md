@@ -4,6 +4,14 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 2.2.5 — 2026-11-04
+
+### Fixed
+- Widget slots (`Ui::slot`) are boxed and never removed, so a reference held across another `slot` call (a list or scroll area keeping its offset while its scrollbar inserts the bar's slot) no longer ends up pointing at a neighbouring widget's value. List and scroll area also re-fetch their slot after the scrollbar.
+- The mouse-release poll swaps the left and right buttons when Windows has them swapped (`SM_SWAPBUTTON`): `GetAsyncKeyState` reports physical buttons, so a left-handed user's logical-left press was read as released at once, breaking drags and leaking the up to the engine.
+
+Installed, not yet seen in game.
+
 ## 2.2.4 — 2026-11-04
 
 ### Fixed

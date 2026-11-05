@@ -115,6 +115,7 @@ impl<'a> Ui<'a> {
             let track = R::new(inner.right() - bar_w - self.u(2.0), inner.y + self.u(2.0), bar_w, inner.h - self.u(4.0));
             self.scrollbar(self.sub_id(id, "bar"), track, content, view.h, &mut sc);
         }
+        let st = self.slot(id);
         st[0] = sc;
         self.claim(r);
         self.draw.push_clip(view);
