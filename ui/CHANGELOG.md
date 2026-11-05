@@ -4,6 +4,11 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 2.2.6 — 2026-11-04
+
+### Fixed
+- Links the a2fmt that no longer panics on a TGA header whose size overflows, or hangs on self-including sprite tables (root 15.6.27). Installed, not yet seen in game.
+
 ## 2.2.5 — 2026-11-04
 
 ### Fixed

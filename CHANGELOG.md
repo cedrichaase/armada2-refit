@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.6.27 — 2026-11-04
+
+Layers: ui 2.2.6, render3d 1.0.5.
+
+### Fixed
+- a2fmt: hostile files can no longer crash or hang the parsers. `tga::decode` sizes its buffers with checked multiplications (a 32768x32768 32-bit header wrapped `width * height * 4` to zero on the 32-bit build and then indexed an empty buffer: a panic, and the plugins abort on panic). `@animation` key counts are clamped to 4096 (`spr::MAX_KEYS`, with a warning), so `auto_offsets` cannot allocate gigabytes. `@include` in sprite tables skips a file that is already being read (a loop) and both sprite and ODF loads stop after a total include budget (512 and 1024 files), so a file that includes itself, or a chain of files each including the next twice, no longer costs exponential time. The budget, not "each file once", because the engine may legitimately include one file from two places. New host tests in `crates/a2fmt/tests/robust.rs`. Installed, not yet seen in game.
+
 ## 15.6.26 — 2026-11-04
 
 Layers: ui 2.2.5.
