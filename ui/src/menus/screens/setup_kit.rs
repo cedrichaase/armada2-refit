@@ -13,7 +13,7 @@
 //! - `list`: a stock list box as our list; a choice is the stock list's selection and
 //!   its parent's notification.
 //! - `form`: any small dialog (labels, edits, buttons) as one window of ours.
-use crate::engine::shellui::Kind;
+use crate::engine::api::shellui::Kind;
 use crate::gfx::{Weight, R};
 use crate::menus::model::{Class, Control, What};
 use crate::menus::{actions, Screen};
@@ -220,7 +220,7 @@ pub fn combo(ui: &mut Ui, s: &Screen, c: &Control, r: R) -> bool {
 
 /// Chooses item `i` of the shell `ComboBox` `c` with the stock clicks.
 pub fn choose(s: &Screen, c: &Control, i: i32) -> bool {
-    let Some((x, y)) = crate::engine::shellcombo::item_point(c.key, i) else { return false };
+    let Some((x, y)) = crate::engine::api::shellcombo::item_point(c.key, i) else { return false };
     // `item_point` is in the dialog's client space; clicks are in design space.
     let (ox, oy) = (s.model.rect[0], s.model.rect[1]);
     s.click_control(c);
@@ -308,7 +308,7 @@ pub fn form(ui: &mut Ui, s: &Screen, title: &str) -> bool {
     lists.sort_by(by_pos);
     buttons.sort_by(|a, b| (a.rect[0], a.rect[1]).cmp(&(b.rect[0], b.rect[1])));
     // A full-screen dialog gets the backdrop; a small one shows over what is under it.
-    if s.model.rect[2] >= crate::engine::dialogs::design_w() {
+    if s.model.rect[2] >= crate::engine::api::dialogs::design_w() {
         backdrop(ui);
     } else {
         ui.draw.rect(ui.screen(), ui.theme.scrim);

@@ -170,7 +170,7 @@ pub fn locked(row: &Setting) -> Lock {
     if row.scope != SCOPE_MATCH || !crate::menus::backdrop::over_mission() {
         return Lock::No;
     }
-    match crate::engine::setup::network_game() {
+    match crate::engine::api::setup::network_game() {
         Some(false) => Lock::No,
         Some(true) => Lock::Network,
         None => Lock::Unknown,

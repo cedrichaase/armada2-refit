@@ -18,8 +18,8 @@
 //!
 //! The craft under the pointer in the 3D view gets a small card above the panel, as
 //! stock's hover strip shows it. Every part has stock's tooltip.
-use crate::engine::info::{self, BarKind, Face, Single, Text};
-use crate::engine::{closeup, hud, sprite};
+use crate::engine::api::info::{self, BarKind, Face, Single, Text};
+use crate::engine::api::{closeup, hud, sprite};
 use crate::gfx::{fade, mix, Color, Corners, Weight, R};
 use crate::widgets::{theme, Align, State, Ui};
 use alloc::string::String;
@@ -80,7 +80,7 @@ pub fn run(ui: &mut Ui) {
 
 fn run_scaled(ui: &mut Ui) {
     let hover_craft = info::take_hover();
-    if hud::hidden(hud::ship_display()) || crate::engine::ingame::hud_hidden() {
+    if hud::hidden(hud::ship_display()) || crate::engine::api::ingame::hud_hidden() {
         unsafe { RECT = None };
         return;
     }
@@ -535,7 +535,7 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
                 *tip = Tip::Comp(comp, r);
             }
             if clicked {
-                crate::engine::sound::click();
+                crate::engine::api::sound::click();
                 info::cancel(s.obj, i);
             }
         }
@@ -554,7 +554,7 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
 fn info_wire_comp() -> usize {
     // The stock wireframe's tooltip names the unit's state; it was handed the object
     // by `info::single`'s reads (the one-object face's `WireframeIcon`).
-    crate::engine::info::wire_comp()
+    crate::engine::api::info::wire_comp()
 }
 
 // ---- a group ---------------------------------------------------------------------------
@@ -627,7 +627,7 @@ fn group(ui: &mut Ui, tip: &mut Tip) -> Option<R> {
         }
         if clicked {
             crate::log!("info: group click, shift: ui {} game {}", ui.input.shift, info::shift_held());
-            crate::engine::sound::click();
+            crate::engine::api::sound::click();
             info::select(u, shift);
         }
     }

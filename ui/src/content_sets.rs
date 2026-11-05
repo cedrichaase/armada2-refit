@@ -1,7 +1,7 @@
 //! Content sets (README.md, "Content sets"; MODDING.md, "Content sets"): a set is a
 //! folder, `ui/content/sets/<set>/`, holding the UI's table `ui.ini`; every `.ini` under
 //! `ui/content/` is built in (`build.rs`). `content.rs` parses the table of the set the
-//! engine profile gives the UI (`Engine::content()`, `profiles/<build>/content.toml`).
+//! engine profile gives the UI (`engine::api::content_set`, `profiles/<build>/content.toml`).
 
 mod files {
     include!(concat!(env!("OUT_DIR"), "/content_files.rs"));
@@ -30,11 +30,11 @@ impl<T> Cache<T> {
         Cache { cell: core::cell::UnsafeCell::new(None) }
     }
 
-    pub fn get(&self, t: &'static a2engine::Table, parse: fn(&'static str) -> T, none: &'static T) -> &'static T {
+    pub fn get(&self, set: fn() -> Option<&'static str>, parse: fn(&'static str) -> T, none: &'static T) -> &'static T {
         if let Some(c) = unsafe { *self.cell.get() } {
             return c;
         }
-        let Some(set) = t.engine().content() else { return none };
+        let Some(set) = set() else { return none };
         let c: &'static T = alloc::boxed::Box::leak(alloc::boxed::Box::new(parse(table(set).unwrap_or(""))));
         unsafe { *self.cell.get() = Some(c) };
         c

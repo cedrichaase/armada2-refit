@@ -3,11 +3,35 @@
 //! race's GUI config keeps), in the order `ORDER` gives (the materials first, then the
 //! people), each its name, its amount as stock writes it (officers
 //! as "have/most"), a mark in the stock panel's colour for it, and the game's tooltip.
-use crate::engine::topbar;
+use crate::engine::api::topbar;
 use crate::gfx::{fade, Corners, Weight, R};
 use crate::widgets::{theme, Align, Anchor, Ui};
 use alloc::string::String;
 use alloc::vec::Vec;
+
+/// The resources, a panel of the table (`panels::PANELS`).
+pub struct Resources;
+
+impl super::panels::Panel for Resources {
+    fn name(&self) -> &'static str {
+        "resources"
+    }
+    fn scope(&self) -> &'static str {
+        "hud.resources"
+    }
+    fn key(&self, c: &crate::config::Hud) -> bool {
+        c.resources
+    }
+    fn component(&self) -> (usize, &'static str) {
+        (topbar::resource_panel(), "ResourcePanel")
+    }
+    fn with_hud(&self) -> bool {
+        true
+    }
+    fn draw(&self, ui: &mut Ui) {
+        run(ui)
+    }
+}
 
 /// Each resource's name (its tooltip's first line, the game's localised word), kept
 /// per component; looked up again after a second.
@@ -50,7 +74,7 @@ const ORDER: [u32; 6] = [2, 4, 3, 5, 0, 1];
 pub fn run(ui: &mut Ui) {
     let mut shown = topbar::shown();
     shown.sort_by_key(|&(r, _)| ORDER.iter().position(|&o| o == r).unwrap_or(6));
-    if shown.is_empty() || crate::engine::hud::hidden(topbar::resource_panel()) {
+    if shown.is_empty() || crate::engine::api::hud::hidden(topbar::resource_panel()) {
         return;
     }
     let names = names(crate::rt::now(), &shown);

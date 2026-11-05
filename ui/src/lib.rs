@@ -79,7 +79,7 @@ fn startup() {
     clock::load();
     log!("UI {} -- game dir {}", env!("CARGO_PKG_VERSION"), rt::game_dir());
     // The identity, the build and each part's symbols summary (crates/a2engine).
-    syms::init();
+    engine::api::tables::init();
     if !cfg.enable {
         log!("Enable=0: standing down");
         return;
@@ -94,28 +94,28 @@ fn startup() {
     // The display mode (the profile's, the shell's, the intro's) and the pointer's clip
     // are Display8's (`[Window]` in Display8.ini).
     if config::get().movies {
-        engine::intro::route_frames();
+        engine::api::intro::route_frames();
     }
     log!("input: {}", if input::install() { "captured" } else { "not captured" });
-    let mission = engine::ingame::install();
+    let mission = engine::api::ingame::install();
     log!("mission: {}", if mission { "hooked" } else { "standing down" });
     let h = &config::get().hud;
     if mission && h.enable {
         // Drawn in the mission frame: without its hook they stay the engine's.
-        let n = engine::leftovers::install(h.overview, h.fade, h.unit_video, h.frame_rate);
+        let n = engine::api::leftovers::install(h.overview, h.fade, h.unit_video, h.frame_rate);
         log!("leftovers: {} of the engine's last draws are ours", n);
     }
-    log!("shell: {}", if engine::shell::install() { "hooked" } else { "standing down" });
-    log!("loading: {}", if engine::loading::install(config::get().loading) { "hooked" } else { "standing down" });
+    log!("shell: {}", if engine::api::shell::install() { "hooked" } else { "standing down" });
+    log!("loading: {}", if engine::api::loading::install(config::get().loading) { "hooked" } else { "standing down" });
     let hud = hud::install();
     claims::set_hud(hud);
     log!("hud: {}", if hud { "panels of ours" } else { "stock" });
-    log!("device: {}", if engine::device::install() { "DestroyRenderSurfaces chained: the UI lets go of the device with the engine" } else { "slot not stock: the UI lets go of the device when it sees the next one" });
+    log!("device: {}", if engine::api::device::install() { "DestroyRenderSurfaces chained: the UI lets go of the device with the engine" } else { "slot not stock: the UI lets go of the device when it sees the next one" });
     // The menus: [Menus] Enable=1 hosts the stock shell's dialogs (ui/MENUS.md). Patched
     // here, at DllMain, because the shell's display mode must be raised before the
     // engine first sets it.
     if config::get().menus {
-        log!("menus: {}", if engine::dialogs::install() { "hosted by the UI" } else { "standing down: the shell runs stock" });
+        log!("menus: {}", if engine::api::dialogs::install() { "hosted by the UI" } else { "standing down: the shell runs stock" });
     }
 }
 
@@ -126,11 +126,11 @@ pub extern "C" fn UI_SettingsNote(row: *const rt::settings::Setting) -> *const u
     use settings_table::{HUD_BARHIDDEN, HUD_ENABLE};
     if row.is_null() {
         // The plugin as a whole: an Armada2.exe Refit does not know.
-        return syms::note_plugin().unwrap_or(core::ptr::null());
+        return engine::api::tables::note_plugin().unwrap_or(core::ptr::null());
     }
     let r = unsafe { &*row };
     // Why a hook that feeds this row stood down, in the engine's own words.
-    if let Some(n) = syms::note_for(r.section(), r.key()) {
+    if let Some(n) = engine::api::tables::note_for(r.section(), r.key()) {
         return n;
     }
     if core::ptr::eq(r, HUD_ENABLE) || core::ptr::eq(r, HUD_BARHIDDEN) {

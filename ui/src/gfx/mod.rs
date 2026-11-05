@@ -596,7 +596,7 @@ static mut EPOCH: Option<u32> = None;
 /// re-creates the device at every switch between the shell's display and the game's:
 /// the new one's `Reset` and `Present` are chained.
 pub fn attach() -> Option<gpu::Attached> {
-    let dev8 = crate::engine::d3d8_device();
+    let dev8 = crate::engine::api::d3d8_device();
     let a = gpu().attach_engine()?;
     // A new device or a `Reset` is Display8's epoch moving on; without it, the device.
     let fresh = match gpu().device_epoch() {
@@ -607,7 +607,7 @@ pub fn attach() -> Option<gpu::Attached> {
         None => a.new,
     };
     if fresh && !dev8.is_null() {
-        crate::engine::device::hook_reset(dev8);
+        crate::engine::api::device::hook_reset(dev8);
     }
     Some(a)
 }

@@ -18,7 +18,7 @@ pub mod media;
 extern crate self as r3d_core;
 extern crate alloc;
 pub mod sets;
-pub use sets::{content, content_sets, syms, syms_core};
+pub use sets::{content, content_sets, engine, syms};
 
 #[cfg(test)]
 mod tests {

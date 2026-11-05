@@ -821,6 +821,47 @@ Behind them, three pieces in `widgets/state.rs` and `focus.rs`:
 `gallery.rs` is every widget on one screen: `[Demo] Shell=1` shows it beside the old
 demo panel, in four tabs (Text, Lists, Choice, Misc). The scenario `ui-widgets` drives it.
 
+## The engine boundary
+
+Everything the UI knows of `Armada2.exe` is in `src/engine/` (one file per area, each
+read by the engine profile's accessors, `profiles/gog-1.1/ui.<part>.toml`) and the
+generated symbol tables (`src/syms_*.rs`, started by `src/syms.rs`). The rest of the UI
+(`app.rs`, `hud/`, `menus/`, `widgets/`, `input.rs`, `lib.rs`, ...) reaches it through
+one facade, **`src/engine/api.rs`** (`crate::engine::api`), as render3d's modules reach
+the engine only through its core:
+
+- **`api` only re-exports and wraps.** Each module of it carries the name of its
+  `engine/` file (`api::hud`, `api::dialogs`, `api::radar`, ...) and lists, item by
+  item, what the rest of the UI uses of that file; so what the UI reads of the engine is
+  one list. The hook installs that `lib.rs` calls go through it too, as do the input
+  hooks (`engine/input.rs`, behind `input.rs`), the simulation's clock
+  (`engine/clock.rs`, behind `clock.rs`), the content set and the symbol tables
+  (`api::tables`).
+- **A new read** goes in its `engine/<area>.rs`, beside the hook it belongs to and
+  explained in this file, `HUD.md` or `MENUS.md` (hard rule 9), and is then named in
+  `api.rs`. Code outside `engine/` never names another engine module, never a
+  `syms_*` table, and never an address.
+- **The HUD canvas** (the 1600 x 1200 space the engine converts every HUD rectangle
+  into, `HUD.md`) is written once, `CANVAS` in `src/engine/canvas.rs`, and read as
+  `api::CANVAS`. It is a constant of the build until the game descriptor carries it
+  (AR-2's `games/<id>.toml`, `[hud] canvas`; `PLAN-ARCHITECTURE.md`).
+- **`ui/lint-layers.sh`** (CI, beside render3d's) fails on a path into the engine other
+  than `engine::api` outside `src/engine/`, on a hex literal there that looks like an
+  address in the exe (0x400000 to 0x7fffff), and on the canvas written anywhere but
+  `canvas.rs`. Comments are words, not code, and are not read.
+
+Two traits sit on top of it. **`hud::panels::Panel`** is a HUD panel of ours: its name
+(the layout log's and its widget scope), its `[HUD]` key, the stock component it claims
+through the panel switch and that component's rectangle in canvas units, whether it
+draws only with the engine's HUD shown, whether it takes the whole screen's mouse (a
+box that pauses the game), and its draw, which reads its input (the widgets are
+immediate mode). The smaller panels are each one entry of `PANELS`, claimed and drawn
+in its order (`HUD.md`, "Adding a panel"). **`menus::screens::Screen`** is a menu
+screen of ours: the key of the stock dialog it lays out (the screen's name, by dialog
+procedure) and its draw, which returns false to leave the dialog to the generic screen.
+Every screen is a `Spec` (a key and a function) in `SPECS` (`MENUS.md`, "Writing a
+screen spec").
+
 ## The HUD
 
 The in-mission HUD is taken over a panel at a time: each stock `DisplayInterface`
@@ -915,7 +956,7 @@ the logos, the cursor sprites) and the widget gallery's sample lists are data: t
 set's `ui/content/sets/<set>/ui.ini` (a set is a folder; `MODDING.md`, "Content sets").
 `build.rs` builds every `.ini` under `ui/content/` in (`src/content_sets.rs`), and
 `src/content.rs` parses, once, the table of the set `Engine::content()` of the UI's core
-table names (`crates/a2engine/README.md`, "Content"). Users:
+table names, read through `engine::api::content_set` (`crates/a2engine/README.md`, "Content"). Users:
 `widgets::theme::Race::{name, from_name, form}` (the loading screen, the HUD race log, the
 theme), `hud/resources.rs`, `credits.rs` (the tour, the text, the logos), `cursor.rs`,
 `loading.rs` (the kicker), `gallery.rs`, `menus/scene.rs` and

@@ -853,7 +853,10 @@ too much of it (`testbench/scenarios/README.md`, "The HUD's layout").
 ## The engine API
 
 One file per area in `src/engine/`, each read by offset through small accessors, each
-named here beside the panel that uses it:
+named here beside the panel that uses it. The panels reach them only through the facade
+`crate::engine::api` (`api::hud`, `api::topbar`, ...), which names each item they use;
+`ui/lint-layers.sh` refuses any other path into the engine (README.md, "The engine
+boundary"). The HUD canvas is `api::CANVAS` (`engine/canvas.rs`), never a literal:
 
 | File | What | Used by |
 |---|---|---|
@@ -902,6 +905,33 @@ presses are made in the UI's frame. A press not taken in half a second is droppe
 `press` checks the button's vtable slot is `StandardButton::mButtonPressFunction`,
 and every panel checks each button's press function (`+0x5c`) is the one its
 `PostLoad` set before it treats the field as that button.
+
+### Adding a panel
+
+A panel of these is a `Panel` (`hud/panels.rs`) and one entry of `PANELS`, whose order
+is the drawing order:
+
+1. **The engine side first**: what the panel reads and presses goes in its
+   `src/engine/<area>.rs`, with the finding in this file beside the panel, and is named
+   in `src/engine/api.rs`. The panel's file imports `crate::engine::api::...` only.
+2. **A `[HUD]` key** in `config.rs` (the `Hud` struct and its parse), in `UI.ini`, and
+   its Refit row in `settings.toml`.
+3. **`src/hud/<name>.rs`** with `pub fn run(ui: &mut Ui)` and a unit struct that
+   implements `Panel`: `name` and `scope` (`"<name>"`, `"hud.<name>"`), `key` (its
+   `[HUD]` flag), `component` (the stock component it takes over and its name; the
+   default `claim` takes it through the panel switch and logs `panels: <Name> ours`),
+   or `claim` itself for a part that is not a component (the chat and the team texts
+   install their own hooks, and stand down by returning false); `with_hud` when it
+   hides with the engine's HUD, `modal` when it is a box that pauses the game; `draw`
+   calls `run`. `rect` gives the claimed component's rectangle in canvas units.
+4. **An entry in `PANELS`** where it should draw (under the boxes, which come last).
+5. **A scenario** in `testbench/scenarios/ui-hud-<name>.md`, and the layout log
+   (`[HUD] LayoutLog=1`) to check where it lands.
+
+The bigger panels (the bar, the info panel, the minimap, the selection overlay, the
+unit view's frame) and the multiplayer boxes are switched in `hud/mod.rs` and
+`hud/comm.rs`, live where their key can change while playing; they are not in the
+table yet.
 
 ### The resources (`ResourcePanel`)
 

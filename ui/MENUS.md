@@ -535,7 +535,12 @@ widget and acts on it the stock way (`kit::button`, `cycle`, `combo`, `edit`, `l
    `menus: model of "<name>"` lines in `UI.log`: every control's kind, id, design
    rectangle and label.
 3. **Write `src/menus/screens/<name>.rs`** with `pub fn draw(ui: &mut Ui, s: &Screen) ->
-   bool`, and add it to `SPECS` in `screens/mod.rs`. In it:
+   bool`, and add it to `SPECS` in `screens/mod.rs` as a `Spec { screen: "<name>", draw }`.
+   A `Spec` is the plain form of the trait `screens::Screen` (the dialog's key and a
+   draw), which `screens::find` looks the screen up by; a screen that needs state of its
+   own can implement the trait itself. What it needs of the engine it takes from
+   `crate::engine::api` (`api::dialogs`, `api::shellui`, `api::sound`, ...) and nothing
+   else (README.md, "The engine boundary"). In it:
    - find each control you lay out, by label (`s.model.by_label`), by id
      (`s.model.by_id`, window controls) or by a design point inside it
      (`s.model.button_at`, for picture buttons without labels); **return false** when

@@ -143,7 +143,7 @@ static CACHE: crate::content_sets::Cache<Content> = crate::content_sets::Cache::
 /// The set this build reads: its table parsed at first use; `NONE` while the build has
 /// no set for the UI.
 pub fn get() -> &'static Content {
-    CACHE.get(&crate::syms_core::TABLE, parse, &NONE)
+    CACHE.get(crate::engine::api::content_set, parse, &NONE)
 }
 
 impl Content {

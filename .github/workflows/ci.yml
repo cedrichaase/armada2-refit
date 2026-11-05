@@ -101,6 +101,8 @@ jobs:
           render3d/lint-layers.sh --strict mods
           render3d/lint-layers.sh --strict core mods
           ui/lint-content.sh
+      - name: the UI's layer rules (the engine only through engine::api, no address, the canvas in one place)
+        run: ui/lint-layers.sh
       - name: render3d on the host (the light word, scene::media, the render3d and UI content sets)
         run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path render3d/hosttest/Cargo.toml
       - name: a2fmt on the host

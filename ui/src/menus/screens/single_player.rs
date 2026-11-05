@@ -266,7 +266,7 @@ fn over_scene(ui: &mut Ui, s: &Screen, names: &[&str; 4], foot: &[&crate::menus:
             // The Tutorial and Federation panels are hit areas of the procedure, which
             // plays no sound for them: ours plays the panels' buttons' own.
             if hover >= 0 && s.model.button_at(x, y).is_none() {
-                crate::engine::sound::shell_hover(like_button(s));
+                crate::engine::api::sound::shell_hover(like_button(s));
             }
         }
     }
@@ -298,7 +298,7 @@ fn over_scene(ui: &mut Ui, s: &Screen, names: &[&str; 4], foot: &[&crate::menus:
         if s.top && FOOT_HOVER != foot_hover {
             FOOT_HOVER = foot_hover;
             if foot_hover != 0 {
-                crate::engine::sound::shell_hover(Some(foot_hover));
+                crate::engine::api::sound::shell_hover(Some(foot_hover));
             }
         }
     }

@@ -26,7 +26,7 @@ mod resources;
 // ui-multiplayer: the comm panel, the drop box, the load wait.
 mod comm;
 
-use crate::engine::{self, hud};
+use crate::engine::api::{self, hud};
 use crate::widgets::Ui;
 
 static mut BAR: bool = false;
@@ -62,7 +62,7 @@ pub fn install() -> bool {
         unsafe { STOOD_DOWN = 2 };
         return false;
     }
-    if !hud::functions_stock() || !engine::sound::functions_stock() || !engine::msvc::available() {
+    if !hud::functions_stock() || !api::sound::functions_stock() || !api::msvc::available() {
         crate::log!("hud: an engine function is not stock, the HUD stays stock");
         unsafe { STOOD_DOWN = 3 };
         return false;
@@ -81,7 +81,7 @@ pub fn install() -> bool {
             crate::log!("bar: stays stock");
         }
     }
-    unsafe { INFO_CAP = engine::info::functions_stock() };
+    unsafe { INFO_CAP = api::info::functions_stock() };
     panels::install(cfg);
     comm::install(cfg);
     apply_live(cfg);
@@ -96,7 +96,7 @@ pub fn apply_live(cfg: &crate::config::Hud) {
     unsafe {
         let want = cfg.minimap && MINIMAP_CAP;
         if want != MINIMAP {
-            hud::set_taken(engine::radar::map_radar(), false, want);
+            hud::set_taken(api::radar::map_radar(), false, want);
             MINIMAP = want;
             crate::log!("minimap: {}", if want { "ours" } else { "stock" });
         } else if cfg.minimap && !MINIMAP_CAP && !MINIMAP_LOGGED {
@@ -127,10 +127,10 @@ static mut INFO_LOGGED: bool = false;
 fn map_panels(cfg: &crate::config::Hud) {
     // The minimap is switched in `apply_live`; its click hook goes in whether or not the
     // key is on at the start, so the key can be turned on while playing.
-    unsafe { MINIMAP_CAP = engine::radar::functions_stock() && minimap::install() };
+    unsafe { MINIMAP_CAP = api::radar::functions_stock() && minimap::install() };
     if cfg.selection {
-        if engine::overlay::functions_stock() && engine::radar::functions_stock() {
-            hud::set_taken(engine::overlay::selection_display(), false, true);
+        if api::overlay::functions_stock() && api::radar::functions_stock() {
+            hud::set_taken(api::overlay::selection_display(), false, true);
             unsafe { SELECTION = true };
             crate::log!("selection: ours, gauges {}", if cfg.selection_gauges { "on the selection" } else { "as stock" });
             if !cfg.selection_bubbles {
@@ -138,7 +138,7 @@ fn map_panels(cfg: &crate::config::Hud) {
                 // (`CLAIM_SELECTION`) and render3d, asking, draws none. The engine's
                 // own are kept from drawing either way: Display8 cannot tell their
                 // draws apart.
-                let off = engine::overlay::hide_bubbles();
+                let off = api::overlay::hide_bubbles();
                 crate::log!(
                     "selection: the 3D bubbles {}{}",
                     if off { "off" } else { "left on: RenderSelectionEffects is not stock" },
@@ -151,8 +151,8 @@ fn map_panels(cfg: &crate::config::Hud) {
     }
     if cfg.unit_view {
         unsafe { UNIT_VIEW = true };
-        if engine::unitview::functions_stock() {
-            engine::unitview::enable();
+        if api::unitview::functions_stock() {
+            api::unitview::enable();
             crate::log!("unit view: placed by us, in our frame");
         } else {
             crate::log!("unit view: its Render is not stock: our frame around the stock place");
@@ -163,7 +163,7 @@ fn map_panels(cfg: &crate::config::Hud) {
 /// The minimap's map square, when the minimap is ours and shows: a move ordered there
 /// is the radar's (`cursor::draw` shows the warp or move cursor over it).
 pub fn minimap_square(ui: &Ui) -> Option<crate::gfx::R> {
-    if unsafe { !MINIMAP } || engine::ingame::hud_hidden() || hud::hidden(engine::radar::map_radar()) {
+    if unsafe { !MINIMAP } || api::ingame::hud_hidden() || hud::hidden(api::radar::map_radar()) {
         return None;
     }
     Some(minimap::place(ui).2)
@@ -221,17 +221,17 @@ pub fn bar_pref_changed() {
 /// away for the mission.
 fn apply_bar_pref() {
     unsafe {
-        if !BAR_PENDING || engine::ingame::hud_hidden() {
+        if !BAR_PENDING || api::ingame::hud_hidden() {
             return;
         }
-        let p = engine::palette::palette();
-        let b = engine::topbar::button(engine::topbar::Which::Palette);
+        let p = api::palette::palette();
+        let b = api::topbar::button(api::topbar::Which::Palette);
         if p == 0 || b == 0 || !hud::in_view(p) {
             return;
         }
         BAR_PENDING = false;
         let want = crate::prefs::bar_hidden();
-        let mode = engine::palette::mode(p);
+        let mode = api::palette::mode(p);
         let press = (mode == 0) != want;
         crate::log!(
             "bar: {} as the player set it (palette mode {}, hidden flag {}){}",
@@ -241,7 +241,7 @@ fn apply_bar_pref() {
             if press { ", toggled" } else { "" }
         );
         if press {
-            engine::buttons::queue(b);
+            api::buttons::queue(b);
         }
     }
 }

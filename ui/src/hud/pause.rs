@@ -3,10 +3,34 @@
 //! of a lightly dimmed screen with the game's "paused" text and its continue button,
 //! which presses the stock unpause button (the unpause order). The keyboard stays the
 //! engine's, so the pause key unpauses as in stock.
-use crate::engine::{buttons, popups};
+use crate::engine::api::{buttons, popups};
 use crate::gfx::{Weight, R};
 use crate::widgets::{Align, Anchor, Ui};
 use alloc::string::String;
+
+/// The pause box, a panel of the table (`panels::PANELS`).
+pub struct Pause;
+
+impl super::panels::Panel for Pause {
+    fn name(&self) -> &'static str {
+        "pause"
+    }
+    fn scope(&self) -> &'static str {
+        "hud.pause"
+    }
+    fn key(&self, c: &crate::config::Hud) -> bool {
+        c.pause
+    }
+    fn component(&self) -> (usize, &'static str) {
+        (popups::pause_box(), "PauseBox")
+    }
+    fn modal(&self) -> bool {
+        popups::pause_shown()
+    }
+    fn draw(&self, ui: &mut Ui) {
+        run(ui)
+    }
+}
 
 struct Words {
     text: String,

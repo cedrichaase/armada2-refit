@@ -6,7 +6,7 @@
 //! screens.
 //!
 //! The modules' `content.rs` name `r3d_core::content` and `crate::syms` (the UI's
-//! `crate::content_sets` and `crate::syms_core`); this crate
+//! `crate::content_sets` and `crate::engine::api`); this crate
 //! stands in for both (lib.rs: `extern crate self as r3d_core`), with the built-in
 //! files read from `render3d/content/`.
 
@@ -36,7 +36,7 @@ pub mod syms {
     pub static TABLE: () = ();
 }
 
-/// What the UI's `crate::content_sets` and `crate::syms_core` offer its `content.rs`,
+/// What the UI's `crate::content_sets` and `crate::engine::api` offer its `content.rs`,
 /// on the host.
 pub mod content_sets {
     pub struct Cache<T: 'static>(core::marker::PhantomData<T>);
@@ -46,13 +46,18 @@ pub mod content_sets {
             Cache(core::marker::PhantomData)
         }
         /// No engine on the host: no set.
-        pub fn get<X>(&self, _: &X, _: fn(&'static str) -> T, none: &'static T) -> &'static T {
+        pub fn get<X>(&self, _: X, _: fn(&'static str) -> T, none: &'static T) -> &'static T {
             none
         }
     }
 }
-pub mod syms_core {
-    pub static TABLE: () = ();
+pub mod engine {
+    pub mod api {
+        /// No engine on the host: no set.
+        pub fn content_set() -> Option<&'static str> {
+            None
+        }
+    }
 }
 
 #[path = "../../../ui/src/content.rs"]

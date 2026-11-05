@@ -6,9 +6,33 @@
 //! toggle is Game Settings' "Command Bar" (`prefs`, `menus::screens::game_settings`),
 //! and so "show more", which only uncovered those two and the menu, is gone too: the
 //! menu button always shows.
-use crate::engine::topbar::{self, Which};
+use crate::engine::api::topbar::{self, Which};
 use crate::widgets::{Anchor, Ui};
 use alloc::vec::Vec;
+
+/// The top-right buttons, a panel of the table (`panels::PANELS`).
+pub struct Buttons;
+
+impl super::panels::Panel for Buttons {
+    fn name(&self) -> &'static str {
+        "buttons"
+    }
+    fn scope(&self) -> &'static str {
+        "hud.buttons"
+    }
+    fn key(&self, c: &crate::config::Hud) -> bool {
+        c.buttons
+    }
+    fn component(&self) -> (usize, &'static str) {
+        (topbar::button_panel(), "ButtonPanel")
+    }
+    fn with_hud(&self) -> bool {
+        true
+    }
+    fn draw(&self, ui: &mut Ui) {
+        run(ui)
+    }
+}
 
 /// Left to right.
 const ORDER: [Which; 5] = [Which::Menu, Which::Comm, Which::Idle, Which::View, Which::Objectives];
@@ -24,7 +48,7 @@ pub fn bottom() -> Option<f32> {
 }
 
 pub fn run(ui: &mut Ui) {
-    if crate::engine::hud::hidden(topbar::button_panel()) {
+    if crate::engine::api::hud::hidden(topbar::button_panel()) {
         return;
     }
     let list: Vec<(Which, usize)> = ORDER
@@ -39,7 +63,7 @@ pub fn run(ui: &mut Ui) {
         if !LOGGED {
             let mut s = alloc::string::String::new();
             for &(w, b) in &list {
-                s.push_str(&crate::sfmt!(" {}{}", w.name(), if crate::engine::buttons::enabled(b) { "" } else { "(off)" }));
+                s.push_str(&crate::sfmt!(" {}{}", w.name(), if crate::engine::api::buttons::enabled(b) { "" } else { "(off)" }));
             }
             crate::log!("buttons:{}", s);
             LOGGED = true;

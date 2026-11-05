@@ -9,7 +9,7 @@
 //! the shell, with each network player's progress; the load's own progress, and what
 //! it is doing, animated between the engine's frames by the frames of ours that
 //! `engine::loading` presents.
-use crate::engine::{loading as eng, setup};
+use crate::engine::api::{loading as eng, setup};
 use crate::gfx::{fade, Corners, Tex, Weight, R};
 use crate::widgets::theme::{self, Race};
 use crate::widgets::{Align, Theme, Ui};

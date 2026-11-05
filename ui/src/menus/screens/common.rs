@@ -6,8 +6,8 @@
 //! as `TextLabel`s and the choices as `ShellButton`s, so a spec finds them by place
 //! (a label above a button names it) rather than by text: the text is the game's own,
 //! localised, and is never written here.
-use crate::engine::dialogs::design_w;
-use crate::engine::shellui::Kind;
+use crate::engine::api::dialogs::design_w;
+use crate::engine::api::shellui::Kind;
 use crate::menus::model::{Control, What};
 use crate::menus::{actions, backdrop, Screen};
 use crate::rt::win::{HWND, WM_MOUSEMOVE};

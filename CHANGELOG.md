@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.12.0 — 2026-11-05
+
+Layers: ui 2.6.0.
+
+### Added
+- ui: the engine boundary (AR-4, `PLAN-ARCHITECTURE.md`, F4): the facade `engine::api`, `trait Panel` and `trait Screen`, the HUD canvas in one constant, and `ui/lint-layers.sh` in CI beside render3d's. `MODDING.md`, "Adding a HUD panel or menu screen". No behaviour change intended. Installed, not yet seen in game.
+
 ## 15.11.0 — 2026-11-05
 
 Layers: render3d 1.3.0, ui 2.5.0, display 1.1.0, qol 2.3.0, rules 1.1.0, online 0.12.0, cutscenes 3.1.0.

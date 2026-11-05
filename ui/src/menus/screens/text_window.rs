@@ -4,7 +4,7 @@
 //! that holds it (the longest edit, static or label of the screen), whole: the model
 //! keeps only the first 4 KB of a control's text, which would cut a licence short.
 use super::common::*;
-use crate::engine::shellui::Kind;
+use crate::engine::api::shellui::Kind;
 use crate::gfx::{Weight, R};
 use crate::menus::model::{Class, Control, What};
 use crate::menus::Screen;
