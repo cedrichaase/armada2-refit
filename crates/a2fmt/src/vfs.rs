@@ -10,11 +10,11 @@
 //! - [`Loose`]: a folder of loose files, read through an [`Io`] the caller supplies (this
 //!   crate makes no system calls: the plugins hand in `a2rt`'s Win32 reads, the host
 //!   tests `std::fs`).
-//! - [`Fpq`] (Fleet Operations' `ODF.fpq`) and [`Zfs`] (Armada's `.zfs`): declared, with
-//!   their place in the mount order, and serving nothing yet. Their [`Vfs::status`] says
-//!   so in a line fit for a log. The readers come with the work that needs them
-//!   (`PLAN-FLEETOPS.md`, FO-5; `PLAN-ARMADA1.md`, A1-11); nothing here describes either
-//!   format.
+//! - [`Fpq`] (Fleet Operations' `ODF.fpq`, read by [`crate::fpq`]): read-only, held in
+//!   memory, mounted at `odf`.
+//! - [`Zfs`] (Armada's `.zfs`): declared, with its place in the mount order, and serving
+//!   nothing yet; its [`Vfs::status`] says so in a line fit for a log (`PLAN-ARMADA1.md`,
+//!   A1-11).
 //! - Planned, not written: an `Engine` source that reads through the game's own file
 //!   functions, for an archive whose format is not ours to read. It would mount last, as
 //!   the fallback behind every source of ours.
@@ -28,6 +28,8 @@ use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::cell::RefCell;
+
+use crate::fpq;
 
 /// One entry of a directory listing: its name as the source spells it, and whether it
 /// is a folder.
@@ -296,8 +298,87 @@ macro_rules! archive {
     };
 }
 
-archive!(Fpq, Kind::Fpq, "Fleet Operations: Roots' archive (`ODF.fpq`).",
-    "no reader for Fleet Operations' .fpq archives yet (PLAN-FLEETOPS.md, FO-5): its files are not served");
+/// Fleet Operations: Roots' archive (`ODF.fpq`), read by [`crate::fpq`]. The archive's
+/// single top folder (`odf`) is the mount's own name, so it is left out of the paths a
+/// mounted `Fpq` serves (`system/x.odf` at `odf`); a path with the top folder, or with
+/// the file's name alone, is found as well, since the archive keys its files by name.
+pub struct Fpq {
+    file: String,
+    archive: fpq::Archive,
+    /// The one folder with no parent, when there is exactly one.
+    root: Option<String>,
+}
+
+impl Fpq {
+    /// The archive in `data`; `file` is its path, for the log.
+    pub fn new(file: &str, data: Vec<u8>) -> Result<Fpq, fpq::Error> {
+        let archive = fpq::Archive::parse(data)?;
+        let mut tops = archive.folders().iter().filter(|f| f.parent.is_none());
+        let root = match (tops.next(), tops.next()) {
+            (Some(f), None) => Some(f.name.clone()),
+            _ => None,
+        };
+        Ok(Fpq { file: String::from(file), archive, root })
+    }
+
+    pub fn archive(&self) -> &fpq::Archive {
+        &self.archive
+    }
+
+    /// A file's folders as the mounted view has them (the top folder left out).
+    fn view_chain(&self, e: &fpq::Entry) -> Vec<&str> {
+        let mut c = e.folder.map(|f| self.archive.folder_names(f)).unwrap_or_default();
+        if self.root.is_some() && !c.is_empty() {
+            c.remove(0);
+        }
+        c
+    }
+}
+
+impl Vfs for Fpq {
+    fn open(&self, path: &str) -> Option<Vec<u8>> {
+        self.archive.open(path)
+    }
+
+    fn exists(&self, path: &str) -> bool {
+        self.archive.find(path).is_some()
+    }
+
+    fn list(&self, dir: &str) -> Vec<Entry> {
+        let Some(mut want) = components(dir) else { return Vec::new() };
+        if let (Some(root), Some(first)) = (&self.root, want.first()) {
+            if first.eq_ignore_ascii_case(root) {
+                want.remove(0);
+            }
+        }
+        let mut out: Vec<Entry> = Vec::new();
+        for e in self.archive.entries() {
+            let chain = self.view_chain(e);
+            if chain.len() < want.len() || !chain.iter().zip(&want).all(|(a, b)| a.eq_ignore_ascii_case(b)) {
+                continue;
+            }
+            let entry = match chain.get(want.len()) {
+                Some(sub) => Entry { name: String::from(*sub), dir: true },
+                None => Entry { name: e.name.clone(), dir: false },
+            };
+            if !out.iter().any(|o| o.dir == entry.dir && o.name.eq_ignore_ascii_case(&entry.name)) {
+                out.push(entry);
+            }
+        }
+        out
+    }
+
+    fn kind(&self) -> Kind {
+        Kind::Fpq
+    }
+
+    fn label(&self) -> String {
+        let mut s = String::from("fpq ");
+        s.push_str(&self.file);
+        s
+    }
+}
+
 archive!(Zfs, Kind::Zfs, "An Armada `.zfs` archive.",
     "no reader for Armada's .zfs archives yet (PLAN-ARMADA1.md, A1-11): its files are not served");
 
