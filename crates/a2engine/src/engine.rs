@@ -64,7 +64,22 @@ impl fmt::Display for StandDown {
     }
 }
 
-pub const PLUGIN_NOTE: &str = "This Armada2.exe is a build Refit does not know: it runs stock";
+/// The plugin note on an unknown build: `This <exe> is a build Refit does not know: it
+/// runs stock`, `<exe>` as in the identity line.
+pub const PLUGIN_NOTE: (&str, &str) = ("This ", " is a build Refit does not know: it runs stock");
+
+/// The name of an executable that names nothing else: an image with no module name.
+const NO_NAME: &str = "exe";
+
+/// Whether `s` is the identity line every resolver logs first (`engine: <exe> timestamp
+/// 0x.., image size 0x.., sections 0x..`, or `engine: <exe> identity unreadable`),
+/// whatever the executable's name: for plugins that log it once over several tables.
+pub fn is_identity_line(s: &str) -> bool {
+    let Some(rest) = s.strip_prefix("engine: ") else { return false };
+    let Some(sp) = rest.find(' ') else { return false };
+    let tail = &rest[sp + 1..];
+    sp > 0 && (tail.starts_with("timestamp 0x") || tail == "identity unreadable")
+}
 
 /// A line on the stack, cut at its capacity.
 pub(crate) struct Line {
@@ -168,22 +183,35 @@ pub fn init_with(t: &'static Table, log: fn(&str), mem: &'static dyn Image, test
         *rt.log.get() = Some(log);
     }
     let id = pe::identify(mem);
-    let mut line = Line::new();
-    match id {
-        Some(id) => {
-            let _ = write!(line, "engine: {}", id);
-        }
-        None => {
-            let _ = line.write_str("engine: Armada2.exe identity unreadable");
-        }
-    }
-    log(line.as_str());
     let found = id.and_then(|id: Identity| {
         t.builds
             .iter()
             .position(|b| b.timestamp == id.timestamp && b.image_size == id.image_size && b.sections == id.sections)
             .map(|i| (i, id))
     });
+    // The executable's name: the matched build's, else the module's, else NO_NAME.
+    let mut module = [0u8; 64];
+    let exe = match found.map(|(i, _)| t.builds[i].exe).filter(|e| !e.is_empty()) {
+        Some(e) => e,
+        None => {
+            let n = mem.name(&mut module).min(module.len());
+            core::str::from_utf8(&module[..n]).ok().filter(|s| !s.is_empty()).unwrap_or(NO_NAME)
+        }
+    };
+    rt.exe.set(exe);
+    let mut note = Line::new();
+    let _ = write!(note, "{}{}{}", PLUGIN_NOTE.0, exe, PLUGIN_NOTE.1);
+    rt.plugin_note.set(note.as_str());
+    let mut line = Line::new();
+    match id {
+        Some(id) => {
+            let _ = write!(line, "engine: {} {}", exe, id);
+        }
+        None => {
+            let _ = write!(line, "engine: {} identity unreadable", exe);
+        }
+    }
+    log(line.as_str());
     let mut line = Line::new();
     let (n, h) = match found {
         Some((i, id)) => {
@@ -225,7 +253,7 @@ pub fn init_with(t: &'static Table, log: fn(&str), mem: &'static dyn Image, test
     t.engine()
 }
 
-/// Starts the resolver of `t` on this process's `Armada2.exe`, reading
+/// Starts the resolver of `t` on this process's executable, reading
 /// `A2EngineTest.ini` beside it if there is one (the bench's fault injection).
 #[cfg(windows)]
 pub fn init(t: &'static Table, log: fn(&str)) -> &'static Engine {
@@ -265,6 +293,15 @@ mod win {
         }
         fn base(&self) -> usize {
             unsafe { GetModuleHandleA(core::ptr::null()) }
+        }
+        fn name(&self, out: &mut [u8]) -> usize {
+            let mut path = [0u8; 300];
+            let n = unsafe { GetModuleFileNameA(0, path.as_mut_ptr(), 260) } as usize;
+            let n = n.min(path.len());
+            let from = path[..n].iter().rposition(|&c| c == b'\\' || c == b'/').map_or(0, |i| i + 1);
+            let k = (n - from).min(out.len());
+            out[..k].copy_from_slice(&path[from..from + k]);
+            k
         }
     }
 
@@ -310,6 +347,17 @@ impl Engine {
             0 | 1 => None,
             b => Some(b as usize - 2),
         }
+    }
+
+    /// The executable's name as logged: the matched build's (`Armada2.exe`), else the
+    /// module's own file name; "" before `init`.
+    pub fn exe(&self) -> &'static str {
+        self.t().rt.exe.get().unwrap_or("")
+    }
+
+    /// The table's game (`armada2`), its profiles' `game`.
+    pub fn game(&self) -> &'static str {
+        self.t().game
     }
 
     /// `armada2/gog-1.1`, or None on an unknown build (or before `init`).
@@ -545,7 +593,7 @@ impl Engine {
             let mut note = Line::new();
             match sd.why {
                 Why::Unknown => {
-                    let _ = note.write_str(PLUGIN_NOTE);
+                    let _ = note.write_str(self.note_plugin_text());
                 }
                 Why::Test => {
                     let _ = write!(note, "Stands down: {}: test mismatch (A2EngineTest.ini)", sd.symbol);
@@ -555,7 +603,7 @@ impl Engine {
                     let _ = note.write_str(b.blocked[x as usize].note);
                 }
                 _ => {
-                    let _ = write!(note, "Stands down: {} is not stock in this Armada2.exe", sd.symbol);
+                    let _ = write!(note, "Stands down: {} is not stock in this {}", sd.symbol, self.exe());
                 }
             }
             t.rt.notes[hk].set(note.as_str());
@@ -599,6 +647,30 @@ impl Engine {
             self.log(l.as_str());
         }
         0
+    }
+
+    /// A `field`'s offset in this build (README.md, "Fields and values"): what the
+    /// generated `field::X()` returns. On an unknown build, and before `init`, the root
+    /// build's (only scan hooks run there, so no hook of ours reads it); 0 when this build
+    /// has no such field (every hook that uses it stands down). Not tied to a hook's
+    /// readiness, so a read in a hot path costs one load and an index.
+    #[inline]
+    pub fn field(&self, s: Sym) -> usize {
+        self.value(s) as usize
+    }
+
+    /// A `value`'s value in this build, as `field` (the generated `value::X()`).
+    #[inline]
+    pub fn value(&self, s: Sym) -> i32 {
+        let t = self.t();
+        let b = match t.rt.build.load(Acquire) {
+            0 | 1 => 0,
+            b => b as usize - 2,
+        };
+        match t.builds.get(b).and_then(|b| b.entries.get(s.0 as usize)) {
+            Some(e) if e.present => e.value,
+            _ => 0,
+        }
     }
 
     /// A `fn` with an `end`: its range, relocated; (0, 0) unless ready.
@@ -658,9 +730,13 @@ impl Engine {
         self.note_plugin()
     }
 
-    /// `This Armada2.exe is a build Refit does not know: it runs stock` on an unknown
-    /// build, else None.
+    /// `This <exe> is a build Refit does not know: it runs stock` on an unknown build,
+    /// else None.
     pub fn note_plugin(&self) -> Option<&'static str> {
-        if self.t().rt.build.load(Acquire) == 1 { Some(PLUGIN_NOTE) } else { None }
+        if self.t().rt.build.load(Acquire) == 1 { Some(self.note_plugin_text()) } else { None }
+    }
+
+    fn note_plugin_text(&self) -> &'static str {
+        self.t().rt.plugin_note.get().unwrap_or("")
     }
 }

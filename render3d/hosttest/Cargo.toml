@@ -3,10 +3,13 @@ name = "render3d-hosttest"
 version = "0.1.0"
 edition = "2024"
 publish = false
-description = "Host tests of render3d's pure parts (the light word, scene::media)"
+description = "Host tests of render3d's pure parts (the light word, scene::media, the content sets)"
 license = "MIT"
 
 [lib]
 path = "src/lib.rs"
 
 [workspace]
+
+[dependencies]
+a2ini = { path = "../../crates/a2ini" }

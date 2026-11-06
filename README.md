@@ -129,6 +129,7 @@ Paths are taken from the environment, then `~/.config/armada2-refit.conf`
 | `A2_GAME` | Heroic's `~/Games/Heroic/Star Trek Armada II` |
 | `A2_PREFIX`, `A2_PROTON` | Heroic's prefix and Proton for it |
 | `A2_DATA` | `~/.local/share/armada2-refit` (`%LOCALAPPDATA%` on Windows): extracted stock art, paid AI layers, builds. **Back up its `ai/` folders**; everything else can be rebuilt with a command |
+| `A2_PROFILE` | `armada2`: which game, by its descriptor in [`games/`](games/README.md); `--game <id>` on `./install`, `./a2mod`, `./a2test` and `tools/layers.py` does the same for one run. The defaults above are the chosen game's |
 
 ## Antivirus false positives
 

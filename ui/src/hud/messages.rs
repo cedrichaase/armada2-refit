@@ -4,9 +4,33 @@
 //! box's own OK (it hides the box and lets the game go on). Like stock's box it keeps
 //! the mouse from everything under it; the keyboard stays the engine's, as in stock
 //! (the stock box reads no keys).
-use crate::engine::popups;
+use crate::engine::api::popups;
 use crate::gfx::{Weight, R};
 use crate::widgets::Ui;
+
+/// The mission message box, a panel of the table (`panels::PANELS`).
+pub struct Messages;
+
+impl super::panels::Panel for Messages {
+    fn name(&self) -> &'static str {
+        "messages"
+    }
+    fn scope(&self) -> &'static str {
+        "hud.messages"
+    }
+    fn key(&self, c: &crate::config::Hud) -> bool {
+        c.messages
+    }
+    fn component(&self) -> (usize, &'static str) {
+        (popups::message_box(), "MessageDisplay")
+    }
+    fn modal(&self) -> bool {
+        popups::message().is_some()
+    }
+    fn draw(&self, ui: &mut Ui) {
+        run(ui)
+    }
+}
 
 static mut LOGGED: bool = false;
 

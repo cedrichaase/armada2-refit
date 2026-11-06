@@ -2,7 +2,7 @@
 //! stock button drawn as ours, and the small statics a spec keeps between frames.
 //! Everything is drawn with `crate::widgets` in the shell theme (`STYLE.md`); nothing
 //! here writes a setting, a click is the stock control's own.
-use crate::engine::shellui::Kind;
+use crate::engine::api::shellui::Kind;
 use crate::gfx::{Weight, R};
 use crate::menus::model::{Control, What};
 use crate::menus::Screen;

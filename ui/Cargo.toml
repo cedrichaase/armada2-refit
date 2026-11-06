@@ -15,6 +15,7 @@ path = "src/lib.rs"
 libm = "0.2"
 a2fmt = { path = "../crates/a2fmt" }
 a2engine = { path = "../crates/a2engine" }
+a2ini = { path = "../crates/a2ini" }
 a2rt = { path = "../crates/a2rt", features = ["dump"] }
 gpu = { path = "../gpu" }
 

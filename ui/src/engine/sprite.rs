@@ -8,27 +8,24 @@
 //! file in `Textures/RGB/`.
 use super::{field, rd};
 use crate::gfx::Tex;
+use crate::syms_core::field as off;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-const ELEMENT_NAME: usize = 0x08;
-const SPRITE_UV: usize = 0x38;
-const SPRITE_TEXTURE: usize = 0x58;
-
 /// The sprite's name, from its `.spr`.
 pub fn name(sprite: usize) -> &'static str {
-    unsafe { super::hud::cstr_static(field(sprite, ELEMENT_NAME) as *const u8) }
+    unsafe { super::hud::cstr_static(field(sprite, off::CORE_ELEMENT_NAME()) as *const u8) }
 }
 
 /// The name of the texture the sprite draws from.
 pub fn texture_name(sprite: usize) -> &'static str {
-    let t = field(sprite, SPRITE_TEXTURE);
-    unsafe { super::hud::cstr_static(field(t, ELEMENT_NAME) as *const u8) }
+    let t = field(sprite, off::CORE_SPRITE_TEXTURE());
+    unsafe { super::hud::cstr_static(field(t, off::CORE_ELEMENT_NAME()) as *const u8) }
 }
 
 /// The sprite's texture rectangle: u0, v0, u1, v1.
 pub fn uv(sprite: usize) -> [f32; 4] {
-    let [u, v, du, dv]: [f32; 4] = unsafe { rd(sprite + SPRITE_UV) };
+    let [u, v, du, dv]: [f32; 4] = unsafe { rd(sprite + off::CORE_SPRITE_UV()) };
     [u, v, u + du, v + dv]
 }
 
@@ -42,7 +39,7 @@ static mut CACHE: Vec<Loaded> = Vec::new();
 /// The texture and rectangle to draw `sprite` with, loading its TGA the first time.
 #[allow(static_mut_refs)]
 pub fn art(sprite: usize) -> Option<(Tex, [f32; 4])> {
-    if sprite == 0 || field(sprite, SPRITE_TEXTURE) == 0 {
+    if sprite == 0 || field(sprite, off::CORE_SPRITE_TEXTURE()) == 0 {
         return None;
     }
     let tn = texture_name(sprite);
@@ -64,14 +61,14 @@ pub fn art(sprite: usize) -> Option<(Tex, [f32; 4])> {
     cache[i].tex.map(|t| (t, uv(sprite)))
 }
 
-/// `Textures/RGB/<name>`, either case of the extension, or the name as given.
+/// `textures\<name>` (`files`), either case of the extension, or the name as given.
 fn load(name: &str) -> Option<Tex> {
     let lower = crate::rt::lower(name);
     if lower.ends_with(".tga") {
-        return crate::gfx::load_tga(&crate::sfmt!("Textures\\RGB\\{}", name));
+        return crate::gfx::load_tga(&crate::sfmt!("textures\\{}", name));
     }
     for ext in [".tga", ".TGA"] {
-        if let Some(t) = crate::gfx::load_tga(&crate::sfmt!("Textures\\RGB\\{}{}", name, ext)) {
+        if let Some(t) = crate::gfx::load_tga(&crate::sfmt!("textures\\{}{}", name, ext)) {
             return Some(t);
         }
     }

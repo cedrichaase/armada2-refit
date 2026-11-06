@@ -19,9 +19,23 @@ pub mod hook {
 }
 
 pub mod field {
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn SP_EFFECT_OBJECT() -> usize { super::TABLE.engine().field(a2engine::Sym(10)) }
+    #[inline(always)] pub fn SP_EFFECT_INSTANCE() -> usize { super::TABLE.engine().field(a2engine::Sym(11)) }
+    #[inline(always)] pub fn SP_EFFECT_DATABASE() -> usize { super::TABLE.engine().field(a2engine::Sym(12)) }
+    #[inline(always)] pub fn SP_EFFECT_TARGET() -> usize { super::TABLE.engine().field(a2engine::Sym(13)) }
+    #[inline(always)] pub fn SP_EFFECT_NODE() -> usize { super::TABLE.engine().field(a2engine::Sym(14)) }
+    #[inline(always)] pub fn SP_EFFECT_TIME_LEFT() -> usize { super::TABLE.engine().field(a2engine::Sym(15)) }
+    #[inline(always)] pub fn SP_EFFECT_DEAD() -> usize { super::TABLE.engine().field(a2engine::Sym(16)) }
+    #[inline(always)] pub fn SP_EFFECT_WEAPON_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(17)) }
+    #[inline(always)] pub fn SP_WEAPON_ORDNANCE() -> usize { super::TABLE.engine().field(a2engine::Sym(18)) }
+    #[inline(always)] pub fn SP_ORDNANCE_PRJ() -> usize { super::TABLE.engine().field(a2engine::Sym(19)) }
+    #[inline(always)] pub fn SP_VT_RENDER() -> usize { super::TABLE.engine().field(a2engine::Sym(20)) }
+    #[inline(always)] pub fn SP_INST_RADIUS() -> usize { super::TABLE.engine().field(a2engine::Sym(21)) }
 }
 
 pub mod value {
+    #![allow(non_snake_case)]
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
@@ -35,21 +49,34 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "vt_crew_disruption", symbol: "TimedCrewDisruption", kind: a2engine::Kind::Vtable },
     a2engine::SymDef { id: "vt_drain", symbol: "TimedDrain", kind: a2engine::Kind::Vtable },
     a2engine::SymDef { id: "effect_head", symbol: "(unnamed) special effects list head", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "sp_effect_object", symbol: "SpecialObjectEffect::object", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "sp_effect_instance", symbol: "TimedEffect::embedded instance", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "sp_effect_database", symbol: "TimedEffect::instance database", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "sp_effect_target", symbol: "TimedEffect::visual target", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "sp_effect_node", symbol: "TimedChangeTeam::target node", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "sp_effect_time_left", symbol: "TimedEffect::time left", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "sp_effect_dead", symbol: "SpecialObjectEffect::ended", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "sp_effect_weapon_class", symbol: "SpecialObjectEffect::weapon class", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "sp_weapon_ordnance", symbol: "WeaponClass::ordnance class", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "sp_ordnance_prj", symbol: "OrdnanceClass::cPrjID", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "sp_vt_render", symbol: "SpecialObjectEffect::Render slot", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "sp_inst_radius", symbol: "ST3D_Instance::radius", kind: a2engine::Kind::Field },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
-    a2engine::HookDef { id: "render3d.specials.reads", run_unknown: false, rows: &["Modules.specials"], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9] },
+    a2engine::HookDef { id: "render3d.specials.reads", run_unknown: false, rows: &["Modules.specials"], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21] },
 ];
 
 pub const BUILDS: &[a2engine::Build] = &[
     a2engine::Build {
         name: "gog-1.1",
         key: "armada2/gog-1.1",
+        exe: "Armada2.exe",
         timestamp: 0x3c4c76bd,
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 10,
+        n_resolved: 22,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x49ea70, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xc2, 0x04, 0x00, 0x90, 0x90, 0x90, 0x90, 0x90], mask: &[], section: "", count: 0, value: 0 }, // fn_render_base
@@ -62,6 +89,18 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x6bbed4, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // vt_crew_disruption
             a2engine::Entry { present: true, addr: 0x6bbf64, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // vt_drain
             a2engine::Entry { present: true, addr: 0x7a8c0c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // effect_head
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // sp_effect_object
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 44 }, // sp_effect_instance
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 172 }, // sp_effect_database
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 176 }, // sp_effect_target
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 200 }, // sp_effect_node
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // sp_effect_time_left
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 12 }, // sp_effect_dead
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // sp_effect_weapon_class
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 24 }, // sp_weapon_ordnance
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 336 }, // sp_ordnance_prj
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // sp_vt_render
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // sp_inst_radius
         ],
         blocked: &[
         ],
@@ -69,8 +108,8 @@ pub const BUILDS: &[a2engine::Build] = &[
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 1] = [const { core::sync::atomic::AtomicU64::new(0) }; 1];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 10] = [const { core::sync::atomic::AtomicU8::new(0) }; 10];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 10] = [const { core::sync::atomic::AtomicUsize::new(0) }; 10];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 22] = [const { core::sync::atomic::AtomicU8::new(0) }; 22];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 22] = [const { core::sync::atomic::AtomicUsize::new(0) }; 22];
 static NOTES: [a2engine::Note; 1] = [const { a2engine::Note::new() }; 1];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 

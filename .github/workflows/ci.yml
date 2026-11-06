@@ -119,12 +119,15 @@ jobs:
         run: CARGO="$(command -v cargo)" ui/build.sh
       - name: Build Display8 (d3d8.dll)
         run: CARGO="$(command -v cargo)" display/build.sh
-      - name: render3d's layer rules (report; every rule strict over the module crates, cross and byname over the core too)
+      - name: render3d's layer rules (report; rules 1-4 strict over the core and the module crates) and the UI's content rule
         run: |
           render3d/lint-layers.sh
           render3d/lint-layers.sh --strict mods
           render3d/lint-layers.sh --strict core mods
-      - name: render3d on the host (the light word, scene::media)
+          ui/lint-content.sh
+      - name: the UI's layer rules (the engine only through engine::api, no address, the canvas in one place)
+        run: ui/lint-layers.sh
+      - name: render3d on the host (the light word, scene::media, the render3d and UI content sets)
         run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path render3d/hosttest/Cargo.toml
       - name: a2fmt on the host
         run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path crates/a2fmt/Cargo.toml

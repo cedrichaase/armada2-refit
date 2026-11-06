@@ -2,10 +2,10 @@
 //! tooltips at the pointer"): what `CursorInterface` would draw for the mouse's owner
 //! (in play, an object's name and description over the 3D view), in the theme's
 //! tooltip beside the pointer, at the screen's resolution. Stock's is drawn on the
-//! 1600 x 1200 canvas and so stretched on a wide screen. The text is the engine's own,
+//! HUD canvas (`api::CANVAS`) and so stretched on a wide screen. The text is the engine's own,
 //! read as the cursor renders (`engine::hud::tooltip`); our panels' tooltips are their
 //! own.
-use crate::engine::hud;
+use crate::engine::api::hud;
 use crate::gfx::R;
 use crate::widgets::{theme, Ui};
 use alloc::string::String;

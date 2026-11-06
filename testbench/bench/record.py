@@ -28,7 +28,7 @@ def take(sess, name='record', timeout=180.0):
     """Ask for a recording called `name`; returns (status, text): 'ok' when every installed
     plugin wrote its stream, 'warn' when some did, 'fail' when none did."""
     name = _safe(name)
-    g = sess.game_dir
+    g = sess.exe_dir
     installed = [p for p in PLUGINS if (g / p).exists()]
     if not installed:
         return 'fail', 'neither Render3D.asi nor UI.asi is installed in this game: nothing records'

@@ -163,10 +163,11 @@ pub fn tex_update(t: Tex, src: *const u8, pitch: usize, w: u32, rows: u32) {
     }
 }
 
-/// An image from the game's files (a TGA, by path under the game directory), or None
-/// if it is missing or not a TGA. The caller keeps the `Tex`: each call registers anew.
+/// An image from the game's files (a TGA, by its path in `files`: `textures\<file>`),
+/// or None if it is missing or not a TGA. The caller keeps the `Tex`: each call
+/// registers anew.
 pub fn load_tga(rel: &str) -> Option<Tex> {
-    let data = crate::rt::read_file(&crate::rt::game_path(rel))?;
+    let data = crate::files::open(rel)?;
     let img = a2fmt::tga::decode(&data).ok()?;
     Some(texture_bgra(img.width, img.height, img.pixels))
 }
@@ -595,7 +596,7 @@ static mut EPOCH: Option<u32> = None;
 /// re-creates the device at every switch between the shell's display and the game's:
 /// the new one's `Reset` and `Present` are chained.
 pub fn attach() -> Option<gpu::Attached> {
-    let dev8 = crate::engine::d3d8_device();
+    let dev8 = crate::engine::api::d3d8_device();
     let a = gpu().attach_engine()?;
     // A new device or a `Reset` is Display8's epoch moving on; without it, the device.
     let fresh = match gpu().device_epoch() {
@@ -606,7 +607,7 @@ pub fn attach() -> Option<gpu::Attached> {
         None => a.new,
     };
     if fresh && !dev8.is_null() {
-        crate::engine::device::hook_reset(dev8);
+        crate::engine::api::device::hook_reset(dev8);
     }
     Some(a)
 }

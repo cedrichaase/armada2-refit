@@ -208,6 +208,39 @@ stock. `a2test run --layers` overrides a scenario's `Layers:`; neither goes with
 heading record the selection. A checkout from before the registry has no `--only`, so
 its `./install` fails the prepare step.
 
+## Another game: Fleet Operations: Roots
+
+`./a2test --game fo-roots ...` (or `A2_PROFILE=fo-roots`) runs Fleet Operations: Roots
+from `games/fo-roots.toml` (FO-1, `PLAN-FLEETOPS.md`). A session records its game in
+`session.json`, so `drive` and `session stop` on it need no `--game`. What differs from
+Armada II, all read from the descriptor:
+
+- **Nothing is installed.** The descriptor lists no layers, so the clone is the user's
+  install as it ships (no stock cache, no `a2mod`, no `./install`): DxWrapper's `d3d8.dll`,
+  then DXVK's `d3d9.dll`, as Heroic launches it. `--mod`, `--install`, `--layers` and
+  `--assets` have nothing to act on there.
+- **`Data/ArmadaL.exe` is launched directly** (not `FleetOps.exe`), in `Data/`, and found by
+  its name. The plugins' inis and logs, the settings file and the crash file are looked for
+  in `Session.exe_dir` (the clone's `Data/`), not the game folder.
+- **`Settings.xml` is the settings adapter** (`fo-settings-xml`): `displayWidth` and
+  `displayHeight` to the session's resolution, `WindowMode` False, `multisample` 0,
+  `IntroVideo` False; the rest as the user left it (the user's first run wrote it, under
+  `Data/settings_saves_logs/`). `--mute` and `--stems` have no adapter yet.
+- **The output must be at least 1200x900.** The shell runs at 1200x900; on a 1280x720
+  output Roots shows a madExcept dialog one second in (null read in
+  `SetActiveDisplay_Internal`, the engine finding no mode of the size it asks for). The
+  session refuses a smaller one and says which to use; **1280x960** is the bench size.
+- **Roots writes no log** beyond madExcept's crash file
+  (`settings_saves_logs/Logs/exceptArmada2.txt`, with a dialog the process stays under;
+  `Expect no crash` reads it), and DXVK's `ArmadaL_d3d9.log`, gathered with `wine.log`. Waits
+  are OCR (`Wait for "6000"`), until `FleetOpsHook.dll` is measured (FO-2) or a plugin
+  logs; **no tick is logged yet.**
+- **The front end is Roots' own**: the `ui.json` design points are Armada II's, so a step
+  by label (`Click "Instant Action"`) works and a target by name does not; `Quit the game`
+  finds Exit and "Exit to Desktop" by their labels.
+- Scenarios: `fo-launch` (to the main menu) and `fo-skirmish` (Instant Action against the
+  default AI to the map with its HUD up), both at 1280x960: about 26 s and 65 s.
+
 ## Audio stems
 
 The game plays four categories of sound, each with its own volume in the options and in
@@ -524,12 +557,15 @@ posts, a hologram, the Evolver, a survey of what no module draws).
 
 ## Which executable ran
 
-At session start the bench reads the clone's `Armada2.exe` and records
+At session start the bench reads the clone's executable (the game descriptor's,
+`games/armada2.toml`: `Armada2.exe`; `./a2test --game <id>` or `A2_PROFILE` picks another
+game, whose executable it launches and matches processes by) and records
 `exe: {name, sha256, timestamp, image_size, sections}` in `session.json`, notes it in
 the session log, and copies it into each case's `result.json` and the run's `report.md`.
 `timestamp`, `image_size` and `sections` are the executable's identity, as the plugins
 read it from memory and log it (`engine: Armada2.exe timestamp 0x…, image size 0x…,
-sections 0x…`; `crates/a2engine/src/pe.rs` is the reader, `bench/session.py`
+sections 0x…`, the executable named by the matched build's `exe`, else by its own file
+name; `crates/a2engine/src/pe.rs` is the reader, `bench/session.py`
 `exe_identity` its offline twin), so a log line and a report can be compared by eye. The
 sha256 is the bench's alone: plugins never hash the file, and it is not a run-time key
 (`profiles/gog-1.1/build.toml` lists it as information). `Expect "Display8.log" contains

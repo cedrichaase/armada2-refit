@@ -5,7 +5,7 @@
 //! all but the placement markers, which are drawn in the theme (`placement`, `[HUD]
 //! Placement=1`). They are drawn first in the UI's frame, under every panel of ours,
 //! where the engine drew them (in the 3D view, under its HUD).
-use crate::engine::leftovers;
+use crate::engine::api::leftovers;
 use crate::gfx::{Color, R};
 use crate::widgets::Ui;
 
@@ -120,7 +120,7 @@ fn ring(ui: &mut Ui, r: &leftovers::Ring) {
 /// of the engine's texture (`ST3D_Texture`), tinted, added to the frame.
 pub fn engine_sprite(ui: &mut Ui, corners: [(f32, f32); 4], texture: usize, uv: [f32; 4], col: [f32; 3]) {
     let tex = ring_tex(texture);
-    let Some((c, tw, th)) = crate::engine::radar::engine_texture(texture) else { return };
+    let Some((c, tw, th)) = crate::engine::api::radar::engine_texture(texture) else { return };
     crate::gfx::tex_set_external(tex, Some(c), tw, th);
     let [u0, v0, u1, v1] = uv;
     let uv = [(u0, v0), (u1, v0), (u1, v1), (u0, v1)];
@@ -133,7 +133,7 @@ fn video(ui: &mut Ui, v: &leftovers::Video) {
     let [x, y, w, h] = v.rect;
     ui.draw.rect(R::new(x, y, w, h), 0xff000000);
     let tex = unsafe { *VIDEO_TEX.get_or_insert_with(crate::gfx::texture_external) };
-    let Some((c, tw, th)) = crate::engine::radar::engine_texture(v.texture) else {
+    let Some((c, tw, th)) = crate::engine::api::radar::engine_texture(v.texture) else {
         crate::gfx::tex_set_external(tex, None, 1, 1);
         return;
     };

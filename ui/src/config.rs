@@ -210,6 +210,7 @@ pub fn load() -> Config {
         menus_scene: on(&ini, MENUS_SCENE),
         credits: on(&ini, MENUS_CREDITS),
         campaign_locks: ini.int("Menus", "CampaignLocks", 1) != 0,
+        // lint-allow(content): LockedSound's default, the shell's own back sound, the engine's, not a set's.
         locked_sound: alloc::string::String::from(ini.string("Menus", "LockedSound").as_deref().unwrap_or("mnu_back.wav").trim()),
         loading: on(&ini, LOADING_ENABLE),
         loading_hold: ini.float("Loading", "Hold", 0.0).clamp(0.0, 600.0),

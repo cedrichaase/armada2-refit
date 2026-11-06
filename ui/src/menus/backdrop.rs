@@ -72,7 +72,7 @@ pub fn begin(screen: &str) {
         unsafe { LAST = None };
         return;
     }
-    if !crate::engine::ingame::recent() {
+    if !crate::engine::api::ingame::recent() {
         unsafe {
             if crate::rt::now() - ENDED < 1.5 {
                 SHOT = LAST;
@@ -83,7 +83,7 @@ pub fn begin(screen: &str) {
     if gfx::attach().is_none() {
         return;
     }
-    let Some(m) = crate::engine::dev8::display_mode(crate::engine::d3d8_device()) else { return };
+    let Some(m) = crate::engine::api::dev8::display_mode(crate::engine::api::d3d8_device()) else { return };
     let (w, h) = (m.width, m.height);
     unsafe {
         if let (true, Some((_, kw, kh, tex))) = (KEPT_OK, &*core::ptr::addr_of!(KEPT)) {

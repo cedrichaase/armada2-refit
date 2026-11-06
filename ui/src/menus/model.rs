@@ -14,8 +14,8 @@
 //! Labels come from the game, so they are its own (localised) strings. What the model
 //! cannot read (a picture button's art, an owner-drawn list, a map preview) is drawn
 //! from the dialog's mirror (`generic`), cropped to the control.
-use crate::engine::dialogs::{self, Slot};
-use crate::engine::shellui::{self, Kind};
+use crate::engine::api::dialogs::{self, Slot};
+use crate::engine::api::shellui::{self, Kind};
 use crate::rt::win::*;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -285,7 +285,7 @@ fn shell_controls(dlg: HWND, ox: i32, oy: i32, out: &mut Vec<Control>) {
         c.align = w.align;
         if w.kind == Kind::Combo {
             // Its choice is the hidden combo box's (engine::shellcombo).
-            (c.items, c.selected) = crate::engine::shellcombo::items(w.obj);
+            (c.items, c.selected) = crate::engine::api::shellcombo::items(w.obj);
             if let Some(t) = c.items.get(c.selected.max(0) as usize).filter(|_| c.selected >= 0) {
                 c.text = t.clone();
             }

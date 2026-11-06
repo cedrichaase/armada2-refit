@@ -15,7 +15,7 @@ doc = "The height posts: DrawHeightPost's five call sites re-pointed to our own 
 rows = ["Modules.overlays"]
 
 [hook."overlays.paths"]
-doc = "The move paths: each ship's path and next point, the sketched path, stock's sketch line re-pointed"
+doc = "The move paths: the selection, each ship's path and next point, the sketched path, stock's sketch line re-pointed"
 rows = ["Overlays.MovePaths"]
 
 
@@ -341,6 +341,392 @@ in = "cOverViewImp::mDrawPost"
 used_by = ["overlays.posts"]
 
 [[sym]]
+id = "ov_edit_mode"
+symbol = "UserProfile::edit mode"
+kind = "field"
+struct = "UserProfile"
+offset = 0x84
+type = "u8"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_tactical_shroud"
+symbol = "UserProfile::tactical shroud option"
+kind = "field"
+struct = "UserProfile"
+offset = 0x45
+type = "u8"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_selection_brightness"
+symbol = "UserProfile::selection brightness"
+kind = "field"
+struct = "UserProfile"
+offset = 0x48
+type = "f32"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_tg_shroud_tree"
+symbol = "Terrain_Geometry::shroud tree grid"
+kind = "field"
+struct = "Terrain_Geometry"
+offset = 0x28
+type = "ptr"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_tg_x0"
+symbol = "Terrain_Geometry::map rectangle x0"
+kind = "field"
+struct = "Terrain_Geometry"
+offset = 0x4
+type = "f32"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_tg_z0"
+symbol = "Terrain_Geometry::map rectangle z0"
+kind = "field"
+struct = "Terrain_Geometry"
+offset = 0xc
+type = "f32"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_tg_x1"
+symbol = "Terrain_Geometry::map rectangle x1"
+kind = "field"
+struct = "Terrain_Geometry"
+offset = 0x10
+type = "f32"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_tg_z1"
+symbol = "Terrain_Geometry::map rectangle z1"
+kind = "field"
+struct = "Terrain_Geometry"
+offset = 0x18
+type = "f32"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_tg_grid_y"
+symbol = "Terrain_Geometry::grid height"
+kind = "field"
+struct = "Terrain_Geometry"
+offset = 0x1c
+type = "f32"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_tg_cells_x"
+symbol = "Terrain_Geometry::cells across"
+kind = "field"
+struct = "Terrain_Geometry"
+offset = 0x20
+type = "i32"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_tg_cells_z"
+symbol = "Terrain_Geometry::cells down"
+kind = "field"
+struct = "Terrain_Geometry"
+offset = 0x24
+type = "i32"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_tg_fog_tex"
+symbol = "Terrain_Geometry::fog texture"
+kind = "field"
+struct = "Terrain_Geometry"
+offset = 0x34
+type = "ptr"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_tg_shroud_tex"
+symbol = "Terrain_Geometry::shroud texture"
+kind = "field"
+struct = "Terrain_Geometry"
+offset = 0x38
+type = "ptr"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_scan_w"
+symbol = "scanner grid width"
+kind = "field"
+struct = "ScanGrid"
+offset = 0xc
+type = "i32"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_scan_h"
+symbol = "scanner grid height"
+kind = "field"
+struct = "ScanGrid"
+offset = 0x10
+type = "i32"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_obj_team_ptr"
+symbol = "GameObject::team"
+kind = "field"
+struct = "GameObject"
+offset = 0xf0
+type = "ptr"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_bucket_count"
+symbol = "selection effect bucket count"
+kind = "value"
+value = 0x10
+unit = "entries"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_sel_next"
+symbol = "SelectionEffect::next"
+kind = "field"
+struct = "SelectionEffect"
+offset = 0x9c
+type = "ptr"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_sel_handle"
+symbol = "SelectionEffect::object handle"
+kind = "field"
+struct = "SelectionEffect"
+offset = 0x88
+type = "u32"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_sel_bits"
+symbol = "SelectionEffect::flags"
+kind = "field"
+struct = "SelectionEffect"
+offset = 0x84
+type = "u32"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_sel_phase"
+symbol = "SelectionEffect::pulse phase"
+kind = "field"
+struct = "SelectionEffect"
+offset = 0x8c
+type = "f32"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_sel_scale"
+symbol = "SelectionEffect::scale"
+kind = "field"
+struct = "SelectionEffect"
+offset = 0x90
+type = "v3"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_obj_pulse"
+symbol = "Craft::health pulse"
+kind = "field"
+struct = "Craft"
+offset = 0x158
+type = "f32"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_vt_spirit_render"
+symbol = "Spirit::Render slot"
+kind = "field"
+struct = "Spirit vftable"
+offset = 0xc
+type = "ptr"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_s3d_material"
+symbol = "ST3D_GraphicsEngine::material override"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 0xa8
+type = "ptr"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_s3d_alpha"
+symbol = "ST3D_GraphicsEngine::additive scale"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 0x4
+type = "f32"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_s3d_team"
+symbol = "ST3D_GraphicsEngine::team tint"
+kind = "field"
+struct = "ST3D_GraphicsEngine"
+offset = 0x34
+type = "v3"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_ghost_material"
+symbol = "Ghost::material"
+kind = "field"
+struct = "Ghost"
+offset = 0x24
+type = "ptr"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_mat_ambient"
+symbol = "ST3D_Material::ambient"
+kind = "field"
+struct = "ST3D_Material"
+offset = 0x18
+type = "v3"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_mat_diffuse"
+symbol = "ST3D_Material::diffuse"
+kind = "field"
+struct = "ST3D_Material"
+offset = 0x24
+type = "v3"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_ghost_factor"
+symbol = "Ghost::tint factor"
+kind = "field"
+struct = "Ghost"
+offset = 0x28
+type = "f32"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_spirit_team"
+symbol = "GameObjectSpirit::team"
+kind = "field"
+struct = "GameObjectSpirit"
+offset = 0xc
+type = "i32"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_spirit_instance"
+symbol = "GameObjectSpirit::instance copy"
+kind = "field"
+struct = "GameObjectSpirit"
+offset = 0x10
+type = "ptr"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_spirit_class"
+symbol = "GameObjectSpirit::class"
+kind = "field"
+struct = "GameObjectSpirit"
+offset = 0x4
+type = "ptr"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_inst_origin"
+symbol = "ST3D_Instance::origin"
+kind = "field"
+struct = "ST3D_Instance"
+offset = 0x68
+type = "v3"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_inst_matrix"
+symbol = "ST3D_Instance::placement"
+kind = "field"
+struct = "ST3D_Instance"
+offset = 0x44
+type = "m34"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_ph_class"
+symbol = "PlaceholderFeature::class"
+kind = "field"
+struct = "PlaceholderFeature"
+offset = 0x34
+type = "ptr"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_ph_matrix"
+symbol = "PlaceholderFeature::placement"
+kind = "field"
+struct = "PlaceholderFeature"
+offset = 0x38
+type = "m34"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_ph_colour"
+symbol = "PlaceholderFeature::colour"
+kind = "field"
+struct = "PlaceholderFeature"
+offset = 0x68
+type = "v3"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_ph_placeable"
+symbol = "PlaceholderFeature::placeable"
+kind = "field"
+struct = "PlaceholderFeature"
+offset = 0x74
+type = "u8"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_vt_tcam_render"
+symbol = "TacticalCamera::Render slot"
+kind = "field"
+struct = "TacticalCamera vftable"
+offset = 0x20
+type = "ptr"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_cam_marker"
+symbol = "TacticalCamera::marker instance"
+kind = "field"
+struct = "TacticalCamera"
+offset = 0xe0
+type = "ptr"
+used_by = ["overlays.reads"]
+
+[[sym]]
+id = "ov_cam_free"
+symbol = "TacticalCamera::free"
+kind = "field"
+struct = "TacticalCamera"
+offset = 0xe4
+type = "u8"
+used_by = ["overlays.reads"]
+
+[[sym]]
 id = "fn_draw_path"
 symbol = "cOverViewImp::mDrawPath"
 kind = "fn"
@@ -379,6 +765,24 @@ symbol = "cOverViewImp"
 kind = "field"
 struct = "cOverViewImp"
 offset = 0x30c
+type = "ptr"
+used_by = ["overlays.paths"]
+
+[[sym]]
+id = "ov_vt_select_num"
+symbol = "cOverViewImp::GetSelectNum"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0x94
+type = "ptr"
+used_by = ["overlays.paths"]
+
+[[sym]]
+id = "ov_vt_select_list"
+symbol = "cOverViewImp::GetSelectList"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0x98
 type = "ptr"
 used_by = ["overlays.paths"]
 

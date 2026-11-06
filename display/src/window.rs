@@ -97,8 +97,8 @@ pub fn raise_intro() -> bool {
 /// None to leave the request as it is. `menus` says whether a plugin claims
 /// `CLAIM_MENUS`; asked only for the front end's request.
 pub fn raise(w: i32, h: i32, bpp: i32, menus: impl FnOnce() -> bool) -> Option<(i32, i32, i32)> {
-    let front_end = (w, h, bpp) == (value::FRONT_END_WIDTH, value::FRONT_END_HEIGHT, value::FRONT_END_DEPTH);
-    let intro = (w, h) == (value::INTRO_WIDTH, value::INTRO_HEIGHT) && (bpp == 32 || bpp == 16);
+    let front_end = (w, h, bpp) == (value::FRONT_END_WIDTH(), value::FRONT_END_HEIGHT(), value::FRONT_END_DEPTH());
+    let intro = (w, h) == (value::INTRO_WIDTH(), value::INTRO_HEIGHT()) && (bpp == 32 || bpp == 16);
     if !(front_end || intro) {
         return None;
     }
@@ -121,18 +121,18 @@ unsafe extern "thiscall" fn init(cfg: usize) -> u8 {
     let up = crate::engine().addr(sym::USER_PROFILE);
     if cfg != 0 && up != 0 && cfg == unsafe { *(up as *const usize) } {
         let rd = |off: usize| unsafe { *((cfg + off) as *const u32) };
-        let (w, h) = (rd(field::PROFILE_MODE_W), rd(field::PROFILE_MODE_H));
+        let (w, h) = (rd(field::PROFILE_MODE_W()), rd(field::PROFILE_MODE_H()));
         let (dw, dh) = desktop();
-        let stock = [(value::DEFAULT_MODE_W as u32, value::DEFAULT_MODE_H as u32), (value::GOG_MODE_W as u32, value::GOG_MODE_H as u32)];
+        let stock = [(value::DEFAULT_MODE_W() as u32, value::DEFAULT_MODE_H() as u32), (value::GOG_MODE_W() as u32, value::GOG_MODE_H() as u32)];
         if dw == 0 {
             log!("window: the desktop's size is unknown: the game's mode stays {}x{}", w, h);
         } else if !stock.contains(&(w, h)) {
             log!("window: the game's mode is {}x{}, chosen in Graphics Settings: kept", w, h);
         } else if (w, h) != (dw, dh) {
             unsafe {
-                *((cfg + field::PROFILE_MODE_W) as *mut u32) = dw;
-                *((cfg + field::PROFILE_MODE_H) as *mut u32) = dh;
-                *((cfg + field::PROFILE_MODE_BPP) as *mut u32) = 32;
+                *((cfg + field::PROFILE_MODE_W()) as *mut u32) = dw;
+                *((cfg + field::PROFILE_MODE_H()) as *mut u32) = dh;
+                *((cfg + field::PROFILE_MODE_BPP()) as *mut u32) = 32;
             }
             log!("window: the game's mode {}x{} (the stock default) -> the desktop's, {}x{}x32", w, h, dw, dh);
         }

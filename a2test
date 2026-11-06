@@ -3,7 +3,33 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'testbench'))
+_root = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, _root)
+import a2env  # noqa: E402
+# `--game ID` anywhere: the game (games/<id>.toml) for this run and what it starts, as
+# A2_PROFILE; bench/config.py reads it through a2env.
+
+def _session_game(argv):
+    """The game of the session a command names (`--session ID`, `session stop ID`, or
+    A2TEST_SESSION): session.json records it at `session start`, so `drive` and `stop`
+    work on a Fleet Operations session without repeating --game."""
+    import json
+    import re
+    cache = os.environ.get('A2TEST_CACHE') or os.path.expanduser('~/.cache/a2test')
+    ids = [a for a in argv[1:] + [os.environ.get('A2TEST_SESSION', '')]
+           if re.fullmatch(r'\d{8}-\d{6}-\d+(-\d+)?', a)]
+    for sid in ids:
+        try:
+            with open(os.path.join(cache, 'sessions', sid, 'session.json')) as f:
+                return json.load(f).get('game')
+        except (OSError, ValueError):
+            continue
+    return None
+
+
+_game = a2env.take_game_arg(sys.argv) or _session_game(sys.argv)
+a2env.use(_game if _game and _game != a2env.GAME_ID else None)
+sys.path.insert(0, os.path.join(_root, 'testbench'))
 from bench.cli import main  # noqa: E402
 
 sys.exit(main())
