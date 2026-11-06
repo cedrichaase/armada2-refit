@@ -1,0 +1,24 @@
+# fo-scan.py's judgements (tools/engine/README.md, "fo-scan.py"): the two things a diff
+# cannot say. Names only; nothing here is read out of a game file.
+schema = 1
+
+# Functions our hooks only CALL, never patch or detour. When Roots takes one over at its
+# entry (a jump, or a push/ret trampoline: everything changed in it lies in its first eight
+# bytes), calling it still reaches the intended code, so the build drops the entry check
+# (`check = ""`) instead of standing the hooks down. A listed function changed anywhere else,
+# or with a call site, jump or patch of ours inside it, is marked changed after all.
+callees = [
+    "operator new",
+    "cPrjID::GetOdfName",
+    "cPrjID::GetName",
+    "GameObject::Render",
+    "Craft::RenderInternal",
+]
+
+# The content set the build reads: none until FO-5 writes Roots' own.
+content = "none"
+
+# Hooks that stay off on Roots whatever the diff says.
+[[disable]]
+hooks = ["qolrules.*"]
+why = "Roots has its own rules"
