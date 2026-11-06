@@ -1,7 +1,7 @@
 ---
 layers: [testbench]
 bump: minor
-status: Installed, not yet seen in game
+status: Confirmed in game 2026-11-06
 ---
 
 ### Added

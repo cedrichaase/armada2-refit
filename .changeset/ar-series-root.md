@@ -1,7 +1,7 @@
 ---
 layers: [root]
 bump: minor
-status: Installed, not yet seen in game
+status: Confirmed in game 2026-11-06
 ---
 
 The AR series (`PLAN-ARCHITECTURE.md`: AR-2 game descriptor, AR-5 file system, AR-6 content sets, AR-3 fields per build, AR-4 UI engine boundary); what belongs to no one layer. The layers' own changesets carry their items.

@@ -1,7 +1,7 @@
 ---
 layers: [gui-installer]
 bump: minor
-status: Installed, not yet seen in game
+status: Confirmed in game 2026-11-06
 ---
 
 Reads package schemas 0 and 1, unchanged.
