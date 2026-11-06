@@ -63,6 +63,10 @@ pub struct Content {
     pub races: &'static [RaceNames],
     /// `eResource`, as `g_eResourceToString` names them.
     pub resources: &'static [&'static str],
+    /// Where the resources panel sits: false at the top centre of the screen (stock), true
+    /// over the game's own resource panel's rectangle (`[Resources] Placement = component`,
+    /// Fleet Operations: Roots, whose HUD fills the top centre).
+    pub resources_at_component: bool,
     pub campaigns: &'static [Campaign],
     /// The views of render3d's map the credits tour.
     pub tour: &'static [&'static CStr],
@@ -79,6 +83,7 @@ pub struct Content {
 pub static NONE: Content = Content {
     races: &[],
     resources: &[],
+    resources_at_component: false,
     campaigns: &[],
     tour: &[],
     main_scene: None,
@@ -140,6 +145,7 @@ pub fn parse(text: &'static str) -> Content {
     Content {
         races: races.leak(),
         resources: t.list("Resources", "Names").leak(),
+        resources_at_component: t.str("Resources", "Placement").trim() == "component",
         campaigns: campaigns.leak(),
         tour: t.list("Scenes", "Tour").iter().map(|s| cstr(s)).collect::<Vec<_>>().leak(),
         main_scene: scene(t.str("Scenes", "Main")),
