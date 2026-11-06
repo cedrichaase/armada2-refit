@@ -14,27 +14,31 @@ fire on the way, and the scenarios wait for what render3d logs of them.
 5. Click at 640,395.
 6. Wait 2 seconds.
 7. Click at 640,395.
-8. Wait up to 10 seconds for "Game Speed".
-9. Move the mouse to 560,248.
+8. Wait 2 seconds.
+9. Move the mouse to 636,392.
 10. Wait 1 second.
-11. Click at 565,248.
-12. Click at 565,248.
-13. Click at 565,248.
-14. Click at 565,248.
+11. Click at 640,395.
+12. Wait up to 15 seconds for "Game Speed".
+13. Move the mouse to 560,248.
+14. Wait 1 second.
 15. Click at 565,248.
 16. Click at 565,248.
 17. Click at 565,248.
 18. Click at 565,248.
-19. Wait 1 second.
-20. Move the mouse to 90,864.
-21. Wait 1 second.
-22. Click at 86,864.
-23. Wait 2 seconds.
-24. Click at 86,864.
-25. Wait 2 seconds.
-26. Move the mouse to 130,894.
-27. Wait 1 second.
-28. Click at 138,894.
+19. Click at 565,248.
+20. Click at 565,248.
+21. Click at 565,248.
+22. Click at 565,248.
+23. Wait 1 second.
+24. Move the mouse to 90,864.
+25. Wait 1 second.
+26. Click at 86,864.
+27. Wait 2 seconds.
+28. Click at 86,864.
 29. Wait 2 seconds.
-30. Click at 138,894.
-31. Wait 2 seconds.
+30. Move the mouse to 130,894.
+31. Wait 1 second.
+32. Click at 138,894.
+33. Wait 2 seconds.
+34. Click at 138,894.
+35. Wait 2 seconds.

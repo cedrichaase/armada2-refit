@@ -29,8 +29,11 @@ so at the module's first frame (`the companion's pick of each hit's model chaine
 first live hit is then `noted as type 0`, and the hits drawn are render3d's (`first
 shield hits drawn`, `shield hit N on ...`), with the shell x2 and white. The check is the
 log's: the camera stays on the start view, and the AI's attack (on the station, which the
-shroud may hide) is seldom in frame, so the two shots are kept for the eye only (run
-20261106-063311: hits on `kcorvette` by the station's missiles, noted as type 0, drawn).
+shroud may hide) is seldom in frame, so the two shots are kept for the eye only. A click on
+the minimap on the base does not do it: the base's corner differs from game to game (run
+20261106-074128 had it bottom left, the one before bottom right), and nothing on Roots
+finds it but the eye. The first live hit is noted as type 0 or 1 (a ship's shields down),
+so the check reads "noted as type ".
 
 1. Include "_fo-render3d-skirmish".
 2. Include "_fo-render3d-battle".
@@ -38,7 +41,7 @@ shroud may hide) is seldom in frame, so the two shots are kept for the eye only 
 4. Wait up to 600 seconds for "Render3D.log" to say "effects: first shield hits drawn".
 5. Take a screenshot called "shield hits".
 6. Wait up to 20 seconds for the logs the next steps expect.
-7. Expect "Render3D.log" contains "noted as type 0)".
+7. Expect "Render3D.log" contains "noted as type ".
 8. Expect "Render3D.log" contains "effects: shields: RTS_CFG.h: the shell scaled x2.00, hits white".
 9. Expect "Render3D.log" contains "effects: shield hit ".
 10. Wait 1 second.
