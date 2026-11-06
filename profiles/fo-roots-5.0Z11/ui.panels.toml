@@ -1,0 +1,10 @@
+# Fleet Operations: Roots: FleetOpsHook.dll takes over this function at its entry as it
+# loads (a jump to its own replacement). Our hooks only call it, and what Roots puts there
+# is what Roots means, so this build checks nothing at its entry (PLAN-FLEETOPS.md,
+# "FleetOpsHook.dll at run time").
+schema = 1
+plugin = "ui"
+
+[[sym]]
+id = "panels_operator_new"
+check = ""

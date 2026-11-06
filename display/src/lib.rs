@@ -19,6 +19,7 @@ pub use a2rt::{log, sfmt};
 #[rustfmt::skip]
 pub mod shaders;
 pub mod api;
+pub mod benchfo;
 pub mod bail;
 pub mod claims;
 pub mod com;
@@ -293,6 +294,7 @@ fn startup() {
     passthrough::configure(&ini);
     detail::configure(&ini);
     window::configure(&ini);
+    benchfo::configure(&ini);
     if config().trace {
         trace::start();
         user32::install();

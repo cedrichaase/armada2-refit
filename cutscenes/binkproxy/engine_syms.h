@@ -42,8 +42,19 @@ static const A2EEntry binkproxy_b0_entries[] = {
 static const A2EBlock binkproxy_b0_blocked[] = {
     {0xffff, 0, 0, 0}
 };
+static const A2E_U8 binkproxy_b1_c0[] = {0x8b, 0xf0, 0x8b, 0x45, 0x14, 0x50, 0x8b, 0x08};
+static const A2EEntry binkproxy_b1_entries[] = {
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4638b5, 0x0, 0, binkproxy_b1_c0, 0, ""}, /* intro_copy_ret */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 40, 0, 0, ""}, /* intro_desc_format */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 16, 0, 0, ""}, /* intro_desc_width */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 12, 0, 0, ""}, /* intro_desc_height */
+};
+static const A2EBlock binkproxy_b1_blocked[] = {
+    {0xffff, 0, 0, 0}
+};
 static const A2EBuild binkproxy_builds[] = {
     {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, binkproxy_b0_entries, binkproxy_b0_blocked, 0, 4},
+    {"fo-roots-5.0Z11", "armada2/fo-roots-5.0Z11", "ArmadaL.exe", 0x3c4c76bd, 0x405000, 0xca07c55a, 0x400000, binkproxy_b1_entries, binkproxy_b1_blocked, 0, 4},
 };
 
 static A2E_U8 binkproxy_hook_state[1];
@@ -53,7 +64,7 @@ static char binkproxy_notes[1][A2E_NOTE_MAX + 1];
 
 static const A2ETable BINKPROXY_ENGINE = {
     "armada2", "binkproxy",
-    binkproxy_syms, 4, binkproxy_hooks, 1, binkproxy_builds, 1, 0,
+    binkproxy_syms, 4, binkproxy_hooks, 1, binkproxy_builds, 2, 0,
     binkproxy_vars, binkproxy_hook_state, binkproxy_sym_flags, binkproxy_sym_addr, binkproxy_notes
 };
 

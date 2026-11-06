@@ -236,7 +236,7 @@ def s_quit(c, m):
         yes = vision.find_text(words, 'Yes')
         if yes and (vision.find_text(words, 'Are you sure') or vision.find_text(words, 'Warning')):
             return 'yes', yes
-        exit_btn = vision.find_text(words, 'Exit to Windows')
+        exit_btn = vision.find_text(words, 'Exit to Windows') or vision.find_text(words, 'Exit to Desktop')
         if exit_btn:
             return 'exit', exit_btn
         if c.screen_def('main') and c.screen_matches(c.screen_def('main'), words):
@@ -248,6 +248,14 @@ def s_quit(c, m):
         what, box = ask(words)
         if box:
             c.sess.click(box['x'] + box['w'] // 2, box['y'] + box['h'] // 2)
+        elif what == 'main' and config.GAME_ID != 'armada2':
+            # another game's shell has its own layout: ui.json's design points are
+            # Armada II's, so the Exit button is found by its label
+            ex = vision.find_text(words, 'Exit')
+            if ex:
+                c.sess.click(ex['x'] + ex['w'] // 2, ex['y'] + ex['h'] // 2)
+            else:
+                c.sess.key('Escape')
         elif what == 'main':
             c.sess.click(*c.target_point(c.target('exit')))
         else:
@@ -471,6 +479,21 @@ def s_bar(c, m):
         raise StepFailed(str(e))
 
 
+@step(r'^(?:put|make) the window ' + Q.format('title') + r' (?:to )?full ?screen$')
+def s_window_fullscreen(c, m):
+    """`put the window "TITLE" full screen`: the session's sway makes the X11 window of
+    that title full screen, as the desktop does for a game's window that covers the
+    screen. Sway puts a window the game makes later (Display8's `BenchWindow` popup)
+    behind the full-screen one, where nothing drawn on it shows and Xwayland holds its
+    presents back to a few a second; Hyprland, the user's desktop, need not."""
+    title = m.group('title')
+    pattern = '^' + re.escape(title) + '$'
+    out = c.sess.swaymsg(f'[title="{pattern}"] fullscreen enable')
+    if '"success": true' not in out:
+        raise StepFailed(f'sway could not make "{title}" full screen: {out.strip() or "no answer"}')
+    return f'"{title}" full screen'
+
+
 @step(r'^press (?:the )?(?P<key>[\w+-]+)(?: key)?(?: (?P<n>\d+) times)?$')
 def s_press(c, m):
     for _ in range(int(m.group('n') or 1)):
@@ -658,8 +681,8 @@ def s_expect_exited(c, m):
 @step(r'^expect no crash$|^expect the game not to (?:have )?crash(?:ed)?$')
 def s_no_crash(c, m):
     crashed = c.sess.crashed()
-    detail = 'exception.txt was written:\n' + (c.sess.game_log('exception.txt') or '')[-1500:] if crashed \
-        else 'exception.txt untouched'
+    detail = f'{Path(config.LOG_CRASH).name} was written:\n' + (c.sess.game_log(config.LOG_CRASH) or '')[-1500:] if crashed \
+        else f'{Path(config.LOG_CRASH).name} untouched'
     return c.checked(not crashed, detail, how="the game's crash handler writes exception.txt")
 
 
@@ -712,7 +735,7 @@ def s_display_mark(c, m):
     """`Mark the display context "mission"`: the calls Display8 counts from here on
     belong to that context. Written into `Display8.mark`, which d3d8.dll reads at its
     next `Present` (at most four times a second) and deletes."""
-    g = c.sess.game_dir
+    g = c.sess.exe_dir
     if not c.sess.log_path('Display8.log'):
         raise StepFailed('Display8 is not in this game (./install puts it in: --install .)')
     mark = g / 'Display8.mark'
@@ -729,7 +752,7 @@ def s_display_mark(c, m):
 def display_inventory(c, since):
     """Display8's inventory, rewritten after `since` (it is every two seconds of
     presenting and at each mark), as rows of dicts."""
-    p = c.sess.game_dir / 'Display8.inventory.tsv'
+    p = c.sess.exe_dir / 'Display8.inventory.tsv'
     end = time.time() + 10
     while not p.exists() or p.stat().st_mtime < since:
         c.assert_alive()
@@ -1352,7 +1375,7 @@ class Case:
     def new_log_lines(self, name):
         """The lines of a game log written since the last action.  A log shorter than its
         mark was written afresh (each launch deletes the old ones) and is read whole."""
-        p = self.sess.log_path(name) or self.sess.game_dir / name
+        p = self.sess.log_path(name) or self.sess.exe_dir / name
         try:
             with open(p, 'rb') as f:
                 size = f.seek(0, 2)

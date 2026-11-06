@@ -48,18 +48,82 @@ makes that layout data: the plugins open files by a virtual path (`textures\<fil
   searched by kind (loose folders, then `Fpq`, then `Zfs`) and then in the order they
   were mounted; the first that has the file serves it. `list` merges them, the first of
   each name in any case kept, with the mount folders inside as folders.
-- **`Fpq` and `Zfs`** are declared, with their place in that order, and serve nothing:
-  their `status()` is `Unsupported`, with a reason fit for a log line. Their readers come
-  with the work that needs them (`PLAN-FLEETOPS.md`, FO-5; `PLAN-ARMADA1.md`, A1-11), and
-  nothing here describes either format.
+- **`Fpq`** serves Fleet Operations: Roots' `ODF.fpq` (below). `Fpq::new(label, bytes)`
+  parses the archive (the caller reads the file) and mounts at `odf`: the archive's single
+  top folder is the mount's name, so `system/x.odf`, `odf/system/x.odf` and `x.odf` all open
+  the same file. It is `Kind::Fpq`, so a loose file in a folder mounted before or after
+  it still wins. This is the whole of the layer, kept small: read-only, the archive held
+  in memory (4 MB for Roots), no caching.
+- **`Zfs`** is declared, with its place in that order, and serves nothing: its
+  `status()` is `Unsupported`, with a reason fit for a log line. Its reader comes with
+  the work that needs it (`PLAN-ARMADA1.md`, A1-11), and nothing here describes the format.
 - **Planned, not written: an `Engine` source**, which reads through the game's own file
   functions, for an archive whose format is not ours to read (FO-5 chooses between it
-  and an `Fpq` reader). It would mount last, the fallback behind every source of ours.
+  and the `Fpq` reader). It would mount last, the fallback behind every source of ours.
 
 The mount list itself is the game descriptor's `[files]` (`games/README.md`, "Files"),
 which `tools/layers.py --check` holds equal to the plugins' `LAYOUT` tables.
 `tests/vfs.rs` checks case-insensitivity on a case-sensitive disk, layering order,
-shadowing, missing files and the archive kinds, on a temporary directory.
+shadowing, missing files and the declared `Zfs`, on a temporary directory.
+
+## Fleet Operations: Roots' archive (`fpq`, `lzo`)
+
+Roots packs its ODFs in `Data/ODF.fpq`, and a loose file overrides a packed one.
+`fpq::Archive::parse(bytes)` checks the tables and `find`, `read`, `open`, `entries` and
+`path` use them; `lzo::decompress(packed, size)` is the decoder. The format was
+established from the engine-side reader's behaviour and checked against the real archive
+(1799 files, every one decoding to its stated size and found again through the hash);
+the code is our own, from the format alone.
+
+- **Header**, seven little-endian `u32`: magic `FPQ\0`, version (exactly 2; any other is refused),
+  folder count, file count, hash-table size (a power of two), data-blob size,
+  names-blob size.
+- **Then, in this order and exactly to the file's last byte**: the hash table (12 bytes a
+  slot: `hash_a`, `hash_b`, file index; an **empty slot is all zero**, and index 0 is a
+  real file), the folders (12 bytes: parent or `0xFFFFFFFF`, name offset, name length),
+  the files (25 bytes: data offset, unpacked size, packed size, name offset, name length,
+  method `u8`, folder index), the names blob, the data blob. Names are single-byte text,
+  not terminated, 1 to 255 bytes each, and one path component (no `/`, `\\` or `:`, not
+  `.` or `..`); the names must not overlap, so their lengths add up to at most the
+  blob's size (a hostile table cannot make a small file decode to a large pile of
+  strings). A folder chain deeper than 64 is taken for a loop and refused. Roots has two folders, `odf` and its child `system`, and every file is
+  in `system`.
+- **Methods**: 0 is stored, 1 is LZO1X. 82 files are stored, 1717 compressed. Compressed
+  streams end with their input (the end marker is accepted but not needed).
+- **Lookup** is the MPQ string hash of the file's own name (no folders; upper-cased by
+  ASCII, so lookups ignore case; taken over the name's single bytes, so a name with a
+  byte above 0x7F is found by its Latin-1 spelling): a 0x500-word table from seed `0x100001`, three
+  hashes of kinds 0, 0x100 and 0x200 (start slot masked by the table size, `hash_a`,
+  `hash_b`), then linear probing to the first empty slot. A path's folders are checked
+  against the file's own afterwards.
+- **LZO1X** is a byte-oriented instruction set: literal runs, and matches of four
+  distance classes whose instruction byte also carries the count of 0 to 3 literals that
+  follow; what `b < 16` means depends on whether a match or a literal run came before
+  (`src/lzo.rs` has the table). Every read and write is checked: input overrun,
+  output past the stated size, distance before the start and a short output are
+  errors, and a size above 64 MiB or beyond what the input could expand to is refused
+  before any allocation (an allocation that fails is an error, not an abort). The unpacked
+  size is the file table's, so the decoder needs it.
+- **Real-archive surprises**: the first entry is itself a complete `.fpq` (1521 files);
+  an empty slot is zeros, not `0xFFFFFFFF`; the folder index is the file entry's last
+  field.
+
+`tests/fpq.rs` builds its own archives and LZO streams in code (nothing from a game),
+and fuzzes both readers for panics. `cargo test --test fpq -- --ignored --nocapture`
+also runs the whole real archive when Roots is installed (or `A2_FO_ODF_FPQ=<file>`) and
+prints counts only. For agents, `cargo run --release --example fpq -- list|cat|extract
+<archive>` lists a file, prints one, or extracts to a directory, and refuses a
+directory inside a git checkout (extracted files are assets: `$A2_DATA` or a scratch
+directory).
+
+`cargo run --release --example shipsurvey -- <Roots Data dir> [out-dir]` surveys the
+craft: every ODF that names a `race` and a `basename` (class label, ship class, SOD), each
+SOD's meshes (blend material, flags, bump or not, textures with their load words), the
+race ODFs' keys, the `RTS_CFG.h`/`ART_CFG.h` lines about race, colour or team, and counts
+per race and of textures shared between races. A mesh counts as bump-mapped when its flags
+carry the dot3 bit or a texture carries the `0x200` height-map word. It writes
+tab-separated tables and `summary.txt` to `$A2_DATA/research/fo-roots/ship-survey/` (the
+tables are derived from the game; the tool refuses a checkout) and reads only.
 
 ## SOD (`sod`)
 

@@ -5,7 +5,7 @@ game (gpu/README.md, "Record and replay").
                           to write its stream, and move the recording, with the frame as
                           the game presented it, into $A2_DATA/replays/<name>/
 
-The plugins record only on Display8's Vulkan backend (Mode=stub, Backend=vulkan;
+The plugins record only on Display8's Vulkan backend (Backend=vulkan;
 display/bench-mode.sh). What the recording holds is game-derived (texture contents,
 the frame), so it goes to A2_DATA, never into a checkout (hard rule 8)."""
 import json
@@ -28,7 +28,7 @@ def take(sess, name='record', timeout=180.0):
     """Ask for a recording called `name`; returns (status, text): 'ok' when every installed
     plugin wrote its stream, 'warn' when some did, 'fail' when none did."""
     name = _safe(name)
-    g = sess.game_dir
+    g = sess.exe_dir
     installed = [p for p in PLUGINS if (g / p).exists()]
     if not installed:
         return 'fail', 'neither Render3D.asi nor UI.asi is installed in this game: nothing records'
@@ -39,8 +39,8 @@ def take(sess, name='record', timeout=180.0):
             k, _, v = line.partition('=')
             keys[k.strip().lower()] = v.strip().lower()
     notes = []
-    if keys.get('mode') != 'stub' or 'vulkan' not in keys.get('backend', ''):
-        notes.append(f'Display8.ini says Mode={keys.get("mode")} Backend={keys.get("backend")}: the plugins record '
+    if 'vulkan' not in keys.get('backend', ''):
+        notes.append(f'Display8.ini says Backend={keys.get("backend")}: the plugins record '
                      f'only on Display8\'s Vulkan backend (display/bench-mode.sh stub Backend=vulkan)')
     src = g / 'Dumps' / name
     if src.exists():

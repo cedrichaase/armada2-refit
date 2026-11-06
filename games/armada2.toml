@@ -38,6 +38,12 @@ file = "ARMADA.PRF"
 # The player's own files that a2mod never switches (not a look).
 keep = ["ARMADA.PRF", "RTS_CFG.h"]
 
+[logs]
+# The game's own crash record and log folders, under data_dir (the bench: a crash is a
+# change of the file's mtime; the folders' new files go into the report).
+crash = "exception.txt"
+dirs = ["Logs"]
+
 [display]
 # The shell's (front end's) resolution, and the HUD's design canvas.
 shell = [800, 600]

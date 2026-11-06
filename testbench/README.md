@@ -208,6 +208,39 @@ stock. `a2test run --layers` overrides a scenario's `Layers:`; neither goes with
 heading record the selection. A checkout from before the registry has no `--only`, so
 its `./install` fails the prepare step.
 
+## Another game: Fleet Operations: Roots
+
+`./a2test --game fo-roots ...` (or `A2_PROFILE=fo-roots`) runs Fleet Operations: Roots
+from `games/fo-roots.toml` (FO-1, `PLAN-FLEETOPS.md`). A session records its game in
+`session.json`, so `drive` and `session stop` on it need no `--game`. What differs from
+Armada II, all read from the descriptor:
+
+- **Nothing is installed.** The descriptor lists no layers, so the clone is the user's
+  install as it ships (no stock cache, no `a2mod`, no `./install`): DxWrapper's `d3d8.dll`,
+  then DXVK's `d3d9.dll`, as Heroic launches it. `--mod`, `--install`, `--layers` and
+  `--assets` have nothing to act on there.
+- **`Data/ArmadaL.exe` is launched directly** (not `FleetOps.exe`), in `Data/`, and found by
+  its name. The plugins' inis and logs, the settings file and the crash file are looked for
+  in `Session.exe_dir` (the clone's `Data/`), not the game folder.
+- **`Settings.xml` is the settings adapter** (`fo-settings-xml`): `displayWidth` and
+  `displayHeight` to the session's resolution, `WindowMode` False, `multisample` 0,
+  `IntroVideo` False; the rest as the user left it (the user's first run wrote it, under
+  `Data/settings_saves_logs/`). `--mute` and `--stems` have no adapter yet.
+- **The output must be at least 1200x900.** The shell runs at 1200x900; on a 1280x720
+  output Roots shows a madExcept dialog one second in (null read in
+  `SetActiveDisplay_Internal`, the engine finding no mode of the size it asks for). The
+  session refuses a smaller one and says which to use; **1280x960** is the bench size.
+- **Roots writes no log** beyond madExcept's crash file
+  (`settings_saves_logs/Logs/exceptArmada2.txt`, with a dialog the process stays under;
+  `Expect no crash` reads it), and DXVK's `ArmadaL_d3d9.log`, gathered with `wine.log`. Waits
+  are OCR (`Wait for "6000"`), until `FleetOpsHook.dll` is measured (FO-2) or a plugin
+  logs; **no tick is logged yet.**
+- **The front end is Roots' own**: the `ui.json` design points are Armada II's, so a step
+  by label (`Click "Instant Action"`) works and a target by name does not; `Quit the game`
+  finds Exit and "Exit to Desktop" by their labels.
+- Scenarios: `fo-launch` (to the main menu) and `fo-skirmish` (Instant Action against the
+  default AI to the map with its HUD up), both at 1280x960: about 26 s and 65 s.
+
 ## Audio stems
 
 The game plays four categories of sound, each with its own volume in the options and in
@@ -566,6 +599,23 @@ picks the globs, so one file runs variants side by side (`engine-mismatch`: `dis
 game are their own files, pending the packages that put their plugin on a profile:
 `engine-mismatch-hulls` (render3d, 8e) and `engine-mismatch-cplugins` (QOL, rules, Online,
 8d). The Display8 shell under a forced `display.modes` is not the engine's.
+
+### What changes in memory: MemDiff.asi
+
+`a2test syms` reads the file; what another module rewrites of the exe at run time
+(Fleet Operations' `FleetOpsHook.dll`, the widescreen `.asi`, our own hooks) only the
+running game shows. `testbench/memdiff/` (`MemDiff.asi`, `--install testbench/memdiff`,
+clones only; the ASI loader goes in beside the exe where a clone has none) compares the
+image's sections with the exe's file at its own load and at 1, 3, 10, 30, 60, 120, 240,
+480 and 900 s, and writes `MemDiff.log` beside the exe: which of `FleetOpsHook.dll`,
+`Win2kDisableTaskSwitch.dll`, `d3d8`, `d3d9` and the D3DX DLLs were loaded when it was, the
+module list in load order, and per pass the changed ranges (section, addresses, the first
+bytes before and after, and for a rel32 `jmp` or `call` the module it now leads into),
+logged only when the set changed. The import table is skipped (every import hook writes
+it), and writable data is compared only at load (the game writes it as it runs). The
+ranges are named by function offline, against the map, outside the repository (hard
+rule 9). On stock 1.1 with nothing else installed it shows the widescreen patch's two
+words in `.text`, from its first second on: the control.
 
 ## Frame dumps
 

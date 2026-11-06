@@ -133,7 +133,15 @@ impl Odf {
     {
         let mut stack: Vec<String> = Vec::new();
         let mut budget = MAX_INCLUDES;
-        load_rec(name, &mut fetch, &mut stack, &mut budget).ok_or_else(|| Error::NotFound(String::from(name)))
+        // A total of decoded bytes too: each include may be a big packed file, and a tree
+        // of a thousand of them must not decode a thousand times over.
+        let mut bytes = MAX_BYTES;
+        let mut counted = |n: &str| -> Option<Vec<u8>> {
+            let d = fetch(n)?;
+            bytes = bytes.checked_sub(d.len())?;
+            Some(d)
+        };
+        load_rec(name, &mut counted, &mut stack, &mut budget).ok_or_else(|| Error::NotFound(String::from(name)))
     }
 
     pub fn parse_single(name: &str, data: &[u8]) -> Odf {
@@ -219,6 +227,8 @@ impl Odf {
 
 /// Most files one [`Odf::load`] opens through includes (stock trees are a few dozen).
 const MAX_INCLUDES: u32 = 1024;
+/// Most bytes the files of one [`Odf::load`] may total, as `fetch` returns them.
+const MAX_BYTES: usize = 256 << 20;
 
 fn load_rec(
     name: &str,

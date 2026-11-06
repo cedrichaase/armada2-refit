@@ -324,6 +324,7 @@ unsafe extern "system" fn reset(this: *mut SObj, pp: *mut PresentParams) -> HRES
 unsafe extern "system" fn present(this: *mut SObj, src: P, dst: P, wnd: P, dirty: P) -> HRESULT {
     trace::call(frame!(), Kind::Device, 15);
     let t0 = crate::rt::now();
+    crate::benchfo::on_present(this);
     let hr = super::present(dev(this), src, dst, wnd, dirty);
     crate::api::presented();
     crate::drop::present();
