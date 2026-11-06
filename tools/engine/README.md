@@ -18,6 +18,7 @@ The format, the generated code and the resolver are described in
 | `negative.sh` | the negative tests on scratch copies of the game's exe (timestamp changed, one checked entry changed per plugin file, a forced child build, `a2test syms --record`), and on Roots' exe: its marks, a FleetOpsHook.dll that is not the profiled one (a wrong CRC, none, unreadable, and a modified file beside the exe), one byte of `.text` or `.test` changed; skips the exe-based ones without a game |
 | `bench-exe.sh`, `bench-mismatch.sh` | the bench's `Setup:` scripts: a clone's exe stamped (unknown build), a clone's `A2EngineTest.ini` (`testbench/README.md`, "The symbol profiles, offline and on the bench") |
 | `fo-scan.py`, `fo-scan.toml`, `fo_scan_test.py` | profiles a new Fleet Operations: Roots build in one command (below); the test runs it on synthetic images |
+| `fo-forms.py` | reads a `FleetOpsHook.dll` (and, with `--map`, its shipped map) once per new build for the UI's forms part (PLAN-FLEETOPS.md, FO-6 step 7, option C, decision 147): prints the identity line for `FAMILY` in `ui/src/engine/forms.rs` (the CRC-32 of the file's `.text`, as `a2engine::companion_crc` computes it) and checks that the forms and controls the UI uses are in the file's VCL class tables; exit 1 when one is missing. Reads only the files it is given |
 | `selftest.sh` | all of the above, as CI's `engine` job runs it |
 
 ## Fixtures

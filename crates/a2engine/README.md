@@ -119,6 +119,10 @@ of a build (PLAN-FLEETOPS.md, "FO-5: render3d on Roots, the design"):
   (`blocked_mod`, with `n_resolved_mod` for the summary line); the symbol count and
   blocked count in the `symbols:` line are those with the module counted bad.
 
+`a2engine::companion_crc(name)` gives a loaded module's CRC by the same rule, for a part
+keyed to the companion alone across the executable's builds (the UI's forms on Roots,
+`ui/MENUS.md`, "Roots' forms").
+
 Offline (`resolve.py`, `a2test syms`) the module is looked for beside the executable and
 one directory up (Roots keeps `FleetOpsHook.dll` above `Data/`); `syms.report(...,
 modules={name: crc | None})` says what the process holds instead (the negative tests).

@@ -2,12 +2,12 @@
 //! generated table per part (`syms_<part>.rs`), started together here. A hook calls
 //! `ready` on its part's engine before it writes anything and stands down with the
 //! engine's reason; the rows a hook feeds get their note from `note_for`.
-use crate::{syms_core, syms_dialogs, syms_hud, syms_info, syms_loading, syms_panels, syms_radar, syms_shell};
+use crate::{syms_core, syms_dialogs, syms_forms, syms_hud, syms_info, syms_loading, syms_panels, syms_radar, syms_shell};
 use a2engine::Table;
 use core::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 
 /// Every table of the UI, in the order they are started (the first logs the identity).
-static TABLES: [(&str, &Table); 8] = [
+static TABLES: [(&str, &Table); 9] = [
     ("core", &syms_core::TABLE),
     ("loading", &syms_loading::TABLE),
     ("radar", &syms_radar::TABLE),
@@ -16,6 +16,7 @@ static TABLES: [(&str, &Table); 8] = [
     ("panels", &syms_panels::TABLE),
     ("shell", &syms_shell::TABLE),
     ("dialogs", &syms_dialogs::TABLE),
+    ("forms", &syms_forms::TABLE),
 ];
 
 /// The table being started (an index into `TABLES`): its log lines are filtered.

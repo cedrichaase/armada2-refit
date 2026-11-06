@@ -53,6 +53,10 @@ pub struct Config {
     /// `[Menus] Scene`: the main menu and the campaign selection stand over render3d's
     /// 3D scene (`menus::scene`), when render3d draws it.
     pub menus_scene: bool,
+    /// `[Menus] Forms`: Roots' front-end forms (FleetOpsHook's) drawn by the UI
+    /// (`engine::forms`, PLAN-FLEETOPS.md, FO-6 step 7, option C). 0: Roots' own; 2
+    /// (`probe`): the test bench's probe of step 0.
+    pub menus_forms: u8,
     /// `[Menus] CampaignLocks`: the campaign selection shows which campaigns are not yet
     /// open (`menus::locks`).
     pub campaign_locks: bool,
@@ -213,6 +217,11 @@ pub fn load() -> Config {
         menus_trace: ini.int("Menus", "Trace", 0) != 0,
         menus_host: ini.int("Menus", "Host", 1) != 0,
         menus_scene: on(&ini, MENUS_SCENE),
+        menus_forms: match rt::lower(&ini.string("Menus", "Forms").unwrap_or_default()).trim() {
+            "probe" => 2,
+            "1" => 1,
+            _ => 0,
+        },
         credits: on(&ini, MENUS_CREDITS),
         campaign_locks: ini.int("Menus", "CampaignLocks", 1) != 0,
         // lint-allow(content): LockedSound's default, the shell's own back sound, the engine's, not a set's.

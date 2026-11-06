@@ -9,3 +9,4 @@ BitBlt@36
 PatBlt@24
 SetViewportOrgEx@16
 GdiFlush@0
+CreateRectRgn@16

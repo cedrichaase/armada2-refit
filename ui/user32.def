@@ -58,3 +58,14 @@ GetDlgCtrlID@4
 GetWindowTextA@12
 RedrawWindow@16
 EnumThreadWindows@12
+SetWindowsHookExA@16
+CallNextHookEx@16
+UnhookWindowsHookEx@4
+SetTimer@16
+KillTimer@8
+SetWindowRgn@12
+EnumPropsExA@12
+WindowFromPoint@8
+GetCursorInfo@4
+SetLayeredWindowAttributes@16
+ChildWindowFromPointEx@16
