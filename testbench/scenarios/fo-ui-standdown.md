@@ -3,7 +3,7 @@
 Resolutions: 1280x960
 Mod: refit
 Layers: display asiloader render3d ui
-Setup: display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh Loading.Enable=0 UI.RefitKey=0
+Setup: display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh HUD.Enable=0 Loading.Enable=0 UI.RefitKey=0
 Timeout: 12 min
 
 The B side of `fo-ui-standdown-ref`, which runs first and records the baseline

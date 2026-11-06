@@ -3,7 +3,7 @@
 Resolutions: 1280x960
 Mod: refit
 Layers: display asiloader render3d ui
-Setup: display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh Loading.Enable=0
+Setup: display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh HUD.Enable=0 Loading.Enable=0
 Timeout: 12 min
 
 The A side of the loading screen's A/B (`fo-ui-loading` is the B): `[Loading] Enable=0` gives

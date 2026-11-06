@@ -163,6 +163,20 @@ for the bench to say (step 3).
 Roots 64 behind a pointer held there, `palette_slots_indirect`), both values of the
 build's profile (`engine::palette::slot`).
 
+**On Fleet Operations: Roots, which panels the UI takes** (PLAN-FLEETOPS.md, FO-6 step 4,
+decisions 120 to 127). `RenderAll` is trampolined at its entry and the stock body, with the
+Render call `hud.panels` re-points, runs behind it, so the panel switch works as on stock; the
+resources, the top-right buttons (Roots' panel holds the stock buttons: the menu sits behind
+the "more" toggle, help and palette are unplaced), the pause box, the chat, the selection
+overlay, the frame-rate panel and the order ring, height posts and footprint are ours there.
+Roots' string table answers `GUI_POP_PAUSE_TEXT` and `GUI_POP_PAUSE_CONTINUE` with an empty
+string and its resource tooltips with a token, so the pause box has words of its own and a
+resource's name comes from the content set when the tooltip is not a word. **Button sounds
+are off** (`panels_sound_ours` = 0): every `operator new` and constructor call at the stock
+sound sites is FleetOpsHook's FMOD, of a size not measured, and the HUD part does not
+require the sound hook. The message, objectives, replay, overlay-text and fade panels stay
+Roots' until a scenario can raise them.
+
 ## The references the stock HUD is drawn against
 
 These are the measured facts about where the engine's 2D drawing gets its scale. The

@@ -637,7 +637,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 154,
+        n_resolved: 172,
         content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x763c00, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_palette_ptr
@@ -827,17 +827,17 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // palette_btn_hover
         ],
         blocked: &[
-            a2engine::Block { hook: 0, symbol: "DisplayInterface::RenderAll", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: DisplayInterface::RenderAll is changed by fo-roots-5.0Z11, not yet verified" },
             a2engine::Block { hook: 9, symbol: "cOverViewImp::mNormalModeRender", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: cOverViewImp::mNormalModeRender is changed by fo-roots-5.0Z11, not yet verified" },
-            a2engine::Block { hook: 11, symbol: "cOverViewImp::mRenderWhere", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: cOverViewImp::mRenderWhere is changed by fo-roots-5.0Z11, not yet verified" },
             a2engine::Block { hook: 14, symbol: "CinematicView::mUpdateVideo", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: CinematicView::mUpdateVideo is changed by fo-roots-5.0Z11, not yet verified" },
-            a2engine::Block { hook: 15, symbol: "Armada_RenderFrame", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Armada_RenderFrame is changed by fo-roots-5.0Z11, not yet verified" },
         ],
         file_crc: &[a2engine::FileCrc { section: ".text", crc: 0xef690537 }, a2engine::FileCrc { section: ".test", crc: 0xe7a4061b }],
         modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
         blocked_mod: &[
+            a2engine::Block { hook: 0, symbol: "DisplayInterface::RenderAll", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: DisplayInterface::RenderAll is patched by FleetOpsHook.dll, which is not the profiled one" },
             a2engine::Block { hook: 5, symbol: "cPrjID::GetName", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: cPrjID::GetName is patched by FleetOpsHook.dll, which is not the profiled one" },
+            a2engine::Block { hook: 11, symbol: "ST3D_Texture::DemandLoad", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: ST3D_Texture::DemandLoad is patched by FleetOpsHook.dll, which is not the profiled one" },
             a2engine::Block { hook: 12, symbol: "ST3D_Texture::DemandLoad", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: ST3D_Texture::DemandLoad is patched by FleetOpsHook.dll, which is not the profiled one" },
+            a2engine::Block { hook: 15, symbol: "Armada_RenderFrame", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: Armada_RenderFrame is patched by FleetOpsHook.dll, which is not the profiled one" },
         ],
         n_resolved_mod: 104,
     },

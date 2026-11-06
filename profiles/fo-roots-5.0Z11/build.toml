@@ -273,10 +273,12 @@ verified = ["render3d.frame.*", "render3d.effects.reads", "render3d.ordnance.war
 # FleetOpsHook's one edit (+0x245) takes out an edit-menu call, away from the seam's call at
 # 0x59886e (FO-5 step 3) and from the UI's call of ChatDisplay::Render at 0x598a16, which
 # is stock's in the file and in memory (FO-6 step 3).
+# The frame-rate prints (+0x286, +0x290), the chat's TextInput_Update call (0x598a07) and the
+# trade call (0x5988d0) are stock's in memory too (FO-6 step 4, decision 123).
 [[changed]]
 fn = "Armada_RenderFrame"
 how = "runtime"
-verified = ["render3d.frame.*", "ui.core.mission"]
+verified = ["render3d.frame.*", "ui.core.mission", "ui.hud.frame_rate", "ui.panels.chat", "ui.panels.trade"]
 
 # FleetOpsHook re-points the node-particle call at +0x4f8, away from the shield-hit call the
 # effects module taps (+0x345, still stock's in memory) (FO-5 step 5).
@@ -343,10 +345,13 @@ fn = "cOverViewImp::mNormalModeRender"
 how = "runtime"
 verified = ["render3d.overlays.paths"]
 
+# FleetOpsHook replaces the call at +0x9d (0x5222fd) and the one at 0x52220b, away from the two
+# DrawQuad calls the order ring takes (0x5222f0 and mRenderGridFX's 0x522537), which are
+# stock's in the file and in memory (FO-6 step 4, decision 121).
 [[changed]]
 fn = "cOverViewImp::mRenderWhere"
 how = "runtime"
-verified = []
+verified = ["ui.hud.order_ring"]
 
 # ui
 
@@ -383,10 +388,14 @@ fn = "DispatchDialog"
 how = "runtime"
 verified = []
 
+# FleetOpsHook trampolines the entry (its clean screenshot skips the HUD) and the stock body runs
+# behind it: the UI's panel switch re-points the Render call at +0x47 (0x51abf7) and the
+# CursorOver call in CursorInterface::RefreshOwner, both stock's in the file and in memory
+# (FO-6 step 4, decision 120).
 [[changed]]
 fn = "DisplayInterface::RenderAll"
 how = "runtime"
-verified = []
+verified = ["ui.hud.panels"]
 
 [[changed]]
 fn = "GameSpyLoginDlgProc"
@@ -443,10 +452,12 @@ fn = "PasswordDlgProc"
 how = "runtime"
 verified = []
 
+# FleetOpsHook trampolines the entry (+0x0); the UI's one site, the Entity::ResetVisibility call
+# at +0x1e9 (0x483869), is stock's in the file and in memory (FO-6 step 4, decision 122).
 [[changed]]
 fn = "Program::DisplayInputProcess"
 how = "runtime"
-verified = []
+verified = ["ui.panels.presses"]
 
 [[changed]]
 fn = "RoomSelectDlgProc"

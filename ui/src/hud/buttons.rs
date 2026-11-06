@@ -66,6 +66,7 @@ pub fn run(ui: &mut Ui) {
                 s.push_str(&crate::sfmt!(" {}{}", w.name(), if crate::engine::api::buttons::enabled(b) { "" } else { "(off)" }));
             }
             crate::log!("buttons:{}", s);
+            crate::log!("buttons: panel{}", topbar::measure());
             LOGGED = true;
         }
     }

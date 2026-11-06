@@ -3,7 +3,7 @@
 Resolutions: 1280x960
 Mod: refit
 Layers: display asiloader render3d ui
-Setup: display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh Loading.Hold=20
+Setup: display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh HUD.Enable=0 Loading.Hold=20
 Timeout: 12 min
 
 Run with `a2test --game fo-roots` and `--install .`: `./install --game fo-roots` puts
