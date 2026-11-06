@@ -57,6 +57,13 @@ impl Grid {
             z += step;
         }
         let c = hooks::grid_colour();
+        static mut SAID: bool = false;
+        unsafe {
+            if !SAID {
+                SAID = true;
+                crate::log!("overlays: first grid drawn: {}x{} cells, colour {:.2},{:.2},{:.2} (read from the engine's colour pointer)", nx, nz, c[0], c[1], c[2]);
+            }
+        }
         let Some(mut cmd) = gfx::cmd() else { return };
         // Lines, depth-tested (`LESSEQUAL`) and written, opaque.
         let pipe = self.pipes.view(0, || {

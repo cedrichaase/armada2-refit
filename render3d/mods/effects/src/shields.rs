@@ -298,6 +298,7 @@ pub struct Shields {
     logged_hits: u32,
     logged_downs: u32,
     said_first: bool,
+    said_list: bool,
     /// The special weapons' recipes (`[Shell.<name>]`), read in `configure` by the
     /// shell type's index in the engine's table.
     recipes: Vec<Option<Recipe>>,
@@ -335,6 +336,7 @@ impl Shields {
             logged_hits: 0,
             logged_downs: 0,
             said_first: false,
+            said_list: false,
             recipes: Vec::new(),
         }
     }
@@ -455,6 +457,15 @@ impl Shields {
         }
         let mut list = Vec::new();
         hk::walk(|id, sh| list.push((id, sh)));
+        if !self.said_list {
+            if let Some(&(_, sh)) = list.iter().find(|(_, sh)| *sh != 0) {
+                self.said_list = true;
+                log!(
+                    "effects: shields: first live hit in the engine's list: {} hit(s), model {:#x} (ordinary {:#x}, shields down {:#x})",
+                    list.len(), hk::hit_model(sh), Self::db(0), Self::db(1)
+                );
+            }
+        }
         for (id, sh) in list {
             if sh == 0 {
                 continue;
