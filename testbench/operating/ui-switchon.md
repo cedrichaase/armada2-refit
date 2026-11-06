@@ -57,6 +57,16 @@ What an agent driving the game as `./install` now gives it (every part of the UI
   `armada2.map`). Seen once, loading a save from the in-mission menu after keys were
   typed into the mission; not reproduced since. `testbench/scenarios/ui-whole-game.md`
   goes through the same path.
+  **On Display8 the same hang is a white window** (seen by the user 2026-11-06, entering
+  a third mission in one session): the handler first re-opens the game windowed on a
+  new window (`Display8.log` ends on a `CreateDevice` with `windowed 1` and another
+  hwnd, which Display8's device does not follow, so nothing draws the new window), then
+  walks the stack. Under Wine that walk faults at the end of the frame chain and the
+  nested faults recurse through the handler, so it never writes `exception.txt` and the
+  original fault is lost. `perf record -t <tid> --call-graph dwarf,65528 --user-regs=...`
+  works on the user's own game where `gdb -p` is refused (ptrace scope 1): the captured
+  stack holds the exception records. `testbench/scenarios/display-mission-cycle.md`
+  enters five missions in a session and checks for it.
 - A gdb attached with SIGSEGV stopping catches Wine's own handled faults too.
 - **`QOLRules.asi` in the clone.** A bench clone is the user's install, and `a2mod stock`
   does not switch the rules plugin: with `PayOnQueue=1` an order the team cannot pay
