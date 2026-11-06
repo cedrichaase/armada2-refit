@@ -5,6 +5,29 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 2.4.0 — 2026-11-06
+
+### Added
+- QOL-11, `RigIgnoresSelf=1` (a live row, Gameplay tab): a construction ship no longer blocks its own blueprint. `ConstructionRig::GetAction` asks the class's `CanPlaceHere` with the rig as the object to ignore instead of nothing, so the ghost stays green over the selected rig and the click sends the ordinary BUILD; own warships, allies, enemies, the grid and the map edge still block. Stock's arrival check already ignores the rig on every node, so a stock player in the same match is unaffected. The hook `qol.rig_self` (two patches in `GetAction`, signatures checked, standing down when they are not stock); `rig: the blueprint's spot is clear|blocked` in `QOL.log`. Off: stock. Issue #51, step 1 of #47. `dc0d5db`
+- Exports `QOL_MoveQueueVersion` (1) and `QOL_MoveQueue(ship, xyz, flags, cap)` (the points still ahead of a ship, for render3d's dots), and `QOL_MoveQueuePoint(xyz, action)` (the UI's minimap hands a Tab click to the queues).
+- `QOL.log`: `move queue: ...` lines (new queue, appended point, run sent / next run sent / next part sent, cleared for N ship(s), ship gone, queue done, minimap point), at most 400. `396bd4f`
+- Export `QOL_MoveQueueGroup(ship, own, pts, flags, cap, queue)`: a ship's own targets, the queue's points and its serial, for drawing a group as one path.
+- Profile entries for the formations stock moves a group in, read only (`mq_formations`, `mq_form_types`, `mq_proc_formation`, `mq_frm_*`, `mq_slot_*`, `mq_min_radius`, `mq_ent_bounds`, `mq_bounds_radius`, `mq_class_shiptype`).
+- `QOL.log`: `queue K spread (...)` with each ship's place, `ship ID passed point N, D from its target`, `at the end of its run`, and on a group's `done` whether each ship was at its own target at every point; the queue's log cap is 600 lines. `aeb6b41`
+
+### Changed
+- QOL-10 is a move queue (`waypoints.c`, still switched by `PathStartsAtOnce`, a live row): a point queued with Tab (or, through the UI, on the minimap) for ships already flying a queue is appended to it instead of restarting it; each leg keeps the mode it was queued with (GO, GO_WARP with Alt or by QOL-8 judged on the leg's own length, PATROL), and the queue is flown a run of same-mode legs at a time, each run as stock's path order, the next run sent when the group reaches the end of the one before; a run longer than one order's packet is sent in parts. The player's orders that replace a ship's movement (stop, move, attack, a path, a special weapon, ...) end its queue; settings orders (alerts, autonomy, formation type) do not. Hooks added to `qol.move_paths`: the calls of `GameObject::DeQueueCommand` in the `NetOrder*::Execute`s, `Broadcast_Go_Command`, `FormFormation` and the special attack's `SetCommand`, the step after `cOverViewImp::mProcessKeyboardInput` and the clock after `GameObject::PreSimulateAll`. `396bd4f`
+- The engine resolver (`crates/a2engine`, `csdk/a2engine.h`; root 15.8.0) names the executable in its log lines and notes by the matched build's `exe` (`profiles/*/build.toml`), or on an unknown build by the process's own module file name, not by a literal: `engine: Armada2.exe timestamp ...` on Armada II as before. The generated symbol tables carry each build's `exe`.
+- Engine fields and values are the matched build's, filled at start-up (`QOL_F_*`, `QOL_V_*` read `a2f_qol_*`), no longer compile-time per game; the asm stubs read them through those variables instead of splicing literals (`A2_STR` is gone). The bar's menu toggles are saved for at most 16 (`BK_TOGGLES_MAX`), the build's count otherwise.
+- The patched functions' frame locals the stubs read (`CheckCanExecute`'s craft array, count, index and route locals, `mSetupSpecialWeapons`' read-back local, `mCheckGroupSelect`'s group number) are profile values (`cce_*`, `msw_read_local`, `cgs_group`, unit `ebp`), no longer literals in the asm (PLAN-ARCHITECTURE.md, AR-3). `b524e42`
+- Move queues: each ship goes on to its next run (or the next part of a long one) the moment it reaches the end of its own; the group no longer waits at a run's end for its last ship (the 8 s straggler rule is gone). Ships still fly to their own formation places. `QOL.log`: `, N ship(s) behind` on a send. `87ac3a0`
+
+### Fixed
+- A group flying a move queue no longer bunches up at each point: each ship flies to the point plus its place in the group's formation (the formation type chosen on the bar, stock's slots, scale and leader, turned to face each leg), one stock path order per ship. A formation picked mid-queue gives the points ahead the new places; ships it has no slot for keep their place in the group's layout. `QOL_MoveQueue` now answers the ship's own targets. `aeb6b41`
+- Move queues: the sends QOL makes on its own (next run, next part, places after a formation change) no longer play the ships' voice acknowledgement: `Craft::Say`'s call of `CaptainsVoice::Say` is re-pointed (entries `mq_say`, `mq_say_call`) and leaves the line out for those orders only, on this machine only. A Tab click's own sends are still spoken. `QOL.log`: ` (quiet)` on such a send, and `acknowledgement left out, queue K ship ID (topic T)`. `87ac3a0`
+
+Confirmed in game 2026-11-06.
+
 ## 2.3.0 — 2026-11-05
 
 ### Added
