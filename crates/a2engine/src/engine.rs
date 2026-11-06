@@ -336,6 +336,19 @@ pub fn init(t: &'static Table, log: fn(&str)) -> &'static Engine {
     init_with(t, log, &win::PROCESS, text)
 }
 
+/// The CRC-32 of a loaded module's `.text` in its file (as `[[module]] text_crc` names a
+/// companion): None when it is not loaded or cannot be read. For a part keyed to a
+/// companion alone, across the builds of the executable that ship it (FleetOpsHook's
+/// forms in the UI, PLAN-FLEETOPS.md, decision 148).
+#[cfg(windows)]
+pub fn companion_crc(name: &str) -> Option<u32> {
+    use crate::pe::{Companion, Image};
+    match win::PROCESS.companion(name) {
+        Companion::Crc(c) => Some(c),
+        _ => None,
+    }
+}
+
 #[cfg(windows)]
 mod win {
     use crate::pe::Image;
