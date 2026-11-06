@@ -55,7 +55,8 @@ Top-level `A2_GAME` and `A2_PREFIX` are the default game's; top-level `A2_HEROIC
 `tools/layers.py --check` holds them together: every field present and typed, one
 default, every `layers.toml` `games` entry naming a descriptor, every descriptor's layers
 existing and listing it back, each `profiles/*/build.toml` naming a described game and
-one of its executables, and `a2env.py`'s built-in copy of the default game (what the
+one of its executables (or another descriptor's: Roots' build is a build of `armada2`'s
+engine, `profiles/fo-roots-5.0Z11/`, and its `ArmadaL.exe` is `fo-roots`'), and `a2env.py`'s built-in copy of the default game (what the
 release package's `a2env.py` resolves without this folder) equal to the descriptor.
 
 Nothing here is derived from the game's files (hard rule 8): names, folder names, ids and

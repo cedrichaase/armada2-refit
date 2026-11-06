@@ -13,26 +13,43 @@
 #       that marks a function changed: its hooks report `is changed by`. This is the
 #       shape of FO-3's first child build (a synthetic image; needs no game);
 #   (d) `a2test syms --record` appends the sha256 of a changed copy under the matched
-#       build and refuses an unknown build (profiles copied to the scratch dir).
+#       build and refuses an unknown build (profiles copied to the scratch dir);
+#   (e) Fleet Operations: Roots (`--roots PATH`, default fo-roots' ArmadaL.exe), both
+#       ways: its exe is matched to fo-roots-5.0Z11 and exactly the hooks its marks
+#       block stand down, "changed by" or "off in" and nothing else; that profile forced
+#       onto stock's exe stands down the same hooks; Roots' exe with its timestamp
+#       changed is an unknown build. (Stock's profile forced onto Roots' exe passes every
+#       check, which is why the identity, not the signatures, picks the build: printed.)
 #
-# (a), (b) and (d) need the game's exe and are skipped, said so, without one; (c) is
-# synthetic and always runs. Exit 1 on any failure.
+# (a), (b) and (d) need the game's exe and (e) Roots' too, and are skipped, said so,
+# without them; (c) is synthetic and always runs. Exit 1 on any failure.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="$(cd "$here/../.." && pwd)"
 exe=
-if [ "${1:-}" = --exe ]; then exe="${2:?--exe PATH}"; fi
+roots=
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --exe) exe="${2:?--exe PATH}"; shift 2 ;;
+        --roots) roots="${2:?--roots PATH}"; shift 2 ;;
+        *) echo "usage: negative.sh [--exe PATH] [--roots PATH]" >&2; exit 2 ;;
+    esac
+done
 if [ -z "$exe" ]; then
     exe="$(python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); import a2env; print(a2env.GAME)' "$repo")/Armada2.exe"
+fi
+if [ -z "$roots" ]; then
+    roots="$(A2_PROFILE=fo-roots python3 "$repo/a2env.py" 2>/dev/null | sed -n 's/^A2_EXE=//p')"
 fi
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-EXE="$exe" TMP="$tmp" REPO="$repo" python3 - <<'PY'
+EXE="$exe" ROOTS="$roots" TMP="$tmp" REPO="$repo" python3 - <<'PY'
 import hashlib, os, shutil, struct, sys
 
 repo, tmp, exe = os.environ['REPO'], os.environ['TMP'], os.environ['EXE']
+roots = os.environ.get('ROOTS', '')
 sys.path.insert(0, os.path.join(repo, 'testbench'))
 sys.path.insert(0, os.path.join(repo, 'tools', 'engine'))
 from bench import syms
@@ -176,5 +193,46 @@ else:
     bad('(d) --record accepted an unknown build')
 if hashlib.sha256(open(exe, 'rb').read()).hexdigest() == base['exe']['sha256']:
     ok('the game exe was only read')
+
+# (e) Fleet Operations: Roots, both ways
+RB = 'fo-roots-5.0Z11'
+if not roots or not os.path.isfile(roots):
+    print(f'skip (e): no Roots executable at {roots or "(fo-roots has none)"}')
+    sys.exit(fail)
+rsha = hashlib.sha256(open(roots, 'rb').read()).hexdigest()
+want = {}
+gs = games['armada2']
+rb = next(b for b in gs.builds if b.name == RB)
+for t in all_tables:
+    if t.fname in gs.files:
+        for hid, (sym, why) in profs.blocks(gs, t.fname, rb, t).items():
+            want[hid] = why
+rep = syms.report(roots)
+down = {h['hook']: h['why'] for h in hooks(rep) if not h['ready']}
+if rep['build'] == f'armada2/{RB}' and down == want and want:
+    ok(f'(e) Roots\' exe is {RB}: exactly its {len(want)} marked hooks stand down, {len(hooks(rep)) - len(want)} ready')
+else:
+    bad(f'(e) Roots\' exe: build {rep["build"]}, down {sorted(down)} against marked {sorted(want)}')
+rep = syms.report(exe, build=RB)
+down2 = {h['hook']: h['why'] for h in hooks(rep) if not h['ready']}
+if down2 == want:
+    ok(f'(e) {RB} forced onto stock\'s exe: the same {len(want)} hooks stand down, nothing else')
+else:
+    bad(f'(e) {RB} on stock: {sorted(set(down2) ^ set(want))} differ')
+rep = syms.report(roots, build='gog-1.1')
+print(f'note (e) gog-1.1 forced onto Roots\' exe: {sum(1 for h in hooks(rep) if h["ready"])}/{len(hooks(rep))} '
+      f'hooks pass their checks: the signatures alone do not see Roots\' changes')
+rd = bytearray(open(roots, 'rb').read())
+rnt = struct.unpack_from('<I', rd, 0x3c)[0]
+struct.pack_into('<I', rd, rnt + 8, struct.unpack_from('<I', rd, rnt + 8)[0] ^ 0x1)
+p = os.path.join(tmp, 'roots-stamp.exe')
+open(p, 'wb').write(rd)
+rep = syms.report(p)
+if rep['build'] is None and {h['hook'] for h in hooks(rep) if h['ready']} <= runs:
+    ok('(e) Roots\' exe with its timestamp changed: unknown build, nothing but unknown="run" hooks')
+else:
+    bad(f'(e) Roots\' stamped exe: build {rep["build"]}')
+if hashlib.sha256(open(roots, 'rb').read()).hexdigest() == rsha:
+    ok('Roots\' exe was only read')
 sys.exit(fail)
 PY

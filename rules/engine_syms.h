@@ -370,8 +370,109 @@ static const A2EEntry qolrules_b0_entries[] = {
 static const A2EBlock qolrules_b0_blocked[] = {
     {0xffff, 0, 0, 0}
 };
+static const A2E_U8 qolrules_b1_c0[] = {0x55, 0x8b, 0xec, 0x83, 0xec, 0x14};
+static const A2E_U8 qolrules_b1_c1[] = {0x53, 0x56, 0x8b, 0xf1, 0x33, 0xdb};
+static const A2E_U8 qolrules_b1_c2[] = {0x55, 0x8b, 0xec, 0x53, 0x56};
+static const A2E_U8 qolrules_b1_c3[] = {0x55, 0x8b, 0xec, 0x51, 0x53, 0x56};
+static const A2E_U8 qolrules_b1_c4[] = {0x53, 0x56, 0x8b, 0xf1, 0x33, 0xdb};
+static const A2E_U8 qolrules_b1_c5[] = {0x56, 0x8b, 0xf1, 0x8b, 0x06};
+static const A2E_U8 qolrules_b1_c6[] = {0x55, 0x8b, 0xec, 0x83, 0xec, 0x08};
+static const A2E_U8 qolrules_b1_c7[] = {0x55, 0x8b, 0xec, 0x83, 0xec, 0x10};
+static const A2E_U8 qolrules_b1_c8[] = {0x55, 0x8b, 0xec, 0x6a, 0xff};
+static const A2E_U8 qolrules_b1_c9[] = {0x55, 0x8b, 0xec, 0x56, 0x8b, 0xf1};
+static const A2E_U8 qolrules_b1_c11[] = {0x55, 0x8b, 0xec, 0x51, 0x53, 0x8b};
+static const A2E_U8 qolrules_b1_c12[] = {0x55, 0x8b, 0xec, 0x53, 0x56, 0x57};
+static const A2E_U8 qolrules_b1_c13[] = {0x55, 0x8b, 0xec, 0x51, 0x53, 0x8b};
+static const A2E_U8 qolrules_b1_c14[] = {0x55, 0x8b, 0xec, 0x51, 0x53, 0x8b};
+static const A2E_U8 qolrules_b1_c15[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08};
+static const A2E_U8 qolrules_b1_c16[] = {0x8b, 0x81, 0x84, 0x00, 0x00, 0x00};
+static const A2E_U8 qolrules_b1_c17[] = {0x55, 0x8b, 0xec, 0x83, 0xec, 0x08};
+static const A2E_U8 qolrules_b1_c18[] = {0x55, 0x8b, 0xec, 0x83, 0xec, 0x08};
+static const A2E_U8 qolrules_b1_c19[] = {0x55, 0x8b, 0xec, 0x83, 0xec, 0x08};
+static const A2E_U8 qolrules_b1_c20[] = {0x55, 0x8b, 0xec, 0x83, 0xec, 0x08};
+static const A2E_U8 qolrules_b1_c21[] = {0x55, 0x8b, 0xec, 0x57, 0x8b, 0xf9};
+static const A2E_U8 qolrules_b1_c22[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08};
+static const A2E_U8 qolrules_b1_c23[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08};
+static const A2E_U8 qolrules_b1_c24[] = {0x56, 0x8b, 0xf1, 0x8b, 0x8e, 0x44};
+static const A2E_U8 qolrules_b1_c25[] = {0x56, 0x8b, 0xf1, 0x57, 0x8b, 0x86};
+static const A2E_U8 qolrules_b1_c30[] = {0x55, 0x8b, 0xec, 0xa1, 0x10, 0xb6};
+static const A2E_U8 qolrules_b1_c31[] = {0x55, 0x8b, 0xec, 0x83, 0x3d, 0x10};
+static const A2E_U8 qolrules_b1_c32[] = {0x81, 0xc1, 0x5c, 0x05, 0x00, 0x00};
+static const A2E_U8 qolrules_b1_c33[] = {0x8b, 0x0d, 0xd4, 0xb8, 0x76, 0x00};
+static const A2E_U8 qolrules_b1_c34[] = {0x6a, 0x09};
+static const A2EEntry qolrules_b1_entries[] = {
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4b8180, 0x0, 0, qolrules_b1_c0, 0, ""}, /* entry_start */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4b79b0, 0x0, 0, qolrules_b1_c1, 0, ""}, /* entry_pop */
+    {1, 0, 0xffff, 0xffff, 0, 0, 5, 0x4b7a60, 0x0, 0, qolrules_b1_c2, 0, ""}, /* entry_actdel */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4b84b0, 0x0, 0, qolrules_b1_c3, 0, ""}, /* entry_cancel */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4b78c0, 0x0, 0, qolrules_b1_c4, 0, ""}, /* entry_clearq */
+    {1, 0, 0xffff, 0xffff, 0, 0, 5, 0x4b7790, 0x0, 0, qolrules_b1_c5, 0, ""}, /* entry_clearteam */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4b8aa0, 0x0, 0, qolrules_b1_c6, 0, ""}, /* entry_save */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4b88d0, 0x0, 0, qolrules_b1_c7, 0, ""}, /* entry_load */
+    {1, 0, 0xffff, 0xffff, 0, 0, 5, 0x4846a0, 0x0, 0, qolrules_b1_c8, 0, ""}, /* entry_open */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4b7930, 0x0, 0, qolrules_b1_c9, 0, ""}, /* push_item */
+    {1, 0, 0x9, 0xffff, 0, 0, 0, 0x431532, 0x0, 0, 0, 0, ""}, /* push_call */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4cddc0, 0x0, 0, qolrules_b1_c11, 0, ""}, /* cost_dil */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4cde90, 0x0, 0, qolrules_b1_c12, 0, ""}, /* cost_lat */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4cdfa0, 0x0, 0, qolrules_b1_c13, 0, ""}, /* cost_met */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4ce070, 0x0, 0, qolrules_b1_c14, 0, ""}, /* cost_bio */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4ce140, 0x0, 0, qolrules_b1_c15, 0, ""}, /* cost_off */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4ce160, 0x0, 0, qolrules_b1_c16, 0, ""}, /* cost_crew */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x496e30, 0x0, 0, qolrules_b1_c17, 0, ""}, /* add_dil */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x496f20, 0x0, 0, qolrules_b1_c18, 0, ""}, /* add_lat */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x497010, 0x0, 0, qolrules_b1_c19, 0, ""}, /* add_met */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x496d40, 0x0, 0, qolrules_b1_c20, 0, ""}, /* add_bio */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4974b0, 0x0, 0, qolrules_b1_c21, 0, ""}, /* add_crew */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x498870, 0x0, 0, qolrules_b1_c22, 0, ""}, /* enlist */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x498890, 0x0, 0, qolrules_b1_c23, 0, ""}, /* discharge */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x497580, 0x0, 0, qolrules_b1_c24, 0, ""}, /* vacancies */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4b7700, 0x0, 0, qolrules_b1_c25, 0, ""}, /* remove_effect */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x76b8d4, 0x0, 0, 0, 0, ""}, /* transport */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6b6d8c, 0x0, 0, 0, 0, ""}, /* vt_local */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6b6eb8, 0x0, 0, 0, 0, ""}, /* vt_local_instant */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6ae228, 0x0, 0, 0, 0, ""}, /* epsilon */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x45d8c0, 0x0, 0, qolrules_b1_c30, 0, ""}, /* say_topic */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x45db20, 0x0, 0, qolrules_b1_c31, 0, ""}, /* say_event */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x48c120, 0x0, 0, qolrules_b1_c32, 0, ""}, /* officer_event */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4d0060, 0x0, 0, qolrules_b1_c33, 0, ""}, /* user_team */
+    {1, 0, 0xffff, 0xffff, 0, 0, 2, 0x4b826c, 0x0, 0, qolrules_b1_c34, 0, ""}, /* voice_topic */
+    {1, 0, 0x1e, 0xffff, 0, 0, 0, 0x4b826e, 0x0, 0, 0, 0, ""}, /* voice_say_topic */
+    {1, 0, 0x20, 0xffff, 0, 0, 0, 0x4b829a, 0x0, 0, 0, 0, ""}, /* voice_officer */
+    {1, 0, 0x1f, 0xffff, 0, 0, 0, 0x4b82a0, 0x0, 0, 0, 0, ""}, /* voice_say_event */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 236, 0, 0, ""}, /* p_teamidx */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 240, 0, 0, ""}, /* p_team */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 596, 0, 0, ""}, /* p_cur */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 624, 0, 0, ""}, /* p_head */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 628, 0, 0, ""}, /* p_count */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 672, 0, 0, ""}, /* p_curid */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 680, 0, 0, ""}, /* p_nextid */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 616, 0, 0, ""}, /* p_effect */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 312, 0, 0, ""}, /* vt_is_busy */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 368, 0, 0, ""}, /* vt_remove_effect */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 8, 0, 0, ""}, /* it_next */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 12, 0, 0, ""}, /* it_id */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 364, 0, 0, ""}, /* t_bank */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 40, 0, 0, ""}, /* t_dil */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 192, 0, 0, ""}, /* t_met */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 116, 0, 0, ""}, /* t_lat */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 360, 0, 0, ""}, /* t_bio */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 268, 0, 0, ""}, /* t_crew */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 580, 0, 0, ""}, /* t_race */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 10, 0, 0, ""}, /* q_max */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 9, 0, 0, ""}, /* topic_dil */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 10, 0, 0, ""}, /* topic_crew */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 54, 0, 0, ""}, /* topic_lat */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 55, 0, 0, ""}, /* topic_met */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 56, 0, 0, ""}, /* topic_bio */
+};
+static const A2EBlock qolrules_b1_blocked[] = {
+    {0, "CraftProcess::Handle_New_Command", "is changed by fo-roots-5.0Z11 (not yet verified)", "Stands down: CraftProcess::Handle_New_Command is changed by fo-roots-5.0Z11, not yet verified"},
+    {1, "ComputerVoice::Say", "is changed by fo-roots-5.0Z11 (not yet verified)", "Stands down: ComputerVoice::Say is changed by fo-roots-5.0Z11, not yet verified"},
+    {0xffff, 0, 0, 0}
+};
 static const A2EBuild qolrules_builds[] = {
     {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qolrules_b0_entries, qolrules_b0_blocked, 0, 63},
+    {"fo-roots-5.0Z11", "armada2/fo-roots-5.0Z11", "ArmadaL.exe", 0x3c4c76bd, 0x405000, 0xca07c55a, 0x400000, qolrules_b1_entries, qolrules_b1_blocked, 2, 0},
 };
 
 static A2E_U8 qolrules_hook_state[2];
@@ -381,7 +482,7 @@ static char qolrules_notes[2][A2E_NOTE_MAX + 1];
 
 static const A2ETable QOLRULES_ENGINE = {
     "armada2", "qolrules",
-    qolrules_syms, 63, qolrules_hooks, 2, qolrules_builds, 1, 0,
+    qolrules_syms, 63, qolrules_hooks, 2, qolrules_builds, 2, 0,
     qolrules_vars, qolrules_hook_state, qolrules_sym_flags, qolrules_sym_addr, qolrules_notes
 };
 

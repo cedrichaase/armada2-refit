@@ -585,6 +585,193 @@ pub const BUILDS: &[a2engine::Build] = &[
         blocked: &[
         ],
     },
+    a2engine::Build {
+        name: "fo-roots-5.0Z11",
+        key: "armada2/fo-roots-5.0Z11",
+        exe: "ArmadaL.exe",
+        timestamp: 0x3c4c76bd,
+        image_size: 0x405000,
+        sections: 0xca07c55a,
+        image_base: 0x400000,
+        n_resolved: 172,
+        content: "stock",
+        entries: &[
+            a2engine::Entry { present: true, addr: 0x763c00, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_palette_ptr
+            a2engine::Entry { present: true, addr: 0x763968, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_ship_display
+            a2engine::Entry { present: true, addr: 0x763810, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_map_radar
+            a2engine::Entry { present: true, addr: 0x7643a8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_cursor
+            a2engine::Entry { present: true, addr: 0x764fd8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_render_lists
+            a2engine::Entry { present: true, addr: 0x76b610, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_view_record
+            a2engine::Entry { present: true, addr: 0x764484, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_tooltip_state
+            a2engine::Entry { present: true, addr: 0x763758, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_cinematic_view
+            a2engine::Entry { present: true, addr: 0x51abf7, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x16, 0x8b, 0xce, 0xff, 0x52, 0x58], mask: &[], section: "", count: 0, value: 0 }, // hud_render_call
+            a2engine::Entry { present: true, addr: 0x505316, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0xce, 0x8b, 0x16, 0xff, 0x52, 0x70], mask: &[], section: "", count: 0, value: 0 }, // hud_owner_call
+            a2engine::Entry { present: true, addr: 0x65f120, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xa1, 0xbc, 0x0f, 0x7b, 0x00], mask: &[], section: "", count: 0, value: 0 }, // hud_text_input_active
+            a2engine::Entry { present: true, addr: 0x4e6350, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x51, 0x24, 0x33, 0xc0], mask: &[], section: "", count: 0, value: 0 }, // hud_is_playing_video
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // hud_di_rect
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 22 }, // hud_di_hidden
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 36 }, // hud_di_cursor
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 24 }, // hud_vt_name
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 88 }, // hud_vt_render
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 112 }, // hud_vt_cursor_over
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 36 }, // hud_cursor_owner
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 44 }, // hud_cursor_sprite
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 52 }, // hud_cursor_tip
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // hud_cursor_tip_verbose
+            a2engine::Entry { present: true, addr: 0x764d68, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // popups_message
+            a2engine::Entry { present: true, addr: 0x7648a8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // popups_objectives
+            a2engine::Entry { present: true, addr: 0x764d18, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // popups_pause
+            a2engine::Entry { present: true, addr: 0x763e30, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // popups_replay
+            a2engine::Entry { present: true, addr: 0x518620, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // popups_msg_unpause
+            a2engine::Entry { present: true, addr: 0x50df20, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // popups_obj_unpause
+            a2engine::Entry { present: true, addr: 0x517990, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // popups_pause_unpause
+            a2engine::Entry { present: true, addr: 0x5002b0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // popups_replay_press_0
+            a2engine::Entry { present: true, addr: 0x5002e0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // popups_replay_press_1
+            a2engine::Entry { present: true, addr: 0x500310, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // popups_replay_press_2
+            a2engine::Entry { present: true, addr: 0x500340, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // popups_replay_press_3
+            a2engine::Entry { present: true, addr: 0x500370, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // popups_replay_press_4
+            a2engine::Entry { present: true, addr: 0x489bf0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xa0, 0xd9, 0x7b, 0x73, 0x00], mask: &[], section: "", count: 0, value: 0 }, // popups_is_game_paused
+            a2engine::Entry { present: true, addr: 0x50d280, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x56, 0x8b, 0xf1, 0xb9], mask: &[], section: "", count: 0, value: 0 }, // popups_obj_focus_simulate
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // popups_msg_title
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 44 }, // popups_msg_body
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 52 }, // popups_msg_ok
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // popups_obj_summary_header
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 44 }, // popups_obj_title
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 48 }, // popups_obj_briefing
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 52 }, // popups_obj_header
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 60 }, // popups_obj_lines
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 92 }, // popups_obj_done
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 112 }, // popups_obj_ok
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 68 }, // popups_vt_focus_simulate
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 48 }, // popups_pause_button
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 44 }, // popups_replay_buttons
+            a2engine::Entry { present: true, addr: 0x709f68, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // palette_mode_names
+            a2engine::Entry { present: true, addr: 0x765030, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // palette_sprite_db
+            a2engine::Entry { present: true, addr: 0x65dce0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x56, 0x57], mask: &[], section: "", count: 0, value: 0 }, // palette_prj_get_name
+            a2engine::Entry { present: true, addr: 0x519780, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x08], mask: &[], section: "", count: 0, value: 0 }, // palette_cmd_button_name
+            a2engine::Entry { present: true, addr: 0x4e7950, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x48], mask: &[], section: "", count: 0, value: 0 }, // palette_mode_button_name
+            a2engine::Entry { present: true, addr: 0x620750, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08], mask: &[], section: "", count: 0, value: 0 }, // palette_find_element
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // palette_slots
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 272 }, // palette_mode
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 292 }, // palette_menu
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 52 }, // palette_btn_state
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 44 }, // palette_btn_sprite
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 132 }, // palette_btn_mode
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 136 }, // palette_btn_command
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // palette_vt_tooltip
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // palette_vt_verbose
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 28 }, // palette_vt_is_valid
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // palette_vt_press
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // palette_cmd_name
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 432 }, // palette_cmd_pos
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // palette_mode_kind
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 12 }, // palette_mode_class
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 124 }, // palette_class_odf
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // palette_mode_weapon
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 520 }, // palette_weapon_prjid
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 20 }, // palette_mode_index
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 21 }, // palette_n_slots
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // palette_names_stride
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 9 }, // palette_names_count
+            a2engine::Entry { present: true, addr: 0x7645b0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // overlay_selection_display
+            a2engine::Entry { present: true, addr: 0x761084, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // overlay_object_list
+            a2engine::Entry { present: true, addr: 0x765010, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // overlay_current_camera
+            a2engine::Entry { present: true, addr: 0x765004, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // overlay_virtual_viewport
+            a2engine::Entry { present: true, addr: 0x70dce0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // overlay_system_order
+            a2engine::Entry { present: true, addr: 0x6eee98, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // overlay_td_game_object_class
+            a2engine::Entry { present: true, addr: 0x6eee08, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // overlay_td_craft_class
+            a2engine::Entry { present: true, addr: 0x6731a0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xff, 0x25], mask: &[], section: "", count: 0, value: 0 }, // overlay_rt_dynamic_cast
+            a2engine::Entry { present: true, addr: 0x5081b0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x74, 0x53, 0x8b, 0x5d, 0x08], mask: &[], section: "", count: 0, value: 0 }, // overlay_container_rect
+            a2engine::Entry { present: true, addr: 0x599900, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0xa1, 0x08, 0xd5, 0x7a, 0x00], mask: &[], section: "", count: 0, value: 0 }, // overlay_render_selection
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 124 }, // overlay_sd_pointed
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 136 }, // overlay_sd_team
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 140 }, // overlay_sd_fade
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 84 }, // overlay_sd_repair_icons
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 52 }, // overlay_ri_sprite
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // overlay_ri_flash
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 20 }, // overlay_obj_flags
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 37 }, // overlay_obj_drawn
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // overlay_obj_class
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 236 }, // overlay_obj_team
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 270 }, // overlay_obj_selected
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 275 }, // overlay_obj_removed
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 288 }, // overlay_obj_group
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 344 }, // overlay_obj_hull
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 352 }, // overlay_obj_hull_max
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 356 }, // overlay_obj_special
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 360 }, // overlay_obj_special_max
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 456 }, // overlay_craft_shield
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 460 }, // overlay_craft_shield_max
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 480 }, // overlay_craft_systems
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 447 }, // overlay_craft_show_all
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // overlay_system_hidden
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // overlay_system_size
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 24 }, // overlay_system_now
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // overlay_vt_can_user_see
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 112 }, // overlay_vt_class_name
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 525 }, // overlay_cls_station
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 252 }, // overlay_s3d_camera
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // overlay_flag_craft
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 48 }, // overlay_system_stride
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 5 }, // overlay_system_count
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 10 }, // overlay_group_count
+            a2engine::Entry { present: true, addr: 0x764488, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // otext_overlay
+            a2engine::Entry { present: true, addr: 0x7644c4, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // otext_nil
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // otext_map_head
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 12 }, // otext_node_key
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 20 }, // otext_node_value
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 88 }, // otext_point
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 104 }, // otext_justify
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 136 }, // otext_text
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 148 }, // otext_colour
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 160 }, // otext_fade
+            a2engine::Entry { present: true, addr: 0x6212b0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_wireframe_rect
+            a2engine::Entry { present: true, addr: 0x52220a, end: 0x0, target: 0x81, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_drag_box_call
+            a2engine::Entry { present: true, addr: 0x618590, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_clip_and_render_line
+            a2engine::Entry { present: true, addr: 0x5938a0, end: 0x0, target: 0x83, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_height_post_call
+            a2engine::Entry { present: true, addr: 0x63a7c0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_sprite_draw_quad
+            a2engine::Entry { present: true, addr: 0x642610, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68], mask: &[], section: "", count: 0, value: 0 }, // lo_demand_load
+            a2engine::Entry { present: true, addr: 0x63b150, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x58, 0xc3], mask: &[], section: "", count: 0, value: 0 }, // lo_sprite_texture
+            a2engine::Entry { present: true, addr: 0x522537, end: 0x0, target: 0x85, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_grid_fx_call
+            a2engine::Entry { present: true, addr: 0x5222f0, end: 0x0, target: 0x85, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_where_call
+            a2engine::Entry { present: true, addr: 0x473a05, end: 0x0, target: 0x85, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_footprint_cell_call
+            a2engine::Entry { present: true, addr: 0x473a77, end: 0x0, target: 0x85, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_footprint_clear_call
+            a2engine::Entry { present: true, addr: 0x473a8e, end: 0x0, target: 0x85, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_footprint_blocked_call
+            a2engine::Entry { present: true, addr: 0x5076cc, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0xcf, 0xff, 0x52, 0x1c], mask: &[], section: "", count: 0, value: 0 }, // lo_fade_white
+            a2engine::Entry { present: true, addr: 0x507704, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8d, 0x45, 0xec, 0x50, 0xff, 0x52, 0x1c], mask: &[], section: "", count: 0, value: 0 }, // lo_fade_black
+            a2engine::Entry { present: true, addr: 0x464350, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_blit
+            a2engine::Entry { present: true, addr: 0x4e5da5, end: 0x0, target: 0x8f, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_blit_render_call
+            a2engine::Entry { present: true, addr: 0x4e6153, end: 0x0, target: 0x8f, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_blit_update_call
+            a2engine::Entry { present: true, addr: 0x621200, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_draw_rectangle
+            a2engine::Entry { present: true, addr: 0x46457c, end: 0x0, target: 0x92, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_video_bar_call_a
+            a2engine::Entry { present: true, addr: 0x4645cd, end: 0x0, target: 0x92, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_video_bar_call_b
+            a2engine::Entry { present: true, addr: 0x63ada0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_draw_scaled_2d
+            a2engine::Entry { present: true, addr: 0x464656, end: 0x0, target: 0x95, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_video_sprite_call
+            a2engine::Entry { present: true, addr: 0x736770, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_bink_width
+            a2engine::Entry { present: true, addr: 0x736774, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_bink_height
+            a2engine::Entry { present: true, addr: 0x628890, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_print_string
+            a2engine::Entry { present: true, addr: 0x599300, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_display_frame_rate
+            a2engine::Entry { present: true, addr: 0x5989a6, end: 0x0, target: 0x99, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_fps_tri_call
+            a2engine::Entry { present: true, addr: 0x5989b0, end: 0x0, target: 0x9a, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_fps_call
+            a2engine::Entry { present: true, addr: 0x6fc8a8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_framerate_display
+            a2engine::Entry { present: true, addr: 0x653950, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x8b, 0x0d, 0x30, 0xec, 0x7a, 0x00], mask: &[], section: "", count: 0, value: 0 }, // lo_slot_name
+            a2engine::Entry { present: true, addr: 0x653990, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0xdd, 0x05], mask: &[], section: "", count: 0, value: 0 }, // lo_time_avg
+            a2engine::Entry { present: true, addr: 0x7aec38, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_slot_count
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 36 }, // lo_sprite_colour
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 36 }, // lo_fade_alpha
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 352 }, // lo_cam_projection
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 432 }, // lo_cam_viewport
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 252 }, // lo_s3d_camera
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 192 }, // lo_s3d_device
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 136 }, // lo_s3d_fps
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 128 }, // lo_s3d_total_fps
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // otext_tree_left
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // otext_tree_parent
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // otext_tree_right
+        ],
+        blocked: &[
+        ],
+    },
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 16] = [const { core::sync::atomic::AtomicU64::new(0) }; 16];

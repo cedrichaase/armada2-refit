@@ -341,6 +341,117 @@ pub const BUILDS: &[a2engine::Build] = &[
         blocked: &[
         ],
     },
+    a2engine::Build {
+        name: "fo-roots-5.0Z11",
+        key: "armada2/fo-roots-5.0Z11",
+        exe: "ArmadaL.exe",
+        timestamp: 0x3c4c76bd,
+        image_size: 0x405000,
+        sections: 0xca07c55a,
+        image_base: 0x400000,
+        n_resolved: 96,
+        content: "stock",
+        entries: &[
+            a2engine::Entry { present: true, addr: 0x5913a0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff], mask: &[], section: "", count: 0, value: 0 }, // shell_show_credits
+            a2engine::Entry { present: true, addr: 0x606bd4, end: 0x0, target: 0x0, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shell_credits_site
+            a2engine::Entry { present: true, addr: 0x62c6d0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x1c], mask: &[], section: "", count: 0, value: 0 }, // shell_set_active_display
+            a2engine::Entry { present: true, addr: 0x62d880, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x18], mask: &[], section: "", count: 0, value: 0 }, // shell_clear_device_displays
+            a2engine::Entry { present: true, addr: 0x62bc70, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x89, 0xcc, 0x00, 0x00, 0x00], mask: &[], section: "", count: 0, value: 0 }, // shell_get_window_handle
+            a2engine::Entry { present: true, addr: 0x488730, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x1c], mask: &[], section: "", count: 0, value: 0 }, // shell_handle_message_queue
+            a2engine::Entry { present: true, addr: 0x623c70, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x08], mask: &[], section: "", count: 0, value: 0 }, // shell_st3d_test_coop
+            a2engine::Entry { present: true, addr: 0x6083f0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x51], mask: &[], section: "", count: 0, value: 0 }, // shell_set_current_background
+            a2engine::Entry { present: true, addr: 0x5a3960, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff], mask: &[], section: "", count: 0, value: 0 }, // shell_shell_bitmap
+            a2engine::Entry { present: true, addr: 0x652710, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec], mask: &[], section: "", count: 0, value: 0 }, // shell_new
+            a2engine::Entry { present: true, addr: 0x7a8f98, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shell_colour_black
+            a2engine::Entry { present: true, addr: 0x727fd0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shell_all_black_background
+            a2engine::Entry { present: true, addr: 0x7a8980, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shell_mode
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 2 }, // shell_display_3d
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 3 }, // shell_display_shell
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1 }, // shell_mode_main_menu
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 48 }, // shell_bitmap_size
+            a2engine::Entry { present: true, addr: 0x6bc6ac, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shell_dx8_vtable
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0x11, index: 27, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shell_dx8_flip_to_gdi
+            a2engine::Entry { present: true, addr: 0x737bb0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shell_exit_code
+            a2engine::Entry { present: true, addr: 0x737b30, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shell_program
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 192 }, // shell_storm3d_device_index
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 204 }, // shell_storm3d_devices
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 268 }, // shell_storm3d_display
+            a2engine::Entry { present: true, addr: 0x488883, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xff, 0x15, 0xa8, 0x81, 0x7b, 0x00], mask: &[], section: "", count: 0, value: 0 }, // shell_wm_setcursor
+            a2engine::Entry { present: true, addr: 0x5a8060, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0xc1, 0x8b, 0x4d, 0x08, 0x89, 0x48, 0x04, 0xc7, 0x00, 0xd4, 0xb2, 0x6b, 0x00, 0x5d, 0xc2, 0x04, 0x00], mask: &[], section: "", count: 0, value: 0 }, // shellui_widget_ctor
+            a2engine::Entry { present: true, addr: 0x6bb2d4, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shellui_vt_widget
+            a2engine::Entry { present: true, addr: 0x5a4af0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shellui_button_update_hdc
+            a2engine::Entry { present: true, addr: 0x5a7590, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shellui_textlabel_draw
+            a2engine::Entry { present: true, addr: 0x6bb064, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shellui_vt_cycle_button
+            a2engine::Entry { present: true, addr: 0x6bb18c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shellui_vt_toggle_button
+            a2engine::Entry { present: true, addr: 0x6bb0e4, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shellui_vt_selbox
+            a2engine::Entry { present: true, addr: 0x6bbaa4, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shellui_vt_std_text_label
+            a2engine::Entry { present: true, addr: 0x6bb164, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shellui_vt_scrollbar
+            a2engine::Entry { present: true, addr: 0x6bad2c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shellui_vt_combo_box
+            a2engine::Entry { present: true, addr: 0x6badcc, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shellui_vt_game_slot
+            a2engine::Entry { present: true, addr: 0x6bae74, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shellui_vt_player_list
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 7012352 }, // shellui_rdata_start
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 7143424 }, // shellui_rdata_end
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // shellui_btn_hwnd
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 60 }, // shellui_btn_label
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 192 }, // shellui_btn_mode
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 196 }, // shellui_btn_rect
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 228 }, // shellui_btn_shown
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 232 }, // shellui_btn_enabled
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // shellui_btn_colour
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 372 }, // shellui_btn_left
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 373 }, // shellui_btn_right
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 376 }, // shellui_selbox_rect
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 392 }, // shellui_toggle_on
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 408 }, // shellui_cycle_selection
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // shellui_sb_rect
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // shellui_sb_track_start
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 20 }, // shellui_sb_track_top
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 60 }, // shellui_sb_value
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // shellui_sb_track_len
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 68 }, // shellui_sb_horizontal
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 72 }, // shellui_sb_lo
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 76 }, // shellui_sb_hi
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // shellui_lbl_hwnd
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // shellui_lbl_text
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1032 }, // shellui_lbl_rect
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1048 }, // shellui_lbl_flags
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1116 }, // shellui_lbl_shown
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1124 }, // shellui_lbl_colour
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1128 }, // shellui_std_lbl_string
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // shellui_btn_label_len
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1024 }, // shellui_lbl_text_len
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 376 }, // shellcombo_count
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 380 }, // shellcombo_item_h
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 384 }, // shellcombo_pull
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 408 }, // shellcombo_combo
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 436 }, // shellcombo_down
+            a2engine::Entry { present: true, addr: 0x76b8d4, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // setup_transport
+            a2engine::Entry { present: true, addr: 0x557940, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x30, 0xc3], mask: &[], section: "", count: 0, value: 0 }, // setup_get_game_setup
+            a2engine::Entry { present: true, addr: 0x5461f0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x56, 0x8b, 0xf1, 0x8b, 0x46, 0x10], mask: &[], section: "", count: 0, value: 0 }, // setup_get_map_name
+            a2engine::Entry { present: true, addr: 0x546240, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x10, 0x83, 0xc0, 0x6c, 0xc3], mask: &[], section: "", count: 0, value: 0 }, // setup_get_map_title
+            a2engine::Entry { present: true, addr: 0x547470, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x01, 0xc3], mask: &[], section: "", count: 0, value: 0 }, // setup_get_local_slot
+            a2engine::Entry { present: true, addr: 0x546650, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08], mask: &[], section: "", count: 0, value: 0 }, // setup_get_race
+            a2engine::Entry { present: true, addr: 0x546610, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08], mask: &[], section: "", count: 0, value: 0 }, // setup_get_team
+            a2engine::Entry { present: true, addr: 0x546af0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08], mask: &[], section: "", count: 0, value: 0 }, // setup_is_vacant
+            a2engine::Entry { present: true, addr: 0x546b90, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08], mask: &[], section: "", count: 0, value: 0 }, // setup_is_game_player
+            a2engine::Entry { present: true, addr: 0x5466e0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff], mask: &[], section: "", count: 0, value: 0 }, // setup_get_player_name
+            a2engine::Entry { present: true, addr: 0x547cd0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xa1, 0xb4, 0x7c, 0x73, 0x00, 0xc3], mask: &[], section: "", count: 0, value: 0 }, // setup_race_random
+            a2engine::Entry { present: true, addr: 0x48b180, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x53, 0x56], mask: &[], section: "", count: 0, value: 0 }, // setup_find_ia_race
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // setup_vt_is_instant_action
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 24 }, // setup_vt_is_single_player
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // setup_vt_show_load_percentages
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 68 }, // setup_vt_get_load_percentage
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 92 }, // setup_vt_is_send_worthy
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 20 }, // setup_race_name
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // setup_slots
+            a2engine::Entry { present: true, addr: 0x7a89a0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // progress_settings
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 13 }, // progress_reached
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 17 }, // progress_complete
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 21 }, // progress_missions
+        ],
+        blocked: &[
+        ],
+    },
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 8] = [const { core::sync::atomic::AtomicU64::new(0) }; 8];

@@ -355,6 +355,127 @@ pub const BUILDS: &[a2engine::Build] = &[
         blocked: &[
         ],
     },
+    a2engine::Build {
+        name: "fo-roots-5.0Z11",
+        key: "armada2/fo-roots-5.0Z11",
+        exe: "ArmadaL.exe",
+        timestamp: 0x3c4c76bd,
+        image_size: 0x405000,
+        sections: 0xca07c55a,
+        image_base: 0x400000,
+        n_resolved: 19,
+        content: "stock",
+        entries: &[
+            a2engine::Entry { present: true, addr: 0x473930, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x3c, 0x53, 0x8b], mask: &[], section: "", count: 0, value: 0 }, // fn_footprints
+            a2engine::Entry { present: true, addr: 0x496340, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x8b, 0x04], mask: &[], section: "", count: 0, value: 0 }, // fn_team_get
+            a2engine::Entry { present: true, addr: 0x4ce370, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x89, 0xcc, 0x01, 0x00, 0x00, 0xe9, 0x25], mask: &[], section: "", count: 0, value: 0 }, // fn_class_odf
+            a2engine::Entry { present: true, addr: 0x4cff40, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x04, 0x83, 0xc0, 0x28, 0xc3, 0x90], mask: &[], section: "", count: 0, value: 0 }, // fn_scale_factor
+            a2engine::Entry { present: true, addr: 0x4cff60, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x04, 0x8a, 0x40, 0x74, 0xc3, 0x90], mask: &[], section: "", count: 0, value: 0 }, // fn_is_scaled
+            a2engine::Entry { present: true, addr: 0x4cfff0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x4d, 0x08, 0x8b, 0xc1], mask: &[], section: "", count: 0, value: 0 }, // fn_entity_get
+            a2engine::Entry { present: true, addr: 0x4d1080, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x8b, 0x89], mask: &[], section: "", count: 0, value: 0 }, // fn_relation
+            a2engine::Entry { present: true, addr: 0x4d5bb0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x18, 0x8b, 0x45], mask: &[], section: "", count: 0, value: 0 }, // fn_distance_cull
+            a2engine::Entry { present: true, addr: 0x4e5260, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8a, 0x45, 0x0c, 0x84, 0xc0], mask: &[], section: "", count: 0, value: 0 }, // fn_render
+            a2engine::Entry { present: true, addr: 0x51e180, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xa1, 0x10, 0xb6, 0x76, 0x00, 0x8d, 0x04, 0x40], mask: &[], section: "", count: 0, value: 0 }, // fn_grid_visible
+            a2engine::Entry { present: true, addr: 0x5462f0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x10, 0x8a, 0x80, 0xaf, 0x00, 0x00], mask: &[], section: "", count: 0, value: 0 }, // fn_is_fog
+            a2engine::Entry { present: true, addr: 0x546300, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x10, 0x8a, 0x80, 0xb0, 0x00, 0x00], mask: &[], section: "", count: 0, value: 0 }, // fn_is_shroud
+            a2engine::Entry { present: true, addr: 0x557940, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x30, 0xc3, 0x90, 0x90, 0x90, 0x90], mask: &[], section: "", count: 0, value: 0 }, // fn_get_game_setup
+            a2engine::Entry { present: true, addr: 0x593480, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x1c, 0x53, 0x56], mask: &[], section: "", count: 0, value: 0 }, // fn_draw_grid
+            a2engine::Entry { present: true, addr: 0x5578b0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x56, 0x8b, 0xf1, 0x57, 0x8b, 0x4e, 0x30, 0xe8], mask: &[], section: "", count: 0, value: 0 }, // fn_user_team
+            a2engine::Entry { present: true, addr: 0x593840, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x18, 0x8b, 0x4d], mask: &[], section: "", count: 0, value: 0 }, // fn_height_post
+            a2engine::Entry { present: true, addr: 0x599900, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0xa1, 0x08, 0xd5, 0x7a, 0x00], mask: &[], section: "", count: 0, value: 0 }, // fn_render_selection
+            a2engine::Entry { present: true, addr: 0x6aff14, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // vt_instance
+            a2engine::Entry { present: true, addr: 0x6aff8c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // vt_ghost
+            a2engine::Entry { present: true, addr: 0x6b005c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // vt_placeholder
+            a2engine::Entry { present: true, addr: 0x6b46c0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // vt_tactical_camera
+            a2engine::Entry { present: true, addr: 0x6bc56c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // vt_database
+            a2engine::Entry { present: true, addr: 0x71a78c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // grid_size
+            a2engine::Entry { present: true, addr: 0x736c94, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // ghost_nodes
+            a2engine::Entry { present: true, addr: 0x736d50, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // placeholder
+            a2engine::Entry { present: true, addr: 0x738a54, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // scan_fog
+            a2engine::Entry { present: true, addr: 0x738a58, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // scan_shroud
+            a2engine::Entry { present: true, addr: 0x76b5ac, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // user_profile
+            a2engine::Entry { present: true, addr: 0x76b610, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // view_record
+            a2engine::Entry { present: true, addr: 0x76b8d4, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // g_transport
+            a2engine::Entry { present: true, addr: 0x772140, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // g_terrain
+            a2engine::Entry { present: true, addr: 0x77215c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // terrain_y
+            a2engine::Entry { present: true, addr: 0x772180, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // terrain_initialized
+            a2engine::Entry { present: true, addr: 0x773c8c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // buckets
+            a2engine::Entry { present: true, addr: 0x7a8ee8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dark_orange
+            a2engine::Entry { present: true, addr: 0x7a8f68, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // green
+            a2engine::Entry { present: true, addr: 0x7a8f78, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // red
+            a2engine::Entry { present: true, addr: 0x473bbc, end: 0x0, target: 0xf, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_post0
+            a2engine::Entry { present: true, addr: 0x522080, end: 0x0, target: 0xf, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_post1
+            a2engine::Entry { present: true, addr: 0x5222fd, end: 0x0, target: 0xf, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_post2
+            a2engine::Entry { present: true, addr: 0x524c02, end: 0x0, target: 0xf, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_post3
+            a2engine::Entry { present: true, addr: 0x524c2d, end: 0x0, target: 0xf, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_post4
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 132 }, // ov_edit_mode
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 69 }, // ov_tactical_shroud
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 72 }, // ov_selection_brightness
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // ov_tg_shroud_tree
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // ov_tg_x0
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 12 }, // ov_tg_z0
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // ov_tg_x1
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 24 }, // ov_tg_z1
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 28 }, // ov_tg_grid_y
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // ov_tg_cells_x
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 36 }, // ov_tg_cells_z
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 52 }, // ov_tg_fog_tex
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // ov_tg_shroud_tex
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 12 }, // ov_scan_w
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // ov_scan_h
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 240 }, // ov_obj_team_ptr
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // ov_bucket_count
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 156 }, // ov_sel_next
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 136 }, // ov_sel_handle
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 132 }, // ov_sel_bits
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 140 }, // ov_sel_phase
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 144 }, // ov_sel_scale
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 344 }, // ov_obj_pulse
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 12 }, // ov_vt_spirit_render
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 168 }, // ov_s3d_material
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // ov_s3d_alpha
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 52 }, // ov_s3d_team
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 36 }, // ov_ghost_material
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 24 }, // ov_mat_ambient
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 36 }, // ov_mat_diffuse
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // ov_ghost_factor
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 12 }, // ov_spirit_team
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // ov_spirit_instance
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // ov_spirit_class
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 104 }, // ov_inst_origin
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 68 }, // ov_inst_matrix
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 52 }, // ov_ph_class
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // ov_ph_matrix
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 104 }, // ov_ph_colour
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 116 }, // ov_ph_placeable
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // ov_vt_tcam_render
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 224 }, // ov_cam_marker
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 228 }, // ov_cam_free
+            a2engine::Entry { present: true, addr: 0x525180, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x78, 0x53, 0x56], mask: &[], section: "", count: 0, value: 0 }, // fn_draw_path
+            a2engine::Entry { present: true, addr: 0x522247, end: 0x0, target: 0x55, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_draw_path
+            a2engine::Entry { present: true, addr: 0x768e40, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // overview
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 612 }, // ov_add_path
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 780 }, // ov_waypoint_key
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 148 }, // ov_vt_select_num
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 152 }, // ov_vt_select_list
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 68 }, // obj_process
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 172 }, // obj_position
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 236 }, // obj_team
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // proc_command
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 136 }, // proc_path
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 300 }, // proc_point
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // path_count
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // path_points
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // path_type
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // cmd_go
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 26 }, // cmd_patrol
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 2 }, // path_patrol
+        ],
+        blocked: &[
+            a2engine::Block { hook: 0, symbol: "Terrain_Geometry::DrawGrid", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Terrain_Geometry::DrawGrid is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 1, symbol: "PlaceholderFeature::sRenderInternal", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: PlaceholderFeature::sRenderInternal is changed by fo-roots-5.0Z11, not yet verified" },
+        ],
+    },
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 3] = [const { core::sync::atomic::AtomicU64::new(0) }; 3];

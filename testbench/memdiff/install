@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Put MemDiff.asi (memdiff.c: what other modules rewrite of the exe in memory) into a
+# test-bench clone, beside the game's executable, with the ASI loader if the clone has
+# none (a Roots clone, whose Data/ ships without one):
+#   ./a2test session start --game fo-roots --install testbench/memdiff
+#   ./a2test session start --install testbench/memdiff            # stock, the control
+# Refuses any game directory that is not an a2test clone: it is a test tool and never
+# goes into the player's install. MemDiff.log appears beside the exe.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$here/../../a2env.sh"
+
+case "$A2_GAME" in
+    "$HOME"/.cache/a2test/*) ;;
+    *) echo "refusing: $A2_GAME is not an a2test clone" >&2; exit 1 ;;
+esac
+
+dir="$(dirname "$A2_EXE")"
+[ -f "$A2_EXE" ] || { echo "no executable at $A2_EXE" >&2; exit 1; }
+
+bash "$here/build.sh"
+cp "$here/build/MemDiff.asi" "$dir/"
+if [ ! -e "$dir/winmm.dll" ]; then
+    cp "$here/../../platform/vendor/STA2WidescreenPatch-1.0/winmm.dll" "$dir/winmm.dll"
+    echo "put the ASI loader into $dir (winmm.dll)"
+fi
+rm -f "$dir/MemDiff.log"
+echo "installed MemDiff.asi into $dir"

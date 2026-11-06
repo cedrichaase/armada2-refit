@@ -450,7 +450,7 @@ def _field(d, dotted):
 def _check_games(reg, errs):
     """Every `games` entry names a descriptor, every descriptor's layers exist and list
     it back, one descriptor is the default, the profiles' builds name a descriptor and
-    one of its executables, and a2env's built-in fallback is the default descriptor."""
+    one of its executables (or another descriptor's: Roots' build of armada2), and a2env's built-in fallback is the default descriptor."""
     gids = a2env.game_ids()
     descs = {}
     for g in gids:
@@ -500,9 +500,13 @@ def _check_games(reg, errs):
         if d is None:
             errs.append(f'{rel}: game {b.get("game")!r} has no games/<id>.toml')
             continue
+        # Another build of the same engine may be its own game for the tools (Roots:
+        # profile game armada2, descriptor fo-roots, which names ArmadaL.exe).
+        named = {x for dd in descs.values() for x in (_field(dd, 'exe.names') or [])}
         for x in b.get('exe', []):
-            if x not in (_field(d, 'exe.names') or []):
-                errs.append(f'{rel}: exe {x} is not one of games/{b["game"]}.toml exe.names')
+            if x not in (_field(d, 'exe.names') or []) and x not in named:
+                errs.append(f'{rel}: exe {x} is not one of games/{b["game"]}.toml exe.names '
+                            f'(nor of any other descriptor)')
     # a2env's fallback, for the release package that ships a2env.py without games/.
     if len(defaults) == 1:
         d = descs[defaults[0]]

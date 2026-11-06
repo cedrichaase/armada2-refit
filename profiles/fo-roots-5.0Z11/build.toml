@@ -1,0 +1,199 @@
+# Star Trek: Armada II -- Fleet Operations: Roots 5.0Z11 (games/fo-roots.toml): its
+# Data/ArmadaL.exe is stock 1.1's image patched (PLAN-FLEETOPS.md, "The executable"), so
+# this build inherits gog-1.1 and only marks what Roots changes. The timestamp is
+# stock's; the image size and the section fingerprint tell it apart.
+#
+# [[changed]] lists only the functions Roots changes that one of our entries is (`symbol`)
+# or sits in (`in`): every hook using one stands down here until it is verified beside
+# Roots' change and named in `verified`. `detour`: Roots jumps or calls into its own code
+# section there; `edit`: constants or branches changed in place; `runtime`: changed in
+# memory by FleetOpsHook.dll, which no file diff shows (PLAN-FLEETOPS.md, FO-2).
+# The file diff and the run-time diff that found them are not published (hard rule 9):
+# they are re-run with the bench's MemDiff.asi (testbench/memdiff/) and the profile tools.
+schema = 1
+game = "armada2"
+build = "fo-roots-5.0Z11"
+label = "Fleet Operations: Roots 5.0Z11"
+exe = ["ArmadaL.exe"]
+inherits = "gog-1.1"
+# No content set yet: stock's recipes are keyed by stock's ODF and model names, and
+# Roots' differ. FO-5 writes Roots' own set; until then the engine's look shows.
+content = "none"
+
+[pe]
+timestamp = 0x3c4c76bd
+image_size = 0x405000
+sections = 0xca07c55a
+image_base = 0x400000
+code = [0x401000, 0x6ae000]
+
+[[known]]
+sha256 = "4300ab71731e323f5767d8ee05457e6444401b823253aebee86c5ac23c2b00de"
+note = "Fleet Operations: Roots 5.0Z11 (23 October 2026), Data/ArmadaL.exe as installed"
+
+# ---- off in Roots -----------------------------------------------------------------
+
+[[disable]]
+hooks = ["qolrules.*"]
+why = "Roots has its own rules"
+
+# ---- display ------------------------------------------------------------------------
+
+[[changed]]
+fn = "ST3D_DisplayDevice::FindDisplayMode"
+how = "edit"
+verified = []
+
+[[changed]]
+fn = "ST3D_GraphicsEngine::SetActiveDisplay_Internal"
+how = "edit"
+verified = []
+
+[[changed]]
+fn = "WinMain"
+how = "edit"
+verified = []
+
+# ---- render3d -----------------------------------------------------------------------
+
+[[changed]]
+fn = "GameObject::RenderInternal"
+how = "detour"
+verified = []
+
+[[changed]]
+fn = "Craft::Explode"
+how = "detour"
+verified = []
+
+[[changed]]
+fn = "BuildingEffect::SafeDestroyConstruction"
+how = "detour"
+verified = []
+
+[[changed]]
+fn = "ShieldHit::DrawShield"
+how = "detour"
+verified = []
+
+[[changed]]
+fn = "PlaceholderFeature::sRenderInternal"
+how = "detour"
+verified = []
+
+[[changed]]
+fn = "GetSensorScramblerWaveLight"
+how = "edit"
+verified = []
+
+[[changed]]
+fn = "Terrain_Geometry::DrawGrid"
+how = "edit"
+verified = []
+
+# ---- ui -------------------------------------------------------------------------------
+# The shell's dialog procedures ask for 1200x900 where stock asks for 800x600.
+
+[[changed]]
+fn = "Program::GameDoOne"
+how = "detour"
+verified = []
+
+[[changed]]
+fn = "AdmiralsLogDlgProc"
+how = "edit"
+verified = []
+
+[[changed]]
+fn = "EscapeMenuDlgProc"
+how = "edit"
+verified = []
+
+[[changed]]
+fn = "GameNameDlgProc"
+how = "edit"
+verified = []
+
+[[changed]]
+fn = "GameSettingsDlgProc"
+how = "edit"
+verified = []
+
+[[changed]]
+fn = "InternetGameDlgProc"
+how = "edit"
+verified = []
+
+[[changed]]
+fn = "LoadGameDlgProc"
+how = "edit"
+verified = []
+
+[[changed]]
+fn = "MissionSelectDlgProc"
+how = "edit"
+verified = []
+
+[[changed]]
+fn = "MultiplayerSetupDlgProc"
+how = "edit"
+verified = []
+
+[[changed]]
+fn = "NetWaitingDlgProc"
+how = "edit"
+verified = []
+
+[[changed]]
+fn = "OneButtonDlgProc"
+how = "edit"
+verified = []
+
+[[changed]]
+fn = "SaveGameDlgProc"
+how = "edit"
+verified = []
+
+[[changed]]
+fn = "SingleDlgProc"
+how = "edit"
+verified = []
+
+# ---- qol ------------------------------------------------------------------------------
+
+[[changed]]
+fn = "cOverViewImp::mCheckGroupSelect"
+how = "detour"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mProcessKeyboardInput"
+how = "detour"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::Simulate"
+how = "detour"
+verified = []
+
+[[changed]]
+fn = "PopupPaletteImp::mProcessKeyboardInput"
+how = "detour"
+verified = []
+
+[[changed]]
+fn = "Producer::FinishBuild"
+how = "detour"
+verified = []
+
+# ---- qolrules (off above in any case) ------------------------------------------------
+
+[[changed]]
+fn = "ComputerVoice::Say"
+how = "detour"
+verified = []
+
+[[changed]]
+fn = "CraftProcess::Handle_New_Command"
+how = "detour"
+verified = []
