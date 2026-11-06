@@ -666,8 +666,8 @@ def s_expect_exited(c, m):
 @step(r'^expect no crash$|^expect the game not to (?:have )?crash(?:ed)?$')
 def s_no_crash(c, m):
     crashed = c.sess.crashed()
-    detail = 'exception.txt was written:\n' + (c.sess.game_log(config.LOG_CRASH) or '')[-1500:] if crashed \
-        else 'exception.txt untouched'
+    detail = f'{Path(config.LOG_CRASH).name} was written:\n' + (c.sess.game_log(config.LOG_CRASH) or '')[-1500:] if crashed \
+        else f'{Path(config.LOG_CRASH).name} untouched'
     return c.checked(not crashed, detail, how="the game's crash handler writes exception.txt")
 
 
