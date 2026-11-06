@@ -57,3 +57,4 @@ IsWindowEnabled@4
 GetDlgCtrlID@4
 GetWindowTextA@12
 RedrawWindow@16
+EnumThreadWindows@12

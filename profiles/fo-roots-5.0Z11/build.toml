@@ -271,11 +271,12 @@ how = "runtime"
 verified = ["render3d.frame.*", "render3d.effects.reads", "render3d.ordnance.warp"]
 
 # FleetOpsHook's one edit (+0x245) takes out an edit-menu call, away from the seam's call at
-# 0x59886e (FO-5 step 3).
+# 0x59886e (FO-5 step 3) and from the UI's call of ChatDisplay::Render at 0x598a16, which
+# is stock's in the file and in memory (FO-6 step 3).
 [[changed]]
 fn = "Armada_RenderFrame"
 how = "runtime"
-verified = ["render3d.frame.*"]
+verified = ["render3d.frame.*", "ui.core.mission"]
 
 # FleetOpsHook re-points the node-particle call at +0x4f8, away from the shield-hit call the
 # effects module taps (+0x345, still stock's in memory) (FO-5 step 5).
@@ -354,10 +355,13 @@ fn = "ChangePasswordDlgProc"
 how = "runtime"
 verified = []
 
+# FleetOpsHook trampolines the entry (its clean screenshot skips the chat): the UI only
+# re-points Armada_RenderFrame's call of it, which is stock's, and calls it, so Roots'
+# version runs whole (FO-6 step 3).
 [[changed]]
 fn = "ChatDisplay::Render"
 how = "runtime"
-verified = []
+verified = ["ui.core.mission"]
 
 [[changed]]
 fn = "CinematicView::mUpdateVideo"

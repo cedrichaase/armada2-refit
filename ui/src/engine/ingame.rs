@@ -15,7 +15,7 @@
 //! mission (`Program::GameOpen` makes it) and nowhere else, and `Armada_RenderFrame`
 //! runs only from the mission loop, so the front end and the loading screen never
 //! reach this hook.
-use super::{eng, field, rd, storm3d};
+use super::{eng, field, storm3d};
 use crate::engine::hook as patch;
 use crate::surface::{self, Context};
 use crate::syms_core::{field, hook, sym};
@@ -23,16 +23,15 @@ use crate::syms_core::{field, hook, sym};
 // The profile (`ui.core.toml`) names, for the hook `core.mission`: in
 // `Armada_RenderFrame`, `call ChatDisplay::Render` (thiscall on `g_chat_display`);
 // `ST3D_TrifanBuffer::Flush`, thiscall, draws the 2D quads the device has batched; and
-// `ST3D_DeviceDirectX8`'s trifan buffer, which `EndScene` flushes. For
-// `core.reads_hud_hidden`: `shipDisplay+0x16` (the HUD's ship panel, `ShipDisplay`),
-// its hidden flag, which `DisplayInterface::SetInterfaceState` sets in every mode that
-// hides the HUD.
+// `ST3D_DeviceDirectX8`'s trifan buffer, which `EndScene` flushes.
 
 /// Frames drawn since the last log line, and when it was written.
 static mut FRAMES: u32 = 0;
 static mut SINCE: f64 = 0.0;
 static mut LAST: f64 = 0.0;
 static mut REPORTS: u32 = 0;
+/// The windows were logged at a mission frame (`input::log_windows`).
+static mut WINDOWS_LOGGED: bool = false;
 
 /// Patches the hook; false (and nothing patched) when the site is not stock.
 pub fn install() -> bool {
@@ -62,6 +61,14 @@ unsafe extern "thiscall" fn chat_render(chat: usize) {
     let flush: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(flush) };
     unsafe { flush(dev + field::CORE_DX8_TRIFAN()) };
     count();
+    // The render lists, once per mission (`hud::log_render_lists`), and the windows at
+    // the first mission frame of a game.
+    let first = !unsafe { WINDOWS_LOGGED };
+    super::hud::log_render_lists();
+    if first {
+        unsafe { WINDOWS_LOGGED = true };
+        super::input::log_engine_window("the first mission frame");
+    }
     // The info panel's close-up: a view of the engine's, drawn before the UI's frame
     // and flushed with it (`engine::closeup`).
     if crate::config::get().hud.info_camera {
@@ -102,13 +109,14 @@ fn count() {
     }
 }
 
-/// Whether the engine has hidden its HUD (a cinematic, or the player hiding it).
+/// Whether the engine has hidden its HUD (a cinematic, or the player hiding it): the info
+/// panel's own hidden flag, which `DisplayInterface::SetInterfaceState` sets in every mode
+/// that hides the HUD. The panel is the one the render lists name (`hud::ship_display`),
+/// never the static `shipDisplay`: on Roots, FleetOpsHook constructs a panel of its own and
+/// the flag is set in that one (PLAN-FLEETOPS.md, FO-6, decision 64). False while the
+/// lists cannot be read or no panel is found.
 pub fn hud_hidden() -> bool {
-    if eng().ready(hook::CORE_READS_HUD_HIDDEN).is_err() {
-        return false;
-    }
-    let a = eng().addr(sym::CORE_SHIP_DISPLAY_HIDDEN);
-    a != 0 && unsafe { rd::<u8>(a) != 0 }
+    super::hud::flag_hidden(super::hud::ship_display())
 }
 
 /// Whether a mission frame was drawn in the last two seconds: the in-mission menus open

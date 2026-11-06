@@ -63,6 +63,17 @@ pub fn field(base: usize, off: usize) -> usize {
     if base == 0 { 0 } else { unsafe { rd::<usize>(base + off) } }
 }
 
+/// Whether `n` bytes at `p` are committed and readable (`VirtualQuery`).
+pub fn readable(p: usize, n: usize) -> bool {
+    use crate::rt::win::{MemoryBasicInformation, VirtualQuery, MEM_COMMIT};
+    let mut m = MemoryBasicInformation::default();
+    if unsafe { VirtualQuery(p as *const u8, &mut m, core::mem::size_of::<MemoryBasicInformation>()) } == 0 {
+        return false;
+    }
+    // PAGE_NOACCESS (1) and guard pages (0x100) cannot be read.
+    m.state == MEM_COMMIT && m.protect & 0x101 == 0 && m.protect != 0 && p + n <= m.base + m.region_size
+}
+
 /// Whether the code at `a` starts with `bytes` (a function checked before it is called).
 pub fn starts(a: usize, bytes: &[u8]) -> bool {
     let ok = unsafe { core::slice::from_raw_parts(a as *const u8, bytes.len()) } == bytes;

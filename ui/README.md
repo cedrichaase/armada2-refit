@@ -111,6 +111,17 @@ thread, also covers the front end: there is no input thread there, but a screen 
 A first version hooked the `PostThreadMessageA` of the mouse path; it worked in a
 mission and saw no clicks at all in the front end.
 
+**On a build whose window procedure is not `WindowProc`** (Fleet Operations: Roots: the
+game window is FleetOpsHook's own form, which hands the keyboard and mouse messages to
+the two functions itself, so `WindowProc`'s calls never run) the first two rows move to
+the two functions' entries (`core.input_callee`, chosen by the profile's
+`core_input_at_callee`): their first six bytes go to a trampoline, the entry jumps to a
+thunk of ours that notes the caller's return address and records the message, and what
+capture lets through runs the function through the trampoline. The drains are the same.
+UI.log names each caller once (`input: ProcessMouseMessages called from ...`) and the
+thread's windows with their window procedures at the first loading and mission frames
+(`windows at ...`). Stock keeps the call sites.
+
 Each site's bytes are checked against stock first; any mismatch and input stands down
 whole (the UI still reads the pointer, but cannot keep input from the engine and sees
 no keys).
@@ -1002,7 +1013,6 @@ is not ready. The findings each hook rests on are in the sections named in the t
 |---|---|
 | `ui.core.storm3d` | The `Storm3D` global and its device table (index at +0xc0, devices from +0xcc, the d3d8 device at the `ST3D_DeviceDirectX8`'s +0x90): how every part finds the engine's device. Read lazily, so a part never reads address 0 |
 | `ui.core.mission` | The `call ChatDisplay::Render` in `Armada_RenderFrame`, after which the mission frame is drawn ("The mission frame"), and `ST3D_TrifanBuffer::Flush` on the device's trifan buffer (+0xe4), which flushes the HUD's batched quads first |
-| `ui.core.reads_hud_hidden` | `shipDisplay`'s hidden flag (+0x16): set by `DisplayInterface::SetInterfaceState` in every mode that hides the HUD |
 | `ui.core.cursor` | Slot 26 of `ST3D_DeviceDirectX8`'s vtable, `RefreshDisplay`, wrapped to empty the device's cursor sprite (+0x60) for one present ("The cursor"); +0xe0 says whether the cursor is the synchronous one |
 | `ui.core.cursor_probe` | The `DrawScaled2D` call in `RefreshDisplay` that draws the synchronous cursor, chained to whatever it called (another plugin's wrap); the global 2D scale and the sprite's hotspot (+0x30) |
 | `ui.core.cursor_square` | `SetCursor`'s `fmuls` of the hardware cursor width, its displacement moved from the x scale to the y scale ("The engine's cursor, square") |
@@ -1010,6 +1020,7 @@ is not ready. The findings each hook rests on are in the sections named in the t
 | `ui.core.intro_mode32`, `ui.core.intro_mode16` | The pushes of `Program::PlayIntroMovie`'s two 640x480 mode lookups ("The intro without the cutscene proxy"); each is a hook of its own, as each was patched alone |
 | `ui.core.intro_frames` | `NextBinkFrame`'s `call [__imp__BinkCopyToBuffer@28]` and the import's slot, to route the movie's frames to the UI |
 | `ui.core.input` | `WindowProc`'s calls of `ProcessKeyboardMessages` and `ProcessMouseMessages`, and the `PeekMessageA` drains inside them ("Input and capture") |
+| `ui.core.input_callee` | The same two functions at their entries (`push ebp; mov ebp, esp; sub esp, 0x1c`, six bytes moved to a trampoline), and the same drains, for a build whose window procedure is not the engine's `WindowProc` (`core_input_at_callee` = 1: Fleet Operations: Roots, where FleetOpsHook's form calls the two functions itself; "Input and capture") |
 | `ui.core.window` | `ST3D_GraphicsEngine::GetWindowHandle`, thiscall on `Storm3D`, for the game window |
 | `ui.core.device` | `DestroyRenderSurfaces` (slot 28 of the device's vtable), chained: another plugin's wrap is kept; the d3d8 device at +0x90 is held across the engine's release |
 | `ui.core.reads_mouse` | `MouseDriver`'s button bits and the flag `g_bMousePosLocked` ("Focus and the pointer") |
