@@ -401,6 +401,14 @@ ring follows the hover state of a weapon's button, so a bar of ours keeps the ri
 a skin over the stock rectangles that leaves the stock bar the pointer; Roots' static mode
 is one row in slot order (`PLAN-FLEETOPS.md`, FO-6 decisions 94 and 95).
 
+With `[HUD] Bar=1` on such a build the bar is a **skin** (`hud/barskin.rs`, FO-6 step 6, decision
+128): each shown button is drawn in the theme at the palette's origin (its rectangle's top left)
+plus the button's local rectangle, in slot order, with hover and pressed read from the button's own
+bytes; nothing is claimed or pressed, `engine::hud::set_bar_skin` skips only `RenderAll`'s drawing of
+the palette and leaves `RefreshOwner`'s mouse call, so the stock bar owns the pointer and the range
+ring and tooltip stay (seen on the bench: the Tractor Beam's ring on that button only, its tooltip,
+the build list and back). Roots ships it off (`ui/defaults/fo-roots.ini`).
+
 ### Seen on the bench
 
 2026-10-16, Instant Action as the Borg at 1280x720 (`ui/bench-asi.sh HUD.Bar=1`): the bar drew as a 5x3 grid of the game's icons above the info panel, the

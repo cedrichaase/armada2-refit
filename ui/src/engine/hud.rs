@@ -110,6 +110,16 @@ pub fn panel_rect(c: usize, w: f32, h: f32) -> Option<[f32; 4]> {
     Some([r[0] as f32 * sx, r[1] as f32 * sy, (r[2] + 1) as f32 * sx, (r[3] + 1) as f32 * sy])
 }
 
+/// A panel's origin in back-buffer pixels (its rectangle's top left, scaled as `panel_rect`), whether or
+/// not the rectangle has an area: the origin a child's local rectangle is offset by.
+pub fn panel_origin(c: usize, w: f32, h: f32) -> Option<(f32, f32)> {
+    if c == 0 || !super::readable(c, 0x40) {
+        return None;
+    }
+    let r: [i32; 4] = unsafe { rd(c + field::HUD_DI_RECT()) };
+    Some((r[0] as f32 * w / super::canvas::CANVAS.0, r[1] as f32 * h / super::canvas::CANVAS.1))
+}
+
 /// Whether the panel is hidden: its own flag (`SetIsHidden`; the interface modes hide
 /// them), or it is not in the render list of the view in use. The cinematic view
 /// (`View_Record` 2, a mission's opening and the scripts' cutscenes) has a list of its
@@ -249,6 +259,15 @@ fn learn(c: usize) {
     }
 }
 
+static mut BAR_SKIN: bool = false;
+
+/// The bar of ours is a skin (FO-6 decision 94): `RenderAll`'s drawing of the palette is skipped, but
+/// `RefreshOwner` still gives it the pointer, so the stock bar's buttons keep the hover state, the
+/// tooltip and the range rings the engine draws from them.
+pub fn set_bar_skin(on: bool) {
+    unsafe { BAR_SKIN = on };
+}
+
 /// Whether the pointer is over a panel of ours (the last UI frame's claim): then no
 /// stock component owns the mouse.
 pub fn set_pointer_over_ui(on: bool) {
@@ -343,7 +362,7 @@ unsafe extern "thiscall" fn cursor_over(c: usize) -> bool {
             let f: unsafe extern "thiscall" fn(usize) -> bool = core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_CURSOR_OVER()));
             return f(c);
         }
-        if OVER_UI || taken(c) {
+        if OVER_UI || (taken(c) && !(BAR_SKIN && c == palette())) {
             return false;
         }
         let f: unsafe extern "thiscall" fn(usize) -> bool = core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_CURSOR_OVER()));

@@ -311,11 +311,17 @@ pub fn outer_size(ui: &Ui) -> (f32, f32) {
 
 /// Whether the bar is up: the player has not hidden it and the HUD shows.
 pub fn shows() -> bool {
+    if palette::slots_indirect() {
+        return false; // a skin sits over the stock buttons and takes no room in the row
+    }
     let p = palette::palette();
     p != 0 && !hud::hidden(p) && !crate::engine::api::ingame::hud_hidden()
 }
 
 pub fn run(ui: &mut Ui) {
+    if palette::slots_indirect() {
+        return super::barskin::run(ui);
+    }
     let s = st();
     if s.pending != 0 {
         s.pending_age += 1;

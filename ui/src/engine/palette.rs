@@ -248,6 +248,33 @@ pub fn press(b: usize) -> bool {
     true
 }
 
+/// The icon sprite the button itself holds (`+0x2c`), whatever the name lookup finds: what a button
+/// whose command or weapon names no sprite of the HUD's database may still carry (FO-6 step 6).
+pub fn own_sprite(b: usize) -> usize {
+    if b == 0 { 0 } else { peek(b, field::PALETTE_BTN_SPRITE()) }
+}
+
+/// Whether the button's hover byte is set: `StandardButton::Simulate` sets it from the pointer and the
+/// button's rectangle whoever owns the pointer (FO-6 step 5), and FleetOpsHook's range ring follows it.
+pub fn hovered(b: usize) -> bool {
+    b != 0 && unsafe { rd::<u8>(b + field::PALETTE_BTN_HOVER()) } != 0
+}
+
+/// Whether the button's pressed byte is set (the mouse is held over an enabled button).
+pub fn pressed(b: usize) -> bool {
+    b != 0 && unsafe { rd::<u8>(b + field::PALETTE_BTN_PRESSED()) } != 0
+}
+
+/// The button's rectangle in canvas units (left, top, right, bottom, inclusive), local to its owner's
+/// origin, which is the bar's own rectangle's top left (FO-6 step 6).
+pub fn local_rect(b: usize) -> Option<[i32; 4]> {
+    if b == 0 || !super::readable(b, 0x40) {
+        return None;
+    }
+    let r: [i32; 4] = unsafe { rd(b + field::PALETTE_BTN_RECT()) };
+    if r[2] < r[0] || r[3] < r[1] { None } else { Some(r) }
+}
+
 // ---- the bar measured (PLAN-FLEETOPS.md, FO-6 step 5) -----------------------------------
 //
 // Where the bar is not the stock one (`palette_slots_indirect`: Roots, whose FleetOpsHook
