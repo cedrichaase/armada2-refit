@@ -1,13 +1,14 @@
 //! Screen specs: a layout of our own for a stock screen, chosen by the screen's name
 //! (`engine::dialogs::screen_name`, which names each shell dialog procedure).
 //!
-//! A spec is a function that draws the screen from `Screen` (the model, the mirror,
-//! the design fit) and acts through it (`Screen::click_control`, `menus::actions`). It
-//! returns false to have the generic screen draw the dialog this frame instead (for
-//! one it does not recognise, such as a model without the controls it expects). Adding
-//! one: a file here, an entry in `SPECS`; MENUS.md, "Writing a screen spec", has the
-//! pattern step by step.
-use super::Screen;
+//! A screen of ours is a `Screen`: the key of the dialog it lays out and a draw that
+//! lays it out from `menus::Screen` (the model, the mirror, the design fit) and acts
+//! through it (`menus::Screen::click_control`, `menus::actions`). The draw returns false
+//! to have the generic screen draw the dialog this frame instead (for one it does not
+//! recognise, such as a model without the controls it expects). Most are a `Spec`, a
+//! key and a function, in `SPECS`. Adding one: a file here, an entry in `SPECS`;
+//! MENUS.md, "Writing a screen spec", has the pattern step by step.
+use super::Screen as Dialog;
 use crate::widgets::Ui;
 
 pub mod admirals_log;
@@ -34,10 +35,30 @@ pub mod sound_settings;
 pub mod tech_tree;
 pub mod text_window;
 
+/// A menu screen of ours: the stock dialog it lays out, and how.
+pub trait Screen: Sync {
+    /// The dialog it lays out, by its key: the screen's name, as
+    /// `engine::api::dialogs::screen_name` names the dialog procedure.
+    fn key(&self) -> &'static str;
+    /// Draws the dialog `s` and reads its input; false to have the generic screen draw
+    /// it this frame instead.
+    fn draw(&self, ui: &mut Ui, s: &Dialog) -> bool;
+}
+
+/// A screen as a key and a function: what every screen of ours is today.
 pub struct Spec {
-    /// The screen it lays out, as `engine::dialogs::screen_name` names it.
+    /// The screen it lays out, as `engine::api::dialogs::screen_name` names it.
     pub screen: &'static str,
-    pub draw: fn(&mut Ui, &Screen) -> bool,
+    pub draw: fn(&mut Ui, &Dialog) -> bool,
+}
+
+impl Screen for Spec {
+    fn key(&self) -> &'static str {
+        self.screen
+    }
+    fn draw(&self, ui: &mut Ui, s: &Dialog) -> bool {
+        (self.draw)(ui, s)
+    }
 }
 
 pub const SPECS: &[Spec] = &[
@@ -75,9 +96,10 @@ pub const SPECS: &[Spec] = &[
     Spec { screen: "internet game", draw: lobby::draw },
 ];
 
-pub fn find(screen: &str) -> Option<&'static Spec> {
+/// The screen of ours for the dialog keyed `screen`, if there is one.
+pub fn find(screen: &str) -> Option<&'static dyn Screen> {
     if screen.is_empty() {
         return None;
     }
-    SPECS.iter().find(|s| s.screen == screen)
+    SPECS.iter().find(|s| s.key() == screen).map(|s| s as &dyn Screen)
 }

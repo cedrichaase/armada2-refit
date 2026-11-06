@@ -20,17 +20,21 @@ with each file's `out` resolved against DIR (the selftest's fixtures do).
     tables; `unknown = "run"` only when every entry of the hook is a scan.
  3. Code <-> profile, both ways, by tokens in the plugin's non-generated sources, comments
     stripped, strings kept (C asm strings matter): Rust `sym::X`, `hook::X`, `field::X`,
-    `value::X`; C `<P>_S_X`, `<P>_H_X`, `<P>_F_X`, `<P>_V_X`, `_a2s_<p>_<id>`. Every token is
+    `value::X` (or the module under an alias, `use crate::syms::{field as off}`, `off::X`); C `<P>_S_X`, `<P>_H_X`, `<P>_F_X`, `<P>_V_X`, `_a2s_<p>_<id>`, `_a2f_<p>_<id>`. Every token is
     defined; every entry and hook is used (an entry that is the call/jmp/slot target or the
     vtable of a used entry counts as used).
  4. No engine address in those sources: any hex literal inside a build's image range fails,
-    unless its line carries a `// not an address` (or `/* not an address */`) comment. In C,
-    probable field offsets are printed as `advisory:` and never fail. `hud/`, `grid/` and
+    unless its line carries a `// not an address` (or `/* not an address */`) comment. A
+    literal struct offset fails too (AR-3): in C `p + 0x..` and an asm `0x..(%reg)` from
+    0x20 up, in Rust `field(x, 0x..)`, `rd(x + 0x..)`, `(x + 0x..) as *` and
+    `const X: usize = 0x..`; a line that parses the module's own PE header says
+    `PE header`, and a literal that is no offset says `not an offset`. `hud/`, `grid/` and
     `menus/` are skipped (no profile; superseded by UI.asi).
  5. Inheritance and marks: a child overrides only what its ancestors have (same kind) or adds
     complete entries; marks only in an inheriting build; every [[changed]] `fn` matches an
     entry (as `symbol` or `in`) of that build; every `verified` and `disable` glob matches a
-    hook of the game; fields and values of a `lang = "c"` file are never overridden (FO-3).
+    hook of the game. A child may move a field or change a value (any `lang`): fields and
+    values are resolved per build at run time.
  6. `gen.py --check`: the generated files are up to date.
 
 Sources of a Rust file: the `.rs` files under the directory of its `out`; of a C file: the
@@ -60,7 +64,6 @@ BUILD_KEYS = {'schema', 'game', 'build', 'label', 'exe', 'inherits', 'content', 
 PE_KEYS = ['timestamp', 'image_size', 'sections', 'image_base', 'code']
 FILE_KEYS = {'schema', 'plugin', 'readme', 'lang', 'out', 'hook', 'sym'}
 HOOK_KEYS = {'doc', 'rows', 'unknown'}
-CONST_KEYS = {'field': 'offset', 'value': 'value'}
 
 
 def isint(v):
@@ -474,9 +477,12 @@ def rule2(games, R, rows_base, skip_fixtures):
 # ---- rule 5: inheritance and marks ---------------------------------------------------
 
 def rule6(games, R, src_root):
-    """Content sets (phase 8f): a build's `content.toml` is `schema = 1` and a `[set]`
-    table keyed by a plugin or a plugin file of its game; a set named for a plugin file
-    that has a `content.rs` beside its generated file must be chosen there (`"<set>" =>`)."""
+    """Content sets (phase 8f, AR-6): a build's `content.toml` is `schema = 1` and a
+    `[set]` table keyed by a plugin or a plugin file of its game; a set named for a
+    plugin file that has a `content.rs` beside its generated file must be a folder of
+    the plugin's `content/sets/` (the nearest one up from that `content.rs`:
+    `render3d/content/sets/<set>/`, `ui/content/sets/<set>/`), which is where its
+    `content.rs` reads its tables from."""
     for gs in games.values():
         stems = {n[:-5] for n in gs.files} | {f.plugin for f in gs.files.values()}
         for b in gs.builds:
@@ -506,10 +512,24 @@ def rule6(games, R, src_root):
                 cr = os.path.join(src_root, os.path.dirname(rf.out), 'content.rs')
                 if not os.path.exists(cr):
                     continue
-                with open(cr, encoding='utf-8', errors='replace') as fh:
-                    text = fh.read()
-                if f'"{sset}" =>' not in text:
-                    R.add(relp(b.path), f'{n}: content set {sset!r} is not chosen in {os.path.relpath(cr, src_root)}')
+                sets = sets_dir(os.path.dirname(cr), src_root)
+                if sets is None:
+                    R.add(relp(b.path), f'{n}: {os.path.relpath(cr, src_root)} has no content/sets folder above it')
+                elif not os.path.isdir(os.path.join(sets, sset)):
+                    R.add(relp(b.path), f'{n}: content set {sset!r} has no folder {os.path.relpath(os.path.join(sets, sset), src_root)}/')
+
+
+def sets_dir(d, src_root):
+    """The nearest `content/sets` folder at or above `d`, up to `src_root`, or None."""
+    top = os.path.abspath(src_root)
+    d = os.path.abspath(d)
+    while True:
+        c = os.path.join(d, 'content', 'sets')
+        if os.path.isdir(c):
+            return c
+        if d == top or os.path.dirname(d) == d:
+            return None
+        d = os.path.dirname(d)
 
 
 def rule5(games, R):
@@ -554,16 +574,6 @@ def rule5(games, R):
                             miss += [k for k in KINDS[s['kind']][0] if k not in s]
                         if miss:
                             R.add(f'{f.rel()}: sym {sid}', f'is new in {b.name} and must be complete; missing {", ".join(miss)}')
-        # C fields and values are compile-time per game (FO-3)
-        for fname, rf in gs.files.items():
-            if rf.lang != 'c':
-                continue
-            base = flatp(gs, fname, gs.root)
-            for b in gs.builds[1:]:
-                for sid, (e, ew) in flatp(gs, fname, b).items():
-                    k = e.get('kind')
-                    if k in CONST_KEYS and sid in base and base[sid][0].get(CONST_KEYS[k]) != e.get(CONST_KEYS[k]):
-                        R.add(f'{ew}: sym {sid}', f'{k} differs in {b.name}; the fields and values of a C plugin are compile-time per game, so a build that changes one is FO-3\'s')
 
 
 # ---- sources: rules 3 and 4 ----------------------------------------------------------
@@ -575,9 +585,11 @@ C_CHAR = re.compile(r"'(?:\\[^']*|[^\\'])'")
 
 
 def strip_comments(text, lang):
-    """(text with comments blanked, newlines kept; lines whose comment says 'not an address')."""
+    """(text with comments blanked, newlines kept; lines whose comment says 'not an address';
+    lines whose comment says 'PE header' or 'not an offset')."""
     out, i, n = [], 0, len(text)
     okl = set()
+    offl = set()
     rs = lang == 'rust'
 
     def blank(s):
@@ -589,6 +601,12 @@ def strip_comments(text, lang):
         if 'not an address' in s.lower() or 'value parity' in s.lower():
             l0 = text.count('\n', 0, start) + 1
             okl.update(range(l0, l0 + s.count('\n') + 1))
+        # `PE header`: the module's own headers parsed (not engine knowledge, AR-3);
+        # `not an offset`: a literal that is no struct offset (a Win32 flag, a size of
+        # our own). Both excuse rule 4's offset check only, never its address check.
+        if 'pe header' in s.lower() or 'not an offset' in s.lower():
+            l0 = text.count('\n', 0, start) + 1
+            offl.update(range(l0, l0 + s.count('\n') + 1))
 
     while i < n:
         c = text[i]
@@ -636,7 +654,7 @@ def strip_comments(text, lang):
         else:
             out.append(c)
             i += 1
-    return ''.join(out), okl
+    return ''.join(out), okl, offl
 
 
 def source_files(rf, src_root):
@@ -703,21 +721,21 @@ def rules34(games, R, src_root):
         srcs = source_files(members[0][1], src_root)
         stripped = []
         for p, t in srcs:
-            s, okl = strip_comments(t, lang)
-            stripped.append((p, s, okl))
+            s, okl, offl = strip_comments(t, lang)
+            stripped.append((p, s, okl, offl))
         defs = [(gs, rf) + defined_sets(gs, rf) for gs, rf in members]
         used = [{'sym': set(), 'hook': set(), 'field': set(), 'value': set()} for _ in members]
         multi = len(members) > 1
-        for p, s, okl in stripped:
+        for p, s, okl, _ in stripped:
             for ln, tok_class, name in tokens(s, lang, members):
                 hit = False
                 for k, (gs, rf, dd, ids) in enumerate(defs):
                     if lang == 'c' and tok_class[0] != rf.plugin:
                         continue
-                    cls = tok_class[1]
-                    if name in dd[cls]:
-                        used[k][cls].add(name)
-                        hit = True
+                    for cls in (('field', 'value') if tok_class[1] == 'fieldvalue' else (tok_class[1],)):
+                        if name in dd[cls]:
+                            used[k][cls].add(name)
+                            hit = True
                 if not hit:
                     tag = f'{tok_class[1]}::{name}' if lang == 'rust' else name
                     owner = members[0][1].rel() if not multi else 'any of ' + ', '.join(m[1].name for m in members)
@@ -745,7 +763,7 @@ def rules34(games, R, src_root):
         ranges = []
         for gs, _ in members:
             ranges += addr_ranges(gs)
-        for p, s, okl in stripped:
+        for p, s, okl, offl in stripped:
             lit = re.compile(r'(?<![A-Za-z0-9_])0[xX]([0-9a-fA-F_]+)')
             for m in lit.finditer(s):
                 try:
@@ -757,25 +775,61 @@ def rules34(games, R, src_root):
                     continue
                 if any(lo <= v < hi for lo, hi in ranges):
                     R.add(f'{relp(p)}:{ln}', f'{m.group(0)} is an engine address in the image; use the profile (or say "// not an address")')
-            if lang == 'c':
-                adv = 0
-                for m in re.finditer(r'\+\s*(0[xX][0-9a-fA-F]{2,4})\b(?!\s*\()|\b(0[xX][0-9a-fA-F]{2,4})\(%', s):
-                    v = int(m.group(1) or m.group(2), 16)
-                    ln = s.count('\n', 0, m.start()) + 1
-                    if ln in okl or not (0x20 <= v < 0x10000) or any(lo <= v < hi for lo, hi in ranges):
-                        continue
-                    adv += 1
-                    if adv <= 5:
-                        R.advice.append(f'advisory: {relp(p)}:{ln}: {m.group(1) or m.group(2)} looks like a field offset')
-                if adv > 5:
-                    R.advice.append(f'advisory: {relp(p)}: {adv - 5} more probable field offsets')
+            # Struct offsets are the profile's too (AR-3): a literal offset read off a
+            # pointer fails, unless its line is the module's own PE header parsing
+            # (`PE header`) or says `not an offset`.
+            for m in offset_literals(s, lang):
+                ln = s.count('\n', 0, m.start()) + 1
+                if ln in okl or ln in offl:
+                    continue
+                if any(lo <= m.value < hi for lo, hi in ranges):
+                    continue
+                R.add(f'{relp(p)}:{ln}', f'{m.text} is a literal struct offset; make it a profile `field` (or say "PE header" / "not an offset")')
 
+
+class Lit:
+    def __init__(self, start, text, value):
+        self._start, self.text, self.value = start, text, value
+
+    def start(self):
+        return self._start
+
+
+# C: `p + 0x..` read off a pointer (not a call), and an asm operand `0x..(%reg)`, from
+# 0x20 up (smaller ones are an asm stub's own arguments and saved registers).
+C_OFFSET = re.compile(r'\+\s*(0[xX][0-9a-fA-F]{2,4})\b(?!\s*\()|\b(0[xX][0-9a-fA-F]{2,4})\(%')
+# Rust: `field(x, 0x..)`, `rd(x + 0x..)` (and `peek`), `(x + 0x..) as *`, and
+# `const X: usize = 0x..;`.
+RS_OFFSET = re.compile(r'''(?x)
+    \bfield\w*\s*\(\s*[^,()]+(?:\([^()]*\))?[^,()]*,\s*(0[xX][0-9a-fA-F]+)\s*\)
+  | \b(?:rd|peek)\w*\s*(?:::\s*<[^>]*>)?\s*\([^()]*\+\s*(0[xX][0-9a-fA-F]+)\s*\)
+  | \+\s*(0[xX][0-9a-fA-F]+)\s*\)\s*as\s*\*
+  | \bconst\s+[A-Z][A-Z0-9_]*\s*:\s*usize\s*=\s*(0[xX][0-9a-fA-F]+)\s*;
+''')
+
+
+def offset_literals(s, lang):
+    """Each literal struct offset in stripped source text (rule 4, AR-3)."""
+    if lang == 'c':
+        for m in C_OFFSET.finditer(s):
+            t = m.group(1) or m.group(2)
+            v = int(t, 16)
+            if 0x20 <= v < 0x10000:
+                yield Lit(m.start(), t, v)
+        return
+    for m in RS_OFFSET.finditer(s):
+        t = next(g for g in m.groups() if g)
+        yield Lit(m.start(), t, int(t, 16))
 
 def tokens(s, lang, members):
     """Yield (line, (plugin, class), NAME) for each profile token in stripped text."""
     if lang == 'rust':
         for m in re.finditer(r'\b(sym|hook|field|value)::([A-Z][A-Z0-9_]*)\b', s):
             yield s.count('\n', 0, m.start()) + 1, (None, m.group(1)), m.group(2)
+        # a module imported under another name (`use crate::syms::{field as off}`)
+        for a in re.finditer(r'\b(sym|hook|field|value)\s+as\s+([a-z_][a-z0-9_]*)\b', s):
+            for m in re.finditer(r'(?<![\w:])' + a.group(2) + r'::([A-Z][A-Z0-9_]*)\b', s):
+                yield s.count('\n', 0, m.start()) + 1, (None, a.group(1)), m.group(1)
         return
     for _, rf in members:
         p = rf.plugin
@@ -785,6 +839,8 @@ def tokens(s, lang, members):
             yield s.count('\n', 0, m.start()) + 1, (p, cls), m.group(2)
         for m in re.finditer(r'(?<![A-Za-z0-9])_?a2s_' + re.escape(p.replace('.', '_')) + r'_([a-z][a-z0-9_]*)', s):
             yield s.count('\n', 0, m.start()) + 1, (p, 'sym'), upper(m.group(1))
+        for m in re.finditer(r'(?<![A-Za-z0-9])_?a2f_' + re.escape(p.replace('.', '_')) + r'_([a-z][a-z0-9_]*)', s):
+            yield s.count('\n', 0, m.start()) + 1, (p, 'fieldvalue'), upper(m.group(1))
 
 
 # ---- driver --------------------------------------------------------------------------

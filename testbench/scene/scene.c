@@ -280,6 +280,8 @@ static int *g_waypoint_orig;   /* the binding's own state, put back when let go 
 #define SET_COMMAND_OBJ  0x4d1af0u   /* GameObject::SetCommand(AiCommand, const GameObject *, long, bool) */
 #define SET_COMMAND      0x4d1a40u   /* GameObject::SetCommand(AiCommand, long, bool, bool) */
 #define CMD_STOP         3           /* AiCommand: STOP */
+#define CMD_SET_FORMATION 0x2a       /* AiCommand: SET_FORMATION, its parameter the bar button's `param` */
+#define DQ_COMMAND_PARAM 0x4d4630u   /* GameObject::DeQueueCommand(AiCommand, long): what NetOrderWhatParam::Execute calls */
 #define SET_COMMAND_AT   0x4d1b50u   /* GameObject::SetCommand(AiCommand, const Vector3 &, long, bool) */
 #define FLAG_CRAFT       0x8u        /* GameObject flags (+0x14): a craft, what Goto and Stop accept */
 #define OBJECT_DEAD      0x113u      /* a byte Goto and Stop refuse an object on */
@@ -404,6 +406,7 @@ typedef BYTE   (__thiscall *FireSpecialFn)(void *craft, int slot);
 typedef BYTE   (__thiscall *CanFireFn)(void *weapon, const void *target);
 typedef void   (__thiscall *SetCommandObjFn)(void *go, int cmd, const void *target, long param, int flag);
 typedef void   (__thiscall *SetCommandFn)(void *go, int cmd, long param, int a, int b);
+typedef void   (__thiscall *DqCommandParamFn)(void *go, int cmd, long param);
 typedef void   (__thiscall *SetCommandAtFn)(void *go, int cmd, const float *pos, long param, int flag);
 typedef const float *(__thiscall *SiLocationFn)(void *si, int h);
 typedef void   (__thiscall *SiSetHealthFn)(void *si, int h, float v);
@@ -1880,6 +1883,23 @@ static void run_command(char *line)
         if (!(o = find_obj(t[1])) || !craft_of(o)) { logline("  ! not a craft in the scene"); return; }
         ((SetCommandFn)SET_COMMAND)(craft_of(o), CMD_STOP, 0, 1, 0);   /* as ScriptInterfaceImp::Stop */
         o->attack[0] = 0;
+        logline("  ok");
+        return;
+    }
+    if (s_eq(t[0], "formation") && n >= 3) {
+        /* formation <name>[,<name>...] <param>: the formation the ships move in, as the
+         * bar's formation buttons give it (SET_FORMATION with the button's `param`, posted
+         * as the ship's next command the way the order's executor posts it) */
+        char *p = t[1], *nm;
+        long  prm = (long)s_atof(t[2]);
+        for (;;) {
+            nm = p;
+            while (*p && *p != ',') p++;
+            if (*p) *p++ = 0; else p = NULLPTR;
+            if (!(o = find_obj(nm)) || !craft_of(o)) { logline("  ! not a craft in the scene"); return; }
+            ((DqCommandParamFn)DQ_COMMAND_PARAM)(craft_of(o), CMD_SET_FORMATION, prm);
+            if (!p) break;
+        }
         logline("  ok");
         return;
     }

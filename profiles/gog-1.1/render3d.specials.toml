@@ -86,3 +86,111 @@ symbol = "(unnamed) special effects list head"
 kind = "global"
 addr = 0x7a8c0c
 used_by = ["specials.reads"]
+
+[[sym]]
+id = "sp_effect_object"
+symbol = "SpecialObjectEffect::object"
+kind = "field"
+struct = "SpecialObjectEffect"
+offset = 0x8
+type = "ptr"
+used_by = ["specials.reads"]
+
+[[sym]]
+id = "sp_effect_instance"
+symbol = "TimedEffect::embedded instance"
+kind = "field"
+struct = "TimedEffect"
+offset = 0x2c
+type = "ptr"
+used_by = ["specials.reads"]
+
+[[sym]]
+id = "sp_effect_database"
+symbol = "TimedEffect::instance database"
+kind = "field"
+struct = "TimedEffect"
+offset = 0xac
+type = "ptr"
+used_by = ["specials.reads"]
+
+[[sym]]
+id = "sp_effect_target"
+symbol = "TimedEffect::visual target"
+kind = "field"
+struct = "TimedEffect"
+offset = 0xb0
+type = "ptr"
+used_by = ["specials.reads"]
+
+[[sym]]
+id = "sp_effect_node"
+symbol = "TimedChangeTeam::target node"
+kind = "field"
+struct = "TimedChangeTeam"
+offset = 0xc8
+type = "ptr"
+used_by = ["specials.reads"]
+
+[[sym]]
+id = "sp_effect_time_left"
+symbol = "TimedEffect::time left"
+kind = "field"
+struct = "TimedEffect"
+offset = 0x28
+type = "f32"
+used_by = ["specials.reads"]
+
+[[sym]]
+id = "sp_effect_dead"
+symbol = "SpecialObjectEffect::ended"
+kind = "field"
+struct = "SpecialObjectEffect"
+offset = 0xc
+type = "u8"
+used_by = ["specials.reads"]
+
+[[sym]]
+id = "sp_effect_weapon_class"
+symbol = "SpecialObjectEffect::weapon class"
+kind = "field"
+struct = "SpecialObjectEffect"
+offset = 0x4
+type = "ptr"
+used_by = ["specials.reads"]
+
+[[sym]]
+id = "sp_weapon_ordnance"
+symbol = "WeaponClass::ordnance class"
+kind = "field"
+struct = "WeaponClass"
+offset = 0x18
+type = "ptr"
+used_by = ["specials.reads"]
+
+[[sym]]
+id = "sp_ordnance_prj"
+symbol = "OrdnanceClass::cPrjID"
+kind = "field"
+struct = "OrdnanceClass"
+offset = 0x150
+type = "ptr"
+used_by = ["specials.reads"]
+
+[[sym]]
+id = "sp_vt_render"
+symbol = "SpecialObjectEffect::Render slot"
+kind = "field"
+struct = "SpecialObjectEffect vftable"
+offset = 0x0
+type = "ptr"
+used_by = ["specials.reads"]
+
+[[sym]]
+id = "sp_inst_radius"
+symbol = "ST3D_Instance::radius"
+kind = "field"
+struct = "ST3D_Instance"
+offset = 0x40
+type = "f32"
+used_by = ["specials.reads"]

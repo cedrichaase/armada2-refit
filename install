@@ -8,6 +8,9 @@
 #   ./install --without a,b      the default, less these
 #   ./install --list             the layers, what each is and whether it is selected
 #                                by default (tools/layers.py --list)
+#   ./install --game ID ...      into another game (games/<id>.toml; default A2_PROFILE,
+#                                else armada2): its folder, and only the layers its
+#                                descriptor offers; a game not offered yet is refused
 #
 # A selectable layer a run does not select is TAKEN OUT, with its remove command, so
 # `--only render3d` on an install that has the UI leaves no UI.asi behind; on a clone that
@@ -42,27 +45,33 @@ here=$(cd "$(dirname "$0")" && pwd)
 layers="$here/tools/layers.py"
 
 sel=()
+list=0
 while [ $# -gt 0 ]; do
     case "$1" in
-        --list)      exec python3 "$layers" --list ;;
+        --list)      list=1 ;;
         --only)      [ $# -ge 2 ] || { echo "--only needs a list of layers" >&2; exit 2; }
                      sel+=(--only "$2"); shift ;;
         --only=*)    sel+=(--only "${1#*=}") ;;
         --without)   [ $# -ge 2 ] || { echo "--without needs a list of layers" >&2; exit 2; }
                      sel+=(--without "$2"); shift ;;
         --without=*) sel+=(--without "${1#*=}") ;;
-        -h|--help)   sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --game)      [ $# -ge 2 ] || { echo "--game needs a game id (python3 a2env.py --list)" >&2; exit 2; }
+                     export A2_PROFILE="$2"; shift ;;
+        --game=*)    export A2_PROFILE="${1#*=}" ;;
+        -h|--help)   sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *)           echo "unknown argument: $1 (./install --help)" >&2; exit 2 ;;
     esac
     shift
 done
 
-# The plan first, so a refused selection touches nothing.
+[ "$list" = 0 ] || exec python3 "$layers" --list
+# The plan first, so a refused selection touches nothing. The game is A2_PROFILE, which
+# layers.py, a2env.sh and every installer read alike.
 plan=$(python3 "$layers" --resolve "${sel[@]}" --commands) || exit 2
 
 . "$here/a2env.sh"
 [ -d "$A2_GAME" ] || { echo "no game directory at $A2_GAME (see a2env.sh)" >&2; exit 1; }
-echo "== $(git -C "$here" describe --always --dirty 2>/dev/null || echo '?') -> $A2_GAME (assets: $A2_DATA)"
+echo "== $(git -C "$here" describe --always --dirty 2>/dev/null || echo '?') -> $A2_GAME ($A2_PROFILE; assets: $A2_DATA)"
 echo "== layers: $(python3 "$layers" --resolve "${sel[@]}" | tr '\n' ' ')"
 
 # What earlier versions installed and nothing installs now (the legacy plugins, the

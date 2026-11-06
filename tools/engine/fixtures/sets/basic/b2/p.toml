@@ -1,4 +1,4 @@
-# b2 fixes f2's bytes and adds n1.
+# b2 fixes f2's bytes, adds n1, moves the field fd and adds the field fx.
 schema = 1
 plugin = "p"
 
@@ -12,3 +12,16 @@ symbol = "g_new"
 kind = "global"
 addr = 0x406000
 used_by = ["badcheck"]
+
+[[sym]]
+id = "fd"
+offset = 0x20
+
+[[sym]]
+id = "fx"
+symbol = "One"
+kind = "field"
+struct = "One"
+offset = 0x30
+type = "f32"
+used_by = ["fieldhook"]

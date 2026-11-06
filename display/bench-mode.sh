@@ -37,9 +37,11 @@ while [ $# -gt 0 ] && [[ "$1" == *=* ]]; do
         # them read past): not in the shipped Display8.ini, so added under [Display8].
         case "$key" in
             FailBackend|Mode|Real) ;;
+            # [Crash] TestFrames= (the bench's alone: a fault on purpose at that frame)
+            TestFrames) sed -i "s/^\[Crash\]\r\?\$/&\n$key=/" "$ini" ;;
             *) echo "Display8.ini has no key $key" >&2; exit 1 ;;
         esac
-        sed -i "s/^\[Display8\]\r\?\$/&\n$key=/" "$ini"
+        [ "$key" = TestFrames ] || sed -i "s/^\[Display8\]\r\?\$/&\n$key=/" "$ini"
     fi
     sed -i "s/^$key=.*/${1//\//\\/}/" "$ini"
     shift

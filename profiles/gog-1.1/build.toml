@@ -1,5 +1,5 @@
-# Star Trek: Armada II 1.1, the GOG release: the identity the plugins log
-# (`engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321`).
+# Star Trek: Armada II 1.1, the GOG release (games/armada2.toml): the identity the
+# plugins log, under the first `exe` (`engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321`).
 # Phase 8 contracts P1 and P3. E1 writes only the identity; the sha256 is information,
 # never a run-time key. E2 completes the file (inheritance, marks) for the generator.
 schema = 1

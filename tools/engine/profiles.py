@@ -118,6 +118,12 @@ class Build:
     def key(self):
         return f'{self.game}/{self.name}'
 
+    @property
+    def exe(self):
+        """The executable's name, the first of `exe`: what the plugins log the build's
+        identity line under (crates/a2engine/README.md)."""
+        return (self.data.get('exe') or [''])[0]
+
     def content_for(self, fname):
         """The content set the plugin file `fname` reads in this build, '' for none
         (phase 8f): the nearest build's `content.toml` entry for the file (`render3d.hulls`)

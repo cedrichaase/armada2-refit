@@ -665,6 +665,16 @@ then acts, so the order is given in the game's simulate as stock's is. A point n
 taken within half a second (the game paused) is dropped. `UI.log`: "minimap: order
 0x2b at x,z".
 
+**With the waypoint key held** (Tab, QOL's move queue: qol/README.md, QOL-10), stock's
+minimap gives the same plain order, which would end the selection's queues. So before
+naming the action to the overview, `radar::act` offers the point and the action to QOL's
+export `QOL_MoveQueuePoint` (looked up by name at each click, never by file name): QOL
+answers 1 when its key is held and its queue is on, having appended the point to the
+selected ships' queues as a Tab right-click in the 3D view does, and the UI then gives no
+order (`UI.log`: "minimap: point 0x2b at x,z queued (QOL)"); 0, or no QOL, and the order
+goes out as above. A move there stays `GO_WARP`, so a minimap leg of a queue is a warp
+leg.
+
 **The filter buttons** press the stock buttons' functions, `MapRadar::NextShipFilter`
 (0x4eb7c0) and `NextStationFilter` (0x4eb930) (static; they cycle the state and post
 its name in the chat, "All ships visible" and so on), from the same step. The stock
@@ -853,7 +863,10 @@ too much of it (`testbench/scenarios/README.md`, "The HUD's layout").
 ## The engine API
 
 One file per area in `src/engine/`, each read by offset through small accessors, each
-named here beside the panel that uses it:
+named here beside the panel that uses it. The panels reach them only through the facade
+`crate::engine::api` (`api::hud`, `api::topbar`, ...), which names each item they use;
+`ui/lint-layers.sh` refuses any other path into the engine (README.md, "The engine
+boundary"). The HUD canvas is `api::CANVAS` (`engine/canvas.rs`), never a literal:
 
 | File | What | Used by |
 |---|---|---|
@@ -902,6 +915,33 @@ presses are made in the UI's frame. A press not taken in half a second is droppe
 `press` checks the button's vtable slot is `StandardButton::mButtonPressFunction`,
 and every panel checks each button's press function (`+0x5c`) is the one its
 `PostLoad` set before it treats the field as that button.
+
+### Adding a panel
+
+A panel of these is a `Panel` (`hud/panels.rs`) and one entry of `PANELS`, whose order
+is the drawing order:
+
+1. **The engine side first**: what the panel reads and presses goes in its
+   `src/engine/<area>.rs`, with the finding in this file beside the panel, and is named
+   in `src/engine/api.rs`. The panel's file imports `crate::engine::api::...` only.
+2. **A `[HUD]` key** in `config.rs` (the `Hud` struct and its parse), in `UI.ini`, and
+   its Refit row in `settings.toml`.
+3. **`src/hud/<name>.rs`** with `pub fn run(ui: &mut Ui)` and a unit struct that
+   implements `Panel`: `name` and `scope` (`"<name>"`, `"hud.<name>"`), `key` (its
+   `[HUD]` flag), `component` (the stock component it takes over and its name; the
+   default `claim` takes it through the panel switch and logs `panels: <Name> ours`),
+   or `claim` itself for a part that is not a component (the chat and the team texts
+   install their own hooks, and stand down by returning false); `with_hud` when it
+   hides with the engine's HUD, `modal` when it is a box that pauses the game; `draw`
+   calls `run`. `rect` gives the claimed component's rectangle in canvas units.
+4. **An entry in `PANELS`** where it should draw (under the boxes, which come last).
+5. **A scenario** in `testbench/scenarios/ui-hud-<name>.md`, and the layout log
+   (`[HUD] LayoutLog=1`) to check where it lands.
+
+The bigger panels (the bar, the info panel, the minimap, the selection overlay, the
+unit view's frame) and the multiplayer boxes are switched in `hud/mod.rs` and
+`hud/comm.rs`, live where their key can change while playing; they are not in the
+table yet.
 
 ### The resources (`ResourcePanel`)
 

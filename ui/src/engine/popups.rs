@@ -50,9 +50,9 @@ pub fn message() -> Option<Message> {
     if m == 0 || super::hud::hidden(m) {
         return None;
     }
-    let ok = peek(m, field::POPUPS_MSG_OK);
+    let ok = peek(m, field::POPUPS_MSG_OK());
     let ok = if buttons::press_fn(ok) == eng().addr(sym::POPUPS_MSG_UNPAUSE) { ok } else { 0 };
-    Some(Message { title: buttons::text(peek(m, field::POPUPS_MSG_TITLE)), body: buttons::text(peek(m, field::POPUPS_MSG_BODY)), ok })
+    Some(Message { title: buttons::text(peek(m, field::POPUPS_MSG_TITLE())), body: buttons::text(peek(m, field::POPUPS_MSG_BODY())), ok })
 }
 
 // ---- the objectives -------------------------------------------------------------------
@@ -89,8 +89,8 @@ pub fn objectives() -> Objectives {
     if o == 0 {
         return Objectives { title: String::new(), summary_header: String::new(), briefing: String::new(), header: String::new(), lines: Vec::new(), ok: 0 };
     }
-    let (b, e) = (peek(o, field::POPUPS_OBJ_LINES), peek(o, field::POPUPS_OBJ_LINES + 4));
-    let (db, de) = (peek(o, field::POPUPS_OBJ_DONE), peek(o, field::POPUPS_OBJ_DONE + 4));
+    let (b, e) = (peek(o, field::POPUPS_OBJ_LINES()), peek(o, field::POPUPS_OBJ_LINES() + 4));
+    let (db, de) = (peek(o, field::POPUPS_OBJ_DONE()), peek(o, field::POPUPS_OBJ_DONE() + 4));
     let mut lines = Vec::new();
     if b != 0 && e > b && (e - b) / 4 < 64 {
         for i in 0..(e - b) / 4 {
@@ -99,13 +99,13 @@ pub fn objectives() -> Objectives {
             lines.push((buttons::text(t), done));
         }
     }
-    let ok = peek(o, field::POPUPS_OBJ_OK);
+    let ok = peek(o, field::POPUPS_OBJ_OK());
     let ok = if buttons::press_fn(ok) == eng().addr(sym::POPUPS_OBJ_UNPAUSE) { ok } else { 0 };
     Objectives {
-        title: buttons::text(peek(o, field::POPUPS_OBJ_TITLE)),
-        summary_header: buttons::text(peek(o, field::POPUPS_OBJ_SUMMARY_HEADER)),
-        briefing: buttons::text(peek(o, field::POPUPS_OBJ_BRIEFING)),
-        header: buttons::text(peek(o, field::POPUPS_OBJ_HEADER)),
+        title: buttons::text(peek(o, field::POPUPS_OBJ_TITLE())),
+        summary_header: buttons::text(peek(o, field::POPUPS_OBJ_SUMMARY_HEADER())),
+        briefing: buttons::text(peek(o, field::POPUPS_OBJ_BRIEFING())),
+        header: buttons::text(peek(o, field::POPUPS_OBJ_HEADER())),
         lines,
         ok,
     }
@@ -129,7 +129,7 @@ pub fn objectives_keys() {
     }
     let (o, focus) = (objectives_box(), eng().addr(sym::POPUPS_OBJ_FOCUS_SIMULATE));
     let vt = peek(o, 0);
-    if focus == 0 || peek(vt, field::POPUPS_VT_FOCUS_SIMULATE) != focus {
+    if focus == 0 || peek(vt, field::POPUPS_VT_FOCUS_SIMULATE()) != focus {
         return;
     }
     let f: unsafe extern "thiscall" fn(usize, f32) = unsafe { core::mem::transmute(focus) };
@@ -158,7 +158,7 @@ pub fn pause_button() -> usize {
     if p == 0 {
         return 0;
     }
-    let b = peek(p, field::POPUPS_PAUSE_BUTTON);
+    let b = peek(p, field::POPUPS_PAUSE_BUTTON());
     if buttons::press_fn(b) == eng().addr(sym::POPUPS_PAUSE_UNPAUSE) { b } else { 0 }
 }
 
@@ -203,7 +203,7 @@ pub fn replay_button(i: usize) -> usize {
         sym::POPUPS_REPLAY_PRESS_3,
         sym::POPUPS_REPLAY_PRESS_4,
     ];
-    let b = peek(r, field::POPUPS_REPLAY_BUTTONS + 4 * i);
+    let b = peek(r, field::POPUPS_REPLAY_BUTTONS() + 4 * i);
     if buttons::press_fn(b) == eng().addr(press[i]) { b } else { 0 }
 }
 

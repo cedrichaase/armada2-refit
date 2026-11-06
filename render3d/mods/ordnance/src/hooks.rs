@@ -18,7 +18,7 @@
 //! for the shots we do not draw ourselves.
 use super::Ordnance;
 use r3d_core::hooks::{Gate, Hook, Hooks, Kind, Prev, Site};
-use r3d_core::engine::{field, field_f32, field_u8, hook as ehook, rd, storm3d, vtable};
+use r3d_core::engine::{field, field_f32, field_u8, hook as ehook, rd, vtable};
 use r3d_core::frame::steps::View;
 use r3d_core::math::{M34, V3};
 use alloc::vec::Vec;
@@ -34,7 +34,6 @@ pub(crate) fn fn_shock_radius() -> usize { at(sym::FN_SHOCK_RADIUS) } // Shockwa
 /// node's pointer at +4), each node's +8 the ordnance.
 pub(crate) fn ordnance_head() -> usize { at(sym::ORDNANCE_HEAD) }
 pub(crate) fn cull_distance() -> usize { at(sym::CULL_DISTANCE) } // cfgOBJECT_CULLING_DISTANCE, f32
-const SLOT_SUBMIT: usize = 0x5c; // Ordnance vtable: Submit(ST3D_Camera*)
 
 // Stock's Submit functions this module draws in their place (`StockSubmit`).
 pub(crate) fn sub_phaser() -> usize { at(sym::SUB_PHASER) }
@@ -47,7 +46,9 @@ pub(crate) fn sub_srt() -> usize { at(sym::SUB_SRT) } // ShieldRemovingTorpedo
 pub(crate) fn sub_chain() -> usize { at(sym::SUB_CHAIN) } // ChainPulsar: its sprite, and its emitter node's Render
 
 // The warp flash: the call to ST3D_Sprite::DrawScaled3D in WarpSpriteEffect::Render.
-use crate::syms::{hook, sym, TABLE};
+use crate::syms::{field as off, hook, sym, TABLE};
+use r3d_core::engine::{obj, sprite as esprite, view as eview};
+use r3d_core::engine::instance::{render_slot, write_on_screen};
 
 /// An engine address of the profile: 0 unless the hook that uses it is ready.
 pub(crate) fn at(s: a2engine::Sym) -> usize { TABLE.engine().addr(s) }
@@ -58,60 +59,20 @@ pub(crate) fn fn_warp() -> usize { at(sym::FN_WARP) }
 /// frustum test (instance slot 3), the on-screen byte +0x25, the instance's draw
 /// (instance slot 5).
 pub(crate) fn fn_entity_render() -> usize { at(sym::FN_ENTITY_RENDER) }
-const SLOT_RENDER: usize = 11;
-
-// An ordnance object (a shot): its class, instance, owner and target handles, the ends
-// of a beam or a bolt's head and tail, the colours its `Submit` tints with.
-const SHOT_INSTANCE: usize = 4;
-const SHOT_CLASS: usize = 0x34;
-const SHOT_LEFT: usize = 0xac;
-const SHOT_OWNER: usize = 0x5c;
-const SHOT_TARGET: usize = 0x60;
-const SHOT_START: usize = 0xbc;
-const SHOT_END: usize = 0xc8;
-const SHOT_HUE: usize = 0xd0;
-const SHOT_HUE_B: usize = 0xd4;
-const SHOT_TINT: usize = 0xf0;
-const SHOT_ON_SCREEN: usize = 0x25;
-// An ordnance class: its light, life span, sprite, sizes and `cPrjID`.
-const CLASS_LIGHT: usize = 0x10;
-const CLASS_LIFE: usize = 0x1c;
-const CLASS_SPRITE: usize = 0x12c;
-const CLASS_LENGTH: usize = 0x144;
-const CLASS_WIDTH: usize = 0x148;
-const CLASS_PRJ: usize = 0x150;
-// A sprite: its texture (name at +8), first frame's rectangle, colour.
-const SPRITE_TEXTURE: usize = 0x58;
-const SPRITE_RECT: usize = 0x38;
-const SPRITE_COLOUR: usize = 0x24;
-// A point light: its ODF colour; the registry (Storm3D+0x60): record +0 the light, +4 its colour.
-const LIGHT_COLOUR: usize = 0xf4;
-const REGISTRY: usize = 0x60;
+// The offsets are the profile's `or_*` (render3d.ordnance.toml). An ordnance object (a
+// shot): its class, owner and target handles, the ends of a beam or a bolt's head and
+// tail, the colours its `Submit` tints with; its instance and on-screen byte are an
+// entity's (the core's). An ordnance class: its light, life span, sprite, sizes and
+// `cPrjID`. A sprite's texture, rectangle and colour, and the lights' registry
+// (Storm3D+0x60: record +0 the light, +4 its colour), are the core's. A point light: its
+// ODF colour.
 pub(crate) fn vt_point() -> usize { at(sym::VT_POINT) }
 pub(crate) fn vt_phaser() -> usize { at(sym::VT_PHASER) }
 // A phaser: two state bytes (spent, firing).
-const PHASER_SPENT: usize = 0x27;
-const PHASER_FIRING: usize = 0x24;
-// A game object: flags (bit 2: a game object), the bytes `RenderAll` tests.
-const ENT_FLAGS: usize = 0x14;
-const OBJ_GONE: usize = 0x113;
-const OBJ_DEAD: usize = 0x112;
-const OBJ_FORGET: usize = 0x10f;
-const OBJ_HIDDEN: usize = 0x183;
-const OBJ_INSTANCE: usize = 4;
-const OBJ_CLASS: usize = 0x40;
-const OBJ_POS: usize = 0xac;
-const OBJ_VEL: usize = 0xdc;
-const INST_DATABASE: usize = 0x80;
-const INST_SPHERE: usize = 0x40;
+// A game object: flags (bit 2: a game object; the core's), the bytes `RenderAll` tests.
 // A warp effect: its handle (+0), position (+4), distance (+0x10).
-const EFFECT_DISTANCE: usize = 0x10;
 // A shockwave explosion: its class (+0x30, with `cPrjID` +0x24 and the fade factor +0xe0)
 // and the radius it ends at (+0x50).
-const WAVE_CLASS: usize = 0x30;
-const WAVE_CLASS_PRJ: usize = 0x24;
-const WAVE_CLASS_FADE: usize = 0xe0;
-const WAVE_END: usize = 0x50;
 
 // -- State of the detours --------------------------------------------------------------
 
@@ -262,7 +223,7 @@ pub fn take_class_slot(ord: usize) -> bool {
     let hook = Hook {
         owner: hooks.owner(),
         used_by: "the shots' models",
-        kind: Kind::Slot { vt, slot: SLOT_RENDER },
+        kind: Kind::Slot { vt, slot: render_slot() },
         site: Site { symbol: "Entity::Render", addr: vt, expect: fn_entity_render() },
         to: ord_render as *const () as usize,
         chain: false,
@@ -302,16 +263,17 @@ pub fn noted() -> Vec<(usize, V3)> {
 
 /// Calls `f` with each live ordnance, re-reading the list's head as `RenderAll` does.
 pub fn for_each_ordnance(mut f: impl FnMut(usize)) {
-    let mut node = field(unsafe { rd::<usize>(ordnance_head()) }, 0);
+    use r3d_core::engine::list_node_next;
+    let mut node = list_node_next(unsafe { rd::<usize>(ordnance_head()) });
     let mut guard = 0;
     loop {
         let head = unsafe { rd::<usize>(ordnance_head()) };
         if node == 0 || node == head || guard > 100_000 {
             break;
         }
-        f(field(node, 8));
+        f(r3d_core::engine::list_node_value(node));
         // The next node is read after the call, as RenderAll reads it.
-        node = field(node, 0);
+        node = list_node_next(node);
         guard += 1;
     }
 }
@@ -334,7 +296,7 @@ pub fn obj_even_if_destroyed(handle: i32) -> usize {
 /// with an instance and a class), or 0.
 pub fn object_of(handle: i32) -> usize {
     let o = entity_get(handle);
-    if o == 0 || field(o, ENT_FLAGS) & 4 == 0 || field(o, OBJ_INSTANCE) == 0 || field(o, OBJ_CLASS) == 0 {
+    if o == 0 || obj::flags(o) & 4 == 0 || obj::instance(o) == 0 || obj::class(o) == 0 {
         return 0;
     }
     o
@@ -342,16 +304,16 @@ pub fn object_of(handle: i32) -> usize {
 
 /// A game object's bounding radius (its instance's sphere, +0x34 +12).
 pub fn radius_of(o: usize) -> f32 {
-    let r = field_f32(field(o, OBJ_INSTANCE), INST_SPHERE);
+    let r = field_f32(obj::instance(o), off::OR_INST_RADIUS());
     if r > 0.01 { r } else { 50.0 }
 }
 
 /// A game object's position (+0xac) and velocity (+0xdc).
 pub fn obj_pos(o: usize) -> V3 {
-    unsafe { rd(o + OBJ_POS) }
+    unsafe { rd(o + off::OR_OBJ_POS()) }
 }
 pub fn obj_vel(o: usize) -> V3 {
-    unsafe { rd(o + OBJ_VEL) }
+    unsafe { rd(o + off::OR_OBJ_VEL()) }
 }
 
 pub fn camera_position(cam: usize) -> V3 {
@@ -380,7 +342,7 @@ pub fn prj_odf(prj: usize) -> &'static str {
 
 /// An ordnance's ODF: its class keeps its cPrjID at +0x150.
 pub fn ord_odf(ord: usize) -> &'static str {
-    prj_odf(field(shot_class(ord), CLASS_PRJ))
+    prj_odf(field(shot_class(ord), off::OR_CLASS_PRJ()))
 }
 
 pub fn odf_name(o: usize) -> &'static str {
@@ -404,14 +366,14 @@ pub fn can_see(o: usize) -> bool {
 /// The engine's `Submit` of a shot (vtable +0x5c).
 pub fn submit(ord: usize, cam: usize) {
     unsafe {
-        let f: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(vtable(ord), SLOT_SUBMIT));
+        let f: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(vtable(ord), off::OR_VT_SUBMIT()));
         f(ord, cam);
     }
 }
 
 /// Where the class's `Submit` is, for the log and for `stock_submit`.
 pub fn submit_addr(ord: usize) -> usize {
-    field(vtable(ord), SLOT_SUBMIT)
+    field(vtable(ord), off::OR_VT_SUBMIT())
 }
 
 /// The classes whose `Submit` is a sprite draw that `Who::Stock` has a copy of.
@@ -458,8 +420,8 @@ pub fn stock_submit(ord: usize) -> Option<StockSubmit> {
 /// none).
 pub fn stock_colour(ord: usize, sub: StockSubmit, sprite: usize) -> V3 {
     match sub {
-        StockSubmit::Photon | StockSubmit::Poleron | StockSubmit::Srt => unsafe { rd(ord + SHOT_HUE) },
-        StockSubmit::Artillery => unsafe { rd(ord + SHOT_HUE_B) },
+        StockSubmit::Photon | StockSubmit::Poleron | StockSubmit::Srt => unsafe { rd(ord + off::OR_SHOT_HUE()) },
+        StockSubmit::Artillery => unsafe { rd(ord + off::OR_SHOT_HUE_B()) },
         _ => sprite_colour(sprite),
     }
 }
@@ -467,11 +429,11 @@ pub fn stock_colour(ord: usize, sub: StockSubmit, sprite: usize) -> V3 {
 // -- Shots -----------------------------------------------------------------------------
 
 pub fn shot_class(ord: usize) -> usize {
-    field(ord, SHOT_CLASS)
+    field(ord, off::OR_SHOT_CLASS())
 }
 
 pub fn shot_instance(ord: usize) -> usize {
-    field(ord, SHOT_INSTANCE)
+    obj::instance(ord)
 }
 
 /// What names a shot for the particles it feeds: its address and class, so a new shot
@@ -481,7 +443,7 @@ pub fn shot_key(ord: usize) -> usize {
 }
 
 pub fn shot_owner_handle(ord: usize) -> i32 {
-    unsafe { rd(ord + SHOT_OWNER) }
+    unsafe { rd(ord + off::OR_SHOT_OWNER()) }
 }
 
 /// The shot's owner / target as a live game object, or 0.
@@ -490,7 +452,7 @@ pub fn shot_owner(ord: usize) -> usize {
 }
 
 pub fn shot_target(ord: usize) -> usize {
-    object_of(unsafe { rd::<i32>(ord + SHOT_TARGET) })
+    object_of(unsafe { rd::<i32>(ord + off::OR_SHOT_TARGET()) })
 }
 
 /// A special weapon's field is about its owner or its target.
@@ -500,39 +462,39 @@ pub fn shot_party(ord: usize, on_owner: bool) -> usize {
 
 /// The ends of a beam, or a bolt's head and tail.
 pub fn shot_start(ord: usize) -> V3 {
-    unsafe { rd(ord + SHOT_START) }
+    unsafe { rd(ord + off::OR_SHOT_START()) }
 }
 pub fn shot_end(ord: usize) -> V3 {
-    unsafe { rd(ord + SHOT_END) }
+    unsafe { rd(ord + off::OR_SHOT_END()) }
 }
 
 /// A phaser's tint, and the second colour the pulse's `Submit` uses.
 pub fn shot_tint(ord: usize) -> V3 {
-    unsafe { rd(ord + SHOT_TINT) }
+    unsafe { rd(ord + off::OR_SHOT_TINT()) }
 }
 pub fn shot_hue_b(ord: usize) -> V3 {
-    unsafe { rd(ord + SHOT_HUE_B) }
+    unsafe { rd(ord + off::OR_SHOT_HUE_B()) }
 }
 
 /// Seconds of life left.
 pub fn shot_life_left(ord: usize) -> f32 {
-    field_f32(ord, SHOT_LEFT)
+    field_f32(ord, off::OR_SHOT_LEFT())
 }
 
 /// Stock's `Entity::Render` writes the on-screen byte of what it draws.
 pub fn mark_on_screen(ord: usize) {
-    unsafe { core::ptr::write_volatile((ord + SHOT_ON_SCREEN) as *mut u8, 1) };
+    write_on_screen(ord, 1);
 }
 
 /// A shot's class light, if it is an `ST3D_Point_Light`.
 pub fn shot_point_light(ord: usize) -> usize {
     let cls = shot_class(ord);
-    let l = if cls != 0 { field(cls, CLASS_LIGHT) } else { 0 };
+    let l = if cls != 0 { field(cls, off::OR_CLASS_LIGHT()) } else { 0 };
     if l != 0 && vtable(l) == vt_point() { l } else { 0 }
 }
 
 pub fn class_sprite(cls: usize) -> usize {
-    field(cls, CLASS_SPRITE)
+    field(cls, off::OR_CLASS_SPRITE())
 }
 
 pub fn shot_sprite(ord: usize) -> usize {
@@ -541,15 +503,15 @@ pub fn shot_sprite(ord: usize) -> usize {
 
 /// A phaser shot's class: its life span.
 pub fn class_life(cls: usize) -> f32 {
-    field_f32(cls, CLASS_LIFE)
+    field_f32(cls, off::OR_CLASS_LIFE())
 }
 
 pub fn class_length(cls: usize) -> f32 {
-    field_f32(cls, CLASS_LENGTH)
+    field_f32(cls, off::OR_CLASS_LENGTH())
 }
 
 pub fn class_width(cls: usize) -> f32 {
-    field_f32(cls, CLASS_WIDTH)
+    field_f32(cls, off::OR_CLASS_WIDTH())
 }
 
 pub fn is_phaser(o: usize) -> bool {
@@ -558,7 +520,7 @@ pub fn is_phaser(o: usize) -> bool {
 
 /// A phaser beam that is firing and not spent.
 pub fn phaser_active(o: usize) -> bool {
-    field_u8(o, PHASER_SPENT) == 0 && field_u8(o, PHASER_FIRING) != 0
+    field_u8(o, off::OR_PHASER_SPENT()) == 0 && field_u8(o, off::OR_PHASER_FIRING()) != 0
 }
 
 /// `Ordnance::RenderAll`'s tests of a shot's parties, and its one write: a shot whose
@@ -568,20 +530,20 @@ pub fn phaser_active(o: usize) -> bool {
 pub fn shot_parties(ord: usize) -> (usize, usize) {
     // The owner, if it is a game object and not +0x113 (gone).
     let mut owner = entity_get(shot_owner_handle(ord));
-    if owner != 0 && (field(owner, ENT_FLAGS) & 4 == 0 || field_u8(owner, OBJ_GONE) != 0) {
+    if owner != 0 && (obj::flags(owner) & 4 == 0 || field_u8(owner, off::OR_OBJ_GONE()) != 0) {
         owner = 0;
     }
-    let mut target = entity_get(unsafe { rd::<i32>(ord + SHOT_TARGET) });
-    if target != 0 && field(target, ENT_FLAGS) & 4 == 0 {
+    let mut target = entity_get(unsafe { rd::<i32>(ord + off::OR_SHOT_TARGET()) });
+    if target != 0 && obj::flags(target) & 4 == 0 {
         target = 0;
-    } else if target != 0 && field_u8(target, OBJ_FORGET) != 0 {
-        unsafe { core::ptr::write_unaligned((ord + SHOT_TARGET) as *mut i32, 0) };
+    } else if target != 0 && field_u8(target, off::OR_OBJ_FORGET()) != 0 {
+        unsafe { core::ptr::write_unaligned((ord + off::OR_SHOT_TARGET()) as *mut i32, 0) };
         target = 0;
     } else if target != 0 {
         let h = shot_owner_handle(ord);
         let o2 = obj_even_if_destroyed(h);
-        if o2 != 0 && field_u8(o2, OBJ_GONE) == 0 && field_u8(o2, OBJ_DEAD) == 0 && field_u8(target, OBJ_DEAD) != 0 {
-            unsafe { core::ptr::write_unaligned((ord + SHOT_TARGET) as *mut i32, 0) };
+        if o2 != 0 && field_u8(o2, off::OR_OBJ_GONE()) == 0 && field_u8(o2, off::OR_OBJ_DEAD()) == 0 && field_u8(target, off::OR_OBJ_DEAD()) != 0 {
+            unsafe { core::ptr::write_unaligned((ord + off::OR_SHOT_TARGET()) as *mut i32, 0) };
             target = 0;
         }
     }
@@ -592,7 +554,7 @@ pub fn shot_parties(ord: usize) -> (usize, usize) {
 /// within the culling distance of the eye and seen.
 pub fn shot_shown(ord: usize, owner: usize, target: usize, eye: V3) -> bool {
     let cull = unsafe { rd::<f32>(cull_distance()) };
-    let seen = |o: usize| o != 0 && field_u8(o, OBJ_HIDDEN) == 0 && can_see(o);
+    let seen = |o: usize| o != 0 && !obj::culled(o) && can_see(o);
     seen(owner) || seen(target) || ((eye - transform(ord).p).len() <= cull && can_see(ord))
 }
 
@@ -600,51 +562,40 @@ pub fn shot_shown(ord: usize, owner: usize, target: usize, eye: V3) -> bool {
 
 /// A sprite's texture name, as the engine holds it.
 pub fn sprite_texture_name(sprite: usize) -> &'static str {
-    let tex = field(sprite, SPRITE_TEXTURE);
-    unsafe { crate::rt::cstr_at(field(tex, 8) as *const u8, 260) }
+    esprite::texture_name(sprite)
 }
 
 /// A sprite's first frame (u, v, w, h).
 pub fn sprite_rect(sprite: usize) -> [f32; 4] {
-    unsafe { rd(sprite + SPRITE_RECT) }
+    esprite::rect(sprite)
 }
 
 pub fn sprite_colour(sprite: usize) -> V3 {
-    unsafe { rd(sprite + SPRITE_COLOUR) }
+    let c = esprite::sprite_colour(sprite);
+    V3 { x: c[0], y: c[1], z: c[2] }
 }
 
 /// A point light's ODF colour.
 pub fn light_colour(l: usize) -> V3 {
-    unsafe { rd(l + LIGHT_COLOUR) }
+    unsafe { rd(l + off::OR_LIGHT_COLOUR()) }
 }
 
 /// Calls `f(record, light)` for each record of the engine's light registry
 /// (`Storm3D+0x60`) this view.
-pub fn for_each_light_record(mut f: impl FnMut(usize, usize)) {
-    let head = field(storm3d(), REGISTRY);
-    if head == 0 {
-        return;
-    }
-    let mut node = field(head, 0);
-    let mut guard = 0;
-    while node != head && node != 0 && guard < 4096 {
-        guard += 1;
-        let rec = field(node, 8);
-        node = field(node, 0);
-        f(rec, field(rec, 0));
-    }
+pub fn for_each_light_record(f: impl FnMut(usize, usize)) {
+    eview::for_each_light_record(f)
 }
 
 /// The colour of a registry record (+4): this view's, not the class's.
 pub fn set_record_colour(rec: usize, c: V3) {
-    unsafe { core::ptr::write_unaligned((rec + 4) as *mut V3, c) };
+    eview::set_light_record_colour(rec, c)
 }
 
 // -- Instances and waves ---------------------------------------------------------------
 
 /// An instance's database (+0x80), checked against the engine's by the caller.
 pub fn instance_database(inst: usize) -> usize {
-    field(inst, INST_DATABASE)
+    r3d_core::engine::instance::instance_database(inst)
 }
 
 /// A warp effect's handle (+0), and its distance.
@@ -652,24 +603,24 @@ pub fn effect_handle(eff: usize) -> i32 {
     unsafe { rd(eff) }
 }
 pub fn effect_distance(eff: usize) -> f32 {
-    field_f32(eff, EFFECT_DISTANCE)
+    field_f32(eff, off::OR_EFFECT_DISTANCE())
 }
 
 /// A `ShockwaveExplosion`'s ODF, by its class's `cPrjID`.
 pub fn wave_odf(expl: usize) -> &'static str {
-    prj_odf(field(field(expl, WAVE_CLASS), WAVE_CLASS_PRJ))
+    prj_odf(field(field(expl, off::OR_WAVE_CLASS()), off::OR_WAVE_CLASS_PRJ()))
 }
 
 /// A `ShockwaveExplosion`'s radius now, the radius it ends at, and the share of the way
 /// after which its class fades it (`fadeFactor`, 0.5 without a class).
 pub fn wave_state(ex: usize) -> (f32, f32, f32) {
-    let cls = field(ex, WAVE_CLASS);
+    let cls = field(ex, off::OR_WAVE_CLASS());
     let rad = unsafe {
         let f: unsafe extern "thiscall" fn(usize) -> f32 = core::mem::transmute(fn_shock_radius());
         f(ex)
     };
-    let end = field_f32(ex, WAVE_END);
-    let fade = if cls != 0 { field_f32(cls, WAVE_CLASS_FADE) } else { 0.5 };
+    let end = field_f32(ex, off::OR_WAVE_END());
+    let fade = if cls != 0 { field_f32(cls, off::OR_WAVE_CLASS_FADE()) } else { 0.5 };
     (rad, end, fade)
 }
 

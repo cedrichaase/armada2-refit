@@ -59,7 +59,7 @@ fn cursor() -> usize {
 }
 
 // `DisplayInterface+0x04` is the panel's rectangle, `{left, top, right, bottom}`,
-// inclusive, in the 1600 x 1200 space every HUD rectangle is converted into
+// inclusive, in the HUD canvas (`canvas::CANVAS`) space every HUD rectangle is converted into
 // (`cfgSCREEN_WIDTH` x `cfgSCREEN_HEIGHT`), which the engine scales to the back buffer
 // per axis; `+0x16` is hidden (`SetIsHidden`; `RenderAll` calls `HiddenRender`); `+0x24`
 // the cursor a panel shows while it owns the mouse. Vtable slots: `GetName` (+0x18),
@@ -74,17 +74,17 @@ pub fn palette() -> usize {
     if g == 0 { 0 } else { unsafe { rd::<usize>(g) } }
 }
 
-/// A panel's rectangle in back-buffer pixels: the 1600 x 1200 rectangle scaled per
+/// A panel's rectangle in back-buffer pixels: the HUD canvas (`canvas::CANVAS`) rectangle scaled per
 /// axis, as the engine draws it. (left, top, right, bottom), right and bottom exclusive.
 pub fn panel_rect(c: usize, w: f32, h: f32) -> Option<[f32; 4]> {
     if c == 0 {
         return None;
     }
-    let r: [i32; 4] = unsafe { rd(c + field::HUD_DI_RECT) };
+    let r: [i32; 4] = unsafe { rd(c + field::HUD_DI_RECT()) };
     if r[2] <= r[0] || r[3] <= r[1] {
         return None;
     }
-    let (sx, sy) = (w / 1600.0, h / 1200.0);
+    let (sx, sy) = (w / super::canvas::CANVAS.0, h / super::canvas::CANVAS.1);
     Some([r[0] as f32 * sx, r[1] as f32 * sy, (r[2] + 1) as f32 * sx, (r[3] + 1) as f32 * sy])
 }
 
@@ -101,7 +101,7 @@ pub fn hidden(c: usize) -> bool {
 /// The panel's own hidden flag alone (`+0x16`), whatever the view: what a toggle such
 /// as `TogglePalette` flips.
 pub fn flag_hidden(c: usize) -> bool {
-    c != 0 && unsafe { rd::<u8>(c + field::HUD_DI_HIDDEN) } != 0
+    c != 0 && unsafe { rd::<u8>(c + field::HUD_DI_HIDDEN()) } != 0
 }
 
 /// Whether `RenderAll` walks this component in the view in use (true when the list
@@ -116,7 +116,7 @@ pub fn name(c: usize) -> &'static str {
     if c == 0 || eng().ready(hook::HUD_READS_COMPONENTS).is_err() {
         return "";
     }
-    let f: unsafe extern "thiscall" fn(usize) -> *const u8 = unsafe { core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_NAME)) };
+    let f: unsafe extern "thiscall" fn(usize) -> *const u8 = unsafe { core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_NAME())) };
     unsafe { cstr_static(f(c)) }
 }
 
@@ -215,20 +215,20 @@ pub fn set_pointer_over_ui(on: bool) {
 
 unsafe extern "thiscall" fn render_component(c: usize) {
     unsafe {
-        if c == cursor() && rd::<usize>(cursor() + field::HUD_CURSOR_SPRITE) == 0 {
+        if c == cursor() && rd::<usize>(cursor() + field::HUD_CURSOR_SPRITE()) == 0 {
             // No cursor named this frame: no owner (the pointer is over a panel of
             // ours), or an owner we have taken, whose stock `Render`, which names it,
             // is skipped (the objectives box, which stays the owner while it shows: at
             // a mission's start nothing else showed a cursor). Show the owner's own
             // cursor, else the bar's arrow, as a stock panel would.
-            let owner = rd::<usize>(cursor() + field::HUD_CURSOR_OWNER);
+            let owner = rd::<usize>(cursor() + field::HUD_CURSOR_OWNER());
             if (owner == 0 && OVER_UI) || taken(owner) {
-                let mut sprite = peek(owner, field::HUD_DI_CURSOR);
+                let mut sprite = peek(owner, field::HUD_DI_CURSOR());
                 if sprite == 0 {
-                    sprite = peek(palette(), field::HUD_DI_CURSOR);
+                    sprite = peek(palette(), field::HUD_DI_CURSOR());
                 }
                 if sprite != 0 {
-                    *((cursor() + field::HUD_CURSOR_SPRITE) as *mut usize) = sprite;
+                    *((cursor() + field::HUD_CURSOR_SPRITE()) as *mut usize) = sprite;
                 }
             }
         }
@@ -241,7 +241,7 @@ unsafe extern "thiscall" fn render_component(c: usize) {
         if c == cinematic_view() && super::unitview::enabled() {
             return super::unitview::render(c);
         }
-        let f: unsafe extern "thiscall" fn(usize) = core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_RENDER));
+        let f: unsafe extern "thiscall" fn(usize) = core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_RENDER()));
         f(c)
     }
 }
@@ -253,7 +253,7 @@ unsafe extern "thiscall" fn render_component(c: usize) {
 /// owner's tooltip once it has waited `s_tooltipDelay` / `s_verboseTooltipDelay`, NULL
 /// when there is none. `CursorInterface::Render` draws the verbose one while
 /// `m_tooltipState` is 0, else the short one, with `mDrawTooltip` at the pointer, 550
-/// units wide on the 1600 x 1200 canvas (stretched on a wide screen), and the verbose
+/// units wide on the HUD canvas (`canvas::CANVAS`) (stretched on a wide screen), and the verbose
 /// one's framing (`mDrawFramingElement`).
 // (`hud.tooltips`; `CursorInterface::m_tooltipState` is what the help button cycles, 0..2.)
 
@@ -277,13 +277,13 @@ pub fn tooltip() -> Option<alloc::string::String> {
 #[allow(static_mut_refs)]
 unsafe fn render_cursor_without_tooltip(c: usize) {
     unsafe {
-        let (tip, tip_verbose) = (cursor() + field::HUD_CURSOR_TIP, cursor() + field::HUD_CURSOR_TIP_VERBOSE);
+        let (tip, tip_verbose) = (cursor() + field::HUD_CURSOR_TIP(), cursor() + field::HUD_CURSOR_TIP_VERBOSE());
         let (short, verbose) = (rd::<usize>(tip), rd::<usize>(tip_verbose));
         let ss = if verbose != 0 && rd::<u32>(eng().addr(sym::HUD_TOOLTIP_STATE)) == 0 { verbose } else { short };
         TIP = if ss != 0 && !OVER_UI { super::msvc::stream_text(ss) } else { None };
         *(tip as *mut usize) = 0;
         *(tip_verbose as *mut usize) = 0;
-        let f: unsafe extern "thiscall" fn(usize) = core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_RENDER));
+        let f: unsafe extern "thiscall" fn(usize) = core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_RENDER()));
         f(c);
         *(tip as *mut usize) = short;
         *(tip_verbose as *mut usize) = verbose;
@@ -295,14 +295,14 @@ unsafe extern "thiscall" fn cursor_over(c: usize) -> bool {
         // The objectives box stays the mouse's owner while it shows, ours or not, as
         // stock's modal box is: `GameKeysProcessInput` opens the chat line on Return
         // unless the owner is this box, and Return is also what closes it.
-        if c == super::popups::objectives_box() && rd::<u8>(c + field::HUD_DI_HIDDEN) == 0 && taken(c) {
-            let f: unsafe extern "thiscall" fn(usize) -> bool = core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_CURSOR_OVER));
+        if c == super::popups::objectives_box() && rd::<u8>(c + field::HUD_DI_HIDDEN()) == 0 && taken(c) {
+            let f: unsafe extern "thiscall" fn(usize) -> bool = core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_CURSOR_OVER()));
             return f(c);
         }
         if OVER_UI || taken(c) {
             return false;
         }
-        let f: unsafe extern "thiscall" fn(usize) -> bool = core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_CURSOR_OVER));
+        let f: unsafe extern "thiscall" fn(usize) -> bool = core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_CURSOR_OVER()));
         f(c)
     }
 }
@@ -341,7 +341,7 @@ pub fn log_components() {
     let list = components();
     let mut s = alloc::string::String::new();
     for c in &list {
-        let r: [i32; 4] = unsafe { rd(c + field::HUD_DI_RECT) };
+        let r: [i32; 4] = unsafe { rd(c + field::HUD_DI_RECT()) };
         s.push_str(&crate::sfmt!(" {}{}[{},{},{},{}]", name(*c), if hidden(*c) { "(hidden)" } else { "" }, r[0], r[1], r[2], r[3]));
     }
     crate::log!("hud: {} components, in drawing order:{}", list.len(), s);

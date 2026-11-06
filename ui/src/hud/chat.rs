@@ -5,10 +5,38 @@
 //! typed, and a caret where the engine's caret is. The keys stay the engine's own
 //! (`TextInput_ProcessInput`): we only draw. The stock drawing of both is skipped
 //! (`engine::chat`).
-use crate::engine::chat;
+use crate::engine::api::chat;
 use crate::gfx::{fade, Weight, R};
 use crate::widgets::{theme, Ui};
 use alloc::string::String;
+
+/// The chat lines and the text entry, a panel of the table (`panels::PANELS`).
+pub struct Chat;
+
+impl super::panels::Panel for Chat {
+    fn name(&self) -> &'static str {
+        "chat"
+    }
+    fn scope(&self) -> &'static str {
+        "hud.chat"
+    }
+    fn key(&self, c: &crate::config::Hud) -> bool {
+        c.chat
+    }
+    fn claim(&self) -> bool {
+        if chat::install() {
+            chat::set_taken(true);
+            crate::log!("panels: chat lines and text entry ours");
+            true
+        } else {
+            crate::log!("panels: chat stays stock");
+            false
+        }
+    }
+    fn draw(&self, ui: &mut Ui) {
+        run(ui)
+    }
+}
 
 struct Seen {
     lines: usize,

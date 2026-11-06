@@ -20,6 +20,9 @@ doc = "The engine's mouse state, read so the pointer clip is not asked for while
 
 # ---- display.modes (stub/modes.rs) ------------------------------------------------
 
+[hook.crash]
+doc = "The engine's crash handler: its call-stack walk is replaced by a log record and a clean exit"
+
 [[sym]]
 id = "find_display_mode"
 symbol = "ST3D_DisplayDevice::FindDisplayMode"
@@ -267,3 +270,71 @@ kind = "fn"
 addr = 0x648520
 end = 0x6485d0
 used_by = ["drop"]
+
+[[sym]]
+id = "dev_modes"
+symbol = "ST3D_DisplayDevice::mode list"
+kind = "field"
+struct = "ST3D_DisplayDevice"
+offset = 0x14
+type = "ptr"
+used_by = ["modes"]
+
+[[sym]]
+id = "mode_node_value"
+symbol = "mode list node mode"
+kind = "field"
+struct = "mode list node"
+offset = 0x8
+type = "ptr"
+used_by = ["modes"]
+
+[[sym]]
+id = "mode_width"
+symbol = "ST3D_DisplayMode::width"
+kind = "field"
+struct = "ST3D_DisplayMode"
+offset = 0x0
+type = "i32"
+used_by = ["modes"]
+
+[[sym]]
+id = "mode_height"
+symbol = "ST3D_DisplayMode::height"
+kind = "field"
+struct = "ST3D_DisplayMode"
+offset = 0x4
+type = "i32"
+used_by = ["modes"]
+
+[[sym]]
+id = "mode_bpp"
+symbol = "ST3D_DisplayMode::bits per pixel"
+kind = "field"
+struct = "ST3D_DisplayMode"
+offset = 0x8
+type = "i32"
+used_by = ["modes"]
+
+# ---- display.crash (crash.rs) ------------------------------------------------------
+
+# DebugCallStack_DumpFrom(file, frame pointer) walks the frames of the faulting thread from
+# the frame pointer the exception left; with a damaged one it faults again, in the handler.
+[[sym]]
+id = "dump_from"
+symbol = "DebugCallStack_DumpFrom"
+kind = "fn"
+addr = 0x64faf0
+check = "55 8b ec 6a ff 68"
+used_by = ["crash"]
+
+# The one call of it in the exception handler (the filter of DebugException_Execute, which
+# the engine's main loop runs inside): re-pointed to our record, which does not walk.
+[[sym]]
+id = "site_dump_from"
+symbol = "DebugException_Execute"
+kind = "call"
+addr = 0x651f65
+target = "dump_from"
+in = "DebugException_Execute"
+used_by = ["crash"]

@@ -29,7 +29,7 @@ fn engine_log(s: &str) {
         crate::log!("{}", s);
     } else if let Some(rest) = s.strip_prefix("engine: symbols:") {
         crate::log!("engine: {} symbols:{}", TABLES[k].0, rest);
-    } else if !(s.starts_with("engine: Armada2.exe") || s.starts_with("engine: build ") || s == "engine: unknown build" || s.starts_with("engine: TEST:")) {
+    } else if !(a2engine::is_identity_line(s) || s.starts_with("engine: build ") || s == "engine: unknown build" || s.starts_with("engine: TEST:")) {
         crate::log!("{}", s);
     }
 }

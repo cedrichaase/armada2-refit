@@ -20,7 +20,7 @@
 //! Every control is found in the model by kind and place, not by label, so the screen
 //! works in every language and in each of its states (host, joiner, Instant Action).
 use super::setup_kit as kit;
-use crate::engine::shellui::Kind;
+use crate::engine::api::shellui::Kind;
 use crate::gfx::{Weight, R};
 use crate::menus::model::{Control, What};
 use crate::menus::Screen;

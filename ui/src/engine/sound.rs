@@ -15,7 +15,7 @@ fn addr(s: a2engine::Sym) -> usize {
 }
 
 /// `AudioSound2D::AudioSound2D(name, priority, volume, ...)` is thiscall; the object is
-/// `value::PANELS_SOUND2D_BYTES` made with the game's `operator new`.
+/// `value::PANELS_SOUND2D_BYTES()` made with the game's `operator new`.
 fn play(name: a2engine::Sym) {
     if !functions_stock() {
         return;
@@ -35,7 +35,7 @@ fn play_as(name: usize, third: i32) {
         }
         let new: unsafe extern "C" fn(usize) -> usize = core::mem::transmute(addr(sym::PANELS_OPERATOR_NEW));
         let ctor: unsafe extern "thiscall" fn(usize, usize, i32, i32, i32, usize) -> usize = core::mem::transmute(addr(sym::PANELS_SOUND2D));
-        let snd = new(value::PANELS_SOUND2D_BYTES as usize);
+        let snd = new(value::PANELS_SOUND2D_BYTES() as usize);
         if snd != 0 {
             // As stock: priority 8, volume 0, then 4 (HUD) or 0 (shell), no callback.
             ctor(snd, name, 8, 0, third, 0);
@@ -64,9 +64,10 @@ pub fn shell_hover(like: Option<usize>) {
     if !functions_stock() {
         return;
     }
-    let own = like.filter(|&b| b != 0 && unsafe { rd::<u32>(b + field::PANELS_SB_HAS_SOUND) } != 0);
+    let own = like.filter(|&b| b != 0 && unsafe { rd::<u32>(b + field::PANELS_SB_HAS_SOUND()) } != 0);
     match own {
-        Some(b) => play_as(b + field::PANELS_SB_HOVER_SOUND, 0),
+        Some(b) => play_as(b + field::PANELS_SB_HOVER_SOUND(), 0),
+        // lint-allow(content): the default SetButtonMode itself plays, the engine's, not a set's.
         None => play_as(c"cornron.wav".as_ptr() as usize, 0),
     }
 }
@@ -75,6 +76,7 @@ pub fn shell_hover(like: Option<usize>) {
 /// a control of ours that has no stock button to click.
 pub fn shell_click() {
     if functions_stock() {
+        // lint-allow(content): the click SetButtonMode itself plays, the engine's, not a set's.
         play_as(c"cornrclk.wav".as_ptr() as usize, 0);
     }
 }

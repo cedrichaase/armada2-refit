@@ -81,7 +81,7 @@ fn demo(ctx: Context, ui: &mut Ui) {
     };
     ui.note(s.row(row), &m);
     if ctx == Context::Loading {
-        let p = crate::engine::loading::progress();
+        let p = crate::engine::api::loading::progress();
         ui.note(s.row(row), &match p {
             Some(f) => crate::sfmt!("Loading {:.0}%", f * 100.0),
             None => crate::sfmt!("No load in progress"),

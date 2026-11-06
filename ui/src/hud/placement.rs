@@ -18,7 +18,7 @@
 //!   corners) in `bad`, crossed: what is in the way.
 //!
 //! With `Placement=0` the engine's sprites are drawn as the engine drew them.
-use crate::engine::leftovers::{Art, Placement, Projector};
+use crate::engine::api::leftovers::{Art, Placement, Projector};
 use crate::gfx::{fade, Color, R};
 use crate::widgets::Ui;
 

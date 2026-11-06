@@ -136,13 +136,25 @@ pub fn load(ini: &crate::rt::Ini) -> Look {
         sun: f("HullSun", 1.1),
         self_illum,
     };
-    let borg = Profile {
-        ambient: c("BorgAmbient", [0.015, 0.018, 0.015]),
-        specular: f("BorgSpecular", 0.15),
-        specular_power: f("BorgSpecularPower", 64.0),
-        rim: c("BorgRimLight", [0.06, 0.13, 0.03]),
-        sun: f("BorgSun", 0.8),
-        self_illum: f("BorgSelfIllumination", self_illum),
+    // The bump-mapped hulls' profile: its keys are the set's prefix (`Borg` in stock:
+    // `BorgAmbient`, ...) before the hull profile's; with no prefix, the hull profile.
+    let prefix = super::content::get().bump_profile;
+    let key = |k: &str| {
+        let mut s = alloc::string::String::from(prefix);
+        s.push_str(k);
+        s
+    };
+    let borg = if prefix.is_empty() {
+        hull
+    } else {
+        Profile {
+            ambient: c(&key("Ambient"), [0.015, 0.018, 0.015]),
+            specular: f(&key("Specular"), 0.15),
+            specular_power: f(&key("SpecularPower"), 64.0),
+            rim: c(&key("RimLight"), [0.06, 0.13, 0.03]),
+            sun: f(&key("Sun"), 0.8),
+            self_illum: f(&key("SelfIllumination"), self_illum),
+        }
     };
     Look {
         hull,

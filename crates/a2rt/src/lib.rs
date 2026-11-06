@@ -44,6 +44,27 @@ pub fn cstr(s: &str) -> Vec<u8> {
     v
 }
 
+/// The address of an export of any loaded module, or 0: plugins find each other by
+/// export, never by file name (the Rust twin of `a2_find_export` in `csdk/a2asi.h`).
+pub fn find_export(name: &str) -> usize {
+    let n = cstr(name);
+    let mut mods = [core::ptr::null_mut::<core::ffi::c_void>(); 256];
+    let mut needed = 0u32;
+    unsafe {
+        if win::K32EnumProcessModules(win::GetCurrentProcess(), mods.as_mut_ptr() as *mut _, core::mem::size_of_val(&mods) as u32, &mut needed) == 0 {
+            return 0;
+        }
+        let count = (needed as usize / core::mem::size_of::<usize>()).min(256);
+        for m in &mods[..count] {
+            let f = win::GetProcAddress(*m as _, n.as_ptr());
+            if f != 0 {
+                return f;
+            }
+        }
+    }
+    0
+}
+
 /// NUL-terminated UTF-16 copy of `s`, for the W-suffixed Win32 calls. Every path in
 /// this crate is a UTF-8 `String` inside and goes through the wide APIs at the edge,
 /// so a path the system gave us (`C:\Users\Jörg\...`) can always be opened again,

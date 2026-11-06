@@ -140,7 +140,7 @@ impl Set {
         let facs = content::get().factions;
         let fac: Vec<V3> = facs.iter().map(|f| c.rgb(f.key, f.colour)).collect();
         let down_time_min = c.f("DownStrikeMin", 0.12).max(0.02);
-        let ray_list = c.s("RayFactions").unwrap_or_else(|| String::from("Klingon")).to_ascii_lowercase();
+        let ray_list = c.s("RayFactions").unwrap_or_else(|| String::from(content::get().ray_factions)).to_ascii_lowercase();
         let ray_fac: Vec<bool> =
             facs.iter().map(|f| ray_list.split([',', ' ']).any(|w| w.trim() == f.key.to_ascii_lowercase())).collect();
         Set {

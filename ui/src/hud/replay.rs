@@ -2,8 +2,29 @@
 //! the stock `ReplayPanel` shows (in a replay), a row of five buttons at the top of
 //! the screen, under the resources, each showing the stock button's picture and
 //! pressing it: restart, pause, slow, normal, fast.
-use crate::engine::popups;
+use crate::engine::api::popups;
 use crate::widgets::{Anchor, Ui};
+
+/// The replay controls, a panel of the table (`panels::PANELS`).
+pub struct Replay;
+
+impl super::panels::Panel for Replay {
+    fn name(&self) -> &'static str {
+        "replay"
+    }
+    fn scope(&self) -> &'static str {
+        "hud.replay"
+    }
+    fn key(&self, c: &crate::config::Hud) -> bool {
+        c.replay
+    }
+    fn component(&self) -> (usize, &'static str) {
+        (popups::replay_box(), "ReplayPanel")
+    }
+    fn draw(&self, ui: &mut Ui) {
+        run(ui)
+    }
+}
 
 static mut LOGGED: bool = false;
 

@@ -313,6 +313,7 @@ build it recognises and the summary:
 | `display.native` | `GameConfiguration::InitializeGraphicsSystem` (`fn`) and its call in `WinMain` (`call`, checked), `UserProfile` (`global`), the profile's mode fields at +0x50, +0x54, +0x58 and the two stock modes (`value`) | `window.rs`: `[Window] Native` ("Window and display mode") | the profile's mode is as set |
 | `display.keepclip` | the mouse driver's button bits and the flag that says the pointer is held for a pan (`global`; read only) | `window.rs`: `[Window] KeepClip` | the clip is put back regardless of a held button |
 | `display.drop` | the code ranges of `RenderLoopAssetLoadStatusUpdate`, the Credits (`Credits3D.obj`, from its first function `SpriteWithLocation::Render`), `ST3D_DeviceDirectX8::RefreshDisplay` and the two workspaces' `Submit` (`fn` with `end`; nothing is written, so nothing is checked) | `drop.rs`: `[Drop]` ("Drop switches"), and the scene a `BeginScene` begins for the claims (`passthrough.rs`) and the contract's mission check (`api.rs`) | nothing is dropped and no scene of the engine's is claimed: the engine draws its own loading screen, Credits and cursor |
+| `display.crash` | `DebugCallStack_DumpFrom` (`fn`, its first 6 bytes checked) and its one call, in `DebugException_Execute` (`call`, checked to call it) | `crash.rs`: `[Crash] Catch` ("The crash catcher") | the engine's own handler, which can hang |
 
 The tracer's caller names (`trace.rs`) are not a hook: they are addresses read off the
 stack against the identity's image range, and mean the same on any build.
@@ -978,6 +979,75 @@ through the back buffer, the gamma pass and the flip-model swap chain, and a mis
 (`-nointro a2_borg01`, the plugins standing down, as they did before display 0.6.0)
 presents past frame 1000 and opens the in-mission menu. With render3d and the UI
 drawing on it: `gpu/README.md`, "The Direct3D 12 backend", "Measured".
+
+## The crash catcher
+
+`crash.rs`, `[Crash] Catch` (on). Display8 is its home because it is the one plugin that is
+always installed and is loaded first: `d3d8.dll` is in the process before the engine's
+first frame, whichever other layers a player has.
+
+**What the engine does.** The main loop runs inside `DebugException_Execute`, whose handler
+(an `__except` filter) names the exception, then calls `DebugCallStack_DumpFrom(file, frame
+pointer)` once, which walks the frames of the thread from the frame pointer in the faulting
+context and writes them to `exception.txt`, and then runs the callback `DebugException_Open`
+was given (`Debug_SystemCleanup`: with `cfgFLIP_TO_WINDOWED_ON_ASSERT` it re-opens the game
+windowed). Under Wine the walk faults again when the frame pointer is damaged, and the nested
+fault re-enters the handler, 35 times and more, without a record and without an exit
+(observed 2026-11-06 entering a third mission in one session, and the white window of
+`testbench/operating/ui-switchon.md`, "Traps"). This is the reason to hook it here: the walk
+is the one part of the handler that does not survive a damaged stack, and it is the call that
+follows the filter's own decoding, so replacing that one call leaves the engine's handler
+otherwise as it is. `RTS_CFG.h` is not touched (network games compare its CRC).
+
+**What Display8 does.** Two parts, the second needing the profile (`display.crash`; a build
+that does not resolve it, such as another build of the engine, gets neither, and the log
+says why):
+
+- the call of `DumpFrom` in the handler is re-pointed to `crash::dump_from`, which does not
+  walk: it logs that the handler was reached (and a frame walk of its own, every read
+  checked, when no record preceded it), then ends the process with `TerminateProcess`, exit
+  code `0xA2C0DE01`. The log is written unbuffered, so it is complete when the process
+  ends. `ExitProcess` is not used: it runs detach code in a process whose heap may be
+  damaged;
+- a vectored exception handler, installed first, writes a record for the fatal classes
+  (access violation, in-page error, illegal and privileged instruction, divide and integer
+  overflow, stack overflow, heap corruption, stack-buffer overrun) before the engine's
+  filter sees them. It is first chance: the record also appears for an exception the game
+  then handles by itself, which is why it says "first chance". The record carries the code,
+  flags, faulting address as `module+offset` (a module's offset resolves against the
+  developer's `armada2.map` with `Armada2.exe`'s image base 0x400000 added; no name is
+  written), for an access violation the address touched and whether it read or wrote,
+  the registers, 64 stack words, the words among them that point into a module (return
+  addresses) and a walk of the frame-pointer chain. The records are built on the stack,
+  not the heap. A nested-exception guard ends the process when the handler itself faults
+  or when more than 32 fatal exceptions have been seen (the loop above).
+
+A record, from the bench (`display-crash`):
+
+    crash: exception 1 (first chance): code 0xc0000005, flags 0x0, address 0x796f3294 d3d8.dll+0x33294, thread 344
+      the access violation was writing 0xdead0010
+      eax 00000001 ebx 00afed38 ... eip 796f3294 eflags 00010202
+      stack+0x00: 00afe9b0 00000000 ...
+      frame 1: bp 0xaffa60 return 0x624738 Armada2.exe+0x224738
+    address space (crash): largest free block 895 MB, free 1453 MB in 96 blocks ...
+    crash: the engine's exception handler is at its call-stack dump (frame pointer 0xaff154); 1 fatal exception(s) were seen before it
+    crash: the engine's handler would walk the stack here, ...; the process ends here (exit code 0xa2c0de01)
+
+**The address space** is logged whatever `Catch` says, on any build, as one line
+(`address space (<why>): largest free block, free total and blocks, the same below 2 GB,
+committed, reserved, top of the user space`, from `VirtualQuery`): at each device creation
+and reset, in each crash record, and from `Present` when the committed total has moved by
+64 MB since the last line (a mission load moves it by hundreds) or a minute has passed. It
+is the evidence for or against the 32-bit address space running out across missions: a
+largest free block shrinking mission by mission, with the total free still large, is
+fragmentation; the free total going to zero is exhaustion. First reading, the bench's
+Wine: user space to 0xfffeffff (the exe is large-address-aware here), 1407 MB largest free
+block at the first device, 895 MB in mission 1, and through five missions in one session (`display-mission-cycle`) the free total stayed between 1.41 and 1.51 GB and the largest block at 895 MB: no exhaustion on the bench's short missions.
+
+**Bench**: `[Crash] TestFrames=N` (honoured in a test bench clone only, not in the shipped
+`Display8.ini`; `display/bench-mode.sh` writes it) writes to an unmapped address at the Nth
+frame. `./a2test run display-crash --install .` checks the record and that the game has
+exited (without the catcher the engine's handler hangs).
 
 ## The bail-out
 

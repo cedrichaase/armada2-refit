@@ -43,9 +43,54 @@ pub mod hook {
 }
 
 pub mod field {
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn HL_VT_RENDER_INTERNAL() -> usize { super::TABLE.engine().field(a2engine::Sym(34)) }
+    #[inline(always)] pub fn HL_VT_INST_UPDATE() -> usize { super::TABLE.engine().field(a2engine::Sym(35)) }
+    #[inline(always)] pub fn HL_INST_CENTRE() -> usize { super::TABLE.engine().field(a2engine::Sym(36)) }
+    #[inline(always)] pub fn HL_INST_RADIUS() -> usize { super::TABLE.engine().field(a2engine::Sym(37)) }
+    #[inline(always)] pub fn HL_INST_MATRIX() -> usize { super::TABLE.engine().field(a2engine::Sym(38)) }
+    #[inline(always)] pub fn HL_OBJ_CLOAK() -> usize { super::TABLE.engine().field(a2engine::Sym(39)) }
+    #[inline(always)] pub fn HL_CLOAK_STATE() -> usize { super::TABLE.engine().field(a2engine::Sym(40)) }
+    #[inline(always)] pub fn HL_CLOAK_ALPHA() -> usize { super::TABLE.engine().field(a2engine::Sym(41)) }
+    #[inline(always)] pub fn HL_CLOAK_PHASE() -> usize { super::TABLE.engine().field(a2engine::Sym(42)) }
+    #[inline(always)] pub fn HL_CRAFT_WARP_B() -> usize { super::TABLE.engine().field(a2engine::Sym(43)) }
+    #[inline(always)] pub fn HL_CRAFT_WARP_S() -> usize { super::TABLE.engine().field(a2engine::Sym(44)) }
+    #[inline(always)] pub fn HL_OBJ_VELOCITY() -> usize { super::TABLE.engine().field(a2engine::Sym(45)) }
+    #[inline(always)] pub fn HL_OBJ_EFFECT() -> usize { super::TABLE.engine().field(a2engine::Sym(46)) }
+    #[inline(always)] pub fn HL_CRAFT_WHITE_WAVE() -> usize { super::TABLE.engine().field(a2engine::Sym(47)) }
+    #[inline(always)] pub fn HL_WAVE_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(48)) }
+    #[inline(always)] pub fn HL_WAVE_LENGTH() -> usize { super::TABLE.engine().field(a2engine::Sym(49)) }
+    #[inline(always)] pub fn HL_WAVE_SPEED() -> usize { super::TABLE.engine().field(a2engine::Sym(50)) }
+    #[inline(always)] pub fn HL_WAVE_DIR() -> usize { super::TABLE.engine().field(a2engine::Sym(51)) }
+    #[inline(always)] pub fn HL_S3D_NEAR_FADE() -> usize { super::TABLE.engine().field(a2engine::Sym(52)) }
+    #[inline(always)] pub fn HL_CLASS_VISIBLE_DB() -> usize { super::TABLE.engine().field(a2engine::Sym(53)) }
+    #[inline(always)] pub fn HL_OBJ_HOLOGRAM() -> usize { super::TABLE.engine().field(a2engine::Sym(54)) }
+    #[inline(always)] pub fn HL_OBJ_SUPPRESSED() -> usize { super::TABLE.engine().field(a2engine::Sym(55)) }
+    #[inline(always)] pub fn HL_RIG_BUILD_ITEM() -> usize { super::TABLE.engine().field(a2engine::Sym(56)) }
+    #[inline(always)] pub fn HL_VT_RIG_BUSY() -> usize { super::TABLE.engine().field(a2engine::Sym(57)) }
+    #[inline(always)] pub fn HL_VT_ITEM_OK() -> usize { super::TABLE.engine().field(a2engine::Sym(58)) }
+    #[inline(always)] pub fn HL_VT_RIG_PLACE() -> usize { super::TABLE.engine().field(a2engine::Sym(59)) }
+    #[inline(always)] pub fn HL_SCRAP_RESOURCE() -> usize { super::TABLE.engine().field(a2engine::Sym(60)) }
+    #[inline(always)] pub fn HL_RESOURCE_EMPTY() -> usize { super::TABLE.engine().field(a2engine::Sym(61)) }
+    #[inline(always)] pub fn HL_RESOURCE_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(62)) }
+    #[inline(always)] pub fn HL_HOLO_INSTANCE() -> usize { super::TABLE.engine().field(a2engine::Sym(63)) }
+    #[inline(always)] pub fn HL_HOLO_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(64)) }
+    #[inline(always)] pub fn HL_EVOLVER_COCOON() -> usize { super::TABLE.engine().field(a2engine::Sym(65)) }
+    #[inline(always)] pub fn HL_EVOLVER_PROGRESS() -> usize { super::TABLE.engine().field(a2engine::Sym(66)) }
+    #[inline(always)] pub fn HL_INST_SCALE_HANDLE() -> usize { super::TABLE.engine().field(a2engine::Sym(67)) }
+    #[inline(always)] pub fn HL_VT_INST_RENDER() -> usize { super::TABLE.engine().field(a2engine::Sym(68)) }
+    #[inline(always)] pub fn HL_FREIGHTER_CAPACITY() -> usize { super::TABLE.engine().field(a2engine::Sym(69)) }
+    #[inline(always)] pub fn HL_FREIGHTER_AMOUNT() -> usize { super::TABLE.engine().field(a2engine::Sym(70)) }
+    #[inline(always)] pub fn HL_FREIGHTER_KIND() -> usize { super::TABLE.engine().field(a2engine::Sym(71)) }
+    #[inline(always)] pub fn HL_INST_ORIGIN() -> usize { super::TABLE.engine().field(a2engine::Sym(73)) }
+    #[inline(always)] pub fn HL_INST_FACES() -> usize { super::TABLE.engine().field(a2engine::Sym(74)) }
+    #[inline(always)] pub fn HL_COCOON_RAMP() -> usize { super::TABLE.engine().field(a2engine::Sym(75)) }
+    #[inline(always)] pub fn HL_VT_CLASS_DISABLE_NODES() -> usize { super::TABLE.engine().field(a2engine::Sym(76)) }
 }
 
 pub mod value {
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn HL_RESOURCE_COUNT() -> i32 { super::TABLE.engine().value(a2engine::Sym(72)) }
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
@@ -83,21 +128,65 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "fade_min_fov", symbol: "cfgFADE_OUT_MIN_FOV", kind: a2engine::Kind::Global },
     a2engine::SymDef { id: "fade_max_fov", symbol: "cfgFADE_OUT_MAX_FOV", kind: a2engine::Kind::Global },
     a2engine::SymDef { id: "fade_max", symbol: "cfgFADE_OUT_MAX", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "hl_vt_render_internal", symbol: "GameObject::RenderInternal slot", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_vt_inst_update", symbol: "GameObjectInstance::Update slot", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_inst_centre", symbol: "ST3D_Instance::sphere centre", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_inst_radius", symbol: "ST3D_Instance::radius", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_inst_matrix", symbol: "ST3D_Instance::placement", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_obj_cloak", symbol: "Craft::cloaking device", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_cloak_state", symbol: "CloakingDevice::state", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_cloak_alpha", symbol: "CloakingDevice::alpha", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_cloak_phase", symbol: "CloakingDevice::phase", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_craft_warp_b", symbol: "Craft::warp stretch", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_craft_warp_s", symbol: "Craft::warp scale", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_obj_velocity", symbol: "GameObject::velocity", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_obj_effect", symbol: "GameObject::billboard effect", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_craft_white_wave", symbol: "Craft::white wave light", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_wave_colour", symbol: "WaveLight::colour", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_wave_length", symbol: "WaveLight::wavelength", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_wave_speed", symbol: "WaveLight::speed", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_wave_dir", symbol: "WaveLight::direction", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_s3d_near_fade", symbol: "ST3D_GraphicsEngine::near fade on", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_class_visible_db", symbol: "GameObjectClass::visible database", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_obj_hologram", symbol: "GameObject::hologram", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_obj_suppressed", symbol: "GameObject::not drawn", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_rig_build_item", symbol: "ConstructionRig::build item", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_vt_rig_busy", symbol: "ConstructionRig::IsBusy slot", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_vt_item_ok", symbol: "build item test slot", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_vt_rig_place", symbol: "ConstructionRig placement slot", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_scrap_resource", symbol: "Scrap::resource", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_resource_empty", symbol: "ResourceComponent::empty", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_resource_class", symbol: "ResourceComponent::class", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_holo_instance", symbol: "TimedHoloEffect::instance", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_holo_class", symbol: "TimedHoloEffect::class shown", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_evolver_cocoon", symbol: "Evolver::cocoon", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_evolver_progress", symbol: "Evolver::evolution", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_inst_scale_handle", symbol: "GameObjectInstance::scale effect handle", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_vt_inst_render", symbol: "ST3D_Instance::Render slot", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_freighter_capacity", symbol: "Freighter::class capacities", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_freighter_amount", symbol: "Freighter::amount carried", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_freighter_kind", symbol: "Freighter::resource carried", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_resource_count", symbol: "eResource count", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "hl_inst_origin", symbol: "ST3D_Instance::origin", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_inst_faces", symbol: "ST3D_Instance::faces remaining", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_cocoon_ramp", symbol: "CocoonInstance::ramp", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_vt_class_disable_nodes", symbol: "DisableSpecialNodes slot", kind: a2engine::Kind::Field },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
-    a2engine::HookDef { id: "render3d.hulls.reads", run_unknown: false, rows: &["Modules.hulls"], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33] },
+    a2engine::HookDef { id: "render3d.hulls.reads", run_unknown: false, rows: &["Modules.hulls"], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76] },
 ];
 
 pub const BUILDS: &[a2engine::Build] = &[
     a2engine::Build {
         name: "gog-1.1",
         key: "armada2/gog-1.1",
+        exe: "Armada2.exe",
         timestamp: 0x3c4c76bd,
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 34,
+        n_resolved: 77,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x4a58e0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x14, 0xa0, 0xd4], mask: &[], section: "", count: 0, value: 0 }, // fn_scrap_render
@@ -134,6 +223,49 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x70444c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // fade_min_fov
             a2engine::Entry { present: true, addr: 0x704450, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // fade_max_fov
             a2engine::Entry { present: true, addr: 0x704454, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // fade_max
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 88 }, // hl_vt_render_internal
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // hl_vt_inst_update
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 52 }, // hl_inst_centre
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // hl_inst_radius
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 68 }, // hl_inst_matrix
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 264 }, // hl_obj_cloak
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 60 }, // hl_cloak_state
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 68 }, // hl_cloak_alpha
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 72 }, // hl_cloak_phase
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 580 }, // hl_craft_warp_b
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 584 }, // hl_craft_warp_s
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 220 }, // hl_obj_velocity
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 60 }, // hl_obj_effect
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 576 }, // hl_craft_white_wave
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 244 }, // hl_wave_colour
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 316 }, // hl_wave_length
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 320 }, // hl_wave_speed
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 324 }, // hl_wave_dir
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 232 }, // hl_s3d_near_fade
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 476 }, // hl_class_visible_db
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 372 }, // hl_obj_hologram
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 38 }, // hl_obj_suppressed
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 596 }, // hl_rig_build_item
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 312 }, // hl_vt_rig_busy
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // hl_vt_item_ok
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 392 }, // hl_vt_rig_place
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 380 }, // hl_scrap_resource
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 24 }, // hl_resource_empty
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // hl_resource_class
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 180 }, // hl_holo_instance
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 196 }, // hl_holo_class
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 684 }, // hl_evolver_cocoon
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 688 }, // hl_evolver_progress
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 148 }, // hl_inst_scale_handle
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 24 }, // hl_vt_inst_render
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 596 }, // hl_freighter_capacity
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 600 }, // hl_freighter_amount
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 604 }, // hl_freighter_kind
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 6 }, // hl_resource_count
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 104 }, // hl_inst_origin
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // hl_inst_faces
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 152 }, // hl_cocoon_ramp
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 28 }, // hl_vt_class_disable_nodes
         ],
         blocked: &[
         ],
@@ -141,8 +273,8 @@ pub const BUILDS: &[a2engine::Build] = &[
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 1] = [const { core::sync::atomic::AtomicU64::new(0) }; 1];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 34] = [const { core::sync::atomic::AtomicU8::new(0) }; 34];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 34] = [const { core::sync::atomic::AtomicUsize::new(0) }; 34];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 77] = [const { core::sync::atomic::AtomicU8::new(0) }; 77];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 77] = [const { core::sync::atomic::AtomicUsize::new(0) }; 77];
 static NOTES: [a2engine::Note; 1] = [const { a2engine::Note::new() }; 1];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 

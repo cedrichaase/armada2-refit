@@ -140,7 +140,7 @@ pub fn cam_rect(cam: usize, w: u32, h: u32) -> PRect {
 pub fn run(cam: usize, rs: usize, main: bool, tw: u32, th: u32, frame: u32) -> PRect {
     let s3d = storm3d();
     let st3d = engine::st3d_device();
-    let rsf = |o: usize| engine::view::render_state_flag(rs, o);
+    let rsf = engine::view::render_state(rs);
     unsafe {
         // 1-3: the viewport (the main camera follows the back buffer), the view's depth.
         this0(fn_update_viewport(), cam);
@@ -181,11 +181,11 @@ pub fn run(cam: usize, rs: usize, main: bool, tw: u32, th: u32, frame: u32) -> P
     unsafe {
         // 8: sky, stars, background objects; then the depth is cleared for the scene.
         if !registry::step(Step::Background, &v) {
-            cdecl3(via(site_background(), fn_background()), cam, rsf(4) as u32, rsf(8) as u32);
+            cdecl3(via(site_background(), fn_background()), cam, rsf.background.0 as u32, rsf.background.1 as u32);
         }
         timing::mark("background");
         // 9: footprints, the tactical grid, fog and shroud.
-        if rsf(0) && !registry::step(Step::Terrain, &v) {
+        if rsf.terrain && !registry::step(Step::Terrain, &v) {
             this1(via(site_terrain(), fn_terrain()), g_terrain(), cam);
         }
         timing::mark("terrain");
@@ -204,7 +204,7 @@ pub fn run(cam: usize, rs: usize, main: bool, tw: u32, th: u32, frame: u32) -> P
         }
         timing::mark("objects");
         // 13-16
-        if rsf(0xc) && !registry::step(Step::Ordnance, &v) {
+        if rsf.ordnance && !registry::step(Step::Ordnance, &v) {
             cdecl1(via(site_ord_render(), fn_ord_render()), cam);
         }
         timing::mark("ordnance");
@@ -244,7 +244,7 @@ pub fn run(cam: usize, rs: usize, main: bool, tw: u32, th: u32, frame: u32) -> P
         }
         timing::mark("chunks");
         if !registry::step(Step::Particles, &v) {
-            this1(via(site_particles(), fn_particles()), s3d, s3d + 0x68);
+            this1(via(site_particles(), fn_particles()), s3d, engine::view::particle_list(s3d));
         }
         timing::mark("particles");
         {

@@ -30,7 +30,8 @@ use alloc::vec::Vec;
 /// (a player in the room). Both are `ShellButton`s with an `UpdateButton(HDC)` of their
 /// own, so slot 8 does not name them (MENUS.md, "The Internet lobby").
 /// The address range of Armada2.exe's vtables (`.rdata`).
-const RDATA: (usize, usize) = (value::SHELLUI_RDATA_START as usize, value::SHELLUI_RDATA_END as usize);
+#[inline(always)]
+fn val_rdata() -> (usize, usize) { (value::SHELLUI_RDATA_START() as usize, value::SHELLUI_RDATA_END() as usize) }
 
 // `ShellButton` fields, and `ShellScrollBar`'s, `TextLabel`'s and the other classes':
 // `syms_shell::field` (label "NULL" for none; mode 0 normal, 1 under the pointer, 2 held;
@@ -38,8 +39,10 @@ const RDATA: (usize, usize) = (value::SHELLUI_RDATA_START as usize, value::SHELL
 // pointer in a part of its shared picture, which its `CheckRollOver` tests; `TextLabel`'s
 // flags are DrawText's; `StdTextLabel` keeps the text as a `std::string`, its pointer at
 // +4 and length at +8).
-const BTN_LABEL_LEN: usize = value::SHELLUI_BTN_LABEL_LEN as usize;
-const LBL_TEXT_LEN: usize = value::SHELLUI_LBL_TEXT_LEN as usize;
+#[inline(always)]
+fn btn_label_len() -> usize { value::SHELLUI_BTN_LABEL_LEN() as usize }
+#[inline(always)]
+fn lbl_text_len() -> usize { value::SHELLUI_LBL_TEXT_LEN() as usize }
 
 /// Widgets remembered, in the order they were made.
 static mut WIDGETS: Vec<(usize, u32)> = Vec::new();
@@ -112,7 +115,7 @@ fn rd<T: Copy>(a: usize) -> T {
 }
 
 fn vt_ok(vt: usize) -> bool {
-    vt >= RDATA.0 && vt < RDATA.1 && vt != vt_widget()
+    vt >= val_rdata().0 && vt < val_rdata().1 && vt != vt_widget()
 }
 
 /// Forgets the widgets that are gone.
@@ -215,9 +218,9 @@ fn read(w: usize) -> Option<Widget> {
     let slot = |i: usize| rd::<usize>(vt + i * 4);
     if slot(8) == eng().addr(sym::SHELLUI_BUTTON_UPDATE_HDC) || vt == vt_scrollbar || vt == vt_combo || vt == vt_game_slot || vt == vt_player_list {
         if vt == vt_scrollbar {
-            let horizontal = rd::<u8>(w + field::SHELLUI_SB_HORIZONTAL) != 0;
-            let r = [rd::<i32>(w + field::SHELLUI_SB_RECT), rd::<i32>(w + field::SHELLUI_SB_RECT + 4), rd::<i32>(w + field::SHELLUI_SB_RECT + 8), rd::<i32>(w + field::SHELLUI_SB_RECT + 12)];
-            let start = rd::<i32>(w + if horizontal { field::SHELLUI_SB_TRACK_START } else { field::SHELLUI_SB_TRACK_TOP });
+            let horizontal = rd::<u8>(w + field::SHELLUI_SB_HORIZONTAL()) != 0;
+            let r = [rd::<i32>(w + field::SHELLUI_SB_RECT()), rd::<i32>(w + field::SHELLUI_SB_RECT() + 4), rd::<i32>(w + field::SHELLUI_SB_RECT() + 8), rd::<i32>(w + field::SHELLUI_SB_RECT() + 12)];
+            let start = rd::<i32>(w + if horizontal { field::SHELLUI_SB_TRACK_START() } else { field::SHELLUI_SB_TRACK_TOP() });
             return Some(Widget {
                 obj: w,
                 kind: Kind::Scroll,
@@ -231,9 +234,9 @@ fn read(w: usize) -> Option<Widget> {
                 choice: -1,
                 colour: 0,
                 align: 0,
-                value: rd::<i32>(w + field::SHELLUI_SB_VALUE),
-                range: (rd::<i32>(w + field::SHELLUI_SB_LO), rd::<i32>(w + field::SHELLUI_SB_HI)),
-                track: (start, rd::<i32>(w + field::SHELLUI_SB_TRACK_LEN)),
+                value: rd::<i32>(w + field::SHELLUI_SB_VALUE()),
+                range: (rd::<i32>(w + field::SHELLUI_SB_LO()), rd::<i32>(w + field::SHELLUI_SB_HI())),
+                track: (start, rd::<i32>(w + field::SHELLUI_SB_TRACK_LEN())),
                 horizontal,
             });
         }
@@ -248,25 +251,25 @@ fn read(w: usize) -> Option<Widget> {
         } else {
             Kind::Button
         };
-        let mut label = cstr_at(w + field::SHELLUI_BTN_LABEL, BTN_LABEL_LEN);
+        let mut label = cstr_at(w + field::SHELLUI_BTN_LABEL(), btn_label_len());
         if label == "NULL" {
             label.clear();
         }
-        let at = if kind == Kind::SelBox { field::SHELLUI_SELBOX_RECT } else { field::SHELLUI_BTN_RECT };
+        let at = if kind == Kind::SelBox { field::SHELLUI_SELBOX_RECT() } else { field::SHELLUI_BTN_RECT() };
         let r = [rd::<i32>(w + at), rd::<i32>(w + at + 4), rd::<i32>(w + at + 8), rd::<i32>(w + at + 12)];
         return Some(Widget {
             obj: w,
             kind,
-            hwnd: rd::<usize>(w + field::SHELLUI_BTN_HWND) as HWND,
+            hwnd: rd::<usize>(w + field::SHELLUI_BTN_HWND()) as HWND,
             rect: r,
             label,
-            shown: rd::<u32>(w + field::SHELLUI_BTN_SHOWN) != 0,
-            enabled: rd::<u32>(w + field::SHELLUI_BTN_ENABLED) != 0,
-            mode: rd::<u32>(w + field::SHELLUI_BTN_MODE),
-            on: kind == Kind::Toggle && rd::<u8>(w + field::SHELLUI_TOGGLE_ON) != 0,
-            choice: if kind == Kind::Cycle { rd::<i32>(w + field::SHELLUI_CYCLE_SELECTION) } else { -1 },
-            colour: rd::<u32>(w + field::SHELLUI_BTN_COLOUR),
-            align: if rd::<u8>(w + field::SHELLUI_BTN_LEFT) != 0 { -1 } else if rd::<u8>(w + field::SHELLUI_BTN_RIGHT) != 0 { 1 } else { 0 },
+            shown: rd::<u32>(w + field::SHELLUI_BTN_SHOWN()) != 0,
+            enabled: rd::<u32>(w + field::SHELLUI_BTN_ENABLED()) != 0,
+            mode: rd::<u32>(w + field::SHELLUI_BTN_MODE()),
+            on: kind == Kind::Toggle && rd::<u8>(w + field::SHELLUI_TOGGLE_ON()) != 0,
+            choice: if kind == Kind::Cycle { rd::<i32>(w + field::SHELLUI_CYCLE_SELECTION()) } else { -1 },
+            colour: rd::<u32>(w + field::SHELLUI_BTN_COLOUR()),
+            align: if rd::<u8>(w + field::SHELLUI_BTN_LEFT()) != 0 { -1 } else if rd::<u8>(w + field::SHELLUI_BTN_RIGHT()) != 0 { 1 } else { 0 },
             value: 0,
             range: (0, 0),
             track: (0, 0),
@@ -275,26 +278,26 @@ fn read(w: usize) -> Option<Widget> {
     }
     if slot(1) == eng().addr(sym::SHELLUI_TEXTLABEL_DRAW) {
         let label = if vt == vt_std {
-            let p: usize = rd(w + field::SHELLUI_STD_LBL_STRING + 4);
-            let n: usize = rd(w + field::SHELLUI_STD_LBL_STRING + 8);
-            if p != 0 && n < 4096 && readable(p, n) { cstr_at(p, n) } else { cstr_at(w + field::SHELLUI_LBL_TEXT, LBL_TEXT_LEN) }
+            let p: usize = rd(w + field::SHELLUI_STD_LBL_STRING() + 4);
+            let n: usize = rd(w + field::SHELLUI_STD_LBL_STRING() + 8);
+            if p != 0 && n < 4096 && readable(p, n) { cstr_at(p, n) } else { cstr_at(w + field::SHELLUI_LBL_TEXT(), lbl_text_len()) }
         } else {
-            cstr_at(w + field::SHELLUI_LBL_TEXT, LBL_TEXT_LEN)
+            cstr_at(w + field::SHELLUI_LBL_TEXT(), lbl_text_len())
         };
-        let flags: u32 = rd(w + field::SHELLUI_LBL_FLAGS);
-        let r = [rd::<i32>(w + field::SHELLUI_LBL_RECT), rd::<i32>(w + field::SHELLUI_LBL_RECT + 4), rd::<i32>(w + field::SHELLUI_LBL_RECT + 8), rd::<i32>(w + field::SHELLUI_LBL_RECT + 12)];
+        let flags: u32 = rd(w + field::SHELLUI_LBL_FLAGS());
+        let r = [rd::<i32>(w + field::SHELLUI_LBL_RECT()), rd::<i32>(w + field::SHELLUI_LBL_RECT() + 4), rd::<i32>(w + field::SHELLUI_LBL_RECT() + 8), rd::<i32>(w + field::SHELLUI_LBL_RECT() + 12)];
         return Some(Widget {
             obj: w,
             kind: Kind::Label,
-            hwnd: rd::<usize>(w + field::SHELLUI_LBL_HWND) as HWND,
+            hwnd: rd::<usize>(w + field::SHELLUI_LBL_HWND()) as HWND,
             rect: r,
             label,
-            shown: rd::<u32>(w + field::SHELLUI_LBL_SHOWN) != 0,
+            shown: rd::<u32>(w + field::SHELLUI_LBL_SHOWN()) != 0,
             enabled: true,
             mode: 0,
             on: false,
             choice: -1,
-            colour: rd::<u32>(w + field::SHELLUI_LBL_COLOUR),
+            colour: rd::<u32>(w + field::SHELLUI_LBL_COLOUR()),
             // DT_CENTER 1, DT_RIGHT 2
             align: if flags & 1 != 0 { 0 } else if flags & 2 != 0 { 1 } else { -1 },
             value: 0,
