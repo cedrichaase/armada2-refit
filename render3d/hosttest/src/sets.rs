@@ -164,8 +164,14 @@ mod tests {
     #[test]
     fn overlays_stock_is_the_old_table() {
         use overlays::*;
-        assert_eq!(parse(stock("overlays")), Content { selection_model: "select" });
+        assert_eq!(parse(stock("overlays")), Content { selection_model: "select", engine_moves_all: false });
         assert_eq!(parse(""), NONE);
+    }
+
+    #[test]
+    fn overlays_fleetops_draws_every_engine_move() {
+        use overlays::*;
+        assert_eq!(parse(fleetops("overlays")), Content { selection_model: "select", engine_moves_all: true });
     }
 
     #[test]
