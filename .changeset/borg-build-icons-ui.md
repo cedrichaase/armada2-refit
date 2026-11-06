@@ -1,6 +1,7 @@
 ---
 layers: [ui]
 bump: patch
+status: Confirmed in game 2026-11-06
 ---
 
 ### Fixed
