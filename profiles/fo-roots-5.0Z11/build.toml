@@ -55,6 +55,18 @@ why = "Roots has its own rules"
 hooks = ["qol.selection", "qol.special_select"]
 why = "Roots holds its own selection of 30 in an array of its own"
 
+# Station groups (QOL-6) need two things Roots has taken over: `cOverViewImp::Select` is replaced
+# whole (its entry jumps to FleetOpsHook's Select_Callback, which calls the Delphi port
+# Select_Enhancement and never the original; nothing reads the trampoline), so the site
+# `stn_sel` that lets a second station of one kind be selected is in a body that never runs; and
+# both callers of `PopupPaletteImp::mUpdateButtonsAndPosition` are re-pointed at FleetOpsHook's
+# own port of it (64 buttons), so the build button's enable site (`stn_enable`) is dead too.
+# Roots keeps one station selected, and has station groups of its own (Alt+number, decision 108)
+# (FO-7 round three, decision 111).
+[[disable]]
+hooks = ["qol.stations"]
+why = "Roots replaces Select and the bar's update with its own code, where QOL-6's sites never run"
+
 # ---- display ------------------------------------------------------------------------
 # display.modes verified 2026-11-06 (FO-A; display/README.md, "On Fleet Operations:
 # Roots"): its six call sites and FindDisplayMode's checked entry are stock's bytes in the
@@ -215,15 +227,20 @@ fn = "cOverViewImp::mCheckGroupSelect"
 how = "detour"
 verified = ["qol.shift_group"]
 
+# The move queue's two sites in these (the keyboard step's call in Simulate, and the waypoint
+# key's handler beside it in mProcessKeyboardInput) are stock's bytes in the file and in
+# memory. Roots' edits sit elsewhere in both: the key that selected the next ship now calls
+# mSelectOnscreen (a jump at +0x3f in mProcessKeyboardInput), the selection array's offset, a
+# camera-pan callback and two flag reads at the end of Simulate (FO-7 round three, decision 114).
 [[changed]]
 fn = "cOverViewImp::mProcessKeyboardInput"
 how = "detour"
-verified = []
+verified = ["qol.move_paths"]
 
 [[changed]]
 fn = "cOverViewImp::Simulate"
 how = "detour"
-verified = []
+verified = ["qol.move_paths"]
 
 [[changed]]
 fn = "PopupPaletteImp::mProcessKeyboardInput"
@@ -542,10 +559,14 @@ verified = []
 
 # qol
 
+# FleetOpsHook jumps out of the function at its entry into its own port (Craft_Say_New, which
+# picks the topic itself), so the site qol.move_paths re-points (the call of CaptainsVoice::Say)
+# never runs on Roots: a ship speaks its acknowledgement when QOL sends it a leg. The queue
+# does not depend on it (decision 114).
 [[changed]]
 fn = "Craft::Say"
 how = "runtime"
-verified = []
+verified = ["qol.move_paths"]
 
 [[changed]]
 fn = "PopupPaletteImp::Update"
@@ -647,10 +668,13 @@ fn = "cOverViewImp::mMainInput"
 how = "runtime"
 verified = []
 
+# The warp site (the block that turns a GO into GO_WARP while Alt is held) and its continue
+# point are stock's bytes in the file and in memory; FleetOpsHook's one write in the function is
+# the call at +0xda, 0x62 bytes past the block (FO-7 round three, decision 112).
 [[changed]]
 fn = "cOverViewImp::mNormalModeInput"
 how = "runtime"
-verified = []
+verified = ["qol.warp"]
 
 [[changed]]
 fn = "cOverViewImp::mSelectMeanY"

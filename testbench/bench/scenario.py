@@ -515,6 +515,29 @@ def s_press(c, m):
     return None
 
 
+@step(r'^right-click at ' + SPACE + r'(?P<x>\d+)\s*,\s*(?P<y>\d+) (?:while )?holding the (?P<btn>left|middle|right) (?:mouse )?button$')
+def s_click_holding(c, m):
+    """`Right-click at 560,330 holding the middle mouse button`: the pointer goes to the
+    point, the named button goes down, a right click is made there and the button comes up
+    again, all in one step. A held key is let go at once under Xwayland, a held mouse button
+    is not, so a game whose Input.map binds a key's action to a button (the Roots move queue
+    scenario binds `enter_waypoint` to the middle one, `testbench/bench/roots-waypoint.sh`)
+    can be driven with it. One step and not a hold and a release: the middle button's own
+    camera drag takes over when it is held for long or while the pointer moves."""
+    x, y = _space(c, m)
+    n = {'left': 1, 'middle': 2, 'right': 3}[m.group('btn')]
+    c.sess.glide(x, y)
+    time.sleep(0.3)
+    c.sess.input(f'down {n}')
+    time.sleep(0.2)
+    c.sess.input('down 3')
+    time.sleep(0.08)
+    c.sess.input('up 3')
+    time.sleep(0.2)
+    c.sess.input(f'up {n}')
+    return f'right-clicked at screen {x},{y} holding the {m.group("btn")} mouse button'
+
+
 @step(r'^overlay (?P<words>.+)$')
 def s_overlay(c, m):
     """`Overlay Render3D.Modules:hulls=0 UI.HUD:Minimap=0` / `Overlay --unset Render3D.Modules:hulls`:
