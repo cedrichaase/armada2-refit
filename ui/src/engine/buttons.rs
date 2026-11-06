@@ -211,10 +211,11 @@ pub fn text_colour(t: usize) -> [f32; 3] {
     if t == 0 { [1.0; 3] } else { unsafe { rd(t + field::PANELS_TEXT_COLOUR()) } }
 }
 
-/// The game's strings mark a hotkey's letter with '^' and wrap lines with '\r\n'.
+/// The game's strings mark a hotkey's letter with '^' and wrap lines with '\r\n'; the
+/// rest is the game's text as the UI draws it (`text::game`).
 pub fn clean(s: &str) -> String {
     let mut out = String::new();
-    for c in s.chars() {
+    for c in crate::text::game::display(s).chars() {
         match c {
             '^' | '\r' => {}
             _ => out.push(c),

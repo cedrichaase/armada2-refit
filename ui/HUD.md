@@ -870,7 +870,10 @@ that `Render` (`render_component`): with `Tooltips=1` it reads the stream's text
 fields for the call so the stock `Render` draws only the cursor, and puts them back,
 so `DoTooltip` still owns and frees the streams. Ours draws the text in the theme's
 tooltip below and right of the pointer. On the bench the tooltips are off until the
-help button is cycled once (the bench's profile).
+help button is cycled once (the bench's profile). The text is the game's code page,
+Windows-1252, and a game's own font codes (Roots' red figures, resource icons and unit
+classes) are written as the content set's words and digits (README.md, "The engine's
+text"); before that, Roots' tooltips read as symbols and question marks.
 
 ## The cursor over a box of ours
 
