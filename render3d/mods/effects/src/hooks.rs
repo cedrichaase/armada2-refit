@@ -867,6 +867,11 @@ pub mod chunks {
     unsafe extern "thiscall" fn fragment_callee(inst: usize, colour: *const f32, vel: usize, smoking: u32, faces: i32, attractor: usize) {
         unsafe {
             if open() && engine::in_companion(CALLER) && super::super::chunks::note_craft(inst, faces, colour_arg(colour)) {
+                static mut SAID: bool = false;
+                if !SAID {
+                    SAID = true;
+                    crate::log!("effects: debris: first dying craft taken at the callee (the companion module's Fragment call), faces {}", faces);
+                }
                 return;
             }
             let f: FragmentFn = core::mem::transmute(PREV_CALLEE.addr());

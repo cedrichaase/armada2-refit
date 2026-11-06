@@ -238,8 +238,23 @@ Armada II, all read from the descriptor:
 - **The front end is Roots' own**: the `ui.json` design points are Armada II's, so a step
   by label (`Click "Instant Action"`) works and a target by name does not; `Quit the game`
   finds Exit and "Exit to Desktop" by their labels.
-- Scenarios: `fo-launch` (to the main menu) and `fo-skirmish` (Instant Action against the
-  default AI to the map with its HUD up), both at 1280x960: about 26 s and 65 s.
+- Scenarios: `fo-launch` (to the main menu) and `fo-skirmish` (Instant Action, Federation
+  against the Klingon AI, to the map with its HUD up), both at 1280x960: about 26 s and
+  65 s. **Pick the sides** (`_fo-sides`): Instant Action deals them at random, and a wait on
+  the HUD's "6000" depended on the race. **Roots' shell takes a click only after the pointer
+  has been over the spot** (a click straight after a jump is lost): move, pause, click, and
+  give a dropdown two seconds. With render3d on Roots (`--install .`, the descriptor's
+  layers) the fragment `_fo-render3d-skirmish` waits on `Render3D.log` saying `(claimed at
+  the instance draw)`, and the `fo-render3d-*` scenarios (FO-5 step 8) check the seam and the hull claim (`-seam`), the range ring
+  of FleetOpsHook with hulls claimed (`-rings`), the debris at the callee hook (`-debris`),
+  the shields' `RTS_CFG.h` keys (`-shields`), the grid's colour (`-grid`) and the logo node's
+  texture (`-stlogo`). There is no scene harness on Roots: the fight for `-debris` and
+  `-shields` is the Hard AI's own attack on a base left alone, with Game Speed at its top
+  (`_fo-render3d-battle`), a few minutes in. `Setup: display/bench-mode.sh stub
+  Backend=vulkan` sets Display8's backend and, on Vulkan, `Validate=1` (the validation
+  layer), which is how these scenarios run it before the bench sets it itself. Roots' logs
+  are in the prefix's `AppData/Local/armada2-refit/logs/`, which `"Render3D.log"` and
+  `"Display8.log"` name.
 
 ## Audio stems
 
