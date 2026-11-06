@@ -404,8 +404,8 @@ lets it in and it would read what Roots no longer uses.
 | panels | `panels.chat`, `panels.trade` | down | `Armada_RenderFrame` (+0x245 only); the chat's text input is FleetOpsHook's (`GameKeysProcessInput+0x23`) | verify |
 | panels | `panels.sound` | ready | `operator new` unchecked (profiled), but **every `Audio*` class is FleetOpsHook's FMOD** | measure |
 | panels | `panels.comm` | ready | `CommDisplay`'s constructor and `PostLoad` trampolined, its unit-transfer rule FleetOpsHook's | verify (multiplayer only) |
-| dialogs | `dialogs.reads_screens` | down | all 30 dialog procedures: `ShellBitmapImp` in each (the shell's bitmaps FleetOpsHook's, scaled with `StretchBlt`), twelve with Roots' 1200x900 constants; **nine `do_*` screens open through FleetOpsHook's own `DialogBoxParamA` import**, past `ArmadaL.exe`'s import table where the host sits; `do_mainMenu` and `DispatchDialog` trampolined | stays Roots' (decision 68) |
-| shell | `shell.screens` | down | `DispatchDialog`, `SetActiveDisplay`'s wrapper, `Show_Credits`, and `SetCurrentBackground` replaced whole | stays Roots' |
+| dialogs | `dialogs.reads_screens` | down | all 30 dialog procedures: `ShellBitmapImp` in each (the shell's bitmaps FleetOpsHook's, scaled with `StretchBlt`), twelve with Roots' 1200x900 constants; **nine `do_*` screens open through FleetOpsHook's own `DialogBoxParamA` import**, past `ArmadaL.exe`'s import table where the host sits; **eight never run: the main menu, Options (the in-mission menu too), Yes/No, Manual IP, Multiplayer Connection, Map Select, Graphics and Advanced Options are FleetOpsHook's Delphi forms** (step 7) | stays Roots' (decisions 68, 140) |
+| shell | `shell.screens` | down | `DispatchDialog`, `SetActiveDisplay`'s wrapper, `Show_Credits`, and `SetCurrentBackground` replaced whole | stays Roots' (decision 140) |
 | shell | `shell.reads_*`, `shell.cursor`, `shell.widgets` | ready | fields and the `WM_SETCURSOR` call in a `WindowProc` that may not be the window's | with the menus |
 
 ### What Roots changes in the HUD and the shell
@@ -436,7 +436,8 @@ patch table:
 - **The minimap.** Map objects drawn by FleetOpsHook's callback, Roots' team colours, an
   observer fix in the action under the pointer.
 - **The shell.** 1200x900 on its own windowed device; FleetOpsHook's bitmap object in
-  every screen; nine screens opened through its own `DialogBoxParamA`; its own Win32
+  every screen; the main menu and seven other screens Delphi forms of its own (step 7);
+  nine screens opened through its own `DialogBoxParamA`; its own Win32
   dialogs (the mod check, before `WinMain`) outside the shell's code, which the host
   refuses by construction.
 - **Elsewhere.** A clean-screenshot mode that hides the HUD and chat (FleetOpsHook's
@@ -452,7 +453,7 @@ patch table:
 | 4 | **The panels Roots changes least**, each its own row and off on Roots until verified: messages and objectives, the pause and replay boxes, overlay text, chat and trade, the top-right buttons (Roots' five), the resources (Roots' amounts, names from the set), the selection overlay, and the engine's last draws (`fade`, `frame_rate`, `order_ring`, `footprints`; the drag box stays the engine's). Sounds measured under FMOD first. **Built 2026-11-06** (branch `fo-6-step4`, on `fo-6-step5`): `hud.panels`, `hud.order_ring`, `hud.frame_rate`, `panels.presses`, `panels.chat` and `panels.trade` verified; seven panels on by default on Roots (the resources, the top-right buttons, the pause box, the chat, the selection overlay, the frame-rate panel, the 3D view's order ring, height posts and footprint), each with its `fo-ui-<panel>` scenario; messages, objectives, replay, overlay text, fade and the team texts stay off for want of a trigger in a skirmish; the UI plays no button sound on Roots; decisions 120–127, "Step 4: what the bench showed" below | profile marks, a panel at a time | 12–20 · 5–8 |
 | 5 | **Measure the bar, draw nothing.** Log FleetOpsHook's bar on the bench: the buttons per selection (a ship with several weapons of one `classLabel`, the construction ship's build list, a station), the mode in use and its columns and rows, which button the range ring follows and through which of the stock bar's states. Decide from it whether a bar of ours can keep the rings without reading FleetOpsHook's memory (decision 65). **Measured 2026-11-06** (branch `fo-6-step5`): `bar: measure` and `bar: hover` log lines from the engine's own objects (`engine/palette.rs`, `log_measure`), scenario `fo-ui-bar-measure`; the answer is decisions 94 and 95, "Step 5: the bar measured" below | bench and logs only | 4–8 · 2–3 |
 | 6 | *Optional, when asked*: **the bar**, laid out by the mode's columns (no 5x3 grid; position keys for the first cells only, QOL's in FO-7), then the info panel and the minimap with FleetOpsHook's own objects, the command info bar left to Roots | step 5; Roots developer's view on the look | 25–45 · 10–15 |
-| 7 | *Optional, when asked*: **the menus**: the host's design space taken from the profile's shell (1200x900, not a fixed 800x600), the generic mirror first, specs after; the nine screens that open through FleetOpsHook's import stay Roots' (decision 68) | step 3 | 20–40 · 8–15 |
+| 7 | *Optional, when asked*: **the menus**: the host's design space taken from the profile's shell (1200x900, not a fixed 800x600), the generic mirror first, specs after; the nine screens that open through FleetOpsHook's import stay Roots' (decision 68). **Stopped after the offline survey 2026-11-06** (branch `fo-6-step7`): the main menu is not a dialog on Roots, so the host cannot reach it; nothing built, nothing benched; decision 140, "Step 7: why the menus stay Roots'" below | step 3 | 2 (survey) · 0 |
 | 8 | **Scenarios**: `fo-ui-loading` (a load with `[Loading] Hold`), `fo-ui-mission` (UI frames logged, a click on a panel of ours not reaching the engine), `fo-ui-refit` (a row toggled in the mission modal and kept after a relaunch: the Acceptance row, moved from Options for now), `fo-ui-standdown` (every UI part at 0: Roots as with Display8 and render3d alone, pixel-exact), one `fo-ui-<panel>` per panel of step 4; the stock set unchanged (`ui-runtime`, `ui-hud-bar`, `ui-whole-game` at 1280x720, `--install .`) | step 2 onward | 4–6 · 3 |
 
 **Round one** (steps 1 to 5 and 8): about 35–60 agent hours and 15–23 bench passes, in
@@ -635,6 +636,46 @@ What the bench rounds showed and fixed:
 still test what they did (not re-run in this step except through `-hud`). Stock at 1280x720 with `--install .`:
 `ui-hud-bar` (a flake on its first run, a pass on the second) and `ui-hud-panels` ran, the log checks pass.
 
+### Step 7: why the menus stay Roots' (2026-11-06)
+
+Offline, as the step asked first: every `DialogBoxParamA` and `CreateDialogParamA` call in
+`ArmadaL.exe`, the function it sits in, FleetOpsHook's patch there (the private patch table)
+and what FleetOpsHook's replacement does, read from its shipped map and its Delphi form
+resources. No game was run. The per-procedure table is in the private notes
+(`fo6-step7.md`); in short, of the 30 dialog procedures `dialogs.reads_screens` names:
+
+| On Roots | Procedures | The host |
+|---|---|---|
+| **Never run**: FleetOpsHook shows a Delphi form of its own instead (`ShowModal` on a `TForm` placed in its 1200x900 window), and does not call the stock function | the main menu (`do_mainMenu`'s detour never calls its trampoline), Options and the in-mission menu (`do_escapeMenu`'s two calls in `DispatchDialog`), Yes/No, Manual IP, Multiplayer Connection, Map Select (from Game Setup), Graphics Options, Advanced Options: **8** | nothing to host: no dialog, no dialog procedure; the forms' buttons are windowless graphic controls |
+| **Behind FleetOpsHook's import**: the stock procedure runs, behind a dialog procedure of FleetOpsHook's that places the dialog in its form, disables the form and forwards every message | Single Player, Game Setup (Instant Action and every multiplayer setup), Game Settings, Load Game, Save Game, the licence, the Technology Tree, the Admiral's Log, Internet: **9** (decision 68) | past the host; even a hook in user32 would meet FleetOpsHook's procedure first and have to read its record for the stock one |
+| **Through `ArmadaL.exe`'s import** | Sound Settings, opened by FleetOpsHook's forms with the engine's window as owner; the GameSpy and lobby dialogs, Map Transfer, Net Waiting, Password, Game Name, Help, One Button, opened from a screen of the two rows above; Mission Select (campaigns, which Roots has none of): **13** | only Sound Settings would be hosted; the rest are refused by owner (their owner is a window the UI does not host), unreached or GameSpy's |
+
+So the main menu, the first screen of the front end, is out of the host's reach, and so are
+Instant Action's setup and the in-mission menu: the bench passes the step asked for (the main
+menu and the Instant Action setup through our host) cannot be had without hooking
+FleetOpsHook's memory, which the step ruled out. Nothing was built and nothing benched; the
+host's design space from the profile's shell size was not started, since no screen would use
+it. What was weighed (detail in the private notes):
+
+- **The front end stays Roots'** (taken, decision 140). The UI on Roots keeps the loading
+  screen, the mission frame, the seven panels and the Refit modal on Ctrl+F12 (decisions 62,
+  86), and nothing of FleetOpsHook's is hooked.
+- Host the nine through a hook in user32 (inline or a CBT hook), reading FleetOpsHook's
+  record to find the stock procedure and working against its placement and its
+  `EnableWindow`: reads FleetOpsHook's memory and changes its behaviour by proxy, and the main
+  menu, Options, Map Select and the rest stay Roots' forms, so the shell would alternate
+  between two looks. Not taken.
+- Draw over the Delphi forms: their controls have no windows, so a mirror would walk Delphi
+  objects in FleetOpsHook's memory. Excluded.
+- Host Sound Settings alone, the one screen within reach: one screen of ours among Roots'
+  forms. Not taken.
+- **When contact opens** (decision 1): a switch in FleetOpsHook that lets the shell's screens
+  run as the executable's dialogs, or an interface that names a form's buttons, is the one
+  clean path to a front end of ours on Roots.
+
+`[Menus]` stays at 0 in `ui/defaults/fo-roots.ini` (`Enable`, `Credits`, `Scene`,
+`CampaignLocks`), as it was; stock is untouched (no code changed), so no stock run was due.
+
 ### Defaults taken
 
 | # | Default | Why | What would change it |
@@ -647,7 +688,7 @@ still test what they did (not re-run in this step except through `-hud`). Stock 
 | 65 | **The bar stays Roots'** (`HUD.Bar=0`, `BarLabels=0`, QOL's `BarKeys` off) until step 5; when taken, it reads the count and the array from the profile and lays out by the mode's columns, never the 5x3 grid | 64 buttons, FleetOpsHook's slot logic, and the range rings on hover, which a bar of ours would lose | a way to keep the rings without reading FleetOpsHook's memory |
 | 66 | **The info panel, the minimap and Roots' new elements stay Roots'** in round one | most changed, drawn from FleetOpsHook's private records, and they carry its gameplay feedback (the subsystem rings) | the user asking, after step 5 |
 | 67 | **No unit view on Roots** (`HUD.UnitView=0`) | Roots' layouts switch it off | a Roots layout with one |
-| 68 | **The menus stay Roots'** (`Menus.Enable=0`, `Credits=0`, `Scene=0`), and nothing is patched in `FleetOpsHook.dll`'s own import table | the 1200x900 shell, FleetOpsHook's bitmaps and the nine screens past the host; FleetOpsHook stays a black box (decision 3) | step 7, asked for |
+| 68 | **The menus stay Roots'** (`Menus.Enable=0`, `Credits=0`, `Scene=0`), and nothing is patched in `FleetOpsHook.dll`'s own import table | the 1200x900 shell, FleetOpsHook's bitmaps and the nine screens past the host; FleetOpsHook stays a black box (decision 3) | step 7, asked for: **widened by decision 140** (step 7 found the whole shell out of reach) |
 | 69 | **The engine's cursor on Roots** (`[UI] Cursor=0`) | Roots sets a Win32 cursor and race-specific sprites of its own; not measured | a measurement in step 3 or 4 |
 | 70 | **The UI's `fleetops` set holds names only**: Roots' races with the six looks (Free Borg as the Borg's), the Dominion and the other races in the shell's look, no new look invented; Roots' resources; no campaign cards, credits tour or cursor sprites | decision 7; a race look for the Dominion is the Roots developer's call | the Roots developer |
 | 71 | **Input on Roots is recorded at the two message functions' entries** if the window procedure is Roots' form, chosen per build by a profile value; stock keeps its call sites | it covers both callers and reads nothing of FleetOpsHook's; render3d's callee hooks are the precedent | the measurement in step 3 showing the engine's `WindowProc` still runs |
@@ -683,6 +724,7 @@ still test what they did (not re-run in this step except through `-hud`). Stock 
 | 125 | **Roots' defaults** (`ui/defaults/fo-roots.ini`): `HUD.Enable=1` with `Resources`, `Buttons`, `Pause`, `Chat`, `Selection`, `FrameRate` and `Overview` on; the info panel, bar, minimap, messages, objectives, replay, overlay text, fade, team texts, tooltips, comm and the rest off | each is on only with a passing Roots scenario (`fo-ui-<panel>`); the others have no trigger in a skirmish or are decisions 65 and 66 | a scenario for each of the rest |
 | 126 | **The UI plays no button sound on Roots**: a profile value `panels_sound_ours` (1 on stock, 0 on Roots) gates `panels.sound`, and the HUD no longer requires it | every audio call site is FleetOpsHook's FMOD (`operator new` and the constructor re-pointed at each site), its object size unknown; a stock-size object under its vtable could corrupt the heap, so it was not played | the size and constructor measured, or the Roots developer's word |
 | 127 | **The selection overlay is ours on Roots**, replacing FleetOpsHook's `SelectionDisplay` callbacks while it is on (its group colours and tooltips are not drawn) | a passing scenario with Roots' unit tooltip, bar and info strip unchanged; the group colours were not seen in a skirmish | a Roots game showing a loss, then `HUD.Selection=0` |
+| 140 | **The front end stays Roots' on Roots**: `[Menus] Enable`, `Credits`, `Scene` and `CampaignLocks` stay 0 in `ui/defaults/fo-roots.ini`; no dialog host, mirror or spec on Roots, no host design space from the profile's shell size, and nothing of `FleetOpsHook.dll` hooked, in user32 or in its memory. Decision 68 widened from nine screens to the whole shell | step 7's survey: the main menu, Options (the in-mission menu too) and six more screens are FleetOpsHook's Delphi forms and never run the stock dialog; nine more run behind its own import and dialog procedure; only Sound Settings passes the host | the Roots developer offering a way for the shell's screens to run as the executable's dialogs (decision 1), or a Roots update that does it |
 
 ### Risks and unknowns
 
