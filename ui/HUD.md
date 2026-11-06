@@ -315,6 +315,11 @@ is named (`+0x8`, as every database element) after its file in `Textures/RGB/`, 
 `gfx::load_tga` loads, so an upscaled texture pack shows. Measured: the Borg icons are
 256x256 files (`gbbuild00`, `gbforder00`, ...) drawn whole, and the shared ones are
 quarters of a 128x128 (`b_stop` is `gbgenorders1` at 0, 0.5, 0.5, 1).
+Four Borg build icons (`gbbsensor`, `gbbturret`, `gbbturret2`, `gbbtechass`: the
+Detection Array, both cannons and the Technology Assimilator) are 32-bit files whose
+alpha is 0 in every texel, the only interface textures in stock stored so; the stock bar
+draws them opaque. `gfx::load_tga` does the same for any file with no alpha at all; taken
+at its word, the alpha left four blank cells in the Assembler's build list (issue #85).
 
 **Tooltips** are the game's own words: `ControlButton::GetTooltip` (vtable +0x00) and
 `GetVerboseTooltip` (+0x04) write into a `std::stringstream` (the command's localised
