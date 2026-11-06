@@ -190,6 +190,13 @@ impl Content {
         self.glyphs.iter().find(|g| g.0 as u32 == b).map(|g| g.1)
     }
 
+    /// Whether `s` (as `display` gave it) is one of the set's glyphs alone: a picture the
+    /// game's font draws, written as the set's word, not the game's own text.
+    pub fn is_glyph(&self, s: &str) -> bool {
+        let s = s.trim();
+        !s.is_empty() && self.glyphs.iter().any(|g| g.1 == s)
+    }
+
     /// The game's string `s` (one byte per `char`) as the UI draws it (`text::game`):
     /// the set's glyphs as their words and figures (a word set apart by a space from a
     /// figure or a letter beside it: the icons sit against their figures, "250\u{85}",

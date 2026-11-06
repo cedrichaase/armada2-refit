@@ -457,8 +457,8 @@ mod tests {
         assert_eq!(codes.len(), c.glyphs.len());
         // Tooltips from a player's UI.log on Roots (2026-11-06), as the UI now draws them.
         let cost = "350$\u{85}$/$175$\u{86}$/$8$\u{87}$/$150$\u{89}$/$50$\u{80}";
-        assert_eq!(c.display(cost), "350 Dilithium / 175 Tritanium / 8 Supplies / 150 Crew / 50 s");
-        assert_eq!(c.display("Buy \u{85} for:\n\n -1000 \u{85} / 1000 \u{86} / 100 \u{87}"), "Buy Dilithium for:\n\n -1000 Dilithium / 1000 Tritanium / 100 Supplies");
+        assert_eq!(c.display(cost), "350 Dilithium / 175 Tritanium / 8 Supply / 150 Crew / 50 s");
+        assert_eq!(c.display("Buy \u{85} for:\n\n -1000 \u{85} / 1000 \u{86} / 100 \u{87}"), "Buy Dilithium for:\n\n -1000 Dilithium / 1000 Tritanium / 100 Supply");
         assert_eq!(c.display(" \u{81}\u{9d}\u{7f}\u{7f} Hitpoints\n\t  \u{aa}"), " 1500 Hitpoints\n   Construction Ship");
         assert_eq!(c.display("Weak vs: \u{a9}, \u{a8}, \u{a3}, \n\t  \u{a5}"), "Weak vs: Artillery, Berserker, Battleship, \n   Dreadnought");
         assert_eq!(c.display("\u{95} Tachyon Detection Grid"), "\u{2022} Tachyon Detection Grid");

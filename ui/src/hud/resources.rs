@@ -49,10 +49,11 @@ fn names(now: f64, shown: &[(u32, usize)]) -> &'static [(usize, String, String)]
         n.names.clear();
         for &(r, c) in shown {
             let tip = topbar::tooltip(c, false).unwrap_or_default();
-            let mut name = word(&tip);
-            // Roots' short tooltip is one icon glyph (a control character, drawn as "?"); its
-            // long one is "Tritanium: <glyph>" and a sentence, in the game's own table and
-            // by race: the name is read from it (decision 153).
+            // Roots' short tooltip is one icon glyph (the set's word for its picture, by
+            // `text::game`, or a control character without it); its long one is
+            // "Tritanium: <glyph>" and a sentence, in the game's own table and by race: the
+            // name is read from it (decisions 153 and 160).
+            let mut name = if crate::content::get().is_glyph(&tip) { None } else { word(&tip) };
             let mut text = tip.clone();
             if name.is_none() {
                 let long = topbar::tooltip(c, true).unwrap_or_default();

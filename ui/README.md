@@ -796,7 +796,7 @@ panel's) and `engine::buttons::clean` (labels, chat, overlay text, localised key
 the UI matches (sprites, ODFs, players) are read raw. A game whose fonts draw codes as
 pictures of their own is the reason for `[Glyphs]`: Fleet Operations: Roots writes its
 tooltips with red figures (0x7f is 0, 0x81 is 1, ...), resource icons (0x85 dilithium,
-0x86 tritanium, 0x87 supplies, ...), unit classes drawn as words (0xa4 "Scout", 0xf8
+0x86 tritanium, 0x87 supply, ...), unit classes drawn as words (0xa4 "Scout", 0xf8
 "Station") and `$` between a cost line's figures and icons, all in its own `Sprites\Font*.spr`
 and atlases. Read as Latin-1, those were the "weird symbols and question marks" of every
 Roots tooltip (`PLAN-FLEETOPS.md`, FO-6, decision 160). The UI writes the words, never the

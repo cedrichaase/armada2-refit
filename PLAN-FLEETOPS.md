@@ -706,6 +706,43 @@ minimap and the avatar box's column; no overlap with Roots' art was reproduced a
 strip was there, so the cause is read as the top-centre placement meeting Roots' top-centre elements (the
 command info bar and messages, hidden in the tutorial's first minutes), not a draw order.
 
+### Step 4b: Roots' tooltips through the UI (2026-11-06)
+
+Branch `fo-tooltip-fix`, on `fo-b`. The user's report on their Roots install (`fo-b` 8d8270fa, the Federation
+economy tutorial): "almost all tooltips have some weird symbols, question marks, etc."
+
+**Whose they are: the UI's** (`HUD.Tooltips`, "The tooltips at the pointer" in `ui/HUD.md`). Roots ships the row at
+0 (decision 125); the player's `RefitPlayer.ini` turned it on with the bar, the info panel and the minimap, and their
+`UI.log` says `tooltips: ours` and logs each tooltip it drew, every one holding bytes 0x7f..0xa0 and letters such as
+`¤ ª © ¨ £ ¥ × ¾ ø`. The A side, `fo-ui-tooltips-off` (Roots' defaults, Display8, render3d and the UI installed),
+shows Roots' own drawing of the same text right: red figures, resource icons, class names as yellow words. With the
+row on, the stock `Render` draws no tooltip, so Display8's passthrough, render3d and QOL are not in the path; and it
+is not Roots' own bug at the player's resolution (below).
+
+**The cause.** Roots' tooltips are written in its fonts' own codes. Its sprite fonts (`Sprites\FontFinal4_*.spr`,
+`FontMedium.spr` ...) give some codes pictures of their own: ten red figures (0x7f is 0, 0x81 1, 0x8d 2, ... 0xd7 9),
+the resource icons (0x85 dilithium, 0x86 tritanium, 0x87 supply, 0x89 crew, 0x8c biomatter, 0x99 connection nodes,
+0x80 a clock), and the unit classes as plates of words (0xa4 Scout, 0xaa Construction Ship, 0xf8 Station, ...); a
+cost line sets its icons apart with `$` (`350$<dilithium>$/$175$<tritanium>$/...`), and tabs lay the text out beside
+a picture. The UI read every byte as Latin-1 and drew it in Noto: the C1 codes and tabs as `?`, the Latin-1 letters as
+themselves. Stock's own bullet (0x95, Windows-1252) drew as `?` too. Decision 124's "string-table token" for the
+resource tooltips was this: the short tooltip is the resource's icon alone. Roots' small font tiers (`FontFinal4_10`,
+`_13`, used at 1280x960) draw `$` and 0x80 as `$` and `€`, so Roots' own cost lines read `350$◆$/$...$60$€` there;
+the larger tiers a wide screen uses make `$` a spacer and 0x80 a clock (decision 162).
+
+**The fix** (ui): `text::game` reads the engine's text as Windows-1252 and writes the content set's `[Glyphs]`
+(`ui/content/sets/fleetops/ui.ini`) as digits and words, where the engine's text enters for display (the string
+streams behind every tooltip, `buttons::clean`); the layout draws a tab as a space and other control characters as
+nothing; the font bakes the rest of Windows-1252. A Roots tooltip now reads "350 Dilithium / 175 Tritanium / 8 Supply
+/ 150 Crew / 50 s", "1500 Hitpoints", "Construction Ship", "Weak vs: Artillery, Berserker, Battleship, Dreadnought".
+
+**Evidence.** `fo-ui-tooltips` (Roots, 1280x960, Vulkan with validation): the Tractor Beam, the starbase, Activate
+Bastion and Buy Dilithium tooltips logged and drawn as plain text, `\u{` nowhere in `UI.log`, no VUID; the resource
+strip reads Tritanium and Supply. `render3d/hosttest` (`ui_fleetops_glyphs`) holds the cost line, the hitpoints, the
+classes and the bullet from the player's log. The build list's cost line was not reached on the bench (a box round
+the station alone does not select it reliably); it is held by the host test. Stock at 1280x720 with `--install .`:
+`ui-hud-bar` and `display-stub` (below, in the PR).
+
 ### Step 7: why the menus stay Roots' (2026-11-06)
 
 Offline, as the step asked first: every `DialogBoxParamA` and `CreateDialogParamA` call in
@@ -996,6 +1033,10 @@ their `ArmadaL.exe` would need a profile of its own.
 | 153 | **The resources' names come from Roots' own table at run time, the set's only a fallback**: the long tooltip's first line when the short one is a glyph; the `fleetops` set's `Names` are Roots' defaults (Tritanium, Supply, Connection Nodes). Supersedes the stock words of decision 124 | Roots renames them, per race (the Species 8472 read Biomatter); reading its table follows any race or build | a Roots table with no long tooltip (the set answers) |
 | 154 | **The resources strip sits over the game's own `ResourcePanel` rectangle on Roots** (`[Resources] Placement = component`, new content-set key; stock stays top centre), top left corner, natural size | Roots draws its command, message and build areas at the top centre; its own resources were top left | an aspect where Roots moves the panel (the rectangle is read each frame) |
 | 155 | **`Resources` stays on in Roots' defaults**: no clean reason to give the panel back | the names and the place are fixed and every race measured | the user seeing the overlap again |
+| 160 | **The game's text is read as Windows-1252, and a game's own font codes are the content set's `[Glyphs]`**: Roots' red figures as digits, its resource icons as the resources' names in its own table (Dilithium, Tritanium, Supply, Crew, Biomatter, Connection Nodes; 0x80, a clock after a cost's crew, as "s"), its unit classes drawn as pictures of words as those words (Construction Ship, Mining Ship and the rest, as the larger fonts name them), `$` as a space; applied where the engine's text enters for display (`text::game`: the string streams of every tooltip and `buttons::clean`) | the user's report (2026-11-06): with `HUD.Tooltips=1` every Roots tooltip showed `?` and stray letters; the UI read Roots' codes as Latin-1. A/B: `fo-ui-tooltips-off` (Roots' own drawing, right) against `fo-ui-tooltips` (ours, now plain text); Display8, render3d and QOL are not in the path (with the row on, the stock `Render` draws no tooltip) | a Roots build whose fonts move a code (the set's table is one edit) |
+| 161 | **Words, never Roots' pictures**: the icons and the class plates are written as words in the UI's font, not drawn from Roots' font atlas | decision 60 and hard rule 8; a word reads at any size, the plates are a 13 px atlas cell | the user wanting the icons inline (the atlas read at run time, as decision 131 allows) |
+| 162 | **The meaning of a code is the one Roots' larger fonts give it** (`FontFinal4_16`, `FontMedium`, `FontLarge`: `$` a 2-3 px spacer, 0x80 a clock, 0xaa Construction Ship, 0xae Mining Ship), not the small tiers' (`FontFinal4_10` and `_13` draw `$` and `€`, and label 0xaa "Civil Vessel"); a player's wide screen uses the larger | Roots' own tooltip at 1280x960 shows `350$◆$/$175$...$60$€` (bench, interactive); the user's 3440x1440 uses a larger tier; the text is the same at every tier, so one meaning is right | the Roots developer |
+| 163 | **The resource strip keeps decision 153's names**: a short tooltip that is a glyph alone (`Content::is_glyph`) still sends the strip to the long tooltip, so a race's own word (the Species 8472's Biomatter) wins over the glyph's word | the two fixes met on `fo-b` (#93): the glyph's word would otherwise read as a name | |
 
 ### Risks and unknowns
 

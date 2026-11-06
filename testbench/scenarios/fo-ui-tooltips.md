@@ -10,7 +10,7 @@ Run with `a2test --game fo-roots` and `--install .`. The user's report of 2026-1
 `HUD.Tooltips=1` (Roots ships it at 0; the player turned it on in the Refit screen) almost
 every tooltip showed odd symbols and question marks. Roots' tooltips are written in its
 fonts' own codes: red figures (0x7f for 0, 0x81 for 1, ...), resource icons (0x85
-dilithium, 0x86 tritanium, 0x87 supplies, ...), unit classes drawn as words (0xa4
+dilithium, 0x86 tritanium, 0x87 supply, ...), unit classes drawn as words (0xa4
 "Scout", 0xf8 "Station"), cost lines set apart with `$`, and tabs; the UI drew those
 bytes as Latin-1 in its own font. It now reads the game's text as Windows-1252 and writes
 the content set's `[Glyphs]` (`ui/content/sets/fleetops/ui.ini`) as words and digits
