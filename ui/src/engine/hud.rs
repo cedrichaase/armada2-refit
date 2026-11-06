@@ -383,16 +383,36 @@ fn components_of(view: usize) -> alloc::vec::Vec<usize> {
     if lists == 0 || view > MAX_VIEW {
         return v;
     }
+    // A pointer the walk follows must look like one: aligned, in the user range above the
+    // first 64 KB. Past the views a build has, the array holds other memory: on Roots the
+    // slots after view 5 led to a "component" at 8 and the rectangle's read faulted
+    // (FO-6 step 3). A list with anything else in it is not a list: the view has none.
+    let ok = |p: usize| p >= 0x10000 && p < 0x8000_0000 && p % 4 == 0;
     unsafe {
         let list = rd::<usize>(lists + 4 * view);
+        if !ok(list) || !super::readable(list, 8) {
+            return v;
+        }
         let head = peek(list, 4);
-        if head == 0 {
+        if !ok(head) || !super::readable(head, 12) {
             return v;
         }
         let mut node = rd::<usize>(head);
-        while node != head && node != 0 && v.len() < 64 {
-            let c = peek(peek(node, 8), 4);
+        let mut steps = 0;
+        while node != head && v.len() < 64 {
+            steps += 1;
+            if !ok(node) || steps > 256 {
+                return alloc::vec::Vec::new();
+            }
+            let info = peek(node, 8);
+            if !ok(info) {
+                return alloc::vec::Vec::new();
+            }
+            let c = peek(info, 4);
             if c != 0 {
+                if !ok(c) || !ok(rd::<usize>(c)) {
+                    return alloc::vec::Vec::new();
+                }
                 v.push(c);
             }
             node = rd::<usize>(node);
@@ -410,6 +430,53 @@ pub fn log_components() {
         s.push_str(&crate::sfmt!(" {}{}[{},{},{},{}]", name(*c), if hidden(*c) { "(hidden)" } else { "" }, r[0], r[1], r[2], r[3]));
     }
     crate::log!("hud: {} components, in drawing order:{}", list.len(), s);
+}
+
+/// The render lists of every view seen last by `log_render_lists` (their components, in
+/// order), so a mission's lists are logged once and a new mission's again.
+static mut LISTS_LOGGED: alloc::vec::Vec<usize> = alloc::vec::Vec::new();
+/// How many times the lists were logged this game (a cap, so a list that keeps changing
+/// cannot fill the log).
+static mut LISTS_LINES: u32 = 0;
+
+/// Logs every view's render list (each component's name, hidden or not, and its rectangle
+/// in the HUD canvas) when they differ from the last logged: once per mission, whatever
+/// part of the HUD is on (PLAN-FLEETOPS.md, FO-6 decision 77: which name the info panel
+/// answers to on a build that constructs its own). Nothing while the lists cannot be read.
+#[allow(static_mut_refs)]
+pub fn log_render_lists() {
+    if eng().ready(hook::HUD_READS_COMPONENTS).is_err() || unsafe { LISTS_LINES } >= 8 {
+        return;
+    }
+    let mut all = alloc::vec::Vec::new();
+    for view in 0..=MAX_VIEW {
+        let l = components_of(view);
+        all.push(l.len());
+        all.extend(l);
+    }
+    if all.iter().all(|&n| n == 0) || unsafe { LISTS_LOGGED == all } {
+        return;
+    }
+    unsafe {
+        LISTS_LOGGED = all;
+        LISTS_LINES += 1;
+    }
+    let record = at(hook::HUD_READS_COMPONENTS, sym::HUD_VIEW_RECORD);
+    let in_use = if record == 0 { -1 } else { (unsafe { rd::<u32>(record) }) as i32 };
+    let info = ship_display();
+    crate::log!("hud: render lists (view in use {}; the info panel {:#x}{})", in_use, info, if info == 0 { ", none named ShipDisplay" } else { "" });
+    for view in 0..=MAX_VIEW {
+        let list = components_of(view);
+        if list.is_empty() {
+            continue;
+        }
+        let mut s = alloc::string::String::new();
+        for c in &list {
+            let r: [i32; 4] = unsafe { rd(c + field::HUD_DI_RECT()) };
+            s.push_str(&crate::sfmt!(" {}{}[{},{},{},{}]", name(*c), if flag_hidden(*c) { "(hidden)" } else { "" }, r[0], r[1], r[2], r[3]));
+        }
+        crate::log!("hud:   view {}: {} components:{}", view, list.len(), s);
+    }
 }
 
 // ---- small reads every panel needs -------------------------------------------------

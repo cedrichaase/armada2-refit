@@ -61,8 +61,8 @@ pub const SYMS: &[a2engine::SymDef] = &[
 pub const HOOKS: &[a2engine::HookDef] = &[
     a2engine::HookDef { id: "ui.loading.overlay", run_unknown: false, rows: &[], syms: &[0, 1, 2, 3] },
     a2engine::HookDef { id: "ui.loading.own", run_unknown: false, rows: &["Loading.Enable"], syms: &[4, 5, 6, 7] },
-    a2engine::HookDef { id: "ui.loading.inner_db", run_unknown: false, rows: &["Loading.Enable"], syms: &[8, 9, 10, 11] },
-    a2engine::HookDef { id: "ui.loading.inner_pixels", run_unknown: false, rows: &["Loading.Enable"], syms: &[12, 13] },
+    a2engine::HookDef { id: "ui.loading.inner_db", run_unknown: false, rows: &[], syms: &[8, 9, 10, 11] },
+    a2engine::HookDef { id: "ui.loading.inner_pixels", run_unknown: false, rows: &[], syms: &[12, 13] },
     a2engine::HookDef { id: "ui.loading.reads_progress", run_unknown: false, rows: &[], syms: &[14, 15] },
     a2engine::HookDef { id: "ui.loading.reads_pump", run_unknown: false, rows: &[], syms: &[16] },
 ];

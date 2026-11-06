@@ -148,7 +148,7 @@ pub fn pending(row: &Setting) -> Pending {
     let differs = |was: &str| !now.trim().eq_ignore_ascii_case(was.trim());
     match row.apply {
         APPLY_RESTART if differs(&s.start) => Pending::Restart,
-        APPLY_MISSION if crate::menus::backdrop::over_mission() && differs(&s.mission) => Pending::Mission,
+        APPLY_MISSION if (crate::menus::backdrop::over_mission() || crate::menus::refit::in_mission()) && differs(&s.mission) => Pending::Mission,
         _ => Pending::No,
     }
 }
@@ -167,7 +167,7 @@ pub enum Lock {
 /// be told). The Refit screen is reached only from Options, so the setup screens never
 /// show it.
 pub fn locked(row: &Setting) -> Lock {
-    if row.scope != SCOPE_MATCH || !crate::menus::backdrop::over_mission() {
+    if row.scope != SCOPE_MATCH || !(crate::menus::backdrop::over_mission() || crate::menus::refit::in_mission()) {
         return Lock::No;
     }
     match crate::engine::api::setup::network_game() {

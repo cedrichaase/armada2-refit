@@ -579,6 +579,14 @@ is the only thing that presents while a mission's menu is up, and the modal draw
 host's frame (`menus::frame`, after the dialog stack, before the frame's claim) works the
 same in the shell and in a mission with the stock dialog still running under it.
 
+- **By its key, over a mission.** With `[UI] RefitKey` set (a virtual-key code, pressed
+  with Ctrl; 0, none, in the shipped `UI.ini`), the same modal opens over a running
+  mission without Options: `crate::input` keeps the key from the engine and
+  `refit::mission_frame`, called last in the mission frame, opens it (`refit: opened in a
+  mission, by its key`) and draws it; Esc, Done or the key again closes it. The game is
+  not paused. Rows count as "over a mission" for the locks and the Next mission badges.
+  This is how Fleet Operations: Roots reaches the screen (Ctrl+F12 in its defaults;
+  PLAN-FLEETOPS.md, FO-6, decision 86), whose Options the host does not draw.
 - **Life.** The Options spec's **Refit settings** button calls `refit::open(host)` (with the
   shell's click sound). The modal closes on Done, on Esc, when its host leaves
   `dialogs::stack()` (`menus::closed`; log `refit: closed (Options ended)`) and when a
