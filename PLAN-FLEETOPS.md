@@ -929,6 +929,27 @@ Action. The nine answers, in short (detail in the private notes, `fo6-optionC.md
 **Go.** Every question passes, the first through its fallback; decision 140 gives way to the
 work list below, with the forms off by default on Roots (decision 149).
 
+### Steps 1 to 5 and 7: what the bench showed (2026-11-06)
+
+Built on branch `fo-6-optionC` (the work list above has each step's status; decisions
+170–184). On Roots 5.0Z11 at 1280x960, Vulkan with validation, `Menus.Forms=1`:
+`fo-ui-forms-main` (our main menu, Options from it and back, Instant Action into Roots' own
+setup dialog), `fo-ui-forms-options` (Esc in a skirmish: our Options over the mission's last
+frame, End Mission, our Yes/No over it, No, Return to Game), `fo-ui-forms-graphics` (the
+generic Graphics screen: dropdowns of ours with the entries read through the combos'
+windows, Roots' check boxes and sliders as crops of its picture, Previous Menu),
+`fo-ui-forms-manualip` (Multiplayer, Manual IP over it, an address typed into Roots' own
+field through ours, Cancel), `fo-ui-forms-standdown` (the hook forced down: Roots' own main
+menu matches the `fo-ui-standdown` baseline) and `fo-ui-forms-probe` pass; no `PANIC`, no
+validation message. Stock Armada II at 1280x720 (`--install .`): `ui-menus-dialogs`,
+`-multiplayer`, `-options`, `-setup`, `-slider-max` and `-widgets` pass, `-scene` asks for
+review; `-locked` and `-scene-abort` fail a judged look of render3d's menu scene (the Borg
+cube seen face on), `-refit` an OCR check ("Movies" matched by "Move"), `-single` two
+judged looks (an empty save list, the Admiral's Log table) and `-success` a 300 s wait for a
+briefing. None of them runs the forms (`Forms=0`: the stock UI.log has only the `forms`
+table's summary line) and none was re-run on `fo-b` for comparison; `ui-menus-match` (two
+players) was not run.
+
 ### Defaults taken
 
 | # | Default | Why | What would change it |
