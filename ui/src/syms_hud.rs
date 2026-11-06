@@ -189,6 +189,19 @@ pub mod field {
     #[inline(always)] pub fn OTEXT_TREE_LEFT() -> usize { super::TABLE.engine().field(a2engine::Sym(169)) }
     #[inline(always)] pub fn OTEXT_TREE_PARENT() -> usize { super::TABLE.engine().field(a2engine::Sym(170)) }
     #[inline(always)] pub fn OTEXT_TREE_RIGHT() -> usize { super::TABLE.engine().field(a2engine::Sym(171)) }
+    #[inline(always)] pub fn PALETTE_HIDDEN() -> usize { super::TABLE.engine().field(a2engine::Sym(172)) }
+    #[inline(always)] pub fn PALETTE_FLOAT_COLS() -> usize { super::TABLE.engine().field(a2engine::Sym(173)) }
+    #[inline(always)] pub fn PALETTE_FLOAT_ROWS() -> usize { super::TABLE.engine().field(a2engine::Sym(174)) }
+    #[inline(always)] pub fn PALETTE_STATIC_A_COLS() -> usize { super::TABLE.engine().field(a2engine::Sym(175)) }
+    #[inline(always)] pub fn PALETTE_STATIC_A_ROWS() -> usize { super::TABLE.engine().field(a2engine::Sym(176)) }
+    #[inline(always)] pub fn PALETTE_STATIC_B_COLS() -> usize { super::TABLE.engine().field(a2engine::Sym(177)) }
+    #[inline(always)] pub fn PALETTE_STATIC_B_ROWS() -> usize { super::TABLE.engine().field(a2engine::Sym(178)) }
+    #[inline(always)] pub fn PALETTE_USE_COLS() -> usize { super::TABLE.engine().field(a2engine::Sym(179)) }
+    #[inline(always)] pub fn PALETTE_USE_ROWS() -> usize { super::TABLE.engine().field(a2engine::Sym(180)) }
+    #[inline(always)] pub fn PALETTE_BTN_OWNER() -> usize { super::TABLE.engine().field(a2engine::Sym(181)) }
+    #[inline(always)] pub fn PALETTE_BTN_RECT() -> usize { super::TABLE.engine().field(a2engine::Sym(182)) }
+    #[inline(always)] pub fn PALETTE_BTN_PRESSED() -> usize { super::TABLE.engine().field(a2engine::Sym(183)) }
+    #[inline(always)] pub fn PALETTE_BTN_HOVER() -> usize { super::TABLE.engine().field(a2engine::Sym(184)) }
 }
 
 pub mod value {
@@ -376,6 +389,19 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "otext_tree_left", symbol: "std::_Tree node left", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "otext_tree_parent", symbol: "std::_Tree node parent", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "otext_tree_right", symbol: "std::_Tree node right", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "palette_hidden", symbol: "PopupPaletteImp", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "palette_float_cols", symbol: "PopupPaletteImp", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "palette_float_rows", symbol: "PopupPaletteImp", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "palette_static_a_cols", symbol: "PopupPaletteImp", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "palette_static_a_rows", symbol: "PopupPaletteImp", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "palette_static_b_cols", symbol: "PopupPaletteImp", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "palette_static_b_rows", symbol: "PopupPaletteImp", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "palette_use_cols", symbol: "PopupPaletteImp", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "palette_use_rows", symbol: "PopupPaletteImp", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "palette_btn_owner", symbol: "ControlButton", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "palette_btn_rect", symbol: "ControlButton", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "palette_btn_pressed", symbol: "ControlButton", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "palette_btn_hover", symbol: "ControlButton", kind: a2engine::Kind::Field },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
@@ -384,7 +410,7 @@ pub const HOOKS: &[a2engine::HookDef] = &[
     a2engine::HookDef { id: "ui.hud.reads_components", run_unknown: false, rows: &[], syms: &[0, 1, 3, 4, 11, 12, 14] },
     a2engine::HookDef { id: "ui.hud.reads_calls", run_unknown: false, rows: &[], syms: &[6, 9, 10] },
     a2engine::HookDef { id: "ui.hud.reads_popups", run_unknown: false, rows: &[], syms: &[21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47] },
-    a2engine::HookDef { id: "ui.hud.reads_bar", run_unknown: false, rows: &["HUD.Bar", "HUD.BarLabels", "HUD.Icons"], syms: &[48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76] },
+    a2engine::HookDef { id: "ui.hud.reads_bar", run_unknown: false, rows: &["HUD.Bar", "HUD.BarLabels", "HUD.Icons"], syms: &[48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184] },
     a2engine::HookDef { id: "ui.hud.reads_overlay", run_unknown: false, rows: &["HUD.Selection", "HUD.SelectionGauges"], syms: &[6, 77, 78, 79, 80, 81, 82, 83, 84, 85, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118] },
     a2engine::HookDef { id: "ui.hud.bubbles", run_unknown: false, rows: &[], syms: &[86] },
     a2engine::HookDef { id: "ui.hud.reads_overlay_text", run_unknown: false, rows: &[], syms: &[119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 169, 170, 171] },
@@ -406,7 +432,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 172,
+        n_resolved: 185,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x763c00, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_palette_ptr
@@ -581,6 +607,19 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // otext_tree_left
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // otext_tree_parent
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // otext_tree_right
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 22 }, // palette_hidden
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 124 }, // palette_float_cols
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 128 }, // palette_float_rows
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 160 }, // palette_static_a_cols
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 164 }, // palette_static_a_rows
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 168 }, // palette_static_b_cols
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 172 }, // palette_static_b_rows
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 176 }, // palette_use_cols
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 180 }, // palette_use_rows
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // palette_btn_owner
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // palette_btn_rect
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 48 }, // palette_btn_pressed
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // palette_btn_hover
         ],
         blocked: &[
         ],
@@ -588,7 +627,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         modules: &[],
         blocked_mod: &[
         ],
-        n_resolved_mod: 172,
+        n_resolved_mod: 185,
     },
     a2engine::Build {
         name: "fo-roots-5.0Z11",
@@ -598,7 +637,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 141,
+        n_resolved: 154,
         content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x763c00, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_palette_ptr
@@ -773,6 +812,19 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // otext_tree_left
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // otext_tree_parent
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // otext_tree_right
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 22 }, // palette_hidden
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 124 }, // palette_float_cols
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 128 }, // palette_float_rows
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 160 }, // palette_static_a_cols
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 164 }, // palette_static_a_rows
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 168 }, // palette_static_b_cols
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 172 }, // palette_static_b_rows
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 176 }, // palette_use_cols
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 180 }, // palette_use_rows
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // palette_btn_owner
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // palette_btn_rect
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 48 }, // palette_btn_pressed
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // palette_btn_hover
         ],
         blocked: &[
             a2engine::Block { hook: 0, symbol: "DisplayInterface::RenderAll", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: DisplayInterface::RenderAll is changed by fo-roots-5.0Z11, not yet verified" },
@@ -792,8 +844,8 @@ pub const BUILDS: &[a2engine::Build] = &[
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 16] = [const { core::sync::atomic::AtomicU64::new(0) }; 16];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 172] = [const { core::sync::atomic::AtomicU8::new(0) }; 172];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 172] = [const { core::sync::atomic::AtomicUsize::new(0) }; 172];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 185] = [const { core::sync::atomic::AtomicU8::new(0) }; 185];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 185] = [const { core::sync::atomic::AtomicUsize::new(0) }; 185];
 static NOTES: [a2engine::Note; 16] = [const { a2engine::Note::new() }; 16];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 

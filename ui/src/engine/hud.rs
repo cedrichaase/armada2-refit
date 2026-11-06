@@ -373,6 +373,21 @@ fn all_components() -> alloc::vec::Vec<usize> {
     v
 }
 
+/// The component the render lists name `n` (the first, in the lowest view), 0 if none.
+pub fn component_named(n: &str) -> usize {
+    if eng().ready(hook::HUD_READS_COMPONENTS).is_err() {
+        return 0;
+    }
+    all_components().into_iter().find(|&c| name(c) == n).unwrap_or(0)
+}
+
+/// The component that owns the pointer now (`CursorInterface`'s owner, set by `RefreshOwner`
+/// as the pointer moves over the panels), 0 when none does.
+pub fn cursor_owner() -> usize {
+    let c = cursor();
+    if c == 0 { 0 } else { unsafe { rd::<usize>(c + field::HUD_CURSOR_OWNER()) } }
+}
+
 /// The highest view number the render lists are read for (`View_Record` is never above it).
 const MAX_VIEW: usize = 8;
 

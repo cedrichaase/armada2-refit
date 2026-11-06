@@ -65,6 +65,7 @@ unsafe extern "thiscall" fn chat_render(chat: usize) {
     // the first mission frame of a game.
     let first = !unsafe { WINDOWS_LOGGED };
     super::hud::log_render_lists();
+    super::palette::log_measure();
     if first {
         unsafe { WINDOWS_LOGGED = true };
         super::input::log_engine_window("the first mission frame");

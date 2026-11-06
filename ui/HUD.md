@@ -375,6 +375,18 @@ info panel.
 **Log.** Each layout once per change ("bar: menu=2 mode=1 | Q=bbase ... T=cancel
 G=back", `(off)` for a disabled button), each click ("bar: click build"); QOL.log names each key ("bar: key S").
 
+**On Roots (measured only; nothing of the bar is drawn there).** On a build whose profile
+has `palette_slots_indirect`, `engine::palette::log_measure` logs the bar once per change
+from the engine's own objects (`bar: measure`, `bar:  slots`, `bar: hover` in UI.log).
+`hud.reads_bar` reads, besides the slots, the bar's mode columns and rows (`+0xb0`/`+0xb4`
+in use; the floating pair `+0x7c`/`+0x80`, the static pairs `+0xa0`/`+0xa4` and
+`+0xa8`/`+0xac`), its hidden flag (`+0x16`), and from a button its owner (`+0x04`), its
+rectangle (`+0x08`, local to the owner), its pressed (`+0x30`) and hover (`+0x38`) bytes:
+`StandardButton::Simulate` sets both from the pointer, whoever owns it. FleetOpsHook's range
+ring follows the hover state of a weapon's button, so a bar of ours keeps the rings only as
+a skin over the stock rectangles that leaves the stock bar the pointer; Roots' static mode
+is one row in slot order (`PLAN-FLEETOPS.md`, FO-6 decisions 94 and 95).
+
 ### Seen on the bench
 
 2026-10-16, Instant Action as the Borg at 1280x720 (`ui/bench-asi.sh HUD.Bar=1`): the bar drew as a 5x3 grid of the game's icons above the info panel, the

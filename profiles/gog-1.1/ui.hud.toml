@@ -1508,3 +1508,120 @@ struct = "std::_Tree node"
 offset = 0x8
 type = "ptr"
 used_by = ["hud.reads_overlay_text"]
+
+[[sym]]
+id = "palette_hidden"
+symbol = "PopupPaletteImp"
+kind = "field"
+struct = "PopupPaletteImp"
+offset = 0x16
+type = "u8"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_float_cols"
+symbol = "PopupPaletteImp"
+kind = "field"
+struct = "PopupPaletteImp"
+offset = 0x7c
+type = "u32"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_float_rows"
+symbol = "PopupPaletteImp"
+kind = "field"
+struct = "PopupPaletteImp"
+offset = 0x80
+type = "u32"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_static_a_cols"
+symbol = "PopupPaletteImp"
+kind = "field"
+struct = "PopupPaletteImp"
+offset = 0xa0
+type = "u32"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_static_a_rows"
+symbol = "PopupPaletteImp"
+kind = "field"
+struct = "PopupPaletteImp"
+offset = 0xa4
+type = "u32"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_static_b_cols"
+symbol = "PopupPaletteImp"
+kind = "field"
+struct = "PopupPaletteImp"
+offset = 0xa8
+type = "u32"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_static_b_rows"
+symbol = "PopupPaletteImp"
+kind = "field"
+struct = "PopupPaletteImp"
+offset = 0xac
+type = "u32"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_use_cols"
+symbol = "PopupPaletteImp"
+kind = "field"
+struct = "PopupPaletteImp"
+offset = 0xb0
+type = "u32"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_use_rows"
+symbol = "PopupPaletteImp"
+kind = "field"
+struct = "PopupPaletteImp"
+offset = 0xb4
+type = "u32"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_btn_owner"
+symbol = "ControlButton"
+kind = "field"
+struct = "ControlButton"
+offset = 0x4
+type = "ptr"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_btn_rect"
+symbol = "ControlButton"
+kind = "field"
+struct = "ControlButton"
+offset = 0x8
+type = "i32"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_btn_pressed"
+symbol = "ControlButton"
+kind = "field"
+struct = "ControlButton"
+offset = 0x30
+type = "u8"
+used_by = ["hud.reads_bar"]
+
+[[sym]]
+id = "palette_btn_hover"
+symbol = "ControlButton"
+kind = "field"
+struct = "ControlButton"
+offset = 0x38
+type = "u8"
+used_by = ["hud.reads_bar"]
