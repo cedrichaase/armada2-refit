@@ -5,7 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use a2fmt::vfs::{Entry, Fpq, Io, Kind, Layered, Loose, Status, Vfs, Zfs, components};
+use a2fmt::vfs::{Entry, Io, Kind, Layered, Loose, Status, Vfs, Zfs, components};
 
 /// `std::fs`, case-sensitive (Linux), as the host has it.
 #[derive(Clone, Copy)]
@@ -164,27 +164,23 @@ fn a_mount_shadows_the_root() {
 }
 
 #[test]
-fn archives_are_declared_and_serve_nothing() {
+fn zfs_is_declared_and_serves_nothing() {
     let t = Tmp::new();
     t.put("game/odf/loose.odf", "loose");
     let mut v = Layered::new();
     // Mounted first, an archive still searches after the loose folders.
-    v.mount("odf", Box::new(Fpq::new("ODF.fpq")));
     v.mount("", Box::new(Zfs::new("data.zfs")));
     v.mount("odf", Box::new(Loose::new(StdIo, &t.path("game/odf"))));
     assert_eq!(text(&v, "odf/loose.odf").as_deref(), Some("loose"));
     assert!(v.open("odf/packed.odf").is_none());
     let m = v.mounts();
-    assert_eq!(m.len(), 3);
+    assert_eq!(m.len(), 2);
     assert_eq!(m[0].2, Status::Ready);
     assert!(m[0].1.starts_with("loose "));
-    assert_eq!(m[1].1, "fpq ODF.fpq");
-    assert_eq!(m[2].1, "zfs data.zfs");
-    for (_, _, s) in &m[1..] {
-        match s {
-            Status::Unsupported(why) => assert!(why.contains("no reader")),
-            Status::Ready => panic!("an archive kind reads nothing yet"),
-        }
+    assert_eq!(m[1].1, "zfs data.zfs");
+    match &m[1].2 {
+        Status::Unsupported(why) => assert!(why.contains("no reader")),
+        Status::Ready => panic!("Zfs reads nothing yet"),
     }
     assert!(Kind::Loose < Kind::Fpq && Kind::Fpq < Kind::Zfs);
 }
