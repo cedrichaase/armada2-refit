@@ -567,10 +567,18 @@ pub fn path_is_loop(path: usize) -> bool {
     path != 0 && field(path, field::PATH_TYPE()) as i32 == value::PATH_PATROL()
 }
 
+/// The overview (`cOverViewImp`), read through `g_pOverView`, which its constructor sets:
+/// on stock the static object beside the pointer, on Roots the enlarged one FleetOpsHook
+/// constructs in its place (the static one is never built there). 0 before it is made.
+pub fn overview() -> usize {
+    let p = at(sym::OVERVIEW_PTR);
+    if p == 0 { 0 } else { unsafe { rd::<usize>(p) } }
+}
+
 /// The waypoint key's live state (`cOverViewImp+0x30c`, the `enter_waypoint` binding):
 /// held or not; false before the overview has bound it.
 pub fn waypoint_key() -> bool {
-    let ov = at(sym::OVERVIEW);
+    let ov = overview();
     let key = if ov == 0 { 0 } else { field(ov, field::OV_WAYPOINT_KEY()) };
     key != 0 && unsafe { rd::<i32>(key) } != 0
 }
@@ -581,14 +589,14 @@ pub fn sketch() -> usize {
     if !waypoint_key() {
         return 0;
     }
-    field(at(sym::OVERVIEW), field::OV_ADD_PATH())
+    field(overview(), field::OV_ADD_PATH())
 }
 
 /// The overview's selected objects (`GetSelectNum`, `GetSelectList`: the entity ids,
-/// wherever QOL's `MaxSelection` keeps the array), as objects.
+/// wherever QOL's `MaxSelection` or Roots' enlarged overview keeps the array), as objects.
 pub fn selected_objects(out: &mut alloc::vec::Vec<usize>) {
     out.clear();
-    let ov = at(sym::OVERVIEW);
+    let ov = overview();
     if ov == 0 {
         return;
     }

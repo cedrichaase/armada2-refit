@@ -134,7 +134,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 24,
+        n_resolved: 26,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x4cfd70, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x04, 0x83, 0xc0, 0x34, 0xc3, 0x90], mask: &[], section: "", count: 0, value: 0 }, // fn_sphere
@@ -165,14 +165,13 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 476 }, // pt_class_database
         ],
         blocked: &[
-            a2engine::Block { hook: 2, symbol: "GameObject::RenderInternal", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: GameObject::RenderInternal is changed by fo-roots-5.0Z11, not yet verified" },
         ],
         file_crc: &[a2engine::FileCrc { section: ".text", crc: 0xef690537 }, a2engine::FileCrc { section: ".test", crc: 0xe7a4061b }],
         modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
         blocked_mod: &[
             a2engine::Block { hook: 1, symbol: "ST3D_DeviceDirectX8::RenderParticle", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: ST3D_DeviceDirectX8::RenderParticle is patched by FleetOpsHook.dll, which is not the profiled one" },
         ],
-        n_resolved_mod: 21,
+        n_resolved_mod: 23,
     },
 ];
 

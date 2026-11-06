@@ -72,11 +72,14 @@ verified = []
 # ---- render3d -----------------------------------------------------------------------
 
 # Roots' cloak calls and wave-light detours sit past the entry; the hulls module only compares
-# this address with a class's slot 22 and reads the cloak's stock fields (FO-5 step 3).
+# this address with a class's slot 22 and reads the cloak's stock fields (FO-5 step 3). The
+# billboard effect's call (+0x19c) and its arguments are stock's in the file and in memory:
+# FleetOpsHook's cloak call begins on the next instruction, which the call returns to and
+# which no particles code touches (FO-5 step 7).
 [[changed]]
 fn = "GameObject::RenderInternal"
 how = "detour"
-verified = ["render3d.hulls.reads"]
+verified = ["render3d.hulls.reads", "render3d.particles.billboard"]
 
 [[changed]]
 fn = "Craft::Explode"
@@ -252,11 +255,13 @@ verified = []
 # render3d
 
 # FleetOpsHook's edit is the object loop's draw (+0x185..+0x194); the effects module reads
-# only the chunks' call (+0x336), which it leaves as it is (FO-5 step 5).
+# only the chunks' call (+0x336), which it leaves as it is (FO-5 step 5); the ordnance
+# module's warp call (+0x313) is a plain call of the untouched RenderWarpSpriteEffects,
+# past the edit (FO-5 step 7).
 [[changed]]
 fn = "Armada_RenderAllOurStuff"
 how = "runtime"
-verified = ["render3d.frame.*", "render3d.effects.reads"]
+verified = ["render3d.frame.*", "render3d.effects.reads", "render3d.ordnance.warp"]
 
 # FleetOpsHook's one edit (+0x245) takes out an edit-menu call, away from the seam's call at
 # 0x59886e (FO-5 step 3).
@@ -279,10 +284,13 @@ fn = "ConstructionRig::Render"
 how = "runtime"
 verified = ["render3d.core.reads"]
 
+# FleetOpsHook's one call (+0x1d9d) is the last key read before the parser is freed, where
+# it reads its own keys; the culling distance's load (+0xebf) is stock's, and FleetOpsHook
+# names neither the far plane nor the culling distance (FO-5 step 7).
 [[changed]]
 fn = "RTS_Configure"
 how = "runtime"
-verified = []
+verified = ["render3d.view.distance"]
 
 # FleetOpsHook's call inside the body (+0xea) runs as it wrote it: the effects module only
 # taps the weapons' calls of the function and calls what they called (FO-5 step 5).
@@ -291,10 +299,14 @@ fn = "ShieldEffect::CreateShieldHit"
 how = "runtime"
 verified = ["render3d.effects.reads", "render3d.effects.shields"]
 
+# FleetOpsHook takes out the free of the previous background database (+0x16, after its
+# destructor; Background_Close likewise), keeping its memory: the entry, the name and the
+# database the sky module reads are stock's, and the module calls the function only on the
+# bench (`[Sky] Load=`) (FO-5 step 7).
 [[changed]]
 fn = "Starfield_Load_Background_Geometry"
 how = "runtime"
-verified = []
+verified = ["render3d.sky.reads"]
 
 # FleetOpsHook's call at +0x143 is inside the function; the terrain step calls it through its
 # site whole, so Roots' change runs as Roots wrote it (FO-5 step 3).
@@ -313,10 +325,14 @@ fn = "cOverViewImp::mDrawPosts"
 how = "runtime"
 verified = []
 
+# FleetOpsHook's three edits are the cursor's height post (+0x40) and the drag box (+0x191,
+# +0x1ca); the move paths' call of mDrawPath (+0x207) and the fields it reads are stock's.
+# FleetOpsHook constructs the overview itself (enlarged), so the module reads it through
+# g_pOverView (FO-5 step 7).
 [[changed]]
 fn = "cOverViewImp::mNormalModeRender"
 how = "runtime"
-verified = []
+verified = ["render3d.overlays.paths"]
 
 [[changed]]
 fn = "cOverViewImp::mRenderWhere"
@@ -512,10 +528,13 @@ fn = "cOverViewImp::FlushLists"
 how = "runtime"
 verified = []
 
+# FleetOpsHook moves the selection's array into its enlarged overview (the offset this
+# returns): the move paths call it through the overview's vtable and read the ids where it
+# says, up to GetSelectNum's count, which is stock's (FO-5 step 7).
 [[changed]]
 fn = "cOverViewImp::GetSelectList"
 how = "runtime"
-verified = []
+verified = ["render3d.overlays.paths"]
 
 [[changed]]
 fn = "cOverViewImp::GetSelectedEntityIds"

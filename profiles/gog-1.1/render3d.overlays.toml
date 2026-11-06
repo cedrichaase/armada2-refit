@@ -747,11 +747,14 @@ target = "fn_draw_path"
 in = "cOverViewImp::mNormalModeRender"
 used_by = ["overlays.paths"]
 
+# The overview through the engine's own pointer to it, which its constructor sets: stock's
+# object is the static one beside it (0x768e40), but a build may construct it elsewhere
+# (Roots: FleetOpsHook constructs an enlarged one of its own), and only the pointer follows.
 [[sym]]
-id = "overview"
-symbol = "cOverViewImp"
+id = "overview_ptr"
+symbol = "g_pOverView"
 kind = "global"
-addr = 0x768e40
+addr = 0x768e3c
 used_by = ["overlays.paths"]
 
 [[sym]]
