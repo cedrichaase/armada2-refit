@@ -870,7 +870,10 @@ that `Render` (`render_component`): with `Tooltips=1` it reads the stream's text
 fields for the call so the stock `Render` draws only the cursor, and puts them back,
 so `DoTooltip` still owns and frees the streams. Ours draws the text in the theme's
 tooltip below and right of the pointer. On the bench the tooltips are off until the
-help button is cycled once (the bench's profile).
+help button is cycled once (the bench's profile). The text is the game's code page,
+Windows-1252, and a game's own font codes (Roots' red figures, resource icons and unit
+classes) are written as the content set's words and digits (README.md, "The engine's
+text"); before that, Roots' tooltips read as symbols and question marks.
 
 ## The cursor over a box of ours
 
@@ -1005,7 +1008,15 @@ officers the team's `+0x160` over `Team::GetMaxOfficers()` ("12/30"); ours write
 same. The colour of each is `ResourceComponent::s_ResourceColor[r]` (a `ST3D_Colour *`
 each, from the GUI config), drawn as a mark beside it; its name and tooltip are the
 component's own `GetTooltip` (vtable `+0x00`, the verbose one `+0x04`), whose first
-line is the localised name. A strip at the top centre of the screen.
+line is the localised name. A strip at the top centre of the screen, or, where the content
+set says `[Resources] Placement = component` (the `fleetops` set), at the top left corner of
+the game's own `ResourcePanel` rectangle: Fleet Operations: Roots draws its resources there
+and its command, message and build areas at the top centre.
+
+On Roots the short tooltip is a single icon glyph (a control character), so the name is read
+from the long one (`+0x04`: "Tritanium: <glyph>" and a sentence, from the game's string table,
+per race: Supply or Biomatter for the biomatter by race, Connection Nodes for the Borg's
+latinum); the set's `Names` are only the fallback when neither tooltip holds a word.
 
 ### The top-right buttons (`ButtonPanel`)
 

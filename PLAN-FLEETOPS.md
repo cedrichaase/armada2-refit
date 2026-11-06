@@ -683,6 +683,66 @@ What the bench rounds showed and fixed:
 still test what they did (not re-run in this step except through `-hud`). Stock at 1280x720 with `--install .`:
 `ui-hud-bar` (a flake on its first run, a pass on the second) and `ui-hud-panels` ran, the log checks pass.
 
+### Step 4a: the resources' names and place on Roots (2026-11-06)
+
+The user's report from the Federation economy tutorial at 3440x1440: "metal should be tritanium, biomatter should
+be supplies", and the strip of ours "painted over HUD drawn by Fleet Ops" (branch `fo-ui-resources-fix`, on `fo-b`).
+**Names.** The `fleetops` set carried stock's words (Metal, Biomatter). Roots renames them in its string table:
+the long tooltips of the resource components (`GUI_RD_*_VTOOLTIP`) read Dilithium, Tritanium, Supply
+(`GUI_RD_BIOMATTER_*`), Biomatter for the Species 8472 (the alternative keys `*_BIOMA_ALT_*`, chosen by the race's
+ODF) and Connections Nodes for the Borg's latinum, while the short tooltips are one icon glyph each (the
+"unresolved token" of step 4: a font glyph, not a key). The panel now reads the name from the long tooltip when
+the short one holds no word, so a race or a build that renames is followed; the set's `Names` (Tritanium,
+Supply, Connection Nodes) remain the fallback. Measured on every race (`fo-ui-resources-<race>`): Federation,
+Klingon, Romulan, Cardassian and Dominion read Dilithium, Tritanium, Supply (Borg and Free Borg:
+Connections Nodes for the latinum, Roots' spelling), the Species 8472 Biomatter alone.
+**Place.** At the user's aspect the canvas file is the 16:9 one (2134x1200 in the layout, converted to the 1600x1200
+space); Roots' own `ResourcePanel` sits at [75,8,426,55] there, top left, and its top centre belongs to its
+command info bar offset, messages and build areas. Ours was centred at the top, as on stock. The strip now sits at
+the top left corner of the game's component rectangle (`[Resources] Placement = component`; stock keeps the top
+centre). On the bench at 2150x900 (2.39, the user's aspect; the shell needs 900 high) the tutorial with the
+Enterprise selected shows the strip over Roots' empty resource spot, clear of the info strip, the bar, the
+minimap and the avatar box's column; no overlap with Roots' art was reproduced at the top centre while the
+strip was there, so the cause is read as the top-centre placement meeting Roots' top-centre elements (the
+command info bar and messages, hidden in the tutorial's first minutes), not a draw order.
+
+### Step 4b: Roots' tooltips through the UI (2026-11-06)
+
+Branch `fo-tooltip-fix`, on `fo-b`. The user's report on their Roots install (`fo-b` 8d8270fa, the Federation
+economy tutorial): "almost all tooltips have some weird symbols, question marks, etc."
+
+**Whose they are: the UI's** (`HUD.Tooltips`, "The tooltips at the pointer" in `ui/HUD.md`). Roots ships the row at
+0 (decision 125); the player's `RefitPlayer.ini` turned it on with the bar, the info panel and the minimap, and their
+`UI.log` says `tooltips: ours` and logs each tooltip it drew, every one holding bytes 0x7f..0xa0 and letters such as
+`¤ ª © ¨ £ ¥ × ¾ ø`. The A side, `fo-ui-tooltips-off` (Roots' defaults, Display8, render3d and the UI installed),
+shows Roots' own drawing of the same text right: red figures, resource icons, class names as yellow words. With the
+row on, the stock `Render` draws no tooltip, so Display8's passthrough, render3d and QOL are not in the path; and it
+is not Roots' own bug at the player's resolution (below).
+
+**The cause.** Roots' tooltips are written in its fonts' own codes. Its sprite fonts (`Sprites\FontFinal4_*.spr`,
+`FontMedium.spr` ...) give some codes pictures of their own: ten red figures (0x7f is 0, 0x81 1, 0x8d 2, ... 0xd7 9),
+the resource icons (0x85 dilithium, 0x86 tritanium, 0x87 supply, 0x89 crew, 0x8c biomatter, 0x99 connection nodes,
+0x80 a clock), and the unit classes as plates of words (0xa4 Scout, 0xaa Construction Ship, 0xf8 Station, ...); a
+cost line sets its icons apart with `$` (`350$<dilithium>$/$175$<tritanium>$/...`), and tabs lay the text out beside
+a picture. The UI read every byte as Latin-1 and drew it in Noto: the C1 codes and tabs as `?`, the Latin-1 letters as
+themselves. Stock's own bullet (0x95, Windows-1252) drew as `?` too. Decision 124's "string-table token" for the
+resource tooltips was this: the short tooltip is the resource's icon alone. Roots' small font tiers (`FontFinal4_10`,
+`_13`, used at 1280x960) draw `$` and 0x80 as `$` and `€`, so Roots' own cost lines read `350$◆$/$...$60$€` there;
+the larger tiers a wide screen uses make `$` a spacer and 0x80 a clock (decision 162).
+
+**The fix** (ui): `text::game` reads the engine's text as Windows-1252 and writes the content set's `[Glyphs]`
+(`ui/content/sets/fleetops/ui.ini`) as digits and words, where the engine's text enters for display (the string
+streams behind every tooltip, `buttons::clean`); the layout draws a tab as a space and other control characters as
+nothing; the font bakes the rest of Windows-1252. A Roots tooltip now reads "350 Dilithium / 175 Tritanium / 8 Supply
+/ 150 Crew / 50 s", "1500 Hitpoints", "Construction Ship", "Weak vs: Artillery, Berserker, Battleship, Dreadnought".
+
+**Evidence.** `fo-ui-tooltips` (Roots, 1280x960, Vulkan with validation): the Tractor Beam, the starbase, Activate
+Bastion and Buy Dilithium tooltips logged and drawn as plain text, `\u{` nowhere in `UI.log`, no VUID; the resource
+strip reads Tritanium and Supply. `render3d/hosttest` (`ui_fleetops_glyphs`) holds the cost line, the hitpoints, the
+classes and the bullet from the player's log. The build list's cost line was not reached on the bench (a box round
+the station alone does not select it reliably); it is held by the host test. Stock at 1280x720 with `--install .`:
+`ui-hud-bar` and `display-stub` (below, in the PR).
+
 ### Step 7: why the menus stay Roots' (2026-11-06)
 
 Offline, as the step asked first: every `DialogBoxParamA` and `CreateDialogParamA` call in
@@ -1002,6 +1062,7 @@ players) was not run.
 | 129 | **Roots' default stays `HUD.Bar=0`** (`ui/defaults/fo-roots.ini`, `BarLabels=0`, QOL's `BarKeys` off, decision 103); the player turns the bar on in the Refit screen to judge the look. The skin takes no room in the bottom row (`bar::shows` is false), draws nothing while the palette or the HUD is hidden, and is not drawn without the UI's device (the stock bar draws then) | the look is the Roots developer's and the user's call (decision 60); a skin cannot lose the gameplay feedback, but the user asked to judge it first | the user's sign-off, then the default line goes |
 | 130 | **Decision 94's open check is closed**: the Tractor Beam ring and tooltip show with the skin drawn; the build list and its back button work through the stock bar's own click | `fo-ui-bar` and the interactive run above | Roots changing its ring condition |
 | 131 | **The skin reads icons from the player's install at run time and copies nothing**: the sprite database's art by name, the UI's own flat icon where it has one, a weapon's name without its `npc_`/`all_` prefix where neither exists; no Roots icon is in the repository or converted | decision 60 and hard rule 8 | a Roots weapon with no sprite of its own and a wanted look |
+| 180 | **`fo-ui-overview`'s failures were staging, not a bug of ours; the height posts are no longer judged.** (1) The box `300,560 to 520,745` took the second construction ship (at about 515,680) only now and then; with both selected the bar's fifth button is not the build button, so the click at 600,788 did nothing and the pointer rested on the starbase's tooltip (step 49). The box is now `375,560 to 465,650`, the first Mediterranean class ship alone, and the bar buttons are hovered before they are clicked, as `fo-ui-bar` does. (2) Posts: `DrawHeightPost` is the pointed unit's, a placement's and the editor's, never a selected ship's, and on Roots the pointed unit's is FleetOpsHook's own edit of `mNormalModeRender` and the move point's its `mRenderWhere`; ships and the ground lie in one plane, so a post would be a point. The runs log no `leftovers: height post` on Roots, hovering the starbase included. The judged step asks for the ring and the dotted move line instead; the footprint is judged as hatched red with amber tiles (the brackets are for a clear place, and the judge was unsure what the starbase's amber tiles were). The placement wait is a plain `Expect` after two seconds: the wait on a log line only matches lines written after the last action | the three passes `20261106-191527`, `-191741`, `-192002`; failing before: `-182038`, `-183823`, `-184615` | a Roots build whose ships hover above the plane |
 | 140 | **The front end stays Roots' on Roots**: `[Menus] Enable`, `Credits`, `Scene` and `CampaignLocks` stay 0 in `ui/defaults/fo-roots.ini`; no dialog host, mirror or spec on Roots, no host design space from the profile's shell size, and nothing of `FleetOpsHook.dll` hooked, in user32 or in its memory. Decision 68 widened from nine screens to the whole shell | step 7's survey: the main menu, Options (the in-mission menu too) and six more screens are FleetOpsHook's Delphi forms and never run the stock dialog; nine more run behind its own import and dialog procedure; only Sound Settings passes the host | the Roots developer offering a way for the shell's screens to run as the executable's dialogs (decision 1), or a Roots update that does it |
 | 141 | **Option C is taken** (the user's go, 2026-11-06, "please go ahead"): our menus over FleetOpsHook's forms, reading its objects (the user's allowance of 2026-11-06), read-only, on the game thread, only while a form is the modal one; nothing of FleetOpsHook's memory is written and none of its code patched. Decision 140 holds for what the forms part does not cover (the nine dialogs until phase two, and every screen while `Forms=0`) | "Step 7, option C" above; reading nothing was a default of model (c), not a rule; the probe passed ("Step 0") | |
 | 142 | **A form is found by its window** (a thread CBT hook; the Delphi class name as window class, owned by the device window), its object through the VCL's own window property, checked by its class pointer lying in FleetOpsHook's image and its class name; no global of FleetOpsHook's | the forms are created and freed per screen and no global holds them | a FleetOpsHook that subclasses its forms or renames the property |
@@ -1015,6 +1076,13 @@ players) was not run.
 | 150 | **The nine dialogs behind FleetOpsHook's import are phase two**, by late attach: found as created, left in FleetOpsHook's placement and procedure, named through the record FleetOpsHook keeps on the window, read with the stock host's model | the eight forms are the larger and simpler half; the nine need the stock procedure's identity | the eight seen in game |
 | 151 | **Generic first** (mirror, then widgets over a form's controls), **specs after**, one per screen at 1200x900 | as on stock; specs need the live bindings seen | |
 | 152 | **Out of scope in this plan**: the map editor's forms, the Internet button's Tunngle and GameSpy menus, hidden debug controls, and Map Select's grid as widgets (mirrored only) | Roots-only tools, dead services, and a grid whose rows are a third-party control's private data | the user asking |
+| 153 | **The resources' names come from Roots' own table at run time, the set's only a fallback**: the long tooltip's first line when the short one is a glyph; the `fleetops` set's `Names` are Roots' defaults (Tritanium, Supply, Connection Nodes). Supersedes the stock words of decision 124 | Roots renames them, per race (the Species 8472 read Biomatter); reading its table follows any race or build | a Roots table with no long tooltip (the set answers) |
+| 154 | **The resources strip sits over the game's own `ResourcePanel` rectangle on Roots** (`[Resources] Placement = component`, new content-set key; stock stays top centre), top left corner, natural size | Roots draws its command, message and build areas at the top centre; its own resources were top left | an aspect where Roots moves the panel (the rectangle is read each frame) |
+| 155 | **`Resources` stays on in Roots' defaults**: no clean reason to give the panel back | the names and the place are fixed and every race measured | the user seeing the overlap again |
+| 160 | **The game's text is read as Windows-1252, and a game's own font codes are the content set's `[Glyphs]`**: Roots' red figures as digits, its resource icons as the resources' names in its own table (Dilithium, Tritanium, Supply, Crew, Biomatter, Connection Nodes; 0x80, a clock after a cost's crew, as "s"), its unit classes drawn as pictures of words as those words (Construction Ship, Mining Ship and the rest, as the larger fonts name them), `$` as a space; applied where the engine's text enters for display (`text::game`: the string streams of every tooltip and `buttons::clean`) | the user's report (2026-11-06): with `HUD.Tooltips=1` every Roots tooltip showed `?` and stray letters; the UI read Roots' codes as Latin-1. A/B: `fo-ui-tooltips-off` (Roots' own drawing, right) against `fo-ui-tooltips` (ours, now plain text); Display8, render3d and QOL are not in the path (with the row on, the stock `Render` draws no tooltip) | a Roots build whose fonts move a code (the set's table is one edit) |
+| 161 | **Words, never Roots' pictures**: the icons and the class plates are written as words in the UI's font, not drawn from Roots' font atlas | decision 60 and hard rule 8; a word reads at any size, the plates are a 13 px atlas cell | the user wanting the icons inline (the atlas read at run time, as decision 131 allows) |
+| 162 | **The meaning of a code is the one Roots' larger fonts give it** (`FontFinal4_16`, `FontMedium`, `FontLarge`: `$` a 2-3 px spacer, 0x80 a clock, 0xaa Construction Ship, 0xae Mining Ship), not the small tiers' (`FontFinal4_10` and `_13` draw `$` and `€`, and label 0xaa "Civil Vessel"); a player's wide screen uses the larger | Roots' own tooltip at 1280x960 shows `350$◆$/$175$...$60$€` (bench, interactive); the user's 3440x1440 uses a larger tier; the text is the same at every tier, so one meaning is right | the Roots developer |
+| 163 | **The resource strip keeps decision 153's names**: a short tooltip that is a glyph alone (`Content::is_glyph`) still sends the strip to the long tooltip, so a race's own word (the Species 8472's Biomatter) wins over the glyph's word | the two fixes met on `fo-b` (#93): the glyph's word would otherwise read as a name | |
 | 170 | **A form of ours is hidden by moving it off screen** (`SetWindowPos` far above and left of every output, its size kept), its region emptied as well; checked every tick and moved again if anything brings it back. Decision 146's order is reversed: the region alone and a layered window at alpha 1 leave a black rectangle on Wine under XWayland | step 0, question 1: the region clipped Roots' paint but not the pop-up's window; off screen showed our frame whole with the form's focus and loop intact | a Wine or compositor where the region works (then nothing need move), or FleetOpsHook moving its forms back |
 | 171 | **While a form is ours the pump sets the arrow** each tick (`SetCursor`), since nothing else does once the form is out from under the pointer | step 0, question 8 | Roots' race cursors wanted in our menus |
 | 172 | **The forms' identity is a list in the UI** (`FAMILY` in `ui/src/engine/forms.rs`: the CRC-32 of FleetOpsHook's file `.text` for Roots 4.0.93, Roots 5.0Z11 and Tactical Maneuvers 5.2.3), read through `a2engine::companion_crc` (new: the `[[module]]` rule as a function). The hook-level "requires the companion" flag in `a2engine` and its C twin is **not built**: the forms are the one part keyed to the companion alone, and no C plugin reads them | the list is about FleetOpsHook, not the executable, so it does not belong to an exe build's profile; a flag in the generator would carry one user | a second part keyed to FleetOpsHook alone, or a C plugin that needs it |
