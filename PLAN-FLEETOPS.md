@@ -483,7 +483,11 @@ transform on both sides (the engine divides the hit's frame by the model's radiu
 render3d's own x2 (decision 22) is still needed and is not applied twice. Step 5's logo
 node cannot fire on 5.0Z11: FleetOpsHook's `CraftClass_InitLogo` looks for a node named
 `stlogo`, which none of the install's 626 SODs has, and the `logo_*` textures the ODFs'
-`logoFileNames` list are not in the install.
+`logoFileNames` list are not in the install. A plain move of one ship draws no path on Roots (bench, run
+20261106-065649: the ship selected and sent, the overview read, no path counted), as on
+stock: without QOL the overlays module draws the engine's path only when it was sketched
+with the waypoint key, and the bench cannot hold a key on Roots (no scene harness), so the
+sketched path is still unseen there.
 
 | # | Default | Why | What would change it |
 |---|---|---|---|

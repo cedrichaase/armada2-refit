@@ -30,7 +30,7 @@ the clone's `Data/`, which the bench reads as "Display8.log".
 10. Include "_fo-sides".
 11. Click "LAUNCH".
 12. Wait up to 180 seconds for "Display8.log" to say "the swap chain follows it".
-13. Wait 5 seconds.
+13. Wait 25 seconds.
 14. Take a screenshot called "skirmish".
 15. Check that a space map is shown from above with a ship or station of the player's in the middle, resource counters along the top, a minimap at the bottom left and a row of small buttons at the top right, the ships and stations textured (not white), and that the picture is not white.
 16. Expect "Display8.log" contains "the swap chain follows it".

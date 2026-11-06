@@ -11,3 +11,4 @@ status: Installed, not yet seen in game
 ### Changed
 - hulls: the claim logs once how many of a SOD's shown nodes it found by name in the instance's database.
 - testbench: `fo-render3d-shields` checks that the companion's pick is chained, that the first hit is noted as an ordinary one and that render3d draws the hits; `fo-render3d-stlogo` says why its log check cannot be written for Roots 5.0Z11 (no SOD has an `stlogo` node).
+- testbench: `fo-display8` waits 25 s (not 5) after Display8 follows the game's device before its shot, which caught the loading screen; `fo-render3d-stlogo` judges the hulls textured, not a close-up the wheel does not always give.

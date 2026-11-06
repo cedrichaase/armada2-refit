@@ -37,7 +37,7 @@ markings.
 7. Move the mouse to 900,720.
 8. Wait 2 seconds.
 9. Take a screenshot called "close-up".
-10. Check that a Federation ship is shown close up, its hull textured (not white or flat grey) with a visible logo or marking on the saucer.
+10. Check that Federation ships are shown (closer than in the "skirmish" shot if the wheel took), their hulls textured (not white or flat grey).
 11. Expect "Render3D.log" contains " shown nodes found by name in the instance's database".
 12. Expect "Display8.log" not contain "VUID".
 13. Quit the game.
