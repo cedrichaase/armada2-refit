@@ -1937,8 +1937,10 @@ not written, blended.
 *Every engine move* (`EngineMoves`, the content set's `overlays.ini`). Which of the
 engine's paths the fallback draws is the build's: `sketched` (the stock set; stock without
 QOL as it always was) or `all`, every move of a selected ship, an ordinary one too (the
-fleetops set: Roots has no QOL, so nothing else would draw a move there; PLAN-FLEETOPS.md,
-"FO-B: the formation move's path").
+fleetops set: without QOL nothing else would draw a move on Roots; with QOL there (FO-7 round
+three: the move queue is on) a ship that has a queue of QOL's gets QOL's, and every other ship its
+engine path, an ordinary move included: QOL's queue takes precedence only where there is one;
+PLAN-FLEETOPS.md, "FO-B: the formation move's path", decision 114).
 
 *A formation move.* Several ships sent at once (`PopupPaletteImp::mBroadcastCommand`
 0x4fda60 sends GO for more than one ship as a `NetOrderMove`; a sketched path never: it is
@@ -3056,7 +3058,7 @@ sprites (Roots' venting emitters draw `empty`) and keeps stock's chain-pulsar an
 emitters, which Roots keeps; `sky.ini` names nothing (Roots' starfields are its own
 art); `overlays.ini`, `specials.ini` and `hulls.ini` are stock's names, which Roots keeps
 (`hulls.ini` with the race-keyed profile, FO-5 step 4; `overlays.ini` with `EngineMoves =
-all`, every move's path drawn, since Roots has no QOL: "Move paths", "Every engine move").
+all`, every move's path drawn, with or without QOL's queue: "Move paths", "Every engine move").
 `hosttest/src/sets.rs` holds the stock tables to what the modules held as constants
 before (render3d 1.2.0). A build with no set gets `NONE`: no faction keys (shields colour by stock's level), no node or sprite
 names (a clean model shows everything; no vent or pulsar emitter), no recipes (no special

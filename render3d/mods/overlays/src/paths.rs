@@ -19,7 +19,7 @@
 //! (`QOL_MoveQueue`: appended legs, a patrol run closed back to its first point; QOL adds
 //! each Tab-click at once, so no sketch is drawn); without it, from the engine's own
 //! path and the sketch, as before: only sketched paths, or every move when the build's
-//! content set says `EngineMoves = all` (Roots, which has no QOL). A formation move's
+//! content set says `EngineMoves = all` (Roots: a ship QOL keeps no queue for draws its engine path). A formation move's
 //! followers (command FOLLOW) fly their leader's path at a place relative to it: they draw
 //! the leader's path, a leg to their place and a small dot at it at each point
 //! (`hooks::ship_follow`). The ships of one order fly copies of the same points: a
@@ -285,20 +285,25 @@ impl Paths {
                 self.qol_live = r >= 0;
                 if r >= 0 {
                     let n = (r as usize).min(QCAP);
-                    if n == 0 {
+                    if n > 0 {
+                        let own: Vec<V3> = (0..n).map(|i| v3(xyz[i * 3], xyz[i * 3 + 1], xyz[i * 3 + 2])).collect();
+                        let gp: Vec<V3> = if g.is_some() {
+                            (0..n).map(|i| v3(gxyz[i * 3], gxyz[i * 3 + 1], gxyz[i * 3 + 2])).collect()
+                        } else {
+                            own.clone()
+                        };
+                        from_qol = true;
+                        ships += 1;
+                        ahead += n;
+                        queued.push((serial, pos, own, gp, flags[..n].to_vec()));
                         continue;
                     }
-                    let own: Vec<V3> = (0..n).map(|i| v3(xyz[i * 3], xyz[i * 3 + 1], xyz[i * 3 + 2])).collect();
-                    let gp: Vec<V3> = if g.is_some() {
-                        (0..n).map(|i| v3(gxyz[i * 3], gxyz[i * 3 + 1], gxyz[i * 3 + 2])).collect()
-                    } else {
-                        own.clone()
-                    };
-                    from_qol = true;
-                    ships += 1;
-                    ahead += n;
-                    queued.push((serial, pos, own, gp, flags[..n].to_vec()));
-                    continue;
+                    // No queue of QOL's for this ship. With every engine move drawn (Roots,
+                    // `EngineMoves = all`) its ordinary move is still its path: QOL's queue
+                    // takes precedence only where there is one.
+                    if !all_moves {
+                        continue;
+                    }
                 }
             }
             // The engine's own path (QOL keeps no queues, or is not there): the ship's, or,

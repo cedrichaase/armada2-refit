@@ -1,4 +1,4 @@
-# Fleet Operations: Roots with QOL: the right-drag pan speed and Shift+number run, and every other part stands down
+# Fleet Operations: Roots with QOL: the right-drag pan speed, Shift+number and the move queue run, the rest stands down
 
 Resolutions: 1280x960
 Mod: refit
@@ -8,8 +8,8 @@ Timeout: 10 min
 
 FO-7 round one (`PLAN-FLEETOPS.md`, "FO-7: QOL on Roots", decisions 100-107). QOL.asi is
 installed into Roots' `Data/` with the game's own defaults (`qol/defaults/fo-roots.ini`):
-`PanSpeed=2.5` on, `ShiftAddsToGroup` on since round two (`fo-qol-groups`), `StationGroups`, `WarpDistance`, `PathStartsAtOnce`,
-`RigIgnoresSelf`, `MaxSelection` and `BarKeys` off. The pan hook is verified on this build
+`PanSpeed=2.5` on, `ShiftAddsToGroup` on since round two (`fo-qol-groups`), `PathStartsAtOnce` on since round
+three (`fo-qol-move-queue`), `StationGroups`, `WarpDistance`, `RigIgnoresSelf`, `MaxSelection` and `BarKeys` off. The pan hook is verified on this build
 (`RTS_Configure`'s site is stock's bytes in the file and in memory after FleetOpsHook), so
 the log says it patched and the parsed coefficient is Roots' own RTS_CFG.h value (0.005)
 times 2.5; the rest of the log says which features were left alone and why (the profile
@@ -27,8 +27,8 @@ started, before a map is loaded. Then an Instant Action game is started
 6. Expect "QOL.log" contains "ShiftAddsToGroup=1  -> Shift+N adds to group N, Alt+N selects and centres, patched".
 7. Expect "QOL.log" contains "StationGroups=0  (stations select and group as in stock)".
 8. Expect "QOL.log" contains "WarpDistance=0  (0: moves left alone)".
-9. Expect "QOL.log" contains "PathStartsAtOnce=0".
-10. Expect "QOL.log" contains "RigIgnoresSelf=0".
+9. Expect "QOL.log" contains "PathStartsAtOnce=1  -> move queues: Tab points (and minimap points) queued per ship, flown at once, patched".
+10. Expect "QOL.log" contains "RigIgnoresSelf=0  (a construction ship blocks its own blueprint, as in stock)".
 11. Expect "QOL.log" contains "BarKeys=0  (the bar's keys left as in stock)".
 12. Expect "QOL.log" contains "MaxSelection=16  (16 or less: selection and groups left at stock's 16)".
 13. Expect "QOL.log" not contain "BarKeys=1".

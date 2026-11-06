@@ -975,8 +975,9 @@ several selected the others still count as blockers in the ghost: step 2 deals w
 ## On Fleet Operations: Roots
 
 `./install --game fo-roots` puts QOL.asi into Roots' `Data/` with `qol/defaults/fo-roots.ini`
-applied over `QOL.ini`: `PanSpeed` runs, every other key is 0 until it has been measured
-beside Roots' own behaviour (PLAN-FLEETOPS.md, "FO-7: QOL on Roots", decisions 100-107).
+applied over `QOL.ini`: `PanSpeed`, `ShiftAddsToGroup` and `PathStartsAtOnce` run, every other key is 0
+because it was measured beside Roots' own behaviour and found moot or blocked (PLAN-FLEETOPS.md,
+"FO-7: QOL on Roots", decisions 100-115).
 
 - **The pan hook** is `RTS_Configure`'s store over the parsed `FASTSCROLL_COEFFICIENT`.
   Roots' executable has the function byte for byte as stock, FleetOpsHook's one run-time
@@ -998,3 +999,27 @@ beside Roots' own behaviour (PLAN-FLEETOPS.md, "FO-7: QOL on Roots", decisions 1
   re-point, so QOL's array would disagree with them; Roots' 30 is already past stock's 16.
 - **`BarKeys` stays off**: Roots' bar is FleetOpsHook's, up to 64 buttons with several per
   weapon classlabel, so the slot plan of QOL-1 does not hold there.
+- **`PathStartsAtOnce` is on** (decision 114): QOL-10's queue reads and hooks only functions
+  that Roots leaves byte for byte as stock's (the right-click and its release, `mAddPathPoint`,
+  `QueueCommand` and `DeQueueCommand`, the `NetOrder*::Execute` family, the formation manager's
+  two entries), reads the selection through `GetSelectList` and the overview through
+  `g_pOverView`, and the three functions of Roots that it shares ground with
+  (`mProcessKeyboardInput`, `Simulate`, `Craft::Say`) are marked verified. Two differences:
+  `Craft::Say` is FleetOpsHook's port, so the re-pointed call of `CaptainsVoice::Say` never
+  runs and the ships **speak as they take each leg** (QOL's own sends are not quiet there); and
+  the engine moves a path on about 300 short of a point for the Mediterranean class, not the
+  150 of stock's destroyers, which the log marks `short of it`. render3d (`EngineMoves = all` on
+  Roots) draws QOL's queue where a ship has one and the engine's path for its ordinary moves.
+  `fo-qol-move-queue` stages it: the bench cannot hold Tab, so `testbench/bench/roots-waypoint.sh`
+  binds Roots' `enter_waypoint` to the middle mouse button in the clone.
+- **`StationGroups` is off and `stations` is disabled** (decision 111): Roots replaces
+  `cOverViewImp::Select` (the site that lets a second station be selected) and the bar's
+  `mUpdateButtonsAndPosition` (the build button's enable site) with FleetOpsHook's own ports, so
+  two of QOL-6's sites are in bodies that never run; Roots has station groups of its own.
+- **`WarpDistance` stays 0** (decision 112): the hook is verified and installed, but Roots has no
+  warp in its games (`GAME_OPTIONS_WARP = 0`, no warp option on the Instant Action settings, AI
+  warp distance 999999), and the hook asks `isAllowWarpSpeed` first.
+- **`RigIgnoresSelf` stays 0** (decision 113): the hook is verified and works (the log says the
+  ship is ignored, the ghost is green, the click builds), but Roots' ghost is green over its
+  own construction ship, and over other ships, with the key at 0 as well (`fo-qol-rig`,
+  `fo-qol-rig-off`).
