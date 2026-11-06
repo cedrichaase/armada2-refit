@@ -646,9 +646,12 @@ command, so a queue is flown a run at a time: QOL sends the stock path order (st
 path. A point that extends the run being flown (same mode, the ships on the queue's last
 run) is sent at once: the order goes out again from the point each ship heads to now
 (ships at different points get one order each), so the ships take it without turning
-back; a point of another mode waits. When a ship reaches the end of its run it waits for
-the rest of its group, and the next run goes to all of them together as one order (a
-ship that lags more than 8 s of game time behind the first is left to follow on its own).
+back; a point of another mode waits. When a ship reaches the end of its run, its next run
+(or the next part of a long one) is sent to it alone, at once: no ship waits for the rest
+of its group, so a ship held back never holds the others up (the log's `N ship(s)
+behind`). The ships still aim for their own places in the formation; they just do not
+wait for each other. (Until the play test of 2026-11-06 a group waited at each run's end
+for its last ship, up to 8 s; it read as the group stalling to form up.)
 The first point of a new queue is sent at once, so the ships are under way from the first
 click, as before.
 
@@ -676,7 +679,7 @@ formation readable) keep where they are in the group, turned to the first leg, a
 few ship widths from the group's centre and pushed apart to a ship's width. A copy of a
 queue (a split) keeps its ships' places. A ship counts a point reached when its process goes
 past it (or stops at the end of a run), each ship at its own target, so no ship waits on a
-point another ship holds; the group still goes on to its next run together, as before.
+point another ship holds, and each ship goes on to its next run on its own.
 
 **The packet.** `QueueCommand` drops a path order that would not fit its packet
 (`4 x (ships + 3 x points) + 10` above 0x1fc bytes) without a word. Every ship has an order
@@ -788,6 +791,26 @@ leg; nothing of the formation is written, and the orders sent are stock's path o
 per ship (entries `mq_formations`, `mq_form_types`, `mq_proc_formation`, `mq_frm_*`,
 `mq_slot_*`, `mq_min_radius`, `mq_ent_bounds`, `mq_bounds_radius`, `mq_class_shiptype`).
 
+**The acknowledgement (hook `qol.move_paths`).** A ship speaks its acknowledgement as it
+*takes* an order, not when the order is given: the processes' `Handle_New_Command`
+(`CraftProcess`, and the cargo, colony and repair ships') call `Craft::Say` (0x4c30e0)
+with a voice topic as they start the new command, and `Craft::Say`'s one call of
+`CaptainsVoice::Say` (0x4c30f1 -> 0x45d720) plays it only for a ship of this machine's
+player (`GameObject::IsLocal`) and remembers the last topic and time. Nothing of it is in
+the order on the wire. So every path order QOL sent was spoken by each ship as it was
+carried out. *Hook:* that call is re-pointed at `mq_say_hook`, which leaves the line out
+(answers false, as `Say` does when it has nothing to say) for a ship whose order of QOL's
+own has been carried out and not yet taken up by its process (the window between
+`mq_dq_path_hook` and the tick seeing the ship fly the order), and calls the engine's
+`Say` for everything else. **Which sends are the player's:** any send made while a
+player's Tab right-click is handled (on the map or the minimap: a new queue's first run,
+and a point that extends the run being flown, sent again at once) is that click's order
+and is spoken as a stock click is. The sends QOL makes on its own from its step (a ship's
+next run or next part at the end of its run, the places taken again after a formation
+change) are quiet: their log line ends in `(quiet)`, and each acknowledgement left out is
+logged. Only this machine's sound is touched; the orders sent are the same stock path
+orders as before (entries `mq_say`, `mq_say_call`).
+
 **Where a ship is on its path.** Each ship has a craft process (`GameObject+0x44`). When
 it takes a new command (`CraftProcess::Handle_New_Command`, 0x430000), a path order's
 `AiPath` moves from the object's next command (`+0x88`) to the process's `+0x88`, the
@@ -841,9 +864,11 @@ as one path; render3d uses it when it is there. Cheap: no allocation, no log.
 - `move queue: appended point N (go|warp|patrol), queue K: M point(s), ships S` (M: the
   points still ahead of the group's last ship)
 - `move queue: run sent: go|warp|patrol, P point(s) from point F, S ship(s), queue K`, and
-  `next run sent: ...` when a group goes on to the next run, `next part sent: ...` to the
-  rest of a run split for the packet; ` (split for the packet: R more later)` at the end
-  when it is split
+  `next run sent: ...` when ships go on to the next run, `next part sent: ...` to the
+  rest of a run split for the packet; then `, N ship(s) behind` when ships of the queue are
+  not yet that far, ` (quiet)` for a send of QOL's own (no acknowledgement), and
+  ` (split for the packet: R more later)` when it is split
+- `move queue: acknowledgement left out, queue K ship ID (topic T)`, once per quiet order
 - `move queue: cleared for N ship(s): stop|move|warp|path|<order>` (`<order>` is
   `AiCommandToName`'s, in lower case: `attack`, `guard`, `special_attack`, ...)
 - `move queue: queue K spread (new queue|formation changed): formation T, scale X, P ship(s)
@@ -862,8 +887,8 @@ as one path; render3d uses it when it is there. Cheap: no allocation, no log.
   step T ms` (once), `move queue: an order executed, its path never flown (...)`
 
 **Open.** A network game against a stock player (it is stock's order, so it should simply
-be carried out). Each send is an ordinary order, one per ship, so each ship acknowledges
-it by voice, once per point. Which of the bar's formation buttons gives which type was not
+be carried out). A Tab click's own sends are spoken, one order per ship, so a group's
+ships may each acknowledge a click (the engine's voice keeps its own pacing). Which of the bar's formation buttons gives which type was not
 checked in game (the buttons' ODFs say `param` 1 to 4; on the bench, 1 gave the column).
 A formation's up offsets (the column's and the wall's rows, the X's arms) are kept as stock
 keeps them, so ships of a queue fly at different heights as they do in a stock group move. The double-click that throws a sketch away no longer stops the ships. The

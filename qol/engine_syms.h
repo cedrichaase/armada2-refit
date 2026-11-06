@@ -195,7 +195,9 @@
 #define QOL_V_MQ_CMD_COUNT ((int)a2f_qol_mq_cmd_count)
 #define QOL_S_MQ_OV_KEYS 190
 #define QOL_S_MQ_OV_KEYS_CALL 191
-#define QOL_S_MQ_FORMATIONS 192
+#define QOL_S_MQ_SAY 192
+#define QOL_S_MQ_SAY_CALL 193
+#define QOL_S_MQ_FORMATIONS 194
 #define QOL_V_MQ_FORM_TYPES ((int)a2f_qol_mq_form_types)
 #define QOL_F_MQ_PROC_FORMATION ((int)a2f_qol_mq_proc_formation)
 #define QOL_F_MQ_FRM_COUNT ((int)a2f_qol_mq_frm_count)
@@ -209,10 +211,10 @@
 #define QOL_F_MQ_ENT_BOUNDS ((int)a2f_qol_mq_ent_bounds)
 #define QOL_V_MQ_BOUNDS_RADIUS ((int)a2f_qol_mq_bounds_radius)
 #define QOL_F_MQ_CLASS_SHIPTYPE ((int)a2f_qol_mq_class_shiptype)
-#define QOL_S_RS_THIS_SITE 206
-#define QOL_S_RS_THIS_CONT 207
-#define QOL_S_RS_CHECK_SITE 208
-#define QOL_S_RS_CHECK_CONT 209
+#define QOL_S_RS_THIS_SITE 208
+#define QOL_S_RS_THIS_CONT 209
+#define QOL_S_RS_CHECK_SITE 210
+#define QOL_S_RS_CHECK_CONT 211
 #define QOL_F_RS_VT_CHECK ((int)a2f_qol_rs_vt_check)
 #define QOL_F_RS_VT_CAN_PLACE ((int)a2f_qol_rs_vt_can_place)
 #define QOL_H_PAN_SPEED 0
@@ -360,6 +362,8 @@ A2E_U32 a2s_qol_mq_presim_call __attribute__((used));
 A2E_U32 a2s_qol_mq_load_time __attribute__((used));
 A2E_U32 a2s_qol_mq_ov_keys __attribute__((used));
 A2E_U32 a2s_qol_mq_ov_keys_call __attribute__((used));
+A2E_U32 a2s_qol_mq_say __attribute__((used));
+A2E_U32 a2s_qol_mq_say_call __attribute__((used));
 A2E_U32 a2s_qol_mq_formations __attribute__((used));
 A2E_U32 a2s_qol_rs_this_site __attribute__((used));
 A2E_U32 a2s_qol_rs_this_cont __attribute__((used));
@@ -631,6 +635,8 @@ static A2E_U32 *const qol_vars[] = {
     &a2f_qol_mq_cmd_count,
     &a2s_qol_mq_ov_keys,
     &a2s_qol_mq_ov_keys_call,
+    &a2s_qol_mq_say,
+    &a2s_qol_mq_say_call,
     &a2s_qol_mq_formations,
     &a2f_qol_mq_form_types,
     &a2f_qol_mq_proc_formation,
@@ -846,6 +852,8 @@ static const A2ESymDef qol_syms[] = {
     {"mq_cmd_count", "AiCommandToName's table: the number of AiCommands", 11},
     {"mq_ov_keys", "cOverViewImp::mProcessKeyboardInput", 0},
     {"mq_ov_keys_call", "cOverViewImp::Simulate", 1},
+    {"mq_say", "CaptainsVoice::Say", 0},
+    {"mq_say_call", "Craft::Say", 1},
     {"mq_formations", "g_FormationManager", 8},
     {"mq_form_types", "FormationManager: its table of Formation *, by formation type", 11},
     {"mq_proc_formation", "CraftProcess", 10},
@@ -880,11 +888,11 @@ static const A2E_U16 qol_h4_syms[] = {7, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
 static const char *const qol_h5_rows[] = {"QOL.WarpDistance", 0};
 static const A2E_U16 qol_h5_syms[] = {6, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 89, 90, 91, 92, 94, 96, 98, 104, 105, 106, 107, 108, 111, 112, 0};
 static const char *const qol_h6_rows[] = {"QOL.PathStartsAtOnce", 0};
-static const A2E_U16 qol_h6_syms[] = {11, 74, 75, 85, 89, 91, 92, 96, 107, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 0};
+static const A2E_U16 qol_h6_syms[] = {11, 74, 75, 85, 89, 91, 92, 96, 107, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 0};
 static const char *const qol_h7_rows[] = {"QOL.BarKeys", 0};
 static const A2E_U16 qol_h7_syms[] = {113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 0};
 static const char *const qol_h8_rows[] = {"QOL.RigIgnoresSelf", 0};
-static const A2E_U16 qol_h8_syms[] = {206, 207, 208, 209, 210, 211, 0};
+static const A2E_U16 qol_h8_syms[] = {208, 209, 210, 211, 212, 213, 0};
 static const A2EHookDef qol_hooks[] = {
     {"qol.pan_speed", 0, qol_h0_rows, 1, qol_h0_syms, 2},
     {"qol.shift_group", 0, qol_h1_rows, 1, qol_h1_syms, 10},
@@ -892,7 +900,7 @@ static const A2EHookDef qol_hooks[] = {
     {"qol.special_select", 0, qol_h3_rows, 1, qol_h3_syms, 9},
     {"qol.stations", 0, qol_h4_rows, 1, qol_h4_syms, 48},
     {"qol.warp", 0, qol_h5_rows, 1, qol_h5_syms, 27},
-    {"qol.move_paths", 0, qol_h6_rows, 1, qol_h6_syms, 78},
+    {"qol.move_paths", 0, qol_h6_rows, 1, qol_h6_syms, 80},
     {"qol.bar_keys", 0, qol_h7_rows, 1, qol_h7_syms, 17},
     {"qol.rig_self", 0, qol_h8_rows, 1, qol_h8_syms, 6},
 };
@@ -996,10 +1004,11 @@ static const A2E_U8 qol_b0_c161[] = {0x55, 0x8b, 0xec, 0x64, 0xa1, 0x00, 0x00, 0
 static const A2E_U8 qol_b0_c162[] = {0x55, 0x8b, 0xec, 0xa1, 0x84, 0x10, 0x76, 0x00};
 static const A2E_U8 qol_b0_c163[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x8b, 0x04};
 static const A2E_U8 qol_b0_c190[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x27, 0x14};
-static const A2E_U8 qol_b0_c206[] = {0x8b, 0x07, 0xff, 0x90, 0x38, 0x01, 0x00, 0x00, 0x8b, 0x75, 0x0c, 0x84, 0xc0, 0x75, 0x4b};
-static const A2E_U8 qol_b0_c207[] = {0x8b, 0x75, 0x0c, 0x84, 0xc0, 0x75, 0x4b};
-static const A2E_U8 qol_b0_c208[] = {0x8b, 0x4e, 0x0c, 0x6a, 0x01, 0x6a, 0x00, 0x57, 0x8b, 0x11, 0xff, 0x52, 0x08, 0x84, 0xc0, 0x8b, 0x45, 0x08, 0x74, 0xe0};
-static const A2E_U8 qol_b0_c209[] = {0x84, 0xc0, 0x8b, 0x45, 0x08, 0x74, 0xe0};
+static const A2E_U8 qol_b0_c192[] = {0x55, 0x8b, 0xec, 0x53, 0x8b, 0x5d, 0x0c, 0x56};
+static const A2E_U8 qol_b0_c208[] = {0x8b, 0x07, 0xff, 0x90, 0x38, 0x01, 0x00, 0x00, 0x8b, 0x75, 0x0c, 0x84, 0xc0, 0x75, 0x4b};
+static const A2E_U8 qol_b0_c209[] = {0x8b, 0x75, 0x0c, 0x84, 0xc0, 0x75, 0x4b};
+static const A2E_U8 qol_b0_c210[] = {0x8b, 0x4e, 0x0c, 0x6a, 0x01, 0x6a, 0x00, 0x57, 0x8b, 0x11, 0xff, 0x52, 0x08, 0x84, 0xc0, 0x8b, 0x45, 0x08, 0x74, 0xe0};
+static const A2E_U8 qol_b0_c211[] = {0x84, 0xc0, 0x8b, 0x45, 0x08, 0x74, 0xe0};
 static const A2EEntry qol_b0_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 25, 0x491766, 0x0, 0, qol_b0_c0, 0, ""}, /* pan_site */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x70fbb4, 0x0, 0, 0, 0, ""}, /* fastscroll */
@@ -1193,6 +1202,8 @@ static const A2EEntry qol_b0_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 57, 0, 0, ""}, /* mq_cmd_count */
     {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x525950, 0x0, 0, qol_b0_c190, 0, ""}, /* mq_ov_keys */
     {1, 0, 0xbe, 0xffff, 0, 0, 0, 0x51ef2e, 0x0, 0, 0, 0, ""}, /* mq_ov_keys_call */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x45d720, 0x0, 0, qol_b0_c192, 0, ""}, /* mq_say */
+    {1, 0, 0xc0, 0xffff, 0, 0, 0, 0x4c30f1, 0x0, 0, 0, 0, ""}, /* mq_say_call */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x73575c, 0x0, 0, 0, 0, ""}, /* mq_formations */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 16, 0, 0, ""}, /* mq_form_types */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 316, 0, 0, ""}, /* mq_proc_formation */
@@ -1207,10 +1218,10 @@ static const A2EEntry qol_b0_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 4, 0, 0, ""}, /* mq_ent_bounds */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 64, 0, 0, ""}, /* mq_bounds_radius */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 1068, 0, 0, ""}, /* mq_class_shiptype */
-    {1, 0, 0xffff, 0xffff, 0, 0, 15, 0x4afa37, 0x0, 0, qol_b0_c206, 0, ""}, /* rs_this_site */
-    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x4afa3f, 0x0, 0, qol_b0_c207, 0, ""}, /* rs_this_cont */
-    {1, 0, 0xffff, 0xffff, 0, 0, 20, 0x4afa71, 0x0, 0, qol_b0_c208, 0, ""}, /* rs_check_site */
-    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x4afa7e, 0x0, 0, qol_b0_c209, 0, ""}, /* rs_check_cont */
+    {1, 0, 0xffff, 0xffff, 0, 0, 15, 0x4afa37, 0x0, 0, qol_b0_c208, 0, ""}, /* rs_this_site */
+    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x4afa3f, 0x0, 0, qol_b0_c209, 0, ""}, /* rs_this_cont */
+    {1, 0, 0xffff, 0xffff, 0, 0, 20, 0x4afa71, 0x0, 0, qol_b0_c210, 0, ""}, /* rs_check_site */
+    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x4afa7e, 0x0, 0, qol_b0_c211, 0, ""}, /* rs_check_cont */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 312, 0, 0, ""}, /* rs_vt_check */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 8, 0, 0, ""}, /* rs_vt_can_place */
 };
@@ -1218,17 +1229,17 @@ static const A2EBlock qol_b0_blocked[] = {
     {0xffff, 0, 0, 0}
 };
 static const A2EBuild qol_builds[] = {
-    {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qol_b0_entries, qol_b0_blocked, 0, 212},
+    {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qol_b0_entries, qol_b0_blocked, 0, 214},
 };
 
 static A2E_U8 qol_hook_state[9];
-static A2E_U8 qol_sym_flags[212];
-static A2E_U32 qol_sym_addr[212];
+static A2E_U8 qol_sym_flags[214];
+static A2E_U32 qol_sym_addr[214];
 static char qol_notes[9][A2E_NOTE_MAX + 1];
 
 static const A2ETable QOL_ENGINE = {
     "armada2", "qol",
-    qol_syms, 212, qol_hooks, 9, qol_builds, 1, 0,
+    qol_syms, 214, qol_hooks, 9, qol_builds, 1, 0,
     qol_vars, qol_hook_state, qol_sym_flags, qol_sym_addr, qol_notes
 };
 

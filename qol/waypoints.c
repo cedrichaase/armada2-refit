@@ -19,7 +19,9 @@
  *     (`target`), with a path order of its own;
  *   - the queue is flown one run (the longest stretch of legs of one mode) at a time,
  *     each run as the stock path order for that run's points, sent at once when it
- *     extends the run being flown and when the group reaches the end of the run before;
+ *     extends the run being flown, and to each ship on its own when it reaches the end
+ *     of the run before (no ship waits for its group); QOL's own sends are not spoken
+ *     (mq_say_hook);
  *   - the player's own orders end it: every order executed for one of the player's
  *     ships passes one of the hooks on the orders' executors (the NetOrder*::Execute
  *     calls of GameObject::DeQueueCommand, FormationManager::Broadcast_Go_Command,
@@ -71,7 +73,6 @@ typedef void  (__thiscall *OvKeysFn)(BYTE *ov);
 #define MQ_RING     512     /* orders of ours remembered (one per ship), to tell them from the player's */
 #define MQ_EXEC_MS  1500    /* an order executed whose path never shows: flown, or refused */
 #define MQ_POST_MS  8000    /* an order sent that never executes: given up */
-#define MQ_WAIT_MS  8000    /* how long a group's first ship at a run's end waits for the rest */
 #define MQ_SAID_MAX 600     /* log lines */
 #define MQ_PASS_NEAR 200.0f /* a ship that goes past a point this near its own target reached it */
 #define MQ_NEAR     0.25f   /* a point of ours read back off an order or a path: as far off as it may be */
@@ -84,7 +85,6 @@ typedef struct {
     float p[MQ_PTS][3];
     float dir[MQ_PTS][2];   /* the way the leg to each point heads (x, z; unit): its slots face it */
     BYTE  mode[MQ_PTS];
-    DWORD waitSince;        /* when its first ship began waiting for the rest (0: none) */
     int   form;             /* the formation type its slots came from (-1: the group's layout) */
     float org[3];           /* where the group was when the queue began */
     int   reached, astray;  /* points a ship reached nearest its own target / nearer another's */
@@ -102,6 +102,9 @@ typedef struct {
     DWORD t;                /* when that order was sent / executed (g_simMs) */
     float slot[3];          /* its place in the group: right, up, ahead of the queue's point */
     int   slotIx;           /* the formation slot it holds (-1: by the group's layout) */
+    BYTE  quiet;            /* its order was QOL's own, not a click's: no acknowledgement */
+    BYTE  mute;             /* that order executed: its acknowledgement is left out until flown */
+    BYTE  muted;            /* one was left out for this order (logged once) */
 } Member;
 
 typedef struct { int cmd, n; float a[3], b[3]; } Sent;
@@ -123,6 +126,7 @@ static int    g_mqSaid;
 static DWORD  g_simMs;         /* the simulation's clock, from PreSimulateAll's steps */
 static float  g_simFrac;
 static int    g_clrN, g_clrCmd = -1;   /* clears not logged yet, and their order */
+static int    g_inClick;        /* a player's click is being handled: its sends are its orders */
 
 /* What QueueCommand reads: a VC6 std::vector<int> (+4 first, +8 last, +0xc end) and
  * an AiPath's first two fields (the count, the points). */
@@ -292,7 +296,6 @@ static int new_queue(void)
         if (!g_q[i].used) {
             g_q[i].used = 1;
             g_q[i].n = 0;
-            g_q[i].waitSince = 0;
             g_q[i].form = -1;
             g_q[i].reached = g_q[i].astray = 0;
             g_q[i].org[0] = g_q[i].org[1] = g_q[i].org[2] = 0.0f;
@@ -366,6 +369,8 @@ static void send_from(int qi, Member **ms, int k, int from, const char *what)
         remember(cmd, cnt, pts[0], pts[cnt - 1]);
         QUEUE_PATH(cmd, &v, &h);
         m->state = MS_POSTED;
+        m->quiet = (BYTE)!g_inClick;
+        m->mute = m->muted = 0;
         m->cmd = cmd;
         m->patrol = patrol;
         m->off = from;
@@ -389,6 +394,13 @@ static void send_from(int qi, Member **ms, int k, int from, const char *what)
         s_num(b, k);
         s_cat(b, " ship(s), queue ");
         s_num(b, q->serial);
+        if (from > 0) {             /* ships of the queue not yet that far: not waited for */
+            int behind = 0;
+            for (i = 0; i < MQ_SHIPS; i++)
+                if (g_m[i].q == qi && member_cur(&g_m[i]) < from) behind++;
+            if (behind) { s_cat(b, ", "); s_num(b, behind); s_cat(b, " ship(s) behind"); }
+        }
+        if (!g_inClick) s_cat(b, " (quiet)");
         if (rest) {
             s_cat(b, " (split for the packet: ");
             s_num(b, rest);
@@ -415,18 +427,18 @@ static void send_each(int qi, Member **sel, int k, const char *what)
             done[j] = 1;
             batch[nb++] = sel[j];
         }
-        if (nb) send_from(qi, batch, nb, from, what);
+        if (nb) send_from(qi, batch, nb, from, what ? what : !from ? "run sent" :
+                          run_start(&g_q[qi], from) == from ? "next run sent" : "next part sent");
     }
 }
 
-/* One queue's step: ships that have reached the end of their order fly on, together,
- * once every ship of the group has (or MQ_WAIT_MS after the first). */
+/* One queue's step: each ship that has reached the end of its order flies on at once,
+ * on its own: no ship waits for the rest of its group. */
 static void queue_step(int qi)
 {
     static Member *wait[MQ_SHIPS];
     Queue *q = &g_q[qi];
-    DWORD now = g_simMs;
-    int   i, k = 0, busy = 0, total = 0, first;
+    int   i, k = 0, busy = 0, total = 0;
 
     for (i = 0; i < MQ_SHIPS; i++) {
         Member *m = &g_m[i];
@@ -454,14 +466,7 @@ static void queue_step(int qi)
         free_queue(qi);
         return;
     }
-    if (!k) { q->waitSince = 0; return; }
-    if (busy && !q->waitSince) q->waitSince = now ? now : 1;
-    if (busy && now - q->waitSince < MQ_WAIT_MS) return;
-    q->waitSince = 0;
-    first = 1;
-    for (i = 0; i < k; i++) if (wait[i]->end > 0) first = 0;
-    send_each(qi, wait, k, first ? "run sent" :
-              run_start(q, wait[0]->end) == wait[0]->end ? "next run sent" : "next part sent");
+    if (k) send_each(qi, wait, k, 0);
 }
 
 /* ---- the player's orders ------------------------------------------------ */
@@ -545,6 +550,7 @@ void __cdecl mq_dq_path_hook(int node, int cmd, int n, int *ids, int np, const f
                 m->state = MS_EXEC;
                 m->t = g_simMs;
                 m->path = 0;
+                m->mute = m->quiet;
             }
         }
     }
@@ -819,6 +825,38 @@ static void heading(const float *a, const float *b, const float *keep, float *ou
     else { out[0] = 0.0f; out[1] = 1.0f; }
 }
 
+/* ---- the acknowledgement ------------------------------------------------- */
+
+/* Craft::Say's call of CaptainsVoice::Say, re-pointed: a ship taking a command speaks
+ * its acknowledgement there (from the processes' Handle_New_Command, as the order is
+ * carried out, and only for a ship of this machine's player: CaptainsVoice::Say checks
+ * GameObject::IsLocal), so it is left out, here only, for a ship whose order of QOL's own
+ * (not a click's) has just been carried out and not yet taken up by its process. */
+typedef BYTE (__thiscall *SayFn)(BYTE *cv, int topic, BYTE *obj);
+#define SAY            ((SayFn)a2s_qol_mq_say)               /* CaptainsVoice::Say */
+
+BYTE __thiscall mq_say_hook(BYTE *cv, int topic, BYTE *obj)
+{
+    Member *m = g_mqLive ? member_of_obj(obj) : 0;
+    if (m && m->mute) {
+        if (!m->muted) {
+            char b[120];
+            m->muted = 1;
+            b[0] = 0;
+            s_cat(b, "move queue: acknowledgement left out, queue ");
+            s_num(b, g_q[m->q].serial);
+            s_cat(b, " ship ");
+            s_num(b, m->id);
+            s_cat(b, " (topic ");
+            s_num(b, topic);
+            s_cat(b, ")");
+            mq_log(b);
+        }
+        return 0;
+    }
+    return SAY(cv, topic, obj);
+}
+
 /* ---- the tick ----------------------------------------------------------- */
 
 /* A ship has gone past queue point k (`what`): how far it is from its own target there. */
@@ -925,9 +963,10 @@ static void mq_tick(void)
             break;
         case MS_EXEC:
             m->last = m->off;
-            if (flies_order(m, &ix)) { m->state = MS_FLYING; m->last = ix; }
+            if (flies_order(m, &ix)) { m->state = MS_FLYING; m->last = ix; m->mute = 0; }
             else if (now - m->t > MQ_EXEC_MS) {
                 m->state = MS_WAIT;
+                m->mute = 0;
                 mq_log("move queue: an order executed, its path never flown (arrived at once, or refused)");
             }
             break;
@@ -1111,7 +1150,6 @@ static int mq_point(BYTE *ov, const float *pt, int cmd, int minimap)
             for (z = 0; z < sizeof(Queue); z++) d[z] = f[z];
         }
         g_q[cp].serial = n;
-        g_q[cp].waitSince = 0;
         qsplit[cp] = g_q[i].serial;
         for (j = 0; j < k; j++) {
             BYTE *o = ENTITY_GET(sel[j]);
@@ -1137,7 +1175,9 @@ static int mq_point(BYTE *ov, const float *pt, int cmd, int minimap)
             s_num(b, n);
             mq_log(b);
         }
+        g_inClick = 1;
         append_point(i, pt, cmd, ms, n, minimap);
+        g_inClick = 0;
         took = 1;
     }
     return took;
@@ -1277,5 +1317,6 @@ static int patch_paths(void)
         && a2_write_call(a2e_addr(QOL_S_MQ_FORM_FORMATION_CALL), mq_form_formation_stub, 5)
         && a2_write_call(a2e_addr(QOL_S_MQ_PATH_CALL), mq_dq_path_hook, 5)
         && a2_write_call(a2e_addr(QOL_S_MQ_PRESIM_CALL), mq_presim_hook, 5)
-        && a2_write_call(a2e_addr(QOL_S_MQ_OV_KEYS_CALL), mq_ov_keys_hook, 5);
+        && a2_write_call(a2e_addr(QOL_S_MQ_OV_KEYS_CALL), mq_ov_keys_hook, 5)
+        && a2_write_call(a2e_addr(QOL_S_MQ_SAY_CALL), mq_say_hook, 5);
 }
