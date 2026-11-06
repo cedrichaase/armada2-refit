@@ -452,7 +452,7 @@ patch table:
 | 3 | **The mission frame, input, the Refit screen.** `core.mission` verified; the window procedure of both windows measured (class, `GWL_WNDPROC`, which one `GetWindowHandle` gives in the shell and in a mission); if Roots' form calls the two message functions itself, record and capture move to their entries on Roots (decision 71); the hidden flag read from Roots' panel; **the Refit screen as a modal in a mission**, opened by a key of the UI's (decision 62), with the clean-screenshot mode left alone (decision 72). **Built 2026-11-06** (branch `fo-6-step3`): the mission frame verified, input at the two functions' entries on Roots, the hidden flag from the named panel, the render lists logged, the Refit screen by Ctrl+F12, Roots' textures mounted for the loading screen's sky; decisions 85–93, "Step 3: what the bench showed" below | profile, `input.rs`, `engine/ingame.rs`, `menus/refit.rs` outside the host | 8–14 · 3–5 |
 | 4 | **The panels Roots changes least**, each its own row and off on Roots until verified: messages and objectives, the pause and replay boxes, overlay text, chat and trade, the top-right buttons (Roots' five), the resources (Roots' amounts, names from the set), the selection overlay, and the engine's last draws (`fade`, `frame_rate`, `order_ring`, `footprints`; the drag box stays the engine's). Sounds measured under FMOD first. **Built 2026-11-06** (branch `fo-6-step4`, on `fo-6-step5`): `hud.panels`, `hud.order_ring`, `hud.frame_rate`, `panels.presses`, `panels.chat` and `panels.trade` verified; seven panels on by default on Roots (the resources, the top-right buttons, the pause box, the chat, the selection overlay, the frame-rate panel, the 3D view's order ring, height posts and footprint), each with its `fo-ui-<panel>` scenario; messages, objectives, replay, overlay text, fade and the team texts stay off for want of a trigger in a skirmish; the UI plays no button sound on Roots; decisions 120–127, "Step 4: what the bench showed" below | profile marks, a panel at a time | 12–20 · 5–8 |
 | 5 | **Measure the bar, draw nothing.** Log FleetOpsHook's bar on the bench: the buttons per selection (a ship with several weapons of one `classLabel`, the construction ship's build list, a station), the mode in use and its columns and rows, which button the range ring follows and through which of the stock bar's states. Decide from it whether a bar of ours can keep the rings without reading FleetOpsHook's memory (decision 65). **Measured 2026-11-06** (branch `fo-6-step5`): `bar: measure` and `bar: hover` log lines from the engine's own objects (`engine/palette.rs`, `log_measure`), scenario `fo-ui-bar-measure`; the answer is decisions 94 and 95, "Step 5: the bar measured" below | bench and logs only | 4–8 · 2–3 |
-| 6 | *Optional, when asked*: **the bar**, laid out by the mode's columns (no 5x3 grid; position keys for the first cells only, QOL's in FO-7), then the info panel and the minimap with FleetOpsHook's own objects, the command info bar left to Roots | step 5; Roots developer's view on the look | 25–45 · 10–15 |
+| 6 | *Optional, when asked*: **the bar**, laid out by the mode's columns (no 5x3 grid; position keys for the first cells only, QOL's in FO-7), then the info panel and the minimap with FleetOpsHook's own objects, the command info bar left to Roots | step 5; Roots developer's view on the look | 25–45 · 10–15 · **the bar part built 2026-11-06** (branch `fo-6-step6`): a skin over the stock buttons, off on Roots by default; decisions 128–131, "Step 6: the bar as a skin" below; the info panel, the minimap, the floating mode and several weapons of one `classLabel` are not done |
 | 7 | *Optional, when asked*: **the menus**: the host's design space taken from the profile's shell (1200x900, not a fixed 800x600), the generic mirror first, specs after; the nine screens that open through FleetOpsHook's import stay Roots' (decision 68). **Stopped after the offline survey 2026-11-06** (branch `fo-6-step7`): the main menu is not a dialog on Roots, so the host cannot reach it; nothing built, nothing benched; decision 140, "Step 7: why the menus stay Roots'" below | step 3 | 2 (survey) · 0 |
 | 8 | **Scenarios**: `fo-ui-loading` (a load with `[Loading] Hold`), `fo-ui-mission` (UI frames logged, a click on a panel of ours not reaching the engine), `fo-ui-refit` (a row toggled in the mission modal and kept after a relaunch: the Acceptance row, moved from Options for now), `fo-ui-standdown` (every UI part at 0: Roots as with Display8 and render3d alone, pixel-exact), one `fo-ui-<panel>` per panel of step 4; the stock set unchanged (`ui-runtime`, `ui-hud-bar`, `ui-whole-game` at 1280x720, `--install .`) | step 2 onward | 4–6 · 3 |
 
@@ -579,6 +579,53 @@ bar's buttons hovered and pressed, no panel of ours drawn.
   decision 95, never the panel switch's mouse skip for the palette; its first bench draws the skin and
   confirms the ring and the tooltip stay.
 
+
+### Step 6: the bar as a skin (2026-11-06)
+
+Branch `fo-6-step6`, on `origin/fo-b`. With `[HUD] Bar=1` on a build whose bar is behind a pointer
+(`palette_slots_indirect`), `ui/src/hud/barskin.rs` draws each shown button of the stock bar in the
+theme (`widgets/theme.rs`) over its own rectangle: the palette's origin (its rectangle's top left, in
+canvas units, scaled per axis) plus the button's local rectangle, buttons walked in slot order, a
+two-pixel gap inside each 88-unit cell. The icon is found as on stock: the HUD's sprite database by
+the command's or weapon's `ButtonName`, drawn as the UI's flat icon where it has one for the name
+and otherwise the game's own art, read from the player's install at run time (the build list's
+building icons, the weapon and trade icons); a button with no sprite shows its name without Roots'
+`npc_` or `all_`. A button's look follows the engine's own bytes: hover (`+0x38`), pressed (`+0x30`),
+disabled and active (`+0x34`). Nothing is claimed (no `interact`, no panel behind the row) and nothing
+is pressed: the stock bar owns the pointer, so the click, the rollover and the tooltip are the
+engine's. `engine::hud::set_bar_skin` makes `RenderAll`'s drawing of the palette skip (the panel
+switch's `taken`) while `RefreshOwner`'s mouse call is left alone for it (`cursor_over`); the stock
+bar's path (21 inline buttons, the 5x3 plan, QOL's keys) is not touched (`palette::slots_indirect`
+chooses). `bar::shows` is false for a skin, so the bottom row's room is not taken.
+
+- **Decision 94's open check: the ring and the tooltip survive.** Interactive bench (Roots, 1280x960,
+  Vulkan with validation, Federation, `HUD.Bar=1`): with the construction ship selected, the pointer
+  on the Tractor Beam button (slot 7) gives the red range circle on the map (radius 400, centred on
+  the ship) and Roots' tooltip beside the pointer ("Tractor Beam (Hotkey: B), 400 Range, Locks on to a
+  friendly or neutral target..."), the skin's button drawn lit. On the Repair button the circle is gone and
+  its tooltip shows. A click on Build opens the build list (11 buttons: nine buildings with Roots'
+  own icons, the unaffordable ones dimmed, cancel, back), and a click on back returns to the eight
+  commands (`bar: measure menu=0` again in the log). The hover line in `UI.log` follows each move
+  (`hover slot 7 Weapon npc_tractorbeam ... pointer owner: the bar`).
+- **What the skin looks like.** Round lavender buttons of the Federation theme in one row, 70 px
+  apart at 1280x960 (one per shown button, so the row's length is the selection's: six for an escort,
+  eight for a construction ship, ten for a Starbase, eleven in a build list), over the stock
+  buttons' rectangles, above the info strip and beside the minimap where Roots puts them.
+- **Scenarios.** `fo-ui-bar` (the skin: `bar: ours as a skin`, the layout lines, the Tractor Beam ring and
+  tooltip judged, no ring on Repair, the build list and back by clicks, no VUID, no crash) passed
+  (20261106-171404), as did `fo-ui-bar-off` (the same steps with `HUD.Bar=0`, Roots' own bar; its
+  ring and tooltip checks pass, its last judge step's wording was loosened); stock `ui-hud-bar` at 1280x720 with `--install .`
+  passed (20261106-171734, its 5x3 grid, QOL's keys and labels, the placement footprint unchanged).
+  The agent selects the construction ship (a box, never a click) because the fleet's ships change
+  places, and ends with a step that puts the pointer where the bench believes it is: a pointer moved
+  by another process parted the bench's aim in both the skin's and the A side's runs (the
+  cursor drawn about 100 px off, then Roots' edge scroll); every later hover and click starts from
+  the same point above the bar.
+- **What it cannot do.** It does not move or re-flow the row (decision 95's re-laid-out bar would lose
+  the ring: the skin never lays out), so the Refit row for the bar changes the look only.
+- **Not measured**: a ship with several weapons of one `classLabel` (a button each, each its own hover),
+  the floating mode, a list over 14 buttons (the skin reads rectangles, so it would follow the engine
+  wherever it wraps, but it was not seen), the info panel and the minimap (still Roots').
 
 ### Step 4: what the bench showed (2026-11-06)
 
@@ -724,6 +771,10 @@ it. What was weighed (detail in the private notes):
 | 125 | **Roots' defaults** (`ui/defaults/fo-roots.ini`): `HUD.Enable=1` with `Resources`, `Buttons`, `Pause`, `Chat`, `Selection`, `FrameRate` and `Overview` on; the info panel, bar, minimap, messages, objectives, replay, overlay text, fade, team texts, tooltips, comm and the rest off | each is on only with a passing Roots scenario (`fo-ui-<panel>`); the others have no trigger in a skirmish or are decisions 65 and 66 | a scenario for each of the rest |
 | 126 | **The UI plays no button sound on Roots**: a profile value `panels_sound_ours` (1 on stock, 0 on Roots) gates `panels.sound`, and the HUD no longer requires it | every audio call site is FleetOpsHook's FMOD (`operator new` and the constructor re-pointed at each site), its object size unknown; a stock-size object under its vtable could corrupt the heap, so it was not played | the size and constructor measured, or the Roots developer's word |
 | 127 | **The selection overlay is ours on Roots**, replacing FleetOpsHook's `SelectionDisplay` callbacks while it is on (its group colours and tooltips are not drawn) | a passing scenario with Roots' unit tooltip, bar and info strip unchanged; the group colours were not seen in a skirmish | a Roots game showing a loss, then `HUD.Selection=0` |
+| 128 | **The bar of ours on Roots is a skin** (`HUD.Bar=1`): the stock buttons drawn in the theme over their own rectangles (the palette's origin plus each local rectangle), hover and pressed read from the buttons' own bytes (`+0x38`, `+0x30`), the stock bar left to simulate, own the pointer, show its tooltip and press; the panel switch skips `RenderAll`'s drawing of the palette only (`set_bar_skin`: `RefreshOwner`'s mouse call still reaches it) | decision 94; the ring and the tooltip are the engine's and stay | a Roots build that draws the ring from the palette's `Render` |
+| 129 | **Roots' default stays `HUD.Bar=0`** (`ui/defaults/fo-roots.ini`, `BarLabels=0`, QOL's `BarKeys` off, decision 103); the player turns the bar on in the Refit screen to judge the look. The skin takes no room in the bottom row (`bar::shows` is false), draws nothing while the palette or the HUD is hidden, and is not drawn without the UI's device (the stock bar draws then) | the look is the Roots developer's and the user's call (decision 60); a skin cannot lose the gameplay feedback, but the user asked to judge it first | the user's sign-off, then the default line goes |
+| 130 | **Decision 94's open check is closed**: the Tractor Beam ring and tooltip show with the skin drawn; the build list and its back button work through the stock bar's own click | `fo-ui-bar` and the interactive run above | Roots changing its ring condition |
+| 131 | **The skin reads icons from the player's install at run time and copies nothing**: the sprite database's art by name, the UI's own flat icon where it has one, a weapon's name without its `npc_`/`all_` prefix where neither exists; no Roots icon is in the repository or converted | decision 60 and hard rule 8 | a Roots weapon with no sprite of its own and a wanted look |
 | 140 | **The front end stays Roots' on Roots**: `[Menus] Enable`, `Credits`, `Scene` and `CampaignLocks` stay 0 in `ui/defaults/fo-roots.ini`; no dialog host, mirror or spec on Roots, no host design space from the profile's shell size, and nothing of `FleetOpsHook.dll` hooked, in user32 or in its memory. Decision 68 widened from nine screens to the whole shell | step 7's survey: the main menu, Options (the in-mission menu too) and six more screens are FleetOpsHook's Delphi forms and never run the stock dialog; nine more run behind its own import and dialog procedure; only Sound Settings passes the host | the Roots developer offering a way for the shell's screens to run as the executable's dialogs (decision 1), or a Roots update that does it |
 
 ### Risks and unknowns

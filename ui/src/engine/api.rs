@@ -83,7 +83,7 @@ pub mod dialogs {
 pub mod hud {
     pub use crate::engine::hud::{
         component_named, components, cursor_owner, flag_hidden, INFO_PANEL_TAKEN, functions_stock, hidden, in_view, install, installed, is_taken, log_components, log_render_lists,
-        map_radar, name, palette_ptr, panel_rect, set_pointer_over_ui, set_taken, ship_display, take_tooltips, tooltip,
+        map_radar, name, palette_ptr, panel_origin, panel_rect, set_bar_skin, set_pointer_over_ui, set_taken, ship_display, take_tooltips, tooltip,
         video_playing,
     };
 }
@@ -133,7 +133,7 @@ pub mod overlay_text {
 
 pub mod palette {
     pub use crate::engine::palette::{
-        describe, menu, mode, palette, press, readable, slot, sprite, state, tooltip, valid, n_slots, Desc, Kind,
+        describe, hovered, local_rect, menu, mode, own_sprite, palette, press, pressed, slots_indirect, readable, slot, sprite, state, tooltip, valid, n_slots, Desc, Kind,
     };
 }
 
