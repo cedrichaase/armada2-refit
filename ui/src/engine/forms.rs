@@ -65,6 +65,7 @@ unsafe extern "system" {
     fn EnumPropsExA(w: HWND, f: unsafe extern "system" fn(HWND, *const u8, HANDLE, usize) -> i32, lp: usize) -> i32;
     fn WindowFromPoint(p: Point) -> HWND;
     fn GetCursorInfo(ci: *mut CursorInfo) -> i32;
+    fn SetLayeredWindowAttributes(w: HWND, key: u32, alpha: u8, flags: u32) -> i32;
 }
 
 #[link(name = "gdi32")]
@@ -206,9 +207,6 @@ fn activated(h: HWND) {
     if !is_form_class(&class) && !dialog {
         return;
     }
-    if forms().iter().any(|f| f.hwnd == h) {
-        return;
-    }
     let visits = unsafe { &mut *core::ptr::addr_of_mut!(VISITS) };
     let visit = match visits.iter_mut().find(|v| v.0 == class) {
         Some(v) => {
@@ -220,6 +218,15 @@ fn activated(h: HWND) {
             1
         }
     };
+    // A form active again (the one under a screen that closed) starts its walk anew.
+    if let Some(f) = forms().iter_mut().find(|f| f.hwnd == h) {
+        f.visit = visit;
+        f.opened = crate::rt::now();
+        f.pressed = 0;
+        f.printed = false;
+        f.emptied = false;
+        return;
+    }
     forms().push(Form { hwnd: h, class, opened: crate::rt::now(), obj: 0, emptied: false, printed: false, pressed: 0, combo: 0, visit });
     unsafe {
         if TIMER == 0 {
@@ -454,11 +461,14 @@ unsafe extern "system" fn tick(_h: HWND, _m: u32, _id: usize, _t: u32) {
     let age = now - f.opened;
     if !f.emptied {
         f.emptied = true;
-        let r = unsafe { SetWindowRgn(f.hwnd, CreateRectRgn(0, 0, 0, 0), 1) };
+        let how = hide(f.hwnd, &f.class, f.visit, c.right, c.bottom);
         log_controls(f, &ctl);
-        crate::log!("forms: {} client {}x{}: empty region set ({}), active {:p}, focus {:p}", f.class, c.right, c.bottom, r,
+        crate::log!("forms: {} client {}x{}: hidden by {}, active {:p}, focus {:p}", f.class, c.right, c.bottom, how,
             unsafe { GetActiveWindow() }, unsafe { GetFocus() });
     }
+    keep_off(f.hwnd);
+    // Q8: with the form hidden nothing sets the pointer's shape: the pump does.
+    unsafe { SetCursor(LoadCursorA(core::ptr::null_mut(), 32512)) };
     if !f.printed && age > 3.0 {
         f.printed = true;
         print(f.hwnd, &f.class, c.right, c.bottom);
@@ -477,6 +487,51 @@ unsafe extern "system" fn tick(_h: HWND, _m: u32, _id: usize, _t: u32) {
     }
     script(f, &ctl, age);
     frame();
+}
+
+const GWL_EXSTYLE: i32 = -20;
+const WS_EX_LAYERED: isize = 0x80000;
+const LWA_ALPHA: u32 = 2;
+/// Off screen: far to the left and above of every output.
+const OFF: i32 = -20000;
+static mut OFFSCREEN: Vec<usize> = Vec::new();
+
+/// Q1 and its fallbacks, one per screen on the walk so one bench pass answers each: the
+/// main menu's first visit an empty region and a nearly transparent layered window (the first
+/// pass tried the region alone on every screen), every other screen moved off screen (and its region
+/// emptied, so nothing of it can show on the way).
+fn hide(h: HWND, class: &str, visit: u32, w: i32, ht: i32) -> &'static str {
+    let rgn = unsafe { SetWindowRgn(h, CreateRectRgn(0, 0, 0, 0), 1) } != 0;
+    match (class, visit) {
+        ("TMainForm", 1) => unsafe {
+            let ex = GetWindowLongA(h, GWL_EXSTYLE);
+            SetWindowLongA(h, GWL_EXSTYLE, ex | WS_EX_LAYERED);
+            let ok = SetLayeredWindowAttributes(h, 0, 1, LWA_ALPHA) != 0;
+            if ok && rgn { "an empty region and a layered window at alpha 1" } else { "an empty region and a layered window (one of them refused)" }
+        },
+        _ => {
+            let _ = (w, ht);
+            unsafe {
+                SetWindowPos(h, core::ptr::null_mut(), OFF, OFF, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+                (*core::ptr::addr_of_mut!(OFFSCREEN)).push(h as usize);
+            }
+            "a move off screen (and an empty region)"
+        }
+    }
+}
+
+/// A form moved off screen stays there: FleetOpsHook re-places its screens when the device
+/// window moves.
+fn keep_off(h: HWND) {
+    if !unsafe { (*core::ptr::addr_of!(OFFSCREEN)).contains(&(h as usize)) } {
+        return;
+    }
+    let mut r = WinRect::default();
+    unsafe { GetWindowRect(h, &mut r) };
+    if r.left != OFF || r.top != OFF {
+        crate::log!("forms: {:p} was moved back to {},{}: off screen again", h, r.left, r.top);
+        unsafe { SetWindowPos(h, core::ptr::null_mut(), OFF, OFF, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE) };
+    }
 }
 
 fn diag(form: HWND, class: &str) {
@@ -528,7 +583,7 @@ fn script(f: &mut Form, v: &[Control], age: f64) {
         combo_probe(f.hwnd, v);
     }
     let Some(t) = target else { return };
-    if f.pressed == 0 && age > 12.0 {
+    if f.pressed == 0 && age > if f.class == "TMainForm" && f.visit == 1 { 25.0 } else { 12.0 } {
         f.pressed = 1;
         match find(v, t) {
             Some(c) if c.visible => {
@@ -556,6 +611,10 @@ fn combo_probe(form: HWND, v: &[Control]) {
         let moved = if r0 == 0 { 1 } else { 0 };
         SendMessageA(rh, CB_SETCURSEL, moved, 0);
         let r1 = SendMessageA(rh, CB_GETCURSEL, 0, 0);
+        // Probe only: a counting subclass on the resolution combo for the length of the
+        // notification (the device combo's handler refills that list).
+        COMBO_SEEN = 0;
+        COMBO_PREV = SetWindowLongA(rh, GWL_WNDPROC, combo_count as unsafe extern "system" fn(HWND, u32, usize, isize) -> isize as usize as isize);
         let d0 = SendMessageA(dh, CB_GETCURSEL, 0, 0);
         SendMessageA(dh, CB_SETCURSEL, d0.max(0) as usize, 0);
         let id = GetDlgCtrlID(dh) as usize;
@@ -563,11 +622,25 @@ fn combo_probe(form: HWND, v: &[Control]) {
         SendMessageA(parent, WM_COMMAND, (CBN_SELCHANGE << 16) | (id & 0xffff), dh as isize);
         let r2 = SendMessageA(rh, CB_GETCURSEL, 0, 0);
         let rn2 = SendMessageA(rh, CB_GETCOUNT, 0, 0);
+        let seen = COMBO_SEEN;
+        SetWindowLongA(rh, GWL_WNDPROC, COMBO_PREV);
         crate::log!(
-            "forms: combo probe on {:p}: resolutions {} of {}, moved quietly to {}, device {} re-selected with CBN_SELCHANGE to {:p}: resolutions {} of {} -> the change handler {}",
-            form, r0, rn, r1, d0, parent, r2, rn2, if r2 != r1 { "ran" } else { "did not run (or left the selection)" }
+            "forms: combo probe on {:p}: resolutions {} of {}, moved quietly to {}, device {} re-selected with CBN_SELCHANGE to {:p}: resolutions {} of {}, {} list messages to it meanwhile -> the change handler {}",
+            form, r0, rn, r1, d0, parent, r2, rn2, seen,
+            if r2 != r1 || seen > 0 { "ran" } else { "did not run" }
         );
     }
+}
+
+static mut COMBO_PREV: isize = 0;
+static mut COMBO_SEEN: u32 = 0;
+
+unsafe extern "system" fn combo_count(h: HWND, m: u32, wp: usize, lp: isize) -> isize {
+    // CB_RESETCONTENT, CB_ADDSTRING, CB_INSERTSTRING, CB_SETCURSEL
+    if matches!(m, 0x14b | 0x143 | 0x14a | 0x14e) {
+        unsafe { COMBO_SEEN += 1 };
+    }
+    unsafe { CallWindowProcA(COMBO_PREV, h, m, wp, lp) }
 }
 
 /// Q6: the form printed into a memory DC, whatever its region; written as a BMP beside
@@ -606,7 +679,8 @@ fn print(h: HWND, class: &str, w: i32, ht: i32) {
         v.extend_from_slice(&32u16.to_le_bytes());
         v.extend_from_slice(&[0u8; 24]);
         v.extend_from_slice(core::slice::from_raw_parts(bits as *const u8, n * 4));
-        crate::rt::write_file(&crate::rt::game_path(&crate::sfmt!("UI-form-{}.bmp", class)), &v);
+        let dir = crate::rt::log_dir().unwrap_or_else(|| crate::rt::game_path(""));
+        crate::rt::write_file(&crate::sfmt!("{}\\UI-form-{}.bmp", dir, class), &v);
         SelectObject(dc, old);
         DeleteObject(bmp);
         DeleteDC(dc);

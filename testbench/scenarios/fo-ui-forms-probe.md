@@ -20,7 +20,7 @@ the screen so the log says which window has it.
 
 1. Launch the game.
 2. Wait up to 180 seconds for "UI.log" to say "TMainForm client".
-3. Wait 4 seconds.
+3. Wait 2 seconds.
 4. Move the mouse to 640,480.
 5. Wait 3 seconds.
 6. Take a screenshot called "main".

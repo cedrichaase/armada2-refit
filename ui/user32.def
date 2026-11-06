@@ -67,3 +67,4 @@ SetWindowRgn@12
 EnumPropsExA@12
 WindowFromPoint@8
 GetCursorInfo@4
+SetLayeredWindowAttributes@16
