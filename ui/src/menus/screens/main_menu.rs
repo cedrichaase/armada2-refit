@@ -116,7 +116,7 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
 fn version(ui: &mut Ui, s: &Screen, at: Option<R>) {
     let t = ui.theme;
     for c in s.model.controls.iter() {
-        if matches!(c.what, crate::menus::model::What::Shell(crate::engine::shellui::Kind::Label)) && c.visible && !c.text.is_empty() {
+        if matches!(c.what, crate::menus::model::What::Shell(crate::engine::api::shellui::Kind::Label)) && c.visible && !c.text.is_empty() {
             let r = at.unwrap_or_else(|| s.fit.rect(c.rect));
             ui.text_in(r, &c.text, t.small_size, Align::Right, t.text_dim, Weight::Regular);
         }
@@ -141,7 +141,7 @@ fn hover_changed(s: &Screen, hover: i32) {
             // plays the buttons' own.
             if hover >= 0 && s.model.button_at(x, y).is_none() {
                 let like = ENTRIES.iter().find_map(|e| s.model.button_at(e.1, e.2)).map(|c| c.key);
-                crate::engine::sound::shell_hover(like);
+                crate::engine::api::sound::shell_hover(like);
             }
         }
     }

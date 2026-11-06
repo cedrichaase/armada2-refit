@@ -139,9 +139,22 @@ fn refuses_what_is_not_a_pe() {
 fn the_log_line() {
     let id = identify(&image(0x3c4c76bd, 0x3fa000, &stock_like(), 0x10b)).unwrap();
     assert_eq!(
-        format!("engine: {id}"),
+        format!("engine: {} {id}", "Armada2.exe"),
         "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa6b2c1cf"
     );
+}
+
+#[test]
+fn identity_lines_of_any_executable() {
+    use a2engine::is_identity_line;
+    assert!(is_identity_line("engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa6b2c1cf"));
+    assert!(is_identity_line("engine: ArmadaL.exe timestamp 0x3c4c76bd, image size 0x3fb000, sections 0x00000001"));
+    assert!(is_identity_line("engine: Armada2.exe identity unreadable"));
+    assert!(!is_identity_line("engine: build armada2/gog-1.1"));
+    assert!(!is_identity_line("engine: unknown build"));
+    assert!(!is_identity_line("engine: symbols: 3/3 resolved; 0 hooks blocked"));
+    assert!(!is_identity_line("engine: TEST: A2EngineTest.ini forces a mismatch for x"));
+    assert!(!is_identity_line("engine: ui.hud stands down: X is not stock (bytes differ)"));
 }
 
 #[test]

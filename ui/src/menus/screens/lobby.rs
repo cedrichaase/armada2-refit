@@ -16,7 +16,7 @@
 //! controls the connection type hides; false (the generic screen draws) when there is
 //! no chat line or no button along the bottom. Every action is the stock click.
 use super::setup_kit as kit;
-use crate::engine::shellui::Kind;
+use crate::engine::api::shellui::Kind;
 use crate::gfx::{Weight, R};
 use crate::menus::model::{Control, What};
 use crate::menus::Screen;

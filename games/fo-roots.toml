@@ -1,0 +1,66 @@
+# Star Trek: Armada II -- Fleet Operations: Roots, installed through Heroic
+# (PLAN-FLEETOPS.md). Not offered: ./install refuses it, and no layer is installed into
+# Roots yet. FO-1 filled in what the bench measured of the shipped game (the install,
+# Heroic's entry and prefix, Settings.xml, its logs); `./a2test --game fo-roots` runs it.
+schema = 1
+id = "fo-roots"
+label = "Fleet Operations: Roots"
+offered = false
+default = false
+
+# The layers on offer: none yet. PLAN-FLEETOPS.md, "What runs on Roots", says which come
+# first; the bench installs nothing into a game with none (its clone is the game as shipped).
+layers = []
+
+[exe]
+# The game itself in Data/, under a launcher (FleetOps.exe) that only starts it; the
+# bench launches ArmadaL.exe directly.
+names = ["ArmadaL.exe"]
+data_dir = "Data"
+
+[install]
+# A sideloaded Heroic app (GamesConfig/fleetopsroots50.json; Proton-CachyOS, WINEDLLOVERRIDES
+# winmm=n,b;d3d8=n,b;d3d9=n,b, PROTON_USE_WOW64=1); no GOG id.
+heroic = ["fleetopsroots50"]
+gog = []
+# Both folders are named so under ~/Games/Heroic and ~/Games/Heroic/Prefixes (seen on the
+# install FO-0 ran; set A2_GAME / A2_PREFIX if yours differ).
+folder = "Star Trek Armada II Fleet Operations Roots"
+prefix = "Star Trek Armada II Fleet Operations Roots"
+
+[settings]
+kind = "fo-settings-xml"
+# Relative to data_dir: Data/settings_saves_logs/Settings.xml, written by the game's first
+# run (displayWidth, displayHeight, WindowMode, multisample, IntroVideo, ...; 0 x 0 is the
+# desktop's mode). The bench's adapter edits those keys in its clone.
+file = "settings_saves_logs/Settings.xml"
+keep = ["settings_saves_logs/Settings.xml", "RTS_CFG.h"]
+
+[logs]
+# Roots writes no log of its own beyond its crash handler (madExcept 4): a crash leaves
+# settings_saves_logs/Logs/exceptArmada2.txt, written with a dialog the process stays under.
+crash = "settings_saves_logs/Logs/exceptArmada2.txt"
+dirs = ["settings_saves_logs/Logs"]
+
+[display]
+# The engine asks for this mode and the output must offer it: on a 1280x720 headless
+# output Roots dies one second in (null display mode in SetActiveDisplay_Internal), so the
+# bench refuses a smaller output. 1280x960 is the cheapest 4:3 bench size above it.
+shell = [1200, 900]
+# Stock's until FO-6 measures Roots' own HUD.
+hud_canvas = [1600, 1200]
+
+[files]
+# PLAN-FLEETOPS.md, "The install": the textures sit in Textures/ itself (no RGB/),
+# TGA and DDS mixed, and the ODFs are packed in ODF.fpq (odf/ is empty, but a loose file
+# there would still win). SOD/, Sprites/ and odf/ are assumed stock's until FO-0 sees them.
+textures = ["Textures"]
+texture_formats = ["tga", "dds"]
+sod = ["SOD"]
+sprites = ["Sprites"]
+odf = ["odf"]
+archives = [{ kind = "fpq", file = "ODF.fpq", at = "odf" }]
+
+[paths]
+# $A2_DATA stays shared between the games (PLAN-ARMADA1.md).
+stem = "armada2-refit"

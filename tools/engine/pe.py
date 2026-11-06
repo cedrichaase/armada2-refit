@@ -17,8 +17,11 @@ class Exe:
     """An executable file, read as the loader would map it at `base` (default: its own
     ImageBase). None of it is written."""
 
-    def __init__(self, data, base=None):
+    def __init__(self, data, base=None, name=None):
         self.data = data
+        # The module's file name, as the process would report it (resolve.py uses it for
+        # the identity line on an unknown build); None for a buffer.
+        self.name = name
         if data[:2] != b'MZ':
             raise ValueError('not an MZ image')
         nt = struct.unpack_from('<I', data, 0x3c)[0]
@@ -60,8 +63,10 @@ class Exe:
     def identity(self):
         return (self.timestamp, self.image_size, self.fingerprint)
 
-    def line(self):
-        return (f'engine: Armada2.exe timestamp 0x{self.timestamp:08x}, image size '
+    def line(self, exe=None):
+        """`engine: <exe> timestamp ..`, the identity line: `exe` is the matched build's
+        executable (build.toml `exe`), else the module's own name, else `exe`."""
+        return (f'engine: {exe or self.name or "exe"} timestamp 0x{self.timestamp:08x}, image size '
                 f'0x{self.image_size:x}, sections 0x{self.fingerprint:08x}')
 
     def read(self, va, n):

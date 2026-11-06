@@ -51,17 +51,21 @@ pub mod hook {
 }
 
 pub mod field {
-    pub const CORE_STORM3D_DEVICE_INDEX: usize = 0xc0;
-    pub const CORE_STORM3D_DEVICES: usize = 0xcc;
-    pub const CORE_DX8_D3D8_DEVICE: usize = 0x90;
-    pub const CORE_DX8_TRIFAN: usize = 0xe4;
-    pub const CORE_DX8_CURSOR: usize = 0x60;
-    pub const CORE_DX8_SYNCHRONOUS: usize = 0xe0;
-    pub const CORE_ELEMENT_NAME: usize = 0x8;
-    pub const CORE_SPRITE_ORIGIN_X: usize = 0x30;
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn CORE_STORM3D_DEVICE_INDEX() -> usize { super::TABLE.engine().field(a2engine::Sym(1)) }
+    #[inline(always)] pub fn CORE_STORM3D_DEVICES() -> usize { super::TABLE.engine().field(a2engine::Sym(2)) }
+    #[inline(always)] pub fn CORE_DX8_D3D8_DEVICE() -> usize { super::TABLE.engine().field(a2engine::Sym(3)) }
+    #[inline(always)] pub fn CORE_DX8_TRIFAN() -> usize { super::TABLE.engine().field(a2engine::Sym(7)) }
+    #[inline(always)] pub fn CORE_DX8_CURSOR() -> usize { super::TABLE.engine().field(a2engine::Sym(12)) }
+    #[inline(always)] pub fn CORE_DX8_SYNCHRONOUS() -> usize { super::TABLE.engine().field(a2engine::Sym(13)) }
+    #[inline(always)] pub fn CORE_ELEMENT_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(14)) }
+    #[inline(always)] pub fn CORE_SPRITE_ORIGIN_X() -> usize { super::TABLE.engine().field(a2engine::Sym(18)) }
+    #[inline(always)] pub fn CORE_SPRITE_UV() -> usize { super::TABLE.engine().field(a2engine::Sym(38)) }
+    #[inline(always)] pub fn CORE_SPRITE_TEXTURE() -> usize { super::TABLE.engine().field(a2engine::Sym(39)) }
 }
 
 pub mod value {
+    #![allow(non_snake_case)]
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
@@ -103,10 +107,12 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "core_imp_ss_dtor", symbol: "__imp_basic_stringstream::_D", kind: a2engine::Kind::Global },
     a2engine::SymDef { id: "core_imp_str_dtor", symbol: "__imp_basic_string::~basic_string", kind: a2engine::Kind::Global },
     a2engine::SymDef { id: "core_sim_time", symbol: "Get_Time", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "core_sprite_uv", symbol: "ST3D_Sprite::texture rectangle", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "core_sprite_texture", symbol: "ST3D_Sprite::texture", kind: a2engine::Kind::Field },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
-    a2engine::HookDef { id: "ui.core.storm3d", run_unknown: false, rows: &[], syms: &[0, 1, 2, 3] },
+    a2engine::HookDef { id: "ui.core.storm3d", run_unknown: false, rows: &[], syms: &[0, 1, 2, 3, 38, 39] },
     a2engine::HookDef { id: "ui.core.mission", run_unknown: false, rows: &[], syms: &[2, 4, 5, 6, 7] },
     a2engine::HookDef { id: "ui.core.cursor", run_unknown: false, rows: &["UI.Cursor"], syms: &[2, 9, 10, 11, 12, 13, 14] },
     a2engine::HookDef { id: "ui.core.cursor_probe", run_unknown: false, rows: &["UI.Cursor"], syms: &[15, 16, 17, 18] },
@@ -125,11 +131,12 @@ pub const BUILDS: &[a2engine::Build] = &[
     a2engine::Build {
         name: "gog-1.1",
         key: "armada2/gog-1.1",
+        exe: "Armada2.exe",
         timestamp: 0x3c4c76bd,
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 38,
+        n_resolved: 40,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x7ad508, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_storm3d
@@ -170,15 +177,74 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x7b7ea8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_imp_ss_dtor
             a2engine::Entry { present: true, addr: 0x7b7dc0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_imp_str_dtor
             a2engine::Entry { present: true, addr: 0x7b0fc8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_sim_time
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // core_sprite_uv
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 88 }, // core_sprite_texture
         ],
         blocked: &[
+        ],
+    },
+    a2engine::Build {
+        name: "fo-roots-5.0Z11",
+        key: "armada2/fo-roots-5.0Z11",
+        exe: "ArmadaL.exe",
+        timestamp: 0x3c4c76bd,
+        image_size: 0x405000,
+        sections: 0xca07c55a,
+        image_base: 0x400000,
+        n_resolved: 35,
+        content: "stock",
+        entries: &[
+            a2engine::Entry { present: true, addr: 0x7ad508, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_storm3d
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 192 }, // core_storm3d_device_index
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 204 }, // core_storm3d_devices
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 144 }, // core_dx8_d3d8_device
+            a2engine::Entry { present: true, addr: 0x51d3c0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_chat_render
+            a2engine::Entry { present: true, addr: 0x598a16, end: 0x0, target: 0x4, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_site_chat
+            a2engine::Entry { present: true, addr: 0x621a90, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_trifan_flush
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 228 }, // core_dx8_trifan
+            a2engine::Entry { present: true, addr: 0x76397e, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_ship_display_hidden
+            a2engine::Entry { present: true, addr: 0x6bc6ac, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_dx8_vtable
+            a2engine::Entry { present: true, addr: 0x624630, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_refresh_display
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xa, vtable: 0x9, index: 26, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_slot_refresh
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 96 }, // core_dx8_cursor
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 224 }, // core_dx8_synchronous
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // core_element_name
+            a2engine::Entry { present: true, addr: 0x63ada0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_draw_scaled_2d
+            a2engine::Entry { present: true, addr: 0x6246fa, end: 0x0, target: 0xf, vtable: 0xffff, index: 0, chain: true, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_site_cursor_draw
+            a2engine::Entry { present: true, addr: 0x7ad6e8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_scale_2d
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 48 }, // core_sprite_origin_x
+            a2engine::Entry { present: true, addr: 0x625dd9, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xd8, 0x4e, 0x18], mask: &[], section: "", count: 0, value: 0 }, // core_site_hw_scale
+            a2engine::Entry { present: true, addr: 0x4638af, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xff, 0x15, 0xa0, 0x82, 0x7b, 0x00], mask: &[], section: "", count: 0, value: 0 }, // core_bink_copy_site
+            a2engine::Entry { present: true, addr: 0x7b82a0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_bink_copy_import
+            a2engine::Entry { present: true, addr: 0x4dd670, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_process_keys
+            a2engine::Entry { present: true, addr: 0x488869, end: 0x0, target: 0x16, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_site_keys
+            a2engine::Entry { present: true, addr: 0x4dd709, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xff, 0x15, 0xd4, 0x81, 0x7b, 0x00], mask: &[], section: "", count: 0, value: 0 }, // core_site_keys_peek
+            a2engine::Entry { present: true, addr: 0x4de250, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_process_mouse
+            a2engine::Entry { present: true, addr: 0x488952, end: 0x0, target: 0x19, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_site_mouse
+            a2engine::Entry { present: true, addr: 0x4de260, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x1d, 0xd4, 0x81, 0x7b, 0x00], mask: &[], section: "", count: 0, value: 0 }, // core_site_mouse_peek
+            a2engine::Entry { present: true, addr: 0x62bc70, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_get_window_handle
+            a2engine::Entry { present: true, addr: 0x624760, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_destroy_render_surfaces
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x1d, vtable: 0x9, index: 28, chain: true, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_slot_destroy
+            a2engine::Entry { present: true, addr: 0x763308, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_mouse_buttons
+            a2engine::Entry { present: true, addr: 0x763350, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_mouse_held
+            a2engine::Entry { present: true, addr: 0x7b7c58, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_imp_ss_ctor
+            a2engine::Entry { present: true, addr: 0x7b7db0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_imp_ss_str
+            a2engine::Entry { present: true, addr: 0x7b7ea8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_imp_ss_dtor
+            a2engine::Entry { present: true, addr: 0x7b7dc0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_imp_str_dtor
+            a2engine::Entry { present: true, addr: 0x7b0fc8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_sim_time
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // core_sprite_uv
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 88 }, // core_sprite_texture
+        ],
+        blocked: &[
+            a2engine::Block { hook: 1, symbol: "ChatDisplay::Render", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ChatDisplay::Render is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 4, symbol: "ST3D_DeviceDirectX8::SetCursor", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ST3D_DeviceDirectX8::SetCursor is changed by fo-roots-5.0Z11, not yet verified" },
         ],
     },
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 13] = [const { core::sync::atomic::AtomicU64::new(0) }; 13];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 38] = [const { core::sync::atomic::AtomicU8::new(0) }; 38];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 38] = [const { core::sync::atomic::AtomicUsize::new(0) }; 38];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 40] = [const { core::sync::atomic::AtomicU8::new(0) }; 40];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 40] = [const { core::sync::atomic::AtomicUsize::new(0) }; 40];
 static NOTES: [a2engine::Note; 13] = [const { a2engine::Note::new() }; 13];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 

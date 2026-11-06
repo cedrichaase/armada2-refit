@@ -30,7 +30,7 @@ pub extern "C" fn claims() -> u32 {
     // The menu host hosts the shell's dialogs at the screen's size (`[Menus] Enable=1`):
     // Display8 raises the shell's 800x600 request for it. Not a
     // draw, so it holds whether or not the UI can draw.
-    let menus = if crate::engine::dialogs::ready() { CLAIM_MENUS } else { 0 };
+    let menus = if crate::engine::api::dialogs::ready() { CLAIM_MENUS } else { 0 };
     if !crate::gfx::drawing() {
         return menus;
     }
@@ -42,13 +42,13 @@ pub extern "C" fn claims() -> u32 {
     if crate::hud::selection_ours() && !cfg.hud.selection_bubbles {
         c |= CLAIM_SELECTION;
     }
-    if crate::engine::loading::own() {
+    if crate::engine::api::loading::own() {
         c |= CLAIM_LOADING;
     }
-    if crate::engine::shell::credits_ours() {
+    if crate::engine::api::shell::credits_ours() {
         c |= CLAIM_CREDITS;
     }
-    if crate::engine::cursor::hiding() {
+    if crate::engine::api::cursor::hiding() {
         c |= CLAIM_CURSOR;
     }
     c

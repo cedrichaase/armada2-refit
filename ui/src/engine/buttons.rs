@@ -34,11 +34,12 @@ fn ok(h: a2engine::HookId) -> bool {
 }
 
 /// How much of an `ObjectivesText`'s string is read (the most `SetText` copies).
-const TEXT_MAX: usize = value::PANELS_TEXT_MAX as usize;
+#[inline(always)]
+fn text_max() -> usize { value::PANELS_TEXT_MAX() as usize }
 
 /// The button's state: 0 disabled, 2 active, else normal. 0 for no button.
 pub fn state(b: usize) -> u32 {
-    if b == 0 { 0 } else { unsafe { rd(b + field::PANELS_BTN_STATE) } }
+    if b == 0 { 0 } else { unsafe { rd(b + field::PANELS_BTN_STATE()) } }
 }
 
 pub fn enabled(b: usize) -> bool {
@@ -47,11 +48,11 @@ pub fn enabled(b: usize) -> bool {
 
 /// The button's picture (`ST3D_Sprite *`), and the border drawn over it on hover.
 pub fn sprite(b: usize) -> usize {
-    fld(b, field::PANELS_BTN_SPRITE)
+    fld(b, field::PANELS_BTN_SPRITE())
 }
 
 pub fn border(b: usize) -> usize {
-    fld(b, field::PANELS_BTN_BORDER)
+    fld(b, field::PANELS_BTN_BORDER())
 }
 
 /// The button's label (`SetLabel`), as the game's localised string.
@@ -59,7 +60,7 @@ pub fn label(b: usize) -> String {
     if b == 0 {
         return String::new();
     }
-    let l = clean(&latin1(b + field::PANELS_BTN_LABEL, 64));
+    let l = clean(&latin1(b + field::PANELS_BTN_LABEL(), 64));
     // Some panels give the GUI config's key (`GUI_POP_PAUSE_CONTINUE`) and let the
     // stock label localise it when it draws.
     if l.starts_with("GUI_") {
@@ -74,7 +75,7 @@ pub fn label(b: usize) -> String {
 
 /// The press function (`+0x5c`), to name a button by what it does.
 pub fn press_fn(b: usize) -> usize {
-    fld(b, field::PANELS_BTN_PRESS_FN)
+    fld(b, field::PANELS_BTN_PRESS_FN())
 }
 
 /// The button's tooltip, short or verbose, as the game writes it.
@@ -82,7 +83,7 @@ pub fn tooltip(b: usize, verbose: bool) -> Option<String> {
     if b == 0 || !super::msvc::available() {
         return None;
     }
-    let slot = if verbose { field::PANELS_BTN_VT_VERBOSE } else { field::PANELS_BTN_VT_TOOLTIP };
+    let slot = if verbose { field::PANELS_BTN_VT_VERBOSE() } else { field::PANELS_BTN_VT_TOOLTIP() };
     super::msvc::with_stringstream(|ss| unsafe {
         let f: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(rd::<usize>(rd::<usize>(b) + slot));
         f(b, ss)
@@ -103,7 +104,7 @@ pub fn press(b: usize) -> bool {
     if !ok(hook::PANELS_BUTTONS) {
         return false;
     }
-    let vt_press = unsafe { rd::<usize>(rd::<usize>(b) + field::PANELS_BTN_VT_PRESS) };
+    let vt_press = unsafe { rd::<usize>(rd::<usize>(b) + field::PANELS_BTN_VT_PRESS()) };
     let toggle = if ok(hook::PANELS_TOGGLE_PRESS) { addr(sym::PANELS_TOGGLE_BUTTON_PRESS) } else { 0 };
     if vt_press != addr(sym::PANELS_STANDARD_BUTTON_PRESS) && (toggle == 0 || vt_press != toggle) {
         crate::log!("buttons: {:#x} is not a StandardButton's press, not pressed", vt_press);
@@ -202,12 +203,12 @@ pub fn text(t: usize) -> String {
     if t == 0 {
         return String::new();
     }
-    latin1(t + field::PANELS_TEXT_STRING, TEXT_MAX)
+    latin1(t + field::PANELS_TEXT_STRING(), text_max())
 }
 
 /// An `ObjectivesText`'s colour, 0..1 per channel.
 pub fn text_colour(t: usize) -> [f32; 3] {
-    if t == 0 { [1.0; 3] } else { unsafe { rd(t + field::PANELS_TEXT_COLOUR) } }
+    if t == 0 { [1.0; 3] } else { unsafe { rd(t + field::PANELS_TEXT_COLOUR()) } }
 }
 
 /// The game's strings mark a hotkey's letter with '^' and wrap lines with '\r\n'.

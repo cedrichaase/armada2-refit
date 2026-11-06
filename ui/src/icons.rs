@@ -133,7 +133,7 @@ pub fn theme_colour(theme: &crate::widgets::Theme, ink: Color) -> impl Fn(Role) 
             Role::Warn => theme.warn,
             Role::Bad => theme.bad,
             Role::Accent => theme.accent,
-            Role::Resource(res) => crate::engine::topbar::colour(res),
+            Role::Resource(res) => crate::engine::api::topbar::colour(res),
         };
         let c = if dark { crate::gfx::mix(c, ink | 0xff000000, 0.45) } else { c };
         (c & 0x00ffffff) | (ink & 0xff000000)

@@ -41,13 +41,15 @@ pub mod hook {
 }
 
 pub mod field {
+    #![allow(non_snake_case)]
 }
 
 pub mod value {
-    pub const DIALOGS_FRONT_END_WIDTH: i32 = 800;
-    pub const DIALOGS_FRONT_END_HEIGHT: i32 = 600;
-    pub const DIALOGS_SHELL_CODE_START: i32 = 5898240;
-    pub const DIALOGS_SHELL_CODE_END: i32 = 6356992;
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn DIALOGS_FRONT_END_WIDTH() -> i32 { super::TABLE.engine().value(a2engine::Sym(0)) }
+    #[inline(always)] pub fn DIALOGS_FRONT_END_HEIGHT() -> i32 { super::TABLE.engine().value(a2engine::Sym(1)) }
+    #[inline(always)] pub fn DIALOGS_SHELL_CODE_START() -> i32 { super::TABLE.engine().value(a2engine::Sym(2)) }
+    #[inline(always)] pub fn DIALOGS_SHELL_CODE_END() -> i32 { super::TABLE.engine().value(a2engine::Sym(3)) }
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
@@ -97,6 +99,7 @@ pub const BUILDS: &[a2engine::Build] = &[
     a2engine::Build {
         name: "gog-1.1",
         key: "armada2/gog-1.1",
+        exe: "Armada2.exe",
         timestamp: 0x3c4c76bd,
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
@@ -142,6 +145,58 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x5a2de0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_shell_screen
         ],
         blocked: &[
+        ],
+    },
+    a2engine::Build {
+        name: "fo-roots-5.0Z11",
+        key: "armada2/fo-roots-5.0Z11",
+        exe: "ArmadaL.exe",
+        timestamp: 0x3c4c76bd,
+        image_size: 0x405000,
+        sections: 0xca07c55a,
+        image_base: 0x400000,
+        n_resolved: 0,
+        content: "stock",
+        entries: &[
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 800 }, // dialogs_front_end_width
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 600 }, // dialogs_front_end_height
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 5898240 }, // dialogs_shell_code_start
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 6356992 }, // dialogs_shell_code_end
+            a2engine::Entry { present: true, addr: 0x5d57c0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_main_menu
+            a2engine::Entry { present: true, addr: 0x5dbdc0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_single_player
+            a2engine::Entry { present: true, addr: 0x5d6d80, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_mission_select
+            a2engine::Entry { present: true, addr: 0x5d48c0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_load_game
+            a2engine::Entry { present: true, addr: 0x5d9320, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_save_game
+            a2engine::Entry { present: true, addr: 0x5cddb0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_escape_menu
+            a2engine::Entry { present: true, addr: 0x5cf930, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_game_settings
+            a2engine::Entry { present: true, addr: 0x5d1540, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_graphics_settings
+            a2engine::Entry { present: true, addr: 0x5dce60, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_sound_settings
+            a2engine::Entry { present: true, addr: 0x5c2270, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_game_setup
+            a2engine::Entry { present: true, addr: 0x5ba900, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_advanced_options
+            a2engine::Entry { present: true, addr: 0x5b81e0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_map_select
+            a2engine::Entry { present: true, addr: 0x5ba140, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_map_transfer
+            a2engine::Entry { present: true, addr: 0x5bf5a0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_multiplayer_connection
+            a2engine::Entry { present: true, addr: 0x5b15f0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_internet_game
+            a2engine::Entry { present: true, addr: 0x5b6c10, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_manual_ip
+            a2engine::Entry { present: true, addr: 0x5cb280, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_room_select
+            a2engine::Entry { present: true, addr: 0x5ab900, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_create_room
+            a2engine::Entry { present: true, addr: 0x5ac3d0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_game_name
+            a2engine::Entry { present: true, addr: 0x5ca690, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_password
+            a2engine::Entry { present: true, addr: 0x5a85b0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_change_password
+            a2engine::Entry { present: true, addr: 0x5a9db0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_create_account
+            a2engine::Entry { present: true, addr: 0x5cc620, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_gamespy_login
+            a2engine::Entry { present: true, addr: 0x5ca0b0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_net_waiting
+            a2engine::Entry { present: true, addr: 0x5b07a0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_help
+            a2engine::Entry { present: true, addr: 0x5d3bd0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_licence
+            a2engine::Entry { present: true, addr: 0x5d7730, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_message
+            a2engine::Entry { present: true, addr: 0x5e1990, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_yes_no
+            a2engine::Entry { present: true, addr: 0x5de0d0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_tech_tree
+            a2engine::Entry { present: true, addr: 0x5e22c0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_admirals_log
+            a2engine::Entry { present: true, addr: 0x5f6010, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_admirals_log_pane
+            a2engine::Entry { present: true, addr: 0x5a2de0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // dialogs_proc_shell_screen
+        ],
+        blocked: &[
+            a2engine::Block { hook: 0, symbol: "AdmiralsLogDlgProc", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: AdmiralsLogDlgProc is changed by fo-roots-5.0Z11, not yet verified" },
         ],
     },
 ];

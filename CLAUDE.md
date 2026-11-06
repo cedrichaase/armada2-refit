@@ -49,6 +49,7 @@ it bundles.
 | `online/` | `Online.asi` — online multiplayer: the *Internet – Online* menu entry, our own `IDirectPlay8Peer` over UDP (`peer.c`), and `server/a2online-server.py` for join codes, hole punching and the relay, public at `c20e.de:2399` (the default `Server=`; the bench blanks it). A layer of `./install` and `a2mod`, `scope = 'match'` | `online/README.md` |
 | `platform/` | what `a2mod` never switches: the ASI loader, the widescreen patch, Heroic/Proton and their Wine overrides (`winmm=n,b;d3d8=n,b`); `vendor/` holds the third-party binaries we may redistribute. It carries no Direct3D chain any more (d3d8to9 and DXVK left in platform 4.0.0; `d3d8-chain.py --retire` takes an old one out) | `platform/README.md` |
 | `layers.toml` | not a folder: the layer registry, every layer once (id, install and remove commands, files, backups, `select` = core / on / off / retired, `requires`, `scope` = local / match, `games`, release `steps`). `tools/layers.py` is its only reader; `./install`, `a2mod`, the bench (`--layers`, `Layers:`), `publish/package.sh`, the release scripts and the GUI installer take their layer lists from it, and `tools/layers.py --check` (CI) fails when they disagree | `layers.toml`, `tools/layers.py` |
+| `games/` | not a layer, versioned by the root: one descriptor per game (`armada2.toml`, the default; `fo-roots.toml`, a stub not offered), "which game" as data — its executable and data folder, Heroic and GOG ids, default folder and prefix names, settings file, shell resolution and HUD canvas, texture roots, data directory stem and the layers on offer. `a2env.py` reads it; `A2_PROFILE` or `--game` (on `./install`, `a2mod`, `a2test`, `tools/layers.py`, `a2env`) chooses the game; `tools/layers.py --check` holds it to `layers.toml` and `profiles/` | `games/README.md` |
 | `profiles/` | not a layer, versioned by the root: one directory per build of `Armada2.exe` (`build.toml` plus one `<plugin>[.<part>].toml` per plugin), only names, addresses, offsets and checks tied to hooks; `tools/engine/` generates the plugins' tables from it, lints it and tests the three resolvers. Another build (Fleet Operations: Roots, `PLAN-FLEETOPS.md`) is a new profile | `crates/a2engine/README.md`, `tools/engine/README.md` |
 | `crates/` | not a layer: `a2rt`, the one runtime of Display8, render3d and the UI (allocator, Win32, log, `sfmt!`, ini with the overlay lookup, files, in-memory patching, frame dumps), linked into each as its `rt`; `a2engine`, the resolver of `profiles/` (`no_std`; the C twin is `csdk/a2engine.h`, the host tools `tools/engine/`), which says which build of `Armada2.exe` is running and whether each hook may hook it; `a2fmt`, the readers of the game's SOD, TGA, `.spr` and ODF files | `crates/a2engine/README.md`, `crates/a2rt/src/lib.rs`, `crates/a2fmt/README.md` |
 | `crates/a2ini` | not a layer: the ini parser (shared by reader and writer) and `edit`, the line-keeping writer of the player's overlay `RefitPlayer.ini`, `no_std`, host-tested on `tools/settings/fixtures/` | `tools/settings/README.md` |
@@ -70,11 +71,15 @@ layer `layers.toml` selects (`--only`, `--without`), and
 `ROOT=textures/`, so everything under `textures/` addresses `$ROOT/lib`,
 `$ROOT/targets` and `$ROOT/tools`.
 
-**Never hard-code a path to the game, its prefix or Proton.** Source `a2env.sh` (shell)
-or `import a2env` (Python, with the repository root on `sys.path`): they resolve
-`A2_GAME`, `A2_PREFIX`, `A2_PROTON` and `A2_DATA` (where assets live, default
-`~/.local/share/armada2-refit`; never a working tree) from the environment, then
-`~/.config/armada2-refit.conf`, then the default location.
+**Never hard-code a path to the game, its prefix or Proton, or the game's executable.**
+Source `a2env.sh` (shell) or `import a2env` (Python, with the repository root on
+`sys.path`): they resolve `A2_GAME`, `A2_PREFIX`, `A2_PROTON` and `A2_DATA` (where assets
+live, default `~/.local/share/armada2-refit`; never a working tree) from the environment,
+then `~/.config/armada2-refit.conf`, then the chosen game's descriptor
+(`games/<id>.toml`; `A2_PROFILE`, default `armada2`), and add `A2_PROFILE` and `A2_EXE`.
+`a2env.py` is the one implementation: `a2env.sh` evaluates its `--sh` output, so there is
+no pair to keep in step. A Python tool that takes `--game` calls
+`a2env.use(a2env.take_game_arg(sys.argv))` before it reads the paths.
 
 **To see a change working in the game without taking over the user's screen, use the
 test bench**: `./a2test session start --res 21:9`, then `./a2test drive --session ID shot`
@@ -705,7 +710,9 @@ Two rules from them still bind:
   which also hands a hook back (the engine's own call runs) when the module is off or a
   symbol is unresolved; engine addresses, offsets and checks come from the symbol
   profile (`profiles/gog-1.1/render3d[.<module>].toml`), never from a literal in a
-  source. A hook whose symbols are not all resolved stands down and logs which one.
+  source: a struct offset is a `field` entry read at run time (`field::X()`, the
+  matched build's), and `lint-layers.sh` rule 1 fails on a literal one. A hook whose
+  symbols are not all resolved stands down and logs which one.
   Modules talk through capabilities and services, not by name; module order is an
   explicit priority.
 - **The seam is the two calls of `Armada_RenderAllOurStuff`.** If either site is not

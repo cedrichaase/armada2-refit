@@ -11,8 +11,12 @@ pub struct Case {
     pub table: &'static a2engine::Table,
     pub image: &'static str,
     pub base: usize,
+    /// The module file name the image stands for (`Image::name`).
+    pub module: &'static str,
     pub test_ini: Option<&'static str>,
     pub addr: &'static [&'static str],
+    /// Field and value ids whose offset or value in the matched build is printed.
+    pub field: &'static [&'static str],
     pub note_for: &'static [&'static str],
     /// The content set expected ("none" for no set), "?" when the fixture does not say.
     pub content: &'static str,
@@ -32,6 +36,7 @@ fn log(s: &str) {
 struct Mapped {
     mem: Vec<u8>,
     base: usize,
+    module: &'static str,
 }
 
 impl Image for Mapped {
@@ -47,6 +52,11 @@ impl Image for Mapped {
     fn base(&self) -> usize {
         self.base
     }
+    fn name(&self, out: &mut [u8]) -> usize {
+        let n = self.module.len().min(out.len());
+        out[..n].copy_from_slice(&self.module.as_bytes()[..n]);
+        n
+    }
 }
 
 fn u16_at(b: &[u8], o: usize) -> usize {
@@ -56,7 +66,7 @@ fn u32_at(b: &[u8], o: usize) -> usize {
     u32::from_le_bytes([b[o], b[o + 1], b[o + 2], b[o + 3]]) as usize
 }
 
-fn map(file: &[u8], base: usize) -> Mapped {
+fn map(file: &[u8], base: usize, module: &'static str) -> Mapped {
     let nt = u32_at(file, 0x3c);
     let count = u16_at(file, nt + 6);
     let opt = nt + 24;
@@ -70,13 +80,13 @@ fn map(file: &[u8], base: usize) -> Mapped {
         let (va, raw, ptr) = (u32_at(file, s + 12), u32_at(file, s + 16), u32_at(file, s + 20));
         mem[va..va + raw].copy_from_slice(&file[ptr..ptr + raw]);
     }
-    Mapped { mem, base }
+    Mapped { mem, base, module }
 }
 
 fn transcript(c: &Case) -> Vec<String> {
     LINES.lock().unwrap().clear();
     let file = std::fs::read(c.image).expect("the fixture image");
-    let mem: &'static Mapped = Box::leak(Box::new(map(&file, c.base)));
+    let mem: &'static Mapped = Box::leak(Box::new(map(&file, c.base, c.module)));
     let e = a2engine::init_with(c.table, log, mem, c.test_ini);
     let t = c.table;
     for (k, h) in t.hooks.iter().enumerate() {
@@ -87,6 +97,12 @@ fn transcript(c: &Case) -> Vec<String> {
         let k = t.syms.iter().position(|s| s.id == *id).expect("an addr query names a symbol");
         let v = e.addr(a2engine::Sym(k as u16));
         log(&format!("addr {} {:#x}", id, v));
+    }
+    for id in c.field {
+        let k = t.syms.iter().position(|s| s.id == *id).expect("a field query names a field");
+        let v = e.value(a2engine::Sym(k as u16)) as u32;
+        assert_eq!(e.field(a2engine::Sym(k as u16)), v as usize, "{}: field and value agree", c.name);
+        log(&format!("field {} {:#x}", id, v));
     }
     for (k, h) in t.hooks.iter().enumerate() {
         if let Some(n) = e.note(a2engine::HookId(k as u16)) {

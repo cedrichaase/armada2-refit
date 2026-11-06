@@ -17,55 +17,44 @@
 //! object's billboard effect (`GameObject+0x3c`).
 use super::content;
 use r3d_core::hooks::{Gate, Hook, Hooks, Kind, Prev, Site};
-use r3d_core::engine::{self, field, field_f32, field_u8, storm3d};
+use r3d_core::engine::{self, field, field_f32, field_u8};
+use r3d_core::engine::instance::{element_name, instance_class, instance_database, system_bytes};
 use r3d_core::math::V3;
 use alloc::collections::BTreeSet;
 use alloc::vec::Vec;
 
-use crate::syms::{hook, sym, TABLE};
+use crate::syms::{field as off, hook, sym, value, TABLE};
 
 /// An engine address of the profile: 0 unless the hook that uses it is ready.
 pub(crate) fn at(s: a2engine::Sym) -> usize { TABLE.engine().addr(s) }
 pub(crate) fn vt_device_dx8() -> usize { at(sym::VT_DEVICE_DX8) }
 const SLOT_RENDER_PARTICLE: usize = 50; // = the profile's slot_render_particle index
-const ENG_CURRENT_INSTANCE: usize = 0x100;
 
 pub(crate) fn fn_sphere() -> usize { at(sym::FN_SPHERE) } // Entity::GetBoundingSphere() const, thiscall: centre, radius
-const OBJ_EFFECT: usize = 0x3c;
+// A game object's billboard effect: `pt_obj_effect` (`GameObject+0x3c`).
 
-/// The damage systems' bytes in a craft instance, in `content::SYSTEMS`' order. A node is
-/// hidden while its byte is non-zero (the system is online), except `borg`, shown while
-/// it is (`CraftInstance::RenderInternal` 0x4cb0e0).
-const SYSTEM_BYTES: [usize; 6] = [0x9c, 0x9d, 0x9e, 0x9f, 0xa0, 0xa1];
+/// The damage systems' bytes in a craft instance, in `content::SYSTEMS`' order (the
+/// core's `system_bytes`, `+0x9c`..`+0xa1`). A node is hidden while its byte is non-zero
+/// (the system is online), except `borg`, shown while it is
+/// (`CraftInstance::RenderInternal` 0x4cb0e0).
 const SYSTEM_BORG: usize = 5;
 pub(crate) fn vt_craft_instance() -> usize { at(sym::VT_CRAFT_INSTANCE) }
-/// `CraftInstance::Update(const GameObject*)` (0x4cb390): the systems into the bytes.
-const SLOT_UPDATE: usize = 14;
+// `CraftInstance::Update(const GameObject*)` (0x4cb390, vtable slot 14:
+// `pt_vt_craft_update`): the systems into the bytes.
 pub(crate) fn ordnance_list() -> usize { at(sym::ORDNANCE_LIST) } // Ordnance::ordnanceList, a std::list (head node at +4)
 pub(crate) fn vt_chain_pulsar() -> usize { at(sym::VT_CHAIN_PULSAR) }
 pub(crate) fn vt_manheim() -> usize { at(sym::VT_MANHEIM) }
-const CHAIN_EMITTER: usize = 0xdc; // ChainPulsar: the free emitter (`crpulsar`)
-const MANHEIM_EMITTER: usize = 0xd4; // ManheimEffect: its free emitter (`gemini`)
+// ChainPulsar's free emitter (`crpulsar`, `+0xdc`) and ManheimEffect's (`gemini`, `+0xd4`).
 /// `Freighter` (vtable 0x6b26a8): the resource carried (`+0x25c`, an `eResource`: 3 is
 /// latinum, 6 none), the amount (`+0x258`) and the class's capacities, one float per
 /// resource (`+0x254`, a pointer).
 pub(crate) fn vt_freighter() -> usize { at(sym::VT_FREIGHTER) }
-const FREIGHTER_CAPACITY: usize = 0x254;
-const FREIGHTER_AMOUNT: usize = 0x258;
-const FREIGHTER_KIND: usize = 0x25c;
-const RESOURCE_LATINUM: usize = 3;
 
 pub fn vt_nebula() -> usize { at(sym::VT_NEBULA) }
 pub fn vt_latinum() -> usize { at(sym::VT_LATINUM) }
 pub(crate) fn fn_fade_out() -> usize { at(sym::FN_FADE_OUT) } // GameObjectInstance::ComputeFadeOut(float&) const, thiscall
-const NEB_HIDDEN: usize = 0x1b0;
-const NEB_INTENSITY: usize = 0x1d0;
-
-const OBJ_KEY: usize = 0x28;
-const INST_RADIUS: usize = 0x40;
-const INST_DATABASE: usize = 0x80;
-const INST_CLASS: usize = 0x98;
-const CLASS_DATABASE: usize = 0x1dc;
+// A nebula's hidden byte (`+0x1b0`) and intensity (`+0x1d0`); an instance's radius
+// (`+0x40`); a craft class's main database (`+0x1dc`).
 
 static mut GATE: Option<Gate> = None;
 static mut PREV_RP: Prev = Prev(0);
@@ -86,7 +75,7 @@ fn open() -> bool {
 unsafe extern "thiscall" fn render_particle(dev: usize, pt: usize) {
     unsafe {
         if open() && SUPPRESS {
-            let inst = field(storm3d(), ENG_CURRENT_INSTANCE);
+            let inst = engine::sprite::current_instance();
             // An owned object's list, or the global list (inst 0: the chain pulsar's and
             // Manheim trails, ours too).
             if inst == 0 || OWNED.contains(&inst) {
@@ -195,11 +184,11 @@ pub fn dropped() -> u32 {
 
 /// What names an object with its address in the simulation's table.
 pub fn object_key(o: usize) -> (usize, u32) {
-    (o, field(o, OBJ_KEY) as u32)
+    (o, engine::entity_handle(o) as u32)
 }
 
 pub fn instance_radius(inst: usize) -> f32 {
-    field_f32(inst, INST_RADIUS)
+    field_f32(inst, off::PT_INST_RADIUS())
 }
 
 pub fn is_freighter(o: usize) -> bool {
@@ -209,15 +198,16 @@ pub fn is_freighter(o: usize) -> bool {
 /// The latinum spray's rate: `cargo / capacity` while the hold carries latinum, else 0,
 /// as `Freighter::RenderInternal` sets it. Reads only.
 pub fn cargo_rate(o: usize) -> f32 {
-    if o == 0 || engine::vtable(o) != vt_freighter() || field(o, FREIGHTER_KIND) != RESOURCE_LATINUM {
+    let latinum = value::PT_RESOURCE_LATINUM() as usize;
+    if o == 0 || engine::vtable(o) != vt_freighter() || field(o, off::PT_FREIGHTER_KIND()) != latinum {
         return 0.0;
     }
-    let caps = field(o, FREIGHTER_CAPACITY);
+    let caps = field(o, off::PT_FREIGHTER_CAPACITY());
     if caps == 0 {
         return 0.0;
     }
-    let cap = field_f32(caps, RESOURCE_LATINUM * 4);
-    let amount = field_f32(o, FREIGHTER_AMOUNT);
+    let cap = field_f32(caps, latinum * 4);
+    let amount = field_f32(o, off::PT_FREIGHTER_AMOUNT());
     if cap > 0.0 && amount.is_finite() {
         (amount / cap).clamp(0.0, 1.0)
     } else {
@@ -236,16 +226,16 @@ pub fn hidden_systems(o: usize, inst: usize) -> u8 {
         return 0;
     }
     unsafe {
-        let up: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(engine::vtable(inst), SLOT_UPDATE * 4));
+        let up: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(engine::vtable(inst), off::PT_VT_CRAFT_UPDATE()));
         up(inst, o);
     }
-    let class = field(inst, INST_CLASS);
-    if field(inst, INST_DATABASE) != field(class, CLASS_DATABASE) {
+    let class = instance_class(inst);
+    if instance_database(inst) != field(class, off::PT_CLASS_DATABASE()) {
         return 0xff;
     }
     let mut h = 0u8;
-    for (s, off) in SYSTEM_BYTES.iter().enumerate() {
-        let b = field_u8(inst, *off);
+    for (s, at) in system_bytes().iter().enumerate() {
+        let b = field_u8(inst, *at);
         let hide = if s == SYSTEM_BORG { b == 0 } else { b != 0 };
         if hide {
             h |= 1 << s;
@@ -258,22 +248,16 @@ pub fn hidden_systems(o: usize, inst: usize) -> u8 {
 /// the Manheim effect's, with the emitter's name.
 pub fn free_emitter_shots() -> Vec<(usize, &'static str)> {
     let mut ords = Vec::new();
-    let head = field(ordnance_list(), 4);
-    if head != 0 {
-        let mut n = field(head, 0);
-        let mut guard = 0;
-        while n != head && n != 0 && guard < 100_000 {
-            guard += 1;
-            let o = field(n, 8);
-            n = field(n, 0);
-            let vt = engine::vtable(o);
-            if vt == vt_chain_pulsar() && field(o, CHAIN_EMITTER) != 0 && !content::get().chain_emitter.is_empty() {
-                ords.push((o, content::get().chain_emitter));
-            } else if vt == vt_manheim() && field(o, MANHEIM_EMITTER) != 0 && !content::get().manheim_emitter.is_empty() {
-                ords.push((o, content::get().manheim_emitter));
-            }
+    let (chain, manheim) = (off::PT_CHAIN_EMITTER(), off::PT_MANHEIM_EMITTER());
+    let (vt_chain, vt_man) = (vt_chain_pulsar(), vt_manheim());
+    engine::for_each_in_list_at(ordnance_list(), |o| {
+        let vt = engine::vtable(o);
+        if vt == vt_chain && field(o, chain) != 0 && !content::get().chain_emitter.is_empty() {
+            ords.push((o, content::get().chain_emitter));
+        } else if vt == vt_man && field(o, manheim) != 0 && !content::get().manheim_emitter.is_empty() {
+            ords.push((o, content::get().manheim_emitter));
         }
-    }
+    });
     ords
 }
 
@@ -284,11 +268,11 @@ pub fn billboard_effect(o: usize) -> Option<&'static str> {
     if o == 0 {
         return None;
     }
-    let nd = field(o, OBJ_EFFECT);
+    let nd = field(o, off::PT_OBJ_EFFECT());
     if nd == 0 {
         return None;
     }
-    Some(unsafe { crate::rt::cstr_at(field(nd, 8) as *const u8, 64) })
+    Some(element_name(nd).unwrap_or(""))
 }
 
 /// `Entity::GetBoundingSphere`: centre and radius.
@@ -318,11 +302,11 @@ pub fn is_nebula(o: usize) -> bool {
 
 /// `Nebula::Render`'s hidden flag.
 pub fn nebula_hidden(o: usize) -> bool {
-    field_u8(o, NEB_HIDDEN) != 0
+    field_u8(o, off::PT_NEB_HIDDEN()) != 0
 }
 
 pub fn nebula_intensity(o: usize) -> f32 {
-    field_f32(o, NEB_INTENSITY)
+    field_f32(o, off::PT_NEB_INTENSITY())
 }
 
 /// `ComputeFadeOut` of a nebula's instance: Some(factor) while the eye is near enough.

@@ -191,7 +191,7 @@ fn loading(ui: &mut Ui) {
     let band = R::new(0.0, screen.h - bh, screen.w, bh);
     ui.draw.rect_vgrad(band, 0x00000000, 0xe0000000);
     let m = ui.u(64.0);
-    let p = crate::engine::loading::progress().unwrap_or(0.0);
+    let p = crate::engine::api::loading::progress().unwrap_or(0.0);
     let w = (screen.w - 2.0 * m).min(ui.u(1400.0));
     let x = (screen.w - w) * 0.5;
     let title = R::new(x, band.y + ui.u(30.0), w, ui.u(40.0));

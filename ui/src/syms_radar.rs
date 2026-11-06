@@ -65,70 +65,72 @@ pub mod hook {
 }
 
 pub mod field {
-    pub const RADAR_MR_RADAR: usize = 0x28;
-    pub const RADAR_MR_SHIP_BUTTON: usize = 0x2c;
-    pub const RADAR_MR_STATION_BUTTON: usize = 0x30;
-    pub const RADAR_BTN_SPRITE: usize = 0x2c;
-    pub const RADAR_RC_BACKGROUND: usize = 0x3c;
-    pub const RADAR_RC_MARKS: usize = 0x4c;
-    pub const RADAR_RC_SIDE: usize = 0x5c;
-    pub const RADAR_SPRITE_TEXTURE: usize = 0x58;
-    pub const RADAR_TEX_W: usize = 0x1c;
-    pub const RADAR_TEX_H: usize = 0x20;
-    pub const RADAR_TEX_DEVICES: usize = 0x40;
-    pub const RADAR_DEVTEX_D3D8: usize = 0x4;
-    pub const RADAR_S3D_DEVICE_INDEX: usize = 0xc0;
-    pub const RADAR_S3D_CAMERA: usize = 0xfc;
-    pub const RADAR_GRID_CELLS: usize = 0x4;
-    pub const RADAR_GRID_W: usize = 0xc;
-    pub const RADAR_GRID_H: usize = 0x10;
-    pub const RADAR_UP_SWAPPED: usize = 0x24;
-    pub const RADAR_UP_EDITOR: usize = 0x84;
-    pub const RADAR_OBJ_REMOVED: usize = 0x113;
-    pub const RADAR_OBJ_CLASS: usize = 0x40;
-    pub const RADAR_OBJ_POS: usize = 0xac;
-    pub const RADAR_OBJ_TEAM: usize = 0xec;
-    pub const RADAR_OBJ_SELECTED: usize = 0x10e;
-    pub const RADAR_VT_CAN_USER_SEE: usize = 0x8;
-    pub const RADAR_CLS_OFF_RADAR: usize = 0x18c;
-    pub const RADAR_CLS_RADAR_SPRITE: usize = 0x190;
-    pub const RADAR_CLS_HAS_MAP_SIZE: usize = 0x184;
-    pub const RADAR_CLS_STATION: usize = 0x20d;
-    pub const RADAR_VT_MAP_SIZE: usize = 0x24;
-    pub const RADAR_VT_IS_CRAFT_CLASS: usize = 0x28;
-    pub const RADAR_SPIRIT_CLASS: usize = 0x4;
-    pub const RADAR_SPIRIT_TEAM: usize = 0xc;
-    pub const RADAR_VT_SPIRIT_POS: usize = 0x10;
-    pub const RADAR_TEAM_COLOUR: usize = 0x14;
-    pub const RADAR_VT_SELECT_NUM: usize = 0x94;
-    pub const RADAR_VT_WHERE_CURSOR: usize = 0xbc;
-    pub const RADAR_VT_SET_CURSOR_ACTION: usize = 0xc8;
-    pub const RADAR_VT_BROADCAST: usize = 0xa4;
-    pub const RADAR_VT_CAMERA_MOVE: usize = 0x54;
-    pub const RADAR_CAM_NEAR: usize = 0x1a0;
-    pub const RADAR_CAM_FAR: usize = 0x1a4;
-    pub const RADAR_CAM_VIEWPORT: usize = 0x1b0;
-    pub const RADAR_CAM_POS: usize = 0xe4;
-    pub const RADAR_TC_EYE_X: usize = 0x8c;
-    pub const RADAR_TC_EYE_Z: usize = 0x94;
-    pub const RADAR_TC_CENTRE_X: usize = 0x98;
-    pub const RADAR_TC_CENTRE_Z: usize = 0xa0;
-    pub const RADAR_SD_SCENES: usize = 0x28;
-    pub const RADAR_SCENE_CENTRE: usize = 0xc;
-    pub const RADAR_SCENE_RADIUS: usize = 0x18;
-    pub const RADAR_MARK_RADIUS: usize = 0x1c;
-    pub const RADAR_MARK_COLOUR: usize = 0x20;
-    pub const RADAR_AC_CURSOR: usize = 0xc;
-    pub const RADAR_AC_CANNOT: usize = 0x10;
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn RADAR_MR_RADAR() -> usize { super::TABLE.engine().field(a2engine::Sym(55)) }
+    #[inline(always)] pub fn RADAR_MR_SHIP_BUTTON() -> usize { super::TABLE.engine().field(a2engine::Sym(56)) }
+    #[inline(always)] pub fn RADAR_MR_STATION_BUTTON() -> usize { super::TABLE.engine().field(a2engine::Sym(57)) }
+    #[inline(always)] pub fn RADAR_BTN_SPRITE() -> usize { super::TABLE.engine().field(a2engine::Sym(58)) }
+    #[inline(always)] pub fn RADAR_RC_BACKGROUND() -> usize { super::TABLE.engine().field(a2engine::Sym(59)) }
+    #[inline(always)] pub fn RADAR_RC_MARKS() -> usize { super::TABLE.engine().field(a2engine::Sym(60)) }
+    #[inline(always)] pub fn RADAR_RC_SIDE() -> usize { super::TABLE.engine().field(a2engine::Sym(61)) }
+    #[inline(always)] pub fn RADAR_SPRITE_TEXTURE() -> usize { super::TABLE.engine().field(a2engine::Sym(62)) }
+    #[inline(always)] pub fn RADAR_TEX_W() -> usize { super::TABLE.engine().field(a2engine::Sym(63)) }
+    #[inline(always)] pub fn RADAR_TEX_H() -> usize { super::TABLE.engine().field(a2engine::Sym(64)) }
+    #[inline(always)] pub fn RADAR_TEX_DEVICES() -> usize { super::TABLE.engine().field(a2engine::Sym(65)) }
+    #[inline(always)] pub fn RADAR_DEVTEX_D3D8() -> usize { super::TABLE.engine().field(a2engine::Sym(66)) }
+    #[inline(always)] pub fn RADAR_S3D_DEVICE_INDEX() -> usize { super::TABLE.engine().field(a2engine::Sym(67)) }
+    #[inline(always)] pub fn RADAR_S3D_CAMERA() -> usize { super::TABLE.engine().field(a2engine::Sym(68)) }
+    #[inline(always)] pub fn RADAR_GRID_CELLS() -> usize { super::TABLE.engine().field(a2engine::Sym(69)) }
+    #[inline(always)] pub fn RADAR_GRID_W() -> usize { super::TABLE.engine().field(a2engine::Sym(70)) }
+    #[inline(always)] pub fn RADAR_GRID_H() -> usize { super::TABLE.engine().field(a2engine::Sym(71)) }
+    #[inline(always)] pub fn RADAR_UP_SWAPPED() -> usize { super::TABLE.engine().field(a2engine::Sym(72)) }
+    #[inline(always)] pub fn RADAR_UP_EDITOR() -> usize { super::TABLE.engine().field(a2engine::Sym(73)) }
+    #[inline(always)] pub fn RADAR_OBJ_REMOVED() -> usize { super::TABLE.engine().field(a2engine::Sym(74)) }
+    #[inline(always)] pub fn RADAR_OBJ_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(75)) }
+    #[inline(always)] pub fn RADAR_OBJ_POS() -> usize { super::TABLE.engine().field(a2engine::Sym(76)) }
+    #[inline(always)] pub fn RADAR_OBJ_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(77)) }
+    #[inline(always)] pub fn RADAR_OBJ_SELECTED() -> usize { super::TABLE.engine().field(a2engine::Sym(78)) }
+    #[inline(always)] pub fn RADAR_VT_CAN_USER_SEE() -> usize { super::TABLE.engine().field(a2engine::Sym(79)) }
+    #[inline(always)] pub fn RADAR_CLS_OFF_RADAR() -> usize { super::TABLE.engine().field(a2engine::Sym(80)) }
+    #[inline(always)] pub fn RADAR_CLS_RADAR_SPRITE() -> usize { super::TABLE.engine().field(a2engine::Sym(81)) }
+    #[inline(always)] pub fn RADAR_CLS_HAS_MAP_SIZE() -> usize { super::TABLE.engine().field(a2engine::Sym(82)) }
+    #[inline(always)] pub fn RADAR_CLS_STATION() -> usize { super::TABLE.engine().field(a2engine::Sym(83)) }
+    #[inline(always)] pub fn RADAR_VT_MAP_SIZE() -> usize { super::TABLE.engine().field(a2engine::Sym(84)) }
+    #[inline(always)] pub fn RADAR_VT_IS_CRAFT_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(85)) }
+    #[inline(always)] pub fn RADAR_SPIRIT_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(86)) }
+    #[inline(always)] pub fn RADAR_SPIRIT_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(87)) }
+    #[inline(always)] pub fn RADAR_VT_SPIRIT_POS() -> usize { super::TABLE.engine().field(a2engine::Sym(88)) }
+    #[inline(always)] pub fn RADAR_TEAM_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(89)) }
+    #[inline(always)] pub fn RADAR_VT_SELECT_NUM() -> usize { super::TABLE.engine().field(a2engine::Sym(90)) }
+    #[inline(always)] pub fn RADAR_VT_WHERE_CURSOR() -> usize { super::TABLE.engine().field(a2engine::Sym(91)) }
+    #[inline(always)] pub fn RADAR_VT_SET_CURSOR_ACTION() -> usize { super::TABLE.engine().field(a2engine::Sym(92)) }
+    #[inline(always)] pub fn RADAR_VT_BROADCAST() -> usize { super::TABLE.engine().field(a2engine::Sym(93)) }
+    #[inline(always)] pub fn RADAR_VT_CAMERA_MOVE() -> usize { super::TABLE.engine().field(a2engine::Sym(94)) }
+    #[inline(always)] pub fn RADAR_CAM_NEAR() -> usize { super::TABLE.engine().field(a2engine::Sym(95)) }
+    #[inline(always)] pub fn RADAR_CAM_FAR() -> usize { super::TABLE.engine().field(a2engine::Sym(96)) }
+    #[inline(always)] pub fn RADAR_CAM_VIEWPORT() -> usize { super::TABLE.engine().field(a2engine::Sym(97)) }
+    #[inline(always)] pub fn RADAR_CAM_POS() -> usize { super::TABLE.engine().field(a2engine::Sym(98)) }
+    #[inline(always)] pub fn RADAR_TC_EYE_X() -> usize { super::TABLE.engine().field(a2engine::Sym(99)) }
+    #[inline(always)] pub fn RADAR_TC_EYE_Z() -> usize { super::TABLE.engine().field(a2engine::Sym(100)) }
+    #[inline(always)] pub fn RADAR_TC_CENTRE_X() -> usize { super::TABLE.engine().field(a2engine::Sym(101)) }
+    #[inline(always)] pub fn RADAR_TC_CENTRE_Z() -> usize { super::TABLE.engine().field(a2engine::Sym(102)) }
+    #[inline(always)] pub fn RADAR_SD_SCENES() -> usize { super::TABLE.engine().field(a2engine::Sym(103)) }
+    #[inline(always)] pub fn RADAR_SCENE_CENTRE() -> usize { super::TABLE.engine().field(a2engine::Sym(104)) }
+    #[inline(always)] pub fn RADAR_SCENE_RADIUS() -> usize { super::TABLE.engine().field(a2engine::Sym(105)) }
+    #[inline(always)] pub fn RADAR_MARK_RADIUS() -> usize { super::TABLE.engine().field(a2engine::Sym(106)) }
+    #[inline(always)] pub fn RADAR_MARK_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(107)) }
+    #[inline(always)] pub fn RADAR_AC_CURSOR() -> usize { super::TABLE.engine().field(a2engine::Sym(108)) }
+    #[inline(always)] pub fn RADAR_AC_CANNOT() -> usize { super::TABLE.engine().field(a2engine::Sym(109)) }
 }
 
 pub mod value {
-    pub const RADAR_ACTION_CURSOR_STRIDE: i32 = 20;
-    pub const RADAR_ACTION_CURSORS_N: i32 = 57;
-    pub const RADAR_ACTION_MASK: i32 = 4095;
-    pub const RADAR_ACTION_MOVE: i32 = 4;
-    pub const RADAR_ACTION_GO_WARP: i32 = 43;
-    pub const RADAR_ACTION_CANNOT: i32 = 16384;
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn RADAR_ACTION_CURSOR_STRIDE() -> i32 { super::TABLE.engine().value(a2engine::Sym(110)) }
+    #[inline(always)] pub fn RADAR_ACTION_CURSORS_N() -> i32 { super::TABLE.engine().value(a2engine::Sym(111)) }
+    #[inline(always)] pub fn RADAR_ACTION_MASK() -> i32 { super::TABLE.engine().value(a2engine::Sym(112)) }
+    #[inline(always)] pub fn RADAR_ACTION_MOVE() -> i32 { super::TABLE.engine().value(a2engine::Sym(113)) }
+    #[inline(always)] pub fn RADAR_ACTION_GO_WARP() -> i32 { super::TABLE.engine().value(a2engine::Sym(114)) }
+    #[inline(always)] pub fn RADAR_ACTION_CANNOT() -> i32 { super::TABLE.engine().value(a2engine::Sym(115)) }
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
@@ -259,6 +261,7 @@ pub const BUILDS: &[a2engine::Build] = &[
     a2engine::Build {
         name: "gog-1.1",
         key: "armada2/gog-1.1",
+        exe: "Armada2.exe",
         timestamp: 0x3c4c76bd,
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
@@ -384,6 +387,139 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16384 }, // radar_action_cannot
         ],
         blocked: &[
+        ],
+    },
+    a2engine::Build {
+        name: "fo-roots-5.0Z11",
+        key: "armada2/fo-roots-5.0Z11",
+        exe: "ArmadaL.exe",
+        timestamp: 0x3c4c76bd,
+        image_size: 0x405000,
+        sections: 0xca07c55a,
+        image_base: 0x400000,
+        n_resolved: 0,
+        content: "stock",
+        entries: &[
+            a2engine::Entry { present: true, addr: 0x763810, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_map_radar
+            a2engine::Entry { present: true, addr: 0x76387c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_map_sprite
+            a2engine::Entry { present: true, addr: 0x763880, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_warp_sprite
+            a2engine::Entry { present: true, addr: 0x763874, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_fog_sprite
+            a2engine::Entry { present: true, addr: 0x76386c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_ship_filter
+            a2engine::Entry { present: true, addr: 0x763870, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_station_filter
+            a2engine::Entry { present: true, addr: 0x739590, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_terrain
+            a2engine::Entry { present: true, addr: 0x738a54, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_scan_fog
+            a2engine::Entry { present: true, addr: 0x738a58, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_scan_shroud
+            a2engine::Entry { present: true, addr: 0x76b5ac, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_user_profile
+            a2engine::Entry { present: true, addr: 0x76b8d4, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_transport
+            a2engine::Entry { present: true, addr: 0x76b610, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_view_record
+            a2engine::Entry { present: true, addr: 0x761084, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_object_list
+            a2engine::Entry { present: true, addr: 0x736c94, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_ghost_list
+            a2engine::Entry { present: true, addr: 0x768e3c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_overview_ptr
+            a2engine::Entry { present: true, addr: 0x763c00, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_palette_ptr
+            a2engine::Entry { present: true, addr: 0x761344, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_command_alt
+            a2engine::Entry { present: true, addr: 0x763370, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_camera_manager
+            a2engine::Entry { present: true, addr: 0x6fcb48, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_tactical_snap
+            a2engine::Entry { present: true, addr: 0x763650, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_tactical_camera
+            a2engine::Entry { present: true, addr: 0x763608, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_shot_director
+            a2engine::Entry { present: true, addr: 0x7379fc, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_g_string
+            a2engine::Entry { present: true, addr: 0x6b4658, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_shot_director_vtable
+            a2engine::Entry { present: true, addr: 0x6b5ff4, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_overview_vtable
+            a2engine::Entry { present: true, addr: 0x6b4f84, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_palette_vtable
+            a2engine::Entry { present: true, addr: 0x6eee98, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_td_game_object_class
+            a2engine::Entry { present: true, addr: 0x6eee08, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_td_craft_class
+            a2engine::Entry { present: true, addr: 0x700c08, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_td_planet_class
+            a2engine::Entry { present: true, addr: 0x70fbd8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_action_cursors
+            a2engine::Entry { present: true, addr: 0x4e8670, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0xd9, 0x40, 0x08], mask: &[], section: "", count: 0, value: 0 }, // radar_to_square
+            a2engine::Entry { present: true, addr: 0x4e86e0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0xd9, 0x05], mask: &[], section: "", count: 0, value: 0 }, // radar_to_world
+            a2engine::Entry { present: true, addr: 0x4d0070, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x0d, 0xd4, 0xb8, 0x76, 0x00], mask: &[], section: "", count: 0, value: 0 }, // radar_teams_visible
+            a2engine::Entry { present: true, addr: 0x557940, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x30, 0xc3], mask: &[], section: "", count: 0, value: 0 }, // radar_get_game_setup
+            a2engine::Entry { present: true, addr: 0x5462f0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x10, 0x8a, 0x80, 0xaf, 0x00, 0x00, 0x00, 0xc3], mask: &[], section: "", count: 0, value: 0 }, // radar_is_fog
+            a2engine::Entry { present: true, addr: 0x546300, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x10, 0x8a, 0x80, 0xb0, 0x00, 0x00, 0x00, 0xc3], mask: &[], section: "", count: 0, value: 0 }, // radar_is_shroud
+            a2engine::Entry { present: true, addr: 0x6731a0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xff, 0x25], mask: &[], section: "", count: 0, value: 0 }, // radar_rt_dynamic_cast
+            a2engine::Entry { present: true, addr: 0x4971f0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x55, 0x08, 0x56, 0x33, 0xc0], mask: &[], section: "", count: 0, value: 0 }, // radar_is_ally
+            a2engine::Entry { present: true, addr: 0x497210, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x55, 0x08, 0x56, 0x33, 0xc0], mask: &[], section: "", count: 0, value: 0 }, // radar_is_neutral
+            a2engine::Entry { present: true, addr: 0x497230, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x55, 0x08, 0x56, 0x33, 0xc0], mask: &[], section: "", count: 0, value: 0 }, // radar_is_enemy
+            a2engine::Entry { present: true, addr: 0x496340, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08], mask: &[], section: "", count: 0, value: 0 }, // radar_team_get
+            a2engine::Entry { present: true, addr: 0x4de460, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x3c], mask: &[], section: "", count: 0, value: 0 }, // radar_snap_to_nearest
+            a2engine::Entry { present: true, addr: 0x4eb7c0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x93, 0xee, 0x69, 0x00], mask: &[], section: "", count: 0, value: 0 }, // radar_next_ship_filter
+            a2engine::Entry { present: true, addr: 0x4eb930, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0xa6, 0xee, 0x69, 0x00], mask: &[], section: "", count: 0, value: 0 }, // radar_next_station_filter
+            a2engine::Entry { present: true, addr: 0x619140, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x34, 0xd9, 0x81, 0xa8, 0x01], mask: &[], section: "", count: 0, value: 0 }, // radar_screen_ray
+            a2engine::Entry { present: true, addr: 0x481c90, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x08, 0x8b, 0xc1], mask: &[], section: "", count: 0, value: 0 }, // radar_localize
+            a2engine::Entry { present: true, addr: 0x44ab70, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0xa8, 0xa8, 0x69, 0x00], mask: &[], section: "", count: 0, value: 0 }, // radar_get_action
+            a2engine::Entry { present: true, addr: 0x526b60, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x8b, 0xc8, 0xc1, 0xe9, 0x0e, 0xf6, 0xc1, 0x01, 0x74, 0x11], mask: &[], section: "", count: 0, value: 0 }, // radar_set_cursor_action
+            a2engine::Entry { present: true, addr: 0x525150, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_get_where_cursor
+            a2engine::Entry { present: true, addr: 0x4fdca0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_broadcast_command
+            a2engine::Entry { present: true, addr: 0x526b78, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x04, 0x95, 0xe8, 0xfb, 0x70, 0x00], mask: &[], section: "", count: 0, value: 0 }, // radar_cursor_table_a
+            a2engine::Entry { present: true, addr: 0x526b89, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x04, 0x85, 0xe4, 0xfb, 0x70, 0x00], mask: &[], section: "", count: 0, value: 0 }, // radar_cursor_table_b
+            a2engine::Entry { present: true, addr: 0x4eb3b2, end: 0x0, target: 0x1f, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_site_teams_visible
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x2e, vtable: 0x17, index: 50, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_slot_set_cursor_action
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x2f, vtable: 0x17, index: 47, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_slot_where_cursor
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x30, vtable: 0x18, index: 41, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_slot_broadcast
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // radar_mr_radar
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 44 }, // radar_mr_ship_button
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 48 }, // radar_mr_station_button
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 44 }, // radar_btn_sprite
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 60 }, // radar_rc_background
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 76 }, // radar_rc_marks
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 92 }, // radar_rc_side
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 88 }, // radar_sprite_texture
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 28 }, // radar_tex_w
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // radar_tex_h
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // radar_tex_devices
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // radar_devtex_d3d8
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 192 }, // radar_s3d_device_index
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 252 }, // radar_s3d_camera
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // radar_grid_cells
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 12 }, // radar_grid_w
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // radar_grid_h
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 36 }, // radar_up_swapped
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 132 }, // radar_up_editor
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 275 }, // radar_obj_removed
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // radar_obj_class
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 172 }, // radar_obj_pos
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 236 }, // radar_obj_team
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 270 }, // radar_obj_selected
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // radar_vt_can_user_see
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 396 }, // radar_cls_off_radar
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 400 }, // radar_cls_radar_sprite
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 388 }, // radar_cls_has_map_size
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 525 }, // radar_cls_station
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 36 }, // radar_vt_map_size
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // radar_vt_is_craft_class
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // radar_spirit_class
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 12 }, // radar_spirit_team
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // radar_vt_spirit_pos
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 20 }, // radar_team_colour
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 148 }, // radar_vt_select_num
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 188 }, // radar_vt_where_cursor
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 200 }, // radar_vt_set_cursor_action
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 164 }, // radar_vt_broadcast
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 84 }, // radar_vt_camera_move
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 416 }, // radar_cam_near
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 420 }, // radar_cam_far
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 432 }, // radar_cam_viewport
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 228 }, // radar_cam_pos
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 140 }, // radar_tc_eye_x
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 148 }, // radar_tc_eye_z
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 152 }, // radar_tc_centre_x
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 160 }, // radar_tc_centre_z
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // radar_sd_scenes
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 12 }, // radar_scene_centre
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 24 }, // radar_scene_radius
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 28 }, // radar_mark_radius
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // radar_mark_colour
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 12 }, // radar_ac_cursor
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // radar_ac_cannot
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 20 }, // radar_action_cursor_stride
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 57 }, // radar_action_cursors_n
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4095 }, // radar_action_mask
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // radar_action_move
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 43 }, // radar_action_go_warp
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16384 }, // radar_action_cannot
+        ],
+        blocked: &[
+            a2engine::Block { hook: 0, symbol: "ActionMode::GetAction", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ActionMode::GetAction is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 1, symbol: "ActionMode::GetAction", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ActionMode::GetAction is changed by fo-roots-5.0Z11, not yet verified" },
         ],
     },
 ];

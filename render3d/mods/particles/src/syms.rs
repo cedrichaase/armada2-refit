@@ -25,9 +25,23 @@ pub mod hook {
 }
 
 pub mod field {
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn PT_OBJ_EFFECT() -> usize { super::TABLE.engine().field(a2engine::Sym(14)) }
+    #[inline(always)] pub fn PT_VT_CRAFT_UPDATE() -> usize { super::TABLE.engine().field(a2engine::Sym(15)) }
+    #[inline(always)] pub fn PT_CHAIN_EMITTER() -> usize { super::TABLE.engine().field(a2engine::Sym(16)) }
+    #[inline(always)] pub fn PT_MANHEIM_EMITTER() -> usize { super::TABLE.engine().field(a2engine::Sym(17)) }
+    #[inline(always)] pub fn PT_FREIGHTER_CAPACITY() -> usize { super::TABLE.engine().field(a2engine::Sym(18)) }
+    #[inline(always)] pub fn PT_FREIGHTER_AMOUNT() -> usize { super::TABLE.engine().field(a2engine::Sym(19)) }
+    #[inline(always)] pub fn PT_FREIGHTER_KIND() -> usize { super::TABLE.engine().field(a2engine::Sym(20)) }
+    #[inline(always)] pub fn PT_NEB_HIDDEN() -> usize { super::TABLE.engine().field(a2engine::Sym(22)) }
+    #[inline(always)] pub fn PT_NEB_INTENSITY() -> usize { super::TABLE.engine().field(a2engine::Sym(23)) }
+    #[inline(always)] pub fn PT_INST_RADIUS() -> usize { super::TABLE.engine().field(a2engine::Sym(24)) }
+    #[inline(always)] pub fn PT_CLASS_DATABASE() -> usize { super::TABLE.engine().field(a2engine::Sym(25)) }
 }
 
 pub mod value {
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn PT_RESOURCE_LATINUM() -> i32 { super::TABLE.engine().value(a2engine::Sym(21)) }
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
@@ -45,10 +59,22 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "ordnance_list", symbol: "Ordnance::ordnanceList", kind: a2engine::Kind::Global },
     a2engine::SymDef { id: "vt_device_dx8", symbol: "ST3D_DeviceDirectX8", kind: a2engine::Kind::Vtable },
     a2engine::SymDef { id: "slot_render_particle", symbol: "ST3D_DeviceDirectX8::RenderParticle", kind: a2engine::Kind::Slot },
+    a2engine::SymDef { id: "pt_obj_effect", symbol: "GameObject::billboard effect", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "pt_vt_craft_update", symbol: "CraftInstance::Update slot", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "pt_chain_emitter", symbol: "ChainPulsar::free emitter", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "pt_manheim_emitter", symbol: "ManheimEffect::free emitter", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "pt_freighter_capacity", symbol: "Freighter::class capacities", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "pt_freighter_amount", symbol: "Freighter::amount carried", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "pt_freighter_kind", symbol: "Freighter::resource carried", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "pt_resource_latinum", symbol: "eResource latinum", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "pt_neb_hidden", symbol: "Nebula::hidden", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "pt_neb_intensity", symbol: "Nebula::intensity", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "pt_inst_radius", symbol: "ST3D_Instance::radius", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "pt_class_database", symbol: "CraftClass::main database", kind: a2engine::Kind::Field },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
-    a2engine::HookDef { id: "render3d.particles.reads", run_unknown: false, rows: &["Modules.particles"], syms: &[0, 2, 5, 6, 7, 8, 9, 10, 11] },
+    a2engine::HookDef { id: "render3d.particles.reads", run_unknown: false, rows: &["Modules.particles"], syms: &[0, 2, 5, 6, 7, 8, 9, 10, 11, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25] },
     a2engine::HookDef { id: "render3d.particles.particle", run_unknown: false, rows: &["Modules.particles"], syms: &[3, 12, 13] },
     a2engine::HookDef { id: "render3d.particles.billboard", run_unknown: false, rows: &["Modules.particles"], syms: &[1, 4] },
 ];
@@ -57,11 +83,12 @@ pub const BUILDS: &[a2engine::Build] = &[
     a2engine::Build {
         name: "gog-1.1",
         key: "armada2/gog-1.1",
+        exe: "Armada2.exe",
         timestamp: 0x3c4c76bd,
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 14,
+        n_resolved: 26,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x4cfd70, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x04, 0x83, 0xc0, 0x34, 0xc3, 0x90], mask: &[], section: "", count: 0, value: 0 }, // fn_sphere
@@ -78,15 +105,69 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x771fa8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // ordnance_list
             a2engine::Entry { present: true, addr: 0x6bc6ac, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // vt_device_dx8
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x3, vtable: 0xc, index: 50, chain: true, check: &[], mask: &[], section: "", count: 0, value: 0 }, // slot_render_particle
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 60 }, // pt_obj_effect
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // pt_vt_craft_update
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 220 }, // pt_chain_emitter
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 212 }, // pt_manheim_emitter
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 596 }, // pt_freighter_capacity
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 600 }, // pt_freighter_amount
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 604 }, // pt_freighter_kind
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 3 }, // pt_resource_latinum
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 432 }, // pt_neb_hidden
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 464 }, // pt_neb_intensity
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // pt_inst_radius
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 476 }, // pt_class_database
         ],
         blocked: &[
+        ],
+    },
+    a2engine::Build {
+        name: "fo-roots-5.0Z11",
+        key: "armada2/fo-roots-5.0Z11",
+        exe: "ArmadaL.exe",
+        timestamp: 0x3c4c76bd,
+        image_size: 0x405000,
+        sections: 0xca07c55a,
+        image_base: 0x400000,
+        n_resolved: 24,
+        content: "stock",
+        entries: &[
+            a2engine::Entry { present: true, addr: 0x4cfd70, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x04, 0x83, 0xc0, 0x34, 0xc3, 0x90], mask: &[], section: "", count: 0, value: 0 }, // fn_sphere
+            a2engine::Entry { present: true, addr: 0x4d544c, end: 0x0, target: 0x4, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_billboard
+            a2engine::Entry { present: true, addr: 0x4d5a20, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x51, 0xa1, 0xc0, 0xca, 0x6f], mask: &[], section: "", count: 0, value: 0 }, // fn_fade_out
+            a2engine::Entry { present: true, addr: 0x6262f0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x08, 0x53, 0x56], mask: &[], section: "", count: 0, value: 0 }, // fn_render_particle
+            a2engine::Entry { present: true, addr: 0x62ebd0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x40, 0xa1, 0x08], mask: &[], section: "", count: 0, value: 0 }, // fn_effect
+            a2engine::Entry { present: true, addr: 0x6b132c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // vt_latinum
+            a2engine::Entry { present: true, addr: 0x6b148c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // vt_nebula
+            a2engine::Entry { present: true, addr: 0x6b26a8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // vt_freighter
+            a2engine::Entry { present: true, addr: 0x6b3e2c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // vt_craft_instance
+            a2engine::Entry { present: true, addr: 0x6b7c74, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // vt_chain_pulsar
+            a2engine::Entry { present: true, addr: 0x6b89fc, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // vt_manheim
+            a2engine::Entry { present: true, addr: 0x771fa8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // ordnance_list
+            a2engine::Entry { present: true, addr: 0x6bc6ac, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // vt_device_dx8
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x3, vtable: 0xc, index: 50, chain: true, check: &[], mask: &[], section: "", count: 0, value: 0 }, // slot_render_particle
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 60 }, // pt_obj_effect
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // pt_vt_craft_update
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 220 }, // pt_chain_emitter
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 212 }, // pt_manheim_emitter
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 596 }, // pt_freighter_capacity
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 600 }, // pt_freighter_amount
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 604 }, // pt_freighter_kind
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 3 }, // pt_resource_latinum
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 432 }, // pt_neb_hidden
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 464 }, // pt_neb_intensity
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // pt_inst_radius
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 476 }, // pt_class_database
+        ],
+        blocked: &[
+            a2engine::Block { hook: 2, symbol: "GameObject::RenderInternal", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: GameObject::RenderInternal is changed by fo-roots-5.0Z11, not yet verified" },
         ],
     },
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 3] = [const { core::sync::atomic::AtomicU64::new(0) }; 3];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 14] = [const { core::sync::atomic::AtomicU8::new(0) }; 14];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 14] = [const { core::sync::atomic::AtomicUsize::new(0) }; 14];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 26] = [const { core::sync::atomic::AtomicU8::new(0) }; 26];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 26] = [const { core::sync::atomic::AtomicUsize::new(0) }; 26];
 static NOTES: [a2engine::Note; 3] = [const { a2engine::Note::new() }; 3];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 

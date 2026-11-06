@@ -19,8 +19,8 @@
 //! cell, presses it, and names the key for the label the UI draws (`QOL_BarLabel`). A
 //! click is pressed in the bar's own update (the game's simulate), which QOL tells the UI
 //! of through `UI_BarStep`; without QOL the UI takes that step in its own frame.
-use crate::engine::palette::{self, Kind};
-use crate::engine::{hud, sound, sprite};
+use crate::engine::api::palette::{self, Kind};
+use crate::engine::api::{hud, sound, sprite};
 use crate::gfx::{fade, Weight, R};
 use crate::widgets::{theme, Align, Ui};
 use alloc::string::String;
@@ -62,7 +62,7 @@ struct Item {
 /// `c`, 0 for an empty one.
 fn layout(p: usize, menu: u32) -> ([usize; CELLS], Vec<Item>) {
     let mut items = Vec::new();
-    for i in 0..palette::N_SLOTS {
+    for i in 0..palette::n_slots() {
         let b = palette::slot(p, i);
         if palette::valid(b) {
             items.push(Item { btn: b, desc: palette::describe(b) });
@@ -312,7 +312,7 @@ pub fn outer_size(ui: &Ui) -> (f32, f32) {
 /// Whether the bar is up: the player has not hidden it and the HUD shows.
 pub fn shows() -> bool {
     let p = palette::palette();
-    p != 0 && !hud::hidden(p) && !crate::engine::ingame::hud_hidden()
+    p != 0 && !hud::hidden(p) && !crate::engine::api::ingame::hud_hidden()
 }
 
 pub fn run(ui: &mut Ui) {
@@ -324,7 +324,7 @@ pub fn run(ui: &mut Ui) {
         }
     }
     let p = palette::palette();
-    if p == 0 || hud::hidden(p) || crate::engine::ingame::hud_hidden() {
+    if p == 0 || hud::hidden(p) || crate::engine::api::ingame::hud_hidden() {
         s.hover = 0;
         s.tip = None;
         unsafe { CELL_BTNS = [0; CELLS] };

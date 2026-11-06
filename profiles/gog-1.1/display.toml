@@ -267,3 +267,48 @@ kind = "fn"
 addr = 0x648520
 end = 0x6485d0
 used_by = ["drop"]
+
+[[sym]]
+id = "dev_modes"
+symbol = "ST3D_DisplayDevice::mode list"
+kind = "field"
+struct = "ST3D_DisplayDevice"
+offset = 0x14
+type = "ptr"
+used_by = ["modes"]
+
+[[sym]]
+id = "mode_node_value"
+symbol = "mode list node mode"
+kind = "field"
+struct = "mode list node"
+offset = 0x8
+type = "ptr"
+used_by = ["modes"]
+
+[[sym]]
+id = "mode_width"
+symbol = "ST3D_DisplayMode::width"
+kind = "field"
+struct = "ST3D_DisplayMode"
+offset = 0x0
+type = "i32"
+used_by = ["modes"]
+
+[[sym]]
+id = "mode_height"
+symbol = "ST3D_DisplayMode::height"
+kind = "field"
+struct = "ST3D_DisplayMode"
+offset = 0x4
+type = "i32"
+used_by = ["modes"]
+
+[[sym]]
+id = "mode_bpp"
+symbol = "ST3D_DisplayMode::bits per pixel"
+kind = "field"
+struct = "ST3D_DisplayMode"
+offset = 0x8
+type = "i32"
+used_by = ["modes"]

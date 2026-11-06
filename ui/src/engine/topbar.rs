@@ -51,8 +51,8 @@ pub fn shown() -> Vec<(u32, usize)> {
         return v;
     }
     for r in 0..6u32 {
-        let c = fld(panel, field::PANELS_RP_COMPONENTS + 4 * r as usize);
-        if c != 0 && unsafe { rd::<u32>(c + field::PANELS_RC_RESOURCE) } == r {
+        let c = fld(panel, field::PANELS_RP_COMPONENTS() + 4 * r as usize);
+        if c != 0 && unsafe { rd::<u32>(c + field::PANELS_RC_RESOURCE()) } == r {
             v.push((r, c));
         }
     }
@@ -63,11 +63,11 @@ pub fn shown() -> Vec<(u32, usize)> {
 /// amount over the most the team may have.
 pub fn amount_text(r: u32) -> String {
     let t = super::resources::user_team_object();
-    if t == 0 || !ok() || unsafe { rd::<usize>(t + field::PANELS_TEAM_IN_PLAY) } == 0 {
+    if t == 0 || !ok() || unsafe { rd::<usize>(t + field::PANELS_TEAM_IN_PLAY()) } == 0 {
         return crate::sfmt!("0");
     }
     if r == OFFICERS {
-        let have: i32 = unsafe { rd(t + field::PANELS_TEAM_OFFICERS) };
+        let have: i32 = unsafe { rd(t + field::PANELS_TEAM_OFFICERS()) };
         let f: unsafe extern "thiscall" fn(usize) -> i32 = unsafe { core::mem::transmute(addr(sym::PANELS_GET_MAX_OFFICERS)) };
         let max = unsafe { f(t) };
         return crate::sfmt!("{}/{}", have, max);
@@ -167,13 +167,13 @@ pub fn button(w: Which) -> usize {
     if panel == 0 {
         return 0;
     }
-    let b = fld(panel, field::PANELS_BP_BUTTONS + 4 * i);
+    let b = fld(panel, field::PANELS_BP_BUTTONS() + 4 * i);
     if b != 0 && buttons::press_fn(b) == addr(PRESS[i]) { b } else { 0 }
 }
 
 pub fn show_more() -> bool {
     let panel = button_panel();
-    panel != 0 && unsafe { rd::<u8>(panel + field::PANELS_BP_SHOW_MORE) != 0 }
+    panel != 0 && unsafe { rd::<u8>(panel + field::PANELS_BP_SHOW_MORE()) != 0 }
 }
 
 /// `CursorInterface::m_tooltipState`: the help level the help button cycles (0, 1, 2).

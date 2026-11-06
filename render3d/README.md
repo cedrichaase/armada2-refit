@@ -798,6 +798,19 @@ that part as stock; its note reaches the Refit screen through the row `Modules.<
 (`Render3D_SettingsNote`). On an unknown `Armada2.exe`, or when `core.reads` or
 `frame.seam` is not ready, render3d stands down whole. Engine reads live in
 `core/src/engine/**` and each module's `hooks.rs` (`lint-layers.sh`, rule 1, strict).
+**Struct offsets are the profile's too**: every field offset, vtable byte offset and
+engine size those files read is a `field` or `value` entry of the core's or the module's
+profile file (ids `<module prefix>_*`: `pt_`, `sky_`, `sp_`, `hl_`, `wd_`, `ov_`, `or_`,
+`ef_`), read at run time as `field::X()` (or the module under an alias,
+`use crate::syms::{field as off}`), the matched build's value, so a build whose structs
+differ gets its own and a field it lacks stands its hook down (`crates/a2engine/README.md`,
+"Fields and values"). An offset a module shares with the core (an object's instance,
+class, flags, team and on-screen byte, an instance's scale, clock and database, a list's
+or a sprite's layout, the light registry) is read through the core's helpers, never
+re-declared. Code that walks many objects reads its offsets once, outside the loop.
+`lint-layers.sh` rule 1 fails on a literal offset anywhere (`field(x, 0x..)`,
+`rd(x + 0x..)`, `(x + 0x..) as *`, `const X: usize = 0x..`), the glue included; the
+offsets written in comments here and in `hooks.rs` say where each was found.
 Render3D.log names the executable (`engine: <identity>`), the build and
 `engine: <part> symbols: N/M resolved`. Hook ids (`render3d.<id>`), what each gates and the
 finding it rests on:
@@ -865,13 +878,28 @@ one a module built in (`recipes::builtin(kind, &[(name, include_str!(..))])`).
 The sky's recipes, the menu's `map.ini` and the built-in `ordnance.ini` (whose sections
 `Render3D.ini` overrides one by one, ordnance's own rule) are read through it.
 
+**Files** (`core/src/files.rs`): every game file render3d reads (`assets`, `recipes`,
+the world module's texture means) goes through one `a2fmt::vfs` file system, built at the
+first lookup, by a virtual path: `textures\`, `sod\`, `sprites\`, `odf\` and the recipe
+override folders `sky\`, `surfaces\`, `nebulae\`, `menu\`. Its `LAYOUT` is the mount list,
+each virtual folder and the game-directory folders it searches in order (`Textures\RGB`,
+`SOD`, `Sprites`, `odf`, `Sky`, ...); the first four rows are `games/armada2.toml`'s
+`[files]`, which `tools/layers.py --check` holds them to. `assets` indexes each of its four
+folders once (every file under it, recursively, by lower-case name, the first found
+winning) and reads through the same file system, so the lookup is the one it was before
+the file system, case-insensitive as the engine's. An archive kind (`fpq`, `zfs`) would
+mount behind a folder and log why it serves nothing (`files: fpq ... no reader ...`);
+Armada II has none.
+
 **Layers.** The engine's addresses, call sites, vtable slots and field reads belong in
 `core/src/engine/` (the core's glue) or a module's own `mods/<m>/src/hooks.rs`; a module's
-built-in tables of game data names in its `content.rs`; its recipe files under
-`render3d/content/`. `render3d/lint-layers.sh` counts what is still elsewhere (report
-mode; `--strict DIR...` fails on any hit under those directories, as the modules are
-moved over; `--rules cross,byname` limits it to the two rules every module already
-keeps).
+game data names in its content set's table (`render3d/content/sets/<set>/<m>.ini`, read
+by its `content.rs`: "Content sets"); its recipe files under `render3d/content/`.
+`render3d/lint-layers.sh` counts what is elsewhere (report mode; `--strict DIR...` fails
+on any hit under those directories, rules 1-4: CI holds `core` and `mods` to it; `--rules
+cross,byname` limits it to those rules). A name rule 4 finds that is the engine's file
+format rather than a set's (`".odf"`, `".tga"` beside a name) stays with
+`// lint-allow(content): <reason>` on its line or the line above.
 
 ### Modules and settings
 
@@ -1753,29 +1781,68 @@ Stock draws the sketch only while the key is held, at the end of `mNormalModeRen
 (`mDrawPath` 0x525180, its call at 0x522247: a one-pixel green line with boxes at the
 points); a path being flown is never drawn.
 
-Ours, in `Step::Translucent` of the main view: for each ship of the player's team whose
-command is a move or a patrol with a path, a row of fine dots from the ship to the point
-it heads to and on through the rest (a patrol on round to that point again), and a
-bigger dot at each point. The dots are placed from the far end of each segment, every
-`MovePathSpacing` pixels, and interpolated in screen space, so they stay put on the map
-as the ship flies and are cut off behind it: the part flown is gone, and a point
-passed loses its dot. The ships of one order fly copies of the same points, so a
-segment or a point already drawn this frame is not drawn again. While the key is held
-the sketch is drawn the same way (stock's call of `mDrawPath` is re-pointed and draws
-nothing while ours are drawn), and for up to a second after it is let go, until a
-ship's copy ending at the same point has arrived over the network. Points are lifted a
-unit above where they were clicked, clear of the grid's lines; depth-tested (a hull in
-front hides them), not written, blended. Render3D.log says `move paths: N ship(s) on a
-path, M point(s) ahead, sketch K` whenever one of the three changes (the first 200).
-`render3d-move-paths` checks it with the QOL change.
+Ours, in `Step::Translucent` of the main view: for each **selected** ship of the player's
+team (the overview's `GetSelectNum` / `GetSelectList`, vtable `+0x94` / `+0x98`, entity
+ids turned into objects by `Entity::Get`; not the selection bubbles' effect hash, which
+also holds co-players' and hovered objects, and not the array at `+0xbc`, which QOL's
+`MaxSelection` moves, so a selection above 16 is read where it is) with a path, a row of
+fine dots from the ship to the point it heads to and on through the rest, and a bigger dot
+at each point. An unselected ship's path is not drawn. The dots are placed from the far
+end of each segment, every `MovePathSpacing` pixels, and interpolated in screen space, so
+they stay put on the map as the ship flies and are cut off behind it: the part flown is
+gone, and a point passed loses its dot. Ships of one order share points: a segment or a
+point already drawn this frame is not drawn again.
+
+*The source of the path.* When a loaded plugin (`QOL.asi`) exports the queue it keeps (the
+appended legs, per-leg warp), that queue is drawn: the exports are found by name among every
+loaded module's (`rt::find_export`, never by the file name), once, and again once a second
+until found (not every frame). The contract, cdecl:
+
+    int QOL_MoveQueueVersion(void);   /* 1; any other value: not used */
+    int QOL_MoveQueue(const void *ship, float *xyz, int *flags, int cap);
+    int QOL_MoveQueueGroup(const void *ship, float *own, float *pts, int *flags, int cap,
+                           int *queue);       /* optional */
+
+`ship` is the `GameObject`; the call returns -1 when QOL keeps no queues, 0 when the ship
+has none, else the number of points (at most `cap`, 128 here), from the one the ship flies
+to now to the last, as xyz triples; `flags[i]` bit 0 is a warp leg (drawn as any other),
+bit 1 a point of a patrol run that loops back to that run's first point (a run is
+closed back to its first point). The points are the ship's own targets: QOL spreads a
+group over its formation, so each ship of a queue flies to the queue's point plus its place
+(`qol/README.md`, QOL-10, "A group's targets"). `QOL_MoveQueueGroup` answers the same and
+also the queue's own points (where the group's leader goes, the formation's anchor) and
+which queue. With it, a queue with one selected ship draws that ship's own path; a queue
+with several selected ships draws **the group's path once**, through the queue's points
+with their big dots, and for each ship only its own leg (from the ship to where it heads)
+and a small dot (`TICK`, 0.55 of a point's) at each of its own targets, so six ships do
+not draw six parallel lines. Without it, each ship's own path is drawn. The line runs from
+the ship to point 0 and on. QOL adds
+each Tab-click at once, so with its queue live (the last call answered 0 or more) **no
+sketch is drawn**. Without the export, or when it answers -1, the engine's own path
+(`+0x88` / `+0x12c`, only paths that came from a sketch: an ordinary move is a path of
+one point and is not drawn) and the sketch are drawn as before, while the key is held and
+for up to a second after, until a ship's copy ending at the same point has arrived;
+the filter and the sketch are only the fallback's. Stock's call of `mDrawPath` is
+re-pointed and draws nothing while ours are drawn. Points are lifted a unit above where
+they were clicked, clear of the grid's lines; depth-tested (a hull in front hides them),
+not written, blended.
+
+Render3D.log (the first 200 lines): once `overlays: move paths: QOL's queue found
+(version 1)` (`(version 1, groups)` with `QOL_MoveQueueGroup`), or `QOL's queue not found (the engine's paths, and the sketch)` (then looked
+for once a second without more lines) or `QOL's queue is version N: not used`; and, when
+one of the counts or the source changes, `overlays: move paths: N selected ship(s) on a
+path, M point(s) ahead (qol|engine|-), sketch K`. `render3d-move-paths` checks it with the
+QOL change.
 
 | Key (`[Overlays]`) | Default | |
 |---|---|---|
 | `MovePaths` | 1 | 0: no paths drawn; stock's line, while the key is held |
-| `MovePathColour`, `MovePathBrightness` | 0.55 1.0 0.55, 1 | the dots' colour (a light green) and the factor on it |
-| `MovePathOpacity` | 0.85 | the dots' opacity |
-| `MovePathDot`, `MovePathPoint` | 2.5, 6 | the dots' and the points' diameter, pixels at 1080 lines |
-| `MovePathSpacing` | 9 | from one dot to the next, pixels at 1080 lines |
+| `MovePathColour`, `MovePathBrightness` | 0.85 0.85 0.85, 1 | the line's colour (a very light grey) and the factor on it |
+| `MovePathOpacity` | 0.85 | the line's opacity |
+| `MovePathDot`, `MovePathSpacing` | 1.9, 8 | the line's dots' diameter and the distance from one to the next, pixels at 1080 lines |
+| `MovePointColour`, `MovePointBrightness` | 0.55 1.0 0.55, 1 | the points' colour (a light green) and the factor on it |
+| `MovePointOpacity` | 0.85 | the points' opacity |
+| `MovePathPoint` | 6 | the points' diameter, pixels at 1080 lines |
 
 #### overlays: Hooks
 
@@ -1788,7 +1855,7 @@ module is off they run as stock.
 | Hook | Site | Used for | Gate shut |
 |---|---|---|---|
 | `DrawHeightPost` | the five calls (the build ghost's, and the overview's `mNormalModeRender`, `mRenderWhere`, `mDrawPosts` and its one-point helper) | the height posts, noted for the view and drawn as anti-aliased lines | the call that was there (`Prev`): the engine's one-pixel line |
-| `mDrawPath` (`render3d.overlays.paths`) | `mNormalModeRender`'s call (0x522247), the sketch while the waypoint key is held | nothing drawn: the move paths draw the sketch | the call that was there: the engine's line |
+| `mDrawPath` (`render3d.overlays.paths`) | `mNormalModeRender`'s call (0x522247), the sketch while the waypoint key is held | nothing drawn: the move paths draw the sketch (or QOL's queue) | the call that was there: the engine's line |
 
 It is installed at the first switch-on, whether or not `HeightPosts` is on, so the key
 can be switched live: the detour notes a post only while one of our views is running
@@ -2744,12 +2811,22 @@ lets go of the GPU objects.
 
 #### Content sets
 
-Every module keeps its built-in tables of the game's names in its `content.rs`, one `Content`
-value per set (`STOCK`, and an empty `NONE`), and `content::get()` picks the one
-`profiles/<build>/content.toml` gives this build (`Engine::content()`,
-`crates/a2engine/README.md`, "Content"). A Fleet Ops build adds a set with its own names
-(`by_set`) and names it in its `content.toml`, without a code change elsewhere; a build with
-no set gets `NONE`: no faction keys (shields colour by stock's level), no node or sprite
+A content set is a folder, `render3d/content/sets/<set>/`, with one small ini table per
+module (`effects.ini`, `hulls.ini`, `ordnance.ini`, `overlays.ini`, `particles.ini`,
+`sky.ini`, `specials.ini`, `world.ini`): the game's names each module matches or draws
+(nodes, sprites, SODs, faction keys and colours, the kinds of special effects) and the
+recipes it builds in, named by their file under `render3d/content/` (`mbg02 =
+sky/mbg02.ini`; a set's own recipes can sit in its folder). `core/build.rs` builds every
+`.ini` under `render3d/content/` into the core (`include_str!`, `r3d_core::content::file`);
+a module's `content.rs` holds only the `Content` type, its `parse` (through
+`a2ini::Table`, which borrows from the built-in text) and an empty `NONE`, and
+`content::get()` parses, once, the table of the set `profiles/<build>/content.toml` gives
+this build (`Engine::content()`, `crates/a2engine/README.md`, "Content";
+`r3d_core::content::Cache`). So `by_set` is a folder lookup: a set with no table for a
+module is the empty table, and a new set (Fleet Ops) is a copy of `sets/stock/` named in
+its `content.toml`, with no code change (MODDING.md, "Content sets").
+`hosttest/src/sets.rs` holds the stock tables to what the modules held as constants
+before (render3d 1.2.0). A build with no set gets `NONE`: no faction keys (shields colour by stock's level), no node or sprite
 names (a clean model shows everything; no vent or pulsar emitter), no recipes (no special
 weapon is told; skies, surfaces and nebulae are the engine's own), no selection model. The
 modules register their set's recipes with `r3d_core::recipes::builtin`, and the game
@@ -2757,7 +2834,7 @@ directory's files still win. Each name is tied to its user in the module's secti
 
 #### world: Content
 
-`content.rs` holds the built-in recipes (`include_str!` of `render3d/content/surfaces/` and
+`world.ini` names the built-in recipes (files of `render3d/content/surfaces/` and
 `render3d/content/nebulae/`, by lower-cased name) and the moons' glow material. A recipe is
 read through `r3d_core::recipes`: the game directory's `Surfaces\<texture>.ini` or
 `Nebulae\<odf>.ini` first (`install.sh` copies the same files there, where an edited copy

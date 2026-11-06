@@ -7,7 +7,7 @@
 //! same input: a click is the dialog's (or the control's) own mouse messages in its
 //! client coordinates, typing is `WM_CHAR`, a choice in a list is the list's selection
 //! and the notification its parent gets.
-use crate::engine::dialogs;
+use crate::engine::api::dialogs;
 use crate::rt::win::*;
 use alloc::vec::Vec;
 

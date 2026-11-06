@@ -227,7 +227,7 @@ impl Draw {
 /// `ui/backdrops/install-plates.sh` installs), 24- or 32-bit uncompressed, as a texture; None
 /// if it is missing or another format. The caller keeps the `Tex`.
 pub fn load_bmp(rel: &str) -> Option<super::Tex> {
-    let b = crate::rt::read_file(&crate::rt::game_path(rel))?;
+    let b = crate::files::open(rel)?;
     let u16_at = |o: usize| b.get(o..o + 2).map(|s| u16::from_le_bytes([s[0], s[1]]));
     let u32_at = |o: usize| b.get(o..o + 4).map(|s| u32::from_le_bytes([s[0], s[1], s[2], s[3]]));
     if b.get(0..2) != Some(b"BM") {

@@ -11,9 +11,11 @@ and Rust (crates/a2engine, `cargo test --features fixtures`).
     fixtures.py rust-module OUT.rs  write the Rust test module (what `run rs` builds)
 
 A fixture: `set` (a directory of fixtures/sets/), `[image]` (mkpe.py), optional `base`
-(where the image is mapped; default its ImageBase), `test_ini` (an A2EngineTest.ini's
+(where the image is mapped; default its ImageBase), optional `module` (the
+process's module file name, named on an unknown build; default Fixture.exe), `test_ini` (an A2EngineTest.ini's
 text), `addr` (symbol ids queried after the readies, those of each table), `note_for`
-(`Section.Key` rows), and `[expect]` with one transcript per plugin.
+(`Section.Key` rows), `field` (field and value ids whose per-build offset or value is
+queried after the addrs), and `[expect]` with one transcript per plugin.
 """
 import glob
 import os
@@ -46,14 +48,24 @@ def fixtures():
     return out
 
 
+def module(d):
+    """The process's module file name the image stands for: what the identity line and
+    the notes name on an unknown build (`module`, default Fixture.exe)."""
+    return d.get('module', 'Fixture.exe')
+
+
 def queries(d, t):
     return [a for a in d.get('addr', []) if a in t.sym_ids], list(d.get('note_for', []))
 
 
+def field_queries(d, t):
+    return [a for a in d.get('field', []) if a in t.sym_ids]
+
+
 def py_transcript(d, t):
-    exe = pe.Exe(mkpe.build(d['image']), d.get('base'))
+    exe = pe.Exe(mkpe.build(d['image']), d.get('base'), name=module(d))
     addr, nf = queries(d, t)
-    return resolve.transcript(t, exe, d.get('test_ini'), addr, nf)
+    return resolve.transcript(t, exe, d.get('test_ini'), addr, nf, field=field_queries(d, t))
 
 
 def expected(d, t):
@@ -67,7 +79,7 @@ def content_expect(d, t):
 
 
 def py_content(d, t):
-    exe = pe.Exe(mkpe.build(d['image']), d.get('base'))
+    exe = pe.Exe(mkpe.build(d['image']), d.get('base'), name=module(d))
     eng = resolve.Engine(t, exe, d.get('test_ini'))
     if eng.bi is None:
         return 'none'
@@ -134,9 +146,11 @@ def run_c(fx, tmp):
                 continue
             addr, nf = queries(d, t)
             base = d.get('base', d['image']['image_base'])
-            args = [exe, img, ini, f'{base:x}']
+            args = [exe, img, ini, f'{base:x}', module(d)]
             for a in addr:
                 args += ['addr', a]
+            for a in field_queries(d, t):
+                args += ['field', a]
             for n in nf:
                 args += ['note_for', n]
             r = subprocess.run(args, capture_output=True, text=True)
@@ -168,7 +182,8 @@ def rust_module(fx, tmp):
             ini = 'None' if d.get('test_ini') is None else f'Some({rs_str(d["test_ini"])})'
             cases.append(
                 f'    Case {{ name: {rs_str(name + " " + t.plugin)}, table: &{m}::TABLE, image: {rs_str(img)}, base: {base:#x}, '
-                f'test_ini: {ini}, addr: &[{", ".join(rs_str(a) for a in addr)}], note_for: &[{", ".join(rs_str(n) for n in nf)}], '
+                f'module: {rs_str(module(d))}, test_ini: {ini}, addr: &[{", ".join(rs_str(a) for a in addr)}], '
+                f'field: &[{", ".join(rs_str(a) for a in field_queries(d, t))}], note_for: &[{", ".join(rs_str(n) for n in nf)}], '
                 f'content: {rs_str(content_expect(d, t) or "?")}, '
                 f'expect: &[{", ".join(rs_str(x) for x in expected(d, t))}] }},')
     o += ['', 'pub const CASES: &[Case] = &['] + cases + ['];', '']

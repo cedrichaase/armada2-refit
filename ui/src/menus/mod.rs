@@ -19,7 +19,7 @@ pub mod refit;
 pub mod scene;
 pub mod screens;
 
-use crate::engine::dialogs::{self, DESIGN_H, DESIGN_W};
+use crate::engine::api::dialogs::{self, design_h, design_w};
 use crate::gfx::{self, Tex, R};
 use crate::rt::win::HWND;
 use crate::widgets::Ui;
@@ -37,8 +37,8 @@ pub struct Fit {
 
 impl Fit {
     pub fn of(w: f32, h: f32) -> Fit {
-        let s = if w * DESIGN_H as f32 > h * DESIGN_W as f32 { h / DESIGN_H as f32 } else { w / DESIGN_W as f32 };
-        Fit { x: libm::floorf((w - DESIGN_W as f32 * s) * 0.5), y: libm::floorf((h - DESIGN_H as f32 * s) * 0.5), s }
+        let s = if w * design_h() as f32 > h * design_w() as f32 { h / design_h() as f32 } else { w / design_w() as f32 };
+        Fit { x: libm::floorf((w - design_w() as f32 * s) * 0.5), y: libm::floorf((h - design_h() as f32 * s) * 0.5), s }
     }
     /// A design rectangle (x, y, w, h) on the screen.
     pub fn rect(&self, r: [i32; 4]) -> R {
@@ -46,7 +46,7 @@ impl Fit {
     }
     /// The design area.
     pub fn area(&self) -> R {
-        self.rect([0, 0, DESIGN_W, DESIGN_H])
+        self.rect([0, 0, design_w(), design_h()])
     }
     /// A screen point in design coordinates.
     pub fn design(&self, p: (f32, f32)) -> (i32, i32) {
@@ -76,12 +76,12 @@ pub fn mirror(s: &dialogs::Slot) -> Option<Tex> {
                 i
             }
             None => {
-                v.push((s.hwnd, gfx::texture_dynamic(DESIGN_W as u32, DESIGN_H as u32), 0));
+                v.push((s.hwnd, gfx::texture_dynamic(design_w() as u32, design_h() as u32), 0));
                 v.len() - 1
             }
         },
     };
-    gfx::tex_update(v[i].1, s.frame.bits, DESIGN_W as usize * 4, DESIGN_W as u32, DESIGN_H as u32);
+    gfx::tex_update(v[i].1, s.frame.bits, design_w() as usize * 4, design_w() as u32, design_h() as u32);
     Some(v[i].1)
 }
 
@@ -120,7 +120,7 @@ pub fn frame(ui: &mut Ui) {
     backdrop::draw(ui);
     let all = dialogs::stack();
     // A full-screen dialog hides everything under it.
-    let first = all.iter().rposition(|s| s.w() >= DESIGN_W && s.h() >= DESIGN_H).unwrap_or(0);
+    let first = all.iter().rposition(|s| s.w() >= design_w() && s.h() >= design_h()).unwrap_or(0);
     let stack = &all[first..];
     let n = stack.len();
     let cfg = crate::config::get();
@@ -149,7 +149,7 @@ pub fn frame(ui: &mut Ui) {
         ui.scope(&crate::sfmt!("dlg{:p}", s.hwnd), |ui| ui.inert_unless(live, |ui| {
             if cfg.menus_specs {
                 if let Some(spec) = screens::find(m.screen) {
-                    if (spec.draw)(ui, &scr) {
+                    if spec.draw(ui, &scr) {
                         return;
                     }
                 }
@@ -180,8 +180,8 @@ impl Screen<'_> {
         let Some(t) = self.mirror else { return };
         // The mirror holds the dialog at its own origin.
         let (ox, oy) = (self.model.rect[0], self.model.rect[1]);
-        let (u0, v0) = ((r[0] - ox) as f32 / DESIGN_W as f32, (r[1] - oy) as f32 / DESIGN_H as f32);
-        let (u1, v1) = (u0 + r[2] as f32 / DESIGN_W as f32, v0 + r[3] as f32 / DESIGN_H as f32);
+        let (u0, v0) = ((r[0] - ox) as f32 / design_w() as f32, (r[1] - oy) as f32 / design_h() as f32);
+        let (u1, v1) = (u0 + r[2] as f32 / design_w() as f32, v0 + r[3] as f32 / design_h() as f32);
         ui.draw.image_uv(t, dst, [u0, v0, u1, v1], tint);
     }
     /// A click on a design point of this dialog, sent after the frame.

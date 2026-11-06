@@ -283,7 +283,7 @@ fn typeset(ui: &mut Ui, s: &Screen, page: R, sel: usize) -> bool {
         .model
         .controls
         .iter()
-        .filter(|c| c.visible && c.text.is_empty() && matches!(c.what, What::Shell(crate::engine::shellui::Kind::Button)) && c.rect[0] >= 700 && c.rect[1] >= PANE[1])
+        .filter(|c| c.visible && c.text.is_empty() && matches!(c.what, What::Shell(crate::engine::api::shellui::Kind::Button)) && c.rect[0] >= 700 && c.rect[1] >= PANE[1])
         .collect();
     arrows.sort_by_key(|c| c.rect[1]);
     if arrows.len() >= 2 {

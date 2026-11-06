@@ -13,6 +13,11 @@ pub trait Image {
     fn base(&self) -> usize {
         0
     }
+    /// The module's file name, without its directory, into `out`: its length, 0 if the
+    /// image has none (a buffer). The identity line names it on an unknown build.
+    fn name(&self, _out: &mut [u8]) -> usize {
+        0
+    }
 }
 
 /// A file or buffer, offsets from its start.
@@ -138,19 +143,20 @@ pub fn section(mem: &dyn Image, name: &str) -> Option<(usize, usize)> {
     None
 }
 
-/// The log line, identical in every plugin: `engine: ` + this. The name is fixed on
-/// purpose: it is the line's key, not a reading of the file.
+/// The log line, identical in every plugin: `engine: <exe> ` + this, where `<exe>` is
+/// the matched build's executable (build.toml `exe`), else the module's own file name
+/// (`init_with` writes it; `is_identity_line` recognises it).
 impl core::fmt::Display for Identity {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
-            "Armada2.exe timestamp {:#010x}, image size {:#x}, sections {:#010x}",
+            "timestamp {:#010x}, image size {:#x}, sections {:#010x}",
             self.timestamp, self.image_size, self.sections
         )
     }
 }
 
-/// The main module (`Armada2.exe`) of this process, read from its mapped headers.
+/// The main module (the game's executable) of this process, read from its mapped headers.
 #[cfg(windows)]
 pub fn this_process() -> Option<Identity> {
     #[link(name = "kernel32")]

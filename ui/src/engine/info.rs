@@ -46,38 +46,64 @@ fn sd() -> usize {
 // ---- the stock panel's children (members of `shipDisplay`) --------------------------
 
 /// The hover strip (`SDInfoBar`): its own shield and hull texts, read for one unit.
-const SD_INFOBAR: usize = field::INFO_SD_INFOBAR;
-const IB_SHIELD_TEXT: usize = field::INFO_IB_SHIELD_TEXT;
-const IB_HULL_TEXT: usize = field::INFO_IB_HULL_TEXT;
+#[inline(always)]
+fn sd_infobar() -> usize { field::INFO_SD_INFOBAR() }
+#[inline(always)]
+fn ib_shield_text() -> usize { field::INFO_IB_SHIELD_TEXT() }
+#[inline(always)]
+fn ib_hull_text() -> usize { field::INFO_IB_HULL_TEXT() }
 /// The five system texts (`SystemText`, with their icons) and their repair icons.
-const SYS_TEXT: usize = field::INFO_SD_SYS_TEXT;
-const SYS_REPAIR: usize = field::INFO_SD_SYS_REPAIR;
-pub const N_SYSTEMS: usize = value::INFO_N_SYSTEMS as usize;
-const CREW_TEXT: usize = field::INFO_SD_CREW_TEXT;
-const ENERGY_TEXT: usize = field::INFO_SD_ENERGY_TEXT;
-const CLASS_TEXT: usize = field::INFO_SD_CLASS_TEXT;
-const NAME_TEXT: usize = field::INFO_SD_NAME_TEXT;
-const OFFICER_TEXT: usize = field::INFO_SD_OFFICER_TEXT;
-const HULL_BAR: usize = field::INFO_SD_HULL_BAR;
-const CARGO_BAR: usize = field::INFO_SD_CARGO_BAR;
-const METAL_BAR: usize = field::INFO_SD_METAL_BAR;
-const WIREFRAME: usize = field::INFO_SD_WIREFRAME;
-const CONSTRUCTION_BAR: usize = field::INFO_SD_CONSTRUCTION_BAR;
-const RESEARCH_TEXT: usize = field::INFO_SD_RESEARCH_TEXT;
-const CARGO_TEXT: usize = field::INFO_SD_CARGO_TEXT;
-const POPULATION_TEXT: usize = field::INFO_SD_POPULATION_TEXT;
-const PLANET_OWNER_TEXT: usize = field::INFO_SD_PLANET_OWNER_TEXT;
+#[inline(always)]
+fn sys_text() -> usize { field::INFO_SD_SYS_TEXT() }
+#[inline(always)]
+fn sys_repair() -> usize { field::INFO_SD_SYS_REPAIR() }
+#[inline(always)]
+pub fn n_systems() -> usize { value::INFO_N_SYSTEMS() as usize }
+#[inline(always)]
+fn crew_text() -> usize { field::INFO_SD_CREW_TEXT() }
+#[inline(always)]
+fn energy_text() -> usize { field::INFO_SD_ENERGY_TEXT() }
+#[inline(always)]
+fn class_text() -> usize { field::INFO_SD_CLASS_TEXT() }
+#[inline(always)]
+fn name_text() -> usize { field::INFO_SD_NAME_TEXT() }
+#[inline(always)]
+fn officer_text() -> usize { field::INFO_SD_OFFICER_TEXT() }
+#[inline(always)]
+fn hull_bar() -> usize { field::INFO_SD_HULL_BAR() }
+#[inline(always)]
+fn cargo_bar() -> usize { field::INFO_SD_CARGO_BAR() }
+#[inline(always)]
+fn metal_bar() -> usize { field::INFO_SD_METAL_BAR() }
+#[inline(always)]
+fn off_wireframe() -> usize { field::INFO_SD_WIREFRAME() }
+#[inline(always)]
+fn construction_bar() -> usize { field::INFO_SD_CONSTRUCTION_BAR() }
+#[inline(always)]
+fn research_text() -> usize { field::INFO_SD_RESEARCH_TEXT() }
+#[inline(always)]
+fn cargo_text() -> usize { field::INFO_SD_CARGO_TEXT() }
+#[inline(always)]
+fn population_text() -> usize { field::INFO_SD_POPULATION_TEXT() }
+#[inline(always)]
+fn planet_owner_text() -> usize { field::INFO_SD_PLANET_OWNER_TEXT() }
 /// The builder's queue: ten `BuildWireframe`s (the queued class at +0x3c, the builder
 /// at +0x28, the slot at +0x40).
-const QUEUE: usize = field::INFO_SD_QUEUE;
-pub const QUEUE_LEN: usize = value::INFO_QUEUE_LEN as usize;
-const BW_BUILDER: usize = field::INFO_BW_BUILDER;
-const BW_CLASS: usize = field::INFO_BW_CLASS;
+#[inline(always)]
+fn off_queue() -> usize { field::INFO_SD_QUEUE() }
+#[inline(always)]
+pub fn queue_len() -> usize { value::INFO_QUEUE_LEN() as usize }
+#[inline(always)]
+fn bw_builder() -> usize { field::INFO_BW_BUILDER() }
+#[inline(always)]
+fn bw_class() -> usize { field::INFO_BW_CLASS() }
 /// The object the panel describes (set by `DetermineSelectedDisplayType`), and the
 /// craft the pointer is over in the 3D view (set by `ShipDisplay::AlwaysSimulate`,
 /// cleared by its `Render` once drawn).
-const CURRENT: usize = field::INFO_SD_CURRENT;
-const HOVER: usize = field::INFO_SD_HOVER;
+#[inline(always)]
+fn off_current() -> usize { field::INFO_SD_CURRENT() }
+#[inline(always)]
+fn off_hover() -> usize { field::INFO_SD_HOVER() }
 
 /// `ShipDisplay::DetermineSelectedDisplayType`, thiscall: which of the panel's faces
 /// the selection needs, and with it the object (`+0x1e8`) and the panel's height
@@ -86,25 +112,40 @@ const HOVER: usize = field::INFO_SD_HOVER;
 
 // ---- component vtable slots ---------------------------------------------------------
 
-const VT_TOOLTIP: usize = field::INFO_VT_TOOLTIP;
-const VT_VERBOSE: usize = field::INFO_VT_VERBOSE;
-const VT_SET_OBJECT: usize = field::INFO_VT_SET_OBJECT;
-const VT_INFORMATION: usize = field::INFO_VT_INFORMATION;
-const VT_LABEL: usize = field::INFO_VT_LABEL;
-const VT_CURRENT_COLOR: usize = field::INFO_VT_CURRENT_COLOR;
-const VT_BAR_COLOR: usize = field::INFO_VT_BAR_COLOR;
-const VT_BAR_VALUE: usize = field::INFO_VT_BAR_VALUE;
-const TS_SPRITE: usize = field::INFO_TS_SPRITE;
-const BAR_OBJECT: usize = field::INFO_BAR_OBJECT;
+#[inline(always)]
+fn vt_tooltip() -> usize { field::INFO_VT_TOOLTIP() }
+#[inline(always)]
+fn vt_verbose() -> usize { field::INFO_VT_VERBOSE() }
+#[inline(always)]
+fn vt_set_object() -> usize { field::INFO_VT_SET_OBJECT() }
+#[inline(always)]
+fn vt_information() -> usize { field::INFO_VT_INFORMATION() }
+#[inline(always)]
+fn vt_label() -> usize { field::INFO_VT_LABEL() }
+#[inline(always)]
+fn vt_current_color() -> usize { field::INFO_VT_CURRENT_COLOR() }
+#[inline(always)]
+fn vt_bar_color() -> usize { field::INFO_VT_BAR_COLOR() }
+#[inline(always)]
+fn vt_bar_value() -> usize { field::INFO_VT_BAR_VALUE() }
+#[inline(always)]
+fn ts_sprite() -> usize { field::INFO_TS_SPRITE() }
+#[inline(always)]
+fn bar_object() -> usize { field::INFO_BAR_OBJECT() }
 /// `RepairIcon`: the craft (+0x28), its system (+0x2c), the system's id in the
 /// craft's repair list (+0x30), its icon (+0x34), and the flash it blinks with (+0x40,
 /// toggled every 0.4 s by `RepairIcon::Flash` in the panel's always-step).
-const RI_SYSTEM: usize = field::INFO_RI_SYSTEM;
-const RI_REPAIR_ID: usize = field::INFO_RI_REPAIR_ID;
-const RI_SPRITE: usize = field::INFO_RI_SPRITE;
-const RI_FLASH: usize = field::INFO_RI_FLASH;
+#[inline(always)]
+fn ri_system() -> usize { field::INFO_RI_SYSTEM() }
+#[inline(always)]
+fn ri_repair_id() -> usize { field::INFO_RI_REPAIR_ID() }
+#[inline(always)]
+fn ri_sprite() -> usize { field::INFO_RI_SPRITE() }
+#[inline(always)]
+fn ri_flash() -> usize { field::INFO_RI_FLASH() }
 /// `WireframeIcon`: its flash (+0x30), toggled as the repair icons'.
-const WI_FLASH: usize = field::INFO_WI_FLASH;
+#[inline(always)]
+fn wi_flash() -> usize { field::INFO_WI_FLASH() }
 
 // ---- objects --------------------------------------------------------------------------
 
@@ -112,45 +153,70 @@ const WI_FLASH: usize = field::INFO_WI_FLASH;
 /// planets), 0x20 it produces, 0x200 it builds (the builder's face), 0x80 and
 /// 0x80000000 it carries cargo, 0x4000 a named object that is no craft, 0x40000 under
 /// construction, 0x101000 drawn whole (no systems in its wireframe).
-const OBJ_FLAGS: usize = field::INFO_OBJ_FLAGS;
-pub const F_CRAFT: u32 = value::INFO_F_CRAFT as u32;
-const F_PRODUCER: u32 = value::INFO_F_PRODUCER as u32;
-const F_CARGO: u32 = value::INFO_F_CARGO as u32;
-const F_CARGO2: u32 = value::INFO_F_CARGO2 as u32;
-const F_NAMED: u32 = value::INFO_F_NAMED as u32;
-const F_CONSTRUCTION: u32 = value::INFO_F_CONSTRUCTION as u32;
-const F_WHOLE: u32 = value::INFO_F_WHOLE as u32;
+#[inline(always)]
+fn obj_flags() -> usize { field::INFO_OBJ_FLAGS() }
+#[inline(always)]
+pub fn f_craft() -> u32 { value::INFO_F_CRAFT() as u32 }
+#[inline(always)]
+fn f_producer() -> u32 { value::INFO_F_PRODUCER() as u32 }
+#[inline(always)]
+fn f_cargo() -> u32 { value::INFO_F_CARGO() as u32 }
+#[inline(always)]
+fn f_cargo2() -> u32 { value::INFO_F_CARGO2() as u32 }
+#[inline(always)]
+fn f_named() -> u32 { value::INFO_F_NAMED() as u32 }
+#[inline(always)]
+fn f_construction() -> u32 { value::INFO_F_CONSTRUCTION() as u32 }
+#[inline(always)]
+fn f_whole() -> u32 { value::INFO_F_WHOLE() as u32 }
 /// `GameObject+0x40`: its class (`GameObjectClass`), whose `+0x7c` names its
 /// wireframe sprites and `+0x88` is its officer cost (`Get_Raw_Officer_Cost`).
-const OBJ_CLASS: usize = field::INFO_OBJ_CLASS;
-const CLASS_WIREFRAME: usize = field::INFO_CLASS_WIREFRAME;
-const CLASS_OFFICERS: usize = field::INFO_CLASS_OFFICERS;
+#[inline(always)]
+fn obj_class() -> usize { field::INFO_OBJ_CLASS() }
+#[inline(always)]
+fn class_wireframe() -> usize { field::INFO_CLASS_WIREFRAME() }
+#[inline(always)]
+fn class_officers() -> usize { field::INFO_CLASS_OFFICERS() }
 /// `ConstructionObject+0x188`: the class being built, whose wireframe it shows.
-const CONSTRUCTING_CLASS: usize = field::INFO_CONSTRUCTING_CLASS;
+#[inline(always)]
+fn constructing_class() -> usize { field::INFO_CONSTRUCTING_CLASS() }
 /// The thresholds stock shows a value at: crew (+0x1c4) and special energy (+0x168)
 /// above 0.1; a cargo store (+0x17c) when it has one; planets' systems (+0xec).
-const OBJ_CREW: usize = field::INFO_OBJ_CREW;
-const OBJ_ENERGY: usize = field::INFO_OBJ_ENERGY;
-const OBJ_STORE: usize = field::INFO_OBJ_STORE;
-const PLANET_SYSTEMS: usize = field::INFO_PLANET_SYSTEMS;
+#[inline(always)]
+fn obj_crew() -> usize { field::INFO_OBJ_CREW() }
+#[inline(always)]
+fn obj_energy() -> usize { field::INFO_OBJ_ENERGY() }
+#[inline(always)]
+fn obj_store() -> usize { field::INFO_OBJ_STORE() }
+#[inline(always)]
+fn planet_systems() -> usize { field::INFO_PLANET_SYSTEMS() }
 /// `GameObject+0x158`: health, 0..1 (a whole wireframe goes red below a half).
-const OBJ_HEALTH: usize = field::INFO_OBJ_HEALTH;
+#[inline(always)]
+fn obj_health() -> usize { field::INFO_OBJ_HEALTH() }
 /// `GameObject+0xfc`: its race, whose name (+0x14) names the race emblem
 /// (`<name>_icon`, as `RaceIcon::Render` finds it).
-const OBJ_RACE: usize = field::INFO_OBJ_RACE;
-const RACE_NAME: usize = field::INFO_RACE_NAME;
+#[inline(always)]
+fn obj_race() -> usize { field::INFO_OBJ_RACE() }
+#[inline(always)]
+fn race_name() -> usize { field::INFO_RACE_NAME() }
 /// `Craft+0x1c8` / `+0x1cc`: shields now and at most (`HealthBar::GetBarColor` reads
 /// them for the colour it gives the hull bar).
-const CRAFT_SHIELD: usize = field::INFO_CRAFT_SHIELD;
-const CRAFT_SHIELD_MAX: usize = field::INFO_CRAFT_SHIELD_MAX;
+#[inline(always)]
+fn craft_shield() -> usize { field::INFO_CRAFT_SHIELD() }
+#[inline(always)]
+fn craft_shield_max() -> usize { field::INFO_CRAFT_SHIELD_MAX() }
 /// `Craft+0x1e0`: its systems, 0x30 bytes each in `eSystem` order; a system's byte +1
 /// is set while it is out, `+0x28` the repair under way. `Craft+0x30`: the list of
 /// systems being repaired (`std::list`, each item's +0x10 the repair id).
-const CRAFT_SYSTEMS: usize = field::INFO_CRAFT_SYSTEMS;
-const SYSTEM_BYTES: usize = value::INFO_SYSTEM_BYTES as usize;
-const CRAFT_REPAIRS: usize = field::INFO_CRAFT_REPAIRS;
+#[inline(always)]
+fn craft_systems() -> usize { field::INFO_CRAFT_SYSTEMS() }
+#[inline(always)]
+fn system_bytes() -> usize { value::INFO_SYSTEM_BYTES() as usize }
+#[inline(always)]
+fn craft_repairs() -> usize { field::INFO_CRAFT_REPAIRS() }
 /// `IsPlanet`, vtable +0x0c of every entity.
-const VT_IS_PLANET: usize = field::INFO_VT_IS_PLANET;
+#[inline(always)]
+fn vt_is_planet() -> usize { field::INFO_VT_IS_PLANET() }
 /// `Craft::mComputeRepairLeft(const CraftSystem *)`, thiscall: how much of a system is
 /// still to be repaired, 0..1.
 /// `GameObject::GetSlowEffect` / `GetLineOfSightEffect`, thiscall: the gravity mine's
@@ -162,15 +228,18 @@ const VT_IS_PLANET: usize = field::INFO_VT_IS_PLANET;
 /// `Producer::GetBuildQueue`, thiscall: the ten queued classes (0 for a free slot).
 /// `Producer::RequestDeleteBuildQueueItem(int)`, vtable +0x140: what a click on a
 /// queue slot does (`BuildWireframe::Simulate`).
-const VT_DELETE_QUEUE_ITEM: usize = field::INFO_VT_DELETE_QUEUE_ITEM;
+#[inline(always)]
+fn vt_delete_queue_item() -> usize { field::INFO_VT_DELETE_QUEUE_ITEM() }
 /// `cOverViewImp::Select(GameObject *, eSelectionType, bool, bool)`, vtable +0x90:
 /// what a click on a group icon does (`ShipIcon::Simulate`): `(obj, 0, true, true)`
 /// selects it alone, with Shift `(obj, 1, false, true)` takes it out.
-const VT_SELECT: usize = field::INFO_VT_SELECT;
+#[inline(always)]
+fn vt_select() -> usize { field::INFO_VT_SELECT() }
 /// `gCameraManager`'s camera (its first member, a `GameCamera *`) and its
 /// `SetInterestEntity` (vtable +0x58): what a click on the one-unit panel does
 /// (`ShipDisplay::SimulateSingleObject`), the camera goes to the unit.
-const VT_SET_INTEREST_ENTITY: usize = field::INFO_VT_SET_INTEREST_ENTITY;
+#[inline(always)]
+fn vt_set_interest_entity() -> usize { field::INFO_VT_SET_INTEREST_ENTITY() }
 /// `Localized_Strings::Localize`, thiscall on `g_string`.
 
 // ---- what the panel shows ---------------------------------------------------------------
@@ -204,7 +273,7 @@ pub fn face() -> Face {
 /// The object the panel describes (after `face`).
 pub fn current() -> usize {
     let panel = sd();
-    if panel == 0 { 0 } else { unsafe { rd::<usize>(panel + CURRENT) } }
+    if panel == 0 { 0 } else { unsafe { rd::<usize>(panel + off_current()) } }
 }
 
 /// Whether the panel still shows `obj` alone (the close-up checks before it draws).
@@ -221,18 +290,18 @@ pub fn take_hover() -> usize {
     }
     unsafe {
         let none = rd::<i32>(none_at);
-        let h = rd::<i32>(panel + HOVER);
-        *((panel + HOVER) as *mut i32) = none;
+        let h = rd::<i32>(panel + off_hover());
+        *((panel + off_hover()) as *mut i32) = none;
         if h == none {
             return 0;
         }
         let o = selection::object(h);
-        if o == 0 || flags(o) & F_CRAFT == 0 { 0 } else { o }
+        if o == 0 || flags(o) & f_craft() == 0 { 0 } else { o }
     }
 }
 
 pub fn flags(obj: usize) -> u32 {
-    if obj == 0 { 0 } else { unsafe { rd::<u32>(obj + OBJ_FLAGS) } }
+    if obj == 0 { 0 } else { unsafe { rd::<u32>(obj + obj_flags()) } }
 }
 
 fn f32_at(obj: usize, off: usize) -> f32 {
@@ -240,7 +309,7 @@ fn f32_at(obj: usize, off: usize) -> f32 {
 }
 
 fn is_planet(obj: usize) -> bool {
-    let f: unsafe extern "thiscall" fn(usize) -> bool = unsafe { core::mem::transmute(rd::<usize>(rd::<usize>(obj) + VT_IS_PLANET)) };
+    let f: unsafe extern "thiscall" fn(usize) -> bool = unsafe { core::mem::transmute(rd::<usize>(rd::<usize>(obj) + vt_is_planet())) };
     unsafe { f(obj) }
 }
 
@@ -308,12 +377,12 @@ fn text_of(c: usize, obj: usize, with_icon: bool) -> Option<Text> {
         return None;
     }
     unsafe {
-        let set: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(vcall(c, VT_SET_OBJECT));
+        let set: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(vcall(c, vt_set_object()));
         set(c, obj);
         let mut out = [0u32; 4];
-        let info: unsafe extern "thiscall" fn(usize, *mut u32) -> usize = core::mem::transmute(vcall(c, VT_INFORMATION));
+        let info: unsafe extern "thiscall" fn(usize, *mut u32) -> usize = core::mem::transmute(vcall(c, vt_information()));
         info(c, out.as_mut_ptr());
-        let label: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(vcall(c, VT_LABEL));
+        let label: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(vcall(c, vt_label()));
         let mut t = Text {
             label: localize(label(c)),
             colour: [f32::from_bits(out[0]), f32::from_bits(out[1]), f32::from_bits(out[2])],
@@ -323,10 +392,10 @@ fn text_of(c: usize, obj: usize, with_icon: bool) -> Option<Text> {
             icon_colour: [1.0; 3],
         };
         if with_icon {
-            t.icon = field(c, TS_SPRITE);
+            t.icon = field(c, ts_sprite());
             if t.icon != 0 {
                 let mut col = [0f32; 3];
-                let cur: unsafe extern "thiscall" fn(usize, *mut f32) -> usize = core::mem::transmute(vcall(c, VT_CURRENT_COLOR));
+                let cur: unsafe extern "thiscall" fn(usize, *mut f32) -> usize = core::mem::transmute(vcall(c, vt_current_color()));
                 cur(c, col.as_mut_ptr());
                 t.icon_colour = col;
             }
@@ -354,12 +423,12 @@ fn bar_of(c: usize, obj: usize) -> Option<Bar> {
         return None;
     }
     unsafe {
-        *((c + BAR_OBJECT) as *mut usize) = obj;
+        *((c + bar_object()) as *mut usize) = obj;
         let mut v = [0f32; 2];
-        let val: unsafe extern "thiscall" fn(usize, *mut f32) -> usize = core::mem::transmute(vcall(c, VT_BAR_VALUE));
+        let val: unsafe extern "thiscall" fn(usize, *mut f32) -> usize = core::mem::transmute(vcall(c, vt_bar_value()));
         val(c, v.as_mut_ptr());
         let mut col = [0f32; 3];
-        let colf: unsafe extern "thiscall" fn(usize, *mut f32) -> usize = core::mem::transmute(vcall(c, VT_BAR_COLOR));
+        let colf: unsafe extern "thiscall" fn(usize, *mut f32) -> usize = core::mem::transmute(vcall(c, vt_bar_color()));
         colf(c, col.as_mut_ptr());
         Some(Bar { value: v[0], max: v[1], colour: col, comp: c })
     }
@@ -376,7 +445,7 @@ pub fn tooltip(comp: usize, verbose: bool) -> Option<String> {
     if comp == 0 || !super::msvc::available() {
         return None;
     }
-    let slot = if verbose { VT_VERBOSE } else { VT_TOOLTIP };
+    let slot = if verbose { vt_verbose() } else { vt_tooltip() };
     super::msvc::with_stringstream(|ss| unsafe {
         let f: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(vcall(comp, slot));
         f(comp, ss)
@@ -389,19 +458,19 @@ pub fn tooltip(comp: usize, verbose: bool) -> Option<String> {
 /// `<wireframe>w1` .. `w5` (one per system, in `eSystem` order), or `<wireframe>_s`
 /// for an object drawn whole (`WireframeIcon::GetWireframe`).
 pub struct Wire {
-    pub sprites: [usize; N_SYSTEMS],
+    pub sprites: Vec<usize>,
     pub whole: bool,
 }
 
 /// The wireframe of `class` (a `GameObjectClass`), whole or by system, falling back
 /// to the other form when the art has only that one.
 pub fn class_wire(class: usize, whole: bool) -> Option<Wire> {
-    let name = latin1(field(class, CLASS_WIREFRAME));
+    let name = latin1(field(class, class_wireframe()));
     if name.is_empty() {
         return None;
     }
     let by_system = || {
-        let mut s = [0usize; N_SYSTEMS];
+        let mut s = alloc::vec![0usize; n_systems()];
         for (i, sp) in s.iter_mut().enumerate() {
             *sp = super::palette::find_sprite(&crate::sfmt!("{}w{}", name, i + 1));
         }
@@ -416,7 +485,9 @@ pub fn class_wire(class: usize, whole: bool) -> Option<Wire> {
     }
     let w = whole_one();
     if w != 0 {
-        return Some(Wire { sprites: [w, 0, 0, 0, 0], whole: true });
+        let mut sprites = alloc::vec![0usize; n_systems().max(1)];
+        sprites[0] = w;
+        return Some(Wire { sprites, whole: true });
     }
     let s = by_system();
     s.iter().any(|&x| x != 0).then_some(Wire { sprites: s, whole: false })
@@ -424,7 +495,7 @@ pub fn class_wire(class: usize, whole: bool) -> Option<Wire> {
 
 /// Whether `obj` is drawn whole rather than by system (`WireframeIcon::Render`).
 pub fn drawn_whole(obj: usize) -> bool {
-    flags(obj) & F_WHOLE != 0 || is_planet(obj)
+    flags(obj) & f_whole() != 0 || is_planet(obj)
 }
 
 /// The wireframe `obj` shows: its own class's, or for a station under construction
@@ -434,7 +505,7 @@ pub fn wire(obj: usize) -> Option<Wire> {
         return None;
     }
     let cons = cast(obj, sym::INFO_TD_GAME_OBJECT, sym::INFO_TD_CONSTRUCTION);
-    let class = if cons != 0 { field(cons, CONSTRUCTING_CLASS) } else { field(obj, OBJ_CLASS) };
+    let class = if cons != 0 { field(cons, constructing_class()) } else { field(obj, obj_class()) };
     class_wire(class, drawn_whole(obj))
 }
 
@@ -449,23 +520,26 @@ pub struct SystemState {
 
 /// The repair id of each system (`eSystem` 0..4), as the craft's repair list names
 /// them (`WireframeIcon::DrawSystem`).
-const REPAIR_ID: [u32; N_SYSTEMS] = [
-    value::INFO_REPAIR_ID_0 as u32,
-    value::INFO_REPAIR_ID_1 as u32,
-    value::INFO_REPAIR_ID_2 as u32,
-    value::INFO_REPAIR_ID_3 as u32,
-    value::INFO_REPAIR_ID_4 as u32,
-];
+fn repair_id(sys: usize) -> Option<u32> {
+    Some(match sys {
+        0 => value::INFO_REPAIR_ID_0(),
+        1 => value::INFO_REPAIR_ID_1(),
+        2 => value::INFO_REPAIR_ID_2(),
+        3 => value::INFO_REPAIR_ID_3(),
+        4 => value::INFO_REPAIR_ID_4(),
+        _ => return None,
+    } as u32)
+}
 
 pub fn system_state(obj: usize, sys: usize) -> Option<SystemState> {
-    if obj == 0 || sys >= N_SYSTEMS || cast(obj, sym::INFO_TD_GAME_OBJECT, sym::INFO_TD_CRAFT) == 0 {
+    if obj == 0 || sys >= n_systems() || cast(obj, sym::INFO_TD_GAME_OBJECT, sym::INFO_TD_CRAFT) == 0 {
         return None;
     }
-    let systems = field(obj, CRAFT_SYSTEMS);
+    let systems = field(obj, craft_systems());
     if systems == 0 {
         return None;
     }
-    let s = systems + sys * SYSTEM_BYTES;
+    let s = systems + sys * system_bytes();
     let a = at(sym::INFO_REPAIR_LEFT);
     if a == 0 {
         return None;
@@ -474,13 +548,13 @@ pub fn system_state(obj: usize, sys: usize) -> Option<SystemState> {
     let left = unsafe { f(obj, s) };
     let mut repairing = false;
     unsafe {
-        let head = rd::<usize>(obj + CRAFT_REPAIRS);
+        let head = rd::<usize>(obj + craft_repairs());
         if head != 0 {
             let mut n = rd::<usize>(head);
             let mut guard = 0;
             while n != head && n != 0 && guard < 32 {
                 let item = rd::<usize>(n + 8);
-                if item != 0 && rd::<u32>(item + field::INFO_REPAIR_ITEM_ID) == REPAIR_ID[sys] {
+                if item != 0 && Some(rd::<u32>(item + field::INFO_REPAIR_ITEM_ID())) == repair_id(sys) {
                     repairing = true;
                     break;
                 }
@@ -488,7 +562,7 @@ pub fn system_state(obj: usize, sys: usize) -> Option<SystemState> {
                 guard += 1;
             }
         }
-        if !repairing && rd::<u8>(s + field::INFO_SYS_OUT) == 0 && rd::<f32>(s + field::INFO_SYS_REPAIR) > 0.0 {
+        if !repairing && rd::<u8>(s + field::INFO_SYS_OUT()) == 0 && rd::<f32>(s + field::INFO_SYS_REPAIR()) > 0.0 {
             repairing = true;
         }
     }
@@ -497,19 +571,19 @@ pub fn system_state(obj: usize, sys: usize) -> Option<SystemState> {
 
 /// The flash stock's wireframe and repair icons blink with (on half of every 0.8 s).
 pub fn flash() -> bool {
-    let w = child(WIREFRAME);
-    w != 0 && unsafe { rd::<u8>(w + WI_FLASH) } != 0
+    let w = child(off_wireframe());
+    w != 0 && unsafe { rd::<u8>(w + wi_flash()) } != 0
 }
 
 /// The one-object face's wireframe component (handed its object by `single`), for
 /// its tooltip.
 pub fn wire_comp() -> usize {
-    child(WIREFRAME)
+    child(off_wireframe())
 }
 
 /// Whether a whole object's wireframe goes red (health below a half).
 pub fn whole_damaged(obj: usize) -> bool {
-    obj != 0 && f32_at(obj, OBJ_HEALTH) < 0.5
+    obj != 0 && f32_at(obj, obj_health()) < 0.5
 }
 
 /// The status icons stock draws by the wireframe: slowed by a gravity mine, a
@@ -528,7 +602,7 @@ pub fn effects(obj: usize) -> (bool, bool) {
         let los: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(la);
         let s = slow(craft) != 0;
         let l = los(craft);
-        let spy = l != 0 && field(l, field::INFO_LOS_ORDNANCE) != 0 && cast(field(field(l, field::INFO_LOS_ORDNANCE), field::INFO_ORDNANCE_CLASS), sym::INFO_TD_ORDNANCE_CLASS, sym::INFO_TD_ROMULAN_SPY_CLASS) != 0;
+        let spy = l != 0 && field(l, field::INFO_LOS_ORDNANCE()) != 0 && cast(field(field(l, field::INFO_LOS_ORDNANCE()), field::INFO_ORDNANCE_CLASS()), sym::INFO_TD_ORDNANCE_CLASS, sym::INFO_TD_ROMULAN_SPY_CLASS) != 0;
         (s, spy)
     }
 }
@@ -540,11 +614,11 @@ pub fn effect_sprites() -> (usize, usize) {
 
 /// The race emblem of `obj` (`<race>_icon`), or 0.
 pub fn race_icon(obj: usize) -> usize {
-    let race = field(obj, OBJ_RACE);
+    let race = field(obj, obj_race());
     if race == 0 {
         return 0;
     }
-    let name = latin1(race + RACE_NAME);
+    let name = latin1(race + race_name());
     if name.is_empty() { 0 } else { super::palette::find_sprite(&crate::sfmt!("{}_icon", name)) }
 }
 
@@ -598,123 +672,123 @@ pub fn single(obj: usize) -> Single {
         return s;
     }
     let fl = flags(obj);
-    let w = child(WIREFRAME);
+    let w = child(off_wireframe());
     if w != 0 {
-        unsafe { *((w + field::INFO_WI_OBJECT) as *mut usize) = obj };
+        unsafe { *((w + field::INFO_WI_OBJECT()) as *mut usize) = obj };
     }
-    s.class = text_of(child(CLASS_TEXT), obj, false);
-    if fl & F_CRAFT != 0 {
+    s.class = text_of(child(class_text()), obj, false);
+    if fl & f_craft() != 0 {
         s.craft = true;
         s.race_icon = race_icon(obj);
-        s.name = text_of(child(NAME_TEXT), obj, false);
-        if f32_at(obj, OBJ_CREW) > 0.1 {
-            s.stats.extend(text_of(child(CREW_TEXT), obj, true));
+        s.name = text_of(child(name_text()), obj, false);
+        if f32_at(obj, obj_crew()) > 0.1 {
+            s.stats.extend(text_of(child(crew_text()), obj, true));
         }
         if is_planet(obj) {
             s.planet = true;
-            s.stats.extend(text_of(child(POPULATION_TEXT), obj, false));
-            s.stats.extend(text_of(child(PLANET_OWNER_TEXT), obj, false));
-            if let Some(b) = bar_of(child(METAL_BAR), obj) {
+            s.stats.extend(text_of(child(population_text()), obj, false));
+            s.stats.extend(text_of(child(planet_owner_text()), obj, false));
+            if let Some(b) = bar_of(child(metal_bar()), obj) {
                 s.bars.push((BarKind::Metal, b));
             }
-            if unsafe { rd::<usize>(obj + PLANET_SYSTEMS) } != 0 {
+            if unsafe { rd::<usize>(obj + planet_systems()) } != 0 {
                 for i in 0..2 {
                     s.systems.extend(system(obj, i));
                 }
-                s.stats.extend(text_of(child(OFFICER_TEXT), obj, true));
-                if let Some(b) = bar_of(child(CONSTRUCTION_BAR), obj) {
+                s.stats.extend(text_of(child(officer_text()), obj, true));
+                if let Some(b) = bar_of(child(construction_bar()), obj) {
                     s.bars.push((BarKind::Construction, b));
                 }
             }
             return s;
         }
-        if field(field(obj, OBJ_CLASS), CLASS_OFFICERS) as i32 > 0 {
-            s.stats.extend(text_of(child(OFFICER_TEXT), obj, true));
+        if field(field(obj, obj_class()), class_officers()) as i32 > 0 {
+            s.stats.extend(text_of(child(officer_text()), obj, true));
         }
-        s.hull = bar_of(child(HULL_BAR), obj);
+        s.hull = bar_of(child(hull_bar()), obj);
         if let Some(h) = &s.hull {
             s.shields_down = h.colour[0] == 0.0 && h.colour[1] == 0.0 && h.colour[2] >= 1.0;
         }
-        let max = f32_at(obj, CRAFT_SHIELD_MAX);
+        let max = f32_at(obj, craft_shield_max());
         if max > 0.0 {
-            s.shields = Some((f32_at(obj, CRAFT_SHIELD), max));
+            s.shields = Some((f32_at(obj, craft_shield()), max));
         }
-        let ib = child(SD_INFOBAR);
-        s.hull_text = text_of(field(ib, IB_HULL_TEXT), obj, true);
-        s.shield_text = text_of(field(ib, IB_SHIELD_TEXT), obj, true);
-        if fl & (F_CARGO | F_CARGO2) != 0 {
-            s.stats.extend(text_of(child(CARGO_TEXT), obj, false));
-            if let Some(b) = bar_of(child(CARGO_BAR), obj) {
+        let ib = child(sd_infobar());
+        s.hull_text = text_of(field(ib, ib_hull_text()), obj, true);
+        s.shield_text = text_of(field(ib, ib_shield_text()), obj, true);
+        if fl & (f_cargo() | f_cargo2()) != 0 {
+            s.stats.extend(text_of(child(cargo_text()), obj, false));
+            if let Some(b) = bar_of(child(cargo_bar()), obj) {
                 s.bars.push((BarKind::Cargo, b));
             }
-        } else if fl & F_PRODUCER != 0 || cast(obj, sym::INFO_TD_CRAFT, sym::INFO_TD_COLONY) != 0 {
-            if let Some(b) = bar_of(child(CONSTRUCTION_BAR), obj) {
+        } else if fl & f_producer() != 0 || cast(obj, sym::INFO_TD_CRAFT, sym::INFO_TD_COLONY) != 0 {
+            if let Some(b) = bar_of(child(construction_bar()), obj) {
                 s.bars.push((BarKind::Construction, b));
             }
-            s.stats.extend(text_of(child(RESEARCH_TEXT), obj, false));
+            s.stats.extend(text_of(child(research_text()), obj, false));
         }
-        if f32_at(obj, OBJ_ENERGY) > 0.1 && f32_at(obj, OBJ_ENERGY) as i32 > 0 {
-            s.stats.extend(text_of(child(ENERGY_TEXT), obj, true));
+        if f32_at(obj, obj_energy()) > 0.1 && f32_at(obj, obj_energy()) as i32 > 0 {
+            s.stats.extend(text_of(child(energy_text()), obj, true));
         }
-        for i in 0..N_SYSTEMS {
+        for i in 0..n_systems() {
             s.systems.extend(system(obj, i));
         }
     } else {
-        if unsafe { rd::<usize>(obj + OBJ_STORE) } != 0 {
-            if let Some(b) = bar_of(child(CARGO_BAR), obj) {
+        if unsafe { rd::<usize>(obj + obj_store()) } != 0 {
+            if let Some(b) = bar_of(child(cargo_bar()), obj) {
                 s.bars.push((BarKind::Cargo, b));
             }
-        } else if fl & F_CONSTRUCTION != 0 {
-            if let Some(b) = bar_of(child(CONSTRUCTION_BAR), obj) {
+        } else if fl & f_construction() != 0 {
+            if let Some(b) = bar_of(child(construction_bar()), obj) {
                 s.bars.push((BarKind::Construction, b));
             }
         }
-        if fl & F_NAMED != 0 {
-            s.name = text_of(child(NAME_TEXT), obj, false);
+        if fl & f_named() != 0 {
+            s.name = text_of(child(name_text()), obj, false);
         }
     }
     s
 }
 
 fn system(obj: usize, i: usize) -> Option<System> {
-    let text = text_of(child(SYS_TEXT + 4 * i), obj, true)?;
-    let ri = child(SYS_REPAIR + 4 * i);
+    let text = text_of(child(sys_text() + 4 * i), obj, true)?;
+    let ri = child(sys_repair() + 4 * i);
     let (icon, sys, flash) = if ri != 0 {
         unsafe {
-            *((ri + field::INFO_RI_OBJECT) as *mut usize) = obj;
-            (field(ri, RI_SPRITE), rd::<u32>(ri + RI_SYSTEM) as usize, rd::<u8>(ri + RI_FLASH) != 0)
+            *((ri + field::INFO_RI_OBJECT()) as *mut usize) = obj;
+            (field(ri, ri_sprite()), rd::<u32>(ri + ri_system()) as usize, rd::<u8>(ri + ri_flash()) != 0)
         }
     } else {
         (0, i, false)
     };
-    let _ = RI_REPAIR_ID;
+    let _ = ri_repair_id();
     Some(System { text, repair_icon: icon, repair_comp: ri, state: system_state(obj, sys).unwrap_or_default(), flash })
 }
 
 /// The hull bar of any object (for group icons): value, maximum, stock's colour.
 pub fn hull(obj: usize) -> Option<Bar> {
-    bar_of(child(HULL_BAR), obj)
+    bar_of(child(hull_bar()), obj)
 }
 
 /// A unit's name and class, as the panel words them.
 pub fn name_and_class(obj: usize) -> (Option<Text>, Option<Text>) {
-    let name = if flags(obj) & (F_CRAFT | F_NAMED) != 0 { text_of(child(NAME_TEXT), obj, false) } else { None };
-    (name, text_of(child(CLASS_TEXT), obj, false))
+    let name = if flags(obj) & (f_craft() | f_named()) != 0 { text_of(child(name_text()), obj, false) } else { None };
+    (name, text_of(child(class_text()), obj, false))
 }
 
 /// The hover strip's shield and hull texts for a craft.
 pub fn hover_texts(obj: usize) -> (Option<Text>, Option<Text>) {
-    let ib = child(SD_INFOBAR);
-    (text_of(field(ib, IB_SHIELD_TEXT), obj, false), text_of(field(ib, IB_HULL_TEXT), obj, false))
+    let ib = child(sd_infobar());
+    (text_of(field(ib, ib_shield_text()), obj, false), text_of(field(ib, ib_hull_text()), obj, false))
 }
 
 // ---- the builder's queue -------------------------------------------------------------
 
 /// The builder's queue: each slot's class (0: free), and stock's slot component for
 /// its tooltip (handed the builder and the class, as stock's `Render` does).
-pub fn queue(obj: usize) -> [(usize, usize); QUEUE_LEN] {
-    let mut out = [(0usize, 0usize); QUEUE_LEN];
-    if obj == 0 || flags(obj) & F_PRODUCER == 0 {
+pub fn queue(obj: usize) -> Vec<(usize, usize)> {
+    let mut out = alloc::vec![(0usize, 0usize); queue_len()];
+    if obj == 0 || flags(obj) & f_producer() == 0 {
         return out;
     }
     let a = at(sym::INFO_GET_BUILD_QUEUE);
@@ -728,11 +802,11 @@ pub fn queue(obj: usize) -> [(usize, usize); QUEUE_LEN] {
     }
     for (i, o) in out.iter_mut().enumerate() {
         let class = unsafe { *q.add(i) };
-        let comp = child(QUEUE + 4 * i);
+        let comp = child(off_queue() + 4 * i);
         if comp != 0 {
             unsafe {
-                *((comp + BW_BUILDER) as *mut usize) = obj;
-                *((comp + BW_CLASS) as *mut usize) = class;
+                *((comp + bw_builder()) as *mut usize) = obj;
+                *((comp + bw_class()) as *mut usize) = class;
             }
         }
         *o = (class, comp);
@@ -742,23 +816,24 @@ pub fn queue(obj: usize) -> [(usize, usize); QUEUE_LEN] {
 
 /// The build progress of the queue's first item (the panel's construction bar).
 pub fn build_progress(obj: usize) -> Option<Bar> {
-    bar_of(child(CONSTRUCTION_BAR), obj)
+    bar_of(child(construction_bar()), obj)
 }
 
 /// Cancels the queue's slot `i`, as a click on it does.
 pub fn cancel(obj: usize, i: usize) {
-    if obj == 0 || flags(obj) & F_PRODUCER == 0 {
+    if obj == 0 || flags(obj) & f_producer() == 0 {
         return;
     }
     crate::log!("info: cancel queue slot {}", i);
-    let f: unsafe extern "thiscall" fn(usize, i32) = unsafe { core::mem::transmute(vcall(obj, VT_DELETE_QUEUE_ITEM)) };
+    let f: unsafe extern "thiscall" fn(usize, i32) = unsafe { core::mem::transmute(vcall(obj, vt_delete_queue_item())) };
     unsafe { f(obj, i as i32) };
 }
 
 // ---- the group ------------------------------------------------------------------------
 
 /// `GameObject+0x113`: set once it is destroyed (stock's panel leaves it out).
-const OBJ_DESTROYED: usize = field::INFO_OBJ_DESTROYED;
+#[inline(always)]
+fn obj_destroyed() -> usize { field::INFO_OBJ_DESTROYED() }
 
 /// The selected objects, in selection order (gone ones left out, as stock's
 /// `GetObjUnlessDestroyed`).
@@ -766,7 +841,7 @@ pub fn group() -> Vec<usize> {
     selection::handles()
         .into_iter()
         .map(selection::object)
-        .filter(|&o| o != 0 && flags(o) & value::INFO_F_GAME_OBJECT as u32 != 0 && unsafe { rd::<u8>(o + OBJ_DESTROYED) } == 0)
+        .filter(|&o| o != 0 && flags(o) & value::INFO_F_GAME_OBJECT() as u32 != 0 && unsafe { rd::<u8>(o + obj_destroyed()) } == 0)
         .collect()
 }
 
@@ -788,7 +863,7 @@ pub fn select(obj: usize, shift: bool) {
         return;
     }
     crate::log!("info: {} {:#x}", if shift { "deselect" } else { "select" }, obj);
-    let f: unsafe extern "thiscall" fn(usize, usize, i32, i32, i32) = unsafe { core::mem::transmute(vcall(o, VT_SELECT)) };
+    let f: unsafe extern "thiscall" fn(usize, usize, i32, i32, i32) = unsafe { core::mem::transmute(vcall(o, vt_select())) };
     unsafe {
         if shift { f(o, obj, 1, 0, 1) } else { f(o, obj, 0, 1, 1) }
     }
@@ -802,7 +877,7 @@ pub fn look_at(obj: usize) {
         return;
     }
     crate::log!("info: camera to {:#x}", obj);
-    let f: unsafe extern "thiscall" fn(usize, usize) = unsafe { core::mem::transmute(vcall(cam, VT_SET_INTEREST_ENTITY)) };
+    let f: unsafe extern "thiscall" fn(usize, usize) = unsafe { core::mem::transmute(vcall(cam, vt_set_interest_entity())) };
     unsafe { f(cam, obj) };
 }
 

@@ -3,7 +3,8 @@
 # resolvers (Python resolve.py, C csdk/a2engine.h through ctest.c, Rust crates/a2engine)
 # on every fixtures/NN-*.toml, gen.py's output for the fixture set against the committed
 # golden files, lint.py passing the good profiles and failing each bad one for its
-# reason, and the repository's profiles: generated files up to date, lint clean.
+# reason, the repository's profiles: generated files up to date, lint clean, and the
+# offsets moved out of the sources (moved.py).
 # Writes only to temp dirs. No game file is read.
 set -euo pipefail
 
@@ -32,7 +33,11 @@ if python3 "$here/lint.py" --selftest; then ok "lint.py fixtures"; else bad "lin
 if python3 "$here/gen.py" --check; then ok "gen.py --check"; else bad "gen.py --check"; fi
 if python3 "$here/lint.py"; then ok "lint.py"; else bad "lint.py"; fi
 
-# 5. the negative tests (the game-exe ones are skipped without a game)
+# 5. AR-3's equivalence test: every offset moved into a profile resolves to what the
+#    source had, on gog-1.1
+if python3 "$here/moved.py"; then ok "moved.py"; else bad "moved.py"; fi
+
+# 6. the negative tests (the game-exe ones are skipped without a game)
 if bash "$here/negative.sh" >"$tmp/neg.log" 2>&1; then ok "negative.sh"; else bad "negative.sh"; cat "$tmp/neg.log"; fi
 
 [ "$fail" = 0 ] && echo "engine selftest: ok" || { echo "engine selftest: FAILED" >&2; exit 1; }

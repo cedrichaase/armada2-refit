@@ -93,8 +93,8 @@ default = "1"
 apply = "live"
 scope = "local"
 tab = "gameplay"
-label = "Move paths start at once"
-help = "With Tab held, each right-click adds a point and the ships set off at the first, taking each new point as it comes. Off: they wait until Tab is let go, as in the game."
+label = "Move queues"
+help = "Hold Tab and right-click points (map or minimap): ships set off at once, new points join their queue, each leg keeps its warp, other orders end it. Off: stock."
 
 [[row]]
 name = "rigignoresself"

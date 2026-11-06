@@ -5,6 +5,8 @@
     ./a2mod stock         put every visual change aside; the game looks as shipped
     ./a2mod refit         bring them back, byte for byte
     ./a2mod stock -n      (either direction) print what would happen, touch nothing
+    ./a2mod --game ID ... another game's folder (games/<id>.toml; default A2_PROFILE,
+                          else armada2)
 
 WHY A SNAPSHOT AND NOT A REINSTALL
 
@@ -25,7 +27,8 @@ WHAT COUNTS AS A CHANGE
 Every layer in the registry (layers.toml; `tools/layers.py --list`) names what it adds
 to the game directory (`files`) and which stock files it changes in place beside a
 backup (`replaces`, `backups`): Render3D.asi and its recipes for render3d, the
-Textures/RGB/*.a2neb-backup of a2tex for textures, SOD/*.a2neb-backup for models,
+*.a2neb-backup of a2tex in the game's texture root for textures (the descriptor's
+[files] textures, a2env.TEXTURES: Textures/RGB in Armada II), SOD/*.a2neb-backup for models,
 d3d8.dll.a2display-backup for display (stock puts back the d3d8.dll that was in the slot
 before Display8, GOG's; with none, Display8's d3d8.dll is set aside and the game runs on the
 system's own, which is stock), and so on.  Retired
@@ -42,7 +45,8 @@ DELIBERATELY NOT SWITCHED, in both states:
         platform 4.0.0) -- plumbing, not a look.
     The ASI loader (winmm.dll) and STA2WidescreenPatch.asi -- base setup; the menu
         and renderer hooks cannot load without the loader.
-    ARMADA.PRF, RTS_CFG.h -- the player's options, set in game.  Not visual.
+    ARMADA.PRF, RTS_CFG.h -- the player's options, set in game.  Not visual.  (The
+        game descriptor's settings.keep: another game names its own.)
     The Heroic side.
 
 Bloom is Render3D.asi's, so it switches with that layer.  a2mod used to flip a vkBasalt
@@ -58,13 +62,19 @@ import fnmatch
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import time
 
 import a2env  # noqa: E402  (beside this script: where the game is)
-GAME = a2env.GAME
+a2env.use(a2env.take_game_arg(sys.argv))
+# Where the executable is and every layer installs: A2_GAME itself, or its data_dir
+# (Data/ in Fleet Operations: Roots).
+GAME = a2env.EXE_DIR
+# The executables whose process counts as the game running, from the descriptor.
+EXES = a2env.DESC['exe']['names']
 STORE = os.path.join(GAME, '.a2mod')
 SNAP = os.path.join(STORE, 'refit')
 STATE = os.path.join(STORE, 'state.json')
@@ -79,7 +89,7 @@ import layers as registry  # noqa: E402
 REG = registry.load()
 BACKUPS = registry.backup_suffixes(REG)
 # Backups that exist but are not a visual change -- see "deliberately not switched".
-EXCLUDE = {'ARMADA.PRF', 'RTS_CFG.h'}
+EXCLUDE = {os.path.basename(f) for f in a2env.DESC.get('settings', {}).get('keep', [])}
 REG_BY_ID = registry.by_id(REG)
 # (pattern, layer): a literal name, or a glob over one directory's names.
 ADDED = registry.added_patterns(REG)
@@ -176,18 +186,21 @@ def discover():
 
 
 def game_running():
-    """Is Armada2.exe running from THIS game directory?  Any Armada2.exe used to count,
+    """Is the game's executable (EXES; Armada2.exe) running from THIS game directory?
+    Any Armada2.exe used to count,
     which made the test bench's `a2mod stock` on a clone refuse whenever the real game
     was open.  A game belongs to GAME if its working directory is GAME or its
     STEAM_COMPAT_INSTALL_PATH names it (Heroic/umu set both).  A process that cannot be
     inspected still counts: refusing is the safe mistake."""
-    r = subprocess.run(['pgrep', '-if', r'armada2\.exe'], capture_output=True, text=True)
+    pat = '|'.join(re.escape(x) for x in EXES)
+    r = subprocess.run(['pgrep', '-if', pat], capture_output=True, text=True)
     if r.returncode:
         return False
     game = os.path.realpath(GAME)
+    homes = {game, os.path.realpath(a2env.GAME)}
     for pid in r.stdout.split():
         try:
-            if os.path.realpath(os.readlink(f'/proc/{pid}/cwd')) == game:
+            if os.path.realpath(os.readlink(f'/proc/{pid}/cwd')) in homes:
                 return True
             with open(f'/proc/{pid}/environ', 'rb') as fh:
                 env = fh.read().split(b'\0')
@@ -197,7 +210,7 @@ def game_running():
             continue
         for kv in env:
             if kv.startswith(b'STEAM_COMPAT_INSTALL_PATH='):
-                if os.path.realpath(kv.split(b'=', 1)[1].decode(errors='replace')) == game:
+                if os.path.realpath(kv.split(b'=', 1)[1].decode(errors='replace')) in homes:
                     return True
     return False
 
@@ -415,7 +428,7 @@ def main():
     if cmd not in ('stock', 'refit'):
         sys.exit(f'unknown command {cmd!r} -- see ./a2mod --help')
     if game_running() and not dry:
-        sys.exit('refusing: Armada2.exe is running -- quit the game first')
+        sys.exit(f'refusing: {EXES[0]} is running -- quit the game first')
     if cmd == 'stock':
         to_stock(dry)
     else:

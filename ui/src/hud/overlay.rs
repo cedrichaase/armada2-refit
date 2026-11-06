@@ -8,7 +8,7 @@
 //!
 //! Drawn first among the panels of ours, so they cover it, and not over a stock panel
 //! that is still drawn (a unit whose middle is under one is left out).
-use crate::engine::{hud, overlay, radar};
+use crate::engine::api::{hud, overlay, radar};
 use crate::gfx::{fade, mix, Corners, Weight, R};
 use crate::widgets::{Align, Ui};
 
@@ -16,7 +16,7 @@ use crate::widgets::{Align, Ui};
 const PANELS: [&str; 8] = ["ShipDisplay", "MapRadar", "PopupPalette", "ResourcePanel", "ButtonPanel", "CinematicView", "ObjectivesDisplay", "MessageDisplay"];
 
 pub fn run(ui: &mut Ui, keep_out: &[R]) {
-    if crate::engine::ingame::hud_hidden() || radar::view() == 2 {
+    if crate::engine::api::ingame::hud_hidden() || radar::view() == 2 {
         return;
     }
     let units = overlay::units(ui.w, ui.h);
@@ -154,7 +154,7 @@ fn systems(ui: &mut Ui, obj: usize, top: (f32, f32)) {
 
 /// A game sprite fitted into `r`, its aspect kept, tinted; false without its art.
 fn sprite_in(ui: &mut Ui, sp: usize, r: R, tint: u32) -> bool {
-    let Some((tex, uv)) = crate::engine::sprite::art(sp) else { return false };
+    let Some((tex, uv)) = crate::engine::api::sprite::art(sp) else { return false };
     let (tw, th) = crate::gfx::tex_size(tex);
     let (pw, ph) = ((uv[2] - uv[0]).abs() * tw as f32, (uv[3] - uv[1]).abs() * th as f32);
     if pw <= 0.0 || ph <= 0.0 {

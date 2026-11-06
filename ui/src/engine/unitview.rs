@@ -3,7 +3,7 @@
 //! `CinematicView` (`g_cinematicView`) keeps drawing itself: a second render of the
 //! scene, a Bink video, or its still picture. Where is read from the component's own
 //! fields every frame, all relative to its rectangle `+0x04` (left, top, right,
-//! bottom, inclusive, in the HUD's 1600 x 1200 space): `RenderView` (and the video)
+//! bottom, inclusive, in the HUD canvas, `canvas::CANVAS`): `RenderView` (and the video)
 //! take the view's rectangle as that corner plus `cinematicDisplayArea` at `+0x48`,
 //! converted to the screen by `DisplayInterface::ConvertRectangle`, and give it to
 //! the view's camera as its viewport; the still picture is drawn at the corner plus
@@ -18,6 +18,7 @@
 //! swapped for an inert object whose `Render` (vtable `+0x10`, the only call made on
 //! it there) does nothing, and put back after.
 use super::{field, rd};
+use super::canvas::CANVAS;
 use crate::syms_info::{field, hook, sym, TABLE};
 
 fn eng() -> &'static a2engine::Engine {
@@ -38,11 +39,16 @@ pub fn cinematic_view() -> usize {
 /// are checked by the hook to be stock; the code never reads them.
 #[allow(dead_code)]
 const CHECKED: [a2engine::Sym; 2] = [sym::UNITVIEW_SLOT_CV_RENDER, sym::UNITVIEW_SLOT_SB_RENDER];
-const VT_RENDER: usize = field::UNITVIEW_VT_RENDER;
-const CV_RECT: usize = field::UNITVIEW_CV_RECT;
-const CV_BACKGROUND_AREA: usize = field::UNITVIEW_CV_BACKGROUND_AREA;
-const CV_DISPLAY_AREA: usize = field::UNITVIEW_CV_DISPLAY_AREA;
-const CV_FRAME: usize = field::UNITVIEW_CV_FRAME;
+#[inline(always)]
+fn vt_render() -> usize { field::UNITVIEW_VT_RENDER() }
+#[inline(always)]
+fn cv_rect() -> usize { field::UNITVIEW_CV_RECT() }
+#[inline(always)]
+fn cv_background_area() -> usize { field::UNITVIEW_CV_BACKGROUND_AREA() }
+#[inline(always)]
+fn cv_display_area() -> usize { field::UNITVIEW_CV_DISPLAY_AREA() }
+#[inline(always)]
+fn cv_frame() -> usize { field::UNITVIEW_CV_FRAME() }
 
 static mut ON: bool = false;
 static mut INERT_VT: [usize; 32] = [0; 32];
@@ -81,24 +87,24 @@ pub fn view_rect(w: f32, h: f32) -> Option<[f32; 4]> {
     if c == 0 {
         return None;
     }
-    let p: [i32; 4] = unsafe { rd(c + CV_RECT) };
-    let a: [i32; 4] = unsafe { rd(c + CV_DISPLAY_AREA) };
+    let p: [i32; 4] = unsafe { rd(c + cv_rect()) };
+    let a: [i32; 4] = unsafe { rd(c + cv_display_area()) };
     let (l, t, r, b) = (p[0] + a[0], p[1] + a[1], p[0] + a[2], p[1] + a[3]);
     if r <= l || b <= t {
         return None;
     }
-    let (sx, sy) = (w / 1600.0, h / 1200.0);
+    let (sx, sy) = (w / CANVAS.0, h / CANVAS.1);
     Some([l as f32 * sx, t as f32 * sy, (r + 1) as f32 * sx, (b + 1) as f32 * sy])
 }
 
 /// Places the view at `px` (left, top, right, bottom in back-buffer pixels of a `w` x
-/// `h` buffer): the three rectangles written in the 1600 x 1200 space, whole units
+/// `h` buffer): the three rectangles written in the HUD canvas (`canvas::CANVAS`) space, whole units
 /// covering the pixels.
 pub fn place(px: [f32; 4], w: f32, h: f32) {
     if !enabled() || w < 1.0 || h < 1.0 {
         return;
     }
-    let (sx, sy) = (1600.0 / w, 1200.0 / h);
+    let (sx, sy) = (CANVAS.0 / w, CANVAS.1 / h);
     let l = libm::floorf(px[0] * sx) as i32;
     let t = libm::floorf(px[1] * sy) as i32;
     let r = (libm::ceilf(px[2] * sx) as i32 - 1).max(l + 1);
@@ -108,14 +114,14 @@ pub fn place(px: [f32; 4], w: f32, h: f32) {
         return;
     }
     unsafe {
-        *((c + CV_RECT) as *mut [i32; 4]) = [l, t, r, b];
+        *((c + cv_rect()) as *mut [i32; 4]) = [l, t, r, b];
         let area = [0, 0, r - l, b - t];
-        *((c + CV_BACKGROUND_AREA) as *mut [i32; 4]) = area;
-        *((c + CV_DISPLAY_AREA) as *mut [i32; 4]) = area;
+        *((c + cv_background_area()) as *mut [i32; 4]) = area;
+        *((c + cv_display_area()) as *mut [i32; 4]) = area;
         let now = [l, t, r, b];
         if *core::ptr::addr_of!(LOGGED) != now {
             LOGGED = now;
-            crate::log!("unit view: placed at [{},{},{},{}] of 1600x1200 ({:.0},{:.0} {:.0}x{:.0} px)", l, t, r, b, px[0], px[1], px[2] - px[0], px[3] - px[1]);
+            crate::log!("unit view: placed at [{},{},{},{}] of {}x{} ({:.0},{:.0} {:.0}x{:.0} px)", l, t, r, b, CANVAS.0, CANVAS.1, px[0], px[1], px[2] - px[0], px[3] - px[1]);
         }
     }
 }
@@ -124,8 +130,8 @@ pub fn place(px: [f32; 4], w: f32, h: f32) {
 /// in place of the component's `Render` while the placement is on).
 pub fn render(c: usize) {
     unsafe {
-        let render: unsafe extern "thiscall" fn(usize) = core::mem::transmute(rd::<usize>(rd::<usize>(c) + VT_RENDER));
-        let slot = (c + CV_FRAME) as *mut usize;
+        let render: unsafe extern "thiscall" fn(usize) = core::mem::transmute(rd::<usize>(rd::<usize>(c) + vt_render()));
+        let slot = (c + cv_frame()) as *mut usize;
         let frame = *slot;
         let sb_vtable = at(sym::UNITVIEW_SB_VTABLE);
         if frame == 0 || sb_vtable == 0 || field(frame, 0) != sb_vtable {

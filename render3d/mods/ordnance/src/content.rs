@@ -1,7 +1,11 @@
-//! The ordnance module's built-in tables (README.md, "Content"): its recipes, as data,
-//! one set per content profile (`profiles/*/content.toml`). A build with no set gets
-//! `NONE`: no recipes, so no special weapon is told and the engine draws its own.
+//! The ordnance module's built-in tables (README.md, "Content sets"): its recipes, as
+//! data, parsed from the set's `ordnance.ini` (`render3d/content/sets/<set>/`) at first
+//! use. A build with no set, or a set with no `ordnance.ini`, gets `NONE`: no recipes, so
+//! no special weapon is told and the engine draws its own.
+use a2ini::table::Table;
+use alloc::vec::Vec;
 
+#[derive(Debug, PartialEq)]
 pub struct Content {
     /// The special weapons' and waves' recipes and the warp flash
     /// (`render3d/content/ordnance/`), as `recipes` takes them: `Render3D.ini` overrides
@@ -11,29 +15,31 @@ pub struct Content {
     pub sod_exts: [&'static str; 2],
 }
 
-pub static STOCK: Content = Content {
-    recipes: &[("ordnance", include_str!("../../../content/ordnance/ordnance.ini"))],
-    sod_exts: [".sod", ".SOD"],
-};
+/// A set's `ordnance.ini`: its `[Recipes]` name the files under `render3d/content/`.
+pub fn parse(text: &'static str) -> Content {
+    let t = Table::parse(text);
+    let exts = t.list("Ordnance", "SodExts");
+    Content {
+        recipes: recipes(&t, "Recipes").leak(),
+        sod_exts: [exts.first().copied().unwrap_or(""), exts.get(1).copied().unwrap_or("")],
+    }
+}
+
+/// A table's recipes: (name, the built-in text of the file it names); a file not built
+/// in is left out.
+fn recipes(t: &Table<'static>, sec: &str) -> Vec<(&'static str, &'static str)> {
+    t.entries(sec).iter().filter_map(|&(n, f)| Some((n, r3d_core::content::file(f)?))).collect()
+}
 
 /// A build with no content set for this module.
 pub static NONE: Content = Content { recipes: &[], sod_exts: ["", ""] };
 
-/// The set this build reads (starting the module's table if nothing has yet).
-pub fn get() -> &'static Content {
-    // The table starts at its first use: a recipe is read before any hook of the module.
-    r3d_core::engine::start_table("ordnance", &crate::syms::TABLE);
-    match crate::syms::TABLE.engine().content() {
-        Some(id) => by_set(id),
-        None => &NONE,
-    }
-}
+static CACHE: r3d_core::content::Cache<Content> = r3d_core::content::Cache::new();
 
-fn by_set(id: &str) -> &'static Content {
-    match id {
-        "stock" => &STOCK,
-        _ => &NONE,
-    }
+/// The set this build reads (starting the module's table if nothing has yet): its
+/// table parsed at first use; `NONE` while the build has no set for the module.
+pub fn get() -> &'static Content {
+    CACHE.get("ordnance", &crate::syms::TABLE, parse, &NONE)
 }
 
 impl Content {
