@@ -13,6 +13,13 @@ pub struct Content {
     pub recipes: &'static [(&'static str, &'static str)],
     /// A SOD name as an ODF's `shotGeometry` writes it, in either case.
     pub sod_exts: [&'static str; 2],
+    /// `[Names]`: which ordnance ODF a built-in recipe draws, `Ordnance.<odf>` or
+    /// `Wave.<odf>` = the recipe's section without its prefix (`Ordnance.npc_tractorbeamo
+    /// = tracbmo`). A set with names draws a built-in recipe only for the ODFs named
+    /// (another game's ODFs: a stock name it shares may be another weapon there); one
+    /// without, each recipe for the ODF of its own name (stock). A section only
+    /// `Render3D.ini` has always draws the ODF of its name.
+    pub names: &'static [(&'static str, &'static str)],
 }
 
 /// A set's `ordnance.ini`: its `[Recipes]` name the files under `render3d/content/`.
@@ -22,6 +29,7 @@ pub fn parse(text: &'static str) -> Content {
     Content {
         recipes: recipes(&t, "Recipes").leak(),
         sod_exts: [exts.first().copied().unwrap_or(""), exts.get(1).copied().unwrap_or("")],
+        names: t.entries("Names").to_vec().leak(),
     }
 }
 
@@ -32,7 +40,7 @@ fn recipes(t: &Table<'static>, sec: &str) -> Vec<(&'static str, &'static str)> {
 }
 
 /// A build with no content set for this module.
-pub static NONE: Content = Content { recipes: &[], sod_exts: ["", ""] };
+pub static NONE: Content = Content { recipes: &[], sod_exts: ["", ""], names: &[] };
 
 static CACHE: r3d_core::content::Cache<Content> = r3d_core::content::Cache::new();
 

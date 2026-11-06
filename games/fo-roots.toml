@@ -66,6 +66,12 @@ sod = ["SOD"]
 sprites = ["Sprites"]
 odf = ["odf"]
 archives = [{ kind = "fpq", file = "ODF.fpq", at = "odf" }]
+# Mods (FO-5 step 6): the first `-mod <name>` or `/mod <name>` on the command line makes
+# Data/Mods/<name>/ (a folder with an info.ini) the active mod. Its files, then its
+# ParentMod's up the chain, then Data/'s own unless a mod in the chain is standalone=1, are
+# searched in that order, each folder with the folders and archives above
+# (render3d/core/src/files/mods.rs). Optional: a game without mods leaves it out.
+mods = { dir = "Mods", switches = ["-mod", "/mod"] }
 
 [paths]
 # $A2_DATA stays shared between the games (PLAN-ARMADA1.md).

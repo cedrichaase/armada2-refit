@@ -10,6 +10,13 @@
 //! in the order written, depth first. Within one file, when a key is written twice,
 //! the later one wins. Names are matched ASCII case-insensitively, keys likewise.
 //! Includes name a file anywhere under `odf/`, by file name alone.
+//!
+//! Fleet Operations layers its files (a mod's over its parent's over the game's), and an
+//! include of the very file being loaded is its **next version down**
+//! ([`Odf::load_layered`]): a mod's `x.odf` that includes `x.odf` inherits the parent's
+//! `x.odf` and changes only what it writes. Each such include, in the order the tree is
+//! read, takes the next version below the last one taken, as Fleet Operations' file
+//! system does. Stock has no versions, so there such an include is a loop and is cut.
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -136,12 +143,35 @@ impl Odf {
         // A total of decoded bytes too: each include may be a big packed file, and a tree
         // of a thousand of them must not decode a thousand times over.
         let mut bytes = MAX_BYTES;
-        let mut counted = |n: &str| -> Option<Vec<u8>> {
+        let mut counted = |n: &str, v: usize| -> Option<Vec<u8>> {
+            if v > 0 {
+                return None;
+            }
             let d = fetch(n)?;
             bytes = bytes.checked_sub(d.len())?;
             Some(d)
         };
-        load_rec(name, &mut counted, &mut stack, &mut budget).ok_or_else(|| Error::NotFound(String::from(name)))
+        let mut w = Walk { root: String::new(), version: 0, stack: &mut stack, budget: &mut budget };
+        load_rec(name, 0, &mut counted, &mut w).ok_or_else(|| Error::NotFound(String::from(name)))
+    }
+
+    /// As [`Odf::load`], over layered files: `fetch(name, v)` returns version `v` of a
+    /// file (0 the top one, 1 the one below it, ...), and an include of the root file's
+    /// own name takes the next version down (the module's doc).
+    pub fn load_layered<F>(name: &str, mut fetch: F) -> Result<Odf, Error>
+    where
+        F: FnMut(&str, usize) -> Option<Vec<u8>>,
+    {
+        let mut stack: Vec<String> = Vec::new();
+        let mut budget = MAX_INCLUDES;
+        let mut bytes = MAX_BYTES;
+        let mut counted = |n: &str, v: usize| -> Option<Vec<u8>> {
+            let d = fetch(n, v)?;
+            bytes = bytes.checked_sub(d.len())?;
+            Some(d)
+        };
+        let mut w = Walk { root: name.to_ascii_lowercase(), version: 0, stack: &mut stack, budget: &mut budget };
+        load_rec(name, 0, &mut counted, &mut w).ok_or_else(|| Error::NotFound(String::from(name)))
     }
 
     pub fn parse_single(name: &str, data: &[u8]) -> Odf {
@@ -230,36 +260,50 @@ const MAX_INCLUDES: u32 = 1024;
 /// Most bytes the files of one [`Odf::load`] may total, as `fetch` returns them.
 const MAX_BYTES: usize = 256 << 20;
 
-fn load_rec(
-    name: &str,
-    fetch: &mut dyn FnMut(&str) -> Option<Vec<u8>>,
-    stack: &mut Vec<String>,
-    budget: &mut u32,
-) -> Option<Odf> {
-    let data = fetch(name)?;
+/// What a load carries down the tree.
+struct Walk<'a> {
+    /// The root file's name, lower case, when its own name reaches its next version
+    /// down (`load_layered`); empty otherwise.
+    root: String,
+    /// The last version of the root taken.
+    version: usize,
+    stack: &'a mut Vec<String>,
+    budget: &'a mut u32,
+}
+
+fn load_rec(name: &str, version: usize, fetch: &mut dyn FnMut(&str, usize) -> Option<Vec<u8>>, w: &mut Walk) -> Option<Odf> {
+    let data = fetch(name, version)?;
     let file = OdfFile::parse(&data);
-    stack.push(name.to_ascii_lowercase());
+    w.stack.push(name.to_ascii_lowercase());
     let mut parents = Vec::new();
     let mut missing = Vec::new();
     for inc in &file.includes {
         let lower = inc.to_ascii_lowercase();
-        if stack.contains(&lower) || stack.len() > 32 {
+        // The root's own name: its next version down, if there is one.
+        let next = !w.root.is_empty() && lower == w.root;
+        if (!next && w.stack.contains(&lower)) || w.stack.len() > 32 {
             missing.push(inc.clone());
             continue;
         }
         // Shared parents (a diamond) are legitimate, so this is a total budget rather than
         // once-per-file; it stops a chain of files each including the next twice.
-        if *budget == 0 {
+        if *w.budget == 0 {
             missing.push(inc.clone());
             continue;
         }
-        *budget -= 1;
-        match load_rec(inc, fetch, stack, budget) {
+        *w.budget -= 1;
+        let v = if next {
+            w.version += 1;
+            w.version
+        } else {
+            0
+        };
+        match load_rec(inc, v, fetch, w) {
             Some(p) => parents.push(p),
             None => missing.push(inc.clone()),
         }
     }
-    stack.pop();
+    w.stack.pop();
     Some(Odf { name: String::from(name), file, parents, missing })
 }
 
@@ -321,6 +365,33 @@ mod tests {
         assert_eq!(odf.get_f32s("pos"), [1.0, 2.0, 0.0, 0.0]);
         assert_eq!(odf.parents[0].file.entries[0].section, "GameObjectClass");
         assert!(odf.file.stray_lines.is_empty());
+    }
+
+    #[test]
+    fn own_name_is_the_next_version_down() {
+        // A mod's ship.odf over the game's: it includes its own name, so it inherits the
+        // game's ship.odf; the game's includes base.odf as usual.
+        let versions: [&[u8]; 2] = [
+            b"#include \"Ship.odf\"\nmaxHealth = 900\n",
+            b"#include \"base.odf\"\nmaxHealth = 720\nrace = \"borg\"\n",
+        ];
+        let odf = Odf::load_layered("ship.odf", |n, v| match n.to_ascii_lowercase().as_str() {
+            "ship.odf" => versions.get(v).map(|d| d.to_vec()),
+            "base.odf" if v == 0 => Some(b"classLabel = \"craft\"\n".to_vec()),
+            _ => None,
+        })
+        .unwrap();
+        assert_eq!(odf.get_i32("maxHealth"), Some(900));
+        assert_eq!(odf.get_str("race"), Some("borg"));
+        assert_eq!(odf.class_label().as_deref(), Some("craft"));
+        assert!(odf.missing.is_empty());
+        // The bottom version including itself again: no version below, so it is missing.
+        let odf = Odf::load_layered("a.odf", |n, v| (n == "a.odf" && v == 0).then(|| b"#include \"a.odf\"\nx = 1\n".to_vec())).unwrap();
+        assert_eq!(odf.get_i32("x"), Some(1));
+        assert_eq!(odf.missing, ["a.odf"]);
+        // Unlayered, the same include is a loop and is cut.
+        let odf = Odf::load("a.odf", |n| (n == "a.odf").then(|| b"#include \"a.odf\"\nx = 1\n".to_vec())).unwrap();
+        assert_eq!(odf.missing, ["a.odf"]);
     }
 
     #[test]

@@ -38,16 +38,22 @@ makes that layout data: the plugins open files by a virtual path (`textures\<fil
 - **`Loose::new(io, root)`**: a folder of loose files. The system calls are an `Io` the
   caller supplies (`read`, `is_file`, `list`, its separator and whether the file system
   ignores case); `FnIo` builds one from plain functions, which is how render3d and the
-  UI hand in `a2rt`'s Win32 reads (`render3d/core/src/files.rs`, `ui/src/files.rs`).
+  UI hand in `a2rt`'s Win32 reads (`render3d/core/src/files/mod.rs`, `ui/src/files.rs`).
   Where the file system ignores case (Windows, Wine) a path goes to it as written, so a
   lookup costs what it did before; where it minds case (the host tests) a path that does
   not open as written is matched through the folders' listings, each listed once.
 - **`Layered`**: sources mounted at virtual folders (`""` is the root). A path is served
   by the mounts at the deepest folder that holds it, so a mount shadows the folder of its
   name in the root mount, as a mounted file system does. Among those, sources are
-  searched by kind (loose folders, then `Fpq`, then `Zfs`) and then in the order they
-  were mounted; the first that has the file serves it. `list` merges them, the first of
-  each name in any case kept, with the mount folders inside as folders.
+  searched by level (`mount_level`: higher first; `mount` is level 0), then by kind
+  (loose folders, then `Fpq`, then `Zfs`), then in the order they were mounted; the
+  first that has the file serves it. `list` merges them, the first of each name in any
+  case kept, with the mount folders inside as folders. Levels are a game's mods: Fleet
+  Operations: Roots layers the active mod's folders over its parent's over the game's
+  own, whatever their kind (render3d mounts each folder of the chain a level up).
+  `sources(dir)` hands out the sources serving a folder in that order, for a caller that
+  indexes each apart (render3d's asset index finds a name in the top source that has it,
+  wherever it sits), and `open_nth(path, n)` reads a file's `n`th version down.
 - **`Fpq`** serves Fleet Operations: Roots' `ODF.fpq` (below). `Fpq::new(label, bytes)`
   parses the archive (the caller reads the file) and mounts at `odf`: the archive's single
   top folder is the mount's name, so `system/x.odf`, `odf/system/x.odf` and `x.odf` all open
@@ -222,3 +228,12 @@ values continued on following lines that hold no `=` (name lists). A few files h
 `[Section]` headers, which lookups ignore. A file's own keys win over its includes,
 searched in order, depth first; a key written twice in one file takes the later value
 (stock has 45 such repeats; which one the engine keeps is not established).
+
+`Odf::load_layered(name, fetch)` reads over layered files (`fetch(name, v)`: version `v`
+of a file, 0 the top one): Fleet Operations' file system keeps every version of a file
+by name, a mod's over its parent's over the game's, and an include of the very file
+being loaded (`x.odf` including `x.odf`) is its next version down, so a mod's file
+inherits the one it replaces and changes only what it writes; each such include in the
+tree takes the version below the last one taken, as the game's own parser does (Roots
+5.0Z11, read off FleetOpsHook's include hook). In `Odf::load`, with no versions, the
+same include is a loop and is cut.

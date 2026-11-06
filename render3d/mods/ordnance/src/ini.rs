@@ -92,6 +92,11 @@ impl<'a> Settings<'a> {
         [v[0] / 255.0, v[1] / 255.0, v[2] / 255.0]
     }
 
+    /// Whether a section is one of the built-in recipes' (not only Render3D.ini's).
+    pub fn builtin(&self, sec: &str) -> bool {
+        self.base.contains_key(&rt::lower(sec))
+    }
+
     /// Every section name, built-in first, then the ones only Render3D.ini has.
     pub fn sections(&self) -> Vec<String> {
         let mut v = self.order.clone();

@@ -119,7 +119,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         sections: 0xca07c55a,
         image_base: 0x400000,
         n_resolved: 22,
-        content: "stock",
+        content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x49ea70, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xc2, 0x04, 0x00, 0x90, 0x90, 0x90, 0x90, 0x90], mask: &[], section: "", count: 0, value: 0 }, // fn_render_base
             a2engine::Entry { present: true, addr: 0x4cff90, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x49], mask: &[], section: "", count: 0, value: 0 }, // fn_world_transform

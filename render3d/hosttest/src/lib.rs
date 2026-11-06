@@ -34,6 +34,77 @@ mod rtscfg_tests {
     }
 }
 
+// `files::mods`, Fleet Operations' active mod and its chain (FO-5 step 6).
+#[path = "../../core/src/files/mods.rs"]
+pub mod mods;
+
+#[cfg(test)]
+mod mods_tests {
+    use super::mods::*;
+
+    #[test]
+    fn the_command_line_names_the_mod() {
+        let sw = ["-mod", "/mod"];
+        assert_eq!(active(r#""C:\Games\Roots\Data\ArmadaL.exe" /mod "STA2 Classic Mod""#, &sw).as_deref(), Some("STA2 Classic Mod"));
+        assert_eq!(active(r#"ArmadaL.exe -MOD Plain -mod Other"#, &sw).as_deref(), Some("Plain"));
+        assert_eq!(active(r#"ArmadaL.exe"#, &sw), None);
+        assert_eq!(active(r#"ArmadaL.exe -mod"#, &sw), None);
+        // The program's own name is not a switch.
+        assert_eq!(active(r#"-mod x"#, &sw), None);
+        assert_eq!(args(r#"a "b c"  d"e f"g """#), ["a", "b c", "de fg", ""]);
+    }
+
+    #[test]
+    fn info_reads_the_chain_keys() {
+        let i = info(b"[mod]\r\nName=X\r\nignoreParentMaps=0\r\nParentMod=\"STA2 Classic Mod\"\r\nstandalone=0\r\n");
+        assert_eq!(i, Info { parent: Some("STA2 Classic Mod".into()), standalone: false });
+        assert_eq!(info(b"[mod]\nstandalone=1\n"), Info { parent: None, standalone: true });
+        assert_eq!(info(b"[other]\nParentMod=x\n[mod]\nParentMod=\n"), Info::default());
+    }
+
+    #[test]
+    fn the_chain_ends_at_a_standalone_mod() {
+        let ini = |m: &str| -> Option<Vec<u8>> {
+            match m {
+                "Child" => Some(b"[mod]\nParentMod=\"Parent\"\nstandalone=0\n".to_vec()),
+                "Parent" => Some(b"[mod]\nstandalone=1\n".to_vec()),
+                "Plain" => Some(b"[mod]\nstandalone=0\n".to_vec()),
+                "Orphan" => Some(b"[mod]\nParentMod=Gone\n".to_vec()),
+                "Loop" => Some(b"[mod]\nParentMod=Loop\n".to_vec()),
+                _ => None,
+            }
+        };
+        assert_eq!(chain("Child", ini), Chain { mods: vec!["Child".into(), "Parent".into()], base: false, missing: None });
+        assert_eq!(chain("Plain", ini), Chain { mods: vec!["Plain".into()], base: true, missing: None });
+        assert_eq!(chain("Orphan", ini), Chain { mods: vec!["Orphan".into()], base: true, missing: Some("Gone".into()) });
+        assert_eq!(chain("Loop", ini), Chain { mods: vec!["Loop".into()], base: true, missing: None });
+        assert_eq!(chain("Nothing", ini), Chain { mods: vec![], base: true, missing: None });
+    }
+
+    /// Roots as installed, when it is (`A2_PROFILE=fo-roots`'s game, else skipped): the
+    /// data-only mod sits on the STA2 Classic mod, which is standalone.
+    #[test]
+    fn roots_mods_as_installed() {
+        let Ok(out) = std::process::Command::new("python3")
+            .args([concat!(env!("CARGO_MANIFEST_DIR"), "/../../a2env.py"), "--game", "fo-roots", "--sh"])
+            .output()
+        else {
+            return;
+        };
+        let text = String::from_utf8_lossy(&out.stdout);
+        let Some(game) = text.lines().find_map(|l| l.strip_prefix("export A2_GAME=")) else { return };
+        let data = std::path::Path::new(game.trim_matches('\'')).join("Data");
+        if !data.join("Mods").is_dir() {
+            eprintln!("no Roots install: skipped");
+            return;
+        }
+        let read = |m: &str| std::fs::read(data.join("Mods").join(m).join("info.ini")).ok();
+        let c = chain("STA2 Classic Mod Enhanced Gameplay", read);
+        assert_eq!(c.mods, ["STA2 Classic Mod Enhanced Gameplay", "STA2 Classic Mod"]);
+        assert!(!c.base);
+    }
+}
+
 // The modules' `content.rs` (sets.rs) name the core as `r3d_core`: this crate
 // stands in for it.
 extern crate self as r3d_core;

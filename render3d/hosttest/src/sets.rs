@@ -257,6 +257,120 @@ mod tests {
         }
     }
 
+    /// The fleetops set's table for a module.
+    fn fleetops(module: &str) -> &'static str {
+        content::file(&format!("sets/fleetops/{module}.ini")).unwrap_or_else(|| panic!("no fleetops {module}.ini"))
+    }
+
+    /// Every module has a table in the fleetops set, and every file one names is built in.
+    #[test]
+    fn fleetops_has_every_module_and_only_files_that_exist() {
+        for m in ["effects", "hulls", "ordnance", "overlays", "particles", "sky", "specials", "world"] {
+            let t = a2ini::Table::parse(fleetops(m));
+            for (sec, es) in &t.sections {
+                if ["Recipes", "Surfaces", "Nebulae"].contains(sec) {
+                    for (n, f) in es {
+                        assert!(content::file(f).is_some(), "fleetops {m}.ini [{sec}] {n} names {f}, which is not in render3d/content/");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn fleetops_effects_key_factions_by_race() {
+        use effects::*;
+        let c = parse(fleetops("effects"));
+        assert!(c.by_race());
+        let key = |race: &str| c.faction_of_race(race).map(|i| c.factions[i].key);
+        assert_eq!(key("unitedfederation"), Some("Federation"));
+        assert_eq!(key("FreeBorg"), Some("Borg"));
+        assert_eq!(key("species8472"), Some("Species8472"));
+        assert_eq!(key("dominion"), Some("Other"));
+        assert_eq!(key(""), Some("Other"));
+        // The stock set keys by initial, as before.
+        assert!(!parse(stock("effects")).by_race());
+        assert_eq!(parse(stock("effects")).faction_of_race("borg"), Some(6));
+    }
+
+    /// Every ODF the fleetops ordnance table names maps to a section of the built-in
+    /// recipes, and Roots' ionstm (another weapon than stock's) is not named.
+    #[test]
+    fn fleetops_ordnance_names_name_recipes() {
+        use ordnance::*;
+        let c = parse(fleetops("ordnance"));
+        assert_eq!(c.recipes, parse(stock("ordnance")).recipes);
+        assert!(!c.names.is_empty());
+        let recipes = a2ini::Table::parse(c.recipes[0].1);
+        for &(odf, sec) in c.names {
+            let prefix = if odf.starts_with("Ordnance.") { "Ordnance." } else if odf.starts_with("Wave.") { "Wave." } else { panic!("{odf}: neither Ordnance. nor Wave.") };
+            let want = format!("{prefix}{sec}");
+            assert!(recipes.sections.iter().any(|(s, _)| s.eq_ignore_ascii_case(&want)), "{odf} = {sec}: no [{want}] in the recipes");
+        }
+        assert!(!c.names.iter().any(|(o, _)| o.eq_ignore_ascii_case("Ordnance.ionstm")));
+        assert!(parse(stock("ordnance")).names.is_empty());
+    }
+
+    /// Roots as installed, when it is: every ODF the fleetops set names is in its
+    /// `ODF.fpq` with the classLabel the set's comments give it, and the nebula classes'
+    /// stock recipes are the stock nebula of the same nebulaType.
+    #[test]
+    fn fleetops_names_are_roots_odfs() {
+        let Some(fpq) = roots_odf_fpq() else { return };
+        let a = a2fmt::fpq::Archive::parse(fpq).unwrap();
+        let class = |name: &str| -> Option<String> {
+            let d = a.open(&format!("{name}.odf"))?;
+            a2fmt::odf::Odf::parse_single(name, &d).class_label()
+        };
+        let want = [
+            ("npc_tractorbeamo", "tractor_bm"), ("borg_ships_holo", "holding_bm"), ("borg_stations_holo", "holding_bm"),
+            ("clairvoyance", "cvoyantlink"), ("gdisso", "micro"), ("hologen", "hologenerator"), ("shieldi", "shieldinv"),
+            ("overrid", "override"), ("all_mine_dilithiumo", "minebm"), ("all_mine_dilithium2o", "minebm"),
+            ("all_mine_tritaniumo", "minebm"), ("all_mine_tritanium2o", "minebm"), ("fed_repair_beamo", "minebm"),
+            ("gcloakenhancew", "shockwavexplode"), ("weaponenhancerwave", "shockwavexplode"), ("ionstm", "utribeam"),
+        ];
+        for (odf, cl) in want {
+            assert_eq!(class(odf).as_deref(), Some(cl), "{odf}");
+        }
+        let c = ordnance::parse(fleetops("ordnance"));
+        for &(odf, _) in c.names {
+            let n = odf.split_once('.').unwrap().1;
+            assert!(want.iter().any(|(w, _)| w.eq_ignore_ascii_case(n)), "{n} is named but not checked here");
+        }
+        let w = world::parse(fleetops("world"));
+        assert!(!w.nebulae.is_empty());
+        let t = a2ini::Table::parse(fleetops("world"));
+        for (odf, file) in t.entries("Nebulae") {
+            let d = a.open(&format!("{odf}.odf")).unwrap_or_else(|| panic!("{odf} is not in ODF.fpq"));
+            let o = a2fmt::odf::Odf::parse_single(odf, &d);
+            assert_eq!(o.class_label().as_deref(), Some("nebula_obj"), "{odf}");
+            let ty = o.get_i32("nebulaType").unwrap();
+            let stock_ty = match *file {
+                "nebulae/mnebula7.ini" => 2,
+                "nebulae/mnebula8.ini" => 3,
+                "nebulae/mnebula9.ini" => 4,
+                "nebulae/mnebula10.ini" => 5,
+                f => panic!("{odf}: {f} is not checked here"),
+            };
+            assert_eq!(ty, stock_ty, "{odf}: nebulaType");
+        }
+    }
+
+    /// Roots' `Data/ODF.fpq`, when Roots is installed (`a2env.py --game fo-roots`).
+    fn roots_odf_fpq() -> Option<Vec<u8>> {
+        let out = std::process::Command::new("python3")
+            .args([concat!(env!("CARGO_MANIFEST_DIR"), "/../../a2env.py"), "--game", "fo-roots", "--sh"])
+            .output()
+            .ok()?;
+        let text = String::from_utf8_lossy(&out.stdout).into_owned();
+        let game = text.lines().find_map(|l| l.strip_prefix("export A2_GAME="))?.trim_matches('\'').to_string();
+        let d = std::fs::read(std::path::Path::new(&game).join("Data/ODF.fpq")).ok();
+        if d.is_none() {
+            eprintln!("no Roots install: skipped");
+        }
+        d
+    }
+
     #[test]
     fn ui_stock_is_the_old_table() {
         use ui::*;

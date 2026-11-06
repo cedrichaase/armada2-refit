@@ -252,7 +252,7 @@ pub fn borg_profile(o: usize, look: &Look, bump: bool) -> bool {
     let races = unsafe { &mut RACES };
     let key = crate::rt::lower(name);
     if !races.contains_key(&key) {
-        let race = r3d_core::assets::odf(name).and_then(|d| d.get_str("race").map(crate::rt::lower)).unwrap_or_default();
+        let race = r3d_core::assets::race(name);
         crate::log!("hulls: {} is of race '{}': the {} profile", name, race, if look.borg_races.iter().any(|r| *r == race) { "Borg" } else { "hull" });
         races.insert(key.clone(), race);
     }
