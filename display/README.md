@@ -632,14 +632,30 @@ The backend is made at the first `CreateDevice`, on its window, and a later `Cre
 only looked the device up. When it names another window now (`stub::follow_window`) that
 window gets the first one's treatment (a popup over the desktop) and the swap chain moves
 to it: on Vulkan a surface of the new window, the old swap chain and surface destroyed and
-a swap chain made again (`Vk::rebind`); the colour target, the pipelines and the mirrors
-stay, so nothing a plugin holds changes. The stock engine reuses its one window at every
-`CreateDevice`, so this never runs there. `display-window-follow` checks it (the bench-only
-`BenchWindow=N` hook hands a popup to the same function at the Nth `Present`, and the first
-window again at the 2Nth, with the popup left from taking the activation, which stops the
-engine drawing). **Direct3D 12 has the same move (`Dx::rebind`) and it is not verified**:
-on the bench the game goes on drawing after it but the new window stays black. Roots on
-Direct3D 12 is for FO-4 to settle; `auto` tries Vulkan first.
+a swap chain made again (`Vk::rebind`); on Direct3D 12 the GPU's work waited for, the swap
+chain and its buffers released and a new one made on the new window (`Dx::rebind`). The
+colour target, the pipelines and the mirrors stay, so nothing a plugin holds changes. The
+stock engine reuses its one window at every `CreateDevice`, so this never runs there.
+`display-window-follow` checks it on both backends (the bench-only `BenchWindow=N` hook
+hands a popup to the same function at the Nth `Present`, and the game's window again at the
+2Nth, hiding the popup; a thread of the hook's gives the activation back to the game's
+window whenever the popup takes it, since the engine stops drawing while its window is not
+the active one, and logs the `Present`s made 1 s and 4 s after each handover).
+
+**A black screen after the move was the bench's sway, not the move.** Sway puts a window
+mapped after the full-screen game window behind it, tiled at 0x0 (`swaymsg -t get_tree`:
+the popup `visible: false`); nothing drawn on it shows, the game's window has lost its
+swap chain and shows black, and Xwayland, which gets no frame callbacks for a hidden
+surface, lets through only a few presents a second (the hook logged 4 `Present`s in the
+first second, against 60). It happened on Vulkan as on Direct3D 12, in some runs and not
+others, and the scenario's step `Put the window "Display8 bench" full screen` ends it: with
+the popup full screen, both backends present at 60 a second and show the frame on it, and
+again on the game's window after the move back. Ruled out on the way, on Direct3D 12: the
+swap chain's window (`GetHwnd` is the new one), the buffers and their views (made again,
+`GetCurrentBackBufferIndex` and `GetLastPresentCount` start over from the new swap chain),
+the fence and frame slots (the frame open at the move is flushed and goes on), `Present`'s
+result (S_OK every frame) and `MakeWindowAssociation` (DXVK's DXGI ignores its flags).
+Roots' own game window is the desktop's to show; `auto` tries Vulkan first.
 
 **A 1200x900 shell** needs nothing new: a mode the stub does not list is answered with the
 desktop's (the same as the 800x600 and 1024x768 requests of the stock shell and profile),

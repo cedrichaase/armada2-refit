@@ -13,3 +13,4 @@ GetClipCursor@4
 ClipCursor@4
 CreateWindowExA@48
 SetForegroundWindow@4
+ShowWindow@8

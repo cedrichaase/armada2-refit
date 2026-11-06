@@ -13,8 +13,9 @@
 //!   down to the 2x2 and 1x1 levels that are one block each.
 //! - **`BenchWindow=N`**: at the Nth `Present`, a second popup window over the desktop is
 //!   made and handed to `ensure_device` as a later `CreateDevice` would, so the swap
-//!   chain follows it; at the 2Nth, back to the first. The frame must show on the new
-//!   window all the same.
+//!   chain follows it; at the 2Nth, back to the first, and the popup is hidden. The frame
+//!   must show on the new window all the same (once the desktop shows it: the scenario
+//!   makes it full screen, as sway leaves it behind the game's window).
 use crate::stub::obj::SObj;
 use crate::{bench_clone, log, rt};
 use core::ffi::c_void;
@@ -23,6 +24,35 @@ use core::ffi::c_void;
 unsafe extern "system" {
     fn SetForegroundWindow(hwnd: *mut c_void) -> i32;
     fn CreateWindowExA(ex: u32, class: *const u8, name: *const u8, style: u32, x: i32, y: i32, w: i32, h: i32, parent: *mut c_void, menu: *mut c_void, inst: *mut c_void, param: *mut c_void) -> *mut c_void;
+    fn GetForegroundWindow() -> *mut c_void;
+    fn ShowWindow(hwnd: *mut c_void, cmd: i32) -> i32;
+}
+
+#[link(name = "kernel32")]
+unsafe extern "system" {
+    fn CreateThread(attr: *mut c_void, stack: usize, start: unsafe extern "system" fn(*mut c_void) -> u32, arg: *mut c_void, flags: u32, id: *mut u32) -> *mut c_void;
+}
+
+/// After a handover, for 4 s, on a thread of its own (the engine stops calling `Present`
+/// while its window is not the active one): the activation goes back to the game's window
+/// whenever the popup has it (the compositor may focus a window it maps after the hook's
+/// `SetForegroundWindow`), and the `Present`s the engine made since are logged at 1 s and
+/// 4 s, so that a window that stays black can be told from an engine that stopped drawing.
+unsafe extern "system" fn watch(_: *mut c_void) -> u32 {
+    unsafe {
+        let start = core::ptr::read_volatile(&raw const FRAME);
+        for t in 1..=40u32 {
+            rt::win::Sleep(100);
+            if GetForegroundWindow() == SECOND_WINDOW {
+                log!("bench: the popup took the activation; it goes back to the game's window");
+                SetForegroundWindow(FIRST_WINDOW);
+            }
+            if t == 10 || t == 40 {
+                log!("bench: {} s after the handover: {} Presents since", t / 10, core::ptr::read_volatile(&raw const FRAME) - start);
+            }
+        }
+    }
+    0
 }
 
 static mut TEX_AT: u32 = 0;
@@ -75,11 +105,21 @@ unsafe fn window(second: bool) {
             }
         }
         let to = if second { SECOND_WINDOW } else { FIRST_WINDOW };
-        log!("bench: a later CreateDevice on window {:p} (the swap chain was on {:p})", to, s.hwnd);
+        if second {
+            log!("bench: a later CreateDevice on the popup {:p} (the swap chain was on {:p})", to, s.hwnd);
+        } else {
+            log!("bench: a later CreateDevice back on the game's window {:p} (the swap chain was on {:p})", to, s.hwnd);
+        }
         crate::stub::ensure_device(to, 0, 0, 0);
         // The engine stops drawing while its own window is not the active one: the bench's
         // popup must not take the activation from it (Roots' own windows are its own).
+        if !second {
+            // Back on the game's window, the popup goes, as a shell's window would: left
+            // up, it stays over the game's (it is topmost) and the screenshot shows it.
+            ShowWindow(SECOND_WINDOW, 0);
+        }
         SetForegroundWindow(FIRST_WINDOW);
+        CreateThread(core::ptr::null_mut(), 0, watch, core::ptr::null_mut(), 0, core::ptr::null_mut());
     }
 }
 
