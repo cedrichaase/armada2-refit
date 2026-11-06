@@ -1934,6 +1934,40 @@ re-pointed and draws nothing while ours are drawn. Points are lifted a unit abov
 they were clicked, clear of the grid's lines; depth-tested (a hull in front hides them),
 not written, blended.
 
+*Every engine move* (`EngineMoves`, the content set's `overlays.ini`). Which of the
+engine's paths the fallback draws is the build's: `sketched` (the stock set; stock without
+QOL as it always was) or `all`, every move of a selected ship, an ordinary one too (the
+fleetops set: Roots has no QOL, so nothing else would draw a move there; PLAN-FLEETOPS.md,
+"FO-B: the formation move's path").
+
+*A formation move.* Several ships sent at once (`PopupPaletteImp::mBroadcastCommand`
+0x4fda60 sends GO for more than one ship as a `NetOrderMove`; a sketched path never: it is
+`NetOrderObjectsWhatPath`, a copy for each ship) go through
+`FormationManager::Broadcast_Go_Command` (0x43b3e0) to `Send_Ships_In_Formation`
+(0x43c410): the group's leader gets the move, every other ship **FOLLOW (11)**, with the
+leader's handle and its place in the formation, relative to the leader. Whether the
+followers then keep that place as the leader flies (the formation move,
+`cfgDEFAULT_TO_FORMATION_MOVE` in `RTS_CFG.h`, 1 in stock and in Roots, Ctrl the other
+way) or each take a copy of the leader's path shifted by its place (a GO of their own,
+`CraftProcess::Copy_Offset_Path` 0x432930) is decided there. While following,
+`Handle_New_Command`'s FOLLOW case keeps the leader's handle at the process's `+0x9c` and
+the place at `+0xf0` (x right, y up, z ahead of the leader's heading); the process's
+`+0x88` then holds no route but the order's start and that place, and `+0x38` is FOLLOW,
+not GO, so the follower was not drawn. `hooks::ship_follow` reads the two fields
+(`proc_follow_target`, `proc_follow_offset`, `cmd_follow` in the profile) and the leader's
+own path (`ship_path` on the leader, `Entity::Get` of the handle): the group's path is the
+leader's, its leg drawn once from the leader, and each follower draws a leg from itself to
+its place at the point the leader flies to and a small dot (`TICK`) at its place at each
+point, the place turned by the heading of each leg as the engine turns it when it copies
+a path (ahead along the leg, right level with the map). Stock draws the same once its
+leader's path is drawn; with `EngineMoves = sketched` that is never (a formation move is
+not sketched), so stock without QOL is unchanged. Roots runs these functions as stock's
+(its file and FleetOpsHook leave the FOLLOW case, `Send_Ships_In_Formation`,
+`Do_Group_Move` and `Copy_Offset_Path` alone; it changes `CraftProcess::Follow` only where a
+computer player's follower cloaks, where the leader is looked up and for a ship that would
+follow itself, and runs the user
+formation's fleet through `AIFleet`'s own `ProcessFleetAI` and `ReplaceLeader`).
+
 Render3D.log (the first 200 lines): once `overlays: move paths: QOL's queue found
 (version 1)` (`(version 1, groups)` with `QOL_MoveQueueGroup`), or `QOL's queue not found (the engine's paths, and the sketch)` (then looked
 for once a second without more lines) or `QOL's queue is version N: not used`; and, when
@@ -3021,7 +3055,8 @@ Roots is the class of its asteroid sets and debris fields. `particles.ini` names
 sprites (Roots' venting emitters draw `empty`) and keeps stock's chain-pulsar and Manheim
 emitters, which Roots keeps; `sky.ini` names nothing (Roots' starfields are its own
 art); `overlays.ini`, `specials.ini` and `hulls.ini` are stock's names, which Roots keeps
-(`hulls.ini` with the race-keyed profile, FO-5 step 4).
+(`hulls.ini` with the race-keyed profile, FO-5 step 4; `overlays.ini` with `EngineMoves =
+all`, every move's path drawn, since Roots has no QOL: "Move paths", "Every engine move").
 `hosttest/src/sets.rs` holds the stock tables to what the modules held as constants
 before (render3d 1.2.0). A build with no set gets `NONE`: no faction keys (shields colour by stock's level), no node or sprite
 names (a clean model shows everything; no vent or pulsar emitter), no recipes (no special

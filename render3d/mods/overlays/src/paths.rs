@@ -18,7 +18,11 @@
 //! (`vs_dots`/`ps_dots`). The path comes from QOL.asi's queue when it exports one
 //! (`QOL_MoveQueue`: appended legs, a patrol run closed back to its first point; QOL adds
 //! each Tab-click at once, so no sketch is drawn); without it, from the engine's own
-//! path and the sketch, as before. The ships of one order fly copies of the same points: a
+//! path and the sketch, as before: only sketched paths, or every move when the build's
+//! content set says `EngineMoves = all` (Roots, which has no QOL). A formation move's
+//! followers (command FOLLOW) fly their leader's path at a place relative to it: they draw
+//! the leader's path, a leg to their place and a small dot at it at each point
+//! (`hooks::ship_follow`). The ships of one order fly copies of the same points: a
 //! segment or point already drawn this frame is not drawn again. While the key is held
 //! the sketch is drawn the same way (stock's line is not: its call is re-pointed,
 //! `hooks::install_paths`), and for a second after it is let go, until the ships' own
@@ -258,6 +262,13 @@ impl Paths {
         let mut gxyz = [0f32; QCAP * 3];
         let mut flags = [0i32; QCAP];
         let mut rest: Vec<V3> = Vec::new();
+        // The engine's paths: every move (`EngineMoves = all` in the build's content set),
+        // or only those sketched with the waypoint key (stock's).
+        let all_moves = super::content::get().engine_moves_all;
+        // The legs from a ship to its next point drawn this frame (a leader's, drawn once
+        // for its followers and itself), and the small dots of each ship's own places.
+        let mut legs: Vec<(V3, V3)> = Vec::new();
+        let mut ticks: Vec<Vtx> = Vec::new();
         // The selected ships on a queue of QOL's: (queue, ship, its own targets, the
         // queue's points, flags); drawn after the loop, a group at a time.
         let mut queued: Vec<(i32, V3, Vec<V3>, Vec<V3>, Vec<i32>)> = Vec::new();
@@ -290,15 +301,22 @@ impl Paths {
                     continue;
                 }
             }
-            // The engine's own path (QOL keeps no queues, or is not there).
-            let Some((pos, path, idx)) = hooks::ship_path(o, team) else { continue };
+            // The engine's own path (QOL keeps no queues, or is not there): the ship's, or,
+            // following a leader in a formation move, the leader's.
+            let (pos, path, idx, follows) = match hooks::ship_follow(o, team) {
+                Some((pos, lpos, path, idx, place)) => (pos, path, idx, Some((lpos, place))),
+                None => {
+                    let Some((pos, path, idx)) = hooks::ship_path(o, team) else { continue };
+                    (pos, path, idx, None)
+                }
+            };
             hooks::path_points(path, &mut buf);
             let n = buf.len();
             if n == 0 {
                 continue;
             }
-            if !self.ends.iter().any(|e| *e == buf[n - 1]) {
-                // Not a sketched path: an ordinary move.
+            if !all_moves && !self.ends.iter().any(|e| *e == buf[n - 1]) {
+                // Not a sketched path: an ordinary move (drawn only with `EngineMoves = all`).
                 continue;
             }
             let i = (idx.max(0) as usize).min(n - 1);
@@ -306,8 +324,29 @@ impl Paths {
             ships += 1;
             ahead += n - i;
             last_points.push(buf[n - 1]);
-            // The leg from the ship to the point it flies to is the ship's own.
-            posts::segment(&mut rows, pos, lift(buf[i]), col);
+            // The leg into the path, from the ship to the point it flies to; a follower's
+            // group path is its leader's, so that leg is the leader's, drawn once for the
+            // group, and the follower has a leg of its own to its place at that point and
+            // a small dot at its place at each point after.
+            let head = match follows {
+                Some((lpos, place)) => {
+                    let mut from = lpos;
+                    for (k, &p) in buf[i..].iter().enumerate() {
+                        let w = lift(formation_place(p, p - from, place));
+                        if k == 0 {
+                            posts::segment(&mut rows, pos, w, col);
+                        }
+                        posts::segment(&mut ticks, w, w, pcol);
+                        from = p;
+                    }
+                    lpos
+                }
+                None => pos,
+            };
+            if !legs.contains(&(head, buf[i])) {
+                legs.push((head, buf[i]));
+                posts::segment(&mut rows, head, lift(buf[i]), col);
+            }
             rest.clear();
             rest.extend_from_slice(&buf[i..]);
             if hooks::path_is_loop(path) {
@@ -338,7 +377,6 @@ impl Paths {
         // One selected ship of a group: its own path, to its own targets. Several: the
         // group's path once (the queue's points, where its leader goes) with each ship's
         // own leg to where it heads now and a small tick at each of its own targets.
-        let mut ticks: Vec<Vtx> = Vec::new();
         for e in 0..queued.len() {
             let (serial, pos, ref own, ref gp, ref fl) = queued[e];
             let group = serial >= 0 && queued.iter().filter(|x| x.0 == serial).count() > 1;
@@ -438,4 +476,15 @@ impl Paths {
         cmd.bind_texture(0, None, &r3d_core::scene::SAMPLER);
         cmd.draw(&span);
     }
+}
+
+/// Where a ship's place in a formation lies (`place`, relative to the leader: x to the
+/// right, y up, z ahead) while the leader stands at `p` heading along `dir`: in the frame
+/// the engine lays a formation in along a path, ahead along the heading, right level with
+/// the map (a heading within 0.02 of straight up or down takes the map's x as right).
+fn formation_place(p: V3, dir: V3, place: V3) -> V3 {
+    let f = dir.norm();
+    let r = if f.x * f.x + f.z * f.z < 0.02 { v3(1.0, 0.0, 0.0) } else { v3(f.z, 0.0, -f.x).norm() };
+    let u = f.cross(r);
+    p + r * place.x + u * place.y + f * place.z
 }

@@ -47,7 +47,7 @@ pub mod sym {
     pub const FN_DRAW_PATH: a2engine::Sym = a2engine::Sym(85);
     pub const SITE_DRAW_PATH: a2engine::Sym = a2engine::Sym(86);
     pub const OVERVIEW_PTR: a2engine::Sym = a2engine::Sym(87);
-    pub const SITE_GRID_COLOUR: a2engine::Sym = a2engine::Sym(106);
+    pub const SITE_GRID_COLOUR: a2engine::Sym = a2engine::Sym(109);
 }
 
 pub mod hook {
@@ -114,6 +114,8 @@ pub mod field {
     #[inline(always)] pub fn PATH_COUNT() -> usize { super::TABLE.engine().field(a2engine::Sym(98)) }
     #[inline(always)] pub fn PATH_POINTS() -> usize { super::TABLE.engine().field(a2engine::Sym(99)) }
     #[inline(always)] pub fn PATH_TYPE() -> usize { super::TABLE.engine().field(a2engine::Sym(100)) }
+    #[inline(always)] pub fn PROC_FOLLOW_TARGET() -> usize { super::TABLE.engine().field(a2engine::Sym(105)) }
+    #[inline(always)] pub fn PROC_FOLLOW_OFFSET() -> usize { super::TABLE.engine().field(a2engine::Sym(106)) }
 }
 
 pub mod value {
@@ -122,8 +124,9 @@ pub mod value {
     #[inline(always)] pub fn CMD_GO() -> i32 { super::TABLE.engine().value(a2engine::Sym(101)) }
     #[inline(always)] pub fn CMD_PATROL() -> i32 { super::TABLE.engine().value(a2engine::Sym(102)) }
     #[inline(always)] pub fn PATH_PATROL() -> i32 { super::TABLE.engine().value(a2engine::Sym(103)) }
-    #[inline(always)] pub fn OV_POSTS_AT_CALLEE() -> i32 { super::TABLE.engine().value(a2engine::Sym(104)) }
-    #[inline(always)] pub fn OV_POST_MOVED() -> i32 { super::TABLE.engine().value(a2engine::Sym(105)) }
+    #[inline(always)] pub fn CMD_FOLLOW() -> i32 { super::TABLE.engine().value(a2engine::Sym(104)) }
+    #[inline(always)] pub fn OV_POSTS_AT_CALLEE() -> i32 { super::TABLE.engine().value(a2engine::Sym(107)) }
+    #[inline(always)] pub fn OV_POST_MOVED() -> i32 { super::TABLE.engine().value(a2engine::Sym(108)) }
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
@@ -231,16 +234,19 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "cmd_go", symbol: "AiCommand GO", kind: a2engine::Kind::Value },
     a2engine::SymDef { id: "cmd_patrol", symbol: "AiCommand PATROL", kind: a2engine::Kind::Value },
     a2engine::SymDef { id: "path_patrol", symbol: "AiPath type: a patrol loop", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "cmd_follow", symbol: "AiCommand FOLLOW", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "proc_follow_target", symbol: "CraftProcess", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "proc_follow_offset", symbol: "CraftProcess", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "ov_posts_at_callee", symbol: "height posts claim point", kind: a2engine::Kind::Value },
     a2engine::SymDef { id: "ov_post_moved", symbol: "DrawHeightPost entry instructions", kind: a2engine::Kind::Value },
     a2engine::SymDef { id: "site_grid_colour", symbol: "Terrain_Geometry::DrawGrid", kind: a2engine::Kind::Label },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
-    a2engine::HookDef { id: "render3d.overlays.reads", run_unknown: false, rows: &["Modules.overlays"], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 106] },
+    a2engine::HookDef { id: "render3d.overlays.reads", run_unknown: false, rows: &["Modules.overlays"], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 109] },
     a2engine::HookDef { id: "render3d.overlays.posts", run_unknown: false, rows: &["Modules.overlays"], syms: &[15, 37, 38, 39, 40, 41] },
-    a2engine::HookDef { id: "render3d.overlays.posts_callee", run_unknown: false, rows: &["Modules.overlays"], syms: &[15, 104, 105] },
-    a2engine::HookDef { id: "render3d.overlays.paths", run_unknown: false, rows: &["Overlays.MovePaths"], syms: &[85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103] },
+    a2engine::HookDef { id: "render3d.overlays.posts_callee", run_unknown: false, rows: &["Modules.overlays"], syms: &[15, 107, 108] },
+    a2engine::HookDef { id: "render3d.overlays.paths", run_unknown: false, rows: &["Overlays.MovePaths"], syms: &[85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106] },
 ];
 
 pub const BUILDS: &[a2engine::Build] = &[
@@ -252,7 +258,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 107,
+        n_resolved: 110,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x473930, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x3c, 0x53, 0x8b], mask: &[], section: "", count: 0, value: 0 }, // fn_footprints
@@ -359,6 +365,9 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // cmd_go
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 26 }, // cmd_patrol
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 2 }, // path_patrol
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 11 }, // cmd_follow
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 156 }, // proc_follow_target
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 240 }, // proc_follow_offset
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // ov_posts_at_callee
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 6 }, // ov_post_moved
             a2engine::Entry { present: true, addr: 0x5934c9, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x68, 0xe8, 0x8e, 0x7a, 0x00], mask: &[], section: "", count: 0, value: 0 }, // site_grid_colour
@@ -369,7 +378,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         modules: &[],
         blocked_mod: &[
         ],
-        n_resolved_mod: 107,
+        n_resolved_mod: 110,
     },
     a2engine::Build {
         name: "fo-roots-5.0Z11",
@@ -379,7 +388,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 102,
+        n_resolved: 105,
         content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x473930, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x3c, 0x53, 0x8b], mask: &[], section: "", count: 0, value: 0 }, // fn_footprints
@@ -486,6 +495,9 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // cmd_go
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 26 }, // cmd_patrol
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 2 }, // path_patrol
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 11 }, // cmd_follow
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 156 }, // proc_follow_target
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 240 }, // proc_follow_offset
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1 }, // ov_posts_at_callee
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 6 }, // ov_post_moved
             a2engine::Entry { present: true, addr: 0x5934c9, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x68], mask: &[], section: "", count: 0, value: 0 }, // site_grid_colour
@@ -503,8 +515,8 @@ pub const BUILDS: &[a2engine::Build] = &[
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 4] = [const { core::sync::atomic::AtomicU64::new(0) }; 4];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 107] = [const { core::sync::atomic::AtomicU8::new(0) }; 107];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 107] = [const { core::sync::atomic::AtomicUsize::new(0) }; 107];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 110] = [const { core::sync::atomic::AtomicU8::new(0) }; 110];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 110] = [const { core::sync::atomic::AtomicUsize::new(0) }; 110];
 static NOTES: [a2engine::Note; 4] = [const { a2engine::Note::new() }; 4];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 

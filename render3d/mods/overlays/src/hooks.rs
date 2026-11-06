@@ -650,6 +650,28 @@ pub fn ship_path(o: usize, team: i32) -> Option<(V3, usize, i32)> {
     Some((pos, path, field(proc_, field::PROC_POINT()) as i32))
 }
 
+/// A ship of the player's team that follows another in a formation move (its command
+/// FOLLOW: `FormationManager::Send_Ships_In_Formation` gives the group's leader the move
+/// and every other ship FOLLOW): (where it is, where its leader is, the leader's path, the
+/// point the leader flies to, the ship's place relative to the leader). The process holds
+/// the leader's handle (`+0x9c`) and the place (`+0xf0`, in the frame of the leader's
+/// heading); its own path (`+0x88`) is no route then (the order's start and that place),
+/// so the leader's path is the one drawn. None when the leader is gone or not on a path.
+pub fn ship_follow(o: usize, team: i32) -> Option<(V3, V3, usize, i32, V3)> {
+    let pos = ship_position(o, team)?;
+    let proc_ = field(o, field::OBJ_PROCESS());
+    if proc_ == 0 || field(proc_, field::PROC_COMMAND()) as i32 != value::CMD_FOLLOW() {
+        return None;
+    }
+    let leader = entity(field(proc_, field::PROC_FOLLOW_TARGET()));
+    if leader == 0 || leader == o {
+        return None;
+    }
+    let (lpos, path, idx) = ship_path(leader, team)?;
+    let place = unsafe { rd::<V3>(proc_ + field::PROC_FOLLOW_OFFSET()) };
+    Some((pos, lpos, path, idx, place))
+}
+
 static mut PATH_GATE: Option<Gate> = None;
 static mut PREV_DRAW_PATH: usize = 0;
 static mut PATHS_READY: bool = false;

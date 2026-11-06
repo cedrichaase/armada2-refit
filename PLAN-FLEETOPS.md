@@ -495,6 +495,84 @@ sketched path is still unseen there.
 | 51 | The pick is chained **although FleetOpsHook owns the site** (rule 4 says to take the callee) | the callees (`SetLogicalDatabase`, `SetVisibleDatabase`) are called from everywhere and do not carry the type; the chained call is FleetOpsHook's own function, called on with its arguments unchanged, so Roots still decides the model | a callee that carries the type |
 | 52 | The **logo node stays generic** (decision 21) and the scenario checks the lookup only (`N of N shown nodes found by name`) | Roots 5.0Z11 has no `stlogo` node, so there is nothing to honour; the code needs no change to honour one when it comes | a Roots release or mod with an `stlogo` node (then the scenario stages that ship and expects the `drawn with` line) |
 
+### FO-B: the formation move's path
+
+Branch `fo-formation-path`, 2026-11-06, designed from the files only (no build, no bench
+run yet). The gap: on Roots a move of several ships draws no path; a step-7 bench run
+logged the first selected ship of such a move with the command 11 and a path of two points
+whose last lay near the map's origin.
+
+**What it is.** Command 11 is not Roots': it is stock's FOLLOW (the engine's own table of
+command names says so, the same in both files), and stock uses it for every move of
+several ships. A move sent to more than one ship goes out as one group order and reaches
+`FormationManager::Send_Ships_In_Formation`, which gives the move to the group's leader
+and FOLLOW to every other ship, with the leader and the ship's place in the formation
+relative to it. With `cfgDEFAULT_TO_FORMATION_MOVE = 1` (stock's and Roots' `RTS_CFG.h`)
+and no Ctrl, the followers keep that place for the whole move; with Ctrl each one soon
+turns its FOLLOW into a move of its own along a copy of the leader's path, shifted by its
+place. A following ship's process keeps the leader's handle and the place
+(`+0x9c`, `+0xf0`); its own path field holds the order's start and the place, not a
+route, which is the two-point "path" the bench saw. A path sketched with the waypoint key
+never takes this road: it is sent as a copy of the path for each ship.
+
+**Why nothing is drawn on Roots.** Two filters in the overlays module's engine fallback
+(`paths.rs`), both stock's by design, not anything of Roots': (1) it reads a path only
+from a ship whose command is GO or PATROL, so a follower is skipped; (2) without QOL's
+queue it draws only paths that came from a sketch, and an ordinary move, of one ship or
+of a group, is not one. On stock the player has QOL, whose queue draws every move, groups
+included (their own formation spread); on Roots QOL is not installed, so (2) alone hides
+every unsketched move, the one-ship move too (as the FO-B note above found on the bench),
+and (1) would hide the followers even with (2) lifted. FleetOpsHook draws no path of its
+own (it references neither `mDrawPath` nor the engine's line draw) and leaves the order's
+road alone: the FOLLOW case of `CraftProcess::Handle_New_Command`, `Send_Ships_In_Formation`,
+`Do_Group_Move`, `Copy_Offset_Path`, the group order and the sketched order are stock's in
+Roots' file and in memory. It changes `CraftProcess::Follow` only in a computer player's
+cloaking, in how the leader is looked up and for a ship that would follow itself, and runs the user formation's fleet through
+`AIFleet`'s plain `ProcessFleetAI` and `ReplaceLeader`, none of which the paths read.
+Confidence: high for the mechanism (read in both files and matched to the bench's log
+line); the drawing itself is unseen.
+
+**The fix, under model (c)** (code written, unbuilt): the engine's own order data only,
+nothing of FleetOpsHook's memory, no new hook.
+
+- `hooks::ship_follow` (render3d overlays): a selected ship of the player's team whose
+  command is FOLLOW is drawn by its leader, found through `Entity::Get` of the handle; the
+  leader must itself be on a path (GO or PATROL, read by the existing `ship_path`). The
+  group's path is the leader's, drawn once (the module's chain already draws a shared
+  segment or point once a frame, and a new list of legs does the same for the leader's
+  leg); each follower adds a leg from itself to its place at the point the leader flies to,
+  and a small dot at its place at each point after, the drawing QOL's groups already have
+  on stock.
+- `EngineMoves` in the content set's `overlays.ini`: `sketched` in the stock set (stock
+  without QOL unchanged), `all` in the fleetops set, so every move of a selected ship
+  draws on Roots, ordinary and formation moves alike. QOL's queue still wins when a plugin
+  exports one.
+- Profile (`profiles/gog-1.1/render3d.overlays.toml`, inherited by Roots):
+  `cmd_follow` (value 11), `proc_follow_target` (`CraftProcess+0x9c`, i32),
+  `proc_follow_offset` (`CraftProcess+0xf0`, v3), all `used_by = ["overlays.paths"]`; no
+  Roots entry (the values are stock's there, and no `[[changed]]` function holds them);
+  the overlays' symbol count goes from 107 to 110 (`engine-syms`).
+- What stock keeps doing: with the stock set nothing new is drawn (a follower's leader
+  is on an unsketched path, which `sketched` still drops), QOL's queue is untouched, and
+  `mDrawPath`'s re-pointing is unchanged.
+
+**To confirm** (needs a build and a bench run; neither was done): `cargo` builds of
+render3d and its `hosttest` (`overlays_fleetops_draws_every_engine_move`,
+`overlays_stock_is_the_old_table`); on Roots (Vulkan, 1280x960), a one-ship move and a
+move of three ships, each followed by `overlays: move paths: N selected ship(s) on a path,
+M point(s) ahead (engine)` with N the ships selected, and shots of the leader's path with a
+leg and a dot per follower; the same with Ctrl (the followers then fly copies, drawn as
+moves of their own); on stock with QOL, `render3d-move-paths` and `engine-syms`
+(overlays 110/110) unchanged; on stock without QOL, a group move still draws nothing.
+
+| # | Default | Why | What would change it |
+|---|---|---|---|
+| 53 | A **follower draws its leader's path** (once for the group), a leg to its own place at the leader's next point and a small dot at its place at each point after | the leader's path is the route the group flies, and the place is where the follower will be; it is the drawing QOL's groups have on stock, so the two look alike | the user's verdict in game; a follower seen away from its dots |
+| 54 | A follower's place is **turned by the heading of each leg of the leader's path** (ahead along the leg, right level with the map), as the engine turns it when it copies a path, not by the leader's live heading | it is fixed on the map, so the dots stay put as the ships fly (the module's rule for every dot), and it is where the engine itself would put the ship on a copied path | dots seen to swing off the ships' tracks on long turns |
+| 55 | On Roots **every move draws** (`EngineMoves = all` in the fleetops set); stock's set stays `sketched` | Roots has no QOL, so the plain and the formation move would draw nothing; stock without QOL keeps its look | QOL installed on Roots (its queue then draws, as on stock); the user preferring only sketched paths on Roots |
+| 56 | The switch is a **content-set key**, not a profile value or a player's `[Overlays]` key | it is per build, as `ProfileBy` (decision 6) and the rest of the set (decision 7b); a mod with QOL of its own sets `sketched` | the user wanting to choose it in the Refit screen (then an `[Overlays]` key with the set's value as default) |
+| 57 | The leader is looked up with **`Entity::Get`** of its handle, not the engine's craft-unless-destroyed lookup FleetOpsHook wraps in `Follow` | it is the module's one lookup and reads nothing of FleetOpsHook's; a leader that is gone draws nothing, as the engine then stops the follower | a follower seen without a path while its leader still flies (a leader FleetOpsHook's lookup resolves another way) |
+
 The Roots profile tools (`tools/engine/fo-scan.py`, PR #61) took these defaults:
 
 | # | Default | Why | What would change it |
