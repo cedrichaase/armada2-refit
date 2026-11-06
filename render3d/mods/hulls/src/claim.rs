@@ -107,9 +107,27 @@ pub fn honour_database(p: &mut r3d_core::scene::pose::Posed) {
             continue;
         }
         found += 1;
+        // A level of detail is the module's own pick (`pose`): the database's flags on a
+        // `lod*` level are the engine's level switch, its own choice of level (by its own
+        // distances), not a hide of Roots' or of the instance. Where the two picks
+        // differ, honouring them hid the very level the module picked, and with it every
+        // mesh of the hull: Roots' first allied tutorial opened on an Enterprise-E
+        // (`fed_sovereignent`, `lod1` flagged) drawn as nothing at all.
+        let level = sod.lod_group(i).is_some_and(|(_, lv)| lv == i);
         if hooks::node_hidden(e) {
-            r3d_core::scene::instance::hide(sod, i, &mut p.pose.shown, true);
-            continue;
+            static mut SAID_HIDDEN: u32 = 0;
+            if unsafe { SAID_HIDDEN } < 8 {
+                unsafe { SAID_HIDDEN += 1 };
+                crate::log!(
+                    "hulls: {} node {} hidden in the instance's database{}",
+                    model.name, n.name,
+                    if level { ": a level of detail, the module's own pick kept" } else { "" }
+                );
+            }
+            if !level {
+                r3d_core::scene::instance::hide(sod, i, &mut p.pose.shown, true);
+                continue;
+            }
         }
         if n.mesh().is_none() {
             continue;
