@@ -985,5 +985,16 @@ beside Roots' own behaviour (PLAN-FLEETOPS.md, "FO-7: QOL on Roots", decisions 1
 - **The overview** is read through `g_pOverView` (`ov_base()` in `qol.c`), since Roots
   constructs an enlarged one of its own instead of the static object. Anything of QOL that
   addresses the overview must do the same.
+- **`ShiftAddsToGroup` is on** (decision 108): Roots has no Shift+number of its own, and every
+  site `qol.shift_group` uses is stock's in the file and in memory. Roots jumps out of
+  `mCheckGroupSelect` before its key loop to take **Alt+number** itself, and Roots' Alt+number
+  empties the selection and recalls the *station* group, not QOL's "select and centre the ship
+  group" (the log and Refit text say so): on Roots Shift+number adds, and Shift's old
+  select-and-centre is gone (the second tap still centres). `fo-qol-groups` shows it.
+- **`MaxSelection` stays 16 and `selection` and `special_select` are disabled** (decision 109):
+  FleetOpsHook has moved the selection into an array of its own in the enlarged overview, at
+  +0x3d0 (so the `+0xbc` sites are not stock's), with a cap of 30 in its own `Select` and in the
+  group add of `mBindGroup`, and its own special-weapon gathering. Its readers are not ours to
+  re-point, so QOL's array would disagree with them; Roots' 30 is already past stock's 16.
 - **`BarKeys` stays off**: Roots' bar is FleetOpsHook's, up to 64 buttons with several per
   weapon classlabel, so the slot plan of QOL-1 does not hold there.
