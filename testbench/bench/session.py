@@ -198,6 +198,37 @@ def vulkan_validate():
     return os.environ.get('A2TEST_VULKAN_VALIDATE', '1') != '0'
 
 
+def set_vulkan_keys(ini):
+    """Put the clone's `Display8.ini` (beside the game's executable) in step with the
+    bench's Vulkan rules, for every launch path: when its `Backend=` names Vulkan or
+    `auto`, `Validate=1` (`Validate=0` with `--no-validate`) and, with `--vulkan-device
+    lavapipe`, `Device=llvmpipe` unless a `Device=` is set. Only ever a bench clone's
+    ini. Returns the text it left, '' when there is no ini."""
+    ini = Path(ini)
+    try:
+        text = ini.read_text(errors='replace')
+    except OSError:
+        return ''
+    m = re.search(r'^Backend=(.*)$', text, re.M | re.I)
+    if not m or not re.search(r'vulkan|auto', m.group(1), re.I):
+        return text
+
+    def put(t, key, val, only_if_empty=False):
+        km = re.search(rf'^{key}=(.*?)\r?$', t, re.M)
+        if km:
+            if only_if_empty and km.group(1).strip():
+                return t
+            return t[:km.start()] + f'{key}={val}' + t[km.end():]
+        return re.sub(r'^\[Display8\][ \t]*\r?\n', lambda x: x.group(0) + f'{key}={val}\n', t, 1, re.M)
+
+    new = put(text, 'Validate', '1' if vulkan_validate() else '0')
+    if vulkan_device() == 'lavapipe':
+        new = put(new, 'Device', 'llvmpipe', only_if_empty=True)
+    if new != text:
+        ini.write_text(new)
+    return new
+
+
 def log_dirs(prefix, game):
     """The folders a plugin's log may be in: the prefix's LocalAppData logs folder, then
     the game directory. `prefix` is the directory WINEPREFIX points at (its `pfx` inside
@@ -1039,12 +1070,15 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                 self.start_stems()
             env['WINEDLLOVERRIDES'] = self.dll_overrides() + ';winealsa.drv=d;wineoss.drv=d'
             route_wine_audio(self.prefix_dir / 'pfx' / 'user.reg', sink)
-        env.update(vulkan_env(d, self.dir / 'logs'))
+        set_vulkan_keys(d / 'Display8.ini')
+        venv = vulkan_env(d, self.dir / 'logs')
+        env.update(venv)
         # a marker the watchdog can match whatever pid namespace the game ends up in
         env['PULSE_PROP'] = f'a2test.session={self.s["id"]}'
         env['PIPEWIRE_PROPS'] = f'{{ a2test.session = "{self.s["id"]}" }}'
         (logs / 'launch-env.txt').write_text(
-            f'cwd: {exe.parent}\nargv: python3 {config.UMU} {exe} {args}\n\n' +
+            f'cwd: {exe.parent}\nargv: python3 {config.UMU} {exe} {args}\n'
+            f'vulkan validation: {"on" if "VK_INSTANCE_LAYERS" in venv else "off"}\n\n' +
             ''.join(f'{k}={v}\n' for k, v in sorted(env.items())))
         wlog = open(logs / 'wine.log', 'a')
         wlog.write(f'--- {now()} launch {config.EXE_NAME} {args}\n')
@@ -1064,7 +1098,8 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             time.sleep(0.1)
         else:
             raise GameError(f'{config.EXE_NAME} did not appear within 120s; see logs/wine.log')
-        self.log.action(f'launched {config.EXE_NAME} {args} through umu (pid {self.game_pid()})' +
+        self.log.action(f'launched {config.EXE_NAME} {args} through umu (pid {self.game_pid()}), '
+                        f'Vulkan validation {"on" if "VK_INSTANCE_LAYERS" in venv else "off"}' +
                         ('' if self.s['audio'] else f', audio to the null sink {self.s["null_sink"]["name"]}'))
         if not self.s['audio']:
             threading.Thread(target=self._audio_watchdog, daemon=True).start()
