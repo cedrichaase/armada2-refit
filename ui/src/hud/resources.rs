@@ -49,12 +49,20 @@ fn names(now: f64, shown: &[(u32, usize)]) -> &'static [(usize, String, String)]
         n.names.clear();
         for &(r, c) in shown {
             let tip = topbar::tooltip(c, false).unwrap_or_default();
-            // "Crew: 1200/3250": the name is the first line up to its colon.
-            let first = tip.lines().next().unwrap_or("");
-            let first = String::from(first.split(':').next().unwrap_or("").trim());
-            // Roots' components answer a tooltip whose first line is not a word (control
-            // characters, which draw as "?"): the set's name then.
-            let name = if first.is_empty() || first.len() > 24 || first.chars().any(|c| c.is_control()) || !first.chars().any(|c| c.is_alphabetic()) { String::from(crate::content::get().resource(r as usize)) } else { first };
+            let mut name = word(&tip);
+            // Roots' short tooltip is one icon glyph (a control character, drawn as "?"); its
+            // long one is "Tritanium: <glyph>" and a sentence, in the game's own table and
+            // by race: the name is read from it (decision 153).
+            let mut text = tip.clone();
+            if name.is_none() {
+                let long = topbar::tooltip(c, true).unwrap_or_default();
+                name = word(&long);
+                if name.is_some() {
+                    text = long.chars().filter(|c| !c.is_control() || *c == '\n').collect();
+                }
+            }
+            let name = name.unwrap_or_else(|| String::from(crate::content::get().resource(r as usize)));
+            let tip = text;
             n.names.push((c, name, tip));
         }
         if !same {
@@ -67,6 +75,15 @@ fn names(now: f64, shown: &[(u32, usize)]) -> &'static [(usize, String, String)]
         n.at = now;
     }
     &n.names
+}
+
+/// A resource's name out of a tooltip: its first line up to the colon ("Crew: 1200/3250"),
+/// when that is a word (not a control character, which draws as "?", nor a sentence).
+fn word(tip: &str) -> Option<String> {
+    let first = tip.lines().next().unwrap_or("");
+    let first = first.split(':').next().unwrap_or("").trim();
+    let ok = !first.is_empty() && first.len() <= 24 && !first.chars().any(|c| c.is_control()) && first.chars().any(|c| c.is_alphabetic());
+    ok.then(|| String::from(first))
 }
 
 /// The cells' order, by `eResource`: dilithium, metal, latinum, biomatter, crew,
@@ -83,7 +100,7 @@ pub fn run(ui: &mut Ui) {
     let t = ui.theme;
     let (cell_w, h, gap) = (ui.u(150.0), ui.u(46.0), ui.u(6.0));
     let w = shown.len() as f32 * cell_w + (shown.len() - 1) as f32 * gap;
-    let (outer, inner) = super::panels::fit(ui, Anchor::Top, w, h, ui.u(6.0));
+    let (outer, inner) = place(ui, w, h);
     ui.panel(outer);
     for (i, &(r, _)) in shown.iter().enumerate() {
         let cell = R::new(inner.x + i as f32 * (cell_w + gap), inner.y, cell_w, inner.h);
@@ -107,4 +124,20 @@ pub fn run(ui: &mut Ui) {
             }
         }
     }
+}
+
+/// The strip's rectangle and its content's. At the top centre of the screen, as the stock
+/// panel is, unless the content set says the game's own resource panel has a place
+/// (`[Resources] Placement = component`): then its top left corner, which is where that
+/// game draws its resources, the top centre being its command and message area.
+fn place(ui: &Ui, w: f32, h: f32) -> (R, R) {
+    use crate::engine::api::hud;
+    if crate::content::get().resources_at_component {
+        if let Some(p) = hud::panel_rect(topbar::resource_panel(), ui.w, ui.h) {
+            let (outer, inner) = super::panels::fit(ui, Anchor::TopLeft, w, h, 0.0);
+            let (dx, dy) = (p[0] - outer.x, p[1] - outer.y);
+            return (R::new(outer.x + dx, outer.y + dy, outer.w, outer.h), R::new(inner.x + dx, inner.y + dy, inner.w, inner.h));
+        }
+    }
+    super::panels::fit(ui, Anchor::Top, w, h, ui.u(6.0))
 }
