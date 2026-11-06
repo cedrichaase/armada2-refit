@@ -169,3 +169,23 @@ step it fell in and the SODs and textures loaded in it.
   (a hook on its import counted none in any of them, and was taken out again): what is
   left is the engine's own work between loads, building a class or the tech tree, which
   has no call of its own to draw from.
+
+## On Fleet Operations: Roots
+
+Verified 2026-11-06 (PLAN-FLEETOPS.md, FO-6 step 2), hook by hook. **`loading.overlay`**: Roots'
+new load bar changes `RenderLoopAssetLoadStatusUpdate` in three places in its first
+half (a string-copy call at +0x1b, six bytes nopped at +0x88, and its own bar call
+in place of the engine's at +0x343..+0x35c); the entry bytes, the `DeleteRegisteredLights`
+call at +0x3b3 and the `EndScene` call at +0x400 are stock's in the file and in memory
+after FleetOpsHook, so the overlay draws after Roots' bar, in the same scene. **`loading.own`**: the
+call of `LoadBarNext` into that function (0x6019eb) and `RenderLoop_Show_Splash_Screen`
+(entry and the call at `GameDoOne+0xcd`) are stock's; Roots edits `GameDoOne` at +0x19b
+(four bytes in the file, a jump into its own code) and FleetOpsHook at +0x17c..+0x30a
+(audio and close calls), none near the splash call. **`loading.inner_db` and
+`loading.inner_pixels` stay down**: `FindLogicalDatabase`, `FindVisibleDatabase` and
+`DemandLoad` are replaced whole, so the screen has frames only between the load's steps
+(0 of 4 sites; still gaps of 100 to 460 ms in the heavy steps, as stock's before the inner
+frames). The map is read through `GameSetup::getMapName` (`shell.reads_setup`) and the race
+from the setup's slot, whose Roots name (`unitedfederation`) is an alias in the `fleetops`
+content set. The sky face is read as TGA only: Roots' DDS faces leave the menu backdrop.
+`scenarios/fo-ui-loading.md` and `fo-ui-loading-off.md` are the B and A sides.

@@ -113,7 +113,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 3,
+        n_resolved: 11,
         content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x601ce0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xd9, 0x05, 0x18, 0xe2, 0x6a, 0x00, 0xd8, 0x25, 0x28, 0x88, 0x7a, 0x00], mask: &[], section: "", count: 0, value: 0 }, // loading_load_fraction
@@ -135,14 +135,14 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x488730, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // loading_handle_message_queue
         ],
         blocked: &[
-            a2engine::Block { hook: 0, symbol: "RenderLoopAssetLoadStatusUpdate", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: RenderLoopAssetLoadStatusUpdate is changed by fo-roots-5.0Z11, not yet verified" },
-            a2engine::Block { hook: 1, symbol: "Program::GameDoOne", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Program::GameDoOne is changed by fo-roots-5.0Z11, not yet verified" },
             a2engine::Block { hook: 2, symbol: "ST3D_GraphicsEngine::FindLogicalDatabase", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ST3D_GraphicsEngine::FindLogicalDatabase is changed by fo-roots-5.0Z11, not yet verified" },
             a2engine::Block { hook: 3, symbol: "ST3D_Texture::DemandLoad", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ST3D_Texture::DemandLoad is changed by fo-roots-5.0Z11, not yet verified" },
         ],
         file_crc: &[a2engine::FileCrc { section: ".text", crc: 0xef690537 }, a2engine::FileCrc { section: ".test", crc: 0xe7a4061b }],
         modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
         blocked_mod: &[
+            a2engine::Block { hook: 0, symbol: "RenderLoopAssetLoadStatusUpdate", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: RenderLoopAssetLoadStatusUpdate is patched by FleetOpsHook.dll, which is not the profiled one" },
+            a2engine::Block { hook: 1, symbol: "RenderLoopAssetLoadStatusUpdate", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: RenderLoopAssetLoadStatusUpdate is patched by FleetOpsHook.dll, which is not the profiled one" },
         ],
         n_resolved_mod: 3,
     },

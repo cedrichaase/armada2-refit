@@ -40,6 +40,8 @@ companions = ["FleetOpsHook.dll"]
 # written again.
 [verified]
 "Armada_RenderAllOurStuff" = ["render3d.frame.*"]
+"RenderLoopAssetLoadStatusUpdate" = ["ui.loading.overlay", "ui.loading.own"]
+"Program::GameDoOne" = ["ui.loading.own"]
 
 # Hooks that stay off on Roots whatever the diff says.
 [[disable]]

@@ -248,7 +248,7 @@ Armada II, all read from the descriptor:
   the instance draw)`, and the `fo-render3d-*` scenarios (FO-5 step 8) check the seam and the hull claim (`-seam`), the range ring
   of FleetOpsHook with hulls claimed (`-rings`), the debris at the callee hook (`-debris`),
   the shields' `RTS_CFG.h` keys (`-shields`), the grid's colour (`-grid`) and the logo node's
-  texture (`-stlogo`). There is no scene harness on Roots: the fight for `-debris` and
+  texture (`-stlogo`); with the UI layer, `fo-ui-loading` and `fo-ui-loading-off` (FO-6 step 2: the loading screen of ours over Roots' own, `Setup: display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh ...`). There is no scene harness on Roots: the fight for `-debris` and
   `-shields` is the Hard AI's own attack on a base left alone, with Game Speed at its top
   (`_fo-render3d-battle`), a few minutes in. `Setup: display/bench-mode.sh stub
   Backend=vulkan` sets Display8's backend and, on Vulkan, `Validate=1` (the validation

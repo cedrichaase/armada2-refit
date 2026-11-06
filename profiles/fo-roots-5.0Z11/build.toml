@@ -125,10 +125,13 @@ verified = ["render3d.overlays.reads"]
 # ---- ui -------------------------------------------------------------------------------
 # The shell's dialog procedures ask for 1200x900 where stock asks for 800x600.
 
+# Roots' four-byte edit (+0x19b) and FleetOpsHook's audio and close calls (+0x17c..+0x30a)
+# sit away from the splash call at +0xcd, which is stock's in the file and in memory (FO-6
+# step 2, 2026-11-06).
 [[changed]]
 fn = "Program::GameDoOne"
 how = "detour"
-verified = []
+verified = ["ui.loading.own"]
 
 [[changed]]
 fn = "AdmiralsLogDlgProc"
@@ -248,9 +251,13 @@ how = "runtime"
 verified = ["display.modes"]
 
 [[changed]]
+# Roots' load bar: three writes (+0x1b, +0x88, +0x343..+0x35c) in the first half of the body.
+# The UI's sites are the entry (checked, and the call of LoadBarNext into it is stock's), the
+# DeleteRegisteredLights call at +0x3b3 and the EndScene call at +0x400: the same bytes as stock's
+# in the file and in memory after FleetOpsHook (FO-6 step 2, 2026-11-06).
 fn = "RenderLoopAssetLoadStatusUpdate"
 how = "runtime"
-verified = []
+verified = ["ui.loading.overlay", "ui.loading.own"]
 
 # render3d
 

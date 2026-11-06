@@ -446,8 +446,8 @@ patch table:
 
 | Step | What | Needs | Agent h · bench |
 |---|---|---|---|
-| 1 | **Groundwork, offline.** `profiles/fo-roots-5.0Z11/content.toml` names a `fleetops` set for the UI (`ui/content/sets/fleetops/ui.ini`: Roots' race names and their looks, resources, no campaigns, no tour; decision 70); `fo-scan.toml` drops the entry check of the callees the UI only calls (`ST3D_Texture::DemandLoad`, `ActionMode::GetAction`, and `operator new` for `hud.closeup`, the gap `--compare` found); the component reads find the info panel by the render list, not the `shipDisplay` global, on every build (decision 64); the bar's button count and indirection become profile values (21 inline on stock, 64 behind a pointer on Roots); `games/fo-roots.toml` adds `ui` with Roots' defaults (decision 63); the stock set must not move (`ui/hosttest`, `tools/engine/negative.sh`) | profile, code in `engine/hud.rs` and `engine/palette.rs`, a set | 4–8 · 0 |
-| 2 | **The loading screen.** `loading.overlay` and `loading.own` verified beside Roots' load bar and `GameDoOne` edits; `inner_db`, `inner_pixels` down by design; the map and players named through `shell.reads_setup` | profile marks; bench A/B with the UI off | 3–6 · 2–4 |
+| 1 | **Groundwork, offline.** `profiles/fo-roots-5.0Z11/content.toml` names a `fleetops` set for the UI (`ui/content/sets/fleetops/ui.ini`: Roots' race names and their looks, resources, no campaigns, no tour; decision 70); `fo-scan.toml` drops the entry check of the callees the UI only calls (`ST3D_Texture::DemandLoad`, `ActionMode::GetAction`, and `operator new` for `hud.closeup`, the gap `--compare` found); the component reads find the info panel by the render list, not the `shipDisplay` global, on every build (decision 64); the bar's button count and indirection become profile values (21 inline on stock, 64 behind a pointer on Roots); `games/fo-roots.toml` adds `ui` with Roots' defaults (decision 63); the stock set must not move (`ui/hosttest`, `tools/engine/negative.sh`). **Built 2026-11-06** (branch `fo-6`): the set, the callee checks (`callees_whole` in `fo-scan.toml`), the info panel found by name, the bar's two profile values and the `ui` layer with Roots' defaults are in; decisions 76–81 | profile, code in `engine/hud.rs` and `engine/palette.rs`, a set | 4–8 · 0 |
+| 2 | **The loading screen.** `loading.overlay` and `loading.own` verified beside Roots' load bar and `GameDoOne` edits; `inner_db`, `inner_pixels` down by design; the map and players named through `shell.reads_setup` | profile marks; bench A/B with the UI off. **Built 2026-11-06** (branch `fo-6`): `loading.overlay` and `loading.own` verified (the bytes at our sites are stock's in the file and in memory); on the bench (Roots, 1280x960, Vulkan with validation) the screen is ours edge to edge with Roots' load bar and logo scene under it, and `fo-ui-loading` / `fo-ui-loading-off` are the A/B; decisions 82–84 | 3–6 · 2–4 |
 | 3 | **The mission frame, input, the Refit screen.** `core.mission` verified; the window procedure of both windows measured (class, `GWL_WNDPROC`, which one `GetWindowHandle` gives in the shell and in a mission); if Roots' form calls the two message functions itself, record and capture move to their entries on Roots (decision 71); the hidden flag read from Roots' panel; **the Refit screen as a modal in a mission**, opened by a key of the UI's (decision 62), with the clean-screenshot mode left alone (decision 72) | profile, `input.rs`, `engine/ingame.rs`, `menus/refit.rs` outside the host | 8–14 · 3–5 |
 | 4 | **The panels Roots changes least**, each its own row and off on Roots until verified: messages and objectives, the pause and replay boxes, overlay text, chat and trade, the top-right buttons (Roots' five), the resources (Roots' amounts, names from the set), the selection overlay, and the engine's last draws (`fade`, `frame_rate`, `order_ring`, `footprints`; the drag box stays the engine's). Sounds measured under FMOD first | profile marks, a panel at a time | 12–20 · 5–8 |
 | 5 | **Measure the bar, draw nothing.** Log FleetOpsHook's bar on the bench: the buttons per selection (a ship with several weapons of one `classLabel`, the construction ship's build list, a station), the mode in use and its columns and rows, which button the range ring follows and through which of the stock bar's states. Decide from it whether a bar of ours can keep the rings without reading FleetOpsHook's memory (decision 65) | bench and logs only | 4–8 · 2–3 |
@@ -460,6 +460,41 @@ round FO-B or a round of its own after it; with steps 6 and 7, about 80–145 ho
 replaces the 10–30 hours of the work-package table, which assumed the HUD's reads held.
 Bench as for FO-5: Roots at 1280x960 (the shell needs 1200x900), Vulkan with the
 validation layer, staged through Instant Action, one Roots game at a time.
+
+### Steps 1 and 2: what the bench and the files showed (2026-11-06)
+
+`./a2test syms --game fo-roots` is 73 of 108 hooks ready (70 before; stock 106 of 108, unchanged);
+`hud.footprints`, `hud.radar` and `hud.radar_cursor` came ready by the callee rule,
+`loading.overlay` and `loading.own` by verification. On the bench (Roots, Display8 on Vulkan
+with validation, Render3D and the UI, 1280x960, Federation against Klingon) `fo-ui-loading`
+passes every log check: the screen is ours edge to edge, in the Federation's theme, titled
+"The Very First Map" (Roots' map `first`), the players panel names "steamuser, Federation"
+and "AI Hard, Klingon" through `shell.reads_setup`, 700 frames of ours to the engine's 18
+(longest wait 690 ms, with the 20 s hold), no frame inside a step, then Roots' own HUD with
+no panel of the UI's over it. `fo-ui-loading-off` shows Roots' own loading screen (a planet,
+a tip, its red bar) with the hook installed and nothing of ours drawn. Findings for step 3:
+
+- **The mission hook (`core.mission`) is the next one down**: it logs `mission: standing
+  down` because of `ChatDisplay::Render`, which is trampolined; the HUD part says "Enable=0,
+  the HUD is stock".
+- **Generated tables carry the marks**: a `verified` edit in `build.toml` is only seen after
+  `tools/engine/gen.py` and a rebuild (`gen.py --check` fails CI otherwise); the first bench
+  run of step 2 stood the loading hooks down for that reason.
+- **The info panel's name on Roots is unmeasured**: `hud.reads_components` is ready but the
+  component list is only logged by `log_components`, which runs from the HUD part; with the
+  HUD off nothing logs it. Step 3 should log the render lists once per mission (the names
+  and rectangles) on Roots to settle decision 77, and to read the window procedure question.
+- **`core.reads_hud_hidden` still reads the stock global** (`shipDisplay+0x16`, ready,
+  wrong): it should go through `hud::ship_display()` like the rest.
+- **The Refit screen's defaults** (`ui/settings.toml`, `shipped = "ui/UI.ini"`) show stock's
+  shipped values; on Roots they differ (`ui/defaults/fo-roots.ini`).
+- **Roots has no `Data/Menus`**, no UI log of its own and its logs sit in the prefix's
+  `AppData/Local/armada2-refit/logs/` (`"UI.log"` names it in a scenario).
+- **A map's sky is TGA only** in `loading.rs`; Roots' faces may be DDS (the screen fell back
+  to the menu backdrop with `sky none`).
+- **The stock `ui-runtime` scenario fails at step 33** (`Context: Mission`, a load still at
+  35%) on this machine, before this branch as after (a run of 2026-11-06 00:07 failed alike):
+  its 8 s wait for the load is too short; `ui-loading` passes.
 
 ### Defaults taken
 
@@ -481,6 +516,15 @@ validation layer, staged through Instant Action, one Roots game at a time.
 | 73 | **The loading screen of ours covers Roots' whole** (its load bar and text included), and animates only between load steps | it is the UI's own look over no Roots art; Roots replaces the functions the in-step frames hooked | the Roots developer preferring Roots' loading screen |
 | 74 | Callees FleetOpsHook takes over and the UI only calls **drop their entry check** (`fo-scan.toml`, as decision 15); **the drag box stays the engine's** (FleetOpsHook owns the call; no callee hook in FO-6) | Roots' replacement is what Roots means there; the box is minor | the drag box wanted in the theme |
 | 75 | `games/fo-roots.toml` **keeps `hud_canvas = [1600, 1200]`**, the space the engine converts every rectangle into; Roots' per-aspect layouts are not read by the UI | the UI reads converted rectangles, never Roots' layout files | a UI part that needs the declared canvas |
+| 76 | **`callees_whole`** in `fo-scan.toml` (`ST3D_Texture::DemandLoad`, `ActionMode::GetAction`): a function our hooks only call that Roots changes anywhere in the body drops its entry check; with a hook of ours also inside it (`loading.inner_pixels` patches a call in `DemandLoad`) it stays marked and only the hooks that merely call it (`hud.order_ring`, `hud.footprints`) are written `verified` by the scan. `operator new` for `hud.closeup` was already a callee; the scan drops its check | the plan's list of three callees did not fit the scan's rule (a callee with something of ours inside, or changed past its entry, was marked); the rule is extended, not the marks hand-edited | a callee whose Roots change alters what the UI reads from it |
+| 77 | **The info panel is found by `GetName` == "ShipDisplay" in the render lists of every view**, kept while a list holds it; the panel switch takes it by name (`INFO_PANEL_TAKEN`, learned from the components `RenderAll` and `RefreshOwner` call). `hud_ship_display` is gone from the profile; `shipDisplay` stays only as `hud.info`'s gate. Outside a mission the answer is 0 | decision 64 on every build, stock the same object; all views, so the cinematic view answers as before. Roots' panel answering to the same name is unmeasured (step 3) | the bench showing another name on Roots |
+| 78 | The bar's **count and indirection are profile values** (`palette_n_slots` 21 and `palette_slots_indirect` 0 on stock; 64 and 1 in `profiles/fo-roots-5.0Z11/ui.hud.toml`, a hand-written entry beside the scan's); `HUD.Bar=0` stays | decision 65; the values come from MemDiff's count and pointer, not yet read in game | step 5's measurement |
+| 79 | **Roots' `UI.ini` defaults are an overlay**, `ui/defaults/fo-roots.ini`, applied over `ui/UI.ini` by `ui/apply-defaults.py` in `ui/install.sh` (a key `UI.ini` lacks fails the install): the HUD's `Enable` and every panel key, `Menus.Enable`, `Credits`, `Scene`, `CampaignLocks`, `[UI] Cursor` and `Movies` at 0; the loading screen on. `Movies=0` is added to the plan's list (Roots plays its intro on a Direct3D 9 device of its own). The Refit screen's "shipped default" still reads `ui/UI.ini` (step 3) | decision 63; one list per game, not a second whole file to keep in step | a part verified |
+| 80 | The `fleetops` set: Federation, Klingon, Romulan, Cardassian, Borg, Species 8472, **Free Borg** (the Borg's look), **Dominion** (no look: the shell's); each race's aliases include Roots' ODF names (`unitedfederation`, `klingonempire`, `romulanempire`; `observer` and `federation` for the Federation); the same six resources; no campaigns, scenes, files or tour; the gallery lists the factions only | decision 70; the order is the plan's | the Roots developer |
+| 81 | **No menu plates on Roots**: `ui/backdrops/install-plates.sh` neither installs nor removes anything for another game (Roots' `Data/` has no `Menus/` today; `layers.toml`'s `Menus/*.bmp` pattern would claim one if a Roots update shipped it, for `a2mod`) | decision 60 and 68 | a Roots with its own `Menus/` |
+| 82 | **`loading.overlay` and `loading.own` are verified** by reading the bytes: the entry and the `LoadBarNext` call into `RenderLoopAssetLoadStatusUpdate`, its `DeleteRegisteredLights` call (+0x3b3) and `EndScene` label (+0x400), the splash call in `GameDoOne` (+0xcd) and `RenderLoop_Show_Splash_Screen`'s entry are the same in the file (compared with stock) and in memory after FleetOpsHook (MemDiff's ranges: Roots' writes are +0x1b, +0x88, +0x343..+0x35c and, in `GameDoOne`, +0x17c..+0x30a and the file's +0x19b); `fo-scan.toml` `[verified]` keeps them. `inner_db` and `inner_pixels` stay down | the plan's "verify (cheap)" | a Roots update changing the sites |
+| 83 | **The screen of ours covers Roots' whole** (decision 73), frames between the load's steps only (0 of 4 inner sites); a map's sky is read as TGA only, so Roots' DDS faces give "the menu backdrop" (no sky) there | the A/B shows the cover; DDS sky faces are a later change of `a2fmt` use | the Roots developer, the user |
+| 84 | **Bench: `ui/bench-asi.sh` follows the executable's folder** (`Data/` on Roots), keeps the clone's own `UI.ini` (Roots' defaults) as the base for `S.K=V` keys, and leaves `retire/` to Armada II; `display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh ...` is the Setup line. Scenarios `fo-ui-loading` (the B side, `Hold=20`) and `fo-ui-loading-off` (`Loading.Enable=0`, the A side) | the bench's scripts wrote `$work/game/` | |
 
 ### Risks and unknowns
 
