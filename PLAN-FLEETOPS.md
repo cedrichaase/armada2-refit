@@ -683,6 +683,29 @@ What the bench rounds showed and fixed:
 still test what they did (not re-run in this step except through `-hud`). Stock at 1280x720 with `--install .`:
 `ui-hud-bar` (a flake on its first run, a pass on the second) and `ui-hud-panels` ran, the log checks pass.
 
+### Step 4a: the resources' names and place on Roots (2026-11-06)
+
+The user's report from the Federation economy tutorial at 3440x1440: "metal should be tritanium, biomatter should
+be supplies", and the strip of ours "painted over HUD drawn by Fleet Ops" (branch `fo-ui-resources-fix`, on `fo-b`).
+**Names.** The `fleetops` set carried stock's words (Metal, Biomatter). Roots renames them in its string table:
+the long tooltips of the resource components (`GUI_RD_*_VTOOLTIP`) read Dilithium, Tritanium, Supply
+(`GUI_RD_BIOMATTER_*`), Biomatter for the Species 8472 (the alternative keys `*_BIOMA_ALT_*`, chosen by the race's
+ODF) and Connections Nodes for the Borg's latinum, while the short tooltips are one icon glyph each (the
+"unresolved token" of step 4: a font glyph, not a key). The panel now reads the name from the long tooltip when
+the short one holds no word, so a race or a build that renames is followed; the set's `Names` (Tritanium,
+Supply, Connection Nodes) remain the fallback. Measured on every race (`fo-ui-resources-<race>`): Federation,
+Klingon, Romulan, Cardassian and Dominion read Dilithium, Tritanium, Supply (Borg and Free Borg:
+Connections Nodes for the latinum, Roots' spelling), the Species 8472 Biomatter alone.
+**Place.** At the user's aspect the canvas file is the 16:9 one (2134x1200 in the layout, converted to the 1600x1200
+space); Roots' own `ResourcePanel` sits at [75,8,426,55] there, top left, and its top centre belongs to its
+command info bar offset, messages and build areas. Ours was centred at the top, as on stock. The strip now sits at
+the top left corner of the game's component rectangle (`[Resources] Placement = component`; stock keeps the top
+centre). On the bench at 2150x900 (2.39, the user's aspect; the shell needs 900 high) the tutorial with the
+Enterprise selected shows the strip over Roots' empty resource spot, clear of the info strip, the bar, the
+minimap and the avatar box's column; no overlap with Roots' art was reproduced at the top centre while the
+strip was there, so the cause is read as the top-centre placement meeting Roots' top-centre elements (the
+command info bar and messages, hidden in the tutorial's first minutes), not a draw order.
+
 ### Step 7: why the menus stay Roots' (2026-11-06)
 
 Offline, as the step asked first: every `DialogBoxParamA` and `CreateDialogParamA` call in
@@ -970,6 +993,9 @@ their `ArmadaL.exe` would need a profile of its own.
 | 150 | **The nine dialogs behind FleetOpsHook's import are phase two**, by late attach: found as created, left in FleetOpsHook's placement and procedure, named through the record FleetOpsHook keeps on the window, read with the stock host's model | the eight forms are the larger and simpler half; the nine need the stock procedure's identity | the eight seen in game |
 | 151 | **Generic first** (mirror, then widgets over a form's controls), **specs after**, one per screen at 1200x900 | as on stock; specs need the live bindings seen | |
 | 152 | **Out of scope in this plan**: the map editor's forms, the Internet button's Tunngle and GameSpy menus, hidden debug controls, and Map Select's grid as widgets (mirrored only) | Roots-only tools, dead services, and a grid whose rows are a third-party control's private data | the user asking |
+| 153 | **The resources' names come from Roots' own table at run time, the set's only a fallback**: the long tooltip's first line when the short one is a glyph; the `fleetops` set's `Names` are Roots' defaults (Tritanium, Supply, Connection Nodes). Supersedes the stock words of decision 124 | Roots renames them, per race (the Species 8472 read Biomatter); reading its table follows any race or build | a Roots table with no long tooltip (the set answers) |
+| 154 | **The resources strip sits over the game's own `ResourcePanel` rectangle on Roots** (`[Resources] Placement = component`, new content-set key; stock stays top centre), top left corner, natural size | Roots draws its command, message and build areas at the top centre; its own resources were top left | an aspect where Roots moves the panel (the rectangle is read each frame) |
+| 155 | **`Resources` stays on in Roots' defaults**: no clean reason to give the panel back | the names and the place are fixed and every race measured | the user seeing the overlap again |
 
 ### Risks and unknowns
 

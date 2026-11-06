@@ -20,16 +20,19 @@ Roots' own strip is not drawn under ours, and that the amounts agree with the ga
 2. Wait up to 60 seconds for "UI.log" to say "resources:".
 3. Wait 3 seconds.
 4. Take a screenshot called "resources ours".
-5. Check that the top centre of the screen shows a strip of resource cells drawn by the UI (a dark rounded panel with one to three cells, each with a name, an amount and a coloured mark), and that Fleet Operations' own resource counters are not drawn a second time under or beside it.
-6. Move the mouse to 640,46.
+5. Check that the top left of the screen, where Fleet Operations' own resource strip sits, shows a strip of resource cells drawn by the UI (a dark rounded panel with one to three cells, each with a name, an amount and a coloured mark), that the names are Roots' (Dilithium, Tritanium, Supply) and that Fleet Operations' own resource counters are not drawn a second time under or beside it.
+6. Move the mouse to 150,40.
 7. Wait 2 seconds.
 8. Take a screenshot called "resources hover".
 9. Expect "UI.log" contains "panels: ResourcePanel ours".
 10. Expect "UI.log" contains "resources:".
-11. Expect "UI.log" not contain "the HUD stays stock".
-12. Expect "UI.log" not contain "PANIC".
-13. Expect "Display8.log" not contain "VUID".
-14. Expect "Display8.log" not contain "device removed".
-15. Quit the game.
-16. Expect the game to have exited.
-17. Expect no crash.
+11. Expect "UI.log" contains "Tritanium=".
+12. Expect "UI.log" contains "Supply=".
+13. Expect "UI.log" not contain "(Metal)".
+14. Expect "UI.log" not contain "the HUD stays stock".
+15. Expect "UI.log" not contain "PANIC".
+16. Expect "Display8.log" not contain "VUID".
+17. Expect "Display8.log" not contain "device removed".
+18. Quit the game.
+19. Expect the game to have exited.
+20. Expect no crash.

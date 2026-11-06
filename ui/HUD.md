@@ -1005,7 +1005,15 @@ officers the team's `+0x160` over `Team::GetMaxOfficers()` ("12/30"); ours write
 same. The colour of each is `ResourceComponent::s_ResourceColor[r]` (a `ST3D_Colour *`
 each, from the GUI config), drawn as a mark beside it; its name and tooltip are the
 component's own `GetTooltip` (vtable `+0x00`, the verbose one `+0x04`), whose first
-line is the localised name. A strip at the top centre of the screen.
+line is the localised name. A strip at the top centre of the screen, or, where the content
+set says `[Resources] Placement = component` (the `fleetops` set), at the top left corner of
+the game's own `ResourcePanel` rectangle: Fleet Operations: Roots draws its resources there
+and its command, message and build areas at the top centre.
+
+On Roots the short tooltip is a single icon glyph (a control character), so the name is read
+from the long one (`+0x04`: "Tritanium: <glyph>" and a sentence, from the game's string table,
+per race: Supply or Biomatter for the biomatter by race, Connection Nodes for the Borg's
+latinum); the set's `Names` are only the fallback when neither tooltip holds a word.
 
 ### The top-right buttons (`ButtonPanel`)
 
