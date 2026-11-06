@@ -39,6 +39,10 @@ pub struct Campaign {
     /// The loading screen's line for its maps, and whether the mission's number follows.
     pub kicker: &'static str,
     pub numbered: bool,
+    /// The card (this list's index) whose campaign must be complete before this one
+    /// opens (`menus::locks`), or None: always open. The list's order is the game's own
+    /// order of the campaigns' progress (`engine::progress`).
+    pub requires: Option<usize>,
 }
 
 /// The game's files the UI reads, by their path in `files` (`textures\<file>` for a
@@ -117,9 +121,22 @@ pub fn parse(text: &'static str) -> Content {
                 map: find(es, "Map").unwrap_or(""),
                 kicker: find(es, "Kicker").unwrap_or(""),
                 numbered: find(es, "Numbered").is_some_and(|v| v.trim() == "1"),
+                requires: None,
             }
         })
         .collect::<Vec<_>>();
+    // `Requires` names another card by its key; it becomes that card's index.
+    let mut campaigns = campaigns;
+    let reqs: Vec<Option<usize>> = t
+        .sections_under("Campaign.")
+        .map(|(_, es)| {
+            let k = find(es, "Requires").unwrap_or("").trim();
+            if k.is_empty() { None } else { campaigns.iter().position(|c| c.key == k) }
+        })
+        .collect();
+    for (c, r) in campaigns.iter_mut().zip(reqs) {
+        c.requires = r;
+    }
     Content {
         races: races.leak(),
         resources: t.list("Resources", "Names").leak(),

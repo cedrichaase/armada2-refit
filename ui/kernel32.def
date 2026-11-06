@@ -49,3 +49,12 @@ MapViewOfFile@20
 GetEnvironmentVariableA@12
 MoveFileExA@12
 K32EnumProcessModules@16
+GetModuleFileNameW@12
+CreateFileW@28
+GetFileAttributesW@4
+CreateDirectoryW@8
+DeleteFileW@4
+GetEnvironmentVariableW@12
+FindFirstFileW@8
+FindNextFileW@8
+MoveFileExW@12

@@ -4,6 +4,19 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 1.0.7 — 2026-11-05
+
+### Fixed
+- a2rt: the game directory, `%LOCALAPPDATA%` and every file path now go through the wide Win32 calls (`GetModuleFileNameW`, `GetEnvironmentVariableW`, `CreateFileW`, `FindFirstFileW`, ...; `wstr` / `from_wide`; the imports join `kernel32.def`). With a non-ASCII install path (`C:\Users\Jörg\...`) the ANSI call's code-page bytes were not UTF-8, the game directory came out empty, `RefitPlayer.ini` was never consulted (every Refit-screen setting saved and ignored) and was written to a relative path, and the log folder was lost. Installed, not yet seen in game. Bench-verified.
+
+## 1.0.6 — 2026-11-04
+
+### Fixed
+- Device release: freeing a device now releases everything it held, not only its back buffer and depth surface: the textures bound with `SetTexture` (8 stages), the streams of `SetStreamSource` and the index buffer of `SetIndices`. Each shell/mission device re-creation leaked them and their GPU mirrors (`stub/obj.rs`).
+- Render target: the device now holds its current target and depth surface with references of its own (`SetRenderTarget` AddRefs the new and releases the old, the same surface set again included), so `GetRenderTarget` and `GetDepthStencilSurface` no longer hand out a surface the engine already released; `Reset` puts the back buffer and depth surface back as target and depth, as Direct3D does, so `Clear` and the passthrough (which skip a target that is not the back buffer) work again after a `Reset` with an engine target set (`stub/device.rs`). This changes COM refcounting.
+
+Installed, not yet seen in game.
+
 ## 1.0.5 — 2026-11-04
 
 ### Fixed

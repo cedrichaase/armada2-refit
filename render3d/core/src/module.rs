@@ -1,10 +1,10 @@
 //! The module interface, version 2 (README.md, "Module interface"): what a module of
-//! render3d is to the registry (`mods/mod.rs`) and to the frame. A module takes over
+//! render3d is to the registry (`core/src/registry.rs`) and to the frame. A module takes over
 //! one or more of the body's steps, or the drawing of some objects in the object loop,
 //! from the engine; a step no module takes is the engine's own (`frame::steps`).
 //!
-//! Staged in the one crate until the crates are split (`core/` then; PLAN.md, "Changes
-//! to the plan"). Nothing here knows a module by name.
+//! Lives in `r3d-core`; each module is a crate under `mods/` that depends on this one
+//! alone. Nothing here knows a module by name.
 use crate::frame::steps::View;
 use crate::rt::Ini;
 use crate::rt::settings::Setting;

@@ -813,8 +813,9 @@ impl Module for Hulls {
         // The finest level of detail at any distance: the scene is a close-up.
         let lod = pose::Lod::Auto { eye: v.eye, settings: pose::LodSettings { detail: 4, dist: [1.0e5, 1.0e5, 1.0e5, 1.0e5] } };
         for (i, s) in shot.ships.iter().enumerate() {
-            // Cloaked whole, a ship is not there at all (it waits to decloak).
-            if s.cloak.is_some_and(|k| k <= 0.0) {
+            // Cloaked whole, a ship is not there at all (it waits to decloak), unless it
+            // is held cloaked (a locked view): then it is the glass.
+            if s.cloak.is_some_and(|k| k <= 0.0) && !s.cloaked {
                 continue;
             }
             // Gone to warp: only its flash, for a moment, where its bow was.
@@ -865,8 +866,9 @@ impl Module for Hulls {
                 warp: s.warp.map(|(b, sv, n)| draw::warp_world(b, sv, n, centre, radius)),
                 waves: None,
                 glow: None,
-                // Decloaking: as the engine's state 3, this much of the hull back.
-                cloak: s.cloak.map(|k| (3, k.min(1.0), 0.0)),
+                // Decloaking: as the engine's state 3, this much of the hull back; held
+                // cloaked: the engine's state 2, none of it.
+                cloak: if s.cloaked { Some((2, 0.0, 0.0)) } else { s.cloak.map(|k| (3, k.min(1.0), 0.0)) },
                 drawn: true,
                 cargo: Vec::new(),
             };

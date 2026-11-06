@@ -28,8 +28,9 @@ folder has:
 
 - a **`README.md`** — how the layer works and *why*: derivations, measurements, traps;
 - a **`CHANGELOG.md`** — *what* changed, when, at which version, and whether it has been
-  seen in game. **Read it before assuming the state of a layer**, and update it with
-  every change (see "Changelogs and versions").
+  seen in game. **Read it before assuming the state of a layer**, together with the
+  pending changesets in `.changeset/` that name it (`tools/changeset.py status`). Every
+  change adds a changeset; the release writes the entry (see "Changelogs and versions").
 
 The root `CHANGELOG.md` is the project's: the modpack version and the layer versions
 it bundles.
@@ -53,7 +54,7 @@ it bundles.
 | `crates/` | not a layer: `a2rt`, the one runtime of Display8, render3d and the UI (allocator, Win32, log, `sfmt!`, ini with the overlay lookup, files, in-memory patching, frame dumps), linked into each as its `rt`; `a2engine`, the resolver of `profiles/` (`no_std`; the C twin is `csdk/a2engine.h`, the host tools `tools/engine/`), which says which build of `Armada2.exe` is running and whether each hook may hook it; `a2fmt`, the readers of the game's SOD, TGA, `.spr` and ODF files | `crates/a2engine/README.md`, `crates/a2rt/src/lib.rs`, `crates/a2fmt/README.md` |
 | `crates/a2ini` | not a layer: the ini parser (shared by reader and writer) and `edit`, the line-keeping writer of the player's overlay `RefitPlayer.ini`, `no_std`, host-tested on `tools/settings/fixtures/` | `tools/settings/README.md` |
 | `tools/settings/` | not a layer: the settings contracts (A2SET_ABI 1.1) — `gen.py` writes each layer's `settings_table` (the descriptor row itself is written by hand in `a2rt` and `a2asi.h`: neither has generated regions), `lint.py` checks the tables, `host.sh` builds the `a2ini` host binary, the one overlay editor, which `overlay.py` wraps for the bench (the GUI installer only reads the overlay, for its report), `move-keys.py` moves a row's `moved_from` key in the plugin inis, `selftest.sh`, `bench-overlay.sh`. Installers, `a2mod` and the release never write, ship or remove `RefitPlayer.ini`; the Refit screen is its only writer in the game. Its sections are `[<Stem>.<Section>]`, the plugin ini's name and section (`[Render3D.Modules]`, `[UI.HUD]`, `[Display8.Display8]`) | `tools/settings/README.md` |
-| `tools/` (the rest) | not layers: `ini-merge.py`, the one ini merge (keys added, the player's values kept, retired defaults moved); `layers.py` (above); `doclinks.py`, which checks the relative links and anchors of every tracked `.md` (run it after moving a file or renaming a heading); `engine/` (the profile tools); `gates/` (the native gates' kit: `gate-windows.ps1`, `gate-macos.sh`, `GATES.txt`; CI attaches it as `native-gates-<commit>`; a test tool like the bench, not an installer); `shaderc/` (below) | `tools/ini-merge.py`, `tools/gates/GATES.txt` |
+| `tools/` (the rest) | not layers: `ini-merge.py`, the one ini merge (keys added, the player's values kept, retired defaults moved); `layers.py` (above); `changeset.py`, the changesets and the release's version step (`.changeset/README.md`); `doclinks.py`, which checks the relative links and anchors of every tracked `.md` (run it after moving a file or renaming a heading); `engine/` (the profile tools); `gates/` (the native gates' kit: `gate-windows.ps1`, `gate-macos.sh`, `GATES.txt`; CI attaches it as `native-gates-<commit>`; a test tool like the bench, not an installer); `shaderc/` (below) | `tools/ini-merge.py`, `tools/gates/GATES.txt` |
 | `csdk/` | not a layer: `a2asi.h`, the header-only base the C plugins (`qol/`, `rules/`, `online/`, `cutscenes/binkproxy/`) are built on (Win32 types and imports, string and log helpers, signature checks, `VirtualProtect` patching, the overlay lookup), `a2engine.h`, and `def/`, their one set of import-library `.def` files | `csdk/a2asi.h` |
 | `gpu/` | not a layer: the graphics interface render3d and the UI draw through (`no_std`, linked into each), on Display8's Vulkan or Direct3D 12 device — no Direct3D 9 (gpu 2.0.0); stood down (nothing drawn) with none; `gpu/shaders/compat.hlsli` lets one HLSL source build SPIR-V and DXIL (dxc only) | `gpu/README.md` |
 | `tools/shaderc/` | not a layer: the shader compiler scripts every crate with shaders builds through (`hlsl-rs.sh` to SPIR-V and DXIL, the pinned dxc fetcher, `verify-generated.sh`, which CI runs); installs nothing, versioned by the root | `render3d/README.md`, "One source, two forms" |
@@ -138,18 +139,29 @@ Required reading, by task:
 
 ## Changelogs and versions
 
-Every layer folder in the table above has a `CHANGELOG.md` with its own semver version.
-The root `CHANGELOG.md` versions the project as a whole. **A commit that changes a layer
-updates that layer's changelog and the root one in the same commit**, with the version
-bumped. A changelog that is updated "later" gets forgotten.
+Every layer folder in the table above has a `CHANGELOG.md` with its own semver version,
+and so do `gui-installer/`, `testbench/` and `films/` (`.changeset/config.toml`). The
+root `CHANGELOG.md` versions the project as a whole. **Versions are never edited by hand.**
+A change records itself as a **changeset**: a small file in `.changeset/` that names the
+layers it touches, the bump each takes, its in-game status and what changed.
+The release assigns the numbers (`.changeset/README.md` has the format).
 
-**What gets an entry:** anything that changes what a layer installs into the game, how
+    python3 tools/changeset.py add --layers render3d,qol --bump minor --section Added -m "..."
+    python3 tools/changeset.py status      # each layer's current -> next version, and why
+
+**A commit that changes a layer adds a changeset in the same commit**, or edits the
+branch's changeset for that work. A changeset written "later" gets forgotten. Do not touch
+a `## X.Y.Z` heading, a `Cargo.toml` version or `INSTALLER_VERSION`.
+`tools/changeset.py check` (CI) fails when a version file disagrees with its changelog,
+and a pull request fails when it changes a version by hand.
+
+**What gets a changeset:** anything that changes what a layer installs into the game, how
 it builds, or its interface (CLI flags, `target.conf`/`.ini`/`.conf` keys, backup
 names). This includes tuning changes like a new blend, seed or threshold, and a revert
-of shipped work. **No entry:** changes to docs and notes only, and scratch work that
+of shipped work. **None:** changes to docs and notes only, and scratch work that
 installs nothing.
 
-**Which part to bump:**
+**Which bump** (the changeset's `bump:`, or `<layer>: <bump>` per layer):
 
 | Bump | When | Examples here |
 |---|---|---|
@@ -157,28 +169,55 @@ installs nothing.
 | MINOR | new content or capability: new targets or texture classes installed, a new menu handled, a new key, flag or tool | the five faction targets; `Embed=1`; `NoiseFloor=` |
 | PATCH | a fix or re-tune behind the same interface | Sovereign blend 35 → 70; main-menu plate seed 6; the `Mmoon` sun-box fix |
 
-The **project version** takes the largest bump among the layers the change touches.
-Changes that belong to no one layer, such as `a2mod`, the repo layout or a cross-layer
-convention, bump only the root. Every root entry lists the new version of each layer it
-touches, for example `menus 1.1.0, textures 1.0.1`.
+At release, each layer's next version is its current one plus the largest bump among the
+pending changesets that name it. The **project version** is the current root plus the
+largest bump of all of them. Changes that belong to no one layer, such as `a2mod`, the
+repo layout or a cross-layer convention, name `root` (`layers: [root]`) and bump only
+the project. The release writes the root entry with the `Layers:` line listing each
+layer's new version.
 
-**Entry format.** Newest first, headed `## X.Y.Z — YYYY-MM-DD`, then `Added` / `Changed`
-/ `Fixed` / `Removed` as needed. Each item is one or two lines saying *what* changed,
-naming the key or target, with the commit hash once there is one. The *why* stays in
-the layer's README. Do not copy derivations into a changelog, and do not copy status
-("confirmed in game", dates, accepted seeds) into this file — that is what the
-changelogs are for.
+**Entry format** (written by `changeset.py version`, newest first): a heading
+`## X.Y.Z — YYYY-MM-DD`, then `Added` / `Changed` / `Fixed` / `Removed`. Each item is one
+or two lines saying *what* changed, naming the key or target, and ends with the hash of
+the commit that added its changeset. The *why* stays in the layer's README. Do not copy
+derivations into a changeset, and do not copy status ("confirmed in game", dates,
+accepted seeds) into this file: status belongs in the changeset and its entry.
 
-**In-game status goes in the entry.** End every entry with "Installed, not yet seen in
-game" or "Confirmed in game". When the user confirms later, **replace** "Installed, not
-yet seen in game" with `Confirmed in game YYYY-MM-DD` and do not bump. Don't keep both:
-an entry that still says "not yet seen" after it has been seen is misleading. This is the
-one permitted edit to an entry that has already been released. A rejection is not a status line. It is a new entry
-that reverts the change, like the font's `--method runs`.
+**In-game status goes in the changeset.** Its `status:` line, by default "Installed, not
+yet seen in game", ends the entry the release writes, and makes the release an
+**untested release** (GitHub's *Pre-release* flag). So does a line starting "Untested"
+(seen, but not past the Windows gate). When the user confirms the change **before it is
+released**, edit the changeset: `status: Confirmed in game YYYY-MM-DD`. When the user
+confirms it **after release**, replace "Installed, not yet seen in game" with
+`Confirmed in game YYYY-MM-DD` in the layer and root entries and do not bump. That is
+the one permitted edit to a released entry. Don't keep both: an entry that still says
+"not yet seen" after it has been seen is misleading. A rejection is not a status line.
+It is a new changeset that reverts the change, like the font's `--method runs`.
 
-**Parallel worktrees** will both claim the next number. Whichever branch merges second
-renumbers its entries (layer and root) while resolving the conflict. Never leave two
-entries with the same version.
+**Releasing** (`publish/README.md`, "Releasing"). The user starts it by hand: the
+Release workflow runs `changeset.py version --commit` on main and opens the pull request
+"Release X.Y.Z". **Merging that PR publishes vX.Y.Z** (with a merge commit or a rebase; do not squash). CI recognises the merge by the
+release commit's `Release-Version` trailer, and no other push releases anything. Every
+push to main also publishes a **pre-release**, `vX.Y.Z-pre.N`, the build of the latest
+main (N is CI's run number; the newest three are kept). The GUI installer offers the
+newest last, as "Pre-release (latest main)", but never picks it for the player. Do not confuse it with an **untested release**, a
+`vX.Y.Z` not yet seen in game. Never run `changeset.py version` on a work branch: only
+the release branch does that.
+
+**Parallel worktrees** no longer clash over numbers: each branch adds its own changeset
+files, which merge without conflict, and no branch assigns a version. Name a changeset
+after its work (`move-paths.md`), not a number.
+
+**A branch with hand-numbered entries** (begun before changesets, such as
+`ar-integration` or `move-queue-2`) converts them before it merges:
+`python3 tools/changeset.py convert` (against its merge-base with `origin/main`, or
+`--base REF`; `--dry-run` first). This turns each layer's new entries into
+`.changeset/converted-<layer>.md`, with the bump from main's version to the branch's
+newest and the status lifted out of the text ("not yet seen" wins). It then takes the
+entries out of the changelogs and puts the version files (`Cargo.toml`, `Cargo.lock`,
+`INSTALLER_VERSION`) back to main's. Root entries are dropped when the branch has layer
+entries, because those carry the items, so read the note it prints. Review the changesets,
+commit, then merge `origin/main`. The changelogs no longer conflict.
 
 ## Finishing work
 
@@ -186,13 +225,15 @@ Work is done when the user has confirmed it working in game **and** signed it of
 done. A test launch, or a passing `verify`, does not count. Then, without being asked
 again, finish in this order:
 
-1. **Record the confirmation** on the branch: `Confirmed in game YYYY-MM-DD` in place
-   of "Installed, not yet seen in game", in the layer and root changelogs (above), and
-   commit.
+1. **Record the confirmation** on the branch: `status: Confirmed in game YYYY-MM-DD` in
+   the branch's changeset(s) (above), and commit. If the work was already released, edit
+   the released entries instead.
 2. **Merge into `main`** from the main checkout, with
-   `git merge --no-ff <branch> -m "Merge <branch>: <what>"`. Resolve version clashes as
-   "Parallel worktrees" says. Don't push unless the user asks: a push to `main` that
-   bumps the root version publishes a GitHub Release (`publish/README.md`).
+   `git merge --no-ff <branch> -m "Merge <branch>: <what>"`. There are no version numbers
+   to resolve: changesets merge side by side. Don't push unless the user asks. A push to
+   `main` publishes the pre-release (the latest main), and no versioned release:
+   releasing is the user's call, through the Release workflow and its pull request
+   (`publish/README.md`, "Releasing").
 3. **Clean up.** Remove the worktree (`git worktree remove`) and delete its branch
    (`git branch -d`). Then do the same for any other worktree whose branch
    `git branch --merged main` lists. Use only the safe forms, never `--force` or
@@ -804,8 +845,9 @@ Two rules from them still bind:
   `p10-fwd-*`, the last from the forward chain that no longer exists).
 - **The native gates are CI's and the user's, not the bench's**: `display/d12probe/` and
   `display/vkprobe/` run in CI (WARP with the Direct3D 12 debug layer; lavapipe) and in
-  the kit `tools/gates/` attaches as `native-gates-<commit>`. A release carries a
-  "Pre-release" line until the user's Windows gate has passed.
+  the kit `tools/gates/` attaches as `native-gates-<commit>`. A release stays an untested
+  release (an "Untested" status line; "Pre-release" before 15.10.0) until the user's
+  Windows gate has passed.
 
 ### ui
 

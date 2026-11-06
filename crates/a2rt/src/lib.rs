@@ -44,6 +44,42 @@ pub fn cstr(s: &str) -> Vec<u8> {
     v
 }
 
+/// The address of an export of any loaded module, or 0: plugins find each other by
+/// export, never by file name (the Rust twin of `a2_find_export` in `csdk/a2asi.h`).
+pub fn find_export(name: &str) -> usize {
+    let n = cstr(name);
+    let mut mods = [core::ptr::null_mut::<core::ffi::c_void>(); 256];
+    let mut needed = 0u32;
+    unsafe {
+        if win::K32EnumProcessModules(win::GetCurrentProcess(), mods.as_mut_ptr() as *mut _, core::mem::size_of_val(&mods) as u32, &mut needed) == 0 {
+            return 0;
+        }
+        let count = (needed as usize / core::mem::size_of::<usize>()).min(256);
+        for m in &mods[..count] {
+            let f = win::GetProcAddress(*m as _, n.as_ptr());
+            if f != 0 {
+                return f;
+            }
+        }
+    }
+    0
+}
+
+/// NUL-terminated UTF-16 copy of `s`, for the W-suffixed Win32 calls. Every path in
+/// this crate is a UTF-8 `String` inside and goes through the wide APIs at the edge,
+/// so a path the system gave us (`C:\Users\Jörg\...`) can always be opened again,
+/// which the ANSI code page's bytes were not.
+pub fn wstr(s: &str) -> Vec<u16> {
+    let mut v: Vec<u16> = s.encode_utf16().collect();
+    v.push(0);
+    v
+}
+
+/// UTF-16 (no terminator) to a `String`.
+pub fn from_wide(w: &[u16]) -> String {
+    char::decode_utf16(w.iter().copied()).map(|r| r.unwrap_or('\u{fffd}')).collect()
+}
+
 /// The game directory, with a trailing backslash (the directory of Armada2.exe).
 pub fn game_dir() -> &'static str {
     let p = GAME_DIR.load(Ordering::Relaxed);
@@ -58,15 +94,20 @@ pub fn game_path(rel: &str) -> String {
 }
 
 pub fn init() {
-    let mut buf = [0u8; 300];
-    let n = unsafe { GetModuleFileNameA(core::ptr::null_mut(), buf.as_mut_ptr(), 300) } as usize;
+    // The wide call: the ANSI one hands back the code page's bytes, which are not UTF-8
+    // for a path such as `C:\Users\Jörg\...` and left the directory empty.
+    let mut buf = [0u16; 1024];
+    let mut n = unsafe { GetModuleFileNameW(core::ptr::null_mut(), buf.as_mut_ptr(), buf.len() as u32) } as usize;
+    if n >= buf.len() {
+        n = 0; // truncated: no directory rather than a wrong one
+    }
     let mut cut = 0;
     for (i, &c) in buf[..n].iter().enumerate() {
-        if c == b'\\' || c == b'/' {
+        if c == b'\\' as u16 || c == b'/' as u16 {
             cut = i + 1;
         }
     }
-    let dir = String::from(core::str::from_utf8(&buf[..cut]).unwrap_or(""));
+    let dir = from_wide(&buf[..cut]);
     GAME_DIR.store(alloc::boxed::Box::into_raw(alloc::boxed::Box::new(dir)), Ordering::Relaxed);
 }
 
@@ -90,9 +131,9 @@ pub(crate) fn log_is_open() -> bool {
 }
 
 fn open_log(path: &str) -> HANDLE {
-    let p = cstr(path);
+    let p = wstr(path);
     unsafe {
-        CreateFileA(p.as_ptr(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, core::ptr::null_mut(),
+        CreateFileW(p.as_ptr(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, core::ptr::null_mut(),
             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, core::ptr::null_mut())
     }
 }
@@ -174,9 +215,9 @@ macro_rules! log {
 
 /// Reads a whole file; None if it cannot be opened.
 pub fn read_file(path: &str) -> Option<Vec<u8>> {
-    let p = cstr(path);
+    let p = wstr(path);
     unsafe {
-        let h = CreateFileA(p.as_ptr(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, core::ptr::null_mut(),
+        let h = CreateFileW(p.as_ptr(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, core::ptr::null_mut(),
             OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, core::ptr::null_mut());
         if h == INVALID_HANDLE {
             return None;
@@ -195,9 +236,9 @@ pub fn read_file(path: &str) -> Option<Vec<u8>> {
 }
 
 pub fn write_file(path: &str, data: &[u8]) -> bool {
-    let p = cstr(path);
+    let p = wstr(path);
     unsafe {
-        let h = CreateFileA(p.as_ptr(), GENERIC_WRITE, FILE_SHARE_READ, core::ptr::null_mut(),
+        let h = CreateFileW(p.as_ptr(), GENERIC_WRITE, FILE_SHARE_READ, core::ptr::null_mut(),
             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, core::ptr::null_mut());
         if h == INVALID_HANDLE {
             return false;
@@ -212,11 +253,11 @@ pub fn write_file(path: &str, data: &[u8]) -> bool {
 /// Renames a file over another (`MOVEFILE_REPLACE_EXISTING`): a reader sees the old
 /// file or the new one, never half of one.
 pub fn move_file(from: &str, to: &str) -> bool {
-    let (f, t) = (cstr(from), cstr(to));
+    let (f, t) = (wstr(from), wstr(to));
     // A reader that holds the target open (the sharing violation of a file being read)
     // fails the move for a moment: retry, bounded at 8 x 50 ms.
     for i in 0..8 {
-        if unsafe { MoveFileExA(f.as_ptr(), t.as_ptr(), 1) } != 0 {
+        if unsafe { MoveFileExW(f.as_ptr(), t.as_ptr(), 1) } != 0 {
             return true;
         }
         if i < 7 {
@@ -228,27 +269,27 @@ pub fn move_file(from: &str, to: &str) -> bool {
 
 /// Deletes a file; false if it could not be.
 pub fn delete_file(path: &str) -> bool {
-    let p = cstr(path);
-    unsafe { DeleteFileA(p.as_ptr()) != 0 }
+    let p = wstr(path);
+    unsafe { DeleteFileW(p.as_ptr()) != 0 }
 }
 
 /// An environment variable of the process; None when it is not set or empty.
 pub fn env(name: &str) -> Option<String> {
-    let n = cstr(name);
-    let mut buf = [0u8; 520];
-    let got = unsafe { GetEnvironmentVariableA(n.as_ptr(), buf.as_mut_ptr(), buf.len() as u32) } as usize;
+    let n = wstr(name);
+    let mut buf = [0u16; 1024];
+    let got = unsafe { GetEnvironmentVariableW(n.as_ptr(), buf.as_mut_ptr(), buf.len() as u32) } as usize;
     if got == 0 || got >= buf.len() {
         return None;
     }
-    core::str::from_utf8(&buf[..got]).ok().map(String::from)
+    Some(from_wide(&buf[..got]))
 }
 
 /// Makes a directory (its parent must exist); true if it exists afterwards.
 pub fn create_dir(path: &str) -> bool {
-    let p = cstr(path);
+    let p = wstr(path);
     unsafe {
-        CreateDirectoryA(p.as_ptr(), core::ptr::null_mut());
-        let a = GetFileAttributesA(p.as_ptr());
+        CreateDirectoryW(p.as_ptr(), core::ptr::null_mut());
+        let a = GetFileAttributesW(p.as_ptr());
         a != INVALID_FILE_ATTRIBUTES && a & FILE_ATTRIBUTE_DIRECTORY != 0
     }
 }
@@ -262,9 +303,9 @@ pub struct Writer {
 
 impl Writer {
     pub fn create(path: &str) -> Option<Writer> {
-        let p = cstr(path);
+        let p = wstr(path);
         let h = unsafe {
-            CreateFileA(p.as_ptr(), GENERIC_WRITE, FILE_SHARE_READ, core::ptr::null_mut(),
+            CreateFileW(p.as_ptr(), GENERIC_WRITE, FILE_SHARE_READ, core::ptr::null_mut(),
                 CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, core::ptr::null_mut())
         };
         if h == INVALID_HANDLE { None } else { Some(Writer { h, ok: true }) }
@@ -286,27 +327,27 @@ impl Drop for Writer {
 }
 
 pub fn file_exists(path: &str) -> bool {
-    let p = cstr(path);
-    let a = unsafe { GetFileAttributesA(p.as_ptr()) };
+    let p = wstr(path);
+    let a = unsafe { GetFileAttributesW(p.as_ptr()) };
     a != INVALID_FILE_ATTRIBUTES && a & FILE_ATTRIBUTE_DIRECTORY == 0
 }
 
 /// File names (not paths) matching a pattern such as `C:\dir\*.sod`.
 pub fn list_files(pattern: &str) -> Vec<String> {
-    let p = cstr(pattern);
+    let p = wstr(pattern);
     let mut out = Vec::new();
     unsafe {
-        let mut fd: FindData = core::mem::zeroed();
-        let h = FindFirstFileA(p.as_ptr(), &mut fd);
+        let mut fd: FindDataW = core::mem::zeroed();
+        let h = FindFirstFileW(p.as_ptr(), &mut fd);
         if h == INVALID_HANDLE {
             return out;
         }
         loop {
             let n = fd.name.iter().position(|&c| c == 0).unwrap_or(260);
             if fd.attrs & FILE_ATTRIBUTE_DIRECTORY == 0 {
-                out.push(String::from_utf8_lossy(&fd.name[..n]).into_owned());
+                out.push(from_wide(&fd.name[..n]));
             }
-            if FindNextFileA(h, &mut fd) == 0 {
+            if FindNextFileW(h, &mut fd) == 0 {
                 break;
             }
         }
@@ -317,18 +358,18 @@ pub fn list_files(pattern: &str) -> Vec<String> {
 
 /// Entries matching a pattern, files and directories, as (name, is_directory).
 pub fn list_entries(pattern: &str) -> Vec<(String, bool)> {
-    let p = cstr(pattern);
+    let p = wstr(pattern);
     let mut out = Vec::new();
     unsafe {
-        let mut fd: FindData = core::mem::zeroed();
-        let h = FindFirstFileA(p.as_ptr(), &mut fd);
+        let mut fd: FindDataW = core::mem::zeroed();
+        let h = FindFirstFileW(p.as_ptr(), &mut fd);
         if h == INVALID_HANDLE {
             return out;
         }
         loop {
             let n = fd.name.iter().position(|&c| c == 0).unwrap_or(260);
-            out.push((String::from_utf8_lossy(&fd.name[..n]).into_owned(), fd.attrs & FILE_ATTRIBUTE_DIRECTORY != 0));
-            if FindNextFileA(h, &mut fd) == 0 {
+            out.push((from_wide(&fd.name[..n]), fd.attrs & FILE_ATTRIBUTE_DIRECTORY != 0));
+            if FindNextFileW(h, &mut fd) == 0 {
                 break;
             }
         }
@@ -484,8 +525,10 @@ mod ini_cache {
     static mut FILES: Vec<File> = Vec::new();
 
     pub fn stamp(path: &[u8]) -> Option<([u32; 2], u32)> {
-        let mut d: FindData = unsafe { core::mem::zeroed() };
-        let h = unsafe { FindFirstFileA(path.as_ptr(), &mut d) };
+        // `path` is the NUL-terminated UTF-8 of an `Ini`'s path.
+        let w = super::wstr(core::str::from_utf8(&path[..path.len().saturating_sub(1)]).unwrap_or(""));
+        let mut d: FindDataW = unsafe { core::mem::zeroed() };
+        let h = unsafe { FindFirstFileW(w.as_ptr(), &mut d) };
         if h == INVALID_HANDLE {
             return None;
         }

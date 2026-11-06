@@ -58,6 +58,8 @@ Status values: **idea** (not investigated), **scoped** (approach known, nothing 
 | [QOL-7](#qol-7-pay-when-queuing-refund-on-cancel) | Pay when queuing, refund on cancel | `QOLRules.asi`, `PayOnQueue=` | — | **built**, now the [`rules/`](../rules/README.md) layer |
 | [QOL-8](#qol-8-long-moves-on-the-map-go-to-warp) | Long moves on the map go to warp | `QOL.asi`, `WarpDistance=` | A stock peer in a network game | **done** (`QOL.asi`), bench |
 | [QOL-9](#qol-9-the-view-reaches-across-the-map) | The view reaches across the map | `Render3D.asi`, `[View] Distance=` | — | **done**, render3d's since qol 2.2.0 |
+| [QOL-10](#qol-10-move-queues) | Move queues: points appended with Tab, flown at once, each leg at its own warp | `QOL.asi`, `PathStartsAtOnce=` | The path key as a binding (issue #26) | **built** (`QOL.asi`), bench |
+| [QOL-11](#qol-11-a-construction-ship-does-not-block-its-own-blueprint) | A construction ship does not block its own blueprint | `QOL.asi`, `RigIgnoresSelf=` | Own, allied ships making way (issues #52, #53) | **built** (`QOL.asi`), bench |
 
 ## Settings live
 
@@ -78,6 +80,8 @@ patch that is in but switched off.
 | `ShiftAddsToGroup` | live | `group_stub` tests the flag; the one byte that moves Shift's old meaning to Alt is written back or forth |
 | `StationGroups` | live | every station hook tests the flag (`sel_pre`, `bind_pre`, `producer_group`, `one_kind`, `focus_stub`) and takes the stock path when it is 0. Groups that already hold stations keep them |
 | `WarpDistance` | live | `warp_pre` already read the distance; 0 does what stock's Alt block did |
+| `PathStartsAtOnce` | live | the three calls stay re-pointed; at 0 a point sends nothing and the release sends as stock |
+| `RigIgnoresSelf` | live | the first stub sets what the check ignores to the rig, or to nothing at 0 (stock's own argument) |
 | `MaxSelection` | restart | the selection array is moved at start; a bigger or smaller one is never re-applied |
 
 `PayOnQueue`, the one row the players must agree on, is `QOLRules.asi`'s, in
@@ -106,6 +110,8 @@ variable and then of the global; field offsets are spliced in with `A2_STR(QOL_F
 | `qol.stations` | `StationGroups` | the eight stub sites (`patch`/`fn`), nine continue points, the engine functions and RTTI the stations code calls, and the object fields | stations as stock |
 | `qol.bar_keys` | `BarKeys` | the call of `mProcessKeyboardInput` in `PopupPaletteImp::Update` (`call`) and that function, the three hotkey counts and the six menu toggles, a button's state and press slot, and the click's sound (`operator new`, the `AudioSound2D` constructor, the click-sound global), `TextInput_IsActive`, `CinematicView::IsPlayingVideo` | position keys off, stock's bar keys |
 | `qol.warp` | `WarpDistance` | the Alt block (`patch`) and its continue point, the warp globals and functions | moves as stock |
+| `qol.move_paths` | `PathStartsAtOnce` | `mAddPathPoint`'s two calls in `mNormalModeRightClick` and `QueueCommand`'s in `mProcessWaypoints` (`call`), those two functions, the craft process's command, path and point fields, the action's no-order flag, the order's packet limit | paths sent on release, as stock |
+| `qol.rig_self` | `RigIgnoresSelf` | two patches in `ConstructionRig::GetAction` (`patch`, each with two continue points as `label`) and the two vtable slots the stubs call | the ghost as stock |
 
 `MaxSelection` needs both of its hooks; the log names the one that failed.
 
@@ -604,3 +610,338 @@ Moved to render3d in qol 2.2.0: the key is `[View] Distance` in `Render3D.ini` a
 findings are in [`render3d/README.md`](../render3d/README.md#view-distance). `QOL.ini`'s
 old `ViewDistance=` is carried over by `tools/settings/move-keys.py` and the release
 installers.
+
+## QOL-10: Move queues
+
+*`QOL.asi`, stock-compatible: only stock's own path orders are sent. Built:
+`PathStartsAtOnce=` (default 1, a live row; 0 leaves paths as stock). Issue #17; the
+dots that show a queue are render3d's (`render3d/README.md`, "overlays", Move paths),
+read through `QOL_MoveQueue`.*
+
+**Problem.** Stock lets the player sketch a path: hold Tab and right-click points on the
+map, and the selection flies them one after another. Nothing moves until Tab is let go,
+a new path replaces the one being flown, and the whole path is flown with the one
+command the cursor showed at the release (all at impulse or all at warp).
+
+**Wanted.** Points queued with Tab are flown at once, a point queued for ships already
+following a queue is added to the end of it, each leg is flown at the warp it was
+queued with, the minimap queues points like the 3D view, and the player's own orders
+end the queue, all with ordinary orders, so stock players in the same game carry them
+out.
+
+### The design
+
+**A queue belongs to the ships it was given to**: a list of points (the clicked map
+points, as the sketch holds them), each with the mode of its click (GO, GO_WARP or
+PATROL), and the ships flying it. A right-click with Tab held appends the point to the
+queue of every selected ship of the player's; selected ships with no queue start one
+together. When only some of a queue's ships are selected, those go on in a copy of the
+queue and only the copy gets the point. Stations and anything without a craft process
+are left out. At most 32 queues, 256 ships and 64 points per queue.
+
+**A run** is the longest stretch of legs of one mode. One path order carries one
+command, so a queue is flown a run at a time: QOL sends the stock path order (stock's
+`QueueCommand`, as the release does) for the run's points, and the ships fly them as any
+path. A point that extends the run being flown (same mode, the ships on the queue's last
+run) is sent at once: the order goes out again from the point each ship heads to now
+(ships at different points get one order each), so the ships take it without turning
+back; a point of another mode waits. When a ship reaches the end of its run it waits for
+the rest of its group, and the next run goes to all of them together as one order (a
+ship that lags more than 8 s of game time behind the first is left to follow on its own).
+The first point of a new queue is sent at once, so the ships are under way from the first
+click, as before.
+
+**Warp per leg.** A leg keeps the mode it was queued with. Alt makes a leg warp, a patrol
+click a patrol leg, and QOL-8 (`WarpDistance`) judges an appended leg by its own length,
+from the queue's last point, not by how far the ships are from the point now (a new
+queue's first leg is judged as QOL-8 judges any move). A minimap point keeps the minimap's
+rule: a move there is GO_WARP unless Alt is held (ui/HUD.md, "The minimap").
+
+**A group's targets.** A path order sends every ship it names to the same points, so a
+group flying one bunched up at each point and circled it, every ship trying to sit on the
+same spot. So each ship of a queue has a place in the group, and flies to the point plus
+that place: QOL sends each ship a path order of its own, to its own targets. The places are
+stock's own formation: the formation type the ships move in (the bar's formation buttons),
+that formation's slots, scaled and filled the way stock fills them for a group move, the
+leader (the filled slot of the lowest rank) on the point itself and every other ship at its
+slot's offset from the leader's. The places are fixed when the queue begins, the formation
+facing the first leg, and at every point the formation is turned to face the leg that
+ends there, as stock's formation faces the way it moves. A single ship's place is the point
+itself. When the player picks another formation for the ships of a queue (an order that
+leaves the queue alone), the places are worked out again from where the ships are, facing
+the point they fly to, and the order is sent again from the point each heads to
+(`formation changed`). Ships the formation has no slot for (more ships than slots, or no
+formation readable) keep where they are in the group, turned to the first leg, at most a
+few ship widths from the group's centre and pushed apart to a ship's width. A copy of a
+queue (a split) keeps its ships' places. A ship counts a point reached when its process goes
+past it (or stops at the end of a run), each ship at its own target, so no ship waits on a
+point another ship holds; the group still goes on to its next run together, as before.
+
+**The packet.** `QueueCommand` drops a path order that would not fit its packet
+(`4 x (ships + 3 x points) + 10` above 0x1fc bytes) without a word. Every ship has an order
+of its own (its own targets), so an order carries one ship and at most 40 points, and a run
+longer than that is sent in parts: the first 40 points, then the rest when the ships reach
+the end of the part (`next part sent`).
+
+**Patrol.** A patrol run loops while it is the queue's last run, as stock's patrol does:
+a patrol point appended to it joins the loop, sent again from the point each ship heads to
+with the loop turned to start there. A point of another mode appended after a patrol ends
+the loop: the ships finish the lap to the patrol's last point and go on to the next run.
+A loop longer than one order takes is cut to what fits.
+
+**What ends a queue.** Any order of the player's that replaces a ship's movement takes
+that ship out of its queue: stop, a plain move or warp, a path not of QOL's, attack,
+guard, follow, dock, repair, build, mine, colonize, a special weapon, forming a formation,
+and every other order except those that leave the movement alone: NONE, DEFAULT, SELECT,
+QUEUE, SET_RALLY_POINT, the two CANCEL_BUILDs, the RED/YELLOW/GREEN alerts, BUY/SELL
+RESOURCE, SET_FORMATION, SET_ATTACK_MODE, the six autonomy settings (special weapons and
+movement) and CMD_SET_FORMATION_ORIENTATION (the masks `mq_keep_lo` / `mq_keep_hi` of the
+profile). A ship destroyed, removed or given to another team leaves its queue
+(`ship gone`), and every queue is dropped when a game is loaded (`g_finish_load_time`
+changes) or `PathStartsAtOnce` goes to 0.
+
+### Stock, and the hooks (hook `qol.move_paths`)
+
+**The key and the sketch.** The key is the `enter_waypoint` binding of `Input.map` (+Tab,
+without Control, Shift or Alt). `cOverViewImp::Init` (0x51e4c0) asks `ControlsGetPointer`
+for it and keeps the pointer to its live state at `cOverViewImp+0x30c`; three places read
+it: the right-click, `mProcessWaypoints` and the sketch's draw. With it held,
+`mNormalModeRightClick` (0x5229a0) adds the map point under the cursor (`+0xa4`) to the
+path at `+0x264` through `mAddPathPoint` (0x5255b0; its call at 0x5229ff makes the path at
+the first point, the one at 0x5229e3 inserts after the last later) and sends nothing.
+`mProcessWaypoints` (0x522aa0, every frame from `mNormalModeInput`) sees the key let go
+with a path there, gathers the selection's ids (`GetSelectList`, so a selection QOL-3
+moved is read where it is) and, unless the action carries the flag 0x4000, calls
+`GameObject::QueueCommand(the action's command, ids, path)` (0x4d4380, cdecl; its call at
+0x522bba): the path order, `NetOrderObjectsWhatPath`, carrying the command the cursor
+shows (GO, GO_WARP with Alt or QOL-8, PATROL in patrol mode). It then frees the sketch.
+`QueueCommand` reads only the path's count and points. A double-click with the key held
+throws the sketch away unsent.
+*Hooks:* the two calls of `mAddPathPoint` go to `mp_add_hook`, which lets it add the point
+(so the engine still draws the sketch while the key is held) and hands the point and the
+action's command to the queues (`mq_point`); the release's call of `QueueCommand` goes to
+`mp_release_hook`, which leaves it out when the sketch's points went to the queues.
+
+**Orders are executed, not sent, on every machine.** Every order of a player is written
+into the outgoing `RoundBuffer` (0x76b888) by its sender (`QueueCommand`'s overloads, the
+bar's `mBroadcastCommand`, `mQueueSpecialWeaponCommand`) and carried out on every machine
+when the round is processed (`RoundBuffer::ProcessOrders`), each by its `Execute`. The
+`NetOrderWhat*::Execute`s are the only callers of the `GameObject::DeQueueCommand`
+overloads, which post the order as the ship's next command (its `AiCmdInfo` at
+`GameObject+0x7c`: the command at `+0x80`, a path at `+0x88`); the path order's static
+`DeQueueCommand` (0x4d4650; node, command, ids, points) checks the ship's owner
+(`+0xec`) against the node and builds each ship an `AiPath` of its own. A move of several
+ships from the bar is a `NetOrderMove`, whose `Execute` calls
+`FormationManager::Broadcast_Go_Command` (0x43b3e0; command, point, ids); forming a
+formation is `NetOrderFormFormation` → `FormationManager::FormFormation` (0x43b680; ids);
+a special weapon `NetOrderSpecialAttack` → `GameObject::SetCommand` (0x4d1d90). The
+ships' own AI and the scripts never go through these: they set the process's command
+directly (`GameObject::SetCommand` and the like), and so does `CraftProcess::Stop` when a
+ship arrives. So an order seen at one of these calls is a player's, which is how arrival
+and a player's Stop are told apart.
+*Hooks:* the 15 calls are re-pointed: `NetOrderWhat::Execute` (0x55007f),
+`NetOrderWhatOn` (0x5500f1), `WhatWho` (0x5502a6), `WhatWhoWhere` (0x55034a),
+`WhatWhoWhereParam` (0x5503ee), `WhatClass` (0x55017e), `WhatClassWhere` (0x550212),
+`WhatParam` (0x550461), `WhatWhere` (0x5504d1), `WhatWhereParam` (0x550545) and
+`WhatWhoParam` (0x5505da) to stubs that note the ship (`ecx`) and the command (the first
+argument) and go on to the engine's `DeQueueCommand`; the special attack's `SetCommand`
+(0x5518a0) likewise; `NetOrderMove`'s `Broadcast_Go_Command` (0x5521a5) and
+`NetOrderFormFormation`'s `FormFormation` (0x5526f6) to stubs that note the ids; and
+`NetOrderObjectsWhatPath::Execute`'s call of the static `DeQueueCommand` (0x54f9ce) to
+`mq_dq_path_hook`. A path order of QOL's own is known by its command, its point count and
+its first and last points (the last 32 sent are remembered); any other is a player's and
+ends the queue of each ship it names.
+
+**How stock moves a group (hook `qol.move_paths`, read only).** A plain move of several
+ships is `NetOrderMove`, whose `Execute` calls `FormationManager::Broadcast_Go_Command`
+(0x43b3e0): it takes the mean of the ships' bearings to the point and hands on to
+`Give_Formation_Go_Commands`, which splits the ships into clusters
+(`Find_Clusters_Of_Ships`: ships that move in the same formation type, close together)
+and moves each with `Do_Group_Move`, the clusters set side by side across the heading,
+`FORMATION_SPACING` apart. `Do_Group_Move` takes the cluster's formation from the
+`FormationManager` (`g_FormationManager`, 0x73575c, a table of 16 `Formation *` by type),
+its scale from `Formation::GetScale` (the largest ship's bounding radius, at least 28,
+over the formation's own ship radius; 1 when that radius is not above 0), and fills the
+slots in their order (`Choose_Spot_In_Formation_For_Each_Ship`): each slot, placed about
+the group's centre and turned to the group's heading (`BuildDirectionalMatrix`: right is
+(z, 0, -x) of the heading), takes the nearest ship of the first of its seven ship types
+that has one (`Find_Closest_Craft_To_Location`, the class's type at +0x42c; `?` any,
+`-` ends the list). The leader is the filled slot of the lowest rank. Then
+`Send_Ships_In_Formation` (0x43c410) gives the leader the move to the point itself and
+every other ship FOLLOW of the leader at its slot's offset from the leader's, so the group
+holds the formation while it flies; forming up (`FormFormation`) gives each ship
+FORM_FORMATION to its slot's own point instead. A path order does none of this:
+`NetOrderObjectsWhatPath`'s `DeQueueCommand` gives every ship a copy of the same points.
+The formation type a ship moves in is its craft process's `+0x13c`
+(`CraftProcess::SetFormation`; the constructor's default is 3), from SET_FORMATION, whose
+parameter becomes the type (posted with `DeQueueCommand(SET_FORMATION, 1)` a ship moves
+in the column, 2 the X; seen on the bench). The types are 0
+`Assault Wall` and 1 `Column` (read from `AI/formations/*.frm`), and 2 and 3, built in code
+(`XFormation`, `SheetFormation`, radius -1, so not scaled). A `Formation` keeps its slot
+count at +4, ship radius at +8, slots at +0xc (0x30 bytes each: seven ship types, the ship
+it holds at +0x1c, the offset (right, up, ahead) at +0x20, the rank at +0x2c) and its type
+at +0x10.
+*Use:* `spread` reads the queue's ships' formation type (the commonest among them), the
+formation's slots, radii and ship types, and fills the slots as above, facing the first
+leg; nothing of the formation is written, and the orders sent are stock's path orders, one
+per ship (entries `mq_formations`, `mq_form_types`, `mq_proc_formation`, `mq_frm_*`,
+`mq_slot_*`, `mq_min_radius`, `mq_ent_bounds`, `mq_bounds_radius`, `mq_class_shiptype`).
+
+**Where a ship is on its path.** Each ship has a craft process (`GameObject+0x44`). When
+it takes a new command (`CraftProcess::Handle_New_Command`, 0x430000), a path order's
+`AiPath` moves from the object's next command (`+0x88`) to the process's `+0x88`, the
+very object, and the point it heads to (`+0x12c`) starts at 0; `Move_To_Formation`
+advances the index (skipping a point the ship is already at), and on arrival the process
+goes to STOP (command `+0x38` 3) with another path in `+0x88` (seen on the bench: never
+null, so only the pointer tells). So after the path hook has run
+the engine's `DeQueueCommand`, QOL keeps each ship's `AiPath` pointer from its `+0x88`;
+the ship is flying the order while its process's path is that pointer, and the queue
+point it heads to is the one that equals the path's point at the index (an engine point
+in between, a detour, keeps the last one found). When the pointer goes, the ship has
+reached the end of the order; an order executed whose path never shows (arrived at once,
+or refused) counts as flown after 1.5 s of game time, and one sent that never executes as
+given up after 8 s.
+
+**The step and the clock.** The queues advance once a frame where the player's own
+input gives its orders: `cOverViewImp::Simulate`'s call of `mProcessKeyboardInput`
+(0x51ef2e) goes to `mq_ov_keys_hook`, which calls it and then steps the queues. A path
+order sent from inside the simulation step (after `GameObject::PreSimulateAll`, the first
+place tried) is written and never carried out: on the bench every next run sent from
+there stayed `POSTED` and the ships never moved, while the same order sent from the
+overview's step is executed within the round. The timers run on the simulation's clock:
+`GameObject::PreSimulateAll`'s call in `Simulate` (0x483327; static, the step's length in
+seconds, 0.1 on the bench) goes to `mq_presim_hook`, which adds it up, so a paused game's
+timers stand still. The clicks, the executors and the step are all on the game thread;
+nothing the simulation reads is written but by the stock orders sent.
+
+**The minimap.** Stock's minimap (`RadarComponent::Simulate`, 0x4e8a90) never touches the
+sketch: a command click there asks `ActionMode::GetAction` and hands the action to the
+bar's `BroadcastCommand`, a plain order, and the UI's minimap does the same from the
+panel's always-step (ui/HUD.md, "The minimap"). So with Tab held a minimap click would
+have been a plain move, which ends the queue. The UI now offers the click to
+`QOL_MoveQueuePoint(xyz, action)` first (found by name, `find_export`): with the waypoint
+key held (read through `cOverViewImp+0x30c`) and the queue on, QOL appends the point as a
+3D right-click would and returns 1, and the UI gives no order; else 0, and the UI's stock
+order goes out.
+
+**For render3d.** `QOL_MoveQueueVersion()` (1) and
+`QOL_MoveQueue(ship, xyz, flags, cap)`: for a `GameObject *`, -1 when QOL keeps no queues
+(`PathStartsAtOnce=0` or the hook stood down), 0 when the ship has none, else the number
+of points still ahead of it (at most `cap` written), from the one it heads to now, each
+where this ship goes (its own target); flag bit 0 a warp leg, bit 1 a leg of a patrol
+that loops back to its run's first point (a looping patrol is listed from the point the
+ship heads to, round the loop). `QOL_MoveQueueGroup(ship, own, pts, flags, cap, queue)`
+answers the same, and also the queue's own points (where the leader goes) into `pts` and
+the queue's serial into `*queue`, so that several selected ships of one group can be drawn
+as one path; render3d uses it when it is there. Cheap: no allocation, no log.
+
+**`QOL.log`** (the first 600 lines of the queue):
+- `move queue: new queue K, ships S`
+- `move queue: appended point N (go|warp|patrol), queue K: M point(s), ships S` (M: the
+  points still ahead of the group's last ship)
+- `move queue: run sent: go|warp|patrol, P point(s) from point F, S ship(s), queue K`, and
+  `next run sent: ...` when a group goes on to the next run, `next part sent: ...` to the
+  rest of a run split for the packet; ` (split for the packet: R more later)` at the end
+  when it is split
+- `move queue: cleared for N ship(s): stop|move|warp|path|<order>` (`<order>` is
+  `AiCommandToName`'s, in lower case: `attack`, `guard`, `special_attack`, ...)
+- `move queue: queue K spread (new queue|formation changed): formation T, scale X, P ship(s)
+  in slots, L by layout`, then one line per ship: `move queue: queue K ship ID slot S|by
+  layout: right R, up U, ahead A`
+- `move queue: queue K ship ID passed point N, D from its target (x,z)` (D in 3D), and
+  `... at the end of its run, point N, ...`; `, short of it` when a ship went past a point
+  more than 200 from its own target (the engine moves a ship on to its next point about 150
+  short of the one it heads to), `, nearer another ship's` when it stopped nearer another
+  ship's target than its own
+- `move queue: ship gone, queue K: S ship(s) left`, `move queue: queue K done, S ship(s)`,
+  with `, each at its own target at every point` for a group whose ships all were, or
+  `, N time(s) a ship not at its own target`
+- `move queue: minimap point at x,z`, `move queue: key let go, the points are queued already`
+- `move queue: reset (a game was loaded | PathStartsAtOnce off)`, `move queue: simulation
+  step T ms` (once), `move queue: an order executed, its path never flown (...)`
+
+**Open.** A network game against a stock player (it is stock's order, so it should simply
+be carried out). Each send is an ordinary order, one per ship, so each ship acknowledges
+it by voice, once per point. Which of the bar's formation buttons gives which type was not
+checked in game (the buttons' ODFs say `param` 1 to 4; on the bench, 1 gave the column).
+A formation's up offsets (the column's and the wall's rows, the X's arms) are kept as stock
+keeps them, so ships of a queue fly at different heights as they do in a stock group move. The double-click that throws a sketch away no longer stops the ships. The
+key itself: it is the `enter_waypoint` binding, so it can be rebound in `Input.map` today;
+issue #26 (key bindings in game) is the place for Shift. A binding there can rebind
+`enter_waypoint`, or point `cOverViewImp+0x30c` (written once per mission by `Init`, at
+0x51e7f9) at a key state of its own: all three readers and `QOL_MoveQueuePoint` go through
+that pointer. Shift alone is taken without modifiers by `enter_waypoint` (`-Shift`) and
+means "add to the selection" on a left click, so the binding has to say +Shift and drop
+the -Shift.
+
+**Seen on the bench (2026-11-05)**, on the `warp` scene, Tab held with Scene.asi's
+`waypoint-key`: `testbench/scenarios/qol-move-queue.md` passes (a point appended while the
+ship flies, sent again from point 2; a 3D point then a minimap point, the warp run sent
+when the ship reached the first and flown; a queue ended by the bar's Stop and one by a
+plain right-click; a point for one of two queued ships, which went on in a copy). By hand
+in sessions: two and three ships flying a queue together; a patrol of three points (the
+bar's Order > Patrol) looping, then a go point appended after it, sent when the ships
+reached the patrol's last point; a ship killed in a queue (`ship gone`). The diagnostics
+of the first sessions showed a ship's process taking the order's own `AiPath` and, on
+arrival, STOP with another path in its place; and that a next run sent from inside the
+simulation step was never executed (hence the overview's step). A Scene.asi `stop` (a
+script's order, not the player's) does not clear a queue: the ship's run counts as ended.
+Not yet seen: an attack or special weapon ending a queue, a run split for the packet, a
+network game, render3d drawing `QOL_MoveQueue`.
+
+## QOL-11: A construction ship does not block its own blueprint
+
+*`QOL.asi`, stock-compatible. Built: `RigIgnoresSelf=` (default 1, a live row; 0 leaves
+the ghost as stock). Issue #51, the first of three steps of #47; the next two (own ships
+make way, #52; allies too, a rules change, #53) are not built.*
+
+**Problem.** Placing a building with a construction ship selected often puts the
+blueprint over the ship itself, and the ghost turns red: the ship is in its own way.
+
+**Stock.** Each frame `cOverViewImp::Simulate` asks `ActionMode::GetAction` what a click
+at the cursor would do, and for a construction ship the answer is
+`ConstructionRig::GetAction` (0x4afa30): in build mode, over shroud the build is
+allowed, otherwise it calls the class's `CanPlaceHere` (vtable +0x8, `CraftClass`'s at
+0x4c01b0) with the position, **nothing to ignore** and the marking of blockers on. It
+answers BUILD (0x19), plus 0x4000 ("no order") when the spot is not free; the overview
+colours the ghost from that and `PopupPaletteImp::BroadcastCommand` sends nothing for a
+refused click. `CanPlaceHere` reaches `Station_Placement::Is_Clear_For_Placement`
+(0x494de0), which refuses the map edge, any blocked cell of the 50-unit placement grid
+(stations, sites, terrain) and then every object whose bounding sphere overlaps the
+footprint except the one it was told to ignore, the destroyed, background objects,
+stations (the grid has them) and most nebulae. There is no team test: own, allied and
+enemy ships block alike.
+
+The simulation is the other half, and it is more lenient: when a construction ship
+reaches its building spot, `CraftProcess::Build` (0x4355d0, the call at 0x4359b0) asks the
+same `CanPlaceHere` with **the rig as the object to ignore**, on every node, and builds if
+it says clear. A ship that stands on its own site is therefore no obstacle to the build:
+it is already inside the spot's distance and the order moves it out. Only the ghost made
+it one.
+
+**With `QOL.asi`.** `ConstructionRig::GetAction` is patched at two places. Its first
+instruction after the prologue is a virtual call on `this`, and `this` is lost a few
+instructions later (the register holding it takes the position), so the first stub
+(`rig_this_stub`, 8 bytes at 0x4afa37, which does what they did) stores `this` as the
+object to ignore, or nothing when the setting is 0. The second (`rig_check_stub`, the 13
+bytes at 0x4afa71 that load the class and make the `CanPlaceHere` call) makes the same
+call with that value where stock passes nothing, then hands the answer back to the
+unchanged code that follows. Nothing else changes: own warships, allies and enemies,
+the grid and the map edge still block, so the only new green ghost is one whose sole
+blocker is the constructing ship. The click now sends the ordinary BUILD, which every
+peer treats as any other; stock's arrival check, which already ignores the rig, finds
+the site clear. Both sites' bytes are checked first (`profiles/gog-1.1/qol.toml`, hook
+`qol.rig_self`), else the ghost stays stock and the log says why. `QOL.log` says
+`rig: the blueprint's spot is clear|blocked (...)` when the answer changes (at most 60
+lines), which the scenario waits on.
+
+**Why its own key and not `ClearBuildSite`.** The second step (own ships move out of the
+way, issue #52) is a bigger feature with its own risks (orders sent for the player, a
+held build) and will take `ClearBuildSite=`. This step is only the ghost's argument, so a
+player can keep it with that one off, and each row says what it does.
+
+**Several constructors.** The ghost is shown only with one object selected (stock) and
+the check ignores that one. The palette sends one BUILD per selected rig, so with
+several selected the others still count as blockers in the ghost: step 2 deals with it.
+
+**Seen on the bench:** `testbench/scenarios/qol-rig-ignores-self.md`.

@@ -154,7 +154,26 @@ pub fn make(pp: PresentParams) -> *mut SObj {
         zbuffer: ds,
         in_scene: false,
     });
+    // The current target and depth slots hold references of their own (SetRenderTarget
+    // swaps them), apart from the device's hold on its back buffer and depth surface.
+    for s in [bb, ds] {
+        if !s.is_null() {
+            obj::add_ref(s);
+        }
+    }
     SObj::new(Kind::Device, Role::Plain, Body::Device(dev))
+}
+
+/// Puts `new` in a current target or depth slot: the device holds it, as Direct3D does
+/// (AddRef first, so setting the same surface again is safe).
+fn swap_held(slot: &mut *mut SObj, new: *mut SObj) {
+    if !new.is_null() {
+        obj::add_ref(new);
+    }
+    let old = core::mem::replace(slot, new);
+    if !old.is_null() {
+        obj::release(old);
+    }
 }
 
 /// A device of ours released by the engine: its back buffer and depth go with it.
@@ -291,6 +310,10 @@ unsafe extern "system" fn reset(this: *mut SObj, pp: *mut PresentParams) -> HRES
         d.pp = asked;
         d.pp.width = w;
         d.pp.height = h;
+        // Direct3D puts the back buffer and its depth surface back as the target.
+        let (bb, ds) = (d.back_buffer, d.depth);
+        swap_held(&mut d.target, bb);
+        swap_held(&mut d.zbuffer, ds);
         log!("stub: Reset: asked {}; nothing to do (one mode) by {}", asked.text(), trace::chain(fp));
     }
     crate::api::device_reset();
@@ -409,9 +432,9 @@ unsafe extern "system" fn set_render_target(this: *mut SObj, rt: P, zs: P) -> HR
     trace::call(fp, Kind::Device, 31);
     let d = dev(this);
     if !rt.is_null() {
-        d.target = rt as *mut SObj;
+        swap_held(&mut d.target, rt as *mut SObj);
     }
-    d.zbuffer = zs as *mut SObj;
+    swap_held(&mut d.zbuffer, zs as *mut SObj);
     if rt as *mut SObj != d.back_buffer || zs as *mut SObj != d.depth {
         once(&sfmt!("STUB SetRenderTarget to a target of the engine's own: its draws went nowhere anyway, by {}", trace::chain(fp)));
     }

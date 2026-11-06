@@ -13,8 +13,8 @@ first; the logs checked at the end are the trace `Online.asi` writes. The joiner
 this machine's address, the "Local IP Address" the host's lobby shows. The host's game
 is listed as "<name>'s Game", which is why the host renames itself first. Launching
 takes three presses: the host asks, the joiner confirms, the host launches. A
-multiplayer match starts with 999999 of each resource (9999999 for Species 8, the one
-counter it has), which is what the HUD is waited for by. The joiner quits first, so
+match is up when `UI.log` says the mission's frames start (the HUD's resource labels
+follow the random side, and the counters the resource setting, not 999999). The joiner quits first, so
 neither game is left with a "player left" dialog. Names are typed in lower case
 (scenarios/multiplayer-name.md says why). After the match has started the host opens the
 Refit screen (Esc, Refit, Gameplay): *Pay when queued* is a must-match row and so reads
@@ -52,11 +52,11 @@ screen"); Esc closes only the Refit screen and Return to Game goes back to the m
 29. Joiner: Click "host's Game".
 30. Joiner: Click "Join Game".
 31. Joiner: Wait up to 30 seconds for "GAME SETUP".
-32. Joiner: Click at design 155,547.
+32. Joiner: Click at design 155,534.
 33. Joiner: Type "hello from joiner".
 34. Joiner: Press Return.
 35. Host: Wait up to 20 seconds for "hello from joiner".
-36. Host: Click at design 155,547.
+36. Host: Click at design 155,534.
 37. Host: Type "hello from host".
 38. Host: Press Return.
 39. Joiner: Wait up to 20 seconds for "hello from host".
@@ -66,8 +66,8 @@ screen"); Esc closes only the Refit screen and Return to Game goes back to the m
 43. Joiner: Click "LAUNCH".
 44. Joiner: Wait 5 seconds.
 45. Host: Click "LAUNCH".
-46. Host: Wait up to 180 seconds for "999999".
-47. Joiner: Wait up to 60 seconds for "999999".
+46. Host: Wait up to 180 seconds for "UI.log" to say "mission: frames start".
+47. Joiner: Wait up to 60 seconds for "UI.log" to say "mission: frames start".
 48. Host: Wait 30 seconds.
 49. Host: Press Escape.
 50. Host: Wait 3 seconds.

@@ -9,9 +9,11 @@
 //! - `actions`: what the UI does to a dialog, run after the frame.
 //! - `backdrop`: what the menus draw over (the mission, for the in-mission menus).
 //! - `scene`: the 3D scene behind the main menu and the campaign selection (render3d's).
+//! - `locks`: which campaigns are not yet open (the campaign selection, the scene).
 pub mod actions;
 pub mod backdrop;
 pub mod generic;
+pub mod locks;
 pub mod model;
 pub mod refit;
 pub mod scene;

@@ -5,6 +5,28 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 4.2.1 — 2026-11-05
+
+### Fixed
+- Scenarios `multiplayer-online-match`, `-loss`, `-code`, `-entry` and `multiplayer-two-players` click Game Setup's chat line at design 155,534 (it was 155,547, which fell just under the field in the UI's lobby, so typed chat went nowhere), and wait for the match's HUD by `UI.log`'s "mission: frames start": the "999999" counter the wait read is not on the UI's HUD, and the resource labels follow the random side (`multiplayer-two-players` likewise); `-code` and `-relay` wait for "Join" in the lobby, since the OCR reads "code:B5F-9GB" as one word.
+
+Installed, not yet seen in game.
+
+## 4.2.0 — 2026-11-05
+
+### Added
+- Scene.asi: `waypoint-key on|off`, the waypoint key (Tab, `enter_waypoint`) held or let go, by pointing the overview's pointer to the binding's state (`cOverViewImp+0x30c`) at its own: the bench cannot hold a key (Wine under Xwayland lets it go at once; README, "Operating the game").
+- Scenario `render3d-move-paths`: a three-point Tab path, the ship under way from the first point, the dots drawn until flown (issue #17).
+
+Installed, not yet seen in game.
+
+## 4.1.6 — 2026-11-05
+
+### Changed
+- New scenario `ui-menus-locked` (issue #13): the locked Klingon and Borg rows on a new profile, then the Klingons opening as the last Federation mission is won. `ui-menus-scene` runs on a profile with every campaign open (`ui/bench-progress.sh 5=1 6=1`) and waits for the Klingon decloak and the Borg view to settle before its shots; `engine-syms` expects UI's 96 shell symbols. `ui-menus-locked` also checks the locked click's sound line, the Klingons held cloaked in the cloak's glass with no decloak sound, and the Borg cube's `LockedYaw`; `render3d-menu-decloak-sound` runs on a profile with the Klingons open (`ui/bench-progress.sh 5=1 6=1`, with `--install`).
+
+Confirmed in game 2026-11-05.
+
 ## 4.1.5 — 2026-11-04
 
 ### Fixed

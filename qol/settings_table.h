@@ -30,8 +30,16 @@ static const A2Setting QOL_SETTINGS[] = {
       "QOL.ini", "QOL", "BarKeys", "1", NULLPTR, NULLPTR,
       "Grid keys",
       "The command bar's keys are the grid's, by position: Q W E R T / A S D F G / Z X C V B. Off keeps the game's own keys. Needs the Refit command bar.", "UI.HUD.BarKeys" },
+    { sizeof(A2Setting), A2SET_KIND_BOOL, A2SET_APPLY_LIVE, A2SET_SCOPE_LOCAL, A2SET_TAB_GAMEPLAY, 0,
+      "QOL.ini", "QOL", "PathStartsAtOnce", "1", NULLPTR, NULLPTR,
+      "Move queues",
+      "Hold Tab and right-click points (map or minimap): ships set off at once, new points join their queue, each leg keeps its warp, other orders end it. Off: stock.", NULLPTR },
+    { sizeof(A2Setting), A2SET_KIND_BOOL, A2SET_APPLY_LIVE, A2SET_SCOPE_LOCAL, A2SET_TAB_GAMEPLAY, 0,
+      "QOL.ini", "QOL", "RigIgnoresSelf", "1", NULLPTR, NULLPTR,
+      "Construction ship may build over itself",
+      "A construction ship no longer blocks its own blueprint: the ghost stays green over it and the order is sent, and the ship moves out to build. Other ships, the grid and map edge still block.", NULLPTR },
 };
-#define QOL_SETTINGS_COUNT 6
+#define QOL_SETTINGS_COUNT 8
 
 #define QOL_ROW_PANSPEED (&QOL_SETTINGS[0])
 #define QOL_ROW_SHIFTADDSTOGROUP (&QOL_SETTINGS[1])
@@ -39,6 +47,8 @@ static const A2Setting QOL_SETTINGS[] = {
 #define QOL_ROW_WARPDISTANCE (&QOL_SETTINGS[3])
 #define QOL_ROW_MAXSELECTION (&QOL_SETTINGS[4])
 #define QOL_ROW_BARKEYS (&QOL_SETTINGS[5])
+#define QOL_ROW_PATHSTARTSATONCE (&QOL_SETTINGS[6])
+#define QOL_ROW_RIGIGNORESSELF (&QOL_SETTINGS[7])
 
 /* The table, for the UI's settings hub (count may be NULL). */
 __declspec(dllexport) const A2Setting *__cdecl QOL_Settings(UINT *count)

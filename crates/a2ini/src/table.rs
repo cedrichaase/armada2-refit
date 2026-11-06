@@ -1,10 +1,11 @@
 //! A content set's table (`render3d/content/sets/<set>/<module>.ini`,
 //! `ui/content/sets/<set>/ui.ini`; MODDING.md, "Content sets"): ini text read by the
 //! rules of `parse` (names without case, a section written twice read as one, the first
-//! of a repeated key winning, one pair of quotes dropped, `;` lines skipped), but
-//! borrowing from the text, so a table built into a plugin with `include_str!` hands out
-//! `&'static str`s. Sections and keys keep their file order: a list of races or recipes
+//! of a repeated key winning, one pair of quotes dropped, `;` lines skipped, ASCII
+//! whitespace only trimmed), but borrowing from the text, so a table built into a plugin
+//! with `include_str!` hands out `&'static str`s. Sections and keys keep their file order: a list of races or recipes
 //! is a table's order.
+use super::trim;
 use alloc::vec::Vec;
 
 #[derive(Default, Debug)]
@@ -19,12 +20,12 @@ impl<'a> Table<'a> {
         let mut t = Table::default();
         let mut cur: Option<usize> = None;
         for line in text.lines() {
-            let l = line.trim();
+            let l = trim(line);
             if l.is_empty() || l.starts_with(';') {
                 continue;
             }
             if let Some(rest) = l.strip_prefix('[') {
-                let s = rest.split(']').next().unwrap_or("").trim();
+                let s = trim(rest.split(']').next().unwrap_or(""));
                 cur = Some(match t.sections.iter().position(|x| x.0.eq_ignore_ascii_case(s)) {
                     Some(i) => i,
                     None => {
@@ -35,7 +36,7 @@ impl<'a> Table<'a> {
                 continue;
             }
             let Some(eq) = l.find('=') else { continue };
-            let key = l[..eq].trim();
+            let key = trim(&l[..eq]);
             // Keys before any section go in the unnamed section "".
             let i = match cur {
                 Some(i) => i,
@@ -49,7 +50,7 @@ impl<'a> Table<'a> {
             if key.is_empty() || es.iter().any(|e| e.0.eq_ignore_ascii_case(key)) {
                 continue;
             }
-            let mut v = l[eq + 1..].trim();
+            let mut v = trim(&l[eq + 1..]);
             if v.len() >= 2 && ((v.starts_with('"') && v.ends_with('"')) || (v.starts_with('\'') && v.ends_with('\''))) {
                 v = &v[1..v.len() - 1];
             }
@@ -96,7 +97,7 @@ pub fn find<'a>(entries: &[(&'a str, &'a str)], key: &str) -> Option<&'a str> {
 
 /// A comma-separated list: items trimmed, empty ones dropped.
 pub fn split_list(v: &str) -> Vec<&str> {
-    v.split(',').map(str::trim).filter(|s| !s.is_empty()).collect()
+    v.split(',').map(trim).filter(|s| !s.is_empty()).collect()
 }
 
 /// A comma-separated list of numbers; an item that does not read is 0.
@@ -118,6 +119,11 @@ mod tests {
         assert_eq!(t.list("q", "q"), Vec::<&str>::new());
         assert_eq!(split_list(" a, b ,,c "), ["a", "b", "c"]);
         assert_eq!(floats("1, 2.5, x"), [1.0, 2.5, 0.0]);
+        // As `parse`: only ASCII whitespace is trimmed, so `x\u{a0}` is another key.
+        let t = Table::parse("[S]\r\nx\u{a0}= 1\r\n\tx \t= 2 \r\n");
+        assert_eq!(t.get("S", "x"), Some("2"));
+        assert_eq!(t.get("S", "x\u{a0}"), Some("1"));
+        assert_eq!(crate::parse("[S]\r\nx\u{a0}= 1\r\n\tx \t= 2 \r\n").value("S", "x"), Some("2"));
     }
 
     #[test]

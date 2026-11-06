@@ -134,6 +134,9 @@ RETIRED = {
         ('lights', 'beamlight'): '1.0',        # render3d 0.26.0: a line of even emission
         ('lights', 'beamreach'): '40',
         ('nebulae', 'litexplosion'): '0.75',   # render3d 0.27.0: a core and a wash in the gas
+        ('overlays', 'movepathcolour'): '0.55 1.0 0.55',   # render3d 1.3.0: the line grey, the points
+        ('overlays', 'movepathdot'): '2.5',                # keep the green (MovePointColour)
+        ('overlays', 'movepathspacing'): '9',
     },
 }
 

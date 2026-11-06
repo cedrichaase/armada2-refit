@@ -14,6 +14,10 @@ rows = ["Modules.overlays"]
 doc = "The height posts: DrawHeightPost's five call sites re-pointed to our own anti-aliased lines"
 rows = ["Modules.overlays"]
 
+[hook."overlays.paths"]
+doc = "The move paths: the selection, each ship's path and next point, the sketched path, stock's sketch line re-pointed"
+rows = ["Overlays.MovePaths"]
+
 
 [[sym]]
 id = "fn_footprints"
@@ -721,3 +725,165 @@ struct = "TacticalCamera"
 offset = 0xe4
 type = "u8"
 used_by = ["overlays.reads"]
+
+[[sym]]
+id = "fn_draw_path"
+symbol = "cOverViewImp::mDrawPath"
+kind = "fn"
+addr = 0x525180
+check = "55 8b ec 83 ec 78 53 56"
+used_by = ["overlays.paths"]
+
+[[sym]]
+id = "site_draw_path"
+symbol = "cOverViewImp::mNormalModeRender"
+kind = "call"
+addr = 0x522247
+target = "fn_draw_path"
+in = "cOverViewImp::mNormalModeRender"
+used_by = ["overlays.paths"]
+
+[[sym]]
+id = "overview"
+symbol = "cOverViewImp"
+kind = "global"
+addr = 0x768e40
+used_by = ["overlays.paths"]
+
+[[sym]]
+id = "ov_add_path"
+symbol = "cOverViewImp"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0x264
+type = "ptr"
+used_by = ["overlays.paths"]
+
+[[sym]]
+id = "ov_waypoint_key"
+symbol = "cOverViewImp"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0x30c
+type = "ptr"
+used_by = ["overlays.paths"]
+
+[[sym]]
+id = "ov_vt_select_num"
+symbol = "cOverViewImp::GetSelectNum"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0x94
+type = "ptr"
+used_by = ["overlays.paths"]
+
+[[sym]]
+id = "ov_vt_select_list"
+symbol = "cOverViewImp::GetSelectList"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0x98
+type = "ptr"
+used_by = ["overlays.paths"]
+
+[[sym]]
+id = "obj_process"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x44
+type = "ptr"
+used_by = ["overlays.paths"]
+
+[[sym]]
+id = "obj_position"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0xac
+type = "f32"
+used_by = ["overlays.paths"]
+
+[[sym]]
+id = "obj_team"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0xec
+type = "i32"
+used_by = ["overlays.paths"]
+
+[[sym]]
+id = "proc_command"
+symbol = "CraftProcess"
+kind = "field"
+struct = "CraftProcess"
+offset = 0x38
+type = "i32"
+used_by = ["overlays.paths"]
+
+[[sym]]
+id = "proc_path"
+symbol = "CraftProcess"
+kind = "field"
+struct = "CraftProcess"
+offset = 0x88
+type = "ptr"
+used_by = ["overlays.paths"]
+
+[[sym]]
+id = "proc_point"
+symbol = "CraftProcess"
+kind = "field"
+struct = "CraftProcess"
+offset = 0x12c
+type = "i32"
+used_by = ["overlays.paths"]
+
+[[sym]]
+id = "path_count"
+symbol = "AiPath"
+kind = "field"
+struct = "AiPath"
+offset = 0x0
+type = "i32"
+used_by = ["overlays.paths"]
+
+[[sym]]
+id = "path_points"
+symbol = "AiPath"
+kind = "field"
+struct = "AiPath"
+offset = 0x4
+type = "ptr"
+used_by = ["overlays.paths"]
+
+[[sym]]
+id = "path_type"
+symbol = "AiPath"
+kind = "field"
+struct = "AiPath"
+offset = 0x8
+type = "i32"
+used_by = ["overlays.paths"]
+
+[[sym]]
+id = "cmd_go"
+symbol = "AiCommand GO"
+kind = "value"
+value = 4
+used_by = ["overlays.paths"]
+
+[[sym]]
+id = "cmd_patrol"
+symbol = "AiCommand PATROL"
+kind = "value"
+value = 26
+used_by = ["overlays.paths"]
+
+[[sym]]
+id = "path_patrol"
+symbol = "AiPath type: a patrol loop"
+kind = "value"
+value = 2
+used_by = ["overlays.paths"]

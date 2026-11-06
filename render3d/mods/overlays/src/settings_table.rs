@@ -5,7 +5,7 @@
 #![allow(dead_code)]
 use crate::rt::settings::*;
 
-pub static ROWS: [Setting; 6] = [
+pub static ROWS: [Setting; 7] = [
     Setting {
         size: ROW_SIZE,
         kind: KIND_BOOL,
@@ -108,6 +108,23 @@ pub static ROWS: [Setting; 6] = [
         help: c"The ring where the tactical camera turns.".as_ptr(),
         moved_from: core::ptr::null(),
     },
+    Setting {
+        size: ROW_SIZE,
+        kind: KIND_BOOL,
+        apply: APPLY_LIVE,
+        scope: SCOPE_LOCAL,
+        tab: TAB_GRAPHICS,
+        flags: 0,
+        file: c"Render3D.ini".as_ptr(),
+        section: c"Overlays".as_ptr(),
+        key: c"MovePaths".as_ptr(),
+        def: c"1".as_ptr(),
+        values: core::ptr::null(),
+        value_labels: core::ptr::null(),
+        label: c"Move paths".as_ptr(),
+        help: c"A path sketched with Tab stays drawn as fine dots until the ships have flown it.".as_ptr(),
+        moved_from: core::ptr::null(),
+    },
 ];
 
 pub const OVERLAYS_FOG: &Setting = &ROWS[0];
@@ -116,6 +133,7 @@ pub const OVERLAYS_SELECTION: &Setting = &ROWS[2];
 pub const OVERLAYS_GHOSTS: &Setting = &ROWS[3];
 pub const OVERLAYS_HEIGHTPOSTS: &Setting = &ROWS[4];
 pub const OVERLAYS_PIVOT: &Setting = &ROWS[5];
+pub const OVERLAYS_MOVEPATHS: &Setting = &ROWS[6];
 
 /// The module these rows belong to (its `[Modules]` key).
 pub const MODULE: &str = "overlays";

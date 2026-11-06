@@ -248,6 +248,13 @@ content and settings are.
 
 - **A module depends on `r3d-core` and on no other module.** What one draws for another
   goes through `r3d_core::services`. `lint-layers.sh` enforces it.
+- **Adding a module** is compile-time only; there are no per-module DLLs. Make a crate
+  `mods/<name>/` on `r3d-core` (copy `mods/specials/`, the smallest). It gets a
+  `hooks.rs` for its engine reads, a `content.rs` for its names, a profile file
+  `profiles/<build>/render3d.<name>.toml` and a `settings.toml`. Then add an optional
+  dependency and a feature for it in `render3d/Cargo.toml`, and one `BuiltIn` line in
+  `render3d/src/lib.rs`. A service another module should use is a trait in
+  `core/src/services.rs`, a core change for now (AR-8).
 - **Features.** The cdylib has one Cargo feature per module, all on by default.
   `render3d/build.sh --features hulls,sky` builds a subset into `build/subset/`. A
   module that is not built in is not in the DLL; the engine draws its part, and its
@@ -383,6 +390,7 @@ so in its log. Rules for a plugin that sits next to ours:
   file locks the player out of games with stock players. Scale a value in memory after
   the parse instead.
 - Export `<Plugin>_Settings` so the Refit screen shows your keys.
+- **`QOL.asi` exports its move queue** for Render3D.asi's move paths (found by the export, in any loaded module, never by file name): `int QOL_MoveQueueVersion(void)` (1) and `int QOL_MoveQueue(const void *ship, float *xyz, int *flags, int cap)` (cdecl; -1 no queues, 0 none for the ship, else the points ahead, flags bit 0 a warp leg, bit 1 a patrol run looping to its first point). Contract in `render3d/README.md`, "Move paths".
 - **Separate rule changes from local ones.** Anything that changes what every machine
   simulates belongs in a plugin that is required of every player and is checked when a
   network game is set up (see `rules/README.md` for the protocol `Online.asi` speaks).
@@ -447,4 +455,5 @@ the assets from the player's own copy of the game, the way `textures/PACKS.md` d
 - A renderer feature: a module in `render3d/mods/`, after the module interface section
   of its README.
 - A different build of the executable: a profile, per "How a new build gets a profile".
-- A different game: `PLAN-ARMADA1.md` for what moves with it and what does not.
+- A different game: `PLAN-ARMADA1.md` for what moves with it and what does not, and
+  `PLAN-ARCHITECTURE.md` for what the shared code still lacks.

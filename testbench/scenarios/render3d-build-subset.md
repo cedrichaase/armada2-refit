@@ -14,7 +14,7 @@ puts it into the clone (run with `--install .`). A module left out is not in the
 all, so in a mission the frame must be the one the full build draws with `[Modules]
 hulls=0` at load (`roundD-base-port-showcase-hulls0`, RMSE 0), and `Render3D_Settings`
 has no row of it: the core's 11 rows less its `[Modules]` row (10), then world's 5 and
-overlays' 6, 21 in all (22 in the full build).
+overlays' 7, 22 in all (23 in the full build).
 
 The other modules are checked by this scenario's variants, from
 `render3d/subset-scenario.sh <module>` (`world`, `particles`; `ordnance` on the firing
@@ -25,7 +25,7 @@ sky or planet in the menu scene, since nothing else draws them (README.md, "Crat
 2. Wait up to 240 seconds for "Scene.log" to say "paused at tick".
 3. Expect "Render3D.log" contains "clock: bench".
 4. Expect "Render3D.log" contains "modules not built in: hulls".
-5. Expect "Render3D.log" contains "settings: 21 rows exported (10 the core's)".
+5. Expect "Render3D.log" contains "settings: 22 rows exported (10 the core's)".
 6. Expect "Render3D.log" not contains "module hulls:".
 7. Wait 5 seconds.
 8. Take a screenshot called "showcase".

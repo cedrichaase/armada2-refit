@@ -579,7 +579,7 @@ the looks they give a mission:
 | (depth cleared) | | the ships and the gas are drawn on a projection of their own, 2 to 16000 |
 | `Ships` | hulls | `menu_begin` poses every ship of the map (finest level of detail, its animation looping, `hardpoints` and the damage, crew and Borg nodes hidden by name, as no class says which) and draws the shadow map from those in view, with the menu planet in place of the engine's; then the hull look, opaque, of the ships in view, and their running lights collected |
 | `Gas` | world | `Nebulae::draw_menu`: each `[Nebula.*]` field's nebulae as the class's gas, marched and lit by the Key with the ships' shadows, as a mission's; before the cloak, which bends a copy of what is behind a hull |
-| `Translucent` | hulls | additive meshes, decloaking hulls (the cloak's glass, as the engine's state 3) and sprite nodes, as at a mission's `Step::Translucent` |
+| `Translucent` | hulls | additive meshes, decloaking hulls (the cloak's glass, as the engine's state 3), hulls held cloaked (state 2) and sprite nodes, as at a mission's `Step::Translucent` |
 | `Warp` | sky | a departure's flashes (the stock `warp_sprite`) and its tunnel (`tunnel_ps`), below |
 
 **One map, one sun.** Every view looks at the same map: asking for another moves the
@@ -600,14 +600,32 @@ for; then, after `CloakDelay` seconds (the camera arriving), each of its ships
 decloaks in turn (`CloakStagger` apart, over `CloakTime`), drawn with the hulls'
 cloak as the engine's decloaking state 3 with that much of the hull back, its running
 lights only once it is whole. When the camera leaves, the group stays as it is until
-the camera has gone (`Blend`), then cloaks again for the next arrival. Each ship is
-heard as its decloak begins (fully cloaked in one frame, part of it back in the next):
-its group's `CloakSound`, by default `clkdisen.wav`, the `offSound` the Klingon
+the camera has gone (`Blend`), then cloaks again for the next arrival. A group's
+decloak is heard once, as its first ship's decloak begins (fully cloaked in one frame,
+part of it back in the next, while the rest of the group is still hidden; one sound per
+ship was too much, issue #12): its group's `CloakSound`, by default `clkdisen.wav`, the `offSound` the Klingon
 cloaking device's ODF (`gkcloak.odf`) gives for "the ship decloaks". It is a 2D sound
 of the game's own sound system (`engine/sound.rs`: an `AudioSound2D` made with the
 game's `operator new` at priority 8, as `ShellButton::SetButtonMode` makes its hover
 sound), so the player's effects volume applies; it is a sound, not a simulation write,
 and plays only in the menu scene.
+
+**Locked campaigns.** `UI.asi` names the views whose campaigns the player has not yet
+opened through a third export, `Render3D_MenuLocked(names)` (a comma-separated list,
+held until the next call; Render3D.log: `menu: locked views: <list>`;
+ui/MENUS.md, "The menu scene"). Every group a locked view looks at is locked: its
+ships sit at their `LockedAt=` (where they always sit, without one), turned to their
+`LockedYaw=` (the ship's, else its `Yaw=` plus the group's), and with `LockedCloak=1`
+they are held cloaked: drawn whole in the cloak's glass, as the hulls draw a fully
+cloaked ship in a mission (the engine's state 2: refraction with the colour split, rim
+and shimmer, no hull left, `CloakHullOthers`), never decloaking, so no sound plays
+(`ShipAt::cloaked`; a ship merely waiting to decloak is not drawn at all). The built-in
+map holds the Klingons cloaked, shapes shimmering in the Metreon gas, and sinks the
+Borg cube and the Diamond into the Mutara gas, the cube turned a corner towards the
+camera (`LockedYaw=70`, judged on the bench among 20..145: the left face catches the
+Key, the right one stays in shade and the bottom corner shows; at its `Yaw=20` a face
+met the camera square on and it read as a flat tile).
+A departure ignores the list (a mission is loading, so its campaign is open).
 
 **The departure.** While a mission loads from the campaign selection, `UI.asi` asks for
 the view under its loading screen through the second export,
@@ -687,13 +705,17 @@ time it is posed (`hulls: menu scene:`). Keys:
 | `[Planet]` | `Class` | the planet class's ODF (`PB_CLSSM`); none: no planet |
 | | `Radius`, `At`, `Axis`, `Spin`, `Clouds`, `Orbit` | its radius, its centre, its pole, how much faster than `Orbit` its ground turns, the clouds' extra turn, the orbit's radians a second (the sky's turn is `SkyTurn`) |
 | `[Group.<name>]` | `At`, `Yaw` | the group's place on the map and its turn about +y in degrees |
-| | `CloakView`, `CloakDelay`, `CloakTime`, `CloakStagger`, `CloakSound` | the view whose arrival decloaks its ships; the seconds before the first starts (`Blend` x 0.7), each takes (2.5), between one and the next (0.5); the sound each makes as it begins (`clkdisen.wav`; empty for none) |
+| | `CloakView`, `CloakDelay`, `CloakTime`, `CloakStagger`, `CloakSound` | the view whose arrival decloaks its ships; the seconds before the first starts (`Blend` x 0.7), each takes (2.5), between one and the next (0.5); the sound heard once as the group's first ship begins (`clkdisen.wav`; empty for none) |
 | | `WarpColour` | the tunnel's tint when the group departs (0.45,0.62,1) |
+| | `LockedCloak` | 1: its ships are held cloaked, drawn in the cloak's glass, while a view of the group is locked (`Render3D_MenuLocked`) |
+| | `LockedYaw` | degrees each of its ships turns by, on top of its `Yaw`, while the group's view is locked (0); a ship's own `LockedYaw` takes precedence |
 | `[View.<name>]` | `Group`, `Eye`, `Target`, `Fov` | in the group's frame; vertical field in degrees |
 | | `Sway`, `SwayPeriod` | the drift's amplitude and period |
 | | `WarpEye`, `WarpTarget` | the camera a departure from the view swings to, in the group's frame (default: behind the departing ships, looking the way they go) |
 | `[Ship.<name>]` | `Group`, `Odf`, `At`, `Yaw`, `Scale`, `Bob`, `Phase`, `Team` | its group; the ship's ODF (its `baseName` and `ScaleSOD`), its place in the group, a turn in degrees, a scale on top of `ScaleSOD`, how much it bobs, its phase, a team colour for its `team*` groups |
 | | `Warp` | 0: stays when its group departs (a station) |
+| | `LockedAt` | its place in the group while the group's view is locked (default: `At`) |
+| | `LockedYaw` | its turn in degrees while the group's view is locked, in place of `Yaw` (default: `Yaw` plus the group's `LockedYaw`) |
 | `[Nebula.<name>]` | `Group`, `Odf`, `At`, `Size`, `Spacing`, `Jitter`, `Seed` | its group; a nebula ODF with a gas recipe; the field's centre (its plane's height is its y); half extents in x and z; the grid's step (the radius x 1.2) and jitter (0.35); the seed |
 | | `Radius` | the class's radius (the ODF's `effectRadius`, else 300) |
 | | `KeyShare`, `Scatter`, `Opacity`, `Brightness` | over the recipe's, for the menu's class only (one set per class: the first field of the class that sets a key) |
@@ -1738,10 +1760,94 @@ drawing nothing in the tactical view.
 | `PivotGlow` | 0.35 | the halo's opacity (0: none) |
 | `PivotColour`, `PivotBrightness` | 0.64 0.36 0.35, 1.6 | its colour (stock's rose) and the factor on it |
 
+**Move paths** (`paths.rs`, `vs_dots`/`ps_dots` in `mods/overlays/shaders/overlays.hlsl`;
+issue #17). Stock sketches a move path with the `enter_waypoint` binding held (Tab in
+`Input.map`; `cOverViewImp::Init` 0x51e4c0 keeps its live state's pointer at
+`cOverViewImp+0x30c`, the overview being the object at 0x768e40): each right-click
+(`mNormalModeRightClick` 0x5229a0) adds the map point under the cursor (`+0xa4`) to an
+`AiPath` at `+0x264` through `mAddPathPoint` (0x5255b0), and nothing is sent. Let go,
+`mProcessWaypoints` (0x522aa0, every frame from `mNormalModeInput`) sends the whole path
+as one order (`GameObject::QueueCommand` 0x4d4380, `NetOrderObjectsWhatPath`) and frees
+the sketch; with `[QOL] PathStartsAtOnce=1` it goes out at each point instead
+(`qol/README.md`, QOL-10). An `AiPath` holds its point count at `+0x0`, its `Vector3`s at
+`+0x4` and its type at `+0x8` (2: a patrol's loop). `GameObject::DeQueueCommand`
+(0x4d4650) gives every ship of the order a copy of its own; on the next tick the craft
+process (`GameObject+0x44`) takes it over in `Handle_New_Command`: the command at `+0x38`
+(GO, 4, for every kind of move; PATROL, 26), the path at `+0x88` and the index of the point
+it heads to at `+0x12c`, from 0. `Move_To_Formation` (0x436ad0) moves the index on as each
+point is reached (a patrol wraps it round); at the last one the ship stops and `STOP`
+releases the path (null). The ship stands at `GameObject+0xac` and its team is `+0xec`.
+Stock draws the sketch only while the key is held, at the end of `mNormalModeRender`
+(`mDrawPath` 0x525180, its call at 0x522247: a one-pixel green line with boxes at the
+points); a path being flown is never drawn.
+
+Ours, in `Step::Translucent` of the main view: for each **selected** ship of the player's
+team (the overview's `GetSelectNum` / `GetSelectList`, vtable `+0x94` / `+0x98`, entity
+ids turned into objects by `Entity::Get`; not the selection bubbles' effect hash, which
+also holds co-players' and hovered objects, and not the array at `+0xbc`, which QOL's
+`MaxSelection` moves, so a selection above 16 is read where it is) with a path, a row of
+fine dots from the ship to the point it heads to and on through the rest, and a bigger dot
+at each point. An unselected ship's path is not drawn. The dots are placed from the far
+end of each segment, every `MovePathSpacing` pixels, and interpolated in screen space, so
+they stay put on the map as the ship flies and are cut off behind it: the part flown is
+gone, and a point passed loses its dot. Ships of one order share points: a segment or a
+point already drawn this frame is not drawn again.
+
+*The source of the path.* When a loaded plugin (`QOL.asi`) exports the queue it keeps (the
+appended legs, per-leg warp), that queue is drawn: the exports are found by name among every
+loaded module's (`rt::find_export`, never by the file name), once, and again once a second
+until found (not every frame). The contract, cdecl:
+
+    int QOL_MoveQueueVersion(void);   /* 1; any other value: not used */
+    int QOL_MoveQueue(const void *ship, float *xyz, int *flags, int cap);
+    int QOL_MoveQueueGroup(const void *ship, float *own, float *pts, int *flags, int cap,
+                           int *queue);       /* optional */
+
+`ship` is the `GameObject`; the call returns -1 when QOL keeps no queues, 0 when the ship
+has none, else the number of points (at most `cap`, 128 here), from the one the ship flies
+to now to the last, as xyz triples; `flags[i]` bit 0 is a warp leg (drawn as any other),
+bit 1 a point of a patrol run that loops back to that run's first point (a run is
+closed back to its first point). The points are the ship's own targets: QOL spreads a
+group over its formation, so each ship of a queue flies to the queue's point plus its place
+(`qol/README.md`, QOL-10, "A group's targets"). `QOL_MoveQueueGroup` answers the same and
+also the queue's own points (where the group's leader goes, the formation's anchor) and
+which queue. With it, a queue with one selected ship draws that ship's own path; a queue
+with several selected ships draws **the group's path once**, through the queue's points
+with their big dots, and for each ship only its own leg (from the ship to where it heads)
+and a small dot (`TICK`, 0.55 of a point's) at each of its own targets, so six ships do
+not draw six parallel lines. Without it, each ship's own path is drawn. The line runs from
+the ship to point 0 and on. QOL adds
+each Tab-click at once, so with its queue live (the last call answered 0 or more) **no
+sketch is drawn**. Without the export, or when it answers -1, the engine's own path
+(`+0x88` / `+0x12c`, only paths that came from a sketch: an ordinary move is a path of
+one point and is not drawn) and the sketch are drawn as before, while the key is held and
+for up to a second after, until a ship's copy ending at the same point has arrived;
+the filter and the sketch are only the fallback's. Stock's call of `mDrawPath` is
+re-pointed and draws nothing while ours are drawn. Points are lifted a unit above where
+they were clicked, clear of the grid's lines; depth-tested (a hull in front hides them),
+not written, blended.
+
+Render3D.log (the first 200 lines): once `overlays: move paths: QOL's queue found
+(version 1)` (`(version 1, groups)` with `QOL_MoveQueueGroup`), or `QOL's queue not found (the engine's paths, and the sketch)` (then looked
+for once a second without more lines) or `QOL's queue is version N: not used`; and, when
+one of the counts or the source changes, `overlays: move paths: N selected ship(s) on a
+path, M point(s) ahead (qol|engine|-), sketch K`. `render3d-move-paths` checks it with the
+QOL change.
+
+| Key (`[Overlays]`) | Default | |
+|---|---|---|
+| `MovePaths` | 1 | 0: no paths drawn; stock's line, while the key is held |
+| `MovePathColour`, `MovePathBrightness` | 0.85 0.85 0.85, 1 | the line's colour (a very light grey) and the factor on it |
+| `MovePathOpacity` | 0.85 | the line's opacity |
+| `MovePathDot`, `MovePathSpacing` | 1.9, 8 | the line's dots' diameter and the distance from one to the next, pixels at 1080 lines |
+| `MovePointColour`, `MovePointBrightness` | 0.55 1.0 0.55, 1 | the points' colour (a light green) and the factor on it |
+| `MovePointOpacity` | 0.85 | the points' opacity |
+| `MovePathPoint` | 6 | the points' diameter, pixels at 1080 lines |
+
 #### overlays: Hooks
 
 `mods/overlays/src/hooks.rs` holds every address and field offset the module reads of
-the engine, behind named accessors, and its one hook. The step bodies (the terrain, the
+the engine, behind named accessors, and its two hooks. The step bodies (the terrain, the
 selection bubbles), the two features (`Ghost`, `PlaceholderFeature`) and the pivot
 marker's feature are reached through the frame's dispatch and patch nothing: while the
 module is off they run as stock.
@@ -1749,11 +1855,16 @@ module is off they run as stock.
 | Hook | Site | Used for | Gate shut |
 |---|---|---|---|
 | `DrawHeightPost` | the five calls (the build ghost's, and the overview's `mNormalModeRender`, `mRenderWhere`, `mDrawPosts` and its one-point helper) | the height posts, noted for the view and drawn as anti-aliased lines | the call that was there (`Prev`): the engine's one-pixel line |
+| `mDrawPath` (`render3d.overlays.paths`) | `mNormalModeRender`'s call (0x522247), the sketch while the waypoint key is held | nothing drawn: the move paths draw the sketch (or QOL's queue) | the call that was there: the engine's line |
 
 It is installed at the first switch-on, whether or not `HeightPosts` is on, so the key
 can be switched live: the detour notes a post only while one of our views is running
 (`IN_VIEW`, which `HeightPosts=0` and a module that is off keep false). A site that is not
 stock's is logged and left to the engine.
+`mDrawPath`'s call is re-pointed at the same time, whether or not `MovePaths` is on: its
+detour draws nothing while the paths are ours (`MovePaths=1`, the module on, every entry of
+`render3d.overlays.paths` resolved), else calls what was there. When the entries are not
+stock's no path is drawn and the engine keeps its line.
 
 #### overlays: Content
 
@@ -1762,10 +1873,10 @@ stock's is logged and left to the engine.
 #### overlays: Settings
 
 `[Overlays]`, read by `configure` at load and at every settings change (`Fog`, `Grid`,
-`Selection`, `Ghosts`, `HeightPosts`, `Pivot`, each a live row, and the keys without a
-row: the fog's filter and thresholds, the posts' and the pivot's looks). `Modules.overlays`
+`Selection`, `Ghosts`, `HeightPosts`, `Pivot`, `MovePaths`, each a live row, and the keys without a
+row: the fog's filter and thresholds, the posts', the pivot's and the paths' looks). `Modules.overlays`
 is live: off, the engine draws the fog, the grid, the bubbles, the ghosts, the posts
-and the pivot marker, and the hook above hands every call back.
+the pivot marker and the sketched move path (no path once let go), and the hooks above hand every call back.
 
 #### Hooks, content and settings
 

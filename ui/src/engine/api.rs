@@ -144,6 +144,10 @@ pub mod popups {
     };
 }
 
+pub mod progress {
+    pub use crate::engine::progress::{read, Progress};
+}
+
 pub mod radar {
     pub use crate::engine::radar::{
         action_cursor, action_cursors_stock, blips, buttons_swapped, engine_texture, filter_name, filter_text, filters,
@@ -179,7 +183,7 @@ pub mod shellui {
 }
 
 pub mod sound {
-    pub use crate::engine::sound::{click, functions_stock, rollover, shell_click, shell_hover};
+    pub use crate::engine::sound::{click, functions_stock, rollover, shell_click, shell_hover, shell_named};
 }
 
 pub mod sprite {

@@ -931,6 +931,79 @@ static int patch_warp(void)
     return 1;
 }
 
+/* ---- the construction ship and its own blueprint ----------------------- */
+
+/* ConstructionRig::GetAction asks the class whether the ghost's spot is free with
+ * nothing to ignore, so the selected rig blocks its own blueprint.  Two sites: the
+ * first, at the virtual call that opens the function, notes `this` (the function
+ * overwrites edi with the position before it asks); the second is the 13 bytes that
+ * ask, now given `this` as the object to ignore while RigIgnoresSelf is on.  Both
+ * stubs do what the bytes they replace did and return to the next instruction.
+ * The simulation's arrival check already ignores the rig, on every node. */
+int   g_rigSelf;                /* RigIgnoresSelf */
+DWORD g_rigIgnore;              /* what this call's check ignores: the rig, or 0 */
+static int g_rigOk, g_rdyRig;
+
+__attribute__((naked)) void rig_this_stub(void)
+{
+    __asm__ __volatile__(
+        "xorl %eax, %eax\n\t"
+        "cmpl $0, _g_rigSelf\n\t"
+        "je 1f\n\t"
+        "movl %edi, %eax\n"
+        "1:\n\t"
+        "movl %eax, _g_rigIgnore\n\t"
+        "movl (%edi), %eax\n\t"
+        "call *" A2_STR(QOL_F_RS_VT_CHECK) "(%eax)\n\t"
+        "pushl _a2s_qol_rs_this_cont\n\t"
+        "ret\n\t");
+}
+
+/* Logged when the answer changes, a few dozen times at most, so the ghost's frames do not
+ * fill the log: the scenarios wait on these lines. */
+void __cdecl rig_result(int clear)
+{
+    static int last = -1, said;
+    int key = (clear ? 1 : 0) | (g_rigIgnore ? 2 : 0);
+    if (key == last || said >= 60) return;
+    last = key;
+    said++;
+    logline(clear ? (g_rigIgnore ? "rig: the blueprint's spot is clear (the construction ship ignored)"
+                                 : "rig: the blueprint's spot is clear")
+                  : (g_rigIgnore ? "rig: the blueprint's spot is blocked (the construction ship ignored)"
+                                 : "rig: the blueprint's spot is blocked"));
+}
+
+__attribute__((naked)) void rig_check_stub(void)
+{
+    __asm__ __volatile__(
+        "movl 0xc(%esi), %ecx\n\t"
+        "pushl $1\n\t"
+        "pushl _g_rigIgnore\n\t"
+        "pushl %edi\n\t"
+        "movl (%ecx), %edx\n\t"
+        "call *" A2_STR(QOL_F_RS_VT_CAN_PLACE) "(%edx)\n\t"
+        "pushl %eax\n\t"
+        "movzbl %al, %eax\n\t"
+        "pushl %eax\n\t"
+        "call _rig_result\n\t"
+        "addl $4, %esp\n\t"
+        "popl %eax\n\t"
+        "pushl _a2s_qol_rs_check_cont\n\t"
+        "ret\n\t");
+}
+
+static int patch_rig(void)
+{
+    BYTE c1[8], c2[13];
+    if (!g_rdyRig) return 0;
+    jmp_to(c1, a2e_addr(QOL_S_RS_THIS_SITE), 8, rig_this_stub);
+    jmp_to(c2, a2e_addr(QOL_S_RS_CHECK_SITE), 13, rig_check_stub);
+    poke((BYTE *)a2e_addr(QOL_S_RS_THIS_SITE), c1, 8);
+    poke((BYTE *)a2e_addr(QOL_S_RS_CHECK_SITE), c2, 13);
+    return 1;
+}
+
 /* ---- bigger selections and groups ------------------------------------- */
 
 /* The button bar's special weapons.  For each special weapon of the selection,
@@ -1042,6 +1115,8 @@ static int patch_selection(int max)
 }
 
 /* ---- startup ---------------------------------------------------------- */
+
+#include "waypoints.c"
 
 static void build_paths(void)
 {
@@ -1159,6 +1234,20 @@ __declspec(dllexport) void __cdecl QOL_SettingsChanged(void)
         if (!g_barOk) gate("BarKeys", 0, 0);
     }
 
+    on = a2_set_int(&g_ini, QOL_ROW_PATHSTARTSATONCE) != 0;
+    if (on != g_pathStart) {
+        g_pathStart = on;
+        changed(m, &n, "PathStartsAtOnce", on ? "1" : "0");
+        if (!g_pathsOk) gate("PathStartsAtOnce", 0, 0);
+    }
+
+    on = a2_set_int(&g_ini, QOL_ROW_RIGIGNORESSELF) != 0;
+    if (on != g_rigSelf) {
+        g_rigSelf = on;
+        changed(m, &n, "RigIgnoresSelf", on ? "1" : "0");
+        if (!g_rigOk) gate("RigIgnoresSelf", 0, 0);
+    }
+
     a2_set_str(&g_ini, QOL_ROW_WARPDISTANCE, val, sizeof val);
     f = s_parse(val);
     if (f < 0.0f) f = 0.0f;
@@ -1194,6 +1283,8 @@ static void startup(void)
     g_rdySpec = a2e_ready(QOL_H_SPECIAL_SELECT);
     g_rdySel = a2e_ready(QOL_H_SELECTION);
     g_rdyBar = a2e_ready(QOL_H_BAR_KEYS);
+    g_rdyPaths = a2e_ready(QOL_H_MOVE_PATHS);
+    g_rdyRig = a2e_ready(QOL_H_RIG_SELF);
     a2_set_str(&g_ini, QOL_ROW_PANSPEED, val, sizeof val);
     f = pan_factor(val, &ok);
     g_panSpeed = f;
@@ -1272,6 +1363,36 @@ static void startup(void)
     }
     logline(b);
     if (!g_barKeys) gate("BarKeys", 0, g_barOk);
+
+    g_pathStart = a2_set_int(&g_ini, QOL_ROW_PATHSTARTSATONCE) != 0;
+    g_pathsOk = patch_paths();
+    b[0] = 0;
+    s_cat(b, "--- QOL PathStartsAtOnce=");
+    s_cat(b, g_pathStart ? "1" : "0");
+    if (!g_pathStart) {
+        s_cat(b, "  (a sketched path is sent when the key is let go, as in stock; no queues)");
+    } else if (g_pathsOk) {
+        s_cat(b, "  -> move queues: Tab points (and minimap points) queued per ship, flown at once, patched");
+    } else {
+        not_patched(b, QOL_H_MOVE_PATHS);
+    }
+    logline(b);
+    if (!g_pathStart) gate("PathStartsAtOnce", 0, g_pathsOk);
+
+    g_rigSelf = a2_set_int(&g_ini, QOL_ROW_RIGIGNORESSELF) != 0;
+    g_rigOk = patch_rig();
+    b[0] = 0;
+    s_cat(b, "--- QOL RigIgnoresSelf=");
+    s_cat(b, g_rigSelf ? "1" : "0");
+    if (!g_rigSelf) {
+        s_cat(b, "  (a construction ship blocks its own blueprint, as in stock)");
+    } else if (g_rigOk) {
+        s_cat(b, "  -> a construction ship does not block its own blueprint, patched");
+    } else {
+        not_patched(b, QOL_H_RIG_SELF);
+    }
+    logline(b);
+    if (!g_rigSelf) gate("RigIgnoresSelf", 0, g_rigOk);
 
     k = (int)a2_set_int(&g_ini, QOL_ROW_MAXSELECTION);
     b[0] = 0;

@@ -72,7 +72,7 @@ pub(super) struct Vtx {
     col: [f32; 4],
 }
 
-static VERTEX: [VertexAttr; 4] = [
+pub(super) static VERTEX: [VertexAttr; 4] = [
     attr(0, AttrFormat::Float3, Semantic::Position, 0),
     attr(12, AttrFormat::Float3, Semantic::TexCoord, 0),
     attr(24, AttrFormat::Float2, Semantic::TexCoord, 1),

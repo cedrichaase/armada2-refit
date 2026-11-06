@@ -665,6 +665,16 @@ then acts, so the order is given in the game's simulate as stock's is. A point n
 taken within half a second (the game paused) is dropped. `UI.log`: "minimap: order
 0x2b at x,z".
 
+**With the waypoint key held** (Tab, QOL's move queue: qol/README.md, QOL-10), stock's
+minimap gives the same plain order, which would end the selection's queues. So before
+naming the action to the overview, `radar::act` offers the point and the action to QOL's
+export `QOL_MoveQueuePoint` (looked up by name at each click, never by file name): QOL
+answers 1 when its key is held and its queue is on, having appended the point to the
+selected ships' queues as a Tab right-click in the 3D view does, and the UI then gives no
+order (`UI.log`: "minimap: point 0x2b at x,z queued (QOL)"); 0, or no QOL, and the order
+goes out as above. A move there stays `GO_WARP`, so a minimap leg of a queue is a warp
+leg.
+
 **The filter buttons** press the stock buttons' functions, `MapRadar::NextShipFilter`
 (0x4eb7c0) and `NextStationFilter` (0x4eb930) (static; they cycle the state and post
 its name in the chat, "All ships visible" and so on), from the same step. The stock

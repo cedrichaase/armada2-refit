@@ -48,18 +48,27 @@ fn strip_bom(s: &str) -> &str {
     s.strip_prefix('\u{feff}').or_else(|| s.strip_prefix("\u{ef}\u{bb}\u{bf}")).unwrap_or(s)
 }
 
+/// The whitespace of an ini line, ASCII only, for the parser and the edit alike (the C
+/// twin's `a2e_ws`, and the game's own files). `str::trim` would also strip U+00A0 and
+/// the other Unicode spaces, and the edit then could not find a key the parser reads.
+const WS: &[char] = &[' ', '\t', '\r', '\n', '\x0b', '\x0c'];
+
+fn trim(s: &str) -> &str {
+    s.trim_matches(WS)
+}
+
 /// Parses `text` into `f` (cleared first).
 pub fn parse_into(text: &str, f: &mut Parsed) {
     f.clear();
     let text = strip_bom(text);
     let mut sec = String::new();
     for line in text.lines() {
-        let l = line.trim();
+        let l = trim(line);
         if l.is_empty() || l.starts_with(';') {
             continue;
         }
         if let Some(rest) = l.strip_prefix('[') {
-            let s = rest.split(']').next().unwrap_or("").trim();
+            let s = trim(rest.split(']').next().unwrap_or(""));
             sec = s.to_ascii_lowercase();
             if !f.sections.iter().any(|x| x.eq_ignore_ascii_case(s)) {
                 f.sections.push(String::from(s));
@@ -67,11 +76,11 @@ pub fn parse_into(text: &str, f: &mut Parsed) {
             continue;
         }
         let Some(eq) = l.find('=') else { continue };
-        let key = l[..eq].trim().to_ascii_lowercase();
+        let key = trim(&l[..eq]).to_ascii_lowercase();
         if key.is_empty() || f.entries.iter().any(|e| e.0 == sec && e.1 == key) {
             continue;
         }
-        let mut v = l[eq + 1..].trim();
+        let mut v = trim(&l[eq + 1..]);
         if v.len() >= 2 && ((v.starts_with('"') && v.ends_with('"')) || (v.starts_with('\'') && v.ends_with('\''))) {
             v = &v[1..v.len() - 1];
         }
@@ -90,12 +99,6 @@ pub const HEADER: [&str; 2] = [
     "; RefitPlayer.ini: your choices from the Refit screen, written by UI.asi. Installers never touch it.",
     "; Delete a line to go back to the shipped setting.",
 ];
-
-const WS: &[char] = &[' ', '\t', '\r', '\n', '\x0b', '\x0c'];
-
-fn trim(s: &str) -> &str {
-    s.trim_matches(WS)
-}
 
 /// A value `edit` will write: no CR or LF, no leading or trailing whitespace (rule 9).
 pub fn valid_value(v: &str) -> bool {
@@ -150,15 +153,17 @@ fn eol(text: &str) -> &'static str {
     }
 }
 
-fn header(content: &str) -> Option<&str> {
-    let t = trim(strip_bom(content));
+/// The section a header line opens. A BOM is only the file's first line's (`first`),
+/// as the parser takes it: one in the middle of the file is text.
+fn header(content: &str, first: bool) -> Option<&str> {
+    let t = trim(if first { strip_bom(content) } else { content });
     let rest = t.strip_prefix('[')?;
     Some(trim(rest.split(']').next().unwrap_or("")))
 }
 
 /// The key of a key line (rule 2), else None.
 fn key_of(content: &str) -> Option<&str> {
-    let t = trim(strip_bom(content));
+    let t = trim(content);
     if t.is_empty() || t.starts_with([';', '#', '[']) {
         return None;
     }
@@ -175,7 +180,7 @@ fn occurrences(lines: &[Line], section: &str) -> Vec<(usize, usize)> {
     let mut occ: Vec<(usize, usize)> = Vec::new();
     let mut open = false;
     for (i, l) in lines.iter().enumerate() {
-        let Some(h) = header(&l.content) else { continue };
+        let Some(h) = header(&l.content, i == 0) else { continue };
         if open {
             occ.last_mut().unwrap().1 = i;
             open = false;

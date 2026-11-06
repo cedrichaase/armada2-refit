@@ -5,6 +5,60 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 15.9.2 — 2026-11-05
+
+Layers: online 0.11.4.
+
+### Fixed
+- online: six bugs in `peer.c`: a duplicate DESTROY_PLAYER when the session ends with one pending, a stale join code when a new one shares its first and last character, stack overflows with a long `Server=`, a kicked or terminated joiner never acking the termination, an unreliable `TerminateSession`, and a connection that answers pings but never acks being resent for ever (dropped after 30 s). Details in `online/CHANGELOG.md` 0.11.4. Installed, not yet seen in game. Bench: multiplayer-online-match/loss/code pass.
+
+## 15.9.1 — 2026-11-05
+
+Layers: testbench 4.2.1.
+
+### Fixed
+- testbench: the online and two-player scenarios click Game Setup's chat line at design 155,534 (the UI's widescreen lobby moved it off 155,547), and wait for the mission's start in `UI.log` instead of "999999". Installed, not yet seen in game.
+
+## 15.9.0 — 2026-11-05
+
+Layers: render3d 1.2.0, qol 2.3.0; testbench 4.2.0.
+
+### Added
+- Move paths (issue #17): a path sketched with Tab (right-clicks with Tab held) is drawn as fine light-green dots until the ships have flown it, the part flown gone (render3d, `[Overlays] MovePaths`), and the ships set off at the first point while Tab is still held (qol, `PathStartsAtOnce`), with the game's own path order. The key stays the `enter_waypoint` binding of `Input.map`; making it Shift is issue #26's.
+- testbench: Scene.asi's `waypoint-key on|off` (the bench cannot hold a key); scenario `render3d-move-paths`.
+
+Installed, not yet seen in game.
+
+## 15.8.0 — 2026-11-05
+
+Layers: ui 2.3.0, render3d 1.1.0, testbench 4.1.6.
+
+### Added
+- Locked campaigns shown on the campaign selection (issue #13): greyed with a padlock and a hint of what opens them, the Klingon and Borg scenes shown locked (`[Menus] CampaignLocks`, `LockedSound`; `Render3D_MenuLocked`, `LockedCloak`, `LockedAt`, `LockedYaw`): "Complete the <campaign> to unlock" on hover, the padlock from the icon atlas, a soft "unavailable" chirp on a click, the Klingons held cloaked in render3d's cloak glass, the Borg cube turned to read as a cube. The campaign progress format of `save\shell.set` and the game's unlock rule were measured on the bench (`platform/README.md`, "Campaign progress format"); the UI reads the progress in the game's memory (profile `ui.shell.reads_progress`). Scenario `ui-menus-locked`. Confirmed in game 2026-11-05.
+
+## 15.7.3 — 2026-11-05
+
+Layers: display 1.0.7, ui 2.2.7, render3d 1.0.7.
+
+### Fixed
+- a2rt (display, ui, render3d): the game directory, `%LOCALAPPDATA%` and every file path now go through the wide Win32 calls (`GetModuleFileNameW`, `GetEnvironmentVariableW`, `CreateFileW`, `FindFirstFileW`, ...; `wstr` / `from_wide`; the imports join `kernel32.def`). With a non-ASCII install path (`C:\Users\Jörg\...`) the ANSI call's code-page bytes were not UTF-8, the game directory came out empty, `RefitPlayer.ini` was never consulted (every Refit-screen setting saved and ignored) and was written to a relative path, and the log folder was lost. Installed, not yet seen in game.
+
+- a2ini (`RefitPlayer.ini`'s parser and edit): the edit and the parser now agree on what a line is. A byte order mark only counts on the file's first line in both (the edit took one mid-file as a header), and whitespace is ASCII in both (the parser trimmed U+00A0 and other Unicode spaces, so `Scale<NBSP>=2` was a key the edit never matched and appended a duplicate). Host tests in `crates/a2ini/tests/agree.rs`; the differential fuzz shows no disagreement. Installed, not yet seen in game.
+
+## 15.7.2 — 2026-11-05
+
+Layers: display 1.0.6.
+
+### Fixed
+- display: a freed device releases its bound textures, streams and index buffer, and holds its render target and depth surface by reference (`Reset` restores the back buffer as target). Installed, not yet seen in game. Bench-verified.
+
+## 15.7.1 — 2026-11-05
+
+Layers: render3d 1.0.6.
+
+### Fixed
+- render3d: the campaign menu's Klingon ships uncloak with one sound, not one each (issue #12; the sound is logged, scenario `render3d-menu-decloak-sound`). Confirmed in game 2026-11-05.
+
 ## 15.7.0 — 2026-11-04
 
 Layers: qol 2.2.4.

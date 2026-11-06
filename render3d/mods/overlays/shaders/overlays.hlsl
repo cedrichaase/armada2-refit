@@ -1,4 +1,4 @@
-// entries: vs_plane:vs_3_0:VS_PLANE ps_fog_bspline:ps_3_0:PS_FOG_BSPLINE ps_fog_catrom:ps_3_0:PS_FOG_CATROM ps_colour:ps_3_0:PS_COLOUR ps_ghost:ps_3_0:PS_GHOST:at vs_line:vs_3_0:VS_LINE ps_line:ps_3_0:PS_LINE
+// entries: vs_plane:vs_3_0:VS_PLANE ps_fog_bspline:ps_3_0:PS_FOG_BSPLINE ps_fog_catrom:ps_3_0:PS_FOG_CATROM ps_colour:ps_3_0:PS_COLOUR ps_ghost:ps_3_0:PS_GHOST:at vs_line:vs_3_0:VS_LINE ps_line:ps_3_0:PS_LINE vs_dots:vs_3_0:VS_DOTS ps_dots:ps_3_0:PS_DOTS
 // The overlays module (mods/overlays/src/): the fog of war and the shroud with
 // smooth edges (ported from Fog.asi), the tactical grid's lines, the
 // selection bubbles and the fog-of-war ghosts.
@@ -236,5 +236,60 @@ cbuffer overlays_ps3 : register(b1)
 float4 ps_line(LO i) : SV_Target
 {
     float cover = saturate((i.d.y + 0.5 * l_ps.x - abs(i.d.x)) / max(l_ps.x, 1e-3));
+    return float4(i.col.rgb, i.col.a * cover);
+}
+
+// ---- dotted lines ----------------------------------------------------------------
+//
+// The move paths (paths.rs): a segment drawn as a row of round dots, the same quad as
+// vs_line, with the distance along the segment in pixels measured from its far end (b),
+// so the dots stay put on the map while the near end (a ship) moves and the row is cut
+// off behind it. A segment of length 0 is one dot at its point (a path's points).
+//
+//   vertex c8 as vs_line (z: the dots' radius); pixel c0: x the soft edge (pixels),
+//   y the dots' spacing (pixels; 0: one dot at b only, else every spacing from b,
+//   b itself left out)
+
+struct DO {
+    float4 pos : SV_Position;
+    // Interpolated in screen space: the distances are in pixels, so a dot's spacing
+    // holds along a segment seen at a slant.
+    noperspective float4 d : TEXCOORD0;   // x: pixels from the centre line; y: half the
+                                          // width; z: pixels along the segment, from b;
+                                          // w: its length
+    float4 col : TEXCOORD1;
+};
+
+DO vs_dots(LI i)
+{
+    LO l = vs_line(i);
+    DO o;
+    o.pos = l.pos;
+    o.col = l.col;
+    // The segment's length on screen, as vs_line measures it.
+    float4 pa = mul(float4(i.a, 1.0), VP);
+    float4 pb = mul(float4(i.b, 1.0), VP);
+    float e = 1e-3;
+    float4 qa = pa.w < e ? lerp(pa, pb, (e - pa.w) / (pb.w - pa.w)) : pa;
+    float4 qb = pb.w < e ? lerp(pb, pa, (e - pb.w) / (pa.w - pb.w)) : pb;
+    float len = length((qb.xy / qb.w - qa.xy / qa.w) * l_vp.xy * 0.5);
+    float w = l_vp.z + l_vp.w;
+    // 0 at b, len at a, and w beyond either end (the quad's caps).
+    float along = (1.0 - i.se.y) * len + (1.0 - 2.0 * i.se.y) * w;
+    o.d = float4(l.d, along, len);
+    return o;
+}
+
+float4 ps_dots(DO i) : SV_Target
+{
+    float sp = l_ps.y;
+    // The nearest dot's centre along the segment: every sp pixels from b, or b alone.
+    float c = sp > 0.0 ? sp * round(i.d.z / max(sp, 1e-3)) : 0.0;
+    float r = length(float2(i.d.x, i.d.z - c));
+    float cover = saturate((i.d.y + 0.5 * l_ps.x - r) / max(l_ps.x, 1e-3));
+    // No dot centred beyond a: the part of the path already flown is not drawn.
+    cover *= step(c, i.d.w + 0.5);
+    // A row of dots leaves b itself to the point's own dot.
+    cover *= max(step(sp, 0.0), step(0.5, c));
     return float4(i.col.rgb, i.col.a * cover);
 }

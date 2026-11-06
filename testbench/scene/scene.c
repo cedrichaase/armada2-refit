@@ -215,6 +215,8 @@ int _fltused = 0;   /* floats without the CRT */
 #define OBJECT_HANDLE    0x28u
 #define ENTITY_GET       0x4cfff0u   /* Entity::Get(handle), cdecl */
 #define OVERVIEW         ((void *)0x768e40u)   /* the one cOverViewImp */
+static int  g_waypoint_key;    /* `waypoint-key`: the state the overview reads while held */
+static int *g_waypoint_orig;   /* the binding's own state, put back when let go */
 #define OV_SELECT        0x90u       /* vtable: Select(obj, type, clear first, ...) */
 #define OV_SELECT_NUM    0x94u       /* vtable: GetSelectNum() */
 #define OV_SELECT_LIST   0x98u       /* vtable: GetSelectList(), the ids */
@@ -278,6 +280,8 @@ int _fltused = 0;   /* floats without the CRT */
 #define SET_COMMAND_OBJ  0x4d1af0u   /* GameObject::SetCommand(AiCommand, const GameObject *, long, bool) */
 #define SET_COMMAND      0x4d1a40u   /* GameObject::SetCommand(AiCommand, long, bool, bool) */
 #define CMD_STOP         3           /* AiCommand: STOP */
+#define CMD_SET_FORMATION 0x2a       /* AiCommand: SET_FORMATION, its parameter the bar button's `param` */
+#define DQ_COMMAND_PARAM 0x4d4630u   /* GameObject::DeQueueCommand(AiCommand, long): what NetOrderWhatParam::Execute calls */
 #define SET_COMMAND_AT   0x4d1b50u   /* GameObject::SetCommand(AiCommand, const Vector3 &, long, bool) */
 #define FLAG_CRAFT       0x8u        /* GameObject flags (+0x14): a craft, what Goto and Stop accept */
 #define OBJECT_DEAD      0x113u      /* a byte Goto and Stop refuse an object on */
@@ -402,6 +406,7 @@ typedef BYTE   (__thiscall *FireSpecialFn)(void *craft, int slot);
 typedef BYTE   (__thiscall *CanFireFn)(void *weapon, const void *target);
 typedef void   (__thiscall *SetCommandObjFn)(void *go, int cmd, const void *target, long param, int flag);
 typedef void   (__thiscall *SetCommandFn)(void *go, int cmd, long param, int a, int b);
+typedef void   (__thiscall *DqCommandParamFn)(void *go, int cmd, long param);
 typedef void   (__thiscall *SetCommandAtFn)(void *go, int cmd, const float *pos, long param, int flag);
 typedef const float *(__thiscall *SiLocationFn)(void *si, int h);
 typedef void   (__thiscall *SiSetHealthFn)(void *si, int h, float v);
@@ -1881,10 +1886,46 @@ static void run_command(char *line)
         logline("  ok");
         return;
     }
+    if (s_eq(t[0], "formation") && n >= 3) {
+        /* formation <name>[,<name>...] <param>: the formation the ships move in, as the
+         * bar's formation buttons give it (SET_FORMATION with the button's `param`, posted
+         * as the ship's next command the way the order's executor posts it) */
+        char *p = t[1], *nm;
+        long  prm = (long)s_atof(t[2]);
+        for (;;) {
+            nm = p;
+            while (*p && *p != ',') p++;
+            if (*p) *p++ = 0; else p = NULLPTR;
+            if (!(o = find_obj(nm)) || !craft_of(o)) { logline("  ! not a craft in the scene"); return; }
+            ((DqCommandParamFn)DQ_COMMAND_PARAM)(craft_of(o), CMD_SET_FORMATION, prm);
+            if (!p) break;
+        }
+        logline("  ok");
+        return;
+    }
     if (s_eq(t[0], "center") && n >= 2) {
         if (!(o = find_obj(t[1]))) { logline("  ! no such object"); return; }
         ((SiHandleFn)SI_CENTER_CAMERA)(SI_INSTANCE, o->handle);
         logline("  ok");
+        return;
+    }
+    if (s_eq(t[0], "waypoint-key") && n >= 2) {
+        /* The waypoint key (`enter_waypoint`, Tab) held or let go, for a move path: the
+         * overview reads the binding's live state through the pointer at +0x30c, which
+         * is pointed at an int of ours while held.  The bench cannot hold a key: Wine
+         * under Xwayland sees a held key let go at once. */
+        int **slot = (int **)((char *)OVERVIEW + 0x30c);
+        if (!*slot) { logline("  ! the overview has not bound the waypoint key yet"); return; }
+        if (s_eq(t[1], "on")) {
+            if (*slot != &g_waypoint_key) g_waypoint_orig = *slot;
+            g_waypoint_key = 1;
+            *slot = &g_waypoint_key;
+            logline("  ok: waypoint key held");
+        } else {
+            g_waypoint_key = 0;
+            if (*slot == &g_waypoint_key && g_waypoint_orig) *slot = g_waypoint_orig;
+            logline("  ok: waypoint key let go");
+        }
         return;
     }
     if (s_eq(t[0], "pause"))  { pause_now("  ");  return; }

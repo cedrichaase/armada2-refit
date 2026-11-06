@@ -53,7 +53,7 @@ import zipfile
 INSTALLER_VERSION = '3.1.1'
 SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, ::step and ::error lines
 REPO = 'cedrichaase/armada2-refit'
-API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'
+API = os.environ.get('A2_RELEASES_API') or f'https://api.github.com/repos/{REPO}/releases?per_page=30'
 RELEASES_PAGE = f'https://github.com/{REPO}/releases'
 SYSTEM = {'win32': 'windows', 'darwin': 'macos'}.get(sys.platform, 'linux')
 # The installer as each system downloads it from a release.
@@ -157,7 +157,10 @@ LEGACY_LAYERS = {
 }
 
 def vtuple(v):
-    return tuple(int(x) for x in re.findall(r'\d+', v)) or (0,)
+    # Only the leading X.Y.Z: a pre-release build's `-pre.abc1234` suffix must not leak its
+    # sha digits into the tuple (15.10.0-pre.abc1234 sorts as 15.10.0).
+    m = re.match(r'\d+(?:\.\d+)*', v or '')
+    return tuple(int(x) for x in m.group().split('.')) if m else (0,)
 
 
 def human(n):
@@ -237,6 +240,70 @@ def processes():
 
 def game_running():
     return any('armada2.exe' in cmd.lower() for _, cmd in processes())
+
+
+LAUNCH_MIN = 4.0        # s a launch shows as launching at least, so a quick start is seen
+LAUNCH_GIVE_UP = 60.0   # s to wait for the game's process before calling the launch failed
+LAUNCH_POLL = 1.5       # s between two looks at the process list
+
+
+class LaunchWatch:
+    """Where Launch game stands, for both windows: idle, launching (asked, the game's
+    process not seen yet, or seen for under LAUNCH_MIN), running (the game is up; the
+    button stays off until it exits). `begin` is the guard at the handler: it says yes
+    once, so a double click or a key repeat starts one game. `poll` looks at the process
+    list on a thread (tasklist and ps can take a while) and hands the answer to the
+    window's own thread through `post(fn, *args)`; `step` is the state machine."""
+    def __init__(self, clock=time.monotonic):
+        self.clock, self.state, self.t0, self.polling = clock, 'idle', 0.0, False
+
+    def begin(self):
+        if self.state != 'idle':
+            return False
+        self.state, self.t0 = 'launching', self.clock()
+        return True
+
+    def fail(self):
+        self.state = 'idle'
+
+    def already_running(self):
+        self.state = 'running'
+
+    def step(self, running):
+        """None, or 'running' (launch confirmed), 'timeout' (never seen), 'exited'."""
+        age = self.clock() - self.t0
+        if self.state == 'launching':
+            if running and age >= LAUNCH_MIN:
+                self.state = 'running'
+                return 'running'
+            if not running and age >= LAUNCH_GIVE_UP:
+                self.state = 'idle'
+                return 'timeout'
+        elif self.state == 'running' and not running:
+            self.state = 'idle'
+            return 'exited'
+        return None
+
+    def poll(self, post, then):
+        if self.polling or self.state == 'idle':
+            return
+        self.polling = True
+
+        def look():
+            r = game_running()
+            post(done, r)
+
+        def done(r):
+            self.polling = False
+            then(self.step(r))
+        threading.Thread(target=look, daemon=True).start()
+
+
+def launch_attempt(start):
+    """Run on a thread: 'already' if the game is up, else 'ok' or 'fail' by `start()`."""
+    if game_running():
+        return 'already'
+    return 'ok' if start() else 'fail'
 
 
 def heroic_running():
@@ -1858,13 +1925,17 @@ def explain(err, path=None):
 class Release:
     def __init__(self, version, **kw):
         self.version = version
-        self.prerelease = kw.get('prerelease', False)
+        # A versioned release GitHub flags as a pre-release: not yet seen in game. (Caches
+        # written before the rename say `prerelease`.)
+        self.untested = kw.get('untested', kw.get('prerelease', False))
         self.date = kw.get('date', '')
         self.url = kw.get('url')            # the zip on GitHub; None when only cached
         self.size = kw.get('size', 0)
         self.digest = kw.get('digest')      # 'sha256:...' as GitHub reports it
         self.installer_url = kw.get('installer_url')
         self.page = kw.get('page', RELEASES_PAGE)
+        self.pre = kw.get('pre', False)     # the pre-release build of the latest main
+        self.commit = kw.get('commit', '')  # its short commit
 
     @property
     def zip_name(self):
@@ -1878,9 +1949,10 @@ class Release:
         return os.path.isfile(self.cached)
 
     def to_json(self):
-        return dict(version=self.version, prerelease=self.prerelease, date=self.date,
+        return dict(version=self.version, untested=self.untested, date=self.date,
                     url=self.url, size=self.size, digest=self.digest,
-                    installer_url=self.installer_url, page=self.page)
+                    installer_url=self.installer_url, page=self.page,
+                    pre=self.pre, commit=self.commit)
 
 
 def host_env():
@@ -1922,24 +1994,46 @@ def http_get(url, timeout=15):
     return urllib.request.urlopen(req, timeout=timeout, context=ssl_context())
 
 
-def fetch_releases():
-    """The releases on GitHub, newest first; also writes the list to the cache."""
-    with http_get(API) as r:
-        data = json.load(r)
-    out = []
+PRE_ZIP = re.compile(r'armada2-refit-(\d+\.\d+\.\d+-pre\.\d+)\.zip$')
+PRE_TAG = re.compile(r'v(\d+)\.(\d+)\.(\d+)-pre\.(\d+)$')
+
+
+def parse_releases(data):
+    """Releases from the API's JSON: tags vX.Y.Z (untested when GitHub flags them), plus
+    the newest vX.Y.Z-pre.N -- CI's build of the latest main -- as one extra entry, last.
+    Any other tag is ignored."""
+    out, pre = [], None
     for rel in data:
         if rel.get('draft'):
             continue
-        version = rel.get('tag_name', '').lstrip('v')
+        tag = rel.get('tag_name', '')
+        pm = PRE_TAG.match(tag)
+        if not pm and not re.match(r'v\d+\.\d+\.\d+$', tag):
+            continue
+        version = tag[1:]
         zips = [a for a in rel.get('assets', []) if a['name'] == f'armada2-refit-{version}.zip']
         if not zips:
             continue
         inst = [a for a in rel.get('assets', []) if a['name'] == INSTALLER_ASSET]
-        out.append(Release(version, prerelease=bool(rel.get('prerelease')),
-                           date=(rel.get('published_at') or '')[:10],
-                           url=zips[0]['browser_download_url'], size=zips[0].get('size', 0),
-                           digest=zips[0].get('digest'), page=rel.get('html_url', RELEASES_PAGE),
-                           installer_url=inst[0]['browser_download_url'] if inst else None))
+        sha = rel.get('target_commitish') or ''
+        r = Release(version, untested=bool(rel.get('prerelease')) and not pm, pre=bool(pm),
+                    commit=sha[:7] if re.match(r'[0-9a-f]{40}$', sha) else '',
+                    date=(rel.get('published_at') or '')[:10],
+                    url=zips[0]['browser_download_url'], size=zips[0].get('size', 0),
+                    digest=zips[0].get('digest'), page=rel.get('html_url', RELEASES_PAGE),
+                    installer_url=inst[0]['browser_download_url'] if inst else None)
+        if not pm:
+            out.append(r)
+        elif not pre or vtuple(version) + (int(pm.group(4)),) > pre[0]:
+            pre = (vtuple(version) + (int(pm.group(4)),), r)
+    return out + ([pre[1]] if pre else [])
+
+
+def fetch_releases():
+    """The releases on GitHub, newest first, the pre-release build last; also writes the
+    list to the cache."""
+    with http_get(API) as r:
+        out = parse_releases(json.load(r))
     save_json(os.path.join(CACHE, 'releases.json'),
               dict(checked=time.time(), releases=[r.to_json() for r in out]))
     return out
@@ -1955,19 +2049,50 @@ def cached_releases():
 
 def merge_cached(rels):
     known = {r.version for r in rels}
-    for z in glob.glob(os.path.join(CACHE, 'releases', 'armada2-refit-*.zip')):
-        m = re.match(r'armada2-refit-([\d.]+)\.zip$', os.path.basename(z))
+    zips = sorted(glob.glob(os.path.join(CACHE, 'releases', 'armada2-refit-*.zip')),
+                  key=os.path.getmtime, reverse=True)
+    have_pre = any(r.pre for r in rels)
+    for z in zips:
+        name = os.path.basename(z)
+        m = re.match(r'armada2-refit-(\d+\.\d+\.\d+)\.zip$', name)
         if m and m.group(1) not in known:
             rels.append(Release(m.group(1), size=os.path.getsize(z)))
             known.add(m.group(1))
-    return sorted(rels, key=lambda r: vtuple(r.version), reverse=True)
+        m = PRE_ZIP.match(name)   # (newest first: the first is kept)
+        # One pre-release entry at most: the list's, else the newest one kept.
+        if m and not have_pre:
+            rels.append(Release(m.group(1), pre=True,
+                                date=time.strftime('%Y-%m-%d', time.localtime(os.path.getmtime(z))),
+                                size=os.path.getsize(z)))
+            have_pre = True
+    return sorted(rels, key=lambda r: (r.pre, [-x for x in vtuple(r.version)]))
 
 
 def default_release(rels):
-    """The newest full release; a pre-release (not yet seen in game) only when there is
-    nothing else."""
-    full = [r for r in rels if not r.prerelease]
+    """The newest full release; an untested release (not yet seen in game) only when there
+    is nothing else; never the pre-release build (None when that is all there is: it is
+    picked on purpose)."""
+    rels = [r for r in rels if not r.pre]
+    full = [r for r in rels if not r.untested]
     return (full or rels or [None])[0]
+
+
+def find_release(rels, want):
+    """--install VERSION; `pre-release` is the build of the latest main."""
+    return next((r for r in rels if (r.pre if want == 'pre-release' else r.version == want)), None)
+
+
+def pre_label(r):
+    return (f'Pre-release (latest main) · {r.version}' + (f' · {r.commit}' if r.commit else '')
+            + (f' · {r.date}' if r.date else '') + ' — untested')
+
+
+def release_tags(r, newest):
+    """The bracketed tags of a versioned release in the list."""
+    return (['newest'] if r is newest else []) + (['untested release'] if r.untested else [])
+
+
+PRE_NOTE = 'the latest main, not seen in game: for testing, or to live on the edge'
 
 
 def download(rel, progress=None):
@@ -1997,6 +2122,10 @@ def download(rel, progress=None):
                                f'the download of {rel.version} is damaged (checksum)')
         Package(tmp)        # a zip we can read, with a package in it
         os.replace(tmp, rel.cached)
+        if rel.pre:         # a zip per commit: keep only this one
+            for z in glob.glob(os.path.join(os.path.dirname(rel.cached), 'armada2-refit-*-pre.*.zip')):
+                if z != rel.cached:
+                    os.unlink(z)
     finally:
         if os.path.exists(tmp):
             os.unlink(tmp)
@@ -2573,8 +2702,10 @@ def cli(argv):
                   + f'  installed: {facts["installed"] or "no"}')
         print('releases:')
         for r in releases():
-            print(f'  {r.version:10} {r.date:10} {"pre-release" if r.prerelease else "release":11}'
-                  f' {"cached" if r.is_cached() else ""}')
+            kind = 'pre-release' if r.pre else 'untested' if r.untested else 'release'
+            print(f'  {r.version:10} {r.date:10} {kind:11}'
+                  f' {"cached" if r.is_cached() else ""}'
+                  + (f'  untested (--install pre-release)' if r.pre else ''))
         return 0
     game = a.game or (games[0].path if games else None)
     if a.report:
@@ -2611,7 +2742,7 @@ def cli(argv):
     try:
         if setup:
             rels = releases()
-            rel = next((r for r in rels if r.version == a.install), None) if a.install \
+            rel = find_release(rels, a.install) if a.install \
                 else default_release(rels)
             if not rel:
                 print(f'no release {a.install or "to install -- check the connection"}',
@@ -2625,7 +2756,7 @@ def cli(argv):
             job.install(None, a.package, game, launcher=not a.no_launcher, skip=skip)
         elif a.install is not None:
             rels = releases()
-            rel = next((r for r in rels if r.version == a.install), None) if a.install \
+            rel = find_release(rels, a.install) if a.install \
                 else default_release(rels)
             if not rel:
                 print(f'no release {a.install}', file=sys.stderr)
@@ -2735,6 +2866,20 @@ def selftest():
         nonlocal ok
         print(('ok    ' if cond else 'FAIL  ') + what)
         ok = ok and cond
+
+    now = [0.0]
+    w = LaunchWatch(lambda: now[0])
+    check(w.begin() and not w.begin(), 'launch: a second click while launching is refused')
+    check(w.step(True) is None and w.state == 'launching',
+          'launch: seen at once, it still shows as launching for the minimum')
+    now[0] = LAUNCH_MIN
+    check(w.step(True) == 'running' and not w.begin(), 'launch: running keeps the button off')
+    check(w.step(True) is None and w.step(False) == 'exited' and w.begin(),
+          'launch: the exit frees it again')
+    w.fail()
+    w.begin()
+    now[0] += LAUNCH_GIVE_UP
+    check(w.step(False) == 'timeout' and w.state == 'idle', 'launch: never seen, it gives up')
 
     with tempfile.TemporaryDirectory() as t:
         cfg = os.path.join(t, 'GamesConfig')
@@ -2864,6 +3009,43 @@ def selftest():
               os.path.realpath(prefix_of(os.path.join(t, 'drive_c', 'x')).root) == os.path.realpath(t),
               'prefix: found above drive_c')
         check(vtuple('11.10.0') > vtuple('11.9.3'), 'versions sort as numbers')
+        check(vtuple('15.10.0-pre.abc1234') == (15, 10, 0) and
+              vtuple('15.10.0-pre.abc1234') > vtuple('15.9.0') and vtuple('x') == (0,),
+              'vtuple: a pre-release build is its X.Y.Z, the sha stays out')
+        # The release list: v-tags, a flagged release, two builds of main, stray tags.
+        sha = 'abcdef1' + '0' * 33
+        def api_rel(tag, pre=False, sha=sha):
+            v = tag[1:]
+            return dict(tag_name=tag, prerelease=pre, published_at='2026-10-01T00:00:00Z',
+                        target_commitish=sha, assets=[dict(name=f'armada2-refit-{v}.zip',
+                        browser_download_url='https://x/' + v, size=1)])
+        api = [api_rel('v15.10.0-pre.9', True), api_rel('v15.9.0'), api_rel('edge', True),
+               api_rel('v15.10.0-pre.12', True, 'main'), api_rel('v15.9.1-rc1', True),
+               api_rel('v15.10.0', True), api_rel('v15.8.0')]
+        rl = parse_releases(api)
+        check([r.version for r in rl] == ['15.9.0', '15.10.0', '15.8.0', '15.10.0-pre.12'],
+              'releases: v-tags, then only the newest build of main; other tags ignored')
+        check(rl[1].untested and not rl[0].untested and not rl[-1].untested,
+              'releases: GitHub\'s flag is `untested` on versions only')
+        check(Release(version='1', prerelease=True).untested and
+              Release(**rl[1].to_json()).untested, 'cache: old `prerelease` read as untested')
+        e = rl[-1]
+        check(e.pre and e.commit == '' and e.zip_name == 'armada2-refit-15.10.0-pre.12.zip'
+              and parse_releases(api[:1])[0].commit == 'abcdef1'
+              and parse_releases(api[:1])[0].date == '2026-10-01',
+              'pre-release: commit from a sha target only, date, zip name')
+        check(vtuple('15.10.0-pre.12') == (15, 10, 0) and vtuple('x') == (0,),
+              'vtuple: the build number stays out')
+        check(default_release(rl).version == '15.9.0', 'default: the newest full release')
+        check(default_release(rl[1:2] + [e]).version == '15.10.0' and default_release([e]) is None
+              and default_release([]) is None, 'default: never the pre-release build')
+        check(find_release(rl, 'pre-release') is e and find_release(rl, '15.8.0').version == '15.8.0',
+              'install: `pre-release` names the build of the latest main')
+        check(Release(**e.to_json()).pre, 'pre-release survives the cache file')
+        e.commit, e.date = 'abcdef1', '2026-11-05'
+        check(pre_label(e) == 'Pre-release (latest main) · 15.10.0-pre.12 · abcdef1 · 2026-11-05 — untested',
+              'pre-release label')
+        check(release_tags(rl[1], rl[0]) == ['untested release'], 'untested release tag')
 
         # The bug report: nothing personal in it, and the findings it exists for.
         r = redact(f'{HOME}/x C:\\Users\\Alice\\A2 Z:\\home\\bob\\g /Users/carol/b '
@@ -3546,9 +3728,16 @@ def run_gui():
             self.b_install.set_size_request(190, 48)
             self.b_install.connect('clicked', lambda _b: self.on_install())
             pair.append(self.b_install)
-            self.b_launch = Gtk.Button(child=Adw.ButtonContent(
-                icon_name='media-playback-start-symbolic', label='Launch game'),
-                tooltip_text='Start Armada II through Heroic')
+            self.launch = LaunchWatch()
+            self.launch_idle = Adw.ButtonContent(
+                icon_name='media-playback-start-symbolic', label='Launch game')
+            self.launch_spin = Gtk.Spinner()
+            self.launch_lbl = Gtk.Label(label='Launching…')
+            self.launch_busy = Gtk.Box(spacing=8, halign=Gtk.Align.CENTER)
+            self.launch_busy.append(self.launch_spin)
+            self.launch_busy.append(self.launch_lbl)
+            self.b_launch = Gtk.Button(child=self.launch_idle,
+                                       tooltip_text='Start Armada II through Heroic')
             self.b_launch.add_css_class('pill')
             self.b_launch.set_size_request(190, 48)
             self.b_launch.connect('clicked', lambda _b: self.on_launch())
@@ -3808,14 +3997,15 @@ def run_gui():
             newest = default_release(rels)
             labels = []
             for r in rels:
-                tags = ['newest'] if r is newest else []
-                if r.prerelease:
-                    tags.append('pre-release')
-                labels.append(r.version + (f'  ({", ".join(tags)})' if tags else ''))
+                tags = release_tags(r, newest)
+                labels.append(pre_label(r) if r.pre else
+                              r.version + (f'  ({", ".join(tags)})' if tags else ''))
             self.updating = True
             self.dd_rel.set_model(Gtk.StringList.new(labels or ['No releases']))
             pick = cur_v or (newest.version if newest else None)
-            self.dd_rel.set_selected(next((i for i, r in enumerate(rels) if r.version == pick), 0))
+            # Nothing but the pre-release build: no pick (no selection, nothing to install).
+            self.dd_rel.set_selected(next((i for i, r in enumerate(rels) if r.version == pick),
+                                          Gtk.INVALID_LIST_POSITION if rels and not pick else 0))
             self.updating = False
             self.on_release(user=False)
 
@@ -3849,12 +4039,15 @@ def run_gui():
             r = self.release()
             self.package = None
             if not r:
-                self.row_rel.set_subtitle('Nothing to install yet. Check the connection and refresh.')
+                self.row_rel.set_subtitle('Pick a version.' if self.releases else
+                                          'Nothing to install yet. Check the connection and refresh.')
                 self.update_all()
                 return
-            sub = [r.date] if r.date else []
-            if r.prerelease:
-                sub.append('pre-release, not yet seen in game')
+            sub = [r.date] if r.date and not r.pre else []
+            if r.pre:
+                sub.append(PRE_NOTE)
+            elif r.untested:
+                sub.append('untested release: not yet seen in game')
             if r.is_cached():
                 self.read_package(r)
             elif r.url and not self.busy:
@@ -4032,7 +4225,7 @@ def run_gui():
             self.b_uninstall.set_visible(bool(g and inst))
             self.b_uninstall.set_sensitive(not self.busy)
             self.b_launch.set_visible(bool(g and g.heroic and inst))
-            self.b_launch.set_sensitive(not self.busy)
+            self.update_launch_button()
             label = 'Install'
             if r and inst:
                 label = ('Reinstall' if inst == r.version else 'Install' if inst == '?' else
@@ -4108,15 +4301,53 @@ def run_gui():
 
         def on_launch(self):
             g = self.game()
-            if not g or not g.heroic or self.busy:
+            if not g or not g.heroic or self.busy or not self.launch.begin():
                 return
-            if game_running():
+            self.update_launch_button()
+            self.in_thread(lambda: launch_attempt(lambda: launch_game(g.heroic)),
+                           lambda r: self.launch_started(r, g),
+                           lambda e: self.launch_failed(f'Could not start the game: {e}'))
+
+        def launch_started(self, r, g):
+            if r == 'already':
+                self.launch.already_running()
                 self.set_status('Armada II is already running.')
-                return
-            if launch_game(g.heroic):
+            elif r == 'ok':
                 self.set_status('Starting Armada II through Heroic…', 'ok')
             else:
-                self.open_uri(heroic_launch_uri(g.heroic))
+                self.open_uri(heroic_launch_uri(g.heroic))   # xdg-open is missing
+            self.update_launch_button()
+            self.launch_tick()
+
+        def launch_failed(self, msg):
+            self.launch.fail()
+            self.set_status(msg, 'err')
+            self.update_launch_button()
+
+        def launch_tick(self):
+            """Look at the game every LAUNCH_POLL seconds while a launch is under way."""
+            def then(ev):
+                if ev == 'running':
+                    self.set_status('Armada II is running.', 'ok')
+                elif ev == 'timeout':
+                    self.set_status('Armada II did not start. Check Heroic and try again.',
+                                    'err')
+                elif ev == 'exited':
+                    self.set_status('Armada II has closed.')
+                if ev:
+                    self.update_launch_button()
+                if self.launch.state != 'idle':
+                    GLib.timeout_add(int(LAUNCH_POLL * 1000), self.launch_tick)
+            self.launch.poll(GLib.idle_add, then)
+            return False
+
+        def update_launch_button(self):
+            st = self.launch.state
+            self.b_launch.set_sensitive(st == 'idle' and not self.busy)
+            self.b_launch.set_child(self.launch_idle if st == 'idle' else self.launch_busy)
+            self.launch_spin.set_visible(st == 'launching')
+            (self.launch_spin.start if st == 'launching' else self.launch_spin.stop)()
+            self.launch_lbl.set_label('Launching…' if st == 'launching' else 'Game running')
 
         def on_uninstall(self):
             g = self.game()
@@ -4709,6 +4940,7 @@ def run_tk():
             self.cv.pack(fill='both', expand=True)
             self.sky = Sky(self.cv)
             self.bar = Bar(self.cv)
+            self.launch, self.launch_arc = LaunchWatch(), None
             self.cv.bind('<Configure>', self.on_configure)
             root.bind('<F5>', lambda e: self.refresh())
             for k in ('Return', 'KP_Enter'):
@@ -4770,6 +5002,9 @@ def run_tk():
                 active = self.bar.busy()
                 if active:
                     self.bar.tick(dt)
+                if self.launch.state == 'launching' and self.launch_arc:
+                    self.cv.itemconfigure(self.launch_arc, start=-(t * 300) % 360)
+                    active = True
             except Exception:
                 self.bug()
             # About 30 frames a second; at warp and while the bar moves, about 60.
@@ -5033,13 +5268,15 @@ def run_tk():
             self.releases = rels
             newest = default_release(rels)
             pick = cur_v or (newest.version if newest else None)
-            self.ri = next((i for i, r in enumerate(rels) if r.version == pick), 0)
+            # Nothing but the pre-release build: no pick (release() is None, nothing installs).
+            self.ri = next((i for i, r in enumerate(rels) if r.version == pick),
+                           -1 if rels and not pick else 0)
             self.on_release(user=False)
 
         def release_label(self, r):
-            tags = ['newest'] if r is default_release(self.releases) else []
-            if r.prerelease:
-                tags.append('pre-release')
+            if r.pre:
+                return pre_label(r)
+            tags = release_tags(r, default_release(self.releases))
             return r.version + (f'  ({", ".join(tags)})' if tags else '')
 
         def refresh(self):
@@ -5483,20 +5720,22 @@ def run_tk():
             # Version.
             seps.append(y)
             if r:
-                bits = [r.date] if r.date else []
-                if r.prerelease:
-                    bits.append('pre-release, not yet seen in game')
+                bits = [r.date] if r.date and not r.pre else []
+                if r.pre:
+                    bits.append(PRE_NOTE)
+                elif r.untested:
+                    bits.append('untested release: not yet seen in game')
                 if self.rel_note:
                     bits.append(self.rel_note)
                 if self.check_error and not r.url:
                     bits.append('no longer on GitHub')
                 sub = ' · '.join(bits)
             else:
-                sub = self.rel_note or ('Checking…' if self.busy else
+                sub = self.rel_note or ('Checking…' if self.busy else 'Pick a version.' if self.releases else
                                         'Nothing to install yet. Check the connection and refresh.')
             rw = px(210)
             y_end, yc = row(y, 'Version', sub, rw)
-            field(ix1 - rw, yc - fh // 2, rw, fh, self.release_label(r) if r else 'No releases',
+            field(ix1 - rw, yc - fh // 2, rw, fh, self.release_label(r) if r else 'Choose a version' if self.releases else 'No releases',
                   popup([self.release_label(x) for x in self.releases], self.ri,
                         self.pick_release), bool(self.releases) and not self.busy)
             y = y_end
@@ -5559,8 +5798,21 @@ def run_tk():
             button(bx, y, bw, bh, label, 'primary' if primary else 'secondary',
                    self.on_install, can)
             if launch:
-                button(bx + bw + gap, y, bw, bh, '▶  Launch game',
-                       'secondary' if primary else 'primary', self.on_launch, not self.busy)
+                st = self.launch.state
+                t = button(bx + bw + gap, y, bw, bh,
+                           {'idle': '▶  Launch game', 'launching': 'Launching…',
+                            'running': 'Game running'}[st],
+                           'secondary' if primary else 'primary', self.on_launch,
+                           not self.busy and st == 'idle')
+                self.launch_arc = None
+                if st == 'launching':
+                    # A quiet arc turning beside the label (frame() moves it).
+                    x0_, _, _, y1_ = cv.bbox(t)
+                    r_ = px(7)
+                    self.launch_arc = cv.create_arc(
+                        x0_ - px(12) - 2 * r_, y + bh // 2 - r_, x0_ - px(12), y + bh // 2 + r_,
+                        start=0, extent=270, style='arc', width=max(2, px(2)),
+                        outline=AMBER_LIGHT, tags=('ui',))
             y += bh + px(14)
             links = ([('Uninstall', self.on_uninstall)] if uninst else []) + \
                 [('Refresh', self.refresh), ('Log', self.show_log), ('Report', self.show_report),
@@ -5680,19 +5932,45 @@ def run_tk():
 
         def on_launch(self):
             g = self.game()
-            if not g or self.busy:
-                return
-            if game_running():
-                self.set_status('Armada II is already running.')
+            if not g or self.busy or not self.launch.begin():
                 return
             env = ((self.facts or {}).get('state') or {}).get('launcher_env') or self.wanted_env()
-            if launch_game_native(g, env):
-                self.set_status('Starting Armada II…', 'ok')
-            elif g.prefix:
-                self.set_status(f'Could not start the game: no Wine found for '
-                                f'{g.prefix.label()}. Start it from there.', 'err')
-            else:
-                self.set_status('Could not start the game.', 'err')
+            self.set_status('Starting Armada II…', 'ok')
+            self.in_thread(lambda: launch_attempt(lambda: launch_game_native(g, env)),
+                           lambda r: self.launch_started(r, g),
+                           lambda e: self.launch_failed(f'Could not start the game: {e}'))
+
+        def launch_started(self, r, g):
+            if r == 'already':
+                self.launch.already_running()
+                self.set_status('Armada II is already running.')
+            elif r == 'fail':
+                self.launch.fail()
+                if g.prefix:
+                    self.set_status(f'Could not start the game: no Wine found for '
+                                    f'{g.prefix.label()}. Start it from there.', 'err')
+                else:
+                    self.set_status('Could not start the game.', 'err')
+                return
+            self.launch_tick()
+
+        def launch_failed(self, msg):
+            self.launch.fail()
+            self.set_status(msg, 'err')
+
+        def launch_tick(self):
+            """Look at the game every LAUNCH_POLL seconds while a launch is under way."""
+            def then(ev):
+                if ev == 'running':
+                    self.set_status('Armada II is running.', 'ok')
+                elif ev == 'timeout':
+                    self.set_status('Armada II did not start. Try again, or start it from '
+                                    'its own launcher.', 'err')
+                elif ev == 'exited':
+                    self.set_status('Armada II has closed.')
+                if self.launch.state != 'idle':
+                    root.after(int(LAUNCH_POLL * 1000), self.launch_tick)
+            self.launch.poll(self.post, then)
 
         def on_uninstall(self):
             g = self.game()

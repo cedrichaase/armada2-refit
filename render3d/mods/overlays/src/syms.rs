@@ -44,11 +44,15 @@ pub mod sym {
     pub const SITE_POST2: a2engine::Sym = a2engine::Sym(39);
     pub const SITE_POST3: a2engine::Sym = a2engine::Sym(40);
     pub const SITE_POST4: a2engine::Sym = a2engine::Sym(41);
+    pub const FN_DRAW_PATH: a2engine::Sym = a2engine::Sym(85);
+    pub const SITE_DRAW_PATH: a2engine::Sym = a2engine::Sym(86);
+    pub const OVERVIEW: a2engine::Sym = a2engine::Sym(87);
 }
 
 pub mod hook {
     pub const OVERLAYS_READS: a2engine::HookId = a2engine::HookId(0);
     pub const OVERLAYS_POSTS: a2engine::HookId = a2engine::HookId(1);
+    pub const OVERLAYS_PATHS: a2engine::HookId = a2engine::HookId(2);
 }
 
 pub mod field {
@@ -95,11 +99,27 @@ pub mod field {
     #[inline(always)] pub fn OV_VT_TCAM_RENDER() -> usize { super::TABLE.engine().field(a2engine::Sym(82)) }
     #[inline(always)] pub fn OV_CAM_MARKER() -> usize { super::TABLE.engine().field(a2engine::Sym(83)) }
     #[inline(always)] pub fn OV_CAM_FREE() -> usize { super::TABLE.engine().field(a2engine::Sym(84)) }
+    #[inline(always)] pub fn OV_ADD_PATH() -> usize { super::TABLE.engine().field(a2engine::Sym(88)) }
+    #[inline(always)] pub fn OV_WAYPOINT_KEY() -> usize { super::TABLE.engine().field(a2engine::Sym(89)) }
+    #[inline(always)] pub fn OV_VT_SELECT_NUM() -> usize { super::TABLE.engine().field(a2engine::Sym(90)) }
+    #[inline(always)] pub fn OV_VT_SELECT_LIST() -> usize { super::TABLE.engine().field(a2engine::Sym(91)) }
+    #[inline(always)] pub fn OBJ_PROCESS() -> usize { super::TABLE.engine().field(a2engine::Sym(92)) }
+    #[inline(always)] pub fn OBJ_POSITION() -> usize { super::TABLE.engine().field(a2engine::Sym(93)) }
+    #[inline(always)] pub fn OBJ_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(94)) }
+    #[inline(always)] pub fn PROC_COMMAND() -> usize { super::TABLE.engine().field(a2engine::Sym(95)) }
+    #[inline(always)] pub fn PROC_PATH() -> usize { super::TABLE.engine().field(a2engine::Sym(96)) }
+    #[inline(always)] pub fn PROC_POINT() -> usize { super::TABLE.engine().field(a2engine::Sym(97)) }
+    #[inline(always)] pub fn PATH_COUNT() -> usize { super::TABLE.engine().field(a2engine::Sym(98)) }
+    #[inline(always)] pub fn PATH_POINTS() -> usize { super::TABLE.engine().field(a2engine::Sym(99)) }
+    #[inline(always)] pub fn PATH_TYPE() -> usize { super::TABLE.engine().field(a2engine::Sym(100)) }
 }
 
 pub mod value {
     #![allow(non_snake_case)]
     #[inline(always)] pub fn OV_BUCKET_COUNT() -> i32 { super::TABLE.engine().value(a2engine::Sym(58)) }
+    #[inline(always)] pub fn CMD_GO() -> i32 { super::TABLE.engine().value(a2engine::Sym(101)) }
+    #[inline(always)] pub fn CMD_PATROL() -> i32 { super::TABLE.engine().value(a2engine::Sym(102)) }
+    #[inline(always)] pub fn PATH_PATROL() -> i32 { super::TABLE.engine().value(a2engine::Sym(103)) }
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
@@ -188,11 +208,31 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "ov_vt_tcam_render", symbol: "TacticalCamera::Render slot", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "ov_cam_marker", symbol: "TacticalCamera::marker instance", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "ov_cam_free", symbol: "TacticalCamera::free", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "fn_draw_path", symbol: "cOverViewImp::mDrawPath", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "site_draw_path", symbol: "cOverViewImp::mNormalModeRender", kind: a2engine::Kind::Call },
+    a2engine::SymDef { id: "overview", symbol: "cOverViewImp", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "ov_add_path", symbol: "cOverViewImp", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ov_waypoint_key", symbol: "cOverViewImp", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ov_vt_select_num", symbol: "cOverViewImp::GetSelectNum", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "ov_vt_select_list", symbol: "cOverViewImp::GetSelectList", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "obj_process", symbol: "GameObject", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "obj_position", symbol: "GameObject", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "obj_team", symbol: "GameObject", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "proc_command", symbol: "CraftProcess", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "proc_path", symbol: "CraftProcess", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "proc_point", symbol: "CraftProcess", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "path_count", symbol: "AiPath", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "path_points", symbol: "AiPath", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "path_type", symbol: "AiPath", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "cmd_go", symbol: "AiCommand GO", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "cmd_patrol", symbol: "AiCommand PATROL", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "path_patrol", symbol: "AiPath type: a patrol loop", kind: a2engine::Kind::Value },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
     a2engine::HookDef { id: "render3d.overlays.reads", run_unknown: false, rows: &["Modules.overlays"], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84] },
     a2engine::HookDef { id: "render3d.overlays.posts", run_unknown: false, rows: &["Modules.overlays"], syms: &[15, 37, 38, 39, 40, 41] },
+    a2engine::HookDef { id: "render3d.overlays.paths", run_unknown: false, rows: &["Overlays.MovePaths"], syms: &[85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103] },
 ];
 
 pub const BUILDS: &[a2engine::Build] = &[
@@ -204,7 +244,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 85,
+        n_resolved: 104,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x473930, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x3c, 0x53, 0x8b], mask: &[], section: "", count: 0, value: 0 }, // fn_footprints
@@ -292,16 +332,35 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // ov_vt_tcam_render
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 224 }, // ov_cam_marker
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 228 }, // ov_cam_free
+            a2engine::Entry { present: true, addr: 0x525180, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x78, 0x53, 0x56], mask: &[], section: "", count: 0, value: 0 }, // fn_draw_path
+            a2engine::Entry { present: true, addr: 0x522247, end: 0x0, target: 0x55, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_draw_path
+            a2engine::Entry { present: true, addr: 0x768e40, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // overview
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 612 }, // ov_add_path
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 780 }, // ov_waypoint_key
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 148 }, // ov_vt_select_num
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 152 }, // ov_vt_select_list
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 68 }, // obj_process
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 172 }, // obj_position
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 236 }, // obj_team
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // proc_command
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 136 }, // proc_path
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 300 }, // proc_point
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // path_count
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // path_points
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // path_type
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // cmd_go
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 26 }, // cmd_patrol
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 2 }, // path_patrol
         ],
         blocked: &[
         ],
     },
 ];
 
-static HOOK_STATE: [core::sync::atomic::AtomicU64; 2] = [const { core::sync::atomic::AtomicU64::new(0) }; 2];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 85] = [const { core::sync::atomic::AtomicU8::new(0) }; 85];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 85] = [const { core::sync::atomic::AtomicUsize::new(0) }; 85];
-static NOTES: [a2engine::Note; 2] = [const { a2engine::Note::new() }; 2];
+static HOOK_STATE: [core::sync::atomic::AtomicU64; 3] = [const { core::sync::atomic::AtomicU64::new(0) }; 3];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 104] = [const { core::sync::atomic::AtomicU8::new(0) }; 104];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 104] = [const { core::sync::atomic::AtomicUsize::new(0) }; 104];
+static NOTES: [a2engine::Note; 3] = [const { a2engine::Note::new() }; 3];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 
 pub static TABLE: a2engine::Table = a2engine::Table {
