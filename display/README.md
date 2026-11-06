@@ -85,14 +85,36 @@ ASI loader of ours). Display8 is told from DxWrapper's stub by its panic message
 Heroic's `fleetopsroots50` entry already sets `WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b;d3d9=n,b`,
 so Wine loads the game folder's `d3d8.dll`; nothing in Heroic's config is edited.
 
-What happens (FO-4, `fo-display8`): Display8 reads the build as `armada2/fo-roots-5.0Z11`,
-the symbols 2/34 resolve, and `display.modes` stands down (`FindDisplayMode` is changed by
-Roots, not yet verified), so the stub could open no display and Display8 **bails out**: the
-game draws through Wine's own `d3d8.dll`, the plugins stand down, and the menu and a
-skirmish draw as Roots does without DxWrapper. The Vulkan backend is not reached yet; that
-needs the display hooks verified after the Display8 audit, and a skirmish on a Display8
-device is expected to go white until Display8 follows Roots' second `CreateDevice`
-(`fo-display-readiness`). `Display8.log` is in the prefix's `AppData/Local/armada2-refit/logs`.
+What happens (FO-A, `fo-display8`, 2026-11-06): Display8 reads the build as
+`armada2/fo-roots-5.0Z11` and **draws the game on its own device**, every draw through the
+passthrough, since no plugin of ours runs there yet. `display.modes` is verified beside
+Roots' changes (below) and ready; `display.native` and `display.drop` stand down, so the
+game's mode is the one in Roots' `Settings.xml` and nothing is dropped. On the bench
+(1280x960, Vulkan on the GPU) the shell draws in its windowed 1200x900 device, the
+skirmish's fullscreen `CreateDevice` on another window is followed ("A second window"),
+and the third, back to the shell when the game is left, too. D3DX8 is told DXT1, DXT3 and
+DXT5 are available, so Roots' DDS art is kept block-compressed and sampled as BC1 to BC3.
+FleetOpsHook's bump-mapped hulls (`SetVertexShader`, on nearly every Roots hull) use the
+stock Borg bump shader's token stream, so they draw through the passthrough's port of it
+("The engine's one vertex shader", under "Passthrough"); the skirmish looks as Roots does
+as it ships on DXVK.
+`Display8.log` is beside `ArmadaL.exe` in `Data/`.
+
+**`display.modes` on Roots.** Its six call sites and `FindDisplayMode`'s checked first 13
+bytes are stock's in `ArmadaL.exe` and still stock's in memory once `FleetOpsHook.dll` has
+patched (MemDiff, FO-2): none of its writes falls on them. What Roots changes beside them:
+`FindDisplayMode`'s width and height tests are turned from "equal" into "not smaller"
+(`jne` to `jl`), so the lookup answers the first listed mode at least as large, at the
+depth asked; the shell's request in `SetActiveDisplay_Internal` is 1200x900 in the file
+and FleetOpsHook raises its depth to 32 bits (the byte before the call at `0x62c4e0`);
+FleetOpsHook raises the intro's two requests in `Program::PlayIntroMovie` to 1200x900 and
+re-points `SetActiveDisplay`'s call of `SetActiveDisplay_Internal` at a wrapper that sets
+the windowed flag and calls the stock body; and it re-points the engine constructor's call
+in `InitializeGraphicsSystem` (`+0x64`), away from the two mode calls. Display8's lookup
+calls Roots' `FindDisplayMode` first and falls back to the one mode only when it answers
+nothing, which on an output smaller than 1200x900 is what keeps the shell from the null
+read FO-1 saw. `profiles/fo-roots-5.0Z11/display.toml` gives the shell's and the intro's
+requests as Roots makes them, so the log names them and `RaiseIntro` knows the intro's.
 
 **The release package** (`publish/README.md`, "Release packages") carries Display8 in
 `display/` with the shipped `Display8.ini`, and its installers (`install.sh`,
@@ -669,8 +691,8 @@ Direct3D 12 is for FO-4 to settle; `auto` tries Vulkan first.
 **A 1200x900 shell** needs nothing new: a mode the stub does not list is answered with the
 desktop's (the same as the 800x600 and 1024x768 requests of the stock shell and profile),
 `CreateDevice` is told it got what it asked and the window covers the desktop. The six
-`FindDisplayMode` calls of `stub/modes.rs` are Armada II's addresses; under Roots they
-stand down until the profile marks them verified (FO-3).
+`FindDisplayMode` calls of `stub/modes.rs` are Armada II's addresses, and Roots keeps
+them: the profile marks them verified (FO-A; "On Fleet Operations: Roots").
 
 **The engine's one vertex shader** (ROADMAP 4d) is the Borg hulls' bump pass. Display8
 keeps every vertex shader's declaration and function tokens at `CreateVertexShader`, the

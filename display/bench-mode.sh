@@ -19,8 +19,11 @@ state="${1:?$usage}"
 mode="${2:?$usage}"
 shift 2
 work="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["work"])' "$state")"
-ini="$work/game/Display8.ini"
-[ -f "$ini" ] || { echo "no Display8.ini in $work/game (install with --install .)" >&2; exit 1; }
+# Display8.ini sits beside the executable: the clone's root, or its Data/ on Fleet
+# Operations: Roots (games/<id>.toml, exe.data_dir; A2_PROFILE comes from a2test --game).
+exe_dir="$(cd "$repo" && python3 -c 'import os, a2env; print(os.path.relpath(os.path.dirname(a2env.EXE), a2env.GAME))')"
+ini="$work/game/$exe_dir/Display8.ini"
+[ -f "$ini" ] || { echo "no Display8.ini in $work/game/$exe_dir (install with --install .)" >&2; exit 1; }
 # Since display 1.0.0 there is one mode, the stub (forward mode went): `stub` is kept as
 # the word scenarios give; Backend=none is the bail-out.
 # `forward` (a scenario not yet moved) runs on the stub too, and says so.

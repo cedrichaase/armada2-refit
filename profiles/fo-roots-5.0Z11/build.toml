@@ -38,16 +38,21 @@ hooks = ["qolrules.*"]
 why = "Roots has its own rules"
 
 # ---- display ------------------------------------------------------------------------
+# display.modes verified 2026-11-06 (FO-A; display/README.md, "On Fleet Operations:
+# Roots"): its six call sites and FindDisplayMode's checked entry are stock's bytes in the
+# file and in memory after FleetOpsHook has patched; Roots' edits sit beside them (the
+# lookup's width and height tests, the shell's and the intro's requested modes), which
+# display.toml here names.
 
 [[changed]]
 fn = "ST3D_DisplayDevice::FindDisplayMode"
 how = "edit"
-verified = []
+verified = ["display.modes"]
 
 [[changed]]
 fn = "ST3D_GraphicsEngine::SetActiveDisplay_Internal"
 how = "edit"
-verified = []
+verified = ["display.modes"]
 
 [[changed]]
 fn = "WinMain"
@@ -209,12 +214,12 @@ verified = []
 [[changed]]
 fn = "GameConfiguration::InitializeGraphicsSystem"
 how = "runtime"
-verified = []
+verified = ["display.modes"]
 
 [[changed]]
 fn = "Program::PlayIntroMovie"
 how = "runtime"
-verified = []
+verified = ["display.modes"]
 
 [[changed]]
 fn = "RenderLoopAssetLoadStatusUpdate"
