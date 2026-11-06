@@ -450,7 +450,7 @@ patch table:
 | 2 | **The loading screen.** `loading.overlay` and `loading.own` verified beside Roots' load bar and `GameDoOne` edits; `inner_db`, `inner_pixels` down by design; the map and players named through `shell.reads_setup` | profile marks; bench A/B with the UI off. **Built 2026-11-06** (branch `fo-6`): `loading.overlay` and `loading.own` verified (the bytes at our sites are stock's in the file and in memory); on the bench (Roots, 1280x960, Vulkan with validation) the screen is ours edge to edge with Roots' load bar and logo scene under it, and `fo-ui-loading` / `fo-ui-loading-off` are the A/B; decisions 82–84 | 3–6 · 2–4 |
 | 3 | **The mission frame, input, the Refit screen.** `core.mission` verified; the window procedure of both windows measured (class, `GWL_WNDPROC`, which one `GetWindowHandle` gives in the shell and in a mission); if Roots' form calls the two message functions itself, record and capture move to their entries on Roots (decision 71); the hidden flag read from Roots' panel; **the Refit screen as a modal in a mission**, opened by a key of the UI's (decision 62), with the clean-screenshot mode left alone (decision 72). **Built 2026-11-06** (branch `fo-6-step3`): the mission frame verified, input at the two functions' entries on Roots, the hidden flag from the named panel, the render lists logged, the Refit screen by Ctrl+F12, Roots' textures mounted for the loading screen's sky; decisions 85–93, "Step 3: what the bench showed" below | profile, `input.rs`, `engine/ingame.rs`, `menus/refit.rs` outside the host | 8–14 · 3–5 |
 | 4 | **The panels Roots changes least**, each its own row and off on Roots until verified: messages and objectives, the pause and replay boxes, overlay text, chat and trade, the top-right buttons (Roots' five), the resources (Roots' amounts, names from the set), the selection overlay, and the engine's last draws (`fade`, `frame_rate`, `order_ring`, `footprints`; the drag box stays the engine's). Sounds measured under FMOD first | profile marks, a panel at a time | 12–20 · 5–8 |
-| 5 | **Measure the bar, draw nothing.** Log FleetOpsHook's bar on the bench: the buttons per selection (a ship with several weapons of one `classLabel`, the construction ship's build list, a station), the mode in use and its columns and rows, which button the range ring follows and through which of the stock bar's states. Decide from it whether a bar of ours can keep the rings without reading FleetOpsHook's memory (decision 65) | bench and logs only | 4–8 · 2–3 |
+| 5 | **Measure the bar, draw nothing.** Log FleetOpsHook's bar on the bench: the buttons per selection (a ship with several weapons of one `classLabel`, the construction ship's build list, a station), the mode in use and its columns and rows, which button the range ring follows and through which of the stock bar's states. Decide from it whether a bar of ours can keep the rings without reading FleetOpsHook's memory (decision 65). **Measured 2026-11-06** (branch `fo-6-step5`): `bar: measure` and `bar: hover` log lines from the engine's own objects (`engine/palette.rs`, `log_measure`), scenario `fo-ui-bar-measure`; the answer is decisions 94 and 95, "Step 5: the bar measured" below | bench and logs only | 4–8 · 2–3 |
 | 6 | *Optional, when asked*: **the bar**, laid out by the mode's columns (no 5x3 grid; position keys for the first cells only, QOL's in FO-7), then the info panel and the minimap with FleetOpsHook's own objects, the command info bar left to Roots | step 5; Roots developer's view on the look | 25–45 · 10–15 |
 | 7 | *Optional, when asked*: **the menus**: the host's design space taken from the profile's shell (1200x900, not a fixed 800x600), the generic mirror first, specs after; the nine screens that open through FleetOpsHook's import stay Roots' (decision 68) | step 3 | 20–40 · 8–15 |
 | 8 | **Scenarios**: `fo-ui-loading` (a load with `[Loading] Hold`), `fo-ui-mission` (UI frames logged, a click on a panel of ours not reaching the engine), `fo-ui-refit` (a row toggled in the mission modal and kept after a relaunch: the Acceptance row, moved from Options for now), `fo-ui-standdown` (every UI part at 0: Roots as with Display8 and render3d alone, pixel-exact), one `fo-ui-<panel>` per panel of step 4; the stock set unchanged (`ui-runtime`, `ui-hud-bar`, `ui-whole-game` at 1280x720, `--install .`) | step 2 onward | 4–6 · 3 |
@@ -541,6 +541,44 @@ scenario's wording now accepts the map's own streaked sky and the step passes. T
 ring-of-dots step 25 stays `INCONCLUSIVE` in both: the judge is given one shot, and the
 two shots' crops of the ring differ (23 and 29 pixels of 1600), so it turns.
 
+### Step 5: the bar measured (2026-11-06)
+
+Branch `fo-6-step5`, on `fo-6-step3`. With the HUD part off (Roots' defaults), `engine::palette::log_measure`
+runs in the mission frame on a build whose bar array is behind a pointer (`palette_slots_indirect`) and
+logs what the engine's own objects say, writing nothing: `bar: measure` (mode, menu, the columns and rows in
+use and of the floating and the two static modes, the hidden flag, how many of the 64 buttons are shown, the
+palette and the render list's "PopupPalette"), `bar:  slots` (each shown button as slot:kind:name, with a
+command's preferred cell and its state) and `bar: hover` (the button whose hover state is set, its pressed
+state, its rectangle and who owns the pointer). One line per change of the layout (cap 40) or of the hover
+(cap 120), by a signature of the buttons' identities (a command by its name's bytes, a mode by kind and the
+class, weapon or fixed index), not of the objects, which the bar makes anew at each update.
+`fo-ui-bar-measure` (Roots, 1280x960, Vulkan with validation) passes: box selections of the start fleet, the
+bar's buttons hovered and pressed, no panel of ours drawn.
+
+- **The bar object.** `g_pPopupPalette` and the render list's "PopupPalette" are the same object, so decision 64's
+  path and the global agree on Roots. Mode 1, columns and rows 14 by 20 in use and in both static modes.
+- **One row.** The shown buttons sit in slots 0 to n-1 in the order the bar built them and are drawn left to
+  right; a rectangle is local to the palette (`[88k, 0, 88k+87, 87]`). Nothing uses `preferredPosition`.
+- **Per selection** (the start fleet, Federation): the Starbase 10 buttons (recrew, order, transport, build,
+  rally, aiMenu, and four weapons: bastion and the three trades), a construction ship 8 (repair, stop, order,
+  transport, build, form, aiMenu, tractor beam), the Starbase with ships 12 to 13, an escort without a special
+  weapon 6; the construction ship's build list is 9 buildings, cancel and back (11), the Starbase's 4 ships,
+  cancel and back (6), the AI menu 9 commands and back. "Weapon" (kind 2) is FleetOpsHook's whole special
+  list: the station's trades are weapons too.
+- **The rings.** The red circle of the Tractor Beam (range 400) is on screen exactly while the pointer is on
+  that button, and gone on repair, build and the other menus, and on the station's bastion and trades. The
+  button's hover state (`+0x38`, set by the engine's `StandardButton::Simulate` from the pointer and the button's
+  rectangle, whoever owns the pointer) follows the pointer button by button, and so does the pressed state
+  (`+0x30`). The pointer's owner (`CursorInterface`) reads 0 at the mission frame's hook even while a button is
+  hovered, so the owner cannot tell the bar has the pointer there.
+- **Not measured**: a ship with several weapons of one `classLabel`; the floating mode (X is not its toggle on
+  Roots, the third top-right button opens Comms and Alliances, which stops the scenario); a menu over 14.
+- **For step 4** (the panels Roots changes least): each is its own row, off on Roots until verified; the bar
+  stays Roots' while step 6 is not asked. **For step 6** (a bar of ours): a skin per decision 94, laid out by
+  decision 95, never the panel switch's mouse skip for the palette; its first bench draws the skin and
+  confirms the ring and the tooltip stay.
+
+
 ### Defaults taken
 
 | # | Default | Why | What would change it |
@@ -579,6 +617,8 @@ two shots' crops of the ring differ (23 and 29 pixels of 1600), so it turns.
 | 91 | **The UI's file system follows the game** (`ui/src/files.rs`, `GAMES` by the executable's name, as render3d's). Roots' layout mounts `Textures\` with `.tga`, then `.dds`. A map's sky face is read with `a2fmt::image`, either format. Roots' mods (`Data\Mods\<name>`) are not mounted for the UI | step 2's `sky none` was the mount; DDS costs nothing with `a2fmt` | a UI part reading a mod's files |
 | 92 | **A walk over the engine's lists follows only pointers.** Each list and its head is checked with `VirtualQuery`; each node, entry, component and vtable must be an aligned user-range address; a list holding anything else counts as empty. The UI sends no window message from inside a frame (no `GetWindowTextA`) | the first mission frame on Roots faulted in the walk over views 6 to 8 | |
 | 93 | **`fo-ui-standdown` is compared with a reference run.** `fo-ui-standdown-ref` (Display8 and Render3D, no `UI.asi`) records the main menu and the Instant Action setup screen as the baseline `fo-ui-standdown`. The UI run, with every part at 0 (`Loading.Enable=0` and `UI.RefitKey=0` over Roots' defaults), must match with at most 0.05% of pixels more than 4/255 off (the first run differed only at the pointer: 102 and 152 pixels, 0.008% and 0.012%); the match is judged by eye, since a skirmish is not pixel-repeatable | the plan's "pixel-exact" holds where the game itself is repeatable | |
+| 94 | **A bar of ours on Roots keeps the range rings only as a skin of the stock bar**: drawn over the stock buttons' own rectangles (the palette's origin plus each button's rectangle, both the engine's objects), with the stock bar left to simulate and to own the pointer, so the stock button's hover state, which the ring follows, is set by the engine itself and nothing of FleetOpsHook's memory is read. A bar laid out differently (the 5x3 grid, any cell off the stock rectangle) or a palette taken by the panel switch's mouse skip loses the rings. The skin's drawing skip is `RenderAll`'s alone; `RefreshOwner` is not skipped for the palette | the ring is on screen exactly while the pointer is on a weapon button's rectangle and gone on any other button (step 5, `fo-ui-bar-measure`); the hover byte is the engine's `StandardButton::Simulate` result and is set whatever the cursor owner is; the bar of ours was not yet drawn, so the claim is confirmed only for the hover state | the first bench of step 6 (ring with the skin drawn), or Roots changing its ring condition |
+| 95 | **Roots' bar is one row in the mode in use** (mode 1, 14 columns by 20 rows in `use`, `staticA` and `staticB`; the floating 3 by 7 is only the stock field), the shown buttons packed in slot order (`preferredPosition` places nothing), 88 canvas units apart, each rectangle local to the palette's origin. A bar of ours reads the shown buttons in slot order and wraps at `use` columns; the 5x3 plan of the stock bar does not apply. The longest list seen is 11 (a construction ship's buildings, cancel and back); several weapons of one `classLabel`, the floating mode and a list over 14 are **not measured** (no start unit has more than one special weapon, no control for the floating mode was found) | step 5's per-selection table (private notes `fo6-step5.md`); a build list over 14 wraps by `use` columns in the engine, not seen | a ship with several special weapons, or a way to the floating mode, on the bench |
 
 ### Risks and unknowns
 
