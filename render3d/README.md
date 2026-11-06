@@ -2129,7 +2129,7 @@ meshes (the Borg) take the Borg profile and a normal map built from the height m
 `ST3D_CreateNormalMap` builds it, in a tangent frame worked out per pixel. On Fleet
 Operations: Roots nearly every hull is bump-mapped, as a switch to the engine's GPU
 vertex path rather than a look, so the content set (`fleetops`, `hulls.ini`) says
-`ProfileBy = race`: the Borg profile goes to the hulls whose ODF `race` (read through its
+`ProfileBy = race`: the Borg profile goes to the hulls whose ODF `race` (the key is the set's `RaceKey`, default `race`; read through its
 includes, from `ODF.fpq`) is in `ProfileRaces` (`borg`, `freeborg`; `[Hulls] BorgRaces=`
 replaces the list), every other hull takes the hull profile, bump-mapped or not. Roots'
 `*_bump` textures are tangent-space normal maps already (mean about 128, 128, 254;

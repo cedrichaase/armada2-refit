@@ -127,7 +127,9 @@ static OBJ_DRAW_PROBED: core::sync::atomic::AtomicBool = core::sync::atomic::Ato
 /// the step's own loop. True when it is.
 pub fn probe_obj_draw() -> bool {
     use core::sync::atomic::Ordering::Relaxed;
-    if !OBJ_DRAW_PROBED.swap(true, Relaxed) && crate::hooks::Hooks::core().ready(&crate::syms::TABLE, crate::syms::hook::FRAME_OBJ_DRAW) {
+    if !OBJ_DRAW_PROBED.swap(true, Relaxed)
+        && crate::hooks::Hooks::core().present(&crate::syms::TABLE, crate::syms::hook::FRAME_OBJ_DRAW)
+        && crate::hooks::Hooks::core().ready(&crate::syms::TABLE, crate::syms::hook::FRAME_OBJ_DRAW) {
         let site = at(sym::SITE_OBJ_DRAW);
         let to = hook::call_target(site).unwrap_or(0);
         if site != 0 && to != 0 {

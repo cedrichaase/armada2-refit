@@ -1,5 +1,6 @@
 ---
 render3d: minor
+root: patch
 status: Installed, not yet seen in game
 ---
 
@@ -11,3 +12,7 @@ status: Installed, not yet seen in game
 
 ### Changed
 - The Roots profile marks `ConstructionRig::Render`, `Armada_RenderFrame`, `Terrain_Geometry::Render`, `GameObject::RenderInternal`, `GetSensorScramblerWaveLight` and `PlaceholderFeature::sRenderInternal` verified for the core, frame and hulls hooks that use them.
+
+### Fixed
+- A build without the object loop's draw site (stock) no longer logs `render3d.frame.obj_draw stands down`: the hook is asked about with a non-logging `present` before `ready`.
+- hulls: a one-time log line when the instance draw is the current object's but its camera is not the view's; the DDS reader takes at most 4096 x 4096 pixels, and the texture mip chain and normal-map chain allocate fallibly (a texture that does not fit is skipped); the ODF key of the race is the set's `RaceKey` (default `race`).

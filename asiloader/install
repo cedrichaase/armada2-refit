@@ -47,8 +47,14 @@ fi
 [ -f "$SRC" ] || { echo "missing $SRC" >&2; exit 1; }
 ours "$SRC" || { echo "$SRC is not the vendored ASI loader (sha256)" >&2; exit 1; }
 if [ -f "$DLL" ] && ! ours "$DLL"; then
-    # A winmm.dll that is not ours is what stock means from now on.
-    [ -f "$BACKUP" ] || cp -p "$DLL" "$BACKUP"
+    # A winmm.dll that is not ours is what stock means from now on. With a backup already
+    # there it would be the second foreign one: overwriting would lose it, so refuse.
+    if [ -f "$BACKUP" ]; then
+        echo "asiloader: $DLL is not the loader and $BACKUP already holds another winmm.dll;" >&2
+        echo "  refusing to overwrite either. Decide which one is the game's, move the other away, and run this again." >&2
+        exit 1
+    fi
+    cp -p "$DLL" "$BACKUP"
 fi
 cp "$SRC" "$DLL.a2asi-new"
 mv "$DLL.a2asi-new" "$DLL"

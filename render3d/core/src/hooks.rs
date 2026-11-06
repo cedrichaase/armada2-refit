@@ -157,6 +157,14 @@ impl Hooks {
         t.engine().ready(hk).is_ok()
     }
 
+    /// Whether the matched build has every address of `hk` at all (no check, nothing
+    /// logged): for a hook only a child build (Roots) has, asked before `ready` so that
+    /// stock, which never uses it, logs no stand-down for it.
+    pub fn present(&mut self, t: &'static a2engine::Table, hk: a2engine::HookId) -> bool {
+        engine::start_table(self.name, t);
+        t.engine().present(hk)
+    }
+
     /// A hook the owner cannot draw without did not install: it is not switched on.
     pub fn stand_down(&mut self, why: &'static str) {
         if self.down.is_none() {
