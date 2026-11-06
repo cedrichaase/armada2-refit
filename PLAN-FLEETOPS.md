@@ -530,6 +530,17 @@ Esc closes the modal without opening Roots' in-game menu. The rest of the bench 
   Roots does not have. All 181 prefix skies of Roots' maps are TGA, and 10 maps name a cube
   model. With Roots' `Textures\` mounted, `first` shows `env_dark_dust` (decision 91).
 
+**The owed runs (2026-11-06, `fo-6-step3`).** `fo-ui-loading` at 1280x960: every log check
+passes, step 42 included (`loading: standing down` is gone since the loading hooks were
+verified in step 2); the screen is the UI's over Roots' load bar, then Roots' own HUD, no
+Display8 validation message, no crash. Stock `ui-hud-bar` at 1280x720: PASS. Stock
+`ui-loading` at 1280x720: the log checks pass; the vision judge failed step 22 for the
+sky ("a starry nebula sky": Warzone's face, `mbgred`, is a dark field with a bright point
+and radial star streaks, the same as in the run that preceded the Roots work), so the
+scenario's wording now accepts the map's own streaked sky and the step passes. The
+ring-of-dots step 25 stays `INCONCLUSIVE` in both: the judge is given one shot, and the
+two shots' crops of the ring differ (23 and 29 pixels of 1600), so it turns.
+
 ### Defaults taken
 
 | # | Default | Why | What would change it |
@@ -604,6 +615,8 @@ Esc closes the modal without opening Roots' in-game menu. The rest of the bench 
 | `fo-ui-mission` | the UI's mission frame on Roots, input at the message functions' entries, a click on the Refit screen kept from the engine (passes, 2026-11-06) |
 | `fo-ui-refit` | the Refit screen over a mission by Ctrl+F12 (decision 86), a row toggled and kept after a relaunch (passes, 2026-11-06) |
 | `fo-ui-standdown-ref`, `fo-ui-standdown` | every UI part at 0: the shell pixel for pixel as with Display8 and Render3D alone (passes, 0 pixels differ, 2026-11-06) |
+| `fo-ui-loading` | the loading screen of ours over Roots' own, 1280x960 (passes, 2026-11-06: `loading: standing down` not in the log, the hold, then Roots' HUD with no panel of ours; the ring-of-dots step is left to a person, the judge sees one shot, a pixel diff of the ring's crop between the two shots shows it turning) |
+| stock `ui-hud-bar`, `ui-loading` | 1280x720, `--install .` on the step 3 branch: `ui-hud-bar` passes (70 steps); `ui-loading` passes but for the ring step, which the judge cannot see (review; 2026-11-06) |
 | `fo-multiplayer` | two Roots games with the refit's visual plugins join and play past the file check |
 | the stock set | unchanged on stock 1.1: the Roots work must not move a single stock pixel |
 
