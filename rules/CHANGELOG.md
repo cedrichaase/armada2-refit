@@ -4,6 +4,14 @@
 refund on cancel: QOL-7). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 1.1.0 — 2026-11-06
+
+### Changed
+- The engine resolver (`crates/a2engine`, `csdk/a2engine.h`; root 15.8.0) names the executable in its log lines and notes by the matched build's `exe` (`profiles/*/build.toml`), or on an unknown build by the process's own module file name, not by a literal: `engine: Armada2.exe timestamp ...` on Armada II as before. The generated symbol tables carry each build's `exe`.
+- Engine fields and values are the matched build's, filled at start-up (`QOLRULES_F_*`, `QOLRULES_V_*`), no longer compile-time per game; the advisor's topics are looked up per shortfall (`topic_of`) (PLAN-ARCHITECTURE.md, AR-3). `b524e42`
+
+Confirmed in game 2026-11-06.
+
 ## 1.0.3 — 2026-11-04
 
 ### Fixed

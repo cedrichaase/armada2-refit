@@ -5,6 +5,23 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 4.3.0 — 2026-11-06
+
+### Added
+- Scenario `qol-move-queue`: Tab queues on the `warp` scene, flown a run at a time (a point appended while flying, a 3D point then a minimap warp point, Stop and a plain right-click ending a queue, a point for one of two queued ships splitting it) (issue #17). `396bd4f` Confirmed in game 2026-11-06.
+- Scene.asi: `formation <name>[,<name>...] <param>`, SET_FORMATION as the bar's formation buttons give it.
+- Scenario `qol-move-queue`: a group of six destroyers on a three-point queue in two formations, each ship at its own target at every point, and a formation picked mid-queue; `render3d-move-paths`: a group's path drawn once.
+- Scenario `qol-move-queue`: a group with one ship 700 behind: the leaders' next (warp) run goes out while it is still behind, quietly (`acknowledgement left out`). `aeb6b41`
+- `./a2test --game <id>` (or `A2_PROFILE`): the game the bench runs, by its descriptor (`games/<id>.toml`). `bench/config.py` exposes `GAME_ID`, `EXE_NAME`, `EXE_REL`, `SETTINGS_KIND`, `SETTINGS_FILE` and `SHELL_RES`; a session launches and matches processes by the descriptor's executable (in its `data_dir`), and writes the settings file through the `armada-prf` adapter only (another kind is refused until it has one). `a2test syms` defaults to the game's executable and prints the identity line the resolver logs. With no game chosen everything is as before. `b524e42` Confirmed in game 2026-11-06.
+- Scenario `ui-bar-borg-build-icons`: the Assembler's build list shows all thirteen icons (issue #85). `3758bd4`
+
+### Changed
+- Scenario `render3d-move-paths` reworked for the queues drawn for the selected ships only (`QOL_MoveQueue`): five Tab points appended one by one with render3d's count of points ahead following, 0 selected ships on a path while another ship is selected and QOL has cleared nothing, a plain right-click and the bar's Stop clearing the drawing, a go leg then a minimap warp leg (no warp run sent before the go legs end). Waits are on the logs' lines; shots: held, released, deselected, mid-flight, cleared, mixed, go-leg, warp-leg, stopped. `396bd4f` Confirmed in game 2026-11-06.
+
+### Fixed
+- Scenario `engine-syms` expects the symbol counts with the fields and values each table now resolves per build (Display8 34, UI 40, hud 172, QOL 212, Render3D 166 and its modules, overlays 104).
+- Scenario `render3d-build-subset` expects 22 settings rows without hulls (overlays' `MovePaths` row), and its prose counts the core's 11 rows. `b524e42` Confirmed in game 2026-11-06.
+
 ## 4.2.1 — 2026-11-05
 
 ### Fixed
