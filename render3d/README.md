@@ -1772,12 +1772,23 @@ until found (not every frame). The contract, cdecl:
 
     int QOL_MoveQueueVersion(void);   /* 1; any other value: not used */
     int QOL_MoveQueue(const void *ship, float *xyz, int *flags, int cap);
+    int QOL_MoveQueueGroup(const void *ship, float *own, float *pts, int *flags, int cap,
+                           int *queue);       /* optional */
 
 `ship` is the `GameObject`; the call returns -1 when QOL keeps no queues, 0 when the ship
 has none, else the number of points (at most `cap`, 128 here), from the one the ship flies
 to now to the last, as xyz triples; `flags[i]` bit 0 is a warp leg (drawn as any other),
 bit 1 a point of a patrol run that loops back to that run's first point (a run is
-closed back to its first point). The line runs from the ship to point 0 and on. QOL adds
+closed back to its first point). The points are the ship's own targets: QOL spreads a
+group over its formation, so each ship of a queue flies to the queue's point plus its place
+(`qol/README.md`, QOL-10, "A group's targets"). `QOL_MoveQueueGroup` answers the same and
+also the queue's own points (where the group's leader goes, the formation's anchor) and
+which queue. With it, a queue with one selected ship draws that ship's own path; a queue
+with several selected ships draws **the group's path once**, through the queue's points
+with their big dots, and for each ship only its own leg (from the ship to where it heads)
+and a small dot (`TICK`, 0.55 of a point's) at each of its own targets, so six ships do
+not draw six parallel lines. Without it, each ship's own path is drawn. The line runs from
+the ship to point 0 and on. QOL adds
 each Tab-click at once, so with its queue live (the last call answered 0 or more) **no
 sketch is drawn**. Without the export, or when it answers -1, the engine's own path
 (`+0x88` / `+0x12c`, only paths that came from a sketch: an ordinary move is a path of
@@ -1789,7 +1800,7 @@ they were clicked, clear of the grid's lines; depth-tested (a hull in front hide
 not written, blended.
 
 Render3D.log (the first 200 lines): once `overlays: move paths: QOL's queue found
-(version 1)`, or `QOL's queue not found (the engine's paths, and the sketch)` (then looked
+(version 1)` (`(version 1, groups)` with `QOL_MoveQueueGroup`), or `QOL's queue not found (the engine's paths, and the sketch)` (then looked
 for once a second without more lines) or `QOL's queue is version N: not used`; and, when
 one of the counts or the source changes, `overlays: move paths: N selected ship(s) on a
 path, M point(s) ahead (qol|engine|-), sketch K`. `render3d-move-paths` checks it with the

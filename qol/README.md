@@ -657,11 +657,31 @@ from the queue's last point, not by how far the ships are from the point now (a 
 queue's first leg is judged as QOL-8 judges any move). A minimap point keeps the minimap's
 rule: a move there is GO_WARP unless Alt is held (ui/HUD.md, "The minimap").
 
+**A group's targets.** A path order sends every ship it names to the same points, so a
+group flying one bunched up at each point and circled it, every ship trying to sit on the
+same spot. So each ship of a queue has a place in the group, and flies to the point plus
+that place: QOL sends each ship a path order of its own, to its own targets. The places are
+stock's own formation: the formation type the ships move in (the bar's formation buttons),
+that formation's slots, scaled and filled the way stock fills them for a group move, the
+leader (the filled slot of the lowest rank) on the point itself and every other ship at its
+slot's offset from the leader's. The places are fixed when the queue begins, the formation
+facing the first leg, and at every point the formation is turned to face the leg that
+ends there, as stock's formation faces the way it moves. A single ship's place is the point
+itself. When the player picks another formation for the ships of a queue (an order that
+leaves the queue alone), the places are worked out again from where the ships are, facing
+the point they fly to, and the order is sent again from the point each heads to
+(`formation changed`). Ships the formation has no slot for (more ships than slots, or no
+formation readable) keep where they are in the group, turned to the first leg, at most a
+few ship widths from the group's centre and pushed apart to a ship's width. A copy of a
+queue (a split) keeps its ships' places. A ship counts a point reached when its process goes
+past it (or stops at the end of a run), each ship at its own target, so no ship waits on a
+point another ship holds; the group still goes on to its next run together, as before.
+
 **The packet.** `QueueCommand` drops a path order that would not fit its packet
-(`4 x (ships + 3 x points) + 10` above 0x1fc bytes) without a word. An order goes to at most
-40 ships (more get several orders), and a run longer than the packet takes is sent in
-parts: the first `(124 - ships) / 3` points, then the rest when the ships reach the end of
-the part (`next part sent`).
+(`4 x (ships + 3 x points) + 10` above 0x1fc bytes) without a word. Every ship has an order
+of its own (its own targets), so an order carries one ship and at most 40 points, and a run
+longer than that is sent in parts: the first 40 points, then the rest when the ships reach
+the end of the part (`next part sent`).
 
 **Patrol.** A patrol run loops while it is the queue's last run, as stock's patrol does:
 a patrol point appended to it joins the loop, sent again from the point each ship heads to
@@ -732,6 +752,41 @@ argument) and go on to the engine's `DeQueueCommand`; the special attack's `SetC
 its first and last points (the last 32 sent are remembered); any other is a player's and
 ends the queue of each ship it names.
 
+**How stock moves a group (hook `qol.move_paths`, read only).** A plain move of several
+ships is `NetOrderMove`, whose `Execute` calls `FormationManager::Broadcast_Go_Command`
+(0x43b3e0): it takes the mean of the ships' bearings to the point and hands on to
+`Give_Formation_Go_Commands`, which splits the ships into clusters
+(`Find_Clusters_Of_Ships`: ships that move in the same formation type, close together)
+and moves each with `Do_Group_Move`, the clusters set side by side across the heading,
+`FORMATION_SPACING` apart. `Do_Group_Move` takes the cluster's formation from the
+`FormationManager` (`g_FormationManager`, 0x73575c, a table of 16 `Formation *` by type),
+its scale from `Formation::GetScale` (the largest ship's bounding radius, at least 28,
+over the formation's own ship radius; 1 when that radius is not above 0), and fills the
+slots in their order (`Choose_Spot_In_Formation_For_Each_Ship`): each slot, placed about
+the group's centre and turned to the group's heading (`BuildDirectionalMatrix`: right is
+(z, 0, -x) of the heading), takes the nearest ship of the first of its seven ship types
+that has one (`Find_Closest_Craft_To_Location`, the class's type at +0x42c; `?` any,
+`-` ends the list). The leader is the filled slot of the lowest rank. Then
+`Send_Ships_In_Formation` (0x43c410) gives the leader the move to the point itself and
+every other ship FOLLOW of the leader at its slot's offset from the leader's, so the group
+holds the formation while it flies; forming up (`FormFormation`) gives each ship
+FORM_FORMATION to its slot's own point instead. A path order does none of this:
+`NetOrderObjectsWhatPath`'s `DeQueueCommand` gives every ship a copy of the same points.
+The formation type a ship moves in is its craft process's `+0x13c`
+(`CraftProcess::SetFormation`; the constructor's default is 3), from SET_FORMATION, whose
+parameter becomes the type (posted with `DeQueueCommand(SET_FORMATION, 1)` a ship moves
+in the column, 2 the X; seen on the bench). The types are 0
+`Assault Wall` and 1 `Column` (read from `AI/formations/*.frm`), and 2 and 3, built in code
+(`XFormation`, `SheetFormation`, radius -1, so not scaled). A `Formation` keeps its slot
+count at +4, ship radius at +8, slots at +0xc (0x30 bytes each: seven ship types, the ship
+it holds at +0x1c, the offset (right, up, ahead) at +0x20, the rank at +0x2c) and its type
+at +0x10.
+*Use:* `spread` reads the queue's ships' formation type (the commonest among them), the
+formation's slots, radii and ship types, and fills the slots as above, facing the first
+leg; nothing of the formation is written, and the orders sent are stock's path orders, one
+per ship (entries `mq_formations`, `mq_form_types`, `mq_proc_formation`, `mq_frm_*`,
+`mq_slot_*`, `mq_min_radius`, `mq_ent_bounds`, `mq_bounds_radius`, `mq_class_shiptype`).
+
 **Where a ship is on its path.** Each ship has a craft process (`GameObject+0x44`). When
 it takes a new command (`CraftProcess::Handle_New_Command`, 0x430000), a path order's
 `AiPath` moves from the object's next command (`+0x88`) to the process's `+0x88`, the
@@ -772,12 +827,15 @@ order goes out.
 **For render3d.** `QOL_MoveQueueVersion()` (1) and
 `QOL_MoveQueue(ship, xyz, flags, cap)`: for a `GameObject *`, -1 when QOL keeps no queues
 (`PathStartsAtOnce=0` or the hook stood down), 0 when the ship has none, else the number
-of points still ahead of it (at most `cap` written), from the one it heads to now; flag
-bit 0 a warp leg, bit 1 a leg of a patrol that loops back to its run's first point (a
-looping patrol is listed from the point the ship heads to, round the loop). Cheap: no
-allocation, no log.
+of points still ahead of it (at most `cap` written), from the one it heads to now, each
+where this ship goes (its own target); flag bit 0 a warp leg, bit 1 a leg of a patrol
+that loops back to its run's first point (a looping patrol is listed from the point the
+ship heads to, round the loop). `QOL_MoveQueueGroup(ship, own, pts, flags, cap, queue)`
+answers the same, and also the queue's own points (where the leader goes) into `pts` and
+the queue's serial into `*queue`, so that several selected ships of one group can be drawn
+as one path; render3d uses it when it is there. Cheap: no allocation, no log.
 
-**`QOL.log`** (the first 400 lines of the queue):
+**`QOL.log`** (the first 600 lines of the queue):
 - `move queue: new queue K, ships S`
 - `move queue: appended point N (go|warp|patrol), queue K: M point(s), ships S` (M: the
   points still ahead of the group's last ship)
@@ -787,14 +845,27 @@ allocation, no log.
   when it is split
 - `move queue: cleared for N ship(s): stop|move|warp|path|<order>` (`<order>` is
   `AiCommandToName`'s, in lower case: `attack`, `guard`, `special_attack`, ...)
-- `move queue: ship gone, queue K: S ship(s) left`, `move queue: queue K done, S ship(s)`
+- `move queue: queue K spread (new queue|formation changed): formation T, scale X, P ship(s)
+  in slots, L by layout`, then one line per ship: `move queue: queue K ship ID slot S|by
+  layout: right R, up U, ahead A`
+- `move queue: queue K ship ID passed point N, D from its target (x,z)` (D in 3D), and
+  `... at the end of its run, point N, ...`; `, short of it` when a ship went past a point
+  more than 200 from its own target (the engine moves a ship on to its next point about 150
+  short of the one it heads to), `, nearer another ship's` when it stopped nearer another
+  ship's target than its own
+- `move queue: ship gone, queue K: S ship(s) left`, `move queue: queue K done, S ship(s)`,
+  with `, each at its own target at every point` for a group whose ships all were, or
+  `, N time(s) a ship not at its own target`
 - `move queue: minimap point at x,z`, `move queue: key let go, the points are queued already`
 - `move queue: reset (a game was loaded | PathStartsAtOnce off)`, `move queue: simulation
   step T ms` (once), `move queue: an order executed, its path never flown (...)`
 
 **Open.** A network game against a stock player (it is stock's order, so it should simply
-be carried out). Each send is an ordinary order, so each ship acknowledges it by voice,
-once per point. The double-click that throws a sketch away no longer stops the ships. The
+be carried out). Each send is an ordinary order, one per ship, so each ship acknowledges
+it by voice, once per point. Which of the bar's formation buttons gives which type was not
+checked in game (the buttons' ODFs say `param` 1 to 4; on the bench, 1 gave the column).
+A formation's up offsets (the column's and the wall's rows, the X's arms) are kept as stock
+keeps them, so ships of a queue fly at different heights as they do in a stock group move. The double-click that throws a sketch away no longer stops the ships. The
 key itself: it is the `enter_waypoint` binding, so it can be rebound in `Input.map` today;
 issue #26 (key bindings in game) is the place for Shift. A binding there can rebind
 `enter_waypoint`, or point `cOverViewImp+0x30c` (written once per mission by `Init`, at
