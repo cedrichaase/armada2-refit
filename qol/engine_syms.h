@@ -1564,7 +1564,6 @@ static const A2EEntry qol_b1_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 8, 0, 0, ""}, /* rs_vt_can_place */
 };
 static const A2EBlock qol_b1_blocked[] = {
-    {1, "cOverViewImp::mCheckGroupSelect", "is changed by fo-roots-5.0Z11 (not yet verified)", "Stands down: cOverViewImp::mCheckGroupSelect is changed by fo-roots-5.0Z11, not yet verified"},
     {2, "cOverViewImp::mCheckGroupSelect", "is changed by fo-roots-5.0Z11 (not yet verified)", "Stands down: cOverViewImp::mCheckGroupSelect is changed by fo-roots-5.0Z11, not yet verified"},
     {3, "PopupPaletteImp::mQueueSpecialWeaponCommand", "is changed by fo-roots-5.0Z11 (not yet verified)", "Stands down: PopupPaletteImp::mQueueSpecialWeaponCommand is changed by fo-roots-5.0Z11, not yet verified"},
     {4, "Producer::FinishBuild", "is changed by fo-roots-5.0Z11 (not yet verified)", "Stands down: Producer::FinishBuild is changed by fo-roots-5.0Z11, not yet verified"},
@@ -1584,11 +1583,12 @@ static const A2EModule qol_b1_mods[] = {
 };
 static const A2EBlock qol_b1_blocked_mod[] = {
     {0, "RTS_Configure", "is patched by FleetOpsHook.dll, which is not the profiled one", "Stands down: RTS_Configure is patched by FleetOpsHook.dll, which is not the profiled one"},
+    {1, "cOverViewImp::mBindGroup", "is patched by FleetOpsHook.dll, which is not the profiled one", "Stands down: cOverViewImp::mBindGroup is patched by FleetOpsHook.dll, which is not the profiled one"},
     {0xffff, 0, 0, 0}
 };
 static const A2EBuild qol_builds[] = {
     {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qol_b0_entries, qol_b0_blocked, 0, 215, qol_b0_fcrc, 0, qol_b0_mods, 0, qol_b0_blocked_mod, 0, 215},
-    {"fo-roots-5.0Z11", "armada2/fo-roots-5.0Z11", "ArmadaL.exe", 0x3c4c76bd, 0x405000, 0xca07c55a, 0x400000, qol_b1_entries, qol_b1_blocked, 7, 8, qol_b1_fcrc, 2, qol_b1_mods, 1, qol_b1_blocked_mod, 1, 6},
+    {"fo-roots-5.0Z11", "armada2/fo-roots-5.0Z11", "ArmadaL.exe", 0x3c4c76bd, 0x405000, 0xca07c55a, 0x400000, qol_b1_entries, qol_b1_blocked, 6, 18, qol_b1_fcrc, 2, qol_b1_mods, 1, qol_b1_blocked_mod, 2, 6},
 };
 
 static A2E_U8 qol_hook_state[9];

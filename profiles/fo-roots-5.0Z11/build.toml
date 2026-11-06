@@ -47,6 +47,14 @@ note = "Fleet Operations: Roots 5.0Z11 (23 October 2026), Data/ArmadaL.exe as in
 hooks = ["qolrules.*"]
 why = "Roots has its own rules"
 
+# FleetOpsHook already moves the selection into the overview object it enlarges (an array of its
+# own at +0x3d0, a cap of 30 in its own Select, a group cap of 30 in mBindGroup) and replaces the
+# special-weapon button's gathering with code of its own; QOL's array and buffers would sit beside
+# an array whose readers are FleetOpsHook's, which QOL cannot re-point (FO-7 round two, decision 109).
+[[disable]]
+hooks = ["qol.selection", "qol.special_select"]
+why = "Roots holds its own selection of 30 in an array of its own"
+
 # ---- display ------------------------------------------------------------------------
 # display.modes verified 2026-11-06 (FO-A; display/README.md, "On Fleet Operations:
 # Roots"): its six call sites and FindDisplayMode's checked entry are stock's bytes in the
@@ -192,10 +200,17 @@ verified = []
 
 # ---- qol ------------------------------------------------------------------------------
 
+# Roots' file jumps out of the function at +0xde (before the loop over the ten group keys)
+# into its own code, which takes the Alt+number case whole (select the group, centre on a
+# second tap) and returns; with Alt not held it comes back to the stock instruction. Every
+# site qol.shift_group uses (the Control test at +0x18a, the centre test, the three
+# continue points) lies on the stock path, and its bytes are stock's in the file and in
+# memory after FleetOpsHook has patched (FO-7 round two, decision 108). The
+# selection-array sites in the same function are Roots' (0x3d0), so qol.selection stays unverified.
 [[changed]]
 fn = "cOverViewImp::mCheckGroupSelect"
 how = "detour"
-verified = []
+verified = ["qol.shift_group"]
 
 [[changed]]
 fn = "cOverViewImp::mProcessKeyboardInput"
@@ -555,10 +570,12 @@ fn = "cOverViewImp::SwapLists"
 how = "runtime"
 verified = []
 
+# FleetOpsHook moves the selection to its own array and raises the group's cap in memory; the
+# entry and the arguments are stock's, and qol.shift_group only calls it (FO-7 round two).
 [[changed]]
 fn = "cOverViewImp::mBindGroup"
 how = "runtime"
-verified = []
+verified = ["qol.shift_group"]
 
 [[changed]]
 fn = "cOverViewImp::mClearFromGroup"
