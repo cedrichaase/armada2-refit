@@ -183,6 +183,63 @@ pub const BUILDS: &[a2engine::Build] = &[
         blocked: &[
         ],
     },
+    a2engine::Build {
+        name: "fo-roots-5.0Z11",
+        key: "armada2/fo-roots-5.0Z11",
+        exe: "ArmadaL.exe",
+        timestamp: 0x3c4c76bd,
+        image_size: 0x405000,
+        sections: 0xca07c55a,
+        image_base: 0x400000,
+        n_resolved: 35,
+        content: "stock",
+        entries: &[
+            a2engine::Entry { present: true, addr: 0x7ad508, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_storm3d
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 192 }, // core_storm3d_device_index
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 204 }, // core_storm3d_devices
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 144 }, // core_dx8_d3d8_device
+            a2engine::Entry { present: true, addr: 0x51d3c0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_chat_render
+            a2engine::Entry { present: true, addr: 0x598a16, end: 0x0, target: 0x4, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_site_chat
+            a2engine::Entry { present: true, addr: 0x621a90, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_trifan_flush
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 228 }, // core_dx8_trifan
+            a2engine::Entry { present: true, addr: 0x76397e, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_ship_display_hidden
+            a2engine::Entry { present: true, addr: 0x6bc6ac, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_dx8_vtable
+            a2engine::Entry { present: true, addr: 0x624630, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_refresh_display
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xa, vtable: 0x9, index: 26, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_slot_refresh
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 96 }, // core_dx8_cursor
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 224 }, // core_dx8_synchronous
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // core_element_name
+            a2engine::Entry { present: true, addr: 0x63ada0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_draw_scaled_2d
+            a2engine::Entry { present: true, addr: 0x6246fa, end: 0x0, target: 0xf, vtable: 0xffff, index: 0, chain: true, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_site_cursor_draw
+            a2engine::Entry { present: true, addr: 0x7ad6e8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_scale_2d
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 48 }, // core_sprite_origin_x
+            a2engine::Entry { present: true, addr: 0x625dd9, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xd8, 0x4e, 0x18], mask: &[], section: "", count: 0, value: 0 }, // core_site_hw_scale
+            a2engine::Entry { present: true, addr: 0x4638af, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xff, 0x15, 0xa0, 0x82, 0x7b, 0x00], mask: &[], section: "", count: 0, value: 0 }, // core_bink_copy_site
+            a2engine::Entry { present: true, addr: 0x7b82a0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_bink_copy_import
+            a2engine::Entry { present: true, addr: 0x4dd670, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_process_keys
+            a2engine::Entry { present: true, addr: 0x488869, end: 0x0, target: 0x16, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_site_keys
+            a2engine::Entry { present: true, addr: 0x4dd709, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xff, 0x15, 0xd4, 0x81, 0x7b, 0x00], mask: &[], section: "", count: 0, value: 0 }, // core_site_keys_peek
+            a2engine::Entry { present: true, addr: 0x4de250, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_process_mouse
+            a2engine::Entry { present: true, addr: 0x488952, end: 0x0, target: 0x19, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_site_mouse
+            a2engine::Entry { present: true, addr: 0x4de260, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x1d, 0xd4, 0x81, 0x7b, 0x00], mask: &[], section: "", count: 0, value: 0 }, // core_site_mouse_peek
+            a2engine::Entry { present: true, addr: 0x62bc70, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_get_window_handle
+            a2engine::Entry { present: true, addr: 0x624760, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_destroy_render_surfaces
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x1d, vtable: 0x9, index: 28, chain: true, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_slot_destroy
+            a2engine::Entry { present: true, addr: 0x763308, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_mouse_buttons
+            a2engine::Entry { present: true, addr: 0x763350, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_mouse_held
+            a2engine::Entry { present: true, addr: 0x7b7c58, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_imp_ss_ctor
+            a2engine::Entry { present: true, addr: 0x7b7db0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_imp_ss_str
+            a2engine::Entry { present: true, addr: 0x7b7ea8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_imp_ss_dtor
+            a2engine::Entry { present: true, addr: 0x7b7dc0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_imp_str_dtor
+            a2engine::Entry { present: true, addr: 0x7b0fc8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_sim_time
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // core_sprite_uv
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 88 }, // core_sprite_texture
+        ],
+        blocked: &[
+            a2engine::Block { hook: 1, symbol: "ChatDisplay::Render", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ChatDisplay::Render is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 4, symbol: "ST3D_DeviceDirectX8::SetCursor", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ST3D_DeviceDirectX8::SetCursor is changed by fo-roots-5.0Z11, not yet verified" },
+        ],
+    },
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 13] = [const { core::sync::atomic::AtomicU64::new(0) }; 13];

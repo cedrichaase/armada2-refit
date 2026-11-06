@@ -95,8 +95,37 @@ static const A2EEntry online_b0_entries[] = {
 static const A2EBlock online_b0_blocked[] = {
     {0xffff, 0, 0, 0}
 };
+static const A2E_U8 online_b1_c0[] = {0x55, 0x8b, 0xec, 0xa0, 0x68, 0x13, 0x76, 0x00};
+static const A2E_U8 online_b1_c1[] = {0x8b, 0x5d, 0x14, 0x8b, 0x0d, 0xa0, 0x30, 0x7a, 0x00};
+static const A2E_U8 online_b1_c2[] = {0x8b, 0xfb, 0x81, 0xe3, 0xff, 0xff, 0x00, 0x00};
+static const A2E_U8 online_b1_c4[] = {0xa1, 0x00, 0x2d, 0x7a, 0x00, 0x8b, 0x4d, 0x08};
+static const A2E_U8 online_b1_c5[] = {0x8b, 0x4d, 0x08, 0x51, 0xe8, 0x21, 0x6b, 0xff, 0xff};
+static const A2E_U8 online_b1_c6[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0xc6, 0x41, 0x04, 0x00};
+static const A2E_U8 online_b1_c7[] = {0x55, 0x8b, 0xec, 0x81, 0xec, 0x00, 0x04, 0x00, 0x00, 0x8b, 0x4d, 0x0c};
+static const A2E_U8 online_b1_c10[] = {0xb9, 0x50, 0xdf, 0x79, 0x00, 0xe8, 0x94, 0x68, 0xff, 0xff};
+static const A2E_U8 online_b1_c11[] = {0xb9, 0x38, 0xb8, 0x79, 0x00, 0xe8, 0xf1, 0x44, 0xfe, 0xff};
+static const A2EEntry online_b1_entries[] = {
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d9a30, 0x0, 0, online_b1_c0, 0, ""}, /* read_label */
+    {1, 0, 0xffff, 0xffff, 0, 0, 9, 0x5bfd01, 0x0, 0, online_b1_c1, 0, ""}, /* click */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x5bfd0a, 0x0, 0, online_b1_c2, 0, ""}, /* click_back */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x7a30a0, 0x0, 0, 0, 0, ""}, /* click_object */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x5bff9b, 0x0, 0, online_b1_c4, 0, ""}, /* ipx_pressed */
+    {1, 0, 0xffff, 0xffff, 0, 0, 9, 0x5c00b6, 0x0, 0, online_b1_c5, 0, ""}, /* manual_dialog */
+    {1, 0, 0xffff, 0xffff, 0, 0, 10, 0x5a9890, 0x0, 0, online_b1_c6, 0, ""}, /* chat_init */
+    {1, 0, 0xffff, 0xffff, 0, 0, 12, 0x5a98b0, 0x0, 0, online_b1_c7, 0, ""}, /* chat_append */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x79df50, 0x0, 0, 0, 0, ""}, /* chat_room */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x79b838, 0x0, 0, 0, 0, ""}, /* chat_game */
+    {1, 0, 0xffff, 0xffff, 0, 0, 10, 0x5b2ff2, 0x0, 0, online_b1_c10, 0, ""}, /* room_init */
+    {1, 0, 0xffff, 0xffff, 0, 0, 10, 0x5c5395, 0x0, 0, online_b1_c11, 0, ""}, /* game_init */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 10004, 0, 0, ""}, /* chat_hwnd */
+};
+static const A2EBlock online_b1_blocked[] = {
+    {0, "InternetGameDlgProc", "is changed by fo-roots-5.0Z11 (not yet verified)", "Stands down: InternetGameDlgProc is changed by fo-roots-5.0Z11, not yet verified"},
+    {0xffff, 0, 0, 0}
+};
 static const A2EBuild online_builds[] = {
     {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, online_b0_entries, online_b0_blocked, 0, 13},
+    {"fo-roots-5.0Z11", "armada2/fo-roots-5.0Z11", "ArmadaL.exe", 0x3c4c76bd, 0x405000, 0xca07c55a, 0x400000, online_b1_entries, online_b1_blocked, 1, 0},
 };
 
 static A2E_U8 online_hook_state[1];
@@ -106,7 +135,7 @@ static char online_notes[1][A2E_NOTE_MAX + 1];
 
 static const A2ETable ONLINE_ENGINE = {
     "armada2", "online",
-    online_syms, 13, online_hooks, 1, online_builds, 1, 0,
+    online_syms, 13, online_hooks, 1, online_builds, 2, 0,
     online_vars, online_hook_state, online_sym_flags, online_sym_addr, online_notes
 };
 

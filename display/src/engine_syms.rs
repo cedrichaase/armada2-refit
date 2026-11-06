@@ -147,6 +147,58 @@ pub const BUILDS: &[a2engine::Build] = &[
         blocked: &[
         ],
     },
+    a2engine::Build {
+        name: "fo-roots-5.0Z11",
+        key: "armada2/fo-roots-5.0Z11",
+        exe: "ArmadaL.exe",
+        timestamp: 0x3c4c76bd,
+        image_size: 0x405000,
+        sections: 0xca07c55a,
+        image_base: 0x400000,
+        n_resolved: 2,
+        content: "",
+        entries: &[
+            a2engine::Entry { present: true, addr: 0x626bf0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x51, 0x14, 0x53, 0x56, 0x57, 0x8b, 0x0a, 0x3b, 0xca], mask: &[], section: "", count: 0, value: 0 }, // find_display_mode
+            a2engine::Entry { present: true, addr: 0x62c4e0, end: 0x0, target: 0x0, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shell_display_find
+            a2engine::Entry { present: true, addr: 0x62c643, end: 0x0, target: 0x0, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // failed_display_find
+            a2engine::Entry { present: true, addr: 0x53e7c9, end: 0x0, target: 0x0, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // game_mode_find
+            a2engine::Entry { present: true, addr: 0x53e7e7, end: 0x0, target: 0x0, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // game_mode_find_again
+            a2engine::Entry { present: true, addr: 0x4861da, end: 0x0, target: 0x0, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // intro_mode_find
+            a2engine::Entry { present: true, addr: 0x4861f2, end: 0x0, target: 0x0, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // intro_mode_find_again
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 800 }, // front_end_width
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 600 }, // front_end_height
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // front_end_depth
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 640 }, // intro_width
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 480 }, // intro_height
+            a2engine::Entry { present: true, addr: 0x53e420, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // init_graphics
+            a2engine::Entry { present: true, addr: 0x484169, end: 0x0, target: 0xc, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_init_graphics
+            a2engine::Entry { present: true, addr: 0x76b5ac, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // user_profile
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 80 }, // profile_mode_w
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 84 }, // profile_mode_h
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 88 }, // profile_mode_bpp
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 800 }, // default_mode_w
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 600 }, // default_mode_h
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1024 }, // gog_mode_w
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 768 }, // gog_mode_h
+            a2engine::Entry { present: true, addr: 0x763308, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // mouse_buttons
+            a2engine::Entry { present: true, addr: 0x763350, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // mouse_held
+            a2engine::Entry { present: true, addr: 0x598ba0, end: 0x598ff0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // loading_status
+            a2engine::Entry { present: true, addr: 0x591340, end: 0x592a70, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // credits
+            a2engine::Entry { present: true, addr: 0x624630, end: 0x624750, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // refresh_display
+            a2engine::Entry { present: true, addr: 0x648af0, end: 0x648c30, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // submit_vb
+            a2engine::Entry { present: true, addr: 0x648520, end: 0x6485d0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // submit_non_vb
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 20 }, // dev_modes
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // mode_node_value
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // mode_width
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // mode_height
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // mode_bpp
+        ],
+        blocked: &[
+            a2engine::Block { hook: 0, symbol: "ST3D_DisplayDevice::FindDisplayMode", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ST3D_DisplayDevice::FindDisplayMode is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 1, symbol: "RenderLoopAssetLoadStatusUpdate", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: RenderLoopAssetLoadStatusUpdate is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 2, symbol: "GameConfiguration::InitializeGraphicsSystem", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: GameConfiguration::InitializeGraphicsSystem is changed by fo-roots-5.0Z11, not yet verified" },
+        ],
+    },
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 4] = [const { core::sync::atomic::AtomicU64::new(0) }; 4];

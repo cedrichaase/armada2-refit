@@ -30,7 +30,9 @@ with each file's `out` resolved against DIR (the selftest's fixtures do).
     `const X: usize = 0x..`; a line that parses the module's own PE header says
     `PE header`, and a literal that is no offset says `not an offset`. `hud/`, `grid/` and
     `menus/` are skipped (no profile; superseded by UI.asi).
- 5. Inheritance and marks: a child overrides only what its ancestors have (same kind) or adds
+ 5. Inheritance and marks: a child may set a `fn`'s `check` to "" (a callee another module
+    takes over at run time, which our hooks only call: no check there in that build); a
+    child overrides only what its ancestors have (same kind) or adds
     complete entries; marks only in an inheriting build; every [[changed]] `fn` matches an
     entry (as `symbol` or `in`) of that build; every `verified` and `disable` glob matches a
     hook of the game. A child may move a field or change a value (any `lang`): fields and
@@ -321,6 +323,10 @@ def lint_entry(gs, fname, b, sid, e, w, ents, R):
     if 'in' in e and not isstr(e['in']):
         R.add(where, 'in must be the enclosing function\'s map name')
     for k in ('check', 'pattern'):
+        if k == 'check' and e.get(k) == '' and kind == 'fn' and b.parent is not None:
+            # An inheriting build may drop a callee's check: another module took the
+            # function over at run time (Roots' FleetOpsHook) and our hooks only call it.
+            continue
         if k in e:
             try:
                 bts, _ = hexbytes(e[k], where, pattern=(k == 'pattern'))

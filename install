@@ -78,7 +78,9 @@ echo "== layers: $(python3 "$layers" --resolve "${sel[@]}" | tr '\n' ' ')"
 # per-part plugins, the file-based HUD fixes, the vkBasalt bloom): retire/retire.sh.
 # --chain also takes out the d3d8to9 and DXVK files of the chain Display8 no longer stands
 # on and a dxvk.conf we wrote (its sampler values go into Display8.ini first).
-retire() { bash "$here/retire/retire.sh" --chain "$A2_GAME"; }
+# Its tables are Armada II's: another game (Roots) has nothing of the kind to take out, and
+# its d3d9.dll is a DXVK that retire.sh would recognise as the old chain's.
+retire() { if [ "$A2_PROFILE" = armada2 ]; then bash "$here/retire/retire.sh" --chain "$A2_GAME"; fi; }
 
 # Display8 is built before anything is retired: the retire step takes out the d3d8_real.dll
 # an older Display8 stood in front of, so a build that failed after it would leave that
@@ -98,4 +100,4 @@ done 3<<<"$plan"
 
 # A settings row that took over another file's key (moved_from) gets a player's value
 # for the old key (tools/settings/README.md, "Moved keys"); nothing to do without one.
-python3 "$here/tools/settings/move-keys.py" "$A2_GAME"
+if [ "$A2_PROFILE" = armada2 ]; then python3 "$here/tools/settings/move-keys.py" "$A2_GAME"; fi

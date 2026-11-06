@@ -1,14 +1,20 @@
 # Star Trek: Armada II -- Fleet Operations: Roots, installed through Heroic
-# (PLAN-FLEETOPS.md). A stub: not offered yet, so ./install refuses it, but every tool
-# resolves its paths (A2_PROFILE=fo-roots, or --game fo-roots). FO-1 fills it in.
+# (PLAN-FLEETOPS.md). Not offered to players (the release and the GUI installer leave it
+# out), but `installable`: ./install and a2mod work on it for the bench and the
+# maintainer's own clones, with the layers listed below (FO-4: Display8 alone). FO-1 filled in what the bench measured of the shipped game (the install,
+# Heroic's entry and prefix, Settings.xml, its logs); `./a2test --game fo-roots` runs it.
 schema = 1
 id = "fo-roots"
 label = "Fleet Operations: Roots"
 offered = false
+installable = true
 default = false
 
-# The layers on offer: none yet. PLAN-FLEETOPS.md, "What is installed on Roots", says which come first.
-layers = []
+# The layers ./install puts in: Display8 alone (FO-4; PLAN-FLEETOPS.md, "What runs on
+# Roots", says which come next). It goes into Data/ in place of DxWrapper's d3d8.dll,
+# which is backed up; no platform layer (Roots has no ASI loader and no widescreen patch of
+# ours). A clone with no layers is the game as shipped.
+layers = ["display"]
 
 [exe]
 # The game itself in Data/, under a launcher (FleetOps.exe) that only starts it; the
@@ -17,20 +23,33 @@ names = ["ArmadaL.exe"]
 data_dir = "Data"
 
 [install]
-# A sideloaded Heroic app; no GOG id.
+# A sideloaded Heroic app (GamesConfig/fleetopsroots50.json; Proton-CachyOS, WINEDLLOVERRIDES
+# winmm=n,b;d3d8=n,b;d3d9=n,b, PROTON_USE_WOW64=1); no GOG id.
 heroic = ["fleetopsroots50"]
 gog = []
-# The folder name is assumed to follow the prefix's; set A2_GAME if it does not.
+# Both folders are named so under ~/Games/Heroic and ~/Games/Heroic/Prefixes (seen on the
+# install FO-0 ran; set A2_GAME / A2_PREFIX if yours differ).
 folder = "Star Trek Armada II Fleet Operations Roots"
 prefix = "Star Trek Armada II Fleet Operations Roots"
 
 [settings]
 kind = "fo-settings-xml"
-# Relative to data_dir, as in armada2; where Roots keeps it against Data/ is FO-0's to see.
+# Relative to data_dir: Data/settings_saves_logs/Settings.xml, written by the game's first
+# run (displayWidth, displayHeight, WindowMode, multisample, IntroVideo, ...; 0 x 0 is the
+# desktop's mode). The bench's adapter edits those keys in its clone.
 file = "settings_saves_logs/Settings.xml"
 keep = ["settings_saves_logs/Settings.xml", "RTS_CFG.h"]
 
+[logs]
+# Roots writes no log of its own beyond its crash handler (madExcept 4): a crash leaves
+# settings_saves_logs/Logs/exceptArmada2.txt, written with a dialog the process stays under.
+crash = "settings_saves_logs/Logs/exceptArmada2.txt"
+dirs = ["settings_saves_logs/Logs"]
+
 [display]
+# The engine asks for this mode and the output must offer it: on a 1280x720 headless
+# output Roots dies one second in (null display mode in SetActiveDisplay_Internal), so the
+# bench refuses a smaller output. 1280x960 is the cheapest 4:3 bench size above it.
 shell = [1200, 900]
 # Stock's until FO-6 measures Roots' own HUD.
 hud_canvas = [1600, 1200]
