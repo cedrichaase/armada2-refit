@@ -82,7 +82,7 @@ pub mod dialogs {
 
 /// FleetOpsHook's front-end forms on Roots (`engine/forms.rs`, FO-6 step 7, option C).
 pub mod forms {
-    pub use crate::engine::forms::{active, install_probe, press, snapshot, Control};
+    pub use crate::engine::forms::{act, active, design, install, picture, press, probe, view, Action, Control, Form, Kind, MOUSE_DOWN, MOUSE_MOVE, MOUSE_UP};
 }
 
 pub mod hud {

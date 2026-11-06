@@ -43,6 +43,8 @@ pub mod syms_core;
 #[rustfmt::skip]
 pub mod syms_dialogs;
 #[rustfmt::skip]
+pub mod syms_forms;
+#[rustfmt::skip]
 pub mod syms_hud;
 #[rustfmt::skip]
 pub mod syms_info;
@@ -114,9 +116,10 @@ fn startup() {
     // The menus: [Menus] Enable=1 hosts the stock shell's dialogs (ui/MENUS.md). Patched
     // here, at DllMain, because the shell's display mode must be raised before the
     // engine first sets it.
-    // Roots' forms (FO-6 step 7, option C): the probe of step 0, on the bench only.
-    if config::get().menus_forms == 2 {
-        engine::api::forms::install_probe();
+    // Roots' forms (FO-6 step 7, option C; MENUS.md, "Roots' forms"): FleetOpsHook's
+    // front-end forms drawn by the UI (1), or the bench's probe of step 0 (2).
+    if config::get().menus_forms != 0 {
+        engine::api::forms::install(config::get().menus_forms);
     }
     if config::get().menus {
         log!("menus: {}", if engine::api::dialogs::install() { "hosted by the UI" } else { "standing down: the shell runs stock" });

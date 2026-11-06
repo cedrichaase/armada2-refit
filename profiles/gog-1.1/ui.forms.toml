@@ -1,0 +1,150 @@
+# UI.asi's symbols for part "forms" (engine/forms.rs): Fleet Operations: Roots' front-end
+# forms, FleetOpsHook.dll's VCL objects read by the UI (PLAN-FLEETOPS.md, FO-6 step 7,
+# option C). Armada II has no forms: `forms_present` is 0 here and the part stands down.
+# The fields are the VCL's own (Delphi 2007, as FleetOpsHook links it), not Armada2.exe's:
+# they sit in this base profile only so every build that inherits it shares one table, and
+# are read only where a build sets `forms_present` (profiles/fo-roots-5.0Z11/ui.forms.toml).
+# `tools/engine/fo-forms.py` checks a new FleetOpsHook against them (decision 147). The
+# findings are in ui/MENUS.md, "Roots' forms".
+schema = 1
+plugin = "ui"
+readme = "ui/MENUS.md"
+lang = "rust"
+out = "ui/src/syms_forms.rs"
+
+[hook."forms.vcl"]
+doc = "FleetOpsHook's front-end forms read through the VCL's objects, found by their windows"
+
+[[sym]]
+id = "forms_present"
+symbol = "FleetOpsHook.dll"
+kind = "value"
+value = 0
+used_by = ["forms.vcl"]
+
+# The design space the forms are laid out in: the full-screen forms' client size (0: none).
+[[sym]]
+id = "forms_design_width"
+symbol = "FleetOpsHook.dll"
+kind = "value"
+value = 0
+unit = "px"
+used_by = ["forms.vcl"]
+
+[[sym]]
+id = "forms_design_height"
+symbol = "FleetOpsHook.dll"
+kind = "value"
+value = 0
+unit = "px"
+used_by = ["forms.vcl"]
+
+# TComponent: Name: a counted string
+[[sym]]
+id = "forms_comp_name"
+symbol = "TComponent"
+kind = "field"
+struct = "TComponent"
+offset = 0x8
+type = "ptr"
+used_by = ["forms.vcl"]
+
+# TComponent: the components it owns: a list
+[[sym]]
+id = "forms_comp_components"
+symbol = "TComponent"
+kind = "field"
+struct = "TComponent"
+offset = 0x10
+type = "ptr"
+used_by = ["forms.vcl"]
+
+# TList: its items
+[[sym]]
+id = "forms_list_items"
+symbol = "TList"
+kind = "field"
+struct = "TList"
+offset = 0x4
+type = "ptr"
+used_by = ["forms.vcl"]
+
+# TList: its count
+[[sym]]
+id = "forms_list_count"
+symbol = "TList"
+kind = "field"
+struct = "TList"
+offset = 0x8
+type = "u32"
+used_by = ["forms.vcl"]
+
+# TControl: Left, then Top, Width and Height: the rectangle in its parent
+[[sym]]
+id = "forms_ctl_left"
+symbol = "TControl"
+kind = "field"
+struct = "TControl"
+offset = 0x40
+type = "u32"
+used_by = ["forms.vcl"]
+
+# TControl: Visible
+[[sym]]
+id = "forms_ctl_visible"
+symbol = "TControl"
+kind = "field"
+struct = "TControl"
+offset = 0x57
+type = "u8"
+used_by = ["forms.vcl"]
+
+# TControl: Enabled
+[[sym]]
+id = "forms_ctl_enabled"
+symbol = "TControl"
+kind = "field"
+struct = "TControl"
+offset = 0x58
+type = "u8"
+used_by = ["forms.vcl"]
+
+# TControl: its text: a C string, null when empty
+[[sym]]
+id = "forms_ctl_text"
+symbol = "TControl"
+kind = "field"
+struct = "TControl"
+offset = 0x64
+type = "ptr"
+used_by = ["forms.vcl"]
+
+# TWinControl: its window
+[[sym]]
+id = "forms_win_handle"
+symbol = "TWinControl"
+kind = "field"
+struct = "TWinControl"
+offset = 0x1b4
+type = "ptr"
+used_by = ["forms.vcl"]
+
+# TCustomForm: FormState (fsModal is bit 3)
+[[sym]]
+id = "forms_form_state"
+symbol = "TCustomForm"
+kind = "field"
+struct = "TCustomForm"
+offset = 0x358
+type = "u8"
+used_by = ["forms.vcl"]
+
+# TComponent: ComponentState (csDestroying is bit 3)
+[[sym]]
+id = "forms_comp_state"
+symbol = "TComponent"
+kind = "field"
+struct = "TComponent"
+offset = 0x1c
+type = "u8"
+used_by = ["forms.vcl"]

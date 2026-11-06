@@ -80,7 +80,7 @@ unsafe extern "thiscall" fn chat_render(chat: usize) {
     surface::frame(Context::Mission);
     super::closeup::end_frame();
     // The frame as it stands, kept for the in-mission menus to draw over.
-    if crate::config::get().menus {
+    if crate::config::get().menus || crate::config::get().menus_forms != 0 {
         crate::menus::backdrop::keep_mission_frame();
     }
 }

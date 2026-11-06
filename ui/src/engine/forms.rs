@@ -1,59 +1,85 @@
-//! Fleet Operations: Roots' front-end forms (PLAN-FLEETOPS.md, FO-6 step 7, option C).
+//! Fleet Operations: Roots' front-end forms (PLAN-FLEETOPS.md, FO-6 step 7, option C;
+//! ui/MENUS.md, "Roots' forms").
 //!
-//! On Roots the main menu, Options and six more screens are not the executable's dialogs
-//! but VCL forms of `FleetOpsHook.dll` (a Delphi library): owned pop-ups over the engine's
-//! device window, each created when its screen opens, shown modal and freed when it
-//! closes. Their buttons are graphic controls with no window of their own. This file
-//! finds such a form by its window, reads its object through the property the VCL sets
-//! on every window it makes, and reads the form's components from the live objects; it
-//! writes nothing of FleetOpsHook's and patches none of its code (decisions 141-146).
+//! On Roots the main menu, Options (the in-mission menu too) and six more screens are not
+//! the executable's dialogs but VCL forms of `FleetOpsHook.dll` (a Delphi library): owned
+//! pop-ups over the engine's device window, each created when its screen opens, shown
+//! modal and freed when it closes. Their buttons are graphic controls with no window of
+//! their own. The UI:
 //!
-//! **Step 0, the probe** (`[Menus] Forms=probe`, the test bench only): a thread CBT hook
-//! sees each form activate; the form gets an empty window region (Roots' drawing hidden);
-//! a thread timer of ours, dispatched by the form's own modal loop, presents a plain frame
-//! of ours on the engine's device with the controls read; on a fixed walk it posts one
-//! press per screen (main menu -> Options -> Graphics -> Back -> Back -> Instant Action)
-//! and changes one combo box through its window. Everything it learns goes to UI.log as
-//! `forms:` lines.
+//! - **finds a form** by its window: a thread CBT hook on the game's thread sees each window
+//!   activate; the form's object comes from the property the VCL sets on every window it
+//!   makes (named for the library's module and its thread), and counts only when its class
+//!   lies in FleetOpsHook's image and is named as the window's class (decision 142);
+//! - **reads its controls** from the live objects, by the VCL's own fields (the profile's
+//!   `forms_*` fields, `profiles/gog-1.1/ui.forms.toml`), every pointer checked, only on
+//!   the game thread, only while the form is modal and not being destroyed, and keeps
+//!   nothing but plain copies (decision 143);
+//! - **hides the form** by moving it off screen (an empty region alone leaves a black
+//!   rectangle on Wine under XWayland: decision 170);
+//! - **draws** from a thread timer of its own, which the form's modal loop dispatches like
+//!   any message: a whole frame of ours on the engine's device (decision 144);
+//! - **acts** only by posting what a player's mouse would (a left press and release at a
+//!   control's centre, to the form's window) or by the messages a windowed control takes
+//!   (a combo's selection and its notification); it calls no handler and writes no
+//!   setting, so Roots' own code runs and writes what it writes (decision 145).
+//!
+//! Nothing of FleetOpsHook's memory is written and none of its code patched. The forms
+//! part runs only on a FleetOpsHook of the measured family (`FAMILY`, decision 148), and
+//! only with `[Menus] Forms=1` (Roots' default is 0, decision 149). `Forms=probe` is the
+//! step 0 probe: the same, plus a fixed walk of presses and a log of what it finds.
 use crate::rt::win::*;
+use crate::syms_forms::{field, hook, value, TABLE};
 use alloc::string::String;
 use alloc::vec::Vec;
 
-// ---- the VCL's objects (Delphi 2007, as FleetOpsHook links it) --------------------
-//
-// Offsets into the VCL's own classes, read from the library's run-time type information
-// and its accessors (the private notes, `fo6-optionC.md`). They are the VCL's, not a
-// Roots structure; step 2 moves them into the profile, checked per build.
+/// The FleetOpsHook builds the forms part accepts: the CRC-32 of the file's `.text` (as
+/// `[[module]] text_crc` names a companion) and the release, from `tools/engine/fo-forms.py`
+/// (decision 147). One build edited in place across these three releases: the forms, their
+/// classes and the VCL's layout are the same in each.
+const FAMILY: &[(u32, &str)] = &[
+    (0x0785_8db1, "Fleet Operations: Roots 4.0.93"),
+    (0x28c9_0d19, "Fleet Operations: Roots 5.0Z11"),
+    (0xa95a_b2d7, "Tactical Maneuvers 5.2.3"),
+];
 
-/// A class's name (a pointer to a length-prefixed string), relative to its class pointer.
-const VMT_CLASS_NAME: isize = -0x2c;
-/// A class's parent (a pointer to the parent's class pointer).
-const VMT_PARENT: isize = -0x24;
-/// A component's name (a counted string), the components it owns (a list).
-const COMP_NAME: usize = 0x08;
-const COMP_COMPONENTS: usize = 0x10;
-/// A list's items and count.
-const LIST_ITEMS: usize = 0x04;
-const LIST_COUNT: usize = 0x08;
-/// A control's rectangle (left, top, width, height), relative to its parent.
-const CTL_LEFT: usize = 0x40;
-const CTL_VISIBLE: usize = 0x57;
-const CTL_ENABLED: usize = 0x58;
-/// A control's text (a null-terminated string, null when empty).
-const CTL_TEXT: usize = 0x64;
-/// A windowed control's window.
-const WIN_HANDLE: usize = 0x1b4;
+/// The forms the UI draws. Any other (the map editor's, Tunngle's wait) stays Roots'
+/// (decision 152).
+const TAKEN: &[&str] = &[
+    "TMainForm",
+    "TOptionsMenuForm",
+    "TYesNoForm",
+    "TManualIPForm",
+    "TMultiplayerConnectionForm",
+    "TMapSelectForm",
+    "TGraphicOptionsForm",
+    "TAdvancedOptionsForm",
+    "TSoundSettingsForm",
+    "TModSettingsForm",
+    "TAdvSettingsForm",
+];
 
 const WH_CBT: i32 = 5;
-const HCBT_CREATEWND: i32 = 3;
 const HCBT_DESTROYWND: i32 = 4;
 const HCBT_ACTIVATE: i32 = 5;
 const WM_LBUTTONDOWN: u32 = 0x201;
 const CB_GETCOUNT: u32 = 0x146;
 const CB_GETCURSEL: u32 = 0x147;
+const CB_GETLBTEXT: u32 = 0x148;
+const CB_GETLBTEXTLEN: u32 = 0x149;
 const CB_SETCURSEL: u32 = 0x14e;
 const CBN_SELCHANGE: usize = 1;
 const PRF_ERASEBKGND: usize = 8;
+const CWP_SKIPINVISIBLE: u32 = 1;
+/// Off screen: far to the left of and above every output (decision 170).
+const OFF: i32 = -20000;
+/// The arrow (`IDC_ARROW`).
+const IDC_ARROW: usize = 32512;
+/// `FormState`'s and `ComponentState`'s bits the walk checks (the VCL's sets).
+const FS_MODAL: u8 = 1 << 3;
+const CS_DESTROYING: u8 = 1 << 3;
+/// The picture of the top form is printed again this often (seconds).
+const PRINT_EVERY: f64 = 0.1;
 
 #[link(name = "user32")]
 unsafe extern "system" {
@@ -64,8 +90,7 @@ unsafe extern "system" {
     fn SetWindowRgn(w: HWND, rgn: HANDLE, redraw: i32) -> i32;
     fn EnumPropsExA(w: HWND, f: unsafe extern "system" fn(HWND, *const u8, HANDLE, usize) -> i32, lp: usize) -> i32;
     fn WindowFromPoint(p: Point) -> HWND;
-    fn GetCursorInfo(ci: *mut CursorInfo) -> i32;
-    fn SetLayeredWindowAttributes(w: HWND, key: u32, alpha: u8, flags: u32) -> i32;
+    fn ChildWindowFromPointEx(w: HWND, p: Point, flags: u32) -> HWND;
 }
 
 #[link(name = "gdi32")]
@@ -73,20 +98,36 @@ unsafe extern "system" {
     fn CreateRectRgn(l: i32, t: i32, r: i32, b: i32) -> HANDLE;
 }
 
-#[repr(C)]
-#[derive(Default)]
-struct CursorInfo {
-    size: u32,
-    flags: u32,
-    cursor: usize,
-    pos: Point,
+fn eng() -> &'static a2engine::Engine {
+    TABLE.engine()
 }
 
-/// A control of a form, as read this tick.
+// ---- what the rest of the UI sees ---------------------------------------------------
+
+/// What a control is, for drawing it.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum Kind {
+    /// A graphic button (pressed by a posted click at its centre).
+    Button,
+    /// Text.
+    Label,
+    /// A picture (a form's background).
+    Image,
+    /// A text field with a window of its own.
+    Edit,
+    /// A combo box with a window of its own.
+    Combo,
+    /// Anything else: drawn from the form's own picture, clicks forwarded.
+    #[default]
+    Other,
+}
+
+/// A control of a form, as read at the last tick: plain copies, no pointer into the form.
 #[derive(Clone, Default)]
 pub struct Control {
     pub name: String,
     pub class: String,
+    pub kind: Kind,
     /// In the form's client coordinates.
     pub rect: [i32; 4],
     pub text: String,
@@ -94,80 +135,177 @@ pub struct Control {
     pub enabled: bool,
     /// The control's own window (0 for a graphic control).
     pub hwnd: usize,
+    /// A combo's entries and the selected one (-1: none).
+    pub items: Vec<String>,
+    pub selected: i32,
 }
 
-/// A form seen by the hook.
-struct Form {
+/// A form as the UI draws it: its class, where it sits in the design space (the
+/// full-screen forms' client size), its size, and its controls.
+#[derive(Clone, Default)]
+pub struct Form {
+    pub hwnd: usize,
+    pub class: String,
+    pub origin: (i32, i32),
+    pub size: (i32, i32),
+    pub controls: Vec<Control>,
+    /// Whether this is the modal form now (the others are under it, drawn inert).
+    pub top: bool,
+    /// Whether this form opened over a mission (the in-mission menu).
+    pub in_mission: bool,
+}
+
+impl Form {
+    pub fn control(&self, name: &str) -> Option<&Control> {
+        self.controls.iter().find(|c| c.name == name)
+    }
+}
+
+/// What the UI asks of the top form, run at the next tick before it is read again.
+#[derive(Clone)]
+pub enum Action {
+    /// A left press and release at a control's centre.
+    Press(usize, [i32; 4]),
+    /// The mouse at a point of the form (forwarded to the window under it): down, move or
+    /// up.
+    Mouse(usize, u32, i32, i32),
+    /// A combo's entry chosen, with the parent's notification.
+    Select(usize, i32),
+    /// The keyboard to a windowed control (a text field clicked).
+    Focus(usize),
+}
+
+pub const MOUSE_DOWN: u32 = WM_LBUTTONDOWN;
+pub const MOUSE_MOVE: u32 = WM_MOUSEMOVE;
+pub const MOUSE_UP: u32 = WM_LBUTTONUP;
+
+// ---- state ----------------------------------------------------------------------------
+
+struct Tracked {
     hwnd: HWND,
     class: String,
-    /// Our walk's state on this form (the probe's script).
-    opened: f64,
     obj: usize,
-    emptied: bool,
-    printed: bool,
-    pressed: u32,
-    combo: u32,
+    opened: f64,
+    origin: (i32, i32),
+    size: (i32, i32),
+    hidden: bool,
+    last: Vec<Control>,
+    in_mission: bool,
+    // the probe's walk
     visit: u32,
+    pressed: bool,
+    combo: bool,
 }
 
+static mut MODE: u8 = 0;
 static mut CBT: HANDLE = core::ptr::null_mut();
 static mut TIMER: usize = 0;
-static mut FORMS: Vec<Form> = Vec::new();
+static mut TRACKED: Vec<Tracked> = Vec::new();
 static mut VISITS: Vec<(String, u32)> = Vec::new();
 static mut FO: (usize, usize) = (0, 0);
-static mut PROBE: bool = false;
+static mut PROP: String = String::new();
 static mut TICKS: u32 = 0;
-static mut TICKS_IN_DIALOG: u32 = 0;
+static mut DIALOG_TICKS: u32 = 0;
 static mut FRAMES: u32 = 0;
 static mut LAST_DIAG: f64 = 0.0;
-static mut LOG_CREATES: u32 = 0;
-/// The top form's controls and size, for the frame (`menus::forms`).
-static mut SNAPSHOT: Vec<Control> = Vec::new();
-static mut SIZE: (i32, i32) = (0, 0);
-static mut PENDING_PRESS: Option<(usize, i32, i32)> = None;
+static mut ACTIONS: Vec<Action> = Vec::new();
+/// The forms as the frame draws them, outermost first.
+static mut VIEW: Vec<Form> = Vec::new();
+/// The top form's picture: DC, bitmap, the DC's old bitmap, the bits (32-bit top-down),
+/// width and height.
+static mut PICTURE: (HDC, HGDIOBJ, HGDIOBJ, *mut u8, i32, i32) =
+    (core::ptr::null_mut(), core::ptr::null_mut(), core::ptr::null_mut(), core::ptr::null_mut(), 0, 0);
+static mut PRINTED_AT: f64 = 0.0;
+static mut PRINTS: u32 = 0;
+static mut HOSTING: bool = false;
 
-fn forms() -> &'static mut Vec<Form> {
-    unsafe { &mut *core::ptr::addr_of_mut!(FORMS) }
+fn tracked() -> &'static mut Vec<Tracked> {
+    unsafe { &mut *core::ptr::addr_of_mut!(TRACKED) }
 }
 
-/// Whether the forms part is running (the probe, for now).
+/// Whether a form of Roots' is drawn by the UI now: the frame of `menus::forms` is the
+/// menus' frame.
 pub fn active() -> bool {
-    unsafe { PROBE && TIMER != 0 && forms().iter().any(|f| f.obj != 0) }
+    unsafe { MODE != 0 && TIMER != 0 && !(*core::ptr::addr_of!(VIEW)).is_empty() }
 }
 
-/// The top form's design size (its client area) and controls, as read at the last tick.
-pub fn snapshot() -> ((i32, i32), Vec<Control>) {
-    unsafe { (SIZE, (*core::ptr::addr_of!(SNAPSHOT)).clone()) }
+/// The probe of step 0 (`Forms=probe`).
+pub fn probe() -> bool {
+    unsafe { MODE == 2 }
 }
 
-/// A press of ours on a control of the top form (its centre, posted to the form's window),
-/// run at the next tick, outside the frame.
-pub fn press(c: &Control) {
-    let f = forms().iter().rev().find(|f| f.obj != 0);
-    if let Some(f) = f {
-        unsafe { PENDING_PRESS = Some((f.hwnd as usize, c.rect[0] + c.rect[2] / 2, c.rect[1] + c.rect[3] / 2)) };
-        crate::log!("forms: press of ours on {} ({}) of {}", c.name, c.text, f.class);
-    }
+/// The forms to draw, outermost first (a copy).
+pub fn view() -> Vec<Form> {
+    unsafe { (*core::ptr::addr_of!(VIEW)).clone() }
 }
 
-/// `[Menus] Forms=probe`: installs the probe's hook on the game's thread (DllMain's).
-pub fn install_probe() -> bool {
-    let m = unsafe { GetModuleHandleA(c"FleetOpsHook.dll".as_ptr() as *const u8) } as usize;
-    if m == 0 {
-        crate::log!("forms: no FleetOpsHook.dll in the process: the probe stands down");
+/// The design space: the full-screen forms' size (the profile's, Roots' shell size).
+pub fn design() -> (i32, i32) {
+    (value::FORMS_DESIGN_WIDTH(), value::FORMS_DESIGN_HEIGHT())
+}
+
+/// The top form's picture as last printed: (bits, width, height, serial), for the mirror.
+pub fn picture() -> Option<(*const u8, i32, i32, u32)> {
+    let p = unsafe { PICTURE };
+    if p.3.is_null() { None } else { Some((p.3 as *const u8, p.4, p.5, unsafe { PRINTS })) }
+}
+
+/// Queues an action on the top form, run at the next tick.
+pub fn act(a: Action) {
+    unsafe { (*core::ptr::addr_of_mut!(ACTIONS)).push(a) };
+}
+
+/// A press of ours on a control.
+pub fn press(form: &Form, c: &Control) {
+    crate::log!("forms: press on {} ({:?}) of {}", c.name, c.text, form.class);
+    act(Action::Press(form.hwnd, c.rect));
+}
+
+// ---- install --------------------------------------------------------------------------
+
+/// `[Menus] Forms` 1 (ours) or 2 (the probe): the CBT hook on the game's thread (DllMain's),
+/// when the build has forms and FleetOpsHook is one of the family.
+pub fn install(mode: u8) -> bool {
+    if let Err(why) = eng().ready(hook::FORMS_VCL) {
+        crate::log!("forms: standing down: {:?}", why);
         return false;
     }
-    let size = unsafe {
-        let nt = m + super::rd::<u32>(m + 0x3c) as usize;
-        super::rd::<u32>(nt + 0x50) as usize
+    if value::FORMS_PRESENT() == 0 {
+        crate::log!("forms: this build has no forms of FleetOpsHook's: standing down");
+        return false;
+    }
+    let m = unsafe { GetModuleHandleA(c"FleetOpsHook.dll".as_ptr() as *const u8) } as usize;
+    if m == 0 {
+        crate::log!("forms: FleetOpsHook.dll is not loaded: standing down");
+        return false;
+    }
+    let crc = a2engine::companion_crc("FleetOpsHook.dll");
+    let Some(&(_, release)) = FAMILY.iter().find(|f| Some(f.0) == crc) else {
+        crate::log!(
+            "forms: FleetOpsHook.dll .text crc {:#010x} is not a measured build: Roots draws its own menus",
+            crc.unwrap_or(0)
+        );
+        return false;
     };
-    unsafe { FO = (m, m + size) };
+    let size = unsafe {
+        let nt = m + super::rd::<u32>(m + 0x3c) as usize; // PE header
+        super::rd::<u32>(nt + 0x50) as usize // PE header: SizeOfImage
+    };
     let tid = unsafe { GetCurrentThreadId() };
+    unsafe {
+        FO = (m, m + size);
+        // The VCL's window property: "ControlOfs", the library's module handle and its
+        // thread's id, eight hex digits each (the thread is the game's: step 0).
+        PROP = crate::sfmt!("ControlOfs{:08X}{:08X}", m, tid);
+    }
     let h = unsafe { SetWindowsHookExA(WH_CBT, cbt, core::ptr::null_mut(), tid) };
-    crate::log!("forms: probe on: FleetOpsHook at {:#x}..{:#x}, CBT hook {:p} on thread {}", m, m + size, h, tid);
+    crate::log!(
+        "forms: {} (FleetOpsHook of {}), CBT hook on thread {}: {}",
+        if mode == 2 { "the probe" } else { "Roots' forms are the UI's" }, release, tid, if h.is_null() { "refused" } else { "on" }
+    );
     unsafe {
         CBT = h;
-        PROBE = !h.is_null();
+        MODE = if h.is_null() { 0 } else { mode };
     }
     !h.is_null()
 }
@@ -179,32 +317,18 @@ fn class_of(h: HWND) -> String {
 }
 
 unsafe extern "system" fn cbt(code: i32, wp: usize, lp: isize) -> isize {
-    let h = wp as HWND;
     match code {
-        HCBT_CREATEWND => unsafe {
-            if LOG_CREATES < 80 {
-                LOG_CREATES += 1;
-                let owner = GetWindow(h, GW_OWNER);
-                crate::log!("forms: window {:p} created, class {}, owner {:p}", h, class_of(h), owner);
-            }
-        },
-        HCBT_ACTIVATE => activated(h),
-        HCBT_DESTROYWND => destroyed(h),
+        HCBT_ACTIVATE => activated(wp as HWND),
+        HCBT_DESTROYWND => destroyed(wp as HWND),
         _ => {}
     }
     unsafe { CallNextHookEx(CBT, code, wp, lp) }
 }
 
-fn is_form_class(c: &str) -> bool {
-    c.starts_with('T') && c.ends_with("Form") && c != "TMainWindowForm"
-}
-
 fn activated(h: HWND) {
     let class = class_of(h);
-    let owner = unsafe { GetWindow(h, GW_OWNER) };
     let dialog = class == "#32770";
-    crate::log!("forms: {:p} activated, class {}, owner {:p} ({}), {} form(s) known", h, class, owner, class_of(owner), forms().len());
-    if !is_form_class(&class) && !dialog {
+    if !TAKEN.contains(&class.as_str()) && !dialog {
         return;
     }
     let visits = unsafe { &mut *core::ptr::addr_of_mut!(VISITS) };
@@ -219,48 +343,97 @@ fn activated(h: HWND) {
         }
     };
     // A form active again (the one under a screen that closed) starts its walk anew.
-    if let Some(f) = forms().iter_mut().find(|f| f.hwnd == h) {
-        f.visit = visit;
-        f.opened = crate::rt::now();
-        f.pressed = 0;
-        f.printed = false;
-        f.emptied = false;
+    if let Some(t) = tracked().iter_mut().find(|t| t.hwnd == h) {
+        t.visit = visit;
+        t.opened = crate::rt::now();
+        t.pressed = false;
         return;
     }
-    forms().push(Form { hwnd: h, class, opened: crate::rt::now(), obj: 0, emptied: false, printed: false, pressed: 0, combo: 0, visit });
+    // Where it sits, before it is moved: relative to the device window's client area, the
+    // design space's origin (Roots places its full-screen forms there).
+    let owner = unsafe { GetWindow(h, GW_OWNER) };
+    let mut r = WinRect::default();
+    let mut o = Point::default();
+    unsafe {
+        GetWindowRect(h, &mut r);
+        ClientToScreen(device_window(owner), &mut o);
+    }
+    let first = !tracked().iter().any(|t| t.class != "#32770");
+    let in_mission = crate::engine::api::ingame::recent();
+    tracked().push(Tracked {
+        hwnd: h,
+        class: class.clone(),
+        obj: 0,
+        opened: crate::rt::now(),
+        origin: (r.left - o.x, r.top - o.y),
+        size: (r.right - r.left, r.bottom - r.top),
+        hidden: false,
+        last: Vec::new(),
+        in_mission,
+        visit,
+        pressed: false,
+        combo: false,
+    });
+    crate::log!(
+        "forms: {} {:p} up at {},{} {}x{}{}",
+        class, h, r.left - o.x, r.top - o.y, r.right - r.left, r.bottom - r.top, if in_mission { ", over a mission" } else { "" }
+    );
+    if first && !dialog {
+        crate::input::set_hosting(true);
+        unsafe { HOSTING = true };
+        crate::menus::backdrop::begin(if in_mission { "forms" } else { "main menu" });
+    }
     unsafe {
         if TIMER == 0 {
             TIMER = SetTimer(core::ptr::null_mut(), 0, 16, tick);
-            crate::log!("forms: timer {} started", TIMER);
         }
     }
+}
+
+/// The device window: the form's owner, or its owner's (a Yes/No is owned by the screen
+/// that asked it).
+fn device_window(owner: HWND) -> HWND {
+    let mut w = owner;
+    for _ in 0..4 {
+        if w.is_null() || class_of(w) == "TMainWindowForm" {
+            return w;
+        }
+        w = unsafe { GetWindow(w, GW_OWNER) };
+    }
+    owner
 }
 
 fn destroyed(h: HWND) {
-    let v = forms();
-    if let Some(i) = v.iter().position(|f| f.hwnd == h) {
-        let f = v.remove(i);
-        crate::log!(
-            "forms: {} {:p} destroyed after {:.1} s; {} ticks, {} frames so far, {} ticks inside a dialog",
-            f.class, h, crate::rt::now() - f.opened, unsafe { TICKS }, unsafe { FRAMES }, unsafe { TICKS_IN_DIALOG }
-        );
-        unsafe { (*core::ptr::addr_of_mut!(SNAPSHOT)).clear() };
+    let v = tracked();
+    let Some(i) = v.iter().position(|t| t.hwnd == h) else { return };
+    let t = v.remove(i);
+    crate::log!("forms: {} {:p} closed after {:.1} s ({} frames of ours so far)", t.class, h, crate::rt::now() - t.opened, unsafe { FRAMES });
+    if v.iter().all(|t| t.class == "#32770") {
+        stop();
     }
-    if v.is_empty() {
-        unsafe {
-            if TIMER != 0 {
-                KillTimer(core::ptr::null_mut(), TIMER);
-                crate::log!("forms: timer {} stopped", TIMER);
-                TIMER = 0;
-            }
+}
+
+/// No form of ours is up: the timer stops, the engine has its input back.
+fn stop() {
+    unsafe {
+        if TIMER != 0 {
+            KillTimer(core::ptr::null_mut(), TIMER);
+            TIMER = 0;
+        }
+        (*core::ptr::addr_of_mut!(VIEW)).clear();
+        (*core::ptr::addr_of_mut!(ACTIONS)).clear();
+        if HOSTING {
+            HOSTING = false;
+            crate::input::set_hosting(false);
+            crate::menus::backdrop::end();
         }
     }
 }
 
-// ---- reading the objects ------------------------------------------------------------
+// ---- reading the objects (decision 143) -----------------------------------------------
 
 fn ptr_ok(p: usize, n: usize) -> bool {
-    p >= 0x10000 && p < 0x8000_0000 && p % 4 == 0 && super::readable(p, n)
+    (0x10000..0x8000_0000).contains(&p) && p % 4 == 0 && super::readable(p, n)
 }
 
 fn in_fo(p: usize) -> bool {
@@ -268,12 +441,16 @@ fn in_fo(p: usize) -> bool {
     p >= a && p < b
 }
 
+fn rd<T: Copy>(p: usize) -> T {
+    unsafe { super::rd::<T>(p) }
+}
+
 /// A counted string (length byte first).
 fn short_string(p: usize) -> Option<String> {
     if p == 0 || !super::readable(p, 1) {
         return None;
     }
-    let n = unsafe { super::rd::<u8>(p) } as usize;
+    let n = rd::<u8>(p) as usize;
     if !super::readable(p + 1, n) {
         return None;
     }
@@ -281,19 +458,21 @@ fn short_string(p: usize) -> Option<String> {
     core::str::from_utf8(b).ok().map(String::from)
 }
 
+/// The VCL's class layout (Delphi 2007): a class's name and its parent sit at fixed
+/// slots before the class pointer, the language runtime's, not FleetOpsHook's.
+const VMT_CLASS_NAME: usize = 0x2c; // not an offset into game memory: a VCL class slot, before the class pointer
+const VMT_PARENT: usize = 0x24; // not an offset into game memory: a VCL class slot, before the class pointer
+
 /// A class's name, when its class pointer lies in FleetOpsHook's image.
-pub fn class_name(vmt: usize) -> Option<String> {
+fn class_name(vmt: usize) -> Option<String> {
     if !in_fo(vmt) {
         return None;
     }
-    let p = unsafe { super::rd::<usize>((vmt as isize + VMT_CLASS_NAME) as usize) };
-    if !in_fo(p) {
-        return None;
-    }
-    short_string(p)
+    let p = rd::<usize>(vmt - VMT_CLASS_NAME);
+    if !in_fo(p) { None } else { short_string(p) }
 }
 
-/// Whether the object's class is `name` or derives from it.
+/// Whether the class `vmt` is `name` or derives from it.
 fn derives(vmt: usize, name: &str) -> bool {
     let mut v = vmt;
     for _ in 0..40 {
@@ -302,13 +481,17 @@ fn derives(vmt: usize, name: &str) -> bool {
             Some(_) => {}
             None => return false,
         }
-        let pp = unsafe { super::rd::<usize>((v as isize + VMT_PARENT) as usize) };
+        let pp = rd::<usize>(v - VMT_PARENT);
         if !in_fo(pp) {
             return false;
         }
-        v = unsafe { super::rd::<usize>(pp) };
+        v = rd::<usize>(pp);
     }
     false
+}
+
+fn latin1(c: u8) -> char {
+    char::from_u32(c as u32).unwrap_or('?')
 }
 
 /// A Delphi long string (characters, length in the dword before).
@@ -316,12 +499,12 @@ fn ansi_string(p: usize) -> String {
     if p < 4 || !super::readable(p - 4, 4) {
         return String::new();
     }
-    let n = (unsafe { super::rd::<u32>(p - 4) } as usize).min(256);
+    let n = (rd::<u32>(p - 4) as usize).min(256);
     if !super::readable(p, n) {
         return String::new();
     }
     let b = unsafe { core::slice::from_raw_parts(p as *const u8, n) };
-    b.iter().map(|&c| if c.is_ascii() { c as char } else { '?' }).collect()
+    b.iter().map(|&c| latin1(c)).collect()
 }
 
 fn c_string(p: usize) -> String {
@@ -329,203 +512,270 @@ fn c_string(p: usize) -> String {
     if p == 0 {
         return s;
     }
-    for i in 0..256 {
+    for i in 0..512 {
         if !super::readable(p + i, 1) {
             break;
         }
-        let c = unsafe { super::rd::<u8>(p + i) };
+        let c = rd::<u8>(p + i);
         if c == 0 {
             break;
         }
-        s.push(if c.is_ascii() { c as char } else { '?' });
+        s.push(latin1(c));
     }
     s
 }
 
-static mut FOUND_PROP: usize = 0;
-static mut PROP_NAME: String = String::new();
+static mut FOUND: usize = 0;
 
 unsafe extern "system" fn prop(_h: HWND, name: *const u8, data: HANDLE, _lp: usize) -> i32 {
     // An atom (a small integer) is not a name.
     if (name as usize) < 0x10000 {
         return 1;
     }
-    let s = c_string(name as usize);
-    if s.starts_with("ControlOfs") {
-        unsafe {
-            FOUND_PROP = data as usize;
-            PROP_NAME = s;
-        }
+    if c_string(name as usize) == unsafe { (*core::ptr::addr_of!(PROP)).as_str() } {
+        unsafe { FOUND = data as usize };
         return 0;
     }
     1
 }
 
-/// The form's object, through the VCL's window property ("ControlOfs" + the library's
-/// module handle and its thread's id), checked: its class pointer in FleetOpsHook's
-/// image, its class name the window's class.
+/// The form's object (decision 142).
 fn object_of(h: HWND, class: &str) -> usize {
     unsafe {
-        FOUND_PROP = 0;
+        FOUND = 0;
         EnumPropsExA(h, prop, 0);
     }
-    let obj = unsafe { FOUND_PROP };
-    let name = unsafe { (*core::ptr::addr_of!(PROP_NAME)).clone() };
+    let obj = unsafe { FOUND };
     if obj == 0 || !ptr_ok(obj, 4) {
-        crate::log!("forms: {:p} ({}) has no object property", h, class);
+        crate::log!("forms: {:p} ({}) has no object of the VCL's: left to Roots", h, class);
         return 0;
     }
-    let vmt = unsafe { super::rd::<usize>(obj) };
+    let vmt = rd::<usize>(obj);
     let cn = class_name(vmt);
-    let ok = cn.as_deref() == Some(class);
-    crate::log!(
-        "forms: {:p} property {} -> object {:#x}, class pointer {:#x} {} FleetOpsHook, class name {:?}: {}",
-        h, name, obj, vmt, if in_fo(vmt) { "in" } else { "outside" }, cn, if ok { "accepted" } else { "refused" }
-    );
-    if ok { obj } else { 0 }
+    if cn.as_deref() != Some(class) || !derives(vmt, "TCustomForm") {
+        crate::log!("forms: {:p}: its object's class {:?} is not {} in FleetOpsHook: left to Roots", h, cn, class);
+        return 0;
+    }
+    obj
+}
+
+/// Whether the form's object can be read now: still its window's, the modal form, not
+/// being destroyed.
+fn live(t: &Tracked) -> bool {
+    if t.obj == 0 || unsafe { IsWindow(t.hwnd) } == 0 || !ptr_ok(t.obj, field::FORMS_FORM_STATE() + 4) {
+        return false;
+    }
+    if !in_fo(rd::<usize>(t.obj)) {
+        return false;
+    }
+    let modal = rd::<u8>(t.obj + field::FORMS_FORM_STATE()) & FS_MODAL != 0;
+    let dying = rd::<u8>(t.obj + field::FORMS_COMP_STATE()) & CS_DESTROYING != 0;
+    modal && !dying
+}
+
+fn kind_of(vmt: usize, class: &str, windowed: bool) -> Kind {
+    if class == "TJetButton" {
+        Kind::Button
+    } else if derives(vmt, "TCustomLabel") {
+        Kind::Label
+    } else if derives(vmt, "TImage") {
+        Kind::Image
+    } else if windowed && derives(vmt, "TCustomComboBox") {
+        Kind::Combo
+    } else if windowed && derives(vmt, "TCustomEdit") && !derives(vmt, "TCustomMemo") {
+        Kind::Edit
+    } else {
+        Kind::Other
+    }
+}
+
+/// A windowed control's text, through its window.
+fn window_text(h: HWND) -> String {
+    let mut b = [0u8; 256];
+    let n = unsafe { SendMessageA(h, WM_GETTEXT, b.len(), b.as_mut_ptr() as isize) }.clamp(0, 255) as usize;
+    b[..n].iter().map(|&c| latin1(c)).collect()
+}
+
+/// A combo's entries, through its window. Roots' combos draw HTML: the tags are dropped.
+fn combo_items(h: HWND) -> (Vec<String>, i32) {
+    let n = unsafe { SendMessageA(h, CB_GETCOUNT, 0, 0) }.clamp(0, 256);
+    let mut v = Vec::new();
+    for i in 0..n {
+        let len = unsafe { SendMessageA(h, CB_GETLBTEXTLEN, i as usize, 0) };
+        if !(0..1024).contains(&len) {
+            v.push(String::new());
+            continue;
+        }
+        let mut b = alloc::vec![0u8; len as usize + 1];
+        unsafe { SendMessageA(h, CB_GETLBTEXT, i as usize, b.as_mut_ptr() as isize) };
+        v.push(strip_tags(&b[..len as usize]));
+    }
+    (v, unsafe { SendMessageA(h, CB_GETCURSEL, 0, 0) } as i32)
+}
+
+fn strip_tags(b: &[u8]) -> String {
+    let mut s = String::new();
+    let mut tag = false;
+    for &c in b {
+        match c {
+            b'<' => tag = true,
+            b'>' => tag = false,
+            _ if !tag => s.push(latin1(c)),
+            _ => {}
+        }
+    }
+    String::from(s.trim())
 }
 
 /// The form's components that are controls, read now.
 fn controls(obj: usize) -> Vec<Control> {
     let mut out = Vec::new();
-    let list = unsafe { super::rd::<usize>(obj + COMP_COMPONENTS) };
-    if !ptr_ok(list, 12) {
+    let list = rd::<usize>(obj + field::FORMS_COMP_COMPONENTS());
+    if !ptr_ok(list, field::FORMS_LIST_COUNT() + 4) {
         return out;
     }
-    let (items, n) = unsafe { (super::rd::<usize>(list + LIST_ITEMS), super::rd::<i32>(list + LIST_COUNT)) };
+    let (items, n) = (rd::<usize>(list + field::FORMS_LIST_ITEMS()), rd::<i32>(list + field::FORMS_LIST_COUNT()));
     if n <= 0 || n > 512 || !ptr_ok(items, n as usize * 4) {
         return out;
     }
     for i in 0..n as usize {
-        let c = unsafe { super::rd::<usize>(items + i * 4) };
-        if !ptr_ok(c, WIN_HANDLE + 4) {
+        let c = rd::<usize>(items + i * 4);
+        if !ptr_ok(c, field::FORMS_WIN_HANDLE() + 4) {
             continue;
         }
-        let vmt = unsafe { super::rd::<usize>(c) };
+        let vmt = rd::<usize>(c);
         let Some(class) = class_name(vmt) else { continue };
         if !derives(vmt, "TControl") {
             continue;
         }
-        let r: [i32; 4] = unsafe { core::array::from_fn(|k| super::rd::<i32>(c + CTL_LEFT + k * 4)) };
+        let r: [i32; 4] = core::array::from_fn(|k| rd::<i32>(c + field::FORMS_CTL_LEFT() + k * 4));
         let windowed = derives(vmt, "TWinControl");
+        let hwnd = if windowed { rd::<usize>(c + field::FORMS_WIN_HANDLE()) } else { 0 };
+        let kind = kind_of(vmt, &class, windowed);
+        let mut text = c_string(rd::<usize>(c + field::FORMS_CTL_TEXT()));
+        let (mut items, mut selected) = (Vec::new(), -1);
+        if hwnd != 0 && unsafe { IsWindow(hwnd as HWND) } != 0 {
+            match kind {
+                Kind::Edit => text = window_text(hwnd as HWND),
+                Kind::Combo => (items, selected) = combo_items(hwnd as HWND),
+                _ => {}
+            }
+        }
         out.push(Control {
-            name: ansi_string(unsafe { super::rd::<usize>(c + COMP_NAME) }),
+            name: ansi_string(rd::<usize>(c + field::FORMS_COMP_NAME())),
             class,
+            kind,
             rect: r,
-            text: c_string(unsafe { super::rd::<usize>(c + CTL_TEXT) }),
-            visible: unsafe { super::rd::<u8>(c + CTL_VISIBLE) } != 0,
-            enabled: unsafe { super::rd::<u8>(c + CTL_ENABLED) } != 0,
-            hwnd: if windowed { unsafe { super::rd::<usize>(c + WIN_HANDLE) } } else { 0 },
+            text,
+            visible: rd::<u8>(c + field::FORMS_CTL_VISIBLE()) != 0,
+            enabled: rd::<u8>(c + field::FORMS_CTL_ENABLED()) != 0,
+            hwnd,
+            items,
+            selected,
         });
     }
     out
 }
 
-fn log_controls(f: &Form, v: &[Control]) {
-    crate::log!("forms: {} (visit {}) has {} controls:", f.class, f.visit, v.len());
+fn log_controls(t: &Tracked, v: &[Control]) {
+    crate::log!("forms: {} has {} controls:", t.class, v.len());
     for c in v {
         crate::log!(
-            "forms:   {} {} {},{} {}x{} {}{} text {:?} window {:#x}",
-            c.class, c.name, c.rect[0], c.rect[1], c.rect[2], c.rect[3],
-            if c.visible { "visible" } else { "hidden" }, if c.enabled { "" } else { " disabled" }, c.text, c.hwnd
+            "forms:   {:?} {} {} {},{} {}x{} {}{} text {:?}{}",
+            c.kind, c.class, c.name, c.rect[0], c.rect[1], c.rect[2], c.rect[3],
+            if c.visible { "visible" } else { "hidden" }, if c.enabled { "" } else { " disabled" }, c.text,
+            if c.items.is_empty() { String::new() } else { crate::sfmt!(" ({} items, {} chosen)", c.items.len(), c.selected) }
         );
     }
 }
 
-// ---- the pump -------------------------------------------------------------------------
+// ---- the pump (decision 144) ------------------------------------------------------------
 
 unsafe extern "system" fn tick(_h: HWND, _m: u32, _id: usize, _t: u32) {
     unsafe { TICKS += 1 };
     let now = crate::rt::now();
-    let v = forms();
-    v.retain(|f| unsafe { IsWindow(f.hwnd) } != 0);
-    let Some(f) = v.last_mut() else { return };
-    if f.class == "#32770" {
-        unsafe { TICKS_IN_DIALOG += 1 };
-        if now - unsafe { LAST_DIAG } > 2.0 {
-            unsafe { LAST_DIAG = now };
-            crate::log!("forms: tick {} inside the dialog {:p} ({} there)", unsafe { TICKS }, f.hwnd, unsafe { TICKS_IN_DIALOG });
-        }
+    let v = tracked();
+    v.retain(|t| unsafe { IsWindow(t.hwnd) } != 0);
+    if !v.iter().any(|t| t.class != "#32770") {
+        stop();
         return;
     }
-    if f.obj == 0 {
-        f.obj = object_of(f.hwnd, &f.class);
-        if f.obj == 0 {
-            f.class.push_str(" (refused)");
+    let top = v.len() - 1;
+    if v[top].class == "#32770" {
+        // One of the nine dialogs FleetOpsHook opens through its own import: Roots' own
+        // until phase two (decision 150). Our last frame stays under it.
+        unsafe { DIALOG_TICKS += 1 };
+        return;
+    }
+    run_actions(v[top].hwnd);
+    let t = &mut v[top];
+    if t.obj == 0 {
+        if t.class.ends_with(')') {
+            return;
+        }
+        t.obj = object_of(t.hwnd, &t.class);
+        if t.obj == 0 {
+            // Not ours: left as Roots draws it (not moved, so it shows).
+            t.class.push_str(" (Roots')");
             return;
         }
     }
-    let ctl = controls(f.obj);
-    let mut c = WinRect::default();
-    unsafe { GetClientRect(f.hwnd, &mut c) };
-    let age = now - f.opened;
-    if !f.emptied {
-        f.emptied = true;
-        let how = hide(f.hwnd, &f.class, f.visit, c.right, c.bottom);
-        log_controls(f, &ctl);
-        crate::log!("forms: {} client {}x{}: hidden by {}, active {:p}, focus {:p}", f.class, c.right, c.bottom, how,
-            unsafe { GetActiveWindow() }, unsafe { GetFocus() });
+    if !live(t) {
+        return;
     }
-    keep_off(f.hwnd);
-    // Q8: with the form hidden nothing sets the pointer's shape: the pump does.
-    unsafe { SetCursor(LoadCursorA(core::ptr::null_mut(), 32512)) };
-    if !f.printed && age > 3.0 {
-        f.printed = true;
-        print(f.hwnd, &f.class, c.right, c.bottom);
-        log_controls(f, &ctl);
+    let ctl = controls(t.obj);
+    if !t.hidden {
+        t.hidden = true;
+        hide(t.hwnd);
+        log_controls(t, &ctl);
+        crate::log!("forms: {} is ours: moved off screen, active {:p}, focus {:p}", t.class, unsafe { GetActiveWindow() }, unsafe { GetFocus() });
     }
-    unsafe {
-        SIZE = (c.right, c.bottom);
-        *core::ptr::addr_of_mut!(SNAPSHOT) = ctl.clone();
+    keep_off(t.hwnd);
+    t.last = ctl;
+    // Nothing else sets the pointer's shape once the form is away from it (decision 171).
+    unsafe { SetCursor(LoadCursorA(core::ptr::null_mut(), IDC_ARROW)) };
+    if now - unsafe { PRINTED_AT } >= PRINT_EVERY {
+        unsafe { PRINTED_AT = now };
+        print(t.hwnd, t.size.0, t.size.1);
     }
-    if now - unsafe { LAST_DIAG } > 2.0 {
-        unsafe { LAST_DIAG = now };
-        diag(f.hwnd, &f.class);
+    if unsafe { MODE } == 2 {
+        if now - unsafe { LAST_DIAG } > 2.0 {
+            unsafe { LAST_DIAG = now };
+            diag(t.hwnd, &t.class);
+        }
+        let age = now - t.opened;
+        script(t, age);
     }
-    if let Some((h, x, y)) = unsafe { PENDING_PRESS.take() } {
-        post_press(h as HWND, x, y);
-    }
-    script(f, &ctl, age);
+    // What the frame draws: the forms that are ours, outermost first; only the last is live.
+    let view: Vec<Form> = v
+        .iter()
+        .enumerate()
+        .filter(|(_, t)| t.obj != 0 && t.hidden)
+        .map(|(i, t)| Form {
+            hwnd: t.hwnd as usize,
+            class: t.class.clone(),
+            origin: t.origin,
+            size: t.size,
+            controls: t.last.clone(),
+            top: i == top,
+            in_mission: t.in_mission,
+        })
+        .collect();
+    unsafe { *core::ptr::addr_of_mut!(VIEW) = view };
     frame();
 }
 
-const GWL_EXSTYLE: i32 = -20;
-const WS_EX_LAYERED: isize = 0x80000;
-const LWA_ALPHA: u32 = 2;
-/// Off screen: far to the left and above of every output.
-const OFF: i32 = -20000;
-static mut OFFSCREEN: Vec<usize> = Vec::new();
-
-/// Q1 and its fallbacks, one per screen on the walk so one bench pass answers each: the
-/// main menu's first visit an empty region and a nearly transparent layered window (the first
-/// pass tried the region alone on every screen), every other screen moved off screen (and its region
-/// emptied, so nothing of it can show on the way).
-fn hide(h: HWND, class: &str, visit: u32, w: i32, ht: i32) -> &'static str {
-    let rgn = unsafe { SetWindowRgn(h, CreateRectRgn(0, 0, 0, 0), 1) } != 0;
-    match (class, visit) {
-        ("TMainForm", 1) => unsafe {
-            let ex = GetWindowLongA(h, GWL_EXSTYLE);
-            SetWindowLongA(h, GWL_EXSTYLE, ex | WS_EX_LAYERED);
-            let ok = SetLayeredWindowAttributes(h, 0, 1, LWA_ALPHA) != 0;
-            if ok && rgn { "an empty region and a layered window at alpha 1" } else { "an empty region and a layered window (one of them refused)" }
-        },
-        _ => {
-            let _ = (w, ht);
-            unsafe {
-                SetWindowPos(h, core::ptr::null_mut(), OFF, OFF, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
-                (*core::ptr::addr_of_mut!(OFFSCREEN)).push(h as usize);
-            }
-            "a move off screen (and an empty region)"
-        }
+/// Decision 170: off screen, its region emptied as well (on a Wine where the region
+/// works, nothing of it shows on the way).
+fn hide(h: HWND) {
+    unsafe {
+        SetWindowRgn(h, CreateRectRgn(0, 0, 0, 0), 1);
+        SetWindowPos(h, core::ptr::null_mut(), OFF, OFF, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
     }
 }
 
-/// A form moved off screen stays there: FleetOpsHook re-places its screens when the device
-/// window moves.
+/// FleetOpsHook re-places its full-screen forms when the device window moves: off again.
 fn keep_off(h: HWND) {
-    if !unsafe { (*core::ptr::addr_of!(OFFSCREEN)).contains(&(h as usize)) } {
-        return;
-    }
     let mut r = WinRect::default();
     unsafe { GetWindowRect(h, &mut r) };
     if r.left != OFF || r.top != OFF {
@@ -534,160 +784,99 @@ fn keep_off(h: HWND) {
     }
 }
 
-fn diag(form: HWND, class: &str) {
-    let mut p = Point::default();
-    let mut ci = CursorInfo { size: core::mem::size_of::<CursorInfo>() as u32, ..Default::default() };
-    unsafe {
-        GetCursorPos(&mut p);
-        GetCursorInfo(&mut ci);
-    }
-    let under = unsafe { WindowFromPoint(p) };
-    let owner = unsafe { GetWindow(form, GW_OWNER) };
-    let mut q = p;
-    unsafe { ScreenToClient(owner, &mut q) };
-    let inp = crate::input::state();
-    crate::log!(
-        "forms: {} up; tick {} frame {}; pointer {},{} (owner client {},{}; UI {:?}) over {:p} {}; owner enabled {}; cursor {:#x} flags {}; active {:p} focus {:p}",
-        class, unsafe { TICKS }, unsafe { FRAMES }, p.x, p.y, q.x, q.y, inp.mouse, under, class_of(under),
-        unsafe { IsWindowEnabled(owner) }, ci.cursor, ci.flags, unsafe { GetActiveWindow() }, unsafe { GetFocus() }
-    );
+fn lparam(x: i32, y: i32) -> isize {
+    ((y as u32) << 16 | (x as u32 & 0xffff)) as isize
 }
 
-fn post_press(h: HWND, x: i32, y: i32) {
-    let lp = ((y as u32) << 16 | (x as u32 & 0xffff)) as isize;
-    unsafe {
-        PostMessageA(h, WM_LBUTTONDOWN, MK_LBUTTON, lp);
-        PostMessageA(h, WM_LBUTTONUP, 0, lp);
-    }
-    crate::log!("forms: press posted to {:p} at {},{}", h, x, y);
-}
-
-fn find<'a>(v: &'a [Control], name: &str) -> Option<&'a Control> {
-    v.iter().find(|c| c.name == name)
-}
-
-/// The probe's walk: one press per screen, a combo changed on the graphics screen.
-fn script(f: &mut Form, v: &[Control], age: f64) {
-    let target = match (f.class.as_str(), f.visit) {
-        // The main menu's field names are swapped against their actions on Roots: the
-        // one named for the map editor runs Options (the private notes).
-        ("TMainForm", 1) => Some("buttonMapEdit"),
-        ("TMainForm", 2) => Some("buttonInstantAction"),
-        ("TOptionsMenuForm", 1) => Some("btnGraphicSettings"),
-        ("TOptionsMenuForm", 2) => Some("buttonBack"),
-        ("TGraphicOptionsForm", _) => Some("buttonBack"),
-        _ => None,
-    };
-    if f.class == "TGraphicOptionsForm" && f.combo == 0 && age > 6.0 {
-        f.combo = 1;
-        combo_probe(f.hwnd, v);
-    }
-    let Some(t) = target else { return };
-    if f.pressed == 0 && age > if f.class == "TMainForm" && f.visit == 1 { 25.0 } else { 12.0 } {
-        f.pressed = 1;
-        match find(v, t) {
-            Some(c) if c.visible => {
-                crate::log!("forms: the walk presses {} ({:?}) of {}", c.name, c.text, f.class);
-                post_press(f.hwnd, c.rect[0] + c.rect[2] / 2, c.rect[1] + c.rect[3] / 2);
+/// The actions the frame queued, on the top form only (one meant for a form no longer on
+/// top is dropped). Run before the form is read again, so the next frame shows what they
+/// did.
+fn run_actions(top: HWND) {
+    let v = core::mem::take(unsafe { &mut *core::ptr::addr_of_mut!(ACTIONS) });
+    for a in v {
+        match a {
+            Action::Press(h, r) if h == top as usize => {
+                let lp = lparam(r[0] + r[2] / 2, r[1] + r[3] / 2);
+                unsafe {
+                    PostMessageA(top, WM_MOUSEMOVE, 0, lp);
+                    PostMessageA(top, WM_LBUTTONDOWN, MK_LBUTTON, lp);
+                    PostMessageA(top, WM_LBUTTONUP, 0, lp);
+                }
             }
-            _ => crate::log!("forms: the walk finds no visible {} on {}", t, f.class),
+            Action::Mouse(h, msg, x, y) if h == top as usize => {
+                // To the deepest visible window at the point, in its own client coordinates.
+                let mut target = top;
+                let mut p = Point { x, y };
+                for _ in 0..8 {
+                    let c = unsafe { ChildWindowFromPointEx(target, p, CWP_SKIPINVISIBLE) };
+                    if c.is_null() || c == target {
+                        break;
+                    }
+                    let mut r = WinRect::default();
+                    let mut o = Point::default();
+                    unsafe {
+                        GetWindowRect(c, &mut r);
+                        ClientToScreen(target, &mut o);
+                    }
+                    p = Point { x: p.x - (r.left - o.x), y: p.y - (r.top - o.y) };
+                    target = c;
+                }
+                let keys = if msg == WM_LBUTTONDOWN || msg == WM_MOUSEMOVE { MK_LBUTTON } else { 0 };
+                unsafe { PostMessageA(target, msg, keys, lparam(p.x, p.y)) };
+            }
+            Action::Select(h, i) => unsafe {
+                let w = h as HWND;
+                let parent = GetParent(w);
+                if IsWindow(w) != 0 && !parent.is_null() {
+                    SendMessageA(w, CB_SETCURSEL, i as usize, 0);
+                    let id = GetDlgCtrlID(w) as usize & 0xffff;
+                    SendMessageA(parent, WM_COMMAND, (CBN_SELCHANGE << 16) | id, w as isize);
+                }
+            },
+            Action::Focus(h) => unsafe {
+                if IsWindow(h as HWND) != 0 {
+                    SetFocus(h as HWND);
+                }
+            },
+            _ => {}
         }
     }
 }
 
-/// Q9: a combo box changed through its window. The device combo's change handler
-/// refills the resolution combo and selects the shell's mode in it, so: move the
-/// resolution combo's selection quietly, then select the device combo's own entry with
-/// the parent's notification, and read the resolution combo again.
-fn combo_probe(form: HWND, v: &[Control]) {
-    let (Some(dev), Some(res)) = (find(v, "comboDevicePrimary"), find(v, "comboDevicePrimaryResolutions")) else {
-        crate::log!("forms: combo probe: the two combos are not there");
-        return;
-    };
-    let (dh, rh) = (dev.hwnd as HWND, res.hwnd as HWND);
-    unsafe {
-        let r0 = SendMessageA(rh, CB_GETCURSEL, 0, 0);
-        let rn = SendMessageA(rh, CB_GETCOUNT, 0, 0);
-        let moved = if r0 == 0 { 1 } else { 0 };
-        SendMessageA(rh, CB_SETCURSEL, moved, 0);
-        let r1 = SendMessageA(rh, CB_GETCURSEL, 0, 0);
-        // Probe only: a counting subclass on the resolution combo for the length of the
-        // notification (the device combo's handler refills that list).
-        COMBO_SEEN = 0;
-        COMBO_PREV = SetWindowLongA(rh, GWL_WNDPROC, combo_count as unsafe extern "system" fn(HWND, u32, usize, isize) -> isize as usize as isize);
-        let d0 = SendMessageA(dh, CB_GETCURSEL, 0, 0);
-        SendMessageA(dh, CB_SETCURSEL, d0.max(0) as usize, 0);
-        let id = GetDlgCtrlID(dh) as usize;
-        let parent = GetParent(dh);
-        SendMessageA(parent, WM_COMMAND, (CBN_SELCHANGE << 16) | (id & 0xffff), dh as isize);
-        let r2 = SendMessageA(rh, CB_GETCURSEL, 0, 0);
-        let rn2 = SendMessageA(rh, CB_GETCOUNT, 0, 0);
-        let seen = COMBO_SEEN;
-        SetWindowLongA(rh, GWL_WNDPROC, COMBO_PREV);
-        crate::log!(
-            "forms: combo probe on {:p}: resolutions {} of {}, moved quietly to {}, device {} re-selected with CBN_SELCHANGE to {:p}: resolutions {} of {}, {} list messages to it meanwhile -> the change handler {}",
-            form, r0, rn, r1, d0, parent, r2, rn2, seen,
-            if r2 != r1 || seen > 0 { "ran" } else { "did not run" }
-        );
-    }
-}
-
-static mut COMBO_PREV: isize = 0;
-static mut COMBO_SEEN: u32 = 0;
-
-unsafe extern "system" fn combo_count(h: HWND, m: u32, wp: usize, lp: isize) -> isize {
-    // CB_RESETCONTENT, CB_ADDSTRING, CB_INSERTSTRING, CB_SETCURSEL
-    if matches!(m, 0x14b | 0x143 | 0x14a | 0x14e) {
-        unsafe { COMBO_SEEN += 1 };
-    }
-    unsafe { CallWindowProcA(COMBO_PREV, h, m, wp, lp) }
-}
-
-/// Q6: the form printed into a memory DC, whatever its region; written as a BMP beside
-/// the logs on the bench (a picture of Roots' art: never copied out of the clone).
-fn print(h: HWND, class: &str, w: i32, ht: i32) {
+/// The top form printed into a memory DC (the VCL answers the print message wherever the
+/// window is): the mirror's picture.
+fn print(h: HWND, w: i32, ht: i32) {
     if w <= 0 || ht <= 0 {
         return;
     }
-    let bi = BitmapInfoHeader { size: 40, width: w, height: -ht, planes: 1, bit_count: 32, ..Default::default() };
     unsafe {
-        let dc = CreateCompatibleDC(core::ptr::null_mut());
-        let mut bits = core::ptr::null_mut();
-        let bmp = CreateDIBSection(dc, &bi, 0, &mut bits, core::ptr::null_mut(), 0);
-        if bmp.is_null() {
-            DeleteDC(dc);
-            return;
+        let p = &mut *core::ptr::addr_of_mut!(PICTURE);
+        if p.4 != w || p.5 != ht {
+            if !p.0.is_null() {
+                SelectObject(p.0, p.2);
+                DeleteObject(p.1);
+                DeleteDC(p.0);
+            }
+            *p = (core::ptr::null_mut(), core::ptr::null_mut(), core::ptr::null_mut(), core::ptr::null_mut(), 0, 0);
+            let bi = BitmapInfoHeader { size: 40, width: w, height: -ht, planes: 1, bit_count: 32, ..Default::default() };
+            let dc = CreateCompatibleDC(core::ptr::null_mut());
+            let mut bits = core::ptr::null_mut();
+            let bmp = CreateDIBSection(dc, &bi, 0, &mut bits, core::ptr::null_mut(), 0);
+            if bmp.is_null() || bits.is_null() {
+                DeleteDC(dc);
+                return;
+            }
+            let old = SelectObject(dc, bmp);
+            *p = (dc, bmp, old, bits, w, ht);
         }
-        let old = SelectObject(dc, bmp);
-        PatBlt(dc, 0, 0, w, ht, BLACKNESS);
-        let r = SendMessageA(h, WM_PRINT, dc as usize, (PRF_CLIENT | PRF_CHILDREN | PRF_ERASEBKGND | PRF_NONCLIENT) as isize);
+        PatBlt(p.0, 0, 0, w, ht, BLACKNESS);
+        SendMessageA(h, WM_PRINT, p.0 as usize, (PRF_CLIENT | PRF_CHILDREN | PRF_ERASEBKGND | PRF_NONCLIENT) as isize);
         GdiFlush();
-        let n = (w * ht) as usize;
-        let px = core::slice::from_raw_parts(bits as *const u32, n);
-        let lit = px.iter().filter(|&&p| p & 0xffffff != 0).count();
-        crate::log!("forms: {} printed ({}): {} of {} pixels not black ({:.1}%)", class, r, lit, n, lit as f64 * 100.0 / n as f64);
-        let size = (n * 4) as u32;
-        let mut v: Vec<u8> = Vec::with_capacity(54 + n * 4);
-        v.extend_from_slice(b"BM");
-        v.extend_from_slice(&(54 + size).to_le_bytes());
-        v.extend_from_slice(&0u32.to_le_bytes());
-        v.extend_from_slice(&54u32.to_le_bytes());
-        v.extend_from_slice(&40u32.to_le_bytes());
-        v.extend_from_slice(&w.to_le_bytes());
-        v.extend_from_slice(&(-ht).to_le_bytes());
-        v.extend_from_slice(&1u16.to_le_bytes());
-        v.extend_from_slice(&32u16.to_le_bytes());
-        v.extend_from_slice(&[0u8; 24]);
-        v.extend_from_slice(core::slice::from_raw_parts(bits as *const u8, n * 4));
-        let dir = crate::rt::log_dir().unwrap_or_else(|| crate::rt::game_path(""));
-        crate::rt::write_file(&crate::sfmt!("{}\\UI-form-{}.bmp", dir, class), &v);
-        SelectObject(dc, old);
-        DeleteObject(bmp);
-        DeleteDC(dc);
+        PRINTS = PRINTS.wrapping_add(1);
     }
 }
 
-/// Q2: one frame of ours on the engine's device, presented from the timer.
+/// One frame of ours on the engine's device, presented from the timer.
 fn frame() {
     use super::dev8;
     let dev = super::d3d8_device();
@@ -702,11 +891,58 @@ fn frame() {
     dev8::clear(dev, dev8::CLEAR_TARGET, 0xff000000);
     crate::surface::frame(crate::surface::Context::Menus);
     dev8::end_scene(dev);
-    let r = dev8::present(dev);
+    dev8::present(dev);
     unsafe {
         FRAMES += 1;
-        if FRAMES == 1 || FRAMES % 600 == 0 {
-            crate::log!("forms: frame {} presented ({:#x}), {}x{}", FRAMES, r, bb.width, bb.height);
+        if FRAMES == 1 {
+            crate::log!("forms: first frame of ours, {}x{}", bb.width, bb.height);
+        }
+    }
+}
+
+// ---- the probe (step 0) ---------------------------------------------------------------
+
+fn diag(form: HWND, class: &str) {
+    let mut p = Point::default();
+    unsafe { GetCursorPos(&mut p) };
+    let under = unsafe { WindowFromPoint(p) };
+    crate::log!(
+        "forms: {} {:p} up; tick {} frame {} ({} inside a dialog); pointer {},{} over {}; UI {:?}; active {:p} focus {:p}",
+        class, form, unsafe { TICKS }, unsafe { FRAMES }, unsafe { DIALOG_TICKS }, p.x, p.y, class_of(under),
+        crate::input::state().mouse, unsafe { GetActiveWindow() }, unsafe { GetFocus() }
+    );
+}
+
+/// The probe's walk: one press per screen (main menu -> Options -> Graphics -> Back ->
+/// Back -> Instant Action), a combo changed on the graphics screen.
+fn script(t: &mut Tracked, age: f64) {
+    let target = match (t.class.as_str(), t.visit) {
+        // The main menu's field names are swapped against their actions on Roots: the
+        // one named for the map editor runs Options.
+        ("TMainForm", 1) => Some("buttonMapEdit"),
+        ("TMainForm", 2) => Some("buttonInstantAction"),
+        ("TOptionsMenuForm", 1) => Some("btnGraphicSettings"),
+        ("TOptionsMenuForm", 2) => Some("buttonBack"),
+        ("TGraphicOptionsForm", _) => Some("buttonBack"),
+        _ => None,
+    };
+    if t.class == "TGraphicOptionsForm" && !t.combo && age > 6.0 {
+        t.combo = true;
+        if let Some(d) = t.last.iter().find(|c| c.name == "comboDevicePrimary") {
+            crate::log!("forms: the walk re-selects {} entry {} of {}", d.name, d.selected, d.items.len());
+            act(Action::Select(d.hwnd, d.selected.max(0)));
+        }
+    }
+    let Some(name) = target else { return };
+    let wait = if t.class == "TMainForm" && t.visit == 1 { 25.0 } else { 12.0 };
+    if !t.pressed && age > wait {
+        t.pressed = true;
+        match t.last.iter().find(|c| c.name == name) {
+            Some(c) if c.visible => {
+                crate::log!("forms: the walk presses {} ({:?}) of {}", c.name, c.text, t.class);
+                act(Action::Press(t.hwnd as usize, c.rect));
+            }
+            _ => crate::log!("forms: the walk finds no visible {} on {}", name, t.class),
         }
     }
 }

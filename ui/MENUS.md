@@ -1071,6 +1071,79 @@ a Mutara nebula with the queen's Diamond (`render3d/README.md`, "The menu scene"
   selection's targets a `label`, which `Click the <target>` clicks (by OCR) while the
   scene is on, since their stock points are on nothing then.
 
+## Roots' forms
+
+Fleet Operations: Roots only (PLAN-FLEETOPS.md, FO-6 step 7, option C), with
+`[Menus] Forms=1` (0 in `UI.ini` and in Roots' defaults until each screen is seen in game).
+On Roots the main menu, Options (the in-mission menu too), Yes/No, Manual IP, Multiplayer
+Connection, Map Select, Graphics and Advanced Options never run the executable's dialogs:
+`FleetOpsHook.dll` shows a VCL form of its own (a Delphi library's window class), modal,
+over the engine's device window, and frees it when the screen closes. Its buttons are
+graphic controls with no window. The dialog host above cannot reach them, so the forms have
+a host of their own, `engine/forms.rs` (drawn by `menus/roots.rs`):
+
+- **Found by its window.** A thread CBT hook on the game's thread (the one `DllMain` runs
+  on, which is the thread the library made its windows on) sees each window activate. A
+  window whose class is one of the forms the UI takes is a form; its object is the data of
+  the window property the VCL sets on every window it makes, named `ControlOfs` and the
+  library's module handle and thread id in hex. The object counts only when its class lies
+  in FleetOpsHook's image, is named as the window's class and derives from the VCL's form
+  class (read through the class's own name and parent slots, which the language runtime
+  lays out).
+- **Read, never written.** Each tick the form's owned components are walked: each control's
+  name, class, rectangle, visibility, enabled state and text, at the VCL's field offsets
+  (`profiles/gog-1.1/ui.forms.toml`, hook `ui.forms.vcl`: the VCL's fields, read only on a
+  build whose `forms_present` is 1). Every pointer is checked (aligned, in user memory,
+  readable), only on the game thread, only while the form is the modal one and not being
+  destroyed, and the frame sees only copies. Text fields and combo boxes have windows: their
+  text and entries come through those (`WM_GETTEXT`, `CB_GETLBTEXT`).
+- **Hidden by moving it off screen.** An empty window region clips the form's painting but
+  on Wine under XWayland its pop-up still covers the screen in black, and a layered window
+  at alpha 1 does the same (the probe of step 0): the form is moved far off screen, its size
+  kept, and moved again whenever it comes back. It keeps the activation, the keyboard focus
+  and its modal loop.
+- **Drawn from a timer.** While a form is modal the engine draws nothing. A thread timer of
+  the UI's (16 ms) is dispatched by the form's own loop; each tick runs the actions the last
+  frame queued, reads the form, prints it into a memory DC every 0.1 s (`WM_PRINT`, the
+  mirror's picture) and presents a whole frame of ours on the engine's device. The design
+  space is the full-screen forms' client size, Roots' 1200x900 shell
+  (`forms_design_width`/`_height`), fitted to the back buffer; UI.log says `menus: forms
+  1200x900 @0,0 -> WxH @X,Y`. The pointer's shape is set to the arrow each tick: with the
+  form away nothing else sets it.
+- **Acting as a player would.** A press of ours is a posted mouse move, left down and left
+  up at the control's centre, to the form's window: the VCL finds the graphic control there
+  and Roots' own button code runs the action Roots binds at that moment (Back is bound at
+  run time). Combo boxes are set by `CB_SETCURSEL` and the parent's `CBN_SELCHANGE`, which
+  the VCL turns into the control's change event. A click on a text field gives the real
+  field the keyboard; the typing goes to it, and ours shows its text. Areas the UI does not
+  draw as its own (check boxes, sliders, grids) are crops of the form's picture with the
+  mouse forwarded to the window under the point. Nothing calls a handler of Roots' and
+  nothing writes a setting: Roots' handlers write what they write (Graphics saves the
+  profile on Back; Manual IP saves its settings file on Join).
+- **Keyed to FleetOpsHook alone.** `FAMILY` lists the measured builds by the CRC-32 of their
+  file's `.text` (`a2engine::companion_crc`; Roots 4.0.93, Roots 5.0Z11, Tactical Maneuvers
+  5.2.3); any other stands the forms down, logged once, and Roots draws its own menus.
+  `tools/engine/fo-forms.py` reads a new FleetOpsHook (and its map) once, prints its line
+  and checks the forms and controls the UI uses are there.
+- **What stays Roots'.** The nine screens FleetOpsHook opens through its own
+  `DialogBoxParamA` (Single Player, Game Setup, Game Settings, Load, Save, the licence, the
+  Technology Tree, the Admiral's Log, Internet: phase two, not done), the map editor's
+  forms, Tunngle's wait; while one of the nine is up over a form of ours, the last frame of
+  ours stays under it.
+
+The screens: the main menu has a spec (our column of buttons in the form's order, the
+version line); Yes/No draws the form's picture (Roots draws the question into it) under
+our two buttons; every other form is generic (`Generic=widgets` in Roots' defaults).
+
+| Hook | What it reads |
+|---|---|
+| `ui.forms.vcl` | the VCL's fields of FleetOpsHook's forms and controls (owner list, name, rectangle, visibility, enabled, text, window, form and component state), and whether the build has forms; feeds `Menus.Forms` |
+
+`[Menus] Forms=probe` is the bench's probe of step 0: the same host, plus a fixed walk of
+posted presses (main menu, Options, Graphics, Back, Back, Instant Action), a combo set on
+Graphics, and a log line of the pointer and focus every two seconds
+(`testbench/scenarios/fo-ui-forms-probe.md`).
+
 ## Testing
 
 `ui/bench-asi.sh --menus` (a scenario's `Setup:` line) puts `UI.asi` in a bench clone
