@@ -672,9 +672,13 @@ directory of images; a session ID, live or ended; or a baseline's name. `record`
 to a baseline and refuses to replace a shot it holds unless given `--force`.
 
 **Vulkan on the bench.** A game whose clone's `Display8.ini` says
-`Backend=vulkan` runs on the user's GPU with the Khronos validation
-layer on (`bench/session.py`, `vulkan_env`: `VK_INSTANCE_LAYERS`; `display/bench-mode.sh`
-adds `Validate=1`), so errors are caught before they can hang the GPU. Flags of
+`Backend=vulkan` or names Vulkan or `auto` (the shipped default) runs on the user's GPU
+with the Khronos validation layer on, in every launch path (sessions, `a2test run`, films,
+the recorder): at launch `Session.launch` sets `Validate=1` in the clone's `Display8.ini`
+(beside the game's executable, so under `Data/` on Fleet Operations: Roots; never a real
+install) and `bench/session.py`, `vulkan_env`, puts `VK_INSTANCE_LAYERS` in the environment.
+`logs/launch-env.txt` has a `vulkan validation: on|off` line and the session log says
+so too, so errors are caught before they can hang the GPU. Flags of
 `session start`, `run` and `drive`-less runs: `--vulkan-device lavapipe` (or
 `A2TEST_VULKAN_DEVICE=lavapipe`) puts it on lavapipe, Mesa's CPU Vulkan
 (`VK_DRIVER_FILES`, `VK_ICD_FILENAMES`, `Device=llvmpipe`); `--no-validate` (or
