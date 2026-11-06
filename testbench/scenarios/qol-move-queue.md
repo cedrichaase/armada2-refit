@@ -27,7 +27,11 @@ of its own (`spread`), flies its own path order, and the queue ends with every s
 own target at every point (QOL's `done` line says so; a ship that went past a point far
 from its own target, or stopped nearer another ship's, would say otherwise). Then a second
 queue in the column (type 1), and while it is flown the X (type 2): the points ahead take
-the new places without ending the queue. Judge the shots: the ships spread in the
+the new places without ending the queue. Last, a group whose sixth ship starts 700 behind
+the others: each ship goes on to the next run (a warp leg) the moment it reaches the end
+of its own, so the leaders' next run goes out while that ship is still behind (`1 ship(s)
+behind`), and QOL's own sends are quiet: the ship's acknowledgement is left out
+(`acknowledgement left out`; the bench has no sound). Judge the shots: the ships spread in the
 formation, not bunched on one point, mid-path and at the end.
 
 1. Launch the game.
@@ -125,6 +129,19 @@ formation, not bunched on one point, mid-path and at the end.
 93. Wait up to 90 seconds for "QOL.log" to say "done, 6 ship(s), each at its own target at every point".
 94. Wait 2 seconds.
 95. Take a screenshot called "group-x-end".
-96. Expect the game is still running.
-97. Quit the game.
-98. Expect no crash.
+96. Scene "spawn s1 fdestroy 4400 0 2500; spawn s2 fdestroy 4500 0 2500; spawn s3 fdestroy 4600 0 2500; spawn s4 fdestroy 4450 0 2600; spawn s5 fdestroy 4550 0 2600; spawn s6 fdestroy 3700 0 2500".
+97. Scene "center s3; select s1 s2 s3 s4 s5 s6".
+98. Scene "waypoint-key on".
+99. Right-click at 900,360.
+100. Wait up to 10 seconds for "QOL.log" to say "move queue: run sent: go, 1 point(s) from point 1, 6 ship(s)".
+101. Right-click at 100,100.
+102. Wait up to 10 seconds for "QOL.log" to say "move queue: appended point 2 (warp)".
+103. Scene "waypoint-key off".
+104. Wait up to 60 seconds for "QOL.log" to say "1 ship(s) behind (quiet)".
+105. Take a screenshot called "straggler".
+106. Wait up to 10 seconds for the logs the next steps expect.
+107. Expect "QOL.log" contains "move queue: acknowledgement left out".
+108. Wait up to 120 seconds for "QOL.log" to say "done, 6 ship(s)".
+109. Expect the game is still running.
+110. Quit the game.
+111. Expect no crash.

@@ -1625,6 +1625,26 @@ target = "mq_ov_keys"
 in = "cOverViewImp::Simulate"
 used_by = ["move_paths"]
 
+# The ship's voice on a new command (qol/README.md, QOL-10, "The acknowledgement"): every
+# CraftProcess::Handle_New_Command (and the other processes') ends in Craft::Say, whose one
+# call of CaptainsVoice::Say is re-pointed to leave out QOL's own sends.
+[[sym]]
+id = "mq_say"
+symbol = "CaptainsVoice::Say"
+kind = "fn"
+addr = 0x45d720
+check = "55 8b ec 53 8b 5d 0c 56"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_say_call"
+symbol = "Craft::Say"
+kind = "call"
+addr = 0x4c30f1
+target = "mq_say"
+in = "Craft::Say"
+used_by = ["move_paths"]
+
 # The group's spread (qol/README.md, QOL-10, "A group's targets"): the formations stock
 # moves a group in, read, never written.
 [[sym]]
