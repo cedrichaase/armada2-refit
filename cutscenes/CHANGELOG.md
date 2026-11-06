@@ -4,20 +4,6 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`binkproxy/README.md`](binkproxy/README.md).
 
-## 3.1.0 — 2026-11-05
-
-### Changed
-- binkproxy: engine fields are the matched build's, filled at start-up (`BINKPROXY_F_*`), no longer compile-time per game (PLAN-ARCHITECTURE.md, AR-3).
-
-Installed, not yet seen in game.
-
-## 3.0.3 — 2026-11-04
-
-### Changed
-- The engine resolver (`crates/a2engine`, `csdk/a2engine.h`; root 15.8.0) names the executable in its log lines and notes by the matched build's `exe` (`profiles/*/build.toml`), or on an unknown build by the process's own module file name, not by a literal: `engine: Armada2.exe timestamp ...` on Armada II as before. The generated symbol tables carry each build's `exe`. (binkproxy)
-
-Installed, not yet seen in game.
-
 ## 3.0.2 — 2026-11-04
 
 ### Fixed
@@ -47,7 +33,6 @@ Installed, not yet seen in game.
 
 ### Changed
 - BinkProxy leaves the intro's mode lookups to Display8 when `d3d8.dll` exports `display8_abi` (log `intro: Display8 raises the mode`); `RaiseIntroMode=1` is the fallback for any other `d3d8.dll`, until Display8 is required. `IntroWidth` and `IntroHeight` apply only to that fallback. Installed, not yet seen in game.
-
 
 ## 2.6.1 — 2026-11-03
 

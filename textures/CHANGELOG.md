@@ -5,13 +5,6 @@ into `Textures/RGB/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 versions". Newest first. The reasoning behind each change is in [`README.md`](README.md),
 not here.
 
-## 2.3.0 — 2026-11-05
-
-### Changed
-- `./a2tex` takes the game's texture root from the game descriptor (`A2_TEXTURES`, the first of `games/<id>.toml` `[files] textures`, under the data folder) instead of `$A2_GAME/Textures/RGB`; with the default game it is the same folder.
-
-Installed, not yet seen in game.
-
 ## 2.2.0 — 2026-11-03
 
 ### Removed

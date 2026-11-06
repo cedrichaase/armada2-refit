@@ -4,21 +4,6 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
-## 1.1.0 — 2026-11-05
-
-### Changed
-- Engine fields and values come from the matched build at run time (`field::X()`, `value::X()`), no longer compile-time consts of `gog-1.1` (PLAN-ARCHITECTURE.md, AR-3).
-- The stub's walk of the engine's mode list (`stub/modes.rs`) reads the device's list and each mode's width, height and depth through new `display.toml` fields (`dev_modes`, `mode_node_value`, `mode_width`, `mode_height`, `mode_bpp`, hook `modes`), no longer literal offsets.
-
-Installed, not yet seen in game.
-
-## 1.0.6 — 2026-11-04
-
-### Changed
-- The engine resolver (`crates/a2engine`, `csdk/a2engine.h`; root 15.8.0) names the executable in its log lines and notes by the matched build's `exe` (`profiles/*/build.toml`), or on an unknown build by the process's own module file name, not by a literal: `engine: Armada2.exe timestamp ...` on Armada II as before. The generated symbol tables carry each build's `exe`.
-
-Installed, not yet seen in game.
-
 ## 1.0.5 — 2026-11-04
 
 ### Fixed
@@ -123,7 +108,6 @@ Installed, not yet seen in game
 - Contract 1.3 (`gpu/src/display.rs`): `CLAIM_MENUS` and the export `display8v1_mode`, the mode the device was opened at. The profile gets the entries the moved code reads.
 
 Installed, not yet seen in game
-
 
 ## 0.17.0 — 2026-11-03
 

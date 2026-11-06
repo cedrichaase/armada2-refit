@@ -5,69 +5,6 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
-## 15.12.0 — 2026-11-05
-
-Layers: ui 2.6.0.
-
-### Added
-- ui: the engine boundary (AR-4, `PLAN-ARCHITECTURE.md`, F4): the facade `engine::api`, `trait Panel` and `trait Screen`, the HUD canvas in one constant, and `ui/lint-layers.sh` in CI beside render3d's. `MODDING.md`, "Adding a HUD panel or menu screen". No behaviour change intended. Installed, not yet seen in game.
-
-## 15.11.0 — 2026-11-05
-
-Layers: render3d 1.3.0, ui 2.5.0, display 1.1.0, qol 2.3.0, rules 1.1.0, online 0.12.0, cutscenes 3.1.0.
-
-### Changed
-- Profiles: `field` and `value` entries are resolved per build at run time, as addresses are (PLAN-ARCHITECTURE.md, AR-3, finding F3). `tools/engine/gen.py` emits a cheap accessor per entry in Rust (`field::X()`, `value::X()`) and a variable per entry in C (`a2f_<p>_<id>`, behind `<P>_F_X` and `<P>_V_X`), filled from the matched build at start-up; a hook whose field the build lacks stands down, as for a missing symbol. A child build may move a field or change a value in any plugin (the C-only FO-3 lint rule is gone). `crates/a2engine` gains `Engine::field`/`value`, `csdk/a2engine.h` `a2e_field`; the fixtures gain a child build that moves a field, which the three resolvers agree on.
-- Lint: a literal struct offset in a plugin's source fails, no longer an advisory (`tools/engine/lint.py` rule 4, C and Rust, every plugin tree, `ui/src` included; `render3d/lint-layers.sh` rule 1, the engine glue included). Parsing a module's own PE header says `PE header`, a literal that is no offset `not an offset`. Every offset moved out of a source is listed in `tools/engine/moved-gog-1.1.tsv` with its old value, and `tools/engine/moved.py` (in `selftest.sh`) checks that it resolves to it on `gog-1.1`.
-
-Installed, not yet seen in game.
-
-## 15.10.0 — 2026-11-05
-
-Layers: render3d 1.2.0, ui 2.4.0 (others as in 15.9.0).
-
-### Added
-- Content sets as data (AR-6, `PLAN-ARCHITECTURE.md` F6): a set is a folder, `render3d/content/sets/<set>/` and `ui/content/sets/<set>/`, of ini tables the plugins build in and parse; `by_set` is a folder lookup and adding a set needs no code (`MODDING.md`, "Content sets"). `a2ini::Table` reads a table borrowing from its text.
-- The game's names left in code (the cocoon SOD, the shields' default ray faction, the Borg key prefix, the UI's race, campaign and gallery lists and its game file names) moved into the sets; the UI's race colours stay in the theme, keyed by a look the set maps each race to.
-- `ui/lint-content.sh`, and render3d's rule 4 strict, in CI.
-
-### Changed
-- `tools/engine/lint.py`: a set named for a plugin with a `content.rs` must be a folder of its `content/sets/` (was: a `"<set>" =>` arm in the code); the fixture `29-content-set-not-chosen` is `29-content-set-no-folder`.
-
-Installed, not yet seen in game.
-
-## 15.9.0 — 2026-11-05
-
-Layers: render3d 1.1.0, ui 2.3.0, textures 2.3.0.
-
-### Added
-- `a2fmt::vfs` (`crates/a2fmt/README.md`, "The file system"): one file system over a game's files, `no_std`. `trait Vfs` (`open`, `exists`, `list`; case-insensitive, either slash), `Loose(root)` over an `Io` the caller supplies (`FnIo` from plain functions), `Layered` mounts searched by kind and mount order, a mount shadowing its folder in the root. `Fpq` and `Zfs` are declared and report `Unsupported` with a reason; an `Engine` source is documented as the planned fallback. Host tests on a temporary directory (`crates/a2fmt/tests/vfs.rs`).
-- `games/<id>.toml` `[files]` (replacing AR-2's `[assets]`): `textures`, `texture_formats`, `sod`, `sprites`, `odf` and `archives`. `fo-roots.toml` has Roots' layout: `Textures/`, TGA and DDS, `ODF.fpq` behind `odf`.
-- `a2env` gives `A2_TEXTURES` (the first texture root under the data folder) and `a2env.TEXTURES`; its built-in default carries `files.textures`.
-- `tools/layers.py --check` checks `[files]` (relative folders, known formats, archive kinds and mount folders) and holds render3d's and the UI's `LAYOUT` tables to the descriptor.
-
-### Changed
-- render3d and the UI read the game's files through `a2fmt::vfs` with Armada II's mount list; the same files are found in the same order (render3d 1.1.0, ui 2.3.0).
-- `./a2tex` takes the game's texture root from `A2_TEXTURES`, not a `Textures/RGB` literal (textures 2.3.0); `a2mod`'s and `tools/layers.py`'s texture paths come from the descriptor's `[files]`.
-
-Installed, not yet seen in game.
-
-## 15.8.0 — 2026-11-04
-
-Layers: display 1.0.6, ui 2.2.7, render3d 1.0.6, qol 2.2.5, rules 1.0.4, online 0.11.4, cutscenes 3.0.3, testbench 4.2.0.
-
-### Added
-- `games/`: one descriptor per game (`games/<id>.toml`; `games/README.md`): the label, executables and data folder, Heroic and GOG ids, default folder and prefix names, settings file kind, shell resolution and HUD canvas, texture roots, data directory stem and the layers on offer. `armada2.toml` is the default; `fo-roots.toml` is a stub, `offered = false`, whose paths resolve (`Data/ArmadaL.exe`).
-- `A2_PROFILE` and `--game <id>` choose the game in `a2env.py`, `a2env.sh`, `a2mod`, `./install`, `./a2test` and `tools/layers.py`; the default is `armada2`, which resolves the same paths as before. `a2env` also gives `A2_PROFILE` and `A2_EXE`, and the config file takes a `[<id>]` section per other game. `python3 a2env.py --list` lists the games.
-- `tools/layers.py --check` checks the descriptors: every `games` entry names one, every descriptor's layers exist and list it back, one is the default, every `profiles/*/build.toml` names a described game and one of its executables, and `a2env.py`'s built-in default (for the release package, which ships `a2env.py` alone) matches its descriptor.
-
-### Changed
-- `a2env.sh` takes its values from `a2env.py` (`--sh`), so the two are no longer kept in step by hand; the environment variables and `~/.config/armada2-refit.conf` work as before.
-- `tools/layers.py --resolve` and `./install` offer only the chosen game's layers and refuse a game that is not offered; `a2mod` reads the executable to look for and the player's files it never switches (`ARMADA.PRF`, `RTS_CFG.h`) from the descriptor.
-- The resolver (`crates/a2engine`, `csdk/a2engine.h`, `tools/engine/resolve.py`) has no `Armada2.exe` literal: the identity line (`engine: <exe> timestamp ...`) and the notes name the matched build's `exe`, which `tools/engine/gen.py` now emits into each table (`Build.exe`), or the process's module file name on an unknown build. `a2engine::is_identity_line`, `Engine::exe()` and `Engine::game()` are new; the fixtures gain a `module`. The generated tables are regenerated.
-
-Installed, not yet seen in game.
-
 ## 15.7.0 — 2026-11-04
 
 Layers: qol 2.2.4.
