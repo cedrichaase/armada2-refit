@@ -181,7 +181,7 @@ can start now; FO-3 onward waits on phase 8's format and generator (8b).
 | FO-6 | **UI on Roots**: the Refit screen and settings over Roots' Options dialog, the loading screen; then the menu host's specs for the 1200x900 shell and HUD panels against Roots' components, each its own row, as wanted. The button bar is not stock's: its command area can be far larger (several weapons of one classlabel, each a button; FO-7), so the UI's bar and its labels (`ui/HUD.md`, "The button bar") are measured on Roots before they are drawn there | FO-3, FO-4; ROADMAP 6 | 10–30 h · 8–15 · with FO-B, then its own round if panels are taken |
 | FO-7 | **QOL on Roots**: pan speed and camera first; each of the other features measured beside Roots' own and switched on only where both agree. A Fleet Operations developer noted (2026-11-06) that Roots' command button area can be far larger than stock's (several weapons of the same classlabel each get a button), so `BarKeys` and the slot plan (`qol/README.md`, QOL-1) cannot assume stock's bar | FO-3 | 4–10 h · 3–6 gameplay passes · with FO-B |
 | FO-8 | **Multiplayer**: two bench games of Roots with the refit's visual plugins, on Microsoft's DirectPlay in the clones (`online/reference-dplay.sh`), to show the CRC check passes; then whether `Online.asi`'s peer carries a Roots game | FO-4; ROADMAP 9 (the rules plugin as its own layer) | 6–12 h · 4–8 two-game passes · round FO-C if Online is taken |
-| FO-9 | **binkproxy** on Roots' intros, and the release package's Roots support (the GUI installer finding Roots, if wanted) | FO-4 | 4–10 h · 2–3 · with the release |
+| FO-9 | **binkproxy** on Roots' intros. Roots support is not packaged: no GUI installer or release package carries it (Open decisions, 4) | FO-4 | 2–5 h · 2–3 · none |
 
 Summed: about 75–165 agent hours, three sign-off rounds of its own (FO-A, FO-B, FO-C).
 
@@ -384,9 +384,9 @@ Operations team. Each holds until what is named in its last column happens.
 | 5 | Roots' **clean screenshot** keeps hiding the posts (callee hook) but not render3d's selection circles | the selection skip is FleetOpsHook's wrapper of a function render3d does not call | the user using Roots' clean screenshots |
 | 6 | The Roots **hull look is keyed by race**; the Borg profile is for the Borg only, not for every bump-mapped mesh | nearly every Roots hull is bump-mapped | the user's verdict in round FO-B |
 | 7 | The `fleetops` content set holds **names and keys only** (ODFs, races, classes, `RTS_CFG.h` keys); a look fitted to Roots' own art (a sky recipe, a hull grade) stays local, in the game directory's `Sky\` and similar files, and is not committed | Roots' art is never published (decided 2026-11-06), and numbers fitted to it are close enough to it to wait for the creator | the user, after asking the Roots creator |
+| 7b | **Reuse**: everything Roots-specific lives in data, not code: the build profile (`profiles/fo-roots-*`), the game descriptor (`games/fo-roots.toml`) and the `fleetops` content set; the code knows only "a build whose FleetOpsHook owns these sites" (`chain` entries, callee hooks, the companion-module identity) | so another Fleet Operations-based mod can be added by its creator as a descriptor, a profile and a content set of its own, without code of ours changing | a mod whose FleetOpsHook draws differently enough to need code |
 | 8 | The Roots build identity adds **on-disk section CRC-32s** (`.text`, `.test`) and **FleetOpsHook's `.text` CRC** as a companion module | three Roots builds of each file share every header value we read | none expected; a Roots release that changes only data needs no new profile |
 | 9 | The **submods** ("Fleet Ops 4.0", the STA2 classic mods) are not supported: their own `ArmadaL.exe` files are other builds, refused by the identity | scope is Roots itself | the user asking for one (it is then a profile of its own) |
-| 10 | **Release**: Roots support ships in the same package and GUI installer, offered only where a Roots install is found | one package keeps one set of plugins and one changelog | the user preferring a separate download (open decision 4) |
 | 11 | No Ghidra project for FO-5: the questions were answered by the map-named disassembly of a dozen functions and by the bench | cheaper and lighter on memory | a question the map names cannot settle |
 
 The Roots profile tools (`tools/engine/fo-scan.py`, PR #61) took these defaults:
@@ -404,16 +404,26 @@ The Roots profile tools (`tools/engine/fo-scan.py`, PR #61) took these defaults:
 
 Decided by the user, 2026-11-06:
 
-1. **The Fleet Operations team** approved the work; Roots' own developer wants to tinker
-   with it once it works.
-2. **Scope**: the renderer only on Roots first, Display8 and render3d (FO-2 to FO-5).
-   The UI, QOL and Online on Roots come later, if ever (FO-6 to FO-8 wait).
+1. **What the Fleet Operations team agreed to** (2026-11-06, the user's message to them):
+   the user tries to get the refit's UI and renderer working on Roots, to see the effort
+   and whether it suits Roots' art, and to make the code reusable for other Fleet
+   Operations-based mods if their creators want it; the code is released only with a
+   bash script for installation on the user's own Linux setup, **not advertised or
+   announced**. Roots' own developer wants to tinker with it once it works.
+2. **Scope**: the renderer first on Roots, Display8 and render3d (FO-2 to FO-5); **the UI
+   is within the agreed scope** and comes after it (FO-6 stays planned). QOL and Online on
+   Roots come later, if ever (FO-7, FO-8 wait).
 3. **Roots' art** is at most a local experiment, never published: that is the Roots
    creator's call. The texture and movie pipelines are not pointed at it for any release.
+4. **The release** (closed): Roots support stays **in code only**, installed by
+   `./install --game fo-roots` (bash) on the user's own setup. It is never in the GUI
+   installer, the release packages, `PLAYING.md` or the release notes, and is not
+   advertised, until the user says otherwise. Roots' layers stay out of what
+   `publish/package.sh` and the GUI installer offer.
+5. **Reuse**: Roots-specific knowledge is kept in the profile, the game descriptor and
+   the content set (decision 7b), so other Fleet Operations-based mods could add their own.
 
 Still open:
 
-4. **The release**: ship Roots support in the same package and GUI installer, or as a
-   separate download (the same package by default: decision 10).
-5. **The submods**: whether "Fleet Ops 4.0" and the classic mods (their own executables)
+6. **The submods**: whether "Fleet Ops 4.0" and the classic mods (their own executables)
    are wanted at all (not by default: decision 9).
