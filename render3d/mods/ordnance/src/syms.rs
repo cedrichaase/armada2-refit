@@ -216,7 +216,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         sections: 0xca07c55a,
         image_base: 0x400000,
         n_resolved: 49,
-        content: "stock",
+        content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x42bfa0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 0xe8], mask: &[], section: "", count: 0, value: 0 }, // fn_obj_even_if_destroyed
             a2engine::Entry { present: true, addr: 0x467730, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x30, 0x8b, 0x50, 0x34, 0xd9, 0x02], mask: &[], section: "", count: 0, value: 0 }, // fn_shock_radius

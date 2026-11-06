@@ -6,7 +6,11 @@
 //! Names are looked up case-insensitively, as the engine (on Windows) does, through
 //! an index of each directory made once. The directories are the file system's virtual
 //! folders (`files`, `LAYOUT`): `textures`, `sod`, `sprites` and `odf`, wherever the
-//! game keeps them.
+//! game keeps them. The index goes source by source, top first, so a name is found in
+//! the top source that has it wherever it sits under the folder (a mod's
+//! `odf\weapons\x.odf` over the game's `odf\x.odf`, as Fleet Operations' file system
+//! finds a file by its name), and keeps every version of it below for an ODF's include
+//! of its own name (`a2fmt::odf`, `Odf::load_layered`).
 
 use crate::files;
 use crate::log;
@@ -21,38 +25,45 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 
-/// Every file under a virtual folder (recursively), by lower-case file name, to its
-/// virtual path.
+/// Every file under a virtual folder (recursively), by lower-case file name, to where
+/// it is: each source that has one of that name, top first, with its path there.
 struct DirIndex {
-    files: BTreeMap<String, String>,
+    files: BTreeMap<String, Vec<(&'static dyn a2fmt::vfs::Vfs, String)>>,
 }
 
 impl DirIndex {
     fn build(dir: &str) -> DirIndex {
-        let mut files = BTreeMap::new();
-        walk(dir, &mut files, 0);
+        let mut files: BTreeMap<String, Vec<(&'static dyn a2fmt::vfs::Vfs, String)>> = BTreeMap::new();
+        for (src, rest) in files::sources(dir) {
+            let mut one = BTreeMap::new();
+            walk(src, &rest, &mut one, 0);
+            for (name, path) in one {
+                files.entry(name).or_default().push((src, path));
+            }
+        }
         DirIndex { files }
     }
-    fn path(&self, name: &str) -> Option<&str> {
-        self.files.get(&rt::lower(name)).map(|s| s.as_str())
+    /// The version `v` of a file (0 the top one).
+    fn read_version(&self, name: &str, v: usize) -> Option<Vec<u8>> {
+        let (src, path) = self.files.get(&rt::lower(name))?.get(v)?;
+        src.open(path)
     }
     fn read(&self, name: &str) -> Option<Vec<u8>> {
-        files::open(self.path(name)?)
+        self.read_version(name, 0)
     }
 }
 
-fn walk(rel: &str, out: &mut BTreeMap<String, String>, depth: u32) {
+/// One source's files under `rel`, by lower-case name: the first found wins within it,
+/// a top-level file over one in a subdirectory.
+fn walk(src: &dyn a2fmt::vfs::Vfs, rel: &str, out: &mut BTreeMap<String, String>, depth: u32) {
     if depth > 6 {
         return;
     }
-    for files::Entry { name, dir } in files::list_dir(rel) {
-        let mut p = String::from(rel);
-        p.push('\\');
-        p.push_str(&name);
+    for files::Entry { name, dir } in src.list(rel) {
+        let p = files::join(rel, &name);
         if dir {
-            walk(&p, out, depth + 1);
+            walk(src, &p, out, depth + 1);
         } else {
-            // The first found wins: a top-level file over one in a subdirectory.
             out.entry(rt::lower(&name)).or_insert(p);
         }
     }
@@ -67,6 +78,7 @@ struct Store {
     sods: BTreeMap<String, Option<Rc<Sod>>>,
     odfs: BTreeMap<String, Option<Rc<Odf>>>,
     bases: BTreeMap<String, String>,
+    races: BTreeMap<String, String>,
     sprites: Option<Rc<SpriteTable>>,
     widths: BTreeMap<String, Option<u32>>,
     textures: BTreeMap<String, Option<gpu::Texture>>,
@@ -90,6 +102,7 @@ fn store() -> &'static mut Store {
                 sods: BTreeMap::new(),
                 odfs: BTreeMap::new(),
                 bases: BTreeMap::new(),
+                races: BTreeMap::new(),
                 sprites: None,
                 widths: BTreeMap::new(),
                 textures: BTreeMap::new(),
@@ -143,9 +156,23 @@ pub fn odf(name: &str) -> Option<Rc<Odf>> {
         return v.clone();
     }
     let dir = &s.odf_dir;
-    let v = Odf::load(&key, |n| dir.read(n)).ok().map(Rc::new);
+    let v = Odf::load_layered(&key, |n, v| dir.read_version(n, v)).ok().map(Rc::new);
     s.odfs.insert(key, v.clone());
     v
+}
+
+/// An ODF's `race`, lower case, read through its includes (Fleet Operations names each
+/// object's race there: `unitedfederation`, `borg`, ...); empty when it names none or
+/// there is no such ODF. Cached per name; logged once each.
+pub fn race(name: &str) -> String {
+    let key = rt::lower(odf_stem(name));
+    let s = store();
+    if let Some(r) = s.races.get(&key) {
+        return r.clone();
+    }
+    let r = odf(&key).and_then(|d| d.get_str("race").map(rt::lower)).unwrap_or_default();
+    s.races.insert(key, r.clone());
+    r
 }
 
 /// An ODF file name without its extension (any case); the name as it is if it has none.
@@ -213,11 +240,8 @@ fn tex_width(s: &mut Store, file: &str) -> Option<u32> {
     if let Some(w) = s.widths.get(&key) {
         return *w;
     }
-    let w = s.tex_dir.path(&key).and_then(|p| {
-        // The header is all we need: 18 bytes.
-        let d = files::open(p)?;
-        a2fmt::image::width(&d)
-    });
+    // The header is all we need: 18 bytes.
+    let w = s.tex_dir.read(&key).and_then(|d| a2fmt::image::width(&d));
     s.widths.insert(key, w);
     w
 }

@@ -567,7 +567,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         sections: 0xca07c55a,
         image_base: 0x400000,
         n_resolved: 165,
-        content: "stock",
+        content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x45fc50, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x8a, 0xad], mask: &[], section: "", count: 0, value: 0 }, // sound2d
             a2engine::Entry { present: true, addr: 0x46e4b0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x56, 0x57, 0x8b, 0x3d, 0x84], mask: &[], section: "", count: 0, value: 0 }, // fn_features

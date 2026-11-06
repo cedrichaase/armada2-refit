@@ -20,8 +20,12 @@
 //!   the fallback behind every source of ours.
 //!
 //! [`Layered`] mounts sources at virtual folders (`textures`, `odf`, or `""` for the
-//! root) and searches them in [`Kind`] order, then in the order they were mounted: the
-//! first source that has a file serves it.
+//! root) and searches them by level (a mod's files over the game's: higher first), then
+//! in [`Kind`] order, then in the order they were mounted: the first source that has a
+//! file serves it. [`Layered::sources`] hands out the sources serving a folder in that
+//! order, for a caller that indexes each apart (a file's name found in the top source
+//! that has it, whatever its folder) or reads a file's next version down (Fleet
+//! Operations' include of a file of the same name).
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -384,13 +388,14 @@ archive!(Zfs, Kind::Zfs, "An Armada `.zfs` archive.",
 
 struct Mount {
     at: Vec<String>,
+    level: u32,
     src: Box<dyn Vfs>,
 }
 
 /// Sources mounted at virtual folders. A path is served by the mounts at the deepest
 /// folder that holds it (`textures/a.tga` by those at `textures`, not by a root mount's
-/// own `textures` folder), searched in [`Kind`] order and then in the order they were
-/// mounted.
+/// own `textures` folder), searched by level (highest first; [`Layered::mount`] is level
+/// 0), then in [`Kind`] order, then in the order they were mounted.
 #[derive(Default)]
 pub struct Layered {
     mounts: Vec<Mount>,
@@ -413,11 +418,22 @@ impl Layered {
     /// its kind or an earlier one, before any of a later kind. A folder that is not a
     /// path (`..`) mounts nothing.
     pub fn mount(&mut self, at: &str, src: Box<dyn Vfs>) {
+        self.mount_level(at, 0, src);
+    }
+
+    /// Mounts a source at a level: searched before every source of a lower level, as a
+    /// mod's folders are before the game's (Fleet Operations: the active mod, then its
+    /// parents, then the game's own `Data\`). Within a level, as [`Layered::mount`].
+    pub fn mount_level(&mut self, at: &str, level: u32, src: Box<dyn Vfs>) {
         let Some(parts) = components(at) else { return };
         let at = parts.into_iter().map(String::from).collect();
         let kind = src.kind();
-        let i = self.mounts.iter().position(|m| m.src.kind() > kind).unwrap_or(self.mounts.len());
-        self.mounts.insert(i, Mount { at, src });
+        let i = self
+            .mounts
+            .iter()
+            .position(|m| m.level < level || (m.level == level && m.src.kind() > kind))
+            .unwrap_or(self.mounts.len());
+        self.mounts.insert(i, Mount { at, level, src });
     }
 
     /// Every mount in search order: its folder (`/`-joined), the source's label and
@@ -427,6 +443,20 @@ impl Layered {
             let at: Vec<&str> = m.at.iter().map(|s| s.as_str()).collect();
             (join(&at, '/'), m.src.label(), m.src.status())
         }).collect()
+    }
+
+    /// The sources serving a folder, in search order, each with the folder's path in
+    /// it (`""` for its own root): for a caller that walks or reads each one apart.
+    pub fn sources(&self, dir: &str) -> Vec<(&dyn Vfs, String)> {
+        let Some(parts) = components(dir) else { return Vec::new() };
+        self.serving(&parts).map(|(m, rest)| (&*m.src, rest)).collect()
+    }
+
+    /// The `n`th version of a file, top first: the file as the `n`th source serving it
+    /// that has it holds it (`open_nth(p, 0)` is `open(p)`).
+    pub fn open_nth(&self, path: &str, n: usize) -> Option<Vec<u8>> {
+        let parts = components(path)?;
+        self.serving(&parts).filter(|(m, rest)| m.src.exists(rest)).nth(n).and_then(|(m, rest)| m.src.open(&rest))
     }
 }
 

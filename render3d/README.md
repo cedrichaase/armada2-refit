@@ -882,22 +882,44 @@ one a module built in (`recipes::builtin(kind, &[(name, include_str!(..))])`).
 The sky's recipes, the menu's `map.ini` and the built-in `ordnance.ini` (whose sections
 `Render3D.ini` overrides one by one, ordnance's own rule) are read through it.
 
-**Files** (`core/src/files.rs`): every game file render3d reads (`assets`, `recipes`,
+**Files** (`core/src/files/mod.rs`): every game file render3d reads (`assets`, `recipes`,
 the world module's texture means) goes through one `a2fmt::vfs` file system, built at the
-first lookup, by a virtual path: `textures\`, `sod\`, `sprites\`, `odf\` and the recipe
-override folders `sky\`, `surfaces\`, `nebulae\`, `menu\`. Its `LAYOUT` is the mount list,
+first lookup, by a virtual path: `textures\`, `sod\`, `sprites\`, `odf\`, the recipe
+override folders `sky\`, `surfaces\`, `nebulae\`, `menu\`, and `data\`, the game directory
+itself (`data\RTS_CFG.h`). Its `LAYOUT` is the mount list,
 each virtual folder and the game-directory folders it searches in order (`Textures\RGB`,
 `SOD`, `Sprites`, `odf`, `Sky`, ...); the first four rows are `games/armada2.toml`'s
 `[files]`, which `tools/layers.py --check` holds them to. `assets` indexes each of its four
-folders once (every file under it, recursively, by lower-case name, the first found
-winning) and reads through the same file system, so the lookup is the one it was before
-the file system, case-insensitive as the engine's. An archive kind (`fpq`, `zfs`) would
+folders once (every file under it, recursively, by lower-case name), source by source in
+search order, so a name is the top source's that has it wherever it sits under the
+folder and, within a source, the first found; it keeps each lower version too, and reads
+through the same file system, so on Armada II (one source a folder) the lookup is the
+one it was before the file system, case-insensitive as the engine's. An ODF is read with
+`a2fmt::odf`'s `load_layered`, so an include of its own name is its next version down
+(Fleet Operations' mods; a loop, cut, where there is one version). An archive kind (`fpq`, `zfs`) would
 mount behind a folder and log why it serves nothing (`files: fpq ... no reader ...`);
 Armada II has none. Fleet Operations: Roots' executable (`ArmadaL.exe`, by name: `GAMES`)
 takes `LAYOUT_FO_ROOTS` (`games/fo-roots.toml`'s `[files]`): the textures in `Textures\`
 itself, TGA and DDS (a name with both is the TGA; `a2fmt::dds` decodes DXT1/3/5 and the
 uncompressed forms, and sides that are not powers of two are allowed there), and
 `ODF.fpq` mounted behind `odf\` (`files: ODF.fpq mounted at odf: N files`).
+
+**Mods** (`core/src/files/mods.rs`, FO-5 step 6). Roots has mods: folders
+`Data\Mods\<name>\` with an `info.ini`, one made active by `-mod <name>` or `/mod <name>`
+on the game's command line (`games/fo-roots.toml` `[files] mods`; render3d reads the
+command line with `GetCommandLineW`). The game's file system then finds each file by
+name in the active mod's folder, then in its `ParentMod`'s and up the chain, then in
+`Data\` itself, unless a mod in the chain is `standalone=1`, when `Data\` is not searched;
+within each folder its `ODF.fpq` and its loose files. render3d mounts the whole
+`LAYOUT_FO_ROOTS` list (and `ODF.fpq`) once per folder of that chain, each a level of the
+file system above the one under it (`Layered::mount_level`), so textures, SODs, sprites,
+ODFs and `RTS_CFG.h` all come from where the game takes them. It logs the chain
+(`files: active mod 'X': X, then the game's own folder`, or `(standalone: ...)`, or `files:
+no active mod ...: the game's own folder alone`). The rules were read off Roots 5.0Z11's
+file system and its mod list: the shipped STA2 Classic mod is standalone and runs on
+Roots' own `ArmadaL.exe` (it ships none), and its Enhanced Gameplay mod is a data-only
+child of it. Within a folder render3d keeps loose over packed, as on Armada II; Roots'
+`odf\` folders are empty, so the order between them is not yet seen to matter.
 
 **Layers.** The engine's addresses, call sites, vtable slots and field reads belong in
 `core/src/engine/` (the core's glue) or a module's own `mods/<m>/src/hooks.rs`; a module's
@@ -1456,7 +1478,9 @@ instance's scale (which the stock body applies only while the instance is scaled
 colours a hit by the shields' level only while `SHIELD_EFFECT_DAMAGE_COLORED = 1`, white
 otherwise. On a build whose profile says it follows these keys (`ef_shield_rescale_pct`,
 the factor in percent, and `ef_shield_damage_key`; 0 on stock, which reads neither), the
-module reads them from the game directory's `RTS_CFG.h` (`r3d_core::rtscfg`) and scales its
+module reads them from `RTS_CFG.h` (`r3d_core::rtscfg`, through the file system's `data\`:
+the active mod's copy over its parents' over the game directory's, the one the game
+reads; FO-5 step 6) and scales its
 shield ellipsoid about its centre (the repair sparks' outward direction keeps the unscaled
 one) and, with the damage colour off, draws the stock colour mode white and keeps the
 faction colours from shifting with the shields' level. A hit the module does not draw is
@@ -2874,6 +2898,41 @@ this build (`Engine::content()`, `crates/a2engine/README.md`, "Content";
 `r3d_core::content::Cache`). So `by_set` is a folder lookup: a set with no table for a
 module is the empty table, and a new set (Fleet Ops) is a copy of `sets/stock/` named in
 its `content.toml`, with no code change (MODDING.md, "Content sets").
+
+**The `fleetops` set** (Fleet Operations: Roots, FO-5 step 6; `profiles/fo-roots-5.0Z11/content.toml`
+names it for all of render3d; until then every module but the hulls read the stock set,
+inherited from gog-1.1's `content.toml`). Names and keys only: every look in it is the
+stock set's, never one fitted to Roots' art (PLAN-FLEETOPS.md, decision 7). Two tables
+say how Roots' names map onto stock's looks, generic keys any set may use:
+
+- `ordnance.ini` `[Names]`: `Ordnance.<odf> = <recipe>` (and `Wave.<odf>`), which
+  ordnance ODF each built-in recipe draws. With it a built-in recipe draws only the ODFs
+  named, because a stock name Roots shares may be another weapon there: Roots' `ionstm` is
+  a utritium beam (`utribeam`), stock's the Klingon ion storm torpedo, so it is left out
+  and drawn as the engine draws it. Each pair is a Roots ordnance ODF (a weapon's
+  `ordName` in `ODF.fpq`) with the recipe of the stock weapon of the same `classLabel` and
+  use: the construction ships' tractor beam (`npc_tractorbeamo`, `tracbmo`), the Borg
+  holding beams, Species 8472's Clairvoyance, the Cardassian Energy Drain, stock's own
+  holo-generator, shield inverter and computer override, the miners' dilithium and
+  tritanium beams, the repair beam, two waves. A section only `Render3D.ini` has draws the
+  ODF of its name, as on stock. The ordnance module's first line for each ODF
+  (`ordnance: <odf> (vtable ..., Submit ...): Recipe(n)`, `Stock`, `Model` or `Engine`) is
+  the survey to extend the table from; `hosttest` checks every named ODF against
+  `ODF.fpq`'s `classLabel` where Roots is installed.
+- `effects.ini` `[Races]`: `<race> = <faction key>`, a ship's shield faction by its ODF's
+  `race` (through its includes, `assets::race`), not by its name's first letter: Roots'
+  Dominion ships start with `d` and `n` and its Free Borg with `f`. Races it does not
+  name (the Dominion, the Ferengi, the neutral `npc_*` races) take the last faction.
+
+The rest: `world.ini` names Roots' nebula classes (`map_nebula_*`), each with the stock
+recipe of the stock nebula of the same `nebulaType` and glow hue (Mutara, Nucleon as
+metreon, Crystalid, Fluidic and Organic as metaphasic, Fluid as cerulean; Tetryon has no
+match), no surface recipe (Roots' planets are its own art), and not `latinum`, which in
+Roots is the class of its asteroid sets and debris fields. `particles.ini` names no vent
+sprites (Roots' venting emitters draw `empty`) and keeps stock's chain-pulsar and Manheim
+emitters, which Roots keeps; `sky.ini` names nothing (Roots' starfields are its own
+art); `overlays.ini`, `specials.ini` and `hulls.ini` are stock's names, which Roots keeps
+(`hulls.ini` with the race-keyed profile, FO-5 step 4).
 `hosttest/src/sets.rs` holds the stock tables to what the modules held as constants
 before (render3d 1.2.0). A build with no set gets `NONE`: no faction keys (shields colour by stock's level), no node or sprite
 names (a clean model shows everything; no vent or pulsar emitter), no recipes (no special

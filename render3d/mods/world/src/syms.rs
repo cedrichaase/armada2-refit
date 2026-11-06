@@ -266,7 +266,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         sections: 0xca07c55a,
         image_base: 0x400000,
         n_resolved: 69,
-        content: "stock",
+        content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x4a4a7a, end: 0x0, target: 0x1, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_nebula_lights
             a2engine::Entry { present: true, addr: 0x4a5160, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x14, 0x56, 0x8b], mask: &[], section: "", count: 0, value: 0 }, // fn_nebula_lights

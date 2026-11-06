@@ -399,7 +399,7 @@ ARCHIVE_KINDS = ('fpq', 'zfs')
 TEXTURE_FORMATS = ('tga', 'dds')
 # The plugins' mount lists (a2fmt::vfs), each a `LAYOUT` between `// files: layout <game>`
 # and `// files: end`, whose rows named in FILE_DIRS must be that game's [files].
-LAYOUTS = ('render3d/core/src/files.rs', 'ui/src/files.rs')
+LAYOUTS = ('render3d/core/src/files/mod.rs', 'ui/src/files.rs')
 
 
 def _check_files(gid, d, errs):
@@ -432,6 +432,12 @@ def _check_files(gid, d, errs):
         if a['at'] not in FILE_DIRS:
             errs.append(f'games/{gid}.toml: files.archives: at {a["at"]!r} is none of '
                         f'{", ".join(FILE_DIRS)}')
+    m = f.get('mods')
+    if m is not None and not (isinstance(m, dict) and set(m) == {'dir', 'switches'}
+                              and isinstance(m['dir'], str) and m['dir'] and '/' not in m['dir']
+                              and isinstance(m['switches'], list) and m['switches']
+                              and all(isinstance(x, str) and x for x in m['switches'])):
+        errs.append(f'games/{gid}.toml: files.mods: {m!r} is not {{dir = "<folder>", switches = [...]}}')
 
 
 def _layout_rows(path):
@@ -468,6 +474,22 @@ def _check_layouts(descs, errs):
                                 f'files.{k} is {want}')
             if 'textures' not in rows:
                 errs.append(f'{path}: layout {gid} mounts no textures')
+    # render3d's mod rules, `// files: mods <game>` ... `// files: end`: the descriptor's
+    # [files] mods, both ways.
+    path = LAYOUTS[0]
+    with open(os.path.join(ROOT, path), encoding='utf-8') as fh:
+        text = fh.read()
+    have = {}
+    for m in re.finditer(r'^// files: mods (\S+).*?$(.*?)^// files: end', text, re.M | re.S):
+        d = re.search(r'dir:\s*"([^"]*)"', m.group(2))
+        sw = re.search(r'switches:\s*&\[([^\]]*)\]', m.group(2))
+        have[m.group(1)] = {'dir': d.group(1) if d else None,
+                            'switches': re.findall(r'"([^"]*)"', sw.group(1)) if sw else None}
+    for gid, d in descs.items():
+        want = _field(d, 'files.mods')
+        if (want or None) != have.get(gid):
+            errs.append(f'{path}: {gid} mod rules are {have.get(gid)}, games/{gid}.toml '
+                        f'files.mods is {want}')
 
 
 def _field(d, dotted):

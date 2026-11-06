@@ -1046,9 +1046,15 @@ fn ship_vsconst(cmd: &mut Cmd, a: &[V3; 3], t: V3) {
     cmd.vs_block(Block::new(4, vc.as_flattened()));
 }
 
-/// The faction of a ship, by its ODF name, in the content set's list.
+/// The faction of a ship in the content set's list: by its ODF's race where the set
+/// keys factions by race (Fleet Operations), else by its ODF name's initial.
 fn fac_of(o: usize) -> Option<usize> {
-    content::get().faction_of(&obj::odf_name(o))
+    let c = content::get();
+    let name = obj::odf_name(o);
+    if c.by_race() {
+        return c.faction_of_race(&r3d_core::assets::race(&name));
+    }
+    c.faction_of(&name)
 }
 
 /// The unit sphere, a triangle list: 18 rings by 36 meridians.
