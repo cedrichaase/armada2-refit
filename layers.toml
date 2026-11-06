@@ -70,7 +70,7 @@ backups = ['.a2display-backup']
 select = 'core'
 requires = ['platform']
 scope = 'local'
-games = ['armada2']
+games = ['armada2', 'fo-roots']
 steps = ['display']
 summary = "the game's Direct3D 8, ours: Vulkan or Direct3D 12 for the plugins, the system's own d3d8.dll when neither starts"
 

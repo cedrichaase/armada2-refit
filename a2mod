@@ -286,7 +286,9 @@ def to_stock(dry):
     else:
         entries = discover()
         if not entries:
-            sys.exit('nothing to switch -- no modded files found in the game directory')
+            # A clone of a game as shipped (the bench's, before ./install): already stock.
+            print('nothing to switch -- no modded files found in the game directory')
+            return
         print(f'hashing {len(entries)} modded files ...', flush=True)
         for e in entries:
             p = os.path.join(GAME, e['rel'])

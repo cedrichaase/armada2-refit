@@ -6,9 +6,20 @@ so the shared code names none. Not a layer; versioned by the root.
 | Descriptor | Game | Offered |
 |---|---|---|
 | `armada2.toml` | Star Trek: Armada II, GOG 1.1 — the default | yes |
-| `fo-roots.toml` | Fleet Operations: Roots ([`PLAN-FLEETOPS.md`](../PLAN-FLEETOPS.md)) | no: no layer is installed into it yet; the bench runs it as it ships |
+| `fo-roots.toml` | Fleet Operations: Roots ([`PLAN-FLEETOPS.md`](../PLAN-FLEETOPS.md)) | no (`installable`: `./install` puts Display8 alone into it, for the bench and the maintainer; see below) |
 
 Armada 1 (`armada1`) gets one of its own by [`PLAN-ARMADA1.md`](../PLAN-ARMADA1.md), A1-1.
+
+## Not offered, not released
+
+**Decided by the user, 2026-11-06:** Fleet Operations: Roots support is in code only. Its
+descriptor stays `offered = false` (with `installable = true`, which lets `./install --game
+fo-roots` and `./a2mod --game fo-roots` work on the maintainer's own Linux install and the
+bench's clones) and it never reaches the GUI installer, the release packages and their
+manifest, `PLAYING.md` or the release notes until the user says otherwise.
+`publish/package.sh` writes into the manifest only the games that are `offered`, and
+`tools/layers.py --check` (CI) fails when `publish/`, `gui-installer/` or `.github/` name a
+game that is not.
 
 ## Choosing a game
 
@@ -37,6 +48,7 @@ Top-level `A2_GAME` and `A2_PREFIX` are the default game's; top-level `A2_HEROIC
 |---|---|---|
 | `id`, `label` | the id (the file's name) and a name for people | everything |
 | `offered` | whether players get it: `./install` refuses a game that is not | `tools/layers.py` |
+| `installable` | optional: `./install` and `a2mod` work on a game that is not `offered` (the bench, the maintainer's own clones); never the release or the GUI (below) | `tools/layers.py` |
 | `default` | the game resolved when none is chosen; exactly one | `a2env.py` |
 | `layers` | the `layers.toml` ids on offer (none retired); each layer lists the game in its `games` | `tools/layers.py`, `./install` |
 | `exe.names` | the executables, the first the one launched and looked for; a profile build's `exe` is one of them | `a2env.py` (`A2_EXE`), `a2mod`, the bench, `tools/layers.py --check` |

@@ -406,6 +406,25 @@ The Roots profile tools (`tools/engine/fo-scan.py`, PR #61) took these defaults:
 | 16 | The rules plugin is disabled and the content set is `none` on Roots until FO-5 supplies `fleetops` | Roots has its own rules; stock's names are not Roots' | FO-5 step 6 |
 | 17 | Changed globals, vtables and slots are **reported, not marked**: marks are per function | the stand-down rule is per function | a hook of ours reading a global FleetOpsHook rewrites |
 
+The installer (`./install --game fo-roots`, FO-4, PR #63) took these defaults:
+
+- `./install --game fo-roots` installs the `display` layer only, into `Data/`; DxWrapper's
+  `d3d8.dll` is the backup (`.a2display-backup`, the usual suffix); no platform layer and no
+  `retire/` run on Roots.
+- `games/fo-roots.toml` gets `installable = true` (optional): `./install` and `a2mod`
+  work on a game that is not `offered`; `offered` stays false.
+- A requirement a game does not have is not a requirement (`display` requires `platform`,
+  which is Armada II's).
+- `a2mod stock` on a game with nothing modded says so and exits 0 (the bench's clone of a
+  game as shipped).
+- `fo-display8` records the bail-out as it is today; its bail-out lines change when the
+  display hooks are verified.
+
+**Decided by the user, 2026-11-06 (not a default):** the agreement came from the Roots developer (Roots is a submod of Fleet Operations), not the FO team, and there is no contact with anyone for now. Roots support stays in code only, installed only by `./install --game fo-roots`: never
+in the GUI installer, the release packages and manifest, `PLAYING.md` or the release notes
+until the user says otherwise. `tools/layers.py --check` and `publish/package.sh` enforce it
+(`games/README.md`, "Not offered, not released").
+
 ## Open decisions
 
 Decided by the user, 2026-11-06:

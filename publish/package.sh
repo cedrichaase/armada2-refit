@@ -317,6 +317,11 @@ import json, subprocess, sys
 reg = {l['id']: l for l in json.loads(subprocess.run(
     ['python3', '$root/tools/layers.py', '--json'], check=True, stdout=subprocess.PIPE).stdout)['layers']}
 OF = {'prereqs': 'platform'}
+# Only games offered to players (games/<id>.toml `offered`): one that is merely `installable`
+# (Fleet Operations: Roots) is bash-only and never named in a release package (games/README.md).
+import glob, os, tomllib
+OFFERED = {os.path.basename(f)[:-5] for f in glob.glob('$root/games/*.toml')
+           if tomllib.load(open(f, 'rb')).get('offered')}
 DIR = {'display': 'layers/display', 'render3d': 'layers/render3d', 'ui': 'layers/ui',
        'qol': 'layers/qol', 'rules': 'layers/rules', 'online': 'layers/online',
        'cutscenes': 'layers/cutscenes', 'models': 'models', 'prereqs': 'vendor'}
@@ -324,7 +329,7 @@ def layer(id, name, version, files, summary, when='always'):
     r = reg[OF.get(id, id)]
     return dict(id=id, name=name, version=version, files=files, summary=summary, when=when,
                 dir=DIR[id], select=r['select'], requires=r['requires'], scope=r['scope'],
-                games=r['games'])
+                games=[g for g in r['games'] if g in OFFERED])
 moved = [dict(zip(('from_file', 'from_section', 'from_key', 'to_file', 'to_section', 'to_key', 'default'),
                   l.rstrip('\n').split('\t')))
          for l in open('$d/moved.txt') if l.strip()]
