@@ -971,3 +971,19 @@ the check ignores that one. The palette sends one BUILD per selected rig, so wit
 several selected the others still count as blockers in the ghost: step 2 deals with it.
 
 **Seen on the bench:** `testbench/scenarios/qol-rig-ignores-self.md`.
+
+## On Fleet Operations: Roots
+
+`./install --game fo-roots` puts QOL.asi into Roots' `Data/` with `qol/defaults/fo-roots.ini`
+applied over `QOL.ini`: `PanSpeed` runs, every other key is 0 until it has been measured
+beside Roots' own behaviour (PLAN-FLEETOPS.md, "FO-7: QOL on Roots", decisions 100-107).
+
+- **The pan hook** is `RTS_Configure`'s store over the parsed `FASTSCROLL_COEFFICIENT`.
+  Roots' executable has the function byte for byte as stock, FleetOpsHook's one run-time
+  write inside it is a call far past the site, and Roots' `RTS_CFG.h` has stock's value, so the
+  hook is the same as on Armada II; `QOL.log` says `RTS_CFG.h parsed: ... now 0.0125`.
+- **The overview** is read through `g_pOverView` (`ov_base()` in `qol.c`), since Roots
+  constructs an enlarged one of its own instead of the static object. Anything of QOL that
+  addresses the overview must do the same.
+- **`BarKeys` stays off**: Roots' bar is FleetOpsHook's, up to 64 buttons with several per
+  weapon classlabel, so the slot plan of QOL-1 does not hold there.

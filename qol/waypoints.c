@@ -1220,7 +1220,8 @@ __declspec(dllexport) int __cdecl QOL_MoveQueuePoint(const float *xyz, int actio
     int  *key;
     char  b[96];
     if (!mq_enabled() || !xyz || (action & MP_QUEUED)) return 0;
-    ov = (BYTE *)a2e_addr(QOL_S_OVERVIEW);
+    ov = (BYTE *)ov_base();
+    if (!ov) return 0;
     key = *(int **)(ov + OV_KEY);
     if (!key || !*key) return 0;
     b[0] = 0;

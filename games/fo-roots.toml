@@ -14,9 +14,10 @@ default = false
 # "What runs on Roots"): Display8, in place of DxWrapper's d3d8.dll (backed up); the ASI
 # loader Roots ships none of (asiloader/, winmm.dll; only beside Display8: beside DxWrapper
 # it kills the game at start); and render3d, loaded by it. No platform layer (no widescreen
-# patch of ours), and no UI, QOL, rules, online, textures or cutscenes on Roots yet. A clone
+# patch of ours), QOL (FO-7: the right-drag pan speed on; every other part off until measured
+# beside Roots' own behaviour), and no UI, rules, online, textures or cutscenes on Roots yet. A clone
 # with no layers is the game as shipped.
-layers = ["display", "asiloader", "render3d"]
+layers = ["display", "asiloader", "render3d", "qol"]
 
 [exe]
 # The game itself in Data/, under a launcher (FleetOps.exe) that only starts it; the

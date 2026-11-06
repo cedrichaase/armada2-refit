@@ -286,11 +286,14 @@ verified = ["render3d.core.reads"]
 
 # FleetOpsHook's one call (+0x1d9d) is the last key read before the parser is freed, where
 # it reads its own keys; the culling distance's load (+0xebf) is stock's, and FleetOpsHook
-# names neither the far plane nor the culling distance (FO-5 step 7).
+# names neither the far plane nor the culling distance (FO-5 step 7). QOL's pan site
+# (+0xa36, the store over the parsed FASTSCROLL_COEFFICIENT) is stock's bytes: the whole
+# function is identical to stock's in the file, FleetOpsHook's one run-time write (that call) is
+# 0x12f7 bytes past it, and RTS_CFG.h's value is stock's 0.005 (FO-7, decision 100).
 [[changed]]
 fn = "RTS_Configure"
 how = "runtime"
-verified = ["render3d.view.distance"]
+verified = ["render3d.view.distance", "qol.pan_speed"]
 
 # FleetOpsHook's call inside the body (+0xea) runs as it wrote it: the effects module
 # taps the weapons' calls of the function and calls what they called (FO-5 step 5), and

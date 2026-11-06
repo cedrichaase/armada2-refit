@@ -194,6 +194,20 @@ static const Site k_cap[] = {
 
 static DWORD g_sel[SEL_MAX];
 
+/* The overview the game uses, through the engine's pointer to it (g_pOverView): stock's is
+ * the static object, but Fleet Operations: Roots constructs an enlarged one of its own, and
+ * only the pointer follows (PLAN-FLEETOPS.md, FO-7).  Before the constructor has run the
+ * pointer is NULL; stock's static object is then the answer, and any other build has none
+ * yet (0), so a hook that needs the object stands down rather than guess. */
+static DWORD ov_base(void)
+{
+    DWORD a = a2e_addr(QOL_S_OVERVIEW_PTR);
+    DWORD p = a ? *(volatile DWORD *)a : 0;
+    const char *b = a2e_build();
+    if (p) return p;
+    return (b && a2e_streq(b, "armada2/gog-1.1")) ? a2e_addr(QOL_S_OVERVIEW) : 0;
+}
+
 /* ---- tiny string/log helpers (no CRT) --------------------------------- */
 
 static char g_logpath[320];
@@ -1105,7 +1119,8 @@ static int patch_selection(int max)
     int   i, k, n = (int)(sizeof k_sel / sizeof k_sel[0]);
 
     if (!g_rdySel) return 0;
-    overview = a2e_addr(QOL_S_OVERVIEW);
+    overview = ov_base();
+    if (!overview) return 0;
     disp = (DWORD)g_sel - overview;
     /* whatever is selected already comes along (nothing is, this early) */
     for (k = 0; k < 16; k++) g_sel[k] = *(volatile DWORD *)(overview + QOL_F_OV_SEL + 4 * k);

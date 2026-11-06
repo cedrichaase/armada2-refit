@@ -611,6 +611,37 @@ in the GUI installer, the release packages and manifest, `PLAYING.md` or the rel
 until the user says otherwise. `tools/layers.py --check` and `publish/package.sh` enforce it
 (`games/README.md`, "Not offered, not released").
 
+## FO-7: QOL on Roots
+
+Round one (branch `fo-7`, 2026-11-06): the right-drag pan speed runs on Roots, every other
+QOL feature is off by default. QOL.asi is installed by `./install --game fo-roots` into
+`Data/` with Roots' own defaults (`qol/defaults/fo-roots.ini`, applied over `qol/QOL.ini` by
+`qol/install.sh` with `ui/apply-defaults.py`, the mechanism FO-6 uses for `UI.ini`). The
+scenario is `testbench/scenarios/fo-qol-camera.md`. Which hook is ready: `./a2test syms
+--game fo-roots` (QOL): `qol.pan_speed` ready and `qol.rig_self` ready (off by decision 102);
+`shift_group`, `selection`, `special_select`, `stations`, `warp`, `move_paths` and `bar_keys`
+stand down (their functions are changed by Roots and not yet verified), `qolrules.*` are
+disabled by the profile.
+
+| # | Default | Why | What would change it |
+|---|---|---|---|
+| 100 | **QOL on Roots is the `qol` layer** of `games/fo-roots.toml` and `layers.toml` (`games = ['armada2', 'fo-roots']`), installed into the executable's folder (`dirname $A2_EXE`, `Data/`), with a defaults overlay `qol/defaults/fo-roots.ini` that leaves `PanSpeed=2.5` and sets every other key off; the overlay applies to a new file and to keys an existing `QOL.ini` lacks (the player's values are kept) | one mechanism per game for a plugin's shipped defaults, the same as FO-6's; a feature is switched on in the overlay once its row here says it was measured beside Roots' behaviour | a feature verified: its overlay line is deleted |
+| 101 | **`qol.pan_speed` is verified on Roots** (`RTS_Configure` is marked `verified = ["render3d.view.distance", "qol.pan_speed"]`): the whole function is byte-identical to stock's in `ArmadaL.exe`, the 25 bytes at the site (+0xa36, the store over the parsed `FASTSCROLL_COEFFICIENT`) and the global's initial value are stock's, and in memory after FleetOpsHook has patched (MemDiff log, FO-2) its one write inside the function is a call at +0x1d9e, 0x1367 bytes past the site; Roots' `RTS_CFG.h` carries `FASTSCROLL_COEFFICIENT = 0.005`, stock's value, on its own line (`qol/rts-cfg-check.py` treats it as stock's) | the same method as FO-5 and FO-6: bytes in the file, bytes in memory, then the bench's log line (`RTS_CFG.h parsed: right-drag FASTSCROLL_COEFFICIENT now 0.0125`) | a Roots build whose parser moves the site or whose `RTS_CFG.h` value is not 0.005 (the file check and the profile identity both fail first) |
+| 102 | **Every other QOL key is 0 on Roots, including those whose hook already stands down, and `RigIgnoresSelf`, whose hook is ready**: `ShiftAddsToGroup`, `StationGroups`, `WarpDistance`, `PathStartsAtOnce`, `RigIgnoresSelf`, `MaxSelection=16`, `BarKeys` | a stood-down hook is the profile's judgement today; the key is the user's: it keeps a feature off after its hook is verified and before it is measured beside Roots' own rules (FleetOpsHook edits the construction ship's render and the bar; the placement check of the ghost is unmeasured) | each feature's measurement round |
+| 103 | **`BarKeys` stays off, and is not a candidate until FO-6 has measured the bar**: the bar is FleetOpsHook's (it adds buttons and edits the hotkey table), and TamsynnImogen's note (2026-11-06) is that Roots' command area can reach 64 buttons with several per weapon classlabel; QOL-1's position keys assume stock's slot plan (`row * width + col`, `qol/README.md`) | a key that presses the wrong button is worse than no key | FO-6's measurement of the bar's slot plan on Roots, then a `BarKeys` row of its own |
+| 104 | **QOL reads the overview through `g_pOverView`** (`overview_ptr`, 0x768e3c, in the profile): the selection array patch and the move queue's minimap entry go through it, not through the static object at 0x768e40; before the constructor has run (NULL) the static is used on stock's build only, and any other build gets 0, so the hook stands down | Roots constructs an enlarged overview of its own (FO-5 step 7, decision 42); the 31 selection sites are rewritten to `g_sel` minus the object's address, so a wrong object corrupts the selection. The change is behaviour-preserving on Armada II | the selection round: whether `cOverViewImp`'s fields are at stock's offsets in the enlarged object (the profile's `field` entries) |
+| 105 | **`QOLRules.asi` is not installed on Roots** (`qolrules.*` stay disabled by `[[disable]]`); QOL.asi keeps to changes that stay on this player's machine | Roots has its own rules and network code; multiplayer is FO-8 | FO-8 |
+| 106 | **The next features are measured in this order, each its own row:** `ShiftAddsToGroup` (key handling only), `MaxSelection` (the overview object, decision 104), `StationGroups`, `WarpDistance`, `RigIgnoresSelf`, `PathStartsAtOnce` last (its orders interact with FleetOpsHook's formation path, "FO-B: the formation move's path") | from least to most coupled to what FleetOpsHook rewrites | the user's priorities |
+| 107 | **`ui/apply-defaults.py` is shared** with FO-6 (the same file, `qol/install.sh` calls it from there) | one tool, no second copy to keep in step | a layer-neutral home for it |
+
+Bench, 2026-11-06 (`./a2test run fo-qol-camera --game fo-roots --install .`, 1280x960, Vulkan):
+the log names the build and the matched companion, `PanSpeed=2.5 -> x2.50, patched`, `RTS_CFG.h
+parsed: ... now 0.0125 (file value x 2.50)` and the seven stood-down or off features; a right-drag
+of 400 px moved the map about 260 px (the stock factor would be about 104). The stock plugin is
+unchanged: `qol-big-selection` and `qol-move-queue` pass at 1280x720 with `--install .`
+(`qol-move-queue` failed once on two waits for the "cleared" lines and passed on the
+re-run and on `origin/fo-b`: a timing flake, not the overview change).
+
 ## Open decisions
 
 Decided by the user, 2026-11-06:
