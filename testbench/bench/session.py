@@ -188,8 +188,8 @@ def log_path(dirs, name):
 
 
 def vulkan_env(game_dir, logs=None):
-    """The environment of a game whose Display8 draws on Vulkan (`Mode=stub`,
-    `Backend=vulkan` in its Display8.ini): Mesa's CPU Vulkan (lavapipe) as the only
+    """The environment of a game whose Display8 draws on Vulkan (`Backend=vulkan`
+    in its Display8.ini): Mesa's CPU Vulkan (lavapipe) as the only
     driver and the Khronos validation layer. Since testbench 3.70.0 the default is the
     physical GPU with the layer on (it catches errors before they can hang the GPU);
     `--vulkan-device lavapipe` (`A2TEST_VULKAN_DEVICE=lavapipe`) gives the CPU driver
@@ -215,13 +215,18 @@ def vulkan_env(game_dir, logs=None):
         return {}
     keys = {m.group(1).lower(): m.group(2).strip().lower()
             for m in re.finditer(r'^\s*(\w+)\s*=\s*(.*?)\s*$', text, re.M)}
-    if keys.get('mode') == 'stub' and keys.get('backend') == 'd3d12' and keys.get('validate') == '1':
+    # Since display 1.0.0 the stub is Display8's one mode and `Mode=` is retired (read past,
+    # and absent from the shipped ini): only a retired `Mode=forward` left in an old ini is
+    # not the stub, and Display8 runs the stub then too. Gating on `Mode=stub` left every
+    # game without the validation layer.
+    stub = keys.get('mode', 'stub') in ('stub', 'forward', '')
+    if stub and keys.get('backend') == 'd3d12' and keys.get('validate') == '1':
         env = {'VKD3D_CONFIG': 'vk_debug', 'VK_INSTANCE_LAYERS': 'VK_LAYER_KHRONOS_validation', 'VK_LAYER_DEBUG_ACTION': 'VK_DBG_LAYER_ACTION_LOG_MSG',
                'VK_LAYER_REPORT_FLAGS': 'error,warn'}
         if logs is not None:
             env['VK_LAYER_LOG_FILENAME'] = str(Path(logs) / 'vvl.log')
         return env
-    if keys.get('mode') != 'stub':
+    if not stub:
         return {}
     order = {w.strip() for w in keys.get('backend', '').split(',')}
     if keys.get('backend') != 'vulkan':
