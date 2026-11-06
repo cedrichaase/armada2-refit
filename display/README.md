@@ -586,7 +586,9 @@ drawn with white and logged once; the stub offers the engine no other texture fo
 so none should arrive.
 
 **Texture formats.** `CheckDeviceFormat` says yes to A8R8G8B8 and X8R8G8B8 alone as
-textures (`stub/d3d.rs`, `texture_format_ok`), because a mirror holds no other. The
+textures (`stub/d3d.rs`, `texture_format_ok`), because a mirror holds no other (and, since
+display 1.1.0, DXT1, DXT3 and DXT5 where the backend samples them: "Block-compressed
+textures" below). The
 engine chooses its texture formats in `ST3D_DeviceDirectX8::SelectTextureFormats`
 (0x625f80) by asking in an order its graphics detail sets (`ST3D_GraphicsEngine_Configuration`
 +0x40, the Graphics Detail slider, `ARMADA.PRF` line 5, field 6): at the top detail
@@ -598,6 +600,68 @@ were flat squares, and the fog's texture had no mirror for the overlays
 (`render3d-nebula-detail`). Refused, the engine falls through to the two 32-bit formats
 at every detail; the detail still sets the levels of detail, the starfield and the
 first level of a texture's chain it loads (`ST3D_GraphicsEngine::GetLargestMipMapToUse`).
+
+**Block-compressed textures** (for Fleet Operations: Roots, `PLAN-FLEETOPS.md` FO-4; the
+stock engine never makes one). Roots loads about 550 DDS files through D3DX8, which asks
+`CheckDeviceFormat` for DXT1 to DXT5 and, told no, decompresses each file itself (4 to 8
+times the memory). `CheckDeviceFormat` now says yes to DXT1, DXT3 and DXT5 as 2D textures
+when the backend can sample them (`stub::compressed_textures`: Direct3D 12 always, Vulkan
+with `textureCompressionBC`, which Display8 enables when the physical device has it), and
+to no other new format; cubes and volumes stay refused. The stub already sized them as
+Direct3D 8 does (`stub/blocks.rs`, host-tested): a level's pitch is one row of 4x4 blocks
+(8 bytes a block for DXT1, 16 for the rest), `GetLevelDesc`'s size is the level's bytes,
+and a level under one block (the 2x2 and 1x1 ends of a chain) is one whole block, which is
+what D3DX8's `LockRect` fills. The mirror holds them as BC1 (RGBA), BC2 and BC3 (DXT2 and
+DXT4, the premultiplied spellings, as BC2 and BC3 too), uploaded by block rows and sampled
+natively, with every level (`upload_blocks` on both backends; on Direct3D 12 a footprint
+is the whole block and a base level not a multiple of 4 gets no mirror, as that API
+requires). A plugin that samples such a mirror gets the format in `VkImage8.format` and
+`Dx12Image8.format`: it is not B8G8R8A8, which the contract has always said to read off
+the info. `display-compressed-textures` checks it: with `BenchTextures=N` (bench clones
+only, `benchfo.rs`) Display8 itself makes a DXT1, a DXT3 and a DXT5 texture of 64x64 with
+seven levels through its own device's vtable, fills them through `LockRect` and draws
+them through the passthrough with `DrawPrimitiveUP`, over a paused mission; the checker
+of blocks, the alpha ramps and the flat lower levels are in the screenshot on Vulkan and
+on Direct3D 12. `CheckDeviceMultiSampleType` says yes to any multisample type (2 to 16)
+for a back buffer or depth format, and `CreateDevice` accepts it and ignores it, as the
+device's back buffer is single-sampled whatever is asked and render3d does its own MSAA.
+
+**A second window** (Roots makes one device for its 1200x900 shell and another for the
+game, on another window, and a skirmish was a white screen while the engine drew on).
+The backend is made at the first `CreateDevice`, on its window, and a later `CreateDevice`
+only looked the device up. When it names another window now (`stub::follow_window`) that
+window gets the first one's treatment (a popup over the desktop) and the swap chain moves
+to it: on Vulkan a surface of the new window, the old swap chain and surface destroyed and
+a swap chain made again (`Vk::rebind`); on Direct3D 12 the GPU's work waited for, the swap
+chain and its buffers released and a new one made on the new window (`Dx::rebind`). The
+colour target, the pipelines and the mirrors stay, so nothing a plugin holds changes. The
+stock engine reuses its one window at every `CreateDevice`, so this never runs there.
+`display-window-follow` checks it on both backends (the bench-only `BenchWindow=N` hook
+hands a popup to the same function at the Nth `Present`, and the game's window again at the
+2Nth, hiding the popup; a thread of the hook's gives the activation back to the game's
+window whenever the popup takes it, since the engine stops drawing while its window is not
+the active one, and logs the `Present`s made 1 s and 4 s after each handover).
+
+**A black screen after the move was the bench's sway, not the move.** Sway puts a window
+mapped after the full-screen game window behind it, tiled at 0x0 (`swaymsg -t get_tree`:
+the popup `visible: false`); nothing drawn on it shows, the game's window has lost its
+swap chain and shows black, and Xwayland, which gets no frame callbacks for a hidden
+surface, lets through only a few presents a second (the hook logged 4 `Present`s in the
+first second, against 60). It happened on Vulkan as on Direct3D 12, in some runs and not
+others, and the scenario's step `Put the window "Display8 bench" full screen` ends it: with
+the popup full screen, both backends present at 60 a second and show the frame on it, and
+again on the game's window after the move back. Ruled out on the way, on Direct3D 12: the
+swap chain's window (`GetHwnd` is the new one), the buffers and their views (made again,
+`GetCurrentBackBufferIndex` and `GetLastPresentCount` start over from the new swap chain),
+the fence and frame slots (the frame open at the move is flushed and goes on), `Present`'s
+result (S_OK every frame) and `MakeWindowAssociation` (DXVK's DXGI ignores its flags).
+Roots' own game window is the desktop's to show; `auto` tries Vulkan first.
+
+**A 1200x900 shell** needs nothing new: a mode the stub does not list is answered with the
+desktop's (the same as the 800x600 and 1024x768 requests of the stock shell and profile),
+`CreateDevice` is told it got what it asked and the window covers the desktop. The six
+`FindDisplayMode` calls of `stub/modes.rs` are Armada II's addresses; under Roots they
+stand down until the profile marks them verified (FO-3).
 
 **The engine's one vertex shader** (ROADMAP 4d) is the Borg hulls' bump pass. Display8
 keeps every vertex shader's declaration and function tokens at `CreateVertexShader`, the
