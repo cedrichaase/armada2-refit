@@ -14,6 +14,11 @@ rows = ["Modules.overlays"]
 doc = "The height posts: DrawHeightPost's five call sites re-pointed to our own anti-aliased lines"
 rows = ["Modules.overlays"]
 
+[hook."overlays.posts_callee"]
+doc = "DrawHeightPost itself, for the five calls FleetOpsHook owns on Roots: armed during the chained call"
+rows = ["Modules.overlays"]
+planned = "FO-5 step 5"
+
 [hook."overlays.paths"]
 doc = "The move paths: the selection, each ship's path and next point, the sketched path, stock's sketch line re-pointed"
 rows = ["Overlays.MovePaths"]
@@ -145,7 +150,7 @@ symbol = "DrawHeightPost"
 kind = "fn"
 addr = 0x593840
 check = "55 8b ec 83 ec 18 8b 4d"
-used_by = ["overlays.reads", "overlays.posts"]
+used_by = ["overlays.reads", "overlays.posts", "overlays.posts_callee"]
 
 [[sym]]
 id = "fn_render_selection"

@@ -62,10 +62,11 @@ SNAKE = re.compile(r'[a-z][a-z0-9_]*\Z')
 HOOKNAME = re.compile(r'[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*\Z')
 SKIP_PLUGIN_DIRS = {'hud', 'grid', 'menus'}      # superseded by UI.asi, no profile (plan: "Legacy hud, grid and menus")
 SKIP_TREE = {'target', 'build', '.git', '__pycache__', 'node_modules'}
-BUILD_KEYS = {'schema', 'game', 'build', 'label', 'exe', 'inherits', 'content', 'pe', 'known', 'changed', 'disable'}
+BUILD_KEYS = {'schema', 'game', 'build', 'label', 'exe', 'inherits', 'content', 'pe', 'known', 'changed', 'disable', 'module'}
 PE_KEYS = ['timestamp', 'image_size', 'sections', 'image_base', 'code']
+PE_OPTIONAL = ['file_crc']          # on-disk section CRC-32s, {'.text' = crc}
 FILE_KEYS = {'schema', 'plugin', 'readme', 'lang', 'out', 'hook', 'sym'}
-HOOK_KEYS = {'doc', 'rows', 'unknown'}
+HOOK_KEYS = {'doc', 'rows', 'unknown', 'planned'}
 
 
 def isint(v):
@@ -161,8 +162,18 @@ def lint_build(b, R):
         R.add(w, 'missing [pe]')
     else:
         for k in pe:
-            if k not in PE_KEYS:
+            if k not in PE_KEYS and k not in PE_OPTIONAL:
                 R.add(w, f'[pe]: unknown key {k!r}')
+        fc = pe.get('file_crc')
+        if fc is not None:
+            if not (isinstance(fc, dict) and fc):
+                R.add(w, '[pe]: file_crc must be a table of section name = CRC-32')
+            else:
+                for sec, crc in fc.items():
+                    if not (isinstance(sec, str) and 0 < len(sec) <= 8):
+                        R.add(w, f'[pe]: file_crc: {sec!r} is not a section name (at most 8 characters)')
+                    if not (isint(crc) and 0 <= crc <= 0xffffffff):
+                        R.add(w, f'[pe]: file_crc: {sec} must be a CRC-32 (0..0xffffffff)')
         for k in PE_KEYS:
             if k not in pe:
                 R.add(w, f'[pe]: missing {k}')
@@ -178,6 +189,17 @@ def lint_build(b, R):
                     R.add(w, f'[pe]: code {c[0]:#x}..{c[1]:#x} is not inside the image {r[0]:#x}..{r[1]:#x}')
         if isint(pe.get('image_size')) and pe['image_size'] <= 0:
             R.add(w, '[pe]: image_size must be positive')
+    for i, m in enumerate(d.get('module') or []):
+        if not isinstance(m, dict):
+            R.add(w, f'[[module]] #{i + 1}: not a table')
+            continue
+        for kk in m:
+            if kk not in ('name', 'text_crc'):
+                R.add(w, f'[[module]] #{i + 1}: unknown key {kk!r}')
+        if not (isstr(m.get('name')) and len(m['name']) < 32):
+            R.add(w, f'[[module]] #{i + 1}: name must be a module file name')
+        if not (isint(m.get('text_crc')) and 0 <= m['text_crc'] <= 0xffffffff):
+            R.add(w, f'[[module]] #{i + 1}: text_crc must be the CRC-32 of its .text (0..0xffffffff)')
     for i, k in enumerate(d.get('known') or []):
         if not isinstance(k, dict):
             R.add(w, f'[[known]] #{i + 1}: not a table')
@@ -257,6 +279,8 @@ def lint_file(f, root_file, R):
         for k in h:
             if k not in HOOK_KEYS:
                 R.add(hw, f'unknown key {k!r}')
+        if 'planned' in h and not isstr(h['planned']):
+            R.add(hw, 'planned must say which step will use the hook')
         if not isstr(h.get('doc')):
             R.add(hw, 'missing doc')
         elif len(h['doc']) > 120:
@@ -759,11 +783,17 @@ def rules34(games, R, src_root):
                     if isinstance(t, str) and t in ids and t not in used_ids:
                         used_ids.add(t)
                         todo.append(t)
+            # a hook with `planned = "<step>"` is profile data ahead of its code: it and the
+            # entries only planned hooks use are not orphans yet
+            planned = {h for h, hd in rf.hooks.items() if isinstance(hd, dict) and hd.get('planned')}
             for sid in ids:
                 if sid not in used_ids:
+                    hooks_of = set(ids[sid].get('used_by') or [])
+                    if hooks_of and hooks_of <= planned:
+                        continue
                     R.add(f'{w}: sym {sid}', 'is not used by any code (orphan; delete it, or use it)')
             for n, h in dd['hook'].items():
-                if n not in used[k]['hook']:
+                if n not in used[k]['hook'] and h not in planned:
                     R.add(f'{w}: hook {h}', 'is not used by any code (orphan)')
         # rule 4
         ranges = []

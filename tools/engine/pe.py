@@ -1,7 +1,9 @@
 """PE identity (phase 8 contract P1) and reads by virtual address from an executable
 FILE, through its section table: the offline twin of crates/a2engine/src/pe.rs.
 Stdlib only."""
+import os
 import struct
+import zlib
 
 SCN_CODE = 0x20000020   # IMAGE_SCN_MEM_EXECUTE | IMAGE_SCN_CNT_CODE
 
@@ -13,12 +15,41 @@ def fnv(h, b):
     return h
 
 
+def section_crc(data, name):
+    """The CRC-32 of section `name`'s raw data in a PE file's bytes: the first
+    min(VirtualSize, SizeOfRawData) bytes at PointerToRawData (crates/a2engine pe.rs
+    section_crc_file); None when the section is not there or the file ends early."""
+    try:
+        nt = struct.unpack_from('<I', data, 0x3c)[0]
+        count = struct.unpack_from('<H', data, nt + 6)[0]
+        table = nt + 24 + struct.unpack_from('<H', data, nt + 20)[0]
+        if count > 96:
+            return None
+        for i in range(count):
+            s = data[table + i * 40:table + i * 40 + 40]
+            if len(s) < 40:
+                return None
+            if s[0:8].rstrip(b'\0') != name.encode('latin-1'):
+                continue
+            vsize, _, raw, ptr = struct.unpack_from('<IIII', s, 8)
+            n = min(vsize, raw)
+            chunk = data[ptr:ptr + n]
+            return zlib.crc32(chunk) & 0xffffffff if len(chunk) == n else None
+    except struct.error:
+        return None
+    return None
+
+
 class Exe:
     """An executable file, read as the loader would map it at `base` (default: its own
     ImageBase). None of it is written."""
 
-    def __init__(self, data, base=None, name=None):
+    def __init__(self, data, base=None, name=None, path=None, modules=None):
         self.data = data
+        # Where the file is, for the companion modules beside it (`module_crc`), and, for
+        # the fixtures, the modules the process holds: {name: .text crc | None (unreadable)}.
+        self.path = path
+        self.modules = modules
         # The module's file name, as the process would report it (resolve.py uses it for
         # the identity line on an unknown build); None for a buffer.
         self.name = name
@@ -59,6 +90,32 @@ class Exe:
         self.fingerprint = h
         self.base = self.image_base if base is None else base
         self.code = (self.base + code[0], self.base + code[1]) if code else (0, 0)
+
+    def file_crc(self, name):
+        """The CRC-32 of a section of this file (the on-disk one)."""
+        return section_crc(self.data, name)
+
+    def module_crc(self, name):
+        """('crc', v), ('absent', None) or ('unreadable', None): the companion module `name`
+        the process would hold. A fixture says (`modules`); offline it is looked for beside
+        the executable and one directory up (Roots keeps FleetOpsHook.dll above Data/)."""
+        if self.modules is not None:
+            if name not in self.modules:
+                return ('absent', None)
+            v = self.modules[name]
+            return ('unreadable', None) if v is None else ('crc', v)
+        if self.path:
+            d = os.path.dirname(os.path.abspath(self.path))
+            for dd in (d, os.path.dirname(d)):
+                p = os.path.join(dd, name)
+                if os.path.isfile(p):
+                    try:
+                        with open(p, 'rb') as f:
+                            v = section_crc(f.read(), '.text')
+                    except OSError:
+                        v = None
+                    return ('unreadable', None) if v is None else ('crc', v)
+        return ('absent', None)
 
     def identity(self):
         return (self.timestamp, self.image_size, self.fingerprint)

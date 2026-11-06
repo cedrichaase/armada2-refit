@@ -9,3 +9,20 @@ plugin = "render3d"
 [[sym]]
 id = "fn_new"
 check = ""
+
+[[sym]]
+id = "fn_go_render"
+check = ""
+
+# FleetOpsHook.dll writes this call as it loads (the file holds stock's bytes there): the
+# object loop's draw becomes one call into FleetOpsHook per object, which makes the cull
+# decision and calls GameObject::Render. Chained: the callee is its own.
+[[sym]]
+id = "site_obj_draw"
+symbol = "Armada_RenderAllOurStuff"
+kind = "call"
+addr = 0x598297
+target = "fn_go_render"
+chain = true
+in = "Armada_RenderAllOurStuff"
+used_by = ["frame.obj_draw"]

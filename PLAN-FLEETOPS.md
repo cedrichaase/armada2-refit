@@ -264,7 +264,16 @@ is one new claim point for hulls and a handful of call-site hooks moved one leve
    `registry::object` does not take a Roots object; the engine's `Render` runs with every
    wrapper; at 0x4d5a11 the hulls module draws the instance it posed instead of the
    database, reading the per-instance node flags and mesh textures that stock and Roots
-   wrote just before. Everything the engine draws around it (the overlay model, the rings,
+   wrote just before. **The owner**: the instance holds no pointer to its object, so the
+   object step's call at 0x598297 sets a "current object" around the chained draw (it is
+   synchronous, one object at a time), and the claim accepts the instance only when it is
+   that object's own (`object+0x4`, the entity's instance, equals the instance at the call);
+   that skips planets (reached through the craft instance), the overlay model, holograms and
+   other modules' objects. The race comes from the object's ODF as on stock. Construction
+   rigs: FleetOpsHook gives them the common `GameObject::Render`, so the stock rig draw is
+   never called from the loop and rigs reach the claim like any object; the core's rig read
+   (`core.reads`) stands down on Roots with its `ConstructionRig::Render` mark. Holograms
+   and the overlay model do not pass the call and are left to the engine. Everything the engine draws around it (the overlay model, the rings,
    holograms, sprite nodes, wave lights) is the engine's, through passthrough; hulls' own
    versions of those stand down on Roots. FleetOpsHook's Dot3 draws are never reached for
    a claimed hull; for one hulls does not take, Display8's passthrough draws them (its
@@ -306,14 +315,17 @@ same for all of them. So:
   `.test` it leaves alone), for builds that set them;
 - the build names a **companion module**, `FleetOpsHook.dll`, by the CRC-32 of its own
   `.text`: the marks of `fo-roots-5.0Z11` describe that FleetOpsHook. With another one
-  loaded, every hook marked `runtime` stands down, as an unknown build's would.
+  loaded (or none, or one that cannot be read), every hook marked `runtime` stands down, as an
+  unknown build's would, and so does every hook that calls through the module (a chained
+  call) or whose callee check the build drops: built, and tested with a foreign copy, in
+  step 1.
 
 ### Work list
 
 | Step | What | Agent h · bench |
 |---|---|---|
-| 1 | Identity: `[pe] file_crc` (on-disk `.text`, `.test`) and `[[module]]` (FleetOpsHook's `.text` CRC) in `a2engine`, `gen.py`, the C twin and `fo-scan.py`; the negative test with a foreign FleetOpsHook | 4–6 · 1 |
-| 2 | Profile: `site_obj_draw` (0x598297, `call`, `chain`, Roots only), `site_hull_draw` (0x4d5a11, `call` to `ST3D_Instance::RenderInternal`, in `GameObjectInstance::RenderInternal`, which neither Roots' file nor FleetOpsHook changes); the callee hooks for `Fragment` and `DrawHeightPost`; `verified` on `Armada_RenderAllOurStuff` for `render3d.frame.*`; `fo-scan.py --compare` | 3–5 · 0 |
+| 1 | Identity: `[pe] file_crc` (on-disk `.text`, `.test`) and `[[module]]` (FleetOpsHook's `.text` CRC) in `a2engine`, `gen.py`, the C twin and `fo-scan.py`; the negative test with a foreign FleetOpsHook. **Done 2026-11-06** (branch `fo-5-identity`; crates/a2engine/README.md, "Identity beyond the header") | 4–6 · 1 |
+| 2 | **Done 2026-11-06**, as profile data (`planned` hooks, README rows): Profile: `site_obj_draw` (0x598297, `call`, `chain`, Roots only), `site_hull_draw` (0x4d5a11, `call` to `ST3D_Instance::RenderInternal`, in `GameObjectInstance::RenderInternal`, which neither Roots' file nor FleetOpsHook changes); the callee hooks for `Fragment` and `DrawHeightPost`; `verified` on `Armada_RenderAllOurStuff` for `render3d.frame.*`; `fo-scan.py --compare` | 3–5 · 0 |
 | 3 | Core: the object step calls through the loop's call site when it is one; stock's loop untouched (the stock set must not move a pixel) | 2–4 · 2 |
 | 4 | Hulls: the instance-level claim, chosen by the profile (a `value`), snapshotting node flags and textures at the claim; hulls' own sprite nodes, holograms and wave lights off on Roots; the race-keyed look | 8–14 · 4–6 |
 | 5 | Effects and overlays: the callee hooks; shields from `RTS_CFG.h`; the grid colour | 5–9 · 3–4 |

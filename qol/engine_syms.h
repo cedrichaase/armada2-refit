@@ -1228,6 +1228,15 @@ static const A2EEntry qol_b0_entries[] = {
 static const A2EBlock qol_b0_blocked[] = {
     {0xffff, 0, 0, 0}
 };
+static const A2ECrc qol_b0_fcrc[] = {
+    {0, 0}
+};
+static const A2EModule qol_b0_mods[] = {
+    {0, 0}
+};
+static const A2EBlock qol_b0_blocked_mod[] = {
+    {0xffff, 0, 0, 0}
+};
 static const A2E_U8 qol_b1_c0[] = {0x68, 0xcc, 0xd7, 0x6f, 0x00, 0xe8, 0x00, 0x6c, 0x1c, 0x00, 0x8b, 0x45, 0xf0, 0x85, 0xc0, 0x75, 0x08, 0xd9, 0x1d, 0xb4, 0xfb, 0x70, 0x00, 0xeb, 0x02};
 static const A2E_U8 qol_b1_c2[] = {0x8b, 0x15, 0x3c, 0x13, 0x76, 0x00, 0x83, 0x3a, 0x00, 0x74, 0x1c, 0xa1, 0x40, 0x13, 0x76, 0x00};
 static const A2E_U8 qol_b1_c3[] = {0x8b, 0x0d, 0x40, 0x13, 0x76, 0x00};
@@ -1559,9 +1568,21 @@ static const A2EBlock qol_b1_blocked[] = {
     {7, "PopupPaletteImp::mProcessKeyboardInput", "is changed by fo-roots-5.0Z11 (not yet verified)", "Stands down: PopupPaletteImp::mProcessKeyboardInput is changed by fo-roots-5.0Z11, not yet verified"},
     {0xffff, 0, 0, 0}
 };
+static const A2ECrc qol_b1_fcrc[] = {
+    {".text", 0xef690537},
+    {".test", 0xe7a4061b},
+    {0, 0}
+};
+static const A2EModule qol_b1_mods[] = {
+    {"FleetOpsHook.dll", 0x28c90d19},
+    {0, 0}
+};
+static const A2EBlock qol_b1_blocked_mod[] = {
+    {0xffff, 0, 0, 0}
+};
 static const A2EBuild qol_builds[] = {
-    {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qol_b0_entries, qol_b0_blocked, 0, 214},
-    {"fo-roots-5.0Z11", "armada2/fo-roots-5.0Z11", "ArmadaL.exe", 0x3c4c76bd, 0x405000, 0xca07c55a, 0x400000, qol_b1_entries, qol_b1_blocked, 8, 6},
+    {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qol_b0_entries, qol_b0_blocked, 0, 214, qol_b0_fcrc, 0, qol_b0_mods, 0, qol_b0_blocked_mod, 0, 214},
+    {"fo-roots-5.0Z11", "armada2/fo-roots-5.0Z11", "ArmadaL.exe", 0x3c4c76bd, 0x405000, 0xca07c55a, 0x400000, qol_b1_entries, qol_b1_blocked, 8, 6, qol_b1_fcrc, 2, qol_b1_mods, 1, qol_b1_blocked_mod, 0, 6},
 };
 
 static A2E_U8 qol_hook_state[9];

@@ -10,6 +10,10 @@ out = "render3d/mods/hulls/src/syms.rs"
 doc = "What the hulls module reads of the engine: its objects, lists, globals and calls"
 rows = ["Modules.hulls"]
 
+[hook."hulls.instance_draw"]
+doc = "The call of ST3D_Instance::RenderInternal in GameObjectInstance::RenderInternal: where Roots' hulls are claimed"
+rows = ["Modules.hulls"]
+planned = "FO-5 step 4"
 
 [[sym]]
 id = "fn_scrap_render"
@@ -655,3 +659,20 @@ struct = "GameObjectClass vftable"
 offset = 0x1c
 type = "ptr"
 used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_instance_ri"
+symbol = "ST3D_Instance::RenderInternal"
+kind = "fn"
+addr = 0x62e780
+check = "55 8b ec 51 53 56 8b f1 33 db 8b 0d 08 d5 7a 00"
+used_by = ["hulls.instance_draw"]
+
+[[sym]]
+id = "site_hull_draw"
+symbol = "GameObjectInstance::RenderInternal"
+kind = "call"
+addr = 0x4d5a11
+target = "fn_instance_ri"
+in = "GameObjectInstance::RenderInternal"
+used_by = ["hulls.instance_draw"]

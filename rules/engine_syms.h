@@ -370,6 +370,15 @@ static const A2EEntry qolrules_b0_entries[] = {
 static const A2EBlock qolrules_b0_blocked[] = {
     {0xffff, 0, 0, 0}
 };
+static const A2ECrc qolrules_b0_fcrc[] = {
+    {0, 0}
+};
+static const A2EModule qolrules_b0_mods[] = {
+    {0, 0}
+};
+static const A2EBlock qolrules_b0_blocked_mod[] = {
+    {0xffff, 0, 0, 0}
+};
 static const A2E_U8 qolrules_b1_c0[] = {0x55, 0x8b, 0xec, 0x83, 0xec, 0x14};
 static const A2E_U8 qolrules_b1_c1[] = {0x53, 0x56, 0x8b, 0xf1, 0x33, 0xdb};
 static const A2E_U8 qolrules_b1_c2[] = {0x55, 0x8b, 0xec, 0x53, 0x56};
@@ -470,9 +479,21 @@ static const A2EBlock qolrules_b1_blocked[] = {
     {1, "ComputerVoice::Say", "is changed by fo-roots-5.0Z11 (not yet verified)", "Stands down: ComputerVoice::Say is changed by fo-roots-5.0Z11, not yet verified"},
     {0xffff, 0, 0, 0}
 };
+static const A2ECrc qolrules_b1_fcrc[] = {
+    {".text", 0xef690537},
+    {".test", 0xe7a4061b},
+    {0, 0}
+};
+static const A2EModule qolrules_b1_mods[] = {
+    {"FleetOpsHook.dll", 0x28c90d19},
+    {0, 0}
+};
+static const A2EBlock qolrules_b1_blocked_mod[] = {
+    {0xffff, 0, 0, 0}
+};
 static const A2EBuild qolrules_builds[] = {
-    {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qolrules_b0_entries, qolrules_b0_blocked, 0, 63},
-    {"fo-roots-5.0Z11", "armada2/fo-roots-5.0Z11", "ArmadaL.exe", 0x3c4c76bd, 0x405000, 0xca07c55a, 0x400000, qolrules_b1_entries, qolrules_b1_blocked, 2, 0},
+    {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qolrules_b0_entries, qolrules_b0_blocked, 0, 63, qolrules_b0_fcrc, 0, qolrules_b0_mods, 0, qolrules_b0_blocked_mod, 0, 63},
+    {"fo-roots-5.0Z11", "armada2/fo-roots-5.0Z11", "ArmadaL.exe", 0x3c4c76bd, 0x405000, 0xca07c55a, 0x400000, qolrules_b1_entries, qolrules_b1_blocked, 2, 0, qolrules_b1_fcrc, 2, qolrules_b1_mods, 1, qolrules_b1_blocked_mod, 0, 0},
 };
 
 static A2E_U8 qolrules_hook_state[2];

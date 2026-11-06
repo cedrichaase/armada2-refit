@@ -13,6 +13,9 @@ pub struct Case {
     pub base: usize,
     /// The module file name the image stands for (`Image::name`).
     pub module: &'static str,
+    /// The companion modules the process holds: name and the CRC-32 of its `.text`
+    /// (None: its file cannot be read).
+    pub modules: &'static [(&'static str, Option<u32>)],
     pub test_ini: Option<&'static str>,
     pub addr: &'static [&'static str],
     /// Field and value ids whose offset or value in the matched build is printed.
@@ -35,8 +38,10 @@ fn log(s: &str) {
 /// virtual address.
 struct Mapped {
     mem: Vec<u8>,
+    file: Vec<u8>,
     base: usize,
     module: &'static str,
+    modules: &'static [(&'static str, Option<u32>)],
 }
 
 impl Image for Mapped {
@@ -52,6 +57,26 @@ impl Image for Mapped {
     fn base(&self) -> usize {
         self.base
     }
+    fn file_crc(&self, section: &str) -> Option<u32> {
+        a2engine::pe::section_crc_file(
+            &mut |at, out| match at.checked_add(out.len()) {
+                Some(end) if end <= self.file.len() => {
+                    out.copy_from_slice(&self.file[at..end]);
+                    true
+                }
+                _ => false,
+            },
+            section,
+        )
+    }
+    fn companion(&self, name: &str) -> a2engine::pe::Companion {
+        use a2engine::pe::Companion;
+        match self.modules.iter().find(|m| m.0 == name) {
+            None => Companion::NotLoaded,
+            Some((_, None)) => Companion::Unreadable,
+            Some((_, Some(c))) => Companion::Crc(*c),
+        }
+    }
     fn name(&self, out: &mut [u8]) -> usize {
         let n = self.module.len().min(out.len());
         out[..n].copy_from_slice(&self.module.as_bytes()[..n]);
@@ -66,7 +91,7 @@ fn u32_at(b: &[u8], o: usize) -> usize {
     u32::from_le_bytes([b[o], b[o + 1], b[o + 2], b[o + 3]]) as usize
 }
 
-fn map(file: &[u8], base: usize, module: &'static str) -> Mapped {
+fn map(file: &[u8], base: usize, module: &'static str, modules: &'static [(&'static str, Option<u32>)]) -> Mapped {
     let nt = u32_at(file, 0x3c);
     let count = u16_at(file, nt + 6);
     let opt = nt + 24;
@@ -80,13 +105,13 @@ fn map(file: &[u8], base: usize, module: &'static str) -> Mapped {
         let (va, raw, ptr) = (u32_at(file, s + 12), u32_at(file, s + 16), u32_at(file, s + 20));
         mem[va..va + raw].copy_from_slice(&file[ptr..ptr + raw]);
     }
-    Mapped { mem, base, module }
+    Mapped { mem, file: file.to_vec(), base, module, modules }
 }
 
 fn transcript(c: &Case) -> Vec<String> {
     LINES.lock().unwrap().clear();
     let file = std::fs::read(c.image).expect("the fixture image");
-    let mem: &'static Mapped = Box::leak(Box::new(map(&file, c.base, c.module)));
+    let mem: &'static Mapped = Box::leak(Box::new(map(&file, c.base, c.module, c.modules)));
     let e = a2engine::init_with(c.table, log, mem, c.test_ini);
     let t = c.table;
     for (k, h) in t.hooks.iter().enumerate() {
