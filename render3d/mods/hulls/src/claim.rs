@@ -96,7 +96,15 @@ pub fn honour_database(p: &mut r3d_core::scene::pose::Posed) {
     let sod = &model.sod;
     p.textures.clear();
     static mut SAID_LOOKUP: bool = false;
-    let (mut asked, mut found) = (0u32, 0u32);
+    let (mut asked, mut found, mut hidden) = (0u32, 0u32, 0u32);
+    // Each level of detail this instance shows (the module's pick) with the database's flag.
+    let mut levels: alloc::vec::Vec<(usize, bool, bool)> = alloc::vec::Vec::new();
+    for i in 0..sod.nodes.len() {
+        if sod.lod_group(i).is_some_and(|(_, lv)| lv == i) {
+            let e = hooks::database_node(db, &sod.nodes[i].name);
+            levels.push((i, p.pose.shown.get(i).copied().unwrap_or(false), e != 0 && hooks::node_hidden(e)));
+        }
+    }
     for (i, n) in sod.nodes.iter().enumerate() {
         if !p.pose.shown.get(i).copied().unwrap_or(false) {
             continue;
@@ -125,6 +133,7 @@ pub fn honour_database(p: &mut r3d_core::scene::pose::Posed) {
                 );
             }
             if !level {
+                hidden += 1;
                 r3d_core::scene::instance::hide(sod, i, &mut p.pose.shown, true);
                 continue;
             }
@@ -143,11 +152,51 @@ pub fn honour_database(p: &mut r3d_core::scene::pose::Posed) {
             p.textures.push((i, alloc::string::String::from(t)));
         }
     }
+    say_drawn(p, hidden, &levels);
     // Once: whether the lookup finds the SOD's nodes in the database at all.
     if !unsafe { SAID_LOOKUP } && asked > 0 {
         unsafe { SAID_LOOKUP = true };
         crate::log!("hulls: {}: {} of {} shown nodes found by name in the instance's database (their flags and textures honoured)", model.name, found, asked);
     }
+}
+
+/// How many of the SOD's meshes the claim draws after the database, logged when it
+/// changes for a model (its level of detail moving with the zoom) and at most 400 times:
+/// a hull claimed with none drawn says so (`NOTHING DRAWN`). Diagnostic only.
+fn say_drawn(p: &r3d_core::scene::pose::Posed, hidden: u32, levels: &[(usize, bool, bool)]) {
+    use alloc::collections::BTreeMap;
+    use alloc::string::String;
+    static mut SEEN: Option<BTreeMap<String, usize>> = None;
+    static mut LINES: u32 = 0;
+    let sod = &p.model.sod;
+    let total = sod.nodes.iter().filter(|n| n.mesh().is_some()).count();
+    let drawn = sod.nodes.iter().enumerate().filter(|(i, n)| n.mesh().is_some() && p.pose.shown.get(*i).copied().unwrap_or(false)).count();
+    let seen = unsafe { (*core::ptr::addr_of_mut!(SEEN)).get_or_insert_with(BTreeMap::new) };
+    let prev = seen.get(p.model.name.as_str()).copied();
+    if prev == Some(drawn) || unsafe { LINES } >= 400 {
+        return;
+    }
+    seen.insert(String::from(p.model.name.as_str()), drawn);
+    unsafe { LINES += 1 };
+    static mut SAID_LOD: bool = false;
+    if !unsafe { SAID_LOD } {
+        unsafe { SAID_LOD = true };
+        let l = r3d_core::scene::pose::LodSettings::read();
+        crate::log!("hulls: level of detail settings: detail {}, distances {:.0} {:.0} {:.0} {:.0}", l.detail, l.dist[0], l.dist[1], l.dist[2], l.dist[3]);
+    }
+    if !levels.is_empty() {
+        let mut t = String::new();
+        for (i, m, h) in levels {
+            let n = &sod.nodes[*i];
+            t.push_str(&crate::sfmt!(" {}({} faces: module {}, database {})", n.name, sod.face_count_recursive(*i), if *m { "shows" } else { "hides" }, if *h { "hides" } else { "shows" }));
+        }
+        crate::log!("hulls: {}: levels of detail:{}", p.model.name, t);
+    }
+    crate::log!(
+        "hulls: {}: {} of {} meshes drawn after the database ({} nodes hidden by it){}",
+        p.model.name, drawn, total, hidden,
+        if drawn == 0 && total > 0 { " NOTHING DRAWN" } else { "" }
+    );
 }
 
 /// A texture name without its folder and extension (`logo_gal_Galaxy`).
