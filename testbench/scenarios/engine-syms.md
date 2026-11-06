@@ -36,12 +36,12 @@ appends its plugin's section and touches no other.
 14. Wait up to 60 seconds for "UI.log" to say "hud: panels of ours".
 15. Expect "UI.log" contains "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321".
 16. Expect "UI.log" contains "engine: build armada2/gog-1.1".
-17. Expect "UI.log" contains "engine: symbols: 40/40 resolved; 0 hooks blocked".
+17. Expect "UI.log" contains "engine: symbols: 43/43 resolved; 0 hooks blocked".
 18. Expect "UI.log" contains "engine: loading symbols: 17/17 resolved; 0 hooks blocked".
 19. Expect "UI.log" contains "engine: radar symbols: 116/116 resolved; 0 hooks blocked".
 20. Expect "UI.log" contains "engine: info symbols: 137/137 resolved; 0 hooks blocked".
-21. Expect "UI.log" contains "engine: hud symbols: 172/172 resolved; 0 hooks blocked".
-22. Expect "UI.log" contains "engine: panels symbols: 175/175 resolved; 0 hooks blocked".
+21. Expect "UI.log" contains "engine: hud symbols: 185/185 resolved; 0 hooks blocked".
+22. Expect "UI.log" contains "engine: panels symbols: 176/176 resolved; 0 hooks blocked".
 23. Expect "UI.log" contains "engine: shell symbols: 96/96 resolved; 0 hooks blocked".
 24. Expect "UI.log" contains "engine: dialogs symbols: 36/36 resolved; 0 hooks blocked".
 25. Expect "UI.log" not contains "stands down: ".
@@ -69,7 +69,7 @@ appends its plugin's section and touches no other.
 ## QOL
 42. Expect "QOL.log" contains "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321".
 43. Expect "QOL.log" contains "engine: build armada2/gog-1.1".
-44. Expect "QOL.log" contains "engine: symbols: 214/214 resolved; 0 hooks blocked".
+44. Expect "QOL.log" contains "engine: symbols: 215/215 resolved; 0 hooks blocked".
 45. Expect "QOL.log" not contains "stands down: ".
 46. Expect "QOL.log" not contains "read before its hook".
 47. Expect "QOL.log" not contains "engine: TEST:".
