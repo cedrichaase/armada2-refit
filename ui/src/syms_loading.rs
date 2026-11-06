@@ -99,6 +99,11 @@ pub const BUILDS: &[a2engine::Build] = &[
         ],
         blocked: &[
         ],
+        file_crc: &[],
+        modules: &[],
+        blocked_mod: &[
+        ],
+        n_resolved_mod: 17,
     },
     a2engine::Build {
         name: "fo-roots-5.0Z11",
@@ -135,6 +140,11 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Block { hook: 2, symbol: "ST3D_GraphicsEngine::FindLogicalDatabase", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ST3D_GraphicsEngine::FindLogicalDatabase is changed by fo-roots-5.0Z11, not yet verified" },
             a2engine::Block { hook: 3, symbol: "ST3D_Texture::DemandLoad", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ST3D_Texture::DemandLoad is changed by fo-roots-5.0Z11, not yet verified" },
         ],
+        file_crc: &[a2engine::FileCrc { section: ".text", crc: 0xef690537 }, a2engine::FileCrc { section: ".test", crc: 0xe7a4061b }],
+        modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
+        blocked_mod: &[
+        ],
+        n_resolved_mod: 3,
     },
 ];
 

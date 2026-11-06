@@ -108,6 +108,10 @@ class Build:
         self.pe = data.get('pe') or {}
         self.changed = list(data.get('changed') or [])
         self.disable = list(data.get('disable') or [])
+        # On-disk section CRC-32s the executable must match too, {'.text': crc}, and the
+        # companion modules the build's run-time marks describe, [{name, text_crc}].
+        self.file_crc = dict(self.pe.get('file_crc') or {})
+        self.modules = list(data.get('module') or [])
         self.parent = None
         self.files = {}             # file name -> PluginFile
         cp = os.path.join(self.dir, 'content.toml')
@@ -314,6 +318,72 @@ def blocks(gs, fname, build, table):
     return out
 
 
+def companion_mark(build):
+    """The module a mismatch of which stands the build's dependent hooks down: its first
+    `[[module]]`'s name, else None."""
+    return build.modules[0]['name'] if build.modules else None
+
+
+def companion_why(build):
+    return f'is patched by {companion_mark(build)}, which is not the profiled one'
+
+
+def companion_blocks(gs, fname, build, table, blocked):
+    """{hook id: (symbol, why)} for the hooks, besides `blocked`, that depend on the
+    patches of the build's companion module (`[[module]]`) and so stand down when another
+    one is loaded: those with an entry that is or sits in a function the module changes at
+    run time (`how = "runtime"`, verified or not), a chained call, jump or slot (its callee
+    is the module's), or a function whose entry the build leaves unchecked where its
+    parent checks it (a callee the module takes over)."""
+    if not build.modules:
+        return {}
+    f = gs.files[fname]
+    entries = flat(gs, fname, build)
+    parent = flat(gs, fname, build.parent) if build.parent is not None else {}
+    runtime = {m.get('fn') for kind, m, _ in marks(build) if kind == 'changed' and m.get('how') == 'runtime'}
+    out = {}
+    for hname in f.hooks:
+        hid = f'{f.plugin}.{hname}'
+        if hid in blocked:
+            continue
+        for i in table.sym_ids:
+            e = entries.get(i)
+            if e is None or hname not in (e.get('used_by') or []):
+                continue
+            p = parent.get(i)
+            hit = (e.get('symbol') in runtime or e.get('in') in runtime
+                   or (e.get('kind') in ('call', 'jmp', 'slot') and e.get('chain'))
+                   or (e.get('kind') == 'fn' and not e.get('check') and p is not None and p.get('check')))
+            if hit:
+                out[hid] = (e.get('symbol', ''), companion_why(build))
+                break
+    return out
+
+
+def note_for_block(sym, why):
+    """The SettingsNote text of a block (at most 120 characters)."""
+    if why.startswith('is changed by '):
+        by = why[len('is changed by '):].split(' ')[0]
+        return f'Stands down: {sym} is changed by {by}, not yet verified'[:120]
+    if why.startswith('is patched by '):
+        return f'Stands down: {sym} {why}'[:120]
+    return f'Stands down: {why[3:]}'[:120]
+
+
+def n_resolved(table, entries, blocked):
+    """The `N` of `symbols: N/M resolved`: the entries present, minus those used only by
+    blocked hooks."""
+    n = 0
+    for e in entries:
+        if e is None:
+            continue
+        ub = [f'{table.plugin}.{u}' for u in (e.get('used_by') or [])]
+        if ub and all(u in blocked for u in ub):
+            continue
+        n += 1
+    return n
+
+
 class Table:
     """One plugin file's table: every build of its game, flattened (what gen.py emits
     and resolve.py reads)."""
@@ -335,10 +405,16 @@ class Table:
         self.builds = []
         for b in gs.builds:
             e = flat(gs, fname, b)
+            ents = [e.get(i) for i in self.sym_ids]
+            blk = blocks(gs, fname, b, self)
+            mod = companion_blocks(gs, fname, b, self, blk)
             self.builds.append({
                 'build': b,
-                'entries': [e.get(i) for i in self.sym_ids],
-                'blocked': blocks(gs, fname, b, self),
+                'entries': ents,
+                'blocked': blk,
+                'blocked_mod': mod,
+                'n_resolved': n_resolved(self, ents, blk),
+                'n_resolved_mod': n_resolved(self, ents, {**blk, **mod}),
             })
 
     def kind(self, i):

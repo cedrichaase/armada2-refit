@@ -22,6 +22,10 @@ rows = ["Modules.effects"]
 doc = "The calls of Fragment (a dying craft, the Evolver's cocoon, a cancelled construction) drawn as our chunks"
 rows = ["Modules.effects"]
 
+[hook."effects.debris_callee"]
+doc = "ST3D_Instance::Fragment itself, for the calls FleetOpsHook owns on Roots (Craft::Explode): armed during the chained call"
+rows = ["Modules.effects"]
+planned = "FO-5 step 5"
 
 [[sym]]
 id = "fn_shock_radius"
@@ -216,7 +220,7 @@ symbol = "ST3D_Instance::Fragment"
 kind = "fn"
 addr = 0x62eb20
 check = "55 8b ec 53 57 8b f9 8b"
-used_by = ["effects.reads", "effects.debris"]
+used_by = ["effects.reads", "effects.debris", "effects.debris_callee"]
 
 [[sym]]
 id = "drawscaled3d"

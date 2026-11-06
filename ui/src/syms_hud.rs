@@ -584,6 +584,11 @@ pub const BUILDS: &[a2engine::Build] = &[
         ],
         blocked: &[
         ],
+        file_crc: &[],
+        modules: &[],
+        blocked_mod: &[
+        ],
+        n_resolved_mod: 172,
     },
     a2engine::Build {
         name: "fo-roots-5.0Z11",
@@ -777,6 +782,12 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Block { hook: 14, symbol: "CinematicView::mUpdateVideo", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: CinematicView::mUpdateVideo is changed by fo-roots-5.0Z11, not yet verified" },
             a2engine::Block { hook: 15, symbol: "Armada_RenderFrame", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Armada_RenderFrame is changed by fo-roots-5.0Z11, not yet verified" },
         ],
+        file_crc: &[a2engine::FileCrc { section: ".text", crc: 0xef690537 }, a2engine::FileCrc { section: ".test", crc: 0xe7a4061b }],
+        modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
+        blocked_mod: &[
+            a2engine::Block { hook: 5, symbol: "cPrjID::GetName", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: cPrjID::GetName is patched by FleetOpsHook.dll, which is not the profiled one" },
+        ],
+        n_resolved_mod: 105,
     },
 ];
 

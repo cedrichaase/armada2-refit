@@ -15,7 +15,7 @@ The format, the generated code and the resolver are described in
 | `mkpe.py` | writes a fixture's synthetic PE image (`--identity` prints its three numbers, to put in the fixture set's `build.toml`) |
 | `fixtures.py` | runs the fixtures on the three resolvers (`run [py c rs]`); `bless` writes Python's transcripts into them, to be reviewed as the spec |
 | `ctest.c` | the C resolver's host driver (`csdk/a2engine.h` with `A2E_HOST`) |
-| `negative.sh` | the negative tests on scratch copies of the game's exe (timestamp changed, one checked entry changed per plugin file, a forced child build, `a2test syms --record`); skips the exe-based ones without a game |
+| `negative.sh` | the negative tests on scratch copies of the game's exe (timestamp changed, one checked entry changed per plugin file, a forced child build, `a2test syms --record`), and on Roots' exe: its marks, a FleetOpsHook.dll that is not the profiled one (a wrong CRC, none, unreadable, and a modified file beside the exe), one byte of `.text` or `.test` changed; skips the exe-based ones without a game |
 | `bench-exe.sh`, `bench-mismatch.sh` | the bench's `Setup:` scripts: a clone's exe stamped (unknown build), a clone's `A2EngineTest.ini` (`testbench/README.md`, "The symbol profiles, offline and on the bench") |
 | `fo-scan.py`, `fo-scan.toml`, `fo_scan_test.py` | profiles a new Fleet Operations: Roots build in one command (below); the test runs it on synthetic images |
 | `selftest.sh` | all of the above, as CI's `engine` job runs it |
@@ -66,9 +66,13 @@ For a new `ArmadaL.exe` (a Roots release), one command takes the installed file 
 FO-2/FO-3 (the file diff, the log reader and the mark writer) and runs, in order:
 
 1. **identity**: timestamp, image size, section fingerprint (the profile's key), the sha256
-   and the CRC-32 of each section's raw data, the file and the headers (information
-   only, written as comments in `build.toml`), and the version from
-   `Roots_Download_Version.txt`, which names the build `fo-roots-<version>`;
+   and the CRC-32 of each section's content (`min(VirtualSize, SizeOfRawData)` bytes of the
+   file), the file and the headers, and the version from `Roots_Download_Version.txt`, which
+   names the build `fo-roots-<version>`. The CRCs of the sections `fo-scan.toml` names
+   (`.text`, `.test`) are written as `[pe] file_crc`, and the CRC of the `.text` of each
+   companion module it names (`FleetOpsHook.dll`, found beside the install, one directory
+   up, or `--module NAME=PATH`) as a `[[module]]` (crates/a2engine/README.md, "Identity
+   beyond the header");
 2. **file diff** against stock 1.1's `Armada2.exe` (checked against `gog-1.1`'s identity)
    section by section, ranges of changed bytes (a gap of up to three equal bytes joins
    two), named by function from stock's own `armada2.map`, read at run time from the
@@ -90,10 +94,12 @@ FO-2/FO-3 (the file diff, the log reader and the mark writer) and runs, in order
 
 If the build's directory already exists the scan is written beside the report and compared
 with it (`--compare DIR` for any directory): `5.0Z11` reproduces its committed profile with
-30 file marks (13 detour, 17 edit), 80 runtime marks, the same five callees and the same
-54/103 hooks ready; the one difference is that the scan also drops the check of
+30 file marks (13 detour, 17 edit), 80 runtime marks, the same five callees, the same
+`file_crc`, `[[module]]` and `verified` lists (the last from `fo-scan.toml`'s `[verified]`,
+which the scan writes again); the one difference is that the scan also drops the check of
 `ui.info.toml`'s `closeup_operator_new`, which the committed profile left (its hook
-stands down anyway).
+stands down anyway). What the scan does not write, and `--compare` does not look at, is the
+profile's own entries: Roots-only sites such as `render3d.frame.obj_draw`'s call.
 
 **Defaults taken without asking the Fleet Operations developers** (each a flag or a line in
 `fo-scan.toml`): the build is `fo-roots-<version file's version>` (`--build-name`); the

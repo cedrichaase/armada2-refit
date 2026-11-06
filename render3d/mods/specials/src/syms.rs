@@ -104,6 +104,11 @@ pub const BUILDS: &[a2engine::Build] = &[
         ],
         blocked: &[
         ],
+        file_crc: &[],
+        modules: &[],
+        blocked_mod: &[
+        ],
+        n_resolved_mod: 22,
     },
     a2engine::Build {
         name: "fo-roots-5.0Z11",
@@ -141,6 +146,12 @@ pub const BUILDS: &[a2engine::Build] = &[
         ],
         blocked: &[
         ],
+        file_crc: &[a2engine::FileCrc { section: ".text", crc: 0xef690537 }, a2engine::FileCrc { section: ".test", crc: 0xe7a4061b }],
+        modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
+        blocked_mod: &[
+            a2engine::Block { hook: 0, symbol: "cPrjID::GetOdfName", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: cPrjID::GetOdfName is patched by FleetOpsHook.dll, which is not the profiled one" },
+        ],
+        n_resolved_mod: 0,
     },
 ];
 

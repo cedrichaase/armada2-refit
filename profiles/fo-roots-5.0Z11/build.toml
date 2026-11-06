@@ -26,6 +26,16 @@ image_size = 0x405000
 sections = 0xca07c55a
 image_base = 0x400000
 code = [0x401000, 0x6ae000]
+# CRC-32 of each section's content in the file on disk (FleetOpsHook rewrites .text and
+# .rdata in memory before a plugin runs, so the file is what tells a Roots build apart).
+file_crc = { ".text" = 0xef690537, ".test" = 0xe7a4061b }
+
+# The companion module the run-time marks below describe, named by the CRC-32 of its
+# .text in its file: another one loaded stands down every hook that depends on its
+# patches (crates/a2engine/README.md, "Identity").
+[[module]]
+name = "FleetOpsHook.dll"
+text_crc = 0x28c90d19
 
 [[known]]
 sha256 = "4300ab71731e323f5767d8ee05457e6444401b823253aebee86c5ac23c2b00de"
@@ -226,7 +236,7 @@ verified = []
 [[changed]]
 fn = "Armada_RenderAllOurStuff"
 how = "runtime"
-verified = []
+verified = ["render3d.frame.*"]
 
 [[changed]]
 fn = "Armada_RenderFrame"

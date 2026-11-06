@@ -1,0 +1,89 @@
+# 08's image with one byte of .text changed (an address no entry checks): the three
+# numbers still match, the .text CRC does not, so no build matches: an unknown build,
+# which the log says with the CRCs it read.
+set = "basic"
+modules = { "Comp.dll" = 0xc0ffee11 }
+field = ["fd", "v1"]
+addr = ["f1", "f2"]
+
+[image]
+timestamp = 0x5eed0001
+image_base = 0x400000
+image_size = 0x7800
+section = [
+  { name = ".text", va = 0x1000, vsize = 0x2000, raw = 0x2000, flags = "code" },
+  { name = ".rdata", va = 0x3000, vsize = 0x1000, raw = 0x1000, flags = "data" },
+  { name = ".data", va = 0x4000, vsize = 0x2000, raw = 0x200, flags = "data" },
+  { name = ".test", va = 0x6000, vsize = 0x1800, raw = 0x200, flags = "data" },
+]
+bytes = [
+  { at = 0x401000, hex = "55 8b ec 83 ec 10" },     # One::f1
+  { at = 0x401100, hex = "55 89 e5" },              # One::f2
+  { at = 0x401300, hex = "90 90 90 90 90" },        # One::patched
+  { at = 0x401800, hex = "de ad be ef" },           # the scan that finds one
+  { at = 0x401900, hex = "ca fe ba be" },           # the scan that finds two
+  { at = 0x401a00, hex = "ca fe ba be" },
+  { at = 0x406000, hex = "01 02 03 04" },
+  { at = 0x401f00, hex = "cc" },           # a byte no profile entry checks
+           # the second CRC'd section
+]
+call = [
+  { at = 0x401200, to = 0x401000 },                 # One::caller -> f1
+  { at = 0x401210, to = 0x7ff00000 },               # One::chainer -> outside the exe (the module's)
+  { at = 0x401220, to = 0x401000 },
+]
+word = [
+  { at = 0x403000, value = 0x401100 },              # One::vftable[0]
+  { at = 0x403004, value = 0x401000 },              # [1] = f1
+  { at = 0x403008, value = 0x401000 },              # [2] = f1
+]
+
+[expect]
+p = [
+  "engine: Fixture.exe timestamp 0x5eed0001, image size 0x7800, sections 0x48172dda",
+  "engine: Fixture.exe file crc: .text 0xc8eb4d3d, .test 0x51a76db8",
+  "engine: unknown build",
+  "engine: symbols: 0/15 resolved; 0 hooks blocked",
+  "engine: p.fnhook stands down: One::f1 unknown build",
+  "ready p.fnhook fail",
+  "engine: p.chained stands down: One::chainer unknown build",
+  "ready p.chained fail",
+  "engine: p.wrongcall stands down: One::chainer unknown build",
+  "ready p.wrongcall fail",
+  "engine: p.slothook stands down: One::vftable unknown build",
+  "ready p.slothook fail",
+  "engine: p.wrongslot stands down: One::vftable unknown build",
+  "ready p.wrongslot fail",
+  "engine: p.badcheck stands down: One::f2 unknown build",
+  "ready p.badcheck fail",
+  "engine: p.fieldhook stands down: One unknown build",
+  "ready p.fieldhook fail",
+  "engine: f1 read before its hook was ready",
+  "addr f1 0x0",
+  "engine: f2 read before its hook was ready",
+  "addr f2 0x0",
+  "field fd 0x1c",
+  "field v1 0x280",
+  "note p.fnhook This Fixture.exe is a build Refit does not know: it runs stock",
+  "note p.chained This Fixture.exe is a build Refit does not know: it runs stock",
+  "note p.wrongcall This Fixture.exe is a build Refit does not know: it runs stock",
+  "note p.slothook This Fixture.exe is a build Refit does not know: it runs stock",
+  "note p.wrongslot This Fixture.exe is a build Refit does not know: it runs stock",
+  "note p.badcheck This Fixture.exe is a build Refit does not know: it runs stock",
+  "note p.fieldhook This Fixture.exe is a build Refit does not know: it runs stock",
+  "note_plugin This Fixture.exe is a build Refit does not know: it runs stock",
+]
+s = [
+  "engine: Fixture.exe timestamp 0x5eed0001, image size 0x7800, sections 0x48172dda",
+  "engine: Fixture.exe file crc: .text 0xc8eb4d3d, .test 0x51a76db8",
+  "engine: unknown build",
+  "engine: symbols: 3/3 resolved; 0 hooks blocked",
+  "ready s.scan1 ok",
+  "engine: s.scan0 stands down: Two::missing is found 0 times, not 1",
+  "ready s.scan0 fail",
+  "engine: s.scan2 stands down: Two::twice is found 2 times, not 1",
+  "ready s.scan2 fail",
+  "note s.scan0 Stands down: Two::missing is not stock in this Fixture.exe",
+  "note s.scan2 Stands down: Two::twice is not stock in this Fixture.exe",
+  "note_plugin This Fixture.exe is a build Refit does not know: it runs stock",
+]

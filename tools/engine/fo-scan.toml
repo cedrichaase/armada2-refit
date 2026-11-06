@@ -18,6 +18,19 @@ callees = [
 # The content set the build reads: none until FO-5 writes Roots' own.
 content = "none"
 
+# The sections whose CRC-32 the build's [pe] file_crc holds, from the file on disk
+# (FleetOpsHook rewrites .text and .rdata in memory; .test it leaves alone).
+file_crc = [".text", ".test"]
+
+# Companion modules the run-time marks describe, named by the CRC-32 of their .text in
+# their file; looked for beside the executable and one directory up.
+companions = ["FleetOpsHook.dll"]
+
+# Marks verified beside Roots' change: hook globs per function, kept when the profile is
+# written again.
+[verified]
+"Armada_RenderAllOurStuff" = ["render3d.frame.*"]
+
 # Hooks that stay off on Roots whatever the diff says.
 [[disable]]
 hooks = ["qolrules.*"]
