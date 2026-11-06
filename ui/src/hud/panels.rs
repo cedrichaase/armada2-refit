@@ -8,23 +8,80 @@
 //! `StandardButton`'s picture, its state and the game's tooltip, and presses it.
 use super::{buttons, chat, messages, objectives, overlay_text, pause, replay, resources, trade};
 use crate::config::Hud;
-use crate::engine::{self, hud, popups, sound, sprite, topbar};
+use crate::engine::api::{self, hud, popups, sound, sprite, topbar};
 use crate::gfx::R;
 use crate::widgets::{theme, Align, Ui};
 use crate::gfx::Weight;
 use alloc::string::String;
 
-/// What `install` took over (a copy of `[HUD]` with the panels that stood down off).
-static mut ON: Option<Hud> = None;
+/// A HUD panel of ours (HUD.md, "Adding a panel"): a stock component it claims from
+/// the engine through the panel switch, its `[HUD]` key, and how it draws. Every panel
+/// is one entry of `PANELS`; `install` claims each one switched on, and `run` draws
+/// them in the table's order. The widgets are immediate mode, so a panel's input is
+/// read in its `draw`; `modal` is the one thing about input the table needs to know.
+pub trait Panel: Sync {
+    /// Its name, as the layout log notes its frames (`layout::at`).
+    fn name(&self) -> &'static str;
+    /// Its widget scope (`Ui::scope`): "hud.<name>".
+    fn scope(&self) -> &'static str;
+    /// Its `[HUD]` key: whether it is switched on in `c`.
+    fn key(&self, c: &Hud) -> bool;
+    /// The stock component it claims (`engine::api::hud::set_taken`), 0 for none, and
+    /// that component's name for the log.
+    fn component(&self) -> (usize, &'static str) {
+        (0, "")
+    }
+    /// Claims what the panel takes over from the engine; false when it stands down
+    /// (the stock part stays). By default the panel switch takes `component`.
+    fn claim(&self) -> bool {
+        let (at, name) = self.component();
+        hud::set_taken(at, false, true);
+        crate::log!("panels: {} ours", name);
+        true
+    }
+    /// The claimed component's rectangle in canvas units (`api::CANVAS`): left, top,
+    /// right, bottom, right and bottom exclusive; None without one, or while it has
+    /// none.
+    fn rect(&self) -> Option<[f32; 4]> {
+        hud::panel_rect(self.component().0, api::CANVAS.0, api::CANVAS.1)
+    }
+    /// Drawn only while the engine shows its HUD (`ingame::hud_hidden`).
+    fn with_hud(&self) -> bool {
+        false
+    }
+    /// Input: it takes the whole screen's mouse this frame (a box that pauses the
+    /// game), so nothing under it does.
+    fn modal(&self) -> bool {
+        false
+    }
+    /// Draws the panel and reads its input.
+    fn draw(&self, ui: &mut Ui);
+}
 
-#[allow(static_mut_refs)]
-fn on() -> Option<&'static Hud> {
-    unsafe { ON.as_ref() }
+/// Every panel of these, in the order they draw, which keeps the boxes on top.
+pub static PANELS: &[&dyn Panel] = &[
+    &chat::Chat,
+    &resources::Resources,
+    &buttons::Buttons,
+    &replay::Replay,
+    &trade::Trade,
+    // Over the top bar, as stock's (OverlayText follows ResourcePanel in the list).
+    &overlay_text::Overlay,
+    &pause::Pause,
+    &messages::Messages,
+    &objectives::Objectives,
+];
+
+/// What `install` took over: bit i for `PANELS[i]`.
+static mut ON: Option<u32> = None;
+
+fn on() -> Option<u32> {
+    unsafe { ON }
 }
 
 /// Any of these panels switched on.
 pub fn any(c: &Hud) -> bool {
-    c.resources || c.buttons || c.messages || c.pause || c.replay || c.overlay || c.chat || c.team_texts
+    PANELS.iter().any(|p| p.key(c))
 }
 
 /// Takes over each panel switched on (after the panel switch is installed).
@@ -32,46 +89,18 @@ pub fn install(c: &Hud) {
     if !any(c) {
         return;
     }
-    if !engine::buttons::functions_stock() || !topbar::functions_stock() || !popups::functions_stock() {
+    if !api::buttons::functions_stock() || !topbar::functions_stock() || !popups::functions_stock() {
         crate::log!("panels: an engine function is not stock: these panels stay stock");
         return;
     }
-    let mut o = c.clone();
-    let take = |flag: bool, at: usize, name: &str| {
-        if flag {
-            hud::set_taken(at, false, true);
-            crate::log!("panels: {} ours", name);
-        }
-        flag
-    };
-    engine::buttons::install_presses();
-    o.resources = take(c.resources, topbar::resource_panel(), "ResourcePanel");
-    o.buttons = take(c.buttons, topbar::button_panel(), "ButtonPanel");
-    o.messages = take(c.messages, popups::message_box(), "MessageDisplay") | take(c.messages, popups::objectives_box(), "ObjectivesDisplay");
-    if o.messages {
-        engine::buttons::set_each_pass(popups::objectives_keys);
-    }
-    o.pause = take(c.pause, popups::pause_box(), "PauseBox");
-    o.replay = take(c.replay, popups::replay_box(), "ReplayPanel");
-    o.overlay = take(c.overlay, engine::overlay_text::overlay(), "OverlayText");
-    if c.chat {
-        if engine::chat::install() {
-            engine::chat::set_taken(true);
-            crate::log!("panels: chat lines and text entry ours");
-        } else {
-            crate::log!("panels: chat stays stock");
-            o.chat = false;
+    api::buttons::install_presses();
+    let mut on = 0u32;
+    for (i, p) in PANELS.iter().enumerate() {
+        if p.key(c) && p.claim() {
+            on |= 1 << i;
         }
     }
-    if c.team_texts {
-        if engine::trade::install() {
-            engine::trade::set_taken(true);
-            crate::log!("panels: team texts ours");
-        } else {
-            o.team_texts = false;
-        }
-    }
-    unsafe { ON = Some(o) };
+    unsafe { ON = Some(on) };
 }
 
 /// A mission's frame: every panel of these that is on.
@@ -85,44 +114,24 @@ pub fn box_shown() -> bool {
 }
 
 pub fn run(ui: &mut Ui) {
-    let Some(o) = on() else { return };
-    let hud_hidden = engine::ingame::hud_hidden();
+    let Some(on) = on() else { return };
+    let taken = |i: usize| on & (1 << i) != 0;
+    let hud_hidden = api::ingame::hud_hidden();
     // A box that pauses the game covers everything: nothing under it takes the mouse
     // (its own widgets are drawn in the overlay layer, above the occluder).
-    let blocking = (o.messages && (popups::message().is_some() || popups::objectives_shown())) || (o.pause && popups::pause_shown());
+    let blocking = PANELS.iter().enumerate().any(|(i, p)| taken(i) && p.modal());
     unsafe { BOX_SHOWN = blocking };
     if blocking {
         let screen = ui.screen();
         ui.claim(screen);
         ui.occlude(screen);
     }
-    if o.chat {
-        { crate::hud::layout::at("chat"); ui.scope("hud.chat", chat::run); }
-    }
-    if !hud_hidden {
-        if o.resources {
-            { crate::hud::layout::at("resources"); ui.scope("hud.resources", resources::run); }
+    for (i, p) in PANELS.iter().enumerate() {
+        if !taken(i) || (hud_hidden && p.with_hud()) {
+            continue;
         }
-        if o.buttons {
-            { crate::hud::layout::at("buttons"); ui.scope("hud.buttons", buttons::run); }
-        }
-    }
-    if o.replay {
-        { crate::hud::layout::at("replay"); ui.scope("hud.replay", replay::run); }
-    }
-    if o.team_texts {
-        { crate::hud::layout::at("trade"); ui.scope("hud.trade", trade::run); }
-    }
-    // Over the top bar, as stock's (OverlayText follows ResourcePanel in the list).
-    if o.overlay {
-        { crate::hud::layout::at("overlay"); ui.scope("hud.overlay", overlay_text::run); }
-    }
-    if o.pause {
-        { crate::hud::layout::at("pause"); ui.scope("hud.pause", pause::run); }
-    }
-    if o.messages {
-        { crate::hud::layout::at("messages"); ui.scope("hud.messages", messages::run); }
-        { crate::hud::layout::at("objectives"); ui.scope("hud.objectives", objectives::run); }
+        crate::hud::layout::at(p.name());
+        ui.scope(p.scope(), |ui| p.draw(ui));
     }
 }
 
@@ -142,14 +151,14 @@ static mut HOVER: Hover = Hover { btn: 0, since: 0.0, tip: None };
 pub fn game_button(ui: &mut Ui, r: R, b: usize, name: &str, on: bool) -> bool {
     let id = ui.id(name);
     let (hot, held, clicked) = ui.interact(id, r);
-    let enabled = engine::buttons::enabled(b);
+    let enabled = api::buttons::enabled(b);
     let mut st = theme::State::of(ui, id, hot, held);
     st.off = !enabled;
-    st.on = on || engine::buttons::state(b) == 2;
+    st.on = on || api::buttons::state(b) == 2;
     let col = theme::button_frame(ui, r, st);
     let e = ui.u(ui.theme.edge).max(1.0);
     let img = r.inset(e + ui.u(4.0));
-    let sp = engine::buttons::sprite(b);
+    let sp = api::buttons::sprite(b);
     let t = ui.theme;
     let ours = crate::config::get().hud.icons && sp != 0 && {
         let ink = if !enabled { crate::gfx::fade(col, 0.45) } else { col };
@@ -183,7 +192,7 @@ pub fn game_button(ui: &mut Ui, r: R, b: usize, name: &str, on: bool) -> bool {
     if hot && h.btn == b && !held {
         let verbose = ui.waited(h.since, 1.5);
         if h.tip.as_ref().map(|t| t.0) != Some(verbose) {
-            let text = engine::buttons::tooltip(b, verbose).or_else(|| engine::buttons::tooltip(b, false)).unwrap_or_default();
+            let text = api::buttons::tooltip(b, verbose).or_else(|| api::buttons::tooltip(b, false)).unwrap_or_default();
             h.tip = Some((verbose, text));
         }
         if let Some((_, text)) = &h.tip {
@@ -195,7 +204,7 @@ pub fn game_button(ui: &mut Ui, r: R, b: usize, name: &str, on: bool) -> bool {
     }
     if clicked && enabled {
         crate::log!("panels: click {}", name);
-        engine::buttons::queue(b);
+        api::buttons::queue(b);
         return true;
     }
     false
@@ -204,17 +213,17 @@ pub fn game_button(ui: &mut Ui, r: R, b: usize, name: &str, on: bool) -> bool {
 /// A text button of ours for the stock button `b`, labelled with its own label (or
 /// `fallback`); presses `b` when clicked or when `key` (a virtual key) is pressed.
 pub fn game_text_button(ui: &mut Ui, r: R, b: usize, fallback: &str, keys: &[u8]) -> bool {
-    let label = engine::buttons::label(b);
+    let label = api::buttons::label(b);
     let label = if label.is_empty() { String::from(fallback) } else { label };
     let id = ui.id(&crate::sfmt!("btn:{:x}", b));
     let (hot, held, clicked) = ui.interact(id, r);
     let mut st = theme::State::of(ui, id, hot, held);
-    st.off = !engine::buttons::enabled(b);
+    st.off = !api::buttons::enabled(b);
     theme::button(ui, r, &label, st);
     let key = keys.iter().any(|&k| ui.input.key_pressed(k));
     if (clicked || key) && !st.off {
         crate::log!("panels: {} {}", if clicked { "click" } else { "key" }, label);
-        engine::buttons::queue(b);
+        api::buttons::queue(b);
         return true;
     }
     false

@@ -142,6 +142,7 @@ version = "2.3.0"
 dependencies = [
  "a2engine",
  "a2fmt",
+ "a2ini",
  "a2rt",
  "fontbake",
  "gpu",

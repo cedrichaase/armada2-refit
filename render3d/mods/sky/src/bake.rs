@@ -354,6 +354,7 @@ fn dump_face(cmd: &mut Cmd, r: &Recipe, f: usize, cube: &Texture, s: u32, fmt: F
     path.push_str(&r.name);
     path.push_str(".dump");
     path.push((b'0' + f as u8) as char);
+    // lint-allow(content): a bench dump of our own bake, written as a TGA file.
     path.push_str(".tga");
     rt::write_file(&rt::game_path(&path), &out);
 }

@@ -12,7 +12,7 @@
 //! The minimap preview is Game Setup's, under this dialog: the map chosen here shows
 //! there once Select Map closes it.
 use super::setup_kit as kit;
-use crate::engine::shellui::Kind;
+use crate::engine::api::shellui::Kind;
 use crate::gfx::{Weight, R};
 use crate::menus::model::{Control, What};
 use crate::menus::Screen;

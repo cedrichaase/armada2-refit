@@ -22,7 +22,7 @@ use alloc::vec::Vec;
 /// `ios_base::in | ios_base::out`.
 const MODE_IN_OUT: i32 = 3;
 /// Room for the stream: the engine allocates 0x8c bytes for one; more is harmless.
-const STREAM_BYTES: usize = 0x100;
+const STREAM_BYTES: usize = 0x100; // not an offset: our own allocation
 
 /// The four imports' function addresses, or None when the hook is not ready or an
 /// import is not filled in.

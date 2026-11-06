@@ -52,7 +52,7 @@ pub fn install() -> bool {
 unsafe extern "thiscall" fn chat_render(chat: usize) {
     let stock: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(eng().addr(sym::CORE_CHAT_RENDER)) };
     super::chat::render_stock(chat, stock);
-    let dev = field(storm3d(), field::CORE_STORM3D_DEVICES);
+    let dev = field(storm3d(), field::CORE_STORM3D_DEVICES());
     let flush = eng().addr(sym::CORE_TRIFAN_FLUSH);
     if dev == 0 || flush == 0 {
         return;
@@ -60,13 +60,13 @@ unsafe extern "thiscall" fn chat_render(chat: usize) {
     // The HUD's sprites and text are batched in the device's trifan buffer until the
     // scene ends; draw them now, or they would land on top of the UI.
     let flush: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(flush) };
-    unsafe { flush(dev + field::CORE_DX8_TRIFAN) };
+    unsafe { flush(dev + field::CORE_DX8_TRIFAN()) };
     count();
     // The info panel's close-up: a view of the engine's, drawn before the UI's frame
     // and flushed with it (`engine::closeup`).
     if crate::config::get().hud.info_camera {
         super::closeup::render();
-        unsafe { flush(dev + field::CORE_DX8_TRIFAN) };
+        unsafe { flush(dev + field::CORE_DX8_TRIFAN()) };
     }
     crate::widgets::theme::set_player_race(super::race::mission_race());
     surface::frame(Context::Mission);

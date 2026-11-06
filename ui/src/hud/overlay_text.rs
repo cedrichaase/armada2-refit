@@ -1,10 +1,31 @@
 //! The timed messages in the middle of the screen, ours (`[HUD] Overlay=1`; HUD.md,
-//! "Overlay messages"): each stock `SingleOverlayText` at its own point (the 1600 x
-//! 1200 space scaled to the screen, as stock places it), justified as it was added,
+//! "Overlay messages"): each stock `SingleOverlayText` at its own point (the HUD canvas
+//! (`api::CANVAS`) scaled to the screen, as stock places it), justified as it was added,
 //! in its own colour, faded as the stock panel fades it, in our type with a shadow.
-use crate::engine::{buttons, hud, overlay_text as overlay};
+use crate::engine::api::{self, buttons, hud, overlay_text as overlay};
 use crate::gfx::{fade, Weight};
 use crate::widgets::Ui;
+
+/// The overlay messages, a panel of the table (`panels::PANELS`).
+pub struct Overlay;
+
+impl super::panels::Panel for Overlay {
+    fn name(&self) -> &'static str {
+        "overlay"
+    }
+    fn scope(&self) -> &'static str {
+        "hud.overlay"
+    }
+    fn key(&self, c: &crate::config::Hud) -> bool {
+        c.overlay
+    }
+    fn component(&self) -> (usize, &'static str) {
+        (overlay::overlay(), "OverlayText")
+    }
+    fn draw(&self, ui: &mut Ui) {
+        run(ui)
+    }
+}
 
 static mut LAST_KEY: i32 = i32::MIN;
 
@@ -14,7 +35,7 @@ pub fn run(ui: &mut Ui) {
     }
     let lines = overlay::lines();
     let origin = hud::panel_rect(overlay::overlay(), ui.w, ui.h).map_or((0.0, 0.0), |r| (r[0], r[1]));
-    let (sx, sy) = (ui.w / 1600.0, ui.h / 1200.0);
+    let (sx, sy) = (ui.w / api::CANVAS.0, ui.h / api::CANVAS.1);
     let t = ui.theme;
     let px = ui.u(t.title_size);
     for l in &lines {

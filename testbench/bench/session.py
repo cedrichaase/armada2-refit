@@ -111,7 +111,7 @@ def exe_identity(path):
     """`exe: {name, sha256, timestamp, image_size, sections}` of the executable at path
     (phase 8, contract P1; crates/a2engine/src/pe.rs is the run-time twin and its
     fixtures pin the same fingerprint). The hex strings are what the plugins log
-    (`engine: Armada2.exe timestamp 0x.., image size 0x.., sections 0x..`); the sha256
+    (`engine: <exe> timestamp 0x.., image size 0x.., sections 0x..`); the sha256
     is the bench's alone, never a run-time key. None parts if the file is not a PE."""
     path = Path(path)
     h = hashlib.sha256()
@@ -383,11 +383,11 @@ class Session:
             if r.returncode:
                 raise GameError(f'reflink clone of {src} failed (must be btrfs, same '
                                 f'filesystem as {config.CACHE}): {r.stderr.strip()}')
-        exe = self.game_dir / 'Armada2.exe'
+        exe = self.game_dir / config.EXE_REL
         if exe.is_file():
             self.s['exe'] = exe_identity(exe)
             e = self.s['exe']
-            self.log.action(f"Armada2.exe sha256 {e['sha256']}; timestamp {e['timestamp']}, image size "
+            self.log.action(f"{config.EXE_NAME} sha256 {e['sha256']}; timestamp {e['timestamp']}, image size "
                             f"{e['image_size']}, sections {e['sections']}")
         exc = self.game_dir / 'exception.txt'
         self.s['exception_mtime'] = exc.stat().st_mtime if exc.exists() else None
@@ -396,12 +396,20 @@ class Session:
         self.log.action(f'cloned {what} (reflink) in {time.time() - t:.1f}s',
                         detail='\n'.join(f'{a} -> {b}' for a, b in pairs))
 
+    def prf(self):
+        """The clone's settings file, for the `armada-prf` adapter (the game descriptor's
+        settings); another kind has no adapter yet (PLAN-FLEETOPS.md, FO-1)."""
+        if config.SETTINGS_KIND != 'armada-prf':
+            raise GameError(f'no settings adapter for {config.SETTINGS_KIND!r} '
+                            f'({config.GAME_ID}) yet')
+        return self.game_dir / config.SETTINGS_FILE
+
     def prepare(self):
         w, h = self.res
-        set_prf_resolution(self.game_dir / 'ARMADA.PRF', w, h)
-        self.log.action(f'ARMADA.PRF resolution set to {w}x{h}')
-        set_prf_interface_mode(self.game_dir / 'ARMADA.PRF', 1)
-        self.log.action('ARMADA.PRF interface mode set to 1 (no unit view)')
+        set_prf_resolution(self.prf(), w, h)
+        self.log.action(f'{config.SETTINGS_FILE} resolution set to {w}x{h}')
+        set_prf_interface_mode(self.prf(), 1)
+        self.log.action(f'{config.SETTINGS_FILE} interface mode set to 1 (no unit view)')
         data = config.DATA
         if self.s.get('assets') == 'none':
             data = self.work / 'no-assets'
@@ -540,8 +548,8 @@ class Session:
         vols = {c: 0 for c in self.s.get('mute') or []}
         vols.update({c: VOLUME_MAX for c in self.s.get('stems') or []})
         if vols:
-            set_prf_volumes(self.game_dir / 'ARMADA.PRF', vols)
-            self.log.action('ARMADA.PRF volumes: ' + ', '.join(f'{c} {v}' for c, v in sorted(vols.items())))
+            set_prf_volumes(self.prf(), vols)
+            self.log.action(f'{config.SETTINGS_FILE} volumes: ' + ', '.join(f'{c} {v}' for c, v in sorted(vols.items())))
 
     def dll_overrides(self):
         """The overrides the game launches with. Since display 1.0.0 nothing in the chain
@@ -915,6 +923,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         if self.game_pid():
             raise GameError('the game is already running in this session')
         g = self.game_dir
+        exe = g / config.EXE_REL          # launched where it is, beside the game's files
         for name in ('Menus.log', 'HUD.log', 'QOL.log', 'QOLRules.log', 'GridLayout.log',
                      'BinkProxy.log', 'Scene.log', 'Scene.marks', 'Armada2_d3d9.log',
                      'Render3D.log', 'Stems.log', 'UI.log', 'Online.log',
@@ -963,13 +972,13 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         env['PULSE_PROP'] = f'a2test.session={self.s["id"]}'
         env['PIPEWIRE_PROPS'] = f'{{ a2test.session = "{self.s["id"]}" }}'
         (logs / 'launch-env.txt').write_text(
-            f'cwd: {g}\nargv: python3 {config.UMU} {g / "Armada2.exe"} {args}\n\n' +
+            f'cwd: {exe.parent}\nargv: python3 {config.UMU} {exe} {args}\n\n' +
             ''.join(f'{k}={v}\n' for k, v in sorted(env.items())))
         wlog = open(logs / 'wine.log', 'a')
-        wlog.write(f'--- {now()} launch Armada2.exe {args}\n')
+        wlog.write(f'--- {now()} launch {config.EXE_NAME} {args}\n')
         wlog.flush()
-        p = subprocess.Popen(['python3', str(config.UMU), str(g / 'Armada2.exe'), *args.split()],
-                             env=env, cwd=str(g), stdout=wlog, stderr=subprocess.STDOUT,
+        p = subprocess.Popen(['python3', str(config.UMU), str(exe), *args.split()],
+                             env=env, cwd=str(exe.parent), stdout=wlog, stderr=subprocess.STDOUT,
                              stdin=subprocess.DEVNULL, start_new_session=True, pass_fds=self._slot_fds())
         self.s['pids']['launcher'] = p.pid
         self.s['game_started'] = time.time()
@@ -982,8 +991,8 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                 raise GameError(f'the launcher exited ({p.returncode}) before the game started; see logs/wine.log')
             time.sleep(0.1)
         else:
-            raise GameError('Armada2.exe did not appear within 120s; see logs/wine.log')
-        self.log.action(f'launched Armada2.exe {args} through umu (pid {self.game_pid()})' +
+            raise GameError(f'{config.EXE_NAME} did not appear within 120s; see logs/wine.log')
+        self.log.action(f'launched {config.EXE_NAME} {args} through umu (pid {self.game_pid()})' +
                         ('' if self.s['audio'] else f', audio to the null sink {self.s["null_sink"]["name"]}'))
         if not self.s['audio']:
             threading.Thread(target=self._audio_watchdog, daemon=True).start()
@@ -1164,11 +1173,12 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         Wine names the process `Armada2.exe` under umu but `Main` elsewhere
         (platform/stop-game.sh), so the name is not used either."""
         out = []
+        exe = config.EXE_NAME.encode()
         pfx = str(self.prefix_dir).encode()
         for d in glob.glob('/proc/[0-9]*'):
             try:
                 argv0 = Path(d, 'cmdline').read_bytes().split(b'\0', 1)[0]
-                if not (argv0.endswith(b'\\Armada2.exe') or argv0.endswith(b'/Armada2.exe')):
+                if not (argv0.endswith(b'\\' + exe) or argv0.endswith(b'/' + exe)):
                     continue
                 if pfx in Path(d, 'environ').read_bytes():
                     out.append(int(d.rsplit('/', 1)[1]))
@@ -1306,7 +1316,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         dst = self.dir / 'logs'
         g = self.game_dir
         for name in ('Menus.log', 'HUD.log', 'BinkProxy.log', 'Scene.log', 'Scene.marks', 'RetireCheck.log',
-                     'RefitPlayer.ini', 'Scene.ini', 'ARMADA.PRF',
+                     'RefitPlayer.ini', 'Scene.ini', config.SETTINGS_FILE,
                      'Stems.log', 'Stems.ini',
                      'Menus.ini', 'HUD.ini', 'QOL.log', 'QOL.ini', 'QOLRules.log', 'QOLRules.ini', 'GridLayout.log',
                      'GridLayout.ini', 'dxvk.conf', 'Online.log',

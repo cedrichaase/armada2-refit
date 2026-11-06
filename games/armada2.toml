@@ -1,0 +1,64 @@
+# Star Trek: Armada II, the GOG release (patch 1.1): the game this project was made for.
+# What every tool knows of "which game" (games/README.md): a2env, a2mod, ./install,
+# tools/layers.py and the test bench read it; nothing here is derived from game files.
+schema = 1
+id = "armada2"
+label = "Star Trek: Armada II"
+# Offered to players: ./install and the bench install into it.
+offered = true
+# The game the tools resolve when none is chosen (A2_PROFILE, --game); one game has it.
+default = true
+
+# The layers on offer (layers.toml ids, retired ones left out); each lists this game in
+# its `games`, and tools/layers.py --check holds the two together.
+layers = ["platform", "display", "qol", "rules", "online", "textures", "models",
+          "cutscenes", "render3d", "ui"]
+
+[exe]
+# The executable(s), the first the one the bench launches and the tools look for; the
+# engine profiles' build.toml `exe` names one of these.
+names = ["Armada2.exe"]
+# Where the executable and the game's own files are, under the install folder ("" = the
+# folder itself). The plugins go here.
+data_dir = ""
+
+[install]
+# Heroic's app names (GamesConfig/<name>.json) and GOG's product ids.
+heroic = ["1174788223"]
+gog = ["1174788223"]
+# The install folder's default name: ~/Games/Heroic/<folder> (A2_GAME's default).
+folder = "Star Trek Armada II"
+# The Wine prefix's name: ~/Games/Heroic/Prefixes/<prefix> (A2_PREFIX's default).
+prefix = "Star Trek Armada II"
+
+[settings]
+# The player's settings file and its kind (the bench's adapter: `armada-prf`).
+kind = "armada-prf"
+file = "ARMADA.PRF"
+# The player's own files that a2mod never switches (not a look).
+keep = ["ARMADA.PRF", "RTS_CFG.h"]
+
+[display]
+# The shell's (front end's) resolution, and the HUD's design canvas.
+shell = [800, 600]
+hud_canvas = [1600, 1200]
+
+[files]
+# The game's file layout under data_dir, as the tools and the plugins mount it
+# (a2fmt::vfs; games/README.md, "Files"). Each list is searched in order; a2tex installs
+# into the first texture root. render3d's and the UI's mount lists (files.rs) hold the
+# same rows, and tools/layers.py --check holds them equal.
+textures = ["Textures/RGB"]
+# The texture formats in them, lower case.
+texture_formats = ["tga"]
+sod = ["SOD"]
+sprites = ["Sprites"]
+odf = ["odf"]
+# Archives, searched behind the folders: { kind = "fpq" | "zfs", file = <under
+# data_dir>, at = <one of the folders above> }. No reader is written yet.
+archives = []
+
+[paths]
+# The data directory's name: ${XDG_DATA_HOME:-~/.local/share}/<stem> (A2_DATA's
+# default; %LOCALAPPDATA%\<stem> on Windows), where the logs of the tools go too.
+stem = "armada2-refit"

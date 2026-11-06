@@ -40,7 +40,7 @@ pub fn visibility(o: usize, inst: usize, craft: bool, model: &Model, p: &mut pos
     }
     if craft {
         let class = eng::instance_class(inst);
-        for (cf, ib) in eng::DAMAGE_NODES {
+        for (cf, ib) in eng::damage_nodes() {
             let n = eng::class_node(class, cf);
             if n == 0 {
                 continue;
@@ -55,7 +55,7 @@ pub fn visibility(o: usize, inst: usize, craft: bool, model: &Model, p: &mut pos
         // fifth of the crew (`CrewDamageTraverse`: hidden from `+0xa4` + 0.2 k >= 1).
         // The engine's child lists run in reverse file order (`ST3D_Node::AddChild`
         // puts each new child first), so `crew1`, stored last, is the first shown.
-        let crew = eng::class_node(class, 0x408);
+        let crew = eng::crew_node(class);
         if crew != 0 {
             if let Some(i) = eng::element_name(crew).and_then(|nm| sod.find(nm)) {
                 let mut x = eng::crew_fire(inst);
@@ -75,8 +75,8 @@ pub fn visibility(o: usize, inst: usize, craft: bool, model: &Model, p: &mut pos
             }
         }
         // `borg`: shown only while assimilated.
-        let borg = eng::class_node(class, 0x420);
-        if borg != 0 && eng::instance_byte(inst, 0xa1) == 0 {
+        let borg = eng::borg_node(class);
+        if borg != 0 && !eng::assimilated(inst) {
             if let Some(i) = eng::element_name(borg).and_then(|nm| sod.find(nm)) {
                 hide_tree(p, i);
             }

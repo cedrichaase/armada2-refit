@@ -9,7 +9,7 @@
 //! at 10 left the Klingons shut). So a card whose campaign `requires` another is locked
 //! while that one's flag is 0.
 //!
-//! The progress is read from the game's memory (`engine::progress`), where a campaign
+//! The progress is read from the game's memory (`engine::api::progress`), where a campaign
 //! won a moment ago is already complete; without it (the hook not ready, the object not
 //! plausible) from `save\shell.set`, the same bytes as the game last wrote them (bytes
 //! 0..3 reached, 4..7 complete). With neither, or `CampaignLocks=0`, nothing is locked.
@@ -20,7 +20,7 @@
 //!
 //! UI.log: `menus: campaign progress ...` each time what is read changes, with where it
 //! was read from, and the locks.
-use crate::engine::progress::Progress;
+use crate::engine::api::progress::Progress;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -84,7 +84,7 @@ fn refresh() {
     let cfg = crate::config::get();
     let read = if !cfg.campaign_locks {
         (None, "off (CampaignLocks=0)")
-    } else if let Some(p) = crate::engine::progress::read() {
+    } else if let Some(p) = crate::engine::api::progress::read() {
         (Some(p), "memory")
     } else {
         match from_file() {

@@ -23,14 +23,18 @@ pub mod hook {
     pub const SLOTHOOK: a2engine::HookId = a2engine::HookId(3);
     pub const WRONGSLOT: a2engine::HookId = a2engine::HookId(4);
     pub const BADCHECK: a2engine::HookId = a2engine::HookId(5);
+    pub const FIELDHOOK: a2engine::HookId = a2engine::HookId(6);
 }
 
 pub mod field {
-    pub const FD: usize = 0x1c;
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn FD() -> usize { super::TABLE.engine().field(a2engine::Sym(5)) }
+    #[inline(always)] pub fn FX() -> usize { super::TABLE.engine().field(a2engine::Sym(14)) }
 }
 
 pub mod value {
-    pub const V1: i32 = 640;
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn V1() -> i32 { super::TABLE.engine().value(a2engine::Sym(6)) }
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
@@ -48,6 +52,7 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "s2", symbol: "One::vftable", kind: a2engine::Kind::Slot },
     a2engine::SymDef { id: "f2", symbol: "One::f2", kind: a2engine::Kind::Fn },
     a2engine::SymDef { id: "n1", symbol: "g_new", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "fx", symbol: "One", kind: a2engine::Kind::Field },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
@@ -57,12 +62,14 @@ pub const HOOKS: &[a2engine::HookDef] = &[
     a2engine::HookDef { id: "p.slothook", run_unknown: false, rows: &[], syms: &[9, 10] },
     a2engine::HookDef { id: "p.wrongslot", run_unknown: false, rows: &[], syms: &[9, 11] },
     a2engine::HookDef { id: "p.badcheck", run_unknown: false, rows: &["Graphics.Thing"], syms: &[12, 13] },
+    a2engine::HookDef { id: "p.fieldhook", run_unknown: false, rows: &[], syms: &[14] },
 ];
 
 pub const BUILDS: &[a2engine::Build] = &[
     a2engine::Build {
         name: "b1",
         key: "test/b1",
+        exe: "Test.exe",
         timestamp: 0x5eed0001,
         image_size: 0x6000,
         sections: 0x777d215e,
@@ -84,6 +91,7 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x0, vtable: 0x9, index: 2, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // s2
             a2engine::Entry { present: true, addr: 0x401100, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x89, 0xe5], mask: &[], section: "", count: 0, value: 0 }, // f2
             a2engine::Entry::ABSENT,
+            a2engine::Entry::ABSENT,
         ],
         blocked: &[
         ],
@@ -91,11 +99,12 @@ pub const BUILDS: &[a2engine::Build] = &[
     a2engine::Build {
         name: "b2",
         key: "test/b2",
+        exe: "Test.exe",
         timestamp: 0x5eed0001,
         image_size: 0x7000,
         sections: 0xa56c4602,
         image_base: 0x400000,
-        n_resolved: 7,
+        n_resolved: 8,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x401000, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x10], mask: &[], section: "", count: 0, value: 0 }, // f1
@@ -103,7 +112,7 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x401300, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x90, 0x90, 0x90, 0x90, 0x90], mask: &[], section: "", count: 0, value: 0 }, // pt
             a2engine::Entry { present: true, addr: 0x401305, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // l1
             a2engine::Entry { present: true, addr: 0x404010, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // g1
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 28 }, // fd
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // fd
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 640 }, // v1
             a2engine::Entry { present: true, addr: 0x401210, end: 0x0, target: 0x0, vtable: 0xffff, index: 0, chain: true, check: &[], mask: &[], section: "", count: 0, value: 0 }, // c2
             a2engine::Entry { present: true, addr: 0x401220, end: 0x0, target: 0x0, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // c3
@@ -112,6 +121,7 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x0, vtable: 0x9, index: 2, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // s2
             a2engine::Entry { present: true, addr: 0x401100, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec], mask: &[], section: "", count: 0, value: 0 }, // f2
             a2engine::Entry { present: true, addr: 0x406000, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // n1
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 48 }, // fx
         ],
         blocked: &[
             a2engine::Block { hook: 0, symbol: "One::caller", why: "is changed by b2 (not yet verified)", note: "Stands down: One::caller is changed by b2, not yet verified" },
@@ -121,6 +131,7 @@ pub const BUILDS: &[a2engine::Build] = &[
     a2engine::Build {
         name: "b3",
         key: "test/b3",
+        exe: "Test.exe",
         timestamp: 0x5eed0001,
         image_size: 0x8000,
         sections: 0x756db512,
@@ -142,16 +153,17 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x0, vtable: 0x9, index: 2, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // s2
             a2engine::Entry { present: true, addr: 0x401100, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x89, 0xe5], mask: &[], section: "", count: 0, value: 0 }, // f2
             a2engine::Entry::ABSENT,
+            a2engine::Entry::ABSENT,
         ],
         blocked: &[
         ],
     },
 ];
 
-static HOOK_STATE: [core::sync::atomic::AtomicU64; 6] = [const { core::sync::atomic::AtomicU64::new(0) }; 6];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 14] = [const { core::sync::atomic::AtomicU8::new(0) }; 14];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 14] = [const { core::sync::atomic::AtomicUsize::new(0) }; 14];
-static NOTES: [a2engine::Note; 6] = [const { a2engine::Note::new() }; 6];
+static HOOK_STATE: [core::sync::atomic::AtomicU64; 7] = [const { core::sync::atomic::AtomicU64::new(0) }; 7];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 15] = [const { core::sync::atomic::AtomicU8::new(0) }; 15];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 15] = [const { core::sync::atomic::AtomicUsize::new(0) }; 15];
+static NOTES: [a2engine::Note; 7] = [const { a2engine::Note::new() }; 7];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 
 pub static TABLE: a2engine::Table = a2engine::Table {

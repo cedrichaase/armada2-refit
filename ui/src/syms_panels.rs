@@ -94,110 +94,112 @@ pub mod hook {
 }
 
 pub mod field {
-    pub const PANELS_BTN_BORDER: usize = 0x28;
-    pub const PANELS_BTN_SPRITE: usize = 0x2c;
-    pub const PANELS_BTN_STATE: usize = 0x34;
-    pub const PANELS_BTN_LABEL: usize = 0x39;
-    pub const PANELS_BTN_PRESS_FN: usize = 0x5c;
-    pub const PANELS_BTN_VT_TOOLTIP: usize = 0x0;
-    pub const PANELS_BTN_VT_VERBOSE: usize = 0x4;
-    pub const PANELS_BTN_VT_PRESS: usize = 0x20;
-    pub const PANELS_TEXT_COLOUR: usize = 0x70;
-    pub const PANELS_TEXT_STRING: usize = 0x84;
-    pub const PANELS_VT_SELECT_COUNT: usize = 0x94;
-    pub const PANELS_VT_SELECT_LIST: usize = 0x98;
-    pub const PANELS_OBJ_FLAGS: usize = 0x14;
-    pub const PANELS_OBJ_CLASS: usize = 0x40;
-    pub const PANELS_OBJ_TEAM: usize = 0xec;
-    pub const PANELS_CRAFT_CONTROL: usize = 0x1b0;
-    pub const PANELS_CTL_SPEED: usize = 0x8;
-    pub const PANELS_CTL_WARP: usize = 0xc;
-    pub const PANELS_RP_COMPONENTS: usize = 0x2c;
-    pub const PANELS_RC_RESOURCE: usize = 0x28;
-    pub const PANELS_TEAM_IN_PLAY: usize = 0x16c;
-    pub const PANELS_TEAM_OFFICERS: usize = 0x160;
-    pub const PANELS_BP_BUTTONS: usize = 0x2c;
-    pub const PANELS_BP_SHOW_MORE: usize = 0x4c;
-    pub const PANELS_CHAT_LINES: usize = 0x4;
-    pub const PANELS_NODE_TEXT: usize = 0xc;
-    pub const PANELS_NODE_COLOUR: usize = 0x18;
-    pub const PANELS_REGION_X: usize = 0x0;
-    pub const PANELS_REGION_Y: usize = 0x4;
-    pub const PANELS_REGION_BUF: usize = 0x10;
-    pub const PANELS_REGION_PROMPT: usize = 0x130;
-    pub const PANELS_REGION_END: usize = 0x134;
-    pub const PANELS_REGION_CARET: usize = 0x138;
-    pub const PANELS_REGION_FLAGS: usize = 0x144;
-    pub const PANELS_TEAM_COLOUR: usize = 0x8;
-    pub const PANELS_SENT_DILITHIUM: usize = 0x2c;
-    pub const PANELS_SENT_LATINUM: usize = 0x78;
-    pub const PANELS_SENT_METAL: usize = 0xc4;
-    pub const PANELS_SB_HAS_SOUND: usize = 0xec;
-    pub const PANELS_SB_HOVER_SOUND: usize = 0xf0;
-    pub const PANELS_RACE_NAME: usize = 0x14;
-    pub const PANELS_C_TITLE: usize = 0x3c;
-    pub const PANELS_C_HEAD_PLAYER: usize = 0x40;
-    pub const PANELS_C_HEAD_MESSAGE: usize = 0x44;
-    pub const PANELS_C_HEAD_TEAM: usize = 0x48;
-    pub const PANELS_C_HEAD_ALLIANCE: usize = 0x4c;
-    pub const PANELS_C_GROUP_MESSAGE: usize = 0x50;
-    pub const PANELS_C_GROUP_GIVE: usize = 0x54;
-    pub const PANELS_C_LABEL_VICTORY: usize = 0x58;
-    pub const PANELS_C_LABEL_LATENCY: usize = 0x5c;
-    pub const PANELS_C_MSG_0: usize = 0x60;
-    pub const PANELS_C_MSG_1: usize = 0x64;
-    pub const PANELS_C_MSG_2: usize = 0x68;
-    pub const PANELS_C_MSG_3: usize = 0x6c;
-    pub const PANELS_C_GIVE_UNITS: usize = 0x70;
-    pub const PANELS_C_OKAY: usize = 0x74;
-    pub const PANELS_C_ROW_0: usize = 0x78;
-    pub const PANELS_C_ROW_1: usize = 0x7c;
-    pub const PANELS_C_ROW_2: usize = 0x80;
-    pub const PANELS_C_ROW_3: usize = 0x84;
-    pub const PANELS_C_ROW_4: usize = 0x88;
-    pub const PANELS_C_VICTORY: usize = 0x8c;
-    pub const PANELS_C_LATENCY: usize = 0x90;
-    pub const PANELS_C_BAR_COUNT: usize = 0x94;
-    pub const PANELS_C_BARS: usize = 0x98;
-    pub const PANELS_C_TEAMS: usize = 0x9c;
-    pub const PANELS_C_ALLIANCES: usize = 0x9d;
-    pub const PANELS_C_SELECTED: usize = 0xa0;
-    pub const PANELS_TD_USER: usize = 0x60;
-    pub const PANELS_TD_AMOUNT: usize = 0x40;
-    pub const PANELS_TD_MIN: usize = 0x48;
-    pub const PANELS_TD_MAX: usize = 0x4c;
-    pub const PANELS_B_PRESENT: usize = 0x28;
-    pub const PANELS_B_SLOT: usize = 0x2c;
-    pub const PANELS_B_TEAM: usize = 0x34;
-    pub const PANELS_B_SHOW_TEAM: usize = 0x38;
-    pub const PANELS_B_SHOW_ALLIANCE: usize = 0x39;
-    pub const PANELS_B_NAME_BUTTON: usize = 0x3c;
-    pub const PANELS_B_NAME: usize = 0x40;
-    pub const PANELS_B_CHAT: usize = 0x44;
-    pub const PANELS_B_TEAM_TEXT: usize = 0x48;
-    pub const PANELS_B_ALLIANCE_0: usize = 0x4c;
-    pub const PANELS_B_ALLIANCE_1: usize = 0x50;
-    pub const PANELS_B_ALLIANCE_2: usize = 0x54;
-    pub const PANELS_B_COLOUR: usize = 0x58;
-    pub const PANELS_TEXT_INLINE: usize = 0x84;
-    pub const PANELS_ALLIANCE_PENDING: usize = 0x7c;
-    pub const PANELS_TEXT_LABEL_KEY: usize = 0x54;
-    pub const PANELS_VT_GET_INFORMATION: usize = 0x24;
-    pub const PANELS_D_TEXT: usize = 0x2c;
-    pub const PANELS_D_DROP: usize = 0x30;
-    pub const PANELS_D_AI: usize = 0x34;
-    pub const PANELS_L_TEXT: usize = 0x2c;
-    pub const PANELS_L_MS: usize = 0x284;
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn PANELS_BTN_BORDER() -> usize { super::TABLE.engine().field(a2engine::Sym(3)) }
+    #[inline(always)] pub fn PANELS_BTN_SPRITE() -> usize { super::TABLE.engine().field(a2engine::Sym(4)) }
+    #[inline(always)] pub fn PANELS_BTN_STATE() -> usize { super::TABLE.engine().field(a2engine::Sym(5)) }
+    #[inline(always)] pub fn PANELS_BTN_LABEL() -> usize { super::TABLE.engine().field(a2engine::Sym(6)) }
+    #[inline(always)] pub fn PANELS_BTN_PRESS_FN() -> usize { super::TABLE.engine().field(a2engine::Sym(7)) }
+    #[inline(always)] pub fn PANELS_BTN_VT_TOOLTIP() -> usize { super::TABLE.engine().field(a2engine::Sym(8)) }
+    #[inline(always)] pub fn PANELS_BTN_VT_VERBOSE() -> usize { super::TABLE.engine().field(a2engine::Sym(9)) }
+    #[inline(always)] pub fn PANELS_BTN_VT_PRESS() -> usize { super::TABLE.engine().field(a2engine::Sym(10)) }
+    #[inline(always)] pub fn PANELS_TEXT_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(11)) }
+    #[inline(always)] pub fn PANELS_TEXT_STRING() -> usize { super::TABLE.engine().field(a2engine::Sym(12)) }
+    #[inline(always)] pub fn PANELS_VT_SELECT_COUNT() -> usize { super::TABLE.engine().field(a2engine::Sym(18)) }
+    #[inline(always)] pub fn PANELS_VT_SELECT_LIST() -> usize { super::TABLE.engine().field(a2engine::Sym(19)) }
+    #[inline(always)] pub fn PANELS_OBJ_FLAGS() -> usize { super::TABLE.engine().field(a2engine::Sym(22)) }
+    #[inline(always)] pub fn PANELS_OBJ_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(24)) }
+    #[inline(always)] pub fn PANELS_OBJ_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(25)) }
+    #[inline(always)] pub fn PANELS_CRAFT_CONTROL() -> usize { super::TABLE.engine().field(a2engine::Sym(26)) }
+    #[inline(always)] pub fn PANELS_CTL_SPEED() -> usize { super::TABLE.engine().field(a2engine::Sym(27)) }
+    #[inline(always)] pub fn PANELS_CTL_WARP() -> usize { super::TABLE.engine().field(a2engine::Sym(28)) }
+    #[inline(always)] pub fn PANELS_RP_COMPONENTS() -> usize { super::TABLE.engine().field(a2engine::Sym(40)) }
+    #[inline(always)] pub fn PANELS_RC_RESOURCE() -> usize { super::TABLE.engine().field(a2engine::Sym(41)) }
+    #[inline(always)] pub fn PANELS_TEAM_IN_PLAY() -> usize { super::TABLE.engine().field(a2engine::Sym(42)) }
+    #[inline(always)] pub fn PANELS_TEAM_OFFICERS() -> usize { super::TABLE.engine().field(a2engine::Sym(43)) }
+    #[inline(always)] pub fn PANELS_BP_BUTTONS() -> usize { super::TABLE.engine().field(a2engine::Sym(44)) }
+    #[inline(always)] pub fn PANELS_BP_SHOW_MORE() -> usize { super::TABLE.engine().field(a2engine::Sym(45)) }
+    #[inline(always)] pub fn PANELS_CHAT_LINES() -> usize { super::TABLE.engine().field(a2engine::Sym(59)) }
+    #[inline(always)] pub fn PANELS_NODE_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(60)) }
+    #[inline(always)] pub fn PANELS_NODE_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(61)) }
+    #[inline(always)] pub fn PANELS_REGION_X() -> usize { super::TABLE.engine().field(a2engine::Sym(62)) }
+    #[inline(always)] pub fn PANELS_REGION_Y() -> usize { super::TABLE.engine().field(a2engine::Sym(63)) }
+    #[inline(always)] pub fn PANELS_REGION_BUF() -> usize { super::TABLE.engine().field(a2engine::Sym(64)) }
+    #[inline(always)] pub fn PANELS_REGION_PROMPT() -> usize { super::TABLE.engine().field(a2engine::Sym(65)) }
+    #[inline(always)] pub fn PANELS_REGION_END() -> usize { super::TABLE.engine().field(a2engine::Sym(66)) }
+    #[inline(always)] pub fn PANELS_REGION_CARET() -> usize { super::TABLE.engine().field(a2engine::Sym(67)) }
+    #[inline(always)] pub fn PANELS_REGION_FLAGS() -> usize { super::TABLE.engine().field(a2engine::Sym(68)) }
+    #[inline(always)] pub fn PANELS_TEAM_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(78)) }
+    #[inline(always)] pub fn PANELS_SENT_DILITHIUM() -> usize { super::TABLE.engine().field(a2engine::Sym(79)) }
+    #[inline(always)] pub fn PANELS_SENT_LATINUM() -> usize { super::TABLE.engine().field(a2engine::Sym(80)) }
+    #[inline(always)] pub fn PANELS_SENT_METAL() -> usize { super::TABLE.engine().field(a2engine::Sym(81)) }
+    #[inline(always)] pub fn PANELS_SB_HAS_SOUND() -> usize { super::TABLE.engine().field(a2engine::Sym(87)) }
+    #[inline(always)] pub fn PANELS_SB_HOVER_SOUND() -> usize { super::TABLE.engine().field(a2engine::Sym(88)) }
+    #[inline(always)] pub fn PANELS_RACE_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(90)) }
+    #[inline(always)] pub fn PANELS_C_TITLE() -> usize { super::TABLE.engine().field(a2engine::Sym(122)) }
+    #[inline(always)] pub fn PANELS_C_HEAD_PLAYER() -> usize { super::TABLE.engine().field(a2engine::Sym(123)) }
+    #[inline(always)] pub fn PANELS_C_HEAD_MESSAGE() -> usize { super::TABLE.engine().field(a2engine::Sym(124)) }
+    #[inline(always)] pub fn PANELS_C_HEAD_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(125)) }
+    #[inline(always)] pub fn PANELS_C_HEAD_ALLIANCE() -> usize { super::TABLE.engine().field(a2engine::Sym(126)) }
+    #[inline(always)] pub fn PANELS_C_GROUP_MESSAGE() -> usize { super::TABLE.engine().field(a2engine::Sym(127)) }
+    #[inline(always)] pub fn PANELS_C_GROUP_GIVE() -> usize { super::TABLE.engine().field(a2engine::Sym(128)) }
+    #[inline(always)] pub fn PANELS_C_LABEL_VICTORY() -> usize { super::TABLE.engine().field(a2engine::Sym(129)) }
+    #[inline(always)] pub fn PANELS_C_LABEL_LATENCY() -> usize { super::TABLE.engine().field(a2engine::Sym(130)) }
+    #[inline(always)] pub fn PANELS_C_MSG_0() -> usize { super::TABLE.engine().field(a2engine::Sym(131)) }
+    #[inline(always)] pub fn PANELS_C_MSG_1() -> usize { super::TABLE.engine().field(a2engine::Sym(132)) }
+    #[inline(always)] pub fn PANELS_C_MSG_2() -> usize { super::TABLE.engine().field(a2engine::Sym(133)) }
+    #[inline(always)] pub fn PANELS_C_MSG_3() -> usize { super::TABLE.engine().field(a2engine::Sym(134)) }
+    #[inline(always)] pub fn PANELS_C_GIVE_UNITS() -> usize { super::TABLE.engine().field(a2engine::Sym(135)) }
+    #[inline(always)] pub fn PANELS_C_OKAY() -> usize { super::TABLE.engine().field(a2engine::Sym(136)) }
+    #[inline(always)] pub fn PANELS_C_ROW_0() -> usize { super::TABLE.engine().field(a2engine::Sym(137)) }
+    #[inline(always)] pub fn PANELS_C_ROW_1() -> usize { super::TABLE.engine().field(a2engine::Sym(138)) }
+    #[inline(always)] pub fn PANELS_C_ROW_2() -> usize { super::TABLE.engine().field(a2engine::Sym(139)) }
+    #[inline(always)] pub fn PANELS_C_ROW_3() -> usize { super::TABLE.engine().field(a2engine::Sym(140)) }
+    #[inline(always)] pub fn PANELS_C_ROW_4() -> usize { super::TABLE.engine().field(a2engine::Sym(141)) }
+    #[inline(always)] pub fn PANELS_C_VICTORY() -> usize { super::TABLE.engine().field(a2engine::Sym(142)) }
+    #[inline(always)] pub fn PANELS_C_LATENCY() -> usize { super::TABLE.engine().field(a2engine::Sym(143)) }
+    #[inline(always)] pub fn PANELS_C_BAR_COUNT() -> usize { super::TABLE.engine().field(a2engine::Sym(144)) }
+    #[inline(always)] pub fn PANELS_C_BARS() -> usize { super::TABLE.engine().field(a2engine::Sym(145)) }
+    #[inline(always)] pub fn PANELS_C_TEAMS() -> usize { super::TABLE.engine().field(a2engine::Sym(146)) }
+    #[inline(always)] pub fn PANELS_C_ALLIANCES() -> usize { super::TABLE.engine().field(a2engine::Sym(147)) }
+    #[inline(always)] pub fn PANELS_C_SELECTED() -> usize { super::TABLE.engine().field(a2engine::Sym(148)) }
+    #[inline(always)] pub fn PANELS_TD_USER() -> usize { super::TABLE.engine().field(a2engine::Sym(149)) }
+    #[inline(always)] pub fn PANELS_TD_AMOUNT() -> usize { super::TABLE.engine().field(a2engine::Sym(150)) }
+    #[inline(always)] pub fn PANELS_TD_MIN() -> usize { super::TABLE.engine().field(a2engine::Sym(151)) }
+    #[inline(always)] pub fn PANELS_TD_MAX() -> usize { super::TABLE.engine().field(a2engine::Sym(152)) }
+    #[inline(always)] pub fn PANELS_B_PRESENT() -> usize { super::TABLE.engine().field(a2engine::Sym(153)) }
+    #[inline(always)] pub fn PANELS_B_SLOT() -> usize { super::TABLE.engine().field(a2engine::Sym(154)) }
+    #[inline(always)] pub fn PANELS_B_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(155)) }
+    #[inline(always)] pub fn PANELS_B_SHOW_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(156)) }
+    #[inline(always)] pub fn PANELS_B_SHOW_ALLIANCE() -> usize { super::TABLE.engine().field(a2engine::Sym(157)) }
+    #[inline(always)] pub fn PANELS_B_NAME_BUTTON() -> usize { super::TABLE.engine().field(a2engine::Sym(158)) }
+    #[inline(always)] pub fn PANELS_B_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(159)) }
+    #[inline(always)] pub fn PANELS_B_CHAT() -> usize { super::TABLE.engine().field(a2engine::Sym(160)) }
+    #[inline(always)] pub fn PANELS_B_TEAM_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(161)) }
+    #[inline(always)] pub fn PANELS_B_ALLIANCE_0() -> usize { super::TABLE.engine().field(a2engine::Sym(162)) }
+    #[inline(always)] pub fn PANELS_B_ALLIANCE_1() -> usize { super::TABLE.engine().field(a2engine::Sym(163)) }
+    #[inline(always)] pub fn PANELS_B_ALLIANCE_2() -> usize { super::TABLE.engine().field(a2engine::Sym(164)) }
+    #[inline(always)] pub fn PANELS_B_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(165)) }
+    #[inline(always)] pub fn PANELS_TEXT_INLINE() -> usize { super::TABLE.engine().field(a2engine::Sym(166)) }
+    #[inline(always)] pub fn PANELS_ALLIANCE_PENDING() -> usize { super::TABLE.engine().field(a2engine::Sym(167)) }
+    #[inline(always)] pub fn PANELS_TEXT_LABEL_KEY() -> usize { super::TABLE.engine().field(a2engine::Sym(168)) }
+    #[inline(always)] pub fn PANELS_VT_GET_INFORMATION() -> usize { super::TABLE.engine().field(a2engine::Sym(169)) }
+    #[inline(always)] pub fn PANELS_D_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(170)) }
+    #[inline(always)] pub fn PANELS_D_DROP() -> usize { super::TABLE.engine().field(a2engine::Sym(171)) }
+    #[inline(always)] pub fn PANELS_D_AI() -> usize { super::TABLE.engine().field(a2engine::Sym(172)) }
+    #[inline(always)] pub fn PANELS_L_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(173)) }
+    #[inline(always)] pub fn PANELS_L_MS() -> usize { super::TABLE.engine().field(a2engine::Sym(174)) }
 }
 
 pub mod value {
-    pub const PANELS_TEXT_MAX: i32 = 2048;
-    pub const PANELS_OBJ_IS_GAME_OBJECT: i32 = 4;
-    pub const PANELS_REGION_SHOWN: i32 = 1;
-    pub const PANELS_REGION_ACTIVE: i32 = 256;
-    pub const PANELS_REGION_CHANGED: i32 = 512;
-    pub const PANELS_REGION_BUF_MAX: i32 = 280;
-    pub const PANELS_SOUND2D_BYTES: i32 = 28;
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn PANELS_TEXT_MAX() -> i32 { super::TABLE.engine().value(a2engine::Sym(13)) }
+    #[inline(always)] pub fn PANELS_OBJ_IS_GAME_OBJECT() -> i32 { super::TABLE.engine().value(a2engine::Sym(23)) }
+    #[inline(always)] pub fn PANELS_REGION_SHOWN() -> i32 { super::TABLE.engine().value(a2engine::Sym(69)) }
+    #[inline(always)] pub fn PANELS_REGION_ACTIVE() -> i32 { super::TABLE.engine().value(a2engine::Sym(70)) }
+    #[inline(always)] pub fn PANELS_REGION_CHANGED() -> i32 { super::TABLE.engine().value(a2engine::Sym(71)) }
+    #[inline(always)] pub fn PANELS_REGION_BUF_MAX() -> i32 { super::TABLE.engine().value(a2engine::Sym(72)) }
+    #[inline(always)] pub fn PANELS_SOUND2D_BYTES() -> i32 { super::TABLE.engine().value(a2engine::Sym(86)) }
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
@@ -397,6 +399,7 @@ pub const BUILDS: &[a2engine::Build] = &[
     a2engine::Build {
         name: "gog-1.1",
         key: "armada2/gog-1.1",
+        exe: "Armada2.exe",
         timestamp: 0x3c4c76bd,
         image_size: 0x3fa000,
         sections: 0xa1a8a321,

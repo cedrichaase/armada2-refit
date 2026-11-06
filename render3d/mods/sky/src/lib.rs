@@ -305,6 +305,7 @@ impl Sky {
             self.said_inst = true;
             log!("sky: background instance axes {:?}", inst.r);
         }
+        // lint-allow(content): a background is a SOD file or a texture prefix; the extension is the engine's format.
         if bg.contains(".sod") {
             let Some(model) = scene::model(bg) else { return };
             let p = pose::pose(&model.sod, &model.info, &world, pose::Clock::looping(v.time), pose::Lod::Forced(usize::MAX));

@@ -3,7 +3,13 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'testbench'))
+_root = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, _root)
+import a2env  # noqa: E402
+# `--game ID` anywhere: the game (games/<id>.toml) for this run and what it starts, as
+# A2_PROFILE; bench/config.py reads it through a2env.
+a2env.use(a2env.take_game_arg(sys.argv))
+sys.path.insert(0, os.path.join(_root, 'testbench'))
 from bench.cli import main  # noqa: E402
 
 sys.exit(main())

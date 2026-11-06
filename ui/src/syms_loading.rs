@@ -31,9 +31,11 @@ pub mod hook {
 }
 
 pub mod field {
+    #![allow(non_snake_case)]
 }
 
 pub mod value {
+    #![allow(non_snake_case)]
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
@@ -69,6 +71,7 @@ pub const BUILDS: &[a2engine::Build] = &[
     a2engine::Build {
         name: "gog-1.1",
         key: "armada2/gog-1.1",
+        exe: "Armada2.exe",
         timestamp: 0x3c4c76bd,
         image_size: 0x3fa000,
         sections: 0xa1a8a321,

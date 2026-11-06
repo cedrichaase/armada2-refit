@@ -7,10 +7,11 @@
 //! README ("World") beside the name of the hook that uses them.
 use r3d_core::hooks::{Gate, Hook, Hooks, Kind, Site};
 use r3d_core::engine::{self, field, field_f32, field_m34, field_u8, light, obj, rd};
-use r3d_core::math::{v3, M34, V3};
+use r3d_core::math::{M34, V3};
 use crate::{log, rt};
 use alloc::vec::Vec;
-use crate::syms::{hook, sym, TABLE};
+use crate::syms::{field as off, hook, sym, value, TABLE};
+use r3d_core::engine::instance::{frustum_test, instance_database, set_on_screen};
 
 /// An engine address of the profile: 0 unless the hook that uses it is ready.
 pub(crate) fn at(s: a2engine::Sym) -> usize { TABLE.engine().addr(s) }
@@ -155,8 +156,9 @@ unsafe extern "thiscall" fn nebula_frustum(inst: usize, cam: usize) -> u32 {
         if !(scale > 1.0) {
             return f(inst, cam);
         }
-        let node = field(inst, 0x80);
-        let r = ((if node != 0 { node + 0x1c } else { inst + 0x34 }) + 0xc) as *mut f32;
+        // The radius, the fourth float of the database node's sphere, or the instance's.
+        let node = instance_database(inst);
+        let r = ((if node != 0 { node + off::WD_NODE_SPHERE() } else { inst + off::WD_INST_SPHERE() }) + 3 * 4) as *mut f32;
         let keep = core::ptr::read_unaligned(r);
         core::ptr::write_unaligned(r, keep * scale);
         // Its answer is a bool in al: the rest of eax is not to be relied on.
@@ -172,7 +174,7 @@ unsafe extern "thiscall" fn hook_spirit(sp: usize, cam: usize) {
     unsafe {
         if open() && super::nebulae::spirit_active() && sp != 0 {
             let get: unsafe extern "C" fn(i32) -> usize = core::mem::transmute(fn_entity_get());
-            let o = get(rd::<i32>(sp + 8));
+            let o = get(rd::<i32>(sp + off::WD_SPIRIT_HANDLE()));
             if o != 0 && (engine::vtable(o) == vt_nebula() || engine::vtable(o) == vt_latinum()) && super::nebulae::drawn_as_gas(&rt::lower(obj::odf_name(o))) {
                 return;
             }
@@ -188,17 +190,17 @@ unsafe extern "thiscall" fn hook_spirit(sp: usize, cam: usize) {
 
 /// A nebula's point light (made by `Nebula::InitializeGeometry`, `+0x1ac`); 0 if none.
 pub fn nebula_light_object(neb: usize) -> usize {
-    field(neb, 0x1ac)
+    field(neb, off::WD_NEB_LIGHT())
 }
 
 /// The class's glow colour (`red_glow`..: `NebulaClass+0x22c`).
 pub fn nebula_glow(cls: usize) -> [f32; 3] {
-    unsafe { rd(cls + 0x22c) }
+    unsafe { rd(cls + off::WD_NEB_GLOW()) }
 }
 
 /// The class's light falloff (`+0x244`, `+0x248`).
 pub fn nebula_falloff(cls: usize) -> (f32, f32) {
-    (field_f32(cls, 0x244), field_f32(cls, 0x248))
+    (field_f32(cls, off::WD_NEB_FALLOFF_START()), field_f32(cls, off::WD_NEB_FALLOFF_RANGE()))
 }
 
 /// Registers the nebula's light at its transform (`Entity::GetTransform`).
@@ -216,69 +218,54 @@ pub fn set_light_reach(lt: usize, start: f32, range: f32) {
 
 /// A planet instance's bounding sphere: centre (object space) `+0x34`, radius `+0x40`.
 pub fn instance_sphere(inst: usize) -> [f32; 4] {
-    unsafe { rd(inst + 0x34) }
+    unsafe { rd(inst + off::WD_INST_SPHERE()) }
 }
 
 /// The instance's placement (`+0x44`, a `Matrix34`).
 pub fn instance_world(inst: usize) -> M34 {
-    unsafe { rd(inst + 0x44) }
+    unsafe { rd(inst + off::WD_INST_MATRIX()) }
 }
 
 /// The instance's origin (`+0x68`).
 pub fn instance_origin(inst: usize) -> V3 {
-    unsafe { rd(inst + 0x68) }
+    unsafe { rd(inst + off::WD_INST_ORIGIN()) }
 }
 
 /// The instance's database (`+0x80`).
 pub fn instance_db(inst: usize) -> usize {
-    field(inst, 0x80)
+    instance_database(inst)
 }
 
 // ---- nebulae.rs -----------------------------------------------------------------------
 
 /// The class's radius (`+0x1e0`), when it is a plausible one.
 pub fn nebula_class_radius(o: usize) -> f32 {
-    field_f32(obj::class(o), 0x1e0)
+    field_f32(obj::class(o), off::WD_NEB_CLASS_RADIUS())
 }
 
 /// An object's handle (`+0x28`).
 pub fn handle(o: usize) -> i32 {
-    unsafe { rd::<i32>(o + 0x28) }
+    engine::entity_handle(o) as i32
 }
 
 /// A nebula's position (`+0xac`).
 pub fn position(o: usize) -> [f32; 3] {
-    unsafe { rd(o + 0xac) }
+    unsafe { rd(o + off::WD_NEB_POSITION()) }
 }
 
 /// The handles the engine keeps ghosts of this frame (`Ghost::ghostList`).
 pub fn ghost_handles(out: &mut Vec<i32>) {
-    let head = field(ghost_list(), 4);
-    if head == 0 {
-        return;
-    }
-    let mut n = field(head, 0);
-    let mut guard = 0;
-    while n != 0 && n != head && guard < 100_000 {
-        let sp = field(n, 8);
+    let handle = off::WD_SPIRIT_HANDLE();
+    engine::for_each_in_list_at(ghost_list(), |sp| {
         if sp != 0 {
-            out.push(unsafe { rd::<i32>(sp + 8) });
+            out.push(unsafe { rd::<i32>(sp + handle) });
         }
-        n = field(n, 0);
-        guard += 1;
-    }
+    });
 }
 
 /// Every `Nebula` in the engine's list (`Nebula::nebulaList`).
 pub fn each_nebula(mut f: impl FnMut(usize)) {
-    let vecp = unsafe { rd::<usize>(nebula_list()) };
-    if vecp != 0 {
-        let (mut it, end) = (field(vecp, 4), field(vecp, 8));
-        while it != 0 && it < end {
-            f(field(it, 0));
-            it += 4;
-        }
-    }
+    engine::for_each_in_vector(nebula_list(), |n| f(n));
 }
 
 /// Marks a nebula on screen as `GameObject::Render` would (not hidden `+0x27`, seen by
@@ -286,14 +273,11 @@ pub fn each_nebula(mut f: impl FnMut(usize)) {
 /// engine's nebula lights.
 pub fn mark_nebula_on_screen(o: usize, cam: usize) {
     let inst = obj::instance(o);
-    if field_u8(o, 0x27) != 0 || inst == 0 || cam == 0 || !obj::can_user_see(o) {
+    if obj::expired(o) || inst == 0 || cam == 0 || !obj::can_user_see(o) {
         return;
     }
-    unsafe {
-        let f: unsafe extern "thiscall" fn(usize, usize) -> u8 = core::mem::transmute(field(engine::vtable(inst), SLOT_FRUSTUM * 4));
-        if f(inst, cam) != 0 {
-            core::ptr::write((o + 0x25) as *mut u8, 1);
-        }
+    if frustum_test(inst, cam) {
+        set_on_screen(o);
     }
 }
 
@@ -301,28 +285,33 @@ pub fn mark_nebula_on_screen(o: usize, cam: usize) {
 
 /// A planet class's ground and atmosphere texture names (`+0x4bc`, `+0x4ac`).
 pub fn planet_textures(cls: usize) -> (&'static str, &'static str) {
-    unsafe { (rt::cstr_at((cls + 0x4bc) as *const u8, 16), rt::cstr_at((cls + 0x4ac) as *const u8, 16)) }
+    unsafe { (rt::cstr_at((cls + off::WD_PLANET_GROUND_TEX()) as *const u8, 16), rt::cstr_at((cls + off::WD_PLANET_ATMO_TEX()) as *const u8, 16)) }
 }
 
 /// A planet's colony: its race record (`+0x2c4`).
 pub fn planet_race(o: usize) -> usize {
-    field(o, 0x2c4)
+    field(o, off::WD_PLANET_RACE())
 }
 
 /// The colony's population (`+0x2c8`).
 pub fn planet_population(o: usize) -> f32 {
-    field_f32(o, 0x2c8)
+    field_f32(o, off::WD_PLANET_POPULATION())
 }
 
-/// Whether the race's cities are drawn (`+0x452`).
+/// Whether the race's cities are drawn (`+0x452`, its city texture's name, is set).
 pub fn race_has_people(race: usize) -> bool {
-    field_u8(race, 0x452) != 0
+    field_u8(race, off::WD_RACE_NAME()) != 0
+}
+
+/// The race's city texture name (`+0x452`), which names its `PD_` development textures.
+pub fn race_name(race: usize) -> &'static str {
+    unsafe { rt::cstr_at((race + off::WD_RACE_NAME()) as *const u8, 32) }
 }
 
 /// `PlanetInstance::RenderInternal` draws only while the planet's flags have bit 2 and
 /// its byte `+0x113` is clear.
 pub fn planet_hidden(o: usize) -> bool {
-    obj::flags(o) & 4 == 0 || field_u8(o, 0x113) != 0
+    obj::flags(o) & 4 == 0 || field_u8(o, off::WD_PLANET_HIDDEN()) != 0
 }
 
 /// Whether a database is a planet's.
@@ -333,12 +322,12 @@ pub fn is_planet_db(db: usize) -> bool {
 /// A planet's fog-of-war spirit (`Ghost::ghostList`): the copy of its `PlanetInstance`
 /// (`+0x10`) and its class (`+4`). None if it is not a planet's.
 pub fn planet_spirit(sp: usize) -> Option<(usize, usize, usize)> {
-    let inst = field(sp, 0x10);
+    let inst = field(sp, off::WD_SPIRIT_INSTANCE());
     if inst == 0 || engine::vtable(inst) != vt_planet_instance() {
         return None;
     }
     let db = instance_db(inst);
-    let cls = field(sp, 4);
+    let cls = field(sp, off::WD_SPIRIT_CLASS());
     if cls == 0 || !is_planet_db(db) {
         return None;
     }
@@ -356,8 +345,8 @@ pub fn distance_culled(inst: usize, eye: &V3, pos: &V3) -> bool {
 /// The race's city picture for hemisphere `h` (`+0x514 + 4h`): (array, width, height,
 /// data).
 pub fn city_array(race: usize, h: usize) -> (usize, u32, u32, usize) {
-    let arr = field(race, 0x514 + h * 4);
-    (arr, field(arr, 0) as u32, field(arr, 4) as u32, field(arr, 8))
+    let arr = field(race, off::WD_RACE_CITIES() + h * 4);
+    (arr, field(arr, off::WD_CITY_WIDTH()) as u32, field(arr, off::WD_CITY_HEIGHT()) as u32, field(arr, off::WD_CITY_DATA()))
 }
 
 /// One value of a city array's data.
@@ -367,7 +356,7 @@ pub fn city_value(data: usize, index: usize) -> f32 {
 
 /// The race's city gradient `k` (`+0x470`).
 pub fn race_city_k(race: usize) -> f32 {
-    field_f32(race, 0x470)
+    field_f32(race, off::WD_RACE_CITY_K())
 }
 
 /// cfgPOP_HEAVY, as RTS_CFG.h set it at load.
@@ -377,7 +366,7 @@ pub fn pop_heavy() -> i32 {
 
 /// The class's population level (`+0x490`) and that level's maximum population.
 pub fn class_max_population(cls: usize) -> f32 {
-    let lvl = unsafe { rd::<i32>(cls + 0x490) };
+    let lvl = unsafe { rd::<i32>(cls + off::WD_PLANET_POP_LEVEL()) };
     match lvl {
         1..=4 => (unsafe { rd::<i32>(pop_levels() + (lvl as usize - 1) * 4) }) as f32,
         _ => 0.0,
@@ -386,7 +375,7 @@ pub fn class_max_population(cls: usize) -> f32 {
 
 /// The race's colour (`+0x464`).
 pub fn race_colour(race: usize) -> [f32; 3] {
-    unsafe { rd(race + 0x464) }
+    unsafe { rd(race + off::WD_RACE_COLOUR()) }
 }
 
 /// What `SetAtmosphereParameters` and the database give a planet's draw: the hulls of
@@ -403,15 +392,16 @@ pub struct PlanetParts {
 }
 
 pub fn planet_parts(cls: usize, inst: usize, db: usize) -> PlanetParts {
-    let (h0, h1, shell) = (field(db, 0xa8), field(db, 0xac), field(db, 0xb0));
-    let rad = |h: usize| if h != 0 { field_f32(h, 0x150) } else { 0.0 };
+    let (h0, h1, shell) = (field(db, off::WD_PDB_GROUND()), field(db, off::WD_PDB_GROUND2()), field(db, off::WD_PDB_SHELL()));
+    let radius = off::WD_HULL_RADIUS();
+    let rad = |h: usize| if h != 0 { field_f32(h, radius) } else { 0.0 };
     PlanetParts {
         ground_r: rad(h0),
         ground_r2: rad(h1),
         shell_r: rad(shell),
-        yaw: -field_f32(inst, 0xb4) * field_f32(db, 0xa4),
-        turb_t: field_f32(inst, 0xb8),
-        turb: field_f32(cls, 0x4cc) > 0.0,
+        yaw: -field_f32(inst, off::WD_PLANET_YAW()) * field_f32(db, off::WD_PDB_YAW_RATE()),
+        turb_t: field_f32(inst, off::WD_PLANET_TURB_TIME()),
+        turb: field_f32(cls, off::WD_PLANET_TURBULENCE()) > 0.0,
     }
 }
 
@@ -420,23 +410,28 @@ pub fn planet_parts(cls: usize, inst: usize, db: usize) -> PlanetParts {
 /// The scale an Entity sets on its instance (a moon shrinks as it is mined), applied
 /// while the instance's flag `+0x74` is on; 1 otherwise.
 pub fn instance_scale(inst: usize) -> V3 {
-    if inst != 0 && field_u8(inst, 0x74) != 0 { unsafe { rd::<V3>(inst + 0x28) } } else { v3(1.0, 1.0, 1.0) }
+    r3d_core::engine::instance::instance_scale(inst)
 }
 
 /// The instance's clock as `GameObject::RenderInternal` plays its sprite nodes: the
 /// time since it began (`+0x18`) and its flags (`+0xc`).
 pub fn instance_clock(inst: usize, time: f32) -> (f32, u32) {
-    if inst != 0 { ((time - unsafe { rd::<f32>(inst + 0x18) }).max(0.0), field(inst, 0xc) as u32) } else { (time, 3) }
+    if inst != 0 {
+        let (flags, _, start) = engine::view::instance_clock(inst);
+        ((time - start).max(0.0), flags)
+    } else {
+        (time, 3)
+    }
 }
 
 /// An asteroid field's rocks: the array (`+0x98`) and its count (`+0x9c`).
 pub fn field_rocks(inst: usize) -> (usize, usize) {
-    (field(inst, 0x98), field(inst, 0x9c))
+    (field(inst, off::WD_FIELD_ROCKS()), field(inst, off::WD_FIELD_ROCK_COUNT()))
 }
 
 /// The field class's eight databases (`+0x1e0`) and their count (`+0x1fc`), at most 16.
 pub fn field_databases(cls: usize) -> (usize, usize) {
-    (field(cls, 0x1e0), field(cls, 0x1fc).min(16))
+    (field(cls, off::WD_FIELD_DBS()), field(cls, off::WD_FIELD_DB_COUNT()).min(16))
 }
 
 /// The culling distance (cfgOBJECT_CULLING_DISTANCE).
@@ -446,35 +441,35 @@ pub fn cull_distance() -> f32 {
 
 /// One rock of a field: its `ST3D_Instance` (0x98 bytes each).
 pub fn rock(arr: usize, i: usize) -> usize {
-    arr + i * 0x98
+    arr + i * value::WD_ROCK_BYTES() as usize
 }
 
 /// A rock's model name: the table's name for the class database it uses, or None for
 /// a database that is not the class's.
 pub fn rock_model(rock: usize, dbs: usize, ndb: usize) -> Option<&'static str> {
-    let db = field(rock, 0x80);
+    let db = instance_database(rock);
     let k = (0..ndb).find(|&k| field(dbs, k * 4) == db)?;
     Some(unsafe { rt::cstr_at(field(asteroid_names(), k * 4) as *const u8, 32) })
 }
 
 /// A rock's placement (`+0x44`).
 pub fn rock_world(rock: usize) -> M34 {
-    field_m34(rock, 0x44)
+    field_m34(rock, off::WD_INST_MATRIX())
 }
 
 /// Whether the rock is hidden (`+0x84`).
 pub fn rock_hidden(rock: usize) -> bool {
-    field_u8(rock, 0x84) != 0
+    field_u8(rock, off::WD_ROCK_HIDDEN()) != 0
 }
 
 /// How much of the moon's dilithium is left, 0..1 (`Scrap::Render`: the object's
 /// resource `+0x17c` over the class's maximum); 1 for a Scrap without dilithium.
 pub fn moon_dilithium(o: usize) -> f32 {
-    let res = field(o, 0x17c);
-    if res == 0 || field_u8(res, 0x18) != 0 {
+    let res = field(o, off::WD_SCRAP_RESOURCE());
+    if res == 0 || field_u8(res, off::WD_RESOURCE_EMPTY()) != 0 {
         return 1.0;
     }
-    let rc = field(res, 4);
+    let rc = field(res, off::WD_RESOURCE_CLASS());
     if rc == 0 {
         return 1.0;
     }

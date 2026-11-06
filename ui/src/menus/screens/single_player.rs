@@ -37,7 +37,7 @@ fn lock_hint(i: usize, names: &[&str; 4]) -> Option<String> {
 /// logged, so a bench can tell it played (the bench has no audio).
 fn locked_click(i: usize) {
     let snd = crate::config::get().locked_sound.clone();
-    let played = crate::engine::sound::shell_named(&snd);
+    let played = crate::engine::api::sound::shell_named(&snd);
     let key = crate::content::get().campaigns.get(i).map_or("?", |c| c.key);
     crate::log!("menus: locked campaign {} clicked: sound {}", key, if played { snd.as_str() } else { "none" });
 }
@@ -62,8 +62,14 @@ static mut ICONS: Option<Option<Tex>> = None;
 fn icons() -> Option<Tex> {
     unsafe {
         if ICONS.is_none() {
-            let t = crate::gfx::load_tga("Textures\\RGB\\allrace.tga");
-            crate::log!("menus: campaign emblems {}", if t.is_some() { "from allrace.tga" } else { "not found (allrace.tga): names only" });
+            let file = crate::content::get().files.race_icons;
+            let t = if file.is_empty() { None } else { crate::gfx::load_tga(file) };
+            let name = file.rsplit(['/', '\\']).next().unwrap_or("");
+            if t.is_some() {
+                crate::log!("menus: campaign emblems from {}", name);
+            } else {
+                crate::log!("menus: campaign emblems not found ({}): names only", name);
+            }
             ICONS = Some(t);
         }
         ICONS.flatten()
@@ -330,7 +336,7 @@ fn over_scene(ui: &mut Ui, s: &Screen, names: &[&str; 4], foot: &[&crate::menus:
             // The Tutorial and Federation panels are hit areas of the procedure, which
             // plays no sound for them: ours plays the panels' buttons' own.
             if hover >= 0 && s.model.button_at(x, y).is_none() {
-                crate::engine::sound::shell_hover(like_button(s));
+                crate::engine::api::sound::shell_hover(like_button(s));
             }
         }
     }
@@ -362,7 +368,7 @@ fn over_scene(ui: &mut Ui, s: &Screen, names: &[&str; 4], foot: &[&crate::menus:
         if s.top && FOOT_HOVER != foot_hover {
             FOOT_HOVER = foot_hover;
             if foot_hover != 0 {
-                crate::engine::sound::shell_hover(Some(foot_hover));
+                crate::engine::api::sound::shell_hover(Some(foot_hover));
             }
         }
     }

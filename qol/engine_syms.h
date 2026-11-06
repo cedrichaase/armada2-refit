@@ -88,69 +88,135 @@
 #define QOL_S_TRANSPORT 82
 #define QOL_S_GET_SETUP 83
 #define QOL_S_SETUP_ALLOWS_WARP 84
-#define QOL_F_OV_COUNT 0xb8
-#define QOL_F_OV_SEL 0xbc
-#define QOL_F_OV_SHIPGRP 0x14c
-#define QOL_F_OV_STNGRP 0x1c4
-#define QOL_F_OV_ACTION 0x3c
-#define QOL_F_OV_POINT 0xa4
-#define QOL_F_OV_VT_SELECT_LIST 0x98
-#define QOL_F_GO_FLAGS 0x14
-#define QOL_F_GO_ID 0x28
-#define QOL_F_GO_CLASS 0x40
-#define QOL_F_GO_DYING 0x113
-#define QOL_F_GO_TEAM 0xec
-#define QOL_F_GO_LABEL 0x120
-#define QOL_F_GO_POS 0xac
-#define QOL_F_CC_STATION 0x20d
-#define QOL_F_CI_COMMAND 0x1a0
-#define QOL_F_MODE_CLASS 0xc
-#define QOL_F_BAR_X44 0x44
-#define QOL_F_BAR_BUILD 0xf0
-#define QOL_F_CRAFT_CONTROL 0x1b0
-#define QOL_F_CTL_SPEED 0x8
-#define QOL_F_CTL_WARP 0xc
-#define QOL_V_CMD_GO 4
-#define QOL_V_CMD_GO_WARP 43
-#define QOL_V_CMD_BUILD 25
-#define QOL_V_CMD_CANCEL 19
-#define QOL_V_ACT_COMMAND 4095
-#define QOL_V_ACT_KEEP 16384
+#define QOL_F_OV_COUNT ((int)a2f_qol_ov_count)
+#define QOL_F_OV_SEL ((int)a2f_qol_ov_sel)
+#define QOL_F_OV_SHIPGRP ((int)a2f_qol_ov_shipgrp)
+#define QOL_F_OV_STNGRP ((int)a2f_qol_ov_stngrp)
+#define QOL_F_OV_ACTION ((int)a2f_qol_ov_action)
+#define QOL_F_OV_POINT ((int)a2f_qol_ov_point)
+#define QOL_F_OV_VT_SELECT_LIST ((int)a2f_qol_ov_vt_select_list)
+#define QOL_F_GO_FLAGS ((int)a2f_qol_go_flags)
+#define QOL_F_GO_ID ((int)a2f_qol_go_id)
+#define QOL_F_GO_CLASS ((int)a2f_qol_go_class)
+#define QOL_F_GO_DYING ((int)a2f_qol_go_dying)
+#define QOL_F_GO_TEAM ((int)a2f_qol_go_team)
+#define QOL_F_GO_LABEL ((int)a2f_qol_go_label)
+#define QOL_F_GO_POS ((int)a2f_qol_go_pos)
+#define QOL_F_CC_STATION ((int)a2f_qol_cc_station)
+#define QOL_F_CI_COMMAND ((int)a2f_qol_ci_command)
+#define QOL_F_MODE_CLASS ((int)a2f_qol_mode_class)
+#define QOL_F_BAR_X44 ((int)a2f_qol_bar_x44)
+#define QOL_F_BAR_BUILD ((int)a2f_qol_bar_build)
+#define QOL_F_CRAFT_CONTROL ((int)a2f_qol_craft_control)
+#define QOL_F_CTL_SPEED ((int)a2f_qol_ctl_speed)
+#define QOL_F_CTL_WARP ((int)a2f_qol_ctl_warp)
+#define QOL_V_CMD_GO ((int)a2f_qol_cmd_go)
+#define QOL_V_CMD_GO_WARP ((int)a2f_qol_cmd_go_warp)
+#define QOL_V_CMD_BUILD ((int)a2f_qol_cmd_build)
+#define QOL_V_CMD_CANCEL ((int)a2f_qol_cmd_cancel)
+#define QOL_V_ACT_COMMAND ((int)a2f_qol_act_command)
+#define QOL_V_ACT_KEEP ((int)a2f_qol_act_keep)
 #define QOL_S_BK_TOGGLES 113
 #define QOL_S_BK_PROCESS_KEYS 114
 #define QOL_S_BK_KEYS_CALL 115
-#define QOL_F_BK_KEY_COMMANDS 0xcc
-#define QOL_F_BK_KEY_BUILDS 0xd8
-#define QOL_F_BK_KEY_WEAPONS 0xe4
-#define QOL_V_BK_N_TOGGLES 6
-#define QOL_F_BK_BTN_STATE 0x34
-#define QOL_F_BK_VT_PRESS 0x20
+#define QOL_F_BK_KEY_COMMANDS ((int)a2f_qol_bk_key_commands)
+#define QOL_F_BK_KEY_BUILDS ((int)a2f_qol_bk_key_builds)
+#define QOL_F_BK_KEY_WEAPONS ((int)a2f_qol_bk_key_weapons)
+#define QOL_V_BK_N_TOGGLES ((int)a2f_qol_bk_n_toggles)
+#define QOL_F_BK_BTN_STATE ((int)a2f_qol_bk_btn_state)
+#define QOL_F_BK_VT_PRESS ((int)a2f_qol_bk_vt_press)
 #define QOL_S_BK_TEXT_INPUT 122
 #define QOL_S_BK_IS_PLAYING_VIDEO 123
 #define QOL_S_BK_CINEMATIC_VIEW 124
 #define QOL_S_BK_CLICK_SOUND 125
 #define QOL_S_BK_OPERATOR_NEW 126
 #define QOL_S_BK_SOUND2D 127
-#define QOL_V_BK_SOUND2D_BYTES 28
+#define QOL_V_BK_SOUND2D_BYTES ((int)a2f_qol_bk_sound2d_bytes)
 #define QOL_S_BK_BUTTON_PRESS 129
-#define QOL_S_MP_ADD_POINT 130
-#define QOL_S_MP_ADD_CALL 131
-#define QOL_S_MP_FIRST_CALL 132
-#define QOL_S_MP_QUEUE 133
-#define QOL_S_MP_RELEASE_CALL 134
-#define QOL_F_MP_GO_PROCESS 0x44
-#define QOL_F_MP_PROC_COMMAND 0x38
-#define QOL_F_MP_PROC_PATH 0x88
-#define QOL_F_MP_PROC_POINT 0x12c
-#define QOL_V_MP_ACT_QUEUED 16384
-#define QOL_V_MP_PACKET_MAX 508
-#define QOL_V_MP_CMD_PATROL 26
-#define QOL_S_RS_THIS_SITE 142
-#define QOL_S_RS_THIS_CONT 143
-#define QOL_S_RS_CHECK_SITE 144
-#define QOL_S_RS_CHECK_CONT 145
-#define QOL_F_RS_VT_CHECK 0x138
-#define QOL_F_RS_VT_CAN_PLACE 0x8
+#define QOL_V_CCE_CRAFT_ARRAY ((int)a2f_qol_cce_craft_array)
+#define QOL_V_CCE_CANCEL_COUNT ((int)a2f_qol_cce_cancel_count)
+#define QOL_V_CCE_CANCEL_INDEX ((int)a2f_qol_cce_cancel_index)
+#define QOL_V_CCE_ROUTE_OBJECTS ((int)a2f_qol_cce_route_objects)
+#define QOL_V_CCE_ROUTE_COUNT ((int)a2f_qol_cce_route_count)
+#define QOL_V_MSW_READ_LOCAL ((int)a2f_qol_msw_read_local)
+#define QOL_V_CGS_GROUP ((int)a2f_qol_cgs_group)
+#define QOL_S_MP_ADD_POINT 137
+#define QOL_S_MP_ADD_CALL 138
+#define QOL_S_MP_FIRST_CALL 139
+#define QOL_S_MP_QUEUE 140
+#define QOL_S_MP_RELEASE_CALL 141
+#define QOL_F_MP_GO_PROCESS ((int)a2f_qol_mp_go_process)
+#define QOL_F_MP_PROC_PATH ((int)a2f_qol_mp_proc_path)
+#define QOL_F_MP_PROC_POINT ((int)a2f_qol_mp_proc_point)
+#define QOL_V_MP_ACT_QUEUED ((int)a2f_qol_mp_act_queued)
+#define QOL_V_MP_PACKET_MAX ((int)a2f_qol_mp_packet_max)
+#define QOL_V_MP_CMD_PATROL ((int)a2f_qol_mp_cmd_patrol)
+#define QOL_S_MQ_DQ_WHAT 148
+#define QOL_S_MQ_DQ_WHO 149
+#define QOL_S_MQ_DQ_WHO_WHERE 150
+#define QOL_S_MQ_DQ_WHO_WHERE_PARAM 151
+#define QOL_S_MQ_DQ_CLASS 152
+#define QOL_S_MQ_DQ_CLASS_WHERE 153
+#define QOL_S_MQ_DQ_PARAM 154
+#define QOL_S_MQ_DQ_PATH 155
+#define QOL_S_MQ_DQ_WHERE 156
+#define QOL_S_MQ_DQ_WHERE_PARAM 157
+#define QOL_S_MQ_DQ_WHO_PARAM 158
+#define QOL_S_MQ_GO_BROADCAST 159
+#define QOL_S_MQ_FORM_FORMATION 160
+#define QOL_S_MQ_SET_SPECIAL 161
+#define QOL_S_MQ_PRESIM 162
+#define QOL_S_MQ_CMD_NAME 163
+#define QOL_S_MQ_WHAT_CALL 164
+#define QOL_S_MQ_WHAT_ON_CALL 165
+#define QOL_S_MQ_WHO_CALL 166
+#define QOL_S_MQ_WHO_WHERE_CALL 167
+#define QOL_S_MQ_WHO_WHERE_PARAM_CALL 168
+#define QOL_S_MQ_CLASS_CALL 169
+#define QOL_S_MQ_CLASS_WHERE_CALL 170
+#define QOL_S_MQ_PARAM_CALL 171
+#define QOL_S_MQ_PATH_CALL 172
+#define QOL_S_MQ_WHERE_CALL 173
+#define QOL_S_MQ_WHERE_PARAM_CALL 174
+#define QOL_S_MQ_WHO_PARAM_CALL 175
+#define QOL_S_MQ_GO_BROADCAST_CALL 176
+#define QOL_S_MQ_FORM_FORMATION_CALL 177
+#define QOL_S_MQ_SPECIAL_CALL 178
+#define QOL_S_MQ_PRESIM_CALL 179
+#define QOL_S_MQ_LOAD_TIME 180
+#define QOL_F_MQ_OV_WAYPOINT_KEY ((int)a2f_qol_mq_ov_waypoint_key)
+#define QOL_V_MQ_CMD_STOP ((int)a2f_qol_mq_cmd_stop)
+#define QOL_V_MQ_CMD_GO_SINGLE ((int)a2f_qol_mq_cmd_go_single)
+#define QOL_V_MQ_CMD_FORM_FORMATION ((int)a2f_qol_mq_cmd_form_formation)
+#define QOL_V_MQ_CMD_GO_WARP_SINGLE ((int)a2f_qol_mq_cmd_go_warp_single)
+#define QOL_V_MQ_KEEP_LO ((int)a2f_qol_mq_keep_lo)
+#define QOL_V_MQ_KEEP_HI ((int)a2f_qol_mq_keep_hi)
+#define QOL_F_MQ_GO_NEXT_PATH ((int)a2f_qol_mq_go_next_path)
+#define QOL_V_MQ_CMD_COUNT ((int)a2f_qol_mq_cmd_count)
+#define QOL_S_MQ_OV_KEYS 190
+#define QOL_S_MQ_OV_KEYS_CALL 191
+#define QOL_S_MQ_SAY 192
+#define QOL_S_MQ_SAY_CALL 193
+#define QOL_S_MQ_FORMATIONS 194
+#define QOL_V_MQ_FORM_TYPES ((int)a2f_qol_mq_form_types)
+#define QOL_F_MQ_PROC_FORMATION ((int)a2f_qol_mq_proc_formation)
+#define QOL_F_MQ_FRM_COUNT ((int)a2f_qol_mq_frm_count)
+#define QOL_F_MQ_FRM_RADIUS ((int)a2f_qol_mq_frm_radius)
+#define QOL_F_MQ_FRM_SLOTS ((int)a2f_qol_mq_frm_slots)
+#define QOL_V_MQ_SLOT_SIZE ((int)a2f_qol_mq_slot_size)
+#define QOL_F_MQ_SLOT_PREFS ((int)a2f_qol_mq_slot_prefs)
+#define QOL_F_MQ_SLOT_OFFSET ((int)a2f_qol_mq_slot_offset)
+#define QOL_F_MQ_SLOT_RANK ((int)a2f_qol_mq_slot_rank)
+#define QOL_V_MQ_MIN_RADIUS ((int)a2f_qol_mq_min_radius)
+#define QOL_F_MQ_ENT_BOUNDS ((int)a2f_qol_mq_ent_bounds)
+#define QOL_V_MQ_BOUNDS_RADIUS ((int)a2f_qol_mq_bounds_radius)
+#define QOL_F_MQ_CLASS_SHIPTYPE ((int)a2f_qol_mq_class_shiptype)
+#define QOL_S_RS_THIS_SITE 208
+#define QOL_S_RS_THIS_CONT 209
+#define QOL_S_RS_CHECK_SITE 210
+#define QOL_S_RS_CHECK_CONT 211
+#define QOL_F_RS_VT_CHECK ((int)a2f_qol_rs_vt_check)
+#define QOL_F_RS_VT_CAN_PLACE ((int)a2f_qol_rs_vt_can_place)
 #define QOL_H_PAN_SPEED 0
 #define QOL_H_SHIFT_GROUP 1
 #define QOL_H_SELECTION 2
@@ -261,10 +327,120 @@ A2E_U32 a2s_qol_mp_add_call __attribute__((used));
 A2E_U32 a2s_qol_mp_first_call __attribute__((used));
 A2E_U32 a2s_qol_mp_queue __attribute__((used));
 A2E_U32 a2s_qol_mp_release_call __attribute__((used));
+A2E_U32 a2s_qol_mq_dq_what __attribute__((used));
+A2E_U32 a2s_qol_mq_dq_who __attribute__((used));
+A2E_U32 a2s_qol_mq_dq_who_where __attribute__((used));
+A2E_U32 a2s_qol_mq_dq_who_where_param __attribute__((used));
+A2E_U32 a2s_qol_mq_dq_class __attribute__((used));
+A2E_U32 a2s_qol_mq_dq_class_where __attribute__((used));
+A2E_U32 a2s_qol_mq_dq_param __attribute__((used));
+A2E_U32 a2s_qol_mq_dq_path __attribute__((used));
+A2E_U32 a2s_qol_mq_dq_where __attribute__((used));
+A2E_U32 a2s_qol_mq_dq_where_param __attribute__((used));
+A2E_U32 a2s_qol_mq_dq_who_param __attribute__((used));
+A2E_U32 a2s_qol_mq_go_broadcast __attribute__((used));
+A2E_U32 a2s_qol_mq_form_formation __attribute__((used));
+A2E_U32 a2s_qol_mq_set_special __attribute__((used));
+A2E_U32 a2s_qol_mq_presim __attribute__((used));
+A2E_U32 a2s_qol_mq_cmd_name __attribute__((used));
+A2E_U32 a2s_qol_mq_what_call __attribute__((used));
+A2E_U32 a2s_qol_mq_what_on_call __attribute__((used));
+A2E_U32 a2s_qol_mq_who_call __attribute__((used));
+A2E_U32 a2s_qol_mq_who_where_call __attribute__((used));
+A2E_U32 a2s_qol_mq_who_where_param_call __attribute__((used));
+A2E_U32 a2s_qol_mq_class_call __attribute__((used));
+A2E_U32 a2s_qol_mq_class_where_call __attribute__((used));
+A2E_U32 a2s_qol_mq_param_call __attribute__((used));
+A2E_U32 a2s_qol_mq_path_call __attribute__((used));
+A2E_U32 a2s_qol_mq_where_call __attribute__((used));
+A2E_U32 a2s_qol_mq_where_param_call __attribute__((used));
+A2E_U32 a2s_qol_mq_who_param_call __attribute__((used));
+A2E_U32 a2s_qol_mq_go_broadcast_call __attribute__((used));
+A2E_U32 a2s_qol_mq_form_formation_call __attribute__((used));
+A2E_U32 a2s_qol_mq_special_call __attribute__((used));
+A2E_U32 a2s_qol_mq_presim_call __attribute__((used));
+A2E_U32 a2s_qol_mq_load_time __attribute__((used));
+A2E_U32 a2s_qol_mq_ov_keys __attribute__((used));
+A2E_U32 a2s_qol_mq_ov_keys_call __attribute__((used));
+A2E_U32 a2s_qol_mq_say __attribute__((used));
+A2E_U32 a2s_qol_mq_say_call __attribute__((used));
+A2E_U32 a2s_qol_mq_formations __attribute__((used));
 A2E_U32 a2s_qol_rs_this_site __attribute__((used));
 A2E_U32 a2s_qol_rs_this_cont __attribute__((used));
 A2E_U32 a2s_qol_rs_check_site __attribute__((used));
 A2E_U32 a2s_qol_rs_check_cont __attribute__((used));
+A2E_U32 a2f_qol_ov_count __attribute__((used)) = (A2E_U32)0xb8;
+A2E_U32 a2f_qol_ov_sel __attribute__((used)) = (A2E_U32)0xbc;
+A2E_U32 a2f_qol_ov_shipgrp __attribute__((used)) = (A2E_U32)0x14c;
+A2E_U32 a2f_qol_ov_stngrp __attribute__((used)) = (A2E_U32)0x1c4;
+A2E_U32 a2f_qol_ov_action __attribute__((used)) = (A2E_U32)0x3c;
+A2E_U32 a2f_qol_ov_point __attribute__((used)) = (A2E_U32)0xa4;
+A2E_U32 a2f_qol_ov_vt_select_list __attribute__((used)) = (A2E_U32)0x98;
+A2E_U32 a2f_qol_go_flags __attribute__((used)) = (A2E_U32)0x14;
+A2E_U32 a2f_qol_go_id __attribute__((used)) = (A2E_U32)0x28;
+A2E_U32 a2f_qol_go_class __attribute__((used)) = (A2E_U32)0x40;
+A2E_U32 a2f_qol_go_dying __attribute__((used)) = (A2E_U32)0x113;
+A2E_U32 a2f_qol_go_team __attribute__((used)) = (A2E_U32)0xec;
+A2E_U32 a2f_qol_go_label __attribute__((used)) = (A2E_U32)0x120;
+A2E_U32 a2f_qol_go_pos __attribute__((used)) = (A2E_U32)0xac;
+A2E_U32 a2f_qol_cc_station __attribute__((used)) = (A2E_U32)0x20d;
+A2E_U32 a2f_qol_ci_command __attribute__((used)) = (A2E_U32)0x1a0;
+A2E_U32 a2f_qol_mode_class __attribute__((used)) = (A2E_U32)0xc;
+A2E_U32 a2f_qol_bar_x44 __attribute__((used)) = (A2E_U32)0x44;
+A2E_U32 a2f_qol_bar_build __attribute__((used)) = (A2E_U32)0xf0;
+A2E_U32 a2f_qol_craft_control __attribute__((used)) = (A2E_U32)0x1b0;
+A2E_U32 a2f_qol_ctl_speed __attribute__((used)) = (A2E_U32)0x8;
+A2E_U32 a2f_qol_ctl_warp __attribute__((used)) = (A2E_U32)0xc;
+A2E_U32 a2f_qol_cmd_go __attribute__((used)) = (A2E_U32)4;
+A2E_U32 a2f_qol_cmd_go_warp __attribute__((used)) = (A2E_U32)43;
+A2E_U32 a2f_qol_cmd_build __attribute__((used)) = (A2E_U32)25;
+A2E_U32 a2f_qol_cmd_cancel __attribute__((used)) = (A2E_U32)19;
+A2E_U32 a2f_qol_act_command __attribute__((used)) = (A2E_U32)4095;
+A2E_U32 a2f_qol_act_keep __attribute__((used)) = (A2E_U32)16384;
+A2E_U32 a2f_qol_bk_key_commands __attribute__((used)) = (A2E_U32)0xcc;
+A2E_U32 a2f_qol_bk_key_builds __attribute__((used)) = (A2E_U32)0xd8;
+A2E_U32 a2f_qol_bk_key_weapons __attribute__((used)) = (A2E_U32)0xe4;
+A2E_U32 a2f_qol_bk_n_toggles __attribute__((used)) = (A2E_U32)6;
+A2E_U32 a2f_qol_bk_btn_state __attribute__((used)) = (A2E_U32)0x34;
+A2E_U32 a2f_qol_bk_vt_press __attribute__((used)) = (A2E_U32)0x20;
+A2E_U32 a2f_qol_bk_sound2d_bytes __attribute__((used)) = (A2E_U32)28;
+A2E_U32 a2f_qol_cce_craft_array __attribute__((used)) = (A2E_U32)-40;
+A2E_U32 a2f_qol_cce_cancel_count __attribute__((used)) = (A2E_U32)-32;
+A2E_U32 a2f_qol_cce_cancel_index __attribute__((used)) = (A2E_U32)-20;
+A2E_U32 a2f_qol_cce_route_objects __attribute__((used)) = (A2E_U32)-32;
+A2E_U32 a2f_qol_cce_route_count __attribute__((used)) = (A2E_U32)-24;
+A2E_U32 a2f_qol_msw_read_local __attribute__((used)) = (A2E_U32)-40;
+A2E_U32 a2f_qol_cgs_group __attribute__((used)) = (A2E_U32)-4;
+A2E_U32 a2f_qol_mp_go_process __attribute__((used)) = (A2E_U32)0x44;
+A2E_U32 a2f_qol_mp_proc_path __attribute__((used)) = (A2E_U32)0x88;
+A2E_U32 a2f_qol_mp_proc_point __attribute__((used)) = (A2E_U32)0x12c;
+A2E_U32 a2f_qol_mp_act_queued __attribute__((used)) = (A2E_U32)16384;
+A2E_U32 a2f_qol_mp_packet_max __attribute__((used)) = (A2E_U32)508;
+A2E_U32 a2f_qol_mp_cmd_patrol __attribute__((used)) = (A2E_U32)26;
+A2E_U32 a2f_qol_mq_ov_waypoint_key __attribute__((used)) = (A2E_U32)0x30c;
+A2E_U32 a2f_qol_mq_cmd_stop __attribute__((used)) = (A2E_U32)3;
+A2E_U32 a2f_qol_mq_cmd_go_single __attribute__((used)) = (A2E_U32)5;
+A2E_U32 a2f_qol_mq_cmd_form_formation __attribute__((used)) = (A2E_U32)32;
+A2E_U32 a2f_qol_mq_cmd_go_warp_single __attribute__((used)) = (A2E_U32)44;
+A2E_U32 a2f_qol_mq_keep_lo __attribute__((used)) = (A2E_U32)2013856775;
+A2E_U32 a2f_qol_mq_keep_hi __attribute__((used)) = (A2E_U32)5236480;
+A2E_U32 a2f_qol_mq_go_next_path __attribute__((used)) = (A2E_U32)0x88;
+A2E_U32 a2f_qol_mq_cmd_count __attribute__((used)) = (A2E_U32)57;
+A2E_U32 a2f_qol_mq_form_types __attribute__((used)) = (A2E_U32)16;
+A2E_U32 a2f_qol_mq_proc_formation __attribute__((used)) = (A2E_U32)0x13c;
+A2E_U32 a2f_qol_mq_frm_count __attribute__((used)) = (A2E_U32)0x4;
+A2E_U32 a2f_qol_mq_frm_radius __attribute__((used)) = (A2E_U32)0x8;
+A2E_U32 a2f_qol_mq_frm_slots __attribute__((used)) = (A2E_U32)0xc;
+A2E_U32 a2f_qol_mq_slot_size __attribute__((used)) = (A2E_U32)48;
+A2E_U32 a2f_qol_mq_slot_prefs __attribute__((used)) = (A2E_U32)0x0;
+A2E_U32 a2f_qol_mq_slot_offset __attribute__((used)) = (A2E_U32)0x20;
+A2E_U32 a2f_qol_mq_slot_rank __attribute__((used)) = (A2E_U32)0x2c;
+A2E_U32 a2f_qol_mq_min_radius __attribute__((used)) = (A2E_U32)28;
+A2E_U32 a2f_qol_mq_ent_bounds __attribute__((used)) = (A2E_U32)0x4;
+A2E_U32 a2f_qol_mq_bounds_radius __attribute__((used)) = (A2E_U32)64;
+A2E_U32 a2f_qol_mq_class_shiptype __attribute__((used)) = (A2E_U32)0x42c;
+A2E_U32 a2f_qol_rs_vt_check __attribute__((used)) = (A2E_U32)0x138;
+A2E_U32 a2f_qol_rs_vt_can_place __attribute__((used)) = (A2E_U32)0x8;
 
 static A2E_U32 *const qol_vars[] = {
     &a2s_qol_pan_site,
@@ -352,69 +528,135 @@ static A2E_U32 *const qol_vars[] = {
     &a2s_qol_transport,
     &a2s_qol_get_setup,
     &a2s_qol_setup_allows_warp,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
+    &a2f_qol_ov_count,
+    &a2f_qol_ov_sel,
+    &a2f_qol_ov_shipgrp,
+    &a2f_qol_ov_stngrp,
+    &a2f_qol_ov_action,
+    &a2f_qol_ov_point,
+    &a2f_qol_ov_vt_select_list,
+    &a2f_qol_go_flags,
+    &a2f_qol_go_id,
+    &a2f_qol_go_class,
+    &a2f_qol_go_dying,
+    &a2f_qol_go_team,
+    &a2f_qol_go_label,
+    &a2f_qol_go_pos,
+    &a2f_qol_cc_station,
+    &a2f_qol_ci_command,
+    &a2f_qol_mode_class,
+    &a2f_qol_bar_x44,
+    &a2f_qol_bar_build,
+    &a2f_qol_craft_control,
+    &a2f_qol_ctl_speed,
+    &a2f_qol_ctl_warp,
+    &a2f_qol_cmd_go,
+    &a2f_qol_cmd_go_warp,
+    &a2f_qol_cmd_build,
+    &a2f_qol_cmd_cancel,
+    &a2f_qol_act_command,
+    &a2f_qol_act_keep,
     &a2s_qol_bk_toggles,
     &a2s_qol_bk_process_keys,
     &a2s_qol_bk_keys_call,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
+    &a2f_qol_bk_key_commands,
+    &a2f_qol_bk_key_builds,
+    &a2f_qol_bk_key_weapons,
+    &a2f_qol_bk_n_toggles,
+    &a2f_qol_bk_btn_state,
+    &a2f_qol_bk_vt_press,
     &a2s_qol_bk_text_input,
     &a2s_qol_bk_is_playing_video,
     &a2s_qol_bk_cinematic_view,
     &a2s_qol_bk_click_sound,
     &a2s_qol_bk_operator_new,
     &a2s_qol_bk_sound2d,
-    0,
+    &a2f_qol_bk_sound2d_bytes,
     &a2s_qol_bk_button_press,
+    &a2f_qol_cce_craft_array,
+    &a2f_qol_cce_cancel_count,
+    &a2f_qol_cce_cancel_index,
+    &a2f_qol_cce_route_objects,
+    &a2f_qol_cce_route_count,
+    &a2f_qol_msw_read_local,
+    &a2f_qol_cgs_group,
     &a2s_qol_mp_add_point,
     &a2s_qol_mp_add_call,
     &a2s_qol_mp_first_call,
     &a2s_qol_mp_queue,
     &a2s_qol_mp_release_call,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
+    &a2f_qol_mp_go_process,
+    &a2f_qol_mp_proc_path,
+    &a2f_qol_mp_proc_point,
+    &a2f_qol_mp_act_queued,
+    &a2f_qol_mp_packet_max,
+    &a2f_qol_mp_cmd_patrol,
+    &a2s_qol_mq_dq_what,
+    &a2s_qol_mq_dq_who,
+    &a2s_qol_mq_dq_who_where,
+    &a2s_qol_mq_dq_who_where_param,
+    &a2s_qol_mq_dq_class,
+    &a2s_qol_mq_dq_class_where,
+    &a2s_qol_mq_dq_param,
+    &a2s_qol_mq_dq_path,
+    &a2s_qol_mq_dq_where,
+    &a2s_qol_mq_dq_where_param,
+    &a2s_qol_mq_dq_who_param,
+    &a2s_qol_mq_go_broadcast,
+    &a2s_qol_mq_form_formation,
+    &a2s_qol_mq_set_special,
+    &a2s_qol_mq_presim,
+    &a2s_qol_mq_cmd_name,
+    &a2s_qol_mq_what_call,
+    &a2s_qol_mq_what_on_call,
+    &a2s_qol_mq_who_call,
+    &a2s_qol_mq_who_where_call,
+    &a2s_qol_mq_who_where_param_call,
+    &a2s_qol_mq_class_call,
+    &a2s_qol_mq_class_where_call,
+    &a2s_qol_mq_param_call,
+    &a2s_qol_mq_path_call,
+    &a2s_qol_mq_where_call,
+    &a2s_qol_mq_where_param_call,
+    &a2s_qol_mq_who_param_call,
+    &a2s_qol_mq_go_broadcast_call,
+    &a2s_qol_mq_form_formation_call,
+    &a2s_qol_mq_special_call,
+    &a2s_qol_mq_presim_call,
+    &a2s_qol_mq_load_time,
+    &a2f_qol_mq_ov_waypoint_key,
+    &a2f_qol_mq_cmd_stop,
+    &a2f_qol_mq_cmd_go_single,
+    &a2f_qol_mq_cmd_form_formation,
+    &a2f_qol_mq_cmd_go_warp_single,
+    &a2f_qol_mq_keep_lo,
+    &a2f_qol_mq_keep_hi,
+    &a2f_qol_mq_go_next_path,
+    &a2f_qol_mq_cmd_count,
+    &a2s_qol_mq_ov_keys,
+    &a2s_qol_mq_ov_keys_call,
+    &a2s_qol_mq_say,
+    &a2s_qol_mq_say_call,
+    &a2s_qol_mq_formations,
+    &a2f_qol_mq_form_types,
+    &a2f_qol_mq_proc_formation,
+    &a2f_qol_mq_frm_count,
+    &a2f_qol_mq_frm_radius,
+    &a2f_qol_mq_frm_slots,
+    &a2f_qol_mq_slot_size,
+    &a2f_qol_mq_slot_prefs,
+    &a2f_qol_mq_slot_offset,
+    &a2f_qol_mq_slot_rank,
+    &a2f_qol_mq_min_radius,
+    &a2f_qol_mq_ent_bounds,
+    &a2f_qol_mq_bounds_radius,
+    &a2f_qol_mq_class_shiptype,
     &a2s_qol_rs_this_site,
     &a2s_qol_rs_this_cont,
     &a2s_qol_rs_check_site,
     &a2s_qol_rs_check_cont,
-    0,
-    0,
+    &a2f_qol_rs_vt_check,
+    &a2f_qol_rs_vt_can_place,
 };
 
 static const A2ESymDef qol_syms[] = {
@@ -548,18 +790,84 @@ static const A2ESymDef qol_syms[] = {
     {"bk_sound2d", "AudioSound2D::AudioSound2D", 0},
     {"bk_sound2d_bytes", "AudioSound2D", 11},
     {"bk_button_press", "ControlButton::mButtonPressFunction", 0},
+    {"cce_craft_array", "PopupPaletteImp::CheckCanExecute", 11},
+    {"cce_cancel_count", "PopupPaletteImp::CheckCanExecute", 11},
+    {"cce_cancel_index", "PopupPaletteImp::CheckCanExecute", 11},
+    {"cce_route_objects", "PopupPaletteImp::CheckCanExecute", 11},
+    {"cce_route_count", "PopupPaletteImp::CheckCanExecute", 11},
+    {"msw_read_local", "PopupPaletteImp::mSetupSpecialWeapons", 11},
+    {"cgs_group", "cOverViewImp::mCheckGroupSelect", 11},
     {"mp_add_point", "cOverViewImp::mAddPathPoint", 0},
     {"mp_add_call", "cOverViewImp::mNormalModeRightClick", 1},
     {"mp_first_call", "cOverViewImp::mNormalModeRightClick", 1},
     {"mp_queue", "GameObject::QueueCommand", 0},
     {"mp_release_call", "cOverViewImp::mProcessWaypoints", 1},
     {"mp_go_process", "GameObject", 10},
-    {"mp_proc_command", "CraftProcess", 10},
     {"mp_proc_path", "CraftProcess", 10},
     {"mp_proc_point", "CraftProcess", 10},
     {"mp_act_queued", "cOverViewImp action flag: no order on release", 11},
     {"mp_packet_max", "NetOrderObjectsWhatPath: the largest packet QueueCommand sends", 11},
     {"mp_cmd_patrol", "AiCommand PATROL", 11},
+    {"mq_dq_what", "GameObject::DeQueueCommand", 0},
+    {"mq_dq_who", "GameObject::DeQueueCommand", 0},
+    {"mq_dq_who_where", "GameObject::DeQueueCommand", 0},
+    {"mq_dq_who_where_param", "GameObject::DeQueueCommand", 0},
+    {"mq_dq_class", "GameObject::DeQueueCommand", 0},
+    {"mq_dq_class_where", "GameObject::DeQueueCommand", 0},
+    {"mq_dq_param", "GameObject::DeQueueCommand", 0},
+    {"mq_dq_path", "GameObject::DeQueueCommand", 0},
+    {"mq_dq_where", "GameObject::DeQueueCommand", 0},
+    {"mq_dq_where_param", "GameObject::DeQueueCommand", 0},
+    {"mq_dq_who_param", "GameObject::DeQueueCommand", 0},
+    {"mq_go_broadcast", "FormationManager::Broadcast_Go_Command", 0},
+    {"mq_form_formation", "FormationManager::FormFormation", 0},
+    {"mq_set_special", "GameObject::SetCommand", 0},
+    {"mq_presim", "GameObject::PreSimulateAll", 0},
+    {"mq_cmd_name", "AiCommandToName", 0},
+    {"mq_what_call", "NetOrderWhat::Execute", 1},
+    {"mq_what_on_call", "NetOrderWhatOn::Execute", 1},
+    {"mq_who_call", "NetOrderWhatWho::Execute", 1},
+    {"mq_who_where_call", "NetOrderWhatWhoWhere::Execute", 1},
+    {"mq_who_where_param_call", "NetOrderWhatWhoWhereParam::Execute", 1},
+    {"mq_class_call", "NetOrderWhatClass::Execute", 1},
+    {"mq_class_where_call", "NetOrderWhatClassWhere::Execute", 1},
+    {"mq_param_call", "NetOrderWhatParam::Execute", 1},
+    {"mq_path_call", "NetOrderObjectsWhatPath::Execute", 1},
+    {"mq_where_call", "NetOrderWhatWhere::Execute", 1},
+    {"mq_where_param_call", "NetOrderWhatWhereParam::Execute", 1},
+    {"mq_who_param_call", "NetOrderWhatWhoParam::Execute", 1},
+    {"mq_go_broadcast_call", "NetOrderMove::Execute", 1},
+    {"mq_form_formation_call", "NetOrderFormFormation::Execute", 1},
+    {"mq_special_call", "NetOrderSpecialAttack::Execute", 1},
+    {"mq_presim_call", "Simulate", 1},
+    {"mq_load_time", "g_finish_load_time", 8},
+    {"mq_ov_waypoint_key", "cOverViewImp", 10},
+    {"mq_cmd_stop", "AiCommand STOP", 11},
+    {"mq_cmd_go_single", "AiCommand GO_SINGLE", 11},
+    {"mq_cmd_form_formation", "AiCommand FORM_FORMATION", 11},
+    {"mq_cmd_go_warp_single", "AiCommand GO_WARP_SINGLE", 11},
+    {"mq_keep_lo", "AiCommands 0-31 that leave a ship's movement alone: NONE, DEFAULT, SELECT, QUEUE, SET_RALLY_POINT, CANCEL_BUILD (19, 30), RED/YELLOW/GREEN_ALERT", 11},
+    {"mq_keep_hi", "AiCommands 32-63 that leave a ship's movement alone (bit n-32): BUY/SELL_RESOURCE, SET_FORMATION, SET_ATTACK_MODE, the six autonomy settings, CMD_SET_FORMATION_ORIENTATION", 11},
+    {"mq_go_next_path", "GameObject", 10},
+    {"mq_cmd_count", "AiCommandToName's table: the number of AiCommands", 11},
+    {"mq_ov_keys", "cOverViewImp::mProcessKeyboardInput", 0},
+    {"mq_ov_keys_call", "cOverViewImp::Simulate", 1},
+    {"mq_say", "CaptainsVoice::Say", 0},
+    {"mq_say_call", "Craft::Say", 1},
+    {"mq_formations", "g_FormationManager", 8},
+    {"mq_form_types", "FormationManager: its table of Formation *, by formation type", 11},
+    {"mq_proc_formation", "CraftProcess", 10},
+    {"mq_frm_count", "Formation", 10},
+    {"mq_frm_radius", "Formation", 10},
+    {"mq_frm_slots", "Formation", 10},
+    {"mq_slot_size", "cFormationSlot: its size", 11},
+    {"mq_slot_prefs", "cFormationSlot", 10},
+    {"mq_slot_offset", "cFormationSlot", 10},
+    {"mq_slot_rank", "cFormationSlot", 10},
+    {"mq_min_radius", "Formation::GetScale: the smallest radius it scales by", 11},
+    {"mq_ent_bounds", "Entity", 10},
+    {"mq_bounds_radius", "Entity::GetBoundingSphere's SPHERE: its radius, from the +4 object", 11},
+    {"mq_class_shiptype", "GameObjectClass", 10},
     {"rs_this_site", "ConstructionRig::GetAction", 5},
     {"rs_this_cont", "ConstructionRig::GetAction", 4},
     {"rs_check_site", "ConstructionRig::GetAction", 5},
@@ -570,29 +878,29 @@ static const A2ESymDef qol_syms[] = {
 static const char *const qol_h0_rows[] = {"QOL.PanSpeed", 0};
 static const A2E_U16 qol_h0_syms[] = {0, 1, 0};
 static const char *const qol_h1_rows[] = {"QOL.ShiftAddsToGroup", 0};
-static const A2E_U16 qol_h1_syms[] = {2, 3, 4, 5, 6, 7, 8, 9, 10, 0};
+static const A2E_U16 qol_h1_syms[] = {2, 3, 4, 5, 6, 7, 8, 9, 10, 136, 0};
 static const char *const qol_h2_rows[] = {"QOL.MaxSelection", 0};
 static const A2E_U16 qol_h2_syms[] = {11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 85, 86, 0};
 static const char *const qol_h3_rows[] = {"QOL.MaxSelection", 0};
-static const A2E_U16 qol_h3_syms[] = {46, 47, 48, 49, 50, 51, 52, 53, 0};
+static const A2E_U16 qol_h3_syms[] = {46, 47, 48, 49, 50, 51, 52, 53, 135, 0};
 static const char *const qol_h4_rows[] = {"QOL.StationGroups", 0};
-static const A2E_U16 qol_h4_syms[] = {7, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 85, 87, 88, 91, 92, 93, 94, 95, 96, 97, 99, 100, 101, 102, 103, 109, 110, 0};
+static const A2E_U16 qol_h4_syms[] = {7, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 85, 87, 88, 91, 92, 93, 94, 95, 96, 97, 99, 100, 101, 102, 103, 109, 110, 130, 131, 132, 133, 134, 0};
 static const char *const qol_h5_rows[] = {"QOL.WarpDistance", 0};
 static const A2E_U16 qol_h5_syms[] = {6, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 89, 90, 91, 92, 94, 96, 98, 104, 105, 106, 107, 108, 111, 112, 0};
 static const char *const qol_h6_rows[] = {"QOL.PathStartsAtOnce", 0};
-static const A2E_U16 qol_h6_syms[] = {11, 74, 75, 85, 89, 91, 92, 96, 107, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 0};
+static const A2E_U16 qol_h6_syms[] = {11, 74, 75, 85, 89, 91, 92, 96, 107, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 0};
 static const char *const qol_h7_rows[] = {"QOL.BarKeys", 0};
 static const A2E_U16 qol_h7_syms[] = {113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 0};
 static const char *const qol_h8_rows[] = {"QOL.RigIgnoresSelf", 0};
-static const A2E_U16 qol_h8_syms[] = {142, 143, 144, 145, 146, 147, 0};
+static const A2E_U16 qol_h8_syms[] = {208, 209, 210, 211, 212, 213, 0};
 static const A2EHookDef qol_hooks[] = {
     {"qol.pan_speed", 0, qol_h0_rows, 1, qol_h0_syms, 2},
-    {"qol.shift_group", 0, qol_h1_rows, 1, qol_h1_syms, 9},
+    {"qol.shift_group", 0, qol_h1_rows, 1, qol_h1_syms, 10},
     {"qol.selection", 0, qol_h2_rows, 1, qol_h2_syms, 37},
-    {"qol.special_select", 0, qol_h3_rows, 1, qol_h3_syms, 8},
-    {"qol.stations", 0, qol_h4_rows, 1, qol_h4_syms, 43},
+    {"qol.special_select", 0, qol_h3_rows, 1, qol_h3_syms, 9},
+    {"qol.stations", 0, qol_h4_rows, 1, qol_h4_syms, 48},
     {"qol.warp", 0, qol_h5_rows, 1, qol_h5_syms, 27},
-    {"qol.move_paths", 0, qol_h6_rows, 1, qol_h6_syms, 21},
+    {"qol.move_paths", 0, qol_h6_rows, 1, qol_h6_syms, 80},
     {"qol.bar_keys", 0, qol_h7_rows, 1, qol_h7_syms, 17},
     {"qol.rig_self", 0, qol_h8_rows, 1, qol_h8_syms, 6},
 };
@@ -677,12 +985,30 @@ static const A2E_U8 qol_b0_c123[] = {0x8b, 0x51, 0x24, 0x33, 0xc0};
 static const A2E_U8 qol_b0_c126[] = {0x55, 0x8b, 0xec, 0xa1};
 static const A2E_U8 qol_b0_c127[] = {0x55, 0x8b, 0xec, 0x6a, 0xff};
 static const A2E_U8 qol_b0_c129[] = {0x8b, 0xc1, 0x56, 0x8b, 0x90};
-static const A2E_U8 qol_b0_c130[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x02, 0x14};
-static const A2E_U8 qol_b0_c133[] = {0x55, 0x8b, 0xec, 0x64, 0xa1, 0x00, 0x00, 0x00};
-static const A2E_U8 qol_b0_c142[] = {0x8b, 0x07, 0xff, 0x90, 0x38, 0x01, 0x00, 0x00, 0x8b, 0x75, 0x0c, 0x84, 0xc0, 0x75, 0x4b};
-static const A2E_U8 qol_b0_c143[] = {0x8b, 0x75, 0x0c, 0x84, 0xc0, 0x75, 0x4b};
-static const A2E_U8 qol_b0_c144[] = {0x8b, 0x4e, 0x0c, 0x6a, 0x01, 0x6a, 0x00, 0x57, 0x8b, 0x11, 0xff, 0x52, 0x08, 0x84, 0xc0, 0x8b, 0x45, 0x08, 0x74, 0xe0};
-static const A2E_U8 qol_b0_c145[] = {0x84, 0xc0, 0x8b, 0x45, 0x08, 0x74, 0xe0};
+static const A2E_U8 qol_b0_c137[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x02, 0x14};
+static const A2E_U8 qol_b0_c140[] = {0x55, 0x8b, 0xec, 0x64, 0xa1, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c148[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x55};
+static const A2E_U8 qol_b0_c149[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x55};
+static const A2E_U8 qol_b0_c150[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x10, 0x8b, 0x55};
+static const A2E_U8 qol_b0_c151[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x14, 0x8b, 0x55};
+static const A2E_U8 qol_b0_c152[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x55};
+static const A2E_U8 qol_b0_c153[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x10, 0x8b, 0x55};
+static const A2E_U8 qol_b0_c154[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x55};
+static const A2E_U8 qol_b0_c155[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x0a, 0xe4};
+static const A2E_U8 qol_b0_c156[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x55};
+static const A2E_U8 qol_b0_c157[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x10, 0x8b, 0x55};
+static const A2E_U8 qol_b0_c158[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x10, 0x8b, 0x55};
+static const A2E_U8 qol_b0_c159[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x02, 0xa4};
+static const A2E_U8 qol_b0_c160[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x26, 0xa4};
+static const A2E_U8 qol_b0_c161[] = {0x55, 0x8b, 0xec, 0x64, 0xa1, 0x00, 0x00, 0x00};
+static const A2E_U8 qol_b0_c162[] = {0x55, 0x8b, 0xec, 0xa1, 0x84, 0x10, 0x76, 0x00};
+static const A2E_U8 qol_b0_c163[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x8b, 0x04};
+static const A2E_U8 qol_b0_c190[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x27, 0x14};
+static const A2E_U8 qol_b0_c192[] = {0x55, 0x8b, 0xec, 0x53, 0x8b, 0x5d, 0x0c, 0x56};
+static const A2E_U8 qol_b0_c208[] = {0x8b, 0x07, 0xff, 0x90, 0x38, 0x01, 0x00, 0x00, 0x8b, 0x75, 0x0c, 0x84, 0xc0, 0x75, 0x4b};
+static const A2E_U8 qol_b0_c209[] = {0x8b, 0x75, 0x0c, 0x84, 0xc0, 0x75, 0x4b};
+static const A2E_U8 qol_b0_c210[] = {0x8b, 0x4e, 0x0c, 0x6a, 0x01, 0x6a, 0x00, 0x57, 0x8b, 0x11, 0xff, 0x52, 0x08, 0x84, 0xc0, 0x8b, 0x45, 0x08, 0x74, 0xe0};
+static const A2E_U8 qol_b0_c211[] = {0x84, 0xc0, 0x8b, 0x45, 0x08, 0x74, 0xe0};
 static const A2EEntry qol_b0_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 25, 0x491766, 0x0, 0, qol_b0_c0, 0, ""}, /* pan_site */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x70fbb4, 0x0, 0, 0, 0, ""}, /* fastscroll */
@@ -814,22 +1140,88 @@ static const A2EEntry qol_b0_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 5, 0x45fc50, 0x0, 0, qol_b0_c127, 0, ""}, /* bk_sound2d */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 28, 0, 0, ""}, /* bk_sound2d_bytes */
     {1, 0, 0xffff, 0xffff, 0, 0, 5, 0x4e69e0, 0x0, 0, qol_b0_c129, 0, ""}, /* bk_button_press */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x5255b0, 0x0, 0, qol_b0_c130, 0, ""}, /* mp_add_point */
-    {1, 0, 0x82, 0xffff, 0, 0, 0, 0x5229e3, 0x0, 0, 0, 0, ""}, /* mp_add_call */
-    {1, 0, 0x82, 0xffff, 0, 0, 0, 0x5229ff, 0x0, 0, 0, 0, ""}, /* mp_first_call */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4380, 0x0, 0, qol_b0_c133, 0, ""}, /* mp_queue */
-    {1, 0, 0x85, 0xffff, 0, 0, 0, 0x522bba, 0x0, 0, 0, 0, ""}, /* mp_release_call */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, -40, 0, 0, ""}, /* cce_craft_array */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, -32, 0, 0, ""}, /* cce_cancel_count */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, -20, 0, 0, ""}, /* cce_cancel_index */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, -32, 0, 0, ""}, /* cce_route_objects */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, -24, 0, 0, ""}, /* cce_route_count */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, -40, 0, 0, ""}, /* msw_read_local */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, -4, 0, 0, ""}, /* cgs_group */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x5255b0, 0x0, 0, qol_b0_c137, 0, ""}, /* mp_add_point */
+    {1, 0, 0x89, 0xffff, 0, 0, 0, 0x5229e3, 0x0, 0, 0, 0, ""}, /* mp_add_call */
+    {1, 0, 0x89, 0xffff, 0, 0, 0, 0x5229ff, 0x0, 0, 0, 0, ""}, /* mp_first_call */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4380, 0x0, 0, qol_b0_c140, 0, ""}, /* mp_queue */
+    {1, 0, 0x8c, 0xffff, 0, 0, 0, 0x522bba, 0x0, 0, 0, 0, ""}, /* mp_release_call */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 68, 0, 0, ""}, /* mp_go_process */
-    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 56, 0, 0, ""}, /* mp_proc_command */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 136, 0, 0, ""}, /* mp_proc_path */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 300, 0, 0, ""}, /* mp_proc_point */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 16384, 0, 0, ""}, /* mp_act_queued */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 508, 0, 0, ""}, /* mp_packet_max */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 26, 0, 0, ""}, /* mp_cmd_patrol */
-    {1, 0, 0xffff, 0xffff, 0, 0, 15, 0x4afa37, 0x0, 0, qol_b0_c142, 0, ""}, /* rs_this_site */
-    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x4afa3f, 0x0, 0, qol_b0_c143, 0, ""}, /* rs_this_cont */
-    {1, 0, 0xffff, 0xffff, 0, 0, 20, 0x4afa71, 0x0, 0, qol_b0_c144, 0, ""}, /* rs_check_site */
-    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x4afa7e, 0x0, 0, qol_b0_c145, 0, ""}, /* rs_check_cont */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4540, 0x0, 0, qol_b0_c148, 0, ""}, /* mq_dq_what */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4560, 0x0, 0, qol_b0_c149, 0, ""}, /* mq_dq_who */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4590, 0x0, 0, qol_b0_c150, 0, ""}, /* mq_dq_who_where */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d45c0, 0x0, 0, qol_b0_c151, 0, ""}, /* mq_dq_who_where_param */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d45f0, 0x0, 0, qol_b0_c152, 0, ""}, /* mq_dq_class */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4610, 0x0, 0, qol_b0_c153, 0, ""}, /* mq_dq_class_where */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4630, 0x0, 0, qol_b0_c154, 0, ""}, /* mq_dq_param */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4650, 0x0, 0, qol_b0_c155, 0, ""}, /* mq_dq_path */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4820, 0x0, 0, qol_b0_c156, 0, ""}, /* mq_dq_where */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4850, 0x0, 0, qol_b0_c157, 0, ""}, /* mq_dq_where_param */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4880, 0x0, 0, qol_b0_c158, 0, ""}, /* mq_dq_who_param */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x43b3e0, 0x0, 0, qol_b0_c159, 0, ""}, /* mq_go_broadcast */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x43b680, 0x0, 0, qol_b0_c160, 0, ""}, /* mq_form_formation */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d1d90, 0x0, 0, qol_b0_c161, 0, ""}, /* mq_set_special */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d48b0, 0x0, 0, qol_b0_c162, 0, ""}, /* mq_presim */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x44e1c0, 0x0, 0, qol_b0_c163, 0, ""}, /* mq_cmd_name */
+    {1, 0, 0x94, 0xffff, 0, 0, 0, 0x55007f, 0x0, 0, 0, 0, ""}, /* mq_what_call */
+    {1, 0, 0x94, 0xffff, 0, 0, 0, 0x5500f1, 0x0, 0, 0, 0, ""}, /* mq_what_on_call */
+    {1, 0, 0x95, 0xffff, 0, 0, 0, 0x5502a6, 0x0, 0, 0, 0, ""}, /* mq_who_call */
+    {1, 0, 0x96, 0xffff, 0, 0, 0, 0x55034a, 0x0, 0, 0, 0, ""}, /* mq_who_where_call */
+    {1, 0, 0x97, 0xffff, 0, 0, 0, 0x5503ee, 0x0, 0, 0, 0, ""}, /* mq_who_where_param_call */
+    {1, 0, 0x98, 0xffff, 0, 0, 0, 0x55017e, 0x0, 0, 0, 0, ""}, /* mq_class_call */
+    {1, 0, 0x99, 0xffff, 0, 0, 0, 0x550212, 0x0, 0, 0, 0, ""}, /* mq_class_where_call */
+    {1, 0, 0x9a, 0xffff, 0, 0, 0, 0x550461, 0x0, 0, 0, 0, ""}, /* mq_param_call */
+    {1, 0, 0x9b, 0xffff, 0, 0, 0, 0x54f9ce, 0x0, 0, 0, 0, ""}, /* mq_path_call */
+    {1, 0, 0x9c, 0xffff, 0, 0, 0, 0x5504d1, 0x0, 0, 0, 0, ""}, /* mq_where_call */
+    {1, 0, 0x9d, 0xffff, 0, 0, 0, 0x550545, 0x0, 0, 0, 0, ""}, /* mq_where_param_call */
+    {1, 0, 0x9e, 0xffff, 0, 0, 0, 0x5505da, 0x0, 0, 0, 0, ""}, /* mq_who_param_call */
+    {1, 0, 0x9f, 0xffff, 0, 0, 0, 0x5521a5, 0x0, 0, 0, 0, ""}, /* mq_go_broadcast_call */
+    {1, 0, 0xa0, 0xffff, 0, 0, 0, 0x5526f6, 0x0, 0, 0, 0, ""}, /* mq_form_formation_call */
+    {1, 0, 0xa1, 0xffff, 0, 0, 0, 0x5518a0, 0x0, 0, 0, 0, ""}, /* mq_special_call */
+    {1, 0, 0xa2, 0xffff, 0, 0, 0, 0x483327, 0x0, 0, 0, 0, ""}, /* mq_presim_call */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x737bb8, 0x0, 0, 0, 0, ""}, /* mq_load_time */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 780, 0, 0, ""}, /* mq_ov_waypoint_key */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 3, 0, 0, ""}, /* mq_cmd_stop */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 5, 0, 0, ""}, /* mq_cmd_go_single */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 32, 0, 0, ""}, /* mq_cmd_form_formation */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 44, 0, 0, ""}, /* mq_cmd_go_warp_single */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 2013856775, 0, 0, ""}, /* mq_keep_lo */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 5236480, 0, 0, ""}, /* mq_keep_hi */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 136, 0, 0, ""}, /* mq_go_next_path */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 57, 0, 0, ""}, /* mq_cmd_count */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x525950, 0x0, 0, qol_b0_c190, 0, ""}, /* mq_ov_keys */
+    {1, 0, 0xbe, 0xffff, 0, 0, 0, 0x51ef2e, 0x0, 0, 0, 0, ""}, /* mq_ov_keys_call */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x45d720, 0x0, 0, qol_b0_c192, 0, ""}, /* mq_say */
+    {1, 0, 0xc0, 0xffff, 0, 0, 0, 0x4c30f1, 0x0, 0, 0, 0, ""}, /* mq_say_call */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x73575c, 0x0, 0, 0, 0, ""}, /* mq_formations */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 16, 0, 0, ""}, /* mq_form_types */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 316, 0, 0, ""}, /* mq_proc_formation */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 4, 0, 0, ""}, /* mq_frm_count */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 8, 0, 0, ""}, /* mq_frm_radius */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 12, 0, 0, ""}, /* mq_frm_slots */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 48, 0, 0, ""}, /* mq_slot_size */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* mq_slot_prefs */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 32, 0, 0, ""}, /* mq_slot_offset */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 44, 0, 0, ""}, /* mq_slot_rank */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 28, 0, 0, ""}, /* mq_min_radius */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 4, 0, 0, ""}, /* mq_ent_bounds */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 64, 0, 0, ""}, /* mq_bounds_radius */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 1068, 0, 0, ""}, /* mq_class_shiptype */
+    {1, 0, 0xffff, 0xffff, 0, 0, 15, 0x4afa37, 0x0, 0, qol_b0_c208, 0, ""}, /* rs_this_site */
+    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x4afa3f, 0x0, 0, qol_b0_c209, 0, ""}, /* rs_this_cont */
+    {1, 0, 0xffff, 0xffff, 0, 0, 20, 0x4afa71, 0x0, 0, qol_b0_c210, 0, ""}, /* rs_check_site */
+    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x4afa7e, 0x0, 0, qol_b0_c211, 0, ""}, /* rs_check_cont */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 312, 0, 0, ""}, /* rs_vt_check */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 8, 0, 0, ""}, /* rs_vt_can_place */
 };
@@ -837,17 +1229,17 @@ static const A2EBlock qol_b0_blocked[] = {
     {0xffff, 0, 0, 0}
 };
 static const A2EBuild qol_builds[] = {
-    {"gog-1.1", "armada2/gog-1.1", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qol_b0_entries, qol_b0_blocked, 0, 148},
+    {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qol_b0_entries, qol_b0_blocked, 0, 214},
 };
 
 static A2E_U8 qol_hook_state[9];
-static A2E_U8 qol_sym_flags[148];
-static A2E_U32 qol_sym_addr[148];
+static A2E_U8 qol_sym_flags[214];
+static A2E_U32 qol_sym_addr[214];
 static char qol_notes[9][A2E_NOTE_MAX + 1];
 
 static const A2ETable QOL_ENGINE = {
     "armada2", "qol",
-    qol_syms, 148, qol_hooks, 9, qol_builds, 1, 0,
+    qol_syms, 214, qol_hooks, 9, qol_builds, 1, 0,
     qol_vars, qol_hook_state, qol_sym_flags, qol_sym_addr, qol_notes
 };
 

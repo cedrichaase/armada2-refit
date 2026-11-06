@@ -5,8 +5,11 @@
 //! One file per drawing context: `ingame` (a mission's HUD), `shell` (the front-end
 //! menus), `loading` (the loading screen). Each has an `install()` that patches its
 //! hooks, checked against what stock has there, and stands down on a mismatch.
+pub mod api;
 pub mod buttons;
+pub mod canvas;
 pub mod chat;
+pub mod clock;
 pub mod closeup;
 pub mod cursor;
 pub mod dev8;
@@ -15,6 +18,7 @@ pub mod dialogs;
 pub use crate::rt::hook;
 pub mod hud;
 pub mod info;
+pub mod input;
 pub mod intro;
 pub mod leftovers;
 pub mod ingame;
@@ -93,7 +97,7 @@ pub fn d3d8_device() -> *mut c_void {
     if s == 0 {
         return core::ptr::null_mut();
     }
-    let idx = field(s, crate::syms_core::field::CORE_STORM3D_DEVICE_INDEX);
-    let dev = field(s + crate::syms_core::field::CORE_STORM3D_DEVICES, idx * 4);
-    field(dev, crate::syms_core::field::CORE_DX8_D3D8_DEVICE) as *mut c_void
+    let idx = field(s, crate::syms_core::field::CORE_STORM3D_DEVICE_INDEX());
+    let dev = field(s + crate::syms_core::field::CORE_STORM3D_DEVICES(), idx * 4);
+    field(dev, crate::syms_core::field::CORE_DX8_D3D8_DEVICE()) as *mut c_void
 }

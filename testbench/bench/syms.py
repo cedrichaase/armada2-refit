@@ -34,7 +34,7 @@ def report(exe_path, build=None, plugin=None, profile_dirs=None, test_ini=None):
     pe, profiles, resolve = _load()
     with open(exe_path, 'rb') as f:
         data = f.read()
-    exe = pe.Exe(data)
+    exe = pe.Exe(data, name=os.path.basename(exe_path))
     sha = hashlib.sha256(data).hexdigest()
     games = profiles.load_game_sets(profile_dirs)
     tables = []
@@ -62,7 +62,7 @@ def report(exe_path, build=None, plugin=None, profile_dirs=None, test_ini=None):
     return {
         'exe': {'path': str(exe_path), 'sha256': sha, 'timestamp': exe.timestamp,
                 'image_size': exe.image_size, 'sections': exe.fingerprint},
-        'identity_line': exe.line(), 'build': known, 'tables': tables,
+        'identity_line': tables[0]['log'][0] if tables else exe.line(), 'build': known, 'tables': tables,
         'resolved': sum(x['resolved'] for x in tables), 'total': sum(x['total'] for x in tables),
         'hooks_ready': sum(h['ready'] for x in tables for h in x['hooks']),
         'hooks': sum(len(x['hooks']) for x in tables),
@@ -122,7 +122,7 @@ def render(rep):
 
 def main(argv):
     ap = argparse.ArgumentParser(prog='a2test syms', description=__doc__.split('\n\n')[0])
-    ap.add_argument('--exe', help='the executable to check (default $A2_GAME/Armada2.exe)')
+    ap.add_argument('--exe', help="the executable to check (default the game's, $A2_EXE)")
     ap.add_argument('--build', help="force this build's profile onto the exe (the wrong-profile test)")
     ap.add_argument('--plugin', help='only this plugin (display, ui, ...)')
     ap.add_argument('--record', action='store_true',
@@ -132,9 +132,7 @@ def main(argv):
     a = ap.parse_args(argv)
     exe = a.exe
     if not exe:
-        sys.path.insert(0, str(config.REPO))
-        import a2env
-        exe = os.path.join(a2env.GAME, 'Armada2.exe')
+        exe = str(config.GAME / config.EXE_REL)
     if not os.path.isfile(exe):
         print(f'a2test syms: no executable at {exe}', file=sys.stderr)
         return 2

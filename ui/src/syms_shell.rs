@@ -59,62 +59,64 @@ pub mod hook {
 }
 
 pub mod field {
-    pub const SHELL_STORM3D_DEVICE_INDEX: usize = 0xc0;
-    pub const SHELL_STORM3D_DEVICES: usize = 0xcc;
-    pub const SHELL_STORM3D_DISPLAY: usize = 0x10c;
-    pub const SHELLUI_BTN_HWND: usize = 0x20;
-    pub const SHELLUI_BTN_LABEL: usize = 0x3c;
-    pub const SHELLUI_BTN_MODE: usize = 0xc0;
-    pub const SHELLUI_BTN_RECT: usize = 0xc4;
-    pub const SHELLUI_BTN_SHOWN: usize = 0xe4;
-    pub const SHELLUI_BTN_ENABLED: usize = 0xe8;
-    pub const SHELLUI_BTN_COLOUR: usize = 0x28;
-    pub const SHELLUI_BTN_LEFT: usize = 0x174;
-    pub const SHELLUI_BTN_RIGHT: usize = 0x175;
-    pub const SHELLUI_SELBOX_RECT: usize = 0x178;
-    pub const SHELLUI_TOGGLE_ON: usize = 0x188;
-    pub const SHELLUI_CYCLE_SELECTION: usize = 0x198;
-    pub const SHELLUI_SB_RECT: usize = 0x28;
-    pub const SHELLUI_SB_TRACK_START: usize = 0x10;
-    pub const SHELLUI_SB_TRACK_TOP: usize = 0x14;
-    pub const SHELLUI_SB_VALUE: usize = 0x3c;
-    pub const SHELLUI_SB_TRACK_LEN: usize = 0x40;
-    pub const SHELLUI_SB_HORIZONTAL: usize = 0x44;
-    pub const SHELLUI_SB_LO: usize = 0x48;
-    pub const SHELLUI_SB_HI: usize = 0x4c;
-    pub const SHELLUI_LBL_HWND: usize = 0x4;
-    pub const SHELLUI_LBL_TEXT: usize = 0x8;
-    pub const SHELLUI_LBL_RECT: usize = 0x408;
-    pub const SHELLUI_LBL_FLAGS: usize = 0x418;
-    pub const SHELLUI_LBL_SHOWN: usize = 0x45c;
-    pub const SHELLUI_LBL_COLOUR: usize = 0x464;
-    pub const SHELLUI_STD_LBL_STRING: usize = 0x468;
-    pub const SHELLCOMBO_COUNT: usize = 0x178;
-    pub const SHELLCOMBO_ITEM_H: usize = 0x17c;
-    pub const SHELLCOMBO_PULL: usize = 0x180;
-    pub const SHELLCOMBO_COMBO: usize = 0x198;
-    pub const SHELLCOMBO_DOWN: usize = 0x1b4;
-    pub const SETUP_VT_IS_INSTANT_ACTION: usize = 0x10;
-    pub const SETUP_VT_IS_SINGLE_PLAYER: usize = 0x18;
-    pub const SETUP_VT_SHOW_LOAD_PERCENTAGES: usize = 0x40;
-    pub const SETUP_VT_GET_LOAD_PERCENTAGE: usize = 0x44;
-    pub const SETUP_VT_IS_SEND_WORTHY: usize = 0x5c;
-    pub const SETUP_RACE_NAME: usize = 0x14;
-    pub const PROGRESS_REACHED: usize = 0xd;
-    pub const PROGRESS_COMPLETE: usize = 0x11;
-    pub const PROGRESS_MISSIONS: usize = 0x15;
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn SHELL_STORM3D_DEVICE_INDEX() -> usize { super::TABLE.engine().field(a2engine::Sym(21)) }
+    #[inline(always)] pub fn SHELL_STORM3D_DEVICES() -> usize { super::TABLE.engine().field(a2engine::Sym(22)) }
+    #[inline(always)] pub fn SHELL_STORM3D_DISPLAY() -> usize { super::TABLE.engine().field(a2engine::Sym(23)) }
+    #[inline(always)] pub fn SHELLUI_BTN_HWND() -> usize { super::TABLE.engine().field(a2engine::Sym(39)) }
+    #[inline(always)] pub fn SHELLUI_BTN_LABEL() -> usize { super::TABLE.engine().field(a2engine::Sym(40)) }
+    #[inline(always)] pub fn SHELLUI_BTN_MODE() -> usize { super::TABLE.engine().field(a2engine::Sym(41)) }
+    #[inline(always)] pub fn SHELLUI_BTN_RECT() -> usize { super::TABLE.engine().field(a2engine::Sym(42)) }
+    #[inline(always)] pub fn SHELLUI_BTN_SHOWN() -> usize { super::TABLE.engine().field(a2engine::Sym(43)) }
+    #[inline(always)] pub fn SHELLUI_BTN_ENABLED() -> usize { super::TABLE.engine().field(a2engine::Sym(44)) }
+    #[inline(always)] pub fn SHELLUI_BTN_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(45)) }
+    #[inline(always)] pub fn SHELLUI_BTN_LEFT() -> usize { super::TABLE.engine().field(a2engine::Sym(46)) }
+    #[inline(always)] pub fn SHELLUI_BTN_RIGHT() -> usize { super::TABLE.engine().field(a2engine::Sym(47)) }
+    #[inline(always)] pub fn SHELLUI_SELBOX_RECT() -> usize { super::TABLE.engine().field(a2engine::Sym(48)) }
+    #[inline(always)] pub fn SHELLUI_TOGGLE_ON() -> usize { super::TABLE.engine().field(a2engine::Sym(49)) }
+    #[inline(always)] pub fn SHELLUI_CYCLE_SELECTION() -> usize { super::TABLE.engine().field(a2engine::Sym(50)) }
+    #[inline(always)] pub fn SHELLUI_SB_RECT() -> usize { super::TABLE.engine().field(a2engine::Sym(51)) }
+    #[inline(always)] pub fn SHELLUI_SB_TRACK_START() -> usize { super::TABLE.engine().field(a2engine::Sym(52)) }
+    #[inline(always)] pub fn SHELLUI_SB_TRACK_TOP() -> usize { super::TABLE.engine().field(a2engine::Sym(53)) }
+    #[inline(always)] pub fn SHELLUI_SB_VALUE() -> usize { super::TABLE.engine().field(a2engine::Sym(54)) }
+    #[inline(always)] pub fn SHELLUI_SB_TRACK_LEN() -> usize { super::TABLE.engine().field(a2engine::Sym(55)) }
+    #[inline(always)] pub fn SHELLUI_SB_HORIZONTAL() -> usize { super::TABLE.engine().field(a2engine::Sym(56)) }
+    #[inline(always)] pub fn SHELLUI_SB_LO() -> usize { super::TABLE.engine().field(a2engine::Sym(57)) }
+    #[inline(always)] pub fn SHELLUI_SB_HI() -> usize { super::TABLE.engine().field(a2engine::Sym(58)) }
+    #[inline(always)] pub fn SHELLUI_LBL_HWND() -> usize { super::TABLE.engine().field(a2engine::Sym(59)) }
+    #[inline(always)] pub fn SHELLUI_LBL_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(60)) }
+    #[inline(always)] pub fn SHELLUI_LBL_RECT() -> usize { super::TABLE.engine().field(a2engine::Sym(61)) }
+    #[inline(always)] pub fn SHELLUI_LBL_FLAGS() -> usize { super::TABLE.engine().field(a2engine::Sym(62)) }
+    #[inline(always)] pub fn SHELLUI_LBL_SHOWN() -> usize { super::TABLE.engine().field(a2engine::Sym(63)) }
+    #[inline(always)] pub fn SHELLUI_LBL_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(64)) }
+    #[inline(always)] pub fn SHELLUI_STD_LBL_STRING() -> usize { super::TABLE.engine().field(a2engine::Sym(65)) }
+    #[inline(always)] pub fn SHELLCOMBO_COUNT() -> usize { super::TABLE.engine().field(a2engine::Sym(68)) }
+    #[inline(always)] pub fn SHELLCOMBO_ITEM_H() -> usize { super::TABLE.engine().field(a2engine::Sym(69)) }
+    #[inline(always)] pub fn SHELLCOMBO_PULL() -> usize { super::TABLE.engine().field(a2engine::Sym(70)) }
+    #[inline(always)] pub fn SHELLCOMBO_COMBO() -> usize { super::TABLE.engine().field(a2engine::Sym(71)) }
+    #[inline(always)] pub fn SHELLCOMBO_DOWN() -> usize { super::TABLE.engine().field(a2engine::Sym(72)) }
+    #[inline(always)] pub fn SETUP_VT_IS_INSTANT_ACTION() -> usize { super::TABLE.engine().field(a2engine::Sym(85)) }
+    #[inline(always)] pub fn SETUP_VT_IS_SINGLE_PLAYER() -> usize { super::TABLE.engine().field(a2engine::Sym(86)) }
+    #[inline(always)] pub fn SETUP_VT_SHOW_LOAD_PERCENTAGES() -> usize { super::TABLE.engine().field(a2engine::Sym(87)) }
+    #[inline(always)] pub fn SETUP_VT_GET_LOAD_PERCENTAGE() -> usize { super::TABLE.engine().field(a2engine::Sym(88)) }
+    #[inline(always)] pub fn SETUP_VT_IS_SEND_WORTHY() -> usize { super::TABLE.engine().field(a2engine::Sym(89)) }
+    #[inline(always)] pub fn SETUP_RACE_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(90)) }
+    #[inline(always)] pub fn PROGRESS_REACHED() -> usize { super::TABLE.engine().field(a2engine::Sym(93)) }
+    #[inline(always)] pub fn PROGRESS_COMPLETE() -> usize { super::TABLE.engine().field(a2engine::Sym(94)) }
+    #[inline(always)] pub fn PROGRESS_MISSIONS() -> usize { super::TABLE.engine().field(a2engine::Sym(95)) }
 }
 
 pub mod value {
-    pub const SHELL_DISPLAY_3D: i32 = 2;
-    pub const SHELL_DISPLAY_SHELL: i32 = 3;
-    pub const SHELL_MODE_MAIN_MENU: i32 = 1;
-    pub const SHELL_BITMAP_SIZE: i32 = 48;
-    pub const SHELLUI_RDATA_START: i32 = 7012352;
-    pub const SHELLUI_RDATA_END: i32 = 7143424;
-    pub const SHELLUI_BTN_LABEL_LEN: i32 = 64;
-    pub const SHELLUI_LBL_TEXT_LEN: i32 = 1024;
-    pub const SETUP_SLOTS: i32 = 8;
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn SHELL_DISPLAY_3D() -> i32 { super::TABLE.engine().value(a2engine::Sym(13)) }
+    #[inline(always)] pub fn SHELL_DISPLAY_SHELL() -> i32 { super::TABLE.engine().value(a2engine::Sym(14)) }
+    #[inline(always)] pub fn SHELL_MODE_MAIN_MENU() -> i32 { super::TABLE.engine().value(a2engine::Sym(15)) }
+    #[inline(always)] pub fn SHELL_BITMAP_SIZE() -> i32 { super::TABLE.engine().value(a2engine::Sym(16)) }
+    #[inline(always)] pub fn SHELLUI_RDATA_START() -> i32 { super::TABLE.engine().value(a2engine::Sym(37)) }
+    #[inline(always)] pub fn SHELLUI_RDATA_END() -> i32 { super::TABLE.engine().value(a2engine::Sym(38)) }
+    #[inline(always)] pub fn SHELLUI_BTN_LABEL_LEN() -> i32 { super::TABLE.engine().value(a2engine::Sym(66)) }
+    #[inline(always)] pub fn SHELLUI_LBL_TEXT_LEN() -> i32 { super::TABLE.engine().value(a2engine::Sym(67)) }
+    #[inline(always)] pub fn SETUP_SLOTS() -> i32 { super::TABLE.engine().value(a2engine::Sym(91)) }
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
@@ -231,6 +233,7 @@ pub const BUILDS: &[a2engine::Build] = &[
     a2engine::Build {
         name: "gog-1.1",
         key: "armada2/gog-1.1",
+        exe: "Armada2.exe",
         timestamp: 0x3c4c76bd,
         image_size: 0x3fa000,
         sections: 0xa1a8a321,

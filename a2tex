@@ -33,7 +33,9 @@ set -uo pipefail
 REPO=$(cd "$(dirname "$0")" && pwd); ROOT="$REPO/textures"; export ROOT
 . "$REPO/a2env.sh"; GAME=$A2_GAME
 DATA="$A2_DATA/textures"; export DATA   # work directories, one per target
-TEX="$GAME/Textures/RGB"
+# The game's texture root, the first of its descriptor's [files] textures (games/<id>.toml,
+# A2_PROFILE): Textures/RGB in Armada II.
+TEX="$A2_TEXTURES"
 BAK=.a2neb-backup
 . "$ROOT/lib/common.sh"; . "$ROOT/lib/puff.sh"; . "$ROOT/lib/sky.sh"
 

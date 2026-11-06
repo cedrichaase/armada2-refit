@@ -38,9 +38,54 @@ pub mod hook {
 }
 
 pub mod field {
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn WD_NODE_SPHERE() -> usize { super::TABLE.engine().field(a2engine::Sym(26)) }
+    #[inline(always)] pub fn WD_INST_SPHERE() -> usize { super::TABLE.engine().field(a2engine::Sym(27)) }
+    #[inline(always)] pub fn WD_SPIRIT_HANDLE() -> usize { super::TABLE.engine().field(a2engine::Sym(28)) }
+    #[inline(always)] pub fn WD_SPIRIT_INSTANCE() -> usize { super::TABLE.engine().field(a2engine::Sym(29)) }
+    #[inline(always)] pub fn WD_SPIRIT_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(30)) }
+    #[inline(always)] pub fn WD_NEB_LIGHT() -> usize { super::TABLE.engine().field(a2engine::Sym(31)) }
+    #[inline(always)] pub fn WD_NEB_GLOW() -> usize { super::TABLE.engine().field(a2engine::Sym(32)) }
+    #[inline(always)] pub fn WD_NEB_FALLOFF_START() -> usize { super::TABLE.engine().field(a2engine::Sym(33)) }
+    #[inline(always)] pub fn WD_NEB_FALLOFF_RANGE() -> usize { super::TABLE.engine().field(a2engine::Sym(34)) }
+    #[inline(always)] pub fn WD_INST_MATRIX() -> usize { super::TABLE.engine().field(a2engine::Sym(35)) }
+    #[inline(always)] pub fn WD_INST_ORIGIN() -> usize { super::TABLE.engine().field(a2engine::Sym(36)) }
+    #[inline(always)] pub fn WD_NEB_CLASS_RADIUS() -> usize { super::TABLE.engine().field(a2engine::Sym(37)) }
+    #[inline(always)] pub fn WD_NEB_POSITION() -> usize { super::TABLE.engine().field(a2engine::Sym(38)) }
+    #[inline(always)] pub fn WD_PLANET_GROUND_TEX() -> usize { super::TABLE.engine().field(a2engine::Sym(39)) }
+    #[inline(always)] pub fn WD_PLANET_ATMO_TEX() -> usize { super::TABLE.engine().field(a2engine::Sym(40)) }
+    #[inline(always)] pub fn WD_PLANET_RACE() -> usize { super::TABLE.engine().field(a2engine::Sym(41)) }
+    #[inline(always)] pub fn WD_PLANET_POPULATION() -> usize { super::TABLE.engine().field(a2engine::Sym(42)) }
+    #[inline(always)] pub fn WD_RACE_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(43)) }
+    #[inline(always)] pub fn WD_PLANET_HIDDEN() -> usize { super::TABLE.engine().field(a2engine::Sym(44)) }
+    #[inline(always)] pub fn WD_RACE_CITIES() -> usize { super::TABLE.engine().field(a2engine::Sym(45)) }
+    #[inline(always)] pub fn WD_CITY_WIDTH() -> usize { super::TABLE.engine().field(a2engine::Sym(46)) }
+    #[inline(always)] pub fn WD_CITY_HEIGHT() -> usize { super::TABLE.engine().field(a2engine::Sym(47)) }
+    #[inline(always)] pub fn WD_CITY_DATA() -> usize { super::TABLE.engine().field(a2engine::Sym(48)) }
+    #[inline(always)] pub fn WD_RACE_CITY_K() -> usize { super::TABLE.engine().field(a2engine::Sym(49)) }
+    #[inline(always)] pub fn WD_PLANET_POP_LEVEL() -> usize { super::TABLE.engine().field(a2engine::Sym(50)) }
+    #[inline(always)] pub fn WD_RACE_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(51)) }
+    #[inline(always)] pub fn WD_PDB_GROUND() -> usize { super::TABLE.engine().field(a2engine::Sym(52)) }
+    #[inline(always)] pub fn WD_PDB_GROUND2() -> usize { super::TABLE.engine().field(a2engine::Sym(53)) }
+    #[inline(always)] pub fn WD_PDB_SHELL() -> usize { super::TABLE.engine().field(a2engine::Sym(54)) }
+    #[inline(always)] pub fn WD_HULL_RADIUS() -> usize { super::TABLE.engine().field(a2engine::Sym(55)) }
+    #[inline(always)] pub fn WD_PLANET_YAW() -> usize { super::TABLE.engine().field(a2engine::Sym(56)) }
+    #[inline(always)] pub fn WD_PDB_YAW_RATE() -> usize { super::TABLE.engine().field(a2engine::Sym(57)) }
+    #[inline(always)] pub fn WD_PLANET_TURB_TIME() -> usize { super::TABLE.engine().field(a2engine::Sym(58)) }
+    #[inline(always)] pub fn WD_PLANET_TURBULENCE() -> usize { super::TABLE.engine().field(a2engine::Sym(59)) }
+    #[inline(always)] pub fn WD_FIELD_ROCKS() -> usize { super::TABLE.engine().field(a2engine::Sym(60)) }
+    #[inline(always)] pub fn WD_FIELD_ROCK_COUNT() -> usize { super::TABLE.engine().field(a2engine::Sym(61)) }
+    #[inline(always)] pub fn WD_FIELD_DBS() -> usize { super::TABLE.engine().field(a2engine::Sym(62)) }
+    #[inline(always)] pub fn WD_FIELD_DB_COUNT() -> usize { super::TABLE.engine().field(a2engine::Sym(63)) }
+    #[inline(always)] pub fn WD_ROCK_HIDDEN() -> usize { super::TABLE.engine().field(a2engine::Sym(65)) }
+    #[inline(always)] pub fn WD_SCRAP_RESOURCE() -> usize { super::TABLE.engine().field(a2engine::Sym(66)) }
+    #[inline(always)] pub fn WD_RESOURCE_EMPTY() -> usize { super::TABLE.engine().field(a2engine::Sym(67)) }
+    #[inline(always)] pub fn WD_RESOURCE_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(68)) }
 }
 
 pub mod value {
+    #![allow(non_snake_case)]
+    #[inline(always)] pub fn WD_ROCK_BYTES() -> i32 { super::TABLE.engine().value(a2engine::Sym(64)) }
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
@@ -70,12 +115,55 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "nebula_list", symbol: "Nebula::nebulaList", kind: a2engine::Kind::Global },
     a2engine::SymDef { id: "slot_nebula_frustum", symbol: "NebulaInstance::FrustumTest", kind: a2engine::Kind::Slot },
     a2engine::SymDef { id: "slot_spirit_render", symbol: "GameObjectSpirit::Render", kind: a2engine::Kind::Slot },
+    a2engine::SymDef { id: "wd_node_sphere", symbol: "ST3D_Node::bounding sphere", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_inst_sphere", symbol: "ST3D_Instance::bounding sphere", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_spirit_handle", symbol: "GameObjectSpirit::object handle", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_spirit_instance", symbol: "GameObjectSpirit::instance copy", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_spirit_class", symbol: "GameObjectSpirit::class", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_neb_light", symbol: "Nebula::point light", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_neb_glow", symbol: "NebulaClass::glow colour", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_neb_falloff_start", symbol: "NebulaClass::light falloff start", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_neb_falloff_range", symbol: "NebulaClass::light falloff range", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_inst_matrix", symbol: "ST3D_Instance::placement", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_inst_origin", symbol: "ST3D_Instance::origin", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_neb_class_radius", symbol: "NebulaClass::radius", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_neb_position", symbol: "Nebula::position", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_planet_ground_tex", symbol: "PlanetClass::ground texture name", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_planet_atmo_tex", symbol: "PlanetClass::atmosphere texture name", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_planet_race", symbol: "Planet::colony race", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_planet_population", symbol: "Planet::population", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_race_name", symbol: "Race::city texture name", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_planet_hidden", symbol: "Planet::hidden", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_race_cities", symbol: "Race::city pictures", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_city_width", symbol: "city array width", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_city_height", symbol: "city array height", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_city_data", symbol: "city array data", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_race_city_k", symbol: "Race::city gradient", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_planet_pop_level", symbol: "PlanetClass::population level", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_race_colour", symbol: "Race::colour", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_pdb_ground", symbol: "ST3D_PlanetDatabase::ground hull", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_pdb_ground2", symbol: "ST3D_PlanetDatabase::second ground hull", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_pdb_shell", symbol: "ST3D_PlanetDatabase::atmosphere shell", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_hull_radius", symbol: "planet hull radius", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_planet_yaw", symbol: "PlanetInstance::atmosphere turn", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_pdb_yaw_rate", symbol: "ST3D_PlanetDatabase::atmosphere turn rate", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_planet_turb_time", symbol: "PlanetInstance::turbulence clock", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_planet_turbulence", symbol: "PlanetClass::turbulence", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_field_rocks", symbol: "AsteroidFieldInstance::rocks", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_field_rock_count", symbol: "AsteroidFieldInstance::rock count", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_field_dbs", symbol: "AsteroidFieldClass::databases", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_field_db_count", symbol: "AsteroidFieldClass::database count", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_rock_bytes", symbol: "asteroid rock instance size", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "wd_rock_hidden", symbol: "ST3D_Instance::hidden", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_scrap_resource", symbol: "Scrap::resource", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_resource_empty", symbol: "ResourceComponent::empty", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "wd_resource_class", symbol: "ResourceComponent::class", kind: a2engine::Kind::Field },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
-    a2engine::HookDef { id: "render3d.world.reads", run_unknown: false, rows: &["Modules.world"], syms: &[2, 3, 4, 5, 7, 9, 10, 11, 13, 14, 16, 17, 18, 19, 20, 21, 22, 23] },
+    a2engine::HookDef { id: "render3d.world.reads", run_unknown: false, rows: &["Modules.world"], syms: &[2, 3, 4, 5, 7, 9, 10, 11, 13, 14, 16, 17, 18, 19, 20, 21, 22, 23, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68] },
     a2engine::HookDef { id: "render3d.world.lights", run_unknown: false, rows: &["Modules.world"], syms: &[0, 1] },
-    a2engine::HookDef { id: "render3d.world.cull", run_unknown: false, rows: &["Modules.world"], syms: &[8, 12, 24] },
+    a2engine::HookDef { id: "render3d.world.cull", run_unknown: false, rows: &["Modules.world"], syms: &[8, 12, 24, 26] },
     a2engine::HookDef { id: "render3d.world.ghosts", run_unknown: false, rows: &["Modules.world"], syms: &[6, 15, 25] },
 ];
 
@@ -83,11 +171,12 @@ pub const BUILDS: &[a2engine::Build] = &[
     a2engine::Build {
         name: "gog-1.1",
         key: "armada2/gog-1.1",
+        exe: "Armada2.exe",
         timestamp: 0x3c4c76bd,
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 26,
+        n_resolved: 69,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x4a4a7a, end: 0x0, target: 0x1, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_nebula_lights
@@ -116,6 +205,49 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x73b1bc, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // nebula_list
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x8, vtable: 0xc, index: 3, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // slot_nebula_frustum
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x6, vtable: 0xf, index: 3, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // slot_spirit_render
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 28 }, // wd_node_sphere
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 52 }, // wd_inst_sphere
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // wd_spirit_handle
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // wd_spirit_instance
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // wd_spirit_class
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 428 }, // wd_neb_light
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 556 }, // wd_neb_glow
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 580 }, // wd_neb_falloff_start
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 584 }, // wd_neb_falloff_range
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 68 }, // wd_inst_matrix
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 104 }, // wd_inst_origin
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 480 }, // wd_neb_class_radius
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 172 }, // wd_neb_position
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1212 }, // wd_planet_ground_tex
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1196 }, // wd_planet_atmo_tex
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 708 }, // wd_planet_race
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 712 }, // wd_planet_population
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1106 }, // wd_race_name
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 275 }, // wd_planet_hidden
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1300 }, // wd_race_cities
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // wd_city_width
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // wd_city_height
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // wd_city_data
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1136 }, // wd_race_city_k
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1168 }, // wd_planet_pop_level
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1124 }, // wd_race_colour
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 168 }, // wd_pdb_ground
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 172 }, // wd_pdb_ground2
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 176 }, // wd_pdb_shell
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 336 }, // wd_hull_radius
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 180 }, // wd_planet_yaw
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 164 }, // wd_pdb_yaw_rate
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 184 }, // wd_planet_turb_time
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1228 }, // wd_planet_turbulence
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 152 }, // wd_field_rocks
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 156 }, // wd_field_rock_count
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 480 }, // wd_field_dbs
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 508 }, // wd_field_db_count
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 152 }, // wd_rock_bytes
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 132 }, // wd_rock_hidden
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 380 }, // wd_scrap_resource
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 24 }, // wd_resource_empty
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // wd_resource_class
         ],
         blocked: &[
         ],
@@ -123,8 +255,8 @@ pub const BUILDS: &[a2engine::Build] = &[
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 4] = [const { core::sync::atomic::AtomicU64::new(0) }; 4];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 26] = [const { core::sync::atomic::AtomicU8::new(0) }; 26];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 26] = [const { core::sync::atomic::AtomicUsize::new(0) }; 26];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 69] = [const { core::sync::atomic::AtomicU8::new(0) }; 69];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 69] = [const { core::sync::atomic::AtomicUsize::new(0) }; 69];
 static NOTES: [a2engine::Note; 4] = [const { a2engine::Note::new() }; 4];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 

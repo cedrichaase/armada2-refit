@@ -1,9 +1,11 @@
 # a2fmt
 
 Readers for Star Trek: Armada II's asset formats, for the renderers in `render3d/` and `ui/`:
-SOD models, TGA textures and their mip chains, `.spr` sprite tables and ODFs.
-`no_std` with `alloc`, one dependency (`libm`). Nothing here opens a file: callers pass
-bytes, and for formats that include other files, a closure that fetches them by name.
+SOD models, TGA textures and their mip chains, `.spr` sprite tables and ODFs, and `vfs`,
+the one file system the plugins read the game's files through.
+`no_std` with `alloc`, one dependency (`libm`). Nothing here makes a system call: callers
+pass bytes, and for formats that include other files, a closure that fetches them by
+name; `vfs` reads through functions the caller supplies.
 No parser panics on bad input (a test feeds damaged copies of real files to all four).
 
 ```
@@ -20,6 +22,44 @@ The layouts below were established by parsing every stock file to its last byte 
 by reading the engine's loaders (`ST3D_Stream::ReadDatabase` and its helpers,
 `ST3D_SpriteTableParser`) for what the files alone leave open. They are described
 here because the renderer reads these files in the engine's place.
+
+## The file system (`vfs`)
+
+Each game keeps its files in its own layout: Armada II's textures in `Textures/RGB/`,
+Fleet Operations: Roots' in `Textures/`, TGA and DDS mixed, with its ODFs packed in
+`ODF.fpq`; Armada 1 packs its data in `.zfs` archives (`PLAN-ARCHITECTURE.md`, F5). `vfs`
+makes that layout data: the plugins open files by a virtual path (`textures\<file>`,
+`odf\<file>`), and a mount list says where each virtual folder is.
+
+- **`trait Vfs`**: `open(path) -> Option<Vec<u8>>`, `exists(path)`, `list(dir)`, plus
+  `kind`, `status` and `label` for the log. Paths are case-insensitive (hard rule 3:
+  stock mixes `.tga` and `.TGA`) and take either slash; empty and `.` components are
+  skipped, and a path with `..` names nothing.
+- **`Loose::new(io, root)`**: a folder of loose files. The system calls are an `Io` the
+  caller supplies (`read`, `is_file`, `list`, its separator and whether the file system
+  ignores case); `FnIo` builds one from plain functions, which is how render3d and the
+  UI hand in `a2rt`'s Win32 reads (`render3d/core/src/files.rs`, `ui/src/files.rs`).
+  Where the file system ignores case (Windows, Wine) a path goes to it as written, so a
+  lookup costs what it did before; where it minds case (the host tests) a path that does
+  not open as written is matched through the folders' listings, each listed once.
+- **`Layered`**: sources mounted at virtual folders (`""` is the root). A path is served
+  by the mounts at the deepest folder that holds it, so a mount shadows the folder of its
+  name in the root mount, as a mounted file system does. Among those, sources are
+  searched by kind (loose folders, then `Fpq`, then `Zfs`) and then in the order they
+  were mounted; the first that has the file serves it. `list` merges them, the first of
+  each name in any case kept, with the mount folders inside as folders.
+- **`Fpq` and `Zfs`** are declared, with their place in that order, and serve nothing:
+  their `status()` is `Unsupported`, with a reason fit for a log line. Their readers come
+  with the work that needs them (`PLAN-FLEETOPS.md`, FO-5; `PLAN-ARMADA1.md`, A1-11), and
+  nothing here describes either format.
+- **Planned, not written: an `Engine` source**, which reads through the game's own file
+  functions, for an archive whose format is not ours to read (FO-5 chooses between it
+  and an `Fpq` reader). It would mount last, the fallback behind every source of ours.
+
+The mount list itself is the game descriptor's `[files]` (`games/README.md`, "Files"),
+which `tools/layers.py --check` holds equal to the plugins' `LAYOUT` tables.
+`tests/vfs.rs` checks case-insensitivity on a case-sensitive disk, layering order,
+shadowing, missing files and the archive kinds, on a temporary directory.
 
 ## SOD (`sod`)
 

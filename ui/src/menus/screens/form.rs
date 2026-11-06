@@ -16,7 +16,7 @@
 //! two sides (Display and Performance, the settings and the difficulty) stay two
 //! columns when both have something; one side alone is one column.
 use super::common::*;
-use crate::engine::shellui::Kind;
+use crate::engine::api::shellui::Kind;
 use crate::gfx::{fade, Weight, R};
 use crate::menus::generic::{shell_slider};
 use crate::menus::model::{Class, Control, What};
@@ -232,7 +232,7 @@ pub fn draw_with(ui: &mut Ui, s: &Screen, form: &Form, own: &[Own]) {
                 ui.text_in(R::new(x, y, cw, ui.u(LABEL_H)), o.label, t.text_size, Align::Left, t.text_dim, Weight::Regular);
                 let br = R::new(x, y + ui.u(LABEL_H), cw, ui.u(FIELD_H));
                 if s.top && ui.scope(&crate::sfmt!("own:{}", o.label), |ui| ui.button(br, o.value)) {
-                    crate::engine::sound::shell_click();
+                    crate::engine::api::sound::shell_click();
                     (o.press)();
                 }
                 y += ui.u(OWN_H);
@@ -287,5 +287,5 @@ fn field_row<'a>(ui: &mut Ui, s: &Screen, c: &'a Control, label: Option<&Control
 /// combo box behind it is the field (a choice is its own selection), so the shell widget
 /// is not a field of its own; drawn as one, it took the combo's caption.
 fn is_shell_combo(c: &Control) -> bool {
-    matches!(c.what, What::Shell(crate::engine::shellui::Kind::Combo))
+    matches!(c.what, What::Shell(crate::engine::api::shellui::Kind::Combo))
 }

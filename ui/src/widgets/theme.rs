@@ -10,23 +10,21 @@ use super::{anim, Align, Id, Ui};
 use crate::gfx::{fade, mix, Color, Corners, Elbow, Weight, R};
 use alloc::string::String;
 
-/// The six playable races; each has a theme of its own.
+/// A race of the content set (`ui/content/sets/<set>/ui.ini`, `[Race.*]`): its place in
+/// the set's race list. The set maps each race to one of the theme's looks (`Form`, by
+/// its id: `Form::from_id`), so the colours stay here and the names stay data.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Race {
-    Federation,
-    Klingon,
-    Romulan,
-    Cardassian,
-    Borg,
-    Species8472,
-}
+pub struct Race(u8);
 
 impl Race {
-    pub const ALL: [Race; 6] = [Race::Federation, Race::Klingon, Race::Romulan, Race::Cardassian, Race::Borg, Race::Species8472];
+    /// The set's races, in its order.
+    pub fn all() -> impl Iterator<Item = Race> {
+        (0..crate::content::get().races.len().min(u8::MAX as usize)).map(|i| Race(i as u8))
+    }
 
-    /// Its place in `ALL`, which is the order of the content set's race list.
+    /// Its place in the content set's race list.
     pub fn index(self) -> usize {
-        Race::ALL.iter().position(|r| *r == self).unwrap_or(0)
+        self.0 as usize
     }
 
     /// The race's name in the content set ("" when the build's set has no races).
@@ -34,12 +32,17 @@ impl Race {
         crate::content::get().races.get(self.index()).map_or("", |r| r.name)
     }
 
+    /// The theme's look the set gives the race, None for an id the theme does not know.
+    pub fn form(self) -> Option<Form> {
+        crate::content::get().races.get(self.index()).and_then(|r| Form::from_id(r.theme))
+    }
+
     /// From a name as `[UI] Theme=` or the game spells it (`federation`, `fed`,
     /// `kli`, `bor`, `species8472`, `8472`, ...), any case; the content set's aliases.
     pub fn from_name(s: &str) -> Option<Race> {
         let l = crate::rt::lower(s.trim());
         let races = crate::content::get().races;
-        Race::ALL.iter().copied().find(|r| races.get(r.index()).is_some_and(|n| n.aliases.contains(&l.as_str())))
+        races.iter().position(|n| n.aliases.contains(&l.as_str())).map(|i| Race(i as u8))
     }
 }
 
@@ -60,6 +63,25 @@ pub enum Form {
     Cube,
     /// Species 8472: organic. Leaf-shaped corners, soft inner light.
     Organic,
+}
+
+impl Form {
+    /// A race look by the id a content set gives it (`lcars`, `blade`, `wing`, `arch`,
+    /// `cube`, `organic`; any case). The shell is not a race's.
+    pub fn from_id(id: &str) -> Option<Form> {
+        let id = id.trim();
+        [
+            ("lcars", Form::Lcars),
+            ("blade", Form::Blade),
+            ("wing", Form::Wing),
+            ("arch", Form::Arch),
+            ("cube", Form::Cube),
+            ("organic", Form::Organic),
+        ]
+        .iter()
+        .find(|(n, _)| n.eq_ignore_ascii_case(id))
+        .map(|&(_, f)| f)
+    }
 }
 
 /// Every token a widget draws with.
@@ -227,13 +249,20 @@ impl Theme {
         }
     }
 
-    /// A race's theme.
+    /// A race's theme: the look its content set gives it, under its name (the shell's
+    /// look for an id the theme does not know).
     pub fn for_race(r: Race) -> Theme {
+        let look = r.form().map_or_else(Theme::shell, Theme::for_form);
+        Theme { name: r.name(), race: Some(r), ..look }
+    }
+
+    /// A race look's theme (`Form::from_id`); the shell's for `Form::Shell`. Its name is
+    /// the race's, set by `for_race`.
+    pub fn for_form(f: Form) -> Theme {
         let s = Theme::shell();
-        match r {
-            Race::Federation => Theme {
-                name: "Federation",
-                race: Some(r),
+        match f {
+            Form::Shell => s,
+            Form::Lcars => Theme {
                 form: Form::Lcars,
                 panel: 0xe6000000,
                 panel_top: 0xe6000000,
@@ -272,9 +301,7 @@ impl Theme {
                 caps_buttons: true,
                 ..s
             },
-            Race::Klingon => Theme {
-                name: "Klingon",
-                race: Some(r),
+            Form::Blade => Theme {
                 form: Form::Blade,
                 panel: 0xe8120807,
                 panel_top: 0xe8301a15,
@@ -311,9 +338,7 @@ impl Theme {
                 bar_stripes: [12.0, 0.7, PI * 0.25],
                 ..s
             },
-            Race::Romulan => Theme {
-                name: "Romulan",
-                race: Some(r),
+            Form::Wing => Theme {
                 form: Form::Wing,
                 panel: 0xe8020d04,
                 panel_top: 0xe8072c10,
@@ -349,9 +374,7 @@ impl Theme {
                 bar_stripes: [8.0, 0.55, -PI / 3.0],
                 ..s
             },
-            Race::Cardassian => Theme {
-                name: "Cardassian",
-                race: Some(r),
+            Form::Arch => Theme {
                 form: Form::Arch,
                 panel: 0xe8120902,
                 panel_top: 0xe8301c08,
@@ -386,9 +409,7 @@ impl Theme {
                 small: Corners([-3.0, -3.0, 0.0, 0.0]),
                 ..s
             },
-            Race::Borg => Theme {
-                name: "Borg",
-                race: Some(r),
+            Form::Cube => Theme {
                 form: Form::Cube,
                 panel: 0xea060a08,
                 panel_top: 0xea141c18,
@@ -425,9 +446,7 @@ impl Theme {
                 bar_stripes: [6.0, 0.62, 0.0],
                 ..s
             },
-            Race::Species8472 => Theme {
-                name: "Species 8472",
-                race: Some(r),
+            Form::Organic => Theme {
                 form: Form::Organic,
                 panel: 0xe80b0714,
                 panel_top: 0xe8211836,
@@ -473,13 +492,10 @@ impl Theme {
         Race::from_name(s).map(Theme::for_race)
     }
 
-    /// Every theme, the shell's first: for the style gallery.
-    pub fn all() -> [Theme; 7] {
-        let mut a = [Theme::shell(); 7];
-        for (i, r) in Race::ALL.iter().enumerate() {
-            a[i + 1] = Theme::for_race(*r);
-        }
-        a
+    /// Every theme, the shell's first, then each race of the content set: for the
+    /// style gallery.
+    pub fn all() -> alloc::vec::Vec<Theme> {
+        core::iter::once(Theme::shell()).chain(Race::all().map(Theme::for_race)).collect()
     }
 
     /// The theme for a drawing context, by `[UI] Theme=`: a name puts that theme

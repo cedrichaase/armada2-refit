@@ -1480,3 +1480,29 @@ offset = 0x80
 type = "f32"
 used_by = ["hud.frame_rate"]
 
+[[sym]]
+id = "otext_tree_left"
+symbol = "std::_Tree node left"
+kind = "field"
+struct = "std::_Tree node"
+offset = 0x0
+type = "ptr"
+used_by = ["hud.reads_overlay_text"]
+
+[[sym]]
+id = "otext_tree_parent"
+symbol = "std::_Tree node parent"
+kind = "field"
+struct = "std::_Tree node"
+offset = 0x4
+type = "ptr"
+used_by = ["hud.reads_overlay_text"]
+
+[[sym]]
+id = "otext_tree_right"
+symbol = "std::_Tree node right"
+kind = "field"
+struct = "std::_Tree node"
+offset = 0x8
+type = "ptr"
+used_by = ["hud.reads_overlay_text"]

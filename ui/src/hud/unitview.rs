@@ -5,7 +5,7 @@
 //! component's own rectangles, so the view's camera gets a square viewport at any
 //! aspect) and draws the chrome around it, just outside, so nothing of the picture is
 //! covered; the stock frame is left out.
-use crate::engine::{hud, overlay, unitview};
+use crate::engine::api::{hud, overlay, unitview};
 use crate::gfx::{fade, Corners, R};
 use crate::widgets::Ui;
 
@@ -33,7 +33,7 @@ fn view(ui: &Ui) -> Option<R> {
 /// The view with its frame, while it shows: the bottom row ends at its left
 /// (`hud::bottom_row`).
 pub fn shown_rect(ui: &Ui) -> Option<R> {
-    if hud::hidden(overlay::cinematic_view()) || crate::engine::ingame::hud_hidden() {
+    if hud::hidden(overlay::cinematic_view()) || crate::engine::api::ingame::hud_hidden() {
         return None;
     }
     let r = view(ui)?;
@@ -48,7 +48,7 @@ pub fn run(ui: &mut Ui) {
         let r = place(ui);
         unitview::place([r.x, r.y, r.right(), r.bottom()], ui.w, ui.h);
     }
-    let shown = !hud::hidden(c) && !crate::engine::ingame::hud_hidden();
+    let shown = !hud::hidden(c) && !crate::engine::api::ingame::hud_hidden();
     unsafe {
         if shown != SHOWN {
             SHOWN = shown;
@@ -60,7 +60,7 @@ pub fn run(ui: &mut Ui) {
     }
     // In the cinematic view (a cutscene) the engine draws the unit view only while it
     // plays a video (`CinematicView::Render` returns at once otherwise): no frame then.
-    if crate::engine::radar::view() == 2 && !hud::video_playing() {
+    if crate::engine::api::radar::view() == 2 && !hud::video_playing() {
         return;
     }
     let Some(r) = view(ui) else { return };

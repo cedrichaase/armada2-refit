@@ -34,7 +34,6 @@ Installed, not yet seen in game.
 ### Changed
 - BinkProxy leaves the intro's mode lookups to Display8 when `d3d8.dll` exports `display8_abi` (log `intro: Display8 raises the mode`); `RaiseIntroMode=1` is the fallback for any other `d3d8.dll`, until Display8 is required. `IntroWidth` and `IntroHeight` apply only to that fallback. Installed, not yet seen in game.
 
-
 ## 2.6.1 — 2026-11-03
 
 ### Changed

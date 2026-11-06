@@ -5,25 +5,33 @@
 #   1. engine   no address literal (0x400000..0x7fffff) and no `field*`/`rd` read outside
 #               the engine glue: core/src/engine/** and each module's
 #               mods/<m>/src/hooks.rs (and core/src/hooks.rs, the registry that checks
-#               the sites it patches)
+#               the sites it patches); and anywhere, the glue included, no literal
+#               struct offset (AR-3): `field*(x, 0x..)`, `rd(x + 0x..)`, `(x + 0x..) as *`
+#               or `const X: usize = 0x..`, which are the profile's `field` entries
+#               (a line that says `not an offset` is excused)
 #   2. cross    no path into another module's crate (`r3d_<other>::`) inside
 #               mods/<m>/, and no `r3d-<other>` dependency in its Cargo.toml: a module
 #               depends on r3d-core alone
 #   3. byname   no `running("..")` / `enabled("..")` in module code: ask a capability
 #               (services), never a module by name
 #   4. content  no string literal naming an ODF, SOD, sprite or texture (`*.odf`, `*.sod`,
-#               `*.spr`, `*.tga`) outside mods/<m>/src/content.rs and render3d/content/
-#               (advisory: never strict)
+#               `*.spr`, `*.tga`) in module code outside mods/<m>/src/content.rs: a game's
+#               names are its content set's (render3d/content/sets/<set>/<m>.ini;
+#               README.md, "Content sets"). A literal that is the engine's file format
+#               rather than a set's content stays with a marker on its line or the line
+#               above: `// lint-allow(content): <reason>` (the reason is required)
 #
 #   lint-layers.sh                    report: counts per rule and directory; exits 0
 #   lint-layers.sh --list             report, with every hit as file:line
-#   lint-layers.sh --strict DIR...    exit 1 on any hit of rules 1-3 under the DIRs
+#   lint-layers.sh --strict DIR...    exit 1 on any hit of rules 1-4 under the DIRs
 #                                     (paths relative to render3d/, e.g. mods/hulls)
-#   ... --rules cross,byname          with --strict: only those rules (engine, cross, byname)
+#   ... --rules cross,byname          with --strict: only those rules (engine, cross,
+#                                     byname, content)
 #
-# CI holds every module crate (mods) and the core to rules 1-3 (the core's engine reads
+# CI holds every module crate (mods) and the core to rules 1-4 (the core's engine reads
 # live in core/src/engine/**: phase 8e moved them there, with the addresses into the
-# symbol profile).
+# symbol profile; rule 4 reads module code only: the core's own file handling is the
+# engine's formats). ui/lint-content.sh is rule 4 for the UI.
 #
 # The generated shaders (src/shaders/) and generated settings tables are not read.
 set -euo pipefail
@@ -35,7 +43,7 @@ here = sys.argv[1]
 args = sys.argv[2:]
 listing = '--list' in args
 strict = []
-rules = ('engine', 'cross', 'byname')
+rules = ('engine', 'cross', 'byname', 'content')
 if '--rules' in args:
     rules = tuple(args[args.index('--rules') + 1].split(','))
 if '--strict' in args:
@@ -56,7 +64,14 @@ FIELD = re.compile(r'(?<![\w.])(?:engine::)?(field|field_f32|field_u8|field_m34|
 CROSS = re.compile(r'\br3d_([a-z_]+)::')
 DEP = re.compile(r'^\s*r3d-([a-z_]+)\s*=', re.M)
 BYNAME = re.compile(r'(?<![\w])(?:r3d_core::registry::|registry::)?(running|enabled)\s*\(\s*"')
+OFFSET = re.compile(r'''(?x)
+    \bfield\w*\s*\(\s*[^,()]+(?:\([^()]*\))?[^,()]*,\s*0[xX][0-9a-fA-F]+\s*\)
+  | \b(?:rd|peek)\w*\s*(?:::\s*<[^>]*>)?\s*\([^()]*\+\s*0[xX][0-9a-fA-F]+\s*\)
+  | \+\s*0[xX][0-9a-fA-F]+\s*\)\s*as\s*\*
+  | \bconst\s+[A-Z][A-Z0-9_]*\s*:\s*usize\s*=\s*0[xX][0-9a-fA-F]+\s*;
+''')
 CONTENT = re.compile(r'"[^"\n]*\.(odf|sod|spr|tga)"', re.I)
+ALLOW = re.compile(r'//\s*lint-allow\(content\):\s*\S')
 
 
 def strip_comments(line):
@@ -101,8 +116,12 @@ for d, dirs, files in (w for src in roots for w in os.walk(src)):
             continue
         m = module_of(rel)
         glue = is_glue(rel)
-        for n, raw in enumerate(text.split('\n'), 1):
+        lines = text.split('\n')
+        for n, raw in enumerate(lines, 1):
             line = strip_comments(raw)
+            if 'not an offset' not in raw:
+                for _ in OFFSET.finditer(line):
+                    hits['engine'].append((rel, n))
             if not glue:
                 for _ in ADDR.finditer(line):
                     hits['engine'].append((rel, n))
@@ -114,7 +133,8 @@ for d, dirs, files in (w for src in roots for w in os.walk(src)):
                         hits['cross'].append((rel, n))
                 if BYNAME.search(line):
                     hits['byname'].append((rel, n))
-                if f != 'content.rs' and CONTENT.search(line):
+                allowed = ALLOW.search(raw) or (n > 1 and ALLOW.search(lines[n - 2]))
+                if f != 'content.rs' and CONTENT.search(line) and not allowed:
                     hits['content'].append((rel, n))
 
 # A module's crate depends on r3d-core and on no other module.
@@ -137,8 +157,8 @@ def area(rel):
     return rel
 
 
-names = {'engine': 'engine glue outside core/src/engine and hooks.rs', 'cross': 'another module\'s crate in a module',
-         'byname': 'running/enabled by name in a module', 'content': 'content names outside content.rs (advisory)'}
+names = {'engine': 'engine glue outside core/src/engine and hooks.rs, or a literal struct offset', 'cross': 'another module\'s crate in a module',
+         'byname': 'running/enabled by name in a module', 'content': 'content names outside content.rs'}
 total = 0
 for r, hs in hits.items():
     by = {}
@@ -150,9 +170,8 @@ for r, hs in hits.items():
         if listing:
             for rel, n in by[a]:
                 print(f'                  {rel}:{n}')
-    if r != 'content':
-        total += len(hs)
-print(f'lint-layers.sh: {total} hits of rules 1-3 ({len(hits["content"])} advisory)')
+    total += len(hs)
+print(f'lint-layers.sh: {total} hits of rules 1-4')
 
 if strict:
     bad = [(r, rel, n) for r in rules for rel, n in hits[r]

@@ -40,8 +40,8 @@ pub fn handles() -> Vec<i32> {
     }
     unsafe {
         let vt = rd::<usize>(o);
-        let count: unsafe extern "thiscall" fn(usize) -> i32 = core::mem::transmute(rd::<usize>(vt + field::PANELS_VT_SELECT_COUNT));
-        let list: unsafe extern "thiscall" fn(usize) -> *const i32 = core::mem::transmute(rd::<usize>(vt + field::PANELS_VT_SELECT_LIST));
+        let count: unsafe extern "thiscall" fn(usize) -> i32 = core::mem::transmute(rd::<usize>(vt + field::PANELS_VT_SELECT_COUNT()));
+        let list: unsafe extern "thiscall" fn(usize) -> *const i32 = core::mem::transmute(rd::<usize>(vt + field::PANELS_VT_SELECT_LIST()));
         let n = count(o).clamp(0, 4096) as usize;
         let p = list(o);
         if !p.is_null() {
@@ -116,15 +116,15 @@ pub fn move_cursor() -> Option<&'static str> {
             continue;
         }
         unsafe {
-            if rd::<u8>(o + field::PANELS_OBJ_FLAGS) as i32 & value::PANELS_OBJ_IS_GAME_OBJECT == 0 || rd::<i32>(o + field::PANELS_OBJ_TEAM) != team {
+            if rd::<u8>(o + field::PANELS_OBJ_FLAGS()) as i32 & value::PANELS_OBJ_IS_GAME_OBJECT() == 0 || rd::<i32>(o + field::PANELS_OBJ_TEAM()) != team {
                 continue;
             }
-            if super::overlay::cast_craft_class(rd::<usize>(o + field::PANELS_OBJ_CLASS)) == 0 {
+            if super::overlay::cast_craft_class(rd::<usize>(o + field::PANELS_OBJ_CLASS())) == 0 {
                 continue;
             }
             any = true;
-            let ctl = rd::<usize>(o + field::PANELS_CRAFT_CONTROL);
-            if allowed && ctl != 0 && rd::<f32>(ctl + field::PANELS_CTL_WARP) > rd::<f32>(ctl + field::PANELS_CTL_SPEED) {
+            let ctl = rd::<usize>(o + field::PANELS_CRAFT_CONTROL());
+            if allowed && ctl != 0 && rd::<f32>(ctl + field::PANELS_CTL_WARP()) > rd::<f32>(ctl + field::PANELS_CTL_SPEED()) {
                 return Some("c_warp");
             }
         }

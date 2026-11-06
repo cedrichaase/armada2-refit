@@ -4,8 +4,10 @@
  *
  *   cc -std=c99 -Wall -Werror -DA2E_HOST -I csdk -DA2E_TABLE_H='"<generated.h>"' \
  *      -DA2E_TABLE=<PLUGIN>_ENGINE tools/engine/ctest.c -o ctest
- *   ctest IMAGE TESTINI|- BASE_HEX [addr <id>]... [note_for <Section.Key>]...
+ *   ctest IMAGE TESTINI|- BASE_HEX MODULE [addr <id>]... [field <id>]... [note_for <Section.Key>]...
  *
+ * MODULE is the process's module file name the image stands for (the fixture's
+ * `module`), which the identity line and the notes name on an unknown build.
  * The PE file is mapped as a loader would (headers, then each section's raw data at its
  * VirtualAddress, the rest zero) and handed to a2e_start at BASE_HEX. */
 #include <stdio.h>
@@ -40,7 +42,7 @@ int main(int argc, char **argv)
     unsigned long base;
     int a;
 
-    if (argc < 4) { fprintf(stderr, "usage: ctest IMAGE TESTINI|- BASE_HEX [addr ID]... [note_for S.K]...\n"); return 2; }
+    if (argc < 5) { fprintf(stderr, "usage: ctest IMAGE TESTINI|- BASE_HEX MODULE [addr ID]... [field ID]... [note_for S.K]...\n"); return 2; }
     file = slurp(argv[1], &fn);
     if (!file) { fprintf(stderr, "ctest: cannot read %s\n", argv[1]); return 2; }
     if (strcmp(argv[2], "-")) {
@@ -72,12 +74,12 @@ int main(int argc, char **argv)
         memcpy(mem + va, file + ptr, n);
     }
 
-    a2e_start(&A2E_TABLE, say, mem, (A2E_U32)base, isize, ini);
+    a2e_start(&A2E_TABLE, say, mem, (A2E_U32)base, isize, ini, argv[4]);
     for (i = 0; i < A2E_TABLE.n_hooks; i++) {
         int ok = a2e_ready(i);
         printf("ready %s %s\n", A2E_TABLE.hooks[i].id, ok ? "ok" : "fail");
     }
-    for (a = 4; a + 1 < argc + 0; a++) {
+    for (a = 5; a + 1 < argc + 0; a++) {
         if (!strcmp(argv[a], "addr") && a + 1 < argc) {
             A2E_U32 k, v;
             for (k = 0; k < A2E_TABLE.n_syms; k++)
@@ -86,13 +88,25 @@ int main(int argc, char **argv)
             v = a2e_addr(k);
             printf("addr %s 0x%x\n", argv[a + 1], v);
             a++;
-        } else if (!strcmp(argv[a], "note_for")) a++;
+        } else if (!strcmp(argv[a], "note_for") || !strcmp(argv[a], "field")) a++;
+    }
+    for (a = 5; a + 1 < argc; a++) {
+        if (!strcmp(argv[a], "field")) {
+            A2E_U32 k, v;
+            for (k = 0; k < A2E_TABLE.n_syms; k++)
+                if (!strcmp(A2E_TABLE.syms[k].id, argv[a + 1])) break;
+            if (k == A2E_TABLE.n_syms) { fprintf(stderr, "ctest: no symbol %s\n", argv[a + 1]); return 2; }
+            v = (A2E_U32)a2e_field(k);
+            if (!A2E_TABLE.vars[k] || *A2E_TABLE.vars[k] != v) { printf("field %s: the variable disagrees\n", argv[a + 1]); return 1; }
+            printf("field %s 0x%x\n", argv[a + 1], v);
+            a++;
+        } else if (!strcmp(argv[a], "note_for") || !strcmp(argv[a], "addr")) a++;
     }
     for (i = 0; i < A2E_TABLE.n_hooks; i++) {
         const char *n = a2e_note(i);
         if (n) printf("note %s %s\n", A2E_TABLE.hooks[i].id, n);
     }
-    for (a = 4; a + 1 < argc; a++) {
+    for (a = 5; a + 1 < argc; a++) {
         if (!strcmp(argv[a], "note_for")) {
             char sec[128];
             const char *row = argv[a + 1], *dot = strchr(row, '.'), *n;
@@ -102,7 +116,7 @@ int main(int argc, char **argv)
             n = a2e_note_for(sec, dot + 1);
             printf("note_for %s %s\n", row, n ? n : "-");
             a++;
-        } else if (!strcmp(argv[a], "addr")) a++;
+        } else if (!strcmp(argv[a], "addr") || !strcmp(argv[a], "field")) a++;
     }
     {
         const char *n = a2e_note_plugin();

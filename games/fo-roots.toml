@@ -1,0 +1,51 @@
+# Star Trek: Armada II -- Fleet Operations: Roots, installed through Heroic
+# (PLAN-FLEETOPS.md). A stub: not offered yet, so ./install refuses it, but every tool
+# resolves its paths (A2_PROFILE=fo-roots, or --game fo-roots). FO-1 fills it in.
+schema = 1
+id = "fo-roots"
+label = "Fleet Operations: Roots"
+offered = false
+default = false
+
+# The layers on offer: none yet. PLAN-FLEETOPS.md, "What is installed on Roots", says which come first.
+layers = []
+
+[exe]
+# The game itself in Data/, under a launcher (FleetOps.exe) that only starts it; the
+# bench launches ArmadaL.exe directly.
+names = ["ArmadaL.exe"]
+data_dir = "Data"
+
+[install]
+# A sideloaded Heroic app; no GOG id.
+heroic = ["fleetopsroots50"]
+gog = []
+# The folder name is assumed to follow the prefix's; set A2_GAME if it does not.
+folder = "Star Trek Armada II Fleet Operations Roots"
+prefix = "Star Trek Armada II Fleet Operations Roots"
+
+[settings]
+kind = "fo-settings-xml"
+# Relative to data_dir, as in armada2; where Roots keeps it against Data/ is FO-0's to see.
+file = "settings_saves_logs/Settings.xml"
+keep = ["settings_saves_logs/Settings.xml", "RTS_CFG.h"]
+
+[display]
+shell = [1200, 900]
+# Stock's until FO-6 measures Roots' own HUD.
+hud_canvas = [1600, 1200]
+
+[files]
+# PLAN-FLEETOPS.md, "The install": the textures sit in Textures/ itself (no RGB/),
+# TGA and DDS mixed, and the ODFs are packed in ODF.fpq (odf/ is empty, but a loose file
+# there would still win). SOD/, Sprites/ and odf/ are assumed stock's until FO-0 sees them.
+textures = ["Textures"]
+texture_formats = ["tga", "dds"]
+sod = ["SOD"]
+sprites = ["Sprites"]
+odf = ["odf"]
+archives = [{ kind = "fpq", file = "ODF.fpq", at = "odf" }]
+
+[paths]
+# $A2_DATA stays shared between the games (PLAN-ARMADA1.md).
+stem = "armada2-refit"

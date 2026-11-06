@@ -19,7 +19,7 @@
 //! everything under it while it shows; the keyboard stays the engine's, so the chat
 //! line still opens on Return over the comm panel.
 use crate::config::Hud;
-use crate::engine::{self, buttons, comm, hud, setup, sound};
+use crate::engine::api::{self, buttons, comm, hud, setup, sound};
 use crate::gfx::{Weight, R};
 use crate::widgets::{theme, Align, Ui};
 use alloc::string::String;
@@ -39,7 +39,7 @@ pub fn install(c: &Hud) {
         crate::log!("comm: an engine function is not stock: the multiplayer boxes stay stock");
         return;
     }
-    engine::buttons::install_presses();
+    api::buttons::install_presses();
     let take = |flag: bool, at: usize, name: &str| {
         if flag {
             hud::set_taken(at, false, true);

@@ -41,31 +41,31 @@
 #define QOLRULES_S_VOICE_SAY_TOPIC 35
 #define QOLRULES_S_VOICE_OFFICER 36
 #define QOLRULES_S_VOICE_SAY_EVENT 37
-#define QOLRULES_F_P_TEAMIDX 0xec
-#define QOLRULES_F_P_TEAM 0xf0
-#define QOLRULES_F_P_CUR 0x254
-#define QOLRULES_F_P_HEAD 0x270
-#define QOLRULES_F_P_COUNT 0x274
-#define QOLRULES_F_P_CURID 0x2a0
-#define QOLRULES_F_P_NEXTID 0x2a8
-#define QOLRULES_F_P_EFFECT 0x268
-#define QOLRULES_F_VT_IS_BUSY 0x138
-#define QOLRULES_F_VT_REMOVE_EFFECT 0x170
-#define QOLRULES_F_IT_NEXT 0x8
-#define QOLRULES_F_IT_ID 0xc
-#define QOLRULES_F_T_BANK 0x16c
-#define QOLRULES_F_T_DIL 0x28
-#define QOLRULES_F_T_MET 0xc0
-#define QOLRULES_F_T_LAT 0x74
-#define QOLRULES_F_T_BIO 0x168
-#define QOLRULES_F_T_CREW 0x10c
-#define QOLRULES_F_T_RACE 0x244
-#define QOLRULES_V_Q_MAX 10
-#define QOLRULES_V_TOPIC_DIL 9
-#define QOLRULES_V_TOPIC_CREW 10
-#define QOLRULES_V_TOPIC_LAT 54
-#define QOLRULES_V_TOPIC_MET 55
-#define QOLRULES_V_TOPIC_BIO 56
+#define QOLRULES_F_P_TEAMIDX ((int)a2f_qolrules_p_teamidx)
+#define QOLRULES_F_P_TEAM ((int)a2f_qolrules_p_team)
+#define QOLRULES_F_P_CUR ((int)a2f_qolrules_p_cur)
+#define QOLRULES_F_P_HEAD ((int)a2f_qolrules_p_head)
+#define QOLRULES_F_P_COUNT ((int)a2f_qolrules_p_count)
+#define QOLRULES_F_P_CURID ((int)a2f_qolrules_p_curid)
+#define QOLRULES_F_P_NEXTID ((int)a2f_qolrules_p_nextid)
+#define QOLRULES_F_P_EFFECT ((int)a2f_qolrules_p_effect)
+#define QOLRULES_F_VT_IS_BUSY ((int)a2f_qolrules_vt_is_busy)
+#define QOLRULES_F_VT_REMOVE_EFFECT ((int)a2f_qolrules_vt_remove_effect)
+#define QOLRULES_F_IT_NEXT ((int)a2f_qolrules_it_next)
+#define QOLRULES_F_IT_ID ((int)a2f_qolrules_it_id)
+#define QOLRULES_F_T_BANK ((int)a2f_qolrules_t_bank)
+#define QOLRULES_F_T_DIL ((int)a2f_qolrules_t_dil)
+#define QOLRULES_F_T_MET ((int)a2f_qolrules_t_met)
+#define QOLRULES_F_T_LAT ((int)a2f_qolrules_t_lat)
+#define QOLRULES_F_T_BIO ((int)a2f_qolrules_t_bio)
+#define QOLRULES_F_T_CREW ((int)a2f_qolrules_t_crew)
+#define QOLRULES_F_T_RACE ((int)a2f_qolrules_t_race)
+#define QOLRULES_V_Q_MAX ((int)a2f_qolrules_q_max)
+#define QOLRULES_V_TOPIC_DIL ((int)a2f_qolrules_topic_dil)
+#define QOLRULES_V_TOPIC_CREW ((int)a2f_qolrules_topic_crew)
+#define QOLRULES_V_TOPIC_LAT ((int)a2f_qolrules_topic_lat)
+#define QOLRULES_V_TOPIC_MET ((int)a2f_qolrules_topic_met)
+#define QOLRULES_V_TOPIC_BIO ((int)a2f_qolrules_topic_bio)
 #define QOLRULES_H_PAY_ON_QUEUE 0
 #define QOLRULES_H_ADVISOR 1
 
@@ -107,6 +107,31 @@ A2E_U32 a2s_qolrules_voice_topic __attribute__((used));
 A2E_U32 a2s_qolrules_voice_say_topic __attribute__((used));
 A2E_U32 a2s_qolrules_voice_officer __attribute__((used));
 A2E_U32 a2s_qolrules_voice_say_event __attribute__((used));
+A2E_U32 a2f_qolrules_p_teamidx __attribute__((used)) = (A2E_U32)0xec;
+A2E_U32 a2f_qolrules_p_team __attribute__((used)) = (A2E_U32)0xf0;
+A2E_U32 a2f_qolrules_p_cur __attribute__((used)) = (A2E_U32)0x254;
+A2E_U32 a2f_qolrules_p_head __attribute__((used)) = (A2E_U32)0x270;
+A2E_U32 a2f_qolrules_p_count __attribute__((used)) = (A2E_U32)0x274;
+A2E_U32 a2f_qolrules_p_curid __attribute__((used)) = (A2E_U32)0x2a0;
+A2E_U32 a2f_qolrules_p_nextid __attribute__((used)) = (A2E_U32)0x2a8;
+A2E_U32 a2f_qolrules_p_effect __attribute__((used)) = (A2E_U32)0x268;
+A2E_U32 a2f_qolrules_vt_is_busy __attribute__((used)) = (A2E_U32)0x138;
+A2E_U32 a2f_qolrules_vt_remove_effect __attribute__((used)) = (A2E_U32)0x170;
+A2E_U32 a2f_qolrules_it_next __attribute__((used)) = (A2E_U32)0x8;
+A2E_U32 a2f_qolrules_it_id __attribute__((used)) = (A2E_U32)0xc;
+A2E_U32 a2f_qolrules_t_bank __attribute__((used)) = (A2E_U32)0x16c;
+A2E_U32 a2f_qolrules_t_dil __attribute__((used)) = (A2E_U32)0x28;
+A2E_U32 a2f_qolrules_t_met __attribute__((used)) = (A2E_U32)0xc0;
+A2E_U32 a2f_qolrules_t_lat __attribute__((used)) = (A2E_U32)0x74;
+A2E_U32 a2f_qolrules_t_bio __attribute__((used)) = (A2E_U32)0x168;
+A2E_U32 a2f_qolrules_t_crew __attribute__((used)) = (A2E_U32)0x10c;
+A2E_U32 a2f_qolrules_t_race __attribute__((used)) = (A2E_U32)0x244;
+A2E_U32 a2f_qolrules_q_max __attribute__((used)) = (A2E_U32)10;
+A2E_U32 a2f_qolrules_topic_dil __attribute__((used)) = (A2E_U32)9;
+A2E_U32 a2f_qolrules_topic_crew __attribute__((used)) = (A2E_U32)10;
+A2E_U32 a2f_qolrules_topic_lat __attribute__((used)) = (A2E_U32)54;
+A2E_U32 a2f_qolrules_topic_met __attribute__((used)) = (A2E_U32)55;
+A2E_U32 a2f_qolrules_topic_bio __attribute__((used)) = (A2E_U32)56;
 
 static A2E_U32 *const qolrules_vars[] = {
     &a2s_qolrules_entry_start,
@@ -147,31 +172,31 @@ static A2E_U32 *const qolrules_vars[] = {
     &a2s_qolrules_voice_say_topic,
     &a2s_qolrules_voice_officer,
     &a2s_qolrules_voice_say_event,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
+    &a2f_qolrules_p_teamidx,
+    &a2f_qolrules_p_team,
+    &a2f_qolrules_p_cur,
+    &a2f_qolrules_p_head,
+    &a2f_qolrules_p_count,
+    &a2f_qolrules_p_curid,
+    &a2f_qolrules_p_nextid,
+    &a2f_qolrules_p_effect,
+    &a2f_qolrules_vt_is_busy,
+    &a2f_qolrules_vt_remove_effect,
+    &a2f_qolrules_it_next,
+    &a2f_qolrules_it_id,
+    &a2f_qolrules_t_bank,
+    &a2f_qolrules_t_dil,
+    &a2f_qolrules_t_met,
+    &a2f_qolrules_t_lat,
+    &a2f_qolrules_t_bio,
+    &a2f_qolrules_t_crew,
+    &a2f_qolrules_t_race,
+    &a2f_qolrules_q_max,
+    &a2f_qolrules_topic_dil,
+    &a2f_qolrules_topic_crew,
+    &a2f_qolrules_topic_lat,
+    &a2f_qolrules_topic_met,
+    &a2f_qolrules_topic_bio,
 };
 
 static const A2ESymDef qolrules_syms[] = {
@@ -346,7 +371,7 @@ static const A2EBlock qolrules_b0_blocked[] = {
     {0xffff, 0, 0, 0}
 };
 static const A2EBuild qolrules_builds[] = {
-    {"gog-1.1", "armada2/gog-1.1", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qolrules_b0_entries, qolrules_b0_blocked, 0, 63},
+    {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qolrules_b0_entries, qolrules_b0_blocked, 0, 63},
 };
 
 static A2E_U8 qolrules_hook_state[2];

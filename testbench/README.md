@@ -524,12 +524,15 @@ posts, a hologram, the Evolver, a survey of what no module draws).
 
 ## Which executable ran
 
-At session start the bench reads the clone's `Armada2.exe` and records
+At session start the bench reads the clone's executable (the game descriptor's,
+`games/armada2.toml`: `Armada2.exe`; `./a2test --game <id>` or `A2_PROFILE` picks another
+game, whose executable it launches and matches processes by) and records
 `exe: {name, sha256, timestamp, image_size, sections}` in `session.json`, notes it in
 the session log, and copies it into each case's `result.json` and the run's `report.md`.
 `timestamp`, `image_size` and `sections` are the executable's identity, as the plugins
 read it from memory and log it (`engine: Armada2.exe timestamp 0x…, image size 0x…,
-sections 0x…`; `crates/a2engine/src/pe.rs` is the reader, `bench/session.py`
+sections 0x…`, the executable named by the matched build's `exe`, else by its own file
+name; `crates/a2engine/src/pe.rs` is the reader, `bench/session.py`
 `exe_identity` its offline twin), so a log line and a report can be compared by eye. The
 sha256 is the bench's alone: plugins never hash the file, and it is not a run-time key
 (`profiles/gog-1.1/build.toml` lists it as information). `Expect "Display8.log" contains

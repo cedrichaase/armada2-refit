@@ -5,10 +5,37 @@
 //! in the resource's colour, its name, the amount); while it shows a team message, the
 //! message in a strip under the resources. The stock printing is skipped
 //! (`engine::trade`).
-use crate::engine::{topbar, trade};
+use crate::engine::api::{topbar, trade};
 use crate::gfx::{Corners, Weight, R};
 use crate::widgets::{Align, Anchor, Ui};
 use alloc::string::String;
+
+/// The team texts, a panel of the table (`panels::PANELS`).
+pub struct Trade;
+
+impl super::panels::Panel for Trade {
+    fn name(&self) -> &'static str {
+        "trade"
+    }
+    fn scope(&self) -> &'static str {
+        "hud.trade"
+    }
+    fn key(&self, c: &crate::config::Hud) -> bool {
+        c.team_texts
+    }
+    fn claim(&self) -> bool {
+        if trade::install() {
+            trade::set_taken(true);
+            crate::log!("panels: team texts ours");
+            true
+        } else {
+            false
+        }
+    }
+    fn draw(&self, ui: &mut Ui) {
+        run(ui)
+    }
+}
 
 static mut LOGGED: Option<String> = None;
 
@@ -40,7 +67,7 @@ pub fn run(ui: &mut Ui) {
             message.as_deref().unwrap_or("")
         )),
     }
-    if crate::engine::ingame::hud_hidden() {
+    if crate::engine::api::ingame::hud_hidden() {
         return;
     }
     let t = ui.theme;
