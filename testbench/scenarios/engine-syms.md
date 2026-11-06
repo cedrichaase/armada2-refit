@@ -14,6 +14,7 @@ has a symbol read before its hook was ready. One game straight into a mission, s
 hooks that are readied late (the stub's mode requests at the first `Direct3DCreate8`,
 `[Drop]`'s ranges at the engine's first scene) have run. Each package of phase 8
 appends its plugin's section and touches no other.
+The symbol counts below are the profile tables' sizes (`tools/engine/resolve.py` against the stock exe); they must change when the profile does.
 
 ## Mission
 1. Launch the game.
@@ -69,7 +70,7 @@ appends its plugin's section and touches no other.
 ## QOL
 42. Expect "QOL.log" contains "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321".
 43. Expect "QOL.log" contains "engine: build armada2/gog-1.1".
-44. Expect "QOL.log" contains "engine: symbols: 212/212 resolved; 0 hooks blocked".
+44. Expect "QOL.log" contains "engine: symbols: 214/214 resolved; 0 hooks blocked".
 45. Expect "QOL.log" not contains "stands down: ".
 46. Expect "QOL.log" not contains "read before its hook".
 47. Expect "QOL.log" not contains "engine: TEST:".
