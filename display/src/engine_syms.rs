@@ -205,6 +205,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         file_crc: &[a2engine::FileCrc { section: ".text", crc: 0xef690537 }, a2engine::FileCrc { section: ".test", crc: 0xe7a4061b }],
         modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
         blocked_mod: &[
+            a2engine::Block { hook: 0, symbol: "GameConfiguration::InitializeGraphicsSystem", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: GameConfiguration::InitializeGraphicsSystem is patched by FleetOpsHook.dll, which is not the profiled one" },
         ],
         n_resolved_mod: 2,
     },

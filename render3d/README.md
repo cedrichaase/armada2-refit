@@ -823,7 +823,7 @@ finding it rests on:
 | `render3d.frame.obj_draw` | Roots only (absent in stock, so it stands down there): the call at 0x598297 in the object loop, which FleetOpsHook writes as it loads and which it makes for each object, culling and then drawing through `GameObject::Render`; accepted as `chained` | PLAN-FLEETOPS.md, "FO-5: render3d on Roots". The object step (`frame/steps.rs`) reads the call's target every frame and calls it as `stdcall(object, camera)` for every object that is not a background object, never writing there; a module may still take an object the engine has not culled first (`registry::object`). The object is the step's current object (`steps::current`) around the call, for the hull claim. Offline (`a2test syms`) the file still holds stock's bytes there, so only the game's log says it is ready (`frame: the object step calls through the loop's draw site`) |
 | `render3d.frame.destroy` | `DestroyRenderSurfaces` chained, so render3d lets go of the device before the engine does | kept for the device Display8 hands out; native Direct3D 9 (gone in 15.0.0) kept a device alive while anything made on it was held |
 | `render3d.view.distance` | the load of the culling distance in `RTS_Configure` and the far plane and culling distance it parses (`View.Distance`) | "View distance"; not ready: the engine keeps its view limits |
-| `render3d.hulls.instance_draw` | the call of `ST3D_Instance::RenderInternal` at 0x4d5a11 in `GameObjectInstance::RenderInternal`, and the callee's entry | where a hull is claimed on Roots, after the per-instance node and texture writes of stock and of FleetOpsHook, which neither Roots' file nor FleetOpsHook changes; on Roots every hull draw, FleetOpsHook's bump-mapped replacement included, is nested under this one call, and no other route reaches it with a hull. The instance does not point back to its object: the owner is the object the object step is drawing through the `frame.obj_draw` call, confirmed by the object's instance being the one at the call; planets (which reach the call through the craft instance), construction rigs (FleetOpsHook gives them the common `GameObject::Render`, so the stock rig draw is not called from the loop) and other modules' objects are skipped by that test. Holograms and FleetOpsHook's overlay models do not pass here and are the engine's. Installed only where the profile's value `hl_claim_instance` is 1 (Roots); stock (0) claims at the object and patches nothing here. Claimed, the hull is posed and drawn as in `object`, after the engine's own frustum test and on-screen byte; the engine's function is not called, as on stock with hulls on (it returns nothing its caller reads), and the object's billboard effect is left to the engine's call in `GameObject::RenderInternal` (`mods/hulls/src/claim.rs`) |
+| `render3d.hulls.instance_draw` | the call of `ST3D_Instance::RenderInternal` at 0x4d5a11 in `GameObjectInstance::RenderInternal`, and the callee's entry | where a hull is claimed on Roots, after the per-instance node and texture writes of stock and of FleetOpsHook, which neither Roots' file nor FleetOpsHook changes; on Roots every hull draw, FleetOpsHook's bump-mapped replacement included, is nested under this one call, and no other route reaches it with a hull. The instance does not point back to its object: the owner is the object the object step is drawing through the `frame.obj_draw` call, confirmed by the object's instance being the one at the call; planets (which reach the call through the craft instance), construction rigs (FleetOpsHook gives them the common `GameObject::Render`, so the stock rig draw is not called from the loop) and other modules' objects are skipped by that test. Holograms and FleetOpsHook's overlay models do not pass here and are the engine's. Installed only where the profile's value `hl_claim_instance` is 1 (Roots); stock (0) claims at the object and patches nothing here. Claimed, the hull is posed and drawn as in `object`, after the engine's own frustum test and on-screen byte; the engine's function is not called, as on stock with hulls on (it returns nothing its caller reads), and the object's billboard effect is left to the engine's call in `GameObject::RenderInternal`. What the engine and FleetOpsHook wrote into the shared database for this instance just before is honoured (FO-5 step 5): for each node of the SOD the module looks the database's node up by name (`ST3D_Database::FindElement` on its node list, `fn_find_element`, `hl_node_list`); a node whose render flags (`+0xbc`, bits 0 and 1, the bits stock's `GameObjectInstance::RenderInternal` sets on the lights node) say hidden is hidden with what hangs from it, and a mesh whose first texture (`+0x114`, `+0x11c` entries; a texture is a database element, named at `+0x8`) is not its SOD's is drawn with that one: Roots' per-ship logo on the `stlogo` node, shown with the ship's own texture or hidden, comes through this way without a read of FleetOpsHook's memory. The sprite nodes are drawn by the module on Roots too (the database draw that drew them is the one replaced), and the wave light stays the module's (`mods/hulls/src/claim.rs`) |
 | `render3d.hulls.reads` | the hulls module: class `Render` / `RenderInternal` functions and vtables, the fade, culling and wave-light reads and calls | hulls draws in `GameObject::Render`'s place and installs no hook; not ready: the engine draws the hulls |
 | `render3d.sky.reads` | the sky module: the background name, database, starfield, far planes, `GameObject::Render` and the plain database vtable | the sky takes `Step::Background`; not ready: the engine's sky |
 | `render3d.specials.reads` | the special-weapon effect list and the `Render` functions and vtables of the timed effects | only the timed effects draw; others go back to the engine |
@@ -834,13 +834,13 @@ finding it rests on:
 | `render3d.effects.repair` | the `AddParticle` call in `Craft::RepairSystem` and the `DrawScaled3D` call in `NodeParticleEffect::Render` | the new tail of the particle list is a weld |
 | `render3d.effects.shields` | the weapons' calls of `CreateShieldHit` | records which weapon made a hit and its damage |
 | `render3d.effects.debris` | the `Fragment` calls in `Craft::Explode`, the Evolver's cocoon and `BuildingEffect::SafeDestroyConstruction` | the faces are drawn as our own debris; all or none |
-| `render3d.effects.debris_callee` | `ST3D_Instance::Fragment` itself | on Roots FleetOpsHook owns the call in `Craft::Explode` and decides whether it runs; the module takes over the callee, armed only during that call; planned (FO-5 step 5) |
+| `render3d.effects.debris_callee` | `ST3D_Instance::Fragment` itself | on Roots FleetOpsHook owns the call in `Craft::Explode` and decides whether it runs; the module takes over the callee at its entry, armed only while the build's companion module is the caller (`ef_debris_at_callee`; FO-5 step 5, see "effects: Hooks") |
 | `render3d.ordnance.reads` | the ordnance module's `Entity` calls, list head, vtables and each stock `Submit` | a shot's class is told by its `Submit` |
 | `render3d.ordnance.warp` | the `DrawScaled3D` call in `WarpSpriteEffect::Render` and the body's `RenderWarpSpriteEffects` call | notes stock's warp flash for ours; optional |
 | `render3d.ordnance.shots` | `Entity::Render`, slot 11 of an ordnance vtable, taken per class when first met | the profile holds the `Render` check; required for the per-class slots |
 | `render3d.overlays.reads` | the overlays module: terrain, fog and shroud grids, profile flags, game-setup, selection and team calls, the ghost list, the tactical camera | plain reads |
 | `render3d.overlays.posts` | the five calls of `DrawHeightPost` | handed back to the engine while the gate is shut; not ready: the engine's posts |
-| `render3d.overlays.posts_callee` | `DrawHeightPost` itself | on Roots FleetOpsHook owns its five calls (and skips them in a clean screenshot); the module takes over the callee, armed only during those calls; planned (FO-5 step 5) |
+| `render3d.overlays.posts_callee` | `DrawHeightPost` itself | on Roots FleetOpsHook owns its five calls (and skips them in a clean screenshot); the module takes over the callee at its entry, armed only while the build's companion module is the caller (`ov_posts_at_callee`; FO-5 step 5, see "overlays: Hooks") |
 | `render3d.world.reads` | the world module's vtables, nebula and ghost lists, population tables, culling distance and name table | plain reads |
 | `render3d.world.lights` | the call of `Nebula::Simulate_Nebula_Lights` in `Nebula::Simulate` | the nebulae's lights become ours; optional |
 | `render3d.world.cull` | `NebulaInstance` vtable slot 3, `FrustumTest` | the nebulae's cull; optional |
@@ -1432,10 +1432,35 @@ Scenario `render3d-specialfx`.
 | `Craft::RepairSystem`'s `AddParticle` call (0x4c90c0) | call | the new tail of the particle list is a weld |
 | `NodeParticleEffect::Render`'s `DrawScaled3D` call (0x473767) | call | the particle's node (in `esi`) is noted; a weld, or every particle while the sparks are ours, is not drawn by the engine |
 | the four `CreateShieldHit` calls (0x58bb95, 0x58cad8, 0x58d502, 0x58dd65) | call, one hook each | which weapon made a hit, and its damage: a passive tap (it records and calls on, so it has no gate; a hit made while off keeps its damage if the module comes on) |
+| `ST3D_Instance::Fragment` itself (0x62eb20), on a build whose profile says so (`ef_debris_at_callee`, Fleet Operations: Roots) in place of the three `Fragment` calls above (`render3d.effects.debris_callee`) | entry: its first five bytes (whole instructions, `ef_fragment_moved`, within the entry's check) moved to a trampoline | a dying craft noted as above, only while the caller is the build's companion module (FleetOpsHook, which owns `Craft::Explode`'s call and breaks a craft up only when its class allows); every other caller (a cancelled construction, the Evolver's cocoon, render3d) gets the function as it was |
 
 The hooks are put in at the module's first frame (`device()`), not at load: other plugins check the stock bytes of these sites when they load, and the bench's `Scene.asi` reads the shield sites. With the gate shut, or a part off, every detour hands the call to what was there, so the engine breaks craft up and draws welds and particles itself. The explosion, shield, bee and construction draws need no hook (`feature()` and `object()`); the registry hands them back.
 
 **Content** (`effects/content.rs`): the weapons' names for the shield taps and the faction keys, colours and ODF initials of `[Shields]`.
+
+**Callee hooks** (PLAN-FLEETOPS.md, "The rules of (c)", rule 4). On Roots, FleetOpsHook
+re-points `Craft::Explode`'s call of `Fragment` at a callback of its own, which calls
+`Fragment` through a pointer of its own when the class's `explosionChunks` allows; writing
+that call site would take Roots' decision away, so the module takes the callee instead
+(`Hooks::install_entry`): `Fragment`'s entry jumps to a naked stub that keeps the return
+address and goes on to the detour, which notes the craft only when that address lies in
+the build's companion module (the profile's `[[module]]`, found loaded) and otherwise runs
+the moved instructions and the rest of the function. FleetOpsHook calls `Fragment` from
+nowhere else, so "called from the companion" is "during its explode callback". The entry is
+checked as the profile's check says before the bytes move, and the hook stands down if
+another plugin has written there.
+
+**Shields and `RTS_CFG.h`**. Roots' `ShieldHit::DrawShield` (its file and FleetOpsHook)
+scales a hit's shell by 2 while `RTS_CFG.h` sets `SHIELD_EFFECT_RESCALE = 1`, on top of the
+instance's scale (which the stock body applies only while the instance is scaled), and
+colours a hit by the shields' level only while `SHIELD_EFFECT_DAMAGE_COLORED = 1`, white
+otherwise. On a build whose profile says it follows these keys (`ef_shield_rescale_pct`,
+the factor in percent, and `ef_shield_damage_key`; 0 on stock, which reads neither), the
+module reads them from the game directory's `RTS_CFG.h` (`r3d_core::rtscfg`) and scales its
+shield ellipsoid about its centre (the repair sparks' outward direction keeps the unscaled
+one) and, with the damage colour off, draws the stock colour mode white and keeps the
+faction colours from shifting with the shields' level. A hit the module does not draw is
+handed to the engine's `DrawShield` whole, Roots' version on Roots.
 
 **Settings**: `Modules.effects` (live) is the only row. A flip off drops the debris in flight; the shield hits, welds and construction edges are keyed to the engine's own records and stay, so a flip on picks them up where they are. Effects already in flight finish in the look they started with.
 
@@ -1864,6 +1889,7 @@ module is off they run as stock.
 |---|---|---|---|
 | `DrawHeightPost` | the five calls (the build ghost's, and the overview's `mNormalModeRender`, `mRenderWhere`, `mDrawPosts` and its one-point helper) | the height posts, noted for the view and drawn as anti-aliased lines | the call that was there (`Prev`): the engine's one-pixel line |
 | `mDrawPath` (`render3d.overlays.paths`) | `mNormalModeRender`'s call (0x522247), the sketch while the waypoint key is held | nothing drawn: the move paths draw the sketch (or QOL's queue) | the call that was there: the engine's line |
+| `DrawHeightPost` at its entry (`render3d.overlays.posts_callee`), on a build whose profile says so (`ov_posts_at_callee`, Roots) in place of the five calls | its first six bytes (`ov_post_moved`) moved to a trampoline | the posts, noted as above only while the caller is the build's companion module (FleetOpsHook's two post callbacks, which skip a post during its clean screenshot and under `DISABLE_HEIGHT_CHANGE`); every other caller, render3d's own engine posts included, gets the function as it was | the function as it was |
 
 It is installed at the first switch-on, whether or not `HeightPosts` is on, so the key
 can be switched live: the detour notes a post only while one of our views is running
@@ -1873,6 +1899,13 @@ stock's is logged and left to the engine.
 detour draws nothing while the paths are ours (`MovePaths=1`, the module on, every entry of
 `render3d.overlays.paths` resolved), else calls what was there. When the entries are not
 stock's no path is drawn and the engine keeps its line.
+
+The grid's colour is what `Terrain_Geometry::DrawGrid`'s first line is drawn in, read every
+frame from the pointer its `push` holds (`site_grid_colour`, 0x5934c9): stock's
+`ST3D_Colour_Dark_Orange`; on Roots the file points the push at another colour and
+FleetOpsHook at its own grid colour as it loads, so the grid takes Roots' colour without an
+address of FleetOpsHook's. The pointer is used only when it is committed, readable memory;
+stock's dark orange otherwise.
 
 #### overlays: Content
 

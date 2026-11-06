@@ -227,7 +227,10 @@ impl Module for Effects {
         if self.rp.want && hooks::repair::install(h) {
             self.hk |= HK_REPAIR;
         }
-        if self.ch.want && hooks::chunks::install(h) {
+        // A build whose companion module owns Craft::Explode's call (Roots) takes the debris
+        // at Fragment's entry instead, and none of the call sites.
+        let debris = self.ch.want && if hooks::chunks::at_callee() { hooks::chunks::install_callee(h) } else { hooks::chunks::install(h) };
+        if debris {
             self.hk |= HK_DEBRIS;
         }
         if self.sp.want && hooks::repair::hooked() == false {

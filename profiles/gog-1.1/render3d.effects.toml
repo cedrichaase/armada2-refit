@@ -23,9 +23,8 @@ doc = "The calls of Fragment (a dying craft, the Evolver's cocoon, a cancelled c
 rows = ["Modules.effects"]
 
 [hook."effects.debris_callee"]
-doc = "ST3D_Instance::Fragment itself, for the calls FleetOpsHook owns on Roots (Craft::Explode): armed during the chained call"
+doc = "ST3D_Instance::Fragment at its entry, armed only while the companion module (Roots: FleetOpsHook) calls it"
 rows = ["Modules.effects"]
-planned = "FO-5 step 5"
 
 [[sym]]
 id = "fn_shock_radius"
@@ -1076,4 +1075,46 @@ kind = "field"
 struct = "BuildingEffect m_list node"
 offset = 0x14
 type = "ptr"
+used_by = ["effects.reads"]
+
+# Where the debris of a dying craft is taken: 0 at Craft::Explode's call of Fragment
+# (site_explode_fragment, effects.debris), 1 at Fragment's entry, armed only while the build's
+# companion module calls it (effects.debris_callee), for a build whose companion owns that
+# call and decides whether a craft breaks up (Roots: FleetOpsHook, PLAN-FLEETOPS.md, "The
+# rules of (c)", rule 4). Stock takes the call and installs nothing at the entry.
+[[sym]]
+id = "ef_debris_at_callee"
+symbol = "debris claim point"
+kind = "value"
+value = 0
+used_by = ["effects.debris_callee"]
+
+# The bytes of whole, position-independent instructions at Fragment's entry that the callee
+# hook moves aside (within fn_fragment's check, which vouches for them).
+[[sym]]
+id = "ef_fragment_moved"
+symbol = "ST3D_Instance::Fragment entry instructions"
+kind = "value"
+value = 5
+unit = "bytes"
+used_by = ["effects.debris_callee"]
+
+# How much a build's SHIELD_EFFECT_RESCALE = 1 (RTS_CFG.h) scales a shield hit's shell, in
+# percent; 0: the build has no such key (stock), and RTS_CFG.h is not read for it.
+[[sym]]
+id = "ef_shield_rescale_pct"
+symbol = "SHIELD_EFFECT_RESCALE factor"
+kind = "value"
+value = 0
+unit = "percent"
+used_by = ["effects.reads"]
+
+# 1: the build colours a shield hit by the shields' level only while RTS_CFG.h's
+# SHIELD_EFFECT_DAMAGE_COLORED is 1, and draws it white otherwise; 0: stock, which always
+# colours it, and RTS_CFG.h is not read for it.
+[[sym]]
+id = "ef_shield_damage_key"
+symbol = "SHIELD_EFFECT_DAMAGE_COLORED honoured"
+kind = "value"
+value = 0
 used_by = ["effects.reads"]

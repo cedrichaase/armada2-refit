@@ -653,7 +653,7 @@ impl Shields {
             if o == 0 || !obj::can_user_see(o) {
                 continue;
             }
-            let Some((a, t, r)) = ship_xform(o) else { continue };
+            let Some((a, t, r)) = shell_xform(o) else { continue };
             let (col, bright) = self.look(o, h.ty, now);
             let mut br = hk::object_radius(o);
             if !(br > 0.01) {
@@ -694,7 +694,7 @@ impl Shields {
             if o == 0 || !obj::can_user_see(o) {
                 continue;
             }
-            let Some((a, t, r)) = ship_xform(o) else { continue };
+            let Some((a, t, r)) = shell_xform(o) else { continue };
             let mut best = 0.0;
             let mut kb = None;
             for k in 0..self.s.down_strikes {
@@ -810,12 +810,17 @@ impl Shields {
         // A set with no factions gives the faction mode nothing to key by: stock's colour.
         let by_faction = if s.colour_mode == ColMode::Faction { fac_of(o).and_then(|i| s.fac.get(i)) } else { None };
         let stock_col = s.colour_mode == ColMode::Stock || (s.colour_mode == ColMode::Faction && by_faction.is_none());
+        // A build whose RTS_CFG.h turns the damage colour off (Roots'
+        // SHIELD_EFFECT_DAMAGE_COLORED = 0) draws stock's hits white, and no colour of ours
+        // follows the shields' level either.
+        let coloured = hk::rts_keys().1;
         let mut col = match s.colour_mode {
+            _ if stock_col && !coloured => v3(1.0, 1.0, 1.0),
             _ if stock_col => v3(1.0 - lvl, lvl, 0.0),
             ColMode::Fixed => s.fixed,
             _ => *by_faction.unwrap_or(&V3::ZERO),
         };
-        if !stock_col {
+        if !stock_col && coloured {
             col = col + (s.low - col) * (s.low_shift * (1.0 - lvl));
         }
         let mut bright = s.brightness * (s.weak_level + (1.0 - s.weak_level) * lvl);
@@ -846,7 +851,7 @@ impl Shields {
     #[allow(clippy::too_many_arguments)]
     fn draw_ship(&self, cmd: &mut Cmd, c: &Cam, o: usize, pick: &[(usize, f32)], now: f64, ty: usize, whole: bool) {
         let s = &self.s;
-        let Some((a, t, r)) = ship_xform(o) else { return };
+        let Some((a, t, r)) = shell_xform(o) else { return };
         ship_vsconst(cmd, &a, t);
         let (col, bright) = self.look(o, ty, now);
         let lvl = Self::level(o, ty);
@@ -888,7 +893,7 @@ impl Shields {
 
     fn draw_down(&self, cmd: &mut Cmd, c: &Cam, o: usize, d: &mut Down, now: f64) {
         let s = &self.s;
-        let Some((a, t, r)) = ship_xform(o) else { return };
+        let Some((a, t, r)) = shell_xform(o) else { return };
         ship_vsconst(cmd, &a, t);
         let mut pc = [[0.0f32; 4]; 22];
         pc[0] = [c.eye.x, c.eye.y, c.eye.z, 1.0 / r];
@@ -1011,6 +1016,18 @@ pub fn ship_xform(o: usize) -> Option<([V3; 3], V3, f32)> {
     }
     let r = libm::powf(det.abs(), 1.0 / 3.0);
     if r > 0.01 { Some((a, t, r)) } else { None }
+}
+
+/// The shell the shields draw: `ship_xform`, scaled about its centre by the factor this
+/// build's `RTS_CFG.h` gives (Roots' `SHIELD_EFFECT_RESCALE`, as its `DrawShield` scales
+/// the engine's shell; 1 on stock).
+fn shell_xform(o: usize) -> Option<([V3; 3], V3, f32)> {
+    let (a, t, r) = ship_xform(o)?;
+    let k = hk::rts_keys().0;
+    if k == 1.0 {
+        return Some((a, t, r));
+    }
+    Some(([a[0] * k, a[1] * k, a[2] * k], t, r * k))
 }
 
 /// The vertex shader's constants for one ellipsoid (c4..c9): the columns of the unit

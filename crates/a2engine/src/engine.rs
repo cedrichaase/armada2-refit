@@ -541,6 +541,35 @@ impl Engine {
         self.build_index().map(|i| self.t().builds[i].content).filter(|c| !c.is_empty())
     }
 
+    /// The companion modules the matched build's marks describe (build.toml `[[module]]`),
+    /// by name; empty on a build with none, an unknown build, and before `init`. Whether
+    /// the loaded one is the profiled one is the identity's business (`init` logs it, and
+    /// the hooks that depend on it stand down when it is not).
+    pub fn companions(&self) -> &'static [crate::table::Module] {
+        match self.build_index() {
+            Some(i) => self.t().builds[i].modules,
+            None => &[],
+        }
+    }
+
+    /// Whether every companion module the matched build names is the one profiled (true on
+    /// a build that names none).
+    pub fn companions_ok(&self) -> bool {
+        self.t().rt.companion_bad.load(Relaxed) == 0
+    }
+
+    /// The `check` bytes of a `fn`, `label` or `patch` in the matched build: what `ready`
+    /// compared memory with (empty when the build checks nothing there, or unless a hook
+    /// that uses it is ready). For a hook that moves whole instructions from a function's
+    /// entry (render3d's callee hooks), which may move only bytes the profile vouches for.
+    pub fn check_bytes(&self, s: Sym) -> &'static [u8] {
+        let k = s.0 as usize;
+        if self.addr(s) == 0 {
+            return &[];
+        }
+        self.entries().get(k).map(|e| e.check).unwrap_or(&[])
+    }
+
     /// The identity's first executable section, as mapped: replaces `EXE_CODE`.
     pub fn code(&self) -> (usize, usize) {
         let rt = self.t().rt;

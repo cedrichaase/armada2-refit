@@ -687,3 +687,51 @@ symbol = "hull claim point"
 kind = "value"
 value = 0
 used_by = ["hulls.instance_draw"]
+
+# What the instance claim reads of the database just before the engine would draw it
+# (FO-5 step 5): the nodes' render flags and the meshes' textures, as stock's
+# GameObjectInstance::RenderInternal and Roots' CraftInstance::RenderInternal wrote them for
+# this instance (render3d/README.md, "Hulls", "The claim at the instance draw").
+[[sym]]
+id = "fn_find_element"
+symbol = "ST3D_Database::FindElement"
+kind = "fn"
+addr = 0x620750
+check = "55 8b ec 8b 45 08"
+used_by = ["hulls.instance_draw"]
+
+# FindElement's element list of the database's nodes (meshes and plain nodes).
+[[sym]]
+id = "hl_node_list"
+symbol = "ST3D_Database node element list"
+kind = "value"
+value = 4
+used_by = ["hulls.instance_draw"]
+
+# Bits 0 and 1: the node (and what hangs from it) is not drawn.
+[[sym]]
+id = "hl_node_render_flags"
+symbol = "ST3D_Node::render flags"
+kind = "field"
+struct = "ST3D_Node"
+offset = 0xbc
+type = "u32"
+used_by = ["hulls.instance_draw"]
+
+[[sym]]
+id = "hl_mesh_textures"
+symbol = "ST3D_Mesh::textures"
+kind = "field"
+struct = "ST3D_Mesh"
+offset = 0x114
+type = "ptr"
+used_by = ["hulls.instance_draw"]
+
+[[sym]]
+id = "hl_mesh_texture_count"
+symbol = "ST3D_Mesh::texture count"
+kind = "field"
+struct = "ST3D_Mesh"
+offset = 0x11c
+type = "i32"
+used_by = ["hulls.instance_draw"]

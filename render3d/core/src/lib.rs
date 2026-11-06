@@ -22,6 +22,7 @@ pub mod hooks;
 pub mod module;
 pub mod particles;
 pub mod recipes;
+pub mod rtscfg;
 pub mod services;
 pub mod engine;
 pub mod frame;

@@ -151,8 +151,32 @@ pub fn grid_step() -> f32 {
     unsafe { rd::<f32>(grid_size()) }
 }
 
+/// The grid's colour: what `Terrain_Geometry::DrawGrid`'s first line is drawn in, read
+/// from the pointer its push holds now (`site_grid_colour`, the byte after the opcode):
+/// `ST3D_Colour_Dark_Orange` on stock; on Roots its own colour, and FleetOpsHook's over
+/// that. Stock's dark orange when the pointer is not one the process can read.
 pub fn grid_colour() -> [f32; 3] {
+    let site = at(sym::SITE_GRID_COLOUR);
+    if site != 0 {
+        let p = unsafe { core::ptr::read_unaligned((site + 1) as *const usize) };
+        if p != 0 && readable(p, 12) {
+            return unsafe { rd(p) };
+        }
+    }
     unsafe { rd(dark_orange()) }
+}
+
+/// Whether `n` bytes at `p` are committed, readable memory (a pointer another module put
+/// in the engine's code).
+fn readable(p: usize, n: usize) -> bool {
+    use crate::rt::win::{MemInfo, VirtualQuery};
+    let mut mi: MemInfo = unsafe { core::mem::zeroed() };
+    if unsafe { VirtualQuery(p as *const u8, &mut mi, core::mem::size_of::<MemInfo>()) } == 0 {
+        return false;
+    }
+    const MEM_COMMIT: u32 = 0x1000;
+    const READ: u32 = 0x02 | 0x04 | 0x08 | 0x20 | 0x40 | 0x80; // not an offset: page protection bits
+    mi.state == MEM_COMMIT && mi.protect & READ != 0 && mi.protect & 0x100 == 0 && p + n <= mi.base + mi.size // not an offset: PAGE_GUARD
 }
 
 /// The engine's texture behind a layer: `Terrain_Geometry+0x34` the fog's, `+0x38` the
@@ -220,6 +244,57 @@ pub fn install_posts(h: &mut Hooks) -> usize {
         }
     }
     n
+}
+
+// ---- the posts at DrawHeightPost's entry (a build whose companion owns its calls) ----
+
+/// The return address of the latest call of `DrawHeightPost` that reached the entry
+/// detour (the game draws on one thread).
+static mut POST_CALLER: usize = 0;
+
+/// `DrawHeightPost`'s entry: notes who called (`[esp]`) and goes on to `post_callee`
+/// with the call as it was.
+#[unsafe(naked)]
+unsafe extern "C" fn post_entry() {
+    core::arch::naked_asm!(
+        "mov eax, dword ptr [esp]",
+        "mov dword ptr [{caller}], eax",
+        "jmp {f}",
+        caller = sym POST_CALLER,
+        f = sym post_callee,
+    )
+}
+
+/// `DrawHeightPost` at its entry: a post noted for the view only while the build's
+/// companion module calls it (Roots: FleetOpsHook's callbacks for the five calls, which
+/// skip a post during its clean screenshot and under `DISABLE_HEIGHT_CHANGE`); any other
+/// caller, render3d's own `draw_engine_post` included, gets the function as it was.
+unsafe extern "C" fn post_callee(pos: *const V3, cam: usize) {
+    let armed = engine::in_companion(unsafe { POST_CALLER });
+    if armed && super::posts::in_view() && unsafe { GATE.is_some_and(|g| g.open()) } && !pos.is_null() && super::posts::note_raw(unsafe { core::ptr::read_unaligned(pos) }) {
+        return;
+    }
+    draw_engine_post(pos, cam);
+}
+
+/// Whether this build takes the posts at `DrawHeightPost`'s entry (the profile's value).
+pub fn posts_at_callee() -> bool {
+    value::OV_POSTS_AT_CALLEE() != 0
+}
+
+/// Installs the callee hook (`overlays.posts_callee`; PLAN-FLEETOPS.md, "The rules of
+/// (c)", rule 4), for a build whose profile asks for it. True when it is in.
+pub fn install_posts_callee(h: &mut Hooks) -> bool {
+    unsafe { GATE = Some(h.gate()) };
+    if !posts_at_callee() || !h.ready(&TABLE, hook::OVERLAYS_POSTS_CALLEE) {
+        return false;
+    }
+    let len = value::OV_POST_MOVED().max(0) as usize;
+    let Some(prev) = h.install_entry("height posts (at the callee)", &TABLE, sym::FN_HEIGHT_POST, len, post_entry as *const () as usize) else {
+        return false;
+    };
+    unsafe { PREV_POST = prev.addr() };
+    true
 }
 
 /// `DrawHeightPost`, re-pointed: noted for the view while one of ours runs, else the

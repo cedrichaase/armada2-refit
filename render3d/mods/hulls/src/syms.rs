@@ -38,6 +38,7 @@ pub mod sym {
     pub const FADE_MAX: a2engine::Sym = a2engine::Sym(33);
     pub const FN_INSTANCE_RI: a2engine::Sym = a2engine::Sym(77);
     pub const SITE_HULL_DRAW: a2engine::Sym = a2engine::Sym(78);
+    pub const FN_FIND_ELEMENT: a2engine::Sym = a2engine::Sym(80);
 }
 
 pub mod hook {
@@ -89,12 +90,16 @@ pub mod field {
     #[inline(always)] pub fn HL_INST_FACES() -> usize { super::TABLE.engine().field(a2engine::Sym(74)) }
     #[inline(always)] pub fn HL_COCOON_RAMP() -> usize { super::TABLE.engine().field(a2engine::Sym(75)) }
     #[inline(always)] pub fn HL_VT_CLASS_DISABLE_NODES() -> usize { super::TABLE.engine().field(a2engine::Sym(76)) }
+    #[inline(always)] pub fn HL_NODE_RENDER_FLAGS() -> usize { super::TABLE.engine().field(a2engine::Sym(82)) }
+    #[inline(always)] pub fn HL_MESH_TEXTURES() -> usize { super::TABLE.engine().field(a2engine::Sym(83)) }
+    #[inline(always)] pub fn HL_MESH_TEXTURE_COUNT() -> usize { super::TABLE.engine().field(a2engine::Sym(84)) }
 }
 
 pub mod value {
     #![allow(non_snake_case)]
     #[inline(always)] pub fn HL_RESOURCE_COUNT() -> i32 { super::TABLE.engine().value(a2engine::Sym(72)) }
     #[inline(always)] pub fn HL_CLAIM_INSTANCE() -> i32 { super::TABLE.engine().value(a2engine::Sym(79)) }
+    #[inline(always)] pub fn HL_NODE_LIST() -> i32 { super::TABLE.engine().value(a2engine::Sym(81)) }
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
@@ -178,11 +183,16 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "fn_instance_ri", symbol: "ST3D_Instance::RenderInternal", kind: a2engine::Kind::Fn },
     a2engine::SymDef { id: "site_hull_draw", symbol: "GameObjectInstance::RenderInternal", kind: a2engine::Kind::Call },
     a2engine::SymDef { id: "hl_claim_instance", symbol: "hull claim point", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "fn_find_element", symbol: "ST3D_Database::FindElement", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "hl_node_list", symbol: "ST3D_Database node element list", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "hl_node_render_flags", symbol: "ST3D_Node::render flags", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_mesh_textures", symbol: "ST3D_Mesh::textures", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hl_mesh_texture_count", symbol: "ST3D_Mesh::texture count", kind: a2engine::Kind::Field },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
     a2engine::HookDef { id: "render3d.hulls.reads", run_unknown: false, rows: &["Modules.hulls"], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76] },
-    a2engine::HookDef { id: "render3d.hulls.instance_draw", run_unknown: false, rows: &["Modules.hulls"], syms: &[77, 78, 79] },
+    a2engine::HookDef { id: "render3d.hulls.instance_draw", run_unknown: false, rows: &["Modules.hulls"], syms: &[77, 78, 79, 80, 81, 82, 83, 84] },
 ];
 
 pub const BUILDS: &[a2engine::Build] = &[
@@ -194,7 +204,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 80,
+        n_resolved: 85,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x4a58e0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x14, 0xa0, 0xd4], mask: &[], section: "", count: 0, value: 0 }, // fn_scrap_render
@@ -277,6 +287,11 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x62e780, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x51, 0x53, 0x56, 0x8b, 0xf1, 0x33, 0xdb, 0x8b, 0x0d, 0x08, 0xd5, 0x7a, 0x00], mask: &[], section: "", count: 0, value: 0 }, // fn_instance_ri
             a2engine::Entry { present: true, addr: 0x4d5a11, end: 0x0, target: 0x4d, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_hull_draw
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hl_claim_instance
+            a2engine::Entry { present: true, addr: 0x620750, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08], mask: &[], section: "", count: 0, value: 0 }, // fn_find_element
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // hl_node_list
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 188 }, // hl_node_render_flags
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 276 }, // hl_mesh_textures
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 284 }, // hl_mesh_texture_count
         ],
         blocked: &[
         ],
@@ -284,7 +299,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         modules: &[],
         blocked_mod: &[
         ],
-        n_resolved_mod: 80,
+        n_resolved_mod: 85,
     },
     a2engine::Build {
         name: "fo-roots-5.0Z11",
@@ -294,7 +309,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 80,
+        n_resolved: 85,
         content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x4a58e0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x14, 0xa0, 0xd4], mask: &[], section: "", count: 0, value: 0 }, // fn_scrap_render
@@ -377,6 +392,11 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x62e780, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x51, 0x53, 0x56, 0x8b, 0xf1, 0x33, 0xdb, 0x8b, 0x0d, 0x08, 0xd5, 0x7a, 0x00], mask: &[], section: "", count: 0, value: 0 }, // fn_instance_ri
             a2engine::Entry { present: true, addr: 0x4d5a11, end: 0x0, target: 0x4d, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_hull_draw
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1 }, // hl_claim_instance
+            a2engine::Entry { present: true, addr: 0x620750, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08], mask: &[], section: "", count: 0, value: 0 }, // fn_find_element
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // hl_node_list
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 188 }, // hl_node_render_flags
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 276 }, // hl_mesh_textures
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 284 }, // hl_mesh_texture_count
         ],
         blocked: &[
         ],
@@ -385,13 +405,13 @@ pub const BUILDS: &[a2engine::Build] = &[
         blocked_mod: &[
             a2engine::Block { hook: 0, symbol: "Craft::RenderInternal", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: Craft::RenderInternal is patched by FleetOpsHook.dll, which is not the profiled one" },
         ],
-        n_resolved_mod: 3,
+        n_resolved_mod: 8,
     },
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 2] = [const { core::sync::atomic::AtomicU64::new(0) }; 2];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 80] = [const { core::sync::atomic::AtomicU8::new(0) }; 80];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 80] = [const { core::sync::atomic::AtomicUsize::new(0) }; 80];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 85] = [const { core::sync::atomic::AtomicU8::new(0) }; 85];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 85] = [const { core::sync::atomic::AtomicUsize::new(0) }; 85];
 static NOTES: [a2engine::Note; 2] = [const { a2engine::Note::new() }; 2];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 

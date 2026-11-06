@@ -13,6 +13,27 @@
 #[path = "../../core/src/scene/media.rs"]
 pub mod media;
 
+// `rtscfg::parse_int`, the reader of RTS_CFG.h's integer keys (FO-5 step 5).
+#[path = "../../core/src/rtscfg/parse.rs"]
+pub mod rtscfg_parse;
+
+#[cfg(test)]
+mod rtscfg_tests {
+    use super::rtscfg_parse::parse_int;
+
+    #[test]
+    fn reads_keys() {
+        let t = b"// a comment\r\nint SHIELD_EFFECT_RESCALE = 1;\r\nint SHIELD_EFFECT_DAMAGE_COLORED = 0; // off\r\nfloat X = 1.5;\nint NEG = -3;\n";
+        assert_eq!(parse_int(t, "SHIELD_EFFECT_RESCALE"), Some(1));
+        assert_eq!(parse_int(t, "SHIELD_EFFECT_DAMAGE_COLORED"), Some(0));
+        assert_eq!(parse_int(t, "X"), None);
+        assert_eq!(parse_int(t, "NEG"), Some(-3));
+        assert_eq!(parse_int(t, "RESCALE"), None);
+        assert_eq!(parse_int(b"// int SHIELD_EFFECT_RESCALE = 1;\n", "SHIELD_EFFECT_RESCALE"), None);
+        assert_eq!(parse_int(b"int A = 1;\nint A = 2;\n", "A"), Some(2));
+    }
+}
+
 // The modules' `content.rs` (sets.rs) name the core as `r3d_core`: this crate
 // stands in for it.
 extern crate self as r3d_core;
