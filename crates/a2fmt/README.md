@@ -116,6 +116,15 @@ prints counts only. For agents, `cargo run --release --example fpq -- list|cat|e
 directory inside a git checkout (extracted files are assets: `$A2_DATA` or a scratch
 directory).
 
+`cargo run --release --example shipsurvey -- <Roots Data dir> [out-dir]` surveys the
+craft: every ODF that names a `race` and a `basename` (class label, ship class, SOD), each
+SOD's meshes (blend material, flags, bump or not, textures with their load words), the
+race ODFs' keys, the `RTS_CFG.h`/`ART_CFG.h` lines about race, colour or team, and counts
+per race and of textures shared between races. A mesh counts as bump-mapped when its flags
+carry the dot3 bit or a texture carries the `0x200` height-map word. It writes
+tab-separated tables and `summary.txt` to `$A2_DATA/research/fo-roots/ship-survey/` (the
+tables are derived from the game; the tool refuses a checkout) and reads only.
+
 ## SOD (`sod`)
 
 Little-endian. A string is a `u16` length and that many bytes. A 3x4 matrix is twelve
