@@ -28,7 +28,10 @@ plain right-click clears the queue and render3d with it ("cleared"). Then a go l
 from a Tab click on the minimap, a warp leg: "mixed" shows both, "go-leg" the ship on the
 first leg (at impulse: QOL has not sent the warp run yet), "warp-leg" the ship on the
 second after the warp run went out. Last, the bar's Stop clears a queue and the drawing
-("stopped").
+("stopped"). Then six destroyers in a group (`g1`..`g6`) get a three-point queue: with all
+six selected the group's path is drawn once, through the queue's points, with each ship's
+own leg and a small dot at each of its own targets ("group"), not six parallel lines; with
+one of them selected, that ship's own path to its own targets ("group-one").
 
 Judge the shots: the line is very light grey and fine, dotted, not stock's one-pixel green
 line with boxes; the point dots are green and bigger than the line's dots; nothing is
@@ -38,7 +41,7 @@ drawn for a ship that is not selected; the part flown is not drawn.
 2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
 4. Expect "Render3D.log" contains "overlays: move paths 1".
-5. Expect "Render3D.log" contains "overlays: move paths: QOL's queue found (version 1)".
+5. Expect "Render3D.log" contains "overlays: move paths: QOL's queue found (version 1, groups)".
 6. Expect "QOL.log" contains "move queues: Tab points (and minimap points) queued per ship, flown at once, patched".
 7. Scene "select ship2".
 8. Expect scene "selection" answers "ship2".
@@ -110,6 +113,21 @@ drawn for a ship that is not selected; the part flown is not drawn.
 74. Wait up to 10 seconds for "Render3D.log" to say "0 selected ship(s) on a path".
 75. Wait 2 seconds.
 76. Take a screenshot called "stopped".
-77. Expect the game is still running.
-78. Quit the game.
-79. Expect no crash.
+77. Scene "spawn g1 fdestroy 2850 0 3500; spawn g2 fdestroy 2950 0 3500; spawn g3 fdestroy 3050 0 3500; spawn g4 fdestroy 3150 0 3500; spawn g5 fdestroy 2900 0 3600; spawn g6 fdestroy 3100 0 3600".
+78. Scene "center g3; select g1 g2 g3 g4 g5 g6".
+79. Scene "waypoint-key on".
+80. Right-click at 900,300.
+81. Right-click at 900,150.
+82. Right-click at 600,150.
+83. Wait up to 10 seconds for "QOL.log" to say "move queue: appended point 3 (go)".
+84. Scene "waypoint-key off".
+85. Wait up to 10 seconds for "Render3D.log" to say "6 selected ship(s) on a path".
+86. Wait 2 seconds.
+87. Take a screenshot called "group".
+88. Scene "select g2".
+89. Wait up to 10 seconds for "Render3D.log" to say "1 selected ship(s) on a path".
+90. Wait 1 seconds.
+91. Take a screenshot called "group-one".
+92. Expect the game is still running.
+93. Quit the game.
+94. Expect no crash.

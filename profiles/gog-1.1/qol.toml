@@ -1625,6 +1625,130 @@ target = "mq_ov_keys"
 in = "cOverViewImp::Simulate"
 used_by = ["move_paths"]
 
+# The group's spread (qol/README.md, QOL-10, "A group's targets"): the formations stock
+# moves a group in, read, never written.
+[[sym]]
+id = "mq_formations"
+symbol = "g_FormationManager"
+kind = "global"
+addr = 0x73575c
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_form_types"
+symbol = "FormationManager: its table of Formation *, by formation type"
+kind = "value"
+value = 16
+used_by = ["move_paths"]
+
+# the formation type the ship moves in (SET_FORMATION; Find_Clusters_Of_Ships reads it)
+[[sym]]
+id = "mq_proc_formation"
+symbol = "CraftProcess"
+kind = "field"
+struct = "CraftProcess"
+offset = 0x13c
+type = "i32"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_frm_count"
+symbol = "Formation"
+kind = "field"
+struct = "Formation"
+offset = 0x4
+type = "i32"
+used_by = ["move_paths"]
+
+# the ship radius the slots are drawn for (GetScale: none at or below 0)
+[[sym]]
+id = "mq_frm_radius"
+symbol = "Formation"
+kind = "field"
+struct = "Formation"
+offset = 0x8
+type = "f32"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_frm_slots"
+symbol = "Formation"
+kind = "field"
+struct = "Formation"
+offset = 0xc
+type = "ptr"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_slot_size"
+symbol = "cFormationSlot: its size"
+kind = "value"
+value = 48
+used_by = ["move_paths"]
+
+# seven ship types, best first: '-' ends them, '?' takes any
+[[sym]]
+id = "mq_slot_prefs"
+symbol = "cFormationSlot"
+kind = "field"
+struct = "cFormationSlot"
+offset = 0x0
+type = "u32"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_slot_offset"
+symbol = "cFormationSlot"
+kind = "field"
+struct = "cFormationSlot"
+offset = 0x20
+type = "v3"
+used_by = ["move_paths"]
+
+# the slot's leader rank: the lowest filled slot leads
+[[sym]]
+id = "mq_slot_rank"
+symbol = "cFormationSlot"
+kind = "field"
+struct = "cFormationSlot"
+offset = 0x2c
+type = "i32"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_min_radius"
+symbol = "Formation::GetScale: the smallest radius it scales by"
+kind = "value"
+value = 28
+used_by = ["move_paths"]
+
+# Entity::GetBoundingSphere: this +4, then +0x34; the radius at +0xc
+[[sym]]
+id = "mq_ent_bounds"
+symbol = "Entity"
+kind = "field"
+struct = "Entity"
+offset = 0x4
+type = "ptr"
+used_by = ["move_paths"]
+
+[[sym]]
+id = "mq_bounds_radius"
+symbol = "Entity::GetBoundingSphere's SPHERE: its radius, from the +4 object"
+kind = "value"
+value = 64
+used_by = ["move_paths"]
+
+# the eShipTypeInfo a formation slot asks for (Find_Closest_Craft_To_Location)
+[[sym]]
+id = "mq_class_shiptype"
+symbol = "GameObjectClass"
+kind = "field"
+struct = "GameObjectClass"
+offset = 0x42c
+type = "i32"
+used_by = ["move_paths"]
+
 [[sym]]
 id = "rs_this_site"
 symbol = "ConstructionRig::GetAction"

@@ -47,10 +47,15 @@ pub fn ours() -> bool {
 const KEEP: f32 = 1.0;
 /// Points are drawn this far above where they were clicked, clear of the grid's lines.
 const LIFT: f32 = 1.0;
+/// A ship's own target in a group drawn as one path: this much of a point's dot.
+const TICK: f32 = 0.55;
 
 /// QOL.asi's queue: `int QOL_MoveQueue(const void *ship, float *xyz, int *flags, int cap)`,
 /// cdecl (README.md, "Move paths").
 type QueueFn = unsafe extern "C" fn(usize, *mut f32, *mut i32, i32) -> i32;
+/// And, when QOL has it, `int QOL_MoveQueueGroup(ship, own, pts, flags, cap, int *queue)`:
+/// the ship's own targets, the queue's points and which queue.
+type GroupFn = unsafe extern "C" fn(usize, *mut f32, *mut f32, *mut i32, i32, *mut i32) -> i32;
 const QCAP: usize = 128;
 /// How often the plugin's export is looked for until found (s).
 const LOOKUP: f64 = 1.0;
@@ -59,11 +64,11 @@ const LOOKUP: f64 = 1.0;
 enum Qol {
     Unknown,
     Absent { at: f64, said: bool },
-    Found(QueueFn),
+    Found(QueueFn, Option<GroupFn>),
     Refused,
 }
 
-fn find_qol() -> Result<QueueFn, Option<i32>> {
+fn find_qol() -> Result<(QueueFn, Option<GroupFn>), Option<i32>> {
     unsafe {
         let ver = crate::rt::find_export("QOL_MoveQueueVersion");
         if ver == 0 {
@@ -77,7 +82,9 @@ fn find_qol() -> Result<QueueFn, Option<i32>> {
         if v != 1 {
             return Err(Some(v));
         }
-        Ok(core::mem::transmute::<usize, QueueFn>(q))
+        let g = crate::rt::find_export("QOL_MoveQueueGroup");
+        let g = if g == 0 { None } else { Some(core::mem::transmute::<usize, GroupFn>(g)) };
+        Ok((core::mem::transmute::<usize, QueueFn>(q), g))
     }
 }
 
@@ -166,19 +173,19 @@ impl Paths {
     }
 
     /// QOL's export, looked up once found and once a second until then.
-    fn queue_fn(&mut self, now: f64) -> Option<QueueFn> {
+    fn queue_fn(&mut self, now: f64) -> Option<(QueueFn, Option<GroupFn>)> {
         match self.qol {
-            Qol::Found(f) => return Some(f),
+            Qol::Found(f, g) => return Some((f, g)),
             Qol::Refused => return None,
             Qol::Absent { at, .. } if now >= at && now - at < LOOKUP => return None,
             _ => {}
         }
         let said = matches!(self.qol, Qol::Absent { said: true, .. });
         match find_qol() {
-            Ok(f) => {
-                log!("overlays: move paths: QOL's queue found (version 1)");
-                self.qol = Qol::Found(f);
-                Some(f)
+            Ok((f, g)) => {
+                log!("overlays: move paths: QOL's queue found (version 1{})", if g.is_some() { ", groups" } else { "" });
+                self.qol = Qol::Found(f, g);
+                Some((f, g))
             }
             Err(Some(v)) => {
                 log!("overlays: move paths: QOL's queue is version {}: not used", v);
@@ -248,45 +255,38 @@ impl Paths {
         let mut selected: Vec<usize> = Vec::new();
         hooks::selected_objects(&mut selected);
         let mut xyz = [0f32; QCAP * 3];
+        let mut gxyz = [0f32; QCAP * 3];
         let mut flags = [0i32; QCAP];
         let mut rest: Vec<V3> = Vec::new();
+        // The selected ships on a queue of QOL's: (queue, ship, its own targets, the
+        // queue's points, flags); drawn after the loop, a group at a time.
+        let mut queued: Vec<(i32, V3, Vec<V3>, Vec<V3>, Vec<i32>)> = Vec::new();
         for &o in &selected {
             let Some(pos) = hooks::ship_position(o, team) else { continue };
-            if let Some(q) = qfn {
-                let r = unsafe { q(o, xyz.as_mut_ptr(), flags.as_mut_ptr(), QCAP as i32) };
+            if let Some((q, g)) = qfn {
+                let mut serial = -1i32;
+                let r = unsafe {
+                    match g {
+                        Some(g) => g(o, xyz.as_mut_ptr(), gxyz.as_mut_ptr(), flags.as_mut_ptr(), QCAP as i32, &mut serial),
+                        None => q(o, xyz.as_mut_ptr(), flags.as_mut_ptr(), QCAP as i32),
+                    }
+                };
                 self.qol_live = r >= 0;
                 if r >= 0 {
                     let n = (r as usize).min(QCAP);
                     if n == 0 {
                         continue;
                     }
-                    buf.clear();
-                    for i in 0..n {
-                        buf.push(v3(xyz[i * 3], xyz[i * 3 + 1], xyz[i * 3 + 2]));
-                    }
+                    let own: Vec<V3> = (0..n).map(|i| v3(xyz[i * 3], xyz[i * 3 + 1], xyz[i * 3 + 2])).collect();
+                    let gp: Vec<V3> = if g.is_some() {
+                        (0..n).map(|i| v3(gxyz[i * 3], gxyz[i * 3 + 1], gxyz[i * 3 + 2])).collect()
+                    } else {
+                        own.clone()
+                    };
                     from_qol = true;
                     ships += 1;
                     ahead += n;
-                    rest.clear();
-                    rest.extend_from_slice(&buf);
-                    posts::segment(&mut rows, pos, lift(buf[0]), col);
-                    chain(&mut rows, &mut dots, &rest);
-                    // A patrol run goes round again: from its last point back to its first.
-                    let mut i = 0;
-                    while i < n {
-                        if flags[i] & 2 == 0 {
-                            i += 1;
-                            continue;
-                        }
-                        let mut j = i;
-                        while j + 1 < n && flags[j + 1] & 2 != 0 {
-                            j += 1;
-                        }
-                        if j > i {
-                            chain(&mut rows, &mut dots, &[buf[j], buf[i]]);
-                        }
-                        i = j + 1;
-                    }
+                    queued.push((serial, pos, own, gp, flags[..n].to_vec()));
                     continue;
                 }
             }
@@ -315,6 +315,47 @@ impl Paths {
                 rest.extend_from_slice(&buf[..=i]);
             }
             chain(&mut rows, &mut dots, &rest);
+        }
+        // A patrol run goes round again: from its last point back to its first.
+        let close = |rows: &mut Vec<Vtx>, dots: &mut Vec<Vtx>, chain: &mut dyn FnMut(&mut Vec<Vtx>, &mut Vec<Vtx>, &[V3]), ps: &[V3], fl: &[i32]| {
+            let n = ps.len();
+            let mut i = 0;
+            while i < n {
+                if fl[i] & 2 == 0 {
+                    i += 1;
+                    continue;
+                }
+                let mut j = i;
+                while j + 1 < n && fl[j + 1] & 2 != 0 {
+                    j += 1;
+                }
+                if j > i {
+                    chain(rows, dots, &[ps[j], ps[i]]);
+                }
+                i = j + 1;
+            }
+        };
+        // One selected ship of a group: its own path, to its own targets. Several: the
+        // group's path once (the queue's points, where its leader goes) with each ship's
+        // own leg to where it heads now and a small tick at each of its own targets.
+        let mut ticks: Vec<Vtx> = Vec::new();
+        for e in 0..queued.len() {
+            let (serial, pos, ref own, ref gp, ref fl) = queued[e];
+            let group = serial >= 0 && queued.iter().filter(|x| x.0 == serial).count() > 1;
+            posts::segment(&mut rows, pos, lift(own[0]), col);
+            if !group {
+                chain(&mut rows, &mut dots, own);
+                close(&mut rows, &mut dots, &mut chain, own, fl);
+                continue;
+            }
+            chain(&mut rows, &mut dots, gp);
+            close(&mut rows, &mut dots, &mut chain, gp, fl);
+            for (k, &w) in own.iter().enumerate() {
+                if w != gp[k] {
+                    let w = lift(w);
+                    posts::segment(&mut ticks, w, w, pcol);
+                }
+            }
         }
         // The sketch while the key is held, and a moment after: only when QOL's queue
         // is not the source (QOL adds each click to the queue at once).
@@ -359,18 +400,20 @@ impl Paths {
             log!("overlays: move paths: {} selected ship(s) on a path, {} point(s) ahead ({}), sketch {}", ships, ahead, src, sketch_n);
         }
         self.last = now_counts;
-        if rows.is_empty() && dots.is_empty() {
+        if rows.is_empty() && dots.is_empty() && ticks.is_empty() {
             return;
         }
-        self.flush(v, &rows, &dots);
+        self.flush(v, &rows, &dots, &ticks);
     }
 
-    /// Draws `rows` (rows of dots) and `dots` (one dot per segment, at its b).
-    fn flush(&mut self, v: &View, rows: &[Vtx], dots: &[Vtx]) {
+    /// Draws `rows` (rows of dots), `dots` (one dot per segment, at its b) and `ticks`
+    /// (the smaller dots of each ship's own targets in a group).
+    fn flush(&mut self, v: &View, rows: &[Vtx], dots: &[Vtx], ticks: &[Vtx]) {
         let scale = (v.rect.h as f32 / 1080.0).max(0.5);
         let soft = 1.0;
         self.draw(v, rows, 0.5 * self.dot * scale, soft, self.spacing * scale);
         self.draw(v, dots, 0.5 * self.point * scale, soft, 0.0);
+        self.draw(v, ticks, 0.5 * TICK * self.point * scale, soft, 0.0);
     }
 
     fn draw(&mut self, v: &View, vs: &[Vtx], radius: f32, soft: f32, spacing: f32) {
