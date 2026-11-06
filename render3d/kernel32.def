@@ -47,3 +47,4 @@ GetEnvironmentVariableW@12
 FindFirstFileW@8
 FindNextFileW@8
 MoveFileExW@12
+VirtualQuery@12

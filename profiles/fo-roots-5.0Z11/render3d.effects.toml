@@ -1,0 +1,23 @@
+# Fleet Operations: Roots: the effects module's values (FO-5 step 5).
+schema = 1
+plugin = "render3d"
+
+# FleetOpsHook owns Craft::Explode's call of Fragment (it breaks a craft up only when the
+# class's explosionChunks allows) and calls Fragment through a pointer of its own: the debris
+# is taken at Fragment's entry, armed only while FleetOpsHook calls it (PLAN-FLEETOPS.md,
+# "The rules of (c)", rule 4). The other callers (a cancelled construction, the Evolver's
+# cocoon) stay the engine's.
+[[sym]]
+id = "ef_debris_at_callee"
+value = 1
+
+# Roots' FleetOpsHook doubles a shield hit's shell while RTS_CFG.h's SHIELD_EFFECT_RESCALE is
+# 1, and colours a hit by the shields' level only while SHIELD_EFFECT_DAMAGE_COLORED is 1
+# (white otherwise). render3d reads both keys from the game's RTS_CFG.h.
+[[sym]]
+id = "ef_shield_rescale_pct"
+value = 200
+
+[[sym]]
+id = "ef_shield_damage_key"
+value = 1

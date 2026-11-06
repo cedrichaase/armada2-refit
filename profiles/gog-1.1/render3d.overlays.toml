@@ -15,9 +15,8 @@ doc = "The height posts: DrawHeightPost's five call sites re-pointed to our own 
 rows = ["Modules.overlays"]
 
 [hook."overlays.posts_callee"]
-doc = "DrawHeightPost itself, for the five calls FleetOpsHook owns on Roots: armed during the chained call"
+doc = "DrawHeightPost at its entry, armed only while the companion module (Roots: FleetOpsHook) calls it"
 rows = ["Modules.overlays"]
-planned = "FO-5 step 5"
 
 [hook."overlays.paths"]
 doc = "The move paths: the selection, each ship's path and next point, the sketched path, stock's sketch line re-pointed"
@@ -892,3 +891,37 @@ symbol = "AiPath type: a patrol loop"
 kind = "value"
 value = 2
 used_by = ["overlays.paths"]
+
+# Where the height posts are taken: 0 at DrawHeightPost's five calls (overlays.posts), 1 at
+# its entry, armed only while the build's companion module calls it (overlays.posts_callee),
+# for a build whose companion owns the five calls and decides whether a post is drawn
+# (Roots: FleetOpsHook, PLAN-FLEETOPS.md, "The rules of (c)", rule 4). Stock takes the calls
+# and installs nothing at the entry.
+[[sym]]
+id = "ov_posts_at_callee"
+symbol = "height posts claim point"
+kind = "value"
+value = 0
+used_by = ["overlays.posts_callee"]
+
+# The bytes of whole, position-independent instructions at DrawHeightPost's entry that the
+# callee hook moves aside (within fn_height_post's check, which vouches for them).
+[[sym]]
+id = "ov_post_moved"
+symbol = "DrawHeightPost entry instructions"
+kind = "value"
+value = 6
+unit = "bytes"
+used_by = ["overlays.posts_callee"]
+
+# The colour pointer DrawGrid's first line pushes (its operand follows the push): the grid
+# is drawn in the colour it points at, read at run time, so a build that points it elsewhere
+# (Roots, and FleetOpsHook's own colour over that) has its grid in its own colour.
+[[sym]]
+id = "site_grid_colour"
+symbol = "Terrain_Geometry::DrawGrid"
+kind = "label"
+addr = 0x5934c9
+in = "Terrain_Geometry::DrawGrid"
+check = "68 e8 8e 7a 00"
+used_by = ["overlays.reads"]

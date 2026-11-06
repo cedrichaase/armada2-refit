@@ -279,6 +279,7 @@ impl Hulls {
             cloak,
             drawn: false,
             cargo,
+            textures: Vec::new(),
         })
     }
 }
@@ -322,6 +323,7 @@ impl Hulls {
             cloak: None,
             drawn: true,
             cargo: Vec::new(),
+            textures: Vec::new(),
         })
     }
 
@@ -879,6 +881,7 @@ impl Module for Hulls {
                 cloak: if s.cloaked { Some((2, 0.0, 0.0)) } else { s.cloak.map(|k| (3, k.min(1.0), 0.0)) },
                 drawn: true,
                 cargo: Vec::new(),
+                textures: Vec::new(),
             };
             if posed.cloak.is_some() && look.cloak {
                 st.cloaked.push(i + 1);
@@ -1013,6 +1016,9 @@ pub(crate) fn claim_hull(o: usize, v: &View) -> bool {
     let st = view_state(key);
     let Some(p) = st.posed().get_mut(&o) else { return false };
     p.drawn = true;
+    // The node flags and mesh textures the engine and Roots wrote for this instance into
+    // the shared database, just before the draw this replaces.
+    claim::honour_database(p);
     if h.said < 6 {
         h.said += 1;
         log!(
@@ -1084,6 +1090,7 @@ fn draw_instance(v: &View, key: usize, inst: usize, craft: bool, sod: &str, worl
         cloak: None,
         drawn: true,
         cargo: Vec::new(),
+        textures: Vec::new(),
     };
     h.draw.draw(v, &look, &posed, draw::Mode::Opaque);
     let st = view_state(v.key());

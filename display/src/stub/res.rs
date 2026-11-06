@@ -474,7 +474,7 @@ unsafe extern "system" fn surf_get_desc(this: *mut SObj, d: *mut SurfaceDesc) ->
                 x.rtype = 1;
                 x
             }
-            None => SurfaceDesc { format: sf.format, rtype: 1, usage: sf.usage, pool: sf.pool, size: sf.pitch * sf.h, ms_type: sf.ms, width: sf.w, height: sf.h },
+            None => SurfaceDesc { format: sf.format, rtype: 1, usage: sf.usage, pool: sf.pool, size: sf.pitch * sf.h.div_ceil(obj::format_block(sf.format).map_or(1, |b| b.1)), ms_type: sf.ms, width: sf.w, height: sf.h },
         }
     };
     S_OK

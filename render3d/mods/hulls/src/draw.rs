@@ -593,6 +593,9 @@ impl Drawer {
                 cmd.ps_block(Block::new(16, &pick_points(world.p, look.point_lights)));
             }
             let tex_name = if p.assimilated { second_texture(m, part.node).or(part.texture.as_deref()) } else { part.texture.as_deref() };
+            // The texture the engine's database held for this instance at a claim there
+            // (Roots: a ship's own logo), over the SOD's.
+            let tex_name = p.texture_of(part.node).or(tex_name);
             let tex = tex_name.and_then(assets::texture);
             cmd.bind_texture(0, tex.as_ref(), &WRAP);
             let uv = flipbook(m, part.node, p);

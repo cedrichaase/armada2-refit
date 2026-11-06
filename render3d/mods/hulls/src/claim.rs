@@ -78,6 +78,60 @@ unsafe extern "thiscall" fn detour(inst: usize, cam: usize) -> u32 {
     }
 }
 
+/// What the engine's database says of this instance at the claim, applied to its pose:
+/// the database is shared by every instance of the class, and stock's
+/// `GameObjectInstance::RenderInternal` and Roots' `CraftInstance::RenderInternal` (in
+/// FleetOpsHook, just before it) write each instance's node flags and mesh textures into
+/// it before the draw this claim replaces. So each node of the SOD the database hides now
+/// is hidden (with what hangs from it), and each mesh whose texture is not its SOD's now
+/// is drawn with that one (Roots' per-ship logo on the `stlogo` node, shown with the
+/// ship's own texture or hidden). Nothing of FleetOpsHook's memory is read.
+pub fn honour_database(p: &mut r3d_core::scene::pose::Posed) {
+    use crate::hooks;
+    let db = hooks::instance_database(p.inst);
+    if db == 0 {
+        return;
+    }
+    let model = p.model.clone();
+    let sod = &model.sod;
+    p.textures.clear();
+    for (i, n) in sod.nodes.iter().enumerate() {
+        if !p.pose.shown.get(i).copied().unwrap_or(false) {
+            continue;
+        }
+        let e = hooks::database_node(db, &n.name);
+        if e == 0 {
+            continue;
+        }
+        if hooks::node_hidden(e) {
+            r3d_core::scene::instance::hide(sod, i, &mut p.pose.shown, true);
+            continue;
+        }
+        if n.mesh().is_none() {
+            continue;
+        }
+        let Some(t) = hooks::mesh_texture(e).map(stem) else { continue };
+        let own = model.parts.iter().find(|pt| pt.node == i).and_then(|pt| pt.texture.as_deref()).map(stem).unwrap_or("");
+        if !t.is_empty() && !own.is_empty() && !t.eq_ignore_ascii_case(own) && !p.textures.iter().any(|(k, _)| *k == i) {
+            static mut SAID: u32 = 0;
+            if unsafe { SAID } < 8 {
+                unsafe { SAID += 1 };
+                crate::log!("hulls: {} node {} drawn with {} (the database's for this instance; the SOD has {})", model.name, n.name, t, own);
+            }
+            p.textures.push((i, alloc::string::String::from(t)));
+        }
+    }
+}
+
+/// A texture name without its folder and extension (`logo_gal_Galaxy`).
+fn stem(s: &str) -> &str {
+    let s = s.rsplit(['\\', '/']).next().unwrap_or(s);
+    match s.rfind('.') {
+        Some(d) if d > 0 => &s[..d],
+        _ => s,
+    }
+}
+
 fn claim(inst: usize, cam: usize) -> bool {
     let Some((o, v)) = steps::current() else { return false };
     if inst == 0 || obj::instance(o) != inst {
