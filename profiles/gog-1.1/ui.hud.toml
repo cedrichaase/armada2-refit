@@ -69,13 +69,6 @@ addr = 0x763c00
 used_by = ["hud.reads_components", "hud.panels"]
 
 [[sym]]
-id = "hud_ship_display"
-symbol = "shipDisplay"
-kind = "global"
-addr = 0x763968
-used_by = ["hud.reads_components"]
-
-[[sym]]
 id = "hud_map_radar"
 symbol = "mapRadar"
 kind = "global"
@@ -684,6 +677,15 @@ id = "palette_n_slots"
 symbol = "palette_n_slots"
 kind = "value"
 value = 21
+used_by = ["hud.reads_bar"]
+
+# 1 when the button array is behind a pointer held at the field's offset instead of laid
+# out inline there (Roots: FO-6 step 1, decision 65).
+[[sym]]
+id = "palette_slots_indirect"
+symbol = "palette_slots_indirect"
+kind = "value"
+value = 0
 used_by = ["hud.reads_bar"]
 
 [[sym]]

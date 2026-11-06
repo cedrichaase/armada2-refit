@@ -105,7 +105,7 @@ pub fn apply_live(cfg: &crate::config::Hud) {
         MINIMAP_LOGGED = true;
         let want = cfg.info && INFO_CAP;
         if want != INFO {
-            hud::set_taken(hud::ship_display(), false, want);
+            hud::set_taken(hud::INFO_PANEL_TAKEN, false, want);
             INFO = want;
             crate::log!("info: {}", if want { "ours" } else { "stock" });
         } else if cfg.info && !INFO_CAP && !INFO_LOGGED {

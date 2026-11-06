@@ -15,6 +15,16 @@ callees = [
     "Craft::RenderInternal",
 ]
 
+# Functions our hooks only call, which Roots changes anywhere in the body (FO-6 step 1;
+# decision 74): what they return is what Roots means, so their entry checks go. When a hook
+# of ours also sits inside one (a call site, a patch), the function stays marked and only the
+# hooks that merely call it are verified beside it. `DemandLoad` is replaced whole and one
+# loading hook patches a call inside it; `GetAction` carries an observer fix past its entry.
+callees_whole = [
+    "ST3D_Texture::DemandLoad",
+    "ActionMode::GetAction",
+]
+
 # The content set the build reads: none until FO-5 writes Roots' own.
 content = "none"
 

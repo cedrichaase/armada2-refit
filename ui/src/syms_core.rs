@@ -197,7 +197,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         sections: 0xca07c55a,
         image_base: 0x400000,
         n_resolved: 35,
-        content: "stock",
+        content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x7ad508, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_storm3d
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 192 }, // core_storm3d_device_index

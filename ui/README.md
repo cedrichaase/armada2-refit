@@ -500,6 +500,17 @@ so a clone of an install from before still tests the UI alone. The UI has no sta
 for the old plugins since ui 2.2.0: they are gone, and a copy `retire.sh` missed would
 hook the same sites as the UI does.
 
+**On Fleet Operations: Roots** (`./install --game fo-roots`, code only; PLAN-FLEETOPS.md,
+"FO-6") `UI.asi` goes into `Data/` beside the executable, and the shipped `UI.ini` has the
+game's own defaults put over it first (`ui/defaults/fo-roots.ini`, applied by
+`ui/apply-defaults.py`, which fails on a key `UI.ini` lacks): the loading screen on, and the
+HUD's panels, the menus, the Credits, the menu scene, the cursor and the movies off, each
+until its hook is verified on Roots. The menu plates are not installed there and the
+game's `Menus/` is never touched. The UI reads the `fleetops` content set (Roots'
+race names, `content/sets/fleetops/ui.ini`). The bar's count (21 inline on stock, 64
+behind a pointer on Roots) and the info panel (found by name in the render lists) are
+read the build's way (`HUD.md`).
+
 **The overlay's retired keys** (`settings.rs`, `RETIRED`). The hub is the overlay's only
 writer, so at its first frame it removes what Direct3D 9's and the forward mode's removal
 left in `RefitPlayer.ini`: the token `d3d9` of `[Display8.Display8] Backend` (a list like

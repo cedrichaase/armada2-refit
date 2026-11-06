@@ -114,7 +114,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         sections: 0xca07c55a,
         image_base: 0x400000,
         n_resolved: 3,
-        content: "stock",
+        content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x601ce0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xd9, 0x05, 0x18, 0xe2, 0x6a, 0x00, 0xd8, 0x25, 0x28, 0x88, 0x7a, 0x00], mask: &[], section: "", count: 0, value: 0 }, // loading_load_fraction
             a2engine::Entry { present: true, addr: 0x62d2e0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // loading_delete_lights

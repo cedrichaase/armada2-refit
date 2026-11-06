@@ -343,11 +343,6 @@ verified = []
 # ui
 
 [[changed]]
-fn = "ActionMode::GetAction"
-how = "runtime"
-verified = []
-
-[[changed]]
 fn = "ChangePasswordDlgProc"
 how = "runtime"
 verified = []
@@ -467,10 +462,13 @@ fn = "ST3D_GraphicsEngine::SetActiveDisplay"
 how = "runtime"
 verified = []
 
+# Replaced whole at its entry. The order ring and the footprints only call it (their entry
+# check is dropped in ui.hud.toml); loading.inner_pixels patches a call inside it, so the
+# function stays marked for that hook alone (FO-6 step 1; decision 74).
 [[changed]]
 fn = "ST3D_Texture::DemandLoad"
 how = "runtime"
-verified = []
+verified = ["ui.hud.footprints", "ui.hud.order_ring"]
 
 [[changed]]
 fn = "SetCurrentBackground"

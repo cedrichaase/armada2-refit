@@ -161,7 +161,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         sections: 0xca07c55a,
         image_base: 0x400000,
         n_resolved: 0,
-        content: "stock",
+        content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 800 }, // dialogs_front_end_width
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 600 }, // dialogs_front_end_height

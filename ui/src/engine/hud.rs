@@ -45,10 +45,32 @@ fn at(h: a2engine::HookId, s: a2engine::Sym) -> usize {
 pub fn palette_ptr() -> usize {
     at(hook::HUD_READS_COMPONENTS, sym::HUD_PALETTE_PTR)
 }
-/// `shipDisplay`: the info panel (an instance, not a pointer).
+/// The info panel (`ShipDisplay`), found in the render lists by its name, never through
+/// the static global `shipDisplay` (PLAN-FLEETOPS.md, FO-6, decision 64): on Roots,
+/// FleetOpsHook constructs a panel of its own and that global is not it. On stock the
+/// list holds the very instance the global is, so the answer is the same. 0 outside a
+/// mission (no list holds it) and while the components cannot be read.
 pub fn ship_display() -> usize {
-    at(hook::HUD_READS_COMPONENTS, sym::HUD_SHIP_DISPLAY)
+    if eng().ready(hook::HUD_READS_COMPONENTS).is_err() {
+        return 0;
+    }
+    let all = all_components();
+    let known = unsafe { INFO_PANEL };
+    if known != 0 && all.contains(&known) && name(known) == INFO_PANEL_NAME {
+        return known;
+    }
+    let found = all.iter().copied().find(|&c| name(c) == INFO_PANEL_NAME).unwrap_or(0);
+    unsafe { INFO_PANEL = found };
+    found
 }
+
+/// The info panel's `GetName`.
+const INFO_PANEL_NAME: &str = "ShipDisplay";
+/// The panel last found (`ship_display`, `learn`).
+static mut INFO_PANEL: usize = 0;
+/// `set_taken`'s `at` for the info panel: not an address, the panel found by name, which
+/// can be a different object in each mission.
+pub const INFO_PANEL_TAKEN: usize = 1;
 /// `mapRadar`: the minimap.
 pub fn map_radar() -> usize {
     at(hook::HUD_READS_COMPONENTS, sym::HUD_MAP_RADAR)
@@ -204,7 +226,27 @@ pub fn is_taken(c: usize) -> bool {
 /// stub reach the screen through passthrough.
 #[allow(static_mut_refs)]
 fn taken(c: usize) -> bool {
-    c != 0 && unsafe { INSTALLED } && crate::gfx::drawing() && unsafe { TAKEN.iter().any(|&(a, p)| a != 0 && if p { rd::<usize>(a) == c } else { a == c }) }
+    c != 0
+        && unsafe { INSTALLED }
+        && crate::gfx::drawing()
+        && unsafe { TAKEN.iter().any(|&(a, p)| a != 0 && if a == INFO_PANEL_TAKEN { c == INFO_PANEL } else if p { rd::<usize>(a) == c } else { a == c }) }
+}
+
+/// Notes, for a component the engine's walk is calling (so one of the render list), that
+/// it is the info panel when the panel is taken by name: the panel is known before the
+/// first frame of a mission draws it, whichever object it is.
+#[allow(static_mut_refs)]
+fn learn(c: usize) {
+    unsafe {
+        if !TAKEN.iter().any(|&(a, _)| a == INFO_PANEL_TAKEN) {
+            return;
+        }
+        if name(c) == INFO_PANEL_NAME {
+            INFO_PANEL = c;
+        } else if INFO_PANEL == c {
+            INFO_PANEL = 0;
+        }
+    }
 }
 
 /// Whether the pointer is over a panel of ours (the last UI frame's claim): then no
@@ -215,6 +257,7 @@ pub fn set_pointer_over_ui(on: bool) {
 
 unsafe extern "thiscall" fn render_component(c: usize) {
     unsafe {
+        learn(c);
         if c == cursor() && rd::<usize>(cursor() + field::HUD_CURSOR_SPRITE()) == 0 {
             // No cursor named this frame: no owner (the pointer is over a panel of
             // ours), or an owner we have taken, whose stock `Render`, which names it,
@@ -292,6 +335,7 @@ unsafe fn render_cursor_without_tooltip(c: usize) {
 
 unsafe extern "thiscall" fn cursor_over(c: usize) -> bool {
     unsafe {
+        learn(c);
         // The objectives box stays the mouse's owner while it shows, ours or not, as
         // stock's modal box is: `GameKeysProcessInput` opens the chat line on Return
         // unless the owner is this box, and Return is also what closes it.
@@ -309,16 +353,37 @@ unsafe extern "thiscall" fn cursor_over(c: usize) -> bool {
 
 /// The components of the view in use, in the order `RenderAll` draws them.
 pub fn components() -> alloc::vec::Vec<usize> {
+    let record = at(hook::HUD_READS_COMPONENTS, sym::HUD_VIEW_RECORD);
+    if record == 0 {
+        return alloc::vec::Vec::new();
+    }
+    components_of(unsafe { rd::<u32>(record) } as usize)
+}
+
+/// Every component of every view's list, each once.
+fn all_components() -> alloc::vec::Vec<usize> {
     let mut v = alloc::vec::Vec::new();
-    let (record, lists) = (at(hook::HUD_READS_COMPONENTS, sym::HUD_VIEW_RECORD), at(hook::HUD_READS_COMPONENTS, sym::HUD_RENDER_LISTS));
-    if record == 0 || lists == 0 {
+    for view in 0..=MAX_VIEW {
+        for c in components_of(view) {
+            if !v.contains(&c) {
+                v.push(c);
+            }
+        }
+    }
+    v
+}
+
+/// The highest view number the render lists are read for (`View_Record` is never above it).
+const MAX_VIEW: usize = 8;
+
+/// The components of view `view`'s render list, in drawing order; none for a view with no list.
+fn components_of(view: usize) -> alloc::vec::Vec<usize> {
+    let mut v = alloc::vec::Vec::new();
+    let lists = at(hook::HUD_READS_COMPONENTS, sym::HUD_RENDER_LISTS);
+    if lists == 0 || view > MAX_VIEW {
         return v;
     }
     unsafe {
-        let view = rd::<u32>(record) as usize;
-        if view > 8 {
-            return v;
-        }
         let list = rd::<usize>(lists + 4 * view);
         let head = peek(list, 4);
         if head == 0 {

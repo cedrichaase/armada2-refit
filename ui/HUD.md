@@ -148,6 +148,21 @@ a video; the unit view's frame follows.
 **Taking a panel.** `engine::hud::set_taken(at, by_pointer, on)`: a component by its
 address, or (the bar) by the global that points to it, read when asked.
 
+**The info panel is found by name, not by `shipDisplay`.** On Roots, FleetOpsHook
+constructs a `ShipDisplay` of its own (larger, in place of the static instance), so the
+static global is not the panel there (PLAN-FLEETOPS.md, FO-6, decision 64). On every
+build `engine::hud::ship_display()` looks through the render lists of all views for the
+component whose `GetName` is "ShipDisplay" (on stock the very instance the global is, in
+the normal view's list; the cinematic view's list lacks it, as before), keeps it while a
+list still holds it, and the panel switch takes it by name (`INFO_PANEL_TAKEN`), learning
+it from the components the walks of `RenderAll` and `RefreshOwner` call. Outside a mission
+no list holds it, and the answer is 0. Whether Roots' panel answers to the same name is
+for the bench to say (step 3).
+
+**The bar's buttons** are `palette_n_slots` of them (21 inline at `+0x28` on stock; on
+Roots 64 behind a pointer held there, `palette_slots_indirect`), both values of the
+build's profile (`engine::palette::slot`).
+
 ## The references the stock HUD is drawn against
 
 These are the measured facts about where the engine's 2D drawing gets its scale. The
@@ -1489,7 +1504,7 @@ down is explained on are named in the profile.
 |---|---|---|
 | `ui.hud.panels` (`HUD.Minimap`, `HUD.Info`, `HUD.Bar`, `HUD.UnitView`) | the call of a component's `Render` in `DisplayInterface::RenderAll` and of its `CursorOver` in `CursorInterface::RefreshOwner` (patched, 7 bytes each, "The panel switch"), `iCursor` and its owner / sprite fields | no panel of ours is taken over |
 | `ui.hud.tooltips` (`HUD.Tooltips`) | `iCursor+0x34` / `+0x38`, `CursorInterface::m_tooltipState` | the engine draws its tooltips at the pointer |
-| `ui.hud.reads_components` | `g_pPopupPalette`, `shipDisplay`, `mapRadar`, `DisplayInterface::s_pRenderList`, `View_Record`, the `DisplayInterface` rectangle / hidden fields and `GetName` slot | no component is found, hidden or placed |
+| `ui.hud.reads_components` | `g_pPopupPalette`, `mapRadar`, `DisplayInterface::s_pRenderList`, `View_Record`, the `DisplayInterface` rectangle / hidden fields and `GetName` slot | no component is found, hidden or placed |
 | `ui.hud.reads_calls` | `TextInput_IsActive` and `CinematicView::IsPlayingVideo` (`fn`, checked), `g_cinematicView` | keys are not held back for the chat line; a click sounds during a video |
 | `ui.hud.reads_popups` | the message, objectives, pause and replay boxes, their press functions, `IsGamePausedAtAll` and `ObjectivesDisplay::FocusSimulate` (`fn`, checked) | no box of ours ("Messages and objectives", "Pause and replay") |
 | `ui.hud.reads_bar` (`HUD.Bar`, `HUD.BarLabels`, `HUD.Icons`) | the bar's slots, mode and menu, the `ControlButton` / `CommandInfoClass` / `ModeInfo` fields, the `ButtonName` pair, `cPrjID::GetName`, `FindElement` and `ControlButton::mButtonPressFunction` (`fn`, checked), the sprite database | no button is described or drawn |

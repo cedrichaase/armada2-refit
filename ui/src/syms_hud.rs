@@ -3,37 +3,36 @@
 
 pub mod sym {
     pub const HUD_PALETTE_PTR: a2engine::Sym = a2engine::Sym(0);
-    pub const HUD_SHIP_DISPLAY: a2engine::Sym = a2engine::Sym(1);
-    pub const HUD_MAP_RADAR: a2engine::Sym = a2engine::Sym(2);
-    pub const HUD_CURSOR: a2engine::Sym = a2engine::Sym(3);
-    pub const HUD_RENDER_LISTS: a2engine::Sym = a2engine::Sym(4);
-    pub const HUD_VIEW_RECORD: a2engine::Sym = a2engine::Sym(5);
-    pub const HUD_TOOLTIP_STATE: a2engine::Sym = a2engine::Sym(6);
-    pub const HUD_CINEMATIC_VIEW: a2engine::Sym = a2engine::Sym(7);
-    pub const HUD_RENDER_CALL: a2engine::Sym = a2engine::Sym(8);
-    pub const HUD_OWNER_CALL: a2engine::Sym = a2engine::Sym(9);
-    pub const HUD_TEXT_INPUT_ACTIVE: a2engine::Sym = a2engine::Sym(10);
-    pub const HUD_IS_PLAYING_VIDEO: a2engine::Sym = a2engine::Sym(11);
-    pub const POPUPS_MESSAGE: a2engine::Sym = a2engine::Sym(22);
-    pub const POPUPS_OBJECTIVES: a2engine::Sym = a2engine::Sym(23);
-    pub const POPUPS_PAUSE: a2engine::Sym = a2engine::Sym(24);
-    pub const POPUPS_REPLAY: a2engine::Sym = a2engine::Sym(25);
-    pub const POPUPS_MSG_UNPAUSE: a2engine::Sym = a2engine::Sym(26);
-    pub const POPUPS_OBJ_UNPAUSE: a2engine::Sym = a2engine::Sym(27);
-    pub const POPUPS_PAUSE_UNPAUSE: a2engine::Sym = a2engine::Sym(28);
-    pub const POPUPS_REPLAY_PRESS_0: a2engine::Sym = a2engine::Sym(29);
-    pub const POPUPS_REPLAY_PRESS_1: a2engine::Sym = a2engine::Sym(30);
-    pub const POPUPS_REPLAY_PRESS_2: a2engine::Sym = a2engine::Sym(31);
-    pub const POPUPS_REPLAY_PRESS_3: a2engine::Sym = a2engine::Sym(32);
-    pub const POPUPS_REPLAY_PRESS_4: a2engine::Sym = a2engine::Sym(33);
-    pub const POPUPS_IS_GAME_PAUSED: a2engine::Sym = a2engine::Sym(34);
-    pub const POPUPS_OBJ_FOCUS_SIMULATE: a2engine::Sym = a2engine::Sym(35);
-    pub const PALETTE_MODE_NAMES: a2engine::Sym = a2engine::Sym(49);
-    pub const PALETTE_SPRITE_DB: a2engine::Sym = a2engine::Sym(50);
-    pub const PALETTE_PRJ_GET_NAME: a2engine::Sym = a2engine::Sym(51);
-    pub const PALETTE_CMD_BUTTON_NAME: a2engine::Sym = a2engine::Sym(52);
-    pub const PALETTE_MODE_BUTTON_NAME: a2engine::Sym = a2engine::Sym(53);
-    pub const PALETTE_FIND_ELEMENT: a2engine::Sym = a2engine::Sym(54);
+    pub const HUD_MAP_RADAR: a2engine::Sym = a2engine::Sym(1);
+    pub const HUD_CURSOR: a2engine::Sym = a2engine::Sym(2);
+    pub const HUD_RENDER_LISTS: a2engine::Sym = a2engine::Sym(3);
+    pub const HUD_VIEW_RECORD: a2engine::Sym = a2engine::Sym(4);
+    pub const HUD_TOOLTIP_STATE: a2engine::Sym = a2engine::Sym(5);
+    pub const HUD_CINEMATIC_VIEW: a2engine::Sym = a2engine::Sym(6);
+    pub const HUD_RENDER_CALL: a2engine::Sym = a2engine::Sym(7);
+    pub const HUD_OWNER_CALL: a2engine::Sym = a2engine::Sym(8);
+    pub const HUD_TEXT_INPUT_ACTIVE: a2engine::Sym = a2engine::Sym(9);
+    pub const HUD_IS_PLAYING_VIDEO: a2engine::Sym = a2engine::Sym(10);
+    pub const POPUPS_MESSAGE: a2engine::Sym = a2engine::Sym(21);
+    pub const POPUPS_OBJECTIVES: a2engine::Sym = a2engine::Sym(22);
+    pub const POPUPS_PAUSE: a2engine::Sym = a2engine::Sym(23);
+    pub const POPUPS_REPLAY: a2engine::Sym = a2engine::Sym(24);
+    pub const POPUPS_MSG_UNPAUSE: a2engine::Sym = a2engine::Sym(25);
+    pub const POPUPS_OBJ_UNPAUSE: a2engine::Sym = a2engine::Sym(26);
+    pub const POPUPS_PAUSE_UNPAUSE: a2engine::Sym = a2engine::Sym(27);
+    pub const POPUPS_REPLAY_PRESS_0: a2engine::Sym = a2engine::Sym(28);
+    pub const POPUPS_REPLAY_PRESS_1: a2engine::Sym = a2engine::Sym(29);
+    pub const POPUPS_REPLAY_PRESS_2: a2engine::Sym = a2engine::Sym(30);
+    pub const POPUPS_REPLAY_PRESS_3: a2engine::Sym = a2engine::Sym(31);
+    pub const POPUPS_REPLAY_PRESS_4: a2engine::Sym = a2engine::Sym(32);
+    pub const POPUPS_IS_GAME_PAUSED: a2engine::Sym = a2engine::Sym(33);
+    pub const POPUPS_OBJ_FOCUS_SIMULATE: a2engine::Sym = a2engine::Sym(34);
+    pub const PALETTE_MODE_NAMES: a2engine::Sym = a2engine::Sym(48);
+    pub const PALETTE_SPRITE_DB: a2engine::Sym = a2engine::Sym(49);
+    pub const PALETTE_PRJ_GET_NAME: a2engine::Sym = a2engine::Sym(50);
+    pub const PALETTE_CMD_BUTTON_NAME: a2engine::Sym = a2engine::Sym(51);
+    pub const PALETTE_MODE_BUTTON_NAME: a2engine::Sym = a2engine::Sym(52);
+    pub const PALETTE_FIND_ELEMENT: a2engine::Sym = a2engine::Sym(53);
     pub const OVERLAY_SELECTION_DISPLAY: a2engine::Sym = a2engine::Sym(77);
     pub const OVERLAY_OBJECT_LIST: a2engine::Sym = a2engine::Sym(78);
     pub const OVERLAY_CURRENT_CAMERA: a2engine::Sym = a2engine::Sym(79);
@@ -101,48 +100,48 @@ pub mod hook {
 
 pub mod field {
     #![allow(non_snake_case)]
-    #[inline(always)] pub fn HUD_DI_RECT() -> usize { super::TABLE.engine().field(a2engine::Sym(12)) }
-    #[inline(always)] pub fn HUD_DI_HIDDEN() -> usize { super::TABLE.engine().field(a2engine::Sym(13)) }
-    #[inline(always)] pub fn HUD_DI_CURSOR() -> usize { super::TABLE.engine().field(a2engine::Sym(14)) }
-    #[inline(always)] pub fn HUD_VT_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(15)) }
-    #[inline(always)] pub fn HUD_VT_RENDER() -> usize { super::TABLE.engine().field(a2engine::Sym(16)) }
-    #[inline(always)] pub fn HUD_VT_CURSOR_OVER() -> usize { super::TABLE.engine().field(a2engine::Sym(17)) }
-    #[inline(always)] pub fn HUD_CURSOR_OWNER() -> usize { super::TABLE.engine().field(a2engine::Sym(18)) }
-    #[inline(always)] pub fn HUD_CURSOR_SPRITE() -> usize { super::TABLE.engine().field(a2engine::Sym(19)) }
-    #[inline(always)] pub fn HUD_CURSOR_TIP() -> usize { super::TABLE.engine().field(a2engine::Sym(20)) }
-    #[inline(always)] pub fn HUD_CURSOR_TIP_VERBOSE() -> usize { super::TABLE.engine().field(a2engine::Sym(21)) }
-    #[inline(always)] pub fn POPUPS_MSG_TITLE() -> usize { super::TABLE.engine().field(a2engine::Sym(36)) }
-    #[inline(always)] pub fn POPUPS_MSG_BODY() -> usize { super::TABLE.engine().field(a2engine::Sym(37)) }
-    #[inline(always)] pub fn POPUPS_MSG_OK() -> usize { super::TABLE.engine().field(a2engine::Sym(38)) }
-    #[inline(always)] pub fn POPUPS_OBJ_SUMMARY_HEADER() -> usize { super::TABLE.engine().field(a2engine::Sym(39)) }
-    #[inline(always)] pub fn POPUPS_OBJ_TITLE() -> usize { super::TABLE.engine().field(a2engine::Sym(40)) }
-    #[inline(always)] pub fn POPUPS_OBJ_BRIEFING() -> usize { super::TABLE.engine().field(a2engine::Sym(41)) }
-    #[inline(always)] pub fn POPUPS_OBJ_HEADER() -> usize { super::TABLE.engine().field(a2engine::Sym(42)) }
-    #[inline(always)] pub fn POPUPS_OBJ_LINES() -> usize { super::TABLE.engine().field(a2engine::Sym(43)) }
-    #[inline(always)] pub fn POPUPS_OBJ_DONE() -> usize { super::TABLE.engine().field(a2engine::Sym(44)) }
-    #[inline(always)] pub fn POPUPS_OBJ_OK() -> usize { super::TABLE.engine().field(a2engine::Sym(45)) }
-    #[inline(always)] pub fn POPUPS_VT_FOCUS_SIMULATE() -> usize { super::TABLE.engine().field(a2engine::Sym(46)) }
-    #[inline(always)] pub fn POPUPS_PAUSE_BUTTON() -> usize { super::TABLE.engine().field(a2engine::Sym(47)) }
-    #[inline(always)] pub fn POPUPS_REPLAY_BUTTONS() -> usize { super::TABLE.engine().field(a2engine::Sym(48)) }
-    #[inline(always)] pub fn PALETTE_SLOTS() -> usize { super::TABLE.engine().field(a2engine::Sym(55)) }
-    #[inline(always)] pub fn PALETTE_MODE() -> usize { super::TABLE.engine().field(a2engine::Sym(56)) }
-    #[inline(always)] pub fn PALETTE_MENU() -> usize { super::TABLE.engine().field(a2engine::Sym(57)) }
-    #[inline(always)] pub fn PALETTE_BTN_STATE() -> usize { super::TABLE.engine().field(a2engine::Sym(58)) }
-    #[inline(always)] pub fn PALETTE_BTN_SPRITE() -> usize { super::TABLE.engine().field(a2engine::Sym(59)) }
-    #[inline(always)] pub fn PALETTE_BTN_MODE() -> usize { super::TABLE.engine().field(a2engine::Sym(60)) }
-    #[inline(always)] pub fn PALETTE_BTN_COMMAND() -> usize { super::TABLE.engine().field(a2engine::Sym(61)) }
-    #[inline(always)] pub fn PALETTE_VT_TOOLTIP() -> usize { super::TABLE.engine().field(a2engine::Sym(62)) }
-    #[inline(always)] pub fn PALETTE_VT_VERBOSE() -> usize { super::TABLE.engine().field(a2engine::Sym(63)) }
-    #[inline(always)] pub fn PALETTE_VT_IS_VALID() -> usize { super::TABLE.engine().field(a2engine::Sym(64)) }
-    #[inline(always)] pub fn PALETTE_VT_PRESS() -> usize { super::TABLE.engine().field(a2engine::Sym(65)) }
-    #[inline(always)] pub fn PALETTE_CMD_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(66)) }
-    #[inline(always)] pub fn PALETTE_CMD_POS() -> usize { super::TABLE.engine().field(a2engine::Sym(67)) }
-    #[inline(always)] pub fn PALETTE_MODE_KIND() -> usize { super::TABLE.engine().field(a2engine::Sym(68)) }
-    #[inline(always)] pub fn PALETTE_MODE_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(69)) }
-    #[inline(always)] pub fn PALETTE_CLASS_ODF() -> usize { super::TABLE.engine().field(a2engine::Sym(70)) }
-    #[inline(always)] pub fn PALETTE_MODE_WEAPON() -> usize { super::TABLE.engine().field(a2engine::Sym(71)) }
-    #[inline(always)] pub fn PALETTE_WEAPON_PRJID() -> usize { super::TABLE.engine().field(a2engine::Sym(72)) }
-    #[inline(always)] pub fn PALETTE_MODE_INDEX() -> usize { super::TABLE.engine().field(a2engine::Sym(73)) }
+    #[inline(always)] pub fn HUD_DI_RECT() -> usize { super::TABLE.engine().field(a2engine::Sym(11)) }
+    #[inline(always)] pub fn HUD_DI_HIDDEN() -> usize { super::TABLE.engine().field(a2engine::Sym(12)) }
+    #[inline(always)] pub fn HUD_DI_CURSOR() -> usize { super::TABLE.engine().field(a2engine::Sym(13)) }
+    #[inline(always)] pub fn HUD_VT_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(14)) }
+    #[inline(always)] pub fn HUD_VT_RENDER() -> usize { super::TABLE.engine().field(a2engine::Sym(15)) }
+    #[inline(always)] pub fn HUD_VT_CURSOR_OVER() -> usize { super::TABLE.engine().field(a2engine::Sym(16)) }
+    #[inline(always)] pub fn HUD_CURSOR_OWNER() -> usize { super::TABLE.engine().field(a2engine::Sym(17)) }
+    #[inline(always)] pub fn HUD_CURSOR_SPRITE() -> usize { super::TABLE.engine().field(a2engine::Sym(18)) }
+    #[inline(always)] pub fn HUD_CURSOR_TIP() -> usize { super::TABLE.engine().field(a2engine::Sym(19)) }
+    #[inline(always)] pub fn HUD_CURSOR_TIP_VERBOSE() -> usize { super::TABLE.engine().field(a2engine::Sym(20)) }
+    #[inline(always)] pub fn POPUPS_MSG_TITLE() -> usize { super::TABLE.engine().field(a2engine::Sym(35)) }
+    #[inline(always)] pub fn POPUPS_MSG_BODY() -> usize { super::TABLE.engine().field(a2engine::Sym(36)) }
+    #[inline(always)] pub fn POPUPS_MSG_OK() -> usize { super::TABLE.engine().field(a2engine::Sym(37)) }
+    #[inline(always)] pub fn POPUPS_OBJ_SUMMARY_HEADER() -> usize { super::TABLE.engine().field(a2engine::Sym(38)) }
+    #[inline(always)] pub fn POPUPS_OBJ_TITLE() -> usize { super::TABLE.engine().field(a2engine::Sym(39)) }
+    #[inline(always)] pub fn POPUPS_OBJ_BRIEFING() -> usize { super::TABLE.engine().field(a2engine::Sym(40)) }
+    #[inline(always)] pub fn POPUPS_OBJ_HEADER() -> usize { super::TABLE.engine().field(a2engine::Sym(41)) }
+    #[inline(always)] pub fn POPUPS_OBJ_LINES() -> usize { super::TABLE.engine().field(a2engine::Sym(42)) }
+    #[inline(always)] pub fn POPUPS_OBJ_DONE() -> usize { super::TABLE.engine().field(a2engine::Sym(43)) }
+    #[inline(always)] pub fn POPUPS_OBJ_OK() -> usize { super::TABLE.engine().field(a2engine::Sym(44)) }
+    #[inline(always)] pub fn POPUPS_VT_FOCUS_SIMULATE() -> usize { super::TABLE.engine().field(a2engine::Sym(45)) }
+    #[inline(always)] pub fn POPUPS_PAUSE_BUTTON() -> usize { super::TABLE.engine().field(a2engine::Sym(46)) }
+    #[inline(always)] pub fn POPUPS_REPLAY_BUTTONS() -> usize { super::TABLE.engine().field(a2engine::Sym(47)) }
+    #[inline(always)] pub fn PALETTE_SLOTS() -> usize { super::TABLE.engine().field(a2engine::Sym(54)) }
+    #[inline(always)] pub fn PALETTE_MODE() -> usize { super::TABLE.engine().field(a2engine::Sym(55)) }
+    #[inline(always)] pub fn PALETTE_MENU() -> usize { super::TABLE.engine().field(a2engine::Sym(56)) }
+    #[inline(always)] pub fn PALETTE_BTN_STATE() -> usize { super::TABLE.engine().field(a2engine::Sym(57)) }
+    #[inline(always)] pub fn PALETTE_BTN_SPRITE() -> usize { super::TABLE.engine().field(a2engine::Sym(58)) }
+    #[inline(always)] pub fn PALETTE_BTN_MODE() -> usize { super::TABLE.engine().field(a2engine::Sym(59)) }
+    #[inline(always)] pub fn PALETTE_BTN_COMMAND() -> usize { super::TABLE.engine().field(a2engine::Sym(60)) }
+    #[inline(always)] pub fn PALETTE_VT_TOOLTIP() -> usize { super::TABLE.engine().field(a2engine::Sym(61)) }
+    #[inline(always)] pub fn PALETTE_VT_VERBOSE() -> usize { super::TABLE.engine().field(a2engine::Sym(62)) }
+    #[inline(always)] pub fn PALETTE_VT_IS_VALID() -> usize { super::TABLE.engine().field(a2engine::Sym(63)) }
+    #[inline(always)] pub fn PALETTE_VT_PRESS() -> usize { super::TABLE.engine().field(a2engine::Sym(64)) }
+    #[inline(always)] pub fn PALETTE_CMD_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(65)) }
+    #[inline(always)] pub fn PALETTE_CMD_POS() -> usize { super::TABLE.engine().field(a2engine::Sym(66)) }
+    #[inline(always)] pub fn PALETTE_MODE_KIND() -> usize { super::TABLE.engine().field(a2engine::Sym(67)) }
+    #[inline(always)] pub fn PALETTE_MODE_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(68)) }
+    #[inline(always)] pub fn PALETTE_CLASS_ODF() -> usize { super::TABLE.engine().field(a2engine::Sym(69)) }
+    #[inline(always)] pub fn PALETTE_MODE_WEAPON() -> usize { super::TABLE.engine().field(a2engine::Sym(70)) }
+    #[inline(always)] pub fn PALETTE_WEAPON_PRJID() -> usize { super::TABLE.engine().field(a2engine::Sym(71)) }
+    #[inline(always)] pub fn PALETTE_MODE_INDEX() -> usize { super::TABLE.engine().field(a2engine::Sym(72)) }
     #[inline(always)] pub fn OVERLAY_SD_POINTED() -> usize { super::TABLE.engine().field(a2engine::Sym(87)) }
     #[inline(always)] pub fn OVERLAY_SD_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(88)) }
     #[inline(always)] pub fn OVERLAY_SD_FADE() -> usize { super::TABLE.engine().field(a2engine::Sym(89)) }
@@ -194,7 +193,8 @@ pub mod field {
 
 pub mod value {
     #![allow(non_snake_case)]
-    #[inline(always)] pub fn PALETTE_N_SLOTS() -> i32 { super::TABLE.engine().value(a2engine::Sym(74)) }
+    #[inline(always)] pub fn PALETTE_N_SLOTS() -> i32 { super::TABLE.engine().value(a2engine::Sym(73)) }
+    #[inline(always)] pub fn PALETTE_SLOTS_INDIRECT() -> i32 { super::TABLE.engine().value(a2engine::Sym(74)) }
     #[inline(always)] pub fn PALETTE_NAMES_STRIDE() -> i32 { super::TABLE.engine().value(a2engine::Sym(75)) }
     #[inline(always)] pub fn PALETTE_NAMES_COUNT() -> i32 { super::TABLE.engine().value(a2engine::Sym(76)) }
     #[inline(always)] pub fn OVERLAY_FLAG_CRAFT() -> i32 { super::TABLE.engine().value(a2engine::Sym(115)) }
@@ -205,7 +205,6 @@ pub mod value {
 
 pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "hud_palette_ptr", symbol: "g_pPopupPalette", kind: a2engine::Kind::Global },
-    a2engine::SymDef { id: "hud_ship_display", symbol: "shipDisplay", kind: a2engine::Kind::Global },
     a2engine::SymDef { id: "hud_map_radar", symbol: "mapRadar", kind: a2engine::Kind::Global },
     a2engine::SymDef { id: "hud_cursor", symbol: "iCursor", kind: a2engine::Kind::Global },
     a2engine::SymDef { id: "hud_render_lists", symbol: "DisplayInterface::s_pRenderList", kind: a2engine::Kind::Global },
@@ -279,6 +278,7 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "palette_weapon_prjid", symbol: "ModeInfo special weapon class", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "palette_mode_index", symbol: "ModeInfo", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "palette_n_slots", symbol: "palette_n_slots", kind: a2engine::Kind::Value },
+    a2engine::SymDef { id: "palette_slots_indirect", symbol: "palette_slots_indirect", kind: a2engine::Kind::Value },
     a2engine::SymDef { id: "palette_names_stride", symbol: "palette_names_stride", kind: a2engine::Kind::Value },
     a2engine::SymDef { id: "palette_names_count", symbol: "palette_names_count", kind: a2engine::Kind::Value },
     a2engine::SymDef { id: "overlay_selection_display", symbol: "selectionDisplay", kind: a2engine::Kind::Global },
@@ -379,13 +379,13 @@ pub const SYMS: &[a2engine::SymDef] = &[
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
-    a2engine::HookDef { id: "ui.hud.panels", run_unknown: false, rows: &["HUD.Minimap", "HUD.Info", "HUD.Bar", "HUD.UnitView"], syms: &[0, 3, 7, 8, 9, 13, 14, 16, 17, 18, 19, 22, 23, 77, 119] },
-    a2engine::HookDef { id: "ui.hud.tooltips", run_unknown: false, rows: &["HUD.Tooltips"], syms: &[3, 6, 16, 20, 21] },
-    a2engine::HookDef { id: "ui.hud.reads_components", run_unknown: false, rows: &[], syms: &[0, 1, 2, 4, 5, 12, 13, 15] },
-    a2engine::HookDef { id: "ui.hud.reads_calls", run_unknown: false, rows: &[], syms: &[7, 10, 11] },
-    a2engine::HookDef { id: "ui.hud.reads_popups", run_unknown: false, rows: &[], syms: &[22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48] },
-    a2engine::HookDef { id: "ui.hud.reads_bar", run_unknown: false, rows: &["HUD.Bar", "HUD.BarLabels", "HUD.Icons"], syms: &[49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76] },
-    a2engine::HookDef { id: "ui.hud.reads_overlay", run_unknown: false, rows: &["HUD.Selection", "HUD.SelectionGauges"], syms: &[7, 77, 78, 79, 80, 81, 82, 83, 84, 85, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118] },
+    a2engine::HookDef { id: "ui.hud.panels", run_unknown: false, rows: &["HUD.Minimap", "HUD.Info", "HUD.Bar", "HUD.UnitView"], syms: &[0, 2, 6, 7, 8, 12, 13, 15, 16, 17, 18, 21, 22, 77, 119] },
+    a2engine::HookDef { id: "ui.hud.tooltips", run_unknown: false, rows: &["HUD.Tooltips"], syms: &[2, 5, 15, 19, 20] },
+    a2engine::HookDef { id: "ui.hud.reads_components", run_unknown: false, rows: &[], syms: &[0, 1, 3, 4, 11, 12, 14] },
+    a2engine::HookDef { id: "ui.hud.reads_calls", run_unknown: false, rows: &[], syms: &[6, 9, 10] },
+    a2engine::HookDef { id: "ui.hud.reads_popups", run_unknown: false, rows: &[], syms: &[21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47] },
+    a2engine::HookDef { id: "ui.hud.reads_bar", run_unknown: false, rows: &["HUD.Bar", "HUD.BarLabels", "HUD.Icons"], syms: &[48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76] },
+    a2engine::HookDef { id: "ui.hud.reads_overlay", run_unknown: false, rows: &["HUD.Selection", "HUD.SelectionGauges"], syms: &[6, 77, 78, 79, 80, 81, 82, 83, 84, 85, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118] },
     a2engine::HookDef { id: "ui.hud.bubbles", run_unknown: false, rows: &[], syms: &[86] },
     a2engine::HookDef { id: "ui.hud.reads_overlay_text", run_unknown: false, rows: &[], syms: &[119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 169, 170, 171] },
     a2engine::HookDef { id: "ui.hud.drag_box", run_unknown: false, rows: &[], syms: &[129, 130, 164, 165] },
@@ -410,7 +410,6 @@ pub const BUILDS: &[a2engine::Build] = &[
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x763c00, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_palette_ptr
-            a2engine::Entry { present: true, addr: 0x763968, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_ship_display
             a2engine::Entry { present: true, addr: 0x763810, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_map_radar
             a2engine::Entry { present: true, addr: 0x7643a8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_cursor
             a2engine::Entry { present: true, addr: 0x764fd8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_render_lists
@@ -484,6 +483,7 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 520 }, // palette_weapon_prjid
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 20 }, // palette_mode_index
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 21 }, // palette_n_slots
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // palette_slots_indirect
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // palette_names_stride
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 9 }, // palette_names_count
             a2engine::Entry { present: true, addr: 0x7645b0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // overlay_selection_display
@@ -598,11 +598,10 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 133,
-        content: "stock",
+        n_resolved: 141,
+        content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x763c00, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_palette_ptr
-            a2engine::Entry { present: true, addr: 0x763968, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_ship_display
             a2engine::Entry { present: true, addr: 0x763810, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_map_radar
             a2engine::Entry { present: true, addr: 0x7643a8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_cursor
             a2engine::Entry { present: true, addr: 0x764fd8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_render_lists
@@ -675,7 +674,8 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // palette_mode_weapon
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 520 }, // palette_weapon_prjid
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 20 }, // palette_mode_index
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 21 }, // palette_n_slots
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 64 }, // palette_n_slots
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1 }, // palette_slots_indirect
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16 }, // palette_names_stride
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 9 }, // palette_names_count
             a2engine::Entry { present: true, addr: 0x7645b0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // overlay_selection_display
@@ -735,7 +735,7 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x618590, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_clip_and_render_line
             a2engine::Entry { present: true, addr: 0x5938a0, end: 0x0, target: 0x83, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_height_post_call
             a2engine::Entry { present: true, addr: 0x63a7c0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_sprite_draw_quad
-            a2engine::Entry { present: true, addr: 0x642610, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68], mask: &[], section: "", count: 0, value: 0 }, // lo_demand_load
+            a2engine::Entry { present: true, addr: 0x642610, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_demand_load
             a2engine::Entry { present: true, addr: 0x63b150, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x58, 0xc3], mask: &[], section: "", count: 0, value: 0 }, // lo_sprite_texture
             a2engine::Entry { present: true, addr: 0x522537, end: 0x0, target: 0x85, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_grid_fx_call
             a2engine::Entry { present: true, addr: 0x5222f0, end: 0x0, target: 0x85, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_where_call
@@ -778,7 +778,6 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Block { hook: 0, symbol: "DisplayInterface::RenderAll", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: DisplayInterface::RenderAll is changed by fo-roots-5.0Z11, not yet verified" },
             a2engine::Block { hook: 9, symbol: "cOverViewImp::mNormalModeRender", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: cOverViewImp::mNormalModeRender is changed by fo-roots-5.0Z11, not yet verified" },
             a2engine::Block { hook: 11, symbol: "cOverViewImp::mRenderWhere", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: cOverViewImp::mRenderWhere is changed by fo-roots-5.0Z11, not yet verified" },
-            a2engine::Block { hook: 12, symbol: "ST3D_Texture::DemandLoad", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ST3D_Texture::DemandLoad is changed by fo-roots-5.0Z11, not yet verified" },
             a2engine::Block { hook: 14, symbol: "CinematicView::mUpdateVideo", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: CinematicView::mUpdateVideo is changed by fo-roots-5.0Z11, not yet verified" },
             a2engine::Block { hook: 15, symbol: "Armada_RenderFrame", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Armada_RenderFrame is changed by fo-roots-5.0Z11, not yet verified" },
         ],
@@ -786,8 +785,9 @@ pub const BUILDS: &[a2engine::Build] = &[
         modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
         blocked_mod: &[
             a2engine::Block { hook: 5, symbol: "cPrjID::GetName", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: cPrjID::GetName is patched by FleetOpsHook.dll, which is not the profiled one" },
+            a2engine::Block { hook: 12, symbol: "ST3D_Texture::DemandLoad", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: ST3D_Texture::DemandLoad is patched by FleetOpsHook.dll, which is not the profiled one" },
         ],
-        n_resolved_mod: 105,
+        n_resolved_mod: 104,
     },
 ];
 

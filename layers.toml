@@ -209,7 +209,7 @@ files = ['UI.asi', 'UI.ini', 'Menus/*.bmp']
 select = 'on'
 requires = ['display']
 scope = 'local'
-games = ['armada2']
+games = ['armada2', 'fo-roots']
 steps = ['ui']
 summary = 'the HUD, the menus, the loading screen and the cursor redrawn at any aspect ratio'
 

@@ -1,0 +1,12 @@
+# Fleet Operations: Roots 5.0Z11: FleetOpsHook.dll takes over these functions at their entry as it
+# loads (a jump to its own replacement, or a trampoline: push and ret, after which
+# the stock body runs from its callback). Our hooks only call them, and what Roots
+# puts there is what Roots means, so this build checks nothing at their entry
+# (PLAN-FLEETOPS.md, "FleetOpsHook.dll at run time"). Written by tools/engine/fo-scan.py.
+schema = 1
+plugin = "ui"
+
+# ActionMode::GetAction
+[[sym]]
+id = "radar_get_action"
+check = ""

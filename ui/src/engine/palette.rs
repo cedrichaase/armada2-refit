@@ -2,8 +2,9 @@
 //! buttons. Read by `hud::bar` (HUD.md, "The button bar").
 //!
 //! The bar's `Update` (in its `AlwaysGameSimulate`) works out the buttons for what is
-//! selected and the menu open (`mUpdateButtonsAndPosition`), and keeps them in 21
-//! `ControlButton`s at `+0x28`. A button is shown when its `IsValid` (vtable `+0x1c`)
+//! selected and the menu open (`mUpdateButtonsAndPosition`), and keeps them in
+//! `ControlButton`s at `+0x28`: 21 inline on stock, behind a pointer on Roots (up to 64:
+//! the profile's `palette_n_slots` and `palette_slots_indirect`). A button is shown when its `IsValid` (vtable `+0x1c`)
 //! says so, which is when `Render` draws it. Each holds a `CommandInfoClass` (`+0x88`)
 //! or a `ModeInfo` (`+0x84`), its state (`+0x34`: 0 disabled, 2 active, else normal)
 //! and, once drawn, its icon sprite (`+0x2c`, looked up by the name the command or
@@ -21,7 +22,7 @@ fn a(s: a2engine::Sym) -> usize {
 }
 use alloc::string::String;
 
-// `PopupPaletteImp+0x28` holds `ControlButton *[21]`; `+0x110` is the palette mode (1 the
+// `PopupPaletteImp+0x28` holds `ControlButton *[21]` (stock; Roots: a pointer to the array); `+0x110` is the palette mode (1 the
 // bar, 2 the build-locked bar, else floating) and `+0x124` the menu shown (`eMenuType`:
 // 0 the top level, 1 orders, 2..4 build, evolve, research, 8 the top level again after a
 // menu closed). The hotkey tables' counts (commands `+0xcc`, build items `+0xd8`,
@@ -61,9 +62,23 @@ pub fn menu(p: usize) -> u32 {
     if p == 0 { 0 } else { unsafe { rd(p + field::PALETTE_MENU()) } }
 }
 
-/// The `i`-th of the bar's 21 buttons (0 if there is none).
+/// Whether the button array sits behind a pointer held at `+0x28` (the profile's
+/// `palette_slots_indirect`: Roots) rather than inline there (stock).
+#[inline(always)]
+pub fn slots_indirect() -> bool { value::PALETTE_SLOTS_INDIRECT() != 0 }
+
+/// The `i`-th of the bar's buttons (0 if there is none): of `n_slots()`, 21 inline on
+/// stock, 64 behind a pointer on Roots (both from the build's profile).
 pub fn slot(p: usize, i: usize) -> usize {
-    if i >= n_slots() { 0 } else { peek(p, field::PALETTE_SLOTS() + 4 * i) }
+    if i >= n_slots() {
+        return 0;
+    }
+    if slots_indirect() {
+        let base = peek(p, field::PALETTE_SLOTS());
+        if base == 0 { 0 } else { peek(base, 4 * i) }
+    } else {
+        peek(p, field::PALETTE_SLOTS() + 4 * i)
+    }
 }
 
 /// Whether the button is shown (`IsValid`).

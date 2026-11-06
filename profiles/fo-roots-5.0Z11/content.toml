@@ -5,8 +5,9 @@
 # to Roots' art (PLAN-FLEETOPS.md, decision 7). Before it, every render3d module but the
 # hulls read the stock set here, inherited from gog-1.1's content.toml (build.toml's
 # `none` is only the fallback for a plugin no content.toml up the chain names). The UI
-# still inherits gog-1.1's stock set; it is not installed on Roots (FO-6).
+# reads the fleetops set too (ui/content/sets/fleetops/, FO-6 step 1): Roots' race names.
 schema = 1
 
 [set]
 render3d = "fleetops"
+ui = "fleetops"
