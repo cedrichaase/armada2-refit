@@ -211,7 +211,7 @@ A content set is a folder of small ini tables, one per plugin part:
 | Folder | Tables |
 |---|---|
 | `render3d/content/sets/<set>/` | `effects.ini`, `hulls.ini`, `ordnance.ini`, `overlays.ini`, `particles.ini`, `sky.ini`, `specials.ini`, `world.ini`: each module's names (nodes, sprites, SODs, faction keys and colours, the special effects' kinds) and the recipes it builds in, named by their file under `render3d/content/` |
-| `ui/content/sets/<set>/` | `ui.ini`: the races (with the theme's look for each), resources, campaign cards, the credits' and menus' views, the game files the UI reads and the widget gallery's lists |
+| `ui/content/sets/<set>/` | `ui.ini`: the races (with the theme's look for each), resources, campaign cards, the credits' and menus' views, the game files the UI reads, the widget gallery's lists, and `[Glyphs]`: the codes the game's fonts draw as pictures or figures of their own (a code in hex = the word or figure the UI writes instead; any other code is Windows-1252) |
 
 Every `.ini` under `render3d/content/` and `ui/content/` is built into the plugin
 (`render3d/core/build.rs`, `ui/build.rs`), so a set needs nothing installed; the modules

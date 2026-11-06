@@ -64,8 +64,8 @@ pub fn with_stringstream(f: impl FnOnce(usize)) -> Option<String> {
         let (p, n) = (s[1] as usize, s[2] as usize);
         let out = if p != 0 && n > 0 && n < 4096 {
             let bytes = core::slice::from_raw_parts(p as *const u8, n);
-            // Latin-1, as the game's localised strings are.
-            Some(bytes.iter().map(|&b| b as char).collect::<String>())
+            // The game's text, as the UI draws it (`text::game`).
+            Some(crate::text::game::display(&bytes.iter().map(|&b| b as char).collect::<String>()))
         } else {
             None
         };
@@ -89,6 +89,7 @@ pub unsafe fn stream_text(ss: usize) -> Option<String> {
     with_string(|sp| unsafe {
         str_(ss, sp);
     })
+    .map(|t| crate::text::game::display(&t))
 }
 
 /// Runs `f` with an empty `std::string` (all zero, as its default constructor leaves

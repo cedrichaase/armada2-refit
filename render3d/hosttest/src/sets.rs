@@ -431,6 +431,42 @@ mod tests {
         ];
         assert_eq!(c.gallery_ships, ships);
         assert_eq!(c.gallery_factions, ["Federation", "Klingon", "Romulan", "Borg", "Cardassian", "Species 8472"]);
+        // Stock's fonts draw Windows-1252 throughout: no glyph of their own.
+        assert!(c.glyphs.is_empty());
         assert_eq!(parse(""), NONE);
+    }
+
+    #[test]
+    fn ui_fleetops_glyphs() {
+        use ui::*;
+        let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../ui/content/sets/fleetops/ui.ini")).unwrap();
+        let c = parse(Box::leak(text.into_boxed_str()));
+        let g = |b: u8| c.glyphs.iter().find(|x| x.0 == b).map(|x| x.1);
+        // Roots' red figures, in order, the cost lines' separator (a space, quoted), a
+        // resource icon and a unit class (ui/README.md, "The engine's text").
+        let figures: Vec<&str> = [0x7f, 0x81, 0x8d, 0x8f, 0x90, 0x9d, 0xa0, 0xad, 0xbe, 0xd7].iter().map(|&b| g(b).unwrap()).collect();
+        assert_eq!(figures, ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]);
+        assert_eq!(g(b'$'), Some(" "));
+        assert_eq!(g(0x85), Some("Dilithium"));
+        assert_eq!(g(0xf8), Some("Station"));
+        assert_eq!(g(b'A'), None);
+        // One line per code.
+        let mut codes: Vec<u8> = c.glyphs.iter().map(|x| x.0).collect();
+        codes.sort();
+        codes.dedup();
+        assert_eq!(codes.len(), c.glyphs.len());
+        // Tooltips from a player's UI.log on Roots (2026-11-06), as the UI now draws them.
+        let cost = "350$\u{85}$/$175$\u{86}$/$8$\u{87}$/$150$\u{89}$/$50$\u{80}";
+        assert_eq!(c.display(cost), "350 Dilithium / 175 Tritanium / 8 Supplies / 150 Crew / 50 s");
+        assert_eq!(c.display("Buy \u{85} for:\n\n -1000 \u{85} / 1000 \u{86} / 100 \u{87}"), "Buy Dilithium for:\n\n -1000 Dilithium / 1000 Tritanium / 100 Supplies");
+        assert_eq!(c.display(" \u{81}\u{9d}\u{7f}\u{7f} Hitpoints\n\t  \u{aa}"), " 1500 Hitpoints\n   Construction Ship");
+        assert_eq!(c.display("Weak vs: \u{a9}, \u{a8}, \u{a3}, \n\t  \u{a5}"), "Weak vs: Artillery, Berserker, Battleship, \n   Dreadnought");
+        assert_eq!(c.display("\u{95} Tachyon Detection Grid"), "\u{2022} Tachyon Detection Grid");
+        // Twice is once.
+        let once = c.display(cost);
+        assert_eq!(c.display(&once), once);
+        // Stock reads the code page only: 0x95 is the bullet, '$' and 0x85 its own.
+        let stock = parse(Box::leak(std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../ui/content/sets/stock/ui.ini")).unwrap().into_boxed_str()));
+        assert_eq!(stock.display("\u{95} 5$ \u{85}\t"), "\u{2022} 5$ \u{2026} ");
     }
 }

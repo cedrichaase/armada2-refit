@@ -771,7 +771,8 @@ strings use, with real kerning.
 **Baked at build time, never committed.** `fontbake` (a host crate `build.rs` runs)
 reads each TTF with `skrifa` and writes a single-channel signed-distance atlas into
 `OUT_DIR`: 1024x512, 48 texels to the em, distances out to 6 texels (128 on the outline,
-higher inside), for ASCII, Latin-1 and the typographic punctuation (‘ ’ “ ” – — … • € ×).
+higher inside), for ASCII, Latin-1, the rest of Windows-1252 (the game's code page) and
+the typographic punctuation (‘ ’ “ ” – — … • € ×).
 Distances are exact: curves flattened into short segments, the nearest segment found
 for every texel, inside by nonzero winding. Kerning is the font's GPOS `kern` feature.
 The blob (format at the top of `src/text/mod.rs`) is read in place, so a `Font` is a
@@ -781,7 +782,25 @@ static and lookups are binary searches. The bake is brute force and runs with
 **One atlas for every size.** The pixel shader turns distance into coverage over one
 screen pixel: the distance scale is `2 * spread * size / em_texels` screen pixels per unit
 of the atlas, so 14 and 60 pixel text are equally sharp. Baselines snap to whole pixels.
-`layout_wrapped` breaks at spaces and newlines; a character the font lacks draws as `?`.
+`layout_wrapped` breaks at spaces and newlines; a tab is a space, another control
+character draws nothing, and a character the font lacks draws as `?`.
+
+**The engine's text** (`text/game.rs`). The game's strings are bytes in its fonts' code
+page, Windows-1252: 0x80..0x9f are the bullet, the dashes, the curly quotes and the euro,
+where Latin-1 has control characters (a stock tooltip's `•` came out as a control
+character, drawn as `?`). `text::game::display` turns a string of the game's into what the
+UI draws: Windows-1252, a tab as a space, and the content set's `[Glyphs]` (below) as
+their words and figures. It runs where the engine's text enters for display: the string
+streams of `engine::msvc` (every tooltip: the pointer's, the bar's, the panels', the info
+panel's) and `engine::buttons::clean` (labels, chat, overlay text, localised keys). Names
+the UI matches (sprites, ODFs, players) are read raw. A game whose fonts draw codes as
+pictures of their own is the reason for `[Glyphs]`: Fleet Operations: Roots writes its
+tooltips with red figures (0x7f is 0, 0x81 is 1, ...), resource icons (0x85 dilithium,
+0x86 tritanium, 0x87 supplies, ...), unit classes drawn as words (0xa4 "Scout", 0xf8
+"Station") and `$` between a cost line's figures and icons, all in its own `Sprites\Font*.spr`
+and atlases. Read as Latin-1, those were the "weird symbols and question marks" of every
+Roots tooltip (`PLAN-FLEETOPS.md`, FO-6, decision 160). The UI writes the words, never the
+pictures: no art of Roots' is copied or drawn (decision 60).
 
 `fontbake`'s preview test renders sample lines through the runtime's own layout code into
 PGM files (outside the repository); the command is at the top of `fontbake/tests/preview.rs`.
@@ -977,7 +996,9 @@ The names of the game's races (display names, the theme's look for each and the 
 (card names, the words that match the stock labels, the view of the map behind each, the
 emblem's cell in the race icons, and the loading screen's map prefix and line for each),
 the credits tour's views, the game files the UI reads (the race icons, `Credits.txt` and
-the logos, the cursor sprites) and the widget gallery's sample lists are data: the content
+the logos, the cursor sprites), the widget gallery's sample lists and the codes the game's
+fonts draw as pictures or figures of their own (`[Glyphs]`, a code in hex = the word or figure
+the UI writes in its place: "The engine's text", above) are data: the content
 set's `ui/content/sets/<set>/ui.ini` (a set is a folder; `MODDING.md`, "Content sets").
 `build.rs` builds every `.ini` under `ui/content/` in (`src/content_sets.rs`), and
 `src/content.rs` parses, once, the table of the set `Engine::content()` of the UI's core

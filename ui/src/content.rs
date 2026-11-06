@@ -7,6 +7,7 @@
 //! screens that need them stand down to the engine's own.
 use a2ini::table::{find, floats, split_list, Table};
 use alloc::boxed::Box;
+use alloc::string::String;
 use alloc::ffi::CString;
 use alloc::vec::Vec;
 use core::ffi::CStr;
@@ -73,6 +74,9 @@ pub struct Content {
     /// The widget gallery's sample lists (`gallery.rs`).
     pub gallery_ships: &'static [&'static str],
     pub gallery_factions: &'static [&'static str],
+    /// The codes the game's fonts draw as a picture or a figure of their own
+    /// (`[Glyphs]`, a code in hex = its word or figure), for `text::game::display`.
+    pub glyphs: &'static [(u8, &'static str)],
 }
 
 /// A build with no content set for the UI.
@@ -86,6 +90,7 @@ pub static NONE: Content = Content {
     files: Files { race_icons: "", credits: "", credits_logos: "", cursor_sprites: "" },
     gallery_ships: &[],
     gallery_factions: &[],
+    glyphs: &[],
 };
 
 /// A name as the engine's C string, made once and kept for the plugin's life.
@@ -152,6 +157,12 @@ pub fn parse(text: &'static str) -> Content {
         },
         gallery_ships: t.list("Gallery", "Ships").leak(),
         gallery_factions: t.list("Gallery", "Factions").leak(),
+        glyphs: t
+            .entries("Glyphs")
+            .iter()
+            .filter_map(|&(k, v)| u8::from_str_radix(k.trim(), 16).ok().map(|b| (b, v)))
+            .collect::<Vec<_>>()
+            .leak(),
     }
 }
 
@@ -164,8 +175,71 @@ pub fn get() -> &'static Content {
 }
 
 impl Content {
+    /// What the game's fonts draw for `c` (a byte), when the set names it.
+    fn glyph(&self, c: char) -> Option<&'static str> {
+        let b = c as u32;
+        if b > 0xff {
+            return None;
+        }
+        self.glyphs.iter().find(|g| g.0 as u32 == b).map(|g| g.1)
+    }
+
+    /// The game's string `s` (one byte per `char`) as the UI draws it (`text::game`):
+    /// the set's glyphs as their words and figures (a word set apart by a space from a
+    /// figure or a letter beside it: the icons sit against their figures, "250\u{85}",
+    /// "Buy \u{85} for"), the rest as Windows-1252, a tab as a space. Characters past
+    /// one byte are kept, and no glyph gives a code a byte of its own spells, so a
+    /// string that went through here comes back the same.
+    pub fn display(&self, s: &str) -> String {
+        let chars: Vec<char> = s.chars().collect();
+        let mut out = String::new();
+        for (i, &c) in chars.iter().enumerate() {
+            if let Some(g) = self.glyph(c) {
+                if is_word(g) {
+                    if out.chars().last().is_some_and(|p| p.is_alphanumeric()) {
+                        out.push(' ');
+                    }
+                    out.push_str(g);
+                    let next = chars.get(i + 1).map(|&n| self.glyph(n).and_then(|g| g.chars().next()).unwrap_or(n));
+                    if next.is_some_and(|n| n.is_alphanumeric()) {
+                        out.push(' ');
+                    }
+                } else {
+                    out.push_str(g);
+                }
+                continue;
+            }
+            out.push(if c == '\t' { ' ' } else { cp1252(c) });
+        }
+        out
+    }
+
     /// A resource's name, "" past the list.
     pub fn resource(&self, kind: usize) -> &'static str {
         self.resources.get(kind).copied().unwrap_or("")
     }
+}
+
+// ---- the game's code page (text::game) -------------------------------------------------
+
+/// Windows-1252's 0x80..0x9f; the five codes it leaves unassigned stay what they are.
+const CP1252: [char; 32] = [
+    '\u{20ac}', '\u{81}', '\u{201a}', '\u{192}', '\u{201e}', '\u{2026}', '\u{2020}', '\u{2021}',
+    '\u{2c6}', '\u{2030}', '\u{160}', '\u{2039}', '\u{152}', '\u{8d}', '\u{17d}', '\u{8f}',
+    '\u{90}', '\u{2018}', '\u{2019}', '\u{201c}', '\u{201d}', '\u{2022}', '\u{2013}', '\u{2014}',
+    '\u{2dc}', '\u{2122}', '\u{161}', '\u{203a}', '\u{153}', '\u{9d}', '\u{178}', '\u{9e}',
+];
+
+/// A byte of the game's code page as a character.
+pub fn cp1252(c: char) -> char {
+    match c as u32 {
+        v @ 0x80..=0x9f => CP1252[(v - 0x80) as usize],
+        _ => c,
+    }
+}
+
+/// A glyph that is a word (a picture of a name, an icon written as its name), not a
+/// figure or a separator.
+fn is_word(s: &str) -> bool {
+    s.chars().count() > 1 && s.chars().next().is_some_and(|c| c.is_alphabetic())
 }
