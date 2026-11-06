@@ -9,7 +9,7 @@ Timeout: 20 min
 Run with `--install .`. On GOG's 1.1 every plugin that has moved onto its symbol
 profile (`crates/a2engine/README.md`) logs the executable's identity, recognises the
 build, resolves all of its symbols (the fields and values each build resolves count
-as symbols; the core's 168 are 167 on stock, `site_obj_draw` being Roots' alone, and the hulls' 80 include `hl_claim_instance`) with no hook blocked, and no hook stands down or
+as symbols; the core's 168 are 167 on stock, `site_obj_draw` being Roots' alone, and the hulls' 85, the effects' 126 and the overlays' 107 include the Roots claim points (`hl_claim_instance`, `ef_debris_at_callee`, `ov_posts_at_callee`: 0 on stock)) with no hook blocked, and no hook stands down or
 has a symbol read before its hook was ready. One game straight into a mission, so the
 hooks that are readied late (the stub's mode requests at the first `Direct3DCreate8`,
 `[Drop]`'s ranges at the engine's first scene) have run. Each package of phase 8
@@ -88,12 +88,12 @@ appends its plugin's section and touches no other.
 56. Expect "Render3D.log" contains "engine: symbols: 167/168 resolved; 0 hooks blocked".
 57. Expect "Render3D.log" contains "engine: world symbols: 69/69 resolved; 0 hooks blocked".
 58. Expect "Render3D.log" contains "engine: particles symbols: 26/26 resolved; 0 hooks blocked".
-59. Expect "Render3D.log" contains "engine: hulls symbols: 80/80 resolved; 0 hooks blocked".
-60. Expect "Render3D.log" contains "engine: effects symbols: 122/122 resolved; 0 hooks blocked".
+59. Expect "Render3D.log" contains "engine: hulls symbols: 85/85 resolved; 0 hooks blocked".
+60. Expect "Render3D.log" contains "engine: effects symbols: 126/126 resolved; 0 hooks blocked".
 61. Expect "Render3D.log" contains "engine: ordnance symbols: 53/53 resolved; 0 hooks blocked".
 62. Expect "Render3D.log" contains "engine: specials symbols: 22/22 resolved; 0 hooks blocked".
 63. Expect "Render3D.log" contains "engine: sky symbols: 21/21 resolved; 0 hooks blocked".
-64. Expect "Render3D.log" contains "engine: overlays symbols: 104/104 resolved; 0 hooks blocked".
+64. Expect "Render3D.log" contains "engine: overlays symbols: 107/107 resolved; 0 hooks blocked".
 65. Expect "Render3D.log" not contains "stands down: ".
 66. Expect "Render3D.log" not contains "read before its hook".
 67. Expect "Render3D.log" not contains "engine: TEST:".
