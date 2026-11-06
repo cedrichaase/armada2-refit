@@ -195,7 +195,7 @@ if hashlib.sha256(open(exe, 'rb').read()).hexdigest() == base['exe']['sha256']:
     ok('the game exe was only read')
 
 # (e) Fleet Operations: Roots, both ways
-RB = 'fo-roots-5.0Z11'
+RB = os.environ.get('FO_ROOTS_BUILD', 'fo-roots-5.0Z11')   # fo-scan.py: the build under test
 if not roots or not os.path.isfile(roots):
     print(f'skip (e): no Roots executable at {roots or "(fo-roots has none)"}')
     sys.exit(fail)
