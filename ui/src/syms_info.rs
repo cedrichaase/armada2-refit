@@ -453,6 +453,11 @@ pub const BUILDS: &[a2engine::Build] = &[
         ],
         blocked: &[
         ],
+        file_crc: &[],
+        modules: &[],
+        blocked_mod: &[
+        ],
+        n_resolved_mod: 137,
     },
     a2engine::Build {
         name: "fo-roots-5.0Z11",
@@ -607,6 +612,11 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Block { hook: 0, symbol: "ShipDisplay::DetermineSelectedDisplayType", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ShipDisplay::DetermineSelectedDisplayType is changed by fo-roots-5.0Z11, not yet verified" },
             a2engine::Block { hook: 2, symbol: "Armada_RenderAllOurStuff", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Armada_RenderAllOurStuff is changed by fo-roots-5.0Z11, not yet verified" },
         ],
+        file_crc: &[a2engine::FileCrc { section: ".text", crc: 0xef690537 }, a2engine::FileCrc { section: ".test", crc: 0xe7a4061b }],
+        modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
+        blocked_mod: &[
+        ],
+        n_resolved_mod: 12,
     },
 ];
 

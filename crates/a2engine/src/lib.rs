@@ -12,4 +12,4 @@ pub mod table;
 pub use engine::{glob, init_with, is_identity_line, test_mismatch, Engine, StandDown, Why, PLUGIN_NOTE};
 #[cfg(windows)]
 pub use engine::init;
-pub use table::{Block, Build, Entry, HookDef, HookId, Kind, Note, Runtime, Sym, SymDef, Table, NONE, NOTE_MAX};
+pub use table::{Block, Build, Entry, FileCrc, Module, HookDef, HookId, Kind, Note, Runtime, Sym, SymDef, Table, NONE, NOTE_MAX};

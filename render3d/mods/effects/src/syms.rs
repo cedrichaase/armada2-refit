@@ -62,6 +62,8 @@ pub mod hook {
     pub const EFFECTS_REPAIR: a2engine::HookId = a2engine::HookId(1);
     pub const EFFECTS_SHIELDS: a2engine::HookId = a2engine::HookId(2);
     pub const EFFECTS_DEBRIS: a2engine::HookId = a2engine::HookId(3);
+    #[allow(dead_code)] // planned: no code reads it yet
+    pub const EFFECTS_DEBRIS_CALLEE: a2engine::HookId = a2engine::HookId(4);
 }
 
 pub mod field {
@@ -271,6 +273,7 @@ pub const HOOKS: &[a2engine::HookDef] = &[
     a2engine::HookDef { id: "render3d.effects.repair", run_unknown: false, rows: &["Modules.effects"], syms: &[2, 3, 4, 11, 23] },
     a2engine::HookDef { id: "render3d.effects.shields", run_unknown: false, rows: &["Modules.effects"], syms: &[6, 45, 46, 47, 48] },
     a2engine::HookDef { id: "render3d.effects.debris", run_unknown: false, rows: &["Modules.effects"], syms: &[1, 10, 22, 49, 50, 51, 52] },
+    a2engine::HookDef { id: "render3d.effects.debris_callee", run_unknown: false, rows: &["Modules.effects"], syms: &[22] },
 ];
 
 pub const BUILDS: &[a2engine::Build] = &[
@@ -410,6 +413,11 @@ pub const BUILDS: &[a2engine::Build] = &[
         ],
         blocked: &[
         ],
+        file_crc: &[],
+        modules: &[],
+        blocked_mod: &[
+        ],
+        n_resolved_mod: 122,
     },
     a2engine::Build {
         name: "fo-roots-5.0Z11",
@@ -419,7 +427,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 5,
+        n_resolved: 6,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x467730, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x30, 0x8b, 0x50, 0x34, 0xd9, 0x02], mask: &[], section: "", count: 0, value: 0 }, // fn_shock_radius
@@ -550,13 +558,19 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Block { hook: 2, symbol: "Beam::Simulate", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Beam::Simulate is changed by fo-roots-5.0Z11, not yet verified" },
             a2engine::Block { hook: 3, symbol: "Craft::Explode", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Craft::Explode is changed by fo-roots-5.0Z11, not yet verified" },
         ],
+        file_crc: &[a2engine::FileCrc { section: ".text", crc: 0xef690537 }, a2engine::FileCrc { section: ".test", crc: 0xe7a4061b }],
+        modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
+        blocked_mod: &[
+            a2engine::Block { hook: 1, symbol: "NodeParticleEffect::Render", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: NodeParticleEffect::Render is patched by FleetOpsHook.dll, which is not the profiled one" },
+        ],
+        n_resolved_mod: 1,
     },
 ];
 
-static HOOK_STATE: [core::sync::atomic::AtomicU64; 4] = [const { core::sync::atomic::AtomicU64::new(0) }; 4];
+static HOOK_STATE: [core::sync::atomic::AtomicU64; 5] = [const { core::sync::atomic::AtomicU64::new(0) }; 5];
 static SYM_FLAGS: [core::sync::atomic::AtomicU8; 122] = [const { core::sync::atomic::AtomicU8::new(0) }; 122];
 static SYM_ADDR: [core::sync::atomic::AtomicUsize; 122] = [const { core::sync::atomic::AtomicUsize::new(0) }; 122];
-static NOTES: [a2engine::Note; 4] = [const { a2engine::Note::new() }; 4];
+static NOTES: [a2engine::Note; 5] = [const { a2engine::Note::new() }; 5];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 
 pub static TABLE: a2engine::Table = a2engine::Table {
