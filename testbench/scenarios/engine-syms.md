@@ -8,7 +8,8 @@ Timeout: 20 min
 
 Run with `--install .`. On GOG's 1.1 every plugin that has moved onto its symbol
 profile (`crates/a2engine/README.md`) logs the executable's identity, recognises the
-build, resolves all of its symbols with no hook blocked, and no hook stands down or
+build, resolves all of its symbols (the fields and values each build resolves count
+as symbols) with no hook blocked, and no hook stands down or
 has a symbol read before its hook was ready. One game straight into a mission, so the
 hooks that are readied late (the stub's mode requests at the first `Direct3DCreate8`,
 `[Drop]`'s ranges at the engine's first scene) have run. Each package of phase 8
@@ -24,7 +25,7 @@ appends its plugin's section and touches no other.
 ## Display8
 6. Expect "Display8.log" contains "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321".
 7. Expect "Display8.log" contains "engine: build armada2/gog-1.1".
-8. Expect "Display8.log" contains "engine: symbols: 29/29 resolved; 0 hooks blocked".
+8. Expect "Display8.log" contains "engine: symbols: 34/34 resolved; 0 hooks blocked".
 9. Expect "Display8.log" contains "stub: the engine's own mode requests (6 of 6 calls)".
 10. Expect "Display8.log" not contains "stands down: ".
 11. Expect "Display8.log" not contains "read before its hook".
@@ -35,11 +36,11 @@ appends its plugin's section and touches no other.
 14. Wait up to 60 seconds for "UI.log" to say "hud: panels of ours".
 15. Expect "UI.log" contains "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321".
 16. Expect "UI.log" contains "engine: build armada2/gog-1.1".
-17. Expect "UI.log" contains "engine: symbols: 38/38 resolved; 0 hooks blocked".
+17. Expect "UI.log" contains "engine: symbols: 40/40 resolved; 0 hooks blocked".
 18. Expect "UI.log" contains "engine: loading symbols: 17/17 resolved; 0 hooks blocked".
 19. Expect "UI.log" contains "engine: radar symbols: 116/116 resolved; 0 hooks blocked".
 20. Expect "UI.log" contains "engine: info symbols: 137/137 resolved; 0 hooks blocked".
-21. Expect "UI.log" contains "engine: hud symbols: 169/169 resolved; 0 hooks blocked".
+21. Expect "UI.log" contains "engine: hud symbols: 172/172 resolved; 0 hooks blocked".
 22. Expect "UI.log" contains "engine: panels symbols: 175/175 resolved; 0 hooks blocked".
 23. Expect "UI.log" contains "engine: shell symbols: 92/92 resolved; 0 hooks blocked".
 24. Expect "UI.log" contains "engine: dialogs symbols: 36/36 resolved; 0 hooks blocked".
@@ -68,7 +69,7 @@ appends its plugin's section and touches no other.
 ## QOL
 42. Expect "QOL.log" contains "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321".
 43. Expect "QOL.log" contains "engine: build armada2/gog-1.1".
-44. Expect "QOL.log" contains "engine: symbols: 130/130 resolved; 0 hooks blocked".
+44. Expect "QOL.log" contains "engine: symbols: 137/137 resolved; 0 hooks blocked".
 45. Expect "QOL.log" not contains "stands down: ".
 46. Expect "QOL.log" not contains "read before its hook".
 47. Expect "QOL.log" not contains "engine: TEST:".
@@ -84,15 +85,15 @@ appends its plugin's section and touches no other.
 ## Render3D
 54. Expect "Render3D.log" contains "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321".
 55. Expect "Render3D.log" contains "engine: build armada2/gog-1.1".
-56. Expect "Render3D.log" contains "engine: symbols: 75/75 resolved; 0 hooks blocked".
-57. Expect "Render3D.log" contains "engine: world symbols: 26/26 resolved; 0 hooks blocked".
-58. Expect "Render3D.log" contains "engine: particles symbols: 14/14 resolved; 0 hooks blocked".
-59. Expect "Render3D.log" contains "engine: hulls symbols: 34/34 resolved; 0 hooks blocked".
-60. Expect "Render3D.log" contains "engine: effects symbols: 53/53 resolved; 0 hooks blocked".
-61. Expect "Render3D.log" contains "engine: ordnance symbols: 23/23 resolved; 0 hooks blocked".
-62. Expect "Render3D.log" contains "engine: specials symbols: 10/10 resolved; 0 hooks blocked".
-63. Expect "Render3D.log" contains "engine: sky symbols: 11/11 resolved; 0 hooks blocked".
-64. Expect "Render3D.log" contains "engine: overlays symbols: 42/42 resolved; 0 hooks blocked".
+56. Expect "Render3D.log" contains "engine: symbols: 166/166 resolved; 0 hooks blocked".
+57. Expect "Render3D.log" contains "engine: world symbols: 69/69 resolved; 0 hooks blocked".
+58. Expect "Render3D.log" contains "engine: particles symbols: 26/26 resolved; 0 hooks blocked".
+59. Expect "Render3D.log" contains "engine: hulls symbols: 77/77 resolved; 0 hooks blocked".
+60. Expect "Render3D.log" contains "engine: effects symbols: 122/122 resolved; 0 hooks blocked".
+61. Expect "Render3D.log" contains "engine: ordnance symbols: 53/53 resolved; 0 hooks blocked".
+62. Expect "Render3D.log" contains "engine: specials symbols: 22/22 resolved; 0 hooks blocked".
+63. Expect "Render3D.log" contains "engine: sky symbols: 21/21 resolved; 0 hooks blocked".
+64. Expect "Render3D.log" contains "engine: overlays symbols: 85/85 resolved; 0 hooks blocked".
 65. Expect "Render3D.log" not contains "stands down: ".
 66. Expect "Render3D.log" not contains "read before its hook".
 67. Expect "Render3D.log" not contains "engine: TEST:".

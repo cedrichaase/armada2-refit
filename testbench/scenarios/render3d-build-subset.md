@@ -13,8 +13,8 @@ Cargo feature of the DLL (`render3d/build.sh --features`); `render3d/bench-asi.s
 puts it into the clone (run with `--install .`). A module left out is not in the DLL at
 all, so in a mission the frame must be the one the full build draws with `[Modules]
 hulls=0` at load (`roundD-base-port-showcase-hulls0`, RMSE 0), and `Render3D_Settings`
-has no row of it: the core's 10 rows less its `[Modules]` row, then world's 5 and
-overlays' 6, 20 in all (21 in the full build).
+has no row of it: the core's 11 rows less its `[Modules]` row (10), then world's 5 and
+overlays' 6, 21 in all (22 in the full build).
 
 The other modules are checked by this scenario's variants, from
 `render3d/subset-scenario.sh <module>` (`world`, `particles`; `ordnance` on the firing
