@@ -134,7 +134,16 @@ fn stem(s: &str) -> &str {
 
 fn claim(inst: usize, cam: usize) -> bool {
     let Some((o, v)) = steps::current() else { return false };
-    if inst == 0 || obj::instance(o) != inst || v.cam != cam {
+    if inst == 0 || obj::instance(o) != inst {
+        return false;
+    }
+    if v.cam != cam {
+        // The instance is the current object's but the engine draws it for another camera
+        // than the view's: left to the engine; logged once, for a hull that never changes.
+        static SEEN: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+        if !SEEN.swap(true, core::sync::atomic::Ordering::Relaxed) {
+            crate::log!("hulls: the instance draw of the current object ({:#x}) comes with camera {:#x}, not the view's {:#x}: the engine draws it", o, cam, v.cam);
+        }
         return false;
     }
     crate::claim_hull(o, v)

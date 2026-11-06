@@ -134,6 +134,7 @@ mod tests {
             bump_profile: "Borg",
             profile_by_race: false,
             profile_races: &[],
+            race_key: "race",
             bump_maps_normal: false,
         };
         assert_eq!(c, old);
@@ -147,6 +148,7 @@ mod tests {
         assert!(c.profile_by_race);
         assert!(c.bump_maps_normal);
         assert_eq!(c.profile_races, ["borg", "freeborg"]);
+        assert_eq!(c.race_key, "race");
         assert_eq!(c.bump_profile, "Borg");
     }
 

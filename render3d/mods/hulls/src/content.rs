@@ -40,6 +40,8 @@ pub struct Content {
     pub profile_by_race: bool,
     /// The races whose hulls take the bump profile under `ProfileBy = race`.
     pub profile_races: &'static [&'static str],
+    /// The ODF key `ProfileBy = race` reads (`RaceKey`, default `race`).
+    pub race_key: &'static str,
     /// A mesh's bump texture is a tangent-space normal map (`BumpMaps = normal`, Fleet
     /// Operations' `*_bump`), or a height map (`height`, stock's Borg, made into one).
     pub bump_maps_normal: bool,
@@ -70,6 +72,10 @@ pub fn parse(text: &'static str) -> Content {
         bump_profile: t.str(s, "BumpProfile"),
         profile_by_race: t.str(s, "ProfileBy").eq_ignore_ascii_case("race"),
         profile_races: t.list(s, "ProfileRaces").leak(),
+        race_key: match t.str(s, "RaceKey") {
+            "" => "race",
+            k => k,
+        },
         bump_maps_normal: t.str(s, "BumpMaps").eq_ignore_ascii_case("normal"),
     }
 }
@@ -88,6 +94,7 @@ pub static NONE: Content = Content {
     bump_profile: "",
     profile_by_race: false,
     profile_races: &[],
+    race_key: "race",
     bump_maps_normal: false,
 };
 

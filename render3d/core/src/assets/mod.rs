@@ -253,7 +253,10 @@ fn load_texture(s: &mut Store, name: &str) -> Option<gpu::Texture> {
         let names = unsafe { &*idx }.mip_chain(&base, |f| tex_width(s, f));
         names.into_iter().map(String::from).collect()
     };
+    // The game is 32-bit: every allocation on this path can fail, and a texture that does
+    // not fit is skipped (logged by the caller), never an abort.
     let mut levels: Vec<Vec<u8>> = Vec::new();
+    levels.try_reserve_exact(32).ok()?;
     levels.push(img.pixels);
     let (mut lw, mut lh) = (w, h);
     while lw > 1 || lh > 1 {
@@ -262,26 +265,34 @@ fn load_texture(s: &mut Store, name: &str) -> Option<gpu::Texture> {
         let stock = chain.get(k - 1).and_then(|f| s.tex_dir.read(f)).and_then(|d| a2fmt::image::decode(&d).ok());
         let next = match stock {
             Some(i) if i.width == nw && i.height == nh => i.pixels,
-            _ => halve(&levels[k - 1], lw, lh),
+            _ => halve(&levels[k - 1], lw, lh)?,
         };
         levels.push(next);
         lw = nw;
         lh = nh;
     }
     let n = levels.len() as u32;
-    let mut px = Vec::with_capacity(levels.iter().map(|l| l.len()).sum());
-    for l in &levels {
-        px.extend_from_slice(l);
-    }
+    let px = concat_levels(&levels)?;
     drop(levels);
     let d = gpu::TextureDesc::d2(w, h, gpu::Format::Bgra8, gpu::Usage::SAMPLED).with_levels(n);
     Some(crate::gfx::gpu().texture(d, gpu::Contents::Transient(px)))
 }
 
-/// A 2x2 box filter of a BGRA8 image.
-fn halve(src: &[u8], w: u32, h: u32) -> Vec<u8> {
+/// A mip chain's levels end to end in one buffer; None when that does not fit.
+pub fn concat_levels(levels: &[Vec<u8>]) -> Option<Vec<u8>> {
+    let mut px = Vec::new();
+    px.try_reserve_exact(levels.iter().map(|l| l.len()).sum()).ok()?;
+    for l in levels {
+        px.extend_from_slice(l);
+    }
+    Some(px)
+}
+
+/// A 2x2 box filter of a BGRA8 image; None when the result does not fit.
+pub fn halve(src: &[u8], w: u32, h: u32) -> Option<Vec<u8>> {
     let (nw, nh) = ((w / 2).max(1), (h / 2).max(1));
-    let mut out = Vec::with_capacity((nw * nh * 4) as usize);
+    let mut out = Vec::new();
+    out.try_reserve_exact((nw * nh * 4) as usize).ok()?;
     for y in 0..nh {
         for x in 0..nw {
             for c in 0..4 {
@@ -295,7 +306,7 @@ fn halve(src: &[u8], w: u32, h: u32) -> Vec<u8> {
             }
         }
     }
-    out
+    Some(out)
 }
 
 /// Drops everything on the device (before a `Reset`).

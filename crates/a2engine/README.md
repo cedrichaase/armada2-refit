@@ -165,7 +165,10 @@ hooks use, as an orphan, and the generated constants of both carry `#[allow(dead
 Take the key out when the code reads the hook; it must still be written in its layer's
 README. A hook whose every entry a build lacks stands down there (`has no address in
 <build>`): a Roots-only site, `render3d.frame.obj_draw`, stands down on stock, which
-never asks (`negative.sh` knows it).
+never asks (`negative.sh` knows it). A plugin that may or may not have such a hook asks
+`Engine::present(hook)` first (every entry has an address in the matched build; no
+check, no log line) and calls `ready` only when it is true, so stock logs no stand-down
+for a site it never had. Its entry still counts in `symbols: N/M` (M is the table's size).
 
 `in` is the enclosing function of every code site; `tools/engine/annotate.py` checks it
 and `symbol` against the developer's own `armada2.map` (report only, never written).

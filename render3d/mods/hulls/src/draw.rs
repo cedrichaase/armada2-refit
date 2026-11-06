@@ -700,31 +700,20 @@ fn normal_map_of_normals(w: u32, h: u32, px: Vec<u8>) -> Option<Texture> {
     if px.chunks_exact(4).all(|t| t[0].abs_diff(first[0]) <= 1 && t[1].abs_diff(first[1]) <= 1 && t[2].abs_diff(first[2]) <= 1) {
         return None;
     }
-    let mut levels: Vec<Vec<u8>> = alloc::vec![px];
-    let (mut lw, mut lh) = (w as usize, h as usize);
+    // 32-bit: a chain that does not fit skips the texture (the caller's look stays flat).
+    let mut levels: Vec<Vec<u8>> = Vec::new();
+    levels.try_reserve_exact(32).ok()?;
+    levels.push(px);
+    let (mut lw, mut lh) = (w, h);
     while lw > 1 || lh > 1 {
-        let (nw, nh) = ((lw / 2).max(1), (lh / 2).max(1));
-        let src = levels.last().unwrap();
-        let mut out = Vec::with_capacity(nw * nh * 4);
-        for y in 0..nh {
-            for x in 0..nw {
-                for c in 0..4 {
-                    let mut s = 0u32;
-                    for (dx, dy) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
-                        let sx = (x * 2 + dx).min(lw - 1);
-                        let sy = (y * 2 + dy).min(lh - 1);
-                        s += src[(sy * lw + sx) * 4 + c] as u32;
-                    }
-                    out.push(((s + 2) / 4) as u8);
-                }
-            }
-        }
-        levels.push(out);
-        lw = nw;
-        lh = nh;
+        let next = assets::halve(levels.last().unwrap(), lw, lh)?;
+        levels.push(next);
+        lw = (lw / 2).max(1);
+        lh = (lh / 2).max(1);
     }
     let n = levels.len() as u32;
-    let px: Vec<u8> = levels.concat();
+    let px = assets::concat_levels(&levels)?;
+    drop(levels);
     let g = gfx::gpu();
     let d = TextureDesc::d2(w, h, Format::Bgra8, Usage::SAMPLED).with_levels(n);
     let t = g.texture(d, Contents::Transient(px));

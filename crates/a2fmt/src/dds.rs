@@ -13,8 +13,9 @@ use alloc::vec::Vec;
 
 /// Largest width or height accepted (Roots has 12600x280 sprite strips)...
 pub const MAX_SIDE: u32 = 16384;
-/// ...and the most pixels: 8192 x 8192.
-pub const MAX_PIXELS: u64 = 8192 * 8192;
+/// ...and the most pixels: 4096 x 4096 (Roots' largest is 2300 x 2300; the 32-bit game
+/// holds the decoded level and its chain at once).
+pub const MAX_PIXELS: u64 = 4096 * 4096;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error {
@@ -150,7 +151,7 @@ pub fn decode(data: &[u8]) -> Result<Image, Error> {
     let (w, ht) = (h.width as usize, h.height as usize);
     let src = &data[DATA..];
     // The data is measured before anything is allocated, so a header that claims
-    // 8192x8192 over a few bytes costs nothing.
+    // 4096x4096 over a few bytes costs nothing.
     let (block, need) = match h.format {
         Format::Dxt1 | Format::Dxt3 | Format::Dxt5 => {
             let block = if h.format == Format::Dxt1 { 8 } else { 16 };
@@ -448,6 +449,6 @@ mod tests {
         bad[0] = b'X';
         assert_eq!(decode(&bad), Err(Error::BadHeader));
         // A huge claimed size with no data fails before anything is allocated.
-        assert_eq!(decode(&dxt(8192, 8192, b"DXT5", &[])), Err(Error::Truncated));
+        assert_eq!(decode(&dxt(4096, 4096, b"DXT5", &[])), Err(Error::Truncated));
     }
 }

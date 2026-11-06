@@ -832,6 +832,17 @@ impl Engine {
         Ok(())
     }
 
+    /// Whether every entry of hook `h` has an address in the matched build (none is
+    /// `absent`), asked without a check and without a log line: for a hook only a child
+    /// build has (a Roots site), which stock never asks `ready` about, so that its
+    /// stand-down (`has no address in <build>`) is not logged on every stock run. False
+    /// on an unknown build.
+    pub fn present(&self, h: HookId) -> bool {
+        let t = self.t();
+        let Some(hd) = t.hooks.get(h.0 as usize) else { return false };
+        self.build_index().is_some() && hd.syms.iter().all(|&k| self.entries().get(k as usize).is_some_and(|e| e.present))
+    }
+
     /// Whether a hook that uses the symbol is ready, without the warning `addr` logs when
     /// it is not: for a read that may come before the hook does (a settings load).
     pub fn resolved(&self, s: Sym) -> bool {
