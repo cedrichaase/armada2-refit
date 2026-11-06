@@ -77,6 +77,8 @@ pub mod sym {
     pub const VIEW_SITE: a2engine::Sym = a2engine::Sym(72);
     pub const VIEW_FAR_PLANE: a2engine::Sym = a2engine::Sym(73);
     pub const VIEW_CULL_DIST: a2engine::Sym = a2engine::Sym(74);
+    pub const FN_GO_RENDER: a2engine::Sym = a2engine::Sym(166);
+    pub const SITE_OBJ_DRAW: a2engine::Sym = a2engine::Sym(167);
 }
 
 pub mod hook {
@@ -84,7 +86,8 @@ pub mod hook {
     pub const FRAME_SEAM: a2engine::HookId = a2engine::HookId(1);
     pub const FRAME_STEPS: a2engine::HookId = a2engine::HookId(2);
     pub const FRAME_DESTROY: a2engine::HookId = a2engine::HookId(3);
-    pub const VIEW_DISTANCE: a2engine::HookId = a2engine::HookId(4);
+    pub const FRAME_OBJ_DRAW: a2engine::HookId = a2engine::HookId(4);
+    pub const VIEW_DISTANCE: a2engine::HookId = a2engine::HookId(5);
 }
 
 pub mod field {
@@ -353,6 +356,8 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "inst_assimilated", symbol: "CraftInstance::assimilated byte", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "light_rec_light", symbol: "light registry record light", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "sprite_colour", symbol: "ST3D_Sprite::colour", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "fn_go_render", symbol: "GameObject::Render", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "site_obj_draw", symbol: "Armada_RenderAllOurStuff", kind: a2engine::Kind::Call },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
@@ -360,6 +365,7 @@ pub const HOOKS: &[a2engine::HookDef] = &[
     a2engine::HookDef { id: "render3d.frame.seam", run_unknown: false, rows: &[], syms: &[15, 70, 71] },
     a2engine::HookDef { id: "render3d.frame.steps", run_unknown: false, rows: &[], syms: &[1, 2, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 35, 37, 38, 39, 49, 50, 55, 56, 57] },
     a2engine::HookDef { id: "render3d.frame.destroy", run_unknown: false, rows: &[], syms: &[34, 46] },
+    a2engine::HookDef { id: "render3d.frame.obj_draw", run_unknown: false, rows: &[], syms: &[166, 167] },
     a2engine::HookDef { id: "render3d.view.distance", run_unknown: false, rows: &["View.Distance"], syms: &[72, 73, 74] },
 ];
 
@@ -372,7 +378,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 166,
+        n_resolved: 167,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x45fc50, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x8a, 0xad], mask: &[], section: "", count: 0, value: 0 }, // sound2d
@@ -541,9 +547,16 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 161 }, // inst_assimilated
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // light_rec_light
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 36 }, // sprite_colour
+            a2engine::Entry { present: true, addr: 0x4d54e0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x56, 0x8b, 0xf1, 0x8a, 0x46], mask: &[], section: "", count: 0, value: 0 }, // fn_go_render
+            a2engine::Entry::ABSENT,
         ],
         blocked: &[
         ],
+        file_crc: &[],
+        modules: &[],
+        blocked_mod: &[
+        ],
+        n_resolved_mod: 167,
     },
     a2engine::Build {
         name: "fo-roots-5.0Z11",
@@ -553,7 +566,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 2,
+        n_resolved: 165,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x45fc50, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x8a, 0xad], mask: &[], section: "", count: 0, value: 0 }, // sound2d
@@ -722,20 +735,28 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 161 }, // inst_assimilated
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // light_rec_light
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 36 }, // sprite_colour
+            a2engine::Entry { present: true, addr: 0x4d54e0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // fn_go_render
+            a2engine::Entry { present: true, addr: 0x598297, end: 0x0, target: 0xa6, vtable: 0xffff, index: 0, chain: true, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_obj_draw
         ],
         blocked: &[
-            a2engine::Block { hook: 0, symbol: "ConstructionRig::Render", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ConstructionRig::Render is changed by fo-roots-5.0Z11, not yet verified" },
-            a2engine::Block { hook: 1, symbol: "Armada_RenderAllOurStuff", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Armada_RenderAllOurStuff is changed by fo-roots-5.0Z11, not yet verified" },
-            a2engine::Block { hook: 2, symbol: "Armada_RenderAllOurStuff", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Armada_RenderAllOurStuff is changed by fo-roots-5.0Z11, not yet verified" },
-            a2engine::Block { hook: 4, symbol: "RTS_Configure", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: RTS_Configure is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 5, symbol: "RTS_Configure", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: RTS_Configure is changed by fo-roots-5.0Z11, not yet verified" },
         ],
+        file_crc: &[a2engine::FileCrc { section: ".text", crc: 0xef690537 }, a2engine::FileCrc { section: ".test", crc: 0xe7a4061b }],
+        modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
+        blocked_mod: &[
+            a2engine::Block { hook: 0, symbol: "ConstructionRig::Render", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: ConstructionRig::Render is patched by FleetOpsHook.dll, which is not the profiled one" },
+            a2engine::Block { hook: 1, symbol: "Armada_RenderAllOurStuff", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: Armada_RenderAllOurStuff is patched by FleetOpsHook.dll, which is not the profiled one" },
+            a2engine::Block { hook: 2, symbol: "Terrain_Geometry::Render", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: Terrain_Geometry::Render is patched by FleetOpsHook.dll, which is not the profiled one" },
+            a2engine::Block { hook: 4, symbol: "GameObject::Render", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: GameObject::Render is patched by FleetOpsHook.dll, which is not the profiled one" },
+        ],
+        n_resolved_mod: 2,
     },
 ];
 
-static HOOK_STATE: [core::sync::atomic::AtomicU64; 5] = [const { core::sync::atomic::AtomicU64::new(0) }; 5];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 166] = [const { core::sync::atomic::AtomicU8::new(0) }; 166];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 166] = [const { core::sync::atomic::AtomicUsize::new(0) }; 166];
-static NOTES: [a2engine::Note; 5] = [const { a2engine::Note::new() }; 5];
+static HOOK_STATE: [core::sync::atomic::AtomicU64; 6] = [const { core::sync::atomic::AtomicU64::new(0) }; 6];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 168] = [const { core::sync::atomic::AtomicU8::new(0) }; 168];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 168] = [const { core::sync::atomic::AtomicUsize::new(0) }; 168];
+static NOTES: [a2engine::Note; 6] = [const { a2engine::Note::new() }; 6];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 
 pub static TABLE: a2engine::Table = a2engine::Table {

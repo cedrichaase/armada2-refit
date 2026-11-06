@@ -164,7 +164,7 @@ written per hook. Observing the running game is preferred over reading
 | cutscenes (binkproxy) | yes, if the measurement passes | `FleetOpsHook` imports `binkw32` too; the proxy must forward every export it uses |
 | hud, grid, menus (legacy) | **no** | Roots has its own widescreen HUD layouts and shell; the legacy plugins assume stock's |
 | textures, models, menus backdrops, movies | **no** for now | the recipes are stock-hashed (`a2tex stock` refuses Roots' files, so nothing is installed by accident); Roots' art is mixed TGA and DDS |
-| platform | the ASI loader as `Data/winmm.dll`; DXVK left as Heroic installs it | — |
+| platform | not installed on Roots; the ASI loader is the `asiloader` layer (`Data/winmm.dll`, with Display8 and only with it: beside DxWrapper it stops Roots at start); DXVK left as Heroic installs it | FO-5 step 3: nothing loaded our `.asi` files on Roots before it (Roots ships no loader; DxWrapper loads them only with `LoadPlugins=1`, and is not loaded once Display8 is `d3d8.dll`) |
 
 ## Work packages
 
@@ -264,7 +264,16 @@ is one new claim point for hulls and a handful of call-site hooks moved one leve
    `registry::object` does not take a Roots object; the engine's `Render` runs with every
    wrapper; at 0x4d5a11 the hulls module draws the instance it posed instead of the
    database, reading the per-instance node flags and mesh textures that stock and Roots
-   wrote just before. Everything the engine draws around it (the overlay model, the rings,
+   wrote just before. **The owner**: the instance holds no pointer to its object, so the
+   object step's call at 0x598297 sets a "current object" around the chained draw (it is
+   synchronous, one object at a time), and the claim accepts the instance only when it is
+   that object's own (`object+0x4`, the entity's instance, equals the instance at the call);
+   that skips planets (reached through the craft instance), the overlay model, holograms and
+   other modules' objects. The race comes from the object's ODF as on stock. Construction
+   rigs: FleetOpsHook gives them the common `GameObject::Render`, so the stock rig draw is
+   never called from the loop and rigs reach the claim like any object; the core's rig read
+   (`core.reads`) stands down on Roots with its `ConstructionRig::Render` mark. Holograms
+   and the overlay model do not pass the call and are left to the engine. Everything the engine draws around it (the overlay model, the rings,
    holograms, sprite nodes, wave lights) is the engine's, through passthrough; hulls' own
    versions of those stand down on Roots. FleetOpsHook's Dot3 draws are never reached for
    a claimed hull; for one hulls does not take, Display8's passthrough draws them (its
@@ -306,16 +315,19 @@ same for all of them. So:
   `.test` it leaves alone), for builds that set them;
 - the build names a **companion module**, `FleetOpsHook.dll`, by the CRC-32 of its own
   `.text`: the marks of `fo-roots-5.0Z11` describe that FleetOpsHook. With another one
-  loaded, every hook marked `runtime` stands down, as an unknown build's would.
+  loaded (or none, or one that cannot be read), every hook marked `runtime` stands down, as an
+  unknown build's would, and so does every hook that calls through the module (a chained
+  call) or whose callee check the build drops: built, and tested with a foreign copy, in
+  step 1.
 
 ### Work list
 
 | Step | What | Agent h · bench |
 |---|---|---|
-| 1 | Identity: `[pe] file_crc` (on-disk `.text`, `.test`) and `[[module]]` (FleetOpsHook's `.text` CRC) in `a2engine`, `gen.py`, the C twin and `fo-scan.py`; the negative test with a foreign FleetOpsHook | 4–6 · 1 |
-| 2 | Profile: `site_obj_draw` (0x598297, `call`, `chain`, Roots only), `site_hull_draw` (0x4d5a11, `call` to `ST3D_Instance::RenderInternal`, in `GameObjectInstance::RenderInternal`, which neither Roots' file nor FleetOpsHook changes); the callee hooks for `Fragment` and `DrawHeightPost`; `verified` on `Armada_RenderAllOurStuff` for `render3d.frame.*`; `fo-scan.py --compare` | 3–5 · 0 |
-| 3 | Core: the object step calls through the loop's call site when it is one; stock's loop untouched (the stock set must not move a pixel) | 2–4 · 2 |
-| 4 | Hulls: the instance-level claim, chosen by the profile (a `value`), snapshotting node flags and textures at the claim; hulls' own sprite nodes, holograms and wave lights off on Roots; the race-keyed look | 8–14 · 4–6 |
+| 1 | Identity: `[pe] file_crc` (on-disk `.text`, `.test`) and `[[module]]` (FleetOpsHook's `.text` CRC) in `a2engine`, `gen.py`, the C twin and `fo-scan.py`; the negative test with a foreign FleetOpsHook. **Done 2026-11-06** (branch `fo-5-identity`; crates/a2engine/README.md, "Identity beyond the header") | 4–6 · 1 |
+| 2 | **Done 2026-11-06**, as profile data (`planned` hooks, README rows): Profile: `site_obj_draw` (0x598297, `call`, `chain`, Roots only), `site_hull_draw` (0x4d5a11, `call` to `ST3D_Instance::RenderInternal`, in `GameObjectInstance::RenderInternal`, which neither Roots' file nor FleetOpsHook changes); the callee hooks for `Fragment` and `DrawHeightPost`; `verified` on `Armada_RenderAllOurStuff` for `render3d.frame.*`; `fo-scan.py --compare` | 3–5 · 0 |
+| 3 | Core: the object step calls through the loop's call site when it is one; stock's loop untouched (the stock set must not move a pixel). **Built 2026-11-06** (branch `fo-5-step3`): `frame.obj_draw` ready on Roots (logged chained to FleetOpsHook), the step calls it per object with the object current around it; the Roots marks that held the core, the seam and the steps (`ConstructionRig::Render`, `Armada_RenderFrame`, `Terrain_Geometry::Render`) verified; Render3D on Roots through the `asiloader` layer and `./install --game fo-roots` (display, asiloader, render3d) | 2–4 · 2 |
+| 4 | Hulls: the instance-level claim, chosen by the profile (a `value`), snapshotting node flags and textures at the claim; hulls' own sprite nodes, holograms and wave lights off on Roots; the race-keyed look. **Built 2026-11-06** with step 3: `hulls.instance_draw` (`hl_claim_instance` = 1 on Roots, 0 on stock, which installs nothing), the race-keyed profile and normal-map bump textures in the `fleetops` set (hulls only), Roots' files (`Textures\` with DDS, `ODF.fpq`) in render3d's file system. Left: the node flags and textures FleetOpsHook writes at the claim are not read yet (hulls poses from the SOD as on stock), the hulls' sprite nodes stay on (the claim replaces the database draw, which drew them), wave lights stay ours | 8–14 · 4–6 |
 | 5 | Effects and overlays: the callee hooks; shields from `RTS_CFG.h`; the grid colour | 5–9 · 3–4 |
 | 6 | Content set `fleetops`: an ODF reader over `a2fmt::vfs` (`ODF.fpq`, then `Data/`, then the active mod; Roots' inheritance key), races, ordnance and special ODF names, nebula and planet classes, the two `RTS_CFG.h` keys | 6–12 · 1–2 |
 | 7 | Sky, particles, ordnance, specials, world: each verified beside Roots' changes and marked `verified` | 8–16 · 6–10 |
@@ -388,7 +400,7 @@ Operations team. Each holds until what is named in its last column happens.
 | 3 | render3d on Roots follows **model (c)** (FO-5 design): the frame is ours, Roots' wrappers keep running, hulls claim at the instance draw, callee hooks where FleetOpsHook owns a site | the only model that reads nothing of FleetOpsHook's memory, so a Roots update cannot silently break it | an FO export that draws a ship's extras, or a Roots build that moves the hull draw out of the instance path |
 | 4 | Roots' **range rings and overlay models are drawn by the engine** through passthrough, in its own look (tone-mapped and bloomed with the scene) | they are Roots' gameplay feedback; drawing them ourselves would mean reading Roots' private records | the user wanting them in render3d's style: the rings could be taken at the engine's circle draw, as the posts are |
 | 5 | Roots' **clean screenshot** keeps hiding the posts (callee hook) but not render3d's selection circles | the selection skip is FleetOpsHook's wrapper of a function render3d does not call | the user using Roots' clean screenshots |
-| 6 | The Roots **hull look is keyed by race**; the Borg profile is for the Borg only, not for every bump-mapped mesh | nearly every Roots hull is bump-mapped | the user's verdict in round FO-B |
+| 6 | The Roots **hull look is keyed by race**; the Borg profile is for the Borg only, not for every bump-mapped mesh. The mapping is data: the `fleetops` set's `hulls.ini` (`ProfileBy = race`, `ProfileRaces = borg, freeborg`: the Borg profile; every other race the hull profile), `Render3D.ini` `[Hulls] BorgRaces=` replaces the list; the race is the ODF's `race` read through its includes. Roots' `*_bump` textures are read as the normal maps they are (`BumpMaps = normal`), and a flat one (`all_bump`) as none | nearly every Roots hull is bump-mapped, for the engine's GPU path, not for a look; the two races are the ones whose hulls are Borg art | the user's verdict in round FO-B |
 | 7 | The `fleetops` content set holds **names and keys only** (ODFs, races, classes, `RTS_CFG.h` keys); a look fitted to Roots' own art (a sky recipe, a hull grade) stays local, in the game directory's `Sky\` and similar files, and is not committed | Roots' art is never published (decided 2026-11-06), and numbers fitted to it are close enough to it to wait for the creator | the user, after asking the Roots creator |
 | 7b | **Reuse**: everything Roots-specific lives in data, not code: the build profile (`profiles/fo-roots-*`), the game descriptor (`games/fo-roots.toml`) and the `fleetops` content set; the code knows only "a build whose FleetOpsHook owns these sites" (`chain` entries, callee hooks, the companion-module identity) | so another Fleet Operations-based mod can be added by its creator as a descriptor, a profile and a content set of its own, without code of ours changing | a mod whose FleetOpsHook draws differently enough to need code |
 | 8 | The Roots build identity adds **on-disk section CRC-32s** (`.text`, `.test`) and **FleetOpsHook's `.text` CRC** as a companion module | three Roots builds of each file share every header value we read | none expected; a Roots release that changes only data needs no new profile |
@@ -406,9 +418,9 @@ The Roots profile tools (`tools/engine/fo-scan.py`, PR #61) took these defaults:
 | 16 | The rules plugin is disabled and the content set is `none` on Roots until FO-5 supplies `fleetops` | Roots has its own rules; stock's names are not Roots' | FO-5 step 6 |
 | 17 | Changed globals, vtables and slots are **reported, not marked**: marks are per function | the stand-down rule is per function | a hook of ours reading a global FleetOpsHook rewrites |
 
-The installer (`./install --game fo-roots`, FO-4, PR #63) took these defaults:
+The installer (`./install --game fo-roots`, FO-4, PR #63, and FO-5 step 3) took these defaults:
 
-- `./install --game fo-roots` installs the `display` layer only, into `Data/`; DxWrapper's
+- `./install --game fo-roots` installs `display`, `asiloader` and `render3d` (FO-5 step 3; at first `display` only), into `Data/`; DxWrapper's
   `d3d8.dll` is the backup (`.a2display-backup`, the usual suffix); no platform layer and no
   `retire/` run on Roots.
 - `games/fo-roots.toml` gets `installable = true` (optional): `./install` and `a2mod`

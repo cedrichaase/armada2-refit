@@ -36,6 +36,7 @@ pub mod shaders;
 use r3d_core::scene::anim;
 pub mod content;
 pub mod hooks;
+mod claim;
 mod syms;
 pub mod look;
 mod draw;
@@ -579,6 +580,12 @@ impl Module for Hulls {
     fn hooks(&mut self, h: &mut r3d_core::hooks::Hooks) {
         if !h.ready(&syms::TABLE, syms::hook::HULLS_READS) {
             h.stand_down("the engine's reads are not stock");
+            return;
+        }
+        // A build whose object loop is another module's (Roots): hulls are taken at the
+        // instance's database draw, or not at all.
+        if claim::wanted() && !claim::install(h) {
+            h.stand_down("the instance draw cannot be claimed here");
         }
     }
     fn provide(&mut self, id: r3d_core::module::ModuleId, s: &mut r3d_core::services::Services) {
@@ -696,7 +703,8 @@ impl Module for Hulls {
     }
     fn object(&mut self, o: usize, v: &View) -> bool {
         let look = self.look().clone();
-        if self.off || !our_class(o, &look) {
+        // Claimed at the instance draw instead: the engine's Render runs, with its wrappers.
+        if self.off || claim::on() || !our_class(o, &look) {
             return false;
         }
         let key = v.key();
@@ -972,6 +980,61 @@ impl Module for Hulls {
 
 /// The hulls module while it runs (set at its `begin_view`), for `draw_instance`.
 static mut THIS: *mut Hulls = core::ptr::null_mut();
+
+/// `claim`: the hull of `o` at its instance's database draw, inside the engine's own
+/// `Render` (the frustum test, the on-screen byte, holograms and the build placeholder
+/// are the engine's there, and so is the object's billboard effect). False leaves the
+/// draw to the engine: the module stands aside, the object is not one of our classes,
+/// or its model does not load.
+pub(crate) fn claim_hull(o: usize, v: &View) -> bool {
+    let h = unsafe { THIS };
+    if h.is_null() {
+        return false;
+    }
+    let h = unsafe { &mut *h };
+    if h.off {
+        return false;
+    }
+    let look = h.look().clone();
+    if !our_class(o, &look) {
+        return false;
+    }
+    let key = v.key();
+    let sc = hooks::instance_scale(obj::instance(o));
+    let fresh = view_state(key).posed().get(&o).is_none_or(|p| (p.scale - sc).len() > 1e-4);
+    if fresh {
+        match h.prepare(o, v) {
+            Some(p) => {
+                view_state(key).posed().insert(o, p);
+            }
+            None => return false,
+        }
+    }
+    let st = view_state(key);
+    let Some(p) = st.posed().get_mut(&o) else { return false };
+    p.drawn = true;
+    if h.said < 6 {
+        h.said += 1;
+        log!(
+            "hulls: {} at {:.0},{:.0},{:.0}: {} parts, radius {:.0}, {} profile (claimed at the instance draw)",
+            p.model.name, p.centre.x, p.centre.y, p.centre.z, p.model.parts.len(), p.radius,
+            if look::borg_profile(o, &look, false) { "Borg" } else { "hull" }
+        );
+    }
+    let fade = draw::fade(p, v, &look);
+    if p.cloak.is_some() && look.cloak {
+        st.cloaked.push(o);
+    } else if let Some((s, a, _)) = p.cloak.filter(|_| !look.cloak) {
+        st.faded.push((o, if s == 2 { 0.2 } else { 0.2 + 0.8 * a }));
+    } else if fade < 0.999 {
+        st.faded.push((o, fade));
+    } else {
+        h.draw.draw(v, &look, p, draw::Mode::Opaque);
+        st.additive.push(o);
+    }
+    h.sprites.collect(v, &look, p, &mut st.sprites);
+    true
+}
 
 /// For other modules: draws an `ST3D_Instance` that is no game object's (a station
 /// being built, a worker bee) as a hull, now, with the hull look: `sod` placed by

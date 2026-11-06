@@ -80,7 +80,7 @@ fn store() -> &'static mut Store {
         if STORE.is_none() {
             let t0 = rt::now();
             let tex_dir = DirIndex::build("textures");
-            let tex_index = TexIndex::new(tex_dir.files.keys().cloned());
+            let tex_index = TexIndex::with_extensions(tex_dir.files.keys().cloned(), files::game().texture_exts);
             let s = Store {
                 sod_dir: DirIndex::build("sod"),
                 tex_dir,
@@ -199,7 +199,7 @@ pub fn sprites() -> Rc<SpriteTable> {
 pub fn image(name: &str) -> Option<tga::Image> {
     let s = store();
     let base = String::from(s.tex_index.find(name)?);
-    tga::decode(&s.tex_dir.read(&base)?).ok()
+    a2fmt::image::decode(&s.tex_dir.read(&base)?).ok()
 }
 
 /// Whether a texture of that name exists (`textures\<name>.tga`: `Textures/RGB` in
@@ -216,7 +216,7 @@ fn tex_width(s: &mut Store, file: &str) -> Option<u32> {
     let w = s.tex_dir.path(&key).and_then(|p| {
         // The header is all we need: 18 bytes.
         let d = files::open(p)?;
-        tga::Header::parse(&d).ok().map(|h| h.width as u32)
+        a2fmt::image::width(&d)
     });
     s.widths.insert(key, w);
     w
@@ -242,9 +242,9 @@ pub fn texture(name: &str) -> Option<gpu::Texture> {
 
 fn load_texture(s: &mut Store, name: &str) -> Option<gpu::Texture> {
     let base = String::from(s.tex_index.find(name)?);
-    let img = tga::decode(&s.tex_dir.read(&base)?).ok()?;
+    let img = a2fmt::image::decode(&s.tex_dir.read(&base)?).ok()?;
     let (w, h) = (img.width, img.height);
-    if w == 0 || h == 0 || !w.is_power_of_two() || !h.is_power_of_two() {
+    if w == 0 || h == 0 || (!files::game().npot_textures && (!w.is_power_of_two() || !h.is_power_of_two())) {
         return None;
     }
     let chain: Vec<String> = {
@@ -253,35 +253,46 @@ fn load_texture(s: &mut Store, name: &str) -> Option<gpu::Texture> {
         let names = unsafe { &*idx }.mip_chain(&base, |f| tex_width(s, f));
         names.into_iter().map(String::from).collect()
     };
+    // The game is 32-bit: every allocation on this path can fail, and a texture that does
+    // not fit is skipped (logged by the caller), never an abort.
     let mut levels: Vec<Vec<u8>> = Vec::new();
+    levels.try_reserve_exact(32).ok()?;
     levels.push(img.pixels);
     let (mut lw, mut lh) = (w, h);
     while lw > 1 || lh > 1 {
         let (nw, nh) = ((lw / 2).max(1), (lh / 2).max(1));
         let k = levels.len();
-        let stock = chain.get(k - 1).and_then(|f| s.tex_dir.read(f)).and_then(|d| tga::decode(&d).ok());
+        let stock = chain.get(k - 1).and_then(|f| s.tex_dir.read(f)).and_then(|d| a2fmt::image::decode(&d).ok());
         let next = match stock {
             Some(i) if i.width == nw && i.height == nh => i.pixels,
-            _ => halve(&levels[k - 1], lw, lh),
+            _ => halve(&levels[k - 1], lw, lh)?,
         };
         levels.push(next);
         lw = nw;
         lh = nh;
     }
     let n = levels.len() as u32;
-    let mut px = Vec::with_capacity(levels.iter().map(|l| l.len()).sum());
-    for l in &levels {
-        px.extend_from_slice(l);
-    }
+    let px = concat_levels(&levels)?;
     drop(levels);
     let d = gpu::TextureDesc::d2(w, h, gpu::Format::Bgra8, gpu::Usage::SAMPLED).with_levels(n);
     Some(crate::gfx::gpu().texture(d, gpu::Contents::Transient(px)))
 }
 
-/// A 2x2 box filter of a BGRA8 image.
-fn halve(src: &[u8], w: u32, h: u32) -> Vec<u8> {
+/// A mip chain's levels end to end in one buffer; None when that does not fit.
+pub fn concat_levels(levels: &[Vec<u8>]) -> Option<Vec<u8>> {
+    let mut px = Vec::new();
+    px.try_reserve_exact(levels.iter().map(|l| l.len()).sum()).ok()?;
+    for l in levels {
+        px.extend_from_slice(l);
+    }
+    Some(px)
+}
+
+/// A 2x2 box filter of a BGRA8 image; None when the result does not fit.
+pub fn halve(src: &[u8], w: u32, h: u32) -> Option<Vec<u8>> {
     let (nw, nh) = ((w / 2).max(1), (h / 2).max(1));
-    let mut out = Vec::with_capacity((nw * nh * 4) as usize);
+    let mut out = Vec::new();
+    out.try_reserve_exact((nw * nh * 4) as usize).ok()?;
     for y in 0..nh {
         for x in 0..nw {
             for c in 0..4 {
@@ -295,7 +306,7 @@ fn halve(src: &[u8], w: u32, h: u32) -> Vec<u8> {
             }
         }
     }
-    out
+    Some(out)
 }
 
 /// Drops everything on the device (before a `Reset`).

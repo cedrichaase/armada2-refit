@@ -95,6 +95,11 @@ pub const BUILDS: &[a2engine::Build] = &[
         ],
         blocked: &[
         ],
+        file_crc: &[],
+        modules: &[],
+        blocked_mod: &[
+        ],
+        n_resolved_mod: 13,
     },
     a2engine::Build {
         name: "b2",
@@ -127,6 +132,11 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Block { hook: 0, symbol: "One::caller", why: "is changed by b2 (not yet verified)", note: "Stands down: One::caller is changed by b2, not yet verified" },
             a2engine::Block { hook: 1, symbol: "One::chainer", why: "is off in b2: b2 has its own", note: "Stands down: off in b2: b2 has its own" },
         ],
+        file_crc: &[],
+        modules: &[],
+        blocked_mod: &[
+        ],
+        n_resolved_mod: 8,
     },
     a2engine::Build {
         name: "b3",
@@ -157,6 +167,49 @@ pub const BUILDS: &[a2engine::Build] = &[
         ],
         blocked: &[
         ],
+        file_crc: &[],
+        modules: &[],
+        blocked_mod: &[
+        ],
+        n_resolved_mod: 13,
+    },
+    a2engine::Build {
+        name: "b4",
+        key: "test/b4",
+        exe: "Test.exe",
+        timestamp: 0x5eed0001,
+        image_size: 0x7800,
+        sections: 0x48172dda,
+        image_base: 0x400000,
+        n_resolved: 12,
+        content: "stock",
+        entries: &[
+            a2engine::Entry { present: true, addr: 0x401000, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x10], mask: &[], section: "", count: 0, value: 0 }, // f1
+            a2engine::Entry { present: true, addr: 0x401200, end: 0x0, target: 0x0, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // c1
+            a2engine::Entry { present: true, addr: 0x401300, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x90, 0x90, 0x90, 0x90, 0x90], mask: &[], section: "", count: 0, value: 0 }, // pt
+            a2engine::Entry { present: true, addr: 0x401305, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // l1
+            a2engine::Entry { present: true, addr: 0x404010, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // g1
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 28 }, // fd
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 640 }, // v1
+            a2engine::Entry { present: true, addr: 0x401210, end: 0x0, target: 0x0, vtable: 0xffff, index: 0, chain: true, check: &[], mask: &[], section: "", count: 0, value: 0 }, // c2
+            a2engine::Entry { present: true, addr: 0x401220, end: 0x0, target: 0x0, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // c3
+            a2engine::Entry { present: true, addr: 0x403000, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // vt
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x0, vtable: 0x9, index: 1, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // s1
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x0, vtable: 0x9, index: 2, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // s2
+            a2engine::Entry { present: true, addr: 0x401100, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x89, 0xe5], mask: &[], section: "", count: 0, value: 0 }, // f2
+            a2engine::Entry::ABSENT,
+            a2engine::Entry::ABSENT,
+        ],
+        blocked: &[
+            a2engine::Block { hook: 2, symbol: "One::caller", why: "is changed by b4 (not yet verified)", note: "Stands down: One::caller is changed by b4, not yet verified" },
+        ],
+        file_crc: &[a2engine::FileCrc { section: ".text", crc: 0x72e45ba5 }, a2engine::FileCrc { section: ".test", crc: 0x51a76db8 }],
+        modules: &[a2engine::Module { name: "Comp.dll", text_crc: 0xc0ffee11 }],
+        blocked_mod: &[
+            a2engine::Block { hook: 0, symbol: "One::caller", why: "is patched by Comp.dll, which is not the profiled one", note: "Stands down: One::caller is patched by Comp.dll, which is not the profiled one" },
+            a2engine::Block { hook: 1, symbol: "One::chainer", why: "is patched by Comp.dll, which is not the profiled one", note: "Stands down: One::chainer is patched by Comp.dll, which is not the profiled one" },
+        ],
+        n_resolved_mod: 4,
     },
 ];
 

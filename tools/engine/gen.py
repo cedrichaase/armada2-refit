@@ -56,23 +56,7 @@ def root_values(t):
     return out
 
 
-def n_resolved(t, b):
-    n = 0
-    for e in b['entries']:
-        if e is None:
-            continue
-        ub = [f'{t.plugin}.{u}' for u in (e.get('used_by') or [])]
-        if ub and all(u in b['blocked'] for u in ub):
-            continue
-        n += 1
-    return n
-
-
-def note_for_block(sym, why):
-    if why.startswith('is changed by '):
-        by = why[len('is changed by '):].split(' ')[0]
-        return f'Stands down: {sym} is changed by {by}, not yet verified'[:120]
-    return f'Stands down: {why[3:]}'[:120]
+note_for_block = profiles.note_for_block
 
 
 def entry_fields(t, e):
@@ -103,14 +87,36 @@ def rs_bytes(b):
     return '&[' + ', '.join(f'0x{x:02x}' for x in b) + ']'
 
 
+def planned_syms(t):
+    """The ids of the entries only `planned` hooks use (profile data ahead of its code)."""
+    out = set()
+    for k, sid in enumerate(t.sym_ids):
+        ub = set()
+        for b in t.builds:
+            e = b['entries'][k]
+            if e is not None:
+                ub |= set(e.get('used_by') or [])
+        if ub and all(t.file.hooks[h].get('planned') for h in ub if h in t.file.hooks):
+            out.add(sid)
+    return out
+
+
+DEAD = '    #[allow(dead_code)] // planned: no code reads it yet'
+
+
 def emit_rs(t):
     o = [header(t), '//! The symbol table of `' + t.plugin + '` (crates/a2engine/README.md).', '']
+    plan = planned_syms(t)
     o.append('pub mod sym {')
     for k, sid in enumerate(t.sym_ids):
         if t.kind(k) not in profiles.CONST_KINDS:
+            if sid in plan:
+                o.append(DEAD)
             o.append(f'    pub const {upper(sid)}: a2engine::Sym = a2engine::Sym({k});')
     o += ['}', '', 'pub mod hook {']
     for h, name in enumerate(t.hooks):
+        if t.file.hooks[name].get('planned'):
+            o.append(DEAD)
         o.append(f'    pub const {upper(name)}: a2engine::HookId = a2engine::HookId({h});')
     # Fields and values are the matched build's, read at run time (README.md, "Fields
     # and values"): a cheap accessor each, never a const.
@@ -146,7 +152,7 @@ def emit_rs(t):
         o.append(f'        image_size: {p.get("image_size", 0):#x},')
         o.append(f'        sections: {p.get("sections", 0):#010x},')
         o.append(f'        image_base: {p.get("image_base", 0):#x},')
-        o.append(f'        n_resolved: {n_resolved(t, b)},')
+        o.append(f'        n_resolved: {b["n_resolved"]},')
         o.append(f'        content: "{esc(bb.content_for(t.fname))}",')
         o.append('        entries: &[')
         for k, e in enumerate(b['entries']):
@@ -165,6 +171,16 @@ def emit_rs(t):
             h = t.hook_ids.index(hid)
             o.append(f'            a2engine::Block {{ hook: {h}, symbol: "{esc(sym)}", why: "{esc(why)}", note: "{esc(note_for_block(sym, why))}" }},')
         o.append('        ],')
+        o.append('        file_crc: &[' + ', '.join(
+            f'a2engine::FileCrc {{ section: "{esc(sec)}", crc: {crc:#010x} }}' for sec, crc in bb.file_crc.items()) + '],')
+        o.append('        modules: &[' + ', '.join(
+            f'a2engine::Module {{ name: "{esc(m["name"])}", text_crc: {m["text_crc"]:#010x} }}' for m in bb.modules) + '],')
+        o.append('        blocked_mod: &[')
+        for hid, (sym, why) in b['blocked_mod'].items():
+            h = t.hook_ids.index(hid)
+            o.append(f'            a2engine::Block {{ hook: {h}, symbol: "{esc(sym)}", why: "{esc(why)}", note: "{esc(note_for_block(sym, why))}" }},')
+        o.append('        ],')
+        o.append(f'        n_resolved_mod: {b["n_resolved_mod"]},')
         o.append('    },')
     nh, ns = len(t.hooks), len(t.sym_ids)
     n_scan = sum(1 for k in range(ns) if t.kind(k) == 'scan')
@@ -271,13 +287,30 @@ def emit_c(t):
             o.append(f'    {{{t.hook_ids.index(hid)}, "{esc(sym)}", "{esc(why)}", "{esc(note_for_block(sym, why))}"}},')
         o.append('    {0xffff, 0, 0, 0}')
         o.append('};')
+        bb = b['build']
+        o.append(f'static const A2ECrc {p}_b{bi}_fcrc[] = {{')
+        for sec, crc in bb.file_crc.items():
+            o.append(f'    {{"{esc(sec)}", 0x{crc:08x}}},')
+        o.append('    {0, 0}')
+        o.append('};')
+        o.append(f'static const A2EModule {p}_b{bi}_mods[] = {{')
+        for m in bb.modules:
+            o.append(f'    {{"{esc(m["name"])}", 0x{m["text_crc"]:08x}}},')
+        o.append('    {0, 0}')
+        o.append('};')
+        o.append(f'static const A2EBlock {p}_b{bi}_blocked_mod[] = {{')
+        for hid, (sym, why) in b['blocked_mod'].items():
+            o.append(f'    {{{t.hook_ids.index(hid)}, "{esc(sym)}", "{esc(why)}", "{esc(note_for_block(sym, why))}"}},')
+        o.append('    {0xffff, 0, 0, 0}')
+        o.append('};')
     o.append(f'static const A2EBuild {p}_builds[] = {{')
     for bi, b in enumerate(t.builds):
         bb = b['build']
         pe_ = bb.pe
         o.append(f'    {{"{esc(bb.name)}", "{esc(bb.key)}", "{esc(bb.exe)}", 0x{pe_.get("timestamp", 0):x}, 0x{pe_.get("image_size", 0):x}, '
                  f'0x{pe_.get("sections", 0):08x}, 0x{pe_.get("image_base", 0):x}, {p}_b{bi}_entries, {p}_b{bi}_blocked, '
-                 f'{len(b["blocked"])}, {n_resolved(t, b)}}},')
+                 f'{len(b["blocked"])}, {b["n_resolved"]}, {p}_b{bi}_fcrc, {len(bb.file_crc)}, {p}_b{bi}_mods, {len(bb.modules)}, '
+                 f'{p}_b{bi}_blocked_mod, {len(b["blocked_mod"])}, {b["n_resolved_mod"]}}},')
     nh, ns = len(t.hooks), len(t.sym_ids)
     n_scan = sum(1 for k in range(ns) if t.kind(k) == 'scan')
     o += ['};', '',

@@ -21,6 +21,11 @@ manifest, `PLAYING.md` or the release notes until the user says otherwise.
 `tools/layers.py --check` (CI) fails when `publish/`, `gui-installer/` or `.github/` name a
 game that is not.
 
+What `./install --game fo-roots` puts in `Data/` now: Display8 (`display`), the ASI loader
+Roots ships none of (`asiloader`, `winmm.dll`; `asiloader/README.md`) and render3d. No UI,
+QOL, rules, online, textures or cutscenes yet. a2mod files each layer's files only for the
+games in the layer's `games`.
+
 ## Choosing a game
 
 `A2_PROFILE=<id>` (the environment, or a top-level line of

@@ -13,3 +13,10 @@ check = ""
 [[sym]]
 id = "fn_go_render"
 check = ""
+
+# The object loop is FleetOpsHook's (render3d.toml, site_obj_draw): the hulls module takes a
+# hull at the instance's database draw, inside the engine's Render and every wrapper Roots
+# puts around it (PLAN-FLEETOPS.md, "The rules of (c)", rule 3).
+[[sym]]
+id = "hl_claim_instance"
+value = 1

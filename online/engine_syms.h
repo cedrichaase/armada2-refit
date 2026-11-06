@@ -95,6 +95,15 @@ static const A2EEntry online_b0_entries[] = {
 static const A2EBlock online_b0_blocked[] = {
     {0xffff, 0, 0, 0}
 };
+static const A2ECrc online_b0_fcrc[] = {
+    {0, 0}
+};
+static const A2EModule online_b0_mods[] = {
+    {0, 0}
+};
+static const A2EBlock online_b0_blocked_mod[] = {
+    {0xffff, 0, 0, 0}
+};
 static const A2E_U8 online_b1_c0[] = {0x55, 0x8b, 0xec, 0xa0, 0x68, 0x13, 0x76, 0x00};
 static const A2E_U8 online_b1_c1[] = {0x8b, 0x5d, 0x14, 0x8b, 0x0d, 0xa0, 0x30, 0x7a, 0x00};
 static const A2E_U8 online_b1_c2[] = {0x8b, 0xfb, 0x81, 0xe3, 0xff, 0xff, 0x00, 0x00};
@@ -123,9 +132,21 @@ static const A2EBlock online_b1_blocked[] = {
     {0, "InternetGameDlgProc", "is changed by fo-roots-5.0Z11 (not yet verified)", "Stands down: InternetGameDlgProc is changed by fo-roots-5.0Z11, not yet verified"},
     {0xffff, 0, 0, 0}
 };
+static const A2ECrc online_b1_fcrc[] = {
+    {".text", 0xef690537},
+    {".test", 0xe7a4061b},
+    {0, 0}
+};
+static const A2EModule online_b1_mods[] = {
+    {"FleetOpsHook.dll", 0x28c90d19},
+    {0, 0}
+};
+static const A2EBlock online_b1_blocked_mod[] = {
+    {0xffff, 0, 0, 0}
+};
 static const A2EBuild online_builds[] = {
-    {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, online_b0_entries, online_b0_blocked, 0, 13},
-    {"fo-roots-5.0Z11", "armada2/fo-roots-5.0Z11", "ArmadaL.exe", 0x3c4c76bd, 0x405000, 0xca07c55a, 0x400000, online_b1_entries, online_b1_blocked, 1, 0},
+    {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, online_b0_entries, online_b0_blocked, 0, 13, online_b0_fcrc, 0, online_b0_mods, 0, online_b0_blocked_mod, 0, 13},
+    {"fo-roots-5.0Z11", "armada2/fo-roots-5.0Z11", "ArmadaL.exe", 0x3c4c76bd, 0x405000, 0xca07c55a, 0x400000, online_b1_entries, online_b1_blocked, 1, 0, online_b1_fcrc, 2, online_b1_mods, 1, online_b1_blocked_mod, 0, 0},
 };
 
 static A2E_U8 online_hook_state[1];

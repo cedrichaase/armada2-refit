@@ -122,8 +122,11 @@ def main():
         rd = mkpe.build(roots_img())
         se, re_ = pe.Exe(sd), pe.Exe(rd)
         ident = fo.identify(rd, os.path.join(tmp, 'Data', 'Test.exe'))
-        check(ident['sections'][0]['crc32'] == zlib.crc32(rd[re_.sections[0][4]:re_.sections[0][4] + 0x2000]),
+        # the content: VirtualSize (0x2000 here) or SizeOfRawData, the lesser
+        check(ident['sections'][0]['crc32'] == zlib.crc32(rd[re_.sections[0][4]:re_.sections[0][4] + min(re_.sections[0][2], re_.sections[0][3])]),
               'identity: a section\'s CRC-32')
+        check(pe.section_crc(rd, '.text') == ident['sections'][0]['crc32'] and pe.section_crc(rd, '.nope') is None,
+              'identity: pe.section_crc is the same CRC-32')
         os.makedirs(os.path.join(tmp, 'Data'))
         open(os.path.join(tmp, 'Data', 'Test.exe'), 'wb').write(rd)
         open(os.path.join(tmp, 'stock.exe'), 'wb').write(sd)
@@ -131,10 +134,14 @@ def main():
         open(os.path.join(tmp, 'memdiff.log'), 'w').write(LOG)
         open(os.path.join(tmp, 'Roots_Download_Version.txt'), 'w').write('Version 9.9T1 (1 January 2030)')
         open(os.path.join(tmp, 'patches.tsv'), 'w').write('')
+        comp = mkpe.build(stock_img())                  # a companion module: its .text is what is named
+        open(os.path.join(tmp, 'Comp.dll'), 'wb').write(comp)
         pdir = profile_set(tmp, se.identity())
         os.environ['A2_DATA'] = os.path.join(tmp, 'data')
         cfgp = os.path.join(tmp, 'fo-scan.toml')
         open(cfgp, 'w').write('callees = ["FnCallee", "FnCalleeRt", "FnBody"]\n'
+                              'file_crc = [".text", ".nope"]\ncompanions = ["Comp.dll"]\n'
+                              '[verified]\nFnAlpha = ["p.h1"]\n'
                               '[[disable]]\nhooks = ["p.h2"]\nwhy = "off"\n')
         argv = ['--exe', os.path.join(tmp, 'Data', 'Test.exe'), '--stock', os.path.join(tmp, 'stock.exe'),
                 '--map', os.path.join(tmp, 'stock.map'), '--memdiff', os.path.join(tmp, 'memdiff.log'),
@@ -146,11 +153,14 @@ def main():
         check(rc == 0, 'scan runs')
         out = os.path.join(pdir, 'fo-roots-9.9T1')
         check(os.path.isfile(os.path.join(out, 'build.toml')), 'a new build is written into the profile set, named from the version')
-        marks, checks, dis, p = fo.read_marks(out)
+        marks, checks, dis, p, ver, mods = fo.read_marks(out)
         check(marks == {'FnAlpha': 'detour', 'FnBeta': 'edit', 'FnBody': 'detour', 'FnRt': 'runtime'},
               f'marks: detour, edit (a constant is no call), a callee beyond its entry, runtime: {marks}')
         check(checks == {('p.toml', 'f_fncallee'), ('p.toml', 'f_fncalleert')}, f'callees drop their check: {checks}')
         check(dis == {'p.h2'}, 'disable from the config')
+        check(p['file_crc'] == {'.text': pe.section_crc(rd, '.text')}, f'[pe] file_crc: the sections of the config the exe has: {p.get("file_crc")}')
+        check(mods == {'Comp.dll': pe.section_crc(comp, '.text')}, f'[[module]]: the companion found beside the install: {mods}')
+        check(ver.get('FnAlpha') == ['p.h1'] and ver.get('FnBeta') == [], f'verified from the config is written: {ver}')
         check(p['image_size'] == 0x8000 and p['code'] == [0x401000, 0x403000], '[pe] identity and code range')
         games = fo.profiles.load_game_sets([pdir])
         check([b.name for b in games['tg'].builds] == ['stk-1', 'fo-roots-9.9T1'], 'the profile set loads')

@@ -33,6 +33,7 @@ use core::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use win::*;
 
 static GAME_DIR: AtomicPtr<String> = AtomicPtr::new(core::ptr::null_mut());
+static EXE_NAME: AtomicPtr<String> = AtomicPtr::new(core::ptr::null_mut());
 static LOG_ON: AtomicBool = AtomicBool::new(true);
 static LOG_FILE: AtomicPtr<u8> = AtomicPtr::new(core::ptr::null_mut());
 
@@ -93,6 +94,13 @@ pub fn game_path(rel: &str) -> String {
     s
 }
 
+/// The executable's file name as it is on disk (`Armada2.exe`, `ArmadaL.exe`): which game
+/// this is, for what is laid out per game (render3d's mount list).
+pub fn exe_name() -> &'static str {
+    let p = EXE_NAME.load(Ordering::Relaxed);
+    if p.is_null() { "" } else { unsafe { (*p).as_str() } }
+}
+
 pub fn init() {
     // The wide call: the ANSI one hands back the code page's bytes, which are not UTF-8
     // for a path such as `C:\Users\Jörg\...` and left the directory empty.
@@ -108,7 +116,9 @@ pub fn init() {
         }
     }
     let dir = from_wide(&buf[..cut]);
+    let exe = from_wide(&buf[cut..n]);
     GAME_DIR.store(alloc::boxed::Box::into_raw(alloc::boxed::Box::new(dir)), Ordering::Relaxed);
+    EXE_NAME.store(alloc::boxed::Box::into_raw(alloc::boxed::Box::new(exe)), Ordering::Relaxed);
 }
 
 /// The folder the logs go in: `%LOCALAPPDATA%\armada2-refit\logs` (beside Display8's

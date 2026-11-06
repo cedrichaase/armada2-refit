@@ -9,7 +9,7 @@ Timeout: 20 min
 Run with `--install .`. On GOG's 1.1 every plugin that has moved onto its symbol
 profile (`crates/a2engine/README.md`) logs the executable's identity, recognises the
 build, resolves all of its symbols (the fields and values each build resolves count
-as symbols) with no hook blocked, and no hook stands down or
+as symbols; the core's 168 are 167 on stock, `site_obj_draw` being Roots' alone, and the hulls' 80 include `hl_claim_instance`) with no hook blocked, and no hook stands down or
 has a symbol read before its hook was ready. One game straight into a mission, so the
 hooks that are readied late (the stub's mode requests at the first `Direct3DCreate8`,
 `[Drop]`'s ranges at the engine's first scene) have run. Each package of phase 8
@@ -85,10 +85,10 @@ appends its plugin's section and touches no other.
 ## Render3D
 54. Expect "Render3D.log" contains "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321".
 55. Expect "Render3D.log" contains "engine: build armada2/gog-1.1".
-56. Expect "Render3D.log" contains "engine: symbols: 166/166 resolved; 0 hooks blocked".
+56. Expect "Render3D.log" contains "engine: symbols: 167/168 resolved; 0 hooks blocked".
 57. Expect "Render3D.log" contains "engine: world symbols: 69/69 resolved; 0 hooks blocked".
 58. Expect "Render3D.log" contains "engine: particles symbols: 26/26 resolved; 0 hooks blocked".
-59. Expect "Render3D.log" contains "engine: hulls symbols: 77/77 resolved; 0 hooks blocked".
+59. Expect "Render3D.log" contains "engine: hulls symbols: 80/80 resolved; 0 hooks blocked".
 60. Expect "Render3D.log" contains "engine: effects symbols: 122/122 resolved; 0 hooks blocked".
 61. Expect "Render3D.log" contains "engine: ordnance symbols: 53/53 resolved; 0 hooks blocked".
 62. Expect "Render3D.log" contains "engine: specials symbols: 22/22 resolved; 0 hooks blocked".

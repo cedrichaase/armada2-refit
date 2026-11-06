@@ -19,6 +19,10 @@ Every plugin logs, right after its version line:
     engine: build armada2/gog-1.1                (or: engine: unknown build)
     engine: symbols: 15/15 resolved; 0 hooks blocked
 
+A build that is also told by its file or by a companion module (below) adds lines between
+them: `engine: <exe> file crc: .text 0x..., .test 0x...` after the identity line, and
+`engine: companion <module> ...` after the build line.
+
 **The executable's name** in these lines and in the notes is not a literal of the
 resolver: it is the matched build's `exe` (the first of `build.toml`'s list, which
 `gen.py` emits as `Build.exe`), or, when no build matches, the process's own module file
@@ -68,6 +72,9 @@ code = [0x401000, 0x6ae000]       # where code kinds may sit (lint); at run time
 [[known]]                         # files seen with this identity: information only
 sha256 = "..."
 note = "GOG, patch 1.1, as installed"
+# Optional, for a build the three numbers cannot tell apart from another (Roots):
+#   [pe]  file_crc = { ".text" = 0x.., ".test" = 0x.. }
+#   [[module]] name = "FleetOpsHook.dll", text_crc = 0x..          ("Identity", below)
 # Only in a build that inherits:
 [[changed]]                       # a function this build changes
 fn = "mCheckGroupSelect"          # a map name
@@ -79,7 +86,42 @@ why = "Roots has its own rules"
 ```
 
 A build is recognised only when all three of `timestamp`, `image_size` and `sections`
-match: the timestamp alone is never the key (Fleet Operations' Roots shares stock's).
+match (and, where it sets `file_crc`, the CRCs below): the timestamp alone is never the key
+(Fleet Operations' Roots shares stock's).
+
+### Identity beyond the header (`file_crc`, `[[module]]`)
+
+Roots' builds cannot be told apart by their headers: the next release has the same
+timestamp, image size and section table as this one, with other bytes. Two optional parts
+of a build (PLAN-FLEETOPS.md, "FO-5: render3d on Roots, the design"):
+
+- **`[pe] file_crc`**: CRC-32 (IEEE, zlib's) of named sections as **the file on disk** has
+  them: the first `min(VirtualSize, SizeOfRawData)` bytes at `PointerToRawData`, so the file
+  alignment's padding does not count. The file, never the mapped image: FleetOpsHook
+  rewrites `.text` and `.rdata` in memory before a plugin of ours starts (`.test` it
+  leaves alone). A build that sets it is matched only when the three numbers *and* every
+  CRC match; a build that sets none keeps matching on the three numbers (stock 1.1 sets
+  none, and `init` reads no file for it). The resolver streams the file in 4 KiB steps
+  (`pe::section_crc_file`, `a2e_section_crc_file`; `a2rt`'s `read_file` would hold the whole
+  4.8 MB, and `a2engine` has no dependency), once per plugin however many tables it has.
+  A match that fails logs the CRCs it read and `engine: unknown build`.
+- **`[[module]]`**: a companion module whose run-time patches the build's marks describe,
+  named by the CRC-32 of its `.text` **in its file** (`GetModuleHandle`, then the path of
+  that module: not its image, which may be relocated or patched). It is not part of the
+  match. The log says `engine: companion FleetOpsHook.dll .text crc 0x.. matches the
+  profile`, or that it is not the profiled CRC, not loaded, or cannot be read. With
+  anything but a match, **every hook that depends on the module's patches stands down**
+  (`is patched by FleetOpsHook.dll, which is not the profiled one`; the settings note
+  says the same), whatever a mark's `verified` says, since `verified` was beside that
+  module. A hook depends on it when one of its entries is or sits `in` a `how = "runtime"`
+  function, is a `call`, `jmp` or `slot` with `chain`, or is a `fn` whose check the build
+  drops (`check = ""`, a callee the module takes over). The generator computes the list
+  (`blocked_mod`, with `n_resolved_mod` for the summary line); the symbol count and
+  blocked count in the `symbols:` line are those with the module counted bad.
+
+Offline (`resolve.py`, `a2test syms`) the module is looked for beside the executable and
+one directory up (Roots keeps `FleetOpsHook.dll` above `Data/`); `syms.report(...,
+modules={name: crc | None})` says what the process holds instead (the negative tests).
 
 ### `<plugin>[.<part>].toml`
 
@@ -94,6 +136,7 @@ out = "display/src/engine_syms.rs"
 doc = "..."                       # at most 120 characters
 rows = ["Section.Key"]            # settings rows whose SettingsNote this hook feeds
 unknown = "stand_down"            # or "run": only when every entry is a scan
+planned = "FO-5 step 3"           # optional: profile data ahead of its code (below)
 
 [[sym]]
 id = "find_display_mode"          # the code identifier, unique in the build (snake case)
@@ -115,6 +158,17 @@ used_by = ["modes"]
 | `vtable`, `global`, `rtti` | `addr` | the address | none |
 | `field` | `struct`, `offset`, `type` (`u8 u16 u32 i32 f32 ptr v3 m34`) | the offset | none |
 | `value` | `value` (integer), optional `unit` | the value | none |
+
+A hook with `planned = "<step>"` is written ahead of the code that will use it (a Roots
+site whose module is not written yet): lint does not count it, nor an entry only planned
+hooks use, as an orphan, and the generated constants of both carry `#[allow(dead_code)]`.
+Take the key out when the code reads the hook; it must still be written in its layer's
+README. A hook whose every entry a build lacks stands down there (`has no address in
+<build>`): a Roots-only site, `render3d.frame.obj_draw`, stands down on stock, which
+never asks (`negative.sh` knows it). A plugin that may or may not have such a hook asks
+`Engine::present(hook)` first (every entry has an address in the matched build; no
+check, no log line) and calls `ready` only when it is true, so stock logs no stand-down
+for a site it never had. Its entry still counts in `symbols: N/M` (M is the table's size).
 
 `in` is the enclosing function of every code site; `tools/engine/annotate.py` checks it
 and `symbol` against the developer's own `armada2.map` (report only, never written).
@@ -252,6 +306,12 @@ per-hook stand-down end to end on a stock exe without editing code bytes the gam
 It is the bench's: nothing ships it, and `./install` deletes it.
 
 ## Tests
+
+Fixtures 08 to 12 are the identity beyond the header (build `b4`: `file_crc` and a
+`[[module]]`): the module matching, differing, absent and unreadable, and a `.text` byte
+changed so that the three numbers match and the CRC does not. The C leg reads the image
+file for the CRCs (`ctest.c`, `module NAME CRC` arguments), the Rust leg's `Mapped`
+implements `Image::file_crc` and `Image::companion`.
 
 `tools/engine/selftest.sh` (CI job `engine`): the three resolvers on every fixture
 (`tools/engine/README.md`, "Fixtures"; synthetic PE images written at test time, no game
