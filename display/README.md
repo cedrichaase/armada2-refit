@@ -69,6 +69,31 @@ Windows, Wine's builtin under Wine). Run again, the installer replaces only `d3d
 Wine loads the game directory's `d3d8.dll` because of the `d3d8=n,b` override
 (`platform/README.md`).
 
+### On Fleet Operations: Roots
+
+`./install --game fo-roots` (and `./a2mod --game fo-roots stock|refit|status`) work on
+Roots for the bench and the maintainer's own Linux install; the game is `offered = false`
+and in code only (`games/README.md`, "Not offered, not released"). The installer works in
+the executable's folder, Roots' `Data/` (`exe.data_dir`), not the install folder. The
+`d3d8.dll` there is DxWrapper's stub (it loads `dxwrapper.dll`, which turns Direct3D 8
+into 9 for Roots' DXVK `d3d9.dll`); it is not ours, so it is copied to
+`d3d8.dll.a2display-backup` as in any install, and `--remove` and `a2mod stock` put it
+back byte for byte. Nothing else of Roots' chain is touched (`dxwrapper.dll`,
+`dxwrapper.ini`, `d3d9.dll`, ReShade, `FleetOpsHook.dll`), nor `Textures/` or
+`ODF.fpq`; `retire/` does not run there and no `platform` layer is installed (Roots has no
+ASI loader of ours). Display8 is told from DxWrapper's stub by its panic message, as ever.
+Heroic's `fleetopsroots50` entry already sets `WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b;d3d9=n,b`,
+so Wine loads the game folder's `d3d8.dll`; nothing in Heroic's config is edited.
+
+What happens (FO-4, `fo-display8`): Display8 reads the build as `armada2/fo-roots-5.0Z11`,
+the symbols 2/34 resolve, and `display.modes` stands down (`FindDisplayMode` is changed by
+Roots, not yet verified), so the stub could open no display and Display8 **bails out**: the
+game draws through Wine's own `d3d8.dll`, the plugins stand down, and the menu and a
+skirmish draw as Roots does without DxWrapper. The Vulkan backend is not reached yet; that
+needs the display hooks verified after the Display8 audit, and a skirmish on a Display8
+device is expected to go white until Display8 follows Roots' second `CreateDevice`
+(`fo-display-readiness`). `Display8.log` is in the prefix's `AppData/Local/armada2-refit/logs`.
+
 **The release package** (`publish/README.md`, "Release packages") carries Display8 in
 `display/` with the shipped `Display8.ini`, and its installers (`install.sh`,
 `install.ps1`) put it in the same way, with one difference: they make no
