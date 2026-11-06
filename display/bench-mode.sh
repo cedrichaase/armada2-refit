@@ -36,7 +36,7 @@ while [ $# -gt 0 ] && [[ "$1" == *=* ]]; do
         # and Real= are retired (display 1.0.0; display-retired-keys writes them to see
         # them read past): not in the shipped Display8.ini, so added under [Display8].
         case "$key" in
-            FailBackend|Mode|Real) ;;
+            FailBackend|Mode|Real|BenchTextures|BenchWindow) ;;
             *) echo "Display8.ini has no key $key" >&2; exit 1 ;;
         esac
         sed -i "s/^\[Display8\]\r\?\$/&\n$key=/" "$ini"

@@ -18,6 +18,7 @@
 //!   view's Bink frame; `vk/mirror.rs`, `dx12/mirror.rs`): made once with every level,
 //!   and brought up to date when the engine unlocks a level (on the device's thread) or
 //!   at the next `BeginScene` or `Present` (a lock from another thread: `BinkThread`).
+pub mod blocks;
 pub mod d3d;
 pub mod device;
 pub mod modes;
@@ -171,6 +172,17 @@ fn device_exists(s: &Stub) -> bool {
     }
 }
 
+/// Whether the device made can sample BC1, BC2 and BC3 natively, so `CheckDeviceFormat`
+/// says yes to DXT1, DXT3 and DXT5. Direct3D 12 always can; Vulkan when the physical
+/// device has `textureCompressionBC` (every desktop GPU and lavapipe; not a phone's).
+pub fn compressed_textures() -> bool {
+    match made() {
+        Some(Backend::Vulkan) => crate::vk::get().is_some_and(|v| v.bc),
+        Some(Backend::D3d12) => true,
+        None => false,
+    }
+}
+
 pub fn vulkan() -> bool {
     made() == Some(Backend::Vulkan)
 }
@@ -186,6 +198,9 @@ pub fn d3d12() -> bool {
 pub fn ensure_device(hwnd: *mut c_void, _flags: u32, _depth: u32, interval: u32) -> bool {
     let s = stub();
     if s.decided {
+        if device_exists(s) && !hwnd.is_null() && hwnd != s.hwnd {
+            follow_window(s, hwnd);
+        }
         return device_exists(s);
     }
     let (w, h) = (s.mode.width, s.mode.height);
@@ -230,6 +245,33 @@ pub fn ensure_device(hwnd: *mut c_void, _flags: u32, _depth: u32, interval: u32)
     s.decided = true;
     log!("stub: no backend could start ({})", names(&s.order));
     false
+}
+
+/// A later `CreateDevice` names another window than the one the backend presents to (Fleet
+/// Operations: Roots makes a windowed device on its 1200x900 shell window, then one for the
+/// game, and a skirmish was a white screen while the engine kept drawing into the first).
+/// The new window gets the first one's treatment (a popup over the desktop) and the
+/// backend's swap chain moves to it; the device, its targets and its mirrors are the same.
+/// The stock engine reuses its one window at every `CreateDevice`, so this never runs there.
+fn follow_window(s: &mut Stub, hwnd: *mut c_void) {
+    let (w, h) = (s.mode.width, s.mode.height);
+    let old = s.hwnd;
+    unsafe {
+        SetWindowLongA(hwnd, -16, 0x9000_0000u32 as i32);
+        SetWindowPos(hwnd, core::ptr::null_mut(), 0, 0, w as i32, h as i32, 0x0020 | 0x0040);
+    }
+    let r = if vulkan() {
+        crate::vk::get().map(|v| v.rebind(hwnd))
+    } else {
+        crate::dx12::get().map(|d| d.rebind(hwnd))
+    };
+    match r {
+        Some(Ok(())) => log!("stub: CreateDevice on another window ({:p}, was {:p}): the swap chain follows it", hwnd, old),
+        Some(Err(e)) => log!("stub: CreateDevice on another window ({:p}, was {:p}): the swap chain could not follow: {}", hwnd, old, e),
+        None => {}
+    }
+    s.hwnd = hwnd;
+    crate::window::device_opened(hwnd, w, h);
 }
 
 /// Copies the levels written since into the mirror.
