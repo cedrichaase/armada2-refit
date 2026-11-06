@@ -397,7 +397,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 116,
+        n_resolved: 0,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x763810, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // radar_map_radar
@@ -518,6 +518,8 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 16384 }, // radar_action_cannot
         ],
         blocked: &[
+            a2engine::Block { hook: 0, symbol: "ActionMode::GetAction", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ActionMode::GetAction is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 1, symbol: "ActionMode::GetAction", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ActionMode::GetAction is changed by fo-roots-5.0Z11, not yet verified" },
         ],
     },
 ];

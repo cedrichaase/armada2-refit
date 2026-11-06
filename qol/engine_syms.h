@@ -1550,16 +1550,19 @@ static const A2EEntry qol_b1_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 8, 0, 0, ""}, /* rs_vt_can_place */
 };
 static const A2EBlock qol_b1_blocked[] = {
+    {0, "RTS_Configure", "is changed by fo-roots-5.0Z11 (not yet verified)", "Stands down: RTS_Configure is changed by fo-roots-5.0Z11, not yet verified"},
     {1, "cOverViewImp::mCheckGroupSelect", "is changed by fo-roots-5.0Z11 (not yet verified)", "Stands down: cOverViewImp::mCheckGroupSelect is changed by fo-roots-5.0Z11, not yet verified"},
     {2, "cOverViewImp::mCheckGroupSelect", "is changed by fo-roots-5.0Z11 (not yet verified)", "Stands down: cOverViewImp::mCheckGroupSelect is changed by fo-roots-5.0Z11, not yet verified"},
+    {3, "PopupPaletteImp::mQueueSpecialWeaponCommand", "is changed by fo-roots-5.0Z11 (not yet verified)", "Stands down: PopupPaletteImp::mQueueSpecialWeaponCommand is changed by fo-roots-5.0Z11, not yet verified"},
     {4, "Producer::FinishBuild", "is changed by fo-roots-5.0Z11 (not yet verified)", "Stands down: Producer::FinishBuild is changed by fo-roots-5.0Z11, not yet verified"},
+    {5, "cOverViewImp::mNormalModeInput", "is changed by fo-roots-5.0Z11 (not yet verified)", "Stands down: cOverViewImp::mNormalModeInput is changed by fo-roots-5.0Z11, not yet verified"},
     {6, "cOverViewImp::mProcessKeyboardInput", "is changed by fo-roots-5.0Z11 (not yet verified)", "Stands down: cOverViewImp::mProcessKeyboardInput is changed by fo-roots-5.0Z11, not yet verified"},
     {7, "PopupPaletteImp::mProcessKeyboardInput", "is changed by fo-roots-5.0Z11 (not yet verified)", "Stands down: PopupPaletteImp::mProcessKeyboardInput is changed by fo-roots-5.0Z11, not yet verified"},
     {0xffff, 0, 0, 0}
 };
 static const A2EBuild qol_builds[] = {
     {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qol_b0_entries, qol_b0_blocked, 0, 214},
-    {"fo-roots-5.0Z11", "armada2/fo-roots-5.0Z11", "ArmadaL.exe", 0x3c4c76bd, 0x405000, 0xca07c55a, 0x400000, qol_b1_entries, qol_b1_blocked, 5, 44},
+    {"fo-roots-5.0Z11", "armada2/fo-roots-5.0Z11", "ArmadaL.exe", 0x3c4c76bd, 0x405000, 0xca07c55a, 0x400000, qol_b1_entries, qol_b1_blocked, 8, 6},
 };
 
 static A2E_U8 qol_hook_state[9];

@@ -462,7 +462,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 137,
+        n_resolved: 12,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x763968, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_ship_display
@@ -604,6 +604,8 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 648 }, // closeup_camera_size
         ],
         blocked: &[
+            a2engine::Block { hook: 0, symbol: "ShipDisplay::DetermineSelectedDisplayType", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ShipDisplay::DetermineSelectedDisplayType is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 2, symbol: "Armada_RenderAllOurStuff", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Armada_RenderAllOurStuff is changed by fo-roots-5.0Z11, not yet verified" },
         ],
     },
 ];

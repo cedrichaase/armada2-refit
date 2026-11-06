@@ -108,7 +108,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 13,
+        n_resolved: 3,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x601ce0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xd9, 0x05, 0x18, 0xe2, 0x6a, 0x00, 0xd8, 0x25, 0x28, 0x88, 0x7a, 0x00], mask: &[], section: "", count: 0, value: 0 }, // loading_load_fraction
@@ -130,7 +130,10 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x488730, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // loading_handle_message_queue
         ],
         blocked: &[
+            a2engine::Block { hook: 0, symbol: "RenderLoopAssetLoadStatusUpdate", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: RenderLoopAssetLoadStatusUpdate is changed by fo-roots-5.0Z11, not yet verified" },
             a2engine::Block { hook: 1, symbol: "Program::GameDoOne", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Program::GameDoOne is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 2, symbol: "ST3D_GraphicsEngine::FindLogicalDatabase", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ST3D_GraphicsEngine::FindLogicalDatabase is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 3, symbol: "ST3D_Texture::DemandLoad", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ST3D_Texture::DemandLoad is changed by fo-roots-5.0Z11, not yet verified" },
         ],
     },
 ];

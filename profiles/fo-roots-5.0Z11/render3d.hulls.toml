@@ -1,0 +1,15 @@
+# Fleet Operations: Roots: FleetOpsHook.dll takes over this function at its entry as it
+# loads (a jump to its own replacement, or a trampoline: push and ret, after which the stock
+# body runs from its callback). Our hooks only call it, and what Roots puts there is what
+# Roots means, so this build checks nothing at its entry (render3d/README.md, "Fleet
+# Operations: Roots").
+schema = 1
+plugin = "render3d"
+
+[[sym]]
+id = "fn_craft_ri"
+check = ""
+
+[[sym]]
+id = "fn_go_render"
+check = ""

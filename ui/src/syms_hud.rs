@@ -593,7 +593,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 172,
+        n_resolved: 133,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x763c00, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_palette_ptr
@@ -770,6 +770,12 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // otext_tree_right
         ],
         blocked: &[
+            a2engine::Block { hook: 0, symbol: "DisplayInterface::RenderAll", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: DisplayInterface::RenderAll is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 9, symbol: "cOverViewImp::mNormalModeRender", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: cOverViewImp::mNormalModeRender is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 11, symbol: "cOverViewImp::mRenderWhere", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: cOverViewImp::mRenderWhere is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 12, symbol: "ST3D_Texture::DemandLoad", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ST3D_Texture::DemandLoad is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 14, symbol: "CinematicView::mUpdateVideo", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: CinematicView::mUpdateVideo is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 15, symbol: "Armada_RenderFrame", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Armada_RenderFrame is changed by fo-roots-5.0Z11, not yet verified" },
         ],
     },
 ];

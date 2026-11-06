@@ -197,3 +197,419 @@ verified = []
 fn = "CraftProcess::Handle_New_Command"
 how = "detour"
 verified = []
+
+# ---- FleetOpsHook.dll, in memory (how = "runtime") -------------------------------
+# Written by FleetOpsHook.dll as it loads (inside Win2kDisableTaskSwitch.dll's attach,
+# before WinMain and before any plugin of ours starts): seen by MemDiff.asi on the bench,
+# and in agreement with a reading of the DLL. Functions marked above for the file are not
+# repeated. Grouped by the first of our plugins whose hooks use them.
+
+# display
+
+[[changed]]
+fn = "GameConfiguration::InitializeGraphicsSystem"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "Program::PlayIntroMovie"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "RenderLoopAssetLoadStatusUpdate"
+how = "runtime"
+verified = []
+
+# render3d
+
+[[changed]]
+fn = "Armada_RenderAllOurStuff"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "Armada_RenderFrame"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "Beam::Simulate"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "ConstructionRig::Render"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "RTS_Configure"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "ShieldEffect::CreateShieldHit"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "Starfield_Load_Background_Geometry"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "Terrain_Geometry::Render"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mDrawPost"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mDrawPosts"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mNormalModeRender"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mRenderWhere"
+how = "runtime"
+verified = []
+
+# ui
+
+[[changed]]
+fn = "ActionMode::GetAction"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "ChangePasswordDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "ChatDisplay::Render"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "CinematicView::mUpdateVideo"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "CreateNewAccountDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "CreateRoomDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "DispatchDialog"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "DisplayInterface::RenderAll"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "GameSpyLoginDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "GraphicsOptionsDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "HelpWindowDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "LicenseAgreementWindowDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "MainMenuDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "ManualIPDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "MapSelectDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "MapTransferDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "MultiplayerAdvancedOptionsDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "MultiplayerConnectionDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "PasswordDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "Program::DisplayInputProcess"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "RoomSelectDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "ST3D_DeviceDirectX8::SetCursor"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "ST3D_GraphicsEngine::FindLogicalDatabase"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "ST3D_GraphicsEngine::FindVisibleDatabase"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "ST3D_GraphicsEngine::SetActiveDisplay"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "ST3D_Texture::DemandLoad"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "SetCurrentBackground"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "ShipDisplay::DetermineSelectedDisplayType"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "Show_Credits"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "SoundSettingsDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "TechTreeWindowDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "YesNoDlgProc"
+how = "runtime"
+verified = []
+
+# qol
+
+[[changed]]
+fn = "Craft::Say"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "PopupPaletteImp::Update"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "PopupPaletteImp::mQueueSpecialWeaponCommand"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "PopupPaletteImp::mUpdateButtonsAndPosition"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::FlushLists"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::GetSelectList"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::GetSelectedEntityIds"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::Select"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::SwapLists"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mBindGroup"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mClearFromGroup"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mDeselectAll"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mEditModeCopy"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mEditModeDeleteAll"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mEditModeDrag"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mEditModeDragAll"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mEditModeInput"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mEditModeSelect"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mFocusNextSelected"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mMainInput"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mNormalModeInput"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mSelectMeanY"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mSetFormationOrientationToCurrentView"
+how = "runtime"
+verified = []
+
+# qolrules
+
+[[changed]]
+fn = "GameObjectClass::Get_Biomatter_Cost"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "GameObjectClass::Get_Crew_Cost"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "GameObjectClass::Get_Dilithium_Cost"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "GameObjectClass::Get_Latinum_Cost"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "GameObjectClass::Get_Metal_Cost"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "Producer::ActDeleteBuildQueueItem"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "Producer::CancelBuild"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "Producer::ClearBuildQueue"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "Producer::PushBuildQueueItem"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "Producer::StartBuild"
+how = "runtime"
+verified = []

@@ -594,7 +594,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 175,
+        n_resolved: 145,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x50bad0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x5c, 0x85, 0xc0], mask: &[], section: "", count: 0, value: 0 }, // panels_standard_button_press
@@ -774,6 +774,9 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 644 }, // panels_l_ms
         ],
         blocked: &[
+            a2engine::Block { hook: 2, symbol: "Program::DisplayInputProcess", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Program::DisplayInputProcess is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 7, symbol: "Armada_RenderFrame", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Armada_RenderFrame is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 8, symbol: "Armada_RenderFrame", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Armada_RenderFrame is changed by fo-roots-5.0Z11, not yet verified" },
         ],
     },
 ];

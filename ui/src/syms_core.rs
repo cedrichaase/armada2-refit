@@ -191,7 +191,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 40,
+        n_resolved: 35,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x7ad508, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // core_storm3d
@@ -236,6 +236,8 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 88 }, // core_sprite_texture
         ],
         blocked: &[
+            a2engine::Block { hook: 1, symbol: "ChatDisplay::Render", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ChatDisplay::Render is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 4, symbol: "ST3D_DeviceDirectX8::SetCursor", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ST3D_DeviceDirectX8::SetCursor is changed by fo-roots-5.0Z11, not yet verified" },
         ],
     },
 ];

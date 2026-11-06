@@ -419,7 +419,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 10,
+        n_resolved: 5,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x467730, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x30, 0x8b, 0x50, 0x34, 0xd9, 0x02], mask: &[], section: "", count: 0, value: 0 }, // fn_shock_radius
@@ -547,6 +547,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         ],
         blocked: &[
             a2engine::Block { hook: 0, symbol: "ShieldHit::DrawShield", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ShieldHit::DrawShield is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 2, symbol: "Beam::Simulate", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Beam::Simulate is changed by fo-roots-5.0Z11, not yet verified" },
             a2engine::Block { hook: 3, symbol: "Craft::Explode", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Craft::Explode is changed by fo-roots-5.0Z11, not yet verified" },
         ],
     },

@@ -155,7 +155,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 7,
+        n_resolved: 2,
         content: "",
         entries: &[
             a2engine::Entry { present: true, addr: 0x626bf0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x51, 0x14, 0x53, 0x56, 0x57, 0x8b, 0x0a, 0x3b, 0xca], mask: &[], section: "", count: 0, value: 0 }, // find_display_mode
@@ -195,6 +195,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         ],
         blocked: &[
             a2engine::Block { hook: 0, symbol: "ST3D_DisplayDevice::FindDisplayMode", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: ST3D_DisplayDevice::FindDisplayMode is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 1, symbol: "RenderLoopAssetLoadStatusUpdate", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: RenderLoopAssetLoadStatusUpdate is changed by fo-roots-5.0Z11, not yet verified" },
             a2engine::Block { hook: 2, symbol: "GameConfiguration::InitializeGraphicsSystem", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: GameConfiguration::InitializeGraphicsSystem is changed by fo-roots-5.0Z11, not yet verified" },
         ],
     },

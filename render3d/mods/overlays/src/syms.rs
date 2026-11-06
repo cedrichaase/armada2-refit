@@ -363,7 +363,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 19,
+        n_resolved: 0,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x473930, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x3c, 0x53, 0x8b], mask: &[], section: "", count: 0, value: 0 }, // fn_footprints
@@ -474,6 +474,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         blocked: &[
             a2engine::Block { hook: 0, symbol: "Terrain_Geometry::DrawGrid", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Terrain_Geometry::DrawGrid is changed by fo-roots-5.0Z11, not yet verified" },
             a2engine::Block { hook: 1, symbol: "PlaceholderFeature::sRenderInternal", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: PlaceholderFeature::sRenderInternal is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 2, symbol: "cOverViewImp::mNormalModeRender", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: cOverViewImp::mNormalModeRender is changed by fo-roots-5.0Z11, not yet verified" },
         ],
     },
 ];
