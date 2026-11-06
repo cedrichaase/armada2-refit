@@ -198,7 +198,7 @@ Designed 2026-11-06 (branch `fo-5-design`), from a reading of `FleetOpsHook.dll`
 its shipped map, the file and run-time diffs of FO-2, Roots' ODFs read out of `ODF.fpq`
 with `a2fmt::fpq` (PR #60), FO-2's Display8 inventory, and one bench session of Roots as it
 ships. It is built for **`FleetOpsHook.dll` as it ships and as it will change**: nothing in
-it waits on the Roots developer or the Fleet Operations team (user's decision, 2026-11-06). The detail that would
+it waits on the Roots developer or the Fleet Operations team (user's decision, 2026-11-06; as far as the user can tell, the Fleet Operations team has abandoned the project, and Roots, updated as recently as 5.0Z11 of 2026-10-23, is the live party). The detail that would
 read as FleetOpsHook's internals is in the private notes (`fo5-design-notes.md` beside
 `fleetopshook.md` in `$A2_DATA/research/fo-roots/`); here each finding is stated per hook.
 
@@ -325,9 +325,11 @@ About 45–75 agent hours and 20–30 bench passes, after FO-4 (a skirmish drawn
 FO-2 saw a white screen on entering one). Roots has no scene harness, so its scenarios
 stage through the front end (Instant Action) and OCR, as `fo-skirmish` does.
 
-### What we would ask the Roots developer or the Fleet Operations team, if ever (optional)
+### What we would ask the Roots developer, if ever (optional)
 
-Nothing above depends on it. Each would replace a hook of ours with a call of theirs:
+As far as the user can tell, the Fleet Operations team has abandoned the project; Roots
+and its developer are the live party, and the `FleetOpsHook.dll` that ships with Roots
+changes with Roots' releases. Nothing above depends on it. Each would replace a hook of ours with a call of theirs:
 an exported "draw this object's extras" (overlay model and rings) for a renderer that
 draws the hull itself; an export naming FleetOpsHook's build (a version number) for the
 identity; a note when they move the object-loop edit or the craft wrappers.
@@ -365,7 +367,10 @@ identity; a note when they move the object-loop edit or the craft wrappers.
    classes (`Evolver`, `LatinumNebula`, `UtritiumBall`, `Producer`, `cOverViewImp`).
    A field a hook reads may mean something else. Each verified hook checks the fields it
    reads in game.
-4. **Roots updates.** A new Roots release is a new build with a new profile; an unknown
+4. **Roots updates.** Updates come from Roots, not from Fleet Operations (whose team, as far
+   as the user can tell, has abandoned the project), and Roots is actively updated (5.0Z11,
+   2026-10-23), its `ArmadaL.exe` and `FleetOpsHook.dll` with it. A new Roots release is a
+   new build with a new profile (`fo-scan.py`); an unknown
    build runs only what resolves by scan, as the profile design says. The three submods'
    own `ArmadaL.exe` files are further builds, not in scope until asked.
 5. **Fairness and the Fleet Operations community.** A visual plugin in a competitive mod's
