@@ -58,7 +58,8 @@ pub fn install(h: &mut Hooks) -> bool {
         GATE = Some(h.gate());
         ON = true;
     }
-    crate::log!("hulls: hulls are claimed at the instance's database draw, inside the engine's Render (the object loop is another module's)");
+    let chained = prev.addr() != crate::hooks::at(sym::FN_INSTANCE_RI);
+    crate::log!("hulls: hulls are claimed at the instance's database draw{}, inside the engine's Render (the object loop is another module's)", if chained { " (chained)" } else { "" });
     true
 }
 

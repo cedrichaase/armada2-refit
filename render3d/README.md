@@ -820,10 +820,10 @@ finding it rests on:
 | `render3d.core.reads` | the engine state every module shares: the object, light and feature lists, instances, sprites, sound, team and game-setup reads | the renderer stands down whole if these are not stock |
 | `render3d.frame.seam` | `Armada_RenderAllOurStuff`, called from `Armada_RenderFrame` and `CinematicView::RenderView`, both re-pointed at the renderer's body | "How the frame works" |
 | `render3d.frame.steps` | the calls inside the stock body that the frame's steps replace one by one | "How the frame works"; not ready: the stock body runs whole |
-| `render3d.frame.obj_draw` | Roots only (absent in stock, so it stands down there): the call at 0x598297 in the object loop, which FleetOpsHook writes as it loads and which it makes for each object, culling and then drawing through `GameObject::Render`; accepted as `chained` | PLAN-FLEETOPS.md, "FO-5: render3d on Roots"; planned (FO-5 step 3): the object step calls through it; offline (`a2test syms`) the file still holds stock's bytes there, so only the game's log says it is ready |
+| `render3d.frame.obj_draw` | Roots only (absent in stock, so it stands down there): the call at 0x598297 in the object loop, which FleetOpsHook writes as it loads and which it makes for each object, culling and then drawing through `GameObject::Render`; accepted as `chained` | PLAN-FLEETOPS.md, "FO-5: render3d on Roots". The object step (`frame/steps.rs`) reads the call's target every frame and calls it as `stdcall(object, camera)` for every object that is not a background object, never writing there; a module may still take an object the engine has not culled first (`registry::object`). The object is the step's current object (`steps::current`) around the call, for the hull claim. Offline (`a2test syms`) the file still holds stock's bytes there, so only the game's log says it is ready (`frame: the object step calls through the loop's draw site`) |
 | `render3d.frame.destroy` | `DestroyRenderSurfaces` chained, so render3d lets go of the device before the engine does | kept for the device Display8 hands out; native Direct3D 9 (gone in 15.0.0) kept a device alive while anything made on it was held |
 | `render3d.view.distance` | the load of the culling distance in `RTS_Configure` and the far plane and culling distance it parses (`View.Distance`) | "View distance"; not ready: the engine keeps its view limits |
-| `render3d.hulls.instance_draw` | the call of `ST3D_Instance::RenderInternal` at 0x4d5a11 in `GameObjectInstance::RenderInternal`, and the callee's entry | where a hull is claimed on Roots, after the per-instance node and texture writes of stock and of FleetOpsHook, which neither Roots' file nor FleetOpsHook changes; on Roots every hull draw, FleetOpsHook's bump-mapped replacement included, is nested under this one call, and no other route reaches it with a hull. The instance does not point back to its object: the owner is the object the object step is drawing through the `frame.obj_draw` call, confirmed by the object's instance being the one at the call; planets (which reach the call through the craft instance), construction rigs (FleetOpsHook gives them the common `GameObject::Render`, so the stock rig draw is not called from the loop) and other modules' objects are skipped by that test. Holograms and FleetOpsHook's overlay models do not pass here and are the engine's. Planned (FO-5 step 4) |
+| `render3d.hulls.instance_draw` | the call of `ST3D_Instance::RenderInternal` at 0x4d5a11 in `GameObjectInstance::RenderInternal`, and the callee's entry | where a hull is claimed on Roots, after the per-instance node and texture writes of stock and of FleetOpsHook, which neither Roots' file nor FleetOpsHook changes; on Roots every hull draw, FleetOpsHook's bump-mapped replacement included, is nested under this one call, and no other route reaches it with a hull. The instance does not point back to its object: the owner is the object the object step is drawing through the `frame.obj_draw` call, confirmed by the object's instance being the one at the call; planets (which reach the call through the craft instance), construction rigs (FleetOpsHook gives them the common `GameObject::Render`, so the stock rig draw is not called from the loop) and other modules' objects are skipped by that test. Holograms and FleetOpsHook's overlay models do not pass here and are the engine's. Installed only where the profile's value `hl_claim_instance` is 1 (Roots); stock (0) claims at the object and patches nothing here. Claimed, the hull is posed and drawn as in `object`, after the engine's own frustum test and on-screen byte; the engine's function is not called, as on stock with hulls on (it returns nothing its caller reads), and the object's billboard effect is left to the engine's call in `GameObject::RenderInternal` (`mods/hulls/src/claim.rs`) |
 | `render3d.hulls.reads` | the hulls module: class `Render` / `RenderInternal` functions and vtables, the fade, culling and wave-light reads and calls | hulls draws in `GameObject::Render`'s place and installs no hook; not ready: the engine draws the hulls |
 | `render3d.sky.reads` | the sky module: the background name, database, starfield, far planes, `GameObject::Render` and the plain database vtable | the sky takes `Step::Background`; not ready: the engine's sky |
 | `render3d.specials.reads` | the special-weapon effect list and the `Render` functions and vtables of the timed effects | only the timed effects draw; others go back to the engine |
@@ -893,7 +893,11 @@ folders once (every file under it, recursively, by lower-case name, the first fo
 winning) and reads through the same file system, so the lookup is the one it was before
 the file system, case-insensitive as the engine's. An archive kind (`fpq`, `zfs`) would
 mount behind a folder and log why it serves nothing (`files: fpq ... no reader ...`);
-Armada II has none.
+Armada II has none. Fleet Operations: Roots' executable (`ArmadaL.exe`, by name: `GAMES`)
+takes `LAYOUT_FO_ROOTS` (`games/fo-roots.toml`'s `[files]`): the textures in `Textures\`
+itself, TGA and DDS (a name with both is the TGA; `a2fmt::dds` decodes DXT1/3/5 and the
+uncompressed forms, and sides that are not powers of two are allowed there), and
+`ODF.fpq` mounted behind `odf\` (`files: ODF.fpq mounted at odf: N files`).
 
 **Layers.** The engine's addresses, call sites, vtable slots and field reads belong in
 `core/src/engine/` (the core's glue) or a module's own `mods/<m>/src/hooks.rs`; a module's
@@ -2122,7 +2126,15 @@ and its highlight shoulder: the lit hull rolls off towards white above
 `HighlightKnee` and stays within 1, as it did when `Lighting.asi` drew into the same
 target, so a hot spot whitens plating without blooming over the hull. Bump-mapped
 meshes (the Borg) take the Borg profile and a normal map built from the height map as
-`ST3D_CreateNormalMap` builds it, in a tangent frame worked out per pixel. Normals:
+`ST3D_CreateNormalMap` builds it, in a tangent frame worked out per pixel. On Fleet
+Operations: Roots nearly every hull is bump-mapped, as a switch to the engine's GPU
+vertex path rather than a look, so the content set (`fleetops`, `hulls.ini`) says
+`ProfileBy = race`: the Borg profile goes to the hulls whose ODF `race` (read through its
+includes, from `ODF.fpq`) is in `ProfileRaces` (`borg`, `freeborg`; `[Hulls] BorgRaces=`
+replaces the list), every other hull takes the hull profile, bump-mapped or not. Roots'
+`*_bump` textures are tangent-space normal maps already (mean about 128, 128, 254;
+measured), so `BumpMaps = normal` uploads them as they are, and a flat one (`all_bump`,
+one colour, used by 976 meshes) counts as no bump map: the plain hull shader. Normals:
 the SOD's winding makes them inward, as the engine's are (`scene::NORMAL_SIGN` = -1
 turns them out); a mirrored node swaps the cull and needs no flip of its own. A mesh's
 texture flipbook (a SOD animation reference) and the engine's wave lights
