@@ -844,6 +844,7 @@ finding it rests on:
 | `render3d.effects.reads` | the effects module's list walks, vtables and calls, and the `RenderChunks` call site | the walks of the old Explosions, Shields and Repair plugins |
 | `render3d.effects.repair` | the `AddParticle` call in `Craft::RepairSystem` and the `DrawScaled3D` call in `NodeParticleEffect::Render` | the new tail of the particle list is a weld |
 | `render3d.effects.shields` | the weapons' calls of `CreateShieldHit` | records which weapon made a hit and its damage |
+| `render3d.effects.shield_models` | the call FleetOpsHook writes in `ShieldEffect::CreateShieldHit` (+0xea) to pick a hit's model | on Roots the hit's model is the struck class's own (its ODF), never the shield database's; chained, the model each pick sets is noted against the shield type asked for, so the shields know a hit by its type; not ready (or stock, which has no such call): only the database's models are known, and Roots' hits are left to the engine (see "Shields on Roots") |
 | `render3d.effects.debris` | the `Fragment` calls in `Craft::Explode`, the Evolver's cocoon and `BuildingEffect::SafeDestroyConstruction` | the faces are drawn as our own debris; all or none |
 | `render3d.effects.debris_callee` | `ST3D_Instance::Fragment` itself | on Roots FleetOpsHook owns the call in `Craft::Explode` and decides whether it runs; the module takes over the callee at its entry, armed only while the build's companion module is the caller (`ef_debris_at_callee`; FO-5 step 5, see "effects: Hooks") |
 | `render3d.ordnance.reads` | the ordnance module's `Entity` calls, list head, vtables and each stock `Submit` | a shot's class is told by its `Submit` |
@@ -1465,6 +1466,7 @@ Scenario `render3d-specialfx`.
 | `Craft::RepairSystem`'s `AddParticle` call (0x4c90c0) | call | the new tail of the particle list is a weld |
 | `NodeParticleEffect::Render`'s `DrawScaled3D` call (0x473767) | call | the particle's node (in `esi`) is noted; a weld, or every particle while the sparks are ours, is not drawn by the engine |
 | the four `CreateShieldHit` calls (0x58bb95, 0x58cad8, 0x58d502, 0x58dd65) | call, one hook each | which weapon made a hit, and its damage: a passive tap (it records and calls on, so it has no gate; a hit made while off keeps its damage if the module comes on) |
+| the call FleetOpsHook writes at `ShieldEffect::CreateShieldHit`+0xea (0x47449a), on a build that has it (Roots; `render3d.effects.shield_models`) | call (chained) | the model the companion's pick gave each new hit is noted against the shield type it was asked for (a passive tap, no gate) |
 | `ST3D_Instance::Fragment` itself (0x62eb20), on a build whose profile says so (`ef_debris_at_callee`, Fleet Operations: Roots) in place of the three `Fragment` calls above (`render3d.effects.debris_callee`) | entry: its first five bytes (whole instructions, `ef_fragment_moved`, within the entry's check) moved to a trampoline | a dying craft noted as above, only while the caller is the build's companion module (FleetOpsHook, which owns `Craft::Explode`'s call and breaks a craft up only when its class allows); every other caller (a cancelled construction, the Evolver's cocoon, render3d) gets the function as it was |
 
 The hooks are put in at the module's first frame (`device()`), not at load: other plugins check the stock bytes of these sites when they load, and the bench's `Scene.asi` reads the shield sites. With the gate shut, or a part off, every detour hands the call to what was there, so the engine breaks craft up and draws welds and particles itself. The explosion, shield, bee and construction draws need no hook (`feature()` and `object()`); the registry hands them back.
@@ -1482,6 +1484,27 @@ the moved instructions and the rest of the function. FleetOpsHook calls `Fragmen
 nowhere else, so "called from the companion" is "during its explode callback". The entry is
 checked as the profile's check says before the bytes move, and the hook stands down if
 another plugin has written there.
+
+**Shields on Roots**. Stock's `CreateShieldHit` gives a new hit the model of its shield
+type from `m_logical_db` (`ST3D_Instance::SetLogicalDatabase`, then the visible one);
+FleetOpsHook writes over that pick (+0xe0, the call at +0xea) a call of its own with the
+type and the struck object as arguments and the hit in `ecx`. It picks per ship class from
+the class's ODF: `shieldHit` (`shieldHitCritical` past a threshold of 0.2 on a value it
+reads of the object, presumably the shields' level), `shieldDown`, `ShieldAdd`, `ShieldSub` and `ShieldSpecial1` to `4` for types 0 to
+7 (Roots' ODFs name sized sets, `shield_fed_hitL`, `shield_bor_down` and the like), each
+database loaded once by name through `FindLogicalDatabase` and kept for the class, and falls
+back to the database's model where the ODF names none. So in a Roots fight no hit carries
+the database's models (the bench's `first live hit` line showed a model that was neither),
+and the shields, which knew a hit by its model, drew none of them: Roots' own
+`DrawShield` drew them all through `feature()`. The module chains that call
+(`render3d.effects.shield_models`, `site_hit_model`, Roots only) and notes, after it
+returns, the model it set against the type it was given: a hit is then ordinary, a
+shields-down ring or a shell by its type, whichever model it carries. Nothing of
+FleetOpsHook's memory is read: the type is the call's argument and the model the hit's.
+The shell's size is not the model's: `ShieldHit::ShieldUpdate` divides the hit's frame by
+the model's radius and scales it by the class's shield transform, so the engine's shell is
+the class's ellipsoid whatever SOD the class names, and the module's ellipsoid (the same
+transform) stays the one to scale by `SHIELD_EFFECT_RESCALE` (below).
 
 **Shields and `RTS_CFG.h`**. Roots' `ShieldHit::DrawShield` (its file and FleetOpsHook)
 scales a hit's shell by 2 while `RTS_CFG.h` sets `SHIELD_EFFECT_RESCALE = 1`, on top of the

@@ -469,6 +469,28 @@ It took these defaults:
 | 43 | On Roots the **particles module draws every object's billboard effect** and skips the engine's call in our views, as on stock | the call site is whole and runs for every object Roots' loop draws, so the trade is stock's | a Roots ODF that uses `renderIgnoreCameraDistance` (objects the engine culls but Roots draws), or a billboard seen missing or doubled in FO-B |
 | 44 | `ordnance.warp` and `overlays.paths` are **marked verified from the code and the reads observed**, though the warp flash and a sketched path were not drawn on the bench | the sites, callees and fields are stock's, and the reads were seen right in game; only staging failed (a held key, a warp) | either seen wrong on Roots; step 8's scenarios are to stage them |
 
+### FO-B: Roots' shield hits, the logo node
+
+Branch `fo-b`, 2026-11-06. Step 8's `fo-render3d-shields` failed because no Roots hit
+carried the shield database's models: FleetOpsHook replaces `CreateShieldHit`'s pick of
+the model (`m_logical_db` of the hit's type) with a call of its own (+0xea), which picks
+per ship class from the ODF (`shieldHit`, `shieldHitCritical`, `shieldDown`, `ShieldAdd`,
+`ShieldSub`, `ShieldSpecial1..4`; Roots names sized sets such as `shield_fed_hitL`) and
+loads each once by name. The effects module now chains that call
+(`render3d.effects.shield_models`) and knows a model by the type it was picked for
+(render3d/README.md, "Shields on Roots"). The shell's size is the class's shield
+transform on both sides (the engine divides the hit's frame by the model's radius), so
+render3d's own x2 (decision 22) is still needed and is not applied twice. Step 5's logo
+node cannot fire on 5.0Z11: FleetOpsHook's `CraftClass_InitLogo` looks for a node named
+`stlogo`, which none of the install's 626 SODs has, and the `logo_*` textures the ODFs'
+`logoFileNames` list are not in the install.
+
+| # | Default | Why | What would change it |
+|---|---|---|---|
+| 50 | A Roots hit's **type is learnt at FleetOpsHook's pick**: its call in `CreateShieldHit` is chained (a `call` site, `chain`, Roots only), and the model it set on the hit is noted against the type it was asked for; stock's models are still known from `m_logical_db` | the type is the call's argument and the model the hit's own field, so nothing of FleetOpsHook's memory is read (rule 5); reading the ODF's keys instead would need each database's name and FleetOpsHook's per-class cache, and calling `FindLogicalDatabase` loads a second copy | a FleetOpsHook whose pick takes other arguments (its `.text` CRC then differs and the hook stands down, as every runtime mark does) |
+| 51 | The pick is chained **although FleetOpsHook owns the site** (rule 4 says to take the callee) | the callees (`SetLogicalDatabase`, `SetVisibleDatabase`) are called from everywhere and do not carry the type; the chained call is FleetOpsHook's own function, called on with its arguments unchanged, so Roots still decides the model | a callee that carries the type |
+| 52 | The **logo node stays generic** (decision 21) and the scenario checks the lookup only (`N of N shown nodes found by name`) | Roots 5.0Z11 has no `stlogo` node, so there is nothing to honour; the code needs no change to honour one when it comes | a Roots release or mod with an `stlogo` node (then the scenario stages that ship and expects the `drawn with` line) |
+
 The Roots profile tools (`tools/engine/fo-scan.py`, PR #61) took these defaults:
 
 | # | Default | Why | What would change it |

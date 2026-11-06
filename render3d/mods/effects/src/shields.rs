@@ -416,10 +416,18 @@ impl Shields {
         if self.shells.is_empty() || self.shells_db != Self::db(2) {
             self.read_shells();
         }
-        if model == Self::db(0) {
+        // A build whose companion picks the models per ship class (Roots) has them noted
+        // by type; stock's are the shield database's.
+        let noted = hk::model_type(model);
+        if model == Self::db(0) || noted == Some(0) {
             return Some(0);
         }
-        (2..8).find(|&k| self.shells[k].on && self.shells[k].model == model)
+        (2..8).find(|&k| self.shells[k].on && (self.shells[k].model == model || noted == Some(k)))
+    }
+
+    /// Whether a hit's model is the shields-down ring's (type 1).
+    fn is_down(model: usize) -> bool {
+        model != 0 && (model == Self::db(1) || hk::model_type(model) == Some(1))
     }
 
     fn ours(&mut self, hit: usize) -> bool {
@@ -427,7 +435,7 @@ impl Shields {
         if self.hit_type(model).is_some() {
             return true;
         }
-        self.s.down && self.down_ok && model != 0 && model == Self::db(1)
+        self.s.down && self.down_ok && Self::is_down(model)
     }
 
     /// `ShieldEffect::Render` in the engine's place.
@@ -445,7 +453,6 @@ impl Shields {
 
     /// The engine's live hits into ours: new ones born now, gone ones dying now.
     fn gather(&mut self, now: f64) {
-        let model1 = Self::db(1);
         let s_fade = self.s.fade_out;
         let mut keep = (s_fade.max(self.s.ring_time)) as f64;
         keep = keep.max(self.s.glow_time as f64 * 3.0).max(self.s.duration as f64 * 3.0);
@@ -461,8 +468,9 @@ impl Shields {
             if let Some(&(_, sh)) = list.iter().find(|(_, sh)| *sh != 0) {
                 self.said_list = true;
                 log!(
-                    "effects: shields: first live hit in the engine's list: {} hit(s), model {:#x} (ordinary {:#x}, shields down {:#x})",
-                    list.len(), hk::hit_model(sh), Self::db(0), Self::db(1)
+                    "effects: shields: first live hit in the engine's list: {} hit(s), model {:#x} (ordinary {:#x}, shields down {:#x}; noted as type {})",
+                    list.len(), hk::hit_model(sh), Self::db(0), Self::db(1),
+                    hk::model_type(hk::hit_model(sh)).map_or(-1, |t| t as i32)
                 );
             }
         }
@@ -476,7 +484,7 @@ impl Shields {
                 continue;
             }
             let model = hk::hit_model(sh);
-            if model1 != 0 && model == model1 {
+            if Self::is_down(model) {
                 let idx = self.downs.iter().position(|d| d.handle == handle);
                 let idx = match idx {
                     Some(i) => Some(i),

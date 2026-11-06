@@ -6,7 +6,7 @@ Layers: display asiloader render3d
 Setup: display/bench-mode.sh stub Backend=vulkan
 Timeout: 10 min
 
-FleetOpsHook writes each ship's own logo into the shared database before the draw render3d
+FleetOpsHook is made to write each ship's own logo into the shared database before the draw render3d
 claims (`CraftInstance::RenderInternal`, just before `ST3D_Instance::RenderInternal`): the
 `stlogo` node's mesh gets the ship's logo texture, or is hidden. The claim honours the
 database for every node of the SOD (`hulls::claim::honour_database`, FO-5 step 5, decision
@@ -14,13 +14,19 @@ database for every node of the SOD (`hulls::claim::honour_database`, FO-5 step 5
 the first eight such nodes: `hulls: <model> node stlogo drawn with <texture> (the database's
 for this instance; the SOD has <texture>)`.
 
-This is a close-up for the eye, not yet a log check: on the start (the two construction
-ships and the station) and on four Sabers in a fight, no node was logged as drawn with a
-texture other than its SOD's (no `node ... drawn with` line), so the override has not
-been seen to fire on Roots with anything the bench can stage cheaply. The mouse wheel
-zooms the camera towards the pointer; the Federation ship's hull is then judged textured,
-with its markings. When a ship that carries Roots' logo node is staged, add the wait
-and `Expect "Render3D.log" contains " node stlogo drawn with "` here.
+This is a close-up for the eye, not a log check, **and the log check cannot be written for
+Roots 5.0Z11**: FleetOpsHook's logo (`CraftClass_InitLogo`) looks the class's database up
+for a node named `stlogo` and gives it one of the textures the ODF's `logoFileNames`
+lists, but none of the 626 SODs of the install (`Data\sod`, `Data\addon`) has a node
+of that name, and none of the `logo_*` textures 63 ODFs list is in the install. So no
+instance gets a logo, nothing is written for render3d to honour, and no `node ... drawn
+with` line can come (none was seen on the construction ships, the station or four Sabers).
+The lookup itself is shown by the claim's one line, `hulls: <model>: N of N shown nodes
+found by name in the instance's database`, which this scenario expects. When a Roots
+release or mod ships a SOD with an `stlogo` node, stage that ship and add
+`Expect "Render3D.log" contains " node stlogo drawn with "`. The mouse wheel zooms the
+camera towards the pointer; the Federation ship's hull is then judged textured, with its
+markings.
 
 1. Include "_fo-render3d-skirmish".
 2. Take a screenshot called "skirmish".
@@ -32,7 +38,8 @@ and `Expect "Render3D.log" contains " node stlogo drawn with "` here.
 8. Wait 2 seconds.
 9. Take a screenshot called "close-up".
 10. Check that a Federation ship is shown close up, its hull textured (not white or flat grey) with a visible logo or marking on the saucer.
-11. Expect "Display8.log" not contain "VUID".
-12. Quit the game.
-13. Expect the game to have exited.
-14. Expect no crash.
+11. Expect "Render3D.log" contains " shown nodes found by name in the instance's database".
+12. Expect "Display8.log" not contain "VUID".
+13. Quit the game.
+14. Expect the game to have exited.
+15. Expect no crash.

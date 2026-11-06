@@ -18,6 +18,10 @@ rows = ["Modules.effects"]
 doc = "The four weapon calls of CreateShieldHit, noted to know which weapon made a hit"
 rows = ["Modules.effects"]
 
+[hook."effects.shield_models"]
+doc = "Roots: the call its companion writes in CreateShieldHit to pick a hit's model, chained to note each model's type"
+rows = ["Modules.effects"]
+
 [hook."effects.debris"]
 doc = "The calls of Fragment (a dying craft, the Evolver's cocoon, a cancelled construction) drawn as our chunks"
 rows = ["Modules.effects"]
@@ -86,6 +90,16 @@ kind = "fn"
 addr = 0x4743b0
 check = "55 8b ec 6a ff 68 87 b5"
 used_by = ["effects.reads", "effects.shields"]
+
+# Stock's CreateShieldHit gives the new hit its model with this call (m_logical_db of the
+# hit's type); a build whose companion module replaces that pick calls it from there.
+[[sym]]
+id = "fn_set_logical_db"
+symbol = "ST3D_Instance::SetLogicalDatabase"
+kind = "fn"
+addr = 0x62eea0
+check = "55 8b ec 8b 45 08 8b 11"
+used_by = ["effects.shield_models"]
 
 [[sym]]
 id = "fn_get_shield_type"

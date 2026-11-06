@@ -222,6 +222,7 @@ impl Module for Effects {
         self.hooked = true;
         if self.sh.want {
             hooks::shields::install(h);
+            hooks::shields::install_models(h);
             self.hk |= HK_SHIELDS;
         }
         if self.rp.want && hooks::repair::install(h) {

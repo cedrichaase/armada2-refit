@@ -21,3 +21,20 @@ value = 200
 [[sym]]
 id = "ef_shield_damage_key"
 value = 1
+
+# FleetOpsHook replaces CreateShieldHit's pick of the hit's model (m_logical_db of the hit's
+# type) with a call of its own, written as it loads (the file holds stock's bytes): a model per
+# ship class and type, from the class's ODF (shieldHit, shieldHitCritical when low,
+# shieldDown, ...), so no hit carries the shield database's models. The call is
+# chained (the type and the object are its two arguments, the hit in ecx), and the model it
+# set is noted against the type, so the shields know an ordinary hit, a shields-down ring and
+# a special weapon's shell by type, not by model (render3d/README.md, "Shields on Roots").
+[[sym]]
+id = "site_hit_model"
+symbol = "ShieldEffect::CreateShieldHit"
+kind = "call"
+addr = 0x47449a
+target = "fn_set_logical_db"
+chain = true
+in = "ShieldEffect::CreateShieldHit"
+used_by = ["effects.shield_models"]

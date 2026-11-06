@@ -292,12 +292,13 @@ fn = "RTS_Configure"
 how = "runtime"
 verified = ["render3d.view.distance"]
 
-# FleetOpsHook's call inside the body (+0xea) runs as it wrote it: the effects module only
-# taps the weapons' calls of the function and calls what they called (FO-5 step 5).
+# FleetOpsHook's call inside the body (+0xea) runs as it wrote it: the effects module
+# taps the weapons' calls of the function and calls what they called (FO-5 step 5), and
+# chains that call to note which type each model it picks is (effects.shield_models).
 [[changed]]
 fn = "ShieldEffect::CreateShieldHit"
 how = "runtime"
-verified = ["render3d.effects.reads", "render3d.effects.shields"]
+verified = ["render3d.effects.reads", "render3d.effects.shields", "render3d.effects.shield_models"]
 
 # FleetOpsHook takes out the free of the previous background database (+0x16, after its
 # destructor; Background_Close likewise), keeping its memory: the entry, the name and the

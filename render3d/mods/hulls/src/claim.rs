@@ -95,14 +95,18 @@ pub fn honour_database(p: &mut r3d_core::scene::pose::Posed) {
     let model = p.model.clone();
     let sod = &model.sod;
     p.textures.clear();
+    static mut SAID_LOOKUP: bool = false;
+    let (mut asked, mut found) = (0u32, 0u32);
     for (i, n) in sod.nodes.iter().enumerate() {
         if !p.pose.shown.get(i).copied().unwrap_or(false) {
             continue;
         }
         let e = hooks::database_node(db, &n.name);
+        asked += 1;
         if e == 0 {
             continue;
         }
+        found += 1;
         if hooks::node_hidden(e) {
             r3d_core::scene::instance::hide(sod, i, &mut p.pose.shown, true);
             continue;
@@ -120,6 +124,11 @@ pub fn honour_database(p: &mut r3d_core::scene::pose::Posed) {
             }
             p.textures.push((i, alloc::string::String::from(t)));
         }
+    }
+    // Once: whether the lookup finds the SOD's nodes in the database at all.
+    if !unsafe { SAID_LOOKUP } && asked > 0 {
+        unsafe { SAID_LOOKUP = true };
+        crate::log!("hulls: {}: {} of {} shown nodes found by name in the instance's database (their flags and textures honoured)", model.name, found, asked);
     }
 }
 

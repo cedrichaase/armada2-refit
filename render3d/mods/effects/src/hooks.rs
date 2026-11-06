@@ -605,6 +605,79 @@ pub mod shields {
         crate::log!("effects: shields: the weapons' hits noted at:{}", names);
     }
 
+    // Roots: FleetOpsHook picks a hit's model per ship class and type (the class's ODF:
+    // shieldHit, shieldHitCritical, shieldDown, ...) in place of CreateShieldHit's pick from
+    // m_logical_db, so no hit there carries the shield database's models. Its call is
+    // chained, and the model it gave each hit is noted against the type it was asked for.
+    const NMODELS: usize = 512;
+    static mut MODELS: [(usize, u8); NMODELS] = [(0, 0); NMODELS];
+    static mut NMODEL: usize = 0;
+    static mut MODELS_FULL: bool = false;
+    static mut PREV_MODEL: Prev = Prev(0);
+
+    /// The pick (thiscall: the hit, its shield type, the struck object), and what it set
+    /// noted. Passive, as the tap: it records and calls on, so it has no gate.
+    unsafe extern "thiscall" fn model_pick(hit: usize, ty: i32, o: usize) {
+        unsafe {
+            let f: unsafe extern "thiscall" fn(usize, i32, usize) = core::mem::transmute(PREV_MODEL.addr());
+            f(hit, ty, o);
+            if hit == 0 || !(0..8).contains(&ty) {
+                return;
+            }
+            let m = hit_model(hit);
+            if m == 0 {
+                return;
+            }
+            let n = NMODEL;
+            let list = &mut *core::ptr::addr_of_mut!(MODELS);
+            if let Some(e) = list[..n].iter_mut().find(|e| e.0 == m) {
+                e.1 = ty as u8;
+            } else if n < NMODELS {
+                list[n] = (m, ty as u8);
+                NMODEL = n + 1;
+            } else if !MODELS_FULL {
+                MODELS_FULL = true;
+                crate::log!("effects: shields: {} hit models noted, no room for more: further ones are left to the engine", NMODELS);
+            }
+        }
+    }
+
+    /// The shield type a hit model was picked for by the build's companion module (Roots),
+    /// if it was noted; None on stock, where nothing is noted.
+    pub fn model_type(model: usize) -> Option<usize> {
+        if model == 0 {
+            return None;
+        }
+        unsafe {
+            let list = &*core::ptr::addr_of!(MODELS);
+            list[..NMODEL].iter().find(|e| e.0 == model).map(|e| e.1 as usize)
+        }
+    }
+
+    /// Chains the companion module's pick of a hit's model, on a build that has it (Roots;
+    /// stock has no such call and logs nothing).
+    pub fn install_models(h: &mut Hooks) -> bool {
+        if !h.present(&TABLE, crate::syms::hook::EFFECTS_SHIELD_MODELS) {
+            return false;
+        }
+        if !h.ready(&TABLE, crate::syms::hook::EFFECTS_SHIELD_MODELS) {
+            crate::log!("effects: shields: the companion's pick of a hit's model is not as profiled: its hits are left to the engine");
+            return false;
+        }
+        let hk = Hook {
+            owner: h.owner(),
+            used_by: "effects' shield hit models",
+            kind: Kind::Call,
+            site: Site::of(&TABLE, sym::SITE_HIT_MODEL),
+            to: model_pick as *const () as usize,
+            chain: true,
+        };
+        let Some(prev) = h.install(hk) else { return false };
+        unsafe { PREV_MODEL = prev };
+        crate::log!("effects: shields: the companion's pick of each hit's model chained: hits known by their shield type");
+        true
+    }
+
     /// What this build's `RTS_CFG.h` says of the shield hits, for a build whose profile
     /// says it follows the keys (Roots, FO-5 step 5): (the shell's scale factor, whether
     /// a hit is coloured by the shields' level). Stock: (1, true), and RTS_CFG.h unread.

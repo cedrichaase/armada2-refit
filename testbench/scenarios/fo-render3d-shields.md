@@ -19,26 +19,30 @@ does and is not recognised.
 
 The fight is the AI's, as in `fo-render3d-debris` (`_fo-render3d-battle`).
 
-**This scenario fails on the branch it was written on, and that is the finding** (run
-20261106-054918): in a real fight the engine's list holds live hits (`effects: shields:
-first live hit in the engine's list: 1 hit(s), model 0x14e8f830 (ordinary 0x12e5e1f8,
-shields down 0x12e5e2a8)`), but their model is none of the shield database's, so
-`hit_type` finds no type, `ours()` is false, and render3d draws none of them: the engine's
-`DrawShield` (Roots' own, with its own x2 and white) draws them through `feature()`. The
-RTS_CFG.h path (`rts_keys`) therefore never runs on Roots. The shield module needs the
-model Roots' hits carry (its own shell models, not `m_logical_db`'s) before this passes.
+**The hits are render3d's.** On the branch the scenario was written on it failed (run
+20261106-054918): the engine's list held live hits whose model was none of the shield
+database's, so render3d drew none of them and Roots' own `DrawShield` drew them all. The
+cause is FleetOpsHook's pick of a hit's model in `CreateShieldHit` (per ship class, from
+its ODF's `shieldHit`, `shieldDown` and the like); render3d now chains that call
+(`effects.shield_models`) and knows each model by the type it was picked for. The log says
+so at the module's first frame (`the companion's pick of each hit's model chained`), the
+first live hit is then `noted as type 0`, and the hits drawn are render3d's (`first
+shield hits drawn`, `shield hit N on ...`), with the shell x2 and white.
 
 1. Include "_fo-render3d-skirmish".
 2. Include "_fo-render3d-battle".
-3. Wait up to 600 seconds for "Render3D.log" to say "effects: first shield hits drawn".
-4. Take a screenshot called "shield hits".
-5. Wait up to 20 seconds for the logs the next steps expect.
-6. Expect "Render3D.log" contains "effects: shields: RTS_CFG.h: the shell scaled x2.00, hits white".
-7. Expect "Render3D.log" contains "effects: shield hit ".
-8. Wait 1 second.
-9. Take a screenshot called "shield hits later".
-10. Expect "Display8.log" not contain "VUID".
-11. Expect "Display8.log" not contain "device removed".
-12. Stop the game.
-13. Expect the game to have exited.
-14. Expect no crash.
+3. Expect "Render3D.log" contains "effects: shields: the companion's pick of each hit's model chained".
+4. Wait up to 600 seconds for "Render3D.log" to say "effects: first shield hits drawn".
+5. Take a screenshot called "shield hits".
+6. Wait up to 20 seconds for the logs the next steps expect.
+7. Expect "Render3D.log" contains "noted as type 0)".
+8. Expect "Render3D.log" contains "effects: shields: RTS_CFG.h: the shell scaled x2.00, hits white".
+9. Expect "Render3D.log" contains "effects: shield hit ".
+10. Wait 1 second.
+11. Take a screenshot called "shield hits later".
+12. Check that, in either shot, a struck ship shows render3d's shield: a soft glowing ellipsoid about the hull with a bright spot where it is hit (not a faceted hex mesh), in white or pale colours.
+13. Expect "Display8.log" not contain "VUID".
+14. Expect "Display8.log" not contain "device removed".
+15. Stop the game.
+16. Expect the game to have exited.
+17. Expect no crash.
