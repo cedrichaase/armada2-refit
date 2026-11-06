@@ -36,6 +36,15 @@ fn texture_format_ok(fmt: u32) -> bool {
     matches!(fmt, 21 | 22)
 }
 
+/// DXT1, DXT3 and DXT5 as 2D textures (`CheckDeviceFormat`, resource type 3): what a mirror
+/// holds as BC1, BC2 and BC3 (`vk/mirror.rs`, `dx12/mirror.rs`) when the backend's device
+/// can sample them (README.md, "Block-compressed textures"). Fleet Operations: Roots loads
+/// its DDS files through D3DX8, which asks for each and decompresses the file itself when
+/// told no (4 to 8 times the memory). The stock engine never asks for them.
+fn compressed_ok(fmt: u32) -> bool {
+    matches!(fmt, 0x3154_5844 | 0x3354_5844 | 0x3554_5844) && super::compressed_textures()
+}
+
 unsafe extern "system" fn qi(this: *mut SObj, iid: *const Guid, out: *mut *mut c_void) -> HRESULT {
     trace::call(frame!(), Kind::D3D, 0);
     obj::query(this, iid, out)
@@ -115,7 +124,8 @@ unsafe extern "system" fn check_device_format(_this: *mut SObj, adapter: u32, dt
         && match (rtype, usage) {
             (1, u) if u & 2 != 0 => matches!(fmt, 70 | 71 | 73 | 75 | 77 | 79 | 80), // a depth surface
             (1, u) if u & 1 != 0 => matches!(fmt, 21 | 22),                          // a render target
-            (3 | 4 | 5, 0) | (1, 0) => texture_format_ok(fmt),
+            (3, 0) => texture_format_ok(fmt) || compressed_ok(fmt),
+            (4 | 5, 0) | (1, 0) => texture_format_ok(fmt),
             (3, u) if u & 1 != 0 => matches!(fmt, 21 | 22),
             _ => false,
         };
@@ -124,9 +134,18 @@ unsafe extern "system" fn check_device_format(_this: *mut SObj, adapter: u32, dt
     hr
 }
 
-unsafe extern "system" fn check_device_multisample_type(_this: *mut SObj, _a: u32, _dt: u32, _fmt: u32, _w: i32, ms: u32) -> HRESULT {
+unsafe extern "system" fn check_device_multisample_type(_this: *mut SObj, _a: u32, _dt: u32, fmt: u32, _w: i32, ms: u32) -> HRESULT {
     trace::call(frame!(), Kind::D3D, 11);
-    if ms == 0 { S_OK } else { D3DERR_NOTAVAILABLE }
+    // A multisample type is accepted for a back buffer or depth format and then ignored:
+    // the device's own back buffer is single-sampled whatever `CreateDevice` asks, and
+    // render3d does its own MSAA (a game that asks, as Fleet Operations does from its
+    // setting, is told yes instead of falling back to none). The stock engine asks for
+    // none.
+    let ok = ms == 0 || (ms <= 16 && matches!(fmt, 21 | 22 | 70 | 71 | 73 | 75 | 77 | 79 | 80));
+    if ms != 0 {
+        once(&sfmt!("STUB CheckDeviceMultiSampleType({}, {}) -> {}", fmt, ms, ok));
+    }
+    if ok { S_OK } else { D3DERR_NOTAVAILABLE }
 }
 
 unsafe extern "system" fn check_depth_stencil_match(_this: *mut SObj, _a: u32, _dt: u32, _af: u32, _rt: u32, _ds: u32) -> HRESULT {
