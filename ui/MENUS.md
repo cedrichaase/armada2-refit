@@ -1131,9 +1131,12 @@ a host of their own, `engine/forms.rs` (drawn by `menus/roots.rs`):
   forms, Tunngle's wait; while one of the nine is up over a form of ours, the last frame of
   ours stays under it.
 
-The screens: the main menu has a spec (our column of buttons in the form's order, the
-version line); Yes/No draws the form's picture (Roots draws the question into it) under
-our two buttons; every other form is generic (`Generic=widgets` in Roots' defaults).
+The screens: the main menu and Options are a column of our buttons in the form's order
+(Options' Back, which Roots binds when the form opens, at the window's foot; the main
+menu's version line at the bottom right); Yes/No draws the form's picture (Roots draws the
+question into it) under our two buttons, where the form sits over the screen that asked;
+every other form is generic (`Generic=widgets` in Roots' defaults). The in-mission Options
+stands over the mission's last frame, as the stock host's in-mission menus do.
 
 | Hook | What it reads |
 |---|---|

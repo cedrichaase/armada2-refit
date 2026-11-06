@@ -358,6 +358,14 @@ fn activated(h: HWND) {
         GetWindowRect(h, &mut r);
         ClientToScreen(device_window(owner), &mut o);
     }
+    // A form centred on one of ours (a Yes/No over Options) sits where that one is drawn,
+    // not where it was moved to.
+    let mut origin = (r.left - o.x, r.top - o.y);
+    if let Some(p) = tracked().iter().find(|t| t.hwnd == owner && t.hidden) {
+        let mut pr = WinRect::default();
+        unsafe { GetWindowRect(owner, &mut pr) };
+        origin = (p.origin.0 + r.left - pr.left, p.origin.1 + r.top - pr.top);
+    }
     let first = !tracked().iter().any(|t| t.class != "#32770");
     let in_mission = crate::engine::api::ingame::recent();
     tracked().push(Tracked {
@@ -365,7 +373,7 @@ fn activated(h: HWND) {
         class: class.clone(),
         obj: 0,
         opened: crate::rt::now(),
-        origin: (r.left - o.x, r.top - o.y),
+        origin,
         size: (r.right - r.left, r.bottom - r.top),
         hidden: false,
         last: Vec::new(),
@@ -376,7 +384,7 @@ fn activated(h: HWND) {
     });
     crate::log!(
         "forms: {} {:p} up at {},{} {}x{}{}",
-        class, h, r.left - o.x, r.top - o.y, r.right - r.left, r.bottom - r.top, if in_mission { ", over a mission" } else { "" }
+        class, h, origin.0, origin.1, r.right - r.left, r.bottom - r.top, if in_mission { ", over a mission" } else { "" }
     );
     if first && !dialog {
         crate::input::set_hosting(true);
@@ -731,6 +739,7 @@ unsafe extern "system" fn tick(_h: HWND, _m: u32, _id: usize, _t: u32) {
         crate::log!("forms: {} is ours: moved off screen, active {:p}, focus {:p}", t.class, unsafe { GetActiveWindow() }, unsafe { GetFocus() });
     }
     keep_off(t.hwnd);
+    poll_button(t.hwnd);
     t.last = ctl;
     // Nothing else sets the pointer's shape once the form is away from it (decision 171).
     unsafe { SetCursor(LoadCursorA(core::ptr::null_mut(), IDC_ARROW)) };
@@ -763,6 +772,22 @@ unsafe extern "system" fn tick(_h: HWND, _m: u32, _id: usize, _t: u32) {
         .collect();
     unsafe { *core::ptr::addr_of_mut!(VIEW) = view };
     frame();
+}
+
+static mut BUTTON: bool = false;
+
+/// The real pointer falls on the device window, whose procedure hands its mouse to the
+/// engine's message functions, where the UI records it; under a form that leaves the
+/// device window disabled (Yes/No, Manual IP) no click arrives at all, so the pump reads
+/// the left button itself and records its changes (decision 183).
+fn poll_button(top: HWND) {
+    let down = unsafe { GetAsyncKeyState(1) } as u16 & 0x8000 != 0;
+    let was = unsafe { core::mem::replace(&mut BUTTON, down) };
+    let dev = device_window(unsafe { GetWindow(top, GW_OWNER) });
+    if dev.is_null() || unsafe { IsWindowEnabled(dev) } != 0 || down == was {
+        return;
+    }
+    crate::input::note_message(if down { WM_LBUTTONDOWN } else { WM_LBUTTONUP }, if down { MK_LBUTTON } else { 0 });
 }
 
 /// Decision 170: off screen, its region emptied as well (on a Wine where the region
@@ -836,6 +861,9 @@ fn run_actions(top: HWND) {
             Action::Focus(h) => unsafe {
                 if IsWindow(h as HWND) != 0 {
                     SetFocus(h as HWND);
+                    // EM_SETSEL over the whole text: typing replaces it, as a click into a
+                    // field and a select-all would.
+                    SendMessageA(h as HWND, 0xb1, 0, -1);
                 }
             },
             _ => {}

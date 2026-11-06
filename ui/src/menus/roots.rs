@@ -122,7 +122,9 @@ pub fn frame(ui: &mut Ui) {
         ui.note(R::new(area.x + ui.u(8.0), area.bottom() - ui.u(28.0), area.w, ui.u(24.0)), "forms probe");
     }
     let cfg = crate::config::get();
-    for (i, f) in view.iter().enumerate() {
+    // A full-screen form hides every form under it.
+    let first = view.iter().rposition(|f| f.size.0 >= dw && f.size.1 >= dh).unwrap_or(0);
+    for (i, f) in view.iter().enumerate().skip(first) {
         let live = f.top;
         ui.scope(&crate::sfmt!("form{}", f.hwnd), |ui| {
             ui.inert_unless(live, |ui| match (cfg.menus_specs, f.class.as_str()) {
@@ -216,6 +218,14 @@ fn generic(ui: &mut Ui, fit: &Fit, f: &Form, widgets: bool, live: bool) {
         }
         forward(ui, fit, f, r);
         return;
+    }
+    // A small form (Manual IP and the like) has its title and labels painted into its
+    // background by Roots, not as controls: its picture stands behind our widgets, as
+    // Yes/No's does (decision 184).
+    if !full {
+        if let Some((t, _, _)) = pic {
+            ui.draw.image(t, r, 0xff_ff_ff_ff);
+        }
     }
     let mut controls: Vec<&Control> = f.controls.iter().filter(|c| c.visible && c.rect[2] > 0 && c.rect[3] > 0).collect();
     controls.sort_by_key(|c| (c.rect[1], c.rect[0]));
