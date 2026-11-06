@@ -230,6 +230,25 @@ Roots, so phase 11 changes nothing here.
 5. **Fairness and the Fleet Operations team.** A visual plugin in a competitive mod's
    network games is a question of the community's norms as well as of CRCs.
 
+## Decisions taken by default (FO-4)
+
+- `./install --game fo-roots` installs the `display` layer only, into `Data/`; DxWrapper's
+  `d3d8.dll` is the backup (`.a2display-backup`, the usual suffix); no platform layer and no
+  `retire/` run on Roots.
+- `games/fo-roots.toml` gets `installable = true` (optional): `./install` and `a2mod`
+  work on a game that is not `offered`; `offered` stays false.
+- A requirement a game does not have is not a requirement (`display` requires `platform`,
+  which is Armada II's).
+- `a2mod stock` on a game with nothing modded says so and exits 0 (the bench's clone of a
+  game as shipped).
+- `fo-display8` records the bail-out as it is today; its bail-out lines change when the
+  display hooks are verified.
+
+**Decided by the user, 2026-11-06 (not a default):** Roots support stays in code only: never
+in the GUI installer, the release packages and manifest, `PLAYING.md` or the release notes
+until the user says otherwise. `tools/layers.py --check` and `publish/package.sh` enforce it
+(`games/README.md`, "Not offered, not released").
+
 ## Open decisions
 
 Decided by the user, 2026-11-06:

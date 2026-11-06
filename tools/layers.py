@@ -105,12 +105,19 @@ def resolve(reg, only=None, without=None, game=None):
     `game`: the game's id (default: the chosen one); only the layers its descriptor
     offers are installed, and a game not offered is refused."""
     gid, desc = game_layers(game)
-    if not desc.get('offered'):
+    # `installable`: not offered to players (the release, the GUI installer), but ./install
+    # and a2mod work on it for the bench and the maintainer's own clones.
+    if not (desc.get('offered') or desc.get('installable')):
         raise Refused(f'{gid}: not offered yet (games/{gid}.toml)')
     mine = game_ids(reg, gid)
     ids = by_id(reg)
     offered = [lay['id'] for lay in reg['layer'] if lay['select'] in ('on', 'off') and lay['id'] in mine]
     core = [lay['id'] for lay in reg['layer'] if lay['select'] == 'core' and lay['id'] in mine]
+    def need(i):
+        # A requirement the game does not have is not one: Display8 on Roots needs no platform
+        # layer (its widescreen patch and ASI loader are Armada II's).
+        return [r for r in ids[i]['requires'] if r in mine or ids[r]['select'] == 'retired']
+
     for i in (only or []) + (without or []):
         if i not in ids:
             raise Refused(f'{i}: no such layer (tools/layers.py --list)')
@@ -128,7 +135,7 @@ def resolve(reg, only=None, without=None, game=None):
         # Requirements: added, transitively.
         todo = list(want)
         while todo:
-            for r in ids[todo.pop()]['requires']:
+            for r in need(todo.pop()):
                 if r not in want:
                     if ids[r]['select'] == 'retired':
                         raise Refused(f'{r}: required, but a {ids[r]["select"]} layer')
@@ -139,7 +146,7 @@ def resolve(reg, only=None, without=None, game=None):
     for i in without or []:
         want.discard(i)
     for i in sorted(want):
-        for r in ids[i]['requires']:
+        for r in need(i):
             if r not in want:
                 raise Refused(f'{i} requires {r}, which --without takes out')
     return [lay['id'] for lay in reg['layer'] if lay['id'] in want]
@@ -519,6 +526,30 @@ def _check_games(reg, errs):
     _check_layouts(descs, errs)
 
 
+def _check_unoffered(errs):
+    """A game that is not offered (`offered = false`, Fleet Operations: Roots) stays out of
+    the release package and the GUI installer: publish/, gui-installer/ and the workflows
+    never name it, and package.sh filters the manifest's games by `offered`."""
+    quiet = [g for g in a2env.game_ids() if not a2env.load(g).get('offered')]
+    pkg = os.path.join(ROOT, 'publish', 'package.sh')
+    with open(pkg, encoding='utf-8') as fh:
+        if 'OFFERED' not in fh.read():
+            errs.append('publish/package.sh: the manifest games are not filtered by `offered`')
+    for g in quiet:
+        for top in ('publish', 'gui-installer', '.github'):
+            for dp, _, fs in os.walk(os.path.join(ROOT, top)):
+                for f in fs:
+                    p = os.path.join(dp, f)
+                    try:
+                        with open(p, encoding='utf-8') as fh:
+                            text = fh.read()
+                    except (UnicodeDecodeError, OSError):
+                        continue
+                    if g in text:
+                        errs.append(f'{os.path.relpath(p, ROOT)}: names {g}, which is not offered '
+                                    f'(games/README.md, "Not offered, not released")')
+
+
 def check(reg):
     errs = []
     _check_registry(reg, errs)
@@ -526,6 +557,7 @@ def check(reg):
         _check_games(reg, errs)
         _check_a2mod(reg, errs)
         _check_release(reg, errs)
+        _check_unoffered(errs)
     return errs
 
 
