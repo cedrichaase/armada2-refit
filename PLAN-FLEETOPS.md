@@ -293,8 +293,8 @@ is one new claim point for hulls and a handful of call-site hooks moved one leve
 |---|---|
 | core (seam, steps) | the seam as on stock; `frame.steps` verified beside Roots' loop edit with the object step calling through 0x598297; `site_seam_frame`'s function (`Armada_RenderFrame`, FleetOpsHook's +0x245 edit removes an edit-menu call, not at our sites) verified as is; `fn_new` called unchecked (FleetOpsHook's allocator, as profiled) |
 | hulls | the instance-level claim (rule 3); a Roots look keyed by race, not by "bump-mapped": in Roots almost every hull is bump-mapped (34 of 34 meshes in a skirmish), so the stock rule "bump-mapped means Borg" would give every hull the Borg profile; the normal map from Roots' own height maps as for the Borg; the highlight read from Storm3D's ambient at the claim point; cloak from the stock fields, verified beside Roots' cloak |
-| sky | the step as on stock; Roots' backgrounds are its own art, so no built-in recipe matches and the engine's sky shows through passthrough until the content set has Roots recipes; `Starfield_Load_Background_Geometry` (nine bytes nopped at +0x16) verified |
-| particles | `site_billboard` sits in `GameObject::RenderInternal` (Roots' cloak and wave-light edits): verified on the bench; the step as on stock |
+| sky | the step as on stock; Roots' backgrounds are its own art, so no built-in recipe matches and the module draws the map's own faces or cube, stars and background planets itself (decision 40); `Starfield_Load_Background_Geometry` (nine bytes nopped at +0x16) verified (step 7) |
+| particles | `site_billboard` sits in `GameObject::RenderInternal` (Roots' cloak and wave-light edits): verified (step 7); the step as on stock |
 | effects | debris at the callee (rule 4); shields follow `SHIELD_EFFECT_RESCALE` (the instance's scale effect) and `SHIELD_EFFECT_DAMAGE_COLORED` from `RTS_CFG.h`; the four `CreateShieldHit` taps verified beside Roots' `CreateShieldHit` edit and `Beam::Simulate`'s node-particle call |
 | ordnance | as on stock for the stock classes (`cPrjID::GetOdfName` called unchecked: Roots' name table); Roots' own ordnance classes (registered by FleetOpsHook before `WinMain`) are left to the engine until each is surveyed; `PhotonTorpedo`'s `Hit` slot is Roots', which ordnance does not use |
 | specials | keyed by ODF as on stock, Roots' specials named in the content set; Roots' new special-weapon classes left to the engine until surveyed |
@@ -330,7 +330,7 @@ same for all of them. So:
 | 4 | Hulls: the instance-level claim, chosen by the profile (a `value`), snapshotting node flags and textures at the claim; hulls' own sprite nodes, holograms and wave lights off on Roots; the race-keyed look. **Built 2026-11-06** with step 3: `hulls.instance_draw` (`hl_claim_instance` = 1 on Roots, 0 on stock, which installs nothing), the race-keyed profile and normal-map bump textures in the `fleetops` set (hulls only), Roots' files (`Textures\` with DDS, `ODF.fpq`) in render3d's file system. **Finished in step 5**: at the claim the node flags and mesh textures that the engine and FleetOpsHook wrote into the shared database for the instance are honoured (a hidden node is hidden; Roots' `stlogo` node is drawn with the ship's own logo texture); the hulls' sprite nodes stay on and wave lights stay ours (decisions 19 and 20 below) | 8–14 · 4–6 |
 | 5 | Effects and overlays: the callee hooks; shields from `RTS_CFG.h`; the grid colour. **Built 2026-11-06** (branch `fo-5-step5`): a callee hook is a new hook kind (`Hooks::install_entry`): the function's first whole instructions, a profile value within the bytes its check vouches for, moved to a trampoline, and the detour armed only while the caller's return address lies in the build's companion module (`FleetOpsHook.dll`, by `[[module]]`), so Roots' gate decides whether and render3d how. `effects.debris_callee` (`ST3D_Instance::Fragment`, `ef_debris_at_callee` = 1 on Roots) takes a dying craft's debris; the cancelled construction and the Evolver's cocoon, whose calls are the exe's, stay the engine's on Roots. `overlays.posts_callee` (`DrawHeightPost`, `ov_posts_at_callee` = 1) notes the posts FleetOpsHook's two callbacks draw (none in 5.0Z11's skirmish: `DISABLE_HEIGHT_CHANGE` = 1). Shields: `SHIELD_EFFECT_RESCALE` = 1 scales the shell x2 (`ef_shield_rescale_pct` = 200, the factor FleetOpsHook applies), `SHIELD_EFFECT_DAMAGE_COLORED` = 0 draws stock-coloured hits white, both read from `Data\RTS_CFG.h` (`rtscfg`). Grid: the colour pointer `DrawGrid`'s first push holds (`site_grid_colour`), read every frame. The Roots marks of `ShieldHit::DrawShield`, `ShieldEffect::CreateShieldHit`, `Beam::Simulate`, `Armada_RenderAllOurStuff` (effects) and `Terrain_Geometry::DrawGrid` (overlays) are verified, so effects and overlays run on Roots. Stock: values 0, nothing at either entry, `RTS_CFG.h` unread, the grid's pointer is stock's dark orange | 5–9 · 3–4 |
 | 6 | Content set `fleetops`: an ODF reader over `a2fmt::vfs` (`ODF.fpq`, then `Data/`, then the active mod; Roots' inheritance key), races, ordnance and special ODF names, nebula and planet classes, the two `RTS_CFG.h` keys | 6–12 · 1–2 |
-| 7 | Sky, particles, ordnance, specials, world: each verified beside Roots' changes and marked `verified` | 8–16 · 6–10 |
+| 7 | Sky, particles, ordnance, specials, world: each verified beside Roots' changes and marked `verified`. **Done 2026-11-06** (branch `fo-5-step7`, "FO-5 step 7" below): `sky.reads`, `particles.billboard`, `ordnance.warp`, `view.distance` and `overlays.paths` verified; the move paths read the overview through `g_pOverView` (FleetOpsHook builds its own); specials and world had no marks. Every render3d hook is ready on Roots but the two call-site hooks the callee hooks replace | 8–16 · 6–10 |
 | 8 | Scenarios: `fo-render3d-seam` (a skirmish, render3d on, no stand-down in the log), `fo-render3d-rings` (the Tractor Beam hover ring present with hulls on, as in the bench shot), one per module with the module off for the passthrough look; the stock set unchanged | 4–6 · 3 |
 
 About 45–75 agent hours and 20–30 bench passes, after FO-4 (a skirmish drawn on Display8;
@@ -418,6 +418,42 @@ FO-5 step 5 (branch `fo-5-step5`) took these defaults:
 | 22 | `SHIELD_EFFECT_RESCALE`'s **factor (x2) is the profile's** (`ef_shield_rescale_pct` = 200), applied to render3d's shield ellipsoid about its centre; `SHIELD_EFFECT_DAMAGE_COLORED` = 0 makes the stock colour mode white and stops the faction colours shifting with the shields' level | the factor is FleetOpsHook's code, not content; the key's meaning is "the hit is not coloured by damage" | the user's verdict in round FO-B on the shell's size |
 | 23 | `RTS_CFG.h` is read from the **game directory** (Roots' `Data\`), not from an active mod | step 6 brings the mod order (`ODF.fpq`, `Data\`, the active mod) | step 6 |
 | 24 | The **grid colour is read from the push in `DrawGrid`** whatever points there (Roots' file points it at its own colour, FleetOpsHook at `memGridColor` over that), checked as a `push` and as readable memory; stock's dark orange otherwise | it is what the engine itself draws the grid in, and needs no address of FleetOpsHook's | a build whose grid is not drawn by that push |
+
+### FO-5 step 7
+
+Branch `fo-5-step7`, 2026-11-06. Each render3d hook that still stood down on Roots was
+compared with gog-1.1 at the bytes it checks and uses, in Roots' file and beside
+FleetOpsHook's run-time patches, and checked for collisions; the findings are in
+`render3d/README.md` beside each hook:
+
+| Hook | Roots' change | Verdict |
+|---|---|---|
+| `render3d.sky.reads` | FleetOpsHook nops the free of the previous background database at `Starfield_Load_Background_Geometry+0x16` (and in `Background_Close`) | verified: entry, name, database and `Background_Render` are stock's; the module calls the function only on the bench |
+| `render3d.particles.billboard` | Roots' wave-light detours and FleetOpsHook's cloak tests in `GameObject::RenderInternal` | verified: the call at +0x19c, its arguments and callee are stock's; FleetOpsHook's code starts on the instruction after it |
+| `render3d.ordnance.warp` | FleetOpsHook's object-loop edit in `Armada_RenderAllOurStuff` (+0x185..+0x1a4) | verified: the warp call (+0x313) and its callees are untouched |
+| `render3d.view.distance` | FleetOpsHook's call at `RTS_Configure+0x1d9d` (its own keys) | verified: the load at +0xebf and its 21 checked bytes are stock's; FleetOpsHook names neither value |
+| `render3d.overlays.paths` | FleetOpsHook's three edits in `cOverViewImp::mNormalModeRender` (the cursor's post, the drag box); `GetSelectList`'s offset; an overview of its own | **adapted**: the paths' call (+0x207) and fields are stock's; the overview is now read through `g_pOverView` on every build, since FleetOpsHook constructs its own in place of the static one; `GetSelectList` verified (called through the vtable) |
+| `render3d.effects.debris`, `render3d.overlays.posts` | FleetOpsHook owns the call sites | stay down by design: `effects.debris_callee` and `overlays.posts_callee` (step 5) replace them |
+| `render3d.frame.obj_draw` | written by FleetOpsHook at run time | `a2test syms` reads the file (stock's call there) and says it stands down; in the game it is ready (step 3) |
+
+Bench (Roots, Display8 on Vulkan with the validation layer, Render3D, 1280x960, three
+skirmishes): every hook above installed or patched, `view: ART_CFG.h parsed: far plane now
+1000000`, the sky drawn by the module from the map's own sky, the overview read as
+FleetOpsHook's and the selection and the craft process's path read as on stock; 0 VUIDs, no
+`device removed`. Not yet seen on Roots: a warp flash, a billboard effect and a sketched
+move path (the bench could not stage them). Stock (`--install .`): `render3d-live-hulls`
+PASS, `render3d-move-paths` PASS (a first run failed only at its last step, the game not
+quitting through its menus; the rerun passed), `tools/engine/negative.sh` ok.
+
+It took these defaults:
+
+| # | Default | Why | What would change it |
+|---|---|---|---|
+| 40 | On Roots the **sky module draws the map's own sky** (its faces or cube, the starfield, the background planets) when no recipe matches, rather than handing the step to Display8's passthrough | it is what the module does on any stock map without a recipe, and it puts the sky on render3d's target, tone-mapped with the rest; a Roots recipe stays local (decision 7) | the user's verdict in round FO-B, or a Roots sky recipe made locally |
+| 41 | **`View.Distance` applies on Roots as on stock** (default 1000000): the far plane and the culling distance are raised at Roots' parse of `ART_CFG.h` | both values are only read to draw, FleetOpsHook reads neither, and fog and shroud still decide what is seen; Roots' `renderIgnoreCameraDistance` exception then has nothing left to except | the user, or the Roots developer, judging the wide view unfair in Roots' network games (risk 5); `[View] Distance=0` gives the engine's limits |
+| 42 | The **overview is read through `g_pOverView` on every build**, not through a Roots-only value | stock's pointer holds the static object, so stock reads the same address as before; one code path, and any build that constructs the overview elsewhere is followed with no profile value | a build whose pointer is not set by the constructor |
+| 43 | On Roots the **particles module draws every object's billboard effect** and skips the engine's call in our views, as on stock | the call site is whole and runs for every object Roots' loop draws, so the trade is stock's | a Roots ODF that uses `renderIgnoreCameraDistance` (objects the engine culls but Roots draws), or a billboard seen missing or doubled in FO-B |
+| 44 | `ordnance.warp` and `overlays.paths` are **marked verified from the code and the reads observed**, though the warp flash and a sketched path were not drawn on the bench | the sites, callees and fields are stock's, and the reads were seen right in game; only staging failed (a held key, a warp) | either seen wrong on Roots; step 8's scenarios are to stage them |
 
 The Roots profile tools (`tools/engine/fo-scan.py`, PR #61) took these defaults:
 

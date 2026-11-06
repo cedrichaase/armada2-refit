@@ -566,7 +566,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 165,
+        n_resolved: 168,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x45fc50, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x8a, 0xad], mask: &[], section: "", count: 0, value: 0 }, // sound2d
@@ -739,7 +739,6 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x598297, end: 0x0, target: 0xa6, vtable: 0xffff, index: 0, chain: true, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_obj_draw
         ],
         blocked: &[
-            a2engine::Block { hook: 5, symbol: "RTS_Configure", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: RTS_Configure is changed by fo-roots-5.0Z11, not yet verified" },
         ],
         file_crc: &[a2engine::FileCrc { section: ".text", crc: 0xef690537 }, a2engine::FileCrc { section: ".test", crc: 0xe7a4061b }],
         modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
@@ -748,6 +747,7 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Block { hook: 1, symbol: "Armada_RenderAllOurStuff", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: Armada_RenderAllOurStuff is patched by FleetOpsHook.dll, which is not the profiled one" },
             a2engine::Block { hook: 2, symbol: "Terrain_Geometry::Render", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: Terrain_Geometry::Render is patched by FleetOpsHook.dll, which is not the profiled one" },
             a2engine::Block { hook: 4, symbol: "GameObject::Render", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: GameObject::Render is patched by FleetOpsHook.dll, which is not the profiled one" },
+            a2engine::Block { hook: 5, symbol: "RTS_Configure", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: RTS_Configure is patched by FleetOpsHook.dll, which is not the profiled one" },
         ],
         n_resolved_mod: 2,
     },
