@@ -3,7 +3,7 @@
 Resolutions: 1280x960
 Timeout: 8 min
 
-An Instant Action game, Federation against the Klingon AI (`_fo-sides-chain`: the sides are picked, since
+An Instant Action game, Federation against the Klingon AI (`_fo-sides`: the sides are picked, since
 the race is dealt at random and the HUD's "6000" is Federation's), on the map Roots proposes, from the
 main menu to the map with its HUD up (`a2test --game fo-roots`; `fo-launch` has the setup).
 Nothing logs a tick yet: Roots writes no log, and `FleetOpsHook.dll` is the only code
@@ -13,7 +13,7 @@ that moved.
 
 1. Launch the game.
 2. Wait for the main menu.
-3. Include "_fo-sides-chain".
+3. Include "_fo-sides".
 4. Click "LAUNCH".
 5. Wait up to 180 seconds for "6000".
 6. Wait 5 seconds.

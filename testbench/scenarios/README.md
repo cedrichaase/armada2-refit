@@ -58,7 +58,7 @@ each phase has got. Without headings it makes one phase per screenshot.
 | `Wait for the main menu` / `… the single player screen` / `… the briefing` / `… the options menu` / `… the admiral's log` / `… the mission selection` | OCR signature from `../ui.json` |
 | `Click the single player emblem` (any `ui.json` target) | design coordinates, mapped the way Menus.asi maps them, unless the target names another space (`objectives`, `minimap fog` are HUD targets) |
 | `Click "TEXT"` / `Right-click …` / `Double-click …` | OCR, then click the centre |
-| `Click at 100,200` / `… at design 400,300` / `… at hud 25,27` / `… at hud-right 1500,26` | screen pixels, 800x600 shell space, HUD canvas (1200 high, top-left), or HUD canvas anchored top right at its stock 1600-wide position |
+| `Click at 100,200` / `… at design 400,300` / `… at hud 25,27` / `… at hud-right 1500,26` | screen pixels, 800x600 shell space, HUD canvas (1200 high, top-left), or HUD canvas anchored top right at its stock 1600-wide position; `at shell 270,114` is Fleet Operations: Roots' 1200x900 shell as the Instant Action setup screen has it at the top left, moved by where LAUNCH is found (0,0 under Display8, 40,30 on the DxWrapper chain) |
 | `Move the mouse to …` / `Hover over …` | same four coordinate spaces |
 | `Drag from hud 400,300 to hud 1400,900` | press, glide with the button held, release (a selection box); either end in any of the four spaces |
 | `Right-drag from 960,500 to 760,500` | the same with the right button: pans the map in a mission |

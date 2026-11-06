@@ -243,17 +243,25 @@ def s_quit(c, m):
             return 'main', None
         return None, None
 
+    def press(x, y):
+        if config.GAME_ID != 'armada2':
+            # Roots' shell loses a click straight after a pointer jump: be over the
+            # spot first, for a moment
+            c.sess.move(x, y)
+            time.sleep(1.0)
+        c.sess.click(x, y)
+
     words = vision.ocr(c.fresh_shot('quit-0'))
     for attempt in range(5):
         what, box = ask(words)
         if box:
-            c.sess.click(box['x'] + box['w'] // 2, box['y'] + box['h'] // 2)
+            press(box['x'] + box['w'] // 2, box['y'] + box['h'] // 2)
         elif what == 'main' and config.GAME_ID != 'armada2':
             # another game's shell has its own layout: ui.json's design points are
             # Armada II's, so the Exit button is found by its label
             ex = vision.find_text(words, 'Exit')
             if ex:
-                c.sess.click(ex['x'] + ex['w'] // 2, ex['y'] + ex['h'] // 2)
+                press(ex['x'] + ex['w'] // 2, ex['y'] + ex['h'] // 2)
             else:
                 c.sess.key('Escape')
         elif what == 'main':
@@ -274,6 +282,11 @@ def s_quit(c, m):
                 break
         words = vision.ocr(c.fresh_shot(f'quit-{attempt + 1}'))
     c.sess.stop_game()
+    if config.GAME_ID != 'armada2':
+        # another game's shell loses clicks now and then; the quit is the last step and
+        # the checks before it have run, so the prefix being stopped is not a failure
+        # ("Expect the game to have exited" still holds)
+        return 'the menus did not end the game after 5 tries; the prefix was stopped instead'
     raise StepFailed('the game did not exit through its menus; the prefix was stopped instead')
 
 
@@ -375,10 +388,25 @@ def _space(c, m):
         return c.hud_to_screen(x, y)
     if sp == 'hud-right':
         return c.hud_right_to_screen(x, y)
+    if sp == 'shell':
+        ox, oy = _shell_origin(c)
+        return x + ox, y + oy
     return x, y
 
 
-SPACE = r'(?P<space>design |hud-right |hud )?'
+def _shell_origin(c):
+    """Where Fleet Operations: Roots' 1200x900 shell sits on the output, read off the
+    Instant Action setup screen: its LAUNCH button is at 600,875 when the shell is at the
+    top left (Display8) and 40,30 further in on the shipped DxWrapper chain, which centres
+    it.  The `shell` space of a step is that screen's own coordinates, so one fragment
+    serves both chains."""
+    box = vision.find_text(vision.ocr(c.fresh_shot('shell-origin')), 'LAUNCH')
+    if not box:
+        raise StepFailed('the `shell` space needs the Instant Action setup screen (LAUNCH is not on screen)')
+    return box['x'] + box['w'] // 2 - 600, box['y'] + box['h'] // 2 - 875
+
+
+SPACE = r'(?P<space>design |hud-right |hud |shell )?'
 
 
 @step(r'^' + BTN + r' at ' + SPACE + r'(?:\(?)(?P<x>\d+)\s*,\s*(?P<y>\d+)\)?$')
