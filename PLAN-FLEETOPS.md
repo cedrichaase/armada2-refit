@@ -453,7 +453,7 @@ patch table:
 | 4 | **The panels Roots changes least**, each its own row and off on Roots until verified: messages and objectives, the pause and replay boxes, overlay text, chat and trade, the top-right buttons (Roots' five), the resources (Roots' amounts, names from the set), the selection overlay, and the engine's last draws (`fade`, `frame_rate`, `order_ring`, `footprints`; the drag box stays the engine's). Sounds measured under FMOD first. **Built 2026-11-06** (branch `fo-6-step4`, on `fo-6-step5`): `hud.panels`, `hud.order_ring`, `hud.frame_rate`, `panels.presses`, `panels.chat` and `panels.trade` verified; seven panels on by default on Roots (the resources, the top-right buttons, the pause box, the chat, the selection overlay, the frame-rate panel, the 3D view's order ring, height posts and footprint), each with its `fo-ui-<panel>` scenario; messages, objectives, replay, overlay text, fade and the team texts stay off for want of a trigger in a skirmish; the UI plays no button sound on Roots; decisions 120–127, "Step 4: what the bench showed" below | profile marks, a panel at a time | 12–20 · 5–8 |
 | 5 | **Measure the bar, draw nothing.** Log FleetOpsHook's bar on the bench: the buttons per selection (a ship with several weapons of one `classLabel`, the construction ship's build list, a station), the mode in use and its columns and rows, which button the range ring follows and through which of the stock bar's states. Decide from it whether a bar of ours can keep the rings without reading FleetOpsHook's memory (decision 65). **Measured 2026-11-06** (branch `fo-6-step5`): `bar: measure` and `bar: hover` log lines from the engine's own objects (`engine/palette.rs`, `log_measure`), scenario `fo-ui-bar-measure`; the answer is decisions 94 and 95, "Step 5: the bar measured" below | bench and logs only | 4–8 · 2–3 |
 | 6 | *Optional, when asked*: **the bar**, laid out by the mode's columns (no 5x3 grid; position keys for the first cells only, QOL's in FO-7), then the info panel and the minimap with FleetOpsHook's own objects, the command info bar left to Roots | step 5; Roots developer's view on the look | 25–45 · 10–15 |
-| 7 | *Optional, when asked*: **the menus**: the host's design space taken from the profile's shell (1200x900, not a fixed 800x600), the generic mirror first, specs after; the nine screens that open through FleetOpsHook's import stay Roots' (decision 68). **Stopped after the offline survey 2026-11-06** (branch `fo-6-step7`): the main menu is not a dialog on Roots, so the host cannot reach it; nothing built, nothing benched; decision 140, "Step 7: why the menus stay Roots'" below | step 3 | 2 (survey) · 0 |
+| 7 | *Optional, when asked*: **the menus**: the host's design space taken from the profile's shell (1200x900, not a fixed 800x600), the generic mirror first, specs after; the nine screens that open through FleetOpsHook's import stay Roots' (decision 68). **Stopped after the offline survey 2026-11-06** (branch `fo-6-step7`): the main menu is not a dialog on Roots, so the host cannot reach it; nothing built, nothing benched; decision 140, "Step 7: why the menus stay Roots'" below. **Option C planned 2026-11-06** (branch `fo-6-optionC-plan`): our menus over FleetOpsHook's forms, probe first; decisions 141–152, "Step 7, option C" below | step 3 | 2 (survey) · 0 |
 | 8 | **Scenarios**: `fo-ui-loading` (a load with `[Loading] Hold`), `fo-ui-mission` (UI frames logged, a click on a panel of ours not reaching the engine), `fo-ui-refit` (a row toggled in the mission modal and kept after a relaunch: the Acceptance row, moved from Options for now), `fo-ui-standdown` (every UI part at 0: Roots as with Display8 and render3d alone, pixel-exact), one `fo-ui-<panel>` per panel of step 4; the stock set unchanged (`ui-runtime`, `ui-hud-bar`, `ui-whole-game` at 1280x720, `--install .`) | step 2 onward | 4–6 · 3 |
 
 **Round one** (steps 1 to 5 and 8): about 35–60 agent hours and 15–23 bench passes, in
@@ -676,6 +676,188 @@ it. What was weighed (detail in the private notes):
 `[Menus]` stays at 0 in `ui/defaults/fo-roots.ini` (`Enable`, `Credits`, `Scene`,
 `CampaignLocks`), as it was; stock is untouched (no code changed), so no stock run was due.
 
+### Step 7, option C: our menus over FleetOpsHook's forms (plan)
+
+Planned 2026-11-06 (branch `fo-6-optionC-plan`), offline: FleetOpsHook's Delphi form
+resources, its shipped map and its classes' run-time type information, and the UI's stock
+menu host, read without running the game or building anything. On that day the user allowed
+reading FleetOpsHook's memory for this: "read nothing of FleetOpsHook's memory" was model
+(c)'s default (decision 3), not a rule of the user's. So option C of the list above is no
+longer excluded, and this section plans it. Class, component and handler names, object
+offsets and the per-screen dispatch are in the private notes (`fo6-optionC.md`). Decision
+140 stands until the user takes this plan up.
+
+**What the forms are.** Each of the eight screens is a Delphi form of FleetOpsHook's,
+created when the screen opens, shown modal and freed when it closes: a top-level pop-up
+owned by the engine's device window (itself a form of FleetOpsHook's), not a child of it,
+with screen-sized forms pinned to the device window's top-left at 1200x900. The buttons are
+graphic controls with no window of their own. A button's size comes from its bitmap at run
+time, the Options form stacks its buttons in code each time it opens, and every caption is
+set from the game's language table as the form is created, so no position or caption in the
+form resources can be trusted: everything is read from the live objects. Which buttons show
+depends on the context (the in-mission menu and the shell's Options are one form), and two
+buttons are bound to their action only when the form opens (the Options form's Back, and
+Multiplayer Connection's Internet). A press sets the shell's mode and closes the form, so
+the next screen is again the engine's choice. Three screens write settings in their own
+handlers: Manual IP saves FleetOpsHook's settings file, the graphics screen writes the
+profile as a control changes and saves it on Back. A button fires on a left press and
+release over an opaque pixel of its bitmap, its centre included, with no hover needed.
+Text fields, lists and the map grid are ordinary windows. While a form is modal the thread
+waits in the form's own loop: nothing renders or presents a frame.
+
+**How Roots' releases differ.** FleetOpsHook is one build edited in place across Roots
+4.0.93, Roots 5.0Z11 and Tactical Maneuvers 5.2.3: same size, stamp and layout, 1 to 3 KB of
+byte edits between any two, mostly in game logic; every symbol of the one shipped map keeps
+its address, no class changes its size or published fields, and the form resources are
+identical but for one screen's control positions. Fleet Operations 3.2.7 is a different
+build (addresses moved, forms laid out at 800x600). `ArmadaL.exe` differs per release.
+
+**The mechanism.**
+
+1. **Finding the form.** A thread CBT hook of the UI's sees each window the game thread
+   creates or activates. A form of FleetOpsHook's is told by its window class (the Delphi
+   class name) and its owner (the device window); its object comes from the property the
+   VCL itself sets on each of its windows, the property's name rebuilt from FleetOpsHook's
+   module handle and the thread's id. The object counts only when its class pointer lies in
+   FleetOpsHook's image and the class name there is the one expected. No global of
+   FleetOpsHook's is read.
+2. **Reading the controls.** By name, through the class's own table of published fields
+   (how the VCL streams a form), each control's class checked by name; rectangle,
+   visibility and the published events through the class's property information. The few
+   private fields (caption, enabled, the control lists, the form's state) are profile
+   entries, checked per build by the tool of decision 147. Every read is guarded: on the
+   game thread, only while the form is the modal one and not being destroyed, every pointer
+   aligned and in user memory, nothing kept past a dispatched message.
+3. **Hiding Roots' drawing.** The form gets an empty window region. That one call clips its
+   paint, the buttons' direct repaints (they draw through the form's DC on every state
+   change, not only in a paint message) and its hit-testing, writes nothing of
+   FleetOpsHook's, and FleetOpsHook never sets a region on these forms. Fallbacks, in this
+   order: a nearly transparent layered window; a subclass with an empty paint, moved off
+   screen. A patch of FleetOpsHook's paint methods is rejected.
+4. **Drawing ours.** A thread timer of the UI's (about 60 Hz) is dispatched by
+   FleetOpsHook's own modal loop like any message; in it the stock host's `frame()` draws
+   the backdrop or scene and the UI's widgets and presents on the engine's shell device, in
+   Display8's one mode. The design space is the form's, 1200x900 (the profile's shell
+   size), fitted to the back buffer as the host fits 800x600. Nothing is written into
+   FleetOpsHook's application object. The UI's model (`menus::model`) gets a second source
+   beside its Win32 walk: a form's controls as `Control`s, with rectangles, captions, states
+   and an action each.
+5. **Acting.** A press is posted to the form's window: left button down and up at the
+   centre of the live rectangle, in the form's client coordinates. It runs through
+   FleetOpsHook's loop and its button code, so the action is the one Roots binds at that
+   moment. Text fields, lists and combo boxes are driven through their windows as the stock
+   host drives a dialog's. Nothing calls a handler or `Click` directly (that would run a
+   nested modal form on the UI's stack), and nothing writes a setting: FleetOpsHook's
+   handlers write what they write, as on Roots today (MENUS.md, "Writing a screen spec").
+6. **Input.** With the region empty the real pointer falls to the device window, which one
+   screen (Yes/No) leaves disabled. So the pump polls the pointer and the buttons itself,
+   and keys are taken from a thread `WH_GETMESSAGE` hook, which can keep a key from the form
+   while a field of ours has the keyboard.
+7. **A picture of the form** for the mirror mode (`Generic=mirror`): the form printed into a
+   memory DC (the VCL answers the print message, graphic buttons included, whatever the
+   region). It gives every screen a mirrored first step with no widgets, the map grid
+   included.
+8. **The nine dialogs behind FleetOpsHook's import** (Single Player, Game Setup, Game
+   Settings, Load, Save, the licence, the Technology Tree, the Admiral's Log, Internet) are
+   a second phase, by **late attach**: the stock dialog is found as it is created and left
+   in FleetOpsHook's hands (its placement, its procedure, its owner's enable state). The
+   record FleetOpsHook keeps on the window names the stock procedure, which the UI checks
+   against the profile's shell range and uses to name the screen; the stock host's model
+   (which reads the shell's widgets as on stock) then runs on that window, hidden by the
+   same empty region and printed for the mirror. Until then these nine stay Roots', so a
+   player with the forms on sees two looks in turn.
+
+**Identity and safety.** The forms are keyed to **FleetOpsHook alone**: a list of measured
+identities (the three family members today); any other FleetOpsHook stands the forms down,
+logged once, whichever `ArmadaL.exe` build runs. Everything that reads the executable stays
+keyed to its own build profile, as now. No address of FleetOpsHook's is in the profile or
+the code. The shipped map is not read at run time (it describes the unpatched build: good
+for names and addresses, not for bytes); a tool reads it once per new FleetOpsHook
+(decision 147).
+
+**Hard rule 9.** The repository says only what a hook needs, in our words: that the screens
+are VCL forms, how a form, a control and a press are found and made, and which VCL
+mechanisms are used. FleetOpsHook's class, component and handler names, its addresses and
+its form resources stay in the private notes; a screen spec names the controls it uses by
+the names the forms give them, which are symbol names the rule allows.
+
+**The look** (decision 60). Ours replaces Roots' front end only when the player turns it
+on: the forms part ships off on Roots (decision 149), and with it off nothing of this runs.
+Stock is untouched: the new source, hooks and timer exist only where the profile says a
+build has forms.
+
+**First bench probe** (step 0; the questions are numbered in the private notes): does an
+empty region hide a VCL pop-up under Wine on XWayland/Hyprland, and does the form keep focus
+and its loop; does a present on the shell device from the timer reach the screen while a
+form is modal; does the timer fire inside the form's loop and inside the nine dialogs'
+loops; does the window property give the object, and is the window class the Delphi class;
+does a posted press on Options' Back act with no hover; does a printed form include its
+buttons; which window gets the real pointer, and does polling read it right under Wine's
+scaling; where is the cursor drawn while a form is modal; does a combo box changed through
+its window fire the form's change handler.
+
+**Work list.**
+
+| Step | What | Agent h · bench |
+|---|---|---|
+| 0 | **Probe**: a bench-only switch in the UI that finds the main menu's form, empties its region, runs the timer pump with a plain frame, logs the controls it reads and posts one press; answers the nine questions. Go or stop here | 4–6 · 1–2 |
+| 1 | **Identity**: the tool of decision 147, the companion list of decision 148 (three identities), a hook-level "requires the companion" flag in `a2engine` and its C twin (about 30 lines each; no module-relative addresses needed), negative tests | 6–10 · 0 |
+| 2 | **The VCL reader** (`ui/src/engine/forms.rs`): window to object, class checks, published fields and properties by name, the guarded walk; host tests on a recorded object image | 10–16 · 1–2 |
+| 3 | **The forms host**: the CBT and message hooks, the timer pump, the empty region and its fallback, input by polling, the model's second source and an action back end (`menus::model` and `actions` get a source-neutral seam), the claim and Display8's mode | 16–26 · 4–6 |
+| 4 | **Generic screens**: the mirror (printed form, forwarded presses) and the widgets mode over a form's controls, at 1200x900 | 8–14 · 2–3 |
+| 5 | **Specs** for the main menu, Options (shell and mission), Yes/No, Manual IP, Multiplayer Connection, Graphics, Advanced Options; Map Select stays mirrored (decision 152) | 18–30 · 5–8 |
+| 6 | *Phase two, optional*: **the nine dialogs** by late attach, generic first | 20–35 · 6–10 |
+| 7 | **Scenarios and stock**: `fo-ui-forms-main`, `-options` (shell and mission), `-yesno`, `-manualip` (the address typed, the setting written by Roots' own handler and kept after a relaunch), `-graphics`, `-standdown` (forms on with an unlisted FleetOpsHook: Roots' own look, compared as decision 93); the bench's design-to-screen mapping for 1200x900; stock's `ui-menus-*` set unchanged at 1280x720 | 6–10 · 3–4 |
+
+Without phase two about **68–112 agent hours and 16–25 bench passes**; with it about
+**88–147 hours and 22–35 passes**. Roots at 1280x960 on Vulkan, one Roots game at a time.
+
+**Against the other options.**
+
+| Option | Cost | What the player gets |
+|---|---|---|
+| A, the front end stays Roots' (taken) | 0 | Roots' menus; the Refit modal on Ctrl+F12 |
+| B, host the nine through user32 | about 25–40 h | nine screens of ours among eight of Roots': two looks in turn, the main menu Roots' |
+| C, this plan | 68–112 h (eight forms), 88–147 h (all seventeen) | the whole front end in our style with phase two, opt-in |
+| D, ask the Roots developer for a switch or an interface | ours small once it exists (10–20 h); waits on contact (decision 1) | the clean path; not available now |
+
+**Recommendation: no-go on the build for now; go on step 0 when the user wants Roots' menus
+in our style.** C is feasible, and better than B: it covers the main menu, reads only what
+the VCL publishes plus a few checked fields, writes nothing of FleetOpsHook's, and the
+family's stability makes one table enough. But it is the largest UI piece on Roots for a part
+that ships off, the most used path (Instant Action's setup) keeps Roots' look without phase
+two, and its whole case rests on the probe (an empty region, a timer frame and a posted press
+under Wine). So: the probe (step 0, 4–6 hours, one or two passes), then the user's go for
+steps 1 to 5 and 7, and phase two only after the eight forms are seen in game.
+
+**Risks.**
+
+1. **Wine and the compositor.** An empty region or a layered window on a pop-up may behave
+   differently under XWayland; focus or the modal loop may break. The probe answers it
+   first; neither fallback is free.
+2. **Lifetime.** The forms are freed after every screen, and a press starts a nested modal
+   form: a pointer kept a message too long is a use-after-free. The guarded walk and "read
+   inside the pump, never across a dispatch" are the defence; step 2's host tests pin them.
+3. **Unmeasured FleetOpsHook releases** (Roots 5.0, Z1 to Z10, two identities named by
+   A2FOExtensions). The family edits bytes in place, so any release may change a form's code
+   without moving it. The identity list refuses everything unmeasured; the tool makes a new
+   member a re-run plus the step 7 scenarios.
+4. **Run-time bindings.** Back, Internet and the per-context visibility are set when the
+   form opens; a spec that assumed a button's meaning from its name would act wrongly. Specs
+   read visibility and the bound action's name live, and fall back to the generic widgets
+   when a control they expect is missing.
+5. **Two looks** until phase two: the shell alternates between ours and Roots' at Single
+   Player, Game Setup, Load and Save.
+6. **Settings written by Roots' handlers** (Manual IP's settings file, the graphics
+   profile) are Roots' behaviour; a press of ours makes the same writes, and no row of the
+   Refit screen maps onto them.
+7. **The cursor and the modal device.** Where Roots draws the pointer during a form, and the
+   shell device's state while nothing presents, are unmeasured (probe).
+
+*A later extension, not planned:* since FleetOpsHook is one build across Roots 4.0.93, Roots
+5.0Z11 and Tactical Maneuvers 5.2.3, the other two could become game profiles cheaply; only
+their `ArmadaL.exe` would need a profile of its own.
+
 ### Defaults taken
 
 | # | Default | Why | What would change it |
@@ -725,6 +907,18 @@ it. What was weighed (detail in the private notes):
 | 126 | **The UI plays no button sound on Roots**: a profile value `panels_sound_ours` (1 on stock, 0 on Roots) gates `panels.sound`, and the HUD no longer requires it | every audio call site is FleetOpsHook's FMOD (`operator new` and the constructor re-pointed at each site), its object size unknown; a stock-size object under its vtable could corrupt the heap, so it was not played | the size and constructor measured, or the Roots developer's word |
 | 127 | **The selection overlay is ours on Roots**, replacing FleetOpsHook's `SelectionDisplay` callbacks while it is on (its group colours and tooltips are not drawn) | a passing scenario with Roots' unit tooltip, bar and info strip unchanged; the group colours were not seen in a skirmish | a Roots game showing a loss, then `HUD.Selection=0` |
 | 140 | **The front end stays Roots' on Roots**: `[Menus] Enable`, `Credits`, `Scene` and `CampaignLocks` stay 0 in `ui/defaults/fo-roots.ini`; no dialog host, mirror or spec on Roots, no host design space from the profile's shell size, and nothing of `FleetOpsHook.dll` hooked, in user32 or in its memory. Decision 68 widened from nine screens to the whole shell | step 7's survey: the main menu, Options (the in-mission menu too) and six more screens are FleetOpsHook's Delphi forms and never run the stock dialog; nine more run behind its own import and dialog procedure; only Sound Settings passes the host | the Roots developer offering a way for the shell's screens to run as the executable's dialogs (decision 1), or a Roots update that does it |
+| 141 | **Option C is planned, not taken**: our menus over FleetOpsHook's forms, reading its objects (the user's allowance of 2026-11-06), read-only, on the game thread, only while a form is the modal one; nothing of FleetOpsHook's is written. Decision 140 holds until the user starts step 0 | "Step 7, option C" above; reading nothing was a default of model (c), not a rule | the user's go on step 0 |
+| 142 | **A form is found by its window** (a thread CBT hook; the Delphi class name as window class, owned by the device window), its object through the VCL's own window property, checked by its class pointer lying in FleetOpsHook's image and its class name; no global of FleetOpsHook's | the forms are created and freed per screen and no global holds them | a FleetOpsHook that subclasses its forms or renames the property |
+| 143 | **Controls by name and class** through the class's published field table, rectangles and visibility through its property information, from the live objects; captions from the control; nothing from the form resources | sizes come from bitmaps, Options lays out in code, captions are set at run time | none expected |
+| 144 | **The frame pump is a thread timer of the UI's**, dispatched by FleetOpsHook's own modal loop; the stock host's `frame()` draws and presents on the engine's shell device; the design space is the profile's shell size (1200x900) | nothing renders while a form is modal, and a timer needs no write into FleetOpsHook's application object | probe questions 2 or 3 failing |
+| 145 | **A press is posted** (left down and up at the centre of the live rectangle, to the form's window); windowed controls through their windows as the stock host does; no handler or `Click` called directly; no setting written by the UI | the press runs through Roots' own button code and loop, with Roots' binding of the moment; a direct call would nest a modal form on our stack | probe question 5 failing |
+| 146 | **Roots' drawing is hidden by an empty window region**; input is polled in the pump and keys come from a thread message hook; fallbacks a nearly transparent layered window, then an empty paint off screen; never a patch of FleetOpsHook's code | one call clips paint, the buttons' direct repaints and hit-testing | probe question 1 |
+| 147 | **A tool reads FleetOpsHook and its shipped map once per new build** (`tools/engine/`): checks the map against the DLL, checks the few private VCL offsets against the accessors the map names, lists the forms and the controls each spec needs, and prints the identity lines to add; the map is not read at run time and nothing is generated into the game | a new family member is a re-run and the scenarios, not hand work; the map describes the unpatched build, so it is trusted for names and addresses, not bytes | a FleetOpsHook shipped without its map |
+| 148 | **The forms are keyed to FleetOpsHook alone**: a list of measured identities (Roots 4.0.93, Roots 5.0Z11, Tactical Maneuvers 5.2.3); anything else refused and logged once; what reads `ArmadaL.exe` stays keyed to its own build | the three share every address, class layout and form but one screen's positions; the exe differs per release | a measured release outside the family |
+| 149 | **The forms ship off on Roots**: a new `[Menus] Forms` key, 0 in `ui/UI.ini` and in `ui/defaults/fo-roots.ini`, a Refit row only once step 5 passes; stock ignores it (no build there has forms) | decision 60: ours replaces Roots' look only when the player turns it on | the user or the Roots developer |
+| 150 | **The nine dialogs behind FleetOpsHook's import are phase two**, by late attach: found as created, left in FleetOpsHook's placement and procedure, named through the record FleetOpsHook keeps on the window, read with the stock host's model | the eight forms are the larger and simpler half; the nine need the stock procedure's identity | the eight seen in game |
+| 151 | **Generic first** (mirror, then widgets over a form's controls), **specs after**, one per screen at 1200x900 | as on stock; specs need the live bindings seen | |
+| 152 | **Out of scope in this plan**: the map editor's forms, the Internet button's Tunngle and GameSpy menus, hidden debug controls, and Map Select's grid as widgets (mirrored only) | Roots-only tools, dead services, and a grid whose rows are a third-party control's private data | the user asking |
 
 ### Risks and unknowns
 
