@@ -358,6 +358,7 @@ GAME_FIELDS = {
     'install.heroic': list, 'install.gog': list, 'install.folder': str, 'install.prefix': str,
     'settings.kind': str, 'settings.file': str, 'settings.keep': list,
     'display.shell': list, 'display.hud_canvas': list,
+    'logs.crash': str, 'logs.dirs': list,
     'files.textures': list, 'files.texture_formats': list, 'files.sod': list,
     'files.sprites': list, 'files.odf': list, 'files.archives': list, 'paths.stem': str,
 }
