@@ -123,6 +123,11 @@ const OBJ_BACKGROUND: u32 = 0x10000;
 
 /// Whether the object body draws for this view: it exists, is not a background object and
 /// was not culled.
+/// A background object (flag `0x10000`), which the body's loop never draws.
+pub fn is_background_object(o: usize) -> bool {
+    field(o, off::OBJ_FLAGS()) as u32 & OBJ_BACKGROUND != 0
+}
+
 pub fn object_drawn_by_body(o: usize) -> bool {
     !(o == 0 || field(o, off::OBJ_FLAGS()) as u32 & OBJ_BACKGROUND != 0 || field_u8(o, off::OBJ_CULLED()) != 0)
 }

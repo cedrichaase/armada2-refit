@@ -22,7 +22,6 @@ doc = "DestroyRenderSurfaces chained, so the renderer lets go of the device befo
 
 [hook."frame.obj_draw"]
 doc = "Roots' object loop: the call at its draw site, into FleetOpsHook, which culls and draws each object"
-planned = "FO-5 step 3"
 
 [hook."view.distance"]
 doc = "The far plane and object culling raised to [View] Distance, at the end of RTS_Configure's ART_CFG parse"

@@ -132,9 +132,22 @@ mod tests {
             resource_colours: &[[0.0, 1.0, 0.0], [1.0, 1.0, 1.0], [0.6, 0.9, 1.0], [1.0, 1.0, 0.0], [0.8, 0.8, 0.8], [1.0, 0.0, 0.0]],
             // The prefix of the `Borg*` keys look.rs read by name.
             bump_profile: "Borg",
+            profile_by_race: false,
+            profile_races: &[],
+            bump_maps_normal: false,
         };
         assert_eq!(c, old);
         assert_eq!(parse(""), NONE);
+    }
+
+    #[test]
+    fn hulls_fleetops_keys_the_profile_by_race() {
+        use hulls::*;
+        let c = parse(include_str!("../../content/sets/fleetops/hulls.ini"));
+        assert!(c.profile_by_race);
+        assert!(c.bump_maps_normal);
+        assert_eq!(c.profile_races, ["borg", "freeborg"]);
+        assert_eq!(c.bump_profile, "Borg");
     }
 
     #[test]

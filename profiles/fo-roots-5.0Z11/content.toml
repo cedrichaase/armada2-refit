@@ -1,0 +1,7 @@
+# Fleet Operations: Roots' content sets (crates/a2engine/README.md, "Content"): the build
+# has none (build.toml, content = "none"), except the hulls module's, which carries only
+# how a Roots hull's look is chosen (by race) and how its bump maps are read (FO-5).
+schema = 1
+
+[set]
+"render3d.hulls" = "fleetops"

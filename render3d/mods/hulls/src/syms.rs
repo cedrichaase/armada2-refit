@@ -36,15 +36,12 @@ pub mod sym {
     pub const FADE_MIN_FOV: a2engine::Sym = a2engine::Sym(31);
     pub const FADE_MAX_FOV: a2engine::Sym = a2engine::Sym(32);
     pub const FADE_MAX: a2engine::Sym = a2engine::Sym(33);
-    #[allow(dead_code)] // planned: no code reads it yet
     pub const FN_INSTANCE_RI: a2engine::Sym = a2engine::Sym(77);
-    #[allow(dead_code)] // planned: no code reads it yet
     pub const SITE_HULL_DRAW: a2engine::Sym = a2engine::Sym(78);
 }
 
 pub mod hook {
     pub const HULLS_READS: a2engine::HookId = a2engine::HookId(0);
-    #[allow(dead_code)] // planned: no code reads it yet
     pub const HULLS_INSTANCE_DRAW: a2engine::HookId = a2engine::HookId(1);
 }
 
@@ -97,6 +94,7 @@ pub mod field {
 pub mod value {
     #![allow(non_snake_case)]
     #[inline(always)] pub fn HL_RESOURCE_COUNT() -> i32 { super::TABLE.engine().value(a2engine::Sym(72)) }
+    #[inline(always)] pub fn HL_CLAIM_INSTANCE() -> i32 { super::TABLE.engine().value(a2engine::Sym(79)) }
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
@@ -179,11 +177,12 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "hl_vt_class_disable_nodes", symbol: "DisableSpecialNodes slot", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "fn_instance_ri", symbol: "ST3D_Instance::RenderInternal", kind: a2engine::Kind::Fn },
     a2engine::SymDef { id: "site_hull_draw", symbol: "GameObjectInstance::RenderInternal", kind: a2engine::Kind::Call },
+    a2engine::SymDef { id: "hl_claim_instance", symbol: "hull claim point", kind: a2engine::Kind::Value },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
     a2engine::HookDef { id: "render3d.hulls.reads", run_unknown: false, rows: &["Modules.hulls"], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76] },
-    a2engine::HookDef { id: "render3d.hulls.instance_draw", run_unknown: false, rows: &["Modules.hulls"], syms: &[77, 78] },
+    a2engine::HookDef { id: "render3d.hulls.instance_draw", run_unknown: false, rows: &["Modules.hulls"], syms: &[77, 78, 79] },
 ];
 
 pub const BUILDS: &[a2engine::Build] = &[
@@ -195,7 +194,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 79,
+        n_resolved: 80,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x4a58e0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x14, 0xa0, 0xd4], mask: &[], section: "", count: 0, value: 0 }, // fn_scrap_render
@@ -277,6 +276,7 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 28 }, // hl_vt_class_disable_nodes
             a2engine::Entry { present: true, addr: 0x62e780, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x51, 0x53, 0x56, 0x8b, 0xf1, 0x33, 0xdb, 0x8b, 0x0d, 0x08, 0xd5, 0x7a, 0x00], mask: &[], section: "", count: 0, value: 0 }, // fn_instance_ri
             a2engine::Entry { present: true, addr: 0x4d5a11, end: 0x0, target: 0x4d, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_hull_draw
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hl_claim_instance
         ],
         blocked: &[
         ],
@@ -284,7 +284,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         modules: &[],
         blocked_mod: &[
         ],
-        n_resolved_mod: 79,
+        n_resolved_mod: 80,
     },
     a2engine::Build {
         name: "fo-roots-5.0Z11",
@@ -294,8 +294,8 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 2,
-        content: "stock",
+        n_resolved: 80,
+        content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x4a58e0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x14, 0xa0, 0xd4], mask: &[], section: "", count: 0, value: 0 }, // fn_scrap_render
             a2engine::Entry { present: true, addr: 0x4b1170, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x53, 0x56, 0x8b, 0xf1, 0x32], mask: &[], section: "", count: 0, value: 0 }, // fn_evolver_ri
@@ -376,21 +376,22 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 28 }, // hl_vt_class_disable_nodes
             a2engine::Entry { present: true, addr: 0x62e780, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x51, 0x53, 0x56, 0x8b, 0xf1, 0x33, 0xdb, 0x8b, 0x0d, 0x08, 0xd5, 0x7a, 0x00], mask: &[], section: "", count: 0, value: 0 }, // fn_instance_ri
             a2engine::Entry { present: true, addr: 0x4d5a11, end: 0x0, target: 0x4d, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_hull_draw
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1 }, // hl_claim_instance
         ],
         blocked: &[
-            a2engine::Block { hook: 0, symbol: "GameObject::RenderInternal", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: GameObject::RenderInternal is changed by fo-roots-5.0Z11, not yet verified" },
         ],
         file_crc: &[a2engine::FileCrc { section: ".text", crc: 0xef690537 }, a2engine::FileCrc { section: ".test", crc: 0xe7a4061b }],
         modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
         blocked_mod: &[
+            a2engine::Block { hook: 0, symbol: "Craft::RenderInternal", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: Craft::RenderInternal is patched by FleetOpsHook.dll, which is not the profiled one" },
         ],
-        n_resolved_mod: 2,
+        n_resolved_mod: 3,
     },
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 2] = [const { core::sync::atomic::AtomicU64::new(0) }; 2];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 79] = [const { core::sync::atomic::AtomicU8::new(0) }; 79];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 79] = [const { core::sync::atomic::AtomicUsize::new(0) }; 79];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 80] = [const { core::sync::atomic::AtomicU8::new(0) }; 80];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 80] = [const { core::sync::atomic::AtomicUsize::new(0) }; 80];
 static NOTES: [a2engine::Note; 2] = [const { a2engine::Note::new() }; 2];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 

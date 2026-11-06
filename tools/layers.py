@@ -187,31 +187,42 @@ def _spec(pat):
     return len(pat) if m is None else m.start()
 
 
-def classify(reg, rel, suffix=None):
+def _mine(lay, game=None):
+    """Is the layer the game's? A layer with no `games` (the selftest's toy) is every game's."""
+    gid = game or a2env.GAME_ID
+    return gid in lay.get('games', [gid])
+
+
+def classify(reg, rel, suffix=None, game=None):
     """The layer a2mod files `rel` (relative to the game directory) under, or None.
-    `suffix`: the backup it was found by, for a replaced file; None for an added one."""
+    `suffix`: the backup it was found by, for a replaced file; None for an added one.
+    Only the layers of `game` (default: the chosen one) are considered, retired ones
+    included: a pattern of another game's layer (the ASI loader's winmm.dll on Roots)
+    must never claim a file of this one (Armada II's winmm.dll is the platform's)."""
     if suffix and suffix != BACKUP:
         for lay in reg['layer']:
-            if suffix in lay['backups']:
+            if suffix in lay['backups'] and _mine(lay, game):
                 return lay['id']
         return None
     key = 'replaces' if suffix else 'files'
     best, best_n = None, -1
     low = rel.lower()
     for lay in reg['layer']:
+        if not _mine(lay, game):
+            continue
         for pat in lay[key]:
             if fnmatch.fnmatchcase(low, pat.lower()) and _spec(pat) > best_n:
                 best, best_n = lay['id'], _spec(pat)
     return best
 
 
-def backup_suffixes(reg):
-    return (BACKUP,) + tuple(s for lay in reg['layer'] for s in lay['backups'])
+def backup_suffixes(reg, game=None):
+    return (BACKUP,) + tuple(s for lay in reg['layer'] if _mine(lay, game) for s in lay['backups'])
 
 
-def added_patterns(reg):
-    """(pattern, id) for every file a layer adds."""
-    return [(p, lay['id']) for lay in reg['layer'] for p in lay['files']]
+def added_patterns(reg, game=None):
+    """(pattern, id) for every file a layer of the game adds."""
+    return [(p, lay['id']) for lay in reg['layer'] if _mine(lay, game) for p in lay['files']]
 
 
 # --- --check ----------------------------------------------------------------------------
@@ -262,10 +273,21 @@ def _check_registry(reg, errs):
     for s in steps:
         if s not in owned and s not in rel.get('own', []):
             errs.append(f'[release] step {s}: no layer has it and it is not in own')
-    # Every added file is filed under exactly the layer that names it.
-    for pat, i in added_patterns(reg):
-        if not re.search(r'[*?\[]', pat) and classify(reg, pat) != i:
-            errs.append(f'{i}: {pat} would be filed under {classify(reg, pat)}')
+    # Every added file is filed under exactly the layer that names it, in each game the
+    # layer is for.
+    for lay in reg.get('layer', []):
+        for g in lay.get('games', []):
+            for pat in lay.get('files', []):
+                if not re.search(r'[*?\[]', pat) and classify(reg, pat, game=g) != lay['id']:
+                    errs.append(f'{lay["id"]}: {pat} would be filed under '
+                                f'{classify(reg, pat, game=g)} on {g}')
+    # winmm.dll is the ASI loader. Armada II's is the platform's, which a2mod never
+    # switches (no layer files it); on Roots it is the asiloader layer's.
+    if any(lay.get('id') == 'asiloader' for lay in reg.get('layer', [])):
+        for g, want in (('armada2', None), ('fo-roots', 'asiloader')):
+            got = classify(reg, 'winmm.dll', game=g)
+            if got != want:
+                errs.append(f'winmm.dll would be filed under {got} on {g}, expected {want}')
 
 
 def _load_a2mod():
@@ -290,6 +312,7 @@ def _check_a2mod(reg, errs):
     want = [lay['id'] for lay in reg['layer']] + ['other']
     if list(m.LAYERS) != want:
         errs.append(f'a2mod: LAYERS {list(m.LAYERS)} is not the registry\'s {want}')
+    # a2mod works on the chosen game: only that game's layers' patterns and backups.
     added = {p: i for p, i in added_patterns(reg)}
     for p, i in m.ADDED:
         if added.get(p) != i:

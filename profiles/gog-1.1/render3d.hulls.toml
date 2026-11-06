@@ -13,7 +13,6 @@ rows = ["Modules.hulls"]
 [hook."hulls.instance_draw"]
 doc = "The call of ST3D_Instance::RenderInternal in GameObjectInstance::RenderInternal: where Roots' hulls are claimed"
 rows = ["Modules.hulls"]
-planned = "FO-5 step 4"
 
 [[sym]]
 id = "fn_scrap_render"
@@ -675,4 +674,16 @@ kind = "call"
 addr = 0x4d5a11
 target = "fn_instance_ri"
 in = "GameObjectInstance::RenderInternal"
+used_by = ["hulls.instance_draw"]
+
+# Where the hulls module takes a hull: 0 at the object (in GameObject::Render's place, the
+# object step's registry::object), 1 at the instance's database draw (site_hull_draw, inside
+# the engine's own Render), for a build whose object loop is another module's (Roots:
+# FleetOpsHook draws each object, PLAN-FLEETOPS.md, "The rules of (c)", rule 3). Stock
+# claims at the object and installs nothing at site_hull_draw.
+[[sym]]
+id = "hl_claim_instance"
+symbol = "hull claim point"
+kind = "value"
+value = 0
 used_by = ["hulls.instance_draw"]

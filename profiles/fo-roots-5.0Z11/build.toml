@@ -66,10 +66,12 @@ verified = []
 
 # ---- render3d -----------------------------------------------------------------------
 
+# Roots' cloak calls and wave-light detours sit past the entry; the hulls module only compares
+# this address with a class's slot 22 and reads the cloak's stock fields (FO-5 step 3).
 [[changed]]
 fn = "GameObject::RenderInternal"
 how = "detour"
-verified = []
+verified = ["render3d.hulls.reads"]
 
 [[changed]]
 fn = "Craft::Explode"
@@ -86,15 +88,20 @@ fn = "ShieldHit::DrawShield"
 how = "detour"
 verified = []
 
+# The hulls module calls it only for a rig whose Render is ConstructionRig::Render, which
+# no Roots rig has (FleetOpsHook gives them GameObject::Render); were it called, Roots'
+# detour inside it runs as Roots wrote it (FO-5 step 3).
 [[changed]]
 fn = "PlaceholderFeature::sRenderInternal"
 how = "detour"
-verified = []
+verified = ["render3d.hulls.reads"]
 
+# Called for the wave light it returns, as GameObject::RenderInternal calls it: Roots' edit is
+# Roots' meaning of that light (FO-5 step 3).
 [[changed]]
 fn = "GetSensorScramblerWaveLight"
 how = "edit"
-verified = []
+verified = ["render3d.hulls.reads"]
 
 [[changed]]
 fn = "Terrain_Geometry::DrawGrid"
@@ -238,20 +245,24 @@ fn = "Armada_RenderAllOurStuff"
 how = "runtime"
 verified = ["render3d.frame.*"]
 
+# FleetOpsHook's one edit (+0x245) takes out an edit-menu call, away from the seam's call at
+# 0x59886e (FO-5 step 3).
 [[changed]]
 fn = "Armada_RenderFrame"
 how = "runtime"
-verified = []
+verified = ["render3d.frame.*"]
 
 [[changed]]
 fn = "Beam::Simulate"
 how = "runtime"
 verified = []
 
+# FleetOpsHook edits the body (+0x10, +0x69) and gives rigs GameObject::Render in their
+# vtable: the core only compares this address with a class's Render slot (FO-5 step 3).
 [[changed]]
 fn = "ConstructionRig::Render"
 how = "runtime"
-verified = []
+verified = ["render3d.core.reads"]
 
 [[changed]]
 fn = "RTS_Configure"
@@ -268,10 +279,12 @@ fn = "Starfield_Load_Background_Geometry"
 how = "runtime"
 verified = []
 
+# FleetOpsHook's call at +0x143 is inside the function; the terrain step calls it through its
+# site whole, so Roots' change runs as Roots wrote it (FO-5 step 3).
 [[changed]]
 fn = "Terrain_Geometry::Render"
 how = "runtime"
-verified = []
+verified = ["render3d.frame.*"]
 
 [[changed]]
 fn = "cOverViewImp::mDrawPost"

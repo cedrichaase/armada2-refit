@@ -1,7 +1,7 @@
 # Star Trek: Armada II -- Fleet Operations: Roots, installed through Heroic
 # (PLAN-FLEETOPS.md). Not offered to players (the release and the GUI installer leave it
 # out), but `installable`: ./install and a2mod work on it for the bench and the
-# maintainer's own clones, with the layers listed below (FO-4: Display8 alone). FO-1 filled in what the bench measured of the shipped game (the install,
+# maintainer's own clones, with the layers listed below. FO-1 filled in what the bench measured of the shipped game (the install,
 # Heroic's entry and prefix, Settings.xml, its logs); `./a2test --game fo-roots` runs it.
 schema = 1
 id = "fo-roots"
@@ -10,11 +10,13 @@ offered = false
 installable = true
 default = false
 
-# The layers ./install puts in: Display8 alone (FO-4; PLAN-FLEETOPS.md, "What runs on
-# Roots", says which come next). It goes into Data/ in place of DxWrapper's d3d8.dll,
-# which is backed up; no platform layer (Roots has no ASI loader and no widescreen patch of
-# ours). A clone with no layers is the game as shipped.
-layers = ["display"]
+# The layers ./install puts in, all into Data/, the executable's folder (PLAN-FLEETOPS.md,
+# "What runs on Roots"): Display8, in place of DxWrapper's d3d8.dll (backed up); the ASI
+# loader Roots ships none of (asiloader/, winmm.dll; only beside Display8: beside DxWrapper
+# it kills the game at start); and render3d, loaded by it. No platform layer (no widescreen
+# patch of ours), and no UI, QOL, rules, online, textures or cutscenes on Roots yet. A clone
+# with no layers is the game as shipped.
+layers = ["display", "asiloader", "render3d"]
 
 [exe]
 # The game itself in Data/, under a launcher (FleetOps.exe) that only starts it; the

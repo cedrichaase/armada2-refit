@@ -22,6 +22,10 @@ pub struct Look {
     /// plating without blooming over the hull (1: clip, above: no shoulder at all).
     pub knee: f32,
     pub bump: f32,
+    /// The bump profile goes by race (the set's `ProfileBy = race`): the races that take
+    /// it (`[Hulls] BorgRaces=`, else the set's `ProfileRaces`), lower case.
+    pub by_race: bool,
+    pub borg_races: alloc::vec::Vec<alloc::string::String>,
     pub point_lights: usize,
     pub near_fade: bool,
     pub near_fade_depth: f32,
@@ -162,6 +166,11 @@ pub fn load(ini: &crate::rt::Ini) -> Look {
         rim_power: f("RimPower", 3.0),
         knee: f("HighlightKnee", 0.8),
         bump: f("BumpStrength", 1.0),
+        by_race: super::content::get().profile_by_race,
+        borg_races: match ini.string(s, "BorgRaces") {
+            Some(l) => l.split(',').map(|r| crate::rt::lower(r.trim())).filter(|r| !r.is_empty()).collect(),
+            None => super::content::get().profile_races.iter().map(|r| crate::rt::lower(r)).collect(),
+        },
         point_lights: ini.int(s, "PointLights", 12).clamp(0, 16) as usize,
         near_fade: ini.int(s, "NearFade", 1) != 0,
         near_fade_depth: f("NearFadeDepth", 0.3).max(0.01),
@@ -224,4 +233,29 @@ pub fn load(ini: &crate::rt::Ini) -> Look {
         evolver: ini.int(s, "Evolver", 1) != 0,
         reload: ini.int(s, "Reload", 0) != 0,
     }
+}
+
+/// Whether a hull takes the bump ("Borg") profile: by race where the set says so (the
+/// object's ODF `race`, through its includes; Fleet Operations), else by whether the
+/// mesh is bump-mapped (`bump`, stock, where the Borg alone are). A model with no
+/// object behind it goes by `bump` too.
+pub fn borg_profile(o: usize, look: &Look, bump: bool) -> bool {
+    if !look.by_race || o == 0 {
+        return bump;
+    }
+    let name = r3d_core::engine::obj::odf_name(o);
+    if name.is_empty() {
+        return false;
+    }
+    static mut RACES: alloc::collections::BTreeMap<alloc::string::String, alloc::string::String> = alloc::collections::BTreeMap::new();
+    #[allow(static_mut_refs)]
+    let races = unsafe { &mut RACES };
+    let key = crate::rt::lower(name);
+    if !races.contains_key(&key) {
+        let race = r3d_core::assets::odf(name).and_then(|d| d.get_str("race").map(crate::rt::lower)).unwrap_or_default();
+        crate::log!("hulls: {} is of race '{}': the {} profile", name, race, if look.borg_races.iter().any(|r| *r == race) { "Borg" } else { "hull" });
+        races.insert(key.clone(), race);
+    }
+    let race = &races[&key];
+    look.borg_races.iter().any(|r| r == race)
 }

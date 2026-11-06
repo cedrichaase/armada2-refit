@@ -117,6 +117,11 @@ def is_display8(path):
         return False
 
 
+# The ASI loader the asiloader layer puts in as winmm.dll (platform/vendor/
+# STA2WidescreenPatch-1.0/SOURCE.txt: Ultimate ASI Loader 4.68, x86).
+ASI_LOADER_SHA = 'baba99929487b005bb9b168acfd852550055f22e5f1059c9032765209bb185e5'
+
+
 def layer_of(rel, suffix):
     """The layer a file replaced in place belongs to, by the backup beside it."""
     return registry.classify(REG, rel, suffix) or 'other'
@@ -178,6 +183,8 @@ def discover():
             continue   # d3d8.dll with a backup beside it is a replaced file already
         if rel == 'd3d8.dll' and not is_display8(os.path.join(GAME, rel)):
             continue   # only ours: GOG's, or a d3d8.dll of the player's own, is not a change
+        if rel == 'winmm.dll' and sha(os.path.join(GAME, rel)) != ASI_LOADER_SHA:
+            continue   # only the asiloader layer's: a winmm.dll of the player's own is not a change
         if rel.startswith(MOVIE_DIR + '/') and os.path.splitext(rel)[1].lower() in MOVIE_EXTS \
                 and os.path.splitext(os.path.basename(rel))[0].lower() not in biks:
             continue
