@@ -1,6 +1,7 @@
 # Plan: Fleet Operations: Roots
 
-How the refit comes to Fleet Operations: Roots, the total conversion of Armada II, in
+How the refit comes to Fleet Operations: Roots, a submod built on Fleet Operations (itself
+a total conversion of Armada II), in
 **this** repository. The first target is Roots 5.0Z11 (23 October 2026), as the user has
 it installed through Heroic. Decided 2026-11-02: Roots comes first among other
 executables, before Armada 1 (`PLAN-ARMADA1.md`), and its profile work rides on
@@ -179,7 +180,7 @@ can start now; FO-3 onward waits on phase 8's format and generator (8b).
 | FO-4 | **Display8 on Roots**: stub and passthrough on Vulkan with whatever FO-2 found (block-compressed textures sampled natively, the D3DX8 calls, the 1200x900 shell mode, Roots' `FindDisplayMode` change). If `FleetOpsHook` draws through its own Direct3D 9, that is solved here or Display8 is not installed on Roots (Roots keeps DxWrapper). Installed by `./install --game fo-roots` with DxWrapper's `d3d8.dll` backed up | FO-2, ROADMAP 1 signed off | 10–25 h · 10–20 with A/B against Roots as it ships (DxWrapper, then DXVK) · **round FO-A**: Roots looks as Roots on our device |
 | FO-5 | **render3d on Roots**: designed 2026-11-06, "FO-5: render3d on Roots, the design" below: render3d keeps the frame and its steps; the object step calls through Roots' own per-object draw; hulls claim at the instance's database draw, not at the object, so Fleet Operations' wrappers (range rings, overlay models, highlight, node and texture swaps) keep running; where FleetOpsHook owns a call site, render3d takes over at the callee instead; the Roots content set reads `ODF.fpq` through `a2fmt::vfs` | FO-3, FO-4 (a skirmish drawn on Display8); ROADMAP 7 | 45–75 h · 20–30 · **round FO-B**: a skirmish with the refit's look |
 | FO-6 | **UI on Roots**: the Refit screen and settings over Roots' Options dialog, the loading screen; then the menu host's specs for the 1200x900 shell and HUD panels against Roots' components, each its own row, as wanted. The button bar is not stock's: its command area can be far larger (several weapons of one classlabel, each a button; FO-7), so the UI's bar and its labels (`ui/HUD.md`, "The button bar") are measured on Roots before they are drawn there | FO-3, FO-4; ROADMAP 6 | 10–30 h · 8–15 · with FO-B, then its own round if panels are taken |
-| FO-7 | **QOL on Roots**: pan speed and camera first; each of the other features measured beside Roots' own and switched on only where both agree. A Fleet Operations developer noted (2026-11-06) that Roots' command button area can be far larger than stock's (several weapons of the same classlabel each get a button), so `BarKeys` and the slot plan (`qol/README.md`, QOL-1) cannot assume stock's bar | FO-3 | 4–10 h · 3–6 gameplay passes · with FO-B |
+| FO-7 | **QOL on Roots**: pan speed and camera first; each of the other features measured beside Roots' own and switched on only where both agree. Another developer noted (2026-11-06) that Roots' command button area can be far larger than stock's (several weapons of the same classlabel each get a button), so `BarKeys` and the slot plan (`qol/README.md`, QOL-1) cannot assume stock's bar | FO-3 | 4–10 h · 3–6 gameplay passes · with FO-B |
 | FO-8 | **Multiplayer**: two bench games of Roots with the refit's visual plugins, on Microsoft's DirectPlay in the clones (`online/reference-dplay.sh`), to show the CRC check passes; then whether `Online.asi`'s peer carries a Roots game | FO-4; ROADMAP 9 (the rules plugin as its own layer) | 6–12 h · 4–8 two-game passes · round FO-C if Online is taken |
 | FO-9 | **binkproxy** on Roots' intros. Roots support is not packaged: no GUI installer or release package carries it (Open decisions, 4) | FO-4 | 2–5 h · 2–3 · none |
 
@@ -197,7 +198,7 @@ Designed 2026-11-06 (branch `fo-5-design`), from a reading of `FleetOpsHook.dll`
 its shipped map, the file and run-time diffs of FO-2, Roots' ODFs read out of `ODF.fpq`
 with `a2fmt::fpq` (PR #60), FO-2's Display8 inventory, and one bench session of Roots as it
 ships. It is built for **`FleetOpsHook.dll` as it ships and as it will change**: nothing in
-it waits on the Fleet Operations team (user's decision, 2026-11-06). The detail that would
+it waits on the Roots developer or the Fleet Operations team (user's decision, 2026-11-06). The detail that would
 read as FleetOpsHook's internals is in the private notes (`fo5-design-notes.md` beside
 `fleetopshook.md` in `$A2_DATA/research/fo-roots/`); here each finding is stated per hook.
 
@@ -324,7 +325,7 @@ About 45–75 agent hours and 20–30 bench passes, after FO-4 (a skirmish drawn
 FO-2 saw a white screen on entering one). Roots has no scene harness, so its scenarios
 stage through the front end (Instant Action) and OCR, as `fo-skirmish` does.
 
-### What we would ask the Fleet Operations team, if ever (optional)
+### What we would ask the Roots developer or the Fleet Operations team, if ever (optional)
 
 Nothing above depends on it. Each would replace a hook of ours with a call of theirs:
 an exported "draw this object's extras" (overlay model and rings) for a renderer that
@@ -367,7 +368,7 @@ identity; a note when they move the object-loop edit or the craft wrappers.
 4. **Roots updates.** A new Roots release is a new build with a new profile; an unknown
    build runs only what resolves by scan, as the profile design says. The three submods'
    own `ArmadaL.exe` files are further builds, not in scope until asked.
-5. **Fairness and the Fleet Operations team.** A visual plugin in a competitive mod's
+5. **Fairness and the Fleet Operations community.** A visual plugin in a competitive mod's
    network games is a question of the community's norms as well as of CRCs.
 
 ## Decisions taken by default
@@ -377,7 +378,7 @@ Operations team. Each holds until what is named in its last column happens.
 
 | # | Default | Why | What would change it |
 |---|---|---|---|
-| 1 | **No contact** with the Fleet Operations team or with the author of the third-party A2FOExtensions; the design is for `FleetOpsHook.dll` as it ships and for its updates, with nothing asked of them | the user's decision, 2026-11-06 | the user opening contact; "What we would ask", under FO-5, lists what would then help |
+| 1 | **No contact for now** with the Roots developer, the Fleet Operations team or TamsynnImogen (the author of the third-party A2FOExtensions); the design is for `FleetOpsHook.dll` as it ships and for its updates, with nothing asked of them | the user's decision, 2026-11-06 | the user opening contact; "What we would ask", under FO-5, lists what would then help |
 | 2 | A2FOExtensions (no licence) is used only for **hypotheses**, each checked by us and written in our words; nothing of it is copied | it has no licence, so its text and tables are not ours to take | a licence from its author |
 | 3 | render3d on Roots follows **model (c)** (FO-5 design): the frame is ours, Roots' wrappers keep running, hulls claim at the instance draw, callee hooks where FleetOpsHook owns a site | the only model that reads nothing of FleetOpsHook's memory, so a Roots update cannot silently break it | an FO export that draws a ship's extras, or a Roots build that moves the hull draw out of the instance path |
 | 4 | Roots' **range rings and overlay models are drawn by the engine** through passthrough, in its own look (tone-mapped and bloomed with the scene) | they are Roots' gameplay feedback; drawing them ourselves would mean reading Roots' private records | the user wanting them in render3d's style: the rings could be taken at the engine's circle draw, as the posts are |
@@ -404,12 +405,14 @@ The Roots profile tools (`tools/engine/fo-scan.py`, PR #61) took these defaults:
 
 Decided by the user, 2026-11-06:
 
-1. **What the Fleet Operations team agreed to** (2026-11-06, the user's message to them):
+1. **What the Roots developer agreed to** (2026-11-06, the user's message to them; the earlier
+   approval of the work, the same day, was also the Roots developer's, not the Fleet
+   Operations team's):
    the user tries to get the refit's UI and renderer working on Roots, to see the effort
    and whether it suits Roots' art, and to make the code reusable for other Fleet
    Operations-based mods if their creators want it; the code is released only with a
    bash script for installation on the user's own Linux setup, **not advertised or
-   announced**. Roots' own developer wants to tinker with it once it works.
+   announced**. The Roots developer wants to tinker with it once it works.
 2. **Scope**: the renderer first on Roots, Display8 and render3d (FO-2 to FO-5); **the UI
    is within the agreed scope** and comes after it (FO-6 stays planned). QOL and Online on
    Roots come later, if ever (FO-7, FO-8 wait).
