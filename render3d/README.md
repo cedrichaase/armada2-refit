@@ -309,6 +309,17 @@ The patch is made when render3d runs; with `Enable=0` the engine's view is stock
 profile's hook `view.distance` must be ready (the 21 bytes at the site are checked), or
 nothing is patched and the settings note says so.
 
+**On Fleet Operations: Roots** (FO-5 step 7, verified). Roots' file leaves `RTS_Configure`
+as stock's; FleetOpsHook re-points one call in it at run time, the last key read before the
+parser is freed (+0x1d9d), where it reads keys of its own. The load at `view_site` (+0xebf)
+and the 21 bytes checked there are stock's in the file and in memory, FleetOpsHook names
+neither the far plane nor the culling distance anywhere, and the function is still called
+after the plugins load, so the patch is made and the stub runs at Roots' parse as at
+stock's (bench: `view: ART_CFG.h parsed: far plane now 1000000, object culling now
+1000000`). Roots' own culling exception (its object loop draws an object the engine culled
+for distance when its class sets `renderIgnoreCameraDistance`) is decided after this, by
+the same distance.
+
 **Cost.** More is drawn on a wide view. The near plane stays at 20, so the depth
 buffer's precision at a given distance hardly changes with the far plane. The shadow map
 is fitted around every hull drawn, so far-off ships on a wide view make its texels
@@ -823,7 +834,7 @@ finding it rests on:
 | `render3d.frame.obj_draw` | Roots only (absent in stock, so it stands down there): the call at 0x598297 in the object loop, which FleetOpsHook writes as it loads and which it makes for each object, culling and then drawing through `GameObject::Render`; accepted as `chained` | PLAN-FLEETOPS.md, "FO-5: render3d on Roots". The object step (`frame/steps.rs`) reads the call's target every frame and calls it as `stdcall(object, camera)` for every object that is not a background object, never writing there; a module may still take an object the engine has not culled first (`registry::object`). The object is the step's current object (`steps::current`) around the call, for the hull claim. Offline (`a2test syms`) the file still holds stock's bytes there, so only the game's log says it is ready (`frame: the object step calls through the loop's draw site`) |
 | `render3d.frame.destroy` | `DestroyRenderSurfaces` chained, so render3d lets go of the device before the engine does | kept for the device Display8 hands out; native Direct3D 9 (gone in 15.0.0) kept a device alive while anything made on it was held |
 | `render3d.view.distance` | the load of the culling distance in `RTS_Configure` and the far plane and culling distance it parses (`View.Distance`) | "View distance"; not ready: the engine keeps its view limits |
-| `render3d.hulls.instance_draw` | the call of `ST3D_Instance::RenderInternal` at 0x4d5a11 in `GameObjectInstance::RenderInternal`, and the callee's entry | where a hull is claimed on Roots, after the per-instance node and texture writes of stock and of FleetOpsHook, which neither Roots' file nor FleetOpsHook changes; on Roots every hull draw, FleetOpsHook's bump-mapped replacement included, is nested under this one call, and no other route reaches it with a hull. The instance does not point back to its object: the owner is the object the object step is drawing through the `frame.obj_draw` call, confirmed by the object's instance being the one at the call; planets (which reach the call through the craft instance), construction rigs (FleetOpsHook gives them the common `GameObject::Render`, so the stock rig draw is not called from the loop) and other modules' objects are skipped by that test. Holograms and FleetOpsHook's overlay models do not pass here and are the engine's. Installed only where the profile's value `hl_claim_instance` is 1 (Roots); stock (0) claims at the object and patches nothing here. Claimed, the hull is posed and drawn as in `object`, after the engine's own frustum test and on-screen byte; the engine's function is not called, as on stock with hulls on (it returns nothing its caller reads), and the object's billboard effect is left to the engine's call in `GameObject::RenderInternal`. What the engine and FleetOpsHook wrote into the shared database for this instance just before is honoured (FO-5 step 5): for each node of the SOD the module looks the database's node up by name (`ST3D_Database::FindElement` on its node list, `fn_find_element`, `hl_node_list`); a node whose render flags (`+0xbc`, bits 0 and 1, the bits stock's `GameObjectInstance::RenderInternal` sets on the lights node) say hidden is hidden with what hangs from it, and a mesh whose first texture (`+0x114`, `+0x11c` entries; a texture is a database element, named at `+0x8`) is not its SOD's is drawn with that one: Roots' per-ship logo on the `stlogo` node, shown with the ship's own texture or hidden, comes through this way without a read of FleetOpsHook's memory. The sprite nodes are drawn by the module on Roots too (the database draw that drew them is the one replaced), and the wave light stays the module's (`mods/hulls/src/claim.rs`) |
+| `render3d.hulls.instance_draw` | the call of `ST3D_Instance::RenderInternal` at 0x4d5a11 in `GameObjectInstance::RenderInternal`, and the callee's entry | where a hull is claimed on Roots, after the per-instance node and texture writes of stock and of FleetOpsHook, which neither Roots' file nor FleetOpsHook changes; on Roots every hull draw, FleetOpsHook's bump-mapped replacement included, is nested under this one call, and no other route reaches it with a hull. The instance does not point back to its object: the owner is the object the object step is drawing through the `frame.obj_draw` call, confirmed by the object's instance being the one at the call; planets (which reach the call through the craft instance), construction rigs (FleetOpsHook gives them the common `GameObject::Render`, so the stock rig draw is not called from the loop) and other modules' objects are skipped by that test. Holograms and FleetOpsHook's overlay models do not pass here and are the engine's. Installed only where the profile's value `hl_claim_instance` is 1 (Roots); stock (0) claims at the object and patches nothing here. Claimed, the hull is posed and drawn as in `object`, after the engine's own frustum test and on-screen byte; the engine's function is not called, as on stock with hulls on (it returns nothing its caller reads), and the object's billboard effect is left to the call in `GameObject::RenderInternal` (the particles module's, as on stock, since step 7). What the engine and FleetOpsHook wrote into the shared database for this instance just before is honoured (FO-5 step 5): for each node of the SOD the module looks the database's node up by name (`ST3D_Database::FindElement` on its node list, `fn_find_element`, `hl_node_list`); a node whose render flags (`+0xbc`, bits 0 and 1, the bits stock's `GameObjectInstance::RenderInternal` sets on the lights node) say hidden is hidden with what hangs from it, and a mesh whose first texture (`+0x114`, `+0x11c` entries; a texture is a database element, named at `+0x8`) is not its SOD's is drawn with that one: Roots' per-ship logo on the `stlogo` node, shown with the ship's own texture or hidden, comes through this way without a read of FleetOpsHook's memory. The sprite nodes are drawn by the module on Roots too (the database draw that drew them is the one replaced), and the wave light stays the module's (`mods/hulls/src/claim.rs`) |
 | `render3d.hulls.reads` | the hulls module: class `Render` / `RenderInternal` functions and vtables, the fade, culling and wave-light reads and calls | hulls draws in `GameObject::Render`'s place and installs no hook; not ready: the engine draws the hulls |
 | `render3d.sky.reads` | the sky module: the background name, database, starfield, far planes, `GameObject::Render` and the plain database vtable | the sky takes `Step::Background`; not ready: the engine's sky |
 | `render3d.specials.reads` | the special-weapon effect list and the `Render` functions and vtables of the timed effects | only the timed effects draw; others go back to the engine |
@@ -1636,7 +1647,22 @@ from stock, and look at it: the measure is blind to a value-noise lattice (hence
 
 #### sky: Hooks, Content, Settings
 
-**Hooks** (`sky/hooks.rs`): none installed. The sky takes `Step::Background` and the background objects from the seam, and hands an object it cannot draw back to the engine's `Render`; the file holds the reads (the background name, the sky database, `g_starfield` and its octree, the far planes, the detail byte that turns the sky off, edit mode, the background instance). **Content**: the built-in recipes (`render3d/content/sky/`, `sky/content.rs`; a `Sky\<name>.ini` in the game directory wins) and the point-star texture. **Settings**: `Modules.sky` (live); `[Sky]` is read in `configure`. `formats_changed` drops the view pipelines and keeps the baked cube, which does not depend on the scene target.
+**Hooks** (`sky/hooks.rs`): none installed. The sky takes `Step::Background` and the background objects from the seam, and hands an object it cannot draw back to the engine's `Render`; the file holds the reads (the background name, the sky database, `g_starfield` and its octree, the far planes, the detail byte that turns the sky off, edit mode, the background instance).
+
+*On Fleet Operations: Roots* (FO-5 step 7, verified). The one Roots change in what the module
+uses is FleetOpsHook's in `Starfield_Load_Background_Geometry`: nine bytes at +0x16, the
+free of the previous background database after its destructor has run (it does the same in
+`Background_Close`), so the old database's memory is kept rather than handed back. The entry
+the module checks, the name the function keeps lower-cased (`STARFIELD_GEOMETRY_NAME`), the
+database pointer it sets and `Background_Render` are stock's in the file and in memory, and
+the module calls the function only on the bench (`[Sky] Load=`). `GameObject::Render` is
+FleetOpsHook's trampoline at its entry (checked as nothing there, as for the core): the
+module only compares a background object's `Render` slot with its address, which the
+vtables still hold. Roots' skies are its own art, so no built-in recipe matches and the
+module draws the map's own faces or cube (`sky: "env_dark_dust": no recipe, the stock
+sky`), with the starfield and the background planets, on render3d's target.
+
+**Content**: the built-in recipes (`render3d/content/sky/`, `sky/content.rs`; a `Sky\<name>.ini` in the game directory wins) and the point-star texture. **Settings**: `Modules.sky` (live); `[Sky]` is read in `configure`. `formats_changed` drops the view pipelines and keeps the baked cube, which does not depend on the scene target.
 
 ### overlays
 
@@ -1820,7 +1846,8 @@ drawing nothing in the tactical view.
 **Move paths** (`paths.rs`, `vs_dots`/`ps_dots` in `mods/overlays/shaders/overlays.hlsl`;
 issue #17). Stock sketches a move path with the `enter_waypoint` binding held (Tab in
 `Input.map`; `cOverViewImp::Init` 0x51e4c0 keeps its live state's pointer at
-`cOverViewImp+0x30c`, the overview being the object at 0x768e40): each right-click
+`cOverViewImp+0x30c`, the overview being the object `g_pOverView` (0x768e3c) points to,
+stock's static one at 0x768e40): each right-click
 (`mNormalModeRightClick` 0x5229a0) adds the map point under the cursor (`+0xa4`) to an
 `AiPath` at `+0x264` through `mAddPathPoint` (0x5255b0), and nothing is sent. Let go,
 `mProcessWaypoints` (0x522aa0, every frame from `mNormalModeInput`) sends the whole path
@@ -1915,6 +1942,26 @@ module is off they run as stock.
 | `mDrawPath` (`render3d.overlays.paths`) | `mNormalModeRender`'s call (0x522247), the sketch while the waypoint key is held | nothing drawn: the move paths draw the sketch (or QOL's queue) | the call that was there: the engine's line |
 | `DrawHeightPost` at its entry (`render3d.overlays.posts_callee`), on a build whose profile says so (`ov_posts_at_callee`, Roots) in place of the five calls | its first six bytes (`ov_post_moved`) moved to a trampoline | the posts, noted as above only while the caller is the build's companion module (FleetOpsHook's two post callbacks, which skip a post during its clean screenshot and under `DISABLE_HEIGHT_CHANGE`); every other caller, render3d's own engine posts included, gets the function as it was | the function as it was |
 
+*Move paths on Fleet Operations: Roots* (FO-5 step 7, verified). FleetOpsHook edits
+`mNormalModeRender` at three places, none of them the paths': the cursor's height post
+(+0x40) and the drag box's colour and draw (+0x191, +0x1ca); the call of `mDrawPath` at
++0x207 and the overview's fields the module reads (`+0x264`, `+0x30c`, both read the same way
+by the function's own unchanged code) are stock's. Two of its changes do concern the module.
+FleetOpsHook constructs the overview itself, an enlarged object in its own memory, in place
+of the static one beside `g_pOverView` (it re-points the static constructor and destructor
+at its own object), so the static object is never built on Roots; the module reads the
+overview through `g_pOverView` (`overview_ptr`), which the constructor sets, on stock as on
+Roots (stock's pointer holds the static object, so nothing changes there). And it moves the
+selection's array into that object (`GetSelectList` returns another offset), which the
+module already follows by calling `GetSelectList` and `GetSelectNum` through the overview's
+vtable. On the bench the overview is FleetOpsHook's, the selection is read (two ships), and
+the craft process's command, path and point (`+0x38`, `+0x88`, `+0x12c`) and the path's
+count and points read as on stock (a stop: one point where the ship stands; a move: the
+command GO and a new path at each order). The sketch itself, held `enter_waypoint` (Tab in
+Roots' `Input.map` too), was not reached on the bench: with the bench's input daemon holding
+Tab (and then Shift), each right-click was still a new order of its own, so no sketch was
+made and no sketched path has been drawn on Roots yet.
+
 It is installed at the first switch-on, whether or not `HeightPosts` is on, so the key
 can be switched live: the detour notes a post only while one of our views is running
 (`IN_VIEW`, which `HeightPosts=0` and a module that is off keep false). A site that is not
@@ -1960,6 +2007,15 @@ constant: the warp sprite hook was seeded with `DrawScaled3D` and `ord_render` c
 `Entity::Render`, which unchained any plugin that had sat on the slot first. The flash is
 `[Warp] Enable` read again with the settings; with it off the hook stays in and hands the call
 on.
+
+*On Fleet Operations: Roots* (FO-5 step 7, verified). `RenderWarpSpriteEffects`,
+`WarpSpriteEffect::Render` and `DrawScaled3D` are stock's in Roots' file and FleetOpsHook
+writes none of them; the body's call of the first (+0x313 of `Armada_RenderAllOurStuff`) is
+a plain call well past FleetOpsHook's edit of the object loop (+0x185..+0x1a4), and the
+warp step calls whatever that call holds. So `ordnance.warp` is marked verified beside the
+body's run-time change, and the sprite hook goes in (`hooks: ordnance the warp flash at
+WarpSpriteEffect::Render (0x59cc6b) installed`). No flash has been seen on Roots yet: the long
+move staged on the bench (across the minimap) did not go to warp.
 
 **Content.** The special weapons' recipes, the models' looks and `[Warp]` are
 `render3d/content/ordnance/ordnance.ini`, compiled in through `ordnance/content.rs` and
@@ -2089,6 +2145,16 @@ installed through `r3d_core::hooks` at the module's first switch-on, behind its 
 |---|---|---|
 | `ST3D_DeviceDirectX8::RenderParticle` (vtable 0x6bc6ac, slot 50) | slot, chained | drops the engine's draw of a particle handed over while the engine's current instance is an object we own, or the global list, in a view of ours |
 | `GameObject::RenderInternal`, the call of `RenderSpriteNodeEffect` (0x4d544c) | call | skipped in a view of ours, since we draw every object's billboard effect; if the site is not stock's the engine's call draws them and we do not |
+
+*On Fleet Operations: Roots* (FO-5 step 7, verified). In `GameObject::RenderInternal`
+Roots' file detours two wave-light calls (+0x9c, +0x1fc) and FleetOpsHook rewrites the
+cloak's two tests (+0x1f, +0x1a1 and the bytes after each); the billboard call at +0x19c,
+its three pushes and its callee are stock's in the file and in memory, and FleetOpsHook's
+second cloak call begins on the very instruction the billboard call returns to (and where
+the branch that skips it lands), so the call site is whole. The function still runs for
+every object Roots' loop draws (the hulls claim one level further down, at the instance's
+database draw), so skipping the engine's call in our views and drawing every object's
+effect from the object list stays the same trade as on stock.
 
 Both call what was there before (`Prev`) when the gate is shut: the billboard stub called
 `RenderSpriteNodeEffect` by its constant, which dropped a plugin chained onto the call.

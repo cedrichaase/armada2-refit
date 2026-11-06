@@ -46,7 +46,7 @@ pub mod sym {
     pub const SITE_POST4: a2engine::Sym = a2engine::Sym(41);
     pub const FN_DRAW_PATH: a2engine::Sym = a2engine::Sym(85);
     pub const SITE_DRAW_PATH: a2engine::Sym = a2engine::Sym(86);
-    pub const OVERVIEW: a2engine::Sym = a2engine::Sym(87);
+    pub const OVERVIEW_PTR: a2engine::Sym = a2engine::Sym(87);
     pub const SITE_GRID_COLOUR: a2engine::Sym = a2engine::Sym(106);
 }
 
@@ -214,7 +214,7 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "ov_cam_free", symbol: "TacticalCamera::free", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "fn_draw_path", symbol: "cOverViewImp::mDrawPath", kind: a2engine::Kind::Fn },
     a2engine::SymDef { id: "site_draw_path", symbol: "cOverViewImp::mNormalModeRender", kind: a2engine::Kind::Call },
-    a2engine::SymDef { id: "overview", symbol: "cOverViewImp", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "overview_ptr", symbol: "g_pOverView", kind: a2engine::Kind::Global },
     a2engine::SymDef { id: "ov_add_path", symbol: "cOverViewImp", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "ov_waypoint_key", symbol: "cOverViewImp", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "ov_vt_select_num", symbol: "cOverViewImp::GetSelectNum", kind: a2engine::Kind::Field },
@@ -342,7 +342,7 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 228 }, // ov_cam_free
             a2engine::Entry { present: true, addr: 0x525180, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x78, 0x53, 0x56], mask: &[], section: "", count: 0, value: 0 }, // fn_draw_path
             a2engine::Entry { present: true, addr: 0x522247, end: 0x0, target: 0x55, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_draw_path
-            a2engine::Entry { present: true, addr: 0x768e40, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // overview
+            a2engine::Entry { present: true, addr: 0x768e3c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // overview_ptr
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 612 }, // ov_add_path
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 780 }, // ov_waypoint_key
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 148 }, // ov_vt_select_num
@@ -379,7 +379,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 83,
+        n_resolved: 102,
         content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x473930, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x3c, 0x53, 0x8b], mask: &[], section: "", count: 0, value: 0 }, // fn_footprints
@@ -469,7 +469,7 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 228 }, // ov_cam_free
             a2engine::Entry { present: true, addr: 0x525180, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x78, 0x53, 0x56], mask: &[], section: "", count: 0, value: 0 }, // fn_draw_path
             a2engine::Entry { present: true, addr: 0x522247, end: 0x0, target: 0x55, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_draw_path
-            a2engine::Entry { present: true, addr: 0x768e40, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // overview
+            a2engine::Entry { present: true, addr: 0x768e3c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // overview_ptr
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 612 }, // ov_add_path
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 780 }, // ov_waypoint_key
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 148 }, // ov_vt_select_num
@@ -492,11 +492,11 @@ pub const BUILDS: &[a2engine::Build] = &[
         ],
         blocked: &[
             a2engine::Block { hook: 1, symbol: "PlaceholderFeature::sRenderInternal", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: PlaceholderFeature::sRenderInternal is changed by fo-roots-5.0Z11, not yet verified" },
-            a2engine::Block { hook: 3, symbol: "cOverViewImp::mNormalModeRender", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: cOverViewImp::mNormalModeRender is changed by fo-roots-5.0Z11, not yet verified" },
         ],
         file_crc: &[a2engine::FileCrc { section: ".text", crc: 0xef690537 }, a2engine::FileCrc { section: ".test", crc: 0xe7a4061b }],
         modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
         blocked_mod: &[
+            a2engine::Block { hook: 3, symbol: "cOverViewImp::mNormalModeRender", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: cOverViewImp::mNormalModeRender is patched by FleetOpsHook.dll, which is not the profiled one" },
         ],
         n_resolved_mod: 83,
     },
