@@ -473,9 +473,12 @@ class Session:
                             detail='logs/prepare.log')
         if not config.LAYERS:
             # A game with no layers on offer (Fleet Operations: Roots in FO-1): nothing of
-            # ours goes in; the clone is the game as it ships.
-            steps = []
-            self.log.action(f'prepare: {config.GAME_ID} has no layers on offer; nothing installed')
+            # ours goes in; the clone is the game as it ships. An --install still runs
+            # (a test tool such as testbench/memdiff, or a layer's own script measured
+            # there by hand, FO-2), with no a2mod stock first: there is no stock to reach.
+            steps = [[str(Path(i['path']) / 'install')] for i in installs]
+            if not steps:
+                self.log.action(f'prepare: {config.GAME_ID} has no layers on offer; nothing installed')
         elif self.s['mod'] == 'stock':
             steps = stock
         elif installs:

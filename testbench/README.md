@@ -567,6 +567,23 @@ game are their own files, pending the packages that put their plugin on a profil
 `engine-mismatch-hulls` (render3d, 8e) and `engine-mismatch-cplugins` (QOL, rules, Online,
 8d). The Display8 shell under a forced `display.modes` is not the engine's.
 
+### What changes in memory: MemDiff.asi
+
+`a2test syms` reads the file; what another module rewrites of the exe at run time
+(Fleet Operations' `FleetOpsHook.dll`, the widescreen `.asi`, our own hooks) only the
+running game shows. `testbench/memdiff/` (`MemDiff.asi`, `--install testbench/memdiff`,
+clones only; the ASI loader goes in beside the exe where a clone has none) compares the
+image's sections with the exe's file at its own load and at 1, 3, 10, 30, 60, 120, 240,
+480 and 900 s, and writes `MemDiff.log` beside the exe: which of `FleetOpsHook.dll`,
+`Win2kDisableTaskSwitch.dll`, `d3d8`, `d3d9` and the D3DX DLLs were loaded when it was, the
+module list in load order, and per pass the changed ranges (section, addresses, the first
+bytes before and after, and for a rel32 `jmp` or `call` the module it now leads into),
+logged only when the set changed. The import table is skipped (every import hook writes
+it), and writable data is compared only at load (the game writes it as it runs). The
+ranges are named by function offline, against the map, outside the repository (hard
+rule 9). On stock 1.1 with nothing else installed it shows the widescreen patch's two
+words in `.text`, from its first second on: the control.
+
 ## Frame dumps
 
     ./a2test drive --session ID dump NAME      # or a scenario step: Dump the frame called "NAME"
