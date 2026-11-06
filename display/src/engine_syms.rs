@@ -19,6 +19,8 @@ pub mod sym {
     pub const REFRESH_DISPLAY: a2engine::Sym = a2engine::Sym(26);
     pub const SUBMIT_VB: a2engine::Sym = a2engine::Sym(27);
     pub const SUBMIT_NON_VB: a2engine::Sym = a2engine::Sym(28);
+    pub const DUMP_FROM: a2engine::Sym = a2engine::Sym(34);
+    pub const SITE_DUMP_FROM: a2engine::Sym = a2engine::Sym(35);
 }
 
 pub mod hook {
@@ -26,6 +28,7 @@ pub mod hook {
     pub const DROP: a2engine::HookId = a2engine::HookId(1);
     pub const NATIVE: a2engine::HookId = a2engine::HookId(2);
     pub const KEEPCLIP: a2engine::HookId = a2engine::HookId(3);
+    pub const CRASH: a2engine::HookId = a2engine::HookId(4);
 }
 
 pub mod field {
@@ -88,6 +91,8 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "mode_width", symbol: "ST3D_DisplayMode::width", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "mode_height", symbol: "ST3D_DisplayMode::height", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "mode_bpp", symbol: "ST3D_DisplayMode::bits per pixel", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "dump_from", symbol: "DebugCallStack_DumpFrom", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "site_dump_from", symbol: "DebugException_Execute", kind: a2engine::Kind::Call },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
@@ -95,6 +100,7 @@ pub const HOOKS: &[a2engine::HookDef] = &[
     a2engine::HookDef { id: "display.drop", run_unknown: false, rows: &[], syms: &[24, 25, 26, 27, 28] },
     a2engine::HookDef { id: "display.native", run_unknown: false, rows: &[], syms: &[12, 13, 14, 15, 16, 17, 18, 19, 20, 21] },
     a2engine::HookDef { id: "display.keepclip", run_unknown: false, rows: &[], syms: &[22, 23] },
+    a2engine::HookDef { id: "display.crash", run_unknown: false, rows: &[], syms: &[34, 35] },
 ];
 
 pub const BUILDS: &[a2engine::Build] = &[
@@ -106,7 +112,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 34,
+        n_resolved: 36,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x626bf0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x51, 0x14, 0x53, 0x56, 0x57, 0x8b, 0x0a, 0x3b, 0xca], mask: &[], section: "", count: 0, value: 0 }, // find_display_mode
@@ -143,16 +149,18 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // mode_width
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // mode_height
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // mode_bpp
+            a2engine::Entry { present: true, addr: 0x64faf0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68], mask: &[], section: "", count: 0, value: 0 }, // dump_from
+            a2engine::Entry { present: true, addr: 0x651f65, end: 0x0, target: 0x22, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // site_dump_from
         ],
         blocked: &[
         ],
     },
 ];
 
-static HOOK_STATE: [core::sync::atomic::AtomicU64; 4] = [const { core::sync::atomic::AtomicU64::new(0) }; 4];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 34] = [const { core::sync::atomic::AtomicU8::new(0) }; 34];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 34] = [const { core::sync::atomic::AtomicUsize::new(0) }; 34];
-static NOTES: [a2engine::Note; 4] = [const { a2engine::Note::new() }; 4];
+static HOOK_STATE: [core::sync::atomic::AtomicU64; 5] = [const { core::sync::atomic::AtomicU64::new(0) }; 5];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 36] = [const { core::sync::atomic::AtomicU8::new(0) }; 36];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 36] = [const { core::sync::atomic::AtomicUsize::new(0) }; 36];
+static NOTES: [a2engine::Note; 5] = [const { a2engine::Note::new() }; 5];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 
 pub static TABLE: a2engine::Table = a2engine::Table {

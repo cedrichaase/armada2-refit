@@ -4,7 +4,7 @@
 #![allow(dead_code)]
 use crate::rt::settings::*;
 
-pub static SETTINGS: [Setting; 6] = [
+pub static SETTINGS: [Setting; 7] = [
     Setting {
         size: ROW_SIZE,
         kind: KIND_BOOL,
@@ -107,6 +107,23 @@ pub static SETTINGS: [Setting; 6] = [
         help: c"1 holds a negative LOD bias at 0. auto: the default, off.".as_ptr(),
         moved_from: core::ptr::null(),
     },
+    Setting {
+        size: ROW_SIZE,
+        kind: KIND_BOOL,
+        apply: APPLY_RESTART,
+        scope: SCOPE_LOCAL,
+        tab: TAB_NONE,
+        flags: FLAG_NO_ROW,
+        file: c"Display8.ini".as_ptr(),
+        section: c"Crash".as_ptr(),
+        key: c"Catch".as_ptr(),
+        def: c"1".as_ptr(),
+        values: core::ptr::null(),
+        value_labels: core::ptr::null(),
+        label: c"Crash catcher".as_ptr(),
+        help: c"Write a record of the engine's exception into Display8.log and end the process, instead of the engine's call-stack walk that can hang.".as_ptr(),
+        moved_from: core::ptr::null(),
+    },
 ];
 
 pub const WINDOW_NATIVE: &Setting = &SETTINGS[0];
@@ -115,6 +132,7 @@ pub const WINDOW_RAISEINTRO: &Setting = &SETTINGS[2];
 pub const SAMPLERS_ANISOTROPY: &Setting = &SETTINGS[3];
 pub const SAMPLERS_LODBIAS: &Setting = &SETTINGS[4];
 pub const SAMPLERS_CLAMP: &Setting = &SETTINGS[5];
+pub const CRASH_CATCH: &Setting = &SETTINGS[6];
 
 /// The table, for the UI's settings hub (`count` may be NULL).
 #[unsafe(no_mangle)]

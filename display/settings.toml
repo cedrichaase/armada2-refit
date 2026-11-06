@@ -92,3 +92,16 @@ tab = "none"
 label = "Clamp negative LOD bias"
 help = "1 holds a negative LOD bias at 0. auto: the default, off."
 flags = ["no_row", "advanced"]
+
+[[row]]
+name = "crash_catch"
+section = "Crash"
+key = "Catch"
+kind = "bool"
+default = "1"
+apply = "restart"
+scope = "local"
+tab = "none"
+label = "Crash catcher"
+help = "Write a record of the engine's exception into Display8.log and end the process, instead of the engine's call-stack walk that can hang."
+flags = ["no_row"]

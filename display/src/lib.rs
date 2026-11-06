@@ -21,6 +21,7 @@ pub mod shaders;
 pub mod api;
 pub mod bail;
 pub mod claims;
+pub mod crash;
 pub mod com;
 pub mod d3d8;
 pub mod detail;
@@ -293,6 +294,7 @@ fn startup() {
     passthrough::configure(&ini);
     detail::configure(&ini);
     window::configure(&ini);
+    crash::configure(&ini);
     if config().trace {
         trace::start();
         user32::install();
