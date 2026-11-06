@@ -479,6 +479,21 @@ def s_bar(c, m):
         raise StepFailed(str(e))
 
 
+@step(r'^(?:put|make) the window ' + Q.format('title') + r' (?:to )?full ?screen$')
+def s_window_fullscreen(c, m):
+    """`put the window "TITLE" full screen`: the session's sway makes the X11 window of
+    that title full screen, as the desktop does for a game's window that covers the
+    screen. Sway puts a window the game makes later (Display8's `BenchWindow` popup)
+    behind the full-screen one, where nothing drawn on it shows and Xwayland holds its
+    presents back to a few a second; Hyprland, the user's desktop, need not."""
+    title = m.group('title')
+    pattern = '^' + re.escape(title) + '$'
+    out = c.sess.swaymsg(f'[title="{pattern}"] fullscreen enable')
+    if '"success": true' not in out:
+        raise StepFailed(f'sway could not make "{title}" full screen: {out.strip() or "no answer"}')
+    return f'"{title}" full screen'
+
+
 @step(r'^press (?:the )?(?P<key>[\w+-]+)(?: key)?(?: (?P<n>\d+) times)?$')
 def s_press(c, m):
     for _ in range(int(m.group('n') or 1)):
