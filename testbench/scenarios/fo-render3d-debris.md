@@ -18,7 +18,7 @@ own line, `effects: debris: <odf> broke into N chunks`.
 
 The kill is the AI's (`_fo-render3d-battle`): the Klingon AI's fleet reaches the base
 within minutes and ships die on both sides. The wait is for the log line, up to ten
-minutes of the game's time at its top speed, and the screenshots follow it.
+minutes of the game's time at its top speed, and the screenshots follow it. The base falls and the score screen is up by the end, which the menus' Quit cannot leave, so the game is stopped.
 
 1. Include "_fo-render3d-skirmish".
 2. Expect "Render3D.log" contains "effects: debris: Fragment hooked at its entry, ours only while the companion module calls it".
@@ -33,6 +33,6 @@ minutes of the game's time at its top speed, and the screenshots follow it.
 11. Take a screenshot called "debris later".
 12. Expect "Display8.log" not contain "VUID".
 13. Expect "Display8.log" not contain "device removed".
-14. Quit the game.
+14. Stop the game.
 15. Expect the game to have exited.
 16. Expect no crash.

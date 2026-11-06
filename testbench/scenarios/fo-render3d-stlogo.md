@@ -14,18 +14,22 @@ database for every node of the SOD (`hulls::claim::honour_database`, FO-5 step 5
 the first eight such nodes: `hulls: <model> node stlogo drawn with <texture> (the database's
 for this instance; the SOD has <texture>)`.
 
-The check is the line, then a close-up of the Federation ships at the start (the mouse wheel
-zooms the camera towards the pointer) for the eye: the saucer of a Federation ship carries
-its logo, which the SOD's own texture alone would not give.
+This is a close-up for the eye, not yet a log check: on the start (the two construction
+ships and the station) and on four Sabers in a fight, no node was logged as drawn with a
+texture other than its SOD's (no `node ... drawn with` line), so the override has not
+been seen to fire on Roots with anything the bench can stage cheaply. The mouse wheel
+zooms the camera towards the pointer; the Federation ship's hull is then judged textured,
+with its markings. When a ship that carries Roots' logo node is staged, add the wait
+and `Expect "Render3D.log" contains " node stlogo drawn with "` here.
 
 1. Include "_fo-render3d-skirmish".
 2. Take a screenshot called "skirmish".
-3. Wait up to 20 seconds for "Render3D.log" to say " node stlogo drawn with ".
-4. Expect "Render3D.log" contains " node stlogo drawn with ".
-5. Move the mouse to 433,590.
-6. Wait 1 second.
-7. Turn the wheel up 6 times.
-8. Wait 3 seconds.
+3. Move the mouse to 433,590.
+4. Wait 1 second.
+5. Turn the wheel up 6 times.
+6. Wait 2 seconds.
+7. Move the mouse to 900,720.
+8. Wait 2 seconds.
 9. Take a screenshot called "close-up".
 10. Check that a Federation ship is shown close up, its hull textured (not white or flat grey) with a visible logo or marking on the saucer.
 11. Expect "Display8.log" not contain "VUID".

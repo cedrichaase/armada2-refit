@@ -11,14 +11,14 @@ Run with `a2test --game fo-roots` and `--install .` (`fo-display8` has the setup
 `Data/`. `bench-mode.sh` sets `Backend=vulkan` and, on Vulkan, `Validate=1`: the game
 draws on the GPU with the validation layer, so a bad call is a VUID in Display8's log
 and not a hang. FO-5 (`PLAN-FLEETOPS.md`, "FO-5: render3d on Roots, the design") keeps
-render3d's frame and steps on Roots and changes two places:
+render3d's frame and steps on Roots and changes two places.
 
-- the object step calls through the loop's own draw site (0x598297, which FleetOpsHook
-  has redirected: `frame.obj_draw`, chained), so each object goes through Roots'
-  per-object draw and its wrappers;
-- hulls are claimed at the instance's database draw (0x4d5a11, `hulls.instance_draw`,
-  the profile's `hl_claim_instance` = 1), not at the object, so what FleetOpsHook adds to
-  a ship (range rings, overlay models, node and texture swaps) keeps running.
+The object step calls through the loop's own draw site (0x598297, which FleetOpsHook
+has redirected: `frame.obj_draw`, chained), so each object goes through Roots' per-object
+draw and its wrappers. And hulls are claimed at the instance's database draw (0x4d5a11,
+`hulls.instance_draw`, the profile's `hl_claim_instance` = 1), not at the object, so what
+FleetOpsHook adds to a ship (range rings, overlay models, node and texture swaps) keeps
+running.
 
 The checks are the log lines that say both are in, which the profile's identity lines
 precede (the executable's file CRCs and the companion module's `.text` CRC, which every

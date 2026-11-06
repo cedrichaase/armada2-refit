@@ -17,22 +17,23 @@ fails there and not as a Borg game three minutes on.
 2. Wait 1 second.
 3. Click "Instant Action".
 4. Wait up to 30 seconds for "LAUNCH".
-5. Move the mouse to 270,114.
-6. Wait 1 second.
-7. Click at 278,114.
-8. Wait 2 seconds.
-9. Move the mouse to 278,177.
-10. Wait 1 second.
-11. Click at 278,177.
-12. Wait 2 seconds.
-13. Move the mouse to 270,144.
-14. Wait 1 second.
-15. Click at 278,144.
-16. Wait 2 seconds.
-17. Move the mouse to 278,228.
-18. Wait 1 second.
-19. Click at 278,228.
-20. Wait 2 seconds.
-21. Take a screenshot called "instant action setup".
-22. Expect "Federation" is visible.
-23. Expect "Klingon" is visible.
+5. Wait 3 seconds.
+6. Move the mouse to 270,114.
+7. Wait 1 second.
+8. Click at 278,114.
+9. Wait 2 seconds.
+10. Move the mouse to 278,177.
+11. Wait 1 second.
+12. Click at 278,177.
+13. Wait 2 seconds.
+14. Move the mouse to 270,144.
+15. Wait 1 second.
+16. Click at 278,144.
+17. Wait 2 seconds.
+18. Move the mouse to 278,228.
+19. Wait 1 second.
+20. Click at 278,228.
+21. Wait 2 seconds.
+22. Take a screenshot called "instant action setup".
+23. Expect "Federation" is visible.
+24. Expect "Klingon" is visible.

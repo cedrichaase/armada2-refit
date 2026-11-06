@@ -15,10 +15,9 @@ Tractor Beam button of the selected construction ships puts a ring of its 400 ra
 each of them, and the ring is in the picture.
 
 The start camera shows the player's two construction ships in the lower left of the map
-and the station beyond them, above the button bar (1280x960); a box over the map selects
-the ships and not the station. The button bar then ends in Tractor Beam, at 810,788. The
-tooltip beside the pointer says "400 Range", which OCR reads; whether the ring is round
-the ships is judged.
+and the station beyond them; a box over the map selects the three (the bar then has the
+station's buttons too, and ends in Tractor Beam, at 1162,788). The tooltip beside the
+pointer says "400 Range", which OCR reads; whether the ring is round the ships is judged.
 
 1. Include "_fo-render3d-skirmish".
 2. Expect "Render3D.log" contains "(claimed at the instance draw)".
@@ -27,9 +26,9 @@ the ships is judged.
 5. Drag from 30,120 to 1250,640.
 6. Wait 2 seconds.
 7. Take a screenshot called "selected".
-8. Move the mouse to 810,788.
+8. Move the mouse to 1162,788.
 9. Wait 1 second.
-10. Move the mouse to 812,790.
+10. Move the mouse to 1164,790.
 11. Wait 2 seconds.
 12. Take a screenshot called "tractor ring".
 13. Expect "Tractor Beam" is visible.
