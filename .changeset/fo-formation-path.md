@@ -11,3 +11,7 @@ status: Installed, not yet seen in game
 
 ### Changed
 - testbench: `engine-syms` expects the overlays' 110 symbols (was 107).
+- testbench: `engine-syms` expects the effects module's 127/128 symbols (was 126/126, stale since the shield-hit entries).
+
+### Added
+- testbench: `fo-render3d-paths`, a one-ship and a group move on Roots, the log's `(engine)` line, and the path gone on arrival.

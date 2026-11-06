@@ -573,6 +573,14 @@ moves of their own); on stock with QOL, `render3d-move-paths` and `engine-syms`
 | 56 | The switch is a **content-set key**, not a profile value or a player's `[Overlays]` key | it is per build, as `ProfileBy` (decision 6) and the rest of the set (decision 7b); a mod with QOL of its own sets `sketched` | the user wanting to choose it in the Refit screen (then an `[Overlays]` key with the set's value as default) |
 | 57 | The leader is looked up with **`Entity::Get`** of its handle, not the engine's craft-unless-destroyed lookup FleetOpsHook wraps in `Follow` | it is the module's one lookup and reads nothing of FleetOpsHook's; a leader that is gone draws nothing, as the engine then stops the follower | a follower seen without a path while its leader still flies (a leader FleetOpsHook's lookup resolves another way) |
 
+**Bench result (2026-11-06, Roots, Vulkan with validation, 1280x960).** A one-ship move and a
+two-ship group move each logged `overlays: move paths: N selected ship(s) on a path, ... (engine)`
+(N = 1, then 2) and drew a fine dotted line from the leader to the point and one from the follower to
+its place beside it; N went to 0 on arrival with no line left, no stray line to the origin, no `VUID`.
+Not staged: three ships (a drag selects only one class) and Ctrl (the bench cannot hold a key), so a
+follower's real end position against its dot is unchecked. Stock: `render3d-move-paths` passes and the
+overlays resolve 110/110. `fo-render3d-paths` is the scenario.
+
 The Roots profile tools (`tools/engine/fo-scan.py`, PR #61) took these defaults:
 
 | # | Default | Why | What would change it |
