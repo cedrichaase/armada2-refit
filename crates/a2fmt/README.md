@@ -75,7 +75,7 @@ established from the engine-side reader's behaviour and checked against the real
 (1799 files, every one decoding to its stated size and found again through the hash);
 the code is our own, from the format alone.
 
-- **Header**, seven little-endian `u32`: magic `FPQ\0`, version (2; below 2 is refused),
+- **Header**, seven little-endian `u32`: magic `FPQ\0`, version (exactly 2; any other is refused),
   folder count, file count, hash-table size (a power of two), data-blob size,
   names-blob size.
 - **Then, in this order and exactly to the file's last byte**: the hash table (12 bytes a
@@ -83,12 +83,16 @@ the code is our own, from the format alone.
   real file), the folders (12 bytes: parent or `0xFFFFFFFF`, name offset, name length),
   the files (25 bytes: data offset, unpacked size, packed size, name offset, name length,
   method `u8`, folder index), the names blob, the data blob. Names are single-byte text,
-  not terminated; Roots has two folders, `odf` and its child `system`, and every file is
+  not terminated, 1 to 255 bytes each, and one path component (no `/`, `\\` or `:`, not
+  `.` or `..`); the names must not overlap, so their lengths add up to at most the
+  blob's size (a hostile table cannot make a small file decode to a large pile of
+  strings). A folder chain deeper than 64 is taken for a loop and refused. Roots has two folders, `odf` and its child `system`, and every file is
   in `system`.
 - **Methods**: 0 is stored, 1 is LZO1X. 82 files are stored, 1717 compressed. Compressed
   streams end with their input (the end marker is accepted but not needed).
 - **Lookup** is the MPQ string hash of the file's own name (no folders; upper-cased by
-  ASCII, so lookups ignore case): a 0x500-word table from seed `0x100001`, three
+  ASCII, so lookups ignore case; taken over the name's single bytes, so a name with a
+  byte above 0x7F is found by its Latin-1 spelling): a 0x500-word table from seed `0x100001`, three
   hashes of kinds 0, 0x100 and 0x200 (start slot masked by the table size, `hash_a`,
   `hash_b`), then linear probing to the first empty slot. A path's folders are checked
   against the file's own afterwards.
@@ -98,7 +102,8 @@ the code is our own, from the format alone.
   (`src/lzo.rs` has the table). Every read and write is checked: input overrun,
   output past the stated size, distance before the start and a short output are
   errors, and a size above 64 MiB or beyond what the input could expand to is refused
-  before any allocation. The unpacked size is the file table's, so the decoder needs it.
+  before any allocation (an allocation that fails is an error, not an abort). The unpacked
+  size is the file table's, so the decoder needs it.
 - **Real-archive surprises**: the first entry is itself a complete `.fpq` (1521 files);
   an empty slot is zeros, not `0xFFFFFFFF`; the folder index is the file entry's last
   field.
