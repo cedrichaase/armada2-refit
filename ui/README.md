@@ -514,9 +514,12 @@ hook the same sites as the UI does.
 **On Fleet Operations: Roots** (`./install --game fo-roots`, code only; PLAN-FLEETOPS.md,
 "FO-6") `UI.asi` goes into `Data/` beside the executable, and the shipped `UI.ini` has the
 game's own defaults put over it first (`ui/defaults/fo-roots.ini`, applied by
-`ui/apply-defaults.py`, which fails on a key `UI.ini` lacks): the loading screen on, and the
-HUD's panels, the menus, the Credits, the menu scene, the cursor and the movies off, each
-until its hook is verified on Roots. The menu plates are not installed there and the
+`ui/apply-defaults.py`, which fails on a key `UI.ini` lacks): the loading screen on, the HUD's
+verified panels on (the resources, the top-right buttons, the pause box, the chat, the
+selection overlay, the frame-rate panel, the order ring, height posts and footprint), and
+the other panels, the menus, the Credits, the menu scene, the cursor and the movies off, each
+until its hook is verified on Roots. The UI plays no button sound there (`panels_sound_ours`
+= 0: every audio class is FleetOpsHook's FMOD). The menu plates are not installed there and the
 game's `Menus/` is never touched. The UI reads the `fleetops` content set (Roots'
 race names, `content/sets/fleetops/ui.ini`). The bar's count (21 inline on stock, 64
 behind a pointer on Roots) and the info panel (found by name in the render lists) are

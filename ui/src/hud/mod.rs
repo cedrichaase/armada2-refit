@@ -62,7 +62,7 @@ pub fn install() -> bool {
         unsafe { STOOD_DOWN = 2 };
         return false;
     }
-    if !hud::functions_stock() || !api::sound::functions_stock() || !api::msvc::available() {
+    if !hud::functions_stock() || !api::msvc::available() {
         crate::log!("hud: an engine function is not stock, the HUD stays stock");
         unsafe { STOOD_DOWN = 3 };
         return false;

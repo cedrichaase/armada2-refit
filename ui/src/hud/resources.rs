@@ -52,13 +52,15 @@ fn names(now: f64, shown: &[(u32, usize)]) -> &'static [(usize, String, String)]
             // "Crew: 1200/3250": the name is the first line up to its colon.
             let first = tip.lines().next().unwrap_or("");
             let first = String::from(first.split(':').next().unwrap_or("").trim());
-            let name = if first.is_empty() || first.len() > 24 { String::from(crate::content::get().resource(r as usize)) } else { first };
+            // Roots' components answer a tooltip whose first line is not a word (control
+            // characters, which draw as "?"): the set's name then.
+            let name = if first.is_empty() || first.len() > 24 || first.chars().any(|c| c.is_control()) || !first.chars().any(|c| c.is_alphabetic()) { String::from(crate::content::get().resource(r as usize)) } else { first };
             n.names.push((c, name, tip));
         }
         if !same {
             let mut line = String::new();
             for (i, &(r, _)) in shown.iter().enumerate() {
-                line.push_str(&crate::sfmt!(" {}={}({})", crate::content::get().resource(r as usize), topbar::amount_text(r), n.names[i].1));
+                line.push_str(&crate::sfmt!(" {}={}({}) tip {:?}", crate::content::get().resource(r as usize), topbar::amount_text(r), n.names[i].1, n.names[i].2));
             }
             crate::log!("resources:{}", line);
         }

@@ -11,7 +11,7 @@ menu host does not reach Roots' Options, so the Refit screen comes to Roots as a
 a running mission, opened with Ctrl+F12 (`[UI] RefitKey=123` in Roots' defaults;
 `PLAN-FLEETOPS.md`, FO-6, decision 86). Its rows start from Roots' own `UI.ini` (the
 install puts `ui/defaults/fo-roots.ini` over it), so the Interface page shows the HUD's
-panels off and the loading screen on (decision 90).
+panels as step 4 left them (the verified ones on, Minimap, Info and Bar off) and the loading screen on (decision 90).
 
 The row changed is `Loading screen` (`[Loading] Enable`, a RESTART row): a click on it
 writes `[UI.Loading] Enable=0` into `RefitPlayer.ini` through the settings hub, the screen
@@ -30,7 +30,7 @@ keeps `RefitPlayer.ini` across the two launches (`testbench/operating/refit-scre
 9. Click "Interface".
 10. Wait 2 seconds.
 11. Take a screenshot called "interface".
-12. Check that the settings window shows its Interface page with Refit HUD, Minimap and the other HUD rows switched off and Loading screen switched on.
+12. Check that the settings window shows its Interface page with Refit HUD and Loading screen switched on and the Minimap, Info and Bar rows switched off.
 13. Click "Loading screen".
 14. Wait up to 10 seconds for "UI.log" to say "refit: [UI.Loading] Enable 1 -> 0 (restart)".
 15. Wait 2 seconds.

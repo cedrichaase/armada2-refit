@@ -192,7 +192,7 @@ pub mod sprite {
 
 pub mod topbar {
     pub use crate::engine::topbar::{
-        amount_text, button, button_panel, colour, functions_stock, resource_panel, shown, tooltip, Which,
+        amount_text, button, button_panel, colour, functions_stock, measure, resource_panel, shown, tooltip, Which,
     };
 }
 
