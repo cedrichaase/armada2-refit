@@ -33,6 +33,8 @@ pub enum Error {
     Overrun,
     /// A match reaches back before the start of the output.
     Distance,
+    /// The output buffer could not be allocated.
+    Alloc,
     /// The stream ended (or the input ran out) before the output was full.
     Short,
 }
@@ -50,7 +52,8 @@ impl Reader<'_> {
     }
 
     /// The extension of a length: each zero byte adds 255, the first other byte ends it.
-    fn extension(&mut self) -> Result<usize, Error> {
+    /// A run past `cap` (the output size) can only be a lie, and ends here.
+    fn extension(&mut self, cap: usize) -> Result<usize, Error> {
         let mut n = 0usize;
         loop {
             let b = self.byte()?;
@@ -58,6 +61,9 @@ impl Reader<'_> {
                 return Ok(n + b as usize);
             }
             n += 255;
+            if n > cap {
+                return Err(Error::Overrun);
+            }
         }
     }
 }
@@ -92,10 +98,11 @@ fn copy_match(out: &mut Vec<u8>, dist: usize, len: usize, size: usize) -> Result
 pub fn decompress(src: &[u8], size: usize) -> Result<Vec<u8>, Error> {
     // The most an instruction can expand is bounded (about 255 output bytes per input
     // byte), so a size far beyond that is a lie that would only cost an allocation.
-    if size > MAX_OUTPUT || size / 1024 > src.len() {
+    if size > MAX_OUTPUT || size > src.len().saturating_mul(255).saturating_add(512) {
         return Err(Error::Short);
     }
-    let mut out: Vec<u8> = Vec::with_capacity(size);
+    let mut out: Vec<u8> = Vec::new();
+    out.try_reserve_exact(size).map_err(|_| Error::Alloc)?;
     let mut r = Reader { src, pos: 0 };
     // How many literals the last instruction left to copy: 0 to 3 after a match, 4 after
     // a run of literals.
@@ -121,7 +128,7 @@ pub fn decompress(src: &[u8], size: usize) -> Result<Vec<u8>, Error> {
         } else if b >= 32 {
             let mut l = b & 31;
             if l == 0 {
-                l = 31 + r.extension()?;
+                l = 31 + r.extension(size)?;
             }
             let lo = r.byte()? as usize;
             let hi = r.byte()? as usize;
@@ -132,7 +139,7 @@ pub fn decompress(src: &[u8], size: usize) -> Result<Vec<u8>, Error> {
         } else if b >= 16 {
             let mut l = b & 7;
             if l == 0 {
-                l = 7 + r.extension()?;
+                l = 7 + r.extension(size)?;
             }
             let lo = r.byte()? as usize;
             let hi = r.byte()? as usize;
@@ -145,7 +152,7 @@ pub fn decompress(src: &[u8], size: usize) -> Result<Vec<u8>, Error> {
             dist = far + 16384;
             trailing = v & 3;
         } else if state == 0 {
-            let n = if b == 0 { 15 + r.extension()? } else { b } + 3;
+            let n = if b == 0 { 15 + r.extension(size)? } else { b } + 3;
             literals(&mut r, &mut out, n, size)?;
             state = 4;
             continue;

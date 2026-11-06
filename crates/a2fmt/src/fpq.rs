@@ -33,6 +33,8 @@ pub enum Error {
     /// A table entry that points outside its blob, a hash entry to no file, or a
     /// folder chain that loops.
     Table,
+    /// A buffer the reader needed could not be allocated.
+    Alloc,
     /// A file stored by a method other than 0 and 1.
     Method(u8),
     /// The compressed data of a file did not decode to its size.
@@ -63,6 +65,8 @@ const MAGIC: u32 = u32::from_le_bytes(*b"FPQ\0");
 const HEADER: usize = 28;
 /// A deeper chain of folders is taken for a loop.
 const DEPTH: usize = 64;
+/// The longest name a folder or file may have.
+const NAME_MAX: u32 = 255;
 
 /// The archive's three string hashes of a name: the start slot (`Slot`), and the two
 /// checks stored in a slot (`CheckA`, `CheckB`).
@@ -74,34 +78,51 @@ pub enum Hash {
 }
 
 /// The 0x500 words the hash draws on, from the generator seeded with 0x100001.
-fn crypt_table() -> [u32; 0x500] {
+const fn crypt_table() -> [u32; 0x500] {
     let mut t = [0u32; 0x500];
     let mut seed: u32 = 0x0010_0001;
-    for i in 0..256 {
+    let mut i = 0;
+    while i < 256 {
         let mut j = i;
-        for _ in 0..5 {
+        let mut k = 0;
+        while k < 5 {
             seed = (seed * 125 + 3) % 0x2A_AAAB;
             let hi = (seed & 0xFFFF) << 16;
             seed = (seed * 125 + 3) % 0x2A_AAAB;
             t[j] = hi | (seed & 0xFFFF);
             j += 256;
+            k += 1;
         }
+        i += 1;
     }
     t
 }
 
-/// The string hash of a name, upper-cased by ASCII. The slot is this hash of kind
-/// [`Hash::Slot`] masked by the table size.
-pub fn hash(name: &str, kind: Hash) -> u32 {
-    hash_with(&crypt_table(), name, kind)
-}
+static CRYPT: [u32; 0x500] = crypt_table();
 
-fn hash_with(t: &[u32; 0x500], name: &str, kind: Hash) -> u32 {
+/// The string hash of a name's bytes, upper-cased by ASCII. The slot is this hash of
+/// kind [`Hash::Slot`] masked by the table size. The archive's names are single-byte
+/// text, and the hash is taken over those bytes as stored.
+pub fn hash_bytes(name: &[u8], kind: Hash) -> u32 {
     let mut s1: u32 = 0x7FED_7FED;
     let mut s2: u32 = 0xEEEE_EEEE;
-    for c in name.bytes() {
+    for &c in name {
         let c = c.to_ascii_uppercase() as u32;
-        s1 = t[kind as usize + c as usize] ^ s1.wrapping_add(s2);
+        s1 = CRYPT[kind as usize + c as usize] ^ s1.wrapping_add(s2);
+        s2 = c.wrapping_add(s1).wrapping_add(s2).wrapping_add(s2 << 5).wrapping_add(3);
+    }
+    s1
+}
+
+/// [`hash_bytes`] of a name read as Latin-1 (a character is the byte of its value, as
+/// the names are decoded); a character above U+00FF is not a byte of any name and is
+/// truncated, so [`Archive::find`] refuses such a name before it hashes.
+pub fn hash(name: &str, kind: Hash) -> u32 {
+    let mut s1: u32 = 0x7FED_7FED;
+    let mut s2: u32 = 0xEEEE_EEEE;
+    for ch in name.chars() {
+        let c = (ch as u32 as u8).to_ascii_uppercase() as u32;
+        s1 = CRYPT[kind as usize + c as usize] ^ s1.wrapping_add(s2);
         s2 = c.wrapping_add(s1).wrapping_add(s2).wrapping_add(s2 << 5).wrapping_add(3);
     }
     s1
@@ -115,7 +136,6 @@ fn u32_at(d: &[u8], at: usize) -> u32 {
 pub struct Archive {
     data: Vec<u8>,
     data_start: usize,
-    crypt: [u32; 0x500],
     /// (hash_a, hash_b, file index); all zero is an empty slot.
     slots: Vec<(u32, u32, u32)>,
     folders: Vec<Folder>,
@@ -127,7 +147,7 @@ impl Archive {
     /// checked against the blob it points into, so [`Archive::read`] cannot go out of
     /// range afterwards.
     pub fn parse(data: Vec<u8>) -> Result<Archive, Error> {
-        if data.len() < HEADER || u32_at(&data, 0) != MAGIC || u32_at(&data, 4) < 2 {
+        if data.len() < HEADER || u32_at(&data, 0) != MAGIC || u32_at(&data, 4) != 2 {
             return Err(Error::Header);
         }
         let n_folders = u32_at(&data, 8) as u64;
@@ -152,14 +172,29 @@ impl Archive {
         let names = &data[names_at..data_start];
         let blob = data_size as usize;
 
-        let name_of = |off: u32, len: u32| -> Result<String, Error> {
+        // The names may not overlap or repeat: together they fit the names blob, so what
+        // they decode to is bounded by the archive's own size.
+        let mut name_budget = names.len();
+        let mut name_of = |off: u32, len: u32| -> Result<String, Error> {
             let end = (off as u64) + len as u64;
-            let b = names.get(off as usize..).filter(|_| end <= names.len() as u64).ok_or(Error::Table)?;
+            if len == 0 || len > NAME_MAX || end > names.len() as u64 || len as usize > name_budget {
+                return Err(Error::Table);
+            }
+            name_budget -= len as usize;
+            let b = &names[off as usize..end as usize];
+            // A name is one path component: no separators, no drive, not `.` or `..`.
+            if b == b"." || b == b".." || b.iter().any(|&c| c == b'/' || c == b'\\' || c == b':') {
+                return Err(Error::Table);
+            }
+            let mut s = String::new();
+            s.try_reserve(b.len() * 2).map_err(|_| Error::Alloc)?;
             // Latin-1: a byte is the character of its value.
-            Ok(b[..len as usize].iter().map(|&c| c as char).collect())
+            s.extend(b.iter().map(|&c| c as char));
+            Ok(s)
         };
 
-        let mut folders = Vec::with_capacity(n_folders);
+        let mut folders = Vec::new();
+        folders.try_reserve_exact(n_folders).map_err(|_| Error::Alloc)?;
         for i in 0..n_folders {
             let at = folder_at + i * 12;
             let parent = u32_at(&data, at);
@@ -181,7 +216,8 @@ impl Archive {
             }
         }
 
-        let mut files = Vec::with_capacity(n_files);
+        let mut files = Vec::new();
+        files.try_reserve_exact(n_files).map_err(|_| Error::Alloc)?;
         for i in 0..n_files {
             let at = file_at + i * 25;
             let offset = u32_at(&data, at);
@@ -206,7 +242,8 @@ impl Archive {
             });
         }
 
-        let mut slots = Vec::with_capacity(hash_size);
+        let mut slots = Vec::new();
+        slots.try_reserve_exact(hash_size).map_err(|_| Error::Alloc)?;
         for i in 0..hash_size {
             let at = hash_at + i * 12;
             let s = (u32_at(&data, at), u32_at(&data, at + 4), u32_at(&data, at + 8));
@@ -215,7 +252,7 @@ impl Archive {
             }
             slots.push(s);
         }
-        Ok(Archive { data, data_start, crypt: crypt_table(), slots, folders, files })
+        Ok(Archive { data, data_start, slots, folders, files })
     }
 
     /// The folders, in the archive's order.
@@ -270,10 +307,14 @@ impl Archive {
     pub fn find(&self, path: &str) -> Option<usize> {
         let parts = crate::vfs::components(path)?;
         let (name, dirs) = parts.split_last()?;
-        let a = hash_with(&self.crypt, name, Hash::CheckA);
-        let b = hash_with(&self.crypt, name, Hash::CheckB);
+        // Names are single-byte text: a character beyond Latin-1 is in no name.
+        if name.chars().any(|c| c as u32 > 0xFF) {
+            return None;
+        }
+        let a = hash(name, Hash::CheckA);
+        let b = hash(name, Hash::CheckB);
         let mask = self.slots.len() - 1;
-        let mut i = hash_with(&self.crypt, name, Hash::Slot) as usize & mask;
+        let mut i = hash(name, Hash::Slot) as usize & mask;
         for _ in 0..self.slots.len() {
             let (sa, sb, idx) = self.slots[i];
             if sa == 0 && sb == 0 {
@@ -306,7 +347,12 @@ impl Archive {
         // parse() checked offset + packed against the data blob.
         let packed = &self.data[start..start + e.packed as usize];
         match e.method {
-            0 if e.packed == e.unpacked => Ok(packed.to_vec()),
+            0 if e.packed == e.unpacked => {
+                let mut v = Vec::new();
+                v.try_reserve_exact(packed.len()).map_err(|_| Error::Alloc)?;
+                v.extend_from_slice(packed);
+                Ok(v)
+            }
             0 => Err(Error::Data(lzo::Error::Short)),
             1 => lzo::decompress(packed, e.unpacked as usize).map_err(Error::Data),
             m => Err(Error::Method(m)),

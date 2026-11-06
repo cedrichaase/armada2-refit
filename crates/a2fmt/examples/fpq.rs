@@ -9,7 +9,7 @@
 //! asset and belongs in `$A2_DATA` or a scratch directory (hard rule 8).
 
 use std::io::Write;
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 use std::process::exit;
 
 use a2fmt::fpq::Archive;
@@ -21,6 +21,21 @@ fn die(msg: &str) -> ! {
 
 fn in_checkout(dir: &Path) -> bool {
     dir.ancestors().any(|a| a.join(".git").exists())
+}
+
+/// `out` plus the archive path's components, each of which must be a plain name: an
+/// absolute path, a `..` or a drive in an archive's name never leaves `out`.
+fn safe_join(out: &Path, path: &str) -> Option<PathBuf> {
+    let mut to = out.to_path_buf();
+    for c in path.split('/') {
+        let mut it = Path::new(c).components();
+        match (it.next(), it.next()) {
+            (Some(Component::Normal(n)), None) => to.push(n),
+            _ => return None,
+        }
+    }
+    assert!(to.starts_with(out));
+    Some(to)
 }
 
 fn main() {
@@ -61,7 +76,7 @@ fn main() {
             for i in &wanted {
                 let path = arc.path(*i).unwrap_or_default();
                 let bytes = arc.read(*i).unwrap_or_else(|e| die(&format!("{path}: {e:?}")));
-                let to = out.join(&path);
+                let to = safe_join(&out, &path).unwrap_or_else(|| die(&format!("{path}: not a safe path")));
                 std::fs::create_dir_all(to.parent().unwrap()).unwrap();
                 std::fs::write(&to, bytes).unwrap_or_else(|e| die(&format!("{}: {e}", to.display())));
             }

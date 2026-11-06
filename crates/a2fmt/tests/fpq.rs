@@ -20,7 +20,7 @@ fn lits(data: &[u8]) -> Vec<u8> {
 
 /// The bytes of a length extension: zeros for each 255, then the rest (non-zero).
 fn ext(mut n: usize) -> Vec<u8> {
-    assert!(n < 1 << 20);
+    assert!(n > 0 && n < 1 << 20);
     let mut v = vec![];
     while n > 255 {
         v.push(0);
@@ -32,7 +32,7 @@ fn ext(mut n: usize) -> Vec<u8> {
 
 /// A long M3 match (`dist` back, `len` bytes, no trailing literals).
 fn m3(dist: usize, len: usize) -> Vec<u8> {
-    assert!(len >= 33 && dist >= 1);
+    assert!(len >= 34 && dist >= 1);
     let mut v = vec![32];
     v.extend(ext(len - 2 - 31));
     let w = ((dist - 1) << 2) as u16;
@@ -112,7 +112,7 @@ fn lzo_refuses_bad_streams() {
     assert_eq!(lzo::decompress(&[18, b'a', 168, 0], 7), Err(lzo::Error::Distance));
     // Literals past the input; a length extension past the input.
     assert_eq!(lzo::decompress(&[30, b'a'], 13), Err(lzo::Error::Input));
-    assert_eq!(lzo::decompress(&[18, b'a', 32, 0, 0], 100), Err(lzo::Error::Input));
+    assert_eq!(lzo::decompress(&[18, b'a', 32, 0, 0], 1000), Err(lzo::Error::Input));
     // A match that would pass the output size.
     assert_eq!(lzo::decompress(&[18, b'a', 160, 0], 3), Err(lzo::Error::Overrun));
     // A size no stream of this length could make.
@@ -170,6 +170,11 @@ fn put(v: &mut Vec<u8>, x: u32) {
     v.extend_from_slice(&x.to_le_bytes());
 }
 
+/// A name as the archive stores it: one byte a character.
+fn latin1(n: &str) -> Vec<u8> {
+    n.chars().map(|c| c as u32 as u8).collect()
+}
+
 /// Builds an archive with `hash_size` slots, folders `odf` (0) and `odf/system` (1).
 fn build(files: &[F], hash_size: u32) -> Vec<u8> {
     let mut names = Vec::new();
@@ -188,19 +193,20 @@ fn build(files: &[F], hash_size: u32) -> Vec<u8> {
         put(&mut table, f.unpacked.len() as u32);
         put(&mut table, packed.len() as u32);
         put(&mut table, names.len() as u32);
-        put(&mut table, f.name.len() as u32);
+        put(&mut table, latin1(f.name).len() as u32);
         table.push(f.packed.is_some() as u8);
         put(&mut table, f.folder.unwrap_or(u32::MAX));
-        names.extend_from_slice(f.name.as_bytes());
+        names.extend_from_slice(&latin1(f.name));
         blob.extend_from_slice(&packed);
     }
     let mut slots = vec![(0u32, 0u32, 0u32); hash_size as usize];
     for (i, f) in files.iter().enumerate() {
-        let mut j = fpq::hash(f.name, Hash::Slot) as usize & (hash_size as usize - 1);
+        let n = latin1(f.name);
+        let mut j = fpq::hash_bytes(&n, Hash::Slot) as usize & (hash_size as usize - 1);
         while slots[j] != (0, 0, 0) {
             j = (j + 1) & (hash_size as usize - 1);
         }
-        slots[j] = (fpq::hash(f.name, Hash::CheckA), fpq::hash(f.name, Hash::CheckB), i as u32);
+        slots[j] = (fpq::hash_bytes(&n, Hash::CheckA), fpq::hash_bytes(&n, Hash::CheckB), i as u32);
     }
     let mut out = Vec::new();
     out.extend_from_slice(b"FPQ\0");
@@ -360,6 +366,179 @@ fn archive_never_panics_on_flips() {
             let _ = a.find("long.odf");
         }
     }
+}
+
+// ---- hostile archives and streams ----
+
+fn file(name: &'static str) -> F {
+    F { folder: Some(1), name, unpacked: b"x".to_vec(), packed: None }
+}
+
+/// Where the file table starts in `build(.., hash_size)`.
+fn file_at(hash_size: usize) -> usize {
+    28 + hash_size * 12 + 2 * 12
+}
+
+#[test]
+fn overlapping_names_are_refused() {
+    // 2000 files all naming the same 255 bytes: 500 KB of strings from a small file.
+    let n = 2000usize;
+    let hash_size = 2048usize;
+    let names = vec![b'a'; 255];
+    let mut out = Vec::new();
+    out.extend_from_slice(b"FPQ\0");
+    for x in [2, 0, n as u32, hash_size as u32, 0, names.len() as u32] {
+        put(&mut out, x);
+    }
+    out.extend(vec![0u8; hash_size * 12]);
+    for _ in 0..n {
+        for x in [0, 0, 0, 0, 255] {
+            put(&mut out, x);
+        }
+        out.push(0);
+        put(&mut out, u32::MAX);
+    }
+    out.extend(names);
+    assert_eq!(Archive::parse(out).err(), Some(fpq::Error::Table));
+    // A name over 255 bytes is refused too.
+    let long: &'static str = Box::leak("n".repeat(256).into_boxed_str());
+    assert_eq!(Archive::parse(build(&[file(long)], 4)).err(), Some(fpq::Error::Table));
+}
+
+#[test]
+fn bad_names_are_refused() {
+    for bad in ["..", ".", "/abs", "a\\b", "c:x", ""] {
+        assert_eq!(Archive::parse(build(&[file(bad)], 4)).err(), Some(fpq::Error::Table), "{bad:?}");
+    }
+    assert!(Archive::parse(build(&[file("fine..odf")], 4)).is_ok());
+}
+
+#[test]
+fn a_name_with_a_high_byte_is_found_again() {
+    let a = Archive::parse(build(&[file("caf\u{e9}.odf"), file("plain.odf")], 4)).unwrap();
+    assert_eq!(a.entries()[0].name, "caf\u{e9}.odf");
+    assert_eq!(a.find("caf\u{e9}.odf"), Some(0));
+    assert_eq!(a.find("CAF\u{e9}.ODF"), Some(0));
+    assert_eq!(a.find("system/caf\u{e9}.odf"), Some(0));
+    assert_eq!(a.find("caf\u{20ac}.odf"), None);
+    assert_eq!(a.find("plain.odf"), Some(1));
+}
+
+#[test]
+fn version_must_be_two() {
+    for v in [0u8, 1, 3, 255] {
+        let mut t = sample();
+        t[4] = v;
+        assert_eq!(Archive::parse(t).err(), Some(fpq::Error::Header), "{v}");
+    }
+}
+
+#[test]
+fn slots_with_no_hash_but_an_index() {
+    let good = sample();
+    let empty = (0..16).find(|i| good[28 + i * 12..28 + i * 12 + 12].iter().all(|&b| b == 0)).unwrap();
+    let at = 28 + empty * 12;
+    // (0, 0, idx past the files) is an empty slot with junk in its index.
+    let mut t = good.clone();
+    t[at + 8..at + 12].copy_from_slice(&5u32.to_le_bytes());
+    let a = Archive::parse(t).unwrap();
+    assert_eq!(a.find("ship.odf"), Some(0));
+    assert_eq!(a.find("zzz.odf"), None);
+    // A slot with a hash and an index past the files is a bad table.
+    for (x, y) in [(1u32, 0u32), (0, 1), (7, 7)] {
+        let mut t = good.clone();
+        t[at..at + 4].copy_from_slice(&x.to_le_bytes());
+        t[at + 4..at + 8].copy_from_slice(&y.to_le_bytes());
+        t[at + 8..at + 12].copy_from_slice(&5u32.to_le_bytes());
+        assert_eq!(Archive::parse(t).err(), Some(fpq::Error::Table));
+    }
+}
+
+#[test]
+fn a_huge_hash_table_in_a_short_file_is_refused() {
+    let mut t = Vec::new();
+    t.extend_from_slice(b"FPQ\0");
+    for x in [2u32, 0, 0, 1 << 31, 0, 0] {
+        put(&mut t, x);
+    }
+    t.extend(vec![0u8; 64]);
+    assert_eq!(Archive::parse(t).err(), Some(fpq::Error::Size));
+}
+
+#[test]
+fn folder_depth_is_limited_to_64() {
+    // A chain of `d` folders, one byte of name each (names may not overlap).
+    let deep = |d: usize| {
+        let mut out = Vec::new();
+        out.extend_from_slice(b"FPQ\0");
+        for x in [2, d as u32, 0, 1, 0, d as u32] {
+            put(&mut out, x);
+        }
+        out.extend_from_slice(&[0u8; 12]);
+        for i in 0..d {
+            put(&mut out, if i == 0 { u32::MAX } else { i as u32 - 1 });
+            put(&mut out, i as u32);
+            put(&mut out, 1);
+        }
+        out.extend(vec![b'd'; d]);
+        out
+    };
+    let a = Archive::parse(deep(64)).unwrap();
+    assert_eq!(a.folder_names(63).len(), 64);
+    assert_eq!(Archive::parse(deep(65)).err(), Some(fpq::Error::Table));
+}
+
+#[test]
+fn a_size_no_stream_can_make_is_refused_before_allocating() {
+    // 64 MiB from a 3-byte stream, directly and through an archive's file table.
+    assert!(lzo::decompress(&[17, 0, 0], 64 << 20).is_err());
+    assert!(lzo::decompress(&[17, 0, 0], usize::MAX).is_err());
+    let mut t = build(
+        &[F { folder: Some(1), name: "big.odf", unpacked: b"x".to_vec(), packed: Some(lits(b"x")) }],
+        4,
+    );
+    let at = file_at(4);
+    t[at + 4..at + 8].copy_from_slice(&(64u32 << 20).to_le_bytes());
+    let a = Archive::parse(t).unwrap();
+    assert!(a.read(0).is_err());
+    assert_eq!(a.open("big.odf"), None);
+}
+
+#[test]
+fn lzo_edge_streams() {
+    // M4 with a zero distance first is the end marker: an empty output.
+    assert_eq!(lzo::decompress(&[17, 0, 0], 0).unwrap(), b"");
+    assert_eq!(lzo::decompress(&[16, 1, 0, 0], 0).unwrap(), b"");
+    assert_eq!(lzo::decompress(&[17, 0, 0], 1), Err(lzo::Error::Short));
+    // M1 right after a first run of 4 or more literals is the 3-byte, beyond-2048 kind:
+    // nothing is that far back yet.
+    assert_eq!(lzo::decompress(&[21, b'a', b'b', b'c', b'd', 0, 0], 7), Err(lzo::Error::Distance));
+    // Zero-extension bytes running to the end of the input, wherever one is read.
+    for head in [[18, b'a', 32], [18, b'a', 16], [18, b'a', 0]] {
+        let mut s = head.to_vec();
+        s.extend(vec![0u8; 15]);
+        assert_eq!(lzo::decompress(&s, 5000), Err(lzo::Error::Input), "{s:?}");
+    }
+    // A run of them longer than the output could be stops before the end of the input.
+    let mut s = vec![18, b'a', 32];
+    s.extend(vec![0u8; 5000]);
+    s.extend_from_slice(&[1, 0, 0]);
+    assert_eq!(lzo::decompress(&s, 100), Err(lzo::Error::Overrun));
+    // A 3-byte M1 at distance 2049: with 2048 bytes written it reaches one before the
+    // start; with 2049 it copies the first three.
+    let stream = |matched: usize| {
+        let mut s = vec![18, b'a'];
+        s.extend(m3(1, matched));
+        s.push(4); // a run of 4 + 3 literals, which leaves state 4
+        s.extend_from_slice(b"1234567");
+        s.extend_from_slice(&[0, 0]); // the M1: distance 2049, 3 bytes
+        s
+    };
+    assert_eq!(lzo::decompress(&stream(2040), 2048 + 3), Err(lzo::Error::Distance));
+    let mut w = vec![b'a'; 2042];
+    w.extend_from_slice(b"1234567");
+    w.extend_from_slice(b"aaa");
+    assert_eq!(lzo::decompress(&stream(2041), w.len()).unwrap(), w);
 }
 
 // ---- as a Vfs ----
