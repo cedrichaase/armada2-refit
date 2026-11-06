@@ -469,7 +469,7 @@ pub fn is_plain_instance(inst: usize) -> bool {
 
 // ---- the move paths -------------------------------------------------------------------
 
-use crate::syms::{field, value};
+use crate::syms::field;
 
 /// A path's points (`AiPath`: `+0x0` the count, `+0x4` the `Vector3`s), at most 256.
 pub fn path_points(path: usize, out: &mut alloc::vec::Vec<V3>) {

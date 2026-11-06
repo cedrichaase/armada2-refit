@@ -600,7 +600,7 @@ __attribute__((naked)) void mq_form_formation_stub(void)
 {
     __asm__ __volatile__(
         "pushl %ecx\n\t"
-        "pushl $" A2_STR(QOL_V_MQ_CMD_FORM_FORMATION) "\n\t"
+        "pushl _a2f_qol_mq_cmd_form_formation\n\t"
         "pushl 0xc(%esp)\n\t"       /* ids */
         "call _mq_seen_ids\n\t"
         "addl $8, %esp\n\t"
@@ -636,9 +636,13 @@ static float ship_radius(BYTE *o)
 /* The formation type most of queue qi's ships move in (-1: none readable). */
 static int queue_formation(int qi)
 {
-    static int count[QOL_V_MQ_FORM_TYPES];
+    /* The build's count of types is read at start-up, so the tally has room for a cap
+     * of them; a type past it counts as unreadable. */
+    enum { FORM_CAP = 64 };
+    static int count[FORM_CAP];
+    int n = QOL_V_MQ_FORM_TYPES < FORM_CAP ? QOL_V_MQ_FORM_TYPES : FORM_CAP;
     int i, best = -1;
-    for (i = 0; i < QOL_V_MQ_FORM_TYPES; i++) count[i] = 0;
+    for (i = 0; i < n; i++) count[i] = 0;
     for (i = 0; i < MQ_SHIPS; i++) {
         BYTE *pr;
         int t;
@@ -646,9 +650,9 @@ static int queue_formation(int qi)
         pr = *(BYTE **)(g_m[i].obj + MP_PROCESS);
         if (!pr) continue;
         t = *(int *)(pr + PROC_FORMATION);
-        if (t >= 0 && t < QOL_V_MQ_FORM_TYPES) count[t]++;
+        if (t >= 0 && t < n) count[t]++;
     }
-    for (i = 0; i < QOL_V_MQ_FORM_TYPES; i++) if (count[i] && (best < 0 || count[i] > count[best])) best = i;
+    for (i = 0; i < n; i++) if (count[i] && (best < 0 || count[i] > count[best])) best = i;
     return best;
 }
 

@@ -954,7 +954,8 @@ __attribute__((naked)) void rig_this_stub(void)
         "1:\n\t"
         "movl %eax, _g_rigIgnore\n\t"
         "movl (%edi), %eax\n\t"
-        "call *" A2_STR(QOL_F_RS_VT_CHECK) "(%eax)\n\t"
+        "addl _a2f_qol_rs_vt_check, %eax\n\t"
+        "call *(%eax)\n\t"
         "pushl _a2s_qol_rs_this_cont\n\t"
         "ret\n\t");
 }
@@ -982,7 +983,8 @@ __attribute__((naked)) void rig_check_stub(void)
         "pushl _g_rigIgnore\n\t"
         "pushl %edi\n\t"
         "movl (%ecx), %edx\n\t"
-        "call *" A2_STR(QOL_F_RS_VT_CAN_PLACE) "(%edx)\n\t"
+        "addl _a2f_qol_rs_vt_can_place, %edx\n\t"
+        "call *(%edx)\n\t"
         "pushl %eax\n\t"
         "movzbl %al, %eax\n\t"
         "pushl %eax\n\t"

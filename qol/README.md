@@ -99,7 +99,8 @@ own, with the reason in the log (`engine: <hook> stands down: ...`), on the feat
 for the settings screen. All hooks are asked first, before the first patch, because
 patches change bytes another hook's check reads. Each asm stub continues through a
 resolved variable (`pushl _a2s_qol_<id>; ret`), and reads a global as a load of the
-variable and then of the global; field offsets are spliced in with `A2_STR(QOL_F_...)`.
+variable and then of the global; field offsets, values and frame locals are read from
+the build's own variables (`_a2f_qol_<id>`), filled at start-up.
 
 | Hook | Setting | Entries | Without it |
 |---|---|---|---|
