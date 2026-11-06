@@ -38,9 +38,11 @@ fn at(s: a2engine::Sym) -> usize {
     eng().addr(s)
 }
 
-/// `shipDisplay` (an instance), or 0 while the info panel's hook is not ready.
+/// The info panel (an instance, found in the render lists: `hud::ship_display`), or 0
+/// while the info panel's hook is not ready. `shipDisplay` itself is only the profile's
+/// gate here: Roots' panel is not that global (decision 64).
 fn sd() -> usize {
-    at(sym::INFO_SHIP_DISPLAY)
+    if at(sym::INFO_SHIP_DISPLAY) == 0 { 0 } else { super::hud::ship_display() }
 }
 
 // ---- the stock panel's children (members of `shipDisplay`) --------------------------

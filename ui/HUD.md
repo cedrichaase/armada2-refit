@@ -148,6 +148,35 @@ a video; the unit view's frame follows.
 **Taking a panel.** `engine::hud::set_taken(at, by_pointer, on)`: a component by its
 address, or (the bar) by the global that points to it, read when asked.
 
+**The info panel is found by name, not by `shipDisplay`.** On Roots, FleetOpsHook
+constructs a `ShipDisplay` of its own (larger, in place of the static instance), so the
+static global is not the panel there (PLAN-FLEETOPS.md, FO-6, decision 64). On every
+build `engine::hud::ship_display()` looks through the render lists of all views for the
+component whose `GetName` is "ShipDisplay" (on stock the very instance the global is, in
+the normal view's list; the cinematic view's list lacks it, as before), keeps it while a
+list still holds it, and the panel switch takes it by name (`INFO_PANEL_TAKEN`), learning
+it from the components the walks of `RenderAll` and `RefreshOwner` call. Outside a mission
+no list holds it, and the answer is 0. Whether Roots' panel answers to the same name is
+for the bench to say (step 3).
+
+**The bar's buttons** are `palette_n_slots` of them (21 inline at `+0x28` on stock; on
+Roots 64 behind a pointer held there, `palette_slots_indirect`), both values of the
+build's profile (`engine::palette::slot`).
+
+**On Fleet Operations: Roots, which panels the UI takes** (PLAN-FLEETOPS.md, FO-6 step 4,
+decisions 120 to 127). `RenderAll` is trampolined at its entry and the stock body, with the
+Render call `hud.panels` re-points, runs behind it, so the panel switch works as on stock; the
+resources, the top-right buttons (Roots' panel holds the stock buttons: the menu sits behind
+the "more" toggle, help and palette are unplaced), the pause box, the chat, the selection
+overlay, the frame-rate panel and the order ring, height posts and footprint are ours there.
+Roots' string table answers `GUI_POP_PAUSE_TEXT` and `GUI_POP_PAUSE_CONTINUE` with an empty
+string and its resource tooltips with a token, so the pause box has words of its own and a
+resource's name comes from the content set when the tooltip is not a word. **Button sounds
+are off** (`panels_sound_ours` = 0): every `operator new` and constructor call at the stock
+sound sites is FleetOpsHook's FMOD, of a size not measured, and the HUD part does not
+require the sound hook. The message, objectives, replay, overlay-text and fade panels stay
+Roots' until a scenario can raise them.
+
 ## The references the stock HUD is drawn against
 
 These are the measured facts about where the engine's 2D drawing gets its scale. The
@@ -359,6 +388,18 @@ info panel.
 
 **Log.** Each layout once per change ("bar: menu=2 mode=1 | Q=bbase ... T=cancel
 G=back", `(off)` for a disabled button), each click ("bar: click build"); QOL.log names each key ("bar: key S").
+
+**On Roots (measured only; nothing of the bar is drawn there).** On a build whose profile
+has `palette_slots_indirect`, `engine::palette::log_measure` logs the bar once per change
+from the engine's own objects (`bar: measure`, `bar:  slots`, `bar: hover` in UI.log).
+`hud.reads_bar` reads, besides the slots, the bar's mode columns and rows (`+0xb0`/`+0xb4`
+in use; the floating pair `+0x7c`/`+0x80`, the static pairs `+0xa0`/`+0xa4` and
+`+0xa8`/`+0xac`), its hidden flag (`+0x16`), and from a button its owner (`+0x04`), its
+rectangle (`+0x08`, local to the owner), its pressed (`+0x30`) and hover (`+0x38`) bytes:
+`StandardButton::Simulate` sets both from the pointer, whoever owns it. FleetOpsHook's range
+ring follows the hover state of a weapon's button, so a bar of ours keeps the rings only as
+a skin over the stock rectangles that leaves the stock bar the pointer; Roots' static mode
+is one row in slot order (`PLAN-FLEETOPS.md`, FO-6 decisions 94 and 95).
 
 ### Seen on the bench
 
@@ -1489,7 +1530,7 @@ down is explained on are named in the profile.
 |---|---|---|
 | `ui.hud.panels` (`HUD.Minimap`, `HUD.Info`, `HUD.Bar`, `HUD.UnitView`) | the call of a component's `Render` in `DisplayInterface::RenderAll` and of its `CursorOver` in `CursorInterface::RefreshOwner` (patched, 7 bytes each, "The panel switch"), `iCursor` and its owner / sprite fields | no panel of ours is taken over |
 | `ui.hud.tooltips` (`HUD.Tooltips`) | `iCursor+0x34` / `+0x38`, `CursorInterface::m_tooltipState` | the engine draws its tooltips at the pointer |
-| `ui.hud.reads_components` | `g_pPopupPalette`, `shipDisplay`, `mapRadar`, `DisplayInterface::s_pRenderList`, `View_Record`, the `DisplayInterface` rectangle / hidden fields and `GetName` slot | no component is found, hidden or placed |
+| `ui.hud.reads_components` | `g_pPopupPalette`, `mapRadar`, `DisplayInterface::s_pRenderList`, `View_Record`, the `DisplayInterface` rectangle / hidden fields and `GetName` slot | no component is found, hidden or placed |
 | `ui.hud.reads_calls` | `TextInput_IsActive` and `CinematicView::IsPlayingVideo` (`fn`, checked), `g_cinematicView` | keys are not held back for the chat line; a click sounds during a video |
 | `ui.hud.reads_popups` | the message, objectives, pause and replay boxes, their press functions, `IsGamePausedAtAll` and `ObjectivesDisplay::FocusSimulate` (`fn`, checked) | no box of ours ("Messages and objectives", "Pause and replay") |
 | `ui.hud.reads_bar` (`HUD.Bar`, `HUD.BarLabels`, `HUD.Icons`) | the bar's slots, mode and menu, the `ControlButton` / `CommandInfoClass` / `ModeInfo` fields, the `ButtonName` pair, `cPrjID::GetName`, `FindElement` and `ControlButton::mButtonPressFunction` (`fn`, checked), the sprite database | no button is described or drawn |

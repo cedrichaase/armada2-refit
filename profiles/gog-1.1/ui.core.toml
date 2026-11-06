@@ -33,6 +33,9 @@ doc = "NextBinkFrame's BinkCopyToBuffer call re-pointed, so the UI draws the mov
 [hook."core.input"]
 doc = "WindowProc's keyboard and mouse message calls and their PeekMessage drains"
 
+[hook."core.input_callee"]
+doc = "The two message functions at their entries and their drains, for a window procedure not the engine's WindowProc"
+
 [hook."core.window"]
 doc = "GetWindowHandle called on Storm3D, for the game window"
 
@@ -47,9 +50,6 @@ doc = "The msvcp60 imports the engine's stringstream and string functions are ca
 
 [hook."core.reads_clock"]
 doc = "Get_Time's float, read for the bench clock"
-
-[hook."core.reads_hud_hidden"]
-doc = "The HUD's ship display hidden flag, read to know when the engine hides its HUD"
 
 # ---- core.storm3d (engine/mod.rs) -------------------------------------------------
 
@@ -120,13 +120,6 @@ struct = "ST3D_DeviceDirectX8"
 offset = 0xe4
 type = "u32"
 used_by = ["core.mission"]
-
-[[sym]]
-id = "core_ship_display_hidden"
-symbol = "shipDisplay"
-kind = "global"
-addr = 0x76397e
-used_by = ["core.reads_hud_hidden"]
 
 # ---- core.cursor, cursor_probe, cursor_square (engine/cursor.rs) ------------------
 
@@ -265,7 +258,7 @@ kind = "patch"
 addr = 0x4dd709
 in = "ProcessKeyboardMessages"
 check = "ff 15 d4 81 7b 00"
-used_by = ["core.input"]
+used_by = ["core.input", "core.input_callee"]
 
 [[sym]]
 id = "core_process_mouse"
@@ -290,7 +283,48 @@ kind = "patch"
 addr = 0x4de260
 in = "ProcessMouseMessages"
 check = "8b 1d d4 81 7b 00"
-used_by = ["core.input"]
+used_by = ["core.input", "core.input_callee"]
+
+# The same two functions at their entries, for core.input_callee: a build whose window
+# procedure is not the engine's (Roots: FleetOpsHook's form passes the keyboard and mouse
+# messages to the two functions itself, PLAN-FLEETOPS.md, FO-6 step 3) takes each message
+# there, before the function runs. The check vouches for the instructions the hook moves
+# aside (core_input_moved).
+[[sym]]
+id = "core_keys_entry"
+symbol = "ProcessKeyboardMessages"
+kind = "fn"
+addr = 0x4dd670
+check = "55 8b ec 83 ec 1c"
+used_by = ["core.input_callee"]
+
+[[sym]]
+id = "core_mouse_entry"
+symbol = "ProcessMouseMessages"
+kind = "fn"
+addr = 0x4de250
+check = "55 8b ec 83 ec 1c"
+used_by = ["core.input_callee"]
+
+# Where input is taken: 0 at WindowProc's two calls (core.input), 1 at the two functions'
+# entries (core.input_callee); the drains are taken either way. Stock takes the calls and
+# installs nothing at the entries.
+[[sym]]
+id = "core_input_at_callee"
+symbol = "input claim point"
+kind = "value"
+value = 0
+used_by = ["core.input", "core.input_callee"]
+
+# The bytes of whole, position-independent instructions at each entry that the callee hook
+# moves aside (push ebp; mov ebp, esp; sub esp, imm8: within the entries' checks).
+[[sym]]
+id = "core_input_moved"
+symbol = "ProcessKeyboardMessages and ProcessMouseMessages entry instructions"
+kind = "value"
+value = 6
+unit = "bytes"
+used_by = ["core.input_callee"]
 
 [[sym]]
 id = "core_get_window_handle"

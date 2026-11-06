@@ -62,7 +62,7 @@ pub fn install() -> bool {
         unsafe { STOOD_DOWN = 2 };
         return false;
     }
-    if !hud::functions_stock() || !api::sound::functions_stock() || !api::msvc::available() {
+    if !hud::functions_stock() || !api::msvc::available() {
         crate::log!("hud: an engine function is not stock, the HUD stays stock");
         unsafe { STOOD_DOWN = 3 };
         return false;
@@ -105,7 +105,7 @@ pub fn apply_live(cfg: &crate::config::Hud) {
         MINIMAP_LOGGED = true;
         let want = cfg.info && INFO_CAP;
         if want != INFO {
-            hud::set_taken(hud::ship_display(), false, want);
+            hud::set_taken(hud::INFO_PANEL_TAKEN, false, want);
             INFO = want;
             crate::log!("info: {}", if want { "ours" } else { "stock" });
         } else if cfg.info && !INFO_CAP && !INFO_LOGGED {

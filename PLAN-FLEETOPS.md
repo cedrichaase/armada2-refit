@@ -179,7 +179,7 @@ can start now; FO-3 onward waits on phase 8's format and generator (8b).
 | FO-3 | **The Roots profile**: (game, build) in the format, inheritance with overrides, the "changed by Roots" mark and its stand-down rule; the marked list from the static diff and FO-2's run-time diff; `a2test syms --game fo-roots`; the negative test (the Roots profile on stock and the reverse, both standing down cleanly). **Begun 2026-11-06**: `profiles/fo-roots-5.0Z11/` inherits gog-1.1 (timestamp, image size `0x405000`, section fingerprint) and marks the 30 functions of the file diff and 80 more of the run-time diff that our hooks use (49 of 103 hooks stand down, 54 ready; the rules plugin off); five callees FleetOpsHook takes over drop their entry check; `tools/engine/negative.sh` (e) tests it both ways | ROADMAP 8b; FO-2 | 6–12 h · 2 · none |
 | FO-4 | **Display8 on Roots**: stub and passthrough on Vulkan with whatever FO-2 found (block-compressed textures sampled natively, the D3DX8 calls, the 1200x900 shell mode, Roots' `FindDisplayMode` change). If `FleetOpsHook` draws through its own Direct3D 9, that is solved here or Display8 is not installed on Roots (Roots keeps DxWrapper). Installed by `./install --game fo-roots` with DxWrapper's `d3d8.dll` backed up. **Ready for round FO-A 2026-11-06** (branch `fo-a-display`): `display.modes` verified beside Roots' changes, so Display8 starts on Vulkan instead of bailing out; on the bench (1280x960, the GPU, the validation layer on) the shell, the skirmish's second device (followed) and the return to the shell draw through the passthrough with no validation message and no crash, D3DX8 keeps Roots' DDS art as BC1 to BC3, and FleetOpsHook's bump-mapped hulls draw through the port of the Borg bump shader; the skirmish looks as Roots on DXVK. `display.native` and `display.drop` stand down (not needed: the mode is `Settings.xml`'s, nothing is dropped). Not yet seen: the intro (FleetOpsHook plays it through a Direct3D 9 device of its own; the bench sets `IntroVideo` off), Direct3D 12 (its second window is black: `Dx::rebind`), the player's own install | FO-2, ROADMAP 1 signed off | 10–25 h · 10–20 with A/B against Roots as it ships (DxWrapper, then DXVK) · **round FO-A**: Roots looks as Roots on our device |
 | FO-5 | **render3d on Roots**: designed 2026-11-06, "FO-5: render3d on Roots, the design" below: render3d keeps the frame and its steps; the object step calls through Roots' own per-object draw; hulls claim at the instance's database draw, not at the object, so Fleet Operations' wrappers (range rings, overlay models, highlight, node and texture swaps) keep running; where FleetOpsHook owns a call site, render3d takes over at the callee instead; the Roots content set reads `ODF.fpq` through `a2fmt::vfs` | FO-3, FO-4 (a skirmish drawn on Display8); ROADMAP 7 | 45–75 h · 20–30 · **round FO-B**: a skirmish with the refit's look |
-| FO-6 | **UI on Roots**: the Refit screen and settings over Roots' Options dialog, the loading screen; then the menu host's specs for the 1200x900 shell and HUD panels against Roots' components, each its own row, as wanted. The button bar is not stock's: its command area can be far larger (several weapons of one classlabel, each a button; FO-7), so the UI's bar and its labels (`ui/HUD.md`, "The button bar") are measured on Roots before they are drawn there | FO-3, FO-4; ROADMAP 6 | 10–30 h · 8–15 · with FO-B, then its own round if panels are taken |
+| FO-6 | **UI on Roots**: the Refit screen and settings over Roots' Options dialog, the loading screen; then the menu host's specs for the 1200x900 shell and HUD panels against Roots' components, each its own row, as wanted. The button bar is not stock's: its command area can be far larger (several weapons of one classlabel, each a button; FO-7), so the UI's bar and its labels (`ui/HUD.md`, "The button bar") are measured on Roots before they are drawn there. **Planned 2026-11-06**: "FO-6: the UI on Roots (plan)" below, which re-estimates it | FO-3, FO-4; ROADMAP 6 | 35–60 h · 15–23 for round one (80–145 h with the bar, info panel, minimap and menus) · with FO-B, then its own round if panels are taken |
 | FO-7 | **QOL on Roots**: pan speed and camera first; each of the other features measured beside Roots' own and switched on only where both agree. TamsynnImogen (Blade, the author of A2FOExtensions) noted (2026-11-06) that Roots' command button area can be far larger than stock's (several weapons of the same classlabel each get a button), so `BarKeys` and the slot plan (`qol/README.md`, QOL-1) cannot assume stock's bar | FO-3 | 4–10 h · 3–6 gameplay passes · with FO-B |
 | FO-8 | **Multiplayer**: two bench games of Roots with the refit's visual plugins, on Microsoft's DirectPlay in the clones (`online/reference-dplay.sh`), to show the CRC check passes; then whether `Online.asi`'s peer carries a Roots game | FO-4; ROADMAP 9 (the rules plugin as its own layer) | 6–12 h · 4–8 two-game passes · round FO-C if Online is taken |
 | FO-9 | **binkproxy** on Roots' intros. Roots support is not packaged: no GUI installer or release package carries it (Open decisions, 4) | FO-4 | 2–5 h · 2–3 · none |
@@ -346,6 +346,368 @@ an exported "draw this object's extras" (overlay model and rings) for a renderer
 draws the hull itself; an export naming FleetOpsHook's build (a version number) for the
 identity; a note when they move the object-loop edit or the craft wrappers.
 
+## FO-6: the UI on Roots (plan)
+
+Planned 2026-11-06 (branch `fo-6-plan`), offline: `./a2test syms --game fo-roots` on
+`fo-b`, `tools/engine/fo-scan.py --compare` against `profiles/fo-roots-5.0Z11/`, the
+private patch and collision tables beside `fleetopshook.md`, MemDiff's log of FO-2,
+Roots' `misc/gui_*.cfg` (read for rectangles and counts, never copied), and the bench
+shots of FO-4 and FO-5 (Federation, Klingon, Borg and Species 8472 in Instant Action at
+1280x960). No game was run for it. Findings are stated per hook; the detail stays in the
+private notes.
+
+**The short of it.** The loading screen and the mission frame are nearly free: their
+call sites are stock's in the file and in memory, and only the marks on the functions
+around them hold them down. The HUD is not: FleetOpsHook replaces three of the objects
+the UI reads (the info panel's `ShipDisplay`, the bar's button array, the resource
+components) and draws gameplay feedback of its own off the stock components' mouse state
+(the range rings), so several hooks that `a2test syms` calls ready would read the wrong
+memory. The menus are the most changed part of Roots, and the last.
+
+### The hooks, by UI part
+
+`a2test syms --game fo-roots`: **40 of 61 UI hooks ready, 21 stand down** (every plugin:
+70 of 107). "Ready" means only that no function a hook's entries sit in is marked: the
+marks are per function, and a global or an object FleetOpsHook replaces is reported, not
+marked (decision 17). So the table has a third verdict, **ready, wrong**: the profile
+lets it in and it would read what Roots no longer uses.
+
+| Part | Hook | `syms` | What FleetOpsHook (or Roots' file) changes there | Verdict |
+|---|---|---|---|---|
+| core | `core.storm3d`, `core.device`, `core.reads_mouse`, `core.reads_msvc`, `core.reads_clock`, `core.cursor`, `core.cursor_probe` | ready | nothing at their sites | ready |
+| core | `core.mission` | **ready** (step 3) | `ChatDisplay::Render` is trampolined at its entry (Roots' clean screenshot); `Armada_RenderFrame`'s one edit (+0x245) is away from the call at 0x598a16, which is stock's | verified (decision 85) |
+| core | `core.input`, `core.input_callee` | ready | the four sites are stock's, but **the game window is FleetOpsHook's own form**, whose window procedure calls `ProcessKeyboardMessages` and `ProcessMouseMessages` itself: the two `WindowProc` sites never run on Roots (measured, step 3) | Roots takes the two functions' entries (`core.input_callee`, decision 87) |
+| core | `core.window` | ready | Roots makes the shell's device and the game's on two windows (`display/README.md`, "A second window"), both FleetOpsHook's forms on the game's thread; `GetWindowHandle` names the shell's form until its device goes, then the game's (measured, step 3) | ready |
+| core | ~~`core.reads_hud_hidden`~~ | gone | `SetInterfaceState` writes the hidden flag into FleetOpsHook's own `ShipDisplay`; the stock global `shipDisplay` is not the panel any more | read from the panel the render lists name (decision 88) |
+| core | `core.cursor_square` | down | `SetCursor`'s texture is FleetOpsHook's (enlarged `ST3D_Texture`); Roots sets a Win32 cursor and loads race-specific cursor sprites | leave down (decision 69) |
+| core | `core.intro_frames` | ready | never reached: FleetOpsHook plays the intro on a Direct3D 9 device of its own | harmless |
+| loading | `loading.overlay` | down | Roots' new load bar and its text (`RenderLoopAssetLoadStatusUpdate` +0x1b, +0x88, +0x343..+0x35c); the UI's call at +0x3b3 is stock's in file and memory | verify (cheap) |
+| loading | `loading.own` | down | `Program::GameDoOne`: Roots' four-byte edit at +0x19b and FleetOpsHook's audio and close calls (+0x17c..+0x30a); the splash call at +0xcd and `LoadBarNext`'s call at 0x6019eb are stock's | verify (cheap) |
+| loading | `loading.inner_db`, `loading.inner_pixels` | down | `FindLogicalDatabase`, `FindVisibleDatabase` and `ST3D_Texture::DemandLoad` are replaced whole: the bodies these sites sit in never run | down by design |
+| loading | `loading.reads_progress`, `loading.reads_pump` | ready | the fraction and the pump are stock's (Roots' `LoadBarStart` callback only adds to it) | ready |
+| hud | `hud.panels` | down | `DisplayInterface::RenderAll` is trampolined (clean screenshot); the call at +0x47 runs behind it and is stock's | verify |
+| hud | `hud.reads_components` | ready | `g_pPopupPalette` and `mapRadar` hold Roots' objects; **`shipDisplay` does not** (FleetOpsHook constructs its own, larger) | **ready, wrong** for the info panel |
+| hud | `hud.reads_bar` | ready | **the bar holds up to 64 buttons, not 21**: the inline array at +0x28 becomes a pointer to one of FleetOpsHook's, and the count in `PostLoad`, `Cleanup`, `Update`, `Clear`, `Render` and `CursorOver` goes from 21 to 64 (MemDiff); `mUpdateButtonsAndPosition` and the focus step are FleetOpsHook's, special weapons are laid out by its own function (one button per weapon, so several of one `classLabel` each get one); `cPrjID::GetName` is called unchecked (profiled) | **ready, wrong** |
+| hud | `hud.reads_overlay` | ready | `SelectionDisplay`'s `PostLoad`, `Render` and `Cleanup` trampolined, 43 bytes of `PreRender` nopped, its tooltips and group colours FleetOpsHook's | verify |
+| hud | `hud.tooltips`, `hud.reads_calls`, `hud.reads_popups`, `hud.reads_overlay_text`, `hud.bubbles`, `hud.fade`, `hud.height_posts` | ready | nothing at their sites (the tooltip box's one constant changed) | verify in game |
+| hud | `hud.drag_box` | down | **direct clash**: FleetOpsHook owns the call at `mNormalModeRender+0x1ca` | stays the engine's (decision 74) |
+| hud | `hud.order_ring`, `hud.footprints` | down | `mRenderWhere`'s post is FleetOpsHook's (+0x9d), and `DemandLoad`, which both only call, is replaced at its entry | drop the callee check, then verify |
+| hud | `hud.video` | down | `CinematicView::mUpdateVideo`: FleetOpsHook's audio calls, away from the blits | verify |
+| hud | `hud.frame_rate` | down | `Armada_RenderFrame`'s edit at +0x245, away from the prints | verify |
+| info | `hud.info` | down | **the most changed panel**: its own object, the display type decided by FleetOpsHook (`DetermineSelectedDisplayType+0x99`), its own health bars, ship icons and wireframe icons, 26 to 30 bytes nopped in every single-object draw and simulate | stays Roots' (decision 66) |
+| info | `hud.closeup` | down | the action camera's `Armada_RenderAllOurStuff` (verified for render3d only), and `operator new` with no override in `ui.info.toml` (`fo-scan --compare` found the gap) | with the info panel |
+| info | `hud.unitview` | ready | **Roots has no unit view** (`cinematicPanelArea` is off in its layouts) | off (decision 67) |
+| radar | `hud.radar`, `hud.radar_cursor` | down | `ActionMode::GetAction`, which they only call, carries an observer fix (+0x11e); `RadarComponent::Render` calls FleetOpsHook's map-object draw; team colours are Roots' | stays Roots' (decision 66) |
+| panels | `panels.buttons`, `panels.toggle_press`, `panels.reads_selection`, `panels.reads_warp`, `panels.reads_race` | ready | the overview is FleetOpsHook's (read through `g_pOverView`, verified for render3d) | ready |
+| panels | `panels.presses` | down | `DisplayInputProcess` changed elsewhere; the site at +0x1e9 runs as stock | verify |
+| panels | `panels.resources`, `panels.topbar` | ready | `ResourceComponent` is larger and drawn by FleetOpsHook (its `Render` slot), `ResourcePanel::PostLoad` is FleetOpsHook's; Roots shows one to three resources and five top-right buttons, not stock's eight | verify, names in the set |
+| panels | `panels.chat`, `panels.trade` | down | `Armada_RenderFrame` (+0x245 only); the chat's text input is FleetOpsHook's (`GameKeysProcessInput+0x23`) | verify |
+| panels | `panels.sound` | ready | `operator new` unchecked (profiled), but **every `Audio*` class is FleetOpsHook's FMOD** | measure |
+| panels | `panels.comm` | ready | `CommDisplay`'s constructor and `PostLoad` trampolined, its unit-transfer rule FleetOpsHook's | verify (multiplayer only) |
+| dialogs | `dialogs.reads_screens` | down | all 30 dialog procedures: `ShellBitmapImp` in each (the shell's bitmaps FleetOpsHook's, scaled with `StretchBlt`), twelve with Roots' 1200x900 constants; **nine `do_*` screens open through FleetOpsHook's own `DialogBoxParamA` import**, past `ArmadaL.exe`'s import table where the host sits; `do_mainMenu` and `DispatchDialog` trampolined | stays Roots' (decision 68) |
+| shell | `shell.screens` | down | `DispatchDialog`, `SetActiveDisplay`'s wrapper, `Show_Credits`, and `SetCurrentBackground` replaced whole | stays Roots' |
+| shell | `shell.reads_*`, `shell.cursor`, `shell.widgets` | ready | fields and the `WM_SETCURSOR` call in a `WindowProc` that may not be the window's | with the menus |
+
+### What Roots changes in the HUD and the shell
+
+Seen on the bench shots (1280x960, 4:3) and read from Roots' layouts and FleetOpsHook's
+patch table:
+
+- **The layout.** The minimap bottom left, the bar a row of large square buttons above
+  the info panel's left end, the info panel a wide strip along the bottom (one unit, or a
+  builder's ten-slot queue), the resources top left (one to three, by race), five
+  top-right buttons, and **new elements**: a command info bar at the top centre (the
+  selected unit's name, hull, shields, crew, energy), an avatar box, a build box and
+  multi-segment health bars. Each race has its own art. No unit view.
+- **The canvas.** FleetOpsHook picks the layout file by the display's aspect
+  (`gui_<race><aspect>.cfg`: 1600x1200 at 4:3, 1600x1280 at 5:4, 1920x1200 at 16:10,
+  2134x1200 at 16:9); the engine still converts every rectangle into its fixed 1600x1200
+  space and scales per axis, so the UI's reading of a component's rectangle is unchanged.
+  The fonts are scaled by FleetOpsHook's own `FontNewScreenWidth`. What 21:9 picks is not
+  known.
+- **The bar.** 64 buttons behind a pointer; the static (bottom) mode 14 columns by 20
+  rows, the floating one stock's 3 by 7; the slot plan and the special weapons laid out by
+  FleetOpsHook (each weapon its own button), the hotkey tables edited (QOL's concern,
+  FO-7). **Its range rings follow the button under the pointer** (FO-5: hovering the
+  Tractor Beam button draws its range): a bar of ours, which never lets the stock bar own
+  the mouse, would lose them.
+- **The info panel.** FleetOpsHook's own `ShipDisplay` (enlarged), its single and builder
+  faces drawn by its callbacks, its subsystem icons, whose hover draws Roots' cyan ring.
+- **The minimap.** Map objects drawn by FleetOpsHook's callback, Roots' team colours, an
+  observer fix in the action under the pointer.
+- **The shell.** 1200x900 on its own windowed device; FleetOpsHook's bitmap object in
+  every screen; nine screens opened through its own `DialogBoxParamA`; its own Win32
+  dialogs (the mod check, before `WinMain`) outside the shell's code, which the host
+  refuses by construction.
+- **Elsewhere.** A clean-screenshot mode that hides the HUD and chat (FleetOpsHook's
+  trampolines); FMOD in place of DirectSound; its own chat text input.
+
+### Step list
+
+| Step | What | Needs | Agent h · bench |
+|---|---|---|---|
+| 1 | **Groundwork, offline.** `profiles/fo-roots-5.0Z11/content.toml` names a `fleetops` set for the UI (`ui/content/sets/fleetops/ui.ini`: Roots' race names and their looks, resources, no campaigns, no tour; decision 70); `fo-scan.toml` drops the entry check of the callees the UI only calls (`ST3D_Texture::DemandLoad`, `ActionMode::GetAction`, and `operator new` for `hud.closeup`, the gap `--compare` found); the component reads find the info panel by the render list, not the `shipDisplay` global, on every build (decision 64); the bar's button count and indirection become profile values (21 inline on stock, 64 behind a pointer on Roots); `games/fo-roots.toml` adds `ui` with Roots' defaults (decision 63); the stock set must not move (`ui/hosttest`, `tools/engine/negative.sh`). **Built 2026-11-06** (branch `fo-6`): the set, the callee checks (`callees_whole` in `fo-scan.toml`), the info panel found by name, the bar's two profile values and the `ui` layer with Roots' defaults are in; decisions 76–81 | profile, code in `engine/hud.rs` and `engine/palette.rs`, a set | 4–8 · 0 |
+| 2 | **The loading screen.** `loading.overlay` and `loading.own` verified beside Roots' load bar and `GameDoOne` edits; `inner_db`, `inner_pixels` down by design; the map and players named through `shell.reads_setup` | profile marks; bench A/B with the UI off. **Built 2026-11-06** (branch `fo-6`): `loading.overlay` and `loading.own` verified (the bytes at our sites are stock's in the file and in memory); on the bench (Roots, 1280x960, Vulkan with validation) the screen is ours edge to edge with Roots' load bar and logo scene under it, and `fo-ui-loading` / `fo-ui-loading-off` are the A/B; decisions 82–84 | 3–6 · 2–4 |
+| 3 | **The mission frame, input, the Refit screen.** `core.mission` verified; the window procedure of both windows measured (class, `GWL_WNDPROC`, which one `GetWindowHandle` gives in the shell and in a mission); if Roots' form calls the two message functions itself, record and capture move to their entries on Roots (decision 71); the hidden flag read from Roots' panel; **the Refit screen as a modal in a mission**, opened by a key of the UI's (decision 62), with the clean-screenshot mode left alone (decision 72). **Built 2026-11-06** (branch `fo-6-step3`): the mission frame verified, input at the two functions' entries on Roots, the hidden flag from the named panel, the render lists logged, the Refit screen by Ctrl+F12, Roots' textures mounted for the loading screen's sky; decisions 85–93, "Step 3: what the bench showed" below | profile, `input.rs`, `engine/ingame.rs`, `menus/refit.rs` outside the host | 8–14 · 3–5 |
+| 4 | **The panels Roots changes least**, each its own row and off on Roots until verified: messages and objectives, the pause and replay boxes, overlay text, chat and trade, the top-right buttons (Roots' five), the resources (Roots' amounts, names from the set), the selection overlay, and the engine's last draws (`fade`, `frame_rate`, `order_ring`, `footprints`; the drag box stays the engine's). Sounds measured under FMOD first. **Built 2026-11-06** (branch `fo-6-step4`, on `fo-6-step5`): `hud.panels`, `hud.order_ring`, `hud.frame_rate`, `panels.presses`, `panels.chat` and `panels.trade` verified; seven panels on by default on Roots (the resources, the top-right buttons, the pause box, the chat, the selection overlay, the frame-rate panel, the 3D view's order ring, height posts and footprint), each with its `fo-ui-<panel>` scenario; messages, objectives, replay, overlay text, fade and the team texts stay off for want of a trigger in a skirmish; the UI plays no button sound on Roots; decisions 120–127, "Step 4: what the bench showed" below | profile marks, a panel at a time | 12–20 · 5–8 |
+| 5 | **Measure the bar, draw nothing.** Log FleetOpsHook's bar on the bench: the buttons per selection (a ship with several weapons of one `classLabel`, the construction ship's build list, a station), the mode in use and its columns and rows, which button the range ring follows and through which of the stock bar's states. Decide from it whether a bar of ours can keep the rings without reading FleetOpsHook's memory (decision 65). **Measured 2026-11-06** (branch `fo-6-step5`): `bar: measure` and `bar: hover` log lines from the engine's own objects (`engine/palette.rs`, `log_measure`), scenario `fo-ui-bar-measure`; the answer is decisions 94 and 95, "Step 5: the bar measured" below | bench and logs only | 4–8 · 2–3 |
+| 6 | *Optional, when asked*: **the bar**, laid out by the mode's columns (no 5x3 grid; position keys for the first cells only, QOL's in FO-7), then the info panel and the minimap with FleetOpsHook's own objects, the command info bar left to Roots | step 5; Roots developer's view on the look | 25–45 · 10–15 |
+| 7 | *Optional, when asked*: **the menus**: the host's design space taken from the profile's shell (1200x900, not a fixed 800x600), the generic mirror first, specs after; the nine screens that open through FleetOpsHook's import stay Roots' (decision 68) | step 3 | 20–40 · 8–15 |
+| 8 | **Scenarios**: `fo-ui-loading` (a load with `[Loading] Hold`), `fo-ui-mission` (UI frames logged, a click on a panel of ours not reaching the engine), `fo-ui-refit` (a row toggled in the mission modal and kept after a relaunch: the Acceptance row, moved from Options for now), `fo-ui-standdown` (every UI part at 0: Roots as with Display8 and render3d alone, pixel-exact), one `fo-ui-<panel>` per panel of step 4; the stock set unchanged (`ui-runtime`, `ui-hud-bar`, `ui-whole-game` at 1280x720, `--install .`) | step 2 onward | 4–6 · 3 |
+
+**Round one** (steps 1 to 5 and 8): about 35–60 agent hours and 15–23 bench passes, in
+round FO-B or a round of its own after it; with steps 6 and 7, about 80–145 hours. This
+replaces the 10–30 hours of the work-package table, which assumed the HUD's reads held.
+Bench as for FO-5: Roots at 1280x960 (the shell needs 1200x900), Vulkan with the
+validation layer, staged through Instant Action, one Roots game at a time.
+
+### Steps 1 and 2: what the bench and the files showed (2026-11-06)
+
+`./a2test syms --game fo-roots` is 73 of 108 hooks ready (70 before; stock 106 of 108, unchanged);
+`hud.footprints`, `hud.radar` and `hud.radar_cursor` came ready by the callee rule,
+`loading.overlay` and `loading.own` by verification. On the bench (Roots, Display8 on Vulkan
+with validation, Render3D and the UI, 1280x960, Federation against Klingon) `fo-ui-loading`
+passes every log check: the screen is ours edge to edge, in the Federation's theme, titled
+"The Very First Map" (Roots' map `first`), the players panel names "steamuser, Federation"
+and "AI Hard, Klingon" through `shell.reads_setup`, 700 frames of ours to the engine's 18
+(longest wait 690 ms, with the 20 s hold), no frame inside a step, then Roots' own HUD with
+no panel of the UI's over it. `fo-ui-loading-off` shows Roots' own loading screen (a planet,
+a tip, its red bar) with the hook installed and nothing of ours drawn. Findings for step 3:
+
+- **The mission hook (`core.mission`) is the next one down**: it logs `mission: standing
+  down` because of `ChatDisplay::Render`, which is trampolined; the HUD part says "Enable=0,
+  the HUD is stock".
+- **Generated tables carry the marks**: a `verified` edit in `build.toml` is only seen after
+  `tools/engine/gen.py` and a rebuild (`gen.py --check` fails CI otherwise); the first bench
+  run of step 2 stood the loading hooks down for that reason.
+- **The info panel's name on Roots is unmeasured**: `hud.reads_components` is ready but the
+  component list is only logged by `log_components`, which runs from the HUD part; with the
+  HUD off nothing logs it. Step 3 should log the render lists once per mission (the names
+  and rectangles) on Roots to settle decision 77, and to read the window procedure question.
+- **`core.reads_hud_hidden` still reads the stock global** (`shipDisplay+0x16`, ready,
+  wrong): it should go through `hud::ship_display()` like the rest.
+- **The Refit screen's defaults** (`ui/settings.toml`, `shipped = "ui/UI.ini"`) show stock's
+  shipped values; on Roots they differ (`ui/defaults/fo-roots.ini`).
+- **Roots has no `Data/Menus`**, no UI log of its own and its logs sit in the prefix's
+  `AppData/Local/armada2-refit/logs/` (`"UI.log"` names it in a scenario).
+- **A map's sky is TGA only** in `loading.rs`; Roots' faces may be DDS (the screen fell back
+  to the menu backdrop with `sky none`).
+- **The stock `ui-runtime` scenario fails at step 33** (`Context: Mission`, a load still at
+  35%) on this machine, before this branch as after (a run of 2026-11-06 00:07 failed alike):
+  its 8 s wait for the load is too short; `ui-loading` passes.
+
+### Step 3: what the bench showed (2026-11-06)
+
+`./a2test syms --game fo-roots`: 76 of 108 hooks ready (73 before); stock 106 of 108, unchanged.
+`core.input_callee` is new and `core.reads_hud_hidden` is gone. On the bench (Roots, Display8
+on Vulkan with validation, Render3D and the UI, 1280x960, Federation against Klingon),
+`fo-ui-mission` passes: the UI draws about 62 frames a second over Roots' own HUD, with
+Roots' cursor. Ctrl+F12 opens the Refit screen over the running mission. A click on its
+Interface tab is kept from the engine (`input: a left button down kept from the engine`), and
+Esc closes the modal without opening Roots' in-game menu. The rest of the bench round
+(`fo-ui-refit`, `fo-ui-standdown`, `fo-ui-loading`, and stock's `ui-hud-bar` and
+`ui-loading`) is listed under "Acceptance" with its results. What the first runs showed:
+
+- **The window and its messages.** Every window of Roots' game thread is FleetOpsHook's
+  (VCL): both device windows are its form class, and their window procedures are thunks in
+  heap memory, in no module. The engine's `WindowProc` never runs. FleetOpsHook's form calls
+  `ProcessMouseMessages` and `ProcessKeyboardMessages` itself, from two call sites in its
+  window procedure. `GetWindowHandle` names the shell's form until the shell's device is
+  released, then a new form for the mission, on the same thread.
+- **The render lists.** Six views on Roots (stock's walk read nine). Views 0, 1, 3 and 4
+  each hold 21 components, among them Roots' `AvatarBox`, `BuildBox` and `CommandInfoBar`.
+  Views 2 and 5 are the cinematic views, with 7 components each. The info panel answers
+  `ShipDisplay`, an object of FleetOpsHook's with an empty rectangle (decision 77 holds).
+  The `ButtonPanel` and `ResourcePanel` rectangles are Roots' own.
+- **The first mission frame stopped Roots twice.** The cause was the UI's own read past the
+  views a build has: the slots after view 5 hold other memory, which led the walk to a
+  "component" at address 8, and reading its rectangle faulted. FleetOpsHook's madExcept
+  caught the fault and parked the game's thread in its report dialog, so it looked like a
+  hang. A watchdog thread (bench only, since removed) read the parked thread's registers and
+  stack, and madExcept's own report named the faulting function. The walk now rejects a list
+  holding anything that is not a pointer, on every build (decision 92).
+- **The sky.** Step 2's `sky none` was the mount, not DDS: the UI read `Textures\RGB`, which
+  Roots does not have. All 181 prefix skies of Roots' maps are TGA, and 10 maps name a cube
+  model. With Roots' `Textures\` mounted, `first` shows `env_dark_dust` (decision 91).
+
+**The owed runs (2026-11-06, `fo-6-step3`).** `fo-ui-loading` at 1280x960: every log check
+passes, step 42 included (`loading: standing down` is gone since the loading hooks were
+verified in step 2); the screen is the UI's over Roots' load bar, then Roots' own HUD, no
+Display8 validation message, no crash. Stock `ui-hud-bar` at 1280x720: PASS. Stock
+`ui-loading` at 1280x720: the log checks pass; the vision judge failed step 22 for the
+sky ("a starry nebula sky": Warzone's face, `mbgred`, is a dark field with a bright point
+and radial star streaks, the same as in the run that preceded the Roots work), so the
+scenario's wording now accepts the map's own streaked sky and the step passes. The
+ring-of-dots step 25 stays `INCONCLUSIVE` in both: the judge is given one shot, and the
+two shots' crops of the ring differ (23 and 29 pixels of 1600), so it turns.
+
+### Step 5: the bar measured (2026-11-06)
+
+Branch `fo-6-step5`, on `fo-6-step3`. With the HUD part off (Roots' defaults), `engine::palette::log_measure`
+runs in the mission frame on a build whose bar array is behind a pointer (`palette_slots_indirect`) and
+logs what the engine's own objects say, writing nothing: `bar: measure` (mode, menu, the columns and rows in
+use and of the floating and the two static modes, the hidden flag, how many of the 64 buttons are shown, the
+palette and the render list's "PopupPalette"), `bar:  slots` (each shown button as slot:kind:name, with a
+command's preferred cell and its state) and `bar: hover` (the button whose hover state is set, its pressed
+state, its rectangle and who owns the pointer). One line per change of the layout (cap 40) or of the hover
+(cap 120), by a signature of the buttons' identities (a command by its name's bytes, a mode by kind and the
+class, weapon or fixed index), not of the objects, which the bar makes anew at each update.
+`fo-ui-bar-measure` (Roots, 1280x960, Vulkan with validation) passes: box selections of the start fleet, the
+bar's buttons hovered and pressed, no panel of ours drawn.
+
+- **The bar object.** `g_pPopupPalette` and the render list's "PopupPalette" are the same object, so decision 64's
+  path and the global agree on Roots. Mode 1, columns and rows 14 by 20 in use and in both static modes.
+- **One row.** The shown buttons sit in slots 0 to n-1 in the order the bar built them and are drawn left to
+  right; a rectangle is local to the palette (`[88k, 0, 88k+87, 87]`). Nothing uses `preferredPosition`.
+- **Per selection** (the start fleet, Federation): the Starbase 10 buttons (recrew, order, transport, build,
+  rally, aiMenu, and four weapons: bastion and the three trades), a construction ship 8 (repair, stop, order,
+  transport, build, form, aiMenu, tractor beam), the Starbase with ships 12 to 13, an escort without a special
+  weapon 6; the construction ship's build list is 9 buildings, cancel and back (11), the Starbase's 4 ships,
+  cancel and back (6), the AI menu 9 commands and back. "Weapon" (kind 2) is FleetOpsHook's whole special
+  list: the station's trades are weapons too.
+- **The rings.** The red circle of the Tractor Beam (range 400) is on screen exactly while the pointer is on
+  that button, and gone on repair, build and the other menus, and on the station's bastion and trades. The
+  button's hover state (`+0x38`, set by the engine's `StandardButton::Simulate` from the pointer and the button's
+  rectangle, whoever owns the pointer) follows the pointer button by button, and so does the pressed state
+  (`+0x30`). The pointer's owner (`CursorInterface`) reads 0 at the mission frame's hook even while a button is
+  hovered, so the owner cannot tell the bar has the pointer there.
+- **Not measured**: a ship with several weapons of one `classLabel`; the floating mode (X is not its toggle on
+  Roots, the third top-right button opens Comms and Alliances, which stops the scenario); a menu over 14.
+- **For step 4** (the panels Roots changes least): each is its own row, off on Roots until verified; the bar
+  stays Roots' while step 6 is not asked. **For step 6** (a bar of ours): a skin per decision 94, laid out by
+  decision 95, never the panel switch's mouse skip for the palette; its first bench draws the skin and
+  confirms the ring and the tooltip stay.
+
+
+### Step 4: what the bench showed (2026-11-06)
+
+Branch `fo-6-step4`, on `fo-6-step5`. `./a2test syms --game fo-roots`: 82 of 108 hooks ready (76 before step 4; stock
+106 of 108, unchanged). Verified, each against the MemDiff log of FO-2 (no changed range touches its sites) and the
+file: `hud.panels` (`DisplayInterface::RenderAll`'s entry is FleetOpsHook's trampoline and the Render call behind it and
+`CursorInterface::RefreshOwner`'s CursorOver call are stock's), `hud.order_ring` (`mRenderWhere`'s edits are FleetOpsHook's
+own calls, away from the two DrawQuad calls the hook takes), `hud.frame_rate`, `panels.chat` and `panels.trade`
+(`Armada_RenderFrame`'s one edit, +0x245, is away from their call sites), `panels.presses` (`Program::DisplayInputProcess`
+is trampolined at its entry; the ResetVisibility call the hook takes is stock's); `hud.footprints` was ready since step 1.
+Bench: Roots at 1280x960, Federation against Klingon in Instant Action, Vulkan with validation, one scenario per panel and
+`fo-ui-hud` for the seven together.
+
+| Panel (row) | Verdict | Evidence |
+|---|---|---|
+| Resources (`HUD.Resources`) | **on** | `fo-ui-resources`: three cells for the Federation (dilithium, metal, biomatter: the components found through the panel's array, the resource id checked against the slot), Roots' own strip hidden by the panel switch; Roots' components answer a tooltip that is a string-table token (a control character), so the name comes from the `fleetops` set when the tooltip's first line is not a word (decision 124) |
+| Top-right buttons (`HUD.Buttons`) | **on** | `fo-ui-topbar`: Roots' panel holds the stock buttons (`buttons: panel` logs each field's rectangle: idle, view, comm, objectives and the "more" toggle laid out, the menu behind the toggle, help and palette unplaced), all recognised by their press functions; ours draws menu, comm, idle, view and objectives, a click presses Roots' own button (`panels: click idle` selected the idle ship and moved the camera, `click view` swapped the view), the tooltip is the engine's text |
+| Pause box (`HUD.Pause`) | **on** | `fo-ui-pause`: the pause key shows the box, the Continue button presses the stock unpause (`unpaused the game` follows in the chat); Roots' string table answers both keys with an empty string, so the box has words of its own (decision 124) |
+| Chat (`HUD.Chat`) | **on** | `fo-ui-chat`: the entry follows each key (`chat: entry active "steamuser: " "hello roots"`), FleetOpsHook's text input still receives them, the lines are ours (`steamuser paused the game.`), Roots' own entry and lines are not drawn twice |
+| Selection overlay (`HUD.Selection`) | **on, one caveat** | `fo-ui-selection` against `fo-ui-selection-off`: ours draws corner brackets and the gauges (health green, shield blue) where Roots draws only the gauges; Roots' unit tooltip, bar, info strip and minimap are unchanged. FleetOpsHook's `SelectionDisplay` callbacks (its group colours and tooltips) are skipped while ours is on: not seen in the skirmish, so unjudged (decision 127) |
+| Frame rate (`HUD.FrameRate`) | **on** | `fo-ui-frame-rate` (`--rts FRAMERATE_DISPLAY=1`): the engine's lines become one panel of ours; it takes the mouse where it is drawn, as on stock |
+| Order ring, height posts, footprints (`HUD.Overview`) | **on** | `fo-ui-overview`: the move point is marked at the click, the placement of a building shows ours (the footprint hatched red where it is blocked, amber tiles for the cells taken; `leftovers: 4 of the engine's last draws are ours`). The drag box is the engine's (decision 74), and its stray end marker at the pointer is as without the UI. The log's `order ring at 520,744` four times over names one degenerate quad of the stock call; Roots draws its own marker through FleetOpsHook's call in `mRenderWhere`, so the ring seen at the click is probably Roots' (unconfirmed: a bench with the row off, a right-click and a screenshot would settle it) |
+| Messages, objectives (`HUD.Messages`), overlay text (`HUD.Overlay`), replay (`HUD.Replay`), fade (`HUD.Fade`), team texts (`HUD.TeamTexts`) | **off** | claimed and read without error in the probe, but a skirmish raises none of their boxes (no script message, no objectives, no replay, no fade), so no scenario can show them; none is on for want of one. The objectives button is dimmed in a skirmish |
+| Comm, drop box, load wait | **off** | multiplayer only (two games; not asked in step 4) |
+| Drag box | engine's | decision 74 |
+| `panels.sound` | **off** | decision 126 |
+
+**Sound.** Every call site that makes a button sound in Roots (`StandardButton::Simulate`, `ShellButton::SetButtonMode`,
+the bar's key handler, the audio queue) has both its `operator new` call and its constructor call re-pointed to
+FleetOpsHook's own FMOD classes, whose object is not the stock 0x1c bytes; the UI's own sound is a stock-size object made
+with the game's `operator new` and the stock constructor, which would sit under FleetOpsHook's vtable. It was not played to
+find out: a build value (`panels_sound_ours`, 0 on Roots) turns the UI's button sounds off, the HUD part no longer requires
+them, and the panels are silent on Roots. The first attempt, marking `AudioSound2D::AudioSound2D` as changed, stood the HUD
+down whole (the HUD part required the sound hook) and also Render3D's reads, which share the symbol; a value is the cleaner
+switch.
+
+What the bench rounds showed and fixed:
+
+- **A mark is by function, across plugins.** Marking a function changed stands down every hook of every plugin whose
+  entries use it; `verified` names the hooks the mark does not apply to. A thing one plugin must switch off goes in a
+  profile value.
+- **The HUD part stood down on "an engine function is not stock"** because `api::sound::functions_stock()` was required for
+  the whole HUD; sound is optional now.
+- **Roots' string table gives "" for `GUI_POP_PAUSE_TEXT` and `GUI_POP_PAUSE_CONTINUE`** (stock gives words), and its
+  resource tooltips are tokens; both read as a blank box or `?` before the fallbacks.
+- **The frame-rate panel sits over the top left** (to y 340): a drag that starts there is the panel's, not the map's.
+  Scenarios start their boxes below it.
+- **`fo-ui-topbar` failed once on `_fo-sides`' "Klingon is visible"** (OCR of the setup screen), and stock `ui-hud-bar`
+  once on a selection that did not land (`| Nexus |` not logged); both passed on the rerun, neither on a step of this
+  work.
+
+**Acceptance (2026-11-06, `fo-6-step4`).** Roots, 1280x960: `fo-ui-resources`, `-topbar`, `-pause`, `-chat`, `-selection`,
+`-frame-rate`, `-overview` and `-hud` pass every log check (the screens left to the judge are in the reports); the earlier
+`fo-ui-mission`, `-refit`, `-standdown`, `-loading`, `-loading-off` and `-bar-measure` carry `HUD.Enable=0` so that they
+still test what they did (not re-run in this step except through `-hud`). Stock at 1280x720 with `--install .`:
+`ui-hud-bar` (a flake on its first run, a pass on the second) and `ui-hud-panels` ran, the log checks pass.
+
+### Defaults taken
+
+| # | Default | Why | What would change it |
+|---|---|---|---|
+| 60 | **Roots' art stays Roots'**: the UI draws its own look (`ui/STYLE.md`) and never copies, converts or ships Roots' HUD or shell art; the information art the UI keeps on stock (unit and build icons, wireframes, portraits, cursor shapes) is read from the player's install at run time, as on stock | hard rule 8 and decision 7; the Roots developer decides Roots' art style | the Roots developer |
+| 61 | **Order**: loading screen, mission frame and input, the Refit screen, the least-changed panels, a measurement of the bar; the bar, info panel, minimap and menus only when asked | lowest risk first, and the user's direction (renderer first, the UI after) | the user |
+| 62 | **The Refit screen comes to Roots as a modal in a mission**, opened by a key of the UI's, not over Options | the host stands down on all 30 dialog procedures and nine screens open past it; the mission frame needs two hooks | the host working on Roots' Options (step 7) |
+| 63 | **Roots gets UI defaults of its own** (the loading screen, the mission frame and the Refit modal on; every HUD panel, the menus, the Credits, the menu scene and the cursor off), merged at install for `--game fo-roots`; a panel is switched on there only once verified | Roots' HUD is Roots' gameplay until each panel is shown to keep it | each panel's verification, and the user's or the Roots developer's wish |
+| 64 | **A component FleetOpsHook replaces with an object of its own is found through the engine's lists** (the render list, by its name), on every build, never through the static global and never at an address of FleetOpsHook's | as decision 42 for the overview: one path, any build that constructs it elsewhere is followed | a build whose list does not hold it |
+| 65 | **The bar stays Roots'** (`HUD.Bar=0`, `BarLabels=0`, QOL's `BarKeys` off) until step 5; when taken, it reads the count and the array from the profile and lays out by the mode's columns, never the 5x3 grid | 64 buttons, FleetOpsHook's slot logic, and the range rings on hover, which a bar of ours would lose | a way to keep the rings without reading FleetOpsHook's memory |
+| 66 | **The info panel, the minimap and Roots' new elements stay Roots'** in round one | most changed, drawn from FleetOpsHook's private records, and they carry its gameplay feedback (the subsystem rings) | the user asking, after step 5 |
+| 67 | **No unit view on Roots** (`HUD.UnitView=0`) | Roots' layouts switch it off | a Roots layout with one |
+| 68 | **The menus stay Roots'** (`Menus.Enable=0`, `Credits=0`, `Scene=0`), and nothing is patched in `FleetOpsHook.dll`'s own import table | the 1200x900 shell, FleetOpsHook's bitmaps and the nine screens past the host; FleetOpsHook stays a black box (decision 3) | step 7, asked for |
+| 69 | **The engine's cursor on Roots** (`[UI] Cursor=0`) | Roots sets a Win32 cursor and race-specific sprites of its own; not measured | a measurement in step 3 or 4 |
+| 70 | **The UI's `fleetops` set holds names only**: Roots' races with the six looks (Free Borg as the Borg's), the Dominion and the other races in the shell's look, no new look invented; Roots' resources; no campaign cards, credits tour or cursor sprites | decision 7; a race look for the Dominion is the Roots developer's call | the Roots developer |
+| 71 | **Input on Roots is recorded at the two message functions' entries** if the window procedure is Roots' form, chosen per build by a profile value; stock keeps its call sites | it covers both callers and reads nothing of FleetOpsHook's; render3d's callee hooks are the precedent | the measurement in step 3 showing the engine's `WindowProc` still runs |
+| 72 | **Roots' clean screenshot does not hide the UI** | its state is FleetOpsHook's memory (decision 5) | the user using Roots' clean screenshots |
+| 73 | **The loading screen of ours covers Roots' whole** (its load bar and text included), and animates only between load steps | it is the UI's own look over no Roots art; Roots replaces the functions the in-step frames hooked | the Roots developer preferring Roots' loading screen |
+| 74 | Callees FleetOpsHook takes over and the UI only calls **drop their entry check** (`fo-scan.toml`, as decision 15); **the drag box stays the engine's** (FleetOpsHook owns the call; no callee hook in FO-6) | Roots' replacement is what Roots means there; the box is minor | the drag box wanted in the theme |
+| 75 | `games/fo-roots.toml` **keeps `hud_canvas = [1600, 1200]`**, the space the engine converts every rectangle into; Roots' per-aspect layouts are not read by the UI | the UI reads converted rectangles, never Roots' layout files | a UI part that needs the declared canvas |
+| 76 | **`callees_whole`** in `fo-scan.toml` (`ST3D_Texture::DemandLoad`, `ActionMode::GetAction`): a function our hooks only call that Roots changes anywhere in the body drops its entry check; with a hook of ours also inside it (`loading.inner_pixels` patches a call in `DemandLoad`) it stays marked and only the hooks that merely call it (`hud.order_ring`, `hud.footprints`) are written `verified` by the scan. `operator new` for `hud.closeup` was already a callee; the scan drops its check | the plan's list of three callees did not fit the scan's rule (a callee with something of ours inside, or changed past its entry, was marked); the rule is extended, not the marks hand-edited | a callee whose Roots change alters what the UI reads from it |
+| 77 | **The info panel is found by `GetName` == "ShipDisplay" in the render lists of every view**, kept while a list holds it; the panel switch takes it by name (`INFO_PANEL_TAKEN`, learned from the components `RenderAll` and `RefreshOwner` call). `hud_ship_display` is gone from the profile; `shipDisplay` stays only as `hud.info`'s gate. Outside a mission the answer is 0 | decision 64 on every build, stock the same object; all views, so the cinematic view answers as before. Roots' panel answering to the same name is unmeasured (step 3) | the bench showing another name on Roots |
+| 78 | The bar's **count and indirection are profile values** (`palette_n_slots` 21 and `palette_slots_indirect` 0 on stock; 64 and 1 in `profiles/fo-roots-5.0Z11/ui.hud.toml`, a hand-written entry beside the scan's); `HUD.Bar=0` stays | decision 65; the values come from MemDiff's count and pointer, not yet read in game | step 5's measurement |
+| 79 | **Roots' `UI.ini` defaults are an overlay**, `ui/defaults/fo-roots.ini`, applied over `ui/UI.ini` by `ui/apply-defaults.py` in `ui/install.sh` (a key `UI.ini` lacks fails the install): the HUD's `Enable` and every panel key, `Menus.Enable`, `Credits`, `Scene`, `CampaignLocks`, `[UI] Cursor` and `Movies` at 0; the loading screen on. `Movies=0` is added to the plan's list (Roots plays its intro on a Direct3D 9 device of its own). The Refit screen's "shipped default" still reads `ui/UI.ini` (step 3) | decision 63; one list per game, not a second whole file to keep in step | a part verified |
+| 80 | The `fleetops` set: Federation, Klingon, Romulan, Cardassian, Borg, Species 8472, **Free Borg** (the Borg's look), **Dominion** (no look: the shell's); each race's aliases include Roots' ODF names (`unitedfederation`, `klingonempire`, `romulanempire`; `observer` and `federation` for the Federation); the same six resources; no campaigns, scenes, files or tour; the gallery lists the factions only | decision 70; the order is the plan's | the Roots developer |
+| 81 | **No menu plates on Roots**: `ui/backdrops/install-plates.sh` neither installs nor removes anything for another game (Roots' `Data/` has no `Menus/` today; `layers.toml`'s `Menus/*.bmp` pattern would claim one if a Roots update shipped it, for `a2mod`) | decision 60 and 68 | a Roots with its own `Menus/` |
+| 82 | **`loading.overlay` and `loading.own` are verified** by reading the bytes: the entry and the `LoadBarNext` call into `RenderLoopAssetLoadStatusUpdate`, its `DeleteRegisteredLights` call (+0x3b3) and `EndScene` label (+0x400), the splash call in `GameDoOne` (+0xcd) and `RenderLoop_Show_Splash_Screen`'s entry are the same in the file (compared with stock) and in memory after FleetOpsHook (MemDiff's ranges: Roots' writes are +0x1b, +0x88, +0x343..+0x35c and, in `GameDoOne`, +0x17c..+0x30a and the file's +0x19b); `fo-scan.toml` `[verified]` keeps them. `inner_db` and `inner_pixels` stay down | the plan's "verify (cheap)" | a Roots update changing the sites |
+| 83 | **The screen of ours covers Roots' whole** (decision 73), frames between the load's steps only (0 of 4 inner sites); a map's sky is read as TGA only, so Roots' DDS faces give "the menu backdrop" (no sky) there | the A/B shows the cover; DDS sky faces are a later change of `a2fmt` use | the Roots developer, the user |
+| 84 | **Bench: `ui/bench-asi.sh` follows the executable's folder** (`Data/` on Roots), keeps the clone's own `UI.ini` (Roots' defaults) as the base for `S.K=V` keys, and leaves `retire/` to Armada II; `display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh ...` is the Setup line. Scenarios `fo-ui-loading` (the B side, `Hold=20`) and `fo-ui-loading-off` (`Loading.Enable=0`, the A side) | the bench's scripts wrote `$work/game/` | |
+| 85 | **`core.mission` is verified** by reading the bytes. The call of `ChatDisplay::Render` at 0x598a16 is the same in the file (compared with stock) and in memory after FleetOpsHook (MemDiff: nothing there). FleetOpsHook's writes are a trampoline at `ChatDisplay::Render`'s entry, which the UI only calls, so Roots' version runs whole, and +0x245 in `Armada_RenderFrame`. Both functions carry `ui.core.mission` in `[verified]` | the plan's "verify (cheap)" | a Roots update changing the call |
+| 86 | **The Refit screen over a mission opens with Ctrl and `[UI] RefitKey`**, a virtual-key code: 123 (Ctrl+F12) in Roots' defaults, 0 (none) in the shipped `UI.ini`, so stock does not change. The key is kept from the engine. It opens the same modal (`refit::mission_frame`), drawn last in the mission frame; Esc, Done or the key again closes it. The game is not paused, and the rows count as "over a mission" for the network locks and the "next mission" badges | decision 62. F12 is a build-menu slot in stock (QOL-1), and Ctrl+F12 is bound nowhere we know of. A key of the UI's is the smallest addition, and needs neither Options nor the menu host | Roots' players, or the host reaching Roots' Options (step 7) |
+| 87 | **Input on Roots is taken at the two message functions' entries** (decision 71 carried out). A new hook, `core.input_callee`, is chosen by the profile value `core_input_at_callee` (0 on stock, 1 in `profiles/fo-roots-5.0Z11/ui.core.toml`). The six entry bytes, checked, move to a trampoline (`core_input_moved`). A naked thunk notes the caller, records the message and keeps what capture takes; the rest runs through the trampoline. The drains are stock's. Stock keeps `WindowProc`'s calls | the bench: the engine's `WindowProc` never runs on Roots, and FleetOpsHook's form calls both functions | a Roots build that calls them elsewhere |
+| 88 | **Whether the HUD is hidden is read from the panel the render lists name** (`hud::flag_hidden(hud::ship_display())`) on every build. The hook `core.reads_hud_hidden` and its `shipDisplay` symbol are gone | decision 64 | a build whose lists do not hold the panel |
+| 89 | **The render lists are logged whenever they change** (in practice once per mission, at most 8 times a game), whichever HUD part is on. The thread's windows are logged with their classes, threads and window procedures at the first device release and the first loading frame, the engine's window at the first mission frame, and each message function's callers once | step 2's finding: nothing logged the lists with the HUD off | |
+| 90 | **The Refit screen's defaults on Roots are the installed `UI.ini`'s.** The install puts `ui/defaults/fo-roots.ini` over it, and the screen's base for a row is the plugin ini's value; the compiled default applies only to a key `UI.ini` lacks, and the install never leaves one out. So there is no per-game defaults table. The two loading-screen hooks that draw inside a step (`inner_db`, `inner_pixels`) no longer name the `Loading.Enable` row: on Roots they stand down by design, and the screen's note claimed the whole screen stood down | the screen read Roots' values in the bench run; the note was misleading there | a row whose key is not in `UI.ini` |
+| 91 | **The UI's file system follows the game** (`ui/src/files.rs`, `GAMES` by the executable's name, as render3d's). Roots' layout mounts `Textures\` with `.tga`, then `.dds`. A map's sky face is read with `a2fmt::image`, either format. Roots' mods (`Data\Mods\<name>`) are not mounted for the UI | step 2's `sky none` was the mount; DDS costs nothing with `a2fmt` | a UI part reading a mod's files |
+| 92 | **A walk over the engine's lists follows only pointers.** Each list and its head is checked with `VirtualQuery`; each node, entry, component and vtable must be an aligned user-range address; a list holding anything else counts as empty. The UI sends no window message from inside a frame (no `GetWindowTextA`) | the first mission frame on Roots faulted in the walk over views 6 to 8 | |
+| 93 | **`fo-ui-standdown` is compared with a reference run.** `fo-ui-standdown-ref` (Display8 and Render3D, no `UI.asi`) records the main menu and the Instant Action setup screen as the baseline `fo-ui-standdown`. The UI run, with every part at 0 (`Loading.Enable=0` and `UI.RefitKey=0` over Roots' defaults), must match with at most 0.05% of pixels more than 4/255 off (the first run differed only at the pointer: 102 and 152 pixels, 0.008% and 0.012%); the match is judged by eye, since a skirmish is not pixel-repeatable | the plan's "pixel-exact" holds where the game itself is repeatable | |
+| 94 | **A bar of ours on Roots keeps the range rings only as a skin of the stock bar**: drawn over the stock buttons' own rectangles (the palette's origin plus each button's rectangle, both the engine's objects), with the stock bar left to simulate and to own the pointer, so the stock button's hover state, which the ring follows, is set by the engine itself and nothing of FleetOpsHook's memory is read. A bar laid out differently (the 5x3 grid, any cell off the stock rectangle) or a palette taken by the panel switch's mouse skip loses the rings. The skin's drawing skip is `RenderAll`'s alone; `RefreshOwner` is not skipped for the palette | the ring is on screen exactly while the pointer is on a weapon button's rectangle and gone on any other button (step 5, `fo-ui-bar-measure`); the hover byte is the engine's `StandardButton::Simulate` result and is set whatever the cursor owner is; the bar of ours was not yet drawn, so the claim is confirmed only for the hover state | the first bench of step 6 (ring with the skin drawn), or Roots changing its ring condition |
+| 95 | **Roots' bar is one row in the mode in use** (mode 1, 14 columns by 20 rows in `use`, `staticA` and `staticB`; the floating 3 by 7 is only the stock field), the shown buttons packed in slot order (`preferredPosition` places nothing), 88 canvas units apart, each rectangle local to the palette's origin. A bar of ours reads the shown buttons in slot order and wraps at `use` columns; the 5x3 plan of the stock bar does not apply. The longest list seen is 11 (a construction ship's buildings, cancel and back); several weapons of one `classLabel`, the floating mode and a list over 14 are **not measured** (no start unit has more than one special weapon, no control for the floating mode was found) | step 5's per-selection table (private notes `fo6-step5.md`); a build list over 14 wraps by `use` columns in the engine, not seen | a ship with several special weapons, or a way to the floating mode, on the bench |
+| 120 | **`hud.panels` is verified on Roots**: `DisplayInterface::RenderAll` is FleetOpsHook's trampoline at its entry and the stock body runs behind it, so the panel switch's two sites (the Render call in `RenderAll`, `RefreshOwner`'s CursorOver call) are stock's in the file and in memory | MemDiff, no changed range touches either; the resource strip is hidden where ours draws and the mouse works | a Roots build that changes either call |
+| 121 | **`hud.order_ring` is verified** (`cOverViewImp::mRenderWhere`'s edits are FleetOpsHook's own calls, away from the two DrawQuad calls the hook takes), `hud.footprints` through the callee rule; `HUD.Overview` is on, the drag box stays the engine's | the placement footprint is ours in the bench, the move marker is drawn at the click; no crash, no VUID | a Roots build with another marker |
+| 122 | **`panels.presses` is verified** (`Program::DisplayInputProcess`'s entry is a trampoline, the ResetVisibility call the hook takes is stock's): a press of ours is made at the engine's simulate pass | `panels: click idle`, `click view` and `click Continue` took effect on Roots' own buttons | a build that moves the call |
+| 123 | **`hud.frame_rate`, `panels.chat` and `panels.trade` are verified** against `Armada_RenderFrame`'s one edit (+0x245) | their call sites are stock's in memory; the chat's entry follows FleetOpsHook's text input | an edit near them |
+| 124 | **Where Roots' string table gives no word, the UI uses its own**: the pause box ("Game paused", "Continue") when `GUI_POP_PAUSE_*` come back empty, and a resource's name from the content set when its tooltip's first line is not a word | the first bench showed a blank box and `?` for two resources; the tooltips are string-table tokens | Roots' table carrying the keys |
+| 125 | **Roots' defaults** (`ui/defaults/fo-roots.ini`): `HUD.Enable=1` with `Resources`, `Buttons`, `Pause`, `Chat`, `Selection`, `FrameRate` and `Overview` on; the info panel, bar, minimap, messages, objectives, replay, overlay text, fade, team texts, tooltips, comm and the rest off | each is on only with a passing Roots scenario (`fo-ui-<panel>`); the others have no trigger in a skirmish or are decisions 65 and 66 | a scenario for each of the rest |
+| 126 | **The UI plays no button sound on Roots**: a profile value `panels_sound_ours` (1 on stock, 0 on Roots) gates `panels.sound`, and the HUD no longer requires it | every audio call site is FleetOpsHook's FMOD (`operator new` and the constructor re-pointed at each site), its object size unknown; a stock-size object under its vtable could corrupt the heap, so it was not played | the size and constructor measured, or the Roots developer's word |
+| 127 | **The selection overlay is ours on Roots**, replacing FleetOpsHook's `SelectionDisplay` callbacks while it is on (its group colours and tooltips are not drawn) | a passing scenario with Roots' unit tooltip, bar and info strip unchanged; the group colours were not seen in a skirmish | a Roots game showing a loss, then `HUD.Selection=0` |
+
+### Risks and unknowns
+
+1. **"Ready" is not "right".** Globals and objects FleetOpsHook replaces are reported,
+   not marked, so `syms` lets in hooks that would read stock's dead `shipDisplay` or a
+   21-button array that is now a pointer: wrong pictures at best, a crash at worst. Step 1
+   closes the three found; every `reads_` hook is checked in game before its panel is on.
+2. **The window and its messages.** Roots' own form, two devices on two windows, and
+   FleetOpsHook's activation handling: input capture may miss the first message of a
+   burst, or read the pointer against the wrong window. Measured first in step 3.
+3. **Roots' feedback lives on the stock components' mouse state** (the range rings of the
+   bar's and the info panel's hover): any panel of ours that takes the mouse from them
+   takes that feedback away. Known for two panels, possibly more.
+4. **FMOD.** The UI makes its click and rollover sounds with the engine's
+   `AudioSound2D`, whose class FleetOpsHook replaced: silent, or worse. Measured before
+   any panel with sounds is on.
+5. **Roots updates** move the bar's count, the replaced objects or the dialog path; the
+   profile values and `fo-scan.py` catch the code, not the meaning, so each Roots release
+   re-runs the UI scenarios.
+6. **The look.** The UI's own style may not suit Roots, which has strong per-race art;
+   the agreement is to try it, and the Roots developer decides.
+7. **Unknown**: whether FleetOpsHook's `DialogBoxParamA` ever reaches `ArmadaL.exe`'s
+   import table; what 21:9 and wider pick for a layout; where Roots' cursor is drawn on
+   our device; how many buttons a real Roots fleet puts in the bar.
+
 ## Acceptance
 
 | Scenario | Shows |
@@ -354,7 +716,11 @@ identity; a note when they move the object-loop edit or the craft wrappers.
 | `fo-syms` | "symbols: N/N resolved" with Roots' marked symbols listed as standing down; the negative test both ways |
 | `fo-passthrough` | Roots with Display8 alone on Vulkan matches Roots as it ships (DxWrapper, then DXVK) at a paused tick, in the front end and in a mission, within the tolerance stock's passthrough references are judged by |
 | `fo-render3d-*` | per module, Roots' scenes with the module on, and with it off the passthrough look |
-| `fo-ui-refit` | the Refit screen in Roots' Options, a row toggled and kept after a relaunch |
+| `fo-ui-mission` | the UI's mission frame on Roots, input at the message functions' entries, a click on the Refit screen kept from the engine (passes, 2026-11-06) |
+| `fo-ui-refit` | the Refit screen over a mission by Ctrl+F12 (decision 86), a row toggled and kept after a relaunch (passes, 2026-11-06) |
+| `fo-ui-standdown-ref`, `fo-ui-standdown` | every UI part at 0: the shell pixel for pixel as with Display8 and Render3D alone (passes, 0 pixels differ, 2026-11-06) |
+| `fo-ui-loading` | the loading screen of ours over Roots' own, 1280x960 (passes, 2026-11-06: `loading: standing down` not in the log, the hold, then Roots' HUD with no panel of ours; the ring-of-dots step is left to a person, the judge sees one shot, a pixel diff of the ring's crop between the two shots shows it turning) |
+| stock `ui-hud-bar`, `ui-loading` | 1280x720, `--install .` on the step 3 branch: `ui-hud-bar` passes (70 steps); `ui-loading` passes but for the ring step, which the judge cannot see (review; 2026-11-06) |
 | `fo-multiplayer` | two Roots games with the refit's visual plugins join and play past the file check |
 | the stock set | unchanged on stock 1.1: the Roots work must not move a single stock pixel |
 

@@ -147,6 +147,9 @@ extern "thiscall" fn loading_frame(storm3d: usize) {
     if n <= 3 || n % 20 == 0 {
         log!("loading: frame {} at {:.0}%", n, progress().unwrap_or(0.0) * 100.0);
     }
+    if n == 1 {
+        super::input::log_windows("the first loading frame");
+    }
     if s.own {
         departure(super::d3d8_device());
     }

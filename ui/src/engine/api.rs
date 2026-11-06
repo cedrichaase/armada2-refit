@@ -82,7 +82,7 @@ pub mod dialogs {
 
 pub mod hud {
     pub use crate::engine::hud::{
-        components, flag_hidden, functions_stock, hidden, in_view, install, installed, is_taken, log_components,
+        component_named, components, cursor_owner, flag_hidden, INFO_PANEL_TAKEN, functions_stock, hidden, in_view, install, installed, is_taken, log_components, log_render_lists,
         map_radar, name, palette_ptr, panel_rect, set_pointer_over_ui, set_taken, ship_display, take_tooltips, tooltip,
         video_playing,
     };
@@ -192,7 +192,7 @@ pub mod sprite {
 
 pub mod topbar {
     pub use crate::engine::topbar::{
-        amount_text, button, button_panel, colour, functions_stock, resource_panel, shown, tooltip, Which,
+        amount_text, button, button_panel, colour, functions_stock, measure, resource_panel, shown, tooltip, Which,
     };
 }
 

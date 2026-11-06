@@ -86,7 +86,7 @@ FO-2/FO-3 (the file diff, the log reader and the mark writer) and runs, in order
    (an entry's `symbol`, or its `in`). File changes are `detour`/`edit`, the rest
    `runtime`. A function listed as a *callee* in `fo-scan.toml` (ours only call it) whose
    changes all lie in its first eight bytes (a jump or trampoline) does not stand its
-   hooks down: its entries get `check = ""` in a child plugin file. `[[disable]]` blocks
+   hooks down: its entries get `check = ""` in a child plugin file. A function in `callees_whole` (ours only call it, and Roots may change it anywhere in the body: `ActionMode::GetAction`'s observer fix) is treated alike; when a hook of ours also sits inside it (`ST3D_Texture::DemandLoad`, patched by the loading screen's `inner_pixels`) it stays marked and only the hooks that merely call it are written as `verified`. `[[disable]]` blocks
    also come from `fo-scan.toml`. Changed globals, vtables and slots of ours are only
    reported. The report goes to `$A2_DATA/research/fo-roots/scan-<build>.md`;
 5. `--verify` runs `a2test syms --game fo-roots` and `negative.sh` (its case (e) takes the

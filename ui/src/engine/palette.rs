@@ -2,8 +2,9 @@
 //! buttons. Read by `hud::bar` (HUD.md, "The button bar").
 //!
 //! The bar's `Update` (in its `AlwaysGameSimulate`) works out the buttons for what is
-//! selected and the menu open (`mUpdateButtonsAndPosition`), and keeps them in 21
-//! `ControlButton`s at `+0x28`. A button is shown when its `IsValid` (vtable `+0x1c`)
+//! selected and the menu open (`mUpdateButtonsAndPosition`), and keeps them in
+//! `ControlButton`s at `+0x28`: 21 inline on stock, behind a pointer on Roots (up to 64:
+//! the profile's `palette_n_slots` and `palette_slots_indirect`). A button is shown when its `IsValid` (vtable `+0x1c`)
 //! says so, which is when `Render` draws it. Each holds a `CommandInfoClass` (`+0x88`)
 //! or a `ModeInfo` (`+0x84`), its state (`+0x34`: 0 disabled, 2 active, else normal)
 //! and, once drawn, its icon sprite (`+0x2c`, looked up by the name the command or
@@ -21,7 +22,7 @@ fn a(s: a2engine::Sym) -> usize {
 }
 use alloc::string::String;
 
-// `PopupPaletteImp+0x28` holds `ControlButton *[21]`; `+0x110` is the palette mode (1 the
+// `PopupPaletteImp+0x28` holds `ControlButton *[21]` (stock; Roots: a pointer to the array); `+0x110` is the palette mode (1 the
 // bar, 2 the build-locked bar, else floating) and `+0x124` the menu shown (`eMenuType`:
 // 0 the top level, 1 orders, 2..4 build, evolve, research, 8 the top level again after a
 // menu closed). The hotkey tables' counts (commands `+0xcc`, build items `+0xd8`,
@@ -61,9 +62,23 @@ pub fn menu(p: usize) -> u32 {
     if p == 0 { 0 } else { unsafe { rd(p + field::PALETTE_MENU()) } }
 }
 
-/// The `i`-th of the bar's 21 buttons (0 if there is none).
+/// Whether the button array sits behind a pointer held at `+0x28` (the profile's
+/// `palette_slots_indirect`: Roots) rather than inline there (stock).
+#[inline(always)]
+pub fn slots_indirect() -> bool { value::PALETTE_SLOTS_INDIRECT() != 0 }
+
+/// The `i`-th of the bar's buttons (0 if there is none): of `n_slots()`, 21 inline on
+/// stock, 64 behind a pointer on Roots (both from the build's profile).
 pub fn slot(p: usize, i: usize) -> usize {
-    if i >= n_slots() { 0 } else { peek(p, field::PALETTE_SLOTS() + 4 * i) }
+    if i >= n_slots() {
+        return 0;
+    }
+    if slots_indirect() {
+        let base = peek(p, field::PALETTE_SLOTS());
+        if base == 0 { 0 } else { peek(base, 4 * i) }
+    } else {
+        peek(p, field::PALETTE_SLOTS() + 4 * i)
+    }
 }
 
 /// Whether the button is shown (`IsValid`).
@@ -231,4 +246,144 @@ pub fn press(b: usize) -> bool {
     let f: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(rd::<usize>(rd::<usize>(b) + field::PALETTE_VT_PRESS())) };
     unsafe { f(b) };
     true
+}
+
+// ---- the bar measured (PLAN-FLEETOPS.md, FO-6 step 5) -----------------------------------
+//
+// Where the bar is not the stock one (`palette_slots_indirect`: Roots, whose FleetOpsHook
+// owns the array, the slot plan and the range rings that follow the pointer), the UI draws
+// nothing of it but logs what the engine's own objects say: the mode and its columns and
+// rows, the buttons shown and what each is, and the button under the pointer with the
+// states `StandardButton::Simulate` keeps (hover, pressed) and who owns the pointer. Each
+// log line is once per change and the counts are capped; nothing is written to the engine.
+
+static mut M_LAYOUT_SIG: u64 = 0;
+static mut M_HOVER_SIG: u64 = 0;
+static mut M_LAYOUT_LINES: u32 = 0;
+static mut M_HOVER_LINES: u32 = 0;
+const M_LAYOUT_MAX: u32 = 40;
+const M_HOVER_MAX: u32 = 120;
+
+fn fnv(h: &mut u64, v: u64) {
+    *h = (*h ^ v).wrapping_mul(0x0000_0100_0000_01b3);
+}
+
+fn sane(p: usize) -> bool {
+    p >= 0x10000 && p < 0x8000_0000 && p % 4 == 0 && super::readable(p, 0x40)
+}
+
+/// What a button is, as a number that does not change when the bar rebuilds its `CommandInfoClass`
+/// and `ModeInfo` objects (they are new each time): a command by the bytes of its name, a mode by
+/// its kind and the class, weapon or fixed-button index it names.
+fn identity(b: usize) -> u64 {
+    let cmd = peek(b, field::PALETTE_BTN_COMMAND());
+    let mode = peek(b, field::PALETTE_BTN_MODE());
+    let mut h = 0xcbf2_9ce4_8422_2325u64;
+    if sane(cmd) {
+        let name: [u8; 16] = unsafe { rd(cmd + field::PALETTE_CMD_NAME()) };
+        for c in name {
+            fnv(&mut h, c as u64);
+        }
+    } else if sane(mode) {
+        let kind = unsafe { rd::<u32>(mode + field::PALETTE_MODE_KIND()) };
+        fnv(&mut h, kind as u64);
+        fnv(&mut h, match kind {
+            1 => peek(mode, field::PALETTE_MODE_CLASS()),
+            2 => { let w = peek(mode, field::PALETTE_MODE_WEAPON()); if sane(w) { peek(w, field::PALETTE_WEAPON_PRJID()) } else { 0 } }
+            _ => unsafe { rd::<u32>(mode + field::PALETTE_MODE_INDEX()) as usize },
+        } as u64);
+    }
+    h
+}
+
+/// Logs the bar when what it shows or what is under the pointer has changed.
+#[allow(static_mut_refs)]
+pub fn log_measure() {
+    if !slots_indirect() || !readable() || unsafe { M_LAYOUT_LINES >= M_LAYOUT_MAX && M_HOVER_LINES >= M_HOVER_MAX } {
+        return;
+    }
+    let p = palette();
+    if p == 0 || !sane(p) || !super::readable(p, 0x130) {
+        return;
+    }
+    let base = peek(p, field::PALETTE_SLOTS());
+    if !sane(base) || !super::readable(base, 4 * n_slots()) {
+        return;
+    }
+    // The buttons shown, by a cheap pass over raw values; names only when something changed.
+    let mut shown: alloc::vec::Vec<(usize, usize)> = alloc::vec::Vec::new();
+    let (mut lsig, mut hsig) = (0xcbf2_9ce4_8422_2325u64, 0xcbf2_9ce4_8422_2325u64);
+    let mut hover = usize::MAX;
+    let mut pressed = usize::MAX;
+    for i in 0..n_slots() {
+        let b = slot(p, i);
+        if !sane(b) || !super::readable(b, 0x90) || !sane(peek(b, 0)) || !valid(b) {
+            continue;
+        }
+        shown.push((i, b));
+        fnv(&mut lsig, i as u64);
+        fnv(&mut lsig, identity(b));
+        fnv(&mut lsig, state(b) as u64);
+        if unsafe { rd::<u8>(b + field::PALETTE_BTN_HOVER()) } != 0 && hover == usize::MAX {
+            hover = i;
+        }
+        if unsafe { rd::<u8>(b + field::PALETTE_BTN_PRESSED()) } != 0 && pressed == usize::MAX {
+            pressed = i;
+        }
+    }
+    let (m, menu_now) = (mode(p), menu(p));
+    let r = |o: usize| -> u32 { unsafe { rd::<u32>(p + o) } };
+    let (uc, ur) = (r(field::PALETTE_USE_COLS()), r(field::PALETTE_USE_ROWS()));
+    let hidden = unsafe { rd::<u8>(p + field::PALETTE_HIDDEN()) };
+    for v in [m as u64, menu_now as u64, uc as u64, ur as u64, hidden as u64] {
+        fnv(&mut lsig, v);
+    }
+    let owner = super::hud::cursor_owner();
+    let on_bar = owner == p;
+    fnv(&mut hsig, hover as u64);
+    fnv(&mut hsig, pressed as u64);
+    fnv(&mut hsig, on_bar as u64);
+    if hover != usize::MAX {
+        fnv(&mut hsig, shown.iter().find(|(i, _)| *i == hover).map_or(0, |&(_, b)| state(b)) as u64);
+    }
+    unsafe {
+        if lsig != M_LAYOUT_SIG && M_LAYOUT_LINES < M_LAYOUT_MAX {
+            M_LAYOUT_SIG = lsig;
+            M_LAYOUT_LINES += 1;
+            let listed = super::hud::component_named("PopupPalette");
+            crate::log!(
+                "bar: measure mode={} menu={} use={}x{} floating={}x{} staticA={}x{} staticB={}x{} hidden={} shown={} of {} (palette {:#x}, render list {:#x})",
+                m, menu_now, uc, ur,
+                r(field::PALETTE_FLOAT_COLS()), r(field::PALETTE_FLOAT_ROWS()),
+                r(field::PALETTE_STATIC_A_COLS()), r(field::PALETTE_STATIC_A_ROWS()),
+                r(field::PALETTE_STATIC_B_COLS()), r(field::PALETTE_STATIC_B_ROWS()),
+                hidden, shown.len(), n_slots(), p, listed
+            );
+            for chunk in shown.chunks(8) {
+                let mut line = String::new();
+                for &(i, b) in chunk {
+                    let d = describe(b);
+                    let pos = d.pos.map_or(String::new(), |(c, r)| crate::sfmt!("@{},{}", c, r));
+                    line.push_str(&crate::sfmt!(" {}:{:?}:{}{}:s{}", i, d.kind, d.name, pos, state(b)));
+                }
+                crate::log!("bar:  slots{}", line);
+            }
+        }
+        if hsig != M_HOVER_SIG && M_HOVER_LINES < M_HOVER_MAX {
+            M_HOVER_SIG = hsig;
+            M_HOVER_LINES += 1;
+            let who = if owner == 0 { "none" } else if on_bar { "the bar" } else { super::hud::name(owner) };
+            match shown.iter().find(|(i, _)| *i == hover) {
+                Some(&(i, b)) => {
+                    let d = describe(b);
+                    let rc: [i32; 4] = rd(b + field::PALETTE_BTN_RECT());
+                    crate::log!(
+                        "bar: hover slot {} {:?} {} state={} pressed={} rect=[{},{},{},{}] pointer owner: {} (button owner {:#x})",
+                        i, d.kind, d.name, state(b), pressed != usize::MAX, rc[0], rc[1], rc[2], rc[3], who, peek(b, field::PALETTE_BTN_OWNER())
+                    );
+                }
+                None => crate::log!("bar: hover none, pressed={} pointer owner: {}", pressed != usize::MAX, who),
+            }
+        }
+    }
 }

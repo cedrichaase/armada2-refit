@@ -44,38 +44,38 @@ pub mod sym {
     pub const PANELS_SOUND2D: a2engine::Sym = a2engine::Sym(83);
     pub const PANELS_CLICK_SOUND: a2engine::Sym = a2engine::Sym(84);
     pub const PANELS_ROLLOVER_SOUND: a2engine::Sym = a2engine::Sym(85);
-    pub const PANELS_MISSION_RACE: a2engine::Sym = a2engine::Sym(89);
-    pub const PANELS_COMM: a2engine::Sym = a2engine::Sym(91);
-    pub const PANELS_VT_COMM: a2engine::Sym = a2engine::Sym(92);
-    pub const PANELS_VT_BAR: a2engine::Sym = a2engine::Sym(93);
-    pub const PANELS_DROP: a2engine::Sym = a2engine::Sym(94);
-    pub const PANELS_VT_DROP: a2engine::Sym = a2engine::Sym(95);
-    pub const PANELS_LOAD: a2engine::Sym = a2engine::Sym(96);
-    pub const PANELS_VT_LOAD: a2engine::Sym = a2engine::Sym(97);
-    pub const PANELS_VT_DROP_TEXT: a2engine::Sym = a2engine::Sym(98);
-    pub const PANELS_VT_LOAD_TEXT: a2engine::Sym = a2engine::Sym(99);
-    pub const PANELS_DROP_TEXT_INFO: a2engine::Sym = a2engine::Sym(100);
-    pub const PANELS_LOAD_TEXT_INFO: a2engine::Sym = a2engine::Sym(101);
-    pub const PANELS_DROP_TEXT_SLOT: a2engine::Sym = a2engine::Sym(102);
-    pub const PANELS_LOAD_TEXT_SLOT: a2engine::Sym = a2engine::Sym(103);
-    pub const PANELS_CB_PLAYER_SELECT: a2engine::Sym = a2engine::Sym(104);
-    pub const PANELS_CB_CHAT: a2engine::Sym = a2engine::Sym(105);
-    pub const PANELS_CB_ENEMY: a2engine::Sym = a2engine::Sym(106);
-    pub const PANELS_CB_NEUTRAL: a2engine::Sym = a2engine::Sym(107);
-    pub const PANELS_CB_ALLY: a2engine::Sym = a2engine::Sym(108);
-    pub const PANELS_CB_MSG_ALL: a2engine::Sym = a2engine::Sym(109);
-    pub const PANELS_CB_MSG_ALLIES: a2engine::Sym = a2engine::Sym(110);
-    pub const PANELS_CB_MSG_ENEMIES: a2engine::Sym = a2engine::Sym(111);
-    pub const PANELS_CB_MSG_PRIVATE: a2engine::Sym = a2engine::Sym(112);
-    pub const PANELS_CB_GIVE_UNITS: a2engine::Sym = a2engine::Sym(113);
-    pub const PANELS_CB_OKAY: a2engine::Sym = a2engine::Sym(114);
-    pub const PANELS_CB_UP: a2engine::Sym = a2engine::Sym(115);
-    pub const PANELS_CB_DOWN: a2engine::Sym = a2engine::Sym(116);
-    pub const PANELS_CB_GIVE: a2engine::Sym = a2engine::Sym(117);
-    pub const PANELS_CB_VICTORY: a2engine::Sym = a2engine::Sym(118);
-    pub const PANELS_CB_LATENCY: a2engine::Sym = a2engine::Sym(119);
-    pub const PANELS_CB_DROP: a2engine::Sym = a2engine::Sym(120);
-    pub const PANELS_CB_AI: a2engine::Sym = a2engine::Sym(121);
+    pub const PANELS_MISSION_RACE: a2engine::Sym = a2engine::Sym(90);
+    pub const PANELS_COMM: a2engine::Sym = a2engine::Sym(92);
+    pub const PANELS_VT_COMM: a2engine::Sym = a2engine::Sym(93);
+    pub const PANELS_VT_BAR: a2engine::Sym = a2engine::Sym(94);
+    pub const PANELS_DROP: a2engine::Sym = a2engine::Sym(95);
+    pub const PANELS_VT_DROP: a2engine::Sym = a2engine::Sym(96);
+    pub const PANELS_LOAD: a2engine::Sym = a2engine::Sym(97);
+    pub const PANELS_VT_LOAD: a2engine::Sym = a2engine::Sym(98);
+    pub const PANELS_VT_DROP_TEXT: a2engine::Sym = a2engine::Sym(99);
+    pub const PANELS_VT_LOAD_TEXT: a2engine::Sym = a2engine::Sym(100);
+    pub const PANELS_DROP_TEXT_INFO: a2engine::Sym = a2engine::Sym(101);
+    pub const PANELS_LOAD_TEXT_INFO: a2engine::Sym = a2engine::Sym(102);
+    pub const PANELS_DROP_TEXT_SLOT: a2engine::Sym = a2engine::Sym(103);
+    pub const PANELS_LOAD_TEXT_SLOT: a2engine::Sym = a2engine::Sym(104);
+    pub const PANELS_CB_PLAYER_SELECT: a2engine::Sym = a2engine::Sym(105);
+    pub const PANELS_CB_CHAT: a2engine::Sym = a2engine::Sym(106);
+    pub const PANELS_CB_ENEMY: a2engine::Sym = a2engine::Sym(107);
+    pub const PANELS_CB_NEUTRAL: a2engine::Sym = a2engine::Sym(108);
+    pub const PANELS_CB_ALLY: a2engine::Sym = a2engine::Sym(109);
+    pub const PANELS_CB_MSG_ALL: a2engine::Sym = a2engine::Sym(110);
+    pub const PANELS_CB_MSG_ALLIES: a2engine::Sym = a2engine::Sym(111);
+    pub const PANELS_CB_MSG_ENEMIES: a2engine::Sym = a2engine::Sym(112);
+    pub const PANELS_CB_MSG_PRIVATE: a2engine::Sym = a2engine::Sym(113);
+    pub const PANELS_CB_GIVE_UNITS: a2engine::Sym = a2engine::Sym(114);
+    pub const PANELS_CB_OKAY: a2engine::Sym = a2engine::Sym(115);
+    pub const PANELS_CB_UP: a2engine::Sym = a2engine::Sym(116);
+    pub const PANELS_CB_DOWN: a2engine::Sym = a2engine::Sym(117);
+    pub const PANELS_CB_GIVE: a2engine::Sym = a2engine::Sym(118);
+    pub const PANELS_CB_VICTORY: a2engine::Sym = a2engine::Sym(119);
+    pub const PANELS_CB_LATENCY: a2engine::Sym = a2engine::Sym(120);
+    pub const PANELS_CB_DROP: a2engine::Sym = a2engine::Sym(121);
+    pub const PANELS_CB_AI: a2engine::Sym = a2engine::Sym(122);
 }
 
 pub mod hook {
@@ -133,62 +133,62 @@ pub mod field {
     #[inline(always)] pub fn PANELS_SENT_DILITHIUM() -> usize { super::TABLE.engine().field(a2engine::Sym(79)) }
     #[inline(always)] pub fn PANELS_SENT_LATINUM() -> usize { super::TABLE.engine().field(a2engine::Sym(80)) }
     #[inline(always)] pub fn PANELS_SENT_METAL() -> usize { super::TABLE.engine().field(a2engine::Sym(81)) }
-    #[inline(always)] pub fn PANELS_SB_HAS_SOUND() -> usize { super::TABLE.engine().field(a2engine::Sym(87)) }
-    #[inline(always)] pub fn PANELS_SB_HOVER_SOUND() -> usize { super::TABLE.engine().field(a2engine::Sym(88)) }
-    #[inline(always)] pub fn PANELS_RACE_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(90)) }
-    #[inline(always)] pub fn PANELS_C_TITLE() -> usize { super::TABLE.engine().field(a2engine::Sym(122)) }
-    #[inline(always)] pub fn PANELS_C_HEAD_PLAYER() -> usize { super::TABLE.engine().field(a2engine::Sym(123)) }
-    #[inline(always)] pub fn PANELS_C_HEAD_MESSAGE() -> usize { super::TABLE.engine().field(a2engine::Sym(124)) }
-    #[inline(always)] pub fn PANELS_C_HEAD_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(125)) }
-    #[inline(always)] pub fn PANELS_C_HEAD_ALLIANCE() -> usize { super::TABLE.engine().field(a2engine::Sym(126)) }
-    #[inline(always)] pub fn PANELS_C_GROUP_MESSAGE() -> usize { super::TABLE.engine().field(a2engine::Sym(127)) }
-    #[inline(always)] pub fn PANELS_C_GROUP_GIVE() -> usize { super::TABLE.engine().field(a2engine::Sym(128)) }
-    #[inline(always)] pub fn PANELS_C_LABEL_VICTORY() -> usize { super::TABLE.engine().field(a2engine::Sym(129)) }
-    #[inline(always)] pub fn PANELS_C_LABEL_LATENCY() -> usize { super::TABLE.engine().field(a2engine::Sym(130)) }
-    #[inline(always)] pub fn PANELS_C_MSG_0() -> usize { super::TABLE.engine().field(a2engine::Sym(131)) }
-    #[inline(always)] pub fn PANELS_C_MSG_1() -> usize { super::TABLE.engine().field(a2engine::Sym(132)) }
-    #[inline(always)] pub fn PANELS_C_MSG_2() -> usize { super::TABLE.engine().field(a2engine::Sym(133)) }
-    #[inline(always)] pub fn PANELS_C_MSG_3() -> usize { super::TABLE.engine().field(a2engine::Sym(134)) }
-    #[inline(always)] pub fn PANELS_C_GIVE_UNITS() -> usize { super::TABLE.engine().field(a2engine::Sym(135)) }
-    #[inline(always)] pub fn PANELS_C_OKAY() -> usize { super::TABLE.engine().field(a2engine::Sym(136)) }
-    #[inline(always)] pub fn PANELS_C_ROW_0() -> usize { super::TABLE.engine().field(a2engine::Sym(137)) }
-    #[inline(always)] pub fn PANELS_C_ROW_1() -> usize { super::TABLE.engine().field(a2engine::Sym(138)) }
-    #[inline(always)] pub fn PANELS_C_ROW_2() -> usize { super::TABLE.engine().field(a2engine::Sym(139)) }
-    #[inline(always)] pub fn PANELS_C_ROW_3() -> usize { super::TABLE.engine().field(a2engine::Sym(140)) }
-    #[inline(always)] pub fn PANELS_C_ROW_4() -> usize { super::TABLE.engine().field(a2engine::Sym(141)) }
-    #[inline(always)] pub fn PANELS_C_VICTORY() -> usize { super::TABLE.engine().field(a2engine::Sym(142)) }
-    #[inline(always)] pub fn PANELS_C_LATENCY() -> usize { super::TABLE.engine().field(a2engine::Sym(143)) }
-    #[inline(always)] pub fn PANELS_C_BAR_COUNT() -> usize { super::TABLE.engine().field(a2engine::Sym(144)) }
-    #[inline(always)] pub fn PANELS_C_BARS() -> usize { super::TABLE.engine().field(a2engine::Sym(145)) }
-    #[inline(always)] pub fn PANELS_C_TEAMS() -> usize { super::TABLE.engine().field(a2engine::Sym(146)) }
-    #[inline(always)] pub fn PANELS_C_ALLIANCES() -> usize { super::TABLE.engine().field(a2engine::Sym(147)) }
-    #[inline(always)] pub fn PANELS_C_SELECTED() -> usize { super::TABLE.engine().field(a2engine::Sym(148)) }
-    #[inline(always)] pub fn PANELS_TD_USER() -> usize { super::TABLE.engine().field(a2engine::Sym(149)) }
-    #[inline(always)] pub fn PANELS_TD_AMOUNT() -> usize { super::TABLE.engine().field(a2engine::Sym(150)) }
-    #[inline(always)] pub fn PANELS_TD_MIN() -> usize { super::TABLE.engine().field(a2engine::Sym(151)) }
-    #[inline(always)] pub fn PANELS_TD_MAX() -> usize { super::TABLE.engine().field(a2engine::Sym(152)) }
-    #[inline(always)] pub fn PANELS_B_PRESENT() -> usize { super::TABLE.engine().field(a2engine::Sym(153)) }
-    #[inline(always)] pub fn PANELS_B_SLOT() -> usize { super::TABLE.engine().field(a2engine::Sym(154)) }
-    #[inline(always)] pub fn PANELS_B_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(155)) }
-    #[inline(always)] pub fn PANELS_B_SHOW_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(156)) }
-    #[inline(always)] pub fn PANELS_B_SHOW_ALLIANCE() -> usize { super::TABLE.engine().field(a2engine::Sym(157)) }
-    #[inline(always)] pub fn PANELS_B_NAME_BUTTON() -> usize { super::TABLE.engine().field(a2engine::Sym(158)) }
-    #[inline(always)] pub fn PANELS_B_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(159)) }
-    #[inline(always)] pub fn PANELS_B_CHAT() -> usize { super::TABLE.engine().field(a2engine::Sym(160)) }
-    #[inline(always)] pub fn PANELS_B_TEAM_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(161)) }
-    #[inline(always)] pub fn PANELS_B_ALLIANCE_0() -> usize { super::TABLE.engine().field(a2engine::Sym(162)) }
-    #[inline(always)] pub fn PANELS_B_ALLIANCE_1() -> usize { super::TABLE.engine().field(a2engine::Sym(163)) }
-    #[inline(always)] pub fn PANELS_B_ALLIANCE_2() -> usize { super::TABLE.engine().field(a2engine::Sym(164)) }
-    #[inline(always)] pub fn PANELS_B_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(165)) }
-    #[inline(always)] pub fn PANELS_TEXT_INLINE() -> usize { super::TABLE.engine().field(a2engine::Sym(166)) }
-    #[inline(always)] pub fn PANELS_ALLIANCE_PENDING() -> usize { super::TABLE.engine().field(a2engine::Sym(167)) }
-    #[inline(always)] pub fn PANELS_TEXT_LABEL_KEY() -> usize { super::TABLE.engine().field(a2engine::Sym(168)) }
-    #[inline(always)] pub fn PANELS_VT_GET_INFORMATION() -> usize { super::TABLE.engine().field(a2engine::Sym(169)) }
-    #[inline(always)] pub fn PANELS_D_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(170)) }
-    #[inline(always)] pub fn PANELS_D_DROP() -> usize { super::TABLE.engine().field(a2engine::Sym(171)) }
-    #[inline(always)] pub fn PANELS_D_AI() -> usize { super::TABLE.engine().field(a2engine::Sym(172)) }
-    #[inline(always)] pub fn PANELS_L_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(173)) }
-    #[inline(always)] pub fn PANELS_L_MS() -> usize { super::TABLE.engine().field(a2engine::Sym(174)) }
+    #[inline(always)] pub fn PANELS_SB_HAS_SOUND() -> usize { super::TABLE.engine().field(a2engine::Sym(88)) }
+    #[inline(always)] pub fn PANELS_SB_HOVER_SOUND() -> usize { super::TABLE.engine().field(a2engine::Sym(89)) }
+    #[inline(always)] pub fn PANELS_RACE_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(91)) }
+    #[inline(always)] pub fn PANELS_C_TITLE() -> usize { super::TABLE.engine().field(a2engine::Sym(123)) }
+    #[inline(always)] pub fn PANELS_C_HEAD_PLAYER() -> usize { super::TABLE.engine().field(a2engine::Sym(124)) }
+    #[inline(always)] pub fn PANELS_C_HEAD_MESSAGE() -> usize { super::TABLE.engine().field(a2engine::Sym(125)) }
+    #[inline(always)] pub fn PANELS_C_HEAD_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(126)) }
+    #[inline(always)] pub fn PANELS_C_HEAD_ALLIANCE() -> usize { super::TABLE.engine().field(a2engine::Sym(127)) }
+    #[inline(always)] pub fn PANELS_C_GROUP_MESSAGE() -> usize { super::TABLE.engine().field(a2engine::Sym(128)) }
+    #[inline(always)] pub fn PANELS_C_GROUP_GIVE() -> usize { super::TABLE.engine().field(a2engine::Sym(129)) }
+    #[inline(always)] pub fn PANELS_C_LABEL_VICTORY() -> usize { super::TABLE.engine().field(a2engine::Sym(130)) }
+    #[inline(always)] pub fn PANELS_C_LABEL_LATENCY() -> usize { super::TABLE.engine().field(a2engine::Sym(131)) }
+    #[inline(always)] pub fn PANELS_C_MSG_0() -> usize { super::TABLE.engine().field(a2engine::Sym(132)) }
+    #[inline(always)] pub fn PANELS_C_MSG_1() -> usize { super::TABLE.engine().field(a2engine::Sym(133)) }
+    #[inline(always)] pub fn PANELS_C_MSG_2() -> usize { super::TABLE.engine().field(a2engine::Sym(134)) }
+    #[inline(always)] pub fn PANELS_C_MSG_3() -> usize { super::TABLE.engine().field(a2engine::Sym(135)) }
+    #[inline(always)] pub fn PANELS_C_GIVE_UNITS() -> usize { super::TABLE.engine().field(a2engine::Sym(136)) }
+    #[inline(always)] pub fn PANELS_C_OKAY() -> usize { super::TABLE.engine().field(a2engine::Sym(137)) }
+    #[inline(always)] pub fn PANELS_C_ROW_0() -> usize { super::TABLE.engine().field(a2engine::Sym(138)) }
+    #[inline(always)] pub fn PANELS_C_ROW_1() -> usize { super::TABLE.engine().field(a2engine::Sym(139)) }
+    #[inline(always)] pub fn PANELS_C_ROW_2() -> usize { super::TABLE.engine().field(a2engine::Sym(140)) }
+    #[inline(always)] pub fn PANELS_C_ROW_3() -> usize { super::TABLE.engine().field(a2engine::Sym(141)) }
+    #[inline(always)] pub fn PANELS_C_ROW_4() -> usize { super::TABLE.engine().field(a2engine::Sym(142)) }
+    #[inline(always)] pub fn PANELS_C_VICTORY() -> usize { super::TABLE.engine().field(a2engine::Sym(143)) }
+    #[inline(always)] pub fn PANELS_C_LATENCY() -> usize { super::TABLE.engine().field(a2engine::Sym(144)) }
+    #[inline(always)] pub fn PANELS_C_BAR_COUNT() -> usize { super::TABLE.engine().field(a2engine::Sym(145)) }
+    #[inline(always)] pub fn PANELS_C_BARS() -> usize { super::TABLE.engine().field(a2engine::Sym(146)) }
+    #[inline(always)] pub fn PANELS_C_TEAMS() -> usize { super::TABLE.engine().field(a2engine::Sym(147)) }
+    #[inline(always)] pub fn PANELS_C_ALLIANCES() -> usize { super::TABLE.engine().field(a2engine::Sym(148)) }
+    #[inline(always)] pub fn PANELS_C_SELECTED() -> usize { super::TABLE.engine().field(a2engine::Sym(149)) }
+    #[inline(always)] pub fn PANELS_TD_USER() -> usize { super::TABLE.engine().field(a2engine::Sym(150)) }
+    #[inline(always)] pub fn PANELS_TD_AMOUNT() -> usize { super::TABLE.engine().field(a2engine::Sym(151)) }
+    #[inline(always)] pub fn PANELS_TD_MIN() -> usize { super::TABLE.engine().field(a2engine::Sym(152)) }
+    #[inline(always)] pub fn PANELS_TD_MAX() -> usize { super::TABLE.engine().field(a2engine::Sym(153)) }
+    #[inline(always)] pub fn PANELS_B_PRESENT() -> usize { super::TABLE.engine().field(a2engine::Sym(154)) }
+    #[inline(always)] pub fn PANELS_B_SLOT() -> usize { super::TABLE.engine().field(a2engine::Sym(155)) }
+    #[inline(always)] pub fn PANELS_B_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(156)) }
+    #[inline(always)] pub fn PANELS_B_SHOW_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(157)) }
+    #[inline(always)] pub fn PANELS_B_SHOW_ALLIANCE() -> usize { super::TABLE.engine().field(a2engine::Sym(158)) }
+    #[inline(always)] pub fn PANELS_B_NAME_BUTTON() -> usize { super::TABLE.engine().field(a2engine::Sym(159)) }
+    #[inline(always)] pub fn PANELS_B_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(160)) }
+    #[inline(always)] pub fn PANELS_B_CHAT() -> usize { super::TABLE.engine().field(a2engine::Sym(161)) }
+    #[inline(always)] pub fn PANELS_B_TEAM_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(162)) }
+    #[inline(always)] pub fn PANELS_B_ALLIANCE_0() -> usize { super::TABLE.engine().field(a2engine::Sym(163)) }
+    #[inline(always)] pub fn PANELS_B_ALLIANCE_1() -> usize { super::TABLE.engine().field(a2engine::Sym(164)) }
+    #[inline(always)] pub fn PANELS_B_ALLIANCE_2() -> usize { super::TABLE.engine().field(a2engine::Sym(165)) }
+    #[inline(always)] pub fn PANELS_B_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(166)) }
+    #[inline(always)] pub fn PANELS_TEXT_INLINE() -> usize { super::TABLE.engine().field(a2engine::Sym(167)) }
+    #[inline(always)] pub fn PANELS_ALLIANCE_PENDING() -> usize { super::TABLE.engine().field(a2engine::Sym(168)) }
+    #[inline(always)] pub fn PANELS_TEXT_LABEL_KEY() -> usize { super::TABLE.engine().field(a2engine::Sym(169)) }
+    #[inline(always)] pub fn PANELS_VT_GET_INFORMATION() -> usize { super::TABLE.engine().field(a2engine::Sym(170)) }
+    #[inline(always)] pub fn PANELS_D_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(171)) }
+    #[inline(always)] pub fn PANELS_D_DROP() -> usize { super::TABLE.engine().field(a2engine::Sym(172)) }
+    #[inline(always)] pub fn PANELS_D_AI() -> usize { super::TABLE.engine().field(a2engine::Sym(173)) }
+    #[inline(always)] pub fn PANELS_L_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(174)) }
+    #[inline(always)] pub fn PANELS_L_MS() -> usize { super::TABLE.engine().field(a2engine::Sym(175)) }
 }
 
 pub mod value {
@@ -199,7 +199,8 @@ pub mod value {
     #[inline(always)] pub fn PANELS_REGION_ACTIVE() -> i32 { super::TABLE.engine().value(a2engine::Sym(70)) }
     #[inline(always)] pub fn PANELS_REGION_CHANGED() -> i32 { super::TABLE.engine().value(a2engine::Sym(71)) }
     #[inline(always)] pub fn PANELS_REGION_BUF_MAX() -> i32 { super::TABLE.engine().value(a2engine::Sym(72)) }
-    #[inline(always)] pub fn PANELS_SOUND2D_BYTES() -> i32 { super::TABLE.engine().value(a2engine::Sym(86)) }
+    #[inline(always)] pub fn PANELS_SOUND_OURS() -> i32 { super::TABLE.engine().value(a2engine::Sym(86)) }
+    #[inline(always)] pub fn PANELS_SOUND2D_BYTES() -> i32 { super::TABLE.engine().value(a2engine::Sym(87)) }
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
@@ -289,6 +290,7 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "panels_sound2d", symbol: "AudioSound2D::AudioSound2D", kind: a2engine::Kind::Fn },
     a2engine::SymDef { id: "panels_click_sound", symbol: "StandardButton::s_buttonClickSound", kind: a2engine::Kind::Global },
     a2engine::SymDef { id: "panels_rollover_sound", symbol: "StandardButton::s_buttonRolloverSound", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "panels_sound_ours", symbol: "panels_sound_ours", kind: a2engine::Kind::Value },
     a2engine::SymDef { id: "panels_sound2d_bytes", symbol: "AudioSound2D", kind: a2engine::Kind::Value },
     a2engine::SymDef { id: "panels_sb_has_sound", symbol: "ShellButton", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "panels_sb_hover_sound", symbol: "ShellButton", kind: a2engine::Kind::Field },
@@ -390,9 +392,9 @@ pub const HOOKS: &[a2engine::HookDef] = &[
     a2engine::HookDef { id: "ui.panels.topbar", run_unknown: false, rows: &[], syms: &[35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53] },
     a2engine::HookDef { id: "ui.panels.chat", run_unknown: false, rows: &[], syms: &[54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72] },
     a2engine::HookDef { id: "ui.panels.trade", run_unknown: false, rows: &[], syms: &[73, 74, 75, 76, 77, 78, 79, 80, 81] },
-    a2engine::HookDef { id: "ui.panels.sound", run_unknown: false, rows: &[], syms: &[82, 83, 84, 85, 86, 87, 88] },
-    a2engine::HookDef { id: "ui.panels.reads_race", run_unknown: false, rows: &[], syms: &[89, 90] },
-    a2engine::HookDef { id: "ui.panels.comm", run_unknown: false, rows: &[], syms: &[91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174] },
+    a2engine::HookDef { id: "ui.panels.sound", run_unknown: false, rows: &[], syms: &[82, 83, 84, 85, 86, 87, 88, 89] },
+    a2engine::HookDef { id: "ui.panels.reads_race", run_unknown: false, rows: &[], syms: &[90, 91] },
+    a2engine::HookDef { id: "ui.panels.comm", run_unknown: false, rows: &[], syms: &[92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175] },
 ];
 
 pub const BUILDS: &[a2engine::Build] = &[
@@ -404,7 +406,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 175,
+        n_resolved: 176,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x50bad0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x5c, 0x85, 0xc0], mask: &[], section: "", count: 0, value: 0 }, // panels_standard_button_press
@@ -493,6 +495,7 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x45fc50, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff], mask: &[], section: "", count: 0, value: 0 }, // panels_sound2d
             a2engine::Entry { present: true, addr: 0x764854, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_click_sound
             a2engine::Entry { present: true, addr: 0x764814, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_rollover_sound
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1 }, // panels_sound_ours
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 28 }, // panels_sound2d_bytes
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 236 }, // panels_sb_has_sound
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 240 }, // panels_sb_hover_sound
@@ -509,8 +512,8 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x6b5e18, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_vt_load_text
             a2engine::Entry { present: true, addr: 0x516ae0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_drop_text_info
             a2engine::Entry { present: true, addr: 0x518b70, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_load_text_info
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x64, vtable: 0x62, index: 9, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_drop_text_slot
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x65, vtable: 0x63, index: 9, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_load_text_slot
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x65, vtable: 0x63, index: 9, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_drop_text_slot
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x66, vtable: 0x64, index: 9, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_load_text_slot
             a2engine::Entry { present: true, addr: 0x510530, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_cb_player_select
             a2engine::Entry { present: true, addr: 0x510610, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_cb_chat
             a2engine::Entry { present: true, addr: 0x510550, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_cb_enemy
@@ -589,7 +592,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         modules: &[],
         blocked_mod: &[
         ],
-        n_resolved_mod: 175,
+        n_resolved_mod: 176,
     },
     a2engine::Build {
         name: "fo-roots-5.0Z11",
@@ -599,8 +602,8 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 145,
-        content: "stock",
+        n_resolved: 176,
+        content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x50bad0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x5c, 0x85, 0xc0], mask: &[], section: "", count: 0, value: 0 }, // panels_standard_button_press
             a2engine::Entry { present: true, addr: 0x481c90, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec], mask: &[], section: "", count: 0, value: 0 }, // panels_localize
@@ -688,6 +691,7 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x45fc50, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff], mask: &[], section: "", count: 0, value: 0 }, // panels_sound2d
             a2engine::Entry { present: true, addr: 0x764854, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_click_sound
             a2engine::Entry { present: true, addr: 0x764814, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_rollover_sound
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_sound_ours
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 28 }, // panels_sound2d_bytes
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 236 }, // panels_sb_has_sound
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 240 }, // panels_sb_hover_sound
@@ -704,8 +708,8 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x6b5e18, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_vt_load_text
             a2engine::Entry { present: true, addr: 0x516ae0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_drop_text_info
             a2engine::Entry { present: true, addr: 0x518b70, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_load_text_info
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x64, vtable: 0x62, index: 9, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_drop_text_slot
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x65, vtable: 0x63, index: 9, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_load_text_slot
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x65, vtable: 0x63, index: 9, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_drop_text_slot
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0x66, vtable: 0x64, index: 9, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_load_text_slot
             a2engine::Entry { present: true, addr: 0x510530, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_cb_player_select
             a2engine::Entry { present: true, addr: 0x510610, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_cb_chat
             a2engine::Entry { present: true, addr: 0x510550, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // panels_cb_enemy
@@ -779,13 +783,13 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 644 }, // panels_l_ms
         ],
         blocked: &[
-            a2engine::Block { hook: 2, symbol: "Program::DisplayInputProcess", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Program::DisplayInputProcess is changed by fo-roots-5.0Z11, not yet verified" },
-            a2engine::Block { hook: 7, symbol: "Armada_RenderFrame", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Armada_RenderFrame is changed by fo-roots-5.0Z11, not yet verified" },
-            a2engine::Block { hook: 8, symbol: "Armada_RenderFrame", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Armada_RenderFrame is changed by fo-roots-5.0Z11, not yet verified" },
         ],
         file_crc: &[a2engine::FileCrc { section: ".text", crc: 0xef690537 }, a2engine::FileCrc { section: ".test", crc: 0xe7a4061b }],
         modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
         blocked_mod: &[
+            a2engine::Block { hook: 2, symbol: "Program::DisplayInputProcess", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: Program::DisplayInputProcess is patched by FleetOpsHook.dll, which is not the profiled one" },
+            a2engine::Block { hook: 7, symbol: "Armada_RenderFrame", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: Armada_RenderFrame is patched by FleetOpsHook.dll, which is not the profiled one" },
+            a2engine::Block { hook: 8, symbol: "Armada_RenderFrame", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: Armada_RenderFrame is patched by FleetOpsHook.dll, which is not the profiled one" },
             a2engine::Block { hook: 9, symbol: "operator new", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: operator new is patched by FleetOpsHook.dll, which is not the profiled one" },
         ],
         n_resolved_mod: 138,
@@ -793,8 +797,8 @@ pub const BUILDS: &[a2engine::Build] = &[
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 12] = [const { core::sync::atomic::AtomicU64::new(0) }; 12];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 175] = [const { core::sync::atomic::AtomicU8::new(0) }; 175];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 175] = [const { core::sync::atomic::AtomicUsize::new(0) }; 175];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 176] = [const { core::sync::atomic::AtomicU8::new(0) }; 176];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 176] = [const { core::sync::atomic::AtomicUsize::new(0) }; 176];
 static NOTES: [a2engine::Note; 12] = [const { a2engine::Note::new() }; 12];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 

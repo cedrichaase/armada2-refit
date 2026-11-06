@@ -764,6 +764,18 @@ kind = "global"
 addr = 0x764814
 used_by = ["panels.sound"]
 
+# 1 where the UI makes the buttons' sounds itself (an AudioSound2D of the stock size, made
+# with the game's operator new); 0 where every call site makes them another way. Fleet
+# Operations: Roots re-points both the operator new call and the constructor call at every
+# stock site to FleetOpsHook's own FMOD classes, whose object is not the stock size, so the
+# UI plays no button sound there (PLAN-FLEETOPS.md, FO-6 step 4, decision 126).
+[[sym]]
+id = "panels_sound_ours"
+symbol = "panels_sound_ours"
+kind = "value"
+value = 1
+used_by = ["panels.sound"]
+
 [[sym]]
 id = "panels_sound2d_bytes"
 symbol = "AudioSound2D"

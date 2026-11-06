@@ -13,11 +13,13 @@ default = false
 # The layers ./install puts in, all into Data/, the executable's folder (PLAN-FLEETOPS.md,
 # "What runs on Roots"): Display8, in place of DxWrapper's d3d8.dll (backed up); the ASI
 # loader Roots ships none of (asiloader/, winmm.dll; only beside Display8: beside DxWrapper
-# it kills the game at start); and render3d, loaded by it. No platform layer (no widescreen
-# patch of ours), QOL (FO-7: the right-drag pan speed on; every other part off until measured
-# beside Roots' own behaviour), and no UI, rules, online, textures or cutscenes on Roots yet. A clone
-# with no layers is the game as shipped.
-layers = ["display", "asiloader", "render3d", "qol"]
+# it kills the game at start); render3d, loaded by it; QOL (FO-7: the right-drag pan speed
+# and Shift+number on; every other part off until measured beside Roots' own behaviour); and
+# the UI (FO-6: UI.ini with Roots' own defaults, ui/defaults/fo-roots.ini: the parts verified on
+# Roots on, every other part off; no menu plates). No platform layer (no widescreen patch of
+# ours), and no rules, online, textures or cutscenes on Roots yet. A clone with no layers is
+# the game as shipped.
+layers = ["display", "asiloader", "render3d", "qol", "ui"]
 
 [exe]
 # The game itself in Data/, under a launcher (FleetOps.exe) that only starts it; the
@@ -54,7 +56,8 @@ dirs = ["settings_saves_logs/Logs"]
 # output Roots dies one second in (null display mode in SetActiveDisplay_Internal), so the
 # bench refuses a smaller output. 1280x960 is the cheapest 4:3 bench size above it.
 shell = [1200, 900]
-# Stock's until FO-6 measures Roots' own HUD.
+# Stock's: the space the engine converts every rectangle into, whatever layout Roots' files
+# declare per aspect (FO-6, decision 75).
 hud_canvas = [1600, 1200]
 
 [files]

@@ -355,7 +355,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         sections: 0xca07c55a,
         image_base: 0x400000,
         n_resolved: 79,
-        content: "stock",
+        content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x5913a0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff], mask: &[], section: "", count: 0, value: 0 }, // shell_show_credits
             a2engine::Entry { present: true, addr: 0x606bd4, end: 0x0, target: 0x0, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shell_credits_site

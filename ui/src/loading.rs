@@ -181,7 +181,9 @@ fn bzn_background(map: &str) -> Option<String> {
 }
 
 /// The candidate face files of a background: each `(path, quadrant)`, a quadrant of a
-/// 2x2 atlas (`MBG02`) or the whole file (None).
+/// 2x2 atlas (`MBG02`) or the whole file (None). Each name is looked for with the game's
+/// texture extensions in turn (`files::game`: `.tga` on Armada II; `.tga`, then `.dds` on
+/// Fleet Operations: Roots, whose faces are mostly DDS), and read by `a2fmt::image`.
 fn sky_faces(bg: &str) -> Vec<(String, Option<u8>)> {
     let tex = |n: &str| crate::sfmt!("textures\\{}", n);
     let mut out = Vec::new();
@@ -206,18 +208,22 @@ fn sky_faces(bg: &str) -> Vec<(String, Option<u8>)> {
         }
         None => names.push(lower.clone()),
     }
+    // A face by its name without extension: the first of the game's extensions present.
+    let face = |stem: &str| -> Option<String> {
+        crate::files::game().texture_exts.iter().map(|e| tex(&crate::sfmt!("{}{}", stem, e))).find(|p| crate::files::exists(p))
+    };
     for n in &names {
-        if crate::files::exists(&tex(&crate::sfmt!("{}.1.tga", n))) {
+        if face(&crate::sfmt!("{}.1", n)).is_some() {
             for k in 1..=6 {
-                out.push((tex(&crate::sfmt!("{}.{}.tga", n, k)), None));
+                out.extend(face(&crate::sfmt!("{}.{}", n, k)).map(|p| (p, None)));
             }
-        } else if crate::files::exists(&tex(&crate::sfmt!("{}0.tga", n))) {
+        } else if face(&crate::sfmt!("{}0", n)).is_some() {
             for k in 0..6 {
-                out.push((tex(&crate::sfmt!("{}{}.tga", n, k)), None));
+                out.extend(face(&crate::sfmt!("{}{}", n, k)).map(|p| (p, None)));
             }
-        } else if crate::files::exists(&tex(&crate::sfmt!("{}.tga", n))) {
+        } else if let Some(p) = face(n) {
             for q in 0..4 {
-                out.push((tex(&crate::sfmt!("{}.tga", n)), Some(q)));
+                out.push((p.clone(), Some(q)));
             }
         }
         if !out.is_empty() {
@@ -262,20 +268,20 @@ fn quadrant(img: &a2fmt::tga::Image, q: Option<u8>) -> (u32, u32, u32, u32) {
 fn sky(map: &str) -> Option<(Tex, [f32; 4], f32)> {
     let bg = bzn_background(map)?;
     let faces = sky_faces(&bg);
-    let mut best: Option<(u32, a2fmt::tga::Image, Option<u8>)> = None;
+    let mut best: Option<(u32, a2fmt::tga::Image, Option<u8>, bool)> = None;
     let mut i = 0;
     while i < faces.len() {
         // An atlas's quadrants share a file: it is read once.
         let path = faces[i].0.clone();
         let quads: Vec<Option<u8>> = faces[i..].iter().take_while(|f| f.0 == path).map(|f| f.1).collect();
         i += quads.len();
-        let Some(img) = crate::files::open(&path).and_then(|b| a2fmt::tga::decode(&b).ok()) else { continue };
+        let Some(img) = crate::files::open(&path).and_then(|b| a2fmt::image::decode(&b).ok()) else { continue };
         let Some((score, q)) = quads.iter().map(|&q| (interest(&img, q), q)).max_by_key(|e| e.0) else { continue };
         if best.as_ref().is_none_or(|b| score > b.0) {
-            best = Some((score, img, q));
+            best = Some((score, img, q, crate::rt::lower(&path).ends_with(".dds")));
         }
     }
-    let (score, img, q) = best?;
+    let (score, img, q, dds) = best?;
     let (x0, y0, w, h) = quadrant(&img, q);
     if w == 0 || h == 0 || w > 4096 || h > 4096 {
         return None;
@@ -284,7 +290,7 @@ fn sky(map: &str) -> Option<(Tex, [f32; 4], f32)> {
     let pitch = img.width as usize * 4;
     let start = (y0 as usize * img.width as usize + x0 as usize) * 4;
     crate::gfx::tex_update(tex, img.pixels[start..].as_ptr(), pitch, w, h);
-    crate::log!("loading: sky \"{}\", face {}x{}{} (brightness {})", bg, w, h, if q.is_some() { " of an atlas" } else { "" }, score);
+    crate::log!("loading: sky \"{}\", face {}x{}{} (brightness {}, {})", bg, w, h, if q.is_some() { " of an atlas" } else { "" }, score, if dds { "DDS" } else { "TGA" });
     Some((tex, [0.0, 0.0, 1.0, 1.0], w as f32 / h as f32))
 }
 

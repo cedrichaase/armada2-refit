@@ -365,7 +365,7 @@ def hooks_of(entries):
     return out
 
 
-def decide(file_fn, rt_fn, index, uses, callees, roots_exe, stock_exe):
+def decide(file_fn, rt_fn, index, uses, callees, roots_exe, stock_exe, callees_whole=frozenset()):
     """The marks. file_fn / rt_fn: {function start VA: [(lo, hi)]} of the file diff and of
     the run-time diff. -> (changed, callee_marks, unused, notes)
     changed: {name: {'how': detour|edit|runtime, 'ranges': n, 'entries': [...]}}"""
@@ -386,10 +386,20 @@ def decide(file_fn, rt_fn, index, uses, callees, roots_exe, stock_exe):
             how = 'runtime'
         entry_only = all(start <= lo and hi <= start + ENTRY_BYTES for lo, hi in allr)
         for n in used:
-            if n in callees:
+            if n in callees or n in callees_whole:
                 inside = [e for f, e, pl in uses[n] if e.get('kind') != 'fn']
-                if entry_only and not inside:
-                    callee_marks[n] = [(f, e['id'], pl) for f, e, pl in uses[n] if e.get('kind') == 'fn']
+                calls = [(f, e['id'], pl) for f, e, pl in uses[n] if e.get('kind') == 'fn']
+                if (entry_only or n in callees_whole) and not inside:
+                    callee_marks[n] = calls
+                    continue
+                if n in callees_whole:
+                    # something of ours sits inside it (another hook's patch): the function
+                    # stays marked, but the hooks that only call it are verified beside it
+                    only = hooks_of([x for x in uses[n] if x[1].get('kind') == 'fn']) - \
+                           hooks_of([x for x in uses[n] if x[1].get('kind') != 'fn'])
+                    callee_marks[n] = calls
+                    changed[n] = {'how': how, 'ranges': len(allr), 'entries': uses[n],
+                                  'verify': sorted(only)}
                     continue
                 notes.append(f'{n} is listed as a callee, but ' +
                              ('something of ours sits inside it' if inside else 'changed beyond its entry') +
@@ -474,7 +484,8 @@ def build_toml(ctx, changed, cfg):
         for g in keys:
             res += ['', f'# {g}']
             for n in sorted(groups[g]):
-                v = (cfg.get('verified') or {}).get(n) or []
+                v = list((cfg.get('verified') or {}).get(n) or []) + \
+                    [h for h in changed[n].get('verify') or []]
                 res += ['', '[[changed]]', f'fn = {toml_str(n)}', f'how = "{changed[n]["how"]}"',
                         'verified = [' + ', '.join(toml_str(h) for h in v) + ']']
         return res if keys else []
@@ -727,7 +738,8 @@ def scan(a):
     cfg = tomllib.load(open(a.config, 'rb')) if os.path.isfile(a.config) else {}
     callees = set(cfg.get('callees') or [])
     uses, dentries = profile_uses(gs)
-    changed, callee_marks, unused, dnotes = decide(file_fn, rt_fn, index, uses, callees, e, se)
+    callees_whole = set(cfg.get('callees_whole') or [])
+    changed, callee_marks, unused, dnotes = decide(file_fn, rt_fn, index, uses, callees, e, se, callees_whole)
     notes += dnotes
     ctx = {'file_crc': file_crc, 'modules': modules, 'ident': ident, 'name': name, 'label': label, 'parent': parent.name, 'game': a.profile_game,
            'version': version, 'exe_path': roots_path, 'code': (e.code[0], (e.code[1] + 0xfff) & ~0xfff)}

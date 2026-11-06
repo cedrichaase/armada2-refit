@@ -133,10 +133,13 @@ verified = ["render3d.overlays.reads"]
 # ---- ui -------------------------------------------------------------------------------
 # The shell's dialog procedures ask for 1200x900 where stock asks for 800x600.
 
+# Roots' four-byte edit (+0x19b) and FleetOpsHook's audio and close calls (+0x17c..+0x30a)
+# sit away from the splash call at +0xcd, which is stock's in the file and in memory (FO-6
+# step 2, 2026-11-06).
 [[changed]]
 fn = "Program::GameDoOne"
 how = "detour"
-verified = []
+verified = ["ui.loading.own"]
 
 [[changed]]
 fn = "AdmiralsLogDlgProc"
@@ -263,9 +266,13 @@ how = "runtime"
 verified = ["display.modes"]
 
 [[changed]]
+# Roots' load bar: three writes (+0x1b, +0x88, +0x343..+0x35c) in the first half of the body.
+# The UI's sites are the entry (checked, and the call of LoadBarNext into it is stock's), the
+# DeleteRegisteredLights call at +0x3b3 and the EndScene call at +0x400: the same bytes as stock's
+# in the file and in memory after FleetOpsHook (FO-6 step 2, 2026-11-06).
 fn = "RenderLoopAssetLoadStatusUpdate"
 how = "runtime"
-verified = []
+verified = ["ui.loading.overlay", "ui.loading.own"]
 
 # render3d
 
@@ -279,11 +286,14 @@ how = "runtime"
 verified = ["render3d.frame.*", "render3d.effects.reads", "render3d.ordnance.warp"]
 
 # FleetOpsHook's one edit (+0x245) takes out an edit-menu call, away from the seam's call at
-# 0x59886e (FO-5 step 3).
+# 0x59886e (FO-5 step 3) and from the UI's call of ChatDisplay::Render at 0x598a16, which
+# is stock's in the file and in memory (FO-6 step 3).
+# The frame-rate prints (+0x286, +0x290), the chat's TextInput_Update call (0x598a07) and the
+# trade call (0x5988d0) are stock's in memory too (FO-6 step 4, decision 123).
 [[changed]]
 fn = "Armada_RenderFrame"
 how = "runtime"
-verified = ["render3d.frame.*"]
+verified = ["render3d.frame.*", "ui.core.mission", "ui.hud.frame_rate", "ui.panels.chat", "ui.panels.trade"]
 
 # FleetOpsHook re-points the node-particle call at +0x4f8, away from the shield-hit call the
 # effects module taps (+0x345, still stock's in memory) (FO-5 step 5).
@@ -353,27 +363,28 @@ fn = "cOverViewImp::mNormalModeRender"
 how = "runtime"
 verified = ["render3d.overlays.paths"]
 
+# FleetOpsHook replaces the call at +0x9d (0x5222fd) and the one at 0x52220b, away from the two
+# DrawQuad calls the order ring takes (0x5222f0 and mRenderGridFX's 0x522537), which are
+# stock's in the file and in memory (FO-6 step 4, decision 121).
 [[changed]]
 fn = "cOverViewImp::mRenderWhere"
 how = "runtime"
-verified = []
+verified = ["ui.hud.order_ring"]
 
 # ui
-
-[[changed]]
-fn = "ActionMode::GetAction"
-how = "runtime"
-verified = []
 
 [[changed]]
 fn = "ChangePasswordDlgProc"
 how = "runtime"
 verified = []
 
+# FleetOpsHook trampolines the entry (its clean screenshot skips the chat): the UI only
+# re-points Armada_RenderFrame's call of it, which is stock's, and calls it, so Roots'
+# version runs whole (FO-6 step 3).
 [[changed]]
 fn = "ChatDisplay::Render"
 how = "runtime"
-verified = []
+verified = ["ui.core.mission"]
 
 [[changed]]
 fn = "CinematicView::mUpdateVideo"
@@ -395,10 +406,14 @@ fn = "DispatchDialog"
 how = "runtime"
 verified = []
 
+# FleetOpsHook trampolines the entry (its clean screenshot skips the HUD) and the stock body runs
+# behind it: the UI's panel switch re-points the Render call at +0x47 (0x51abf7) and the
+# CursorOver call in CursorInterface::RefreshOwner, both stock's in the file and in memory
+# (FO-6 step 4, decision 120).
 [[changed]]
 fn = "DisplayInterface::RenderAll"
 how = "runtime"
-verified = []
+verified = ["ui.hud.panels"]
 
 [[changed]]
 fn = "GameSpyLoginDlgProc"
@@ -455,10 +470,12 @@ fn = "PasswordDlgProc"
 how = "runtime"
 verified = []
 
+# FleetOpsHook trampolines the entry (+0x0); the UI's one site, the Entity::ResetVisibility call
+# at +0x1e9 (0x483869), is stock's in the file and in memory (FO-6 step 4, decision 122).
 [[changed]]
 fn = "Program::DisplayInputProcess"
 how = "runtime"
-verified = []
+verified = ["ui.panels.presses"]
 
 [[changed]]
 fn = "RoomSelectDlgProc"
@@ -485,10 +502,13 @@ fn = "ST3D_GraphicsEngine::SetActiveDisplay"
 how = "runtime"
 verified = []
 
+# Replaced whole at its entry. The order ring and the footprints only call it (their entry
+# check is dropped in ui.hud.toml); loading.inner_pixels patches a call inside it, so the
+# function stays marked for that hook alone (FO-6 step 1; decision 74).
 [[changed]]
 fn = "ST3D_Texture::DemandLoad"
 how = "runtime"
-verified = []
+verified = ["ui.hud.footprints", "ui.hud.order_ring"]
 
 [[changed]]
 fn = "SetCurrentBackground"
