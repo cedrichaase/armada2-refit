@@ -15,6 +15,7 @@ pub mod cursor;
 pub mod dev8;
 pub mod device;
 pub mod dialogs;
+pub mod forms;
 pub use crate::rt::hook;
 pub mod hud;
 pub mod info;
