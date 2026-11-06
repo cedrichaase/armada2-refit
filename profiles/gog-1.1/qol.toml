@@ -140,6 +140,16 @@ kind = "global"
 addr = 0x768e40
 used_by = ["selection", "move_paths"]
 
+# The overview through the engine's own pointer to it, which its constructor sets: stock's
+# object is the static one above, but a build may construct it elsewhere (Roots: FleetOpsHook
+# constructs an enlarged one of its own, FO-7), and only the pointer follows.
+[[sym]]
+id = "overview_ptr"
+symbol = "g_pOverView"
+kind = "global"
+addr = 0x768e3c
+used_by = ["selection", "move_paths"]
+
 [[sym]]
 id = "sel_00"
 symbol = "cOverViewImp::Simulate"

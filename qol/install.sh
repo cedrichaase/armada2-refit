@@ -11,6 +11,12 @@
 #
 # QOLRules.asi is the rules layer's (rules/install.sh), not installed or removed here.
 #
+# It installs into the executable's folder (dirname $A2_EXE): the game directory on Armada
+# II, Data/ on Fleet Operations: Roots. On Roots the shipped QOL.ini has that game's own
+# defaults applied (qol/defaults/fo-roots.ini: the pan speed on, every other part off until
+# measured; PLAN-FLEETOPS.md, FO-7, decision 100), for a new file and for the keys an
+# existing one lacks.
+#
 # RTS_CFG.h must stay stock: network games compare its CRC (qol/README.md). If its
 # FASTSCROLL_COEFFICIENT differs from the stock .a2neb-backup beside it -- a hand edit,
 # or the old gameplay/scrollspeed.py -- the plugin would multiply the edit, so that one
@@ -18,7 +24,7 @@
 set -euo pipefail
 
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/a2env.sh"
-GAME="$A2_GAME"
+GAME="$(dirname "$A2_EXE")"
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 pan=""
@@ -45,10 +51,16 @@ python3 "$here/rts-cfg-check.py" --fix "$GAME"
 bash "$here/build.sh" >/dev/null
 
 cp "$here/build/QOL.asi" "$GAME/QOL.asi"
+shipped="$here/QOL.ini"
+if [ -f "$here/defaults/$A2_PROFILE.ini" ]; then
+    shipped="$(mktemp)"
+    trap 'rm -f "$shipped"' EXIT
+    python3 "$here/../ui/apply-defaults.py" "$here/QOL.ini" "$here/defaults/$A2_PROFILE.ini" "$shipped"
+fi
 if [ -f "$GAME/QOL.ini" ]; then
-    python3 "$here/../tools/ini-merge.py" "$here/QOL.ini" "$GAME/QOL.ini"
+    python3 "$here/../tools/ini-merge.py" "$shipped" "$GAME/QOL.ini"
 else
-    cp "$here/QOL.ini" "$GAME/QOL.ini"
+    cp "$shipped" "$GAME/QOL.ini"
 fi
 if [ -n "$pan" ]; then
     sed -i "s/^PanSpeed=.*/PanSpeed=$pan/" "$GAME/QOL.ini"

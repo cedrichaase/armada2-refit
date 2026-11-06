@@ -105,7 +105,7 @@ files = ['QOL.asi', 'QOL.ini']
 select = 'on'
 requires = []
 scope = 'local'
-games = ['armada2']
+games = ['armada2', 'fo-roots']
 steps = ['qol']
 summary = 'right-drag pan speed, bigger selections and control groups; plays against stock players'
 
