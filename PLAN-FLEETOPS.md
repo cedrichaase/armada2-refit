@@ -651,7 +651,7 @@ ship(s)` with each ship 20 and 22 from its own target at the end, the dotted que
 after; then a second queue and a plain right click with no key: `cleared for 2 ship(s): move` and the engine's path for the
 plain move drawn `(engine)`), `fo-qol-rig` passes (decision 113: green ghost with the key at 1, the shipyard paid for and
 rising), `fo-qol-rig-off` passes (green ghost with the key at 0, and over the other ship), and `fo-qol-camera` and `fo-qol-groups`
-pass with the new defaults. Stock, `--install .`, 1280x720: STOCKRESULTS Not benched: a warp on Roots (there is none to
+pass with the new defaults. Stock, `--install .`, 1280x720: `qol-move-queue`, `qol-warp` and `qol-rig-ignores-self` pass; `qol-station-groups` fails at its steps 51 to 56 (the queue sizes after five orders with three yards selected) and `render3d-move-paths` at its step 73 (the bar's Stop click, whose position follows the HUD's race, which is drawn at random), **both on an unmodified `origin/fo-b` too** (a `git archive` of it installed with `--install`, the same steps failing, `render3d-move-paths` after one pass on a Borg HUD): not this branch's. `fo-render3d-paths` (Roots, no QOL) has every check passing and ends REVIEW because the game did not leave through its menus. Not benched: a warp on Roots (there is none to
 bench), stations (disabled), the queue in a network game (FO-8), and the voice of the ships (no sound on the bench).
 
 Round two (branch `fo-7-round2`, 2026-11-06): `ShiftAddsToGroup` is on (decision 108), the selection
