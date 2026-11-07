@@ -200,6 +200,7 @@
 #define SCENE_F_OBJ_HULL_MAX ((int)a2f_scene_obj_hull_max)
 #define SCENE_F_OBJ_SELECTED ((int)a2f_scene_obj_selected)
 #define SCENE_V_OBJECTS_MAX ((int)a2f_scene_objects_max)
+#define SCENE_S_FN_DEBUG_SYSTEM_CLEANUP 197
 #define SCENE_H_TICK 0
 #define SCENE_H_CAMERA 1
 #define SCENE_H_BUILD 2
@@ -240,6 +241,7 @@
 #define SCENE_H_GROUPS 37
 #define SCENE_H_WAYPOINT 38
 #define SCENE_H_OBJECTS 39
+#define SCENE_H_WINDOWED 40
 
 A2E_U32 a2s_scene_site_tick __attribute__((used));
 A2E_U32 a2s_scene_fn_update_range __attribute__((used));
@@ -358,6 +360,7 @@ A2E_U32 a2s_scene_fn_dyn_cast __attribute__((used));
 A2E_U32 a2s_scene_td_game_object_class __attribute__((used));
 A2E_U32 a2s_scene_td_craft_class __attribute__((used));
 A2E_U32 a2s_scene_td_planet_class __attribute__((used));
+A2E_U32 a2s_scene_fn_debug_system_cleanup __attribute__((used));
 A2E_U32 a2f_scene_view_vt_update_camera __attribute__((used)) = (A2E_U32)0x88;
 A2E_U32 a2f_scene_cam_to_world __attribute__((used)) = (A2E_U32)0xc0;
 A2E_U32 a2f_scene_cam_vt_set_transform __attribute__((used)) = (A2E_U32)0x14;
@@ -637,6 +640,7 @@ static A2E_U32 *const scene_vars[] = {
     &a2f_scene_obj_hull_max,
     &a2f_scene_obj_selected,
     &a2f_scene_objects_max,
+    &a2s_scene_fn_debug_system_cleanup,
 };
 
 static const A2ESymDef scene_syms[] = {
@@ -837,6 +841,7 @@ static const A2ESymDef scene_syms[] = {
     {"obj_hull_max", "GameObject", 10},
     {"obj_selected", "GameObject", 10},
     {"objects_max", "objects_max", 11},
+    {"fn_debug_system_cleanup", "Debug_SystemCleanup", 0},
 };
 static const char *const scene_h0_rows[] = {0};
 static const A2E_U16 scene_h0_syms[] = {0, 1, 37, 43, 44, 47, 0};
@@ -918,6 +923,8 @@ static const char *const scene_h38_rows[] = {0};
 static const A2E_U16 scene_h38_syms[] = {170, 171, 182, 0};
 static const char *const scene_h39_rows[] = {0};
 static const A2E_U16 scene_h39_syms[] = {6, 7, 8, 9, 11, 12, 13, 14, 57, 58, 59, 60, 75, 76, 131, 132, 133, 134, 154, 170, 171, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 0};
+static const char *const scene_h40_rows[] = {0};
+static const A2E_U16 scene_h40_syms[] = {197, 0};
 static const A2EHookDef scene_hooks[] = {
     {"scene.tick", 0, scene_h0_rows, 0, scene_h0_syms, 6},
     {"scene.camera", 0, scene_h1_rows, 0, scene_h1_syms, 5},
@@ -959,6 +966,7 @@ static const A2EHookDef scene_hooks[] = {
     {"scene.groups", 0, scene_h37_rows, 0, scene_h37_syms, 9},
     {"scene.waypoint", 0, scene_h38_rows, 0, scene_h38_syms, 3},
     {"scene.objects", 0, scene_h39_rows, 0, scene_h39_syms, 35},
+    {"scene.windowed", 0, scene_h40_rows, 0, scene_h40_syms, 1},
 };
 static const A2E_U8 scene_b0_c1[] = {0x55, 0x8b, 0xec, 0x83, 0xec, 0x28, 0xa1, 0x80, 0x10, 0x76, 0x00};
 static const A2E_U8 scene_b0_c2[] = {0xff, 0x90, 0x88, 0x00, 0x00, 0x00};
@@ -1030,6 +1038,7 @@ static const A2E_U8 scene_b0_c181[] = {0x8b, 0x89, 0x70, 0x02, 0x00, 0x00, 0x33,
 static const A2E_U8 scene_b0_c184[] = {0x8b, 0x49, 0x40, 0xe9};
 static const A2E_U8 scene_b0_c185[] = {0x8b, 0x0d, 0xd4, 0xb8, 0x76, 0x00, 0xe9, 0x45};
 static const A2E_U8 scene_b0_c186[] = {0xff, 0x25};
+static const A2E_U8 scene_b0_c197[] = {0xa1, 0x14, 0xeb, 0x7a, 0x00, 0x85, 0xc0, 0x74};
 static const A2EEntry scene_b0_entries[] = {
     {1, 0, 0x1, 0xffff, 0, 0, 0, 0x483351, 0x0, 0, 0, 0, ""}, /* site_tick */
     {1, 0, 0xffff, 0xffff, 0, 0, 11, 0x4d3e90, 0x0, 0, scene_b0_c1, 0, ""}, /* fn_update_range */
@@ -1228,6 +1237,7 @@ static const A2EEntry scene_b0_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 352, 0, 0, ""}, /* obj_hull_max */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 270, 0, 0, ""}, /* obj_selected */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 4096, 0, 0, ""}, /* objects_max */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x64f250, 0x0, 0, scene_b0_c197, 0, ""}, /* fn_debug_system_cleanup */
 };
 static const A2EBlock scene_b0_blocked[] = {
     {0xffff, 0, 0, 0}
@@ -1310,6 +1320,7 @@ static const A2E_U8 scene_b1_c181[] = {0x8b, 0x89, 0x70, 0x02, 0x00, 0x00, 0x33,
 static const A2E_U8 scene_b1_c184[] = {0x8b, 0x49, 0x40, 0xe9};
 static const A2E_U8 scene_b1_c185[] = {0x8b, 0x0d, 0xd4, 0xb8, 0x76, 0x00, 0xe9, 0x45};
 static const A2E_U8 scene_b1_c186[] = {0xff, 0x25};
+static const A2E_U8 scene_b1_c197[] = {0xa1, 0x14, 0xeb, 0x7a, 0x00, 0x85, 0xc0, 0x74};
 static const A2EEntry scene_b1_entries[] = {
     {1, 0, 0x1, 0xffff, 0, 0, 0, 0x483351, 0x0, 0, 0, 0, ""}, /* site_tick */
     {1, 0, 0xffff, 0xffff, 0, 0, 11, 0x4d3e90, 0x0, 0, scene_b1_c1, 0, ""}, /* fn_update_range */
@@ -1508,6 +1519,7 @@ static const A2EEntry scene_b1_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 352, 0, 0, ""}, /* obj_hull_max */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 270, 0, 0, ""}, /* obj_selected */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 4096, 0, 0, ""}, /* objects_max */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x64f250, 0x0, 0, scene_b1_c197, 0, ""}, /* fn_debug_system_cleanup */
 };
 static const A2EBlock scene_b1_blocked[] = {
     {12, "CraftInstance::Update", "is changed by fo-roots-5.0Z11 (not yet verified)", "Stands down: CraftInstance::Update is changed by fo-roots-5.0Z11, not yet verified"},
@@ -1536,18 +1548,18 @@ static const A2EBlock scene_b1_blocked_mod[] = {
     {0xffff, 0, 0, 0}
 };
 static const A2EBuild scene_builds[] = {
-    {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, scene_b0_entries, scene_b0_blocked, 0, 197, scene_b0_fcrc, 0, scene_b0_mods, 0, scene_b0_blocked_mod, 0, 197},
-    {"fo-roots-5.0Z11", "armada2/fo-roots-5.0Z11", "ArmadaL.exe", 0x3c4c76bd, 0x405000, 0xca07c55a, 0x400000, scene_b1_entries, scene_b1_blocked, 3, 178, scene_b1_fcrc, 2, scene_b1_mods, 1, scene_b1_blocked_mod, 8, 147},
+    {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, scene_b0_entries, scene_b0_blocked, 0, 198, scene_b0_fcrc, 0, scene_b0_mods, 0, scene_b0_blocked_mod, 0, 198},
+    {"fo-roots-5.0Z11", "armada2/fo-roots-5.0Z11", "ArmadaL.exe", 0x3c4c76bd, 0x405000, 0xca07c55a, 0x400000, scene_b1_entries, scene_b1_blocked, 3, 179, scene_b1_fcrc, 2, scene_b1_mods, 1, scene_b1_blocked_mod, 8, 148},
 };
 
-static A2E_U8 scene_hook_state[40];
-static A2E_U8 scene_sym_flags[197];
-static A2E_U32 scene_sym_addr[197];
-static char scene_notes[40][A2E_NOTE_MAX + 1];
+static A2E_U8 scene_hook_state[41];
+static A2E_U8 scene_sym_flags[198];
+static A2E_U32 scene_sym_addr[198];
+static char scene_notes[41][A2E_NOTE_MAX + 1];
 
 static const A2ETable SCENE_ENGINE = {
     "armada2", "scene",
-    scene_syms, 197, scene_hooks, 40, scene_builds, 2, 0,
+    scene_syms, 198, scene_hooks, 41, scene_builds, 2, 0,
     scene_vars, scene_hook_state, scene_sym_flags, scene_sym_addr, scene_notes
 };
 

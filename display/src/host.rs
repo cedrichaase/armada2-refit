@@ -19,8 +19,9 @@
 //!
 //! The host is made at the first `CreateDevice` where the build's profile says the game
 //! makes a device window at each switch (`from_start`), else at the first `CreateDevice` on
-//! another window (`stub::follow_window`); a game that makes its device on one window, as
-//! Armada II does, never meets it.
+//! another window (`stub::follow_window`). Armada II makes a new device window only when it
+//! makes its display again (its flip to windowed after an assert or a crash): its profile
+//! says 0, so the swap chain follows that window and the host is never made.
 use crate::log;
 use core::ffi::c_void;
 use core::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};

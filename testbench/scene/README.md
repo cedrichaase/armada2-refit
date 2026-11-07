@@ -194,6 +194,7 @@ that is not one of the scene's is written `#<id>`, the handle as an unsigned dec
 | `pause-at <tick>` | pause when that many ticks have passed since the scene was built, as `Pause=` does; refused when that tick has gone |
 | `tick` | the ticks since the scene was built |
 | `seed <n>` | the engine's random sequences started again from n now, as `Seed=` does |
+| `windowed` | the engine's own flip to windowed, as its assert and exception handlers make it (`scene.windowed`): a new device, windowed, on a new window, the old window destroyed. For Display8's handling of a later `CreateDevice` on another window (`scenarios/display-a2-windowed-flip.md`) |
 | `hud`, `grid`, `cursor`, `notices`, `tooltips`, `hover`, `shieldfx` `on\|off` | as the keys above. `tooltips off` also clears a box already showing; `shieldfx off` lets flashes already showing run out |
 | `query` | every object's handle and position (and a producer's build queue, a planet's team, population and the population its cities are drawn at), and the camera's eye, front and up |
 | `select <name> [<name> ...]` | select the first as a click does and add the rest as Shift-clicks do, through the overview's own `Select` (its vtable: on Roots FleetOpsHook's, which keeps its own array and cap of 30), up to 39 names (a command has at most 40 words); answers as `selection` |
@@ -633,6 +634,16 @@ reports them offline. Names below are `armada2.map`'s; the profile holds the add
   stations (+0x1c4), each a `list_array` (its count at +0, its handles at +0x18).
   `waypoint-key` (`scene.waypoint`) points the overview's pointer to the waypoint
   binding's live state (+0x30c) at an int of its own while held.
+- **The flip to windowed: `Debug_SystemCleanup`** (`scene.windowed`). `Debug_Open` hands it
+  to the assert handler and to the exception filter (`DebugAssert_Open`,
+  `DebugException_Open`), and with `cfgFLIP_TO_WINDOWED_ON_ASSERT` (1 in the stock
+  `RTS_CFG.h`) it clears the fullscreen flag of the graphics configuration (byte +1) and calls
+  `ST3D_GraphicsEngine::SetActiveDisplay` with the display type in use. A fullscreen flag
+  that differs from the device's makes `SetActiveDisplay_Internal` delete the device, whose
+  destructor destroys its window, and `DeviceOpen` a new `ST3D_DeviceDirectX8`, whose
+  `CreateDevice` makes a new window (`CreateOrResizeWindow`: no window yet), windowed, and
+  shows it once the device is made. `windowed` calls it from the tick, the game's thread,
+  as the handlers do on whichever thread failed; nothing else of the engine's is touched.
 - **Objects: `GameObject::objectList`** (`scene.objects`), a `std::list` of every
   `GameObject`: its head node at +4, each node's next at +0 and its object at +8, as the
   UI's selection overlay walks it (`ui/src/engine/overlay.rs`). For each object

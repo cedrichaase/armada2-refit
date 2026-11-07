@@ -36,6 +36,10 @@ use obj::SObj;
 unsafe extern "system" {
     fn SetWindowLongA(hwnd: *mut c_void, index: i32, v: i32) -> i32;
     fn SetWindowPos(hwnd: *mut c_void, after: *mut c_void, x: i32, y: i32, cx: i32, cy: i32, flags: u32) -> i32;
+    fn GetClassNameA(hwnd: *mut c_void, name: *mut u8, n: i32) -> i32;
+    fn IsWindowVisible(hwnd: *mut c_void) -> i32;
+    fn IsWindow(hwnd: *mut c_void) -> i32;
+    fn GetWindowThreadProcessId(hwnd: *mut c_void, pid: *mut u32) -> u32;
     fn GetSystemMetrics(index: i32) -> i32;
     fn MonitorFromPoint(x: i32, y: i32, flags: u32) -> usize;
 }
@@ -260,10 +264,15 @@ pub fn ensure_device(hwnd: *mut c_void, _flags: u32, _depth: u32, interval: u32)
 /// game, and a skirmish was a white screen while the engine kept drawing into the first).
 /// The new window gets the first one's treatment (a popup over the desktop) and the
 /// backend's swap chain moves to it; the device, its targets and its mirrors are the same.
-/// The stock engine reuses its one window at every `CreateDevice`, so this never runs there.
+/// Armada II's engine keeps its one window until it makes its display again (a change of the
+/// fullscreen flag, the device type or the display device; in a retail game its assert and
+/// exception handlers' flip to windowed): the old device is deleted with its window and the
+/// new one made on a new window of the engine's class, shown by the engine only once the
+/// device exists. Following it is right there too: the old window is gone.
 fn follow_window(s: &mut Stub, hwnd: *mut c_void) {
     let (w, h) = (s.mode.width, s.mode.height);
     let old = s.hwnd;
+    describe_windows(hwnd, old);
     // `OneWindow` (host.rs): the new window goes inside Display8's host, which the swap
     // chain is on (moved there once, should the host be made only now) and stays on. Only
     // where the profile says the game makes a window at each switch: anywhere else (the
@@ -300,6 +309,24 @@ fn follow_window(s: &mut Stub, hwnd: *mut c_void) {
     }
     s.hwnd = hwnd;
     crate::window::device_opened(hwnd, w, h);
+}
+
+/// What a later `CreateDevice` names, before the swap chain moves: the new window's class,
+/// whether it is shown and its thread, and whether the old one still exists. Armada II's
+/// engine makes a new device on a new window of its class when its display is made again
+/// (its assert and exception handlers flip it to windowed), its old window destroyed with
+/// the old device; Roots makes a window at each switch.
+fn describe_windows(hwnd: *mut c_void, old: *mut c_void) {
+    let mut class = [0u8; 64];
+    let n = unsafe { GetClassNameA(hwnd, class.as_mut_ptr(), class.len() as i32) }.max(0) as usize;
+    let class = core::str::from_utf8(&class[..n.min(class.len())]).unwrap_or("?");
+    let shown = unsafe { IsWindowVisible(hwnd) } != 0;
+    let thread = unsafe { GetWindowThreadProcessId(hwnd, core::ptr::null_mut()) };
+    let old_thread = if old.is_null() { 0 } else { unsafe { GetWindowThreadProcessId(old, core::ptr::null_mut()) } };
+    let old_alive = !old.is_null() && unsafe { IsWindow(old) } != 0;
+    log!("stub: CreateDevice on another window {:p}: class \"{}\", {}, thread {} (the old window {:p}: {}, thread {})",
+         hwnd, class, if shown { "shown" } else { "hidden" }, thread, old,
+         if old_alive { "still there" } else { "gone" }, old_thread);
 }
 
 /// Copies the levels written since into the mirror.

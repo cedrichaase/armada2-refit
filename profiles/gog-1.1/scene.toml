@@ -128,6 +128,9 @@ doc = "The overview's waypoint-key binding pointed at a state of ours while held
 [hook.objects]
 doc = "GameObject::objectList walked read-only into Scene.objects.jsonl (`objects`)"
 
+[hook.windowed]
+doc = "Debug_SystemCleanup, as the engine's assert and exception handlers call it: a new windowed device (`windowed`)"
+
 # The game tick: Simulate's one unconditional call of GameObject_UpdateRange.
 [[sym]]
 id = "site_tick"
@@ -1791,3 +1794,14 @@ symbol = "objects_max"
 kind = "value"
 value = 0x1000
 used_by = ["objects"]
+
+# The engine's own flip to windowed on an assert or an exception (`windowed`): Debug_Open hands
+# Debug_SystemCleanup to both handlers, and it clears the fullscreen flag of the graphics
+# configuration and calls SetActiveDisplay, which makes a new device on a new window.
+[[sym]]
+id = "fn_debug_system_cleanup"
+symbol = "Debug_SystemCleanup"
+kind = "fn"
+addr = 0x64f250
+check = "a1 14 eb 7a 00 85 c0 74"
+used_by = ["windowed"]
