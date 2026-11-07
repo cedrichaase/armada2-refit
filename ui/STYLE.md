@@ -158,7 +158,7 @@ space (as it shows in game; read only, never copied), in 0..255:
 | Free Borg | as the Borg, the line teal 2,81,70 | dark teal speckle: 8,20,20; 7,44,41 near the lamps | **teal** nodes (49,255,205) | as the Borg |
 | Dominion | dark violet 14,2,39; top light 110,89,154 | violet lit from the left: 32,19,72; 20,11,43; 12,2,40 (ours: black, by request) | **violet** (130,80,255) at the clamps along the foot | as the Cardassian (clamps, cut corner) |
 
-Checked in game (1280x960, `fo-ui-theme-roots-<race>`; Roots' own info strip is in the
+Checked in game (1280x960, a skirmish as each race through Instant Action; Roots' own info strip is in the
 same shot, so both sit over the same space): the middle of the glass, Roots' strip
 against our resource strip, in 0..255:
 
@@ -182,9 +182,9 @@ strip in the same shot:
 | Romulan | 42% / 6% | 38% / 19% | dark, a little green in the glass, as ours |
 | Cardassian | 3% / 33% | 7% / 38% | olive throughout: kept |
 | Borg | 63% / 9% | 65% / 6% | dark with green accents, as ours |
-| Species 8472 | 0% / 96% | (lifted toward Roots) | violet throughout: kept, a shade lighter |
+| Species 8472 | 0% / 96% | 0% / 97% | violet throughout: kept, a shade lighter |
 | Free Borg | 60% / 9% | 62% / 6% | as the Borg |
-| Dominion | 1% / 93% | dark by request | Roots' is violet throughout (mean 33,21,60); ours is black gunmetal and black glass with violet only in the accents, at the user's word (2026-11-07) |
+| Dominion | 1% / 93% | 87% / 3% | Roots' is violet throughout (mean 33,21,60); ours is black gunmetal and black glass with violet only in the accents, at the user's word (2026-11-07) |
 
 How ours carries each (`Machined`): the rim's colours, width and grain; `glass_light`
 for the light lying from the left (Romulan, Dominion); `shade_right`; `glass_grain`, the

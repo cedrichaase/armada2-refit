@@ -886,7 +886,7 @@ impl Theme {
                     rim_w: 7.0,
                     grain: 0.12,
                     bevel: 0x70b4a0e0,
-                    rim_line: 0xc05a34c8,
+                    rim_line: 0x905a34c8,
                     glow: 0xff2c1468,
                     lamp: 0xff8250ff,
                     pool: 0xff3a18a0,
