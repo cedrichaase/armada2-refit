@@ -1,6 +1,7 @@
 ---
 layers: [ui]
 bump: patch
+games: [fo-roots]
 status: Installed, not yet seen in game
 ---
 

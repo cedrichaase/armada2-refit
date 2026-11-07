@@ -1,5 +1,6 @@
 ---
 testbench: patch
+games: [fo-roots]
 ---
 
 ### Fixed

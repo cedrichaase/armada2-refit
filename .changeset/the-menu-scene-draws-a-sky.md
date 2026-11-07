@@ -1,6 +1,7 @@
 ---
 layers: [render3d]
 bump: patch
+games: [fo-roots]
 ---
 
 ### Changed

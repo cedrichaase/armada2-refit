@@ -1,6 +1,7 @@
 ---
 layers: [ui, testbench]
 bump: minor
+games: [fo-roots]
 status: Installed, not yet seen in game
 ---
 

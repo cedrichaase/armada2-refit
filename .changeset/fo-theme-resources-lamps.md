@@ -1,6 +1,7 @@
 ---
 layers: [ui]
 bump: patch
+games: [armada2, fo-roots]
 ---
 
 ### Changed

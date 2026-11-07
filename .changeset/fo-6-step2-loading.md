@@ -2,6 +2,7 @@
 root: minor
 ui: minor
 testbench: minor
+games: [fo-roots]
 status: Installed, not yet seen in game
 ---
 
