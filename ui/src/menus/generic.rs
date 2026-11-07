@@ -250,6 +250,12 @@ static mut SENT: (usize, i32) = (0, 0);
 /// landed, so a drag is shown by the slider and the click is sent on release; a key
 /// step is one click at once.
 pub fn shell_slider(ui: &mut Ui, s: &Screen, c: &Control, track: R, id: &str) {
+    shell_slider_with(ui, c, track, id, s.top, &mut |x, y| s.click(x, y));
+}
+
+/// `shell_slider` for any front end (Roots' adopted dialogs, `menus::roots_dialogs`):
+/// `live` the dialog takes input, `click` a click at a design point of it.
+pub fn shell_slider_with(ui: &mut Ui, c: &Control, track: R, id: &str, live: bool, click: &mut dyn FnMut(i32, i32)) {
     let (lo, hi) = (c.range.0 as f32, c.range.1 as f32);
     if hi <= lo || c.track.1 <= 0 {
         return;
@@ -263,7 +269,7 @@ pub fn shell_slider(ui: &mut Ui, s: &Screen, c: &Control, track: R, id: &str) {
     // A key steps a twentieth of the range, at least one value: a range under 20 would
     // otherwise round back to where it stood.
     let changed = ui.slider_step(track, id, &mut v, lo, hi, ((hi - lo) / 20.0).max(1.0));
-    if !s.top {
+    if !live {
         return;
     }
     let to = |v: f32| libm::roundf(v) as i32;
@@ -271,14 +277,14 @@ pub fn shell_slider(ui: &mut Ui, s: &Screen, c: &Control, track: R, id: &str) {
         if ui.input.down[0] {
             unsafe { DRAG = (c.key, v) };
         } else if to(v) != c.pos {
-            click_scroll(s, c, to(v));
+            click_scroll_with(c, to(v), click);
         }
     }
     if drag && !ui.input.down[0] {
         let v = unsafe { DRAG.1 };
         unsafe { DRAG = (0, 0.0) };
         if to(v) != c.pos {
-            click_scroll(s, c, to(v));
+            click_scroll_with(c, to(v), click);
         }
     }
 }
@@ -291,6 +297,11 @@ pub fn shell_slider(ui: &mut Ui, s: &Screen, c: &Control, track: R, id: &str) {
 /// of the track and one on the far arrow button, which steps the value up by one
 /// (graphics detail could not be set back to its top before).
 pub fn click_scroll(s: &Screen, c: &Control, v: i32) {
+    click_scroll_with(c, v, &mut |x, y| s.click(x, y));
+}
+
+/// `click_scroll` for any front end: `click` a click at a design point of the dialog.
+pub fn click_scroll_with(c: &Control, v: i32, click: &mut dyn FnMut(i32, i32)) {
     let (lo, hi) = c.range;
     unsafe { SENT = (c.key, v) };
     crate::log!("menus: scroll bar set to {} of {}..{}", v, lo, hi);
@@ -305,18 +316,18 @@ pub fn click_scroll(s: &Screen, c: &Control, v: i32) {
     };
     if v >= hi {
         let (x, y) = at(len.max(1) - 1);
-        s.click(x, y);
+        click(x, y);
         let (x, y) = if c.horizontal {
             (c.rect[0] + c.rect[2] - 3, c.rect[1] + c.rect[3] / 2)
         } else {
             (c.rect[0] + c.rect[2] / 2, c.rect[1] + c.rect[3] - 3)
         };
-        s.click(x, y);
+        click(x, y);
         return;
     }
     let along = ((v - lo) * (len + 1) * 2 + (len + 1)) / (2 * n);
     let (x, y) = at(along.min(len.max(1) - 1));
-    s.click(x, y);
+    click(x, y);
 }
 
 /// A stock edit as our text field: it edits a copy of the edit's text, and what the

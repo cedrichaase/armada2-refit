@@ -352,7 +352,22 @@ pub fn log_unread(hwnd: HWND) {
     let mine = v.iter().filter(|&&(w, _)| readable(w, 8) && rd::<usize>(w + 4) == hwnd as usize).count();
     crate::log!("menus: {} shell widgets remembered, {} made for {:p}", v.len(), mine, hwnd);
     for &(w, _) in v.iter() {
-        if !readable(w, 8) || rd::<usize>(w + 4) != hwnd as usize || read(w).is_some() {
+        if !readable(w, 8) || rd::<usize>(w + 4) != hwnd as usize {
+            continue;
+        }
+        if let Some(x) = read(w) {
+            // A label read with no text: what its fields hold, for a build whose labels
+            // keep their text elsewhere.
+            if x.kind == Kind::Label && x.label.is_empty() && readable(w, 0x470) {
+                let vt: usize = rd(w);
+                let p: usize = rd(w + field::SHELLUI_STD_LBL_STRING() + 4);
+                let n: usize = rd(w + field::SHELLUI_STD_LBL_STRING() + 8);
+                let head: [u8; 16] = rd(w + field::SHELLUI_LBL_TEXT());
+                crate::log!(
+                    "menus: label {:#x} of {:p} reads empty: vtable {:#x} (StdTextLabel: {}), inline {:02x?}, string {:#x} length {}",
+                    w, hwnd, vt, vt == eng().addr(sym::SHELLUI_VT_STD_TEXT_LABEL), head, p, n
+                );
+            }
             continue;
         }
         let vt: usize = rd(w);

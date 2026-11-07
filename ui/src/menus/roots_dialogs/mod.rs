@@ -24,6 +24,7 @@ use crate::rt::win::HWND;
 use crate::widgets::Ui;
 use alloc::vec::Vec;
 
+pub mod game_settings;
 pub mod mission_select;
 pub mod notice;
 pub mod saves;
@@ -176,6 +177,7 @@ fn spec(screen: &str) -> Option<Draw> {
         "load game" => saves::draw_load,
         "save game" => saves::draw_save,
         "message" => notice::draw,
+        "game settings" => game_settings::draw,
         _ => return None,
     })
 }
