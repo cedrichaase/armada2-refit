@@ -13,6 +13,7 @@ pub(super) fn draw(ui: &mut Ui, _fit: &super::Fit, f: &Form) -> bool {
         "TAdvSettingsForm" => super::advsettings::draw(ui, f),
         "TMultiplayerConnectionForm" => super::multiplayer::draw(ui, f),
         "TManualIPForm" => super::manualip::draw(ui, f),
+        "TAdvancedOptionsForm" => super::advanced::draw(ui, f),
         _ => false,
     }
 }

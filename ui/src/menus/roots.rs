@@ -12,6 +12,7 @@
 //!
 //! Every action goes back to Roots' form as a player's would (`forms::act`): a press of
 //! ours is a posted click at the control's centre; nothing writes a setting.
+mod advanced;
 mod advsettings;
 mod graphics;
 mod kit;
