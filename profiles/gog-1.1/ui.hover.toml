@@ -225,3 +225,14 @@ struct = "TextAndSprite"
 offset = 0x2c
 type = "ptr"
 used_by = ["hud.hover"]
+
+# ST3D_Font::GetHeight, thiscall, a float: the line height of the font a text prints in
+# (StandardText+0x28 points at the font's pointer). Roots picks its fonts by the screen's
+# width (FontNewScreenWidth), so the figures' size follows this, not the text's rectangle.
+[[sym]]
+id = "hover_font_height"
+symbol = "ST3D_Font::GetHeight"
+kind = "fn"
+addr = 0x629400
+check = "55 8b ec 83 ec 0c 56 57"
+used_by = ["hud.hover"]

@@ -961,8 +961,14 @@ the sum is the same place for every face), all on the HUD's canvas (1600 by 1200
 scaled per axis); the justification is `+0x68` (bit 0 right, bit 3 centred in height: the
 figures are 8, left; the name 9, right). The UI's frame then
 draws each part there: the engine's icon, tinted as the engine tints it, and the text in
-our font, in the engine's colour, justified as the engine justifies it, its figures as
-tall as the engine's (measured, below), with a one-pixel shadow. Nothing is laid out by
+our font, in the engine's colour, justified as the engine justifies it, with a one-pixel
+shadow. **Sizes**: Roots picks its font tier by the screen's width and its text outgrows the
+strip's rectangles on a wide screen, so neither the rectangle nor the font's line height
+(`ST3D_Font::GetHeight`, logged: 23.8 at 1280x960, 33.0 at 2560x1080) is in proportion to
+what shows; the figures and capitals were measured at 10 px (1280x960) and 19 px
+(2560x1080), and ours are as tall on the line through both. The icons are square (the
+canvas is scaled per axis, so the engine's stretch on a wide screen), 0.78 of their
+rectangle's shorter side, as much of it as the engine's art covers. Nothing is laid out by
 us, so the line follows Roots' layout files at every aspect, and the UI's text is drawn
 over everything the engine draws.
 

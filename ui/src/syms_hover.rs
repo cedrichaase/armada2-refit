@@ -4,6 +4,7 @@
 pub mod sym {
     pub const HOVER_INFOBAR_CALL: a2engine::Sym = a2engine::Sym(0);
     pub const HOVER_INFOBAR_RENDER: a2engine::Sym = a2engine::Sym(1);
+    pub const HOVER_FONT_HEIGHT: a2engine::Sym = a2engine::Sym(22);
 }
 
 pub mod hook {
@@ -61,10 +62,11 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "hover_vt_set_object", symbol: "StandardText::vtable SetCurrentObject", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "hover_vt_information", symbol: "StandardText::vtable GetInformation", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "hover_vt_current_color", symbol: "TextAndSprite::vtable GetCurrentColor", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "hover_font_height", symbol: "ST3D_Font::GetHeight", kind: a2engine::Kind::Fn },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
-    a2engine::HookDef { id: "ui.hud.hover", run_unknown: false, rows: &["HUD.Hover"], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21] },
+    a2engine::HookDef { id: "ui.hud.hover", run_unknown: false, rows: &["HUD.Hover"], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22] },
 ];
 
 pub const BUILDS: &[a2engine::Build] = &[
@@ -76,7 +78,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 22,
+        n_resolved: 23,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x4f2daa, end: 0x0, target: 0x1, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hover_infobar_call
@@ -101,6 +103,7 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // hover_vt_set_object
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 36 }, // hover_vt_information
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 44 }, // hover_vt_current_color
+            a2engine::Entry { present: true, addr: 0x629400, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x0c, 0x56, 0x57], mask: &[], section: "", count: 0, value: 0 }, // hover_font_height
         ],
         blocked: &[
         ],
@@ -108,7 +111,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         modules: &[],
         blocked_mod: &[
         ],
-        n_resolved_mod: 22,
+        n_resolved_mod: 23,
     },
     a2engine::Build {
         name: "fo-roots-5.0Z11",
@@ -118,7 +121,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 22,
+        n_resolved: 23,
         content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x4f2daa, end: 0x0, target: 0x1, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hover_infobar_call
@@ -143,6 +146,7 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // hover_vt_set_object
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 36 }, // hover_vt_information
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 44 }, // hover_vt_current_color
+            a2engine::Entry { present: true, addr: 0x629400, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x0c, 0x56, 0x57], mask: &[], section: "", count: 0, value: 0 }, // hover_font_height
         ],
         blocked: &[
         ],
@@ -156,8 +160,8 @@ pub const BUILDS: &[a2engine::Build] = &[
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 1] = [const { core::sync::atomic::AtomicU64::new(0) }; 1];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 22] = [const { core::sync::atomic::AtomicU8::new(0) }; 22];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 22] = [const { core::sync::atomic::AtomicUsize::new(0) }; 22];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 23] = [const { core::sync::atomic::AtomicU8::new(0) }; 23];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 23] = [const { core::sync::atomic::AtomicUsize::new(0) }; 23];
 static NOTES: [a2engine::Note; 1] = [const { a2engine::Note::new() }; 1];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 

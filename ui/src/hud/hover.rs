@@ -13,10 +13,17 @@ use crate::engine::api::{self, hover, sprite};
 use crate::gfx::{fade, Color, Weight, R};
 use crate::widgets::Ui;
 
-/// Roots' figures and capitals stand 10 pixels tall in a text rectangle 19 canvas units
-/// (15.2 pixels) tall at 1280x960, so a figure is 0.66 of the rectangle's height on screen
-/// (decision 462); our font's figures are 0.714 of an em.
-const FIGURE_OF_RECT: f32 = 0.66;
+/// The height of Roots' figures (and capitals) on screen. Roots picks its font tier by the
+/// screen's width (FleetOpsHook's `FontNewScreenWidth`), and its text outgrows the strip's
+/// rectangles on a wide screen, so neither the rectangle nor the font's line height
+/// (`ST3D_Font::GetHeight`: 23.8 and 33.0) gives it in proportion. Measured on the bench:
+/// 10 px at 1280x960, 19 px at 2560x1080; the line through both (decision 462).
+fn figure_px(screen_w: f32) -> f32 {
+    (1.0 + screen_w * 0.00703).clamp(8.0, 48.0)
+}
+/// How much of its rectangle's shorter side the engine's icon art covers.
+const ICON_OF_RECT: f32 = 0.78;
+/// Our font's figures are 0.714 of an em.
 const FIGURE_EM: f32 = 0.714;
 
 fn rgb(c: [f32; 3], a: f32) -> Color {
@@ -38,12 +45,15 @@ fn screen(ui: &Ui, r: [i32; 4]) -> R {
 
 fn draw(ui: &mut Ui, r: &hover::Readout) {
     let shadow = fade(0xff000000, 0.8);
+    let px = figure_px(ui.w) / FIGURE_EM;
     for p in &r.parts {
         if p.icon != 0 {
             // Square, as the icon's art is, in the middle of its rectangle (the canvas is
-            // scaled per axis, so on a wide screen the engine's icon is stretched).
+            // scaled per axis, so on a wide screen the engine's icon is stretched), at the
+            // size the engine's art covers of it (17 px of 21.6 at 1280x960, 18 of 24 at
+            // 2560x1080; decision 462).
             let ir = screen(ui, p.icon_rect);
-            let side = ir.w.min(ir.h);
+            let side = libm::roundf(ir.w.min(ir.h) * ICON_OF_RECT);
             let sq = R::new(libm::roundf(ir.x + (ir.w - side) * 0.5), libm::roundf(ir.y + (ir.h - side) * 0.5), side, side);
             icon(ui, p.icon, sq, rgb(p.icon_rgb, 1.0));
         }
@@ -52,7 +62,6 @@ fn draw(ui: &mut Ui, r: &hover::Readout) {
             continue;
         }
         let tr = screen(ui, p.rect);
-        let px = (tr.h * FIGURE_OF_RECT / FIGURE_EM).max(8.0);
         let font = crate::text::font_bold();
         let (tw, th) = crate::text::measure_with(font, text, px);
         // eJustify, as the strip's texts use it: bit 0 right, bit 1 centred, else left;

@@ -64,6 +64,8 @@ pub struct Part {
     pub rect: [i32; 4],
     pub justify: i32,
     pub font: usize,
+    /// The font's line height (`ST3D_Font::GetHeight`), 0 without a font.
+    pub font_h: f32,
     pub icon: usize,
     pub icon_rect: [i32; 4],
     pub icon_rgb: [f32; 3],
@@ -173,6 +175,15 @@ fn font(c: usize) -> usize {
     if p == 0 { 0 } else { unsafe { rd::<usize>(p) } }
 }
 
+fn font_height(f: usize) -> f32 {
+    if f == 0 {
+        return 0.0;
+    }
+    let g: unsafe extern "thiscall" fn(usize) -> f32 = unsafe { core::mem::transmute(eng().addr(sym::HOVER_FONT_HEIGHT)) };
+    let h = unsafe { g(f) };
+    if h.is_finite() && h > 0.0 { h } else { 0.0 }
+}
+
 /// A `TextAndSprite` child (icon and text) at the place `x`, `y`.
 fn with_icon(kind: Kind, c: usize, craft: usize, x: i32, y: i32) -> Option<Part> {
     if c == 0 {
@@ -187,6 +198,7 @@ fn with_icon(kind: Kind, c: usize, craft: usize, x: i32, y: i32) -> Option<Part>
         rect: shift(rect_at(c + field::HOVER_TS_TEXT_RECT()), x + ox, y + oy),
         justify: unsafe { rd::<i32>(c + field::HOVER_ST_JUSTIFY()) },
         font: font(c),
+        font_h: font_height(font(c)),
         icon: peek(c, field::HOVER_TS_SPRITE()),
         icon_rect: shift(rect_at(c + field::HOVER_TS_SPRITE_RECT()), x + ox, y + oy),
         icon_rgb,
@@ -207,6 +219,7 @@ fn plain(kind: Kind, c: usize, craft: usize, x: i32, y: i32) -> Option<Part> {
         rect: shift(rect_at(c + field::HOVER_CT_RECT()), x + ox, y + oy),
         justify: unsafe { rd::<i32>(c + field::HOVER_ST_JUSTIFY()) },
         font: font(c),
+        font_h: font_height(font(c)),
         icon: 0,
         icon_rect: [0; 4],
         icon_rgb: [1.0; 3],
@@ -276,7 +289,7 @@ fn log(r: &Readout) {
     let mut line = crate::sfmt!("hover: craft {:#x} at {},{} ({}):", r.craft, r.at.0, r.at.1, if unsafe { OURS && !ASIDE } { "ours" } else { "drawn by the engine" });
     for p in &r.parts {
         line.push_str(&crate::sfmt!(
-            " | {:?} {:?} {:.2},{:.2},{:.2} text {},{}..{},{} j{} font {:#x}",
+            " | {:?} {:?} {:.2},{:.2},{:.2} text {},{}..{},{} j{} font {:#x} h {:.1}",
             p.kind,
             p.text,
             p.rgb[0],
@@ -287,7 +300,8 @@ fn log(r: &Readout) {
             p.rect[2],
             p.rect[3],
             p.justify,
-            p.font
+            p.font,
+            p.font_h
         ));
         if p.icon != 0 {
             let r = p.icon_rect;
