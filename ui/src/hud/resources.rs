@@ -116,7 +116,7 @@ pub fn run(ui: &mut Ui) {
     let (cell_w, h, gap) = (ui.u(150.0), ui.u(46.0), ui.u(6.0));
     let w = shown.len() as f32 * cell_w + (shown.len() - 1) as f32 * gap;
     let (outer, inner) = place(ui, w, h);
-    let at_left = crate::content::get().resources_at_component && outer.x < ui.w * 0.25;
+    let at_left = crate::content::get().resources_placement != crate::content::ResourcePlacement::Top && outer.x < ui.w * 0.25;
     unsafe { LEFT_STRIP = if at_left { Some((outer, crate::rt::now())) } else { None } };
     // Lamps in the frame (Starfleet): the user wants them on the resource strip.
     ui.panel_lit(outer);
