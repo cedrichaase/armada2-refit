@@ -3,7 +3,7 @@
 Resolutions: 1280x960
 Mod: refit
 Layers: display asiloader render3d ui
-Setup: display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh HUD.Enable=1 HUD.Resources=1 HUD.Buttons=0 HUD.Pause=0 HUD.Chat=0 HUD.Selection=0 HUD.FrameRate=0 HUD.Overview=0 HUD.LayoutLog=1
+Setup: display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh Menus.Enable=0 Menus.Forms=0 HUD.Enable=1 HUD.Resources=1 HUD.Buttons=0 HUD.Pause=0 HUD.Chat=0 HUD.Selection=0 HUD.FrameRate=0 HUD.Overview=0 HUD.LayoutLog=1
 Timeout: 14 min
 
 Run with `a2test --game fo-roots` and `--install .`. FO-6 step 4 (`PLAN-FLEETOPS.md`, "FO-6:
