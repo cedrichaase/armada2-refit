@@ -743,6 +743,31 @@ classes and the bullet from the player's log. The build list's cost line was not
 the station alone does not select it reliably); it is held by the host test. Stock at 1280x720 with `--install .`:
 `ui-hud-bar` and `display-stub` (below, in the PR).
 
+### The briefing under the HUD (2026-11-07)
+
+Branch `fo-hud-briefing`, on `fo-b`. The user's report (Roots 5.0Z11, 3440x1440, `fo-b` 8084a885, their
+`RefitPlayer.ini` turning on the minimap, info panel, unit view, tooltips, bar and its labels beyond decision 125):
+in the first allied tutorial the briefing and objectives screen was "very stretched", and every panel of ours was
+drawn over it.
+
+**The stretch is Roots' own** (decision 320). The screen is the engine's `ObjectivesDisplay` with Roots' art
+(`[HUD] Messages=0` on Roots). With no `UI.asi` at all (`fo-ui-briefing-ref`, 2150x900, the user's aspect) its frame
+spans the same x 3% to 93% of the screen, top to bottom, as in the user's shot. Roots lays its interface out per
+aspect (`misc/gui_*4x3`, `5x4`, `16x10`, `16x9`); at 2.39 FleetOpsHook takes the 16:9 files, whose canvas is
+2134 x 1200, and Roots' objectives panel is a 5 x 4 grid of 384 x 307 tiles from x 64 on that canvas. The engine
+scales the canvas to the back buffer per axis (`ui/HUD.md`, "The layout canvas"), so at 21:9 the frame is about 1.34
+times wider than drawn; the components' rectangles in `UI.log` agree (`ObjectivesDisplay` and `MessageDisplay` both
+at [48,0,1199,1535] of the 1600 space, which is 64..1600 of 2134). Nothing of ours scales it: not the canvas (the UI
+writes none), not Display8's mode, not a hook. The dark
+vertical lines are the seams between the grid's tiles (`ui/HUD.md`, "Sprite edges"), also Roots'.
+
+**The HUD over it was ours** (decision 321). The engine draws its boxes in `RenderAll`, before the UI's frame, so
+every panel of ours landed on top, and could take clicks there while stock's box is meant to own the pointer.
+While the engine's objectives or message box shows and is not ours, the panels of ours now stand aside (`ui/HUD.md`,
+"Under the engine's boxes"). `fo-ui-briefing` (2150x900, the user's panels on): the briefing shot matches the
+reference's, with none of ours over it; OK closes it and the panels come back; `hud: under the engine's box` and
+`the engine's box closed` in `UI.log`; no VUID.
+
 ### Step 7: why the menus stay Roots' (2026-11-06)
 
 Offline, as the step asked first: every `DialogBoxParamA` and `CreateDialogParamA` call in
@@ -1195,6 +1220,8 @@ them, 2–4 h together).
 | 290 | **The setup flash (258) is the adopted dialog's paint, measured; not yet removed**: every paint the pump sends (`fodialogs::paint`: `WM_ERASEBKGND` and `WM_PAINT`) takes about 50 ms (a tick that paints measured 53 to 69 ms, the children's `WM_PRINT` not part of it: with it skipped the tick still took 45 to 57), and the dialog's background (what the dialog paints without its controls) shows 1:1 at the window's top left in the grim shots taken while it runs: 3 of 8 consecutive shots without any change. Ruled out by probe or A/B: the executable's own `GetDC` of any window but the adopted ones (none logged while a dialog was adopted), a scratch DC for `GetDC` of the 3D window as the dialog host gives (never hit), the periodic repaint (off: the flash stays, since invalidations paint too), `LockWindowUpdate` of the 3D window (no change: 2 of 3 runs), a pump that stalls (only the adoption's 0.4 to 0.8 s), and a frame presented at once after each paint (still 2 of 3 runs flashed). So the draw is FleetOpsHook's own GDI on the real window during the paint, which no import of the executable passes. Named screenshots rarely show it, the checks' and `before-click` shots do, so `fo-ui-dialogs-setup` fails at step 11, 15 or 19 on fo-b itself (`20261107-072303` with no change of ours) | the probes above (`20261107-0735` to `-0749`); the flash is only a compositor effect, a frame dump never shows it | not paint through `WM_PAINT` at all while the dialog has a spec (its picture from the stock procedure alone, `CallWindowProc` on the record's procedure, if the front procedure's captions are not needed), or an inline hook of user32's `GetDC` (a write outside FleetOpsHook and the executable)  |
 | 291 | **Map Select's and Map Editor's list cells are cut at their column**: a long file name no longer runs into Size (`roots/mapselect.rs`, `list`) | the user's report | an ellipsis instead of a cut |
 | 300 | **The setup flash (258, 290) is FleetOpsHook's shell background drawn onto the game window, and is skipped**: measured with Wine's relay of FleetOpsHook's `user32`/`gdi32` calls on the bench (`RelayFromInclude=fleetopshook`): in each of Game Setup's paints (46 of 46) FleetOpsHook's replacement of `SetCurrentBackground` (`ShellBitmapImp.SetCurrentBackgroundNew`), reached from the stock procedure's paint, keeps the background in `hCurrentBackground` and then takes `GetDC` of the window `ST3D_GraphicsEngine::GetWindowHandle` names, the device window, through its own import, and draws the 1200x900 background onto it at 0,0 with the executable's `DrawTransparentBitmap` (magenta transparent): a real GDI draw on the device window, which shows over the frame until a later image of the swap chain covers it. None of decision 290's suspects; the dialog's own window is never drawn on screen. The fix takes `DrawTransparentBitmap` at its entry in the executable (hook `ui.forms.shell_background`, its first six bytes checked) and skips a draw whose DC is the device window's while the forms' frame covers it (`forms::covers`); every other draw runs as stock, `hCurrentBackground` is set as before, FleetOpsHook's memory is not written and no `user32` function is hooked. The same path ran once as Roots' main menu gave way to Game Setup, and is covered too | the relay probe `20261107-075857` (4 of 8 consecutive shots flashed); with the fix, eight consecutive shots `20261107-081746` (none), `fo-ui-dialogs-setup` 5 of 5 (`20261107-081616`, `-081832`, `-081948`, `-082106`, `-082221`), `fo-ui-dialogs-single` `-082337`, `-settings` `-082545`, `-log` `-082637`, `-saves` `-084028` (its LAUNCH click moved to where the Game Setup spec of decision 257 puts the button: it still clicked the mirror's place, so the run before, `-082811`, never started the skirmish), the `Specs=0` mirror `fo-ui-dialogs-load-mirror` `-083420` | the user's look in game (Hyprland, not the bench's sway) |
+| 320 | **The briefing's width at 21:9 is Roots' layout, left as Roots draws it**: Roots' 16:9 interface files (canvas 2134 x 1200) stretched per axis by the engine; the same with no `UI.asi` (`fo-ui-briefing-ref`) | "The briefing under the HUD" above; the brief: Roots' intended layout, as with the UI off | the user wanting it narrower: `[HUD] Messages=1` on Roots (our box, laid out by us) once `fo-ui-briefing` passes with it, or a pillarbox of the engine's box |
+| 321 | **While the engine's objectives or message box shows (not ours), the HUD of ours stands aside whole**, the boxes of ours and the multiplayer boxes excepted; it comes back when the box closes | stock's box is modal and drawn before the UI's frame; the UI cannot draw between two engine components, so hiding is the faithful choice (the box owns the pointer as in stock) | drawing ours under the engine's box (a frame of ours split at `RenderAll`) |
 
 ### Risks and unknowns
 
