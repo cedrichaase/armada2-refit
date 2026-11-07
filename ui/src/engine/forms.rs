@@ -712,6 +712,20 @@ fn ansi_string(p: usize) -> String {
     b.iter().map(|&c| latin1(c)).collect()
 }
 
+/// A Delphi wide string (UTF-16, the length in bytes in the dword before): what a grid's
+/// string cells hold.
+fn wide_string(p: usize) -> String {
+    if p < 4 || !super::readable(p - 4, 4) {
+        return String::new();
+    }
+    let n = (rd::<u32>(p - 4) as usize / 2).min(256);
+    if !super::readable(p, n * 2) {
+        return String::new();
+    }
+    let w = unsafe { core::slice::from_raw_parts(p as *const u16, n) };
+    char::decode_utf16(w.iter().copied()).map(|c| c.unwrap_or('?')).collect()
+}
+
 fn c_string(p: usize) -> String {
     let mut s = String::new();
     if p == 0 {
@@ -930,7 +944,7 @@ fn grid_of(g: usize, vmt: usize, class: &str) -> Option<Grid> {
             let mut text = String::new();
             if ptr_ok(cell, field::FORMS_CELL_VALUE() + 4) {
                 match class_name(rd::<usize>(cell)).as_deref() {
-                    Some("TStringCell") => text = ansi_string(rd::<usize>(cell + field::FORMS_CELL_VALUE())),
+                    Some("TStringCell") => text = wide_string(rd::<usize>(cell + field::FORMS_CELL_VALUE())),
                     Some("TIntegerCell") => text = crate::sfmt!("{}", rd::<i32>(cell + field::FORMS_CELL_VALUE())),
                     _ => {}
                 }

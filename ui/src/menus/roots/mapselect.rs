@@ -25,7 +25,7 @@ const COLUMNS: [(&str, f32); 4] = [("Name", 0.42), ("Players", 0.14), ("Filename
 
 /// The grid's row `i` selected as a player would: a click at the row when the grid shows
 /// it, the arrow keys from the selected row otherwise.
-fn choose(f: &Form, g: &Control, grid: &Grid, i: usize) {
+fn choose(f: &Form, g: &Control, grid: &Grid, i: usize, from: i32) {
     let (rh, hh) = (if grid.row_h > 0 { grid.row_h } else { ROW_H }, if grid.head_h > 0 { grid.head_h } else { HEAD_H });
     let shown = ((g.rect[3] - hh) / rh).max(1);
     let at = i as i32 - grid.first;
@@ -35,7 +35,6 @@ fn choose(f: &Form, g: &Control, grid: &Grid, i: usize) {
         forms::act(Action::Mouse(f.hwnd, forms::MOUSE_DOWN, forms::MOUSE_HELD, x, y));
         forms::act(Action::Mouse(f.hwnd, forms::MOUSE_UP, 0, x, y));
     } else if g.hwnd != 0 {
-        let from = grid.selected.max(0) as i32;
         let (vk, n) = if i as i32 > from { (VK_DOWN, i as i32 - from) } else { (VK_UP, from - i as i32) };
         crate::log!("forms: map {} chosen ({} keys from row {})", i, n, from);
         for _ in 0..n.min(64) {
@@ -57,7 +56,7 @@ pub(super) fn draw(ui: &mut Ui, f: &Form) -> bool {
     };
     let Some(grid) = g.grid.as_ref() else { return false };
     let t = ui.theme;
-    let list_h = 440.0;
+    let list_h = 520.0;
     let (body, foot) = sform::frame(ui, 1180.0, sform::LABEL_H + sform::FIELD_H + list_h + 2.0 * kit::GAP, "SELECT MAP");
 
     // The filter, in the settings screens' caption-over-field place.
@@ -98,8 +97,26 @@ pub(super) fn draw(ui: &mut Ui, f: &Form) -> bool {
             }
         }
     }
+    // A selection the grid made (a key, the filter, the form's own start) brings its row
+    // into view in our list.
+    static mut SEEN: (usize, i32) = (0, -2);
+    unsafe {
+        if SEEN != (f.hwnd, grid.selected) {
+            SEEN = (f.hwnd, grid.selected);
+            if let Some(s) = sel {
+                let slot = ui.slot(ui.id("maps"));
+                let (top, view) = (s as f32 * row_h, rows_r.h - ui.u(8.0));
+                if top < slot[0] {
+                    slot[0] = top;
+                } else if top + row_h > slot[0] + view {
+                    slot[0] = top + row_h - view;
+                }
+            }
+        }
+    }
     let rows: Vec<&Vec<alloc::string::String>> = grid.rows.iter().collect();
     let width = rows_r.w - bar - ui.u(10.0);
+    let was = sel;
     let ev = ui.list(rows_r, "maps", rows.len(), row_h, &mut sel, |ui, i, rr, _sel, _hot| {
         let mut x = rr.x + ui.u(10.0);
         for (k, cell) in rows[i].iter().enumerate() {
@@ -111,7 +128,7 @@ pub(super) fn draw(ui: &mut Ui, f: &Form) -> bool {
     if f.top && g.enabled {
         if let (ListEvent::Changed | ListEvent::Activated, Some(i)) = (ev, sel) {
             if grid.selected != i as i32 {
-                choose(f, g, grid, i);
+                choose(f, g, grid, i, was.map_or(grid.selected.max(0), |s| s as i32));
                 unsafe { PENDING = (f.hwnd, i, 8) };
             }
             if ev == ListEvent::Activated {
