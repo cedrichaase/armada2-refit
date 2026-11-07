@@ -1050,9 +1050,9 @@ dialog's model and its picture, and acting only as a player's clicks and typing:
 
 | Dialog | Drawn as | Bench |
 |---|---|---|
-| Single Player | Armada II's campaign selection: over the menu scene the column of Roots' four campaigns (the dialog's hover labels as names, a cut of each card's art as its mark), Load Game and Previous Menu; each campaign its view of the fleetops map; the 2x2 cards without the scene | `fo-ui-dialogs-single` `20261107-051028` (1600x900), the column at 3440x1440 in `20261107-051240` (its later steps aim at 1600x900 places) |
+| Single Player | Armada II's campaign selection: over the menu scene the column of Roots' four campaigns (the dialog's hover labels as names, a cut of each card's art as its mark), Load Game and Previous Menu; each campaign its view of the fleetops map; the 2x2 cards without the scene | `fo-ui-dialogs-single` `20261107-051711` (1600x900, merged with fo-b), the column at 3440x1440 in `20261107-051240` (its later steps aim at 1600x900 places) |
 | The mission list | Armada II's list in a window of ours; a row and OK start the mission | `fo-ui-dialogs-single` (the tutorial started) |
-| Load Game, Save Game | Armada II's save list: name and date, the scroll buttons, the name field writing Roots' edit, the foot | `fo-ui-dialogs-saves` `20261107-050545`; the one-button message after a save is ours too (Armada II's `notice.rs`) |
+| Load Game, Save Game | Armada II's save list: name and date, the scroll buttons, the name field writing Roots' edit, the foot | `fo-ui-dialogs-saves` `20261107-051932` (merged with fo-b); the one-button message after a save is ours too (Armada II's `notice.rs`) |
 
 The cheaper path to the specs was the shell's widget reader, as decision 238 left open:
 it ran on Roots at the first try but for one check (decision 250), and with it every
