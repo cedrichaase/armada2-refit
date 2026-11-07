@@ -501,10 +501,13 @@ fn = "CreateRoomDlgProc"
 how = "runtime"
 verified = []
 
+# `ui.shell.screens` patches only the call of Show_Credits at +0x514 (checked to call it);
+# FleetOpsHook's entry detour and its two calls at +0x90 and +0xa9 leave that call stock's
+# (PLAN-FLEETOPS.md, decision 607).
 [[changed]]
 fn = "DispatchDialog"
 how = "runtime"
-verified = []
+verified = ["ui.shell.screens"]
 
 # FleetOpsHook trampolines the entry (its clean screenshot skips the HUD) and the stock body runs
 # behind it: the UI's panel switch re-points the Render call at +0x47 (0x51abf7) and the
@@ -601,10 +604,12 @@ fn = "ST3D_GraphicsEngine::FindVisibleDatabase"
 how = "runtime"
 verified = []
 
+# FleetOpsHook re-points its calls at +0x3b and +0x11c (its window mode, texture
+# parameters); the UI's Credits call it as Roots' own Credits do, through those (decision 607).
 [[changed]]
 fn = "ST3D_GraphicsEngine::SetActiveDisplay"
 how = "runtime"
-verified = []
+verified = ["ui.shell.screens"]
 
 # Replaced whole at its entry. The order ring and the footprints only call it (their entry
 # check is dropped in ui.hud.toml); loading.inner_pixels patches a call inside it, so the
@@ -637,10 +642,12 @@ fn = "ShipDisplay::Render"
 how = "runtime"
 verified = ["ui.hud.hover"]
 
+# FleetOpsHook re-points two calls inside it (its bitmap object); `ui.shell.screens` never
+# runs it, it only replaces the call to it (decision 607).
 [[changed]]
 fn = "Show_Credits"
 how = "runtime"
-verified = []
+verified = ["ui.shell.screens"]
 
 [[changed]]
 fn = "SoundSettingsDlgProc"

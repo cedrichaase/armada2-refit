@@ -360,7 +360,8 @@ nothing (None, an empty list, 0) while their hook is not ready.
 
 | Hook | What it needs of `Armada2.exe` |
 |---|---|
-| `ui.shell.screens` | `DispatchDialog`'s call of `Show_Credits` (re-pointed at the Credits of ours, or at the demo screen), and the functions a screen of ours calls between two shell screens: `SetActiveDisplay` (2 the 3D display, 3 the shell's), `ClearDeviceDisplays` with `ST3D_Colour_Black`, `GetWindowHandle`, `HandleMessageQueue`, `TestCooperativeLevel`, `SetCurrentBackground`, `ShellBitmap`'s constructor (0x30 bytes, from `operator new`) with `ALL_BLACK_8_BY_6_BACKGROUND`, and `g_shellMode` (1: main menu); feeds `Menus.Credits` |
+| `ui.shell.screens` | `DispatchDialog`'s call of `Show_Credits` (re-pointed at the Credits of ours, or at the demo screen), and the functions a screen of ours calls between two shell screens: `SetActiveDisplay` (2 the 3D display, 3 the shell's), `ClearDeviceDisplays` with `ST3D_Colour_Black`, `GetWindowHandle`, `HandleMessageQueue`, `TestCooperativeLevel`, and `g_shellMode` (1: main menu); feeds `Menus.Credits` |
+| `ui.shell.background` | the black background a screen of ours in the Credits' place leaves behind, as the stock Credits do: `SetCurrentBackground` with a `ShellBitmap` (0x30 bytes, from `operator new`) of `ALL_BLACK_8_BY_6_BACKGROUND`; stands down on Roots, whose `SetCurrentBackground` is FleetOpsHook's (PLAN-FLEETOPS.md, decision 607) |
 | `ui.shell.reads_device` | Storm3D's display, device index and device table (+0x10c, +0xc0, +0xcc), `ST3D_DeviceDirectX8`'s vtable (to tell the device) and its `FlipToGDISurface` slot, `ExitCode` (a `WM_QUIT`'s code) and the `star_trek` `Program`'s first byte (lets Alt+Tab through); read by the screens, the dialog host and the loading screen |
 | `ui.shell.cursor` | the one `call [SetCursor]` in `WindowProc`'s `WM_SETCURSOR` case, bytes checked, replaced by a call of ours; the arrow over a screen of ours or a hosted dialog |
 | `ui.shell.widgets` | `Shell::Widget`'s constructor, re-pointed (its bytes checked) at one that stores the same two fields and remembers the object, and `Shell::Widget`'s vtable; feeds `Menus.Enable` |
@@ -1186,8 +1187,7 @@ a host of their own, `engine/forms.rs` (drawn by `menus/roots.rs`):
   FleetOpsHook opens through its own `DialogBoxParamA` (Single Player, Game Setup, Game
   Settings, Load, Save, the licence, the Technology Tree, the Admiral's Log, Internet) are
   Roots' dialogs drawn by the UI: "The nine dialogs, adopted" below. Still Roots' or the
-  engine's (PLAN-FLEETOPS.md, "The leftover menus"): the Credits (`ui.shell.screens` stands
-  down on Roots), the map editor's Load Map and Save Map file dialog (a window of its own,
+  engine's (PLAN-FLEETOPS.md, "The leftover menus"): the map editor's Load Map and Save Map file dialog (a window of its own,
   not owned by the device window, so neither adopted nor hidden), and, unreached, the
   Technology Tree, a game's password and the map transfer, which stay the picture.
 - **The fallback: the nine framed** (PLAN-FLEETOPS.md, decision 200), when the
@@ -1494,6 +1494,13 @@ the Credits' place does: the black shell background and `g_shellMode` = main men
 - **Keys**: Esc or a right click returns to the main menu (the stock Credits took no
   key); Space, Enter, the right arrow or a left click turn the page, the left arrow goes
   back; the last page's end returns too. The foot of the screen says so.
+
+**On Fleet Operations: Roots** (PLAN-FLEETOPS.md, decisions 607 to 609; off in Roots' defaults):
+the same screen from the main menu form's Credits, over Roots' own `Credits.txt` and
+`textures\logos.tga` and a tour of the `fleetops` map's five views. The black background it
+leaves on Armada II (`ui.shell.background`) stands down there: Roots' `SetCurrentBackground` is
+FleetOpsHook's and takes a bitmap of its own, and the next screen is a form of FleetOpsHook's.
+`fo-ui-credits` checks it.
 
 Seen on the bench (2026-10-17, 1280x720): the title page over the fleet with the four
 logos, page 5 of 30, Esc back to the main menu (`credits: left (0)`).
