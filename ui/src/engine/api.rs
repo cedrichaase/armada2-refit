@@ -168,7 +168,7 @@ pub mod progress {
 
 pub mod radar {
     pub use crate::engine::radar::{
-        action_cursor, action_cursors_stock, blips, buttons_swapped, engine_texture, filter_name, filter_sprites, filter_text, filters,
+        action_cursor, action_cursors_stock, blips, buttons_swapped, editor, engine_texture, filter_name, filter_sprites, filter_text, filters,
         fog_grid, fog_on, fog_texture_size, functions_stock, hooked, install, map_radar, map_texture, marks,
         queue_camera, queue_filter, queue_order, radar, relation, selection_count, shot_scenes, shroud_grid,
         tactical_camera, teams_visible, view, view_outline, warp_texture, Grid, Kind,

@@ -260,6 +260,81 @@ fn = "Producer::FinishBuild"
 how = "detour"
 verified = []
 
+# ---- scene (the test bench's Scene.asi; testbench/scene/README.md, "On Fleet Operations: Roots") ------
+
+# Roots' file changes the Vector3 overload's body (+0x1c..+0x2c); the three entries Scene.asi turns
+# into `return false` while notices are off (6 bytes each) are stock's in the file and in memory.
+[[changed]]
+fn = "GameEvent::TriggerEvent"
+how = "detour"
+verified = ["scene.notices"]
+
+# Roots' edit points the zoom's lower limit at another constant of the same 1.0; the scene only
+# calls the function through the camera's vtable slot, which holds it.
+[[changed]]
+fn = "TacticalCamera::SetZoomLevel"
+how = "edit"
+verified = ["scene.zoom"]
+
+# Roots' edit is a constant at +0x2d; the step hook calls the function as GameProcess does.
+[[changed]]
+fn = "getGameSpeedModifier"
+how = "edit"
+verified = ["scene.step"]
+
+# FleetOpsHook takes out a test at the entries of both overloads (+0x3..+0x18): the special
+# command is not needed on Roots's bench and stands down.
+[[changed]]
+fn = "Craft::FireAtSpecial"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cPrjID::SetName"
+how = "runtime"
+verified = []
+
+# FleetOpsHook trampolines the entry: the damage-node slot of ours would call its callback, and
+# stands down.
+[[changed]]
+fn = "CraftInstance::Update"
+how = "runtime"
+verified = []
+
+# FleetOpsHook's calls inside the body hide or show its own unit view with the mode; the hud
+# command sets the mode and calls the function whole, so Roots' version runs.
+[[changed]]
+fn = "DisplayInterface::SetInterfaceState"
+how = "runtime"
+verified = ["scene.hud"]
+
+# FleetOpsHook's writes are its audio update (+0x62..+0x73); the step hook's call of
+# getGameSpeedModifier (+0x53) and the product with `ms` after it are stock's in the file and in memory.
+[[changed]]
+fn = "Program::GameProcess"
+how = "runtime"
+verified = ["scene.step"]
+
+# FleetOpsHook's writes are the tech tree file's name (+0x207) and a call at +0x369; the seed hook's
+# call of Starfield_Initialize (+0x2a9) is stock's in the file and in memory.
+[[changed]]
+fn = "Program::GameOpenPostLoad"
+how = "runtime"
+verified = ["scene.seed_load"]
+
+# FleetOpsHook nops two runs of the body (+0x6c, +0x9a); the hover hook's MouseOn call (+0x32) is
+# stock's in the file and in memory.
+[[changed]]
+fn = "SelectionDisplay::PreRender"
+how = "runtime"
+verified = ["scene.hover"]
+
+# TechnologyTree::Available and Possible jump to FleetOpsHook's own tree (TechnologyTreeImp), which
+# does not read the TechItem bytes the tech command writes.
+[[disable]]
+hooks = ["scene.tech"]
+why = "Roots answers the technology tree from a tree of its own"
+
 # ---- qolrules (off above in any case) ------------------------------------------------
 
 [[changed]]
@@ -325,7 +400,7 @@ verified = ["render3d.frame.*", "ui.core.mission", "ui.hud.frame_rate", "ui.pane
 [[changed]]
 fn = "Beam::Simulate"
 how = "runtime"
-verified = ["render3d.effects.shields"]
+verified = ["render3d.effects.shields", "scene.shieldfx"]
 
 # FleetOpsHook edits the body (+0x10, +0x69) and gives rigs GameObject::Render in their
 # vtable: the core only compares this address with a class's Render slot (FO-5 step 3).
@@ -351,7 +426,7 @@ verified = ["render3d.view.distance", "qol.pan_speed"]
 [[changed]]
 fn = "ShieldEffect::CreateShieldHit"
 how = "runtime"
-verified = ["render3d.effects.reads", "render3d.effects.shields", "render3d.effects.shield_models"]
+verified = ["render3d.effects.reads", "render3d.effects.shields", "render3d.effects.shield_models", "scene.shieldfx"]
 
 # FleetOpsHook takes out the free of the previous background database (+0x16, after its
 # destructor; Background_Close likewise), keeping its memory: the entry, the name and the
