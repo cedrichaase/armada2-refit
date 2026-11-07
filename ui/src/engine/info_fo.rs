@@ -80,6 +80,9 @@ pub fn install() -> bool {
         if !available() {
             return false;
         }
+        if !install_focus() {
+            crate::log!("info: the panel's FocusSimulate slot is not stock: ours keeps Roots' place for the pointer");
+        }
         // The status line under the pointer is drawn inside the panel's Render, through the
         // hover hook's call (which lifts the gate around it): the hook goes in with the gate.
         if !super::hover::install_only() {
@@ -112,6 +115,70 @@ pub fn install() -> bool {
         }
         INSTALLED = true;
         true
+    }
+}
+
+// ---- the pointer mapped into the panel's own rectangle ------------------------------------
+
+/// The map from ours to the panel's own place, in the HUD canvas's units: x' = ax + bx·x,
+/// y' = ay + by·y; None while ours sits where the panel does (nothing to map).
+static mut MAP: Option<[f32; 4]> = None;
+static mut FOCUS_ORIG: usize = 0;
+static mut FOCUS_ON: bool = false;
+
+/// Wraps the panel's `FocusSimulate` slot (once): around the stock call the HUD's mouse position
+/// is mapped from ours into the panel's own rectangle (`set_pointer_map`) and put back, so every
+/// child's hover and click (FleetOpsHook's rings included) follows ours wherever it is drawn.
+/// False when the slot is not stock: ours then keeps the panel's own place for the pointer.
+#[allow(static_mut_refs)]
+fn install_focus() -> bool {
+    unsafe {
+        if FOCUS_ON {
+            return true;
+        }
+        let at = eng().addr(sym::INFO_SLOT_FOCUS_SIMULATE);
+        if at == 0 || eng().addr(sym::INFO_MOUSE_POS) == 0 {
+            return false;
+        }
+        match super::hook::patch_slot(at, 0, focus_simulate as *const () as usize) {
+            Some(old) => {
+                FOCUS_ORIG = old;
+                FOCUS_ON = true;
+                true
+            }
+            None => false,
+        }
+    }
+}
+
+/// Whether the pointer can be mapped (ours may sit anywhere and keep the engine's pointer).
+pub fn pointer_map_available() -> bool {
+    unsafe { FOCUS_ON }
+}
+
+/// Sets this frame's map (canvas units, from ours into the panel's own rectangle), None for
+/// none.
+pub fn set_pointer_map(m: Option<[f32; 4]>) {
+    unsafe { MAP = m };
+}
+
+unsafe extern "thiscall" fn focus_simulate(this: usize, dt: f32) {
+    unsafe {
+        let f: unsafe extern "thiscall" fn(usize, f32) = core::mem::transmute(FOCUS_ORIG);
+        let at = eng().addr(sym::INFO_MOUSE_POS);
+        match MAP {
+            Some([ax, bx, ay, by]) if at != 0 => {
+                let p: [i32; 2] = rd(at);
+                let q = [libm::roundf(ax + bx * p[0] as f32) as i32, libm::roundf(ay + by * p[1] as f32) as i32];
+                core::ptr::write_unaligned(at as *mut [i32; 2], q);
+                f(this, dt);
+                // Put back, unless the call moved it itself.
+                if rd::<[i32; 2]>(at) == q {
+                    core::ptr::write_unaligned(at as *mut [i32; 2], p);
+                }
+            }
+            _ => f(this, dt),
+        }
     }
 }
 
@@ -159,6 +226,8 @@ pub struct Icon {
     pub rect: [i32; 4],
     pub sprite: usize,
     pub comp: usize,
+    /// How FleetOpsHook draws it this frame.
+    pub look: Option<Look>,
 }
 
 /// Whether the craft's class gives weapon `i` an icon (FleetOpsHook's record of the class's
@@ -184,12 +253,12 @@ fn weapon_has_icon(obj: usize, i: usize) -> bool {
     i < n && n <= 64 && readable(e, stride) && unsafe { rd::<u32>(e + field::INFO_FO_ICON_POS_PRESENT()) } != 0
 }
 
-fn icons_at(off: usize, n: usize, obj: usize, weapons: bool) -> Vec<Icon> {
+fn weapon_icons_at(obj: usize) -> Vec<Icon> {
     let mut out = Vec::new();
     let systems = child(field::INFO_FO_SYSTEMS());
     let Some(area) = comp_rect(systems) else { return out };
-    for i in 0..n {
-        let c = child(off + 4 * i);
+    for i in 0..value::INFO_FO_N_WEAPON_ICONS() as usize {
+        let c = child(field::INFO_FO_WEAPON_ICONS() + 4 * i);
         if c == 0 || !readable(c, 0x50) {
             continue;
         }
@@ -200,30 +269,201 @@ fn icons_at(off: usize, n: usize, obj: usize, weapons: bool) -> Vec<Icon> {
             continue;
         }
         // A weapon icon is drawn for the weapons the class places.
-        if weapons && !weapon_has_icon(obj, i) {
+        if !weapon_has_icon(obj, i) {
             continue;
         }
-        // A buff icon, while the object has one of the effects stock knows (slowed by a gravity
-        // mine, a spy aboard): FleetOpsHook's weapon buffs are not told apart from a stale icon.
-        if !weapons {
-            let (slowed, spy) = super::info::effects(obj);
-            if !slowed && !spy {
-                continue;
-            }
+        let look = weapon_look(obj, c);
+        if look.is_none() {
+            continue;
         }
-        out.push(Icon { rect: r, sprite, comp: c });
+        out.push(Icon { rect: r, sprite, comp: c, look });
     }
     out
 }
 
-/// The weapon icons FleetOpsHook placed on the ship image this frame.
+/// The weapon icons FleetOpsHook placed on the ship image this frame, each with its look.
 pub fn weapon_icons(obj: usize) -> Vec<Icon> {
-    icons_at(field::INFO_FO_WEAPON_ICONS(), value::INFO_FO_N_WEAPON_ICONS() as usize, obj, true)
+    weapon_icons_at(obj)
 }
 
-/// The buff icons (a spy aboard, a gravity mine, a weapon's buff).
+/// The buff icons FleetOpsHook's panel shows this frame (`mProcessBuffIcons`: the buffs, then the
+/// debuffs, a spy aboard and a gravity mine's slowing among them), placed as its Render places
+/// them: a row centred on the image's middle, at its foot. Only the first `ShipSystems+0x30` icons
+/// are live, and only while the panel shows the ship image (`<class>_si`).
 pub fn buff_icons(obj: usize) -> Vec<Icon> {
-    icons_at(field::INFO_FO_BUFF_ICONS(), value::INFO_FO_N_BUFF_ICONS() as usize, obj, false)
+    let mut out = Vec::new();
+    let systems = child(field::INFO_FO_SYSTEMS());
+    let Some(area) = comp_rect(systems) else { return out };
+    if super::info::flags(obj) & super::info::f_craft() == 0 || !readable(systems, 0x34) {
+        return out;
+    }
+    let n = (unsafe { rd::<u32>(systems + field::INFO_FO_SYSTEMS_COUNT()) } as usize).min(value::INFO_FO_N_BUFF_ICONS() as usize);
+    for k in 0..n {
+        let c = child(field::INFO_FO_BUFF_ICONS() + 4 * k);
+        if c == 0 || !readable(c, 0x58) {
+            continue;
+        }
+        let (kind, blink, phase, positive) = unsafe {
+            (rd::<u8>(c + field::INFO_FO_BUFF_KIND()), rd::<u8>(c + field::INFO_FO_BUFF_BLINK()) != 0, rd::<u8>(c + field::INFO_FO_BUFF_PHASE()) != 0, rd::<u8>(c + field::INFO_FO_BUFF_POSITIVE()) != 0)
+        };
+        let sprite = match kind {
+            1 => field(c, field::INFO_FO_BUFF_SPRITE_SPY()),
+            2 => field(c, field::INFO_FO_BUFF_SPRITE_MINE()),
+            3 => field(c, field::INFO_FO_ICON_SPRITE()),
+            _ => 0,
+        };
+        if sprite == 0 {
+            continue;
+        }
+        let [w, h]: [i32; 2] = unsafe { rd(c + field::INFO_FO_BUFF_SIZE()) };
+        let (w, h) = if w > 0 && h > 0 && w < 200 && h < 200 { (w, h) } else { (34, 34) };
+        // FleetOpsHook centres the row on half the image's width without adding its left.
+        let sys_w = area[2] - area[0] + 1;
+        let x = libm::roundf(sys_w as f32 * 0.5 - (w + 2) as f32 * n as f32 * 0.5 + ((w + 2) * k as i32) as f32) as i32;
+        let y = area[3] + 1 - h - 2;
+        let c3 = if blink && !phase {
+            [0.15, 0.15, 0.15]
+        } else if positive {
+            race_colour(eng().addr(sym::INFO_WEAPON_ICON_COLOUR))
+        } else {
+            [1.0, 0.0, 0.0]
+        };
+        let look = Some(Look { grey: false, fill: 1.0, colour: c3, backing: None });
+        out.push(Icon { rect: [x, y, x + w - 1, y + h - 1], sprite, comp: c, look });
+    }
+    out
+}
+
+/// How FleetOpsHook draws a weapon icon this frame (`ShipSystemIcon`'s Render, read): its colour,
+/// the part filled (the reload, or the special energy short of its cost, from the left) over a
+/// backing copy, or grey for a special weapon not yet researched.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Look {
+    pub grey: bool,
+    pub fill: f32,
+    pub colour: [f32; 3],
+    pub backing: Option<[f32; 3]>,
+}
+
+/// The race's `systemIconHealthyColor` the engine loaded with the HUD (None where it reads
+/// nothing).
+pub fn system_icon_colour() -> Option<[f32; 3]> {
+    let at = eng().addr(sym::INFO_SYSTEM_ICON_COLOUR);
+    (at != 0 && readable(at, 12)).then(|| race_colour(at)).filter(|c| c.iter().any(|&v| v > 0.0))
+}
+
+/// The race's `weaponIconColor`, likewise.
+pub fn weapon_icon_colour() -> Option<[f32; 3]> {
+    let at = eng().addr(sym::INFO_WEAPON_ICON_COLOUR);
+    (at != 0 && readable(at, 12)).then(|| race_colour(at)).filter(|c| c.iter().any(|&v| v > 0.0))
+}
+
+/// One of the race colours the engine loads from the HUD race's `gui_<race>.cfg`.
+fn race_colour(at: usize) -> [f32; 3] {
+    if at == 0 || !readable(at, 12) {
+        return [1.0; 3];
+    }
+    unsafe { rd::<[f32; 3]>(at) }
+}
+
+/// The weapon icon `c` of `obj`'s look, or None when FleetOpsHook does not draw it (a special
+/// weapon its tree does not show).
+fn weapon_look(obj: usize, c: usize) -> Option<Look> {
+    let normal = race_colour(eng().addr(sym::INFO_WEAPON_ICON_COLOUR));
+    let healthy = race_colour(eng().addr(sym::INFO_SYSTEM_ICON_COLOUR));
+    let craft = cast(obj, sym::INFO_TD_GAME_OBJECT, sym::INFO_TD_CRAFT);
+    let carrier = field(craft, field::INFO_CRAFT_CARRIER());
+    if carrier == 0 || !readable(carrier + field::INFO_CARRIER_WEAPONS(), 8) {
+        return Some(Look { grey: false, fill: 1.0, colour: normal, backing: None });
+    }
+    let i = unsafe { rd::<u32>(c + field::INFO_FO_ICON_INDEX()) } as usize;
+    let (begin, end): (usize, usize) = unsafe { (rd(carrier + field::INFO_CARRIER_WEAPONS()), rd(carrier + field::INFO_CARRIER_WEAPONS() + 4)) };
+    if begin == 0 || end < begin || i >= (end - begin) / 4 || !readable(begin + 4 * i, 4) {
+        return Some(Look { grey: false, fill: 1.0, colour: normal, backing: None });
+    }
+    let weapon = unsafe { rd::<usize>(begin + 4 * i) };
+    let class = field(weapon, field::INFO_WEAPON_CLASS());
+    if weapon == 0 || class == 0 || !readable(weapon, 0x60) || !readable(class, 0x250) {
+        return Some(Look { grey: false, fill: 1.0, colour: normal, backing: None });
+    }
+    let f = |b: usize, o: usize| unsafe { rd::<f32>(b + o) };
+    // A special weapon: its technology item decides whether it shows, and grey until researched.
+    if unsafe { rd::<u32>(class + field::INFO_WCLASS_SPECIAL()) } != 0 {
+        if let Some((shown, available)) = tech_state(craft, class) {
+            if !shown {
+                return None;
+            }
+            if !available {
+                return Some(Look { grey: true, fill: 1.0, colour: [0.5, 0.5, 0.5], backing: None });
+            }
+        }
+    }
+    // The special energy short of the weapon's cost: filled to what the craft has.
+    let ord = field(class, field::INFO_WCLASS_ORDNANCE());
+    let cost = f(class, field::INFO_WCLASS_ENERGY()) + if ord != 0 && readable(ord, 0x18) { f(ord, field::INFO_ORDNANCE_COST()) } else { 0.0 };
+    let energy = f(craft, field::INFO_CRAFT_ENERGY_NOW());
+    let (mut fill, mut backing) = (1.0f32, [normal[0] * 0.25, normal[1] * 0.25, normal[2] * 0.25]);
+    let mut colour = normal;
+    if energy < cost && cost > 0.0 {
+        fill = (energy / cost).clamp(0.0, 1.0);
+        backing = [0.25, 0.2, 0.0];
+    } else {
+        let cannon = unsafe { rd::<u32>(class + field::INFO_WCLASS_SIG()) } == value::INFO_SIG_CANNON() as u32;
+        let reload = if cannon { f(weapon, field::INFO_WEAPON_CANNON_RELOAD()) } else { f(class, field::INFO_WCLASS_SHOT_DELAY()) };
+        if reload > 0.0 {
+            fill = (1.0 - f(weapon, field::INFO_WEAPON_RELOAD_LEFT()) / reload).min(1.0);
+            if fill < 0.0 {
+                fill = 1.0;
+            }
+        }
+    }
+    if unsafe { rd::<i32>(class + field::INFO_WCLASS_SLOT()) } == -1 {
+        colour = healthy;
+    } else if unsafe { rd::<u8>(weapon + field::INFO_WEAPON_ACTIVE()) } != 0 && unsafe { rd::<u8>(c + field::INFO_FO_ICON_FLASH()) } != 0 {
+        colour = [(normal[0] + 0.7).min(1.0), (normal[1] + 0.7).min(1.0), (normal[2] + 0.7).min(1.0)];
+        backing = [0.2, 0.25, 0.2];
+    }
+    Some(Look { grey: false, fill: fill.clamp(0.0, 1.0), colour, backing: Some(backing) })
+}
+
+/// A special weapon's technology item in FleetOpsHook's tree of the craft's team: (shown,
+/// researched), read (its `item+0x09` shown flag without its requirement groups, and its cached
+/// available flag `+0x08`). None when the tree or the item is not there (drawn as normal).
+fn tech_state(craft: usize, class: usize) -> Option<(bool, bool)> {
+    let rva = value::INFO_FO_TECH_TREES() as usize;
+    if rva == 0 {
+        return None;
+    }
+    let module = eng().companions().first()?;
+    let mut name = [0u8; 40];
+    let b = module.name.as_bytes();
+    if b.len() >= name.len() {
+        return None;
+    }
+    name[..b.len()].copy_from_slice(b);
+    let base = unsafe { crate::rt::win::GetModuleHandleA(name.as_ptr()) } as usize;
+    if base == 0 {
+        return None;
+    }
+    let team = unsafe { rd::<u32>(craft + field::INFO_CRAFT_TEAM()) } as usize;
+    if team >= 9 || !readable(base + rva + 4 * team, 4) {
+        return None;
+    }
+    let tree = unsafe { rd::<usize>(base + rva + 4 * team) };
+    let id_at = field(class, field::INFO_WCLASS_TECH_ID());
+    if tree == 0 || id_at == 0 || !readable(tree, 0x10) || !readable(id_at, 4) {
+        return None;
+    }
+    let id = unsafe { rd::<u32>(id_at) } as usize;
+    let items = field(tree, field::INFO_FO_TREE_ITEMS());
+    if id == 0 || items == 0 || !readable(items + 4 * (id - 1), 4) {
+        return None;
+    }
+    let item = unsafe { rd::<usize>(items + 4 * (id - 1)) };
+    if item == 0 || !readable(item, 0x10) {
+        return None;
+    }
+    unsafe { Some((rd::<u8>(item + field::INFO_FO_ITEM_SHOWN()) != 0, rd::<u8>(item + field::INFO_FO_ITEM_AVAILABLE()) != 0)) }
 }
 
 /// The ship image's area (`infoSingleSystemsDisplay`), local to the panel.
