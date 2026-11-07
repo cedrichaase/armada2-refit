@@ -46,9 +46,10 @@ struct State {
     /// The overflow columns the last frame drew (the bar's size for the bottom row).
     over_cols: usize,
     last_log: String,
+    last_rect: [i32; 4],
 }
 
-static mut STATE: State = State { on: false, geom: None, cells: [0; CELLS], over: Vec::new(), built_at: -1.0, over_cols: 0, last_log: String::new() };
+static mut STATE: State = State { on: false, geom: None, cells: [0; CELLS], over: Vec::new(), built_at: -1.0, over_cols: 0, last_log: String::new(), last_rect: [0; 4] };
 
 #[allow(static_mut_refs)]
 fn st() -> &'static mut State {
@@ -113,6 +114,14 @@ pub fn after_layout(p: usize) {
     }
     for (k, &b) in over.iter().enumerate() {
         place(b, CELLS + k);
+    }
+    // The first cell's rectangle as written, once per change: a bench run shows where the
+    // buttons were moved to, beside the hover line's pointer (decision 348).
+    let first = cell_rect(&g, 0);
+    let sig = [libm::floorf(first.x * g.kx) as i32 - ox, libm::floorf(first.y * g.ky) as i32 - oy, ox, oy];
+    if s.last_rect != sig {
+        s.last_rect = sig;
+        crate::log!("bar: grid cells moved: Q at [{},{}] local to the bar's origin {},{} (canvas)", sig[0], sig[1], ox, oy);
     }
     bar::set_cells(cells, false);
     s.cells = cells;

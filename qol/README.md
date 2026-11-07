@@ -175,10 +175,10 @@ button of that cell", and which button sits in which cell is the UI's layout.
   (`TextInput_IsActive`), Ctrl or Alt is held, or the game is not the foreground window.
 - **Cells without a key.** `bk_key_cells` (a value of the build's profile, one bit per cell)
   says which cells get a key: all fifteen on Armada II; on Fleet Operations: Roots not W, which
-  Roots' `Input.map` gives to `select_next_ship`, read by the overview and not the bar, so the
-  letter would do two things. `QOL_BarLabel` answers NULL for such a cell and the UI draws no
-  badge there. On Roots the keys press the UI's grid of Roots' bar (PLAN-FLEETOPS.md, decisions
-  330 to 338); `qol.bar_keys` is verified there (the call in `Update` is stock's; Roots' edits to
+  its `Input.map` gives to `select_next_ship` (reworked by Roots to select the damaged ships of the
+  selection, so W empties a shipyard's), read by the overview before the bar's keys.
+  `QOL_BarLabel` answers NULL for such a cell, the UI draws no badge there and its grid puts no
+  button there either (PLAN-FLEETOPS.md, decision 347). On Roots the keys press the UI's grid of Roots' bar (decisions 330 to 338); `qol.bar_keys` is verified there (the call in `Update` is stock's; Roots' edits to
   `mProcessKeyboardInput` leave its hotkey tables at stock's fields, which the hook empties).
 - **A press** is what releasing a click does: nothing for a disabled button, else the
   click (a fire-and-forget `AudioSound2D` made with the game's `operator new`, named by
