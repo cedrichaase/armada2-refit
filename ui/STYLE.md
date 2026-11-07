@@ -110,9 +110,17 @@ a short panel so the middle stays smoke); the rim is 10 units of the **metal kin
 slow blotches and a per-pixel speckle, fixed in screen pixels so plates side by side
 share one surface and nothing crawls when a panel moves by a pixel; strength 0.1, a
 broad sheen from the top left), with a light hairline along its top, a dark outline
-and a dark lip 2.5 units wide; the buttons are the metal kind in translucent grey
-(`button_top`/`button` about 60% cover) with a bright 1.5-unit rim and a light along
-the foot, lit blue from inside on hover, with a lamp along the foot when on. Window
+and a dark lip 2.5 units wide. **Starfleet's buttons are dark** (the user's call,
+2026-11-07): a near-black plate (`button_top`/`button`, 0x14/0x0a grey at 91%) with a
+dark grey 1.2-unit edge and a faint top highlight, the label in the lamps' blue
+(`accent`), lighter on hover and near white pressed; on hover the label **blooms**, a
+soft halo of the same blue round its glyphs (`Draw::text_glow`: the text's distance
+field drawn wider and softer, shader kind 2's `z`, at most the atlas's reach), and the
+plate's edge and a faint outer glow turn blue; disabled is a dimmer plate with the label
+in `text_off`; on keeps the lamp along its foot. (Roots' own art tiles in the bar and the
+top-right buttons are drawn as they are.) The other machined looks keep the brushed
+tiles: the metal kind in the race's translucent colour with a bright rim and a light
+along the foot, lit from inside on hover, a lamp along the foot when on. Window
 headers keep the glass and carry no mark. Text, status colours, sizes
 and the amber `accent2` are the shell's and Roots'.
 
@@ -148,7 +156,7 @@ space (as it shows in game; read only, never copied), in 0..255:
 | Borg | dark 20,23,20 with a bright green line 6,81,2 | dark green speckle: 8,20,9 middle, 8,44,8 near the lamps, 4,11,5 right | **green** nodes (82,255,49 core) in the top left corner and the foot's middle | cables and pipes; square |
 | Species 8472 | thick lavender bone 77,64,116; top light 194,173,229 | violet: 26,19,46 at the top to 15,7,48 at the foot | none | thick, soft, segmented by notches |
 | Free Borg | as the Borg, the line teal 2,81,70 | dark teal speckle: 8,20,20; 7,44,41 near the lamps | **teal** nodes (49,255,205) | as the Borg |
-| Dominion | dark violet 14,2,39; top light 110,89,154 | violet lit from the left: 32,19,72; 20,11,43; 12,2,40 | **violet** (130,80,255) at the clamps along the foot | as the Cardassian (clamps, cut corner) |
+| Dominion | dark violet 14,2,39; top light 110,89,154 | violet lit from the left: 32,19,72; 20,11,43; 12,2,40 (ours: black, by request) | **violet** (130,80,255) at the clamps along the foot | as the Cardassian (clamps, cut corner) |
 
 Checked in game (1280x960, `fo-ui-theme-roots-<race>`; Roots' own info strip is in the
 same shot, so both sit over the same space): the middle of the glass, Roots' strip
@@ -162,7 +170,21 @@ against our resource strip, in 0..255:
 | Borg (foot, by the lamp) | 20,33,22 (17,58,16) | 18,35,21 (22,63,23) |
 | Species 8472 | 31,22,59 | 23,15,53 |
 | Free Borg | 20,33,35 | 18,35,34 |
-| Dominion | 33,21,59 | 28,17,53 |
+| Dominion | 33,21,59 | dark by request (below) |
+
+**Dark, or tinted?** Measured over the whole of Roots' info strip in game (each pixel
+counted; near-black: no channel over 35; tinted: chroma over 25), against our resource
+strip in the same shot:
+
+| Race | Roots: near-black / tinted | Ours | So |
+|---|---|---|---|
+| Klingon | 86% / 10% | 80% / 12% | dark with red accents, as ours |
+| Romulan | 42% / 6% | 38% / 19% | dark, a little green in the glass, as ours |
+| Cardassian | 3% / 33% | 7% / 38% | olive throughout: kept |
+| Borg | 63% / 9% | 65% / 6% | dark with green accents, as ours |
+| Species 8472 | 0% / 96% | (lifted toward Roots) | violet throughout: kept, a shade lighter |
+| Free Borg | 60% / 9% | 62% / 6% | as the Borg |
+| Dominion | 1% / 93% | dark by request | Roots' is violet throughout (mean 33,21,60); ours is black gunmetal and black glass with violet only in the accents, at the user's word (2026-11-07) |
 
 How ours carries each (`Machined`): the rim's colours, width and grain; `glass_light`
 for the light lying from the left (Romulan, Dominion); `shade_right`; `glass_grain`, the
@@ -175,7 +197,10 @@ them (the resource strip and the info panel), as Starfleet's. The text, title an
 status colours are each race's Armada II look's, so a race reads the same on both games.
 
 **Which theme shows** is `[UI] Theme=` in `UI.ini`: `auto` (the default) uses the
-player's race in a mission and the shell's theme in the menus and the loading screen;
+player's race in a mission and, in the menus and the loading screen, the content set's
+look (`[Looks] Menus`; Armada II's set names none: the shell's; Roots' names
+`starfleet`), with the menus over a running mission following `[Looks] MissionMenus`
+(`race`: the HUD's race's look, as Roots' set has it; empty: as the front end's);
 a theme's name (`shell`, `federation`, `klingon`, `romulan`, `cardassian`, `borg`,
 `species8472`), or a look's id (`starfleet`, `redline`, `jade`,
 `bronze`, `circuit`, `bone`, `circuit-teal`, `violet`,

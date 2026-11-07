@@ -1010,11 +1010,15 @@ theme), `hud/resources.rs`, `credits.rs` (the tour, the text, the logos), `curso
 `loading.rs` (the kicker), `gallery.rs`, `menus/scene.rs` and
 `menus/screens/single_player.rs`.
 
-**The colours stay the theme's.** `widgets/theme.rs` keys its six race palettes by a look
-(`Form`: `lcars`, `blade`, `wing`, `arch`, `cube`, `organic`), and the set maps each race
-to one (`Theme = cube`); `Race` is a race's place in the set's list, so another game's
-races take the looks without a code change, and a race whose look the theme does not know
-draws in the shell's.
+**The colours stay the theme's.** `widgets/theme.rs` keys its palettes by a look
+(`Form`, named by how it looks: `lcars`, `blade`, `wing`, `arch`, `cube`, `organic`, and the
+machined ones `starfleet`, `redline`, `jade`, `bronze`, `circuit`, `bone`,
+`circuit-teal`, `violet`), and the set maps each race to one (`Theme = cube`); `Race` is a
+race's place in the set's list, so another game's races take the looks without a code
+change, and a race whose look the theme does not know draws in the shell's. `[Looks]`
+names the menus' look the same way (`Menus = starfleet`, the front end's with
+`Theme=auto`; `MissionMenus = race`, the menus over a running mission in the HUD's race's
+look); a set without it draws its menus in the shell's.
 
 A build with no set, or a set with no `ui.ini`, has no races (no theme of its own for the
 HUD's race), no resources names, no tour and no main-menu view, no credits text or cursor

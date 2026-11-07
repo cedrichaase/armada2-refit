@@ -1840,7 +1840,7 @@ Left: the campaign views were not framed for Roots' hulls (their radii are about
 stock's); DS9 is dark on the shadow side of the orbit. (The forms host calls
 `Render3D_MenuScene` since #102, beside the side column rather than a centred card.)
 
-### The Federation's theme on Roots: Starfleet (decisions 380–395)
+### The Federation's theme on Roots: Starfleet (decisions 380–400)
 
 FO-6 gave the Federation LCARS on both games. Roots dresses it in dark machined metal and
 blue glass, and the user asked for a look of that kind (2026-11-07): `starfleet`
@@ -1864,6 +1864,11 @@ blue glass, and the user asked for a look of that kind (2026-11-07): `starfleet`
 | 393 | **The Dominion gets a look** (it had the shell's): Roots' Dominion HUD is the Cardassian frame in violet glass | Roots' sheets; decision 80's "no look" was for want of one | the user |
 | 394 | **Text, title and status colours stay each race's Armada II look's**, only the frame, glass, lamps and buttons follow Roots | a race reads the same on both games; Roots' text is the game's own font, not ours | the user |
 | 395 | **One scenario per race** (`fo-ui-theme-roots-<race>`), through the menu (Instant Action, the race picked in the side list, the Federation AI): no direct launch on fo-b yet | the bench | `bench-instrument`'s direct launch on fo-b |
+| 396 | **The looks are named by how they look** (`redline`, `jade`, `bronze`, `circuit`, `bone`, `circuit-teal`, `violet`, `Form::Machine`), and the content set maps the races to them | `ui/lint-content.sh`: no race named in code; the set is where a race's choice lives | — |
+| 397 | **Starfleet's buttons are dark**: a near-black plate, a dark grey edge, the label in the lamps' blue that blooms on hover (`Draw::text_glow`, shader kind 2 grown softer and wider); Roots' art tiles stay as they are; the other machined looks keep their brushed tiles | the user, 2026-11-07 | the user |
+| 398 | **Roots' menus wear Starfleet** (`[Looks] Menus = starfleet` in the fleetops set; the front end, its forms and dialogs, the Refit screen and the loading screen before the race is known); **the menus over a running mission follow the HUD's race** (`MissionMenus = race`: a Klingon's pause menu is Redline); Armada II's set names no look, so its menus stay the shell's | the user, 2026-11-07 ("the default for all menus currently covered by the shell theme"); the race default for the in-mission menus is the coordinator's | the user |
+| 399 | **The in-mission menu's column has a foot as deep as the gap under its title**: the window's height is taken from the theme's own frame, title bar and padding (`frame_margins`), so Return to Game no longer sits on the frame (it did under Starfleet's 10-unit rim) | the user's 3440x1440 shot, 2026-11-07 | — |
+| 400 | **The Dominion's look is dark**: black gunmetal and black glass, violet only for the accents; measured over the whole of Roots' info strip, Klingon, Romulan, Borg and Free Borg are mostly near-black with colour as accent (60–86% near-black pixels), as ours already were, while Roots' Cardassian (3% near-black), Species 8472 (0%) and Dominion (1%) are tinted throughout: the Cardassian and 8472 looks keep their tint, the Dominion goes dark at the user's word | the user, 2026-11-07 ("darker... dark / black gunmetal, black glass, and purple only for accents"); the measurement in `ui/STYLE.md`, "Dark, or tinted?" | the user |
 
 ## The map editor after a mission (2026-11-07, branch `fo-mapedit-crash`; decisions 500–509)
 
