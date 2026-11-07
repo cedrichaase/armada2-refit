@@ -27,6 +27,11 @@ impl super::panels::Panel for Overlay {
     }
 }
 
+/// The canvas rectangle (left, top, right, bottom) the engine's status line spans at any
+/// aspect on Roots: its name or class at 625..974 x 50..69 at 4:3 and 669..930 at 21:9,
+/// its icons and figures down to 117 (PLAN-FLEETOPS.md, decisions 460-469), rounded out.
+const HOVER_BAND: [f32; 4] = [600.0, 45.0, 1000.0, 125.0];
+
 static mut LAST_KEY: i32 = i32::MIN;
 /// The last message logged as moved clear of the panels of ours.
 static mut MOVED_KEY: i32 = i32::MIN;
@@ -76,7 +81,14 @@ pub fn run(ui: &mut Ui) {
         // that would touch a panel of ours is centred across the screen at the same
         // height, and if that still touches one, moved down below it (HUD.md, "Overlay
         // messages"; PLAN-FLEETOPS.md, decision 326).
-        let taken = super::layout::occupied();
+        let mut taken = super::layout::occupied();
+        // The status line under the pointer (ours with `Hover=1`) shows only while the
+        // pointer is over a craft, at the top centre where a relocated message lands: its
+        // band is kept clear at all times, so the message does not jump when it shows
+        // (decision 470).
+        if api::hover::ours() {
+            taken.push(R::new(ui.w * HOVER_BAND[0] / api::CANVAS.0, ui.h * HOVER_BAND[1] / api::CANVAS.1, ui.w * (HOVER_BAND[2] - HOVER_BAND[0]) / api::CANVAS.0, ui.h * (HOVER_BAND[3] - HOVER_BAND[1]) / api::CANVAS.1));
+        }
         let gap = ui.u(t.gap).max(4.0);
         let hits = |rs: &[R]| -> Option<f32> {
             let mut low: Option<f32> = None;

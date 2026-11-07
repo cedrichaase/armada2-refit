@@ -1338,7 +1338,7 @@ not the layout log is on); a message whose rows would touch one is centred acros
 at the same height, and if it still touches one, put just below it. UI.log says
 `overlay: #<n> moved clear of the panels of ours, to x,y`. On Armada II the resource strip
 is at the top centre and the intro's lines are centred lower down, so nothing there moves
-unless it would have overlapped. `fo-ui-overlay`.
+unless it would have overlapped. `fo-ui-overlay`. With `Hover=1` (Roots) the status line's band (canvas 600..1000 x 45..125) counts as taken too, so the mission timer (*Politics by Other Means*, at 50,85) sits below it and never under the line (decision 470; `fo-ui-timer-hover`).
 
 ### The trade status and the team message (not components)
 
