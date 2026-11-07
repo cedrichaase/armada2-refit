@@ -146,7 +146,11 @@ pub(super) fn list(ui: &mut Ui, f: &Form, g: &Control, grid: &Grid, list_r: R, c
         let mut x = rr.x + ui.u(10.0);
         for (k, cell) in rows[i].iter().enumerate() {
             let share = if named { cols[k.min(cols.len() - 1)].1 } else { 1.0 / rows[i].len().max(1) as f32 };
-            ui.text_in(R::new(x, rr.y, width * share, rr.h), cell, t.text_size, Align::Left, t.text, Weight::Regular);
+            // A cell is cut at its column's edge, so a long file name stays out of Size.
+            let cell_r = R::new(x, rr.y, width * share, rr.h);
+            ui.draw.push_clip(R::new(cell_r.x, cell_r.y, (cell_r.w - ui.u(8.0)).max(0.0), cell_r.h));
+            ui.text_in(cell_r, cell, t.text_size, Align::Left, t.text, Weight::Regular);
+            ui.draw.pop_clip();
             x += width * share;
         }
     });
