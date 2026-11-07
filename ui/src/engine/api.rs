@@ -98,7 +98,7 @@ pub mod info {
     pub use crate::engine::info::{
         build_progress, cancel, class_wire, colour, current, drawn_whole, effect_sprites, effects, face, flash,
         functions_stock, group, hover_texts, hull, look_at, name_and_class, queue, select, shift_held, single,
-        system_state, take_hover, tooltip, whole_damaged, wire, wire_comp, Bar, BarKind, Face, Single, SystemState, repair_icon, right_bar,
+        system_state, take_hover, tooltip, whole_damaged, wire, wire_comp, Bar, BarKind, Face, Single, SystemState, repair_icon, right_bar, race_icon,
         Text, queue_len,
     };
 }

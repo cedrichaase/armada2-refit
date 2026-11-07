@@ -168,7 +168,30 @@ pub struct Icon {
     pub comp: usize,
 }
 
-fn icons_at(off: usize, n: usize) -> Vec<Icon> {
+/// Whether the craft's class gives weapon `i` an icon (FleetOpsHook's record of the class's
+/// `weapon<N>IconPos`, read from the ODF): the panel's icons past the weapons the class has keep
+/// the place and the sprite the last class gave them, so only these are drawn.
+fn weapon_has_icon(obj: usize, i: usize) -> bool {
+    let craft = cast(obj, sym::INFO_TD_GAME_OBJECT, sym::INFO_TD_CRAFT);
+    let rec = field(craft, field::INFO_FO_CRAFT_RECORD());
+    if rec == 0 || !readable(rec, 8) {
+        return false;
+    }
+    let class = field(rec, field::INFO_FO_RECORD_CLASS());
+    if class == 0 || !readable(class + field::INFO_FO_CLASS_ICON_POS(), 4) {
+        return false;
+    }
+    let arr = unsafe { rd::<usize>(class + field::INFO_FO_CLASS_ICON_POS()) };
+    if arr < 4 || !readable(arr - 4, 4) {
+        return false;
+    }
+    let n = unsafe { rd::<u32>(arr - 4) } as usize;
+    let stride = value::INFO_FO_ICON_POS_BYTES() as usize;
+    let e = arr + i * stride;
+    i < n && n <= 64 && readable(e, stride) && unsafe { rd::<u32>(e + field::INFO_FO_ICON_POS_PRESENT()) } != 0
+}
+
+fn icons_at(off: usize, n: usize, obj: usize, weapons: bool) -> Vec<Icon> {
     let mut out = Vec::new();
     let systems = child(field::INFO_FO_SYSTEMS());
     let Some(area) = comp_rect(systems) else { return out };
@@ -183,19 +206,31 @@ fn icons_at(off: usize, n: usize) -> Vec<Icon> {
         if sprite == 0 || r == area || r[2] - r[0] > (area[2] - area[0]) / 2 {
             continue;
         }
+        // A weapon icon is drawn for the weapons the class places.
+        if weapons && !weapon_has_icon(obj, i) {
+            continue;
+        }
+        // A buff icon, while the object has one of the effects stock knows (slowed by a gravity
+        // mine, a spy aboard): FleetOpsHook's weapon buffs are not told apart from a stale icon.
+        if !weapons {
+            let (slowed, spy) = super::info::effects(obj);
+            if !slowed && !spy {
+                continue;
+            }
+        }
         out.push(Icon { rect: r, sprite, comp: c });
     }
     out
 }
 
 /// The weapon icons FleetOpsHook placed on the ship image this frame.
-pub fn weapon_icons() -> Vec<Icon> {
-    icons_at(field::INFO_FO_WEAPON_ICONS(), value::INFO_FO_N_WEAPON_ICONS() as usize)
+pub fn weapon_icons(obj: usize) -> Vec<Icon> {
+    icons_at(field::INFO_FO_WEAPON_ICONS(), value::INFO_FO_N_WEAPON_ICONS() as usize, obj, true)
 }
 
 /// The buff icons (a spy aboard, a gravity mine, a weapon's buff).
-pub fn buff_icons() -> Vec<Icon> {
-    icons_at(field::INFO_FO_BUFF_ICONS(), value::INFO_FO_N_BUFF_ICONS() as usize)
+pub fn buff_icons(obj: usize) -> Vec<Icon> {
+    icons_at(field::INFO_FO_BUFF_ICONS(), value::INFO_FO_N_BUFF_ICONS() as usize, obj, false)
 }
 
 /// The ship image's area (`infoSingleSystemsDisplay`), local to the panel.

@@ -1014,7 +1014,7 @@ symbol = "StandardComponent::rectangle (local to its owner)"
 kind = "field"
 struct = "StandardComponent"
 offset = 0x8
-type = "i32x4"
+type = "i32"
 used_by = ["hud.info_fo"]
 
 [[sym]]
@@ -1119,6 +1119,40 @@ kind = "field"
 struct = "FOClassRecord"
 offset = 0xac
 type = "u32"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_class_icon_pos"
+symbol = "FleetOpsHook's class record: weapon<N>IconPos, a Delphi dynamic array (its length at -4)"
+kind = "field"
+struct = "FOClassRecord"
+offset = 0x11c
+type = "ptr"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_icon_pos_bytes"
+symbol = "FleetOpsHook's weapon<N>IconPos entry: x%, y%, present (bytes each)"
+kind = "value"
+value = 12
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_icon_pos_present"
+symbol = "FleetOpsHook's weapon<N>IconPos entry: whether the ODF gives the weapon an icon"
+kind = "field"
+struct = "FOIconPos"
+offset = 0x8
+type = "u32"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_sys_present"
+symbol = "CraftSystem: the craft has the system (0: none, as a station's engines)"
+kind = "field"
+struct = "CraftSystem"
+offset = 0x0
+type = "u8"
 used_by = ["hud.info_fo"]
 
 [[sym]]

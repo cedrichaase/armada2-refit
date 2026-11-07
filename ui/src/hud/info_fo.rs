@@ -180,16 +180,44 @@ fn text(ui: &mut Ui, r: R, s: &str, c: Color, w: Weight, align: Align) {
     ui.draw.pop_clip();
 }
 
-/// A subsystem icon's tint: Roots' healthy blue (the theme's accent), toward `bad` with the
-/// damage, `warn` on the flash while it is repaired.
-fn system_tint(ui: &Ui, st: &info::SystemState, flash: bool) -> Color {
+/// The hull bar's colour: the theme's blue while over half, toward warn, then bad.
+fn hull_bar_colour(ui: &Ui, hull: f32) -> Color {
     let t = &ui.theme;
+    if hull > 0.5 { t.fill } else if hull > 0.25 { mix(t.warn, t.fill, (hull - 0.25) / 0.25) } else { t.bad }
+}
+
+/// A text's colour as Roots' panel gives it (the race's colours, through the text's own
+/// answer), or `or` where it gives none (black or plain white).
+fn text_colour(ui: &Ui, c: [f32; 3], or: Color) -> Color {
+    let _ = ui;
+    let max = c[0].max(c[1]).max(c[2]);
+    let min = c[0].min(c[1]).min(c[2]);
+    if max <= 0.05 || min >= 0.95 { or } else { info::colour(c) }
+}
+
+/// A colour of the layout table for the HUD's race (`<key>.<race>`, the race's name without
+/// spaces), else `<key>`.
+fn race_tint(l: &InfoLayout, key: &str) -> Option<Color> {
+    let race = theme::player_race().map(|r| r.name()).unwrap_or("");
+    let mut name = String::from(key);
+    name.push('.');
+    name.extend(race.chars().filter(|c| !c.is_whitespace()));
+    let v = if race.is_empty() { &[][..] } else { l.numbers(&name) };
+    let v = if v.len() >= 3 { v } else { l.numbers(key) };
+    (v.len() >= 3).then(|| 0xff000000 | (v[0] as u32).min(255) << 16 | (v[1] as u32).min(255) << 8 | (v[2] as u32).min(255))
+}
+
+/// A subsystem icon's tint: Roots' healthy colour of the race (`SystemTint.<race>`, else the
+/// theme's accent), toward `bad` with the damage, `warn` on the flash while it is repaired.
+fn system_tint(ui: &Ui, l: &InfoLayout, st: &info::SystemState, flash: bool) -> Color {
+    let t = &ui.theme;
+    let healthy = race_tint(l, "SystemTint").unwrap_or(mix(t.accent, 0xffffffff, 0.15));
     if st.repairing && flash {
         t.warn
     } else if st.repair_left > 0.01 {
-        mix(t.accent, t.bad, 0.45 + 0.55 * st.repair_left)
+        mix(healthy, t.bad, 0.45 + 0.55 * st.repair_left)
     } else {
-        mix(t.accent, 0xffffffff, 0.15)
+        healthy
     }
 }
 
@@ -240,12 +268,14 @@ pub fn run(ui: &mut Ui) {
     let min_w = l.min_width * kx;
     let ours = R::new(plan.info.x, plan.info.y, plan.info.w.max(min_w.min(ui.w - plan.info.x)), plan.info.h);
     let d = ours.w / kx - l.size[0];
+    // Within a pixel of Roots' own width is Roots' own width (no move, no squeeze).
+    let d = if d.abs() * kx < 1.5 { 0.0 } else { d };
     let aligned = (ours.x - plan.native.x).abs() < 1.0 && (ours.y - plan.native.y).abs() < 1.0;
     let fr = Frame { ours, native: plan.native, kx, ky, d, squeeze: squeeze(l, d), aligned };
 
     // The frame: the theme's (with its lamps where Roots' panel has them), never a claimed panel
     // while the panel keeps the pointer.
-    theme::panel(ui, ours);
+    theme::panel_as(ui, ours, if l.lamps { theme::Lamps::On } else { theme::Lamps::Off });
     super::layout::note(ours);
     if aligned {
         hud::set_info_area(Some([ours.x, ours.y, ours.right(), ours.bottom()]));
@@ -272,6 +302,18 @@ pub fn run(ui: &mut Ui) {
     }
 }
 
+/// Logs the child the engine has the pointer over, once each time it changes (the range rings
+/// follow it; the bench waits on it).
+fn note_hover(comp: usize, what: &str, sprite: usize) {
+    static mut LAST: usize = 0;
+    unsafe {
+        if LAST != comp {
+            LAST = comp;
+            crate::log!("info: the engine's hover on Roots' {} {:#x} ({})", what, comp, sprite::name(sprite));
+        }
+    }
+}
+
 fn log_once(face: &str, obj: usize, line: String) {
     #[allow(static_mut_refs)]
     let last = unsafe { &mut LAST_LOG };
@@ -293,8 +335,8 @@ fn single(ui: &mut Ui, l: &'static InfoLayout, fr: &Frame, obj: usize, builder: 
     let craft = info_fo::is_craft(obj);
     let art = info_fo::class_art_name(obj);
     let image = if art.is_empty() { 0 } else { crate::engine::api::palette::find_sprite(&crate::sfmt!("{}{}", art, l.name("ImageSuffix"))) };
-    let weapons = if image != 0 { info_fo::weapon_icons() } else { alloc::vec::Vec::new() };
-    let buffs = if image != 0 { info_fo::buff_icons() } else { alloc::vec::Vec::new() };
+    let weapons = if image != 0 { info_fo::weapon_icons(obj) } else { alloc::vec::Vec::new() };
+    let buffs = if image != 0 { info_fo::buff_icons(obj) } else { alloc::vec::Vec::new() };
 
     // The picture: the ship image with FleetOpsHook's icons on it, or the wireframe picture.
     let mut drew_image = false;
@@ -317,14 +359,17 @@ fn single(ui: &mut Ui, l: &'static InfoLayout, fr: &Frame, obj: usize, builder: 
             }
         }
     }
+    // Roots tints its weapon icons with the race's `weaponIconColor` (`WeaponTint.<race>`).
+    let weapon_tint = race_tint(l, "WeaponTint").unwrap_or(0xffffffff);
     if drew_image {
         for ic in weapons.iter().chain(buffs.iter()) {
             let r = fr.child_px(ui, ic.rect);
             let hot = info_fo::comp_hover(ic.comp);
             if hot {
-                ui.draw.fill(r.inset(-ui.u(1.5)), Corners::round(ui.u(4.0)), fade(t.accent, 0.35));
+                ui.draw.stroke(r.inset(-ui.u(1.0)), Corners::round(r.w * 0.16), ui.u(1.5).max(1.0), t.accent);
+                note_hover(ic.comp, "weapon icon", ic.sprite);
             }
-            sprite_over(ui, ic.sprite, r, 0xffffffff);
+            sprite_over(ui, ic.sprite, r, weapon_tint);
             if !fr.aligned && ui.input.mouse.is_some_and(|m| r.contains(m)) {
                 *tip = Tip::Comp(ic.comp, r);
             }
@@ -341,7 +386,8 @@ fn single(ui: &mut Ui, l: &'static InfoLayout, fr: &Frame, obj: usize, builder: 
     // The words and the bars, at the left.
     if let (Some(e), Some(n)) = (el(l, "Name"), name.as_ref()) {
         let r = fr.px(e, 0.0, 0.0);
-        text(ui, r, n.text.trim(), t.title, Weight::Bold, Align::Left);
+        // The name in the colour Roots gives it (the race's shipNameColor, through the text).
+        text(ui, r, n.text.trim(), text_colour(ui, n.colour, t.title), Weight::Bold, Align::Left);
         if !fr.aligned && ui.input.mouse.is_some_and(|m| r.contains(m)) {
             *tip = Tip::Comp(n.comp, r);
         }
@@ -356,38 +402,42 @@ fn single(ui: &mut Ui, l: &'static InfoLayout, fr: &Frame, obj: usize, builder: 
         if let Some(e) = el(l, text_el) {
             let r = fr.px(e, 0.0, 0.0);
             let r = R::new(r.x, r.y, r.w, r.h.min(fr.ky * 22.0));
-            text(ui, r, tx.text.trim(), t.text, Weight::Bold, Align::Left);
+            text(ui, r, tx.text.trim(), text_colour(ui, tx.colour, t.text), Weight::Bold, Align::Left);
             if !fr.aligned && ui.input.mouse.is_some_and(|m| r.contains(m)) {
                 *tip = Tip::Comp(tx.comp, r);
             }
         }
     }
+    // Roots' two bars: the shields above (green when up, through to red), the hull below (blue,
+    // toward warn and bad as it goes); a moon or a resource has the hull's alone.
     if craft {
         if let (Some(e), Some((now, max))) = (el(l, "Shield"), shields) {
             if max > 0.0 {
-                strip(ui, fr.px(e, 0.0, 0.0), now / max, t.fill);
+                let f = (now / max).clamp(0.0, 1.0);
+                strip(ui, fr.px(e, 0.0, 0.0), f, hull_colour(ui, f));
             }
         }
     }
-    if craft || builder {
-        if let Some(e) = el(l, "Hull") {
-            strip(ui, fr.px(e, 0.0, 0.0), hull, hull_colour(ui, hull));
-        }
+    if let Some(e) = el(l, "Hull") {
+        strip(ui, fr.px(e, 0.0, 0.0), hull, hull_bar_colour(ui, hull));
     }
 
     // The subsystems and the race icon.
     let mut sys_line = String::new();
     if craft {
         for i in 0..5 {
-            let Some((comp, sp, st, flash)) = info::repair_icon(obj, i) else { continue };
+            let Some((comp, sp, st, flash, present)) = info::repair_icon(obj, i) else { continue };
             let Some(e) = el(l, &crate::sfmt!("System{}", i)) else { continue };
             let r = fr.px(e, 0.0, 0.0);
             let hot = info_fo::comp_hover(comp);
             if hot {
-                ui.draw.fill(r.inset(-ui.u(1.0)), Corners::round(ui.u(4.0)), fade(t.accent, 0.3));
+                ui.draw.stroke(r.inset(-ui.u(1.0)), Corners::round(r.w * 0.16), ui.u(1.5).max(1.0), t.accent);
+                note_hover(comp, if i == 0 { "system 0 (sensors)" } else if i == 2 { "system 2 (weapons)" } else { "system" }, sp);
             }
-            if !sprite_over(ui, sp, r, system_tint(ui, &st, flash)) {
-                ui.draw.fill(r.inset(ui.u(2.0)), Corners::round(ui.u(3.0)), system_tint(ui, &st, flash));
+            // A system the craft does not have (a station's engines) is greyed, as Roots does.
+            let tint = if present { system_tint(ui, l, &st, flash) } else { 0xff5a5a5a };
+            if !sprite_over(ui, sp, r, tint) {
+                ui.draw.fill(r.inset(ui.u(2.0)), Corners::round(ui.u(3.0)), tint);
             }
             if st.repair_left > 0.01 {
                 sys_line.push_str(&crate::sfmt!(" sys{}:{:.0}%", i, (1.0 - st.repair_left) * 100.0));
@@ -398,7 +448,7 @@ fn single(ui: &mut Ui, l: &'static InfoLayout, fr: &Frame, obj: usize, builder: 
         }
         // Roots shows the race icon while a builder's queue has room, and always for a craft.
         if let Some(e) = el(l, "Race") {
-            let sp = crate::engine::api::palette::find_sprite(l.name("RaceSprite"));
+            let sp = info::race_icon(obj);
             sprite_in(ui, sp, fr.px(e, 0.0, 0.0), 0xffffffff);
         }
     }
@@ -468,7 +518,7 @@ fn single(ui: &mut Ui, l: &'static InfoLayout, fr: &Frame, obj: usize, builder: 
         if let Some(e) = el(l, "StoreText") {
             let r = fr.px(e, 0.0, 0.0);
             let s = crate::sfmt!("{}{}", bt.label, bt.text);
-            text(ui, r, s.trim(), t.text, Weight::Regular, Align::Left);
+            text(ui, r, s.trim(), text_colour(ui, bt.colour, t.text), Weight::Regular, Align::Left);
         }
     }
 
@@ -531,7 +581,7 @@ fn group(ui: &mut Ui, l: &'static InfoLayout, fr: &Frame, tip: &mut Tip) {
         };
         let art = info_fo::class_art_name(u);
         let sp = crate::engine::api::palette::find_sprite(&crate::sfmt!("{}{}", art, l.name("WireSuffix")));
-        let pic = if small { wr } else { R::new(tile.x, tile.y, tile.w, tile.h * 0.85) };
+        let pic = wr;
         sprite_in(ui, sp, pic, 0xffffffff);
         if let Some(e) = name_el {
             let (n, _) = info::name_and_class(u);
@@ -539,14 +589,16 @@ fn group(ui: &mut Ui, l: &'static InfoLayout, fr: &Frame, tip: &mut Tip) {
                 text(ui, part(e), n.text.trim(), t.text, Weight::Regular, Align::Centre);
             }
         }
+        // As the one-object face: the shields green to red above, the hull blue below.
         let (h, s) = info_fo::hull_shields(u);
         if let (Some(e), Some((now, mx))) = (shield_el, s) {
             if mx > 0.0 {
-                strip(ui, part(e), now / mx, t.fill);
+                let f = (now / mx).clamp(0.0, 1.0);
+                strip(ui, part(e), f, hull_colour(ui, f));
             }
         }
         if let Some(e) = hull_el {
-            strip(ui, part(e), h, hull_colour(ui, h));
+            strip(ui, part(e), h, hull_bar_colour(ui, h));
         }
         if !fr.aligned {
             let id = ui.id(&crate::sfmt!("info.fo.unit{}", u));

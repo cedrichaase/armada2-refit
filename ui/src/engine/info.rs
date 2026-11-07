@@ -755,13 +755,17 @@ pub fn single(obj: usize) -> Single {
 /// The panel's repair icon `i` (in the panel's order of them), read only (Roots, whose panel's
 /// `Render` hands the icons their craft): the component, its sprite, its system's state and its
 /// flash.
-pub fn repair_icon(obj: usize, i: usize) -> Option<(usize, usize, SystemState, bool)> {
+pub fn repair_icon(obj: usize, i: usize) -> Option<(usize, usize, SystemState, bool, bool)> {
     let ri = child(sys_repair() + 4 * i);
     if ri == 0 || obj == 0 {
         return None;
     }
     let (sprite, sys, flash) = unsafe { (field(ri, ri_sprite()), rd::<u32>(ri + ri_system()) as usize, rd::<u8>(ri + ri_flash()) != 0) };
-    Some((ri, sprite, system_state(obj, sys).unwrap_or_default(), flash))
+    // Whether the craft has the system at all (a station has no engines: Roots greys its icon).
+    let craft = cast(obj, sym::INFO_TD_GAME_OBJECT, sym::INFO_TD_CRAFT);
+    let systems = field(craft, craft_systems());
+    let present = systems == 0 || sys >= n_systems() || unsafe { rd::<u8>(systems + sys * system_bytes() + field::INFO_SYS_PRESENT()) } != 0;
+    Some((ri, sprite, system_state(obj, sys).unwrap_or_default(), flash, present))
 }
 
 /// What the right of Roots' panel shows for `obj`: a construction or research bar (a producer,

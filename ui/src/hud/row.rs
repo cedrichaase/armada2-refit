@@ -80,7 +80,7 @@ pub fn clear() {
 }
 
 /// The info panel's own rectangle: as the panel had it on this screen, else estimated from the
-/// layout table (its units are square on the layouts Roots picks by aspect, 1200 high).
+/// layout table (its units are square on the layouts Roots picks by aspect, as high as the HUD canvas).
 fn native(ui: &Ui) -> Option<R> {
     if let Some((r, s)) = unsafe { NATIVE } {
         if s == (ui.w, ui.h) {
@@ -91,7 +91,7 @@ fn native(ui: &Ui) -> Option<R> {
     if l.is_empty() {
         return None;
     }
-    let k = ui.h / 1200.0;
+    let k = ui.h / crate::engine::api::CANVAS.1;
     let place = l.numbers("Place");
     let (x, y) = if place.len() >= 2 { (place[0], place[1]) } else { (352.0, 1038.0) };
     Some(R::new(libm::roundf(x * k), libm::roundf(y * k), libm::roundf(l.size[0] * k), ui.h - libm::roundf(y * k)))
