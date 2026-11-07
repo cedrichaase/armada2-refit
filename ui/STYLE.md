@@ -223,6 +223,10 @@ explore, the wrench for repair, darts in each formation's shape) and draw it fla
   three in green, yellow or red (alerts, movement and special-weapon autonomy);
 - a 64-unit grid, strokes about 5 units, round caps, the symbol inside 6..58.
 
+**On Fleet Operations: Roots the game's art goes first** (the user's wish; PLAN-FLEETOPS.md,
+decision 340): an icon of ours stands in for a Roots sprite only where the sprite has no art
+(`icons::ours_for_sprite`). Roots' art is read from the player's install, never shipped.
+
 They are built from a few primitives with exact distances (circles, rounded boxes,
 capsules, polygons, arcs; union, cut and intersection) in `ui/fontbake/src/icons.rs`,
 baked at build time into a signed-distance atlas like the font (1 MB, 64 texels per

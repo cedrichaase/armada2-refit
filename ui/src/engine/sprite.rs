@@ -1,5 +1,5 @@
 //! The game's 2D sprites (`ST3D_Sprite`), drawn with our renderer: a HUD icon is the
-//! game's own art, loaded from the same TGA the engine uses (HUD.md, "Icons").
+//! game's own art, loaded from the same file the engine uses, TGA or DDS (HUD.md, "Icons").
 //!
 //! A sprite (a Storm3D database element, its `.spr` name at `+0x8`) draws a rectangle
 //! of one texture: `ST3D_Sprite::DrawScaled2D` hands the device the texture at `+0x58`
@@ -36,7 +36,7 @@ struct Loaded {
 
 static mut CACHE: Vec<Loaded> = Vec::new();
 
-/// The texture and rectangle to draw `sprite` with, loading its TGA the first time.
+/// The texture and rectangle to draw `sprite` with, loading its file the first time.
 #[allow(static_mut_refs)]
 pub fn art(sprite: usize) -> Option<(Tex, [f32; 4])> {
     if sprite == 0 || field(sprite, off::CORE_SPRITE_TEXTURE()) == 0 {
@@ -61,15 +61,20 @@ pub fn art(sprite: usize) -> Option<(Tex, [f32; 4])> {
     cache[i].tex.map(|t| (t, uv(sprite)))
 }
 
-/// `textures\<name>` (`files`), either case of the extension, or the name as given.
+/// `textures\<name>` (`files`), with the game's texture extensions in its order (`files::game`:
+/// `.tga` on Armada II; `.tga`, then `.dds` on Fleet Operations: Roots, whose interface
+/// buttons are mostly DDS, `all_interface_buttons03` to `11`), either case, or the name as
+/// given when it has an extension. TGA or DDS is told by the bytes (`gfx::load_image`).
 fn load(name: &str) -> Option<Tex> {
     let lower = crate::rt::lower(name);
-    if lower.ends_with(".tga") {
-        return crate::gfx::load_tga(&crate::sfmt!("textures\\{}", name));
+    if lower.ends_with(".tga") || lower.ends_with(".dds") {
+        return crate::gfx::load_image(&crate::sfmt!("textures\\{}", name));
     }
-    for ext in [".tga", ".TGA"] {
-        if let Some(t) = crate::gfx::load_tga(&crate::sfmt!("textures\\{}{}", name, ext)) {
-            return Some(t);
+    for ext in crate::files::game().texture_exts {
+        for e in [String::from(*ext), ext.to_ascii_uppercase()] {
+            if let Some(t) = crate::gfx::load_image(&crate::sfmt!("textures\\{}{}", name, e)) {
+                return Some(t);
+            }
         }
     }
     None

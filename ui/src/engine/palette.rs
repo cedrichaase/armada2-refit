@@ -275,6 +275,63 @@ pub fn local_rect(b: usize) -> Option<[i32; 4]> {
     if r[2] < r[0] || r[3] < r[1] { None } else { Some(r) }
 }
 
+// ---- the grid of ours on Roots (PLAN-FLEETOPS.md, FO-6, decisions 330 to 349) -----------
+//
+// FleetOpsHook's range ring follows a weapon button's mouse-over flag, which the engine's
+// `StandardComponent::Simulate` sets from the pointer and the button's own rectangle, and only
+// for the bar while the bar owns the pointer. So the grid moves the stock buttons, not the
+// pointer: right after the bar's `Update` has laid them out (its call of `IsGamePausedAtAll`,
+// `hud.bar_grid`), each shown button's rectangle is set to its cell of ours, and
+// `hud::cursor_over` gives the bar the pointer over the grid's frame. The buttons then simulate
+// where they are drawn: hover, press, rollover, tooltip and ring are the engine's and
+// FleetOpsHook's own. The layout writes the rectangles again at every update, so nothing of
+// ours outlives a frame without the grid. Nothing of FleetOpsHook's memory is written.
+
+static mut GRID_AFTER_LAYOUT: Option<fn(usize)> = None;
+
+/// Wraps the bar's `Update` call of `IsGamePausedAtAll` (`hud.bar_grid`), on a build whose bar
+/// is behind a pointer (Roots) only: `after_layout(palette)` runs right after the stock call,
+/// once per update, on the game's thread. False: the grid cannot be had (the skin is drawn).
+pub fn install_grid(after_layout: fn(usize)) -> bool {
+    if !slots_indirect() || eng().ready(hook::HUD_BAR_GRID).is_err() || eng().ready(hook::HUD_READS_BAR).is_err() {
+        return false;
+    }
+    unsafe { GRID_AFTER_LAYOUT = Some(after_layout) };
+    let (site, paused) = (eng().addr(sym::PALETTE_UPDATE_PAUSED_CALL), eng().addr(sym::POPUPS_IS_GAME_PAUSED));
+    super::hook::patch_call(site, paused, update_paused as *const () as usize)
+}
+
+extern "C" fn update_paused() -> bool {
+    let f: extern "C" fn() -> bool = unsafe { core::mem::transmute(eng().addr(sym::POPUPS_IS_GAME_PAUSED)) };
+    let paused = f();
+    if let Some(cb) = unsafe { GRID_AFTER_LAYOUT } {
+        let p = palette();
+        if p != 0 {
+            cb(p);
+        }
+    }
+    paused
+}
+
+/// The bar's own origin in canvas units (its rectangle's top left), which a button's rectangle
+/// is local to.
+pub fn origin(p: usize) -> Option<(i32, i32)> {
+    if p == 0 || !super::readable(p, 0x40) {
+        return None;
+    }
+    let r: [i32; 4] = unsafe { rd(p + field::HUD_DI_RECT()) };
+    Some((r[0], r[1]))
+}
+
+/// Sets a shown button's rectangle (canvas units, local to the bar's origin, inclusive), where
+/// its `Simulate` looks for the pointer next.
+pub fn set_rect(b: usize, r: [i32; 4]) {
+    if b == 0 || !super::readable(b, 0x40) || eng().ready(hook::HUD_BAR_GRID).is_err() {
+        return;
+    }
+    unsafe { core::ptr::write_unaligned((b + field::PALETTE_BTN_RECT()) as *mut [i32; 4], r) };
+}
+
 // ---- the bar measured (PLAN-FLEETOPS.md, FO-6 step 5) -----------------------------------
 //
 // Where the bar is not the stock one (`palette_slots_indirect`: Roots, whose FleetOpsHook

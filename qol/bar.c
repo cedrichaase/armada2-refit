@@ -99,10 +99,17 @@ static int bar_active(void)
     return on;
 }
 
-/* QOL_BarLabel: the UI asks for each cell it draws. */
+/* Whether the cell has a key on this build (bk_key_cells: all fifteen on stock; on Roots not
+ * W, which its key map gives to select_next_ship outside the bar). */
+static int bar_cell_keyed(UINT cell)
+{
+    return cell < BAR_CELLS && ((DWORD)QOL_V_BK_KEY_CELLS >> cell & 1);
+}
+
+/* QOL_BarLabel: the UI asks for each cell it draws.  NULL for a cell without a key. */
 __declspec(dllexport) const char *__cdecl QOL_BarLabel(UINT cell)
 {
-    if (!g_barOk || bar_why() || cell >= BAR_CELLS) return NULLPTR;
+    if (!g_barOk || bar_why() || !bar_cell_keyed(cell)) return NULLPTR;
     return k_barLabel[cell];
 }
 
@@ -162,7 +169,7 @@ static void bar_scan(void)
     UINT c;
     for (c = 0; c < BAR_CELLS; c++) {
         int d = bar_held(g_barVk[c]);
-        if (d && !g_barDown[c] && ok && hit < 0) hit = (int)c;
+        if (d && !g_barDown[c] && ok && hit < 0 && bar_cell_keyed(c)) hit = (int)c;
         g_barDown[c] = d;
     }
     if (hit >= 0) {

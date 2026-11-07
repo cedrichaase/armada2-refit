@@ -160,7 +160,7 @@ pub fn game_button(ui: &mut Ui, r: R, b: usize, name: &str, on: bool) -> bool {
     let img = r.inset(e + ui.u(4.0));
     let sp = api::buttons::sprite(b);
     let t = ui.theme;
-    let ours = crate::config::get().hud.icons && sp != 0 && {
+    let ours = crate::icons::ours_for_sprite(crate::config::get().hud.icons, sp, |s| sprite::art(s).is_some()) && {
         let ink = if !enabled { crate::gfx::fade(col, 0.45) } else { col };
         let ir = img.inset(ui.u(1.0));
         crate::icons::draw(&mut ui.draw, sprite::name(sp), ir, 1.0, crate::icons::theme_colour(&t, ink))

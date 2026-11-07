@@ -74,6 +74,21 @@ fn first(name: &str) -> Option<usize> {
     (lo < n() && name_at(lo) == key).then_some(lo)
 }
 
+/// Whether the game's own art goes before an icon of ours for a game sprite: Armada II, no (the
+/// flat icons are the UI's look, `[HUD] Icons`); Fleet Operations: Roots, yes (the user's wish:
+/// Roots' HUD icons are Roots' own, read from the player's install at run time; PLAN-FLEETOPS.md,
+/// decision 340). An icon of ours is then drawn only for a sprite with no art.
+pub fn game_art_first() -> bool {
+    crate::files::game().game_icons
+}
+
+/// Whether to draw the icon of ours for the game sprite `sp` (named `name`): `[HUD] Icons` on, and
+/// on a game whose art goes first, only where the sprite has no art of its own. The callers draw
+/// the art when this is false (`sprite::art`), and the name when there is neither.
+pub fn ours_for_sprite(icons_on: bool, sp: usize, has_art: impl FnOnce(usize) -> bool) -> bool {
+    icons_on && sp != 0 && !(game_art_first() && has_art(sp))
+}
+
 pub fn has(name: &str) -> bool {
     !name.is_empty() && first(name).is_some()
 }

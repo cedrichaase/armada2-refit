@@ -627,6 +627,53 @@ chooses). `bar::shows` is false for a skin, so the bottom row's room is not take
   the floating mode, a list over 14 buttons (the skin reads rectangles, so it would follow the engine
   wherever it wraps, but it was not seen), the info panel and the minimap (still Roots').
 
+### The bar as the grid (2026-11-07)
+
+Branch `fo-bar-grid`, on `origin/fo-b`. The user asked for the grid on Roots ("i'd also like to
+have the grid layout in FO: Roots"), which overrides the defaults of decisions 65, 94 and 103: with
+`HUD.Bar=1` the bar of ours on Roots is Armada II's 5x3 grid of position keys (`ui/HUD.md`, "The
+grid on Fleet Operations: Roots"), and the skin of step 6 stays only as the fallback.
+
+- **How the ring is drawn**, read from `FleetOpsHook.dll` and its shipped map (read only; nothing
+  of it is published): FleetOpsHook puts its own function in the `Simulate` slot of
+  `ControlButton`'s vtable. It calls the stock `StandardButton::Simulate` and then, when the
+  button's mouse-over flag (`+0x18`, which `StandardComponent::Simulate` sets from the pointer and
+  the button's rectangle while the button's owner owns the pointer) is set and the button's
+  `ModeInfo` is a special weapon, marks each selected ship that has the weapon to show its range.
+  The bar's buttons are simulated only while the bar owns the pointer (its `FocusGameSimulate`,
+  FleetOpsHook's, walks the 64 buttons). So the ring follows the button's rectangle and the
+  pointer's owner, nothing else.
+- **What the bench showed** (interactive, Roots at 1280x960, Vulkan with validation, the user's
+  overlay keys: `HUD.Bar`, `BarLabels`, `QOL.BarKeys`): the grid above Roots' minimap; the
+  pointer on the Tractor Beam's cell (Z) drew the red ring round the construction ship and Roots'
+  tooltip beside it (`hover slot 7 Weapon npc_tractorbeam ... pointer owner: the bar`), the
+  mining freighter's Harvest cell its tooltip; Q opened the build list (`bar: key Q`), a click on
+  G came back, Z put the pointer in the Tractor Beam's targeting, B (Roots' Tractor Beam hotkey
+  and its build toggle, an empty cell at the top level) did nothing, W (no key on Roots) pressed
+  no button. Sprites on Roots' DDS sheets load (`b_npc_tractorbeam -> texture
+  all_interface_buttons09 512x512`).
+- **Scenarios.** `fo-ui-bar-grid` (the grid, the ring and tooltip on hover, none on Stop, Q, the
+  click on back, Z) and `fo-ui-bar-icons` (the Starbase's and the construction ship's icons from
+  the DDS sheets).
+- **Not measured**: more than fifteen buttons (no start selection has them; the overflow columns
+  were not seen), the floating mode, Roots' own minimap and info panel switched to ours, a
+  campaign mission's bar.
+
+| # | Decision | Why | What would change it |
+|---|---|---|---|
+| 330 | **On Roots, `HUD.Bar=1` is the grid** (the 5x3 plan of `ui/HUD.md`, "The button bar", the same layout code and QOL's keys); the skin of decision 128 is drawn only where the grid's hook stands down. No new key | the user's request; one bar, one look on both games | the user preferring the row |
+| 331 | **The grid moves the stock buttons onto its cells**: right after each layout of the bar, each shown button's rectangle (`ControlButton+0x8`, local to the bar's origin, canvas units) is set to its cell's, and `cursor_over` gives the bar the pointer over the grid's frame and nowhere else; the cells are drawn from the buttons' bytes and nothing is claimed. The ring, the tooltip, the sounds and the click are the engine's and FleetOpsHook's own | FleetOpsHook's ring follows the button's mouse-over flag, which the engine sets from the button's own rectangle while the bar owns the pointer (above); moving the rectangles keeps that path whole, where drawing the ring ourselves would re-implement FleetOpsHook's rule (which ships, which range) and drift from it. The rectangle is the engine's `ControlButton` field that the layout writes at every update; nothing of FleetOpsHook's own memory is written | a Roots build that draws the ring from something other than the mouse-over flag |
+| 332 | **The rectangles are written at the bar's `Update` call of `IsGamePausedAtAll`** (`+0xf2`, `hud.bar_grid`, its target checked), not at QOL's call of `mProcessKeyboardInput` | it follows the layout's call on every path and comes before anything simulates the buttons; QOL's call runs only with something selected and only with QOL installed, and the grid must not need QOL. FleetOpsHook's four writes in `Update` (`+0x7d`, `+0xbc`, `+0xda`, `+0xde`) leave it stock's, in the file and in memory (`hud.bar_grid` patched on the bench) | a Roots build that changes `Update` there |
+| 333 | **The hook is installed only where the bar is behind a pointer** (`palette_slots_indirect`, Roots): Armada II's bar, its click path and QOL's step are unchanged | Armada II's bar draws its own cells and presses through `UI_BarStep`; nothing there needs the move | Armada II wanting the engine's own tooltips on the grid |
+| 334 | **More buttons than the fifteen cells go in columns of three to the right of the keyed block**, after a dividing line and without keys, in the bar's order; the cells shrink when the grid would run off the screen. No pages, no rows above | every button stays one click away and keeps its ring and tooltip (a page would hide weapons whose ring can then not be had), the keyed cells never move, and the bottom row grows sideways instead of over the map. Roots' longest list seen is 13 | a selection over fifteen seen on the bench and judged |
+| 335 | **QOL's `BarKeys` work on Roots** (`qol.bar_keys` verified: the call in `Update` is stock's, `mProcessKeyboardInput` is only called, its hotkey tables are stock's fields), **and the W cell has no key there** (`bk_key_cells`, a value of QOL's profile: 0x7fff on stock, 0x7ffd on Roots); the UI draws no badge on a cell without a key | Roots' `Input.map` gives plain W to `select_next_ship`, which the overview handles outside the bar: the key would press a cell and change the selection. Roots' other plain letters (`A attack`, `B toggle_build` / `wc_npc_tractorbeam`, `C` the cloaks, `Q recrew`, `R repair`, `S cancel` / `stop`, `X priorityRepair` ...) are the bar's tables, which QOL empties as on stock: B at the top level did nothing on the bench | a Roots build or `Input.map` with another plain letter outside the bar |
+| 336 | **Over the grid, the tooltips of ours drop Roots' `(Hotkey: X)` while the position keys are on** (`HUD.Tooltips=1`); with `Tooltips=0` the engine's tooltip is drawn before the UI and the grid covers part of it | the bar's own hotkeys are silenced while the keys are on; the cell's badge names the key | the stock tooltip drawn after the UI |
+| 337 | **A sprite's texture is read with the game's texture extensions in order and either format** (`.tga`, then `.dds` on Roots; `a2fmt::image`): Roots' buttons whose art is on its DDS sheets (`all_interface_buttons03` to `11`, the user's `cycle_support` and `Wgesconv`, the Tractor Beam, the bastion and the trades) showed their names | the sprite database found them; only the TGA-only load failed (`NOT FOUND`) | |
+| 340 | **On Roots the HUD's icons are Roots' own art** (the user, 2026-11-07: "for the icons in the HUD, please use the ones provided by FO Roots"): wherever a panel of ours stands for a game sprite (the bar's buttons, the top-right buttons, the comm, pause and replay boxes' buttons, all through `icons::ours_for_sprite`), the sprite's art is drawn first and the UI's flat icon only where the sprite has none; `files::Game::game_icons` says which game does this (Roots yes, Armada II no: its look is unchanged). The sprite is the one the engine's own HUD uses, found by name in the HUD's sprite database, which the engine loads per race from Roots' `gui_<race>.cfg` and `.spr` files; read from the player's install at run time, nothing copied | the user's wish and decision 60 (Roots' art stays Roots', read, never shipped); one switch in the icon lookup, not per panel, and nothing in the theme's frames | the user wanting the flat icons back on Roots |
+| 341 | **The minimap's filter strip shows the stock filter buttons' pictures before SHIPS and STATIONS on Roots**; its four state dots stay ours | the stock button is one picture per filter, the strip of ours a four-state control; the picture names the filter as Roots draws it | |
+| 342 | **Where Roots draws no sprite, the HUD keeps ours**: the resource strip's coloured marks and the tooltips' symbols (Roots draws both as glyphs of its bitmap font, `FontFinal4_*`, an animation strip per size, not as sprites; the UI shows the glyph's word, decision 153), the minimap's blips without a sprite and its state dots, the info panel's bars without an icon. The info panel, the selection overlay, the unit view and the minimap's blips already draw the engine's sprites where there are any | drawing the game's bitmap font is a renderer of its own (its `.spr` strip and keyframes), left for a later round | the user asking for Roots' resource glyphs |
+| 338 | **Roots' defaults are unchanged** (`HUD.Bar=0`, `BarLabels=0`, `BarKeys=0`, decisions 103 and 129) | the player turns the grid on in the Refit screen, as the user's install does | the user's sign-off |
+
 ### Step 4: what the bench showed (2026-11-06)
 
 Branch `fo-6-step4`, on `fo-6-step5`. `./a2test syms --game fo-roots`: 82 of 108 hooks ready (76 before step 4; stock

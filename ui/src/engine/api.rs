@@ -89,7 +89,7 @@ pub mod forms {
 pub mod hud {
     pub use crate::engine::hud::{
         component_named, components, cursor_owner, flag_hidden, INFO_PANEL_TAKEN, functions_stock, hidden, in_view, install, installed, is_taken, log_components, log_render_lists,
-        map_radar, name, palette_ptr, panel_origin, panel_rect, set_bar_skin, set_pointer_over_ui, set_taken, ship_display, take_tooltips, tooltip,
+        map_radar, name, palette_ptr, panel_origin, panel_rect, pointer_over_bar, set_bar_area, set_bar_skin, set_pointer_over_ui, set_taken, ship_display, take_tooltips, tooltip,
         video_playing,
     };
 }
@@ -139,7 +139,7 @@ pub mod overlay_text {
 
 pub mod palette {
     pub use crate::engine::palette::{
-        describe, hovered, local_rect, menu, mode, own_sprite, palette, press, pressed, slots_indirect, readable, slot, sprite, state, tooltip, valid, n_slots, Desc, Kind,
+        describe, hovered, install_grid, local_rect, menu, mode, origin, own_sprite, palette, press, pressed, set_rect, slots_indirect, readable, slot, sprite, state, tooltip, valid, n_slots, Desc, Kind,
     };
 }
 
@@ -156,7 +156,7 @@ pub mod progress {
 
 pub mod radar {
     pub use crate::engine::radar::{
-        action_cursor, action_cursors_stock, blips, buttons_swapped, engine_texture, filter_name, filter_text, filters,
+        action_cursor, action_cursors_stock, blips, buttons_swapped, engine_texture, filter_name, filter_sprites, filter_text, filters,
         fog_grid, fog_on, fog_texture_size, functions_stock, hooked, install, map_radar, map_texture, marks,
         queue_camera, queue_filter, queue_order, radar, relation, selection_count, shot_scenes, shroud_grid,
         tactical_camera, teams_visible, view, view_outline, warp_texture, Grid, Kind,

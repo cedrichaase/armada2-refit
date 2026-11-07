@@ -268,6 +268,23 @@ pub fn set_bar_skin(on: bool) {
     unsafe { BAR_SKIN = on };
 }
 
+/// The grid of ours on Roots (FO-6 decisions 330 to 349): its frame in back-buffer pixels as the
+/// last UI frame drew it, over which `cursor_over` gives the bar the pointer (and nowhere else),
+/// since the stock buttons are moved onto its cells. None: the bar's own `CursorOver` answers.
+static mut BAR_AREA: Option<[f32; 4]> = None;
+
+pub fn set_bar_area(r: Option<[f32; 4]>) {
+    unsafe { BAR_AREA = r };
+}
+
+/// Whether the pointer is over the grid's frame (`set_bar_area`).
+pub fn pointer_over_bar() -> bool {
+    match unsafe { BAR_AREA } {
+        Some([l, t, r, b]) => crate::input::state().mouse.is_some_and(|(x, y)| x >= l && x < r && y >= t && y < b),
+        None => false,
+    }
+}
+
 /// Whether the pointer is over a panel of ours (the last UI frame's claim): then no
 /// stock component owns the mouse.
 pub fn set_pointer_over_ui(on: bool) {
@@ -364,6 +381,11 @@ unsafe extern "thiscall" fn cursor_over(c: usize) -> bool {
         }
         if OVER_UI || (taken(c) && !(BAR_SKIN && c == palette())) {
             return false;
+        }
+        if BAR_SKIN && c == palette() {
+            if BAR_AREA.is_some() {
+                return pointer_over_bar();
+            }
         }
         let f: unsafe extern "thiscall" fn(usize) -> bool = core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_CURSOR_OVER()));
         f(c)
