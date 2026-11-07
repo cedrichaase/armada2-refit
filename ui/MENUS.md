@@ -1268,6 +1268,24 @@ dialog host's model for a dialog the UI did not create:
   them). UI.log: `forms: #32770 ... adopted: client WxH, style ..., stock procedure
   0x...`, `... adopted at X,Y WxH in the design space`, and once, the child windows;
   `Trace=1` also writes the picture as a BMP into the game directory.
+- **The shell background kept off the game window** (hook `ui.forms.shell_background`,
+  decision 300 in PLAN-FLEETOPS.md). Game Setup's paint has the shell set its background,
+  and on Roots that is FleetOpsHook's replacement of `SetCurrentBackground`
+  (`ShellBitmapImp.SetCurrentBackgroundNew` in its map): it keeps the picture in
+  `hCurrentBackground`, then draws it, 1200x900 with magenta as the transparent colour,
+  onto the window `ST3D_GraphicsEngine::GetWindowHandle` (0x62bc70) names, the device
+  window, through the executable's `DrawTransparentBitmap` (0x608100) and a DC from
+  FleetOpsHook's own `GetDC`. No import of the executable sees it, and the GDI draw shows
+  at 1:1 at the window's top left over the frame until a later image of the swap chain
+  covers it: the flash of decision 258, once per paint. Measured with Wine's relay of
+  FleetOpsHook's calls on the bench (one `GetDC` of the device window and one 1200x900
+  draw onto it in each of the dialog's 46 paints). The UI takes `DrawTransparentBitmap`
+  at its entry (the six bytes of its first three instructions, checked) and skips a draw
+  whose DC is the device window's (`WindowFromDC`) while the forms' frame covers it
+  (`forms::covers`); every other draw, the stock procedures' into our surfaces among
+  them, runs as stock, and `hCurrentBackground` is set as before. FleetOpsHook's memory
+  is not written. UI.log: `forms: DrawTransparentBitmap taken at its entry` and, at the
+  first draw skipped, `the shell background's draw onto the game window skipped`.
 
 ### Roots' dialogs, laid out
 
