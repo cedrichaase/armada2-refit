@@ -10,9 +10,10 @@
 //! point inside the card, after the pointer has rested there (decision 190).
 //!
 //! Over render3d's map the screen is the column: each campaign a cut of its own card's
-//! art as its emblem (Roots' picture, captured from the dialog at run time and never
-//! stored: the α, γ, V and B are the only marks Roots gives its campaigns, and a theme
-//! cannot draw them; decision 251) and its name, and pointing at one moves the camera to
+//! art as its emblem, or the faction's logo where the content set names one (`Emblem =`,
+//! decision 530; the card's cut is the fallback: Roots' picture, captured from the dialog at
+//! run time and never stored, the α, γ, V and B being the only marks Roots gives its
+//! campaigns; decision 251) and its name, and pointing at one moves the camera to
 //! its view (the fleetops map's `federation`, `dominion`, `species8472`, `freeborg`).
 //! Without the scene, the cards (2x2) with the same art. Load Game and Previous Menu are
 //! the dialog's own buttons, by their labels.
@@ -75,7 +76,14 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
         let mut emblem = |ui: &mut Ui, i: usize, r: crate::gfx::R, c: crate::gfx::Color| {
             let k = 0.55 + 0.45 * (((c >> 8) & 0xff) as f32 / 255.0);
             let g = (255.0 * k) as u32;
-            art(ui, i, r, 0xff00_0000 | g << 16 | g << 8 | g);
+            let tint = 0xff00_0000 | g << 16 | g << 8 | g;
+            // The campaign's logo from the content set's `Emblem` (or UI.ini's), drawn whole;
+            // without one, the card's own art as a rounded square.
+            if let Some(t) = a2::campaign_picture(i) {
+                ui.draw.image(t, r, tint);
+                return;
+            }
+            art(ui, i, r, tint);
             ui.draw.frame(r, 1.0, crate::gfx::fade(ui.theme.panel_edge, 0.8));
         };
         let out = a2::campaign_column(ui, "FLEET OPERATIONS", "SINGLE PLAYER", &rows, &mut emblem, &foot_entries);

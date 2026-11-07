@@ -26,6 +26,7 @@ use crate::menus::{actions, Screen};
 use crate::rt::win::{HWND, WM_MOUSEMOVE};
 use crate::widgets::{theme, Align, Ui};
 use alloc::string::String;
+use alloc::vec::Vec;
 
 /// What opens card `i`, while it is locked: "Complete the <name> to unlock".
 pub fn lock_hint(i: usize, names: &[&str; 4]) -> Option<String> {
@@ -73,6 +74,35 @@ fn icons() -> Option<Tex> {
             ICONS = Some(t);
         }
         ICONS.flatten()
+    }
+}
+
+/// Campaign `i`'s emblem picture (the content set's `Emblem = <file>`, or `[Menus]
+/// Emblem<Id>=` in UI.ini: another file, `none` for the card's own art), read once. None:
+/// no picture named or readable, so the caller draws what it drew before.
+static mut PICTURES: Vec<Option<Tex>> = Vec::new();
+
+#[allow(static_mut_refs)]
+pub fn campaign_picture(i: usize) -> Option<Tex> {
+    let camps = crate::content::get().campaigns;
+    unsafe {
+        if PICTURES.len() != camps.len() {
+            let ini = crate::rt::Ini::open(&crate::rt::game_path("UI.ini"));
+            PICTURES = camps
+                .iter()
+                .map(|c| {
+                    let over = ini.string("Menus", &crate::sfmt!("Emblem{}", c.id)).unwrap_or_default();
+                    let file = if over.trim().is_empty() { c.emblem_file } else { over.trim() };
+                    if file.is_empty() || file.eq_ignore_ascii_case("none") {
+                        return None;
+                    }
+                    let t = crate::gfx::load_tga(file);
+                    crate::log!("menus: campaign {} emblem {}: {}", c.id, file, if t.is_some() { "read" } else { "not found, the card's art stands" });
+                    t
+                })
+                .collect();
+        }
+        PICTURES.get(i).copied().flatten()
     }
 }
 
@@ -258,6 +288,10 @@ pub fn campaign_cards(
 
 /// The emblem of card `i` in `r` (a square), tinted.
 fn emblem(ui: &mut Ui, i: usize, r: R, c: crate::gfx::Color) {
+    if let Some(t) = campaign_picture(i) {
+        ui.draw.image(t, r, c);
+        return;
+    }
     match crate::content::get().campaigns[i].emblem {
         Some((x, y)) => {
             let Some(t) = icons() else { return };

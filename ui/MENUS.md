@@ -1004,6 +1004,13 @@ a Mutara nebula with the queen's Diamond (`render3d/README.md`, "The menu scene"
   stock tutorial card shows, drawn as an outline round the Federation icon's delta.
   Without `allrace.tga` the names stand alone (UI.log: `menus: campaign emblems`).
   Without the scene the four cards draw in a 2x2 grid as before.
+- **Campaign emblems from a picture** (`Emblem = <TGA path>` in a content set's
+  `[Campaign.*]`, `menus::screens::single_player::campaign_picture`): the column draws the
+  file whole, in the name's tint, in place of the race icon cell or the card's cut; the file
+  is read from the player's game files at run time. A file that cannot be read keeps the
+  card's own art. `[Menus] Emblem<Id>=` in UI.ini (`EmblemAllied`, `EmblemDominion`,
+  `EmblemSpecies8472`, `EmblemFreeBorg`: the section's id) names another picture, or `none`
+  for the card's own art; empty takes the set's. UI.log: `menus: campaign <Id> emblem <file>`.
 - **Locked campaigns** (`src/menus/locks.rs`, `src/engine/progress.rs`, issue #13): the
   stock screen draws a campaign the player cannot play yet exactly as an open one, and a
   click on it does nothing (no mission list, no sound of its own). Ours greys it: its
@@ -1259,7 +1266,9 @@ dialog host's model for a dialog the UI did not create:
   framing above would put it (its place in the design space), then moved off screen with
   its size kept, as the forms are. A window wholly off every output is not mapped, so the
   compositor manages only the game's window (sway's tree on the bench; the bench step
-  `Expect the window manager to see one window`). The dialog keeps the activation, the
+  `Expect the window manager to see one window`). A dialog whose place would not fit in the design space
+  (the map editor's licence, which Roots leaves at the device window's origin) is centred
+  in it (PLAN-FLEETOPS.md, decision 503). The dialog keeps the activation, the
   keyboard focus and FleetOpsHook's modal loop; the UI's timer goes on inside that loop.
   A dialog with no control to take the focus is given it (decision 236).
 - **Painted into a surface of ours.** The stock procedures draw through the executable's

@@ -81,7 +81,13 @@ a2test -- run Armada II headless and test it end to end
                                        Render3D.World:Surfaces) a key of RefitPlayer.ini in the
                                        running game; waits for UI.asi's hub to log the change
   a2test drive scene "CMD" ["CMD" ...]  commands to Scene.asi (testbench/scene/README.md),
-                                       e.g. "orbit ship 30 15 900", "camera rts", "query"
+                                       e.g. "orbit ship 30 15 900", "camera rts", "query",
+                                       "select #57 #58", "camera on #57", "goto #57 world 3000 0 3000"
+  a2test drive objects [FILTER...] [--json]   the game's objects (Scene.asi's `objects`):
+                                       id, team, kind, ODF, name, class, position, hull,
+                                       shields, selection; filters: ships stations planets mine
+                                       !mine selected team=N odf=GLOB class=TEXT name=GLOB #N
+                                       near=X,Y,Z,D (testbench/bench/objects.py)
 
   a2test syms [--exe PATH] [--build B] [--plugin P] [--record] [--json]
                                        the symbol profiles (profiles/) checked offline against
@@ -746,8 +752,26 @@ def cmd_drive(argv):
         return 1 if st == 'fail' else 0
     elif sub == 'scene':
         return _scene_command(s, rest)
+    elif sub == 'objects':
+        from . import objects
+        js = '--json' in rest
+        try:
+            flt = objects.from_words([w for w in rest if w != '--json'])
+        except ValueError as e:
+            raise GameError(str(e))
+        header, objs = s.objects()
+        hits = [o for o in objs if flt(o)]
+        log.action(f'objects {" ".join(rest)}'.rstrip() + f': {len(hits)} of {len(objs)}')
+        if js:
+            print(json.dumps(header))
+            for o in hits:
+                print(json.dumps(o))
+        else:
+            print(f'{len(hits)} of {header.get("count", len(objs))} objects ({flt.describe()}); tick '
+                  f'{header.get("tick")}, player team {header.get("player_team")}, {header.get("build")}')
+            print(objects.table(hits))
     elif sub == 'launch':
-        s.launch(' '.join(rest) or '-nointro')
+        s.launch(' '.join(f'"{w}"' if ' ' in w else w for w in rest) or '-nointro')
         print(f'launched, pid {s.game_pid()}')
     elif sub == 'overlay':
         if not rest:

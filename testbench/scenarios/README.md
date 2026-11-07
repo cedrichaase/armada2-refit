@@ -82,6 +82,46 @@ each phase has got. Without headings it makes one phase per screenshot.
 | `Expect scene "selection" answers "TEXT"` / `… not answer …` | that command's own answer, not the whole `Scene.log` (a check) |
 | `Include "_enter-borg-mission"` | that file's steps, in place, at parse time. Files starting with `_` are fragments and are not listed |
 
+## Objects
+
+With `Scene.asi` in the game (any scene; `game` is the harness alone on whatever map the
+game loaded: `../scene/README.md`), steps can find, count, select and order the game's
+objects by what they are rather than where they are on the screen. Each one asks the
+plugin for `objects`, which writes the engine's object list into `Scene.objects.jsonl`
+(read-only on the game), and filters it (`../bench/objects.py`; `a2test drive objects`
+lists the same by hand). An object is named by its handle, `#<id>`, in every command.
+
+A phrase is a quantifier, a noun and any run of clauses:
+
+| Part | Words | Means |
+|---|---|---|
+| quantifier | `a` `an` `the` `one` `any` · `no` · `3` · `at least 2` · `at most 1` · `every` `all` | at least one · none · exactly · bounds. For a selection or an order, a singular noun takes the first match, a plural every match (up to 30) |
+| noun | `object(s)` `unit(s)` `craft` · `ship(s)` · `station(s)` · `planet(s)` | any kind · that kind (`kind` in the list: ship, station, planet, other) |
+| `of class "Galaxy"` | | the class as the player reads it contains the text, or the ODF is it |
+| `with odf "fgal*"` | | the ODF name, `*` wild, any case |
+| `named "mine"` | | the scene's name for it, or its script label (`fgalaxy12`) |
+| `on team 2` / `owned by player 2` | | its team |
+| `owned by the player` / `of the player's` / `not owned by the player` | | the local player's team, or not |
+| `that is selected` / `not selected` | | the player's selection |
+| `within 300 of 3000,0,3000` | | world distance from a point |
+| `with id 57` | | its handle |
+
+`is` / `are` between clauses is read past (`a ship named "mine" is within 100 of ...`).
+
+| Step | What it does |
+|---|---|
+| `Expect an object of class "Galaxy" owned by player 1` / `Expect no ship on team 2` / `Expect 3 stations of the player's` | counts the matches now (a check; the detail lists them) |
+| `Wait up to 60 seconds until a ship named "mine" is within 100 of 3000,0,3000` / `Wait until no ship is on team 2` | the list read every second until the count holds; at the limit a failed check |
+| `Select the ships of class "Galaxy" on team 1` / `Add the station named "yard1" to the selection` | `select` / `select+` by id: the overview's own `Select`, as clicks are (on Roots FleetOpsHook's, with its cap of 30) |
+| `Center the camera on the station of class "Starbase"` | `camera on #id`: the RTS camera centred on the first match |
+| `Order the ships of the player's to move to 3000,0,3000` / `… at warp` | `goto #a,#b world X Y Z`: a player's move order, world coordinates (the list's own) |
+| `Order the ship named "kli" to attack the station on team 2` | `attack #a #b` for each attacker, at the first target found |
+
+The selection, camera and order steps are actions: a log wait after one reads only
+what was written since. They need the scene to be built (`Wait up to N seconds for
+"Scene.log" to say "scene ready"` first). The file the last list was read from is kept
+with the logs (`logs/Scene.objects.jsonl`).
+
 ## Waits and checks
 
 A wait decides **when** the next step runs; a check decides **whether** the case passes.
@@ -97,6 +137,7 @@ Pick the wait by what the next steps need:
 | a log line the steps after it read (a join code) | `Wait up to N seconds for "LOG" to say "TEXT"` | whatever follows |
 | text or a screen to show | `Wait up to N seconds for "TEXT"` / `Wait for the main menu` (OCR) | the wait is the check: it fails at the limit |
 | the result of a Scene command | nothing: `Scene "…"` returns on Scene.asi's answer | `Expect scene "…" answers "…"` |
+| a unit to be built, to arrive, to die, to change hands | `Wait up to N seconds until a ship … is within …` ("Objects") | `Expect an object …` |
 | the next frame to be drawn, before a screenshot or OCR check | a short fixed `Wait 2 seconds` | the screenshot, OCR or judged step |
 | time to pass in the game (a battle, an effect developing, a cooldown) | a fixed `Wait N seconds`: here the time is the point | the screenshot or check after it |
 
