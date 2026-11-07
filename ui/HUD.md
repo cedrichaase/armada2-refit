@@ -1186,7 +1186,16 @@ sentinel), keyed by a counter. Each message: its point at `+0x58` (1600 x 1200, 
 the panel's corner), justification `+0x68`, text `+0x84` (a `std::string`), colour
 `+0x94`, fade `+0xa0` (raised and lowered by the stock `AlwaysGameSimulate`, which also
 erases a faded one: it keeps running). Ours draws each in title type with a shadow,
-in its colour times its fade.
+in its colour times its fade. **Kept clear of the panels of ours**: stock places a message
+against stock's panels, and ours sit elsewhere. Roots' scripts add the mission's name at
+the start of a mission at (50,50) with justification 0, the top left corner, where the
+resource strip of ours is (the user's report, PLAN-FLEETOPS.md decision 326). Every panel
+frame drawn this mission frame is kept (`layout::occupied`, filled by `Ui::panel` whether or
+not the layout log is on); a message whose rows would touch one is centred across the screen
+at the same height, and if it still touches one, put just below it. UI.log says
+`overlay: #<n> moved clear of the panels of ours, to x,y`. On Armada II the resource strip
+is at the top centre and the intro's lines are centred lower down, so nothing there moves
+unless it would have overlapped. `fo-ui-overlay`.
 
 ### The trade status and the team message (not components)
 

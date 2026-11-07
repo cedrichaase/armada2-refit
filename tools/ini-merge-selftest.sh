@@ -97,4 +97,14 @@ msg() {  # name, profile, installed Messages, wanted Messages
 msg "ui: Roots Messages 0 -> 1" fo-roots 0 1
 msg "ui: Roots Messages already 1" fo-roots 1 1
 msg "ui: Armada II, a 0 stays" armada2 0 0
+ovl() {  # name, profile, installed Overlay, wanted Overlay
+    printf '[HUD]\nEnable=1\nOverlay=1\n' > "$t/uiship.ini"
+    printf '[HUD]\nEnable=1\nOverlay=%s\n' "$3" > "$t/ui.ini"
+    A2_PROFILE="$2" python3 "$here/ini-merge.py" "$t/uiship.ini" "$t/ui.ini" >/dev/null
+    n=$((n+1))
+    if grep -qx "Overlay=$4" "$t/ui.ini"; then echo "ok   $1"
+    else echo "FAIL $1"; cat "$t/ui.ini"; bad=$((bad+1)); fi
+}
+ovl "ui: Roots Overlay 0 -> 1" fo-roots 0 1
+ovl "ui: Armada II Overlay 0 stays" armada2 0 0
 echo "$n cases, $bad failed"; [ "$bad" = 0 ]
