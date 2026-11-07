@@ -140,12 +140,38 @@ pub fn build<'a>(s: &'a Screen, combos: &[(i32, usize)]) -> Form<'a> {
     Form { cols }
 }
 
-const HEADING_H: f32 = 40.0;
-const LABEL_H: f32 = 26.0;
-const FIELD_H: f32 = 40.0;
-const SLIDER_H: f32 = 28.0;
-const CAP_H: f32 = 20.0;
-const GAP: f32 = 16.0;
+pub const HEADING_H: f32 = 40.0;
+pub const LABEL_H: f32 = 26.0;
+pub const FIELD_H: f32 = 40.0;
+pub const SLIDER_H: f32 = 28.0;
+pub const CAP_H: f32 = 20.0;
+pub const GAP: f32 = 16.0;
+
+/// The window of a settings screen, `w` units wide round a body `body_h` units tall:
+/// centred, with the screen's title, the body above and the foot (the row of "Previous
+/// Menu" buttons) below. Shared with Roots' settings forms (`menus::roots`), which are
+/// laid out the same way.
+pub fn frame(ui: &mut Ui, w: f32, body_h: f32, name: &str) -> (R, R) {
+    let t = ui.theme;
+    let h = (body_h + 60.0 + 44.0 + 2.0 * t.pad + 54.0 + 36.0).min(1040.0);
+    let screen = ui.screen();
+    let r = crate::widgets::Anchor::Centre.place(screen, ui.u(w), ui.u(h), 0.0);
+    let inner = ui.window(r, name);
+    inner.take_top(inner.h - ui.u(44.0 + 12.0))
+}
+
+/// A heading with its rule, over a column `cw` wide at `x`, `y`.
+pub fn heading(ui: &mut Ui, x: f32, y: f32, cw: f32, text: &str) {
+    let t = ui.theme;
+    theme::heading(ui, R::new(x, y, cw, ui.u(HEADING_H - 6.0)), text);
+    ui.draw.rect(R::new(x, y + ui.u(HEADING_H - 8.0), cw, 1.0_f32.max(ui.u(1.0))), fade(t.panel_edge, 0.8));
+}
+
+/// The caption over a row's field.
+pub fn caption(ui: &mut Ui, r: R, text: &str) {
+    let t = ui.theme;
+    ui.text_in(r, text, t.text_size, Align::Left, t.text_dim, Weight::Regular);
+}
 
 fn item_h(i: &Item) -> f32 {
     match i {
@@ -189,12 +215,8 @@ pub fn draw_with(ui: &mut Ui, s: &Screen, form: &Form, own: &[Own]) {
     let with_own = |k: usize| col_h(&form.cols[k]) + if k == own_col { own.len() as f32 * OWN_H } else { 0.0 };
     let body_h = with_own(0).max(with_own(1));
     let w = if two { 1180.0 } else { 640.0 };
-    let h = (body_h + 60.0 + 44.0 + 2.0 * t.pad + 54.0 + 36.0).min(1040.0);
-    let screen = ui.screen();
-    let r = crate::widgets::Anchor::Centre.place(screen, ui.u(w), ui.u(h), 0.0);
     let name = title(s).map_or("", |c| c.text.as_str());
-    let inner = ui.window(r, name);
-    let (body, foot) = inner.take_top(inner.h - ui.u(44.0 + 12.0));
+    let (body, foot) = frame(ui, w, body_h, name);
     let mut hot = None;
     footer(ui, s, foot.inset(0.0), &mut hot);
     if let Some(n) = footnote(s) {
@@ -213,13 +235,12 @@ pub fn draw_with(ui: &mut Ui, s: &Screen, form: &Form, own: &[Own]) {
             let ih = ui.u(item_h(it));
             match it {
                 Item::Heading(c) => {
-                    theme::heading(ui, R::new(x, y, cw, ui.u(HEADING_H - 6.0)), &c.text);
-                    ui.draw.rect(R::new(x, y + ui.u(HEADING_H - 8.0), cw, 1.0_f32.max(ui.u(1.0))), fade(t.panel_edge, 0.8));
+                    heading(ui, x, y, cw, &c.text);
                 }
                 Item::Row { label, field, caps } => {
                     let mut ry = y;
                     if let Some(l) = label {
-                        ui.text_in(R::new(x, ry, cw, ui.u(LABEL_H)), &l.text, t.text_size, Align::Left, t.text_dim, Weight::Regular);
+                        caption(ui, R::new(x, ry, cw, ui.u(LABEL_H)), &l.text);
                         ry += ui.u(LABEL_H);
                     }
                     ui.scope(&crate::sfmt!("f{:x}", field.key), |ui| field_row(ui, s, field, *label, caps, R::new(x, ry, cw, ui.u(FIELD_H)), &mut hot));

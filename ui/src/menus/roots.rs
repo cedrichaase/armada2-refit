@@ -12,6 +12,16 @@
 //!
 //! Every action goes back to Roots' form as a player's would (`forms::act`): a press of
 //! ours is a posted click at the control's centre; nothing writes a setting.
+mod advanced;
+mod advsettings;
+mod graphics;
+mod kit;
+mod manualip;
+mod mods;
+mod multiplayer;
+mod sound;
+mod specs;
+
 use crate::engine::api::forms::{self, Action, Control, Dialog, Form, Kind};
 use crate::gfx::{self, Tex, R};
 use crate::gfx::Weight;
@@ -21,10 +31,10 @@ use alloc::vec::Vec;
 
 /// Where the design space lands on the back buffer.
 #[derive(Clone, Copy)]
-struct Fit {
-    x: f32,
-    y: f32,
-    s: f32,
+pub(super) struct Fit {
+    pub(super) x: f32,
+    pub(super) y: f32,
+    pub(super) s: f32,
 }
 
 impl Fit {
@@ -169,6 +179,7 @@ pub fn frame(ui: &mut Ui) {
                     (true, "TMainForm") => main_menu(ui, f),
                     (true, "TOptionsMenuForm") => column(ui, &fit, f, area, Some("buttonBack")),
                     (true, "TYesNoForm") => yes_no(ui, &fit, f),
+                    (true, _) if specs::draw(ui, &fit, f) => {}
                     _ => generic(ui, &fit, f, cfg.menus_widgets, live),
                 })
             });

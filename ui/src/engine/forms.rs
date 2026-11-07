@@ -28,6 +28,7 @@
 //! part runs only on a FleetOpsHook of the measured family (`FAMILY`, decision 148), and
 //! only with `[Menus] Forms=1` (Roots' default is 0, decision 149). `Forms=probe` is the
 //! step 0 probe: the same, plus a fixed walk of presses and a log of what it finds.
+use super::forms_props;
 use crate::rt::win::*;
 use crate::syms_forms::{field, hook, value, TABLE};
 use alloc::string::String;
@@ -159,6 +160,11 @@ pub struct Control {
     /// A combo's entries and the selected one (-1: none).
     pub items: Vec<String>,
     pub selected: i32,
+    /// A check box's state, read from its published `Checked` (None: not a check box, or
+    /// its class reads it through a method).
+    pub checked: Option<bool>,
+    /// A slider's published `Value`, `MinValue`, `MaxValue` and `Increment` (None as above).
+    pub value: Option<(i32, i32, i32, i32)>,
 }
 
 /// A form as the UI draws it: its class, where it sits in the design space (the
@@ -200,6 +206,11 @@ pub enum Action {
     /// wParam), as the player's typing would send it: an adopted dialog's edit rewritten
     /// by a text field of ours (decision 250).
     Key(usize, u32, usize),
+    /// A mouse message sent (not posted) to the control at a point of the form, with the
+    /// form moved for that moment so the point lies under the real pointer: the library's
+    /// check boxes decide where a click fell from the real pointer's place, which a form
+    /// kept off screen never has under it. (form, message, buttons, x, y)
+    Poke(usize, u32, usize, i32, i32),
 }
 
 pub const MOUSE_DOWN: u32 = WM_LBUTTONDOWN;
@@ -836,6 +847,7 @@ fn controls(obj: usize) -> Vec<Control> {
                 _ => {}
             }
         }
+        let (checked, value) = state_of(c, vmt, &class);
         out.push(Control {
             name: ansi_string(rd::<usize>(c + field::FORMS_COMP_NAME())),
             class,
@@ -847,20 +859,87 @@ fn controls(obj: usize) -> Vec<Control> {
             hwnd,
             items,
             selected,
+            checked,
+            value,
         });
     }
     out
+}
+
+static mut PROPS_LOGGED: Vec<String> = Vec::new();
+
+/// A check box's and a slider's state, from their published properties (read only,
+/// `forms_props.rs`); the class's table is logged once.
+fn state_of(c: usize, vmt: usize, class: &str) -> (Option<bool>, Option<(i32, i32, i32, i32)>) {
+    let check = derives(vmt, "TJvgCheckBox");
+    let slider = derives(vmt, "TJvxSlider");
+    if !check && !slider {
+        return (None, None);
+    }
+    let props = forms_props::published(vmt, in_fo);
+    let logged = unsafe { &mut *core::ptr::addr_of_mut!(PROPS_LOGGED) };
+    if !logged.iter().any(|n| n == class) {
+        logged.push(String::from(class));
+        let list: Vec<String> = props
+            .iter()
+            .map(|p| match p.getter {
+                forms_props::Getter::Field(o) => crate::sfmt!("{}@{:#x}", p.name, o),
+                forms_props::Getter::Method => crate::sfmt!("{}()", p.name),
+            })
+            .collect();
+        crate::log!("forms: published properties of {}: {}", class, list.join(" "));
+    }
+    let checked = if check { forms_props::field_of(c, &props, "Checked", 1).map(|v| v != 0) } else { None };
+    let value = if slider {
+        let v = forms_props::field_of(c, &props, "Value", 4);
+        let lo = forms_props::field_of(c, &props, "MinValue", 4);
+        let hi = forms_props::field_of(c, &props, "MaxValue", 4);
+        let inc = forms_props::field_of(c, &props, "Increment", 4).unwrap_or(1).max(1);
+        match (v, lo, hi) {
+            (Some(v), Some(lo), Some(hi)) => Some((v, lo, hi, inc)),
+            _ => None,
+        }
+    } else {
+        None
+    };
+    (checked, value)
 }
 
 fn log_controls(t: &Tracked, v: &[Control]) {
     crate::log!("forms: {} has {} controls:", t.class, v.len());
     for c in v {
         crate::log!(
-            "forms:   {:?} {} {} {},{} {}x{} {}{} text {:?}{}",
+            "forms:   {:?} {} {} {},{} {}x{} {}{} text {:?}{}{}{}",
             c.kind, c.class, c.name, c.rect[0], c.rect[1], c.rect[2], c.rect[3],
             if c.visible { "visible" } else { "hidden" }, if c.enabled { "" } else { " disabled" }, c.text,
-            if c.items.is_empty() { String::new() } else { crate::sfmt!(" ({} items, {} chosen)", c.items.len(), c.selected) }
+            if c.items.is_empty() { String::new() } else { crate::sfmt!(" ({} items, {} chosen)", c.items.len(), c.selected) },
+            match (c.checked, c.value) {
+                (Some(k), _) => crate::sfmt!(" checked {}", k),
+                (_, Some((v, lo, hi, inc))) => crate::sfmt!(" value {} of {}..{} step {}", v, lo, hi, inc),
+                _ => String::new(),
+            },
+            if c.hwnd != 0 { " windowed" } else { "" }
         );
+    }
+}
+
+/// A check box's, a slider's or a combo's state that changed since the last read: logged,
+/// for the bench to check what a press of ours did (`forms: <name> of <class> now ...`).
+fn log_changes(t: &Tracked, now: &[Control]) {
+    if t.last.is_empty() {
+        return;
+    }
+    for c in now {
+        let Some(o) = t.last.iter().find(|o| o.name == c.name) else { continue };
+        if c.checked != o.checked {
+            crate::log!("forms: {} of {} now {}", c.name, t.class, if c.checked == Some(true) { "checked" } else { "unchecked" });
+        }
+        if c.value != o.value {
+            crate::log!("forms: {} of {} now at {}", c.name, t.class, c.value.map_or(-1, |v| v.0));
+        }
+        if c.selected != o.selected {
+            crate::log!("forms: {} of {} now chose {}", c.name, t.class, c.selected);
+        }
     }
 }
 
@@ -898,7 +977,7 @@ unsafe extern "system" fn tick(_h: HWND, _m: u32, _id: usize, _t: u32) {
                 crate::log!("forms: #32770 {:p} had no keyboard focus: given the focus", h);
             }
             poll_button(h);
-            run_actions(h);
+            run_actions(h, 0);
             crate::engine::fodialogs::tick(PRINT_EVERY, h);
             unsafe { SetCursor(LoadCursorA(core::ptr::null_mut(), IDC_ARROW)) };
             publish(v, None);
@@ -913,7 +992,7 @@ unsafe extern "system" fn tick(_h: HWND, _m: u32, _id: usize, _t: u32) {
         frame();
         return;
     }
-    run_actions(v[top].hwnd);
+    run_actions(v[top].hwnd, v[top].obj);
     let t = &mut v[top];
     if t.obj == 0 {
         if t.class.ends_with(')') {
@@ -938,12 +1017,14 @@ unsafe extern "system" fn tick(_h: HWND, _m: u32, _id: usize, _t: u32) {
     }
     keep_off(t.hwnd);
     poll_button(t.hwnd);
+    log_changes(t, &ctl);
     t.last = ctl;
     // Nothing else sets the pointer's shape once the form is away from it (decision 171).
     unsafe { SetCursor(LoadCursorA(core::ptr::null_mut(), IDC_ARROW)) };
     if now - unsafe { PRINTED_AT } >= PRINT_EVERY {
         unsafe { PRINTED_AT = now };
-        print(t.hwnd, t.size.0, t.size.1);
+        let grids: Vec<(usize, [i32; 4])> = t.last.iter().filter(|c| c.class == "TNextGrid" && c.visible && c.hwnd != 0).map(|c| (c.hwnd, c.rect)).collect();
+        print(t.hwnd, t.size.0, t.size.1, &grids);
     }
     if unsafe { MODE } == 2 {
         if now - unsafe { LAST_DIAG } > 2.0 {
@@ -1145,7 +1226,7 @@ fn lparam(x: i32, y: i32) -> isize {
 /// The actions the frame queued, on the top form only (one meant for a form no longer on
 /// top is dropped). Run before the form is read again, so the next frame shows what they
 /// did.
-fn run_actions(top: HWND) {
+fn run_actions(top: HWND, _obj: usize) {
     let v = core::mem::take(unsafe { &mut *core::ptr::addr_of_mut!(ACTIONS) });
     for a in v {
         match a {
@@ -1186,6 +1267,30 @@ fn run_actions(top: HWND) {
                     SendMessageA(parent, WM_COMMAND, (CBN_SELCHANGE << 16) | id, w as isize);
                 }
             },
+            Action::Poke(h, msg, keys, x, y) if h == top as usize => {
+                // The form's window put where `x, y` lies under the real pointer.
+                let mut cp = Point::default();
+                unsafe { GetCursorPos(&mut cp) };
+                unsafe { SetWindowPos(top, core::ptr::null_mut(), cp.x - x, cp.y - y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE) };
+                let mut target = top;
+                let mut p = Point { x, y };
+                for _ in 0..8 {
+                    let c = unsafe { ChildWindowFromPointEx(target, p, CWP_SKIPINVISIBLE) };
+                    if c.is_null() || c == target {
+                        break;
+                    }
+                    let mut r = WinRect::default();
+                    let mut o = Point::default();
+                    unsafe {
+                        GetWindowRect(c, &mut r);
+                        ClientToScreen(target, &mut o);
+                    }
+                    p = Point { x: p.x - (r.left - o.x), y: p.y - (r.top - o.y) };
+                    target = c;
+                }
+                unsafe { SendMessageA(target, msg, keys, lparam(p.x, p.y)) };
+                unsafe { SetWindowPos(top, core::ptr::null_mut(), OFF, OFF, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE) };
+            }
             Action::Focus(h) => unsafe {
                 if IsWindow(h as HWND) != 0 {
                     SetFocus(h as HWND);
@@ -1206,7 +1311,7 @@ fn run_actions(top: HWND) {
 
 /// The top form printed into a memory DC (the VCL answers the print message wherever the
 /// window is): the mirror's picture.
-fn print(h: HWND, w: i32, ht: i32) {
+fn print(h: HWND, w: i32, ht: i32, grids: &[(usize, [i32; 4])]) {
     if w <= 0 || ht <= 0 {
         return;
     }
@@ -1232,6 +1337,27 @@ fn print(h: HWND, w: i32, ht: i32) {
         }
         PatBlt(p.0, 0, 0, w, ht, BLACKNESS);
         SendMessageA(h, WM_PRINT, p.0 as usize, (PRF_CLIENT | PRF_CHILDREN | PRF_ERASEBKGND | PRF_NONCLIENT) as isize);
+        // A grid paints its cells itself, which the form's print leaves out: printed by its
+        // own window, over the form's picture, at its place.
+        for &(g, r) in grids {
+            if IsWindow(g as HWND) == 0 {
+                continue;
+            }
+            static mut SEEN: usize = 0;
+            if SEEN != g {
+                SEEN = g;
+                let mut c = GetWindow(g as HWND, 5);
+                while !c.is_null() {
+                    let mut wr = WinRect::default();
+                    GetWindowRect(c, &mut wr);
+                    crate::log!("forms: grid child {:p} class {} {}x{} visible {}", c, class_of(c), wr.right - wr.left, wr.bottom - wr.top, IsWindowVisible(c));
+                    c = GetWindow(c, 2);
+                }
+            }
+            SetViewportOrgEx(p.0, r[0], r[1], core::ptr::null_mut());
+            SendMessageA(g as HWND, WM_PRINT, p.0 as usize, (PRF_CLIENT | PRF_CHILDREN | PRF_ERASEBKGND) as isize);
+            SetViewportOrgEx(p.0, 0, 0, core::ptr::null_mut());
+        }
         GdiFlush();
         PRINTS = PRINTS.wrapping_add(1);
     }
