@@ -1,7 +1,8 @@
 //! DirectDraw Surface images, as Fleet Operations: Roots ships its textures.
 //!
-//! Only the base level is decoded: the engine's mip chains are either inside the file
-//! (not read here) or named files beside it (`tga::TexIndex`). Compressed formats are
+//! The base level is what [`decode`] returns; [`decode_level`] reads a level of the
+//! file's own mip chain (render3d takes a DDS file's chain where it has one, as the
+//! engine draws it). TGA chains are named files beside the base (`tga::TexIndex`). Compressed formats are
 //! DXT1, DXT3 and DXT5; uncompressed ones are read by their channel masks (8, 16, 24
 //! and 32 bits: A8R8G8B8, X8R8G8B8, A8B8G8R8, R8G8B8, R5G6B5, A1R5G5B5, X1R5G5B5,
 //! A4R4G4B4, L8, A8L8 and the like). The result is the same BGRA8 top-down
@@ -145,21 +146,42 @@ impl Chan {
     }
 }
 
-/// Decode the base level to BGRA8, rows top-down.
-pub fn decode(data: &[u8]) -> Result<Image, Error> {
-    let h = Header::parse(data)?;
-    let (w, ht) = (h.width as usize, h.height as usize);
-    let src = &data[DATA..];
-    // The data is measured before anything is allocated, so a header that claims
-    // 4096x4096 over a few bytes costs nothing.
-    let (block, need) = match h.format {
+/// A level's size: its width and height (halved per level, at least 1), the bytes of one
+/// block or pixel, and the bytes of the whole level.
+fn level_size(h: &Header, level: u32) -> (usize, usize, usize, usize) {
+    let w = (h.width >> level).max(1) as usize;
+    let ht = (h.height >> level).max(1) as usize;
+    match h.format {
         Format::Dxt1 | Format::Dxt3 | Format::Dxt5 => {
             let block = if h.format == Format::Dxt1 { 8 } else { 16 };
-            (block, (w.div_ceil(4) * ht.div_ceil(4)).saturating_mul(block))
+            (w, ht, block, (w.div_ceil(4) * ht.div_ceil(4)).saturating_mul(block))
         }
-        Format::Mask { bits, .. } => (bits as usize / 8, (w * ht).saturating_mul(bits as usize / 8)),
-    };
-    let src = src.get(..need).ok_or(Error::Truncated)?;
+        Format::Mask { bits, .. } => (w, ht, bits as usize / 8, (w * ht).saturating_mul(bits as usize / 8)),
+    }
+}
+
+/// Decode the base level to BGRA8, rows top-down.
+pub fn decode(data: &[u8]) -> Result<Image, Error> {
+    decode_level(data, 0)
+}
+
+/// Decode level `level` of the file's own mip chain (0 is the base) to BGRA8, rows
+/// top-down: `Header::mip_count` says how many the file holds; a level past them, or
+/// past the end of the file, is `Truncated`. The levels follow each other after the
+/// header, each half the size of the one before (at least 1x1).
+pub fn decode_level(data: &[u8], level: u32) -> Result<Image, Error> {
+    let h = Header::parse(data)?;
+    if level >= h.mip_count {
+        return Err(Error::Truncated);
+    }
+    let mut at = DATA;
+    for l in 0..level {
+        at = at.saturating_add(level_size(&h, l).3);
+    }
+    let (w, ht, block, need) = level_size(&h, level);
+    // The data is measured before anything is allocated, so a header that claims
+    // 4096x4096 over a few bytes costs nothing.
+    let src = data.get(at..).and_then(|s| s.get(..need)).ok_or(Error::Truncated)?;
     let out_len = w * ht * 4;
     let mut pixels: Vec<u8> = Vec::new();
     pixels.try_reserve_exact(out_len).map_err(|_| Error::Alloc)?;
@@ -208,7 +230,7 @@ pub fn decode(data: &[u8]) -> Result<Image, Error> {
         Format::Mask { a, .. } if a != 0 => 32,
         Format::Mask { bits, .. } => bits.max(24),
     };
-    Ok(Image { width: h.width, height: h.height, bits_per_pixel, pixels })
+    Ok(Image { width: w as u32, height: ht as u32, bits_per_pixel, pixels })
 }
 
 fn rgb565(c: u16) -> [u8; 3] {
@@ -419,6 +441,33 @@ mod tests {
         let mut d = header(1, 1, 0x2_0001, b"\0\0\0\0", 16, [0xFF, 0, 0, 0xFF00]);
         d.extend_from_slice(&[77, 5]);
         assert_eq!(decode(&d).unwrap().pixel(0, 0), [77, 77, 77, 5]);
+    }
+
+    #[test]
+    fn levels_of_the_files_own_chain() {
+        // 8x4 DXT1 with three levels: two blocks of red, then one of blue (4x2), then
+        // one of red (2x1: a level smaller than a block still takes a whole one).
+        // Pixels are BGRA.
+        let red = [0x00, 0xF8, 0x00, 0xF8, 0, 0, 0, 0];
+        let blue = [0x1F, 0x00, 0x1F, 0x00, 0, 0, 0, 0];
+        let mut b = Vec::new();
+        b.extend_from_slice(&red);
+        b.extend_from_slice(&red);
+        b.extend_from_slice(&blue);
+        b.extend_from_slice(&red);
+        let d = dxt(8, 4, b"DXT1", &b);
+        let l0 = decode_level(&d, 0).unwrap();
+        assert_eq!((l0.width, l0.height), (8, 4));
+        assert_eq!(l0.pixel(7, 3), [0, 0, 255, 255]);
+        let l1 = decode_level(&d, 1).unwrap();
+        assert_eq!((l1.width, l1.height), (4, 2));
+        assert_eq!(l1.pixel(0, 0), [255, 0, 0, 255]);
+        let l2 = decode_level(&d, 2).unwrap();
+        assert_eq!((l2.width, l2.height), (2, 1));
+        assert_eq!(l2.pixel(1, 0), [0, 0, 255, 255]);
+        // Past the header's count, or past the data: refused.
+        assert_eq!(decode_level(&d, 3).err(), Some(Error::Truncated));
+        assert_eq!(decode_level(&d[..d.len() - 1], 2).err(), Some(Error::Truncated));
     }
 
     #[test]

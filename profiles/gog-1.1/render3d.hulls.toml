@@ -76,6 +76,15 @@ kind = "vtable"
 addr = 0x6b2b3c
 used_by = ["hulls.reads"]
 
+# A latinum nebula (Roots' asteroid sets) is drawn by the plain GameObject::Render, so it
+# looks like a hull to the claim; it is the particles module's, else the engine's.
+[[sym]]
+id = "vt_latinum"
+symbol = "LatinumNebula"
+kind = "vtable"
+addr = 0x6b132c
+used_by = ["hulls.reads"]
+
 [[sym]]
 id = "resource_colours"
 symbol = "ResourceComponent::s_ResourceColor"

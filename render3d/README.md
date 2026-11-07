@@ -2205,9 +2205,10 @@ vents (the look settled with the user, and the settings keep its keys, in
   whose SODs hold only sprite nodes: sheets of rocks, `alpha`, over additive dust) with
   them. Cut out at one half, the ice sets' rocks (an alpha that is soft over most of each
   rock) kept only their highlights over the haze, and read as see-through; the brown
-  sets' alpha is a hard mask and hid it. `alpha` is sampled from the top level only: our
-  box-filtered chain averaged the soft alpha away and the rocks stayed faint beside the
-  engine's (PLAN-FLEETOPS.md, decisions 350 and 351; `fo-render3d-asteroids`).
+  sets' alpha is a hard mask and hid it. Like every texture, `alpha` is sampled through its chain, and a DDS
+  file's chain is the file's own levels, as the engine samples them (`assets::texture`).
+  With the module off the sets are the engine's: the hulls module never takes a latinum
+  nebula (PLAN-FLEETOPS.md, decisions 350, 353 and 355; `fo-render3d-asteroids`).
 
 | Key (`[Particles]`) | Default | |
 |---|---|---|

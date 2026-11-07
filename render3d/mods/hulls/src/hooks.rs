@@ -571,6 +571,14 @@ pub fn is_craft_class(class: usize) -> bool {
     field(engine::vtable(class), off::HL_VT_CLASS_DISABLE_NODES()) == at(sym::FN_CRAFT_CLASS_DISABLE_NODES)
 }
 
+/// A latinum nebula (`LatinumNebula`, vtable 0x6b132c): drawn by the plain
+/// `GameObject::Render`, so it passes the class test of a hull, but its SOD holds only
+/// sprite nodes (Roots' asteroid sets). The particles module draws it, else the engine.
+pub fn is_latinum_nebula(o: usize) -> bool {
+    let vt = at(sym::VT_LATINUM);
+    vt != 0 && engine::vtable(o) == vt
+}
+
 /// The planets in the object list (`vtable 0x6b2b3c`), as the shadow map's occluders:
 /// (centre, radius) of each, from the instance's sphere (`+0x34`, `+0x40`) and the
 /// translation of its placement (`+0x44` + `0x24`), at most `max`.

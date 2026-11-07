@@ -135,9 +135,9 @@ impl Batch {
             let Some(t) = assets::texture(tex) else { continue };
             let Some(pipe) = self.pipe(*m) else { continue };
             cmd.set_pipeline(&pipe);
-            // `alpha` from the top level too: a chain of ours (box-filtered) averages a
-            // soft alpha away and the rocks went faint against the engine's (decision 351).
-            let mip = if matches!(*m, Material::AdditiveNoMip | Material::Alpha) { MipFilter::None } else { MipFilter::Linear };
+            // `alpha` through its texture's chain as the rest: a DDS file's own levels,
+            // as the engine samples them (decisions 351 and 355).
+            let mip = if *m == Material::AdditiveNoMip { MipFilter::None } else { MipFilter::Linear };
             cmd.bind_texture(0, Some(&t), &gfx::sampler(Filter::Linear, mip, Address::Wrap, Address::Wrap));
             // In pieces, as the old dynamic buffer held them.
             for chunk in verts.chunks(6 * 8192) {

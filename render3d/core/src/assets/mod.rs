@@ -247,7 +247,8 @@ fn tex_width(s: &mut Store, file: &str) -> Option<u32> {
 }
 
 /// A texture by name (no extension), with its whole chain: stock's own levels where it
-/// has them (`mip_name()`'s rule), the rest box-filtered. None if there is no such
+/// has them (`mip_name()`'s rule; a DDS file's own levels inside it), the rest
+/// box-filtered. None if there is no such
 /// texture. Made on the device at once, holding no copy of its texels (`Transient`):
 /// it is loaded again after the next `reset()`.
 pub fn texture(name: &str) -> Option<gpu::Texture> {
@@ -266,7 +267,16 @@ pub fn texture(name: &str) -> Option<gpu::Texture> {
 
 fn load_texture(s: &mut Store, name: &str) -> Option<gpu::Texture> {
     let base = String::from(s.tex_index.find(name)?);
-    let img = a2fmt::image::decode(&s.tex_dir.read(&base)?).ok()?;
+    let data = s.tex_dir.read(&base)?;
+    let img = a2fmt::image::decode(&data).ok()?;
+    // A DDS file's own chain (Roots' textures), level by level while it lasts: what the
+    // engine samples, not our box filter's (PLAN-FLEETOPS.md, decision 355).
+    let own = if a2fmt::image::is_dds(&data) {
+        a2fmt::dds::Header::parse(&data).map(|h| h.mip_count).unwrap_or(1)
+    } else {
+        1
+    };
+    let own_data = if own > 1 { Some(data) } else { drop(data); None };
     let (w, h) = (img.width, img.height);
     if w == 0 || h == 0 || (!files::game().npot_textures && (!w.is_power_of_two() || !h.is_power_of_two())) {
         return None;
@@ -286,7 +296,10 @@ fn load_texture(s: &mut Store, name: &str) -> Option<gpu::Texture> {
     while lw > 1 || lh > 1 {
         let (nw, nh) = ((lw / 2).max(1), (lh / 2).max(1));
         let k = levels.len();
-        let stock = chain.get(k - 1).and_then(|f| s.tex_dir.read(f)).and_then(|d| a2fmt::image::decode(&d).ok());
+        let stock = match own_data.as_deref() {
+            Some(d) if (k as u32) < own => a2fmt::dds::decode_level(d, k as u32).ok(),
+            _ => chain.get(k - 1).and_then(|f| s.tex_dir.read(f)).and_then(|d| a2fmt::image::decode(&d).ok()),
+        };
         let next = match stock {
             Some(i) if i.width == nw && i.height == nh => i.pixels,
             _ => halve(&levels[k - 1], lw, lh)?,

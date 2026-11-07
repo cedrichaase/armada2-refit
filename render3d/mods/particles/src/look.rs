@@ -18,10 +18,9 @@ pub enum Material {
     AdditiveNoMip,
     /// `translucent`: SRCALPHA, INVSRCALPHA.
     Translucent,
-    /// `alpha` and `alpha_nof`: SRCALPHA, INVSRCALPHA as `translucent`, sampled from the
-    /// texture's top level only. Stock's sprite tables never name them; Roots' asteroid
-    /// sets draw their sheets of rocks with `alpha` (PLAN-FLEETOPS.md, decisions 350
-    /// and 351).
+    /// `alpha` and `alpha_nof`: SRCALPHA, INVSRCALPHA as `translucent`, without its
+    /// opacity factor. Stock's sprite tables never name them; Roots' asteroid sets draw
+    /// their sheets of rocks with `alpha` (PLAN-FLEETOPS.md, decisions 350 and 355).
     Alpha,
     /// `alphathreshold` (and anything else): opaque, alpha-tested.
     Cutout,
