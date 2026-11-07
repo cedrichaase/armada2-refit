@@ -18,6 +18,11 @@ pub enum Material {
     AdditiveNoMip,
     /// `translucent`: SRCALPHA, INVSRCALPHA.
     Translucent,
+    /// `alpha` and `alpha_nof`: SRCALPHA, INVSRCALPHA as `translucent`, sampled from the
+    /// texture's top level only. Stock's sprite tables never name them; Roots' asteroid
+    /// sets draw their sheets of rocks with `alpha` (PLAN-FLEETOPS.md, decisions 350
+    /// and 351).
+    Alpha,
     /// `alphathreshold` (and anything else): opaque, alpha-tested.
     Cutout,
 }
@@ -86,6 +91,9 @@ fn build(id: &str) -> Option<Look> {
                 "additive" => Material::Additive,
                 "add_nomipf" => Material::AdditiveNoMip,
                 "translucent" => Material::Translucent,
+                // Blended, never cut out: a sheet whose rocks have a soft alpha (Roots'
+                // ice asteroids) kept only its highlights when tested at one half.
+                "alpha" | "alpha_nof" => Material::Alpha,
                 _ => Material::Cutout,
             };
             let anims = s.anims.iter().filter_map(|a| t.animation(a)).filter_map(Track::new).collect();
