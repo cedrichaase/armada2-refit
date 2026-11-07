@@ -1343,6 +1343,25 @@ pub fn bar(ui: &mut Ui, r: R, f: f32, col: Option<Color>) {
     }
 }
 
+/// The loading screen's second bar (`[Loading] Bar=panel`): a rectangle, square-cornered,
+/// the fill inset in a thin outline box with a small gap between them, and a gentle glow on
+/// the fill. `r` is the outline box; every colour is the theme's.
+pub fn bar_boxed(ui: &mut Ui, r: R, f: f32, col: Option<Color>) {
+    let t = ui.theme;
+    let f = f.clamp(0.0, 1.0);
+    let col = col.unwrap_or(t.fill);
+    ui.draw.fill(r, Corners::SQUARE, fade(t.track, 0.6));
+    ui.draw.stroke(r, Corners::SQUARE, hair(ui), fade(t.panel_hi, 0.75));
+    let inner = r.inset(hair(ui) + ui.u(4.0));
+    ui.draw.fill(inner, Corners::SQUARE, t.track);
+    if f <= 0.0 {
+        return;
+    }
+    let fr = R::new(inner.x, inner.y, inner.w * f, inner.h);
+    ui.draw.glow(fr, Corners::SQUARE, ui.u(8.0), fade(col, 0.4));
+    ui.draw.fill_v(fr, Corners::SQUARE, lighten(col, 0.18), col);
+}
+
 /// A list row's background: alternate rows faintly lit, hover, selection.
 pub fn row(ui: &mut Ui, r: R, index: usize, st: State) {
     let t = ui.theme;

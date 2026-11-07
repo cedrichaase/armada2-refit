@@ -84,6 +84,9 @@ pub struct Content {
     /// The codes the game's fonts draw as a picture or a figure of their own
     /// (`[Glyphs]`, a code in hex = its word or figure), for `text::game::display`.
     pub glyphs: &'static [(u8, &'static str)],
+    /// `[Loading] Bar`: the loading screen's bar when `[Loading] Bar=` in UI.ini is empty
+    /// (`panel`: a square bar in a thin box; empty: the classic one).
+    pub loading_bar: &'static str,
 }
 
 /// A build with no content set for the UI.
@@ -99,6 +102,7 @@ pub static NONE: Content = Content {
     gallery_ships: &[],
     gallery_factions: &[],
     glyphs: &[],
+    loading_bar: "",
 };
 
 /// A name as the engine's C string, made once and kept for the plugin's life.
@@ -173,6 +177,7 @@ pub fn parse(text: &'static str) -> Content {
             .filter_map(|&(k, v)| u8::from_str_radix(k.trim(), 16).ok().map(|b| (b, v)))
             .collect::<Vec<_>>()
             .leak(),
+        loading_bar: t.str("Loading", "Bar").trim(),
     }
 }
 
