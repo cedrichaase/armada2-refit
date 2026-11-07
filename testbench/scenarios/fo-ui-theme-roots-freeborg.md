@@ -1,4 +1,4 @@
-# Fleet Operations: Roots with the UI: the Free Borg HUD in its Roots look (`roots-freeborg`)
+# Fleet Operations: Roots with the UI: the Free Borg HUD in its Roots look (`circuit-teal`)
 
 Resolutions: 1280x960
 Mod: refit

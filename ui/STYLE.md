@@ -47,7 +47,7 @@ clean. The front end is not any race's, so it has a theme of its own.
 | **Cardassian** | `Arch` | ochre/amber `#823E10`..`#D0A056`, trapezoids and pointed arches | amber on brown, chamfered tops over square feet (the trapezoid), arch marks |
 | **Borg** | `Cube` | grey machinery `#586564`, green circuit lights, dense greebles | near-black, square, double edge with green corner brackets, faint scan lines, blinking node lights |
 | **Federation on Roots** | `Starfleet` | Roots' own Federation HUD (below) | dark brushed gunmetal rims round smoked glass, blue lamps in the side rims of the info panel only, lighting its glass from the ends; light-grey tile buttons |
-| **The other races on Roots** | `Roots(<race>)` | each race's Roots HUD (below, "The other factions on Roots") | Starfleet's frame and glass in the race's own metal, glass and lamps |
+| **The other races on Roots** | `Machine(...)` | each race's Roots HUD (below, "The other factions on Roots") | Starfleet's frame and glass in the race's own metal, glass and lamps |
 | **Species 8472** | `Organic` | violet bone `#574C6F`/`#B19FD0`, gold-tan organic strands | purple-black, leaf-shaped corners (large radius on two opposite corners), soft lilac inner light, an amber "eye" |
 
 The tooltip colours are the stock ones from each `gui_<race>.cfg`
@@ -132,9 +132,11 @@ On Roots every race's HUD is the same idea as the Federation's (a metal rim roun
 a minimap frame and an info strip along the foot) in that race's own metal, glass and
 light, so every race gets a **machined look** of its own: Starfleet's frame and glass
 (`starfleet_panel`, `starfleet_button`), drawn from the race's `Machined` tokens
-(`theme.rs`, `Theme::roots`), chosen by the fleetops set (`roots-klingon`,
-`roots-romulan`, `roots-cardassian`, `roots-borg`, `roots-8472`, `roots-freeborg`,
-`roots-dominion`). Armada II's set keeps its looks (blade, wing, arch, cube, organic).
+(`theme.rs`, `Theme::machine`). The looks are named by how they look, and the content
+set says which race wears which, so no race is named in code (`ui/lint-content.sh`):
+the fleetops set gives the Klingon `redline`, the Romulan `jade`, the Cardassian
+`bronze`, the Borg `circuit`, Species 8472 `bone`, the Free Borg `circuit-teal` and the
+Dominion `violet`. Armada II's set keeps its looks (blade, wing, arch, cube, organic).
 Measured like Starfleet's, off each race's Roots interface sheet composited over dark
 space (as it shows in game; read only, never copied), in 0..255:
 
@@ -175,8 +177,8 @@ status colours are each race's Armada II look's, so a race reads the same on bot
 **Which theme shows** is `[UI] Theme=` in `UI.ini`: `auto` (the default) uses the
 player's race in a mission and the shell's theme in the menus and the loading screen;
 a theme's name (`shell`, `federation`, `klingon`, `romulan`, `cardassian`, `borg`,
-`species8472`), or a look's id (`starfleet`, `roots-klingon`, `roots-romulan`,
-`roots-cardassian`, `roots-borg`, `roots-8472`, `roots-freeborg`, `roots-dominion`,
+`species8472`), or a look's id (`starfleet`, `redline`, `jade`,
+`bronze`, `circuit`, `bone`, `circuit-teal`, `violet`,
 `lcars`, `blade`, `wing`, `arch`, `cube`, `organic`), puts that one everywhere. `Theme::for_context` decides; the player's
 race comes from `theme::set_player_race`, which the mission frame calls with the race
 the stock HUD is loaded in (`engine/race.rs`, HUD.md "The player's race").

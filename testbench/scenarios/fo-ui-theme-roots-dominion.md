@@ -1,4 +1,4 @@
-# Fleet Operations: Roots with the UI: the Dominion HUD in its Roots look (`roots-dominion`)
+# Fleet Operations: Roots with the UI: the Dominion HUD in its Roots look (`violet`)
 
 Resolutions: 1280x960
 Mod: refit

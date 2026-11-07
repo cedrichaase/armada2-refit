@@ -1,4 +1,4 @@
-# Fleet Operations: Roots with the UI: the Cardassian HUD in its Roots look (`roots-cardassian`)
+# Fleet Operations: Roots with the UI: the Cardassian HUD in its Roots look (`bronze`)
 
 Resolutions: 1280x960
 Mod: refit

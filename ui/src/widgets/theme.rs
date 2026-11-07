@@ -66,22 +66,30 @@ pub enum Form {
     /// Starfleet (the Federation on Fleet Operations: Roots): dark machined metal
     /// frames round smoked glass, lit by blue lamps set into the frame (STYLE.md).
     Starfleet,
-    /// The other factions on Fleet Operations: Roots: the same machined frame and
-    /// glass as Starfleet, each in its own metal, glass, lamps and corners, measured
-    /// off that race's Roots HUD (STYLE.md, "The other factions on Roots").
-    Roots(Faction),
+    /// The other machined looks: the same frame and glass as Starfleet, each in its
+    /// own metal, glass, lamps and corners (STYLE.md, "The other factions on Roots").
+    Machine(Machine),
 }
 
-/// A Roots faction with a machined look of its own (`Form::Roots`).
+/// The machined looks besides Starfleet (`Form::Machine`), named by what they look
+/// like; the content set says which race wears which (STYLE.md, "The other factions on
+/// Roots").
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Faction {
-    Klingon,
-    Romulan,
-    Cardassian,
-    Borg,
-    Species8472,
-    FreeBorg,
-    Dominion,
+pub enum Machine {
+    /// Near-black red glass, red lamps in the top corners, red lines.
+    Redline,
+    /// Teal-green glass lit from the left, green lamps along the top.
+    Jade,
+    /// An opaque olive-bronze plate under clamps, a cut corner, no lamps.
+    Bronze,
+    /// Dark green speckled glass, a green circuit in the rim, green nodes.
+    Circuit,
+    /// Violet glass in a thick, notched rim of lavender bone, no lamps.
+    Bone,
+    /// The circuit look in teal.
+    CircuitTeal,
+    /// Violet glass lit from the left under clamps, violet nodes.
+    Violet,
 }
 
 impl Form {
@@ -96,20 +104,20 @@ impl Form {
             Form::Cube => "Cube",
             Form::Organic => "Organic",
             Form::Starfleet => "Starfleet",
-            Form::Roots(Faction::Klingon) => "Roots Klingon",
-            Form::Roots(Faction::Romulan) => "Roots Romulan",
-            Form::Roots(Faction::Cardassian) => "Roots Cardassian",
-            Form::Roots(Faction::Borg) => "Roots Borg",
-            Form::Roots(Faction::Species8472) => "Roots Species 8472",
-            Form::Roots(Faction::FreeBorg) => "Roots Free Borg",
-            Form::Roots(Faction::Dominion) => "Roots Dominion",
+            Form::Machine(Machine::Redline) => "Redline",
+            Form::Machine(Machine::Jade) => "Jade",
+            Form::Machine(Machine::Bronze) => "Bronze",
+            Form::Machine(Machine::Circuit) => "Circuit",
+            Form::Machine(Machine::Bone) => "Bone",
+            Form::Machine(Machine::CircuitTeal) => "Circuit teal",
+            Form::Machine(Machine::Violet) => "Violet",
         }
     }
 
     /// A machined look (Starfleet's frame and glass, `Machined`): Starfleet and the
     /// other factions on Roots.
     pub fn machined(self) -> bool {
-        matches!(self, Form::Starfleet | Form::Roots(_))
+        matches!(self, Form::Starfleet | Form::Machine(_))
     }
 
     /// A race look by the id a content set gives it (`lcars`, `blade`, `wing`, `arch`,
@@ -124,13 +132,13 @@ impl Form {
             ("cube", Form::Cube),
             ("organic", Form::Organic),
             ("starfleet", Form::Starfleet),
-            ("roots-klingon", Form::Roots(Faction::Klingon)),
-            ("roots-romulan", Form::Roots(Faction::Romulan)),
-            ("roots-cardassian", Form::Roots(Faction::Cardassian)),
-            ("roots-borg", Form::Roots(Faction::Borg)),
-            ("roots-8472", Form::Roots(Faction::Species8472)),
-            ("roots-freeborg", Form::Roots(Faction::FreeBorg)),
-            ("roots-dominion", Form::Roots(Faction::Dominion)),
+            ("redline", Form::Machine(Machine::Redline)),
+            ("jade", Form::Machine(Machine::Jade)),
+            ("bronze", Form::Machine(Machine::Bronze)),
+            ("circuit", Form::Machine(Machine::Circuit)),
+            ("bone", Form::Machine(Machine::Bone)),
+            ("circuit-teal", Form::Machine(Machine::CircuitTeal)),
+            ("violet", Form::Machine(Machine::Violet)),
         ]
         .iter()
         .find(|(n, _)| n.eq_ignore_ascii_case(id))
@@ -539,7 +547,7 @@ impl Theme {
                 ..s
             },
             Form::Starfleet => Theme::starfleet(),
-            Form::Roots(f) => Theme::roots(f),
+            Form::Machine(f) => Theme::machine(f),
         }
     }
 
@@ -595,12 +603,12 @@ impl Theme {
     /// frame and glass in that race's metal, glass and lamps, measured off its Roots HUD
     /// (composited over dark space, as it shows in game). Text and status colours keep
     /// the faction's Armada II look's, so a race reads the same on both games.
-    fn roots(f: Faction) -> Theme {
+    fn machine(f: Machine) -> Theme {
         let sf = Theme::starfleet();
         let m = Machined::STARFLEET;
         match f {
-            Faction::Klingon => Theme {
-                form: Form::Roots(f),
+            Machine::Redline => Theme {
+                form: Form::Machine(f),
                 panel: 0xb8140a0c,
                 panel_top: 0xb8160b0e,
                 panel_edge: 0xff5a2a24,
@@ -645,8 +653,8 @@ impl Theme {
                 },
                 ..sf
             },
-            Faction::Romulan => Theme {
-                form: Form::Roots(f),
+            Machine::Jade => Theme {
+                form: Form::Machine(f),
                 panel: 0xc01a281c,
                 panel_top: 0xc01e2c20,
                 panel_edge: 0xff2a5a3c,
@@ -691,8 +699,8 @@ impl Theme {
                 },
                 ..sf
             },
-            Faction::Cardassian => Theme {
-                form: Form::Roots(f),
+            Machine::Bronze => Theme {
+                form: Form::Machine(f),
                 panel: 0xe83a301e,
                 panel_top: 0xe84a3e2c,
                 panel_edge: 0xff6a5a36,
@@ -735,8 +743,8 @@ impl Theme {
                 },
                 ..sf
             },
-            Faction::Borg | Faction::FreeBorg => {
-                let free = f == Faction::FreeBorg;
+            Machine::Circuit | Machine::CircuitTeal => {
+                let free = f == Machine::CircuitTeal;
                 let (lamp, pool, line, glow) = if free {
                     (0xff31ffcd, 0xff1c8a72, 0xff045a4a, 0xff085a48)
                 } else {
@@ -744,7 +752,7 @@ impl Theme {
                 };
                 let (accent, title, text) = if free { (0xff3ee8c8, 0xff62f0d8, 0xffd2f2ee) } else { (0xff52e86c, 0xff62f07a, 0xffd2f2d8) };
                 Theme {
-                    form: Form::Roots(f),
+                    form: Form::Machine(f),
                     panel: if free { 0xc0102422 } else { 0xc0102412 },
                     panel_top: if free { 0xc0121c1c } else { 0xc0121c14 },
                     panel_edge: 0xff3a4a40,
@@ -792,8 +800,8 @@ impl Theme {
                     ..sf
                 }
             }
-            Faction::Species8472 => Theme {
-                form: Form::Roots(f),
+            Machine::Bone => Theme {
+                form: Form::Machine(f),
                 panel: 0xc80e0434,
                 panel_top: 0xc81c1238,
                 panel_edge: 0xff6f628d,
@@ -839,8 +847,8 @@ impl Theme {
                 },
                 ..sf
             },
-            Faction::Dominion => Theme {
-                form: Form::Roots(f),
+            Machine::Violet => Theme {
+                form: Form::Machine(f),
                 panel: 0xc81c1036,
                 panel_top: 0xc81e123c,
                 panel_edge: 0xff4a3a78,
@@ -1124,7 +1132,7 @@ pub fn window(ui: &mut Ui, r: R, title: &str, opened: f32) -> R {
     // The header: the panel's top, tinted.
     let tint = match t.form {
         Form::Cube => fade(t.accent, 0.07),
-        Form::Starfleet | Form::Roots(_) => fade(t.panel_hi, 0.06),
+        Form::Starfleet | Form::Machine(_) => fade(t.panel_hi, 0.06),
         _ => fade(t.panel_hi, 0.10),
     };
     ui.draw.fill_v(bar.inset(e), c.grown(-e).only(true, true, false, false), tint, fade(tint, 0.25));
@@ -1195,7 +1203,7 @@ fn header_mark(ui: &mut Ui, at: R) {
         }
         // Starfleet's headers carry no lamps: Roots puts lamps only in its info panel's
         // frame (STYLE.md, "Starfleet").
-        Form::Starfleet | Form::Roots(_) => {}
+        Form::Starfleet | Form::Machine(_) => {}
         Form::Lcars => {}
     }
 }
@@ -1824,7 +1832,7 @@ pub fn slider(ui: &mut Ui, r: R, f: f32, st: State) {
         Form::Cube => (k * 0.8, Corners::SQUARE),
         Form::Organic => (k, Corners::round(k * 0.5)),
         Form::Shell => (k, Corners::cut(k * 0.28)),
-        Form::Starfleet | Form::Roots(_) => (k * 0.6, Corners::round(k * 0.18)),
+        Form::Starfleet | Form::Machine(_) => (k * 0.6, Corners::round(k * 0.18)),
     };
     let kr = R::new(libm::roundf(kx - kw * 0.5), libm::roundf(r.y + (r.h - k) * 0.5), kw, k);
     if !st.off && (st.hot > 0.01 || st.down) && t.form != Form::Lcars {

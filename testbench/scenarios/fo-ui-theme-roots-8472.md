@@ -1,4 +1,4 @@
-# Fleet Operations: Roots with the UI: the Species 8472 HUD in its Roots look (`roots-8472`)
+# Fleet Operations: Roots with the UI: the Species 8472 HUD in its Roots look (`bone`)
 
 Resolutions: 1280x960
 Mod: refit

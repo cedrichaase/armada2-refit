@@ -1,4 +1,4 @@
-# Fleet Operations: Roots with the UI: the Klingon HUD in its Roots look (`roots-klingon`)
+# Fleet Operations: Roots with the UI: the Klingon HUD in its Roots look (`redline`)
 
 Resolutions: 1280x960
 Mod: refit
