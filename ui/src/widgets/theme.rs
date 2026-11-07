@@ -66,6 +66,31 @@ pub enum Form {
     /// Starfleet (the Federation on Fleet Operations: Roots): dark machined metal
     /// frames round smoked glass, lit by blue lamps set into the frame (STYLE.md).
     Starfleet,
+    /// The other machined looks: the same frame and glass as Starfleet, each in its
+    /// own metal, glass, lamps and corners (STYLE.md, "The other factions on Roots").
+    Machine(Machine),
+}
+
+/// The machined looks besides Starfleet (`Form::Machine`), named by what they look
+/// like; the content set says which race wears which (STYLE.md, "The other factions on
+/// Roots").
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Machine {
+    /// Near-black red glass, red lamps in the top corners, red lines.
+    Redline,
+    /// Teal-green glass lit from the left, green lamps along the top.
+    Jade,
+    /// An opaque olive-bronze plate under clamps, a cut corner, no lamps.
+    Bronze,
+    /// Dark green speckled glass, a green circuit in the rim, green nodes.
+    Circuit,
+    /// Violet glass in a thick, notched rim of lavender bone, no lamps.
+    Bone,
+    /// The circuit look in teal.
+    CircuitTeal,
+    /// Black gunmetal round black glass under clamps, violet only in its accents (a
+    /// line in the rim, the bevel, the nodes).
+    Violet,
 }
 
 impl Form {
@@ -80,7 +105,20 @@ impl Form {
             Form::Cube => "Cube",
             Form::Organic => "Organic",
             Form::Starfleet => "Starfleet",
+            Form::Machine(Machine::Redline) => "Redline",
+            Form::Machine(Machine::Jade) => "Jade",
+            Form::Machine(Machine::Bronze) => "Bronze",
+            Form::Machine(Machine::Circuit) => "Circuit",
+            Form::Machine(Machine::Bone) => "Bone",
+            Form::Machine(Machine::CircuitTeal) => "Circuit teal",
+            Form::Machine(Machine::Violet) => "Violet",
         }
+    }
+
+    /// A machined look (Starfleet's frame and glass, `Machined`): Starfleet and the
+    /// other factions on Roots.
+    pub fn machined(self) -> bool {
+        matches!(self, Form::Starfleet | Form::Machine(_))
     }
 
     /// A race look by the id a content set gives it (`lcars`, `blade`, `wing`, `arch`,
@@ -95,6 +133,13 @@ impl Form {
             ("cube", Form::Cube),
             ("organic", Form::Organic),
             ("starfleet", Form::Starfleet),
+            ("redline", Form::Machine(Machine::Redline)),
+            ("jade", Form::Machine(Machine::Jade)),
+            ("bronze", Form::Machine(Machine::Bronze)),
+            ("circuit", Form::Machine(Machine::Circuit)),
+            ("bone", Form::Machine(Machine::Bone)),
+            ("circuit-teal", Form::Machine(Machine::CircuitTeal)),
+            ("violet", Form::Machine(Machine::Violet)),
         ]
         .iter()
         .find(|(n, _)| n.eq_ignore_ascii_case(id))
@@ -175,6 +220,8 @@ pub struct Theme {
     pub texture: [f32; 4],
     /// Stripes along a progress bar's fill: period, duty, angle. Period 0: solid.
     pub bar_stripes: [f32; 3],
+    /// A machined look's frame, glass and lamps (`Form::machined`); unused otherwise.
+    pub machined: Machined,
 
     // ---- type (units) ----
     pub display_size: f32,
@@ -252,6 +299,7 @@ impl Theme {
             glow: 14.0,
             texture: [0.0; 4],
             bar_stripes: [0.0; 3],
+            machined: Machined::STARFLEET,
             display_size: 44.0,
             title_size: 26.0,
             heading_size: 22.0,
@@ -500,6 +548,7 @@ impl Theme {
                 ..s
             },
             Form::Starfleet => Theme::starfleet(),
+            Form::Machine(f) => Theme::machine(f),
         }
     }
 
@@ -524,13 +573,13 @@ impl Theme {
             accent: 0xff4a94ff,
             accent2: 0xffe8b030,
             accent3: 0xff1c3a8c,
-            button: 0x98686a6e,
-            button_top: 0x98808286,
-            button_hot: 0xb0868c98,
-            button_down: 0xc0384660,
-            button_on: 0xb05a6886,
-            button_off: 0x60606266,
-            button_edge: 0xf0b4b6ba,
+            button: 0xe80a0b0d,
+            button_top: 0xe8141619,
+            button_hot: 0xe8181d26,
+            button_down: 0xf0101a2c,
+            button_on: 0xe8121a28,
+            button_off: 0xa00c0d10,
+            button_edge: 0xff2e3238,
             track: 0xc0050609,
             fill: 0xff4088f0,
             focus: 0xff9cc4ff,
@@ -546,7 +595,320 @@ impl Theme {
             glow: 12.0,
             texture: [0.0; 4],
             bar_stripes: [5.0, 0.72, 0.0],
+            machined: Machined::STARFLEET,
             ..Theme::shell()
+        }
+    }
+
+    /// A Roots faction's tokens (STYLE.md, "The other factions on Roots"): Starfleet's
+    /// frame and glass in that race's metal, glass and lamps, measured off its Roots HUD
+    /// (composited over dark space, as it shows in game). Text and status colours keep
+    /// the faction's Armada II look's, so a race reads the same on both games.
+    fn machine(f: Machine) -> Theme {
+        let sf = Theme::starfleet();
+        let m = Machined::STARFLEET;
+        match f {
+            Machine::Redline => Theme {
+                form: Form::Machine(f),
+                panel: 0xb8140a0c,
+                panel_top: 0xb8160b0e,
+                panel_edge: 0xff5a2a24,
+                panel_hi: 0xffc4aca6,
+                text: 0xfff2e0d8,
+                text_dim: 0xffac8e86,
+                text_off: 0xff5e4844,
+                title: 0xffee4e3e,
+                accent: 0xffd8261c,
+                accent2: 0xffe8b030,
+                accent3: 0xff6a0806,
+                button: 0x98502220,
+                button_top: 0x98703430,
+                button_hot: 0xb0803a34,
+                button_down: 0xc0601410,
+                button_on: 0xb0802a20,
+                button_off: 0x60402220,
+                button_edge: 0xf0b06a62,
+                track: 0xc0080203,
+                fill: 0xffd8261c,
+                focus: 0xffffbc3a,
+                tip: 0xf0140606,
+                tip_edge: 0xff6a2a24,
+                tip_text: 0xfff2e0d8,
+                row_hot: 0x30d8261c,
+                row_sel: 0x5cd8261c,
+                corners: Corners([2.0, -12.0, 2.0, -12.0]),
+                control: Corners([2.0, -6.0, 2.0, -6.0]),
+                machined: Machined {
+                    rim: [0xff2e2422, 0xff2a1e1c, 0xff200806, 0xff220a08],
+                    rim_w: 8.0,
+                    grain: 0.14,
+                    bevel: 0x80e8dcd2,
+                    glow: 0xff600000,
+                    lamp: 0xffff1a10,
+                    pool: 0xffc00000,
+                    pool_far: 0x60600000,
+                    lamps: LampAt::Corners,
+                    lines: 0x70c01410,
+                    shade_right: 0x20000000,
+                    ..m
+                },
+                ..sf
+            },
+            Machine::Jade => Theme {
+                form: Form::Machine(f),
+                panel: 0xc01a281c,
+                panel_top: 0xc01e2c20,
+                panel_edge: 0xff2a5a3c,
+                panel_hi: 0xff86da8c,
+                text: 0xffd6f2da,
+                text_dim: 0xff7ea888,
+                text_off: 0xff3e5a44,
+                title: 0xff5ae064,
+                accent: 0xff48c850,
+                accent2: 0xff8bacbb,
+                accent3: 0xff12502a,
+                button: 0x98385a46,
+                button_top: 0x98507a62,
+                button_hot: 0xb05a8a6c,
+                button_down: 0xc01a5030,
+                button_on: 0xb0306e46,
+                button_off: 0x60304a3a,
+                button_edge: 0xf09cc8b0,
+                track: 0xc0030a05,
+                fill: 0xff48c850,
+                focus: 0xffaaffb2,
+                tip: 0xf0081208,
+                tip_edge: 0xff2a5a3c,
+                tip_text: 0xffd6f2da,
+                row_hot: 0x2c48c850,
+                row_sel: 0x5048c850,
+                corners: Corners::round(12.0),
+                control: Corners::round(7.0),
+                machined: Machined {
+                    rim: [0xff1e2c28, 0xff1a2824, 0xff0c1a14, 0xff0e1c16],
+                    rim_w: 7.0,
+                    grain: 0.12,
+                    bevel: 0x70b4d0c6,
+                    glow: 0xff0e5a26,
+                    lamp: 0xff40d070,
+                    pool: 0xff1c8a3c,
+                    pool_far: 0x50124a22,
+                    lamps: LampAt::Top,
+                    glass_light: 0x3030a070,
+                    shade_right: 0x50000000,
+                    ..m
+                },
+                ..sf
+            },
+            Machine::Bronze => Theme {
+                form: Form::Machine(f),
+                panel: 0xe83a301e,
+                panel_top: 0xe84a3e2c,
+                panel_edge: 0xff6a5a36,
+                panel_hi: 0xffdcac62,
+                text: 0xfff6e6c8,
+                text_dim: 0xffc8b48e,
+                text_off: 0xff6e5c40,
+                title: 0xffeeae4a,
+                accent: 0xffe8a438,
+                accent2: 0xffc8561a,
+                accent3: 0xff5a3a10,
+                button: 0x98584a30,
+                button_top: 0x98786848,
+                button_hot: 0xb0887650,
+                button_down: 0xc05a3c10,
+                button_on: 0xb0805a20,
+                button_off: 0x60483c28,
+                button_edge: 0xf0c8b48a,
+                track: 0xd0140f06,
+                fill: 0xffe8a438,
+                focus: 0xffffd890,
+                tip: 0xf0241c0e,
+                tip_edge: 0xff6a5a36,
+                tip_text: 0xfff6e6c8,
+                row_hot: 0x2ce8a438,
+                row_sel: 0x50e8a438,
+                corners: Corners([3.0, 3.0, -14.0, 3.0]),
+                control: Corners([2.0, 2.0, -7.0, 2.0]),
+                machined: Machined {
+                    rim: [0xff36301e, 0xff322c1c, 0xff1c1806, 0xff1e1a08],
+                    rim_w: 6.0,
+                    grain: 0.10,
+                    bevel: 0x90e0d0a0,
+                    lamp: 0,
+                    lamps: LampAt::None,
+                    shade_right: 0x38000000,
+                    clamps: true,
+                    seam: false,
+                    ..m
+                },
+                ..sf
+            },
+            Machine::Circuit | Machine::CircuitTeal => {
+                let free = f == Machine::CircuitTeal;
+                let (lamp, pool, line, glow) = if free {
+                    (0xff31ffcd, 0xff1c8a72, 0xff045a4a, 0xff085a48)
+                } else {
+                    (0xff52ff31, 0xff1c8a19, 0xff065a02, 0xff0a5a06)
+                };
+                let (accent, title, text) = if free { (0xff3ee8c8, 0xff62f0d8, 0xffd2f2ee) } else { (0xff52e86c, 0xff62f07a, 0xffd2f2d8) };
+                Theme {
+                    form: Form::Machine(f),
+                    panel: if free { 0xc0102422 } else { 0xc0102412 },
+                    panel_top: if free { 0xc0121c1c } else { 0xc0121c14 },
+                    panel_edge: 0xff3a4a40,
+                    panel_hi: 0xffa9b5b5,
+                    text,
+                    text_dim: 0xff7f9a88,
+                    text_off: 0xff3e4a44,
+                    title,
+                    accent,
+                    accent2: 0xff73888d,
+                    accent3: glow,
+                    button: 0x98303a34,
+                    button_top: 0x98485650,
+                    button_hot: 0xb0506660,
+                    button_down: 0xc0104a20,
+                    button_on: 0xb0206a3a,
+                    button_off: 0x60303a34,
+                    button_edge: 0xf09ab0a8,
+                    track: 0xc0020604,
+                    fill: accent,
+                    focus: 0xffb4ffc0,
+                    tip: 0xf0060c08,
+                    tip_edge: 0xff3a4a40,
+                    tip_text: text,
+                    row_hot: (accent & 0x00ff_ffff) | 0x2800_0000,
+                    row_sel: (accent & 0x00ff_ffff) | 0x4800_0000,
+                    corners: Corners::round(3.0),
+                    control: Corners::round(3.0),
+                    machined: Machined {
+                        rim: [0xff1a1e1a, 0xff181c18, 0xff0c100c, 0xff0e120e],
+                        rim_w: 7.0,
+                        grain: 0.12,
+                        bevel: 0x50b0c0b0,
+                        glow,
+                        lamp,
+                        pool,
+                        pool_far: (pool & 0x00ff_ffff) | 0x3000_0000,
+                        lamps: LampAt::Nodes,
+                        rim_line: line,
+                        glass_grain: 0.35,
+                        shade_right: 0x40000000,
+                        seam: false,
+                        ..m
+                    },
+                    ..sf
+                }
+            }
+            Machine::Bone => Theme {
+                form: Form::Machine(f),
+                panel: 0xc8180c40,
+                panel_top: 0xc8241844,
+                panel_edge: 0xff6f628d,
+                panel_hi: 0xffc8b6e8,
+                text: 0xffefe6fc,
+                text_dim: 0xffa496bc,
+                text_off: 0xff4e4562,
+                title: 0xffd4b8ff,
+                accent: 0xffc4a2ff,
+                accent2: 0xffe0a24a,
+                accent3: 0xff3a2a6a,
+                button: 0x985a4c80,
+                button_top: 0x98786aa0,
+                button_hot: 0xb08a7cb4,
+                button_down: 0xc03a2a6a,
+                button_on: 0xb06a50a8,
+                button_off: 0x60483c64,
+                button_edge: 0xf0c8b8ee,
+                track: 0xc0060312,
+                fill: 0xffc4a2ff,
+                focus: 0xffeadcff,
+                tip: 0xf00e0820,
+                tip_edge: 0xff6f628d,
+                tip_text: 0xffefe6fc,
+                row_hot: 0x2cc4a2ff,
+                row_sel: 0x50c4a2ff,
+                corners: Corners::round(10.0),
+                control: Corners::round(7.0),
+                machined: Machined {
+                    rim: [0xff6c5ca0, 0xff685896, 0xff4c3e7a, 0xff4e407e],
+                    rim_w: 10.0,
+                    grain: 0.06,
+                    aniso: 3.0,
+                    sheen: 0.6,
+                    bevel: 0xc0e8daff,
+                    lip: 0xd0100a20,
+                    lamp: 0,
+                    lamps: LampAt::None,
+                    shade_right: 0x00000000,
+                    notch: 180.0,
+                    seam: false,
+                    ..m
+                },
+                ..sf
+            },
+            Machine::Violet => Theme {
+                // Dark: black gunmetal round black glass, violet only for accents (the
+                // lamps, a line in the rim, the bevel), at the user's word (2026-11-07);
+                // Roots' own Dominion strip is violet throughout (STYLE.md).
+                form: Form::Machine(f),
+                panel: 0xc00b0a10,
+                panel_top: 0xc0121117,
+                panel_edge: 0xff3a3448,
+                panel_hi: 0xffb4a0dc,
+                text: 0xffe4e0ee,
+                text_dim: 0xff948ca8,
+                text_off: 0xff4a4658,
+                title: 0xffc8b0ff,
+                accent: 0xff9a6cff,
+                accent2: 0xffe0a24a,
+                accent3: 0xff2c1468,
+                button: 0xe00c0b10,
+                button_top: 0xe0161519,
+                button_hot: 0xe01c1826,
+                button_down: 0xf0181030,
+                button_on: 0xe0181428,
+                button_off: 0xa00c0b10,
+                button_edge: 0xff3c3448,
+                track: 0xc0040306,
+                fill: 0xff9a6cff,
+                focus: 0xffdcc8ff,
+                tip: 0xf00a090e,
+                tip_edge: 0xff3c3448,
+                tip_text: 0xffe4e0ee,
+                row_hot: 0x2c9a6cff,
+                row_sel: 0x509a6cff,
+                corners: Corners([3.0, 3.0, -14.0, 3.0]),
+                control: Corners([2.0, 2.0, -7.0, 2.0]),
+                machined: Machined {
+                    rim: [0xff2e2d32, 0xff2a292e, 0xff141317, 0xff161519],
+                    rim_w: 7.0,
+                    grain: 0.12,
+                    bevel: 0x70b4a0e0,
+                    rim_line: 0x905a34c8,
+                    glow: 0xff2c1468,
+                    lamp: 0xff8250ff,
+                    pool: 0xff3a18a0,
+                    pool_far: 0x30200c60,
+                    lamps: LampAt::Nodes,
+                    glass_light: 0,
+                    shade_right: 0x30000000,
+                    clamps: true,
+                    seam: false,
+                    ..m
+                },
+                ..sf
+            },
+        }
+    }
+
+    /// The theme of a look by its id (`Form::from_id`), the shell's for an empty or
+    /// unknown one: the content set's choice for the menus.
+    fn look(id: &str) -> Theme {
+        match Form::from_id(id) {
+            Some(f) => Theme { name: f.name(), ..Theme::for_form(f) },
+            None => Theme::shell(),
         }
     }
 
@@ -578,7 +940,20 @@ impl Theme {
             Some(name) => Theme::named(name).unwrap_or_default(),
             None => match (ctx, player_race()) {
                 (crate::surface::Context::Mission, Some(r)) => Theme::for_race(r),
-                _ => Theme::shell(),
+                (crate::surface::Context::Mission, None) => Theme::shell(),
+                // The menus and the front end: the content set's look (`[Looks]`), the
+                // shell's without one. A menu over a running mission may follow the
+                // HUD's race (`MissionMenus = race`).
+                _ => {
+                    let c = crate::content::get();
+                    let over = ctx == crate::surface::Context::Menus && crate::menus::backdrop::over_mission();
+                    let look = if over && !c.mission_menus_look.is_empty() { c.mission_menus_look } else { c.menus_look };
+                    match (look.eq_ignore_ascii_case("race"), player_race()) {
+                        (true, Some(r)) => Theme::for_race(r),
+                        (true, None) => Theme::look(c.menus_look),
+                        (false, _) => Theme::look(look),
+                    }
+                }
             },
         }
     }
@@ -683,7 +1058,7 @@ pub fn panel_as(ui: &mut Ui, r: R, lamps: Lamps) {
         lcars_frame(ui, r, None);
         return;
     }
-    if t.form == Form::Starfleet {
+    if t.form.machined() {
         starfleet_panel(ui, r, lamps == Lamps::On);
         return;
     }
@@ -758,8 +1133,8 @@ pub fn frame_margins(ui: &Ui) -> (f32, f32, f32, f32) {
         let (side, top, bottom) = lcars_bars(ui, None);
         return (side, top, 0.0, bottom);
     }
-    if ui.theme.form == Form::Starfleet {
-        let m = ui.u(SF_RIM);
+    if ui.theme.form.machined() {
+        let m = ui.u(ui.theme.machined.rim_w);
         return (m, m, m, m);
     }
     (0.0, 0.0, 0.0, 0.0)
@@ -776,7 +1151,7 @@ pub fn window(ui: &mut Ui, r: R, title: &str, opened: f32) -> R {
     // The header sits inside what the frame itself takes (a Starfleet rim).
     let (ml, mt, mr, mb) = frame_margins(ui);
     let r = R::new(r.x + ml, r.y + mt, r.w - ml - mr, r.h - mt - mb);
-    let c = if t.form == Form::Starfleet { Corners::round(ui.u(3.0)) } else { t.px(ui, t.corners) };
+    let c = if t.form.machined() { Corners::round(ui.u(3.0)) } else { t.px(ui, t.corners) };
     let pad = ui.u(t.pad);
     let bar_h = ui.u(t.title_size + 2.0 * t.pad * 0.7);
     let (bar, rest) = r.take_top(bar_h);
@@ -784,7 +1159,7 @@ pub fn window(ui: &mut Ui, r: R, title: &str, opened: f32) -> R {
     // The header: the panel's top, tinted.
     let tint = match t.form {
         Form::Cube => fade(t.accent, 0.07),
-        Form::Starfleet => fade(t.panel_hi, 0.06),
+        Form::Starfleet | Form::Machine(_) => fade(t.panel_hi, 0.06),
         _ => fade(t.panel_hi, 0.10),
     };
     ui.draw.fill_v(bar.inset(e), c.grown(-e).only(true, true, false, false), tint, fade(tint, 0.25));
@@ -855,99 +1230,316 @@ fn header_mark(ui: &mut Ui, at: R) {
         }
         // Starfleet's headers carry no lamps: Roots puts lamps only in its info panel's
         // frame (STYLE.md, "Starfleet").
-        Form::Starfleet => {}
+        Form::Starfleet | Form::Machine(_) => {}
         Form::Lcars => {}
     }
 }
 
-// ---- Starfleet ---------------------------------------------------------------------------
+// ---- Starfleet and the machined looks ---------------------------------------------------
 //
 // Measured off Roots' Federation HUD (STYLE.md, "Starfleet"): a neutral gunmetal rim, a
 // dark lip, smoked glass that is near neutral in the middle, and the blue only where the
-// lamps set into the side rims throw it across the glass.
+// lamps set into the side rims throw it across the glass. The other factions on Roots
+// draw the same frame and glass from their own `Machined` tokens (STYLE.md, "The other
+// factions on Roots").
 
-/// The metal rim's width all round, units (Roots': about 9 pixels at 960 lines, lip included).
-const SF_RIM: f32 = 10.0;
-/// A lamp's core: Roots' lamps peak at about (73,150,255).
-const SF_LAMP: Color = 0xff4996ff;
-/// The lamps' light close to them on the glass: deeper than the core, as Roots' glass
-/// takes it (about +6, +25, +80 over the glass at its edge).
-const SF_POOL: Color = 0xff1238d8;
+/// Where a machined frame's lamps sit (`Machined::lamps`), on a panel that asks for
+/// them (`Lamps::On`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum LampAt {
+    /// None at all.
+    None,
+    /// Two slots in each side rim, either side of the seam (Starfleet).
+    Sides,
+    /// Short slots along the top rim, shining down (Romulan).
+    Top,
+    /// One in each top corner, lighting the glass from there (Klingon).
+    Corners,
+    /// Round nodes in the rim: the top left corner and the foot's middle (Borg).
+    Nodes,
+}
 
-/// The grain of a Starfleet plate at this screen's scale.
+/// A machined frame, its glass and its lamps: the tokens of `Form::machined` looks.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Machined {
+    /// The rim's colour at each corner (tl, tr, br, bl), before its grain.
+    pub rim: [Color; 4],
+    /// The rim's width all round, units, lip included.
+    pub rim_w: f32,
+    /// The metal's grain: strength, stretch along the brushing, the broad sheen.
+    pub grain: f32,
+    pub aniso: f32,
+    pub sheen: f32,
+    /// The light hairline along the rim's outer top.
+    pub bevel: Color,
+    /// The dark lip where the rim meets the glass.
+    pub lip: Color,
+    /// A bright line along the middle of the rim (the Borg's circuits); 0: none.
+    pub rim_line: Color,
+    /// A seam across the side rims half way down.
+    pub seam: bool,
+    /// Notches across the top and foot rims every so many units (Species 8472's
+    /// segments); 0: none.
+    pub notch: f32,
+    /// Dark clamps over the top rim (Cardassian, Dominion).
+    pub clamps: bool,
+    /// The glass darkened toward the right by this (alpha) colour.
+    pub shade_right: Color,
+    /// Light lying on the glass from its left end whatever the lamps (Romulan,
+    /// Dominion); 0: none.
+    pub glass_light: Color,
+    /// The glass's own speckle (the Borg's), the metal kind's strength; 0: smooth.
+    pub glass_grain: f32,
+    /// Lines across the glass (the Klingon's structure); 0: none.
+    pub lines: Color,
+    /// The lamps: where, their core, the glow round them, their light on the glass
+    /// close to them and far.
+    pub lamps: LampAt,
+    pub lamp: Color,
+    pub glow: Color,
+    pub pool: Color,
+    pub pool_far: Color,
+}
+
+impl Machined {
+    /// Starfleet's, measured off Roots' Federation HUD (STYLE.md, "Starfleet").
+    pub const STARFLEET: Machined = Machined {
+        rim: [0xff3e4042, 0xff3b3d3f, 0xff252629, 0xff27282b],
+        rim_w: 10.0,
+        grain: 0.10,
+        aniso: 22.0,
+        sheen: 0.25,
+        bevel: 0x60e0e2e6,
+        lip: 0xf0030405,
+        rim_line: 0,
+        seam: true,
+        notch: 0.0,
+        clamps: false,
+        shade_right: 0x30000000,
+        glass_light: 0,
+        glass_grain: 0.0,
+        lines: 0,
+        lamps: LampAt::Sides,
+        // A lamp's core: Roots' lamps peak at about (73,150,255).
+        lamp: 0xff4996ff,
+        glow: 0xff1c3a8c,
+        // The lamps' light close to them on the glass: deeper than the core, as Roots'
+        // glass takes it (about +6, +25, +80 over the glass at its edge).
+        pool: 0xff1238d8,
+        pool_far: 0xff1c3a8c,
+    };
+}
+
+/// The grain of a machined plate at this screen's scale.
 fn sf_metal(ui: &Ui, strength: f32, sheen: f32) -> Metal {
-    Metal { size: ui.u(1.0).max(1.0), strength, aniso: 22.0, angle: 0.0, sheen }
+    Metal { size: ui.u(1.0).max(1.0), strength, aniso: ui.theme.machined.aniso, angle: 0.0, sheen }
 }
 
 /// A lamp in a slot on a rim: a dark slot, a bright core and its glow on the metal.
 fn sf_lamp(ui: &mut Ui, r: R, a: f32) {
-    let t = ui.theme;
-    ui.draw.fill(r.inset(-ui.u(1.0)), Corners::round(ui.u(1.5)), 0xff030406);
-    ui.draw.glow(r, Corners::round(ui.u(1.0)), ui.u(7.0), fade(t.accent3, 0.7 * a));
-    ui.draw.fill_v(r, Corners::round(ui.u(1.0)), fade(mix(SF_LAMP, 0xffffffff, 0.2), a), fade(SF_LAMP, a));
+    let m = ui.theme.machined;
+    // A slot is rounded a unit at its corners, a node (as wide as tall) is round.
+    let node = (r.w - r.h).abs() < 0.5;
+    let round = if node { Corners::round(r.w * 0.5) } else { Corners::round(ui.u(1.0)) };
+    let outer = if node { round.grown(ui.u(1.0)) } else { Corners::round(ui.u(1.5)) };
+    ui.draw.fill(r.inset(-ui.u(1.0)), outer, 0xff030406);
+    ui.draw.glow(r, round, ui.u(7.0), fade(m.glow, 0.7 * a));
+    ui.draw.fill_v(r, round, fade(mix(m.lamp, 0xffffffff, 0.2), a), fade(m.lamp, a));
+}
+
+/// A lamp's light on the glass `g` from the point `(x, y)`, spread `w` by `h` at its
+/// source: a bright pool within `near` and a long faint tail to `far`.
+fn sf_light(ui: &mut Ui, g: R, (x, y): (f32, f32), (w, h): (f32, f32), near: f32, far: f32, a: f32) {
+    let m = ui.theme.machined;
+    let src = |w: f32, h: f32| R::new(x - w * 0.5, y - h * 0.5, w, h);
+    ui.draw.push_clip(g);
+    ui.draw.shadow(src(w * 1.5, h), Corners::round(ui.u(3.0)), (0.0, 0.0), far, fade(m.pool_far, 0.45 * a));
+    ui.draw.shadow(src(w, h * (0.55 / 0.9)), Corners::round(ui.u(2.0)), (0.0, 0.0), near, fade(m.pool, 0.42 * a));
+    ui.draw.pop_clip();
 }
 
 /// The light a side's lamps throw across the glass `g`, from its left (`right` false) or
 /// right edge, centred at height `cy`: a bright pool close to the lamps and a long faint
 /// tail, as Roots' falls off (STYLE.md, "Starfleet").
 fn sf_lamp_light(ui: &mut Ui, g: R, cy: f32, right: bool, a: f32) {
-    let t = ui.theme;
     // On a short panel the two sides' tails would meet and tint the whole glass: each
     // keeps to its own end, so the middle stays smoke.
     let near = ui.u(30.0).min(g.h * 0.45).min(g.w * 0.12);
     let far = ui.u(170.0).min(g.w * 0.28);
     let x = if right { g.right() } else { g.x };
-    let src = |w: f32, h: f32| R::new(x - w * 0.5, cy - h * 0.5, w, h);
-    ui.draw.push_clip(g);
-    ui.draw.shadow(src(ui.u(6.0), g.h * 0.9), Corners::round(ui.u(3.0)), (0.0, 0.0), far, fade(t.accent3, 0.45 * a));
-    ui.draw.shadow(src(ui.u(4.0), g.h * 0.55), Corners::round(ui.u(2.0)), (0.0, 0.0), near, fade(SF_POOL, 0.42 * a));
-    ui.draw.pop_clip();
+    sf_light(ui, g, (x, cy), (ui.u(4.0), g.h * 0.9), near, far, a);
 }
 
-/// A Starfleet panel: a machined rim of metal round smoked glass, two lamps in each
-/// side rim lighting the glass from its ends (STYLE.md).
+/// A machined panel: a rim of metal round glass, lamps in the frame where the look has
+/// them and the panel asks (STYLE.md, "Starfleet").
 fn starfleet_panel(ui: &mut Ui, r: R, lamps: bool) {
     let t = ui.theme;
+    let m = t.machined;
     let h = hair(ui);
-    let side = ui.u(SF_RIM);
+    let side = ui.u(m.rim_w);
     let g = r.inset(side);
     let c = t.px(ui, t.corners);
     let gc = Corners::round(ui.u(3.0));
     ui.draw.shadow(r, c, (0.0, ui.u(4.0)), ui.u(22.0), t.shadow);
-    // The glass: a smoke lighter at the top, a little darker toward the right.
-    ui.draw.fill_v(g, gc, t.panel_top, t.panel);
-    ui.draw.fill_h(g, gc, 0x00000000, 0x30000000);
-    // The lamps' light on it, from both ends; the left the stronger. A panel without
-    // lamps keeps the plain smoke.
-    let cy = libm::roundf(r.y + r.h * 0.5);
-    let lamps = lamps && g.h > ui.u(26.0);
-    if lamps {
-        sf_lamp_light(ui, g, cy, false, 1.0);
-        sf_lamp_light(ui, g, cy, true, 0.65);
+    // The glass: lighter at the top, a little darker toward the right.
+    if m.glass_grain > 0.0 {
+        let gm = Metal { aniso: 1.0, ..sf_metal(ui, m.glass_grain, 0.0) };
+        ui.draw.metal(g, &Shape { corners: gc, ..Shape::default() }, &gm, [t.panel_top, t.panel_top, t.panel, t.panel]);
+    } else {
+        ui.draw.fill_v(g, gc, t.panel_top, t.panel);
     }
-    // The rim: neutral gunmetal, brushed, lit from above.
+    if m.glass_light >> 24 != 0 {
+        let w = (g.w * 0.45).min(ui.u(320.0));
+        ui.draw.push_clip(g);
+        ui.draw.rect_hgrad(R::new(g.x, g.y, w, g.h), m.glass_light, m.glass_light & 0x00ff_ffff);
+        ui.draw.pop_clip();
+    }
+    ui.draw.fill_h(g, gc, 0x00000000, m.shade_right);
+    if m.lines >> 24 != 0 {
+        // The structure's lines: across the glass near its foot and, dimmer, near its
+        // top, clear of the text between, fading toward the middle.
+        for (f, a) in [(0.88, 1.0), (0.12, 0.5)] {
+            let y = libm::roundf(g.y + g.h * f);
+            let lw = ui.u(1.5).max(1.0);
+            let half = g.w * 0.5;
+            let col = fade(m.lines, a);
+            ui.draw.rect_hgrad(R::new(g.x, y, half, lw), col, fade(col, 0.4));
+            ui.draw.rect_hgrad(R::new(g.x + half, y, half, lw), fade(col, 0.4), col);
+        }
+    }
+    // The lamps' light on it. A panel without lamps keeps the plain glass.
+    let cy = libm::roundf(r.y + r.h * 0.5);
+    let lamps = lamps && m.lamps != LampAt::None && m.lamp >> 24 != 0 && g.h > ui.u(26.0);
+    let spacing = ui.u(150.0);
+    let top_lamps = move |g: R| {
+        let n = ((g.w / spacing) as usize).clamp(1, 12);
+        (0..n).map(move |i| g.x + g.w * (i as f32 + 0.5) / n as f32)
+    };
+    if lamps {
+        match m.lamps {
+            LampAt::Sides => {
+                sf_lamp_light(ui, g, cy, false, 1.0);
+                sf_lamp_light(ui, g, cy, true, 0.65);
+            }
+            LampAt::Top => {
+                for x in top_lamps(g) {
+                    sf_light(ui, g, (x, g.y), (ui.u(14.0), ui.u(4.0)), ui.u(20.0).min(g.h * 0.5), ui.u(70.0).min(g.h), 0.9);
+                }
+            }
+            LampAt::Corners => {
+                for (x, a) in [(g.x, 1.0), (g.right(), 0.8)] {
+                    sf_light(ui, g, (x, g.y), (ui.u(10.0), ui.u(10.0)), ui.u(40.0).min(g.w * 0.2), ui.u(150.0).min(g.w * 0.35), a);
+                }
+            }
+            LampAt::Nodes => {
+                sf_light(ui, g, (g.x, g.y), (ui.u(8.0), ui.u(8.0)), ui.u(30.0).min(g.h * 0.6), ui.u(110.0).min(g.w * 0.3), 1.0);
+                sf_light(ui, g, (g.x + g.w * 0.5, g.bottom()), (ui.u(8.0), ui.u(8.0)), ui.u(30.0).min(g.h * 0.6), ui.u(110.0).min(g.w * 0.3), 0.85);
+            }
+            LampAt::None => {}
+        }
+    }
+    // The rim: brushed metal, lit from above.
     let rim_sh = Shape { corners: c, stroke: side + 1.0, ..Shape::default() };
-    let m = sf_metal(ui, 0.10, 0.25);
-    let cols = [0xff3e4042, 0xff3b3d3f, 0xff252629, 0xff27282b];
-    ui.draw.metal(r, &rim_sh, &m, cols);
+    let mm = sf_metal(ui, m.grain, m.sheen);
+    ui.draw.metal(r, &rim_sh, &mm, m.rim);
+    if m.rim_line >> 24 != 0 {
+        let i = side * 0.5;
+        ui.draw.stroke(r.inset(i - h), c.grown(-i + h), (h * 1.5).max(ui.u(1.2)), m.rim_line);
+    }
     // The bevels: a light along the outer top, a dark line round the outside, a dark lip
     // at the glass.
-    ui.draw.stroke_v(r, c, h, 0x60e0e2e6, 0x08e0e2e6);
+    ui.draw.stroke_v(r, c, h, m.bevel, m.bevel & 0x08ff_ffff);
     ui.draw.stroke(r, c, h, 0x70000000);
     let lip = ui.u(2.5).max(h * 2.0);
     // The lip also covers the pixel the rim's stroke reaches past the glass's edge.
-    ui.draw.stroke(g.inset(-lip), gc.grown(lip), lip + h, 0xf0030405);
-    // A seam across the side rims, half way down, where the lamps sit either side.
-    for x in [r.x, r.right() - side] {
-        ui.draw.rect(R::new(x, cy - h, side, h), 0xc0030405);
-        ui.draw.rect(R::new(x, cy, side, h), 0x28e0e2e6);
+    ui.draw.stroke(g.inset(-lip), gc.grown(lip), lip + h, m.lip);
+    if m.seam {
+        // A seam across the side rims, half way down, where the lamps sit either side.
+        for x in [r.x, r.right() - side] {
+            ui.draw.rect(R::new(x, cy - h, side, h), 0xc0030405);
+            ui.draw.rect(R::new(x, cy, side, h), 0x28e0e2e6);
+        }
+    }
+    if m.notch > 0.0 {
+        let step = ui.u(m.notch);
+        let n = ((r.w - 2.0 * side) / step) as usize;
+        for i in 1..=n.min(24) {
+            let x = libm::roundf(r.x + side + (r.w - 2.0 * side) * i as f32 / (n + 1) as f32);
+            for (y, hh) in [(r.y, side), (g.bottom() + lip, side - lip)] {
+                ui.draw.rect(R::new(x - h, y, h * 2.0, hh), 0x90100a20);
+                ui.draw.rect(R::new(x + h, y, h, hh), m.bevel & 0x40ff_ffff);
+            }
+        }
+    }
+    if m.clamps {
+        // Clamps over the top rim: a dark bracket with a light top, two near the left
+        // and one further along.
+        let (cw, ch) = (ui.u(18.0), side + ui.u(3.0));
+        for f in [0.07, 0.13, 0.42] {
+            let x = libm::roundf(r.x + r.w * f);
+            let cr = R::new(x, r.y - ui.u(2.0), cw, ch);
+            ui.draw.fill(cr, Corners::round(ui.u(1.5)), 0xf0141008);
+            ui.draw.stroke_v(cr, Corners::round(ui.u(1.5)), h, m.bevel, 0x00000000);
+        }
     }
     if lamps {
-        let (lw, lh, gap) = (ui.u(3.5), ui.u(7.0).min(g.h * 0.3), ui.u(3.0));
-        for (x, a) in [(g.x - lip - lw, 1.0), (g.right() + lip, 0.85)] {
-            sf_lamp(ui, R::new(x, cy - gap - lh, lw, lh), a);
-            sf_lamp(ui, R::new(x, cy + gap, lw, lh), a);
+        match m.lamps {
+            LampAt::Sides => {
+                let (lw, lh, gap) = (ui.u(3.5), ui.u(7.0).min(g.h * 0.3), ui.u(3.0));
+                for (x, a) in [(g.x - lip - lw, 1.0), (g.right() + lip, 0.85)] {
+                    sf_lamp(ui, R::new(x, cy - gap - lh, lw, lh), a);
+                    sf_lamp(ui, R::new(x, cy + gap, lw, lh), a);
+                }
+            }
+            LampAt::Top => {
+                let (lw, lh) = (ui.u(12.0), ui.u(2.5));
+                for x in top_lamps(g) {
+                    sf_lamp(ui, R::new(x - lw * 0.5, r.y + (side - lh) * 0.5, lw, lh), 0.9);
+                }
+            }
+            LampAt::Corners => {
+                let (lw, lh) = (ui.u(9.0), ui.u(3.0));
+                sf_lamp(ui, R::new(g.x + ui.u(4.0), r.y + (side - lh) * 0.5, lw, lh), 1.0);
+                sf_lamp(ui, R::new(g.right() - ui.u(4.0) - lw, r.y + (side - lh) * 0.5, lw, lh), 0.8);
+            }
+            LampAt::Nodes => {
+                let d = (side * 0.7).max(ui.u(4.0));
+                sf_lamp(ui, R::new(r.x + (side - d) * 0.5, r.y + (side - d) * 0.5, d, d), 1.0);
+                sf_lamp(ui, R::new(g.x + g.w * 0.5 - d * 0.5, r.bottom() - side + (side - d) * 0.5, d, d), 0.85);
+            }
+            LampAt::None => {}
         }
+    }
+}
+
+/// Starfleet's button (the user's call, 2026-11-07): a near-black plate with a dark grey
+/// edge and its label in the lamps' blue (`button_frame`), which blooms on hover
+/// (`button`); pressed goes a shade bluer, on puts a lamp along its foot.
+fn starfleet_dark_button(ui: &mut Ui, r: R, c: Corners, st: State) {
+    let t = ui.theme;
+    let h = hair(ui);
+    let lit = if st.off { 0.0 } else { st.hot.max(if st.down { 1.0 } else { 0.0 }) };
+    if lit > 0.01 {
+        ui.draw.glow(r, c, ui.u(t.glow), fade(t.accent3, 0.45 * lit));
+    }
+    let (top, bot) = if st.down {
+        (t.button_down, t.button_down)
+    } else if st.on {
+        (t.button_on, mix(t.button_on, t.button, 0.5))
+    } else {
+        (mix(t.button_top, t.button_hot, st.hot), mix(t.button, t.button_hot, st.hot))
+    };
+    let (top, bot) = if st.off { (t.button_off, t.button_off) } else { (top, bot) };
+    ui.draw.fill_v(r, c, top, bot);
+    if !st.down {
+        ui.draw.stroke_v(r.inset(h), c.grown(-h), h, 0x14ffffff, 0x00ffffff);
+    }
+    let edge = if st.off { fade(t.button_edge, 0.5) } else { mix(t.button_edge, t.accent, 0.55 * lit) };
+    ui.draw.stroke(r, c, ui.u(1.2).max(h), edge);
+    if st.on && !st.down {
+        let b = R::new(r.x + r.w * 0.22, r.bottom() - ui.u(4.0), r.w * 0.56, ui.u(2.0).max(1.0));
+        ui.draw.glow(b, Corners::SQUARE, ui.u(7.0), fade(t.accent, 0.6));
+        ui.draw.rect(b, mix(t.machined.lamp, 0xffffffff, 0.2));
     }
 }
 
@@ -955,6 +1547,9 @@ fn starfleet_panel(ui: &mut Ui, r: R, lamps: bool) {
 /// (STYLE.md); hover lights it blue from inside, on puts a lamp along its foot.
 fn starfleet_button(ui: &mut Ui, r: R, c: Corners, st: State) {
     let t = ui.theme;
+    if t.form == Form::Starfleet {
+        return starfleet_dark_button(ui, r, c, st);
+    }
     let h = hair(ui);
     let lit = if st.off { 0.0 } else { st.hot.max(if st.down { 1.0 } else { 0.0 }) };
     if !st.off && st.hot > 0.01 {
@@ -980,7 +1575,8 @@ fn starfleet_button(ui: &mut Ui, r: R, c: Corners, st: State) {
     if st.on && !st.down {
         let b = R::new(r.x + r.w * 0.22, r.bottom() - ui.u(4.0), r.w * 0.56, ui.u(2.0).max(1.0));
         ui.draw.glow(b, Corners::SQUARE, ui.u(7.0), fade(t.accent, 0.6));
-        ui.draw.rect(b, mix(SF_LAMP, 0xffffffff, 0.2));
+        let lamp = if t.machined.lamp >> 24 != 0 { t.machined.lamp } else { t.accent };
+        ui.draw.rect(b, mix(lamp, 0xffffffff, 0.2));
     }
 }
 
@@ -1106,8 +1702,24 @@ pub fn button(ui: &mut Ui, r: R, label: &str, st: State) {
         let p = r.h * 0.5;
         ui.text_in(R::new(r.x + p, r.y, r.w - 2.0 * p, r.h), &label, t.text_size, Align::Right, text, Weight::Bold);
     } else {
-        ui.text_in(R::new(r.x, r.y + nudge, r.w, r.h), &label, t.text_size, Align::Centre, text, Weight::Bold);
+        let lr = R::new(r.x, r.y + nudge, r.w, r.h);
+        let lit = if st.off { 0.0 } else { st.hot.max(if st.down { 1.0 } else { 0.0 }) };
+        if t.form == Form::Starfleet && lit > 0.01 {
+            // Starfleet's labels bloom on hover: a soft halo in the lamps' blue.
+            label_glow(ui, lr, &label, t.text_size, fade(t.accent, 0.6 * lit));
+        }
+        ui.text_in(lr, &label, t.text_size, Align::Centre, text, Weight::Bold);
     }
+}
+
+/// A soft halo under a bold label centred in `r` (where `Ui::text_in` puts it): a
+/// button label's bloom.
+pub fn label_glow(ui: &mut Ui, r: R, s: &str, size: f32, c: Color) {
+    let px = ui.u(size);
+    let (tw, th) = crate::text::measure_with(crate::text::font_bold(), s, px);
+    let (x, y) = (libm::roundf(r.x + (r.w - tw) * 0.5), libm::roundf(r.y + (r.h - th) * 0.5));
+    let reach = ui.u(5.0);
+    ui.draw.text_glow(s, px, x, y, c, Weight::Bold, reach);
 }
 
 /// The corners a button of the theme has, in pixels, for `r`.
@@ -1132,7 +1744,7 @@ pub fn button_frame(ui: &mut Ui, r: R, st: State) -> Color {
     } else {
         mix(t.button, t.button_hot, st.hot)
     };
-    if t.form == Form::Starfleet {
+    if t.form.machined() {
         starfleet_button(ui, r, c, st);
     } else if lcars {
         ui.draw.fill(r, c, base);
@@ -1161,7 +1773,17 @@ pub fn button_frame(ui: &mut Ui, r: R, st: State) -> Color {
             ui.draw.fill(R::new(r.x + inset, r.y + r.h * 0.28, bw, r.h * 0.44), Corners::round(bw * 0.5), t.accent);
         }
     }
-    let text = if st.off {
+    let text = if t.form == Form::Starfleet {
+        // Starfleet's dark buttons carry their label in the lamps' blue, brighter on
+        // hover and pressed.
+        if st.off {
+            t.text_off
+        } else if st.down {
+            mix(t.accent, 0xffffffff, 0.6)
+        } else {
+            mix(t.accent, mix(t.accent, 0xffffffff, 0.45), st.hot.max(if st.on { 0.4 } else { 0.0 }))
+        }
+    } else if st.off {
         if lcars { fade(t.text_on, 0.6) } else { t.text_off }
     } else if lcars || st.down {
         if lcars { t.text_on } else { 0xffffffff }
@@ -1297,7 +1919,7 @@ pub fn slider(ui: &mut Ui, r: R, f: f32, st: State) {
         Form::Cube => (k * 0.8, Corners::SQUARE),
         Form::Organic => (k, Corners::round(k * 0.5)),
         Form::Shell => (k, Corners::cut(k * 0.28)),
-        Form::Starfleet => (k * 0.6, Corners::round(k * 0.18)),
+        Form::Starfleet | Form::Machine(_) => (k * 0.6, Corners::round(k * 0.18)),
     };
     let kr = R::new(libm::roundf(kx - kw * 0.5), libm::roundf(r.y + (r.h - k) * 0.5), kw, k);
     if !st.off && (st.hot > 0.01 || st.down) && t.form != Form::Lcars {

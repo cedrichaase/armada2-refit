@@ -4,13 +4,16 @@ Resolutions: 1280x960, 3440x1440
 Mod: refit
 Layers: display asiloader render3d qol ui
 Overlay: UI.Menus:Forms=1 UI.Menus:Enable=1 UI.Menus:Scene=1 UI.Menus:Credits=1 UI.UI:Cursor=1 UI.HUD:Minimap=1 UI.HUD:Info=1 UI.HUD:UnitView=1 UI.HUD:Tooltips=1 UI.HUD:Bar=1 UI.HUD:BarLabels=1 QOL.QOL:BarKeys=1
+Setup: testbench/bench/roots-licence.sh
 Timeout: 12 min
 
 Run with `a2test --game fo-roots` and `--install .` (PLAN-FLEETOPS.md, decision 504). In the
 map editor Roots draws its own menu ("Edit Menu", the team line, F1 to F9 and "Navigate with
 TAB and F keys") in the top-right corner, under where our top-right buttons stand; the
 heading was covered. In the editor (`UserProfile+0x84`) the buttons stand beside the resource
-strip at the top left instead. The overlay is the user's own. Every click is by a label.
+strip at the top left instead. The overlay is the user's own. The editor shows its licence on the first start only and a clone
+inherits the install's `AgreedLicense`, so `Setup:` puts it back to False
+(`testbench/bench/roots-licence.sh`). Every click is by a label.
 
 1. Launch the game.
 2. Wait up to 180 seconds for "UI.log" to say "forms: TMainForm is ours".

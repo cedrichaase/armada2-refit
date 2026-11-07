@@ -442,8 +442,11 @@ it the stock tooltip and click. So the grid **moves the stock buttons onto its c
 - **More than fifteen buttons** (Roots' bar holds 64): the buttons the plan has no cell for
   go in columns of three to the right of the keyed block, after a line, without keys; the
   cells shrink when the grid would run off the screen.
-- **Keys.** The W cell has no key on Roots (`bk_key_cells` in QOL's profile): Roots' key map
-  gives plain W to `select_next_ship`, which the overview reads, not the bar. Roots' other
+- **Keys.** The W cell has no key on Roots (`bk_key_cells` in QOL's profile) and the grid puts
+  no button there (`[Bar] GameKeys` of the content set, decision 347): Roots' key map gives
+  plain W to `select_next_ship`, which Roots reworked to select the damaged ships of the
+  selection (so it empties a shipyard's) and which the overview reads before the bar. Every
+  button therefore sits under a key that presses it. Roots' other
   bindings on the fifteen letters are the bar's hotkey tables, which QOL empties around the
   stock step as on Armada II. While the keys are on, the tooltips of ours (`HUD.Tooltips=1`)
   drop Roots' `(Hotkey: X)` note over the grid; the cell's badge names the key.
@@ -1346,7 +1349,7 @@ not the layout log is on); a message whose rows would touch one is centred acros
 at the same height, and if it still touches one, put just below it. UI.log says
 `overlay: #<n> moved clear of the panels of ours, to x,y`. On Armada II the resource strip
 is at the top centre and the intro's lines are centred lower down, so nothing there moves
-unless it would have overlapped. `fo-ui-overlay`.
+unless it would have overlapped. `fo-ui-overlay`. With `Hover=1` (Roots) the status line's band (canvas 600..1000 x 45..125) counts as taken too, so the mission timer (*Politics by Other Means*, at 50,85) sits below it and never under the line (decision 470; `fo-ui-timer-hover`).
 
 ### The trade status and the team message (not components)
 

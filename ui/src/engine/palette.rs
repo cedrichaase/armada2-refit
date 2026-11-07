@@ -424,6 +424,7 @@ pub fn log_measure() {
     }
     let owner = super::hud::cursor_owner();
     let on_bar = owner == p;
+    let mp: [i32; 2] = { let a = eng().addr(sym::HUD_MOUSE_POS); if a == 0 { [0, 0] } else { unsafe { rd(a) } } };
     fnv(&mut hsig, hover as u64);
     fnv(&mut hsig, pressed as u64);
     fnv(&mut hsig, on_bar as u64);
@@ -462,11 +463,14 @@ pub fn log_measure() {
                     let d = describe(b);
                     let rc: [i32; 4] = rd(b + field::PALETTE_BTN_RECT());
                     crate::log!(
-                        "bar: hover slot {} {:?} {} state={} pressed={} rect=[{},{},{},{}] pointer owner: {} (button owner {:#x})",
-                        i, d.kind, d.name, state(b), pressed != usize::MAX, rc[0], rc[1], rc[2], rc[3], who, peek(b, field::PALETTE_BTN_OWNER())
+                        "bar: hover slot {} {:?} {} state={} pressed={} rect=[{},{},{},{}] pointer owner: {} (button owner {:#x}; the game's pointer at {},{} canvas)",
+                        i, d.kind, d.name, state(b), pressed != usize::MAX, rc[0], rc[1], rc[2], rc[3], who, peek(b, field::PALETTE_BTN_OWNER()), mp[0], mp[1]
                     );
                 }
-                None => crate::log!("bar: hover none, pressed={} pointer owner: {}", pressed != usize::MAX, who),
+                None => {
+                    let ui = crate::input::state().mouse.map_or(String::from("outside"), |(x, y)| crate::sfmt!("{},{} px", x as i32, y as i32));
+                    crate::log!("bar: hover none, pressed={} pointer owner: {} (the game's pointer at {},{} canvas; the window's at {})", pressed != usize::MAX, who, mp[0], mp[1], ui)
+                }
             }
         }
     }

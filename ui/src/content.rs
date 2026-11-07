@@ -210,9 +210,21 @@ pub struct Content {
     pub glyphs: &'static [(u8, &'static str)],
     /// The game's own info panel's layout (`[InfoPanel]`), empty where the UI lays it out.
     pub info: InfoLayout,
+    /// The bar's position keys (`QWERTASDFGZXCVB`) the game's own key map gives to an action of
+    /// its own (`[Bar] GameKeys`; Roots: W, its `select_next_ship`, reworked to select the damaged
+    /// ships of the selection, which empties a shipyard's). The grid leaves those cells empty in
+    /// every menu, so no button sits under a key that does not press it (`hud::bar`,
+    /// PLAN-FLEETOPS.md decision 347).
+    pub bar_game_keys: &'static str,
     /// `[Loading] Bar`: the loading screen's bar when `[Loading] Bar=` in UI.ini is empty
     /// (`panel`: a square bar in a thin box; empty: the classic one).
     pub loading_bar: &'static str,
+    /// `[Looks] Menus`: the look (`widgets::theme::Form::from_id`) of the front end's
+    /// screens and menus with `[UI] Theme=auto`; empty: the shell's.
+    pub menus_look: &'static str,
+    /// `[Looks] MissionMenus`: the look of the menus over a running mission: `race` (the
+    /// HUD's race's look), a look's id, or empty (as the front end's).
+    pub mission_menus_look: &'static str,
 }
 
 /// A build with no content set for the UI.
@@ -230,7 +242,10 @@ pub static NONE: Content = Content {
     gallery_factions: &[],
     glyphs: &[],
     info: InfoLayout { size: [0.0, 0.0], min_width: 0.0, lamps: false, elements: &[], numbers: &[], names: &[] },
+    bar_game_keys: "",
     loading_bar: "",
+    menus_look: "",
+    mission_menus_look: "",
 };
 
 /// A name as the engine's C string, made once and kept for the plugin's life.
@@ -314,6 +329,7 @@ pub fn parse(text: &'static str) -> Content {
         },
         gallery_ships: t.list("Gallery", "Ships").leak(),
         gallery_factions: t.list("Gallery", "Factions").leak(),
+        bar_game_keys: t.str("Bar", "GameKeys"),
         glyphs: t
             .entries("Glyphs")
             .iter()
@@ -322,6 +338,8 @@ pub fn parse(text: &'static str) -> Content {
             .leak(),
         info: info_layout(&t),
         loading_bar: t.str("Loading", "Bar").trim(),
+        menus_look: t.str("Looks", "Menus").trim(),
+        mission_menus_look: t.str("Looks", "MissionMenus").trim(),
     }
 }
 

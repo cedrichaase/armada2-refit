@@ -4,6 +4,7 @@ Resolutions: 1280x960
 Mod: refit
 Layers: display asiloader render3d qol ui
 Overlay: UI.Menus:Forms=1 UI.Menus:Enable=1 UI.Menus:Scene=1 UI.Menus:Credits=1 UI.UI:Cursor=1 UI.HUD:Minimap=1 UI.HUD:Info=1 UI.HUD:UnitView=1 UI.HUD:Tooltips=1 UI.HUD:Bar=1 UI.HUD:BarLabels=1 QOL.QOL:BarKeys=1
+Setup: testbench/bench/roots-licence.sh
 Timeout: 15 min
 
 Run with `a2test --game fo-roots` and `--install .`. The user's report of 2026-11-07: after

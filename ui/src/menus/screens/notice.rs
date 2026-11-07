@@ -43,17 +43,34 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
 /// one, `menus::roots_dialogs`): titled `name`, the text wrapped, and `n` buttons in a
 /// row at its foot, each drawn by `button` in its rectangle.
 pub fn notice_window(ui: &mut Ui, name: &str, text: &str, n: usize, button: &mut dyn FnMut(&mut Ui, usize, R)) {
+    notice_window_icon(ui, name, text, None, 620.0, n, button);
+}
+
+/// The size of a notice's icon, in units.
+pub const ICON: f32 = 44.0;
+
+/// As `notice_window`, `w` units wide, with a picture (a `Tex` over the whole texture, drawn
+/// `ICON` units square) beside the text, which is wrapped to what is left of the width and
+/// centred on the picture's height when it is shorter.
+pub fn notice_window_icon(ui: &mut Ui, name: &str, text: &str, icon: Option<crate::gfx::Tex>, w: f32, n: usize, button: &mut dyn FnMut(&mut Ui, usize, R)) {
     let t = ui.theme;
-    let w = 620.0;
-    let inner_w = ui.u(w - 2.0 * t.pad - 40.0);
+    let gap = if icon.is_some() { ICON + 16.0 } else { 0.0 };
+    let inner_w = ui.u(w - 2.0 * t.pad - 40.0 - gap);
     let size = ui.u(t.text_size + 2.0);
     let (_, th) = crate::text::measure_wrapped(crate::text::font(), text, size, inner_w);
-    let h = (th / ui.scale + 70.0 + 2.0 * t.pad + 48.0 + 44.0).max(240.0);
+    let body_h = (th / ui.scale).max(if icon.is_some() { ICON } else { 0.0 });
+    let h = (body_h + 70.0 + 2.0 * t.pad + 48.0 + 44.0).max(if icon.is_some() { 200.0 } else { 240.0 });
     let r = Anchor::Centre.place(ui.screen(), ui.u(w), ui.u(h), 0.0);
     let inner = ui.window(r, name);
     let (body_r, foot) = inner.take_top(inner.h - ui.u(44.0 + 12.0));
     let tx = body_r.inset(ui.u(20.0));
-    ui.draw.text_wrapped(text, size, tx.w, tx.x, tx.y + ui.u(8.0), t.text, Weight::Regular);
+    let top = tx.y + ui.u(8.0);
+    if let Some(tex) = icon {
+        let ir = R::new(tx.x, top, ui.u(ICON), ui.u(ICON));
+        ui.draw.image(tex, ir, 0xff_ff_ff_ff);
+    }
+    let ty = top + (ui.u(body_h) - th).max(0.0) * 0.5;
+    ui.draw.text_wrapped(text, size, inner_w, tx.x + ui.u(gap), ty, t.text, Weight::Regular);
 
     let nf = n.max(1) as f32;
     let (bw, gap) = (ui.u(180.0), ui.u(24.0));
