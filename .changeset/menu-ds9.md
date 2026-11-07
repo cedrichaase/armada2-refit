@@ -1,6 +1,7 @@
 ---
 layers: [render3d]
 bump: minor
+status: Confirmed in game 2026-11-07
 ---
 
 ### Added
