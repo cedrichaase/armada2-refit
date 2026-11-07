@@ -1148,15 +1148,21 @@ a host of their own, `engine/forms.rs` (drawn by `menus/roots.rs`):
   `main` view and every other form and dialog over the view last shown. The `fleetops`
   set names only `Main` in `[Scenes]` (Roots' campaigns are not the stock four, so no
   campaign view is chosen). The screens' backdrop is then the scene, dimmed
-  (`theme::backdrop`), as on stock; without render3d it is the gradient as before.
+  (`theme::backdrop`), as on stock, but under the main menu, which shades only its column;
+without render3d, or when it draws nothing, it is the gradient as before. render3d draws the
+`fleetops` set's own map there (DS9 and the Defiant: render3d/README.md, "The menu scene").
 
-The screens: the main menu and Options are a column of our buttons in the form's on-screen
-order, each labelled with the caption Roots set on it and pressed at its own rectangle, so
+The screens: the main menu is Armada II's main menu over the scene (decisions 205 and 206:
+`screens::main_menu::scene_column`, the same function Armada II's spec draws with, titled
+FLEET OPERATIONS over ROOTS, the entries as text in capitals down the left, no window, the
+scene showing through); Options is a window with a column of our buttons. Both take the
+form's visible buttons in their on-screen order, each labelled with the caption Roots set on
+it and pressed at its own rectangle, so
 a button is what the player sees whatever its field is called (on Roots' main menu the
 field named for Options reads "Map Editor" and runs the map editor, and the one named for
 the map editor reads "Options"; decision 204). Options' Back, which Roots binds when the
-form opens, stands at the window's foot, and the main menu's version line at the bottom
-right. Yes/No draws the form's picture (Roots draws the
+form opens, stands at the window's foot, and the main menu's version line (Roots' `labelVersion`) at
+the bottom right, small and dim, as Armada II's version. Yes/No draws the form's picture (Roots draws the
 question into it) under our two buttons, where the form sits over the screen that asked;
 every other form is generic (`Generic=widgets` in Roots' defaults). The in-mission Options
 stands over the mission's last frame, as the stock host's in-mission menus do.

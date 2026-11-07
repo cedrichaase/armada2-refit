@@ -101,7 +101,8 @@ pub fn frame(ui: &mut Ui) {
     }
     let (mut dw, mut dh) = forms::design();
     if dw <= 0 || dh <= 0 {
-        (dw, dh) = view.last().map_or((1200, 900), |f| f.size);
+        let Some(f) = view.last() else { return };
+        (dw, dh) = f.size;
     }
     let s = (ui.w / dw as f32).min(ui.h / dh as f32);
     let fit = Fit { x: libm::floorf((ui.w - dw as f32 * s) * 0.5), y: libm::floorf((ui.h - dh as f32 * s) * 0.5), s };
