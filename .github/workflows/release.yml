@@ -1,6 +1,6 @@
 # Releasing (publish/README.md, "Releasing"). The one manual step: run this from the
-# Actions tab. It runs tools/changeset.py version --commit on main: every pending
-# changeset consumed, each layer's version, changelog entry and version files written,
+# Actions tab. It runs tools/changeset.py version --game armada2 --commit on main: every
+# pending changeset of Armada II's track consumed, each layer's version, changelog entry and version files written,
 # the root entry listing the layer versions it bundles, committed as "Release X.Y.Z" with
 # the trailer "Release-Version: X.Y.Z". It pushes that to the branch release/next and
 # opens (or updates) the pull request "Release X.Y.Z", whose CI it starts. Review it
@@ -39,31 +39,34 @@ jobs:
           fetch-depth: 0   # the commit that added each changeset is cited in its entry
       - name: What the release bumps (tools/changeset.py status)
         run: |
+          # Armada II's track: the version files and the published changelogs. Another
+          # game's track is released by hand (.changeset/README.md, "Games"). status.md
+          # lives outside the checkout, so `version --commit` (git add -A) cannot take it in.
           python3 tools/changeset.py check
-          python3 tools/changeset.py status
-          python3 tools/changeset.py status --markdown > status.md
-          cat status.md >> "$GITHUB_STEP_SUMMARY"
+          python3 tools/changeset.py status --game armada2
+          python3 tools/changeset.py status --game armada2 --markdown > "$RUNNER_TEMP/status.md"
+          cat "$RUNNER_TEMP/status.md" >> "$GITHUB_STEP_SUMMARY"
       - name: Version, commit to release/next, open the pull request
         run: |
-          if [ -z "$(python3 tools/changeset.py status --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["changesets"] and 1 or "")')" ]; then
+          if [ -z "$(python3 tools/changeset.py status --game armada2 --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["changesets"] and 1 or "")')" ]; then
             echo "::error::no pending changesets: nothing to release"; exit 1
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git switch -C release/next
-          python3 tools/changeset.py version --commit --date "$(date -u +%Y-%m-%d)"
+          python3 tools/changeset.py version --game armada2 --commit --date "$(date -u +%Y-%m-%d)"
           ver=$(sed -n 's/^## \([0-9][0-9.]*\) .*/\1/p' CHANGELOG.md | head -1)
           git push -f origin release/next
           {
             printf 'The release of the pending changesets, made by `tools/changeset.py version` (the Release workflow, step prepare).\n\n'
-            cat status.md
+            cat "$RUNNER_TEMP/status.md"
             printf '\n**Before merging**: read the entries. A status line edited here ("Confirmed in game YYYY-MM-DD" in place of "Installed, not yet seen in game") decides whether v%s is a full release or an untested release.\n\n' "$ver"
             printf '**Merging publishes v%s.** Merge with a merge commit or rebase; do not squash: a squash drops the `Release-Version` trailer CI publishes on, and CI then fails and publishes nothing.\n' "$ver"
-          } > body.md
+          } > "$RUNNER_TEMP/body.md"
           if [ -n "$(gh pr list --head release/next --state open --json number --jq '.[].number')" ]; then
-            gh pr edit release/next --title "Release $ver" --body-file body.md
+            gh pr edit release/next --title "Release $ver" --body-file "$RUNNER_TEMP/body.md"
           else
-            gh pr create --base main --head release/next --title "Release $ver" --body-file body.md
+            gh pr create --base main --head release/next --title "Release $ver" --body-file "$RUNNER_TEMP/body.md"
           fi
           # A pull request opened with the workflow's token starts no workflow, so CI is
           # dispatched on the branch by hand.

@@ -82,7 +82,7 @@ jobs:
             [ "$HEAD_REF" = release/next ] && args+=(--allow-version-change)
           fi
           python3 tools/changeset.py check "${args[@]}"
-          python3 tools/changeset.py status
+          python3 tools/changeset.py status --game armada2
 
   # render3d builds Render3D.asi from Rust (no_std, i686-pc-windows-msvc, lld-link) and
   # tests its asset readers on the host (the tests that need a game install skip).
@@ -831,7 +831,7 @@ jobs:
               "$short" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$(date -u +%Y-%m-%d)"
             printf 'Nothing in it has been seen in game: it is for testing, and for players who want to live on the edge. '
             printf 'The GUI installer offers the newest as *Pre-release (latest main)*, never by default; any release takes you back.\n\n'
-            python3 tools/changeset.py status --markdown
+            python3 tools/changeset.py status --game armada2 --markdown
           } > notes.md
           gh release create "$tag" "dist/$zip" dist/armada2-refit-installer.py \
             dist/armada2-refit-installer-x86_64.AppImage dist/armada2-refit-installer-windows.exe \

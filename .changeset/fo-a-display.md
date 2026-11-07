@@ -1,6 +1,7 @@
 ---
 root: minor
 display: minor
+games: [fo-roots]
 status: Untested: seen on the bench only (Fleet Operations: Roots on Vulkan, shell and a skirmish); stock 1.1 unchanged
 ---
 

@@ -1,6 +1,7 @@
 ---
 layers: [display]
 bump: patch
+games: [fo-roots]
 ---
 
 ### Fixed

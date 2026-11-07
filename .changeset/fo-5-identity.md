@@ -8,6 +8,7 @@ rules: patch
 online: patch
 cutscenes: patch
 testbench: patch
+games: [fo-roots]
 status: Installed, not yet seen in game
 ---
 

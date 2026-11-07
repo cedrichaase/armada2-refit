@@ -26,6 +26,15 @@ Roots ships none of (`asiloader`, `winmm.dll`; `asiloader/README.md`) and render
 QOL, rules, online, textures or cutscenes yet. a2mod files each layer's files only for the
 games in the layer's `games`.
 
+## Versions and changelogs
+
+Each game has its own version track (`.changeset/README.md`, "Games"): a changeset names
+its games (`games: [armada2]`). The default game's track is the layers' `CHANGELOG.md`
+files, the root `CHANGELOG.md` and the version files; every other game's is one file,
+`games/<id>/CHANGELOG.md`, written by `tools/changeset.py version --game <id>` by hand
+and never released on GitHub. Nothing else lives in `games/<id>/`; the tools read only
+`games/*.toml` as descriptors.
+
 ## Choosing a game
 
 `A2_PROFILE=<id>` (the environment, or a top-level line of
@@ -69,6 +78,7 @@ Top-level `A2_GAME` and `A2_PREFIX` are the default game's; top-level `A2_HEROIC
 | `files.sod`, `files.sprites`, `files.odf` | the folders of models, sprite tables and ODFs | render3d ("Files") |
 | `files.archives` | archives searched behind the folders, `{ kind = "fpq" \| "zfs", file, at }` | `tools/layers.py --check`; their readers come with FO-5 and A1-11 |
 | `paths.stem` | the data directory's name (`A2_DATA`'s default); shared by the games | `a2env.py` |
+| `changesets.quiet` | optional: words a changeset on an offered game's track never holds, besides the id and label (a game not offered) | `tools/changeset.py check` |
 
 `tools/layers.py --check` holds them together: every field present and typed, one
 default, every `layers.toml` `games` entry naming a descriptor, every descriptor's layers

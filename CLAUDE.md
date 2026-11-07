@@ -149,6 +149,13 @@ The release assigns the numbers (`.changeset/README.md` has the format).
     python3 tools/changeset.py add --layers render3d,qol --bump minor --section Added -m "..."
     python3 tools/changeset.py status      # each layer's current -> next version, and why
 
+**Each game has its own version track.** A changeset names its games (`games: [armada2]`,
+the default of `add`; `--games armada2,fo-roots`). Armada II's track is the version files
+and the published changelogs; another game's is only `games/<id>/CHANGELOG.md`, written by
+hand with `changeset.py version --game <id>`. A changeset on Armada II's track never names
+a game that is not offered (`check` fails): word it neutrally, or split off a changeset
+for that game alone (`.changeset/README.md`, "Games").
+
 **A commit that changes a layer adds a changeset in the same commit**, or edits the
 branch's changeset for that work. A changeset written "later" gets forgotten. Do not touch
 a `## X.Y.Z` heading, a `Cargo.toml` version or `INSTALLER_VERSION`.

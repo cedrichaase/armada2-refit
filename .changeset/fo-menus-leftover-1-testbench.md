@@ -1,6 +1,7 @@
 ---
 layers: [testbench]
 bump: patch
+games: [fo-roots]
 ---
 
 ### Added

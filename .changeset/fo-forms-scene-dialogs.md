@@ -2,6 +2,7 @@
 layers: [ui, testbench]
 bump: patch
 ui: minor
+games: [fo-roots]
 ---
 
 ### Added

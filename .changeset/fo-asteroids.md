@@ -1,6 +1,7 @@
 ---
 layers: [render3d, testbench]
 bump: patch
+games: [fo-roots]
 status: Installed, not yet seen in game
 ---
 

@@ -7,6 +7,7 @@ qol: patch
 rules: patch
 online: patch
 cutscenes: patch
+games: [fo-roots]
 status: Untested: Fleet Operations: Roots is not offered; stock 1.1 resolves as before (103/103 hooks)
 ---
 

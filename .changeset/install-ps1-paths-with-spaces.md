@@ -1,6 +1,7 @@
 ---
 layers: [root]
 bump: patch
+games: [armada2]
 status: Untested: not yet past the Windows gate
 ---
 

@@ -271,9 +271,10 @@ version changed by hand included.
    current → next version and the changesets behind each bump. CI prints the same, and
    every pre-release's notes list them.
 2. **Prepare**: Actions → **Release** → *Run workflow* (`.github/workflows/release.yml`).
-   It runs `tools/changeset.py version --commit` on `main`. That writes each layer's
-   entry and version files and the root entry with its `Layers:` line, deletes the
-   changesets, and commits it all as "Release X.Y.Z" with the trailer
+   It runs `tools/changeset.py version --game armada2 --commit` on `main`. That writes
+   each layer's entry and version files and the root entry with its `Layers:` line from
+   the changesets naming Armada II, consumes them (`.changeset/README.md`, "Games": a
+   changeset that names another game too stays, for that game's track), and commits it all as "Release X.Y.Z" with the trailer
    `Release-Version: X.Y.Z`. The workflow pushes that to the branch `release/next`, opens
    (or updates) the pull request **"Release X.Y.Z"**, and dispatches CI on it, since a
    pull request opened with the workflow's own token starts no workflow. Running it again
@@ -302,6 +303,11 @@ create and approve pull requests*, which is on.
 **Locally**, the same: `python3 tools/changeset.py version --commit` on a branch from
 `main` (`--dry-run` shows the plan first), then `git merge --no-ff` it into `main` and
 push.
+
+**Another game's track** is never released here: `tools/changeset.py version --game
+<id>` (by hand, no `--commit`) writes only `games/<id>/CHANGELOG.md`, committed like any
+change. The release notes, the release PR and the pre-releases' notes are Armada II's
+track alone (`--game armada2`).
 
 ### Pre-releases: the latest main
 

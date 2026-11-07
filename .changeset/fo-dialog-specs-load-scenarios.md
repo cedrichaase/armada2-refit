@@ -1,6 +1,7 @@
 ---
 layers: [testbench]
 bump: minor
+games: [fo-roots]
 status: none
 ---
 

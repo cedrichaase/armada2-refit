@@ -80,3 +80,11 @@ mods = { dir = "Mods", switches = ["-mod", "/mod"] }
 [paths]
 # $A2_DATA stays shared between the games (PLAN-ARMADA1.md).
 stem = "armada2-refit"
+
+[changesets]
+# Not offered, so never named on a published track: `tools/changeset.py check` fails on a
+# changeset whose games include an offered game and whose text holds one of these (or the
+# id or label), case-sensitively from the start of a word. Such a change is worded
+# without them, or split off into a changeset with `games: [fo-roots]`
+# (.changeset/README.md, "Games").
+quiet = ["Roots", "Fleet Op", "FO-", "ArmadaL", "FLEETOPS", "DxWrapper"]
