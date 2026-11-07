@@ -117,9 +117,10 @@ and the amber `accent2` are the shell's and Roots'.
 
 **Which panels carry lamps** is the panel's own choice, not the theme's guess from where
 it sits: `theme::panel_as(ui, r, Lamps::On)` (`Ui::panel_lit`) draws them, `panel`
-(`Lamps::Off`) does not, and the forms other than Starfleet ignore it. Lamps, as on
-Roots, only where Roots has them: **the info panel** (`hud/info.rs`, one unit and a
-group). No lamps: the minimap, the top-right buttons, the resource strip, the bar's
+(`Lamps::Off`) does not, and the forms other than Starfleet ignore it. Lamps on
+**the info panel** (`hud/info.rs`, one unit and a group), where Roots has them, and
+**the resource strip** (`hud/resources.rs`), which Roots draws with no frame: the user
+wants them there (2026-11-07). No lamps: the minimap, the top-right buttons, the bar's
 grid, the pause, trade, replay and leftover boxes, the hover card, the menus and the
 Refit screen. (On Roots the info strip is Roots' own while `Info` leaves it to the
 game, so a Federation HUD of ours may show no lamp at all; that is Roots' look.)
