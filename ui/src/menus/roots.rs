@@ -14,6 +14,7 @@
 //! ours is a posted click at the control's centre; nothing writes a setting.
 mod graphics;
 mod kit;
+mod sound;
 mod specs;
 
 use crate::engine::api::forms::{self, Action, Control, Dialog, Form, Kind};

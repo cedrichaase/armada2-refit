@@ -142,8 +142,8 @@ pub struct Control {
     /// A check box's state, read from its published `Checked` (None: not a check box, or
     /// its class reads it through a method).
     pub checked: Option<bool>,
-    /// A slider's published `Value`, `MinValue` and `MaxValue` (None as above).
-    pub value: Option<(i32, i32, i32)>,
+    /// A slider's published `Value`, `MinValue`, `MaxValue` and `Increment` (None as above).
+    pub value: Option<(i32, i32, i32, i32)>,
 }
 
 /// A form as the UI draws it: its class, where it sits in the design space (the
@@ -845,7 +845,7 @@ static mut PROPS_LOGGED: Vec<String> = Vec::new();
 
 /// A check box's and a slider's state, from their published properties (read only,
 /// `forms_props.rs`); the class's table is logged once.
-fn state_of(c: usize, vmt: usize, class: &str) -> (Option<bool>, Option<(i32, i32, i32)>) {
+fn state_of(c: usize, vmt: usize, class: &str) -> (Option<bool>, Option<(i32, i32, i32, i32)>) {
     let check = derives(vmt, "TJvgCheckBox");
     let slider = derives(vmt, "TJvxSlider");
     if !check && !slider {
@@ -869,8 +869,9 @@ fn state_of(c: usize, vmt: usize, class: &str) -> (Option<bool>, Option<(i32, i3
         let v = forms_props::field_of(c, &props, "Value", 4);
         let lo = forms_props::field_of(c, &props, "MinValue", 4);
         let hi = forms_props::field_of(c, &props, "MaxValue", 4);
+        let inc = forms_props::field_of(c, &props, "Increment", 4).unwrap_or(1).max(1);
         match (v, lo, hi) {
-            (Some(v), Some(lo), Some(hi)) => Some((v, lo, hi)),
+            (Some(v), Some(lo), Some(hi)) => Some((v, lo, hi, inc)),
             _ => None,
         }
     } else {
@@ -889,7 +890,7 @@ fn log_controls(t: &Tracked, v: &[Control]) {
             if c.items.is_empty() { String::new() } else { crate::sfmt!(" ({} items, {} chosen)", c.items.len(), c.selected) },
             match (c.checked, c.value) {
                 (Some(k), _) => crate::sfmt!(" checked {}", k),
-                (_, Some((v, lo, hi))) => crate::sfmt!(" value {} of {}..{}", v, lo, hi),
+                (_, Some((v, lo, hi, inc))) => crate::sfmt!(" value {} of {}..{} step {}", v, lo, hi, inc),
                 _ => String::new(),
             },
             if c.hwnd != 0 { " windowed" } else { "" }

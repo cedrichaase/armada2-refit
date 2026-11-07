@@ -8,6 +8,7 @@ use crate::widgets::Ui;
 pub fn draw(ui: &mut Ui, f: &Form) -> bool {
     match f.class.as_str() {
         "TGraphicOptionsForm" => super::graphics::draw(ui, f),
+        "TSoundSettingsForm" => super::sound::draw(ui, f),
         _ => false,
     }
 }

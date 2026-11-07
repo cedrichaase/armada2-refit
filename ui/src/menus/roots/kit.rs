@@ -93,7 +93,7 @@ pub fn click(f: &Form, c: &Control) {
 static mut DRAG: (u32, f32) = (0, 0.0);
 /// A value being set on Roots' slider: the control's name, the target, the frame count
 /// since the last attempt and the attempts made.
-static mut SETTING: (u32, i32, u32, u32) = (0, 0, 0, 0);
+static mut SETTING: (u32, i32, u32, u32, i32) = (0, 0, 0, 0, i32::MAX);
 
 fn key_of(name: &str) -> u32 {
     name.bytes().fold(0x811c_9dc5u32, |h, b| (h ^ b as u32).wrapping_mul(0x0100_0193)) | 1
@@ -112,7 +112,7 @@ fn thumb_x(c: &Control, v: i32, lo: i32, hi: i32) -> i32 {
 /// shows is always the control's. Without a readable value it draws nothing (the caller
 /// keeps the form's picture for it).
 pub fn slider(ui: &mut Ui, f: &Form, c: &Control, r: R) -> bool {
-    let Some((value, lo, hi)) = c.value else { return false };
+    let Some((value, lo, hi, step)) = c.value else { return false };
     if hi <= lo {
         return false;
     }
@@ -136,16 +136,16 @@ pub fn slider(ui: &mut Ui, f: &Form, c: &Control, r: R) -> bool {
                 set(f, c, t);
             }
         }
-        follow(f, c, value, lo, hi);
+        follow(f, c, value, step);
     }
     true
 }
 
 /// Starts setting a slider: a drag from the thumb's place to the target's.
 fn set(f: &Form, c: &Control, target: i32) {
-    let Some((value, lo, hi)) = c.value else { return };
+    let Some((value, lo, hi, _)) = c.value else { return };
     crate::log!("forms: {} set to {} (of {}..{})", c.name, target, lo, hi);
-    unsafe { SETTING = (key_of(&c.name), target, 0, 0) };
+    unsafe { SETTING = (key_of(&c.name), target, 0, 0, i32::MAX) };
     let (y, a, b) = (c.rect[1] + c.rect[3] / 2, thumb_x(c, value, lo, hi), thumb_x(c, target, lo, hi));
     let h = f.hwnd;
     forms::act(Action::Poke(h, forms::MOUSE_DOWN, forms::MOUSE_HELD, a, y));
@@ -156,25 +156,27 @@ fn set(f: &Form, c: &Control, target: i32) {
 
 /// A slider being set: read back, and where the drag left it short, a press at the end of
 /// the track on the target's side (the control steps towards a press on its track).
-fn follow(f: &Form, c: &Control, value: i32, lo: i32, hi: i32) {
-    let (k, target, since, tries) = unsafe { SETTING };
+fn follow(f: &Form, c: &Control, value: i32, step: i32) {
+    let (k, target, since, tries, last) = unsafe { SETTING };
     if k != key_of(&c.name) {
-        return;
-    }
-    if value == target || tries >= 40 {
-        unsafe { SETTING = (0, 0, 0, 0) };
         return;
     }
     if since < 6 {
         unsafe { SETTING.2 += 1 };
         return;
     }
+    // Done at the target, or when the last attempt brought it no nearer (a slider that
+    // moves in steps larger than one rests beside a target between two of them).
+    let dist = (value - target).abs();
+    if dist * 2 <= step.max(1) || tries >= 40 || dist >= last {
+        unsafe { SETTING = (0, 0, 0, 0, i32::MAX) };
+        return;
+    }
     let x = if target > value { c.rect[0] + c.rect[2] - 2 } else { c.rect[0] + 2 };
     let y = c.rect[1] + c.rect[3] / 2;
-    let _ = (lo, hi);
     forms::act(Action::Poke(f.hwnd, forms::MOUSE_DOWN, forms::MOUSE_HELD, x, y));
     forms::act(Action::Poke(f.hwnd, forms::MOUSE_UP, 0, x, y));
-    unsafe { SETTING = (k, target, 0, tries + 1) };
+    unsafe { SETTING = (k, target, 0, tries + 1, dist) };
 }
 
 /// A text field of Roots', drawn as a field: what it holds, with a caret while it has
