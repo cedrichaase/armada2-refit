@@ -1446,6 +1446,40 @@ offset = 0x34
 type = "i32"
 used_by = ["hud.info_fo"]
 
+# The pointer mapped into Roots' own panel while the panel simulates under ours placed elsewhere
+# (centred, unstretched): ShipDisplay's FocusSimulate slot is wrapped, and around the stock call
+# the HUD's mouse position (canvas units) is moved from ours into the panel's own rectangle and put
+# back, so every child's hover and click (the rings included) follows ours.
+[[sym]]
+id = "info_sd_vtable"
+symbol = "ShipDisplay::vftable"
+kind = "vtable"
+addr = 0x6b4bcc
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_sd_focus_simulate"
+symbol = "ShipDisplay::FocusSimulate"
+kind = "fn"
+addr = 0x4f2960
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_slot_focus_simulate"
+symbol = "ShipDisplay::FocusSimulate"
+kind = "slot"
+target = "info_sd_focus_simulate"
+vtable = "info_sd_vtable"
+index = 17
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_mouse_pos"
+symbol = "DisplayInterface::s_mousePos"
+kind = "global"
+addr = 0x765018
+used_by = ["hud.info_fo"]
+
 [[sym]]
 id = "info_obj_cloak"
 symbol = "GameObject::cloak"

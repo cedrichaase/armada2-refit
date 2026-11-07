@@ -110,7 +110,7 @@ pub mod info {
 /// Roots' info panel under ours (`engine/info_fo.rs`).
 pub mod info_fo {
     pub use crate::engine::info_fo::{
-        available, buff_icons, class_art_name, is_craft, system_icon_colour, weapon_icon_colour, Look, class_art_name_of, cloak, comp_hover, comp_rect, forget, hull_shields, image_rect, install,
+        available, pointer_map_available, set_pointer_map, buff_icons, class_art_name, is_craft, system_icon_colour, weapon_icon_colour, Look, class_art_name_of, cloak, comp_hover, comp_rect, forget, hull_shields, image_rect, install,
         log_children, move_rect, original_rect, queue_classes, queue_slot, race_comp, rank, restore, texts, weapon_icons, Icon,
     };
 }

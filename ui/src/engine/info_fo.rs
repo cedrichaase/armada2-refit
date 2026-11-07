@@ -80,6 +80,9 @@ pub fn install() -> bool {
         if !available() {
             return false;
         }
+        if !install_focus() {
+            crate::log!("info: the panel's FocusSimulate slot is not stock: ours keeps Roots' place for the pointer");
+        }
         // The status line under the pointer is drawn inside the panel's Render, through the
         // hover hook's call (which lifts the gate around it): the hook goes in with the gate.
         if !super::hover::install_only() {
@@ -112,6 +115,70 @@ pub fn install() -> bool {
         }
         INSTALLED = true;
         true
+    }
+}
+
+// ---- the pointer mapped into the panel's own rectangle ------------------------------------
+
+/// The map from ours to the panel's own place, in the HUD canvas's units: x' = ax + bx·x,
+/// y' = ay + by·y; None while ours sits where the panel does (nothing to map).
+static mut MAP: Option<[f32; 4]> = None;
+static mut FOCUS_ORIG: usize = 0;
+static mut FOCUS_ON: bool = false;
+
+/// Wraps the panel's `FocusSimulate` slot (once): around the stock call the HUD's mouse position
+/// is mapped from ours into the panel's own rectangle (`set_pointer_map`) and put back, so every
+/// child's hover and click (FleetOpsHook's rings included) follows ours wherever it is drawn.
+/// False when the slot is not stock: ours then keeps the panel's own place for the pointer.
+#[allow(static_mut_refs)]
+fn install_focus() -> bool {
+    unsafe {
+        if FOCUS_ON {
+            return true;
+        }
+        let at = eng().addr(sym::INFO_SLOT_FOCUS_SIMULATE);
+        if at == 0 || eng().addr(sym::INFO_MOUSE_POS) == 0 {
+            return false;
+        }
+        match super::hook::patch_slot(at, 0, focus_simulate as *const () as usize) {
+            Some(old) => {
+                FOCUS_ORIG = old;
+                FOCUS_ON = true;
+                true
+            }
+            None => false,
+        }
+    }
+}
+
+/// Whether the pointer can be mapped (ours may sit anywhere and keep the engine's pointer).
+pub fn pointer_map_available() -> bool {
+    unsafe { FOCUS_ON }
+}
+
+/// Sets this frame's map (canvas units, from ours into the panel's own rectangle), None for
+/// none.
+pub fn set_pointer_map(m: Option<[f32; 4]>) {
+    unsafe { MAP = m };
+}
+
+unsafe extern "thiscall" fn focus_simulate(this: usize, dt: f32) {
+    unsafe {
+        let f: unsafe extern "thiscall" fn(usize, f32) = core::mem::transmute(FOCUS_ORIG);
+        let at = eng().addr(sym::INFO_MOUSE_POS);
+        match MAP {
+            Some([ax, bx, ay, by]) if at != 0 => {
+                let p: [i32; 2] = rd(at);
+                let q = [libm::roundf(ax + bx * p[0] as f32) as i32, libm::roundf(ay + by * p[1] as f32) as i32];
+                core::ptr::write_unaligned(at as *mut [i32; 2], q);
+                f(this, dt);
+                // Put back, unless the call moved it itself.
+                if rd::<[i32; 2]>(at) == q {
+                    core::ptr::write_unaligned(at as *mut [i32; 2], p);
+                }
+            }
+            _ => f(this, dt),
+        }
     }
 }
 

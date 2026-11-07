@@ -1,6 +1,6 @@
-# Fleet Operations: Roots with the UI: the info panel and the grid in the bottom row (BottomRow=auto)
+# Fleet Operations: Roots with the UI: the bottom row at wide aspects (BottomRow=auto: the minimap, the info panel centred in its own proportions, the grid in the corner)
 
-Resolutions: 2150x900, 3440x1440
+Resolutions: 3440x1440, 2560x1080, 1920x1080
 Mod: refit
 Layers: display asiloader render3d ui qol
 Launch: -nointro save\ia-fed-kli.sav
@@ -24,7 +24,7 @@ bar's range rings still follow the pointer. The game starts in Instant Action fr
 8. Wait up to 10 seconds for "UI.log" to say "info: Roots' panel ours: Builder".
 9. Wait 2 seconds.
 10. Take a screenshot called "station, the bottom row".
-11. Check that along the bottom of the screen the minimap is at the left, then the wide info panel (the station's picture, icons and ten numbered slots), then a grid of square buttons (three rows) at its right, the grid's bottom level with the panel's.
+11. Check that the minimap is in the bottom left corner, the info panel (the station's picture, icons and ten numbered slots, not stretched wide) along the bottom, and a grid of square buttons (three rows) in the bottom right corner, none of them overlapping.
 12. Overlay UI.HUD:BottomRow=stacked.
 13. Wait 3 seconds.
 14. Take a screenshot called "station, stacked".

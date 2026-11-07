@@ -66,13 +66,15 @@ pub fn rect() -> Option<R> {
 #[derive(Clone, Copy)]
 struct Frame {
     ours: R,
-    native: R,
     kx: f32,
     ky: f32,
     d: f32,
     /// (factor, the right-anchored elements' right edge in table units after the move).
     squeeze: Option<(f32, f32)>,
     aligned: bool,
+    /// Ours' horizontal scale against the panel's own (1: the same; below 1: Roots' panel is
+    /// stretched across a wide screen and ours keeps its proportions).
+    rx: f32,
 }
 
 impl Frame {
@@ -101,15 +103,17 @@ impl Frame {
     /// The same in the engine's canvas units, local to the panel's own origin (a child's
     /// rectangle, inclusive).
     fn canvas(&self, ui: &Ui, e: &Element, dx: f32, dy: f32) -> [i32; 4] {
+        // Where the pointer, mapped into the panel's own rectangle (`info_fo::set_pointer_map`),
+        // finds ours: ours' offset from its left, at the panel's own scale.
         let r = self.px(e, dx, dy);
-        let (cx, cy) = (CANVAS.0 / ui.w, CANVAS.1 / ui.h);
-        let l = libm::roundf((r.x - self.native.x) * cx) as i32;
-        let t = libm::roundf((r.y - self.native.y) * cy) as i32;
-        [l, t, (libm::roundf((r.right() - self.native.x) * cx) as i32 - 1).max(l), (libm::roundf((r.bottom() - self.native.y) * cy) as i32 - 1).max(t)]
+        let (cx, cy) = (CANVAS.0 / ui.w / self.rx, CANVAS.1 / ui.h);
+        let l = libm::roundf((r.x - self.ours.x) * cx) as i32;
+        let t = libm::roundf((r.y - self.ours.y) * cy) as i32;
+        [l, t, (libm::roundf((r.right() - self.ours.x) * cx) as i32 - 1).max(l), (libm::roundf((r.bottom() - self.ours.y) * cy) as i32 - 1).max(t)]
     }
     /// A child's own rectangle (canvas units, local to the panel's origin) in pixels on ours.
     fn child_px(&self, ui: &Ui, r: [i32; 4]) -> R {
-        let (sx, sy) = (ui.w / CANVAS.0, ui.h / CANVAS.1);
+        let (sx, sy) = (ui.w / CANVAS.0 * self.rx, ui.h / CANVAS.1);
         R::new(self.ours.x + r[0] as f32 * sx, self.ours.y + r[1] as f32 * sy, (r[2] - r[0] + 1) as f32 * sx, (r[3] - r[1] + 1) as f32 * sy)
     }
 }
@@ -271,6 +275,8 @@ pub fn run(ui: &mut Ui) {
         unsafe { RECT = None };
         return;
     }
+    // No map unless this frame sets one (ours shown away from the panel's own place).
+    info_fo::set_pointer_map(None);
     // A new mission's panel: the rectangles moved for the last one went with it.
     static mut PANEL: usize = 0;
     unsafe {
@@ -302,14 +308,29 @@ pub fn run(ui: &mut Ui) {
         return;
     }
     info_fo::log_children(panel);
-    let (kx, ky) = (plan.native.w / l.size[0], plan.native.h / l.size[1]);
+    // The table's units in pixels: Roots' own (`knx`, stretched across a wide screen), and ours,
+    // the same as its height's (the panel's own proportions, decision 458).
+    let (knx, ky) = (plan.native.w / l.size[0], plan.native.h / l.size[1]);
+    let kx = knx.min(ky);
     let min_w = l.min_width * kx;
     let ours = R::new(plan.info.x, plan.info.y, plan.info.w.max(min_w.min(ui.w - plan.info.x)), plan.info.h);
     let d = ours.w / kx - l.size[0];
     // Within a pixel of Roots' own width is Roots' own width (no move, no squeeze).
     let d = if d.abs() * kx < 1.5 { 0.0 } else { d };
-    let aligned = (ours.x - plan.native.x).abs() < 1.0 && (ours.y - plan.native.y).abs() < 1.0;
-    let fr = Frame { ours, native: plan.native, kx, ky, d, squeeze: squeeze(l, d), aligned };
+    let rx = kx / knx;
+    // The engine keeps the pointer over ours wherever ours is, with the pointer mapped into the
+    // panel's own rectangle while it simulates; without that map, only where ours is the panel's.
+    let same = (ours.x - plan.native.x).abs() < 1.0 && (ours.y - plan.native.y).abs() < 1.0 && (rx - 1.0).abs() < 1e-3;
+    let mapped = info_fo::pointer_map_available();
+    let aligned = same || mapped;
+    if mapped && !same {
+        let cw = CANVAS.0 / ui.w;
+        let r = 1.0 / rx;
+        info_fo::set_pointer_map(Some([cw * (plan.native.x - ours.x * r), r, 0.0, 1.0]));
+    } else {
+        info_fo::set_pointer_map(None);
+    }
+    let fr = Frame { ours, kx, ky, d, squeeze: squeeze(l, d), aligned, rx };
 
     // The frame: the theme's (with its lamps where Roots' panel has them), never a claimed panel
     // while the panel keeps the pointer.
@@ -502,6 +523,9 @@ fn single(ui: &mut Ui, l: &'static InfoLayout, fr: &Frame, obj: usize, builder: 
             let (comp, plate) = info_fo::queue_slot(i);
             if fr.aligned && (fr.d != 0.0 || fr.squeeze.is_some()) {
                 info_fo::move_rect(comp, fr.canvas(ui, e, dx, 0.0));
+            } else if i == 0 {
+                // Ours at the panel's own width: the slots' own rectangles again.
+                info_fo::restore();
             }
             let hot = info_fo::comp_hover(comp) || (!fr.aligned && ui.input.mouse.is_some_and(|m| r.contains(m)));
             if plate == 0 || !sprite_over(ui, plate, r, if hot { 0xffffffff } else { 0xe0ffffff }) {
