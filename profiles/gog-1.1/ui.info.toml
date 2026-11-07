@@ -1155,6 +1155,297 @@ offset = 0x0
 type = "u8"
 used_by = ["hud.info_fo"]
 
+# The weapon icons' and buff icons' state, read as FleetOpsHook's icon Render decides it (read only;
+# PLAN-FLEETOPS.md, FO-6, decisions 458 and 459).
+[[sym]]
+id = "info_weapon_icon_colour"
+symbol = "weaponIconColor (the HUD race's gui_<race>.cfg, three floats)"
+kind = "global"
+addr = 0x738754
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_system_icon_colour"
+symbol = "systemIconHealthyColor (the HUD race's gui_<race>.cfg, three floats)"
+kind = "global"
+addr = 0x738760
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_craft_carrier"
+symbol = "Craft::carrier (its weapons)"
+kind = "field"
+struct = "Craft"
+offset = 0x128
+type = "ptr"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_carrier_weapons"
+symbol = "Carrier::weapons (a vector of Weapon *: begin, end)"
+kind = "field"
+struct = "Carrier"
+offset = 0xc
+type = "ptr"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_weapon_class"
+symbol = "Weapon::class"
+kind = "field"
+struct = "Weapon"
+offset = 0x4
+type = "ptr"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_weapon_reload_left"
+symbol = "Weapon::reload left"
+kind = "field"
+struct = "Weapon"
+offset = 0x28
+type = "f32"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_weapon_active"
+symbol = "Weapon::active"
+kind = "field"
+struct = "Weapon"
+offset = 0x2d
+type = "u8"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_weapon_cannon_reload"
+symbol = "Weapon (a cannon): its reload"
+kind = "field"
+struct = "Weapon"
+offset = 0x58
+type = "f32"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_wclass_sig"
+symbol = "WeaponClass::signature"
+kind = "field"
+struct = "WeaponClass"
+offset = 0x10
+type = "u32"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_wclass_ordnance"
+symbol = "WeaponClass::ordnance class"
+kind = "field"
+struct = "WeaponClass"
+offset = 0x18
+type = "ptr"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_ordnance_cost"
+symbol = "OrdnanceClass::energy cost"
+kind = "field"
+struct = "OrdnanceClass"
+offset = 0x14
+type = "f32"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_wclass_slot"
+symbol = "WeaponClass::buttonSlot (-1: none)"
+kind = "field"
+struct = "WeaponClass"
+offset = 0x1a0
+type = "i32"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_wclass_special"
+symbol = "WeaponClass::special"
+kind = "field"
+struct = "WeaponClass"
+offset = 0x1b4
+type = "u32"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_wclass_energy"
+symbol = "WeaponClass::energy cost"
+kind = "field"
+struct = "WeaponClass"
+offset = 0x1e4
+type = "f32"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_wclass_tech_id"
+symbol = "WeaponClass::its technology item's id (a pointer to it)"
+kind = "field"
+struct = "WeaponClass"
+offset = 0x208
+type = "ptr"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_wclass_shot_delay"
+symbol = "WeaponClass::shotDelay"
+kind = "field"
+struct = "WeaponClass"
+offset = 0x24c
+type = "f32"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_craft_energy_now"
+symbol = "Craft::special energy now"
+kind = "field"
+struct = "Craft"
+offset = 0x16c
+type = "f32"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_craft_team"
+symbol = "GameObject::team"
+kind = "field"
+struct = "GameObject"
+offset = 0xec
+type = "u32"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_sig_cannon"
+symbol = "WeaponClass signature of FleetOpsHook's cannon ('CANI')"
+kind = "value"
+value = 0x43414e49
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_tech_trees"
+symbol = "FleetOpsHook's technologyTreeArray, from its image's base (one per team)"
+kind = "value"
+value = 0
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_tree_items"
+symbol = "FleetOpsHook's technology tree: its items"
+kind = "field"
+struct = "FOTechTree"
+offset = 0xc
+type = "ptr"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_item_available"
+symbol = "FleetOpsHook's technology item: available (researched)"
+kind = "field"
+struct = "FOTechItem"
+offset = 0x8
+type = "u8"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_item_shown"
+symbol = "FleetOpsHook's technology item: shown"
+kind = "field"
+struct = "FOTechItem"
+offset = 0x9
+type = "u8"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_icon_index"
+symbol = "ShipSystemIcon::weapon index"
+kind = "field"
+struct = "ShipSystemIcon"
+offset = 0x30
+type = "u32"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_icon_flash"
+symbol = "ShipSystemIcon::flash phase"
+kind = "field"
+struct = "ShipSystemIcon"
+offset = 0x4c
+type = "u8"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_systems_count"
+symbol = "ShipSystems::buff icons shown"
+kind = "field"
+struct = "ShipSystems"
+offset = 0x30
+type = "u32"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_buff_kind"
+symbol = "ShipBuffIcon::kind (0 none)"
+kind = "field"
+struct = "ShipBuffIcon"
+offset = 0x49
+type = "u8"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_buff_blink"
+symbol = "ShipBuffIcon::blinking"
+kind = "field"
+struct = "ShipBuffIcon"
+offset = 0x4a
+type = "u8"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_buff_phase"
+symbol = "ShipBuffIcon::flash phase"
+kind = "field"
+struct = "ShipBuffIcon"
+offset = 0x48
+type = "u8"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_buff_positive"
+symbol = "ShipBuffIcon::a buff (else a debuff)"
+kind = "field"
+struct = "ShipBuffIcon"
+offset = 0x4b
+type = "u8"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_buff_sprite_spy"
+symbol = "ShipBuffIcon::its spy sprite (romspy_icon_si)"
+kind = "field"
+struct = "ShipBuffIcon"
+offset = 0x50
+type = "ptr"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_buff_sprite_mine"
+symbol = "ShipBuffIcon::its gravity mine sprite (gravmine_icon_si)"
+kind = "field"
+struct = "ShipBuffIcon"
+offset = 0x4c
+type = "ptr"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_buff_size"
+symbol = "ShipBuffIcon::width, height"
+kind = "field"
+struct = "ShipBuffIcon"
+offset = 0x34
+type = "i32"
+used_by = ["hud.info_fo"]
+
 [[sym]]
 id = "info_obj_cloak"
 symbol = "GameObject::cloak"

@@ -195,6 +195,48 @@ fn text_colour(ui: &Ui, c: [f32; 3], or: Color) -> Color {
     if max <= 0.05 || min >= 0.95 { or } else { info::colour(c) }
 }
 
+/// A colour of three floats, 0..1, opaque.
+fn rgb(c: [f32; 3]) -> Color {
+    let b = |v: f32| (v.clamp(0.0, 1.0) * 255.0 + 0.5) as u32;
+    0xff000000 | b(c[0]) << 16 | b(c[1]) << 8 | b(c[2])
+}
+
+/// A sprite's part from the left, `f` of its width, stretched over the same part of `r`.
+fn sprite_part(ui: &mut Ui, sp: usize, r: R, f: f32, tint: Color) {
+    let Some((tex, uv)) = sprite::art(sp) else { return };
+    let f = f.clamp(0.0, 1.0);
+    if f <= 0.0 {
+        return;
+    }
+    let u1 = uv[0] + (uv[2] - uv[0]) * f;
+    ui.draw.image_uv(tex, R::new(r.x, r.y, r.w * f, r.h), [uv[0], uv[1], u1, uv[3]], tint);
+}
+
+/// One of FleetOpsHook's icons as its Render draws it (`info_fo::Look`): grey whole for a weapon
+/// not researched; else a backing copy in its dim colour and the icon in its colour filled from
+/// the left to the reload (or to the special energy it has of its cost). Roots fills a special
+/// weapon round like a clock; ours fills it from the left like the others.
+fn draw_icon(ui: &mut Ui, ic: &info_fo::Icon, r: R, fallback: Color) {
+    match ic.look {
+        None => {
+            sprite_over(ui, ic.sprite, r, fallback);
+        }
+        Some(l) if l.grey || l.fill >= 0.999 && l.backing.is_none() => {
+            sprite_over(ui, ic.sprite, r, rgb(l.colour));
+        }
+        Some(l) => {
+            if let Some(b) = l.backing {
+                sprite_over(ui, ic.sprite, r, rgb(b));
+            }
+            if l.fill >= 0.999 {
+                sprite_over(ui, ic.sprite, r, rgb(l.colour));
+            } else {
+                sprite_part(ui, ic.sprite, r, l.fill, rgb(l.colour));
+            }
+        }
+    }
+}
+
 /// A colour of the layout table for the HUD's race (`<key>.<race>`, the race's name without
 /// spaces), else `<key>`.
 fn race_tint(l: &InfoLayout, key: &str) -> Option<Color> {
@@ -211,7 +253,7 @@ fn race_tint(l: &InfoLayout, key: &str) -> Option<Color> {
 /// theme's accent), toward `bad` with the damage, `warn` on the flash while it is repaired.
 fn system_tint(ui: &Ui, l: &InfoLayout, st: &info::SystemState, flash: bool) -> Color {
     let t = &ui.theme;
-    let healthy = race_tint(l, "SystemTint").unwrap_or(mix(t.accent, 0xffffffff, 0.15));
+    let healthy = info_fo::system_icon_colour().map(rgb).or_else(|| race_tint(l, "SystemTint")).unwrap_or(mix(t.accent, 0xffffffff, 0.15));
     if st.repairing && flash {
         t.warn
     } else if st.repair_left > 0.01 {
@@ -352,8 +394,9 @@ fn single(ui: &mut Ui, l: &'static InfoLayout, fr: &Frame, obj: usize, builder: 
             }
         }
     }
-    // Roots tints its weapon icons with the race's `weaponIconColor` (`WeaponTint.<race>`).
-    let weapon_tint = race_tint(l, "WeaponTint").unwrap_or(0xffffffff);
+    // Roots tints its weapon icons with the race's `weaponIconColor` (the engine's, from the HUD
+    // race's gui_<race>.cfg; the table's `WeaponTint.<race>` where it cannot be read).
+    let weapon_tint = info_fo::weapon_icon_colour().map(rgb).or_else(|| race_tint(l, "WeaponTint")).unwrap_or(0xffffffff);
     if drew_image {
         for ic in weapons.iter().chain(buffs.iter()) {
             let r = fr.child_px(ui, ic.rect);
@@ -362,7 +405,7 @@ fn single(ui: &mut Ui, l: &'static InfoLayout, fr: &Frame, obj: usize, builder: 
                 ui.draw.stroke(r.inset(-ui.u(1.0)), Corners::round(r.w * 0.16), ui.u(1.5).max(1.0), t.accent);
                 note_hover(ic.comp, "weapon icon", ic.sprite);
             }
-            sprite_over(ui, ic.sprite, r, weapon_tint);
+            draw_icon(ui, ic, r, weapon_tint);
             if !fr.aligned && ui.input.mouse.is_some_and(|m| r.contains(m)) {
                 *tip = Tip::Comp(ic.comp, r);
             }
