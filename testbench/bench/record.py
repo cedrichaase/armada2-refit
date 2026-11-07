@@ -32,7 +32,7 @@ def take(sess, name='record', timeout=180.0):
     installed = [p for p in PLUGINS if (g / p).exists()]
     if not installed:
         return 'fail', 'neither Render3D.asi nor UI.asi is installed in this game: nothing records'
-    ini = g / 'Display8.ini'
+    ini = (g / config.EXE_REL).parent / 'Display8.ini'
     keys = {}
     if ini.exists():
         for line in ini.read_text(errors='replace').splitlines():

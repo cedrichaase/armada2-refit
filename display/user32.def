@@ -25,3 +25,4 @@ IsWindow@4
 GetWindowTextA@12
 ValidateRect@8
 FindWindowExA@16
+ShowWindow@8

@@ -61,6 +61,8 @@ __declspec(dllimport) DWORD   __stdcall GetPrivateProfileSectionNamesA(LPSTR, DW
 #define SI_SET_HEALTH    a2e_addr(SCENE_S_SI_SET_HEALTH)
 #define SI_MAX_HEALTH    a2e_addr(SCENE_S_SI_MAX_HEALTH)
 #define SI_CANNOT_DIE    a2e_addr(SCENE_S_SI_CANNOT_DIE)
+#define SI_SET_REAL_TEAM a2e_addr(SCENE_S_SI_SET_REAL_TEAM)    /* calls the object's own virtual SetTeam */
+#define DAMAGE_HULL      a2e_addr(SCENE_S_FN_DAMAGE_HULL)      /* Craft::DamageHull(float, int attacker): a weapon's hit */
 #define SI_EXPLODE_NOW   a2e_addr(SCENE_S_SI_EXPLODE_NOW)      /* a craft dies now, as a mission script blows one up */
 #define SI_SUCCEED       a2e_addr(SCENE_S_SI_SUCCEED)          /* SucceedMission(float delay, char *text) */
 #define SI_FAIL          a2e_addr(SCENE_S_SI_FAIL)             /* FailMission(float delay, char *text) */
@@ -190,6 +192,8 @@ typedef void   (__thiscall *SiVoidFn)(void *si);
 typedef void   (__thiscall *SiHandleFn)(void *si, int h);
 typedef void   (__thiscall *SiEndFn)(void *si, float delay, char *text);
 typedef void   (__thiscall *SiHandleBoolFn)(void *si, int h, int yes);
+typedef void   (__thiscall *SiSetTeamFn)(void *si, int h, int team);
+typedef BYTE   (__thiscall *DamageHullFn)(void *craft, float amount, int attacker);
 typedef void   (__thiscall *SiAttackFn)(void *si, int h, int target, int unused);
 typedef void   (__thiscall *PrjSetNameFn)(int *prj, const char *name);
 typedef void  *(__cdecl    *WeaponFindFn)(const int *prj);
@@ -1991,6 +1995,27 @@ static void run_command(char *line)
         logline("  ok");
         return;
     }
+    if (s_ieq(t[0], "damage") && n >= 3) {
+        /* As a weapon's hit: the hull loses AMOUNT, and at zero the engine destroys the
+         * object its own way. Stations are craft too; not while it is immortal. */
+        BYTE *go;
+        Obj  *by = n >= 4 ? find_obj(t[3]) : NULLPTR;
+        if (!need(SCENE_H_HIT)) return;
+        if (!(o = find_obj(t[1])) || !(go = (BYTE *)craft_of(o))) { logline("  ! not a craft"); return; }
+        ((DamageHullFn)DAMAGE_HULL)(go, s_atof(t[2]), by ? by->handle : 0);
+        logline("  ok");
+        return;
+    }
+    if (s_ieq(t[0], "team") && n >= 3) {
+        /* Hand an object to another team as mission scripts do (SetRealTeam, which calls
+         * the object's own SetTeam): what a capture or an assimilation does once the
+         * boarding has won. */
+        if (!need(SCENE_H_HIT)) return;
+        if (!(o = find_obj(t[1]))) { logline("  ! no such object"); return; }
+        ((SiSetTeamFn)SI_SET_REAL_TEAM)(SI_INSTANCE, o->handle, (int)s_atof(t[2]));
+        logline("  ok");
+        return;
+    }
     if (s_ieq(t[0], "succeed") || s_ieq(t[0], "fail")) {
         /* The mission ends as its script ends it, won or lost, after the delay (seconds;
          * the script's own message is none). */
@@ -2157,7 +2182,7 @@ static void run_command(char *line)
         return;
     }
     logline("  ! unknown command (camera, orbit, glide, spin, zoom, spawn, attack, heal, engines, weapons, "
-            "immortal, special, energy, tech, kill, cloak, colonize, goto, move, stop, center, pause, resume, hud, grid, "
+            "immortal, special, energy, tech, kill, damage, team, cloak, colonize, goto, move, stop, center, pause, resume, hud, grid, "
             "cursor, notices, tooltips, hover, shieldfx, query, objects, select, select+, selection, marks)");
 }
 
