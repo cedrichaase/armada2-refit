@@ -306,9 +306,13 @@ pub fn step_from_qol(p: usize) {
 /// to its left edge (4:3), so the middle of the screen stays clear. Without a minimap,
 /// above the info panel.
 pub(super) fn place(ui: &Ui, w: f32, h: f32) -> R {
+    // In the bottom row (Roots, `row`): where the row put it.
+    if let Some((r, _)) = super::row::bar() {
+        return R::new(r.x, r.bottom() - h, w, h);
+    }
     let m = ui.u(10.0);
     // Ours when it draws, else the stock panel's rectangle.
-    let ours = super::info::rect().map(|r| [r.x, r.y, r.right(), r.bottom()]);
+    let ours = if super::info_fo_on() { super::info_fo::rect() } else { super::info::rect() }.map(|r| [r.x, r.y, r.right(), r.bottom()]);
     let info = if hud::hidden(hud::ship_display()) { None } else if unsafe { super::INFO } { ours } else { hud::panel_rect(hud::ship_display(), ui.w, ui.h) };
     let mini = super::minimap_rect(ui);
     match (info, mini) {

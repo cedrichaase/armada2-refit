@@ -123,7 +123,19 @@ pub fn after_layout(p: usize) {
 /// The grid's outer size in pixels for `n` overflow columns, and its cell size and gap (the
 /// cells shrink when the overflow would run off the screen).
 fn size(ui: &Ui, over_cols: usize) -> (f32, f32, f32, f32, f32) {
-    let (mut cs, mut gap, pad) = (ui.u(62.0), ui.u(5.0), ui.u(8.0));
+    // In the bottom row (`row`, Roots) the cell is the row's: three rows as high as the info panel.
+    size_with(ui, over_cols, super::row::bar().map_or(ui.u(62.0), |b| b.1))
+}
+
+/// The grid's outer size with no overflow for a cell of `cs` pixels (the bottom row's plan).
+pub fn size_for(ui: &Ui, cs: f32) -> (f32, f32) {
+    let (w, h, ..) = size_with(ui, st().over_cols, cs);
+    (w, h)
+}
+
+fn size_with(ui: &Ui, over_cols: usize, cs: f32) -> (f32, f32, f32, f32, f32) {
+    let k = cs / ui.u(62.0);
+    let (mut cs, mut gap, pad) = (cs, ui.u(5.0) * k.min(1.0), ui.u(8.0) * k.min(1.0));
     let (fl, ft, fr, fb) = theme::frame_margins(ui);
     let cols = (COLS + over_cols) as f32;
     let sep = if over_cols > 0 { 2.0 } else { 0.0 };

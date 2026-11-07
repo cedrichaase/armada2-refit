@@ -615,10 +615,14 @@ fn = "SetCurrentBackground"
 how = "runtime"
 verified = []
 
+# FleetOpsHook's tail (at +0x99) only shows a producer whose class is its build yard as a single
+# object; the function is otherwise stock's, and the panel's own Render calls it every frame. The
+# UI calls it as the Render does, for the face and the object (hud.info's reads), and draws Roots'
+# panel over the Render run unseen (hud.info_fo; PLAN-FLEETOPS.md, FO-6, decisions 440 to 459).
 [[changed]]
 fn = "ShipDisplay::DetermineSelectedDisplayType"
 how = "runtime"
-verified = []
+verified = ["ui.hud.info", "ui.hud.info_fo"]
 
 # FleetOpsHook's calls for the one-unit and builder faces (+0x99, +0xa5) and its edits of the group
 # faces (+0xcf..+0x1b7) sit before the strip's call at +0x1fa, which is stock's in the file and in

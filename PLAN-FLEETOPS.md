@@ -684,6 +684,87 @@ grid on Fleet Operations: Roots"), and the skin of step 6 stays only as the fall
 | 346 | **The `.spr` file of the sprites every race shares is the content set's** (`[Files] GuiSprites`, `gui_global.spr` in the fleetops set, `content::Files::gui_sprites`), not a literal in `engine/sprite.rs` | `ui/lint-content.sh`: game file names belong to the content set | |
 | 338 | **Roots' defaults are unchanged** (`HUD.Bar=0`, `BarLabels=0`, `BarKeys=0`, decisions 103 and 129) | the player turns the grid on in the Refit screen, as the user's install does | the user's sign-off |
 
+### The info panel on Roots (2026-11-07)
+
+Branch `fo-info-panel`, on `origin/fo-b`. The user asked for the bottom panel as ours ("try to
+recreate its layout and contents quite precisely, but with our own HUD code. fonts and bars
+(health, shields) can deviate from the original. the layout (icons, their position, images, etc)
+should not"), and then for the panels to be resizable so the grid bar can flow into the bottom row.
+`ui/HUD.md`, "The info panel on Fleet Operations: Roots" and "The bottom row on Fleet Operations:
+Roots", has how it works; the reads of FleetOpsHook's panel (static, its map and its file read only)
+are in the private notes beside `fleetopshook.md`.
+
+- **Measured** (bench, Roots' own panel and the panel's children read at run time; the table below
+  is the `fleetops` set's `[InfoPanel]`, Roots' layout units local to the panel, 1249 x 163 at
+  `infoPanelArea_1` 352,1038, the same at 4:3 and 16:9 in their own canvas): every child's rectangle
+  matched the table on 5.0Z11 (UI.log `info: Roots' panel ...`).
+
+| Element | Rect (x y w h) | Picture | Shown for |
+|---|---|---|---|
+| Name | 29 28 240 20 | ours (text) | a craft, a named object |
+| Crew icon, crew | 29 60 28 28; 60 62 79 28 | the text's own icon (`crew_amt`) | crew above 0.1 |
+| Energy icon, energy | 29 95 28 28; 60 97 106 20 | `energy_amt` | special energy above 0.1 |
+| Shield bar, hull bar | 26 126 103 10; 26 136 103 10 | ours | a craft; the hull for every object |
+| Ship image | 10 18 512 128 | `<class>_si`, tinted by the cloak | a class with one (151 on Roots) |
+| Wireframe picture | 337 31 128 128 | `<class>w1` | a class without `_si` (moons, resources) |
+| Weapon icons | 34 x 34 at the ODF's `weapon<N>IconPos` in the image | `i_<weapon>` (FleetOpsHook's children), in `weaponIconColor` | each weapon its class places |
+| Buff icons | 34 x 34, a row near the image's foot | `romspy_icon_si`, `gravmine_icon_si`, ... | a gravity mine, a spy (ours) |
+| Rank | 21 x 21 at 489,24 | `select_rank_<n>` | a craft with a rank |
+| Subsystems | sensors 537,42; shields 508,71; weapons 508,42; engines 537,71; life support 508,100; 28 x 28 | the `RepairIcon`s' sprites | a craft |
+| Race icon | 537 100 28 28 | `<race>_icon` | a craft |
+| Construction, research | 614 117 592 32 | ours (the theme's bar) | a producer, a colony, under construction |
+| Store / cargo, its text | 614 112 592 32; 627 87 592 20 | ours, in the resource's colour | a moon, a resource, a cargo |
+| Queue | slot 1 570 31 96 96; slots 2 to 10 at 660 + 60(i-2), 41, 64 x 64 | FleetOpsHook's plate per slot, the class's `w1` | a builder |
+| Group of 2 to 16 | tile 27 + 74i, 33, 82 x 82; name at its foot; shields 5,84 72 x 7; hull 5,91 72 x 8 | the class's `w1` | a group |
+| Group of 17 to 30 | tile 25 + 120(i/3), 19 + 39(i mod 3), 100 x 50; picture 50 x 50; shields 42,17; hull 42,24 | the class's `w1` | a large group |
+
+- **States covered on the bench** (Federation, 1280x960, each against Roots' own panel in the same
+  game, `HUD.Info` toggled live): a Saber, an Akira, the construction ship (its "Empty" research line
+  and bar), the Starbase as a builder (ten slots, its engines' icon greyed: a station has none), a
+  group of two, a tritanium moon (and the dilithium moon in an earlier session); the Borg's Assembler
+  and the Romulans' Ludanian Station at 2150x900 and 3440x1440 (Instant Action deals the race
+  there); the weapon icons' red ring and the sensors' green ring on hover through ours. Not staged:
+  an enemy (no contact in the first minutes; FleetOpsHook draws the same face for any team), a damaged
+  subsystem, a cloak, a queued item (the Starbase's build clicks did not queue on the bench), a group
+  over 16, a planet.
+- **Runs**: `fo-ui-info` PASS (`20261107-153215`: the face, both rings, two ships, the Starbase, Roots'
+  own after `Info=0`); `fo-ui-info-row` PASS at 2150x900 (`20261107-155841`) and 3440x1440
+  (`20261107-160730`): minimap, info panel at Roots' width, the grid at its right as high as the panel,
+  then stacked; `fo-ui-info-row-narrow` PASS (`20261107-161412`, and from the save `20261107-174913`): the row forced at 4:3 squeezes the
+  queue, `auto` there is stacked. Side-by-side sheets in `$A2_DATA/review/fo-info-panel/`. After
+  merging fo-b's bench instrumentation the scenarios start from the Instant Action save and select by
+  class through `Scene.asi`: `fo-ui-info` (`20261107-172751`) passes the one-ship, group, Starbase
+  (its engines' icon grey) and Roots'-own steps; its pointer steps (the two rings, the status line
+  under the pointer) fail there as `fo-ui-bar-grid`'s hover steps do on the same launch
+  (`20261107-165904`): the bench's pointer does not reach a save-launched Roots game yet, and the
+  menu walk misplaces clicks since the one-window change. The rings through ours were seen on the
+  menu-walked bench before that merge (`20261107-153215`; the merge changed only the hover strip's
+  call, let through the gate).
+- **Seen, for decision 455**: at 21:9 and wider the row reads as one strip (the grid level with the
+  panel, the panel at Roots' width); at 4:3 the forced row leaves the queue at about two thirds of
+  its size, legible but small, so `auto` keeps the grid above the minimap there.
+
+| # | Decision | Why | What would change it |
+|---|---|---|---|
+| 440 | **On Roots, `HUD.Info=1` is Roots' panel in Roots' layout, drawn by us** (`hud/info_fo.rs`); Armada II's info panel is unchanged (`hud/info.rs`) | the user's request: the layout and the pictures Roots', the fonts, bars and frame ours | |
+| 441 | **The panel's `Render` keeps running, unseen**: while it runs, seven drawing slots of `ST3D_DeviceDirectX8`'s vtable (both triangle fans, the rectangles, the clipped rectangles, the line strips, `WriteText`, `RenderClippedSprite2D`), each checked to hold its function, do nothing (`hud.info_fo`); the panel is never taken | FleetOpsHook does gameplay work inside the drawing (the weapon icons' places, the subsystem rings' flags, the buffs); skipping the Render would lose it, calling parts of it ourselves would re-implement FleetOpsHook. Every draw a component makes goes through those slots (no direct calls in the file) | a Roots build that draws the panel through Direct3D directly |
+| 442 | **Not `RenderParticle`**: render3d's particles module holds that slot (seen: `hud.info_fo stands down: RenderParticle calls something else`), and no panel draws particles | | |
+| 443 | **The layout is data**: `[InfoPanel]` in the `fleetops` set, Roots' `gui_interface.cfg` numbers in its units, each element with an anchor (left, right, centre, flex); the panel's children's rectangles are logged once per mission to check it; FleetOpsHook's weapon and buff icons are drawn at the rectangles its `Render` gives them | another FO build changes a number in the set, not the code; the weapon icons' places are per ship (the ODF's `weapon<N>IconPos`), so only the live icons know them | |
+| 444 | **Pictures are Roots' sprites by name from the HUD's sprite database at run time** (`<class>_si`, `<class>w1`, `<race>_icon`, `select_rank_<n>`, the queue plates FleetOpsHook gave each `BuildWireframe`), never copied | decision 60 | |
+| 445 | **The pointer stays the panel's over ours while ours keeps Roots' left edge** (`hud::set_info_area`, as decision 331 does for the bar): the engine's hover flags, its tooltips, its clicks (camera, cancel, select) and FleetOpsHook's range rings are its own; nothing of ours is claimed there | the rings follow the children's mouse-over flags (`StandardComponent::Simulate`, only while the panel owns the pointer); seen on the bench: the weapon icon's red ring and the sensors' green ring through ours | |
+| 446 | **A weapon icon is drawn only for a weapon its class places** (FleetOpsHook's record of the class's `weapon<N>IconPos`, a present flag per weapon) | the panel's icons past them keep the last class's place and sprite (seen: a Saber's icons over an Akira) | |
+| 447 | **Buff icons only while stock knows an effect** (a gravity mine, a spy) | FleetOpsHook's weapon buffs could not be told apart from a stale icon without writing or re-implementing it | a buff seen missing on the bench |
+| 448 | **Weapon icons in the race's `weaponIconColor`, the subsystems in its `systemIconHealthyColor` (`WeaponTint.<race>`, `SystemTint.<race>`), a system the craft lacks grey (`CraftSystem+0x0`), no other state colours** | Roots' greys, fills and dims are computed in its Render from several weapon and tech fields; they are colours, not layout | the user asking for them |
+| 449 | **Ours draws the panel in the theme's frame with lamps** (`theme::panel_as(.., Lamps::On)`, `[InfoPanel] Lamps`), never `ui.panel_lit`, which would claim the pointer | Roots' panel has lamps at both ends (decision 382, #124) | |
+| 450 | **Shield bar above, green to red; hull bar below, blue toward warn and bad** | Roots colours its shield bar red to green and its hull bar blue to yellow; bars may be ours | |
+| 451 | **Resizable**: the right-anchored elements (the queue) move with the right edge, the flex ones (construction, store) take the change in width, the queue is scaled about the right edge when it would run into the systems, `MinWidth` 640 units; the queue's slot components are moved with ours (an engine `StandardComponent` rectangle, put back when ours goes off) | the user's request; the slots must stay under ours for the engine's click and tooltip | |
+| 452 | **`[HUD] BottomRow`**: `stacked`, an order of `minimap, info, bar`, or `auto`; `InfoWidth`, `BarCellSize` (units); keys of `[HUD]`, not a section of their own | the user's request; one section per plugin ini keeps the overlay's `[UI.HUD]` | |
+| 453 | **The bar in the row is as high as the info panel**: its cell fitted so three rows and the grid's padding fill the panel's height; the grid's position comes from the row (`bar::place`, `bargrid::size_for`), its drawing and decision 331 unchanged | the user's request | |
+| 454 | **Off Roots' left edge, ours takes the pointer** and makes the clicks itself (camera, cancel, select) with the children's tooltips; the weapon icons' rings are not had there | FleetOpsHook's icons' rectangles are its own objects, which are not written | |
+| 455 | **`BottomRow=auto` is Roots' default**: the row (minimap, info, bar) where the info panel keeps its own width beside the bar, else stacked | "Seen, for decision 455" above | the user's look |
+| 456 | **Roots' `Info` default stays 0** (decision 125): the player's `RefitPlayer.ini` turns it on | not every state was staged (above) | the user's sign-off |
+| 457 | **The status line under the pointer stays Roots' (or `[HUD] Hover`'s)**: the gate is lifted around the panel's `SDInfoBar::Render` call, which `hud.hover` wraps (installed with the gate); ours draws no hover card of its own on Roots | the strip is drawn inside the panel's Render; gated, Roots' status line at the top of the screen would vanish | |
+
 ### Step 4: what the bench showed (2026-11-06)
 
 Branch `fo-6-step4`, on `fo-6-step5`. `./a2test syms --game fo-roots`: 82 of 108 hooks ready (76 before step 4; stock

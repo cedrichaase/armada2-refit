@@ -106,6 +106,21 @@ pub fn set(ours: bool, log: bool) -> bool {
     }
 }
 
+/// Puts the hook in without taking the strip (Roots' info panel drawn unseen under ours,
+/// `info_fo`): the strip's own drawing is then let through the info panel's draw gate.
+pub fn install_only() -> bool {
+    unsafe {
+        let (ours, log) = (OURS, LOG);
+        if !INSTALLED && eng().ready(hook::HUD_HOVER).is_ok() {
+            let (site, render) = (eng().addr(sym::HOVER_INFOBAR_CALL), eng().addr(sym::HOVER_INFOBAR_RENDER));
+            INSTALLED = rthook::patch_call(site, render, infobar as *const () as usize);
+        }
+        OURS = ours;
+        LOG = log;
+        INSTALLED
+    }
+}
+
 /// Whether the strip is the UI's this frame (the key on and the hook in).
 pub fn ours() -> bool {
     unsafe { OURS }
@@ -262,7 +277,8 @@ unsafe extern "thiscall" fn infobar(ib: usize, craft: usize, x: i32, y: i32) {
             }
         }
         let f: unsafe extern "thiscall" fn(usize, usize, i32, i32) = core::mem::transmute(eng().addr(sym::HOVER_INFOBAR_RENDER));
-        f(ib, craft, x, y);
+        // Drawn even while Roots' info panel runs unseen under ours (`info_fo`'s gate).
+        super::info_fo::ungated(|| f(ib, craft, x, y));
     }
 }
 

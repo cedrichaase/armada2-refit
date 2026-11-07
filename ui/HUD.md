@@ -637,6 +637,92 @@ is the unit's name and class. Stock's strings keep printf's `%%`: shown as `%`.
 720/720 | shield 100% | ..."), each tooltip's text, each press ("info: cancel queue
 slot 2", "info: select 0x...", "info: camera to 0x...").
 
+## The info panel on Fleet Operations: Roots
+
+`hud/info_fo.rs` over `engine/info_fo.rs` (PLAN-FLEETOPS.md, FO-6, "The info panel on Roots",
+decisions 440 to 459): with `[HUD] Info=1` on Roots, the bottom panel is ours in **Roots' own
+layout**: the same places, the same pictures and icons, our fonts, bars and frame. Roots' panel is
+FleetOpsHook's `ShipDisplay`, a larger object in its image with members of its own; it does part of
+its gameplay work in its drawing (each weapon icon gets its place from the ODF's
+`weapon<N>IconPos` in its `Render`; the sensors' and the weapons' subsystem icons set the flags
+that draw their range rings from their `Render`; the buffs are worked out there). So:
+
+- **The panel's `Render` keeps running, unseen.** The panel switch calls it as the engine would,
+  with the device's drawing dropped while it runs: seven drawing slots of `ST3D_DeviceDirectX8`'s
+  vtable (the two triangle fans the sprites and text are made of, the rectangles, the clipped
+  rectangles, the line strips, `WriteText` and `RenderClippedSprite2D`), each checked to hold its
+  function, are wrapped and do nothing while the flag is up (`render_unseen`). Every other call
+  (state changes, textures) runs. Not `RenderParticle`: render3d's particles module holds that
+  slot, and no panel draws particles. Nothing is taken: the panel is never `set_taken`.
+- **Ours draws what the children say, where Roots' layout puts them.** The layout is data:
+  `[InfoPanel]` in the `fleetops` content set (`content::InfoLayout`), Roots' `gui_interface.cfg`
+  numbers in the units of Roots' layout files, local to the panel (1249 x 163), each element with an
+  anchor. UI.log's `info: Roots' panel ...` line logs the panel's own children's rectangles at the
+  first selection of a mission, which the table matches (on 5.0Z11 every one of them). The
+  pictures are Roots' sprites, found by name in the HUD's sprite database at run time: the ship image
+  `<class>_si` (stretched over its area, tinted by the cloak as Roots does), or the wireframe picture
+  `<class>w1` for a class without one; the weapon and buff icons are FleetOpsHook's own children,
+  drawn at the rectangle and with the sprite its `Render` gave them, tinted with the race's
+  `weaponIconColor` (`WeaponTint.<race>`); the subsystem icons are the stock `RepairIcon`s' sprites,
+  in the race's `systemIconHealthyColor` (`SystemTint.<race>`), toward the theme's bad with the damage
+  and warn on the repair's flash, and grey for a system the craft does not have (a station's engines:
+  the craft's system record's first byte is 0); the race icon is the race's
+  `<race>_icon`; the rank is `select_rank_<n>` from FleetOpsHook's class record; the builder's queue
+  slots are drawn on the plate sprite FleetOpsHook gave each `BuildWireframe`, with the queued class's
+  `w1` picture. Name, crew and special energy are the panel's own texts in our font; the shield bar
+  (green to red, as Roots colours its shield bar) above the hull bar (blue, toward warn and bad) are
+  ours; the construction, research or store bar is the theme's bar, in the resource's colour.
+  A weapon icon past the weapons its class places is not drawn: the panel's icons keep the place and
+  sprite the last class gave them, so only the indices FleetOpsHook's record of the class's
+  `weapon<N>IconPos` marks present are (`weapon_has_icon`).
+- **The pointer stays Roots' panel's** over ours (`hud::set_info_area`) while ours keeps Roots' left
+  edge: the engine's `StandardComponent::Simulate` sets each child's mouse-over flag from the child's
+  own rectangle, so the tooltips, the clicks (a click on the panel takes the camera to the unit; a
+  queue slot cancels; a group icon selects, Shift takes it out) and FleetOpsHook's range rings are the
+  engine's and FleetOpsHook's own: a weapon icon under the pointer draws that weapon's red ring, the
+  sensors icon the green sensor ring, the weapons icon the cyan and red rings. Ours draws a hovered
+  icon lit, from the same flag. Nothing of ours is claimed there. When the panel is narrower or wider
+  than Roots' (`InfoWidth`, the bottom row), the right-anchored children (the queue's slots) are moved
+  with ours (`info_fo::move_rect`, an engine component's rectangle, put back when ours goes off);
+  FleetOpsHook's own children are never written.
+- **Moved off Roots' left edge** (`BottomRow` with the bar before the info panel), FleetOpsHook's
+  icons cannot follow ours (their rectangles are its objects'): ours then claims the panel and makes
+  the clicks itself as on Armada II (the camera, the queue's cancel, a group icon's selection), with
+  the children's tooltips; the weapon icons' range rings are not had there.
+- **The status line under the pointer** (the panel's `SDInfoBar`, which Roots draws at the top of the
+  screen) is drawn inside the panel's `Render` through one call, which `hud.hover` wraps ("The status
+  line under the pointer"): the gate is lifted around that call (`info_fo::ungated`), so the line stays
+  Roots' own, or the UI's with `[HUD] Hover=1`. The hook goes in with the gate.
+- **Faces** (all Roots'): one object (a craft: name, crew, energy, bars, image with its weapons, rank,
+  subsystems, race icon, and for a combat ship the long dark bar Roots shows; a moon or resource: the
+  image or picture, the hull strip and the store bar in the resource's colour), a builder (the same
+  and its ten slots, the first larger, and the construction bar), a group of up to 16 (one row of
+  82-unit tiles: picture, name, shields, hull) and of 17 to 30 (three rows of ten, filled down each
+  column). Roots' build yards show as one object (FleetOpsHook's choice in
+  `DetermineSelectedDisplayType`).
+
+**Not drawn by ours** (gaps): the weapon icons' state colours (Roots greys a weapon not yet
+researched, fills an icon to its reload and dims it while energy is short: ours draws every placed
+icon in the race's tint), FleetOpsHook's weapon buffs (a buff icon shows only while a gravity mine
+slows the unit or a spy is aboard), and a planet's population and owner texts beyond the store bar.
+
+### The bottom row on Fleet Operations: Roots
+
+`hud/row.rs`: on Roots with `Info=1`, `[HUD] BottomRow` arranges the bottom of the screen.
+
+| `BottomRow` | What |
+|---|---|
+| `stacked` (or empty) | the bar above the minimap, the info panel at Roots' own place (as before) |
+| `minimap, info, bar` (any order of the three) | along the bottom, left to right; the bar as high as the info panel (its three rows of cells fitted to it, or `BarCellSize`, units), the info panel in the room left, at most its own width (or `InfoWidth`, units) |
+| `auto` | that row (`minimap, info, bar`) where the info panel keeps its own width beside the bar, else stacked |
+
+The info panel's own place is the panel's rectangle as the engine has it (learnt while it shows),
+else estimated from the layout table (its units square, 1200 high). Narrower than its own width, the
+right-anchored elements (the queue) move with the right edge and the flexible ones (the
+construction and store bars) shorten; when the queue would run into the systems it is scaled down
+about the right edge (`MinWidth` is the narrowest drawn). The grid keeps its cell drawing and its
+moving of the stock buttons onto its cells (decision 331) wherever the row puts it.
+
 ### The player's race
 
 `engine/race.rs`. `Race::s_missionRace` (0x737cc0) is the race the HUD is loaded in:
@@ -1716,6 +1802,7 @@ is entered or called.
 | Hook | Entries | Without it |
 |---|---|---|
 | `ui.hud.info` (`HUD.Info`) | `shipDisplay`, `ShipDisplay::DetermineSelectedDisplayType`, `Craft::mComputeRepairLeft`, `Producer::GetBuildQueue`, `GameObject::GetSlowEffect` / `GetLineOfSightEffect`, `Localized_Strings::Localize` and `__RTDynamicCast` (`fn`, entry bytes checked), the type descriptors it casts with, `Entity::NO_ENTITY`, `gCameraManager`, `g_pCommandShift`, the panel's children and the objects' fields | the info panel stays stock |
+| `ui.hud.info_fo` (`HUD.Info`, Roots) | `info_fo_panel` (1 on Roots), `ST3D_DeviceDirectX8`'s vtable and seven of its drawing slots (each checked to hold its function), the panel's race icon, FleetOpsHook's members (the ship image, 32 weapon icons and 10 buff icons, each icon's sprite; `BuildWireframe`'s plate), FleetOpsHook's records of a craft and its class (rank, `weapon<N>IconPos`), a component's rectangle and mouse-over flag, the cloak's state | Roots' own info panel shows |
 | `ui.hud.unitview` (`HUD.UnitView`) | `g_cinematicView`, `CinematicView::Render` (checked) and `StandardBackground::Render`, held by their vtables' slots, the three rectangles and the frame pointer | the unit view keeps its stock place and frame |
 | `ui.hud.closeup` (`HUD.InfoCamera`) | `Armada_Camera`'s constructor, `ST3D_Camera::SetViewport` / `SetNearPlane` / `SetFarPlane`, `ST3D_GraphicsEngine::SetCurrentCamera` (checked), `SetTransform` in `Armada_Camera`'s vtable, `operator new`, the action camera's `Render_Stuff`, `DisplayInterface::currentCamera`, the entity and object lists, and the action camera's call of `Armada_RenderAllOurStuff` in `CinematicView::RenderView` (a `call`, `chain`: render3d re-points it, and the close-up goes through it) | the wireframe shows |
 | `ui.hud.radar` (`HUD.Minimap`) | `mapRadar` and the radar's sprites, filters and fog (`g_terrain`, `Scanner::m_fog`, `m_shroud`), `RadarComponent::ConvertWorldToSquareNormal` / `ConvertSquareNormalToWorld`, `Entity::GetTeamsVisibleToUser` and its call in `MapRadar::AlwaysGameSimulate` (patched: the clicks are made there), the team and filter functions, `ActionMode::GetAction`, `CameraManager::SnapToNearestVisible`, `ST3D_Camera::ProjectScreenPointToWorldRay`, `cOverViewImp`'s slots `+0xbc` / `+0xc8` and `PopupPaletteImp`'s `+0xa4` (checked to hold their functions), the object, class and camera fields | the minimap stays stock |

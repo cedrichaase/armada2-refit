@@ -23,6 +23,7 @@ pub use crate::rt::hook;
 pub mod hud;
 pub mod hover;
 pub mod info;
+pub mod info_fo;
 pub mod input;
 pub mod intro;
 pub mod leftovers;

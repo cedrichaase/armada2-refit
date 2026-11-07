@@ -11,6 +11,10 @@ out = "ui/src/syms_info.rs"
 doc = "The info panel: ShipDisplay's children asked for their answers, and the presses on the panel"
 rows = ["HUD.Info"]
 
+[hook."hud.info_fo"]
+doc = "Roots' info panel under ours: its Render runs unseen (the device's 2D draws dropped), FleetOpsHook's members read"
+rows = ["HUD.Info"]
+
 [hook."hud.unitview"]
 doc = "The unit view: CinematicView's rectangles written, its frame left out of Render"
 rows = ["HUD.UnitView"]
@@ -866,6 +870,308 @@ symbol = "Craft repair list: the id of system 4"
 kind = "value"
 value = 6
 used_by = ["hud.info"]
+
+# ---- hud.info_fo: Roots' info panel under ours (PLAN-FLEETOPS.md, FO-6, decisions 440-459) ----
+#
+# On a build whose info panel is FleetOpsHook's (`info_fo_panel`, Roots), the panel's own Render
+# keeps running every frame, so FleetOpsHook's per-frame work in it stays whole (the weapon icons'
+# rectangles, the subsystem icons' range rings, the buffs), but the device's 2D draws are dropped
+# while it runs: the seven drawing slots of ST3D_DeviceDirectX8's vtable are wrapped (not RenderParticle: render3d's
+# particles module holds that slot, and the HUD draws no particles), each checked
+# to hold its function, and do nothing while the panel draws. The members below are the ones
+# FleetOpsHook adds to its larger ShipDisplay and to BuildWireframe; they are read, never written.
+# On Armada II (`info_fo_panel` 0) nothing of this hook is installed or read.
+
+[[sym]]
+id = "info_fo_panel"
+symbol = "info panel: FleetOpsHook's ShipDisplay drawn by ours over its unseen Render"
+kind = "value"
+value = 0
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_dev_vtable"
+symbol = "ST3D_DeviceDirectX8::vftable"
+kind = "vtable"
+addr = 0x6bc6ac
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_dev_draw_clipped_rect"
+symbol = "ST3D_DeviceDirectX8::DrawClippedRectangle"
+kind = "fn"
+addr = 0x625770
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_dev_draw_rect"
+symbol = "ST3D_DeviceDirectX8::DrawRectangle"
+kind = "fn"
+addr = 0x623af0
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_dev_write_text"
+symbol = "ST3D_DeviceDirectX8::WriteText"
+kind = "fn"
+addr = 0x625500
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_dev_fan_plain"
+symbol = "ST3D_DeviceDirectX8::DrawTriangleFan (ST3D_Vertex_NoSpecular)"
+kind = "fn"
+addr = 0x624860
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_dev_fan"
+symbol = "ST3D_DeviceDirectX8::DrawTriangleFan (ST3D_Vertex)"
+kind = "fn"
+addr = 0x624790
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_dev_line_strip"
+symbol = "ST3D_DeviceDirectX8::DrawLineStrip"
+kind = "fn"
+addr = 0x624950
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_dev_sprite_2d"
+symbol = "ST3D_DeviceDirectX8::RenderClippedSprite2D"
+kind = "fn"
+addr = 0x625590
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_slot_draw_clipped_rect"
+symbol = "ST3D_DeviceDirectX8::DrawClippedRectangle"
+kind = "slot"
+target = "info_dev_draw_clipped_rect"
+vtable = "info_dev_vtable"
+index = 7
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_slot_draw_rect"
+symbol = "ST3D_DeviceDirectX8::DrawRectangle"
+kind = "slot"
+target = "info_dev_draw_rect"
+vtable = "info_dev_vtable"
+index = 8
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_slot_write_text"
+symbol = "ST3D_DeviceDirectX8::WriteText"
+kind = "slot"
+target = "info_dev_write_text"
+vtable = "info_dev_vtable"
+index = 9
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_slot_fan_plain"
+symbol = "ST3D_DeviceDirectX8::DrawTriangleFan (ST3D_Vertex_NoSpecular)"
+kind = "slot"
+target = "info_dev_fan_plain"
+vtable = "info_dev_vtable"
+index = 32
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_slot_fan"
+symbol = "ST3D_DeviceDirectX8::DrawTriangleFan (ST3D_Vertex)"
+kind = "slot"
+target = "info_dev_fan"
+vtable = "info_dev_vtable"
+index = 33
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_slot_line_strip"
+symbol = "ST3D_DeviceDirectX8::DrawLineStrip"
+kind = "slot"
+target = "info_dev_line_strip"
+vtable = "info_dev_vtable"
+index = 35
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_slot_sprite_2d"
+symbol = "ST3D_DeviceDirectX8::RenderClippedSprite2D"
+kind = "slot"
+target = "info_dev_sprite_2d"
+vtable = "info_dev_vtable"
+index = 49
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_comp_rect"
+symbol = "StandardComponent::rectangle (local to its owner)"
+kind = "field"
+struct = "StandardComponent"
+offset = 0x8
+type = "i32"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_comp_hover"
+symbol = "StandardComponent::mouse over"
+kind = "field"
+struct = "StandardComponent"
+offset = 0x18
+type = "u8"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_sd_race_icon"
+symbol = "ShipDisplay::race icon"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0x9c
+type = "ptr"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_systems"
+symbol = "ShipDisplay (FleetOpsHook's): the ship image (ShipSystems)"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0x308
+type = "ptr"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_weapon_icons"
+symbol = "ShipDisplay (FleetOpsHook's): the weapon icons (ShipSystemIcon)"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0x30c
+type = "ptr"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_n_weapon_icons"
+symbol = "ShipDisplay (FleetOpsHook's): weapon icons"
+kind = "value"
+value = 32
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_buff_icons"
+symbol = "ShipDisplay (FleetOpsHook's): the buff icons (ShipBuffIcon)"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0x38c
+type = "ptr"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_n_buff_icons"
+symbol = "ShipDisplay (FleetOpsHook's): buff icons"
+kind = "value"
+value = 10
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_icon_sprite"
+symbol = "ShipSystemIcon::sprite"
+kind = "field"
+struct = "ShipSystemIcon"
+offset = 0x2c
+type = "ptr"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_bw_plate"
+symbol = "BuildWireframe (FleetOpsHook's): the slot's plate sprite"
+kind = "field"
+struct = "BuildWireframe"
+offset = 0x44
+type = "ptr"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_craft_record"
+symbol = "Craft: FleetOpsHook's record of the craft"
+kind = "field"
+struct = "Craft"
+offset = 0x1a4
+type = "ptr"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_record_class"
+symbol = "FleetOpsHook's craft record: its class record"
+kind = "field"
+struct = "FOCraftRecord"
+offset = 0x4
+type = "ptr"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_class_rank"
+symbol = "FleetOpsHook's class record: rank (XPlevel)"
+kind = "field"
+struct = "FOClassRecord"
+offset = 0xac
+type = "u32"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_class_icon_pos"
+symbol = "FleetOpsHook's class record: weapon<N>IconPos, a Delphi dynamic array (its length at -4)"
+kind = "field"
+struct = "FOClassRecord"
+offset = 0x11c
+type = "ptr"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_icon_pos_bytes"
+symbol = "FleetOpsHook's weapon<N>IconPos entry: x%, y%, present (bytes each)"
+kind = "value"
+value = 12
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_fo_icon_pos_present"
+symbol = "FleetOpsHook's weapon<N>IconPos entry: whether the ODF gives the weapon an icon"
+kind = "field"
+struct = "FOIconPos"
+offset = 0x8
+type = "u32"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_sys_present"
+symbol = "CraftSystem: the craft has the system (0: none, as a station's engines)"
+kind = "field"
+struct = "CraftSystem"
+offset = 0x0
+type = "u8"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_obj_cloak"
+symbol = "GameObject::cloak"
+kind = "field"
+struct = "GameObject"
+offset = 0x108
+type = "ptr"
+used_by = ["hud.info_fo"]
+
+[[sym]]
+id = "info_cloak_state"
+symbol = "cloak: its state"
+kind = "field"
+struct = "CloakingDevice"
+offset = 0x3c
+type = "u32"
+used_by = ["hud.info_fo"]
 
 [[sym]]
 id = "unitview_cinematic_view"

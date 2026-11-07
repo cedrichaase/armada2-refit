@@ -440,6 +440,37 @@ mod tests {
     }
 
     #[test]
+    fn ui_fleetops_info_layout() {
+        use ui::*;
+        let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../ui/content/sets/fleetops/ui.ini")).unwrap();
+        let c = parse(Box::leak(text.into_boxed_str()));
+        let l = &c.info;
+        // Roots' panel (infoPanelArea_1) and the places its children were measured at on the bench.
+        assert_eq!(l.size, [1249.0, 163.0]);
+        assert!(l.lamps);
+        let e = |n: &str| l.element(n).unwrap_or_else(|| panic!("no {n}"));
+        assert_eq!((e("Name").anchor, e("Name").rect), (Anchor::Left, [29.0, 28.0, 240.0, 20.0]));
+        assert_eq!(e("Image").rect, [10.0, 18.0, 512.0, 128.0]);
+        let systems: Vec<[f32; 2]> = (0..5).map(|i| { let r = e(&format!("System{i}")).rect; [r[0], r[1]] }).collect();
+        assert_eq!(systems, [[537.0, 42.0], [508.0, 71.0], [508.0, 42.0], [537.0, 71.0], [508.0, 100.0]]);
+        assert_eq!((e("Queue0").anchor, e("Queue0").rect), (Anchor::Right, [570.0, 31.0, 96.0, 96.0]));
+        assert_eq!(e("Progress").anchor, Anchor::Flex);
+        assert_eq!(l.number("QueueStep", 0.0), 60.0);
+        assert_eq!(l.numbers("SmallStep"), [120.0, 39.0]);
+        assert_eq!(l.numbers("WeaponTint"), [153.0, 153.0, 242.0]);
+        assert_eq!(l.name("ImageSuffix"), "_si");
+        assert_eq!(l.name("WireSuffix"), "w1");
+        // Every element lies inside the panel.
+        for el in l.elements.iter().filter(|e| !e.name.starts_with("Group") && !e.name.starts_with("Small")) {
+            let r = el.rect;
+            assert!(r[0] >= 0.0 && r[1] >= 0.0 && r[0] + r[2] <= l.size[0] && r[1] + r[3] <= l.size[1], "{} is outside the panel", el.name);
+        }
+        // Armada II's set lays its panel out itself.
+        let stock = parse(Box::leak(std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../ui/content/sets/stock/ui.ini")).unwrap().into_boxed_str()));
+        assert!(stock.info.is_empty());
+    }
+
+    #[test]
     fn ui_fleetops_glyphs() {
         use ui::*;
         let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../ui/content/sets/fleetops/ui.ini")).unwrap();

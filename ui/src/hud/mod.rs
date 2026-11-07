@@ -8,6 +8,8 @@ mod bargrid;
 mod barskin;
 mod hover;
 pub mod info;
+pub mod info_fo;
+pub mod row;
 pub mod layout;
 pub mod leftovers;
 pub mod minimap;
@@ -43,6 +45,13 @@ static mut HOVER: (bool, bool) = (false, false);
 /// the minimap's click hook is in, the info panel's engine functions are stock.
 static mut MINIMAP_CAP: bool = false;
 static mut INFO_CAP: bool = false;
+/// The info panel is FleetOpsHook's (Roots): ours draws it in Roots' layout (`info_fo`).
+static mut INFO_FO: bool = false;
+
+/// Whether the info panel of ours is Roots' layout over its panel's unseen Render.
+pub fn info_fo_on() -> bool {
+    unsafe { INFO && INFO_FO }
+}
 
 /// Whether the selection overlay is ours (`[HUD] Selection=1`, its functions stock).
 pub fn selection_ours() -> bool {
@@ -94,7 +103,10 @@ pub fn install() -> bool {
             crate::log!("bar: stays stock");
         }
     }
-    unsafe { INFO_CAP = api::info::functions_stock() };
+    unsafe {
+        INFO_CAP = api::info::functions_stock();
+        INFO_FO = INFO_CAP && api::info_fo::available();
+    }
     panels::install(cfg);
     comm::install(cfg);
     apply_live(cfg);
@@ -118,9 +130,16 @@ pub fn apply_live(cfg: &crate::config::Hud) {
         MINIMAP_LOGGED = true;
         let want = cfg.info && INFO_CAP;
         if want != INFO {
-            hud::set_taken(hud::INFO_PANEL_TAKEN, false, want);
-            INFO = want;
-            crate::log!("info: {}", if want { "ours" } else { "stock" });
+            if INFO_FO {
+                // Roots: the panel's Render runs unseen under ours (info_fo), never taken.
+                let ok = info_fo::set(want);
+                INFO = want && ok;
+                crate::log!("info: {}", if INFO { "ours, in Roots' layout over its panel's unseen Render" } else { "Roots' own" });
+            } else {
+                hud::set_taken(hud::INFO_PANEL_TAKEN, false, want);
+                INFO = want;
+                crate::log!("info: {}", if want { "ours" } else { "stock" });
+            }
         } else if cfg.info && !INFO_CAP && !INFO_LOGGED {
             crate::log!("info: an engine function is not stock, the info panel stays stock");
         }
@@ -328,10 +347,18 @@ pub fn run(ui: &mut Ui) {
             layout::at("minimap");
             minimap::run(ui);
         }
-        // The info panel first: the bar is placed against it.
-        if INFO {
+        // The info panel first: the bar is placed against it. On Roots the bottom row is planned
+        // first (`row`): where the info panel and the bar go this frame.
+        if INFO && INFO_FO {
+            row::plan(ui, BAR && bar::shows());
             layout::at("info");
-            info::run(ui);
+            info_fo::run(ui);
+        } else {
+            row::clear();
+            if INFO {
+                layout::at("info");
+                info::run(ui);
+            }
         }
         if BAR {
             layout::at("bar");
