@@ -1295,21 +1295,28 @@ Admiral's Log, the one-button message), told apart by address only; Roots' build
 each verified beside its edit, since FleetOpsHook's record was measured to hold stock's
 address for every one. A spec acts as a player: `Screen::click` moves the pointer to the
 stock control's point, and once it has rested there (0.12 s; Roots' screens take a press
-only on a control already under the pointer, decision 190) presses and releases; one
-click at a time, in order. Typing into an edit is `End`, a Backspace for each character
+only on a control already under the pointer, decision 190) presses, and releases 0.06 s
+later, each in a pass of its own through the dialog's messages; one click at a time, in
+order, and the clicks still waiting when something opens over the dialog (Roots' Yes/No)
+are dropped, as a player's would land on it. Load and Save never click a stock row that is
+already picked: two clicks on one are its own double click, which loaded nothing after
+Roots' question answered Yes (decision 255). Typing into an edit is `End`, a Backspace for each character
 it held, and the new text, posted to the edit as the keyboard would send them. Nothing
 writes a setting. A spec that does not recognise its dialog returns false and the frame
 draws the picture.
 
 The specs reuse Armada II's layouts, factored out of `screens/` with Armada II's
 behaviour unchanged: `single_player::campaign_column` and `campaign_cards`,
-`mission_select::mission_list`, `saves::saves_screen`, `notice::notice_window`. Return in a text field of ours on an adopted dialog never reaches it: user32's modal loop turns it into the dialog's OK command first (decision 253).
+`mission_select::mission_list`, `saves::saves_screen`, `notice::notice_window`, `admirals_log::log_frame`. `setup_kit` acts through the trait `menus::Host`, which Armada II's `Screen` and Roots' `roots_dialogs::Screen` both are (a click, the picture, keys, Enter, a selection), and Game Setup's places are a `game_setup::Layout` (`ARMADA`, `ROOTS`). Return in a text field of ours on an adopted dialog never reaches it: user32's modal loop turns it into the dialog's OK command first (decision 253).
 
 | Dialog | Spec | What it shows |
 |---|---|---|
 | Single Player (`SingleDlgProc`) | `roots_dialogs/single_player.rs` | Armada II's campaign selection: over render3d's map the column (the four campaigns, each named by the dialog's hidden hover label and marked by a cut of its own card's art, then Load Game and Previous Menu), pointing at one moving the camera to its view (`federation`, `dominion`, `species8472`, `freeborg` in the fleetops map); without the scene, the cards (2x2). The top two cards are hit areas of the procedure, the bottom two picture `ShellButton`s, as on Armada II |
 | The mission list (`MissionSelectDlgProc`) | `roots_dialogs/mission_select.rs` | Armada II's list in a window of ours over the campaign selection: the stock rows by their labels, OK and Cancel |
 | Load Game, Save Game (`LoadGameDlgProc`, `SaveGameDlgProc`) | `roots_dialogs/saves.rs` | Armada II's save list: name and date, the stock list's two scroll buttons and the wheel, Save's name field writing the stock `Edit` (id 2100), the foot |
+| The Admiral's Log (`AdmiralsLogDlgProc`) | `roots_dialogs/admirals_log.rs` | Armada II's log frame (`admirals_log::log_frame`): the tabs (words of ours by id: Roots paints them), the players and Done, the stock owner-drawn buttons; the page is the shown pane's picture (the panes are adopted pop-ups, not drawn again by the frame), the pointer posted to it (decision 259) |
+| Game Setup (`MultiplayerSetupDlgProc`) | `roots_dialogs/game_setup.rs` | Armada II's Game Setup (`game_setup::draw_with`) with Roots' places (`ROOTS`, a `game_setup::Layout`): the players' rows as our drop-downs over the stock `ComboBox`es, the palette, the map's window with its preview and settings, the bottom row; the column headings are Armada II's words, Roots paints its own (decision 257) |
+| Game Settings (`GameSettingsDlgProc`) | `roots_dialogs/game_settings.rs` | Armada II's settings form (a caption over each control): the six stock sliders (set by a click on the track, `generic::click_scroll_with`) and the two cycle buttons; Roots' labels hold no text, so the captions are words of ours, given in the order Roots stacks the controls (decision 256) |
 | The one-button message (`OneButtonDlgProc`) | `roots_dialogs/notice.rs` | Armada II's message window (`notice::notice_window`): the labels as title and text, the stock OK |
 
 **The campaign tiles are Roots' art**: the column draws each card's own picture, cut from

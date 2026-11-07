@@ -24,6 +24,9 @@ use crate::rt::win::HWND;
 use crate::widgets::Ui;
 use alloc::vec::Vec;
 
+pub mod admirals_log;
+pub mod game_settings;
+pub mod game_setup;
 pub mod mission_select;
 pub mod notice;
 pub mod saves;
@@ -104,34 +107,81 @@ impl Screen<'_> {
     }
 }
 
+/// The shared layouts (`screens::setup_kit`, Game Setup) act on an adopted dialog through
+/// this: a click is `Screen::click` (the pointer resting first), typing is posted to the
+/// edit as the keyboard would send it, Enter too (the dialog's modal loop, user32's, makes
+/// it the dialog's OK, decision 253), a combo box's choice is its selection and its
+/// parent's notification.
+impl crate::menus::Host for Screen<'_> {
+    fn model(&self) -> &Model {
+        self.model
+    }
+    fn top(&self) -> bool {
+        self.top
+    }
+    fn click(&self, x: i32, y: i32) {
+        Screen::click(self, x, y);
+    }
+    fn mirror_part(&self, ui: &mut Ui, r: [i32; 4], dst: crate::gfx::R, tint: u32) {
+        Screen::mirror_part(self, ui, r, dst, tint);
+    }
+    fn key(&self, h: HWND, msg: u32, wp: usize) {
+        forms::act(Action::Key(h as usize, msg, wp));
+    }
+    fn enter(&self, h: HWND) {
+        forms::act(Action::Key(h as usize, crate::rt::win::WM_KEYDOWN, 0x0d));
+    }
+    fn select(&self, h: HWND, combo: bool, index: i32, _double: bool) {
+        if combo {
+            forms::act(Action::Select(h as usize, index));
+        } else {
+            crate::log!("menus: roots dialog {:#x}: a list's selection is not sent (no list on Roots' dialogs yet)", self.d.hwnd);
+        }
+    }
+    fn full_screen(&self) -> bool {
+        self.model.rect[2] >= forms::design().0
+    }
+}
+
 /// Clicks waiting their turn, in order: (dialog, client point).
 static mut CLICKS: Vec<(usize, i32, i32)> = Vec::new();
-/// The click whose hover went out: (dialog, client point, when).
-static mut ACTIVE: Option<(usize, i32, i32, f64)> = None;
+/// The click under way: (dialog, client point, when its last step was sent, step: 0 the
+/// pointer moved there, 1 the button down).
+static mut ACTIVE: Option<(usize, i32, i32, f64, u8)> = None;
 /// How long the pointer rests on a control before the press (seconds).
 const PRESS_AFTER: f64 = 0.12;
+/// How long the button is held (seconds).
+const RELEASE_AFTER: f64 = 0.06;
 
-/// The clicks, one at a time: the pointer moved to the point, and once it has rested
-/// there the press and the release. A click for a dialog no longer on top is dropped.
+/// The clicks, one at a time, as a player's: the pointer moved to the point, once it has
+/// rested there the button down, and a moment later up, each in a pass of its own through
+/// the dialog's messages (decision 255: a press and its release sent together left Load
+/// Game's question answered Yes without the load). A click for a dialog no longer on top
+/// is dropped.
 fn flush(top: usize) {
     let now = crate::rt::now();
     let q = unsafe { &mut *core::ptr::addr_of_mut!(CLICKS) };
     q.retain(|c| c.0 == top);
-    if let Some((h, x, y, at)) = unsafe { ACTIVE } {
+    if let Some((h, x, y, at, step)) = unsafe { ACTIVE } {
         if h != top {
             unsafe { ACTIVE = None };
-        } else if now - at >= PRESS_AFTER {
-            unsafe { ACTIVE = None };
+        } else if step == 0 && now - at >= PRESS_AFTER {
             forms::act(Action::Mouse(h, forms::MOUSE_MOVE, 0, x, y));
             forms::act(Action::Mouse(h, forms::MOUSE_DOWN, forms::MOUSE_HELD, x, y));
+            if crate::config::get().menus_trace {
+                crate::log!("menus: trace: roots dialog {:#x}: pressed at {},{} (client)", h, x, y);
+            }
+            unsafe { ACTIVE = Some((h, x, y, now, 1)) };
+        } else if step == 1 && now - at >= RELEASE_AFTER {
             forms::act(Action::Mouse(h, forms::MOUSE_UP, 0, x, y));
+            unsafe { ACTIVE = None };
         }
         return;
     }
     if !q.is_empty() {
         let (h, x, y) = q.remove(0);
         forms::act(Action::Mouse(h, forms::MOUSE_MOVE, 0, x, y));
-        unsafe { ACTIVE = Some((h, x, y, now)) };
+        unsafe { ACTIVE = Some((h, x, y, now, 0)) };
     }
 }
 
@@ -165,6 +215,9 @@ fn spec(screen: &str) -> Option<Draw> {
         "load game" => saves::draw_load,
         "save game" => saves::draw_save,
         "message" => notice::draw,
+        "game settings" => game_settings::draw,
+        "game setup" => game_setup::draw,
+        "admiral's log" => admirals_log::draw,
         _ => return None,
     })
 }
@@ -174,7 +227,9 @@ fn spec(screen: &str) -> Option<Draw> {
 pub fn draw(ui: &mut Ui, d: &Dialog, fit: Fit, picture: Option<Tex>) -> bool {
     let Some(design) = d.design else { return false };
     if d.pane {
-        return false;
+        // The Admiral's Log's panes are drawn by the log's spec, in its page (decision 259).
+        let owner = forms::dialogs().into_iter().find(|o| !o.pane && o.z + 1 == d.z);
+        return crate::config::get().menus_specs && owner.is_some_and(|o| forms::dialog_screen(o.stock_proc) == "admiral's log");
     }
     let name = forms::dialog_screen(d.stock_proc);
     let m = model::read_adopted(d.hwnd as HWND, design, name);
@@ -185,6 +240,16 @@ pub fn draw(ui: &mut Ui, d: &Dialog, fit: Fit, picture: Option<Tex>) -> bool {
     let Some(f) = spec(name) else { return false };
     if d.top {
         flush(d.hwnd);
+    } else {
+        // Something opened over it (Load's question, after the stock row's double click):
+        // the clicks still waiting are a player's that the question took, not this
+        // dialog's; sent after it, one more Load undid the answer (decision 255).
+        unsafe {
+            if ACTIVE.is_some_and(|c| c.0 == d.hwnd) {
+                ACTIVE = None;
+            }
+            (*core::ptr::addr_of_mut!(CLICKS)).retain(|c| c.0 != d.hwnd);
+        }
     }
     let s = Screen { d, model: &m, fit, picture, top: d.top };
     let drawn = ui.scope(&crate::sfmt!("rdlg{}", d.hwnd), |ui| ui.inert_unless(d.top, |ui| f(ui, &s)));

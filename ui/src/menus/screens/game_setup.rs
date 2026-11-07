@@ -23,24 +23,77 @@ use super::setup_kit as kit;
 use crate::engine::api::shellui::Kind;
 use crate::gfx::{Weight, R};
 use crate::menus::model::{Control, What};
-use crate::menus::Screen;
+use crate::menus::{Host, Screen};
 use crate::widgets::{theme, Align, Ui};
 use alloc::vec::Vec;
 
-/// The stock layout's parts, in design coordinates: the players' table is left of
-/// x 450 and above y 300; the minimap preview's frame; the bottom row of buttons.
-const TABLE_RIGHT: i32 = 450;
-const TABLE_BOTTOM: i32 = 260;
-const PREVIEW: [i32; 4] = [627, 129, 155, 155];
-const BOTTOM_ROW: i32 = 560;
+/// Where the stock screen keeps its parts, in design coordinates (`ARMADA`: Armada II's
+/// 800x600; Roots' 1200x900 is `menus::roots_dialogs::game_setup`'s). The players' table
+/// is left of `table_right` and above `table_bottom`; its columns start at `cols` (player,
+/// side, the multiplayer "Armada" column, team: a combo is in the last column it starts
+/// at or right of), its headings between `heads_y`; the row's swatch is `swatch` (x, size)
+/// beside the row; the palette is between `table_bottom` and `palette_bottom`, its Random
+/// button left of `random_right`, its swatches `swatch.1` square; the chat log is a
+/// multi-line edit left of `log_right`, the chat target a toggle below `target_y`; the
+/// map's labels are right of `info_x` and above `info_bottom`, its settings the labelled
+/// buttons right of `set_x` and below `set_top`, those beside the preview right of
+/// `beside_x`; the bottom row is below `bottom_row`; the title above `title_bottom`.
+pub struct Layout {
+    pub table_right: i32,
+    pub table_bottom: i32,
+    pub cols: [i32; 4],
+    pub armada: (i32, i32),
+    pub heads_y: (i32, i32),
+    pub swatch: (i32, i32),
+    pub palette_bottom: i32,
+    pub random_right: i32,
+    pub log_right: i32,
+    pub target_y: i32,
+    pub info_x: i32,
+    pub info_bottom: i32,
+    pub set_x: i32,
+    pub set_top: i32,
+    pub beside_x: i32,
+    pub preview: [i32; 4],
+    pub bottom_row: i32,
+    pub title_bottom: i32,
+}
+
+/// Armada II's screen.
+pub const ARMADA: Layout = Layout {
+    table_right: 450,
+    table_bottom: 260,
+    cols: [41, 200, 290, 370],
+    armada: (290, 370),
+    heads_y: (40, 80),
+    swatch: (30, 16),
+    palette_bottom: 320,
+    random_right: 250,
+    log_right: 450,
+    target_y: 500,
+    info_x: 480,
+    info_bottom: 125,
+    set_x: 380,
+    set_top: 120,
+    beside_x: 480,
+    preview: [627, 129, 155, 155],
+    bottom_row: 560,
+    title_bottom: 30,
+};
 
 fn is_combo(c: &Control) -> bool {
     matches!(c.what, What::Shell(Kind::Combo))
 }
 
 pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
+    draw_with(ui, s, &ARMADA)
+}
+
+/// The screen laid out from `s` with the stock layout `l`, for any front end (Roots'
+/// adopted Game Setup, `menus::roots_dialogs`).
+pub fn draw_with(ui: &mut Ui, s: &dyn Host, l: &Layout) -> bool {
     let combos = kit::visible(s, is_combo);
-    let nav: Vec<&Control> = kit::visible(s, |c| kit::is_button(c) && c.rect[1] >= BOTTOM_ROW && !c.text.is_empty());
+    let nav: Vec<&Control> = s.model().controls.iter().filter(|c| c.visible && c.rect[2] > 0 && c.rect[3] > 0 && kit::is_button(c) && c.rect[1] >= l.bottom_row && !c.text.is_empty()).collect();
     if combos.is_empty() || nav.is_empty() {
         return false;
     }
@@ -52,10 +105,10 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
 
     // The title: the screen's own (its first label, "GAME SETUP").
     let title = s
-        .model
+        .model()
         .controls
         .iter()
-        .find(|c| kit::is_label(c) && c.rect[1] < 30 && !c.text.trim().is_empty())
+        .find(|c| kit::is_label(c) && c.rect[1] < l.title_bottom && !c.text.trim().is_empty())
         .map(|c| c.text.trim())
         .unwrap_or("GAME SETUP");
     let title_r = R::new(screen.x + m, screen.y + m * 0.5, screen.w - 2.0 * m, ui.u(t.display_size + 16.0));
@@ -67,8 +120,8 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     let left = R::new(body.x, body.y, left_w, body.h);
     let right = R::new(left.right() + gap, body.y, body.w - left_w - gap, body.h);
 
-    players(ui, s, &combos, left);
-    map(ui, s, right);
+    players(ui, s, l, &combos, left);
+    map(ui, s, l, right);
 
     // The bottom row: the first button (Previous Menu) at the left, the rest at the right.
     let mut nav = nav;
@@ -83,11 +136,11 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
 }
 
 /// The players' window, and the chat under it when the screen has one.
-fn players(ui: &mut Ui, s: &Screen, combos: &[&Control], r: R) {
+fn players(ui: &mut Ui, s: &dyn Host, l: &Layout, combos: &[&Control], r: R) {
     let t = ui.theme;
     // Group the combos into rows by their top.
     let mut rows: Vec<(i32, Vec<&Control>)> = Vec::new();
-    for c in combos.iter().filter(|c| c.rect[1] < TABLE_BOTTOM && c.rect[0] < TABLE_RIGHT) {
+    for c in combos.iter().filter(|c| c.rect[1] < l.table_bottom && c.rect[0] < l.table_right) {
         match rows.iter_mut().find(|r| (r.0 - c.rect[1]).abs() < 6) {
             Some(r) => r.1.push(c),
             None => rows.push((c.rect[1], alloc::vec![*c])),
@@ -101,7 +154,7 @@ fn players(ui: &mut Ui, s: &Screen, combos: &[&Control], r: R) {
     let edits = kit::visible(s, kit::is_edit);
     // A multiplayer game has a second multi-line edit at the right (x 600, the
     // observers); the log is the one under the table.
-    let log = edits.iter().find(|c| c.style & 0x4 != 0 && c.rect[0] < TABLE_RIGHT).copied();
+    let log = edits.iter().find(|c| c.style & 0x4 != 0 && c.rect[0] < l.log_right).copied();
     let line = edits.iter().find(|c| c.style & 0x4 == 0).copied();
     // The log also says what the host changed ("Resources: Lots"), in Instant Action too.
     let chat = line.is_some() || log.is_some();
@@ -114,22 +167,22 @@ fn players(ui: &mut Ui, s: &Screen, combos: &[&Control], r: R) {
     let inner = ui.window(pr, "Players");
 
     // The column headings (the screen's own labels over the table).
-    let heads: Vec<&Control> = kit::visible(s, |c| kit::is_label(c) && c.rect[1] < 80 && c.rect[1] > 40 && c.rect[0] < TABLE_RIGHT && !c.text.trim().is_empty());
+    let heads: Vec<&Control> = s.model().controls.iter().filter(|c| c.visible && c.rect[2] > 0 && c.rect[3] > 0 && kit::is_label(c) && c.rect[1] < l.heads_y.1 && c.rect[1] > l.heads_y.0 && c.rect[0] < l.table_right && !c.text.trim().is_empty()).collect();
     // A multiplayer game's rows have a fourth combo, the "Armada" column (x 295:
     // Personal, Allied, ...), between the side (x 203) and the team (x 375), and a
     // ready light left of the swatch (a 10x10 picture at x 14, under the "Comm"
     // heading), green once the player has pressed LAUNCH.
-    let armada = rows.iter().any(|r| r.1.iter().any(|c| c.rect[0] >= 290 && c.rect[0] < 370));
-    let lights = kit::visible(s, |c| matches!(c.what, What::Shell(Kind::Button)) && c.rect[0] < 30 && c.rect[2] == 10 && c.rect[3] == 10 && c.rect[1] < TABLE_BOTTOM);
+    let armada = rows.iter().any(|r| r.1.iter().any(|c| c.rect[0] >= l.armada.0 && c.rect[0] < l.armada.1));
+    let lights: Vec<&Control> = s.model().controls.iter().filter(|c| c.visible && c.rect[2] > 0 && c.rect[3] > 0 && matches!(c.what, What::Shell(Kind::Button)) && c.rect[0] < l.swatch.0 && c.rect[2] == 10 && c.rect[3] == 10 && c.rect[1] < l.table_bottom).collect();
     let light = if lights.is_empty() { 0.0 } else { ui.u(t.row_h * 0.6) + ui.u(t.gap) };
     let chip = ui.u(t.row_h) + light;
     let ncol = if armada { 4 } else { 3 };
     let cols = column_rects(ui, R::new(inner.x + chip + ui.u(t.gap), inner.y, inner.w - chip - ui.u(t.gap), head_h), ncol);
     let head = |x0: i32, x1: i32, d: &'static str| heads.iter().find(|h| h.rect[0] >= x0 && h.rect[0] < x1).map_or(d, |h| h.text.as_str());
     let names: [&str; 4] = if armada {
-        [head(41, 200, "Player"), head(200, 290, "Side"), head(290, 370, "Armada"), head(370, 450, "Team")]
+        [head(l.cols[0], l.cols[1], "Player"), head(l.cols[1], l.cols[2], "Side"), head(l.cols[2], l.cols[3], "Armada"), head(l.cols[3], l.table_right, "Team")]
     } else {
-        [head(41, 200, "Player"), head(200, 290, "Side"), head(360, 450, "Team"), ""]
+        [head(l.cols[0], l.cols[1], "Player"), head(l.cols[1], l.cols[2], "Side"), head(l.cols[3] - (l.cols[3] - l.cols[2]) / 8, l.table_right, "Team"), ""]
     };
     for i in 0..ncol {
         kit::caption(ui, cols[i], names[i]);
@@ -145,17 +198,17 @@ fn players(ui: &mut Ui, s: &Screen, combos: &[&Control], r: R) {
         }
         let cz = ui.u(t.row_h) * 0.7;
         let sw = R::new(rr.x + light, rr.y + (rr.h - cz) * 0.5, cz, cz);
-        kit::picture(ui, s, [30, *ry, 16, 16], sw, true);
+        kit::picture(ui, s, [l.swatch.0, *ry, l.swatch.1, l.swatch.1], sw, true);
         let cols = column_rects(ui, R::new(inner.x + chip + ui.u(t.gap), rr.y, inner.w - chip - ui.u(t.gap), rr.h), ncol);
         for c in cs.iter() {
-            let col = if c.rect[0] < 200 { 0 } else if c.rect[0] < 290 { 1 } else if c.rect[0] < 370 && armada { 2 } else if armada { 3 } else { 2 };
+            let col = if c.rect[0] < l.cols[1] { 0 } else if c.rect[0] < l.cols[2] { 1 } else if c.rect[0] < l.cols[3] && armada { 2 } else if armada { 3 } else { 2 };
             kit::combo(ui, s, c, cols[col]);
         }
     }
     // The palette: the stock Random button and the colour swatches, by place.
     let pal_y = inner.bottom() - palette_h;
-    let random = kit::visible(s, |c| kit::is_button(c) && !c.text.is_empty() && c.rect[1] > TABLE_BOTTOM && c.rect[1] < 320 && c.rect[0] < 250);
-    let swatches = kit::visible(s, |c| kit::is_button(c) && c.text.is_empty() && c.rect[2] == 16 && c.rect[1] > TABLE_BOTTOM && c.rect[1] < 320);
+    let random: Vec<&Control> = s.model().controls.iter().filter(|c| c.visible && c.rect[2] > 0 && c.rect[3] > 0 && kit::is_button(c) && !c.text.is_empty() && c.rect[1] > l.table_bottom && c.rect[1] < l.palette_bottom && c.rect[0] < l.random_right).collect();
+    let swatches: Vec<&Control> = s.model().controls.iter().filter(|c| c.visible && c.rect[2] > 0 && c.rect[3] > 0 && kit::is_button(c) && c.text.is_empty() && c.rect[2] == l.swatch.1 && c.rect[1] > l.table_bottom && c.rect[1] < l.palette_bottom).collect();
     let mut x = inner.x;
     if let Some(c) = random.first() {
         let br = R::new(x, pal_y, ui.u(180.0), palette_h);
@@ -179,7 +232,7 @@ fn players(ui: &mut Ui, s: &Screen, combos: &[&Control], r: R) {
         if let Some(lc) = line {
             // Beside the line, the toggle that says who it goes to ("All"), when the
             // screen has one (a multiplayer game: a toggle right of the line).
-            let target = kit::visible(s, |c| matches!(c.what, What::Shell(Kind::Toggle)) && c.rect[1] > 500 && c.rect[0] < TABLE_RIGHT);
+            let target: Vec<&Control> = s.model().controls.iter().filter(|c| c.visible && c.rect[2] > 0 && c.rect[3] > 0 && matches!(c.what, What::Shell(Kind::Toggle)) && c.rect[1] > l.target_y && c.rect[0] < l.table_right).collect();
             let tw = if target.is_empty() { 0.0 } else { ui.u(120.0) };
             kit::edit(ui, s, lc, R::new(ci.x, ci.bottom() - fh, ci.w - tw - if tw > 0.0 { ui.u(t.gap) } else { 0.0 }, fh));
             if let Some(tc) = target.first() {
@@ -220,15 +273,15 @@ fn chat_log(ui: &mut Ui, text: &str, r: R) {
 }
 
 /// The map's window: what the screen says of the map, the preview, the settings.
-fn map(ui: &mut Ui, s: &Screen, r: R) {
+fn map(ui: &mut Ui, s: &dyn Host, l: &Layout, r: R) {
     let t = ui.theme;
     // The map's own labels (name, players, "Teams are locked."), top to bottom.
-    let mut info: Vec<&Control> = kit::visible(s, |c| kit::is_label(c) && c.rect[0] >= 480 && c.rect[1] < 125 && !c.text.trim().is_empty());
+    let mut info: Vec<&Control> = s.model().controls.iter().filter(|c| c.visible && c.rect[2] > 0 && c.rect[3] > 0 && kit::is_label(c) && c.rect[0] >= l.info_x && c.rect[1] < l.info_bottom && !c.text.trim().is_empty()).collect();
     info.sort_by_key(|c| c.rect[1]);
     // The settings: every labelled shell button right of the table and above the bottom row.
-    let mut set: Vec<&Control> = kit::visible(s, |c| {
-        kit::is_button(c) && !c.text.is_empty() && c.rect[0] >= 380 && c.rect[1] > TABLE_BOTTOM - 140 && c.rect[1] < BOTTOM_ROW && !matches!(c.what, What::Shell(Kind::Combo))
-    });
+    let mut set: Vec<&Control> = s.model().controls.iter().filter(|c| {
+        c.visible && c.rect[2] > 0 && c.rect[3] > 0 && kit::is_button(c) && !c.text.is_empty() && c.rect[0] >= l.set_x && c.rect[1] > l.set_top && c.rect[1] < l.bottom_row && !matches!(c.what, What::Shell(Kind::Combo))
+    }).collect();
     kit::dedupe(&mut set);
     set.sort_by_key(|c| (c.rect[0] / 100, c.rect[1]));
     let inner = ui.window(r, info.first().map_or("Map", |c| c.text.trim()));
@@ -244,7 +297,7 @@ fn map(ui: &mut Ui, s: &Screen, r: R) {
     }
     let pr = R::new(inner.x, y + ui.u(t.gap), pv, pv);
     ui.draw.rect(pr.inset(-ui.u(2.0)), t.panel_edge);
-    kit::picture(ui, s, PREVIEW, pr, true);
+    kit::picture(ui, s, l.preview, pr, true);
     // Beside the preview: SELECT MAP and the toggles; under it the rest, two columns.
     let bh = ui.u(t.button_h);
     let sx = pr.right() + ui.u(t.pad * 1.5);
@@ -252,7 +305,7 @@ fn map(ui: &mut Ui, s: &Screen, r: R) {
     let mut sy = pr.y;
     let mut rest: Vec<&Control> = Vec::new();
     for c in set.iter() {
-        let beside = matches!(c.what, What::Shell(Kind::SelBox | Kind::Toggle)) || c.rect[0] >= 480;
+        let beside = matches!(c.what, What::Shell(Kind::SelBox | Kind::Toggle)) || c.rect[0] >= l.beside_x;
         if beside && sy + bh <= pr.bottom() + 0.5 {
             let br = R::new(sx, sy, sw, bh);
             match c.what {

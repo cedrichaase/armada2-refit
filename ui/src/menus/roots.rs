@@ -409,7 +409,7 @@ fn forward(ui: &mut Ui, fit: &Fit, f: &Form, r: R) {
 /// dialogs come and go, as the host's mirrors are).
 static mut DIALOG_TEX: Vec<(usize, Tex, i32, i32, u32)> = Vec::new();
 
-fn dialog_texture(d: &Dialog) -> Option<Tex> {
+pub(crate) fn dialog_texture(d: &Dialog) -> Option<Tex> {
     let (bits, w, h, serial) = forms::dialog_picture(d.hwnd)?;
     let v = unsafe { &mut *core::ptr::addr_of_mut!(DIALOG_TEX) };
     let i = match v.iter().position(|e| e.0 == d.hwnd && e.2 == w && e.3 == h) {
