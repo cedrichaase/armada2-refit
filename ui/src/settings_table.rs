@@ -240,7 +240,7 @@ pub static SETTINGS: [Setting; 19] = [
         values: core::ptr::null(),
         value_labels: core::ptr::null(),
         label: c"Redrawn menus".as_ptr(),
-        help: c"The shell's menus hosted and drawn by the UI, and this screen with them. Off gives the game's menus back. Roots also needs its own row below.".as_ptr(),
+        help: c"The shell's menus hosted and drawn by the UI, and this screen with them. Off gives the game's menus back.".as_ptr(),
         moved_from: core::ptr::null(),
     },
     Setting {
@@ -290,8 +290,8 @@ pub static SETTINGS: [Setting; 19] = [
         def: c"0".as_ptr(),
         values: core::ptr::null(),
         value_labels: core::ptr::null(),
-        label: c"Redrawn menus: Fleet Operations: Roots".as_ptr(),
-        help: c"Roots' front end (main menu, Options and more) redrawn by the UI; needs Redrawn menus on too. Only matters on Roots.".as_ptr(),
+        label: c"Redrawn front-end forms".as_ptr(),
+        help: c"The front end's own forms (main menu, Options and more) drawn by the UI. Off gives the game's forms back.".as_ptr(),
         moved_from: core::ptr::null(),
     },
     Setting {

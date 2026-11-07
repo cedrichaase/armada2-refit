@@ -1075,8 +1075,8 @@ a Mutara nebula with the queen's Diamond (`render3d/README.md`, "The menu scene"
 
 Fleet Operations: Roots only (PLAN-FLEETOPS.md, FO-6 step 7, option C), with
 `[Menus] Forms=1` (0 in `UI.ini` and in Roots' defaults until each screen is seen in game;
-the Refit screen's "Redrawn menus: Fleet Operations: Roots" row, Interface tab, advanced, sets it, and
-next to `Enable`, which it needs too; applies at the next start).
+the Refit screen shows an advanced "Redrawn front-end forms" row, Interface tab, only on a build
+that has forms; it applies at the next start and does not need `Enable`).
 On Roots the main menu, Options (the in-mission menu too), Yes/No, Manual IP, Multiplayer
 Connection, Map Select, Graphics and Advanced Options never run the executable's dialogs:
 `FleetOpsHook.dll` shows a VCL form of its own (a Delphi library's window class), modal,

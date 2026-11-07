@@ -263,6 +263,24 @@ pub fn press(form: &Form, c: &Control) {
 
 // ---- install --------------------------------------------------------------------------
 
+/// Whether this game has forms of FleetOpsHook's the UI knows: the build has them and the
+/// loaded FleetOpsHook is one of the family. Decides whether the Refit screen shows the
+/// `Forms` row at all; settled once, as neither changes while the game runs.
+pub fn available() -> bool {
+    use core::sync::atomic::{AtomicU8, Ordering};
+    static A: AtomicU8 = AtomicU8::new(0);
+    match A.load(Ordering::Relaxed) {
+        1 => return false,
+        2 => return true,
+        _ => {}
+    }
+    let ok = eng().ready(hook::FORMS_VCL).is_ok()
+        && value::FORMS_PRESENT() != 0
+        && a2engine::companion_crc("FleetOpsHook.dll").is_some_and(|c| FAMILY.iter().any(|f| f.0 == c));
+    A.store(if ok { 2 } else { 1 }, Ordering::Relaxed);
+    ok
+}
+
 /// `[Menus] Forms` 1 (ours) or 2 (the probe): the CBT hook on the game's thread (DllMain's),
 /// when the build has forms and FleetOpsHook is one of the family.
 pub fn install(mode: u8) -> bool {

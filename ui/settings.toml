@@ -170,7 +170,7 @@ apply = "restart"
 scope = "local"
 tab = "interface"
 label = "Redrawn menus"
-help = "The shell's menus hosted and drawn by the UI, and this screen with them. Off gives the game's menus back. Roots also needs its own row below."
+help = "The shell's menus hosted and drawn by the UI, and this screen with them. Off gives the game's menus back."
 flags = ["advanced"]
 
 [[row]]
@@ -207,8 +207,8 @@ apply = "restart"
 scope = "local"
 tab = "interface"
 flags = ["advanced"]
-label = "Redrawn menus: Fleet Operations: Roots"
-help = "Roots' front end (main menu, Options and more) redrawn by the UI; needs Redrawn menus on too. Only matters on Roots."
+label = "Redrawn front-end forms"
+help = "The front end's own forms (main menu, Options and more) drawn by the UI. Off gives the game's forms back."
 
 [[row]]
 name = "loading_enable"
