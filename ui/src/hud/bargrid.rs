@@ -217,12 +217,22 @@ pub fn run(ui: &mut Ui) {
         let mut st = theme::State::of(ui, id, palette::hovered(b) && enabled, palette::pressed(b) && enabled);
         st.on = palette::state(b) == 2;
         st.off = !enabled;
-        let content = theme::button_frame(ui, r, st);
-        let icon = r.inset(ui.u(5.0));
         let mut sp = palette::sprite(b);
         if sp == 0 {
             sp = palette::own_sprite(b);
         }
+        // Roots' button art is a tile itself (decision 344): it fills the cell, no plate of ours.
+        if crate::icons::whole_tile(sp) {
+            crate::icons::tile_button(ui, r, sp, st);
+            if let Some(label) = if c < CELLS && cfg.hud.bar_labels { bar::qol_label(c) } else { None } {
+                let sz = ui.u(t.micro_size + 1.0);
+                let lr = R::new(r.x + ui.u(3.0), r.y + ui.u(2.0), sz * 1.1, sz * 1.15);
+                theme::badge(ui, lr, label, !enabled);
+            }
+            continue;
+        }
+        let content = theme::button_frame(ui, r, st);
+        let icon = r.inset(ui.u(5.0));
         let ours = crate::icons::ours_for_sprite(cfg.hud.icons, sp, |s| sprite::art(s).is_some()) && {
             let ink = if enabled { content } else { fade(content, 0.45) };
             let ir = icon.inset(ui.u(0.5));

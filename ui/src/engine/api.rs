@@ -201,7 +201,7 @@ pub mod sound {
 }
 
 pub mod sprite {
-    pub use crate::engine::sprite::{art, name};
+    pub use crate::engine::sprite::{art, name, own_tile};
 }
 
 pub mod topbar {

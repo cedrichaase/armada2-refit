@@ -182,19 +182,21 @@ pub fn game_button(ui: &mut Ui, r: R, b: usize, name: &str, on: bool) -> bool {
     let mut st = theme::State::of(ui, id, hot, held);
     st.off = !enabled;
     st.on = on || api::buttons::state(b) == 2;
-    let col = theme::button_frame(ui, r, st);
-    let e = ui.u(ui.theme.edge).max(1.0);
-    let img = r.inset(e + ui.u(4.0));
     let sp = api::buttons::sprite(b);
     note_icon(name, sp);
+    // A Roots button whose art is a tile itself fills the button, no plate of ours (decision 344).
+    let tiled = crate::icons::whole_tile(sp);
+    let col = if tiled { crate::icons::tile_button(ui, r, sp, st) } else { theme::button_frame(ui, r, st) };
+    let e = ui.u(ui.theme.edge).max(1.0);
+    let img = r.inset(e + ui.u(4.0));
     let t = ui.theme;
-    let ours = crate::icons::ours_for_sprite(crate::config::get().hud.icons, sp, |s| sprite::art(s).is_some()) && {
+    let ours = !tiled && crate::icons::ours_for_sprite(crate::config::get().hud.icons, sp, |s| sprite::art(s).is_some()) && {
         let ink = if !enabled { crate::gfx::fade(col, 0.45) } else { col };
         let ir = img.inset(ui.u(1.0));
         crate::icons::draw(&mut ui.draw, sprite::name(sp), ir, 1.0, crate::icons::theme_colour(&t, ink))
     };
-    match if ours { None } else { sprite::art(sp) } {
-        _ if ours => {}
+    match if ours || tiled { None } else { sprite::art(sp) } {
+        _ if ours || tiled => {}
         Some((tex, uv)) => {
             let tint = if !enabled { 0xff5a5a5a } else if hot { 0xffffffff } else { 0xffd0d0d0 };
             ui.draw.image_uv(tex, img, uv, tint);

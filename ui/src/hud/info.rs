@@ -314,7 +314,8 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
     let (_, ft, _, fb) = theme::frame_margins(ui);
     let h = pad * 2.0 + top_h + sys_h + queue_h + ft + fb;
     let outer = place(ui, w, h);
-    ui.panel(outer);
+    // Lamps in the frame (Starfleet): the info panel stands where Roots' has them.
+    ui.panel_lit(outer);
     let inner = theme::panel_inner(ui, outer);
 
     // The wireframe, at the left.
@@ -596,7 +597,7 @@ fn group(ui: &mut Ui, tip: &mut Tip) -> Option<R> {
     let w = cols as f32 * tw + (cols - 1) as f32 * gap + chrome_w;
     let h = rows as f32 * th + (rows - 1) as f32 * gap + 2.0 * pad + ft + fb;
     let outer = place(ui, w.max(ui.u(150.0)), h);
-    ui.panel(outer);
+    ui.panel_lit(outer);
     let inner = theme::panel_inner(ui, outer).inset(pad - ui.u(t.pad));
     let x0 = inner.x + (inner.w - (cols as f32 * tw + (cols - 1) as f32 * gap)) * 0.5;
     let shift = ui.input.shift || info::shift_held();

@@ -60,6 +60,10 @@ pub struct Files {
     /// The main menu's title lettering on a game that has it as art (a PNG under the game
     /// directory, read at run time; `menus::title_art`), or "" for the text heading.
     pub menu_title: &'static str,
+    /// The `.spr` file of the HUD sprites every race shares (Roots: `gui_global.spr`), looked in
+    /// after the race's own when a sprite's art is read from its `.spr` line
+    /// (`engine::sprite::spr_entry`); "" for none.
+    pub gui_sprites: &'static str,
 }
 
 /// Where an element of a laid-out panel goes when the panel is wider or narrower than its
@@ -196,7 +200,7 @@ pub static NONE: Content = Content {
     tour: &[],
     main_scene: None,
     first_campaign_scene: None,
-    files: Files { race_icons: "", credits: "", credits_logos: "", cursor_sprites: "", menu_title: "" },
+    files: Files { race_icons: "", credits: "", credits_logos: "", cursor_sprites: "", menu_title: "", gui_sprites: "" },
     gallery_ships: &[],
     gallery_factions: &[],
     glyphs: &[],
@@ -266,6 +270,7 @@ pub fn parse(text: &'static str) -> Content {
             credits_logos: t.str("Files", "CreditsLogos"),
             cursor_sprites: t.str("Files", "CursorSprites"),
             menu_title: t.str("Files", "MenuTitle"),
+            gui_sprites: t.str("Files", "GuiSprites"),
         },
         gallery_ships: t.list("Gallery", "Ships").leak(),
         gallery_factions: t.list("Gallery", "Factions").leak(),
