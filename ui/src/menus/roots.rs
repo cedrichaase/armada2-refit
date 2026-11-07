@@ -12,6 +12,10 @@
 //!
 //! Every action goes back to Roots' form as a player's would (`forms::act`): a press of
 //! ours is a posted click at the control's centre; nothing writes a setting.
+mod graphics;
+mod kit;
+mod specs;
+
 use crate::engine::api::forms::{self, Action, Control, Form, Kind};
 use crate::gfx::{self, Tex, R};
 use crate::gfx::Weight;
@@ -137,6 +141,7 @@ pub fn frame(ui: &mut Ui) {
                 (true, "TMainForm") => main_menu(ui, f),
                 (true, "TOptionsMenuForm") => column(ui, &fit, f, area, Some("buttonBack")),
                 (true, "TYesNoForm") => yes_no(ui, &fit, f),
+                (true, _) if specs::draw(ui, f) => {}
                 _ => generic(ui, &fit, f, cfg.menus_widgets, live),
             })
         });

@@ -28,6 +28,7 @@
 //! part runs only on a FleetOpsHook of the measured family (`FAMILY`, decision 148), and
 //! only with `[Menus] Forms=1` (Roots' default is 0, decision 149). `Forms=probe` is the
 //! step 0 probe: the same, plus a fixed walk of presses and a log of what it finds.
+use super::forms_props;
 use crate::rt::win::*;
 use crate::syms_forms::{field, hook, value, TABLE};
 use alloc::string::String;
@@ -138,6 +139,11 @@ pub struct Control {
     /// A combo's entries and the selected one (-1: none).
     pub items: Vec<String>,
     pub selected: i32,
+    /// A check box's state, read from its published `Checked` (None: not a check box, or
+    /// its class reads it through a method).
+    pub checked: Option<bool>,
+    /// A slider's published `Value`, `MinValue` and `MaxValue` (None as above).
+    pub value: Option<(i32, i32, i32)>,
 }
 
 /// A form as the UI draws it: its class, where it sits in the design space (the
@@ -718,6 +724,7 @@ fn controls(obj: usize) -> Vec<Control> {
                 _ => {}
             }
         }
+        let (checked, value) = state_of(c, vmt, &class);
         out.push(Control {
             name: ansi_string(rd::<usize>(c + field::FORMS_COMP_NAME())),
             class,
@@ -729,20 +736,86 @@ fn controls(obj: usize) -> Vec<Control> {
             hwnd,
             items,
             selected,
+            checked,
+            value,
         });
     }
     out
+}
+
+static mut PROPS_LOGGED: Vec<String> = Vec::new();
+
+/// A check box's and a slider's state, from their published properties (read only,
+/// `forms_props.rs`); the class's table is logged once.
+fn state_of(c: usize, vmt: usize, class: &str) -> (Option<bool>, Option<(i32, i32, i32)>) {
+    let check = derives(vmt, "TJvgCheckBox");
+    let slider = derives(vmt, "TJvxSlider");
+    if !check && !slider {
+        return (None, None);
+    }
+    let props = forms_props::published(vmt, in_fo);
+    let logged = unsafe { &mut *core::ptr::addr_of_mut!(PROPS_LOGGED) };
+    if !logged.iter().any(|n| n == class) {
+        logged.push(String::from(class));
+        let list: Vec<String> = props
+            .iter()
+            .map(|p| match p.getter {
+                forms_props::Getter::Field(o) => crate::sfmt!("{}@{:#x}", p.name, o),
+                forms_props::Getter::Method => crate::sfmt!("{}()", p.name),
+            })
+            .collect();
+        crate::log!("forms: published properties of {}: {}", class, list.join(" "));
+    }
+    let checked = if check { forms_props::field_of(c, &props, "Checked", 1).map(|v| v != 0) } else { None };
+    let value = if slider {
+        let v = forms_props::field_of(c, &props, "Value", 4);
+        let lo = forms_props::field_of(c, &props, "MinValue", 4);
+        let hi = forms_props::field_of(c, &props, "MaxValue", 4);
+        match (v, lo, hi) {
+            (Some(v), Some(lo), Some(hi)) => Some((v, lo, hi)),
+            _ => None,
+        }
+    } else {
+        None
+    };
+    (checked, value)
 }
 
 fn log_controls(t: &Tracked, v: &[Control]) {
     crate::log!("forms: {} has {} controls:", t.class, v.len());
     for c in v {
         crate::log!(
-            "forms:   {:?} {} {} {},{} {}x{} {}{} text {:?}{}",
+            "forms:   {:?} {} {} {},{} {}x{} {}{} text {:?}{}{}{}",
             c.kind, c.class, c.name, c.rect[0], c.rect[1], c.rect[2], c.rect[3],
             if c.visible { "visible" } else { "hidden" }, if c.enabled { "" } else { " disabled" }, c.text,
-            if c.items.is_empty() { String::new() } else { crate::sfmt!(" ({} items, {} chosen)", c.items.len(), c.selected) }
+            if c.items.is_empty() { String::new() } else { crate::sfmt!(" ({} items, {} chosen)", c.items.len(), c.selected) },
+            match (c.checked, c.value) {
+                (Some(k), _) => crate::sfmt!(" checked {}", k),
+                (_, Some((v, lo, hi))) => crate::sfmt!(" value {} of {}..{}", v, lo, hi),
+                _ => String::new(),
+            },
+            if c.hwnd != 0 { " windowed" } else { "" }
         );
+    }
+}
+
+/// A check box's, a slider's or a combo's state that changed since the last read: logged,
+/// for the bench to check what a press of ours did (`forms: <name> of <class> now ...`).
+fn log_changes(t: &Tracked, now: &[Control]) {
+    if t.last.is_empty() {
+        return;
+    }
+    for c in now {
+        let Some(o) = t.last.iter().find(|o| o.name == c.name) else { continue };
+        if c.checked != o.checked {
+            crate::log!("forms: {} of {} now {}", c.name, t.class, if c.checked == Some(true) { "checked" } else { "unchecked" });
+        }
+        if c.value != o.value {
+            crate::log!("forms: {} of {} now at {}", c.name, t.class, c.value.map_or(-1, |v| v.0));
+        }
+        if c.selected != o.selected {
+            crate::log!("forms: {} of {} now chose {}", c.name, t.class, c.selected);
+        }
     }
 }
 
@@ -796,6 +869,7 @@ unsafe extern "system" fn tick(_h: HWND, _m: u32, _id: usize, _t: u32) {
     }
     keep_off(t.hwnd);
     poll_button(t.hwnd);
+    log_changes(t, &ctl);
     t.last = ctl;
     // Nothing else sets the pointer's shape once the form is away from it (decision 171).
     unsafe { SetCursor(LoadCursorA(core::ptr::null_mut(), IDC_ARROW)) };
