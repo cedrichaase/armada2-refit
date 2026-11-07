@@ -369,6 +369,11 @@ def games_test():
     put(root, 'leak.md', '---\nlayers: [alpha]\nbump: patch\ngames: [two]\n---\n\n- for the Secret Mod, in Game Two.\n', commit=False)
     check(not C.check(root, units)[1], 'check: a quiet word on the quiet game\'s own track is fine')
     os.remove(os.path.join(root, '.changeset', 'leak.md'))
+    # check: a file players receive never names it either (publish/README.md)
+    put(root, '../PLAYING.md', 'ok\nSee the Secret Mod.\n', commit=False)
+    e = C.check(root, units)[1]
+    check(any('PLAYING.md:2' in x and 'Secret Mod' in x for x in e), f'check: a quiet word in PLAYING.md: {e}')
+    os.remove(os.path.join(root, 'PLAYING.md'))
     try:
         C.add(root, units, {'alpha': 'patch'}, None, 'Fixed', 'two: fix', games=['one'])
         check(False, 'add refuses a quiet game\'s id on a published track')

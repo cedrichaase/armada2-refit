@@ -657,6 +657,68 @@ def quiet_hits(c, games):
     return hits
 
 
+def shipped_files(root):
+    """What a player or a reader of the published pages receives, from publish/package.sh and
+    layers.toml, not a hand list: every repository file package.sh names under $root/ and
+    every glob among them, the guides, the installers' sources, the GUI installer, the
+    settings tables (their labels and help are drawn on the Refit screen) and the changelogs
+    of the offered games' layers. Developer material (the layer READMEs, profiles, plans,
+    defaults of a game) is not among them."""
+    import glob
+    out = set()
+    pk = read(root, 'publish/package.sh') if os.path.exists(os.path.join(root, 'publish/package.sh')) else ''
+    # The cp statements only (with their continuation lines): the rest of package.sh
+    # runs repository tools (tools/layers.py, games/) that no package carries.
+    stmt, cps = '', []
+    for line in pk.splitlines():
+        stmt += line + ' '
+        if line.rstrip().endswith('\\'):
+            stmt = stmt.rstrip('\\ ') + ' '
+            continue
+        if re.match(r'\s*cp ', stmt):
+            cps.append(stmt)
+        stmt = ''
+    for st in cps:
+        for m in re.finditer(r'\$root/([A-Za-z0-9_./*-]+)', st):
+            for f in glob.glob(os.path.join(root, m.group(1))):
+                if os.path.isfile(f):
+                    out.add(os.path.relpath(f, root))
+    for d in ('publish/installer', 'gui-installer', 'csdk'):
+        for dp, _, fs in os.walk(os.path.join(root, d)):
+            if 'build' in dp.split(os.sep):
+                continue
+            out.update(os.path.relpath(os.path.join(dp, f), root) for f in fs)
+    out.update(('README.md', 'PLAYING.md', 'MODDING.md', 'CHANGELOG.md', 'publish/MODDING.txt',
+                'retire/known.txt'))
+    for dp, _, fs in os.walk(root):
+        rel = os.path.relpath(dp, root)
+        if rel.split(os.sep)[0] in ('.git', 'games', 'target', 'plans', '.claude'):
+            continue
+        for f in fs:
+            if f in ('settings.toml', 'CHANGELOG.md') and rel.count(os.sep) < 1:
+                out.add(os.path.normpath(os.path.join(rel, f)))
+    out = {f for f in out if not f.endswith(('.png', '.tga', '.dll', '.asi', '.exe', '.lib'))}
+    return sorted(f for f in out if os.path.exists(os.path.join(root, f)))
+
+
+def shipped_hits(root, games):
+    """[(file, line, game, word)]: a word of a game that is not offered, in a file a player
+    receives (publish/README.md, "Nothing of a quiet game in what players read")."""
+    words = [(g.id, w) for g in games.values() if not g.offered for w in g.quiet]
+    res = [(gid, w, re.compile(r'(?<![A-Za-z0-9])' + re.escape(w))) for gid, w in words]
+    hits = []
+    for f in shipped_files(root):
+        try:
+            text = read(root, f)
+        except (UnicodeDecodeError, OSError):
+            continue
+        for n, line in enumerate(text.splitlines(), 1):
+            for gid, w, rx in res:
+                if rx.search(line):
+                    hits.append((f, n, gid, w))
+    return hits
+
+
 def check(root, units, base=None, allow_version_change=False):
     errs = []
     games = load_games(root)
@@ -668,6 +730,9 @@ def check(root, units, base=None, allow_version_change=False):
             errs.append(f'{c.name}: names {w!r} ({gid}, not offered) on the track of {offered}, '
                         f'which is published: word it without it, or split off a changeset '
                         f'with games: [{gid}] (.changeset/README.md, "Games")')
+    for f, n, gid, w in shipped_hits(root, games):
+        errs.append(f'{f}:{n}: names {w!r} ({gid}, not offered) in a file players receive: '
+                    f'reword it neutrally, or move it to developer material (publish/README.md)')
     for g in games.values():
         if g.changelog and os.path.exists(os.path.join(root, g.changelog)):
             for line in read(root, g.changelog).splitlines():

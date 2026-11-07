@@ -77,6 +77,24 @@ position, not legal advice):
   data directories or the old `archive/` and `promo/`. No publishable file here is
   binary, so the binary test catches a renamed image without a list of extensions.
 
+### Nothing of a game that is not offered in what players read
+
+A game that is not offered (`games/<id>.toml`, no `offered`; today Fleet Operations: Roots,
+bash-only, installed by `./install --game <id>` and not advertised) is never named in a
+file a player or a reader of the published pages receives. `tools/changeset.py check`
+(CI, "The changesets") greps those files for each such game's id, label and `[changesets]
+quiet` words and fails with `file:line`. The list is derived, not kept by hand
+(`shipped_files()`): every repository file a `cp` in `publish/package.sh` puts in the
+package (the plugins' inis, the model scripts, `a2env.py`, the installers, the SDK), the
+installers' sources (`publish/installer/`), the GUI installer (`gui-installer/`), the
+guides (`README.md`, `PLAYING.md`, `MODDING.md`, `publish/MODDING.txt`), the root and the
+layers' `CHANGELOG.md` (the release notes), `retire/known.txt`, and each layer's
+`settings.toml`, whose labels and help the Refit screen draws. Developer material may name
+it: the layers' READMEs and sources, `HUD.md` and the like, the plans, `games/`,
+`profiles/`, the games' defaults (`ui/defaults/`, `qol/defaults/`) and the content sets.
+A key's comment in a shipped ini says what the key does for a player, without the game;
+the specifics go in the layer README or the game's defaults file.
+
 ## Commit hashes in the changelogs
 
 This repository's history was rewritten without any binary, and `check.sh` passes on
