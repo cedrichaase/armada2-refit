@@ -56,6 +56,9 @@ doc = "ScriptInterfaceImp::Attack (Attack=, `attack`)"
 [hook.switches]
 doc = "ScriptInterfaceImp's DisableEngines, DisableWeapons and CraftCannotDie (`engines`, `weapons`, `immortal`)"
 
+[hook.hit]
+doc = "Craft::DamageHull and ScriptInterfaceImp::SetRealTeam: a weapon's hit on a hull and a change of team (`damage`, `team`)"
+
 [hook.kill]
 doc = "ScriptInterfaceImp::ExplodeNow: a craft dies now (`kill`)"
 
@@ -188,7 +191,7 @@ symbol = "Entity::Get"
 kind = "fn"
 addr = 0x4cfff0
 check = "55 8b ec 8b 4d 08 8b c1"
-used_by = ["heal", "special", "damage", "move", "build_order", "cloak", "freighter", "colonize", "tech", "marks", "select", "groups", "objects", "build", "switches", "kill", "attack", "locate", "center"]
+used_by = ["heal", "special", "damage", "move", "build_order", "cloak", "freighter", "colonize", "tech", "marks", "select", "groups", "objects", "build", "switches", "kill", "hit", "attack", "locate", "center"]
 
 [[sym]]
 id = "obj_handle"
@@ -464,7 +467,7 @@ id = "script_interface"
 symbol = "g_pScriptInterface"
 kind = "global"
 addr = 0x735c70
-used_by = ["heal", "special", "attack", "switches", "kill", "mission", "move", "build_order", "pause", "center", "locate", "tick", "cloak"]
+used_by = ["heal", "special", "attack", "switches", "kill", "mission", "move", "build_order", "pause", "center", "locate", "tick", "cloak", "hit"]
 
 [[sym]]
 id = "si_attack"
@@ -553,6 +556,22 @@ kind = "fn"
 addr = 0x456cf0
 check = "55 8b ec 8b 45 08 50 e8"
 used_by = ["kill"]
+
+[[sym]]
+id = "si_set_real_team"
+symbol = "ScriptInterfaceImp::SetRealTeam"
+kind = "fn"
+addr = 0x455cc0
+check = "55 8b ec 8b 45 08 50 e8"
+used_by = ["hit"]
+
+[[sym]]
+id = "fn_damage_hull"
+symbol = "Craft::DamageHull"
+kind = "fn"
+addr = 0x4c8a80
+check = "55 8b ec d9 45 08 56 8b"
+used_by = ["hit"]
 
 [[sym]]
 id = "si_succeed"

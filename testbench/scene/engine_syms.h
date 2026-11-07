@@ -52,12 +52,14 @@
 #define SCENE_S_SI_MAX_HEALTH 46
 #define SCENE_S_SI_CANNOT_DIE 47
 #define SCENE_S_SI_EXPLODE_NOW 48
-#define SCENE_S_SI_SUCCEED 49
-#define SCENE_S_SI_FAIL 50
-#define SCENE_S_SI_SET_SHIELDS 51
-#define SCENE_S_SI_SET_CREW 52
-#define SCENE_S_SI_SET_SPECIAL 53
-#define SCENE_S_FN_REPAIR_ALL 54
+#define SCENE_S_SI_SET_REAL_TEAM 49
+#define SCENE_S_FN_DAMAGE_HULL 50
+#define SCENE_S_SI_SUCCEED 51
+#define SCENE_S_SI_FAIL 52
+#define SCENE_S_SI_SET_SHIELDS 53
+#define SCENE_S_SI_SET_CREW 54
+#define SCENE_S_SI_SET_SPECIAL 55
+#define SCENE_S_FN_REPAIR_ALL 56
 #define SCENE_F_CRAFT_MAX_CREW ((int)a2f_scene_craft_max_crew)
 #define SCENE_F_CRAFT_SHIELDS ((int)a2f_scene_craft_shields)
 #define SCENE_F_CRAFT_SHIELDS_MAX ((int)a2f_scene_craft_shields_max)
@@ -68,14 +70,14 @@
 #define SCENE_F_SYS_MAX_HP ((int)a2f_scene_sys_max_hp)
 #define SCENE_F_SYS_HP ((int)a2f_scene_sys_hp)
 #define SCENE_V_SYS_SIZE ((int)a2f_scene_sys_size)
-#define SCENE_S_VT_CRAFT_INSTANCE 65
-#define SCENE_S_SLOT_INST_UPDATE 66
-#define SCENE_S_FN_INST_UPDATE 67
+#define SCENE_S_VT_CRAFT_INSTANCE 67
+#define SCENE_S_SLOT_INST_UPDATE 68
+#define SCENE_S_FN_INST_UPDATE 69
 #define SCENE_F_INST_SYS_SHOWN ((int)a2f_scene_inst_sys_shown)
-#define SCENE_S_FN_PRJ_SET_NAME 69
-#define SCENE_S_FN_WEAPON_FIND 70
-#define SCENE_S_FN_FIRE_AT_SPECIAL 71
-#define SCENE_S_FN_FIRE_SPECIAL 72
+#define SCENE_S_FN_PRJ_SET_NAME 71
+#define SCENE_S_FN_WEAPON_FIND 72
+#define SCENE_S_FN_FIRE_AT_SPECIAL 73
+#define SCENE_S_FN_FIRE_SPECIAL 74
 #define SCENE_F_CRAFT_SPECIAL_MAX ((int)a2f_scene_craft_special_max)
 #define SCENE_F_CRAFT_SPECIAL ((int)a2f_scene_craft_special)
 #define SCENE_F_CRAFT_CARRIER ((int)a2f_scene_craft_carrier)
@@ -83,96 +85,96 @@
 #define SCENE_F_CARRIER_WEAPONS_END ((int)a2f_scene_carrier_weapons_end)
 #define SCENE_F_WEAPON_CLASS ((int)a2f_scene_weapon_class)
 #define SCENE_F_WEAPON_VT_CAN_FIRE ((int)a2f_scene_weapon_vt_can_fire)
-#define SCENE_S_FN_SET_COMMAND_OBJ 80
-#define SCENE_S_FN_SET_COMMAND 81
-#define SCENE_S_FN_SET_COMMAND_AT 82
-#define SCENE_S_FN_DQ_COMMAND 83
+#define SCENE_S_FN_SET_COMMAND_OBJ 82
+#define SCENE_S_FN_SET_COMMAND 83
+#define SCENE_S_FN_SET_COMMAND_AT 84
+#define SCENE_S_FN_DQ_COMMAND 85
 #define SCENE_V_CMD_STOP ((int)a2f_scene_cmd_stop)
 #define SCENE_V_CMD_GO ((int)a2f_scene_cmd_go)
 #define SCENE_V_CMD_SET_FORMATION ((int)a2f_scene_cmd_set_formation)
 #define SCENE_V_CMD_GO_WARP ((int)a2f_scene_cmd_go_warp)
-#define SCENE_S_FN_SET_COMMAND_BUILD 88
-#define SCENE_S_FN_CLASS_FIND 89
-#define SCENE_S_FN_TEAM_ADD_RES 90
-#define SCENE_S_FN_TEAM_GET 91
+#define SCENE_S_FN_SET_COMMAND_BUILD 90
+#define SCENE_S_FN_CLASS_FIND 91
+#define SCENE_S_FN_TEAM_ADD_RES 92
+#define SCENE_S_FN_TEAM_GET 93
 #define SCENE_V_CMD_BUILD ((int)a2f_scene_cmd_build)
 #define SCENE_V_MAX_TEAM ((int)a2f_scene_max_team)
-#define SCENE_S_FN_CLOAK_NOW 94
+#define SCENE_S_FN_CLOAK_NOW 96
 #define SCENE_F_OBJ_CLOAK ((int)a2f_scene_obj_cloak)
 #define SCENE_F_CLOAK_REQUEST ((int)a2f_scene_cloak_request)
 #define SCENE_F_CLOAK_STATE ((int)a2f_scene_cloak_state)
-#define SCENE_S_VT_FREIGHTER 98
-#define SCENE_S_FN_FREIGHTER_LOAD 99
+#define SCENE_S_VT_FREIGHTER 100
+#define SCENE_S_FN_FREIGHTER_LOAD 101
 #define SCENE_F_FREIGHTER_AMOUNT ((int)a2f_scene_freighter_amount)
 #define SCENE_F_FREIGHTER_KIND ((int)a2f_scene_freighter_kind)
-#define SCENE_S_VT_PLANET 102
-#define SCENE_S_FN_PL_START_COLONY 103
-#define SCENE_S_FN_PL_SET_POP 104
-#define SCENE_S_FN_PL_MAX_POP 105
-#define SCENE_S_FN_PL_NEUTRALIZE 106
-#define SCENE_S_FN_CRAFT_SET_CREW 107
+#define SCENE_S_VT_PLANET 104
+#define SCENE_S_FN_PL_START_COLONY 105
+#define SCENE_S_FN_PL_SET_POP 106
+#define SCENE_S_FN_PL_MAX_POP 107
+#define SCENE_S_FN_PL_NEUTRALIZE 108
+#define SCENE_S_FN_CRAFT_SET_CREW 109
 #define SCENE_F_TEAM_RACE ((int)a2f_scene_team_race)
 #define SCENE_F_RACE_CITY_NAME ((int)a2f_scene_race_city_name)
 #define SCENE_F_PL_POPULATION ((int)a2f_scene_pl_population)
 #define SCENE_F_PL_SHOWN_RACE ((int)a2f_scene_pl_shown_race)
 #define SCENE_F_PL_SHOWN_POP ((int)a2f_scene_pl_shown_pop)
-#define SCENE_S_TECH_TREES 113
+#define SCENE_S_TECH_TREES 115
 #define SCENE_V_TECH_TREE_SIZE ((int)a2f_scene_tech_tree_size)
 #define SCENE_V_TECH_MAX_TEAM ((int)a2f_scene_tech_max_team)
-#define SCENE_S_FN_TECH_FIND 116
+#define SCENE_S_FN_TECH_FIND 118
 #define SCENE_F_TECH_AVAILABLE ((int)a2f_scene_tech_available)
 #define SCENE_F_TECH_POSSIBLE ((int)a2f_scene_tech_possible)
-#define SCENE_S_ORDNANCE_LIST 119
-#define SCENE_S_EXPLOSION_LIST 120
+#define SCENE_S_ORDNANCE_LIST 121
+#define SCENE_S_EXPLOSION_LIST 122
 #define SCENE_F_ORD_CLASS ((int)a2f_scene_ord_class)
 #define SCENE_F_ORD_OWNER ((int)a2f_scene_ord_owner)
 #define SCENE_F_ORD_TARGET ((int)a2f_scene_ord_target)
 #define SCENE_F_ORD_CLASS_PRJ ((int)a2f_scene_ord_class_prj)
-#define SCENE_S_FN_PRJ_GET_ODF 125
+#define SCENE_S_FN_PRJ_GET_ODF 127
 #define SCENE_F_EXP_RADIUS ((int)a2f_scene_exp_radius)
-#define SCENE_S_VT_FIREBALL 127
-#define SCENE_S_VT_SHOCKWAVE 128
-#define SCENE_S_FN_ENTITY_TRANSFORM 129
+#define SCENE_S_VT_FIREBALL 129
+#define SCENE_S_VT_SHOCKWAVE 130
+#define SCENE_S_FN_ENTITY_TRANSFORM 131
 #define SCENE_F_LIST_HEAD ((int)a2f_scene_list_head)
 #define SCENE_F_NODE_NEXT ((int)a2f_scene_node_next)
 #define SCENE_F_NODE_VALUE ((int)a2f_scene_node_value)
-#define SCENE_S_FN_RANDOM_CTOR 133
-#define SCENE_S_G_RANDOM 134
-#define SCENE_S_G_MISSION_RANDOM 135
-#define SCENE_S_G_ASYNC_RANDOM 136
+#define SCENE_S_FN_RANDOM_CTOR 135
+#define SCENE_S_G_RANDOM 136
+#define SCENE_S_G_MISSION_RANDOM 137
+#define SCENE_S_G_ASYNC_RANDOM 138
 #define SCENE_F_RANDOM_LOG ((int)a2f_scene_random_log)
-#define SCENE_S_SITE_PRELOAD_STARS 138
-#define SCENE_S_FN_STARFIELD_INIT 139
-#define SCENE_S_SITE_GAME_SPEED 140
-#define SCENE_S_FN_GAME_SPEED 141
-#define SCENE_S_STEP_PRODUCT 142
+#define SCENE_S_SITE_PRELOAD_STARS 140
+#define SCENE_S_FN_STARFIELD_INIT 141
+#define SCENE_S_SITE_GAME_SPEED 142
+#define SCENE_S_FN_GAME_SPEED 143
+#define SCENE_S_STEP_PRODUCT 144
 #define SCENE_V_STEP_MS_ARG ((int)a2f_scene_step_ms_arg)
-#define SCENE_S_FN_RACE_FIND 144
-#define SCENE_S_SITE_RACE_1 145
-#define SCENE_S_SITE_RACE_2 146
-#define SCENE_S_FN_OVERLAY_ADD 147
-#define SCENE_S_SITE_SHOW_TITLE 148
-#define SCENE_S_SITE_SHOW_SUBTITLE 149
-#define SCENE_S_MUSIC_START 150
-#define SCENE_S_MUSIC_NEW_TRACK 151
-#define SCENE_S_SIM_TIME 152
-#define SCENE_S_CAMERA_MANAGER 153
-#define SCENE_S_VT_TACTICAL 154
-#define SCENE_S_VT_PARABOLIC 155
-#define SCENE_S_SLOT_ZOOM_TACTICAL 156
-#define SCENE_S_SLOT_ZOOM_PARABOLIC 157
-#define SCENE_S_FN_ZOOM_TACTICAL 158
-#define SCENE_S_FN_ZOOM_PARABOLIC 159
+#define SCENE_S_FN_RACE_FIND 146
+#define SCENE_S_SITE_RACE_1 147
+#define SCENE_S_SITE_RACE_2 148
+#define SCENE_S_FN_OVERLAY_ADD 149
+#define SCENE_S_SITE_SHOW_TITLE 150
+#define SCENE_S_SITE_SHOW_SUBTITLE 151
+#define SCENE_S_MUSIC_START 152
+#define SCENE_S_MUSIC_NEW_TRACK 153
+#define SCENE_S_SIM_TIME 154
+#define SCENE_S_CAMERA_MANAGER 155
+#define SCENE_S_VT_TACTICAL 156
+#define SCENE_S_VT_PARABOLIC 157
+#define SCENE_S_SLOT_ZOOM_TACTICAL 158
+#define SCENE_S_SLOT_ZOOM_PARABOLIC 159
+#define SCENE_S_FN_ZOOM_TACTICAL 160
+#define SCENE_S_FN_ZOOM_PARABOLIC 161
 #define SCENE_F_TACT_ZOOM ((int)a2f_scene_tact_zoom)
 #define SCENE_F_PARA_HEIGHT ((int)a2f_scene_para_height)
-#define SCENE_S_TACT_ZOOM_MIN 162
-#define SCENE_S_TACT_ZOOM_MAX 163
-#define SCENE_S_PARA_HEIGHT_MIN 164
-#define SCENE_S_PARA_HEIGHT_MAX 165
-#define SCENE_S_TACTICAL_CAMERA 166
+#define SCENE_S_TACT_ZOOM_MIN 164
+#define SCENE_S_TACT_ZOOM_MAX 165
+#define SCENE_S_PARA_HEIGHT_MIN 166
+#define SCENE_S_PARA_HEIGHT_MAX 167
+#define SCENE_S_TACTICAL_CAMERA 168
 #define SCENE_F_CAMERA_INTEREST ((int)a2f_scene_camera_interest)
-#define SCENE_S_OVERVIEW_PTR 168
-#define SCENE_S_OVERVIEW 169
+#define SCENE_S_OVERVIEW_PTR 170
+#define SCENE_S_OVERVIEW 171
 #define SCENE_F_OV_VT_SELECT ((int)a2f_scene_ov_vt_select)
 #define SCENE_F_OV_VT_SELECT_NUM ((int)a2f_scene_ov_vt_select_num)
 #define SCENE_F_OV_VT_SELECT_LIST ((int)a2f_scene_ov_vt_select_list)
@@ -182,15 +184,15 @@
 #define SCENE_F_GROUP_LIST ((int)a2f_scene_group_list)
 #define SCENE_F_LIST_ARRAY_COUNT ((int)a2f_scene_list_array_count)
 #define SCENE_F_LIST_ARRAY_ITEMS ((int)a2f_scene_list_array_items)
-#define SCENE_S_FN_QUEUE_SIZE 179
+#define SCENE_S_FN_QUEUE_SIZE 181
 #define SCENE_F_OV_WAYPOINT_KEY ((int)a2f_scene_ov_waypoint_key)
-#define SCENE_S_OBJECT_LIST 181
-#define SCENE_S_FN_ODF_NAME 182
-#define SCENE_S_FN_USER_TEAM 183
-#define SCENE_S_FN_DYN_CAST 184
-#define SCENE_S_TD_GAME_OBJECT_CLASS 185
-#define SCENE_S_TD_CRAFT_CLASS 186
-#define SCENE_S_TD_PLANET_CLASS 187
+#define SCENE_S_OBJECT_LIST 183
+#define SCENE_S_FN_ODF_NAME 184
+#define SCENE_S_FN_USER_TEAM 185
+#define SCENE_S_FN_DYN_CAST 186
+#define SCENE_S_TD_GAME_OBJECT_CLASS 187
+#define SCENE_S_TD_CRAFT_CLASS 188
+#define SCENE_S_TD_PLANET_CLASS 189
 #define SCENE_F_CLS_STATION ((int)a2f_scene_cls_station)
 #define SCENE_F_OBJ_LABEL ((int)a2f_scene_obj_label)
 #define SCENE_F_OBJ_VT_CLASS_NAME ((int)a2f_scene_obj_vt_class_name)
@@ -214,29 +216,30 @@
 #define SCENE_H_SPECIAL 13
 #define SCENE_H_ATTACK 14
 #define SCENE_H_SWITCHES 15
-#define SCENE_H_KILL 16
-#define SCENE_H_MISSION 17
-#define SCENE_H_MOVE 18
-#define SCENE_H_BUILD_ORDER 19
-#define SCENE_H_CLOAK 20
-#define SCENE_H_FREIGHTER 21
-#define SCENE_H_COLONIZE 22
-#define SCENE_H_TECH 23
-#define SCENE_H_MARKS 24
-#define SCENE_H_SEED 25
-#define SCENE_H_SEED_LOAD 26
-#define SCENE_H_STEP 27
-#define SCENE_H_RACE 28
-#define SCENE_H_CAPTIONS 29
-#define SCENE_H_MUSIC 30
-#define SCENE_H_PAUSE 31
-#define SCENE_H_CENTER 32
-#define SCENE_H_ZOOM 33
-#define SCENE_H_LOCATE 34
-#define SCENE_H_SELECT 35
-#define SCENE_H_GROUPS 36
-#define SCENE_H_WAYPOINT 37
-#define SCENE_H_OBJECTS 38
+#define SCENE_H_HIT 16
+#define SCENE_H_KILL 17
+#define SCENE_H_MISSION 18
+#define SCENE_H_MOVE 19
+#define SCENE_H_BUILD_ORDER 20
+#define SCENE_H_CLOAK 21
+#define SCENE_H_FREIGHTER 22
+#define SCENE_H_COLONIZE 23
+#define SCENE_H_TECH 24
+#define SCENE_H_MARKS 25
+#define SCENE_H_SEED 26
+#define SCENE_H_SEED_LOAD 27
+#define SCENE_H_STEP 28
+#define SCENE_H_RACE 29
+#define SCENE_H_CAPTIONS 30
+#define SCENE_H_MUSIC 31
+#define SCENE_H_PAUSE 32
+#define SCENE_H_CENTER 33
+#define SCENE_H_ZOOM 34
+#define SCENE_H_LOCATE 35
+#define SCENE_H_SELECT 36
+#define SCENE_H_GROUPS 37
+#define SCENE_H_WAYPOINT 38
+#define SCENE_H_OBJECTS 39
 
 A2E_U32 a2s_scene_site_tick __attribute__((used));
 A2E_U32 a2s_scene_fn_update_range __attribute__((used));
@@ -275,6 +278,8 @@ A2E_U32 a2s_scene_si_set_health __attribute__((used));
 A2E_U32 a2s_scene_si_max_health __attribute__((used));
 A2E_U32 a2s_scene_si_cannot_die __attribute__((used));
 A2E_U32 a2s_scene_si_explode_now __attribute__((used));
+A2E_U32 a2s_scene_si_set_real_team __attribute__((used));
+A2E_U32 a2s_scene_fn_damage_hull __attribute__((used));
 A2E_U32 a2s_scene_si_succeed __attribute__((used));
 A2E_U32 a2s_scene_si_fail __attribute__((used));
 A2E_U32 a2s_scene_si_set_shields __attribute__((used));
@@ -484,6 +489,8 @@ static A2E_U32 *const scene_vars[] = {
     &a2s_scene_si_max_health,
     &a2s_scene_si_cannot_die,
     &a2s_scene_si_explode_now,
+    &a2s_scene_si_set_real_team,
+    &a2s_scene_fn_damage_hull,
     &a2s_scene_si_succeed,
     &a2s_scene_si_fail,
     &a2s_scene_si_set_shields,
@@ -682,6 +689,8 @@ static const A2ESymDef scene_syms[] = {
     {"si_max_health", "ScriptInterfaceImp::GetMaxHealth", 0},
     {"si_cannot_die", "ScriptInterfaceImp::CraftCannotDie", 0},
     {"si_explode_now", "ScriptInterfaceImp::ExplodeNow", 0},
+    {"si_set_real_team", "ScriptInterfaceImp::SetRealTeam", 0},
+    {"fn_damage_hull", "Craft::DamageHull", 0},
     {"si_succeed", "ScriptInterfaceImp::SucceedMission", 0},
     {"si_fail", "ScriptInterfaceImp::FailMission", 0},
     {"si_set_shields", "ScriptInterfaceImp::SetShieldPercent", 0},
@@ -834,7 +843,7 @@ static const A2E_U16 scene_h0_syms[] = {0, 1, 37, 43, 44, 47, 0};
 static const char *const scene_h1_rows[] = {0};
 static const A2E_U16 scene_h1_syms[] = {2, 3, 4, 5, 39, 0};
 static const char *const scene_h2_rows[] = {0};
-static const A2E_U16 scene_h2_syms[] = {6, 7, 15, 39, 166, 167, 0};
+static const A2E_U16 scene_h2_syms[] = {6, 7, 15, 39, 168, 169, 0};
 static const char *const scene_h3_rows[] = {0};
 static const A2E_U16 scene_h3_syms[] = {16, 17, 0};
 static const char *const scene_h4_rows[] = {0};
@@ -852,61 +861,63 @@ static const A2E_U16 scene_h9_syms[] = {29, 30, 31, 0};
 static const char *const scene_h10_rows[] = {0};
 static const A2E_U16 scene_h10_syms[] = {32, 33, 34, 35, 36, 0};
 static const char *const scene_h11_rows[] = {0};
-static const A2E_U16 scene_h11_syms[] = {6, 8, 9, 37, 45, 46, 51, 52, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 0};
+static const A2E_U16 scene_h11_syms[] = {6, 8, 9, 37, 45, 46, 53, 54, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 0};
 static const char *const scene_h12_rows[] = {0};
-static const A2E_U16 scene_h12_syms[] = {6, 7, 8, 9, 59, 61, 64, 65, 66, 67, 68, 0};
+static const A2E_U16 scene_h12_syms[] = {6, 7, 8, 9, 61, 63, 66, 67, 68, 69, 70, 0};
 static const char *const scene_h13_rows[] = {0};
-static const A2E_U16 scene_h13_syms[] = {6, 8, 9, 37, 53, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 0};
+static const A2E_U16 scene_h13_syms[] = {6, 8, 9, 37, 55, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 0};
 static const char *const scene_h14_rows[] = {0};
 static const A2E_U16 scene_h14_syms[] = {6, 37, 38, 0};
 static const char *const scene_h15_rows[] = {0};
 static const A2E_U16 scene_h15_syms[] = {6, 37, 43, 44, 47, 0};
 static const char *const scene_h16_rows[] = {0};
-static const A2E_U16 scene_h16_syms[] = {6, 37, 47, 48, 0};
+static const A2E_U16 scene_h16_syms[] = {6, 37, 49, 50, 0};
 static const char *const scene_h17_rows[] = {0};
-static const A2E_U16 scene_h17_syms[] = {37, 49, 50, 0};
+static const A2E_U16 scene_h17_syms[] = {6, 37, 47, 48, 0};
 static const char *const scene_h18_rows[] = {0};
-static const A2E_U16 scene_h18_syms[] = {6, 8, 9, 11, 37, 39, 43, 80, 81, 82, 83, 84, 85, 86, 87, 166, 167, 0};
+static const A2E_U16 scene_h18_syms[] = {37, 51, 52, 0};
 static const char *const scene_h19_rows[] = {0};
-static const A2E_U16 scene_h19_syms[] = {6, 12, 37, 39, 43, 88, 89, 90, 91, 92, 93, 166, 167, 0};
+static const A2E_U16 scene_h19_syms[] = {6, 8, 9, 11, 37, 39, 43, 82, 83, 84, 85, 86, 87, 88, 89, 168, 169, 0};
 static const char *const scene_h20_rows[] = {0};
-static const A2E_U16 scene_h20_syms[] = {6, 37, 53, 73, 74, 94, 95, 96, 97, 0};
+static const A2E_U16 scene_h20_syms[] = {6, 12, 37, 39, 43, 90, 91, 92, 93, 94, 95, 168, 169, 0};
 static const char *const scene_h21_rows[] = {0};
-static const A2E_U16 scene_h21_syms[] = {6, 98, 99, 100, 101, 0};
+static const A2E_U16 scene_h21_syms[] = {6, 37, 55, 75, 76, 96, 97, 98, 99, 0};
 static const char *const scene_h22_rows[] = {0};
-static const A2E_U16 scene_h22_syms[] = {6, 12, 91, 93, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 0};
+static const A2E_U16 scene_h22_syms[] = {6, 100, 101, 102, 103, 0};
 static const char *const scene_h23_rows[] = {0};
-static const A2E_U16 scene_h23_syms[] = {6, 12, 113, 114, 115, 116, 117, 118, 0};
+static const A2E_U16 scene_h23_syms[] = {6, 12, 93, 95, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 0};
 static const char *const scene_h24_rows[] = {0};
-static const A2E_U16 scene_h24_syms[] = {4, 6, 8, 9, 11, 39, 95, 97, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 131, 132, 168, 169, 171, 172, 0};
+static const A2E_U16 scene_h24_syms[] = {6, 12, 115, 116, 117, 118, 119, 120, 0};
 static const char *const scene_h25_rows[] = {0};
-static const A2E_U16 scene_h25_syms[] = {133, 134, 135, 136, 137, 0};
+static const A2E_U16 scene_h25_syms[] = {4, 6, 8, 9, 11, 39, 97, 99, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 133, 134, 170, 171, 173, 174, 0};
 static const char *const scene_h26_rows[] = {0};
-static const A2E_U16 scene_h26_syms[] = {133, 134, 135, 136, 137, 138, 139, 0};
+static const A2E_U16 scene_h26_syms[] = {135, 136, 137, 138, 139, 0};
 static const char *const scene_h27_rows[] = {0};
-static const A2E_U16 scene_h27_syms[] = {140, 141, 142, 143, 0};
+static const A2E_U16 scene_h27_syms[] = {135, 136, 137, 138, 139, 140, 141, 0};
 static const char *const scene_h28_rows[] = {0};
-static const A2E_U16 scene_h28_syms[] = {144, 145, 146, 0};
+static const A2E_U16 scene_h28_syms[] = {142, 143, 144, 145, 0};
 static const char *const scene_h29_rows[] = {0};
-static const A2E_U16 scene_h29_syms[] = {147, 148, 149, 0};
+static const A2E_U16 scene_h29_syms[] = {146, 147, 148, 0};
 static const char *const scene_h30_rows[] = {0};
-static const A2E_U16 scene_h30_syms[] = {150, 151, 0};
+static const A2E_U16 scene_h30_syms[] = {149, 150, 151, 0};
 static const char *const scene_h31_rows[] = {0};
-static const A2E_U16 scene_h31_syms[] = {37, 40, 41, 152, 0};
+static const A2E_U16 scene_h31_syms[] = {152, 153, 0};
 static const char *const scene_h32_rows[] = {0};
-static const A2E_U16 scene_h32_syms[] = {6, 37, 42, 0};
+static const A2E_U16 scene_h32_syms[] = {37, 40, 41, 154, 0};
 static const char *const scene_h33_rows[] = {0};
-static const A2E_U16 scene_h33_syms[] = {153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 0};
+static const A2E_U16 scene_h33_syms[] = {6, 37, 42, 0};
 static const char *const scene_h34_rows[] = {0};
-static const A2E_U16 scene_h34_syms[] = {4, 6, 37, 39, 95, 97, 102, 110, 112, 166, 167, 179, 0};
+static const A2E_U16 scene_h34_syms[] = {155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 0};
 static const char *const scene_h35_rows[] = {0};
-static const A2E_U16 scene_h35_syms[] = {6, 8, 10, 13, 14, 168, 169, 170, 171, 172, 179, 0};
+static const A2E_U16 scene_h35_syms[] = {4, 6, 37, 39, 97, 99, 104, 112, 114, 168, 169, 181, 0};
 static const char *const scene_h36_rows[] = {0};
-static const A2E_U16 scene_h36_syms[] = {6, 168, 169, 173, 174, 175, 176, 177, 178, 0};
+static const A2E_U16 scene_h36_syms[] = {6, 8, 10, 13, 14, 170, 171, 172, 173, 174, 181, 0};
 static const char *const scene_h37_rows[] = {0};
-static const A2E_U16 scene_h37_syms[] = {168, 169, 180, 0};
+static const A2E_U16 scene_h37_syms[] = {6, 170, 171, 175, 176, 177, 178, 179, 180, 0};
 static const char *const scene_h38_rows[] = {0};
-static const A2E_U16 scene_h38_syms[] = {6, 7, 8, 9, 11, 12, 13, 14, 55, 56, 57, 58, 73, 74, 129, 130, 131, 132, 152, 168, 169, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 0};
+static const A2E_U16 scene_h38_syms[] = {170, 171, 182, 0};
+static const char *const scene_h39_rows[] = {0};
+static const A2E_U16 scene_h39_syms[] = {6, 7, 8, 9, 11, 12, 13, 14, 57, 58, 59, 60, 75, 76, 131, 132, 133, 134, 154, 170, 171, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 0};
 static const A2EHookDef scene_hooks[] = {
     {"scene.tick", 0, scene_h0_rows, 0, scene_h0_syms, 6},
     {"scene.camera", 0, scene_h1_rows, 0, scene_h1_syms, 5},
@@ -924,29 +935,30 @@ static const A2EHookDef scene_hooks[] = {
     {"scene.special", 0, scene_h13_rows, 0, scene_h13_syms, 16},
     {"scene.attack", 0, scene_h14_rows, 0, scene_h14_syms, 3},
     {"scene.switches", 0, scene_h15_rows, 0, scene_h15_syms, 5},
-    {"scene.kill", 0, scene_h16_rows, 0, scene_h16_syms, 4},
-    {"scene.mission", 0, scene_h17_rows, 0, scene_h17_syms, 3},
-    {"scene.move", 0, scene_h18_rows, 0, scene_h18_syms, 17},
-    {"scene.build_order", 0, scene_h19_rows, 0, scene_h19_syms, 13},
-    {"scene.cloak", 0, scene_h20_rows, 0, scene_h20_syms, 9},
-    {"scene.freighter", 0, scene_h21_rows, 0, scene_h21_syms, 5},
-    {"scene.colonize", 0, scene_h22_rows, 0, scene_h22_syms, 15},
-    {"scene.tech", 0, scene_h23_rows, 0, scene_h23_syms, 8},
-    {"scene.marks", 0, scene_h24_rows, 0, scene_h24_syms, 25},
-    {"scene.seed", 0, scene_h25_rows, 0, scene_h25_syms, 5},
-    {"scene.seed_load", 0, scene_h26_rows, 0, scene_h26_syms, 7},
-    {"scene.step", 0, scene_h27_rows, 0, scene_h27_syms, 4},
-    {"scene.race", 0, scene_h28_rows, 0, scene_h28_syms, 3},
-    {"scene.captions", 0, scene_h29_rows, 0, scene_h29_syms, 3},
-    {"scene.music", 0, scene_h30_rows, 0, scene_h30_syms, 2},
-    {"scene.pause", 0, scene_h31_rows, 0, scene_h31_syms, 4},
-    {"scene.center", 0, scene_h32_rows, 0, scene_h32_syms, 3},
-    {"scene.zoom", 0, scene_h33_rows, 0, scene_h33_syms, 13},
-    {"scene.locate", 0, scene_h34_rows, 0, scene_h34_syms, 12},
-    {"scene.select", 0, scene_h35_rows, 0, scene_h35_syms, 11},
-    {"scene.groups", 0, scene_h36_rows, 0, scene_h36_syms, 9},
-    {"scene.waypoint", 0, scene_h37_rows, 0, scene_h37_syms, 3},
-    {"scene.objects", 0, scene_h38_rows, 0, scene_h38_syms, 35},
+    {"scene.hit", 0, scene_h16_rows, 0, scene_h16_syms, 4},
+    {"scene.kill", 0, scene_h17_rows, 0, scene_h17_syms, 4},
+    {"scene.mission", 0, scene_h18_rows, 0, scene_h18_syms, 3},
+    {"scene.move", 0, scene_h19_rows, 0, scene_h19_syms, 17},
+    {"scene.build_order", 0, scene_h20_rows, 0, scene_h20_syms, 13},
+    {"scene.cloak", 0, scene_h21_rows, 0, scene_h21_syms, 9},
+    {"scene.freighter", 0, scene_h22_rows, 0, scene_h22_syms, 5},
+    {"scene.colonize", 0, scene_h23_rows, 0, scene_h23_syms, 15},
+    {"scene.tech", 0, scene_h24_rows, 0, scene_h24_syms, 8},
+    {"scene.marks", 0, scene_h25_rows, 0, scene_h25_syms, 25},
+    {"scene.seed", 0, scene_h26_rows, 0, scene_h26_syms, 5},
+    {"scene.seed_load", 0, scene_h27_rows, 0, scene_h27_syms, 7},
+    {"scene.step", 0, scene_h28_rows, 0, scene_h28_syms, 4},
+    {"scene.race", 0, scene_h29_rows, 0, scene_h29_syms, 3},
+    {"scene.captions", 0, scene_h30_rows, 0, scene_h30_syms, 3},
+    {"scene.music", 0, scene_h31_rows, 0, scene_h31_syms, 2},
+    {"scene.pause", 0, scene_h32_rows, 0, scene_h32_syms, 4},
+    {"scene.center", 0, scene_h33_rows, 0, scene_h33_syms, 3},
+    {"scene.zoom", 0, scene_h34_rows, 0, scene_h34_syms, 13},
+    {"scene.locate", 0, scene_h35_rows, 0, scene_h35_syms, 12},
+    {"scene.select", 0, scene_h36_rows, 0, scene_h36_syms, 11},
+    {"scene.groups", 0, scene_h37_rows, 0, scene_h37_syms, 9},
+    {"scene.waypoint", 0, scene_h38_rows, 0, scene_h38_syms, 3},
+    {"scene.objects", 0, scene_h39_rows, 0, scene_h39_syms, 35},
 };
 static const A2E_U8 scene_b0_c1[] = {0x55, 0x8b, 0xec, 0x83, 0xec, 0x28, 0xa1, 0x80, 0x10, 0x76, 0x00};
 static const A2E_U8 scene_b0_c2[] = {0xff, 0x90, 0x88, 0x00, 0x00, 0x00};
@@ -973,49 +985,51 @@ static const A2E_U8 scene_b0_c45[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 
 static const A2E_U8 scene_b0_c46[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 0xe8};
 static const A2E_U8 scene_b0_c47[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 0xe8};
 static const A2E_U8 scene_b0_c48[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 0xe8};
-static const A2E_U8 scene_b0_c49[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x4d};
-static const A2E_U8 scene_b0_c50[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x4d};
-static const A2E_U8 scene_b0_c51[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 0xe8};
-static const A2E_U8 scene_b0_c52[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 0xe8};
+static const A2E_U8 scene_b0_c49[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 0xe8};
+static const A2E_U8 scene_b0_c50[] = {0x55, 0x8b, 0xec, 0xd9, 0x45, 0x08, 0x56, 0x8b};
+static const A2E_U8 scene_b0_c51[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x4d};
+static const A2E_U8 scene_b0_c52[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x4d};
 static const A2E_U8 scene_b0_c53[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 0xe8};
-static const A2E_U8 scene_b0_c54[] = {0x53, 0x56, 0x8b, 0xf1, 0x33, 0xdb, 0x8b, 0x86};
-static const A2E_U8 scene_b0_c67[] = {0x55, 0x8b, 0xec, 0xa1, 0xac, 0x0b, 0x74, 0x00};
-static const A2E_U8 scene_b0_c69[] = {0x55, 0x8b, 0xec, 0x83, 0xec, 0x40, 0x53, 0x57};
-static const A2E_U8 scene_b0_c70[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68};
-static const A2E_U8 scene_b0_c71[] = {0x55, 0x8b, 0xec, 0xa1, 0xc0, 0x0f, 0x7b, 0x00};
-static const A2E_U8 scene_b0_c72[] = {0x55, 0x8b, 0xec, 0xa1, 0xc0, 0x0f, 0x7b, 0x00};
-static const A2E_U8 scene_b0_c80[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x14, 0x8b, 0x55};
-static const A2E_U8 scene_b0_c81[] = {0x55, 0x8b, 0xec, 0x64, 0xa1, 0x00, 0x00, 0x00};
+static const A2E_U8 scene_b0_c54[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 0xe8};
+static const A2E_U8 scene_b0_c55[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 0xe8};
+static const A2E_U8 scene_b0_c56[] = {0x53, 0x56, 0x8b, 0xf1, 0x33, 0xdb, 0x8b, 0x86};
+static const A2E_U8 scene_b0_c69[] = {0x55, 0x8b, 0xec, 0xa1, 0xac, 0x0b, 0x74, 0x00};
+static const A2E_U8 scene_b0_c71[] = {0x55, 0x8b, 0xec, 0x83, 0xec, 0x40, 0x53, 0x57};
+static const A2E_U8 scene_b0_c72[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68};
+static const A2E_U8 scene_b0_c73[] = {0x55, 0x8b, 0xec, 0xa1, 0xc0, 0x0f, 0x7b, 0x00};
+static const A2E_U8 scene_b0_c74[] = {0x55, 0x8b, 0xec, 0xa1, 0xc0, 0x0f, 0x7b, 0x00};
 static const A2E_U8 scene_b0_c82[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x14, 0x8b, 0x55};
-static const A2E_U8 scene_b0_c83[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x55};
-static const A2E_U8 scene_b0_c88[] = {0x55, 0x8b, 0xec, 0x64, 0xa1, 0x00, 0x00, 0x00};
-static const A2E_U8 scene_b0_c89[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x8d, 0x4d};
-static const A2E_U8 scene_b0_c90[] = {0x55, 0x8b, 0xec, 0x51, 0x8b, 0x45, 0x0c, 0x56};
-static const A2E_U8 scene_b0_c91[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x8b, 0x04};
-static const A2E_U8 scene_b0_c94[] = {0x8b, 0x89, 0x08, 0x01, 0x00, 0x00, 0x85, 0xc9};
-static const A2E_U8 scene_b0_c99[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x91};
-static const A2E_U8 scene_b0_c103[] = {0x55, 0x8b, 0xec, 0xa1, 0x84, 0x10, 0x76, 0x00};
-static const A2E_U8 scene_b0_c104[] = {0x55, 0x8b, 0xec, 0xd9, 0x45, 0x08, 0xd8, 0x1d};
-static const A2E_U8 scene_b0_c105[] = {0x8b, 0x41, 0x40, 0x8b, 0x80, 0x90, 0x04, 0x00};
-static const A2E_U8 scene_b0_c106[] = {0x53, 0x8b, 0xd9, 0x56, 0x33, 0xf6, 0x39, 0xb3};
-static const A2E_U8 scene_b0_c107[] = {0x55, 0x8b, 0xec, 0xd9, 0x81, 0xc4, 0x01, 0x00};
-static const A2E_U8 scene_b0_c116[] = {0x55, 0x8b, 0xec, 0x51, 0x53, 0x56, 0x57, 0x8b};
-static const A2E_U8 scene_b0_c125[] = {0x8b, 0x01, 0x85, 0xc0, 0x75, 0x06};
-static const A2E_U8 scene_b0_c129[] = {0x8b, 0x41, 0x04, 0x83, 0xc0, 0x44, 0xc3};
-static const A2E_U8 scene_b0_c133[] = {0x55, 0x8b, 0xec, 0x8b, 0x55, 0x08, 0x8b, 0xc1};
-static const A2E_U8 scene_b0_c139[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68};
-static const A2E_U8 scene_b0_c141[] = {0x55, 0x8b, 0xec, 0x51, 0x83, 0x3d};
-static const A2E_U8 scene_b0_c142[] = {0xda, 0x4d, 0x08};
-static const A2E_U8 scene_b0_c144[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x53, 0x56};
-static const A2E_U8 scene_b0_c147[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x20, 0xff};
-static const A2E_U8 scene_b0_c150[] = {0x55, 0x8b, 0xec, 0xa1};
-static const A2E_U8 scene_b0_c151[] = {0x55, 0x8b, 0xec, 0x6a};
-static const A2E_U8 scene_b0_c158[] = {0x55, 0x8b, 0xec, 0xd9, 0x05, 0xa8, 0x46, 0x6b, 0x00};
-static const A2E_U8 scene_b0_c159[] = {0x55, 0x8b, 0xec, 0xd9, 0x05, 0x1c, 0x9a, 0x70, 0x00};
-static const A2E_U8 scene_b0_c179[] = {0x8b, 0x89, 0x70, 0x02, 0x00, 0x00, 0x33, 0xc0};
-static const A2E_U8 scene_b0_c182[] = {0x8b, 0x49, 0x40, 0xe9};
-static const A2E_U8 scene_b0_c183[] = {0x8b, 0x0d, 0xd4, 0xb8, 0x76, 0x00, 0xe9, 0x45};
-static const A2E_U8 scene_b0_c184[] = {0xff, 0x25};
+static const A2E_U8 scene_b0_c83[] = {0x55, 0x8b, 0xec, 0x64, 0xa1, 0x00, 0x00, 0x00};
+static const A2E_U8 scene_b0_c84[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x14, 0x8b, 0x55};
+static const A2E_U8 scene_b0_c85[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x55};
+static const A2E_U8 scene_b0_c90[] = {0x55, 0x8b, 0xec, 0x64, 0xa1, 0x00, 0x00, 0x00};
+static const A2E_U8 scene_b0_c91[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x8d, 0x4d};
+static const A2E_U8 scene_b0_c92[] = {0x55, 0x8b, 0xec, 0x51, 0x8b, 0x45, 0x0c, 0x56};
+static const A2E_U8 scene_b0_c93[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x8b, 0x04};
+static const A2E_U8 scene_b0_c96[] = {0x8b, 0x89, 0x08, 0x01, 0x00, 0x00, 0x85, 0xc9};
+static const A2E_U8 scene_b0_c101[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x91};
+static const A2E_U8 scene_b0_c105[] = {0x55, 0x8b, 0xec, 0xa1, 0x84, 0x10, 0x76, 0x00};
+static const A2E_U8 scene_b0_c106[] = {0x55, 0x8b, 0xec, 0xd9, 0x45, 0x08, 0xd8, 0x1d};
+static const A2E_U8 scene_b0_c107[] = {0x8b, 0x41, 0x40, 0x8b, 0x80, 0x90, 0x04, 0x00};
+static const A2E_U8 scene_b0_c108[] = {0x53, 0x8b, 0xd9, 0x56, 0x33, 0xf6, 0x39, 0xb3};
+static const A2E_U8 scene_b0_c109[] = {0x55, 0x8b, 0xec, 0xd9, 0x81, 0xc4, 0x01, 0x00};
+static const A2E_U8 scene_b0_c118[] = {0x55, 0x8b, 0xec, 0x51, 0x53, 0x56, 0x57, 0x8b};
+static const A2E_U8 scene_b0_c127[] = {0x8b, 0x01, 0x85, 0xc0, 0x75, 0x06};
+static const A2E_U8 scene_b0_c131[] = {0x8b, 0x41, 0x04, 0x83, 0xc0, 0x44, 0xc3};
+static const A2E_U8 scene_b0_c135[] = {0x55, 0x8b, 0xec, 0x8b, 0x55, 0x08, 0x8b, 0xc1};
+static const A2E_U8 scene_b0_c141[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68};
+static const A2E_U8 scene_b0_c143[] = {0x55, 0x8b, 0xec, 0x51, 0x83, 0x3d};
+static const A2E_U8 scene_b0_c144[] = {0xda, 0x4d, 0x08};
+static const A2E_U8 scene_b0_c146[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x53, 0x56};
+static const A2E_U8 scene_b0_c149[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x20, 0xff};
+static const A2E_U8 scene_b0_c152[] = {0x55, 0x8b, 0xec, 0xa1};
+static const A2E_U8 scene_b0_c153[] = {0x55, 0x8b, 0xec, 0x6a};
+static const A2E_U8 scene_b0_c160[] = {0x55, 0x8b, 0xec, 0xd9, 0x05, 0xa8, 0x46, 0x6b, 0x00};
+static const A2E_U8 scene_b0_c161[] = {0x55, 0x8b, 0xec, 0xd9, 0x05, 0x1c, 0x9a, 0x70, 0x00};
+static const A2E_U8 scene_b0_c181[] = {0x8b, 0x89, 0x70, 0x02, 0x00, 0x00, 0x33, 0xc0};
+static const A2E_U8 scene_b0_c184[] = {0x8b, 0x49, 0x40, 0xe9};
+static const A2E_U8 scene_b0_c185[] = {0x8b, 0x0d, 0xd4, 0xb8, 0x76, 0x00, 0xe9, 0x45};
+static const A2E_U8 scene_b0_c186[] = {0xff, 0x25};
 static const A2EEntry scene_b0_entries[] = {
     {1, 0, 0x1, 0xffff, 0, 0, 0, 0x483351, 0x0, 0, 0, 0, ""}, /* site_tick */
     {1, 0, 0xffff, 0xffff, 0, 0, 11, 0x4d3e90, 0x0, 0, scene_b0_c1, 0, ""}, /* fn_update_range */
@@ -1066,12 +1080,14 @@ static const A2EEntry scene_b0_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x456da0, 0x0, 0, scene_b0_c46, 0, ""}, /* si_max_health */
     {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x457590, 0x0, 0, scene_b0_c47, 0, ""}, /* si_cannot_die */
     {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x456cf0, 0x0, 0, scene_b0_c48, 0, ""}, /* si_explode_now */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x457d70, 0x0, 0, scene_b0_c49, 0, ""}, /* si_succeed */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x457d50, 0x0, 0, scene_b0_c50, 0, ""}, /* si_fail */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x455eb0, 0x0, 0, scene_b0_c51, 0, ""}, /* si_set_shields */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x456060, 0x0, 0, scene_b0_c52, 0, ""}, /* si_set_crew */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x456280, 0x0, 0, scene_b0_c53, 0, ""}, /* si_set_special */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4c8be0, 0x0, 0, scene_b0_c54, 0, ""}, /* fn_repair_all */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x455cc0, 0x0, 0, scene_b0_c49, 0, ""}, /* si_set_real_team */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4c8a80, 0x0, 0, scene_b0_c50, 0, ""}, /* fn_damage_hull */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x457d70, 0x0, 0, scene_b0_c51, 0, ""}, /* si_succeed */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x457d50, 0x0, 0, scene_b0_c52, 0, ""}, /* si_fail */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x455eb0, 0x0, 0, scene_b0_c53, 0, ""}, /* si_set_shields */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x456060, 0x0, 0, scene_b0_c54, 0, ""}, /* si_set_crew */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x456280, 0x0, 0, scene_b0_c55, 0, ""}, /* si_set_special */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4c8be0, 0x0, 0, scene_b0_c56, 0, ""}, /* fn_repair_all */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 452, 0, 0, ""}, /* craft_max_crew */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 456, 0, 0, ""}, /* craft_shields */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 460, 0, 0, ""}, /* craft_shields_max */
@@ -1083,13 +1099,13 @@ static const A2EEntry scene_b0_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 24, 0, 0, ""}, /* sys_hp */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 48, 0, 0, ""}, /* sys_size */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6b3e2c, 0x0, 0, 0, 0, ""}, /* vt_craft_instance */
-    {1, 0, 0x43, 0x41, 14, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* slot_inst_update */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4cb390, 0x0, 0, scene_b0_c67, 0, ""}, /* fn_inst_update */
+    {1, 0, 0x45, 0x43, 14, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* slot_inst_update */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4cb390, 0x0, 0, scene_b0_c69, 0, ""}, /* fn_inst_update */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 156, 0, 0, ""}, /* inst_sys_shown */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x6593c0, 0x0, 0, scene_b0_c69, 0, ""}, /* fn_prj_set_name */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x664850, 0x0, 0, scene_b0_c70, 0, ""}, /* fn_weapon_find */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4c3820, 0x0, 0, scene_b0_c71, 0, ""}, /* fn_fire_at_special */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4c3b20, 0x0, 0, scene_b0_c72, 0, ""}, /* fn_fire_special */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x6593c0, 0x0, 0, scene_b0_c71, 0, ""}, /* fn_prj_set_name */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x664850, 0x0, 0, scene_b0_c72, 0, ""}, /* fn_weapon_find */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4c3820, 0x0, 0, scene_b0_c73, 0, ""}, /* fn_fire_at_special */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4c3b20, 0x0, 0, scene_b0_c74, 0, ""}, /* fn_fire_special */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 360, 0, 0, ""}, /* craft_special_max */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 364, 0, 0, ""}, /* craft_special */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 296, 0, 0, ""}, /* craft_carrier */
@@ -1097,34 +1113,34 @@ static const A2EEntry scene_b0_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 16, 0, 0, ""}, /* carrier_weapons_end */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 4, 0, 0, ""}, /* weapon_class */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 32, 0, 0, ""}, /* weapon_vt_can_fire */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d1af0, 0x0, 0, scene_b0_c80, 0, ""}, /* fn_set_command_obj */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d1a40, 0x0, 0, scene_b0_c81, 0, ""}, /* fn_set_command */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d1b50, 0x0, 0, scene_b0_c82, 0, ""}, /* fn_set_command_at */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4630, 0x0, 0, scene_b0_c83, 0, ""}, /* fn_dq_command */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d1af0, 0x0, 0, scene_b0_c82, 0, ""}, /* fn_set_command_obj */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d1a40, 0x0, 0, scene_b0_c83, 0, ""}, /* fn_set_command */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d1b50, 0x0, 0, scene_b0_c84, 0, ""}, /* fn_set_command_at */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4630, 0x0, 0, scene_b0_c85, 0, ""}, /* fn_dq_command */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 3, 0, 0, ""}, /* cmd_stop */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 4, 0, 0, ""}, /* cmd_go */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 42, 0, 0, ""}, /* cmd_set_formation */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 43, 0, 0, ""}, /* cmd_go_warp */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d1cb0, 0x0, 0, scene_b0_c88, 0, ""}, /* fn_set_command_build */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4cd370, 0x0, 0, scene_b0_c89, 0, ""}, /* fn_class_find */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4988d0, 0x0, 0, scene_b0_c90, 0, ""}, /* fn_team_add_res */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x496340, 0x0, 0, scene_b0_c91, 0, ""}, /* fn_team_get */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d1cb0, 0x0, 0, scene_b0_c90, 0, ""}, /* fn_set_command_build */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4cd370, 0x0, 0, scene_b0_c91, 0, ""}, /* fn_class_find */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4988d0, 0x0, 0, scene_b0_c92, 0, ""}, /* fn_team_add_res */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x496340, 0x0, 0, scene_b0_c93, 0, ""}, /* fn_team_get */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 25, 0, 0, ""}, /* cmd_build */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 12, 0, 0, ""}, /* max_team */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d03e0, 0x0, 0, scene_b0_c94, 0, ""}, /* fn_cloak_now */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d03e0, 0x0, 0, scene_b0_c96, 0, ""}, /* fn_cloak_now */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 264, 0, 0, ""}, /* obj_cloak */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 44, 0, 0, ""}, /* cloak_request */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 60, 0, 0, ""}, /* cloak_state */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6b26a8, 0x0, 0, 0, 0, ""}, /* vt_freighter */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b16f0, 0x0, 0, scene_b0_c99, 0, ""}, /* fn_freighter_load */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b16f0, 0x0, 0, scene_b0_c101, 0, ""}, /* fn_freighter_load */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 600, 0, 0, ""}, /* freighter_amount */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 604, 0, 0, ""}, /* freighter_kind */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6b2b3c, 0x0, 0, 0, 0, ""}, /* vt_planet */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b5660, 0x0, 0, scene_b0_c103, 0, ""}, /* fn_pl_start_colony */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b5970, 0x0, 0, scene_b0_c104, 0, ""}, /* fn_pl_set_pop */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b5550, 0x0, 0, scene_b0_c105, 0, ""}, /* fn_pl_max_pop */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b5150, 0x0, 0, scene_b0_c106, 0, ""}, /* fn_pl_neutralize */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4c83e0, 0x0, 0, scene_b0_c107, 0, ""}, /* fn_craft_set_crew */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b5660, 0x0, 0, scene_b0_c105, 0, ""}, /* fn_pl_start_colony */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b5970, 0x0, 0, scene_b0_c106, 0, ""}, /* fn_pl_set_pop */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b5550, 0x0, 0, scene_b0_c107, 0, ""}, /* fn_pl_max_pop */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b5150, 0x0, 0, scene_b0_c108, 0, ""}, /* fn_pl_neutralize */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4c83e0, 0x0, 0, scene_b0_c109, 0, ""}, /* fn_craft_set_crew */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 580, 0, 0, ""}, /* team_race */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 1106, 0, 0, ""}, /* race_city_name */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 684, 0, 0, ""}, /* pl_population */
@@ -1133,7 +1149,7 @@ static const A2EEntry scene_b0_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x739000, 0x0, 0, 0, 0, ""}, /* tech_trees */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 152, 0, 0, ""}, /* tech_tree_size */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 8, 0, 0, ""}, /* tech_max_team */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4999e0, 0x0, 0, scene_b0_c116, 0, ""}, /* fn_tech_find */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4999e0, 0x0, 0, scene_b0_c118, 0, ""}, /* fn_tech_find */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 4, 0, 0, ""}, /* tech_available */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 12, 0, 0, ""}, /* tech_possible */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x771fac, 0x0, 0, 0, 0, ""}, /* ordnance_list */
@@ -1142,41 +1158,41 @@ static const A2EEntry scene_b0_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 92, 0, 0, ""}, /* ord_owner */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 96, 0, 0, ""}, /* ord_target */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 336, 0, 0, ""}, /* ord_class_prj */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x6593a0, 0x0, 0, scene_b0_c125, 0, ""}, /* fn_prj_get_odf */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x6593a0, 0x0, 0, scene_b0_c127, 0, ""}, /* fn_prj_get_odf */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 52, 0, 0, ""}, /* exp_radius */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6afbd4, 0x0, 0, 0, 0, ""}, /* vt_fireball */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6afdac, 0x0, 0, 0, 0, ""}, /* vt_shockwave */
-    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x4cfd50, 0x0, 0, scene_b0_c129, 0, ""}, /* fn_entity_transform */
+    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x4cfd50, 0x0, 0, scene_b0_c131, 0, ""}, /* fn_entity_transform */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 4, 0, 0, ""}, /* list_head */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* node_next */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 8, 0, 0, ""}, /* node_value */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x65e1b0, 0x0, 0, scene_b0_c133, 0, ""}, /* fn_random_ctor */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x65e1b0, 0x0, 0, scene_b0_c135, 0, ""}, /* fn_random_ctor */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x7b0fac, 0x0, 0, 0, 0, ""}, /* g_random */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x7b0fa8, 0x0, 0, 0, 0, ""}, /* g_mission_random */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x7300c4, 0x0, 0, 0, 0, ""}, /* g_async_random */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 9, 0, 0, ""}, /* random_log */
-    {1, 0, 0x8b, 0xffff, 0, 0, 0, 0x485159, 0x0, 0, 0, 0, ""}, /* site_preload_stars */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x59ac00, 0x0, 0, scene_b0_c139, 0, ""}, /* fn_starfield_init */
-    {1, 0, 0x8d, 0xffff, 0, 0, 0, 0x4834a3, 0x0, 0, 0, 0, ""}, /* site_game_speed */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x604700, 0x0, 0, scene_b0_c141, 0, ""}, /* fn_game_speed */
-    {1, 0, 0xffff, 0xffff, 0, 0, 3, 0x4834a8, 0x0, 0, scene_b0_c142, 0, ""}, /* step_product */
+    {1, 0, 0x8d, 0xffff, 0, 0, 0, 0x485159, 0x0, 0, 0, 0, ""}, /* site_preload_stars */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x59ac00, 0x0, 0, scene_b0_c141, 0, ""}, /* fn_starfield_init */
+    {1, 0, 0x8f, 0xffff, 0, 0, 0, 0x4834a3, 0x0, 0, 0, 0, ""}, /* site_game_speed */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x604700, 0x0, 0, scene_b0_c143, 0, ""}, /* fn_game_speed */
+    {1, 0, 0xffff, 0xffff, 0, 0, 3, 0x4834a8, 0x0, 0, scene_b0_c144, 0, ""}, /* step_product */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 8, 0, 0, ""}, /* step_ms_arg */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x48b100, 0x0, 0, scene_b0_c144, 0, ""}, /* fn_race_find */
-    {1, 0, 0x90, 0xffff, 0, 0, 0, 0x4897ad, 0x0, 0, 0, 0, ""}, /* site_race_1 */
-    {1, 0, 0x90, 0xffff, 0, 0, 0, 0x489872, 0x0, 0, 0, 0, ""}, /* site_race_2 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x5061e0, 0x0, 0, scene_b0_c147, 0, ""}, /* fn_overlay_add */
-    {1, 0, 0x93, 0xffff, 0, 0, 0, 0x455081, 0x0, 0, 0, 0, ""}, /* site_show_title */
-    {1, 0, 0x93, 0xffff, 0, 0, 0, 0x45510c, 0x0, 0, 0, 0, ""}, /* site_show_subtitle */
-    {1, 0, 0xffff, 0xffff, 0, 0, 4, 0x4586c0, 0x0, 0, scene_b0_c150, 0, ""}, /* music_start */
-    {1, 0, 0xffff, 0xffff, 0, 0, 4, 0x463680, 0x0, 0, scene_b0_c151, 0, ""}, /* music_new_track */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x48b100, 0x0, 0, scene_b0_c146, 0, ""}, /* fn_race_find */
+    {1, 0, 0x92, 0xffff, 0, 0, 0, 0x4897ad, 0x0, 0, 0, 0, ""}, /* site_race_1 */
+    {1, 0, 0x92, 0xffff, 0, 0, 0, 0x489872, 0x0, 0, 0, 0, ""}, /* site_race_2 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x5061e0, 0x0, 0, scene_b0_c149, 0, ""}, /* fn_overlay_add */
+    {1, 0, 0x95, 0xffff, 0, 0, 0, 0x455081, 0x0, 0, 0, 0, ""}, /* site_show_title */
+    {1, 0, 0x95, 0xffff, 0, 0, 0, 0x45510c, 0x0, 0, 0, 0, ""}, /* site_show_subtitle */
+    {1, 0, 0xffff, 0xffff, 0, 0, 4, 0x4586c0, 0x0, 0, scene_b0_c152, 0, ""}, /* music_start */
+    {1, 0, 0xffff, 0xffff, 0, 0, 4, 0x463680, 0x0, 0, scene_b0_c153, 0, ""}, /* music_new_track */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x7b0fc8, 0x0, 0, 0, 0, ""}, /* sim_time */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x763370, 0x0, 0, 0, 0, ""}, /* camera_manager */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6b46c0, 0x0, 0, 0, 0, ""}, /* vt_tactical */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6b4598, 0x0, 0, 0, 0, ""}, /* vt_parabolic */
-    {1, 0, 0x9e, 0x9a, 17, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* slot_zoom_tactical */
-    {1, 0, 0x9f, 0x9b, 17, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* slot_zoom_parabolic */
-    {1, 0, 0xffff, 0xffff, 0, 0, 9, 0x4e4db0, 0x0, 0, scene_b0_c158, 0, ""}, /* fn_zoom_tactical */
-    {1, 0, 0xffff, 0xffff, 0, 0, 9, 0x4dfcc0, 0x0, 0, scene_b0_c159, 0, ""}, /* fn_zoom_parabolic */
+    {1, 0, 0xa0, 0x9c, 17, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* slot_zoom_tactical */
+    {1, 0, 0xa1, 0x9d, 17, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* slot_zoom_parabolic */
+    {1, 0, 0xffff, 0xffff, 0, 0, 9, 0x4e4db0, 0x0, 0, scene_b0_c160, 0, ""}, /* fn_zoom_tactical */
+    {1, 0, 0xffff, 0xffff, 0, 0, 9, 0x4dfcc0, 0x0, 0, scene_b0_c161, 0, ""}, /* fn_zoom_parabolic */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 212, 0, 0, ""}, /* tact_zoom */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 84, 0, 0, ""}, /* para_height */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6b46a4, 0x0, 0, 0, 0, ""}, /* tact_zoom_min */
@@ -1196,12 +1212,12 @@ static const A2EEntry scene_b0_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* group_list */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* list_array_count */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 24, 0, 0, ""}, /* list_array_items */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b7b70, 0x0, 0, scene_b0_c179, 0, ""}, /* fn_queue_size */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b7b70, 0x0, 0, scene_b0_c181, 0, ""}, /* fn_queue_size */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 780, 0, 0, ""}, /* ov_waypoint_key */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x761084, 0x0, 0, 0, 0, ""}, /* object_list */
-    {1, 0, 0xffff, 0xffff, 0, 0, 4, 0x4d5620, 0x0, 0, scene_b0_c182, 0, ""}, /* fn_odf_name */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d0060, 0x0, 0, scene_b0_c183, 0, ""}, /* fn_user_team */
-    {1, 0, 0xffff, 0xffff, 0, 0, 2, 0x6731a0, 0x0, 0, scene_b0_c184, 0, ""}, /* fn_dyn_cast */
+    {1, 0, 0xffff, 0xffff, 0, 0, 4, 0x4d5620, 0x0, 0, scene_b0_c184, 0, ""}, /* fn_odf_name */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d0060, 0x0, 0, scene_b0_c185, 0, ""}, /* fn_user_team */
+    {1, 0, 0xffff, 0xffff, 0, 0, 2, 0x6731a0, 0x0, 0, scene_b0_c186, 0, ""}, /* fn_dyn_cast */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6eee98, 0x0, 0, 0, 0, ""}, /* td_game_object_class */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6eee08, 0x0, 0, 0, 0, ""}, /* td_craft_class */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x700c08, 0x0, 0, 0, 0, ""}, /* td_planet_class */
@@ -1250,48 +1266,50 @@ static const A2E_U8 scene_b1_c45[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 
 static const A2E_U8 scene_b1_c46[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 0xe8};
 static const A2E_U8 scene_b1_c47[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 0xe8};
 static const A2E_U8 scene_b1_c48[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 0xe8};
-static const A2E_U8 scene_b1_c49[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x4d};
-static const A2E_U8 scene_b1_c50[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x4d};
-static const A2E_U8 scene_b1_c51[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 0xe8};
-static const A2E_U8 scene_b1_c52[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 0xe8};
+static const A2E_U8 scene_b1_c49[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 0xe8};
+static const A2E_U8 scene_b1_c50[] = {0x55, 0x8b, 0xec, 0xd9, 0x45, 0x08, 0x56, 0x8b};
+static const A2E_U8 scene_b1_c51[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x4d};
+static const A2E_U8 scene_b1_c52[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x4d};
 static const A2E_U8 scene_b1_c53[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 0xe8};
-static const A2E_U8 scene_b1_c54[] = {0x53, 0x56, 0x8b, 0xf1, 0x33, 0xdb, 0x8b, 0x86};
-static const A2E_U8 scene_b1_c67[] = {0x55, 0x8b, 0xec, 0xa1, 0xac, 0x0b, 0x74, 0x00};
-static const A2E_U8 scene_b1_c69[] = {0x55, 0x8b, 0xec, 0x83, 0xec, 0x40, 0x53, 0x57};
-static const A2E_U8 scene_b1_c70[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68};
-static const A2E_U8 scene_b1_c71[] = {0x55, 0x8b, 0xec, 0xa1, 0xc0, 0x0f, 0x7b, 0x00};
-static const A2E_U8 scene_b1_c72[] = {0x55, 0x8b, 0xec, 0xa1, 0xc0, 0x0f, 0x7b, 0x00};
-static const A2E_U8 scene_b1_c80[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x14, 0x8b, 0x55};
-static const A2E_U8 scene_b1_c81[] = {0x55, 0x8b, 0xec, 0x64, 0xa1, 0x00, 0x00, 0x00};
+static const A2E_U8 scene_b1_c54[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 0xe8};
+static const A2E_U8 scene_b1_c55[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 0xe8};
+static const A2E_U8 scene_b1_c56[] = {0x53, 0x56, 0x8b, 0xf1, 0x33, 0xdb, 0x8b, 0x86};
+static const A2E_U8 scene_b1_c69[] = {0x55, 0x8b, 0xec, 0xa1, 0xac, 0x0b, 0x74, 0x00};
+static const A2E_U8 scene_b1_c71[] = {0x55, 0x8b, 0xec, 0x83, 0xec, 0x40, 0x53, 0x57};
+static const A2E_U8 scene_b1_c72[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68};
+static const A2E_U8 scene_b1_c73[] = {0x55, 0x8b, 0xec, 0xa1, 0xc0, 0x0f, 0x7b, 0x00};
+static const A2E_U8 scene_b1_c74[] = {0x55, 0x8b, 0xec, 0xa1, 0xc0, 0x0f, 0x7b, 0x00};
 static const A2E_U8 scene_b1_c82[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x14, 0x8b, 0x55};
-static const A2E_U8 scene_b1_c83[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x55};
-static const A2E_U8 scene_b1_c88[] = {0x55, 0x8b, 0xec, 0x64, 0xa1, 0x00, 0x00, 0x00};
-static const A2E_U8 scene_b1_c89[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x8d, 0x4d};
-static const A2E_U8 scene_b1_c90[] = {0x55, 0x8b, 0xec, 0x51, 0x8b, 0x45, 0x0c, 0x56};
-static const A2E_U8 scene_b1_c91[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x8b, 0x04};
-static const A2E_U8 scene_b1_c94[] = {0x8b, 0x89, 0x08, 0x01, 0x00, 0x00, 0x85, 0xc9};
-static const A2E_U8 scene_b1_c99[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x91};
-static const A2E_U8 scene_b1_c103[] = {0x55, 0x8b, 0xec, 0xa1, 0x84, 0x10, 0x76, 0x00};
-static const A2E_U8 scene_b1_c104[] = {0x55, 0x8b, 0xec, 0xd9, 0x45, 0x08, 0xd8, 0x1d};
-static const A2E_U8 scene_b1_c105[] = {0x8b, 0x41, 0x40, 0x8b, 0x80, 0x90, 0x04, 0x00};
-static const A2E_U8 scene_b1_c106[] = {0x53, 0x8b, 0xd9, 0x56, 0x33, 0xf6, 0x39, 0xb3};
-static const A2E_U8 scene_b1_c107[] = {0x55, 0x8b, 0xec, 0xd9, 0x81, 0xc4, 0x01, 0x00};
-static const A2E_U8 scene_b1_c116[] = {0x55, 0x8b, 0xec, 0x51, 0x53, 0x56, 0x57, 0x8b};
-static const A2E_U8 scene_b1_c129[] = {0x8b, 0x41, 0x04, 0x83, 0xc0, 0x44, 0xc3};
-static const A2E_U8 scene_b1_c133[] = {0x55, 0x8b, 0xec, 0x8b, 0x55, 0x08, 0x8b, 0xc1};
-static const A2E_U8 scene_b1_c139[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68};
-static const A2E_U8 scene_b1_c141[] = {0x55, 0x8b, 0xec, 0x51, 0x83, 0x3d};
-static const A2E_U8 scene_b1_c142[] = {0xda, 0x4d, 0x08};
-static const A2E_U8 scene_b1_c144[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x53, 0x56};
-static const A2E_U8 scene_b1_c147[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x20, 0xff};
-static const A2E_U8 scene_b1_c150[] = {0x55, 0x8b, 0xec, 0xa1};
-static const A2E_U8 scene_b1_c151[] = {0x55, 0x8b, 0xec, 0x6a};
-static const A2E_U8 scene_b1_c158[] = {0x55, 0x8b, 0xec, 0xd9, 0x05, 0xa8, 0x46, 0x6b, 0x00};
-static const A2E_U8 scene_b1_c159[] = {0x55, 0x8b, 0xec, 0xd9, 0x05, 0x1c, 0x9a, 0x70, 0x00};
-static const A2E_U8 scene_b1_c179[] = {0x8b, 0x89, 0x70, 0x02, 0x00, 0x00, 0x33, 0xc0};
-static const A2E_U8 scene_b1_c182[] = {0x8b, 0x49, 0x40, 0xe9};
-static const A2E_U8 scene_b1_c183[] = {0x8b, 0x0d, 0xd4, 0xb8, 0x76, 0x00, 0xe9, 0x45};
-static const A2E_U8 scene_b1_c184[] = {0xff, 0x25};
+static const A2E_U8 scene_b1_c83[] = {0x55, 0x8b, 0xec, 0x64, 0xa1, 0x00, 0x00, 0x00};
+static const A2E_U8 scene_b1_c84[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x14, 0x8b, 0x55};
+static const A2E_U8 scene_b1_c85[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x55};
+static const A2E_U8 scene_b1_c90[] = {0x55, 0x8b, 0xec, 0x64, 0xa1, 0x00, 0x00, 0x00};
+static const A2E_U8 scene_b1_c91[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x8d, 0x4d};
+static const A2E_U8 scene_b1_c92[] = {0x55, 0x8b, 0xec, 0x51, 0x8b, 0x45, 0x0c, 0x56};
+static const A2E_U8 scene_b1_c93[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x8b, 0x04};
+static const A2E_U8 scene_b1_c96[] = {0x8b, 0x89, 0x08, 0x01, 0x00, 0x00, 0x85, 0xc9};
+static const A2E_U8 scene_b1_c101[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x0c, 0x8b, 0x91};
+static const A2E_U8 scene_b1_c105[] = {0x55, 0x8b, 0xec, 0xa1, 0x84, 0x10, 0x76, 0x00};
+static const A2E_U8 scene_b1_c106[] = {0x55, 0x8b, 0xec, 0xd9, 0x45, 0x08, 0xd8, 0x1d};
+static const A2E_U8 scene_b1_c107[] = {0x8b, 0x41, 0x40, 0x8b, 0x80, 0x90, 0x04, 0x00};
+static const A2E_U8 scene_b1_c108[] = {0x53, 0x8b, 0xd9, 0x56, 0x33, 0xf6, 0x39, 0xb3};
+static const A2E_U8 scene_b1_c109[] = {0x55, 0x8b, 0xec, 0xd9, 0x81, 0xc4, 0x01, 0x00};
+static const A2E_U8 scene_b1_c118[] = {0x55, 0x8b, 0xec, 0x51, 0x53, 0x56, 0x57, 0x8b};
+static const A2E_U8 scene_b1_c131[] = {0x8b, 0x41, 0x04, 0x83, 0xc0, 0x44, 0xc3};
+static const A2E_U8 scene_b1_c135[] = {0x55, 0x8b, 0xec, 0x8b, 0x55, 0x08, 0x8b, 0xc1};
+static const A2E_U8 scene_b1_c141[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68};
+static const A2E_U8 scene_b1_c143[] = {0x55, 0x8b, 0xec, 0x51, 0x83, 0x3d};
+static const A2E_U8 scene_b1_c144[] = {0xda, 0x4d, 0x08};
+static const A2E_U8 scene_b1_c146[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x53, 0x56};
+static const A2E_U8 scene_b1_c149[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, 0x20, 0xff};
+static const A2E_U8 scene_b1_c152[] = {0x55, 0x8b, 0xec, 0xa1};
+static const A2E_U8 scene_b1_c153[] = {0x55, 0x8b, 0xec, 0x6a};
+static const A2E_U8 scene_b1_c160[] = {0x55, 0x8b, 0xec, 0xd9, 0x05, 0xa8, 0x46, 0x6b, 0x00};
+static const A2E_U8 scene_b1_c161[] = {0x55, 0x8b, 0xec, 0xd9, 0x05, 0x1c, 0x9a, 0x70, 0x00};
+static const A2E_U8 scene_b1_c181[] = {0x8b, 0x89, 0x70, 0x02, 0x00, 0x00, 0x33, 0xc0};
+static const A2E_U8 scene_b1_c184[] = {0x8b, 0x49, 0x40, 0xe9};
+static const A2E_U8 scene_b1_c185[] = {0x8b, 0x0d, 0xd4, 0xb8, 0x76, 0x00, 0xe9, 0x45};
+static const A2E_U8 scene_b1_c186[] = {0xff, 0x25};
 static const A2EEntry scene_b1_entries[] = {
     {1, 0, 0x1, 0xffff, 0, 0, 0, 0x483351, 0x0, 0, 0, 0, ""}, /* site_tick */
     {1, 0, 0xffff, 0xffff, 0, 0, 11, 0x4d3e90, 0x0, 0, scene_b1_c1, 0, ""}, /* fn_update_range */
@@ -1342,12 +1360,14 @@ static const A2EEntry scene_b1_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x456da0, 0x0, 0, scene_b1_c46, 0, ""}, /* si_max_health */
     {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x457590, 0x0, 0, scene_b1_c47, 0, ""}, /* si_cannot_die */
     {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x456cf0, 0x0, 0, scene_b1_c48, 0, ""}, /* si_explode_now */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x457d70, 0x0, 0, scene_b1_c49, 0, ""}, /* si_succeed */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x457d50, 0x0, 0, scene_b1_c50, 0, ""}, /* si_fail */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x455eb0, 0x0, 0, scene_b1_c51, 0, ""}, /* si_set_shields */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x456060, 0x0, 0, scene_b1_c52, 0, ""}, /* si_set_crew */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x456280, 0x0, 0, scene_b1_c53, 0, ""}, /* si_set_special */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4c8be0, 0x0, 0, scene_b1_c54, 0, ""}, /* fn_repair_all */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x455cc0, 0x0, 0, scene_b1_c49, 0, ""}, /* si_set_real_team */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4c8a80, 0x0, 0, scene_b1_c50, 0, ""}, /* fn_damage_hull */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x457d70, 0x0, 0, scene_b1_c51, 0, ""}, /* si_succeed */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x457d50, 0x0, 0, scene_b1_c52, 0, ""}, /* si_fail */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x455eb0, 0x0, 0, scene_b1_c53, 0, ""}, /* si_set_shields */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x456060, 0x0, 0, scene_b1_c54, 0, ""}, /* si_set_crew */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x456280, 0x0, 0, scene_b1_c55, 0, ""}, /* si_set_special */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4c8be0, 0x0, 0, scene_b1_c56, 0, ""}, /* fn_repair_all */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 452, 0, 0, ""}, /* craft_max_crew */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 456, 0, 0, ""}, /* craft_shields */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 460, 0, 0, ""}, /* craft_shields_max */
@@ -1359,13 +1379,13 @@ static const A2EEntry scene_b1_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 24, 0, 0, ""}, /* sys_hp */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 48, 0, 0, ""}, /* sys_size */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6b3e2c, 0x0, 0, 0, 0, ""}, /* vt_craft_instance */
-    {1, 0, 0x43, 0x41, 14, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* slot_inst_update */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4cb390, 0x0, 0, scene_b1_c67, 0, ""}, /* fn_inst_update */
+    {1, 0, 0x45, 0x43, 14, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* slot_inst_update */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4cb390, 0x0, 0, scene_b1_c69, 0, ""}, /* fn_inst_update */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 156, 0, 0, ""}, /* inst_sys_shown */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x6593c0, 0x0, 0, scene_b1_c69, 0, ""}, /* fn_prj_set_name */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x664850, 0x0, 0, scene_b1_c70, 0, ""}, /* fn_weapon_find */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4c3820, 0x0, 0, scene_b1_c71, 0, ""}, /* fn_fire_at_special */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4c3b20, 0x0, 0, scene_b1_c72, 0, ""}, /* fn_fire_special */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x6593c0, 0x0, 0, scene_b1_c71, 0, ""}, /* fn_prj_set_name */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x664850, 0x0, 0, scene_b1_c72, 0, ""}, /* fn_weapon_find */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4c3820, 0x0, 0, scene_b1_c73, 0, ""}, /* fn_fire_at_special */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4c3b20, 0x0, 0, scene_b1_c74, 0, ""}, /* fn_fire_special */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 360, 0, 0, ""}, /* craft_special_max */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 364, 0, 0, ""}, /* craft_special */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 296, 0, 0, ""}, /* craft_carrier */
@@ -1373,34 +1393,34 @@ static const A2EEntry scene_b1_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 16, 0, 0, ""}, /* carrier_weapons_end */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 4, 0, 0, ""}, /* weapon_class */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 32, 0, 0, ""}, /* weapon_vt_can_fire */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d1af0, 0x0, 0, scene_b1_c80, 0, ""}, /* fn_set_command_obj */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d1a40, 0x0, 0, scene_b1_c81, 0, ""}, /* fn_set_command */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d1b50, 0x0, 0, scene_b1_c82, 0, ""}, /* fn_set_command_at */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4630, 0x0, 0, scene_b1_c83, 0, ""}, /* fn_dq_command */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d1af0, 0x0, 0, scene_b1_c82, 0, ""}, /* fn_set_command_obj */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d1a40, 0x0, 0, scene_b1_c83, 0, ""}, /* fn_set_command */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d1b50, 0x0, 0, scene_b1_c84, 0, ""}, /* fn_set_command_at */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d4630, 0x0, 0, scene_b1_c85, 0, ""}, /* fn_dq_command */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 3, 0, 0, ""}, /* cmd_stop */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 4, 0, 0, ""}, /* cmd_go */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 42, 0, 0, ""}, /* cmd_set_formation */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 43, 0, 0, ""}, /* cmd_go_warp */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d1cb0, 0x0, 0, scene_b1_c88, 0, ""}, /* fn_set_command_build */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4cd370, 0x0, 0, scene_b1_c89, 0, ""}, /* fn_class_find */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4988d0, 0x0, 0, scene_b1_c90, 0, ""}, /* fn_team_add_res */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x496340, 0x0, 0, scene_b1_c91, 0, ""}, /* fn_team_get */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d1cb0, 0x0, 0, scene_b1_c90, 0, ""}, /* fn_set_command_build */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4cd370, 0x0, 0, scene_b1_c91, 0, ""}, /* fn_class_find */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4988d0, 0x0, 0, scene_b1_c92, 0, ""}, /* fn_team_add_res */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x496340, 0x0, 0, scene_b1_c93, 0, ""}, /* fn_team_get */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 25, 0, 0, ""}, /* cmd_build */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 12, 0, 0, ""}, /* max_team */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d03e0, 0x0, 0, scene_b1_c94, 0, ""}, /* fn_cloak_now */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d03e0, 0x0, 0, scene_b1_c96, 0, ""}, /* fn_cloak_now */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 264, 0, 0, ""}, /* obj_cloak */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 44, 0, 0, ""}, /* cloak_request */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 60, 0, 0, ""}, /* cloak_state */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6b26a8, 0x0, 0, 0, 0, ""}, /* vt_freighter */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b16f0, 0x0, 0, scene_b1_c99, 0, ""}, /* fn_freighter_load */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b16f0, 0x0, 0, scene_b1_c101, 0, ""}, /* fn_freighter_load */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 600, 0, 0, ""}, /* freighter_amount */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 604, 0, 0, ""}, /* freighter_kind */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6b2b3c, 0x0, 0, 0, 0, ""}, /* vt_planet */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b5660, 0x0, 0, scene_b1_c103, 0, ""}, /* fn_pl_start_colony */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b5970, 0x0, 0, scene_b1_c104, 0, ""}, /* fn_pl_set_pop */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b5550, 0x0, 0, scene_b1_c105, 0, ""}, /* fn_pl_max_pop */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b5150, 0x0, 0, scene_b1_c106, 0, ""}, /* fn_pl_neutralize */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4c83e0, 0x0, 0, scene_b1_c107, 0, ""}, /* fn_craft_set_crew */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b5660, 0x0, 0, scene_b1_c105, 0, ""}, /* fn_pl_start_colony */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b5970, 0x0, 0, scene_b1_c106, 0, ""}, /* fn_pl_set_pop */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b5550, 0x0, 0, scene_b1_c107, 0, ""}, /* fn_pl_max_pop */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b5150, 0x0, 0, scene_b1_c108, 0, ""}, /* fn_pl_neutralize */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4c83e0, 0x0, 0, scene_b1_c109, 0, ""}, /* fn_craft_set_crew */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 580, 0, 0, ""}, /* team_race */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 1106, 0, 0, ""}, /* race_city_name */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 684, 0, 0, ""}, /* pl_population */
@@ -1409,7 +1429,7 @@ static const A2EEntry scene_b1_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x739000, 0x0, 0, 0, 0, ""}, /* tech_trees */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 152, 0, 0, ""}, /* tech_tree_size */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 8, 0, 0, ""}, /* tech_max_team */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4999e0, 0x0, 0, scene_b1_c116, 0, ""}, /* fn_tech_find */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4999e0, 0x0, 0, scene_b1_c118, 0, ""}, /* fn_tech_find */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 4, 0, 0, ""}, /* tech_available */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 12, 0, 0, ""}, /* tech_possible */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x771fac, 0x0, 0, 0, 0, ""}, /* ordnance_list */
@@ -1422,37 +1442,37 @@ static const A2EEntry scene_b1_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 52, 0, 0, ""}, /* exp_radius */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6afbd4, 0x0, 0, 0, 0, ""}, /* vt_fireball */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6afdac, 0x0, 0, 0, 0, ""}, /* vt_shockwave */
-    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x4cfd50, 0x0, 0, scene_b1_c129, 0, ""}, /* fn_entity_transform */
+    {1, 0, 0xffff, 0xffff, 0, 0, 7, 0x4cfd50, 0x0, 0, scene_b1_c131, 0, ""}, /* fn_entity_transform */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 4, 0, 0, ""}, /* list_head */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* node_next */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 8, 0, 0, ""}, /* node_value */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x65e1b0, 0x0, 0, scene_b1_c133, 0, ""}, /* fn_random_ctor */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x65e1b0, 0x0, 0, scene_b1_c135, 0, ""}, /* fn_random_ctor */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x7b0fac, 0x0, 0, 0, 0, ""}, /* g_random */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x7b0fa8, 0x0, 0, 0, 0, ""}, /* g_mission_random */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x7300c4, 0x0, 0, 0, 0, ""}, /* g_async_random */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 9, 0, 0, ""}, /* random_log */
-    {1, 0, 0x8b, 0xffff, 0, 0, 0, 0x485159, 0x0, 0, 0, 0, ""}, /* site_preload_stars */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x59ac00, 0x0, 0, scene_b1_c139, 0, ""}, /* fn_starfield_init */
-    {1, 0, 0x8d, 0xffff, 0, 0, 0, 0x4834a3, 0x0, 0, 0, 0, ""}, /* site_game_speed */
-    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x604700, 0x0, 0, scene_b1_c141, 0, ""}, /* fn_game_speed */
-    {1, 0, 0xffff, 0xffff, 0, 0, 3, 0x4834a8, 0x0, 0, scene_b1_c142, 0, ""}, /* step_product */
+    {1, 0, 0x8d, 0xffff, 0, 0, 0, 0x485159, 0x0, 0, 0, 0, ""}, /* site_preload_stars */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x59ac00, 0x0, 0, scene_b1_c141, 0, ""}, /* fn_starfield_init */
+    {1, 0, 0x8f, 0xffff, 0, 0, 0, 0x4834a3, 0x0, 0, 0, 0, ""}, /* site_game_speed */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x604700, 0x0, 0, scene_b1_c143, 0, ""}, /* fn_game_speed */
+    {1, 0, 0xffff, 0xffff, 0, 0, 3, 0x4834a8, 0x0, 0, scene_b1_c144, 0, ""}, /* step_product */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 8, 0, 0, ""}, /* step_ms_arg */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x48b100, 0x0, 0, scene_b1_c144, 0, ""}, /* fn_race_find */
-    {1, 0, 0x90, 0xffff, 0, 0, 0, 0x4897ad, 0x0, 0, 0, 0, ""}, /* site_race_1 */
-    {1, 0, 0x90, 0xffff, 0, 0, 0, 0x489872, 0x0, 0, 0, 0, ""}, /* site_race_2 */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x5061e0, 0x0, 0, scene_b1_c147, 0, ""}, /* fn_overlay_add */
-    {1, 0, 0x93, 0xffff, 0, 0, 0, 0x455081, 0x0, 0, 0, 0, ""}, /* site_show_title */
-    {1, 0, 0x93, 0xffff, 0, 0, 0, 0x45510c, 0x0, 0, 0, 0, ""}, /* site_show_subtitle */
-    {1, 0, 0xffff, 0xffff, 0, 0, 4, 0x4586c0, 0x0, 0, scene_b1_c150, 0, ""}, /* music_start */
-    {1, 0, 0xffff, 0xffff, 0, 0, 4, 0x463680, 0x0, 0, scene_b1_c151, 0, ""}, /* music_new_track */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x48b100, 0x0, 0, scene_b1_c146, 0, ""}, /* fn_race_find */
+    {1, 0, 0x92, 0xffff, 0, 0, 0, 0x4897ad, 0x0, 0, 0, 0, ""}, /* site_race_1 */
+    {1, 0, 0x92, 0xffff, 0, 0, 0, 0x489872, 0x0, 0, 0, 0, ""}, /* site_race_2 */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x5061e0, 0x0, 0, scene_b1_c149, 0, ""}, /* fn_overlay_add */
+    {1, 0, 0x95, 0xffff, 0, 0, 0, 0x455081, 0x0, 0, 0, 0, ""}, /* site_show_title */
+    {1, 0, 0x95, 0xffff, 0, 0, 0, 0x45510c, 0x0, 0, 0, 0, ""}, /* site_show_subtitle */
+    {1, 0, 0xffff, 0xffff, 0, 0, 4, 0x4586c0, 0x0, 0, scene_b1_c152, 0, ""}, /* music_start */
+    {1, 0, 0xffff, 0xffff, 0, 0, 4, 0x463680, 0x0, 0, scene_b1_c153, 0, ""}, /* music_new_track */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x7b0fc8, 0x0, 0, 0, 0, ""}, /* sim_time */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x763370, 0x0, 0, 0, 0, ""}, /* camera_manager */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6b46c0, 0x0, 0, 0, 0, ""}, /* vt_tactical */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6b4598, 0x0, 0, 0, 0, ""}, /* vt_parabolic */
-    {1, 0, 0x9e, 0x9a, 17, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* slot_zoom_tactical */
-    {1, 0, 0x9f, 0x9b, 17, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* slot_zoom_parabolic */
-    {1, 0, 0xffff, 0xffff, 0, 0, 9, 0x4e4db0, 0x0, 0, scene_b1_c158, 0, ""}, /* fn_zoom_tactical */
-    {1, 0, 0xffff, 0xffff, 0, 0, 9, 0x4dfcc0, 0x0, 0, scene_b1_c159, 0, ""}, /* fn_zoom_parabolic */
+    {1, 0, 0xa0, 0x9c, 17, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* slot_zoom_tactical */
+    {1, 0, 0xa1, 0x9d, 17, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* slot_zoom_parabolic */
+    {1, 0, 0xffff, 0xffff, 0, 0, 9, 0x4e4db0, 0x0, 0, scene_b1_c160, 0, ""}, /* fn_zoom_tactical */
+    {1, 0, 0xffff, 0xffff, 0, 0, 9, 0x4dfcc0, 0x0, 0, scene_b1_c161, 0, ""}, /* fn_zoom_parabolic */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 212, 0, 0, ""}, /* tact_zoom */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 84, 0, 0, ""}, /* para_height */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6b46a4, 0x0, 0, 0, 0, ""}, /* tact_zoom_min */
@@ -1472,12 +1492,12 @@ static const A2EEntry scene_b1_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* group_list */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 0, 0, 0, ""}, /* list_array_count */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 24, 0, 0, ""}, /* list_array_items */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b7b70, 0x0, 0, scene_b1_c179, 0, ""}, /* fn_queue_size */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4b7b70, 0x0, 0, scene_b1_c181, 0, ""}, /* fn_queue_size */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 780, 0, 0, ""}, /* ov_waypoint_key */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x761084, 0x0, 0, 0, 0, ""}, /* object_list */
-    {1, 0, 0xffff, 0xffff, 0, 0, 4, 0x4d5620, 0x0, 0, scene_b1_c182, 0, ""}, /* fn_odf_name */
-    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d0060, 0x0, 0, scene_b1_c183, 0, ""}, /* fn_user_team */
-    {1, 0, 0xffff, 0xffff, 0, 0, 2, 0x6731a0, 0x0, 0, scene_b1_c184, 0, ""}, /* fn_dyn_cast */
+    {1, 0, 0xffff, 0xffff, 0, 0, 4, 0x4d5620, 0x0, 0, scene_b1_c184, 0, ""}, /* fn_odf_name */
+    {1, 0, 0xffff, 0xffff, 0, 0, 8, 0x4d0060, 0x0, 0, scene_b1_c185, 0, ""}, /* fn_user_team */
+    {1, 0, 0xffff, 0xffff, 0, 0, 2, 0x6731a0, 0x0, 0, scene_b1_c186, 0, ""}, /* fn_dyn_cast */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6eee98, 0x0, 0, 0, 0, ""}, /* td_game_object_class */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x6eee08, 0x0, 0, 0, 0, ""}, /* td_craft_class */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x700c08, 0x0, 0, 0, 0, ""}, /* td_planet_class */
@@ -1492,7 +1512,7 @@ static const A2EEntry scene_b1_entries[] = {
 static const A2EBlock scene_b1_blocked[] = {
     {12, "CraftInstance::Update", "is changed by fo-roots-5.0Z11 (not yet verified)", "Stands down: CraftInstance::Update is changed by fo-roots-5.0Z11, not yet verified"},
     {13, "Craft::FireAtSpecial", "is changed by fo-roots-5.0Z11 (not yet verified)", "Stands down: Craft::FireAtSpecial is changed by fo-roots-5.0Z11, not yet verified"},
-    {23, "Entity::Get", "is off in fo-roots-5.0Z11: Roots answers the technology tree from a tree of its own", "Stands down: off in fo-roots-5.0Z11: Roots answers the technology tree from a tree of its own"},
+    {24, "Entity::Get", "is off in fo-roots-5.0Z11: Roots answers the technology tree from a tree of its own", "Stands down: off in fo-roots-5.0Z11: Roots answers the technology tree from a tree of its own"},
     {0xffff, 0, 0, 0}
 };
 static const A2ECrc scene_b1_fcrc[] = {
@@ -1510,24 +1530,24 @@ static const A2EBlock scene_b1_blocked_mod[] = {
     {8, "DisplayInterface::TooltipOn", "is patched by FleetOpsHook.dll, which is not the profiled one", "Stands down: DisplayInterface::TooltipOn is patched by FleetOpsHook.dll, which is not the profiled one"},
     {9, "DisplayInterface::MouseOn", "is patched by FleetOpsHook.dll, which is not the profiled one", "Stands down: DisplayInterface::MouseOn is patched by FleetOpsHook.dll, which is not the profiled one"},
     {10, "ShieldEffect::CreateShieldHit", "is patched by FleetOpsHook.dll, which is not the profiled one", "Stands down: ShieldEffect::CreateShieldHit is patched by FleetOpsHook.dll, which is not the profiled one"},
-    {24, "cPrjID::GetOdfName", "is patched by FleetOpsHook.dll, which is not the profiled one", "Stands down: cPrjID::GetOdfName is patched by FleetOpsHook.dll, which is not the profiled one"},
-    {26, "Starfield_Initialize", "is patched by FleetOpsHook.dll, which is not the profiled one", "Stands down: Starfield_Initialize is patched by FleetOpsHook.dll, which is not the profiled one"},
-    {27, "getGameSpeedModifier", "is patched by FleetOpsHook.dll, which is not the profiled one", "Stands down: getGameSpeedModifier is patched by FleetOpsHook.dll, which is not the profiled one"},
+    {25, "cPrjID::GetOdfName", "is patched by FleetOpsHook.dll, which is not the profiled one", "Stands down: cPrjID::GetOdfName is patched by FleetOpsHook.dll, which is not the profiled one"},
+    {27, "Starfield_Initialize", "is patched by FleetOpsHook.dll, which is not the profiled one", "Stands down: Starfield_Initialize is patched by FleetOpsHook.dll, which is not the profiled one"},
+    {28, "getGameSpeedModifier", "is patched by FleetOpsHook.dll, which is not the profiled one", "Stands down: getGameSpeedModifier is patched by FleetOpsHook.dll, which is not the profiled one"},
     {0xffff, 0, 0, 0}
 };
 static const A2EBuild scene_builds[] = {
-    {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, scene_b0_entries, scene_b0_blocked, 0, 195, scene_b0_fcrc, 0, scene_b0_mods, 0, scene_b0_blocked_mod, 0, 195},
-    {"fo-roots-5.0Z11", "armada2/fo-roots-5.0Z11", "ArmadaL.exe", 0x3c4c76bd, 0x405000, 0xca07c55a, 0x400000, scene_b1_entries, scene_b1_blocked, 3, 176, scene_b1_fcrc, 2, scene_b1_mods, 1, scene_b1_blocked_mod, 8, 145},
+    {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, scene_b0_entries, scene_b0_blocked, 0, 197, scene_b0_fcrc, 0, scene_b0_mods, 0, scene_b0_blocked_mod, 0, 197},
+    {"fo-roots-5.0Z11", "armada2/fo-roots-5.0Z11", "ArmadaL.exe", 0x3c4c76bd, 0x405000, 0xca07c55a, 0x400000, scene_b1_entries, scene_b1_blocked, 3, 178, scene_b1_fcrc, 2, scene_b1_mods, 1, scene_b1_blocked_mod, 8, 147},
 };
 
-static A2E_U8 scene_hook_state[39];
-static A2E_U8 scene_sym_flags[195];
-static A2E_U32 scene_sym_addr[195];
-static char scene_notes[39][A2E_NOTE_MAX + 1];
+static A2E_U8 scene_hook_state[40];
+static A2E_U8 scene_sym_flags[197];
+static A2E_U32 scene_sym_addr[197];
+static char scene_notes[40][A2E_NOTE_MAX + 1];
 
 static const A2ETable SCENE_ENGINE = {
     "armada2", "scene",
-    scene_syms, 195, scene_hooks, 39, scene_builds, 2, 0,
+    scene_syms, 197, scene_hooks, 40, scene_builds, 2, 0,
     scene_vars, scene_hook_state, scene_sym_flags, scene_sym_addr, scene_notes
 };
 
