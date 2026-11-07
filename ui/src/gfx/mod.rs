@@ -166,10 +166,27 @@ pub fn tex_update(t: Tex, src: *const u8, pitch: usize, w: u32, rows: u32) {
 /// An image from the game's files (a TGA, by its path in `files`: `textures\<file>`),
 /// or None if it is missing or not a TGA. The caller keeps the `Tex`: each call
 /// registers anew.
+///
+/// A 32-bit file whose alpha is 0 in every texel is drawn opaque, as the engine draws
+/// it: four of the Borg build icons (`gbbsensor`, `gbbturret`, `gbbturret2`,
+/// `gbbtechass`) are stored that way, and the stock bar shows them whole; taken at its
+/// word, the alpha made them invisible on our bar (issue #85, HUD.md "Icons").
 pub fn load_tga(rel: &str) -> Option<Tex> {
     let data = crate::files::open(rel)?;
-    let img = a2fmt::tga::decode(&data).ok()?;
+    let mut img = a2fmt::tga::decode(&data).ok()?;
+    if opaque_if_no_alpha(&mut img.pixels) {
+        crate::log!("tga: {} has no alpha; drawn opaque", rel);
+    }
     Some(texture_bgra(img.width, img.height, img.pixels))
+}
+
+/// Sets alpha to 255 throughout when no texel has any (BGRA8); true if it did.
+fn opaque_if_no_alpha(px: &mut [u8]) -> bool {
+    if px.len() >= 4 && px.chunks_exact(4).all(|p| p[3] == 0) {
+        px.chunks_exact_mut(4).for_each(|p| p[3] = 255);
+        return true;
+    }
+    false
 }
 
 /// The texture's size in texels.

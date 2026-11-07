@@ -40,12 +40,35 @@ named on stdout as "::error <code> <path>", one line per file (codes: av-locked,
 av-missing, damaged, game-running, no-game, write-denied; gui-installer/README.md,
 "Errors").
 #>
+[CmdletBinding(PositionalBinding = $false)]   # only the game directory by position
 param(
-    [string]$GameDir = "",
+    [Parameter(Position = 0)][string]$GameDir = "",
     [switch]$Uninstall,
     [string]$Without = "",
-    [switch]$All
+    [switch]$All,
+    [Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest = @()
 )
+# install.bat hands %* on as typed, and powershell -File splits it by the C rules, which
+# break a game directory with spaces two ways. Quoted and ending in a backslash
+# ("C:\My Games\Armada II\"), the \" is an escaped quote: the path keeps a " at its end and
+# swallows every argument after it. Unquoted, it arrives in pieces, the first as -GameDir and
+# the rest in $Rest (-Without takes none of them by position). Put the path together again
+# and read the options that came along.
+$extra = @()
+if ($GameDir.Contains('"')) {
+    $i = $GameDir.IndexOf('"')
+    $extra = @($GameDir.Substring($i + 1) -split '\s+' | Where-Object { $_ })
+    $GameDir = $GameDir.Substring(0, $i)
+}
+$extra += @($Rest)
+for ($i = 0; $i -lt $extra.Count; $i++) {
+    $a = "$($extra[$i])".Trim('"')
+    if ($a -eq "-Uninstall") { $Uninstall = $true }
+    elseif ($a -eq "-All") { $All = $true }
+    elseif ($a -eq "-Without" -and $i + 1 -lt $extra.Count) { $i++; $Without = "$($extra[$i])".Trim('"') }
+    elseif ($a) { $GameDir = ("$GameDir $a").Trim() }
+}
+$GameDir = $GameDir.Trim().Trim('"')
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"   # Invoke-WebRequest's bar: slow, and not output
 

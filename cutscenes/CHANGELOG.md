@@ -4,6 +4,14 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`binkproxy/README.md`](binkproxy/README.md).
 
+## 3.1.0 — 2026-11-06
+
+### Changed
+- The engine resolver (`crates/a2engine`, `csdk/a2engine.h`; root 15.8.0) names the executable in its log lines and notes by the matched build's `exe` (`profiles/*/build.toml`), or on an unknown build by the process's own module file name, not by a literal: `engine: Armada2.exe timestamp ...` on Armada II as before. The generated symbol tables carry each build's `exe`. (binkproxy)
+- binkproxy: engine fields are the matched build's, filled at start-up (`BINKPROXY_F_*`), no longer compile-time per game (PLAN-ARCHITECTURE.md, AR-3). `b524e42`
+
+Confirmed in game 2026-11-06.
+
 ## 3.0.2 — 2026-11-04
 
 ### Fixed
