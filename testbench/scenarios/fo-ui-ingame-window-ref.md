@@ -9,10 +9,9 @@ Timeout: 10 min
 The reference for `fo-ui-ingame-window` (PLAN-FLEETOPS.md, decisions 310 to 313): Roots with
 Display8 and Render3D and no UI, so its forms are its own windows. The first allied tutorial
 (as `fo-render3d-tutorial` reaches it), Esc opens Roots' Options, Esc again goes back. The
-window manager's events are recorded across both: `Expect the window manager to have seen no
-other window` fails here by design (Roots' Options is a window of its own, a floating dialog),
-and its detail counts how often FleetOpsHook replaced its device window, which happens with or
-without the UI.
+window manager's events are recorded across both: Roots' Options is a window of its own (a
+floating dialog), so the window manager sees another window, and the check's detail counts how
+often FleetOpsHook replaced its device window, which happens with or without the UI.
 
 1. Launch the game.
 2. Wait for the main menu.
@@ -46,7 +45,7 @@ without the UI.
 30. Press Escape.
 31. Wait 8 seconds.
 32. Take a screenshot called "mission".
-33. Expect the window manager to have seen no other window.
+33. Expect the window manager to have seen another window.
 34. Expect "Display8.log" not contain "device removed".
 35. Stop the game.
 36. Expect no crash.

@@ -812,7 +812,7 @@ def _wm_events(path):
         events.append(ev)
 
 
-@step(r'^expect the window manager to have seen no other window$')
+@step(r'^expect the window manager to have seen (?:no other window|(?P<another>another window))$')
 def s_expect_wm_no_other(c, m):
     """`Expect the window manager to have seen no other window` (after `Watch the window
     manager`): fails on any window event since the watch began for a window that is not
@@ -820,7 +820,8 @@ def s_expect_wm_no_other(c, m):
     screen given to it). The game's own are its normal windows with the game's title:
     Roots' FleetOpsHook replaces its device window at each switch between the shell and a
     mission (PLAN-FLEETOPS.md, decision 311), so those come and go and are counted, not
-    failed. Stops the watch."""
+    failed. `... to have seen another window` is its opposite, for a reference run of the
+    game drawing its own windows (`fo-ui-ingame-window-ref`). Stops the watch."""
     w = getattr(c, '_wm_watch', None)
     if not w:
         return c.checked(None, 'no `Watch the window manager` step ran before this one')
@@ -861,7 +862,8 @@ def s_expect_wm_no_other(c, m):
     swaps = sum(1 for ev in events if ev.get('change') == 'new' and (ev.get('container') or {}).get('id') in game)
     detail = (f"{len(events)} window events; the game's windows {sorted(game)} ({swaps} new: its device "
               f"window replaced)" + (f"; others: {'; '.join(others)}" if others else '; no other window'))
-    return c.checked(not others, detail, how=f'swaymsg subscribe window -> {path.name}')
+    return c.checked(bool(others) if m.group('another') else not others, detail,
+                     how=f'swaymsg subscribe window -> {path.name}')
 
 
 @step(r'^expect the game (?:to have |has )?(?:exited|quit|closed)$')
