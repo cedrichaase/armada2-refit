@@ -12,6 +12,8 @@ pub(super) fn draw(ui: &mut Ui, _fit: &super::Fit, f: &Form) -> bool {
         "TModSettingsForm" => super::mods::draw(ui, f),
         "TMapSelectForm" => super::mapselect::draw(ui, f),
         "TAdvSettingsForm" => super::advsettings::draw(ui, f),
+        "TMapEditForm" => super::mapedit::draw(ui, f),
+        "TMapEditCreateForm" => super::mapeditcreate::draw(ui, f),
         "TMultiplayerConnectionForm" => super::multiplayer::draw(ui, f),
         "TManualIPForm" => super::manualip::draw(ui, f),
         "TAdvancedOptionsForm" => super::advanced::draw(ui, f),

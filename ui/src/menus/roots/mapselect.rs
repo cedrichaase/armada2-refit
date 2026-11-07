@@ -25,11 +25,16 @@ const COLUMNS: [(&str, f32); 4] = [("Name", 0.42), ("Players", 0.14), ("Filename
 
 /// The grid's row `i` selected as a player would: a click at the row when the grid shows
 /// it, the arrow keys from the selected row otherwise.
-fn choose(f: &Form, g: &Control, grid: &Grid, i: usize, from: i32) {
+fn choose(f: &Form, g: &Control, grid: &Grid, i: usize, from: i32, keys: bool) {
     let (rh, hh) = (if grid.row_h > 0 { grid.row_h } else { ROW_H }, if grid.head_h > 0 { grid.head_h } else { HEAD_H });
     let shown = ((g.rect[3] - hh) / rh).max(1);
     let at = i as i32 - grid.first;
-    if (0..shown).contains(&at) {
+    // The grid takes the keyboard with the click, so the arrow keys that follow move its
+    // selection (Map Select's filter combo has it first, and would take them).
+    if g.hwnd != 0 {
+        forms::act(Action::Focus(g.hwnd));
+    }
+    if !keys && (0..shown).contains(&at) {
         let (x, y) = (g.rect[0] + 12, g.rect[1] + hh + at * rh + rh / 2);
         crate::log!("forms: map {} chosen (row {} at {},{})", i, i, x, y);
         forms::act(Action::Mouse(f.hwnd, forms::MOUSE_DOWN, forms::MOUSE_HELD, x, y));
@@ -55,7 +60,6 @@ pub(super) fn draw(ui: &mut Ui, f: &Form) -> bool {
         return false;
     };
     let Some(grid) = g.grid.as_ref() else { return false };
-    let t = ui.theme;
     let list_h = 520.0;
     let (body, foot) = sform::frame(ui, 1180.0, sform::LABEL_H + sform::FIELD_H + list_h + 2.0 * kit::GAP, "SELECT MAP");
 
@@ -71,15 +75,36 @@ pub(super) fn draw(ui: &mut Ui, f: &Form) -> bool {
     let top = body.y + ui.u(sform::LABEL_H + sform::FIELD_H + kit::GAP);
     let pv = ui.u(300.0);
     let list_r = R::new(body.x, top, body.w - pv - ui.u(24.0), ui.u(list_h));
+    list(ui, f, g, grid, list_r, &COLUMNS, Some(accept), false);
+
+    // The preview: the form's picture of its image.
+    if let Some(c) = kit::shown(f, "previewImage") {
+        let side = pv.min(list_r.h);
+        kit::crop(ui, f, c, R::new(list_r.right() + ui.u(24.0), top, side, side));
+    }
+
+    kit::back(ui, f, foot, "buttonClose");
+    let (bw, bh) = (ui.u(220.0), ui.u(44.0));
+    kit::button(ui, f, accept, R::new(foot.right() - bw, foot.bottom() - bh, bw, bh));
+    let _ = cancel;
+    true
+}
+
+/// A grid's rows as a list of ours in `list_r`, under a header of the columns' captions
+/// (when the grid has as many columns as `cols`): the player's click is the grid's row
+/// chosen (by the arrow keys instead of a click when `keys`: a grid of slides, which has
+/// no plain rows to click), a double click or Enter presses `activate`.
+pub(super) fn list(ui: &mut Ui, f: &Form, g: &Control, grid: &Grid, list_r: R, cols: &[(&str, f32)], activate: Option<&Control>, keys: bool) {
+    let t = ui.theme;
     let row_h = ui.u(t.text_size + 14.0);
     let head_h = ui.u(t.small_size + 12.0);
     let head = R::new(list_r.x, list_r.y, list_r.w, head_h);
     let rows_r = R::new(list_r.x, list_r.y + head_h, list_r.w, list_r.h - head_h);
-    let named = grid.rows.first().map_or(COLUMNS.len(), |r| r.len()) == COLUMNS.len();
+    let named = grid.rows.first().map_or(cols.len(), |r| r.len()) == cols.len();
     let bar = ui.u(18.0);
     let mut x = head.x + ui.u(10.0);
     if named {
-        for (name, share) in COLUMNS {
+        for (name, share) in cols {
             ui.text_in(R::new(x, head.y, head.w * share, head.h), name, t.small_size, Align::Left, t.text_dim, Weight::Bold);
             x += (head.w - bar - ui.u(10.0)) * share;
         }
@@ -120,7 +145,7 @@ pub(super) fn draw(ui: &mut Ui, f: &Form) -> bool {
     let ev = ui.list(rows_r, "maps", rows.len(), row_h, &mut sel, |ui, i, rr, _sel, _hot| {
         let mut x = rr.x + ui.u(10.0);
         for (k, cell) in rows[i].iter().enumerate() {
-            let share = if named { COLUMNS[k].1 } else { 1.0 / rows[i].len().max(1) as f32 };
+            let share = if named { cols[k.min(cols.len() - 1)].1 } else { 1.0 / rows[i].len().max(1) as f32 };
             ui.text_in(R::new(x, rr.y, width * share, rr.h), cell, t.text_size, Align::Left, t.text, Weight::Regular);
             x += width * share;
         }
@@ -128,24 +153,14 @@ pub(super) fn draw(ui: &mut Ui, f: &Form) -> bool {
     if f.top && g.enabled {
         if let (ListEvent::Changed | ListEvent::Activated, Some(i)) = (ev, sel) {
             if grid.selected != i as i32 {
-                choose(f, g, grid, i, was.map_or(grid.selected.max(0), |s| s as i32));
+                choose(f, g, grid, i, was.map_or(grid.selected.max(0), |s| s as i32), keys);
                 unsafe { PENDING = (f.hwnd, i, 8) };
             }
             if ev == ListEvent::Activated {
-                kit::press(f, accept);
+                if let Some(a) = activate {
+                    kit::press(f, a);
+                }
             }
         }
     }
-
-    // The preview: the form's picture of its image.
-    if let Some(c) = kit::shown(f, "previewImage") {
-        let side = pv.min(list_r.h);
-        kit::crop(ui, f, c, R::new(list_r.right() + ui.u(24.0), top, side, side));
-    }
-
-    kit::back(ui, f, foot, "buttonClose");
-    let (bw, bh) = (ui.u(220.0), ui.u(44.0));
-    kit::button(ui, f, accept, R::new(foot.right() - bw, foot.bottom() - bh, bw, bh));
-    let _ = cancel;
-    true
 }

@@ -44,7 +44,7 @@ const FAMILY: &[(u32, &str)] = &[
     (0xa95a_b2d7, "Tactical Maneuvers 5.2.3"),
 ];
 
-/// The forms the UI draws. Any other (the map editor's, Tunngle's wait) stays Roots'
+/// The forms the UI draws. Any other (Tunngle's wait) stays Roots'
 /// (decision 152).
 const TAKEN: &[&str] = &[
     "TMainForm",
@@ -58,6 +58,8 @@ const TAKEN: &[&str] = &[
     "TSoundSettingsForm",
     "TModSettingsForm",
     "TAdvSettingsForm",
+    "TMapEditForm",
+    "TMapEditCreateForm",
 ];
 
 const WH_CBT: i32 = 5;

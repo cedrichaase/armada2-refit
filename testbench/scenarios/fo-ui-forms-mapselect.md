@@ -32,20 +32,24 @@ Roots' own handler changes the preview.
 15. Wait 3 seconds.
 16. Take a screenshot called "chosen".
 17. Check that one row of the list is highlighted and the preview shows a map.
-18. Click at 468,186.
-19. Wait 1 second.
-20. Click at 400,256.
-21. Wait 3 seconds.
-22. Take a screenshot called "two players".
-23. Check that the dropdown reads 2 Players and every row of the list shows 2 in its Players column.
-24. Click at 400,341.
-25. Wait 2 seconds.
-26. Click at 1190,771.
-27. Wait up to 20 seconds for "UI.log" to say "press on buttonAccept".
-28. Wait 3 seconds.
-29. Take a screenshot called "game setup".
-30. Check that Instant Action's setup is shown again with the map chosen in Map Select named at the top right and its minimap beside it.
-31. Expect "UI.log" not contain "PANIC".
-32. Expect "Display8.log" not contain "VUID".
-33. Stop the game.
-34. Expect no crash.
+18. Press Down.
+19. Wait 2 seconds.
+20. Take a screenshot called "down".
+21. Check that the highlighted row is now The Sentinels II, the row below The Reef, which was highlighted in the previous shot, that the preview shows another map, and that the Players dropdown still reads All Maps.
+22. Click at 468,186.
+23. Wait 1 second.
+24. Click at 400,256.
+25. Wait 3 seconds.
+26. Take a screenshot called "two players".
+27. Check that the dropdown reads 2 Players and every row of the list shows 2 in its Players column.
+28. Click at 400,341.
+29. Wait 2 seconds.
+30. Click at 1190,771.
+31. Wait up to 20 seconds for "UI.log" to say "press on buttonAccept".
+32. Wait 3 seconds.
+33. Take a screenshot called "game setup".
+34. Check that Instant Action's setup is shown again with the map chosen in Map Select named at the top right and its minimap beside it.
+35. Expect "UI.log" not contain "PANIC".
+36. Expect "Display8.log" not contain "VUID".
+37. Stop the game.
+38. Expect no crash.
