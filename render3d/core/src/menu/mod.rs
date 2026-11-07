@@ -114,6 +114,12 @@ pub struct Shot {
     pub stars: Vec<(V3, f32, f32)>,
     /// The sun's ODF (a background object's SOD), the way towards it, its distance.
     pub sun: Option<(String, V3, f32)>,
+    /// The sun's SOD scaled by this (`SunScale=`).
+    pub sun_scale: f32,
+    /// The star sheet laid on a cube of n x n tiles a face, fixed in the sky's frame
+    /// (`StarTiles=`; 0: none), and the level it is drawn at (`StarLevel=`).
+    pub star_tiles: u32,
+    pub star_level: f32,
     pub planet: Option<PlanetAt>,
     pub ships: Vec<ShipAt>,
     pub gas: Vec<Gas>,
@@ -346,6 +352,9 @@ struct Map {
     sky_rate: f32,
     stars: Vec<(V3, f32, f32)>,
     sun: Option<(String, V3, f32)>,
+    sun_scale: f32,
+    star_tiles: u32,
+    star_level: f32,
     key: Directional,
     fill: Directional,
     /// Ground, clouds, radius, spin, cloud turn, axis, centre.
@@ -418,7 +427,7 @@ impl Map {
             let b = 0.25 + 0.75 * u * u * u;
             stars.push((d, size * (0.6 + 0.8 * b), b));
         }
-        let sun = t.get(s, "sun").filter(|x| !x.is_empty()).map(|o| (String::from(o), -key_dir, t.f(s, "sundistance", 30000.0)));
+        let sun = t.get(s, "sun").filter(|x| !x.is_empty()).map(|o| (String::from(o), t.v(s, "sunat", -key_dir).norm(), t.f(s, "sundistance", 30000.0)));
         let planet = t.get("planet", "class").map(|cls| {
             let odf = assets::odf(cls);
             let g = |k: &str, d: &str| -> String {
@@ -564,6 +573,9 @@ impl Map {
             sky_rate: t.f(s, "skyturn", 0.004),
             stars,
             sun,
+            sun_scale: t.f(s, "sunscale", 1.0).clamp(0.01, 20.0),
+            star_tiles: t.f(s, "startiles", 0.0).clamp(0.0, 16.0) as u32,
+            star_level: t.f(s, "starlevel", 0.8),
             key: Directional { dir: key_dir, colour: t.v(s, "keycolour", v3(1.0, 0.95, 0.86)) },
             fill: Directional { dir: fill_dir, colour: t.v(s, "fillcolour", v3(0.10, 0.12, 0.18)) },
             planet,
@@ -704,6 +716,9 @@ impl Map {
             sky_turn: rotation(v3(1.0, 0.0, 0.0), self.sky_rate * t),
             stars: self.stars.clone(),
             sun: self.sun.clone(),
+            sun_scale: self.sun_scale,
+            star_tiles: self.star_tiles,
+            star_level: self.star_level,
             planet,
             ships,
             gas: self.gas.clone(),
