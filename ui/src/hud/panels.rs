@@ -105,6 +105,8 @@ pub fn install(c: &Hud) {
 
 /// A mission's frame: every panel of these that is on.
 static mut BOX_SHOWN: bool = false;
+/// `IsGamePausedAtAll` at the last frame, for the log.
+static mut PAUSED: Option<bool> = None;
 
 /// Whether a box of ours that pauses the game (message, objectives, pause) showed in
 /// the last frame: it wants the pointer, so the cursor shows over it even when the
@@ -131,6 +133,17 @@ pub fn run(ui: &mut Ui) {
     let hud_hidden = api::ingame::hud_hidden();
     // Under the engine's own box only the boxes of ours (which pause the game too) draw.
     let under_box = stock_box_up();
+    // Whether the engine counts the game paused, logged as it changes: a box of ours
+    // leaves the pause to the engine, as the stock box does (fo-ui-briefing-ours).
+    let paused = popups::game_paused();
+    unsafe {
+        if PAUSED != Some(paused) {
+            if PAUSED.is_some() || paused {
+                crate::log!("panels: the game {}", if paused { "paused" } else { "runs" });
+            }
+            PAUSED = Some(paused);
+        }
+    }
     // A box that pauses the game covers everything: nothing under it takes the mouse
     // (its own widgets are drawn in the overlay layer, above the occluder).
     let blocking = PANELS.iter().enumerate().any(|(i, p)| taken(i) && p.modal());

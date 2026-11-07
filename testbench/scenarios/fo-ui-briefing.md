@@ -3,7 +3,7 @@
 Resolutions: 2150x900
 Mod: refit
 Layers: display asiloader render3d ui
-Setup: display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh HUD.Minimap=1 HUD.Info=1 HUD.UnitView=1 HUD.Tooltips=1 HUD.Bar=1 HUD.BarLabels=1 HUD.InfoCamera=1 HUD.LayoutLog=1
+Setup: display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh HUD.Minimap=1 HUD.Info=1 HUD.UnitView=1 HUD.Tooltips=1 HUD.Bar=1 HUD.BarLabels=1 HUD.InfoCamera=1 HUD.Messages=0 HUD.LayoutLog=1
 Timeout: 14 min
 
 The user's report of 2026-11-07 (Roots 5.0Z11, 3440x1440, the panels of the player's

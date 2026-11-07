@@ -701,7 +701,8 @@ Bench: Roots at 1280x960, Federation against Klingon in Instant Action, Vulkan w
 | Selection overlay (`HUD.Selection`) | **on, one caveat** | `fo-ui-selection` against `fo-ui-selection-off`: ours draws corner brackets and the gauges (health green, shield blue) where Roots draws only the gauges; Roots' unit tooltip, bar, info strip and minimap are unchanged. FleetOpsHook's `SelectionDisplay` callbacks (its group colours and tooltips) are skipped while ours is on: not seen in the skirmish, so unjudged (decision 127) |
 | Frame rate (`HUD.FrameRate`) | **on** | `fo-ui-frame-rate` (`--rts FRAMERATE_DISPLAY=1`): the engine's lines become one panel of ours; it takes the mouse where it is drawn, as on stock |
 | Order ring, height posts, footprints (`HUD.Overview`) | **on** | `fo-ui-overview`: the move point is marked at the click, the placement of a building shows ours (the footprint hatched red where it is blocked, amber tiles for the cells taken; `leftovers: 4 of the engine's last draws are ours`). The drag box is the engine's (decision 74), and its stray end marker at the pointer is as without the UI. The log's `order ring at 520,744` four times over names one degenerate quad of the stock call; Roots draws its own marker through FleetOpsHook's call in `mRenderWhere`, so the ring seen at the click is probably Roots' (unconfirmed: a bench with the row off, a right-click and a screenshot would settle it) |
-| Messages, objectives (`HUD.Messages`), overlay text (`HUD.Overlay`), replay (`HUD.Replay`), fade (`HUD.Fade`), team texts (`HUD.TeamTexts`) | **off** | claimed and read without error in the probe, but a skirmish raises none of their boxes (no script message, no objectives, no replay, no fade), so no scenario can show them; none is on for want of one. The objectives button is dimmed in a skirmish |
+| Messages, objectives (`HUD.Messages`) | **on** since decision 322 | `fo-ui-briefing-ours`: the tutorial's script raises the briefing; ours shows the title, summary, briefing, objectives with their state and OK, pauses as the engine's box does, keeps the mouse; Alt+O opens it again (decision 323), Return closes it |
+| Overlay text (`HUD.Overlay`), replay (`HUD.Replay`), fade (`HUD.Fade`), team texts (`HUD.TeamTexts`) | **off** | claimed and read without error in the probe, but a skirmish raises none of their boxes (no script message, no objectives, no replay, no fade), so no scenario can show them; none is on for want of one. The objectives button is dimmed in a skirmish |
 | Comm, drop box, load wait | **off** | multiplayer only (two games; not asked in step 4) |
 | Drag box | engine's | decision 74 |
 | `panels.sound` | **off** | decision 126 |
@@ -820,6 +821,39 @@ While the engine's objectives or message box shows and is not ours, the panels o
 "Under the engine's boxes"). `fo-ui-briefing` (2150x900, the user's panels on): the briefing shot matches the
 reference's, with none of ours over it; OK closes it and the panels come back; `hud: under the engine's box` and
 `the engine's box closed` in `UI.log`; no VUID.
+
+### The briefing and objectives as ours (2026-11-07)
+
+Branch `fo-hud-briefing-2`, on `fo-b`, after decision 320 left the engine's briefing at Roots' 16:9 layout
+(stretched on a wider screen). Taken by default for the user's goal, everything reimplemented in our shell:
+`[HUD] Messages=1` in Roots' defaults (decision 322), so the briefing and objectives and the script's message
+boxes are the UI's own windows (`hud/objectives.rs`, `hud/messages.rs`), laid out in the UI's units and drawn
+with the theme's tokens. The stock component still simulates and is shown and hidden by the engine.
+
+**What the bench showed** (`fo-ui-briefing-ours`, 2150x900, the user's panels on). The tutorial's script raises
+the briefing by itself about 25 seconds in; ours shows the mission's title, the summary's header and the briefing,
+the objectives' header and each objective with its state, and OK. The engine counts the game paused while it
+shows (`panels: the game paused`, logged from `IsGamePausedAtAll`), as with its own box; a click on the dimmed
+map beside it does nothing; OK closes it and the game runs. Sending the Enterprise through the wormhole ticks the
+first objective, and the script shows the box again with it ticked, then once more with the second objective
+added. This tutorial raises no message box: its lessons are objectives, so the message box of ours is not seen on
+Roots yet. At 3440x1440 (an interactive session) the same box reads at the same proportions, about a third of the
+screen wide.
+
+**The objectives key on Roots** (decision 323). Alt+O (`objectives_toggle` in Roots' `Input.map`) opened the
+engine's box but never ours. With the box ours, `popups::objectives_keys` runs the box's focus-step at every
+simulate pass while it shows, and it ran on the very pass the key opened it; on Roots that key is also one of the
+two commands the step closes the box on, so it closed at once. Stock's box becomes the mouse's owner only at the
+next pass's `RefreshOwner`, so its focus-step first runs a pass later; ours now skips the pass the box opened on,
+and Alt+O opens the box (Return still closes it).
+
+**An install made before** (decision 324). `ui/install.sh` merges the shipped `UI.ini` (with Roots' defaults
+applied) into the installed one, keeping the installed values. An install made before holds `Messages=0`, Roots'
+old default, which the player never set: the Refit screen writes `RefitPlayer.ini`, never `UI.ini`.
+`tools/ini-merge.py` now has retired defaults per game (`RETIRED_BY_GAME`, applied when `A2_PROFILE` names the
+game): on Roots an installed `Messages=0` becomes 1. On Armada II, which ships 1 already, a 0 there is the
+player's own and stays (`tools/ini-merge-selftest.sh`). A player's `Messages=0` in `RefitPlayer.ini` still wins
+over both.
 
 ### Step 7: why the menus stay Roots' (2026-11-06)
 
@@ -1286,6 +1320,10 @@ them, 2–4 h together).
 | 313 | **The bench watches the window manager across steps**: `Watch the window manager` records sway's window events into `wm-events.jsonl`; `Expect the window manager to have seen no other window` fails on any event for a window that is not the game's (decision 311's replacements counted); `Take N screenshots called "NAME" every S seconds` takes a series and a contact sheet, which `Check that the series "NAME" ...` gives the judge. `fo-ui-ingame-window` (the first allied tutorial, Esc, Game Settings, Return, Esc, End Mission, Yes, Single Player ours) and `fo-ui-ingame-window-ref` use them. Two stale scenarios fixed on the way: `fo-ui-forms-mapselect` clicks SELECT MAP by its caption (its fixed point fell on the preview once Game Setup had a spec, decision 257) and checks the map's name in the window's title | a step "see one window" at fixed moments missed a window that came and went between them (the first run passed every such step and failed the watch) | |
 | 320 | **The briefing's width at 21:9 is Roots' layout, left as Roots draws it**: Roots' 16:9 interface files (canvas 2134 x 1200) stretched per axis by the engine; the same with no `UI.asi` (`fo-ui-briefing-ref`) | "The briefing under the HUD" above; the brief: Roots' intended layout, as with the UI off | the user wanting it narrower: `[HUD] Messages=1` on Roots (our box, laid out by us) once `fo-ui-briefing` passes with it, or a pillarbox of the engine's box |
 | 321 | **While the engine's objectives or message box shows (not ours), the HUD of ours stands aside whole**, the boxes of ours and the multiplayer boxes excepted; it comes back when the box closes | stock's box is modal and drawn before the UI's frame; the UI cannot draw between two engine components, so hiding is the faithful choice (the box owns the pointer as in stock) | drawing ours under the engine's box (a frame of ours split at `RenderAll`) |
+| 322 | **The briefing and objectives and the message box are ours on Roots** (`[HUD] Messages=1` in `ui/defaults/fo-roots.ini`) | the user's goal, everything reimplemented in our shell; Roots' own box is laid out on its 16:9 canvas and stretched wider (320); the tutorial raises it, so a scenario can show it (`fo-ui-briefing-ours`) | the user preferring Roots' art; a Roots theme (another branch) restyles it through the tokens |
+| 323 | **The objectives box's focus-step skips the pass on which the box opened** (`popups::objectives_keys`), on every build | on Roots the objectives key also closes the box, and run on that pass the step closed what the key had opened; stock's own box gets its first focus-step a pass later too | |
+| 324 | **Retired defaults per game in `tools/ini-merge.py`** (`RETIRED_BY_GAME`, by `A2_PROFILE`): Roots' `[HUD] Messages=0` becomes 1 on reinstall; the release installers (Armada II only) are unchanged | an old Roots install holds the old default, which no player set (the Refit screen writes `RefitPlayer.ini`); Armada II ships 1, where a 0 is the player's | |
+| 325 | **`UI.log` logs the engine's pause as it changes** (`panels: the game paused` / `runs`, from `IsGamePausedAtAll`) | the evidence that a box of ours pauses as the engine's does | |
 
 ### Risks and unknowns
 
