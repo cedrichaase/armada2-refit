@@ -705,7 +705,8 @@ Bench: Roots at 1280x960, Federation against Klingon in Instant Action, Vulkan w
 | Frame rate (`HUD.FrameRate`) | **on** | `fo-ui-frame-rate` (`--rts FRAMERATE_DISPLAY=1`): the engine's lines become one panel of ours; it takes the mouse where it is drawn, as on stock |
 | Order ring, height posts, footprints (`HUD.Overview`) | **on** | `fo-ui-overview`: the move point is marked at the click, the placement of a building shows ours (the footprint hatched red where it is blocked, amber tiles for the cells taken; `leftovers: 4 of the engine's last draws are ours`). The drag box is the engine's (decision 74), and its stray end marker at the pointer is as without the UI. The log's `order ring at 520,744` four times over names one degenerate quad of the stock call; Roots draws its own marker through FleetOpsHook's call in `mRenderWhere`, so the ring seen at the click is probably Roots' (unconfirmed: a bench with the row off, a right-click and a screenshot would settle it) |
 | Messages, objectives (`HUD.Messages`) | **on** since decision 322 | `fo-ui-briefing-ours`: the tutorial's script raises the briefing; ours shows the title, summary, briefing, objectives with their state and OK, pauses as the engine's box does, keeps the mouse; Alt+O opens it again (decision 323), Return closes it |
-| Overlay text (`HUD.Overlay`), replay (`HUD.Replay`), fade (`HUD.Fade`), team texts (`HUD.TeamTexts`) | **off** | claimed and read without error in the probe, but a skirmish raises none of their boxes (no script message, no objectives, no replay, no fade), so no scenario can show them; none is on for want of one. The objectives button is dimmed in a skirmish |
+| Overlay text (`HUD.Overlay`) | **on** since decision 327 | `fo-ui-overlay`: the tutorial's mission name, at the top centre, faded as the engine fades it |
+| Replay (`HUD.Replay`), fade (`HUD.Fade`), team texts (`HUD.TeamTexts`) | **off** | claimed and read without error in the probe, but a skirmish raises none of their boxes (no script message, no objectives, no replay, no fade), so no scenario can show them; none is on for want of one. The objectives button is dimmed in a skirmish |
 | Comm, drop box, load wait | **off** | multiplayer only (two games; not asked in step 4) |
 | Drag box | engine's | decision 74 |
 | `panels.sound` | **off** | decision 126 |
@@ -824,6 +825,27 @@ While the engine's objectives or message box shows and is not ours, the panels o
 "Under the engine's boxes"). `fo-ui-briefing` (2150x900, the user's panels on): the briefing shot matches the
 reference's, with none of ours over it; OK closes it and the panels come back; `hud: under the engine's box` and
 `the engine's box closed` in `UI.log`; no VUID.
+
+### The mission's name over the resource strip (2026-11-07)
+
+Branch `fo-hud-overlay`, on `fo-b`. The user's report (Roots 5.0Z11, 3440x1440, `fo-b` f86bb5b8): at the start of
+the first allied tutorial the mission's name ("Gameplay Tutorial", blue) shows for a few seconds at the very top
+left, partly behind the resource strip of ours.
+
+**Whose it is: the engine's `OverlayText`**, the scripts' on-screen messages (`[HUD] Overlay`, off on Roots by
+decision 125 for want of a trigger; this mission is one). With `Overlay=1` on the bench the panel logs
+`overlay: #0 at 50,50 justify 0 "Gameplay Tutorial"`: the script adds it at the HUD canvas's (50,50) with no
+justification, the top left corner, where Roots' own resource panel leaves room for it and where the strip of
+ours sits. It fades in, holds about six seconds and fades out (the "start" series of `fo-ui-overlay`).
+
+**Ours** (decisions 326 and 327): `Overlay=1` in Roots' defaults (the old 0 moved to 1 on reinstall, as decision
+324 does for `Messages`), and the overlay panel keeps every message clear of the panels of ours. It draws in
+our type, in the message's colour, with the engine's fade, so the timing is Roots'. A message whose rows would
+touch a panel frame of ours drawn this frame is centred across the screen at the same height, and if that still
+touches one, put just below it. The mission's name lands at the top centre: 2150x900 and 3440x1440 both show it
+between the strip and the round buttons, about level with the strip's figures. The engine's own draw is skipped by
+the panel switch, as for every panel of ours; nothing of FleetOpsHook's is touched. Other messages a script adds
+go through the same rule (Armada II's intro lines are centred lower down and move only if they would overlap).
 
 ### The briefing and objectives as ours (2026-11-07)
 
@@ -1337,6 +1359,8 @@ them, 2–4 h together).
 | 323 | **The objectives box's focus-step skips the pass on which the box opened** (`popups::objectives_keys`), on every build | on Roots the objectives key also closes the box, and run on that pass the step closed what the key had opened; stock's own box gets its first focus-step a pass later too | |
 | 324 | **Retired defaults per game in `tools/ini-merge.py`** (`RETIRED_BY_GAME`, by `A2_PROFILE`): Roots' `[HUD] Messages=0` becomes 1 on reinstall; the release installers (Armada II only) are unchanged | an old Roots install holds the old default, which no player set (the Refit screen writes `RefitPlayer.ini`); Armada II ships 1, where a 0 is the player's | |
 | 325 | **`UI.log` logs the engine's pause as it changes** (`panels: the game paused` / `runs`, from `IsGamePausedAtAll`) | the evidence that a box of ours pauses as the engine's does | |
+| 326 | **An overlay message of ours never covers a panel of ours**: one that would touch a panel frame drawn this frame is centred across the screen at its height, then moved below the panel if it still touches one (`hud/overlay_text.rs`, `layout::occupied`); on every build | stock places messages against stock's panels; on Roots the mission's name at (50,50) fell under the resource strip | a script whose layout relies on the exact place (none seen) |
+| 327 | **The scripts' on-screen messages are ours on Roots** (`[HUD] Overlay=1` in `ui/defaults/fo-roots.ini`; an install's old 0 moved to 1 by `RETIRED_BY_GAME`) | the user's report; the tutorial raises one, so `fo-ui-overlay` shows it | |
 
 ### Risks and unknowns
 
