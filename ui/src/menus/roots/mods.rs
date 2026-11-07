@@ -23,7 +23,9 @@ pub(super) fn draw(ui: &mut Ui, f: &Form) -> bool {
     // The rows are read from the grid's memory (Roots' grid paints none of them while the
     // form is off screen); without them the form's picture is what there is to show.
     match grid.grid.as_ref() {
-        Some(g) => mapselect::list(ui, f, grid, g, grid_r, &COLUMNS, None, true),
+        Some(g) => {
+            mapselect::list(ui, f, grid, g, grid_r, &COLUMNS, None, true);
+        }
         None => kit::crop(ui, f, grid, grid_r),
     }
 

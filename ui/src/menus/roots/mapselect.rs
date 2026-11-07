@@ -93,8 +93,9 @@ pub(super) fn draw(ui: &mut Ui, f: &Form) -> bool {
 /// A grid's rows as a list of ours in `list_r`, under a header of the columns' captions
 /// (when the grid has as many columns as `cols`): the player's click is the grid's row
 /// chosen (by the arrow keys instead of a click when `keys`: a grid of slides, which has
-/// no plain rows to click), a double click or Enter presses `activate`.
-pub(super) fn list(ui: &mut Ui, f: &Form, g: &Control, grid: &Grid, list_r: R, cols: &[(&str, f32)], activate: Option<&Control>, keys: bool) {
+/// no plain rows to click), a double click or Enter presses `activate`. Returns what the
+/// list saw (an `Activated` with no `activate` is the caller's to act on).
+pub(super) fn list(ui: &mut Ui, f: &Form, g: &Control, grid: &Grid, list_r: R, cols: &[(&str, f32)], activate: Option<&Control>, keys: bool) -> ListEvent {
     let t = ui.theme;
     let row_h = ui.u(t.text_size + 14.0);
     let head_h = ui.u(t.small_size + 12.0);
@@ -167,4 +168,5 @@ pub(super) fn list(ui: &mut Ui, f: &Form, g: &Control, grid: &Grid, list_r: R, c
             }
         }
     }
+    ev
 }

@@ -49,6 +49,10 @@ NEEDS = {
     'TGraphicOptionsForm': ['buttonBack', 'comboDevicePrimary', 'comboDevicePrimaryResolutions'],
     'TAdvancedOptionsForm': [],
     'TMapSelectForm': [],
+    # The map editor's Load Map / Save Map form, and the VCL's message box (its overwrite
+    # question): the message box's controls are made at run time, so none is published.
+    'TMapSaveForm': ['grdMaps', 'edtSaveName', 'btnConfirm', 'btnClose', 'lbl1'],
+    'TMessageForm': [],
 }
 
 # Map names of the VCL accessors behind the private fields the UI reads (decision 147).
