@@ -54,6 +54,36 @@ lavender cap (the stock violet is the LCARS lavender's dark), the others are kep
 they are (Klingon 0.37,0.06,0, Romulan 0.02,0.38,0, Cardassian 0.46,0.23,0, Borg
 0.36,0.48,0.54 darkened, 8472 0.50,0.28,0.07).
 
+### Starfleet (the Federation on Fleet Operations: Roots)
+
+Roots does not dress the Federation in LCARS: its HUD is **dark machined metal round
+blue glass**, so on Roots the Federation's look is `starfleet`
+(`content/sets/fleetops/ui.ini`); Armada II's set keeps `lcars`. What Roots' own
+Federation HUD measures (its interface sheet and a bench skirmish, read only; none of
+its art is copied, traced or shipped, the look is drawn in code):
+
+- **The metal** is near-black gunmetal, slightly cool (mean about 27..40 of 255, blue a
+  touch above red), with a strong fine grain (luminance deviation about 30 of 255 at
+  the frame's top): it reads as cast or bead-blasted metal more than polished steel.
+  The rims are heavy, about 4% of a panel's width, with small radii, a seam across the
+  side rims half way down, and raised tabs where two plates meet.
+- **The glass** inside is deep navy (about 15,17,29) at about 70% cover, so the map
+  shows through dimly; a pool of blue light (peaking near `#1d5bd8`) rises from one
+  end, and the glass's edge is lit blue along the bottom.
+- **The lights** are small blue slots (`#3a7bff` at their brightest) set into the rims,
+  two by two; nothing else glows.
+- **The buttons** are grey translucent tiles (about 120 of 255) with a light top edge,
+  carrying the game's full-colour icon art; the unit's name is amber, values pale
+  steel blue.
+
+Ours keeps the proportions and the light, and adds what the user asked for: a
+**brushed** grain (the metal kind of the shape shader, `Draw::metal`: streaks along x
+at one unit's width, wider streaks, slow blotches and a per-pixel speckle, fixed in
+screen space so plates side by side share one surface and nothing crawls when a
+panel moves by a pixel), screws and bevels, faint scan lines in the glass that never
+move, and the dark blue `accent3` for every glow, keeping the brighter blue `accent`
+for lights and edges. Text, status colours and sizes are the shell's.
+
 **Which theme shows** is `[UI] Theme=` in `UI.ini`: `auto` (the default) uses the
 player's race in a mission and the shell's theme in the menus and the loading screen;
 a theme's name (`shell`, `federation`, `klingon`, `romulan`, `cardassian`, `borg`,
