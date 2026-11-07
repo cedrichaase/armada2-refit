@@ -1,6 +1,7 @@
 ---
 root: minor
 render3d: minor
+games: [fo-roots]
 status: Installed, not yet seen in game
 ---
 

@@ -52,7 +52,7 @@ commit="$(git -C "$root" rev-parse --short HEAD)"
 # "Pre-releases: the latest main").
 if [ -n "${A2_PRERELEASE:-}" ]; then
     [[ "$A2_PRERELEASE" =~ ^[0-9]+$ ]] || { echo "A2_PRERELEASE is a number" >&2; exit 1; }
-    ver="$(python3 "$root/tools/changeset.py" status --next-root)-pre.$A2_PRERELEASE"
+    ver="$(python3 "$root/tools/changeset.py" status --game armada2 --next-root)-pre.$A2_PRERELEASE"
 fi
 
 name="armada2-refit-$ver"

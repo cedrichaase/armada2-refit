@@ -263,6 +263,7 @@ static void logline(const char *s)
     a2_append_line(g_logpath, s);
 }
 
+#include "rebind.c"
 #include "bar.c"
 
 /* ---- the pan-speed hook ----------------------------------------------- */
@@ -1255,6 +1256,7 @@ __declspec(dllexport) void __cdecl QOL_SettingsChanged(void)
     m[0] = 0;
     s_cat(m, "settings: applied ");
 
+    rebind_settings();
     a2_set_str(&g_ini, QOL_ROW_PANSPEED, val, sizeof val);
     f = pan_factor(val, &ok);
     if (f != g_panSpeed) {
@@ -1339,6 +1341,7 @@ static void startup(void)
     g_rdySpec = a2e_ready(QOL_H_SPECIAL_SELECT);
     g_rdySel = a2e_ready(QOL_H_SELECTION);
     g_rdyBar = a2e_ready(QOL_H_BAR_KEYS);
+    g_rdyRebind = a2e_ready(QOL_H_REBIND);
     g_rdyPaths = a2e_ready(QOL_H_MOVE_PATHS);
     g_rdyRig = a2e_ready(QOL_H_RIG_SELF);
     g_rdyScript = a2e_ready(QOL_H_SCRIPT_INPUT);
@@ -1426,6 +1429,14 @@ static void startup(void)
     }
     logline(b);
     if (!g_barKeys) gate("BarKeys", 0, g_barOk);
+    rebind_settings();
+    b[0] = 0;
+    s_cat(b, "--- QOL [BarKeys] Rebind=");
+    s_cat(b, g_rbText);
+    if (!g_rbN) s_cat(b, "  (no key moved)");
+    else if (!g_rdyRebind || !g_barOk) not_patched(b, g_rdyRebind ? QOL_H_BAR_KEYS : QOL_H_REBIND);
+    else s_cat(b, "  -> applied in memory while the position keys are on, the game's own keys back when they stop");
+    logline(b);
 
     g_pathStart = a2_set_int(&g_ini, QOL_ROW_PATHSTARTSATONCE) != 0;
     g_pathsOk = patch_paths();

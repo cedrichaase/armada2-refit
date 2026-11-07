@@ -350,6 +350,11 @@ is named (`+0x8`, as every database element) after its file in `Textures/RGB/`, 
 `gfx::load_tga` loads, so an upscaled texture pack shows. Measured: the Borg icons are
 256x256 files (`gbbuild00`, `gbforder00`, ...) drawn whole, and the shared ones are
 quarters of a 128x128 (`b_stop` is `gbgenorders1` at 0, 0.5, 0.5, 1).
+Four Borg build icons (`gbbsensor`, `gbbturret`, `gbbturret2`, `gbbtechass`: the
+Detection Array, both cannons and the Technology Assimilator) are 32-bit files whose
+alpha is 0 in every texel, the only interface textures in stock stored so; the stock bar
+draws them opaque. `gfx::load_tga` does the same for any file with no alpha at all; taken
+at its word, the alpha left four blank cells in the Assembler's build list (issue #85).
 
 **Tooltips** are the game's own words: `ControlButton::GetTooltip` (vtable +0x00) and
 `GetVerboseTooltip` (+0x04) write into a `std::stringstream` (the command's localised
@@ -442,11 +447,13 @@ it the stock tooltip and click. So the grid **moves the stock buttons onto its c
 - **More than fifteen buttons** (Roots' bar holds 64): the buttons the plan has no cell for
   go in columns of three to the right of the keyed block, after a line, without keys; the
   cells shrink when the grid would run off the screen.
-- **Keys.** The W cell has no key on Roots (`bk_key_cells` in QOL's profile) and the grid puts
-  no button there (`[Bar] GameKeys` of the content set, decision 347): Roots' key map gives
-  plain W to `select_next_ship`, which Roots reworked to select the damaged ships of the
-  selection (so it empties a shipyard's) and which the overview reads before the bar. Every
-  button therefore sits under a key that presses it. Roots' other
+- **Keys.** All fifteen cells have their key on Roots too. Roots' key map gives plain W to
+  `select_next_ship`, which Roots reworked to select the damaged ships of the selection and which
+  the overview reads before the bar; while the grid's keys are on, QOL's rebind table moves it to
+  M in the engine's parsed key map (`[BarKeys] Rebind = select_next_ship:W>M`, `qol/README.md`,
+  "Key rebinds"; decision 349); while a row has not applied, its FROM key stays the game's and
+  its cell has no key and no button. `[Bar] GameKeys` of the content set (cells the grid leaves empty
+  for a game key, decision 347) is empty on Roots now. Roots' other
   bindings on the fifteen letters are the bar's hotkey tables, which QOL empties around the
   stock step as on Armada II. While the keys are on, the tooltips of ours (`HUD.Tooltips=1`)
   drop Roots' `(Hotkey: X)` note over the grid; the cell's badge names the key.

@@ -49,13 +49,14 @@ pub mod sym {
 
 pub mod hook {
     pub const SHELL_SCREENS: a2engine::HookId = a2engine::HookId(0);
-    pub const SHELL_READS_DEVICE: a2engine::HookId = a2engine::HookId(1);
-    pub const SHELL_CURSOR: a2engine::HookId = a2engine::HookId(2);
-    pub const SHELL_WIDGETS: a2engine::HookId = a2engine::HookId(3);
-    pub const SHELL_READS_WIDGETS: a2engine::HookId = a2engine::HookId(4);
-    pub const SHELL_READS_COMBO: a2engine::HookId = a2engine::HookId(5);
-    pub const SHELL_READS_SETUP: a2engine::HookId = a2engine::HookId(6);
-    pub const SHELL_READS_PROGRESS: a2engine::HookId = a2engine::HookId(7);
+    pub const SHELL_BACKGROUND: a2engine::HookId = a2engine::HookId(1);
+    pub const SHELL_READS_DEVICE: a2engine::HookId = a2engine::HookId(2);
+    pub const SHELL_CURSOR: a2engine::HookId = a2engine::HookId(3);
+    pub const SHELL_WIDGETS: a2engine::HookId = a2engine::HookId(4);
+    pub const SHELL_READS_WIDGETS: a2engine::HookId = a2engine::HookId(5);
+    pub const SHELL_READS_COMBO: a2engine::HookId = a2engine::HookId(6);
+    pub const SHELL_READS_SETUP: a2engine::HookId = a2engine::HookId(7);
+    pub const SHELL_READS_PROGRESS: a2engine::HookId = a2engine::HookId(8);
 }
 
 pub mod field {
@@ -219,7 +220,8 @@ pub const SYMS: &[a2engine::SymDef] = &[
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
-    a2engine::HookDef { id: "ui.shell.screens", run_unknown: false, rows: &["Menus.Credits"], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 21, 22, 23] },
+    a2engine::HookDef { id: "ui.shell.screens", run_unknown: false, rows: &["Menus.Credits"], syms: &[0, 1, 2, 3, 4, 5, 6, 10, 12, 13, 14, 15, 21, 22, 23] },
+    a2engine::HookDef { id: "ui.shell.background", run_unknown: false, rows: &["Menus.Credits"], syms: &[7, 8, 9, 11, 16] },
     a2engine::HookDef { id: "ui.shell.reads_device", run_unknown: false, rows: &[], syms: &[17, 18, 19, 20, 21, 22, 23] },
     a2engine::HookDef { id: "ui.shell.cursor", run_unknown: false, rows: &[], syms: &[24] },
     a2engine::HookDef { id: "ui.shell.widgets", run_unknown: false, rows: &["Menus.Enable"], syms: &[25, 26] },
@@ -354,7 +356,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 79,
+        n_resolved: 91,
         content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x5913a0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff], mask: &[], section: "", count: 0, value: 0 }, // shell_show_credits
@@ -455,20 +457,21 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 21 }, // progress_missions
         ],
         blocked: &[
-            a2engine::Block { hook: 0, symbol: "DispatchDialog", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: DispatchDialog is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 1, symbol: "SetCurrentBackground", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: SetCurrentBackground is changed by fo-roots-5.0Z11, not yet verified" },
         ],
         file_crc: &[a2engine::FileCrc { section: ".text", crc: 0xef690537 }, a2engine::FileCrc { section: ".test", crc: 0xe7a4061b }],
         modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
         blocked_mod: &[
+            a2engine::Block { hook: 0, symbol: "Show_Credits", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: Show_Credits is patched by FleetOpsHook.dll, which is not the profiled one" },
         ],
         n_resolved_mod: 79,
     },
 ];
 
-static HOOK_STATE: [core::sync::atomic::AtomicU64; 8] = [const { core::sync::atomic::AtomicU64::new(0) }; 8];
+static HOOK_STATE: [core::sync::atomic::AtomicU64; 9] = [const { core::sync::atomic::AtomicU64::new(0) }; 9];
 static SYM_FLAGS: [core::sync::atomic::AtomicU8; 96] = [const { core::sync::atomic::AtomicU8::new(0) }; 96];
 static SYM_ADDR: [core::sync::atomic::AtomicUsize; 96] = [const { core::sync::atomic::AtomicUsize::new(0) }; 96];
-static NOTES: [a2engine::Note; 8] = [const { a2engine::Note::new() }; 8];
+static NOTES: [a2engine::Note; 9] = [const { a2engine::Note::new() }; 9];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 
 pub static TABLE: a2engine::Table = a2engine::Table {

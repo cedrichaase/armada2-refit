@@ -2,6 +2,7 @@
 render3d: patch
 testbench: patch
 root: patch
+games: [fo-roots]
 status: Installed, not yet seen in game
 ---
 

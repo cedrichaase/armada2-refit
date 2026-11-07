@@ -168,7 +168,7 @@ apply = "live"
 scope = "local"
 tab = "interface"
 label = "Theme"
-help = "auto takes your race in a mission and the shell's look in the menus; or one look everywhere. Starfleet is the Federation's look on Fleet Operations: Roots."
+help = "auto takes your race in a mission and the shell's look in the menus; or one look everywhere. Starfleet is the Federation's look in a game whose set has none of its own."
 values = ["auto", "shell", "federation", "klingon", "romulan", "cardassian", "borg", "species8472", "starfleet"]
 labels = ["Auto", "Shell", "Federation", "Klingon", "Romulan", "Cardassian", "Borg", "Species 8472", "Starfleet"]
 

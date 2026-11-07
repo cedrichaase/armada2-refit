@@ -10,9 +10,14 @@ pub mod sym {
     pub const FORMS_PROC_GAME_SETUP: a2engine::Sym = a2engine::Sym(27);
     pub const FORMS_PROC_ADMIRALS_LOG: a2engine::Sym = a2engine::Sym(28);
     pub const FORMS_PROC_MESSAGE: a2engine::Sym = a2engine::Sym(29);
-    pub const FORMS_DRAW_TRANSPARENT: a2engine::Sym = a2engine::Sym(30);
-    pub const FORMS_YES_NO_MESSAGE: a2engine::Sym = a2engine::Sym(31);
-    pub const FORMS_YES_NO_TITLE: a2engine::Sym = a2engine::Sym(32);
+    pub const FORMS_PROC_LICENCE: a2engine::Sym = a2engine::Sym(30);
+    pub const FORMS_PROC_INTERNET_GAME: a2engine::Sym = a2engine::Sym(31);
+    pub const FORMS_PROC_NET_WAITING: a2engine::Sym = a2engine::Sym(32);
+    pub const FORMS_PROC_HELP: a2engine::Sym = a2engine::Sym(33);
+    pub const FORMS_PROC_GAME_NAME: a2engine::Sym = a2engine::Sym(34);
+    pub const FORMS_DRAW_TRANSPARENT: a2engine::Sym = a2engine::Sym(35);
+    pub const FORMS_YES_NO_MESSAGE: a2engine::Sym = a2engine::Sym(36);
+    pub const FORMS_YES_NO_TITLE: a2engine::Sym = a2engine::Sym(37);
 }
 
 pub mod hook {
@@ -83,6 +88,11 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "forms_proc_game_setup", symbol: "MultiplayerSetupDlgProc", kind: a2engine::Kind::Fn },
     a2engine::SymDef { id: "forms_proc_admirals_log", symbol: "AdmiralsLogDlgProc", kind: a2engine::Kind::Fn },
     a2engine::SymDef { id: "forms_proc_message", symbol: "OneButtonDlgProc", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "forms_proc_licence", symbol: "LicenseAgreementWindowDlgProc", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "forms_proc_internet_game", symbol: "InternetGameDlgProc", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "forms_proc_net_waiting", symbol: "NetWaitingDlgProc", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "forms_proc_help", symbol: "HelpWindowDlgProc", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "forms_proc_game_name", symbol: "GameNameDlgProc", kind: a2engine::Kind::Fn },
     a2engine::SymDef { id: "forms_draw_transparent", symbol: "DrawTransparentBitmap", kind: a2engine::Kind::Fn },
     a2engine::SymDef { id: "forms_yes_no_message", symbol: "yesNoMessageText", kind: a2engine::Kind::Global },
     a2engine::SymDef { id: "forms_yes_no_title", symbol: "yesNoTitleText", kind: a2engine::Kind::Global },
@@ -90,9 +100,9 @@ pub const SYMS: &[a2engine::SymDef] = &[
 
 pub const HOOKS: &[a2engine::HookDef] = &[
     a2engine::HookDef { id: "ui.forms.vcl", run_unknown: false, rows: &[], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21] },
-    a2engine::HookDef { id: "ui.forms.shell_background", run_unknown: false, rows: &["Menus.Forms"], syms: &[30] },
-    a2engine::HookDef { id: "ui.forms.dialog_specs", run_unknown: false, rows: &["Menus.Forms"], syms: &[22, 23, 24, 25, 26, 27, 28, 29] },
-    a2engine::HookDef { id: "ui.forms.message_text", run_unknown: false, rows: &["Menus.Forms"], syms: &[31, 32] },
+    a2engine::HookDef { id: "ui.forms.shell_background", run_unknown: false, rows: &["Menus.Forms"], syms: &[35] },
+    a2engine::HookDef { id: "ui.forms.dialog_specs", run_unknown: false, rows: &["Menus.Forms"], syms: &[22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34] },
+    a2engine::HookDef { id: "ui.forms.message_text", run_unknown: false, rows: &["Menus.Forms"], syms: &[36, 37] },
 ];
 
 pub const BUILDS: &[a2engine::Build] = &[
@@ -104,7 +114,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 33,
+        n_resolved: 38,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_present
@@ -137,6 +147,11 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x5c2270, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_game_setup
             a2engine::Entry { present: true, addr: 0x5e22c0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_admirals_log
             a2engine::Entry { present: true, addr: 0x5d7730, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_message
+            a2engine::Entry { present: true, addr: 0x5d3bd0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_licence
+            a2engine::Entry { present: true, addr: 0x5b15f0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_internet_game
+            a2engine::Entry { present: true, addr: 0x5ca0b0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_net_waiting
+            a2engine::Entry { present: true, addr: 0x5b07a0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_help
+            a2engine::Entry { present: true, addr: 0x5ac3d0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_game_name
             a2engine::Entry { present: true, addr: 0x608100, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x3c], mask: &[], section: "", count: 0, value: 0 }, // forms_draw_transparent
             a2engine::Entry { present: true, addr: 0x7a7eac, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_yes_no_message
             a2engine::Entry { present: true, addr: 0x7a7f2c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_yes_no_title
@@ -147,7 +162,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         modules: &[],
         blocked_mod: &[
         ],
-        n_resolved_mod: 33,
+        n_resolved_mod: 38,
     },
     a2engine::Build {
         name: "fo-roots-5.0Z11",
@@ -157,7 +172,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 33,
+        n_resolved: 38,
         content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1 }, // forms_present
@@ -190,6 +205,11 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x5c2270, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_game_setup
             a2engine::Entry { present: true, addr: 0x5e22c0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_admirals_log
             a2engine::Entry { present: true, addr: 0x5d7730, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_message
+            a2engine::Entry { present: true, addr: 0x5d3bd0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_licence
+            a2engine::Entry { present: true, addr: 0x5b15f0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_internet_game
+            a2engine::Entry { present: true, addr: 0x5ca0b0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_net_waiting
+            a2engine::Entry { present: true, addr: 0x5b07a0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_help
+            a2engine::Entry { present: true, addr: 0x5ac3d0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_game_name
             a2engine::Entry { present: true, addr: 0x608100, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x3c], mask: &[], section: "", count: 0, value: 0 }, // forms_draw_transparent
             a2engine::Entry { present: true, addr: 0x7a7eac, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_yes_no_message
             a2engine::Entry { present: true, addr: 0x7a7f2c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_yes_no_title
@@ -199,14 +219,15 @@ pub const BUILDS: &[a2engine::Build] = &[
         file_crc: &[a2engine::FileCrc { section: ".text", crc: 0xef690537 }, a2engine::FileCrc { section: ".test", crc: 0xe7a4061b }],
         modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
         blocked_mod: &[
+            a2engine::Block { hook: 2, symbol: "LicenseAgreementWindowDlgProc", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: LicenseAgreementWindowDlgProc is patched by FleetOpsHook.dll, which is not the profiled one" },
         ],
-        n_resolved_mod: 33,
+        n_resolved_mod: 25,
     },
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 4] = [const { core::sync::atomic::AtomicU64::new(0) }; 4];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 33] = [const { core::sync::atomic::AtomicU8::new(0) }; 33];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 33] = [const { core::sync::atomic::AtomicUsize::new(0) }; 33];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 38] = [const { core::sync::atomic::AtomicU8::new(0) }; 38];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 38] = [const { core::sync::atomic::AtomicUsize::new(0) }; 38];
 static NOTES: [a2engine::Note; 4] = [const { a2engine::Note::new() }; 4];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 

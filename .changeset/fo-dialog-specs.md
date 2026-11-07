@@ -1,6 +1,7 @@
 ---
 layers: [ui, render3d]
 bump: minor
+games: [fo-roots]
 ---
 
 ### Added

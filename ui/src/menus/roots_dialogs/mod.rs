@@ -27,10 +27,12 @@ use alloc::vec::Vec;
 pub mod admirals_log;
 pub mod game_settings;
 pub mod game_setup;
+pub mod lobby;
 pub mod mission_select;
 pub mod notice;
 pub mod saves;
 pub mod single_player;
+pub mod text_window;
 
 /// Where Roots' design space lands on the back buffer (`menus::roots`' fit).
 #[derive(Clone, Copy)]
@@ -218,6 +220,10 @@ fn spec(screen: &str) -> Option<Draw> {
         "game settings" => game_settings::draw,
         "game setup" => game_setup::draw,
         "admiral's log" => admirals_log::draw,
+        "licence agreement" | "help" => text_window::draw,
+        "internet game" => lobby::draw,
+        "net waiting" => notice::draw,
+        "game name" => lobby::game_name,
         _ => return None,
     })
 }

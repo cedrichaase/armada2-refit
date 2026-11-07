@@ -1,5 +1,6 @@
 ---
 root: minor
+games: [fo-roots]
 status: Installed, not yet seen in game
 ---
 

@@ -2,6 +2,7 @@
 ui: minor
 qol: minor
 root: patch
+games: [fo-roots]
 ---
 
 ### Added

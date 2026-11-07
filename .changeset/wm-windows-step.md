@@ -1,6 +1,7 @@
 ---
 layers: [testbench]
 bump: minor
+games: [armada2, fo-roots]
 status: none
 ---
 

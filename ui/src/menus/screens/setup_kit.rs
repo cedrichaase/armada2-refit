@@ -39,7 +39,7 @@ pub fn is_list(c: &Control) -> bool {
 }
 
 /// The visible controls of the dialog that `f` accepts, in the order it made them.
-pub fn visible<'a>(s: &'a dyn Host, f: fn(&Control) -> bool) -> Vec<&'a Control> {
+pub fn visible<'a>(s: &'a dyn Host, f: impl Fn(&Control) -> bool) -> Vec<&'a Control> {
     s.model().controls.iter().filter(|c| c.visible && c.rect[2] > 0 && c.rect[3] > 0 && f(c)).collect()
 }
 

@@ -1,6 +1,7 @@
 ---
 ui: patch
 root: patch
+games: [fo-roots]
 ---
 
 ### Fixed
