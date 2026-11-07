@@ -348,7 +348,7 @@ antivirus holds).
 | A change in Refit has no effect | Check its badge: *Next mission* and *Restart* rows apply later |
 | Joiners cannot connect | Check `Online.log` on both sides: it says whether the direct path or the relay was used. A host with `Server=` emptied in `Online.ini` needs the address |
 | The game feels different in a network game | *Pay when queued* is on for that game (see "Multiplayer") |
-| A different edition of the game (Armada 1, a total-conversion mod) | Not supported; the plugins run as stock on a build they do not know. Armada 1 is planned ([`PLAN-ARMADA1.md`](PLAN-ARMADA1.md)) |
+| A different edition of the game (Armada 1, or a mod with an executable of its own) | Not supported; the plugins run as stock on a build they do not know. Armada 1 is planned ([`PLAN-ARMADA1.md`](PLAN-ARMADA1.md)) |
 
 When you open an issue, attach the installer's report, the version of the release
 installed (the installer shows it), and say which backend `Display8.log` names.
