@@ -1,6 +1,6 @@
 # Fragment: Fleet Operations: Roots, a Federation skirmish at top game speed, until the AI attacks
 
-After `_fo-render3d-skirmish`. Nothing on Roots stages a fight (no scene harness), so the
+After `_fo-render3d-skirmish`. Nothing on Roots staged a fight when this was written (`Scene.asi` runs on Roots now: `../scene/README.md`), so the
 fight is the AI's: the Hard AI attacks the player's base with a fleet a few minutes in at
 the stock speed, and in a couple at the top of Game Settings' Game Speed slider, which is
 turned up here from the in-game Options (Esc), eight clicks on its plus. Each click on a screen is repeated where the second is harmless on the screen it would then be on (the first of a pair is sometimes lost). The base falls

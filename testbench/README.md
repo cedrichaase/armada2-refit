@@ -88,7 +88,9 @@ copy, and can run while the game is being played.
 
 **Scenes on demand** (`scene/`): `Scene.asi` turns a directly launched, empty map into
 a test scene, so renderer work need not reach a model, an angle or a weapon through
-the menus. Fog, HUD, grid, cursor and notices are off, and the objects come from a
+the menus. It also lists the game's objects and selects and orders them by
+handle on any map (`SCENE=game`; `a2test drive objects`), in Armada II and in Fleet
+Operations: Roots. Fog, HUD, grid, cursor and notices are off, and the objects come from a
 scene file (`SCENE=planet|nebula|firing`). A free camera can be moved while the game
 runs: `a2test drive scene "orbit ship 120 20 250"`. `--install testbench/scene`; see
 `scene/README.md`.
@@ -249,13 +251,68 @@ Armada II, all read from the descriptor:
   of FleetOpsHook with hulls claimed (`-rings`), the debris at the callee hook (`-debris`),
   the shields' `RTS_CFG.h` keys (`-shields`), the grid's colour (`-grid`) and the logo node's
   texture (`-stlogo`), and the Enterprise-E of the first allied tutorial (`-tutorial`, the
-  single-player screen's mission list; double-click the item, then OK); with the UI layer, `fo-ui-loading` and `fo-ui-loading-off` (FO-6 step 2: the loading screen of ours over Roots' own, `Setup: display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh ...`), and the `fo-ui-forms-*` scenarios (FO-6 step 7, option C: Roots' front-end forms drawn by the UI with `Menus.Forms=1`, `ui/MENUS.md`, "Roots' forms"; our buttons carry Roots' captions, so a step clicks them by label). There is no scene harness on Roots: the fight for `-debris` and
+  single-player screen's mission list; double-click the item, then OK); with the UI layer, `fo-ui-loading` and `fo-ui-loading-off` (FO-6 step 2: the loading screen of ours over Roots' own, `Setup: display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh ...`), and the `fo-ui-forms-*` scenarios (FO-6 step 7, option C: Roots' front-end forms drawn by the UI with `Menus.Forms=1`, `ui/MENUS.md`, "Roots' forms"; our buttons carry Roots' captions, so a step clicks them by label). The fight for `-debris` and
   `-shields` is the Hard AI's own attack on a base left alone, with Game Speed at its top
-  (`_fo-render3d-battle`), a few minutes in. `Setup: display/bench-mode.sh stub
+  (`_fo-render3d-battle`), a few minutes in; `Scene.asi` now runs on Roots too (below). `Setup: display/bench-mode.sh stub
   Backend=vulkan` sets Display8's backend and, on Vulkan, `Validate=1` (the validation
   layer), which is how these scenarios run it before the bench sets it itself. Roots' logs
   are in the prefix's `AppData/Local/armada2-refit/logs/`, which `"Render3D.log"` and
   `"Display8.log"` name.
+
+### Roots straight into a map, and scenes on Roots
+
+The menus are only walked where the menus are what is tested. Everything else starts in
+the map (decisions 420 to 439 of `PLAN-FLEETOPS.md`):
+
+- **A mission or tutorial by its map: `Launch: -nointro tutorialgameplay.bzn`.** Roots'
+  `ArmadaL.exe` parses its command line as stock does (the option table, `CommandLine::*`,
+  `Program::MainLoop` and `SetupDefaultGame` are stock's in the file, and FleetOpsHook
+  writes nothing in them at run time; it adds `-mod` and `rec`), so a bare argument is a
+  map, set up by `SetupDefaultGame`. **The `.bzn` is required**: with it the map's details
+  are read, the player is the race its first start location names (`unitedfederation` for
+  the first allied tutorial) and the map's Lua mission runs (Roots' `mmm_loader` finds it
+  from the map; nothing else is needed): the HUD in about 25 s, the tutorial's briefing at
+  about 50 s. Without it (`tutorialgameplay`) the map loads with no title, no units, no
+  script and a random race. The other tutorials and missions go by their `.bzn` names.
+- **A skirmish with an AI opponent: an Instant Action save, `Launch: -nointro
+  save\ia-fed-kli.sav`.** A command-line name with a backslash is a saved game to stock's
+  `MainLoop`, and a save whose header says Instant Action is set up by
+  `LoadInstantActionGameSetup`: the slots, races, AI and game type come back from the
+  file (HUD in about 25 s). Roots needs its own `<name>.ias` beside the `.sav`, or it stops
+  on a black screen. Saves are the game's data: they live in
+  `$A2_DATA/bench/fo-roots/saves/`, and `Setup: testbench/bench/roots-save.sh ia-fed-kli
+  [next setup script ...]` copies a pair into the clone's `Data/settings_saves_logs/save/`.
+  One is made once per machine: walk Instant Action (`_fo-sides`), LAUNCH, Ctrl+S on the
+  map (Roots writes `save/s1.sav` and `s1.ias`), then `testbench/bench/roots-save.sh --keep
+  SESSION_ID s1 ia-fed-kli`. Only `save\<name>.sav` resolves (a longer or absolute path was
+  taken as a map name).
+- **What does not work: a multiplayer map named bare** (`-nointro Battlezone1v1.bzn`).
+  `SetupDefaultGame` always makes a mission game (`GameTypeDLLMission`); it marks the free
+  start locations as computer players, but nobody gets starting units, and the player's
+  race is random (its start locations name none; one run drew the Observer).
+- **Arguments with spaces** go in double quotes (`Launch: -nointro "Blue Skies.bzn"`,
+  `drive launch -nointro "Blue Skies.bzn"`); the bench keeps backslashes as typed.
+- **The race on Roots is spelled as Roots' `races.odf` spells it**: `unitedfederation`,
+  `klingonempire`, `romulanempire`, and `borg`, `cardassian`, `dominion`, `species8472`,
+  `freeborg` as stock. **`federation` is Roots' Observer** (`Race::Find` takes the first
+  exact match), so `Race=federation` in a scene gives the observer's HUD.
+
+**Scenes on Roots.** `Scene.asi` reads its engine knowledge from the symbol profiles
+(`profiles/gog-1.1/scene.toml`, inherited by `fo-roots-5.0Z11`), so on Roots each of its
+parts runs or stands down by the build's marks, as the shipped plugins' hooks do, and it
+reads and calls what FleetOpsHook replaced through the engine's own entries (the
+overview's `Select`, FleetOpsHook's with its cap of 30), never writing it. It loads
+through the ASI loader, so a Roots scene needs `Layers: display asiloader` (or more), and
+goes into `Data/`. `Setup: testbench/scene/bench-setup.sh game` is the harness alone on
+whatever map the game loaded: the object list, selection and orders by id, the camera,
+pause, seed and step (`scene/README.md`; `scenarios/README.md`, "Objects").
+On Roots' first allied tutorial 36 of its 39 hooks are ready; `scene.damage`
+(`CraftInstance::Update` is trampolined), `scene.special` (both `Craft::FireAtSpecial`
+change at their entry) and `scene.tech` (Roots answers from its own tree) stand down, and
+their commands say so (`! scene.<hook> stood down: ...`). `spawn` takes Roots' ODF names
+(`fconst` is the Federation construction ship; `fdestroy` and `fdefiant` do not exist).
+Roots' map planets (`map_planet_*`) are listed as kind `other`: their class is not a
+`PlanetClass`.
 
 ## Audio stems
 
@@ -563,6 +620,29 @@ posts, a hologram, the Evolver, a survey of what no module draws).
   stops reading commands until "Return to Game" is clicked.
 - **Agent sandboxes** may refuse shell lines that mix variables with `sed`, loops of
   `drive` commands or heredocs: put the sequence in a small script and run that.
+- **Find units by what they are, not where they are.** `a2test drive --session ID objects
+  ships mine` (with `Scene.asi` in: `--install testbench/scene`, or `Setup:
+  testbench/scene/bench-setup.sh game` on any map) lists every object with its handle, ODF,
+  class, team, position, hull and shields; `scene "select #<id>"`, `"select+ #<id>"`,
+  `"camera on #<id>"`, `"goto #<id> world X Y Z"` and `"attack #<a> #<b>"` act on them
+  through the engine's own selection and order paths. In a scenario: `Select the ship of
+  class "Mediterranean"`, `Wait up to 60 seconds until a ship named "rig" is within 100 of
+  3500,0,3000` (`scenarios/README.md`, "Objects"). A box drag by an agent was the slow,
+  flaky way to select one ship; a start fleet's ships change places from game to game.
+- **Handles are large unsigned numbers** (`#2147516417`): the top bit is set. Copy them
+  from the list, never from a hex `query` line.
+- **A paused game still takes Scene commands**: with no tick for 500 ms the plugin reads
+  `Scene.cmd` from the camera hook (Roots' tutorial briefing pauses the simulation).
+- **Roots goes straight into a map** (`Launch: -nointro tutorialgameplay.bzn`, `.bzn` and
+  all; or an Instant Action save, `save\<name>.sav` with its `.ias`): walk Roots' menus
+  only where the menus are what is tested ("Roots straight into a map, and scenes on
+  Roots"). Roots' `federation` race is the Observer: `Race=unitedfederation`.
+- **After a direct launch, push the pointer into the corner before aiming at anything**
+  (`Move the mouse into the bottom right corner`). No menu has moved the game's own
+  cursor, and in a mission it moves by relative motion only, so the first moves land
+  elsewhere: on `fo-ui-bar-grid` the UI saw the hover at the right cell while the game's
+  cursor sat at the top of the screen, and neither FleetOpsHook's range ring nor the
+  tooltip came up.
 - **Say what you are doing**: `a2test drive --session ID note "what, and why"` when
   you start driving a session and whenever your intent changes (a new scene, a new
   question, waiting on a build). The dashboard shows the latest note as the session's
