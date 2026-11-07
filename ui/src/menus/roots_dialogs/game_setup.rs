@@ -28,7 +28,7 @@ pub const ROOTS: Layout = Layout {
     swatch: (45, 24),
     palette_bottom: 450,
     random_right: 300,
-    log_right: 1200,
+    log_right: i32::MAX,
     target_y: 750,
     info_x: 700,
     info_bottom: 150,
