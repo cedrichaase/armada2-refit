@@ -63,10 +63,9 @@ pub enum Form {
     Cube,
     /// Species 8472: organic. Leaf-shaped corners, soft inner light.
     Organic,
-    /// Starfleet (the Federation on Fleet Operations: Roots): machined metal frames
-    /// around blue holographic glass, lit by dark blue lights. The number is the
-    /// variant on trial (STYLE.md, "Starfleet"): 0 gunmetal, 1 steel, 2 holo.
-    Starfleet(u8),
+    /// Starfleet (the Federation on Fleet Operations: Roots): dark machined metal
+    /// frames round smoked glass, lit by blue lamps set into the frame (STYLE.md).
+    Starfleet,
 }
 
 impl Form {
@@ -80,15 +79,8 @@ impl Form {
             Form::Arch => "Arch",
             Form::Cube => "Cube",
             Form::Organic => "Organic",
-            Form::Starfleet(0) => "Starfleet A",
-            Form::Starfleet(1) => "Starfleet B",
-            Form::Starfleet(_) => "Starfleet C",
+            Form::Starfleet => "Starfleet",
         }
-    }
-
-    /// The Starfleet look, any variant.
-    pub fn starfleet(self) -> bool {
-        matches!(self, Form::Starfleet(_))
     }
 
     /// A race look by the id a content set gives it (`lcars`, `blade`, `wing`, `arch`,
@@ -102,10 +94,7 @@ impl Form {
             ("arch", Form::Arch),
             ("cube", Form::Cube),
             ("organic", Form::Organic),
-            ("starfleet", Form::Starfleet(0)),
-            ("starfleet-a", Form::Starfleet(0)),
-            ("starfleet-b", Form::Starfleet(1)),
-            ("starfleet-c", Form::Starfleet(2)),
+            ("starfleet", Form::Starfleet),
         ]
         .iter()
         .find(|(n, _)| n.eq_ignore_ascii_case(id))
@@ -510,89 +499,54 @@ impl Theme {
                 small: Corners([6.0, 2.0, 6.0, 2.0]),
                 ..s
             },
-            Form::Starfleet(v) => Theme::starfleet(v),
+            Form::Starfleet => Theme::starfleet(),
         }
     }
 
-    /// Starfleet's tokens (STYLE.md, "Starfleet"): dark blue light on machined metal.
-    /// The text, title and status colours are shared by the variants; the plates differ.
-    fn starfleet(v: u8) -> Theme {
-        let s = Theme::shell();
-        let base = Theme {
-            form: Form::Starfleet(v),
+    /// Starfleet's tokens (STYLE.md, "Starfleet", where the numbers come from): Roots'
+    /// Federation HUD measured, its own art never used. The glass is a near neutral
+    /// smoke; the blue is the lamps' (`accent`), and the dark blue `accent3` their glow.
+    fn starfleet() -> Theme {
+        Theme {
+            form: Form::Starfleet,
             backdrop_top: 0xff03060c,
             backdrop_bottom: 0xff08101e,
-            panel: 0xd8070b16,
-            panel_top: 0xd80c1426,
-            panel_edge: 0xff2a3442,
-            panel_hi: 0xff9fb4d0,
-            shadow: 0xa0000000,
-            text: 0xffd6dfeb,
-            text_dim: 0xff8c9cb2,
-            text_off: 0xff4c5666,
+            panel: 0xb40c0d15,
+            panel_top: 0xb4161725,
+            panel_edge: 0xff3a3c40,
+            panel_hi: 0xff9a9ca0,
+            shadow: 0x90000000,
+            text: 0xffd8dee8,
+            text_dim: 0xff8e9aac,
+            text_off: 0xff505662,
             text_on: 0xff060a12,
-            title: 0xffb8cff2,
-            accent: 0xff4a80e0,
-            accent2: 0xffe0a83c,
-            accent3: 0xff1c3c84,
-            button: 0xff1d2127,
-            button_top: 0xff353a43,
-            button_hot: 0xff2a323e,
-            button_down: 0xff141a26,
-            button_on: 0xff1c2a44,
-            button_off: 0x801d2127,
-            button_edge: 0xff0a0c10,
-            track: 0xd005080f,
-            fill: 0xff3f78d8,
-            focus: 0xff9cc0ff,
-            tip: 0xf00a1122,
-            tip_text: 0xffd6dfeb,
-            tip_edge: 0xff35609e,
-            row_hot: 0x264a80e0,
-            row_sel: 0x484a80e0,
-            row_alt: 0x0ca0b8e0,
-            corners: Corners::round(7.0),
-            control: Corners::round(5.0),
+            title: 0xffb4cbef,
+            accent: 0xff4a94ff,
+            accent2: 0xffe8b030,
+            accent3: 0xff1c3a8c,
+            button: 0xa0707276,
+            button_top: 0xa08e9094,
+            button_hot: 0xb0868c98,
+            button_down: 0xc0384660,
+            button_on: 0xb05a6886,
+            button_off: 0x60606266,
+            button_edge: 0xe0a6a8ac,
+            track: 0xc0050609,
+            fill: 0xff4088f0,
+            focus: 0xff9cc4ff,
+            tip: 0xf0101218,
+            tip_text: 0xffd8dee8,
+            tip_edge: 0xff4a4e56,
+            row_hot: 0x264a94ff,
+            row_sel: 0x484a94ff,
+            row_alt: 0x0cb0b8c8,
+            corners: Corners::round(6.0),
+            control: Corners::round(6.0),
             small: Corners::round(2.0),
             glow: 12.0,
             texture: [0.0; 4],
             bar_stripes: [5.0, 0.72, 0.0],
-            ..s
-        };
-        match v {
-            0 => base,
-            1 => Theme {
-                panel: 0xd40d1015,
-                panel_top: 0xd41a1e25,
-                panel_edge: 0xff5d636c,
-                button: 0xff2f343b,
-                button_top: 0xff59606a,
-                button_hot: 0xff3c4450,
-                button_down: 0xff1b2230,
-                button_on: 0xff26344c,
-                button_edge: 0xff16191e,
-                corners: Corners::cut(9.0),
-                control: Corners::cut(5.0),
-                small: Corners::cut(2.0),
-                ..base
-            },
-            _ => Theme {
-                panel: 0x9a0a1630,
-                panel_top: 0xb0122448,
-                panel_edge: 0xff3a68c0,
-                button: 0xb0102040,
-                button_top: 0xc81a3260,
-                button_hot: 0xd0213c70,
-                button_down: 0xe0102850,
-                button_on: 0xd0183a78,
-                button_off: 0x60102040,
-                button_edge: 0xff3a68c0,
-                track: 0xa0040a18,
-                corners: Corners([0.0, -12.0, 0.0, -12.0]),
-                control: Corners([0.0, -6.0, 0.0, -6.0]),
-                small: Corners::SQUARE,
-                ..base
-            },
+            ..Theme::shell()
         }
     }
 
@@ -714,8 +668,8 @@ pub fn panel(ui: &mut Ui, r: R) {
         lcars_frame(ui, r, None);
         return;
     }
-    if let Form::Starfleet(v) = t.form {
-        starfleet_panel(ui, r, v);
+    if t.form == Form::Starfleet {
+        starfleet_panel(ui, r);
         return;
     }
     let c = t.px(ui, t.corners);
@@ -789,9 +743,9 @@ pub fn frame_margins(ui: &Ui) -> (f32, f32, f32, f32) {
         let (side, top, bottom) = lcars_bars(ui, None);
         return (side, top, 0.0, bottom);
     }
-    if let Form::Starfleet(v) = ui.theme.form {
-        let (l, t, r, b) = starfleet_rim(v);
-        return (ui.u(l), ui.u(t), ui.u(r), ui.u(b));
+    if ui.theme.form == Form::Starfleet {
+        let m = ui.u(SF_RIM);
+        return (m, m, m, m);
     }
     (0.0, 0.0, 0.0, 0.0)
 }
@@ -807,7 +761,7 @@ pub fn window(ui: &mut Ui, r: R, title: &str, opened: f32) -> R {
     // The header sits inside what the frame itself takes (a Starfleet rim).
     let (ml, mt, mr, mb) = frame_margins(ui);
     let r = R::new(r.x + ml, r.y + mt, r.w - ml - mr, r.h - mt - mb);
-    let c = if t.form.starfleet() { Corners::round(ui.u(3.0)) } else { t.px(ui, t.corners) };
+    let c = if t.form == Form::Starfleet { Corners::round(ui.u(3.0)) } else { t.px(ui, t.corners) };
     let pad = ui.u(t.pad);
     let bar_h = ui.u(t.title_size + 2.0 * t.pad * 0.7);
     let (bar, rest) = r.take_top(bar_h);
@@ -815,7 +769,7 @@ pub fn window(ui: &mut Ui, r: R, title: &str, opened: f32) -> R {
     // The header: the panel's top, tinted.
     let tint = match t.form {
         Form::Cube => fade(t.accent, 0.07),
-        Form::Starfleet(_) => fade(t.accent3, 0.35),
+        Form::Starfleet => fade(t.panel_hi, 0.06),
         _ => fade(t.panel_hi, 0.10),
     };
     ui.draw.fill_v(bar.inset(e), c.grown(-e).only(true, true, false, false), tint, fade(tint, 0.25));
@@ -884,7 +838,7 @@ fn header_mark(ui: &mut Ui, at: R) {
             ui.draw.glow(r, Corners::round(s * 0.5), ui.u(14.0), fade(t.accent2, 0.45));
             ui.draw.fill(r, Corners::round(s * 0.5), t.accent2);
         }
-        Form::Starfleet(_) => {
+        Form::Starfleet => {
             // Two status lights in slots, the second dimmer.
             let (w, h) = (ui.u(14.0), ui.u(4.0));
             for i in 0..2 {
@@ -901,203 +855,123 @@ fn header_mark(ui: &mut Ui, at: R) {
 }
 
 // ---- Starfleet ---------------------------------------------------------------------------
+//
+// Measured off Roots' Federation HUD (STYLE.md, "Starfleet"): a neutral gunmetal rim, a
+// dark lip, smoked glass that is near neutral in the middle, and the blue only where the
+// lamps set into the side rims throw it across the glass.
 
-/// What a Starfleet panel's metal takes at each side, in units: (left, top, right, bottom).
-fn starfleet_rim(v: u8) -> (f32, f32, f32, f32) {
-    match v {
-        0 => (8.0, 8.0, 8.0, 8.0),
-        1 => (6.0, 6.0, 6.0, 6.0),
-        _ => (7.0, 4.0, 0.0, 0.0),
-    }
-}
+/// The metal rim's width all round, units (Roots': about 8 pixels at 960 lines).
+const SF_RIM: f32 = 8.0;
+/// A lamp's core: Roots' lamps peak at about (73,150,255).
+const SF_LAMP: Color = 0xff4996ff;
+/// The lamps' light close to them on the glass: deeper than the core, as Roots' glass
+/// takes it (about +6, +25, +80 over the glass at its edge).
+const SF_POOL: Color = 0xff1238d8;
 
 /// The grain of a Starfleet plate at this screen's scale.
-fn sf_metal(ui: &Ui, strength: f32, aniso: f32, sheen: f32) -> Metal {
-    Metal { size: ui.u(1.0).max(1.0), strength, aniso, angle: 0.0, sheen }
+fn sf_metal(ui: &Ui, strength: f32, sheen: f32) -> Metal {
+    Metal { size: ui.u(1.0).max(1.0), strength, aniso: 22.0, angle: 0.0, sheen }
 }
 
-/// A small screw head: a dark recess, a lit dome and a slot.
-fn sf_screw(ui: &mut Ui, cx: f32, cy: f32, rad: f32) {
-    let r = R::new(cx - rad, cy - rad, 2.0 * rad, 2.0 * rad);
-    ui.draw.fill(r.inset(-ui.u(0.8)), Corners::round(rad + ui.u(0.8)), 0xd0050608);
-    ui.draw.fill_v(r, Corners::round(rad), 0xff6c737e, 0xff22262c);
-    let s = ui.u(0.9).max(1.0);
-    ui.draw.line((cx - rad * 0.6, cy + rad * 0.35), (cx + rad * 0.6, cy - rad * 0.35), s, 0xc0080a0d);
-}
-
-/// A light in a slot on a rim: a dark slot and a blue bar glowing over it.
-fn sf_led(ui: &mut Ui, r: R, a: f32) {
+/// A lamp in a slot on a rim: a dark slot, a bright core and its glow on the metal.
+fn sf_lamp(ui: &mut Ui, r: R, a: f32) {
     let t = ui.theme;
-    ui.draw.fill(r.inset(-ui.u(1.0)), Corners::round(ui.u(1.5)), 0xff040508);
-    ui.draw.glow(r, Corners::round(ui.u(1.0)), ui.u(10.0), fade(t.accent, 0.4 * a));
-    ui.draw.fill_v(r, Corners::round(ui.u(1.0)), fade(mix(t.accent, 0xffffffff, 0.25), a), fade(t.accent, a));
+    ui.draw.fill(r.inset(-ui.u(1.0)), Corners::round(ui.u(1.5)), 0xff030406);
+    ui.draw.glow(r, Corners::round(ui.u(1.0)), ui.u(7.0), fade(t.accent3, 0.7 * a));
+    ui.draw.fill_v(r, Corners::round(ui.u(1.0)), fade(mix(SF_LAMP, 0xffffffff, 0.2), a), fade(SF_LAMP, a));
 }
 
-/// A pool of dark blue light inside `r`, from its left edge.
-fn sf_pool(ui: &mut Ui, r: R, a: f32) {
+/// The light a side's lamps throw across the glass `g`, from its left (`right` false) or
+/// right edge, centred at height `cy`: a bright pool close to the lamps and a long faint
+/// tail, as Roots' falls off (STYLE.md, "Starfleet").
+fn sf_lamp_light(ui: &mut Ui, g: R, cy: f32, right: bool, a: f32) {
     let t = ui.theme;
-    let h = r.h * 0.7;
-    ui.draw.push_clip(r);
-    ui.draw.shadow(R::new(r.x - ui.u(6.0), r.y + (r.h - h) * 0.5, ui.u(8.0), h), Corners::round(ui.u(4.0)), (0.0, 0.0), r.h.min(ui.u(140.0)), fade(t.accent, a));
+    let near = ui.u(30.0).min(g.h * 0.45);
+    let far = ui.u(170.0).min(g.w * 0.45);
+    let x = if right { g.right() } else { g.x };
+    let src = |w: f32, h: f32| R::new(x - w * 0.5, cy - h * 0.5, w, h);
+    ui.draw.push_clip(g);
+    ui.draw.shadow(src(ui.u(6.0), g.h * 0.9), Corners::round(ui.u(3.0)), (0.0, 0.0), far, fade(t.accent3, 0.45 * a));
+    ui.draw.shadow(src(ui.u(4.0), g.h * 0.55), Corners::round(ui.u(2.0)), (0.0, 0.0), near, fade(SF_POOL, 0.5 * a));
     ui.draw.pop_clip();
 }
 
-/// Holographic glass: translucent navy, faint scan lines, a pool of light from the left.
-fn sf_glass(ui: &mut Ui, r: R, c: Corners, top: Color, bottom: Color, scan: f32) {
-    let t = ui.theme;
-    ui.draw.fill_v(r, c, top, bottom);
-    ui.draw.stripes(r, c, ui.u(3.0).max(2.0), 0.5, PI * 0.5, fade(t.accent, scan));
-    sf_pool(ui, r, 0.28);
-}
-
-/// A Starfleet panel: a machined rim of metal around holographic glass (STYLE.md).
-fn starfleet_panel(ui: &mut Ui, r: R, v: u8) {
+/// A Starfleet panel: a machined rim of metal round smoked glass, two lamps in each
+/// side rim lighting the glass from its ends (STYLE.md).
+fn starfleet_panel(ui: &mut Ui, r: R) {
     let t = ui.theme;
     let h = hair(ui);
-    let (ml, mt, mr, mb) = starfleet_rim(v);
-    let inner = R::new(r.x + ui.u(ml), r.y + ui.u(mt), r.w - ui.u(ml + mr), r.h - ui.u(mt + mb));
+    let side = ui.u(SF_RIM);
+    let g = r.inset(side);
     let c = t.px(ui, t.corners);
-    ui.draw.shadow(r, c, (0.0, ui.u(5.0)), ui.u(26.0), t.shadow);
-    match v {
-        0 => {
-            // Gunmetal: a heavy, finely brushed rim, bevelled, around navy glass.
-            let ic = Corners::round(ui.u(4.0));
-            sf_glass(ui, inner, ic, t.panel_top, t.panel, 0.035);
-            let rim = Shape { corners: c, stroke: ui.u(ml) + 1.0, ..Shape::default() };
-            ui.draw.metal(r, &rim, &sf_metal(ui, 0.42, 22.0, 0.55), [0xff25292f, 0xff212429, 0xff101215, 0xff131518]);
-            // The machined bevels: light along the outer top, a dark lip at the glass,
-            // and the glass's own edge lit blue from below.
-            ui.draw.stroke_v(r, c, h, 0x70c8d4e4, 0x10c8d4e4);
-            ui.draw.stroke(r, c, h, 0x60000000);
-            ui.draw.stroke(inner.inset(-h), ic.grown(h), h * 2.0, 0xe0050608);
-            ui.draw.stroke_v(inner, ic, h, fade(t.accent, 0.10), fade(t.accent, 0.55));
-            // A seam across the side rims, half way down.
-            let y = libm::roundf(r.y + r.h * 0.5);
-            for x in [r.x, r.right() - ui.u(mr)] {
-                ui.draw.rect(R::new(x, y - h, ui.u(ml), h), 0xc0050608);
-                ui.draw.rect(R::new(x, y, ui.u(ml), h), 0x30c8d4e4);
-            }
-            // Lights in the left rim either side of the seam.
-            let (lw, lh) = (ui.u(2.5), ui.u(9.0));
-            if r.h > ui.u(70.0) {
-                let lx = r.x + (ui.u(ml) - lw) * 0.5;
-                sf_led(ui, R::new(lx, y - ui.u(5.0) - lh, lw, lh), 0.9);
-                sf_led(ui, R::new(lx, y + ui.u(5.0), lw, lh), 0.6);
-            }
-            // Screws in the corners of a large plate.
-            if r.w > ui.u(180.0) && r.h > ui.u(120.0) {
-                let (sr, o) = (ui.u(2.0), ui.u(ml) * 0.5);
-                for (x, yy) in [(r.x + o + ui.u(10.0), r.y + o), (r.right() - o - ui.u(10.0), r.y + o), (r.x + o + ui.u(10.0), r.bottom() - o), (r.right() - o - ui.u(10.0), r.bottom() - o)] {
-                    sf_screw(ui, x, yy, sr);
-                }
-            }
-        }
-        1 => {
-            // Steel: a lighter, strongly brushed rim with chamfers, a navy light in a
-            // groove along the top and the foot, rivets along the top.
-            ui.draw.fill_v(inner, c.grown(-ui.u(ml)), t.panel_top, t.panel);
-            ui.draw.stripes(inner, c.grown(-ui.u(ml)), ui.u(3.0).max(2.0), 0.5, PI * 0.5, fade(t.accent, 0.02));
-            let rim = Shape { corners: c, stroke: ui.u(ml) + 1.0, ..Shape::default() };
-            ui.draw.metal(r, &rim, &sf_metal(ui, 0.28, 60.0, 0.9), [0xff6e757f, 0xff646a73, 0xff3a3e45, 0xff3e434a]);
-            ui.draw.stroke_v(r, c, h, 0x90e4ecf6, 0x20e4ecf6);
-            ui.draw.stroke(r, c, h, 0x80000000);
-            ui.draw.stroke(inner.inset(-h), c.grown(-ui.u(ml) + h), h * 1.5, 0xd0080a0d);
-            // The emissive grooves: inside the glass, under the top rim and over the foot.
-            let gw = inner.w - ui.u(24.0);
-            let gh = ui.u(2.0).max(1.0);
-            for (y, a) in [(inner.y + ui.u(3.0), 0.9), (inner.bottom() - ui.u(3.0) - gh, 0.6)] {
-                let g = R::new(inner.x + ui.u(12.0), y, gw, gh);
-                ui.draw.glow(g, Corners::SQUARE, ui.u(10.0), fade(t.accent3, 0.6 * a));
-                let mid = R::new(g.x, g.y, g.w * 0.5, g.h);
-                ui.draw.rect_hgrad(mid, fade(t.accent, 0.0), fade(t.accent, 0.85 * a));
-                ui.draw.rect_hgrad(R::new(g.x + g.w * 0.5, g.y, g.w * 0.5, g.h), fade(t.accent, 0.85 * a), fade(t.accent, 0.0));
-            }
-            // Rivets along the top rim.
-            let n = ((r.w - ui.u(40.0)) / ui.u(56.0)).max(0.0) as usize;
-            for i in 0..=n.min(40) {
-                let x = r.x + ui.u(20.0) + (r.w - ui.u(40.0)) * if n == 0 { 0.5 } else { i as f32 / n as f32 };
-                let rr = ui.u(1.4);
-                ui.draw.fill_v(R::new(x - rr, r.y + ui.u(mt) * 0.5 - rr, 2.0 * rr, 2.0 * rr), Corners::round(rr), 0xffb8c0ca, 0xff30343a);
-            }
-        }
-        _ => {
-            // Holo: a projected panel with an emissive edge, held by a metal spine at the
-            // left and a cap along the top.
-            let hc = Corners([0.0, c.0[1], 0.0, c.0[3]]);
-            ui.draw.glow(r, hc, ui.u(14.0), fade(t.accent3, 0.45));
-            sf_glass(ui, r, hc, t.panel_top, t.panel, 0.06);
-            // A faint band of interference a third of the way down: still, not swept.
-            let by = r.y + r.h * 0.32;
-            ui.draw.push_clip(r);
-            ui.draw.rect_vgrad(R::new(r.x, by, r.w, ui.u(10.0)), fade(t.accent, 0.0), fade(t.accent, 0.07));
-            ui.draw.rect_vgrad(R::new(r.x, by + ui.u(10.0), r.w, ui.u(10.0)), fade(t.accent, 0.07), fade(t.accent, 0.0));
-            ui.draw.pop_clip();
-            ui.draw.stroke(r, hc, h, fade(mix(t.accent, 0xffffffff, 0.2), 0.75));
-            ui.draw.inner_glow(r, hc, ui.u(12.0), fade(t.accent, 0.18));
-            // Corner ticks at the right.
-            let (tl, tw) = (ui.u(12.0), ui.u(2.0));
-            let tc = fade(mix(t.accent, 0xffffffff, 0.35), 0.9);
-            ui.draw.rect(R::new(r.right() - ui.u(2.0) - tl - ui.u(8.0), r.bottom() - ui.u(4.0), tl, tw), tc);
-            // The spine and the cap.
-            let spine = R::new(r.x, r.y, ui.u(ml), r.h);
-            let cap = R::new(r.x, r.y, (r.w * 0.42).max(ui.u(60.0)).min(r.w), ui.u(mt));
-            let m = sf_metal(ui, 0.4, 24.0, 0.4);
-            ui.draw.metal(cap, &Shape { corners: Corners([ui.u(3.0), cap.h * 0.5, 0.0, 0.0]), ..Shape::default() }, &m, [0xff383d46, 0xff2c3038, 0xff1a1d22, 0xff1a1d22]);
-            ui.draw.metal(spine, &Shape { corners: Corners([ui.u(3.0), 0.0, 0.0, ui.u(3.0)]), ..Shape::default() }, &Metal { angle: PI * 0.5, ..m }, [0xff3a3f48, 0xff2a2e35, 0xff15171b, 0xff1a1c21]);
-            ui.draw.stroke_v(spine, Corners([ui.u(3.0), 0.0, 0.0, ui.u(3.0)]), h, 0x70c8d4e4, 0x10c8d4e4);
-            ui.draw.rect(R::new(spine.right() - h, r.y + cap.h, h, r.h - cap.h), fade(t.accent, 0.7));
-            if r.h > ui.u(50.0) {
-                let (lw, lh) = (ui.u(2.5), ui.u(8.0));
-                let lx = r.x + (ui.u(ml) - lw) * 0.5;
-                sf_led(ui, R::new(lx, r.y + ui.u(14.0), lw, lh), 0.9);
-                sf_led(ui, R::new(lx, r.y + ui.u(26.0), lw, lh), 0.5);
-            }
+    let gc = Corners::round(ui.u(3.0));
+    ui.draw.shadow(r, c, (0.0, ui.u(4.0)), ui.u(22.0), t.shadow);
+    // The glass: a smoke lighter at the top, a little darker toward the right.
+    ui.draw.fill_v(g, gc, t.panel_top, t.panel);
+    ui.draw.fill_h(g, gc, 0x00000000, 0x30000000);
+    ui.draw.stripes(g, gc, ui.u(3.0).max(2.0), 0.5, PI * 0.5, 0x06ffffff);
+    // The lamps' light on it, from both ends; the left the stronger.
+    let cy = libm::roundf(r.y + r.h * 0.5);
+    let lamps = g.h > ui.u(26.0);
+    if lamps {
+        sf_lamp_light(ui, g, cy, false, 1.0);
+        sf_lamp_light(ui, g, cy, true, 0.8);
+    }
+    // The rim: neutral gunmetal, brushed, lit from above.
+    let rim_sh = Shape { corners: c, stroke: side + 1.0, ..Shape::default() };
+    let m = sf_metal(ui, 0.20, 0.25);
+    let cols = [0xff5c5e60, 0xff56585a, 0xff36373a, 0xff38393c];
+    ui.draw.metal(r, &rim_sh, &m, cols);
+    // The bevels: a light along the outer top, a dark line round the outside, a dark lip
+    // at the glass.
+    ui.draw.stroke_v(r, c, h, 0x60e0e2e6, 0x08e0e2e6);
+    ui.draw.stroke(r, c, h, 0x70000000);
+    let lip = ui.u(2.5).max(h * 2.0);
+    ui.draw.stroke(g.inset(-lip), gc.grown(lip), lip, 0xf0030405);
+    // A seam across the side rims, half way down, where the lamps sit either side.
+    for x in [r.x, r.right() - side] {
+        ui.draw.rect(R::new(x, cy - h, side, h), 0xc0030405);
+        ui.draw.rect(R::new(x, cy, side, h), 0x28e0e2e6);
+    }
+    if lamps {
+        let (lw, lh, gap) = (ui.u(3.5), ui.u(7.0).min(g.h * 0.3), ui.u(3.0));
+        for (x, a) in [(g.x - lip - lw, 1.0), (g.right() + lip, 0.85)] {
+            sf_lamp(ui, R::new(x, cy - gap - lh, lw, lh), a);
+            sf_lamp(ui, R::new(x, cy + gap, lw, lh), a);
         }
     }
 }
 
-/// A Starfleet button's plate (`button_frame`): metal (gunmetal, steel) or glass (holo),
-/// bevelled; hover lights it blue from inside, on puts a light along its foot.
-fn starfleet_button(ui: &mut Ui, r: R, c: Corners, st: State, v: u8) {
+/// A Starfleet button: a tile of brushed light grey glass with a bright rim, as Roots'
+/// (STYLE.md); hover lights it blue from inside, on puts a lamp along its foot.
+fn starfleet_button(ui: &mut Ui, r: R, c: Corners, st: State) {
     let t = ui.theme;
     let h = hair(ui);
     let lit = if st.off { 0.0 } else { st.hot.max(if st.down { 1.0 } else { 0.0 }) };
     if !st.off && st.hot > 0.01 {
-        ui.draw.glow(r, c, ui.u(t.glow), fade(t.accent3, 0.55 * st.hot));
+        ui.draw.glow(r, c, ui.u(t.glow), fade(t.accent3, 0.6 * st.hot));
     }
     let (top, bot) = if st.down {
         (t.button_down, t.button_down)
     } else if st.on {
         (mix(t.button_top, t.button_on, 0.6), t.button_on)
     } else {
-        (mix(t.button_top, t.button_hot, st.hot * 0.5), mix(t.button, t.button_hot, st.hot))
+        (mix(t.button_top, t.button_hot, st.hot), mix(t.button, t.button_hot, st.hot))
     };
-    let (top, bot) = if st.off { (fade(top, 0.55), fade(bot, 0.55)) } else { (top, bot) };
-    if v == 2 {
-        ui.draw.fill_v(r, c, top, bot);
-        ui.draw.stripes(r, c, ui.u(3.0).max(2.0), 0.5, PI * 0.5, fade(t.accent, 0.05));
-    } else {
-        let m = sf_metal(ui, if v == 1 { 0.26 } else { 0.38 }, if v == 1 { 60.0 } else { 22.0 }, 0.5);
-        ui.draw.metal(r, &Shape { corners: c, ..Shape::default() }, &m, [top, top, bot, bot]);
-    }
+    let (top, bot) = if st.off { (fade(top, 0.6), fade(bot, 0.6)) } else { (top, bot) };
+    ui.draw.metal(r, &Shape { corners: c, ..Shape::default() }, &sf_metal(ui, 0.30, 0.35), [top, top, bot, bot]);
+    // Roots' tiles are lit along the foot from inside.
+    ui.draw.fill_v(R::new(r.x, r.y + r.h * 0.7, r.w, r.h * 0.3), c.only(false, false, true, true), 0x00ffffff, fade(0xffffffff, 0.16));
     if lit > 0.01 {
-        ui.draw.inner_glow(r, c, r.h.min(r.w) * 0.45, fade(t.accent, 0.30 * lit));
+        ui.draw.inner_glow(r, c, r.h.min(r.w) * 0.45, fade(t.accent, 0.32 * lit));
     }
-    let edge = if st.off {
-        fade(t.button_edge, 0.5)
-    } else if v == 2 {
-        mix(t.button_edge, mix(t.accent, 0xffffffff, 0.3), lit)
-    } else {
-        mix(t.button_edge, t.accent, lit * 0.8)
-    };
-    ui.draw.stroke(r, c, h.max(ui.u(1.2)), edge);
-    if !st.down && v != 2 {
-        ui.draw.stroke_v(r.inset(h), c.grown(-h), h, fade(0xffffffff, 0.16 + 0.08 * st.hot), 0x00ffffff);
-    }
+    let edge = if st.off { fade(t.button_edge, 0.45) } else { mix(t.button_edge, t.accent, lit * 0.85) };
+    ui.draw.stroke(r, c, ui.u(1.5).max(h), edge);
+    ui.draw.stroke(r.inset(-h), c.grown(h), h, 0x50000000);
     if st.on && !st.down {
         let b = R::new(r.x + r.w * 0.22, r.bottom() - ui.u(4.0), r.w * 0.56, ui.u(2.0).max(1.0));
         ui.draw.glow(b, Corners::SQUARE, ui.u(7.0), fade(t.accent, 0.6));
-        ui.draw.rect(b, mix(t.accent, 0xffffffff, 0.2));
+        ui.draw.rect(b, mix(SF_LAMP, 0xffffffff, 0.2));
     }
 }
 
@@ -1249,8 +1123,8 @@ pub fn button_frame(ui: &mut Ui, r: R, st: State) -> Color {
     } else {
         mix(t.button, t.button_hot, st.hot)
     };
-    if let Form::Starfleet(v) = t.form {
-        starfleet_button(ui, r, c, st, v);
+    if t.form == Form::Starfleet {
+        starfleet_button(ui, r, c, st);
     } else if lcars {
         ui.draw.fill(r, c, base);
     } else {
@@ -1414,7 +1288,7 @@ pub fn slider(ui: &mut Ui, r: R, f: f32, st: State) {
         Form::Cube => (k * 0.8, Corners::SQUARE),
         Form::Organic => (k, Corners::round(k * 0.5)),
         Form::Shell => (k, Corners::cut(k * 0.28)),
-        Form::Starfleet(_) => (k * 0.6, Corners::round(k * 0.18)),
+        Form::Starfleet => (k * 0.6, Corners::round(k * 0.18)),
     };
     let kr = R::new(libm::roundf(kx - kw * 0.5), libm::roundf(r.y + (r.h - k) * 0.5), kw, k);
     if !st.off && (st.hot > 0.01 || st.down) && t.form != Form::Lcars {
