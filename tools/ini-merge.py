@@ -138,6 +138,13 @@ RETIRED = {
         ('overlays', 'movepathdot'): '2.5',                # keep the green (MovePointColour)
         ('overlays', 'movepathspacing'): '9',
     },
+    'ui.ini': {
+        # A per-game default (ui/defaults/<game>.ini, applied over UI.ini by ui/install.sh) moved
+        # off what the shipped UI.ini says: Roots' [Menus] Generic went from mirror to widgets
+        # (PLAN-FLEETOPS.md, decision 174). An install made before holds mirror, which the player
+        # never set. On Armada II the shipped value is mirror too, so this changes nothing there.
+        ('menus', 'generic'): 'mirror',
+    },
 }
 
 KEY = re.compile(r'^\s*(\w+)\s*=\s*(.*?)\s*$')
