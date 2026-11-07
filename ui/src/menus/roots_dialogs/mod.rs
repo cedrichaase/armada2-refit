@@ -25,6 +25,7 @@ use crate::widgets::Ui;
 use alloc::vec::Vec;
 
 pub mod game_settings;
+pub mod game_setup;
 pub mod mission_select;
 pub mod notice;
 pub mod saves;
@@ -105,6 +106,42 @@ impl Screen<'_> {
     }
 }
 
+/// The shared layouts (`screens::setup_kit`, Game Setup) act on an adopted dialog through
+/// this: a click is `Screen::click` (the pointer resting first), typing is posted to the
+/// edit as the keyboard would send it, Enter too (the dialog's modal loop, user32's, makes
+/// it the dialog's OK, decision 253), a combo box's choice is its selection and its
+/// parent's notification.
+impl crate::menus::Host for Screen<'_> {
+    fn model(&self) -> &Model {
+        self.model
+    }
+    fn top(&self) -> bool {
+        self.top
+    }
+    fn click(&self, x: i32, y: i32) {
+        Screen::click(self, x, y);
+    }
+    fn mirror_part(&self, ui: &mut Ui, r: [i32; 4], dst: crate::gfx::R, tint: u32) {
+        Screen::mirror_part(self, ui, r, dst, tint);
+    }
+    fn key(&self, h: HWND, msg: u32, wp: usize) {
+        forms::act(Action::Key(h as usize, msg, wp));
+    }
+    fn enter(&self, h: HWND) {
+        forms::act(Action::Key(h as usize, crate::rt::win::WM_KEYDOWN, 0x0d));
+    }
+    fn select(&self, h: HWND, combo: bool, index: i32, _double: bool) {
+        if combo {
+            forms::act(Action::Select(h as usize, index));
+        } else {
+            crate::log!("menus: roots dialog {:#x}: a list's selection is not sent (no list on Roots' dialogs yet)", self.d.hwnd);
+        }
+    }
+    fn full_screen(&self) -> bool {
+        self.model.rect[2] >= forms::design().0
+    }
+}
+
 /// Clicks waiting their turn, in order: (dialog, client point).
 static mut CLICKS: Vec<(usize, i32, i32)> = Vec::new();
 /// The click under way: (dialog, client point, when its last step was sent, step: 0 the
@@ -178,6 +215,7 @@ fn spec(screen: &str) -> Option<Draw> {
         "save game" => saves::draw_save,
         "message" => notice::draw,
         "game settings" => game_settings::draw,
+        "game setup" => game_setup::draw,
         _ => return None,
     })
 }

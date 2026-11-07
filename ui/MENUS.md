@@ -1307,13 +1307,14 @@ draws the picture.
 
 The specs reuse Armada II's layouts, factored out of `screens/` with Armada II's
 behaviour unchanged: `single_player::campaign_column` and `campaign_cards`,
-`mission_select::mission_list`, `saves::saves_screen`, `notice::notice_window`. Return in a text field of ours on an adopted dialog never reaches it: user32's modal loop turns it into the dialog's OK command first (decision 253).
+`mission_select::mission_list`, `saves::saves_screen`, `notice::notice_window`. `setup_kit` acts through the trait `menus::Host`, which Armada II's `Screen` and Roots' `roots_dialogs::Screen` both are (a click, the picture, keys, Enter, a selection), and Game Setup's places are a `game_setup::Layout` (`ARMADA`, `ROOTS`). Return in a text field of ours on an adopted dialog never reaches it: user32's modal loop turns it into the dialog's OK command first (decision 253).
 
 | Dialog | Spec | What it shows |
 |---|---|---|
 | Single Player (`SingleDlgProc`) | `roots_dialogs/single_player.rs` | Armada II's campaign selection: over render3d's map the column (the four campaigns, each named by the dialog's hidden hover label and marked by a cut of its own card's art, then Load Game and Previous Menu), pointing at one moving the camera to its view (`federation`, `dominion`, `species8472`, `freeborg` in the fleetops map); without the scene, the cards (2x2). The top two cards are hit areas of the procedure, the bottom two picture `ShellButton`s, as on Armada II |
 | The mission list (`MissionSelectDlgProc`) | `roots_dialogs/mission_select.rs` | Armada II's list in a window of ours over the campaign selection: the stock rows by their labels, OK and Cancel |
 | Load Game, Save Game (`LoadGameDlgProc`, `SaveGameDlgProc`) | `roots_dialogs/saves.rs` | Armada II's save list: name and date, the stock list's two scroll buttons and the wheel, Save's name field writing the stock `Edit` (id 2100), the foot |
+| Game Setup (`MultiplayerSetupDlgProc`) | `roots_dialogs/game_setup.rs` | Armada II's Game Setup (`game_setup::draw_with`) with Roots' places (`ROOTS`, a `game_setup::Layout`): the players' rows as our drop-downs over the stock `ComboBox`es, the palette, the map's window with its preview and settings, the bottom row; the column headings are Armada II's words, Roots paints its own (decision 257) |
 | Game Settings (`GameSettingsDlgProc`) | `roots_dialogs/game_settings.rs` | Armada II's settings form (a caption over each control): the six stock sliders (set by a click on the track, `generic::click_scroll_with`) and the two cycle buttons; Roots' labels hold no text, so the captions are words of ours, given in the order Roots stacks the controls (decision 256) |
 | The one-button message (`OneButtonDlgProc`) | `roots_dialogs/notice.rs` | Armada II's message window (`notice::notice_window`): the labels as title and text, the stock OK |
 

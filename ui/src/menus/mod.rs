@@ -169,6 +169,57 @@ pub fn frame(ui: &mut Ui) {
     ui.claim(ui.screen());
 }
 
+/// What the layouts several screens share (`screens::setup_kit`, Game Setup) read and act
+/// through: Armada II's hosted dialog (`Screen`) or Roots' adopted one
+/// (`roots_dialogs::Screen`). Every action is what the player's input would send.
+pub trait Host {
+    fn model(&self) -> &model::Model;
+    /// It takes input (the innermost dialog).
+    fn top(&self) -> bool;
+    /// A click at a design point of the dialog.
+    fn click(&self, x: i32, y: i32);
+    fn click_control(&self, c: &model::Control) {
+        self.click(c.rect[0] + c.rect[2] / 2, c.rect[1] + c.rect[3] / 2);
+    }
+    /// The part `r` (design coordinates) of the dialog's picture drawn into `dst`.
+    fn mirror_part(&self, ui: &mut Ui, r: [i32; 4], dst: R, tint: u32);
+    /// A key or a character for a window control (`WM_KEYDOWN`, `WM_CHAR`).
+    fn key(&self, h: HWND, msg: u32, wp: usize);
+    /// Enter in the edit `h`, as the dialog's modal loop gives it.
+    fn enter(&self, h: HWND);
+    /// A list's or combo box's selection and its parent's notification.
+    fn select(&self, h: HWND, combo: bool, index: i32, double: bool);
+    /// Whether the dialog fills the design space.
+    fn full_screen(&self) -> bool;
+}
+
+impl Host for Screen<'_> {
+    fn model(&self) -> &model::Model {
+        self.model
+    }
+    fn top(&self) -> bool {
+        self.top
+    }
+    fn click(&self, x: i32, y: i32) {
+        Screen::click(self, x, y);
+    }
+    fn mirror_part(&self, ui: &mut Ui, r: [i32; 4], dst: R, tint: u32) {
+        Screen::mirror_part(self, ui, r, dst, tint);
+    }
+    fn key(&self, h: HWND, msg: u32, wp: usize) {
+        actions::push(actions::Action::Key { h, msg, wp });
+    }
+    fn enter(&self, h: HWND) {
+        actions::push(actions::Action::Enter { h });
+    }
+    fn select(&self, h: HWND, combo: bool, index: i32, double: bool) {
+        actions::push(actions::Action::Select { h, combo, index, double });
+    }
+    fn full_screen(&self) -> bool {
+        self.model.rect[2] >= design_w()
+    }
+}
+
 /// What a screen is drawn from.
 pub struct Screen<'a> {
     pub slot: &'a dialogs::Slot,
