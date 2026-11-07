@@ -1122,6 +1122,23 @@ a host of their own, `engine/forms.rs` (drawn by `menus/roots.rs`):
   mouse forwarded to the window under the point. Nothing calls a handler of Roots' and
   nothing writes a setting: Roots' handlers write what they write (Graphics saves the
   profile on Back; Manual IP saves its settings file on Join).
+- **A grid's rows are read, not printed.** NextSuite's `TNextGrid` (Map Select's list, the
+  Mods list) paints through its own window's device context, which is clipped to nothing
+  while the form is off screen: neither a print of the form nor of the grid's window has
+  the rows. The UI reads the cells (read only, `grid_of`): the grid's cells object holds a
+  list of cells for each column, a string cell a wide string and an integer cell the
+  integer, told by the class's name; the selected row and the first row shown are fields of
+  the grid, its row and header sizes published properties. Offsets are the profile's
+  (`forms_grid_*`, found in the grid's `GetCells`, `GetRowCount` and `GetSelectedRow` and
+  the string cell's `GetAsString`, measured on Roots 5.0Z11's FleetOpsHook). A row is
+  chosen by a posted click at the row in the grid's own window, or the arrow keys when the
+  grid shows another part of its list.
+- **A poke is not seen.** `Action::Poke` moves the form under the real pointer for one
+  message and back (decision 242). On the bench (sway, window events and a 20 Hz tree
+  sample during seven pokes) the form never became a window: no `new`, `focus` or
+  `urgent` event and the game window kept the focus, because Wine has the off-screen form
+  unmapped and the two moves of one tick do not map it (decision 261). Hyprland is not
+  measured.
 - **Keyed to FleetOpsHook alone.** `FAMILY` lists the measured builds by the CRC-32 of their
   file's `.text` (`a2engine::companion_crc`; Roots 4.0.93, Roots 5.0Z11, Tactical Maneuvers
   5.2.3); any other stands the forms down, logged once, and Roots draws its own menus.
@@ -1182,8 +1199,9 @@ channel count, unit speech, hardware acceleration, device and speaker set-up; Mo
 (a crop of the form's picture with the mouse forwarded), the mod's screenshot, title and
 description, three buttons; Advanced Options ("Game Settings"): four dropdowns, the
 switches, six sliders with end captions, OK, Cancel, Default; Multiplayer Connection and
-Manual IP as Armada II's. Not done: Map Select (its grid's rows are not in the picture:
-decision 244), the map editor's forms; Advanced Settings has a spec no button reaches.
+Manual IP as Armada II's; Map Select: the filter, the list of maps, the preview and the two
+buttons, with the rows read from the grid's memory (decision 260). Not done: the map editor's
+forms; Advanced Settings has a spec no button reaches.
 
 | Hook | What it reads |
 |---|---|

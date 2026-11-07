@@ -165,6 +165,22 @@ pub struct Control {
     pub checked: Option<bool>,
     /// A slider's published `Value`, `MinValue`, `MaxValue` and `Increment` (None as above).
     pub value: Option<(i32, i32, i32, i32)>,
+    /// A grid's cells, read from its memory (Map Select's list, the Mods list).
+    pub grid: Option<Grid>,
+}
+
+/// A NextSuite grid's rows as read at the last tick: plain copies of the cells that hold
+/// text or a number, row by row.
+#[derive(Clone, Default)]
+pub struct Grid {
+    pub rows: Vec<Vec<String>>,
+    /// The selected row (-1: none) and the first row the grid shows.
+    pub selected: i32,
+    pub first: i32,
+    /// The grid's row and header heights in the form's pixels (its published `RowSize` and
+    /// `HeaderSize`; 0 when the class does not hold them in a field).
+    pub row_h: i32,
+    pub head_h: i32,
 }
 
 /// A form as the UI draws it: its class, where it sits in the design space (the
@@ -211,6 +227,9 @@ pub enum Action {
     /// check boxes decide where a click fell from the real pointer's place, which a form
     /// kept off screen never has under it. (form, message, buttons, x, y)
     Poke(usize, u32, usize, i32, i32),
+    /// A key pressed and released at a windowed control (a grid's arrow keys), sent to its
+    /// window. (window, virtual key)
+    GridKey(usize, u32),
 }
 
 pub const MOUSE_DOWN: u32 = WM_LBUTTONDOWN;
@@ -693,6 +712,20 @@ fn ansi_string(p: usize) -> String {
     b.iter().map(|&c| latin1(c)).collect()
 }
 
+/// A Delphi wide string (UTF-16, the length in bytes in the dword before): what a grid's
+/// string cells hold.
+fn wide_string(p: usize) -> String {
+    if p < 4 || !super::readable(p - 4, 4) {
+        return String::new();
+    }
+    let n = (rd::<u32>(p - 4) as usize / 2).min(256);
+    if !super::readable(p, n * 2) {
+        return String::new();
+    }
+    let w = unsafe { core::slice::from_raw_parts(p as *const u16, n) };
+    char::decode_utf16(w.iter().copied()).map(|c| c.unwrap_or('?')).collect()
+}
+
 fn c_string(p: usize) -> String {
     let mut s = String::new();
     if p == 0 {
@@ -848,6 +881,7 @@ fn controls(obj: usize) -> Vec<Control> {
             }
         }
         let (checked, value) = state_of(c, vmt, &class);
+        let grid = if class == "TNextGrid" { grid_of(c, vmt, &class) } else { None };
         out.push(Control {
             name: ansi_string(rd::<usize>(c + field::FORMS_COMP_NAME())),
             class,
@@ -861,9 +895,91 @@ fn controls(obj: usize) -> Vec<Control> {
             selected,
             checked,
             value,
+            grid,
         });
     }
     out
+}
+
+/// A grid's cells, read from its memory (read only, decision 260): the grid's cells
+/// object holds one list of cells for each column, each cell its value. Only a string
+/// cell's text and an integer cell's number are read, each cell by its class's name; every
+/// pointer is checked and any shape that is not the expected one ends the read with `None`
+/// (the form's picture then stays).
+fn grid_of(g: usize, vmt: usize, class: &str) -> Option<Grid> {
+    let cols = rd::<usize>(g + field::FORMS_GRID_COLUMNS());
+    if !ptr_ok(cols, field::FORMS_COLUMNS_LIST() + 4) {
+        return None;
+    }
+    let list = rd::<usize>(cols + field::FORMS_COLUMNS_LIST());
+    if !ptr_ok(list, field::FORMS_LIST_COUNT() + 4) {
+        return None;
+    }
+    let ncols = rd::<i32>(list + field::FORMS_LIST_COUNT());
+    let cells = rd::<usize>(g + field::FORMS_GRID_CELLS());
+    if !(1..=32).contains(&ncols) || !ptr_ok(cells, field::FORMS_CELLS_ROWS() + 4) {
+        return None;
+    }
+    let nrows = rd::<i32>(cells + field::FORMS_CELLS_ROWS());
+    if !(0..=4096).contains(&nrows) || !ptr_ok(cells + field::FORMS_CELLS_LISTS(), ncols as usize * 4) {
+        return None;
+    }
+    let mut lists = Vec::new();
+    for c in 0..ncols as usize {
+        let l = rd::<usize>(cells + field::FORMS_CELLS_LISTS() + c * 4);
+        if !ptr_ok(l, field::FORMS_LIST_COUNT() + 4) {
+            return None;
+        }
+        let (items, n) = (rd::<usize>(l + field::FORMS_LIST_ITEMS()), rd::<i32>(l + field::FORMS_LIST_COUNT()));
+        if n < nrows || (nrows > 0 && !ptr_ok(items, nrows as usize * 4)) {
+            return None;
+        }
+        lists.push(items);
+    }
+    let mut rows = Vec::with_capacity(nrows as usize);
+    for r in 0..nrows as usize {
+        let mut row = Vec::with_capacity(lists.len());
+        for items in &lists {
+            let cell = rd::<usize>(items + r * 4);
+            let mut text = String::new();
+            if ptr_ok(cell, field::FORMS_CELL_VALUE() + 4) {
+                match class_name(rd::<usize>(cell)).as_deref() {
+                    Some("TStringCell") => text = wide_string(rd::<usize>(cell + field::FORMS_CELL_VALUE())),
+                    Some("TIntegerCell") => text = crate::sfmt!("{}", rd::<i32>(cell + field::FORMS_CELL_VALUE())),
+                    _ => {}
+                }
+            }
+            row.push(text);
+        }
+        rows.push(row);
+    }
+    static mut LAST: (usize, i32) = (0, -1);
+    unsafe {
+        if LAST != (g, nrows) {
+            LAST = (g, nrows);
+            crate::log!("forms: grid {:#x} read: {} rows of {} columns, first row {:?}", g, nrows, ncols, rows.first());
+        }
+    }
+    let props = forms_props::published(vmt, in_fo);
+    let logged = unsafe { &mut *core::ptr::addr_of_mut!(PROPS_LOGGED) };
+    if !logged.iter().any(|n| n == class) {
+        logged.push(String::from(class));
+        let list: Vec<String> = props
+            .iter()
+            .map(|p| match p.getter {
+                forms_props::Getter::Field(o) => crate::sfmt!("{}@{:#x}", p.name, o),
+                forms_props::Getter::Method => crate::sfmt!("{}()", p.name),
+            })
+            .collect();
+        crate::log!("forms: published properties of {}: {}", class, list.join(" "));
+    }
+    Some(Grid {
+        rows,
+        selected: rd::<i32>(g + field::FORMS_GRID_SELECTED()),
+        first: rd::<i32>(g + field::FORMS_GRID_FIRST()),
+        row_h: forms_props::field_of(g, &props, "RowSize", 4).unwrap_or(0),
+        head_h: forms_props::field_of(g, &props, "HeaderSize", 4).unwrap_or(0),
+    })
 }
 
 static mut PROPS_LOGGED: Vec<String> = Vec::new();
@@ -1023,8 +1139,7 @@ unsafe extern "system" fn tick(_h: HWND, _m: u32, _id: usize, _t: u32) {
     unsafe { SetCursor(LoadCursorA(core::ptr::null_mut(), IDC_ARROW)) };
     if now - unsafe { PRINTED_AT } >= PRINT_EVERY {
         unsafe { PRINTED_AT = now };
-        let grids: Vec<(usize, [i32; 4])> = t.last.iter().filter(|c| c.class == "TNextGrid" && c.visible && c.hwnd != 0).map(|c| (c.hwnd, c.rect)).collect();
-        print(t.hwnd, t.size.0, t.size.1, &grids);
+        print(t.hwnd, t.size.0, t.size.1);
     }
     if unsafe { MODE } == 2 {
         if now - unsafe { LAST_DIAG } > 2.0 {
@@ -1291,6 +1406,19 @@ fn run_actions(top: HWND, _obj: usize) {
                 unsafe { SendMessageA(target, msg, keys, lparam(p.x, p.y)) };
                 unsafe { SetWindowPos(top, core::ptr::null_mut(), OFF, OFF, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE) };
             }
+            Action::GridKey(h, vk) => unsafe {
+                let mut p = h as HWND;
+                for _ in 0..6 {
+                    if p == top || p.is_null() {
+                        break;
+                    }
+                    p = GetParent(p);
+                }
+                if IsWindow(h as HWND) != 0 && p == top {
+                    SendMessageA(h as HWND, 0x100, vk as usize, 1);
+                    SendMessageA(h as HWND, 0x101, vk as usize, 0xc000_0001u32 as isize);
+                }
+            },
             Action::Focus(h) => unsafe {
                 if IsWindow(h as HWND) != 0 {
                     SetFocus(h as HWND);
@@ -1311,7 +1439,7 @@ fn run_actions(top: HWND, _obj: usize) {
 
 /// The top form printed into a memory DC (the VCL answers the print message wherever the
 /// window is): the mirror's picture.
-fn print(h: HWND, w: i32, ht: i32, grids: &[(usize, [i32; 4])]) {
+fn print(h: HWND, w: i32, ht: i32) {
     if w <= 0 || ht <= 0 {
         return;
     }
@@ -1337,27 +1465,9 @@ fn print(h: HWND, w: i32, ht: i32, grids: &[(usize, [i32; 4])]) {
         }
         PatBlt(p.0, 0, 0, w, ht, BLACKNESS);
         SendMessageA(h, WM_PRINT, p.0 as usize, (PRF_CLIENT | PRF_CHILDREN | PRF_ERASEBKGND | PRF_NONCLIENT) as isize);
-        // A grid paints its cells itself, which the form's print leaves out: printed by its
-        // own window, over the form's picture, at its place.
-        for &(g, r) in grids {
-            if IsWindow(g as HWND) == 0 {
-                continue;
-            }
-            static mut SEEN: usize = 0;
-            if SEEN != g {
-                SEEN = g;
-                let mut c = GetWindow(g as HWND, 5);
-                while !c.is_null() {
-                    let mut wr = WinRect::default();
-                    GetWindowRect(c, &mut wr);
-                    crate::log!("forms: grid child {:p} class {} {}x{} visible {}", c, class_of(c), wr.right - wr.left, wr.bottom - wr.top, IsWindowVisible(c));
-                    c = GetWindow(c, 2);
-                }
-            }
-            SetViewportOrgEx(p.0, r[0], r[1], core::ptr::null_mut());
-            SendMessageA(g as HWND, WM_PRINT, p.0 as usize, (PRF_CLIENT | PRF_CHILDREN | PRF_ERASEBKGND) as isize);
-            SetViewportOrgEx(p.0, 0, 0, core::ptr::null_mut());
-        }
+        // A grid paints its cells through its own window's device context, which a print
+        // of the form does not reach (nor a print of the grid's window): the UI reads the
+        // cells instead (`grid_of`).
         GdiFlush();
         PRINTS = PRINTS.wrapping_add(1);
     }
