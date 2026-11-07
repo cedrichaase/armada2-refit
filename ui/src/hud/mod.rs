@@ -48,12 +48,12 @@ static mut INFO_CAP: bool = false;
 /// The info panel is FleetOpsHook's (Roots): ours draws it in Roots' layout (`info_fo`).
 static mut INFO_FO: bool = false;
 
-/// Whether the selection overlay is ours (`[HUD] Selection=1`, its functions stock).
 /// Whether the info panel of ours is Roots' layout over its panel's unseen Render.
 pub fn info_fo_on() -> bool {
     unsafe { INFO && INFO_FO }
 }
 
+/// Whether the selection overlay is ours (`[HUD] Selection=1`, its functions stock).
 pub fn selection_ours() -> bool {
     unsafe { SELECTION }
 }

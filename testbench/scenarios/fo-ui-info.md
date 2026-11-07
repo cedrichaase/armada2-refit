@@ -57,14 +57,20 @@ right one at about 637,902); the sensors icon at about 720,873.
 39. Wait 2 seconds.
 40. Take a screenshot called "starbase".
 41. Check that the bottom panel shows the station's picture with purple icons on it, and at the right a row of ten numbered slots, the first larger, over a long empty bar.
-42. Overlay UI.HUD:Info=0.
-43. Wait up to 10 seconds for "UI.log" to say "info: Roots' own".
-44. Wait 2 seconds.
-45. Take a screenshot called "starbase, Roots' own".
-46. Check that the bottom panel is Fleet Operations' own (its own frame art), with the same pictures and slots in the same places.
-47. Expect "UI.log" not contain "PANIC".
-48. Expect "Display8.log" not contain "VUID".
-49. Expect "Display8.log" not contain "device removed".
-50. Quit the game.
-51. Expect the game to have exited.
-52. Expect no crash.
+42. Move the mouse to 520,664.
+43. Wait 1 second.
+44. Move the mouse to 523,668.
+45. Wait 2 seconds.
+46. Take a screenshot called "pointer over a ship".
+47. Check that a status line about the ship under the pointer (its name or class with its shields and hull figures, Fleet Operations' own small text) is drawn near the top centre of the screen.
+48. Overlay UI.HUD:Info=0.
+49. Wait up to 10 seconds for "UI.log" to say "info: Roots' own".
+50. Wait 2 seconds.
+51. Take a screenshot called "starbase, Roots' own".
+52. Check that the bottom panel is Fleet Operations' own (its own frame art), with the same pictures and slots in the same places.
+53. Expect "UI.log" not contain "PANIC".
+54. Expect "Display8.log" not contain "VUID".
+55. Expect "Display8.log" not contain "device removed".
+56. Quit the game.
+57. Expect the game to have exited.
+58. Expect no crash.
