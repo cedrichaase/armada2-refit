@@ -898,6 +898,15 @@ impl Theme {
         }
     }
 
+    /// The theme of a look by its id (`Form::from_id`), the shell's for an empty or
+    /// unknown one: the content set's choice for the menus.
+    fn look(id: &str) -> Theme {
+        match Form::from_id(id) {
+            Some(f) => Theme { name: f.name(), ..Theme::for_form(f) },
+            None => Theme::shell(),
+        }
+    }
+
     /// A theme by name: `shell`, a race as `Race::from_name` reads it, or a look by its
     /// id (`Form::from_id`: `starfleet`, `lcars`, ...), which keeps the player's race.
     pub fn named(s: &str) -> Option<Theme> {
@@ -926,7 +935,20 @@ impl Theme {
             Some(name) => Theme::named(name).unwrap_or_default(),
             None => match (ctx, player_race()) {
                 (crate::surface::Context::Mission, Some(r)) => Theme::for_race(r),
-                _ => Theme::shell(),
+                (crate::surface::Context::Mission, None) => Theme::shell(),
+                // The menus and the front end: the content set's look (`[Looks]`), the
+                // shell's without one. A menu over a running mission may follow the
+                // HUD's race (`MissionMenus = race`).
+                _ => {
+                    let c = crate::content::get();
+                    let over = ctx == crate::surface::Context::Menus && crate::menus::backdrop::over_mission();
+                    let look = if over && !c.mission_menus_look.is_empty() { c.mission_menus_look } else { c.menus_look };
+                    match (look.eq_ignore_ascii_case("race"), player_race()) {
+                        (true, Some(r)) => Theme::for_race(r),
+                        (true, None) => Theme::look(c.menus_look),
+                        (false, _) => Theme::look(look),
+                    }
+                }
             },
         }
     }

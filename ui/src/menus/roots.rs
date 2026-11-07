@@ -274,7 +274,15 @@ fn column(ui: &mut Ui, fit: &Fit, f: &Form, area: R, back: Option<&str>) {
     let inner_h = buttons.len() as f32 * (bh + gap) - gap + if foot.is_some() { bh + gap * 2.0 } else { 0.0 };
     let pad = ui.u(24.0);
     let head = ui.u(56.0);
-    let r = R::new(area.x + (area.w - bw) * 0.5 - pad, area.y + (area.h - inner_h - head) * 0.5 - pad, bw + pad * 2.0, inner_h + head + pad * 2.0);
+    // The window's own top (its frame, its title bar, its padding) and foot, as
+    // `theme::window` takes them, so the last button stands as far above the foot as the
+    // first stands under the title (`head - pad`), whatever the theme's frame.
+    let t = ui.theme;
+    let (_, ft, _, fb) = crate::widgets::theme::frame_margins(ui);
+    let top = ft + ui.u(t.title_size + 2.0 * t.pad * 0.7) + ui.u(t.pad);
+    let foot_h = (head - pad) + ui.u(t.pad) + fb;
+    let h = top + (head - pad) + inner_h + foot_h;
+    let r = R::new(area.x + (area.w - bw) * 0.5 - pad, area.y + (area.h - h) * 0.5, bw + pad * 2.0, h);
     let inner = ui.window(r, title(&f.class));
     let mut y = inner.y + head - pad;
     for c in buttons {
