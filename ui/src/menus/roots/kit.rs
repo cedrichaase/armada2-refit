@@ -85,9 +85,8 @@ pub fn check(ui: &mut Ui, f: &Form, c: &Control, r: R) {
 pub fn click(f: &Form, c: &Control) {
     let (x, y) = (c.rect[0] + 8, c.rect[1] + c.rect[3] / 2);
     crate::log!("forms: click on {} ({:?}) of {}", c.name, c.text, f.class);
-    forms::act(Action::Mouse(f.hwnd, forms::MOUSE_MOVE, x, y));
-    forms::act(Action::Mouse(f.hwnd, forms::MOUSE_DOWN, x, y));
-    forms::act(Action::Mouse(f.hwnd, forms::MOUSE_UP, x, y));
+    forms::act(Action::Poke(f.hwnd, forms::MOUSE_DOWN, forms::MOUSE_HELD, x, y));
+    forms::act(Action::Poke(f.hwnd, forms::MOUSE_UP, 0, x, y));
 }
 
 /// What a slider of ours is being dragged to: the control's name and the value.
@@ -149,10 +148,10 @@ fn set(f: &Form, c: &Control, target: i32) {
     unsafe { SETTING = (key_of(&c.name), target, 0, 0) };
     let (y, a, b) = (c.rect[1] + c.rect[3] / 2, thumb_x(c, value, lo, hi), thumb_x(c, target, lo, hi));
     let h = f.hwnd;
-    forms::act(Action::Mouse(h, forms::MOUSE_DOWN, a, y));
-    forms::act(Action::Mouse(h, forms::MOUSE_MOVE, (a + b) / 2, y));
-    forms::act(Action::Mouse(h, forms::MOUSE_MOVE, b, y));
-    forms::act(Action::Mouse(h, forms::MOUSE_UP, b, y));
+    forms::act(Action::Poke(h, forms::MOUSE_DOWN, forms::MOUSE_HELD, a, y));
+    forms::act(Action::Poke(h, forms::MOUSE_MOVE, forms::MOUSE_HELD, (a + b) / 2, y));
+    forms::act(Action::Poke(h, forms::MOUSE_MOVE, forms::MOUSE_HELD, b, y));
+    forms::act(Action::Poke(h, forms::MOUSE_UP, 0, b, y));
 }
 
 /// A slider being set: read back, and where the drag left it short, a press at the end of
@@ -173,8 +172,8 @@ fn follow(f: &Form, c: &Control, value: i32, lo: i32, hi: i32) {
     let x = if target > value { c.rect[0] + c.rect[2] - 2 } else { c.rect[0] + 2 };
     let y = c.rect[1] + c.rect[3] / 2;
     let _ = (lo, hi);
-    forms::act(Action::Mouse(f.hwnd, forms::MOUSE_DOWN, x, y));
-    forms::act(Action::Mouse(f.hwnd, forms::MOUSE_UP, x, y));
+    forms::act(Action::Poke(f.hwnd, forms::MOUSE_DOWN, forms::MOUSE_HELD, x, y));
+    forms::act(Action::Poke(f.hwnd, forms::MOUSE_UP, 0, x, y));
     unsafe { SETTING = (k, target, 0, tries + 1) };
 }
 

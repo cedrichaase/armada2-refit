@@ -181,6 +181,11 @@ pub enum Action {
     Select(usize, i32),
     /// The keyboard to a windowed control (a text field clicked).
     Focus(usize),
+    /// A mouse message sent (not posted) to the control at a point of the form, with the
+    /// form moved for that moment so the point lies under the real pointer: the library's
+    /// check boxes decide where a click fell from the real pointer's place, which a form
+    /// kept off screen never has under it. (form, message, buttons, x, y)
+    Poke(usize, u32, usize, i32, i32),
 }
 
 pub const MOUSE_DOWN: u32 = WM_LBUTTONDOWN;
@@ -946,7 +951,7 @@ unsafe extern "system" fn tick(_h: HWND, _m: u32, _id: usize, _t: u32) {
                 crate::log!("forms: #32770 {:p} had no keyboard focus: given the focus", h);
             }
             poll_button(h);
-            run_actions(h);
+            run_actions(h, 0);
             crate::engine::fodialogs::tick(PRINT_EVERY, h);
             unsafe { SetCursor(LoadCursorA(core::ptr::null_mut(), IDC_ARROW)) };
             publish(v, None);
@@ -961,7 +966,7 @@ unsafe extern "system" fn tick(_h: HWND, _m: u32, _id: usize, _t: u32) {
         frame();
         return;
     }
-    run_actions(v[top].hwnd);
+    run_actions(v[top].hwnd, v[top].obj);
     let t = &mut v[top];
     if t.obj == 0 {
         if t.class.ends_with(')') {
@@ -1194,7 +1199,7 @@ fn lparam(x: i32, y: i32) -> isize {
 /// The actions the frame queued, on the top form only (one meant for a form no longer on
 /// top is dropped). Run before the form is read again, so the next frame shows what they
 /// did.
-fn run_actions(top: HWND) {
+fn run_actions(top: HWND, _obj: usize) {
     let v = core::mem::take(unsafe { &mut *core::ptr::addr_of_mut!(ACTIONS) });
     for a in v {
         match a {
@@ -1235,6 +1240,30 @@ fn run_actions(top: HWND) {
                     SendMessageA(parent, WM_COMMAND, (CBN_SELCHANGE << 16) | id, w as isize);
                 }
             },
+            Action::Poke(h, msg, keys, x, y) if h == top as usize => {
+                // The form's window put where `x, y` lies under the real pointer.
+                let mut cp = Point::default();
+                unsafe { GetCursorPos(&mut cp) };
+                unsafe { SetWindowPos(top, core::ptr::null_mut(), cp.x - x, cp.y - y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE) };
+                let mut target = top;
+                let mut p = Point { x, y };
+                for _ in 0..8 {
+                    let c = unsafe { ChildWindowFromPointEx(target, p, CWP_SKIPINVISIBLE) };
+                    if c.is_null() || c == target {
+                        break;
+                    }
+                    let mut r = WinRect::default();
+                    let mut o = Point::default();
+                    unsafe {
+                        GetWindowRect(c, &mut r);
+                        ClientToScreen(target, &mut o);
+                    }
+                    p = Point { x: p.x - (r.left - o.x), y: p.y - (r.top - o.y) };
+                    target = c;
+                }
+                unsafe { SendMessageA(target, msg, keys, lparam(p.x, p.y)) };
+                unsafe { SetWindowPos(top, core::ptr::null_mut(), OFF, OFF, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE) };
+            }
             Action::Focus(h) => unsafe {
                 if IsWindow(h as HWND) != 0 {
                     SetFocus(h as HWND);
