@@ -15,6 +15,10 @@ out = "ui/src/syms_forms.rs"
 [hook."forms.vcl"]
 doc = "FleetOpsHook's front-end forms read through the VCL's objects, found by their windows"
 
+[hook."forms.dialog_specs"]
+doc = "The dialog procedures FleetOpsHook opens, told by address to choose a screen spec for an adopted dialog"
+rows = ["Menus.Forms"]
+
 [[sym]]
 id = "forms_present"
 symbol = "FleetOpsHook.dll"
@@ -148,3 +152,64 @@ struct = "TComponent"
 offset = 0x1c
 type = "u8"
 used_by = ["forms.vcl"]
+
+# ---- forms.dialog_specs: the dialogs FleetOpsHook opens, adopted (engine/fodialogs.rs) --
+# Only told apart by address: nothing is called or read at them. A build that edits one
+# names `ui.forms.dialog_specs` in its `verified` once FleetOpsHook's record is seen to
+# hold the same address (PLAN-FLEETOPS.md, decision 250).
+
+[[sym]]
+id = "forms_proc_single_player"
+symbol = "SingleDlgProc"
+kind = "fn"
+addr = 0x5dbdc0
+used_by = ["forms.dialog_specs"]
+
+[[sym]]
+id = "forms_proc_mission_select"
+symbol = "MissionSelectDlgProc"
+kind = "fn"
+addr = 0x5d6d80
+used_by = ["forms.dialog_specs"]
+
+[[sym]]
+id = "forms_proc_load_game"
+symbol = "LoadGameDlgProc"
+kind = "fn"
+addr = 0x5d48c0
+used_by = ["forms.dialog_specs"]
+
+[[sym]]
+id = "forms_proc_save_game"
+symbol = "SaveGameDlgProc"
+kind = "fn"
+addr = 0x5d9320
+used_by = ["forms.dialog_specs"]
+
+[[sym]]
+id = "forms_proc_game_settings"
+symbol = "GameSettingsDlgProc"
+kind = "fn"
+addr = 0x5cf930
+used_by = ["forms.dialog_specs"]
+
+[[sym]]
+id = "forms_proc_game_setup"
+symbol = "MultiplayerSetupDlgProc"
+kind = "fn"
+addr = 0x5c2270
+used_by = ["forms.dialog_specs"]
+
+[[sym]]
+id = "forms_proc_admirals_log"
+symbol = "AdmiralsLogDlgProc"
+kind = "fn"
+addr = 0x5e22c0
+used_by = ["forms.dialog_specs"]
+
+[[sym]]
+id = "forms_proc_message"
+symbol = "OneButtonDlgProc"
+kind = "fn"
+addr = 0x5d7730
+used_by = ["forms.dialog_specs"]

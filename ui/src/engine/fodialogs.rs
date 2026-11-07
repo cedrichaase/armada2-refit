@@ -60,6 +60,7 @@ unsafe extern "system" {
 const WH_GETMESSAGE: i32 = 3;
 const GWL_EXSTYLE: i32 = -20;
 const GWL_USERDATA: i32 = -21;
+const DWL_DLGPROC: i32 = 4;
 const WM_ERASEBKGND_: u32 = 0x14;
 const WM_MOUSEWHEEL: u32 = 0x20a;
 const WS_CHILD_: u32 = 0x4000_0000;
@@ -268,6 +269,12 @@ pub fn install(thread: u32) -> bool {
         READY = true;
     }
     crate::log!("forms: the executable's paint imports are ours for FleetOpsHook's dialogs (message hook {})", if unsafe { MSG_HOOK }.is_null() { "refused" } else { "on" });
+    // The shell's own widgets (buttons, labels, rows: painted, not windows) are what a
+    // screen spec reads (decision 250); the dialog host installs the reader on Armada II.
+    crate::log!(
+        "forms: the shell's widgets {}",
+        if super::shellui::install() { "are read (screen specs for the adopted dialogs)" } else { "are not read: the adopted dialogs are mirrored" }
+    );
     true
 }
 
@@ -282,7 +289,12 @@ pub fn adopt(h: HWND) {
     let (w, ht) = client_of(h);
     // FleetOpsHook keeps {stock procedure, stock parameter} in the window's user data.
     let rec = unsafe { GetWindowLongA(h, GWL_USERDATA) } as usize;
-    let stock_proc = if super::readable(rec, 8) && rec % 4 == 0 { unsafe { super::rd::<usize>(rec) } } else { 0 };
+    let mut stock_proc = if super::readable(rec, 8) && rec % 4 == 0 { unsafe { super::rd::<usize>(rec) } } else { 0 };
+    // One the executable opens through its own import (the mission list, the one-button
+    // message) has no record: its procedure is the dialog's own (decision 250).
+    if stock_proc == 0 {
+        stock_proc = unsafe { GetWindowLongA(h, DWL_DLGPROC) } as usize;
+    }
     crate::log!(
         "forms: #32770 {:p} adopted: client {}x{}, style {:#010x} ex {:#010x}, stock procedure {:#x}",
         h, w, ht, unsafe { GetWindowLongA(h, GWL_STYLE) } as u32, unsafe { GetWindowLongA(h, GWL_EXSTYLE) } as u32, stock_proc

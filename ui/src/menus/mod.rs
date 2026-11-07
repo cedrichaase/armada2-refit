@@ -13,6 +13,7 @@
 pub mod actions;
 pub mod backdrop;
 pub mod roots;
+pub mod roots_dialogs;
 pub mod generic;
 pub mod locks;
 pub mod model;

@@ -28,14 +28,14 @@ use crate::widgets::{theme, Align, Ui};
 use alloc::string::String;
 
 /// What opens card `i`, while it is locked: "Complete the <name> to unlock".
-fn lock_hint(i: usize, names: &[&str; 4]) -> Option<String> {
+pub fn lock_hint(i: usize, names: &[&str; 4]) -> Option<String> {
     let req = crate::menus::locks::locked(i)?;
     Some(crate::sfmt!("Complete the {} to unlock", names.get(req).copied().unwrap_or("")))
 }
 
 /// A click on the locked card `i`: the "unavailable" sound (`[Menus] LockedSound`),
 /// logged, so a bench can tell it played (the bench has no audio).
-fn locked_click(i: usize) {
+pub fn locked_click(i: usize) {
     let snd = crate::config::get().locked_sound.clone();
     let played = crate::engine::api::sound::shell_named(&snd);
     let key = crate::content::get().campaigns.get(i).map_or("?", |c| c.key);
@@ -91,7 +91,7 @@ const CARDS: [Card; 4] = [
 /// The labels were seen out of order (logged once).
 static mut SAID_ORDER: bool = false;
 
-fn card_names<'a>(labels: &[&'a crate::menus::model::Control]) -> [&'a str; 4] {
+pub fn card_names<'a>(labels: &[&'a crate::menus::model::Control]) -> [&'a str; 4] {
     let camps = crate::content::get().campaigns;
     let mut out = [camps[0].name, camps[1].name, camps[2].name, camps[3].name];
     let mut any = false;
@@ -135,70 +135,29 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     if crate::menus::scene::shown() {
         return over_scene(ui, s, &card_names(&names), &foot);
     }
-    let t = ui.theme;
-    let sc = ui.screen();
     let names = card_names(&names);
     kit::backdrop(ui);
-
-    // The screen: a title, the cards (2x2), the foot.
-    let m = ui.u(40.0);
-    let title_h = ui.u(74.0);
-    let foot_h = ui.u(t.button_h);
-    let gap = ui.u(24.0);
-    ui.text_in(R::new(m, ui.u(18.0), sc.w - 2.0 * m, title_h), "SINGLE PLAYER", t.display_size, Align::Left, t.title, crate::gfx::Weight::Bold);
-    let grid = R::new(m, ui.u(18.0) + title_h, sc.w - 2.0 * m, sc.h - ui.u(18.0) - title_h - foot_h - 2.0 * gap - ui.u(10.0));
-    let cols = 2usize;
-    let card_h = (grid.h - gap) * 0.5;
-    let card_w = ((grid.w - gap) * 0.5).min(card_h * 1.5 + ui.u(24.0));
-    let x0 = grid.x + (grid.w - cols as f32 * card_w - (cols - 1) as f32 * gap) * 0.5;
-    let y0 = grid.y;
-    let mut hover = -1i32;
-    for (i, card) in CARDS.iter().enumerate() {
-        let r = R::new(x0 + (i % cols) as f32 * (card_w + gap), y0 + (i / cols) as f32 * (card_h + gap), card_w, card_h);
-        let id = ui.id(names[i]);
-        let live = s.top && s.model.button_at(card.at.0, card.at.1).is_none_or(|c| c.enabled);
-        let (hot, held, clicked) = if live { ui.interact(id, r) } else { (false, false, false) };
-        let st = theme::State::of(ui, id, hot, held);
-        theme::panel(ui, r);
-        let (bar, rest) = r.take_top(ui.u(46.0));
-        let name = names[i];
-        let hint = lock_hint(i, &names);
-        let lock = hint.is_some();
-        let col = if lock {
-            crate::gfx::mix(t.text_off, t.text, 0.3 * st.hot)
-        } else if hot {
-            t.accent
-        } else {
-            t.title
-        };
-        let tw = ui.text_in(bar.inset(ui.u(8.0)), name, t.heading_size, Align::Left, col, crate::gfx::Weight::Bold);
-        if lock {
-            let ph = ui.u(24.0);
-            padlock(ui, R::new(bar.x + ui.u(8.0) + tw + ui.u(12.0), bar.y + (bar.h - ph) * 0.5, ph, ph), col);
+    let hints: [Option<String>; 4] = core::array::from_fn(|i| lock_hint(i, &names));
+    let rows: [ColumnRow; 4] = core::array::from_fn(|i| ColumnRow {
+        name: names[i],
+        hint: hints[i].as_deref(),
+        live: s.top && s.model.button_at(CARDS[i].at.0, CARDS[i].at.1).is_none_or(|c| c.enabled),
+        here: false,
+    });
+    let arts: [[i32; 4]; 4] = core::array::from_fn(|i| CARDS[i].art);
+    // The foot: Previous Menu at the left, Load Game at the right.
+    let last = foot.len() - 1;
+    let foot_controls = [foot[0], foot[last]];
+    let foot_entries = [(foot[0].text.as_str(), foot[0].enabled), (foot[last].text.as_str(), foot[last].enabled)];
+    let out = campaign_cards(ui, "SINGLE PLAYER", &rows, &arts, &mut |ui, i, dst, tint| s.mirror_part(ui, CARDS[i].art, dst, tint), foot_entries, s.top);
+    if let Some(i) = out.clicked {
+        if hints[i].is_some() {
+            locked_click(i);
         }
-        let art = kit::contain(rest.inset(ui.u(8.0)), card.art);
-        // A locked campaign's picture, dimmed.
-        s.mirror_part(ui, card.art, art, if lock { 0xff606060 } else { 0xffffffff });
-        ui.draw.frame(art, 1.0, fade(t.panel_edge, 0.8));
-        if let Some(h) = hint.as_deref().filter(|_| st.hot > 0.01) {
-            let hb = R::new(art.x, art.bottom() - ui.u(40.0), art.w, ui.u(40.0));
-            ui.draw.rect(hb, fade(0xff000000, 0.7 * st.hot));
-            ui.text_in(hb, h, t.text_size, Align::Centre, fade(t.text, st.hot), crate::gfx::Weight::Bold);
-        }
-        if st.hot > 0.01 {
-            ui.draw.frame(r, ui.u(2.0).max(1.0), fade(if lock { t.text_off } else { t.accent }, st.hot));
-        }
-        if hot {
-            hover = i as i32;
-        }
-        if clicked {
-            if lock {
-                locked_click(i);
-            }
-            s.click(card.at.0, card.at.1);
-        }
+        s.click(CARDS[i].at.0, CARDS[i].at.1);
     }
     // The stock screen hears of the hover, so its own animation and sound play.
+    let hover = out.hover;
     unsafe {
         let h = s.slot.hwnd;
         if s.top && HOVER != (h, hover) {
@@ -207,13 +166,94 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
             actions::push(actions::Action::Mouse { h, msg: WM_MOUSEMOVE, keys: 0, x: x - s.model.rect[0], y: y - s.model.rect[1] });
         }
     }
-    // The foot: Previous Menu at the left, Load Game at the right.
-    let fy = sc.h - foot_h - gap;
-    let (bw, _) = (ui.u(300.0), 0);
-    kit::button(ui, s, R::new(m, fy, bw, foot_h), foot[0], &foot[0].text);
-    let last = foot.len() - 1;
-    kit::button(ui, s, R::new(sc.w - m - bw, fy, bw, foot_h), foot[last], &foot[last].text);
+    if let Some(i) = out.foot_clicked {
+        s.click_control(foot_controls[i]);
+    }
     true
+}
+
+/// The campaign selection as cards (2x2), for any front end (Armada II's, and Roots'
+/// adopted Single Player, `menus::roots_dialogs`), when no scene stands behind it: a
+/// title, each card its name in a bar over its picture (`art` for row `i` into a
+/// rectangle shaped as `arts[i]`, in a tint: a locked campaign's dimmed, with what opens
+/// it shown on hover), lit under the pointer; the foot's two buttons (label, enabled) at
+/// the left and right, live only on the top dialog (`top`), as `kit::button` draws them.
+pub fn campaign_cards(
+    ui: &mut Ui,
+    title: &str,
+    rows: &[ColumnRow],
+    arts: &[[i32; 4]],
+    art: &mut dyn FnMut(&mut Ui, usize, R, u32),
+    foot: [(&str, bool); 2],
+    top: bool,
+) -> ColumnOut {
+    let t = ui.theme;
+    let sc = ui.screen();
+    // The screen: a title, the cards (2x2), the foot.
+    let m = ui.u(40.0);
+    let title_h = ui.u(74.0);
+    let foot_h = ui.u(t.button_h);
+    let gap = ui.u(24.0);
+    ui.text_in(R::new(m, ui.u(18.0), sc.w - 2.0 * m, title_h), title, t.display_size, Align::Left, t.title, crate::gfx::Weight::Bold);
+    let grid = R::new(m, ui.u(18.0) + title_h, sc.w - 2.0 * m, sc.h - ui.u(18.0) - title_h - foot_h - 2.0 * gap - ui.u(10.0));
+    let cols = 2usize;
+    let card_h = (grid.h - gap) * 0.5;
+    let card_w = ((grid.w - gap) * 0.5).min(card_h * 1.5 + ui.u(24.0));
+    let x0 = grid.x + (grid.w - cols as f32 * card_w - (cols - 1) as f32 * gap) * 0.5;
+    let y0 = grid.y;
+    let mut out = ColumnOut { clicked: None, hover: -1, foot_clicked: None, foot_hover: None };
+    for (i, row) in rows.iter().enumerate() {
+        let r = R::new(x0 + (i % cols) as f32 * (card_w + gap), y0 + (i / cols) as f32 * (card_h + gap), card_w, card_h);
+        let id = ui.id(row.name);
+        let (hot, held, clicked) = if row.live { ui.interact(id, r) } else { (false, false, false) };
+        let st = theme::State::of(ui, id, hot, held);
+        theme::panel(ui, r);
+        let (bar, rest) = r.take_top(ui.u(46.0));
+        let lock = row.hint.is_some();
+        let col = if lock {
+            crate::gfx::mix(t.text_off, t.text, 0.3 * st.hot)
+        } else if hot {
+            t.accent
+        } else {
+            t.title
+        };
+        let tw = ui.text_in(bar.inset(ui.u(8.0)), row.name, t.heading_size, Align::Left, col, crate::gfx::Weight::Bold);
+        if lock {
+            let ph = ui.u(24.0);
+            padlock(ui, R::new(bar.x + ui.u(8.0) + tw + ui.u(12.0), bar.y + (bar.h - ph) * 0.5, ph, ph), col);
+        }
+        let dst = kit::contain(rest.inset(ui.u(8.0)), arts[i]);
+        // A locked campaign's picture, dimmed.
+        art(ui, i, dst, if lock { 0xff606060 } else { 0xffffffff });
+        ui.draw.frame(dst, 1.0, fade(t.panel_edge, 0.8));
+        if let Some(h) = row.hint.filter(|_| st.hot > 0.01) {
+            let hb = R::new(dst.x, dst.bottom() - ui.u(40.0), dst.w, ui.u(40.0));
+            ui.draw.rect(hb, fade(0xff000000, 0.7 * st.hot));
+            ui.text_in(hb, h, t.text_size, Align::Centre, fade(t.text, st.hot), crate::gfx::Weight::Bold);
+        }
+        if st.hot > 0.01 {
+            ui.draw.frame(r, ui.u(2.0).max(1.0), fade(if lock { t.text_off } else { t.accent }, st.hot));
+        }
+        if hot {
+            out.hover = i as i32;
+        }
+        if clicked {
+            out.clicked = Some(i);
+        }
+    }
+    let fy = sc.h - foot_h - gap;
+    let bw = ui.u(300.0);
+    for (i, &(label, on)) in foot.iter().enumerate() {
+        let r = if i == 0 { R::new(m, fy, bw, foot_h) } else { R::new(sc.w - m - bw, fy, bw, foot_h) };
+        if top && on {
+            if ui.button(r, label) {
+                out.foot_clicked = Some(i);
+            }
+        } else {
+            theme::button(ui, r, label, theme::State { off: !on, ..theme::State::default() });
+        }
+    }
+    out
 }
 
 /// The emblem of card `i` in `r` (a square), tinted.
@@ -253,6 +293,92 @@ fn academy(ui: &mut Ui, r: R, c: crate::gfx::Color) {
 /// moves the camera to its scene; the row whose scene shows keeps its bar. Load Game
 /// and Previous Menu follow in the column.
 fn over_scene(ui: &mut Ui, s: &Screen, names: &[&str; 4], foot: &[&crate::menus::model::Control]) -> bool {
+    let shown = crate::menus::scene::chosen();
+    let hints: [Option<String>; 4] = core::array::from_fn(|i| lock_hint(i, names));
+    let rows: [ColumnRow; 4] = core::array::from_fn(|i| ColumnRow {
+        name: names[i],
+        hint: hints[i].as_deref(),
+        live: s.top && s.model.button_at(CARDS[i].at.0, CARDS[i].at.1).is_none_or(|c| c.enabled),
+        here: shown.is_some_and(|v| v == crate::content::get().campaigns[i].scene) || (shown.is_none() && i == 1),
+    });
+    // Load Game, then Previous Menu, quieter, below a gap.
+    let last = foot.len() - 1;
+    let foot_entries = [(foot[last].text.as_str(), s.top && foot[last].enabled), (foot[0].text.as_str(), s.top && foot[0].enabled)];
+    let out = campaign_column(ui, "STAR TREK ARMADA II", "SINGLE PLAYER", &rows, &mut |ui, i, r, c| emblem(ui, i, r, c), &foot_entries);
+    if out.hover >= 0 {
+        crate::menus::scene::choose(crate::content::get().campaigns[out.hover as usize].scene);
+    }
+    if let Some(i) = out.clicked {
+        if hints[i].is_some() {
+            locked_click(i);
+        }
+        s.click(CARDS[i].at.0, CARDS[i].at.1);
+    }
+    // The stock screen hears of the hover, so its own sound plays.
+    let hover = out.hover;
+    unsafe {
+        let h = s.slot.hwnd;
+        if s.top && HOVER != (h, hover) {
+            HOVER = (h, hover);
+            let (x, y) = if hover >= 0 { CARDS[hover as usize].at } else { (2, 2) };
+            actions::push(actions::Action::Mouse { h, msg: WM_MOUSEMOVE, keys: 0, x: x - s.model.rect[0], y: y - s.model.rect[1] });
+            // The Tutorial and Federation panels are hit areas of the procedure, which
+            // plays no sound for them: ours plays the panels' buttons' own.
+            if hover >= 0 && s.model.button_at(x, y).is_none() {
+                crate::engine::api::sound::shell_hover(like_button(s));
+            }
+        }
+    }
+    // The stock screen is not told of the pointer over the foot (its buttons stand
+    // elsewhere), so ours plays the sound.
+    let foot_controls = [foot[last], foot[0]];
+    if let Some(i) = out.foot_clicked {
+        s.click_control(foot_controls[i]);
+    }
+    let foot_hover = out.foot_hover.map_or(0, |i| foot_controls[i].key);
+    unsafe {
+        if s.top && FOOT_HOVER != foot_hover {
+            FOOT_HOVER = foot_hover;
+            if foot_hover != 0 {
+                crate::engine::api::sound::shell_hover(Some(foot_hover));
+            }
+        }
+    }
+    true
+}
+
+/// A row of the campaign column (`campaign_column`): the name, what opens it while it
+/// is locked, whether it takes the pointer, and whether its scene is the one shown.
+pub struct ColumnRow<'a> {
+    pub name: &'a str,
+    pub hint: Option<&'a str>,
+    pub live: bool,
+    pub here: bool,
+}
+
+/// What the campaign column was told this frame: the row clicked, the row under the
+/// pointer (-1: none), and the same for the foot's entries.
+pub struct ColumnOut {
+    pub clicked: Option<usize>,
+    pub hover: i32,
+    pub foot_clicked: Option<usize>,
+    pub foot_hover: Option<usize>,
+}
+
+/// The campaign selection over the scene, for any front end that has one (Armada II's,
+/// and Roots' adopted Single Player, `menus::roots_dialogs`): the shade, the title
+/// (`small` over `big`), a column of campaigns, each its emblem (drawn by `emblem` for
+/// row `i` in a square, in a colour) and its name, lit under the pointer, a locked one
+/// greyed with a padlock and what opens it; then the foot's entries (label, enabled),
+/// quieter, below a gap.
+pub fn campaign_column(
+    ui: &mut Ui,
+    small: &str,
+    big: &str,
+    rows: &[ColumnRow],
+    emblem: &mut dyn FnMut(&mut Ui, usize, R, crate::gfx::Color),
+    foot: &[(&str, bool)],
+) -> ColumnOut {
     use crate::gfx::Weight;
     let sc = ui.screen();
     let t = ui.theme;
@@ -261,28 +387,26 @@ fn over_scene(ui: &mut Ui, s: &Screen, names: &[&str; 4], foot: &[&crate::menus:
     ui.draw.rect_vgrad(R::new(0.0, 0.0, sc.w, sc.h * 0.12), 0x80000000, 0x00000000);
     ui.draw.rect_vgrad(R::new(0.0, sc.h * 0.84, sc.w, sc.h * 0.16), 0x00000000, 0x90000000);
 
+    let n = rows.len() as f32;
     let (w, eh, gap) = (ui.u(420.0), ui.u(68.0), ui.u(10.0));
     let (fh, title_h) = (ui.u(46.0), ui.u(90.0));
-    let total = title_h + 4.0 * eh + 3.0 * gap + ui.u(36.0) + 2.0 * fh;
+    let total = title_h + n * eh + (n - 1.0) * gap + ui.u(36.0) + foot.len() as f32 * fh;
     let x = libm::roundf(sc.w * 0.08).max(ui.u(40.0));
     let top = libm::roundf((sc.h - total) * 0.5);
-    ui.text_in(R::new(x, top - ui.u(40.0), w, ui.u(40.0)), "STAR TREK ARMADA II", 24.0, Align::Left, fade(t.text, 0.85), Weight::Bold);
-    ui.text_in(R::new(x - ui.u(2.0), top - ui.u(8.0), w * 1.5, ui.u(76.0)), "SINGLE PLAYER", 56.0, Align::Left, t.title, Weight::Bold);
+    ui.text_in(R::new(x, top - ui.u(40.0), w, ui.u(40.0)), small, 24.0, Align::Left, fade(t.text, 0.85), Weight::Bold);
+    ui.text_in(R::new(x - ui.u(2.0), top - ui.u(8.0), w * 1.5, ui.u(76.0)), big, 56.0, Align::Left, t.title, Weight::Bold);
     ui.draw.rect_hgrad(R::new(x, top + ui.u(74.0), ui.u(260.0), ui.u(2.0).max(1.0)), t.accent, fade(t.accent, 0.0));
-    let shown = crate::menus::scene::chosen();
     let mut y = top + title_h;
-    let mut hover = -1i32;
-    for (i, card) in CARDS.iter().enumerate() {
+    let mut out = ColumnOut { clicked: None, hover: -1, foot_clicked: None, foot_hover: None };
+    for (i, row) in rows.iter().enumerate() {
         let r = R::new(x, y, w, eh);
         y += eh + gap;
-        let id = ui.id(names[i]);
-        let live = s.top && s.model.button_at(card.at.0, card.at.1).is_none_or(|c| c.enabled);
+        let id = ui.id(row.name);
+        let live = row.live;
         let (hot, held, clicked) = if live { ui.interact(id, r) } else { (false, false, false) };
         let st = theme::State::of(ui, id, hot, held);
-        let here = shown.is_some_and(|v| v == crate::content::get().campaigns[i].scene) || (shown.is_none() && i == 1);
-        let k = st.hot.max(if here { 0.45 } else { 0.0 });
-        let hint = lock_hint(i, names);
-        let lock = hint.is_some();
+        let k = st.hot.max(if row.here { 0.45 } else { 0.0 });
+        let lock = row.hint.is_some();
         // A locked campaign's bar is grey, not the accent: it is pointed at, not offered.
         let bar = if lock { t.text_off } else { t.accent };
         if k > 0.01 {
@@ -301,13 +425,12 @@ fn over_scene(ui: &mut Ui, s: &Screen, names: &[&str; 4], foot: &[&crate::menus:
         let nudge = ui.u(8.0) * st.hot;
         let is = ui.u(46.0);
         emblem(ui, i, R::new(r.x + ui.u(20.0) + nudge, r.y + (r.h - is) * 0.5, is, is), c);
-        let name = names[i];
         let tr = R::new(r.x + ui.u(20.0) + is + ui.u(18.0) + nudge, r.y, r.w - is - ui.u(44.0), r.h);
         // Locked and pointed at: the name moves up and what opens it shows below.
         let hk = if lock { st.hot } else { 0.0 };
         let name_r = R::new(tr.x, tr.y - ui.u(11.0) * hk, tr.w, tr.h);
-        let tw = ui.text_in(name_r, name, 24.0, Align::Left, c, Weight::Bold);
-        if let Some(h) = hint.as_deref() {
+        let tw = ui.text_in(name_r, row.name, 24.0, Align::Left, c, Weight::Bold);
+        if let Some(h) = row.hint {
             let ph = ui.u(22.0);
             padlock(ui, R::new(tr.x + tw + ui.u(12.0), name_r.y + (name_r.h - ph) * 0.5, ph, ph), c);
             if hk > 0.01 {
@@ -316,63 +439,32 @@ fn over_scene(ui: &mut Ui, s: &Screen, names: &[&str; 4], foot: &[&crate::menus:
             }
         }
         if hot {
-            hover = i as i32;
-            crate::menus::scene::choose(crate::content::get().campaigns[i].scene);
+            out.hover = i as i32;
         }
         if clicked {
-            if lock {
-                locked_click(i);
-            }
-            s.click(card.at.0, card.at.1);
+            out.clicked = Some(i);
         }
     }
-    // The stock screen hears of the hover, so its own sound plays.
-    unsafe {
-        let h = s.slot.hwnd;
-        if s.top && HOVER != (h, hover) {
-            HOVER = (h, hover);
-            let (x, y) = if hover >= 0 { CARDS[hover as usize].at } else { (2, 2) };
-            actions::push(actions::Action::Mouse { h, msg: WM_MOUSEMOVE, keys: 0, x: x - s.model.rect[0], y: y - s.model.rect[1] });
-            // The Tutorial and Federation panels are hit areas of the procedure, which
-            // plays no sound for them: ours plays the panels' buttons' own.
-            if hover >= 0 && s.model.button_at(x, y).is_none() {
-                crate::engine::api::sound::shell_hover(like_button(s));
-            }
-        }
-    }
-    // Load Game, then Previous Menu, quieter, below a gap. The stock screen is not told
-    // of the pointer over them (its buttons stand elsewhere), so ours plays the sound.
     y += ui.u(26.0);
-    let last = foot.len() - 1;
-    let mut foot_hover = 0usize;
-    for c in [foot[last], foot[0]] {
+    for (i, &(label, on)) in foot.iter().enumerate() {
         let r = R::new(x, y, w, fh);
         y += fh;
-        let id = ui.id(c.text.as_str());
-        let on = s.top && c.enabled;
+        let id = ui.id(label);
         let (hot, held, clicked) = if on { ui.interact(id, r) } else { (false, false, false) };
         if hot {
-            foot_hover = c.key;
+            out.foot_hover = Some(i);
         }
         let st = theme::State::of(ui, id, hot, held);
         if st.hot > 0.01 {
             ui.draw.rect(R::new(r.x, r.y + ui.u(10.0), ui.u(3.0).max(2.0), r.h - ui.u(20.0)), fade(t.accent, st.hot));
         }
         let col = if !on { t.text_off } else if held { t.accent } else { crate::gfx::mix(fade(t.text, 0.8), 0xffffffff, st.hot) };
-        ui.text_in(R::new(r.x + ui.u(20.0) + ui.u(8.0) * st.hot, r.y, r.w, r.h), &c.text, 19.0, Align::Left, col, Weight::Bold);
+        ui.text_in(R::new(r.x + ui.u(20.0) + ui.u(8.0) * st.hot, r.y, r.w, r.h), label, 19.0, Align::Left, col, Weight::Bold);
         if clicked {
-            s.click_control(c);
+            out.foot_clicked = Some(i);
         }
     }
-    unsafe {
-        if s.top && FOOT_HOVER != foot_hover {
-            FOOT_HOVER = foot_hover;
-            if foot_hover != 0 {
-                crate::engine::api::sound::shell_hover(Some(foot_hover));
-            }
-        }
-    }
-    true
+    out
 }
 
 /// The foot entry under the pointer last frame (its widget; 0 for none).

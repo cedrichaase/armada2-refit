@@ -102,6 +102,27 @@ fn eng() -> &'static a2engine::Engine {
     TABLE.engine()
 }
 
+/// An adopted dialog's screen, by its stock procedure (`Dialog::stock_proc`), named as
+/// `engine::dialogs::screen_name` names Armada II's: "" when unknown, or when the build's
+/// procedures are not verified for it (`forms.dialog_specs`; decision 250).
+pub fn dialog_screen(stock_proc: usize) -> &'static str {
+    use crate::syms_forms::sym;
+    if stock_proc == 0 || eng().ready(hook::FORMS_DIALOG_SPECS).is_err() {
+        return "";
+    }
+    const SCREENS: [(a2engine::Sym, &str); 8] = [
+        (sym::FORMS_PROC_SINGLE_PLAYER, "single player"),
+        (sym::FORMS_PROC_MISSION_SELECT, "mission select"),
+        (sym::FORMS_PROC_LOAD_GAME, "load game"),
+        (sym::FORMS_PROC_SAVE_GAME, "save game"),
+        (sym::FORMS_PROC_GAME_SETTINGS, "game settings"),
+        (sym::FORMS_PROC_GAME_SETUP, "game setup"),
+        (sym::FORMS_PROC_ADMIRALS_LOG, "admiral's log"),
+        (sym::FORMS_PROC_MESSAGE, "message"),
+    ];
+    SCREENS.iter().find(|s| eng().addr(s.0) == stock_proc).map_or("", |s| s.1)
+}
+
 // ---- what the rest of the UI sees ---------------------------------------------------
 
 /// What a control is, for drawing it.
@@ -175,6 +196,10 @@ pub enum Action {
     Select(usize, i32),
     /// The keyboard to a windowed control (a text field clicked).
     Focus(usize),
+    /// A key or a character for a windowed control (`WM_KEYDOWN` or `WM_CHAR`, its
+    /// wParam), as the player's typing would send it: an adopted dialog's edit rewritten
+    /// by a text field of ours (decision 250).
+    Key(usize, u32, usize),
 }
 
 pub const MOUSE_DOWN: u32 = WM_LBUTTONDOWN;
@@ -1167,6 +1192,11 @@ fn run_actions(top: HWND) {
                     // EM_SETSEL over the whole text: typing replaces it, as a click into a
                     // field and a select-all would.
                     SendMessageA(h as HWND, 0xb1, 0, -1);
+                }
+            },
+            Action::Key(h, msg, wp) => unsafe {
+                if IsWindow(h as HWND) != 0 {
+                    PostMessageA(h as HWND, msg, wp, 1);
                 }
             },
             _ => {}

@@ -321,6 +321,15 @@ pub fn read(s: &Slot) -> Model {
     }
 }
 
+/// Reads a dialog FleetOpsHook opens on Roots, adopted (`engine::fodialogs`): the same
+/// walk as a hosted one's, its rectangles in Roots' design space (the dialog stands at
+/// `design`'s origin), named by its stock procedure (`roots_dialogs`).
+pub fn read_adopted(hwnd: HWND, design: [i32; 4], screen: &'static str) -> Model {
+    let mut controls = Vec::new();
+    walk(hwnd, design[0], design[1], &mut controls);
+    Model { hwnd, screen, template: 0, rect: design, controls }
+}
+
 /// UI.log: a dialog's controls, once per screen, for writing specs.
 pub fn log(m: &Model) {
     crate::log!("menus: model of \"{}\" (template {}), {} controls:", m.screen, m.template, m.controls.len());

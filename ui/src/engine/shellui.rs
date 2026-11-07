@@ -100,14 +100,28 @@ unsafe extern "thiscall" fn widget_ctor(this: usize, hwnd: usize) -> usize {
     this
 }
 
-/// Whether `n` bytes at `p` are committed and readable.
+/// Whether `n` bytes at `p` are committed and readable. The bytes may span regions: on
+/// Roots, FleetOpsHook re-protects pages of the executable's `.rdata` as it patches it,
+/// which splits it into regions, and a vtable can straddle two (decision 250).
 fn readable(p: usize, n: usize) -> bool {
-    let mut m = MemoryBasicInformation::default();
-    if unsafe { VirtualQuery(p as *const u8, &mut m, core::mem::size_of::<MemoryBasicInformation>()) } == 0 {
-        return false;
+    let end = p.saturating_add(n);
+    let mut at = p;
+    for _ in 0..4 {
+        let mut m = MemoryBasicInformation::default();
+        if unsafe { VirtualQuery(at as *const u8, &mut m, core::mem::size_of::<MemoryBasicInformation>()) } == 0 {
+            return false;
+        }
+        // PAGE_NOACCESS (1) and guard pages (0x100) cannot be read.
+        if !(m.state == MEM_COMMIT && m.protect & 0x101 == 0 && m.protect != 0) {
+            return false;
+        }
+        let next = m.base + m.region_size;
+        if end <= next {
+            return true;
+        }
+        at = next;
     }
-    // PAGE_NOACCESS (1) and guard pages (0x100) cannot be read.
-    m.state == MEM_COMMIT && m.protect & 0x101 == 0 && m.protect != 0 && p + n <= m.base + m.region_size
+    false
 }
 
 fn rd<T: Copy>(a: usize) -> T {
@@ -326,4 +340,23 @@ pub fn widgets_of(hwnd: HWND) -> Vec<Widget> {
         }
     }
     out
+}
+
+/// UI.log: the widgets made for `hwnd` that `read` does not know (their vtable and the
+/// two slots it tells classes by): what another build's classes look like.
+pub fn log_unread(hwnd: HWND) {
+    if !installed() {
+        return;
+    }
+    let v = unsafe { &*core::ptr::addr_of!(WIDGETS) };
+    let mine = v.iter().filter(|&&(w, _)| readable(w, 8) && rd::<usize>(w + 4) == hwnd as usize).count();
+    crate::log!("menus: {} shell widgets remembered, {} made for {:p}", v.len(), mine, hwnd);
+    for &(w, _) in v.iter() {
+        if !readable(w, 8) || rd::<usize>(w + 4) != hwnd as usize || read(w).is_some() {
+            continue;
+        }
+        let vt: usize = rd(w);
+        let (s1, s8) = if readable(vt, 0x24) { (rd::<usize>(vt + 4), rd::<usize>(vt + 32)) } else { (0, 0) };
+        crate::log!("menus: widget {:#x} of {:p} not read: vtable {:#x} (in the exe's .rdata: {}), slots 1 {:#x} and 8 {:#x}", w, hwnd, vt, vt_ok(vt), s1, s8);
+    }
 }

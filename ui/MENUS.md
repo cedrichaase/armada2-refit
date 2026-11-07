@@ -1222,12 +1222,61 @@ dialog host's model for a dialog the UI did not create:
   gives it the focus, and typing goes there (Save Game's name).
 - **A model for a spec.** Its child windows (class, id, text, rectangle, style) and
   FleetOpsHook's record of the stock procedure (the record in the window's user data, read
-  once) are what the frame sees (`forms::Dialog`). No spec is written yet: every adopted
-  dialog is the mirror (`[Menus] Generic` does not apply to them: the shell's widgets,
-  which the widgets screen needs, are read only under the dialog host). UI.log: `forms:
-  #32770 ... adopted: client WxH, style ..., stock procedure 0x...`, `... adopted at X,Y
-  WxH in the design space`, and once, the child windows; `Trace=1` also writes the
-  picture as a BMP into the game directory.
+  once; for a dialog the executable opens through its own import, which has no record,
+  the dialog's own procedure, `DWL_DLGPROC`) are what the frame sees (`forms::Dialog`),
+  and the shell's own widgets are read as under the host ("Roots' dialogs, laid out"
+  below). A dialog without a spec is the mirror (`[Menus] Generic` does not apply to
+  them). UI.log: `forms: #32770 ... adopted: client WxH, style ..., stock procedure
+  0x...`, `... adopted at X,Y WxH in the design space`, and once, the child windows;
+  `Trace=1` also writes the picture as a BMP into the game directory.
+
+### Roots' dialogs, laid out
+
+PLAN-FLEETOPS.md, decisions 250 onwards; `menus/roots_dialogs/`. An adopted dialog with a
+spec is drawn by it, from the same two things a hosted dialog's spec reads:
+
+- **Its model** (`model::read_adopted`), the host's walk over the adopted window: the
+  shell's widgets that draw into it and its child windows, in Roots' design space
+  (1200x900, the dialog at its place in it). The widget reader (`engine/shellui.rs`, the
+  `Shell::Widget` constructor re-pointed) is installed by the forms on Roots, at DllMain,
+  as the host installs it on Armada II: Roots' shell classes are stock's (the same
+  vtables, the same fields), and it reads them as on Armada II once one difference is
+  allowed for: FleetOpsHook re-protects pages of the executable's `.rdata` as it patches
+  them, which splits `.rdata` into regions, and the buttons' vtable (`ShellButton`'s
+  family) straddles two; the reader's check that a vtable can be read now spans regions
+  (on Armada II the check gives what it gave). UI.log has each dialog's model, as the
+  host logs it (`menus: model of "single player" ...`), and the widgets made for it that
+  the reader does not know.
+- **Its picture**, cut for what a theme cannot draw (a campaign's art).
+
+The spec is chosen by the stock procedure (`forms::dialog_screen`): the profile's
+`ui.forms.dialog_specs` lists the eight procedures FleetOpsHook opens or that open from
+them (Single Player, the mission list, Load, Save, Game Settings, Game Setup, the
+Admiral's Log, the one-button message), told apart by address only; Roots' build marks
+each verified beside its edit, since FleetOpsHook's record was measured to hold stock's
+address for every one. A spec acts as a player: `Screen::click` moves the pointer to the
+stock control's point, and once it has rested there (0.12 s; Roots' screens take a press
+only on a control already under the pointer, decision 190) presses and releases; one
+click at a time, in order. Typing into an edit is `End`, a Backspace for each character
+it held, and the new text, posted to the edit as the keyboard would send them. Nothing
+writes a setting. A spec that does not recognise its dialog returns false and the frame
+draws the picture.
+
+The specs reuse Armada II's layouts, factored out of `screens/` with Armada II's
+behaviour unchanged: `single_player::campaign_column` and `campaign_cards`,
+`mission_select::mission_list`, `saves::saves_screen`, `notice::notice_window`. Return in a text field of ours on an adopted dialog never reaches it: user32's modal loop turns it into the dialog's OK command first (decision 253).
+
+| Dialog | Spec | What it shows |
+|---|---|---|
+| Single Player (`SingleDlgProc`) | `roots_dialogs/single_player.rs` | Armada II's campaign selection: over render3d's map the column (the four campaigns, each named by the dialog's hidden hover label and marked by a cut of its own card's art, then Load Game and Previous Menu), pointing at one moving the camera to its view (`federation`, `dominion`, `species8472`, `freeborg` in the fleetops map); without the scene, the cards (2x2). The top two cards are hit areas of the procedure, the bottom two picture `ShellButton`s, as on Armada II |
+| The mission list (`MissionSelectDlgProc`) | `roots_dialogs/mission_select.rs` | Armada II's list in a window of ours over the campaign selection: the stock rows by their labels, OK and Cancel |
+| Load Game, Save Game (`LoadGameDlgProc`, `SaveGameDlgProc`) | `roots_dialogs/saves.rs` | Armada II's save list: name and date, the stock list's two scroll buttons and the wheel, Save's name field writing the stock `Edit` (id 2100), the foot |
+| The one-button message (`OneButtonDlgProc`) | `roots_dialogs/notice.rs` | Armada II's message window (`notice::notice_window`): the labels as title and text, the stock OK |
+
+**The campaign tiles are Roots' art**: the column draws each card's own picture, cut from
+the dialog's picture at run time (never stored; decision 251), because the α, γ, V and
+B on them are the only marks Roots gives its campaigns and no theme of ours can draw them;
+the names, the layout and everything else are ours.
 
 ## Testing
 
