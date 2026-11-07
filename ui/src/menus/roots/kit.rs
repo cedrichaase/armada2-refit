@@ -262,3 +262,24 @@ pub const SLIDER: f32 = sform::SLIDER_H;
 pub const HEADING: f32 = sform::HEADING_H;
 pub const CHECK: f32 = 30.0;
 pub const CHECK_GAP: f32 = 10.0;
+
+/// A control Roots draws as a picture (a grid, an image) shown as a crop of the form's own
+/// picture in `r`, with the mouse over it forwarded to the control's window: the way to
+/// show what cannot be read as widgets. Nothing is drawn while there is no picture.
+pub(super) fn crop(ui: &mut Ui, f: &Form, c: &Control, r: R) {
+    ui.panel(r.inset(-ui.u(4.0)));
+    if let Some((t, w, h)) = super::picture().filter(|_| f.top) {
+        let uv = [
+            c.rect[0] as f32 / w as f32,
+            c.rect[1] as f32 / h as f32,
+            (c.rect[0] + c.rect[2]) as f32 / w as f32,
+            (c.rect[1] + c.rect[3]) as f32 / h as f32,
+        ];
+        ui.draw.image_uv(t, r, uv, 0xff_ff_ff_ff);
+    }
+    // The form's coordinates map onto `r` by the crop's own scale.
+    let s = r.w / c.rect[2].max(1) as f32;
+    let cf = super::Fit { x: r.x - c.rect[0] as f32 * s, y: r.y - c.rect[1] as f32 * s, s };
+    let local = Form { origin: (0, 0), ..f.clone() };
+    super::forward(ui, &cf, &local, r);
+}

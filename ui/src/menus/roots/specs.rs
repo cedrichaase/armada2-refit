@@ -5,10 +5,12 @@
 use crate::engine::api::forms::Form;
 use crate::widgets::Ui;
 
-pub fn draw(ui: &mut Ui, f: &Form) -> bool {
+pub(super) fn draw(ui: &mut Ui, fit: &super::Fit, f: &Form) -> bool {
     match f.class.as_str() {
         "TGraphicOptionsForm" => super::graphics::draw(ui, f),
         "TSoundSettingsForm" => super::sound::draw(ui, f),
+        "TModSettingsForm" => super::mods::draw(ui, f),
+        "TAdvSettingsForm" => super::advsettings::draw(ui, f),
         _ => false,
     }
 }
