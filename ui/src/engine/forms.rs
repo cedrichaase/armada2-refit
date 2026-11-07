@@ -153,6 +153,8 @@ pub struct Form {
     pub top: bool,
     /// Whether this form opened over a mission (the in-mission menu).
     pub in_mission: bool,
+    /// Its place among the forms and dialogs, outermost first (the frame draws in this order).
+    pub z: usize,
 }
 
 impl Form {
@@ -166,9 +168,9 @@ impl Form {
 pub enum Action {
     /// A left press and release at a control's centre.
     Press(usize, [i32; 4]),
-    /// The mouse at a point of the form (forwarded to the window under it): down, move or
-    /// up.
-    Mouse(usize, u32, i32, i32),
+    /// The mouse at a point of the form or adopted dialog (forwarded to the window under
+    /// it): down, move or up, and the buttons held (`MK_LBUTTON` or 0).
+    Mouse(usize, u32, usize, i32, i32),
     /// A combo's entry chosen, with the parent's notification.
     Select(usize, i32),
     /// The keyboard to a windowed control (a text field clicked).
@@ -178,6 +180,34 @@ pub enum Action {
 pub const MOUSE_DOWN: u32 = WM_LBUTTONDOWN;
 pub const MOUSE_MOVE: u32 = WM_MOUSEMOVE;
 pub const MOUSE_UP: u32 = WM_LBUTTONUP;
+pub const MOUSE_HELD: usize = MK_LBUTTON;
+
+/// A dialog over the device window (one of the nine FleetOpsHook opens through its own
+/// import, or one they open), as the frame draws it.
+#[derive(Clone, Default)]
+pub struct Dialog {
+    pub hwnd: usize,
+    /// Adopted (decision 230): its place in the design space, where the frame draws its
+    /// picture. None: framed as a Win32 window (decision 200), at `framed`.
+    pub design: Option<[i32; 4]>,
+    /// Where the window stands on the device window's client area (a framed window), and
+    /// that area's size.
+    pub framed: [i32; 4],
+    pub client: (i32, i32),
+    /// Whether it is the modal one now (an adopted dialog under another is inert).
+    pub top: bool,
+    /// Its child windows (an adopted dialog's model; empty for a framed one).
+    pub children: Vec<crate::engine::fodialogs::Child>,
+    /// FleetOpsHook's record of the stock procedure (0: not read): what a spec will be
+    /// chosen by.
+    pub stock_proc: usize,
+    /// Its place among the forms and dialogs, outermost first (the frame draws in this order).
+    pub z: usize,
+    /// A pane of the dialog under it (drawn as part of it, with no frame of its own).
+    pub pane: bool,
+    /// Whether the window is shown (a pane the Admiral's Log hides is not drawn).
+    pub visible: bool,
+}
 
 // ---- state ----------------------------------------------------------------------------
 
@@ -195,6 +225,12 @@ struct Tracked {
     /// open), framed by the UI: where it was put, in the device window's client
     /// coordinates (decision 200).
     framed: Option<[i32; 4]>,
+    /// Adopted (decision 230): drawn by the UI from its picture, its window off screen;
+    /// its place in the design space.
+    adopted: Option<[i32; 4]>,
+    /// Where the window stood on the screen when it activated, before it was placed: a
+    /// pane keeps its place against its owner's (decision 235).
+    orig: (i32, i32),
     // the probe's walk
     visit: u32,
     pressed: bool,
@@ -217,7 +253,7 @@ static mut ACTIONS: Vec<Action> = Vec::new();
 static mut VIEW: Vec<Form> = Vec::new();
 /// The framed dialogs over them, outermost first: each one's rectangle in the device
 /// window's client coordinates, and that client area's size.
-static mut DIALOGS: Vec<([i32; 4], (i32, i32))> = Vec::new();
+static mut DIALOGS: Vec<Dialog> = Vec::new();
 /// The top form's picture: DC, bitmap, the DC's old bitmap, the bits (32-bit top-down),
 /// width and height.
 static mut PICTURE: (HDC, HGDIOBJ, HGDIOBJ, *mut u8, i32, i32) =
@@ -245,13 +281,28 @@ pub fn main_menu_shown() -> bool {
 
 /// The dialogs the UI frames (decision 200), outermost first: each one's rectangle on
 /// the device window's client area, and that area's size.
-pub fn dialogs() -> Vec<([i32; 4], (i32, i32))> {
+pub fn dialogs() -> Vec<Dialog> {
     unsafe { (*core::ptr::addr_of!(DIALOGS)).clone() }
 }
 
 /// Whether a tracked window keeps the pump going: a form of ours, or a framed dialog.
 fn ours(t: &Tracked) -> bool {
-    t.class != "#32770" || t.framed.is_some()
+    t.class != "#32770" || t.framed.is_some() || t.adopted.is_some()
+}
+
+/// Whether `h` is an adopted pane of `top` (the Admiral's Log's pop-up panes).
+fn pane_of(h: HWND, top: HWND) -> bool {
+    crate::engine::fodialogs::is_adopted(h) && unsafe { GetWindow(h, GW_OWNER) } == top
+}
+
+/// Whether the window on top of the ones tracked is an adopted dialog.
+fn dialog_adopted_on_top() -> bool {
+    tracked().last().is_some_and(|t| t.adopted.is_some())
+}
+
+/// An adopted dialog's picture, for the mirror: (bits, width, height, serial).
+pub fn dialog_picture(hwnd: usize) -> Option<(*const u8, i32, i32, u32)> {
+    crate::engine::fodialogs::picture(hwnd as HWND)
 }
 
 /// The probe of step 0 (`Forms=probe`).
@@ -350,6 +401,11 @@ pub fn install(mode: u8) -> bool {
         CBT = h;
         MODE = if h.is_null() { 0 } else { mode };
     }
+    if !h.is_null() {
+        // FleetOpsHook's dialogs drawn by the UI (decision 230), or framed windows when
+        // the executable's paint imports cannot be ours (decision 200).
+        crate::engine::fodialogs::install(tid);
+    }
     !h.is_null()
 }
 
@@ -404,14 +460,44 @@ fn activated(h: HWND) {
     // A form centred on one of ours (a Yes/No over Options) sits where that one is drawn,
     // not where it was moved to.
     let mut origin = (r.left - o.x, r.top - o.y);
-    if let Some(p) = tracked().iter().find(|t| t.hwnd == owner && t.hidden) {
+    // Over an adopted dialog (Map Select over Game Setup) the same, from where the frame
+    // draws that dialog.
+    if let Some(p) = tracked().iter().find(|t| t.hwnd == owner && (t.hidden || t.adopted.is_some())) {
         let mut pr = WinRect::default();
         unsafe { GetWindowRect(owner, &mut pr) };
-        origin = (p.origin.0 + r.left - pr.left, p.origin.1 + r.top - pr.top);
+        let at = p.adopted.map_or(p.origin, |a| (a[0], a[1]));
+        origin = (at.0 + r.left - pr.left, at.1 + r.top - pr.top);
+    }
+    // FleetOpsHook places a form opened over an adopted dialog (Map Select over Game Setup)
+    // against the dialog's off-screen place: a form that would stand outside the design
+    // space is centred in it.
+    let (dw, dh) = design();
+    let (fw, fh) = (r.right - r.left, r.bottom - r.top);
+    if dialog_adopted_on_top() && dw > 0 && (origin.0 < 0 || origin.1 < 0 || origin.0 + fw > dw || origin.1 + fh > dh) {
+        origin = (((dw - fw) / 2).max(0), ((dh - fh) / 2).max(0));
     }
     let first = !tracked().iter().any(ours);
     let in_mission = crate::engine::api::ingame::recent();
     let framed = if dialog { frame_dialog(h) } else { None };
+    // Adopted (decision 230): cut and placed as above, then off screen, drawn by the UI.
+    let adopted = match framed {
+        Some(p) if crate::engine::fodialogs::ready() => {
+            let d = device_of(h);
+            let (cw, ch) = client_size(h);
+            let (dw, dh) = design();
+            let (ox, oy) = (((cw - dw) / 2).max(0), ((ch - dh) / 2).max(0));
+            hide(h);
+            crate::engine::fodialogs::adopt(h);
+            let mut dr = WinRect::default();
+            unsafe { GetWindowRect(d, &mut dr) };
+            crate::log!(
+                "forms: #32770 {:p} moved off screen; device window at {},{} {}x{}, active {:p}, focus {:p}",
+                h, dr.left, dr.top, dr.right - dr.left, dr.bottom - dr.top, unsafe { GetActiveWindow() }, unsafe { GetFocus() }
+            );
+            Some([p[0] - ox, p[1] - oy, p[2], p[3]])
+        }
+        _ => None,
+    };
     tracked().push(Tracked {
         hwnd: h,
         class: class.clone(),
@@ -422,7 +508,9 @@ fn activated(h: HWND) {
         hidden: false,
         last: Vec::new(),
         in_mission,
-        framed,
+        framed: if adopted.is_some() { None } else { framed },
+        adopted,
+        orig: (r.left, r.top),
         visit,
         pressed: false,
         combo: false,
@@ -431,7 +519,9 @@ fn activated(h: HWND) {
         "forms: {} {:p} up at {},{} {}x{}{}",
         class, h, origin.0, origin.1, r.right - r.left, r.bottom - r.top, if in_mission { ", over a mission" } else { "" }
     );
-    if let Some(f) = framed {
+    if let Some(f) = adopted {
+        crate::log!("forms: #32770 {:p} adopted at {},{} {}x{} in the design space", h, f[0], f[1], f[2], f[3]);
+    } else if let Some(f) = framed {
         crate::log!("forms: #32770 {:p} framed at {},{} {}x{} on the device window", h, f[0], f[1], f[2], f[3]);
     }
     if first && (!dialog || framed.is_some()) {
@@ -463,6 +553,9 @@ fn destroyed(h: HWND) {
     let v = tracked();
     let Some(i) = v.iter().position(|t| t.hwnd == h) else { return };
     let t = v.remove(i);
+    if t.adopted.is_some() {
+        crate::engine::fodialogs::forget(h);
+    }
     crate::log!("forms: {} {:p} closed after {:.1} s ({} frames of ours so far)", t.class, h, crate::rt::now() - t.opened, unsafe { FRAMES });
     if !v.iter().any(ours) {
         stop();
@@ -763,6 +856,30 @@ unsafe extern "system" fn tick(_h: HWND, _m: u32, _id: usize, _t: u32) {
         // until phase two (decision 150). A framed one (decision 200) stands at its place
         // over our frame, which goes on under it; any other leaves our last frame.
         unsafe { DIALOG_TICKS += 1 };
+        if v[top].adopted.is_some() {
+            // Adopted (decision 230): off screen, painted into our surface, drawn by the
+            // frame from its picture, driven by what the frame queued.
+            let h = v[top].hwnd;
+            // Its panes too: the Admiral's Log shows one and hides the others as its tabs
+            // are pressed, and a pane shown is put back where it was.
+            for t in v.iter().filter(|t| t.adopted.is_some()) {
+                keep_off(t.hwnd);
+            }
+            // A dialog with no control to take it leaves the keyboard focus nowhere, and
+            // keys then come as system keys that no dialog sees (MENUS.md, "A focus left
+            // nowhere"): the focus goes to the dialog (decision 236).
+            if unsafe { GetFocus() }.is_null() && unsafe { GetActiveWindow() } == h {
+                unsafe { SetFocus(h) };
+                crate::log!("forms: #32770 {:p} had no keyboard focus: given the focus", h);
+            }
+            poll_button(h);
+            run_actions(h);
+            crate::engine::fodialogs::tick(PRINT_EVERY, h);
+            unsafe { SetCursor(LoadCursorA(core::ptr::null_mut(), IDC_ARROW)) };
+            publish(v, None);
+            frame();
+            return;
+        }
         if v[top].framed.is_none() {
             return;
         }
@@ -830,9 +947,42 @@ fn publish(v: &[Tracked], live: Option<usize>) {
             controls: t.last.clone(),
             top: Some(i) == live,
             in_mission: t.in_mission,
+            z: 2 * i,
         })
         .collect();
-    let dialogs: Vec<([i32; 4], (i32, i32))> = v.iter().filter_map(|t| t.framed.map(|f| (f, client_size(t.hwnd)))).collect();
+    let n = v.len();
+    // A pane (a pop-up owned by an adopted dialog: the Admiral's Log's eight) opens before
+    // its owner activates; it is drawn just above its owner, and takes the pointer while
+    // its owner is the top one (decision 235).
+    let owner_of = |t: &Tracked| -> Option<usize> {
+        let o = unsafe { GetWindow(t.hwnd, GW_OWNER) };
+        v.iter().position(|u| u.hwnd == o && u.adopted.is_some())
+    };
+    let dialogs: Vec<Dialog> = v
+        .iter()
+        .enumerate()
+        .filter(|(_, t)| t.framed.is_some() || t.adopted.is_some())
+        .map(|(i, t)| {
+            let pane = owner_of(t).filter(|&j| j > i);
+            // A pane stands where it stood against its owner before either was moved.
+            let design = match (pane, t.adopted) {
+                (Some(j), Some(a)) => v[j].adopted.map(|o| [o[0] + t.orig.0 - v[j].orig.0, o[1] + t.orig.1 - v[j].orig.1, a[2], a[3]]),
+                _ => t.adopted,
+            };
+            Dialog {
+                hwnd: t.hwnd as usize,
+                design,
+                framed: t.framed.unwrap_or_default(),
+                client: client_size(t.hwnd),
+                top: i + 1 == n || pane.is_some_and(|j| j + 1 == n),
+                children: if t.adopted.is_some() { crate::engine::fodialogs::children(t.hwnd) } else { Vec::new() },
+                stock_proc: crate::engine::fodialogs::stock_proc(t.hwnd),
+                z: pane.map_or(2 * i, |j| 2 * j + 1),
+                pane: pane.is_some(),
+                visible: unsafe { IsWindowVisible(t.hwnd) } != 0,
+            }
+        })
+        .collect();
     unsafe {
         *core::ptr::addr_of_mut!(VIEW) = view;
         *core::ptr::addr_of_mut!(DIALOGS) = dialogs;
@@ -982,9 +1132,9 @@ fn run_actions(top: HWND) {
                     PostMessageA(top, WM_LBUTTONUP, 0, lp);
                 }
             }
-            Action::Mouse(h, msg, x, y) if h == top as usize => {
+            Action::Mouse(h, msg, keys, x, y) if h == top as usize || pane_of(h as HWND, top) => {
                 // To the deepest visible window at the point, in its own client coordinates.
-                let mut target = top;
+                let mut target = h as HWND;
                 let mut p = Point { x, y };
                 for _ in 0..8 {
                     let c = unsafe { ChildWindowFromPointEx(target, p, CWP_SKIPINVISIBLE) };
@@ -1000,7 +1150,6 @@ fn run_actions(top: HWND) {
                     p = Point { x: p.x - (r.left - o.x), y: p.y - (r.top - o.y) };
                     target = c;
                 }
-                let keys = if msg == WM_LBUTTONDOWN || msg == WM_MOUSEMOVE { MK_LBUTTON } else { 0 };
                 unsafe { PostMessageA(target, msg, keys, lparam(p.x, p.y)) };
             }
             Action::Select(h, i) => unsafe {

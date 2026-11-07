@@ -12,7 +12,7 @@
 //!
 //! Every action goes back to Roots' form as a player's would (`forms::act`): a press of
 //! ours is a posted click at the control's centre; nothing writes a setting.
-use crate::engine::api::forms::{self, Action, Control, Form, Kind};
+use crate::engine::api::forms::{self, Action, Control, Dialog, Form, Kind};
 use crate::gfx::{self, Tex, R};
 use crate::gfx::Weight;
 use crate::widgets::{Align, Ui};
@@ -128,27 +128,74 @@ pub fn frame(ui: &mut Ui) {
         ui.note(R::new(area.x + ui.u(8.0), area.bottom() - ui.u(28.0), area.w, ui.u(24.0)), "forms probe");
     }
     let cfg = crate::config::get();
-    // A full-screen form hides every form under it.
-    let first = view.iter().rposition(|f| f.size.0 >= dw && f.size.1 >= dh).unwrap_or(0);
-    for (i, f) in view.iter().enumerate().skip(first) {
-        let live = f.top;
-        ui.scope(&crate::sfmt!("form{}", f.hwnd), |ui| {
-            ui.inert_unless(live, |ui| match (cfg.menus_specs, f.class.as_str()) {
-                (true, "TMainForm") => main_menu(ui, f),
-                (true, "TOptionsMenuForm") => column(ui, &fit, f, area, Some("buttonBack")),
-                (true, "TYesNoForm") => yes_no(ui, &fit, f),
-                _ => generic(ui, &fit, f, cfg.menus_widgets, live),
-            })
-        });
-        let _ = i;
-    }
-    // The dialogs FleetOpsHook opens through its own import stand over this frame as
-    // Roots draws them, cut to the design size and centred (decision 200): a panel of
-    // ours frames each, in the device window's client pixels.
-    for (r, (cw, ch)) in dialogs {
+    // Forms and dialogs in their order, outermost first; a full-screen one (a form or an
+    // adopted dialog the design space's size) hides everything under it.
+    let full_dialog = |d: &Dialog| d.design.is_some_and(|p| p[2] >= dw && p[3] >= dh);
+    let first = view
+        .iter()
+        .filter(|f| f.size.0 >= dw && f.size.1 >= dh)
+        .map(|f| f.z)
+        .chain(dialogs.iter().filter(|d| d.visible && full_dialog(d)).map(|d| d.z))
+        .max()
+        .unwrap_or(0);
+    let mut order: Vec<(usize, Option<&Form>, Option<&Dialog>)> = view
+        .iter()
+        .filter(|f| f.z >= first)
+        .map(|f| (f.z, Some(f), None))
+        .chain(dialogs.iter().filter(|d| d.visible && (d.z >= first || d.design.is_none())).map(|d| (d.z, None, Some(d))))
+        .collect();
+    order.sort_by_key(|o| o.0);
+    // The pointer goes to the live dialog it is over, the uppermost (a pane over its
+    // owner), or to the one that holds the button.
+    let rect_of = |p: [i32; 4]| R::new(fit.x + p[0] as f32 * fit.s, fit.y + p[1] as f32 * fit.s, p[2] as f32 * fit.s, p[3] as f32 * fit.s);
+    let held = unsafe { HELD };
+    let target = if held != 0 && dialogs.iter().any(|d| d.hwnd == held && d.top) {
+        held
+    } else {
+        let mut live: Vec<&Dialog> = dialogs.iter().filter(|d| d.top && d.visible && d.design.is_some()).collect();
+        live.sort_by_key(|d| core::cmp::Reverse(d.z));
+        match ui.input.mouse {
+            Some(m) => live.iter().find(|d| rect_of(d.design.unwrap_or_default()).contains(m)).map_or(0, |d| d.hwnd),
+            None => 0,
+        }
+    };
+    for (_, f, d) in order {
+        if let Some(f) = f {
+            let live = f.top;
+            ui.scope(&crate::sfmt!("form{}", f.hwnd), |ui| {
+                ui.inert_unless(live, |ui| match (cfg.menus_specs, f.class.as_str()) {
+                    (true, "TMainForm") => main_menu(ui, f),
+                    (true, "TOptionsMenuForm") => column(ui, &fit, f, area, Some("buttonBack")),
+                    (true, "TYesNoForm") => yes_no(ui, &fit, f),
+                    _ => generic(ui, &fit, f, cfg.menus_widgets, live),
+                })
+            });
+        }
+        let Some(d) = d else { continue };
+        // An adopted dialog (decision 230) is drawn here from its picture, in the design
+        // space like the forms, scaled to fit (decision 232), and takes the pointer while
+        // it is the top one.
+        if let Some(p) = d.design {
+            let r = rect_of(p);
+            if !d.pane {
+                ui.panel(r.inset(-ui.u(6.0)));
+            }
+            if let Some(t) = dialog_texture(d) {
+                ui.draw.image(t, r, 0xff_ff_ff_ff);
+            }
+            if d.hwnd == target {
+                ui.scope(&crate::sfmt!("dialog{}", d.hwnd), |ui| forward_dialog(ui, d, r, fit.s));
+            }
+            continue;
+        }
+        // A framed one (decision 200: the executable's paint imports could not be ours)
+        // stands over this frame as Roots draws it, cut to the design size and centred: a
+        // panel of ours frames it, in the device window's client pixels.
+        let (cw, ch) = d.client;
         if cw <= 0 || ch <= 0 {
             continue;
         }
+        let r = d.framed;
         let (sx, sy) = (ui.w / cw as f32, ui.h / ch as f32);
         let dr = R::new(r[0] as f32 * sx, r[1] as f32 * sy, r[2] as f32 * sx, r[3] as f32 * sy);
         ui.panel(dr.inset(-ui.u(6.0)));
@@ -323,14 +370,79 @@ fn forward(ui: &mut Ui, fit: &Fit, f: &Form, r: R) {
     unsafe {
         if over && ui.input.pressed[0] && HELD == 0 {
             HELD = f.hwnd;
-            forms::act(Action::Mouse(f.hwnd, forms::MOUSE_DOWN, x, y));
+            forms::act(Action::Mouse(f.hwnd, forms::MOUSE_DOWN, forms::MOUSE_HELD, x, y));
         } else if HELD == f.hwnd {
             if ui.input.released[0] || !ui.input.down[0] {
                 HELD = 0;
-                forms::act(Action::Mouse(f.hwnd, forms::MOUSE_UP, x, y));
+                forms::act(Action::Mouse(f.hwnd, forms::MOUSE_UP, 0, x, y));
             } else {
-                forms::act(Action::Mouse(f.hwnd, forms::MOUSE_MOVE, x, y));
+                forms::act(Action::Mouse(f.hwnd, forms::MOUSE_MOVE, forms::MOUSE_HELD, x, y));
             }
+        }
+    }
+}
+
+/// An adopted dialog's picture as a texture, by window (textures are kept and reused as
+/// dialogs come and go, as the host's mirrors are).
+static mut DIALOG_TEX: Vec<(usize, Tex, i32, i32, u32)> = Vec::new();
+
+fn dialog_texture(d: &Dialog) -> Option<Tex> {
+    let (bits, w, h, serial) = forms::dialog_picture(d.hwnd)?;
+    let v = unsafe { &mut *core::ptr::addr_of_mut!(DIALOG_TEX) };
+    let i = match v.iter().position(|e| e.0 == d.hwnd && e.2 == w && e.3 == h) {
+        Some(i) => i,
+        None => match v.iter().position(|e| e.2 == w && e.3 == h && !forms::dialogs().iter().any(|o| o.hwnd == e.0)) {
+            Some(i) => {
+                v[i].0 = d.hwnd;
+                v[i].4 = serial.wrapping_sub(1);
+                i
+            }
+            None => {
+                v.push((d.hwnd, gfx::texture_dynamic(w as u32, h as u32), w, h, serial.wrapping_sub(1)));
+                v.len() - 1
+            }
+        },
+    };
+    if v[i].4 != serial {
+        gfx::tex_update(v[i].1, bits, w as usize * 4, w as u32, h as u32);
+        v[i].4 = serial;
+    }
+    Some(v[i].1)
+}
+
+/// The pointer over the dialog's picture goes to the dialog as the real pointer would:
+/// every move (the stock buttons light up and take a click only under the pointer), the
+/// press, the moves while held and the release, in its client coordinates.
+static mut DIALOG_HOVER: (usize, i32, i32) = (0, i32::MIN, i32::MIN);
+
+fn forward_dialog(ui: &mut Ui, d: &Dialog, r: R, s: f32) {
+    let Some(m) = ui.input.mouse else { return };
+    let over = r.contains(m);
+    if over {
+        ui.claim(r);
+    }
+    let x = libm::floorf((m.0 - r.x) / s) as i32;
+    let y = libm::floorf((m.1 - r.y) / s) as i32;
+    unsafe {
+        let moved = DIALOG_HOVER != (d.hwnd, x, y);
+        if HELD == d.hwnd {
+            if ui.input.released[0] || !ui.input.down[0] {
+                HELD = 0;
+                forms::act(Action::Mouse(d.hwnd, forms::MOUSE_UP, 0, x, y));
+            } else if moved {
+                forms::act(Action::Mouse(d.hwnd, forms::MOUSE_MOVE, forms::MOUSE_HELD, x, y));
+            }
+        } else if over {
+            if moved {
+                forms::act(Action::Mouse(d.hwnd, forms::MOUSE_MOVE, 0, x, y));
+            }
+            if ui.input.pressed[0] && HELD == 0 {
+                HELD = d.hwnd;
+                forms::act(Action::Mouse(d.hwnd, forms::MOUSE_DOWN, forms::MOUSE_HELD, x, y));
+            }
+        }
+        if over || HELD == d.hwnd {
+            DIALOG_HOVER = (d.hwnd, x, y);
         }
     }
 }
