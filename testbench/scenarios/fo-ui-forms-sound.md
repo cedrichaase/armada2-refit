@@ -32,7 +32,7 @@ and read back, a check box is clicked through the library's own hit test.
 17. Wait up to 10 seconds for "UI.log" to say "sldrSoundChannels of TSoundSettingsForm now at".
 18. Wait 2 seconds.
 19. Take a screenshot called "changed".
-20. Check that the Music Volume slider has moved right of where it stood, Unit Speech is not ticked and the Sound Channels count and slider show a larger number.
+20. Check that the Music Volume slider's knob is well right of the middle of its track, Unit Speech is not ticked, and the Sound Channels slider's knob is right of the middle with its count above 32.
 21. Click "Previous Menu".
 22. Wait up to 20 seconds for "UI.log" to say "press on buttonBack".
 23. Wait 3 seconds.

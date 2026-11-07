@@ -32,7 +32,7 @@ Roots' settings file and start a connection, which Wine's DirectPlay cannot make
 14. Type "10.11.12.13".
 15. Wait 2 seconds.
 16. Take a screenshot called "manual ip".
-17. Check that a window of ours titled "MANUAL IP" over the dimmed connection window shows a Host address caption over a field reading 10.11.12.13 with a caret, and two buttons, OK and Cancel.
+17. Check that a window of ours titled "MANUAL IP" over the dimmed connection window shows a Host address caption over a field reading 10.11.12.13 with a highlighted frame, and two buttons, OK and Cancel.
 18. Expect "10.11.12.13" is visible.
 19. Click "Cancel".
 20. Wait up to 20 seconds for "UI.log" to say "TManualIPForm".

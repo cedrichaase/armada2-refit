@@ -21,7 +21,7 @@ Roots' own Back.
 5. Wait up to 20 seconds for "UI.log" to say "forms: TMultiplayerConnectionForm is ours".
 6. Wait 3 seconds.
 7. Take a screenshot called "connection".
-8. Check that a window of ours titled "MULTIPLAYER", laid out as Armada II's Multiplayer Connection screen over the dimmed menu scene, shows a Name caption over a field reading the player's name, three wide buttons (Internet, Internet - Manual IP, Local Area Network) and a Previous Menu button at the bottom left.
+8. Check that a window of ours titled "MULTIPLAYER", laid out as Armada II's Multiplayer Connection screen over the dimmed menu scene, shows a Name caption over a field reading the player's name, three wide buttons (the first reads Internet - Tunngle or Internet - GameSpy, then Internet - Manual IP and Local Area Network) and a Previous Menu button at the bottom left.
 9. Click at 800,366.
 10. Wait 1 second.
 11. Type "Zed".
