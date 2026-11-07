@@ -27,51 +27,52 @@ pointer where the bench aims from; the hovers, keys and clicks after it are the 
 5. Wait 1 second.
 6. Select the Federation construction ship (Mediterranean class) alone with a box selection, a small box dragged round that one ship only and never a click (a box is made with the drive step command, `a2test drive --session ID step "Drag from 300,590 to 385,695"`; hover a ship to read its class in the tooltip; the Starbase is the big station), then, as your last action, run the step "Move the mouse to 700,300" so that the pointer ends exactly there, and stop once UI.log's last "bar: grid" line ends with "Z=npc_tractorbeam".
 7. Expect "UI.log" contains "Q=build W=order E=form R=aiMenu A=repair S=stop D=transport Z=npc_tractorbeam".
-8. Expect "QOL.log" contains "bar: position keys on (the Refit bar is drawn)".
-9. Take a screenshot called "construction ship, the grid".
-10. Check that the bar is a grid of three rows of round buttons above the minimap, with key letters on the cells (Q, E, R, A, S, D, Z; none on the second cell of the top row), and the Tractor Beam's icon bottom left.
-11. Move the mouse to 46,598.
-12. Wait 1 second.
-13. Move the mouse to 49,601.
-14. Wait up to 10 seconds for "UI.log" to say "hover slot 7 Weapon npc_tractorbeam".
-15. Wait 2 seconds.
-16. Take a screenshot called "tractor beam hover".
-17. Check that a thin red circle is drawn on the map round the selected ship, that the Tractor Beam tooltip (400 Range) is drawn beside the pointer without a "Hotkey" note, and that the bottom-left cell is drawn lit.
-18. Move the mouse to 700,300.
-19. Wait 1 second.
-20. Move the mouse to 106,538.
-21. Wait 1 second.
-22. Move the mouse to 109,541.
-23. Wait up to 10 seconds for "UI.log" to say "hover slot 1 Command stop".
-24. Wait 2 seconds.
-25. Take a screenshot called "stop hover, no ring".
-26. Check that no red circle is drawn on the map.
-27. Move the mouse to 700,300.
-28. Wait 1 second.
-29. Press q.
-30. Wait up to 10 seconds for "QOL.log" to say "bar: key Q".
-31. Wait up to 10 seconds for "UI.log" to say "G=back".
-32. Expect "UI.log" contains "Q=fed_outpost".
-33. Wait 2 seconds.
-34. Take a screenshot called "build list by Q".
-35. Check that the grid shows the buildings' icons, some dimmed, a cancel button top right and a back arrow below it.
-36. Move the mouse to 284,538.
-37. Wait 1 second.
-38. Move the mouse to 287,541.
-39. Wait 1 second.
-40. Click at 287,541.
-41. Wait up to 10 seconds for "UI.log" to say "R=aiMenu A=repair S=stop D=transport Z=npc_tractorbeam".
-42. Move the mouse to 700,300.
-43. Wait 1 second.
-44. Press z.
-45. Wait up to 10 seconds for "QOL.log" to say "bar: key Z".
-46. Wait 1 second.
-47. Take a screenshot called "tractor beam by Z".
-48. Check that the pointer is the tractor beam's targeting cursor (a red circle with a stroke, near 700,300) rather than the ordinary arrow.
-49. Expect "UI.log" not contain "NOT FOUND".
-50. Expect "UI.log" not contain "PANIC".
-51. Expect "Display8.log" not contain "VUID".
-52. Expect "Display8.log" not contain "device removed".
-53. Quit the game.
-54. Expect the game to have exited.
-55. Expect no crash.
+8. Expect "UI.log" contains "carries its own tile".
+9. Expect "QOL.log" contains "bar: position keys on (the Refit bar is drawn)".
+10. Take a screenshot called "construction ship, the grid".
+11. Check that the bar is a grid of three rows above the minimap whose filled cells are Roots' own button tiles (a grey rounded tile with its picture, filling the cell, with no second plate around it), with key letters on the cells (Q, E, R, A, S, D, Z; none on the second cell of the top row), and the Tractor Beam's picture bottom left.
+12. Move the mouse to 46,598.
+13. Wait 1 second.
+14. Move the mouse to 49,601.
+15. Wait up to 10 seconds for "UI.log" to say "hover slot 7 Weapon npc_tractorbeam".
+16. Wait 2 seconds.
+17. Take a screenshot called "tractor beam hover".
+18. Check that a thin red circle is drawn on the map round the selected ship, that the Tractor Beam tooltip (400 Range) is drawn beside the pointer without a "Hotkey" note, and that the bottom-left tile is drawn lit (brighter, with a coloured edge).
+19. Move the mouse to 700,300.
+20. Wait 1 second.
+21. Move the mouse to 106,538.
+22. Wait 1 second.
+23. Move the mouse to 109,541.
+24. Wait up to 10 seconds for "UI.log" to say "hover slot 1 Command stop".
+25. Wait 2 seconds.
+26. Take a screenshot called "stop hover, no ring".
+27. Check that no red circle is drawn on the map.
+28. Move the mouse to 700,300.
+29. Wait 1 second.
+30. Press q.
+31. Wait up to 10 seconds for "QOL.log" to say "bar: key Q".
+32. Wait up to 10 seconds for "UI.log" to say "G=back".
+33. Expect "UI.log" contains "Q=fed_outpost".
+34. Wait 2 seconds.
+35. Take a screenshot called "build list by Q".
+36. Check that the grid shows the buildings' icons, some dimmed, a cancel button top right and a back arrow below it.
+37. Move the mouse to 284,538.
+38. Wait 1 second.
+39. Move the mouse to 287,541.
+40. Wait 1 second.
+41. Click at 287,541.
+42. Wait up to 10 seconds for "UI.log" to say "R=aiMenu A=repair S=stop D=transport Z=npc_tractorbeam".
+43. Move the mouse to 700,300.
+44. Wait 1 second.
+45. Press z.
+46. Wait up to 10 seconds for "QOL.log" to say "bar: key Z".
+47. Wait 1 second.
+48. Take a screenshot called "tractor beam by Z".
+49. Check that the pointer is the tractor beam's targeting cursor (a red circle with a stroke, near 700,300) rather than the ordinary arrow.
+50. Expect "UI.log" not contain "NOT FOUND".
+51. Expect "UI.log" not contain "PANIC".
+52. Expect "Display8.log" not contain "VUID".
+53. Expect "Display8.log" not contain "device removed".
+54. Quit the game.
+55. Expect the game to have exited.
+56. Expect no crash.
