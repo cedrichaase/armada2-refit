@@ -17,3 +17,9 @@ check = ""
 [[sym]]
 id = "info_fo_panel"
 value = 1
+
+# FleetOpsHook's technologyTreeArray (one tree per team, in its .bss), from its image's base: the
+# weapon icons' research state is read there (hud.info_fo).
+[[sym]]
+id = "info_fo_tech_trees"
+value = 0x24100c

@@ -66,13 +66,15 @@ pub fn rect() -> Option<R> {
 #[derive(Clone, Copy)]
 struct Frame {
     ours: R,
-    native: R,
     kx: f32,
     ky: f32,
     d: f32,
     /// (factor, the right-anchored elements' right edge in table units after the move).
     squeeze: Option<(f32, f32)>,
     aligned: bool,
+    /// Ours' horizontal scale against the panel's own (1: the same; below 1: Roots' panel is
+    /// stretched across a wide screen and ours keeps its proportions).
+    rx: f32,
 }
 
 impl Frame {
@@ -101,15 +103,17 @@ impl Frame {
     /// The same in the engine's canvas units, local to the panel's own origin (a child's
     /// rectangle, inclusive).
     fn canvas(&self, ui: &Ui, e: &Element, dx: f32, dy: f32) -> [i32; 4] {
+        // Where the pointer, mapped into the panel's own rectangle (`info_fo::set_pointer_map`),
+        // finds ours: ours' offset from its left, at the panel's own scale.
         let r = self.px(e, dx, dy);
-        let (cx, cy) = (CANVAS.0 / ui.w, CANVAS.1 / ui.h);
-        let l = libm::roundf((r.x - self.native.x) * cx) as i32;
-        let t = libm::roundf((r.y - self.native.y) * cy) as i32;
-        [l, t, (libm::roundf((r.right() - self.native.x) * cx) as i32 - 1).max(l), (libm::roundf((r.bottom() - self.native.y) * cy) as i32 - 1).max(t)]
+        let (cx, cy) = (CANVAS.0 / ui.w / self.rx, CANVAS.1 / ui.h);
+        let l = libm::roundf((r.x - self.ours.x) * cx) as i32;
+        let t = libm::roundf((r.y - self.ours.y) * cy) as i32;
+        [l, t, (libm::roundf((r.right() - self.ours.x) * cx) as i32 - 1).max(l), (libm::roundf((r.bottom() - self.ours.y) * cy) as i32 - 1).max(t)]
     }
     /// A child's own rectangle (canvas units, local to the panel's origin) in pixels on ours.
     fn child_px(&self, ui: &Ui, r: [i32; 4]) -> R {
-        let (sx, sy) = (ui.w / CANVAS.0, ui.h / CANVAS.1);
+        let (sx, sy) = (ui.w / CANVAS.0 * self.rx, ui.h / CANVAS.1);
         R::new(self.ours.x + r[0] as f32 * sx, self.ours.y + r[1] as f32 * sy, (r[2] - r[0] + 1) as f32 * sx, (r[3] - r[1] + 1) as f32 * sy)
     }
 }
@@ -195,6 +199,48 @@ fn text_colour(ui: &Ui, c: [f32; 3], or: Color) -> Color {
     if max <= 0.05 || min >= 0.95 { or } else { info::colour(c) }
 }
 
+/// A colour of three floats, 0..1, opaque.
+fn rgb(c: [f32; 3]) -> Color {
+    let b = |v: f32| (v.clamp(0.0, 1.0) * 255.0 + 0.5) as u32;
+    0xff000000 | b(c[0]) << 16 | b(c[1]) << 8 | b(c[2])
+}
+
+/// A sprite's part from the left, `f` of its width, stretched over the same part of `r`.
+fn sprite_part(ui: &mut Ui, sp: usize, r: R, f: f32, tint: Color) {
+    let Some((tex, uv)) = sprite::art(sp) else { return };
+    let f = f.clamp(0.0, 1.0);
+    if f <= 0.0 {
+        return;
+    }
+    let u1 = uv[0] + (uv[2] - uv[0]) * f;
+    ui.draw.image_uv(tex, R::new(r.x, r.y, r.w * f, r.h), [uv[0], uv[1], u1, uv[3]], tint);
+}
+
+/// One of FleetOpsHook's icons as its Render draws it (`info_fo::Look`): grey whole for a weapon
+/// not researched; else a backing copy in its dim colour and the icon in its colour filled from
+/// the left to the reload (or to the special energy it has of its cost). Roots fills a special
+/// weapon round like a clock; ours fills it from the left like the others.
+fn draw_icon(ui: &mut Ui, ic: &info_fo::Icon, r: R, fallback: Color) {
+    match ic.look {
+        None => {
+            sprite_over(ui, ic.sprite, r, fallback);
+        }
+        Some(l) if l.grey || l.fill >= 0.999 && l.backing.is_none() => {
+            sprite_over(ui, ic.sprite, r, rgb(l.colour));
+        }
+        Some(l) => {
+            if let Some(b) = l.backing {
+                sprite_over(ui, ic.sprite, r, rgb(b));
+            }
+            if l.fill >= 0.999 {
+                sprite_over(ui, ic.sprite, r, rgb(l.colour));
+            } else {
+                sprite_part(ui, ic.sprite, r, l.fill, rgb(l.colour));
+            }
+        }
+    }
+}
+
 /// A colour of the layout table for the HUD's race (`<key>.<race>`, the race's name without
 /// spaces), else `<key>`.
 fn race_tint(l: &InfoLayout, key: &str) -> Option<Color> {
@@ -211,7 +257,7 @@ fn race_tint(l: &InfoLayout, key: &str) -> Option<Color> {
 /// theme's accent), toward `bad` with the damage, `warn` on the flash while it is repaired.
 fn system_tint(ui: &Ui, l: &InfoLayout, st: &info::SystemState, flash: bool) -> Color {
     let t = &ui.theme;
-    let healthy = race_tint(l, "SystemTint").unwrap_or(mix(t.accent, 0xffffffff, 0.15));
+    let healthy = info_fo::system_icon_colour().map(rgb).or_else(|| race_tint(l, "SystemTint")).unwrap_or(mix(t.accent, 0xffffffff, 0.15));
     if st.repairing && flash {
         t.warn
     } else if st.repair_left > 0.01 {
@@ -229,6 +275,8 @@ pub fn run(ui: &mut Ui) {
         unsafe { RECT = None };
         return;
     }
+    // No map unless this frame sets one (ours shown away from the panel's own place).
+    info_fo::set_pointer_map(None);
     // A new mission's panel: the rectangles moved for the last one went with it.
     static mut PANEL: usize = 0;
     unsafe {
@@ -260,14 +308,29 @@ pub fn run(ui: &mut Ui) {
         return;
     }
     info_fo::log_children(panel);
-    let (kx, ky) = (plan.native.w / l.size[0], plan.native.h / l.size[1]);
+    // The table's units in pixels: Roots' own (`knx`, stretched across a wide screen), and ours,
+    // the same as its height's (the panel's own proportions, decision 458).
+    let (knx, ky) = (plan.native.w / l.size[0], plan.native.h / l.size[1]);
+    let kx = knx.min(ky);
     let min_w = l.min_width * kx;
     let ours = R::new(plan.info.x, plan.info.y, plan.info.w.max(min_w.min(ui.w - plan.info.x)), plan.info.h);
     let d = ours.w / kx - l.size[0];
     // Within a pixel of Roots' own width is Roots' own width (no move, no squeeze).
     let d = if d.abs() * kx < 1.5 { 0.0 } else { d };
-    let aligned = (ours.x - plan.native.x).abs() < 1.0 && (ours.y - plan.native.y).abs() < 1.0;
-    let fr = Frame { ours, native: plan.native, kx, ky, d, squeeze: squeeze(l, d), aligned };
+    let rx = kx / knx;
+    // The engine keeps the pointer over ours wherever ours is, with the pointer mapped into the
+    // panel's own rectangle while it simulates; without that map, only where ours is the panel's.
+    let same = (ours.x - plan.native.x).abs() < 1.0 && (ours.y - plan.native.y).abs() < 1.0 && (rx - 1.0).abs() < 1e-3;
+    let mapped = info_fo::pointer_map_available();
+    let aligned = same || mapped;
+    if mapped && !same {
+        let cw = CANVAS.0 / ui.w;
+        let r = 1.0 / rx;
+        info_fo::set_pointer_map(Some([cw * (plan.native.x - ours.x * r), r, 0.0, 1.0]));
+    } else {
+        info_fo::set_pointer_map(None);
+    }
+    let fr = Frame { ours, kx, ky, d, squeeze: squeeze(l, d), aligned, rx };
 
     // The frame: the theme's (with its lamps where Roots' panel has them), never a claimed panel
     // while the panel keeps the pointer.
@@ -352,8 +415,9 @@ fn single(ui: &mut Ui, l: &'static InfoLayout, fr: &Frame, obj: usize, builder: 
             }
         }
     }
-    // Roots tints its weapon icons with the race's `weaponIconColor` (`WeaponTint.<race>`).
-    let weapon_tint = race_tint(l, "WeaponTint").unwrap_or(0xffffffff);
+    // Roots tints its weapon icons with the race's `weaponIconColor` (the engine's, from the HUD
+    // race's gui_<race>.cfg; the table's `WeaponTint.<race>` where it cannot be read).
+    let weapon_tint = info_fo::weapon_icon_colour().map(rgb).or_else(|| race_tint(l, "WeaponTint")).unwrap_or(0xffffffff);
     if drew_image {
         for ic in weapons.iter().chain(buffs.iter()) {
             let r = fr.child_px(ui, ic.rect);
@@ -362,7 +426,7 @@ fn single(ui: &mut Ui, l: &'static InfoLayout, fr: &Frame, obj: usize, builder: 
                 ui.draw.stroke(r.inset(-ui.u(1.0)), Corners::round(r.w * 0.16), ui.u(1.5).max(1.0), t.accent);
                 note_hover(ic.comp, "weapon icon", ic.sprite);
             }
-            sprite_over(ui, ic.sprite, r, weapon_tint);
+            draw_icon(ui, ic, r, weapon_tint);
             if !fr.aligned && ui.input.mouse.is_some_and(|m| r.contains(m)) {
                 *tip = Tip::Comp(ic.comp, r);
             }
@@ -419,7 +483,7 @@ fn single(ui: &mut Ui, l: &'static InfoLayout, fr: &Frame, obj: usize, builder: 
     let mut sys_line = String::new();
     if craft {
         for i in 0..5 {
-            let Some((comp, sp, st, flash, present)) = info::repair_icon(obj, i) else { continue };
+            let Some((comp, sp, st, flash, present)) = info::repair_icon(obj, i, builder) else { continue };
             let Some(e) = el(l, &crate::sfmt!("System{}", i)) else { continue };
             let r = fr.px(e, 0.0, 0.0);
             let hot = info_fo::comp_hover(comp);
@@ -459,6 +523,9 @@ fn single(ui: &mut Ui, l: &'static InfoLayout, fr: &Frame, obj: usize, builder: 
             let (comp, plate) = info_fo::queue_slot(i);
             if fr.aligned && (fr.d != 0.0 || fr.squeeze.is_some()) {
                 info_fo::move_rect(comp, fr.canvas(ui, e, dx, 0.0));
+            } else if i == 0 {
+                // Ours at the panel's own width: the slots' own rectangles again.
+                info_fo::restore();
             }
             let hot = info_fo::comp_hover(comp) || (!fr.aligned && ui.input.mouse.is_some_and(|m| r.contains(m)));
             if plate == 0 || !sprite_over(ui, plate, r, if hot { 0xffffffff } else { 0xe0ffffff }) {

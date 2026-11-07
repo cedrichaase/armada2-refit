@@ -119,24 +119,55 @@ pub fn plan(ui: &Ui, bar_shown: bool) {
         unsafe { PLAN = None };
         return;
     };
-    let m = ui.u(10.0);
     let gap = ui.u(6.0);
-    let own_w = if cfg.info_width > 0.0 { ui.u(cfg.info_width) } else { native.w };
+    let l = &crate::content::get().info;
+    // Roots' own proportions: the panel scaled by its height alone. On a screen wider than the
+    // layout Roots picks (21:9 takes its 16:9 layout, stretched across), that is narrower than its
+    // own rectangle (decision 458).
+    let unstretched = if l.size[1] > 0.0 { native.h * l.size[0] / l.size[1] } else { native.w };
+    let own_w = if cfg.info_width > 0.0 { ui.u(cfg.info_width) } else { unstretched.min(native.w) };
     let stacked = Plan { info: R::new(native.x, native.y, own_w.min(ui.w - native.x), native.h), native, bar: None };
     let Some(order) = cfg.bottom_row.clone() else {
         unsafe { PLAN = Some(stacked) };
         return;
     };
     if !bar_shown {
+        // No bar: the panel unstretched and centred where it is narrower than its rectangle.
+        let info = if own_w + 1.0 < native.w { R::new(libm::roundf((ui.w - own_w) * 0.5), native.y, libm::roundf(own_w), native.h) } else { stacked.info };
+        unsafe { PLAN = Some(Plan { info, ..stacked }) };
+        return;
+    }
+    let mini = super::minimap_rect(ui);
+    // The minimap's margins from the screen's left and bottom edges: the grid in the corner keeps
+    // the same ones on the right (decision 459).
+    let (mx, my) = mini.map_or((0.0, 0.0), |r| (r[0].max(0.0), (ui.h - r[3]).max(0.0)));
+    if order.is_empty() {
+        // auto: (1) the corners: the minimap bottom left, the info panel centred, the grid as tall
+        // as the minimap in the bottom right corner, where none of them overlap (21:9 and wider);
+        // (2) the row: the info panel at its own place, the grid as tall as the panel in the bottom
+        // right corner (16:9, 16:10); (3) stacked (4:3, 5:4).
+        let mini_h = mini.map_or(native.h, |r| r[3] - r[1]);
+        let left = mini.map_or(0.0, |r| r[2]);
+        for (h, centred) in [(mini_h, true), (native.h, false)] {
+            let cs = if cfg.bar_cell_size > 0.0 { ui.u(cfg.bar_cell_size) } else { cell_for(ui, h) };
+            let (bw, bh) = bar_size(ui, cs);
+            let bar = R::new(libm::roundf(ui.w - mx - bw), libm::roundf(ui.h - my - bh), bw, bh);
+            let x = if centred { libm::roundf((ui.w - own_w) * 0.5) } else { native.x };
+            // The row keeps Roots' own place, right beside the minimap as Roots puts it.
+            let clear_left = if centred { x >= left + gap - 0.5 } else { x >= left - 1.0 };
+            if clear_left && x + own_w <= bar.x - gap + 0.5 {
+                let info = R::new(x, native.y, libm::roundf(own_w), native.h);
+                unsafe { PLAN = Some(Plan { info, native, bar: Some((bar, cs)) }) };
+                return;
+            }
+        }
         unsafe { PLAN = Some(stacked) };
         return;
     }
+    // An order: left to right along the bottom, the grid as tall as the info panel.
     let cs = if cfg.bar_cell_size > 0.0 { ui.u(cfg.bar_cell_size) } else { cell_for(ui, native.h) };
     let (bw, bh) = bar_size(ui, cs);
-    let auto = order.is_empty();
-    let order = if auto { alloc::vec![Part::Minimap, Part::Info, Part::Bar] } else { order };
-    // The minimap's right edge (it keeps its own place); its left edge when it comes last.
-    let mini = super::minimap_rect(ui);
+    let m = mx;
     let mut x = 0.0f32;
     let mut info_x = native.x;
     let mut bar_x = 0.0;
@@ -151,20 +182,8 @@ pub fn plan(ui: &Ui, bar_shown: bool) {
                 }
             }
             Part::Info => {
-                // Right after the minimap the info panel keeps its own left edge (Roots' place).
-                info_x = if i > 0 && mi == Some(i - 1) { native.x.max(x) } else if i == 0 { native.x.min(m) } else { x + gap };
-                // The room up to the next part (the bar after it, or the minimap at the end).
-                let mut right = ui.w;
-                if bi > ii {
-                    right -= bw + gap;
-                }
-                if let (Some(j), Some(r)) = (mi, mini) {
-                    if j > ii {
-                        right = right.min(r[0] - gap);
-                    }
-                }
-                let w = own_w.min(right - info_x).max(0.0);
-                x = info_x + w;
+                info_x = if i > 0 && mi == Some(i - 1) { native.x.max(x) } else if i == 0 { m } else { x + gap };
+                x = info_x;
             }
             Part::Bar => {
                 bar_x = if i == 0 { m } else { x + gap };
@@ -172,21 +191,14 @@ pub fn plan(ui: &Ui, bar_shown: bool) {
             }
         }
     }
-    let room_right = if bi > ii { ui.w - bw - gap } else { mini.filter(|_| mi.is_some_and(|j| j > ii)).map_or(ui.w, |r| r[0] - gap) };
+    let room_right = if bi > ii { ui.w - mx - bw - gap } else { mini.filter(|_| mi.is_some_and(|j| j > ii)).map_or(ui.w, |r| r[0] - gap) };
     let info_w = own_w.min(room_right - info_x).max(0.0);
-    // Auto: the row only where the info panel keeps its own width beside the bar.
-    if auto && (info_w + 0.5 < own_w || bh > native.h + 1.0) {
-        unsafe { PLAN = Some(stacked) };
-        return;
-    }
-    // The bar after the info panel sits right after it.
+    // The grid after the info panel sits in the bottom right corner.
     if bi > ii {
-        bar_x = info_x + info_w + gap;
+        bar_x = ui.w - mx - bw;
     }
-    let bar = R::new(libm::roundf(bar_x), native.bottom() - bh, bw, bh);
-    unsafe {
-        PLAN = Some(Plan { info: R::new(libm::roundf(info_x), native.y, libm::roundf(info_w), native.h), native, bar: Some((bar, cs)) })
-    };
+    let bar = R::new(libm::roundf(bar_x), libm::roundf(ui.h - my - bh), bw, bh);
+    unsafe { PLAN = Some(Plan { info: R::new(libm::roundf(info_x), native.y, libm::roundf(info_w), native.h), native, bar: Some((bar, cs)) }) };
 }
 
 /// The bar's place and cell when it is in the row this frame.

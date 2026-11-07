@@ -4,7 +4,7 @@ Resolutions: 1280x960
 Mod: refit
 Layers: display asiloader render3d ui
 Launch: -nointro save\ia-fed-kli.sav
-Setup: testbench/bench/roots-save.sh ia-fed-kli display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh --scene game HUD.Info=1
+Setup: testbench/bench/roots-save.sh ia-fed-kli display/bench-mode.sh stub Backend=vulkan OneWindow=0 ui/bench-asi.sh --scene game HUD.Info=1
 Overlay: UI.HUD:Info=1 UI.HUD:Tooltips=1 UI.HUD:BottomRow=stacked
 Timeout: 14 min
 
@@ -29,50 +29,52 @@ the corner first, where the bench and the game agree on it (no menu was walked).
 8. Wait up to 10 seconds for "UI.log" to say "info: Roots' panel ours: Single".
 9. Wait 2 seconds.
 10. Take a screenshot called "one ship".
-11. Expect "UI.log" contains "info: Roots' panel 0x".
-12. Check that the bottom panel spans from the minimap to the right edge in a metal frame with blue lamps at both ends, and shows the ship's name at the top left, a crew figure with a number, a green bar above a blue bar at the bottom left, a top view of the ship in the middle with four small purple square icons on it, and a block of six blue square icons to its right.
-13. Move the mouse to 635,900.
-14. Wait 1 second.
-15. Move the mouse to 637,902.
-16. Wait up to 10 seconds for "UI.log" to say "info: the engine's hover on Roots' weapon icon".
-17. Wait 2 seconds.
-18. Take a screenshot called "weapon icon hover, the ring".
-19. Check that a thin red circle is drawn on the map round the selected ship, and a weapon's tooltip (its name, DPS and range) is shown.
-20. Move the mouse to 718,871.
-21. Wait 1 second.
-22. Move the mouse to 720,873.
-23. Wait up to 10 seconds for "UI.log" to say "info: the engine's hover on Roots' system 0 (sensors)".
-24. Wait 2 seconds.
-25. Take a screenshot called "sensors hover, the ring".
-26. Check that a thin green circle is drawn on the map round the selected ship, and a tooltip about the sensors is shown.
-27. Move the mouse to 640,150.
-28. Wait 1 second.
-29. Select the ships of class "Mediterranean" owned by the player.
-30. Wait up to 10 seconds for "UI.log" to say "info: Roots' panel ours: Group of 2".
-31. Wait 2 seconds.
-32. Take a screenshot called "two ships".
-33. Check that the bottom panel shows two small ship pictures side by side at its left, each with a name under it and two thin bars.
-34. Select the station of class "Starbase" owned by the player.
-35. Wait up to 10 seconds for "UI.log" to say "info: Roots' panel ours: Builder".
-36. Wait 2 seconds.
-37. Take a screenshot called "starbase".
-38. Check that the bottom panel shows the station's picture with purple icons on it, a grey icon among the blue system icons, and at the right a row of ten numbered slots, the first larger, over a long empty bar.
-39. Center the camera on the station of class "Starbase" owned by the player.
-40. Move the mouse to 640,520.
-41. Wait 1 second.
-42. Move the mouse to 643,523.
-43. Wait 2 seconds.
-44. Take a screenshot called "pointer over the station".
-45. Check that a status line about the station under the pointer (its name or class with its shields and hull figures, in Fleet Operations' own small text) is drawn near the top centre of the screen.
-46. Overlay UI.HUD:Info=0.
-47. Wait up to 10 seconds for "UI.log" to say "info: Roots' own".
-48. Move the mouse to 640,150.
-49. Wait 2 seconds.
-50. Take a screenshot called "starbase, Roots' own".
-51. Check that the bottom panel is Fleet Operations' own (its own frame art), with the station's picture, icons and ten slots.
-52. Expect "UI.log" not contain "PANIC".
-53. Expect "Display8.log" not contain "VUID".
-54. Expect "Display8.log" not contain "device removed".
-55. Quit the game.
-56. Expect the game to have exited.
-57. Expect no crash.
+11. Scene "camera 2752 6500 14500 2752 0 17628".
+12. Expect "UI.log" contains "info: Roots' panel 0x".
+13. Check that the bottom panel spans from the minimap to the right edge in a metal frame with blue lamps at both ends, and shows the ship's name at the top left, a crew figure with a number, a green bar above a blue bar at the bottom left, a top view of the ship in the middle with four small purple square icons on it, and a block of six blue square icons to its right.
+14. Move the mouse to 635,900.
+15. Wait 1 second.
+16. Move the mouse to 637,902.
+17. Wait up to 10 seconds for "UI.log" to say "info: the engine's hover on Roots' weapon icon".
+18. Wait 2 seconds.
+19. Take a screenshot called "weapon icon hover, the ring".
+20. Check that a thin red circle is drawn on the map round the selected ship, and a weapon's tooltip (its name, DPS and range) is shown.
+21. Move the mouse to 718,871.
+22. Wait 1 second.
+23. Move the mouse to 720,873.
+24. Wait up to 10 seconds for "UI.log" to say "info: the engine's hover on Roots' system 0 (sensors)".
+25. Wait 2 seconds.
+26. Take a screenshot called "sensors hover, the ring".
+27. Check that a thin green circle is drawn on the map round the selected ship, and a tooltip about the sensors is shown.
+28. Move the mouse to 640,150.
+29. Wait 1 second.
+30. Scene "camera rts".
+31. Select the ships of class "Mediterranean" owned by the player.
+32. Wait up to 10 seconds for "UI.log" to say "info: Roots' panel ours: Group of 2".
+33. Wait 2 seconds.
+34. Take a screenshot called "two ships".
+35. Check that the bottom panel shows two small ship pictures side by side at its left, each with a name under it and two thin bars.
+36. Select the station of class "Starbase" owned by the player.
+37. Wait up to 10 seconds for "UI.log" to say "info: Roots' panel ours: Builder".
+38. Wait 2 seconds.
+39. Take a screenshot called "starbase".
+40. Check that the bottom panel shows the station's picture with purple icons on it, a grey icon among the blue system icons, and at the right a row of ten numbered slots, the first larger, over a long empty bar.
+41. Center the camera on the station of class "Starbase" owned by the player.
+42. Move the mouse to 640,520.
+43. Wait 1 second.
+44. Move the mouse to 643,523.
+45. Wait 2 seconds.
+46. Take a screenshot called "pointer over the station".
+47. Check that a status line about the station under the pointer (its name or class with its shields and hull figures, in Fleet Operations' own small text) is drawn near the top centre of the screen.
+48. Overlay UI.HUD:Info=0.
+49. Wait up to 10 seconds for "UI.log" to say "info: Roots' own".
+50. Move the mouse to 640,150.
+51. Wait 2 seconds.
+52. Take a screenshot called "starbase, Roots' own".
+53. Check that the bottom panel is Fleet Operations' own (its own frame art), with the station's picture, icons and ten slots.
+54. Expect "UI.log" not contain "PANIC".
+55. Expect "Display8.log" not contain "VUID".
+56. Expect "Display8.log" not contain "device removed".
+57. Quit the game.
+58. Expect the game to have exited.
+59. Expect no crash.
