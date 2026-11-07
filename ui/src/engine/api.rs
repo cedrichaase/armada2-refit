@@ -196,6 +196,10 @@ pub mod sound {
     pub use crate::engine::sound::{click, functions_stock, rollover, shell_click, shell_hover, shell_named};
 }
 
+pub mod fontglyph {
+    pub use crate::engine::fontglyph::glyph;
+}
+
 pub mod sprite {
     pub use crate::engine::sprite::{art, name, own_tile};
 }

@@ -1997,3 +1997,14 @@ Still open:
 
 6. **The submods**: whether "Fleet Ops 4.0" and the classic mods (their own executables)
    are wanted at all (not by default: decision 9).
+
+### The resources panel in the corner, with Roots' icons (decisions 520–529)
+
+The user's request of 2026-11-07, for Roots only: "move the resources panel all the way to the
+top left in fo: roots. also, let's add the roots' icons for each resource instead of the generic
+lines next to each resource" (branch `fo-resources-panel`).
+
+| # | Decision | Why | What would change it |
+|---|---|---|---|
+| 520 | **On Roots the strip sits flush in the top left corner** of the screen, the panels' edge margin in (`[Resources] Placement = corner`, `ui/content/sets/fleetops/ui.ini`; `hud/resources.rs` `place`). Decision 153's `component` stays as a value of the key but the set no longer uses it: it put the strip at the game's own panel rectangle, about 80 px in from the left at 1280x960. Armada II's set has no `Placement`: top centre as before | the user's "all the way to the top left"; a content-set value, not a literal | the user's look |
+| 521 | **A resource's mark is Roots' own icon**, the glyph its bitmap font draws for it (decision 342 left this for "the user asking for Roots' resource glyphs"): `[Files] IconFont = FontFinal4_16.spr` names the font, `engine/fontglyph.rs` reads its `.spr` (the `_uv` and `_w` strips, one entry per code from 0x20, in the file's reference size; the `page` line's texture and glyph height; the glyph's y is its top) and cuts the picture out of `textures\all_interface_font20` in Roots' install at run time; `[ResourceIcons]` maps the name Roots' string table gives the resource (the panel's own name, else the set's) to the code `[Glyphs]` already names (Dilithium 0x85, Tritanium 0x86, Supply 0x87, Crew 0x89, Connection Nodes 0x99). Nothing of Roots' art is copied. A resource with no icon in the set, or a missing file, keeps the coloured bar | `FontFinal4_16` is the tier whose texture is 1:1 with its reference size (1024x256) and holds the largest pictures (25x23 px); `FontMedium.spr`'s x coordinates do not match its texture (its icons sit at 1.5 times its reference scale beside letters at 1.75) and `FontFinal4_13` and `_10` are smaller. The race's icon: Roots' pictures are the same for every race, but the name is the race's (Biomatter for the Species 8472), so the table follows the race | **0x8c, Biomatter, is a stub in `FontFinal4_10`, `_13` and `_16`** (the entry points at a letter, "oe"; the purple picture is in the texture but no code of those fonts names it), so the Species 8472's strip keeps its bar until Roots' own drawing of it is seen | the user's look; another Roots font file |

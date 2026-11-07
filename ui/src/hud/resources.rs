@@ -2,8 +2,10 @@
 //! top of the screen with one cell per resource the player's race has (those the
 //! race's GUI config keeps), in the order `ORDER` gives (the materials first, then the
 //! people), each its name, its amount as stock writes it (officers
-//! as "have/most"), a mark in the stock panel's colour for it, and the game's tooltip.
-use crate::engine::api::topbar;
+//! as "have/most"), a mark for it (the game's own icon where the content set names its font
+//! and the resource's picture is there, else a bar in the stock panel's colour), and the
+//! game's tooltip.
+use crate::engine::api::{fontglyph, topbar};
 use crate::gfx::{fade, Corners, Weight, R};
 use crate::widgets::{theme, Align, Anchor, Ui};
 use alloc::string::String;
@@ -114,18 +116,30 @@ pub fn run(ui: &mut Ui) {
     let (cell_w, h, gap) = (ui.u(150.0), ui.u(46.0), ui.u(6.0));
     let w = shown.len() as f32 * cell_w + (shown.len() - 1) as f32 * gap;
     let (outer, inner) = place(ui, w, h);
-    let at_left = crate::content::get().resources_at_component && outer.x < ui.w * 0.25;
+    let at_left = crate::content::get().resources_placement != crate::content::ResourcePlacement::Top && outer.x < ui.w * 0.25;
     unsafe { LEFT_STRIP = if at_left { Some((outer, crate::rt::now())) } else { None } };
     // Lamps in the frame (Starfleet): the user wants them on the resource strip.
     ui.panel_lit(outer);
     for (i, &(r, _)) in shown.iter().enumerate() {
         let cell = R::new(inner.x + i as f32 * (cell_w + gap), inner.y, cell_w, inner.h);
-        // The mark: a short bar in the stock panel's colour for this resource.
-        let mark = R::new(cell.x, cell.y + cell.h * 0.18, ui.u(4.0), cell.h * 0.64);
-        ui.draw.fill(mark, Corners::round(ui.u(2.0)), topbar::colour(r));
+        // The mark: the game's icon for this resource, or a short bar in the stock panel's
+        // colour for it.
+        let name = names.get(i).map_or("", |n| n.1.as_str());
+        let mark = match icon(r, name) {
+            Some((tex, uv, aspect)) => {
+                let ih = cell.h * 0.62;
+                let m = R::new(cell.x, cell.y + (cell.h - ih) * 0.5, ih * aspect, ih);
+                ui.draw.image_uv(tex, m, uv, 0xffffffff);
+                m
+            }
+            None => {
+                let m = R::new(cell.x, cell.y + cell.h * 0.18, ui.u(4.0), cell.h * 0.64);
+                ui.draw.fill(m, Corners::round(ui.u(2.0)), topbar::colour(r));
+                m
+            }
+        };
         let text_x = mark.right() + ui.u(8.0);
         let label = R::new(text_x, cell.y, cell.right() - text_x, cell.h * 0.42);
-        let name = names.get(i).map_or("", |n| n.1.as_str());
         ui.text_in(label, &theme::caps(name), t.micro_size, Align::Left, t.text_dim, Weight::Regular);
         let value = R::new(text_x, cell.y + cell.h * 0.38, cell.right() - text_x, cell.h * 0.62);
         ui.text_in(value, &topbar::amount_text(r), t.heading_size, Align::Left, t.text, Weight::Bold);
@@ -142,13 +156,29 @@ pub fn run(ui: &mut Ui) {
     }
 }
 
+/// The picture the game's font draws for resource `r`, named `name` by the game's table
+/// (else by the set's), by the content set's `[ResourceIcons]`; None when the set has none
+/// for it or the font's picture is not there.
+fn icon(r: u32, name: &str) -> Option<(crate::gfx::Tex, [f32; 4], f32)> {
+    let c = crate::content::get();
+    let find = |n: &str| c.resource_icons.iter().find(|(k, _)| k.eq_ignore_ascii_case(n.trim())).map(|&(_, code)| code);
+    let code = find(name).or_else(|| find(c.resource(r as usize)))?;
+    fontglyph::glyph(code)
+}
+
 /// The strip's rectangle and its content's. At the top centre of the screen, as the stock
-/// panel is, unless the content set says the game's own resource panel has a place
-/// (`[Resources] Placement = component`): then its top left corner, which is where that
-/// game draws its resources, the top centre being its command and message area.
+/// panel is, unless the content set says otherwise (`[Resources] Placement`): `corner`, flush in
+/// the top left corner of the screen (Fleet Operations: Roots draws its command and message
+/// area at the top centre), or `component`, its top left corner over the game's own resource
+/// panel's rectangle.
 fn place(ui: &Ui, w: f32, h: f32) -> (R, R) {
     use crate::engine::api::hud;
-    if crate::content::get().resources_at_component {
+    use crate::content::ResourcePlacement::*;
+    let placement = crate::content::get().resources_placement;
+    if placement == Corner {
+        return super::panels::fit(ui, Anchor::TopLeft, w, h, ui.u(6.0));
+    }
+    if placement == Component {
         if let Some(p) = hud::panel_rect(topbar::resource_panel(), ui.w, ui.h) {
             let (outer, inner) = super::panels::fit(ui, Anchor::TopLeft, w, h, 0.0);
             let (dx, dy) = (p[0] - outer.x, p[1] - outer.y);

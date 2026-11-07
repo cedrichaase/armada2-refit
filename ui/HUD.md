@@ -1113,9 +1113,13 @@ same. The colour of each is `ResourceComponent::s_ResourceColor[r]` (a `ST3D_Col
 each, from the GUI config), drawn as a mark beside it; its name and tooltip are the
 component's own `GetTooltip` (vtable `+0x00`, the verbose one `+0x04`), whose first
 line is the localised name. A strip at the top centre of the screen, or, where the content
-set says `[Resources] Placement = component` (the `fleetops` set), at the top left corner of
-the game's own `ResourcePanel` rectangle: Fleet Operations: Roots draws its resources there
-and its command, message and build areas at the top centre.
+set says `[Resources] Placement = corner` (the `fleetops` set), flush in the top left corner
+of the screen (`component` puts it at the top left of the game's own `ResourcePanel`
+rectangle): Fleet Operations: Roots draws its command, message and build areas at the top
+centre. Its mark for each resource is the game's own icon where the set has one
+(`[ResourceIcons]`, `[Files] IconFont`: the glyph Roots' bitmap font draws for it, read by
+`engine/fontglyph.rs` from the install at run time; PLAN-FLEETOPS.md, decisions 520 and 521), else
+the bar in the stock panel's colour.
 
 On Roots the short tooltip is a single icon glyph (a control character), so the name is read
 from the long one (`+0x04`: "Tritanium: <glyph>" and a sentence, from the game's string table,

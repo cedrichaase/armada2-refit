@@ -16,6 +16,7 @@ pub mod dev8;
 pub mod device;
 pub mod dialogs;
 pub mod fodialogs;
+pub mod fontglyph;
 pub mod forms;
 pub mod forms_props;
 pub use crate::rt::hook;

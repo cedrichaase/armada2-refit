@@ -69,6 +69,17 @@ pub struct Files {
     /// after the race's own when a sprite's art is read from its `.spr` line
     /// (`engine::sprite::spr_entry`); "" for none.
     pub gui_sprites: &'static str,
+    /// The `.spr` of the bitmap font whose pictures the resource icons are (`Sprites\<file>`,
+    /// its page's texture read from `textures\`); "" for none (`engine::fontglyph`).
+    pub icon_font: &'static str,
+}
+
+/// Where the resources panel sits.
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum ResourcePlacement {
+    Top,
+    Component,
+    Corner,
 }
 
 #[derive(Debug, PartialEq)]
@@ -76,10 +87,15 @@ pub struct Content {
     pub races: &'static [RaceNames],
     /// `eResource`, as `g_eResourceToString` names them.
     pub resources: &'static [&'static str],
-    /// Where the resources panel sits: false at the top centre of the screen (stock), true
-    /// over the game's own resource panel's rectangle (`[Resources] Placement = component`,
-    /// Fleet Operations: Roots, whose HUD fills the top centre).
-    pub resources_at_component: bool,
+    /// Where the resources panel sits (`[Resources] Placement`): at the top centre of the
+    /// screen (stock), over the game's own resource panel's rectangle (`component`), or
+    /// flush in the top left corner (`corner`: Fleet Operations: Roots, whose HUD fills the
+    /// top centre).
+    pub resources_placement: ResourcePlacement,
+    /// `[ResourceIcons]`: a resource's name (as the game's table gives it, lower case) = the
+    /// code of the picture its font draws for it (hex), as `[Glyphs]` names it; a resource
+    /// not listed keeps the panel's coloured bar.
+    pub resource_icons: &'static [(&'static str, u8)],
     pub campaigns: &'static [Campaign],
     /// The views of render3d's map the credits tour.
     pub tour: &'static [&'static CStr],
@@ -102,12 +118,13 @@ pub struct Content {
 pub static NONE: Content = Content {
     races: &[],
     resources: &[],
-    resources_at_component: false,
+    resources_placement: ResourcePlacement::Top,
+    resource_icons: &[],
     campaigns: &[],
     tour: &[],
     main_scene: None,
     first_campaign_scene: None,
-    files: Files { race_icons: "", credits: "", credits_logos: "", cursor_sprites: "", menu_title: "", gui_sprites: "" },
+    files: Files { race_icons: "", credits: "", credits_logos: "", cursor_sprites: "", menu_title: "", gui_sprites: "", icon_font: "" },
     gallery_ships: &[],
     gallery_factions: &[],
     glyphs: &[],
@@ -169,7 +186,17 @@ pub fn parse(text: &'static str) -> Content {
     Content {
         races: races.leak(),
         resources: t.list("Resources", "Names").leak(),
-        resources_at_component: t.str("Resources", "Placement").trim() == "component",
+        resources_placement: match t.str("Resources", "Placement").trim() {
+            "component" => ResourcePlacement::Component,
+            "corner" => ResourcePlacement::Corner,
+            _ => ResourcePlacement::Top,
+        },
+        resource_icons: t
+            .entries("ResourceIcons")
+            .iter()
+            .filter_map(|&(k, v)| u8::from_str_radix(v.trim(), 16).ok().map(|b| (k.trim(), b)))
+            .collect::<Vec<_>>()
+            .leak(),
         campaigns: campaigns.leak(),
         tour: t.list("Scenes", "Tour").iter().map(|s| cstr(s)).collect::<Vec<_>>().leak(),
         main_scene: scene(t.str("Scenes", "Main")),
@@ -181,6 +208,7 @@ pub fn parse(text: &'static str) -> Content {
             cursor_sprites: t.str("Files", "CursorSprites"),
             menu_title: t.str("Files", "MenuTitle"),
             gui_sprites: t.str("Files", "GuiSprites"),
+            icon_font: t.str("Files", "IconFont"),
         },
         gallery_ships: t.list("Gallery", "Ships").leak(),
         gallery_factions: t.list("Gallery", "Factions").leak(),
