@@ -62,8 +62,17 @@ impl<'a> Ui<'a> {
                     *sel = Some(i);
                     ev = ListEvent::Changed;
                 }
-                if input.double[0] {
+                // The window's double click, or a second press on the same row soon after
+                // the first (a window without double clicks, Roots' device window under a
+                // form, gives two plain downs).
+                let now = self.time() as f32;
+                let st = self.slot(id);
+                let again = st[2] == (i + 1) as f32 && now - st[1] < 0.45;
+                st[1] = now;
+                st[2] = (i + 1) as f32;
+                if input.double[0] || again {
                     ev = ListEvent::Activated;
+                    st[2] = 0.0;
                 }
             }
         }

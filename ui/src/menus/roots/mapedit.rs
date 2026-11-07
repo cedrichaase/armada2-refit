@@ -25,7 +25,7 @@ pub(super) fn draw(ui: &mut Ui, f: &Form) -> bool {
     let side = ui.u(260.0);
     let list_r = R::new(body.x, top, body.w - side - ui.u(24.0), ui.u(list_h));
     let edit = kit::shown(f, "buttonEditMap");
-    mapselect::list(ui, f, g, grid, list_r, &COLUMNS, edit, false);
+    let _ = mapselect::list(ui, f, g, grid, list_r, &COLUMNS, edit, false);
 
     // The selected map: its preview and the name Roots shows under it.
     let x = list_r.right() + ui.u(24.0);

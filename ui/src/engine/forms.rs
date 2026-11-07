@@ -61,6 +61,8 @@ const TAKEN: &[&str] = &[
     "TAdvSettingsForm",
     "TMapEditForm",
     "TMapEditCreateForm",
+    "TMapSaveForm",
+    "TMessageForm",
 ];
 
 const WH_CBT: i32 = 5;
@@ -209,6 +211,8 @@ pub struct Form {
     pub origin: (i32, i32),
     pub size: (i32, i32),
     pub controls: Vec<Control>,
+    /// The window's caption (a VCL message box's title: "Warning", "Confirm").
+    pub caption: String,
     /// Whether this is the modal form now (the others are under it, drawn inert).
     pub top: bool,
     /// Whether this form opened over a mission (the in-mission menu).
@@ -314,6 +318,8 @@ static mut CBT: HANDLE = core::ptr::null_mut();
 static mut TIMER: usize = 0;
 static mut TRACKED: Vec<Tracked> = Vec::new();
 static mut VISITS: Vec<(String, u32)> = Vec::new();
+/// The classes `activated` saw over the forms and does not take, each logged once.
+static mut UNTAKEN: Vec<String> = Vec::new();
 static mut FO: (usize, usize) = (0, 0);
 static mut PROP: String = String::new();
 static mut TICKS: u32 = 0;
@@ -436,6 +442,15 @@ pub fn act(a: Action) {
 /// A press of ours on a control.
 pub fn press(form: &Form, c: &Control) {
     crate::log!("forms: press on {} ({:?}) of {}", c.name, c.text, form.class);
+    if c.hwnd != 0 {
+        // A windowed button (the VCL's `TButton`, on the map editor's Save Map form) is a
+        // window of its own: the press goes to it, down and up at its centre, as a
+        // player's click would reach it. A graphic button has no window; the form finds it.
+        let (x, y) = (c.rect[0] + c.rect[2] / 2, c.rect[1] + c.rect[3] / 2);
+        act(Action::Mouse(form.hwnd, MOUSE_DOWN, MOUSE_HELD, x, y));
+        act(Action::Mouse(form.hwnd, MOUSE_UP, 0, x, y));
+        return;
+    }
     act(Action::Press(form.hwnd, c.rect));
 }
 
@@ -697,6 +712,16 @@ fn activated(h: HWND) {
     let class = class_of(h);
     let dialog = class == "#32770";
     if !TAKEN.contains(&class.as_str()) && !dialog {
+        // A window that activates over the forms and is not one of them (nor the device
+        // window, `TMainWindowForm`, which a click on our frame activates) stands on the
+        // screen as a window of its own: named once per class, for the next one to take.
+        if !tracked().is_empty() && class != "TMainWindowForm" {
+            let seen = unsafe { &mut *core::ptr::addr_of_mut!(UNTAKEN) };
+            if !seen.contains(&class) {
+                crate::log!("forms: {} {:p} activated over the forms: not one the forms take", class, h);
+                seen.push(class);
+            }
+        }
         return;
     }
     let visits = unsafe { &mut *core::ptr::addr_of_mut!(VISITS) };
@@ -1127,6 +1152,8 @@ fn controls(obj: usize) -> Vec<Control> {
         if hwnd != 0 && unsafe { IsWindow(hwnd as HWND) } != 0 {
             match kind {
                 Kind::Edit => text = window_text(hwnd as HWND),
+                // A windowed button keeps its caption in its window, not the VCL's field.
+                Kind::Other if text.is_empty() && derives(vmt, "TButtonControl") => text = window_text(hwnd as HWND),
                 Kind::Combo => (items, selected) = combo_items(hwnd as HWND),
                 _ => {}
             }
@@ -1381,7 +1408,10 @@ unsafe extern "system" fn tick(_h: HWND, _m: u32, _id: usize, _t: u32) {
         t.hidden = true;
         hide(t.hwnd);
         log_controls(t, &ctl);
-        crate::log!("forms: {} is ours: moved off screen, active {:p}, focus {:p}", t.class, unsafe { GetActiveWindow() }, unsafe { GetFocus() });
+        crate::log!(
+            "forms: {} is ours: moved off screen, active {:p}, focus {:p}, owner {}",
+            t.class, unsafe { GetActiveWindow() }, unsafe { GetFocus() }, class_of(unsafe { GetWindow(t.hwnd, GW_OWNER) })
+        );
     }
     keep_off(t.hwnd);
     poll_button(t.hwnd);
@@ -1421,6 +1451,7 @@ fn publish(v: &[Tracked], live: Option<usize>) {
             origin: t.origin,
             size: t.size,
             controls: t.last.clone(),
+            caption: window_text(t.hwnd),
             top: Some(i) == live,
             in_mission: t.in_mission,
             z: 2 * i,
@@ -1578,11 +1609,26 @@ static mut BUTTON: bool = false;
 fn poll_button(top: HWND) {
     let down = unsafe { GetAsyncKeyState(1) } as u16 & 0x8000 != 0;
     let was = unsafe { core::mem::replace(&mut BUTTON, down) };
-    let dev = device_window(unsafe { GetWindow(top, GW_OWNER) });
+    let dev = device_under(top);
     if dev.is_null() || unsafe { IsWindowEnabled(dev) } != 0 || down == was {
         return;
     }
     crate::input::note_message(if down { WM_LBUTTONDOWN } else { WM_LBUTTONUP }, if down { MK_LBUTTON } else { 0 });
+}
+
+/// The device window under the top form: its owner's, or, for a form whose owner is not
+/// the device window (the VCL's message box, owned by the library's own window over the map
+/// editor's Save Map form), the first form under it that has one.
+fn device_under(top: HWND) -> HWND {
+    let mut owners = alloc::vec![unsafe { GetWindow(top, GW_OWNER) }];
+    owners.extend(tracked().iter().rev().map(|t| unsafe { GetWindow(t.hwnd, GW_OWNER) }));
+    for o in owners {
+        let d = device_window(o);
+        if !d.is_null() && class_of(d) == "TMainWindowForm" {
+            return d;
+        }
+    }
+    core::ptr::null_mut()
 }
 
 /// The keys of a prompt, Enter and Escape: the form holds the keyboard focus, so a key goes

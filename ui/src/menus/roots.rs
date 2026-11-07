@@ -16,6 +16,8 @@ mod advanced;
 mod advsettings;
 mod mapedit;
 mod mapeditcreate;
+mod mapsave;
+mod msgdlg;
 mod graphics;
 mod kit;
 mod mapselect;

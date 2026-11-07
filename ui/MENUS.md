@@ -1251,6 +1251,49 @@ field is empty; decision 280). Edit Map ends, on Roots as for a player, in the e
 dialog. Advanced Settings has a spec that nothing on Roots 5.0Z11 opens (decision 281), so it is
 unbenched. Tunngle's wait is the one form left to Roots.
 
+### The map editor's Load Map and Save Map (`TMapSaveForm`, `TMessageForm`)
+
+PLAN-FLEETOPS.md, decisions 620 to 629; `menus/roots/mapsave.rs` and `menus/roots/msgdlg.rs`.
+The editor's Options menu (`TOptionsMenuForm`, its captions Load Map... and Save Map...) ends
+in the engine's `MissionDialog::GetLoadName` and `GetSaveName`, which on Roots are
+FleetOpsHook's replacements (`MissionDialog_GetLoadName_New`, `MissionDialog_GetSaveName_New`
+in its map). Each makes a VCL form of its own, `TMapSaveForm` (a pop-up owned by the device
+window, 586x360), shows it modally on the game thread and hands the file name it confirmed
+back to the engine; the mission's loop waits inside that call, so the forms' timer is the
+only thing that presents, as for every form. One form serves both: Save shows a text field
+(`edtSaveName`) and a confirm reading "Save"; Load hides the field and its confirm reads
+"Open". Its controls: a NextSuite grid of the map files (`grdMaps`, two columns, Filename and
+Location; a map the player saved lies in `settings_saves_logs\bzn` and its location reads
+`userdir:bzn`), the label, and two windowed VCL buttons, the confirm (the form's default
+button: Enter) and Cancel (its cancel button: Escape). Before Save overwrites a map, FleetOpsHook asks
+through a task dialog unit that, under Wine, falls back to the VCL's `MessageDlg`: a
+`TMessageForm` titled "Warning", the question in its `Message` label and two windowed
+buttons, Yes and No, owned by the library's own window rather than the device window.
+
+Both are forms of `TAKEN` and need no hook of their own. `TMapSaveForm` is drawn as a dialog
+of ours over the editor: the grid's rows as our list (Map Select's `list`, the rows read from
+the grid's memory), our field over Roots' text field (Save) or the chosen row's name (Load),
+and Roots' two buttons; a click on a row is the grid's row clicked, so Roots' handler fills
+the field, and a double click (or two presses on one row within 0.45 s, as the device window
+under a form gives no double click) is the confirm. `TMessageForm` is Armada II's message
+window (`notice::notice_window`) with the form's caption, its words and its buttons, and
+any message box FleetOpsHook shows through the VCL is drawn the same way. A windowed button
+is pressed in its own window (`forms::press`: down and up at its centre), and its caption is
+read through its window. The keyboard stays on Roots' forms: Enter and Escape are theirs.
+With the message box on top the device window is disabled and the pointer's button is read
+by the pump (decision 183); the device window is found through the forms under it, since the
+box's owner is not the device window. A window that activates over the forms and is not one
+the forms take is logged once by class (`forms: <class> ... activated over the forms: not one
+the forms take`). After Save, Roots leaves its Options menu up (Return to Editor); Load closes
+Options before the form opens, and the mission's frames are no longer recent, so the form
+stands over the menu scene. Scenario: `fo-mapedit-filedlg`.
+
+**Armada II (gog-1.1) is not covered.** Its `MissionDialog::GetSaveName` and `GetLoadName`
+call comdlg32's `GetSaveFileNameA` and `GetOpenFileNameA` (imports of the executable,
+reached from `PromptSaveMission`, `PromptLoadMission` and `do_loadGame`), Wine's own file
+dialog, a path Roots does not take. A picker of ours there would take those two imports and
+run a modal loop of its own (as the dialog host does), which is left for later (decision 627).
+
 | Hook | What it reads |
 |---|---|
 | `ui.forms.vcl` | the VCL's fields of FleetOpsHook's forms and controls (owner list, name, rectangle, visibility, enabled, text, window, form and component state), and whether the build has forms; feeds `Menus.Forms` |
