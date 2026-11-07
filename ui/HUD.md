@@ -447,11 +447,14 @@ it the stock tooltip and click. So the grid **moves the stock buttons onto its c
 
 Without `hud.bar_grid` (a Roots build whose `Update` differs) the bar of ours is the skin above.
 
-**On Roots the icons are Roots' own** (decisions 340 to 342): `icons::ours_for_sprite` draws the
+**On Roots the icons are Roots' own** (decisions 340 to 343): `icons::ours_for_sprite` draws the
 UI's flat icon for a game sprite only where the sprite has no art (`files::Game::game_icons`, on for
 Roots, off for Armada II), so the bar, the top-right buttons and the boxes' buttons show the art
-Roots' own HUD shows, found per race in the sprite database. The minimap's filter strip puts the
-stock filter buttons' pictures before its words. The resource strip and the tooltips' symbols keep
+Roots' own HUD shows, found per race in the sprite database; a sprite the engine never drew (Roots'
+own HUD draws the top-right buttons with FleetOpsHook's art) takes its texture and rectangle from its
+line in Roots' `.spr` files (`engine/sprite.rs`, `spr_entry`). The minimap's filter strip would put the
+stock filter buttons' pictures before its words, but Roots blanks those sprites, so it keeps its
+words. The resource strip and the tooltips' symbols keep
 ours: Roots draws those as glyphs of its bitmap font, not as sprites.
 
 ### Seen on the bench

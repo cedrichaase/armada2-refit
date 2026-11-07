@@ -653,8 +653,13 @@ grid on Fleet Operations: Roots"), and the skin of step 6 stays only as the fall
   no button. Sprites on Roots' DDS sheets load (`b_npc_tractorbeam -> texture
   all_interface_buttons09 512x512`).
 - **Scenarios.** `fo-ui-bar-grid` (the grid, the ring and tooltip on hover, none on Stop, Q, the
-  click on back, Z) and `fo-ui-bar-icons` (the Starbase's and the construction ship's icons from
-  the DDS sheets).
+  click on back, Z) passed (`20261107-111151`, `20261107-113500`, `20261107-121836` on the final
+  build). `fo-ui-bar-icons` (the Starbase's icons from the DDS sheets, the top-right buttons' art
+  from Roots' `.spr` lines): its icon checks passed in `20261107-121836` (`icon: menu sprite
+  menu_button art yes`; Instant Action dealt the Borg there, so the shared side-picking OCR steps
+  failed and the judge of the top-right buttons was inconclusive on the green tiles). Armada II:
+  `ui-hud-bar`, `qol-bar-keys` and `qol-bar-keys-stock` passed with `--install .`
+  (`20261107-115244`).
 - **Not measured**: more than fifteen buttons (no start selection has them; the overflow columns
   were not seen), the floating mode, Roots' own minimap and info panel switched to ours, a
   campaign mission's bar.
@@ -670,8 +675,9 @@ grid on Fleet Operations: Roots"), and the skin of step 6 stays only as the fall
 | 336 | **Over the grid, the tooltips of ours drop Roots' `(Hotkey: X)` while the position keys are on** (`HUD.Tooltips=1`); with `Tooltips=0` the engine's tooltip is drawn before the UI and the grid covers part of it | the bar's own hotkeys are silenced while the keys are on; the cell's badge names the key | the stock tooltip drawn after the UI |
 | 337 | **A sprite's texture is read with the game's texture extensions in order and either format** (`.tga`, then `.dds` on Roots; `a2fmt::image`): Roots' buttons whose art is on its DDS sheets (`all_interface_buttons03` to `11`, the user's `cycle_support` and `Wgesconv`, the Tractor Beam, the bastion and the trades) showed their names | the sprite database found them; only the TGA-only load failed (`NOT FOUND`) | |
 | 340 | **On Roots the HUD's icons are Roots' own art** (the user, 2026-11-07: "for the icons in the HUD, please use the ones provided by FO Roots"): wherever a panel of ours stands for a game sprite (the bar's buttons, the top-right buttons, the comm, pause and replay boxes' buttons, all through `icons::ours_for_sprite`), the sprite's art is drawn first and the UI's flat icon only where the sprite has none; `files::Game::game_icons` says which game does this (Roots yes, Armada II no: its look is unchanged). The sprite is the one the engine's own HUD uses, found by name in the HUD's sprite database, which the engine loads per race from Roots' `gui_<race>.cfg` and `.spr` files; read from the player's install at run time, nothing copied | the user's wish and decision 60 (Roots' art stays Roots', read, never shipped); one switch in the icon lookup, not per panel, and nothing in the theme's frames | the user wanting the flat icons back on Roots |
-| 341 | **The minimap's filter strip shows the stock filter buttons' pictures before SHIPS and STATIONS on Roots**; its four state dots stay ours | the stock button is one picture per filter, the strip of ours a four-state control; the picture names the filter as Roots draws it | |
+| 341 | **The minimap's filter strip shows the stock filter buttons' pictures before SHIPS and STATIONS where the sprite has art; on Roots it has none** (`mapfilter_ship_button` and `mapfilter_station_button` are empty rectangles in `gui_<race>.spr`), so the strip keeps its words and dots; an empty `.spr` rectangle counts as no art | Roots chose no picture there; the four-state control stays ours | a Roots build with filter art |
 | 342 | **Where Roots draws no sprite, the HUD keeps ours**: the resource strip's coloured marks and the tooltips' symbols (Roots draws both as glyphs of its bitmap font, `FontFinal4_*`, an animation strip per size, not as sprites; the UI shows the glyph's word, decision 153), the minimap's blips without a sprite and its state dots, the info panel's bars without an icon. The info panel, the selection overlay, the unit view and the minimap's blips already draw the engine's sprites where there are any | drawing the game's bitmap font is a renderer of its own (its `.spr` strip and keyframes), left for a later round | the user asking for Roots' resource glyphs |
+| 343 | **A sprite the engine has not drawn yet takes its texture and rectangle from its `.spr` line** (Roots only, `files::Game::game_icons`): by its name, the line with the engine's texture when it named one, else the mission race's `gui_<race>.spr` first, then `gui_global.spr`, then any; all of `Sprites\*.spr` parsed once with `a2fmt::spr` | the engine fills a sprite's texture and rectangle when the sprite is first drawn; Roots' own HUD draws the top-right buttons and the minimap's filters with FleetOpsHook's art, so the stock sprites behind them were never drawn and showed nothing (seen: `mapfilter_ship_button` with an empty rectangle) | |
 | 338 | **Roots' defaults are unchanged** (`HUD.Bar=0`, `BarLabels=0`, `BarKeys=0`, decisions 103 and 129) | the player turns the grid on in the Refit screen, as the user's install does | the user's sign-off |
 
 ### Step 4: what the bench showed (2026-11-06)

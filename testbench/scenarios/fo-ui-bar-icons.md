@@ -1,4 +1,4 @@
-# Fleet Operations: Roots with the UI: the HUD's icons are Roots' own art (the bar, the top-right buttons, the minimap's filters)
+# Fleet Operations: Roots with the UI: the HUD's icons are Roots' own art (the bar, the top-right buttons)
 
 Resolutions: 1280x960
 Mod: refit
@@ -16,9 +16,10 @@ the game's extensions in its order (`.tga`, then `.dds`) and either format decod
 construction ship's Tractor Beam draw from those sheets; `UI.log` names each texture the first time
 (`sprite: <name> -> texture <file> 512x512`). And on Roots every HUD icon of ours that stands for a
 game sprite is Roots' own art first (decision 340, `icons::game_art_first`): the bar's buttons, the
-top-right buttons (menu, comms, idle ship, view, objectives) and, before the words SHIPS and
-STATIONS, the minimap's filter buttons' pictures (decision 341); the UI's flat icons only where
-Roots' sprite has no art.
+top-right buttons (menu, comms, idle ship, view, objectives; their sprites were never drawn by the
+engine, so their art comes from their lines in Roots' `.spr` files, decision 343); the UI's flat
+icons only where Roots' sprite has no art. Roots blanks the minimap's filter sprites (an empty
+rectangle in its `.spr`), so that strip keeps its words (decision 341).
 
 1. Include "_fo-render3d-skirmish".
 2. Expect "UI.log" contains "bar: ours as the grid".
@@ -30,9 +31,12 @@ Roots' sprite has no art.
 8. Expect "UI.log" not contain "NOT FOUND".
 9. Take a screenshot called "starbase icons".
 10. Check that every button of the grid shows an icon (the bottom row's four weapons included) and none shows a word in place of one.
-11. Check that the five round buttons at the top right show Roots' own coloured pictures rather than flat single-colour line icons, and that the minimap's strip shows a small picture before SHIPS and before STATIONS.
-12. Expect "UI.log" not contain "PANIC".
-13. Expect "Display8.log" not contain "VUID".
-14. Quit the game.
-15. Expect the game to have exited.
-16. Expect no crash.
+11. Expect "UI.log" contains "icon: menu sprite menu_button art yes".
+12. Expect "UI.log" contains "icon: objectives sprite objectives_button art yes".
+13. Check that each of the five buttons at the top right holds a small square tile picture in the race's colours (lines, a swirl, a question mark, an eye, a tick: Roots' own art), not a line icon drawn straight on the button.
+14. Expect "UI.log" contains "mapfilter_ship_button not drawn by the engine yet: its .spr line".
+15. Expect "UI.log" not contain "PANIC".
+16. Expect "Display8.log" not contain "VUID".
+17. Quit the game.
+18. Expect the game to have exited.
+19. Expect no crash.
