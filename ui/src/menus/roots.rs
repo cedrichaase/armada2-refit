@@ -16,6 +16,7 @@ mod advanced;
 mod advsettings;
 mod graphics;
 mod kit;
+mod mapselect;
 mod manualip;
 mod mods;
 mod multiplayer;

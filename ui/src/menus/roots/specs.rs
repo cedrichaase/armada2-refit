@@ -10,6 +10,7 @@ pub(super) fn draw(ui: &mut Ui, _fit: &super::Fit, f: &Form) -> bool {
         "TGraphicOptionsForm" => super::graphics::draw(ui, f),
         "TSoundSettingsForm" => super::sound::draw(ui, f),
         "TModSettingsForm" => super::mods::draw(ui, f),
+        "TMapSelectForm" => super::mapselect::draw(ui, f),
         "TAdvSettingsForm" => super::advsettings::draw(ui, f),
         "TMultiplayerConnectionForm" => super::multiplayer::draw(ui, f),
         "TManualIPForm" => super::manualip::draw(ui, f),
