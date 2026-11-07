@@ -10,3 +10,8 @@ PatBlt@24
 SetViewportOrgEx@16
 GdiFlush@0
 CreateRectRgn@16
+CreateEnhMetaFileA@16
+CloseEnhMetaFile@4
+PlayEnhMetaFile@12
+DeleteEnhMetaFile@4
+GetEnhMetaFileHeader@12
