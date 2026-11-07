@@ -3,62 +3,51 @@
 Resolutions: 1280x960
 Mod: refit
 Layers: display asiloader render3d ui
-Setup: display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh Menus.Forms=1
-Timeout: 16 min
+Launch: -nointro save\ia-fed-kli.sav
+Setup: testbench/bench/roots-save.sh ia-fed-kli display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh --scene game Menus.Forms=1
+Timeout: 12 min
 
 Run with `a2test --game fo-roots` and `--install .` (`ui/MENUS.md`, "Roots' forms"). Esc in a skirmish opens
 Roots' Options form in its mission mode; Exit to Desktop and End Mission each ask Roots'
 Warning form (`TYesNoForm`), which the UI draws as a dialog of its own (a themed panel, the
 question in our font, the form's icon smaller, Yes and No); No closes it, Esc answers No.
 
-The sides are not picked (`_fo-sides` checks them by OCR in Roots' own setup dialog, whose
-lost clicks failed this scenario at random; a click there is preceded by a move and a pause): nothing here depends on the race, since the
-wait is on render3d's log, and each wait after a click reads only lines written since it.
+The game starts straight in an Instant Action save (Federation against the Klingon AI,
+`testbench/bench/roots-save.sh`; `../README.md`, "Roots straight into a map, and scenes on
+Roots"), so the prompt wears the Federation's Starfleet look.
 
 1. Launch the game.
-2. Wait up to 180 seconds for "UI.log" to say "forms: TMainForm is ours".
-3. Wait 2 seconds.
-4. Move the mouse to 640,520.
-5. Wait 1 second.
-6. Click "Instant Action".
-7. Wait up to 30 seconds for "LAUNCH".
+2. Wait up to 240 seconds for "Scene.log" to say "scene ready".
+3. Move the mouse into the bottom right corner.
+4. Move the mouse to 700,300.
+5. Wait 2 seconds.
+6. Press Escape.
+7. Wait up to 20 seconds for "UI.log" to say "forms: TOptionsMenuForm is ours".
 8. Wait 3 seconds.
-9. Move the mouse to 560,872.
-10. Wait 1 second.
-11. Move the mouse to 601,875.
-12. Wait 2 seconds.
-13. Click "LAUNCH".
-14. Wait up to 240 seconds for "Render3D.log" to say "(claimed at the instance draw)".
-15. Wait 8 seconds.
-16. Move the mouse to 700,300.
-17. Press Escape.
-18. Wait up to 20 seconds for "UI.log" to say "forms: TOptionsMenuForm is ours".
+9. Click "Exit to Desktop".
+10. Wait up to 20 seconds for "UI.log" to say "forms: TYesNoForm is ours".
+11. Wait 3 seconds.
+12. Take a screenshot called "warning exit".
+13. Check that a dialog of ours titled WARNING, in the Federation's dark Starfleet frame and buttons, shows a small warning triangle and the whole question "Are you sure you want to exit to Windows?", with Yes and No once each.
+14. Click "No".
+15. Wait up to 20 seconds for "UI.log" to say "closed after".
+16. Wait 3 seconds.
+17. Click "End Mission".
+18. Wait up to 20 seconds for "UI.log" to say "forms: TYesNoForm is ours".
 19. Wait 3 seconds.
-20. Take a screenshot called "mission options".
-21. Click "Exit to Desktop".
-22. Wait up to 20 seconds for "UI.log" to say "forms: TYesNoForm is ours".
-23. Wait 3 seconds.
-24. Take a screenshot called "warning exit".
-25. Check that a dialog of ours (a themed panel, sized to its text and centred) shows the title "Warning", a small warning triangle, the whole question "Are you sure you want to exit to Windows?" in our font, wrapped inside the panel with nothing cut, and Yes and No once each at its foot.
-26. Click "No".
-27. Wait up to 20 seconds for "UI.log" to say "closed after".
-28. Wait 3 seconds.
-29. Click "End Mission".
-30. Wait up to 20 seconds for "UI.log" to say "forms: TYesNoForm is ours".
-31. Wait 3 seconds.
-32. Take a screenshot called "warning end mission".
-33. Check that the same dialog shows the End Mission question whole, with Yes and No once each.
-34. Press Escape.
-35. Wait up to 20 seconds for "UI.log" to say "closed after".
-36. Wait 3 seconds.
-37. Take a screenshot called "escape answered no".
-38. Check that the Warning dialog is gone and the Options window of ours is shown again, the skirmish going on behind it.
-39. Click "Return".
-40. Wait up to 20 seconds for "UI.log" to say "closed after".
-41. Wait 4 seconds.
-42. Take a screenshot called "mission"
-43. Check that the skirmish is shown again with no menu over it.
-44. Expect "UI.log" not contain "PANIC".
-45. Expect "Display8.log" not contain "VUID".
-46. Stop the game.
-47. Expect no crash.
+20. Take a screenshot called "warning end mission".
+21. Check that the same dialog shows the End Mission question whole, with Yes and No once each.
+22. Press Escape.
+23. Wait up to 20 seconds for "UI.log" to say "closed after".
+24. Wait 3 seconds.
+25. Take a screenshot called "escape answered no".
+26. Check that the Warning dialog is gone and the Options window is shown again over the mission.
+27. Click "Return".
+28. Wait up to 20 seconds for "UI.log" to say "closed after".
+29. Wait 3 seconds.
+30. Take a screenshot called "mission".
+31. Check that the skirmish is shown again with no menu over it.
+32. Expect "UI.log" not contain "PANIC".
+33. Expect "Display8.log" not contain "VUID".
+34. Stop the game.
+35. Expect no crash.
