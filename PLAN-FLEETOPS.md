@@ -744,6 +744,20 @@ are in the private notes beside `fleetopshook.md`.
   panel, the panel at Roots' width); at 4:3 the forced row leaves the queue at about two thirds of
   its size, legible but small, so `auto` keeps the grid above the minimap there.
 
+- **Round 2 (2026-11-07, branch `fo-info-panel-2`)**: the user's look on 3440x1440 (fo-b 2ab009f4)
+  asked for the panel unstretched and centred and the grid as tall as the minimap in the bottom right
+  corner (decisions 458, 459); the weapon icons' states and the buff icons as FleetOpsHook decides
+  them (decisions 447, 448 revised, read statically from its icon Render). Runs, all with Display8's
+  `OneWindow=0` on the bench (decision 348): `fo-ui-info` PASS `20261107-192031` (both rings through
+  ours, from the save); `fo-ui-info-states` PASS `20261107-191716` (the Saber's first weapon icon
+  grey as Roots', the Starbase's engines icon grey, its weapon in `systemIconHealthyColor`);
+  `fo-ui-info-row` PASS at 3440x1440, 1920x1080 and the 1600x1200 case (`20261107-190554`): the
+  corners at 21:9 with the Starbase's green sensor ring through the centred, unstretched panel, the
+  row at 16:9, stacked at 4:3; at 2560x1080 the corners passed (`20261107-185956`, its ring step
+  inconclusive before the camera was set above the base). Not staged: a buff (no gravity mine or spy
+  can be fired on Roots by the bench: `scene.special` stands down), another team's unit and a planet
+  (the overview's Select leaves the selection empty for them, even spawned beside the base).
+
 | # | Decision | Why | What would change it |
 |---|---|---|---|
 | 440 | **On Roots, `HUD.Info=1` is Roots' panel in Roots' layout, drawn by us** (`hud/info_fo.rs`); Armada II's info panel is unchanged (`hud/info.rs`) | the user's request: the layout and the pictures Roots', the fonts, bars and frame ours | |
