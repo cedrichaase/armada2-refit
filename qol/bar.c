@@ -199,6 +199,7 @@ static void __thiscall bar_keys_hook(BYTE *p, int crafts)
     int on;
     bar_find_ui();
     on = bar_active();
+    rebind_follow(on);
     if (on) {
         /* The build's offsets and toggle count (resolved at start-up); at most
          * BK_TOGGLES_MAX toggles are saved, the room on this stack. */

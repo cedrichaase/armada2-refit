@@ -12,13 +12,13 @@ Run with `a2test --game fo-roots` and `--install .`. FO-6, "The bar as the grid"
 (`PLAN-FLEETOPS.md`, decisions 330 to 339): with `HUD.Bar=1` the UI lays Roots' bar out in the
 grid of Armada II (`ui/HUD.md`, "The button bar"), the stock buttons moved onto its cells right
 after each update of the bar (`hud.bar_grid`), so FleetOpsHook's range ring, the tooltip and the
-click follow the cells; QOL's position keys press them (`BarKeys`; the W cell left empty in every menu on
-Roots). The overlay is the user's install's: the bar, its labels, the tooltips and the keys on.
+click follow the cells; QOL's position keys press them (`BarKeys`; on Roots W
+is the bar's while they are on: Roots' own `select_next_ship` moves to M, decision 349). The overlay is the user's install's: the bar, its labels, the tooltips and the keys on.
 
 The grid stands above Roots' minimap at 1280x960 (Roots' minimap is stock here): cells about 60 px
 apart, Q at 49,482, Z at 49,601, G (back) at 287,541. The construction ship's top level is
-`Q=build E=order R=form A=repair S=stop D=transport Z=npc_tractorbeam X=aiMenu` (the W cell is left empty in
-every menu: Roots' own W, decision 347). The game starts in an Instant Action game from a save
+`Q=build W=order E=form R=aiMenu A=repair S=stop D=transport Z=npc_tractorbeam` (W the bar's: Roots'
+`select_next_ship` moved to M while the keys are on, decision 349). The game starts in an Instant Action game from a save
 (Federation against the Klingon AI, `Launch: -nointro save\ia-fed-kli.sav`, the save from
 `$A2_DATA` through `testbench/bench/roots-save.sh`) with Display8's `OneWindow=0`: on the bench,
 with one window (#127, the shipped default) the game's own pointer (`DisplayInterface::s_mousePos`,
@@ -35,12 +35,12 @@ through the overview's own Select (`README.md`, "Objects"); the hovers, keys and
 6. Move the mouse to 700,300.
 7. Wait 1 second.
 8. Select the ship of class "Mediterranean" owned by the player.
-9. Wait up to 10 seconds for "UI.log" to say "X=aiMenu".
-10. Expect "UI.log" contains "Q=build E=order R=form A=repair S=stop D=transport Z=npc_tractorbeam X=aiMenu".
+9. Wait up to 10 seconds for "UI.log" to say "Z=npc_tractorbeam".
+10. Expect "UI.log" contains "Q=build W=order E=form R=aiMenu A=repair S=stop D=transport Z=npc_tractorbeam".
 11. Expect "UI.log" contains "carries its own tile".
 12. Expect "QOL.log" contains "bar: position keys on (the Refit bar is drawn)".
 13. Take a screenshot called "construction ship, the grid".
-14. Check that the bar is a grid of three rows above the minimap whose filled cells are Roots' own button tiles (a grey rounded tile with its picture, filling the cell, with no second plate around it), with key letters on every filled cell (Q, E, R, A, S, D, Z, X; the second cell of the top row empty: Roots' W is its own at the top level), and the Tractor Beam's picture bottom left.
+14. Check that the bar is a grid of three rows above the minimap whose filled cells are Roots' own button tiles (a grey rounded tile with its picture, filling the cell, with no second plate around it), with key letters on every filled cell (Q, W, E, R, A, S, D, Z), and the Tractor Beam's picture bottom left.
 15. Move the mouse to 46,598.
 16. Wait 1 second.
 17. Move the mouse to 49,601.
@@ -71,7 +71,7 @@ through the overview's own Select (`README.md`, "Objects"); the hovers, keys and
 42. Move the mouse to 287,541.
 43. Wait 1 second.
 44. Click at 287,541.
-45. Wait up to 10 seconds for "UI.log" to say "A=repair S=stop D=transport Z=npc_tractorbeam X=aiMenu".
+45. Wait up to 10 seconds for "UI.log" to say "R=aiMenu A=repair S=stop D=transport Z=npc_tractorbeam".
 46. Move the mouse to 700,300.
 47. Wait 1 second.
 48. Press z.

@@ -8,11 +8,3 @@ plugin = "qol"
 [[sym]]
 id = "bk_operator_new"
 check = ""
-
-# Roots' Input.map gives plain W to select_next_ship, which Roots reworked to select the damaged
-# ships of the selected group (and so empties a selection with none, a shipyard's included). The
-# overview reads it, not the bar, and before the bar's keys: the W cell gets no position key here,
-# and the UI's grid puts no button under W (FO-6 decisions 335 and 347).
-[[sym]]
-id = "bk_key_cells"
-value = 0x7ffd

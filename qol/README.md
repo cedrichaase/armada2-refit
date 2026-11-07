@@ -109,6 +109,7 @@ the build's own variables (`_a2f_qol_<id>`), filled at start-up.
 | `qol.selection` | `MaxSelection` | `cOverViewImp` (`global`), its 31 selection-array sites and 3 caps (`patch`, each with the bytes it replaces) | selection of 16 |
 | `qol.special_select` | `MaxSelection` | the five special-weapon array sequences (`patch`) and three continue points | selection of 16 (it is moved only with this hook) |
 | `qol.stations` | `StationGroups` | the eight stub sites (`patch`/`fn`), nine continue points, the engine functions and RTTI the stations code calls, and the object fields | stations as stock |
+| `qol.rebind` | `BarKeys` | the parsed key map: the named controls' array and count (`FieldDesc`: the name inline, the state cell at `+0x20`) and the discrete maps' array and count (`DiscreteMap`: its state cell, its chord's length and keys) | no key moves; the game's own key map |
 | `qol.bar_keys` | `BarKeys` | the call of `mProcessKeyboardInput` in `PopupPaletteImp::Update` (`call`) and that function, the three hotkey counts and the six menu toggles, a button's state and press slot, and the click's sound (`operator new`, the `AudioSound2D` constructor, the click-sound global), `TextInput_IsActive`, `CinematicView::IsPlayingVideo` | position keys off, stock's bar keys |
 | `qol.warp` | `WarpDistance` | the Alt block (`patch`) and its continue point, the warp globals and functions | moves as stock |
 | `qol.move_paths` | `PathStartsAtOnce` | `mAddPathPoint`'s two calls in `mNormalModeRightClick` and `QueueCommand`'s in `mProcessWaypoints` (`call`), those two functions, the craft process's command, path and point fields, the action's no-order flag, the order's packet limit | paths sent on release, as stock |
@@ -174,11 +175,11 @@ button of that cell", and which button sits in which cell is the UI's layout.
   any layout. A key goes down once. Nothing happens while chat has the keyboard
   (`TextInput_IsActive`), Ctrl or Alt is held, or the game is not the foreground window.
 - **Cells without a key.** `bk_key_cells` (a value of the build's profile, one bit per cell)
-  says which cells get a key: all fifteen on Armada II; on Fleet Operations: Roots not W, which
-  its `Input.map` gives to `select_next_ship` (reworked by Roots to select the damaged ships of the
-  selection, so W empties a shipyard's), read by the overview before the bar's keys.
-  `QOL_BarLabel` answers NULL for such a cell, the UI draws no badge there and its grid puts no
-  button there either (PLAN-FLEETOPS.md, decision 347). On Roots the keys press the UI's grid of Roots' bar (decisions 330 to 338); `qol.bar_keys` is verified there (the call in `Update` is stock's; Roots' edits to
+  says which cells get a key: all fifteen, on Armada II and on Fleet Operations: Roots.
+  `QOL_BarLabel` answers NULL for a cell without one and the UI draws no badge there. Roots'
+  own plain W (`select_next_ship`, reworked by Roots to select the damaged ships of the
+  selection, which emptied a shipyard's) moves to M while the keys are on ("Key rebinds" below;
+  PLAN-FLEETOPS.md, decision 349), so the W cell is the bar's there too. On Roots the keys press the UI's grid of Roots' bar (decisions 330 to 338); `qol.bar_keys` is verified there (the call in `Update` is stock's; Roots' edits to
   `mProcessKeyboardInput` leave its hotkey tables at stock's fields, which the hook empties).
 - **A press** is what releasing a click does: nothing for a disabled button, else the
   click (a fire-and-forget `AudioSound2D` made with the game's `operator new`, named by
@@ -229,6 +230,41 @@ working beside the grid?
 in a real game, the user doesn't have to look down.
 
 ---
+
+### Key rebinds (`rebind.c`, hook `qol.rebind`)
+
+`[BarKeys] Rebind` in `QOL.ini` is a table of rows `action:FROM>TO` (apart by commas): while the
+grid's position keys are on (`BarKeys=1` and the Refit bar drawn), every chord of `action` that
+holds FROM holds TO instead, its other keys (the modifiers it wants held or up) kept; when the keys
+stop, the game's own keys come back. Fleet Operations: Roots ships one row,
+`select_next_ship:W>M` (`qol/defaults/fo-roots.ini`): Roots gives plain W to `select_next_ship`,
+which it reworked to select the damaged ships of the selection, and the overview reads that before
+the bar's keys, so W emptied a shipyard's selection instead of pressing the bar's W cell. Plain M is
+free in Roots' `Input.map` (only Alt+M, `memory_toggle`, is bound; its metal lines are comments).
+Stock ships the key empty.
+
+- **In memory, never in a file.** `Input.map` is parsed once at start (`InputInit`) into two arrays
+  the input thread tests each frame: the named controls (`FieldDesc`: the name, and the state cell
+  the game reads) and the discrete maps (`DiscreteMap`: the state cell it sets and a chord of up to
+  eight keys, each a device, a code and held or up; `s_FindOrAppendDiscreteMap` shares one map
+  among the controls of one chord). A rebind finds the control by name, its maps by its state cell,
+  and writes the held key's code (set-1 scancodes for the keyboard) in each: one aligned word, put
+  back when the keys stop. `RTS_CFG.h` is not involved.
+- **Refused, logged:** a target another chord already fires on (it holds TO and wants none of the
+  keys held that ours wants up: Roots' Alt+M is not a clash for M with Alt up), an action not in
+  the key map, a key name not known, a chord without FROM held (its keys' codes logged).
+- **Multiplayer.** The key map is the player's own: a network game checks the executable and
+  `RTS_CFG.h`, the ODF, SOD, TT and AIP/FRM files ("... files do not match node %d"), never
+  `Input.map`, and a key only makes the ordinary command it always made. A player with a rebind
+  plays with stock players and with Roots players as before.
+
+### Keybinds page (later)
+
+The user wants a keybinds page in the game's settings (the Refit screen or Options) where every
+binding can be seen and changed, and where switching the hotkey layout to the grid applies its
+rebinds. The table is meant to feed it: the page lists the key map's controls and chords (the two
+arrays above), writes its changes as rows of `[BarKeys] Rebind` (or a table of the same rows per
+layout), and the grid preset is the rows a layout brings. Not built.
 
 ## QOL-2: Configurable right-drag pan speed
 
