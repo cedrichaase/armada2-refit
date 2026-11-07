@@ -929,6 +929,56 @@ Windows-1252, and a game's own font codes (Roots' red figures, resource icons an
 classes) are written as the content set's words and digits (README.md, "The engine's
 text"); before that, Roots' tooltips read as symbols and question marks.
 
+## The status line under the pointer
+
+`hud/hover.rs` over `engine/hover.rs`, with `[HUD] Hover=1` (hook `ui.hud.hover`,
+`profiles/gog-1.1/ui.hover.toml`). While the pointer is over a ship or station in the 3D
+view, the engine draws a strip about it: its name (or its class), then its shields,
+hull and crew, each an icon and a figure, and its special energy while it has some.
+`ShipDisplay::AlwaysSimulate` puts the craft at `ShipDisplay+0x1ec`, and
+`ShipDisplay::Render` draws the strip with one call, `SDInfoBar::Render(craft, x, y)`
+at `+0x1fa`, at the strip's place for the panel's face (the pair at `+0x1b8` that `+0x1f4`
+picks, from the layout's `infoBarOffset_<face>`), then clears `+0x1ec`. Armada II's
+layout puts the place inside the info panel (ours shows the same craft as its hover card,
+"The info panel"); **Fleet Operations: Roots moves it to the top centre of the screen**
+(`infoBarOffset_1` and `_2` lift it out of the panel), where it reads as the status of
+whatever the pointer is over, and FleetOpsHook leaves both the call and `SDInfoBar::Render`
+stock (in the file and in memory; its own changes to `ShipDisplay::Render` are the
+one-unit and builder faces' calls and the group faces' edits before it).
+
+**Ours** takes that call: the strip is not drawn, and each of its children is asked for
+what it would draw, as `SDInfoBar::Render` hands them the craft. The children
+(`SDInfoBar` members): three `TextAndSprite`s, shields (`+0xc`), hull (`+0x10`) and crew
+(`+0x14`); the special energy (`+0x18`, an `EnergyText`, drawn only while the craft's
+`+0x168` is at least 1); and the craft's name (`NameText`, `+0x20`) when its class has the
+byte `+0x3c4` set, else its class (`ClassText`, `+0x1c`). Each answers its colour and
+string (`GetInformation`, vtable `+0x24`, after `SetCurrentObject`, `+0x20`) and its icon's
+tint (`GetCurrentColor`, `+0x2c`); a `TextAndSprite` has its icon at `+0x104`, the icon's
+rectangle at `+0x10c` and the text's at `+0x11c`, a `ClassText` or `NameText` its text's at
+`+0x104`, each relative to the place, plus the origin the parent answers (`DisplayInterface`'s
+vtable `+0x64`: the info panel's corner for the group faces, none for the one-unit face, so
+the sum is the same place for every face), all on the HUD's canvas (1600 by 1200 units,
+scaled per axis); the justification is `+0x68` (bit 0 right, bit 3 centred in height: the
+figures are 8, left; the name 9, right). The UI's frame then
+draws each part there: the engine's icon, tinted as the engine tints it, and the text in
+our font, in the engine's colour, justified as the engine justifies it, with a one-pixel
+shadow. **Sizes**: Roots picks its font tier by the screen's width and its text outgrows the
+strip's rectangles on a wide screen, so neither the rectangle nor the font's line height
+(`ST3D_Font::GetHeight`, logged: 23.8 at 1280x960, 33.0 at 2560x1080) is in proportion to
+what shows; the figures and capitals were measured at 10 px (1280x960) and 19 px
+(2560x1080), and ours are as tall on the line through both. The icons are square (the
+canvas is scaled per axis, so the engine's stretch on a wide screen), 0.78 of their
+rectangle's shorter side, as much of it as the engine's art covers. Nothing is laid out by
+us, so the line follows Roots' layout files at every aspect, and the UI's text is drawn
+over everything the engine draws.
+
+While the key is off the call goes to the strip as before; the hook goes in the first
+time the key is on (or with `LayoutLog=1`, which logs the engine's strip without taking
+it: the bench's reference), so Armada II with the key off is unchanged. Under the
+engine's box ("Under the engine's boxes") the strip goes back to the engine. `UI.log`:
+`hover: ours`, and each strip once while it changes, `hover: craft 0x... at 625,50 (ours):
+| Shields "100" 0.40,0.60,1.00 text ... icon ... | ...`.
+
 ## The cursor over a box of ours
 
 The objectives box stays the mouse's owner while it shows (above), but its stock
@@ -1186,7 +1236,16 @@ sentinel), keyed by a counter. Each message: its point at `+0x58` (1600 x 1200, 
 the panel's corner), justification `+0x68`, text `+0x84` (a `std::string`), colour
 `+0x94`, fade `+0xa0` (raised and lowered by the stock `AlwaysGameSimulate`, which also
 erases a faded one: it keeps running). Ours draws each in title type with a shadow,
-in its colour times its fade.
+in its colour times its fade. **Kept clear of the panels of ours**: stock places a message
+against stock's panels, and ours sit elsewhere. Roots' scripts add the mission's name at
+the start of a mission at (50,50) with justification 0, the top left corner, where the
+resource strip of ours is (the user's report, PLAN-FLEETOPS.md decision 326). Every panel
+frame drawn this mission frame is kept (`layout::occupied`, filled by `Ui::panel` whether or
+not the layout log is on); a message whose rows would touch one is centred across the screen
+at the same height, and if it still touches one, put just below it. UI.log says
+`overlay: #<n> moved clear of the panels of ours, to x,y`. On Armada II the resource strip
+is at the top centre and the intro's lines are centred lower down, so nothing there moves
+unless it would have overlapped. `fo-ui-overlay`.
 
 ### The trade status and the team message (not components)
 
@@ -1638,6 +1697,7 @@ down is explained on are named in the profile.
 | `ui.hud.fade` | the two draws of `ScreenFade::Render` (patched, 5 and 7 bytes) | the engine draws the fade |
 | `ui.hud.video` | the two callers of `BinkThread::BlitToBlackBackground` and its three draws (patched), `GetTexture` (`fn`, checked), the video's size | the engine draws the unit view's and the comm videos |
 | `ui.hud.frame_rate` | the two prints in `Armada_RenderFrame` (patched, both or none), `FrameStats::GetSlotName` / `GetTimeAvg` (`fn`, checked), `FRAMERATE_DISPLAY` | the engine prints the frame rate |
+| `ui.hud.hover` (`HUD.Hover`; `ui.hover.toml`, `src/syms_hover.rs`) | the call of `SDInfoBar::Render` in `ShipDisplay::Render` (patched, its target checked; "The status line under the pointer"), `SDInfoBar::Render` (`fn`, checked), the strip's children, the text and icon fields and slots, the class's name byte and the special energy | the engine draws the strip |
 
 ### Hooks of the info panel, minimap, unit view and close-up (`ui.hud.*`)
 

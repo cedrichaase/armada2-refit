@@ -204,13 +204,21 @@ pub fn ensure_device(hwnd: *mut c_void, _flags: u32, _depth: u32, interval: u32)
         return device_exists(s);
     }
     let (w, h) = (s.mode.width, s.mode.height);
-    unsafe {
-        // WS_POPUP | WS_VISIBLE: no frame, and the client area is the whole window.
-        SetWindowLongA(hwnd, -16, 0x9000_0000u32 as i32);
-        SetWindowPos(hwnd, core::ptr::null_mut(), 0, 0, w as i32, h as i32, 0x0020 | 0x0040); // FRAMECHANGED | SHOWWINDOW
-    }
+    // `OneWindow` from the start (host.rs): the device window goes inside Display8's host
+    // and the backend presents to the host.
+    let present_to = match crate::host::from_start().then(|| crate::host::adopt(hwnd, w, h)).flatten() {
+        Some((host, _)) => host,
+        None => {
+            unsafe {
+                // WS_POPUP | WS_VISIBLE: no frame, and the client area is the whole window.
+                SetWindowLongA(hwnd, -16, 0x9000_0000u32 as i32);
+                SetWindowPos(hwnd, core::ptr::null_mut(), 0, 0, w as i32, h as i32, 0x0020 | 0x0040); // FRAMECHANGED | SHOWWINDOW
+            }
+            hwnd
+        }
+    };
     s.hwnd = hwnd;
-    crate::window::device_opened(hwnd, w, h);
+    crate::window::device_opened(present_to, w, h);
     s.main_thread = unsafe { GetCurrentThreadId() };
     crate::trace::MAIN_THREAD.store(s.main_thread, Ordering::Relaxed);
     let mut failed: Vec<Backend> = Vec::new();
@@ -220,8 +228,8 @@ pub fn ensure_device(hwnd: *mut c_void, _flags: u32, _depth: u32, interval: u32)
         s.backend = b;
         log!("stub: trying {} ({} of {})", b.name(), s.next, s.order.len());
         let r = match b {
-            Backend::Vulkan => crate::vk::Vk::start(hwnd, w, h, interval, s.validate),
-            Backend::D3d12 => crate::dx12::Dx::start(hwnd, w, h, interval, s.validate),
+            Backend::Vulkan => crate::vk::Vk::start(present_to, w, h, interval, s.validate),
+            Backend::D3d12 => crate::dx12::Dx::start(present_to, w, h, interval, s.validate),
         };
         match r {
             Ok(()) => {
@@ -256,6 +264,26 @@ pub fn ensure_device(hwnd: *mut c_void, _flags: u32, _depth: u32, interval: u32)
 fn follow_window(s: &mut Stub, hwnd: *mut c_void) {
     let (w, h) = (s.mode.width, s.mode.height);
     let old = s.hwnd;
+    // `OneWindow` (host.rs): the new window goes inside Display8's host, which the swap
+    // chain is on (moved there once, should the host be made only now) and stays on. Only
+    // where the profile says the game makes a window at each switch: anywhere else (the
+    // bench's `BenchWindow` on Armada II) the swap chain follows as before.
+    if let Some((host, made)) = crate::host::from_start().then(|| crate::host::adopt(hwnd, w, h)).flatten() {
+        if made {
+            let r = if vulkan() {
+                crate::vk::get().map(|v| v.rebind(host))
+            } else {
+                crate::dx12::get().map(|d| d.rebind(host))
+            };
+            match r {
+                Some(Err(e)) => log!("stub: the swap chain could not move to the host window: {}", e),
+                _ => log!("stub: CreateDevice on another window ({:p}, was {:p}): the swap chain is on the host {:p} from now on", hwnd, old, host),
+            }
+        }
+        s.hwnd = hwnd;
+        crate::window::device_opened(host, w, h);
+        return;
+    }
     unsafe {
         SetWindowLongA(hwnd, -16, 0x9000_0000u32 as i32);
         SetWindowPos(hwnd, core::ptr::null_mut(), 0, 0, w as i32, h as i32, 0x0020 | 0x0040);
@@ -399,10 +427,18 @@ pub fn present(dev: &mut device::Dev, _src: *mut c_void, _dst: *mut c_void, _wnd
     };
     if let Some(v) = crate::vk::get() {
         written(true);
+        if crate::host::hold() {
+            v.skip();
+            return 0;
+        }
         return if v.present() { 0 } else { 0x8876_0868u32 as i32 }; // D3DERR_DEVICELOST
     }
     if let Some(x) = crate::dx12::get() {
         written(true);
+        if crate::host::hold() {
+            x.skip();
+            return 0;
+        }
         return if x.present() { 0 } else { 0x8876_0868u32 as i32 }; // D3DERR_DEVICELOST
     }
     0

@@ -47,6 +47,7 @@ pub mod syms_forms;
 #[rustfmt::skip]
 pub mod syms_hud;
 #[rustfmt::skip]
+pub mod syms_hover;
 pub mod syms_info;
 #[rustfmt::skip]
 pub mod syms_loading;

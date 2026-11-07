@@ -69,7 +69,7 @@ appends its plugin's section and touches no other.
 ## QOL
 42. Expect "QOL.log" contains "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa1a8a321".
 43. Expect "QOL.log" contains "engine: build armada2/gog-1.1".
-44. Expect "QOL.log" contains "engine: symbols: 215/215 resolved; 0 hooks blocked".
+44. Expect "QOL.log" contains "engine: symbols: 218/218 resolved; 0 hooks blocked".
 45. Expect "QOL.log" not contains "stands down: ".
 46. Expect "QOL.log" not contains "read before its hook".
 47. Expect "QOL.log" not contains "engine: TEST:".

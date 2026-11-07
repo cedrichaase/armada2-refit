@@ -43,6 +43,9 @@ rows = ["QOL.BarKeys"]
 doc = "The construction ship does not block its own blueprint: the ghost's check ignores the rig"
 rows = ["QOL.RigIgnoresSelf"]
 
+[hook.script_input]
+doc = "A script's input monitor called only while set: the editor after a scripted mission no longer calls a cleared one"
+
 [[sym]]
 id = "pan_site"
 symbol = "RTS_Configure"
@@ -1901,3 +1904,22 @@ struct = "CraftClass vtable (CanPlaceHere)"
 offset = 0x8
 type = "ptr"
 used_by = ["rig_self"]
+
+[[sym]]
+id = "si_always"
+symbol = "ScriptInputCallbacks::AlwaysSimulate"
+kind = "patch"
+addr = 0x451dc0
+check = "56 8b f1 ff 56 24 84 c0 75 07 c7 46 24 00 00 00 00 5e c2 04 00"
+in = "ScriptInputCallbacks::AlwaysSimulate"
+used_by = ["script_input"]
+
+# the script's monitor function (ScriptInterfaceImp::MonitorInputControls stores it)
+[[sym]]
+id = "si_callback"
+symbol = "ScriptInputCallbacks"
+kind = "field"
+struct = "ScriptInputCallbacks"
+offset = 0x24
+type = "ptr"
+used_by = ["script_input"]

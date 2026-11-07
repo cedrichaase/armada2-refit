@@ -31,6 +31,7 @@ pub mod drop;
 pub mod engine_syms;
 pub mod passthrough;
 pub mod dx12;
+pub mod host;
 pub mod trace;
 pub mod stub;
 pub mod user32;

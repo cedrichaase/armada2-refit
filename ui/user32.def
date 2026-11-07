@@ -70,3 +70,4 @@ WindowFromDC@4
 GetCursorInfo@4
 SetLayeredWindowAttributes@16
 ChildWindowFromPointEx@16
+FindWindowExA@16
