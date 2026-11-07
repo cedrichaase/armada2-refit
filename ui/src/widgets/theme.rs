@@ -572,13 +572,13 @@ impl Theme {
             accent: 0xff4a94ff,
             accent2: 0xffe8b030,
             accent3: 0xff1c3a8c,
-            button: 0x98686a6e,
-            button_top: 0x98808286,
-            button_hot: 0xb0868c98,
-            button_down: 0xc0384660,
-            button_on: 0xb05a6886,
-            button_off: 0x60606266,
-            button_edge: 0xf0b4b6ba,
+            button: 0xe80a0b0d,
+            button_top: 0xe8141619,
+            button_hot: 0xe8181d26,
+            button_down: 0xf0101a2c,
+            button_on: 0xe8121a28,
+            button_off: 0xa00c0d10,
+            button_edge: 0xff2e3238,
             track: 0xc0050609,
             fill: 0xff4088f0,
             focus: 0xff9cc4ff,
@@ -1485,10 +1485,44 @@ fn starfleet_panel(ui: &mut Ui, r: R, lamps: bool) {
     }
 }
 
+/// Starfleet's button (the user's call, 2026-11-07): a near-black plate with a dark grey
+/// edge and its label in the lamps' blue (`button_frame`), which blooms on hover
+/// (`button`); pressed goes a shade bluer, on puts a lamp along its foot.
+fn starfleet_dark_button(ui: &mut Ui, r: R, c: Corners, st: State) {
+    let t = ui.theme;
+    let h = hair(ui);
+    let lit = if st.off { 0.0 } else { st.hot.max(if st.down { 1.0 } else { 0.0 }) };
+    if lit > 0.01 {
+        ui.draw.glow(r, c, ui.u(t.glow), fade(t.accent3, 0.45 * lit));
+    }
+    let (top, bot) = if st.down {
+        (t.button_down, t.button_down)
+    } else if st.on {
+        (t.button_on, mix(t.button_on, t.button, 0.5))
+    } else {
+        (mix(t.button_top, t.button_hot, st.hot), mix(t.button, t.button_hot, st.hot))
+    };
+    let (top, bot) = if st.off { (t.button_off, t.button_off) } else { (top, bot) };
+    ui.draw.fill_v(r, c, top, bot);
+    if !st.down {
+        ui.draw.stroke_v(r.inset(h), c.grown(-h), h, 0x14ffffff, 0x00ffffff);
+    }
+    let edge = if st.off { fade(t.button_edge, 0.5) } else { mix(t.button_edge, t.accent, 0.55 * lit) };
+    ui.draw.stroke(r, c, ui.u(1.2).max(h), edge);
+    if st.on && !st.down {
+        let b = R::new(r.x + r.w * 0.22, r.bottom() - ui.u(4.0), r.w * 0.56, ui.u(2.0).max(1.0));
+        ui.draw.glow(b, Corners::SQUARE, ui.u(7.0), fade(t.accent, 0.6));
+        ui.draw.rect(b, mix(t.machined.lamp, 0xffffffff, 0.2));
+    }
+}
+
 /// A Starfleet button: a tile of brushed light grey glass with a bright rim, as Roots'
 /// (STYLE.md); hover lights it blue from inside, on puts a lamp along its foot.
 fn starfleet_button(ui: &mut Ui, r: R, c: Corners, st: State) {
     let t = ui.theme;
+    if t.form == Form::Starfleet {
+        return starfleet_dark_button(ui, r, c, st);
+    }
     let h = hair(ui);
     let lit = if st.off { 0.0 } else { st.hot.max(if st.down { 1.0 } else { 0.0 }) };
     if !st.off && st.hot > 0.01 {
@@ -1641,8 +1675,24 @@ pub fn button(ui: &mut Ui, r: R, label: &str, st: State) {
         let p = r.h * 0.5;
         ui.text_in(R::new(r.x + p, r.y, r.w - 2.0 * p, r.h), &label, t.text_size, Align::Right, text, Weight::Bold);
     } else {
-        ui.text_in(R::new(r.x, r.y + nudge, r.w, r.h), &label, t.text_size, Align::Centre, text, Weight::Bold);
+        let lr = R::new(r.x, r.y + nudge, r.w, r.h);
+        let lit = if st.off { 0.0 } else { st.hot.max(if st.down { 1.0 } else { 0.0 }) };
+        if t.form == Form::Starfleet && lit > 0.01 {
+            // Starfleet's labels bloom on hover: a soft halo in the lamps' blue.
+            label_glow(ui, lr, &label, t.text_size, fade(t.accent, 0.6 * lit));
+        }
+        ui.text_in(lr, &label, t.text_size, Align::Centre, text, Weight::Bold);
     }
+}
+
+/// A soft halo under a bold label centred in `r` (where `Ui::text_in` puts it): a
+/// button label's bloom.
+pub fn label_glow(ui: &mut Ui, r: R, s: &str, size: f32, c: Color) {
+    let px = ui.u(size);
+    let (tw, th) = crate::text::measure_with(crate::text::font_bold(), s, px);
+    let (x, y) = (libm::roundf(r.x + (r.w - tw) * 0.5), libm::roundf(r.y + (r.h - th) * 0.5));
+    let reach = ui.u(5.0);
+    ui.draw.text_glow(s, px, x, y, c, Weight::Bold, reach);
 }
 
 /// The corners a button of the theme has, in pixels, for `r`.
@@ -1696,7 +1746,17 @@ pub fn button_frame(ui: &mut Ui, r: R, st: State) -> Color {
             ui.draw.fill(R::new(r.x + inset, r.y + r.h * 0.28, bw, r.h * 0.44), Corners::round(bw * 0.5), t.accent);
         }
     }
-    let text = if st.off {
+    let text = if t.form == Form::Starfleet {
+        // Starfleet's dark buttons carry their label in the lamps' blue, brighter on
+        // hover and pressed.
+        if st.off {
+            t.text_off
+        } else if st.down {
+            mix(t.accent, 0xffffffff, 0.6)
+        } else {
+            mix(t.accent, mix(t.accent, 0xffffffff, 0.45), st.hot.max(if st.on { 0.4 } else { 0.0 }))
+        }
+    } else if st.off {
         if lcars { fade(t.text_on, 0.6) } else { t.text_off }
     } else if lcars || st.down {
         if lcars { t.text_on } else { 0xffffffff }
