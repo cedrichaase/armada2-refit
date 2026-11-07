@@ -16,15 +16,15 @@ reading on the plates, and nothing that moves on its own.
 1. Include "_fo-render3d-skirmish".
 2. Move the mouse to 700,300.
 3. Wait 1 second.
-4. Drag from 690,530 to 860,690.
+4. Drag from 520,240 to 1010,700.
 5. Wait 2 seconds.
 6. Move the mouse to 700,300.
 7. Wait 1 second.
 8. Take a screenshot called "hud".
 9. Wait 1 second.
-10. Move the mouse to 320,788.
+10. Move the mouse to 46,512.
 11. Wait 1 second.
-12. Move the mouse to 324,790.
+12. Move the mouse to 50,514.
 13. Wait 2 seconds.
 14. Take a screenshot called "hud hover".
 15. Wait 2 seconds.

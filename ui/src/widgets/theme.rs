@@ -511,8 +511,8 @@ impl Theme {
             form: Form::Starfleet,
             backdrop_top: 0xff03060c,
             backdrop_bottom: 0xff08101e,
-            panel: 0xb40c0d15,
-            panel_top: 0xb4161725,
+            panel: 0xb4111219,
+            panel_top: 0xb41c1c28,
             panel_edge: 0xff3a3c40,
             panel_hi: 0xff9a9ca0,
             shadow: 0x90000000,
@@ -524,13 +524,13 @@ impl Theme {
             accent: 0xff4a94ff,
             accent2: 0xffe8b030,
             accent3: 0xff1c3a8c,
-            button: 0xa0707276,
-            button_top: 0xa08e9094,
+            button: 0x98686a6e,
+            button_top: 0x98808286,
             button_hot: 0xb0868c98,
             button_down: 0xc0384660,
             button_on: 0xb05a6886,
             button_off: 0x60606266,
-            button_edge: 0xe0a6a8ac,
+            button_edge: 0xf0b4b6ba,
             track: 0xc0050609,
             fill: 0xff4088f0,
             focus: 0xff9cc4ff,
@@ -860,8 +860,8 @@ fn header_mark(ui: &mut Ui, at: R) {
 // dark lip, smoked glass that is near neutral in the middle, and the blue only where the
 // lamps set into the side rims throw it across the glass.
 
-/// The metal rim's width all round, units (Roots': about 8 pixels at 960 lines).
-const SF_RIM: f32 = 8.0;
+/// The metal rim's width all round, units (Roots': about 9 pixels at 960 lines, lip included).
+const SF_RIM: f32 = 10.0;
 /// A lamp's core: Roots' lamps peak at about (73,150,255).
 const SF_LAMP: Color = 0xff4996ff;
 /// The lamps' light close to them on the glass: deeper than the core, as Roots' glass
@@ -886,13 +886,15 @@ fn sf_lamp(ui: &mut Ui, r: R, a: f32) {
 /// tail, as Roots' falls off (STYLE.md, "Starfleet").
 fn sf_lamp_light(ui: &mut Ui, g: R, cy: f32, right: bool, a: f32) {
     let t = ui.theme;
-    let near = ui.u(30.0).min(g.h * 0.45);
-    let far = ui.u(170.0).min(g.w * 0.45);
+    // On a short panel the two sides' tails would meet and tint the whole glass: each
+    // keeps to its own end, so the middle stays smoke.
+    let near = ui.u(30.0).min(g.h * 0.45).min(g.w * 0.12);
+    let far = ui.u(170.0).min(g.w * 0.28);
     let x = if right { g.right() } else { g.x };
     let src = |w: f32, h: f32| R::new(x - w * 0.5, cy - h * 0.5, w, h);
     ui.draw.push_clip(g);
     ui.draw.shadow(src(ui.u(6.0), g.h * 0.9), Corners::round(ui.u(3.0)), (0.0, 0.0), far, fade(t.accent3, 0.45 * a));
-    ui.draw.shadow(src(ui.u(4.0), g.h * 0.55), Corners::round(ui.u(2.0)), (0.0, 0.0), near, fade(SF_POOL, 0.5 * a));
+    ui.draw.shadow(src(ui.u(4.0), g.h * 0.55), Corners::round(ui.u(2.0)), (0.0, 0.0), near, fade(SF_POOL, 0.42 * a));
     ui.draw.pop_clip();
 }
 
@@ -915,19 +917,20 @@ fn starfleet_panel(ui: &mut Ui, r: R) {
     let lamps = g.h > ui.u(26.0);
     if lamps {
         sf_lamp_light(ui, g, cy, false, 1.0);
-        sf_lamp_light(ui, g, cy, true, 0.8);
+        sf_lamp_light(ui, g, cy, true, 0.65);
     }
     // The rim: neutral gunmetal, brushed, lit from above.
     let rim_sh = Shape { corners: c, stroke: side + 1.0, ..Shape::default() };
-    let m = sf_metal(ui, 0.20, 0.25);
-    let cols = [0xff5c5e60, 0xff56585a, 0xff36373a, 0xff38393c];
+    let m = sf_metal(ui, 0.10, 0.25);
+    let cols = [0xff3e4042, 0xff3b3d3f, 0xff252629, 0xff27282b];
     ui.draw.metal(r, &rim_sh, &m, cols);
     // The bevels: a light along the outer top, a dark line round the outside, a dark lip
     // at the glass.
     ui.draw.stroke_v(r, c, h, 0x60e0e2e6, 0x08e0e2e6);
     ui.draw.stroke(r, c, h, 0x70000000);
     let lip = ui.u(2.5).max(h * 2.0);
-    ui.draw.stroke(g.inset(-lip), gc.grown(lip), lip, 0xf0030405);
+    // The lip also covers the pixel the rim's stroke reaches past the glass's edge.
+    ui.draw.stroke(g.inset(-lip), gc.grown(lip), lip + h, 0xf0030405);
     // A seam across the side rims, half way down, where the lamps sit either side.
     for x in [r.x, r.right() - side] {
         ui.draw.rect(R::new(x, cy - h, side, h), 0xc0030405);
