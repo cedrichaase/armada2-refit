@@ -24,6 +24,7 @@ use crate::rt::win::HWND;
 use crate::widgets::Ui;
 use alloc::vec::Vec;
 
+pub mod admirals_log;
 pub mod game_settings;
 pub mod game_setup;
 pub mod mission_select;
@@ -216,6 +217,7 @@ fn spec(screen: &str) -> Option<Draw> {
         "message" => notice::draw,
         "game settings" => game_settings::draw,
         "game setup" => game_setup::draw,
+        "admiral's log" => admirals_log::draw,
         _ => return None,
     })
 }
@@ -225,7 +227,9 @@ fn spec(screen: &str) -> Option<Draw> {
 pub fn draw(ui: &mut Ui, d: &Dialog, fit: Fit, picture: Option<Tex>) -> bool {
     let Some(design) = d.design else { return false };
     if d.pane {
-        return false;
+        // The Admiral's Log's panes are drawn by the log's spec, in its page (decision 259).
+        let owner = forms::dialogs().into_iter().find(|o| !o.pane && o.z + 1 == d.z);
+        return crate::config::get().menus_specs && owner.is_some_and(|o| forms::dialog_screen(o.stock_proc) == "admiral's log");
     }
     let name = forms::dialog_screen(d.stock_proc);
     let m = model::read_adopted(d.hwnd as HWND, design, name);
