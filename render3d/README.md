@@ -714,7 +714,8 @@ time it is posed (`hulls: menu scene:`). Keys:
 |---|---|---|
 | `[Scene]` | `Sky`, `SkyTurn` | a sky recipe's name; radians a second it turns |
 | | `Stars`, `StarSize`, `StarSeed` | how many stars, their half size in radians, the seed |
-| | `Sun`, `SunDistance` | the sun's ODF (none: no sun) and its distance from the eye |
+| | `Sun`, `SunDistance`, `SunAt`, `SunScale` | the sun's ODF (none: no sun), its distance from the eye, the way towards it (default: against `KeyAxis`; set it to show the sun where the camera can see it while the Key stays as it is) and a scale for its SOD |
+| | `StarTiles`, `StarLevel` | the star sheet (the sprite `bstar.0`) laid on a cube of n x n tiles a face, fixed in the sky's frame (nothing turns to face the camera, so it holds still as the camera orbits), drawn at this level: for a build whose star sprite is a whole tile of small stars (Roots'), not one star |
 | | `KeyAxis`, `KeyColour`, `FillAxis`, `FillColour` | the two lights: the way each travels, and its colour |
 | | `Blend` | seconds the camera takes from one view to the next (2; the map's 1.6) |
 | `[Warp]` | `Delay`, `Stagger`, `Ramp` | a departure: seconds before the first ship goes (0.9), between one and the next (0.18), from impulse to gone (0.75) |

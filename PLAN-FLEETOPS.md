@@ -1490,10 +1490,18 @@ fed_mediterranean 84, bor_cube 422, bor_diamond 129.
 | 218 | **A sun, small and far**: `Sun=map_planet_sun01` (Roots' "Orange Sun", `map_planet_sun01.SOD`) at `SunDistance=20000`, where it is a point in the sky; the Key is stock map's `KeyAxis` (unchanged, so the campaign views stay lit as tuned), the fill brighter (0.20,0.24,0.34) so the dark side of the station reads. At this angle the sun stays above the frame | the user asked for a sun, then for it much smaller and further |
 | 219 | **No nebulae**: the Roots map has no `[Nebula.*]` (the Metreon and Mutara gas of the stock map are left out), including behind the campaign views | the user's wish, 2026-11-07 |
 
-Left: the forms host does not call `Render3D_MenuScene` yet (branch
-`fo-forms-scene-dialogs`), so on Roots the scene shows only once that lands; the station
-is mostly behind the centred menu card; the campaign views were not framed for Roots'
-hulls (their radii are about twice stock's).
+**Fix after the user's first look in game (2026-11-07, branch `fo-menu-ds9-fix`)**: "the
+skybox sides shift around weirdly, and there's no more sun".
+
+| # | Decision | Why |
+|---|---|---|
+| 220 | **The star sheet is a fixed cube, not billboards** (`StarTiles=3`, `StarLevel=0.8`, `Stars=0`): Roots' `bstar.0` is a whole 1024 tile of small stars, and the menu drew it as 14 large quads that always faced the camera, so the patches' edges and contents slid as the camera orbited. Now six faces of 3 x 3 tiles at about 1 texel a pixel, fixed in the sky's frame, each tile turned a quarter by its place; the black between the stars hides every edge. Bench, 1920x1080, six shots across 125 s of the 150 s orbit: no edge, no sliding patch | the user's report; the engine's own starfield is not reproduced (the menu has no octree), only its sheet |
+| 221 | **The sun was never in the frame**: it sits against `KeyAxis`, 27 degrees above the horizon, and the higher camera looks 20 degrees down with a 40 degree field, so its top edge is at the horizon. `SunAt=-0.80,-0.10,0.59` shows the sun a little below the horizon, in the same direction round the compass as the Key; the Key and its shadows are unchanged, so the campaign views stay lit as tuned, and the price is a sun that does not quite match the light (the Key comes from above). With the camera coming round it crosses the top of the frame for about 25 s of each turn (shots 2 and 3 of the bench series) | the user wanted a visible sun and the higher angle; changing `KeyAxis` for the whole map would have re-lit the campaign views |
+| 222 | **`SunScale=0.2`, `SunDistance=8000`**: `map_planet_sun01`'s SOD at a fifth of its size, well inside the sky pass's far plane (twice the distance); 0.3 read as a disc with a halo, still too large | the user: much smaller and further |
+
+Left: the campaign views were not framed for Roots' hulls (their radii are about twice
+stock's); DS9 is dark on the shadow side of the orbit. (The forms host calls
+`Render3D_MenuScene` since #102, beside the side column rather than a centred card.)
 
 ## Open decisions
 

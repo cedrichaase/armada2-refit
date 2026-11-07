@@ -483,6 +483,34 @@ impl Sky {
                     let h = size * d;
                     self.batch.billboard(info, dir * d, right, up, h, h, [b, b, b, if b > 0.7 { lift } else { 0.0 }]);
                 }
+                // The star sheet on a cube, fixed in the sky's frame (never turned to
+                // face the camera, so nothing shifts as the camera goes round): each
+                // face n x n tiles, each tile the sheet once, turned a quarter by its
+                // place so the repeat does not read.
+                let n = shot.star_tiles;
+                if n > 0 {
+                    let l = shot.star_level;
+                    let faces: [(V3, V3, V3); 6] = [
+                        (v3(0.0, 0.0, 1.0), v3(1.0, 0.0, 0.0), v3(0.0, 1.0, 0.0)),
+                        (v3(0.0, 0.0, -1.0), v3(-1.0, 0.0, 0.0), v3(0.0, 1.0, 0.0)),
+                        (v3(1.0, 0.0, 0.0), v3(0.0, 0.0, -1.0), v3(0.0, 1.0, 0.0)),
+                        (v3(-1.0, 0.0, 0.0), v3(0.0, 0.0, 1.0), v3(0.0, 1.0, 0.0)),
+                        (v3(0.0, 1.0, 0.0), v3(1.0, 0.0, 0.0), v3(0.0, 0.0, -1.0)),
+                        (v3(0.0, -1.0, 0.0), v3(1.0, 0.0, 0.0), v3(0.0, 0.0, 1.0)),
+                    ];
+                    let step = 2.0 / n as f32;
+                    for (fi, (c, r, u)) in faces.iter().enumerate() {
+                        for j in 0..n {
+                            for i in 0..n {
+                                let (a0, b0) = (-1.0 + i as f32 * step, -1.0 + j as f32 * step);
+                                let p = |a: f32, b: f32| (*c + *r * a + *u * b) * d;
+                                let k = [p(a0, b0 + step), p(a0 + step, b0 + step), p(a0 + step, b0), p(a0, b0)];
+                                let t = (i + 2 * j + fi as u32) as usize % 4;
+                                self.batch.quad(&small, [k[t], k[(t + 1) % 4], k[(t + 2) % 4], k[(t + 3) % 4]], [l, l, l, 0.0]);
+                            }
+                        }
+                    }
+                }
                 self.draw_batch(&mut cmd, &vp);
             }
         }
@@ -491,7 +519,7 @@ impl Sky {
             let b = r3d_core::frame::steps::View { view: rot, ..a };
             let bvp = b.view.mul(&b.proj);
             if let Some(model) = scene::model(&assets::sod_of(odf)) {
-                let s = self.scale_sod(odf);
+                let s = self.scale_sod(odf) * shot.sun_scale;
                 let mut world = M34::IDENTITY;
                 world.r = [world.r[0] * s, world.r[1] * s, world.r[2] * s];
                 world.p = *dir * *dist;
