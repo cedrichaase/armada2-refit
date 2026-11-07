@@ -167,49 +167,127 @@ fn over_scene(ui: &mut Ui, s: &Screen) -> bool {
 }
 
 /// The main menu over the scene, for any front end that has one (Armada II's, and Roots'
-/// forms, `menus::roots`): the shade, the title (`small` over `big`), and a column of
-/// entries, each (label, enabled), that light up under the pointer. Returns the entry
-/// clicked and the one under the pointer (-1: none).
+/// forms, `menus::roots`): the shade, the title (`small` over `big`, or the layout's
+/// words or picture), and a column of entries, each (label, enabled), that light up
+/// under the pointer. Where and how it stands is the layout's (`menus::main_layout`,
+/// `Menu\mainmenu.ini`); with none it is the faded-art layout's, entry for entry. Returns
+/// the entry clicked and the one under the pointer (-1: none), as indices of `entries`
+/// whether or not the layout hides some.
 pub fn scene_column(ui: &mut Ui, small: &str, big: &str, entries: &[(&str, bool)]) -> (Option<usize>, i32) {
-    scene_column_titled(ui, small, big, false, entries)
-}
-
-/// `scene_column`, with the title as the game's own lettering (`menus::title_art`) when
-/// `art` is set and the picture is there; the text heading otherwise.
-pub fn scene_column_titled(ui: &mut Ui, small: &str, big: &str, art: bool, entries: &[(&str, bool)]) -> (Option<usize>, i32) {
+    use crate::menus::main_layout::{self as ml, Side};
+    let lay = ml::get();
     let screen = ui.screen();
     let t = ui.theme;
-    // Shade for the text: the left, and a little at the top and the foot.
-    ui.draw.rect_hgrad(R::new(0.0, 0.0, screen.w * 0.22, screen.h), 0xd8010205, 0xa0010205);
-    ui.draw.rect_hgrad(R::new(screen.w * 0.22, 0.0, screen.w * 0.3, screen.h), 0xa0010205, 0x00010205);
-    ui.draw.rect_vgrad(R::new(0.0, 0.0, screen.w, screen.h * 0.12), 0x80000000, 0x00000000);
-    ui.draw.rect_vgrad(R::new(0.0, screen.h * 0.84, screen.w, screen.h * 0.16), 0x00000000, 0x90000000);
-
-    // The column's geometry is the faded-art layout's (`draw`), entry for entry: the
-    // bench's scenarios click its entries by position.
-    let (w, eh, gap) = (ui.u(380.0), ui.u(54.0), ui.u(12.0));
-    let n = entries.len() as f32;
-    let title_h = ui.u(90.0);
-    let total = title_h + n * eh + (n - 1.0) * gap;
-    let x = libm::roundf(screen.w * 0.08).max(ui.u(40.0));
-    let top = libm::roundf((screen.h - total) * 0.5);
-    // The title, rising above the column's own title space.
-    let lettering = if art { crate::menus::title_art::get(ui.u(460.0)) } else { None };
-    if let Some((tex, aspect)) = lettering {
-        // The picture holds the rule and both lines: width 460 units, rising a little
-        // above the column's title space, ending inside it.
-        let iw = ui.u(460.0);
-        ui.draw.image(tex, R::new(x - ui.u(8.0), top - ui.u(14.0), iw, iw / aspect), 0xff_ff_ff_ff);
-    } else {
-        ui.text_in(R::new(x, top - ui.u(40.0), w, ui.u(40.0)), small, 28.0, Align::Left, fade(t.text, 0.85), Weight::Bold);
-        ui.text_in(R::new(x - ui.u(3.0), top - ui.u(10.0), w * 1.5, ui.u(80.0)), big, 68.0, Align::Left, t.title, Weight::Bold);
-        let rule = R::new(x, top + ui.u(74.0), ui.u(260.0), ui.u(2.0).max(1.0));
-        ui.draw.rect_hgrad(rule, t.accent, fade(t.accent, 0.0));
+    let mirror = lay.side == Side::Right;
+    let al = match lay.side {
+        Side::Left => Align::Left,
+        Side::Right => Align::Right,
+        Side::Centre => Align::Centre,
+    };
+    static mut LISTED: bool = false;
+    if !unsafe { LISTED } {
+        unsafe { LISTED = true };
+        let keys: alloc::vec::Vec<alloc::string::String> = entries.iter().map(|e| ml::norm(e.0)).collect();
+        crate::log!("menus: main menu entries (the keys of [Entries]): {}", keys.join(", "));
     }
-    let mut y = top + title_h;
+    // The entries shown, under the words the layout gives them.
+    let shown: alloc::vec::Vec<(usize, alloc::string::String, bool)> =
+        entries.iter().enumerate().filter_map(|(i, &(l, on))| lay.entry(l).map(|w| (i, w, on))).collect();
+    // Shade for the text: the column's side, and a little at the top and the foot.
+    let k = lay.opacity;
+    let sh = |c: u32| (c & 0x00ff_ffff) | (((c >> 24) as f32 * k) as u32).min(255) << 24;
+    let (dark, mid) = (sh(0xd8010205), sh(0xa0010205));
+    let clear = sh(0x00010205);
+    match lay.side {
+        Side::Left => {
+            ui.draw.rect_hgrad(R::new(0.0, 0.0, screen.w * 0.22, screen.h), dark, mid);
+            ui.draw.rect_hgrad(R::new(screen.w * 0.22, 0.0, screen.w * 0.3, screen.h), mid, clear);
+        }
+        Side::Right => {
+            ui.draw.rect_hgrad(R::new(screen.w * 0.78, 0.0, screen.w * 0.22, screen.h), mid, dark);
+            ui.draw.rect_hgrad(R::new(screen.w * 0.48, 0.0, screen.w * 0.3, screen.h), clear, mid);
+        }
+        Side::Centre => {
+            ui.draw.rect_hgrad(R::new(screen.w * 0.24, 0.0, screen.w * 0.26, screen.h), clear, dark);
+            ui.draw.rect_hgrad(R::new(screen.w * 0.5, 0.0, screen.w * 0.26, screen.h), dark, clear);
+        }
+    }
+    ui.draw.rect_vgrad(R::new(0.0, 0.0, screen.w, screen.h * 0.12), sh(0x80000000), sh(0x00000000));
+    ui.draw.rect_vgrad(R::new(0.0, screen.h * 0.84, screen.w, screen.h * 0.16), sh(0x00000000), sh(0x90000000));
+
+    // The column's geometry is the faded-art layout's with the built-in layout, entry for
+    // entry: the bench's scenarios click its entries by position.
+    let (w, eh, gap) = (ui.u(lay.width), ui.u(lay.entry_height), ui.u(lay.entry_gap));
+    let n = shown.len() as f32;
+    let auto_x = libm::roundf(screen.w * 0.08).max(ui.u(40.0));
+    let x = match lay.side {
+        Side::Left => lay.x.map_or(auto_x, |v| ui.u(v)),
+        Side::Right => screen.w - lay.x.map_or(auto_x, |v| ui.u(v)) - w,
+        Side::Centre => (screen.w - w) * 0.5 + lay.x.map_or(0.0, |v| ui.u(v)),
+    };
+    // The title: a picture when the layout names one and it is there, else two lines.
+    let lettering = if lay.image.is_empty() { None } else { crate::menus::title_art::get(&lay.image, lay.crop, ui.u(lay.image_width)) };
+    // `rise`: how far the title reaches above the column's nominal top; `bottom`: where
+    // it ends below it.
+    let (rise, bottom) = match lettering {
+        Some((_, aspect)) => (ui.u(14.0), ui.u(lay.image_width) / aspect - ui.u(14.0)),
+        None => (ui.u(40.0), ui.u(76.0)),
+    };
+    let first = bottom + ui.u(lay.title_gap);
+    let total = first + n * eh + (n - 1.0).max(0.0) * gap;
+    let top = match lay.y {
+        Some(y) => ui.u(y) + rise,
+        None => libm::roundf((screen.h - total) * 0.5),
+    };
+    // A box `bw` wide in the column's width, placed on its side.
+    let boxed = |bw: f32| match lay.side {
+        Side::Left => x,
+        Side::Right => x + w - bw,
+        Side::Centre => x + (w - bw) * 0.5,
+    };
+    if let Some((tex, aspect)) = lettering {
+        // The picture holds the rule and both lines, rising a little above the column's
+        // title space.
+        let iw = ui.u(lay.image_width);
+        let ix = match lay.side {
+            Side::Left => x - ui.u(8.0),
+            Side::Right => x + w - iw + ui.u(8.0),
+            Side::Centre => x + (w - iw) * 0.5,
+        };
+        ui.draw.image(tex, R::new(ix, top - ui.u(14.0), iw, iw / aspect), 0xff_ff_ff_ff);
+    } else {
+        let l1 = lay.line1.text.as_deref().unwrap_or(small);
+        let l2 = lay.line2.text.as_deref().unwrap_or(big);
+        let off = match lay.side {
+            Side::Left => -ui.u(3.0),
+            Side::Right => ui.u(3.0),
+            Side::Centre => 0.0,
+        };
+        ui.text_in(R::new(boxed(w), top - ui.u(40.0), w, ui.u(40.0)), l1, lay.line1.size, al, lay.line1.colour.unwrap_or(fade(t.text, 0.85)), Weight::Bold);
+        ui.text_in(R::new(boxed(w * 1.5) + off, top - ui.u(10.0), w * 1.5, ui.u(80.0)), l2, lay.line2.size, al, lay.line2.colour.unwrap_or(t.title), Weight::Bold);
+        if lay.rule {
+            let rw = ui.u(260.0);
+            let rx = match lay.side {
+                Side::Left => x,
+                Side::Right => x + w - rw,
+                Side::Centre => x + (w - rw) * 0.5,
+            };
+            let rc = lay.rule_colour.unwrap_or(t.accent);
+            let rule = R::new(rx, top + ui.u(74.0), rw, ui.u(2.0).max(1.0));
+            match lay.side {
+                Side::Left => ui.draw.rect_hgrad(rule, rc, fade(rc, 0.0)),
+                Side::Right => ui.draw.rect_hgrad(rule, fade(rc, 0.0), rc),
+                Side::Centre => {
+                    ui.draw.rect_hgrad(R::new(rule.x, rule.y, rw * 0.5, rule.h), fade(rc, 0.0), rc);
+                    ui.draw.rect_hgrad(R::new(rule.x + rw * 0.5, rule.y, rw * 0.5, rule.h), rc, fade(rc, 0.0));
+                }
+            }
+        }
+    }
+    let mut y = top + first;
     let mut hover = -1;
     let mut picked = None;
-    for (i, &(label, enabled)) in entries.iter().enumerate() {
+    for &(i, ref label, enabled) in shown.iter() {
         let r = R::new(x, y, w, eh);
         y += eh + gap;
         let id = ui.id(label);
@@ -217,9 +295,14 @@ pub fn scene_column_titled(ui: &mut Ui, small: &str, big: &str, art: bool, entri
         let st = crate::widgets::State::of(ui, id, hot, held);
         let k = st.hot;
         if k > 0.01 {
-            // A glow from the left fading out, the accent bar, the text nudged right.
-            ui.draw.rect_hgrad(r, fade(t.accent, 0.28 * k), fade(t.accent, 0.0));
-            ui.draw.rect(R::new(r.x, r.y + ui.u(8.0), ui.u(4.0).max(2.0), r.h - ui.u(16.0)), fade(t.accent, k));
+            // A glow from the column's edge fading out, the accent bar, the text nudged in.
+            if mirror {
+                ui.draw.rect_hgrad(r, fade(t.accent, 0.0), fade(t.accent, 0.28 * k));
+                ui.draw.rect(R::new(r.x + r.w - ui.u(4.0).max(2.0), r.y + ui.u(8.0), ui.u(4.0).max(2.0), r.h - ui.u(16.0)), fade(t.accent, k));
+            } else {
+                ui.draw.rect_hgrad(r, fade(t.accent, 0.28 * k), fade(t.accent, 0.0));
+                ui.draw.rect(R::new(r.x, r.y + ui.u(8.0), ui.u(4.0).max(2.0), r.h - ui.u(16.0)), fade(t.accent, k));
+            }
         }
         let c = if !enabled {
             t.text_off
@@ -230,8 +313,12 @@ pub fn scene_column_titled(ui: &mut Ui, small: &str, big: &str, art: bool, entri
         } else {
             t.text
         };
-        let tr = R::new(r.x + ui.u(18.0) + ui.u(10.0) * k, r.y, r.w - ui.u(24.0), r.h);
-        ui.text_in(tr, label, 26.0, Align::Left, c, Weight::Bold);
+        let tr = if mirror {
+            R::new(r.x + ui.u(6.0) - ui.u(10.0) * k, r.y, r.w - ui.u(24.0), r.h)
+        } else {
+            R::new(r.x + ui.u(18.0) + ui.u(10.0) * k, r.y, r.w - ui.u(24.0), r.h)
+        };
+        ui.text_in(tr, label, lay.entry_size, al, c, Weight::Bold);
         if hot {
             hover = i as i32;
         }

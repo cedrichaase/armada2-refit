@@ -1104,6 +1104,21 @@ a host of their own, `engine/forms.rs` (drawn by `menus/roots.rs`):
   uploaded as straight alpha with the colour of transparent texels borrowed from their
   neighbours. A missing or unreadable file logs `menus: title picture ...` and the column
   keeps the text heading of decision 206. Armada II's main menu draws no picture.
+- **The main menu's layout file** (decisions 410 to 419, `menus/main_layout.rs`). The
+  column's place, sizes, spacing, title (two lines of text or a picture) and the words and
+  presence of its entries are data, in the menu scene's way: `Menu\mainmenu.ini` in the
+  game directory (Roots: `Data\Menu\mainmenu.ini`) over the content set's `[MainMenu]`
+  (`ui/content/sets/<set>/ui.ini`, entries in `[MainMenu.Entries]`) over the built-in
+  defaults, which are Armada II's look to the pixel. The file is looked at twice a second
+  and read again when it changes. The title picture's path: UI.ini `[Menus] TitleImage=`
+  first (`none`: text), then the file's, then the set's `[MainMenu]`, then `Files.MenuTitle`.
+  `TitleGap` is measured from the title's bottom (a picture's real height, or the text
+  title's rule) to the first entry; the built-in 14 units is the old text layout, and the
+  `fleetops` set says more. Every key and its default is `main_layout::resolve`'s. UI.log says which sources spoke
+  (`menus: main menu layout: ...`) and the first frame lists the entries' keys. Scenarios:
+  `fo-ui-mainmenu-ini` (the set's default at 2150x900 and 3440x1440) and
+  `fo-ui-mainmenu-ini-custom` (a right-side text-title file with an entry hidden and one
+  relabelled); `ui-menus-scene` holds Armada II's menu unchanged.
 - **Read, never written.** Each tick the form's owned components are walked: each control's
   name, class, rectangle, visibility, enabled state and text, at the VCL's field offsets
   (`profiles/gog-1.1/ui.forms.toml`, hook `ui.forms.vcl`: the VCL's fields, read only on a
