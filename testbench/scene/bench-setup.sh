@@ -15,6 +15,13 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 state="${1:?usage: bench-setup.sh <session state.json> [scene]}"
 work="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["work"])' "$state")"
 [ -d "$work/game" ] || { echo "no clone at $work/game" >&2; exit 1; }
+case "$work" in
+    "$HOME"/.cache/a2test/*) ;;
+    *) echo "refusing: $work is not an a2test session" >&2; exit 1 ;;
+esac
+# The executable's folder: the game directory, Data/ on Fleet Operations: Roots.
+. "$here/exe-dir.sh"
+dir="$(exe_dir "$work/game")"
 
 ini="$here/Scene.ini"
 if [ -n "${2:-}" ] && [[ "$2" != *=* ]]; then ini="$here/scenes/$2.ini"; shift; fi
@@ -22,13 +29,13 @@ shift
 [ -f "$ini" ] || { echo "no scene file $ini" >&2; exit 1; }
 
 bash "$here/build.sh" >/dev/null
-cp "$here/build/Scene.asi" "$work/game/"
-cp "$ini" "$work/game/Scene.ini"
+cp "$here/build/Scene.asi" "$dir/"
+cp "$ini" "$dir/Scene.ini"
 for kv in "$@"; do
     case "$kv" in
-        [A-Za-z]*=*) sed -i "s/^\[Scene\]\r\?\$/&\n${kv//\//\\/}/" "$work/game/Scene.ini" ;;
+        [A-Za-z]*=*) sed -i "s/^\[Scene\]\r\?\$/&\n${kv//\//\\/}/" "$dir/Scene.ini" ;;
         *) echo "not Key=value: $kv" >&2; exit 1 ;;
     esac
 done
-rm -f "$work/game/Scene.log" "$work/game/Scene.cmd"
-echo "installed Scene.asi into $work/game, scene $ini"
+rm -f "$dir/Scene.log" "$dir/Scene.cmd" "$dir/Scene.objects.jsonl" "$dir/Scene.objects.tmp"
+echo "installed Scene.asi into $dir, scene $ini"

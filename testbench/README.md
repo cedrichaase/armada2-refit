@@ -249,13 +249,61 @@ Armada II, all read from the descriptor:
   of FleetOpsHook with hulls claimed (`-rings`), the debris at the callee hook (`-debris`),
   the shields' `RTS_CFG.h` keys (`-shields`), the grid's colour (`-grid`) and the logo node's
   texture (`-stlogo`), and the Enterprise-E of the first allied tutorial (`-tutorial`, the
-  single-player screen's mission list; double-click the item, then OK); with the UI layer, `fo-ui-loading` and `fo-ui-loading-off` (FO-6 step 2: the loading screen of ours over Roots' own, `Setup: display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh ...`), and the `fo-ui-forms-*` scenarios (FO-6 step 7, option C: Roots' front-end forms drawn by the UI with `Menus.Forms=1`, `ui/MENUS.md`, "Roots' forms"; our buttons carry Roots' captions, so a step clicks them by label). There is no scene harness on Roots: the fight for `-debris` and
+  single-player screen's mission list; double-click the item, then OK); with the UI layer, `fo-ui-loading` and `fo-ui-loading-off` (FO-6 step 2: the loading screen of ours over Roots' own, `Setup: display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh ...`), and the `fo-ui-forms-*` scenarios (FO-6 step 7, option C: Roots' front-end forms drawn by the UI with `Menus.Forms=1`, `ui/MENUS.md`, "Roots' forms"; our buttons carry Roots' captions, so a step clicks them by label). The fight for `-debris` and
   `-shields` is the Hard AI's own attack on a base left alone, with Game Speed at its top
-  (`_fo-render3d-battle`), a few minutes in. `Setup: display/bench-mode.sh stub
+  (`_fo-render3d-battle`), a few minutes in; `Scene.asi` now runs on Roots too (below). `Setup: display/bench-mode.sh stub
   Backend=vulkan` sets Display8's backend and, on Vulkan, `Validate=1` (the validation
   layer), which is how these scenarios run it before the bench sets it itself. Roots' logs
   are in the prefix's `AppData/Local/armada2-refit/logs/`, which `"Render3D.log"` and
   `"Display8.log"` name.
+
+### Roots straight into a map, and scenes on Roots
+
+The menus are only walked where the menus are what is tested. Everything else starts in
+the map (decisions 420 to 439 of `PLAN-FLEETOPS.md`):
+
+- **A mission or tutorial by its map: `Launch: -nointro tutorialgameplay.bzn`.** Roots'
+  `ArmadaL.exe` parses its command line as stock does (the option table, `CommandLine::*`,
+  `Program::MainLoop` and `SetupDefaultGame` are stock's in the file, and FleetOpsHook
+  writes nothing in them at run time; it adds `-mod` and `rec`), so a bare argument is a
+  map, set up by `SetupDefaultGame`. **The `.bzn` is required**: with it the map's details
+  are read, the player is the race its first start location names (`unitedfederation` for
+  the first allied tutorial) and the map's Lua mission runs (Roots' `mmm_loader` finds it
+  from the map; nothing else is needed): the HUD in about 25 s, the tutorial's briefing at
+  about 50 s. Without it (`tutorialgameplay`) the map loads with no title, no units, no
+  script and a random race. The other tutorials and missions go by their `.bzn` names.
+- **A skirmish with an AI opponent: an Instant Action save, `Launch: -nointro
+  save\ia-fed-kli.sav`.** A command-line name with a backslash is a saved game to stock's
+  `MainLoop`, and a save whose header says Instant Action is set up by
+  `LoadInstantActionGameSetup`: the slots, races, AI and game type come back from the
+  file (HUD in about 25 s). Roots needs its own `<name>.ias` beside the `.sav`, or it stops
+  on a black screen. Saves are the game's data: they live in
+  `$A2_DATA/bench/fo-roots/saves/`, and `Setup: testbench/bench/roots-save.sh ia-fed-kli
+  [next setup script ...]` copies a pair into the clone's `Data/settings_saves_logs/save/`.
+  One is made once per machine: walk Instant Action (`_fo-sides`), LAUNCH, Ctrl+S on the
+  map (Roots writes `save/s1.sav` and `s1.ias`), then `testbench/bench/roots-save.sh --keep
+  SESSION_ID s1 ia-fed-kli`. Only `save\<name>.sav` resolves (a longer or absolute path was
+  taken as a map name).
+- **What does not work: a multiplayer map named bare** (`-nointro Battlezone1v1.bzn`).
+  `SetupDefaultGame` always makes a mission game (`GameTypeDLLMission`); it marks the free
+  start locations as computer players, but nobody gets starting units, and the player's
+  race is random (its start locations name none; one run drew the Observer).
+- **Arguments with spaces** go in double quotes (`Launch: -nointro "Blue Skies.bzn"`,
+  `drive launch -nointro "Blue Skies.bzn"`); the bench keeps backslashes as typed.
+- **The race on Roots is spelled as Roots' `races.odf` spells it**: `unitedfederation`,
+  `klingonempire`, `romulanempire`, and `borg`, `cardassian`, `dominion`, `species8472`,
+  `freeborg` as stock. **`federation` is Roots' Observer** (`Race::Find` takes the first
+  exact match), so `Race=federation` in a scene gives the observer's HUD.
+
+**Scenes on Roots.** `Scene.asi` reads its engine knowledge from the symbol profiles
+(`profiles/gog-1.1/scene.toml`, inherited by `fo-roots-5.0Z11`), so on Roots each of its
+parts runs or stands down by the build's marks, as the shipped plugins' hooks do, and it
+reads and calls what FleetOpsHook replaced through the engine's own entries (the
+overview's `Select`, FleetOpsHook's with its cap of 30), never writing it. It loads
+through the ASI loader, so a Roots scene needs `Layers: display asiloader` (or more), and
+goes into `Data/`. `Setup: testbench/scene/bench-setup.sh game` is the harness alone on
+whatever map the game loaded: the object list, selection and orders by id, the camera,
+pause, seed and step (`scene/README.md`; `scenarios/README.md`, "Objects"). SCENE_STATE_ROOTS
 
 ## Audio stems
 

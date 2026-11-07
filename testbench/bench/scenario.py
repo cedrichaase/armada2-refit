@@ -33,6 +33,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import config, judge, slots, vision
+from . import objects as objs_mod
 from .log import Log
 from .session import GameError, Session
 
@@ -1031,6 +1032,117 @@ def s_scene_answer(c, m):
     return c.checked(ok, out, how=f'Scene.asi\'s answer to "{m.group("cmd")}"')
 
 
+# -- the game's objects, through Scene.asi's `objects` (bench/objects.py; scenarios/README.md, "Objects")
+
+def _objects(c, noun, clauses):
+    flt = objs_mod.from_phrase(noun, clauses or '')
+    header, objs = c.sess.objects()
+    return flt, header, [o for o in objs if flt(o)]
+
+
+def _listing(objs, limit=12):
+    return objs_mod.table(objs[:limit]) + (f'\n... and {len(objs) - limit} more' if len(objs) > limit else '')
+
+
+@step(r'^(?:expect|check|verify)(?: that)? (?:there (?:is|are) )?' + objs_mod.QUANT + r' ' + objs_mod.PHRASE + r'$')
+def s_expect_objects(c, m):
+    """`Expect an object of class "Galaxy" owned by player 1`, `Expect no ship on team 2`,
+    `Expect 3 stations of the player's`, `Expect at least 2 ships within 300 of
+    3000,0,3000`: counted in the game's object list (Scene.asi's `objects`)."""
+    test, want = objs_mod.quantity(m.group('q'))
+    flt, header, hits = _objects(c, m.group('noun'), m.group('clauses'))
+    return c.checked(test(len(hits)), f'{len(hits)} of {header.get("count", "?")} objects are {flt.describe()} '
+                     f'(want {want})' + ('\n' + _listing(hits) if hits else ''),
+                     how="Scene.asi's object list (Scene.objects.jsonl)", measure=dict(count=len(hits)))
+
+
+@step(r'^wait ' + SECS + r'(?:for|until) (?:there (?:is|are) )?' + objs_mod.QUANT + r' ' + objs_mod.PHRASE
+      + r'(?: (?:to )?(?:exists?|appears?|to be there))?$')
+def s_wait_objects(c, m):
+    """`Wait up to 60 seconds until a ship named "mine" is within 100 of 3000,0,3000`,
+    `Wait until no ship is on team 2`: the object list read every second until the count
+    holds. At the limit it is a failed check and the run goes on."""
+    n = int(m.group('n') or 90)
+    test, want = objs_mod.quantity(m.group('q'))
+    end = time.time() + n
+    while True:
+        c.assert_alive()
+        flt, header, hits = _objects(c, m.group('noun'), m.group('clauses'))
+        if test(len(hits)):
+            return f'{len(hits)} {flt.describe()} after {n - max(0, end - time.time()):.0f} s' + \
+                ('\n' + _listing(hits, 6) if hits else '')
+        if time.time() > end:
+            return c.checked(False, f'{len(hits)} objects are {flt.describe()} after {n} s (want {want})'
+                             + ('\n' + _listing(hits, 6) if hits else ''), how="Scene.asi's object list, polled")
+        time.sleep(1)
+
+
+def _pick(c, q, noun, clauses, what):
+    flt, header, hits = _objects(c, noun, clauses)
+    if not hits:
+        raise StepFailed(f'{what}: no object is {flt.describe()} (of {header.get("count", "?")})')
+    if (q or 'the').lower() in ('a', 'an', 'one', 'the', 'any') and not noun.lower().endswith('s'):
+        hits = hits[:1]
+    return flt, hits
+
+
+@step(r'^select ' + objs_mod.QUANT + r' ' + objs_mod.PHRASE + r'$|^add ' + objs_mod.QUANT.replace('<q>', '<q2>')
+      + r' ' + objs_mod.PHRASE.replace('<noun>', '<noun2>').replace('<clauses>', '<clauses2>') + r' to the selection$')
+def s_select_objects(c, m):
+    """`Select the ships of class "Galaxy" on team 1`, `Select a station of the player's`,
+    `Add the ship named "s2" to the selection`: through the overview's own Select, as
+    clicks do (Scene.asi's `select` / `select+` by id). A singular noun takes the first
+    match; a plural takes every match, up to 30 (Roots' cap; FleetOpsHook's Select refuses
+    the rest)."""
+    add = m.group('noun2') is not None
+    q, noun, cl = (m.group('q2'), m.group('noun2'), m.group('clauses2')) if add else \
+        (m.group('q'), m.group('noun'), m.group('clauses'))
+    flt, hits = _pick(c, q, noun, cl, 'select')
+    refs = ' '.join(objs_mod.ref(o) for o in hits[:30])
+    out = c.sess.scene(('select+ ' if add else 'select ') + refs)
+    if '\n  !' in '\n' + out:
+        raise StepFailed('Scene.asi refused: ' + out)
+    return f'{len(hits[:30])} {flt.describe()}: {refs}\n{out}'
+
+
+@step(r'^(?:center|centre|point|put) the camera on ' + objs_mod.QUANT + r' ' + objs_mod.PHRASE + r'$')
+def s_camera_object(c, m):
+    """`Center the camera on the station named "yard1"`: the RTS camera, as the
+    script interface's CenterCamera (Scene.asi's `camera on #id`)."""
+    flt, hits = _pick(c, 'the', m.group('noun').rstrip('s'), m.group('clauses'), 'camera')
+    out = c.sess.scene('camera on ' + objs_mod.ref(hits[0]))
+    if '\n  !' in '\n' + out:
+        raise StepFailed('Scene.asi refused: ' + out)
+    return out
+
+
+@step(r'^order ' + objs_mod.QUANT + r' ' + objs_mod.PHRASE + r' to (?:move|go) to (?P<x>' + objs_mod.NUM
+      + r'),\s*(?P<y>' + objs_mod.NUM + r'),\s*(?P<z>' + objs_mod.NUM + r')(?P<warp> at warp)?$')
+def s_order_move(c, m):
+    """`Order the ships of the player's to move to 3000,0,3000`: a player's move order
+    (Scene.asi's `goto ... world x y z`), the group keeping its places."""
+    flt, hits = _pick(c, m.group('q'), m.group('noun'), m.group('clauses'), 'move')
+    out = c.sess.scene('goto ' + ','.join(objs_mod.ref(o) for o in hits[:30]) +
+                       f' world {m.group("x")} {m.group("y")} {m.group("z")}' + (' warp' if m.group('warp') else ''))
+    if '\n  !' in '\n' + out:
+        raise StepFailed('Scene.asi refused: ' + out)
+    return out
+
+
+@step(r'^order ' + objs_mod.QUANT + r' ' + objs_mod.PHRASE + r' to attack '
+      + objs_mod.QUANT.replace('<q>', '<q2>') + r' '
+      + objs_mod.PHRASE.replace('<noun>', '<noun2>').replace('<clauses>', '<clauses2>') + r'$')
+def s_order_attack(c, m):
+    """`Order the ship named "kli" to attack the station of class "Starbase" on team 2`:
+    each attacker ordered at the first target found (Scene.asi's `attack`)."""
+    _, attackers = _pick(c, m.group('q'), m.group('noun'), m.group('clauses'), 'attack')
+    _, targets = _pick(c, 'the', m.group('noun2').rstrip('s'), m.group('clauses2'), 'attack target')
+    out = '\n'.join(c.sess.scene(f'attack {objs_mod.ref(a)} {objs_mod.ref(targets[0])}') for a in attackers[:30])
+    if '\n  !' in '\n' + out:
+        raise StepFailed('Scene.asi refused: ' + out)
+    return out
+
+
 @step(r'^expect (?:to be on )?the (?P<screen>[\w\' -]+?) (?:screen|menu)(?: to be shown| is shown)?$')
 def s_expect_screen(c, m):
     scr = c.screen_def(m.group('screen').lower())
@@ -1338,7 +1450,8 @@ def s_judge(c, m):
 
 # The steps that act on the game: a log wait reads what was written after the last one.
 ACTIONS = {s_launch, s_quit, s_stop, s_click_at, s_click_text, s_click_named, s_drag, s_move, s_press,
-           s_wheel, s_overlay, s_type, s_type_address, s_type_from_log, s_scene, s_scene_answer}
+           s_wheel, s_overlay, s_type, s_type_address, s_type_from_log, s_scene, s_scene_answer,
+           s_select_objects, s_camera_object, s_order_move, s_order_attack}
 
 
 # ---------------------------------------------------------------------- one case

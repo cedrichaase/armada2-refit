@@ -1,0 +1,1774 @@
+# Scene.asi's symbols in Armada2.exe 1.1 (GOG): what testbench/scene/scene.c reads, calls and
+# patches of the exe, each entry tied to the hook that uses it, so that each part of the scene builder
+# stands down on its own. The findings are in testbench/scene/README.md, "How it works", beside each
+# hook. Scene.asi is the test bench's: it never ships.
+schema = 1
+plugin = "scene"
+readme = "testbench/scene/README.md"
+lang = "c"
+out = "testbench/scene/engine_syms.h"
+
+[hook.tick]
+doc = "Simulate's call of GameObject_UpdateRange runs the scene's tick after it: the scene is built and Scene.cmd read"
+
+[hook.camera]
+doc = "s_UpdateMainCamera's virtual call of UpdateCamera, then the free camera's transform; marks polled per frame"
+
+[hook.build]
+doc = "BuildObject makes the scene file's objects and `spawn`'s at a full transform"
+
+[hook.fog]
+doc = "Scanner::ForceFogAndShroud(false) and ForceUpdate: the map explored, never re-fogged (Fog=0)"
+
+[hook.hud]
+doc = "DisplayInterface::SetInterfaceState and the profile's interface mode (Hud=, `hud`)"
+
+[hook.grid]
+doc = "GridRenderState's records, the grid hidden or shown (Grid=, `grid`)"
+
+[hook.cursor]
+doc = "RefreshDisplay's DrawScaled2D call of the cursor, skipped while the cursor is off (chained)"
+
+[hook.notices]
+doc = "The three GameEvent::TriggerEvent entries return false while notices are off"
+
+[hook.tooltips]
+doc = "AlwaysSimulate's TooltipOn call answers no object while tooltips are off"
+
+[hook.hover]
+doc = "AlwaysSimulate's and PreRender's MouseOn calls answer no object while hover is off"
+
+[hook.shieldfx]
+doc = "The four weapons' CreateShieldHit calls answer no effect while shield hits are off (chained)"
+
+[hook.heal]
+doc = "Hull, shields, crew and systems back to full every tick (Heal=, `heal`)"
+
+[hook.damage]
+doc = "CraftInstance's Update slot: a system's damage node shown or hidden (Vent=, `vent`)"
+
+[hook.special]
+doc = "Special energy filled and a special weapon fired by its ODF (`special`, `energy`, Energy=)"
+
+[hook.attack]
+doc = "ScriptInterfaceImp::Attack (Attack=, `attack`)"
+
+[hook.switches]
+doc = "ScriptInterfaceImp's DisableEngines, DisableWeapons and CraftCannotDie (`engines`, `weapons`, `immortal`)"
+
+[hook.kill]
+doc = "ScriptInterfaceImp::ExplodeNow: a craft dies now (`kill`)"
+
+[hook.mission]
+doc = "ScriptInterfaceImp's SucceedMission and FailMission (`succeed`, `fail`)"
+
+[hook.move]
+doc = "GameObject::SetCommand's overloads and DeQueueCommand: GO, GO_WARP, STOP, SET_FORMATION"
+
+[hook.build_order]
+doc = "A BUILD order to a construction ship, its team paid first (`build`)"
+
+[hook.cloak]
+doc = "A craft's cloaking device asked to cloak or decloak, or cloaked at once (`cloak`)"
+
+[hook.freighter]
+doc = "Freighter::LoadResource fills or empties a freighter's hold (`cargo`)"
+
+[hook.colonize]
+doc = "A planet colonised without a colony ship, or made neutral (Population=, `colonize`)"
+
+[hook.tech]
+doc = "A team's TechnologyTree item made available or not (Tech=, `tech`)"
+
+[hook.marks]
+doc = "Ordnance and explosion lists read each frame for Scene.marks; the ordnance named by its ODF"
+
+[hook.seed]
+doc = "RandomSequence's constructor on g_random, g_missionRandom and g_asyncRandom (Seed=, `seed`)"
+
+[hook.seed_load]
+doc = "GameOpenPreLoad's Starfield_Initialize call seeds the sequences first (Seed=)"
+
+[hook.step]
+doc = "GameProcess's getGameSpeedModifier call sets the tick's milliseconds first (Step=)"
+
+[hook.race]
+doc = "SetupDefaultGame's two Race::Find calls answer the race of Race="
+
+[hook.captions]
+doc = "ShowTitle's and ShowSubtitle's AddMessage calls add nothing while Captions=0"
+
+[hook.music]
+doc = "StartMusic and JukeBox::mStartNewTrack return at once (Music=0)"
+
+[hook.pause]
+doc = "ScriptInterfaceImp's PauseSimulation and UnpauseSimulation; the sim time read (`pause`, Pause=)"
+
+[hook.center]
+doc = "ScriptInterfaceImp::CenterCamera (Center=, `center`, `camera on`)"
+
+[hook.zoom]
+doc = "The camera in use's SetZoomLevel, and its zoom read in its own unit (Zoom=, `zoom`)"
+
+[hook.locate]
+doc = "ScriptInterfaceImp::GetLocation and the RTS camera's interest point (`query`, Anchor=camera)"
+
+[hook.select]
+doc = "The overview's own Select, through g_pOverView, and its selection read back (`select`, `selection`)"
+
+[hook.groups]
+doc = "The overview's ship and station control groups listed (`selection`)"
+
+[hook.waypoint]
+doc = "The overview's waypoint-key binding pointed at a state of ours while held (`waypoint-key`)"
+
+[hook.objects]
+doc = "GameObject::objectList walked read-only into Scene.objects.jsonl (`objects`)"
+
+# The game tick: Simulate's one unconditional call of GameObject_UpdateRange.
+[[sym]]
+id = "site_tick"
+symbol = "GameObject_UpdateRange"
+kind = "call"
+addr = 0x483351
+target = "fn_update_range"
+in = "Simulate"
+used_by = ["tick"]
+
+[[sym]]
+id = "fn_update_range"
+symbol = "GameObject_UpdateRange"
+kind = "fn"
+addr = 0x4d3e90
+check = "55 8b ec 83 ec 28 a1 80 10 76 00"
+used_by = ["tick"]
+
+# s_UpdateMainCamera's virtual call of the view's UpdateCamera (6 bytes, `call *0x88(%eax)`), made a
+# direct call of ours.
+[[sym]]
+id = "site_main_camera"
+symbol = "s_UpdateMainCamera"
+kind = "patch"
+addr = 0x53edac
+check = "ff 90 88 00 00 00"
+in = "s_UpdateMainCamera"
+used_by = ["camera"]
+
+[[sym]]
+id = "view_vt_update_camera"
+symbol = "cOverViewImp vtable (UpdateCamera)"
+kind = "field"
+struct = "cOverViewImp vtable (UpdateCamera)"
+offset = 0x88
+type = "ptr"
+used_by = ["camera"]
+
+[[sym]]
+id = "cam_to_world"
+symbol = "ST3D_Camera"
+kind = "field"
+struct = "ST3D_Camera"
+offset = 0xc0
+type = "m34"
+used_by = ["camera", "locate", "marks"]
+
+[[sym]]
+id = "cam_vt_set_transform"
+symbol = "ST3D_Camera vtable (SetTransform)"
+kind = "field"
+struct = "ST3D_Camera vtable (SetTransform)"
+offset = 0x14
+type = "ptr"
+used_by = ["camera"]
+
+# Entity::Get(handle), cdecl: the object of a handle, or NULL.
+[[sym]]
+id = "fn_entity_get"
+symbol = "Entity::Get"
+kind = "fn"
+addr = 0x4cfff0
+check = "55 8b ec 8b 4d 08 8b c1"
+used_by = ["heal", "special", "damage", "move", "build_order", "cloak", "freighter", "colonize", "tech", "marks", "select", "groups", "objects", "build", "switches", "kill", "attack", "locate", "center"]
+
+[[sym]]
+id = "obj_handle"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x28
+type = "i32"
+used_by = ["build", "damage", "objects"]
+
+[[sym]]
+id = "obj_flags"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x14
+type = "u32"
+used_by = ["heal", "special", "damage", "move", "marks", "select", "objects"]
+
+[[sym]]
+id = "flag_craft"
+symbol = "flag_craft"
+kind = "value"
+value = 8
+used_by = ["heal", "special", "damage", "move", "marks", "objects"]
+
+[[sym]]
+id = "flag_producer"
+symbol = "flag_producer"
+kind = "value"
+value = 0x200
+used_by = ["select"]
+
+[[sym]]
+id = "obj_dead"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x113
+type = "u8"
+used_by = ["move", "marks", "objects"]
+
+[[sym]]
+id = "obj_team"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0xec
+type = "i32"
+used_by = ["colonize", "build_order", "tech", "objects"]
+
+[[sym]]
+id = "obj_class"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x40
+type = "ptr"
+used_by = ["select", "objects"]
+
+[[sym]]
+id = "obj_group"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x120
+type = "i32"
+used_by = ["select", "objects"]
+
+# BuildObject(char *odf, int team, const Matrix34 &), cdecl.
+[[sym]]
+id = "fn_build_object"
+symbol = "BuildObject"
+kind = "fn"
+addr = 0x451990
+check = "55 8b ec 8b 45 08 56 50"
+used_by = ["build"]
+
+[[sym]]
+id = "fn_force_fog"
+symbol = "Scanner::ForceFogAndShroud"
+kind = "fn"
+addr = 0x4935d0
+check = "55 8b ec 8b 0d d4 b8 76 00"
+used_by = ["fog"]
+
+[[sym]]
+id = "fn_force_update"
+symbol = "Scanner::ForceUpdate"
+kind = "fn"
+addr = 0x493600
+check = "8b 0d 54 8a 73 00 b0 01"
+used_by = ["fog"]
+
+[[sym]]
+id = "fn_set_iface_state"
+symbol = "DisplayInterface::SetInterfaceState"
+kind = "fn"
+addr = 0x51a460
+check = "55 8b ec 8b 45 08 53 83"
+used_by = ["hud"]
+
+# UserProfile: the GameConfiguration whose +0x78 is the interface mode toggle_interface steps through.
+[[sym]]
+id = "user_profile"
+symbol = "UserProfile"
+kind = "global"
+addr = 0x76b5ac
+used_by = ["hud"]
+
+[[sym]]
+id = "profile_iface_mode"
+symbol = "GameConfiguration"
+kind = "field"
+struct = "GameConfiguration"
+offset = 0x78
+type = "i32"
+used_by = ["hud"]
+
+# GridRenderState: three ints per view, {mode, ?, visible}, that grid_toggle cycles through.
+[[sym]]
+id = "grid_records"
+symbol = "(unnamed) GridRenderState records"
+kind = "global"
+addr = 0x768e18
+used_by = ["grid"]
+
+[[sym]]
+id = "site_cursor_draw"
+symbol = "ST3D_Sprite::DrawScaled2D"
+kind = "call"
+addr = 0x6246fa
+target = "fn_draw_scaled_2d"
+in = "ST3D_DeviceDirectX8::RefreshDisplay"
+chain = true
+used_by = ["cursor"]
+
+[[sym]]
+id = "fn_draw_scaled_2d"
+symbol = "ST3D_Sprite::DrawScaled2D"
+kind = "fn"
+addr = 0x63ada0
+check = "55 8b ec 83 ec 34 56 57"
+used_by = ["cursor"]
+
+# The three entries of GameEvent::TriggerEvent (no argument; a Vector3, team and Race; a Race): the
+# first bytes become `xor eax,eax; ret n`.
+[[sym]]
+id = "ev_trigger_0"
+symbol = "GameEvent::TriggerEvent"
+kind = "patch"
+addr = 0x479880
+check = "55 8b ec 6a ff 68"
+in = "GameEvent::TriggerEvent"
+used_by = ["notices"]
+
+[[sym]]
+id = "ev_trigger_3"
+symbol = "GameEvent::TriggerEvent"
+kind = "patch"
+addr = 0x4799a0
+check = "55 8b ec 6a ff 68"
+in = "GameEvent::TriggerEvent"
+used_by = ["notices"]
+
+[[sym]]
+id = "ev_trigger_1"
+symbol = "GameEvent::TriggerEvent"
+kind = "patch"
+addr = 0x479bb0
+check = "55 8b ec 6a ff 68"
+in = "GameEvent::TriggerEvent"
+used_by = ["notices"]
+
+[[sym]]
+id = "site_tooltip_on"
+symbol = "DisplayInterface::TooltipOn"
+kind = "call"
+addr = 0x508070
+target = "fn_tooltip_on"
+in = "SelectionDisplay::AlwaysSimulate"
+chain = true
+used_by = ["tooltips"]
+
+[[sym]]
+id = "fn_tooltip_on"
+symbol = "DisplayInterface::TooltipOn"
+kind = "fn"
+addr = 0x51b610
+check = "a1 24 50 76 00 50 e8"
+used_by = ["tooltips"]
+
+[[sym]]
+id = "site_hover_sim"
+symbol = "DisplayInterface::MouseOn"
+kind = "call"
+addr = 0x5080fc
+target = "fn_mouse_on"
+in = "SelectionDisplay::AlwaysSimulate"
+chain = true
+used_by = ["hover"]
+
+[[sym]]
+id = "site_hover_pre"
+symbol = "DisplayInterface::MouseOn"
+kind = "call"
+addr = 0x508e72
+target = "fn_mouse_on"
+in = "SelectionDisplay::PreRender"
+chain = true
+used_by = ["hover"]
+
+[[sym]]
+id = "fn_mouse_on"
+symbol = "DisplayInterface::MouseOn"
+kind = "fn"
+addr = 0x51b5e0
+check = "a1 20 50 76 00 50 e8"
+used_by = ["hover"]
+
+[[sym]]
+id = "site_hit_beam"
+symbol = "ShieldEffect::CreateShieldHit"
+kind = "call"
+addr = 0x58bb95
+target = "fn_create_shield_hit"
+in = "Beam::Simulate"
+chain = true
+used_by = ["shieldfx"]
+
+[[sym]]
+id = "site_hit_shot"
+symbol = "ShieldEffect::CreateShieldHit"
+kind = "call"
+addr = 0x58cad8
+target = "fn_create_shield_hit"
+in = "Bullet::Simulate"
+chain = true
+used_by = ["shieldfx"]
+
+[[sym]]
+id = "site_hit_mine"
+symbol = "ShieldEffect::CreateShieldHit"
+kind = "call"
+addr = 0x58d502
+target = "fn_create_shield_hit"
+in = "Mine::mMoveTowardsTarget"
+chain = true
+used_by = ["shieldfx"]
+
+[[sym]]
+id = "site_hit_missile"
+symbol = "ShieldEffect::CreateShieldHit"
+kind = "call"
+addr = 0x58dd65
+target = "fn_create_shield_hit"
+in = "Missile::Simulate"
+chain = true
+used_by = ["shieldfx"]
+
+[[sym]]
+id = "fn_create_shield_hit"
+symbol = "ShieldEffect::CreateShieldHit"
+kind = "fn"
+addr = 0x4743b0
+check = "55 8b ec 6a ff 68"
+used_by = ["shieldfx"]
+
+# g_pScriptInterface: the ScriptInterfaceImp the methods below are called on (none of them reads
+# `this`).
+[[sym]]
+id = "script_interface"
+symbol = "g_pScriptInterface"
+kind = "global"
+addr = 0x735c70
+used_by = ["heal", "special", "attack", "switches", "kill", "mission", "move", "build_order", "pause", "center", "locate", "tick", "cloak"]
+
+[[sym]]
+id = "si_attack"
+symbol = "ScriptInterfaceImp::Attack"
+kind = "fn"
+addr = 0x452be0
+check = "55 8b ec 8b 45 08 56 50"
+used_by = ["attack"]
+
+[[sym]]
+id = "si_get_location"
+symbol = "ScriptInterfaceImp::GetLocation"
+kind = "fn"
+addr = 0x453140
+check = "55 8b ec 8b 45 08 50 e8"
+used_by = ["locate", "move", "build_order", "marks", "camera", "build"]
+
+[[sym]]
+id = "si_pause"
+symbol = "ScriptInterfaceImp::PauseSimulation"
+kind = "fn"
+addr = 0x454cc0
+check = "b9 58 37 76 00 c6 05 da"
+used_by = ["pause"]
+
+[[sym]]
+id = "si_unpause"
+symbol = "ScriptInterfaceImp::UnpauseSimulation"
+kind = "fn"
+addr = 0x454cf0
+check = "b9 58 37 76 00 c6 05 da"
+used_by = ["pause"]
+
+[[sym]]
+id = "si_center_camera"
+symbol = "ScriptInterfaceImp::CenterCamera"
+kind = "fn"
+addr = 0x455190
+check = "55 8b ec 8b 45 08 50 e8"
+used_by = ["center"]
+
+[[sym]]
+id = "si_no_engines"
+symbol = "ScriptInterfaceImp::DisableEngines"
+kind = "fn"
+addr = 0x456960
+check = "55 8b ec 8b 45 08 50 e8"
+used_by = ["switches", "move", "build_order", "tick"]
+
+[[sym]]
+id = "si_no_weapons"
+symbol = "ScriptInterfaceImp::DisableWeapons"
+kind = "fn"
+addr = 0x456a60
+check = "55 8b ec 8b 45 08 50 e8"
+used_by = ["switches", "tick"]
+
+[[sym]]
+id = "si_set_health"
+symbol = "ScriptInterfaceImp::SetCurrentHealth"
+kind = "fn"
+addr = 0x456d20
+check = "55 8b ec 8b 45 08 50 e8"
+used_by = ["heal"]
+
+[[sym]]
+id = "si_max_health"
+symbol = "ScriptInterfaceImp::GetMaxHealth"
+kind = "fn"
+addr = 0x456da0
+check = "55 8b ec 8b 45 08 50 e8"
+used_by = ["heal"]
+
+[[sym]]
+id = "si_cannot_die"
+symbol = "ScriptInterfaceImp::CraftCannotDie"
+kind = "fn"
+addr = 0x457590
+check = "55 8b ec 8b 45 08 50 e8"
+used_by = ["switches", "kill", "tick"]
+
+[[sym]]
+id = "si_explode_now"
+symbol = "ScriptInterfaceImp::ExplodeNow"
+kind = "fn"
+addr = 0x456cf0
+check = "55 8b ec 8b 45 08 50 e8"
+used_by = ["kill"]
+
+[[sym]]
+id = "si_succeed"
+symbol = "ScriptInterfaceImp::SucceedMission"
+kind = "fn"
+addr = 0x457d70
+check = "55 8b ec 8b 45 0c 8b 4d"
+used_by = ["mission"]
+
+[[sym]]
+id = "si_fail"
+symbol = "ScriptInterfaceImp::FailMission"
+kind = "fn"
+addr = 0x457d50
+check = "55 8b ec 8b 45 0c 8b 4d"
+used_by = ["mission"]
+
+[[sym]]
+id = "si_set_shields"
+symbol = "ScriptInterfaceImp::SetShieldPercent"
+kind = "fn"
+addr = 0x455eb0
+check = "55 8b ec 8b 45 08 50 e8"
+used_by = ["heal"]
+
+[[sym]]
+id = "si_set_crew"
+symbol = "ScriptInterfaceImp::SetCrew"
+kind = "fn"
+addr = 0x456060
+check = "55 8b ec 8b 45 08 50 e8"
+used_by = ["heal"]
+
+[[sym]]
+id = "si_set_special"
+symbol = "ScriptInterfaceImp::SetSpecialEnergy"
+kind = "fn"
+addr = 0x456280
+check = "55 8b ec 8b 45 08 50 e8"
+used_by = ["special", "cloak"]
+
+[[sym]]
+id = "fn_repair_all"
+symbol = "Craft::RepairAllSystemsComplete"
+kind = "fn"
+addr = 0x4c8be0
+check = "53 56 8b f1 33 db 8b 86"
+used_by = ["heal"]
+
+[[sym]]
+id = "craft_max_crew"
+symbol = "Craft"
+kind = "field"
+struct = "Craft"
+offset = 0x1c4
+type = "f32"
+used_by = ["heal", "objects"]
+
+[[sym]]
+id = "craft_shields"
+symbol = "Craft"
+kind = "field"
+struct = "Craft"
+offset = 0x1c8
+type = "f32"
+used_by = ["heal", "objects"]
+
+[[sym]]
+id = "craft_shields_max"
+symbol = "Craft"
+kind = "field"
+struct = "Craft"
+offset = 0x1cc
+type = "f32"
+used_by = ["heal", "objects"]
+
+[[sym]]
+id = "craft_crew"
+symbol = "Craft"
+kind = "field"
+struct = "Craft"
+offset = 0x1dc
+type = "f32"
+used_by = ["heal", "objects"]
+
+[[sym]]
+id = "craft_systems"
+symbol = "Craft"
+kind = "field"
+struct = "Craft"
+offset = 0x1e0
+type = "ptr"
+used_by = ["heal", "damage"]
+
+[[sym]]
+id = "sys_online"
+symbol = "CraftSystem"
+kind = "field"
+struct = "CraftSystem"
+offset = 0x0
+type = "u8"
+used_by = ["heal"]
+
+[[sym]]
+id = "sys_held_off"
+symbol = "CraftSystem"
+kind = "field"
+struct = "CraftSystem"
+offset = 0x1
+type = "u8"
+used_by = ["heal", "damage"]
+
+[[sym]]
+id = "sys_max_hp"
+symbol = "CraftSystem"
+kind = "field"
+struct = "CraftSystem"
+offset = 0x4
+type = "i32"
+used_by = ["heal"]
+
+[[sym]]
+id = "sys_hp"
+symbol = "CraftSystem (a double)"
+kind = "field"
+struct = "CraftSystem (a double)"
+offset = 0x18
+type = "u32"
+used_by = ["heal"]
+
+[[sym]]
+id = "sys_size"
+symbol = "sys_size"
+kind = "value"
+value = 0x30
+unit = "bytes"
+used_by = ["heal", "damage"]
+
+[[sym]]
+id = "vt_craft_instance"
+symbol = "CraftInstance"
+kind = "vtable"
+addr = 0x6b3e2c
+used_by = ["damage"]
+
+[[sym]]
+id = "slot_inst_update"
+symbol = "CraftInstance::Update"
+kind = "slot"
+vtable = "vt_craft_instance"
+index = 0xe
+target = "fn_inst_update"
+used_by = ["damage"]
+
+[[sym]]
+id = "fn_inst_update"
+symbol = "CraftInstance::Update"
+kind = "fn"
+addr = 0x4cb390
+check = "55 8b ec a1 ac 0b 74 00"
+used_by = ["damage"]
+
+[[sym]]
+id = "inst_sys_shown"
+symbol = "CraftInstance"
+kind = "field"
+struct = "CraftInstance"
+offset = 0x9c
+type = "u8"
+used_by = ["damage"]
+
+[[sym]]
+id = "fn_prj_set_name"
+symbol = "cPrjID::SetName"
+kind = "fn"
+addr = 0x6593c0
+check = "55 8b ec 83 ec 40 53 57"
+used_by = ["special"]
+
+[[sym]]
+id = "fn_weapon_find"
+symbol = "WeaponClass::Find"
+kind = "fn"
+addr = 0x664850
+check = "55 8b ec 6a ff 68"
+used_by = ["special"]
+
+[[sym]]
+id = "fn_fire_at_special"
+symbol = "Craft::FireAtSpecial"
+kind = "fn"
+addr = 0x4c3820
+check = "55 8b ec a1 c0 0f 7b 00"
+used_by = ["special"]
+
+[[sym]]
+id = "fn_fire_special"
+symbol = "Craft::FireAtSpecial"
+kind = "fn"
+addr = 0x4c3b20
+check = "55 8b ec a1 c0 0f 7b 00"
+used_by = ["special"]
+
+[[sym]]
+id = "craft_special_max"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x168
+type = "f32"
+used_by = ["special", "cloak", "objects"]
+
+[[sym]]
+id = "craft_special"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x16c
+type = "f32"
+used_by = ["special", "cloak", "objects"]
+
+[[sym]]
+id = "craft_carrier"
+symbol = "Craft"
+kind = "field"
+struct = "Craft"
+offset = 0x128
+type = "ptr"
+used_by = ["special"]
+
+[[sym]]
+id = "carrier_weapons"
+symbol = "Carrier"
+kind = "field"
+struct = "Carrier"
+offset = 0xc
+type = "ptr"
+used_by = ["special"]
+
+[[sym]]
+id = "carrier_weapons_end"
+symbol = "Carrier"
+kind = "field"
+struct = "Carrier"
+offset = 0x10
+type = "ptr"
+used_by = ["special"]
+
+[[sym]]
+id = "weapon_class"
+symbol = "Weapon"
+kind = "field"
+struct = "Weapon"
+offset = 0x4
+type = "ptr"
+used_by = ["special"]
+
+[[sym]]
+id = "weapon_vt_can_fire"
+symbol = "Weapon vtable (can it fire at this target now)"
+kind = "field"
+struct = "Weapon vtable (can it fire at this target now)"
+offset = 0x20
+type = "ptr"
+used_by = ["special"]
+
+# The GameObject::SetCommand overloads the script interface's own orders end in: (AiCommand, const
+# GameObject *, long, bool), (AiCommand, long, bool, bool), (AiCommand, const Vector3 &, long, bool);
+# DeQueueCommand(AiCommand, long).
+[[sym]]
+id = "fn_set_command_obj"
+symbol = "GameObject::SetCommand"
+kind = "fn"
+addr = 0x4d1af0
+check = "55 8b ec 8b 45 14 8b 55"
+used_by = ["move"]
+
+[[sym]]
+id = "fn_set_command"
+symbol = "GameObject::SetCommand"
+kind = "fn"
+addr = 0x4d1a40
+check = "55 8b ec 64 a1 00 00 00"
+used_by = ["move"]
+
+[[sym]]
+id = "fn_set_command_at"
+symbol = "GameObject::SetCommand"
+kind = "fn"
+addr = 0x4d1b50
+check = "55 8b ec 8b 45 14 8b 55"
+used_by = ["move"]
+
+[[sym]]
+id = "fn_dq_command"
+symbol = "GameObject::DeQueueCommand"
+kind = "fn"
+addr = 0x4d4630
+check = "55 8b ec 8b 45 0c 8b 55"
+used_by = ["move"]
+
+[[sym]]
+id = "cmd_stop"
+symbol = "cmd_stop"
+kind = "value"
+value = 3
+used_by = ["move"]
+
+[[sym]]
+id = "cmd_go"
+symbol = "cmd_go"
+kind = "value"
+value = 4
+used_by = ["move"]
+
+[[sym]]
+id = "cmd_set_formation"
+symbol = "cmd_set_formation"
+kind = "value"
+value = 0x2a
+used_by = ["move"]
+
+[[sym]]
+id = "cmd_go_warp"
+symbol = "cmd_go_warp"
+kind = "value"
+value = 0x2b
+used_by = ["move"]
+
+[[sym]]
+id = "fn_set_command_build"
+symbol = "GameObject::SetCommand"
+kind = "fn"
+addr = 0x4d1cb0
+check = "55 8b ec 64 a1 00 00 00"
+used_by = ["build_order"]
+
+[[sym]]
+id = "fn_class_find"
+symbol = "GameObjectClass::Find"
+kind = "fn"
+addr = 0x4cd370
+check = "55 8b ec 8b 45 08 8d 4d"
+used_by = ["build_order"]
+
+[[sym]]
+id = "fn_team_add_res"
+symbol = "Team::AddResource"
+kind = "fn"
+addr = 0x4988d0
+check = "55 8b ec 51 8b 45 0c 56"
+used_by = ["build_order"]
+
+[[sym]]
+id = "fn_team_get"
+symbol = "Team::GetTeam"
+kind = "fn"
+addr = 0x496340
+check = "55 8b ec 8b 45 08 8b 04"
+used_by = ["build_order", "colonize"]
+
+[[sym]]
+id = "cmd_build"
+symbol = "cmd_build"
+kind = "value"
+value = 0x19
+used_by = ["build_order"]
+
+[[sym]]
+id = "max_team"
+symbol = "max_team"
+kind = "value"
+value = 0xc
+used_by = ["build_order", "colonize"]
+
+[[sym]]
+id = "fn_cloak_now"
+symbol = "GameObject::ImmediateCloak"
+kind = "fn"
+addr = 0x4d03e0
+check = "8b 89 08 01 00 00 85 c9"
+used_by = ["cloak"]
+
+[[sym]]
+id = "obj_cloak"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x108
+type = "ptr"
+used_by = ["cloak", "marks", "locate"]
+
+[[sym]]
+id = "cloak_request"
+symbol = "CloakingDevice"
+kind = "field"
+struct = "CloakingDevice"
+offset = 0x2c
+type = "u8"
+used_by = ["cloak"]
+
+[[sym]]
+id = "cloak_state"
+symbol = "CloakingDevice"
+kind = "field"
+struct = "CloakingDevice"
+offset = 0x3c
+type = "u32"
+used_by = ["cloak", "marks", "locate"]
+
+[[sym]]
+id = "vt_freighter"
+symbol = "Freighter"
+kind = "vtable"
+addr = 0x6b26a8
+used_by = ["freighter"]
+
+[[sym]]
+id = "fn_freighter_load"
+symbol = "Freighter::LoadResource"
+kind = "fn"
+addr = 0x4b16f0
+check = "55 8b ec 8b 45 0c 8b 91"
+used_by = ["freighter"]
+
+[[sym]]
+id = "freighter_amount"
+symbol = "Freighter"
+kind = "field"
+struct = "Freighter"
+offset = 0x258
+type = "f32"
+used_by = ["freighter"]
+
+[[sym]]
+id = "freighter_kind"
+symbol = "Freighter"
+kind = "field"
+struct = "Freighter"
+offset = 0x25c
+type = "i32"
+used_by = ["freighter"]
+
+[[sym]]
+id = "vt_planet"
+symbol = "Planet"
+kind = "vtable"
+addr = 0x6b2b3c
+used_by = ["colonize", "locate"]
+
+[[sym]]
+id = "fn_pl_start_colony"
+symbol = "Planet::StartWithColony"
+kind = "fn"
+addr = 0x4b5660
+check = "55 8b ec a1 84 10 76 00"
+used_by = ["colonize"]
+
+[[sym]]
+id = "fn_pl_set_pop"
+symbol = "Planet::SetPopulation"
+kind = "fn"
+addr = 0x4b5970
+check = "55 8b ec d9 45 08 d8 1d"
+used_by = ["colonize"]
+
+[[sym]]
+id = "fn_pl_max_pop"
+symbol = "Planet::GetMaxPopulation"
+kind = "fn"
+addr = 0x4b5550
+check = "8b 41 40 8b 80 90 04 00"
+used_by = ["colonize"]
+
+[[sym]]
+id = "fn_pl_neutralize"
+symbol = "Planet::NeutralizePlanet"
+kind = "fn"
+addr = 0x4b5150
+check = "53 8b d9 56 33 f6 39 b3"
+used_by = ["colonize"]
+
+[[sym]]
+id = "fn_craft_set_crew"
+symbol = "Craft::SetCrew"
+kind = "fn"
+addr = 0x4c83e0
+check = "55 8b ec d9 81 c4 01 00"
+used_by = ["colonize"]
+
+[[sym]]
+id = "team_race"
+symbol = "Team"
+kind = "field"
+struct = "Team"
+offset = 0x244
+type = "ptr"
+used_by = ["colonize"]
+
+[[sym]]
+id = "race_city_name"
+symbol = "Race"
+kind = "field"
+struct = "Race"
+offset = 0x452
+type = "u8"
+used_by = ["colonize"]
+
+[[sym]]
+id = "pl_population"
+symbol = "Planet"
+kind = "field"
+struct = "Planet"
+offset = 0x2ac
+type = "f32"
+used_by = ["colonize", "locate"]
+
+[[sym]]
+id = "pl_shown_race"
+symbol = "Planet"
+kind = "field"
+struct = "Planet"
+offset = 0x2c4
+type = "ptr"
+used_by = ["colonize"]
+
+[[sym]]
+id = "pl_shown_pop"
+symbol = "Planet"
+kind = "field"
+struct = "Planet"
+offset = 0x2c8
+type = "f32"
+used_by = ["colonize", "locate"]
+
+[[sym]]
+id = "tech_trees"
+symbol = "g_technologyTreeArray"
+kind = "global"
+addr = 0x739000
+used_by = ["tech"]
+
+[[sym]]
+id = "tech_tree_size"
+symbol = "tech_tree_size"
+kind = "value"
+value = 0x98
+unit = "bytes"
+used_by = ["tech"]
+
+[[sym]]
+id = "tech_max_team"
+symbol = "tech_max_team"
+kind = "value"
+value = 8
+used_by = ["tech"]
+
+[[sym]]
+id = "fn_tech_find"
+symbol = "TechnologyTree::mFind"
+kind = "fn"
+addr = 0x4999e0
+check = "55 8b ec 51 53 56 57 8b"
+used_by = ["tech"]
+
+[[sym]]
+id = "tech_available"
+symbol = "TechItem"
+kind = "field"
+struct = "TechItem"
+offset = 0x4
+type = "u8"
+used_by = ["tech"]
+
+[[sym]]
+id = "tech_possible"
+symbol = "TechItem"
+kind = "field"
+struct = "TechItem"
+offset = 0xc
+type = "u8"
+used_by = ["tech"]
+
+# Ordnance::ordnanceList and Explosion::explosionList, each a std::list: the head node's pointer.
+[[sym]]
+id = "ordnance_list"
+symbol = "(unnamed) Ordnance::ordnanceList head node"
+kind = "global"
+addr = 0x771fac
+used_by = ["marks"]
+
+[[sym]]
+id = "explosion_list"
+symbol = "(unnamed) Explosion::explosionList head node"
+kind = "global"
+addr = 0x7367c4
+used_by = ["marks"]
+
+[[sym]]
+id = "ord_class"
+symbol = "Ordnance"
+kind = "field"
+struct = "Ordnance"
+offset = 0x34
+type = "ptr"
+used_by = ["marks"]
+
+[[sym]]
+id = "ord_owner"
+symbol = "Ordnance"
+kind = "field"
+struct = "Ordnance"
+offset = 0x5c
+type = "i32"
+used_by = ["marks"]
+
+[[sym]]
+id = "ord_target"
+symbol = "Ordnance"
+kind = "field"
+struct = "Ordnance"
+offset = 0x60
+type = "i32"
+used_by = ["marks"]
+
+[[sym]]
+id = "ord_class_prj"
+symbol = "OrdnanceClass"
+kind = "field"
+struct = "OrdnanceClass"
+offset = 0x150
+type = "ptr"
+used_by = ["marks"]
+
+[[sym]]
+id = "fn_prj_get_odf"
+symbol = "cPrjID::GetOdfName"
+kind = "fn"
+addr = 0x6593a0
+check = "8b 01 85 c0 75 06"
+used_by = ["marks"]
+
+[[sym]]
+id = "exp_radius"
+symbol = "Explosion"
+kind = "field"
+struct = "Explosion"
+offset = 0x34
+type = "f32"
+used_by = ["marks"]
+
+[[sym]]
+id = "vt_fireball"
+symbol = "FireballExplosion"
+kind = "vtable"
+addr = 0x6afbd4
+used_by = ["marks"]
+
+[[sym]]
+id = "vt_shockwave"
+symbol = "ShockwaveExplosion"
+kind = "vtable"
+addr = 0x6afdac
+used_by = ["marks"]
+
+[[sym]]
+id = "fn_entity_transform"
+symbol = "Entity::GetTransform"
+kind = "fn"
+addr = 0x4cfd50
+check = "8b 41 04 83 c0 44 c3"
+used_by = ["marks", "objects"]
+
+[[sym]]
+id = "list_head"
+symbol = "std::list"
+kind = "field"
+struct = "std::list"
+offset = 0x4
+type = "ptr"
+used_by = ["objects"]
+
+[[sym]]
+id = "node_next"
+symbol = "std::list node"
+kind = "field"
+struct = "std::list node"
+offset = 0x0
+type = "ptr"
+used_by = ["marks", "objects"]
+
+[[sym]]
+id = "node_value"
+symbol = "std::list node"
+kind = "field"
+struct = "std::list node"
+offset = 0x8
+type = "ptr"
+used_by = ["marks", "objects"]
+
+[[sym]]
+id = "fn_random_ctor"
+symbol = "RandomSequence::RandomSequence"
+kind = "fn"
+addr = 0x65e1b0
+check = "55 8b ec 8b 55 08 8b c1"
+used_by = ["seed", "seed_load"]
+
+[[sym]]
+id = "g_random"
+symbol = "g_random"
+kind = "global"
+addr = 0x7b0fac
+used_by = ["seed", "seed_load"]
+
+[[sym]]
+id = "g_mission_random"
+symbol = "g_missionRandom"
+kind = "global"
+addr = 0x7b0fa8
+used_by = ["seed", "seed_load"]
+
+[[sym]]
+id = "g_async_random"
+symbol = "g_asyncRandom"
+kind = "global"
+addr = 0x7300c4
+used_by = ["seed", "seed_load"]
+
+[[sym]]
+id = "random_log"
+symbol = "RandomSequence"
+kind = "field"
+struct = "RandomSequence"
+offset = 0x9
+type = "u8"
+used_by = ["seed", "seed_load"]
+
+[[sym]]
+id = "site_preload_stars"
+symbol = "Starfield_Initialize"
+kind = "call"
+addr = 0x485159
+target = "fn_starfield_init"
+in = "Program::GameOpenPostLoad"
+used_by = ["seed_load"]
+
+[[sym]]
+id = "fn_starfield_init"
+symbol = "Starfield_Initialize"
+kind = "fn"
+addr = 0x59ac00
+check = "55 8b ec 6a ff 68"
+used_by = ["seed_load"]
+
+# Program::GameProcess(int ms): its one call of getGameSpeedModifier, then the product with `ms`
+# (ebp+8).
+[[sym]]
+id = "site_game_speed"
+symbol = "getGameSpeedModifier"
+kind = "call"
+addr = 0x4834a3
+target = "fn_game_speed"
+in = "Program::GameProcess"
+used_by = ["step"]
+
+[[sym]]
+id = "fn_game_speed"
+symbol = "getGameSpeedModifier"
+kind = "fn"
+addr = 0x604700
+check = "55 8b ec 51 83 3d"
+used_by = ["step"]
+
+[[sym]]
+id = "step_product"
+symbol = "Program::GameProcess"
+kind = "label"
+addr = 0x4834a8
+in = "Program::GameProcess"
+check = "da 4d 08"
+used_by = ["step"]
+
+[[sym]]
+id = "step_ms_arg"
+symbol = "step_ms_arg"
+kind = "value"
+value = 8
+unit = "ebp"
+used_by = ["step"]
+
+[[sym]]
+id = "fn_race_find"
+symbol = "Race::Find"
+kind = "fn"
+addr = 0x48b100
+check = "55 8b ec 8b 45 08 53 56"
+used_by = ["race"]
+
+# SetupDefaultGame's two calls of Race::Find for slot 0, on its two branches.
+[[sym]]
+id = "site_race_1"
+symbol = "Race::Find"
+kind = "call"
+addr = 0x4897ad
+target = "fn_race_find"
+in = "SetupDefaultGame"
+used_by = ["race"]
+
+[[sym]]
+id = "site_race_2"
+symbol = "Race::Find"
+kind = "call"
+addr = 0x489872
+target = "fn_race_find"
+in = "SetupDefaultGame"
+used_by = ["race"]
+
+[[sym]]
+id = "fn_overlay_add"
+symbol = "OverlayText::AddMessage"
+kind = "fn"
+addr = 0x5061e0
+check = "55 8b ec 6a ff 68 20 ff"
+used_by = ["captions"]
+
+[[sym]]
+id = "site_show_title"
+symbol = "OverlayText::AddMessage"
+kind = "call"
+addr = 0x455081
+target = "fn_overlay_add"
+in = "ScriptInterfaceImp::ShowTitle"
+used_by = ["captions"]
+
+[[sym]]
+id = "site_show_subtitle"
+symbol = "OverlayText::AddMessage"
+kind = "call"
+addr = 0x45510c
+target = "fn_overlay_add"
+in = "ScriptInterfaceImp::ShowSubtitle"
+used_by = ["captions"]
+
+[[sym]]
+id = "music_start"
+symbol = "StartMusic"
+kind = "patch"
+addr = 0x4586c0
+check = "55 8b ec a1"
+in = "StartMusic"
+used_by = ["music"]
+
+[[sym]]
+id = "music_new_track"
+symbol = "JukeBox::mStartNewTrack"
+kind = "patch"
+addr = 0x463680
+check = "55 8b ec 6a"
+in = "JukeBox::mStartNewTrack"
+used_by = ["music"]
+
+# Get_Time's float: the simulation's time in seconds, written once a tick.
+[[sym]]
+id = "sim_time"
+symbol = "Get_Time"
+kind = "global"
+addr = 0x7b0fc8
+used_by = ["pause", "objects"]
+
+# gCameraManager's first field: the camera in use, a ParabolicCamera or a TacticalCamera.
+[[sym]]
+id = "camera_manager"
+symbol = "gCameraManager"
+kind = "global"
+addr = 0x763370
+used_by = ["zoom"]
+
+[[sym]]
+id = "vt_tactical"
+symbol = "TacticalCamera"
+kind = "vtable"
+addr = 0x6b46c0
+used_by = ["zoom"]
+
+[[sym]]
+id = "vt_parabolic"
+symbol = "ParabolicCamera"
+kind = "vtable"
+addr = 0x6b4598
+used_by = ["zoom"]
+
+[[sym]]
+id = "slot_zoom_tactical"
+symbol = "TacticalCamera::SetZoomLevel"
+kind = "slot"
+vtable = "vt_tactical"
+index = 0x11
+target = "fn_zoom_tactical"
+used_by = ["zoom"]
+
+[[sym]]
+id = "slot_zoom_parabolic"
+symbol = "ParabolicCamera::SetZoomLevel"
+kind = "slot"
+vtable = "vt_parabolic"
+index = 0x11
+target = "fn_zoom_parabolic"
+used_by = ["zoom"]
+
+[[sym]]
+id = "fn_zoom_tactical"
+symbol = "TacticalCamera::SetZoomLevel"
+kind = "fn"
+addr = 0x4e4db0
+check = "55 8b ec d9 05 a8 46 6b 00"
+used_by = ["zoom"]
+
+[[sym]]
+id = "fn_zoom_parabolic"
+symbol = "ParabolicCamera::SetZoomLevel"
+kind = "fn"
+addr = 0x4dfcc0
+check = "55 8b ec d9 05 1c 9a 70 00"
+used_by = ["zoom"]
+
+[[sym]]
+id = "tact_zoom"
+symbol = "TacticalCamera"
+kind = "field"
+struct = "TacticalCamera"
+offset = 0xd4
+type = "f32"
+used_by = ["zoom"]
+
+[[sym]]
+id = "para_height"
+symbol = "ParabolicCamera"
+kind = "field"
+struct = "ParabolicCamera"
+offset = 0x54
+type = "f32"
+used_by = ["zoom"]
+
+[[sym]]
+id = "tact_zoom_min"
+symbol = "(unnamed) TacticalCamera zoom minimum, float 1.0"
+kind = "global"
+addr = 0x6b46a4
+used_by = ["zoom"]
+
+[[sym]]
+id = "tact_zoom_max"
+symbol = "(unnamed) TacticalCamera zoom maximum, float 20.0"
+kind = "global"
+addr = 0x6b46a8
+used_by = ["zoom"]
+
+[[sym]]
+id = "para_height_min"
+symbol = "OVERVIEW_MIN_HEIGHT"
+kind = "global"
+addr = 0x709a20
+used_by = ["zoom"]
+
+[[sym]]
+id = "para_height_max"
+symbol = "OVERVIEW_MAX_HEIGHT"
+kind = "global"
+addr = 0x709a1c
+used_by = ["zoom"]
+
+# gTacticalCamera: its interest point, the map position the RTS camera looks at
+# (TacticalCamera::GetInterest).
+[[sym]]
+id = "tactical_camera"
+symbol = "gTacticalCamera"
+kind = "global"
+addr = 0x763650
+used_by = ["locate", "build", "move", "build_order"]
+
+[[sym]]
+id = "camera_interest"
+symbol = "TacticalCamera"
+kind = "field"
+struct = "TacticalCamera"
+offset = 0x98
+type = "v3"
+used_by = ["locate", "build", "move", "build_order"]
+
+# The overview through the engine's pointer to it (its constructor sets it): Roots constructs an
+# enlarged one of its own, and only the pointer follows.
+[[sym]]
+id = "overview_ptr"
+symbol = "g_pOverView"
+kind = "global"
+addr = 0x768e3c
+used_by = ["select", "groups", "waypoint", "marks", "objects"]
+
+# Stock's static overview, the answer on gog-1.1 before the pointer is set.
+[[sym]]
+id = "overview"
+symbol = "cOverViewImp"
+kind = "global"
+addr = 0x768e40
+used_by = ["select", "groups", "waypoint", "marks", "objects"]
+
+[[sym]]
+id = "ov_vt_select"
+symbol = "cOverViewImp vtable (Select)"
+kind = "field"
+struct = "cOverViewImp vtable (Select)"
+offset = 0x90
+type = "ptr"
+used_by = ["select"]
+
+[[sym]]
+id = "ov_vt_select_num"
+symbol = "cOverViewImp vtable (GetSelectNum)"
+kind = "field"
+struct = "cOverViewImp vtable (GetSelectNum)"
+offset = 0x94
+type = "ptr"
+used_by = ["select", "marks"]
+
+[[sym]]
+id = "ov_vt_select_list"
+symbol = "cOverViewImp vtable (GetSelectList)"
+kind = "field"
+struct = "cOverViewImp vtable (GetSelectList)"
+offset = 0x98
+type = "ptr"
+used_by = ["select", "marks"]
+
+[[sym]]
+id = "ov_ship_groups"
+symbol = "cOverViewImp"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0x14c
+type = "ptr"
+used_by = ["groups"]
+
+[[sym]]
+id = "ov_station_groups"
+symbol = "cOverViewImp"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0x1c4
+type = "ptr"
+used_by = ["groups"]
+
+[[sym]]
+id = "group_size"
+symbol = "group_size"
+kind = "value"
+value = 0xc
+unit = "bytes"
+used_by = ["groups"]
+
+[[sym]]
+id = "group_list"
+symbol = "cGroup"
+kind = "field"
+struct = "cGroup"
+offset = 0x0
+type = "ptr"
+used_by = ["groups"]
+
+[[sym]]
+id = "list_array_count"
+symbol = "list_array"
+kind = "field"
+struct = "list_array"
+offset = 0x0
+type = "i32"
+used_by = ["groups"]
+
+[[sym]]
+id = "list_array_items"
+symbol = "list_array"
+kind = "field"
+struct = "list_array"
+offset = 0x18
+type = "ptr"
+used_by = ["groups"]
+
+[[sym]]
+id = "fn_queue_size"
+symbol = "Producer::BuildQueueSize"
+kind = "fn"
+addr = 0x4b7b70
+check = "8b 89 70 02 00 00 33 c0"
+used_by = ["select", "locate"]
+
+[[sym]]
+id = "ov_waypoint_key"
+symbol = "cOverViewImp"
+kind = "field"
+struct = "cOverViewImp"
+offset = 0x30c
+type = "ptr"
+used_by = ["waypoint"]
+
+# GameObject::objectList, a std::list of every GameObject: its head node at +4, a node's next at +0,
+# its object at +8.
+[[sym]]
+id = "object_list"
+symbol = "GameObject::objectList"
+kind = "global"
+addr = 0x761084
+used_by = ["objects"]
+
+[[sym]]
+id = "fn_odf_name"
+symbol = "GameObject::GetOdfName"
+kind = "fn"
+addr = 0x4d5620
+check = "8b 49 40 e9"
+used_by = ["objects"]
+
+# Entity::GetUserTeam, cdecl: the local player's team.
+[[sym]]
+id = "fn_user_team"
+symbol = "Entity::GetUserTeam"
+kind = "fn"
+addr = 0x4d0060
+check = "8b 0d d4 b8 76 00 e9 45"
+used_by = ["objects"]
+
+[[sym]]
+id = "fn_dyn_cast"
+symbol = "__RTDynamicCast"
+kind = "fn"
+addr = 0x6731a0
+check = "ff 25"
+used_by = ["objects"]
+
+[[sym]]
+id = "td_game_object_class"
+symbol = "GameObjectClass"
+kind = "rtti"
+addr = 0x6eee98
+used_by = ["objects"]
+
+[[sym]]
+id = "td_craft_class"
+symbol = "CraftClass"
+kind = "rtti"
+addr = 0x6eee08
+used_by = ["objects"]
+
+[[sym]]
+id = "td_planet_class"
+symbol = "PlanetClass"
+kind = "rtti"
+addr = 0x700c08
+used_by = ["objects"]
+
+[[sym]]
+id = "cls_station"
+symbol = "CraftClass"
+kind = "field"
+struct = "CraftClass"
+offset = 0x20d
+type = "u8"
+used_by = ["objects"]
+
+[[sym]]
+id = "obj_label"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x48
+type = "ptr"
+used_by = ["objects"]
+
+[[sym]]
+id = "obj_vt_class_name"
+symbol = "GameObject vtable (GetClassDisplayName)"
+kind = "field"
+struct = "GameObject vtable (GetClassDisplayName)"
+offset = 0x70
+type = "ptr"
+used_by = ["objects"]
+
+[[sym]]
+id = "obj_hull"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x15c
+type = "f32"
+used_by = ["objects"]
+
+[[sym]]
+id = "obj_hull_max"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x160
+type = "f32"
+used_by = ["objects"]
+
+[[sym]]
+id = "obj_selected"
+symbol = "GameObject"
+kind = "field"
+struct = "GameObject"
+offset = 0x10e
+type = "u8"
+used_by = ["objects"]
+
+[[sym]]
+id = "objects_max"
+symbol = "objects_max"
+kind = "value"
+value = 0x1000
+used_by = ["objects"]

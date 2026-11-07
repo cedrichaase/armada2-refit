@@ -3,8 +3,10 @@
 #   ./a2test session start --install . --install testbench/scene --args '-nointro a2_borg01'
 #   SCENE=planet ./a2test session start ...      # testbench/scene/scenes/planet.ini
 #   SCENE_INI=my.ini ./a2test session start ...  # a scene file of your own
+#   ./a2test --game fo-roots session start --install . --layers display,asiloader --install testbench/scene
 # Refuses any game directory that is not an a2test clone: the scene builder is a
-# test tool and never goes into the player's install.
+# test tool and never goes into the player's install. Scene.asi and Scene.ini go into
+# the executable's folder (Data/ on Fleet Operations: Roots).
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,6 +17,12 @@ case "$GAME" in
     "$HOME"/.cache/a2test/*) ;;
     *) echo "refusing: $GAME is not an a2test clone" >&2; exit 1 ;;
 esac
+. "$here/exe-dir.sh"
+DIR="$(exe_dir "$GAME")"
+case "$DIR" in
+    "$HOME"/.cache/a2test/*) ;;
+    *) echo "refusing: $DIR is not in an a2test clone" >&2; exit 1 ;;
+esac
 
 ini="$here/Scene.ini"
 if [ -n "${SCENE:-}" ]; then ini="$here/scenes/$SCENE.ini"; fi
@@ -22,16 +30,16 @@ if [ -n "${SCENE_INI:-}" ]; then ini="$SCENE_INI"; fi
 if [ ! -f "$ini" ]; then echo "no scene file $ini" >&2; exit 1; fi
 
 bash "$here/build.sh"
-cp "$here/build/Scene.asi" "$GAME/"
-cp "$ini" "$GAME/Scene.ini"
+cp "$here/build/Scene.asi" "$DIR/"
+cp "$ini" "$DIR/Scene.ini"
 # SCENE_MUSIC=0 puts Music=0 into the installed copy (the scene file itself stays as it is)
-if [ "${SCENE_MUSIC:-1}" = 0 ]; then sed -i 's/^\[Scene\]\r\?$/&\nMusic=0/' "$GAME/Scene.ini"; fi
+if [ "${SCENE_MUSIC:-1}" = 0 ]; then sed -i 's/^\[Scene\]\r\?$/&\nMusic=0/' "$DIR/Scene.ini"; fi
 # SCENE_RACE=<race> puts Race=<race> into it the same way, ahead of any Race= of the file's own
-if [ -n "${SCENE_RACE:-}" ]; then sed -i "s/^\[Scene\]\r\?\$/&\nRace=$SCENE_RACE/" "$GAME/Scene.ini"; fi
+if [ -n "${SCENE_RACE:-}" ]; then sed -i "s/^\[Scene\]\r\?\$/&\nRace=$SCENE_RACE/" "$DIR/Scene.ini"; fi
 # SCENE_SEED=<n>, SCENE_PAUSE=<tick> and SCENE_STEP=<ms> likewise put Seed=, Pause= and Step= into it, for a
 # frame that repeats from launch to launch (README.md, "A frame that repeats")
-if [ -n "${SCENE_SEED:-}" ]; then sed -i "s/^\[Scene\]\r\?\$/&\nSeed=$SCENE_SEED/" "$GAME/Scene.ini"; fi
-if [ -n "${SCENE_PAUSE:-}" ]; then sed -i "s/^\[Scene\]\r\?\$/&\nPause=$SCENE_PAUSE/" "$GAME/Scene.ini"; fi
-if [ -n "${SCENE_STEP:-}" ]; then sed -i "s/^\[Scene\]\r\?\$/&\nStep=$SCENE_STEP/" "$GAME/Scene.ini"; fi
-rm -f "$GAME/Scene.log" "$GAME/Scene.cmd"
-echo "installed Scene.asi into $GAME, scene $ini"
+if [ -n "${SCENE_SEED:-}" ]; then sed -i "s/^\[Scene\]\r\?\$/&\nSeed=$SCENE_SEED/" "$DIR/Scene.ini"; fi
+if [ -n "${SCENE_PAUSE:-}" ]; then sed -i "s/^\[Scene\]\r\?\$/&\nPause=$SCENE_PAUSE/" "$DIR/Scene.ini"; fi
+if [ -n "${SCENE_STEP:-}" ]; then sed -i "s/^\[Scene\]\r\?\$/&\nStep=$SCENE_STEP/" "$DIR/Scene.ini"; fi
+rm -f "$DIR/Scene.log" "$DIR/Scene.cmd" "$DIR/Scene.objects.jsonl" "$DIR/Scene.objects.tmp"
+echo "installed Scene.asi into $DIR, scene $ini"
