@@ -56,6 +56,16 @@ loaded while the engine draws (inside its scene) gets no frame, since `BeginScen
 refuses inside a scene and the frame is then skipped. Each site stands down on its
 own when it is not stock.
 
+## The bar
+
+`[Loading] Bar=` picks the progress bar: `classic` is the rounded bar of the themes
+(`theme::bar`, Armada II's); `panel` is `theme::bar_boxed`, a y2k look: square corners, a
+bar about twice as tall, the fill inset in a thin outline box with a 4-unit gap between
+them, and a faint glow (40% of the fill's colour, 8 units) round the fill. Every colour is
+the theme's (`panel_hi` for the outline, `track` behind, `fill` for the fill). Empty (the
+shipped default) takes the content set's `[Loading] Bar` (the Fleet Operations: Roots set
+names `panel`), else classic. It is read at each load; no Refit row.
+
 **`[Loading] Hold=N`** is for the test bench only: at the load's half-way point the
 status hook keeps presenting frames of ours for N seconds, draining the queue through
 the engine's own `HandleMessageQueue` (`0x488730`) as its status update does, so a

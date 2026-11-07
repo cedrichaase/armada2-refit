@@ -76,6 +76,8 @@ pub struct Config {
     /// `[Loading] Hold`: seconds the load waits at its half-way point, the screen
     /// still drawn, for the test bench to look at it (0: never).
     pub loading_hold: f32,
+    /// `[Loading] Bar`: `classic`, `panel`, or empty for the content set's (`loading.rs`).
+    pub loading_bar: alloc::string::String,
 }
 
 /// `[HUD]` in UI.ini: which stock panels ours replace. Every panel is on by default,
@@ -233,6 +235,7 @@ pub fn load() -> Config {
         locked_sound: alloc::string::String::from(ini.string("Menus", "LockedSound").as_deref().unwrap_or("mnu_back.wav").trim()),
         loading: on(&ini, LOADING_ENABLE),
         loading_hold: ini.float("Loading", "Hold", 0.0).clamp(0.0, 600.0),
+        loading_bar: alloc::string::String::from(ini.string("Loading", "Bar").as_deref().unwrap_or("").trim()).to_ascii_lowercase(),
     }
 }
 

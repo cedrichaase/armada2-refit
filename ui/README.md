@@ -694,6 +694,7 @@ a MISSION or RESTART row `settings: <Section.Key=v> (next mission or restart)`.
 | `[Menus] Trace` | 0 | UI.log: each hosted dialog's messages of note, its actions, and its surfaces as `UI-dlg<depth>-*.bmp` every 5 s |
 | `[Menus] Host` | 1 | 0 (with `Trace=1`): the dialogs run stock and are only traced, for comparing |
 | `[Loading] Enable` | 1 | the loading screen of ours (`LOADING.md`) in place of the engine's logo scene and bar |
+| `[Loading] Bar` | (empty) | the loading screen's bar: `classic` (rounded, Armada II's), `panel` (square, taller, inset in a thin outline box, a faint glow); empty: the content set's `[Loading] Bar`, else classic (`LOADING.md`, "The bar") |
 | `[Loading] Hold` | 0 | the test bench's: seconds each load waits half-way, the screen still drawn, to be looked at. Never in play |
 | `[Bench] Clock` | wall | the animation clock ("The animation clock"): `wall` in play; `bench` for the test bench, on the simulation's time with transitions settled |
 
