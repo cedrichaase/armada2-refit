@@ -780,6 +780,16 @@ impl Vk {
         r
     }
 
+    /// A `Present` not shown (`host::hold`): the frame is ended without its last pass and
+    /// without a swap chain image, so the image on the screen stays.
+    pub fn skip(&mut self) {
+        if !self.recording {
+            self.begin();
+        }
+        pass::presented(self);
+        self.end_frame(None);
+    }
+
     /// Whether every image of the swap chain has its view, framebuffer and semaphore: a
     /// failed `make_swapchain` leaves this false until one succeeds.
     fn swapchain_complete(&self) -> bool {

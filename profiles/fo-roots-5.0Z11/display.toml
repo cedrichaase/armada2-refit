@@ -26,3 +26,9 @@ value = 1200
 [[sym]]
 id = "intro_height"
 value = 900
+
+# FleetOpsHook makes a new device window at each switch (PLAN-FLEETOPS.md, decision 311):
+# Display8's one window from the first CreateDevice on (decision 314).
+[[sym]]
+id = "device_windows"
+value = 1

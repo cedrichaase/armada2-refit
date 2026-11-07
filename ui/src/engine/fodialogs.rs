@@ -197,6 +197,11 @@ pub fn ready() -> bool {
     unsafe { READY }
 }
 
+/// An adopted dialog's stock procedure (0 when `h` is not adopted).
+pub fn stock_proc_of(h: HWND) -> usize {
+    find(h).map_or(0, |a| a.stock_proc)
+}
+
 pub fn is_adopted(h: HWND) -> bool {
     find(h).is_some()
 }

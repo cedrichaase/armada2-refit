@@ -4,7 +4,7 @@
 #![allow(dead_code)]
 use crate::rt::settings::*;
 
-pub static SETTINGS: [Setting; 6] = [
+pub static SETTINGS: [Setting; 7] = [
     Setting {
         size: ROW_SIZE,
         kind: KIND_BOOL,
@@ -38,6 +38,23 @@ pub static SETTINGS: [Setting; 6] = [
         label: c"Keep the pointer clip".as_ptr(),
         help: c"Under Wine, put the pointer clip back while the pointer moves in the game.".as_ptr(),
         moved_from: c"UI.UI.KeepClip".as_ptr(),
+    },
+    Setting {
+        size: ROW_SIZE,
+        kind: KIND_BOOL,
+        apply: APPLY_RESTART,
+        scope: SCOPE_LOCAL,
+        tab: TAB_NONE,
+        flags: FLAG_NO_ROW,
+        file: c"Display8.ini".as_ptr(),
+        section: c"Window".as_ptr(),
+        key: c"OneWindow".as_ptr(),
+        def: c"1".as_ptr(),
+        values: core::ptr::null(),
+        value_labels: core::ptr::null(),
+        label: c"One window for the whole game".as_ptr(),
+        help: c"A game that makes its device on a new window at each switch keeps one window of Display8's, the device's windows inside it.".as_ptr(),
+        moved_from: core::ptr::null(),
     },
     Setting {
         size: ROW_SIZE,
@@ -111,10 +128,11 @@ pub static SETTINGS: [Setting; 6] = [
 
 pub const WINDOW_NATIVE: &Setting = &SETTINGS[0];
 pub const WINDOW_KEEPCLIP: &Setting = &SETTINGS[1];
-pub const WINDOW_RAISEINTRO: &Setting = &SETTINGS[2];
-pub const SAMPLERS_ANISOTROPY: &Setting = &SETTINGS[3];
-pub const SAMPLERS_LODBIAS: &Setting = &SETTINGS[4];
-pub const SAMPLERS_CLAMP: &Setting = &SETTINGS[5];
+pub const WINDOW_ONEWINDOW: &Setting = &SETTINGS[2];
+pub const WINDOW_RAISEINTRO: &Setting = &SETTINGS[3];
+pub const SAMPLERS_ANISOTROPY: &Setting = &SETTINGS[4];
+pub const SAMPLERS_LODBIAS: &Setting = &SETTINGS[5];
+pub const SAMPLERS_CLAMP: &Setting = &SETTINGS[6];
 
 /// The table, for the UI's settings hub (`count` may be NULL).
 #[unsafe(no_mangle)]

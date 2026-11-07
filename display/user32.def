@@ -13,3 +13,15 @@ GetClipCursor@4
 ClipCursor@4
 CreateWindowExA@48
 SetForegroundWindow@4
+RegisterClassA@4
+DefWindowProcA@16
+SetParent@8
+SetFocus@4
+GetFocus@0
+EnableWindow@8
+PostMessageA@16
+SendMessageA@16
+IsWindow@4
+GetWindowTextA@12
+ValidateRect@8
+FindWindowExA@16

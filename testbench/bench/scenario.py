@@ -652,7 +652,34 @@ def s_shot_burst(c, m):
         c.log.shot(sheet, f"{m.group('name')}-sheet")
         c._series = getattr(c, '_series', {})
         c._series[m.group('name')] = sheet
+    c._series_shots = getattr(c, '_series_shots', {})
+    c._series_shots[m.group('name')] = paths
     return f'{n} shots in {took:.1f} s: {paths[0].name} .. {paths[-1].name}' + (f', sheet {sheet.name}' if sheet.exists() else '')
+
+
+@step(r'^expect no shot of the series ' + Q.format('name') + r' to be black$')
+def s_series_not_black(c, m):
+    """`Expect no shot of the series "end" to be black`: each shot of the last series of
+    that name is measured, the share of its pixels brighter than 3% (ImageMagick); a shot
+    with fewer than 0.2% of them is black, as a window just mapped or a frame cleared and
+    presented with nothing on it is. A held picture (the last frame kept on screen) is not."""
+    paths = getattr(c, '_series_shots', {}).get(m.group('name'))
+    if not paths:
+        return c.checked(None, f'no series "{m.group("name")}" was taken before this step')
+    shares, black = [], []
+    for p in paths:
+        r = subprocess.run(['magick', str(p), '-colorspace', 'gray', '-threshold', '3%', '-format', '%[fx:mean]', 'info:'],
+                           capture_output=True, text=True)
+        try:
+            v = float(r.stdout.strip())
+        except ValueError:
+            v = -1.0
+        shares.append(f'{v * 100:.2f}%')
+        if 0 <= v < 0.002:
+            black.append(p)
+    detail = (f"{len(black)} of {len(paths)} black ({', '.join(Path(p).name for p in black) or 'none'}); "
+              f"bright share per shot: {' '.join(shares)}")
+    return c.checked(not black, detail, black[:4], how='share of pixels above 3% grey (ImageMagick)')
 
 
 @step(r'^check that the series ' + Q.format('name') + r' (?P<what>.+)$')
@@ -812,7 +839,8 @@ def _wm_events(path):
         events.append(ev)
 
 
-@step(r'^expect the window manager to have seen (?:no other window|(?P<another>another window))$')
+@step(r'^expect the window manager to have seen (?:no other window|(?P<another>another window))'
+      r'(?P<kept>,? and the game\'s window kept)?$')
 def s_expect_wm_no_other(c, m):
     """`Expect the window manager to have seen no other window` (after `Watch the window
     manager`): fails on any window event since the watch began for a window that is not
@@ -820,8 +848,10 @@ def s_expect_wm_no_other(c, m):
     screen given to it). The game's own are its normal windows with the game's title:
     Roots' FleetOpsHook replaces its device window at each switch between the shell and a
     mission (PLAN-FLEETOPS.md, decision 311), so those come and go and are counted, not
-    failed. `... to have seen another window` is its opposite, for a reference run of the
-    game drawing its own windows (`fo-ui-ingame-window-ref`). Stops the watch."""
+    failed; `..., and the game's window kept` fails on those too (Display8's one window,
+    `[Window] OneWindow`, decision 314: the game's window never closes and none opens).
+    `... to have seen another window` is its opposite, for a reference run of the game
+    drawing its own windows (`fo-ui-ingame-window-ref`). Stops the watch."""
     w = getattr(c, '_wm_watch', None)
     if not w:
         return c.checked(None, 'no `Watch the window manager` step ran before this one')
@@ -862,6 +892,10 @@ def s_expect_wm_no_other(c, m):
     swaps = sum(1 for ev in events if ev.get('change') == 'new' and (ev.get('container') or {}).get('id') in game)
     detail = (f"{len(events)} window events; the game's windows {sorted(game)} ({swaps} new: its device "
               f"window replaced)" + (f"; others: {'; '.join(others)}" if others else '; no other window'))
+    closes = sum(1 for ev in events if ev.get('change') == 'close' and (ev.get('container') or {}).get('id') in game)
+    if m.group('kept'):
+        detail += f"; the game's window closed {closes} times"
+        return c.checked(not others and swaps == 0 and closes == 0, detail, how=f'swaymsg subscribe window -> {path.name}')
     return c.checked(bool(others) if m.group('another') else not others, detail,
                      how=f'swaymsg subscribe window -> {path.name}')
 

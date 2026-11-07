@@ -419,6 +419,7 @@ pub fn draw(d: &mut Dx, dv: &Dev, dr: &Draw, fp: usize) {
         }
     }
     p.drawn += 1;
+    crate::host::engine_drew();
     if p.drawn.is_power_of_two() && p.drawn >= 1024 {
         log!("passthrough: {} draws of the engine's so far", p.drawn);
     } else if p.drawn == 1 {
