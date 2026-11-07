@@ -1499,10 +1499,9 @@ skybox sides shift around weirdly, and there's no more sun".
 | 221 | **The sun was never in the frame**: it sits against `KeyAxis`, 27 degrees above the horizon, and the higher camera looks 20 degrees down with a 40 degree field, so its top edge is at the horizon. `SunAt=-0.80,-0.10,0.59` shows the sun a little below the horizon, in the same direction round the compass as the Key; the Key and its shadows are unchanged, so the campaign views stay lit as tuned, and the price is a sun that does not quite match the light (the Key comes from above). With the camera coming round it crosses the top of the frame for about 25 s of each turn (shots 2 and 3 of the bench series) | the user wanted a visible sun and the higher angle; changing `KeyAxis` for the whole map would have re-lit the campaign views |
 | 222 | **`SunScale=0.2`, `SunDistance=8000`**: `map_planet_sun01`'s SOD at a fifth of its size, well inside the sky pass's far plane (twice the distance); 0.3 read as a disc with a halo, still too large | the user: much smaller and further |
 
-Left: the forms host does not call `Render3D_MenuScene` yet (branch
-`fo-forms-scene-dialogs`), so on Roots the scene shows only once that lands; the station
-is mostly behind the centred menu card; the campaign views were not framed for Roots'
-hulls (their radii are about twice stock's).
+Left: the campaign views were not framed for Roots' hulls (their radii are about twice
+stock's); DS9 is dark on the shadow side of the orbit. (The forms host calls
+`Render3D_MenuScene` since #102, beside the side column rather than a centred card.)
 
 ## Open decisions
 
