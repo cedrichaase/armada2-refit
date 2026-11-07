@@ -89,7 +89,7 @@ pub mod forms {
 pub mod hud {
     pub use crate::engine::hud::{
         component_named, components, cursor_owner, flag_hidden, INFO_PANEL_TAKEN, functions_stock, hidden, in_view, install, installed, is_taken, log_components, log_render_lists,
-        map_radar, name, palette_ptr, panel_origin, panel_rect, pointer_over_bar, set_bar_area, set_bar_skin, set_pointer_over_ui, set_taken, ship_display, take_tooltips, tooltip,
+        map_radar, name, palette_ptr, panel_origin, panel_rect, pointer_over_bar, set_bar_area, set_bar_skin, set_info_area, set_info_unseen, info_unseen, set_pointer_over_ui, set_taken, ship_display, take_tooltips, tooltip,
         video_playing,
     };
 }
@@ -98,8 +98,16 @@ pub mod info {
     pub use crate::engine::info::{
         build_progress, cancel, class_wire, colour, current, drawn_whole, effect_sprites, effects, face, flash,
         functions_stock, group, hover_texts, hull, look_at, name_and_class, queue, select, shift_held, single,
-        system_state, take_hover, tooltip, whole_damaged, wire, wire_comp, Bar, BarKind, Face, Single, SystemState,
+        system_state, take_hover, tooltip, whole_damaged, wire, wire_comp, Bar, BarKind, Face, Single, SystemState, repair_icon, right_bar,
         Text, queue_len,
+    };
+}
+
+/// Roots' info panel under ours (`engine/info_fo.rs`).
+pub mod info_fo {
+    pub use crate::engine::info_fo::{
+        available, buff_icons, class_art_name, is_craft, class_art_name_of, cloak, comp_hover, comp_rect, forget, hover, hull_shields, image_rect, install,
+        log_children, move_rect, original_rect, queue_classes, queue_slot, race_comp, rank, restore, texts, weapon_icons, Icon,
     };
 }
 
@@ -139,7 +147,7 @@ pub mod overlay_text {
 
 pub mod palette {
     pub use crate::engine::palette::{
-        describe, hovered, install_grid, local_rect, menu, mode, origin, own_sprite, palette, press, pressed, set_rect, slots_indirect, readable, slot, sprite, state, tooltip, valid, n_slots, Desc, Kind,
+        describe, find_sprite, hovered, install_grid, local_rect, menu, mode, origin, own_sprite, palette, press, pressed, set_rect, slots_indirect, readable, slot, sprite, state, tooltip, valid, n_slots, Desc, Kind,
     };
 }
 

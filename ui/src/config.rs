@@ -97,6 +97,16 @@ pub struct Hud {
     pub info_camera: bool,
     /// The info panel's size, a factor on the UI's scale.
     pub info_scale: f32,
+    /// The bottom row's arrangement (HUD.md, "The bottom row on Fleet Operations: Roots"): the
+    /// minimap, the info panel and the bar in this order along the bottom, or None for the bar
+    /// above the minimap; `BottomRow=auto` (Some(empty)) takes the row where the info panel keeps
+    /// its own width beside the bar, else the bar above the minimap.
+    pub bottom_row: Option<alloc::vec::Vec<crate::hud::row::Part>>,
+    /// The info panel's width in units (1080-line pixels), 0: its own (Roots' layout).
+    pub info_width: f32,
+    /// The bar's cell in units when the bar is in the bottom row, 0: its three rows as high
+    /// as the info panel.
+    pub bar_cell_size: f32,
     /// The minimap (`MapRadar`), ours, and its size in units.
     pub minimap: bool,
     pub minimap_size: f32,
@@ -185,6 +195,9 @@ pub fn load() -> Config {
             info: on(&ini, HUD_INFO),
             info_camera: on(&ini, HUD_INFOCAMERA),
             info_scale: ini.float("HUD", "InfoScale", 1.3).clamp(0.6, 2.5),
+            bottom_row: crate::hud::row::parse(&ini.string("HUD", "BottomRow").unwrap_or_default()),
+            info_width: ini.float("HUD", "InfoWidth", 0.0).clamp(0.0, 4000.0),
+            bar_cell_size: ini.float("HUD", "BarCellSize", 0.0).clamp(0.0, 200.0),
             minimap: on(&ini, HUD_MINIMAP),
             minimap_size: ini.float("HUD", "MinimapSize", 300.0).clamp(120.0, 900.0),
             selection: on(&ini, HUD_SELECTION),
@@ -274,6 +287,9 @@ pub fn reload() {
     h.info = n.info;
     h.info_camera = n.info_camera;
     h.info_scale = n.info_scale;
+    h.bottom_row = n.bottom_row.clone();
+    h.info_width = n.info_width;
+    h.bar_cell_size = n.bar_cell_size;
     h.icons = n.icons;
     h.bar_labels = n.bar_labels;
     h.selection_gauges = n.selection_gauges;

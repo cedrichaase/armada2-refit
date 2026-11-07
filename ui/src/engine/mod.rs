@@ -21,6 +21,7 @@ pub mod forms_props;
 pub use crate::rt::hook;
 pub mod hud;
 pub mod info;
+pub mod info_fo;
 pub mod input;
 pub mod intro;
 pub mod leftovers;

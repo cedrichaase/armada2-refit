@@ -248,7 +248,7 @@ fn taken(c: usize) -> bool {
 #[allow(static_mut_refs)]
 fn learn(c: usize) {
     unsafe {
-        if !TAKEN.iter().any(|&(a, _)| a == INFO_PANEL_TAKEN) {
+        if !TAKEN.iter().any(|&(a, _)| a == INFO_PANEL_TAKEN) && !INFO_UNSEEN {
             return;
         }
         if name(c) == INFO_PANEL_NAME {
@@ -260,6 +260,31 @@ fn learn(c: usize) {
 }
 
 static mut BAR_SKIN: bool = false;
+
+/// The info panel drawn unseen under ours (Roots, `info_fo`; PLAN-FLEETOPS.md, FO-6, decisions
+/// 440 to 459): its `Render` runs with the device's drawing dropped, and it keeps the pointer
+/// over `INFO_AREA` (ours, where it sits on Roots' own place), so the engine's hover, clicks and
+/// FleetOpsHook's range rings follow the panel's own children. None: no pointer for it (ours
+/// handles the pointer itself, or shows nothing).
+static mut INFO_UNSEEN: bool = false;
+static mut INFO_AREA: Option<[f32; 4]> = None;
+
+pub fn set_info_unseen(on: bool) {
+    unsafe { INFO_UNSEEN = on };
+    if !on {
+        set_info_area(None);
+    }
+}
+
+/// Whether the info panel is drawn unseen under ours (and so is not `taken`).
+pub fn info_unseen() -> bool {
+    let on = unsafe { INFO_UNSEEN && INSTALLED };
+    on && crate::gfx::drawing()
+}
+
+pub fn set_info_area(r: Option<[f32; 4]>) {
+    unsafe { INFO_AREA = r };
+}
 
 /// The bar of ours is a skin (FO-6 decision 94): `RenderAll`'s drawing of the palette is skipped, but
 /// `RefreshOwner` still gives it the pointer, so the stock bar's buttons keep the hover state, the
@@ -316,6 +341,10 @@ unsafe extern "thiscall" fn render_component(c: usize) {
         }
         if taken(c) {
             return;
+        }
+        if c == INFO_PANEL && info_unseen() && super::info_fo::available() {
+            let f: unsafe extern "thiscall" fn(usize) = core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_RENDER()));
+            return super::info_fo::render_unseen(c, f);
         }
         if c == cinematic_view() && super::unitview::enabled() {
             return super::unitview::render(c);
@@ -378,6 +407,12 @@ unsafe extern "thiscall" fn cursor_over(c: usize) -> bool {
         if c == super::popups::objectives_box() && rd::<u8>(c + field::HUD_DI_HIDDEN()) == 0 && taken(c) {
             let f: unsafe extern "thiscall" fn(usize) -> bool = core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_CURSOR_OVER()));
             return f(c);
+        }
+        if c == INFO_PANEL && info_unseen() {
+            return match INFO_AREA {
+                Some([l, t, r, b]) => !OVER_UI && crate::input::state().mouse.is_some_and(|(x, y)| x >= l && x < r && y >= t && y < b),
+                None => false,
+            };
         }
         if OVER_UI || (taken(c) && !(BAR_SKIN && c == palette())) {
             return false;

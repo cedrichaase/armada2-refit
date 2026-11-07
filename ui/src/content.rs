@@ -62,6 +62,105 @@ pub struct Files {
     pub menu_title: &'static str,
 }
 
+/// Where an element of a laid-out panel goes when the panel is wider or narrower than its
+/// table's size (`[InfoPanel]`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Anchor {
+    /// Stays at its place from the left edge.
+    Left,
+    /// Moves with the right edge.
+    Right,
+    /// Moves half as far as the right edge.
+    Centre,
+    /// Stays at its place from the left edge and takes the change in its width.
+    Flex,
+}
+
+/// One element of a laid-out panel: its name in the table, its anchor and its rectangle
+/// (x, y, w, h, in the table's units).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Element {
+    pub name: &'static str,
+    pub anchor: Anchor,
+    pub rect: [f32; 4],
+}
+
+/// A game's own info panel laid out as data (`[InfoPanel]`: Fleet Operations: Roots), which the
+/// HUD draws in that layout (`hud::info_fo`). Empty (no elements) on a build whose info panel
+/// is laid out by the UI itself.
+#[derive(Debug, PartialEq)]
+pub struct InfoLayout {
+    /// The panel's size in the table's units.
+    pub size: [f32; 2],
+    /// The narrowest the panel is drawn, in the table's units.
+    pub min_width: f32,
+    /// Whether the theme's frame carries lamps (Starfleet) round it.
+    pub lamps: bool,
+    pub elements: &'static [Element],
+    /// The other numbers by name (`QueueStep`, `GroupMax`, `SmallStep`, ...).
+    pub numbers: &'static [(&'static str, &'static [f32])],
+    /// The sprite names by key (`ImageSuffix`, `RaceSprite`, ...).
+    pub names: &'static [(&'static str, &'static str)],
+}
+
+impl InfoLayout {
+    pub fn is_empty(&self) -> bool {
+        self.elements.is_empty()
+    }
+    pub fn element(&self, name: &str) -> Option<&'static Element> {
+        self.elements.iter().find(|e| e.name.eq_ignore_ascii_case(name))
+    }
+    /// A number (its first value), or `or`.
+    pub fn number(&self, name: &str, or: f32) -> f32 {
+        self.numbers(name).first().copied().unwrap_or(or)
+    }
+    pub fn numbers(&self, name: &str) -> &'static [f32] {
+        self.numbers.iter().find(|n| n.0.eq_ignore_ascii_case(name)).map_or(&[], |n| n.1)
+    }
+    pub fn name(&self, key: &str) -> &'static str {
+        self.names.iter().find(|n| n.0.eq_ignore_ascii_case(key)).map_or("", |n| n.1)
+    }
+}
+
+/// `[InfoPanel]`: `Size`, `MinWidth`, `Lamps`, then each element (`anchor, x, y, w, h`), each
+/// number (`QueueStep = 60`, `SmallStep = 120, 39`) and each name (`ImageSuffix = _si`).
+fn info_layout(t: &Table<'static>) -> InfoLayout {
+    let mut elements = Vec::new();
+    let mut numbers = Vec::new();
+    let mut names = Vec::new();
+    for &(k, v) in t.entries("InfoPanel") {
+        let k = k.trim();
+        let items = split_list(v);
+        let anchor = match items.first().map(|s| s.to_ascii_lowercase()).as_deref() {
+            Some("left") => Some(Anchor::Left),
+            Some("right") => Some(Anchor::Right),
+            Some("centre") | Some("center") => Some(Anchor::Centre),
+            Some("flex") => Some(Anchor::Flex),
+            _ => None,
+        };
+        if let Some(anchor) = anchor {
+            let n: Vec<f32> = items[1..].iter().map(|s| s.parse::<f32>().unwrap_or(0.0)).collect();
+            if n.len() >= 4 {
+                elements.push(Element { name: k, anchor, rect: [n[0], n[1], n[2], n[3]] });
+            }
+        } else if matches!(k.to_ascii_lowercase().as_str(), "size" | "minwidth" | "lamps") {
+        } else if !items.is_empty() && items.iter().all(|s| s.parse::<f32>().is_ok()) {
+            numbers.push((k, floats(v).leak() as &'static [f32]));
+        } else {
+            names.push((k, v.trim()));
+        }
+    }
+    let size = floats(t.str("InfoPanel", "Size"));
+    InfoLayout {
+        size: if size.len() >= 2 { [size[0], size[1]] } else { [0.0, 0.0] },
+        min_width: t.str("InfoPanel", "MinWidth").trim().parse().unwrap_or(0.0),
+        lamps: t.str("InfoPanel", "Lamps").trim() == "1",
+        elements: elements.leak(),
+        numbers: numbers.leak(),
+        names: names.leak(),
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Content {
     pub races: &'static [RaceNames],
@@ -84,6 +183,8 @@ pub struct Content {
     /// The codes the game's fonts draw as a picture or a figure of their own
     /// (`[Glyphs]`, a code in hex = its word or figure), for `text::game::display`.
     pub glyphs: &'static [(u8, &'static str)],
+    /// The game's own info panel's layout (`[InfoPanel]`), empty where the UI lays it out.
+    pub info: InfoLayout,
 }
 
 /// A build with no content set for the UI.
@@ -99,6 +200,7 @@ pub static NONE: Content = Content {
     gallery_ships: &[],
     gallery_factions: &[],
     glyphs: &[],
+    info: InfoLayout { size: [0.0, 0.0], min_width: 0.0, lamps: false, elements: &[], numbers: &[], names: &[] },
 };
 
 /// A name as the engine's C string, made once and kept for the plugin's life.
@@ -173,6 +275,7 @@ pub fn parse(text: &'static str) -> Content {
             .filter_map(|&(k, v)| u8::from_str_radix(k.trim(), 16).ok().map(|b| (b, v)))
             .collect::<Vec<_>>()
             .leak(),
+        info: info_layout(&t),
     }
 }
 

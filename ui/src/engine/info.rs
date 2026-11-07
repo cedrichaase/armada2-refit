@@ -41,7 +41,7 @@ fn at(s: a2engine::Sym) -> usize {
 /// The info panel (an instance, found in the render lists: `hud::ship_display`), or 0
 /// while the info panel's hook is not ready. `shipDisplay` itself is only the profile's
 /// gate here: Roots' panel is not that global (decision 64).
-fn sd() -> usize {
+pub(super) fn sd() -> usize {
     if at(sym::INFO_SHIP_DISPLAY) == 0 { 0 } else { super::hud::ship_display() }
 }
 
@@ -166,7 +166,7 @@ fn f_cargo() -> u32 { value::INFO_F_CARGO() as u32 }
 #[inline(always)]
 fn f_cargo2() -> u32 { value::INFO_F_CARGO2() as u32 }
 #[inline(always)]
-fn f_named() -> u32 { value::INFO_F_NAMED() as u32 }
+pub(super) fn f_named() -> u32 { value::INFO_F_NAMED() as u32 }
 #[inline(always)]
 fn f_construction() -> u32 { value::INFO_F_CONSTRUCTION() as u32 }
 #[inline(always)]
@@ -306,7 +306,7 @@ pub fn flags(obj: usize) -> u32 {
     if obj == 0 { 0 } else { unsafe { rd::<u32>(obj + obj_flags()) } }
 }
 
-fn f32_at(obj: usize, off: usize) -> f32 {
+pub(super) fn f32_at(obj: usize, off: usize) -> f32 {
     unsafe { rd::<f32>(obj + off) }
 }
 
@@ -315,7 +315,7 @@ fn is_planet(obj: usize) -> bool {
     unsafe { f(obj) }
 }
 
-fn cast(obj: usize, from: a2engine::Sym, to: a2engine::Sym) -> usize {
+pub(super) fn cast(obj: usize, from: a2engine::Sym, to: a2engine::Sym) -> usize {
     let (a, from, to) = (at(sym::INFO_RT_DYNAMIC_CAST), at(from), at(to));
     if obj == 0 || a == 0 || from == 0 || to == 0 {
         return 0;
@@ -325,7 +325,7 @@ fn cast(obj: usize, from: a2engine::Sym, to: a2engine::Sym) -> usize {
 }
 
 /// A NUL-terminated Latin-1 string of the game's.
-fn latin1(p: usize) -> String {
+pub(super) fn latin1(p: usize) -> String {
     let mut s = String::new();
     if p == 0 {
         return s;
@@ -374,7 +374,7 @@ pub struct Text {
     pub icon_colour: [f32; 3],
 }
 
-fn text_of(c: usize, obj: usize, with_icon: bool) -> Option<Text> {
+pub(super) fn text_of(c: usize, obj: usize, with_icon: bool) -> Option<Text> {
     if c == 0 || obj == 0 {
         return None;
     }
@@ -436,7 +436,7 @@ fn bar_of(c: usize, obj: usize) -> Option<Bar> {
     }
 }
 
-fn child(off: usize) -> usize {
+pub(super) fn child(off: usize) -> usize {
     let panel = sd();
     if panel == 0 { 0 } else { unsafe { rd::<usize>(panel + off) } }
 }
@@ -752,6 +752,36 @@ pub fn single(obj: usize) -> Single {
     s
 }
 
+/// The panel's repair icon `i` (in the panel's order of them), read only (Roots, whose panel's
+/// `Render` hands the icons their craft): the component, its sprite, its system's state and its
+/// flash.
+pub fn repair_icon(obj: usize, i: usize) -> Option<(usize, usize, SystemState, bool)> {
+    let ri = child(sys_repair() + 4 * i);
+    if ri == 0 || obj == 0 {
+        return None;
+    }
+    let (sprite, sys, flash) = unsafe { (field(ri, ri_sprite()), rd::<u32>(ri + ri_system()) as usize, rd::<u8>(ri + ri_flash()) != 0) };
+    Some((ri, sprite, system_state(obj, sys).unwrap_or_default(), flash))
+}
+
+/// What the right of Roots' panel shows for `obj`: a construction or research bar (a producer,
+/// a colony, an object under construction) with its text, or a store (a resource, a cargo), or
+/// a planet's metal; each the stock child's own answer.
+pub fn right_bar(obj: usize) -> (Option<(BarKind, Bar)>, Option<Text>) {
+    let fl = flags(obj);
+    if is_planet(obj) {
+        return (bar_of(child(metal_bar()), obj).map(|b| (BarKind::Metal, b)), text_of(child(population_text()), obj, false));
+    }
+    let craft = fl & f_craft() != 0;
+    if (craft && fl & (f_cargo() | f_cargo2()) != 0) || (!craft && unsafe { rd::<usize>(obj + obj_store()) } != 0) {
+        return (bar_of(child(cargo_bar()), obj).map(|b| (BarKind::Cargo, b)), if craft { text_of(child(cargo_text()), obj, false) } else { None });
+    }
+    if (craft && (fl & f_producer() != 0 || cast(obj, sym::INFO_TD_CRAFT, sym::INFO_TD_COLONY) != 0)) || (!craft && fl & f_construction() != 0) {
+        return (bar_of(child(construction_bar()), obj).map(|b| (BarKind::Construction, b)), text_of(child(research_text()), obj, false));
+    }
+    (None, None)
+}
+
 fn system(obj: usize, i: usize) -> Option<System> {
     let text = text_of(child(sys_text() + 4 * i), obj, true)?;
     let ri = child(sys_repair() + 4 * i);
@@ -785,6 +815,27 @@ pub fn hover_texts(obj: usize) -> (Option<Text>, Option<Text>) {
 }
 
 // ---- the builder's queue -------------------------------------------------------------
+
+/// The builder's queue, each slot's class (0: free), read only: nothing is handed to the slots
+/// (Roots, whose panel's `Render` runs and hands them their classes itself).
+pub fn queue_read(obj: usize) -> Vec<usize> {
+    let mut out = alloc::vec![0usize; queue_len()];
+    if obj == 0 || flags(obj) & f_producer() == 0 {
+        return out;
+    }
+    let a = at(sym::INFO_GET_BUILD_QUEUE);
+    if a == 0 {
+        return out;
+    }
+    let f: unsafe extern "thiscall" fn(usize) -> *const usize = unsafe { core::mem::transmute(a) };
+    let q = unsafe { f(obj) };
+    if !q.is_null() {
+        for (i, o) in out.iter_mut().enumerate() {
+            *o = unsafe { *q.add(i) };
+        }
+    }
+    out
+}
 
 /// The builder's queue: each slot's class (0: free), and stock's slot component for
 /// its tooltip (handed the builder and the class, as stock's `Render` does).
