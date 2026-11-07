@@ -20,6 +20,7 @@ mod graphics;
 mod kit;
 mod mapselect;
 mod manualip;
+mod message;
 mod mods;
 mod multiplayer;
 mod sound;
@@ -183,6 +184,7 @@ pub fn frame(ui: &mut Ui) {
                 ui.inert_unless(live, |ui| match (cfg.menus_specs, f.class.as_str()) {
                     (true, "TMainForm") => main_menu(ui, f),
                     (true, "TOptionsMenuForm") => column(ui, &fit, f, area, Some("buttonBack")),
+                    (true, "TYesNoForm") if message::draw(ui, f) => {}
                     (true, "TYesNoForm") => yes_no(ui, &fit, f),
                     (true, _) if specs::draw(ui, &fit, f) => {}
                     _ => generic(ui, &fit, f, cfg.menus_widgets, live),

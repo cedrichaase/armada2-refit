@@ -393,6 +393,30 @@ pub fn picture() -> Option<(*const u8, i32, i32, u32)> {
     if p.3.is_null() { None } else { Some((p.3 as *const u8, p.4, p.5, unsafe { PRINTS })) }
 }
 
+/// The words of the Yes/No prompt: its title and question, read from the executable's
+/// buffers (`forms.message_text`, decision 540). None while the hook is not ready or the
+/// question is empty; the frame then draws the form's own picture instead.
+pub struct Message {
+    pub title: String,
+    pub text: String,
+}
+
+pub fn message() -> Option<Message> {
+    use crate::syms_forms::sym;
+    if eng().ready(hook::FORMS_MESSAGE_TEXT).is_err() {
+        return None;
+    }
+    let read = |s: a2engine::Sym| {
+        let p = eng().addr(s);
+        if p == 0 { String::new() } else { c_string(p).chars().take(127).collect::<String>() }
+    };
+    let text = read(sym::FORMS_YES_NO_MESSAGE);
+    if text.trim().is_empty() {
+        return None;
+    }
+    Some(Message { title: read(sym::FORMS_YES_NO_TITLE), text })
+}
+
 /// Queues an action on the top form, run at the next tick.
 pub fn act(a: Action) {
     unsafe { (*core::ptr::addr_of_mut!(ACTIONS)).push(a) };
@@ -1340,6 +1364,9 @@ unsafe extern "system" fn tick(_h: HWND, _m: u32, _id: usize, _t: u32) {
     }
     keep_off(t.hwnd);
     poll_button(t.hwnd);
+    if t.class == "TYesNoForm" {
+        poll_keys(t.hwnd);
+    }
     log_changes(t, &ctl);
     t.last = ctl;
     // Nothing else sets the pointer's shape once the form is away from it (decision 171).
@@ -1535,6 +1562,24 @@ fn poll_button(top: HWND) {
         return;
     }
     crate::input::note_message(if down { WM_LBUTTONDOWN } else { WM_LBUTTONUP }, if down { MK_LBUTTON } else { 0 });
+}
+
+/// The keys of a prompt, Enter and Escape: the form holds the keyboard focus, so a key goes
+/// to its window and never to the device window's procedure, where the UI records keys. The
+/// pump reads the two keys itself while the form is the active window of this thread and
+/// records their downs (decision 541), as it does the left button.
+static mut KEYS_WAS: [bool; 2] = [false; 2];
+
+fn poll_keys(top: HWND) {
+    const KEYS: [usize; 2] = [0x0d, 0x1b];
+    let active = unsafe { GetActiveWindow() } == top;
+    for (i, vk) in KEYS.iter().enumerate() {
+        let down = active && unsafe { GetAsyncKeyState(*vk as i32) } as u16 & 0x8000 != 0;
+        let was = unsafe { core::mem::replace(&mut (*core::ptr::addr_of_mut!(KEYS_WAS))[i], down) };
+        if down && !was {
+            crate::input::note_message(WM_KEYDOWN, *vk);
+        }
+    }
 }
 
 /// Decision 170: off screen, its region emptied as well (on a Wine where the region

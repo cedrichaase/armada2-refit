@@ -23,6 +23,10 @@ rows = ["Menus.Forms"]
 doc = "The dialog procedures FleetOpsHook opens, told by address to choose a screen spec for an adopted dialog"
 rows = ["Menus.Forms"]
 
+[hook."forms.message_text"]
+doc = "The words of the Yes/No prompt (title, question, the two buttons), read from the executable's four 128-byte text buffers that the caller fills before the prompt opens"
+rows = ["Menus.Forms"]
+
 [[sym]]
 id = "forms_present"
 symbol = "FleetOpsHook.dll"
@@ -315,3 +319,36 @@ kind = "fn"
 addr = 0x608100
 check = "55 8b ec 83 ec 3c"
 used_by = ["forms.shell_background"]
+
+# ---- forms.message_text: the words of the Yes/No prompt ---------------------------------
+# (menus/roots.rs, `message`; PLAN-FLEETOPS.md, decision 540). The executable keeps the
+# title, the question and the captions of the two buttons in four buffers of 128 bytes
+# (C strings) that a caller fills before it opens the prompt; FleetOpsHook's Yes/No form
+# paints them into its picture, from where a pixel print cannot be wrapped or restyled.
+[[sym]]
+id = "forms_yes_no_message"
+symbol = "yesNoMessageText"
+kind = "global"
+addr = 0x7a7eac
+used_by = ["forms.message_text"]
+
+[[sym]]
+id = "forms_yes_no_title"
+symbol = "yesNoTitleText"
+kind = "global"
+addr = 0x7a7f2c
+used_by = ["forms.message_text"]
+
+[[sym]]
+id = "forms_yes_no_cancel"
+symbol = "yesNoCancelText"
+kind = "global"
+addr = 0x7a7fac
+used_by = ["forms.message_text"]
+
+[[sym]]
+id = "forms_yes_no_ok"
+symbol = "yesNoOKText"
+kind = "global"
+addr = 0x7a802c
+used_by = ["forms.message_text"]
