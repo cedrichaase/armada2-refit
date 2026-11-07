@@ -53,6 +53,7 @@ const BS_OWNERDRAW: u32 = 0xb;
 
 #[link(name = "user32")]
 unsafe extern "system" {
+    fn WindowFromDC(dc: HDC) -> HWND;
     fn SetWindowsHookExA(id: i32, f: unsafe extern "system" fn(i32, usize, isize) -> isize, module: HANDLE, thread: u32) -> HANDLE;
     fn CallNextHookEx(h: HANDLE, code: i32, wp: usize, lp: isize) -> isize;
 }
@@ -229,6 +230,7 @@ pub fn install(thread: u32) -> bool {
         crate::log!("forms: the dialog host has the executable's imports: FleetOpsHook's dialogs stay framed windows");
         return false;
     }
+    install_background();
     let hooks: [(&str, usize, *mut usize); 6] = [
         ("GetDC", my_get_dc as *const () as usize, core::ptr::addr_of_mut!(O_GET_DC)),
         ("ReleaseDC", my_release_dc as *const () as usize, core::ptr::addr_of_mut!(O_RELEASE_DC)),
@@ -276,6 +278,60 @@ pub fn install(thread: u32) -> bool {
         if super::shellui::install() { "are read (screen specs for the adopted dialogs)" } else { "are not read: the adopted dialogs are mirrored" }
     );
     true
+}
+
+// ---- the shell background (decision 300) -----------------------------------------------
+
+/// The trampoline `DrawTransparentBitmap` runs through when the hook lets a draw pass: its
+/// first instructions, then a jump back. 0 until installed.
+static mut BG_TRAMP: usize = 0;
+#[repr(align(16))]
+struct Tramp([u8; 32]);
+static mut BG_CODE: Tramp = Tramp([0xcc; 32]);
+static mut BG_SKIPPED: u32 = 0;
+
+/// Game Setup's paint has the shell set its background, which on Roots is FleetOpsHook's
+/// `SetCurrentBackgroundNew`: it keeps the picture in `hCurrentBackground`, then draws it
+/// with the executable's `DrawTransparentBitmap` onto the game window (the window
+/// `ST3D_GraphicsEngine::GetWindowHandle` names), through a DC from its own `GetDC`, which
+/// no import of the executable passes. That GDI draw lands on the device window at 1:1
+/// and shows over the frame until the swap chain's next image covers it (decision 258,
+/// measured with Wine's relay in decision 300). The function is taken at its entry: a draw
+/// onto the device window while the forms' frame covers it is skipped, every other draw
+/// (the stock procedures' own, into the surfaces of ours) runs as it was.
+fn install_background() {
+    use crate::syms_forms::{hook, sym, TABLE};
+    let e = TABLE.engine();
+    if let Err(why) = e.ready(hook::FORMS_SHELL_BACKGROUND) {
+        crate::log!("forms: the shell background is not kept off the game window ({}): Game Setup may flash its background", why);
+        return;
+    }
+    let at = e.addr(sym::FORMS_DRAW_TRANSPARENT);
+    let check = e.check_bytes(sym::FORMS_DRAW_TRANSPARENT);
+    let code = unsafe { &mut (*core::ptr::addr_of_mut!(BG_CODE)).0 };
+    if !super::hook::patch_entry(at, check, check.len(), draw_transparent as *const () as usize, code) {
+        crate::log!("forms: DrawTransparentBitmap's entry ({:#x}) is not stock: Game Setup may flash its background", at);
+        return;
+    }
+    unsafe { BG_TRAMP = code.as_ptr() as usize };
+    crate::log!("forms: DrawTransparentBitmap taken at its entry ({:#x}): the shell background stays off the game window under the frame", at);
+}
+
+/// `DrawTransparentBitmap(dc, bitmap, x, y, key, dc)`, cdecl (the two shorts pushed as
+/// words), at its entry.
+unsafe extern "C" fn draw_transparent(dc: HDC, bmp: HGDIOBJ, x: i32, y: i32, key: u32, other: HDC) {
+    if super::forms::covers(unsafe { WindowFromDC(dc) }) {
+        let n = unsafe {
+            BG_SKIPPED = BG_SKIPPED.wrapping_add(1);
+            BG_SKIPPED
+        };
+        if n == 1 || (crate::config::get().menus_trace && n % 50 == 0) {
+            crate::log!("forms: the shell background's draw onto the game window skipped ({} so far)", n);
+        }
+        return;
+    }
+    let f: unsafe extern "C" fn(HDC, HGDIOBJ, i32, i32, u32, HDC) = unsafe { core::mem::transmute(BG_TRAMP) };
+    unsafe { f(dc, bmp, x, y, key, other) }
 }
 
 // ---- adopting --------------------------------------------------------------------------

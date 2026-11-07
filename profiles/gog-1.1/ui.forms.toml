@@ -15,6 +15,10 @@ out = "ui/src/syms_forms.rs"
 [hook."forms.vcl"]
 doc = "FleetOpsHook's front-end forms read through the VCL's objects, found by their windows"
 
+[hook."forms.shell_background"]
+doc = "DrawTransparentBitmap at its entry: FleetOpsHook's shell background kept off the game window under the frame"
+rows = ["Menus.Forms"]
+
 [hook."forms.dialog_specs"]
 doc = "The dialog procedures FleetOpsHook opens, told by address to choose a screen spec for an adopted dialog"
 rows = ["Menus.Forms"]
@@ -295,3 +299,19 @@ symbol = "OneButtonDlgProc"
 kind = "fn"
 addr = 0x5d7730
 used_by = ["forms.dialog_specs"]
+
+# ---- forms.shell_background: the shell background kept off the game window -------------
+# (engine/fodialogs.rs; PLAN-FLEETOPS.md, decision 300). Roots replaces SetCurrentBackground
+# at run time (FleetOpsHook's ShellBitmapImp.SetCurrentBackgroundNew, profiles/
+# fo-roots-5.0Z11/build.toml): called from Game Setup's paint, it keeps the background in
+# hCurrentBackground and then draws it onto the window ST3D_GraphicsEngine::GetWindowHandle
+# names (the device window) with this function, through a DC from FleetOpsHook's own
+# GetDC. While the forms' frame covers that window the draw is skipped; every other call
+# runs as stock. The six checked bytes are the three instructions the hook moves aside.
+[[sym]]
+id = "forms_draw_transparent"
+symbol = "DrawTransparentBitmap"
+kind = "fn"
+addr = 0x608100
+check = "55 8b ec 83 ec 3c"
+used_by = ["forms.shell_background"]

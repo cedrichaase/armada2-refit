@@ -1214,6 +1214,14 @@ fn publish(v: &[Tracked], live: Option<usize>) {
 
 // ---- the dialogs over the device window (decision 200) ------------------------------------
 
+/// Whether `w` is the device window (FleetOpsHook's `TMainWindowForm`) while the forms'
+/// frame is drawn over it: nothing drawn on it through GDI is ours to show then
+/// (`fodialogs`, the shell background; decision 300).
+pub fn covers(w: HWND) -> bool {
+    let hosting = unsafe { HOSTING };
+    hosting && !w.is_null() && class_of(w) == "TMainWindowForm"
+}
+
 /// The device window a window is owned by (through its owners), or null.
 fn device_of(h: HWND) -> HWND {
     let mut w = unsafe { GetWindow(h, GW_OWNER) };

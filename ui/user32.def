@@ -66,6 +66,7 @@ KillTimer@8
 SetWindowRgn@12
 EnumPropsExA@12
 WindowFromPoint@8
+WindowFromDC@4
 GetCursorInfo@4
 SetLayeredWindowAttributes@16
 ChildWindowFromPointEx@16

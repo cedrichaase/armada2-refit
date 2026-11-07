@@ -28,11 +28,11 @@ dialog's own OK command before the UI sees a key.
 6. Click "Instant Action".
 7. Wait up to 30 seconds for "LAUNCH".
 8. Wait 3 seconds.
-9. Move the mouse to 790,872.
+9. Move the mouse to 1225,854.
 10. Wait 1 second.
-11. Move the mouse to 800,875.
+11. Move the mouse to 1235,857.
 12. Wait 2 seconds.
-13. Click at 800,875.
+13. Click at 1235,857.
 14. Wait up to 240 seconds for "Render3D.log" to say "(claimed at the instance draw)".
 15. Wait 10 seconds.
 16. Move the mouse to 700,300.
