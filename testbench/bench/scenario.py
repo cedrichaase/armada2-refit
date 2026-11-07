@@ -704,6 +704,28 @@ def s_expect_running(c, m):
                      how='process table, exception.txt')
 
 
+@step(r'^expect the window manager to (?:see|manage) (?:only )?(?P<n>one|\d+) windows?$')
+def s_expect_wm_windows(c, m):
+    """`Expect the window manager to see one window`: the X windows the session's
+    compositor manages (sway's tree: tiled and floating views, not override-redirect
+    ones), so a dialog the game shows as a window of its own fails it. A window wholly off
+    every output is not mapped and does not count."""
+    want = 1 if m['n'] == 'one' else int(m['n'])
+    views = []
+
+    def walk(n):
+        if n.get('type') in ('con', 'floating_con') and (n.get('window') or n.get('app_id') or n.get('shell')):
+            views.append(f"{n.get('shell')} {n.get('name')!r} {n.get('rect', {}).get('width')}x"
+                         f"{n.get('rect', {}).get('height')}")
+        for k in n.get('nodes', []) + n.get('floating_nodes', []):
+            walk(k)
+    try:
+        walk(json.loads(c.sess.swaymsg('-t', 'get_tree') or '{}'))
+    except ValueError:
+        return c.checked(False, 'no answer from the compositor', how='swaymsg get_tree')
+    return c.checked(len(views) == want, f"{len(views)}: {'; '.join(views) or 'none'}", how='swaymsg get_tree')
+
+
 @step(r'^expect the game (?:to have |has )?(?:exited|quit|closed)$')
 def s_expect_exited(c, m):
     for _ in range(40):
