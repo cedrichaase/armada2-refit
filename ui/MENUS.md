@@ -1092,6 +1092,18 @@ a host of their own, `engine/forms.rs` (drawn by `menus/roots.rs`):
   in FleetOpsHook's image, is named as the window's class and derives from the VCL's form
   class (read through the class's own name and parent slots, which the language runtime
   lays out).
+- **Roots' main menu title** (decisions 360 to 366, `menus/title_art.rs`). The column's
+  heading is the lettering of `bitmaps\main\transparant.png` in the game directory (Roots'
+  `Data\`), the title alone over transparency, read from the player's install at run time
+  and never copied; `mainbkgr.png`, the same title over the DS9 picture, is never read.
+  `[Menus] TitleImage=` in UI.ini names another file (a Fleet Operations mod's own), `none`
+  keeps the text heading, empty takes the content set's `Files.MenuTitle`. The file is
+  decoded by `a2fmt::png`, cropped by `a2fmt::png::title_box` (the first band of rows with
+  gold or silver ink of alpha 128 or more, inside a 3% margin; the frame line and the faint
+  panel, which are blue, are left out), cut down by whole factors in premultiplied space and
+  uploaded as straight alpha with the colour of transparent texels borrowed from their
+  neighbours. A missing or unreadable file logs `menus: title picture ...` and the column
+  keeps the text heading of decision 206. Armada II's main menu draws no picture.
 - **Read, never written.** Each tick the form's owned components are walked: each control's
   name, class, rectangle, visibility, enabled state and text, at the VCL's field offsets
   (`profiles/gog-1.1/ui.forms.toml`, hook `ui.forms.vcl`: the VCL's fields, read only on a
@@ -1103,7 +1115,11 @@ a host of their own, `engine/forms.rs` (drawn by `menus/roots.rs`):
   on Wine under XWayland its pop-up still covers the screen in black, and a layered window
   at alpha 1 does the same (the probe of step 0): the form is moved far off screen, its size
   kept, and moved again whenever it comes back. It keeps the activation, the keyboard focus
-  and its modal loop.
+  and its modal loop. It is off screen from the moment it is shown, not from its
+  activation: the game thread's sent messages are watched (`WH_CALLWNDPROC`), a window the
+  forms may take is subclassed while still hidden, and the `WM_WINDOWPOSCHANGING` that
+  shows it is moved off screen, so Wine never maps it and the window manager never sees
+  it (PLAN-FLEETOPS.md, decision 310). The same holds for the dialogs the forms adopt.
 - **Drawn from a timer.** While a form is modal the engine draws nothing. A thread timer of
   the UI's (16 ms) is dispatched by the form's own loop; each tick runs the actions the last
   frame queued, reads the form, prints it into a memory DC every 0.1 s (`WM_PRINT`, the

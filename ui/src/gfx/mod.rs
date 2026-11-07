@@ -172,6 +172,14 @@ pub fn load_tga(rel: &str) -> Option<Tex> {
     Some(texture_bgra(img.width, img.height, img.pixels))
 }
 
+/// A texture file in either format the games use (TGA or DDS, told by its bytes:
+/// `a2fmt::image`), as one BGRA texture.
+pub fn load_image(rel: &str) -> Option<Tex> {
+    let data = crate::files::open(rel)?;
+    let img = a2fmt::image::decode(&data).ok()?;
+    Some(texture_bgra(img.width, img.height, img.pixels))
+}
+
 /// The texture's size in texels.
 #[allow(static_mut_refs)]
 pub fn tex_size(t: Tex) -> (u32, u32) {

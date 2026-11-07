@@ -113,10 +113,24 @@ pub fn box_shown() -> bool {
     unsafe { BOX_SHOWN }
 }
 
+/// Whether a box that pauses the game and is not ours shows: the engine's briefing and
+/// objectives (`ObjectivesDisplay`) or its message box (`MessageDisplay`) with
+/// `[HUD] Messages=0` (Roots' default, decision 125). The engine draws it in
+/// `RenderAll`, before the UI's frame, and stock's box owns the mouse wherever the
+/// pointer is (`CursorOver` always true); so while it shows the HUD of ours stands
+/// aside, as stock's HUD sits under the box (HUD.md, "Under the engine's boxes").
+pub fn stock_box_up() -> bool {
+    let on = on().unwrap_or(0);
+    let ours = |name: &str| PANELS.iter().enumerate().any(|(i, p)| on & (1 << i) != 0 && p.name() == name);
+    (!ours("objectives") && popups::objectives_shown()) || (!ours("messages") && popups::message().is_some())
+}
+
 pub fn run(ui: &mut Ui) {
     let Some(on) = on() else { return };
     let taken = |i: usize| on & (1 << i) != 0;
     let hud_hidden = api::ingame::hud_hidden();
+    // Under the engine's own box only the boxes of ours (which pause the game too) draw.
+    let under_box = stock_box_up();
     // A box that pauses the game covers everything: nothing under it takes the mouse
     // (its own widgets are drawn in the overlay layer, above the occluder).
     let blocking = PANELS.iter().enumerate().any(|(i, p)| taken(i) && p.modal());
@@ -127,7 +141,7 @@ pub fn run(ui: &mut Ui) {
         ui.occlude(screen);
     }
     for (i, p) in PANELS.iter().enumerate() {
-        if !taken(i) || (hud_hidden && p.with_hud()) {
+        if !taken(i) || (hud_hidden && p.with_hud()) || (under_box && !p.modal()) {
             continue;
         }
         crate::hud::layout::at(p.name());
@@ -159,8 +173,9 @@ pub fn game_button(ui: &mut Ui, r: R, b: usize, name: &str, on: bool) -> bool {
     let e = ui.u(ui.theme.edge).max(1.0);
     let img = r.inset(e + ui.u(4.0));
     let sp = api::buttons::sprite(b);
+    note_icon(name, sp);
     let t = ui.theme;
-    let ours = crate::config::get().hud.icons && sp != 0 && {
+    let ours = crate::icons::ours_for_sprite(crate::config::get().hud.icons, sp, |s| sprite::art(s).is_some()) && {
         let ink = if !enabled { crate::gfx::fade(col, 0.45) } else { col };
         let ir = img.inset(ui.u(1.0));
         crate::icons::draw(&mut ui.draw, sprite::name(sp), ir, 1.0, crate::icons::theme_colour(&t, ink))
@@ -250,4 +265,19 @@ pub fn boxed(ui: &mut Ui, title: &str, w: f32, h: f32, dim: f32) -> R {
     ui.claim(screen);
     let r = crate::widgets::Anchor::Centre.place(screen, ui.u(w), ui.u(h), 0.0);
     ui.window(r, title)
+}
+
+/// Logs once per button which sprite stands behind its icon and whether it has art (FO-6,
+/// decision 340: on Roots the art goes first).
+#[allow(static_mut_refs)]
+fn note_icon(button: &str, sp: usize) {
+    static mut SEEN: alloc::vec::Vec<String> = alloc::vec::Vec::new();
+    unsafe {
+        if SEEN.len() >= 32 || SEEN.iter().any(|n| n == button) {
+            return;
+        }
+        SEEN.push(String::from(button));
+    }
+    let art = sprite::art(sp).is_some();
+    crate::log!("icon: {} sprite {} art {}", button, if sp == 0 { "none" } else { sprite::name(sp) }, if art { "yes" } else { "no" });
 }

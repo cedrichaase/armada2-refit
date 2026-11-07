@@ -14,7 +14,10 @@ static mut LAST: String = String::new();
 
 pub fn run(ui: &mut Ui) {
     let Some(raw) = hud::tooltip() else { return };
-    let text = clean(&raw);
+    let mut text = clean(&raw);
+    if super::bargrid::keys_under_pointer() {
+        text = without_hotkey(&text);
+    }
     if text.is_empty() {
         return;
     }
@@ -45,4 +48,19 @@ pub fn run(ui: &mut Ui) {
 fn clean(s: &str) -> String {
     let o: String = s.chars().filter(|&c| c != '^' && c != '\r' && c != '\0').collect();
     String::from(o.replace("%%", "%").trim())
+}
+
+/// Roots' button tooltips name the bar's own hotkey (`(Hotkey: B)`), which does nothing while the
+/// grid's position keys are on (QOL empties the bar's hotkey tables): the note goes, the cell's
+/// badge names the key.
+fn without_hotkey(s: &str) -> String {
+    let Some(i) = s.find("(Hotkey") else { return String::from(s) };
+    let end = s[i..].find(')').map_or(s.len(), |j| i + j + 1);
+    let mut o = String::from(s[..i].trim_end());
+    let rest = s[end..].trim_start_matches([' ', '\n']);
+    if !rest.is_empty() {
+        o.push('\n');
+        o.push_str(rest);
+    }
+    o
 }

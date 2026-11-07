@@ -21,7 +21,7 @@ Roots' own handler changes the preview.
 4. Click "INSTANT ACTION".
 5. Wait up to 30 seconds for "UI.log" to say "adopted at".
 6. Wait 3 seconds.
-7. Click at 955,213.
+7. Click "SELECT MAP".
 8. Wait up to 20 seconds for "UI.log" to say "forms: TMapSelectForm is ours".
 9. Wait 3 seconds.
 10. Take a screenshot called "map select".
@@ -48,7 +48,7 @@ Roots' own handler changes the preview.
 31. Wait up to 20 seconds for "UI.log" to say "press on buttonAccept".
 32. Wait 3 seconds.
 33. Take a screenshot called "game setup".
-34. Check that Instant Action's setup is shown again with the map chosen in Map Select named at the top right and its minimap beside it.
+34. Check that Instant Action's setup is shown again, the window at the right titled with the map chosen in Map Select (not "THE VERY FIRST MAP").
 35. Expect "UI.log" not contain "PANIC".
 36. Expect "Display8.log" not contain "VUID".
 37. Stop the game.

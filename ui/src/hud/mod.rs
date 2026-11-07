@@ -4,6 +4,7 @@
 //! (`engine::hud`) stops it drawing and taking the mouse. Ours reads that state and
 //! acts through the component's own functions.
 pub mod bar;
+mod bargrid;
 mod barskin;
 pub mod info;
 pub mod layout;
@@ -79,7 +80,11 @@ pub fn install() -> bool {
             unsafe { BAR = true };
             if api::palette::slots_indirect() {
                 hud::set_bar_skin(true);
-                crate::log!("bar: ours as a skin over the stock buttons (the stock bar keeps the pointer)");
+                if bargrid::install() {
+                    crate::log!("bar: ours as the grid, the stock buttons moved onto its cells (the stock bar keeps the pointer)");
+                } else {
+                    crate::log!("bar: ours as a skin over the stock buttons (the stock bar keeps the pointer)");
+                }
             } else {
                 crate::log!("bar: ours, its keys are QOL's");
             }
@@ -252,6 +257,18 @@ fn apply_bar_pref() {
     }
 }
 
+static mut UNDER_BOX: bool = false;
+
+/// Logs once each time the HUD of ours stands aside for the engine's box and comes back.
+fn note_under_box(up: bool) {
+    unsafe {
+        if up != UNDER_BOX {
+            UNDER_BOX = up;
+            crate::log!("hud: {}", if up { "under the engine's box (objectives or message): the panels of ours stand aside" } else { "the engine's box closed: the panels of ours are back" });
+        }
+    }
+}
+
 /// A mission's frame: every panel of ours.
 pub fn run(ui: &mut Ui) {
     if !hud::installed() {
@@ -273,6 +290,18 @@ pub fn run(ui: &mut Ui) {
             ui.occlude(screen);
         }
         layout::begin();
+        // The engine's briefing or message box is up (not ours): stock's HUD sits under
+        // it and the box owns the mouse, so nothing of ours but the boxes and the
+        // multiplayer boxes draws or takes input (HUD.md, "Under the engine's boxes").
+        if panels::stock_box_up() {
+            note_under_box(true);
+            panels::run(ui);
+            layout::at("comm");
+            comm::run(ui);
+            layout::end(ui.w, ui.h);
+            return;
+        }
+        note_under_box(false);
         if SELECTION {
             let keep = if MINIMAP { let (o, _, _) = minimap::place(ui); alloc::vec![o] } else { alloc::vec::Vec::new() };
             overlay::run(ui, &keep);

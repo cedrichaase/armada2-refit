@@ -29,6 +29,7 @@ pub mod image;
 pub mod lzo;
 pub mod math;
 pub mod odf;
+pub mod png;
 pub mod sod;
 pub mod spr;
 mod text;

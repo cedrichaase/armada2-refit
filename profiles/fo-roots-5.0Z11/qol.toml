@@ -8,3 +8,9 @@ plugin = "qol"
 [[sym]]
 id = "bk_operator_new"
 check = ""
+
+# Roots' Input.map gives plain W to select_next_ship (stock's is the left bracket), which the
+# overview reads, not the bar: the W cell gets no position key here (FO-6 decisions 330 to 349).
+[[sym]]
+id = "bk_key_cells"
+value = 0x7ffd

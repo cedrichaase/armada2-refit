@@ -409,6 +409,54 @@ the palette and leaves `RefreshOwner`'s mouse call, so the stock bar owns the po
 ring and tooltip stay (seen on the bench: the Tractor Beam's ring on that button only, its tooltip,
 the build list and back). Roots ships it off (`ui/defaults/fo-roots.ini`).
 
+### The grid on Fleet Operations: Roots
+
+`ui/src/hud/bargrid.rs` (PLAN-FLEETOPS.md, FO-6, "The bar as the grid", decisions 330 to 338).
+With `HUD.Bar=1` on Roots the bar of ours is this section's grid, as on Armada II: the same
+layout (`bar::layout_all`), the same keys (QOL's `BarKeys`, through `UI_BarCell` and
+`QOL_BarLabel`), the same place in the bottom row. What differs is who handles the pointer.
+FleetOpsHook draws a weapon's range ring while that weapon's button has the mouse-over flag that
+`StandardComponent::Simulate` sets from the pointer and the button's own rectangle, and only while
+the bar owns the pointer. A grid drawn elsewhere than the stock row would lose the ring, and with
+it the stock tooltip and click. So the grid **moves the stock buttons onto its cells**:
+
+- **After each layout.** The bar's `Update` lays the buttons out (FleetOpsHook's port of
+  `mUpdateButtonsAndPosition`, at every update) and then, on every path, calls
+  `IsGamePausedAtAll`. That call is wrapped (`hud.bar_grid`, installed only where the bar is
+  behind a pointer): after the stock call, each shown button's rectangle (`ControlButton+0x8`,
+  canvas units local to the bar's origin) is set to its cell's, from the place the last UI frame
+  drew the grid. The next layout writes the rectangles again, so nothing of ours outlives the
+  grid by more than one update.
+- **The pointer.** `cursor_over` gives the bar the pointer over the grid's frame and nowhere
+  else (`set_bar_area`), so the stock row's old place belongs to the map again.
+- **Everything else is the engine's.** The buttons simulate where they are drawn: hover,
+  pressed, the rollover and click sounds, the press, the tooltip and FleetOpsHook's ring.
+  Nothing is claimed (`theme::panel`, not `ui.panel`, which would take the pointer). The
+  cells are drawn from the buttons' bytes, as the skin draws them.
+- **More than fifteen buttons** (Roots' bar holds 64): the buttons the plan has no cell for
+  go in columns of three to the right of the keyed block, after a line, without keys; the
+  cells shrink when the grid would run off the screen.
+- **Keys.** The W cell has no key on Roots (`bk_key_cells` in QOL's profile): Roots' key map
+  gives plain W to `select_next_ship`, which the overview reads, not the bar. Roots' other
+  bindings on the fifteen letters are the bar's hotkey tables, which QOL empties around the
+  stock step as on Armada II. While the keys are on, the tooltips of ours (`HUD.Tooltips=1`)
+  drop Roots' `(Hotkey: X)` note over the grid; the cell's badge names the key.
+- **Icons.** Roots keeps most of its button art in DDS sheets (`all_interface_buttons03` to
+  `11`); a sprite's texture is read with the game's extensions in its order (`.tga`, then
+  `.dds`) and decoded by its bytes (`engine/sprite.rs`).
+
+Without `hud.bar_grid` (a Roots build whose `Update` differs) the bar of ours is the skin above.
+
+**On Roots the icons are Roots' own** (decisions 340 to 343): `icons::ours_for_sprite` draws the
+UI's flat icon for a game sprite only where the sprite has no art (`files::Game::game_icons`, on for
+Roots, off for Armada II), so the bar, the top-right buttons and the boxes' buttons show the art
+Roots' own HUD shows, found per race in the sprite database; a sprite the engine never drew (Roots'
+own HUD draws the top-right buttons with FleetOpsHook's art) takes its texture and rectangle from its
+line in Roots' `.spr` files (`engine/sprite.rs`, `spr_entry`). The minimap's filter strip would put the
+stock filter buttons' pictures before its words, but Roots blanks those sprites, so it keeps its
+words. The resource strip and the tooltips' symbols keep
+ours: Roots draws those as glyphs of its bitmap font, not as sprites.
+
 ### Seen on the bench
 
 2026-10-16, Instant Action as the Borg at 1280x720 (`ui/bench-asi.sh HUD.Bar=1`): the bar drew as a 5x3 grid of the game's icons above the info panel, the
@@ -1088,6 +1136,22 @@ over a dimmed screen (`panels::boxed`; not `Ui::modal`, which keeps the keyboard
 the message's title as the window's, the text wrapped; the objectives with a check
 box per line, ticked when complete.
 
+### Under the engine's boxes
+
+With `[HUD] Messages=0` (Roots' default, PLAN-FLEETOPS.md decision 125) the message box
+and the briefing are the engine's: drawn in `RenderAll`, which runs before the UI's frame,
+and modal (their `CursorOver` is always true). Every panel of ours used to be drawn after
+them, over the briefing and could take clicks there (the user's
+report on Roots' first allied tutorial, 2026-11-07). So while either box shows and is not
+ours (`panels::stock_box_up`), `hud::run` draws only the boxes of ours that pause the game
+and the multiplayer boxes; the rest (selection overlay, unit view, minimap, info panel,
+bar, resources, top-right buttons, chat lines, tooltips) stands aside and claims nothing,
+so the engine's box owns the pointer as in stock. UI.log says `hud: under the engine's
+box` and `the engine's box closed`. Stock's HUD sits under the box rather than going;
+ours goes whole, because the UI's frame cannot be put between two of the engine's
+components. With `Messages=1` (Armada II's shipped value) the boxes are ours and nothing
+changes. `testbench/scenarios/fo-ui-briefing.md`.
+
 ### Pause and replay (`PauseBox`, `ReplayPanel`)
 
 The pause box is shown and hidden by the pause order (`NetOrderPause::Execute`); its
@@ -1553,6 +1617,7 @@ down is explained on are named in the profile.
 | `ui.hud.reads_calls` | `TextInput_IsActive` and `CinematicView::IsPlayingVideo` (`fn`, checked), `g_cinematicView` | keys are not held back for the chat line; a click sounds during a video |
 | `ui.hud.reads_popups` | the message, objectives, pause and replay boxes, their press functions, `IsGamePausedAtAll` and `ObjectivesDisplay::FocusSimulate` (`fn`, checked) | no box of ours ("Messages and objectives", "Pause and replay") |
 | `ui.hud.reads_bar` (`HUD.Bar`, `HUD.BarLabels`, `HUD.Icons`) | the bar's slots, mode and menu, the `ControlButton` / `CommandInfoClass` / `ModeInfo` fields, the `ButtonName` pair, `cPrjID::GetName`, `FindElement` and `ControlButton::mButtonPressFunction` (`fn`, checked), the sprite database | no button is described or drawn |
+| `ui.hud.bar_grid` (`HUD.Bar`) | the call of `IsGamePausedAtAll` in `PopupPaletteImp::Update` (patched, once the buttons are laid out; installed on Roots only) and the `ControlButton` rectangle written ("The grid on Fleet Operations: Roots") | the bar of ours on Roots is the skin over the stock row |
 | `ui.hud.reads_overlay` (`HUD.Selection`, `HUD.SelectionGauges`) | `GameObject::objectList`, the object / craft / `SelectionDisplay` fields, `ComputeContainerRect` and `__RTDynamicCast` (`fn`, checked), `currentCamera`, the virtual viewport, `SystemOrder` | no overlay of ours |
 | `ui.hud.bubbles` | `RenderSelectionEffects` (patched, its first byte) | the engine's 3D bubbles stay |
 | `ui.hud.reads_overlay_text` | `overlayText`, its map's `_Nil` and the message fields | no overlay messages of ours |

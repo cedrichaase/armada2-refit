@@ -38,12 +38,15 @@ pub const LAYOUT_FO_ROOTS: &[(&str, &[&str])] = &[
 pub struct Game {
     pub layout: &'static [(&'static str, &'static [&'static str])],
     pub texture_exts: &'static [&'static str],
+    /// The HUD draws the game's own icon art before the UI's flat icons (`icons::game_art_first`):
+    /// on Roots, whose icons are Roots' own (PLAN-FLEETOPS.md, decision 340).
+    pub game_icons: bool,
 }
 
-const ARMADA2: Game = Game { layout: LAYOUT, texture_exts: &[".tga"] };
+const ARMADA2: Game = Game { layout: LAYOUT, texture_exts: &[".tga"], game_icons: false };
 
 /// The games other than Armada II, by their executable's file name (any case).
-const GAMES: &[(&str, Game)] = &[("ArmadaL.exe", Game { layout: LAYOUT_FO_ROOTS, texture_exts: &[".tga", ".dds"] })];
+const GAMES: &[(&str, Game)] = &[("ArmadaL.exe", Game { layout: LAYOUT_FO_ROOTS, texture_exts: &[".tga", ".dds"], game_icons: true })];
 
 /// This process's game: by the executable's name, Armada II's for any other.
 pub fn game() -> &'static Game {

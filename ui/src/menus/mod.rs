@@ -19,6 +19,7 @@ pub mod locks;
 pub mod model;
 pub mod refit;
 pub mod scene;
+pub mod title_art;
 pub mod screens;
 
 use crate::engine::api::dialogs::{self, design_h, design_w};

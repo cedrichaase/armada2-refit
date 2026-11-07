@@ -47,7 +47,7 @@ pub fn run(ui: &mut Ui) {
         if sp == 0 {
             sp = palette::own_sprite(b);
         }
-        let ours = cfg.hud.icons && sp != 0 && {
+        let ours = crate::icons::ours_for_sprite(cfg.hud.icons, sp, |s| sprite::art(s).is_some()) && {
             let ink = if enabled { content } else { fade(content, 0.45) };
             let ir = icon.inset(ui.u(0.5));
             crate::icons::draw(&mut ui.draw, sprite::name(sp), ir, 1.0, crate::icons::theme_colour(&t, ink))

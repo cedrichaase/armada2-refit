@@ -236,8 +236,9 @@ fn caption(c: &Control) -> &str {
     if c.text.is_empty() || c.text == "*" { c.name.as_str() } else { c.text.as_str() }
 }
 
-/// The main menu: Armada II's main menu over the scene (`screens::main_menu::scene_column`,
-/// the same layout and look), titled for Roots, its entries the form's visible buttons in
+/// The main menu: Armada II's main menu over the scene (`screens::main_menu::scene_column_titled`,
+/// the same layout and look), titled for Roots, with Roots' own lettering when its picture
+/// is there (`menus::title_art`, decisions 360 to 369) and the text heading when not, its entries the form's visible buttons in
 /// the order Roots shows them and with the captions Roots set (decision 205); a press goes
 /// to the button at its own rectangle, so two buttons whose names are swapped against
 /// their actions still do what their captions say. Roots' version line stands at the
@@ -246,7 +247,7 @@ fn main_menu(ui: &mut Ui, f: &Form) {
     let buttons = shown(f, Kind::Button);
     let labels: Vec<String> = buttons.iter().map(|c| caption(c).to_uppercase()).collect();
     let entries: Vec<(&str, bool)> = labels.iter().zip(buttons.iter()).map(|(l, c)| (l.as_str(), f.top && c.enabled)).collect();
-    let (clicked, _) = crate::menus::screens::main_menu::scene_column(ui, "FLEET OPERATIONS", "ROOTS", &entries);
+    let (clicked, _) = crate::menus::screens::main_menu::scene_column_titled(ui, "FLEET OPERATIONS", "ROOTS", true, &entries);
     if let Some(i) = clicked {
         forms::press(f, buttons[i]);
     }
