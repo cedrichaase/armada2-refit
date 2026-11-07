@@ -194,11 +194,11 @@ pub fn scene_column_titled(ui: &mut Ui, small: &str, big: &str, art: bool, entri
     let x = libm::roundf(screen.w * 0.08).max(ui.u(40.0));
     let top = libm::roundf((screen.h - total) * 0.5);
     // The title, rising above the column's own title space.
-    let lettering = if art { crate::menus::title_art::get(ui.u(420.0)) } else { None };
+    let lettering = if art { crate::menus::title_art::get(ui.u(460.0)) } else { None };
     if let Some((tex, aspect)) = lettering {
-        // The picture holds the rule and both lines: width 420 units, rising a little
+        // The picture holds the rule and both lines: width 460 units, rising a little
         // above the column's title space, ending inside it.
-        let iw = ui.u(420.0);
+        let iw = ui.u(460.0);
         ui.draw.image(tex, R::new(x - ui.u(8.0), top - ui.u(14.0), iw, iw / aspect), 0xff_ff_ff_ff);
     } else {
         ui.text_in(R::new(x, top - ui.u(40.0), w, ui.u(40.0)), small, 28.0, Align::Left, fade(t.text, 0.85), Weight::Bold);

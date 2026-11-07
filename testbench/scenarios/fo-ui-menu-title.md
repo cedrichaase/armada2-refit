@@ -1,6 +1,6 @@
 # Fleet Operations: Roots with the UI: the main menu's title is Roots' own lettering
 
-Resolutions: 1280x720, 21:9
+Resolutions: 1280x960, 21:9
 Mod: refit
 Layers: display asiloader render3d ui
 Setup: display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh Menus.Forms=1 Menus.Scene=1
