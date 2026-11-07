@@ -30,10 +30,10 @@ rectangle in its `.spr`), so that strip keeps its words (decision 341).
 7. Expect "UI.log" contains "texture all_interface_buttons0".
 8. Expect "UI.log" not contain "NOT FOUND".
 9. Take a screenshot called "starbase icons".
-10. Check that every button of the grid shows an icon (the bottom row's four weapons included) and none shows a word in place of one.
+10. Check that every filled cell of the grid shows a picture (the bottom row's four weapons included), none a word in place of one, and that each Roots tile fills its cell with no second plate of ours around it.
 11. Expect "UI.log" contains "icon: menu sprite menu_button art yes".
 12. Expect "UI.log" contains "icon: objectives sprite objectives_button art yes".
-13. Check that each of the five buttons at the top right holds a small square tile picture in the race's colours (lines, a swirl, a question mark, an eye, a tick: Roots' own art), not a line icon drawn straight on the button.
+13. Check that each of the five buttons at the top right is a square tile picture in the race's colours (lines, a swirl, a question mark, an eye, a tick), with no round button or second plate drawn around or behind it.
 14. Expect "UI.log" contains "mapfilter_ship_button not drawn by the engine yet: its .spr line".
 15. Expect "UI.log" not contain "PANIC".
 16. Expect "Display8.log" not contain "VUID".

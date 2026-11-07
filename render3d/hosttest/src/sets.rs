@@ -422,6 +422,7 @@ mod tests {
                 credits_logos: "textures\\logos.tga",
                 cursor_sprites: "Sprites/cursor.spr",
                 menu_title: "",
+                gui_sprites: "",
             }
         );
         // gallery.rs's lists before.

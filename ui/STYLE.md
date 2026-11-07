@@ -284,6 +284,16 @@ explore, the wrench for repair, darts in each formation's shape) and draw it fla
 decision 340): an icon of ours stands in for a Roots sprite only where the sprite has no art
 (`icons::ours_for_sprite`). Roots' art is read from the player's install, never shipped.
 
+**A sprite that carries its own tile is the button** (decision 344): Roots' button sheets draw
+each icon on a rounded translucent plate, and its top-right buttons are square tiles, so a plate
+of ours behind them reads as a tile inside a tile. Whether a sprite does is measured on its art,
+per sprite (`sprite::own_tile`: the band a sixth in from each edge covered along nine tenths of
+every side). Such a sprite is drawn filling the button at the button's size, as Roots draws it,
+with no plate, frame or edge of ours (`icons::tile_button`); on top go only the state, in the
+theme's colours (the hover light and an accent edge, the active edge, a darker tile while pressed,
+a grey tile while disabled) and the key badge. Empty cells, our own flat icons and art without a
+tile keep the theme's plate. Armada II keeps its flat icons, so it never reaches this.
+
 They are built from a few primitives with exact distances (circles, rounded boxes,
 capsules, polygons, arcs; union, cut and intersection) in `ui/fontbake/src/icons.rs`,
 baked at build time into a signed-distance atlas like the font (1 MB, 64 texels per

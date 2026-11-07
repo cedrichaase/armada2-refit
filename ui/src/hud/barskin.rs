@@ -41,12 +41,17 @@ pub fn run(ui: &mut Ui) {
         let mut st = theme::State::of(ui, id, palette::hovered(b) && enabled, palette::pressed(b) && enabled);
         st.on = palette::state(b) == 2;
         st.off = !enabled;
-        let content = theme::button_frame(ui, r, st);
-        let icon = r.inset(ui.u(5.0));
         let mut sp = palette::sprite(b);
         if sp == 0 {
             sp = palette::own_sprite(b);
         }
+        // Roots' button art is a tile itself (decision 344): it fills the button, no plate of ours.
+        if crate::icons::whole_tile(sp) {
+            crate::icons::tile_button(ui, r, sp, st);
+            continue;
+        }
+        let content = theme::button_frame(ui, r, st);
+        let icon = r.inset(ui.u(5.0));
         let ours = crate::icons::ours_for_sprite(cfg.hud.icons, sp, |s| sprite::art(s).is_some()) && {
             let ink = if enabled { content } else { fade(content, 0.45) };
             let ir = icon.inset(ui.u(0.5));
