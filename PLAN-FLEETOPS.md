@@ -1853,6 +1853,19 @@ engine's own answers logged by the hook (`LayoutLog=1`) and the shots' pixels:
 | Background | none: the text and icons over the 3D view |
 | Special energy | a fourth part only while the craft has special energy (none of the start fleets seen) |
 
+**Evidence.** `fo-ui-hover-ref` `20261107-140604` and `fo-ui-hover-wide-ref` `20261107-142919` (the
+engine's strip, logged); `fo-ui-hover` and `fo-ui-hover-wide` `20261107-155701` (ours, both pass:
+the strip at the engine's places for the starbase and four Federation classes at 1280x960, a
+Romulan starbase and Mogai at 2560x1080; Roots' own not drawn; no VUID); Armada II's
+`ui-hud-panels` and `ui-hud-info` `20261107-152454` pass with the hook not installed. Side-by-side
+sheets (Roots | ours, 2x) are in `$A2_DATA/review/fo-hover/`, never in the repository.
+**Not seen**: an enemy, allied or neutral craft, a damaged one, a cloaked one, one under
+construction, and the special energy part (no scene harness on Roots yet: the colours and
+strings are the engine's answer for each, so they follow, but unjudged). With
+`Tooltips=0` (Roots' shipped value) Roots' own tooltip box at the pointer can lie under our
+line at the top centre; with `Tooltips=1` ours is drawn after it. At 1280x960 our resources
+panel covers the left end of Roots' strip (the hull) where Roots draws it; ours is drawn over it.
+
 | # | Decision | Why | What would change it |
 |---|---|---|---|
 | 460 | **The strip is ours on Roots (`[HUD] Hover=1` in Roots' defaults), off on Armada II** (`Hover=0` in `UI.ini`): Armada II draws it inside the info panel, which `Info=1` replaces with the hover card | the user's request; on Armada II the info panel of ours already shows the craft under the pointer | Armada II's info panel off and the player wanting the strip as ours |
