@@ -224,6 +224,23 @@ $out = Install @("-All", $G)
 Check "-All brings them back" ((Test-Path (G "QOL.asi")) -and (Test-Path (G "QOLRules.asi")) -and -not (Test-Path (G "armada2-refit-layers.txt")))
 Check "RefitPlayer.ini untouched by the selection" (OverlayKept)
 
+Write-Host "== the game directory as install.bat hands it on: quoted with a trailing backslash, or unquoted"
+# A raw command line, as cmd's %* passes it: PowerShell's own quoting of native arguments
+# differs between 5.1 and 7, so it is not used here.
+function RawInstall([string]$line) {
+    $si = New-Object Diagnostics.ProcessStartInfo "powershell.exe"
+    $si.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$(Join-Path $P 'install.ps1')`" $line"
+    $si.UseShellExecute = $false; $si.RedirectStandardOutput = $true; $si.RedirectStandardError = $true
+    $p = [Diagnostics.Process]::Start($si)
+    $out = $p.StandardOutput.ReadToEnd(); $err = $p.StandardError.ReadToEnd(); $p.WaitForExit()
+    if ($p.ExitCode) { Write-Host $out $err; throw "install.ps1 $line exited $($p.ExitCode)" }
+    return $out -split "`r?`n"
+}
+$out = RawInstall "`"$G\`" -Without qol"
+Check "a quoted path ending in \ (and -Without after it)" ((Has $out "*quality of life left out*") -and -not (Test-Path (G "QOL.asi")))
+$out = RawInstall "-All $G\"
+Check "an unquoted path with spaces" (Test-Path (G "QOL.asi"))
+
 Write-Host "== a DXVK d3d8.dll is the old chain's: replaced by Display8, GOG's copy kept; an old package's bloom preset out"
 Set-Content (G "d3d8.dll") "dxvk"
 Set-Content (G "ReShade.ini") "[GENERAL]"
