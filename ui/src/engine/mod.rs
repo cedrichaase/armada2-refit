@@ -20,6 +20,7 @@ pub mod forms;
 pub mod forms_props;
 pub use crate::rt::hook;
 pub mod hud;
+pub mod hover;
 pub mod info;
 pub mod input;
 pub mod intro;

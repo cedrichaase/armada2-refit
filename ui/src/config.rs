@@ -135,6 +135,9 @@ pub struct Hud {
     /// The tooltips the engine shows at the pointer (`CursorInterface`: an object's
     /// name and description over the 3D view), drawn by us in the theme.
     pub tooltips: bool,
+    /// The status line about the craft under the pointer (`SDInfoBar`, which Roots draws at
+    /// the top of the screen), drawn by us where the engine would (`hud::hover`).
+    pub hover: bool,
     /// The engine's last draws in a mission, drawn by us (`engine::leftovers`):
     /// `Overview`, the 3D view's drag box, height posts, order ring and placement markers;
     /// `Fade`, the scripts' fade
@@ -206,6 +209,7 @@ pub fn load() -> Config {
             drop_player: ini.int("HUD", "DropPlayer", 1) != 0,
             load_wait: ini.int("HUD", "LoadWait", 1) != 0,
             tooltips: on(&ini, HUD_TOOLTIPS),
+            hover: on(&ini, HUD_HOVER),
             overview: ini.int("HUD", "Overview", 1) != 0,
             placement: ini.int("HUD", "Placement", 1) != 0,
             fade: ini.int("HUD", "Fade", 1) != 0,
@@ -281,6 +285,7 @@ pub fn reload() {
     h.bar_labels = n.bar_labels;
     h.selection_gauges = n.selection_gauges;
     h.tooltips = n.tooltips;
+    h.hover = n.hover;
     h.unit_view_size = n.unit_view_size;
     h.system_icons = n.system_icons;
     h.shot_scenes = n.shot_scenes;

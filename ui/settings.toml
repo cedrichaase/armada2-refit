@@ -75,6 +75,18 @@ label = "Tooltips"
 help = "The tooltips at the pointer drawn by the UI. Off gives the game's back."
 
 [[row]]
+name = "hud_hover"
+section = "HUD"
+key = "Hover"
+kind = "bool"
+default = "0"
+apply = "live"
+scope = "local"
+tab = "interface"
+label = "Unit under the pointer"
+help = "The status line of the ship or station under the pointer drawn by the UI. Off gives the game's back."
+
+[[row]]
 name = "hud_bar"
 section = "HUD"
 key = "Bar"

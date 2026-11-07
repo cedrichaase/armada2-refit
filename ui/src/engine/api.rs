@@ -94,6 +94,10 @@ pub mod hud {
     };
 }
 
+pub mod hover {
+    pub use crate::engine::hover::{ours, set, stand_aside, take, Kind, Part, Readout};
+}
+
 pub mod info {
     pub use crate::engine::info::{
         build_progress, cancel, class_wire, colour, current, drawn_whole, effect_sprites, effects, face, flash,
