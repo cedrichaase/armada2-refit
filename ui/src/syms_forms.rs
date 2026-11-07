@@ -13,8 +13,6 @@ pub mod sym {
     pub const FORMS_DRAW_TRANSPARENT: a2engine::Sym = a2engine::Sym(30);
     pub const FORMS_YES_NO_MESSAGE: a2engine::Sym = a2engine::Sym(31);
     pub const FORMS_YES_NO_TITLE: a2engine::Sym = a2engine::Sym(32);
-    pub const FORMS_YES_NO_CANCEL: a2engine::Sym = a2engine::Sym(33);
-    pub const FORMS_YES_NO_OK: a2engine::Sym = a2engine::Sym(34);
 }
 
 pub mod hook {
@@ -88,15 +86,13 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "forms_draw_transparent", symbol: "DrawTransparentBitmap", kind: a2engine::Kind::Fn },
     a2engine::SymDef { id: "forms_yes_no_message", symbol: "yesNoMessageText", kind: a2engine::Kind::Global },
     a2engine::SymDef { id: "forms_yes_no_title", symbol: "yesNoTitleText", kind: a2engine::Kind::Global },
-    a2engine::SymDef { id: "forms_yes_no_cancel", symbol: "yesNoCancelText", kind: a2engine::Kind::Global },
-    a2engine::SymDef { id: "forms_yes_no_ok", symbol: "yesNoOKText", kind: a2engine::Kind::Global },
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
     a2engine::HookDef { id: "ui.forms.vcl", run_unknown: false, rows: &[], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21] },
     a2engine::HookDef { id: "ui.forms.shell_background", run_unknown: false, rows: &["Menus.Forms"], syms: &[30] },
     a2engine::HookDef { id: "ui.forms.dialog_specs", run_unknown: false, rows: &["Menus.Forms"], syms: &[22, 23, 24, 25, 26, 27, 28, 29] },
-    a2engine::HookDef { id: "ui.forms.message_text", run_unknown: false, rows: &["Menus.Forms"], syms: &[31, 32, 33, 34] },
+    a2engine::HookDef { id: "ui.forms.message_text", run_unknown: false, rows: &["Menus.Forms"], syms: &[31, 32] },
 ];
 
 pub const BUILDS: &[a2engine::Build] = &[
@@ -108,7 +104,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 35,
+        n_resolved: 33,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_present
@@ -144,8 +140,6 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x608100, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x3c], mask: &[], section: "", count: 0, value: 0 }, // forms_draw_transparent
             a2engine::Entry { present: true, addr: 0x7a7eac, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_yes_no_message
             a2engine::Entry { present: true, addr: 0x7a7f2c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_yes_no_title
-            a2engine::Entry { present: true, addr: 0x7a7fac, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_yes_no_cancel
-            a2engine::Entry { present: true, addr: 0x7a802c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_yes_no_ok
         ],
         blocked: &[
         ],
@@ -153,7 +147,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         modules: &[],
         blocked_mod: &[
         ],
-        n_resolved_mod: 35,
+        n_resolved_mod: 33,
     },
     a2engine::Build {
         name: "fo-roots-5.0Z11",
@@ -163,7 +157,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 35,
+        n_resolved: 33,
         content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1 }, // forms_present
@@ -199,8 +193,6 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x608100, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x3c], mask: &[], section: "", count: 0, value: 0 }, // forms_draw_transparent
             a2engine::Entry { present: true, addr: 0x7a7eac, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_yes_no_message
             a2engine::Entry { present: true, addr: 0x7a7f2c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_yes_no_title
-            a2engine::Entry { present: true, addr: 0x7a7fac, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_yes_no_cancel
-            a2engine::Entry { present: true, addr: 0x7a802c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_yes_no_ok
         ],
         blocked: &[
         ],
@@ -208,13 +200,13 @@ pub const BUILDS: &[a2engine::Build] = &[
         modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
         blocked_mod: &[
         ],
-        n_resolved_mod: 35,
+        n_resolved_mod: 33,
     },
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 4] = [const { core::sync::atomic::AtomicU64::new(0) }; 4];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 35] = [const { core::sync::atomic::AtomicU8::new(0) }; 35];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 35] = [const { core::sync::atomic::AtomicUsize::new(0) }; 35];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 33] = [const { core::sync::atomic::AtomicU8::new(0) }; 33];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 33] = [const { core::sync::atomic::AtomicUsize::new(0) }; 33];
 static NOTES: [a2engine::Note; 4] = [const { a2engine::Note::new() }; 4];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 

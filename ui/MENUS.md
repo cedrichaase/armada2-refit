@@ -1496,7 +1496,7 @@ buttons in a row at its foot, a press going to the form's own button as a click 
 - **The words** are the executable's own: the title, the question and the two captions are
   four 128-byte C buffers (`yesNoTitleText`, `yesNoMessageText`, `yesNoCancelText`,
   `yesNoOKText`) that a caller fills before the prompt opens and that FleetOpsHook's form
-  paints into its picture. Hook `forms.message_text` reads them (a global each, no check: the
+  paints into its picture. Hook `ui.forms.message_text` reads the first two (the captions are the form's controls') (a global each, no check: the
   data of the stock image, which Roots' file keeps at the same addresses); with the question
   empty the prompt falls back to the picture under our buttons. The buttons' captions come from
   the form's controls, so a Roots that renames them is followed.
