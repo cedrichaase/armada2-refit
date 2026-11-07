@@ -446,7 +446,8 @@ it the stock tooltip and click. So the grid **moves the stock buttons onto its c
   `select_next_ship`, which Roots reworked to select the damaged ships of the selection and which
   the overview reads before the bar; while the grid's keys are on, QOL's rebind table moves it to
   M in the engine's parsed key map (`[BarKeys] Rebind = select_next_ship:W>M`, `qol/README.md`,
-  "Key rebinds"; decision 349). `[Bar] GameKeys` of the content set (cells the grid leaves empty
+  "Key rebinds"; decision 349); while a row has not applied, its FROM key stays the game's and
+  its cell has no key and no button. `[Bar] GameKeys` of the content set (cells the grid leaves empty
   for a game key, decision 347) is empty on Roots now. Roots' other
   bindings on the fifteen letters are the bar's hotkey tables, which QOL empties around the
   stock step as on Armada II. While the keys are on, the tooltips of ours (`HUD.Tooltips=1`)

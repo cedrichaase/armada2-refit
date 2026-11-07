@@ -26,7 +26,7 @@
 #define RB_MAX_ROWS 8
 #define RB_MAX_HITS 16
 
-typedef struct { char action[40]; DWORD from, to; } RbRow;
+typedef struct { char action[40]; DWORD from, to; int applied; } RbRow;
 typedef struct { int map, key; DWORD word, bit, toWord, toBit; } RbHit;
 
 static int    g_rdyRebind;
@@ -36,6 +36,7 @@ static char   g_rbText[256];
 static RbHit  g_rbHits[RB_MAX_HITS];
 static int    g_rbNHits;
 static int    g_rbOn = -1;          /* the state applied: 1 in, 0 out, -1 not yet */
+static DWORD  g_rbBlockedLogged;    /* the FROM keys last logged as left to the game */
 
 static const struct { const char *name; BYTE code; } k_rbKeys[] = {
     {"Q",0x10},{"W",0x11},{"E",0x12},{"R",0x13},{"T",0x14},{"Y",0x15},{"U",0x16},{"I",0x17},
@@ -175,6 +176,7 @@ static void rb_apply(void)
         RbRow *row = &g_rbRows[r];
         void  *cell = rb_cell(row->action);
         int    done = 0;
+        row->applied = 0;
         char   m[300];
         m[0] = 0;
         if (!cell) {
@@ -230,6 +232,7 @@ static void rb_apply(void)
                 logline(m);
             }
         }
+        row->applied = done == 1;
     }
 }
 
@@ -248,6 +251,10 @@ static void rb_revert(void)
     }
     if (g_rbNHits) logline("rebind: the key map's own keys back");
     g_rbNHits = 0;
+    {
+        int r;
+        for (r = 0; r < g_rbN; r++) g_rbRows[r].applied = 0;
+    }
 }
 
 /* Reads [BarKeys] Rebind again (QOL_SettingsChanged); a changed table is put back and
@@ -273,4 +280,43 @@ static void rebind_follow(int on)
     if (on == g_rbOn) return;
     if (on) rb_apply(); else rb_revert();
     g_rbOn = on;
+}
+
+/* Whether the key with set-1 scancode `scan` is the FROM key of a row that has not moved its
+ * action off it (the hook stood down, the action not found, the target refused, or the table not
+ * applied yet): the key is still the game's, so the bar's cell of that key gets no position key
+ * and the UI puts no button there (a key never does two things; decision 349).  Logged once per
+ * change of the set of such keys. */
+static int rebind_blocks(BYTE scan)
+{
+    int r;
+    for (r = 0; r < g_rbN; r++)
+        if (g_rbRows[r].from == scan && !(g_rdyRebind && g_rbOn == 1 && g_rbRows[r].applied)) return 1;
+    return 0;
+}
+
+/* Logs the keys left to the game (each with its action), once per change; called with the
+ * bar's step. */
+static void rebind_note_blocked(void)
+{
+    DWORD set = 0;
+    int   r;
+    char  m[300];
+    if (g_rdyRebind && g_rbOn == -1) return;   /* not decided yet: the next step applies the table */
+    for (r = 0; r < g_rbN && r < 32; r++)
+        if (rebind_blocks((BYTE)g_rbRows[r].from)) set |= 1u << r;
+    if (set == g_rbBlockedLogged) return;
+    g_rbBlockedLogged = set;
+    for (r = 0; r < g_rbN && r < 32; r++) {
+        if (!(set >> r & 1)) continue;
+        m[0] = 0;
+        s_cat(m, "rebind not applied: ");
+        s_cat(m, rb_name(g_rbRows[r].from));
+        s_cat(m, " stays the game's (");
+        s_cat(m, g_rbRows[r].action);
+        s_cat(m, "); the ");
+        s_cat(m, rb_name(g_rbRows[r].from));
+        s_cat(m, " cell is left without a key and empty");
+        logline(m);
+    }
 }

@@ -250,6 +250,12 @@ Stock ships the key empty.
   among the controls of one chord). A rebind finds the control by name, its maps by its state cell,
   and writes the held key's code (set-1 scancodes for the keyboard) in each: one aligned word, put
   back when the keys stop. `RTS_CFG.h` is not involved.
+- **A key never does two things.** While a row has not moved its action off FROM (the hook stood
+  down, the action not in the key map, the target refused, or the table not applied yet), FROM is
+  still the game's: its cell of the bar gets no position key (`QOL_BarLabel` NULL) and the UI puts
+  no button there, as `bk_key_cells` does for a cell without a key; logged once per change
+  (`rebind not applied: W stays the game's (select_next_ship); the W cell is left without a key
+  and empty`). Generic over the table's rows, not tied to W.
 - **Refused, logged:** a target another chord already fires on (it holds TO and wants none of the
   keys held that ours wants up: Roots' Alt+M is not a clash for M with Alt up), an action not in
   the key map, a key name not known, a chord without FROM held (its keys' codes logged).

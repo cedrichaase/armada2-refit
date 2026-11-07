@@ -23,7 +23,9 @@ queue), so A queues a ship (the list's cancel turns on, `T=cancel `), W presses 
 queue halts: `T=cancel(off)` again) and the Starbase stays selected. Then, with the construction
 ships selected, W keeps the selection and M, Roots' action now, empties it (none is damaged, so
 "the damaged ships of the selection" is none, as W did before). With `BarKeys=0` the key map's own
-keys come back.
+keys come back. Last, a row that cannot apply (`select_next_ship:W>Q`: Q is `recrew`'s, so the
+target is refused) leaves W the game's: QOL gives the W cell no key and the grid puts no button
+there (the Starbase's top level then reads `Q=build E=order ...`), so a key never does two things.
 
 1. Launch the game.
 2. Wait up to 240 seconds for "Scene.log" to say "scene ready".
@@ -56,8 +58,13 @@ keys come back.
 29. Overlay QOL.QOL:BarKeys=0
 30. Select the ships of class "Mediterranean" owned by the player.
 31. Wait up to 10 seconds for "QOL.log" to say "rebind: the key map's own keys back".
-32. Expect "UI.log" not contain "PANIC".
-33. Expect "Display8.log" not contain "VUID".
-34. Quit the game.
-35. Expect the game to have exited.
-36. Expect no crash.
+32. Overlay QOL.QOL:BarKeys=1 QOL.BarKeys:Rebind=select_next_ship:W>Q
+33. Select the station of class "Starbase" owned by the player.
+34. Wait up to 10 seconds for "QOL.log" to say "refused: another chord already fires on it".
+35. Wait up to 10 seconds for "QOL.log" to say "rebind not applied: W stays the game's (select_next_ship)".
+36. Wait up to 10 seconds for "UI.log" to say "| Q=build E=order R=aiMenu".
+37. Expect "UI.log" not contain "PANIC".
+38. Expect "Display8.log" not contain "VUID".
+39. Quit the game.
+40. Expect the game to have exited.
+41. Expect no crash.
