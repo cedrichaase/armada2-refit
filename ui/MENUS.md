@@ -1092,6 +1092,18 @@ a host of their own, `engine/forms.rs` (drawn by `menus/roots.rs`):
   in FleetOpsHook's image, is named as the window's class and derives from the VCL's form
   class (read through the class's own name and parent slots, which the language runtime
   lays out).
+- **Roots' main menu title** (decisions 360 to 366, `menus/title_art.rs`). The column's
+  heading is the lettering of `bitmaps\main\transparant.png` in the game directory (Roots'
+  `Data\`), the title alone over transparency, read from the player's install at run time
+  and never copied; `mainbkgr.png`, the same title over the DS9 picture, is never read.
+  `[Menus] TitleImage=` in UI.ini names another file (a Fleet Operations mod's own), `none`
+  keeps the text heading, empty takes the content set's `Files.MenuTitle`. The file is
+  decoded by `a2fmt::png`, cropped by `a2fmt::png::title_box` (the first band of rows with
+  gold or silver ink of alpha 128 or more, inside a 3% margin; the frame line and the faint
+  panel, which are blue, are left out), cut down by whole factors in premultiplied space and
+  uploaded as straight alpha with the colour of transparent texels borrowed from their
+  neighbours. A missing or unreadable file logs `menus: title picture ...` and the column
+  keeps the text heading of decision 206. Armada II's main menu draws no picture.
 - **Read, never written.** Each tick the form's owned components are walked: each control's
   name, class, rectangle, visibility, enabled state and text, at the VCL's field offsets
   (`profiles/gog-1.1/ui.forms.toml`, hook `ui.forms.vcl`: the VCL's fields, read only on a

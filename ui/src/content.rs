@@ -57,6 +57,9 @@ pub struct Files {
     pub credits_logos: &'static str,
     /// The cursor sprites.
     pub cursor_sprites: &'static str,
+    /// The main menu's title lettering on a game that has it as art (a PNG under the game
+    /// directory, read at run time; `menus::title_art`), or "" for the text heading.
+    pub menu_title: &'static str,
 }
 
 #[derive(Debug, PartialEq)]
@@ -92,7 +95,7 @@ pub static NONE: Content = Content {
     tour: &[],
     main_scene: None,
     first_campaign_scene: None,
-    files: Files { race_icons: "", credits: "", credits_logos: "", cursor_sprites: "" },
+    files: Files { race_icons: "", credits: "", credits_logos: "", cursor_sprites: "", menu_title: "" },
     gallery_ships: &[],
     gallery_factions: &[],
     glyphs: &[],
@@ -160,6 +163,7 @@ pub fn parse(text: &'static str) -> Content {
             credits: t.str("Files", "Credits"),
             credits_logos: t.str("Files", "CreditsLogos"),
             cursor_sprites: t.str("Files", "CursorSprites"),
+            menu_title: t.str("Files", "MenuTitle"),
         },
         gallery_ships: t.list("Gallery", "Ships").leak(),
         gallery_factions: t.list("Gallery", "Factions").leak(),
