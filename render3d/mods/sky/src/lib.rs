@@ -103,6 +103,7 @@ pub struct Sky {
     nodes: BTreeMap<String, Option<(SprInfo, [f32; 2], [f32; 3])>>,
     pipes: Pipes,
     said_inst: bool,
+    said_prefix: bool,
     said_objects: usize,
     loaded: String,
 }
@@ -121,6 +122,7 @@ impl Default for Sky {
             nodes: BTreeMap::new(),
             pipes: Pipes::new(),
             said_inst: false,
+            said_prefix: false,
             said_objects: 0,
             loaded: String::new(),
         }
@@ -333,20 +335,36 @@ impl Sky {
                 }
             }
         } else {
-            let Some(pipe) = self.pipe(P_FACE, Cull::CounterClockwise) else { return };
+            self.draw_prefix(cmd, &world.to_m4().mul(vp), bg, Cull::CounterClockwise, 1.0);
+        }
+    }
+
+    /// The six faces of a prefix sky (`<prefix>0`..`<prefix>5`) at the origin of `wvp`'s
+    /// frame, unlit, depth off: the stock sky's, and the menu scene's for a sky named by
+    /// a prefix with no recipe. `scale` stretches the cube (the menu's near plane is past
+    /// the stock cube's 100).
+    fn draw_prefix(&mut self, cmd: &mut Cmd, wvp: &M4, bg: &str, cull: Cull, scale: f32) {
+        {
+            let Some(pipe) = self.pipe(P_FACE, cull) else { return };
+            if !pipe.ready(gfx::gpu()) {
+                return;
+            }
             cmd.set_pipeline(&pipe);
-            let wvp = world.to_m4().mul(vp);
             cmd.vs_block(Block::new(0, wvp.transpose().as_floats()));
             let uv = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]];
             for (i, face) in PREFIX_FACES.iter().enumerate() {
                 let mut name = String::from(bg);
                 name.push((b'0' + i as u8) as char);
                 let tex = assets::texture(&name);
+                if !self.said_prefix && i == 5 {
+                    self.said_prefix = true;
+                    log!("sky: prefix sky \"{}\": face {} {}", bg, i, if tex.is_some() { "loaded" } else { "missing" });
+                }
                 cmd.bind_texture(0, tex.as_ref(), &FACE_SAMPLER);
                 cmd.ps_block(Block::new(0, &[1.0, 1.0, 1.0, if tex.is_some() { 0.0 } else { 1.0 }]));
                 let vtx: Vec<scene::Vertex> = [0usize, 1, 2, 0, 2, 3]
                     .iter()
-                    .map(|&k| scene::Vertex { pos: face[k], nrm: [0.0; 3], uv: uv[k] })
+                    .map(|&k| scene::Vertex { pos: [face[k][0] * scale, face[k][1] * scale, face[k][2] * scale], nrm: [0.0; 3], uv: uv[k] })
                     .collect();
                 if let Some(s) = cmd.vertices(&vtx) {
                     cmd.draw(&s);
@@ -470,6 +488,10 @@ impl Sky {
             Self::clear(&mut cmd, v, evp);
             if self.cfg.recipes && self.recipe_now(&shot.sky, true).is_some() {
                 self.draw_recipe(&mut cmd, &a, &vp, evp);
+            } else if !shot.sky.contains('.') && assets::texture_exists(&sfmt!("{}0", shot.sky)) {
+                // No recipe: a sky named by a texture prefix (Roots' `env_*`) is its six
+                // faces as they are, about the eye, under the stars.
+                self.draw_prefix(&mut cmd, &vp, &shot.sky, Cull::None, far * 0.4 / 100.0);
             }
             // The stars, in the sky's frame.
             let star = |n: &str| sprites::sprite_info(n);

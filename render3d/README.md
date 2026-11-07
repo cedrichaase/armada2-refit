@@ -613,7 +613,7 @@ the built-in `content/menu/map.ini`. A view's `Orbit=<degrees a second>` turns i
 about the vertical axis through its target (0, the default, is a fixed view; the sway
 still rides on it). The sky module's menu pass draws `bstar.0` for the bright stars too
 when the sprite table has no `mstar.0` (Roots'), and takes the stock sky recipe of
-`Sky=`'s name when the set has none (the menu only; a name with no recipe is black).
+`Sky=`'s name when the set has none (the menu only); a name with no recipe that is a texture prefix (`<name>0`..`<name>5`, Roots' `env_*`) is drawn as its six faces, as the stock prefix sky is, and any other name is black.
 
 **Decloaking.** A group with `CloakView=<view>` is cloaked until that view is asked
 for; then, after `CloakDelay` seconds (the camera arriving), each of its ships
