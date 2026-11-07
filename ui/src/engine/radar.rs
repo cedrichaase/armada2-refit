@@ -208,7 +208,8 @@ fn game_setup() -> usize {
     unsafe { f(t) }
 }
 
-fn editor() -> bool {
+/// Whether the map editor is on (`UserProfile+0x84`, the flag `RadarComponent::Render` reads).
+pub fn editor() -> bool {
     let p = ptr_of(sym::RADAR_USER_PROFILE);
     p != 0 && unsafe { rd::<u8>(p + field::RADAR_UP_EDITOR()) } != 0
 }

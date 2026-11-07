@@ -1261,7 +1261,9 @@ dialog host's model for a dialog the UI did not create:
   framing above would put it (its place in the design space), then moved off screen with
   its size kept, as the forms are. A window wholly off every output is not mapped, so the
   compositor manages only the game's window (sway's tree on the bench; the bench step
-  `Expect the window manager to see one window`). The dialog keeps the activation, the
+  `Expect the window manager to see one window`). A dialog whose place would not fit in the design space
+  (the map editor's licence, which Roots leaves at the device window's origin) is centred
+  in it (PLAN-FLEETOPS.md, decision 503). The dialog keeps the activation, the
   keyboard focus and FleetOpsHook's modal loop; the UI's timer goes on inside that loop.
   A dialog with no control to take the focus is given it (decision 236).
 - **Painted into a surface of ours.** The stock procedures draw through the executable's

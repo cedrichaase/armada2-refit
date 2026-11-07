@@ -5,385 +5,179 @@
  * stage with fog of war. This plugin turns that stage into a scene: after the
  * mission has simulated Delay= ticks it clears fog and shroud for good, hides
  * the HUD, the grid, the cursor, the event notices and the rollover tooltips,
- * and builds the named
- * objects of Scene.ini's
- * [Object.<name>] sections. Commands written to Scene.cmd in the game directory
- * then change the scene while it runs: a free camera (`camera`, `orbit`),
- * `zoom`, `spawn`, `attack`, `pause`, `query` and more (testbench/scene/README.md).
+ * and builds the named objects of Scene.ini's [Object.<name>] sections.
+ * Commands written to Scene.cmd in the executable's folder then change the scene
+ * while it runs: a free camera (`camera`, `orbit`), `zoom`, `spawn`, `attack`,
+ * `pause`, `objects`, `select`, `query` and more (testbench/scene/README.md).
  *
- * WHAT IT CALLS IN Armada2.exe (GOG patch 1.1, addresses from armada2.map)
- * -----------------------------------------------------------------------
- *   Simulate (0x483290), the game tick, calls GameObject_UpdateRange()
- *     unconditionally at 0x483351. That call is pointed at scene_tick(), which
- *     calls the original first.
- *   BuildObject(char *odf, int team, const Matrix34 &) (0x451990, cdecl) builds
- *     a GameObject at a full transform. ScriptInterfaceImp::BuildObject is a
- *     wrapper that only places relative to an existing object, so it cannot
- *     start an empty scene. The object's handle is the int at +0x28.
- *   Scanner::ForceFogAndShroud(bool) (0x4935d0) writes the game setup's fog and
- *     shroud flags, which Scanner::IsFogged / IsShrouded read on every query;
- *     Scanner::ForceUpdate() (0x493600) makes the scanner recompute. false is the
- *     map as with fog and shroud off in the setup screen: explored, and never
- *     re-fogged.
- *   ScriptInterfaceImp methods, called on the engine's static instance
- *     (0x735c40, what g_pScriptInterface points at from start-up); none of them
- *     reads `this`: CenterCamera(int) 0x455190, CraftCannotDie(int, bool)
- *     0x457590, Attack(int, int, int) 0x452be0, DisableEngines(int, bool)
- *     0x456960, DisableWeapons(int, bool) 0x456a60, GetLocation(int) 0x453140,
- *     SetCurrentHealth(int, float) 0x456d20, GetMaxHealth(int) 0x456da0,
- *     PauseSimulation() 0x454cc0, UnpauseSimulation() 0x454cf0.
- *   DisplayInterface::SetInterfaceState(mode) (0x51a460, cdecl) applies one of
- *     the four modes toggle_interface (Ctrl+I) steps through, kept at +0x78 of
- *     the struct 0x76b5ac points at. 0 is the full HUD, 1 drops the tactical
- *     camera view, 3 is no HUD at all (seen on the bench).
- *   GridRenderState (0x768e18): three ints per view, {mode, ?, visible}, which
- *     grid_toggle (Alt+G) cycles through Update (0x528080); mode 2 sets both
- *     others to 0, and GridVisible() (0x51e180) returns `visible`.
- *   gTacticalCamera (0x763650): its interest point, the map position the RTS
- *     camera looks at, is the Vector3 at +0x98 (TacticalCamera::GetInterest).
- *   The camera in use is gCameraManager's first field (0x763370): a ParabolicCamera
- *     (gParabolicCamera 0x763470, vtable 0x6b4598; height at +0x54, 10 to 2200)
- *     or a TacticalCamera (vtable 0x6b46c0; distance factor at +0xd4, 1 to 20).
- *     Both implement SetZoomLevel(0..1) at vtable +0x44, which ScriptInterfaceImp::
- *     SetCameraZoom (0x4551d0) calls; the `zoom` command and `Zoom=` call it.
- *   s_UpdateMainCamera (0x53ed90) updates the main ST3D_Camera through one
- *     virtual call, `call *0x88(%eax)` at 0x53edac, on the view object
- *     (cOverViewImp::UpdateCamera, which hands it to gCameraManager's current
- *     camera, whatever its class). That call is pointed at camera_update(),
- *     which makes the same call and then, with the free camera on, calls the
- *     ST3D_Camera's virtual SetTransform (slot 5) with its own camera-to-world
- *     matrix; SetTransform derives the rest (world-to-camera, frustum). The
- *     current camera-to-world matrix is at +0xc0
- *     (ST3D_Camera::GetCameraToWorldTransform). Patching TacticalCamera's
- *     vtable instead did nothing: the camera in use is not that class.
- *   RefreshDisplay draws the cursor with one ST3D_Sprite::DrawScaled2D call
- *     (0x6246fa), which HUD.asi also wraps; see cursor_draw().
- *   GameEvent::TriggerEvent (0x479880, 0x4799a0, 0x479bb0) fires the events of
- *     events.dat -- "Enemy engaged." and the rest; see set_notices().
- *   Planet::StartWithColony(int) 0x4b5660, SetPopulation(float) 0x4b5970,
- *     GetMaxPopulation() 0x4b5550, NeutralizePlanet() 0x4b5150, Craft::SetCrew
- *     (float) 0x4c83e0 and Team::GetTeam(int) 0x496340 colonise a planet
- *     without a colony ship; see colonize().
- *   SelectionDisplay::AlwaysSimulate asks DisplayInterface::TooltipOn() for the
- *     object to show a rollover tooltip for, in one call at 0x508070; see
- *     set_tooltips(). Its DisplayInterface::MouseOn call at 0x5080fc, and
- *     SelectionDisplay::PreRender's at 0x508e72, find the hover object; see
- *     set_hover().
- *   ShieldEffect::CreateShieldHit (0x4743b0), called by Beam, Bullet, Mine and
- *     Missile at 0x58bb95, 0x58cad8, 0x58d502 and 0x58dd65, makes the flash of a
- *     hit on shields; see set_shieldfx().
- *   Heal: ScriptInterfaceImp::SetShieldPercent(int, float) 0x455eb0 and
- *     SetCrew(int, float) 0x456060, and Craft::RepairAllSystemsComplete()
- *     0x4c8be0; see heal_all().
- *   CraftInstance::Update (0x4cb390), slot 0x6b3e64 of CraftInstance's vtable,
- *     decides which of a model's damage nodes show; see inst_update().
- *   The player's race: SetupDefaultGame (Program::MainLoop's set-up for a map
- *     named on the command line) gives slot 0 the race of the map's first start
- *     location, through Race::Find (0x48b100) at 0x4897ad and 0x489872, and
- *     leaves it "random" when the map names none (a2_borg01 names none), which
- *     Program::GameOpenPreLoad then draws at random. With Race= set both calls
- *     go to race_find(), which finds that race instead; see race_find().
- *   A mission script's captions -- the intro cinematics' subtitles, the stardate
- *     lower thirds and the mission's title -- come from ScriptInterfaceImp::ShowTitle
- *     (0x454ff0) and ShowSubtitle (0x4550c0), each one call to OverlayText::
- *     AddMessage (0x5061e0) on overlayText, at 0x455081 and 0x45510c. With
- *     Captions=0 both calls go to caption_add(), which adds nothing; see
- *     captions_hook().
- *   Marks (Scene.marks) are read, never patched: each frame, from the camera hook,
- *     the camera matrix, the selection, the scene's crafts' cloaks and deaths,
- *     Ordnance::ordnanceList (0x771fac; owner +0x5c, target +0x60, its ODF through
- *     cPrjID::GetOdfName 0x6593a0) and Explosion::explosionList (0x7367c4; its
- *     place through Entity::GetTransform 0x4cfd50); see marks_poll().
- *   Move orders: the GameObject::SetCommand overloads the script interface's
- *     own Goto and Stop end in -- (AiCommand, const GameObject *, long, bool)
- *     0x4d1af0, (AiCommand, const Vector3 &, long, bool) 0x4d1b50 and
- *     (AiCommand, long, bool, bool) 0x4d1a40 -- with GO (4), GO_WARP (0x2b)
- *     or STOP (3); see order_goto().
- *   TechnologyTree::mFind(const char *) 0x4999e0, on g_technologyTreeArray
- *     (0x739000, one tree per team), finds a tech item, whose flags `tech` sets;
- *     see set_tech().
+ * Every engine address, struct offset and value is the symbol profile's
+ * (profiles/<build>/scene.toml, generated into engine_syms.h), checked by
+ * a2e_ready per hook before anything is patched or called: each part of the
+ * scene builder (scene.tick, scene.camera, scene.fog, scene.select, ...) stands
+ * down on its own on an executable it does not know, and a command that needs a
+ * hook that stood down says so (`  ! scene.<hook> stood down: ...`). What each
+ * hook is, and why, is in testbench/scene/README.md, "How it works".
  *
  * Matrix34 is three axis rows -- right, up, front -- then the position: a local
  * point (x, y, z) lands at x*right + y*up + z*front + position.
- *
- * Every site and entry point is checked against its bytes before anything is
- * patched or called; a different Armada2.exe leaves the plugin inert.
  */
 
-typedef unsigned char       BYTE;
-typedef unsigned long       DWORD;
-typedef int                 BOOL;
-typedef int                 INT;
-typedef unsigned int        UINT;
-typedef long                LONG;
-typedef void               *HANDLE;
-typedef HANDLE              HMODULE;
-typedef const char         *LPCSTR;
-typedef char               *LPSTR;
+#define A2_FLTUSED
+#include "../../csdk/a2asi.h"
+#include "../../csdk/a2engine.h"
+#include "engine_syms.h"
 
-#define NULLPTR ((void *)0)
-#define TRUE  1
-
+#ifndef GENERIC_READ
 #define GENERIC_READ           0x80000000
-#define GENERIC_WRITE          0x40000000
-#define FILE_SHARE_READ        0x00000001
+#endif
+#ifndef OPEN_EXISTING
 #define OPEN_EXISTING          3
-#define OPEN_ALWAYS            4
-#define FILE_ATTRIBUTE_NORMAL  0x80
-#define FILE_END               2
-#define INVALID_HANDLE_VALUE   ((HANDLE)(LONG)-1)
-#define PAGE_EXECUTE_READWRITE 0x40
+#endif
+#define MOVEFILE_REPLACE_EXISTING 1
 
-__declspec(dllimport) DWORD   __stdcall GetModuleFileNameA(HMODULE, LPSTR, DWORD);
-__declspec(dllimport) BOOL    __stdcall VirtualProtect(void *, UINT, DWORD, DWORD *);
-__declspec(dllimport) BOOL    __stdcall FlushInstructionCache(HANDLE, const void *, UINT);
-__declspec(dllimport) HANDLE  __stdcall GetCurrentProcess(void);
-__declspec(dllimport) HANDLE  __stdcall CreateFileA(LPCSTR, DWORD, DWORD, void *, DWORD, DWORD, HANDLE);
-__declspec(dllimport) BOOL    __stdcall ReadFile(HANDLE, void *, DWORD, DWORD *, void *);
-__declspec(dllimport) BOOL    __stdcall WriteFile(HANDLE, const void *, DWORD, DWORD *, void *);
-__declspec(dllimport) DWORD   __stdcall SetFilePointer(HANDLE, LONG, LONG *, DWORD);
-__declspec(dllimport) BOOL    __stdcall CloseHandle(HANDLE);
 __declspec(dllimport) BOOL    __stdcall DeleteFileA(LPCSTR);
+__declspec(dllimport) BOOL    __stdcall MoveFileExA(LPCSTR, LPCSTR, DWORD);
 __declspec(dllimport) DWORD   __stdcall GetTickCount(void);
 __declspec(dllimport) void    __stdcall GetSystemTimeAsFileTime(DWORD *ft);   /* FILETIME: low, high */
-__declspec(dllimport) UINT    __stdcall GetPrivateProfileIntA(LPCSTR, LPCSTR, INT, LPCSTR);
-__declspec(dllimport) DWORD   __stdcall GetPrivateProfileStringA(LPCSTR, LPCSTR, LPCSTR, LPSTR, DWORD, LPCSTR);
 __declspec(dllimport) DWORD   __stdcall GetPrivateProfileSectionNamesA(LPSTR, DWORD, LPCSTR);
 
-int _fltused = 0;   /* floats without the CRT */
+/* ---- the engine, through the profile ------------------------------------ */
 
-/* ---- the engine (Armada2.exe, GOG patch 1.1) ---------------------------- */
-
-#define HOOK_SITE        0x483351u   /* call GameObject_UpdateRange, in Simulate */
-#define UPDATE_RANGE     0x4d3e90u
-#define BUILD_OBJECT     0x451990u
-#define FORCE_FOG        0x4935d0u
-#define FORCE_UPDATE     0x493600u
-#define SET_IFACE_STATE  0x51a460u   /* DisplayInterface::SetInterfaceState */
-#define MAIN_CAM_CALL    0x53edacu   /* call *0x88(%eax) in s_UpdateMainCamera */
-#define CAM_TO_WORLD     0xc0u       /* ST3D_Camera's camera-to-world Matrix34 */
-#define SI_ATTACK        0x452be0u
-#define SI_GET_LOCATION  0x453140u
-#define SI_PAUSE         0x454cc0u
-#define SI_UNPAUSE       0x454cf0u
-#define SI_CENTER_CAMERA 0x455190u
-#define SI_NO_ENGINES    0x456960u
-#define SI_NO_WEAPONS    0x456a60u
-#define SI_SET_HEALTH    0x456d20u
-#define SI_MAX_HEALTH    0x456da0u
-#define SI_CANNOT_DIE    0x457590u
-#define SI_EXPLODE_NOW   0x456cf0u   /* ScriptInterfaceImp::ExplodeNow(int): a craft dies now, as a mission script blows one up */
-#define SI_SUCCEED       0x457d70u   /* ScriptInterfaceImp::SucceedMission(float delay, char *text): the script's win */
-#define SI_FAIL          0x457d50u   /* ScriptInterfaceImp::FailMission(float delay, char *text): the script's loss */
-#define GO_CLOAK_NOW     0x4d03e0u   /* GameObject::ImmediateCloak: thiscall, fully cloaked at once */
-#define OBJECT_CLOAK     0x108       /* a GameObject's cloaking device, if any: its state at +0x3c
-                                      * (0 visible, 1 cloaking, 2 cloaked, 3 decloaking) */
-#define FREIGHTER_VT     0x6b26a8u   /* Freighter's vtable */
-#define FREIGHTER_LOAD   0x4b16f0u   /* Freighter::LoadResource(float amount, eResource): thiscall; a new
-                                      * resource empties the hold first, the amount is clamped to the
-                                      * class's capacity for it and to 0 */
-#define FREIGHTER_KIND   0x25c       /* the resource carried (eResource; 6: none) */
-#define FREIGHTER_AMOUNT 0x258       /* how much of it */
-#define SI_SPECIAL_AT    0x452d10u   /* ScriptInterfaceImp::Special_Attack(int, int target, const char *weapon) */
-#define SI_SPECIAL       0x452dc0u   /* ScriptInterfaceImp::Special_Attack(int, const char *weapon): no target */
-#define SI_SET_SPECIAL   0x456280u   /* ScriptInterfaceImp::SetSpecialEnergy(int, float) */
-#define CRAFT_SPECIAL_MAX 0x168u     /* a craft's special energy: its maximum, then what it has (+0x16c) */
-#define CRAFT_CARRIER    0x128u      /* a craft's Carrier: its weapons, a vector of Weapon * at +0xc..+0x10 */
-#define PRJ_SET_NAME     0x6593c0u   /* cPrjID::SetName(const char *), thiscall */
-#define WEAPON_FIND      0x664850u   /* WeaponClass::Find(const cPrjID &), cdecl */
-#define FIRE_AT_SPECIAL  0x4c3820u   /* Craft::FireAtSpecial(int slot, const GameObject *), thiscall */
-#define FIRE_SPECIAL     0x4c3b20u   /* Craft::FireAtSpecial(int slot): no target */
-#define WEAPON_CAN_FIRE  0x20u       /* Weapon vtable: can it fire at this target now */
-#define SI_INSTANCE      ((void *)0x735c40u)
-#define TACTICAL_CAMERA  0x763650u
-#define CAMERA_INTEREST  0x98u
-#define CAMERA_CURRENT   0x763370u   /* gCameraManager's first field: the camera in use (a GameCamera *) */
-#define CAM_VT_SET_ZOOM  0x44u       /* GameCamera vtable: SetZoomLevel(float 0..1), what SetCameraZoom calls */
-#define TACTICAL_VTABLE  0x6b46c0u   /* ??_7TacticalCamera@@6B@ */
-#define TACT_ZOOM        0xd4u       /* TacticalCamera's zoom, a distance factor: min..max below, default below */
-#define TACT_ZOOM_MIN    0x6b46a4u   /* float 1.0 */
-#define TACT_ZOOM_MAX    0x6b46a8u   /* float 20.0 */
-#define PARABOLIC_VTABLE 0x6b4598u   /* ??_7ParabolicCamera@@6B@ */
-#define PARA_HEIGHT      0x54u       /* ParabolicCamera's height above the ground */
-#define PARA_HEIGHT_MIN  0x709a20u   /* OVERVIEW_MIN_HEIGHT, float 25.0 */
-#define PARA_HEIGHT_MAX  0x709a1cu   /* OVERVIEW_MAX_HEIGHT, float 400.0 */
-#define CAM_SET_ZOOM_TAC 0x4e4db0u   /* TacticalCamera::SetZoomLevel */
-#define CAM_SET_ZOOM_PAR 0x4dfcc0u   /* ParabolicCamera::SetZoomLevel */
-#define GAME_STATE_PTR   0x76b5acu   /* -> the struct whose +0x78 is the HUD mode */
-#define IFACE_MODE       0x78u
-#define GRID_RECORDS     0x768e18u   /* GridRenderState, 3 ints per view */
-#define OBJECT_HANDLE    0x28u
-#define ENTITY_GET       0x4cfff0u   /* Entity::Get(handle), cdecl */
-#define OVERVIEW         ((void *)0x768e40u)   /* the one cOverViewImp */
+/* Addresses (a2e_addr: 0 unless a hook using the entry is ready, so every use sits
+ * behind its hook's check), struct offsets (SCENE_F_*) and values (SCENE_V_*). */
+#define UPDATE_RANGE     a2e_addr(SCENE_S_FN_UPDATE_RANGE)     /* GameObject_UpdateRange */
+#define BUILD_OBJECT     a2e_addr(SCENE_S_FN_BUILD_OBJECT)
+#define FORCE_FOG        a2e_addr(SCENE_S_FN_FORCE_FOG)
+#define FORCE_UPDATE     a2e_addr(SCENE_S_FN_FORCE_UPDATE)
+#define SET_IFACE_STATE  a2e_addr(SCENE_S_FN_SET_IFACE_STATE)   /* DisplayInterface::SetInterfaceState */
+#define CAM_TO_WORLD     SCENE_F_CAM_TO_WORLD                  /* ST3D_Camera's camera-to-world Matrix34 */
+#define SI_ATTACK        a2e_addr(SCENE_S_SI_ATTACK)
+#define SI_GET_LOCATION  a2e_addr(SCENE_S_SI_GET_LOCATION)
+#define SI_PAUSE         a2e_addr(SCENE_S_SI_PAUSE)
+#define SI_UNPAUSE       a2e_addr(SCENE_S_SI_UNPAUSE)
+#define SI_CENTER_CAMERA a2e_addr(SCENE_S_SI_CENTER_CAMERA)
+#define SI_NO_ENGINES    a2e_addr(SCENE_S_SI_NO_ENGINES)
+#define SI_NO_WEAPONS    a2e_addr(SCENE_S_SI_NO_WEAPONS)
+#define SI_SET_HEALTH    a2e_addr(SCENE_S_SI_SET_HEALTH)
+#define SI_MAX_HEALTH    a2e_addr(SCENE_S_SI_MAX_HEALTH)
+#define SI_CANNOT_DIE    a2e_addr(SCENE_S_SI_CANNOT_DIE)
+#define SI_EXPLODE_NOW   a2e_addr(SCENE_S_SI_EXPLODE_NOW)      /* a craft dies now, as a mission script blows one up */
+#define SI_SUCCEED       a2e_addr(SCENE_S_SI_SUCCEED)          /* SucceedMission(float delay, char *text) */
+#define SI_FAIL          a2e_addr(SCENE_S_SI_FAIL)             /* FailMission(float delay, char *text) */
+#define GO_CLOAK_NOW     a2e_addr(SCENE_S_FN_CLOAK_NOW)        /* GameObject::ImmediateCloak: fully cloaked at once */
+#define OBJECT_CLOAK     SCENE_F_OBJ_CLOAK      /* a GameObject's cloaking device, if any */
+#define CLOAK_STATE      SCENE_F_CLOAK_STATE    /* 0 visible, 1 cloaking, 2 cloaked, 3 decloaking */
+#define CLOAK_REQUEST    SCENE_F_CLOAK_REQUEST  /* the byte the player's button sets */
+#define FREIGHTER_VT     a2e_addr(SCENE_S_VT_FREIGHTER)
+#define FREIGHTER_LOAD   a2e_addr(SCENE_S_FN_FREIGHTER_LOAD)  /* Freighter::LoadResource(float, eResource) */
+#define FREIGHTER_KIND   SCENE_F_FREIGHTER_KIND    /* the resource carried (eResource; 6: none) */
+#define FREIGHTER_AMOUNT SCENE_F_FREIGHTER_AMOUNT  /* how much of it */
+#define SI_SET_SPECIAL   a2e_addr(SCENE_S_SI_SET_SPECIAL)
+#define CRAFT_SPECIAL_MAX SCENE_F_CRAFT_SPECIAL_MAX  /* a craft's special energy: its maximum ... */
+#define CRAFT_SPECIAL    SCENE_F_CRAFT_SPECIAL       /* ... and what it has */
+#define CRAFT_CARRIER    SCENE_F_CRAFT_CARRIER       /* a craft's Carrier: its weapons, a vector of Weapon * */
+#define PRJ_SET_NAME     a2e_addr(SCENE_S_FN_PRJ_SET_NAME)
+#define WEAPON_FIND      a2e_addr(SCENE_S_FN_WEAPON_FIND)
+#define FIRE_AT_SPECIAL  a2e_addr(SCENE_S_FN_FIRE_AT_SPECIAL)  /* Craft::FireAtSpecial(int slot, const GameObject *) */
+#define FIRE_SPECIAL     a2e_addr(SCENE_S_FN_FIRE_SPECIAL)     /* Craft::FireAtSpecial(int slot): no target */
+#define WEAPON_CAN_FIRE  SCENE_F_WEAPON_VT_CAN_FIRE          /* Weapon vtable: can it fire at this target now */
+#define TACTICAL_CAMERA  a2e_addr(SCENE_S_TACTICAL_CAMERA)
+#define CAMERA_INTEREST  SCENE_F_CAMERA_INTEREST
+#define CAMERA_CURRENT   a2e_addr(SCENE_S_CAMERA_MANAGER)   /* gCameraManager's first field: the camera in use */
+#define TACTICAL_VTABLE  a2e_addr(SCENE_S_VT_TACTICAL)
+#define TACT_ZOOM        SCENE_F_TACT_ZOOM       /* TacticalCamera's zoom, a distance factor */
+#define TACT_ZOOM_MIN    a2e_addr(SCENE_S_TACT_ZOOM_MIN)
+#define TACT_ZOOM_MAX    a2e_addr(SCENE_S_TACT_ZOOM_MAX)
+#define PARABOLIC_VTABLE a2e_addr(SCENE_S_VT_PARABOLIC)
+#define PARA_HEIGHT      SCENE_F_PARA_HEIGHT     /* ParabolicCamera's height above the ground */
+#define PARA_HEIGHT_MIN  a2e_addr(SCENE_S_PARA_HEIGHT_MIN)
+#define PARA_HEIGHT_MAX  a2e_addr(SCENE_S_PARA_HEIGHT_MAX)
+#define USER_PROFILE     a2e_addr(SCENE_S_USER_PROFILE)   /* -> the struct whose IFACE_MODE is the HUD mode */
+#define IFACE_MODE       SCENE_F_PROFILE_IFACE_MODE
+#define GRID_RECORDS     a2e_addr(SCENE_S_GRID_RECORDS)
+#define OBJECT_HANDLE    SCENE_F_OBJ_HANDLE
+#define ENTITY_GET       a2e_addr(SCENE_S_FN_ENTITY_GET)  /* Entity::Get(handle), cdecl */
 static int  g_waypoint_key;    /* `waypoint-key`: the state the overview reads while held */
 static int *g_waypoint_orig;   /* the binding's own state, put back when let go */
-#define OV_SELECT        0x90u       /* vtable: Select(obj, type, clear first, ...) */
-#define OV_SELECT_NUM    0x94u       /* vtable: GetSelectNum() */
-#define OV_SELECT_LIST   0x98u       /* vtable: GetSelectList(), the ids */
-#define OV_SHIP_GROUPS   0x14cu      /* ten cGroup, 12 bytes each: list_array *, -, label */
-#define OV_STATION_GROUPS 0x1c4u     /* the stations' ten */
-#define OBJECT_CLASS     0x40u       /* GameObjectClass *, one per ODF */
-#define OBJECT_GROUP     0x120u      /* the group number drawn beside it, -1 for none */
-#define OBJECT_FLAGS     0x14u
-#define FLAG_PRODUCER    0x200u      /* a Producer: it has a build queue */
-#define QUEUE_SIZE       0x4b7b70u   /* Producer::BuildQueueSize, the one in progress included */
-#define CURSOR_DRAW_CALL 0x6246fau   /* RefreshDisplay: call ST3D_Sprite::DrawScaled2D */
-#define EVENT_TRIGGER_0  0x479880u   /* GameEvent::TriggerEvent() */
-#define EVENT_TRIGGER_3  0x4799a0u   /* GameEvent::TriggerEvent(const Vector3 &, int, const Race *) */
-#define EVENT_TRIGGER_1  0x479bb0u   /* GameEvent::TriggerEvent(const Race *) */
-#define PLANET_VTABLE    0x6b2b3cu   /* what Planet's constructor stores at +0 */
-#define PL_START_COLONY  0x4b5660u   /* Planet::StartWithColony(int team) */
-#define PL_SET_POP       0x4b5970u   /* Planet::SetPopulation(float) */
-#define PL_MAX_POP       0x4b5550u   /* Planet::GetMaxPopulation(), from the class's maxPopulation */
-#define PL_NEUTRALIZE    0x4b5150u   /* Planet::NeutralizePlanet() */
-#define CRAFT_SET_CREW   0x4c83e0u   /* Craft::SetCrew(float), clamped to the maximum crew */
-#define TEAM_GET         0x496340u   /* Team::GetTeam(int), static: Team &, unchecked */
-#define MAX_TEAM         12          /* Team::s_pTeamList (0x738db0) holds teams 0..12 */
-#define TEAM_RACE        0x244u      /* Team: its Race * */
-#define RACE_CITY_NAME   0x452u      /* Race: cityTextureName, inline (ECFR, ECNA, BORG) */
-#define PL_TEAM          0xecu       /* GameObject: its team */
-#define PL_POPULATION    0x2acu      /* Planet: population, float */
-#define PL_SHOWN_RACE    0x2c4u      /* Planet: the Race whose cities are drawn */
-#define PL_SHOWN_POP     0x2c8u      /* Planet: the population drawn, eased toward +0x2ac */
-#define RACE_FIND        0x48b100u   /* Race::Find(const char *name), cdecl: the Race of that name (exact, as races.odf's
-                                      * `name`), or NULL */
-#define DEFAULT_RACE_1   0x4897adu   /* SetupDefaultGame: call Race::Find(start location 1's race) for slot 0 */
-#define DEFAULT_RACE_2   0x489872u   /* the same, on its other branch */
-#define START_MUSIC      0x4586c0u   /* StartMusic(long, int): cdecl, starts a music track */
-#define NEW_TRACK        0x463680u   /* JukeBox::mStartNewTrack: thiscall, no arguments, the in-mission music */
-#define OVERLAY_ADD      0x5061e0u   /* OverlayText::AddMessage(x, y, justify, text, colour, fade in, font): thiscall, ret 0x1c,
-                                      * the message's key */
-#define SHOW_TITLE_CALL  0x455081u   /* ScriptInterfaceImp::ShowTitle: call OverlayText::AddMessage */
-#define SHOW_SUB_CALL    0x45510cu   /* ScriptInterfaceImp::ShowSubtitle: the same */
-#define TOOLTIP_ON_CALL  0x508070u   /* SelectionDisplay::AlwaysSimulate: call DisplayInterface::TooltipOn */
-#define HOVER_SIM_CALL   0x5080fcu   /* SelectionDisplay::AlwaysSimulate: call DisplayInterface::MouseOn -> +0x7c */
-#define HOVER_PRE_CALL   0x508e72u   /* SelectionDisplay::PreRender: call DisplayInterface::MouseOn -> hover effect */
-#define SHIELD_HIT_BEAM  0x58bb95u   /* Beam::Simulate: call ShieldEffect::CreateShieldHit */
-#define SHIELD_HIT_SHOT  0x58cad8u   /* Bullet::Simulate: the same */
-#define SHIELD_HIT_MINE  0x58d502u   /* Mine::mMoveTowardsTarget: the same */
-#define SHIELD_HIT_MSL   0x58dd65u   /* Missile::Simulate: the same */
-#define SI_SET_SHIELDS   0x455eb0u   /* ScriptInterfaceImp::SetShieldPercent(int, float), 0..1 */
-#define SI_SET_CREW      0x456060u   /* ScriptInterfaceImp::SetCrew(int, float) -> Craft::SetCrew, clamped to the maximum */
-#define CRAFT_MAX_CREW   0x1c4u      /* Craft: maximum crew (float) */
-#define CRAFT_SHIELDS    0x1c8u      /* Craft: shields, then the maximum at +0x1cc (floats) */
-#define CRAFT_CREW       0x1dcu      /* Craft: crew (float) */
-#define CRAFT_SYSTEMS    0x1e0u      /* Craft: its five CraftSystems, 0x30 bytes each */
-#define SYS_SIZE         0x30u
-#define SYS_ONLINE       0x0u        /* CraftSystem: byte, the system works */
-#define SYS_HELD_OFF     0x1u        /* CraftSystem: byte, switched off for good (PermanentDisable*) */
-#define SYS_MAX_HP       0x4u        /* CraftSystem: int, its hit points when whole */
-#define SYS_HP           0x18u       /* CraftSystem: double, its hit points now */
-#define REPAIR_ALL       0x4c8be0u   /* Craft::RepairAllSystemsComplete(), skips systems held off */
-#define INST_VT_UPDATE   0x6b3e64u   /* CraftInstance's vtable: Update(const GameObject *) */
-#define INST_UPDATE      0x4cb390u   /* CraftInstance::Update */
-#define INST_SYS_OK      0x9cu       /* CraftInstance: five bytes, a system's damage node hidden */
-#define SET_COMMAND_OBJ  0x4d1af0u   /* GameObject::SetCommand(AiCommand, const GameObject *, long, bool) */
-#define SET_COMMAND      0x4d1a40u   /* GameObject::SetCommand(AiCommand, long, bool, bool) */
-#define CMD_STOP         3           /* AiCommand: STOP */
-#define CMD_SET_FORMATION 0x2a       /* AiCommand: SET_FORMATION, its parameter the bar button's `param` */
-#define DQ_COMMAND_PARAM 0x4d4630u   /* GameObject::DeQueueCommand(AiCommand, long): what NetOrderWhatParam::Execute calls */
-#define SET_COMMAND_AT   0x4d1b50u   /* GameObject::SetCommand(AiCommand, const Vector3 &, long, bool) */
-#define FLAG_CRAFT       0x8u        /* GameObject flags (+0x14): a craft, what Goto and Stop accept */
-#define OBJECT_DEAD      0x113u      /* a byte Goto and Stop refuse an object on */
-#define CMD_GO           4           /* AiCommand: GO, a player's move */
-#define CMD_GO_WARP      0x2b        /* AiCommand: GO_WARP */
-#define CMD_BUILD        0x19        /* AiCommand: BUILD */
-#define SET_COMMAND_BUILD 0x4d1cb0u  /* GameObject::SetCommand(AiCommand, const GameObjectClass *, const Vector3 &, bool) */
-#define CLASS_FIND       0x4cd370u   /* GameObjectClass::Find(const char *odf), static */
-#define TEAM_ADD_RES     0x4988d0u   /* Team::AddResource(float, eResource): clamped to the team's maximum */
-#define TECH_TREES       0x739000u   /* g_technologyTreeArray: one TechnologyTree per team */
-#define TECH_TREE_SIZE   0x98u
-#define MAX_TECH_TEAM    8           /* the array holds 9 (it ends where g_terrain begins) */
-#define TECH_FIND        0x4999e0u   /* TechnologyTree::mFind(const char *): thiscall, the TechItem or null */
-#define TECH_AVAILABLE   0x4u        /* TechItem: byte, what TechnologyTree::Available answers */
-#define TECH_POSSIBLE    0xcu        /* TechItem: byte, 0 for an item the map's tree makes impossible (-1) */
-#define ORDNANCE_HEAD    0x771facu   /* Ordnance::ordnanceList, a std::list: its head node's pointer */
-#define ORD_CLASS        0x34u       /* an ordnance's class; the class's cPrjID at +0x150 names its ODF */
-#define ORD_CLASS_PRJ    0x150u
-#define ORD_OWNER        0x5cu       /* an ordnance's shooter, a handle */
-#define ORD_TARGET       0x60u       /* ... and its target, a handle (0 for none) */
-#define PRJ_GET_ODF      0x6593a0u   /* cPrjID::GetOdfName() const, thiscall: char * */
-#define EXPLOSION_HEAD   0x7367c4u   /* Explosion::explosionList, a std::list: its head node's pointer */
-#define EXP_RADIUS       0x34u       /* an explosion's radius, as built (the dead craft's bounding radius) */
-#define VT_FIREBALL      0x6afbd4u   /* FireballExplosion's vtable */
-#define VT_SHOCKWAVE     0x6afdacu   /* ShockwaveExplosion's vtable */
-#define ENTITY_TRANSFORM 0x4cfd50u   /* Entity::GetTransform() const, thiscall: Matrix34 *, the place at +0x24 */
-#define RANDOM_CTOR      0x65e1b0u   /* RandomSequence::RandomSequence(int seed, bool log), thiscall */
-#define G_RANDOM         0x7b0facu   /* g_random: RandomSequence *, the simulation's */
-#define G_MISSION_RANDOM 0x7b0fa8u   /* g_missionRandom: RandomSequence * */
-#define G_ASYNC_RANDOM   0x7300c4u   /* g_asyncRandom: RandomSequence *, the one not kept in step */
-#define RANDOM_LOG_KEEP  0x09u       /* the log flag the constructor's bool sets, as kept */
-#define STARFIELD_INIT   0x59ac00u   /* Starfield_Initialize(), cdecl: lays the stars out from g_asyncRandom */
-#define PRELOAD_STARS    0x485159u   /* its call in Program::GameOpenPreLoad, after g_random is made */
-#define GAME_SPEED       0x604700u   /* getGameSpeedModifier(), cdecl: float */
-#define PROCESS_SPEED    0x4834a3u   /* its call in Program::GameProcess(int ms), whose tick is speed x ms x 0.001 */
-#define SIM_TIME         0x7b0fc8u   /* Get_Time's float: the simulation's time, written once a tick */
-
-#define P_SI_HANDLE      { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x50, 0xE8 }  /* script methods taking a handle */
-#define P_SI_PAUSE       { 0xB9, 0x58, 0x37, 0x76, 0x00, 0xC6, 0x05, 0xDA }
-
-typedef struct { DWORD at; int len; BYTE sig[8]; } Sig;
-
-static const Sig k_sigs[] = {
-    { HOOK_SITE,        5, { 0xE8, 0x3A, 0x0B, 0x05, 0x00 } },
-    { BUILD_OBJECT,     8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x56, 0x50 } },
-    { FORCE_FOG,        8, { 0x55, 0x8B, 0xEC, 0x8B, 0x0D, 0xD4, 0xB8, 0x76 } },
-    { FORCE_UPDATE,     8, { 0x8B, 0x0D, 0x54, 0x8A, 0x73, 0x00, 0xB0, 0x01 } },
-    { SET_IFACE_STATE,  8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x53, 0x83 } },
-    { MAIN_CAM_CALL,    6, { 0xFF, 0x90, 0x88, 0x00, 0x00, 0x00 } },
-    { CAM_SET_ZOOM_TAC, 8, { 0x55, 0x8B, 0xEC, 0xD9, 0x05, 0xA8, 0x46, 0x6B } },
-    { CAM_SET_ZOOM_PAR, 8, { 0x55, 0x8B, 0xEC, 0xD9, 0x05, 0x1C, 0x9A, 0x70 } },
-    { CURSOR_DRAW_CALL, 1, { 0xE8 } },   /* HUD.asi may have retargeted it: chained */
-    { EVENT_TRIGGER_0,  6, { 0x55, 0x8B, 0xEC, 0x6A, 0xFF, 0x68 } },
-    { EVENT_TRIGGER_3,  6, { 0x55, 0x8B, 0xEC, 0x6A, 0xFF, 0x68 } },
-    { EVENT_TRIGGER_1,  6, { 0x55, 0x8B, 0xEC, 0x6A, 0xFF, 0x68 } },
-    { TOOLTIP_ON_CALL,  5, { 0xE8, 0x9B, 0x35, 0x01, 0x00 } },
-    { HOVER_SIM_CALL,   5, { 0xE8, 0xDF, 0x34, 0x01, 0x00 } },
-    { HOVER_PRE_CALL,   5, { 0xE8, 0x69, 0x27, 0x01, 0x00 } },
-    { SHIELD_HIT_BEAM,  5, { 0xE8, 0x16, 0x88, 0xEE, 0xFF } },
-    { SHIELD_HIT_SHOT,  5, { 0xE8, 0xD3, 0x78, 0xEE, 0xFF } },
-    { SHIELD_HIT_MINE,  5, { 0xE8, 0xA9, 0x6E, 0xEE, 0xFF } },
-    { SHIELD_HIT_MSL,   5, { 0xE8, 0x46, 0x66, 0xEE, 0xFF } },
-    { SI_SET_SHIELDS,   8, P_SI_HANDLE },
-    { SI_SET_CREW,      8, P_SI_HANDLE },
-    { REPAIR_ALL,       8, { 0x53, 0x56, 0x8B, 0xF1, 0x33, 0xDB, 0x8B, 0x86 } },
-    { INST_UPDATE,      8, { 0x55, 0x8B, 0xEC, 0xA1, 0xAC, 0x0B, 0x74, 0x00 } },
-    { INST_VT_UPDATE,   4, { 0x90, 0xB3, 0x4C, 0x00 } },
-    { SET_COMMAND_AT,   8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x14, 0x8B, 0x55 } },
-    { SET_COMMAND_OBJ,  8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x14, 0x8B, 0x55 } },
-    { SET_COMMAND,      8, { 0x55, 0x8B, 0xEC, 0x64, 0xA1, 0x00, 0x00, 0x00 } },
-    { SI_ATTACK,        8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x56, 0x50 } },
-    { SI_GET_LOCATION,  8, P_SI_HANDLE },
-    { SI_PAUSE,         8, P_SI_PAUSE },
-    { SI_UNPAUSE,       8, P_SI_PAUSE },
-    { SI_CENTER_CAMERA, 8, P_SI_HANDLE },
-    { SI_NO_ENGINES,    8, P_SI_HANDLE },
-    { SI_NO_WEAPONS,    8, P_SI_HANDLE },
-    { SI_SET_HEALTH,    8, P_SI_HANDLE },
-    { SI_MAX_HEALTH,    8, P_SI_HANDLE },
-    { SI_CANNOT_DIE,    8, P_SI_HANDLE },
-    { SI_EXPLODE_NOW,   8, P_SI_HANDLE },
-    { SI_SUCCEED,       8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x0C, 0x8B, 0x4D } },
-    { SI_FAIL,          8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x0C, 0x8B, 0x4D } },
-    { GO_CLOAK_NOW,     8, { 0x8B, 0x89, 0x08, 0x01, 0x00, 0x00, 0x85, 0xC9 } },
-    { SI_SET_SPECIAL,   8, P_SI_HANDLE },
-    { SI_SPECIAL_AT,    8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x53, 0x56 } },
-    { SI_SPECIAL,       8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x53, 0x56 } },
-    { FIRE_AT_SPECIAL,  8, { 0x55, 0x8B, 0xEC, 0xA1, 0xC0, 0x0F, 0x7B, 0x00 } },
-    { PL_START_COLONY,  8, { 0x55, 0x8B, 0xEC, 0xA1, 0x84, 0x10, 0x76, 0x00 } },
-    { PL_SET_POP,       8, { 0x55, 0x8B, 0xEC, 0xD9, 0x45, 0x08, 0xD8, 0x1D } },
-    { PL_MAX_POP,       8, { 0x8B, 0x41, 0x40, 0x8B, 0x80, 0x90, 0x04, 0x00 } },
-    { PL_NEUTRALIZE,    8, { 0x53, 0x8B, 0xD9, 0x56, 0x33, 0xF6, 0x39, 0xB3 } },
-    { CRAFT_SET_CREW,   8, { 0x55, 0x8B, 0xEC, 0xD9, 0x81, 0xC4, 0x01, 0x00 } },
-    { TEAM_GET,         8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x8B, 0x04 } },
-    { SET_COMMAND_BUILD, 8, { 0x55, 0x8B, 0xEC, 0x64, 0xA1, 0x00, 0x00, 0x00 } },
-    { CLASS_FIND,       8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x8D, 0x4D } },
-    { TEAM_ADD_RES,     8, { 0x55, 0x8B, 0xEC, 0x51, 0x8B, 0x45, 0x0C, 0x56 } },
-    { TECH_FIND,        8, { 0x55, 0x8B, 0xEC, 0x51, 0x53, 0x56, 0x57, 0x8B } },
-    { PRJ_GET_ODF,      6, { 0x8B, 0x01, 0x85, 0xC0, 0x75, 0x06 } },
-    { ENTITY_TRANSFORM, 7, { 0x8B, 0x41, 0x04, 0x83, 0xC0, 0x44, 0xC3 } },
-    { RANDOM_CTOR,      8, { 0x55, 0x8B, 0xEC, 0x8B, 0x55, 0x08, 0x8B, 0xC1 } },
-};
+#define OV_SELECT        SCENE_F_OV_VT_SELECT       /* vtable: Select(obj, type, clear first, ...) */
+#define OV_SELECT_NUM    SCENE_F_OV_VT_SELECT_NUM   /* vtable: GetSelectNum() */
+#define OV_SELECT_LIST   SCENE_F_OV_VT_SELECT_LIST  /* vtable: GetSelectList(), the ids */
+#define OV_SHIP_GROUPS   SCENE_F_OV_SHIP_GROUPS     /* ten cGroup: list_array *, -, label */
+#define OV_STATION_GROUPS SCENE_F_OV_STATION_GROUPS /* the stations' ten */
+#define OBJECT_CLASS     SCENE_F_OBJ_CLASS       /* GameObjectClass *, one per ODF */
+#define OBJECT_GROUP     SCENE_F_OBJ_GROUP       /* the group number drawn beside it, -1 for none */
+#define OBJECT_FLAGS     SCENE_F_OBJ_FLAGS
+#define FLAG_PRODUCER    ((DWORD)SCENE_V_FLAG_PRODUCER)   /* a Producer: it has a build queue */
+#define QUEUE_SIZE       a2e_addr(SCENE_S_FN_QUEUE_SIZE)   /* Producer::BuildQueueSize */
+#define PLANET_VTABLE    a2e_addr(SCENE_S_VT_PLANET)
+#define PL_START_COLONY  a2e_addr(SCENE_S_FN_PL_START_COLONY)
+#define PL_SET_POP       a2e_addr(SCENE_S_FN_PL_SET_POP)
+#define PL_MAX_POP       a2e_addr(SCENE_S_FN_PL_MAX_POP)
+#define PL_NEUTRALIZE    a2e_addr(SCENE_S_FN_PL_NEUTRALIZE)
+#define CRAFT_SET_CREW   a2e_addr(SCENE_S_FN_CRAFT_SET_CREW)
+#define TEAM_GET         a2e_addr(SCENE_S_FN_TEAM_GET)     /* Team::GetTeam(int), static: Team &, unchecked */
+#define MAX_TEAM         SCENE_V_MAX_TEAM
+#define TEAM_RACE        SCENE_F_TEAM_RACE
+#define RACE_CITY_NAME   SCENE_F_RACE_CITY_NAME  /* Race: cityTextureName, inline */
+#define PL_TEAM          SCENE_F_OBJ_TEAM        /* GameObject: its team */
+#define PL_POPULATION    SCENE_F_PL_POPULATION
+#define PL_SHOWN_RACE    SCENE_F_PL_SHOWN_RACE
+#define PL_SHOWN_POP     SCENE_F_PL_SHOWN_POP
+#define RACE_FIND        a2e_addr(SCENE_S_FN_RACE_FIND)
+#define OVERLAY_ADD      a2e_addr(SCENE_S_FN_OVERLAY_ADD)
+#define SI_SET_SHIELDS   a2e_addr(SCENE_S_SI_SET_SHIELDS)
+#define SI_SET_CREW      a2e_addr(SCENE_S_SI_SET_CREW)
+#define CRAFT_MAX_CREW   SCENE_F_CRAFT_MAX_CREW
+#define CRAFT_SHIELDS    SCENE_F_CRAFT_SHIELDS
+#define CRAFT_SHIELDS_MAX SCENE_F_CRAFT_SHIELDS_MAX
+#define CRAFT_CREW       SCENE_F_CRAFT_CREW
+#define CRAFT_SYSTEMS    SCENE_F_CRAFT_SYSTEMS
+#define SYS_SIZE         SCENE_V_SYS_SIZE
+#define SYS_ONLINE       SCENE_F_SYS_ONLINE
+#define SYS_HELD_OFF     SCENE_F_SYS_HELD_OFF
+#define SYS_MAX_HP       SCENE_F_SYS_MAX_HP
+#define SYS_HP           SCENE_F_SYS_HP          /* a double */
+#define REPAIR_ALL       a2e_addr(SCENE_S_FN_REPAIR_ALL)
+#define INST_UPDATE      a2e_addr(SCENE_S_FN_INST_UPDATE)
+#define INST_SYS_SHOWN   SCENE_F_INST_SYS_SHOWN  /* CraftInstance: five bytes, a system's damage node hidden */
+#define SET_COMMAND_OBJ  a2e_addr(SCENE_S_FN_SET_COMMAND_OBJ)
+#define SET_COMMAND      a2e_addr(SCENE_S_FN_SET_COMMAND)
+#define SET_COMMAND_AT   a2e_addr(SCENE_S_FN_SET_COMMAND_AT)
+#define DQ_COMMAND_PARAM a2e_addr(SCENE_S_FN_DQ_COMMAND)
+#define CMD_STOP         SCENE_V_CMD_STOP
+#define CMD_SET_FORMATION SCENE_V_CMD_SET_FORMATION
+#define CMD_GO           SCENE_V_CMD_GO
+#define CMD_GO_WARP      SCENE_V_CMD_GO_WARP
+#define CMD_BUILD        SCENE_V_CMD_BUILD
+#define FLAG_CRAFT       ((DWORD)SCENE_V_FLAG_CRAFT)   /* a craft, what Goto and Stop accept */
+#define OBJECT_DEAD      SCENE_F_OBJ_DEAD        /* a byte Goto and Stop refuse an object on */
+#define SET_COMMAND_BUILD a2e_addr(SCENE_S_FN_SET_COMMAND_BUILD)
+#define CLASS_FIND       a2e_addr(SCENE_S_FN_CLASS_FIND)
+#define TEAM_ADD_RES     a2e_addr(SCENE_S_FN_TEAM_ADD_RES)
+#define TECH_TREES       a2e_addr(SCENE_S_TECH_TREES)
+#define TECH_TREE_SIZE   ((DWORD)SCENE_V_TECH_TREE_SIZE)
+#define MAX_TECH_TEAM    SCENE_V_TECH_MAX_TEAM
+#define TECH_FIND        a2e_addr(SCENE_S_FN_TECH_FIND)
+#define TECH_AVAILABLE   SCENE_F_TECH_AVAILABLE
+#define TECH_POSSIBLE    SCENE_F_TECH_POSSIBLE
+#define ORDNANCE_HEAD    a2e_addr(SCENE_S_ORDNANCE_LIST)
+#define ORD_CLASS        SCENE_F_ORD_CLASS
+#define ORD_CLASS_PRJ    SCENE_F_ORD_CLASS_PRJ
+#define ORD_OWNER        SCENE_F_ORD_OWNER
+#define ORD_TARGET       SCENE_F_ORD_TARGET
+#define PRJ_GET_ODF      a2e_addr(SCENE_S_FN_PRJ_GET_ODF)
+#define EXPLOSION_HEAD   a2e_addr(SCENE_S_EXPLOSION_LIST)
+#define EXP_RADIUS       SCENE_F_EXP_RADIUS
+#define VT_FIREBALL      a2e_addr(SCENE_S_VT_FIREBALL)
+#define VT_SHOCKWAVE     a2e_addr(SCENE_S_VT_SHOCKWAVE)
+#define ENTITY_TRANSFORM a2e_addr(SCENE_S_FN_ENTITY_TRANSFORM)
+#define NODE_NEXT        SCENE_F_NODE_NEXT       /* a std::list node: the next one */
+#define NODE_VALUE       SCENE_F_NODE_VALUE      /* ... and its value */
+#define RANDOM_CTOR      a2e_addr(SCENE_S_FN_RANDOM_CTOR)
+#define RANDOM_LOG_KEEP  SCENE_F_RANDOM_LOG
+#define STARFIELD_INIT   a2e_addr(SCENE_S_FN_STARFIELD_INIT)
+#define GAME_SPEED       a2e_addr(SCENE_S_FN_GAME_SPEED)
+#define SIM_TIME         a2e_addr(SCENE_S_SIM_TIME)
 
 typedef void   (__cdecl    *UpdateRangeFn)(void);
 typedef void  *(__cdecl    *BuildObjectFn)(char *odf, int team, const float *m34);
@@ -397,8 +191,6 @@ typedef void   (__thiscall *SiHandleFn)(void *si, int h);
 typedef void   (__thiscall *SiEndFn)(void *si, float delay, char *text);
 typedef void   (__thiscall *SiHandleBoolFn)(void *si, int h, int yes);
 typedef void   (__thiscall *SiAttackFn)(void *si, int h, int target, int unused);
-typedef void   (__thiscall *SiSpecialAtFn)(void *si, int h, int target, const char *weapon);
-typedef void   (__thiscall *SiSpecialFn)(void *si, int h, const char *weapon);
 typedef void   (__thiscall *PrjSetNameFn)(int *prj, const char *name);
 typedef void  *(__cdecl    *WeaponFindFn)(const int *prj);
 typedef BYTE   (__thiscall *FireAtSpecialFn)(void *craft, int slot, const void *target);
@@ -430,56 +222,50 @@ typedef const char  *(__thiscall *PrjOdfFn)(void *prj);
 typedef const float *(__thiscall *TransformFn)(void *entity);
 typedef void  *(__thiscall *RandomCtorFn)(void *seq, int seed, int log);
 
-/* ---- tiny string/log helpers (no CRT) --------------------------------- */
+/* ---- tiny string/log helpers (no CRT; the rest are csdk/a2asi.h's) ------ */
 
 static char g_logpath[320];
 static char g_ini[320];
 static char g_cmdpath[320];
 
-static int s_len(const char *s) { int n = 0; while (s[n]) n++; return n; }
+/* Case-insensitive, as the commands and the scene's names are. */
+static int s_ieq(const char *a, const char *b) { return a2_ieq(a, b); }
 
-static int s_eq(const char *a, const char *b)
+#define SCENE_N_HOOKS ((DWORD)(sizeof scene_hooks / sizeof scene_hooks[0]))
+static int  g_rdy[64];   /* each hook's a2e_ready, asked once at start */
+typedef char scene_hooks_fit[sizeof scene_hooks / sizeof scene_hooks[0] <= 64 ? 1 : -1];
+static void logline(const char *s);
+
+/* Whether a hook may run; if not, the command's refusal names it and why. */
+static int need(DWORD hook)
 {
-    while (*a && (*a | 32) == (*b | 32)) { a++; b++; }
-    return *a == *b;
+    char b[260];
+    const char *why;
+    if (hook < SCENE_N_HOOKS && g_rdy[hook]) return 1;
+    why = a2e_note(hook);
+    if (why) {   /* the note says "Stands down: ...": the line says it already */
+        const char *pre = "Stands down:";
+        int k = 0;
+        while (pre[k] && why[k] == pre[k]) k++;
+        if (!pre[k]) why += k;
+    }
+    while (why && *why == ' ') why++;
+    b[0] = 0;
+    s_cat(b, "  ! ");
+    s_cat(b, hook < SCENE_N_HOOKS ? SCENE_ENGINE.hooks[hook].id : "?");
+    s_cat(b, " stood down: ");
+    s_copyn(b + s_len(b), why ? why : "the engine is not the one profiled", 180);
+    logline(b);
+    return 0;
 }
 
-static void s_cpy(char *d, const char *s, int max)
+/* The script interface the ScriptInterfaceImp methods are called on (g_pScriptInterface). */
+static void *si_ptr(void)
 {
-    int n = 0;
-    while (s[n] && n < max - 1) { d[n] = s[n]; n++; }
-    d[n] = 0;
+    DWORD a = a2e_addr(SCENE_S_SCRIPT_INTERFACE);
+    return a ? *(void **)a : NULLPTR;
 }
-
-static void s_cat(char *d, const char *s)
-{
-    int n = s_len(d);
-    while (*s) d[n++] = *s++;
-    d[n] = 0;
-}
-
-static void s_num(char *d, long v)
-{
-    char t[16];
-    int  n = 0, neg = 0, k = s_len(d);
-    if (v < 0) { neg = 1; v = -v; }
-    if (!v) t[n++] = '0';
-    while (v) { t[n++] = (char)('0' + (v % 10)); v /= 10; }
-    if (neg) d[k++] = '-';
-    while (n) d[k++] = t[--n];
-    d[k] = 0;
-}
-
-static void s_hex(char *d, DWORD v)
-{
-    char t[11];
-    int  i;
-    t[0] = '0'; t[1] = 'x';
-    for (i = 0; i < 8; i++) t[2 + i] = "0123456789abcdef"[(v >> (28 - 4 * i)) & 15];
-    t[10] = 0;
-    s_cat(d, t);
-}
-
+#define SI_INSTANCE      si_ptr()
 /* one decimal place is enough to read positions in a log */
 static void s_flt(char *d, float f)
 {
@@ -534,7 +320,7 @@ static void file_append(const char *path, const char *s)
     if (h == INVALID_HANDLE_VALUE) return;
     SetFilePointer(h, 0, NULLPTR, FILE_END);
     buf[0] = 0;
-    s_cpy(buf, s, 560);
+    s_copyn(buf, s, 560);
     s_cat(buf, "\r\n");
     WriteFile(h, buf, (DWORD)s_len(buf), &wrote, NULLPTR);
     CloseHandle(h);
@@ -637,7 +423,7 @@ static void mark_end(void)
     if (!g_marks_on) return;
     if (GetTickCount() - g_mark_epoch > 10000) mark_epoch();
     file_append(g_markpath, g_mb);
-    s_cpy(g_mark_ring[g_nmarks % 16], g_mb, 128);
+    s_copyn(g_mark_ring[g_nmarks % 16], g_mb, 128);
     g_nmarks++;
 }
 
@@ -689,17 +475,102 @@ static Obj   g_obj[MAX_OBJECTS];
 static int   g_nobj;
 static float g_anchor[3];   /* added to every position given in Scene.ini/spawn */
 
-static Obj *find_obj(const char *name)
+static Obj *find_named(const char *name)
 {
     int i;
     for (i = 0; i < g_nobj; i++)
-        if (s_eq(g_obj[i].name, name)) return &g_obj[i];
+        if (s_ieq(g_obj[i].name, name)) return &g_obj[i];
     return NULLPTR;
 }
 
+/* `#<id>` (decimal, or #0x.. hex): an object's handle, the int at OBJECT_HANDLE. */
+static int parse_ref(const char *s, int *h)
+{
+    DWORD v = 0;
+    int   digits = 0;
+    if (s[0] != '#') return 0;
+    s++;
+    if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) {
+        for (s += 2; *s; s++, digits++) {
+            char c = a2_lc(*s);
+            if (c >= '0' && c <= '9') v = v * 16 + (DWORD)(c - '0');
+            else if (c >= 'a' && c <= 'f') v = v * 16 + (DWORD)(c - 'a' + 10);
+            else return 0;
+        }
+    } else {
+        int neg = *s == '-';
+        if (neg) s++;
+        for (; *s; s++, digits++) {
+            if (*s < '0' || *s > '9') return 0;
+            v = v * 10 + (DWORD)(*s - '0');
+        }
+        if (neg) v = 0u - v;
+    }
+    *h = (int)v;
+    return digits > 0;
+}
+
+/* Any game object a command names by `#<id>` that is not one of the scene's is lent a
+ * record from this ring for the command (its name `#<decimal id>`); a setting that must
+ * last (heal, vent, energy, a cloak's energy) adopts it into the scene's objects. */
+#define MAX_REFS 160
+static Obj g_ref[MAX_REFS];
+static int g_nref;
+
+static void obj_init(Obj *o, const char *name, int handle)
+{
+    s_copyn(o->name, name, sizeof o->name);
+    o->attack[0] = 0;
+    o->handle = handle;
+    o->heal = 0;
+    o->vent = 0;
+    o->energy = 0;
+    o->cloak_st = -1;
+    o->gone = 0;
+    o->craft = 0;
+    o->last[0] = o->last[1] = o->last[2] = 0;
+    o->gone_t = 0;
+}
+
+static void *entity_of(int h)
+{
+    DWORD get = ENTITY_GET;
+    return get ? ((EntityGetFn)get)(h) : NULLPTR;
+}
+
+/* A command's object: a scene name, or `#<id>` for any game object there is now. */
+static Obj *find_obj(const char *tok)
+{
+    char nm[16];
+    int  h, i;
+    Obj *o;
+    if (!parse_ref(tok, &h)) return find_named(tok);
+    for (i = 0; i < g_nobj; i++)
+        if (g_obj[i].handle == h) return &g_obj[i];
+    if (!entity_of(h)) return NULLPTR;
+    o = &g_ref[g_nref++ % MAX_REFS];
+    nm[0] = '#'; nm[1] = 0;
+    s_unum(nm, (DWORD)h);
+    obj_init(o, nm, h);
+    return o;
+}
+
+static Obj *adopt(Obj *o)
+{
+    if (o < g_ref || o >= g_ref + MAX_REFS) return o;
+    if (g_nobj >= MAX_OBJECTS) return o;
+    obj_init(&g_obj[g_nobj], o->name, o->handle);
+    return &g_obj[g_nobj++];
+}
+
+static const float k_zero[12];
+
+/* Where an object is (ScriptInterfaceImp::GetLocation), or the origin without the hook. */
 static const float *obj_pos(const Obj *o)
 {
-    return ((SiLocationFn)SI_GET_LOCATION)(SI_INSTANCE, o->handle);
+    DWORD f = SI_GET_LOCATION;
+    void *si = SI_INSTANCE;
+    return f && si ? ((SiLocationFn)f)(si, o->handle) : k_zero;
 }
 
 /* A ship or station draws the model named after its ODF, SOD/<odf>.sod. An ODF
@@ -714,7 +585,7 @@ static void sod_check(const char *odf)
     HANDLE h;
     p[0] = 0;
     s_cat(p, g_sodpath);
-    s_cpy(p + s_len(p), odf, 64);
+    s_copyn(p + s_len(p), odf, 64);
     s_cat(p, ".sod");
     h = CreateFileA(p, GENERIC_READ, FILE_SHARE_READ, NULLPTR, OPEN_EXISTING,
                     FILE_ATTRIBUTE_NORMAL, NULLPTR);
@@ -740,11 +611,12 @@ static Obj *spawn(const char *name, const char *odf, int team,
     s_cat(b, name);
     s_cat(b, " ");
     s_cat(b, odf);
-    if (find_obj(name) || g_nobj >= MAX_OBJECTS) {
+    if (find_named(name) || g_nobj >= MAX_OBJECTS) {
         s_cat(b, " FAILED: name taken, or too many objects");
         logline(b);
         return NULLPTR;
     }
+    if (!g_rdy[SCENE_H_BUILD]) { logline(b); need(SCENE_H_BUILD); return NULLPTR; }
 
     /* right, up, front, position */
     m[0] = c; m[1] = 0; m[2]  = -s;
@@ -754,7 +626,7 @@ static Obj *spawn(const char *name, const char *odf, int team,
     m[10] = pos[1] + g_anchor[1];
     m[11] = pos[2] + g_anchor[2];
 
-    s_cpy(odfbuf, odf, sizeof odfbuf);
+    s_copyn(odfbuf, odf, sizeof odfbuf);
     go = ((BuildObjectFn)BUILD_OBJECT)(odfbuf, team, m);
     if (!go) {
         s_cat(b, " FAILED: BuildObject returned null (no such ODF, or not buildable)");
@@ -762,15 +634,7 @@ static Obj *spawn(const char *name, const char *odf, int team,
         return NULLPTR;
     }
     o = &g_obj[g_nobj++];
-    s_cpy(o->name, name, sizeof o->name);
-    o->attack[0] = 0;
-    o->heal = 0;
-    o->vent = 0;
-    o->energy = 0;
-    o->cloak_st = -1;
-    o->gone = 0;
-    o->craft = 0;
-    o->handle = *(int *)((BYTE *)go + OBJECT_HANDLE);
+    obj_init(o, name, *(int *)((BYTE *)go + OBJECT_HANDLE));
     s_cat(b, " team ");
     s_num(b, team);
     s_cat(b, " handle ");
@@ -792,7 +656,9 @@ static void order_attack(Obj *o, const char *target)
     s_cat(b, " -> ");
     s_cat(b, target);
     if (!t) { s_cat(b, " FAILED: no such object"); logline(b); return; }
-    s_cpy(o->attack, target, sizeof o->attack);
+    if (t->name[0] == '#') { b[0] = 0; s_cat(b, "attack "); s_cat(b, o->name); s_cat(b, " -> "); s_cat(b, t->name); }
+    if (!g_rdy[SCENE_H_ATTACK]) { logline(b); need(SCENE_H_ATTACK); return; }
+    s_copyn(o->attack, target, sizeof o->attack);
     ((SiAttackFn)SI_ATTACK)(SI_INSTANCE, o->handle, t->handle, 0);
     logline(b);
 }
@@ -814,16 +680,16 @@ static void *craft_of(Obj *o);
 static void fire_special(const Obj *o, const char *weapon, const Obj *tg)
 {
     BYTE  *craft = (BYTE *)craft_of((Obj *)o), *carrier, **w, *cls;
-    void  *target = tg ? ((EntityGetFn)ENTITY_GET)(tg->handle) : NULLPTR;
+    void  *target = tg ? entity_of(tg->handle) : NULLPTR;
     int    prj = 0, n, i, slot = -1;
     char   b[200];
     BYTE   can, fired;
     if (!craft || !(carrier = *(BYTE **)(craft + CRAFT_CARRIER))) { logline("  ! no weapons"); return; }
     ((PrjSetNameFn)PRJ_SET_NAME)(&prj, weapon);
     cls = (BYTE *)((WeaponFindFn)WEAPON_FIND)(&prj);
-    w = *(BYTE ***)(carrier + 0xc);
-    n = w ? (int)((*(BYTE ***)(carrier + 0x10)) - w) : 0;
-    for (i = 0; i < n; i++) if (w[i] && *(BYTE **)(w[i] + 4) == cls) { slot = i; break; }
+    w = *(BYTE ***)(carrier + SCENE_F_CARRIER_WEAPONS);
+    n = w ? (int)((*(BYTE ***)(carrier + SCENE_F_CARRIER_WEAPONS_END)) - w) : 0;
+    for (i = 0; i < n; i++) if (w[i] && *(BYTE **)(w[i] + SCENE_F_WEAPON_CLASS) == cls) { slot = i; break; }
     if (!cls || slot < 0) { logline(cls ? "  ! the craft has no such weapon" : "  ! no such weapon class"); return; }
     can = ((CanFireFn)(*(void ***)w[slot])[WEAPON_CAN_FIRE / 4])(w[slot], target);
     fired = target ? ((FireAtSpecialFn)FIRE_AT_SPECIAL)(craft, slot, target) : ((FireSpecialFn)FIRE_SPECIAL)(craft, slot);
@@ -843,9 +709,11 @@ static void fire_special(const Obj *o, const char *weapon, const Obj *tg)
 /* Special energy: a craft's to its maximum (ScriptInterfaceImp::SetSpecialEnergy). */
 static void fill_special(const Obj *o)
 {
-    BYTE *go = (BYTE *)((EntityGetFn)ENTITY_GET)(o->handle);
+    BYTE *go;
+    if (!g_rdy[SCENE_H_SPECIAL] && !g_rdy[SCENE_H_CLOAK]) return;
+    go = (BYTE *)entity_of(o->handle);
     if (!go || !(*(DWORD *)(go + OBJECT_FLAGS) & FLAG_CRAFT)) return;
-    if (*(float *)(go + CRAFT_SPECIAL_MAX + 4) < *(float *)(go + CRAFT_SPECIAL_MAX))
+    if (*(float *)(go + CRAFT_SPECIAL) < *(float *)(go + CRAFT_SPECIAL_MAX))
         ((SiSetHealthFn)SI_SET_SPECIAL)(SI_INSTANCE, o->handle, *(float *)(go + CRAFT_SPECIAL_MAX));
 }
 
@@ -862,15 +730,16 @@ static void set_tech(int team, const char *item, int on)
 {
     char  b[200], nm[72];
     BYTE *it = NULLPTR, *tree;
+    if (!need(SCENE_H_TECH)) return;
     b[0] = 0;
     s_cat(b, "  tech team "); s_num(b, team); s_cat(b, " "); s_cat(b, item);
     if (team < 0 || team > MAX_TECH_TEAM) { s_cat(b, ": ! team 0..8"); logline(b); return; }
     tree = (BYTE *)(TECH_TREES + (DWORD)team * TECH_TREE_SIZE);
-    s_cpy(nm, item, 64);
+    s_copyn(nm, item, 64);
     it = ((TechFindFn)TECH_FIND)(tree, nm);
     if (!it) {   /* the other spelling: with or without .odf */
         int k = s_len(nm);
-        if (k > 4 && s_eq(nm + k - 4, ".odf")) nm[k - 4] = 0; else s_cat(nm, ".odf");
+        if (k > 4 && s_ieq(nm + k - 4, ".odf")) nm[k - 4] = 0; else s_cat(nm, ".odf");
         it = ((TechFindFn)TECH_FIND)(tree, nm);
     }
     if (!it) { s_cat(b, ": ! not in the tech tree"); logline(b); return; }
@@ -889,12 +758,12 @@ static void heal_all(void)
         float max;
         BYTE *go;
         if (g_obj[i].energy) fill_special(&g_obj[i]);
-        if (!g_obj[i].heal) continue;
+        if (!g_obj[i].heal || !g_rdy[SCENE_H_HEAL]) continue;
         max = ((SiMaxHealthFn)SI_MAX_HEALTH)(SI_INSTANCE, g_obj[i].handle);
         ((SiSetHealthFn)SI_SET_HEALTH)(SI_INSTANCE, g_obj[i].handle, max);
-        go = (BYTE *)((EntityGetFn)ENTITY_GET)(g_obj[i].handle);
+        go = (BYTE *)entity_of(g_obj[i].handle);
         if (!go || !(*(DWORD *)(go + OBJECT_FLAGS) & FLAG_CRAFT)) continue;
-        if (*(float *)(go + CRAFT_SHIELDS) < *(float *)(go + CRAFT_SHIELDS + 4))
+        if (*(float *)(go + CRAFT_SHIELDS) < *(float *)(go + CRAFT_SHIELDS_MAX))
             ((SiSetHealthFn)SI_SET_SHIELDS)(SI_INSTANCE, g_obj[i].handle, 1.0f);
         if (*(float *)(go + CRAFT_CREW) < *(float *)(go + CRAFT_MAX_CREW))
             ((SiSetHealthFn)SI_SET_CREW)(SI_INSTANCE, g_obj[i].handle, *(float *)(go + CRAFT_MAX_CREW));
@@ -928,16 +797,17 @@ static int systems_hurt(const BYTE *craft)
  * hidden; a healed craft shows none at all. The vent command (Vent= in a scene
  * file) shows a system's node as a damaged one shows it, healed or not, and
  * changes nothing else: the system keeps working. */
-static const BYTE k_inst_sys[5] = { 0x00, 0x30, 0x60, 0xc0, 0x90 };   /* for +0x9c..+0xa0 */
+/* The system record each of the five bytes stands for (shields, engines, weapons, sensors, life). */
+static const BYTE k_inst_sys[5] = { 0, 1, 2, 4, 3 };
 static const char *const k_sys_name[5] = { "shields", "engines", "weapons", "sensors", "life" };
 
 /* A Vent= value or the vent command's system: a name, "all", or "none". */
 static int vent_mask(const char *v)
 {
     int k;
-    if (s_eq(v, "all"))  return 0x1f;
-    if (s_eq(v, "none") || !v[0]) return 0;
-    for (k = 0; k < 5; k++) if (s_eq(v, k_sys_name[k])) return 1 << k;
+    if (s_ieq(v, "all"))  return 0x1f;
+    if (s_ieq(v, "none") || !v[0]) return 0;
+    for (k = 0; k < 5; k++) if (s_ieq(v, k_sys_name[k])) return 1 << k;
     return -1;
 }
 
@@ -945,7 +815,7 @@ static void __thiscall inst_update(void *inst, const void *go)
 {
     const BYTE *sys;
     int i, k;
-    ((void (__thiscall *)(void *, const void *))INST_UPDATE)(inst, go);
+    ((void (__thiscall *)(void *, const void *))INST_UPDATE)(inst, go);   /* the slot's own */
     if (!go || !(*(const DWORD *)((const BYTE *)go + OBJECT_FLAGS) & FLAG_CRAFT)) return;
     for (i = 0; i < g_nobj; i++)
         if (g_obj[i].handle == *(const int *)((const BYTE *)go + OBJECT_HANDLE)) break;
@@ -954,9 +824,9 @@ static void __thiscall inst_update(void *inst, const void *go)
     if (!sys) return;
     for (k = 0; k < 5; k++)
         if (g_obj[i].vent & (1 << k))
-            ((BYTE *)inst)[INST_SYS_OK + k] = 0;
-        else if (g_obj[i].heal || sys[k_inst_sys[k] + SYS_HELD_OFF])
-            ((BYTE *)inst)[INST_SYS_OK + k] = 1;
+            ((BYTE *)inst)[INST_SYS_SHOWN + k] = 0;
+        else if (g_obj[i].heal || sys[k_inst_sys[k] * SYS_SIZE + SYS_HELD_OFF])
+            ((BYTE *)inst)[INST_SYS_SHOWN + k] = 1;
 }
 
 /* A colonised planet, without a colony ship: what a map that starts with a
@@ -974,12 +844,13 @@ static void __thiscall inst_update(void *inst, const void *go)
 static void colonize(Obj *o, const char *amount, int team)
 {
     char  b[200];
-    BYTE *pl = (BYTE *)((EntityGetFn)ENTITY_GET)(o->handle);
-    BYTE *tm, *race;
+    BYTE *pl, *tm, *race;
     float max, pop;
 
+    if (!need(SCENE_H_COLONIZE)) return;
+    pl = (BYTE *)entity_of(o->handle);
     if (!pl || *(DWORD *)pl != PLANET_VTABLE) { logline("  ! not a planet"); return; }
-    if (s_eq(amount, "off") || s_eq(amount, "none")) {
+    if (s_ieq(amount, "off") || s_ieq(amount, "none")) {
         ((PlVoidFn)PL_NEUTRALIZE)(pl);          /* back to team 0, no garrison */
         ((PlFloatFn)PL_SET_POP)(pl, 0);
         *(float *)(pl + PL_SHOWN_POP) = 0;
@@ -988,7 +859,7 @@ static void colonize(Obj *o, const char *amount, int team)
     }
     max = ((PlGetFloatFn)PL_MAX_POP)(pl);
     if (max <= 0) { logline("  ! this class of planet holds no population"); return; }
-    pop = s_eq(amount, "full") ? max : s_atof(amount);
+    pop = s_ieq(amount, "full") ? max : s_atof(amount);
     if (pop > max) pop = max;
     if (pop < 0)   pop = 0;
     tm = team >= 1 && team <= MAX_TEAM ? ((TeamGetFn)TEAM_GET)(team) : NULLPTR;
@@ -1005,7 +876,7 @@ static void colonize(Obj *o, const char *amount, int team)
     s_cat(b, "  team ");
     s_num(b, *(int *)(pl + PL_TEAM));
     s_cat(b, ", cities ");
-    s_cpy(b + s_len(b), (const char *)(race + RACE_CITY_NAME), 16);
+    s_copyn(b + s_len(b), (const char *)(race + RACE_CITY_NAME), 16);
     if (!race[RACE_CITY_NAME]) s_cat(b, "(none: this race has no city texture)");
     s_cat(b, ", population ");
     s_num(b, (long)*(float *)(pl + PL_POPULATION));
@@ -1016,22 +887,27 @@ static void colonize(Obj *o, const char *amount, int team)
 
 /* ---- the view: HUD, grid, camera -------------------------------------- */
 
-static void set_hud(int on)
+static int set_hud(int on)
 {
     int mode = on ? 0 : 3;
-    *(int *)(*(BYTE **)GAME_STATE_PTR + IFACE_MODE) = mode;
+    if (!need(SCENE_H_HUD)) return 0;
+    *(int *)(*(BYTE **)USER_PROFILE + IFACE_MODE) = mode;
     ((SetIfaceStateFn)SET_IFACE_STATE)(mode);
+    return 1;
 }
 
-static void set_grid(int on)
+static int set_grid(int on)
 {
     int  v;
-    int *r = (int *)GRID_RECORDS;
+    int *r;
+    if (!need(SCENE_H_GRID)) return 0;
+    r = (int *)GRID_RECORDS;
     for (v = 0; v < 2; v++) {          /* the two views grid_toggle serves */
         r[3 * v + 0] = on ? 0 : 2;     /* as Update derives the other two */
         r[3 * v + 1] = 0;
         r[3 * v + 2] = on ? 1 : 0;     /* what GridVisible() returns */
     }
+    return 1;
 }
 
 /* The cursor: the engine draws it itself, as a 2D sprite in RefreshDisplay
@@ -1051,12 +927,14 @@ static void __thiscall cursor_draw(void *sprite, const float *pos, float sx, flo
 
 static void hook_cursor(void)
 {
-    BYTE *p = (BYTE *)CURSOR_DRAW_CALL;
-    DWORD old;
-    if (g_cursor_draw) return;
-    g_cursor_draw = (DrawScaled2DFn)(CURSOR_DRAW_CALL + 5 + *(LONG *)(p + 1));
+    DWORD at, old;
+    BYTE *p;
+    if (g_cursor_draw || !g_rdy[SCENE_H_CURSOR]) return;
+    at = a2e_addr(SCENE_S_SITE_CURSOR_DRAW);
+    p = (BYTE *)at;
+    g_cursor_draw = (DrawScaled2DFn)(at + 5 + *(LONG *)(p + 1));   /* stock's, or a plugin's that chains it */
     if (!VirtualProtect(p, 5, PAGE_EXECUTE_READWRITE, &old)) { g_cursor_draw = NULLPTR; return; }
-    *(DWORD *)(p + 1) = (DWORD)&cursor_draw - (CURSOR_DRAW_CALL + 5);
+    *(DWORD *)(p + 1) = (DWORD)&cursor_draw - (at + 5);
     VirtualProtect(p, 5, old, &old);
     FlushInstructionCache(GetCurrentProcess(), p, 5);
 }
@@ -1065,20 +943,21 @@ static void hook_cursor(void)
  * from events.dat, fired through three GameEvent::TriggerEvent entry points (the
  * GameObject overload goes through the Vector3 one). With notices off each one
  * returns false at once; the original first bytes are kept and put back. */
-static const struct { DWORD at; BYTE stub[5]; int len; } k_events[3] = {
-    { EVENT_TRIGGER_0, { 0x31, 0xC0, 0xC3 },             3 },   /* xor eax,eax; ret    */
-    { EVENT_TRIGGER_3, { 0x31, 0xC0, 0xC2, 0x0C, 0x00 }, 5 },   /* xor eax,eax; ret 12 */
-    { EVENT_TRIGGER_1, { 0x31, 0xC0, 0xC2, 0x04, 0x00 }, 5 },   /* xor eax,eax; ret 4  */
+static const struct { DWORD sym; BYTE stub[5]; int len; } k_events[3] = {
+    { SCENE_S_EV_TRIGGER_0, { 0x31, 0xC0, 0xC3 },             3 },   /* xor eax,eax; ret    */
+    { SCENE_S_EV_TRIGGER_3, { 0x31, 0xC0, 0xC2, 0x0C, 0x00 }, 5 },   /* xor eax,eax; ret 12 */
+    { SCENE_S_EV_TRIGGER_1, { 0x31, 0xC0, 0xC2, 0x04, 0x00 }, 5 },   /* xor eax,eax; ret 4  */
 };
 static BYTE g_event_orig[3][5];
 static int  g_notices_off;
 
-static void set_notices(int on)
+static int set_notices(int on)
 {
     int i, k;
-    if (on == !g_notices_off) return;
+    if (!need(SCENE_H_NOTICES)) return 0;
+    if (on == !g_notices_off) return 1;
     for (i = 0; i < 3; i++) {
-        BYTE *p = (BYTE *)k_events[i].at;
+        BYTE *p = (BYTE *)a2e_addr(k_events[i].sym);
         DWORD old;
         if (!VirtualProtect(p, 5, PAGE_EXECUTE_READWRITE, &old)) continue;
         for (k = 0; k < k_events[i].len; k++) {
@@ -1089,6 +968,7 @@ static void set_notices(int on)
         FlushInstructionCache(GetCurrentProcess(), p, 5);
     }
     g_notices_off = !on;
+    return 1;
 }
 
 /* Tooltips: the rollover box over the 3D view (an object's name and its
@@ -1107,19 +987,21 @@ static const BYTE k_no_effect[5] = { 0x83, 0xC8, 0xFF, 0x90, 0x90 };   /* or eax
 /* A switch over 5-byte call sites: off writes the stub over each and keeps the
  * original bytes, on puts them back. */
 typedef struct {
-    const DWORD *sites;
+    DWORD        hook;
+    const DWORD *sites;   /* the call sites' symbols */
     int          n;
     const BYTE  *stub;
     BYTE         orig[4][5];
     int          off;
 } CallSwitch;
 
-static void set_switch(CallSwitch *w, int on)
+static int set_switch(CallSwitch *w, int on)
 {
     int i, k;
-    if (on == !w->off) return;
+    if (!need(w->hook)) return 0;
+    if (on == !w->off) return 1;
     for (i = 0; i < w->n; i++) {
-        BYTE *p = (BYTE *)w->sites[i];
+        BYTE *p = (BYTE *)a2e_addr(w->sites[i]);
         DWORD old;
         if (!VirtualProtect(p, 5, PAGE_EXECUTE_READWRITE, &old)) continue;
         for (k = 0; k < 5; k++) {
@@ -1130,31 +1012,32 @@ static void set_switch(CallSwitch *w, int on)
         FlushInstructionCache(GetCurrentProcess(), p, 5);
     }
     w->off = !on;
+    return 1;
 }
 
-static const DWORD k_tooltip_sites[1] = { TOOLTIP_ON_CALL };
-static CallSwitch  g_tooltips = { k_tooltip_sites, 1, k_no_object, {{0}}, 0 };
+static const DWORD k_tooltip_sites[1] = { SCENE_S_SITE_TOOLTIP_ON };
+static CallSwitch  g_tooltips = { SCENE_H_TOOLTIPS, k_tooltip_sites, 1, k_no_object, {{0}}, 0 };
 
-static void set_tooltips(int on) { set_switch(&g_tooltips, on); }
+static int set_tooltips(int on) { return set_switch(&g_tooltips, on); }
 
 /* Hover: the object under the pointer gets its gauges -- hull, shields, special
  * energy, the system icons -- and a hover ring, even with the HUD and the cursor
  * off. SelectionDisplay::Render draws an object's gauges when it is the hover
  * object (SelectionDisplay+0x7c), or is selected and on the hover object's team
- * (+0x88); both fields are set in AlwaysSimulate from the one DisplayInterface::MouseOn() call at 0x5080fc. The
- * ring is SelectionDisplay::PreRender's: its own MouseOn() call (0x508e72) moves
+ * (+0x88); both fields are set in AlwaysSimulate from its one DisplayInterface::MouseOn() call. The
+ * ring is SelectionDisplay::PreRender's: its own MouseOn() call moves
  * selection effect 4 to the object under the pointer. With hover off both calls
  * become `xor eax,eax` (no object), which is what either sees with the pointer over
  * empty space: no hover gauges, no ring, and a selected object's gauges as they
  * are then. Selection circles and group numbers are untouched, and so are clicks
  * and orders, which ask MouseOn() themselves. */
-static const DWORD k_hover_sites[2] = { HOVER_SIM_CALL, HOVER_PRE_CALL };
-static CallSwitch  g_hover = { k_hover_sites, 2, k_no_object, {{0}}, 0 };
+static const DWORD k_hover_sites[2] = { SCENE_S_SITE_HOVER_SIM, SCENE_S_SITE_HOVER_PRE };
+static CallSwitch  g_hover = { SCENE_H_HOVER, k_hover_sites, 2, k_no_object, {{0}}, 0 };
 
-static void set_hover(int on) { set_switch(&g_hover, on); }
+static int set_hover(int on) { return set_switch(&g_hover, on); }
 
 /* Shield hits: the flash on a shielded craft that a weapon strikes is a ShieldHit,
- * made by the static ShieldEffect::CreateShieldHit (0x4743b0), which returns its id,
+ * made by the static ShieldEffect::CreateShieldHit, which returns its id,
  * or -1 when that shield type has no model. Weapons call it from four sites, after
  * the damage is dealt: Beam::Simulate, Bullet::Simulate, Mine::mMoveTowardsTarget
  * and Missile::Simulate. With shield effects off each call becomes `or eax,-1`, the
@@ -1163,10 +1046,11 @@ static void set_hover(int on) { set_switch(&g_hover, on); }
  * -1). Damage is untouched. The shields-down effect (Craft::ShieldsDown and others,
  * a lasting type-1 ShieldHit kept at Craft+0x208) and the special weapons' shield
  * effects call it from elsewhere and are left alone. */
-static const DWORD k_shield_sites[4] = { SHIELD_HIT_BEAM, SHIELD_HIT_SHOT, SHIELD_HIT_MINE, SHIELD_HIT_MSL };
-static CallSwitch  g_shieldfx = { k_shield_sites, 4, k_no_effect, {{0}}, 0 };
+static const DWORD k_shield_sites[4] = { SCENE_S_SITE_HIT_BEAM, SCENE_S_SITE_HIT_SHOT, SCENE_S_SITE_HIT_MINE,
+                                         SCENE_S_SITE_HIT_MISSILE };
+static CallSwitch  g_shieldfx = { SCENE_H_SHIELDFX, k_shield_sites, 4, k_no_effect, {{0}}, 0 };
 
-static void set_shieldfx(int on) { set_switch(&g_shieldfx, on); }
+static int set_shieldfx(int on) { return set_switch(&g_shieldfx, on); }
 
 /* The free camera: off, a fixed eye and target, or an orbit about a point or an
  * object. Recomputed every frame, so it follows a moving object. */
@@ -1260,6 +1144,8 @@ static int cam_matrix(float *m)
 }
 
 static int  g_paused;
+static DWORD g_tick_at;   /* GetTickCount() of the last tick: none for a while, the game is paused */
+static int  g_ready;   /* the scene has been built; commands may run */
 static int  g_refresh;   /* ticks left of a run that refreshes a paused frame */
 static int  g_ticks;     /* mission ticks before the scene was built */
 static long g_scene_ticks;   /* ticks since the scene was built: what Pause= and pause-at count */
@@ -1272,16 +1158,17 @@ static long g_pause_at = -1; /* Pause= / pause-at: the tick to pause at (-1: non
  * same on every launch, and the simulation runs the same ticks the same way. */
 static void seed_random(DWORD seed)
 {
-    static const DWORD k_seqs[3] = { G_RANDOM, G_MISSION_RANDOM, G_ASYNC_RANDOM };
+    static const DWORD k_seqs[3] = { SCENE_S_G_RANDOM, SCENE_S_G_MISSION_RANDOM, SCENE_S_G_ASYNC_RANDOM };
     char  b[96];
     int   i, n = 0;
+    if (!g_rdy[SCENE_H_SEED] && !g_rdy[SCENE_H_SEED_LOAD]) { need(SCENE_H_SEED); return; }
     for (i = 0; i < 3; i++) {
-        BYTE *seq = *(BYTE **)k_seqs[i];
+        BYTE *seq = *(BYTE **)a2e_addr(k_seqs[i]);
         if (!seq) continue;
         ((RandomCtorFn)RANDOM_CTOR)(seq, (int)(seed + (DWORD)i), seq[RANDOM_LOG_KEEP]);
         n++;
     }
-    s_cpy(b, "seed ", sizeof b); s_unum(b + s_len(b), seed);
+    s_copyn(b, "seed ", sizeof b); s_unum(b + s_len(b), seed);
     s_cat(b, ": "); s_num(b + s_len(b), n); s_cat(b, " random sequences started again");
     logline(b);
 }
@@ -1290,9 +1177,10 @@ static void seed_random(DWORD seed)
 static void pause_now(const char *why)
 {
     char b[96];
+    if (!need(SCENE_H_PAUSE)) return;
     ((SiVoidFn)SI_PAUSE)(SI_INSTANCE);
     g_paused = 1;
-    s_cpy(b, why, sizeof b); s_cat(b, "paused at tick "); s_num(b + s_len(b), g_scene_ticks);
+    s_copyn(b, why, sizeof b); s_cat(b, "paused at tick "); s_num(b + s_len(b), g_scene_ticks);
     s_cat(b, ", sim time "); s_flt(b, *(const float *)SIM_TIME);
     s_cat(b, " ("); s_hex(b, *(const DWORD *)SIM_TIME); s_cat(b, ")");
     logline(b);
@@ -1309,24 +1197,26 @@ static void marks_poll(void);
 
 static void camera_changed(void)
 {
-    if (!g_paused) return;
+    if (!g_paused || !g_rdy[SCENE_H_PAUSE]) return;
     ((SiVoidFn)SI_UNPAUSE)(SI_INSTANCE);
     g_refresh = REFRESH_TICKS;
 }
 
-/* In place of `call *0x88(%eax)` in s_UpdateMainCamera: the same virtual call
+/* In place of the view's virtual UpdateCamera call in s_UpdateMainCamera: the same call
  * (ecx is still the view object, the ST3D_Camera is the one stack argument),
  * then the free camera's transform over whatever the game's camera set. */
 static void __thiscall camera_update(void *view, void *st3dcam)
 {
     void **vt = *(void ***)view;
-    ((UpdateCameraFn)vt[0x88 / 4])(view, st3dcam);
+    ((UpdateCameraFn)vt[SCENE_F_VIEW_VT_UPDATE_CAMERA / 4])(view, st3dcam);
     g_st3dcam = st3dcam;
-    if (g_paused) process_commands();   /* the tick may not run while paused */
+    /* the tick does not run while paused, by `pause` or by the game itself (a briefing,
+     * the menu): commands are then read here, once a frame */
+    if (g_paused || GetTickCount() - g_tick_at > 500) process_commands();
     move_step();
     if (g_cam.mode != CAM_RTS && cam_matrix(g_cam_m)) {
         void **cvt = *(void ***)st3dcam;
-        ((SetTransformFn)cvt[5])(st3dcam, g_cam_m);
+        ((SetTransformFn)cvt[SCENE_F_CAM_VT_SET_TRANSFORM / 4])(st3dcam, g_cam_m);
     }
     marks_poll();
 }
@@ -1347,15 +1237,22 @@ static int split(char *line, char **tok)
     return n;
 }
 
-/* A point is three numbers or an object's name; returns the tokens it used. */
+/* A point is three numbers, `world` and three numbers (a world position, never offset by
+ * Anchor=camera: what `objects` reports), or an object (a name or `#<id>`); returns the
+ * tokens it used, and sets g_point_world for a `world` point. */
+static int g_point_world;
+
 static int point_arg(char **tok, int n, float *p, char *objname)
 {
+    int w = n >= 4 && s_ieq(tok[0], "world");
     objname[0] = 0;
-    if (n >= 3 && s_isnum(tok[0]) && s_isnum(tok[1]) && s_isnum(tok[2])) {
-        p[0] = s_atof(tok[0]); p[1] = s_atof(tok[1]); p[2] = s_atof(tok[2]);
-        return 3;
+    g_point_world = w;
+    if (n >= 3 + w && s_isnum(tok[w]) && s_isnum(tok[w + 1]) && s_isnum(tok[w + 2])) {
+        p[0] = s_atof(tok[w]); p[1] = s_atof(tok[w + 1]); p[2] = s_atof(tok[w + 2]);
+        return 3 + w;
     }
-    if (n >= 1 && find_obj(tok[0])) { s_cpy(objname, tok[0], 32); return 1; }
+    g_point_world = 0;
+    if (n >= 1 && find_obj(tok[0])) { s_copyn(objname, tok[0], 32); return 1; }
     return 0;
 }
 
@@ -1363,6 +1260,7 @@ static void query(void)
 {
     char b[200];
     int  i;
+    if (!need(SCENE_H_LOCATE)) return;
     for (i = 0; i < g_nobj; i++) {
         b[0] = 0;
         s_cat(b, "  object ");
@@ -1374,10 +1272,10 @@ static void query(void)
         if (g_obj[i].attack[0]) { s_cat(b, " attacking "); s_cat(b, g_obj[i].attack); }
         if (g_obj[i].heal) s_cat(b, " healed");
         {
-            BYTE *o = (BYTE *)((EntityGetFn)ENTITY_GET)(g_obj[i].handle);
+            BYTE *o = (BYTE *)entity_of(g_obj[i].handle);
             if (o && (*(DWORD *)(o + OBJECT_FLAGS) & FLAG_CRAFT) && *(BYTE **)(o + OBJECT_CLOAK)) {
                 static const char *const st[4] = { "visible", "cloaking", "cloaked", "decloaking" };
-                DWORD c = *(DWORD *)(*(BYTE **)(o + OBJECT_CLOAK) + 0x3c);
+                DWORD c = *(DWORD *)(*(BYTE **)(o + OBJECT_CLOAK) + CLOAK_STATE);
                 s_cat(b, " cloak ");
                 s_cat(b, c < 4 ? st[c] : "?");
             }
@@ -1409,7 +1307,7 @@ static void query(void)
         logline(b);
     }
     log_vec("  rts interest", (const float *)(TACTICAL_CAMERA + CAMERA_INTEREST));
-    zoom_command(1, NULLPTR);
+    if (g_rdy[SCENE_H_ZOOM]) zoom_command(1, NULLPTR);
 }
 
 /* The RTS camera's zoom. The camera in use (gCameraManager's first field) is a
@@ -1422,11 +1320,14 @@ typedef void (__thiscall *SetZoomFn)(void *cam, float level);
 
 static void zoom_command(int n, char **t)
 {
-    BYTE  *cam = *(BYTE **)CAMERA_CURRENT;
-    DWORD  vt  = cam ? *(DWORD *)cam : 0;
+    BYTE  *cam;
+    DWORD  vt;
     float  lo, hi, v, level;
     const char *name;
     char   b[160];
+    if (!need(SCENE_H_ZOOM)) return;
+    cam = *(BYTE **)CAMERA_CURRENT;
+    vt  = cam ? *(DWORD *)cam : 0;
     if (vt == PARABOLIC_VTABLE) {
         lo = *(float *)PARA_HEIGHT_MIN; hi = *(float *)PARA_HEIGHT_MAX;
         name = "parabolic camera, height";
@@ -1442,7 +1343,8 @@ static void zoom_command(int n, char **t)
         level = s_atof(t[1]);
         if (level < 0) level = 0;
         if (level > 1) level = 1;
-        (*(SetZoomFn *)(*(BYTE **)cam + CAM_VT_SET_ZOOM))(cam, level);
+        /* SetZoomLevel, through the slot of the camera's own class */
+        (*(SetZoomFn *)a2e_addr(vt == PARABOLIC_VTABLE ? SCENE_S_SLOT_ZOOM_PARABOLIC : SCENE_S_SLOT_ZOOM_TACTICAL))(cam, level);
         if (g_cam.mode != CAM_RTS) logline("  (a free camera is on: the zoom shows after `camera rts`)");
     }
     v = *(float *)(cam + (vt == PARABOLIC_VTABLE ? PARA_HEIGHT : TACT_ZOOM));
@@ -1462,18 +1364,34 @@ static void zoom_command(int n, char **t)
     logline(b);
 }
 
-/* An object's scene name, or its handle in hex. */
+/* An object's scene name, or `#<id>`, its handle as an unsigned decimal, as commands take it. */
 static void cat_handle(char *b, int h)
 {
     int i;
     for (i = 0; i < g_nobj; i++)
         if (g_obj[i].handle == h) { s_cat(b, g_obj[i].name); return; }
-    s_hex(b, (DWORD)h);
+    s_cat(b, "#");
+    s_unum(b, (DWORD)h);
 }
 
-static void *ov_method(DWORD slot)
+/* The overview the game uses, through the engine's pointer to it (g_pOverView): stock's
+ * is the static object, but Fleet Operations: Roots constructs an enlarged one of its
+ * own, and only the pointer follows.  Before the constructor has run the pointer is
+ * NULL; stock's static object is then the answer, and any other build has none. */
+static BYTE *overview(void)
 {
-    return *(void **)(*(BYTE **)OVERVIEW + slot);
+    DWORD a = a2e_addr(SCENE_S_OVERVIEW_PTR);
+    DWORD p = a ? *(volatile DWORD *)a : 0;
+    const char *bld = a2e_build();
+    if (p) return (BYTE *)p;
+    return (bld && a2e_streq(bld, "armada2/gog-1.1")) ? (BYTE *)a2e_addr(SCENE_S_OVERVIEW) : NULLPTR;
+}
+#define OVERVIEW overview()
+
+/* One of the overview's own virtual methods, by its vtable offset (the profile's). */
+static void *ov_method(BYTE *ov, DWORD slot)
+{
+    return *(void **)(*(BYTE **)ov + slot);
 }
 
 /* What is selected, each one's group label and class, and every control group
@@ -1481,16 +1399,22 @@ static void *ov_method(DWORD slot)
 static void selection(void)
 {
     char b[400];
-    int  n = ((OvIntFn)ov_method(OV_SELECT_NUM))(OVERVIEW);
-    const int *ids = ((OvListFn)ov_method(OV_SELECT_LIST))(OVERVIEW);
+    BYTE *ov;
+    int  n;
+    const int *ids;
     int  i, g, k;
+
+    if (!need(SCENE_H_SELECT)) return;
+    if (!(ov = OVERVIEW)) { logline("  ! no overview yet"); return; }
+    n = ((OvIntFn)ov_method(ov, OV_SELECT_NUM))(ov);
+    ids = ((OvListFn)ov_method(ov, OV_SELECT_LIST))(ov);
 
     b[0] = 0;
     s_cat(b, "  selected ");
     s_num(b, n);
     s_cat(b, ":");
-    for (i = 0; i < n && s_len(b) < 340; i++) {
-        BYTE *o = (BYTE *)((EntityGetFn)ENTITY_GET)(ids[i]);
+    for (i = 0; ids && i < n && s_len(b) < 340; i++) {
+        BYTE *o = (BYTE *)entity_of(ids[i]);
         s_cat(b, " ");
         cat_handle(b, ids[i]);
         if (o) {
@@ -1506,51 +1430,65 @@ static void selection(void)
         }
     }
     logline(b);
+    if (!g_rdy[SCENE_H_GROUPS]) return;   /* its stand-down is in the log at start */
     for (k = 0; k < 2; k++)
         for (g = 0; g < 10; g++) {
-            BYTE *grp = (BYTE *)OVERVIEW + (k ? OV_STATION_GROUPS : OV_SHIP_GROUPS) + 12 * g;
-            int  *la = *(int **)grp;
-            if (!la || la[0] <= 0) continue;
+            BYTE *grp = ov + (k ? OV_STATION_GROUPS : OV_SHIP_GROUPS) + SCENE_V_GROUP_SIZE * g;
+            BYTE *la = *(BYTE **)(grp + SCENE_F_GROUP_LIST);
+            int   cnt = la ? *(int *)(la + SCENE_F_LIST_ARRAY_COUNT) : 0;
+            const int *items = la ? *(const int **)(la + SCENE_F_LIST_ARRAY_ITEMS) : NULLPTR;
+            if (cnt <= 0 || !items) continue;
             b[0] = 0;
             s_cat(b, k ? "  station group " : "  ship group ");
             s_num(b, g);
             s_cat(b, " (");
-            s_num(b, la[0]);
+            s_num(b, cnt);
             s_cat(b, "):");
-            for (i = 0; i < la[0] && s_len(b) < 340; i++) {
+            for (i = 0; i < cnt && s_len(b) < 340; i++) {
                 s_cat(b, " ");
-                cat_handle(b, ((int *)la[6])[i]);
+                cat_handle(b, items[i]);
             }
             logline(b);
         }
 }
 
-/* select <name> [<name> ...]: as clicking the first and Shift-clicking the
- * rest, through cOverViewImp::Select, which every click goes through. */
-static void select_objs(char **t, int n)
+/* select <ref> [<ref> ...]: as clicking the first and Shift-clicking the rest;
+ * select+ (add) Shift-clicks them all, keeping what is selected. Through the overview's
+ * own Select (its vtable), which every click goes through: on Roots that is
+ * FleetOpsHook's, with its own cap and array, and the selection is never written here. */
+static void select_objs(char **t, int n, int keep)
 {
-    int i;
+    BYTE *ov;
+    int   i;
+    if (!need(SCENE_H_SELECT)) return;
+    if (!(ov = OVERVIEW)) { logline("  ! no overview yet"); return; }
     for (i = 0; i < n; i++) {
         Obj  *o = find_obj(t[i]);
-        void *go = o ? ((EntityGetFn)ENTITY_GET)(o->handle) : NULLPTR;
-        if (!go) { logline("  ! no such object"); return; }
-        ((OvSelectFn)ov_method(OV_SELECT))(OVERVIEW, go, 0, i == 0, 1);
+        void *go = o ? entity_of(o->handle) : NULLPTR;
+        if (!go) {
+            char b[96];
+            s_copyn(b, "  ! no such object: ", sizeof b);
+            s_copyn(b + s_len(b), t[i], 40);
+            logline(b);
+            return;
+        }
+        ((OvSelectFn)ov_method(ov, OV_SELECT))(ov, go, 0, i == 0 && !keep, 1);
     }
     selection();
 }
 
-static int on_arg(const char *s) { return s_eq(s, "on") || s_eq(s, "1"); }
+static int on_arg(const char *s) { return s_ieq(s, "on") || s_ieq(s, "1"); }
 
 /* A craft the move orders accept: a craft (flag 8) that is not dead, as
  * ScriptInterfaceImp's orders check. */
 static void *craft_of(Obj *o)
 {
-    BYTE *go = o ? (BYTE *)((EntityGetFn)ENTITY_GET)(o->handle) : NULLPTR;
+    BYTE *go = o ? (BYTE *)entity_of(o->handle) : NULLPTR;
     if (!go || !(*(DWORD *)(go + OBJECT_FLAGS) & FLAG_CRAFT) || go[OBJECT_DEAD]) return NULLPTR;
     return go;
 }
 
-/* goto <name>[,<name>...] <object | x y z> [warp]: the move a player's
+/* goto (move) <ref>[,<ref>...] [to] <object | [world] x y z> [warp]: the move a player's
  * right-click gives (AiCommand GO, or GO_WARP), through the GameObject::SetCommand
  * overloads ScriptInterfaceImp's own orders end in: to an object or to a point.
  * ScriptInterfaceImp::Goto itself is not used: it also checks a byte at +0x1bc
@@ -1566,6 +1504,7 @@ static void order_goto(char **t, int n)
     float  dest[3], mid[3] = { 0, 0, 0 };
     int    k = 0, i, used, warp = 0;
 
+    if (!need(SCENE_H_MOVE)) return;
     for (p = names; ; ) {          /* split the comma list in place */
         list[k++] = p;
         while (*p && *p != ',') p++;
@@ -1573,8 +1512,8 @@ static void order_goto(char **t, int n)
         *p++ = 0;
     }
     used = point_arg(t + 2, n - 2, dest, target_name);
-    if (!used) { logline("  ! usage: goto <name>[,<name>...] <object | x y z> [warp]"); return; }
-    if (n > 2 + used && s_eq(t[2 + used], "warp")) warp = 1;
+    if (!used) { logline("  ! usage: goto <ref>[,<ref>...] [to] <object | [world] x y z> [warp]"); return; }
+    if (n > 2 + used && s_ieq(t[2 + used], "warp")) warp = 1;
     /* GO to an object works for a craft (the ship follows it); ordered to a
      * nebula it did nothing (bench), so any other object is gone to as a point */
     if (target_name[0]) tgt = find_obj(target_name);
@@ -1583,13 +1522,13 @@ static void order_goto(char **t, int n)
         dest[0] = tp[0]; dest[1] = tp[1]; dest[2] = tp[2];
         tgt = NULLPTR;
     }
-    else if (!tgt && !target_name[0]) { dest[0] += g_anchor[0]; dest[1] += g_anchor[1]; dest[2] += g_anchor[2]; }
+    else if (!tgt && !target_name[0] && !g_point_world) { dest[0] += g_anchor[0]; dest[1] += g_anchor[1]; dest[2] += g_anchor[2]; }
 
     for (i = 0; i < k; i++) {
         const float *q;
         grp[i] = find_obj(list[i]);
         if (!grp[i] || !craft_of(grp[i])) {
-            b[0] = 0; s_cat(b, "  ! not a craft in the scene: "); s_cat(b, list[i]);
+            b[0] = 0; s_cat(b, "  ! not a craft: "); s_copyn(b + s_len(b), list[i], 40);
             logline(b);
             return;
         }
@@ -1604,7 +1543,7 @@ static void order_goto(char **t, int n)
         s_cat(b, "  ");
         s_cat(b, o->name);
         if (tgt && k == 1) {
-            void *tg = ((EntityGetFn)ENTITY_GET)(tgt->handle);
+            void *tg = entity_of(tgt->handle);
             if (!tg) { logline("  ! the target is gone"); return; }
             ((SetCommandObjFn)SET_COMMAND_OBJ)(craft_of(o), warp ? CMD_GO_WARP : CMD_GO, tg, 0, 0);
             s_cat(b, " -> ");
@@ -1645,17 +1584,18 @@ static void order_build(char **t, int n)
     char   objname[32], b[200];
     int    used, r, tn;
 
+    if (!need(SCENE_H_BUILD_ORDER)) return;
     o = find_obj(t[1]);
     go = o ? (BYTE *)craft_of(o) : NULLPTR;
-    if (!go) { logline("  ! not a craft in the scene"); return; }
+    if (!go) { logline("  ! not a craft"); return; }
     cls = ((ClassFindFn)CLASS_FIND)(t[2]);
     if (!cls) { logline("  ! no such class (an ODF name, without .odf)"); return; }
     used = point_arg(t + 3, n - 3, at, objname);
-    if (!used) { logline("  ! usage: build <rig> <odf> <x y z | object>"); return; }
+    if (!used) { logline("  ! usage: build <rig> <odf> <[world] x y z | object>"); return; }
     if (objname[0]) {
         const float *tp = obj_pos(find_obj(objname));
         at[0] = tp[0]; at[1] = tp[1]; at[2] = tp[2];
-    } else { at[0] += g_anchor[0]; at[1] += g_anchor[1]; at[2] += g_anchor[2]; }
+    } else if (!g_point_world) { at[0] += g_anchor[0]; at[1] += g_anchor[1]; at[2] += g_anchor[2]; }
     tn = *(int *)(go + PL_TEAM);
     team = tn >= 1 && tn <= MAX_TEAM ? ((TeamGetFn)TEAM_GET)(tn) : NULLPTR;
     if (team)
@@ -1673,6 +1613,190 @@ static void order_build(char **t, int n)
     logline(b);
 }
 
+/* ---- objects: every game object, read-only, into Scene.objects.jsonl ----- */
+
+/* `objects` walks GameObject::objectList (a std::list: its head node, each node's next
+ * and its object, the profile's fields) and writes one JSON object per game object to
+ * Scene.objects.jsonl beside Scene.log, after a header line: what the bench's
+ * `a2test drive objects` and the scenario steps on objects read (testbench/bench/
+ * objects.py). The file is written whole under another name and moved over the last
+ * one, so a reader never sees half of it. Nothing of the engine's is written: each
+ * object's fields are read, and three of its own const functions called (its ODF name,
+ * its class's name for the player, its transform), with __RTDynamicCast on its class. */
+static char g_objpath[320], g_objtmp[320];
+
+typedef struct { char b[1600]; int n; } Jb;
+
+static void jb_s(Jb *j, const char *s)
+{
+    while (*s && j->n < (int)sizeof j->b - 8) j->b[j->n++] = *s++;
+    j->b[j->n] = 0;
+}
+
+/* A JSON string (at most 120 bytes of it), or null. Bytes outside printable ASCII are
+ * written as \u00XX, so the line is ASCII whatever code page the game's text is in. */
+static void jb_str(Jb *j, const char *s)
+{
+    static const char x[] = "0123456789abcdef";
+    int k;
+    if (!s) { jb_s(j, "null"); return; }
+    jb_s(j, "\"");
+    for (k = 0; s[k] && k < 120 && j->n < (int)sizeof j->b - 16; k++) {
+        unsigned char c = (unsigned char)s[k];
+        if (c == '"' || c == '\\') { j->b[j->n++] = '\\'; j->b[j->n++] = (char)c; }
+        else if (c < 0x20 || c >= 0x7f) {
+            j->b[j->n++] = '\\'; j->b[j->n++] = 'u'; j->b[j->n++] = '0'; j->b[j->n++] = '0';
+            j->b[j->n++] = x[c >> 4]; j->b[j->n++] = x[c & 15];
+        } else j->b[j->n++] = (char)c;
+    }
+    j->b[j->n] = 0;
+    jb_s(j, "\"");
+}
+
+static void jb_num(Jb *j, long v) { char t[16]; t[0] = 0; s_num(t, v); jb_s(j, t); }
+static void jb_unum(Jb *j, DWORD v) { char t[16]; t[0] = 0; s_unum(t, v); jb_s(j, t); }
+
+/* An ODF's name without its directory and its `.odf`, as the scene files spell it. */
+static void jb_odf(Jb *j, const char *s)
+{
+    char t[64];
+    const char *p;
+    int  n = 0;
+    if (!s) { jb_str(j, NULLPTR); return; }
+    for (p = s; *p; p++) if (*p == '\\' || *p == '/') s = p + 1;
+    while (s[n] && n < 63) { t[n] = s[n]; n++; }
+    t[n] = 0;
+    if (n > 4 && s_ieq(t + n - 4, ".odf")) t[n - 4] = 0;
+    jb_str(j, t);
+}
+
+/* One decimal; a value that is not a finite number of sane size is 0 (no NaN in JSON). */
+static void jb_flt(Jb *j, float f)
+{
+    char t[24];
+    if (!(f == f) || f > 1e8f || f < -1e8f) f = 0;
+    t[0] = 0;
+    s_flt(t, f);
+    jb_s(j, t);
+}
+
+static void jb_key(Jb *j, const char *k) { jb_s(j, ",\""); jb_s(j, k); jb_s(j, "\":"); }
+
+static void jb_pair(Jb *j, const char *k, int have, float cur, float max)
+{
+    jb_key(j, k);
+    if (!have) { jb_s(j, "null"); return; }
+    jb_s(j, "["); jb_flt(j, cur); jb_s(j, ","); jb_flt(j, max); jb_s(j, "]");
+}
+
+typedef const char *(__thiscall *ObjStrFn)(void *obj);
+typedef void *(__cdecl *DynCastFn)(void *p, int vfdelta, void *src, void *dst, int is_ref);
+typedef int (__cdecl *UserTeamFn)(void);
+
+static void *cast_class(void *cls, DWORD td)
+{
+    if (!cls) return NULLPTR;
+    return ((DynCastFn)a2e_addr(SCENE_S_FN_DYN_CAST))(cls, 0, (void *)a2e_addr(SCENE_S_TD_GAME_OBJECT_CLASS),
+                                                      (void *)a2e_addr(td), 0);
+}
+
+/* The objects, in the list's order: (count, or written to h when it is not NULL). */
+static int walk_objects(HANDLE h, int player)
+{
+    DWORD head, node;
+    int   n = 0, guard = 0, max = SCENE_V_OBJECTS_MAX;
+    BYTE *list = *(BYTE **)a2e_addr(SCENE_S_OBJECT_LIST);
+    if (!list) return 0;
+    head = *(DWORD *)(list + SCENE_F_LIST_HEAD);
+    for (node = head ? *(DWORD *)(head + NODE_NEXT) : 0; node && node != head && guard < 100000 && n < max; guard++) {
+        BYTE *o = *(BYTE **)(node + NODE_VALUE);
+        BYTE *cls, *cc;
+        Jb    j;
+        DWORD flags;
+        int   craft, station, planet, team, i, handle;
+        const char *nm = NULLPTR, *kind;
+        const float *m;
+        node = *(DWORD *)(node + NODE_NEXT);
+        if (!o) continue;
+        n++;
+        if (!h) continue;
+        handle = *(int *)(o + OBJECT_HANDLE);
+        flags = *(DWORD *)(o + OBJECT_FLAGS);
+        craft = (flags & FLAG_CRAFT) != 0;
+        cls = *(BYTE **)(o + OBJECT_CLASS);
+        planet = cast_class(cls, SCENE_S_TD_PLANET_CLASS) != NULLPTR;
+        cc = craft ? (BYTE *)cast_class(cls, SCENE_S_TD_CRAFT_CLASS) : NULLPTR;
+        station = cc && cc[SCENE_F_CLS_STATION];
+        kind = planet ? "planet" : station ? "station" : craft ? "ship" : "other";
+        team = *(int *)(o + SCENE_F_OBJ_TEAM);
+        for (i = 0; i < g_nobj; i++)
+            if (g_obj[i].handle == handle && g_obj[i].name[0] != '#') { nm = g_obj[i].name; break; }
+        j.n = 0; j.b[0] = 0;
+        jb_s(&j, "{\"id\":"); jb_unum(&j, (DWORD)handle);
+        jb_key(&j, "name"); jb_str(&j, nm);
+        jb_key(&j, "odf"); jb_odf(&j, cls ? ((ObjStrFn)a2e_addr(SCENE_S_FN_ODF_NAME))(o) : NULLPTR);
+        jb_key(&j, "label"); jb_str(&j, *(const char **)(o + SCENE_F_OBJ_LABEL));
+        jb_key(&j, "class"); jb_str(&j, ((ObjStrFn)(*(void ***)o)[SCENE_F_OBJ_VT_CLASS_NAME / 4])(o));
+        jb_key(&j, "team"); jb_num(&j, team);
+        jb_key(&j, "mine"); jb_s(&j, team == player ? "true" : "false");
+        jb_key(&j, "craft"); jb_s(&j, craft ? "true" : "false");
+        jb_key(&j, "station"); jb_s(&j, station ? "true" : "false");
+        jb_key(&j, "kind"); jb_str(&j, kind);
+        m = ((TransformFn)ENTITY_TRANSFORM)(o);
+        jb_key(&j, "pos");
+        if (m) { jb_s(&j, "["); jb_flt(&j, m[9]); jb_s(&j, ","); jb_flt(&j, m[10]); jb_s(&j, ","); jb_flt(&j, m[11]); jb_s(&j, "]"); }
+        else jb_s(&j, "null");
+        jb_pair(&j, "hull", craft, *(float *)(o + SCENE_F_OBJ_HULL), *(float *)(o + SCENE_F_OBJ_HULL_MAX));
+        jb_pair(&j, "shields", craft, *(float *)(o + CRAFT_SHIELDS), *(float *)(o + CRAFT_SHIELDS_MAX));
+        jb_pair(&j, "crew", craft, *(float *)(o + CRAFT_CREW), *(float *)(o + CRAFT_MAX_CREW));
+        jb_pair(&j, "special", craft, *(float *)(o + CRAFT_SPECIAL), *(float *)(o + CRAFT_SPECIAL_MAX));
+        jb_key(&j, "selected"); jb_s(&j, o[SCENE_F_OBJ_SELECTED] ? "true" : "false");
+        jb_key(&j, "group"); jb_num(&j, *(int *)(o + OBJECT_GROUP));
+        jb_key(&j, "dying"); jb_s(&j, o[OBJECT_DEAD] ? "true" : "false");
+        jb_s(&j, "}\n");
+        {
+            DWORD wrote;
+            WriteFile(h, j.b, (DWORD)j.n, &wrote, NULLPTR);
+        }
+    }
+    return n;
+}
+
+static void list_objects(void)
+{
+    HANDLE h;
+    Jb     j;
+    DWORD  wrote;
+    int    n, player;
+    const char *bld = a2e_build();
+    char   b[120];
+
+    if (!need(SCENE_H_OBJECTS)) return;
+    player = ((UserTeamFn)a2e_addr(SCENE_S_FN_USER_TEAM))();
+    n = walk_objects(NULLPTR, player);
+    h = CreateFileA(g_objtmp, GENERIC_WRITE, 0, NULLPTR, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULLPTR);
+    if (h == INVALID_HANDLE_VALUE) { logline("  ! cannot write Scene.objects.tmp"); return; }
+    j.n = 0; j.b[0] = 0;
+    jb_s(&j, "{\"header\":true");
+    jb_key(&j, "count"); jb_num(&j, n);
+    jb_key(&j, "tick"); jb_num(&j, g_ready ? g_scene_ticks : -1);
+    jb_key(&j, "time"); jb_flt(&j, *(const float *)SIM_TIME);
+    jb_key(&j, "player_team"); jb_num(&j, player);
+    jb_key(&j, "build"); jb_str(&j, bld ? bld : "unknown");
+    jb_s(&j, "}\n");
+    WriteFile(h, j.b, (DWORD)j.n, &wrote, NULLPTR);
+    walk_objects(h, player);
+    CloseHandle(h);
+    if (!MoveFileExA(g_objtmp, g_objpath, MOVEFILE_REPLACE_EXISTING)) {
+        logline("  ! cannot move Scene.objects.tmp over Scene.objects.jsonl");
+        return;
+    }
+    s_copyn(b, "  objects ", sizeof b);
+    s_num(b, n);
+    s_cat(b, " -> Scene.objects.jsonl");
+    logline(b);
+}
+
 static void run_command(char *line)
 {
     char *t[MAXTOK];
@@ -1682,7 +1806,7 @@ static void run_command(char *line)
 
     echo[0] = 0;
     s_cat(echo, "> ");
-    s_cpy(echo + 2, line, 190);
+    s_copyn(echo + 2, line, 190);
     n = split(line, t);
     if (!n || t[0][0] == ';' || t[0][0] == '#') return;
     logline(echo);
@@ -1690,28 +1814,40 @@ static void run_command(char *line)
     mark_kv("text", echo + 2);
     mark_end();
 
-    if (s_eq(t[0], "camera") && n >= 2) {
-        if (s_eq(t[1], "rts") || s_eq(t[1], "off")) { g_cam.mode = CAM_RTS; camera_changed(); logline("  camera: the game's own"); return; }
+    g_nref = 0;   /* the objects lent to `#<id>` references are the command's own */
+    if (s_ieq(t[0], "camera") && n >= 2) {
+        if (s_ieq(t[1], "rts") || s_ieq(t[1], "off")) { g_cam.mode = CAM_RTS; camera_changed(); logline("  camera: the game's own"); return; }
+        if (s_ieq(t[1], "on") && n >= 3) {
+            /* camera on <ref>: the RTS camera, centred on the object (ScriptInterfaceImp::CenterCamera) */
+            if (!need(SCENE_H_CENTER)) return;
+            if (!(o = find_obj(t[2]))) { logline("  ! no such object"); return; }
+            if (g_cam.mode != CAM_RTS) { g_cam.mode = CAM_RTS; camera_changed(); }
+            ((SiHandleFn)SI_CENTER_CAMERA)(SI_INSTANCE, o->handle);
+            logline("  camera: the game's own, on the object");
+            return;
+        }
+        if (!need(SCENE_H_CAMERA)) return;
         if (n >= 4 && s_isnum(t[1])) {
             float at[3]; char nm[32];
             g_cam.eye[0] = s_atof(t[1]); g_cam.eye[1] = s_atof(t[2]); g_cam.eye[2] = s_atof(t[3]);
             if (point_arg(t + 4, n - 4, at, nm)) {
                 g_cam.at[0] = at[0]; g_cam.at[1] = at[1]; g_cam.at[2] = at[2];
-                s_cpy(g_cam.at_obj, nm, 32);
+                s_copyn(g_cam.at_obj, nm, 32);
                 g_cam.mode = CAM_LOOK; camera_changed();
                 logline("  camera: free");
                 return;
             }
         }
-        logline("  ! usage: camera <ex> <ey> <ez> <tx> <ty> <tz> | camera <ex> <ey> <ez> <object> | camera rts");
+        logline("  ! usage: camera <ex> <ey> <ez> <tx> <ty> <tz> | camera <ex> <ey> <ez> <object> | camera on <object> | camera rts");
         return;
     }
-    if (s_eq(t[0], "orbit") && n >= 2) {
+    if (s_ieq(t[0], "orbit") && n >= 2) {
         float at[3]; char nm[32];
+        if (!need(SCENE_H_CAMERA)) return;
         used = point_arg(t + 1, n - 1, at, nm);
         if (used && n >= 1 + used + 3) {
             g_cam.at[0] = at[0]; g_cam.at[1] = at[1]; g_cam.at[2] = at[2];
-            s_cpy(g_cam.at_obj, nm, 32);
+            s_copyn(g_cam.at_obj, nm, 32);
             g_cam.yaw   = s_atof(t[1 + used]);
             g_cam.pitch = s_atof(t[2 + used]);
             g_cam.dist  = s_atof(t[3 + used]);
@@ -1722,10 +1858,10 @@ static void run_command(char *line)
             logline("  camera: orbit");
             return;
         }
-        logline("  ! usage: orbit <object | x y z> <yaw> <pitch> <distance>");
+        logline("  ! usage: orbit <object | [world] x y z> <yaw> <pitch> <distance>");
         return;
     }
-    if (s_eq(t[0], "glide") && n == 5 && g_cam.mode == CAM_ORBIT) {
+    if (s_ieq(t[0], "glide") && n == 5 && g_cam.mode == CAM_ORBIT) {
         int i;
         g_move.from[0] = g_cam.yaw; g_move.from[1] = g_cam.pitch; g_move.from[2] = g_cam.dist;
         for (i = 0; i < 3; i++) g_move.to[i] = s_atof(t[2 + i]);
@@ -1741,11 +1877,11 @@ static void run_command(char *line)
         logline("  camera: glide");
         return;
     }
-    if (s_eq(t[0], "glide")) {
+    if (s_ieq(t[0], "glide")) {
         logline("  ! usage: glide <seconds> <yaw> <pitch> <distance>, after an orbit");
         return;
     }
-    if (s_eq(t[0], "spin") && n == 2) {
+    if (s_ieq(t[0], "spin") && n == 2) {
         g_move.spin = s_atof(t[1]);
         g_move.spin_t = GetTickCount();
         mark_begin(g_move.spin_t, g_move.spin != 0 ? "spin.start" : "spin.stop");
@@ -1754,65 +1890,72 @@ static void run_command(char *line)
         logline(g_move.spin != 0 ? "  camera: spin" : "  camera: spin off");
         return;
     }
-    if (s_eq(t[0], "zoom")) { zoom_command(n, t); return; }
-    if (s_eq(t[0], "spawn") && n >= 6) {
+    if (s_ieq(t[0], "zoom")) { zoom_command(n, t); return; }
+    if (s_ieq(t[0], "spawn") && n >= 6) {
         float p[3];
         p[0] = s_atof(t[3]); p[1] = s_atof(t[4]); p[2] = s_atof(t[5]);
         spawn(t[1], t[2], n >= 8 ? (int)s_atof(t[7]) : 1, p, n >= 7 ? s_atof(t[6]) : 0);
         return;
     }
-    if (s_eq(t[0], "attack") && n >= 3) {
+    if (s_ieq(t[0], "attack") && n >= 3) {
+        if (!need(SCENE_H_ATTACK)) return;
         if ((o = find_obj(t[1]))) order_attack(o, t[2]);
         else logline("  ! no such object");
         return;
     }
-    if ((s_eq(t[0], "heal") || s_eq(t[0], "engines") || s_eq(t[0], "weapons") ||
-         s_eq(t[0], "immortal")) && n >= 3) {
+    if ((s_ieq(t[0], "heal") || s_ieq(t[0], "engines") || s_ieq(t[0], "weapons") ||
+         s_ieq(t[0], "immortal")) && n >= 3) {
         int on = on_arg(t[2]);
+        if (!need(s_ieq(t[0], "heal") ? SCENE_H_HEAL : SCENE_H_SWITCHES)) return;
         if (!(o = find_obj(t[1]))) { logline("  ! no such object"); return; }
-        if (s_eq(t[0], "heal"))          o->heal = on;
-        else if (s_eq(t[0], "engines"))  ((SiHandleBoolFn)SI_NO_ENGINES)(SI_INSTANCE, o->handle, !on);
-        else if (s_eq(t[0], "weapons"))  ((SiHandleBoolFn)SI_NO_WEAPONS)(SI_INSTANCE, o->handle, !on);
+        if (s_ieq(t[0], "heal"))          (o = adopt(o))->heal = on;
+        else if (s_ieq(t[0], "engines"))  ((SiHandleBoolFn)SI_NO_ENGINES)(SI_INSTANCE, o->handle, !on);
+        else if (s_ieq(t[0], "weapons"))  ((SiHandleBoolFn)SI_NO_WEAPONS)(SI_INSTANCE, o->handle, !on);
         else                             ((SiHandleBoolFn)SI_CANNOT_DIE)(SI_INSTANCE, o->handle, on);
         logline("  ok");
         return;
     }
-    if (s_eq(t[0], "vent") && n >= 4) {
+    if (s_ieq(t[0], "vent") && n >= 4) {
         int m = vent_mask(t[2]), on = on_arg(t[3]);
-        if (!(o = find_obj(t[1])) || !craft_of(o)) { logline("  ! not a craft in the scene"); return; }
+        if (!need(SCENE_H_DAMAGE)) return;
+        if (!(o = find_obj(t[1])) || !craft_of(o)) { logline("  ! not a craft"); return; }
         if (m < 0) { logline("  ! system: shields, engines, weapons, sensors, life or all"); return; }
+        o = adopt(o);
         o->vent = on ? (o->vent | m) : (o->vent & ~m);
         logline("  ok");
         return;
     }
-    if (s_eq(t[0], "special") && n >= 3) {
+    if (s_ieq(t[0], "special") && n >= 3) {
         Obj *tg = NULLPTR;
-        if (!(o = find_obj(t[1])) || !craft_of(o)) { logline("  ! not a craft in the scene"); return; }
+        if (!need(SCENE_H_SPECIAL)) return;
+        if (!(o = find_obj(t[1])) || !craft_of(o)) { logline("  ! not a craft"); return; }
         if (n >= 4 && !(tg = find_obj(t[3]))) { logline("  ! no such target"); return; }
         fill_special(o);
         fire_special(o, t[2], tg);
         return;
     }
-    if (s_eq(t[0], "tech") && n >= 3) {
+    if (s_ieq(t[0], "tech") && n >= 3) {
         /* tech <team | object> <item> [on|off]: an object stands for its team */
         int team, on = n >= 4 ? on_arg(t[3]) : 1;
         if (s_isnum(t[1])) team = (int)s_atof(t[1]);
         else {
             BYTE *go;
-            if (!(o = find_obj(t[1])) || !(go = (BYTE *)((EntityGetFn)ENTITY_GET)(o->handle))) { logline("  ! no such object"); return; }
+            if (!(o = find_obj(t[1])) || !(go = (BYTE *)entity_of(o->handle))) { logline("  ! no such object"); return; }
             team = *(int *)(go + PL_TEAM);
         }
         set_tech(team, t[2], on);
         return;
     }
-    if (s_eq(t[0], "energy") && n >= 3) {
-        if (!(o = find_obj(t[1])) || !craft_of(o)) { logline("  ! not a craft in the scene"); return; }
+    if (s_ieq(t[0], "energy") && n >= 3) {
+        if (!need(SCENE_H_SPECIAL)) return;
+        if (!(o = find_obj(t[1])) || !craft_of(o)) { logline("  ! not a craft"); return; }
+        o = adopt(o);
         o->energy = on_arg(t[2]);
         if (o->energy) fill_special(o);
         logline("  ok");
         return;
     }
-    if (s_eq(t[0], "cargo") && n >= 3) {
+    if (s_ieq(t[0], "cargo") && n >= 3) {
         /* cargo <name> <resource> [amount | full | empty]: the freighter's hold, as mining
          * fills it (Freighter::LoadResource). Resources by eResource: the order of the
          * class's max<Resource> keys. */
@@ -1820,11 +1963,12 @@ static void run_command(char *line)
         BYTE *go;
         int r = -1, i;
         float amount = 1e9f;
-        if (!(o = find_obj(t[1])) || !(go = (BYTE *)craft_of(o)) || *(DWORD *)go != FREIGHTER_VT) { logline("  ! not a freighter in the scene"); return; }
-        for (i = 0; i < 6; i++) if (s_eq(t[2], res[i])) r = i;
+        if (!need(SCENE_H_FREIGHTER)) return;
+        if (!(o = find_obj(t[1])) || !(go = (BYTE *)craft_of(o)) || *(DWORD *)go != FREIGHTER_VT) { logline("  ! not a freighter"); return; }
+        for (i = 0; i < 6; i++) if (s_ieq(t[2], res[i])) r = i;
         if (r < 0) { logline("  ! resource: dilithium, latinum, metal, biomatter, crew or officers"); return; }
-        if (n >= 4 && s_eq(t[3], "empty")) amount = -1e9f;
-        else if (n >= 4 && !s_eq(t[3], "full")) amount = s_atof(t[3]);
+        if (n >= 4 && s_ieq(t[3], "empty")) amount = -1e9f;
+        else if (n >= 4 && !s_ieq(t[3], "full")) amount = s_atof(t[3]);
         if (*(int *)(go + FREIGHTER_KIND) == r && amount < 1e9f && amount > -1e9f)
             amount -= *(float *)(go + FREIGHTER_AMOUNT);           /* a number is the hold's new level */
         ((LoadResFn)FREIGHTER_LOAD)(go, amount, r);
@@ -1838,85 +1982,105 @@ static void run_command(char *line)
         }
         return;
     }
-    if (s_eq(t[0], "kill") && n >= 2) {
-        if (!(o = find_obj(t[1])) || !craft_of(o)) { logline("  ! not a craft in the scene"); return; }
+    if (s_ieq(t[0], "kill") && n >= 2) {
+        if (!need(SCENE_H_KILL)) return;
+        if (!(o = find_obj(t[1])) || !craft_of(o)) { logline("  ! not a craft"); return; }
         o->heal = 0;
         ((SiHandleBoolFn)SI_CANNOT_DIE)(SI_INSTANCE, o->handle, 0);
         ((SiHandleFn)SI_EXPLODE_NOW)(SI_INSTANCE, o->handle);
         logline("  ok");
         return;
     }
-    if (s_eq(t[0], "succeed") || s_eq(t[0], "fail")) {
+    if (s_ieq(t[0], "succeed") || s_ieq(t[0], "fail")) {
         /* The mission ends as its script ends it, won or lost, after the delay (seconds;
          * the script's own message is none). */
         float delay = n >= 2 ? s_atof(t[1]) : 0.0f;
-        ((SiEndFn)(s_eq(t[0], "succeed") ? SI_SUCCEED : SI_FAIL))(SI_INSTANCE, delay, NULLPTR);
+        if (!need(SCENE_H_MISSION)) return;
+        ((SiEndFn)(s_ieq(t[0], "succeed") ? SI_SUCCEED : SI_FAIL))(SI_INSTANCE, delay, NULLPTR);
         logline("  ok");
         return;
     }
-    if (s_eq(t[0], "cloak") && n >= 3) {
+    if (s_ieq(t[0], "cloak") && n >= 3) {
         /* The device itself, not ScriptInterfaceImp::Cloak: that one asks AbleToCloak,
          * which wants the team to have researched the device, and refuses the bench's
-         * ships besides. A set request byte (+0x2c) is what the player's button leaves
+         * ships besides. A set request byte (CLOAK_REQUEST) is what the player's button leaves
          * for CloakingDevice::Simulate, which then cloaks (from visible, given the
          * special energy) or decloaks (from cloaked). */
         BYTE *go, *dev;
         DWORD st;
-        if (!(o = find_obj(t[1])) || !(go = (BYTE *)craft_of(o))) { logline("  ! not a craft in the scene"); return; }
+        if (!need(SCENE_H_CLOAK)) return;
+        if (!(o = find_obj(t[1])) || !(go = (BYTE *)craft_of(o))) { logline("  ! not a craft"); return; }
         if (!(dev = *(BYTE **)(go + OBJECT_CLOAK))) { logline("  ! no cloaking device"); return; }
-        st = *(DWORD *)(dev + 0x3c);
-        o->energy = s_eq(t[2], "now") || on_arg(t[2]);       /* the cloak draws on it */
+        o = adopt(o);
+        st = *(DWORD *)(dev + CLOAK_STATE);
+        o->energy = s_ieq(t[2], "now") || on_arg(t[2]);       /* the cloak draws on it */
         if (o->energy) fill_special(o);
-        if (s_eq(t[2], "now")) ((SiVoidFn)GO_CLOAK_NOW)(go);
-        else if (o->energy ? st == 0 : st == 2) dev[0x2c] = 1;
+        if (s_ieq(t[2], "now")) ((SiVoidFn)GO_CLOAK_NOW)(go);
+        else if (o->energy ? st == 0 : st == 2) dev[CLOAK_REQUEST] = 1;
         logline("  ok");
         return;
     }
-    if (s_eq(t[0], "colonize") && n >= 2) {
+    if (s_ieq(t[0], "colonize") && n >= 2) {
         if (!(o = find_obj(t[1]))) { logline("  ! no such object"); return; }
         colonize(o, n >= 3 ? t[2] : "full", n >= 4 ? (int)s_atof(t[3]) : 1);
         return;
     }
-    if (s_eq(t[0], "goto") && n >= 3) { order_goto(t, n); return; }
-    if (s_eq(t[0], "build") && n >= 4) { order_build(t, n); return; }
-    if (s_eq(t[0], "stop") && n >= 2) {
-        if (!(o = find_obj(t[1])) || !craft_of(o)) { logline("  ! not a craft in the scene"); return; }
+    if ((s_ieq(t[0], "goto") || s_ieq(t[0], "move")) && n >= 3) {
+        /* move is goto, with an optional `to` before the destination */
+        if (n >= 4 && s_ieq(t[2], "to")) {
+            int i;
+            for (i = 2; i < n - 1; i++) t[i] = t[i + 1];
+            n--;
+        }
+        order_goto(t, n);
+        return;
+    }
+    if (s_ieq(t[0], "build") && n >= 4) { order_build(t, n); return; }
+    if (s_ieq(t[0], "stop") && n >= 2) {
+        if (!need(SCENE_H_MOVE)) return;
+        if (!(o = find_obj(t[1])) || !craft_of(o)) { logline("  ! not a craft"); return; }
         ((SetCommandFn)SET_COMMAND)(craft_of(o), CMD_STOP, 0, 1, 0);   /* as ScriptInterfaceImp::Stop */
         o->attack[0] = 0;
         logline("  ok");
         return;
     }
-    if (s_eq(t[0], "formation") && n >= 3) {
+    if (s_ieq(t[0], "formation") && n >= 3) {
         /* formation <name>[,<name>...] <param>: the formation the ships move in, as the
          * bar's formation buttons give it (SET_FORMATION with the button's `param`, posted
          * as the ship's next command the way the order's executor posts it) */
         char *p = t[1], *nm;
         long  prm = (long)s_atof(t[2]);
+        if (!need(SCENE_H_MOVE)) return;
         for (;;) {
             nm = p;
             while (*p && *p != ',') p++;
             if (*p) *p++ = 0; else p = NULLPTR;
-            if (!(o = find_obj(nm)) || !craft_of(o)) { logline("  ! not a craft in the scene"); return; }
+            if (!(o = find_obj(nm)) || !craft_of(o)) { logline("  ! not a craft"); return; }
             ((DqCommandParamFn)DQ_COMMAND_PARAM)(craft_of(o), CMD_SET_FORMATION, prm);
             if (!p) break;
         }
         logline("  ok");
         return;
     }
-    if (s_eq(t[0], "center") && n >= 2) {
+    if (s_ieq(t[0], "center") && n >= 2) {
+        if (!need(SCENE_H_CENTER)) return;
         if (!(o = find_obj(t[1]))) { logline("  ! no such object"); return; }
         ((SiHandleFn)SI_CENTER_CAMERA)(SI_INSTANCE, o->handle);
         logline("  ok");
         return;
     }
-    if (s_eq(t[0], "waypoint-key") && n >= 2) {
+    if (s_ieq(t[0], "waypoint-key") && n >= 2) {
         /* The waypoint key (`enter_waypoint`, Tab) held or let go, for a move path: the
-         * overview reads the binding's live state through the pointer at +0x30c, which
+         * overview reads the binding's live state through a pointer of its own, which
          * is pointed at an int of ours while held.  The bench cannot hold a key: Wine
          * under Xwayland sees a held key let go at once. */
-        int **slot = (int **)((char *)OVERVIEW + 0x30c);
+        BYTE  *ov;
+        int  **slot;
+        if (!need(SCENE_H_WAYPOINT)) return;
+        if (!(ov = OVERVIEW)) { logline("  ! no overview yet"); return; }
+        slot = (int **)(ov + SCENE_F_OV_WAYPOINT_KEY);
         if (!*slot) { logline("  ! the overview has not bound the waypoint key yet"); return; }
-        if (s_eq(t[1], "on")) {
+        if (s_ieq(t[1], "on")) {
             if (*slot != &g_waypoint_key) g_waypoint_orig = *slot;
             g_waypoint_key = 1;
             *slot = &g_waypoint_key;
@@ -1928,39 +2092,55 @@ static void run_command(char *line)
         }
         return;
     }
-    if (s_eq(t[0], "pause"))  { pause_now("  ");  return; }
-    if (s_eq(t[0], "pause-at") && n >= 2) {
+    if (s_ieq(t[0], "pause"))  { pause_now("  ");  return; }
+    if (s_ieq(t[0], "pause-at") && n >= 2) {
         long at = (long)s_atof(t[1]);
         char b[96];
         if (at <= g_scene_ticks) {
-            s_cpy(b, "  ! tick ", sizeof b); s_num(b + s_len(b), g_scene_ticks); s_cat(b, " already");
+            s_copyn(b, "  ! tick ", sizeof b); s_num(b + s_len(b), g_scene_ticks); s_cat(b, " already");
             logline(b);
             return;
         }
         g_pause_at = at;
-        s_cpy(b, "  ok: at tick ", sizeof b); s_num(b + s_len(b), g_scene_ticks);
+        s_copyn(b, "  ok: at tick ", sizeof b); s_num(b + s_len(b), g_scene_ticks);
         logline(b);
         return;
     }
-    if (s_eq(t[0], "tick")) {
+    if (s_ieq(t[0], "tick")) {
         char b[64];
-        s_cpy(b, "  tick ", sizeof b); s_num(b + s_len(b), g_scene_ticks);
+        s_copyn(b, "  tick ", sizeof b); s_num(b + s_len(b), g_scene_ticks);
         logline(b);
         return;
     }
-    if (s_eq(t[0], "seed") && n >= 2 && s_isnum(t[1])) { seed_random((DWORD)s_atof(t[1])); logline("  ok"); return; }
-    if (s_eq(t[0], "resume")) { ((SiVoidFn)SI_UNPAUSE)(SI_INSTANCE); g_paused = 0; logline("  resumed"); return; }
-    if (s_eq(t[0], "hud")  && n >= 2) { set_hud(on_arg(t[1]));  logline("  ok"); return; }
-    if (s_eq(t[0], "grid") && n >= 2) { set_grid(on_arg(t[1])); logline("  ok"); return; }
-    if (s_eq(t[0], "cursor") && n >= 2) { g_cursor_on = on_arg(t[1]); logline("  ok"); return; }
-    if (s_eq(t[0], "notices") && n >= 2) { set_notices(on_arg(t[1])); logline("  ok"); return; }
-    if (s_eq(t[0], "tooltips") && n >= 2) { set_tooltips(on_arg(t[1])); logline("  ok"); return; }
-    if (s_eq(t[0], "hover") && n >= 2) { set_hover(on_arg(t[1])); logline("  ok"); return; }
-    if (s_eq(t[0], "shieldfx") && n >= 2) { set_shieldfx(on_arg(t[1])); logline("  ok"); return; }
-    if (s_eq(t[0], "query")) { query(); return; }
-    if (s_eq(t[0], "selection")) { selection(); return; }
-    if (s_eq(t[0], "select") && n >= 2) { select_objs(t + 1, n - 1); return; }
-    if (s_eq(t[0], "marks")) {
+    if (s_ieq(t[0], "seed") && n >= 2 && s_isnum(t[1])) {
+        if (!g_rdy[SCENE_H_SEED]) { need(SCENE_H_SEED); return; }
+        seed_random((DWORD)s_atof(t[1]));
+        logline("  ok");
+        return;
+    }
+    if (s_ieq(t[0], "resume")) {
+        if (!need(SCENE_H_PAUSE)) return;
+        ((SiVoidFn)SI_UNPAUSE)(SI_INSTANCE); g_paused = 0; logline("  resumed"); return;
+    }
+    if (s_ieq(t[0], "hud")  && n >= 2) { if (set_hud(on_arg(t[1]))) logline("  ok"); return; }
+    if (s_ieq(t[0], "grid") && n >= 2) { if (set_grid(on_arg(t[1]))) logline("  ok"); return; }
+    if (s_ieq(t[0], "cursor") && n >= 2) {
+        if (!need(SCENE_H_CURSOR)) return;
+        hook_cursor();
+        g_cursor_on = on_arg(t[1]);
+        logline("  ok");
+        return;
+    }
+    if (s_ieq(t[0], "notices") && n >= 2) { if (set_notices(on_arg(t[1]))) logline("  ok"); return; }
+    if (s_ieq(t[0], "tooltips") && n >= 2) { if (set_tooltips(on_arg(t[1]))) logline("  ok"); return; }
+    if (s_ieq(t[0], "hover") && n >= 2) { if (set_hover(on_arg(t[1]))) logline("  ok"); return; }
+    if (s_ieq(t[0], "shieldfx") && n >= 2) { if (set_shieldfx(on_arg(t[1]))) logline("  ok"); return; }
+    if (s_ieq(t[0], "query")) { query(); return; }
+    if (s_ieq(t[0], "selection")) { selection(); return; }
+    if (s_ieq(t[0], "select") && n >= 2) { select_objs(t + 1, n - 1, 0); return; }
+    if ((s_ieq(t[0], "select+") || s_ieq(t[0], "add")) && n >= 2) { select_objs(t + 1, n - 1, 1); return; }
+    if (s_ieq(t[0], "objects")) { list_objects(); return; }
+    if (s_ieq(t[0], "marks")) {
         long i0 = g_nmarks > 16 ? g_nmarks - 16 : 0, i;
         char b[160];
         b[0] = 0;
@@ -1977,12 +2157,9 @@ static void run_command(char *line)
         return;
     }
     logline("  ! unknown command (camera, orbit, glide, spin, zoom, spawn, attack, heal, engines, weapons, "
-            "immortal, special, energy, tech, kill, cloak, colonize, goto, stop, center, pause, resume, hud, grid, cursor, notices, tooltips, hover, "
-            "shieldfx, query, "
-            "select, selection, marks)");
+            "immortal, special, energy, tech, kill, cloak, colonize, goto, move, stop, center, pause, resume, hud, grid, "
+            "cursor, notices, tooltips, hover, shieldfx, query, objects, select, select+, selection, marks)");
 }
-
-static int g_ready;   /* the scene has been built; commands may run */
 
 static void process_commands(void)
 {
@@ -2072,8 +2249,9 @@ static int   g_msel_have;
 
 static void poll_selection(DWORD now)
 {
-    int        n = ((OvIntFn)ov_method(OV_SELECT_NUM))(OVERVIEW);
-    const int *ids = ((OvListFn)ov_method(OV_SELECT_LIST))(OVERVIEW);
+    BYTE      *ov = OVERVIEW;
+    int        n = ov ? ((OvIntFn)ov_method(ov, OV_SELECT_NUM))(ov) : 0;
+    const int *ids = ov ? ((OvListFn)ov_method(ov, OV_SELECT_LIST))(ov) : NULLPTR;
     DWORD      sig = 2166136261u ^ (DWORD)n;
     char       b[300];
     int        i;
@@ -2094,7 +2272,7 @@ static void poll_selection(DWORD now)
 }
 
 /* The scene's own objects: a craft dying (+0x113 set), an object gone (no entity),
- * and each step of a cloak (its device's state at +0x3c: 0 visible, 1 cloaking,
+ * and each step of a cloak (its device's state, CLOAK_STATE: 0 visible, 1 cloaking,
  * 2 cloaked, 3 decloaking). `kill` (ExplodeNow) takes a craft away within the frame,
  * before +0x113 is ever seen set (bench, films/marks m02), so a craft that is gone
  * without having been seen dying is marked destroyed then. Where each object was is
@@ -2107,7 +2285,7 @@ static void poll_objects(DWORD now)
         Obj  *o = &g_obj[i];
         BYTE *go, *dev;
         if (o->gone == 2) continue;
-        go = (BYTE *)((EntityGetFn)ENTITY_GET)(o->handle);
+        go = (BYTE *)entity_of(o->handle);
         if (!go) {
             if (o->craft && !o->gone) {
                 mark_begin(now, "destroyed"); mark_kv("obj", o->name); mark_kv("how", "removed"); mark_end();
@@ -2128,7 +2306,7 @@ static void poll_objects(DWORD now)
             mark_begin(now, "destroyed"); mark_kv("obj", o->name); mark_end();
         }
         if ((dev = *(BYTE **)(go + OBJECT_CLOAK))) {
-            int st = (int)*(DWORD *)(dev + 0x3c);
+            int st = (int)*(DWORD *)(dev + CLOAK_STATE);
             if (st != o->cloak_st) {
                 if (o->cloak_st >= 0 && st >= 0 && st < 4) {
                     mark_begin(now, k_cloak[st]); mark_kv("obj", o->name); mark_end();
@@ -2159,7 +2337,7 @@ static void ord_odf(const BYTE *ord, char *out)
     void       *prj = cls ? *(void *const *)(cls + ORD_CLASS_PRJ) : NULLPTR;   /* as render3d reads it */
     const char *s = prj ? ((PrjOdfFn)PRJ_GET_ODF)(prj) : NULLPTR, *p;
     int         n = 0;
-    if (!s) { s_cpy(out, "unknown", 24); return; }
+    if (!s) { s_copyn(out, "unknown", 24); return; }
     for (p = s; *p; p++) if (*p == '\\' || *p == '/') s = p + 1;
     for (; *s && *s != '.' && n < 23; s++) {
         char c = *s;
@@ -2182,24 +2360,24 @@ static void poll_ordnance(DWORD now)
     int   ncur = 0, k, guard = 0;
     DWORD head = *(DWORD *)ORDNANCE_HEAD, node;
     for (k = 0; k < g_nfire; k++) g_fire[k].live = 0;
-    for (node = head ? *(DWORD *)head : 0; node && node != head && guard < 100000; guard++) {
-        BYTE *ord = *(BYTE **)(node + 8);
+    for (node = head ? *(DWORD *)(head + NODE_NEXT) : 0; node && node != head && guard < 100000; guard++) {
+        BYTE *ord = *(BYTE **)(node + NODE_VALUE);
         Fire *f = NULLPTR;
         char  odf[24];
         int   owner;
-        node = *(DWORD *)node;
+        node = *(DWORD *)(node + NODE_NEXT);
         if (!ord) continue;
         if (ncur < MAX_TRACK) cur[ncur++] = (DWORD)ord;
         owner = *(int *)(ord + ORD_OWNER);
         ord_odf(ord, odf);
         for (k = 0; k < g_nfire; k++)
-            if (g_fire[k].owner == owner && s_eq(g_fire[k].odf, odf)) { f = &g_fire[k]; break; }
+            if (g_fire[k].owner == owner && s_ieq(g_fire[k].odf, odf)) { f = &g_fire[k]; break; }
         if (!f) {
             if (g_nfire >= MAX_FIRE) continue;
             f = &g_fire[g_nfire++];
             f->owner = owner;
             f->target = *(int *)(ord + ORD_TARGET);
-            s_cpy(f->odf, odf, sizeof f->odf);
+            s_copyn(f->odf, odf, sizeof f->odf);
             f->first = now;
             f->shots = 0;
             mark_begin(now, "fire.start");
@@ -2265,9 +2443,9 @@ static void poll_explosions(DWORD now)
 {
     DWORD cur[256], head = *(DWORD *)EXPLOSION_HEAD, n;
     int   ncur = 0, guard = 0, k;
-    for (n = head ? *(DWORD *)head : 0; n && n != head && guard < 100000; guard++) {
-        BYTE *e = *(BYTE **)(n + 8);
-        n = *(DWORD *)n;
+    for (n = head ? *(DWORD *)(head + NODE_NEXT) : 0; n && n != head && guard < 100000; guard++) {
+        BYTE *e = *(BYTE **)(n + NODE_VALUE);
+        n = *(DWORD *)(n + NODE_NEXT);
         if (!e) continue;
         if (ncur < 256) cur[ncur++] = (DWORD)e;
         if (g_exp_have && !tracked(g_exp_prev, g_nexp_prev, (DWORD)e)) mark_explosion(now, e);
@@ -2283,8 +2461,9 @@ static void marks_poll(void)
     if (!g_marks_on || !g_ready) return;
     now = GetTickCount();
     poll_camera(now);
-    poll_selection(now);
+    if (g_rdy[SCENE_H_SELECT]) poll_selection(now);
     poll_objects(now);
+    if (!g_rdy[SCENE_H_MARKS]) return;
     poll_ordnance(now);
     poll_explosions(now);
 }
@@ -2306,7 +2485,7 @@ static int ini_int(const char *sect, const char *key, int dflt)
 static void build_scene(void)
 {
     char  names[2048], *sect, b[200];
-    const float *interest = (const float *)(TACTICAL_CAMERA + CAMERA_INTEREST);
+    const float *interest = g_rdy[SCENE_H_LOCATE] ? (const float *)(TACTICAL_CAMERA + CAMERA_INTEREST) : k_zero;
     int   i;
 
     log_vec("camera interest", interest);
@@ -2316,6 +2495,7 @@ static void build_scene(void)
     if (g_marks_on) { mark_epoch(); logline("marks to Scene.marks"); }
     GetPrivateProfileStringA("Scene", "Anchor", "camera", b, 32, g_ini);
     if (b[0] == 'c' || b[0] == 'C') {
+        if (!g_rdy[SCENE_H_LOCATE]) logline("Anchor=camera: scene.locate stood down, positions are world positions");
         g_anchor[0] = interest[0]; g_anchor[1] = interest[1]; g_anchor[2] = interest[2];
     }
 
@@ -2326,20 +2506,20 @@ static void build_scene(void)
         GetPrivateProfileStringA("Scene", "Pause", "", v, sizeof v, g_ini);
         if (v[0] && s_isnum(v)) g_pause_at = (long)s_atof(v);
     }
-    if (!ini_int("Scene", "Fog", 0)) {
+    if (!ini_int("Scene", "Fog", 0) && need(SCENE_H_FOG)) {
         ((ForceFogFn)FORCE_FOG)(0);
         ((VoidFn)FORCE_UPDATE)();
         logline("fog and shroud off");
     }
-    if (!ini_int("Scene", "Hud", 0))  { set_hud(0);  logline("HUD off (interface mode 3)"); }
-    if (!ini_int("Scene", "Grid", 0)) { set_grid(0); logline("grid off"); }
+    if (!ini_int("Scene", "Hud", 0) && set_hud(0))  logline("HUD off (interface mode 3)");
+    if (!ini_int("Scene", "Grid", 0) && set_grid(0)) logline("grid off");
     hook_cursor();
     g_cursor_on = ini_int("Scene", "Cursor", 0);
-    if (!g_cursor_on) logline(g_cursor_draw ? "cursor off" : "cursor: could not hook");
-    if (!ini_int("Scene", "Notices", 0)) { set_notices(0); logline("notices off"); }
-    if (!ini_int("Scene", "Tooltips", 0)) { set_tooltips(0); logline("tooltips off"); }
-    if (!ini_int("Scene", "Hover", 1))    { set_hover(0);    logline("hover gauges off"); }
-    if (!ini_int("Scene", "ShieldFx", 1)) { set_shieldfx(0); logline("shield hit effects off"); }
+    if (!g_cursor_on) logline(g_cursor_draw ? "cursor off" : "cursor: could not hook (scene.cursor stood down)");
+    if (!ini_int("Scene", "Notices", 0) && set_notices(0)) logline("notices off");
+    if (!ini_int("Scene", "Tooltips", 0) && set_tooltips(0)) logline("tooltips off");
+    if (!ini_int("Scene", "Hover", 1) && set_hover(0))    logline("hover gauges off");
+    if (!ini_int("Scene", "ShieldFx", 1) && set_shieldfx(0)) logline("shield hit effects off");
 
     /* [Object.<name>] sections, in file order */
     GetPrivateProfileSectionNamesA(names, sizeof names, g_ini);
@@ -2366,7 +2546,7 @@ static void build_scene(void)
         o->energy = ini_int(sect, "Energy", 0);
         {   /* Tech=<item> [<item> ...]: available to the object's team, as `tech` */
             char v[160], *tk[MAXTOK];
-            BYTE *go = (BYTE *)((EntityGetFn)ENTITY_GET)(o->handle);
+            BYTE *go = (BYTE *)entity_of(o->handle);
             int   k, m;
             GetPrivateProfileStringA(sect, "Tech", "", v, sizeof v, g_ini);
             m = v[0] && go ? split(v, tk) : 0;
@@ -2389,7 +2569,7 @@ static void build_scene(void)
     GetPrivateProfileStringA("Scene", "Center", "", b, 32, g_ini);
     if (b[0]) {
         Obj *o = find_obj(b);
-        if (o) {
+        if (o && need(SCENE_H_CENTER)) {
             ((SiHandleFn)SI_CENTER_CAMERA)(SI_INSTANCE, o->handle);
             logline("RTS camera centred");
         }
@@ -2413,6 +2593,7 @@ static void build_scene(void)
 static void __cdecl scene_tick(void)
 {
     ((UpdateRangeFn)UPDATE_RANGE)();
+    g_tick_at = GetTickCount();
     if (!g_ready) {
         if (g_ticks == 0) logline("first mission tick");
         if (g_ticks++ >= ini_int("Scene", "Delay", 30)) build_scene();
@@ -2420,7 +2601,7 @@ static void __cdecl scene_tick(void)
     }
     g_scene_ticks++;
     heal_all();
-    if (g_refresh && --g_refresh == 0 && g_paused)
+    if (g_refresh && --g_refresh == 0 && g_paused && g_rdy[SCENE_H_PAUSE])
         ((SiVoidFn)SI_PAUSE)(SI_INSTANCE);
     if (g_pause_at >= 0 && g_scene_ticks >= g_pause_at) {
         g_pause_at = -1;
@@ -2430,17 +2611,6 @@ static void __cdecl scene_tick(void)
 }
 
 /* ---- startup ---------------------------------------------------------- */
-
-static int check_sigs(void)
-{
-    int i, k;
-    for (i = 0; i < (int)(sizeof k_sigs / sizeof k_sigs[0]); i++) {
-        const BYTE *p = (const BYTE *)k_sigs[i].at;
-        for (k = 0; k < k_sigs[i].len; k++)
-            if (p[k] != k_sigs[i].sig[k]) return i;
-    }
-    return -1;
-}
 
 static int patch_dword(DWORD at, DWORD v)
 {
@@ -2466,6 +2636,14 @@ static int patch_call6(DWORD at, DWORD target)
     return 1;
 }
 
+/* A call site (a `call` entry) pointed at fn, the rel32 rewritten. */
+static int patch_call(DWORD sym, const void *fn)
+{
+    DWORD at = a2e_addr(sym);
+    return at && patch_dword(at + 1, (DWORD)fn - (at + 5));
+}
+
+/* The executable's folder (Data\ on Roots): Scene.ini, Scene.cmd and the logs sit there. */
 static void build_paths(void)
 {
     char path[320];
@@ -2480,28 +2658,22 @@ static void build_paths(void)
     g_logpath[0] = 0; s_cat(g_logpath, path); s_cat(g_logpath, "Scene.log");
     g_cmdpath[0] = 0; s_cat(g_cmdpath, path); s_cat(g_cmdpath, "Scene.cmd");
     g_markpath[0] = 0; s_cat(g_markpath, path); s_cat(g_markpath, "Scene.marks");
+    g_objpath[0] = 0; s_cat(g_objpath, path); s_cat(g_objpath, "Scene.objects.jsonl");
+    g_objtmp[0] = 0; s_cat(g_objtmp, path); s_cat(g_objtmp, "Scene.objects.tmp");
     g_sodpath[0] = 0; s_cat(g_sodpath, path); s_cat(g_sodpath, "SOD\\");
 }
 
 /* Music off: StartMusic (cdecl) and JukeBox::mStartNewTrack (thiscall, no stack
  * arguments) take nothing off the stack that the caller does not, so a `ret` over each
  * first byte makes every call a no-op. Sound effects and voices go another way and stay. */
-static int music_sigs_ok(void)
-{
-    static const BYTE a[4] = { 0x55, 0x8B, 0xEC, 0xA1 }, b[4] = { 0x55, 0x8B, 0xEC, 0x6A };
-    int i;
-    for (i = 0; i < 4; i++)
-        if (((const BYTE *)START_MUSIC)[i] != a[i] || ((const BYTE *)NEW_TRACK)[i] != b[i]) return 0;
-    return 1;
-}
-
 static void music_off(void)
 {
-    static const DWORD sites[2] = { START_MUSIC, NEW_TRACK };
+    static const DWORD sites[2] = { SCENE_S_MUSIC_START, SCENE_S_MUSIC_NEW_TRACK };
     int i;
+    if (!need(SCENE_H_MUSIC)) return;
     for (i = 0; i < 2; i++) {
         DWORD old;
-        BYTE *p = (BYTE *)sites[i];
+        BYTE *p = (BYTE *)a2e_addr(sites[i]);
         if (!VirtualProtect(p, 1, PAGE_EXECUTE_READWRITE, &old)) continue;
         p[0] = 0xC3;
         VirtualProtect(p, 1, old, &old);
@@ -2534,8 +2706,8 @@ static void *__cdecl race_find(const char *map_race)
     return r ? r : ((RaceFindFn)RACE_FIND)(map_race);
 }
 
-/* Seed= as the mission loads. Program::GameOpenPreLoad makes g_random (from the game
- * setup's seed) and then calls Starfield_Initialize, which lays the background's stars
+/* Seed= as the mission loads. Once g_random is made (from the game setup's seed),
+ * Program::GameOpenPostLoad calls Starfield_Initialize, which lays the background's stars
  * out from g_asyncRandom, seeded from the wall clock when the game started: a different
  * sky on every launch. That call comes here, which seeds every sequence first, so the
  * stars and everything the mission draws from then on repeat. */
@@ -2551,13 +2723,11 @@ static void __cdecl preload_stars(void)
 static void seed_hook(void)
 {
     char v[24];
-    const BYTE *p = (const BYTE *)PRELOAD_STARS;
     GetPrivateProfileStringA("Scene", "Seed", "", v, sizeof v, g_ini);
     if (!v[0] || !s_isnum(v)) return;
     g_seed_value = (DWORD)s_atof(v);
-    if (p[0] != 0xE8 || *(const DWORD *)(p + 1) != STARFIELD_INIT - (PRELOAD_STARS + 5) ||
-        !patch_dword(PRELOAD_STARS + 1, (DWORD)&preload_stars - (PRELOAD_STARS + 5))) {
-        logline("seed: NOT PATCHED: GameOpenPreLoad's Starfield_Initialize call differs -- seeded at the scene only");
+    if (!g_rdy[SCENE_H_SEED_LOAD] || !patch_call(SCENE_S_SITE_PRELOAD_STARS, (const void *)&preload_stars)) {
+        logline("seed: NOT PATCHED: scene.seed_load stood down -- seeded at the scene only");
         return;
     }
     logline("seed: Seed= hooked, the random sequences seeded as the mission loads");
@@ -2568,61 +2738,55 @@ static void seed_hook(void)
  * so a tick's length -- and with it every position, reload and timer at tick N -- follows
  * the frame rate of that run. Its one call of getGameSpeedModifier, just before the
  * product is formed, comes here: the call is made as before, and the `ms` argument in
- * GameProcess's frame (ebp + 8, which nothing reads before) is set to Step= first. The
- * simulation then advances Step= ms a tick whatever the frame rate: faster or slower than
- * the wall clock, the same on every launch. */
+ * GameProcess's frame (the profile's ebp offset, which nothing reads before) is set to
+ * Step= first. The simulation then advances Step= ms a tick whatever the frame rate:
+ * faster or slower than the wall clock, the same on every launch. */
 typedef float (__cdecl *SpeedFn)(void);
 static int g_step_ms;
 
 static float __cdecl fixed_speed(void)
 {
-    int *frame = *(int **)__builtin_frame_address(0);   /* GameProcess's ebp */
-    frame[2] = g_step_ms;
+    BYTE *frame = *(BYTE **)__builtin_frame_address(0);   /* GameProcess's ebp */
+    *(int *)(frame + SCENE_V_STEP_MS_ARG) = g_step_ms;
     return ((SpeedFn)GAME_SPEED)();
 }
 
 static void step_hook(void)
 {
-    const BYTE *p = (const BYTE *)PROCESS_SPEED;
     char b[96];
     g_step_ms = ini_int("Scene", "Step", 0);
     if (g_step_ms <= 0) return;
-    if (p[0] != 0xE8 || *(const DWORD *)(p + 1) != GAME_SPEED - (PROCESS_SPEED + 5) ||
-        p[5] != 0xDA || p[6] != 0x4D || p[7] != 0x08 ||
-        !patch_dword(PROCESS_SPEED + 1, (DWORD)&fixed_speed - (PROCESS_SPEED + 5))) {
-        logline("step: NOT PATCHED: GameProcess differs -- ticks as long as the frames");
+    /* the product with `ms` (the profile's label) follows the call at once: nothing between
+     * them reads the argument this sets */
+    if (!g_rdy[SCENE_H_STEP] || a2e_addr(SCENE_S_STEP_PRODUCT) != a2e_addr(SCENE_S_SITE_GAME_SPEED) + 5 ||
+        !patch_call(SCENE_S_SITE_GAME_SPEED, (const void *)&fixed_speed)) {
+        logline("step: NOT PATCHED: scene.step stood down -- ticks as long as the frames");
         return;
     }
-    s_cpy(b, "step: Step=", sizeof b); s_num(b, g_step_ms); s_cat(b, " ms a tick, whatever the frame rate");
+    b[0] = 0;
+    s_cat(b, "step: Step="); s_num(b, g_step_ms); s_cat(b, " ms a tick, whatever the frame rate");
     logline(b);
 }
 
 static void race_hook(void)
 {
-    static const BYTE find[8] = { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x53, 0x56 };
-    static const DWORD sites[2] = { DEFAULT_RACE_1, DEFAULT_RACE_2 };
-    int i, k;
+    int i;
 
     GetPrivateProfileStringA("Scene", "Race", "", g_race, sizeof g_race, g_ini);
     if (!g_race[0]) return;
     for (i = 0; g_race[i]; i++)
         if (g_race[i] >= 'A' && g_race[i] <= 'Z') g_race[i] += 'a' - 'A';
-    for (k = 0; k < 8; k++)
-        if (((const BYTE *)RACE_FIND)[k] != find[k]) goto bad;
-    for (i = 0; i < 2; i++) {
-        const BYTE *p = (const BYTE *)sites[i];
-        if (p[0] != 0xE8 || *(const DWORD *)(p + 1) != RACE_FIND - (sites[i] + 5)) goto bad;
+    if (!g_rdy[SCENE_H_RACE] ||
+        !patch_call(SCENE_S_SITE_RACE_1, (const void *)&race_find) ||
+        !patch_call(SCENE_S_SITE_RACE_2, (const void *)&race_find)) {
+        logline("race: NOT PATCHED: scene.race stood down -- the game's own race");
+        return;
     }
-    for (i = 0; i < 2; i++)
-        if (!patch_dword(sites[i] + 1, (DWORD)&race_find - (sites[i] + 5))) goto bad;
     {
         char b[80];
         b[0] = 0; s_cat(b, "race: Race="); s_cat(b, g_race); s_cat(b, ", hooked");
         logline(b);
     }
-    return;
-bad:
-    logline("race: NOT PATCHED: Race::Find or its calls differ -- the game's own race");
 }
 
 /* Captions off. A mission script shows its captions -- the subtitles over an intro
@@ -2660,34 +2824,48 @@ static int __thiscall caption_add(void *overlay, int x, int y, int justify, cons
 
 static void captions_hook(void)
 {
-    static const BYTE add[8] = { 0x55, 0x8B, 0xEC, 0x6A, 0xFF, 0x68, 0x20, 0xFF };
-    static const DWORD sites[2] = { SHOW_TITLE_CALL, SHOW_SUB_CALL };
-    int i, k;
-
     if (ini_int("Scene", "Captions", 1)) return;
-    for (k = 0; k < 8; k++)
-        if (((const BYTE *)OVERLAY_ADD)[k] != add[k]) goto bad;
-    for (i = 0; i < 2; i++) {
-        const BYTE *p = (const BYTE *)sites[i];
-        if (p[0] != 0xE8 || *(const DWORD *)(p + 1) != OVERLAY_ADD - (sites[i] + 5)) goto bad;
+    if (!g_rdy[SCENE_H_CAPTIONS] ||
+        !patch_call(SCENE_S_SITE_SHOW_TITLE, (const void *)&caption_add) ||
+        !patch_call(SCENE_S_SITE_SHOW_SUBTITLE, (const void *)&caption_add)) {
+        logline("captions: NOT PATCHED: scene.captions stood down -- captions as the game has them");
+        return;
     }
-    for (i = 0; i < 2; i++)
-        if (!patch_dword(sites[i] + 1, (DWORD)&caption_add - (sites[i] + 5))) goto bad;
     logline("captions off: ShowTitle and ShowSubtitle add no overlay message");
-    return;
-bad:
-    logline("captions: NOT PATCHED: OverlayText::AddMessage or its calls differ -- captions as the game has them");
+}
+
+/* Every hook's state, asked once before anything is written (a patch changes bytes
+ * another hook's check reads), and logged in two lines. */
+static void ready_all(void)
+{
+    char  b[700];
+    DWORD h;
+    int   pass;
+    for (h = 0; h < SCENE_N_HOOKS; h++) g_rdy[h] = a2e_ready(h);
+    for (pass = 1; pass >= 0; pass--) {
+        b[0] = 0;
+        s_cat(b, pass ? "hooks ready:" : "hooks stood down:");
+        for (h = 0; h < SCENE_N_HOOKS; h++) {
+            const char *id = SCENE_ENGINE.hooks[h].id;
+            if (g_rdy[h] != pass) continue;
+            if (s_len(b) > 640) { s_cat(b, " ..."); break; }
+            s_cat(b, " ");
+            s_cat(b, id + 6);   /* past "scene." */
+        }
+        if (!pass && s_len(b) == 17) s_cat(b, " none");
+        logline(b);
+    }
 }
 
 static void startup(void)
 {
-    char b[200];
-    int  bad;
-
     build_paths();
+    logline("--- Scene.asi");
+    a2e_init(&SCENE_ENGINE, logline);
+    ready_all();
     /* Music has its own switch, outside Enable: a campaign take wants the music off and
      * no scene. */
-    if (!ini_int("Scene", "Music", 1) && music_sigs_ok()) music_off();
+    if (!ini_int("Scene", "Music", 1)) music_off();
     /* So has the race: it is set before the mission loads, whatever the scene. */
     race_hook();
     /* And the seed: the stars are laid out as the mission loads, before any tick. */
@@ -2703,23 +2881,21 @@ static void startup(void)
     logline("--- Scene");
     DeleteFileA(g_cmdpath);   /* a command left from an earlier run is stale */
     DeleteFileA(g_markpath);  /* and so are the marks of one */
+    DeleteFileA(g_objtmp);
 
-    bad = check_sigs();
-    if (bad >= 0) {
-        b[0] = 0;
-        s_cat(b, "NOT PATCHED: bytes at ");
-        s_hex(b, k_sigs[bad].at);
-        s_cat(b, " differ -- not the Armada2.exe this was built for");
-        logline(b);
+    if (!g_rdy[SCENE_H_TICK]) {
+        logline("NOT PATCHED: scene.tick stood down -- no scene, no commands");
         return;
     }
-    if (!patch_dword(HOOK_SITE + 1, (DWORD)&scene_tick - (HOOK_SITE + 5)) ||
-        !patch_call6(MAIN_CAM_CALL, (DWORD)&camera_update) ||
-        !patch_dword(INST_VT_UPDATE, (DWORD)&inst_update)) {
+    if (!patch_call(SCENE_S_SITE_TICK, (const void *)&scene_tick)) {
         logline("NOT PATCHED: VirtualProtect failed");
         return;
     }
-    logline("tick, camera and craft instances hooked");
+    if (g_rdy[SCENE_H_CAMERA] && !patch_call6(a2e_addr(SCENE_S_SITE_MAIN_CAMERA), (DWORD)&camera_update))
+        g_rdy[SCENE_H_CAMERA] = 0;
+    if (g_rdy[SCENE_H_DAMAGE] && !patch_dword(a2e_addr(SCENE_S_SLOT_INST_UPDATE), (DWORD)&inst_update))
+        g_rdy[SCENE_H_DAMAGE] = 0;
+    logline(g_rdy[SCENE_H_CAMERA] ? "tick and camera hooked" : "tick hooked; no free camera, no marks (scene.camera stood down)");
 }
 
 BOOL __stdcall DllMain(HMODULE mod, DWORD reason, void *reserved)

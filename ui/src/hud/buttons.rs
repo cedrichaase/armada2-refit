@@ -72,7 +72,15 @@ pub fn run(ui: &mut Ui) {
     }
     let (cs, gap) = (ui.u(44.0), ui.u(5.0));
     let w = list.len() as f32 * cs + (list.len() - 1) as f32 * gap;
-    let (outer, inner) = super::panels::fit(ui, Anchor::TopRight, w, cs, ui.u(6.0));
+    let (mut outer, mut inner) = super::panels::fit(ui, Anchor::TopRight, w, cs, ui.u(6.0));
+    // The map editor's own menu ("Edit Menu" and its F-key list) is drawn by the game in
+    // the top-right corner on Roots, where these stand: in the editor they stand beside
+    // the resource strip at the top left instead (PLAN-FLEETOPS.md, decision 504).
+    if let Some(strip) = editor_place(ui, outer) {
+        let (dx, dy) = (strip.0 - outer.x, strip.1 - outer.y);
+        outer = crate::gfx::R::new(outer.x + dx, outer.y + dy, outer.w, outer.h);
+        inner = crate::gfx::R::new(inner.x + dx, inner.y + dy, inner.w, inner.h);
+    }
     ui.panel(outer);
     unsafe { BOTTOM = Some((outer.bottom(), crate::rt::now())) };
     for (i, &(which, b)) in list.iter().enumerate() {
@@ -81,4 +89,26 @@ pub fn run(ui: &mut Ui) {
             unsafe { LOGGED = false };
         }
     }
+}
+
+/// Where the panel `outer` stands in the map editor: just right of the resource strip,
+/// at its top, when the strip stands at the top left (Roots); None in a game, or where
+/// the strip is at the top centre (Armada II, whose editor menu is at the top left).
+fn editor_place(ui: &Ui, outer: crate::gfx::R) -> Option<(f32, f32)> {
+    static mut SAID: bool = false;
+    if !crate::engine::api::radar::editor() {
+        return None;
+    }
+    let strip = super::resources::left_strip()?;
+    let x = strip.right() + ui.u(8.0);
+    if x + outer.w > ui.w * 0.6 {
+        return None;
+    }
+    unsafe {
+        if !SAID {
+            SAID = true;
+            crate::log!("buttons: in the map editor, beside the resources at {:.0},{:.0} (the editor's menu keeps the top right)", x, strip.y);
+        }
+    }
+    Some((x, strip.y))
 }

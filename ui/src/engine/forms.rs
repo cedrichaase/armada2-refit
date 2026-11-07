@@ -761,7 +761,17 @@ fn activated(h: HWND) {
                 in_mission = false;
                 crate::log!("forms: #32770 {:p} is the front end's {}: not over the mission that just ended", h, screen);
             }
-            Some([p[0] - ox, p[1] - oy, p[2], p[3]])
+            let (mut ax, mut ay) = (p[0] - ox, p[1] - oy);
+            // A dialog the executable opens at the device window's origin and never
+            // moves (the editor's licence, `LicenseAgreementWindowDlgProc`) would stand
+            // across the design space's top left corner, cut by the frame: one that does
+            // not fit in the design space is centred in it, as a form over an adopted
+            // dialog is above (PLAN-FLEETOPS.md, decision 503).
+            if dw > 0 && dh > 0 && p[2] <= dw && p[3] <= dh && (ax < 0 || ay < 0 || ax + p[2] > dw || ay + p[3] > dh) {
+                crate::log!("forms: #32770 {:p} would stand at {},{} {}x{} across the design space's edge: centred in it", h, ax, ay, p[2], p[3]);
+                (ax, ay) = ((dw - p[2]) / 2, (dh - p[3]) / 2);
+            }
+            Some([ax, ay, p[2], p[3]])
         }
         Some(p) => {
             put(h, p);

@@ -23,10 +23,11 @@ static mut ICON_BOX: (usize, [i32; 4]) = (0, [0; 4]);
 /// The icon's box in the picture: the bounding box of what is lit in the band left of the
 /// question, between the title and the buttons, when it is about as wide as it is tall.
 fn find_icon(bits: *const u8, w: i32, h: i32) -> Option<[i32; 4]> {
-    let (x1, y0, y1) = (w * 22 / 100, h * 17 / 100, h * 78 / 100);
+    // Left of x0 is the form's frame, a thin lit line.
+    let (x0, x1, y0, y1) = (w * 7 / 100, w * 22 / 100, h * 17 / 100, h * 78 / 100);
     let (mut lx, mut ly, mut hx, mut hy) = (i32::MAX, i32::MAX, -1, -1);
     for y in y0..y1 {
-        for x in 0..x1 {
+        for x in x0..x1 {
             let p = unsafe { core::slice::from_raw_parts(bits.add(((y * w + x) * 4) as usize), 3) };
             if p[0].max(p[1]).max(p[2]) > 24 {
                 lx = lx.min(x);
