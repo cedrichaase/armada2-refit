@@ -627,6 +627,55 @@ def s_shot(c, m):
     return f'{p.name}'
 
 
+@step(r'^take (?P<n>\d+) screenshots (?:called|named) ' + Q.format('name') +
+      r',? (?:one )?every (?P<s>[\d.]+) seconds?$')
+def s_shot_burst(c, m):
+    """`Take 12 screenshots called "end" every 0.25 seconds`: a series across a transition
+    (`end-01` ... `end-12`), as fast as the compositor's capture allows when the interval
+    is shorter than a capture, then a contact sheet of them in order (`end-sheet`, the
+    last shot, so a judged `Check that ...` right after it sees the whole series)."""
+    n, every, paths = int(m.group('n')), float(m.group('s')), []
+    t0 = time.time()
+    for i in range(n):
+        paths.append(c.shot(f"{m.group('name')}-{i + 1:02d}"))
+        wait = t0 + (i + 1) * every - time.time()
+        if wait > 0 and i + 1 < n:
+            time.sleep(wait)
+    took = time.time() - t0
+    c.sess.s['shots'] += 1
+    c.sess.save()
+    safe = re.sub(r'[^A-Za-z0-9_.-]+', '-', m.group('name')).strip('-') or 'shot'
+    sheet = c.dir / 'shots' / f"{c.sess.s['shots']:03d}-{safe}-sheet.png"
+    subprocess.run(['magick', 'montage', *map(str, paths), '-tile', '4x', '-geometry', '480x+4+4',
+                    '-background', '#808080', str(sheet)], capture_output=True)
+    if sheet.exists():
+        c.log.shot(sheet, f"{m.group('name')}-sheet")
+        c._series = getattr(c, '_series', {})
+        c._series[m.group('name')] = sheet
+    return f'{n} shots in {took:.1f} s: {paths[0].name} .. {paths[-1].name}' + (f', sheet {sheet.name}' if sheet.exists() else '')
+
+
+@step(r'^check that the series ' + Q.format('name') + r' (?P<what>.+)$')
+def s_check_series(c, m):
+    """`Check that the series "end" shows ...`: the judge reads the contact sheet the last
+    `Take N screenshots called "end" ...` made (the shots in order, left to right and top
+    to bottom), not a fresh shot."""
+    sheet = getattr(c, '_series', {}).get(m.group('name'))
+    if not sheet:
+        return c.checked(None, f'no series "{m.group("name")}" was taken before this step')
+    what = (f'This is a contact sheet of a series of screenshots taken in order, read left to right '
+            f'and top to bottom. The series {m.group("what")}')
+    if c.opts.get('no_claude') or not judge.available():
+        return c.checked_status('review', 'left for a person to judge from the sheet', [sheet],
+                                how='human review (no Claude)')
+    result, meta = judge.judge(what, [(f'the series "{m.group("name")}"', sheet)], c.context(), c.dir)
+    c.log.note('judge', detail=json.dumps(meta, indent=1))
+    if not result:
+        return c.checked_status('review', f'the judge did not answer: {meta}', [sheet], how='Claude vision judge (failed)')
+    status = {'pass': 'pass', 'fail': 'fail'}.get(result['verdict'], 'inconclusive')
+    return c.checked_status(status, result['reason'], [sheet], how=f'Claude vision judge (${meta.get("cost_usd") or 0:.3f})')
+
+
 @step(r'^dump the frame(?: (?:called|named|as) ' + Q.format('name') + r')?$')
 def s_dump(c, m):
     """`Dump the frame called "NAME"`: Render3D.asi's targets and UI.asi's presented
@@ -724,6 +773,95 @@ def s_expect_wm_windows(c, m):
     except ValueError:
         return c.checked(False, 'no answer from the compositor', how='swaymsg get_tree')
     return c.checked(len(views) == want, f"{len(views)}: {'; '.join(views) or 'none'}", how='swaymsg get_tree')
+
+
+@step(r'^watch the window manager$')
+def s_watch_wm(c, m):
+    """`Watch the window manager`: from here on every window event of the session's
+    compositor (sway's `subscribe` to `window`: new, focus, close, floating, urgent, ...) is
+    written to `wm-events.jsonl` in the case's directory, for `Expect the window manager to
+    have seen no other window`, which judges them. A window that comes and goes between two
+    shots (one `Expect the window manager to see one window` would miss it) shows here."""
+    from .session import _die_with_parent
+    old = getattr(c, '_wm_watch', None)
+    if old:
+        old[0].kill()
+    path = c.dir / 'wm-events.jsonl'
+    out = open(path, 'w')
+    sub = subprocess.Popen(['swaymsg', '-s', c.sess.s['env']['SWAYSOCK'], '-m', '-r', '-t', 'subscribe',
+                            '["window"]'], stdout=out, stderr=subprocess.DEVNULL,
+                           preexec_fn=_die_with_parent)
+    c._wm_watch = (sub, out, path, time.time())
+    time.sleep(0.3)
+    c.log.action(f'watching the window manager\'s window events into {path.name}')
+
+
+def _wm_events(path):
+    """The events `swaymsg -m -r subscribe` wrote: one JSON object each, pretty-printed and
+    concatenated, so they are split by a streaming decode, not by line."""
+    text, events, dec, i = path.read_text(), [], json.JSONDecoder(), 0
+    while True:
+        while i < len(text) and text[i].isspace():
+            i += 1
+        if i >= len(text):
+            return events
+        try:
+            ev, i = dec.raw_decode(text, i)
+        except ValueError:
+            return events
+        events.append(ev)
+
+
+@step(r'^expect the window manager to have seen no other window$')
+def s_expect_wm_no_other(c, m):
+    """`Expect the window manager to have seen no other window` (after `Watch the window
+    manager`): fails on any window event since the watch began for a window that is not
+    one of the game's own (a pop-up's `new`, `floating` or `urgent`, a focus or the full
+    screen given to it). The game's own are its normal windows with the game's title:
+    Roots' FleetOpsHook replaces its device window at each switch between the shell and a
+    mission (PLAN-FLEETOPS.md, decision 311), so those come and go and are counted, not
+    failed. Stops the watch."""
+    w = getattr(c, '_wm_watch', None)
+    if not w:
+        return c.checked(None, 'no `Watch the window manager` step ran before this one')
+    sub, out, path, _t = w
+    time.sleep(0.5)
+    sub.kill()
+    out.close()
+    c._wm_watch = None
+    events = _wm_events(path)
+    title = None
+    try:
+        tree = json.loads(c.sess.swaymsg('-t', 'get_tree') or '{}')
+
+        def walk(n):
+            nonlocal title
+            if n.get('type') == 'con' and n.get('window') and not title:
+                title = n.get('name')
+            for k in n.get('nodes', []) + n.get('floating_nodes', []):
+                walk(k)
+        walk(tree)
+    except ValueError:
+        pass
+    props = {}
+    for ev in events:
+        con = ev.get('container') or {}
+        p = props.setdefault(con.get('id'), dict(names=set(), types=set()))
+        if con.get('name'):
+            p['names'].add(con['name'])
+        p['types'].add((con.get('window_properties') or {}).get('window_type') or 'normal')
+    game = {i for i, p in props.items() if p['names'] == {title} and p['types'] == {'normal'}}
+    others = []
+    for ev in events:
+        con = ev.get('container') or {}
+        if con.get('id') not in game:
+            others.append(f"{ev.get('change')} #{con.get('id')} {con.get('name')!r} "
+                          f"{(con.get('rect') or {}).get('width')}x{(con.get('rect') or {}).get('height')} "
+                          f"{(con.get('window_properties') or {}).get('window_type') or ''}".rstrip())
+    swaps = sum(1 for ev in events if ev.get('change') == 'new' and (ev.get('container') or {}).get('id') in game)
+    detail = (f"{len(events)} window events; the game's windows {sorted(game)} ({swaps} new: its device "
+              f"window replaced)" + (f"; others: {'; '.join(others)}" if others else '; no other window'))
+    return c.checked(not others, detail, how=f'swaymsg subscribe window -> {path.name}')
 
 
 @step(r'^expect the game (?:to have |has )?(?:exited|quit|closed)$')

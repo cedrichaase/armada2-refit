@@ -1103,7 +1103,11 @@ a host of their own, `engine/forms.rs` (drawn by `menus/roots.rs`):
   on Wine under XWayland its pop-up still covers the screen in black, and a layered window
   at alpha 1 does the same (the probe of step 0): the form is moved far off screen, its size
   kept, and moved again whenever it comes back. It keeps the activation, the keyboard focus
-  and its modal loop.
+  and its modal loop. It is off screen from the moment it is shown, not from its
+  activation: the game thread's sent messages are watched (`WH_CALLWNDPROC`), a window the
+  forms may take is subclassed while still hidden, and the `WM_WINDOWPOSCHANGING` that
+  shows it is moved off screen, so Wine never maps it and the window manager never sees
+  it (PLAN-FLEETOPS.md, decision 310). The same holds for the dialogs the forms adopt.
 - **Drawn from a timer.** While a form is modal the engine draws nothing. A thread timer of
   the UI's (16 ms) is dispatched by the form's own loop; each tick runs the actions the last
   frame queued, reads the form, prints it into a memory DC every 0.1 s (`WM_PRINT`, the
