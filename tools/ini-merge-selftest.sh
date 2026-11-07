@@ -83,4 +83,18 @@ ui() {  # name, shipped Generic, installed Generic, wanted Generic
 ui "ui: Roots default moved, old default updated" widgets mirror widgets
 ui "ui: the player's own value kept" widgets off off
 ui "ui: Armada II, mirror stays" mirror mirror mirror
+# UI.ini on Roots: [HUD] Messages moved 0 -> 1 in ui/defaults/fo-roots.ini (decision 324). With
+# A2_PROFILE=fo-roots an install still at 0 follows; on Armada II (shipped 1 already) a 0 is the
+# player's and stays.
+msg() {  # name, profile, installed Messages, wanted Messages
+    printf '[HUD]\nEnable=1\nMessages=1\nPause=1\n' > "$t/uiship.ini"
+    printf '[HUD]\nEnable=1\nMessages=%s\n' "$3" > "$t/ui.ini"
+    A2_PROFILE="$2" python3 "$here/ini-merge.py" "$t/uiship.ini" "$t/ui.ini" >/dev/null
+    n=$((n+1))
+    if grep -qx "Messages=$4" "$t/ui.ini" && grep -qx 'Pause=1' "$t/ui.ini"; then echo "ok   $1"
+    else echo "FAIL $1"; cat "$t/ui.ini"; bad=$((bad+1)); fi
+}
+msg "ui: Roots Messages 0 -> 1" fo-roots 0 1
+msg "ui: Roots Messages already 1" fo-roots 1 1
+msg "ui: Armada II, a 0 stays" armada2 0 0
 echo "$n cases, $bad failed"; [ "$bad" = 0 ]

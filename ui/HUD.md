@@ -174,7 +174,13 @@ string and its resource tooltips with a token, so the pause box has words of its
 resource's name comes from the content set when the tooltip is not a word. **Button sounds
 are off** (`panels_sound_ours` = 0): every `operator new` and constructor call at the stock
 sound sites is FleetOpsHook's FMOD, of a size not measured, and the HUD part does not
-require the sound hook. The message, objectives, replay, overlay-text and fade panels stay
+require the sound hook. **The message box and the briefing and objectives are ours on Roots
+too** (`Messages=1` in Roots' defaults since PLAN-FLEETOPS.md decision 322): Roots lays the
+engine's box out on its 16:9 canvas, so on a wider screen it was stretched, and ours is laid
+out in the UI's units. The tutorial's script raises the briefing by itself
+(`fo-ui-briefing-ours`). On Roots the objectives key (`objectives_toggle`, Alt+O) also closes
+the box, so `popups::objectives_keys` leaves the pass on which the box opened alone, as stock's
+owner choice does ("Messages and objectives"). The replay, overlay-text and fade panels stay
 Roots' until a scenario can raise them.
 
 ## The references the stock HUD is drawn against
@@ -1074,7 +1080,11 @@ its focus-step (`FocusSimulate`) when either of two command flags is set (pointe
 tutorial's lessons advance on the same key). A component that never owns the mouse
 never gets its focus-step, so with the box ours `popups::objectives_keys` calls
 `ObjectivesDisplay::FocusSimulate` itself at each simulate pass while the box shows
-(the presses' hook): the box closes on the engine's own bindings, as in stock.
+(the presses' hook): the box closes on the engine's own bindings, as in stock. It skips the
+pass on which the box opened, since stock's box becomes the owner only at the next
+`RefreshOwner`: on Roots the objectives key is also a closing command, and run on that pass
+the step closed the box the key had just opened (Alt+O opened the engine's box and never
+ours, on the bench).
 Measured on the bench: a first version that pressed OK on Enter itself and kept the
 key from the engine left the Starfleet Academy tutorial's lessons stuck and its
 zoom unanswered; closed by its own step, the tutorial runs as with the stock box. Its
@@ -1101,7 +1111,7 @@ bar, resources, top-right buttons, chat lines, tooltips) stands aside and claims
 so the engine's box owns the pointer as in stock. UI.log says `hud: under the engine's
 box` and `the engine's box closed`. Stock's HUD sits under the box rather than going;
 ours goes whole, because the UI's frame cannot be put between two of the engine's
-components. With `Messages=1` (Armada II's shipped value) the boxes are ours and nothing
+components. With `Messages=1` (Armada II's shipped value, and Roots' since decision 322) the boxes are ours and nothing
 changes. `testbench/scenarios/fo-ui-briefing.md`.
 
 ### Pause and replay (`PauseBox`, `ReplayPanel`)

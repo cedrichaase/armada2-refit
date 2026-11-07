@@ -145,7 +145,7 @@ pub mod palette {
 
 pub mod popups {
     pub use crate::engine::popups::{
-        functions_stock, message, message_box, objectives, objectives_box, objectives_keys, objectives_shown,
+        functions_stock, game_paused, message, message_box, objectives, objectives_box, objectives_keys, objectives_shown,
         pause_box, pause_button, pause_shown, replay_box, replay_button, replay_shown, Objectives, REPLAY_NAMES,
     };
 }

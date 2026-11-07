@@ -11,7 +11,8 @@ Render3D.ini; without it only blank lines are skipped.
 Retired defaults (RETIRED below), keyed by the installed file's name: a key whose meaning
 changed has its old default replaced by the shipped value, wherever it still holds it.
 Unlike `Defaults=` this needs no number in the file, so it serves files that never had one
-(Render3D.ini).
+(Render3D.ini). RETIRED_BY_GAME does the same for one game alone, chosen by A2_PROFILE (set by
+ui/install.sh), for a default that moved in that game's ui/defaults/<game>.ini only.
 
 One exception, when the shipped defaults themselves change: a `Defaults=` key numbers
 them, in whichever section of the shipped file has it (`[UI]` in UI.ini, `[Display8]`
@@ -26,6 +27,7 @@ and `d3d9` from Backend and carries a marked dxvk.conf's sampler keys into [Samp
 The release scripts do the same in awk (publish/installer/install.sh) and PowerShell
 (install.ps1). All three must write the same bytes on tools/ini-merge-fixtures/:
 publish/installer/equiv-ini.sh checks it (publish/installer/README.md, "Equivalence")."""
+import os
 import re
 import sys
 
@@ -147,6 +149,20 @@ RETIRED = {
     },
 }
 
+# Retired defaults of one game's defaults file (ui/defaults/<game>.ini), applied only when
+# A2_PROFILE names that game (ui/install.sh runs under it). A key whose shipped value moved
+# on that game alone, where the other game ships the new value already: there an old value
+# in the installed file is a player's own, and stays. Roots' [HUD] Messages went from 0 to 1
+# (PLAN-FLEETOPS.md, decision 324): an install made before holds 0, which the player never
+# set (the Refit screen writes RefitPlayer.ini, never UI.ini).
+RETIRED_BY_GAME = {
+    'fo-roots': {
+        'ui.ini': {
+            ('hud', 'messages'): '0',
+        },
+    },
+}
+
 KEY = re.compile(r'^\s*(\w+)\s*=\s*(.*?)\s*$')
 SEC = re.compile(r'^\s*\[([^\]]+)\]')
 
@@ -225,7 +241,8 @@ if (dsec, 'defaults') in have_vals and have_n < ship_n:
 
 # Retired defaults: the shipped value replaces the old default, under the key as the player
 # spells it.
-retired = RETIRED.get(label.lower(), {})
+retired = dict(RETIRED.get(label.lower(), {}))
+retired.update(RETIRED_BY_GAME.get(os.environ.get('A2_PROFILE', ''), {}).get(label.lower(), {}))
 if retired:
     cur = None
     for i, l in enumerate(lines):
