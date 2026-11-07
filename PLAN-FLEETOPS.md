@@ -2109,6 +2109,25 @@ it), a game's password, the map transfer, Tunngle's wait and GameSpy's screens.
 | 605 | **Not redrawn here, ranked**: the editor's Load Map and Save Map dialog (a window of its own: not owned by the device window, so the forms neither adopt nor hide it, and the window manager sees it); the Credits (`ui.shell.screens` stands down on Roots: `DispatchDialog`, `Show_Credits` and `SetCurrentBackground` are FleetOpsHook's at run time); the Technology Tree, a game's password and the map transfer (unreached; Armada II's specs would serve once their procedures are measured); Tunngle's wait and GameSpy's screens (dead services) | each needs a mechanism or a measurement this branch did not have | the user's priorities |
 | 606 | **Armada II's lobby, Help and game's name are unchanged by the shared layouts**: `ui-menus-lobby` (new, one game, *Internet - Manual IP* hosting an empty lobby, Help, Create Game) gives the same shots on this branch (`20261107-201108`, passes) and on `fo-b` before it (`20261107-201323`): 90, 14 and 28 pixels differ of 921,600 (fuzz 2%, the backdrop's motion). The reference run failed at its last step, Cancel on the game's name not taken, a click this branch's run took | the refactor of decisions 600 and 601 touches Armada II's specs; the lobby needs no second game to be reached | — |
 
+### The Credits on Roots (branch `fo-menus-credits`; decisions 607–609)
+
+Backlog item 2 of "The leftover menus". The main menu's Credits ran the engine's own screen on
+Roots (black, four logos, Roots' `Credits.txt`), because `ui.shell.screens` stood down: four of its
+functions are changed by FleetOpsHook at run time.
+
+| # | Decision | Why | What would change it |
+|---|---|---|---|
+| 607 | **`ui.shell.screens` is verified on Roots 5.0Z11, read only, and the black background split off into `ui.shell.background`**, which stands down there. What FleetOpsHook changes, from its patch table: `DispatchDialog`'s entry (a detour) and its calls at +0x90 and +0xa9, not the call of `Show_Credits` at +0x514 that the UI replaces (checked to call it before it is patched); two calls inside `Show_Credits`, which the UI never runs; `SetActiveDisplay`'s calls at +0x3b and +0x11c, which the UI goes through exactly as Roots' own Credits do; `SetCurrentBackground`, jump-replaced by FleetOpsHook's, which takes a bitmap object of its own: handing it the stock `ShellBitmap` the UI makes is not safe, so the UI leaves the background as it is on Roots | the change is a call site in stock code, and every function the Credits of ours call is called as Roots' Credits call it; nothing of FleetOpsHook's is written | a FleetOpsHook that patches the call at +0x514 (the patch's check then refuses) |
+| 608 | **The `fleetops` set names Roots' own `Credits.txt` and `textures\logos.tga`** (read at run time, never copied) **and a tour of its map's five views** (`main`, `federation`, `dominion`, `species8472`, `freeborg`) | the same files Roots' engine Credits read; the views are render3d's map, not Roots' art | the user's or the Roots developer's wish for `Fleet Ops Credits.txt` |
+| 609 | **`[Menus] Credits` stays 0 in Roots' defaults**, as `Forms` does (decision 149): the player turns it on | every front-end part of ours on Roots ships off until seen in game | the user's sign-off |
+
+Bench: `fo-ui-credits` `20261107-202222` (1280x960) and `20261107-203219` (3440x1440) pass: Roots'
+32 pages over the map's tour with the logos, Esc back to Roots' main menu of ours. Armada II:
+`ui-widgets` (the demo in the Credits' place, through the same screen and its black background)
+left its screen as before (`demo screen left (0)`); its two runs failed on other steps (typed text,
+a drop-down), where `fo-b`'s own run passed, in the demo's widgets, which this branch does not touch.
+Sheets: `$A2_DATA/review/fo-menu-audit/sheet-credits-*.png`.
+
 ## Open decisions
 
 Decided by the user, 2026-11-06:
