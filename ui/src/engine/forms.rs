@@ -16,7 +16,8 @@
 //!   the game thread, only while the form is modal and not being destroyed, and keeps
 //!   nothing but plain copies (decision 143);
 //! - **hides the form** by moving it off screen (an empty region alone leaves a black
-//!   rectangle on Wine under XWayland: decision 170);
+//!   rectangle on Wine under XWayland: decision 170), from the moment it is shown, so the
+//!   window manager never sees it (decision 310);
 //! - **draws** from a thread timer of its own, which the form's modal loop dispatches like
 //!   any message: a whole frame of ours on the engine's device (decision 144);
 //! - **acts** only by posting what a player's mouse would (a left press and release at a
@@ -63,6 +64,11 @@ const TAKEN: &[&str] = &[
 ];
 
 const WH_CBT: i32 = 5;
+const WH_CALLWNDPROC: i32 = 4;
+const WM_WINDOWPOSCHANGING: u32 = 0x46;
+const SWP_SHOWWINDOW_: u32 = 0x40;
+const SWP_NOMOVE_: u32 = 0x2;
+const SWP_NOSIZE_: u32 = 0x1;
 const HCBT_DESTROYWND: i32 = 4;
 const HCBT_ACTIVATE: i32 = 5;
 const WM_LBUTTONDOWN: u32 = 0x201;
@@ -458,12 +464,179 @@ pub fn install(mode: u8) -> bool {
         CBT = h;
         MODE = if h.is_null() { 0 } else { mode };
     }
+    // Shown off screen from the start (decision 310): a window a form or a dialog of ours
+    // would show is moved off before it is first mapped, not after it activated.
+    if !h.is_null() && mode == 1 {
+        let s = unsafe { SetWindowsHookExA(WH_CALLWNDPROC, call_wnd, core::ptr::null_mut(), tid) };
+        unsafe { SHOW_HOOK = s };
+        crate::log!(
+            "forms: the windows of ours are shown off screen from the start (window-procedure hook {})",
+            if s.is_null() { "refused: they show until they activate" } else { "on" }
+        );
+    }
     if !h.is_null() {
         // FleetOpsHook's dialogs drawn by the UI (decision 230), or framed windows when
         // the executable's paint imports cannot be ours (decision 200).
         crate::engine::fodialogs::install(tid);
     }
     !h.is_null()
+}
+
+static mut SHOW_HOOK: HANDLE = core::ptr::null_mut();
+/// Where a window shown off screen by `call_wnd` would have stood (screen coordinates),
+/// for `activated` to place it from.
+static mut WOULD: Vec<(HWND, WinRect)> = Vec::new();
+
+/// `WINDOWPOS` (user32's).
+#[repr(C)]
+struct WindowPos {
+    hwnd: HWND,
+    after: HWND,
+    x: i32,
+    y: i32,
+    cx: i32,
+    cy: i32,
+    flags: u32,
+}
+
+/// `CWPSTRUCT` (user32's).
+#[repr(C)]
+struct CwpStruct {
+    lp: isize,
+    wp: usize,
+    msg: u32,
+    hwnd: HWND,
+}
+
+/// Windows `call_wnd` subclassed: the window and the procedure before ours.
+static mut SUBCLASSED: Vec<(HWND, isize)> = Vec::new();
+const WM_NCDESTROY: u32 = 0x82;
+
+/// Decision 310: a window the forms would take (a form of `TAKEN` whose object is the
+/// modal form, a `#32770` over the device window while the dialogs are adopted) is moved
+/// off screen in the `WM_WINDOWPOSCHANGING` that shows it, before Wine maps it: hidden
+/// only once it activated (decision 170), it stood on the screen for a moment as a window
+/// of its own, which the window manager managed (a floating dialog that took the focus and
+/// the full screen from the game). A thread `WH_CALLWNDPROC` hook sees each window of the
+/// game's thread a message is sent to while it is still hidden and subclasses the ones the
+/// forms may take (a VCL form once the VCL put its own procedure in, so that it is ours the
+/// VCL chains to, not the other way round); `show_proc` then moves the window. The hook's
+/// own copy of the message cannot change it (under Proton's WoW64 it is a copy: the first
+/// take, which rewrote it, changed nothing). The position it was given is kept for
+/// `activated`.
+unsafe extern "system" fn call_wnd(code: i32, wp: usize, lp: isize) -> isize {
+    if code == 0 && lp != 0 {
+        let h = unsafe { (*(lp as *const CwpStruct)).hwnd };
+        if !h.is_null() && unsafe { IsWindowVisible(h) } == 0 {
+            let done = unsafe { &mut *core::ptr::addr_of_mut!(SUBCLASSED) };
+            if !done.iter().any(|e| e.0 == h) && may_take(h) {
+                let old = unsafe { SetWindowLongA(h, GWL_WNDPROC, show_proc as *const () as usize as isize) };
+                if old != 0 {
+                    done.retain(|e| unsafe { IsWindow(e.0) } != 0);
+                    done.push((h, old));
+                }
+            }
+        }
+    }
+    unsafe { CallNextHookEx(SHOW_HOOK, code, wp, lp) }
+}
+
+/// Whether `h` is a window the forms may take when it is shown, and its procedure is
+/// settled: a `#32770` over the device window, or a form of `TAKEN` whose window procedure
+/// is no longer the VCL's creation procedure (which lies in FleetOpsHook's image and puts
+/// the form's own procedure in at the first message).
+fn may_take(h: HWND) -> bool {
+    let class = class_of(h);
+    if class == "#32770" {
+        return crate::engine::fodialogs::ready() && !device_of(h).is_null();
+    }
+    TAKEN.contains(&class.as_str()) && !in_fo(unsafe { GetWindowLongA(h, GWL_WNDPROC) } as usize)
+}
+
+unsafe extern "system" fn show_proc(h: HWND, msg: u32, wp: usize, lp: isize) -> isize {
+    let done = unsafe { &mut *core::ptr::addr_of_mut!(SUBCLASSED) };
+    let Some(&(_, old)) = done.iter().find(|e| e.0 == h) else { return 0 };
+    if msg == WM_WINDOWPOSCHANGING && lp != 0 {
+        let pos = unsafe { &mut *(lp as *mut WindowPos) };
+        if pos.flags & SWP_SHOWWINDOW_ != 0 && takes_at_show(h) {
+            let mut r = WinRect::default();
+            unsafe { GetWindowRect(h, &mut r) };
+            let (w, ht) = (r.right - r.left, r.bottom - r.top);
+            if pos.flags & SWP_NOMOVE_ == 0 {
+                (r.left, r.top) = (pos.x, pos.y);
+            }
+            let (w, ht) = if pos.flags & SWP_NOSIZE_ == 0 { (pos.cx, pos.cy) } else { (w, ht) };
+            (r.right, r.bottom) = (r.left + w, r.top + ht);
+            let would = unsafe { &mut *core::ptr::addr_of_mut!(WOULD) };
+            would.retain(|e| e.0 != h && unsafe { IsWindow(e.0) } != 0);
+            would.push((h, r));
+            pos.x = OFF;
+            pos.y = OFF;
+            pos.flags &= !SWP_NOMOVE_;
+            crate::log!("forms: {} {:p} shown off screen (it was to stand at {},{} {}x{})", class_of(h), h, r.left, r.top, w, ht);
+            // The next tick puts back one that did not activate (`restore_unactivated`).
+            unsafe {
+                if TIMER == 0 {
+                    TIMER = SetTimer(core::ptr::null_mut(), 0, 16, tick);
+                }
+            }
+        }
+    }
+    if msg == WM_NCDESTROY {
+        unsafe { SetWindowLongA(h, GWL_WNDPROC, old) };
+        done.retain(|e| e.0 != h);
+    }
+    unsafe { CallWindowProcA(old, h, msg, wp, lp) }
+}
+
+/// Whether `activated` will take `h` off screen: a dialog it adopts, or a form whose
+/// object the pump will find and read (the checks of `object_of` and `live`, quietly).
+fn takes_at_show(h: HWND) -> bool {
+    let class = class_of(h);
+    if class == "#32770" {
+        return crate::engine::fodialogs::ready() && !device_of(h).is_null();
+    }
+    if !TAKEN.contains(&class.as_str()) {
+        return false;
+    }
+    unsafe {
+        FOUND = 0;
+        EnumPropsExA(h, prop, 0);
+    }
+    let obj = unsafe { FOUND };
+    if obj == 0 || !ptr_ok(obj, field::FORMS_FORM_STATE() + 4) {
+        return false;
+    }
+    let vmt = rd::<usize>(obj);
+    class_name(vmt).as_deref() == Some(class.as_str())
+        && derives(vmt, "TCustomForm")
+        && rd::<u8>(obj + field::FORMS_FORM_STATE()) & FS_MODAL != 0
+        && rd::<u8>(obj + field::FORMS_COMP_STATE()) & CS_DESTROYING == 0
+}
+
+/// Where `h` stands, or where it would have stood when `call_wnd` showed it off screen
+/// (taken: asked once, at its activation).
+fn placed_rect(h: HWND) -> WinRect {
+    let would = unsafe { &mut *core::ptr::addr_of_mut!(WOULD) };
+    if let Some(i) = would.iter().position(|e| e.0 == h) {
+        return would.remove(i).1;
+    }
+    let mut r = WinRect::default();
+    unsafe { GetWindowRect(h, &mut r) };
+    r
+}
+
+/// A window `call_wnd` showed off screen that did not then activate (so `activated` never
+/// took it) is put back where it was to stand: only what the forms take stays off.
+fn restore_unactivated() {
+    let would = unsafe { &mut *core::ptr::addr_of_mut!(WOULD) };
+    for (h, r) in core::mem::take(would) {
+        if unsafe { IsWindow(h) } == 0 || tracked().iter().any(|t| t.hwnd == h) {
+            continue;
+        }
+        crate::log!("forms: {} {:p} was shown off screen but did not activate: put back at {},{}", class_of(h), h, r.left, r.top);
+        unsafe { SetWindowPos(h, core::ptr::null_mut(), r.left, r.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE) };
+    }
 }
 
 fn class_of(h: HWND) -> String {
@@ -508,10 +681,9 @@ fn activated(h: HWND) {
     // Where it sits, before it is moved: relative to the device window's client area, the
     // design space's origin (Roots places its full-screen forms there).
     let owner = unsafe { GetWindow(h, GW_OWNER) };
-    let mut r = WinRect::default();
+    let r = placed_rect(h);
     let mut o = Point::default();
     unsafe {
-        GetWindowRect(h, &mut r);
         ClientToScreen(device_window(owner), &mut o);
     }
     // A form centred on one of ours (a Yes/No over Options) sits where that one is drawn,
@@ -535,7 +707,7 @@ fn activated(h: HWND) {
     }
     let first = !tracked().iter().any(ours);
     let in_mission = crate::engine::api::ingame::recent();
-    let framed = if dialog { frame_dialog(h) } else { None };
+    let framed = if dialog { placement(h, r) } else { None };
     // Adopted (decision 230): cut and placed as above, then off screen, drawn by the UI.
     let adopted = match framed {
         Some(p) if crate::engine::fodialogs::ready() => {
@@ -552,6 +724,10 @@ fn activated(h: HWND) {
                 h, dr.left, dr.top, dr.right - dr.left, dr.bottom - dr.top, unsafe { GetActiveWindow() }, unsafe { GetFocus() }
             );
             Some([p[0] - ox, p[1] - oy, p[2], p[3]])
+        }
+        Some(p) => {
+            put(h, p);
+            None
         }
         _ => None,
     };
@@ -1066,6 +1242,7 @@ fn log_changes(t: &Tracked, now: &[Control]) {
 unsafe extern "system" fn tick(_h: HWND, _m: u32, _id: usize, _t: u32) {
     unsafe { TICKS += 1 };
     let now = crate::rt::now();
+    restore_unactivated();
     let v = tracked();
     v.retain(|t| unsafe { IsWindow(t.hwnd) } != 0);
     if !v.iter().any(ours) {
@@ -1218,8 +1395,16 @@ fn publish(v: &[Tracked], live: Option<usize>) {
 /// frame is drawn over it: nothing drawn on it through GDI is ours to show then
 /// (`fodialogs`, the shell background; decision 300).
 pub fn covers(w: HWND) -> bool {
+    if w.is_null() || class_of(w) != "TMainWindowForm" {
+        return false;
+    }
+    // Decision 312: also while a dialog the forms will take is being made over this window
+    // and is not yet adopted (the forms' frame is not up between the in-mission menu's end
+    // and Single Player's adoption, and FleetOpsHook draws Single Player's background onto
+    // the window in that time, which stood on the screen until our next frame).
     let hosting = unsafe { HOSTING };
-    hosting && !w.is_null() && class_of(w) == "TMainWindowForm"
+    let pending = unsafe { &*core::ptr::addr_of!(SUBCLASSED) };
+    hosting || pending.iter().any(|&(h, _)| unsafe { IsWindow(h) } != 0 && class_of(h) == "#32770" && device_of(h) == w)
 }
 
 /// The device window a window is owned by (through its owners), or null.
@@ -1246,12 +1431,15 @@ fn client_size(h: HWND) -> (i32, i32) {
 
 /// A window's rectangle in its device window's client coordinates.
 fn on_device(h: HWND, d: HWND) -> [i32; 4] {
-    let mut o = Point::default();
     let mut r = WinRect::default();
-    unsafe {
-        ClientToScreen(d, &mut o);
-        GetWindowRect(h, &mut r);
-    }
+    unsafe { GetWindowRect(h, &mut r) };
+    rect_on_device(r, d)
+}
+
+/// A rectangle in screen coordinates, in the device window's client coordinates.
+fn rect_on_device(r: WinRect, d: HWND) -> [i32; 4] {
+    let mut o = Point::default();
+    unsafe { ClientToScreen(d, &mut o) };
     [r.left - o.x, r.top - o.y, r.right - r.left, r.bottom - r.top]
 }
 
@@ -1261,13 +1449,13 @@ fn on_device(h: HWND, d: HWND) -> [i32; 4] {
 /// such a dialog is cut to the design size and centred. A smaller one stays where the
 /// shell put it, unless that is off the client area (its owner a form of ours, moved off
 /// screen): then it is centred. None: not over the device window, left alone.
-fn placement(h: HWND) -> Option<[i32; 4]> {
+fn placement(h: HWND, r: WinRect) -> Option<[i32; 4]> {
     let d = device_of(h);
     if d.is_null() {
         return None;
     }
     let (cw, ch) = client_size(h);
-    let [x, y, w, ht] = on_device(h, d);
+    let [x, y, w, ht] = rect_on_device(r, d);
     let (dw, dh) = design();
     if dw > 0 && dh > 0 && w >= dw && ht >= dh {
         return Some([((cw - dw) / 2).max(0), ((ch - dh) / 2).max(0), dw, dh]);
@@ -1277,13 +1465,6 @@ fn placement(h: HWND) -> Option<[i32; 4]> {
     } else {
         Some([((cw - w) / 2).max(0), ((ch - ht) / 2).max(0), w, ht])
     }
-}
-
-/// Puts a dialog where `placement` says; its place.
-fn frame_dialog(h: HWND) -> Option<[i32; 4]> {
-    let p = placement(h)?;
-    put(h, p);
-    Some(p)
 }
 
 fn put(h: HWND, p: [i32; 4]) {

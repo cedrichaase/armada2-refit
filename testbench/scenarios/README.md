@@ -71,6 +71,7 @@ each phase has got. Without headings it makes one phase per screenshot.
 | `Type this machine's address` | the source address of the default route: what the game shows as "Local IP Address", and where every player of a case is |
 | `Type what follows "TEXT" in "LOG" of PLAYER` | the word after TEXT on the last line of that player's log that has it (`of PLAYER` left out: this game's), waiting up to 30 s for it: how a joiner types the host's join code |
 | `Take a screenshot called "NAME"` | kept in the report; same-named shots are compared across resolutions |
+| `Take 16 screenshots called "NAME" every 0.25 seconds` | a series across a transition (`NAME-01` ...) and its contact sheet; `Check that the series "NAME" shows ...` gives the sheet to the judge |
 | `Dump the frame called "NAME"` | Render3D.asi's targets (PFM) and UI.asi's presented frame (PPM), read back inside the game, into `dumps/NAME/` with PNG previews (`../README.md`, "Frame dumps"); fails when no plugin dumped |
 | `Overlay Render3D.Modules:hulls=0 UI.HUD:Minimap=0` / `Overlay --unset Render3D.Modules:hulls` | `a2test drive overlay` as a step: writes `RefitPlayer.ini` in the running game (`tools/settings/overlay.py`), then waits up to 5 s for UI.asi's `settings: RefitPlayer.ini changed` in `UI.log`; fails without it. It is an action, so a log wait or `Expect` after it sees only lines written since. The `Overlay:` header does the same before launch |
 | `Note "TEXT"` | a line in the log |
@@ -143,6 +144,7 @@ audio reached the real output before the bench's guard stopped it (run
 | `Expect the game is still running` / `Expect the game to have exited` | process table |
 | `Expect no crash` | `exception.txt` untouched |
 | `Expect the window manager to see one window` (or `N windows`) | the compositor's managed windows (`swaymsg -t get_tree`): a dialog the game shows as a window of its own counts; one wholly off screen is not mapped and does not |
+| `Watch the window manager`, later `Expect the window manager to have seen no other window` (or `… another window`, its opposite, for a reference run) | sway's window events between the two (`wm-events.jsonl`): any event for a window that is not one of the game's fails, a window that came and went between two shots too; the game's own normal windows with its title count (Roots replaces its device window at each switch between shell and mission, PLAN-FLEETOPS.md decision 311) |
 | `Expect the engine to draw nothing in "NAME"` | no `Draw*` call from `Armada2.exe` in that display context (`Display8.inventory.tsv`, rewritten every two seconds); lists the call sites when there are some |
 | `Expect "Menus.log" contains "TEXT"` / `… not contain …` | any log beside `Armada2.exe`, or one of the bench's |
 | `Check that the screenshot is not stretched compared with 4:3` | template match of the reference shot over horizontal scales; vertical fixed at H/H_ref |
