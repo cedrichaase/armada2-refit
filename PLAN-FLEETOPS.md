@@ -1523,6 +1523,45 @@ in the GUI installer, the release packages and manifest, `PLAYING.md` or the rel
 until the user says otherwise. `tools/layers.py --check` and `publish/package.sh` enforce it
 (`games/README.md`, "Not offered, not released").
 
+### FO-B: Roots' asteroid sets, the `alpha` sprite material
+
+Branch `fo-asteroids`, 2026-11-07. The user's report (Roots 5.0Z11, 3440x1440, fo-b
+8084a885): in the first allied tutorial (*TUTORIAL: Gameplay*, `tutorialgameplay.bzn`)
+the ice asteroid field across the lower half of the opening view looked washed out and
+see-through, the brown field at the top right solid. Roots' asteroid sets
+(`map_asteroidset*`, `map_iceasteroidset*`, the `*bg` sets) are `latinum` nebulae (their
+ODFs' `classlabel`) whose SODs hold only sprite nodes: six to eight sheets of rocks
+(`isfield*`/`asfield*`, 1024-pixel DXT5 `map_*astroid_field*.dds` under `@tmaterial=alpha`,
+`(150,150)` billboards, each node turning on a 40 s channel) and as many quads of dust
+(`isdust*`, additive 24-bit TGA; the brown sets' dust, `map_astroid_dust*`, and the
+biomass nebula's puffs, `map_nebula_biomass*`, are `alpha` too, and change with it). render3d's particles
+module draws them (its nebula puffs) and took every material it did not know, `alpha`
+among them, as `alphathreshold`: cut out at alpha one half. The ice sheets' alpha is soft
+(9.5% of texels above 0, 2.3% above one half), so only the highlights of each rock were
+left over the haze; the brown sheets' alpha is a hard mask (9.8% and 8.2%), so they kept
+their shape. The engine makes `alpha` and `alpha_nof` blended by alpha (source alpha,
+inverse source alpha) with no alpha test, like `translucent` without its opacity factor
+(`ST3D_GraphicsEngine::Initialize`, which makes the texture materials by name; stock
+Armada II has the same two materials and its sprite tables never name them).
+
+| # | Default | Why | What would change it |
+|---|---|---|---|
+| 350 | A sprite of the **`alpha` or `alpha_nof` material is blended by its alpha** (the particles module's `Material::Alpha`, the `translucent` pipeline), never cut out | it is how the engine makes those materials; a cut-out kept the ice rocks' highlights only | none expected |
+| 351 | **`alpha` is sampled from the texture's top level only** (as `add_nomipf`), not through render3d's box-filtered chain | blended through the chain the ice rocks stayed faint beside the engine's own draw at the same view: the share of bright pixels (grey over 60%) in a 400x250 patch of the field was 0.93% cut out, 0.88% blended through the chain, 1.59% blended from the top level, 2.47% for the engine's puffs (passthrough); the engine's rocks are crisp, as a texture without levels draws; the DDS files' own levels (brighter than our box filter, 12.2 against 7.7 mean at 128 pixels) are not read (`a2fmt::dds` decodes the base level) | shimmer of the rocks while zooming, in the user's look; reading the DDS files' own chains |
+| 352 | The **remaining difference is left open**: the engine's field shows more rocks and another layout than ours at the same view (the mean of the patch 43.6 against 37.2), and its sheets turn on screen with their nodes' 40 s channels while ours stay upright billboards placed at the nodes | the user's report was the see-through look; how the engine turns a billboard sprite node (by its node's axes on screen, with or without a mirror) was tried on the bench (three variants against the engine's draw, none lined up with it at the same moment, the channel's phase being unknown) and not settled | the user's verdict on the shots; a measurement of the engine's sprite-node quads (Display8's `DRAW` capture saw none of the 3D sprite draws in render3d's frame) |
+
+Bench (Roots, Display8 on Vulkan with the validation layer, Render3D and UI, 1280x960),
+`fo-render3d-asteroids`: before the fix `20261107-110052` (the field cut out; then the
+particles module off, the engine's puffs through passthrough; then every module off),
+after `20261107-113908` (PASS, the judged shot left for review; no VUID, no device
+removed); the experiments (a blended draw through the chain, from the top level, three
+ways of turning the sheets) in session `20261107-111755-21109`.
+Armada II (`--install .`, run `20261107-114450`): `render3d-live-world` and
+`render3d-live-particles` keep their frame equal through every live switch, and every
+shot sits at RMSE 0.002/255 from its `roundD-base-port-*` baseline (max 2/255, no pixel
+over 2/255), the same with the particles or world module off, where nothing of this
+change runs: a drift of the baselines, not of this change (no stock sprite is `alpha`).
+
 ## FO-7: QOL on Roots
 
 Round one (branch `fo-7`, 2026-11-06): the right-drag pan speed runs on Roots, every other

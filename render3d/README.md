@@ -2188,13 +2188,26 @@ vents (the look settled with the user, and the settings keep its keys, in
 - **Nebula puffs.** `object()` takes nebulae (vtable 0x6b148c) and latinum nebulae
   (0x6b132c, drawn by the plain `GameObject::Render`, which is why the module is
   registered before hulls) whose class has no volume recipe (`Nebulae\<odf>.ini` while
-  the world module or `Nebulae.asi` runs): their SODs' sprite nodes as additive
-  billboards (half extents) or, for `lightning#`, quads of the full size in the node's
+  the world module or `Nebulae.asi` runs): their SODs' sprite nodes as billboards
+  in their sprites' materials (below; stock's puffs are all additive) (half extents) or, for `lightning#`, quads of the full size in the node's
   XY plane, coloured by the class's animation on absolute sim time. `ScaleSOD` spreads
   the nodes but does not grow the quads. `Nebula::sCullOccludedNebula` still runs in the
   step body: its hidden flag at `+0x1b0` skips a nebula, its intensity at `+0x1d0`
   dims it, times `GameObjectInstance::ComputeFadeOut` (0x4d5a20) when it reports a near
   fade, as `NebulaInstance::ComputeFadeOut` (0x4a5680) does.
+- **A sprite's material** is its `@tmaterial`: `additive` and `add_nomipf` add,
+  `translucent` blends by alpha, `alphathreshold` (and any name not listed) is cut out
+  at alpha one half and writes depth. `alpha` and `alpha_nof` blend by alpha with no
+  alpha test, as `translucent` does without its opacity factor: that is how
+  `ST3D_GraphicsEngine::Initialize` (0x62b160) makes the engine's texture materials by
+  name (the blend pair and the test flag each is made with). Stock's sprite tables
+  never name them; Fleet Operations: Roots draws its asteroid sets (`latinum` nebulae
+  whose SODs hold only sprite nodes: sheets of rocks, `alpha`, over additive dust) with
+  them. Cut out at one half, the ice sets' rocks (an alpha that is soft over most of each
+  rock) kept only their highlights over the haze, and read as see-through; the brown
+  sets' alpha is a hard mask and hid it. `alpha` is sampled from the top level only: our
+  box-filtered chain averaged the soft alpha away and the rocks stayed faint beside the
+  engine's (PLAN-FLEETOPS.md, decisions 350 and 351; `fo-render3d-asteroids`).
 
 | Key (`[Particles]`) | Default | |
 |---|---|---|
