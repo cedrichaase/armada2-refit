@@ -1218,8 +1218,10 @@ a button is what the player sees whatever its field is called (on Roots' main me
 field named for Options reads "Map Editor" and runs the map editor, and the one named for
 the map editor reads "Options"; decision 204). Options' Back, which Roots binds when the
 form opens, stands at the window's foot, and the main menu's version line (Roots' `labelVersion`) at
-the bottom right, small and dim, as Armada II's version. Yes/No draws the form's picture (Roots draws the
-question into it) under our two buttons, where the form sits over the screen that asked;
+the bottom right, small and dim, as Armada II's version. Yes/No is the Warning prompt of every confirmation
+(Exit to Desktop, End Mission, ...): a dialog of ours, the executable's words wrapped to it, the form's icon smaller
+and its buttons (below, "The Warning prompt"); it falls back to the form's picture (Roots draws the question into
+it) under our two buttons when the words are not readable;
 Graphics, Sound, Mods, Advanced Options, Multiplayer Connection and Manual IP have specs of
 their own (below); every other form is generic (`Generic=widgets` in Roots' defaults). The in-mission Options
 stands over the mission's last frame, as the stock host's in-mission menus do.
@@ -1486,3 +1488,34 @@ the Credits' place does: the black shell background and `g_shellMode` = main men
 
 Seen on the bench (2026-10-17, 1280x720): the title page over the fleet with the four
 logos, page 5 of 30, Esc back to the main menu (`credits: left (0)`).
+
+## The Warning prompt (Roots' `TYesNoForm`, decisions 540 and 541)
+
+Every confirmation and warning of Roots is one form, `TYesNoForm` (a background picture and
+two buttons, `btnYes` and `btnNo`; the form's own "Warning" title, icon and question are
+painted into its picture, in a system font that runs off the form's right edge: the form's
+657 px against a question that starts 157 px in). `menus/roots/message.rs` draws it as our
+notice window (`screens::notice::notice_window_icon`, the same panel as Armada II's one- and
+two-button messages): the title in the heading font, the question in the body font wrapped to
+the panel, the panel sized to its text and centred over a dimming of what asked, the form's
+buttons in a row at its foot, a press going to the form's own button as a click would.
+
+- **The words** are the executable's own: the title, the question and the two captions are
+  four 128-byte C buffers (`yesNoTitleText`, `yesNoMessageText`, `yesNoCancelText`,
+  `yesNoOKText`) that a caller fills before the prompt opens and that FleetOpsHook's form
+  paints into its picture. Hook `ui.forms.message_text` reads the first two (the captions are the form's controls') (a global each, no check: the
+  data of the stock image, which Roots' file keeps at the same addresses); with the question
+  empty the prompt falls back to the picture under our buttons. The buttons' captions come from
+  the form's controls, so a Roots that renames them is followed.
+- **The icon** is a cut of the form's printed picture, found each time the form opens: the
+  bounding box of what is lit (brightness over 24 of 255) in the band left of the question, between
+  the title and the buttons, when it is about as wide as tall. It is cut down by area to the
+  size it is drawn at (44 units, `ICON`) with alpha from brightness, since Roots paints it on
+  black, into a texture of our own; nothing is copied into the repository and the picture is
+  read from the running form. A prompt with another icon (question, information) shows that
+  one, because the cut is of whatever the form painted; a prompt with none shows none.
+- **The keys** are read by the form's pump (`poll_keys`): while the form is the thread's
+  active window it reads Enter and Escape with `GetAsyncKeyState` and records their downs
+  (`input::note_message`), as `poll_button` does the left button, since the form holds the
+  focus and a key never reaches the device window's procedure. Enter presses the first button
+  (Yes, marked by the focus ring), Escape the last (No).
