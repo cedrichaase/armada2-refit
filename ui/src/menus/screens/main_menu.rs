@@ -152,6 +152,25 @@ fn hover_changed(s: &Screen, hover: i32) {
 /// band darkened for the text; the entries are lines of text that light up, an accent
 /// bar and a glow at their left, as the pointer comes over them.
 fn over_scene(ui: &mut Ui, s: &Screen) -> bool {
+    let entries: alloc::vec::Vec<(&str, bool)> = ENTRIES
+        .iter()
+        .map(|&(label, dx, dy)| (label, s.top && s.model.button_at(dx, dy).is_none_or(|c| c.enabled)))
+        .collect();
+    let (clicked, hover) = scene_column(ui, "STAR TREK", "ARMADA II", &entries);
+    if let Some(i) = clicked {
+        s.click(ENTRIES[i].1, ENTRIES[i].2);
+    }
+    hover_changed(s, hover);
+    let m = ui.u(24.0);
+    version(ui, s, Some(R::new(ui.screen().w - m - ui.u(400.0), ui.screen().h - m - ui.u(24.0), ui.u(400.0), ui.u(24.0))));
+    true
+}
+
+/// The main menu over the scene, for any front end that has one (Armada II's, and Roots'
+/// forms, `menus::roots`): the shade, the title (`small` over `big`), and a column of
+/// entries, each (label, enabled), that light up under the pointer. Returns the entry
+/// clicked and the one under the pointer (-1: none).
+pub fn scene_column(ui: &mut Ui, small: &str, big: &str, entries: &[(&str, bool)]) -> (Option<usize>, i32) {
     let screen = ui.screen();
     let t = ui.theme;
     // Shade for the text: the left, and a little at the top and the foot.
@@ -163,23 +182,22 @@ fn over_scene(ui: &mut Ui, s: &Screen) -> bool {
     // The column's geometry is the faded-art layout's (`draw`), entry for entry: the
     // bench's scenarios click its entries by position.
     let (w, eh, gap) = (ui.u(380.0), ui.u(54.0), ui.u(12.0));
-    let n = ENTRIES.len() as f32;
+    let n = entries.len() as f32;
     let title_h = ui.u(90.0);
     let total = title_h + n * eh + (n - 1.0) * gap;
     let x = libm::roundf(screen.w * 0.08).max(ui.u(40.0));
     let top = libm::roundf((screen.h - total) * 0.5);
     // The title, rising above the column's own title space.
-    ui.text_in(R::new(x, top - ui.u(40.0), w, ui.u(40.0)), "STAR TREK", 28.0, Align::Left, fade(t.text, 0.85), Weight::Bold);
-    ui.text_in(R::new(x - ui.u(3.0), top - ui.u(10.0), w * 1.5, ui.u(80.0)), "ARMADA II", 68.0, Align::Left, t.title, Weight::Bold);
+    ui.text_in(R::new(x, top - ui.u(40.0), w, ui.u(40.0)), small, 28.0, Align::Left, fade(t.text, 0.85), Weight::Bold);
+    ui.text_in(R::new(x - ui.u(3.0), top - ui.u(10.0), w * 1.5, ui.u(80.0)), big, 68.0, Align::Left, t.title, Weight::Bold);
     let rule = R::new(x, top + ui.u(74.0), ui.u(260.0), ui.u(2.0).max(1.0));
     ui.draw.rect_hgrad(rule, t.accent, fade(t.accent, 0.0));
     let mut y = top + title_h;
     let mut hover = -1;
-    for (i, &(label, dx, dy)) in ENTRIES.iter().enumerate() {
+    let mut picked = None;
+    for (i, &(label, enabled)) in entries.iter().enumerate() {
         let r = R::new(x, y, w, eh);
         y += eh + gap;
-        let stock = s.model.button_at(dx, dy);
-        let enabled = s.top && stock.is_none_or(|c| c.enabled);
         let id = ui.id(label);
         let (hot, held, clicked) = if enabled { ui.interact(id, r) } else { (false, false, false) };
         let st = crate::widgets::State::of(ui, id, hot, held);
@@ -204,11 +222,8 @@ fn over_scene(ui: &mut Ui, s: &Screen) -> bool {
             hover = i as i32;
         }
         if clicked {
-            s.click(dx, dy);
+            picked = Some(i);
         }
     }
-    hover_changed(s, hover);
-    let m = ui.u(24.0);
-    version(ui, s, Some(R::new(screen.w - m - ui.u(400.0), screen.h - m - ui.u(24.0), ui.u(400.0), ui.u(24.0))));
-    true
+    (picked, hover)
 }

@@ -18,7 +18,7 @@ two).
 2. Wait up to 180 seconds for "UI.log" to say "forms: TMainForm is ours".
 3. Wait 3 seconds.
 4. Take a screenshot called "main".
-5. Check that the screen shows a window of ours titled "MAIN MENU" with a column of buttons (Single Player, Instant Action, Multiplayer, Map Editor, Options, Credits, Exit) and none of Roots' own main menu art.
+5. Check that the screen shows "FLEET OPERATIONS" over "ROOTS" with a column of entries (Single Player, Instant Action, Multiplayer, Map Editor, Options, Credits, Exit) and none of Roots' own main menu art.
 6. Move the mouse to 600,300.
 7. Wait 1 second.
 8. Click "Options".
