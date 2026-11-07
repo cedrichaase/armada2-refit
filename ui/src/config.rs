@@ -20,6 +20,10 @@ pub struct Config {
     /// `[UI] PointerLog`: log the focus changes and the pointer's jumps between two
     /// frames (`input::diagnose`), for the cursor that jumps after a change of focus.
     pub pointer_log: bool,
+    /// `[UI] RefitKey`: the virtual key that, with Ctrl, opens the Refit screen as a modal
+    /// over a mission (`menus::refit::mission_frame`); 0 for none (PLAN-FLEETOPS.md, FO-6,
+    /// decision 86).
+    pub refit_key: u8,
     /// `[UI] Theme`: a theme's name (`shell`, `federation`, `klingon`, ...) to use
     /// everywhere; None for `auto`, the player's race in a mission and the shell's
     /// theme elsewhere (widgets/theme.rs).
@@ -49,6 +53,14 @@ pub struct Config {
     /// `[Menus] Scene`: the main menu and the campaign selection stand over render3d's
     /// 3D scene (`menus::scene`), when render3d draws it.
     pub menus_scene: bool,
+    /// `[Menus] TitleImage`: the main menu title's picture on Roots (`menus::title_art`):
+    /// a path under the game directory, `none` for the text heading, empty for the content
+    /// set's own (`Files.MenuTitle`).
+    pub menus_title_image: alloc::string::String,
+    /// `[Menus] Forms`: Roots' front-end forms (FleetOpsHook's) drawn by the UI
+    /// (`engine::forms`, PLAN-FLEETOPS.md, FO-6 step 7, option C). 0: Roots' own; 2
+    /// (`probe`): the test bench's probe of step 0.
+    pub menus_forms: u8,
     /// `[Menus] CampaignLocks`: the campaign selection shows which campaigns are not yet
     /// open (`menus::locks`).
     pub campaign_locks: bool,
@@ -64,6 +76,8 @@ pub struct Config {
     /// `[Loading] Hold`: seconds the load waits at its half-way point, the screen
     /// still drawn, for the test bench to look at it (0: never).
     pub loading_hold: f32,
+    /// `[Loading] Bar`: `classic`, `panel`, or empty for the content set's (`loading.rs`).
+    pub loading_bar: alloc::string::String,
 }
 
 /// `[HUD]` in UI.ini: which stock panels ours replace. Every panel is on by default,
@@ -85,6 +99,16 @@ pub struct Hud {
     pub info_camera: bool,
     /// The info panel's size, a factor on the UI's scale.
     pub info_scale: f32,
+    /// The bottom row's arrangement (HUD.md, "The bottom row on Fleet Operations: Roots"): the
+    /// minimap, the info panel and the bar in this order along the bottom, or None for the bar
+    /// above the minimap; `BottomRow=auto` (Some(empty)) takes the row where the info panel keeps
+    /// its own width beside the bar, else the bar above the minimap.
+    pub bottom_row: Option<alloc::vec::Vec<crate::hud::row::Part>>,
+    /// The info panel's width in units (1080-line pixels), 0: its own (Roots' layout).
+    pub info_width: f32,
+    /// The bar's cell in units when the bar is in the bottom row, 0: its three rows as high
+    /// as the info panel.
+    pub bar_cell_size: f32,
     /// The minimap (`MapRadar`), ours, and its size in units.
     pub minimap: bool,
     pub minimap_size: f32,
@@ -121,6 +145,9 @@ pub struct Hud {
     /// The tooltips the engine shows at the pointer (`CursorInterface`: an object's
     /// name and description over the 3D view), drawn by us in the theme.
     pub tooltips: bool,
+    /// The status line about the craft under the pointer (`SDInfoBar`, which Roots draws at
+    /// the top of the screen), drawn by us where the engine would (`hud::hover`).
+    pub hover: bool,
     /// The engine's last draws in a mission, drawn by us (`engine::leftovers`):
     /// `Overview`, the 3D view's drag box, height posts, order ring and placement markers;
     /// `Fade`, the scripts' fade
@@ -156,6 +183,7 @@ pub fn load() -> Config {
         cursor_size: ini.float("UI", "CursorSize", 32.0).clamp(16.0, 128.0),
         movies: ini.int("UI", "Movies", 1) != 0,
         pointer_log: ini.int("UI", "PointerLog", 0) != 0,
+        refit_key: ini.int("UI", "RefitKey", 0).clamp(0, 255) as u8,
         theme: {
             let l = rt::lower(value(&ini, UI_THEME).trim());
             (!l.is_empty() && l != "auto").then_some(l)
@@ -172,6 +200,9 @@ pub fn load() -> Config {
             info: on(&ini, HUD_INFO),
             info_camera: on(&ini, HUD_INFOCAMERA),
             info_scale: ini.float("HUD", "InfoScale", 1.3).clamp(0.6, 2.5),
+            bottom_row: crate::hud::row::parse(&ini.string("HUD", "BottomRow").unwrap_or_default()),
+            info_width: ini.float("HUD", "InfoWidth", 0.0).clamp(0.0, 4000.0),
+            bar_cell_size: ini.float("HUD", "BarCellSize", 0.0).clamp(0.0, 200.0),
             minimap: on(&ini, HUD_MINIMAP),
             minimap_size: ini.float("HUD", "MinimapSize", 300.0).clamp(120.0, 900.0),
             selection: on(&ini, HUD_SELECTION),
@@ -191,6 +222,7 @@ pub fn load() -> Config {
             drop_player: ini.int("HUD", "DropPlayer", 1) != 0,
             load_wait: ini.int("HUD", "LoadWait", 1) != 0,
             tooltips: on(&ini, HUD_TOOLTIPS),
+            hover: on(&ini, HUD_HOVER),
             overview: ini.int("HUD", "Overview", 1) != 0,
             placement: ini.int("HUD", "Placement", 1) != 0,
             fade: ini.int("HUD", "Fade", 1) != 0,
@@ -208,12 +240,19 @@ pub fn load() -> Config {
         menus_trace: ini.int("Menus", "Trace", 0) != 0,
         menus_host: ini.int("Menus", "Host", 1) != 0,
         menus_scene: on(&ini, MENUS_SCENE),
+        menus_forms: match rt::lower(&ini.string("Menus", "Forms").unwrap_or_default()).trim() {
+            "probe" => 2,
+            "1" => 1,
+            _ => 0,
+        },
+        menus_title_image: alloc::string::String::from(ini.string("Menus", "TitleImage").as_deref().unwrap_or("").trim()),
         credits: on(&ini, MENUS_CREDITS),
         campaign_locks: ini.int("Menus", "CampaignLocks", 1) != 0,
         // lint-allow(content): LockedSound's default, the shell's own back sound, the engine's, not a set's.
         locked_sound: alloc::string::String::from(ini.string("Menus", "LockedSound").as_deref().unwrap_or("mnu_back.wav").trim()),
         loading: on(&ini, LOADING_ENABLE),
         loading_hold: ini.float("Loading", "Hold", 0.0).clamp(0.0, 600.0),
+        loading_bar: alloc::string::String::from(ini.string("Loading", "Bar").as_deref().unwrap_or("").trim()).to_ascii_lowercase(),
     }
 }
 
@@ -255,10 +294,14 @@ pub fn reload() {
     h.info = n.info;
     h.info_camera = n.info_camera;
     h.info_scale = n.info_scale;
+    h.bottom_row = n.bottom_row.clone();
+    h.info_width = n.info_width;
+    h.bar_cell_size = n.bar_cell_size;
     h.icons = n.icons;
     h.bar_labels = n.bar_labels;
     h.selection_gauges = n.selection_gauges;
     h.tooltips = n.tooltips;
+    h.hover = n.hover;
     h.unit_view_size = n.unit_view_size;
     h.system_icons = n.system_icons;
     h.shot_scenes = n.shot_scenes;

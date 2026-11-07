@@ -98,7 +98,7 @@ def identify(data, path):
     secs = []
     for name, va, vsize, raw, rawptr, flags in e.sections:
         secs.append({'name': name, 'va': va, 'vsize': vsize, 'raw': raw, 'rawptr': rawptr,
-                     'flags': flags, 'crc32': zlib.crc32(data[rawptr:rawptr + raw]) & 0xffffffff})
+                     'flags': flags, 'crc32': zlib.crc32(data[rawptr:rawptr + min(vsize, raw)]) & 0xffffffff})
     version = None
     d = os.path.dirname(os.path.abspath(path))
     for cand in (os.path.join(d, 'Roots_Download_Version.txt'),
@@ -116,14 +116,32 @@ def identify(data, path):
     }
 
 
-def known_build(games, e):
-    """The build of the profiles whose [pe] identity is this exe's, as (game set, build)."""
+def known_build(games, e, data=None):
+    """The build of the profiles whose [pe] identity is this exe's, as (game set, build): the
+    three numbers and, for a build that sets them, the on-disk section CRC-32s."""
+    hit = (None, None)
     for gs in games.values():
         for b in gs.builds:
             p = b.pe
             if p and (p.get('timestamp'), p.get('image_size'), p.get('sections')) == e.identity():
-                return gs, b
-    return None, None
+                if not b.file_crc:
+                    hit = hit if hit[1] is not None else (gs, b)
+                elif data is not None and all(pe.section_crc(data, k) == v for k, v in b.file_crc.items()):
+                    return gs, b
+    return hit
+
+
+def find_companion(exe_path, name):
+    """The companion module `name` beside the executable or one directory up (Roots keeps
+    FleetOpsHook.dll above Data/): (path, CRC-32 of its .text) or None."""
+    d = os.path.dirname(os.path.abspath(exe_path))
+    for dd in (d, os.path.dirname(d)):
+        p = os.path.join(dd, name)
+        if os.path.isfile(p):
+            c = pe.section_crc(open(p, 'rb').read(), '.text')
+            if c is not None:
+                return p, c
+    return None
 
 
 # ---- step 2: the file diff -------------------------------------------------------
@@ -347,7 +365,7 @@ def hooks_of(entries):
     return out
 
 
-def decide(file_fn, rt_fn, index, uses, callees, roots_exe, stock_exe):
+def decide(file_fn, rt_fn, index, uses, callees, roots_exe, stock_exe, callees_whole=frozenset()):
     """The marks. file_fn / rt_fn: {function start VA: [(lo, hi)]} of the file diff and of
     the run-time diff. -> (changed, callee_marks, unused, notes)
     changed: {name: {'how': detour|edit|runtime, 'ranges': n, 'entries': [...]}}"""
@@ -368,10 +386,20 @@ def decide(file_fn, rt_fn, index, uses, callees, roots_exe, stock_exe):
             how = 'runtime'
         entry_only = all(start <= lo and hi <= start + ENTRY_BYTES for lo, hi in allr)
         for n in used:
-            if n in callees:
+            if n in callees or n in callees_whole:
                 inside = [e for f, e, pl in uses[n] if e.get('kind') != 'fn']
-                if entry_only and not inside:
-                    callee_marks[n] = [(f, e['id'], pl) for f, e, pl in uses[n] if e.get('kind') == 'fn']
+                calls = [(f, e['id'], pl) for f, e, pl in uses[n] if e.get('kind') == 'fn']
+                if (entry_only or n in callees_whole) and not inside:
+                    callee_marks[n] = calls
+                    continue
+                if n in callees_whole:
+                    # something of ours sits inside it (another hook's patch): the function
+                    # stays marked, but the hooks that only call it are verified beside it
+                    only = hooks_of([x for x in uses[n] if x[1].get('kind') == 'fn']) - \
+                           hooks_of([x for x in uses[n] if x[1].get('kind') != 'fn'])
+                    callee_marks[n] = calls
+                    changed[n] = {'how': how, 'ranges': len(allr), 'entries': uses[n],
+                                  'verify': sorted(only)}
                     continue
                 notes.append(f'{n} is listed as a callee, but ' +
                              ('something of ours sits inside it' if inside else 'changed beyond its entry') +
@@ -427,6 +455,17 @@ def build_toml(ctx, changed, cfg):
         f'sections = {e.fingerprint:#x}',
         f'image_base = {e.image_base:#x}',
         f'code = [{ctx["code"][0]:#x}, {ctx["code"][1]:#x}]',
+    ]
+    if ctx['file_crc']:
+        out += ['# CRC-32 of each section\'s content in the file on disk (FleetOpsHook rewrites .text and',
+                '# .rdata in memory before a plugin runs, so the file is what tells a Roots build apart).',
+                'file_crc = { ' + ', '.join(f'{toml_str(k)} = {v:#010x}' for k, v in ctx['file_crc'].items()) + ' }']
+    for m in ctx['modules']:
+        out += ['', '# The companion module the run-time marks below describe, named by the CRC-32 of its',
+                '# .text in its file: another one loaded stands down every hook that depends on its',
+                '# patches (crates/a2engine/README.md, "Identity").',
+                '[[module]]', f'name = {toml_str(m["name"])}', f'text_crc = {m["text_crc"]:#010x}']
+    out += [
         '',
         '[[known]]',
         f'sha256 = "{ident["sha256"]}"',
@@ -445,7 +484,10 @@ def build_toml(ctx, changed, cfg):
         for g in keys:
             res += ['', f'# {g}']
             for n in sorted(groups[g]):
-                res += ['', '[[changed]]', f'fn = {toml_str(n)}', f'how = "{changed[n]["how"]}"', 'verified = []']
+                v = list((cfg.get('verified') or {}).get(n) or []) + \
+                    [h for h in changed[n].get('verify') or []]
+                res += ['', '[[changed]]', f'fn = {toml_str(n)}', f'how = "{changed[n]["how"]}"',
+                        'verified = [' + ', '.join(toml_str(h) for h in v) + ']']
         return res if keys else []
 
     out += block({'detour', 'edit'}, 'changed in the file (how = "detour" or "edit")')
@@ -496,6 +538,8 @@ def read_marks(d):
     """{(fn, how)} from [[changed]], {(file, id)} of the dropped checks, {disable globs}."""
     b = tomllib.load(open(os.path.join(d, 'build.toml'), 'rb'))
     marks = {c['fn']: c.get('how', '') for c in b.get('changed') or []}
+    verified = {c['fn']: sorted(c.get('verified') or []) for c in b.get('changed') or []}
+    modules = {m['name']: m['text_crc'] for m in b.get('module') or []}
     checks = set()
     for f in sorted(os.listdir(d)):
         if f.endswith('.toml') and f != 'build.toml':
@@ -504,13 +548,13 @@ def read_marks(d):
                 if s.get('check') == '':
                     checks.add((f, s['id']))
     dis = {h for x in b.get('disable') or [] for h in x['hooks']}
-    return marks, checks, dis, b.get('pe') or {}
+    return marks, checks, dis, b.get('pe') or {}, verified, modules
 
 
 def compare_dirs(new, old):
     """Lines saying how two profile directories differ in their marks; [] when they agree."""
-    nm, nc, nd, npe = read_marks(new)
-    om, oc, od, ope = read_marks(old)
+    nm, nc, nd, npe, nv, nmod = read_marks(new)
+    om, oc, od, ope, ov, omod = read_marks(old)
     lines = []
     for fn in sorted(set(nm) | set(om)):
         if fn not in om:
@@ -525,9 +569,14 @@ def compare_dirs(new, old):
         lines.append(f'check dropped only in {os.path.basename(old)}: {x[0]} {x[1]}')
     if nd != od:
         lines.append(f'disabled hooks differ: scan {sorted(nd)}, {os.path.basename(old)} {sorted(od)}')
-    for k in ('timestamp', 'image_size', 'sections', 'image_base', 'code'):
+    for k in ('timestamp', 'image_size', 'sections', 'image_base', 'code', 'file_crc'):
         if npe.get(k) != ope.get(k):
             lines.append(f'[pe] {k}: scan {npe.get(k)}, {os.path.basename(old)} {ope.get(k)}')
+    if nmod != omod:
+        lines.append(f'[[module]] differ: scan {nmod}, {os.path.basename(old)} {omod}')
+    for fn in sorted(set(nm) & set(om)):
+        if nv.get(fn) != ov.get(fn):
+            lines.append(f'{fn}: verified differs: scan {nv.get(fn)}, {os.path.basename(old)} {ov.get(fn)}')
     return lines
 
 
@@ -537,7 +586,7 @@ def hook_states(profile_root, exe_data, exe_path):
     """(ready, total, {hook: why}) for the exe against the profiles in `profile_root`."""
     import resolve
     games = profiles.load_game_sets([profile_root])
-    exe = pe.Exe(exe_data, name=os.path.basename(exe_path))
+    exe = pe.Exe(exe_data, name=os.path.basename(exe_path), path=exe_path)
     down, total = {}, 0
     for t in profiles.tables(games):
         eng = resolve.Engine(t, exe, None)
@@ -581,6 +630,7 @@ def check_patches(tsv, rt_ranges):
 def scan(a):
     out = sys.stdout
     say = lambda s='': print(s, file=out, flush=True)   # noqa: E731
+    a.module = dict(x.split('=', 1) for x in a.module)
     renv = game_env(a.game)
     senv = game_env('armada2')
     data_root = renv['A2_DATA']
@@ -609,7 +659,7 @@ def scan(a):
     if (parent.pe.get('timestamp'), parent.pe.get('image_size'), parent.pe.get('sections')) != se.identity():
         raise SystemExit(f'fo-scan: {stock_path} is not {parent.name} (identity {se.identity()}): the file diff '
                          f'and the map are stock 1.1\'s')
-    kgs, kb = known_build(games, e)
+    kgs, kb = known_build(games, e, roots_data)
     version = ident['version']
     name = a.build_name or (kb.name if kb is not None and kb.parent is not None else None) or \
         (f'fo-roots-{version[0]}' if version else None)
@@ -618,7 +668,27 @@ def scan(a):
     label = f'Fleet Operations: Roots {version[0]}' if version else name
     say(f'fo-scan: {os.path.basename(roots_path)} {e.line()}')
     say(f'  build {name}' + (f' (the profiles already know this identity as {kb.name})' if kb is not None else ' (new)'))
-    say('  section CRC-32s (information): ' + ' '.join(f'{s["name"]}={s["crc32"]:08x}' for s in ident['sections']))
+    say('  section CRC-32s (of the content: VirtualSize or SizeOfRawData, the lesser): ' +
+        ' '.join(f'{s["name"]}={s["crc32"]:08x}' for s in ident['sections']))
+    cfg0 = tomllib.load(open(a.config, 'rb')) if os.path.isfile(a.config) else {}
+    crc_secs = cfg0.get('file_crc') or ['.text', '.test']
+    file_crc = {n: c for n in crc_secs for c in [pe.section_crc(roots_data, n)] if c is not None}
+    missing = [n for n in crc_secs if n not in file_crc]
+    if missing:
+        say(f'  note: no section {", ".join(missing)} in the executable: not part of its on-disk identity')
+    modules = []
+    for mn in cfg0.get('companions') or []:
+        found = a.module.get(mn) if a.module else None
+        if found:
+            c = pe.section_crc(open(found, 'rb').read(), '.text')
+            found = (found, c) if c is not None else None
+        else:
+            found = find_companion(roots_path, mn)
+        if found:
+            modules.append({'name': mn, 'text_crc': found[1]})
+            say(f'  companion {mn} (.text crc {found[1]:08x}) from {found[0]}')
+        else:
+            say(f'  note: companion {mn} not found beside the install (--module {mn}=PATH): the profile will not check it')
 
     # 2. the file diff, by function
     syms = annotate.load_map(map_path)
@@ -668,9 +738,10 @@ def scan(a):
     cfg = tomllib.load(open(a.config, 'rb')) if os.path.isfile(a.config) else {}
     callees = set(cfg.get('callees') or [])
     uses, dentries = profile_uses(gs)
-    changed, callee_marks, unused, dnotes = decide(file_fn, rt_fn, index, uses, callees, e, se)
+    callees_whole = set(cfg.get('callees_whole') or [])
+    changed, callee_marks, unused, dnotes = decide(file_fn, rt_fn, index, uses, callees, e, se, callees_whole)
     notes += dnotes
-    ctx = {'ident': ident, 'name': name, 'label': label, 'parent': parent.name, 'game': a.profile_game,
+    ctx = {'file_crc': file_crc, 'modules': modules, 'ident': ident, 'name': name, 'label': label, 'parent': parent.name, 'game': a.profile_game,
            'version': version, 'exe_path': roots_path, 'code': (e.code[0], (e.code[1] + 0xfff) & ~0xfff)}
 
     # data entries (globals, vtables, slots) inside a changed range
@@ -853,6 +924,8 @@ def main(argv):
     ap.add_argument('--profile-out', help='write the profile here, whether or not it exists')
     ap.add_argument('--report', help='the report (default $A2_DATA/research/fo-roots/scan-<build>.md)')
     ap.add_argument('--compare', help='compare the scan with this profile directory')
+    ap.add_argument('--module', action='append', default=[], metavar='NAME=PATH',
+                    help='where a companion module of fo-scan.toml is (default: beside the executable or one directory up)')
     ap.add_argument('--config', default=os.path.join(HERE, 'fo-scan.toml'))
     ap.add_argument('--verify', action='store_true', help='run a2test syms and negative.sh on the repository\'s profile')
     ap.add_argument('--gen', action='store_true', help='run gen.py after writing into the repository\'s profiles/')

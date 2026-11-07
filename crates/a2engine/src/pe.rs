@@ -18,6 +18,29 @@ pub trait Image {
     fn name(&self, _out: &mut [u8]) -> usize {
         0
     }
+    /// The CRC-32 of section `name`'s raw data in the executable's FILE on disk (see
+    /// `section_crc_file`), None if it cannot be read. FleetOpsHook rewrites `.text` and
+    /// `.rdata` in memory before a plugin of ours runs, so a build that sets file CRCs
+    /// is told by the file, never by the mapped image.
+    fn file_crc(&self, _section: &str) -> Option<u32> {
+        None
+    }
+    /// The `.text` CRC-32, from its file on disk, of the companion module `name` loaded
+    /// in the process (a profile's `[[module]]`).
+    fn companion(&self, _name: &str) -> Companion {
+        Companion::NotLoaded
+    }
+}
+
+/// What the process holds of a companion module (`Image::companion`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Companion {
+    /// No module of that name is loaded.
+    NotLoaded,
+    /// Loaded, but its file cannot be read.
+    Unreadable,
+    /// Loaded: the CRC-32 of its `.text` as the file has it.
+    Crc(u32),
 }
 
 /// A file or buffer, offsets from its start.
@@ -33,6 +56,74 @@ impl Image for Bytes<'_> {
             _ => false,
         }
     }
+    fn file_crc(&self, section: &str) -> Option<u32> {
+        section_crc_file(&mut |at, out| self.read(at, out), section)
+    }
+}
+
+const CRC_NIBBLE: [u32; 16] = [
+    0x0000_0000, 0x1db7_1064, 0x3b6e_20c8, 0x26d9_30ac, 0x76dc_4190, 0x6b6b_51f4, 0x4db2_6158, 0x5005_713c,
+    0xedb8_8320, 0xf00f_9344, 0xd6d6_a3e8, 0xcb61_b38c, 0x9b64_c2b0, 0x86d3_d2d4, 0xa00a_e278, 0xbdbd_f21c,
+];
+
+/// CRC-32 (IEEE 802.3, the zlib one) running state: start at `!0`, finish with `!`.
+pub fn crc32_update(mut c: u32, data: &[u8]) -> u32 {
+    for &b in data {
+        c ^= b as u32;
+        c = (c >> 4) ^ CRC_NIBBLE[(c & 15) as usize];
+        c = (c >> 4) ^ CRC_NIBBLE[(c & 15) as usize];
+    }
+    c
+}
+
+/// The CRC-32 of section `name` in a PE FILE read through `read(offset, buf)`: its raw
+/// data at `PointerToRawData`, the first `min(VirtualSize, SizeOfRawData)` bytes (the
+/// section's content without the file alignment's padding). In 4 KiB steps, so the file
+/// is never held. None when the section is not there or the file ends early.
+pub fn section_crc_file(read: &mut dyn FnMut(usize, &mut [u8]) -> bool, name: &str) -> Option<u32> {
+    let rd32 = |read: &mut dyn FnMut(usize, &mut [u8]) -> bool, at: usize| {
+        let mut b = [0u8; 4];
+        read(at, &mut b).then(|| u32::from_le_bytes(b))
+    };
+    let rd16 = |read: &mut dyn FnMut(usize, &mut [u8]) -> bool, at: usize| {
+        let mut b = [0u8; 2];
+        read(at, &mut b).then(|| u16::from_le_bytes(b))
+    };
+    let want = name.as_bytes();
+    if want.len() > 8 {
+        return None;
+    }
+    let nt = rd32(read, 0x3c)? as usize;
+    let count = rd16(read, nt + 6)? as usize;
+    let table = nt + 24 + rd16(read, nt + 20)? as usize;
+    if count > MAX_SECTIONS {
+        return None;
+    }
+    for i in 0..count {
+        let mut s = [0u8; 40];
+        if !read(table + i * 40, &mut s) {
+            return None;
+        }
+        let n = s[..8].iter().position(|&c| c == 0).unwrap_or(8);
+        if &s[..n] != want {
+            continue;
+        }
+        let word = |o: usize| u32::from_le_bytes([s[o], s[o + 1], s[o + 2], s[o + 3]]) as usize;
+        let (vsize, raw, ptr) = (word(8), word(16), word(20));
+        let (mut left, mut at, mut c) = (vsize.min(raw), ptr, !0u32);
+        let mut buf = [0u8; 4096];
+        while left > 0 {
+            let k = left.min(buf.len());
+            if !read(at, &mut buf[..k]) {
+                return None;
+            }
+            c = crc32_update(c, &buf[..k]);
+            at += k;
+            left -= k;
+        }
+        return Some(!c);
+    }
+    None
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -5,7 +5,7 @@
 //!
 //! Sizes here are back-buffer pixels: the theme (`widgets/theme.rs`) turns units into
 //! pixels before it calls in.
-use super::{Color, Draw, Vertex, KIND_SHAPE, R};
+use super::{Color, Draw, Vertex, KIND_METAL, KIND_SHAPE, R};
 
 /// A shape's four corners, top left, top right, bottom right, bottom left, in pixels:
 /// a positive one is rounded with that radius, a negative one cut at 45 degrees that
@@ -91,6 +91,22 @@ impl Default for Shape {
     }
 }
 
+/// Machined metal for `Draw::metal`: the shape's colour worked by a grain fixed in
+/// screen space (`shaders/ui.hlsl`, kind 5), so plates side by side share one surface.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Metal {
+    /// The grain's size: one unit, in pixels.
+    pub size: f32,
+    /// How strongly the grain lightens and darkens the colour (0..1).
+    pub strength: f32,
+    /// The grain's stretch along the brushing: 1 is cast, 30 and more brushed.
+    pub aniso: f32,
+    /// The brushing's direction, radians (0: along x).
+    pub angle: f32,
+    /// A broad light across the plate from its top left, 0 for none.
+    pub sheen: f32,
+}
+
 /// Which corner of its rectangle an LCARS elbow turns at.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Elbow {
@@ -103,6 +119,16 @@ pub enum Elbow {
 impl Draw {
     /// A shape in `r`, coloured per corner (tl, tr, br, bl) for gradients.
     pub fn shape(&mut self, r: R, sh: &Shape, cols: [Color; 4]) {
+        self.shape_kind(r, sh, cols, None);
+    }
+
+    /// A filled shape of machined metal (`Metal`), coloured per corner as `shape`; its
+    /// stroke and softness are the shape's, it has no cut-out and no stripes.
+    pub fn metal(&mut self, r: R, sh: &Shape, m: &Metal, cols: [Color; 4]) {
+        self.shape_kind(r, sh, cols, Some(m));
+    }
+
+    fn shape_kind(&mut self, r: R, sh: &Shape, cols: [Color; 4], metal: Option<&Metal>) {
         if r.w <= 0.0 || r.h <= 0.0 {
             return;
         }
@@ -114,9 +140,18 @@ impl Draw {
         let g = r.inset(-m);
         let (ux0, ux1) = if sh.flip_x { (hx + m, -hx - m) } else { (-hx - m, hx + m) };
         let (uy0, uy1) = if sh.flip_y { (hy + m, -hy - m) } else { (-hy - m, hy + m) };
-        let k = [KIND_SHAPE, sh.stroke.max(0.0), hx, hy];
-        let t = [sh.soft.max(1.0), sh.soft_in.max(1.0), sh.cut[0].max(0.0), sh.cut[1].max(0.0)];
-        let p = [sh.stripes[0].max(0.0), sh.stripes[1].clamp(0.0, 1.0), sh.stripes[2], sh.cut[2].max(0.0)];
+        let (k, t, p) = match metal {
+            None => (
+                [KIND_SHAPE, sh.stroke.max(0.0), hx, hy],
+                [sh.soft.max(1.0), sh.soft_in.max(1.0), sh.cut[0].max(0.0), sh.cut[1].max(0.0)],
+                [sh.stripes[0].max(0.0), sh.stripes[1].clamp(0.0, 1.0), sh.stripes[2], sh.cut[2].max(0.0)],
+            ),
+            Some(m) => (
+                [KIND_METAL, sh.stroke.max(0.0), hx, hy],
+                [sh.soft.max(1.0), sh.soft_in.max(1.0), m.aniso.max(1.0), m.sheen.max(0.0)],
+                [m.size.max(0.5), m.strength.clamp(0.0, 1.0), m.angle, 0.0],
+            ),
+        };
         let vx = |x, y, col, u, v| Vertex { x, y, col, u, v, k, s: c, t, p };
         let (x0, y0, x1, y1) = (g.x, g.y, g.right(), g.bottom());
         self.quad(None, [

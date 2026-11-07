@@ -115,6 +115,55 @@ pub fn view_key(cam: usize, main: bool) -> usize {
 }
 
 static READY: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+/// The loop's draw site when `frame.obj_draw` is ready (a build whose object loop is
+/// another module's, Roots), else 0: the step keeps its own loop, as on stock.
+static OBJ_DRAW: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(0);
+
+static OBJ_DRAW_PROBED: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+
+/// Looks once whether the object loop's draw is another module's (`frame.obj_draw`: Roots'
+/// FleetOpsHook call, PLAN-FLEETOPS.md, "The rules of (c)", rule 2): the object step then
+/// calls through that site, never writes there. A build with no such site (stock) keeps
+/// the step's own loop. True when it is.
+pub fn probe_obj_draw() -> bool {
+    use core::sync::atomic::Ordering::Relaxed;
+    if !OBJ_DRAW_PROBED.swap(true, Relaxed)
+        && crate::hooks::Hooks::core().present(&crate::syms::TABLE, crate::syms::hook::FRAME_OBJ_DRAW)
+        && crate::hooks::Hooks::core().ready(&crate::syms::TABLE, crate::syms::hook::FRAME_OBJ_DRAW) {
+        let site = at(sym::SITE_OBJ_DRAW);
+        let to = hook::call_target(site).unwrap_or(0);
+        if site != 0 && to != 0 {
+            OBJ_DRAW.store(site, Relaxed);
+            crate::log!("frame: the object step calls through the loop's draw site {:#x} (to {:#x}, chained): each object is drawn by the module there", site, to);
+        }
+    }
+    OBJ_DRAW.load(Relaxed) != 0
+}
+
+/// What the loop's draw site calls now (read every frame, as every other site), or 0.
+fn obj_draw() -> usize {
+    let site = OBJ_DRAW.load(core::sync::atomic::Ordering::Relaxed);
+    if site == 0 { 0 } else { hook::call_target(site).unwrap_or(0) }
+}
+
+/// Whether the object step calls through another module's per-object draw.
+pub fn obj_draw_on() -> bool {
+    probe_obj_draw()
+}
+
+/// The object the step is drawing through `obj_draw`, and its view, while that call runs
+/// (it is synchronous and one object at a time); for a claim inside the engine's draw.
+static mut CURRENT: (usize, *const View) = (0, core::ptr::null());
+
+fn set_current(o: usize, v: *const View) {
+    unsafe { CURRENT = (o, v) };
+}
+
+/// The object being drawn through the loop's draw site, and the view, while it is.
+pub fn current() -> Option<(usize, &'static View)> {
+    let (o, v) = unsafe { CURRENT };
+    if o == 0 || v.is_null() { None } else { Some((o, unsafe { &*v })) }
+}
 
 /// `frame.steps` of the profile is ready (set once, at the seam's install).
 pub fn set_ready(ok: bool) {
@@ -191,7 +240,28 @@ pub fn run(cam: usize, rs: usize, main: bool, tw: u32, th: u32, frame: u32) -> P
         timing::mark("terrain");
         // 10-12: objects, with the near fade on.
         this1(fn_near_fade(), s3d, engine::view::fade_out_enabled());
-        if !registry::step(Step::Objects, &v) {
+        let chain = obj_draw();
+        let taken = registry::step(Step::Objects, &v);
+        if !taken && chain != 0 {
+            // A build whose object loop is another module's (Roots: FleetOpsHook's call at
+            // the loop's draw site): every object that is not a background object goes to
+            // that call, which makes the cull decision and runs the object's Render with
+            // its wrappers; a module may still take an object that is not culled first.
+            // The object is "current" around the call, for a claim inside it (hulls).
+            cdecl1(via(site_cull_nebula(), fn_cull_nebula()), cam);
+            engine::for_each_in_list(engine::object_list(), |o| {
+                if o == 0 || engine::view::is_background_object(o) {
+                    return;
+                }
+                if engine::view::object_drawn_by_body(o) && registry::object(o, &v) {
+                    return;
+                }
+                set_current(o, &v);
+                let f: unsafe extern "stdcall" fn(usize, usize) = core::mem::transmute(chain);
+                f(o, cam);
+                set_current(0, core::ptr::null());
+            });
+        } else if !taken {
             cdecl1(via(site_cull_nebula(), fn_cull_nebula()), cam);
             engine::for_each_in_list(engine::object_list(), |o| {
                 if !engine::view::object_drawn_by_body(o) {

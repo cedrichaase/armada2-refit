@@ -62,22 +62,56 @@ class Engine:
         self.addrs = [0] * n_syms
         self.warned = [False] * n_syms
         self.bi = None
-        for i, b in enumerate(table.builds):
-            pe_ = b['build'].pe
-            if force_build is not None:
-                hit = b['build'].name == force_build
-            else:
-                hit = (pe_.get('timestamp'), pe_.get('image_size'), pe_.get('sections')) == exe.identity()
-            if hit:
-                self.bi = i
-                break
+        crc_line = None
+        if force_build is not None:
+            for i, b in enumerate(table.builds):
+                if b['build'].name == force_build:
+                    self.bi = i
+                    break
+        else:
+            # The three numbers and, for a build that sets them, the on-disk section CRCs
+            # (a candidate that sets them is preferred to one that does not).
+            cands = [i for i, b in enumerate(table.builds)
+                     if (b['build'].pe.get('timestamp'), b['build'].pe.get('image_size'),
+                         b['build'].pe.get('sections')) == exe.identity()]
+            for i in cands:
+                fc = table.builds[i]['build'].file_crc
+                if not fc:
+                    continue
+                if crc_line is None:
+                    crc_line = i
+                if all(exe.file_crc(sec) == crc for sec, crc in fc.items()):
+                    self.bi = i
+                    break
+            if self.bi is None:
+                self.bi = next((i for i in cands if not table.builds[i]['build'].file_crc), None)
         # The executable's name for the log and the notes: the build's, else the module's.
         self.exe_name = (self.build['build'].exe if self.bi is not None else None) or exe.name or 'exe'
         self.log(exe.line(self.exe_name))
+        if crc_line is not None:
+            parts = []
+            for sec in table.builds[crc_line]['build'].file_crc:
+                c = exe.file_crc(sec)
+                parts.append(f'{sec} 0x{c:08x}' if c is not None else f'{sec} unreadable')
+            self.log(f'engine: {self.exe_name} file crc: ' + ', '.join(parts))
+        self.comp_bad = False
         if self.bi is not None:
             b = self.build
             self.delta = (exe.base - b['build'].pe.get('image_base', 0)) & 0xffffffff
             self.log(f'engine: build {b["build"].key}')
+            for m in b['build'].modules:
+                st, c = exe.module_crc(m['name'])
+                want = m['text_crc']
+                if st == 'crc' and c == want:
+                    self.log(f'engine: companion {m["name"]} .text crc 0x{c:08x} matches the profile')
+                    continue
+                self.comp_bad = True
+                tail = 'the hooks that depend on it stand down'
+                if st == 'crc':
+                    self.log(f'engine: companion {m["name"]} .text crc 0x{c:08x} is not the profiled 0x{want:08x}: {tail}')
+                else:
+                    what = 'is not loaded' if st == 'absent' else 'cannot be read'
+                    self.log(f'engine: companion {m["name"]} {what} (profiled .text crc 0x{want:08x}): {tail}')
         else:
             self.delta = 0
             self.log('engine: unknown build')
@@ -87,16 +121,8 @@ class Engine:
             n = sum(1 for k in range(m) if table.kind(k) == 'scan')
             h = 0
         else:
-            blocked = self.build['blocked']
-            n = 0
-            for k, e in enumerate(self.build['entries']):
-                if e is None:
-                    continue
-                ub = [f'{table.plugin}.{u}' for u in (e.get('used_by') or [])]
-                if ub and all(u in blocked for u in ub):
-                    continue
-                n += 1
-            h = len(blocked)
+            n = self.build['n_resolved_mod' if self.comp_bad else 'n_resolved']
+            h = len(self.build['blocked']) + (len(self.build['blocked_mod']) if self.comp_bad else 0)
         self.log(f'engine: symbols: {n}/{m} resolved; {h} hooks blocked')
         if self.globs:
             self.log(f'engine: TEST: A2EngineTest.ini forces a mismatch for {", ".join(self.globs)}')
@@ -210,6 +236,8 @@ class Engine:
             fail = (sym0, 'unknown build')
         elif self.bi is not None and hid in self.build['blocked']:
             fail = self.build['blocked'][hid]
+        elif self.bi is not None and self.comp_bad and hid in self.build['blocked_mod']:
+            fail = self.build['blocked_mod'][hid]
         elif any(profiles.glob_match(g, hid) for g in self.globs):
             fail = (sym0, TEST_WHY)
         chained, got = [], {}
@@ -262,9 +290,8 @@ class Engine:
             return note_text(PLUGIN_NOTE.format(exe=self.exe_name))
         if why == TEST_WHY:
             return note_text(f'Stands down: {sym}: {why}')
-        if why.startswith('is changed by '):
-            by = why[len('is changed by '):].split(' ')[0]
-            return note_text(f'Stands down: {sym} is changed by {by}, not yet verified')
+        if why.startswith(('is changed by ', 'is patched by ')):
+            return note_text(profiles.note_for_block(sym, why))
         if why.startswith('is off in '):
             return note_text(f'Stands down: {why[3:]}')
         return note_text(f'Stands down: {sym} is not stock in this {self.exe_name}')
@@ -316,7 +343,7 @@ def main(argv):
     ap.add_argument('--profiles', nargs='*')
     a = ap.parse_args(argv)
     with open(a.exe, 'rb') as f:
-        exe = pe.Exe(f.read(), a.base, name=os.path.basename(a.exe))
+        exe = pe.Exe(f.read(), a.base, name=os.path.basename(a.exe), path=a.exe)
     ini = open(a.test_ini).read() if a.test_ini else None
     games = profiles.load_game_sets(a.profiles if a.profiles else None)
     for t in profiles.tables(games):

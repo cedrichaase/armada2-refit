@@ -21,6 +21,7 @@ import itertools
 import json
 import os
 import re
+import shlex
 import shutil
 import signal
 import struct
@@ -101,6 +102,17 @@ def _group_has_members(pgid):
         except (OSError, ValueError, IndexError):
             continue
     return False
+
+
+def split_args(args):
+    """The game's arguments from one string: words, with a double-quoted run kept as one
+    (`-nointro "Blue Skies.bzn"`). Backslashes are kept as typed (`save\\s1.sav`)."""
+    out = []
+    for w in shlex.split(args or '', posix=False):
+        if len(w) >= 2 and w[0] == w[-1] and w[0] in '"\'':
+            w = w[1:-1]
+        out.append(w)
+    return out
 
 
 class GameError(Exception):
@@ -205,8 +217,8 @@ def log_path(dirs, name):
 
 
 def vulkan_env(game_dir, logs=None):
-    """The environment of a game whose Display8 draws on Vulkan (`Mode=stub`,
-    `Backend=vulkan` in its Display8.ini): Mesa's CPU Vulkan (lavapipe) as the only
+    """The environment of a game whose Display8 draws on Vulkan (`Backend=vulkan` in its
+    Display8.ini): Mesa's CPU Vulkan (lavapipe) as the only
     driver and the Khronos validation layer. Since testbench 3.70.0 the default is the
     physical GPU with the layer on (it catches errors before they can hang the GPU);
     `--vulkan-device lavapipe` (`A2TEST_VULKAN_DEVICE=lavapipe`) gives the CPU driver
@@ -232,13 +244,18 @@ def vulkan_env(game_dir, logs=None):
         return {}
     keys = {m.group(1).lower(): m.group(2).strip().lower()
             for m in re.finditer(r'^\s*(\w+)\s*=\s*(.*?)\s*$', text, re.M)}
-    if keys.get('mode') == 'stub' and keys.get('backend') == 'd3d12' and keys.get('validate') == '1':
+    # Since display 1.0.0 the stub is Display8's one mode and `Mode=` is retired (read past,
+    # and absent from the shipped ini): only a retired `Mode=forward` left in an old ini is
+    # not the stub, and Display8 runs the stub then too. Gating on `Mode=stub` left every
+    # game without the validation layer (found in FO-A, 2026-11-06).
+    stub = keys.get('mode', 'stub') in ('stub', 'forward', '')
+    if stub and keys.get('backend') == 'd3d12' and keys.get('validate') == '1':
         env = {'VKD3D_CONFIG': 'vk_debug', 'VK_INSTANCE_LAYERS': 'VK_LAYER_KHRONOS_validation', 'VK_LAYER_DEBUG_ACTION': 'VK_DBG_LAYER_ACTION_LOG_MSG',
                'VK_LAYER_REPORT_FLAGS': 'error,warn'}
         if logs is not None:
             env['VK_LAYER_LOG_FILENAME'] = str(Path(logs) / 'vvl.log')
         return env
-    if keys.get('mode') != 'stub':
+    if not stub:
         return {}
     order = {w.strip() for w in keys.get('backend', '').split(',')}
     if keys.get('backend') != 'vulkan':
@@ -1032,7 +1049,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         wlog = open(logs / 'wine.log', 'a')
         wlog.write(f'--- {now()} launch {config.EXE_NAME} {args}\n')
         wlog.flush()
-        p = subprocess.Popen(['python3', str(config.UMU), str(exe), *args.split()],
+        p = subprocess.Popen(['python3', str(config.UMU), str(exe), *split_args(args)],
                              env=env, cwd=str(exe.parent), stdout=wlog, stderr=subprocess.STDOUT,
                              stdin=subprocess.DEVNULL, start_new_session=True, pass_fds=self._slot_fds())
         self.s['pids']['launcher'] = p.pid
@@ -1367,10 +1384,24 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             raise GameError('scene: Scene.asi did not answer within 15 s')
         return out.replace('\r', '').rstrip()
 
+    def objects(self):
+        """The game's objects now: Scene.asi's `objects` writes Scene.objects.jsonl beside
+        Scene.log (testbench/scene/README.md), read here as (header, [object dicts])
+        (bench/objects.py has the fields and the filters). Read-only on the game."""
+        from . import objects
+        out = self.scene('objects')
+        if '\n  !' in '\n' + out:
+            raise GameError('scene: objects refused: ' + out)
+        f = self.exe_dir / objects.FILE
+        if not f.exists():
+            raise GameError(f'scene: objects answered but wrote no {objects.FILE}: {out}')
+        return objects.parse(f.read_text(errors='replace'))
+
     def collect_logs(self):
         dst = self.dir / 'logs'
         g = self.exe_dir
-        for name in ('Menus.log', 'HUD.log', 'BinkProxy.log', 'Scene.log', 'Scene.marks', 'RetireCheck.log',
+        for name in ('Menus.log', 'HUD.log', 'BinkProxy.log', 'Scene.log', 'Scene.marks', 'Scene.objects.jsonl',
+                     'RetireCheck.log',
                      'RefitPlayer.ini', 'Scene.ini', config.SETTINGS_FILE,
                      'Stems.log', 'Stems.ini',
                      'Menus.ini', 'HUD.ini', 'QOL.log', 'QOL.ini', 'QOLRules.log', 'QOLRules.ini', 'GridLayout.log',

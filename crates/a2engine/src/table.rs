@@ -106,6 +106,21 @@ pub struct Block {
     pub note: &'static str,
 }
 
+/// A section's CRC-32 in the executable's file on disk (build.toml `[pe] file_crc`).
+pub struct FileCrc {
+    /// `.text`.
+    pub section: &'static str,
+    pub crc: u32,
+}
+
+/// A companion module the build's run-time marks describe (build.toml `[[module]]`),
+/// named by the CRC-32 of its `.text` in its file.
+pub struct Module {
+    /// `FleetOpsHook.dll`.
+    pub name: &'static str,
+    pub text_crc: u32,
+}
+
 pub struct Build {
     /// `gog-1.1`.
     pub name: &'static str,
@@ -127,6 +142,16 @@ pub struct Build {
     /// One per symbol, in table order.
     pub entries: &'static [Entry],
     pub blocked: &'static [Block],
+    /// On-disk section CRC-32s the executable must also match (README.md, "Identity"):
+    /// empty for a build told by its three numbers alone.
+    pub file_crc: &'static [FileCrc],
+    /// The companion modules this build's marks describe; empty for none.
+    pub modules: &'static [Module],
+    /// The hooks, besides `blocked`, that stand down when a companion module is not the
+    /// one profiled (they depend on its run-time patches).
+    pub blocked_mod: &'static [Block],
+    /// `n_resolved` with `blocked_mod` blocked too.
+    pub n_resolved_mod: u16,
 }
 
 pub struct Table {
@@ -189,6 +214,8 @@ pub struct Runtime {
     /// note that names it; written in `init`.
     pub(crate) exe: Note,
     pub(crate) plugin_note: Note,
+    /// 1 when a companion module of the matched build is not the one profiled.
+    pub(crate) companion_bad: AtomicU8,
 }
 
 // `mem` and `log` are written once, in `init`, before `build` is published.
@@ -214,6 +241,7 @@ impl Runtime {
             log: UnsafeCell::new(None),
             exe: Note::new(),
             plugin_note: Note::new(),
+            companion_bad: AtomicU8::new(0),
         }
     }
 }

@@ -13,3 +13,6 @@ path = "src/lib.rs"
 
 [dependencies]
 a2ini = { path = "../../crates/a2ini" }
+
+[dev-dependencies]
+a2fmt = { path = "../../crates/a2fmt" }

@@ -337,6 +337,17 @@ pub struct Posed {
     /// A freighter's cargo markings: lighting materials (lower case) drawn unlit in
     /// this colour. Empty for everything else.
     pub cargo: Vec<(String, V3)>,
+    /// Meshes drawn with another texture than their SOD's, as the engine's database held
+    /// it for this instance at the draw: (node, texture name). Filled only where a hull is
+    /// claimed at the instance's database draw (Roots: FleetOpsHook's per-ship logo).
+    pub textures: Vec<(usize, String)>,
+}
+
+impl Posed {
+    /// The texture node `node` is drawn with this time, when it is not its SOD's.
+    pub fn texture_of(&self, node: usize) -> Option<&str> {
+        self.textures.iter().find(|(n, _)| *n == node).map(|(_, t)| t.as_str())
+    }
 }
 
 static mut VIEWS: [BTreeMap<usize, Posed>; 3] = [BTreeMap::new(), BTreeMap::new(), BTreeMap::new()];

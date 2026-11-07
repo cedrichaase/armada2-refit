@@ -21,6 +21,11 @@ manifest, `PLAYING.md` or the release notes until the user says otherwise.
 `tools/layers.py --check` (CI) fails when `publish/`, `gui-installer/` or `.github/` name a
 game that is not.
 
+What `./install --game fo-roots` puts in `Data/` now: Display8 (`display`), the ASI loader
+Roots ships none of (`asiloader`, `winmm.dll`; `asiloader/README.md`) and render3d. No UI,
+QOL, rules, online, textures or cutscenes yet. a2mod files each layer's files only for the
+games in the layer's `games`.
+
 ## Choosing a game
 
 `A2_PROFILE=<id>` (the environment, or a top-level line of
@@ -83,7 +88,7 @@ folders: `textures`, `sod`, `sprites` and `odf`, each mounted from the folders `
 lists, in order. render3d adds its recipe override folders (`sky`, `surfaces`, `nebulae`,
 `menu`: `MODDING.md`, "Content recipes"), which are ours and the same for every game, and
 the UI mounts the game folder behind `textures`. The plugins cannot read this folder at
-run time, so each keeps the rows in a `LAYOUT` table (`render3d/core/src/files.rs`,
+run time, so each keeps the rows in a `LAYOUT` table (`render3d/core/src/files/mod.rs`,
 `ui/src/files.rs`) marked with the game's id, and `tools/layers.py --check` fails when a
 row and the descriptor differ. Archives (`fpq`, `zfs`) mount behind the loose folders of
 the same virtual folder and serve nothing until their readers exist.
@@ -91,6 +96,13 @@ the same virtual folder and serve nothing until their readers exist.
 `tools/layers.py --check` holds `[files]` to its shape too: the folder lists relative and
 non-empty, the formats known, each archive of a declared kind and mounted at one of the
 four folders.
+
+A game with mods says how its mods are laid out in `[files] mods` (optional): `dir`, the
+folder of the mods under the data folder, and `switches`, the command-line switches that
+name the active mod (Fleet Operations: `Mods`, `-mod` and `/mod`). render3d then mounts
+its whole list once per folder of the active mod's chain, the mod's over its parent's
+over the game's (`render3d/core/src/files/mods.rs` has the rules), and `tools/layers.py
+--check` holds the descriptor and render3d's `// files: mods <game>` block equal.
 
 ## What does not read it yet
 

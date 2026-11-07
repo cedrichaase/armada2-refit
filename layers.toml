@@ -74,6 +74,25 @@ games = ['armada2', 'fo-roots']
 steps = ['display']
 summary = "the game's Direct3D 8, ours: Vulkan or Direct3D 12 for the plugins, the system's own d3d8.dll when neither starts"
 
+# The ASI loader of the games that ship none (Fleet Operations: Roots; Armada II's is the
+# platform layer's, which a2mod never switches, so this layer is not Armada II's and a2mod
+# files no winmm.dll there). It goes with Display8 and requires it: beside DxWrapper the
+# loader kills Roots at start (asiloader/README.md).
+[[layer]]
+id = 'asiloader'
+name = 'ASI loader'
+dir = 'asiloader'
+install = 'asiloader/install'
+remove = 'asiloader/install --remove'
+files = ['winmm.dll']   # only where it is the loader's (a2mod checks by content)
+backups = ['.a2asi-backup']
+select = 'core'
+requires = ['display']
+scope = 'local'
+games = ['fo-roots']
+steps = []
+summary = "the Ultimate ASI Loader as winmm.dll, for the games that ship none, so that their .asi plugins load; not part of any release"
+
 # ---------------------------------------------------------------- selectable
 
 [[layer]]
@@ -86,7 +105,7 @@ files = ['QOL.asi', 'QOL.ini']
 select = 'on'
 requires = []
 scope = 'local'
-games = ['armada2']
+games = ['armada2', 'fo-roots']
 steps = ['qol']
 summary = 'right-drag pan speed, bigger selections and control groups; plays against stock players'
 
@@ -174,7 +193,7 @@ files = ['Render3D.asi', 'Render3D.ini', 'Surfaces/*.ini', 'Nebulae/*.ini']
 select = 'on'
 requires = ['display']
 scope = 'local'
-games = ['armada2']
+games = ['armada2', 'fo-roots']
 steps = ['render3d']
 summary = 'the 3D view through a renderer of our own: HDR, anti-aliasing, bloom, lit hulls with shadows, skies, effects, planets and nebulae'
 
@@ -190,7 +209,7 @@ files = ['UI.asi', 'UI.ini', 'Menus/*.bmp']
 select = 'on'
 requires = ['display']
 scope = 'local'
-games = ['armada2']
+games = ['armada2', 'fo-roots']
 steps = ['ui']
 summary = 'the HUD, the menus, the loading screen and the cursor redrawn at any aspect ratio'
 

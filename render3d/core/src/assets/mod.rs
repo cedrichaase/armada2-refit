@@ -6,7 +6,11 @@
 //! Names are looked up case-insensitively, as the engine (on Windows) does, through
 //! an index of each directory made once. The directories are the file system's virtual
 //! folders (`files`, `LAYOUT`): `textures`, `sod`, `sprites` and `odf`, wherever the
-//! game keeps them.
+//! game keeps them. The index goes source by source, top first, so a name is found in
+//! the top source that has it wherever it sits under the folder (a mod's
+//! `odf\weapons\x.odf` over the game's `odf\x.odf`, as Fleet Operations' file system
+//! finds a file by its name), and keeps every version of it below for an ODF's include
+//! of its own name (`a2fmt::odf`, `Odf::load_layered`).
 
 use crate::files;
 use crate::log;
@@ -21,38 +25,45 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 
-/// Every file under a virtual folder (recursively), by lower-case file name, to its
-/// virtual path.
+/// Every file under a virtual folder (recursively), by lower-case file name, to where
+/// it is: each source that has one of that name, top first, with its path there.
 struct DirIndex {
-    files: BTreeMap<String, String>,
+    files: BTreeMap<String, Vec<(&'static dyn a2fmt::vfs::Vfs, String)>>,
 }
 
 impl DirIndex {
     fn build(dir: &str) -> DirIndex {
-        let mut files = BTreeMap::new();
-        walk(dir, &mut files, 0);
+        let mut files: BTreeMap<String, Vec<(&'static dyn a2fmt::vfs::Vfs, String)>> = BTreeMap::new();
+        for (src, rest) in files::sources(dir) {
+            let mut one = BTreeMap::new();
+            walk(src, &rest, &mut one, 0);
+            for (name, path) in one {
+                files.entry(name).or_default().push((src, path));
+            }
+        }
         DirIndex { files }
     }
-    fn path(&self, name: &str) -> Option<&str> {
-        self.files.get(&rt::lower(name)).map(|s| s.as_str())
+    /// The version `v` of a file (0 the top one).
+    fn read_version(&self, name: &str, v: usize) -> Option<Vec<u8>> {
+        let (src, path) = self.files.get(&rt::lower(name))?.get(v)?;
+        src.open(path)
     }
     fn read(&self, name: &str) -> Option<Vec<u8>> {
-        files::open(self.path(name)?)
+        self.read_version(name, 0)
     }
 }
 
-fn walk(rel: &str, out: &mut BTreeMap<String, String>, depth: u32) {
+/// One source's files under `rel`, by lower-case name: the first found wins within it,
+/// a top-level file over one in a subdirectory.
+fn walk(src: &dyn a2fmt::vfs::Vfs, rel: &str, out: &mut BTreeMap<String, String>, depth: u32) {
     if depth > 6 {
         return;
     }
-    for files::Entry { name, dir } in files::list_dir(rel) {
-        let mut p = String::from(rel);
-        p.push('\\');
-        p.push_str(&name);
+    for files::Entry { name, dir } in src.list(rel) {
+        let p = files::join(rel, &name);
         if dir {
-            walk(&p, out, depth + 1);
+            walk(src, &p, out, depth + 1);
         } else {
-            // The first found wins: a top-level file over one in a subdirectory.
             out.entry(rt::lower(&name)).or_insert(p);
         }
     }
@@ -67,6 +78,7 @@ struct Store {
     sods: BTreeMap<String, Option<Rc<Sod>>>,
     odfs: BTreeMap<String, Option<Rc<Odf>>>,
     bases: BTreeMap<String, String>,
+    races: BTreeMap<String, String>,
     sprites: Option<Rc<SpriteTable>>,
     widths: BTreeMap<String, Option<u32>>,
     textures: BTreeMap<String, Option<gpu::Texture>>,
@@ -80,7 +92,7 @@ fn store() -> &'static mut Store {
         if STORE.is_none() {
             let t0 = rt::now();
             let tex_dir = DirIndex::build("textures");
-            let tex_index = TexIndex::new(tex_dir.files.keys().cloned());
+            let tex_index = TexIndex::with_extensions(tex_dir.files.keys().cloned(), files::game().texture_exts);
             let s = Store {
                 sod_dir: DirIndex::build("sod"),
                 tex_dir,
@@ -90,6 +102,7 @@ fn store() -> &'static mut Store {
                 sods: BTreeMap::new(),
                 odfs: BTreeMap::new(),
                 bases: BTreeMap::new(),
+                races: BTreeMap::new(),
                 sprites: None,
                 widths: BTreeMap::new(),
                 textures: BTreeMap::new(),
@@ -143,9 +156,23 @@ pub fn odf(name: &str) -> Option<Rc<Odf>> {
         return v.clone();
     }
     let dir = &s.odf_dir;
-    let v = Odf::load(&key, |n| dir.read(n)).ok().map(Rc::new);
+    let v = Odf::load_layered(&key, |n, v| dir.read_version(n, v)).ok().map(Rc::new);
     s.odfs.insert(key, v.clone());
     v
+}
+
+/// An ODF's `race`, lower case, read through its includes (Fleet Operations names each
+/// object's race there: `unitedfederation`, `borg`, ...); empty when it names none or
+/// there is no such ODF. Cached per name; logged once each.
+pub fn race(name: &str) -> String {
+    let key = rt::lower(odf_stem(name));
+    let s = store();
+    if let Some(r) = s.races.get(&key) {
+        return r.clone();
+    }
+    let r = odf(&key).and_then(|d| d.get_str("race").map(rt::lower)).unwrap_or_default();
+    s.races.insert(key, r.clone());
+    r
 }
 
 /// An ODF file name without its extension (any case); the name as it is if it has none.
@@ -199,7 +226,7 @@ pub fn sprites() -> Rc<SpriteTable> {
 pub fn image(name: &str) -> Option<tga::Image> {
     let s = store();
     let base = String::from(s.tex_index.find(name)?);
-    tga::decode(&s.tex_dir.read(&base)?).ok()
+    a2fmt::image::decode(&s.tex_dir.read(&base)?).ok()
 }
 
 /// Whether a texture of that name exists (`textures\<name>.tga`: `Textures/RGB` in
@@ -213,17 +240,15 @@ fn tex_width(s: &mut Store, file: &str) -> Option<u32> {
     if let Some(w) = s.widths.get(&key) {
         return *w;
     }
-    let w = s.tex_dir.path(&key).and_then(|p| {
-        // The header is all we need: 18 bytes.
-        let d = files::open(p)?;
-        tga::Header::parse(&d).ok().map(|h| h.width as u32)
-    });
+    // The header is all we need: 18 bytes.
+    let w = s.tex_dir.read(&key).and_then(|d| a2fmt::image::width(&d));
     s.widths.insert(key, w);
     w
 }
 
 /// A texture by name (no extension), with its whole chain: stock's own levels where it
-/// has them (`mip_name()`'s rule), the rest box-filtered. None if there is no such
+/// has them (`mip_name()`'s rule; a DDS file's own levels inside it), the rest
+/// box-filtered. None if there is no such
 /// texture. Made on the device at once, holding no copy of its texels (`Transient`):
 /// it is loaded again after the next `reset()`.
 pub fn texture(name: &str) -> Option<gpu::Texture> {
@@ -242,9 +267,18 @@ pub fn texture(name: &str) -> Option<gpu::Texture> {
 
 fn load_texture(s: &mut Store, name: &str) -> Option<gpu::Texture> {
     let base = String::from(s.tex_index.find(name)?);
-    let img = tga::decode(&s.tex_dir.read(&base)?).ok()?;
+    let data = s.tex_dir.read(&base)?;
+    let img = a2fmt::image::decode(&data).ok()?;
+    // A DDS file's own chain (Roots' textures), level by level while it lasts: what the
+    // engine samples, not our box filter's (PLAN-FLEETOPS.md, decision 355).
+    let own = if a2fmt::image::is_dds(&data) {
+        a2fmt::dds::Header::parse(&data).map(|h| h.mip_count).unwrap_or(1)
+    } else {
+        1
+    };
+    let own_data = if own > 1 { Some(data) } else { drop(data); None };
     let (w, h) = (img.width, img.height);
-    if w == 0 || h == 0 || !w.is_power_of_two() || !h.is_power_of_two() {
+    if w == 0 || h == 0 || (!files::game().npot_textures && (!w.is_power_of_two() || !h.is_power_of_two())) {
         return None;
     }
     let chain: Vec<String> = {
@@ -253,35 +287,49 @@ fn load_texture(s: &mut Store, name: &str) -> Option<gpu::Texture> {
         let names = unsafe { &*idx }.mip_chain(&base, |f| tex_width(s, f));
         names.into_iter().map(String::from).collect()
     };
+    // The game is 32-bit: every allocation on this path can fail, and a texture that does
+    // not fit is skipped (logged by the caller), never an abort.
     let mut levels: Vec<Vec<u8>> = Vec::new();
+    levels.try_reserve_exact(32).ok()?;
     levels.push(img.pixels);
     let (mut lw, mut lh) = (w, h);
     while lw > 1 || lh > 1 {
         let (nw, nh) = ((lw / 2).max(1), (lh / 2).max(1));
         let k = levels.len();
-        let stock = chain.get(k - 1).and_then(|f| s.tex_dir.read(f)).and_then(|d| tga::decode(&d).ok());
+        let stock = match own_data.as_deref() {
+            Some(d) if (k as u32) < own => a2fmt::dds::decode_level(d, k as u32).ok(),
+            _ => chain.get(k - 1).and_then(|f| s.tex_dir.read(f)).and_then(|d| a2fmt::image::decode(&d).ok()),
+        };
         let next = match stock {
             Some(i) if i.width == nw && i.height == nh => i.pixels,
-            _ => halve(&levels[k - 1], lw, lh),
+            _ => halve(&levels[k - 1], lw, lh)?,
         };
         levels.push(next);
         lw = nw;
         lh = nh;
     }
     let n = levels.len() as u32;
-    let mut px = Vec::with_capacity(levels.iter().map(|l| l.len()).sum());
-    for l in &levels {
-        px.extend_from_slice(l);
-    }
+    let px = concat_levels(&levels)?;
     drop(levels);
     let d = gpu::TextureDesc::d2(w, h, gpu::Format::Bgra8, gpu::Usage::SAMPLED).with_levels(n);
     Some(crate::gfx::gpu().texture(d, gpu::Contents::Transient(px)))
 }
 
-/// A 2x2 box filter of a BGRA8 image.
-fn halve(src: &[u8], w: u32, h: u32) -> Vec<u8> {
+/// A mip chain's levels end to end in one buffer; None when that does not fit.
+pub fn concat_levels(levels: &[Vec<u8>]) -> Option<Vec<u8>> {
+    let mut px = Vec::new();
+    px.try_reserve_exact(levels.iter().map(|l| l.len()).sum()).ok()?;
+    for l in levels {
+        px.extend_from_slice(l);
+    }
+    Some(px)
+}
+
+/// A 2x2 box filter of a BGRA8 image; None when the result does not fit.
+pub fn halve(src: &[u8], w: u32, h: u32) -> Option<Vec<u8>> {
     let (nw, nh) = ((w / 2).max(1), (h / 2).max(1));
-    let mut out = Vec::with_capacity((nw * nh * 4) as usize);
+    let mut out = Vec::new();
+    out.try_reserve_exact((nw * nh * 4) as usize).ok()?;
     for y in 0..nh {
         for x in 0..nw {
             for c in 0..4 {
@@ -295,7 +343,7 @@ fn halve(src: &[u8], w: u32, h: u32) -> Vec<u8> {
             }
         }
     }
-    out
+    Some(out)
 }
 
 /// Drops everything on the device (before a `Reset`).

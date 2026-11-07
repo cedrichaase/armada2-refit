@@ -20,6 +20,19 @@
 #       onto stock's exe stands down the same hooks; Roots' exe with its timestamp
 #       changed is an unknown build. (Stock's profile forced onto Roots' exe passes every
 #       check, which is why the identity, not the signatures, picks the build: printed.)
+#       Its identity is more than the header: the CRC-32s of the file's .text and .test,
+#       and FleetOpsHook.dll named by the CRC-32 of its .text (build.toml `file_crc`,
+#       `[[module]]`), so also, on Roots' exe:
+#   (f) a FleetOpsHook.dll that is not the profiled one (a wrong CRC), or none loaded:
+#       the build still matches, and exactly the hooks that depend on FleetOpsHook's
+#       patches stand down (`is patched by FleetOpsHook.dll`, or `changed by` where an
+#       unverified mark already stops them), with the rest as with the right one;
+#   (g) one byte of the file's .text or .test changed: the three numbers still match,
+#       the CRC does not, so no build matches: unknown build.
+#   A hook that exists only in Roots' profile (a Roots-only entry, such as the object
+#   loop's call at 0x598297) stands down on stock with `has no address in gog-1.1` and is
+#   left out of "all ready" there; offline it stands down on Roots' exe as well, because
+#   FleetOpsHook writes the call as it loads and the file holds stock's bytes.
 #
 # (a), (b) and (d) need the game's exe and (e) Roots' too, and are skipped, said so,
 # without them; (c) is synthetic and always runs. Exit 1 on any failure.
@@ -97,9 +110,12 @@ if not os.path.isfile(exe):
 data = open(exe, 'rb').read()
 e = pe.Exe(data)
 base = syms.report(exe)
-if base['build'] is None or any(not h['ready'] for h in hooks(base)):
+# Hooks that exist only in a child build (a Roots-only entry) have no address on stock.
+roots_only = {h['hook'] for h in hooks(base) if not h['ready'] and h['why'].startswith('has no address in gog-1.1')}
+if base['build'] is None or any(not h['ready'] and h['hook'] not in roots_only for h in hooks(base)):
     bad(f'the unchanged {exe} is not all ready ({base["hooks_ready"]}/{base["hooks"]}); the negative tests need the stock build')
     sys.exit(1)
+ok(f'stock: {base["hooks_ready"]}/{base["hooks"]} hooks ready ({len(roots_only)} exist only in Roots\' profile: {", ".join(sorted(roots_only)) or "none"})')
 
 # (a) timestamp
 nt = struct.unpack_from('<I', data, 0x3c)[0]
@@ -160,9 +176,9 @@ for t in all_tables:
     open(p, 'wb').write(d)
     rep = syms.report(p, plugin=t.plugin)
     mine = [x for x in rep['tables'] if x['file'] == t.file.rel()][0]
-    down = {h['hook'] for h in mine['hooks'] if not h['ready']}
-    others = {h['hook'] for x in rep['tables'] if x['file'] != t.file.rel() for h in x['hooks'] if not h['ready']}
-    reasons = {h['why'] for h in mine['hooks'] if not h['ready']}
+    down = {h['hook'] for h in mine['hooks'] if not h['ready']} - roots_only
+    others = {h['hook'] for x in rep['tables'] if x['file'] != t.file.rel() for h in x['hooks'] if not h['ready']} - roots_only
+    reasons = {h['why'] for h in mine['hooks'] if not h['ready'] and h['hook'] not in roots_only}
     if mine['build'] is not None and down == want and not others \
             and reasons <= {'is not stock (bytes differ)'}:
         ok(f'(b) {t.file.rel()}: {ent.get("symbol")} changed: exactly {sorted(want)} stand down')
@@ -207,21 +223,53 @@ for t in all_tables:
     if t.fname in gs.files:
         for hid, (sym, why) in profs.blocks(gs, t.fname, rb, t).items():
             want[hid] = why
+# FleetOpsHook's call at the object loop is written at run time: the file holds stock's bytes
+blind = {h for h in roots_only}
+module = rb.modules[0]['name'] if rb.modules else None
+comp = {}
+for t in all_tables:
+    if t.fname in gs.files:
+        blk = profs.blocks(gs, t.fname, rb, t)
+        for hid, (sym, why) in profs.companion_blocks(gs, t.fname, rb, t, blk).items():
+            comp[hid] = why
 rep = syms.report(roots)
 down = {h['hook']: h['why'] for h in hooks(rep) if not h['ready']}
-if rep['build'] == f'armada2/{RB}' and down == want and want:
-    ok(f'(e) Roots\' exe is {RB}: exactly its {len(want)} marked hooks stand down, {len(hooks(rep)) - len(want)} ready')
+if rep['build'] == f'armada2/{RB}' and set(down) == set(want) | blind and want \
+        and all(down[h] == want[h] for h in want) and all(down[h] == 'calls something else' for h in blind):
+    ok(f'(e) Roots\' exe is {RB}: exactly its {len(want)} marked hooks stand down, {len(hooks(rep)) - len(down)} ready'
+       f'{"; " + ", ".join(sorted(blind)) + " too (written at run time)" if blind else ""}')
 else:
     bad(f'(e) Roots\' exe: build {rep["build"]}, down {sorted(down)} against marked {sorted(want)}')
 rep = syms.report(exe, build=RB)
 down2 = {h['hook']: h['why'] for h in hooks(rep) if not h['ready']}
-if down2 == want:
-    ok(f'(e) {RB} forced onto stock\'s exe: the same {len(want)} hooks stand down, nothing else')
+# stock's exe has no FleetOpsHook.dll beside it: its dependants stand down as well
+if set(down2) == set(want) | set(comp) | blind:
+    ok(f'(e) {RB} forced onto stock\'s exe: the {len(want)} marked hooks stand down, and with no {module} the {len(set(comp) - set(want))} that depend on it')
 else:
-    bad(f'(e) {RB} on stock: {sorted(set(down2) ^ set(want))} differ')
+    bad(f'(e) {RB} on stock: {sorted(set(down2) ^ (set(want) | set(comp) | blind))} differ')
 rep = syms.report(roots, build='gog-1.1')
 print(f'note (e) gog-1.1 forced onto Roots\' exe: {sum(1 for h in hooks(rep) if h["ready"])}/{len(hooks(rep))} '
       f'hooks pass their checks: the signatures alone do not see Roots\' changes')
+
+# (f) another FleetOpsHook.dll, or none
+if module is None:
+    print('skip (f): the build names no companion module')
+else:
+    for label, mods in (('a wrong CRC', {module: 0x12345678}), ('none loaded', {}), ('an unreadable file', {module: None})):
+        rep = syms.report(roots, modules=mods)
+        down3 = {h['hook']: h['why'] for h in hooks(rep) if not h['ready']}
+        log = ' '.join(l for x in rep['tables'] for l in x['log'])
+        extra = set(down3) - set(want) - blind
+        expect = set(comp) - set(want) - blind
+        pat = [h for h in extra if not down3[h].startswith('is patched by ' + module)]
+        if rep['build'] == f'armada2/{RB}' and extra == expect and not pat \
+                and all(down3[h] == want[h] for h in want) and f'companion {module}' in log \
+                and 'stand down' in log.split('companion ' + module, 1)[1]:
+            ok(f'(f) {module} with {label}: build kept, {len(extra)} dependent hooks stand down "is patched by {module}", '
+               f'the other {len(hooks(rep)) - len(down3)} stay ready')
+        else:
+            bad(f'(f) {module} with {label}: build {rep["build"]}, extra {sorted(extra)} against {sorted(expect)}, odd {pat}')
+
 rd = bytearray(open(roots, 'rb').read())
 rnt = struct.unpack_from('<I', rd, 0x3c)[0]
 struct.pack_into('<I', rd, rnt + 8, struct.unpack_from('<I', rd, rnt + 8)[0] ^ 0x1)
@@ -232,6 +280,50 @@ if rep['build'] is None and {h['hook'] for h in hooks(rep) if h['ready']} <= run
     ok('(e) Roots\' exe with its timestamp changed: unknown build, nothing but unknown="run" hooks')
 else:
     bad(f'(e) Roots\' stamped exe: build {rep["build"]}')
+# (f) again with a real foreign file: FleetOpsHook.dll copied above a scratch Data/ with one
+# byte of its .text changed (the offline lookup finds it as the game's install has it)
+if module is not None:
+    fdir = os.path.join(tmp, 'fo', 'Data')
+    os.makedirs(fdir)
+    shutil.copyfile(roots, os.path.join(fdir, os.path.basename(roots)))
+    src = None
+    for dd in (os.path.dirname(roots), os.path.dirname(os.path.dirname(roots))):
+        if os.path.isfile(os.path.join(dd, module)):
+            src = os.path.join(dd, module)
+    if src is None:
+        print(f'skip (f) with a file: no {module} beside the install')
+    else:
+        dll = bytearray(open(src, 'rb').read())
+        de = pe.Exe(bytes(dll))
+        name, sva, vsize, raw, rawptr, flags = next(x for x in de.sections if x[0] == '.text')
+        dll[rawptr + 0x1000] ^= 0xff
+        open(os.path.join(tmp, 'fo', module), 'wb').write(dll)
+        rep = syms.report(os.path.join(fdir, os.path.basename(roots)))
+        down4 = {h['hook']: h['why'] for h in hooks(rep) if not h['ready']}
+        log = ' '.join(l for x in rep['tables'] for l in x['log'])
+        if rep['build'] == f'armada2/{RB}' and set(down4) == set(want) | set(comp) | blind and 'is not the profiled' in log:
+            ok(f'(f) a modified {module} file beside the exe: build kept, the dependent hooks stand down')
+        else:
+            bad(f'(f) a modified {module} file: build {rep["build"]}, {sorted(set(down4) ^ (set(want) | set(comp) | blind))}')
+
+# (g) one byte of the file's .text, then .test: the header is unchanged, the CRC is not
+rd = bytearray(open(roots, 'rb').read())
+re_ = pe.Exe(bytes(rd))
+if rb.file_crc:
+    for sec in rb.file_crc:
+        name, sva, vsize, raw, rawptr, flags = next(x for x in re_.sections if x[0] == sec)
+        d2 = bytearray(rd)
+        d2[rawptr + min(vsize, raw) - 1] ^= 0xff          # the last byte of the content
+        p = os.path.join(tmp, f'roots-crc{sec}.exe')
+        open(p, 'wb').write(d2)
+        rep = syms.report(p, modules={rb.modules[0]['name']: rb.modules[0]['text_crc']} if rb.modules else None)
+        log = ' '.join(l for x in rep['tables'] for l in x['log'])
+        r0 = pe.Exe(bytes(d2))
+        if r0.identity() == re_.identity() and rep['build'] is None and 'file crc' in log \
+                and {h['hook'] for h in hooks(rep) if h['ready']} <= runs:
+            ok(f'(g) one byte of {sec} changed: the three numbers match, the CRC does not: unknown build')
+        else:
+            bad(f'(g) {sec} changed: build {rep["build"]}')
 if hashlib.sha256(open(roots, 'rb').read()).hexdigest() == rsha:
     ok('Roots\' exe was only read')
 sys.exit(fail)

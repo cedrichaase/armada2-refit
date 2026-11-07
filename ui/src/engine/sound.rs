@@ -98,6 +98,8 @@ pub fn shell_named(name: &str) -> bool {
     true
 }
 
+/// Whether the UI makes button sounds: the hook is ready and the build's constructors are
+/// the ones it calls (a value, 0 on Fleet Operations: Roots, whose audio is FleetOpsHook's FMOD).
 pub fn functions_stock() -> bool {
-    eng().ready(hook::PANELS_SOUND).is_ok()
+    eng().ready(hook::PANELS_SOUND).is_ok() && value::PANELS_SOUND_OURS() != 0
 }

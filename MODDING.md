@@ -61,9 +61,9 @@ exports yourself.
   be filled says its room and the writer fills no more and sets `size` to what it wrote.
   Whatever is past the other side's size is the field's default. Use what minor N added
   only when Display8's minor is N or more. A struct inside another does not grow in a
-  minor, since that would move what follows. The contract is at 1.4 (the claims at 1.1,
+  minor, since that would move what follows. The contract is at 1.5 (the claims at 1.1,
   Direct3D 12's pipeline library at 1.2, `CLAIM_MENUS` and `display8v1_mode` at 1.3,
-  the Direct3D 12 pass at 1.4).
+  the Direct3D 12 pass at 1.4, `CLAIM_WINDOW` at 1.5).
 - **Anything else is a new major**: a field removed, moved, retyped or given a new
   meaning, an export's signature or meaning, a rule between recorders (layouts,
   states, heaps, who closes a pass). The exports are named with the major
@@ -211,13 +211,15 @@ A content set is a folder of small ini tables, one per plugin part:
 | Folder | Tables |
 |---|---|
 | `render3d/content/sets/<set>/` | `effects.ini`, `hulls.ini`, `ordnance.ini`, `overlays.ini`, `particles.ini`, `sky.ini`, `specials.ini`, `world.ini`: each module's names (nodes, sprites, SODs, faction keys and colours, the special effects' kinds) and the recipes it builds in, named by their file under `render3d/content/` |
-| `ui/content/sets/<set>/` | `ui.ini`: the races (with the theme's look for each), resources, campaign cards, the credits' and menus' views, the game files the UI reads and the widget gallery's lists |
+| `ui/content/sets/<set>/` | `ui.ini`: the races (with the theme's look for each), resources, campaign cards, the credits' and menus' views, the game files the UI reads, the widget gallery's lists, and `[Glyphs]`: the codes the game's fonts draw as pictures or figures of their own (a code in hex = the word or figure the UI writes instead; any other code is Windows-1252) |
 
 Every `.ini` under `render3d/content/` and `ui/content/` is built into the plugin
 (`render3d/core/build.rs`, `ui/build.rs`), so a set needs nothing installed; the modules
 parse their table once, at first use. A set with no table for a part is the empty table
 for it: that part has no names and draws the engine's own. `stock` is the set of
-`gog-1.1`; `games/fo-roots.toml` names no set yet, so Fleet Operations: Roots has none.
+`gog-1.1`, and a build that inherits it (`inherits` in `build.toml`) reads the parent's
+sets until its own `content.toml` names others; `fleetops` is render3d's set of the Fleet
+Operations: Roots build.
 
 To add a set:
 
@@ -225,7 +227,13 @@ To add a set:
    `render3d/content/sets/<set>/` and `ui/content/sets/stock/` to `ui/content/sets/<set>/`.
 2. Edit the copies to the game's names. A recipe of the set's own goes in its folder
    (`render3d/content/sets/<set>/sky/<name>.ini`) and its table names it by that path;
-   leave out a table, or a line, the game has no use for.
+   leave out a table, or a line, the game has no use for. Where the game's ODFs are not
+   stock's, two tables say how its names map onto the built-in looks rather than copying
+   them: `ordnance.ini`'s `[Names]` (`Ordnance.<odf> = <recipe>`, `Wave.<odf> =
+   <recipe>`: which ordnance ODF each built-in recipe draws; with it, a recipe draws only
+   the ODFs named, since a stock name the game shares may be another weapon there) and
+   `effects.ini`'s `[Races]` (`<race> = <faction key>`: a ship's faction by its ODF's
+   `race`, read through its includes, instead of its name's first letter).
 3. Name the set in the build's profile: `content = "<set>"` in
    `profiles/<build>/build.toml`, or per plugin or part in
    `profiles/<build>/content.toml` (`[set] render3d = "<set>"`, `"render3d.hulls" = "<set>"`,
@@ -286,7 +294,7 @@ the built-in one of the same name:
 | `Menu\map.ini` | the main menu's scene |
 
 These folders are mounts of render3d's file system (`a2fmt::vfs`, the `LAYOUT` table in
-`render3d/core/src/files.rs`), like the game's texture roots and its `SOD`, `Sprites` and
+`render3d/core/src/files/mod.rs`), like the game's texture roots and its `SOD`, `Sprites` and
 `odf` folders (`games/README.md`, "Files"): a recipe is looked up as `sky\<name>.ini`
 and the mount says which folder of the game directory that is. In Armada II each is the
 folder of that name, so a recipe file goes where it always did.

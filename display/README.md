@@ -85,14 +85,36 @@ ASI loader of ours). Display8 is told from DxWrapper's stub by its panic message
 Heroic's `fleetopsroots50` entry already sets `WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b;d3d9=n,b`,
 so Wine loads the game folder's `d3d8.dll`; nothing in Heroic's config is edited.
 
-What happens (FO-4, `fo-display8`): Display8 reads the build as `armada2/fo-roots-5.0Z11`,
-the symbols 2/34 resolve, and `display.modes` stands down (`FindDisplayMode` is changed by
-Roots, not yet verified), so the stub could open no display and Display8 **bails out**: the
-game draws through Wine's own `d3d8.dll`, the plugins stand down, and the menu and a
-skirmish draw as Roots does without DxWrapper. The Vulkan backend is not reached yet; that
-needs the display hooks verified after the Display8 audit, and a skirmish on a Display8
-device is expected to go white until Display8 follows Roots' second `CreateDevice`
-(`fo-display-readiness`). `Display8.log` is in the prefix's `AppData/Local/armada2-refit/logs`.
+What happens (FO-A, `fo-display8`, 2026-11-06): Display8 reads the build as
+`armada2/fo-roots-5.0Z11` and **draws the game on its own device**, every draw through the
+passthrough, since no plugin of ours runs there yet. `display.modes` is verified beside
+Roots' changes (below) and ready; `display.native` and `display.drop` stand down, so the
+game's mode is the one in Roots' `Settings.xml` and nothing is dropped. On the bench
+(1280x960, Vulkan on the GPU) the shell draws in its windowed 1200x900 device, the
+skirmish's fullscreen `CreateDevice` on another window is followed ("A second window"),
+and the third, back to the shell when the game is left, too. D3DX8 is told DXT1, DXT3 and
+DXT5 are available, so Roots' DDS art is kept block-compressed and sampled as BC1 to BC3.
+FleetOpsHook's bump-mapped hulls (`SetVertexShader`, on nearly every Roots hull) use the
+stock Borg bump shader's token stream, so they draw through the passthrough's port of it
+("The engine's one vertex shader", under "Passthrough"); the skirmish looks as Roots does
+as it ships on DXVK.
+`Display8.log` is beside `ArmadaL.exe` in `Data/`.
+
+**`display.modes` on Roots.** Its six call sites and `FindDisplayMode`'s checked first 13
+bytes are stock's in `ArmadaL.exe` and still stock's in memory once `FleetOpsHook.dll` has
+patched (MemDiff, FO-2): none of its writes falls on them. What Roots changes beside them:
+`FindDisplayMode`'s width and height tests are turned from "equal" into "not smaller"
+(`jne` to `jl`), so the lookup answers the first listed mode at least as large, at the
+depth asked; the shell's request in `SetActiveDisplay_Internal` is 1200x900 in the file
+and FleetOpsHook raises its depth to 32 bits (the byte before the call at `0x62c4e0`);
+FleetOpsHook raises the intro's two requests in `Program::PlayIntroMovie` to 1200x900 and
+re-points `SetActiveDisplay`'s call of `SetActiveDisplay_Internal` at a wrapper that sets
+the windowed flag and calls the stock body; and it re-points the engine constructor's call
+in `InitializeGraphicsSystem` (`+0x64`), away from the two mode calls. Display8's lookup
+calls Roots' `FindDisplayMode` first and falls back to the one mode only when it answers
+nothing, which on an output smaller than 1200x900 is what keeps the shell from the null
+read FO-1 saw. `profiles/fo-roots-5.0Z11/display.toml` gives the shell's and the intro's
+requests as Roots makes them, so the log names them and `RaiseIntro` knows the intro's.
 
 **The release package** (`publish/README.md`, "Release packages") carries Display8 in
 `display/` with the shipped `Display8.ini`, and its installers (`install.sh`,
@@ -336,6 +358,7 @@ build it recognises and the summary:
 |---|---|---|---|
 | `display.modes` | `ST3D_DisplayDevice::FindDisplayMode` (`fn`, its first 13 bytes checked), its six calls (`call`, each checked to call it), and the front end's 800x600x16 request (`value`) | `stub/modes.rs` ("The engine's hard-coded modes"); the stub's start in `lib.rs` | no stub: the bail-out |
 | `display.native` | `GameConfiguration::InitializeGraphicsSystem` (`fn`) and its call in `WinMain` (`call`, checked), `UserProfile` (`global`), the profile's mode fields at +0x50, +0x54, +0x58 and the two stock modes (`value`) | `window.rs`: `[Window] Native` ("Window and display mode") | the profile's mode is as set |
+| `display.onewindow` | `device_windows` (`value`): 1 where the game makes its device on a new window at each switch (Roots' profile), 0 on Armada II | `host.rs`: `[Window] OneWindow` ("One window") | the swap chain follows each new window ("A second window") |
 | `display.keepclip` | the mouse driver's button bits and the flag that says the pointer is held for a pan (`global`; read only) | `window.rs`: `[Window] KeepClip` | the clip is put back regardless of a held button |
 | `display.drop` | the code ranges of `RenderLoopAssetLoadStatusUpdate`, the Credits (`Credits3D.obj`, from its first function `SpriteWithLocation::Render`), `ST3D_DeviceDirectX8::RefreshDisplay` and the two workspaces' `Submit` (`fn` with `end`; nothing is written, so nothing is checked) | `drop.rs`: `[Drop]` ("Drop switches"), and the scene a `BeginScene` begins for the claims (`passthrough.rs`) and the contract's mission check (`api.rs`) | nothing is dropped and no scene of the engine's is claimed: the engine draws its own loading screen, Credits and cursor |
 
@@ -611,7 +634,9 @@ drawn with white and logged once; the stub offers the engine no other texture fo
 so none should arrive.
 
 **Texture formats.** `CheckDeviceFormat` says yes to A8R8G8B8 and X8R8G8B8 alone as
-textures (`stub/d3d.rs`, `texture_format_ok`), because a mirror holds no other. The
+textures (`stub/d3d.rs`, `texture_format_ok`), because a mirror holds no other (and, since
+display 1.1.0, DXT1, DXT3 and DXT5 where the backend samples them: "Block-compressed
+textures" below). The
 engine chooses its texture formats in `ST3D_DeviceDirectX8::SelectTextureFormats`
 (0x625f80) by asking in an order its graphics detail sets (`ST3D_GraphicsEngine_Configuration`
 +0x40, the Graphics Detail slider, `ARMADA.PRF` line 5, field 6): at the top detail
@@ -623,6 +648,73 @@ were flat squares, and the fog's texture had no mirror for the overlays
 (`render3d-nebula-detail`). Refused, the engine falls through to the two 32-bit formats
 at every detail; the detail still sets the levels of detail, the starfield and the
 first level of a texture's chain it loads (`ST3D_GraphicsEngine::GetLargestMipMapToUse`).
+
+**Block-compressed textures** (for Fleet Operations: Roots, `PLAN-FLEETOPS.md` FO-4; the
+stock engine never makes one). Roots loads about 550 DDS files through D3DX8, which asks
+`CheckDeviceFormat` for DXT1 to DXT5 and, told no, decompresses each file itself (4 to 8
+times the memory). `CheckDeviceFormat` now says yes to DXT1, DXT3 and DXT5 as 2D textures
+when the backend can sample them (`stub::compressed_textures`: Direct3D 12 always, Vulkan
+with `textureCompressionBC`, which Display8 enables when the physical device has it), and
+to no other new format; cubes and volumes stay refused. The stub already sized them as
+Direct3D 8 does (`stub/blocks.rs`, host-tested): a level's pitch is one row of 4x4 blocks
+(8 bytes a block for DXT1, 16 for the rest), `GetLevelDesc`'s size is the level's bytes,
+and a level under one block (the 2x2 and 1x1 ends of a chain) is one whole block, which is
+what D3DX8's `LockRect` fills. The mirror holds them as BC1 (RGBA), BC2 and BC3 (DXT2 and
+DXT4, the premultiplied spellings, as BC2 and BC3 too), uploaded by block rows and sampled
+natively, with every level (`upload_blocks` on both backends; on Direct3D 12 a footprint
+is the whole block and a base level not a multiple of 4 gets no mirror, as that API
+requires). A plugin that samples such a mirror gets the format in `VkImage8.format` and
+`Dx12Image8.format`: it is not B8G8R8A8, which the contract has always said to read off
+the info. `display-compressed-textures` checks it: with `BenchTextures=N` (bench clones
+only, `benchfo.rs`) Display8 itself makes a DXT1, a DXT3 and a DXT5 texture of 64x64 with
+seven levels through its own device's vtable, fills them through `LockRect` and draws
+them through the passthrough with `DrawPrimitiveUP`, over a paused mission; the checker
+of blocks, the alpha ramps and the flat lower levels are in the screenshot on Vulkan and
+on Direct3D 12. `CheckDeviceMultiSampleType` says yes to any multisample type (2 to 16)
+for a back buffer or depth format, and `CreateDevice` accepts it and ignores it, as the
+device's back buffer is single-sampled whatever is asked and render3d does its own MSAA.
+
+**A second window** (Roots makes one device for its 1200x900 shell and another for the
+game, on another window, and a skirmish was a white screen while the engine drew on).
+The backend is made at the first `CreateDevice`, on its window, and a later `CreateDevice`
+only looked the device up. When it names another window now (`stub::follow_window`) that
+window gets the first one's treatment (a popup over the desktop) and the swap chain moves
+to it: on Vulkan a surface of the new window, the old swap chain and surface destroyed and
+a swap chain made again (`Vk::rebind`); the colour target, the pipelines and the mirrors
+stay, so nothing a plugin holds changes. The stock engine reuses its one window at every
+`CreateDevice`, so this never runs there. `display-window-follow` checks it (the bench-only
+`BenchWindow=N` hook hands a popup to the same function at the Nth `Present`, and the first
+window again at the 2Nth, with the popup left from taking the activation, which stops the
+engine drawing). **Direct3D 12 has the same move (`Dx::rebind`) and it is not verified**:
+on the bench the game goes on drawing after it but the new window stays black. Roots on
+Direct3D 12 is for FO-4 to settle; `auto` tries Vulkan first.
+
+**One window** (`[Window] OneWindow`, `host.rs`; PLAN-FLEETOPS.md decisions 314 to 319).
+Following each new window still showed at every switch: Roots destroys its device window and
+makes another between its menus, the loading screen and a mission, so the window manager saw
+the game's window close and a new one open (focus and full screen moved, an animation on
+Hyprland) and the new one was black until its first frame. Where the build's profile says
+the game does this (`device_windows` 1: Roots), Display8 makes a top-level window of its own
+at the first `CreateDevice`, the **host** (class `Display8Host`, the game's title), and puts
+every device window inside it as a child covering it (`WS_CHILD` and `SetParent` before it
+is shown, so it is never mapped as a window of its own); the swap chain is made on the host
+and never moves. The device window keeps its procedure and gets the mouse (it covers the
+host) and the keyboard (the host gives it the focus at every activation and forwards
+`WM_ACTIVATEAPP` and `WM_CLOSE`); the host stays enabled when a modal form disables the
+thread's top-level windows, so the device window's own enabled state is what counts, as it
+was. A window's owner is always a top-level one, so the forms FleetOpsHook owns by the
+device window are owned by the host: the UI finds the device window inside it. Armada II's
+profile says 0 and the bench's `BenchWindow` still follows. The host is made only for a plugin that claims `CLAIM_WINDOW` (contract 1.5: the UI with Roots' forms its own, `[Menus] Forms=1`), decided at the first `CreateDevice`; with the game's own forms and dialogs, windows of their own over the game's, the host took the pointer from them (decision 405), so without the claim the swap chain follows each new window as before. The host is never hidden by the game (decision 404). Frames with nothing drawn are not shown right after a switch, and,
+with the host made, a frame none of the plugins drew on is not shown while they are
+drawing the game's frames (for at most 5 s after their last), so the picture holds
+between two screens instead of going black (`host::hold`, `host::between_screens`;
+PLAN-FLEETOPS.md decisions 315 and 403).
+
+**A 1200x900 shell** needs nothing new: a mode the stub does not list is answered with the
+desktop's (the same as the 800x600 and 1024x768 requests of the stock shell and profile),
+`CreateDevice` is told it got what it asked and the window covers the desktop. The six
+`FindDisplayMode` calls of `stub/modes.rs` are Armada II's addresses, and Roots keeps
+them: the profile marks them verified (FO-A; "On Fleet Operations: Roots").
 
 **The engine's one vertex shader** (ROADMAP 4d) is the Borg hulls' bump pass. Display8
 keeps every vertex shader's declaration and function tokens at `CreateVertexShader`, the

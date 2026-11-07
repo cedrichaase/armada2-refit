@@ -40,12 +40,20 @@ struct Words {
 static mut WORDS: Option<Words> = None;
 static mut LOGGED: bool = false;
 
+/// The game's word for a key, or ours when the build has none: Fleet Operations: Roots'
+/// string table answers these two keys with an empty string, which left the box blank
+/// (FO-6 step 4, decision 124).
+fn or(game: String, ours: &str) -> String {
+    // lint-allow(content): the UI's own English words for a box the game gave none for.
+    if game.trim().is_empty() || game.starts_with("GUI_") { String::from(ours) } else { game }
+}
+
 #[allow(static_mut_refs)]
 fn words() -> &'static Words {
     unsafe {
         WORDS.get_or_insert_with(|| Words {
-            text: buttons::localize(c"GUI_POP_PAUSE_TEXT"),
-            cont: buttons::localize(c"GUI_POP_PAUSE_CONTINUE"),
+            text: or(buttons::localize(c"GUI_POP_PAUSE_TEXT"), "Game paused"),
+            cont: or(buttons::localize(c"GUI_POP_PAUSE_CONTINUE"), "Continue"),
         })
     }
 }

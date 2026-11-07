@@ -84,6 +84,8 @@ pub struct Vk {
     qfam: u32,
     mem: vk::PhysicalDeviceMemoryProperties,
     surface: vk::SurfaceKHR,
+    /// The device samples BC1, BC2 and BC3 (`textureCompressionBC`): DXT textures are mirrored.
+    pub bc: bool,
     swapchain: vk::SwapchainKHR,
     sc_images: Vec<vk::Image>,
     sc_views: Vec<vk::ImageView>,
@@ -355,7 +357,8 @@ impl Vk {
         // Anisotropic filtering where the device has it (gpu's samplers ask for it by
         // `Filter::Anisotropic`).
         let have = unsafe { instance.get_physical_device_features(pdev) };
-        let feats = vk::PhysicalDeviceFeatures { sampler_anisotropy: have.sampler_anisotropy, ..Default::default() };
+        let feats = vk::PhysicalDeviceFeatures { sampler_anisotropy: have.sampler_anisotropy, texture_compression_bc: have.texture_compression_bc, ..Default::default() };
+        let bc = have.texture_compression_bc != 0;
         let dci = vk::DeviceCreateInfo::default().queue_create_infos(&qci).enabled_extension_names(&dexts).enabled_features(&feats);
         let dev = unsafe { instance.create_device(pdev, &dci, None) }.map_err(|_| "vkCreateDevice failed")?;
         let mut features = 0;
@@ -390,6 +393,7 @@ impl Vk {
             qfam,
             mem,
             surface,
+            bc,
             swapchain: vk::SwapchainKHR::null(),
             sc_images: Vec::new(),
             sc_views: Vec::new(),
@@ -740,6 +744,52 @@ impl Vk {
         Ok(())
     }
 
+    /// Moves the swap chain to another window: a game that makes a second device on a new
+    /// window (Fleet Operations: Roots makes one for its 1200x900 shell and one for the
+    /// game) would otherwise keep presenting to the first, which is hidden or gone. A new
+    /// surface, the old swap chain and surface destroyed (a swap chain cannot be handed
+    /// over to a surface of another window), and the swap chain made again on the new
+    /// one; everything else (the colour target, the pipelines, the mirrors) stays.
+    pub fn rebind(&mut self, hwnd: *mut c_void) -> Result<(), &'static str> {
+        unsafe {
+            let _ = self.dev.device_wait_idle();
+            let w32 = ash::khr::win32_surface::Instance::new(&self._entry, &self.instance);
+            let sci = vk::Win32SurfaceCreateInfoKHR::default().hinstance(GetModuleHandleA(core::ptr::null()) as vk::HINSTANCE).hwnd(hwnd as vk::HWND);
+            let surface = w32.create_win32_surface(&sci, None).map_err(|_| "vkCreateWin32SurfaceKHR failed (new window)")?;
+            if !self.surface_fn.get_physical_device_surface_support(self.pdev, self.qfam, surface).unwrap_or(false) {
+                self.surface_fn.destroy_surface(surface, None);
+                return Err("the new window cannot be presented to");
+            }
+            for fb in self.sc_fbs.drain(..) {
+                self.dev.destroy_framebuffer(fb, None);
+            }
+            for v in self.sc_views.drain(..) {
+                self.dev.destroy_image_view(v, None);
+            }
+            for s in self.sc_done.drain(..) {
+                self.dev.destroy_semaphore(s, None);
+            }
+            self.sc_images.clear();
+            self.swap_fn.destroy_swapchain(self.swapchain, None);
+            self.swapchain = vk::SwapchainKHR::null();
+            self.surface_fn.destroy_surface(self.surface, None);
+            self.surface = surface;
+        }
+        let r = self.make_swapchain();
+        log!("vulkan: the swap chain on the new window: {}x{}, {} images ({:?})", self.sc_extent.width, self.sc_extent.height, self.sc_images.len(), r);
+        r
+    }
+
+    /// A `Present` not shown (`host::hold`): the frame is ended without its last pass and
+    /// without a swap chain image, so the image on the screen stays.
+    pub fn skip(&mut self) {
+        if !self.recording {
+            self.begin();
+        }
+        pass::presented(self);
+        self.end_frame(None);
+    }
+
     /// Whether every image of the swap chain has its view, framebuffer and semaphore: a
     /// failed `make_swapchain` leaves this false until one succeeds.
     fn swapchain_complete(&self) -> bool {
@@ -1048,13 +1098,22 @@ impl Vk {
     /// Pixels into an image's level (`B8G8R8A8`-sized texels, `pitch` bytes a row), through
     /// the ring: a mirror's level, the engine's back buffer written by lock.
     pub fn upload(&mut self, img: vk::Image, aspect: vk::ImageAspectFlags, level: u32, w: u32, h: u32, src: &[u8], pitch: u32, bpp: u32, from: vk::ImageLayout, to: vk::ImageLayout) -> bool {
+        self.upload_blocks(img, aspect, level, w, h, src, pitch, (bpp, 1), from, to)
+    }
+
+    /// The same for a block-compressed level: `block` is (bytes a block, its edge in
+    /// texels) and `pitch` the bytes of a row of blocks. A level under one block (2x2, 1x1)
+    /// is one block, and its copy extent is the level's own size, as Vulkan asks.
+    pub fn upload_blocks(&mut self, img: vk::Image, aspect: vk::ImageAspectFlags, level: u32, w: u32, h: u32, src: &[u8], pitch: u32, block: (u32, u32), from: vk::ImageLayout, to: vk::ImageLayout) -> bool {
         if !self.recording {
             self.begin();
         }
         pass::close(self);
-        let row = w * bpp;
-        let Some(a) = self.alloc(row * h, 16) else { return false };
-        for y in 0..h as usize {
+        let (bytes, edge) = block;
+        let row = w.div_ceil(edge) * bytes;
+        let rows = h.div_ceil(edge);
+        let Some(a) = self.alloc(row * rows, 16) else { return false };
+        for y in 0..rows as usize {
             unsafe { core::ptr::copy_nonoverlapping(src.as_ptr().add(y * pitch as usize), a.cpu.add(y * row as usize), row as usize) };
         }
         self.barrier_levels(img, aspect, level, 1, from, vk::ImageLayout::TRANSFER_DST_OPTIMAL);
@@ -1072,7 +1131,7 @@ impl Vk {
     /// Levels of a colour image (`B8G8R8A8`-sized texels: level, width, height, pixels,
     /// pitch) through a staging buffer of their own, let go of once the frame is done.
     /// False, with nothing recorded, when the buffer cannot be made.
-    pub fn upload_levels<'a>(&mut self, img: vk::Image, levels: impl Iterator<Item = (u32, u32, u32, &'a [u8], u32)>, from: vk::ImageLayout, to: vk::ImageLayout) -> bool {
+    pub fn upload_levels<'a>(&mut self, img: vk::Image, levels: impl Iterator<Item = (u32, u32, u32, &'a [u8], u32)>, block: (u32, u32), from: vk::ImageLayout, to: vk::ImageLayout) -> bool {
         if !self.recording {
             self.begin();
         }
@@ -1082,7 +1141,7 @@ impl Vk {
         let mut offsets = Vec::with_capacity(levels.len());
         for &(_, w, h, _, _) in &levels {
             offsets.push(at);
-            at += (w as u64 * h as u64 * 4).div_ceil(16) * 16;
+            at += ((w.div_ceil(block.1) * block.0) as u64 * h.div_ceil(block.1) as u64).div_ceil(16) * 16;
         }
         if at == 0 {
             return true;
@@ -1109,8 +1168,8 @@ impl Vk {
             return false;
         };
         for (n, &(_, w, h, src, pitch)) in levels.iter().enumerate() {
-            let row = (w * 4) as usize;
-            for y in 0..h as usize {
+            let row = (w.div_ceil(block.1) * block.0) as usize;
+            for y in 0..h.div_ceil(block.1) as usize {
                 unsafe { core::ptr::copy_nonoverlapping(src.as_ptr().add(y * pitch as usize), ptr.add(offsets[n] as usize + y * row), row) };
             }
         }

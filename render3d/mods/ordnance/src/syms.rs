@@ -201,6 +201,11 @@ pub const BUILDS: &[a2engine::Build] = &[
         ],
         blocked: &[
         ],
+        file_crc: &[],
+        modules: &[],
+        blocked_mod: &[
+        ],
+        n_resolved_mod: 53,
     },
     a2engine::Build {
         name: "fo-roots-5.0Z11",
@@ -210,8 +215,8 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 49,
-        content: "stock",
+        n_resolved: 53,
+        content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x42bfa0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x50, 0xe8], mask: &[], section: "", count: 0, value: 0 }, // fn_obj_even_if_destroyed
             a2engine::Entry { present: true, addr: 0x467730, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x30, 0x8b, 0x50, 0x34, 0xd9, 0x02], mask: &[], section: "", count: 0, value: 0 }, // fn_shock_radius
@@ -268,8 +273,14 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 80 }, // or_wave_end
         ],
         blocked: &[
-            a2engine::Block { hook: 1, symbol: "Armada_RenderAllOurStuff", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Armada_RenderAllOurStuff is changed by fo-roots-5.0Z11, not yet verified" },
         ],
+        file_crc: &[a2engine::FileCrc { section: ".text", crc: 0xef690537 }, a2engine::FileCrc { section: ".test", crc: 0xe7a4061b }],
+        modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
+        blocked_mod: &[
+            a2engine::Block { hook: 0, symbol: "cPrjID::GetOdfName", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: cPrjID::GetOdfName is patched by FleetOpsHook.dll, which is not the profiled one" },
+            a2engine::Block { hook: 1, symbol: "Armada_RenderAllOurStuff", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: Armada_RenderAllOurStuff is patched by FleetOpsHook.dll, which is not the profiled one" },
+        ],
+        n_resolved_mod: 1,
     },
 ];
 

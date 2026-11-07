@@ -124,7 +124,16 @@ pub fn objectives_shown() -> bool {
 /// never owns the mouse, so `objectives_keys` runs it at each simulate pass while it
 /// shows, and the keys close it as in stock, by the engine's own bindings.
 pub fn objectives_keys() {
-    if !objectives_shown() {
+    // Not on the pass the box opened: stock's box becomes the mouse's owner only at the
+    // next pass's `RefreshOwner`, so its focus-step first runs a pass later. On Roots the
+    // objectives key (Alt+O, `objectives_toggle`) is also one of the two commands that
+    // close it, and run on the same pass it closed the box it had just opened (measured on
+    // the bench: Alt+O opened the engine's box and never ours; PLAN-FLEETOPS.md, decision 323).
+    static mut WAS_SHOWN: bool = false;
+    let shown = objectives_shown();
+    let opened_now = shown && !unsafe { WAS_SHOWN };
+    unsafe { WAS_SHOWN = shown };
+    if !shown || opened_now {
         return;
     }
     let (o, focus) = (objectives_box(), eng().addr(sym::POPUPS_OBJ_FOCUS_SIMULATE));

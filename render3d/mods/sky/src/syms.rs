@@ -101,6 +101,11 @@ pub const BUILDS: &[a2engine::Build] = &[
         ],
         blocked: &[
         ],
+        file_crc: &[],
+        modules: &[],
+        blocked_mod: &[
+        ],
+        n_resolved_mod: 21,
     },
     a2engine::Build {
         name: "fo-roots-5.0Z11",
@@ -110,8 +115,8 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 0,
-        content: "stock",
+        n_resolved: 21,
+        content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x4d54e0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // fn_go_render
             a2engine::Entry { present: true, addr: 0x590c30, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x56, 0x8b, 0x35, 0xfc, 0x20], mask: &[], section: "", count: 0, value: 0 }, // fn_load_bg
@@ -136,8 +141,13 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 68 }, // sky_bg_transform
         ],
         blocked: &[
-            a2engine::Block { hook: 0, symbol: "Starfield_Load_Background_Geometry", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: Starfield_Load_Background_Geometry is changed by fo-roots-5.0Z11, not yet verified" },
         ],
+        file_crc: &[a2engine::FileCrc { section: ".text", crc: 0xef690537 }, a2engine::FileCrc { section: ".test", crc: 0xe7a4061b }],
+        modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
+        blocked_mod: &[
+            a2engine::Block { hook: 0, symbol: "GameObject::Render", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: GameObject::Render is patched by FleetOpsHook.dll, which is not the profiled one" },
+        ],
+        n_resolved_mod: 0,
     },
 ];
 

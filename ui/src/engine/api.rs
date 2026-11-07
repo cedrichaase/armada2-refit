@@ -80,20 +80,38 @@ pub mod dialogs {
     };
 }
 
+/// FleetOpsHook's front-end forms on Roots (`engine/forms.rs`, FO-6 step 7, option C).
+pub mod forms {
+    pub use crate::engine::forms::{act, active, available, forms_ours, design, dialog_picture, dialog_screen, dialogs, main_menu_shown, install, message, picture, press, probe, view, Action, Control, Dialog, Form, Grid, Kind, Message, MOUSE_DOWN, MOUSE_HELD, MOUSE_MOVE, MOUSE_UP};
+    pub use crate::engine::fodialogs::Child as DialogChild;
+}
+
 pub mod hud {
     pub use crate::engine::hud::{
-        components, flag_hidden, functions_stock, hidden, in_view, install, installed, is_taken, log_components,
-        map_radar, name, palette_ptr, panel_rect, set_pointer_over_ui, set_taken, ship_display, take_tooltips, tooltip,
+        component_named, components, cursor_owner, flag_hidden, INFO_PANEL_TAKEN, functions_stock, hidden, in_view, install, installed, is_taken, log_components, log_render_lists,
+        map_radar, name, palette_ptr, panel_origin, panel_rect, pointer_over_bar, set_bar_area, set_bar_skin, set_info_area, set_info_unseen, info_unseen, set_pointer_over_ui, set_taken, ship_display, take_tooltips, tooltip,
         video_playing,
     };
+}
+
+pub mod hover {
+    pub use crate::engine::hover::{ours, set, stand_aside, take, Kind, Part, Readout};
 }
 
 pub mod info {
     pub use crate::engine::info::{
         build_progress, cancel, class_wire, colour, current, drawn_whole, effect_sprites, effects, face, flash,
         functions_stock, group, hover_texts, hull, look_at, name_and_class, queue, select, shift_held, single,
-        system_state, take_hover, tooltip, whole_damaged, wire, wire_comp, Bar, BarKind, Face, Single, SystemState,
+        system_state, take_hover, tooltip, whole_damaged, wire, wire_comp, Bar, BarKind, Face, Single, SystemState, repair_icon, right_bar, race_icon,
         Text, queue_len,
+    };
+}
+
+/// Roots' info panel under ours (`engine/info_fo.rs`).
+pub mod info_fo {
+    pub use crate::engine::info_fo::{
+        available, buff_icons, class_art_name, is_craft, class_art_name_of, cloak, comp_hover, comp_rect, forget, hull_shields, image_rect, install,
+        log_children, move_rect, original_rect, queue_classes, queue_slot, race_comp, rank, restore, texts, weapon_icons, Icon,
     };
 }
 
@@ -133,13 +151,13 @@ pub mod overlay_text {
 
 pub mod palette {
     pub use crate::engine::palette::{
-        describe, menu, mode, palette, press, readable, slot, sprite, state, tooltip, valid, n_slots, Desc, Kind,
+        describe, find_sprite, hovered, install_grid, local_rect, menu, mode, origin, own_sprite, palette, press, pressed, set_rect, slots_indirect, readable, slot, sprite, state, tooltip, valid, n_slots, Desc, Kind,
     };
 }
 
 pub mod popups {
     pub use crate::engine::popups::{
-        functions_stock, message, message_box, objectives, objectives_box, objectives_keys, objectives_shown,
+        functions_stock, game_paused, message, message_box, objectives, objectives_box, objectives_keys, objectives_shown,
         pause_box, pause_button, pause_shown, replay_box, replay_button, replay_shown, Objectives, REPLAY_NAMES,
     };
 }
@@ -150,7 +168,7 @@ pub mod progress {
 
 pub mod radar {
     pub use crate::engine::radar::{
-        action_cursor, action_cursors_stock, blips, buttons_swapped, engine_texture, filter_name, filter_text, filters,
+        action_cursor, action_cursors_stock, blips, buttons_swapped, editor, engine_texture, filter_name, filter_sprites, filter_text, filters,
         fog_grid, fog_on, fog_texture_size, functions_stock, hooked, install, map_radar, map_texture, marks,
         queue_camera, queue_filter, queue_order, radar, relation, selection_count, shot_scenes, shroud_grid,
         tactical_camera, teams_visible, view, view_outline, warp_texture, Grid, Kind,
@@ -179,20 +197,24 @@ pub mod shellcombo {
 }
 
 pub mod shellui {
-    pub use crate::engine::shellui::{installed, widgets_of, Kind};
+    pub use crate::engine::shellui::{installed, log_unread, widgets_of, Kind};
 }
 
 pub mod sound {
     pub use crate::engine::sound::{click, functions_stock, rollover, shell_click, shell_hover, shell_named};
 }
 
+pub mod fontglyph {
+    pub use crate::engine::fontglyph::glyph;
+}
+
 pub mod sprite {
-    pub use crate::engine::sprite::{art, name};
+    pub use crate::engine::sprite::{art, name, own_tile};
 }
 
 pub mod topbar {
     pub use crate::engine::topbar::{
-        amount_text, button, button_panel, colour, functions_stock, resource_panel, shown, tooltip, Which,
+        amount_text, button, button_panel, colour, functions_stock, measure, resource_panel, shown, tooltip, Which,
     };
 }
 

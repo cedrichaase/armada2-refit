@@ -60,6 +60,52 @@ pub fn vtable(obj: usize) -> usize {
     field(obj, 0)
 }
 
+/// The load addresses of the build's companion modules (build.toml `[[module]]`,
+/// `FleetOpsHook.dll` on Roots), looked up once: none on a build that names none, or when
+/// the profiled one is not the one loaded.
+fn companion_bases() -> &'static [usize] {
+    static mut BASES: [usize; 4] = [0; 4];
+    static mut N: usize = usize::MAX;
+    unsafe {
+        if N == usize::MAX {
+            let e = crate::syms::TABLE.engine();
+            let mut n = 0;
+            if e.companions_ok() {
+                for m in e.companions().iter().take(4) {
+                    let mut name = [0u8; 64];
+                    let b = m.name.as_bytes();
+                    if b.len() >= name.len() {
+                        continue;
+                    }
+                    name[..b.len()].copy_from_slice(b);
+                    let h = crate::rt::win::GetModuleHandleA(name.as_ptr()) as usize;
+                    if h != 0 {
+                        BASES[n] = h;
+                        n += 1;
+                    }
+                }
+            }
+            N = n;
+        }
+        let n = N;
+        let all: &'static [usize; 4] = &*core::ptr::addr_of!(BASES);
+        &all[..n]
+    }
+}
+
+/// Whether code at `addr` belongs to one of the build's companion modules: the module
+/// whose run-time patches own a call site render3d takes over at the callee instead
+/// (PLAN-FLEETOPS.md, "The rules of (c)", rule 4). False on stock, which names none.
+pub fn in_companion(addr: usize) -> bool {
+    let bases = companion_bases();
+    if bases.is_empty() || addr == 0 {
+        return false;
+    }
+    let mut mi: crate::rt::win::MemInfo = unsafe { core::mem::zeroed() };
+    let got = unsafe { crate::rt::win::VirtualQuery(addr as *const u8, &mut mi, core::mem::size_of::<crate::rt::win::MemInfo>()) };
+    got != 0 && bases.contains(&mi.alloc_base)
+}
+
 /// `Armada2.exe`'s code: a call target or slot value there that is not stock's is not
 /// another plugin's either (`hooks`).
 pub fn exe_code() -> core::ops::Range<usize> {

@@ -340,6 +340,11 @@ pub const BUILDS: &[a2engine::Build] = &[
         ],
         blocked: &[
         ],
+        file_crc: &[],
+        modules: &[],
+        blocked_mod: &[
+        ],
+        n_resolved_mod: 96,
     },
     a2engine::Build {
         name: "fo-roots-5.0Z11",
@@ -350,7 +355,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         sections: 0xca07c55a,
         image_base: 0x400000,
         n_resolved: 79,
-        content: "stock",
+        content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x5913a0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff], mask: &[], section: "", count: 0, value: 0 }, // shell_show_credits
             a2engine::Entry { present: true, addr: 0x606bd4, end: 0x0, target: 0x0, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // shell_credits_site
@@ -452,6 +457,11 @@ pub const BUILDS: &[a2engine::Build] = &[
         blocked: &[
             a2engine::Block { hook: 0, symbol: "DispatchDialog", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: DispatchDialog is changed by fo-roots-5.0Z11, not yet verified" },
         ],
+        file_crc: &[a2engine::FileCrc { section: ".text", crc: 0xef690537 }, a2engine::FileCrc { section: ".test", crc: 0xe7a4061b }],
+        modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
+        blocked_mod: &[
+        ],
+        n_resolved_mod: 79,
     },
 ];
 

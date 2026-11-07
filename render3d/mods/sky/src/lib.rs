@@ -103,6 +103,7 @@ pub struct Sky {
     nodes: BTreeMap<String, Option<(SprInfo, [f32; 2], [f32; 3])>>,
     pipes: Pipes,
     said_inst: bool,
+    said_prefix: bool,
     said_objects: usize,
     loaded: String,
 }
@@ -121,6 +122,7 @@ impl Default for Sky {
             nodes: BTreeMap::new(),
             pipes: Pipes::new(),
             said_inst: false,
+            said_prefix: false,
             said_objects: 0,
             loaded: String::new(),
         }
@@ -212,19 +214,23 @@ impl Sky {
 
     /// The recipe for the map's sky now, looked up again when the name changes, and
     /// re-read every 30 frames from the game directory's file when `Reload=1`.
-    fn recipe_now(&mut self, bg: &str) -> Option<&Recipe> {
+    fn recipe_now(&mut self, bg: &str, menu: bool) -> Option<&Recipe> {
         self.frames = self.frames.wrapping_add(1);
-        if bg != self.bg {
-            self.bg = String::from(bg);
+        let key = if menu { let mut k = String::from("menu:"); k.push_str(bg); k } else { String::from(bg) };
+        // The menu scene's sky also takes the stock set's recipe of its name when the
+        // build's own set has none (Roots' map asks for a stock look; never in a mission).
+        let find = |base: &str| recipe::text_for(base).or_else(|| if menu { recipe::stock_text(base) } else { None });
+        if key != self.bg {
+            self.bg = key;
             let base = recipe::base_name(bg);
-            self.recipe = recipe::text_for(&base).map(|(t, src)| Recipe::parse(&base, t, src));
+            self.recipe = find(&base).map(|(t, src)| Recipe::parse(&base, t, src));
             match &self.recipe {
                 Some(r) => log!("sky: \"{}\": drawn from its recipe ({})", bg, r.source),
                 None => log!("sky: \"{}\": no recipe, the stock sky", bg),
             }
         } else if self.cfg.reload && self.frames % 30 == 0 {
             let base = recipe::base_name(bg);
-            let now = recipe::text_for(&base);
+            let now = find(&base);
             let changed = match (&now, &self.recipe) {
                 (Some((t, _)), Some(r)) => *t != r.text,
                 (None, None) => false,
@@ -329,20 +335,36 @@ impl Sky {
                 }
             }
         } else {
-            let Some(pipe) = self.pipe(P_FACE, Cull::CounterClockwise) else { return };
+            self.draw_prefix(cmd, &world.to_m4().mul(vp), bg, Cull::CounterClockwise, 1.0);
+        }
+    }
+
+    /// The six faces of a prefix sky (`<prefix>0`..`<prefix>5`) at the origin of `wvp`'s
+    /// frame, unlit, depth off: the stock sky's, and the menu scene's for a sky named by
+    /// a prefix with no recipe. `scale` stretches the cube (the menu's near plane is past
+    /// the stock cube's 100).
+    fn draw_prefix(&mut self, cmd: &mut Cmd, wvp: &M4, bg: &str, cull: Cull, scale: f32) {
+        {
+            let Some(pipe) = self.pipe(P_FACE, cull) else { return };
+            if !pipe.ready(gfx::gpu()) {
+                return;
+            }
             cmd.set_pipeline(&pipe);
-            let wvp = world.to_m4().mul(vp);
             cmd.vs_block(Block::new(0, wvp.transpose().as_floats()));
             let uv = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]];
             for (i, face) in PREFIX_FACES.iter().enumerate() {
                 let mut name = String::from(bg);
                 name.push((b'0' + i as u8) as char);
                 let tex = assets::texture(&name);
+                if !self.said_prefix && i == 5 {
+                    self.said_prefix = true;
+                    log!("sky: prefix sky \"{}\": face {} {}", bg, i, if tex.is_some() { "loaded" } else { "missing" });
+                }
                 cmd.bind_texture(0, tex.as_ref(), &FACE_SAMPLER);
                 cmd.ps_block(Block::new(0, &[1.0, 1.0, 1.0, if tex.is_some() { 0.0 } else { 1.0 }]));
                 let vtx: Vec<scene::Vertex> = [0usize, 1, 2, 0, 2, 3]
                     .iter()
-                    .map(|&k| scene::Vertex { pos: face[k], nrm: [0.0; 3], uv: uv[k] })
+                    .map(|&k| scene::Vertex { pos: [face[k][0] * scale, face[k][1] * scale, face[k][2] * scale], nrm: [0.0; 3], uv: uv[k] })
                     .collect();
                 if let Some(s) = cmd.vertices(&vtx) {
                     cmd.draw(&s);
@@ -464,12 +486,17 @@ impl Sky {
             let Some(mut cmd) = gfx::cmd() else { return };
             let evp = gfx::gpu().engine_viewport();
             Self::clear(&mut cmd, v, evp);
-            if self.cfg.recipes && self.recipe_now(&shot.sky).is_some() {
+            if self.cfg.recipes && self.recipe_now(&shot.sky, true).is_some() {
                 self.draw_recipe(&mut cmd, &a, &vp, evp);
+            } else if !shot.sky.contains('.') && assets::texture_exists(&sfmt!("{}0", shot.sky)) {
+                // No recipe: a sky named by a texture prefix (Roots' `env_*`) is its six
+                // faces as they are, about the eye, under the stars.
+                self.draw_prefix(&mut cmd, &vp, &shot.sky, Cull::None, far * 0.4 / 100.0);
             }
             // The stars, in the sky's frame.
             let star = |n: &str| sprites::sprite_info(n);
-            if let (Some(small), Some(big)) = (star("bstar.0"), star("mstar.0")) {
+            // A build whose sprite table has no `mstar.0` (Roots') draws the one sheet it has.
+            if let (Some(small), Some(big)) = (star("bstar.0"), star("mstar.0").or_else(|| star("bstar.0"))) {
                 let (right, up) = sprites::camera_axes(&a.view);
                 let d = far * 0.25;
                 let lift = self.cfg.star_lift;
@@ -477,6 +504,34 @@ impl Sky {
                     let info = if b > 0.7 { &big } else { &small };
                     let h = size * d;
                     self.batch.billboard(info, dir * d, right, up, h, h, [b, b, b, if b > 0.7 { lift } else { 0.0 }]);
+                }
+                // The star sheet on a cube, fixed in the sky's frame (never turned to
+                // face the camera, so nothing shifts as the camera goes round): each
+                // face n x n tiles, each tile the sheet once, turned a quarter by its
+                // place so the repeat does not read.
+                let n = shot.star_tiles;
+                if n > 0 {
+                    let l = shot.star_level;
+                    let faces: [(V3, V3, V3); 6] = [
+                        (v3(0.0, 0.0, 1.0), v3(1.0, 0.0, 0.0), v3(0.0, 1.0, 0.0)),
+                        (v3(0.0, 0.0, -1.0), v3(-1.0, 0.0, 0.0), v3(0.0, 1.0, 0.0)),
+                        (v3(1.0, 0.0, 0.0), v3(0.0, 0.0, -1.0), v3(0.0, 1.0, 0.0)),
+                        (v3(-1.0, 0.0, 0.0), v3(0.0, 0.0, 1.0), v3(0.0, 1.0, 0.0)),
+                        (v3(0.0, 1.0, 0.0), v3(1.0, 0.0, 0.0), v3(0.0, 0.0, -1.0)),
+                        (v3(0.0, -1.0, 0.0), v3(1.0, 0.0, 0.0), v3(0.0, 0.0, 1.0)),
+                    ];
+                    let step = 2.0 / n as f32;
+                    for (fi, (c, r, u)) in faces.iter().enumerate() {
+                        for j in 0..n {
+                            for i in 0..n {
+                                let (a0, b0) = (-1.0 + i as f32 * step, -1.0 + j as f32 * step);
+                                let p = |a: f32, b: f32| (*c + *r * a + *u * b) * d;
+                                let k = [p(a0, b0 + step), p(a0 + step, b0 + step), p(a0 + step, b0), p(a0, b0)];
+                                let t = (i + 2 * j + fi as u32) as usize % 4;
+                                self.batch.quad(&small, [k[t], k[(t + 1) % 4], k[(t + 2) % 4], k[(t + 3) % 4]], [l, l, l, 0.0]);
+                            }
+                        }
+                    }
                 }
                 self.draw_batch(&mut cmd, &vp);
             }
@@ -486,7 +541,7 @@ impl Sky {
             let b = r3d_core::frame::steps::View { view: rot, ..a };
             let bvp = b.view.mul(&b.proj);
             if let Some(model) = scene::model(&assets::sod_of(odf)) {
-                let s = self.scale_sod(odf);
+                let s = self.scale_sod(odf) * shot.sun_scale;
                 let mut world = M34::IDENTITY;
                 world.r = [world.r[0] * s, world.r[1] * s, world.r[2] * s];
                 world.p = *dir * *dist;
@@ -650,7 +705,7 @@ impl Module for Sky {
             let bg = hooks::background_name();
             let have_db = hooks::has_sky_db();
             if sky_on && have_db {
-                let recipe = self.cfg.recipes && self.recipe_now(&bg).is_some();
+                let recipe = self.cfg.recipes && self.recipe_now(&bg, false).is_some();
                 if !(recipe && self.draw_recipe(cmd, &vf, &vp, evp)) {
                     self.draw_stock(cmd, &vf, &vp, &bg);
                 }

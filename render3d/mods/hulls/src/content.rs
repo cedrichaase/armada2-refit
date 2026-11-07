@@ -34,6 +34,17 @@ pub struct Content {
     /// the Borg alone are bump-mapped, `BorgAmbient`, `BorgSun`, ...); "" gives them the
     /// hull profile.
     pub bump_profile: &'static str,
+    /// What gives a hull the bump profile: `bump` (any bump-mapped mesh, stock, where
+    /// the Borg alone are), or `race` (the ODF's `race` is one of `profile_races`:
+    /// Fleet Operations bump-maps nearly every hull, for the engine's GPU path).
+    pub profile_by_race: bool,
+    /// The races whose hulls take the bump profile under `ProfileBy = race`.
+    pub profile_races: &'static [&'static str],
+    /// The ODF key `ProfileBy = race` reads (`RaceKey`, default `race`).
+    pub race_key: &'static str,
+    /// A mesh's bump texture is a tangent-space normal map (`BumpMaps = normal`, Fleet
+    /// Operations' `*_bump`), or a height map (`height`, stock's Borg, made into one).
+    pub bump_maps_normal: bool,
 }
 
 /// A set's `hulls.ini`.
@@ -59,6 +70,13 @@ pub fn parse(text: &'static str) -> Content {
         scrap_glow_sprite: t.str(s, "ScrapGlowSprite"),
         resource_colours: colours.leak(),
         bump_profile: t.str(s, "BumpProfile"),
+        profile_by_race: t.str(s, "ProfileBy").eq_ignore_ascii_case("race"),
+        profile_races: t.list(s, "ProfileRaces").leak(),
+        race_key: match t.str(s, "RaceKey") {
+            "" => "race",
+            k => k,
+        },
+        bump_maps_normal: t.str(s, "BumpMaps").eq_ignore_ascii_case("normal"),
     }
 }
 
@@ -74,6 +92,10 @@ pub static NONE: Content = Content {
     scrap_glow_sprite: "",
     resource_colours: &[],
     bump_profile: "",
+    profile_by_race: false,
+    profile_races: &[],
+    race_key: "race",
+    bump_maps_normal: false,
 };
 
 static CACHE: r3d_core::content::Cache<Content> = r3d_core::content::Cache::new();

@@ -75,6 +75,18 @@ label = "Tooltips"
 help = "The tooltips at the pointer drawn by the UI. Off gives the game's back."
 
 [[row]]
+name = "hud_hover"
+section = "HUD"
+key = "Hover"
+kind = "bool"
+default = "0"
+apply = "live"
+scope = "local"
+tab = "interface"
+label = "Unit under the pointer"
+help = "The status line of the ship or station under the pointer drawn by the UI. Off gives the game's back."
+
+[[row]]
 name = "hud_bar"
 section = "HUD"
 key = "Bar"
@@ -156,9 +168,9 @@ apply = "live"
 scope = "local"
 tab = "interface"
 label = "Theme"
-help = "auto takes your race in a mission and the shell's look in the menus; or one look everywhere."
-values = ["auto", "shell", "federation", "klingon", "romulan", "cardassian", "borg", "species8472"]
-labels = ["Auto", "Shell", "Federation", "Klingon", "Romulan", "Cardassian", "Borg", "Species 8472"]
+help = "auto takes your race in a mission and the shell's look in the menus; or one look everywhere. Starfleet is the Federation's look on Fleet Operations: Roots."
+values = ["auto", "shell", "federation", "klingon", "romulan", "cardassian", "borg", "species8472", "starfleet"]
+labels = ["Auto", "Shell", "Federation", "Klingon", "Romulan", "Cardassian", "Borg", "Species 8472", "Starfleet"]
 
 [[row]]
 name = "menus_enable"
@@ -196,6 +208,19 @@ scope = "local"
 tab = "interface"
 label = "Credits"
 help = "The Credits drawn by the UI over the 3D scene. Off gives the game's Credits back."
+
+[[row]]
+name = "menus_forms"
+section = "Menus"
+key = "Forms"
+kind = "bool"
+default = "0"
+apply = "restart"
+scope = "local"
+tab = "interface"
+flags = ["advanced"]
+label = "Redrawn front-end forms"
+help = "The front end's own forms (main menu, Options and more) drawn by the UI. Off gives the game's forms back."
 
 [[row]]
 name = "loading_enable"

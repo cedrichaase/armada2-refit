@@ -43,6 +43,9 @@ rows = ["QOL.BarKeys"]
 doc = "The construction ship does not block its own blueprint: the ghost's check ignores the rig"
 rows = ["QOL.RigIgnoresSelf"]
 
+[hook.script_input]
+doc = "A script's input monitor called only while set: the editor after a scripted mission no longer calls a cleared one"
+
 [[sym]]
 id = "pan_site"
 symbol = "RTS_Configure"
@@ -138,6 +141,16 @@ id = "overview"
 symbol = "cOverViewImp"
 kind = "global"
 addr = 0x768e40
+used_by = ["selection", "move_paths"]
+
+# The overview through the engine's own pointer to it, which its constructor sets: stock's
+# object is the static one above, but a build may construct it elsewhere (Roots: FleetOpsHook
+# constructs an enlarged one of its own, FO-7), and only the pointer follows.
+[[sym]]
+id = "overview_ptr"
+symbol = "g_pOverView"
+kind = "global"
+addr = 0x768e3c
 used_by = ["selection", "move_paths"]
 
 [[sym]]
@@ -1077,6 +1090,17 @@ kind = "value"
 value = 6
 used_by = ["bar_keys"]
 
+# The cells that get a position key, one bit per cell (bit 0 Q ... bit 14 B): all fifteen
+# on stock. A build whose own key map gives one of the fifteen letters to an action outside
+# the bar clears that cell's bit, so the letter never does two things (Roots: W, FO-6
+# decisions 330 to 349).
+[[sym]]
+id = "bk_key_cells"
+symbol = "bar_key_cells"
+kind = "value"
+value = 0x7fff
+used_by = ["bar_keys"]
+
 [[sym]]
 id = "bk_btn_state"
 symbol = "ControlButton"
@@ -1880,3 +1904,22 @@ struct = "CraftClass vtable (CanPlaceHere)"
 offset = 0x8
 type = "ptr"
 used_by = ["rig_self"]
+
+[[sym]]
+id = "si_always"
+symbol = "ScriptInputCallbacks::AlwaysSimulate"
+kind = "patch"
+addr = 0x451dc0
+check = "56 8b f1 ff 56 24 84 c0 75 07 c7 46 24 00 00 00 00 5e c2 04 00"
+in = "ScriptInputCallbacks::AlwaysSimulate"
+used_by = ["script_input"]
+
+# the script's monitor function (ScriptInterfaceImp::MonitorInputControls stores it)
+[[sym]]
+id = "si_callback"
+symbol = "ScriptInputCallbacks"
+kind = "field"
+struct = "ScriptInputCallbacks"
+offset = 0x24
+type = "ptr"
+used_by = ["script_input"]

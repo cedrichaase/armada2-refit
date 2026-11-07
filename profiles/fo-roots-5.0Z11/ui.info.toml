@@ -1,0 +1,19 @@
+# Fleet Operations: Roots 5.0Z11: FleetOpsHook.dll takes over these functions at their entry as it
+# loads (a jump to its own replacement, or a trampoline: push and ret, after which
+# the stock body runs from its callback). Our hooks only call them, and what Roots
+# puts there is what Roots means, so this build checks nothing at their entry
+# (PLAN-FLEETOPS.md, "FleetOpsHook.dll at run time"). Written by tools/engine/fo-scan.py.
+schema = 1
+plugin = "ui"
+
+# operator new
+[[sym]]
+id = "closeup_operator_new"
+check = ""
+
+# The info panel is FleetOpsHook's own ShipDisplay (a larger object in its image, with members of
+# its own and its own BuildWireframe): the UI draws it over the panel's Render run unseen
+# (hud.info_fo; PLAN-FLEETOPS.md, FO-6, decisions 440 to 459).
+[[sym]]
+id = "info_fo_panel"
+value = 1

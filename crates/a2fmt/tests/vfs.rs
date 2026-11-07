@@ -184,3 +184,38 @@ fn zfs_is_declared_and_serves_nothing() {
     }
     assert!(Kind::Loose < Kind::Fpq && Kind::Fpq < Kind::Zfs);
 }
+
+#[test]
+fn levels_put_a_mod_over_the_game() {
+    // Fleet Operations' order: the active mod (level 2) over its parent (1) over the
+    // game's own folder (0), whatever the kind; loose over packed within a level.
+    let t = Tmp::new();
+    t.put("game/odf/a.odf", "game-a");
+    t.put("game/odf/ships/b.odf", "game-b");
+    t.put("game/Mods/P/odf/a.odf", "parent-a");
+    t.put("game/Mods/C/odf/weapons/a.odf", "child-a-elsewhere");
+    t.put("game/Mods/C/odf/c.odf", "child-c");
+    let mut v = Layered::new();
+    v.mount_level("odf", 0, Box::new(Loose::new(StdIo, &t.path("game/odf"))));
+    v.mount_level("odf", 2, Box::new(Loose::new(StdIo, &t.path("game/Mods/C/odf"))));
+    v.mount_level("odf", 1, Box::new(Loose::new(StdIo, &t.path("game/Mods/P/odf"))));
+    v.mount("odf", Box::new(Zfs::new("x.zfs")));
+    assert_eq!(text(&v, "odf/a.odf").as_deref(), Some("parent-a"));
+    assert_eq!(text(&v, "odf/c.odf").as_deref(), Some("child-c"));
+    assert_eq!(text(&v, "odf/ships/b.odf").as_deref(), Some("game-b"));
+    // The versions of a.odf, top first, and nothing past the last.
+    assert_eq!(v.open_nth("odf/a.odf", 0).as_deref(), Some(&b"parent-a"[..]));
+    assert_eq!(v.open_nth("odf/a.odf", 1).as_deref(), Some(&b"game-a"[..]));
+    assert!(v.open_nth("odf/a.odf", 2).is_none());
+    // The sources in search order, for a caller that indexes each apart: the child's
+    // a.odf in weapons/ is its top version by name.
+    let src = v.sources("odf");
+    let labels: Vec<String> = src.iter().map(|(s, _)| s.label()).collect();
+    assert_eq!(labels.len(), 4);
+    assert!(labels[0].ends_with("Mods/C/odf") && labels[1].ends_with("Mods/P/odf") && labels[2].ends_with("game/odf"));
+    assert!(labels[3].starts_with("zfs"));
+    assert_eq!(src[0].1, "");
+    assert_eq!(src[0].0.open("weapons/a.odf").as_deref(), Some(&b"child-a-elsewhere"[..]));
+    // The mounts are listed in that order too.
+    assert!(v.mounts()[0].1.ends_with("Mods/C/odf"));
+}

@@ -1,7 +1,7 @@
 # Star Trek: Armada II -- Fleet Operations: Roots, installed through Heroic
 # (PLAN-FLEETOPS.md). Not offered to players (the release and the GUI installer leave it
 # out), but `installable`: ./install and a2mod work on it for the bench and the
-# maintainer's own clones, with the layers listed below (FO-4: Display8 alone). FO-1 filled in what the bench measured of the shipped game (the install,
+# maintainer's own clones, with the layers listed below. FO-1 filled in what the bench measured of the shipped game (the install,
 # Heroic's entry and prefix, Settings.xml, its logs); `./a2test --game fo-roots` runs it.
 schema = 1
 id = "fo-roots"
@@ -10,11 +10,16 @@ offered = false
 installable = true
 default = false
 
-# The layers ./install puts in: Display8 alone (FO-4; PLAN-FLEETOPS.md, "What runs on
-# Roots", says which come next). It goes into Data/ in place of DxWrapper's d3d8.dll,
-# which is backed up; no platform layer (Roots has no ASI loader and no widescreen patch of
-# ours). A clone with no layers is the game as shipped.
-layers = ["display"]
+# The layers ./install puts in, all into Data/, the executable's folder (PLAN-FLEETOPS.md,
+# "What runs on Roots"): Display8, in place of DxWrapper's d3d8.dll (backed up); the ASI
+# loader Roots ships none of (asiloader/, winmm.dll; only beside Display8: beside DxWrapper
+# it kills the game at start); render3d, loaded by it; QOL (FO-7: the right-drag pan speed
+# and Shift+number on; every other part off until measured beside Roots' own behaviour); and
+# the UI (FO-6: UI.ini with Roots' own defaults, ui/defaults/fo-roots.ini: the parts verified on
+# Roots on, every other part off; no menu plates). No platform layer (no widescreen patch of
+# ours), and no rules, online, textures or cutscenes on Roots yet. A clone with no layers is
+# the game as shipped.
+layers = ["display", "asiloader", "render3d", "qol", "ui"]
 
 [exe]
 # The game itself in Data/, under a launcher (FleetOps.exe) that only starts it; the
@@ -51,7 +56,8 @@ dirs = ["settings_saves_logs/Logs"]
 # output Roots dies one second in (null display mode in SetActiveDisplay_Internal), so the
 # bench refuses a smaller output. 1280x960 is the cheapest 4:3 bench size above it.
 shell = [1200, 900]
-# Stock's until FO-6 measures Roots' own HUD.
+# Stock's: the space the engine converts every rectangle into, whatever layout Roots' files
+# declare per aspect (FO-6, decision 75).
 hud_canvas = [1600, 1200]
 
 [files]
@@ -64,6 +70,12 @@ sod = ["SOD"]
 sprites = ["Sprites"]
 odf = ["odf"]
 archives = [{ kind = "fpq", file = "ODF.fpq", at = "odf" }]
+# Mods (FO-5 step 6): the first `-mod <name>` or `/mod <name>` on the command line makes
+# Data/Mods/<name>/ (a folder with an info.ini) the active mod. Its files, then its
+# ParentMod's up the chain, then Data/'s own unless a mod in the chain is standalone=1, are
+# searched in that order, each folder with the folders and archives above
+# (render3d/core/src/files/mods.rs). Optional: a game without mods leaves it out.
+mods = { dir = "Mods", switches = ["-mod", "/mod"] }
 
 [paths]
 # $A2_DATA stays shared between the games (PLAN-ARMADA1.md).

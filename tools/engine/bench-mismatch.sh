@@ -34,8 +34,12 @@ if [ "$globs" = by-player ]; then
     esac
 fi
 [ -d "$work/game" ] || { echo "no clone at $work/game" >&2; exit 1; }
-printf '[Test]\r\nMismatch=%s\r\n' "$globs" > "$work/game/A2EngineTest.ini"
-echo "bench-mismatch: Mismatch=$globs in $work/game/A2EngineTest.ini"
+# Beside the executable, where the resolvers read it: the clone's root, or its Data/ on
+# Fleet Operations: Roots (games/<id>.toml; found as ui/bench-asi.sh finds it).
+exe_dir="$(cd "$repo" && python3 -c 'import os, a2env; print(os.path.relpath(os.path.dirname(a2env.EXE), a2env.GAME))')"
+dir="$work/game/$exe_dir"
+printf '[Test]\r\nMismatch=%s\r\n' "$globs" > "$dir/A2EngineTest.ini"
+echo "bench-mismatch: Mismatch=$globs in $dir/A2EngineTest.ini"
 if [ $# -gt 0 ]; then
     script="$1"
     shift

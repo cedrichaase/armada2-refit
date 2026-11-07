@@ -1,0 +1,1 @@
+file_crc: .text must be a CRC-32
