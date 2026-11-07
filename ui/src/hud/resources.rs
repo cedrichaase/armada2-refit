@@ -93,6 +93,18 @@ fn word(tip: &str) -> Option<String> {
 /// officers (stock's panel goes by `eResource`: crew first).
 const ORDER: [u32; 6] = [2, 4, 3, 5, 0, 1];
 
+/// The strip's rectangle when it stands at the game's own panel, in the top left (Roots),
+/// and the time it last drew.
+static mut LEFT_STRIP: Option<(R, f64)> = None;
+
+/// The strip's rectangle if it stands in the top left corner (the game's own panel, on
+/// Roots) and drew in the last half second: the top-right buttons stand beside it in the
+/// map editor (`buttons`).
+pub fn left_strip() -> Option<R> {
+    let now = crate::rt::now();
+    unsafe { LEFT_STRIP }.filter(|&(_, at)| now - at < 0.5).map(|(r, _)| r)
+}
+
 pub fn run(ui: &mut Ui) {
     let mut shown = topbar::shown();
     shown.sort_by_key(|&(r, _)| ORDER.iter().position(|&o| o == r).unwrap_or(6));
@@ -104,6 +116,8 @@ pub fn run(ui: &mut Ui) {
     let (cell_w, h, gap) = (ui.u(150.0), ui.u(46.0), ui.u(6.0));
     let w = shown.len() as f32 * cell_w + (shown.len() - 1) as f32 * gap;
     let (outer, inner) = place(ui, w, h);
+    let at_left = crate::content::get().resources_at_component && outer.x < ui.w * 0.25;
+    unsafe { LEFT_STRIP = if at_left { Some((outer, crate::rt::now())) } else { None } };
     // Lamps in the frame (Starfleet): the user wants them on the resource strip.
     ui.panel_lit(outer);
     for (i, &(r, _)) in shown.iter().enumerate() {
