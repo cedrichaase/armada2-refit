@@ -18,6 +18,9 @@ doc = "InitializeGraphicsSystem's call: a stock profile mode becomes the desktop
 [hook.keepclip]
 doc = "The engine's mouse state, read so the pointer clip is not asked for while a button is down or a pan holds the pointer"
 
+[hook.onewindow]
+doc = "The game makes its device on a new window at each switch: Display8's one window from the first CreateDevice"
+
 # ---- display.modes (stub/modes.rs) ------------------------------------------------
 
 [[sym]]
@@ -312,3 +315,16 @@ struct = "ST3D_DisplayMode"
 offset = 0x8
 type = "i32"
 used_by = ["modes"]
+
+# ---- display.onewindow (host.rs) ----------------------------------------------------
+
+# 1 where the game makes its Direct3D device on a new top-level window at each switch
+# between its menus, the loading screen and a mission (Fleet Operations: Roots'
+# FleetOpsHook.dll): Display8's one window ([Window] OneWindow) is then made at the first
+# CreateDevice, not at the first switch. Armada II keeps one window: 0.
+[[sym]]
+id = "device_windows"
+symbol = "FleetOpsHook.dll"
+kind = "value"
+value = 0
+used_by = ["onewindow"]

@@ -100,6 +100,7 @@ unsafe extern "system" {
     fn EnumPropsExA(w: HWND, f: unsafe extern "system" fn(HWND, *const u8, HANDLE, usize) -> i32, lp: usize) -> i32;
     fn WindowFromPoint(p: Point) -> HWND;
     fn ChildWindowFromPointEx(w: HWND, p: Point, flags: u32) -> HWND;
+    fn FindWindowExA(parent: HWND, after: HWND, class: *const u8, name: *const u8) -> HWND;
 }
 
 #[link(name = "gdi32")]
@@ -110,6 +111,9 @@ unsafe extern "system" {
 fn eng() -> &'static a2engine::Engine {
     TABLE.engine()
 }
+
+/// The adopted dialogs that belong to the front end, never to a mission's menus.
+const FRONT_END_SCREENS: [&str; 3] = ["single player", "mission select", "game setup"];
 
 /// An adopted dialog's screen, by its stock procedure (`Dialog::stock_proc`), named as
 /// `engine::dialogs::screen_name` names Armada II's: "" when unknown, or when the build's
@@ -706,7 +710,7 @@ fn activated(h: HWND) {
         origin = (((dw - fw) / 2).max(0), ((dh - fh) / 2).max(0));
     }
     let first = !tracked().iter().any(ours);
-    let in_mission = crate::engine::api::ingame::recent();
+    let mut in_mission = crate::engine::api::ingame::recent();
     let framed = if dialog { placement(h, r) } else { None };
     // Adopted (decision 230): cut and placed as above, then off screen, drawn by the UI.
     let adopted = match framed {
@@ -723,6 +727,16 @@ fn activated(h: HWND) {
                 "forms: #32770 {:p} moved off screen; device window at {},{} {}x{}, active {:p}, focus {:p}",
                 h, dr.left, dr.top, dr.right - dr.left, dr.bottom - dr.top, unsafe { GetActiveWindow() }, unsafe { GetFocus() }
             );
+            // A screen of the front end (the campaign selection, the mission list, Game
+            // Setup) is never over a mission, even straight after one: a mission won hands
+            // over to the campaign selection with the mission's frames still recent, and it
+            // was drawn over the mission's last frame, HUD and all, without the scene
+            // (decision 316).
+            let screen = dialog_screen(crate::engine::fodialogs::stock_proc_of(h));
+            if in_mission && FRONT_END_SCREENS.contains(&screen) {
+                in_mission = false;
+                crate::log!("forms: #32770 {:p} is the front end's {}: not over the mission that just ended", h, screen);
+            }
             Some([p[0] - ox, p[1] - oy, p[2], p[3]])
         }
         Some(p) => {
@@ -777,9 +791,23 @@ fn device_window(owner: HWND) -> HWND {
         if w.is_null() || class_of(w) == "TMainWindowForm" {
             return w;
         }
+        if let Some(d) = inside_host(w) {
+            return d;
+        }
         w = unsafe { GetWindow(w, GW_OWNER) };
     }
     owner
+}
+
+/// Display8's one window (`[Window] OneWindow`, PLAN-FLEETOPS.md decision 314): the device
+/// window is a child of Display8's host, so a form's owner (a window's owner is always a
+/// top-level one) is the host: the device window is the `TMainWindowForm` inside it.
+fn inside_host(w: HWND) -> Option<HWND> {
+    if class_of(w) != "Display8Host" {
+        return None;
+    }
+    let d = unsafe { FindWindowExA(w, core::ptr::null_mut(), c"TMainWindowForm".as_ptr() as *const u8, core::ptr::null()) };
+    (!d.is_null()).then_some(d)
 }
 
 fn destroyed(h: HWND) {
@@ -1413,6 +1441,9 @@ fn device_of(h: HWND) -> HWND {
     for _ in 0..6 {
         if w.is_null() || class_of(w) == "TMainWindowForm" {
             return w;
+        }
+        if let Some(d) = inside_host(w) {
+            return d;
         }
         w = unsafe { GetWindow(w, GW_OWNER) };
     }

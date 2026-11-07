@@ -358,6 +358,7 @@ build it recognises and the summary:
 |---|---|---|---|
 | `display.modes` | `ST3D_DisplayDevice::FindDisplayMode` (`fn`, its first 13 bytes checked), its six calls (`call`, each checked to call it), and the front end's 800x600x16 request (`value`) | `stub/modes.rs` ("The engine's hard-coded modes"); the stub's start in `lib.rs` | no stub: the bail-out |
 | `display.native` | `GameConfiguration::InitializeGraphicsSystem` (`fn`) and its call in `WinMain` (`call`, checked), `UserProfile` (`global`), the profile's mode fields at +0x50, +0x54, +0x58 and the two stock modes (`value`) | `window.rs`: `[Window] Native` ("Window and display mode") | the profile's mode is as set |
+| `display.onewindow` | `device_windows` (`value`): 1 where the game makes its device on a new window at each switch (Roots' profile), 0 on Armada II | `host.rs`: `[Window] OneWindow` ("One window") | the swap chain follows each new window ("A second window") |
 | `display.keepclip` | the mouse driver's button bits and the flag that says the pointer is held for a pan (`global`; read only) | `window.rs`: `[Window] KeepClip` | the clip is put back regardless of a held button |
 | `display.drop` | the code ranges of `RenderLoopAssetLoadStatusUpdate`, the Credits (`Credits3D.obj`, from its first function `SpriteWithLocation::Render`), `ST3D_DeviceDirectX8::RefreshDisplay` and the two workspaces' `Submit` (`fn` with `end`; nothing is written, so nothing is checked) | `drop.rs`: `[Drop]` ("Drop switches"), and the scene a `BeginScene` begins for the claims (`passthrough.rs`) and the contract's mission check (`api.rs`) | nothing is dropped and no scene of the engine's is claimed: the engine draws its own loading screen, Credits and cursor |
 
@@ -687,6 +688,23 @@ window again at the 2Nth, with the popup left from taking the activation, which 
 engine drawing). **Direct3D 12 has the same move (`Dx::rebind`) and it is not verified**:
 on the bench the game goes on drawing after it but the new window stays black. Roots on
 Direct3D 12 is for FO-4 to settle; `auto` tries Vulkan first.
+
+**One window** (`[Window] OneWindow`, `host.rs`; PLAN-FLEETOPS.md decisions 314 to 319).
+Following each new window still showed at every switch: Roots destroys its device window and
+makes another between its menus, the loading screen and a mission, so the window manager saw
+the game's window close and a new one open (focus and full screen moved, an animation on
+Hyprland) and the new one was black until its first frame. Where the build's profile says
+the game does this (`device_windows` 1: Roots), Display8 makes a top-level window of its own
+at the first `CreateDevice`, the **host** (class `Display8Host`, the game's title), and puts
+every device window inside it as a child covering it (`WS_CHILD` and `SetParent` before it
+is shown, so it is never mapped as a window of its own); the swap chain is made on the host
+and never moves. The device window keeps its procedure and gets the mouse (it covers the
+host) and the keyboard (the host gives it the focus at every activation and forwards
+`WM_ACTIVATEAPP` and `WM_CLOSE`); the host stays enabled when a modal form disables the
+thread's top-level windows, so the device window's own enabled state is what counts, as it
+was. A window's owner is always a top-level one, so the forms FleetOpsHook owns by the
+device window are owned by the host: the UI finds the device window inside it. Armada II's
+profile says 0 and the bench's `BenchWindow` still follows.
 
 **A 1200x900 shell** needs nothing new: a mode the stub does not list is answered with the
 desktop's (the same as the 800x600 and 1024x768 requests of the stock shell and profile),

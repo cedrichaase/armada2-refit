@@ -31,7 +31,7 @@ use crate::engine_syms::{field, hook, sym, value};
 use crate::log;
 use crate::rt::win::*;
 use crate::rt::{hook as patch, Ini};
-use crate::settings_table::{WINDOW_KEEPCLIP, WINDOW_NATIVE, WINDOW_RAISEINTRO};
+use crate::settings_table::{WINDOW_KEEPCLIP, WINDOW_NATIVE, WINDOW_ONEWINDOW, WINDOW_RAISEINTRO};
 use core::ffi::c_void;
 use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
@@ -68,6 +68,7 @@ pub fn configure(ini: &Ini) {
     NATIVE.store(on(ini, WINDOW_NATIVE), Ordering::Relaxed);
     KEEP_CLIP.store(on(ini, WINDOW_KEEPCLIP), Ordering::Relaxed);
     RAISE_INTRO.store(on(ini, WINDOW_RAISEINTRO), Ordering::Relaxed);
+    crate::host::configure(on(ini, WINDOW_ONEWINDOW));
     if KEEP_CLIP.load(Ordering::Relaxed) {
         if on_wine() {
             log!("window: KeepClip on (Wine)");
