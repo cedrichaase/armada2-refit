@@ -21,6 +21,7 @@ import itertools
 import json
 import os
 import re
+import shlex
 import shutil
 import signal
 import struct
@@ -101,6 +102,17 @@ def _group_has_members(pgid):
         except (OSError, ValueError, IndexError):
             continue
     return False
+
+
+def split_args(args):
+    """The game's arguments from one string: words, with a double-quoted run kept as one
+    (`-nointro "Blue Skies.bzn"`). Backslashes are kept as typed (`save\\s1.sav`)."""
+    out = []
+    for w in shlex.split(args or '', posix=False):
+        if len(w) >= 2 and w[0] == w[-1] and w[0] in '"\'':
+            w = w[1:-1]
+        out.append(w)
+    return out
 
 
 class GameError(Exception):
@@ -1037,7 +1049,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         wlog = open(logs / 'wine.log', 'a')
         wlog.write(f'--- {now()} launch {config.EXE_NAME} {args}\n')
         wlog.flush()
-        p = subprocess.Popen(['python3', str(config.UMU), str(exe), *args.split()],
+        p = subprocess.Popen(['python3', str(config.UMU), str(exe), *split_args(args)],
                              env=env, cwd=str(exe.parent), stdout=wlog, stderr=subprocess.STDOUT,
                              stdin=subprocess.DEVNULL, start_new_session=True, pass_fds=self._slot_fds())
         self.s['pids']['launcher'] = p.pid
@@ -1372,10 +1384,24 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             raise GameError('scene: Scene.asi did not answer within 15 s')
         return out.replace('\r', '').rstrip()
 
+    def objects(self):
+        """The game's objects now: Scene.asi's `objects` writes Scene.objects.jsonl beside
+        Scene.log (testbench/scene/README.md), read here as (header, [object dicts])
+        (bench/objects.py has the fields and the filters). Read-only on the game."""
+        from . import objects
+        out = self.scene('objects')
+        if '\n  !' in '\n' + out:
+            raise GameError('scene: objects refused: ' + out)
+        f = self.exe_dir / objects.FILE
+        if not f.exists():
+            raise GameError(f'scene: objects answered but wrote no {objects.FILE}: {out}')
+        return objects.parse(f.read_text(errors='replace'))
+
     def collect_logs(self):
         dst = self.dir / 'logs'
         g = self.exe_dir
-        for name in ('Menus.log', 'HUD.log', 'BinkProxy.log', 'Scene.log', 'Scene.marks', 'RetireCheck.log',
+        for name in ('Menus.log', 'HUD.log', 'BinkProxy.log', 'Scene.log', 'Scene.marks', 'Scene.objects.jsonl',
+                     'RetireCheck.log',
                      'RefitPlayer.ini', 'Scene.ini', config.SETTINGS_FILE,
                      'Stems.log', 'Stems.ini',
                      'Menus.ini', 'HUD.ini', 'QOL.log', 'QOL.ini', 'QOLRules.log', 'QOLRules.ini', 'GridLayout.log',

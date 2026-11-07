@@ -15,3 +15,5 @@ DeleteFileA@4
 GetPrivateProfileSectionNamesA@12
 GetTickCount@0
 GetSystemTimeAsFileTime@4
+GetModuleHandleA@4
+MoveFileExA@12

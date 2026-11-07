@@ -13,6 +13,17 @@ file describes. A free camera and other commands then change the scene while it 
     ./a2test drive --session ID shot underside
     ./a2test session stop ID
 
+It runs on Armada II and on Fleet Operations: Roots (`ArmadaL.exe`): what it knows of the
+executable is the symbol profiles' (`profiles/gog-1.1/scene.toml`, and Roots' marks in
+`profiles/fo-roots-5.0Z11/`), so each part stands down on its own where the executable
+differs ("How it works", "On Fleet Operations: Roots"). `SCENE=game` builds nothing: it
+only puts the commands into whatever game is running, a skirmish or a mission, to list
+its objects, select them, move the camera and give orders by their handles:
+
+    SCENE=game ./a2test session start --res 1280x720 --install . --install testbench/scene --args '-nointro a2_borg01'
+    ./a2test drive --session ID scene objects          # Scene.objects.jsonl: every object, its handle as "id"
+    ./a2test drive --session ID scene "select #57" "camera on #57" "goto #57 world 3000 0 3000"
+
 A scenario puts the plugin in with `Setup: testbench/scene/bench-setup.sh <name>` and
 drives it with `Scene "CMD"` and `Expect scene "CMD" answers "TEXT"` steps
 (`scenarios/README.md`).
@@ -25,13 +36,17 @@ the bench draws a different race on every launch. `SCENE_SEED=<n>`,
 ("A frame that repeats", below); in a scenario, `Setup: testbench/scene/bench-setup.sh
 <scene> Seed=7 Step=16 Pause=200` puts any `Key=value` after the scene's name into its `[Scene]`.
 `install` refuses any game directory that is
-not an a2test clone: this is a test tool and never goes into the player's install. The
-bench gathers `Scene.log` and `Scene.ini` with the other logs.
+not an a2test clone: this is a test tool and never goes into the player's install. Both
+`install` and `bench-setup.sh` put `Scene.asi` and `Scene.ini` into the executable's
+folder (the game directory; `Data/` on Roots, where the ASI loader looks and the plugin
+writes its files). The bench gathers `Scene.log`, `Scene.ini`, `Scene.marks` and
+`Scene.objects.jsonl` with the other logs.
 
 ## The scenes
 
 | `SCENE=` | What | Seen on the bench |
 |---|---|---|
+| `game` | nothing: no objects, and the game as a player has it (fog, HUD, grid, cursor, notices, tooltips and hover on; `Delay=5`, `Anchor=world`), for the commands in an ordinary game on any map, Armada II's or Roots' (`objects`, `select #<id>`, `camera on #<id>`, the orders, `pause`, `seed`) | 2026-11-07 |
 | `zoom` | the player's Galaxy class (`mine`) and two destroyers, the HUD and cursor on, the camera centred on `mine` at zoom level 0.37: the view the old workaround of 150 `ctrl+Down` then 35 `ctrl+Up` presses reaches, in none of its 28 s | 2026-10-17 |
 | `planet` | a Galaxy class beside a class M planet (`pb_clssm`) | 2026-10-04 |
 | `nebula` | a Galaxy class at the edge of the Mutara nebula (`mnebula8`) | 2026-10-04 |
@@ -131,9 +146,18 @@ there is no SOD.
 ## Commands
 
 `./a2test drive scene "CMD" ["CMD" ...]` (or `;` between commands) writes them to
-`Scene.cmd` in the clone. The plugin reads it on its next tick, or its next frame
-while paused, and logs each command (`> ...`) and its answer. `drive scene` prints that
-answer and fails if a command did.
+`Scene.cmd` in the clone. The plugin reads it on its next tick, or on its next frame
+while the simulation is paused (by `pause`, or by the game itself: a briefing, the menu;
+no tick for half a second), and logs each command (`> ...`) and its answer. `drive scene` prints that
+answer and fails if a command did. A command whose hook stood down on this executable
+refuses with `  ! scene.<hook> stood down: <why>` ("How it works").
+
+**Objects by name or by handle.** Wherever a command takes an object, it takes the
+scene's name for it or **`#<id>`**, the object's handle (decimal, or `#0x..` in hex): any
+game object there is, not only the scene's, as `objects` lists them. In answers an object
+that is not one of the scene's is written `#<id>`, the handle as an unsigned decimal. A setting that lasts (`heal`,
+`vent`, `energy`, a cloak's energy) makes such an object one of the scene's, named
+`#<id>`, for `query` and the marks.
 
 | Command | |
 |---|---|
@@ -142,34 +166,72 @@ answer and fails if a command did.
 | `spin <degrees per second>` | after an `orbit`: turn the yaw steadily; `spin 0` stops. A new `orbit` ends a glide but not a spin |
 | `camera <ex> <ey> <ez> <object \| tx ty tz>` | free camera at an eye, looking at a point or an object |
 | `camera rts` | back to the game's own camera |
+| `camera on <object>` | the game's own camera (a free one is switched off first), centred on the object (`ScriptInterfaceImp::CenterCamera`, as `center`) |
 | `zoom [<level>]` | the RTS camera's zoom level, 0 (closest) to 1 (farthest), clamped. With no level it only reads. It answers with the level the camera has now, the camera in use, its raw value and its limits: `zoom 0.37 (parabolic camera, height 809.81, limits 10.00 to 2200.00)`. `query` ends with the same line |
 | `spawn <name> <odf> <x> <y> <z> [heading] [team]` | build an object (anchored like the scene file's positions) |
+| `objects` | every game object, read-only, into `Scene.objects.jsonl` beside `Scene.log` (below, "Objects"); answers `objects N -> Scene.objects.jsonl` |
 | `attack <name> <target>` | order an attack |
-| `succeed [seconds]`, `fail [seconds]` | the mission ends, won or lost, after the delay, as its script ends it (`ScriptInterfaceImp::SucceedMission`, 0x457d70, and `FailMission`, 0x457d50); for the screens that follow a mission (`scenarios/ui-menus-success.md`) |
-| `kill <name>` | the craft dies at once, as a mission script blows one up (`ScriptInterfaceImp::ExplodeNow`, 0x456cf0); its healing and immortality are switched off first |
-| `special <name> <weapon> [<target>]` | fire a craft's special weapon, by its weapon ODF's name (`gholdbm`, `gcorbom`), at a target or none: its special energy is filled first, the weapon's slot in the craft's carrier found (`WeaponClass::Find`), and `Craft::FireAtSpecial` (0x4c3820) called as a player's order does. Answers `slot N, can fire, fired` (or `cannot fire now`, `NOT fired`). The craft's weapons must be on (`Carrier::TriggerSelected` refuses while they are off) and the target within the weapon's range |
+| `succeed [seconds]`, `fail [seconds]` | the mission ends, won or lost, after the delay, as its script ends it (`ScriptInterfaceImp::SucceedMission` and `FailMission`, `scene.mission`); for the screens that follow a mission (`scenarios/ui-menus-success.md`) |
+| `kill <name>` | the craft dies at once, as a mission script blows one up (`ScriptInterfaceImp::ExplodeNow`, `scene.kill`); its healing and immortality are switched off first |
+| `special <name> <weapon> [<target>]` | fire a craft's special weapon, by its weapon ODF's name (`gholdbm`, `gcorbom`), at a target or none: its special energy is filled first, the weapon's slot in the craft's carrier found (`WeaponClass::Find`), and `Craft::FireAtSpecial` called as a player's order does (`scene.special`). Answers `slot N, can fire, fired` (or `cannot fire now`, `NOT fired`). The craft's weapons must be on (`Carrier::TriggerSelected` refuses while they are off) and the target within the weapon's range |
 | `energy <name> on\|off` | as `Energy=` |
 | `tech <team \| object> <item> [on\|off]` | a tech-tree item (an ODF name as the `techtree/*.tt` files spell it: `gcorbom`, `fedpod1`) made available to a team (an object's, given its name) as if researched, or not (`off`); answers what it was. Only the item changes, not what depends on it. A map's tree makes some items impossible for every team (`-1`; on `a2_borg01` `fedpod1` and with it the Sovereign's `gcorbom`): `on` makes the item possible too. For the Borg technology assimilation beam, which only holds on a ship that carries a special weapon its team has available ("How it works", "Tech tree") |
-| `cloak <name> on\|off\|now` | `on`: the craft starts to cloak, `off`: to decloak, `now`: fully cloaked at once (`GameObject::ImmediateCloak`, 0x4d03e0). Its special energy is filled and kept full while it is on. It sets the request byte of the craft's cloaking device (+0x108, byte +0x2c) that the player's button leaves for `CloakingDevice::Simulate`, rather than calling `ScriptInterfaceImp::Cloak`: that asks `AbleToCloak`, which wants the team to have researched the device, and it refused the bench's ships. `query` shows each craft's state (`cloak visible`, `cloaking`, `cloaked`, `decloaking`) |
-| `goto <name>[,<name>...] <object \| x y z> [warp]` | order a move, as a player's right-click does (AiCommand `GO`; `warp`: `GO_WARP`), and switch the engines on. To a craft, the ship follows it; to any other object (a nebula, a planet), it goes to where the object is. A point is anchored like the scene file's positions. Several names, comma-separated, keep their places: each goes to the point plus its own offset from the group's centre. It ends an `attack`, though a ship still fires at what comes in range |
-| `build <rig> <odf> <x y z \| object>` | order a construction ship to build a station (an ODF name, `fyard`, `fbase`...) at a point (anchored like the scene file's) or where an object is, as a player's build order (AiCommand `BUILD` with the class from `GameObjectClass::Find` and the point, through `GameObject::SetCommand`, 0x4d1cb0, as `ScriptInterfaceImp::SetCommandWhatWhoWhereVO` gives it). The rig's team gets every resource topped up first (`Team::AddResource`, clamped to its maximum) and its engines are switched on. The rig flies there and opens; its bees start the station at that point (fbase took about 2 minutes to start on the bench, fyard less) |
-| `formation <name>[,<name>...] <param>` | the formation the ships move in, as the bar's formation buttons give it: AiCommand `SET_FORMATION` with a parameter, which becomes the formation type the ship moves in (0 assault wall, 1 column, 2 X, 3 sheet, the default; seen on the bench), posted as each ship's next command through `GameObject::DeQueueCommand(AiCommand, long)` (0x4d4630), as the order's executor posts it. For QOL's move queues, whose ships take their places from the formation (`qol/README.md`, QOL-10) |
+| `cloak <name> on\|off\|now` | `on`: the craft starts to cloak, `off`: to decloak, `now`: fully cloaked at once (`GameObject::ImmediateCloak`). Its special energy is filled and kept full while it is on. It sets the request byte of the craft's cloaking device (`scene.cloak`) that the player's button leaves for `CloakingDevice::Simulate`, rather than calling `ScriptInterfaceImp::Cloak`: that asks `AbleToCloak`, which wants the team to have researched the device, and it refused the bench's ships. `query` shows each craft's state (`cloak visible`, `cloaking`, `cloaked`, `decloaking`) |
+| `goto <name>[,<name>...] <object \| [world] x y z> [warp]` | order a move, as a player's right-click does (AiCommand `GO`; `warp`: `GO_WARP`), and switch the engines on. To a craft, the ship follows it; to any other object (a nebula, a planet), it goes to where the object is. A point is anchored like the scene file's positions; `world x y z` is a world position as it stands, never anchored (what `objects` reports: `goto #57 world 3000 0 3000`). Several names, comma-separated, keep their places: each goes to the point plus its own offset from the group's centre. It ends an `attack`, though a ship still fires at what comes in range |
+| `move <name>[,<name>...] [to] <object \| [world] x y z> [warp]` | `goto`, with an optional `to` |
+| `build <rig> <odf> <[world] x y z \| object>` | order a construction ship to build a station (an ODF name, `fyard`, `fbase`...) at a point (anchored like the scene file's) or where an object is, as a player's build order (AiCommand `BUILD` with the class from `GameObjectClass::Find` and the point, through a `GameObject::SetCommand` overload, as `ScriptInterfaceImp::SetCommandWhatWhoWhereVO` gives it; `scene.build_order`). The rig's team gets every resource topped up first (`Team::AddResource`, clamped to its maximum) and its engines are switched on. The rig flies there and opens; its bees start the station at that point (fbase took about 2 minutes to start on the bench, fyard less) |
+| `formation <name>[,<name>...] <param>` | the formation the ships move in, as the bar's formation buttons give it: AiCommand `SET_FORMATION` with a parameter, which becomes the formation type the ship moves in (0 assault wall, 1 column, 2 X, 3 sheet, the default; seen on the bench), posted as each ship's next command through `GameObject::DeQueueCommand(AiCommand, long)` (`scene.move`), as the order's executor posts it. For QOL's move queues, whose ships take their places from the formation (`qol/README.md`, QOL-10) |
 | `stop <name>` | order a stop (AiCommand `STOP`, as `ScriptInterfaceImp::Stop` gives) |
-| `cargo <name> <resource> [<amount> \| full \| empty]` | a freighter's hold, as mining fills it (`Freighter::LoadResource`, 0x4b16f0): `dilithium`, `latinum`, `metal`, `biomatter`, `crew` or `officers`; a number is the hold's new level (default `full`), clamped to the class's capacity for it (a freighter takes only dilithium and latinum: 150 and 75). Another resource empties the hold first. Answers `ok: <resource> <amount>`. A full hold slows the freighter and its AI may head for a station, so keep its engines off to park it |
+| `cargo <name> <resource> [<amount> \| full \| empty]` | a freighter's hold, as mining fills it (`Freighter::LoadResource`, `scene.freighter`): `dilithium`, `latinum`, `metal`, `biomatter`, `crew` or `officers`; a number is the hold's new level (default `full`), clamped to the class's capacity for it (a freighter takes only dilithium and latinum: 150 and 75). Another resource empties the hold first. Answers `ok: <resource> <amount>`. A full hold slows the freighter and its AI may head for a station, so keep its engines off to park it |
 | `heal`, `engines`, `weapons`, `immortal` `<name> on\|off` | as the keys above |
 | `vent <name> <system \| all> on\|off` | as the `Vent` key, one system at a time (or all five) |
 | `colonize <planet> [<population> \| full \| off] [team]` | make a planet a grown colony of a team (default `full` and team 1), without a colony ship: it changes hands, gets a full garrison, and its cities show at once at that population, clamped to the class's maximum. The cities are the team's race's (`cityTextureName`: `ECFR` for the Federation and Romulans, `ECNA`, `BORG`); team 1 on `a2_borg01` is the Federation. `off` makes it neutral again with no population. The planet stays colonised (seen on the bench for several minutes); a population set below the maximum grows as any colony's does |
 | `center <name>` | centre the RTS camera on an object |
-| `waypoint-key on\|off` | the waypoint key (`enter_waypoint`, Tab) held or let go: right-clicks while it is on sketch a move path, `off` sends it (`render3d/README.md`, "overlays", Move paths). The overview's pointer to the binding's state (`cOverViewImp+0x30c`) is pointed at Scene.asi's own while on, since the bench cannot hold a key: Wine under Xwayland lets a held key go at once (a held arrow scrolls one step) |
+| `waypoint-key on\|off` | the waypoint key (`enter_waypoint`, Tab) held or let go: right-clicks while it is on sketch a move path, `off` sends it (`render3d/README.md`, "overlays", Move paths). The overview's pointer to the binding's state (`scene.waypoint`) is pointed at Scene.asi's own while on, since the bench cannot hold a key: Wine under Xwayland lets a held key go at once (a held arrow scrolls one step) |
 | `pause`, `resume` | the game's own pause (`PauseSimulation`); `pause` answers `paused at tick N`, the ticks since the scene was built |
 | `pause-at <tick>` | pause when that many ticks have passed since the scene was built, as `Pause=` does; refused when that tick has gone |
 | `tick` | the ticks since the scene was built |
 | `seed <n>` | the engine's random sequences started again from n now, as `Seed=` does |
 | `hud`, `grid`, `cursor`, `notices`, `tooltips`, `hover`, `shieldfx` `on\|off` | as the keys above. `tooltips off` also clears a box already showing; `shieldfx off` lets flashes already showing run out |
 | `query` | every object's handle and position (and a producer's build queue, a planet's team, population and the population its cities are drawn at), and the camera's eye, front and up |
-| `select <name> [<name> ...]` | select the first as a click does and add the rest as Shift-clicks do (`cOverViewImp::Select`), up to 39 names (a command has at most 40 words); answers as `selection` |
-| `selection` | what is selected, each one as `name[g<group> q<queue> c<class>]` (`q` for producers only; group -1 for none), then every control group that is not empty, ships' and stations' |
+| `select <name> [<name> ...]` | select the first as a click does and add the rest as Shift-clicks do, through the overview's own `Select` (its vtable: on Roots FleetOpsHook's, which keeps its own array and cap of 30), up to 39 names (a command has at most 40 words); answers as `selection` |
+| `select+ <name> [<name> ...]`, `add ...` | add them to what is selected, as Shift-clicks do, without clearing it first; answers as `selection` |
+| `selection` | what is selected (`GetSelectNum`, `GetSelectList`), each one as `name[g<group> q<queue> c<class>]` (`#<id>` for an object not the scene's; `q` for producers only; group -1 for none), then every control group that is not empty, ships' and stations' (`scene.groups`) |
 | `marks` | how many marks `Scene.marks` has, and the last 16, each as written (`Expect scene "marks" answers "cloak.done obj=warbird"`) |
+
+## Objects
+
+`objects` walks `GameObject::objectList` (`scene.objects`) and writes
+**`Scene.objects.jsonl`** beside `Scene.log`: written whole as `Scene.objects.tmp` and
+moved over the last one, so a reader never sees half a file. It only reads: each object's
+fields, and three of its own const functions (its ODF's name, its class's name as the
+player reads it, its transform), with `__RTDynamicCast` on its class. At most 4096
+objects. The bench reads it with `a2test drive objects` and the scenario steps on
+objects (`testbench/bench/objects.py`). The first line is a header:
+
+    {"header":true,"count":12,"tick":431,"time":21.6,"player_team":1,"build":"armada2/gog-1.1"}
+
+`tick` is the ticks since the scene was built, `time` the simulation's seconds
+(`Get_Time`), `player_team` the local player's team (`Entity::GetUserTeam`), `build` the
+profile build the plugin matched (`unknown` on another executable). Then one line per
+object:
+
+    {"id":57,"name":null,"odf":"fgalaxy","label":"fgalaxy1003","class":"Galaxy Class","team":1,"mine":true,"craft":true,"station":false,"kind":"ship","pos":[3000.0,0.0,3000.0],"hull":[2000.0,2000.0],"shields":[1500.0,1500.0],"crew":[200.0,200.0],"special":[100.0,100.0],"selected":false,"group":-1,"dying":false}
+
+| Field | |
+|---|---|
+| `id` | the handle as an unsigned number (a handle's top bit is set: `2147516425`), what `#<id>` names in commands |
+| `name` | the scene's name for it, or `null` |
+| `odf` | its ODF (`GameObject::GetOdfName`), without `.odf`, as the scene files spell it |
+| `label` | its script label (`GameObject`+0x48, what the map or a script calls it), or `null` |
+| `class` | the class's name as the player reads it (`GetClassDisplayName`, the tooltip's) |
+| `team`, `mine` | its team, and whether that is the local player's |
+| `craft`, `station`, `kind` | a craft (the flags' craft bit); a station (`CraftClass`'s station byte, through `__RTDynamicCast`); `kind` is `planet` (its class is a `PlanetClass`), `station`, `ship` (any other craft) or `other` |
+| `pos` | where it is, in world coordinates (its transform's position): give it to `goto ... world x y z` |
+| `hull`, `shields`, `crew`, `special` | `[now, maximum]` for a craft, `null` for anything else |
+| `selected`, `group`, `dying` | selected now; its control group's number (-1 for none); dying (the byte the move orders refuse on) |
+
+Strings are JSON-escaped, and any byte outside printable ASCII is written `\u00XX`.
 
 ## A frame that repeats
 
@@ -194,13 +256,14 @@ measurements and the `--clock bench` it goes with). Three things make the scene 
 
 `Zoom=` and `zoom` set the RTS camera's zoom as a **level from 0 (closest) to 1
 (farthest)**, whichever camera the game is using. The camera in use is the first field
-of `gCameraManager` (0x763370), and on the bench it is a `ParabolicCamera`: its zoom is
+of `gCameraManager` (`scene.zoom`), and on the bench it is a `ParabolicCamera`: its zoom is
 a height above the map, 10 to 2200 (`OVERVIEW_MIN_HEIGHT`, `OVERVIEW_MAX_HEIGHT` as
 the game has them at run time), and the game starts it at 150 (level 0.06). A
 `TacticalCamera` keeps a distance factor from 1 to 20 instead (start 10); the plugin
 handles it the same way, but it has not been seen in use. Both implement
 `SetZoomLevel(t)`, a straight interpolation between their limits and the call
-`ScriptInterfaceImp::SetCameraZoom` (0x4551d0) makes, so the level is the same on both.
+`ScriptInterfaceImp::SetCameraZoom` makes, so the level is the same on both; the plugin
+calls it through the slot of the camera's own class.
 The plugin refuses if the camera in use is neither class.
 
 - **Level to height** (parabolic): `10 + level * 2190`. Level 0.06 is the start, 0.37 is
@@ -236,222 +299,246 @@ cost: a beam or torpedo advances by 3 ticks with each camera move.
 
 ## How it works, and what it relies on in `Armada2.exe`
 
-Addresses are from `armada2.map` (GOG patch 1.1). Every entry point is checked against
-its first bytes before anything is patched or called. A different exe leaves the plugin
-inert, and `Scene.log` says so.
+Every address, struct offset and value the plugin uses is the symbol profile's:
+`profiles/gog-1.1/scene.toml` (generated into `engine_syms.h` by `tools/engine/gen.py`),
+and on Fleet Operations: Roots `profiles/fo-roots-5.0Z11/`, which inherits it and marks
+what Roots changes (`crates/a2engine/README.md`). The entries are grouped into hooks,
+one per part of the plugin, and each hook is checked against the executable in memory
+(`a2e_ready`) before the plugin writes or calls anything of it: a hook whose bytes differ,
+or that a build marks as changed and not yet verified, **stands down on its own**, and
+the rest still work. `Scene.log` names the hooks that are ready and those that stood
+down at start-up, with the engine's lines (`engine: scene.<hook> stands down: ...`), and
+a command that needs one that stood down says `  ! scene.<hook> stood down: <why>`.
+`./a2test syms --plugin scene` (and `./a2test --game fo-roots syms --plugin scene`)
+reports them offline. Names below are `armada2.map`'s; the profile holds the addresses.
 
-- **The tick: one call site.** `Simulate` (0x483290) calls `GameObject_UpdateRange()`
-  at 0x483351 on every tick. The plugin wraps that call to build the scene, heal, and
-  read `Scene.cmd`. One more hook, in a vtable, hides the damage effects of systems the
-  scene switched off ("Damaged-system effects" below).
+- **The tick: one call site (`scene.tick`).** `Simulate` calls `GameObject_UpdateRange()`
+  on every tick, unconditionally. The plugin points that call at its own tick, which
+  calls the original first, then builds the scene, heals, and reads `Scene.cmd`. Without
+  this hook there is no scene and no command, and the log says so. A scene's objects
+  are built with the script interface's `CraftCannotDie`, `DisableEngines` and
+  `DisableWeapons`, which this hook therefore checks too.
 - **Building an object: `BuildObject(char *odf, int team, const Matrix34 &)`**
-  (0x451990, cdecl), a free function. The mission scripts' own
+  (`scene.build`, cdecl), a free function. The mission scripts' own
   `ScriptInterfaceImp::BuildObject` cannot start an empty scene: its third argument is
   an existing object's handle, the position is taken relative to that object, and it
   returns 0 without one. The free function takes a whole transform, so position and
   heading are both free. A `Matrix34` is three axis rows (right, up, front) and then the
-  position. The new object's handle is the int at +0x28.
+  position. The new object's handle is the int at +0x28, what `#<id>` names.
 - **The script interface needs no mission DLL.** The mission scripts (`missions/*.dsl`,
-  `*.drl`, ordinary Win32 DLLs) reach the engine through `g_pScriptInterface`
-  (0x735c70). A static initialiser points it at a static `ScriptInterfaceImp`
-  (0x735c40) at start-up, so its methods work on a map with no script. None of those
-  used reads `this`:
-  - `Attack(int, int, int)` 0x452be0: the attacker must be a craft with weapons; the
-    target is any object.
-  - `GetLocation(int)` 0x453140
-  - `PauseSimulation()` 0x454cc0 / `UnpauseSimulation()` 0x454cf0
-  - `CenterCamera(int)` 0x455190
-  - `DisableEngines(int, bool)` 0x456960 / `DisableWeapons(int, bool)` 0x456a60
-  - `SetCurrentHealth(int, float)` 0x456d20 / `GetMaxHealth(int)` 0x456da0
-  - `CraftCannotDie(int, bool)` 0x457590
-
-  `ScriptInterfaceImp::GridVisible(bool)` is an empty stub, so it cannot hide the grid.
-- **Fog of war: `Scanner::ForceFogAndShroud(bool)`** (0x4935d0) writes the game setup's
-  fog and shroud flags. `Scanner::IsFogged` / `IsShrouded` read them on every query, so
-  `false` is the map as with fog and shroud off in the setup screen: explored, and never
-  re-fogged. `Scanner::ForceUpdate()` (0x493600) makes the scanner recompute.
+  `*.drl`, ordinary Win32 DLLs) reach the engine through `g_pScriptInterface`. A static
+  initialiser points it at a static `ScriptInterfaceImp` at start-up, so its methods
+  work on a map with no script; the plugin calls them on what the pointer holds. None of
+  those used reads `this`: `Attack(int, int, int)` (`scene.attack`: the attacker must be
+  a craft with weapons; the target is any object), `GetLocation(int)` (`scene.locate`,
+  which `query` and every object's position use), `PauseSimulation()` /
+  `UnpauseSimulation()` (`scene.pause`), `CenterCamera(int)` (`scene.center`),
+  `DisableEngines(int, bool)` / `DisableWeapons(int, bool)` / `CraftCannotDie(int, bool)`
+  (`scene.switches`), `SetCurrentHealth(int, float)` / `GetMaxHealth(int)` (`scene.heal`),
+  `ExplodeNow(int)` (`scene.kill`) and `SucceedMission` / `FailMission`
+  (`scene.mission`). `ScriptInterfaceImp::GridVisible(bool)` is an empty stub, so it
+  cannot hide the grid.
+- **Fog of war: `Scanner::ForceFogAndShroud(bool)`** (`scene.fog`) writes the game
+  setup's fog and shroud flags. `Scanner::IsFogged` / `IsShrouded` read them on every
+  query, so `false` is the map as with fog and shroud off in the setup screen: explored,
+  and never re-fogged. `Scanner::ForceUpdate()` makes the scanner recompute.
   `ScriptInterfaceImp::ClearFog` alone would not last, because fog grows back wherever
   no unit can see. Control on the bench: with `Fog=1` the shroud covers the map flat
   grey, and with `Fog=0` it is gone.
-- **HUD: `DisplayInterface::SetInterfaceState(mode)`** (0x51a460, cdecl). The
-  `toggle_interface` binding (Ctrl+I) steps a mode kept at `[0x76b5ac]+0x78` through
-  0..3. 0 is the full HUD, 1 drops the tactical camera view (the 3D portrait of the
-  selection), and 3 shows no HUD at all (seen on the bench, one Ctrl+I at a time).
-- **Grid: `GridRenderState`**, three ints per view at 0x768e18, `{mode, ?, visible}`.
-  The `grid_toggle` binding (Alt+G) cycles `mode`, and `GridRenderState::Update`
-  (0x528080) derives the other two from it: mode 2 sets both to 0. `GridVisible()`
-  (0x51e180), which the grid renderer asks, returns `visible`. The plugin writes
-  `{2, 0, 0}` for views 0 and 1. Alt+G sent through the bench's virtual keyboard did
-  nothing visible, so the toggle is set, not pressed.
-- **The free camera: the one call in `s_UpdateMainCamera`.** `s_UpdateMainCamera`
-  (0x53ed90) updates the main `ST3D_Camera` through a single virtual call,
-  `call *0x88(%eax)` at 0x53edac, on the view object. That is
-  `cOverViewImp::UpdateCamera`, which passes it on to `gCameraManager`'s current camera,
-  whatever its class. The call becomes `call camera_update; nop`. The wrapper makes the
-  same virtual call, then, when the free camera is on, calls the `ST3D_Camera`'s
-  virtual `SetTransform` (slot 5) with its own camera-to-world matrix. `SetTransform`
-  derives the rest itself (world-to-camera matrix, frustum). The camera-to-world matrix
-  is at `ST3D_Camera`+0xc0 (`GetCameraToWorldTransform`), which `query` reads.
-  A dead end that shaped this: patching `TacticalCamera::UpdateCamera`'s slot in
-  `TacticalCamera`'s vtable did nothing, because the camera in use is not that class.
-- **Cursor: the one `ST3D_Sprite::DrawScaled2D` call in `RefreshDisplay`** (0x6246fa),
-  which draws the cursor under DXVK. `HUD.asi` wraps the same call (`ui/HUD.md`, "The references the stock HUD
-  is drawn against", the cursors). So `Scene.asi` patches it only once the scene is built, by when
-  `HUD.asi` has long since loaded, and chains to whatever the call went to. With the
-  cursor off, the draw is skipped. Clicks still land where the pointer is. `UI.asi`
-  wraps the same call when it loads, behind Scene.asi's wrap, and draws no cursor of
-  its own while the draw does not reach it (ui/README.md, "The cursor").
-- **Notices: `GameEvent::TriggerEvent`.** "Enemy engaged." is the event
-  `EVENTS_ENEMY_ENGAGED` from `events.dat` (text, voice, minimap marker). Events are
-  fired through three entry points: `TriggerEvent()` 0x479880,
-  `TriggerEvent(const Vector3 &, int, const Race *)` 0x4799a0, which the `GameObject`
-  overload calls, and `TriggerEvent(const Race *)` 0x479bb0. With notices off, each
-  entry returns false at once (`xor eax,eax; ret N`). The original bytes are kept and
-  put back by `notices on`.
+- **HUD: `DisplayInterface::SetInterfaceState(mode)`** (`scene.hud`, cdecl). The
+  `toggle_interface` binding (Ctrl+I) steps a mode kept at +0x78 of `UserProfile` (a
+  `GameConfiguration`) through 0..3. 0 is the full HUD, 1 drops the tactical camera view
+  (the 3D portrait of the selection), and 3 shows no HUD at all (seen on the bench, one
+  Ctrl+I at a time). The plugin writes the mode and calls the function.
+- **Grid: `GridRenderState`** (`scene.grid`), three ints per view, `{mode, ?, visible}`.
+  The `grid_toggle` binding (Alt+G) cycles `mode`, and `GridRenderState::Update` derives
+  the other two from it: mode 2 sets both to 0. `GridVisible()`, which the grid renderer
+  asks, returns `visible`. The plugin writes `{2, 0, 0}` for views 0 and 1. Alt+G sent
+  through the bench's virtual keyboard did nothing visible, so the toggle is set, not
+  pressed.
+- **The free camera: the one call in `s_UpdateMainCamera`** (`scene.camera`).
+  `s_UpdateMainCamera` updates the main `ST3D_Camera` through a single virtual call
+  (`call *0x88(%eax)`) on the view object. That is `cOverViewImp::UpdateCamera`, which
+  passes it on to `gCameraManager`'s current camera, whatever its class. The call
+  becomes `call camera_update; nop`. The wrapper makes the same virtual call, then, when
+  the free camera is on, calls the `ST3D_Camera`'s virtual `SetTransform` (slot 5) with
+  its own camera-to-world matrix. `SetTransform` derives the rest itself
+  (world-to-camera matrix, frustum). The camera-to-world matrix is at `ST3D_Camera`+0xc0
+  (`GetCameraToWorldTransform`), which `query` reads. The marks are polled from the same
+  wrapper, and commands are read there while the simulation is paused. A dead end that
+  shaped this: patching `TacticalCamera::UpdateCamera`'s slot in `TacticalCamera`'s
+  vtable did nothing, because the camera in use is not that class.
+- **Cursor: the one `ST3D_Sprite::DrawScaled2D` call in `RefreshDisplay`**
+  (`scene.cursor`, a chained call: another plugin may have wrapped it first). `UI.asi`
+  wraps the same call when it loads (ui/README.md, "The cursor"), as the legacy
+  `HUD.asi` did. So `Scene.asi` patches it only once the scene is built, by when every
+  other plugin has loaded, and chains to whatever the call went to. With the cursor off,
+  the draw is skipped. Clicks still land where the pointer is. UI.asi draws no cursor of
+  its own while the draw does not reach it.
+- **Notices: `GameEvent::TriggerEvent`** (`scene.notices`). "Enemy engaged." is the
+  event `EVENTS_ENEMY_ENGAGED` from `events.dat` (text, voice, minimap marker). Events
+  are fired through three entry points: `TriggerEvent()`,
+  `TriggerEvent(const Vector3 &, int, const Race *)`, which the `GameObject` overload
+  calls, and `TriggerEvent(const Race *)`. With notices off, each entry returns false at
+  once (`xor eax,eax; ret N`). The original bytes are kept and put back by `notices on`.
 - **Tooltips: the one `DisplayInterface::TooltipOn()` call in
-  `SelectionDisplay::AlwaysSimulate`** (0x508070). Each tick that function asks
-  `TooltipOn()` (0x51b610, the object `s_PrecomputeMouseOver` found under the
-  pointer) and, with an object, hands it to the cursor's
-  `CursorInterface::DoTooltip` (0x505a80), which shows the box once the pointer has
-  rested for `s_tooltipDelay`; with none it calls `ClearTooltips` (0x505d40). With
-  tooltips off the call becomes `xor eax,eax` plus three `nop`s, "no object", so the
-  box is cleared and never comes up. The original five bytes are kept and put back by
-  `tooltips on`. Nothing else asks `TooltipOn()`. Clicks, orders and the cursor's
-  shape go by `DisplayInterface::MouseOn()` (0x51b5e0, `s_mouseOverObjectHandle`),
-  which this leaves alone, so the pointer still hovers and clicks as before. The
-  `stations` scene, which films the HUD with the cursor on, gets tooltips off too
-  unless it sets `Tooltips=1`. The gauges drawn over an object the pointer rests on
-  do not come from `TooltipOn()`; `hover` (below) removes them.
-- **Hover: the two `DisplayInterface::MouseOn()` calls in `SelectionDisplay`.**
-  `SelectionDisplay::Render` (0x509540) walks every object and draws its gauges
+  `SelectionDisplay::AlwaysSimulate`** (`scene.tooltips`). Each tick that function asks
+  `TooltipOn()` (the object `s_PrecomputeMouseOver` found under the pointer) and, with an
+  object, hands it to the cursor's `CursorInterface::DoTooltip`, which shows the box once
+  the pointer has rested for `s_tooltipDelay`; with none it calls `ClearTooltips`. With
+  tooltips off the call becomes `xor eax,eax` plus three `nop`s, "no object", so the box
+  is cleared and never comes up. The original five bytes are kept and put back by
+  `tooltips on`. Nothing else asks `TooltipOn()`. Clicks, orders and the cursor's shape
+  go by `DisplayInterface::MouseOn()` (`s_mouseOverObjectHandle`), which this leaves
+  alone, so the pointer still hovers and clicks as before. The `stations` scene, which
+  films the HUD with the cursor on, gets tooltips off too unless it sets `Tooltips=1`.
+  The gauges drawn over an object the pointer rests on do not come from `TooltipOn()`;
+  `hover` (below) removes them.
+- **Hover: the two `DisplayInterface::MouseOn()` calls in `SelectionDisplay`**
+  (`scene.hover`). `SelectionDisplay::Render` walks every object and draws its gauges
   (`mDrawHullGauge`, `mDrawShieldGauge`, `mDrawSpecialEnergyGauge`) and system icons
   when it is the *hover object*, `SelectionDisplay`+0x7c, or when it is selected and
   on the hover object's team, +0x88; an unselected object other than the hover object
-  is skipped. Both fields are written in `SelectionDisplay::AlwaysSimulate` from the
-  one `MouseOn()` call at 0x5080fc (+0x88 is the hover object's team, +0x8c a fade-in
-  time). The hover ring is separate: `SelectionDisplay::PreRender` asks `MouseOn()`
-  itself, at 0x508e72, and moves selection effect 4 (`AddSelectionEffect` /
-  `RemoveSelectionEffect`) to that object. With hover off both calls become
-  `xor eax,eax` plus three `nop`s, so both functions see what they see with the
-  pointer over empty space: no hover gauges, no ring, and a selected object's gauges
-  as they are then. Selection circles and group numbers come from elsewhere in
-  `Render` and `PreRender` and stay. Clicks and orders ask `MouseOn()` themselves and
-  still work. Bench, `showcase`, the pointer over a cube: with hover on, a gauge above
-  it and a row of system icons below; with hover off, neither.
-  **Dead end:** blanking only the `PreRender` call (an earlier try) removes the ring
-  but not the gauges, because `Render` reads +0x7c, which only `AlwaysSimulate`
-  writes.
-- **Shield hits: the four weapon calls of `ShieldEffect::CreateShieldHit`.** The flash
+  is skipped. Both fields are written in `SelectionDisplay::AlwaysSimulate` from its
+  one `MouseOn()` call (+0x88 is the hover object's team, +0x8c a fade-in time). The
+  hover ring is separate: `SelectionDisplay::PreRender` asks `MouseOn()` itself, and
+  moves selection effect 4 (`AddSelectionEffect` / `RemoveSelectionEffect`) to that
+  object. With hover off both calls become `xor eax,eax` plus three `nop`s, so both
+  functions see what they see with the pointer over empty space: no hover gauges, no
+  ring, and a selected object's gauges as they are then. Selection circles and group
+  numbers come from elsewhere in `Render` and `PreRender` and stay. Clicks and orders
+  ask `MouseOn()` themselves and still work. Bench, `showcase`, the pointer over a cube:
+  with hover on, a gauge above it and a row of system icons below; with hover off,
+  neither. **Dead end:** blanking only the `PreRender` call (an earlier try) removes
+  the ring but not the gauges, because `Render` reads +0x7c, which only
+  `AlwaysSimulate` writes.
+- **Shield hits: the four weapon calls of `ShieldEffect::CreateShieldHit`**
+  (`scene.shieldfx`, chained: render3d's effects module taps the same calls). The flash
   on a craft's shields where a weapon strikes them is a `ShieldHit`, a model instance
   that the static, cdecl `ShieldEffect::CreateShieldHit(GameObject *, const Matrix34 &,
-  ShieldType, float, int)` (0x4743b0) builds and lists in `m_shieldList`; it returns
-  the hit's id, or -1 when the shield type has no model. The weapons call it after
-  dealing their damage (a virtual call on the target just before): `Beam::Simulate`
-  at 0x58bb95 (which keeps the id at +0xe8 to move the effect along the beam),
-  `Bullet::Simulate` at 0x58cad8, `Mine::mMoveTowardsTarget` at 0x58d502 and
-  `Missile::Simulate` at 0x58dd65, each with the type and duration from the weapon's
-  class. With shield effects off each of those calls becomes `or eax,-1` plus two
-  `nop`s, the "no effect" answer the weapons already handle: `ShieldEffect::ShieldUpdate`
-  (0x4747d0) and `ShieldStop` (0x474770) find nothing under -1. Bench, `showcase`:
-  with shield effects on the struck cube sits in a green shell; with them off, none,
-  and the beams still end at the shield; with `heal cube1 off` its shields ran out
-  within 40 s (the shields-down ring came up and the beams reached the hull), so the
-  damage still lands.
+  ShieldType, float, int)` builds and lists in `m_shieldList`; it returns the hit's id,
+  or -1 when the shield type has no model. The weapons call it after dealing their
+  damage (a virtual call on the target just before): `Beam::Simulate` (which keeps the
+  id at +0xe8 to move the effect along the beam), `Bullet::Simulate`,
+  `Mine::mMoveTowardsTarget` and `Missile::Simulate`, each with the type and duration
+  from the weapon's class. With shield effects off each of those calls becomes
+  `or eax,-1` plus two `nop`s, the "no effect" answer the weapons already handle:
+  `ShieldEffect::ShieldUpdate` and `ShieldStop` find nothing under -1. Bench,
+  `showcase`: with shield effects on the struck cube sits in a green shell; with them
+  off, none, and the beams still end at the shield; with `heal cube1 off` its shields
+  ran out within 40 s (the shields-down ring came up and the beams reached the hull), so
+  the damage still lands.
   Left alone: **the shields-down ring**, the blue electric effect, is a lasting
-  `ShieldHit` of type 1 (duration -1) that `Craft::ShieldsDown` (0x4c74f0),
-  `ShieldCollapse`, `CheckDerelict`, `DamageAlloc`, `mInitShipsSystems` and `Init`
-  create through the same function and keep at `Craft`+0x208; `Heal=1` keeps shields
-  from running out, so it never comes up. The special weapons that make shield
-  effects of their own (`ShieldInversion`, `EnergyShieldConverter`, `ReflectWeapon`,
-  `ClairvoyantLink`, `TimedInvincible`, ...) call it from elsewhere and are untouched.
-- **Heal: hull, shields and crew.** Hull through `ScriptInterfaceImp::SetCurrentHealth`
-  as before; shields through `ScriptInterfaceImp::SetShieldPercent(int, float)`
-  (0x455eb0), whose float is a fraction (0..1) of the maximum: it stores
-  `max * f` into the craft's shields (+0x1c8, the maximum at +0x1cc, as
-  `GetShieldPercent` 0x455e70 reads them); crew through `ScriptInterfaceImp::SetCrew
-  (int, float)` (0x456060), which calls `Craft::SetCrew` (0x4c83e0), clamped to the
-  maximum crew at +0x1c4 (the crew is at +0x1dc). `ScriptInterfaceImp::GetMaxCrew` is
-  a stub that returns a global, so the maximum is read from the craft. Both are only
-  written when below the maximum, because `Craft::SetCrew` also recomputes the craft's
-  state. Bench, `showcase`, 30 s of fire: with only the hull healed both cubes wore
-  the blue electric shields-down ring; with shields healed, none (the green flash of
-  shields taking hits remains; `shieldfx off` removes it).
-- **Damaged-system effects: the model's damage nodes.** The orange plume a Galaxy
-  streamed from a nacelle with nothing shooting it was the engines' damage effect,
-  shown because `Engines=0` had switched the engines off. A craft's model carries a
-  node per system (`Shield`, `Engines`, `Target`, `Sensors` and `Life` `Damage`;
-  `CraftClass::InitializeDamageNodes` 0x4bfc70 finds them), each with an emitter from
+  `ShieldHit` of type 1 (duration -1) that `Craft::ShieldsDown`, `ShieldCollapse`,
+  `CheckDerelict`, `DamageAlloc`, `mInitShipsSystems` and `Init` create through the same
+  function and keep at `Craft`+0x208; `Heal=1` keeps shields from running out, so it
+  never comes up. The special weapons that make shield effects of their own
+  (`ShieldInversion`, `EnergyShieldConverter`, `ReflectWeapon`, `ClairvoyantLink`,
+  `TimedInvincible`, ...) call it from elsewhere and are untouched.
+- **Heal: hull, shields and crew** (`scene.heal`). Hull through
+  `ScriptInterfaceImp::SetCurrentHealth` to `GetMaxHealth`; shields through
+  `ScriptInterfaceImp::SetShieldPercent(int, float)`, whose float is a fraction (0..1)
+  of the maximum: it stores `max * f` into the craft's shields (+0x1c8, the maximum at
+  +0x1cc, as `GetShieldPercent` reads them); crew through `ScriptInterfaceImp::SetCrew
+  (int, float)`, which calls `Craft::SetCrew`, clamped to the maximum crew at +0x1c4
+  (the crew is at +0x1dc). `ScriptInterfaceImp::GetMaxCrew` is a stub that returns a
+  global, so the maximum is read from the craft. Both are only written when below the
+  maximum, because `Craft::SetCrew` also recomputes the craft's state. Bench,
+  `showcase`, 30 s of fire: with only the hull healed both cubes wore the blue electric
+  shields-down ring; with shields healed, none (the green flash of shields taking hits
+  remains; `shieldfx off` removes it).
+- **Damaged-system effects: the model's damage nodes** (`scene.damage`). The orange
+  plume a Galaxy streamed from a nacelle with nothing shooting it was the engines'
+  damage effect, shown because `Engines=0` had switched the engines off. A craft's model
+  carries a node per system (`Shield`, `Engines`, `Target`, `Sensors` and `Life`
+  `Damage`; `CraftClass::InitializeDamageNodes` finds them), each with an emitter from
   `Sprites/emitter.spr` -- the Galaxy's `Engines` node vents `plasmalrg`, its `Life`
-  node `steamsml`. `CraftInstance::Update` (0x4cb390) reads each of the craft's five
-  systems (`Craft`+0x1e0, 0x30 bytes each: shields, engines, weapons, life support,
-  sensors) into a byte at +0x9c..+0xa0 of the render instance, set while the system is
-  online, and `CraftInstance::RenderInternal` (0x4cb0e0) turns each into its node's
-  hidden bit. A system off for any reason is drawn as damaged, and
-  `ScriptInterfaceImp::DisableEngines` ends in `Craft::PermanentDisableEngines`
-  (0x4ca1a0), which takes the engines offline and marks them held off (byte +1 of the
-  system). The plugin replaces `Update` in `CraftInstance`'s vtable (slot at
-  0x6b3e64) with a wrapper that calls it and then, for the scene's own objects, sets
-  the byte of every system held off -- and of all five on a healed craft -- so its
-  node stays hidden. `Heal=1` also mends real damage: whenever a system that is not held
-  off is offline or short of hit points (+0x18, a double, against +0x4), it calls
-  `Craft::RepairAllSystemsComplete` (0x4c8be0), which restores every such system and
-  leaves held-off ones alone, so `Engines=0` survives healing. The crew node (`crew1`..
-  `crew5` fire sprites) follows the crew fraction, which `Heal=1` already keeps full.
-  Bench, `nebula-close` (one Galaxy, `Engines=0`) and `showcase`: the plume on every
-  Federation and Klingon ship before, none after, and the Galaxy still in place.
+  node `steamsml`. `CraftInstance::Update` reads each of the craft's five systems
+  (`Craft`+0x1e0, 0x30 bytes each: shields, engines, weapons, life support, sensors)
+  into a byte at +0x9c..+0xa0 of the render instance, set while the system is online,
+  and `CraftInstance::RenderInternal` turns each into its node's hidden bit. A system
+  off for any reason is drawn as damaged, and `ScriptInterfaceImp::DisableEngines` ends
+  in `Craft::PermanentDisableEngines`, which takes the engines offline and marks them
+  held off (byte +1 of the system). The plugin replaces `Update` in `CraftInstance`'s
+  vtable with a wrapper that calls it and then, for the scene's own objects, sets the
+  byte of every system held off -- and of all five on a healed craft -- so its node
+  stays hidden. `Heal=1` also mends real damage: whenever a system that is not held off
+  is offline or short of hit points (+0x18, a double, against +0x4), it calls
+  `Craft::RepairAllSystemsComplete` (`scene.heal`), which restores every such system
+  and leaves held-off ones alone, so `Engines=0` survives healing. The crew node
+  (`crew1`.. `crew5` fire sprites) follows the crew fraction, which `Heal=1` already
+  keeps full. Bench, `nebula-close` (one Galaxy, `Engines=0`) and `showcase`: the plume
+  on every Federation and Klingon ship before, none after, and the Galaxy still in place.
   `Vent=` and the `vent` command go the other way: the wrapper clears the byte of each
   system named, so its node shows on a healed craft, and nothing else is touched. Bench,
   `SCENE=venting`, 2026-10-13: the Galaxy's nacelle plume and its hull's gas, the
   Klingon's two, for as long as the session runs.
-- **Move orders: `GameObject::SetCommand`.** The script interface's own orders end in
-  `GameObject::SetCommand` overloads: `(AiCommand, const GameObject *, long, bool)`
-  (0x4d1af0), `(AiCommand, const Vector3 &, long, bool)` (0x4d1b50) and
-  `(AiCommand, long, bool, bool)` (0x4d1a40), all thiscall on the object. `goto` calls
-  the first or second with `GO` (4) or `GO_WARP` (0x2b), and `stop` the third with
-  `STOP` (3), as `ScriptInterfaceImp::Stop` (0x453590) does. The names come from
-  `AiCommandToName` (0x44e1c0) and its table. A craft is flag 8 of the flags at +0x14,
-  and +0x113 marks one that is dying; both are checked first, as the script interface
-  does. `ScriptInterfaceImp::Goto(int, int, bool, int)` (0x453520) was tried first and
-  did nothing for a Galaxy ordered to the nebula; it also checks a byte at +0x1bc of
-  the ship. `GO` with the nebula as its object did nothing either, which is why only a
-  craft is gone to as an object. Bench: a Galaxy ordered 590 units away arrived in
-  under 15 s, turning and accelerating as a player's ship does; three ships ordered as
-  a group kept their spacing; a Klingon flagship ordered to a Borg cube flew to it and
-  stopped beside it.
-- **A colony without a colony ship: `Planet::StartWithColony(int team)`** (0x4b5660,
-  thiscall), what a map that starts with a colony uses. It sets the population to the
-  medium level, a garrison of 100 and the team (`SetTeam`, virtual), so the planet is
-  the team's. `colonize` then sets the population asked for with
-  `Planet::SetPopulation(float)` (0x4b5970), which also sets the population level and
-  the maximum garrison; `Planet::GetMaxPopulation()` (0x4b5550) is the class's
-  `maxPopulation` level, read from `RTS_CFG.h`'s `cfgPOP_*` (heavy, a class M planet's,
-  is 5000), and is what `full` means. `Craft::SetCrew(float)` (0x4c83e0) fills the
-  garrison, clamped to that maximum: `Planet::Simulate` neutralises a colonised planet
-  whose garrison is 0. `off` is `Planet::NeutralizePlanet()` (0x4b5150) and a
-  population of 0. A `Planet` is told from other objects by its vtable (0x6b2b3c);
-  the team (+0xec) and population (+0x2ac) are what `query` reads.
+- **Special weapons** (`scene.special`): `ScriptInterfaceImp::SetSpecialEnergy` fills a
+  craft's special energy (+0x16c, its maximum +0x168); `cPrjID::SetName` and
+  `WeaponClass::Find` turn a weapon ODF's name into its class, which the craft's
+  `Carrier` (+0x128, its weapons a vector at +0xc..+0x10, each weapon's class at +4)
+  finds a slot for, and `Craft::FireAtSpecial` (with a target or without) fires it as
+  `CraftProcess::FireCommandedSpecialWeapon` does for a player's order; the weapon's
+  virtual "can it fire at this target now" (+0x20) is logged beside it.
+- **Move orders: `GameObject::SetCommand`** (`scene.move`). The script interface's own
+  orders end in `GameObject::SetCommand` overloads: `(AiCommand, const GameObject *,
+  long, bool)`, `(AiCommand, const Vector3 &, long, bool)` and `(AiCommand, long, bool,
+  bool)`, all thiscall on the object. `goto` calls the first or second with `GO` (4) or
+  `GO_WARP` (0x2b), and `stop` the third with `STOP` (3), as `ScriptInterfaceImp::Stop`
+  does; `formation` posts `SET_FORMATION` (0x2a) through
+  `GameObject::DeQueueCommand(AiCommand, long)`. The names come from `AiCommandToName`
+  and its table. A craft is flag 8 of the flags at +0x14, and +0x113 marks one that is
+  dying; both are checked first, as the script interface does.
+  `ScriptInterfaceImp::Goto(int, int, bool, int)` was tried first and did nothing for a
+  Galaxy ordered to the nebula; it also checks a byte at +0x1bc of the ship. `GO` with
+  the nebula as its object did nothing either, which is why only a craft is gone to as
+  an object. Bench: a Galaxy ordered 590 units away arrived in under 15 s, turning and
+  accelerating as a player's ship does; three ships ordered as a group kept their
+  spacing; a Klingon flagship ordered to a Borg cube flew to it and stopped beside it.
+  `build` (`scene.build_order`) is the `(AiCommand, const GameObjectClass *, const
+  Vector3 &, bool)` overload with `BUILD` (0x19) and `GameObjectClass::Find`'s class,
+  after `Team::GetTeam` and `Team::AddResource` have paid for it.
+- **Cloaks** (`scene.cloak`): a craft's cloaking device is at +0x108, its state at +0x3c
+  (0 visible, 1 cloaking, 2 cloaked, 3 decloaking) and the request byte the player's
+  button sets for `CloakingDevice::Simulate` at +0x2c; `GameObject::ImmediateCloak`
+  cloaks at once.
+- **Freighters** (`scene.freighter`): a `Freighter` is told by its vtable;
+  `Freighter::LoadResource(float, eResource)` fills its hold (the resource at +0x25c, 6
+  for none, the amount at +0x258).
+- **A colony without a colony ship: `Planet::StartWithColony(int team)`**
+  (`scene.colonize`, thiscall), what a map that starts with a colony uses. It sets the
+  population to the medium level, a garrison of 100 and the team (`SetTeam`, virtual), so
+  the planet is the team's. `colonize` then sets the population asked for with
+  `Planet::SetPopulation(float)`, which also sets the population level and the maximum
+  garrison; `Planet::GetMaxPopulation()` is the class's `maxPopulation` level, read from
+  `RTS_CFG.h`'s `cfgPOP_*` (heavy, a class M planet's, is 5000), and is what `full`
+  means. `Craft::SetCrew(float)` fills the garrison, clamped to that maximum:
+  `Planet::Simulate` neutralises a colonised planet whose garrison is 0. `off` is
+  `Planet::NeutralizePlanet()` and a population of 0. A `Planet` is told from other
+  objects by its vtable; the team (+0xec) and population (+0x2ac) are what `query`
+  reads.
   **What is drawn is a second, eased population.** `PlanetInstance::Update` copies the
   planet's +0x2c4 (the race whose cities are drawn) and +0x2c8 (the population they are
   drawn at), and `mSetupHemisphere` paints the population map from
   `pop / cfgPOP_HEAVY` against each race's `CityAllocArray` and binds the race's
   development texture (`PD_<cityTextureName><hemisphere>`). `Planet::Simulate` sets
-  +0x2c4 to the team's race (`Team::GetTeam(int)` 0x496340, +0x244) and moves +0x2c8
-  toward the population at 200 a second, so a planet colonised from nothing would take
-  25 s to show a heavy planet's cities. `colonize` writes both itself.
-  **`ScriptInterfaceImp::Colonize(int, int)` (0x452ca0) is not this**: it orders a
-  colony ship (its first argument, a craft able to colonise) to colonise the planet
-  (its second), and does nothing for any other first argument. That is why it did
-  nothing when tried from this plugin with the planet alone.
-- **Tech tree: `TechnologyTree::mFind(const char *)`** (0x4999e0, thiscall) on
-  `g_technologyTreeArray` (0x739000, one `TechnologyTree` of 0x98 bytes per team, 9 of
-  them) finds a `TechItem` by name (case-insensitive). `TechnologyTree::Available`
-  (0x498d60), which `Weapon::IsAvailable` asks with the weapon class's id (+0x208),
-  answers the item's +0x4 when its +0xc ("possible") is set; `Created` sets +0x4 of an
-  item's children once all its parents exist, and a tree file's `-1` clears +0xc for good.
-  `tech` sets both bytes, or clears +0x4.
-  **Why the assimilation beam needs it.** `TechAssimBeam::Simulate` (0x586720) ends the
-  beam on the tick its owner has no weapon to take from the target: a special weapon of
-  the target's (+0x20c of its class) that `Weapon::IsAvailable` says its team has, that
+  +0x2c4 to the team's race (`Team::GetTeam(int)`, +0x244) and moves +0x2c8 toward the
+  population at 200 a second, so a planet colonised from nothing would take 25 s to
+  show a heavy planet's cities. `colonize` writes both itself.
+  **`ScriptInterfaceImp::Colonize(int, int)` is not this**: it orders a colony ship (its
+  first argument, a craft able to colonise) to colonise the planet (its second), and
+  does nothing for any other first argument. That is why it did nothing when tried from
+  this plugin with the planet alone.
+- **Tech tree: `TechnologyTree::mFind(const char *)`** (`scene.tech`, thiscall) on
+  `g_technologyTreeArray` (one `TechnologyTree` of 0x98 bytes per team, 9 of them) finds
+  a `TechItem` by name (case-insensitive). `TechnologyTree::Available`, which
+  `Weapon::IsAvailable` asks with the weapon class's id (+0x208), answers the item's
+  +0x4 when its +0xc ("possible") is set; `Created` sets +0x4 of an item's children
+  once all its parents exist, and a tree file's `-1` clears +0xc for good. `tech` sets
+  both bytes, or clears +0x4.
+  **Why the assimilation beam needs it.** `TechAssimBeam::Simulate` ends the beam on the
+  tick its owner has no weapon to take from the target: a special weapon of the
+  target's (+0x20c of its class) that `Weapon::IsAvailable` says its team has, that
   the owner does not carry, while the owner holds fewer extra weapons than its class
   allows (`maxExtraWeapons`, 1 on a cube). When the beam has held for
   `assimilationTime` the weapon is the owner's and the beam ends. On `a2_borg01` the tree
@@ -461,77 +548,132 @@ inert, and `Scene.log` says so.
   Sovereign's team could not change that. Bench, `SCENE=assimilation`, 2026-10-17:
   `tech team 2 gcorbom: was not available, now available`, then a green cone from the
   cube onto the saucer for about 6 s; a second cube spawned in its place fires it again.
-- **The player's race: the two `Race::Find` calls in `SetupDefaultGame`** (0x489590).
-  A map named on the command line (`-nointro a2_borg01`) is set up by
+- **The player's race: the two `Race::Find` calls in `SetupDefaultGame`**
+  (`scene.race`). A map named on the command line (`-nointro a2_borg01`) is set up by
   `SetupDefaultGame`, from `Program::MainLoop`: it gives slot 0, the player's, the race
-  of the map's first start location, `Race::Find(name)` (0x48b100, cdecl, an exact match
-  on races.odf's `name`) at 0x4897ad or 0x489872 depending on the branch, then
-  `GameSetup::setRace` with the race's index (`Race`+0x44c). When `Find` returns NULL
-  the slot keeps the "random" race its constructor gave it, and
-  `Program::GameOpenPreLoad` (0x4846a0) draws a random race for every playing slot
-  still random (`GameSetup::RaceRandom`, retried until `CanRacePlayCurrentGameType`)
-  before `DisplayInterface::PostLoadAll` loads that race's HUD into
-  `Race::s_missionRace`. `a2_borg01` names no race for its start location, so the
-  bench's HUD changed race from launch to launch; nothing in `ARMADA.PRF`, the command
-  line or the clone decides it. With `Race=` set, both calls go to the plugin, which
-  returns `Find(Race)`, logs it with what the map named (`race: federation for the
+  of the map's first start location, `Race::Find(name)` (cdecl, an exact match on
+  races.odf's `name`) on one of its two branches, then `GameSetup::setRace` with the
+  race's index (`Race`+0x44c). When `Find` returns NULL the slot keeps the "random" race
+  its constructor gave it, and `Program::GameOpenPreLoad` draws a random race for every
+  playing slot still random (`GameSetup::RaceRandom`, retried until
+  `CanRacePlayCurrentGameType`) before `DisplayInterface::PostLoadAll` loads that race's
+  HUD into `Race::s_missionRace`. `a2_borg01` names no race for its start location, so
+  the bench's HUD changed race from launch to launch; nothing in `ARMADA.PRF`, the
+  command line or the clone decides it. With `Race=` set, both calls go to the plugin,
+  which returns `Find(Race)`, logs it with what the map named (`race: federation for the
   player (the map's first start location names ""; ...)`), and falls back to the map's
-  own for a name `Find` does not know. Both call sites are checked to be `call
-  Race::Find` first, and `Find` against its first bytes; the hook goes in at start-up,
-  outside `Enable`, so it is in place before the mission is set up. Bench, 2026-10-17,
-  `showcase` with `Hud=1` and `Race=federation`: the Federation HUD on three launches
-  in stock and three in refit (the log: the map names `""`); `SCENE_RACE=klingon` over
-  it gave the Klingon theme.
+  own for a name `Find` does not know. The hook goes in at start-up, outside `Enable`, so
+  it is in place before the mission is set up. Bench, 2026-10-17, `showcase` with
+  `Hud=1` and `Race=federation`: the Federation HUD on three launches in stock and three
+  in refit (the log: the map names `""`); `SCENE_RACE=klingon` over it gave the Klingon
+  theme.
 - **A mission's captions: the two `OverlayText::AddMessage` calls in the script
-  interface.** The text burned into the intro cinematics -- the Federation intro's
-  subtitles at the top ("These are the voyages of the starship Enterprise..."), the
-  lower thirds (`USS Enterprise / Stardate 54522.2 / Location: Alpha Quadrant`, and
-  the Klingon and Borg intros' stardates) and the mission's title ("Invasion") -- is
-  not a game option and not part of the scene: the mission script asks for each one
-  through `ScriptInterfaceImp::ShowTitle` (0x454ff0) or `ShowSubtitle` (0x4550c0).
-  Each looks the text up (`MISSION_*_SUBTITLE*` in `Dynamic_Localized_Strings.h`),
-  makes one call to `OverlayText::AddMessage` (0x5061e0, thiscall, seven arguments,
-  `ret 0x1c`) on `overlayText` (0x764488), at 0x455081 and 0x45510c, and returns the
-  key it gives. The script later passes that key to `RemoveTitle` / `RemoveSubtitle`,
-  which hand it to `FadeMessage` (0x506400) or `RemoveMessage` (0x506460); both look
-  it up in the overlay's map and do nothing when it is not there. With `Captions=0`
-  both calls go to the plugin's `caption_add`, which takes the same arguments, adds
-  nothing and returns -1, a key `AddMessage` never gives (a counter from 0, 0x7644bc).
-  No message exists, so neither stock's `OverlayText::Render` nor `UI.asi`'s overlay,
-  which reads the same map (`ui/HUD.md`, "Overlay messages"), has anything to draw.
-  `Scene.log` names each caption it hid (`caption hidden: "..."`). The game's own
+  interface** (`scene.captions`). The text burned into the intro cinematics -- the
+  Federation intro's subtitles at the top ("These are the voyages of the starship
+  Enterprise..."), the lower thirds (`USS Enterprise / Stardate 54522.2 / Location:
+  Alpha Quadrant`, and the Klingon and Borg intros' stardates) and the mission's title
+  ("Invasion") -- is not a game option and not part of the scene: the mission script
+  asks for each one through `ScriptInterfaceImp::ShowTitle` or `ShowSubtitle`. Each
+  looks the text up (`MISSION_*_SUBTITLE*` in `Dynamic_Localized_Strings.h`), makes one
+  call to `OverlayText::AddMessage` (thiscall, seven arguments, `ret 0x1c`) on
+  `overlayText`, and returns the key it gives. The script later passes that key to
+  `RemoveTitle` / `RemoveSubtitle`, which hand it to `FadeMessage` or `RemoveMessage`;
+  both look it up in the overlay's map and do nothing when it is not there. With
+  `Captions=0` both calls go to the plugin's `caption_add`, which takes the same
+  arguments, adds nothing and returns -1, a key `AddMessage` never gives (a counter from
+  0). No message exists, so neither stock's `OverlayText::Render` nor `UI.asi`'s
+  overlay, which reads the same map (`ui/HUD.md`, "Overlay messages"), has anything to
+  draw. `Scene.log` names each caption it hid (`caption hidden: "..."`). The game's own
   callers of `AddMessage` (`GameTypeGeneral::SetGameOverMessage` and the network
   transport's) are left alone. The hook goes in at start-up, outside `Enable`, as
-  `Race=` does; the two call sites are checked to be `call AddMessage` first, and
-  `AddMessage` against its first bytes.
-- **Random sequences: `RandomSequence`.** The engine draws every random number from
-  one of three `RandomSequence` objects: `g_random` (0x7b0fac, a pointer; the
+  `Race=` does.
+- **Music** (`scene.music`): `StartMusic` (cdecl) and `JukeBox::mStartNewTrack`
+  (thiscall, no stack arguments) take nothing off the stack that their callers do not,
+  so with `Music=0` a `ret` over each first byte makes every call a no-op.
+- **Random sequences: `RandomSequence`** (`scene.seed`). The engine draws every random
+  number from one of three `RandomSequence` objects: `g_random` (a pointer; the
   simulation's, made by `Program::GameOpenPreLoad` from the game setup's random seed),
-  `g_missionRandom` (0x7b0fa8, made there too) and `g_asyncRandom` (0x7300c4, a static one
-  seeded from the wall clock at start-up). `Seed=` and `seed` call the class's own
-  constructor, `RandomSequence::RandomSequence(int seed, bool log)` (0x65e1b0, thiscall,
-  checked by its first bytes), on each existing object with seed, seed + 1 and seed + 2,
-  passing back the log flag it kept (+9), so the object starts its sequence again and
-  nothing else of it changes. Nothing is seeded without `Seed=`. It is done twice: as the
-  scene is built, and as the mission loads, where `Program::GameOpenPreLoad` makes
-  `g_random` and then calls `Starfield_Initialize` (0x59ac00, the call at 0x485159,
-  checked to be that call), which lays the background's stars out from `g_asyncRandom`:
-  that call goes to the plugin, which seeds and then makes it. Without it the stars stood
-  elsewhere on every launch (bench, `showcase`).
-- **The tick's length: `Program::GameProcess(int ms)`** (0x483450) runs one tick for the
-  milliseconds the frame took: its length is `getGameSpeedModifier()` (0x604700) times
-  `ms` times 0.001, and that is what `Time_Simulate` adds to the simulation's time and
+  `g_missionRandom` (made there too) and `g_asyncRandom` (a static one seeded from the
+  wall clock at start-up). `Seed=` and `seed` call the class's own constructor,
+  `RandomSequence::RandomSequence(int seed, bool log)` (thiscall), on each existing
+  object with seed, seed + 1 and seed + 2, passing back the log flag it kept (+9), so
+  the object starts its sequence again and nothing else of it changes. Nothing is
+  seeded without `Seed=`. It is done twice: as the scene is built, and as the mission
+  loads (`scene.seed_load`), where, once `g_random` is made, `Program::GameOpenPostLoad`
+  calls `Starfield_Initialize`, which lays the background's stars out from
+  `g_asyncRandom`: that call goes to the plugin, which seeds and then makes it. Without
+  it the stars stood elsewhere on every launch (bench, `showcase`).
+- **The tick's length: `Program::GameProcess(int ms)`** (`scene.step`) runs one tick
+  for the milliseconds the frame took: its length is `getGameSpeedModifier()` times `ms`
+  times 0.001, and that is what `Time_Simulate` adds to the simulation's time and
   `Simulate` hands every object. With `Step=`, its one call of `getGameSpeedModifier`
-  (0x4834a3, checked to be that call and followed by the multiplication by `ms`) goes to
-  the plugin, which makes the same call after setting the `ms` argument in
-  `GameProcess`'s frame to `Step=`; nothing in `GameProcess` reads it before. Bench,
-  `showcase`, before: tick 200 at 4.3550 s on one launch and 4.3484 s on the next.
-- **Where the camera looks: `gTacticalCamera`** (0x763650). Its interest point, the map
-  position the RTS camera looks at, is the `Vector3` at +0x98
+  (checked to be that call and followed at once by the multiplication by `ms`, the
+  profile's label) goes to the plugin, which makes the same call after setting the `ms`
+  argument in `GameProcess`'s frame (ebp+8) to `Step=`; nothing in `GameProcess` reads it
+  before. Bench, `showcase`, before: tick 200 at 4.3550 s on one launch and 4.3484 s on
+  the next.
+- **Where the camera looks: `gTacticalCamera`** (`scene.locate`). Its interest point,
+  the map position the RTS camera looks at, is the `Vector3` at +0x98
   (`TacticalCamera::GetInterest`). **That camera is not the one in use on the bench**
-  (bench, 2026-10-17): `gCameraManager`'s first field (0x763370) held
-  `gParabolicCamera` (0x763470), and `query`'s `rts interest` stayed at 0,0,0 while
-  `Center=` moved the view. The zoom is set through that field; see "The zoom".
+  (bench, 2026-10-17): `gCameraManager`'s first field held `gParabolicCamera`, and
+  `query`'s `rts interest` stayed at 0,0,0 while `Center=` moved the view. The zoom is
+  set through that field (`scene.zoom`): see "The zoom".
+- **The selection: the overview's own methods, through `g_pOverView`** (`scene.select`).
+  `select` and `select+` call the overview's `Select(object, type, clear first, sound)`
+  (its vtable +0x90), which every click goes through, and `selection` and the marks read
+  `GetSelectNum` and `GetSelectList` (+0x94, +0x98). The overview is read through the
+  engine's pointer to it, `g_pOverView`, which its constructor sets: stock's is a static
+  object, but Fleet Operations: Roots constructs an enlarged one of its own, with the
+  selection in an array of its own (+0x3d0) and a `Select` of its own, capped at 30;
+  only the pointer follows it, and only its vtable calls Roots' `Select`. The plugin
+  never writes the selection's arrays or count. The control groups `selection` lists
+  (`scene.groups`) are ten `cGroup`s of 12 bytes each for ships (+0x14c) and for
+  stations (+0x1c4), each a `list_array` (its count at +0, its handles at +0x18).
+  `waypoint-key` (`scene.waypoint`) points the overview's pointer to the waypoint
+  binding's live state (+0x30c) at an int of its own while held.
+- **Objects: `GameObject::objectList`** (`scene.objects`), a `std::list` of every
+  `GameObject`: its head node at +4, each node's next at +0 and its object at +8, as the
+  UI's selection overlay walks it (`ui/src/engine/overlay.rs`). For each object
+  `objects` reads the handle (+0x28), the flags (+0x14, bit 8 a craft), the team (+0xec),
+  the script label (+0x48, a `char *`), selected (+0x10e), the group (+0x120), dying
+  (+0x113), the hull (+0x15c of +0x160, as `GetCurrentHealth` / `GetMaxHealth` read it),
+  shields, crew and special energy (above), and calls three const functions:
+  `GameObject::GetOdfName`, its vtable's `GetClassDisplayName` (+0x70) and
+  `Entity::GetTransform` (the position at +0x24). A station is a craft whose class
+  `__RTDynamicCast` makes a `CraftClass` with its station byte (+0x20d) set, as
+  `SelectionDisplay::Render` tells one; a planet's class is a `PlanetClass`. The local
+  player's team is `Entity::GetUserTeam()`, and `time` the simulation's seconds that
+  `Get_Time` reads, written once a tick.
+
+### On Fleet Operations: Roots
+
+Roots' `Data/ArmadaL.exe` is stock 1.1 patched, under `FleetOpsHook.dll`, which rewrites
+more of it in memory as it loads; its build (`profiles/fo-roots-5.0Z11/build.toml`)
+inherits `gog-1.1` and marks the functions Roots changes that a hook here is or sits in.
+A marked hook stands down unless the mark's `verified` names it, which it does only where
+the hook was checked beside Roots' change: `scene.notices` (the Vector3 overload's body
+changes after the six bytes the hook writes), `scene.zoom` (`TacticalCamera::SetZoomLevel`
+reads its lower limit from another constant of the same 1.0), `scene.step` (a constant in
+`getGameSpeedModifier`, and FleetOpsHook's audio update in `GameProcess` after the call),
+`scene.hud` (FleetOpsHook's own unit view, hidden and shown inside `SetInterfaceState`,
+which the plugin calls whole), `scene.hover` (two runs of `PreRender` nopped, away from its
+`MouseOn` call) and `scene.shieldfx` (as render3d's effects module). Standing down there:
+`scene.damage` (`CraftInstance::Update` is trampolined at its entry), `scene.special`
+(both `Craft::FireAtSpecial` lose a test at their entry) and `scene.tech` (off:
+`TechnologyTree::Available` and `Possible` answer from FleetOpsHook's own tree, which the
+bytes `tech` writes are not). `cPrjID::GetOdfName`, which the marks only call, jumps to
+Roots' file system at its entry: Roots' build checks nothing there
+(`profiles/fo-roots-5.0Z11/scene.toml`). On Roots the plugins load through the ASI loader
+layer, which needs Display8 (`--layers display,asiloader`), and `Scene.asi`, `Scene.ini`
+and the files it writes sit in `Data/`.
+
+A map is reached directly with `--args '-nointro tutorialgameplay.bzn'` (the `.bzn` is
+required; the first allied tutorial, its script running, the HUD after about 25 s) and
+`SCENE=game`. **`Race=` takes Roots' `races.odf` names**: `unitedfederation`,
+`klingonempire`, `romulanempire` (Roots' `federation` is the Observer race), and `borg`,
+`cardassian`, `dominion`, `species8472`, `freeborg`; `Race::Find` takes the first exact
+match, and its two calls in `SetupDefaultGame` are stock's in Roots' file and memory.
+`spawn` takes Roots' ODF names (`Data/ODF.fpq`).
 
 ## Marks
 
@@ -564,24 +706,25 @@ the frame before. What it reads, and why it is safe to read there (`s_UpdateMain
 runs between ticks, on the game's thread, as the renderers' walks do):
 
 - **The camera**: the main `ST3D_Camera`'s camera-to-world matrix (+0xc0), as `query`
-  reads it. An axis that changes by more than 2e-5 or an eye by more than 0.01 units is
+  reads it (`scene.camera`). An axis that changes by more than 2e-5 or an eye by more than 0.01 units is
   motion; none for `Still` seconds settles it, marked at the last motion.
 - **The selection**: `GetSelectNum` and `GetSelectList` (vtable +0x94, +0x98), as
-  `selection` reads it, so `QOL.asi`'s larger selections are seen too.
+  `selection` reads it (`scene.select`), so `QOL.asi`'s larger selections and Roots' are
+  seen too.
 - **The scene's crafts**: the cloaking device's state (+0x108, then +0x3c), as `query`
   reads it; the dying byte +0x113 that the move orders check; `Entity::Get` returning
   nothing once an object is gone.
-- **Fire: `Ordnance::ordnanceList`**, the `std::list` whose head node's pointer is at
-  0x771fac (each node's next at +0, its ordnance at +8), walked as render3d walks it
-  (`render3d/src/mods/ordnance/eng.rs`). An ordnance's shooter is the handle at +0x5c
-  and its target the one at +0x60; its ODF is named by its class (+0x34), whose cPrjID
-  (+0x150) `cPrjID::GetOdfName` (0x6593a0, checked by its first bytes) turns into
-  the ODF's name, as render3d names a special by it. Ordnance are counted per shooter and
+- **Fire: `Ordnance::ordnanceList`** (`scene.marks`), the `std::list` whose head
+  node's pointer is a static of the engine (each node's next at +0, its ordnance at +8),
+  walked as render3d walks it (`render3d/src/mods/ordnance/eng.rs`). An ordnance's
+  shooter is the handle at +0x5c and its target the one at +0x60; its ODF is named by its
+  class (+0x34), whose cPrjID (+0x150) `cPrjID::GetOdfName` turns into the ODF's name, as
+  render3d names a special by it. Ordnance are counted per shooter and
   ODF, and an ordnance pointer not there the frame before is a new shot.
-- **Explosions: `Explosion::explosionList`**, the `std::list` at 0x7367c4, as
-  render3d's explosions module walks it. A fireball has the vtable 0x6afbd4, a
-  shockwave 0x6afdac; +0x34 is the radius it was built with; its place is the
-  transform `Entity::GetTransform` (0x4cfd50) returns, at +0x24.
+- **Explosions: `Explosion::explosionList`** (`scene.marks`), another `std::list`, as
+  render3d's explosions module walks it. A fireball is told by `FireballExplosion`'s
+  vtable, a shockwave by `ShockwaveExplosion`'s; +0x34 is the radius it was built with;
+  its place is the transform `Entity::GetTransform` returns, at +0x24.
 - **Commands and specials** are marked where they are run, `glide.end` from the glide's
   own start and length, so it is exact rather than the frame that saw it.
 
