@@ -520,6 +520,23 @@ impl Draw {
 
     /// Text broken into lines no wider than `max_width` (at newlines, and at spaces),
     /// the first line's box top at `y`; returns the height it took.
+    /// A soft halo round the glyphs of `s` (drawn where `text_w` would draw them), fading
+    /// from `c` at the glyph's edge to nothing `reach` pixels out: a label's bloom. The
+    /// reach is held inside the atlas's distance range.
+    pub fn text_glow(&mut self, s: &str, size: f32, x: f32, y: f32, c: Color, w: Weight, reach: f32) {
+        let font = font_of(w);
+        let Some(tex) = self.font_tex(w) else { return };
+        let scale = 2.0 * font.spread * size / font.em_texels;
+        // The atlas's distance runs 0.5 units each side of the edge: `scale / 2` pixels.
+        let reach = reach.clamp(1.0, scale * 0.45);
+        let k = [KIND_SDF, scale / reach, reach / (2.0 * scale), 0.0];
+        let mut quads = Vec::new();
+        crate::text::layout_with(font, s, size, x, y, &mut |q| quads.push(q));
+        for q in quads {
+            let [x0, y0, x1, y1] = q.rect;
+            self.aquad(Some(tex), R::new(x0, y0, x1 - x0, y1 - y0), [c; 4], q.uv, k);
+        }
+    }
     pub fn text_wrapped(&mut self, s: &str, size: f32, max_width: f32, x: f32, y: f32, c: Color, w: Weight) -> f32 {
         let font = font_of(w);
         let Some(tex) = self.font_tex(w) else { return 0.0 };

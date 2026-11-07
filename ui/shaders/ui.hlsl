@@ -8,7 +8,9 @@
 // TEXCOORD1 (k): x the kind, then per kind:
 //   0  solid: the vertex colour
 //   1  texture: the vertex colour times the texture
-//   2  signed distance (text): y = screen pixels per unit of the atlas's distance
+//   2  signed distance (text): y = screen pixels per unit of the atlas's distance;
+//      z = how far out the edge is moved, in the atlas's distance (0: the glyph's own,
+//      more: a soft halo round it, a text's glow)
 //   3  rounded rectangle: uv is the pixel's offset from the rectangle's centre, in
 //      pixels; y = corner radius, z, w = half the size. Antialiased over one pixel.
 //   4  shape (src/gfx/fx.rs): uv as for 3; y = stroke width (0: filled), z, w = half
@@ -143,7 +145,8 @@ float4 ps_ui(VO i) : SV_Target
     float is_solid = 1.0 - is_tex - is_sdf - is_box - is_shape;
 
     float4 t = tex.Sample(tex_s, i.uv);
-    float sdf = saturate((t.r - 0.5) * i.k.y + 0.5);
+    // z grows the edge outward (0 for text; a glow's soft halo, `Draw::text_glow`).
+    float sdf = saturate((t.r - 0.5 + i.k.z) * i.k.y + 0.5);
 
     float2 q = abs(i.uv) - i.k.zw + i.k.y;
     float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - i.k.y;

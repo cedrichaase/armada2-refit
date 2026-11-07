@@ -213,6 +213,12 @@ pub struct Content {
     /// `[Loading] Bar`: the loading screen's bar when `[Loading] Bar=` in UI.ini is empty
     /// (`panel`: a square bar in a thin box; empty: the classic one).
     pub loading_bar: &'static str,
+    /// `[Looks] Menus`: the look (`widgets::theme::Form::from_id`) of the front end's
+    /// screens and menus with `[UI] Theme=auto`; empty: the shell's.
+    pub menus_look: &'static str,
+    /// `[Looks] MissionMenus`: the look of the menus over a running mission: `race` (the
+    /// HUD's race's look), a look's id, or empty (as the front end's).
+    pub mission_menus_look: &'static str,
 }
 
 /// A build with no content set for the UI.
@@ -231,6 +237,8 @@ pub static NONE: Content = Content {
     glyphs: &[],
     info: InfoLayout { size: [0.0, 0.0], min_width: 0.0, lamps: false, elements: &[], numbers: &[], names: &[] },
     loading_bar: "",
+    menus_look: "",
+    mission_menus_look: "",
 };
 
 /// A name as the engine's C string, made once and kept for the plugin's life.
@@ -322,6 +330,8 @@ pub fn parse(text: &'static str) -> Content {
             .leak(),
         info: info_layout(&t),
         loading_bar: t.str("Loading", "Bar").trim(),
+        menus_look: t.str("Looks", "Menus").trim(),
+        mission_menus_look: t.str("Looks", "MissionMenus").trim(),
     }
 }
 

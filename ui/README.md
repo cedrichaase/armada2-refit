@@ -630,7 +630,7 @@ is checked to be stock. `UI.log`: "cursor: the engine's cursor is kept square".
 | `[UI] Movies` | 1 | the launch reels' and the intro's frames drawn by the UI, fitted ("Movies"), from the cutscene proxy or, without it, from the engine's own copy; 0: copied into the locked back buffer, scaled by the proxy or 640x480 without it |
 | `[UI] Defaults` | 2 | which shipped defaults the file was brought up to ("Installing"); not read by `UI.asi` |
 | `[UI] CursorSize` | 32 | its size in units (32 texels of art at 1080 lines) |
-| `[UI] Theme` | auto | the look (`STYLE.md`): `auto` is the player's race in a mission and the shell's theme elsewhere; or `shell`, `federation`, `klingon`, `romulan`, `cardassian`, `borg`, `species8472`, or a look by its id (`starfleet`, the Federation's look on Roots; `lcars`, `blade`, `wing`, `arch`, `cube`, `organic`) everywhere |
+| `[UI] Theme` | auto | the look (`STYLE.md`): `auto` is the player's race in a mission and the shell's theme elsewhere; or `shell`, `federation`, `klingon`, `romulan`, `cardassian`, `borg`, `species8472`, or a look by its id (`starfleet`, the Federation's look on Roots, and `redline`, `jade`, `bronze`, `circuit`, `bone`, `circuit-teal`, `violet`, the other races'; `lcars`, `blade`, `wing`, `arch`, `cube`, `organic`) everywhere |
 | `[Demo] Mission`, `Shell`, `Loading` | 0 | the demonstration panel in that context (`Shell`: with the widget gallery) |
 | `[Demo] Style` | 0 | the style gallery (`STYLE.md`) in place of the demos: every theme and widget state in the front end (the Credits' place) and over a mission, the loading look on the loading screen |
 | `[HUD] Enable`, `Bar`, `BarLabels` | 1, 1, 1 | the HUD's panels of ours, one key per panel ([`HUD.md`](HUD.md)), every one on |
@@ -1010,11 +1010,15 @@ theme), `hud/resources.rs`, `credits.rs` (the tour, the text, the logos), `curso
 `loading.rs` (the kicker), `gallery.rs`, `menus/scene.rs` and
 `menus/screens/single_player.rs`.
 
-**The colours stay the theme's.** `widgets/theme.rs` keys its six race palettes by a look
-(`Form`: `lcars`, `blade`, `wing`, `arch`, `cube`, `organic`), and the set maps each race
-to one (`Theme = cube`); `Race` is a race's place in the set's list, so another game's
-races take the looks without a code change, and a race whose look the theme does not know
-draws in the shell's.
+**The colours stay the theme's.** `widgets/theme.rs` keys its palettes by a look
+(`Form`, named by how it looks: `lcars`, `blade`, `wing`, `arch`, `cube`, `organic`, and the
+machined ones `starfleet`, `redline`, `jade`, `bronze`, `circuit`, `bone`,
+`circuit-teal`, `violet`), and the set maps each race to one (`Theme = cube`); `Race` is a
+race's place in the set's list, so another game's races take the looks without a code
+change, and a race whose look the theme does not know draws in the shell's. `[Looks]`
+names the menus' look the same way (`Menus = starfleet`, the front end's with
+`Theme=auto`; `MissionMenus = race`, the menus over a running mission in the HUD's race's
+look); a set without it draws its menus in the shell's.
 
 A build with no set, or a set with no `ui.ini`, has no races (no theme of its own for the
 HUD's race), no resources names, no tour and no main-menu view, no credits text or cursor
