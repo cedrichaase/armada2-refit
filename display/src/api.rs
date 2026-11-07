@@ -26,10 +26,12 @@ static DEVICE: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
 pub fn device_made(dev: *mut c_void) {
     DEVICE.store(dev, Ordering::Release);
     EPOCH.fetch_add(1, Ordering::AcqRel);
+    crate::crash::address_space("device made");
 }
 
 pub fn device_reset() {
     EPOCH.fetch_add(1, Ordering::AcqRel);
+    crate::crash::address_space("device reset");
 }
 
 /// The device of ours `dev` is gone (its last reference released).
@@ -42,6 +44,7 @@ pub fn device_gone(dev: *mut c_void) {
 pub fn presented() {
     FRAME.fetch_add(1, Ordering::Relaxed);
     crate::window::present();
+    crate::crash::present(FRAME.load(Ordering::Relaxed));
 }
 
 /// The modules that shook hands at our major (`display8_abi`), by module handle.
