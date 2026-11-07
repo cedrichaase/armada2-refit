@@ -1,7 +1,9 @@
 # Plan: renderer performance follow-ups (phase 14)
 
 This plan comes from the renderer performance review of 2026-11-05. The review was
-read-only: nothing was built, run or measured. It covered `main` at root 15.6.21 and
+read-only: nothing was built, run or measured. It covered `main` at root 15.6.21, and
+its references were checked again against `main` at 15.10.0: the cited files that
+changed in between still show what is described, at the line numbers given. It covered
 five areas:
 
 - `gpu/`, the Vulkan and Direct3D 12 backends;
@@ -11,7 +13,7 @@ five areas:
 - the other draw modules: hulls, effects, ordnance, particles, specials and overlays.
 
 **Nothing below is a measurement.** Each finding gives the code it is based on
-(`file:line` at 15.6.21) and an estimate of its cost. Before a change ships, measure it
+(`file:line` at 15.10.0) and an estimate of its cost. Before a change ships, measure it
 with `render3d/perf/ab.sh` (`render3d/PERF.md`, "A/B: any two checkouts or commits"),
 on the bench, alone, with `RUNS=3` for anything under about 0.1 ms. Judge a change that
 can alter the image in game, not on a table.
@@ -80,9 +82,9 @@ PERF.md's worst view of 7.8 ms in the `showcase` scene.
 | # | Finding | Evidence | Estimate |
 |---|---|---|---|
 | H1 | **The fireballs' noise volume is built at the first explosion.** It is three 64³ FFTs and ~786k `sin`/`cos` on the CPU. `reset()` drops it, so a device reset builds it again | `render3d/mods/effects/src/explosions.rs:206-227`, called from `draw` at `:239`; dropped at `:135` | Tens of ms, once. The log line `effects: explosion noise 64^3 in N ms` gives the real figure |
-| H2 | **A dying ship's debris is broken up in the frame it dies.** `mesh.unindexed()` inserts into a sorted Vec, which is O(V²). The clustering rescans every unused triangle per chunk, and `seen.contains` is O(k²). One index buffer is made per mesh | `render3d/mods/effects/src/chunks.rs:248-272, 275`; `crates/a2fmt/src/sod.rs:166-191` | Several ms for a cube or a station |
+| H2 | **A dying ship's debris is broken up in the frame it dies.** `mesh.unindexed()` inserts into a sorted Vec, which is O(V²). The clustering rescans every unused triangle per chunk, and `seen.contains` is O(k²). One index buffer is made per mesh | `render3d/mods/effects/src/chunks.rs:250-273, 277`; `crates/a2fmt/src/sod.rs:166-191` | Several ms for a cube or a station |
 | H3 | **Pipelines are compiled at their first draw.** `ready()` builds only the shader modules. Hulls alone have 7 pixel shaders × 5 modes × 3 culls, so the first cloak, ghost, faded hull or mirrored node each pays. So do the explosions, shields, the shields-down effect and the debris. Display8's disk cache and pipeline library help only later sessions | `gpu/src/vulkan/pipe.rs:240-264`; `gpu/src/dx12/pipe.rs:255-277`; `render3d/mods/hulls/src/draw.rs` `pipe()` | One driver compile per new key, on the game thread |
-| H4 | **Textures, models and normal maps are made at first draw.** `assets::texture` decodes the TGA, builds the mips and uploads them. `scene::model` parses the SOD and builds its buffers. `normal_map` builds a Borg normal map and its mips per pixel on the CPU | `render3d/core/src/assets/mod.rs:232`; `render3d/core/src/scene/mod.rs:245`; `render3d/mods/hulls/src/draw.rs` `normal_map` | Per new class on screen |
+| H4 | **Textures, models and normal maps are made at first draw.** `assets::texture` decodes the TGA, builds the mips and uploads them. `scene::model` parses the SOD and builds its buffers. `normal_map` builds a Borg normal map and its mips per pixel on the CPU | `render3d/core/src/assets/mod.rs:231`; `render3d/core/src/scene/mod.rs:245`; `render3d/mods/hulls/src/draw.rs` `normal_map` | Per new class on screen |
 | H5 | **Display8 reads files on the render thread, whether tracing is on or not.** `drop::present` opens and parses `Display8.ini` every 60 presents. `detail::present` checks for `Display8.go` every 30 | `display/src/drop.rs:122`; `display/src/detail.rs:223` | 0.1–1 ms each under Wine: a periodic spike |
 | H6 | **A SUBOPTIMAL present rebuilds the swap chain.** `Ok(true)` from `vkQueuePresentKHR` does `device_wait_idle` and `make_swapchain`. A surface that stays suboptimal does this every frame | `display/src/vk/mod.rs:1242` | Conditional; not observed |
 | H7 | **The pipeline-cache check copies the whole cache.** Every 600 frames it fetches the full blob only to compare its length | `display/src/vk/mod.rs:1305`; `display/src/vk/cache.rs:55` | A multi-MB copy every ~10 s |
@@ -131,12 +133,12 @@ bandwidth, and the resolve is more than half of it.
 | # | Finding | Evidence | Estimate |
 |---|---|---|---|
 | U1 | **String allocations per sprite and per quad.** `eng::look` scans and allocates a `String` per shot and spark, batching compares the strings, and each run looks up its texture by a new lowercased key. `mem::take` throws the queue's capacity away every frame. The sky's 770 star quads each allocate a lowercased `String` | `render3d/core/src/scene/sprites.rs:32, 86, 132, 148`; `render3d/core/src/engine/sprite.rs:86`; `render3d/mods/sky/src/sprites.rs:61` | A good part of the effects' 0.1–0.2 ms and the sky's 0.2 ms |
-| U2 | **Asset and model lookups allocate a lowercased key on every call.** This covers `draw_part`'s texture per part per frame, `model()`, and `sod_of` per instance per frame | `render3d/core/src/scene/mod.rs:245, 421`; `render3d/core/src/assets/mod.rs:232`; `render3d/mods/hulls/src/lib.rs:217` | 20–100 µs in battles with debris and rock fields |
-| U3 | **The hull sprite nodes (running lights, fires) are found by reverse linear scans.** Each lookup scans the whole sprite table with `eq_ignore_ascii_case`, per node, per object, per view. Each quad is its own draw and clones its texture name | `render3d/mods/hulls/src/sprites.rs:94, 114-118, 151, 271-277`; `crates/a2fmt/src/spr.rs:312-323` | 0.1–0.3 ms; resolve once per model as `particles/src/look.rs:62` does |
+| U2 | **Asset and model lookups allocate a lowercased key on every call.** This covers `draw_part`'s texture per part per frame, `model()`, and `sod_of` per instance per frame | `render3d/core/src/scene/mod.rs:245, 421`; `render3d/core/src/assets/mod.rs:231`; `render3d/mods/hulls/src/lib.rs:217` | 20–100 µs in battles with debris and rock fields |
+| U3 | **The hull sprite nodes (running lights, fires) are found by reverse linear scans.** Each lookup scans the whole sprite table with `eq_ignore_ascii_case`, per node, per object, per view. Each quad is its own draw and clones its texture name | `render3d/mods/hulls/src/sprites.rs:94, 114-118, 151, 271-277`; `crates/a2fmt/src/spr.rs:335-346` | 0.1–0.3 ms; resolve once per model as `particles/src/look.rs:62` does |
 | U4 | **`points_near` rescans every light for every part.** Each call does a `sqrt`, a BTreeMap flag lookup and a key recomputation per light, allocates two Vecs and sorts | `render3d/core/src/scene/lights.rs:238-261`, from `scene/mod.rs:427-436` | Tens of µs with many lights |
-| U5 | **Debris chunks are drawn one by one with no cull.** There are up to `MaxChunks=1500`, each with 448 bytes of constants, a scan of the lights and a lowercased texture name | `render3d/mods/effects/src/chunks.rs:435-448` | Large in the seconds after a big ship dies |
+| U5 | **Debris chunks are drawn one by one with no cull.** There are up to `MaxChunks=1500`, each with 448 bytes of constants, a scan of the lights and a lowercased texture name | `render3d/mods/effects/src/chunks.rs:436-450` | Large in the seconds after a big ship dies |
 | U6 | **Hull draws redo per-part work every frame.** A texture name is lowercased per part, `flipbook` scans, the materials are compared by string, an `order` Vec is allocated per draw, and `model_sphere`/`model_box` are recomputed | `render3d/mods/hulls/src/draw.rs:426-650` (`:541, 590, 617, 693`) | Under half of the hulls' time |
-| U7 | **Posing covers off-screen objects too, in both views.** Hulls pose every object in the list before the caster test, and particles pose each emitter's SOD again | `render3d/mods/hulls/src/lib.rs:663-670`; `render3d/mods/particles/src/sim.rs:537` | ~0.07 ms per view, could be halved |
+| U7 | **Posing covers off-screen objects too, in both views.** Hulls pose every object in the list before the caster test, and particles pose each emitter's SOD again | `render3d/mods/hulls/src/lib.rs:664-671`; `render3d/mods/particles/src/sim.rs:537` | ~0.07 ms per view, could be halved |
 | U8 | **Torpedo models do string work and a full draw per shot per view** | `render3d/mods/ordnance/src/models.rs:125, 179, 204, 233` | Rises with salvo size |
 
 ### Shaders in the draw modules
