@@ -39,6 +39,10 @@ rows = ["QOL.PathStartsAtOnce"]
 doc = "The bar's keyboard step wrapped for the position keys; a button pressed with its click"
 rows = ["QOL.BarKeys"]
 
+[hook.rebind]
+doc = "The key rebind table applied in the engine's parsed key map while the grid's position keys are on"
+rows = ["QOL.BarKeys"]
+
 [hook.rig_self]
 doc = "The construction ship does not block its own blueprint: the ghost's check ignores the rig"
 rows = ["QOL.RigIgnoresSelf"]
@@ -1923,3 +1927,107 @@ struct = "ScriptInputCallbacks"
 offset = 0x24
 type = "ptr"
 used_by = ["script_input"]
+
+# ---- rebind: the key rebind table (qol/README.md, "Key rebinds") -----------------------
+# Input.map, once parsed (InputInit: read_input_map_key, read_chord, s_FindOrAppendDiscreteMap),
+# is two arrays the input thread tests each frame: the named controls (FieldDesc, the name inline
+# at +0, at +0x20 the pointer to the control's state cell) and the discrete maps (DiscreteMap: at
+# +0 the state cell it sets, at +4 the number of keys in its chord, from +8 the keys, 12 bytes each:
+# the device's index, the key's code on that device, and a byte: 1 for a key held, 0 for a key up).
+# A control is found by its name and its maps by its state cell; a rebind changes one key's code
+# in one map, in memory, and puts it back.
+[[sym]]
+id = "rb_fields"
+symbol = "DynArray<FieldDesc> data"
+kind = "global"
+addr = 0x761370
+used_by = ["rebind"]
+
+[[sym]]
+id = "rb_n_fields"
+symbol = "DynArray<FieldDesc> count"
+kind = "global"
+addr = 0x761378
+used_by = ["rebind"]
+
+[[sym]]
+id = "rb_field_stride"
+symbol = "sizeof(FieldDesc)"
+kind = "value"
+value = 0x3c
+unit = "bytes"
+used_by = ["rebind"]
+
+[[sym]]
+id = "rb_field_cell"
+symbol = "FieldDesc"
+kind = "field"
+struct = "FieldDesc"
+offset = 0x20
+type = "ptr"
+used_by = ["rebind"]
+
+[[sym]]
+id = "rb_maps"
+symbol = "DynArray<DiscreteMap> data"
+kind = "global"
+addr = 0x761850
+used_by = ["rebind"]
+
+[[sym]]
+id = "rb_n_maps"
+symbol = "DynArray<DiscreteMap> count"
+kind = "global"
+addr = 0x761858
+used_by = ["rebind"]
+
+[[sym]]
+id = "rb_map_stride"
+symbol = "sizeof(DiscreteMap)"
+kind = "value"
+value = 0x6c
+unit = "bytes"
+used_by = ["rebind"]
+
+[[sym]]
+id = "rb_map_cell"
+symbol = "DiscreteMap"
+kind = "field"
+struct = "DiscreteMap"
+offset = 0x0
+type = "ptr"
+used_by = ["rebind"]
+
+[[sym]]
+id = "rb_map_n"
+symbol = "DiscreteMap"
+kind = "field"
+struct = "DiscreteMap"
+offset = 0x4
+type = "i32"
+used_by = ["rebind"]
+
+[[sym]]
+id = "rb_map_keys"
+symbol = "DiscreteMap"
+kind = "field"
+struct = "DiscreteMap"
+offset = 0x8
+type = "u8"
+used_by = ["rebind"]
+
+[[sym]]
+id = "rb_key_stride"
+symbol = "sizeof(DiscreteMap key)"
+kind = "value"
+value = 0xc
+unit = "bytes"
+used_by = ["rebind"]
+
+[[sym]]
+id = "rb_max_keys"
+symbol = "DiscreteMap keys"
+kind = "value"
+value = 8
+used_by = ["rebind"]
+

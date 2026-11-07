@@ -93,9 +93,12 @@ fn assign(it: &[Item], menu: u32) -> Vec<Option<usize>> {
     // The cells whose key the game's own key map gives to an action of its own (Roots: W, which
     // selects the damaged ships of the selection and so empties a shipyard's) stay empty in every
     // menu: the key is the game's, and no button sits under a cell whose key does not press it
-    // (decision 347). The buttons fill the other cells.
+    // (decision 347). So do, while QOL's keys are on, the cells it gives no key: a key whose rebind
+    // did not apply is still the game's (decision 349). The buttons fill the other cells.
     let game_keys = crate::content::get().bar_game_keys;
-    let reserved: Vec<usize> = (0..CELLS).filter(|&c| game_keys.bytes().any(|k| k.eq_ignore_ascii_case(&LABEL[c]))).collect();
+    let keys = keys_on();
+    let reserved: Vec<usize> =
+        (0..CELLS).filter(|&c| game_keys.bytes().any(|k| k.eq_ignore_ascii_case(&LABEL[c])) || (keys && qol_label(c).is_none())).collect();
     for &c in &reserved {
         used[c] = true;
     }
@@ -293,7 +296,7 @@ pub(super) fn qol_label(c: usize) -> Option<&'static str> {
 /// Whether QOL's keys are on: the labels and the tooltips (which drop stock's hotkey
 /// while they are) follow it.
 fn keys_on() -> bool {
-    qol_label(0).is_some()
+    (0..CELLS).any(|c| qol_label(c).is_some())
 }
 
 /// Whether QOL's update step has arrived (it calls `UI_BarStep` in each update of the
