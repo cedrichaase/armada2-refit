@@ -153,6 +153,88 @@ offset = 0x1c
 type = "u8"
 used_by = ["forms.vcl"]
 
+# The grid of Map Select and the Mods list, NextSuite's TNextGrid (read only, decision 260):
+# paints its rows through its own window's device context, which is clipped to nothing off
+# screen, so the UI reads the rows from the grid's cells instead.
+# TNextGrid: its columns: a collection
+[[sym]]
+id = "forms_grid_columns"
+symbol = "TNextGrid"
+kind = "field"
+struct = "TNextGrid"
+offset = 0x500
+type = "ptr"
+used_by = ["forms.vcl"]
+
+# TNextGrid: the first visible row
+[[sym]]
+id = "forms_grid_first"
+symbol = "TNextGrid"
+kind = "field"
+struct = "TNextGrid"
+offset = 0x508
+type = "i32"
+used_by = ["forms.vcl"]
+
+# TNextGrid: the selected row
+[[sym]]
+id = "forms_grid_selected"
+symbol = "TNextGrid"
+kind = "field"
+struct = "TNextGrid"
+offset = 0x528
+type = "i32"
+used_by = ["forms.vcl"]
+
+# TNextGrid: its cells: the object that holds one list of cells for each column
+[[sym]]
+id = "forms_grid_cells"
+symbol = "TNextGrid"
+kind = "field"
+struct = "TNextGrid"
+offset = 0x5c0
+type = "ptr"
+used_by = ["forms.vcl"]
+
+# The cells object: its row count
+[[sym]]
+id = "forms_cells_rows"
+symbol = "TCells"
+kind = "field"
+struct = "TCells"
+offset = 0x1028
+type = "i32"
+used_by = ["forms.vcl"]
+
+# The cells object: the first column's list of cells (the others follow, four bytes each)
+[[sym]]
+id = "forms_cells_lists"
+symbol = "TCells"
+kind = "field"
+struct = "TCells"
+offset = 0x4
+type = "ptr"
+used_by = ["forms.vcl"]
+
+# The column collection: the list that holds the columns
+[[sym]]
+id = "forms_columns_list"
+symbol = "TNxColumns"
+kind = "field"
+struct = "TNxColumns"
+offset = 0x38
+type = "ptr"
+used_by = ["forms.vcl"]
+
+# A cell: its value (a string cell holds a long string, an integer cell the integer)
+[[sym]]
+id = "forms_cell_value"
+symbol = "TCell"
+kind = "field"
+struct = "TCell"
+offset = 0x20
+type = "u32"
+used_by = ["forms.vcl"]
 # ---- forms.dialog_specs: the dialogs FleetOpsHook opens, adopted (engine/fodialogs.rs) --
 # Only told apart by address: nothing is called or read at them. A build that edits one
 # names `ui.forms.dialog_specs` in its `verified` once FleetOpsHook's record is seen to

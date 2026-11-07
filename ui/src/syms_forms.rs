@@ -2,14 +2,14 @@
 //! The symbol table of `ui` (crates/a2engine/README.md).
 
 pub mod sym {
-    pub const FORMS_PROC_SINGLE_PLAYER: a2engine::Sym = a2engine::Sym(14);
-    pub const FORMS_PROC_MISSION_SELECT: a2engine::Sym = a2engine::Sym(15);
-    pub const FORMS_PROC_LOAD_GAME: a2engine::Sym = a2engine::Sym(16);
-    pub const FORMS_PROC_SAVE_GAME: a2engine::Sym = a2engine::Sym(17);
-    pub const FORMS_PROC_GAME_SETTINGS: a2engine::Sym = a2engine::Sym(18);
-    pub const FORMS_PROC_GAME_SETUP: a2engine::Sym = a2engine::Sym(19);
-    pub const FORMS_PROC_ADMIRALS_LOG: a2engine::Sym = a2engine::Sym(20);
-    pub const FORMS_PROC_MESSAGE: a2engine::Sym = a2engine::Sym(21);
+    pub const FORMS_PROC_SINGLE_PLAYER: a2engine::Sym = a2engine::Sym(22);
+    pub const FORMS_PROC_MISSION_SELECT: a2engine::Sym = a2engine::Sym(23);
+    pub const FORMS_PROC_LOAD_GAME: a2engine::Sym = a2engine::Sym(24);
+    pub const FORMS_PROC_SAVE_GAME: a2engine::Sym = a2engine::Sym(25);
+    pub const FORMS_PROC_GAME_SETTINGS: a2engine::Sym = a2engine::Sym(26);
+    pub const FORMS_PROC_GAME_SETUP: a2engine::Sym = a2engine::Sym(27);
+    pub const FORMS_PROC_ADMIRALS_LOG: a2engine::Sym = a2engine::Sym(28);
+    pub const FORMS_PROC_MESSAGE: a2engine::Sym = a2engine::Sym(29);
 }
 
 pub mod hook {
@@ -30,6 +30,14 @@ pub mod field {
     #[inline(always)] pub fn FORMS_WIN_HANDLE() -> usize { super::TABLE.engine().field(a2engine::Sym(11)) }
     #[inline(always)] pub fn FORMS_FORM_STATE() -> usize { super::TABLE.engine().field(a2engine::Sym(12)) }
     #[inline(always)] pub fn FORMS_COMP_STATE() -> usize { super::TABLE.engine().field(a2engine::Sym(13)) }
+    #[inline(always)] pub fn FORMS_GRID_COLUMNS() -> usize { super::TABLE.engine().field(a2engine::Sym(14)) }
+    #[inline(always)] pub fn FORMS_GRID_FIRST() -> usize { super::TABLE.engine().field(a2engine::Sym(15)) }
+    #[inline(always)] pub fn FORMS_GRID_SELECTED() -> usize { super::TABLE.engine().field(a2engine::Sym(16)) }
+    #[inline(always)] pub fn FORMS_GRID_CELLS() -> usize { super::TABLE.engine().field(a2engine::Sym(17)) }
+    #[inline(always)] pub fn FORMS_CELLS_ROWS() -> usize { super::TABLE.engine().field(a2engine::Sym(18)) }
+    #[inline(always)] pub fn FORMS_CELLS_LISTS() -> usize { super::TABLE.engine().field(a2engine::Sym(19)) }
+    #[inline(always)] pub fn FORMS_COLUMNS_LIST() -> usize { super::TABLE.engine().field(a2engine::Sym(20)) }
+    #[inline(always)] pub fn FORMS_CELL_VALUE() -> usize { super::TABLE.engine().field(a2engine::Sym(21)) }
 }
 
 pub mod value {
@@ -54,6 +62,14 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "forms_win_handle", symbol: "TWinControl", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "forms_form_state", symbol: "TCustomForm", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "forms_comp_state", symbol: "TComponent", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "forms_grid_columns", symbol: "TNextGrid", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "forms_grid_first", symbol: "TNextGrid", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "forms_grid_selected", symbol: "TNextGrid", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "forms_grid_cells", symbol: "TNextGrid", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "forms_cells_rows", symbol: "TCells", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "forms_cells_lists", symbol: "TCells", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "forms_columns_list", symbol: "TNxColumns", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "forms_cell_value", symbol: "TCell", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "forms_proc_single_player", symbol: "SingleDlgProc", kind: a2engine::Kind::Fn },
     a2engine::SymDef { id: "forms_proc_mission_select", symbol: "MissionSelectDlgProc", kind: a2engine::Kind::Fn },
     a2engine::SymDef { id: "forms_proc_load_game", symbol: "LoadGameDlgProc", kind: a2engine::Kind::Fn },
@@ -65,8 +81,8 @@ pub const SYMS: &[a2engine::SymDef] = &[
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
-    a2engine::HookDef { id: "ui.forms.vcl", run_unknown: false, rows: &[], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] },
-    a2engine::HookDef { id: "ui.forms.dialog_specs", run_unknown: false, rows: &["Menus.Forms"], syms: &[14, 15, 16, 17, 18, 19, 20, 21] },
+    a2engine::HookDef { id: "ui.forms.vcl", run_unknown: false, rows: &[], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21] },
+    a2engine::HookDef { id: "ui.forms.dialog_specs", run_unknown: false, rows: &["Menus.Forms"], syms: &[22, 23, 24, 25, 26, 27, 28, 29] },
 ];
 
 pub const BUILDS: &[a2engine::Build] = &[
@@ -78,7 +94,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 22,
+        n_resolved: 30,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_present
@@ -95,6 +111,14 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 436 }, // forms_win_handle
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 856 }, // forms_form_state
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 28 }, // forms_comp_state
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1280 }, // forms_grid_columns
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1288 }, // forms_grid_first
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1320 }, // forms_grid_selected
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1472 }, // forms_grid_cells
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4136 }, // forms_cells_rows
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // forms_cells_lists
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // forms_columns_list
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // forms_cell_value
             a2engine::Entry { present: true, addr: 0x5dbdc0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_single_player
             a2engine::Entry { present: true, addr: 0x5d6d80, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_mission_select
             a2engine::Entry { present: true, addr: 0x5d48c0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_load_game
@@ -110,7 +134,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         modules: &[],
         blocked_mod: &[
         ],
-        n_resolved_mod: 22,
+        n_resolved_mod: 30,
     },
     a2engine::Build {
         name: "fo-roots-5.0Z11",
@@ -120,7 +144,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 22,
+        n_resolved: 30,
         content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1 }, // forms_present
@@ -137,6 +161,14 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 436 }, // forms_win_handle
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 856 }, // forms_form_state
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 28 }, // forms_comp_state
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1280 }, // forms_grid_columns
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1288 }, // forms_grid_first
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1320 }, // forms_grid_selected
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1472 }, // forms_grid_cells
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4136 }, // forms_cells_rows
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // forms_cells_lists
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // forms_columns_list
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // forms_cell_value
             a2engine::Entry { present: true, addr: 0x5dbdc0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_single_player
             a2engine::Entry { present: true, addr: 0x5d6d80, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_mission_select
             a2engine::Entry { present: true, addr: 0x5d48c0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_load_game
@@ -152,13 +184,13 @@ pub const BUILDS: &[a2engine::Build] = &[
         modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
         blocked_mod: &[
         ],
-        n_resolved_mod: 22,
+        n_resolved_mod: 30,
     },
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 2] = [const { core::sync::atomic::AtomicU64::new(0) }; 2];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 22] = [const { core::sync::atomic::AtomicU8::new(0) }; 22];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 22] = [const { core::sync::atomic::AtomicUsize::new(0) }; 22];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 30] = [const { core::sync::atomic::AtomicU8::new(0) }; 30];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 30] = [const { core::sync::atomic::AtomicUsize::new(0) }; 30];
 static NOTES: [a2engine::Note; 2] = [const { a2engine::Note::new() }; 2];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 
