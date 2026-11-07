@@ -46,7 +46,7 @@ clean. The front end is not any race's, so it has a theme of its own.
 | **Romulan** | `Wing` | strong green `#015701`/`#42B044`, chamfered plates, diagonal hatching, steel-teal `#8BACBB` | green-black, chamfers all round, diagonal hatch in the header |
 | **Cardassian** | `Arch` | ochre/amber `#823E10`..`#D0A056`, trapezoids and pointed arches | amber on brown, chamfered tops over square feet (the trapezoid), arch marks |
 | **Borg** | `Cube` | grey machinery `#586564`, green circuit lights, dense greebles | near-black, square, double edge with green corner brackets, faint scan lines, blinking node lights |
-| **Federation on Roots** | `Starfleet` | Roots' own Federation HUD (below) | dark brushed gunmetal rims round smoked glass, blue lamps in the side rims lighting the glass from its ends, light-grey tile buttons |
+| **Federation on Roots** | `Starfleet` | Roots' own Federation HUD (below) | dark brushed gunmetal rims round smoked glass, blue lamps in the side rims of the info panel only, lighting its glass from the ends; light-grey tile buttons |
 | **Species 8472** | `Organic` | violet bone `#574C6F`/`#B19FD0`, gold-tan organic strands | purple-black, leaf-shaped corners (large radius on two opposite corners), soft lilac inner light, an amber "eye" |
 
 The tooltip colours are the stock ones from each `gui_<race>.cfg`
@@ -74,7 +74,11 @@ What Roots' HUD is, in words:
 - **The blue is the lamps'**: two small slots in each side rim, either side of the
   seam, bright sky blue at their core, and their light falls across the glass from
   each end: strong within a few pixels, gone to a faint tint a hundred pixels in.
-  The left end is the stronger. Nothing else on a panel is blue.
+  The left end is the stronger. Nothing else on a panel is blue. **Only the unit
+  info panel along the bottom has lamps**: the minimap's frame has none (a blue strip
+  of mode buttons at its foot, no inset), the top-right buttons sit in no frame at all,
+  the resources are bare icons and figures, and the bar's tiles float without a panel.
+  Roots' interface sheets hold no other framed panel.
 - **The buttons** are translucent light-grey tiles with a bright rim, lit along the
   foot from inside, holding Roots' full-colour icon art; the unit's name is amber,
   values pale steel blue.
@@ -96,7 +100,8 @@ are 0..255, Roots' info panel and minimap beside our resource strip and minimap)
 | rim grain (luminance deviation along a rim) | 7 | 5 |
 
 So in code: the glass is `panel_top` over `panel` (`0xb41c1c28`, `0xb4111219`) with a
-light darkening to the right and still scan lines at 2.4% white; each side's lamps
+light darkening to the right, and no scan lines (the user's call, 2026-11-07); on a
+panel with lamps each side's lamps
 throw two soft pools (`sf_lamp_light`: `SF_POOL`, a deeper blue than the core, within
 30 units, and the dark blue `accent3` out to 170 units, each kept to its own quarter of
 a short panel so the middle stays smoke); the rim is 10 units of the **metal kind**
@@ -107,8 +112,17 @@ broad sheen from the top left), with a light hairline along its top, a dark outl
 and a dark lip 2.5 units wide; the buttons are the metal kind in translucent grey
 (`button_top`/`button` about 60% cover) with a bright 1.5-unit rim and a light along
 the foot, lit blue from inside on hover, with a lamp along the foot when on. Window
-headers keep the glass and add two lamps at the right. Text, status colours, sizes
+headers keep the glass and carry no mark. Text, status colours, sizes
 and the amber `accent2` are the shell's and Roots'.
+
+**Which panels carry lamps** is the panel's own choice, not the theme's guess from where
+it sits: `theme::panel_as(ui, r, Lamps::On)` (`Ui::panel_lit`) draws them, `panel`
+(`Lamps::Off`) does not, and the forms other than Starfleet ignore it. Lamps, as on
+Roots, only where Roots has them: **the info panel** (`hud/info.rs`, one unit and a
+group). No lamps: the minimap, the top-right buttons, the resource strip, the bar's
+grid, the pause, trade, replay and leftover boxes, the hover card, the menus and the
+Refit screen. (On Roots the info strip is Roots' own while `Info` leaves it to the
+game, so a Federation HUD of ours may show no lamp at all; that is Roots' look.)
 
 **Which theme shows** is `[UI] Theme=` in `UI.ini`: `auto` (the default) uses the
 player's race in a mission and the shell's theme in the menus and the loading screen;

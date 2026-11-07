@@ -1806,7 +1806,7 @@ Left: the campaign views were not framed for Roots' hulls (their radii are about
 stock's); DS9 is dark on the shadow side of the orbit. (The forms host calls
 `Render3D_MenuScene` since #102, beside the side column rather than a centred card.)
 
-### The Federation's theme on Roots: Starfleet (decisions 380–384)
+### The Federation's theme on Roots: Starfleet (decisions 380–388)
 
 FO-6 gave the Federation LCARS on both games. Roots dresses it in dark machined metal and
 blue glass, and the user asked for a look of that kind (2026-11-07): `starfleet`
@@ -1819,6 +1819,10 @@ blue glass, and the user asked for a look of that kind (2026-11-07): `starfleet`
 | 382 | **A is matched to Roots' Federation HUD by measurement, never by its art**: the glass a near-neutral smoke (about 24,23,32 in the middle), the blue only from two lamps in each side rim falling off across the glass (a bright pool within about 30 units, a faint tail to about 170), a neutral brushed rim, a dark lip; the buttons translucent light-grey tiles with a bright rim, as Roots' tiles that its icons were drawn for. Roots' sheets and bench shots were measured (`ImageMagick`, read only); no pixel, crop or plate of them is in the repository or the build | the user's direction ("closer to stock Roots": grey in the middle, blue toward the sides from lamp insets); hard rule 8 and decision 70 | the user's look in game |
 | 383 | **The brushed metal is a shader kind of the 2D renderer** (`ui.hlsl` kind 5, `Draw::metal`): value-noise streaks, wider streaks, slow blotches and a speckle, fixed in screen pixels, branch-free; no texture | sharp at any resolution (3440x1440 is the user's), no asset, nothing that moves when a panel moves by a pixel | — |
 | 384 | **The 21:9 bench case takes the race Instant Action deals**: at 2560x1080 the setup screen's side lists do not open on the bench (the same clicks work at 1280x960), so `fo-ui-theme-starfleet-wide` sets the theme by name, and the Federation is judged at 1280x960 | a bench limit, not the theme's | the side lists fixed at 21:9 |
+| 385 | **Starfleet's lamps are a panel's own choice** (`theme::Lamps`, `panel_as`, `Ui::panel_lit`), never inferred from where a panel sits; a panel draws none unless it asks | the user found the lamps on every panel inflationary (2026-11-07); a per-panel flag keeps the theme free of screen positions | — |
+| 386 | **Lamps only where Roots' own HUD has lamp insets: the info panel** (one unit and a group). Measured off Roots' sheets and bench shots: the bottom info panel's frame carries two lamps a side; the minimap's frame has none, the top-right buttons, resources and bar have no frame at all, and no other framed panel exists. So the minimap, the top-right buttons, the resource strip, the bar's grid, the boxes, the hover card and the menus have plain smoke glass | the user's request (minimap and top-right) and the coordinator's rule (keep them only where Roots has them) | the user |
+| 387 | **No scan lines anywhere in Starfleet**: the still lines on the glass are gone; the lamp light and the brushed metal stay | the user's call, 2026-11-07 | the user |
+| 388 | **Window headers in Starfleet carry no mark** (the two status lights at the right are gone) | they were lamps too, and Roots has none there | the user |
 
 ## Open decisions
 

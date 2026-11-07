@@ -10,7 +10,7 @@ Run with `a2test --game fo-roots` and `--install .`. The Starfleet look (`ui/STY
 "Starfleet") on every HUD panel the user plays with (the Refit screen's Minimap, Info,
 UnitView, Tooltips, Bar and BarLabels), in a Federation skirmish (`testbench/scenarios/fo-ui-theme-starfleet-wide.md` has 21:9), with `Theme=auto`, so the
 fleetops set's mapping gives the Federation the look. Judged: dark brushed metal round
-smoked glass, lit blue only from the lamps in the side rims, legible text, the game's icons
+smoked glass with no scan lines, blue lamps only on the info panel (as on Roots), legible text, the game's icons
 reading on the plates, and nothing that moves on its own.
 
 1. Include "_fo-render3d-skirmish".
@@ -28,7 +28,7 @@ reading on the plates, and nothing that moves on its own.
 13. Wait 2 seconds.
 14. Take a screenshot called "hud hover".
 15. Wait 2 seconds.
-16. Check that the HUD's panels are dark brushed metal round smoked glass lit blue from lamps in the side rims, the text reads, and the bar's icons read on their plates.
+16. Check that the HUD's panels of ours (the resource strip, the top-right buttons, the command grid and the minimap) are grey metal rims round dark smoked glass with no blue lamps in their rims and no scan lines, that the text reads, and that the bar's icons read on their plates.
 17. Expect "UI.log" not contain "PANIC".
 18. Expect "Display8.log" not contain "VUID".
 19. Expect "Display8.log" not contain "device removed".
