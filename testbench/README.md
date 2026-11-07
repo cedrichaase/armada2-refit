@@ -88,7 +88,9 @@ copy, and can run while the game is being played.
 
 **Scenes on demand** (`scene/`): `Scene.asi` turns a directly launched, empty map into
 a test scene, so renderer work need not reach a model, an angle or a weapon through
-the menus. Fog, HUD, grid, cursor and notices are off, and the objects come from a
+the menus. It also lists the game's objects and selects and orders them by
+handle on any map (`SCENE=game`; `a2test drive objects`), in Armada II and in Fleet
+Operations: Roots. Fog, HUD, grid, cursor and notices are off, and the objects come from a
 scene file (`SCENE=planet|nebula|firing`). A free camera can be moved while the game
 runs: `a2test drive scene "orbit ship 120 20 250"`. `--install testbench/scene`; see
 `scene/README.md`.
@@ -303,7 +305,14 @@ overview's `Select`, FleetOpsHook's with its cap of 30), never writing it. It lo
 through the ASI loader, so a Roots scene needs `Layers: display asiloader` (or more), and
 goes into `Data/`. `Setup: testbench/scene/bench-setup.sh game` is the harness alone on
 whatever map the game loaded: the object list, selection and orders by id, the camera,
-pause, seed and step (`scene/README.md`; `scenarios/README.md`, "Objects"). SCENE_STATE_ROOTS
+pause, seed and step (`scene/README.md`; `scenarios/README.md`, "Objects").
+On Roots' first allied tutorial 36 of its 39 hooks are ready; `scene.damage`
+(`CraftInstance::Update` is trampolined), `scene.special` (both `Craft::FireAtSpecial`
+change at their entry) and `scene.tech` (Roots answers from its own tree) stand down, and
+their commands say so (`! scene.<hook> stood down: ...`). `spawn` takes Roots' ODF names
+(`fconst` is the Federation construction ship; `fdestroy` and `fdefiant` do not exist).
+Roots' map planets (`map_planet_*`) are listed as kind `other`: their class is not a
+`PlanetClass`.
 
 ## Audio stems
 
@@ -611,6 +620,29 @@ posts, a hologram, the Evolver, a survey of what no module draws).
   stops reading commands until "Return to Game" is clicked.
 - **Agent sandboxes** may refuse shell lines that mix variables with `sed`, loops of
   `drive` commands or heredocs: put the sequence in a small script and run that.
+- **Find units by what they are, not where they are.** `a2test drive --session ID objects
+  ships mine` (with `Scene.asi` in: `--install testbench/scene`, or `Setup:
+  testbench/scene/bench-setup.sh game` on any map) lists every object with its handle, ODF,
+  class, team, position, hull and shields; `scene "select #<id>"`, `"select+ #<id>"`,
+  `"camera on #<id>"`, `"goto #<id> world X Y Z"` and `"attack #<a> #<b>"` act on them
+  through the engine's own selection and order paths. In a scenario: `Select the ship of
+  class "Mediterranean"`, `Wait up to 60 seconds until a ship named "rig" is within 100 of
+  3500,0,3000` (`scenarios/README.md`, "Objects"). A box drag by an agent was the slow,
+  flaky way to select one ship; a start fleet's ships change places from game to game.
+- **Handles are large unsigned numbers** (`#2147516417`): the top bit is set. Copy them
+  from the list, never from a hex `query` line.
+- **A paused game still takes Scene commands**: with no tick for 500 ms the plugin reads
+  `Scene.cmd` from the camera hook (Roots' tutorial briefing pauses the simulation).
+- **Roots goes straight into a map** (`Launch: -nointro tutorialgameplay.bzn`, `.bzn` and
+  all; or an Instant Action save, `save\<name>.sav` with its `.ias`): walk Roots' menus
+  only where the menus are what is tested ("Roots straight into a map, and scenes on
+  Roots"). Roots' `federation` race is the Observer: `Race=unitedfederation`.
+- **After a direct launch, push the pointer into the corner before aiming at anything**
+  (`Move the mouse into the bottom right corner`). No menu has moved the game's own
+  cursor, and in a mission it moves by relative motion only, so the first moves land
+  elsewhere: on `fo-ui-bar-grid` the UI saw the hover at the right cell while the game's
+  cursor sat at the top of the screen, and neither FleetOpsHook's range ring nor the
+  tooltip came up.
 - **Say what you are doing**: `a2test drive --session ID note "what, and why"` when
   you start driving a session and whenever your intent changes (a new scene, a new
   question, waiting on a build). The dashboard shows the latest note as the session's
