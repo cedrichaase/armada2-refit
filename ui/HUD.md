@@ -662,9 +662,16 @@ that draw their range rings from their `Render`; the buffs are worked out there)
   pictures are Roots' sprites, found by name in the HUD's sprite database at run time: the ship image
   `<class>_si` (stretched over its area, tinted by the cloak as Roots does), or the wireframe picture
   `<class>w1` for a class without one; the weapon and buff icons are FleetOpsHook's own children,
-  drawn at the rectangle and with the sprite its `Render` gave them, tinted with the race's
-  `weaponIconColor` (`WeaponTint.<race>`); the subsystem icons are the stock `RepairIcon`s' sprites,
-  in the race's `systemIconHealthyColor` (`SystemTint.<race>`), toward the theme's bad with the damage
+  drawn at the rectangle and with the sprite its `Render` gave them, in the look its `Render` decides,
+  read the same way: grey for a special weapon its team has not researched (FleetOpsHook's
+  technology tree, the item's available flag), else a backing copy at a quarter of the race's
+  `weaponIconColor` and the icon in that colour filled from the left to the reload (or brown behind
+  and filled to the special energy there is, when short of the cost); the race's colours are the
+  engine's own, loaded from the HUD race's `gui_<race>.cfg` (`WeaponTint.<race>` in the set only where
+  they cannot be read); the buff icons are the first of FleetOpsHook's ten its panel counts this
+  frame, by kind (a spy aboard, a gravity mine's slowing, a weapon), a buff in `weaponIconColor`, a
+  debuff red; the subsystem icons are the stock `RepairIcon`s' sprites,
+  in the race's `systemIconHealthyColor`, toward the theme's bad with the damage
   and warn on the repair's flash, and grey for a system the craft does not have (a station's engines:
   the craft's system record's first byte is 0); the race icon is the race's
   `<race>_icon`; the rank is `select_rank_<n>` from FleetOpsHook's class record; the builder's queue
@@ -675,8 +682,10 @@ that draw their range rings from their `Render`; the buffs are worked out there)
   A weapon icon past the weapons its class places is not drawn: the panel's icons keep the place and
   sprite the last class gave them, so only the indices FleetOpsHook's record of the class's
   `weapon<N>IconPos` marks present are (`weapon_has_icon`).
-- **The pointer stays Roots' panel's** over ours (`hud::set_info_area`) while ours keeps Roots' left
-  edge: the engine's `StandardComponent::Simulate` sets each child's mouse-over flag from the child's
+- **The pointer stays Roots' panel's** over ours (`hud::set_info_area`) wherever ours is: while the
+  panel simulates, its `FocusSimulate` slot (wrapped) sees the HUD's mouse position
+  (`DisplayInterface::s_mousePos`, canvas units) mapped from ours into the panel's own rectangle, and
+  put back after the call (`info_fo::set_pointer_map`; decision 458). So the engine's `StandardComponent::Simulate` sets each child's mouse-over flag from the child's
   own rectangle, so the tooltips, the clicks (a click on the panel takes the camera to the unit; a
   queue slot cancels; a group icon selects, Shift takes it out) and FleetOpsHook's range rings are the
   engine's and FleetOpsHook's own: a weapon icon under the pointer draws that weapon's red ring, the
@@ -685,10 +694,11 @@ that draw their range rings from their `Render`; the buffs are worked out there)
   than Roots' (`InfoWidth`, the bottom row), the right-anchored children (the queue's slots) are moved
   with ours (`info_fo::move_rect`, an engine component's rectangle, put back when ours goes off);
   FleetOpsHook's own children are never written.
-- **Moved off Roots' left edge** (`BottomRow` with the bar before the info panel), FleetOpsHook's
-  icons cannot follow ours (their rectangles are its objects'): ours then claims the panel and makes
-  the clicks itself as on Armada II (the camera, the queue's cancel, a group icon's selection), with
-  the children's tooltips; the weapon icons' range rings are not had there.
+- **Ours keeps the panel's own proportions**: scaled by its height alone, so on a screen wider than
+  the layout Roots picks (21:9 and wider, which take its 16:9 layout stretched across) ours is
+  narrower than Roots' panel and its pictures are not widened. Without the pointer map (a build
+  whose `FocusSimulate` slot is not stock), ours takes the pointer wherever it is not Roots' panel's
+  own place and makes the clicks itself as on Armada II; the weapon icons' rings are not had there.
 - **The status line under the pointer** (the panel's `SDInfoBar`, which Roots draws at the top of the
   screen) is drawn inside the panel's `Render` through one call, which `hud.hover` wraps ("The status
   line under the pointer"): the gate is lifted around that call (`info_fo::ungated`), so the line stays
@@ -701,10 +711,11 @@ that draw their range rings from their `Render`; the buffs are worked out there)
   column). Roots' build yards show as one object (FleetOpsHook's choice in
   `DetermineSelectedDisplayType`).
 
-**Not drawn by ours** (gaps): the weapon icons' state colours (Roots greys a weapon not yet
-researched, fills an icon to its reload and dims it while energy is short: ours draws every placed
-icon in the race's tint), FleetOpsHook's weapon buffs (a buff icon shows only while a gravity mine
-slows the unit or a spy is aboard), and a planet's population and owner texts beyond the store bar.
+**Not drawn by ours** (gaps): a special weapon's clock-wise fill (ours fills it from the left like
+the others) and the halving of the other icons while a bar button for one weapon is hovered. A planet's
+owner text is created by stock and never drawn, by Roots either. Not seen on the bench: the buff
+icons (no gravity mine or spy could be staged) and a planet's or another team's face (Scene.asi's
+select leaves the selection empty for them).
 
 ### The bottom row on Fleet Operations: Roots
 
@@ -713,8 +724,8 @@ slows the unit or a spy is aboard), and a planet's population and owner texts be
 | `BottomRow` | What |
 |---|---|
 | `stacked` (or empty) | the bar above the minimap, the info panel at Roots' own place (as before) |
-| `minimap, info, bar` (any order of the three) | along the bottom, left to right; the bar as high as the info panel (its three rows of cells fitted to it, or `BarCellSize`, units), the info panel in the room left, at most its own width (or `InfoWidth`, units) |
-| `auto` | that row (`minimap, info, bar`) where the info panel keeps its own width beside the bar, else stacked |
+| `minimap, info, bar` (any order of the three) | along the bottom, left to right; the bar as high as the info panel (its three rows of cells fitted to it, or `BarCellSize`, units), in the bottom right corner when it comes after the info panel; the info panel in the room left, at most its own width (or `InfoWidth`, units) |
+| `auto` | in order (decision 459): **the corners**, the minimap bottom left, the info panel centred, the grid as tall as the minimap in the bottom right corner at the minimap's own margins (21:9 and wider); where they would overlap, **the row**, the info panel at Roots' place and the grid as tall as the panel in the bottom right corner (16:9, 16:10); else **stacked** (4:3, 5:4) |
 
 The info panel's own place is the panel's rectangle as the engine has it (learnt while it shows),
 else estimated from the layout table (its units square, 1200 high). Narrower than its own width, the

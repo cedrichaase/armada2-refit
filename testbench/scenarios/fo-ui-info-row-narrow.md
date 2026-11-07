@@ -4,7 +4,7 @@ Resolutions: 1280x960
 Mod: refit
 Layers: display asiloader render3d ui qol
 Launch: -nointro save\ia-fed-kli.sav
-Setup: testbench/bench/roots-save.sh ia-fed-kli display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh --scene game HUD.Info=1
+Setup: testbench/bench/roots-save.sh ia-fed-kli display/bench-mode.sh stub Backend=vulkan OneWindow=0 ui/bench-asi.sh --scene game HUD.Info=1
 Overlay: UI.HUD:Info=1 UI.HUD:Bar=1 UI.HUD:BarLabels=1 UI.HUD:Tooltips=1 UI.HUD:BottomRow=minimap,info,bar QOL.QOL:BarKeys=1
 Timeout: 14 min
 
