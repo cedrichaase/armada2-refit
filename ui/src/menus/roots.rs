@@ -15,7 +15,9 @@
 mod advsettings;
 mod graphics;
 mod kit;
+mod manualip;
 mod mods;
+mod multiplayer;
 mod sound;
 mod specs;
 

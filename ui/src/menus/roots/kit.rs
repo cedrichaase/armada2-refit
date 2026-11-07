@@ -179,21 +179,40 @@ fn follow(f: &Form, c: &Control, value: i32, step: i32) {
     unsafe { SETTING = (k, target, 0, tries + 1, dist) };
 }
 
-/// A text field of Roots', drawn as a field: what it holds, with a caret while it has
-/// the keyboard (a click gives the real field the keyboard and the typing goes to it).
+/// The text field that was clicked last (by name) and has the keyboard.
+static mut TYPING: u32 = 0;
+
+/// A text field of Roots', drawn as one of ours: what it holds, with a caret while it has
+/// the keyboard. A click gives the real field the keyboard (and selects its text, so
+/// typing replaces it) and the typing goes to it, so Enter, Backspace and the rest are the
+/// field's own; ours shows what it holds.
 pub fn edit(ui: &mut Ui, f: &Form, c: &Control, r: R) {
     let id = ui.id(&crate::sfmt!("edit{}", c.name));
     let t = ui.theme;
+    let k = key_of(&c.name);
     let (hot, held, clicked) = ui.interact(id, r);
     if clicked && f.top {
         forms::act(Action::Focus(c.hwnd));
+        unsafe { TYPING = k };
+    } else if ui.input.pressed[0] && !hot {
+        unsafe {
+            if TYPING == k {
+                TYPING = 0;
+            }
+        }
     }
-    let st = State::of(ui, id, hot, held);
+    let typing = unsafe { TYPING == k } && f.top;
+    let mut st = State::of(ui, id, hot, held);
+    st.focus = typing;
     theme::field(ui, r, st);
     let pad = ui.u(t.pad * 0.7);
     let inner = R::new(r.x + pad, r.y, (r.w - 2.0 * pad).max(1.0), r.h);
-    let shown: String = c.text.clone();
-    ui.text_in(inner, &shown, t.text_size, Align::Left, t.text, Weight::Regular);
+    ui.text_in(inner, &c.text, t.text_size, Align::Left, t.text, Weight::Regular);
+    if typing && (libm::floorf(ui.time() as f32 * 2.0) as i32) % 2 == 0 {
+        let px = ui.u(t.text_size);
+        let (w, h) = crate::text::measure_with(crate::text::font(), &c.text, px);
+        theme::caret(ui, inner.x + w, r.y + (r.h - h) * 0.5, h, 1.0);
+    }
 }
 
 /// A small dim note under or beside a field.

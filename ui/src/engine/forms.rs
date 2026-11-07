@@ -998,7 +998,8 @@ unsafe extern "system" fn tick(_h: HWND, _m: u32, _id: usize, _t: u32) {
     unsafe { SetCursor(LoadCursorA(core::ptr::null_mut(), IDC_ARROW)) };
     if now - unsafe { PRINTED_AT } >= PRINT_EVERY {
         unsafe { PRINTED_AT = now };
-        print(t.hwnd, t.size.0, t.size.1);
+        let grids: Vec<(usize, [i32; 4])> = t.last.iter().filter(|c| c.class == "TNextGrid" && c.visible && c.hwnd != 0).map(|c| (c.hwnd, c.rect)).collect();
+        print(t.hwnd, t.size.0, t.size.1, &grids);
     }
     if unsafe { MODE } == 2 {
         if now - unsafe { LAST_DIAG } > 2.0 {
@@ -1280,7 +1281,7 @@ fn run_actions(top: HWND, _obj: usize) {
 
 /// The top form printed into a memory DC (the VCL answers the print message wherever the
 /// window is): the mirror's picture.
-fn print(h: HWND, w: i32, ht: i32) {
+fn print(h: HWND, w: i32, ht: i32, grids: &[(usize, [i32; 4])]) {
     if w <= 0 || ht <= 0 {
         return;
     }
@@ -1306,6 +1307,27 @@ fn print(h: HWND, w: i32, ht: i32) {
         }
         PatBlt(p.0, 0, 0, w, ht, BLACKNESS);
         SendMessageA(h, WM_PRINT, p.0 as usize, (PRF_CLIENT | PRF_CHILDREN | PRF_ERASEBKGND | PRF_NONCLIENT) as isize);
+        // A grid paints its cells itself, which the form's print leaves out: printed by its
+        // own window, over the form's picture, at its place.
+        for &(g, r) in grids {
+            if IsWindow(g as HWND) == 0 {
+                continue;
+            }
+            static mut SEEN: usize = 0;
+            if SEEN != g {
+                SEEN = g;
+                let mut c = GetWindow(g as HWND, 5);
+                while !c.is_null() {
+                    let mut wr = WinRect::default();
+                    GetWindowRect(c, &mut wr);
+                    crate::log!("forms: grid child {:p} class {} {}x{} visible {}", c, class_of(c), wr.right - wr.left, wr.bottom - wr.top, IsWindowVisible(c));
+                    c = GetWindow(c, 2);
+                }
+            }
+            SetViewportOrgEx(p.0, r[0], r[1], core::ptr::null_mut());
+            SendMessageA(g as HWND, WM_PRINT, p.0 as usize, (PRF_CLIENT | PRF_CHILDREN | PRF_ERASEBKGND) as isize);
+            SetViewportOrgEx(p.0, 0, 0, core::ptr::null_mut());
+        }
         GdiFlush();
         PRINTS = PRINTS.wrapping_add(1);
     }
