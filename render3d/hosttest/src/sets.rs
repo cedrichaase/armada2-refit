@@ -423,6 +423,7 @@ mod tests {
                 cursor_sprites: "Sprites/cursor.spr",
                 menu_title: "",
                 gui_sprites: "",
+                icon_font: "",
             }
         );
         // gallery.rs's lists before.

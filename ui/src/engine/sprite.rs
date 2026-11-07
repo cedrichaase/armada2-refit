@@ -93,6 +93,24 @@ pub fn art(sprite: usize) -> Option<(Tex, [f32; 4])> {
     cache[i].tex.map(|t| (t, rect))
 }
 
+/// The game's texture `name` (`textures\<name>`, either case and extension, as `art` finds
+/// a sprite's), loaded once and kept with the sprites'. For a picture that is no sprite
+/// (`fontglyph`).
+#[allow(static_mut_refs)]
+pub fn texture(name: &str) -> Option<Tex> {
+    let cache = unsafe { &mut CACHE };
+    if let Some(l) = cache.iter().find(|l| l.name == name) {
+        return l.tex;
+    }
+    let (tex, alpha, w, h) = match load(name) {
+        Some((t, a, w, h)) => (Some(t), a, w, h),
+        None => (None, Vec::new(), 0, 0),
+    };
+    crate::log!("sprite: texture {} {}", name, if tex.is_some() { "loaded" } else { "NOT FOUND" });
+    cache.push(Loaded { name: String::from(name), tex, alpha, w, h });
+    tex
+}
+
 /// Whether the sprite's art carries a tile of its own (FO-6, decision 344): Roots' button
 /// sheets draw each icon on a rounded translucent plate filling the sprite, so a plate of ours
 /// behind it reads as a tile inside a tile. Measured on the art itself, per sprite: the band
