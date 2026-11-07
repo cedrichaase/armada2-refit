@@ -156,9 +156,9 @@ apply = "live"
 scope = "local"
 tab = "interface"
 label = "Theme"
-help = "auto takes your race in a mission and the shell's look in the menus; or one look everywhere."
-values = ["auto", "shell", "federation", "klingon", "romulan", "cardassian", "borg", "species8472"]
-labels = ["Auto", "Shell", "Federation", "Klingon", "Romulan", "Cardassian", "Borg", "Species 8472"]
+help = "auto takes your race in a mission and the shell's look in the menus; or one look everywhere. Starfleet is the Federation's look on Fleet Operations: Roots."
+values = ["auto", "shell", "federation", "klingon", "romulan", "cardassian", "borg", "species8472", "starfleet"]
+labels = ["Auto", "Shell", "Federation", "Klingon", "Romulan", "Cardassian", "Borg", "Species 8472", "Starfleet"]
 
 [[row]]
 name = "menus_enable"

@@ -7,7 +7,7 @@
 //! calling, or composing, these. Colours are 0xAARRGGBB; sizes are units (pixels of a
 //! 1080-pixel-tall screen, `Ui::u`).
 use super::{anim, Align, Id, Ui};
-use crate::gfx::{fade, mix, Color, Corners, Elbow, Weight, R};
+use crate::gfx::{fade, mix, Color, Corners, Elbow, Metal, Shape, Weight, R};
 use alloc::string::String;
 
 /// A race of the content set (`ui/content/sets/<set>/ui.ini`, `[Race.*]`): its place in
@@ -63,9 +63,26 @@ pub enum Form {
     Cube,
     /// Species 8472: organic. Leaf-shaped corners, soft inner light.
     Organic,
+    /// Starfleet (the Federation on Fleet Operations: Roots): dark machined metal
+    /// frames round smoked glass, lit by blue lamps set into the frame (STYLE.md).
+    Starfleet,
 }
 
 impl Form {
+    /// The look's own name, for a theme chosen by it.
+    pub fn name(self) -> &'static str {
+        match self {
+            Form::Shell => "Shell",
+            Form::Lcars => "LCARS",
+            Form::Blade => "Blade",
+            Form::Wing => "Wing",
+            Form::Arch => "Arch",
+            Form::Cube => "Cube",
+            Form::Organic => "Organic",
+            Form::Starfleet => "Starfleet",
+        }
+    }
+
     /// A race look by the id a content set gives it (`lcars`, `blade`, `wing`, `arch`,
     /// `cube`, `organic`; any case). The shell is not a race's.
     pub fn from_id(id: &str) -> Option<Form> {
@@ -77,6 +94,7 @@ impl Form {
             ("arch", Form::Arch),
             ("cube", Form::Cube),
             ("organic", Form::Organic),
+            ("starfleet", Form::Starfleet),
         ]
         .iter()
         .find(|(n, _)| n.eq_ignore_ascii_case(id))
@@ -481,15 +499,69 @@ impl Theme {
                 small: Corners([6.0, 2.0, 6.0, 2.0]),
                 ..s
             },
+            Form::Starfleet => Theme::starfleet(),
         }
     }
 
-    /// A theme by name (`shell`, or a race as `Race::from_name` reads it).
+    /// Starfleet's tokens (STYLE.md, "Starfleet", where the numbers come from): Roots'
+    /// Federation HUD measured, its own art never used. The glass is a near neutral
+    /// smoke; the blue is the lamps' (`accent`), and the dark blue `accent3` their glow.
+    fn starfleet() -> Theme {
+        Theme {
+            form: Form::Starfleet,
+            backdrop_top: 0xff03060c,
+            backdrop_bottom: 0xff08101e,
+            panel: 0xb4111219,
+            panel_top: 0xb41c1c28,
+            panel_edge: 0xff3a3c40,
+            panel_hi: 0xff9a9ca0,
+            shadow: 0x90000000,
+            text: 0xffd8dee8,
+            text_dim: 0xff8e9aac,
+            text_off: 0xff505662,
+            text_on: 0xff060a12,
+            title: 0xffb4cbef,
+            accent: 0xff4a94ff,
+            accent2: 0xffe8b030,
+            accent3: 0xff1c3a8c,
+            button: 0x98686a6e,
+            button_top: 0x98808286,
+            button_hot: 0xb0868c98,
+            button_down: 0xc0384660,
+            button_on: 0xb05a6886,
+            button_off: 0x60606266,
+            button_edge: 0xf0b4b6ba,
+            track: 0xc0050609,
+            fill: 0xff4088f0,
+            focus: 0xff9cc4ff,
+            tip: 0xf0101218,
+            tip_text: 0xffd8dee8,
+            tip_edge: 0xff4a4e56,
+            row_hot: 0x264a94ff,
+            row_sel: 0x484a94ff,
+            row_alt: 0x0cb0b8c8,
+            corners: Corners::round(6.0),
+            control: Corners::round(6.0),
+            small: Corners::round(2.0),
+            glow: 12.0,
+            texture: [0.0; 4],
+            bar_stripes: [5.0, 0.72, 0.0],
+            ..Theme::shell()
+        }
+    }
+
+    /// A theme by name: `shell`, a race as `Race::from_name` reads it, or a look by its
+    /// id (`Form::from_id`: `starfleet`, `lcars`, ...), which keeps the player's race.
     pub fn named(s: &str) -> Option<Theme> {
-        if crate::rt::lower(s.trim()) == "shell" {
+        let l = crate::rt::lower(s.trim());
+        if l == "shell" {
             return Some(Theme::shell());
         }
-        Race::from_name(s).map(Theme::for_race)
+        if let Some(r) = Race::from_name(s) {
+            return Some(Theme::for_race(r));
+        }
+        let f = Form::from_id(&l)?;
+        Some(Theme { name: f.name(), race: player_race(), ..Theme::for_form(f) })
     }
 
     /// Every theme, the shell's first, then each race of the content set: for the
@@ -596,6 +668,10 @@ pub fn panel(ui: &mut Ui, r: R) {
         lcars_frame(ui, r, None);
         return;
     }
+    if t.form == Form::Starfleet {
+        starfleet_panel(ui, r);
+        return;
+    }
     let c = t.px(ui, t.corners);
     let e = edge_px(ui);
     let h = hair(ui);
@@ -655,7 +731,8 @@ pub fn panel_inner(ui: &Ui, r: R) -> R {
         let p = ui.u(t.pad);
         return R::new(r.x + side + p, r.y + top + p, r.w - side - 2.0 * p, r.h - top - bottom - 2.0 * p);
     }
-    r.inset(ui.u(t.pad))
+    let (l, tp, rt, b) = frame_margins(ui);
+    R::new(r.x + l, r.y + tp, r.w - l - rt, r.h - tp - b).inset(ui.u(t.pad))
 }
 
 /// What a panel's frame itself takes at each side, in pixels, before any padding:
@@ -665,6 +742,10 @@ pub fn frame_margins(ui: &Ui) -> (f32, f32, f32, f32) {
     if ui.theme.form == Form::Lcars {
         let (side, top, bottom) = lcars_bars(ui, None);
         return (side, top, 0.0, bottom);
+    }
+    if ui.theme.form == Form::Starfleet {
+        let m = ui.u(SF_RIM);
+        return (m, m, m, m);
     }
     (0.0, 0.0, 0.0, 0.0)
 }
@@ -677,7 +758,10 @@ pub fn window(ui: &mut Ui, r: R, title: &str, opened: f32) -> R {
         return lcars_frame(ui, r, Some((title, opened)));
     }
     panel(ui, r);
-    let c = t.px(ui, t.corners);
+    // The header sits inside what the frame itself takes (a Starfleet rim).
+    let (ml, mt, mr, mb) = frame_margins(ui);
+    let r = R::new(r.x + ml, r.y + mt, r.w - ml - mr, r.h - mt - mb);
+    let c = if t.form == Form::Starfleet { Corners::round(ui.u(3.0)) } else { t.px(ui, t.corners) };
     let pad = ui.u(t.pad);
     let bar_h = ui.u(t.title_size + 2.0 * t.pad * 0.7);
     let (bar, rest) = r.take_top(bar_h);
@@ -685,6 +769,7 @@ pub fn window(ui: &mut Ui, r: R, title: &str, opened: f32) -> R {
     // The header: the panel's top, tinted.
     let tint = match t.form {
         Form::Cube => fade(t.accent, 0.07),
+        Form::Starfleet => fade(t.panel_hi, 0.06),
         _ => fade(t.panel_hi, 0.10),
     };
     ui.draw.fill_v(bar.inset(e), c.grown(-e).only(true, true, false, false), tint, fade(tint, 0.25));
@@ -753,7 +838,143 @@ fn header_mark(ui: &mut Ui, at: R) {
             ui.draw.glow(r, Corners::round(s * 0.5), ui.u(14.0), fade(t.accent2, 0.45));
             ui.draw.fill(r, Corners::round(s * 0.5), t.accent2);
         }
+        Form::Starfleet => {
+            // Two status lights in slots, the second dimmer.
+            let (w, h) = (ui.u(14.0), ui.u(4.0));
+            for i in 0..2 {
+                let x = at.x - (2 - i) as f32 * (w + ui.u(5.0));
+                let r = R::new(x, cy - h * 0.5, w, h);
+                let a = if i == 1 { 1.0 } else { 0.55 };
+                ui.draw.fill(r.inset(-ui.u(1.0)), Corners::round(ui.u(1.5)), 0xff05070b);
+                ui.draw.glow(r, Corners::round(ui.u(1.0)), ui.u(9.0), fade(t.accent, 0.35 * a));
+                ui.draw.fill(r, Corners::round(ui.u(1.0)), fade(t.accent, a));
+            }
+        }
         Form::Lcars => {}
+    }
+}
+
+// ---- Starfleet ---------------------------------------------------------------------------
+//
+// Measured off Roots' Federation HUD (STYLE.md, "Starfleet"): a neutral gunmetal rim, a
+// dark lip, smoked glass that is near neutral in the middle, and the blue only where the
+// lamps set into the side rims throw it across the glass.
+
+/// The metal rim's width all round, units (Roots': about 9 pixels at 960 lines, lip included).
+const SF_RIM: f32 = 10.0;
+/// A lamp's core: Roots' lamps peak at about (73,150,255).
+const SF_LAMP: Color = 0xff4996ff;
+/// The lamps' light close to them on the glass: deeper than the core, as Roots' glass
+/// takes it (about +6, +25, +80 over the glass at its edge).
+const SF_POOL: Color = 0xff1238d8;
+
+/// The grain of a Starfleet plate at this screen's scale.
+fn sf_metal(ui: &Ui, strength: f32, sheen: f32) -> Metal {
+    Metal { size: ui.u(1.0).max(1.0), strength, aniso: 22.0, angle: 0.0, sheen }
+}
+
+/// A lamp in a slot on a rim: a dark slot, a bright core and its glow on the metal.
+fn sf_lamp(ui: &mut Ui, r: R, a: f32) {
+    let t = ui.theme;
+    ui.draw.fill(r.inset(-ui.u(1.0)), Corners::round(ui.u(1.5)), 0xff030406);
+    ui.draw.glow(r, Corners::round(ui.u(1.0)), ui.u(7.0), fade(t.accent3, 0.7 * a));
+    ui.draw.fill_v(r, Corners::round(ui.u(1.0)), fade(mix(SF_LAMP, 0xffffffff, 0.2), a), fade(SF_LAMP, a));
+}
+
+/// The light a side's lamps throw across the glass `g`, from its left (`right` false) or
+/// right edge, centred at height `cy`: a bright pool close to the lamps and a long faint
+/// tail, as Roots' falls off (STYLE.md, "Starfleet").
+fn sf_lamp_light(ui: &mut Ui, g: R, cy: f32, right: bool, a: f32) {
+    let t = ui.theme;
+    // On a short panel the two sides' tails would meet and tint the whole glass: each
+    // keeps to its own end, so the middle stays smoke.
+    let near = ui.u(30.0).min(g.h * 0.45).min(g.w * 0.12);
+    let far = ui.u(170.0).min(g.w * 0.28);
+    let x = if right { g.right() } else { g.x };
+    let src = |w: f32, h: f32| R::new(x - w * 0.5, cy - h * 0.5, w, h);
+    ui.draw.push_clip(g);
+    ui.draw.shadow(src(ui.u(6.0), g.h * 0.9), Corners::round(ui.u(3.0)), (0.0, 0.0), far, fade(t.accent3, 0.45 * a));
+    ui.draw.shadow(src(ui.u(4.0), g.h * 0.55), Corners::round(ui.u(2.0)), (0.0, 0.0), near, fade(SF_POOL, 0.42 * a));
+    ui.draw.pop_clip();
+}
+
+/// A Starfleet panel: a machined rim of metal round smoked glass, two lamps in each
+/// side rim lighting the glass from its ends (STYLE.md).
+fn starfleet_panel(ui: &mut Ui, r: R) {
+    let t = ui.theme;
+    let h = hair(ui);
+    let side = ui.u(SF_RIM);
+    let g = r.inset(side);
+    let c = t.px(ui, t.corners);
+    let gc = Corners::round(ui.u(3.0));
+    ui.draw.shadow(r, c, (0.0, ui.u(4.0)), ui.u(22.0), t.shadow);
+    // The glass: a smoke lighter at the top, a little darker toward the right.
+    ui.draw.fill_v(g, gc, t.panel_top, t.panel);
+    ui.draw.fill_h(g, gc, 0x00000000, 0x30000000);
+    ui.draw.stripes(g, gc, ui.u(3.0).max(2.0), 0.5, PI * 0.5, 0x06ffffff);
+    // The lamps' light on it, from both ends; the left the stronger.
+    let cy = libm::roundf(r.y + r.h * 0.5);
+    let lamps = g.h > ui.u(26.0);
+    if lamps {
+        sf_lamp_light(ui, g, cy, false, 1.0);
+        sf_lamp_light(ui, g, cy, true, 0.65);
+    }
+    // The rim: neutral gunmetal, brushed, lit from above.
+    let rim_sh = Shape { corners: c, stroke: side + 1.0, ..Shape::default() };
+    let m = sf_metal(ui, 0.10, 0.25);
+    let cols = [0xff3e4042, 0xff3b3d3f, 0xff252629, 0xff27282b];
+    ui.draw.metal(r, &rim_sh, &m, cols);
+    // The bevels: a light along the outer top, a dark line round the outside, a dark lip
+    // at the glass.
+    ui.draw.stroke_v(r, c, h, 0x60e0e2e6, 0x08e0e2e6);
+    ui.draw.stroke(r, c, h, 0x70000000);
+    let lip = ui.u(2.5).max(h * 2.0);
+    // The lip also covers the pixel the rim's stroke reaches past the glass's edge.
+    ui.draw.stroke(g.inset(-lip), gc.grown(lip), lip + h, 0xf0030405);
+    // A seam across the side rims, half way down, where the lamps sit either side.
+    for x in [r.x, r.right() - side] {
+        ui.draw.rect(R::new(x, cy - h, side, h), 0xc0030405);
+        ui.draw.rect(R::new(x, cy, side, h), 0x28e0e2e6);
+    }
+    if lamps {
+        let (lw, lh, gap) = (ui.u(3.5), ui.u(7.0).min(g.h * 0.3), ui.u(3.0));
+        for (x, a) in [(g.x - lip - lw, 1.0), (g.right() + lip, 0.85)] {
+            sf_lamp(ui, R::new(x, cy - gap - lh, lw, lh), a);
+            sf_lamp(ui, R::new(x, cy + gap, lw, lh), a);
+        }
+    }
+}
+
+/// A Starfleet button: a tile of brushed light grey glass with a bright rim, as Roots'
+/// (STYLE.md); hover lights it blue from inside, on puts a lamp along its foot.
+fn starfleet_button(ui: &mut Ui, r: R, c: Corners, st: State) {
+    let t = ui.theme;
+    let h = hair(ui);
+    let lit = if st.off { 0.0 } else { st.hot.max(if st.down { 1.0 } else { 0.0 }) };
+    if !st.off && st.hot > 0.01 {
+        ui.draw.glow(r, c, ui.u(t.glow), fade(t.accent3, 0.6 * st.hot));
+    }
+    let (top, bot) = if st.down {
+        (t.button_down, t.button_down)
+    } else if st.on {
+        (mix(t.button_top, t.button_on, 0.6), t.button_on)
+    } else {
+        (mix(t.button_top, t.button_hot, st.hot), mix(t.button, t.button_hot, st.hot))
+    };
+    let (top, bot) = if st.off { (fade(top, 0.6), fade(bot, 0.6)) } else { (top, bot) };
+    ui.draw.metal(r, &Shape { corners: c, ..Shape::default() }, &sf_metal(ui, 0.30, 0.35), [top, top, bot, bot]);
+    // Roots' tiles are lit along the foot from inside.
+    ui.draw.fill_v(R::new(r.x, r.y + r.h * 0.7, r.w, r.h * 0.3), c.only(false, false, true, true), 0x00ffffff, fade(0xffffffff, 0.16));
+    if lit > 0.01 {
+        ui.draw.inner_glow(r, c, r.h.min(r.w) * 0.45, fade(t.accent, 0.32 * lit));
+    }
+    let edge = if st.off { fade(t.button_edge, 0.45) } else { mix(t.button_edge, t.accent, lit * 0.85) };
+    ui.draw.stroke(r, c, ui.u(1.5).max(h), edge);
+    ui.draw.stroke(r.inset(-h), c.grown(h), h, 0x50000000);
+    if st.on && !st.down {
+        let b = R::new(r.x + r.w * 0.22, r.bottom() - ui.u(4.0), r.w * 0.56, ui.u(2.0).max(1.0));
+        ui.draw.glow(b, Corners::SQUARE, ui.u(7.0), fade(t.accent, 0.6));
+        ui.draw.rect(b, mix(SF_LAMP, 0xffffffff, 0.2));
     }
 }
 
@@ -905,7 +1126,9 @@ pub fn button_frame(ui: &mut Ui, r: R, st: State) -> Color {
     } else {
         mix(t.button, t.button_hot, st.hot)
     };
-    if lcars {
+    if t.form == Form::Starfleet {
+        starfleet_button(ui, r, c, st);
+    } else if lcars {
         ui.draw.fill(r, c, base);
     } else {
         if !st.off && st.hot > 0.01 && t.glow > 0.0 {
@@ -1068,6 +1291,7 @@ pub fn slider(ui: &mut Ui, r: R, f: f32, st: State) {
         Form::Cube => (k * 0.8, Corners::SQUARE),
         Form::Organic => (k, Corners::round(k * 0.5)),
         Form::Shell => (k, Corners::cut(k * 0.28)),
+        Form::Starfleet => (k * 0.6, Corners::round(k * 0.18)),
     };
     let kr = R::new(libm::roundf(kx - kw * 0.5), libm::roundf(r.y + (r.h - k) * 0.5), kw, k);
     if !st.off && (st.hot > 0.01 || st.down) && t.form != Form::Lcars {

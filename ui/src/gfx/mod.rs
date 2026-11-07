@@ -14,7 +14,7 @@ use gpu::{
 };
 
 mod fx;
-pub use fx::{load_bmp, Corners, Elbow, Shape};
+pub use fx::{load_bmp, Corners, Elbow, Metal, Shape};
 
 /// A rectangle in back-buffer pixels.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -225,6 +225,7 @@ const KIND_TEX: f32 = 1.0;
 const KIND_SDF: f32 = 2.0;
 const KIND_BOX: f32 = 3.0;
 const KIND_SHAPE: f32 = 4.0;
+const KIND_METAL: f32 = 5.0;
 
 /// A run of indices drawn with one texture and one clip rectangle. Indices are 16-bit
 /// and relative to `vbase`, so a run never spans more than 65536 vertices.

@@ -220,10 +220,10 @@ pub static SETTINGS: [Setting; 19] = [
         section: c"UI".as_ptr(),
         key: c"Theme".as_ptr(),
         def: c"auto".as_ptr(),
-        values: c"auto|shell|federation|klingon|romulan|cardassian|borg|species8472".as_ptr(),
-        value_labels: c"Auto|Shell|Federation|Klingon|Romulan|Cardassian|Borg|Species 8472".as_ptr(),
+        values: c"auto|shell|federation|klingon|romulan|cardassian|borg|species8472|starfleet".as_ptr(),
+        value_labels: c"Auto|Shell|Federation|Klingon|Romulan|Cardassian|Borg|Species 8472|Starfleet".as_ptr(),
         label: c"Theme".as_ptr(),
-        help: c"auto takes your race in a mission and the shell's look in the menus; or one look everywhere.".as_ptr(),
+        help: c"auto takes your race in a mission and the shell's look in the menus; or one look everywhere. Starfleet is the Federation's look on Fleet Operations: Roots.".as_ptr(),
         moved_from: core::ptr::null(),
     },
     Setting {

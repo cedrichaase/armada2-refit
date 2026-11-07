@@ -46,6 +46,7 @@ clean. The front end is not any race's, so it has a theme of its own.
 | **Romulan** | `Wing` | strong green `#015701`/`#42B044`, chamfered plates, diagonal hatching, steel-teal `#8BACBB` | green-black, chamfers all round, diagonal hatch in the header |
 | **Cardassian** | `Arch` | ochre/amber `#823E10`..`#D0A056`, trapezoids and pointed arches | amber on brown, chamfered tops over square feet (the trapezoid), arch marks |
 | **Borg** | `Cube` | grey machinery `#586564`, green circuit lights, dense greebles | near-black, square, double edge with green corner brackets, faint scan lines, blinking node lights |
+| **Federation on Roots** | `Starfleet` | Roots' own Federation HUD (below) | dark brushed gunmetal rims round smoked glass, blue lamps in the side rims lighting the glass from its ends, light-grey tile buttons |
 | **Species 8472** | `Organic` | violet bone `#574C6F`/`#B19FD0`, gold-tan organic strands | purple-black, leaf-shaped corners (large radius on two opposite corners), soft lilac inner light, an amber "eye" |
 
 The tooltip colours are the stock ones from each `gui_<race>.cfg`
@@ -54,10 +55,66 @@ lavender cap (the stock violet is the LCARS lavender's dark), the others are kep
 they are (Klingon 0.37,0.06,0, Romulan 0.02,0.38,0, Cardassian 0.46,0.23,0, Borg
 0.36,0.48,0.54 darkened, 8472 0.50,0.28,0.07).
 
+### Starfleet (the Federation on Fleet Operations: Roots)
+
+Roots does not dress the Federation in LCARS: its HUD is **dark machined metal round
+smoked glass, lit by blue lamps**, so on Roots the Federation's look is `starfleet`
+(`content/sets/fleetops/ui.ini`); Armada II's set keeps `lcars`. The look is matched to
+Roots' own Federation HUD **by measurement**: its interface sheet and bench shots of
+its HUD at 1280x960 were read with ImageMagick (read only); none of its art is
+copied, traced or shipped, and the look is drawn in code (`theme.rs`, "Starfleet").
+What Roots' HUD is, in words:
+
+- **The rim** is neutral gunmetal (no blue in it), about 9 pixels at 960 lines on the
+  minimap, lit from above (its top edge the brightest), a fine even grain, a dark
+  line round the outside, a dark lip where it meets the glass, and a seam across the
+  side rims half way down.
+- **The glass** is a smoke, near neutral in the middle, a little lighter at the top
+  and darker toward the right; the map shows through it dimly (about 70% cover).
+- **The blue is the lamps'**: two small slots in each side rim, either side of the
+  seam, bright sky blue at their core, and their light falls across the glass from
+  each end: strong within a few pixels, gone to a faint tint a hundred pixels in.
+  The left end is the stronger. Nothing else on a panel is blue.
+- **The buttons** are translucent light-grey tiles with a bright rim, lit along the
+  foot from inside, holding Roots' full-colour icon art; the unit's name is amber,
+  values pale steel blue.
+
+Ours, measured on the bench at the same view (1280x960, a Federation skirmish; values
+are 0..255, Roots' info panel and minimap beside our resource strip and minimap):
+
+| Where | Roots | Ours |
+|---|---|---|
+| glass, middle | 24,23,32 | 23,24,32 |
+| glass, top / foot of the middle column | 27,25,36 / 21,20,28 | 28,29,38 / 21,21,29 |
+| glass at the left lamps' edge | 30,48,108 | 28,48,119 |
+| glass about 90 px from the lamps | 25,25,37 | 27,29,40 |
+| glass about 20 px from the lamps | 29,37,73 | 29,39,70 |
+| glass at the right lamps' edge | 17,37,89 | 23,37,84 |
+| lamp core | 73,150,255 | `SF_LAMP` 73,150,255 |
+| side rim across its width (minimap) | 62, 62, 60, 59 | 45, 66, 65, 66 |
+| top rim, outer to inner | 64, 91, 79, then the lip | 60, 55, 62, 43, then the lip (Roots' top is lit brighter) |
+| rim grain (luminance deviation along a rim) | 7 | 5 |
+
+So in code: the glass is `panel_top` over `panel` (`0xb41c1c28`, `0xb4111219`) with a
+light darkening to the right and still scan lines at 2.4% white; each side's lamps
+throw two soft pools (`sf_lamp_light`: `SF_POOL`, a deeper blue than the core, within
+30 units, and the dark blue `accent3` out to 170 units, each kept to its own quarter of
+a short panel so the middle stays smoke); the rim is 10 units of the **metal kind**
+(`Draw::metal`, shader kind 5: streaks along x at one unit's width, wider streaks,
+slow blotches and a per-pixel speckle, fixed in screen pixels so plates side by side
+share one surface and nothing crawls when a panel moves by a pixel; strength 0.1, a
+broad sheen from the top left), with a light hairline along its top, a dark outline
+and a dark lip 2.5 units wide; the buttons are the metal kind in translucent grey
+(`button_top`/`button` about 60% cover) with a bright 1.5-unit rim and a light along
+the foot, lit blue from inside on hover, with a lamp along the foot when on. Window
+headers keep the glass and add two lamps at the right. Text, status colours, sizes
+and the amber `accent2` are the shell's and Roots'.
+
 **Which theme shows** is `[UI] Theme=` in `UI.ini`: `auto` (the default) uses the
 player's race in a mission and the shell's theme in the menus and the loading screen;
 a theme's name (`shell`, `federation`, `klingon`, `romulan`, `cardassian`, `borg`,
-`species8472`) puts that one everywhere. `Theme::for_context` decides; the player's
+`species8472`), or a look's id (`starfleet`, `lcars`, `blade`, `wing`, `arch`, `cube`,
+`organic`), puts that one everywhere. `Theme::for_context` decides; the player's
 race comes from `theme::set_player_race`, which the mission frame calls with the race
 the stock HUD is loaded in (`engine/race.rs`, HUD.md "The player's race").
 
@@ -287,6 +344,9 @@ antialiased over one pixel; glows, inner glows and shadows are the same shape wi
 wide soft edge. The corners and parts are chosen with `step`/`lerp`, no branches
 (the shader compilers unroll and dislike branches, `render3d/README.md`). Three float4s per vertex carry the parameters, so the
 vertex is 84 bytes; a whole frame of UI is still a few draw calls.
+Kind 5, *metal*, is the same shape with its colour worked into machined metal by a grain
+fixed in screen pixels (`Draw::metal`, `Metal`: grain size, strength, stretch along the
+brushing, its angle, a broad sheen); Starfleet's rims and buttons are drawn with it.
 
 ## The gallery
 

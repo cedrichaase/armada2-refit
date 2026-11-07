@@ -1761,6 +1761,20 @@ Left: the campaign views were not framed for Roots' hulls (their radii are about
 stock's); DS9 is dark on the shadow side of the orbit. (The forms host calls
 `Render3D_MenuScene` since #102, beside the side column rather than a centred card.)
 
+### The Federation's theme on Roots: Starfleet (decisions 380–384)
+
+FO-6 gave the Federation LCARS on both games. Roots dresses it in dark machined metal and
+blue glass, and the user asked for a look of that kind (2026-11-07): `starfleet`
+(`ui/STYLE.md`, "Starfleet", with the numbers it was matched to).
+
+| # | Decision | Why | What would change it |
+|---|---|---|---|
+| 380 | **The fleetops set gives the Federation `Theme = starfleet`; the stock set keeps `lcars`.** `[UI] Theme=` also takes a look's id (`starfleet`, `lcars`, ...), keeping the player's race, so either look can be had on either game | Roots' own Federation HUD is metal and glass, not LCARS; Armada II's is LCARS | the user |
+| 381 | **The look was picked from three variants on the bench**: A (heavy dark gunmetal round glass), B (lighter brushed steel, navy grooves, rivets), C (projected glass on a thin metal spine). The user picked A; B and C were removed | the user's pick, 2026-11-07, from `fo-ui-theme-starfleet` and `-wide` | the user |
+| 382 | **A is matched to Roots' Federation HUD by measurement, never by its art**: the glass a near-neutral smoke (about 24,23,32 in the middle), the blue only from two lamps in each side rim falling off across the glass (a bright pool within about 30 units, a faint tail to about 170), a neutral brushed rim, a dark lip; the buttons translucent light-grey tiles with a bright rim, as Roots' tiles that its icons were drawn for. Roots' sheets and bench shots were measured (`ImageMagick`, read only); no pixel, crop or plate of them is in the repository or the build | the user's direction ("closer to stock Roots": grey in the middle, blue toward the sides from lamp insets); hard rule 8 and decision 70 | the user's look in game |
+| 383 | **The brushed metal is a shader kind of the 2D renderer** (`ui.hlsl` kind 5, `Draw::metal`): value-noise streaks, wider streaks, slow blotches and a speckle, fixed in screen pixels, branch-free; no texture | sharp at any resolution (3440x1440 is the user's), no asset, nothing that moves when a panel moves by a pixel | — |
+| 384 | **The 21:9 bench case takes the race Instant Action deals**: at 2560x1080 the setup screen's side lists do not open on the bench (the same clicks work at 1280x960), so `fo-ui-theme-starfleet-wide` sets the theme by name, and the Federation is judged at 1280x960 | a bench limit, not the theme's | the side lists fixed at 21:9 |
+
 ## Open decisions
 
 Decided by the user, 2026-11-06:
