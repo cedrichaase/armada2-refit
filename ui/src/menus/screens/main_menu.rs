@@ -171,6 +171,12 @@ fn over_scene(ui: &mut Ui, s: &Screen) -> bool {
 /// entries, each (label, enabled), that light up under the pointer. Returns the entry
 /// clicked and the one under the pointer (-1: none).
 pub fn scene_column(ui: &mut Ui, small: &str, big: &str, entries: &[(&str, bool)]) -> (Option<usize>, i32) {
+    scene_column_titled(ui, small, big, false, entries)
+}
+
+/// `scene_column`, with the title as the game's own lettering (`menus::title_art`) when
+/// `art` is set and the picture is there; the text heading otherwise.
+pub fn scene_column_titled(ui: &mut Ui, small: &str, big: &str, art: bool, entries: &[(&str, bool)]) -> (Option<usize>, i32) {
     let screen = ui.screen();
     let t = ui.theme;
     // Shade for the text: the left, and a little at the top and the foot.
@@ -188,10 +194,18 @@ pub fn scene_column(ui: &mut Ui, small: &str, big: &str, entries: &[(&str, bool)
     let x = libm::roundf(screen.w * 0.08).max(ui.u(40.0));
     let top = libm::roundf((screen.h - total) * 0.5);
     // The title, rising above the column's own title space.
-    ui.text_in(R::new(x, top - ui.u(40.0), w, ui.u(40.0)), small, 28.0, Align::Left, fade(t.text, 0.85), Weight::Bold);
-    ui.text_in(R::new(x - ui.u(3.0), top - ui.u(10.0), w * 1.5, ui.u(80.0)), big, 68.0, Align::Left, t.title, Weight::Bold);
-    let rule = R::new(x, top + ui.u(74.0), ui.u(260.0), ui.u(2.0).max(1.0));
-    ui.draw.rect_hgrad(rule, t.accent, fade(t.accent, 0.0));
+    let lettering = if art { crate::menus::title_art::get(ui.u(460.0)) } else { None };
+    if let Some((tex, aspect)) = lettering {
+        // The picture holds the rule and both lines: width 460 units, rising a little
+        // above the column's title space, ending inside it.
+        let iw = ui.u(460.0);
+        ui.draw.image(tex, R::new(x - ui.u(8.0), top - ui.u(14.0), iw, iw / aspect), 0xff_ff_ff_ff);
+    } else {
+        ui.text_in(R::new(x, top - ui.u(40.0), w, ui.u(40.0)), small, 28.0, Align::Left, fade(t.text, 0.85), Weight::Bold);
+        ui.text_in(R::new(x - ui.u(3.0), top - ui.u(10.0), w * 1.5, ui.u(80.0)), big, 68.0, Align::Left, t.title, Weight::Bold);
+        let rule = R::new(x, top + ui.u(74.0), ui.u(260.0), ui.u(2.0).max(1.0));
+        ui.draw.rect_hgrad(rule, t.accent, fade(t.accent, 0.0));
+    }
     let mut y = top + title_h;
     let mut hover = -1;
     let mut picked = None;
