@@ -12,7 +12,7 @@ Roots jumps out of it before the loop over the ten group keys to take Alt+number
 the group, centre on a second tap), and `mBindGroup` is stock's at its entry with Roots' own
 selection array and group cap of 30 behind it. So `ShiftAddsToGroup=1` (QOL.ini's value; the
 Roots overlay no longer sets it) has to leave Roots' Alt+number alone and make Shift+number add.
-There is no scene harness on Roots, so the ships are picked with the mouse in an Instant Action
+There was no scene harness on Roots when this was written (`Select the ships ...`, `README.md`, "Objects", is the way now), so the ships are picked with the mouse in an Instant Action
 game (`_fo-sides`): the player starts with two Mediterranean class construction ships
 (`USS Hafner`, one at the left, 335,640, and one below it, 465,760), the Mandril miner
 `USS Nome` (880,605), the science ship `USS Shield` (790,725) and a starbase. Selected ships
