@@ -160,6 +160,11 @@ impl Default for Hulls {
 /// scrap overrides that set some nodes and then call it), with a `RenderInternal` we
 /// reproduce.
 fn our_class(o: usize, look: &Look) -> bool {
+    // A latinum nebula is the particles module's or the engine's, never a hull: with the
+    // particles module off it goes back to the engine (PLAN-FLEETOPS.md, decision 353).
+    if hooks::is_latinum_nebula(o) {
+        return false;
+    }
     let r = hooks::render_fn(o);
     let ok = if r == 0 {
         false

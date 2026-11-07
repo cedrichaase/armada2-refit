@@ -1,10 +1,10 @@
-# Fleet Operations: Roots with Render3D: the ice asteroid field of the first allied tutorial is drawn solid
+# Fleet Operations: Roots with Render3D: the ice asteroid field of the first allied tutorial is drawn as the engine draws it
 
 Resolutions: 1280x960
 Mod: refit
 Layers: display asiloader render3d ui
 Setup: display/bench-mode.sh stub Backend=vulkan
-Timeout: 14 min
+Timeout: 16 min
 
 The user's report of 2026-11-07 (3440x1440, Roots 5.0Z11): in Roots' first allied
 tutorial (*TUTORIAL: Gameplay*) the ice asteroid field across the bottom of the opening
@@ -14,17 +14,23 @@ nebulae (`classlabel = "latinum"`) whose SODs hold only sprite nodes: each field
 handful of camera-facing quads painted with a sheet of rocks (`map_*astroid_field*`,
 `@tmaterial=alpha`) over a haze of dust quads (`additive`). render3d's particles module
 draws those puffs, and drew the `alpha` material alpha-tested at one half, as
-`alphathreshold`: the ice rocks' alpha is soft (most of each rock under one half), so
-only their highlights were left, over the haze; the brown rocks' alpha is a hard mask,
-so they kept their shape. `alpha` (and `alpha_nof`, the same without filtering) is the
-engine's alpha blend, and is now drawn blended (PLAN-FLEETOPS.md, decision 350).
+`alphathreshold`: the ice rocks' alpha is soft, so only their highlights were left. It
+now blends `alpha`, through the DDS file's own mip chain, as the engine does
+(PLAN-FLEETOPS.md, decisions 350 and 355).
+
+With the particles module off the field is the engine's again, drawn through Display8's
+passthrough into render3d's frame: the hulls module no longer takes a latinum nebula as
+a hull (decision 353; before, it drew the sheets through its own sprite path, which is
+not the engine's look, and that draw was taken for the engine's). So each pair of shots
+here is render3d's field and the engine's at the same view a moment apart, with the
+same layout: the sheets' nodes drift on their channels (translation only) on the sim
+clock, which both read. The pairs are at the opening zoom, zoomed in and zoomed out
+(Roots' ctrl+Up and ctrl+Down), the last two for the top-level sampling's aliasing
+against the engine's.
 
 The mission is reached as in `fo-render3d-tutorial`. The opening view has the ice field
-across its lower half. Each shot after the first hands one more part back to the
-engine through the overlay, live: the particles module (the engine's own puffs, drawn by
-Display8's passthrough into render3d's frame), then every module (the engine draws the
-whole scene, the reference of stock Roots under Display8). The ice field in the first
-shot should read as it does in the last two: whole pale rocks over the blue haze.
+across its lower half. After a while the mission's briefing opens over the view; the button at
+its bottom right (1235,912; its label shows only under the pointer) closes it, and the pointer is kept off the screen's edges (they scroll).
 
 1. Launch the game.
 2. Wait for the main menu.
@@ -47,20 +53,36 @@ shot should read as it does in the last two: whole pale rocks over the blue haze
 19. Wait 1 second.
 20. Click "OK".
 21. Wait up to 180 seconds for "Render3D.log" to say "particles: nebula map_iceasteroidset".
-22. Wait 10 seconds.
-23. Take a screenshot called "field".
-24. Check that the pale ice asteroids across the lower half of the view are drawn as whole rocks, each a solid pale shape over the blue haze, and not as scattered bright flecks with the haze showing through them.
-25. Overlay Render3D.Modules:particles=0
-26. Wait up to 20 seconds for the logs the next steps expect.
-27. Expect "Render3D.log" contains "settings: applied Modules.particles=0"
-28. Wait 3 seconds.
-29. Take a screenshot called "field-engine-puffs".
-30. Overlay Render3D.Modules:world=0 Render3D.Modules:hulls=0 Render3D.Modules:effects=0 Render3D.Modules:ordnance=0 Render3D.Modules:specials=0 Render3D.Modules:sky=0 Render3D.Modules:overlays=0
-31. Wait 3 seconds.
-32. Take a screenshot called "field-engine".
-33. Expect "Render3D.log" contains "particles: nebula map_iceasteroidset"
-34. Expect "Display8.log" not contain "VUID".
-35. Expect "Display8.log" not contain "device removed".
-36. Quit the game.
-37. Expect the game to have exited.
-38. Expect no crash.
+22. Wait up to 240 seconds for "BRIEFING SUMMARY".
+23. Wait 2 seconds.
+24. Click at 1235,912.
+25. Move the mouse to 640,400.
+26. Wait 3 seconds.
+27. Take a screenshot called "field".
+28. Check that the pale ice asteroids across the lower half of the view are drawn as whole rocks, each a solid pale shape over the blue haze, and not as scattered bright flecks with the haze showing through them.
+29. Overlay Render3D.Modules:particles=0
+30. Wait up to 20 seconds for the logs the next steps expect.
+31. Expect "Render3D.log" contains "settings: applied Modules.particles=0"
+32. Wait 1 second.
+33. Take a screenshot called "field-engine".
+34. Expect "Render3D.log" not contain "hulls: map_iceasteroidset"
+35. Overlay --unset Render3D.Modules:particles
+36. Press ctrl+Up 8 times.
+37. Wait 3 seconds.
+38. Take a screenshot called "zoom-in".
+39. Overlay Render3D.Modules:particles=0
+40. Wait 2 seconds.
+41. Take a screenshot called "zoom-in-engine".
+42. Overlay --unset Render3D.Modules:particles
+43. Press ctrl+Down 20 times.
+44. Wait 3 seconds.
+45. Take a screenshot called "zoom-out".
+46. Overlay Render3D.Modules:particles=0
+47. Wait 2 seconds.
+48. Take a screenshot called "zoom-out-engine".
+49. Expect "Render3D.log" contains "particles: nebula map_iceasteroidset"
+50. Expect "Display8.log" not contain "VUID".
+51. Expect "Display8.log" not contain "device removed".
+52. Quit the game.
+53. Expect the game to have exited.
+54. Expect no crash.

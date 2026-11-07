@@ -1547,8 +1547,8 @@ Armada II has the same two materials and its sprite tables never name them).
 | # | Default | Why | What would change it |
 |---|---|---|---|
 | 350 | A sprite of the **`alpha` or `alpha_nof` material is blended by its alpha** (the particles module's `Material::Alpha`, the `translucent` pipeline), never cut out | it is how the engine makes those materials; a cut-out kept the ice rocks' highlights only | none expected |
-| 351 | **`alpha` is sampled from the texture's top level only** (as `add_nomipf`), not through render3d's box-filtered chain | blended through the chain the ice rocks stayed faint beside the engine's own draw at the same view: the share of bright pixels (grey over 60%) in a 400x250 patch of the field was 0.93% cut out, 0.88% blended through the chain, 1.59% blended from the top level, 2.47% for the engine's puffs (passthrough); the engine's rocks are crisp, as a texture without levels draws; the DDS files' own levels (brighter than our box filter, 12.2 against 7.7 mean at 128 pixels) are not read (`a2fmt::dds` decodes the base level) | shimmer of the rocks while zooming, in the user's look; reading the DDS files' own chains |
-| 352 | The **remaining difference is left open**: the engine's field shows more rocks and another layout than ours at the same view (the mean of the patch 43.6 against 37.2), and its sheets turn on screen with their nodes' 40 s channels while ours stay upright billboards placed at the nodes | the user's report was the see-through look; how the engine turns a billboard sprite node (by its node's axes on screen, with or without a mirror) was tried on the bench (three variants against the engine's draw, none lined up with it at the same moment, the channel's phase being unknown) and not settled | the user's verdict on the shots; a measurement of the engine's sprite-node quads (Display8's `DRAW` capture saw none of the 3D sprite draws in render3d's frame) |
+| 351 | *Replaced by decision 355.* **`alpha` is sampled from the texture's top level only** (as `add_nomipf`), not through render3d's box-filtered chain | blended through the chain the ice rocks stayed faint beside the engine's own draw at the same view: the share of bright pixels (grey over 60%) in a 400x250 patch of the field was 0.93% cut out, 0.88% blended through the chain, 1.59% blended from the top level, 2.47% for the engine's puffs (passthrough); the engine's rocks are crisp, as a texture without levels draws; the DDS files' own levels (brighter than our box filter, 12.2 against 7.7 mean at 128 pixels) are not read (`a2fmt::dds` decodes the base level) | shimmer of the rocks while zooming, in the user's look; reading the DDS files' own chains |
+| 352 | *Closed by decisions 354 and 356: the "engine's puffs" here were the hulls module's draw.* The **remaining difference is left open**: the engine's field shows more rocks and another layout than ours at the same view (the mean of the patch 43.6 against 37.2), and its sheets turn on screen with their nodes' 40 s channels while ours stay upright billboards placed at the nodes | the user's report was the see-through look; how the engine turns a billboard sprite node (by its node's axes on screen, with or without a mirror) was tried on the bench (three variants against the engine's draw, none lined up with it at the same moment, the channel's phase being unknown) and not settled | the user's verdict on the shots; a measurement of the engine's sprite-node quads (Display8's `DRAW` capture saw none of the 3D sprite draws in render3d's frame) |
 
 Bench (Roots, Display8 on Vulkan with the validation layer, Render3D and UI, 1280x960),
 `fo-render3d-asteroids`: before the fix `20261107-110052` (the field cut out; then the
@@ -1561,6 +1561,41 @@ Armada II (`--install .`, run `20261107-114450`): `render3d-live-world` and
 shot sits at RMSE 0.002/255 from its `roundD-base-port-*` baseline (max 2/255, no pixel
 over 2/255), the same with the particles or world module off, where nothing of this
 change runs: a drift of the baselines, not of this change (no stock sprite is `alpha`).
+
+### FO-B: the asteroid sets against the engine, measured again (decisions 353–359)
+
+Branch `fo-asteroids-2`, 2026-11-07, the follow-up of decision 352. The "engine's puffs"
+of decisions 351 and 352 were not the engine's. With the particles module off, the
+asteroid sets went to the **hulls module**: a latinum nebula is drawn by the plain
+`GameObject::Render`, so it passed the hulls module's class test, and on Roots the
+instance claim took it (`hulls: map_iceasteroidset2: 0 of 0 meshes drawn after the
+database` in run `20261107-113908`) and drew its sprite nodes through its own sprite
+path: sheets turned by their nodes' axes, brighter and denser. Every module off (that
+run's third shot) was the engine's draw, and it already matched render3d's field: same
+layout, mean 37.06 against 37.17 in the patch, mean absolute difference 2.9/255 against
+12.8 between the hulls module's draw and the engine's.
+
+The sheets' nodes are not turned in time: each `isfield*` channel (40 s, 502 keys) only
+moves its node by up to about 20 units, its rotation fixed (read from the SOD). The
+engine's sprite node is a billboard at the node's place, upright, of the sprite's half
+extent (150), as render3d draws it; the layouts of render3d's field and the engine's
+coincide to within that drift at three zooms.
+
+| # | Default | Why | What would change it |
+|---|---|---|---|
+| 353 | **The hulls module never claims a latinum nebula** (`LatinumNebula`, vtable 0x6b132c, a new `vt_latinum` in its profile): with the particles module off the asteroid sets are the engine's again, through Display8's passthrough, on Roots and on stock | a module at 0 hands its category back to the engine; the hulls module's sprite path is not the engine's look (it turned the sheets by their nodes' axes), and it was taken for the engine's reference | none expected |
+| 354 | The **reference for the asteroid sets** is the engine's draw with the particles module off (`fo-render3d-asteroids`' "-engine" shots, a moment after render3d's at the same view) and with Display8 alone (`fo-render3d-asteroids-stock`) | the first is pixel-aligned with render3d's shot; the second has no render3d frame at all | none |
+| 355 | **A DDS texture's own mip chain is used** (`a2fmt::dds::decode_level`; render3d's `assets::texture` takes the file's level where it has one, of the right size, before a named chain file or our box filter), and `alpha` is sampled through it like every other material (decision 351 withdrawn) | against the engine's draw at the same view (run `20261107-131028`) the mean absolute difference in a 300x150 patch of the field fell from 3.74, 1.41, 2.69 (top level only, run `20261107-123824`) to 3.18, 1.12, 2.04 at the opening zoom, zoomed in and zoomed out; the share of bright pixels went from 1.66, 1.10, 1.61% to 1.15, 0.72, 1.08% against the engine's 1.38, 0.99, 1.36%; and with mips the rocks cannot shimmer while zooming | a Roots hull whose distant look changes for the worse (every Roots DDS texture now has its file's levels) |
+| 356 | **Billboards stay upright**; a sprite node is not turned by its node's axes | the channels translate only; render3d's layout and the engine's coincide | a sprite node whose channel turns it |
+| 357 | The Armada II **`render3d-live-world` and `render3d-live-particles` RMSE 0.002/255** against `roundD-base-port-*` is older than fo-asteroids: the same on fo-b at 41b50aa3 (run `20261107-121051`, every shot, every state) | the baselines drifted, not render3d | re-recording the baselines (not done here) |
+
+Bench (Roots, Vulkan with the validation layer, 1280x960): `fo-render3d-asteroids`
+`20261107-123824` (top level only) and `20261107-131028` (the file's chain; REVIEW, every
+check passing, no `hulls: map_iceasteroidset` in the log); the mission list's OK closed
+the list without a mission twice (`20261107-122559`, `-130151`), the flake
+`fo-render3d-tutorial` describes. The Display8 `DRAW` capture of the engine's own field
+was not taken: the session meant for it (`20261107-124227-54046`) hung at the mission
+list.
 
 ## FO-7: QOL on Roots
 

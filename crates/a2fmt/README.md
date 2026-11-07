@@ -199,10 +199,12 @@ named like a level and is not one (as `mip_name` and `mip_strays` do in
 
 ## DDS (`dds`, `image`)
 
-Fleet Operations: Roots' textures: a 128-byte header, then the base level. `dds::decode` reads
-DXT1 (with its 1-bit alpha), DXT3 and DXT5, and uncompressed 8, 16, 24 and 32-bit formats by
-their channel masks, to the same BGRA8 top-down `Image` as `tga::decode`; the file's own mips
-and DX10 headers are not read (bounded: 16384 a side, 4096 x 4096 pixels). `image::decode` and
+Fleet Operations: Roots' textures: a 128-byte header, then the base level and the file's own
+mip levels after it, each half the size of the one before. `dds::decode` reads the base,
+`dds::decode_level` any level the header counts, DXT1 (with its 1-bit alpha), DXT3 and DXT5,
+and uncompressed 8, 16, 24 and 32-bit formats by their channel masks, to the same BGRA8
+top-down `Image` as `tga::decode`; DX10 headers are not read (bounded: 16384 a side, 4096 x
+4096 pixels). `image::decode` and
 `image::width` take either format by the `DDS ` magic, and `TexIndex::with_extensions(names,
 &[".tga", ".dds"])` indexes both, the earlier extension winning a name present twice.
 
