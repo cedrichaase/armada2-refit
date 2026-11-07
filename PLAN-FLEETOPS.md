@@ -2085,6 +2085,31 @@ selects and orders them by handle in both games; Roots starts straight in a map
 | 428 | **Roots' race names in `Race=`**: `unitedfederation`, `klingonempire`, `romulanempire`; `federation` is Roots' Observer | `Race::Find` takes the first exact match in `races.odf` | — |
 | 429 | **Scenarios whose subject is not the menus start in the map**: `fo-render3d-tutorial`, `fo-render3d-asteroids`, `fo-ui-briefing-ours` by the tutorial's `.bzn`, `fo-ui-bar-grid` from the Instant Action save with the construction ship selected by `Select the ship of class "Mediterranean" owned by the player` (it was an agent's box drag); launch to the map 23–28 s against 52–101 s through the menus; the menu walks stay in the scenarios that test the menus (`fo-ui-dialogs-*`, `fo-ui-forms-*`, `fo-ui-briefing`, `_fo-sides`) | a walk costs 30 s or more per run and fails on any shell change | — |
 
+## The leftover menus (2026-11-07, branch `fo-menus-leftover-1`; decisions 600–609)
+
+The user's request: "check to see if any leftover menus are not yet redrawn, and have them
+redrawn". An audit of every screen Roots can show, from the stock dialog procedures, FleetOpsHook's
+forms and what `UI.log` reports at run time on the bench (Roots 5.0Z11, 1280x960, `Forms=1`), is
+in `$A2_DATA/review/fo-menu-audit/audit.md` with a shot of each leftover (never in the
+repository). Drawn by the UI before this branch: every form of FleetOpsHook's but Tunngle's wait,
+and the eight adopted dialogs with specs (the end of a skirmish is the Admiral's Log's spec too).
+Left as Roots' pictures or the engine's, in the order players meet them: the lobby after Local
+Area Network or Manual IP and its Please Wait (every network game), the map editor's Load Map
+and Save Map file dialog (every editor session), the editor's licence (once per install, its
+text drawn selected in blue), the lobby's Help and Create Game's name, the Credits, and, not
+reached by a player's path on the bench, the Technology Tree (Roots' Options has no button for
+it), a game's password, the map transfer, Tunngle's wait and GameSpy's screens.
+
+| # | Decision | Why | What would change it |
+|---|---|---|---|
+| 600 | **The licence and the lobby's Help are Armada II's text window** (`roots_dialogs/text_window.rs` over `screens::text_window::text_window`, factored out of Armada II's spec unchanged): the text read whole from the stock edit, the stock buttons clicked as a player's | the user's report: the licence's picture showed the whole agreement selected (the edit has the focus, and a print of it shows its selection); drawing the text ourselves removes the selection without touching the edit | — |
+| 601 | **Roots' lobby is drawn by Armada II's lobby spec, its places scaled by the design width over 800** (`lobby::draw_with`, 1.5 on Roots); the heading LOBBY, since Roots' title label is empty | measured: every widget of Roots' lobby stands at 1.5 times Armada II's place (Create and Join at y 389 against 258, the players' column at x 897 against 598, the way out at y 852 against 562), so one spec serves both; on Armada II the scale is 1 and nothing changes | a Roots that moves the lobby's widgets |
+| 602 | **Please Wait is Armada II's notice with no button** (`roots_dialogs/notice.rs`) | it is the one-button message's layout with its button gone | — |
+| 603 | **Create Game's name dialog is a window of ours with captions of ours** ("Game Name", "Password", in the order the edits stand), the stock edits and buttons; with other than two edits and two buttons, Armada II's plain form | Roots' two labels are of a label class (vtable 0x6bb29c) the widget reader does not read (`reads empty` in UI.log), so the plain form showed two fields with no caption | the reader learning that label class |
+| 604 | **The five procedures join `ui.forms.dialog_specs`**, each marked verified in Roots' build: the record FleetOpsHook keeps (the licence, the lobby) or the dialog's own procedure (Please Wait, Help, the game's name, opened through the executable's import) was the stock address on the bench | the hook only tells a dialog by address; one unverified symbol stands the whole hook down, which the first build of this branch did | an unmeasured procedure added later: measure it first |
+| 605 | **Not redrawn here, ranked**: the editor's Load Map and Save Map dialog (a window of its own: not owned by the device window, so the forms neither adopt nor hide it, and the window manager sees it); the Credits (`ui.shell.screens` stands down on Roots: `DispatchDialog`, `Show_Credits` and `SetCurrentBackground` are FleetOpsHook's at run time); the Technology Tree, a game's password and the map transfer (unreached; Armada II's specs would serve once their procedures are measured); Tunngle's wait and GameSpy's screens (dead services) | each needs a mechanism or a measurement this branch did not have | the user's priorities |
+| 606 | **Armada II's lobby, Help and game's name are unchanged by the shared layouts**: `ui-menus-lobby` (new, one game, *Internet - Manual IP* hosting an empty lobby, Help, Create Game) gives the same shots on this branch (`20261107-201108`, passes) and on `fo-b` before it (`20261107-201323`): 90, 14 and 28 pixels differ of 921,600 (fuzz 2%, the backdrop's motion). The reference run failed at its last step, Cancel on the game's name not taken, a click this branch's run took | the refactor of decisions 600 and 601 touches Armada II's specs; the lobby needs no second game to be reached | — |
+
 ## Open decisions
 
 Decided by the user, 2026-11-06:

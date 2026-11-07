@@ -19,7 +19,7 @@ use super::setup_kit as kit;
 use crate::engine::api::shellui::Kind;
 use crate::gfx::{Weight, R};
 use crate::menus::model::{Control, What};
-use crate::menus::Screen;
+use crate::menus::{Host, Screen};
 use crate::widgets::{theme, Align, Ui};
 use alloc::vec::Vec;
 
@@ -36,10 +36,20 @@ fn labelled(c: &Control) -> bool {
 }
 
 pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
+    draw_with(ui, s, 1.0, "INTERNET")
+}
+
+/// The lobby of a dialog laid out as the stock one at `scale` times its design size (1 on
+/// Armada II's 800x600; Roots' 1200x900 lobby is the same screen at 1.5:
+/// `roots_dialogs::lobby`). `title` is the heading when the dialog's own title label is
+/// empty (Roots paints its title into the picture).
+pub fn draw_with(ui: &mut Ui, s: &dyn Host, scale: f32, title: &str) -> bool {
+    let k = |v: i32| (v as f32 * scale) as i32;
+    let (right, list_top, actions_y, bottom) = (k(RIGHT), k(LIST_TOP), k(ACTIONS), k(BOTTOM));
     let edits = kit::visible(s, kit::is_edit);
     let log = edits.iter().find(|c| c.style & 0x4 != 0).copied();
     let line = edits.iter().find(|c| c.style & 0x4 == 0).copied();
-    let mut nav: Vec<&Control> = kit::visible(s, |c| labelled(c) && c.rect[1] >= BOTTOM);
+    let mut nav: Vec<&Control> = kit::visible(s, |c| labelled(c) && c.rect[1] >= bottom);
     if line.is_none() || nav.is_empty() {
         return false;
     }
@@ -50,13 +60,13 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     let gap = ui.u(t.gap * 2.0);
 
     let labels = kit::visible(s, |c| kit::is_label(c) && !c.text.trim().is_empty());
-    let title = labels.iter().filter(|c| c.rect[1] < 40).min_by_key(|c| c.rect[1]).map_or("INTERNET", |c| c.text.trim());
+    let title = labels.iter().filter(|c| c.rect[1] < k(40)).min_by_key(|c| c.rect[1]).map_or(title, |c| c.text.trim());
     let cap = |x0: i32, x1: i32, y0: i32, y1: i32, d: &'static str| -> &str {
         labels.iter().find(|c| c.rect[0] >= x0 && c.rect[0] < x1 && c.rect[1] >= y0 && c.rect[1] < y1).map_or(d, |c| c.text.trim())
     };
-    let games_cap = cap(0, RIGHT, 40, LIST_TOP, "Current Games");
-    let players_cap = cap(RIGHT, 800, 40, LIST_TOP, "Players");
-    let chat_cap = cap(0, 800, ACTIONS + 20, 320, "Chat");
+    let games_cap = cap(0, right, k(40), list_top, "Current Games");
+    let players_cap = cap(right, k(800), k(40), list_top, "Players");
+    let chat_cap = cap(0, k(800), actions_y + k(20), k(320), "Chat");
 
     let title_r = R::new(screen.x + m, screen.y + m * 0.5, screen.w - 2.0 * m, ui.u(t.display_size + 16.0));
     ui.text_in(title_r, &theme::caps(title), t.display_size, Align::Left, t.title, Weight::Bold);
@@ -69,9 +79,9 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     let chat_r = R::new(body.x, games_r.bottom() + gap, body.w, body.bottom() - games_r.bottom() - gap);
 
     // ---- the games, the filter, Create and Join
-    let mut rows: Vec<&Control> = kit::visible(s, |c| labelled(c) && c.rect[0] < RIGHT && c.rect[1] >= LIST_TOP && c.rect[1] < ACTIONS && !matches!(c.what, What::Shell(Kind::Combo)));
+    let mut rows: Vec<&Control> = kit::visible(s, |c| labelled(c) && c.rect[0] < right && c.rect[1] >= list_top && c.rect[1] < actions_y && !matches!(c.what, What::Shell(Kind::Combo)));
     rows.sort_by_key(|c| c.rect[1]);
-    let mut actions: Vec<&Control> = kit::visible(s, |c| labelled(c) && c.rect[0] < RIGHT && c.rect[1] >= ACTIONS && c.rect[1] < BOTTOM - 260);
+    let mut actions: Vec<&Control> = kit::visible(s, |c| labelled(c) && c.rect[0] < right && c.rect[1] >= actions_y && c.rect[1] < bottom - k(260));
     kit::dedupe(&mut actions);
     actions.sort_by_key(|c| c.rect[0]);
     let combos = kit::visible(s, |c| matches!(c.what, What::Shell(Kind::Combo)));
@@ -84,7 +94,7 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
         lr = R::new(lr.x, fr.bottom() + ui.u(t.gap), lr.w, lr.h - fr.h - ui.u(t.gap));
     }
     rows_list(ui, s, &rows, lr, row_h, "game");
-    let arrows = arrows_in(s, RIGHT, 700, ACTIONS + 10);
+    let arrows = arrows_in(s, right, k(700), list_top, actions_y + k(10));
     arrow_buttons(ui, s, &arrows, lr);
     let aw = ui.u(220.0);
     let ay = gi.bottom() - bh;
@@ -95,11 +105,11 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     }
 
     // ---- the players in the room
-    let mut players: Vec<&Control> = kit::visible(s, |c| labelled(c) && c.rect[0] >= RIGHT && c.rect[1] >= LIST_TOP && c.rect[1] < BOTTOM - 260);
+    let mut players: Vec<&Control> = kit::visible(s, |c| labelled(c) && c.rect[0] >= right && c.rect[1] >= list_top && c.rect[1] < bottom - k(260));
     players.sort_by_key(|c| c.rect[1]);
     let pi = ui.window(players_r, players_cap);
     rows_list(ui, s, &players, pi, row_h, "player");
-    arrow_buttons(ui, s, &arrows_in(s, 700, 800, BOTTOM), pi);
+    arrow_buttons(ui, s, &arrows_in(s, k(700), k(800), list_top, bottom), pi);
 
     // ---- the chat
     let ci = ui.window(chat_r, chat_cap);
@@ -125,7 +135,7 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
 
 /// Stock rows (games or players) as our rows in `r`: a click is the stock row's click
 /// (which selects it); the row the stock screen draws held is shown selected.
-fn rows_list(ui: &mut Ui, s: &Screen, rows: &[&Control], r: R, row_h: f32, what: &str) {
+fn rows_list(ui: &mut Ui, s: &dyn Host, rows: &[&Control], r: R, row_h: f32, what: &str) {
     let t = ui.theme;
     ui.draw.push_clip(r);
     let mut y = r.y;
@@ -136,7 +146,7 @@ fn rows_list(ui: &mut Ui, s: &Screen, rows: &[&Control], r: R, row_h: f32, what:
         let rr = R::new(r.x, y, r.w - ui.u(28.0), row_h - ui.u(2.0));
         y += row_h;
         let id = ui.id(&crate::sfmt!("{}{:x}", what, c.key));
-        let live = s.top && c.enabled;
+        let live = s.top() && c.enabled;
         let (hot, held, clicked) = if live { ui.interact(id, rr) } else { (false, false, false) };
         let mut st = theme::State::of(ui, id, hot, held);
         st.on = c.hover == 2 || c.checked;
@@ -154,18 +164,18 @@ fn rows_list(ui: &mut Ui, s: &Screen, rows: &[&Control], r: R, row_h: f32, what:
 
 /// The picture buttons (no label) of a column, top to bottom: the stock scroll bars'
 /// arrows.
-fn arrows_in<'a>(s: &'a Screen, x0: i32, x1: i32, y1: i32) -> Vec<&'a Control> {
+fn arrows_in<'a>(s: &'a dyn Host, x0: i32, x1: i32, y0: i32, y1: i32) -> Vec<&'a Control> {
     let mut v = kit::visible(s, |c| {
         matches!(c.what, What::Shell(Kind::Button)) && (c.text.trim().is_empty() || c.text.eq_ignore_ascii_case("NULL"))
     });
-    v.retain(|c| c.rect[0] >= x0 && c.rect[0] < x1 && c.rect[1] >= LIST_TOP && c.rect[1] < y1 && c.rect[2] <= 32 && c.rect[3] <= 32);
+    v.retain(|c| c.rect[0] >= x0 && c.rect[0] < x1 && c.rect[1] >= y0 && c.rect[1] < y1 && c.rect[2] <= 32 && c.rect[3] <= 32);
     v.sort_by_key(|c| c.rect[1]);
     v
 }
 
 /// The first and last of `arrows` (up and down) as two small buttons at the right edge
 /// of `r`.
-fn arrow_buttons(ui: &mut Ui, s: &Screen, arrows: &[&Control], r: R) {
+fn arrow_buttons(ui: &mut Ui, s: &dyn Host, arrows: &[&Control], r: R) {
     if arrows.len() < 2 {
         return;
     }

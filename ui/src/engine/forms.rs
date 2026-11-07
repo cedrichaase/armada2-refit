@@ -123,7 +123,7 @@ pub fn dialog_screen(stock_proc: usize) -> &'static str {
     if stock_proc == 0 || eng().ready(hook::FORMS_DIALOG_SPECS).is_err() {
         return "";
     }
-    const SCREENS: [(a2engine::Sym, &str); 8] = [
+    const SCREENS: [(a2engine::Sym, &str); 13] = [
         (sym::FORMS_PROC_SINGLE_PLAYER, "single player"),
         (sym::FORMS_PROC_MISSION_SELECT, "mission select"),
         (sym::FORMS_PROC_LOAD_GAME, "load game"),
@@ -132,6 +132,11 @@ pub fn dialog_screen(stock_proc: usize) -> &'static str {
         (sym::FORMS_PROC_GAME_SETUP, "game setup"),
         (sym::FORMS_PROC_ADMIRALS_LOG, "admiral's log"),
         (sym::FORMS_PROC_MESSAGE, "message"),
+        (sym::FORMS_PROC_LICENCE, "licence agreement"),
+        (sym::FORMS_PROC_INTERNET_GAME, "internet game"),
+        (sym::FORMS_PROC_NET_WAITING, "net waiting"),
+        (sym::FORMS_PROC_HELP, "help"),
+        (sym::FORMS_PROC_GAME_NAME, "game name"),
     ];
     SCREENS.iter().find(|s| eng().addr(s.0) == stock_proc).map_or("", |s| s.1)
 }

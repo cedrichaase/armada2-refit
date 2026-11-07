@@ -1185,7 +1185,11 @@ a host of their own, `engine/forms.rs` (drawn by `menus/roots.rs`):
 - **What stays Roots'.** Tunngle's wait. The nine screens
   FleetOpsHook opens through its own `DialogBoxParamA` (Single Player, Game Setup, Game
   Settings, Load, Save, the licence, the Technology Tree, the Admiral's Log, Internet) are
-  Roots' dialogs drawn by the UI: "The nine dialogs, adopted" below.
+  Roots' dialogs drawn by the UI: "The nine dialogs, adopted" below. Still Roots' or the
+  engine's (PLAN-FLEETOPS.md, "The leftover menus"): the Credits (`ui.shell.screens` stands
+  down on Roots), the map editor's Load Map and Save Map file dialog (a window of its own,
+  not owned by the device window, so neither adopted nor hidden), and, unreached, the
+  Technology Tree, a game's password and the map transfer, which stay the picture.
 - **The fallback: the nine framed** (PLAN-FLEETOPS.md, decision 200), when the
   executable's paint imports cannot be ours (decision 230). The shell sizes a
   full-screen screen to the device window's client area, which on Display8 is the
@@ -1349,11 +1353,12 @@ spec is drawn by it, from the same two things a hosted dialog's spec reads:
 - **Its picture**, cut for what a theme cannot draw (a campaign's art).
 
 The spec is chosen by the stock procedure (`forms::dialog_screen`): the profile's
-`ui.forms.dialog_specs` lists the eight procedures FleetOpsHook opens or that open from
+`ui.forms.dialog_specs` lists the thirteen procedures FleetOpsHook opens or that open from
 them (Single Player, the mission list, Load, Save, Game Settings, Game Setup, the
-Admiral's Log, the one-button message), told apart by address only; Roots' build marks
-each verified beside its edit, since FleetOpsHook's record was measured to hold stock's
-address for every one. A spec acts as a player: `Screen::click` moves the pointer to the
+Admiral's Log, the one-button message, the map editor's licence, the lobby, Please Wait,
+the lobby's Help and Create Game's name), told apart by address only; Roots' build marks
+each verified beside its edit, since FleetOpsHook's record (or the dialog's own procedure,
+for those the executable opens) was measured to hold stock's address for every one. A spec acts as a player: `Screen::click` moves the pointer to the
 stock control's point, and once it has rested there (0.12 s; Roots' screens take a press
 only on a control already under the pointer, decision 190) presses, and releases 0.06 s
 later, each in a pass of its own through the dialog's messages; one click at a time, in
@@ -1378,6 +1383,10 @@ behaviour unchanged: `single_player::campaign_column` and `campaign_cards`,
 | Game Setup (`MultiplayerSetupDlgProc`) | `roots_dialogs/game_setup.rs` | Armada II's Game Setup (`game_setup::draw_with`) with Roots' places (`ROOTS`, a `game_setup::Layout`): the players' rows as our drop-downs over the stock `ComboBox`es, the palette, the map's window with its preview and settings, the bottom row; the column headings are Armada II's words, Roots paints its own (decision 257) |
 | Game Settings (`GameSettingsDlgProc`) | `roots_dialogs/game_settings.rs` | Armada II's settings form (a caption over each control): the six stock sliders (set by a click on the track, `generic::click_scroll_with`) and the two cycle buttons; Roots' labels hold no text, so the captions are words of ours, given in the order Roots stacks the controls (decision 256) |
 | The one-button message (`OneButtonDlgProc`) | `roots_dialogs/notice.rs` | Armada II's message window (`notice::notice_window`): the labels as title and text, the stock OK |
+| The map editor's licence, the lobby's Help (`LicenseAgreementWindowDlgProc`, `HelpWindowDlgProc`) | `roots_dialogs/text_window.rs` | Armada II's text window (`text_window::text_window`): the text read whole from the stock edit (`WM_GETTEXT`), in our scroll area, the stock buttons (ACCEPT and CANCEL, OK) in a row; the edit is never printed, so Roots' picture of it with the whole agreement selected is gone (decision 600) |
+| The lobby (`InternetGameDlgProc`) | `roots_dialogs/lobby.rs` | Armada II's lobby (`lobby::draw_with`): Roots' lobby is Armada II's widgets at 1.5 times their places (1200x900 against 800x600), so the spec's places are scaled by the design width over 800; the title LOBBY, which Roots paints (decision 601) |
+| Please Wait (`NetWaitingDlgProc`) | `roots_dialogs/notice.rs` | Armada II's message window with no button, the two labels as title and text (decision 602) |
+| Create Game's name (`GameNameDlgProc`) | `roots_dialogs/lobby.rs` | a window of ours: "Game Name" and "Password" over the two stock edits (words of ours: Roots' labels are of a class the reader does not read), OK and Cancel (decision 603) |
 
 **The campaign tiles are Roots' art**: the column draws each card's own picture, cut from
 the dialog's picture at run time (never stored; decision 251), because the α, γ, V and
