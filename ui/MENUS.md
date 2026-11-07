@@ -1004,6 +1004,13 @@ a Mutara nebula with the queen's Diamond (`render3d/README.md`, "The menu scene"
   stock tutorial card shows, drawn as an outline round the Federation icon's delta.
   Without `allrace.tga` the names stand alone (UI.log: `menus: campaign emblems`).
   Without the scene the four cards draw in a 2x2 grid as before.
+- **Campaign emblems from a picture** (`Emblem = <TGA path>` in a content set's
+  `[Campaign.*]`, `menus::screens::single_player::campaign_picture`): the column draws the
+  file whole, in the name's tint, in place of the race icon cell or the card's cut; the file
+  is read from the player's game files at run time. A file that cannot be read keeps the
+  card's own art. `[Menus] Emblem<Id>=` in UI.ini (`EmblemAllied`, `EmblemDominion`,
+  `EmblemSpecies8472`, `EmblemFreeBorg`: the section's id) names another picture, or `none`
+  for the card's own art; empty takes the set's. UI.log: `menus: campaign <Id> emblem <file>`.
 - **Locked campaigns** (`src/menus/locks.rs`, `src/engine/progress.rs`, issue #13): the
   stock screen draws a campaign the player cannot play yet exactly as an open one, and a
   click on it does nothing (no mission list, no sound of its own). Ours greys it: its
