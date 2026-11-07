@@ -1,6 +1,7 @@
 ---
 layers: [root]
 bump: patch
+games: [armada2, fo-roots]
 ---
 
 ### Fixed
