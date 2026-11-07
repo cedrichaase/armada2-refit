@@ -1088,6 +1088,22 @@ over a dimmed screen (`panels::boxed`; not `Ui::modal`, which keeps the keyboard
 the message's title as the window's, the text wrapped; the objectives with a check
 box per line, ticked when complete.
 
+### Under the engine's boxes
+
+With `[HUD] Messages=0` (Roots' default, PLAN-FLEETOPS.md decision 125) the message box
+and the briefing are the engine's: drawn in `RenderAll`, which runs before the UI's frame,
+and modal (their `CursorOver` is always true). Every panel of ours used to be drawn after
+them, over the briefing and could take clicks there (the user's
+report on Roots' first allied tutorial, 2026-11-07). So while either box shows and is not
+ours (`panels::stock_box_up`), `hud::run` draws only the boxes of ours that pause the game
+and the multiplayer boxes; the rest (selection overlay, unit view, minimap, info panel,
+bar, resources, top-right buttons, chat lines, tooltips) stands aside and claims nothing,
+so the engine's box owns the pointer as in stock. UI.log says `hud: under the engine's
+box` and `the engine's box closed`. Stock's HUD sits under the box rather than going;
+ours goes whole, because the UI's frame cannot be put between two of the engine's
+components. With `Messages=1` (Armada II's shipped value) the boxes are ours and nothing
+changes. `testbench/scenarios/fo-ui-briefing.md`.
+
 ### Pause and replay (`PauseBox`, `ReplayPanel`)
 
 The pause box is shown and hidden by the pause order (`NetOrderPause::Execute`); its

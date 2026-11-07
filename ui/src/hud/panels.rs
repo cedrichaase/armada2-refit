@@ -113,10 +113,24 @@ pub fn box_shown() -> bool {
     unsafe { BOX_SHOWN }
 }
 
+/// Whether a box that pauses the game and is not ours shows: the engine's briefing and
+/// objectives (`ObjectivesDisplay`) or its message box (`MessageDisplay`) with
+/// `[HUD] Messages=0` (Roots' default, decision 125). The engine draws it in
+/// `RenderAll`, before the UI's frame, and stock's box owns the mouse wherever the
+/// pointer is (`CursorOver` always true); so while it shows the HUD of ours stands
+/// aside, as stock's HUD sits under the box (HUD.md, "Under the engine's boxes").
+pub fn stock_box_up() -> bool {
+    let on = on().unwrap_or(0);
+    let ours = |name: &str| PANELS.iter().enumerate().any(|(i, p)| on & (1 << i) != 0 && p.name() == name);
+    (!ours("objectives") && popups::objectives_shown()) || (!ours("messages") && popups::message().is_some())
+}
+
 pub fn run(ui: &mut Ui) {
     let Some(on) = on() else { return };
     let taken = |i: usize| on & (1 << i) != 0;
     let hud_hidden = api::ingame::hud_hidden();
+    // Under the engine's own box only the boxes of ours (which pause the game too) draw.
+    let under_box = stock_box_up();
     // A box that pauses the game covers everything: nothing under it takes the mouse
     // (its own widgets are drawn in the overlay layer, above the occluder).
     let blocking = PANELS.iter().enumerate().any(|(i, p)| taken(i) && p.modal());
@@ -127,7 +141,7 @@ pub fn run(ui: &mut Ui) {
         ui.occlude(screen);
     }
     for (i, p) in PANELS.iter().enumerate() {
-        if !taken(i) || (hud_hidden && p.with_hud()) {
+        if !taken(i) || (hud_hidden && p.with_hud()) || (under_box && !p.modal()) {
             continue;
         }
         crate::hud::layout::at(p.name());
