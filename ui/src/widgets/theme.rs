@@ -663,13 +663,28 @@ fn hair(ui: &Ui) -> f32 {
 
 /// A panel's background. Returns nothing; `panel_inner` gives the room inside.
 pub fn panel(ui: &mut Ui, r: R) {
+    panel_as(ui, r, Lamps::Off);
+}
+
+/// Whether a panel carries lamps in its frame (Starfleet: the blue lamps in the side
+/// rims and their light on the glass). Only the panels that stand where Roots' own HUD
+/// has lamp insets ask for them (STYLE.md, "Starfleet"); the other forms draw no lamps
+/// and ignore it.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Lamps {
+    Off,
+    On,
+}
+
+/// A panel's background, with or without lamps in its frame (`Lamps`).
+pub fn panel_as(ui: &mut Ui, r: R, lamps: Lamps) {
     let t = ui.theme;
     if t.form == Form::Lcars {
         lcars_frame(ui, r, None);
         return;
     }
     if t.form == Form::Starfleet {
-        starfleet_panel(ui, r);
+        starfleet_panel(ui, r, lamps == Lamps::On);
         return;
     }
     let c = t.px(ui, t.corners);
@@ -838,18 +853,9 @@ fn header_mark(ui: &mut Ui, at: R) {
             ui.draw.glow(r, Corners::round(s * 0.5), ui.u(14.0), fade(t.accent2, 0.45));
             ui.draw.fill(r, Corners::round(s * 0.5), t.accent2);
         }
-        Form::Starfleet => {
-            // Two status lights in slots, the second dimmer.
-            let (w, h) = (ui.u(14.0), ui.u(4.0));
-            for i in 0..2 {
-                let x = at.x - (2 - i) as f32 * (w + ui.u(5.0));
-                let r = R::new(x, cy - h * 0.5, w, h);
-                let a = if i == 1 { 1.0 } else { 0.55 };
-                ui.draw.fill(r.inset(-ui.u(1.0)), Corners::round(ui.u(1.5)), 0xff05070b);
-                ui.draw.glow(r, Corners::round(ui.u(1.0)), ui.u(9.0), fade(t.accent, 0.35 * a));
-                ui.draw.fill(r, Corners::round(ui.u(1.0)), fade(t.accent, a));
-            }
-        }
+        // Starfleet's headers carry no lamps: Roots puts lamps only in its info panel's
+        // frame (STYLE.md, "Starfleet").
+        Form::Starfleet => {}
         Form::Lcars => {}
     }
 }
@@ -900,7 +906,7 @@ fn sf_lamp_light(ui: &mut Ui, g: R, cy: f32, right: bool, a: f32) {
 
 /// A Starfleet panel: a machined rim of metal round smoked glass, two lamps in each
 /// side rim lighting the glass from its ends (STYLE.md).
-fn starfleet_panel(ui: &mut Ui, r: R) {
+fn starfleet_panel(ui: &mut Ui, r: R, lamps: bool) {
     let t = ui.theme;
     let h = hair(ui);
     let side = ui.u(SF_RIM);
@@ -911,10 +917,10 @@ fn starfleet_panel(ui: &mut Ui, r: R) {
     // The glass: a smoke lighter at the top, a little darker toward the right.
     ui.draw.fill_v(g, gc, t.panel_top, t.panel);
     ui.draw.fill_h(g, gc, 0x00000000, 0x30000000);
-    ui.draw.stripes(g, gc, ui.u(3.0).max(2.0), 0.5, PI * 0.5, 0x06ffffff);
-    // The lamps' light on it, from both ends; the left the stronger.
+    // The lamps' light on it, from both ends; the left the stronger. A panel without
+    // lamps keeps the plain smoke.
     let cy = libm::roundf(r.y + r.h * 0.5);
-    let lamps = g.h > ui.u(26.0);
+    let lamps = lamps && g.h > ui.u(26.0);
     if lamps {
         sf_lamp_light(ui, g, cy, false, 1.0);
         sf_lamp_light(ui, g, cy, true, 0.65);
