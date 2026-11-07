@@ -28,6 +28,10 @@ doc = "The message, objectives, pause and replay boxes read and their buttons to
 doc = "The button bar's slots, buttons, command and mode names, icon sprites and tooltips"
 rows = ["HUD.Bar", "HUD.BarLabels", "HUD.Icons"]
 
+[hook."hud.bar_grid"]
+doc = "The bar's Update: its IsGamePausedAtAll call wrapped, where the grid moves the stock buttons onto its cells (Roots)"
+rows = ["HUD.Bar"]
+
 [hook."hud.reads_overlay"]
 doc = "The selected and pointed units, their boxes, gauges and systems, as SelectionDisplay reads them"
 rows = ["HUD.Selection", "HUD.SelectionGauges"]
@@ -326,7 +330,19 @@ symbol = "IsGamePausedAtAll"
 kind = "fn"
 addr = 0x489bf0
 check = "a0 d9 7b 73 00"
-used_by = ["hud.reads_popups"]
+used_by = ["hud.reads_popups", "hud.bar_grid"]
+
+# The bar's Update calls IsGamePausedAtAll on every path once the buttons are laid out
+# (mUpdateButtonsAndPosition, or its port on Roots) and before anything simulates them: the
+# grid of ours (Roots, FO-6 decisions 330 to 349) writes the buttons' rectangles there.
+[[sym]]
+id = "palette_update_paused_call"
+symbol = "PopupPaletteImp::Update"
+kind = "call"
+addr = 0x4fb422
+target = "popups_is_game_paused"
+in = "PopupPaletteImp::Update"
+used_by = ["hud.bar_grid"]
 
 [[sym]]
 id = "popups_obj_focus_simulate"
@@ -1606,7 +1622,7 @@ kind = "field"
 struct = "ControlButton"
 offset = 0x8
 type = "i32"
-used_by = ["hud.reads_bar"]
+used_by = ["hud.reads_bar", "hud.bar_grid"]
 
 [[sym]]
 id = "palette_btn_pressed"

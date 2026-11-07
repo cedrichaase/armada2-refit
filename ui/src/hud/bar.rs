@@ -26,9 +26,9 @@ use crate::widgets::{theme, Align, Ui};
 use alloc::string::String;
 use alloc::vec::Vec;
 
-const COLS: usize = 5;
-const ROWS: usize = 3;
-const CELLS: usize = COLS * ROWS;
+pub(super) const COLS: usize = 5;
+pub(super) const ROWS: usize = 3;
+pub(super) const CELLS: usize = COLS * ROWS;
 const fn cell(c: usize, r: usize) -> usize {
     r * COLS + c
 }
@@ -37,7 +37,7 @@ const CELL_BACK: usize = cell(4, 1);
 const CELL_OVERFLOW: usize = cell(4, 2);
 
 /// The cell names the layout log uses (the keys are QOL's: `QOL_BarLabel`).
-const LABEL: &[u8; CELLS] = b"QWERTASDFGZXCVB";
+pub(super) const LABEL: &[u8; CELLS] = b"QWERTASDFGZXCVB";
 /// Free cells are taken down each of the four left columns, then the fifth column's
 /// spare: the left of the keyboard fills first.
 const FILL: [usize; CELLS] = [
@@ -53,14 +53,21 @@ fn top_level(menu: u32) -> bool {
     menu == 0 || menu == 8
 }
 
-struct Item {
-    btn: usize,
-    desc: palette::Desc,
+pub(super) struct Item {
+    pub btn: usize,
+    pub desc: palette::Desc,
 }
 
 /// The bar's buttons and the cell each goes in: `cells[c]` is the button under cell
 /// `c`, 0 for an empty one.
 fn layout(p: usize, menu: u32) -> ([usize; CELLS], Vec<Item>) {
+    let (cells, items, _) = layout_all(p, menu);
+    (cells, items)
+}
+
+/// `layout`, and the buttons the fifteen cells have no room for, in the bar's order: Roots'
+/// bar holds up to 64 (the grid there, `bargrid`, puts them beside the keyed cells).
+pub(super) fn layout_all(p: usize, menu: u32) -> ([usize; CELLS], Vec<Item>, Vec<usize>) {
     let mut items = Vec::new();
     for i in 0..palette::n_slots() {
         let b = palette::slot(p, i);
@@ -70,12 +77,14 @@ fn layout(p: usize, menu: u32) -> ([usize; CELLS], Vec<Item>) {
     }
     let at = assign(&items, menu);
     let mut cells = [0usize; CELLS];
+    let mut over = Vec::new();
     for (it, c) in items.iter().zip(at) {
-        if let Some(c) = c {
-            cells[c] = it.btn;
+        match c {
+            Some(c) => cells[c] = it.btn,
+            None => over.push(it.btn),
         }
     }
-    (cells, items)
+    (cells, items, over)
 }
 
 /// grid.c's `assign`: the cell each item goes in, None only if the grid is full.
@@ -199,6 +208,16 @@ pub fn install() -> bool {
 static mut CELL_BTNS: [usize; CELLS] = [0; CELLS];
 static mut DRAWN_AT: f64 = -1.0;
 
+/// The grid on Roots (`bargrid`): the cells its layout took, and that it is drawn now.
+pub(super) fn set_cells(cells: [usize; CELLS], drawn: bool) {
+    unsafe {
+        CELL_BTNS = cells;
+        if drawn {
+            DRAWN_AT = crate::rt::now();
+        }
+    }
+}
+
 /// `UI_BarCell(cell)`: the stock button in cell 0..14 of the menu now shown, or NULL
 /// (nothing there, or the bar is not drawn). QOL presses it.
 pub fn cell_button(c: u32) -> usize {
@@ -235,7 +254,7 @@ pub fn step(p: usize) {
 
 /// `QOL_BarLabel`, found by name in whichever module has it, never by file name: the key
 /// of a cell, or None while the keys are off or stood down (or there is no QOL.asi).
-fn qol_label(c: usize) -> Option<&'static str> {
+pub(super) fn qol_label(c: usize) -> Option<&'static str> {
     static mut FN: usize = 0;
     static mut TRIES: u32 = 0;
     unsafe {
@@ -286,7 +305,7 @@ pub fn step_from_qol(p: usize) {
 /// right to make it, `info::place`: 16:9 and wider), else above the minimap, aligned
 /// to its left edge (4:3), so the middle of the screen stays clear. Without a minimap,
 /// above the info panel.
-fn place(ui: &Ui, w: f32, h: f32) -> R {
+pub(super) fn place(ui: &Ui, w: f32, h: f32) -> R {
     let m = ui.u(10.0);
     // Ours when it draws, else the stock panel's rectangle.
     let ours = super::info::rect().map(|r| [r.x, r.y, r.right(), r.bottom()]);
@@ -302,6 +321,9 @@ fn place(ui: &Ui, w: f32, h: f32) -> R {
 
 /// The bar's outer size in pixels, as `run` lays it out.
 pub fn outer_size(ui: &Ui) -> (f32, f32) {
+    if palette::slots_indirect() && super::bargrid::on() {
+        return super::bargrid::outer_size(ui);
+    }
     let (cs, gap, pad) = (ui.u(62.0), ui.u(5.0), ui.u(8.0));
     let gw = COLS as f32 * cs + (COLS - 1) as f32 * gap;
     let gh = ROWS as f32 * cs + (ROWS - 1) as f32 * gap;
@@ -311,7 +333,7 @@ pub fn outer_size(ui: &Ui) -> (f32, f32) {
 
 /// Whether the bar is up: the player has not hidden it and the HUD shows.
 pub fn shows() -> bool {
-    if palette::slots_indirect() {
+    if palette::slots_indirect() && !super::bargrid::on() {
         return false; // a skin sits over the stock buttons and takes no room in the row
     }
     let p = palette::palette();
@@ -320,6 +342,9 @@ pub fn shows() -> bool {
 
 pub fn run(ui: &mut Ui) {
     if palette::slots_indirect() {
+        if super::bargrid::on() {
+            return super::bargrid::run(ui);
+        }
         return super::barskin::run(ui);
     }
     let s = st();
@@ -397,7 +422,7 @@ pub fn run(ui: &mut Ui) {
         // The game's icon, inside the edge.
         let icon = r.inset(ui.u(5.0));
         let sp = palette::sprite(b);
-        let ours = cfg.hud.icons && sp != 0 && {
+        let ours = crate::icons::ours_for_sprite(cfg.hud.icons, sp, |s| sprite::art(s).is_some()) && {
             let ink = if enabled { content } else { fade(content, 0.45) };
             let ir = icon.inset(ui.u(0.5));
             crate::icons::draw(&mut ui.draw, sprite::name(sp), ir, 1.0, crate::icons::theme_colour(&t, ink))

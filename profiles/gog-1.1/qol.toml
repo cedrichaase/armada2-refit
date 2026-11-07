@@ -1087,6 +1087,17 @@ kind = "value"
 value = 6
 used_by = ["bar_keys"]
 
+# The cells that get a position key, one bit per cell (bit 0 Q ... bit 14 B): all fifteen
+# on stock. A build whose own key map gives one of the fifteen letters to an action outside
+# the bar clears that cell's bit, so the letter never does two things (Roots: W, FO-6
+# decisions 330 to 349).
+[[sym]]
+id = "bk_key_cells"
+symbol = "bar_key_cells"
+kind = "value"
+value = 0x7fff
+used_by = ["bar_keys"]
+
 [[sym]]
 id = "bk_btn_state"
 symbol = "ControlButton"

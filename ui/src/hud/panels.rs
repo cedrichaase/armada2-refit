@@ -173,8 +173,9 @@ pub fn game_button(ui: &mut Ui, r: R, b: usize, name: &str, on: bool) -> bool {
     let e = ui.u(ui.theme.edge).max(1.0);
     let img = r.inset(e + ui.u(4.0));
     let sp = api::buttons::sprite(b);
+    note_icon(name, sp);
     let t = ui.theme;
-    let ours = crate::config::get().hud.icons && sp != 0 && {
+    let ours = crate::icons::ours_for_sprite(crate::config::get().hud.icons, sp, |s| sprite::art(s).is_some()) && {
         let ink = if !enabled { crate::gfx::fade(col, 0.45) } else { col };
         let ir = img.inset(ui.u(1.0));
         crate::icons::draw(&mut ui.draw, sprite::name(sp), ir, 1.0, crate::icons::theme_colour(&t, ink))
@@ -264,4 +265,19 @@ pub fn boxed(ui: &mut Ui, title: &str, w: f32, h: f32, dim: f32) -> R {
     ui.claim(screen);
     let r = crate::widgets::Anchor::Centre.place(screen, ui.u(w), ui.u(h), 0.0);
     ui.window(r, title)
+}
+
+/// Logs once per button which sprite stands behind its icon and whether it has art (FO-6,
+/// decision 340: on Roots the art goes first).
+#[allow(static_mut_refs)]
+fn note_icon(button: &str, sp: usize) {
+    static mut SEEN: alloc::vec::Vec<String> = alloc::vec::Vec::new();
+    unsafe {
+        if SEEN.len() >= 32 || SEEN.iter().any(|n| n == button) {
+            return;
+        }
+        SEEN.push(String::from(button));
+    }
+    let art = sprite::art(sp).is_some();
+    crate::log!("icon: {} sprite {} art {}", button, if sp == 0 { "none" } else { sprite::name(sp) }, if art { "yes" } else { "no" });
 }

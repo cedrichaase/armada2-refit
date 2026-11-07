@@ -4,6 +4,7 @@
 //! (`engine::hud`) stops it drawing and taking the mouse. Ours reads that state and
 //! acts through the component's own functions.
 pub mod bar;
+mod bargrid;
 mod barskin;
 pub mod info;
 pub mod layout;
@@ -79,7 +80,11 @@ pub fn install() -> bool {
             unsafe { BAR = true };
             if api::palette::slots_indirect() {
                 hud::set_bar_skin(true);
-                crate::log!("bar: ours as a skin over the stock buttons (the stock bar keeps the pointer)");
+                if bargrid::install() {
+                    crate::log!("bar: ours as the grid, the stock buttons moved onto its cells (the stock bar keeps the pointer)");
+                } else {
+                    crate::log!("bar: ours as a skin over the stock buttons (the stock bar keeps the pointer)");
+                }
             } else {
                 crate::log!("bar: ours, its keys are QOL's");
             }

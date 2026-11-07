@@ -26,57 +26,58 @@ pub mod sym {
     pub const POPUPS_REPLAY_PRESS_3: a2engine::Sym = a2engine::Sym(31);
     pub const POPUPS_REPLAY_PRESS_4: a2engine::Sym = a2engine::Sym(32);
     pub const POPUPS_IS_GAME_PAUSED: a2engine::Sym = a2engine::Sym(33);
-    pub const POPUPS_OBJ_FOCUS_SIMULATE: a2engine::Sym = a2engine::Sym(34);
-    pub const PALETTE_MODE_NAMES: a2engine::Sym = a2engine::Sym(48);
-    pub const PALETTE_SPRITE_DB: a2engine::Sym = a2engine::Sym(49);
-    pub const PALETTE_PRJ_GET_NAME: a2engine::Sym = a2engine::Sym(50);
-    pub const PALETTE_CMD_BUTTON_NAME: a2engine::Sym = a2engine::Sym(51);
-    pub const PALETTE_MODE_BUTTON_NAME: a2engine::Sym = a2engine::Sym(52);
-    pub const PALETTE_FIND_ELEMENT: a2engine::Sym = a2engine::Sym(53);
-    pub const OVERLAY_SELECTION_DISPLAY: a2engine::Sym = a2engine::Sym(77);
-    pub const OVERLAY_OBJECT_LIST: a2engine::Sym = a2engine::Sym(78);
-    pub const OVERLAY_CURRENT_CAMERA: a2engine::Sym = a2engine::Sym(79);
-    pub const OVERLAY_VIRTUAL_VIEWPORT: a2engine::Sym = a2engine::Sym(80);
-    pub const OVERLAY_SYSTEM_ORDER: a2engine::Sym = a2engine::Sym(81);
-    pub const OVERLAY_TD_GAME_OBJECT_CLASS: a2engine::Sym = a2engine::Sym(82);
-    pub const OVERLAY_TD_CRAFT_CLASS: a2engine::Sym = a2engine::Sym(83);
-    pub const OVERLAY_RT_DYNAMIC_CAST: a2engine::Sym = a2engine::Sym(84);
-    pub const OVERLAY_CONTAINER_RECT: a2engine::Sym = a2engine::Sym(85);
-    pub const OVERLAY_RENDER_SELECTION: a2engine::Sym = a2engine::Sym(86);
-    pub const OTEXT_OVERLAY: a2engine::Sym = a2engine::Sym(119);
-    pub const OTEXT_NIL: a2engine::Sym = a2engine::Sym(120);
-    pub const LO_WIREFRAME_RECT: a2engine::Sym = a2engine::Sym(129);
-    pub const LO_DRAG_BOX_CALL: a2engine::Sym = a2engine::Sym(130);
-    pub const LO_CLIP_AND_RENDER_LINE: a2engine::Sym = a2engine::Sym(131);
-    pub const LO_HEIGHT_POST_CALL: a2engine::Sym = a2engine::Sym(132);
-    pub const LO_SPRITE_DRAW_QUAD: a2engine::Sym = a2engine::Sym(133);
-    pub const LO_DEMAND_LOAD: a2engine::Sym = a2engine::Sym(134);
-    pub const LO_SPRITE_TEXTURE: a2engine::Sym = a2engine::Sym(135);
-    pub const LO_GRID_FX_CALL: a2engine::Sym = a2engine::Sym(136);
-    pub const LO_WHERE_CALL: a2engine::Sym = a2engine::Sym(137);
-    pub const LO_FOOTPRINT_CELL_CALL: a2engine::Sym = a2engine::Sym(138);
-    pub const LO_FOOTPRINT_CLEAR_CALL: a2engine::Sym = a2engine::Sym(139);
-    pub const LO_FOOTPRINT_BLOCKED_CALL: a2engine::Sym = a2engine::Sym(140);
-    pub const LO_FADE_WHITE: a2engine::Sym = a2engine::Sym(141);
-    pub const LO_FADE_BLACK: a2engine::Sym = a2engine::Sym(142);
-    pub const LO_BLIT: a2engine::Sym = a2engine::Sym(143);
-    pub const LO_BLIT_RENDER_CALL: a2engine::Sym = a2engine::Sym(144);
-    pub const LO_BLIT_UPDATE_CALL: a2engine::Sym = a2engine::Sym(145);
-    pub const LO_DRAW_RECTANGLE: a2engine::Sym = a2engine::Sym(146);
-    pub const LO_VIDEO_BAR_CALL_A: a2engine::Sym = a2engine::Sym(147);
-    pub const LO_VIDEO_BAR_CALL_B: a2engine::Sym = a2engine::Sym(148);
-    pub const LO_DRAW_SCALED_2D: a2engine::Sym = a2engine::Sym(149);
-    pub const LO_VIDEO_SPRITE_CALL: a2engine::Sym = a2engine::Sym(150);
-    pub const LO_BINK_WIDTH: a2engine::Sym = a2engine::Sym(151);
-    pub const LO_BINK_HEIGHT: a2engine::Sym = a2engine::Sym(152);
-    pub const LO_PRINT_STRING: a2engine::Sym = a2engine::Sym(153);
-    pub const LO_DISPLAY_FRAME_RATE: a2engine::Sym = a2engine::Sym(154);
-    pub const LO_FPS_TRI_CALL: a2engine::Sym = a2engine::Sym(155);
-    pub const LO_FPS_CALL: a2engine::Sym = a2engine::Sym(156);
-    pub const LO_FRAMERATE_DISPLAY: a2engine::Sym = a2engine::Sym(157);
-    pub const LO_SLOT_NAME: a2engine::Sym = a2engine::Sym(158);
-    pub const LO_TIME_AVG: a2engine::Sym = a2engine::Sym(159);
-    pub const LO_SLOT_COUNT: a2engine::Sym = a2engine::Sym(160);
+    pub const PALETTE_UPDATE_PAUSED_CALL: a2engine::Sym = a2engine::Sym(34);
+    pub const POPUPS_OBJ_FOCUS_SIMULATE: a2engine::Sym = a2engine::Sym(35);
+    pub const PALETTE_MODE_NAMES: a2engine::Sym = a2engine::Sym(49);
+    pub const PALETTE_SPRITE_DB: a2engine::Sym = a2engine::Sym(50);
+    pub const PALETTE_PRJ_GET_NAME: a2engine::Sym = a2engine::Sym(51);
+    pub const PALETTE_CMD_BUTTON_NAME: a2engine::Sym = a2engine::Sym(52);
+    pub const PALETTE_MODE_BUTTON_NAME: a2engine::Sym = a2engine::Sym(53);
+    pub const PALETTE_FIND_ELEMENT: a2engine::Sym = a2engine::Sym(54);
+    pub const OVERLAY_SELECTION_DISPLAY: a2engine::Sym = a2engine::Sym(78);
+    pub const OVERLAY_OBJECT_LIST: a2engine::Sym = a2engine::Sym(79);
+    pub const OVERLAY_CURRENT_CAMERA: a2engine::Sym = a2engine::Sym(80);
+    pub const OVERLAY_VIRTUAL_VIEWPORT: a2engine::Sym = a2engine::Sym(81);
+    pub const OVERLAY_SYSTEM_ORDER: a2engine::Sym = a2engine::Sym(82);
+    pub const OVERLAY_TD_GAME_OBJECT_CLASS: a2engine::Sym = a2engine::Sym(83);
+    pub const OVERLAY_TD_CRAFT_CLASS: a2engine::Sym = a2engine::Sym(84);
+    pub const OVERLAY_RT_DYNAMIC_CAST: a2engine::Sym = a2engine::Sym(85);
+    pub const OVERLAY_CONTAINER_RECT: a2engine::Sym = a2engine::Sym(86);
+    pub const OVERLAY_RENDER_SELECTION: a2engine::Sym = a2engine::Sym(87);
+    pub const OTEXT_OVERLAY: a2engine::Sym = a2engine::Sym(120);
+    pub const OTEXT_NIL: a2engine::Sym = a2engine::Sym(121);
+    pub const LO_WIREFRAME_RECT: a2engine::Sym = a2engine::Sym(130);
+    pub const LO_DRAG_BOX_CALL: a2engine::Sym = a2engine::Sym(131);
+    pub const LO_CLIP_AND_RENDER_LINE: a2engine::Sym = a2engine::Sym(132);
+    pub const LO_HEIGHT_POST_CALL: a2engine::Sym = a2engine::Sym(133);
+    pub const LO_SPRITE_DRAW_QUAD: a2engine::Sym = a2engine::Sym(134);
+    pub const LO_DEMAND_LOAD: a2engine::Sym = a2engine::Sym(135);
+    pub const LO_SPRITE_TEXTURE: a2engine::Sym = a2engine::Sym(136);
+    pub const LO_GRID_FX_CALL: a2engine::Sym = a2engine::Sym(137);
+    pub const LO_WHERE_CALL: a2engine::Sym = a2engine::Sym(138);
+    pub const LO_FOOTPRINT_CELL_CALL: a2engine::Sym = a2engine::Sym(139);
+    pub const LO_FOOTPRINT_CLEAR_CALL: a2engine::Sym = a2engine::Sym(140);
+    pub const LO_FOOTPRINT_BLOCKED_CALL: a2engine::Sym = a2engine::Sym(141);
+    pub const LO_FADE_WHITE: a2engine::Sym = a2engine::Sym(142);
+    pub const LO_FADE_BLACK: a2engine::Sym = a2engine::Sym(143);
+    pub const LO_BLIT: a2engine::Sym = a2engine::Sym(144);
+    pub const LO_BLIT_RENDER_CALL: a2engine::Sym = a2engine::Sym(145);
+    pub const LO_BLIT_UPDATE_CALL: a2engine::Sym = a2engine::Sym(146);
+    pub const LO_DRAW_RECTANGLE: a2engine::Sym = a2engine::Sym(147);
+    pub const LO_VIDEO_BAR_CALL_A: a2engine::Sym = a2engine::Sym(148);
+    pub const LO_VIDEO_BAR_CALL_B: a2engine::Sym = a2engine::Sym(149);
+    pub const LO_DRAW_SCALED_2D: a2engine::Sym = a2engine::Sym(150);
+    pub const LO_VIDEO_SPRITE_CALL: a2engine::Sym = a2engine::Sym(151);
+    pub const LO_BINK_WIDTH: a2engine::Sym = a2engine::Sym(152);
+    pub const LO_BINK_HEIGHT: a2engine::Sym = a2engine::Sym(153);
+    pub const LO_PRINT_STRING: a2engine::Sym = a2engine::Sym(154);
+    pub const LO_DISPLAY_FRAME_RATE: a2engine::Sym = a2engine::Sym(155);
+    pub const LO_FPS_TRI_CALL: a2engine::Sym = a2engine::Sym(156);
+    pub const LO_FPS_CALL: a2engine::Sym = a2engine::Sym(157);
+    pub const LO_FRAMERATE_DISPLAY: a2engine::Sym = a2engine::Sym(158);
+    pub const LO_SLOT_NAME: a2engine::Sym = a2engine::Sym(159);
+    pub const LO_TIME_AVG: a2engine::Sym = a2engine::Sym(160);
+    pub const LO_SLOT_COUNT: a2engine::Sym = a2engine::Sym(161);
 }
 
 pub mod hook {
@@ -86,16 +87,17 @@ pub mod hook {
     pub const HUD_READS_CALLS: a2engine::HookId = a2engine::HookId(3);
     pub const HUD_READS_POPUPS: a2engine::HookId = a2engine::HookId(4);
     pub const HUD_READS_BAR: a2engine::HookId = a2engine::HookId(5);
-    pub const HUD_READS_OVERLAY: a2engine::HookId = a2engine::HookId(6);
-    pub const HUD_BUBBLES: a2engine::HookId = a2engine::HookId(7);
-    pub const HUD_READS_OVERLAY_TEXT: a2engine::HookId = a2engine::HookId(8);
-    pub const HUD_DRAG_BOX: a2engine::HookId = a2engine::HookId(9);
-    pub const HUD_HEIGHT_POSTS: a2engine::HookId = a2engine::HookId(10);
-    pub const HUD_ORDER_RING: a2engine::HookId = a2engine::HookId(11);
-    pub const HUD_FOOTPRINTS: a2engine::HookId = a2engine::HookId(12);
-    pub const HUD_FADE: a2engine::HookId = a2engine::HookId(13);
-    pub const HUD_VIDEO: a2engine::HookId = a2engine::HookId(14);
-    pub const HUD_FRAME_RATE: a2engine::HookId = a2engine::HookId(15);
+    pub const HUD_BAR_GRID: a2engine::HookId = a2engine::HookId(6);
+    pub const HUD_READS_OVERLAY: a2engine::HookId = a2engine::HookId(7);
+    pub const HUD_BUBBLES: a2engine::HookId = a2engine::HookId(8);
+    pub const HUD_READS_OVERLAY_TEXT: a2engine::HookId = a2engine::HookId(9);
+    pub const HUD_DRAG_BOX: a2engine::HookId = a2engine::HookId(10);
+    pub const HUD_HEIGHT_POSTS: a2engine::HookId = a2engine::HookId(11);
+    pub const HUD_ORDER_RING: a2engine::HookId = a2engine::HookId(12);
+    pub const HUD_FOOTPRINTS: a2engine::HookId = a2engine::HookId(13);
+    pub const HUD_FADE: a2engine::HookId = a2engine::HookId(14);
+    pub const HUD_VIDEO: a2engine::HookId = a2engine::HookId(15);
+    pub const HUD_FRAME_RATE: a2engine::HookId = a2engine::HookId(16);
 }
 
 pub mod field {
@@ -110,110 +112,110 @@ pub mod field {
     #[inline(always)] pub fn HUD_CURSOR_SPRITE() -> usize { super::TABLE.engine().field(a2engine::Sym(18)) }
     #[inline(always)] pub fn HUD_CURSOR_TIP() -> usize { super::TABLE.engine().field(a2engine::Sym(19)) }
     #[inline(always)] pub fn HUD_CURSOR_TIP_VERBOSE() -> usize { super::TABLE.engine().field(a2engine::Sym(20)) }
-    #[inline(always)] pub fn POPUPS_MSG_TITLE() -> usize { super::TABLE.engine().field(a2engine::Sym(35)) }
-    #[inline(always)] pub fn POPUPS_MSG_BODY() -> usize { super::TABLE.engine().field(a2engine::Sym(36)) }
-    #[inline(always)] pub fn POPUPS_MSG_OK() -> usize { super::TABLE.engine().field(a2engine::Sym(37)) }
-    #[inline(always)] pub fn POPUPS_OBJ_SUMMARY_HEADER() -> usize { super::TABLE.engine().field(a2engine::Sym(38)) }
-    #[inline(always)] pub fn POPUPS_OBJ_TITLE() -> usize { super::TABLE.engine().field(a2engine::Sym(39)) }
-    #[inline(always)] pub fn POPUPS_OBJ_BRIEFING() -> usize { super::TABLE.engine().field(a2engine::Sym(40)) }
-    #[inline(always)] pub fn POPUPS_OBJ_HEADER() -> usize { super::TABLE.engine().field(a2engine::Sym(41)) }
-    #[inline(always)] pub fn POPUPS_OBJ_LINES() -> usize { super::TABLE.engine().field(a2engine::Sym(42)) }
-    #[inline(always)] pub fn POPUPS_OBJ_DONE() -> usize { super::TABLE.engine().field(a2engine::Sym(43)) }
-    #[inline(always)] pub fn POPUPS_OBJ_OK() -> usize { super::TABLE.engine().field(a2engine::Sym(44)) }
-    #[inline(always)] pub fn POPUPS_VT_FOCUS_SIMULATE() -> usize { super::TABLE.engine().field(a2engine::Sym(45)) }
-    #[inline(always)] pub fn POPUPS_PAUSE_BUTTON() -> usize { super::TABLE.engine().field(a2engine::Sym(46)) }
-    #[inline(always)] pub fn POPUPS_REPLAY_BUTTONS() -> usize { super::TABLE.engine().field(a2engine::Sym(47)) }
-    #[inline(always)] pub fn PALETTE_SLOTS() -> usize { super::TABLE.engine().field(a2engine::Sym(54)) }
-    #[inline(always)] pub fn PALETTE_MODE() -> usize { super::TABLE.engine().field(a2engine::Sym(55)) }
-    #[inline(always)] pub fn PALETTE_MENU() -> usize { super::TABLE.engine().field(a2engine::Sym(56)) }
-    #[inline(always)] pub fn PALETTE_BTN_STATE() -> usize { super::TABLE.engine().field(a2engine::Sym(57)) }
-    #[inline(always)] pub fn PALETTE_BTN_SPRITE() -> usize { super::TABLE.engine().field(a2engine::Sym(58)) }
-    #[inline(always)] pub fn PALETTE_BTN_MODE() -> usize { super::TABLE.engine().field(a2engine::Sym(59)) }
-    #[inline(always)] pub fn PALETTE_BTN_COMMAND() -> usize { super::TABLE.engine().field(a2engine::Sym(60)) }
-    #[inline(always)] pub fn PALETTE_VT_TOOLTIP() -> usize { super::TABLE.engine().field(a2engine::Sym(61)) }
-    #[inline(always)] pub fn PALETTE_VT_VERBOSE() -> usize { super::TABLE.engine().field(a2engine::Sym(62)) }
-    #[inline(always)] pub fn PALETTE_VT_IS_VALID() -> usize { super::TABLE.engine().field(a2engine::Sym(63)) }
-    #[inline(always)] pub fn PALETTE_VT_PRESS() -> usize { super::TABLE.engine().field(a2engine::Sym(64)) }
-    #[inline(always)] pub fn PALETTE_CMD_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(65)) }
-    #[inline(always)] pub fn PALETTE_CMD_POS() -> usize { super::TABLE.engine().field(a2engine::Sym(66)) }
-    #[inline(always)] pub fn PALETTE_MODE_KIND() -> usize { super::TABLE.engine().field(a2engine::Sym(67)) }
-    #[inline(always)] pub fn PALETTE_MODE_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(68)) }
-    #[inline(always)] pub fn PALETTE_CLASS_ODF() -> usize { super::TABLE.engine().field(a2engine::Sym(69)) }
-    #[inline(always)] pub fn PALETTE_MODE_WEAPON() -> usize { super::TABLE.engine().field(a2engine::Sym(70)) }
-    #[inline(always)] pub fn PALETTE_WEAPON_PRJID() -> usize { super::TABLE.engine().field(a2engine::Sym(71)) }
-    #[inline(always)] pub fn PALETTE_MODE_INDEX() -> usize { super::TABLE.engine().field(a2engine::Sym(72)) }
-    #[inline(always)] pub fn OVERLAY_SD_POINTED() -> usize { super::TABLE.engine().field(a2engine::Sym(87)) }
-    #[inline(always)] pub fn OVERLAY_SD_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(88)) }
-    #[inline(always)] pub fn OVERLAY_SD_FADE() -> usize { super::TABLE.engine().field(a2engine::Sym(89)) }
-    #[inline(always)] pub fn OVERLAY_SD_REPAIR_ICONS() -> usize { super::TABLE.engine().field(a2engine::Sym(90)) }
-    #[inline(always)] pub fn OVERLAY_RI_SPRITE() -> usize { super::TABLE.engine().field(a2engine::Sym(91)) }
-    #[inline(always)] pub fn OVERLAY_RI_FLASH() -> usize { super::TABLE.engine().field(a2engine::Sym(92)) }
-    #[inline(always)] pub fn OVERLAY_OBJ_FLAGS() -> usize { super::TABLE.engine().field(a2engine::Sym(93)) }
-    #[inline(always)] pub fn OVERLAY_OBJ_DRAWN() -> usize { super::TABLE.engine().field(a2engine::Sym(94)) }
-    #[inline(always)] pub fn OVERLAY_OBJ_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(95)) }
-    #[inline(always)] pub fn OVERLAY_OBJ_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(96)) }
-    #[inline(always)] pub fn OVERLAY_OBJ_SELECTED() -> usize { super::TABLE.engine().field(a2engine::Sym(97)) }
-    #[inline(always)] pub fn OVERLAY_OBJ_REMOVED() -> usize { super::TABLE.engine().field(a2engine::Sym(98)) }
-    #[inline(always)] pub fn OVERLAY_OBJ_GROUP() -> usize { super::TABLE.engine().field(a2engine::Sym(99)) }
-    #[inline(always)] pub fn OVERLAY_OBJ_HULL() -> usize { super::TABLE.engine().field(a2engine::Sym(100)) }
-    #[inline(always)] pub fn OVERLAY_OBJ_HULL_MAX() -> usize { super::TABLE.engine().field(a2engine::Sym(101)) }
-    #[inline(always)] pub fn OVERLAY_OBJ_SPECIAL() -> usize { super::TABLE.engine().field(a2engine::Sym(102)) }
-    #[inline(always)] pub fn OVERLAY_OBJ_SPECIAL_MAX() -> usize { super::TABLE.engine().field(a2engine::Sym(103)) }
-    #[inline(always)] pub fn OVERLAY_CRAFT_SHIELD() -> usize { super::TABLE.engine().field(a2engine::Sym(104)) }
-    #[inline(always)] pub fn OVERLAY_CRAFT_SHIELD_MAX() -> usize { super::TABLE.engine().field(a2engine::Sym(105)) }
-    #[inline(always)] pub fn OVERLAY_CRAFT_SYSTEMS() -> usize { super::TABLE.engine().field(a2engine::Sym(106)) }
-    #[inline(always)] pub fn OVERLAY_CRAFT_SHOW_ALL() -> usize { super::TABLE.engine().field(a2engine::Sym(107)) }
-    #[inline(always)] pub fn OVERLAY_SYSTEM_HIDDEN() -> usize { super::TABLE.engine().field(a2engine::Sym(108)) }
-    #[inline(always)] pub fn OVERLAY_SYSTEM_SIZE() -> usize { super::TABLE.engine().field(a2engine::Sym(109)) }
-    #[inline(always)] pub fn OVERLAY_SYSTEM_NOW() -> usize { super::TABLE.engine().field(a2engine::Sym(110)) }
-    #[inline(always)] pub fn OVERLAY_VT_CAN_USER_SEE() -> usize { super::TABLE.engine().field(a2engine::Sym(111)) }
-    #[inline(always)] pub fn OVERLAY_VT_CLASS_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(112)) }
-    #[inline(always)] pub fn OVERLAY_CLS_STATION() -> usize { super::TABLE.engine().field(a2engine::Sym(113)) }
-    #[inline(always)] pub fn OVERLAY_S3D_CAMERA() -> usize { super::TABLE.engine().field(a2engine::Sym(114)) }
-    #[inline(always)] pub fn OTEXT_MAP_HEAD() -> usize { super::TABLE.engine().field(a2engine::Sym(121)) }
-    #[inline(always)] pub fn OTEXT_NODE_KEY() -> usize { super::TABLE.engine().field(a2engine::Sym(122)) }
-    #[inline(always)] pub fn OTEXT_NODE_VALUE() -> usize { super::TABLE.engine().field(a2engine::Sym(123)) }
-    #[inline(always)] pub fn OTEXT_POINT() -> usize { super::TABLE.engine().field(a2engine::Sym(124)) }
-    #[inline(always)] pub fn OTEXT_JUSTIFY() -> usize { super::TABLE.engine().field(a2engine::Sym(125)) }
-    #[inline(always)] pub fn OTEXT_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(126)) }
-    #[inline(always)] pub fn OTEXT_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(127)) }
-    #[inline(always)] pub fn OTEXT_FADE() -> usize { super::TABLE.engine().field(a2engine::Sym(128)) }
-    #[inline(always)] pub fn LO_SPRITE_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(161)) }
-    #[inline(always)] pub fn LO_FADE_ALPHA() -> usize { super::TABLE.engine().field(a2engine::Sym(162)) }
-    #[inline(always)] pub fn LO_CAM_PROJECTION() -> usize { super::TABLE.engine().field(a2engine::Sym(163)) }
-    #[inline(always)] pub fn LO_CAM_VIEWPORT() -> usize { super::TABLE.engine().field(a2engine::Sym(164)) }
-    #[inline(always)] pub fn LO_S3D_CAMERA() -> usize { super::TABLE.engine().field(a2engine::Sym(165)) }
-    #[inline(always)] pub fn LO_S3D_DEVICE() -> usize { super::TABLE.engine().field(a2engine::Sym(166)) }
-    #[inline(always)] pub fn LO_S3D_FPS() -> usize { super::TABLE.engine().field(a2engine::Sym(167)) }
-    #[inline(always)] pub fn LO_S3D_TOTAL_FPS() -> usize { super::TABLE.engine().field(a2engine::Sym(168)) }
-    #[inline(always)] pub fn OTEXT_TREE_LEFT() -> usize { super::TABLE.engine().field(a2engine::Sym(169)) }
-    #[inline(always)] pub fn OTEXT_TREE_PARENT() -> usize { super::TABLE.engine().field(a2engine::Sym(170)) }
-    #[inline(always)] pub fn OTEXT_TREE_RIGHT() -> usize { super::TABLE.engine().field(a2engine::Sym(171)) }
-    #[inline(always)] pub fn PALETTE_HIDDEN() -> usize { super::TABLE.engine().field(a2engine::Sym(172)) }
-    #[inline(always)] pub fn PALETTE_FLOAT_COLS() -> usize { super::TABLE.engine().field(a2engine::Sym(173)) }
-    #[inline(always)] pub fn PALETTE_FLOAT_ROWS() -> usize { super::TABLE.engine().field(a2engine::Sym(174)) }
-    #[inline(always)] pub fn PALETTE_STATIC_A_COLS() -> usize { super::TABLE.engine().field(a2engine::Sym(175)) }
-    #[inline(always)] pub fn PALETTE_STATIC_A_ROWS() -> usize { super::TABLE.engine().field(a2engine::Sym(176)) }
-    #[inline(always)] pub fn PALETTE_STATIC_B_COLS() -> usize { super::TABLE.engine().field(a2engine::Sym(177)) }
-    #[inline(always)] pub fn PALETTE_STATIC_B_ROWS() -> usize { super::TABLE.engine().field(a2engine::Sym(178)) }
-    #[inline(always)] pub fn PALETTE_USE_COLS() -> usize { super::TABLE.engine().field(a2engine::Sym(179)) }
-    #[inline(always)] pub fn PALETTE_USE_ROWS() -> usize { super::TABLE.engine().field(a2engine::Sym(180)) }
-    #[inline(always)] pub fn PALETTE_BTN_OWNER() -> usize { super::TABLE.engine().field(a2engine::Sym(181)) }
-    #[inline(always)] pub fn PALETTE_BTN_RECT() -> usize { super::TABLE.engine().field(a2engine::Sym(182)) }
-    #[inline(always)] pub fn PALETTE_BTN_PRESSED() -> usize { super::TABLE.engine().field(a2engine::Sym(183)) }
-    #[inline(always)] pub fn PALETTE_BTN_HOVER() -> usize { super::TABLE.engine().field(a2engine::Sym(184)) }
+    #[inline(always)] pub fn POPUPS_MSG_TITLE() -> usize { super::TABLE.engine().field(a2engine::Sym(36)) }
+    #[inline(always)] pub fn POPUPS_MSG_BODY() -> usize { super::TABLE.engine().field(a2engine::Sym(37)) }
+    #[inline(always)] pub fn POPUPS_MSG_OK() -> usize { super::TABLE.engine().field(a2engine::Sym(38)) }
+    #[inline(always)] pub fn POPUPS_OBJ_SUMMARY_HEADER() -> usize { super::TABLE.engine().field(a2engine::Sym(39)) }
+    #[inline(always)] pub fn POPUPS_OBJ_TITLE() -> usize { super::TABLE.engine().field(a2engine::Sym(40)) }
+    #[inline(always)] pub fn POPUPS_OBJ_BRIEFING() -> usize { super::TABLE.engine().field(a2engine::Sym(41)) }
+    #[inline(always)] pub fn POPUPS_OBJ_HEADER() -> usize { super::TABLE.engine().field(a2engine::Sym(42)) }
+    #[inline(always)] pub fn POPUPS_OBJ_LINES() -> usize { super::TABLE.engine().field(a2engine::Sym(43)) }
+    #[inline(always)] pub fn POPUPS_OBJ_DONE() -> usize { super::TABLE.engine().field(a2engine::Sym(44)) }
+    #[inline(always)] pub fn POPUPS_OBJ_OK() -> usize { super::TABLE.engine().field(a2engine::Sym(45)) }
+    #[inline(always)] pub fn POPUPS_VT_FOCUS_SIMULATE() -> usize { super::TABLE.engine().field(a2engine::Sym(46)) }
+    #[inline(always)] pub fn POPUPS_PAUSE_BUTTON() -> usize { super::TABLE.engine().field(a2engine::Sym(47)) }
+    #[inline(always)] pub fn POPUPS_REPLAY_BUTTONS() -> usize { super::TABLE.engine().field(a2engine::Sym(48)) }
+    #[inline(always)] pub fn PALETTE_SLOTS() -> usize { super::TABLE.engine().field(a2engine::Sym(55)) }
+    #[inline(always)] pub fn PALETTE_MODE() -> usize { super::TABLE.engine().field(a2engine::Sym(56)) }
+    #[inline(always)] pub fn PALETTE_MENU() -> usize { super::TABLE.engine().field(a2engine::Sym(57)) }
+    #[inline(always)] pub fn PALETTE_BTN_STATE() -> usize { super::TABLE.engine().field(a2engine::Sym(58)) }
+    #[inline(always)] pub fn PALETTE_BTN_SPRITE() -> usize { super::TABLE.engine().field(a2engine::Sym(59)) }
+    #[inline(always)] pub fn PALETTE_BTN_MODE() -> usize { super::TABLE.engine().field(a2engine::Sym(60)) }
+    #[inline(always)] pub fn PALETTE_BTN_COMMAND() -> usize { super::TABLE.engine().field(a2engine::Sym(61)) }
+    #[inline(always)] pub fn PALETTE_VT_TOOLTIP() -> usize { super::TABLE.engine().field(a2engine::Sym(62)) }
+    #[inline(always)] pub fn PALETTE_VT_VERBOSE() -> usize { super::TABLE.engine().field(a2engine::Sym(63)) }
+    #[inline(always)] pub fn PALETTE_VT_IS_VALID() -> usize { super::TABLE.engine().field(a2engine::Sym(64)) }
+    #[inline(always)] pub fn PALETTE_VT_PRESS() -> usize { super::TABLE.engine().field(a2engine::Sym(65)) }
+    #[inline(always)] pub fn PALETTE_CMD_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(66)) }
+    #[inline(always)] pub fn PALETTE_CMD_POS() -> usize { super::TABLE.engine().field(a2engine::Sym(67)) }
+    #[inline(always)] pub fn PALETTE_MODE_KIND() -> usize { super::TABLE.engine().field(a2engine::Sym(68)) }
+    #[inline(always)] pub fn PALETTE_MODE_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(69)) }
+    #[inline(always)] pub fn PALETTE_CLASS_ODF() -> usize { super::TABLE.engine().field(a2engine::Sym(70)) }
+    #[inline(always)] pub fn PALETTE_MODE_WEAPON() -> usize { super::TABLE.engine().field(a2engine::Sym(71)) }
+    #[inline(always)] pub fn PALETTE_WEAPON_PRJID() -> usize { super::TABLE.engine().field(a2engine::Sym(72)) }
+    #[inline(always)] pub fn PALETTE_MODE_INDEX() -> usize { super::TABLE.engine().field(a2engine::Sym(73)) }
+    #[inline(always)] pub fn OVERLAY_SD_POINTED() -> usize { super::TABLE.engine().field(a2engine::Sym(88)) }
+    #[inline(always)] pub fn OVERLAY_SD_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(89)) }
+    #[inline(always)] pub fn OVERLAY_SD_FADE() -> usize { super::TABLE.engine().field(a2engine::Sym(90)) }
+    #[inline(always)] pub fn OVERLAY_SD_REPAIR_ICONS() -> usize { super::TABLE.engine().field(a2engine::Sym(91)) }
+    #[inline(always)] pub fn OVERLAY_RI_SPRITE() -> usize { super::TABLE.engine().field(a2engine::Sym(92)) }
+    #[inline(always)] pub fn OVERLAY_RI_FLASH() -> usize { super::TABLE.engine().field(a2engine::Sym(93)) }
+    #[inline(always)] pub fn OVERLAY_OBJ_FLAGS() -> usize { super::TABLE.engine().field(a2engine::Sym(94)) }
+    #[inline(always)] pub fn OVERLAY_OBJ_DRAWN() -> usize { super::TABLE.engine().field(a2engine::Sym(95)) }
+    #[inline(always)] pub fn OVERLAY_OBJ_CLASS() -> usize { super::TABLE.engine().field(a2engine::Sym(96)) }
+    #[inline(always)] pub fn OVERLAY_OBJ_TEAM() -> usize { super::TABLE.engine().field(a2engine::Sym(97)) }
+    #[inline(always)] pub fn OVERLAY_OBJ_SELECTED() -> usize { super::TABLE.engine().field(a2engine::Sym(98)) }
+    #[inline(always)] pub fn OVERLAY_OBJ_REMOVED() -> usize { super::TABLE.engine().field(a2engine::Sym(99)) }
+    #[inline(always)] pub fn OVERLAY_OBJ_GROUP() -> usize { super::TABLE.engine().field(a2engine::Sym(100)) }
+    #[inline(always)] pub fn OVERLAY_OBJ_HULL() -> usize { super::TABLE.engine().field(a2engine::Sym(101)) }
+    #[inline(always)] pub fn OVERLAY_OBJ_HULL_MAX() -> usize { super::TABLE.engine().field(a2engine::Sym(102)) }
+    #[inline(always)] pub fn OVERLAY_OBJ_SPECIAL() -> usize { super::TABLE.engine().field(a2engine::Sym(103)) }
+    #[inline(always)] pub fn OVERLAY_OBJ_SPECIAL_MAX() -> usize { super::TABLE.engine().field(a2engine::Sym(104)) }
+    #[inline(always)] pub fn OVERLAY_CRAFT_SHIELD() -> usize { super::TABLE.engine().field(a2engine::Sym(105)) }
+    #[inline(always)] pub fn OVERLAY_CRAFT_SHIELD_MAX() -> usize { super::TABLE.engine().field(a2engine::Sym(106)) }
+    #[inline(always)] pub fn OVERLAY_CRAFT_SYSTEMS() -> usize { super::TABLE.engine().field(a2engine::Sym(107)) }
+    #[inline(always)] pub fn OVERLAY_CRAFT_SHOW_ALL() -> usize { super::TABLE.engine().field(a2engine::Sym(108)) }
+    #[inline(always)] pub fn OVERLAY_SYSTEM_HIDDEN() -> usize { super::TABLE.engine().field(a2engine::Sym(109)) }
+    #[inline(always)] pub fn OVERLAY_SYSTEM_SIZE() -> usize { super::TABLE.engine().field(a2engine::Sym(110)) }
+    #[inline(always)] pub fn OVERLAY_SYSTEM_NOW() -> usize { super::TABLE.engine().field(a2engine::Sym(111)) }
+    #[inline(always)] pub fn OVERLAY_VT_CAN_USER_SEE() -> usize { super::TABLE.engine().field(a2engine::Sym(112)) }
+    #[inline(always)] pub fn OVERLAY_VT_CLASS_NAME() -> usize { super::TABLE.engine().field(a2engine::Sym(113)) }
+    #[inline(always)] pub fn OVERLAY_CLS_STATION() -> usize { super::TABLE.engine().field(a2engine::Sym(114)) }
+    #[inline(always)] pub fn OVERLAY_S3D_CAMERA() -> usize { super::TABLE.engine().field(a2engine::Sym(115)) }
+    #[inline(always)] pub fn OTEXT_MAP_HEAD() -> usize { super::TABLE.engine().field(a2engine::Sym(122)) }
+    #[inline(always)] pub fn OTEXT_NODE_KEY() -> usize { super::TABLE.engine().field(a2engine::Sym(123)) }
+    #[inline(always)] pub fn OTEXT_NODE_VALUE() -> usize { super::TABLE.engine().field(a2engine::Sym(124)) }
+    #[inline(always)] pub fn OTEXT_POINT() -> usize { super::TABLE.engine().field(a2engine::Sym(125)) }
+    #[inline(always)] pub fn OTEXT_JUSTIFY() -> usize { super::TABLE.engine().field(a2engine::Sym(126)) }
+    #[inline(always)] pub fn OTEXT_TEXT() -> usize { super::TABLE.engine().field(a2engine::Sym(127)) }
+    #[inline(always)] pub fn OTEXT_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(128)) }
+    #[inline(always)] pub fn OTEXT_FADE() -> usize { super::TABLE.engine().field(a2engine::Sym(129)) }
+    #[inline(always)] pub fn LO_SPRITE_COLOUR() -> usize { super::TABLE.engine().field(a2engine::Sym(162)) }
+    #[inline(always)] pub fn LO_FADE_ALPHA() -> usize { super::TABLE.engine().field(a2engine::Sym(163)) }
+    #[inline(always)] pub fn LO_CAM_PROJECTION() -> usize { super::TABLE.engine().field(a2engine::Sym(164)) }
+    #[inline(always)] pub fn LO_CAM_VIEWPORT() -> usize { super::TABLE.engine().field(a2engine::Sym(165)) }
+    #[inline(always)] pub fn LO_S3D_CAMERA() -> usize { super::TABLE.engine().field(a2engine::Sym(166)) }
+    #[inline(always)] pub fn LO_S3D_DEVICE() -> usize { super::TABLE.engine().field(a2engine::Sym(167)) }
+    #[inline(always)] pub fn LO_S3D_FPS() -> usize { super::TABLE.engine().field(a2engine::Sym(168)) }
+    #[inline(always)] pub fn LO_S3D_TOTAL_FPS() -> usize { super::TABLE.engine().field(a2engine::Sym(169)) }
+    #[inline(always)] pub fn OTEXT_TREE_LEFT() -> usize { super::TABLE.engine().field(a2engine::Sym(170)) }
+    #[inline(always)] pub fn OTEXT_TREE_PARENT() -> usize { super::TABLE.engine().field(a2engine::Sym(171)) }
+    #[inline(always)] pub fn OTEXT_TREE_RIGHT() -> usize { super::TABLE.engine().field(a2engine::Sym(172)) }
+    #[inline(always)] pub fn PALETTE_HIDDEN() -> usize { super::TABLE.engine().field(a2engine::Sym(173)) }
+    #[inline(always)] pub fn PALETTE_FLOAT_COLS() -> usize { super::TABLE.engine().field(a2engine::Sym(174)) }
+    #[inline(always)] pub fn PALETTE_FLOAT_ROWS() -> usize { super::TABLE.engine().field(a2engine::Sym(175)) }
+    #[inline(always)] pub fn PALETTE_STATIC_A_COLS() -> usize { super::TABLE.engine().field(a2engine::Sym(176)) }
+    #[inline(always)] pub fn PALETTE_STATIC_A_ROWS() -> usize { super::TABLE.engine().field(a2engine::Sym(177)) }
+    #[inline(always)] pub fn PALETTE_STATIC_B_COLS() -> usize { super::TABLE.engine().field(a2engine::Sym(178)) }
+    #[inline(always)] pub fn PALETTE_STATIC_B_ROWS() -> usize { super::TABLE.engine().field(a2engine::Sym(179)) }
+    #[inline(always)] pub fn PALETTE_USE_COLS() -> usize { super::TABLE.engine().field(a2engine::Sym(180)) }
+    #[inline(always)] pub fn PALETTE_USE_ROWS() -> usize { super::TABLE.engine().field(a2engine::Sym(181)) }
+    #[inline(always)] pub fn PALETTE_BTN_OWNER() -> usize { super::TABLE.engine().field(a2engine::Sym(182)) }
+    #[inline(always)] pub fn PALETTE_BTN_RECT() -> usize { super::TABLE.engine().field(a2engine::Sym(183)) }
+    #[inline(always)] pub fn PALETTE_BTN_PRESSED() -> usize { super::TABLE.engine().field(a2engine::Sym(184)) }
+    #[inline(always)] pub fn PALETTE_BTN_HOVER() -> usize { super::TABLE.engine().field(a2engine::Sym(185)) }
 }
 
 pub mod value {
     #![allow(non_snake_case)]
-    #[inline(always)] pub fn PALETTE_N_SLOTS() -> i32 { super::TABLE.engine().value(a2engine::Sym(73)) }
-    #[inline(always)] pub fn PALETTE_SLOTS_INDIRECT() -> i32 { super::TABLE.engine().value(a2engine::Sym(74)) }
-    #[inline(always)] pub fn PALETTE_NAMES_STRIDE() -> i32 { super::TABLE.engine().value(a2engine::Sym(75)) }
-    #[inline(always)] pub fn PALETTE_NAMES_COUNT() -> i32 { super::TABLE.engine().value(a2engine::Sym(76)) }
-    #[inline(always)] pub fn OVERLAY_FLAG_CRAFT() -> i32 { super::TABLE.engine().value(a2engine::Sym(115)) }
-    #[inline(always)] pub fn OVERLAY_SYSTEM_STRIDE() -> i32 { super::TABLE.engine().value(a2engine::Sym(116)) }
-    #[inline(always)] pub fn OVERLAY_SYSTEM_COUNT() -> i32 { super::TABLE.engine().value(a2engine::Sym(117)) }
-    #[inline(always)] pub fn OVERLAY_GROUP_COUNT() -> i32 { super::TABLE.engine().value(a2engine::Sym(118)) }
+    #[inline(always)] pub fn PALETTE_N_SLOTS() -> i32 { super::TABLE.engine().value(a2engine::Sym(74)) }
+    #[inline(always)] pub fn PALETTE_SLOTS_INDIRECT() -> i32 { super::TABLE.engine().value(a2engine::Sym(75)) }
+    #[inline(always)] pub fn PALETTE_NAMES_STRIDE() -> i32 { super::TABLE.engine().value(a2engine::Sym(76)) }
+    #[inline(always)] pub fn PALETTE_NAMES_COUNT() -> i32 { super::TABLE.engine().value(a2engine::Sym(77)) }
+    #[inline(always)] pub fn OVERLAY_FLAG_CRAFT() -> i32 { super::TABLE.engine().value(a2engine::Sym(116)) }
+    #[inline(always)] pub fn OVERLAY_SYSTEM_STRIDE() -> i32 { super::TABLE.engine().value(a2engine::Sym(117)) }
+    #[inline(always)] pub fn OVERLAY_SYSTEM_COUNT() -> i32 { super::TABLE.engine().value(a2engine::Sym(118)) }
+    #[inline(always)] pub fn OVERLAY_GROUP_COUNT() -> i32 { super::TABLE.engine().value(a2engine::Sym(119)) }
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
@@ -251,6 +253,7 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "popups_replay_press_3", symbol: "ReplayPanel::NormalPlayback", kind: a2engine::Kind::Fn },
     a2engine::SymDef { id: "popups_replay_press_4", symbol: "ReplayPanel::FastPlayback", kind: a2engine::Kind::Fn },
     a2engine::SymDef { id: "popups_is_game_paused", symbol: "IsGamePausedAtAll", kind: a2engine::Kind::Fn },
+    a2engine::SymDef { id: "palette_update_paused_call", symbol: "PopupPaletteImp::Update", kind: a2engine::Kind::Call },
     a2engine::SymDef { id: "popups_obj_focus_simulate", symbol: "ObjectivesDisplay::FocusSimulate", kind: a2engine::Kind::Fn },
     a2engine::SymDef { id: "popups_msg_title", symbol: "MessageDisplay", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "popups_msg_body", symbol: "MessageDisplay", kind: a2engine::Kind::Field },
@@ -405,22 +408,23 @@ pub const SYMS: &[a2engine::SymDef] = &[
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
-    a2engine::HookDef { id: "ui.hud.panels", run_unknown: false, rows: &["HUD.Minimap", "HUD.Info", "HUD.Bar", "HUD.UnitView"], syms: &[0, 2, 6, 7, 8, 12, 13, 15, 16, 17, 18, 21, 22, 77, 119] },
+    a2engine::HookDef { id: "ui.hud.panels", run_unknown: false, rows: &["HUD.Minimap", "HUD.Info", "HUD.Bar", "HUD.UnitView"], syms: &[0, 2, 6, 7, 8, 12, 13, 15, 16, 17, 18, 21, 22, 78, 120] },
     a2engine::HookDef { id: "ui.hud.tooltips", run_unknown: false, rows: &["HUD.Tooltips"], syms: &[2, 5, 15, 19, 20] },
     a2engine::HookDef { id: "ui.hud.reads_components", run_unknown: false, rows: &[], syms: &[0, 1, 3, 4, 11, 12, 14] },
     a2engine::HookDef { id: "ui.hud.reads_calls", run_unknown: false, rows: &[], syms: &[6, 9, 10] },
-    a2engine::HookDef { id: "ui.hud.reads_popups", run_unknown: false, rows: &[], syms: &[21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47] },
-    a2engine::HookDef { id: "ui.hud.reads_bar", run_unknown: false, rows: &["HUD.Bar", "HUD.BarLabels", "HUD.Icons"], syms: &[48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184] },
-    a2engine::HookDef { id: "ui.hud.reads_overlay", run_unknown: false, rows: &["HUD.Selection", "HUD.SelectionGauges"], syms: &[6, 77, 78, 79, 80, 81, 82, 83, 84, 85, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118] },
-    a2engine::HookDef { id: "ui.hud.bubbles", run_unknown: false, rows: &[], syms: &[86] },
-    a2engine::HookDef { id: "ui.hud.reads_overlay_text", run_unknown: false, rows: &[], syms: &[119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 169, 170, 171] },
-    a2engine::HookDef { id: "ui.hud.drag_box", run_unknown: false, rows: &[], syms: &[129, 130, 164, 165] },
-    a2engine::HookDef { id: "ui.hud.height_posts", run_unknown: false, rows: &[], syms: &[131, 132, 163, 164] },
-    a2engine::HookDef { id: "ui.hud.order_ring", run_unknown: false, rows: &[], syms: &[133, 134, 135, 136, 137, 161, 163, 164, 166] },
-    a2engine::HookDef { id: "ui.hud.footprints", run_unknown: false, rows: &[], syms: &[133, 134, 135, 138, 139, 140, 161, 163, 164, 166] },
-    a2engine::HookDef { id: "ui.hud.fade", run_unknown: false, rows: &[], syms: &[141, 142, 162] },
-    a2engine::HookDef { id: "ui.hud.video", run_unknown: false, rows: &[], syms: &[135, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152] },
-    a2engine::HookDef { id: "ui.hud.frame_rate", run_unknown: false, rows: &[], syms: &[153, 154, 155, 156, 157, 158, 159, 160, 167, 168] },
+    a2engine::HookDef { id: "ui.hud.reads_popups", run_unknown: false, rows: &[], syms: &[21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48] },
+    a2engine::HookDef { id: "ui.hud.reads_bar", run_unknown: false, rows: &["HUD.Bar", "HUD.BarLabels", "HUD.Icons"], syms: &[49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185] },
+    a2engine::HookDef { id: "ui.hud.bar_grid", run_unknown: false, rows: &["HUD.Bar"], syms: &[33, 34, 183] },
+    a2engine::HookDef { id: "ui.hud.reads_overlay", run_unknown: false, rows: &["HUD.Selection", "HUD.SelectionGauges"], syms: &[6, 78, 79, 80, 81, 82, 83, 84, 85, 86, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119] },
+    a2engine::HookDef { id: "ui.hud.bubbles", run_unknown: false, rows: &[], syms: &[87] },
+    a2engine::HookDef { id: "ui.hud.reads_overlay_text", run_unknown: false, rows: &[], syms: &[120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 170, 171, 172] },
+    a2engine::HookDef { id: "ui.hud.drag_box", run_unknown: false, rows: &[], syms: &[130, 131, 165, 166] },
+    a2engine::HookDef { id: "ui.hud.height_posts", run_unknown: false, rows: &[], syms: &[132, 133, 164, 165] },
+    a2engine::HookDef { id: "ui.hud.order_ring", run_unknown: false, rows: &[], syms: &[134, 135, 136, 137, 138, 162, 164, 165, 167] },
+    a2engine::HookDef { id: "ui.hud.footprints", run_unknown: false, rows: &[], syms: &[134, 135, 136, 139, 140, 141, 162, 164, 165, 167] },
+    a2engine::HookDef { id: "ui.hud.fade", run_unknown: false, rows: &[], syms: &[142, 143, 163] },
+    a2engine::HookDef { id: "ui.hud.video", run_unknown: false, rows: &[], syms: &[136, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153] },
+    a2engine::HookDef { id: "ui.hud.frame_rate", run_unknown: false, rows: &[], syms: &[154, 155, 156, 157, 158, 159, 160, 161, 168, 169] },
 ];
 
 pub const BUILDS: &[a2engine::Build] = &[
@@ -432,7 +436,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 185,
+        n_resolved: 186,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x763c00, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_palette_ptr
@@ -469,6 +473,7 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x500340, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // popups_replay_press_3
             a2engine::Entry { present: true, addr: 0x500370, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // popups_replay_press_4
             a2engine::Entry { present: true, addr: 0x489bf0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xa0, 0xd9, 0x7b, 0x73, 0x00], mask: &[], section: "", count: 0, value: 0 }, // popups_is_game_paused
+            a2engine::Entry { present: true, addr: 0x4fb422, end: 0x0, target: 0x21, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // palette_update_paused_call
             a2engine::Entry { present: true, addr: 0x50d280, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x56, 0x8b, 0xf1, 0xb9], mask: &[], section: "", count: 0, value: 0 }, // popups_obj_focus_simulate
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // popups_msg_title
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 44 }, // popups_msg_body
@@ -565,33 +570,33 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 148 }, // otext_colour
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 160 }, // otext_fade
             a2engine::Entry { present: true, addr: 0x6212b0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_wireframe_rect
-            a2engine::Entry { present: true, addr: 0x52220a, end: 0x0, target: 0x81, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_drag_box_call
+            a2engine::Entry { present: true, addr: 0x52220a, end: 0x0, target: 0x82, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_drag_box_call
             a2engine::Entry { present: true, addr: 0x618590, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_clip_and_render_line
-            a2engine::Entry { present: true, addr: 0x5938a0, end: 0x0, target: 0x83, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_height_post_call
+            a2engine::Entry { present: true, addr: 0x5938a0, end: 0x0, target: 0x84, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_height_post_call
             a2engine::Entry { present: true, addr: 0x63a7c0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_sprite_draw_quad
             a2engine::Entry { present: true, addr: 0x642610, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68], mask: &[], section: "", count: 0, value: 0 }, // lo_demand_load
             a2engine::Entry { present: true, addr: 0x63b150, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x58, 0xc3], mask: &[], section: "", count: 0, value: 0 }, // lo_sprite_texture
-            a2engine::Entry { present: true, addr: 0x522537, end: 0x0, target: 0x85, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_grid_fx_call
-            a2engine::Entry { present: true, addr: 0x5222f0, end: 0x0, target: 0x85, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_where_call
-            a2engine::Entry { present: true, addr: 0x473a05, end: 0x0, target: 0x85, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_footprint_cell_call
-            a2engine::Entry { present: true, addr: 0x473a77, end: 0x0, target: 0x85, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_footprint_clear_call
-            a2engine::Entry { present: true, addr: 0x473a8e, end: 0x0, target: 0x85, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_footprint_blocked_call
+            a2engine::Entry { present: true, addr: 0x522537, end: 0x0, target: 0x86, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_grid_fx_call
+            a2engine::Entry { present: true, addr: 0x5222f0, end: 0x0, target: 0x86, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_where_call
+            a2engine::Entry { present: true, addr: 0x473a05, end: 0x0, target: 0x86, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_footprint_cell_call
+            a2engine::Entry { present: true, addr: 0x473a77, end: 0x0, target: 0x86, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_footprint_clear_call
+            a2engine::Entry { present: true, addr: 0x473a8e, end: 0x0, target: 0x86, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_footprint_blocked_call
             a2engine::Entry { present: true, addr: 0x5076cc, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0xcf, 0xff, 0x52, 0x1c], mask: &[], section: "", count: 0, value: 0 }, // lo_fade_white
             a2engine::Entry { present: true, addr: 0x507704, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8d, 0x45, 0xec, 0x50, 0xff, 0x52, 0x1c], mask: &[], section: "", count: 0, value: 0 }, // lo_fade_black
             a2engine::Entry { present: true, addr: 0x464350, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_blit
-            a2engine::Entry { present: true, addr: 0x4e5da5, end: 0x0, target: 0x8f, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_blit_render_call
-            a2engine::Entry { present: true, addr: 0x4e6153, end: 0x0, target: 0x8f, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_blit_update_call
+            a2engine::Entry { present: true, addr: 0x4e5da5, end: 0x0, target: 0x90, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_blit_render_call
+            a2engine::Entry { present: true, addr: 0x4e6153, end: 0x0, target: 0x90, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_blit_update_call
             a2engine::Entry { present: true, addr: 0x621200, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_draw_rectangle
-            a2engine::Entry { present: true, addr: 0x46457c, end: 0x0, target: 0x92, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_video_bar_call_a
-            a2engine::Entry { present: true, addr: 0x4645cd, end: 0x0, target: 0x92, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_video_bar_call_b
+            a2engine::Entry { present: true, addr: 0x46457c, end: 0x0, target: 0x93, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_video_bar_call_a
+            a2engine::Entry { present: true, addr: 0x4645cd, end: 0x0, target: 0x93, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_video_bar_call_b
             a2engine::Entry { present: true, addr: 0x63ada0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_draw_scaled_2d
-            a2engine::Entry { present: true, addr: 0x464656, end: 0x0, target: 0x95, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_video_sprite_call
+            a2engine::Entry { present: true, addr: 0x464656, end: 0x0, target: 0x96, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_video_sprite_call
             a2engine::Entry { present: true, addr: 0x736770, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_bink_width
             a2engine::Entry { present: true, addr: 0x736774, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_bink_height
             a2engine::Entry { present: true, addr: 0x628890, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_print_string
             a2engine::Entry { present: true, addr: 0x599300, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_display_frame_rate
-            a2engine::Entry { present: true, addr: 0x5989a6, end: 0x0, target: 0x99, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_fps_tri_call
-            a2engine::Entry { present: true, addr: 0x5989b0, end: 0x0, target: 0x9a, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_fps_call
+            a2engine::Entry { present: true, addr: 0x5989a6, end: 0x0, target: 0x9a, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_fps_tri_call
+            a2engine::Entry { present: true, addr: 0x5989b0, end: 0x0, target: 0x9b, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_fps_call
             a2engine::Entry { present: true, addr: 0x6fc8a8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_framerate_display
             a2engine::Entry { present: true, addr: 0x653950, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x8b, 0x0d, 0x30, 0xec, 0x7a, 0x00], mask: &[], section: "", count: 0, value: 0 }, // lo_slot_name
             a2engine::Entry { present: true, addr: 0x653990, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0xdd, 0x05], mask: &[], section: "", count: 0, value: 0 }, // lo_time_avg
@@ -627,7 +632,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         modules: &[],
         blocked_mod: &[
         ],
-        n_resolved_mod: 185,
+        n_resolved_mod: 186,
     },
     a2engine::Build {
         name: "fo-roots-5.0Z11",
@@ -637,7 +642,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 172,
+        n_resolved: 173,
         content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x763c00, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // hud_palette_ptr
@@ -674,6 +679,7 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x500340, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // popups_replay_press_3
             a2engine::Entry { present: true, addr: 0x500370, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // popups_replay_press_4
             a2engine::Entry { present: true, addr: 0x489bf0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0xa0, 0xd9, 0x7b, 0x73, 0x00], mask: &[], section: "", count: 0, value: 0 }, // popups_is_game_paused
+            a2engine::Entry { present: true, addr: 0x4fb422, end: 0x0, target: 0x21, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // palette_update_paused_call
             a2engine::Entry { present: true, addr: 0x50d280, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x56, 0x8b, 0xf1, 0xb9], mask: &[], section: "", count: 0, value: 0 }, // popups_obj_focus_simulate
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 40 }, // popups_msg_title
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 44 }, // popups_msg_body
@@ -770,33 +776,33 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 148 }, // otext_colour
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 160 }, // otext_fade
             a2engine::Entry { present: true, addr: 0x6212b0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_wireframe_rect
-            a2engine::Entry { present: true, addr: 0x52220a, end: 0x0, target: 0x81, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_drag_box_call
+            a2engine::Entry { present: true, addr: 0x52220a, end: 0x0, target: 0x82, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_drag_box_call
             a2engine::Entry { present: true, addr: 0x618590, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_clip_and_render_line
-            a2engine::Entry { present: true, addr: 0x5938a0, end: 0x0, target: 0x83, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_height_post_call
+            a2engine::Entry { present: true, addr: 0x5938a0, end: 0x0, target: 0x84, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_height_post_call
             a2engine::Entry { present: true, addr: 0x63a7c0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_sprite_draw_quad
             a2engine::Entry { present: true, addr: 0x642610, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_demand_load
             a2engine::Entry { present: true, addr: 0x63b150, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0x41, 0x58, 0xc3], mask: &[], section: "", count: 0, value: 0 }, // lo_sprite_texture
-            a2engine::Entry { present: true, addr: 0x522537, end: 0x0, target: 0x85, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_grid_fx_call
-            a2engine::Entry { present: true, addr: 0x5222f0, end: 0x0, target: 0x85, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_where_call
-            a2engine::Entry { present: true, addr: 0x473a05, end: 0x0, target: 0x85, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_footprint_cell_call
-            a2engine::Entry { present: true, addr: 0x473a77, end: 0x0, target: 0x85, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_footprint_clear_call
-            a2engine::Entry { present: true, addr: 0x473a8e, end: 0x0, target: 0x85, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_footprint_blocked_call
+            a2engine::Entry { present: true, addr: 0x522537, end: 0x0, target: 0x86, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_grid_fx_call
+            a2engine::Entry { present: true, addr: 0x5222f0, end: 0x0, target: 0x86, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_where_call
+            a2engine::Entry { present: true, addr: 0x473a05, end: 0x0, target: 0x86, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_footprint_cell_call
+            a2engine::Entry { present: true, addr: 0x473a77, end: 0x0, target: 0x86, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_footprint_clear_call
+            a2engine::Entry { present: true, addr: 0x473a8e, end: 0x0, target: 0x86, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_footprint_blocked_call
             a2engine::Entry { present: true, addr: 0x5076cc, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8b, 0xcf, 0xff, 0x52, 0x1c], mask: &[], section: "", count: 0, value: 0 }, // lo_fade_white
             a2engine::Entry { present: true, addr: 0x507704, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x8d, 0x45, 0xec, 0x50, 0xff, 0x52, 0x1c], mask: &[], section: "", count: 0, value: 0 }, // lo_fade_black
             a2engine::Entry { present: true, addr: 0x464350, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_blit
-            a2engine::Entry { present: true, addr: 0x4e5da5, end: 0x0, target: 0x8f, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_blit_render_call
-            a2engine::Entry { present: true, addr: 0x4e6153, end: 0x0, target: 0x8f, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_blit_update_call
+            a2engine::Entry { present: true, addr: 0x4e5da5, end: 0x0, target: 0x90, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_blit_render_call
+            a2engine::Entry { present: true, addr: 0x4e6153, end: 0x0, target: 0x90, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_blit_update_call
             a2engine::Entry { present: true, addr: 0x621200, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_draw_rectangle
-            a2engine::Entry { present: true, addr: 0x46457c, end: 0x0, target: 0x92, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_video_bar_call_a
-            a2engine::Entry { present: true, addr: 0x4645cd, end: 0x0, target: 0x92, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_video_bar_call_b
+            a2engine::Entry { present: true, addr: 0x46457c, end: 0x0, target: 0x93, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_video_bar_call_a
+            a2engine::Entry { present: true, addr: 0x4645cd, end: 0x0, target: 0x93, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_video_bar_call_b
             a2engine::Entry { present: true, addr: 0x63ada0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_draw_scaled_2d
-            a2engine::Entry { present: true, addr: 0x464656, end: 0x0, target: 0x95, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_video_sprite_call
+            a2engine::Entry { present: true, addr: 0x464656, end: 0x0, target: 0x96, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_video_sprite_call
             a2engine::Entry { present: true, addr: 0x736770, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_bink_width
             a2engine::Entry { present: true, addr: 0x736774, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_bink_height
             a2engine::Entry { present: true, addr: 0x628890, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_print_string
             a2engine::Entry { present: true, addr: 0x599300, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_display_frame_rate
-            a2engine::Entry { present: true, addr: 0x5989a6, end: 0x0, target: 0x99, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_fps_tri_call
-            a2engine::Entry { present: true, addr: 0x5989b0, end: 0x0, target: 0x9a, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_fps_call
+            a2engine::Entry { present: true, addr: 0x5989a6, end: 0x0, target: 0x9a, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_fps_tri_call
+            a2engine::Entry { present: true, addr: 0x5989b0, end: 0x0, target: 0x9b, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_fps_call
             a2engine::Entry { present: true, addr: 0x6fc8a8, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // lo_framerate_display
             a2engine::Entry { present: true, addr: 0x653950, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x8b, 0x0d, 0x30, 0xec, 0x7a, 0x00], mask: &[], section: "", count: 0, value: 0 }, // lo_slot_name
             a2engine::Entry { present: true, addr: 0x653990, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0xdd, 0x05], mask: &[], section: "", count: 0, value: 0 }, // lo_time_avg
@@ -827,26 +833,27 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // palette_btn_hover
         ],
         blocked: &[
-            a2engine::Block { hook: 9, symbol: "cOverViewImp::mNormalModeRender", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: cOverViewImp::mNormalModeRender is changed by fo-roots-5.0Z11, not yet verified" },
-            a2engine::Block { hook: 14, symbol: "CinematicView::mUpdateVideo", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: CinematicView::mUpdateVideo is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 10, symbol: "cOverViewImp::mNormalModeRender", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: cOverViewImp::mNormalModeRender is changed by fo-roots-5.0Z11, not yet verified" },
+            a2engine::Block { hook: 15, symbol: "CinematicView::mUpdateVideo", why: "is changed by fo-roots-5.0Z11 (not yet verified)", note: "Stands down: CinematicView::mUpdateVideo is changed by fo-roots-5.0Z11, not yet verified" },
         ],
         file_crc: &[a2engine::FileCrc { section: ".text", crc: 0xef690537 }, a2engine::FileCrc { section: ".test", crc: 0xe7a4061b }],
         modules: &[a2engine::Module { name: "FleetOpsHook.dll", text_crc: 0x28c90d19 }],
         blocked_mod: &[
             a2engine::Block { hook: 0, symbol: "DisplayInterface::RenderAll", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: DisplayInterface::RenderAll is patched by FleetOpsHook.dll, which is not the profiled one" },
             a2engine::Block { hook: 5, symbol: "cPrjID::GetName", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: cPrjID::GetName is patched by FleetOpsHook.dll, which is not the profiled one" },
-            a2engine::Block { hook: 11, symbol: "ST3D_Texture::DemandLoad", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: ST3D_Texture::DemandLoad is patched by FleetOpsHook.dll, which is not the profiled one" },
+            a2engine::Block { hook: 6, symbol: "PopupPaletteImp::Update", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: PopupPaletteImp::Update is patched by FleetOpsHook.dll, which is not the profiled one" },
             a2engine::Block { hook: 12, symbol: "ST3D_Texture::DemandLoad", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: ST3D_Texture::DemandLoad is patched by FleetOpsHook.dll, which is not the profiled one" },
-            a2engine::Block { hook: 15, symbol: "Armada_RenderFrame", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: Armada_RenderFrame is patched by FleetOpsHook.dll, which is not the profiled one" },
+            a2engine::Block { hook: 13, symbol: "ST3D_Texture::DemandLoad", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: ST3D_Texture::DemandLoad is patched by FleetOpsHook.dll, which is not the profiled one" },
+            a2engine::Block { hook: 16, symbol: "Armada_RenderFrame", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: Armada_RenderFrame is patched by FleetOpsHook.dll, which is not the profiled one" },
         ],
         n_resolved_mod: 104,
     },
 ];
 
-static HOOK_STATE: [core::sync::atomic::AtomicU64; 16] = [const { core::sync::atomic::AtomicU64::new(0) }; 16];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 185] = [const { core::sync::atomic::AtomicU8::new(0) }; 185];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 185] = [const { core::sync::atomic::AtomicUsize::new(0) }; 185];
-static NOTES: [a2engine::Note; 16] = [const { a2engine::Note::new() }; 16];
+static HOOK_STATE: [core::sync::atomic::AtomicU64; 17] = [const { core::sync::atomic::AtomicU64::new(0) }; 17];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 186] = [const { core::sync::atomic::AtomicU8::new(0) }; 186];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 186] = [const { core::sync::atomic::AtomicUsize::new(0) }; 186];
+static NOTES: [a2engine::Note; 17] = [const { a2engine::Note::new() }; 17];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 
 pub static TABLE: a2engine::Table = a2engine::Table {

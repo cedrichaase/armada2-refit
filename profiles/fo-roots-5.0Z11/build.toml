@@ -246,10 +246,14 @@ fn = "cOverViewImp::Simulate"
 how = "detour"
 verified = ["qol.move_paths"]
 
+# FleetOpsHook's edits are inside the body (the stack frame's size, the technology test of the
+# build items, three stack offsets); the hotkey tables' counts it reads are stock's fields
+# (+0xcc, +0xd8, +0xe4). QOL's position keys only call it, through the call in Update
+# (FO-6 decisions 330 to 349).
 [[changed]]
 fn = "PopupPaletteImp::mProcessKeyboardInput"
 how = "detour"
-verified = []
+verified = ["qol.bar_keys"]
 
 [[changed]]
 fn = "Producer::FinishBuild"
@@ -572,10 +576,15 @@ fn = "Craft::Say"
 how = "runtime"
 verified = ["qol.move_paths"]
 
+# FleetOpsHook's four writes are the GetUserTeam call (+0x7d), the layout's call (+0xbc,
+# re-pointed at its port of mUpdateButtonsAndPosition) and the pressed-state loop's array and
+# count (+0xda, +0xde). The two calls our hooks wrap, IsGamePausedAtAll at +0xf2 (the UI's grid)
+# and mProcessKeyboardInput at +0x23a (QOL's position keys), are stock's in the file and in
+# memory after FleetOpsHook (FO-6 decisions 330 to 349).
 [[changed]]
 fn = "PopupPaletteImp::Update"
 how = "runtime"
-verified = []
+verified = ["ui.hud.bar_grid", "qol.bar_keys"]
 
 [[changed]]
 fn = "PopupPaletteImp::mQueueSpecialWeaponCommand"
