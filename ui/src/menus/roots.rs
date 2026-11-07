@@ -14,6 +14,8 @@
 //! ours is a posted click at the control's centre; nothing writes a setting.
 mod advanced;
 mod advsettings;
+mod mapedit;
+mod mapeditcreate;
 mod graphics;
 mod kit;
 mod mapselect;
@@ -100,6 +102,8 @@ fn title(class: &str) -> &'static str {
         "TSoundSettingsForm" => "SOUND",
         "TModSettingsForm" => "MODS",
         "TAdvSettingsForm" => "ADVANCED SETTINGS",
+        "TMapEditForm" => "MAP EDITOR",
+        "TMapEditCreateForm" => "NEW MAP",
         _ => "MENU",
     }
 }

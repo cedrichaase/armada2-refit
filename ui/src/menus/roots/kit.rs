@@ -56,6 +56,11 @@ pub fn button(ui: &mut Ui, f: &Form, c: &Control, r: R) -> bool {
     clicked
 }
 
+/// A button that cannot be pressed now, in the theme's disabled look.
+pub fn dimmed(ui: &mut Ui, r: R, label: &str) {
+    theme::button(ui, r, label, State { off: true, ..Default::default() });
+}
+
 /// A combo box as a dropdown of ours: the choice is `CB_SETCURSEL` and the parent's
 /// notification, the way a player's choice reaches the form's change handler.
 pub fn combo(ui: &mut Ui, f: &Form, c: &Control, r: R) {

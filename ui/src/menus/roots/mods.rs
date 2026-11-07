@@ -1,13 +1,18 @@
 //! Roots' Mods screen (`TModSettingsForm`): the list of installed mods (a grid Roots draws
-//! itself, shown as a crop of the form's picture with the mouse forwarded to it, so
-//! selecting a row and a double click are Roots' own), the selected mod's screenshot, title
+//! itself, its rows read from the grid's memory as Map Select's and chosen by a click at the
+//! row, so the selection is Roots' own), the selected mod's screenshot, title
 //! and description, and the Launch Mod, Create Shortcut and Visit Website buttons as ours,
 //! enabled as Roots enables them. Previous Menu is Roots' own.
-use super::kit;
+use super::{kit, mapselect};
 use crate::engine::api::forms::Form;
 use crate::gfx::{Weight, R};
 use crate::menus::screens::form as sform;
 use crate::widgets::{Align, Ui};
+
+/// The list's seven columns as Roots gives them (the fourth is a picture), by share of the
+/// width.
+const COLUMNS: [(&str, f32); 7] =
+    [("Name", 0.28), ("Author", 0.20), ("Version", 0.10), ("", 0.02), ("Requires", 0.24), ("", 0.08), ("", 0.08)];
 
 pub(super) fn draw(ui: &mut Ui, f: &Form) -> bool {
     let Some(grid) = kit::shown(f, "grdModSelect") else { return false };
@@ -15,7 +20,12 @@ pub(super) fn draw(ui: &mut Ui, f: &Form) -> bool {
     let (body, foot) = sform::frame(ui, 1180.0, grid_h + info_h + kit::GAP, "MODS");
     let t = ui.theme;
     let grid_r = R::new(body.x, body.y + ui.u(6.0), body.w, ui.u(grid_h));
-    kit::crop(ui, f, grid, grid_r);
+    // The rows are read from the grid's memory (Roots' grid paints none of them while the
+    // form is off screen); without them the form's picture is what there is to show.
+    match grid.grid.as_ref() {
+        Some(g) => mapselect::list(ui, f, grid, g, grid_r, &COLUMNS, None, true),
+        None => kit::crop(ui, f, grid, grid_r),
+    }
 
     let y = grid_r.bottom() + ui.u(kit::GAP);
     let shot = R::new(body.x, y, ui.u(260.0), ui.u(info_h - 20.0));

@@ -1144,7 +1144,7 @@ a host of their own, `engine/forms.rs` (drawn by `menus/roots.rs`):
   5.2.3); any other stands the forms down, logged once, and Roots draws its own menus.
   `tools/engine/fo-forms.py` reads a new FleetOpsHook (and its map) once, prints its line
   and checks the forms and controls the UI uses are there.
-- **What stays Roots'.** The map editor's forms, Tunngle's wait. The nine screens
+- **What stays Roots'.** Tunngle's wait. The nine screens
   FleetOpsHook opens through its own `DialogBoxParamA` (Single Player, Game Setup, Game
   Settings, Load, Save, the licence, the Technology Tree, the Admiral's Log, Internet) are
   Roots' dialogs drawn by the UI: "The nine dialogs, adopted" below.
@@ -1200,8 +1200,12 @@ channel count, unit speech, hardware acceleration, device and speaker set-up; Mo
 description, three buttons; Advanced Options ("Game Settings"): four dropdowns, the
 switches, six sliders with end captions, OK, Cancel, Default; Multiplayer Connection and
 Manual IP as Armada II's; Map Select: the filter, the list of maps, the preview and the two
-buttons, with the rows read from the grid's memory (decision 260). Not done: the map editor's
-forms; Advanced Settings has a spec no button reaches.
+buttons, with the rows read from the grid's memory (decision 260); the map editor's list
+(the main menu's Map Editor: the same grid list with six columns, the preview and name, Create
+new map, Delete Map and Edit Map) and its new-map name form (as Manual IP, Create dimmed while the
+field is empty; decision 280). Edit Map ends, on Roots as for a player, in the editor's licence
+dialog. Advanced Settings has a spec that nothing on Roots 5.0Z11 opens (decision 281), so it is
+unbenched. Tunngle's wait is the one form left to Roots.
 
 | Hook | What it reads |
 |---|---|
