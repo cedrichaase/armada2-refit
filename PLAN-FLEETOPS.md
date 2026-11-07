@@ -730,8 +730,16 @@ are in the private notes beside `fleetopshook.md`.
 - **Runs**: `fo-ui-info` PASS (`20261107-153215`: the face, both rings, two ships, the Starbase, Roots'
   own after `Info=0`); `fo-ui-info-row` PASS at 2150x900 (`20261107-155841`) and 3440x1440
   (`20261107-160730`): minimap, info panel at Roots' width, the grid at its right as high as the panel,
-  then stacked; `fo-ui-info-row-narrow` PASS (`20261107-161412`): the row forced at 4:3 squeezes the
-  queue, `auto` there is stacked. Side-by-side sheets in `$A2_DATA/review/fo-info-panel/`.
+  then stacked; `fo-ui-info-row-narrow` PASS (`20261107-161412`, and from the save `20261107-174913`): the row forced at 4:3 squeezes the
+  queue, `auto` there is stacked. Side-by-side sheets in `$A2_DATA/review/fo-info-panel/`. After
+  merging fo-b's bench instrumentation the scenarios start from the Instant Action save and select by
+  class through `Scene.asi`: `fo-ui-info` (`20261107-172751`) passes the one-ship, group, Starbase
+  (its engines' icon grey) and Roots'-own steps; its pointer steps (the two rings, the status line
+  under the pointer) fail there as `fo-ui-bar-grid`'s hover steps do on the same launch
+  (`20261107-165904`): the bench's pointer does not reach a save-launched Roots game yet, and the
+  menu walk misplaces clicks since the one-window change. The rings through ours were seen on the
+  menu-walked bench before that merge (`20261107-153215`; the merge changed only the hover strip's
+  call, let through the gate).
 - **Seen, for decision 455**: at 21:9 and wider the row reads as one strip (the grid level with the
   panel, the panel at Roots' width); at 4:3 the forced row leaves the queue at about two thirds of
   its size, legible but small, so `auto` keeps the grid above the minimap there.
