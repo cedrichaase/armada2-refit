@@ -1127,11 +1127,12 @@ a host of their own, `engine/forms.rs` (drawn by `menus/roots.rs`):
   5.2.3); any other stands the forms down, logged once, and Roots draws its own menus.
   `tools/engine/fo-forms.py` reads a new FleetOpsHook (and its map) once, prints its line
   and checks the forms and controls the UI uses are there.
-- **What stays Roots'.** The nine screens FleetOpsHook opens through its own
-  `DialogBoxParamA` (Single Player, Game Setup, Game Settings, Load, Save, the licence, the
-  Technology Tree, the Admiral's Log, Internet: phase two, not done), the map editor's
-  forms, Tunngle's wait.
-- **The nine are framed, not redrawn** (PLAN-FLEETOPS.md, decision 200). The shell sizes a
+- **What stays Roots'.** The map editor's forms, Tunngle's wait. The nine screens
+  FleetOpsHook opens through its own `DialogBoxParamA` (Single Player, Game Setup, Game
+  Settings, Load, Save, the licence, the Technology Tree, the Admiral's Log, Internet) are
+  Roots' dialogs drawn by the UI: "The nine dialogs, adopted" below.
+- **The fallback: the nine framed** (PLAN-FLEETOPS.md, decision 200), when the
+  executable's paint imports cannot be ours (decision 230). The shell sizes a
   full-screen screen to the device window's client area, which on Display8 is the
   desktop's size, while Roots paints its 1200x900 art at the top left: the rest of the
   dialog stayed white (Forms=0 shows the same; it is not the forms' doing). With the forms
@@ -1141,8 +1142,8 @@ a host of their own, `engine/forms.rs` (drawn by `menus/roots.rs`):
   moved off screen), then centred. It is checked every tick and put back if anything moves
   it. The pump goes on under it (the scene or the backdrop, the forms under it inert, a
   panel of ours round the dialog), so the area around it is ours. It stays a Win32 window
-  at 1:1: scaling it means drawing it, which is phase two. UI.log: `forms: #32770 ...
-  framed at X,Y WxH on the device window`.
+  at 1:1, and the window manager sees it as a window of its own. UI.log: `forms: #32770
+  ... framed at X,Y WxH on the device window`.
 - **The menu scene** (`[Menus] Scene=1`, decision 201): the forms' frame draws render3d's
   menu scene first, as the dialog host's does; the main menu's form stands over the
   `main` view and every other form and dialog over the view last shown. The `fleetops`
@@ -1175,6 +1176,58 @@ stands over the mission's last frame, as the stock host's in-mission menus do.
 posted presses (main menu, Options, Graphics, Back, Back, Instant Action), a combo set on
 Graphics, and a log line of the pointer and focus every two seconds
 (`testbench/scenarios/fo-ui-forms-probe.md`).
+
+### The nine dialogs, adopted
+
+PLAN-FLEETOPS.md, "Phase two, step one: the dialogs adopted", decisions 230–238;
+`engine/fodialogs.rs`, drawn by `menus/roots.rs`. With the forms on, each `#32770` over
+the device window (the nine, and what they open: the mission list, the one-button
+message, the Admiral's Log's pop-up panes) is **adopted** as it activates. It is the
+dialog host's model for a dialog the UI did not create:
+
+- **Off screen, so the window manager never sees it.** It is cut and placed as the
+  framing above would put it (its place in the design space), then moved off screen with
+  its size kept, as the forms are. A window wholly off every output is not mapped, so the
+  compositor manages only the game's window (sway's tree on the bench; the bench step
+  `Expect the window manager to see one window`). The dialog keeps the activation, the
+  keyboard focus and FleetOpsHook's modal loop; the UI's timer goes on inside that loop.
+  A dialog with no control to take the focus is given it (decision 236).
+- **Painted into a surface of ours.** The stock procedures draw through the executable's
+  imports of `GetDC`, `ReleaseDC`, `BeginPaint`, `EndPaint`, `InvalidateRect` and
+  `RedrawWindow`, which are pointed at functions of ours (each slot checked to hold
+  user32's own function first; never while the dialog host owns them, which it does on
+  Armada II). An adopted dialog gets a memory DC of its client size; any other window
+  goes to user32. An off-screen window is never sent `WM_PAINT`, so the invalidations
+  are noted and the pump sends the paint; the top dialog is painted at least four times
+  a second besides, since an invalidation from FleetOpsHook's or user32's own code never
+  passes the imports (decision 233). The surface's bitmap is selected back whenever its DC
+  is handed out, as the host's is.
+- **Composed into a picture** each time it drew, and every 0.1 s: the surface, then each
+  visible child window printed with `WM_PRINT` (bottom of the z-order first). An
+  owner-drawn button is printed into a metafile and played back at its place: the
+  Admiral's Log's drawing helper selects a bitmap of its own into the DC it is handed,
+  which on a memory DC replaced the picture and lost every tab (decision 237).
+- **Drawn in the forms' frame**, in the design space with the forms, scaled to fit by
+  any factor (decision 232: 1.6 at 3440x1440), in a panel of ours. Forms and dialogs are
+  drawn in the order they opened, and a full-screen one hides what is under it. A pane (a
+  pop-up owned by an adopted dialog) stands at its place against its owner, just above
+  it, without a panel, only while shown (decision 235).
+- **Driven as a player would.** The pointer over the picture is posted to the window
+  under it in the dialog's client coordinates: every move (the stock buttons light up,
+  and take a click, only under the pointer), the press, the moves while held and the
+  release; to the uppermost live dialog it is over (a pane before its owner). The real
+  pointer's messages can only reach an off-screen dialog through a capture it took on a
+  press of ours, and their points lie outside its client area: a message hook drops them
+  (decision 234). Keys reach the dialog's focus as they would: a click into an edit
+  gives it the focus, and typing goes there (Save Game's name).
+- **A model for a spec.** Its child windows (class, id, text, rectangle, style) and
+  FleetOpsHook's record of the stock procedure (the record in the window's user data, read
+  once) are what the frame sees (`forms::Dialog`). No spec is written yet: every adopted
+  dialog is the mirror (`[Menus] Generic` does not apply to them: the shell's widgets,
+  which the widgets screen needs, are read only under the dialog host). UI.log: `forms:
+  #32770 ... adopted: client WxH, style ..., stock procedure 0x...`, `... adopted at X,Y
+  WxH in the design space`, and once, the child windows; `Trace=1` also writes the
+  picture as a BMP into the game directory.
 
 ## Testing
 

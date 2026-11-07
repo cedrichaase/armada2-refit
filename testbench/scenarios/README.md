@@ -142,6 +142,7 @@ audio reached the real output before the bench's guard stopped it (run
 | `Expect the main menu` (any `ui.json` screen) | OCR signature |
 | `Expect the game is still running` / `Expect the game to have exited` | process table |
 | `Expect no crash` | `exception.txt` untouched |
+| `Expect the window manager to see one window` (or `N windows`) | the compositor's managed windows (`swaymsg -t get_tree`): a dialog the game shows as a window of its own counts; one wholly off screen is not mapped and does not |
 | `Expect the engine to draw nothing in "NAME"` | no `Draw*` call from `Armada2.exe` in that display context (`Display8.inventory.tsv`, rewritten every two seconds); lists the call sites when there are some |
 | `Expect "Menus.log" contains "TEXT"` / `… not contain …` | any log beside `Armada2.exe`, or one of the bench's |
 | `Check that the screenshot is not stretched compared with 4:3` | template match of the reference shot over horizontal scales; vertical fixed at H/H_ref |
