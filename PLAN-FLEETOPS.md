@@ -1820,6 +1820,51 @@ blue glass, and the user asked for a look of that kind (2026-11-07): `starfleet`
 | 383 | **The brushed metal is a shader kind of the 2D renderer** (`ui.hlsl` kind 5, `Draw::metal`): value-noise streaks, wider streaks, slow blotches and a speckle, fixed in screen pixels, branch-free; no texture | sharp at any resolution (3440x1440 is the user's), no asset, nothing that moves when a panel moves by a pixel | — |
 | 384 | **The 21:9 bench case takes the race Instant Action deals**: at 2560x1080 the setup screen's side lists do not open on the bench (the same clicks work at 1280x960), so `fo-ui-theme-starfleet-wide` sets the theme by name, and the Federation is judged at 1280x960 | a bench limit, not the theme's | the side lists fixed at 21:9 |
 
+### The status line under the pointer as ours (decisions 460–469)
+
+The user's request of 2026-11-07: "the roots hud has a status info for stations / ships on
+hover. let's try and take this over with our own draws (fonts, etc.) as well. try and keep
+close to the original colors, sizes, placements, etc." (branch `fo-hover`).
+
+**What it is.** While the pointer is over a ship or station in the 3D view, Roots shows a
+line at the top centre of the screen: the craft's class (or its name) in the race's
+`shipNameColor`, and under it its shields, hull and crew, each an icon and a figure (the
+special energy too, while it has some). It is not FleetOpsHook's: it is the engine's own
+`SDInfoBar`, the strip `ShipDisplay::Render` draws about the craft under the pointer, which
+stock places inside the info panel and Roots' layouts move to the top of the screen
+(`infoBarOffset_1`/`_2`, relative to the info panel's area). FleetOpsHook leaves the strip's
+call and `SDInfoBar::Render` stock. It is not the tooltip at the pointer (the box beside the
+pointer with the craft's DPS, hitpoints and what it builds, FleetOpsHook's
+`SelectionDisplay` tooltip), which `HUD.Tooltips` already takes, nor the selection
+overlay's name over the unit. The mechanism is in `ui/HUD.md`, "The status line under the
+pointer".
+
+**Measured** on the bench (Roots' own strip, `fo-ui-hover-ref` `20261107-140604`, 1280x960,
+Federation; `fo-ui-hover-wide-ref` `20261107-142919`, 2560x1080, Klingon dealt), from the
+engine's own answers logged by the hook (`LayoutLog=1`) and the shots' pixels:
+
+| | Measured |
+|---|---|
+| When | at once (shown in the shot 0.3 s after the pointer reaches the craft), gone in the next frame after the pointer leaves; one craft at a time; no fade |
+| Where | anchored, not at the pointer: the place `(625, 50)` on the 1600x1200 canvas at 4:3 (screen 500, 40), `(669, 50)` at 21:9; the same for the one-unit and group faces (`273,-988` plus the info panel's corner) |
+| Name or class | right-justified (eJustify 9) in canvas `625..974 x 50..69` (4:3) / `669..930` (21:9); the race's `shipNameColor` (Federation 0.95,0.67,0.00; Klingon 1.00,0.78,0.27); capitals 10 px tall at 1280x960 |
+| Hull, shields, crew | in that order left to right, each icon then figure: hull icon `625..652 x 90..117`, text `654..703 x 93..112`; shields `736..763`, `764..813`; crew `847..874`, `875..949` (4:3; 21:9 narrower: 669/691, 752/773, 835/856); left-justified, centred in height (eJustify 8); figures and icons in the race's `infoTextColor` (Federation 0.40,0.60,1.00; Klingon 0.90,0.55,0.00); figures 10 px tall at 1280x960 |
+| Strings | `100%` for hull and shields, the crew count; Roots' font has no `%`, so it shows `100` |
+| Background | none: the text and icons over the 3D view |
+| Special energy | a fourth part only while the craft has special energy (none of the start fleets seen) |
+
+| # | Decision | Why | What would change it |
+|---|---|---|---|
+| 460 | **The strip is ours on Roots (`[HUD] Hover=1` in Roots' defaults), off on Armada II** (`Hover=0` in `UI.ini`): Armada II draws it inside the info panel, which `Info=1` replaces with the hover card | the user's request; on Armada II the info panel of ours already shows the craft under the pointer | Armada II's info panel off and the player wanting the strip as ours |
+| 461 | **One call is taken: `ShipDisplay::Render`'s call of `SDInfoBar::Render`** (`ui.hud.hover`, a part of its own, `ui.hover.toml`), its target checked; nothing of FleetOpsHook's is written or read, the info panel stays Roots' and keeps simulating | the strip is drawn by the engine's code at a stock call site on Roots too; a call-site redirection is the panel switch's way and keeps the rest of `ShipDisplay` whole | a Roots build that draws the strip from its own code |
+| 462 | **Every part is drawn where the engine would draw it, in the engine's colour, with the engine's icon and tint; only the font is ours**, its figures as tall as Roots' (10 px at 1280x960: 0.66 of the text rectangle's height) | the user asked to keep close to the original colours, sizes and placements; the engine's answer per frame follows Roots' layouts at every aspect, where numbers of ours would not | the user asking for the theme's colours or a panel behind the line |
+| 463 | **No box behind the line** (Roots draws none); a one-pixel dark shadow under each text | Roots' bitmap font has a dark edge that keeps it legible over bright space; ours has none without the shadow | the user's eye |
+| 464 | **The hook goes in the first time the key is on (live), and with the key off the call is the engine's**: Armada II's code is untouched unless a player turns the key on; `LayoutLog=1` installs it only to log the engine's strip (the bench's reference) | Armada II unchanged by default; a live row | — |
+| 465 | **Under the engine's box the strip is the engine's** (the HUD stands aside, decision 321) | the box owns the pointer; nothing of ours draws there | — |
+| 466 | **No theme token is added**: the colours are the engine's answer (the race's `shipNameColor`/`infoTextColor` and the icons' tints from Roots' `gui_<race>.cfg`) | the colours follow Roots' race files rather than a copy of them | the user asking for the line in the Starfleet look |
+| 467 | **The figures keep the engine's `%`** (`100%`), which Roots' bitmap font cannot draw | the string is the engine's answer; the missing glyph is a gap of Roots' font, not a choice | the user preferring Roots' look to the letter |
+| 468 | **Scenarios**: `fo-ui-hover` / `fo-ui-hover-ref` (1280x960, Federation, the starbase and four ship classes, at once and after two seconds, off again, with the fleet selected) and `fo-ui-hover-wide` / `-wide-ref` (2560x1080, a sweep of twenty places, the race dealt) | the A side is the engine's strip logged by the same hook | a scene harness for Roots (enemy, allied, damaged, cloaked, under construction on demand) |
+
 ## Open decisions
 
 Decided by the user, 2026-11-06:

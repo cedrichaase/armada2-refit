@@ -636,6 +636,7 @@ is checked to be stock. `UI.log`: "cursor: the engine's cursor is kept square".
 | `[HUD] Enable`, `Bar`, `BarLabels` | 1, 1, 1 | the HUD's panels of ours, one key per panel ([`HUD.md`](HUD.md)), every one on |
 | `[HUD] Overview`, `Fade`, `UnitVideo` | 1, 1, 1 | the engine's last draws in a mission drawn by us: the drag box, height posts, order ring and placement markers, the scripts' fade, the unit view's video (`HUD.md`, "The engine's last draws") |
 | `[HUD] SystemIcons`, `ShotScenes`, `MinimapCursor`, `FrameRate` | 1, 1, 1, 1 | what the stock overlay and minimap drew that ours left out, and the frame rate: the pointed unit's damaged systems, the shot director's scenes on the minimap in the tactical view, the action cursor over the minimap, `FRAMERATE_DISPLAY`'s text (`HUD.md`, "What the stock overlay and minimap drew that ours left out") |
+| `[HUD] Hover` | 0 (Roots: 1) | the status line about the ship or station under the pointer (the engine's `SDInfoBar`: name or class, shields, hull, crew, special energy) drawn by us in the engine's places, colours and icons; Armada II draws it inside the info panel, which `Info=1` already replaces, Roots at the top centre (`HUD.md`, "The status line under the pointer") |
 | `[HUD] Placement` | 1 | with `Overview=1`, a placement's markers (the footprint, the cells other objects take) in the theme; 0 with the engine's sprites (`HUD.md`, "The placement markers") |
 | `[HUD] UnitView`, `UnitViewSize` | 1, 260 | the unit view placed by us, a square of that many units at the bottom right, in our frame (`HUD.md`, "The unit view") |
 | `[Menus] Enable` | 1 | the UI hosts the shell's dialogs (`MENUS.md`); stands down on a build it does not know |
@@ -669,7 +670,7 @@ rows a note while the HUD stood down (`hud::STOOD_DOWN`).
 
 ### Settings
 
-`settings.toml` is the table of the keys a player may set (19 rows, tab Interface),
+`settings.toml` is the table of the keys a player may set (20 rows, tab Interface),
 exported as `UI_Settings` (`src/settings_table.rs` is generated: `python3
 tools/settings/gen.py`). `UI_SettingsChanged`, called by the hub after the overlay changes
 (`config.rs`), reads `UI.ini` and the overlay again and swaps the configuration whole
@@ -677,7 +678,7 @@ tools/settings/gen.py`). `UI_SettingsChanged`, called by the hub after the overl
 every frame, or switched by `hud::apply_live`, are taken from the new read; every key a
 patch was installed for keeps its start value. By apply class:
 
-- **LIVE**: `HUD.Minimap`, `Info`, `Tooltips` (`hud::apply_live` gives the stock panel
+- **LIVE**: `HUD.Minimap`, `Info`, `Tooltips`, `Hover` (`hud::apply_live` gives the stock panel
   back or takes it over; the minimap's click hook goes in at the start whatever the key,
   so it can come back), `BarLabels`, `Icons`,
   `SelectionGauges`, `InfoCamera`, `UI.Cursor`, `UI.Theme` (read per frame). Shown
