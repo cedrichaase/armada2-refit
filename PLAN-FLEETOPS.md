@@ -1809,7 +1809,7 @@ Left: the campaign views were not framed for Roots' hulls (their radii are about
 stock's); DS9 is dark on the shadow side of the orbit. (The forms host calls
 `Render3D_MenuScene` since #102, beside the side column rather than a centred card.)
 
-### The Federation's theme on Roots: Starfleet (decisions 380–389)
+### The Federation's theme on Roots: Starfleet (decisions 380–395)
 
 FO-6 gave the Federation LCARS on both games. Roots dresses it in dark machined metal and
 blue glass, and the user asked for a look of that kind (2026-11-07): `starfleet`
@@ -1827,6 +1827,12 @@ blue glass, and the user asked for a look of that kind (2026-11-07): `starfleet`
 | 387 | **No scan lines anywhere in Starfleet**: the still lines on the glass are gone; the lamp light and the brushed metal stay | the user's call, 2026-11-07 | the user |
 | 388 | **Window headers in Starfleet carry no mark** (the two status lights at the right are gone) | they were lamps too, and Roots has none there | the user |
 | 389 | **The resource strip carries lamps too** (`Ui::panel_lit` in `hud/resources.rs`), with the info panel; every other panel stays unlit | the user, 2026-11-07: lamps "in the resources panel, and in the 'selected ship' panel, but not in the others" | the user |
+| 390 | **Every Roots race gets a machined look of its own** (`Form::Roots(Faction)`: `roots-klingon`, `roots-romulan`, `roots-cardassian`, `roots-borg`, `roots-8472`, `roots-freeborg`, `roots-dominion`), Starfleet's frame and glass drawn from the race's `Machined` tokens; the fleetops set maps each race to it; Armada II's set and looks do not change | the user, 2026-11-07: themes for each faction "that more closely matches the stock roots ones" | the user |
+| 391 | **Measured off each race's Roots interface sheet composited over dark space** (minimap frame and info strip: rim, glass at its ends and middle, lamp cores; `ui/STYLE.md`, "The other factions on Roots"), never copied; the review sheets set Roots' art (left) beside ours in game (right), in `$A2_DATA/review/fo-theme-factions/` | hard rule 8, decision 382's method | — |
+| 392 | **Lamps as each race's art has them**: Klingon red in the top corners, Romulan green along the top rim, Borg green and Free Borg teal nodes, Dominion violet; Cardassian and Species 8472 none. They light only the panels that ask (the resource strip and the info panel, decisions 385, 389) | Roots' sheets | the user |
+| 393 | **The Dominion gets a look** (it had the shell's): Roots' Dominion HUD is the Cardassian frame in violet glass | Roots' sheets; decision 80's "no look" was for want of one | the user |
+| 394 | **Text, title and status colours stay each race's Armada II look's**, only the frame, glass, lamps and buttons follow Roots | a race reads the same on both games; Roots' text is the game's own font, not ours | the user |
+| 395 | **One scenario per race** (`fo-ui-theme-roots-<race>`), through the menu (Instant Action, the race picked in the side list, the Federation AI): no direct launch on fo-b yet | the bench | `bench-instrument`'s direct launch on fo-b |
 
 ## Open decisions
 
