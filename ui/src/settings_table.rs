@@ -4,7 +4,7 @@
 #![allow(dead_code)]
 use crate::rt::settings::*;
 
-pub static SETTINGS: [Setting; 18] = [
+pub static SETTINGS: [Setting; 19] = [
     Setting {
         size: ROW_SIZE,
         kind: KIND_BOOL,
@@ -283,6 +283,23 @@ pub static SETTINGS: [Setting; 18] = [
         apply: APPLY_RESTART,
         scope: SCOPE_LOCAL,
         tab: TAB_INTERFACE,
+        flags: FLAG_ADVANCED,
+        file: c"UI.ini".as_ptr(),
+        section: c"Menus".as_ptr(),
+        key: c"Forms".as_ptr(),
+        def: c"0".as_ptr(),
+        values: core::ptr::null(),
+        value_labels: core::ptr::null(),
+        label: c"Redrawn front-end forms".as_ptr(),
+        help: c"The front end's own forms (main menu, Options and more) drawn by the UI. Off gives the game's forms back.".as_ptr(),
+        moved_from: core::ptr::null(),
+    },
+    Setting {
+        size: ROW_SIZE,
+        kind: KIND_BOOL,
+        apply: APPLY_RESTART,
+        scope: SCOPE_LOCAL,
+        tab: TAB_INTERFACE,
         flags: 0,
         file: c"UI.ini".as_ptr(),
         section: c"Loading".as_ptr(),
@@ -329,8 +346,9 @@ pub const UI_THEME: &Setting = &SETTINGS[12];
 pub const MENUS_ENABLE: &Setting = &SETTINGS[13];
 pub const MENUS_SCENE: &Setting = &SETTINGS[14];
 pub const MENUS_CREDITS: &Setting = &SETTINGS[15];
-pub const LOADING_ENABLE: &Setting = &SETTINGS[16];
-pub const HUD_BARHIDDEN: &Setting = &SETTINGS[17];
+pub const MENUS_FORMS: &Setting = &SETTINGS[16];
+pub const LOADING_ENABLE: &Setting = &SETTINGS[17];
+pub const HUD_BARHIDDEN: &Setting = &SETTINGS[18];
 
 /// The table, for the UI's settings hub (`count` may be NULL).
 #[unsafe(no_mangle)]

@@ -198,6 +198,19 @@ label = "Credits"
 help = "The Credits drawn by the UI over the 3D scene. Off gives the game's Credits back."
 
 [[row]]
+name = "menus_forms"
+section = "Menus"
+key = "Forms"
+kind = "bool"
+default = "0"
+apply = "restart"
+scope = "local"
+tab = "interface"
+flags = ["advanced"]
+label = "Redrawn front-end forms"
+help = "The front end's own forms (main menu, Options and more) drawn by the UI. Off gives the game's forms back."
+
+[[row]]
 name = "loading_enable"
 section = "Loading"
 key = "Enable"

@@ -90,7 +90,10 @@ fn st() -> &'static mut St {
 
 /// Whether a row has a place on the screen at all.
 fn shown(r: &Setting) -> bool {
-    r.flags & FLAG_NO_ROW == 0 && r.tab != TAB_NONE
+    r.flags & FLAG_NO_ROW == 0
+        && r.tab != TAB_NONE
+        // The forms row exists only where there are forms to draw.
+        && (!core::ptr::eq(r, crate::settings_table::MENUS_FORMS) || crate::engine::forms::available())
 }
 
 /// Whether the screen has a row to show at all (the entry in Options needs one).
