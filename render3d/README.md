@@ -606,6 +606,15 @@ given in its frame (+z forward, turned by its `Yaw`), and a ship's nose points a
 on three slow sines. The themed groups are far out (16 000 to 20 000 units), each along
 its own camera's line from the planet, so the globe is behind the camera.
 
+**Which map.** The game directory's `Menu\map.ini` first; else the map of the content set
+the build gives render3d, `content/sets/<set>/menu/map.ini` (the `fleetops` set has one:
+Deep Space Nine for Roots' main menu, `PLAN-FLEETOPS.md`, "The Roots menu scene"); else
+the built-in `content/menu/map.ini`. A view's `Orbit=<degrees a second>` turns its eye
+about the vertical axis through its target (0, the default, is a fixed view; the sway
+still rides on it). The sky module's menu pass draws `bstar.0` for the bright stars too
+when the sprite table has no `mstar.0` (Roots'), and takes the stock sky recipe of
+`Sky=`'s name when the set has none (the menu only; a name with no recipe is black).
+
 **Decloaking.** A group with `CloakView=<view>` is cloaked until that view is asked
 for; then, after `CloakDelay` seconds (the camera arriving), each of its ships
 decloaks in turn (`CloakStagger` apart, over `CloakTime`), drawn with the hulls'
