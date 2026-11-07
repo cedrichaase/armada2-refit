@@ -16,6 +16,7 @@ pub mod roots;
 pub mod roots_dialogs;
 pub mod generic;
 pub mod locks;
+pub mod main_layout;
 pub mod model;
 pub mod refit;
 pub mod scene;

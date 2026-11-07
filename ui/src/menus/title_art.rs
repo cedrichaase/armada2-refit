@@ -7,7 +7,8 @@
 //! colour, so the faint panel and the frame line the picture carries are left out), and
 //! uploaded as a texture of ours. Nothing of it is written anywhere. A picture the
 //! player's install lacks, or that does not decode, gives `None` and the caller keeps
-//! the text heading. Only that file is read, never the picture of the whole menu.
+//! the text heading. Only that file is read, never the picture of the whole menu. Which
+//! file and which crop is the layout's (`menus::main_layout`).
 //!
 //! Colour and alpha are kept apart where it matters: the picture is cut down by whole
 //! factors in premultiplied space (a box, so a transparent texel's colour never leaks
@@ -27,27 +28,15 @@ struct Art {
     tex: Option<(Tex, u32)>,
 }
 
-static mut ART: Option<Option<Art>> = None;
+/// The picture loaded for (path, explicit crop); read again when either changes
+/// (`menus::main_layout`, the layout file is read again on save).
+static mut ART: Option<(String, Option<[u32; 4]>, Option<Art>)> = None;
 
-/// The path to read: `[Menus] TitleImage=` (`none` for no picture), else the content
-/// set's `Files.MenuTitle`; "" when neither names one.
-fn path() -> String {
-    let c = crate::config::get().menus_title_image.trim();
-    if c.eq_ignore_ascii_case("none") {
-        return String::new();
-    }
-    if !c.is_empty() {
-        return String::from(c);
-    }
-    String::from(crate::content::get().files.menu_title)
-}
-
-fn load() -> Option<Art> {
-    let p = path();
+fn load(p: &str, crop: Option<[u32; 4]>) -> Option<Art> {
     if p.is_empty() {
         return None;
     }
-    let Some(data) = crate::files::open(&p) else {
+    let Some(data) = crate::files::open(p) else {
         crate::log!("menus: title picture {} not found; the column keeps its text", p);
         return None;
     };
@@ -58,7 +47,14 @@ fn load() -> Option<Art> {
             return None;
         }
     };
-    let Some([bx, by, bw, bh]) = a2fmt::png::title_box(&img) else {
+    // The box the layout file gives (clamped to the picture), else the one found by
+    // alpha and colour.
+    let found = match crop {
+        Some([x, y, w, h]) if x < img.width && y < img.height => Some([x, y, w.min(img.width - x), h.min(img.height - y)]),
+        Some(_) => None,
+        None => a2fmt::png::title_box(&img),
+    };
+    let Some([bx, by, bw, bh]) = found else {
         crate::log!("menus: title picture {} has no lettering; the column keeps its text", p);
         return None;
     };
@@ -138,10 +134,15 @@ fn reduce(a: &Art, n: u32) -> (u32, u32, Vec<u8>) {
 }
 
 /// The title's texture and its aspect (width over height), made for a picture about
-/// `want_w` screen pixels wide; None when there is no picture to draw.
+/// `want_w` screen pixels wide from the file `path` (under the game directory) cut to
+/// `crop`; None when there is no picture to draw.
 #[allow(static_mut_refs)]
-pub fn get(want_w: f32) -> Option<(Tex, f32)> {
-    let art = unsafe { ART.get_or_insert_with(load) }.as_mut()?;
+pub fn get(path: &str, crop: Option<[u32; 4]>, want_w: f32) -> Option<(Tex, f32)> {
+    let slot = unsafe { &mut ART };
+    if slot.as_ref().is_none_or(|(p, c, _)| p != path || *c != crop) {
+        *slot = Some((String::from(path), crop, load(path, crop)));
+    }
+    let art = slot.as_mut()?.2.as_mut()?;
     // Whole-number reductions down to under twice the size drawn; the sampler does the rest.
     let n = ((art.w as f32 / want_w.max(1.0)) as u32).clamp(1, 8);
     let aspect = art.w as f32 / art.h as f32;
