@@ -1165,8 +1165,25 @@ the map editor reads "Options"; decision 204). Options' Back, which Roots binds 
 form opens, stands at the window's foot, and the main menu's version line (Roots' `labelVersion`) at
 the bottom right, small and dim, as Armada II's version. Yes/No draws the form's picture (Roots draws the
 question into it) under our two buttons, where the form sits over the screen that asked;
-every other form is generic (`Generic=widgets` in Roots' defaults). The in-mission Options
+Graphics, Sound, Mods, Advanced Options, Multiplayer Connection and Manual IP have specs of
+their own (below); every other form is generic (`Generic=widgets` in Roots' defaults). The in-mission Options
 stands over the mission's last frame, as the stock host's in-mission menus do.
+
+**The specs** (`src/menus/roots/`, decisions 240 to 244; one file per form, `kit.rs` for the
+controls they share, `specs.rs` choosing by the form's class) lay each screen out with
+Armada II's functions (`screens::form::frame` and `connection_layout`) and draw Roots' controls
+as ours: a combo as a dropdown (its choice is the window's selection and the parent's
+notification), a check box with the state the control holds, a slider at its value, a text
+field of Roots' own with the keyboard. A check box or slider is read through its published
+properties (`engine/forms_props.rs`) and acted on through `forms::Action::Poke`, since
+Roots' check boxes test a click against the real pointer's place. Graphics: driver,
+resolution, anti-aliasing, detail, gamma and the switches; Sound: four volumes, the
+channel count, unit speech, hardware acceleration, device and speaker set-up; Mods: the list
+(a crop of the form's picture with the mouse forwarded), the mod's screenshot, title and
+description, three buttons; Advanced Options ("Game Settings"): four dropdowns, the
+switches, six sliders with end captions, OK, Cancel, Default; Multiplayer Connection and
+Manual IP as Armada II's. Not done: Map Select (its grid's rows are not in the picture:
+decision 244), the map editor's forms; Advanced Settings has a spec no button reaches.
 
 | Hook | What it reads |
 |---|---|
