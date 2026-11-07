@@ -113,6 +113,7 @@ the build's own variables (`_a2f_qol_<id>`), filled at start-up.
 | `qol.warp` | `WarpDistance` | the Alt block (`patch`) and its continue point, the warp globals and functions | moves as stock |
 | `qol.move_paths` | `PathStartsAtOnce` | `mAddPathPoint`'s two calls in `mNormalModeRightClick` and `QueueCommand`'s in `mProcessWaypoints` (`call`), those two functions, the craft process's command, path and point fields, the action's no-order flag, the order's packet limit | paths sent on release, as stock |
 | `qol.rig_self` | `RigIgnoresSelf` | two patches in `ConstructionRig::GetAction` (`patch`, each with two continue points as `label`) and the two vtable slots the stubs call | the ghost as stock |
+| `qol.script_input` | none (always on) | `ScriptInputCallbacks::AlwaysSimulate` at its entry (`patch`, its whole body as the check) and the callback's field | the editor after a scripted mission crashes, as stock |
 
 `MaxSelection` needs both of its hooks; the log names the one that failed.
 
@@ -978,6 +979,43 @@ the check ignores that one. The palette sends one BUILD per selected rig, so wit
 several selected the others still count as blockers in the ghost: step 2 deals with it.
 
 **Seen on the bench:** `testbench/scenarios/qol-rig-ignores-self.md`.
+
+## A script's input monitor (a crash fix, hook `qol.script_input`)
+
+*`QOL.asi`, no key: it changes nothing a player sees, only a crash. Found on Fleet Operations:
+Roots (PLAN-FLEETOPS.md, decision 500); the bug is stock's code.*
+
+**The crash.** Starting the map editor (a new map or Edit Map) after playing Roots' first
+tutorial, *TUTORIAL: Gameplay*, in the same run of the game kills the game at the first frame
+after the load: madExcept's `exceptArmada2.txt` names an access violation at address 0, from
+`DisplayInterface::SimulateAll` (through FleetOpsHook's `DisplayInterface_SimulateAll_Callback`).
+Stock Roots, with nothing of ours installed, crashes the same way (bench, below); the editor
+started without a scripted mission first works.
+
+**Why.** A mission script watches the player's input through
+`ScriptInterfaceImp::MonitorInputControls(fn)`: it stores `fn` in the engine's static
+`s_inputCallbacks` (a `ScriptInputCallbacks`, at +0x24) and registers that object in the
+simulate lists of view 0 and view 1 (`DisplayInterface::AddViewSimulate`); a null `fn` takes it
+out of both again (`RemViewSimulate`). Each frame `ScriptInputCallbacks::AlwaysSimulate` (0x451dc0)
+calls `fn` with no test, and when `fn` answers false it clears the field and leaves the object
+registered. The tutorial's script ends that way, so the next view that simulates the object,
+the editor's, calls address 0.
+
+**The fix.** QOL replaces `AlwaysSimulate` at its entry with a jump to a `__fastcall` function
+of its own (`script_always` in `qol.c`: `this` in ecx, the float popped by its `ret 4`, as the
+original's), which does the same with the test the original lacks: no function, nothing called.
+It leaves the registration as it is (taking it out from inside the list's own walk would free
+the node the walk is on). It is display-side only: nothing the simulation or the network reads
+changes, so a player with it plays a player without it. `QOL.log` says
+`--- QOL script input monitor: called only while a script has one set, patched` at start-up and,
+the first time the guard is needed, `script: the input monitor is registered with no function`.
+On Armada II the editor is started with `-edit`, in a run of its own, so no mission script has
+run before it there; the guard is the same on both builds.
+
+**Seen on the bench:** `testbench/scenarios/fo-mapedit-after-tutorial.md` (Roots with every layer: the tutorial,
+End Mission, Map Editor, Create new map, the editor up). Roots as it ships was driven the same way
+by hand in a stock session (PLAN-FLEETOPS.md, decision 500): the editor opens from a fresh start
+and crashes after the tutorial.
 
 ## On Fleet Operations: Roots
 

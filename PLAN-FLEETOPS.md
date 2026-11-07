@@ -1859,6 +1859,22 @@ blue glass, and the user asked for a look of that kind (2026-11-07): `starfleet`
 | 388 | **Window headers in Starfleet carry no mark** (the two status lights at the right are gone) | they were lamps too, and Roots has none there | the user |
 | 389 | **The resource strip carries lamps too** (`Ui::panel_lit` in `hud/resources.rs`), with the info panel; every other panel stays unlit | the user, 2026-11-07: lamps "in the resources panel, and in the 'selected ship' panel, but not in the others" | the user |
 
+## The map editor after a mission (2026-11-07, branch `fo-mapedit-crash`; decisions 500–509)
+
+The user's report (2026-11-07, fo-b 0dc2efaf installed): the map editor crashed, and a new map
+crashed the game during or right after its loading screen. Roots' `exceptArmada2.txt` (14:35:33)
+names an access violation at address 0 in `DisplayInterface::SimulateAll`, called through
+FleetOpsHook's `DisplayInterface_SimulateAll_Callback`; the plugins' logs of that run show
+*TUTORIAL: Gameplay* played and ended first, then Map Editor, Create new map, and the load of
+the new map running to `DI Postload`. The cause is stock's code, reached through Roots' tutorial
+script (`qol/README.md`, "A script's input monitor").
+
+| # | Decision | Why | What would change it |
+|---|---|---|---|
+| 500 | **The crash is Roots' and stock's, not ours**: on the bench, Roots as it ships (DxWrapper, nothing of ours) opens the editor on a new map from a fresh start, and crashes the same way (the same address, the same callback, the same registers) when the tutorial was played and ended first | bench session `20261107-144649-30458` (stock, 1280x960): `shots/005-shot.png` (the editor up), `018-shot.png` (madExcept's dialog over the loading screen after the tutorial) | — |
+| 501 | **QOL fixes it, for both builds, with no key** (hook `qol.script_input`): `ScriptInputCallbacks::AlwaysSimulate` replaced at its entry with the same body and the null test it lacks. QOL because it is installed on Roots and holds the other engine-side fixes of stock code that a player never sees (the special-weapon buffers); no key because turning it off can only bring the crash back | the smallest change at the fault itself; display-side, stock-compatible in network games. Bench: `fo-mapedit-after-tutorial` `20261107-151645` passes with every layer (QOL's guard line logged, the editor up after the licence); Armada II's editor (`-edit`, Instant Action, LAUNCH) opens with the hook patched and 218/218 symbols, session `20261107-153535-66746` | a Roots build that changes `AlwaysSimulate` (the hook's check stands it down, and the log says so) |
+| 502 | **The registration is left as it is**: the object stays in the editor's simulate list with no function; taking it out from inside the list's walk would free the node the walk stands on | safe; costs one test a frame | — |
+
 ## Open decisions
 
 Decided by the user, 2026-11-06:
