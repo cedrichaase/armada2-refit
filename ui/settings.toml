@@ -170,7 +170,7 @@ apply = "restart"
 scope = "local"
 tab = "interface"
 label = "Redrawn menus"
-help = "The shell's menus hosted and drawn by the UI, and this screen with them. Off gives the game's menus back."
+help = "The shell's menus hosted and drawn by the UI, and this screen with them. Off gives the game's menus back. Roots also needs its own row below."
 flags = ["advanced"]
 
 [[row]]
@@ -196,6 +196,19 @@ scope = "local"
 tab = "interface"
 label = "Credits"
 help = "The Credits drawn by the UI over the 3D scene. Off gives the game's Credits back."
+
+[[row]]
+name = "menus_forms"
+section = "Menus"
+key = "Forms"
+kind = "bool"
+default = "0"
+apply = "restart"
+scope = "local"
+tab = "interface"
+flags = ["advanced"]
+label = "Redrawn menus: Fleet Operations: Roots"
+help = "Roots' front end (main menu, Options and more) redrawn by the UI; needs Redrawn menus on too. Only matters on Roots."
 
 [[row]]
 name = "loading_enable"
