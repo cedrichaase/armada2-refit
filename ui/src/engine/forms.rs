@@ -103,6 +103,27 @@ fn eng() -> &'static a2engine::Engine {
     TABLE.engine()
 }
 
+/// An adopted dialog's screen, by its stock procedure (`Dialog::stock_proc`), named as
+/// `engine::dialogs::screen_name` names Armada II's: "" when unknown, or when the build's
+/// procedures are not verified for it (`forms.dialog_specs`; decision 250).
+pub fn dialog_screen(stock_proc: usize) -> &'static str {
+    use crate::syms_forms::sym;
+    if stock_proc == 0 || eng().ready(hook::FORMS_DIALOG_SPECS).is_err() {
+        return "";
+    }
+    const SCREENS: [(a2engine::Sym, &str); 8] = [
+        (sym::FORMS_PROC_SINGLE_PLAYER, "single player"),
+        (sym::FORMS_PROC_MISSION_SELECT, "mission select"),
+        (sym::FORMS_PROC_LOAD_GAME, "load game"),
+        (sym::FORMS_PROC_SAVE_GAME, "save game"),
+        (sym::FORMS_PROC_GAME_SETTINGS, "game settings"),
+        (sym::FORMS_PROC_GAME_SETUP, "game setup"),
+        (sym::FORMS_PROC_ADMIRALS_LOG, "admiral's log"),
+        (sym::FORMS_PROC_MESSAGE, "message"),
+    ];
+    SCREENS.iter().find(|s| eng().addr(s.0) == stock_proc).map_or("", |s| s.1)
+}
+
 // ---- what the rest of the UI sees ---------------------------------------------------
 
 /// What a control is, for drawing it.
@@ -197,6 +218,10 @@ pub enum Action {
     Select(usize, i32),
     /// The keyboard to a windowed control (a text field clicked).
     Focus(usize),
+    /// A key or a character for a windowed control (`WM_KEYDOWN` or `WM_CHAR`, its
+    /// wParam), as the player's typing would send it: an adopted dialog's edit rewritten
+    /// by a text field of ours (decision 250).
+    Key(usize, u32, usize),
     /// A mouse message sent (not posted) to the control at a point of the form, with the
     /// form moved for that moment so the point lies under the real pointer: the library's
     /// check boxes decide where a click fell from the real pointer's place, which a form
@@ -204,7 +229,7 @@ pub enum Action {
     Poke(usize, u32, usize, i32, i32),
     /// A key pressed and released at a windowed control (a grid's arrow keys), sent to its
     /// window. (window, virtual key)
-    Key(usize, u32),
+    GridKey(usize, u32),
 }
 
 pub const MOUSE_DOWN: u32 = WM_LBUTTONDOWN;
@@ -1367,7 +1392,7 @@ fn run_actions(top: HWND, _obj: usize) {
                 unsafe { SendMessageA(target, msg, keys, lparam(p.x, p.y)) };
                 unsafe { SetWindowPos(top, core::ptr::null_mut(), OFF, OFF, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE) };
             }
-            Action::Key(h, vk) => unsafe {
+            Action::GridKey(h, vk) => unsafe {
                 let mut p = h as HWND;
                 for _ in 0..6 {
                     if p == top || p.is_null() {
@@ -1386,6 +1411,11 @@ fn run_actions(top: HWND, _obj: usize) {
                     // EM_SETSEL over the whole text: typing replaces it, as a click into a
                     // field and a select-all would.
                     SendMessageA(h as HWND, 0xb1, 0, -1);
+                }
+            },
+            Action::Key(h, msg, wp) => unsafe {
+                if IsWindow(h as HWND) != 0 {
+                    PostMessageA(h as HWND, msg, wp, 1);
                 }
             },
             _ => {}

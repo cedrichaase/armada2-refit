@@ -39,7 +39,7 @@ fn choose(f: &Form, g: &Control, grid: &Grid, i: usize) {
         let (vk, n) = if i as i32 > from { (VK_DOWN, i as i32 - from) } else { (VK_UP, from - i as i32) };
         crate::log!("forms: map {} chosen ({} keys from row {})", i, n, from);
         for _ in 0..n.min(64) {
-            forms::act(Action::Key(g.hwnd, vk));
+            forms::act(Action::GridKey(g.hwnd, vk));
         }
     }
 }

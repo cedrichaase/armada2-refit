@@ -131,6 +131,8 @@ pub fn frame(ui: &mut Ui) {
     // render3d's menu scene, dimmed, when it drew under this frame.
     // The main menu over the scene shades only where its column stands, as Armada II's.
     let main_over_scene = crate::menus::scene::shown() && forms::main_menu_shown() && crate::config::get().menus_specs;
+    // So does the campaign selection, as Armada II's (`roots_dialogs`).
+    let main_over_scene = main_over_scene || crate::menus::roots_dialogs::campaigns_over_scene();
     if !main_over_scene && !crate::menus::backdrop::draw(ui) {
         let full = ui.screen();
         crate::widgets::theme::backdrop(ui, full);
@@ -189,6 +191,11 @@ pub fn frame(ui: &mut Ui) {
         // it is the top one.
         if let Some(p) = d.design {
             let r = rect_of(p);
+            // A spec of ours for it (`roots_dialogs`, decision 250), else its picture.
+            let rf = crate::menus::roots_dialogs::Fit { x: fit.x, y: fit.y, s: fit.s };
+            if crate::menus::roots_dialogs::draw(ui, d, rf, dialog_texture(d)) {
+                continue;
+            }
             if !d.pane {
                 ui.panel(r.inset(-ui.u(6.0)));
             }
