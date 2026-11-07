@@ -212,19 +212,23 @@ impl Sky {
 
     /// The recipe for the map's sky now, looked up again when the name changes, and
     /// re-read every 30 frames from the game directory's file when `Reload=1`.
-    fn recipe_now(&mut self, bg: &str) -> Option<&Recipe> {
+    fn recipe_now(&mut self, bg: &str, menu: bool) -> Option<&Recipe> {
         self.frames = self.frames.wrapping_add(1);
-        if bg != self.bg {
-            self.bg = String::from(bg);
+        let key = if menu { let mut k = String::from("menu:"); k.push_str(bg); k } else { String::from(bg) };
+        // The menu scene's sky also takes the stock set's recipe of its name when the
+        // build's own set has none (Roots' map asks for a stock look; never in a mission).
+        let find = |base: &str| recipe::text_for(base).or_else(|| if menu { recipe::stock_text(base) } else { None });
+        if key != self.bg {
+            self.bg = key;
             let base = recipe::base_name(bg);
-            self.recipe = recipe::text_for(&base).map(|(t, src)| Recipe::parse(&base, t, src));
+            self.recipe = find(&base).map(|(t, src)| Recipe::parse(&base, t, src));
             match &self.recipe {
                 Some(r) => log!("sky: \"{}\": drawn from its recipe ({})", bg, r.source),
                 None => log!("sky: \"{}\": no recipe, the stock sky", bg),
             }
         } else if self.cfg.reload && self.frames % 30 == 0 {
             let base = recipe::base_name(bg);
-            let now = recipe::text_for(&base);
+            let now = find(&base);
             let changed = match (&now, &self.recipe) {
                 (Some((t, _)), Some(r)) => *t != r.text,
                 (None, None) => false,
@@ -464,12 +468,13 @@ impl Sky {
             let Some(mut cmd) = gfx::cmd() else { return };
             let evp = gfx::gpu().engine_viewport();
             Self::clear(&mut cmd, v, evp);
-            if self.cfg.recipes && self.recipe_now(&shot.sky).is_some() {
+            if self.cfg.recipes && self.recipe_now(&shot.sky, true).is_some() {
                 self.draw_recipe(&mut cmd, &a, &vp, evp);
             }
             // The stars, in the sky's frame.
             let star = |n: &str| sprites::sprite_info(n);
-            if let (Some(small), Some(big)) = (star("bstar.0"), star("mstar.0")) {
+            // A build whose sprite table has no `mstar.0` (Roots') draws the one sheet it has.
+            if let (Some(small), Some(big)) = (star("bstar.0"), star("mstar.0").or_else(|| star("bstar.0"))) {
                 let (right, up) = sprites::camera_axes(&a.view);
                 let d = far * 0.25;
                 let lift = self.cfg.star_lift;
@@ -650,7 +655,7 @@ impl Module for Sky {
             let bg = hooks::background_name();
             let have_db = hooks::has_sky_db();
             if sky_on && have_db {
-                let recipe = self.cfg.recipes && self.recipe_now(&bg).is_some();
+                let recipe = self.cfg.recipes && self.recipe_now(&bg, false).is_some();
                 if !(recipe && self.draw_recipe(cmd, &vf, &vp, evp)) {
                     self.draw_stock(cmd, &vf, &vp, &bg);
                 }

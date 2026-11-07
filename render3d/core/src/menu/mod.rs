@@ -214,8 +214,18 @@ fn text_of() -> (String, &'static str) {
     crate::recipes::builtin("menu", &[("map", BUILT_IN)]);
     match crate::recipes::text("menu", "map") {
         Some(r) if r.source == crate::recipes::Source::Game => (r.text, "Menu\\map.ini in the game directory"),
-        _ => (String::from(BUILT_IN), "built in"),
+        _ => match set_map() {
+            Some(m) => (String::from(m), "the content set's map"),
+            None => (String::from(BUILT_IN), "built in"),
+        },
     }
+}
+
+/// The content set's own map (`sets/<set>/menu/map.ini`), if its set has one.
+fn set_map() -> Option<&'static str> {
+    crate::engine::start_table("core", &crate::syms::TABLE);
+    let set = crate::syms::TABLE.engine().content()?;
+    crate::content::file(&crate::sfmt!("sets/{}/menu/map.ini", set))
 }
 
 /// A group of the map: a place the scenes' ships, gas and cameras are given from.
@@ -292,6 +302,9 @@ struct ViewDef {
     fov: f32,
     sway: V3,
     sway_period: f32,
+    /// The camera turns about the vertical axis through its target at this many radians
+    /// a second (`Orbit=`, degrees a second in the recipe); 0 for a fixed view.
+    orbit: f32,
     /// The camera a departure from this view swings to (`WarpEye=`, `WarpTarget=`);
     /// None: behind the departing ships, looking the way they go.
     warp_eye: Option<V3>,
@@ -540,6 +553,7 @@ impl Map {
                 fov: t.f(sec, "fov", 40.0).clamp(5.0, 120.0),
                 sway: t.v(sec, "sway", v3(8.0, 4.0, 6.0)),
                 sway_period: t.f(sec, "swayperiod", 40.0).max(1.0),
+                orbit: t.f(sec, "orbit", 0.0) * DEG,
                 warp_eye: at("warpeye"),
                 warp_target: at("warptarget"),
             });
@@ -611,7 +625,14 @@ impl Map {
         let w = 6.283_185_5 / v.sway_period;
         let s = v.sway;
         let d = v3(s.x * math::sinf(w * t), s.y * math::sinf(w * t * 0.73 + 1.1), s.z * math::sinf(w * t * 0.51 + 2.3));
-        (v.eye + d, v.target + d * 0.3)
+        let (mut eye, target) = (v.eye + d, v.target + d * 0.3);
+        if v.orbit != 0.0 {
+            // About the vertical axis through the target.
+            let (sn, cs) = (math::sinf(v.orbit * t), math::cosf(v.orbit * t));
+            let r = eye - target;
+            eye = target + v3(r.x * cs + r.z * sn, r.y, -r.x * sn + r.z * cs);
+        }
+        (eye, target)
     }
 
     /// The groups a locked view looks at (`Render3D_MenuLocked`), by index.
