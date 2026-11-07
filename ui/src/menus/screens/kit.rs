@@ -68,8 +68,18 @@ pub fn button_if(ui: &mut Ui, s: &Screen, r: R, c: &Control, label: &str, on: bo
 
 /// A small arrow button (up or down), for a stock scroll button.
 pub fn arrow(ui: &mut Ui, s: &Screen, r: R, c: &Control, up: bool) -> bool {
+    let clicked = arrow_at(ui, r, s.top, c.enabled, up);
+    if clicked {
+        s.click_control(c);
+    }
+    clicked
+}
+
+/// The arrow button itself, for any front end: it answers only when `live` (the top
+/// dialog) and `enabled`, and is drawn grey when not `enabled`. True on the click.
+pub fn arrow_at(ui: &mut Ui, r: R, live: bool, enabled: bool, up: bool) -> bool {
     let id = ui.id(if up { "arrow-up" } else { "arrow-down" });
-    let (hot, held, clicked) = if s.top && c.enabled { ui.interact(id, r) } else { (false, false, false) };
+    let (hot, held, clicked) = if live && enabled { ui.interact(id, r) } else { (false, false, false) };
     let st = State::of(ui, id, hot, held);
     theme::button_frame(ui, r, st);
     let t = ui.theme;
@@ -77,12 +87,9 @@ pub fn arrow(ui: &mut Ui, s: &Screen, r: R, c: &Control, up: bool) -> bool {
     let (hw, hh) = (r.w * 0.22, r.h * 0.12);
     let d = if up { -1.0 } else { 1.0 };
     let w = ui.u(2.5).max(1.5);
-    let col = if c.enabled { t.text } else { t.text_off };
+    let col = if enabled { t.text } else { t.text_off };
     ui.draw.line((cx - hw, cy - d * hh), (cx, cy + d * hh), w, col);
     ui.draw.line((cx, cy + d * hh), (cx + hw, cy - d * hh), w, col);
-    if clicked {
-        s.click_control(c);
-    }
     clicked
 }
 

@@ -109,8 +109,17 @@ fn wanted() -> Option<(&'static core::ffi::CStr, SceneFn)> {
     // Roots' forms (MENUS.md, "Roots' forms"): the main menu's form shows the main view,
     // every other form and the dialogs FleetOpsHook opens over them the view last shown.
     if crate::engine::api::forms::active() {
-        let screen = if crate::engine::api::forms::main_menu_shown() { "main menu" } else { "forms" };
-        unsafe { CHOICE = None };
+        // Roots' Single Player (adopted, with its spec) is the campaign selection.
+        let screen = if crate::engine::api::forms::main_menu_shown() {
+            "main menu"
+        } else if crate::config::get().menus_specs && super::roots_dialogs::full_screen() == "single player" {
+            "single player"
+        } else {
+            "forms"
+        };
+        if screen != "single player" {
+            unsafe { CHOICE = None };
+        }
         return Some((scene_for(screen)?, scene_fn()?));
     }
     let all = crate::engine::api::dialogs::stack();

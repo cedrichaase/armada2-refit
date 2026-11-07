@@ -144,6 +144,10 @@ verified = ["render3d.overlays.reads"]
 
 # ---- ui -------------------------------------------------------------------------------
 # The shell's dialog procedures ask for 1200x900 where stock asks for 800x600.
+# `ui.forms.dialog_specs` only tells an adopted dialog by its procedure's address, which
+# FleetOpsHook's record holds (or the dialog's own, for those opened through the exe's
+# import): measured equal to stock's for each on the bench (fo6-dialogs-inventory,
+# 2026-11-07; PLAN-FLEETOPS.md, decision 250). Nothing is hooked or read in them.
 
 # Roots' four-byte edit (+0x19b) and FleetOpsHook's audio and close calls (+0x17c..+0x30a)
 # sit away from the splash call at +0xcd, which is stock's in the file and in memory (FO-6
@@ -156,7 +160,7 @@ verified = ["ui.loading.own"]
 [[changed]]
 fn = "AdmiralsLogDlgProc"
 how = "edit"
-verified = []
+verified = ["ui.forms.dialog_specs"]
 
 [[changed]]
 fn = "EscapeMenuDlgProc"
@@ -171,7 +175,7 @@ verified = []
 [[changed]]
 fn = "GameSettingsDlgProc"
 how = "edit"
-verified = []
+verified = ["ui.forms.dialog_specs"]
 
 [[changed]]
 fn = "InternetGameDlgProc"
@@ -181,17 +185,17 @@ verified = []
 [[changed]]
 fn = "LoadGameDlgProc"
 how = "edit"
-verified = []
+verified = ["ui.forms.dialog_specs"]
 
 [[changed]]
 fn = "MissionSelectDlgProc"
 how = "edit"
-verified = []
+verified = ["ui.forms.dialog_specs"]
 
 [[changed]]
 fn = "MultiplayerSetupDlgProc"
 how = "edit"
-verified = []
+verified = ["ui.forms.dialog_specs"]
 
 [[changed]]
 fn = "NetWaitingDlgProc"
@@ -201,17 +205,17 @@ verified = []
 [[changed]]
 fn = "OneButtonDlgProc"
 how = "edit"
-verified = []
+verified = ["ui.forms.dialog_specs"]
 
 [[changed]]
 fn = "SaveGameDlgProc"
 how = "edit"
-verified = []
+verified = ["ui.forms.dialog_specs"]
 
 [[changed]]
 fn = "SingleDlgProc"
 how = "edit"
-verified = []
+verified = ["ui.forms.dialog_specs"]
 
 # ---- qol ------------------------------------------------------------------------------
 
