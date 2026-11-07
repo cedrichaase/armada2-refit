@@ -152,7 +152,7 @@ a C header. The format, the resolver and the lints are described in
   (`tools/layers.py --check`).
 - A build is recognised by three numbers read from the process's own PE headers: the
   timestamp, the image size and a fingerprint of the section table. All three must
-  match; the timestamp alone is never the key (Fleet Operations: Roots shares stock's).
+  match; the timestamp alone is never the key (a modified build of the same game can share stock's).
 - One file per plugin or part: `<plugin>.toml`, `<plugin>.<part>.toml`. It lists
   **hooks** (each with a one-line description and the settings rows it feeds) and
   **entries** (function, call, jmp, slot, label, patch, scan, vtable, global, field,
@@ -192,8 +192,7 @@ a C header. The format, the resolver and the lints are described in
    `[[known]]` list as information. It refuses a build that is not matched, and the hash
    is never a run-time key.
 5. Run the game on the bench to see what only a running game shows (`engine: ...` lines
-   in each plugin's log). The plans for the first two additional builds are
-   [`PLAN-FLEETOPS.md`](PLAN-FLEETOPS.md) and [`PLAN-ARMADA1.md`](PLAN-ARMADA1.md).
+   in each plugin's log). The plan for Armada I is [`PLAN-ARMADA1.md`](PLAN-ARMADA1.md).
 
 **Content profiles.** A plugin's tables of the game's own names (ODFs, sprites, SOD
 nodes, factions, recipes) are not addresses and are not tied to the executable. A
@@ -218,8 +217,8 @@ Every `.ini` under `render3d/content/` and `ui/content/` is built into the plugi
 parse their table once, at first use. A set with no table for a part is the empty table
 for it: that part has no names and draws the engine's own. `stock` is the set of
 `gog-1.1`, and a build that inherits it (`inherits` in `build.toml`) reads the parent's
-sets until its own `content.toml` names others; `fleetops` is render3d's set of the Fleet
-Operations: Roots build.
+sets until its own `content.toml` names others; `fleetops` is render3d's set of another
+build.
 
 To add a set:
 
