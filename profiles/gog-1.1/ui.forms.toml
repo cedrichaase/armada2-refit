@@ -304,6 +304,46 @@ kind = "fn"
 addr = 0x5d7730
 used_by = ["forms.dialog_specs"]
 
+# The map editor's licence (FleetOpsHook's import, on the editor's first start).
+[[sym]]
+id = "forms_proc_licence"
+symbol = "LicenseAgreementWindowDlgProc"
+kind = "fn"
+addr = 0x5d3bd0
+used_by = ["forms.dialog_specs"]
+
+# The lobby (FleetOpsHook's import, after Local Area Network or Manual IP).
+[[sym]]
+id = "forms_proc_internet_game"
+symbol = "InternetGameDlgProc"
+kind = "fn"
+addr = 0x5b15f0
+used_by = ["forms.dialog_specs"]
+
+# Please Wait (the executable's import, from Roots' connection screens).
+[[sym]]
+id = "forms_proc_net_waiting"
+symbol = "NetWaitingDlgProc"
+kind = "fn"
+addr = 0x5ca0b0
+used_by = ["forms.dialog_specs"]
+
+# The lobby's Help (the executable's import).
+[[sym]]
+id = "forms_proc_help"
+symbol = "HelpWindowDlgProc"
+kind = "fn"
+addr = 0x5b07a0
+used_by = ["forms.dialog_specs"]
+
+# The game's name, the lobby's Create Game (the executable's import).
+[[sym]]
+id = "forms_proc_game_name"
+symbol = "GameNameDlgProc"
+kind = "fn"
+addr = 0x5ac3d0
+used_by = ["forms.dialog_specs"]
+
 # ---- forms.shell_background: the shell background kept off the game window -------------
 # (engine/fodialogs.rs; PLAN-FLEETOPS.md, decision 300). Roots replaces SetCurrentBackground
 # at run time (FleetOpsHook's ShellBitmapImp.SetCurrentBackgroundNew, profiles/

@@ -3,6 +3,8 @@
 //! scroll area and the stock buttons below it. The text is read from the stock control
 //! that holds it (the longest edit, static or label of the screen), whole: the model
 //! keeps only the first 4 KB of a control's text, which would cut a licence short.
+//! `text_window` is the layout alone, which Roots' licence (`roots_dialogs::text_window`)
+//! draws with too.
 use super::common::*;
 use crate::engine::api::shellui::Kind;
 use crate::gfx::{Weight, R};
@@ -13,7 +15,8 @@ use crate::widgets::{Anchor, Ui};
 use alloc::string::String;
 use alloc::vec::Vec;
 
-fn full_text(h: HWND) -> String {
+/// A window control's text, whole, with the carriage returns taken out.
+pub fn full_text(h: HWND) -> String {
     let n = unsafe { SendMessageA(h, WM_GETTEXTLENGTH, 0, 0) }.clamp(0, 200_000) as usize;
     let mut b = alloc::vec![0u8; n + 1];
     let got = unsafe { SendMessageA(h, WM_GETTEXT, n + 1, b.as_mut_ptr() as isize) }.clamp(0, n as isize) as usize;
@@ -37,25 +40,33 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     btns.sort_by_key(|c| (c.rect[0], c.rect[1]));
 
     backdrop_for(ui, s);
+    let name = title(s).map_or("", |c| if c.key != holder.key { c.text.as_str() } else { "" });
+    let mut hot = None;
+    text_window(ui, name, &text, btns.len(), &mut |ui, i, r| {
+        stock_button(ui, s, btns[i], r, &mut hot);
+    });
+    hover_stock(s, hot);
+    true
+}
+
+/// The text window: `name` over `text` in a scroll area, and `n` buttons in a row at the
+/// foot, each drawn by `button` in the rectangle it is given.
+pub fn text_window(ui: &mut Ui, name: &str, text: &str, n: usize, button: &mut dyn FnMut(&mut Ui, usize, R)) {
     let t = ui.theme;
     let r = Anchor::Centre.place(ui.screen(), ui.u(1000.0), ui.u(900.0).min(ui.screen().h * 0.94), 0.0);
-    let name = title(s).map_or("", |c| if c.key != holder.key { c.text.as_str() } else { "" });
     let inner = ui.window(r, name);
     let (body, foot) = inner.take_top(inner.h - ui.u(44.0 + 16.0));
     let size = ui.u(t.text_size);
     let view_w = body.w - ui.u(12.0 + 4.0) - ui.u(16.0);
-    let (_, th) = crate::text::measure_wrapped(crate::text::font(), &text, size, view_w);
+    let (_, th) = crate::text::measure_wrapped(crate::text::font(), text, size, view_w);
     ui.scroll_area(body, "text", th + ui.u(16.0), |ui, c| {
-        ui.draw.text_wrapped(&text, size, view_w, c.x + ui.u(8.0), c.y + ui.u(8.0), t.text, Weight::Regular);
+        ui.draw.text_wrapped(text, size, view_w, c.x + ui.u(8.0), c.y + ui.u(8.0), t.text, Weight::Regular);
     });
-    let mut hot = None;
-    let n = btns.len().max(1) as f32;
+    let nf = n.max(1) as f32;
     let (bw, gap) = (ui.u(200.0), ui.u(20.0));
-    let mut x = foot.x + (foot.w - (n * bw + (n - 1.0) * gap)) * 0.5;
-    for c in btns {
-        stock_button(ui, s, c, R::new(x, foot.bottom() - ui.u(44.0), bw, ui.u(44.0)), &mut hot);
+    let mut x = foot.x + (foot.w - (nf * bw + (nf - 1.0) * gap)) * 0.5;
+    for i in 0..n {
+        button(ui, i, R::new(x, foot.bottom() - ui.u(44.0), bw, ui.u(44.0)));
         x += bw + gap;
     }
-    hover_stock(s, hot);
-    true
 }

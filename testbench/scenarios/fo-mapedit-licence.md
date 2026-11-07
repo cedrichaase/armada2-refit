@@ -1,4 +1,4 @@
-# Fleet Operations: Roots with the UI: the map editor's licence stands whole in the middle
+# Fleet Operations: Roots with the UI: the map editor's licence, ours, whole in the middle
 
 Resolutions: 1280x960, 2560x1080, 3440x1440
 Mod: refit
@@ -14,7 +14,9 @@ the screen, so ACCEPT could not be reached. Roots' procedure leaves the dialog a
 window's origin; the adoption took that for its place in the design space, across the design
 space's top left corner. A dialog that does not fit in the design space is now centred in it.
 Every click here is by a label, so the case runs at any resolution; Edit Map on a chosen map
-ends in the licence, as Create new map does.
+ends in the licence, as Create new map does. The licence is drawn by a spec of ours
+(`roots_dialogs/text_window.rs`, decision 600): the agreement in our scroll area, read whole
+from the stock edit, so Roots' picture of the edit with all its text selected (blue) is gone.
 
 1. Launch the game.
 2. Wait up to 180 seconds for "UI.log" to say "forms: TMainForm is ours".
@@ -28,15 +30,16 @@ ends in the licence, as Create new map does.
 10. Click "Edit Map".
 11. Wait up to 20 seconds for "UI.log" to say "press on buttonEditMap".
 12. Wait up to 150 seconds for "UI.log" to say "centred in it".
-13. Wait 5 seconds.
-14. Take a screenshot called "licence".
-15. Check that the licence agreement (a dark window with the agreement's text and ACCEPT and CANCEL under it) stands whole in the middle of the screen, not cut at any edge of the screen.
-16. Click "ACCEPT".
-17. Wait 10 seconds.
-18. Take a screenshot called "editor".
-19. Check that the map editor is up (a map in space with the HUD) and no licence window is left on the screen.
-20. Expect the game is still running.
-21. Expect "UI.log" not contain "PANIC".
-22. Expect "Display8.log" not contain "VUID".
-23. Stop the game.
-24. Expect no crash.
+13. Wait up to 20 seconds for "UI.log" to say "licence agreement drawn by its spec".
+14. Wait 3 seconds.
+15. Take a screenshot called "licence".
+16. Check that the licence agreement (a window titled LICENSE AGREEMENT with the agreement's text in a scroll area and ACCEPT and CANCEL side by side under it) stands whole in the middle of the screen, not cut at any edge, and no line of the text has a blue selection highlight behind it.
+17. Click "ACCEPT".
+18. Wait 10 seconds.
+19. Take a screenshot called "editor".
+20. Check that the map editor is up (a map in space with the HUD) and no licence window is left on the screen.
+21. Expect the game is still running.
+22. Expect "UI.log" not contain "PANIC".
+23. Expect "Display8.log" not contain "VUID".
+24. Stop the game.
+25. Expect no crash.

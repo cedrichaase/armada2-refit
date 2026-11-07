@@ -170,7 +170,7 @@ verified = []
 [[changed]]
 fn = "GameNameDlgProc"
 how = "edit"
-verified = []
+verified = ["ui.forms.dialog_specs"]
 
 [[changed]]
 fn = "GameSettingsDlgProc"
@@ -180,7 +180,7 @@ verified = ["ui.forms.dialog_specs"]
 [[changed]]
 fn = "InternetGameDlgProc"
 how = "edit"
-verified = []
+verified = ["ui.forms.dialog_specs"]
 
 [[changed]]
 fn = "LoadGameDlgProc"
@@ -200,7 +200,7 @@ verified = ["ui.forms.dialog_specs"]
 [[changed]]
 fn = "NetWaitingDlgProc"
 how = "edit"
-verified = []
+verified = ["ui.forms.dialog_specs"]
 
 [[changed]]
 fn = "OneButtonDlgProc"
@@ -525,15 +525,19 @@ fn = "GraphicsOptionsDlgProc"
 how = "runtime"
 verified = []
 
+# `ui.forms.dialog_specs` tells it by address only: FleetOpsHook's record (or the dialog's own
+# procedure) held stock's on the bench (PLAN-FLEETOPS.md, decision 604).
 [[changed]]
 fn = "HelpWindowDlgProc"
 how = "runtime"
-verified = []
+verified = ["ui.forms.dialog_specs"]
 
+# `ui.forms.dialog_specs` tells it by address only: FleetOpsHook's record (or the dialog's own
+# procedure) held stock's on the bench (PLAN-FLEETOPS.md, decision 604).
 [[changed]]
 fn = "LicenseAgreementWindowDlgProc"
 how = "runtime"
-verified = []
+verified = ["ui.forms.dialog_specs"]
 
 [[changed]]
 fn = "MainMenuDlgProc"
