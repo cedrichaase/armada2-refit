@@ -14,8 +14,7 @@ of ours that rewrites Roots' own edit with the keys a player would type. A skirm
 started from Instant Action (`fo-ui-forms-options`: the tutorials cannot be saved); in it, the in-mission menu's Save
 Game saves under the name typed, the one-button message after it (a spec of ours too) is answered by its
 OK, and Load Savegame lists the save, which is picked and loaded: Roots asks first whether to
-end the mission, answered No here (Yes ended the mission but left Load Game up, and a
-second Load asked again: PLAN-FLEETOPS.md, decision 254, open). At 1600x900 the name
+end the mission, answered Yes, and the save loads (PLAN-FLEETOPS.md, decision 255). At 1600x900 the name
 field of ours stands at y 759 (the window `saves_screen` lays out, at a scale of
 900/1080), from x 418 to its right edge, and its Save Game button at 800,798. Return in
 our field does not reach it: the dialog's modal loop (user32's) turns Return into the
@@ -80,12 +79,14 @@ dialog's own OK command before the UI sees a key.
 57. Take a screenshot called "load asks".
 58. Expect "UI.log" contains "(load game): click at 610,863".
 59. Check that Roots asks whether to end the mission (a "Warning" with Yes and No) over our Load Game window.
-60. Click "No".
-61. Wait up to 20 seconds for "UI.log" to say "closed after".
-62. Wait 2 seconds.
-63. Take a screenshot called "load kept".
-64. Check that our Load Game window is shown again with the save listed.
-65. Expect "UI.log" not contain "PANIC".
-66. Expect "Display8.log" not contain "VUID".
-67. Stop the game.
-68. Expect no crash.
+60. Click "Yes".
+61. Wait up to 60 seconds for "UI.log" to say "loading: map".
+62. Expect "UI.log" contains "s1.sav".
+63. Wait up to 240 seconds for "Render3D.log" to say "(claimed at the instance draw)".
+64. Wait 8 seconds.
+65. Take a screenshot called "loaded".
+66. Check that the skirmish is under way again, loaded from the save: a 3D space view with the game's HUD, no menu or loading screen.
+67. Expect "UI.log" not contain "PANIC".
+68. Expect "Display8.log" not contain "VUID".
+69. Stop the game.
+70. Expect no crash.

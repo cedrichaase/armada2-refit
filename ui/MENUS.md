@@ -1273,8 +1273,12 @@ Admiral's Log, the one-button message), told apart by address only; Roots' build
 each verified beside its edit, since FleetOpsHook's record was measured to hold stock's
 address for every one. A spec acts as a player: `Screen::click` moves the pointer to the
 stock control's point, and once it has rested there (0.12 s; Roots' screens take a press
-only on a control already under the pointer, decision 190) presses and releases; one
-click at a time, in order. Typing into an edit is `End`, a Backspace for each character
+only on a control already under the pointer, decision 190) presses, and releases 0.06 s
+later, each in a pass of its own through the dialog's messages; one click at a time, in
+order, and the clicks still waiting when something opens over the dialog (Roots' Yes/No)
+are dropped, as a player's would land on it. Load and Save never click a stock row that is
+already picked: two clicks on one are its own double click, which loaded nothing after
+Roots' question answered Yes (decision 255). Typing into an edit is `End`, a Backspace for each character
 it held, and the new text, posted to the edit as the keyboard would send them. Nothing
 writes a setting. A spec that does not recognise its dialog returns false and the frame
 draws the picture.

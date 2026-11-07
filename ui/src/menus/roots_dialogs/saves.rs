@@ -14,6 +14,9 @@ use crate::rt::win::{WM_CHAR, WM_KEYDOWN};
 use crate::widgets::Ui;
 use alloc::vec::Vec;
 
+/// The row last clicked on the stock list: (dialog, its label).
+static mut PICKED: Option<(usize, alloc::string::String)> = None;
+
 pub fn draw_load(ui: &mut Ui, s: &Screen) -> bool {
     draw(ui, s, false)
 }
@@ -46,7 +49,18 @@ fn draw(ui: &mut Ui, s: &Screen, save: bool) -> bool {
     };
     for a in saves_screen(ui, &input) {
         match a {
-            SavesAct::Row(i) => s.click_control(rows[i]),
+            SavesAct::Row(i) => {
+                // A row already picked is not clicked again: two clicks on a stock row are
+                // its double click, Roots' own load, whose question answered Yes then
+                // loaded nothing (decision 255). A double click of ours is the pick and
+                // then Load, as the foot's button.
+                let key = (s.hwnd(), rows[i].text.clone());
+                let last = unsafe { &mut *core::ptr::addr_of_mut!(PICKED) };
+                if last.as_ref() != Some(&key) {
+                    *last = Some(key);
+                    s.click_control(rows[i]);
+                }
+            }
             SavesAct::Up => s.click_control(up),
             SavesAct::Down => s.click_control(down),
             SavesAct::Foot(i) => s.click_control(foot[i]),
