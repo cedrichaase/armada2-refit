@@ -75,6 +75,8 @@ const WM_CLOSE: u32 = 0x10;
 const WM_PAINT: u32 = 0x0f;
 const WM_ERASEBKGND: u32 = 0x14;
 const WM_ACTIVATEAPP: u32 = 0x1c;
+const WM_WINDOWPOSCHANGING: u32 = 0x46;
+const SWP_HIDEWINDOW: u32 = 0x80;
 /// Ours: enable the host again (posted from `WM_ENABLE`, not done inside it).
 const WM_REENABLE: u32 = 0x8000 + 0x3d8;
 
@@ -89,6 +91,19 @@ static ON: AtomicBool = AtomicBool::new(true);
 static HOST: AtomicUsize = AtomicUsize::new(0);
 static CHILD: AtomicUsize = AtomicUsize::new(0);
 static SWITCHES: AtomicUsize = AtomicUsize::new(0);
+static HIDE_REFUSED: AtomicBool = AtomicBool::new(false);
+
+/// `WINDOWPOS` (user32's).
+#[repr(C)]
+struct WindowPos {
+    hwnd: *mut c_void,
+    after: *mut c_void,
+    x: i32,
+    y: i32,
+    cx: i32,
+    cy: i32,
+    flags: u32,
+}
 static SWITCH_AT: AtomicU32 = AtomicU32::new(0);
 /// Holding: from a switch until the first frame that drew something.
 static HOLDING: AtomicBool = AtomicBool::new(false);
@@ -127,6 +142,44 @@ pub fn scene_begun(cursor: bool) {
     CURSOR_SCENE.store(cursor, Ordering::Relaxed);
 }
 
+/// Frames held between two screens, outside a switch (`between_screens`), and since when.
+static BETWEEN: AtomicU32 = AtomicU32::new(0);
+static BETWEEN_AT: AtomicU32 = AtomicU32::new(0);
+static BETWEEN_RUNS: AtomicU32 = AtomicU32::new(0);
+/// How long a picture of the plugins' is held at most when the frames after it are none
+/// of theirs.
+const BETWEEN_MS: u32 = 5000;
+
+/// Outside a switch, with the host made (the game is one that makes a window per switch):
+/// while the plugins are drawing the game's frames, a frame none of them drew on is not
+/// shown, for at most `BETWEEN_MS` after the last one they drew; the picture stays.
+/// Measured on Roots (PLAN-FLEETOPS.md, decision 400): End Mission keeps its window (the menus' window of
+/// the Esc before it), and between the in-mission menu's end and the campaign
+/// selection's first frame the engine presents frames with nothing of ours on them, and
+/// the campaign selection's first frame takes about a second (the menu scene's first
+/// draw after a mission), so a black frame stood on the screen for that second.
+fn between_screens(now: u32, passed: bool) -> bool {
+    if passed || host().is_null() {
+        let n = BETWEEN.swap(0, Ordering::Relaxed);
+        if n > 0 {
+            let runs = BETWEEN_RUNS.fetch_add(1, Ordering::Relaxed) + 1;
+            if runs <= 20 || runs % 50 == 0 {
+                log!("window: OneWindow: {} frames between two screens held, the picture kept {} ms", n,
+                     now.wrapping_sub(BETWEEN_AT.load(Ordering::Relaxed)));
+            }
+        }
+        return false;
+    }
+    let last = LAST_PASS.load(Ordering::Relaxed);
+    if last == 0 || now.wrapping_sub(last) > BETWEEN_MS {
+        return false;
+    }
+    if BETWEEN.fetch_add(1, Ordering::Relaxed) == 0 {
+        BETWEEN_AT.store(now, Ordering::Relaxed);
+    }
+    true
+}
+
 /// At the engine's `Present`: whether to leave the picture on the screen as it is instead
 /// of presenting this frame. After a switch (a new device window inside the host) the game
 /// presents a few frames with nothing drawn on them, cleared to black, before the next
@@ -144,7 +197,7 @@ pub fn hold() -> bool {
     }
     let drew = if NEEDS_PASS.load(Ordering::Relaxed) { DREW.swap(false, Ordering::Relaxed) && passed } else { DREW.swap(false, Ordering::Relaxed) };
     if !HOLDING.load(Ordering::Relaxed) {
-        return false;
+        return between_screens(now, passed);
     }
     let ms = now.wrapping_sub(SWITCH_AT.load(Ordering::Relaxed));
     if drew || ms > HOLD_MS {
@@ -172,9 +225,36 @@ pub fn configure(on: bool) {
 /// first switch (the menus to the loading screen) is seamless too. Elsewhere the host waits
 /// for a second window, which Armada II never makes.
 pub fn from_start() -> bool {
-    use crate::engine_syms::{hook, value};
-    ON.load(Ordering::Relaxed) && crate::engine().ready(hook::ONEWINDOW).is_ok() && value::DEVICE_WINDOWS() == 1
+    // Decided once, at the first `CreateDevice`, and kept: a host made stays the game's.
+    match DECIDED.load(Ordering::Relaxed) {
+        1 => return false,
+        2 => return true,
+        _ => {}
+    }
+    let yes = decide();
+    DECIDED.store(if yes { 2 } else { 1 }, Ordering::Relaxed);
+    yes
 }
+
+static DECIDED: AtomicU32 = AtomicU32::new(0);
+
+fn decide() -> bool {
+    use crate::engine_syms::{hook, value};
+    if !ON.load(Ordering::Relaxed) || crate::engine().ready(hook::ONEWINDOW).is_err() || value::DEVICE_WINDOWS() != 1 {
+        return false;
+    }
+    // Only for a plugin that draws the game's screens across its switches (the UI's Roots
+    // forms, `CLAIM_WINDOW`, contract 1.5): with the game's own screens (its forms and
+    // dialogs, windows of their own over the game's) the host took the pointer from them
+    // (PLAN-FLEETOPS.md, decision 402).
+    let claimed = crate::claims::ask() & gpu::display::CLAIM_WINDOW != 0;
+    if !claimed && !SAID_UNCLAIMED.swap(true, Ordering::Relaxed) {
+        log!("window: OneWindow: no plugin draws the game's screens across its windows (no window claim): the swap chain follows each new window");
+    }
+    claimed
+}
+
+static SAID_UNCLAIMED: AtomicBool = AtomicBool::new(false);
 
 /// The host, once made.
 pub fn host() -> *mut c_void {
@@ -300,6 +380,20 @@ unsafe extern "system" fn host_proc(h: *mut c_void, m: u32, wp: usize, lp: isize
                 unsafe { PostMessageA(c, WM_CLOSE, 0, 0) };
             }
             0
+        }
+        WM_WINDOWPOSCHANGING if lp != 0 => {
+            // Kept shown: Roots hides the thread's top-level windows as it goes from its
+            // main menu to a screen of the shell's (its own forms, `[Menus] Forms=0`), and
+            // the host went with them, the device window inside it too, so the shell's
+            // screen had nothing under it and took no click (decision 401).
+            let pos = unsafe { &mut *(lp as *mut WindowPos) };
+            if pos.flags & SWP_HIDEWINDOW != 0 {
+                pos.flags &= !SWP_HIDEWINDOW;
+                if !HIDE_REFUSED.swap(true, Ordering::Relaxed) {
+                    log!("window: OneWindow: a hide of the host refused: the game's window stays shown");
+                }
+            }
+            unsafe { DefWindowProcA(h, m, wp, lp) }
         }
         WM_ERASEBKGND => 1,
         WM_PAINT => {
