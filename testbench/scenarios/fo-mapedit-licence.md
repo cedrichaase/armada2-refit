@@ -4,6 +4,7 @@ Resolutions: 1280x960, 2560x1080, 3440x1440
 Mod: refit
 Layers: display asiloader render3d qol ui
 Overlay: UI.Menus:Forms=1 UI.Menus:Enable=1 UI.Menus:Scene=1 UI.UI:Cursor=1 UI.HUD:Minimap=1 UI.HUD:Info=1 UI.HUD:Bar=1
+Setup: testbench/bench/roots-licence.sh
 Timeout: 12 min
 
 Run with `a2test --game fo-roots` and `--install .` (PLAN-FLEETOPS.md, decision 503). The
