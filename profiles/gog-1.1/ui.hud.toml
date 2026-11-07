@@ -335,6 +335,15 @@ used_by = ["hud.reads_popups", "hud.bar_grid"]
 # The bar's Update calls IsGamePausedAtAll on every path once the buttons are laid out
 # (mUpdateButtonsAndPosition, or its port on Roots) and before anything simulates them: the
 # grid of ours (Roots, FO-6 decisions 330 to 349) writes the buttons' rectangles there.
+# The pointer as the HUD's components test it (canvas units): logged with the bar's hover line, so a
+# bench run shows where the game believes the pointer is (FO-6, decision 348).
+[[sym]]
+id = "hud_mouse_pos"
+symbol = "DisplayInterface::s_mousePos"
+kind = "global"
+addr = 0x765018
+used_by = ["hud.reads_bar"]
+
 [[sym]]
 id = "palette_update_paused_call"
 symbol = "PopupPaletteImp::Update"

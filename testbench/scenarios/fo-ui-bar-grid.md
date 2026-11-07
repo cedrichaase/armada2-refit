@@ -4,7 +4,7 @@ Resolutions: 1280x960
 Mod: refit
 Layers: display asiloader render3d ui qol
 Launch: -nointro save\ia-fed-kli.sav
-Setup: testbench/bench/roots-save.sh ia-fed-kli display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh --scene game HUD.Bar=1
+Setup: testbench/bench/roots-save.sh ia-fed-kli display/bench-mode.sh stub Backend=vulkan OneWindow=0 ui/bench-asi.sh --scene game HUD.Bar=1
 Overlay: UI.HUD:Bar=1 UI.HUD:BarLabels=1 UI.HUD:Tooltips=1 QOL.QOL:BarKeys=1
 Timeout: 14 min
 
@@ -12,19 +12,20 @@ Run with `a2test --game fo-roots` and `--install .`. FO-6, "The bar as the grid"
 (`PLAN-FLEETOPS.md`, decisions 330 to 339): with `HUD.Bar=1` the UI lays Roots' bar out in the
 grid of Armada II (`ui/HUD.md`, "The button bar"), the stock buttons moved onto its cells right
 after each update of the bar (`hud.bar_grid`), so FleetOpsHook's range ring, the tooltip and the
-click follow the cells; QOL's position keys press them (`BarKeys`, the W cell without a key on
+click follow the cells; QOL's position keys press them (`BarKeys`; the W cell left empty in every menu on
 Roots). The overlay is the user's install's: the bar, its labels, the tooltips and the keys on.
 
 The grid stands above Roots' minimap at 1280x960 (Roots' minimap is stock here): cells about 60 px
 apart, Q at 49,482, Z at 49,601, G (back) at 287,541. The construction ship's top level is
-`Q=build W=order E=form R=aiMenu A=repair S=stop D=transport Z=npc_tractorbeam`. The game starts in an Instant Action
-game from a save (Federation against the Klingon AI, `Launch: -nointro save\ia-fed-kli.sav`, the
-save from `$A2_DATA` through `testbench/bench/roots-save.sh`; `../README.md`, "Roots straight into
-a map, and scenes on Roots"), and `Scene.asi` (the `game` scene, the harness only) selects the
-construction ship by its class through the overview's own Select (`README.md`, "Objects"), where
-an agent's box drag did before. Nothing has moved the game's own pointer before the map (no
-menu was walked), so it is pushed into the corner first, where the bench and the game agree
-on it (`../README.md`, "Traps": in a mission the pointer moves by relative motion only); the hovers, keys and clicks after it are the bench's own.
+`Q=build E=order R=form A=repair S=stop D=transport Z=npc_tractorbeam X=aiMenu` (the W cell is left empty in
+every menu: Roots' own W, decision 347). The game starts in an Instant Action game from a save
+(Federation against the Klingon AI, `Launch: -nointro save\ia-fed-kli.sav`, the save from
+`$A2_DATA` through `testbench/bench/roots-save.sh`) with Display8's `OneWindow=0`: on the bench,
+with one window (#127, the shipped default) the game's own pointer (`DisplayInterface::s_mousePos`,
+logged with the bar's hover line) stayed at 12,12 canvas through every move, corner push and click,
+so no button could be hovered; with `OneWindow=0` it follows the bench, and in the user's own game
+with one window the hovers work (`../README.md`, "Traps"; decision 348). `Scene.asi` (the `game` scene, the harness only) selects the construction ship by its class
+through the overview's own Select (`README.md`, "Objects"); the hovers, keys and clicks after it are the bench's own.
 
 1. Launch the game.
 2. Wait up to 240 seconds for "Scene.log" to say "scene ready".
@@ -34,12 +35,12 @@ on it (`../README.md`, "Traps": in a mission the pointer moves by relative motio
 6. Move the mouse to 700,300.
 7. Wait 1 second.
 8. Select the ship of class "Mediterranean" owned by the player.
-9. Wait up to 10 seconds for "UI.log" to say "Z=npc_tractorbeam".
-10. Expect "UI.log" contains "Q=build W=order E=form R=aiMenu A=repair S=stop D=transport Z=npc_tractorbeam".
+9. Wait up to 10 seconds for "UI.log" to say "X=aiMenu".
+10. Expect "UI.log" contains "Q=build E=order R=form A=repair S=stop D=transport Z=npc_tractorbeam X=aiMenu".
 11. Expect "UI.log" contains "carries its own tile".
 12. Expect "QOL.log" contains "bar: position keys on (the Refit bar is drawn)".
 13. Take a screenshot called "construction ship, the grid".
-14. Check that the bar is a grid of three rows above the minimap whose filled cells are Roots' own button tiles (a grey rounded tile with its picture, filling the cell, with no second plate around it), with key letters on the cells (Q, E, R, A, S, D, Z; none on the second cell of the top row), and the Tractor Beam's picture bottom left.
+14. Check that the bar is a grid of three rows above the minimap whose filled cells are Roots' own button tiles (a grey rounded tile with its picture, filling the cell, with no second plate around it), with key letters on every filled cell (Q, E, R, A, S, D, Z, X; the second cell of the top row empty: Roots' W is its own at the top level), and the Tractor Beam's picture bottom left.
 15. Move the mouse to 46,598.
 16. Wait 1 second.
 17. Move the mouse to 49,601.
@@ -70,14 +71,14 @@ on it (`../README.md`, "Traps": in a mission the pointer moves by relative motio
 42. Move the mouse to 287,541.
 43. Wait 1 second.
 44. Click at 287,541.
-45. Wait up to 10 seconds for "UI.log" to say "R=aiMenu A=repair S=stop D=transport Z=npc_tractorbeam".
+45. Wait up to 10 seconds for "UI.log" to say "A=repair S=stop D=transport Z=npc_tractorbeam X=aiMenu".
 46. Move the mouse to 700,300.
 47. Wait 1 second.
 48. Press z.
 49. Wait up to 10 seconds for "QOL.log" to say "bar: key Z".
 50. Wait 1 second.
 51. Take a screenshot called "tractor beam by Z".
-52. Check that the pointer is the tractor beam's targeting cursor (a red circle with a stroke, near 700,300) rather than the ordinary arrow.
+52. Check that the pointer near 700,300 is the tractor beam's targeting cursor (a round targeting symbol: red with a stroke over empty space, a yellow dashed ring over a ship or station it can lock on to) rather than the ordinary arrow.
 53. Expect "UI.log" not contain "NOT FOUND".
 54. Expect "UI.log" not contain "PANIC".
 55. Expect "Display8.log" not contain "VUID".

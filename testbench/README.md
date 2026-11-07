@@ -637,6 +637,15 @@ posts, a hologram, the Evolver, a survey of what no module draws).
   all; or an Instant Action save, `save\<name>.sav` with its `.ias`): walk Roots' menus
   only where the menus are what is tested ("Roots straight into a map, and scenes on
   Roots"). Roots' `federation` race is the Observer: `Race=unitedfederation`.
+- **A Roots scenario that points at the HUD sets Display8's `OneWindow=0`** (`display/bench-mode.sh
+  stub Backend=vulkan OneWindow=0 ...`). With one window (#127, Display8's host keeping Roots'
+  device windows as children, the shipped default) the game's own pointer
+  (`DisplayInterface::s_mousePos`, which `UI.log`'s `bar: hover` lines give) stays where it started,
+  12,12 canvas, through every bench move, corner push and click, so no stock button is hovered,
+  clicked or ringed; the window's pointer, which the UI reads, still moves. With `OneWindow=0` it
+  follows the bench (`fo-ui-bar-grid`, 2026-11-07). The user's own game with one window hovers
+  normally (its `UI.log`), so this is the bench's virtual pointer and the child window, not the
+  game. Scenarios that only press keys and use `Scene.asi` keep the default.
 - **After a direct launch, push the pointer into the corner before aiming at anything**
   (`Move the mouse into the bottom right corner`). No menu has moved the game's own
   cursor, and in a mission it moves by relative motion only, so the first moves land

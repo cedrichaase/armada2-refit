@@ -90,6 +90,15 @@ pub(super) fn layout_all(p: usize, menu: u32) -> ([usize; CELLS], Vec<Item>, Vec
 /// grid.c's `assign`: the cell each item goes in, None only if the grid is full.
 fn assign(it: &[Item], menu: u32) -> Vec<Option<usize>> {
     let mut used = [false; CELLS];
+    // The cells whose key the game's own key map gives to an action of its own (Roots: W, which
+    // selects the damaged ships of the selection and so empties a shipyard's) stay empty in every
+    // menu: the key is the game's, and no button sits under a cell whose key does not press it
+    // (decision 347). The buttons fill the other cells.
+    let game_keys = crate::content::get().bar_game_keys;
+    let reserved: Vec<usize> = (0..CELLS).filter(|&c| game_keys.bytes().any(|k| k.eq_ignore_ascii_case(&LABEL[c]))).collect();
+    for &c in &reserved {
+        used[c] = true;
+    }
     let mut cell_of: Vec<Option<usize>> = alloc::vec![None; it.len()];
     let take = |used: &mut [bool; CELLS], c: usize| -> Option<usize> {
         if c < CELLS && !used[c] {

@@ -210,6 +210,12 @@ pub struct Content {
     pub glyphs: &'static [(u8, &'static str)],
     /// The game's own info panel's layout (`[InfoPanel]`), empty where the UI lays it out.
     pub info: InfoLayout,
+    /// The bar's position keys (`QWERTASDFGZXCVB`) the game's own key map gives to an action of
+    /// its own (`[Bar] GameKeys`; Roots: W, its `select_next_ship`, reworked to select the damaged
+    /// ships of the selection, which empties a shipyard's). The grid leaves those cells empty in
+    /// every menu, so no button sits under a key that does not press it (`hud::bar`,
+    /// PLAN-FLEETOPS.md decision 347).
+    pub bar_game_keys: &'static str,
     /// `[Loading] Bar`: the loading screen's bar when `[Loading] Bar=` in UI.ini is empty
     /// (`panel`: a square bar in a thin box; empty: the classic one).
     pub loading_bar: &'static str,
@@ -236,6 +242,7 @@ pub static NONE: Content = Content {
     gallery_factions: &[],
     glyphs: &[],
     info: InfoLayout { size: [0.0, 0.0], min_width: 0.0, lamps: false, elements: &[], numbers: &[], names: &[] },
+    bar_game_keys: "",
     loading_bar: "",
     menus_look: "",
     mission_menus_look: "",
@@ -322,6 +329,7 @@ pub fn parse(text: &'static str) -> Content {
         },
         gallery_ships: t.list("Gallery", "Ships").leak(),
         gallery_factions: t.list("Gallery", "Factions").leak(),
+        bar_game_keys: t.str("Bar", "GameKeys"),
         glyphs: t
             .entries("Glyphs")
             .iter()
