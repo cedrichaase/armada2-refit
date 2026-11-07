@@ -24,19 +24,20 @@ bar's range rings still follow the pointer. The game starts in Instant Action fr
 8. Wait up to 10 seconds for "UI.log" to say "info: Roots' panel ours: Builder".
 9. Wait 2 seconds.
 10. Take a screenshot called "station, the bottom row".
-11. Check that the minimap is in the bottom left corner, the info panel (the station's picture, icons and ten numbered slots, not stretched wide) along the bottom, and a grid of square buttons (three rows) in the bottom right corner, none of them overlapping.
-12. Move the pointer onto the sensors icon of the bottom panel (the blue square with a wifi-like symbol, top right of the block of six blue system icons right of the station's picture), keep it there, and stop once UI.log says "info: the engine's hover on Roots' system 0 (sensors)".
-13. Wait 2 seconds.
-14. Take a screenshot called "sensors hover".
-15. Check that a thin green circle is drawn on the map round the Starbase and a tooltip about the sensors is shown.
-16. Move the mouse to 1075,150.
-17. Wait 1 second.
-18. Overlay UI.HUD:BottomRow=stacked.
-19. Wait 3 seconds.
-20. Take a screenshot called "station, stacked".
-21. Check that the grid of buttons now stands above the minimap and the info panel is unchanged.
-22. Expect "UI.log" not contain "PANIC".
-23. Expect "Display8.log" not contain "device removed".
-24. Quit the game.
-25. Expect the game to have exited.
-26. Expect no crash.
+11. Check that the minimap is in the bottom left corner, the info panel (the station's picture, icons and ten numbered slots, not stretched wide) along the bottom, and a grid of square buttons (three rows) in the bottom right corner (or, on a 4:3 screen, above the minimap), none of them overlapping.
+12. Center the camera on the station of class "Starbase" owned by the player.
+13. Move the pointer onto the sensors icon of the bottom panel (the blue square with a wifi-like symbol, top right of the block of six blue system icons right of the station's picture) without touching the screen's edges (that scrolls the map), keep it there, and stop once UI.log says "info: the engine's hover on Roots' system 0 (sensors)".
+14. Wait 2 seconds.
+15. Take a screenshot called "sensors hover".
+16. Check that a thin green circle is drawn on the map round the Starbase and a tooltip about the sensors is shown.
+17. Move the mouse to 1075,150.
+18. Wait 1 second.
+19. Overlay UI.HUD:BottomRow=stacked.
+20. Wait 3 seconds.
+21. Take a screenshot called "station, stacked".
+22. Check that the grid of buttons now stands above the minimap and the info panel is unchanged.
+23. Expect "UI.log" not contain "PANIC".
+24. Expect "Display8.log" not contain "device removed".
+25. Quit the game.
+26. Expect the game to have exited.
+27. Expect no crash.

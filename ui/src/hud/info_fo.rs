@@ -483,7 +483,7 @@ fn single(ui: &mut Ui, l: &'static InfoLayout, fr: &Frame, obj: usize, builder: 
     let mut sys_line = String::new();
     if craft {
         for i in 0..5 {
-            let Some((comp, sp, st, flash, present)) = info::repair_icon(obj, i) else { continue };
+            let Some((comp, sp, st, flash, present)) = info::repair_icon(obj, i, builder) else { continue };
             let Some(e) = el(l, &crate::sfmt!("System{}", i)) else { continue };
             let r = fr.px(e, 0.0, 0.0);
             let hot = info_fo::comp_hover(comp);

@@ -1481,6 +1481,15 @@ addr = 0x765018
 used_by = ["hud.info_fo"]
 
 [[sym]]
+id = "info_sd_build_sys_repair"
+symbol = "ShipDisplay::the builder face's repair icons"
+kind = "field"
+struct = "ShipDisplay"
+offset = 0xd8
+type = "ptr"
+used_by = ["hud.info_fo"]
+
+[[sym]]
 id = "info_obj_cloak"
 symbol = "GameObject::cloak"
 kind = "field"

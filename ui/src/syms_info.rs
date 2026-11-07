@@ -41,28 +41,28 @@ pub mod sym {
     pub const INFO_SD_FOCUS_SIMULATE: a2engine::Sym = a2engine::Sym(168);
     pub const INFO_SLOT_FOCUS_SIMULATE: a2engine::Sym = a2engine::Sym(169);
     pub const INFO_MOUSE_POS: a2engine::Sym = a2engine::Sym(170);
-    pub const UNITVIEW_CINEMATIC_VIEW: a2engine::Sym = a2engine::Sym(173);
-    pub const UNITVIEW_CV_VTABLE: a2engine::Sym = a2engine::Sym(174);
-    pub const UNITVIEW_SB_VTABLE: a2engine::Sym = a2engine::Sym(175);
-    pub const UNITVIEW_CV_RENDER: a2engine::Sym = a2engine::Sym(176);
-    pub const UNITVIEW_SB_RENDER: a2engine::Sym = a2engine::Sym(177);
-    pub const UNITVIEW_SLOT_CV_RENDER: a2engine::Sym = a2engine::Sym(178);
-    pub const UNITVIEW_SLOT_SB_RENDER: a2engine::Sym = a2engine::Sym(179);
-    pub const CLOSEUP_INSET_RENDER_STUFF: a2engine::Sym = a2engine::Sym(185);
-    pub const CLOSEUP_DI_CURRENT_CAMERA: a2engine::Sym = a2engine::Sym(186);
-    pub const CLOSEUP_ENTITY_LIST: a2engine::Sym = a2engine::Sym(187);
-    pub const CLOSEUP_OBJECT_LIST: a2engine::Sym = a2engine::Sym(188);
-    pub const CLOSEUP_ARMADA_CAMERA_VTABLE: a2engine::Sym = a2engine::Sym(189);
-    pub const CLOSEUP_OPERATOR_NEW: a2engine::Sym = a2engine::Sym(190);
-    pub const CLOSEUP_CAMERA_CTOR: a2engine::Sym = a2engine::Sym(191);
-    pub const CLOSEUP_SET_NEAR: a2engine::Sym = a2engine::Sym(192);
-    pub const CLOSEUP_SET_FAR: a2engine::Sym = a2engine::Sym(193);
-    pub const CLOSEUP_SET_VIEWPORT: a2engine::Sym = a2engine::Sym(194);
-    pub const CLOSEUP_SET_TRANSFORM: a2engine::Sym = a2engine::Sym(195);
-    pub const CLOSEUP_SET_CURRENT_CAMERA: a2engine::Sym = a2engine::Sym(196);
-    pub const CLOSEUP_BODY: a2engine::Sym = a2engine::Sym(197);
-    pub const CLOSEUP_SLOT_SET_TRANSFORM: a2engine::Sym = a2engine::Sym(198);
-    pub const CLOSEUP_SITE_INSET: a2engine::Sym = a2engine::Sym(199);
+    pub const UNITVIEW_CINEMATIC_VIEW: a2engine::Sym = a2engine::Sym(174);
+    pub const UNITVIEW_CV_VTABLE: a2engine::Sym = a2engine::Sym(175);
+    pub const UNITVIEW_SB_VTABLE: a2engine::Sym = a2engine::Sym(176);
+    pub const UNITVIEW_CV_RENDER: a2engine::Sym = a2engine::Sym(177);
+    pub const UNITVIEW_SB_RENDER: a2engine::Sym = a2engine::Sym(178);
+    pub const UNITVIEW_SLOT_CV_RENDER: a2engine::Sym = a2engine::Sym(179);
+    pub const UNITVIEW_SLOT_SB_RENDER: a2engine::Sym = a2engine::Sym(180);
+    pub const CLOSEUP_INSET_RENDER_STUFF: a2engine::Sym = a2engine::Sym(186);
+    pub const CLOSEUP_DI_CURRENT_CAMERA: a2engine::Sym = a2engine::Sym(187);
+    pub const CLOSEUP_ENTITY_LIST: a2engine::Sym = a2engine::Sym(188);
+    pub const CLOSEUP_OBJECT_LIST: a2engine::Sym = a2engine::Sym(189);
+    pub const CLOSEUP_ARMADA_CAMERA_VTABLE: a2engine::Sym = a2engine::Sym(190);
+    pub const CLOSEUP_OPERATOR_NEW: a2engine::Sym = a2engine::Sym(191);
+    pub const CLOSEUP_CAMERA_CTOR: a2engine::Sym = a2engine::Sym(192);
+    pub const CLOSEUP_SET_NEAR: a2engine::Sym = a2engine::Sym(193);
+    pub const CLOSEUP_SET_FAR: a2engine::Sym = a2engine::Sym(194);
+    pub const CLOSEUP_SET_VIEWPORT: a2engine::Sym = a2engine::Sym(195);
+    pub const CLOSEUP_SET_TRANSFORM: a2engine::Sym = a2engine::Sym(196);
+    pub const CLOSEUP_SET_CURRENT_CAMERA: a2engine::Sym = a2engine::Sym(197);
+    pub const CLOSEUP_BODY: a2engine::Sym = a2engine::Sym(198);
+    pub const CLOSEUP_SLOT_SET_TRANSFORM: a2engine::Sym = a2engine::Sym(199);
+    pub const CLOSEUP_SITE_INSET: a2engine::Sym = a2engine::Sym(200);
 }
 
 pub mod hook {
@@ -184,21 +184,22 @@ pub mod field {
     #[inline(always)] pub fn INFO_FO_BUFF_SPRITE_SPY() -> usize { super::TABLE.engine().field(a2engine::Sym(164)) }
     #[inline(always)] pub fn INFO_FO_BUFF_SPRITE_MINE() -> usize { super::TABLE.engine().field(a2engine::Sym(165)) }
     #[inline(always)] pub fn INFO_FO_BUFF_SIZE() -> usize { super::TABLE.engine().field(a2engine::Sym(166)) }
-    #[inline(always)] pub fn INFO_OBJ_CLOAK() -> usize { super::TABLE.engine().field(a2engine::Sym(171)) }
-    #[inline(always)] pub fn INFO_CLOAK_STATE() -> usize { super::TABLE.engine().field(a2engine::Sym(172)) }
-    #[inline(always)] pub fn UNITVIEW_CV_RECT() -> usize { super::TABLE.engine().field(a2engine::Sym(180)) }
-    #[inline(always)] pub fn UNITVIEW_CV_BACKGROUND_AREA() -> usize { super::TABLE.engine().field(a2engine::Sym(181)) }
-    #[inline(always)] pub fn UNITVIEW_CV_DISPLAY_AREA() -> usize { super::TABLE.engine().field(a2engine::Sym(182)) }
-    #[inline(always)] pub fn UNITVIEW_CV_FRAME() -> usize { super::TABLE.engine().field(a2engine::Sym(183)) }
-    #[inline(always)] pub fn UNITVIEW_VT_RENDER() -> usize { super::TABLE.engine().field(a2engine::Sym(184)) }
-    #[inline(always)] pub fn CLOSEUP_CAM_RENDER_STUFF() -> usize { super::TABLE.engine().field(a2engine::Sym(200)) }
-    #[inline(always)] pub fn CLOSEUP_CAM_FOV() -> usize { super::TABLE.engine().field(a2engine::Sym(201)) }
-    #[inline(always)] pub fn CLOSEUP_VT_SET_TRANSFORM() -> usize { super::TABLE.engine().field(a2engine::Sym(202)) }
-    #[inline(always)] pub fn CLOSEUP_ENTITY_DRAWN() -> usize { super::TABLE.engine().field(a2engine::Sym(203)) }
-    #[inline(always)] pub fn CLOSEUP_OBJECT_CULLED() -> usize { super::TABLE.engine().field(a2engine::Sym(204)) }
-    #[inline(always)] pub fn CLOSEUP_ENTITY_INSTANCE() -> usize { super::TABLE.engine().field(a2engine::Sym(205)) }
-    #[inline(always)] pub fn CLOSEUP_INST_SPHERE() -> usize { super::TABLE.engine().field(a2engine::Sym(206)) }
-    #[inline(always)] pub fn CLOSEUP_INST_TRANSFORM() -> usize { super::TABLE.engine().field(a2engine::Sym(207)) }
+    #[inline(always)] pub fn INFO_SD_BUILD_SYS_REPAIR() -> usize { super::TABLE.engine().field(a2engine::Sym(171)) }
+    #[inline(always)] pub fn INFO_OBJ_CLOAK() -> usize { super::TABLE.engine().field(a2engine::Sym(172)) }
+    #[inline(always)] pub fn INFO_CLOAK_STATE() -> usize { super::TABLE.engine().field(a2engine::Sym(173)) }
+    #[inline(always)] pub fn UNITVIEW_CV_RECT() -> usize { super::TABLE.engine().field(a2engine::Sym(181)) }
+    #[inline(always)] pub fn UNITVIEW_CV_BACKGROUND_AREA() -> usize { super::TABLE.engine().field(a2engine::Sym(182)) }
+    #[inline(always)] pub fn UNITVIEW_CV_DISPLAY_AREA() -> usize { super::TABLE.engine().field(a2engine::Sym(183)) }
+    #[inline(always)] pub fn UNITVIEW_CV_FRAME() -> usize { super::TABLE.engine().field(a2engine::Sym(184)) }
+    #[inline(always)] pub fn UNITVIEW_VT_RENDER() -> usize { super::TABLE.engine().field(a2engine::Sym(185)) }
+    #[inline(always)] pub fn CLOSEUP_CAM_RENDER_STUFF() -> usize { super::TABLE.engine().field(a2engine::Sym(201)) }
+    #[inline(always)] pub fn CLOSEUP_CAM_FOV() -> usize { super::TABLE.engine().field(a2engine::Sym(202)) }
+    #[inline(always)] pub fn CLOSEUP_VT_SET_TRANSFORM() -> usize { super::TABLE.engine().field(a2engine::Sym(203)) }
+    #[inline(always)] pub fn CLOSEUP_ENTITY_DRAWN() -> usize { super::TABLE.engine().field(a2engine::Sym(204)) }
+    #[inline(always)] pub fn CLOSEUP_OBJECT_CULLED() -> usize { super::TABLE.engine().field(a2engine::Sym(205)) }
+    #[inline(always)] pub fn CLOSEUP_ENTITY_INSTANCE() -> usize { super::TABLE.engine().field(a2engine::Sym(206)) }
+    #[inline(always)] pub fn CLOSEUP_INST_SPHERE() -> usize { super::TABLE.engine().field(a2engine::Sym(207)) }
+    #[inline(always)] pub fn CLOSEUP_INST_TRANSFORM() -> usize { super::TABLE.engine().field(a2engine::Sym(208)) }
 }
 
 pub mod value {
@@ -225,7 +226,7 @@ pub mod value {
     #[inline(always)] pub fn INFO_FO_ICON_POS_BYTES() -> i32 { super::TABLE.engine().value(a2engine::Sym(131)) }
     #[inline(always)] pub fn INFO_SIG_CANNON() -> i32 { super::TABLE.engine().value(a2engine::Sym(152)) }
     #[inline(always)] pub fn INFO_FO_TECH_TREES() -> i32 { super::TABLE.engine().value(a2engine::Sym(153)) }
-    #[inline(always)] pub fn CLOSEUP_CAMERA_SIZE() -> i32 { super::TABLE.engine().value(a2engine::Sym(208)) }
+    #[inline(always)] pub fn CLOSEUP_CAMERA_SIZE() -> i32 { super::TABLE.engine().value(a2engine::Sym(209)) }
 }
 
 pub const SYMS: &[a2engine::SymDef] = &[
@@ -400,6 +401,7 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "info_sd_focus_simulate", symbol: "ShipDisplay::FocusSimulate", kind: a2engine::Kind::Fn },
     a2engine::SymDef { id: "info_slot_focus_simulate", symbol: "ShipDisplay::FocusSimulate", kind: a2engine::Kind::Slot },
     a2engine::SymDef { id: "info_mouse_pos", symbol: "DisplayInterface::s_mousePos", kind: a2engine::Kind::Global },
+    a2engine::SymDef { id: "info_sd_build_sys_repair", symbol: "ShipDisplay::the builder face's repair icons", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "info_obj_cloak", symbol: "GameObject::cloak", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "info_cloak_state", symbol: "cloak: its state", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "unitview_cinematic_view", symbol: "g_cinematicView", kind: a2engine::Kind::Global },
@@ -442,9 +444,9 @@ pub const SYMS: &[a2engine::SymDef] = &[
 
 pub const HOOKS: &[a2engine::HookDef] = &[
     a2engine::HookDef { id: "ui.hud.info", run_unknown: false, rows: &["HUD.Info"], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100] },
-    a2engine::HookDef { id: "ui.hud.info_fo", run_unknown: false, rows: &["HUD.Info"], syms: &[101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172] },
-    a2engine::HookDef { id: "ui.hud.unitview", run_unknown: false, rows: &["HUD.UnitView"], syms: &[173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184] },
-    a2engine::HookDef { id: "ui.hud.closeup", run_unknown: false, rows: &["HUD.InfoCamera"], syms: &[185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208] },
+    a2engine::HookDef { id: "ui.hud.info_fo", run_unknown: false, rows: &["HUD.Info"], syms: &[101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173] },
+    a2engine::HookDef { id: "ui.hud.unitview", run_unknown: false, rows: &["HUD.UnitView"], syms: &[174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185] },
+    a2engine::HookDef { id: "ui.hud.closeup", run_unknown: false, rows: &["HUD.InfoCamera"], syms: &[186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209] },
 ];
 
 pub const BUILDS: &[a2engine::Build] = &[
@@ -456,7 +458,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 209,
+        n_resolved: 210,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x763968, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_ship_display
@@ -630,6 +632,7 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x4f2960, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_sd_focus_simulate
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xa8, vtable: 0xa7, index: 17, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_slot_focus_simulate
             a2engine::Entry { present: true, addr: 0x765018, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_mouse_pos
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 216 }, // info_sd_build_sys_repair
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 264 }, // info_obj_cloak
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 60 }, // info_cloak_state
             a2engine::Entry { present: true, addr: 0x763758, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // unitview_cinematic_view
@@ -637,8 +640,8 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x6b561c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // unitview_sb_vtable
             a2engine::Entry { present: true, addr: 0x4e5d30, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x24], mask: &[], section: "", count: 0, value: 0 }, // unitview_cv_render
             a2engine::Entry { present: true, addr: 0x50a820, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // unitview_sb_render
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xb0, vtable: 0xae, index: 22, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // unitview_slot_cv_render
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xb1, vtable: 0xaf, index: 4, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // unitview_slot_sb_render
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xb1, vtable: 0xaf, index: 22, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // unitview_slot_cv_render
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xb2, vtable: 0xb0, index: 4, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // unitview_slot_sb_render
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // unitview_cv_rect
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // unitview_cv_background_area
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 72 }, // unitview_cv_display_area
@@ -657,8 +660,8 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x619500, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // closeup_set_transform
             a2engine::Entry { present: true, addr: 0x62c2d0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x14], mask: &[], section: "", count: 0, value: 0 }, // closeup_set_current_camera
             a2engine::Entry { present: true, addr: 0x598110, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // closeup_body
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xc3, vtable: 0xbd, index: 5, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // closeup_slot_set_transform
-            a2engine::Entry { present: true, addr: 0x4e60f6, end: 0x0, target: 0xc5, vtable: 0xffff, index: 0, chain: true, check: &[], mask: &[], section: "", count: 0, value: 0 }, // closeup_site_inset
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xc4, vtable: 0xbe, index: 5, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // closeup_slot_set_transform
+            a2engine::Entry { present: true, addr: 0x4e60f6, end: 0x0, target: 0xc6, vtable: 0xffff, index: 0, chain: true, check: &[], mask: &[], section: "", count: 0, value: 0 }, // closeup_site_inset
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 644 }, // closeup_cam_render_stuff
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 424 }, // closeup_cam_fov
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 20 }, // closeup_vt_set_transform
@@ -675,7 +678,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         modules: &[],
         blocked_mod: &[
         ],
-        n_resolved_mod: 209,
+        n_resolved_mod: 210,
     },
     a2engine::Build {
         name: "fo-roots-5.0Z11",
@@ -685,7 +688,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 185,
+        n_resolved: 186,
         content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x763968, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_ship_display
@@ -859,6 +862,7 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x4f2960, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_sd_focus_simulate
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xa8, vtable: 0xa7, index: 17, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_slot_focus_simulate
             a2engine::Entry { present: true, addr: 0x765018, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // info_mouse_pos
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 216 }, // info_sd_build_sys_repair
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 264 }, // info_obj_cloak
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 60 }, // info_cloak_state
             a2engine::Entry { present: true, addr: 0x763758, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // unitview_cinematic_view
@@ -866,8 +870,8 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x6b561c, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // unitview_sb_vtable
             a2engine::Entry { present: true, addr: 0x4e5d30, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x24], mask: &[], section: "", count: 0, value: 0 }, // unitview_cv_render
             a2engine::Entry { present: true, addr: 0x50a820, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // unitview_sb_render
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xb0, vtable: 0xae, index: 22, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // unitview_slot_cv_render
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xb1, vtable: 0xaf, index: 4, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // unitview_slot_sb_render
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xb1, vtable: 0xaf, index: 22, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // unitview_slot_cv_render
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xb2, vtable: 0xb0, index: 4, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // unitview_slot_sb_render
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // unitview_cv_rect
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // unitview_cv_background_area
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 72 }, // unitview_cv_display_area
@@ -886,8 +890,8 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x619500, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // closeup_set_transform
             a2engine::Entry { present: true, addr: 0x62c2d0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x14], mask: &[], section: "", count: 0, value: 0 }, // closeup_set_current_camera
             a2engine::Entry { present: true, addr: 0x598110, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // closeup_body
-            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xc3, vtable: 0xbd, index: 5, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // closeup_slot_set_transform
-            a2engine::Entry { present: true, addr: 0x4e60f6, end: 0x0, target: 0xc5, vtable: 0xffff, index: 0, chain: true, check: &[], mask: &[], section: "", count: 0, value: 0 }, // closeup_site_inset
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xc4, vtable: 0xbe, index: 5, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // closeup_slot_set_transform
+            a2engine::Entry { present: true, addr: 0x4e60f6, end: 0x0, target: 0xc6, vtable: 0xffff, index: 0, chain: true, check: &[], mask: &[], section: "", count: 0, value: 0 }, // closeup_site_inset
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 644 }, // closeup_cam_render_stuff
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 424 }, // closeup_cam_fov
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 20 }, // closeup_vt_set_transform
@@ -906,13 +910,13 @@ pub const BUILDS: &[a2engine::Build] = &[
         blocked_mod: &[
             a2engine::Block { hook: 0, symbol: "ShipDisplay::DetermineSelectedDisplayType", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: ShipDisplay::DetermineSelectedDisplayType is patched by FleetOpsHook.dll, which is not the profiled one" },
         ],
-        n_resolved_mod: 84,
+        n_resolved_mod: 85,
     },
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 4] = [const { core::sync::atomic::AtomicU64::new(0) }; 4];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 209] = [const { core::sync::atomic::AtomicU8::new(0) }; 209];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 209] = [const { core::sync::atomic::AtomicUsize::new(0) }; 209];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 210] = [const { core::sync::atomic::AtomicU8::new(0) }; 210];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 210] = [const { core::sync::atomic::AtomicUsize::new(0) }; 210];
 static NOTES: [a2engine::Note; 4] = [const { a2engine::Note::new() }; 4];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 

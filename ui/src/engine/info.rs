@@ -755,8 +755,10 @@ pub fn single(obj: usize) -> Single {
 /// The panel's repair icon `i` (in the panel's order of them), read only (Roots, whose panel's
 /// `Render` hands the icons their craft): the component, its sprite, its system's state and its
 /// flash.
-pub fn repair_icon(obj: usize, i: usize) -> Option<(usize, usize, SystemState, bool, bool)> {
-    let ri = child(sys_repair() + 4 * i);
+pub fn repair_icon(obj: usize, i: usize, builder: bool) -> Option<(usize, usize, SystemState, bool, bool)> {
+    // The builder face has repair icons of its own (the engine's hover is on those there).
+    let base = if builder && value::INFO_FO_PANEL() != 0 { field::INFO_SD_BUILD_SYS_REPAIR() } else { sys_repair() };
+    let ri = child(base + 4 * i);
     if ri == 0 || obj == 0 {
         return None;
     }

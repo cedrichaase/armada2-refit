@@ -153,7 +153,9 @@ pub fn plan(ui: &Ui, bar_shown: bool) {
             let (bw, bh) = bar_size(ui, cs);
             let bar = R::new(libm::roundf(ui.w - mx - bw), libm::roundf(ui.h - my - bh), bw, bh);
             let x = if centred { libm::roundf((ui.w - own_w) * 0.5) } else { native.x };
-            if x >= left + gap - 0.5 && x + own_w <= bar.x - gap + 0.5 {
+            // The row keeps Roots' own place, right beside the minimap as Roots puts it.
+            let clear_left = if centred { x >= left + gap - 0.5 } else { x >= left - 1.0 };
+            if clear_left && x + own_w <= bar.x - gap + 0.5 {
                 let info = R::new(x, native.y, libm::roundf(own_w), native.h);
                 unsafe { PLAN = Some(Plan { info, native, bar: Some((bar, cs)) }) };
                 return;
