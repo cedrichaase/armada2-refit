@@ -421,6 +421,7 @@ mod tests {
                 credits: "Credits.txt",
                 credits_logos: "textures\\logos.tga",
                 cursor_sprites: "Sprites/cursor.spr",
+                menu_title: "",
             }
         );
         // gallery.rs's lists before.
