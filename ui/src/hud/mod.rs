@@ -6,6 +6,7 @@
 pub mod bar;
 mod bargrid;
 mod barskin;
+mod hover;
 pub mod info;
 pub mod info_fo;
 pub mod row;
@@ -39,6 +40,7 @@ static mut MINIMAP: bool = false;
 static mut SELECTION: bool = false;
 static mut UNIT_VIEW: bool = false;
 static mut TOOLTIPS: bool = false;
+static mut HOVER: (bool, bool) = (false, false);
 /// What the start found possible, for the panels `apply_live` switches while playing:
 /// the minimap's click hook is in, the info panel's engine functions are stock.
 static mut MINIMAP_CAP: bool = false;
@@ -68,7 +70,7 @@ pub fn install() -> bool {
         unsafe { STOOD_DOWN = 1 };
         return false;
     }
-    if !cfg.bar && !cfg.info && !cfg.minimap && !cfg.selection && !cfg.unit_view && !cfg.tooltips && !panels::any(cfg) && !comm::any(cfg) {
+    if !cfg.bar && !cfg.info && !cfg.minimap && !cfg.selection && !cfg.unit_view && !cfg.tooltips && !cfg.hover && !panels::any(cfg) && !comm::any(cfg) {
         crate::log!("hud: no panel switched on, the HUD is stock");
         unsafe { STOOD_DOWN = 2 };
         return false;
@@ -146,6 +148,15 @@ pub fn apply_live(cfg: &crate::config::Hud) {
             hud::take_tooltips(cfg.tooltips);
             TOOLTIPS = cfg.tooltips;
             crate::log!("tooltips: {}", if cfg.tooltips { "ours" } else { "stock" });
+        }
+        // The status line about the craft under the pointer; with `LayoutLog=1` the
+        // engine's is logged while the key is off (the bench's reference).
+        if (cfg.hover, cfg.layout_log) != HOVER {
+            let installed = api::hover::set(cfg.hover, cfg.layout_log);
+            if cfg.hover != HOVER.0 {
+                crate::log!("hover: {}", if cfg.hover && installed { "ours" } else { "stock" });
+            }
+            HOVER = (cfg.hover, cfg.layout_log);
         }
     }
 }
@@ -312,7 +323,10 @@ pub fn run(ui: &mut Ui) {
         // The engine's briefing or message box is up (not ours): stock's HUD sits under
         // it and the box owns the mouse, so nothing of ours but the boxes and the
         // multiplayer boxes draws or takes input (HUD.md, "Under the engine's boxes").
-        if panels::stock_box_up() {
+        let aside = panels::stock_box_up();
+        api::hover::stand_aside(aside);
+        if aside {
+            api::hover::take();
             note_under_box(true);
             panels::run(ui);
             layout::at("comm");
@@ -354,6 +368,9 @@ pub fn run(ui: &mut Ui) {
         layout::at("comm");
         comm::run(ui);
         layout::end(ui.w, ui.h);
+        if api::hover::ours() {
+            hover::run(ui);
+        }
         if TOOLTIPS {
             tooltips::run(ui);
         }

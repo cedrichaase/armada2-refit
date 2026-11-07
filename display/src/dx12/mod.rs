@@ -963,6 +963,15 @@ impl Dx {
         true
     }
 
+    /// A `Present` not shown (`host::hold`): the frame is ended without its last pass and
+    /// without a `Present`, so the buffer on the screen stays.
+    pub fn skip(&mut self) {
+        if self.lost || !self.ready() {
+            return;
+        }
+        let _ = self.end_frame(false);
+    }
+
     /// Ends a frame that cannot be presented: its commands are executed without a
     /// `Present` and its fence is signalled, so the next frame begins on the next slot
     /// with its ring and descriptors reset. The frame is lost, the device is fine, so

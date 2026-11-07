@@ -102,7 +102,8 @@ pub fn run(ui: &mut Ui) {
     let (cell_w, h, gap) = (ui.u(150.0), ui.u(46.0), ui.u(6.0));
     let w = shown.len() as f32 * cell_w + (shown.len() - 1) as f32 * gap;
     let (outer, inner) = place(ui, w, h);
-    ui.panel(outer);
+    // Lamps in the frame (Starfleet): the user wants them on the resource strip.
+    ui.panel_lit(outer);
     for (i, &(r, _)) in shown.iter().enumerate() {
         let cell = R::new(inner.x + i as f32 * (cell_w + gap), inner.y, cell_w, inner.h);
         // The mark: a short bar in the stock panel's colour for this resource.

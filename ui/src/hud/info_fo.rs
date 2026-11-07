@@ -18,7 +18,7 @@
 //! moved off Roots' left edge (`BottomRow` with the bar before the info panel), FleetOpsHook's
 //! icons cannot follow (their rectangles are its own); ours then takes the pointer and does the
 //! clicks itself, as on Armada II, and the rings of the weapon icons are not had there.
-use super::info::{hover_card, hull_colour, tooltip, Tip};
+use super::info::{hull_colour, tooltip, Tip};
 use super::row;
 use crate::content::{Anchor, Element, InfoLayout};
 use crate::engine::api::{hud, info, info_fo, sprite, CANVAS};
@@ -249,7 +249,6 @@ pub fn run(ui: &mut Ui) {
         hud::set_info_area(None);
         return;
     };
-    let hover_craft = info_fo::hover();
     let show = match face {
         info::Face::Single | info::Face::Builder => obj != 0,
         info::Face::Group => true,
@@ -258,9 +257,6 @@ pub fn run(ui: &mut Ui) {
     if !show || plan.info.w < 8.0 {
         hud::set_info_area(None);
         unsafe { RECT = None };
-        if hover_craft != 0 {
-            hover_card(ui, hover_craft, None);
-        }
         return;
     }
     info_fo::log_children(panel);
@@ -296,9 +292,6 @@ pub fn run(ui: &mut Ui) {
             info::look_at(obj);
         }
         tooltip(ui, tip, Some(ours));
-    }
-    if hover_craft != 0 && hover_craft != obj {
-        hover_card(ui, hover_craft, Some(ours));
     }
 }
 

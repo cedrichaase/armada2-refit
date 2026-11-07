@@ -154,11 +154,12 @@ RETIRED = {
 # on that game alone, where the other game ships the new value already: there an old value
 # in the installed file is a player's own, and stays. Roots' [HUD] Messages went from 0 to 1
 # (PLAN-FLEETOPS.md, decision 324): an install made before holds 0, which the player never
-# set (the Refit screen writes RefitPlayer.ini, never UI.ini).
+# set (the Refit screen writes RefitPlayer.ini, never UI.ini). [HUD] Overlay likewise (decision 327).
 RETIRED_BY_GAME = {
     'fo-roots': {
         'ui.ini': {
             ('hud', 'messages'): '0',
+            ('hud', 'overlay'): '0',      # decision 327: the scripts' on-screen messages ours
         },
     },
 }

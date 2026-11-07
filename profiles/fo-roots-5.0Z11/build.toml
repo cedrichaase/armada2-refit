@@ -549,6 +549,15 @@ fn = "ShipDisplay::DetermineSelectedDisplayType"
 how = "runtime"
 verified = ["ui.hud.info", "ui.hud.info_fo"]
 
+# FleetOpsHook's calls for the one-unit and builder faces (+0x99, +0xa5) and its edits of the group
+# faces (+0xcf..+0x1b7) sit before the strip's call at +0x1fa, which is stock's in the file and in
+# memory (the hook's patch checks its target, SDInfoBar::Render, also stock's); ui.hud.hover takes
+# only that call (decision 461).
+[[changed]]
+fn = "ShipDisplay::Render"
+how = "runtime"
+verified = ["ui.hud.hover"]
+
 [[changed]]
 fn = "Show_Credits"
 how = "runtime"

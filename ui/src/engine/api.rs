@@ -94,6 +94,10 @@ pub mod hud {
     };
 }
 
+pub mod hover {
+    pub use crate::engine::hover::{ours, set, stand_aside, take, Kind, Part, Readout};
+}
+
 pub mod info {
     pub use crate::engine::info::{
         build_progress, cancel, class_wire, colour, current, drawn_whole, effect_sprites, effects, face, flash,
@@ -106,7 +110,7 @@ pub mod info {
 /// Roots' info panel under ours (`engine/info_fo.rs`).
 pub mod info_fo {
     pub use crate::engine::info_fo::{
-        available, buff_icons, class_art_name, is_craft, class_art_name_of, cloak, comp_hover, comp_rect, forget, hover, hull_shields, image_rect, install,
+        available, buff_icons, class_art_name, is_craft, class_art_name_of, cloak, comp_hover, comp_rect, forget, hull_shields, image_rect, install,
         log_children, move_rect, original_rect, queue_classes, queue_slot, race_comp, rank, restore, texts, weapon_icons, Icon,
     };
 }

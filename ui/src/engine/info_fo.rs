@@ -80,6 +80,11 @@ pub fn install() -> bool {
         if !available() {
             return false;
         }
+        // The status line under the pointer is drawn inside the panel's Render, through the
+        // hover hook's call (which lifts the gate around it): the hook goes in with the gate.
+        if !super::hover::install_only() {
+            crate::log!("info: the hover strip's call is not stock: Roots' status line under the pointer is not drawn while ours is on");
+        }
         let slots = [
             (sym::INFO_SLOT_DRAW_CLIPPED_RECT, g_clipped_rect as *const () as usize),
             (sym::INFO_SLOT_DRAW_RECT, g_rect as *const () as usize),
@@ -110,36 +115,24 @@ pub fn install() -> bool {
     }
 }
 
-/// The craft under the pointer in the 3D view, as the panel had it before its `Render` drew the
-/// hover strip and cleared it (`render_unseen`), or 0.
-static mut HOVER: i32 = 0;
-static mut HOVER_AT: f64 = -1.0;
-
 /// Runs the panel's `Render` (`render`, thiscall on `c`) with the device's drawing dropped.
 pub fn render_unseen(c: usize, render: unsafe extern "thiscall" fn(usize)) {
     unsafe {
-        HOVER = rd::<i32>(c + field::INFO_SD_HOVER());
-        HOVER_AT = crate::rt::now();
         GATE = true;
         render(c);
         GATE = false;
     }
 }
 
-/// The craft under the pointer in the 3D view (for the hover card), as the panel had it this
-/// frame.
-pub fn hover() -> usize {
-    let none_at = eng().addr(sym::INFO_NO_ENTITY);
+/// Runs `f` with the device's drawing let through, inside the panel's unseen `Render`: the
+/// strip about the craft under the pointer (`SDInfoBar`, Roots' status line at the top of the
+/// screen) is drawn by that `Render` and stays Roots' (or `hover`'s, `[HUD] Hover=1`).
+pub fn ungated(f: impl FnOnce()) {
     unsafe {
-        if none_at == 0 || crate::rt::now() - HOVER_AT > 0.25 {
-            return 0;
-        }
-        let h = HOVER;
-        if h == rd::<i32>(none_at) {
-            return 0;
-        }
-        let o = super::selection::object(h);
-        if o == 0 || super::info::flags(o) & super::info::f_craft() == 0 { 0 } else { o }
+        let g = GATE;
+        GATE = false;
+        f();
+        GATE = g;
     }
 }
 

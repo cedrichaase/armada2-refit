@@ -338,6 +338,18 @@ fn doing(status: &str) -> &'static str {
     STEPS.iter().find(|(p, _)| status.starts_with(p)).map_or("Loading the interface", |&(_, s)| s)
 }
 
+/// Which bar the loading screen draws: `[Loading] Bar=` `classic` (the rounded bar, Armada
+/// II's) or `panel` (a square bar inset in a thin box); empty or `auto`, the content set's
+/// `[Loading] Bar`, else classic.
+fn bar_boxed() -> bool {
+    let k = crate::config::get().loading_bar.as_str();
+    match k {
+        "panel" => true,
+        "classic" => false,
+        _ => crate::content::get().loading_bar == "panel",
+    }
+}
+
 pub fn run(ui: &mut Ui) {
     let Some(l) = load() else { return };
     let now = ui.time();
@@ -363,7 +375,8 @@ pub fn run(ui: &mut Ui) {
     let p = eng::progress().unwrap_or(1.0);
 
     // The bottom band: what the load is doing, the percentage, the bar.
-    let bar_h = ui.u(10.0);
+    let boxed = bar_boxed();
+    let bar_h = if boxed { ui.u(22.0) } else { ui.u(10.0) };
     let bar = R::new(m, screen.h - m - bar_h, screen.w - 2.0 * m, bar_h);
     let line_h = ui.u(40.0);
     let line = R::new(bar.x, bar.y - ui.u(14.0) - line_h, bar.w, line_h);
@@ -372,7 +385,11 @@ pub fn run(ui: &mut Ui) {
     let txt = R::new(line.x + sp + ui.u(14.0), line.y, line.w * 0.6, line.h);
     ui.text_in(txt, doing(eng::status()), t.text_size, Align::Left, t.text, Weight::Regular);
     ui.text_in(line, &crate::sfmt!("{:.0}%", p * 100.0), t.title_size, Align::Right, t.title, Weight::Bold);
-    theme::bar(ui, bar, p, None);
+    if boxed {
+        theme::bar_boxed(ui, bar, p, None);
+    } else {
+        theme::bar(ui, bar, p, None);
+    }
 
     // The mission, down the left.
     let right_w = if l.players.is_empty() && l.preview.is_none() { 0.0 } else { ui.u(440.0).min(screen.w * 0.3) };

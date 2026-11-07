@@ -189,6 +189,9 @@ pub struct Content {
     pub glyphs: &'static [(u8, &'static str)],
     /// The game's own info panel's layout (`[InfoPanel]`), empty where the UI lays it out.
     pub info: InfoLayout,
+    /// `[Loading] Bar`: the loading screen's bar when `[Loading] Bar=` in UI.ini is empty
+    /// (`panel`: a square bar in a thin box; empty: the classic one).
+    pub loading_bar: &'static str,
 }
 
 /// A build with no content set for the UI.
@@ -205,6 +208,7 @@ pub static NONE: Content = Content {
     gallery_factions: &[],
     glyphs: &[],
     info: InfoLayout { size: [0.0, 0.0], min_width: 0.0, lamps: false, elements: &[], numbers: &[], names: &[] },
+    loading_bar: "",
 };
 
 /// A name as the engine's C string, made once and kept for the plugin's life.
@@ -281,6 +285,7 @@ pub fn parse(text: &'static str) -> Content {
             .collect::<Vec<_>>()
             .leak(),
         info: info_layout(&t),
+        loading_bar: t.str("Loading", "Bar").trim(),
     }
 }
 

@@ -28,7 +28,7 @@ reading on the plates, and nothing that moves on its own.
 13. Wait 2 seconds.
 14. Take a screenshot called "hud hover".
 15. Wait 2 seconds.
-16. Check that the HUD's panels of ours (the resource strip, the top-right buttons, the command grid and the minimap) are grey metal rims round dark smoked glass with no blue lamps in their rims and no scan lines, that the text reads, and that the bar's icons read on their plates.
+16. Check that the HUD's panels of ours are grey metal rims round dark smoked glass with no scan lines, that the resource strip has small blue lamps in its side rims lighting its glass blue from the ends while the top-right buttons, the command grid and the minimap have no lamps, that the text reads, and that the bar's icons read on their plates.
 17. Expect "UI.log" not contain "PANIC".
 18. Expect "Display8.log" not contain "VUID".
 19. Expect "Display8.log" not contain "device removed".
