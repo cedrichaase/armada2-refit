@@ -61,9 +61,9 @@ exports yourself.
   be filled says its room and the writer fills no more and sets `size` to what it wrote.
   Whatever is past the other side's size is the field's default. Use what minor N added
   only when Display8's minor is N or more. A struct inside another does not grow in a
-  minor, since that would move what follows. The contract is at 1.4 (the claims at 1.1,
+  minor, since that would move what follows. The contract is at 1.5 (the claims at 1.1,
   Direct3D 12's pipeline library at 1.2, `CLAIM_MENUS` and `display8v1_mode` at 1.3,
-  the Direct3D 12 pass at 1.4).
+  the Direct3D 12 pass at 1.4, `CLAIM_WINDOW` at 1.5).
 - **Anything else is a new major**: a field removed, moved, retyped or given a new
   meaning, an export's signature or meaning, a rule between recorders (layouts,
   states, heaps, who closes a pass). The exports are named with the major

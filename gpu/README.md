@@ -51,7 +51,7 @@ root.
 `gpu::VERSION` is this crate's version (`Cargo.toml`, 1.1.0 since root 13.49.0; 1.0.0
 in 13.48.0); it is not a layer, so the changelogs of render3d and the UI say when it
 moves. The contract with Display8 has a version of its own, `display::ABI_MAJOR` and
-`ABI_MINOR` (1.0 since display 0.12.0, 1.1 since 0.13.0: the claims, 1.2 since 0.15.0: the Direct3D 12 pipeline library, 1.3 since 0.18.0: `CLAIM_MENUS` and `display8v1_mode`, 1.4 since 0.19.0: `display8v1_dx12_pass`, the pass published on Direct3D 12), which both sides
+`ABI_MINOR` (1.0 since display 0.12.0, 1.1 since 0.13.0: the claims, 1.2 since 0.15.0: the Direct3D 12 pipeline library, 1.3 since 0.18.0: `CLAIM_MENUS` and `display8v1_mode`, 1.4 since 0.19.0: `display8v1_dx12_pass`, the pass published on Direct3D 12, 1.5: `CLAIM_WINDOW`, one window for a plugin that draws the game's screens across its windows), which both sides
 build against. gpu 1.3.0 is the first on contract 1.4.
 
 At the first question of which backend draws, `Gpu` shakes hands: `display8_abi`

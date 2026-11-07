@@ -335,6 +335,12 @@ fn tracked() -> &'static mut Vec<Tracked> {
 
 /// Whether a form of Roots' is drawn by the UI now: the frame of `menus::forms` is the
 /// menus' frame.
+/// Whether Roots' forms are the UI's (`[Menus] Forms=1`, installed on a FleetOpsHook of
+/// the family), not the probe's.
+pub fn forms_ours() -> bool {
+    unsafe { MODE == 1 }
+}
+
 pub fn active() -> bool {
     unsafe { MODE != 0 && TIMER != 0 && !((*core::ptr::addr_of!(VIEW)).is_empty() && (*core::ptr::addr_of!(DIALOGS)).is_empty()) }
 }

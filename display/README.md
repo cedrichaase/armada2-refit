@@ -704,7 +704,11 @@ host) and the keyboard (the host gives it the focus at every activation and forw
 thread's top-level windows, so the device window's own enabled state is what counts, as it
 was. A window's owner is always a top-level one, so the forms FleetOpsHook owns by the
 device window are owned by the host: the UI finds the device window inside it. Armada II's
-profile says 0 and the bench's `BenchWindow` still follows.
+profile says 0 and the bench's `BenchWindow` still follows. The host is made only for a plugin that claims `CLAIM_WINDOW` (contract 1.5: the UI with Roots' forms its own, `[Menus] Forms=1`), decided at the first `CreateDevice`; with the game's own forms and dialogs, windows of their own over the game's, the host took the pointer from them (decision 405), so without the claim the swap chain follows each new window as before. The host is never hidden by the game (decision 404). Frames with nothing drawn are not shown right after a switch, and,
+with the host made, a frame none of the plugins drew on is not shown while they are
+drawing the game's frames (for at most 5 s after their last), so the picture holds
+between two screens instead of going black (`host::hold`, `host::between_screens`;
+PLAN-FLEETOPS.md decisions 315 and 403).
 
 **A 1200x900 shell** needs nothing new: a mode the stub does not list is answered with the
 desktop's (the same as the 800x600 and 1024x768 requests of the stock shell and profile),
