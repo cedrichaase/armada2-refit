@@ -663,8 +663,10 @@ that draw their range rings from their `Render`; the buffs are worked out there)
   `<class>_si` (stretched over its area, tinted by the cloak as Roots does), or the wireframe picture
   `<class>w1` for a class without one; the weapon and buff icons are FleetOpsHook's own children,
   drawn at the rectangle and with the sprite its `Render` gave them, tinted with the race's
-  `weaponIconColor` (`WeaponTint`); the subsystem icons are the stock `RepairIcon`s' sprites (tinted by
-  damage and repair like stock's, in the theme's accent, warn and bad); the race icon is the race's
+  `weaponIconColor` (`WeaponTint.<race>`); the subsystem icons are the stock `RepairIcon`s' sprites,
+  in the race's `systemIconHealthyColor` (`SystemTint.<race>`), toward the theme's bad with the damage
+  and warn on the repair's flash, and grey for a system the craft does not have (a station's engines:
+  the craft's system record's first byte is 0); the race icon is the race's
   `<race>_icon`; the rank is `select_rank_<n>` from FleetOpsHook's class record; the builder's queue
   slots are drawn on the plate sprite FleetOpsHook gave each `BuildWireframe`, with the queued class's
   `w1` picture. Name, crew and special energy are the panel's own texts in our font; the shield bar

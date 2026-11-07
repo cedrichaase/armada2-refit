@@ -721,7 +721,7 @@ are in the private notes beside `fleetopshook.md`.
   game, `HUD.Info` toggled live): a Saber, an Akira, the construction ship (its "Empty" research line
   and bar), the Starbase as a builder (ten slots, its engines' icon greyed: a station has none), a
   group of two, a tritanium moon (and the dilithium moon in an earlier session); the Borg's Assembler
-  and the Romulans' Ludanian Station at 21:9 and 32:9-wide 3440x1440 (Instant Action deals the race
+  and the Romulans' Ludanian Station at 2150x900 and 3440x1440 (Instant Action deals the race
   there); the weapon icons' red ring and the sensors' green ring on hover through ours. Not staged:
   an enemy (no contact in the first minutes; FleetOpsHook draws the same face for any team), a damaged
   subsystem, a cloak, a queued item (the Starbase's build clicks did not queue on the bench), a group
