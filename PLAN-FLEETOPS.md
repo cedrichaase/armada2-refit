@@ -1933,6 +1933,14 @@ panel covers the left end of Roots' strip (the hull) where Roots draws it; ours 
 | 467 | **The figures keep the engine's `%`** (`100%`), which Roots' bitmap font cannot draw | the string is the engine's answer; the missing glyph is a gap of Roots' font, not a choice | the user preferring Roots' look to the letter |
 | 468 | **Scenarios**: `fo-ui-hover` / `fo-ui-hover-ref` (1280x960, Federation, the starbase and four ship classes, at once and after two seconds, off again, with the fleet selected) and `fo-ui-hover-wide` / `-wide-ref` (2560x1080, a sweep of twenty places, the race dealt) | the A side is the engine's strip logged by the same hook | a scene harness for Roots (enemy, allied, damaged, cloaked, under construction on demand) |
 
+### The campaigns' emblems on Roots (2026-11-07, branch `fo-campaign-icons`; decisions 530-539)
+
+The user's request: "search for suitable icons for the single player campaigns, for the campaigns menu".
+
+| # | Decision | Why | What would change it |
+|---|---|---|---|
+| 530 | **Each campaign's emblem is its faction's logo, a TGA of Roots' own `Textures` folder, read at run time** (`[Campaign.*] Emblem = textures\<file>.tga` in the fleetops set): `federation_logo` (Allied), `dominion_logo`, `logospecies8472` and `free_borg_logo`. Drawn whole, in the column's tint. The cut of the card's own art stays the fallback (file missing, or `[Menus] Emblem<Id>=none`); `[Menus] Emblem<Id>=<path>` names another file | candidates measured on a contact sheet (the HUD's `allrace.tga` has no Dominion and no Free Borg mark, and the Admiral's Log logos are 41 px blurs): only this one set covers all four in one style, full colour with alpha, 128 to 1000 px, readable at 48 px. Nothing copied or committed (decision 70) | the user preferring white silhouettes (the `allrace` cells for the Federation, Borg and 8472, which leave the other two without) |
+
 ## Open decisions
 
 Decided by the user, 2026-11-06:

@@ -26,6 +26,8 @@ pub struct RaceNames {
 /// A campaign card of the single player screen, in the card order.
 #[derive(Debug, PartialEq)]
 pub struct Campaign {
+    /// The section's id (`Allied` of `[Campaign.Allied]`), which names `[Menus] Emblem<Id>=`.
+    pub id: &'static str,
     /// The card's name, when the stock labels do not give one.
     pub name: &'static str,
     /// A word the stock label of this campaign contains (lower case), which matches the
@@ -35,6 +37,9 @@ pub struct Campaign {
     pub scene: &'static CStr,
     /// The emblem: a race icon's cell in `Files::race_icons` (84 px cells of 256), or None.
     pub emblem: Option<(u32, u32)>,
+    /// Or the emblem as a picture of the game's own, a TGA path (`textures\x.tga`), drawn whole
+    /// (`Emblem = <path>`); "" for none. A picture that cannot be read leaves the card's own art.
+    pub emblem_file: &'static str,
     /// The prefix of the campaign's map names (lower case), for the loading screen.
     pub map: &'static str,
     /// The loading screen's line for its maps, and whether the mission's number follows.
@@ -132,13 +137,16 @@ pub fn parse(text: &'static str) -> Content {
         .collect::<Vec<_>>();
     let campaigns = t
         .sections_under("Campaign.")
-        .map(|(_, es)| {
-            let e = floats(find(es, "Emblem").unwrap_or(""));
+        .map(|(id, es)| {
+            let raw = find(es, "Emblem").unwrap_or("").trim();
+            let e = floats(raw);
             Campaign {
+                id,
                 name: find(es, "Name").unwrap_or(""),
                 key: find(es, "Key").unwrap_or(""),
                 scene: cstr(find(es, "Scene").unwrap_or("")),
                 emblem: (e.len() >= 2).then(|| (e[0] as u32, e[1] as u32)),
+                emblem_file: if e.len() < 2 { raw } else { "" },
                 map: find(es, "Map").unwrap_or(""),
                 kicker: find(es, "Kicker").unwrap_or(""),
                 numbered: find(es, "Numbered").is_some_and(|v| v.trim() == "1"),
