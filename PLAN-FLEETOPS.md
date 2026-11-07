@@ -1522,6 +1522,11 @@ particles module off, the engine's puffs through passthrough; then every module 
 after `20261107-113908` (PASS, the judged shot left for review; no VUID, no device
 removed); the experiments (a blended draw through the chain, from the top level, three
 ways of turning the sheets) in session `20261107-111755-21109`.
+Armada II (`--install .`, run `20261107-114450`): `render3d-live-world` and
+`render3d-live-particles` keep their frame equal through every live switch, and every
+shot sits at RMSE 0.002/255 from its `roundD-base-port-*` baseline (max 2/255, no pixel
+over 2/255), the same with the particles or world module off, where nothing of this
+change runs: a drift of the baselines, not of this change (no stock sprite is `alpha`).
 
 ## FO-7: QOL on Roots
 
