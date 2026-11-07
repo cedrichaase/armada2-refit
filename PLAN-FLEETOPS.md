@@ -1458,6 +1458,36 @@ unchanged: `qol-big-selection` and `qol-move-queue` pass at 1280x720 with `--ins
 (`qol-move-queue` failed once on two waits for the "cleared" lines and passed on the
 re-run and on `origin/fo-b`: a timing flake, not the overview change).
 
+## The Roots menu scene (2026-11-07, branch `fo-menu-ds9`)
+
+Roots' main menu gets a scene of its own: Deep Space Nine, the camera turning slowly
+about it, a Defiant holding station near it (render3d, "The menu scene"). The map is
+`render3d/content/sets/fleetops/menu/map.ini`; Armada II's map is untouched. Bench shots
+(a local, uncommitted preview, because the forms host does not yet call the scene: the
+shots came from a temporary patch to the UI that is not in this branch) showed the
+station at 1600x1200 with the orbit running. Hull radii (`Render3D.log`, "hulls: menu
+scene"): ds9 502, fed_defiant 55, fed_galaxy 124, fed_sovereign 158, fed_akira 103,
+fed_nebula 100, fed_steamrunner 73, fed_outpost 314, fed_intrepid 78,
+fed_mediterranean 84, bor_cube 422, bor_diamond 129.
+
+| # | Decision | Why |
+|---|---|---|
+| 210 | **A set supplies its own menu map**: `sets/<set>/menu/map.ini`, chosen by the set the build gives render3d; a `Menu\map.ini` in the game directory still wins, and a set with none falls back to the built-in map | the smallest mechanism: the set already names the build's content |
+| 211 | **`Orbit=` on a view**: degrees a second, the eye turned about the vertical axis through the target; 0 (the default) is a fixed view, so no Armada II view changes | the camera had only a sway |
+| 212 | **Orbit rate 2.4 degrees a second**: a full turn in 150 s | the user asked for 2 to 3 minutes |
+| 213 | **ODFs by Roots' names**: DS9 is `fds9`, the Defiant `fescort` (basename `fed_defiant`, ScaleSOD 2.2); the campaign views keep stock's ships under Roots' ODFs (`flbattleship`, `fhbattleship`, `fcruiser`, `fsupport`, `fartillery`, `fbase`, `fIntrepid`, `fconst`, `khbattleship`, `kcruiser`, `kdestroyer`, `kartillery`, `bhbattleship`, `bsupport`) so every view the UI asks for exists | Roots renamed the ODFs; nothing is missing, and the menu warp is unchanged |
+| 214 | **Station and ship**: the `ds9` group sits at -5200,2600,6200 (away from the fleet, the planet low in a part of the orbit); the camera is 880 out and 330 up looking at the station's centre, field 40; the Defiant 540 out at 70 up, bobbing a little | the ring (radius about 500) fills the frame at 4:3; the Defiant is outside it so the ring never hides it from the camera's side |
+| 215 | **Higher angle**: the user preferred the higher camera on the bench (2026-11-07) to a camera near the ring's plane, which an earlier take used | user's choice, 2026-11-07 |
+| 216 | **Sky `env_black` with Roots' own starfield**: the plain starry skybox Roots' maps use. `Sky=env_black` names no recipe, so the sky is black; the stars are the menu's own quads (`Stars=14`, `StarSize=0.5`, so each quad is a wide patch of Roots' star sheet), through `bstar.0` of Roots' `starfield.spr` (`env_starsB`, a 1024 tile of many small stars). Roots has no `mstar.0`, so the sky module draws `bstar.0` for the bright ones too (it drew nothing without both) | the user asked for Roots' plain black starfield; stock's per-star sprites do not exist there |
+| 217 | **The menu sky may take the stock recipe** when the build's set has none (`recipe::stock_text`, menu scene only; missions on Roots keep the engine's sky) | an earlier take with `mbgblue` was a coloured nebula, which the user did not want; the fallback keeps other maps of this kind possible without putting recipes into Roots' set |
+| 218 | **A sun, small and far**: `Sun=map_planet_sun01` (Roots' "Orange Sun", `map_planet_sun01.SOD`) at `SunDistance=20000`, where it is a point in the sky; the Key is stock map's `KeyAxis` (unchanged, so the campaign views stay lit as tuned), the fill brighter (0.20,0.24,0.34) so the dark side of the station reads. At this angle the sun stays above the frame | the user asked for a sun, then for it much smaller and further |
+| 219 | **No nebulae**: the Roots map has no `[Nebula.*]` (the Metreon and Mutara gas of the stock map are left out), including behind the campaign views | the user's wish, 2026-11-07 |
+
+Left: the forms host does not call `Render3D_MenuScene` yet (branch
+`fo-forms-scene-dialogs`), so on Roots the scene shows only once that lands; the station
+is mostly behind the centred menu card; the campaign views were not framed for Roots'
+hulls (their radii are about twice stock's).
+
 ## Open decisions
 
 Decided by the user, 2026-11-06:
