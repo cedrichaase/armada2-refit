@@ -24,10 +24,10 @@ Roots' own Back.
 8. Check that a window of ours titled "MULTIPLAYER", laid out as Armada II's Multiplayer Connection screen over the dimmed menu scene, shows a Name caption over a field reading the player's name, three wide buttons (the first reads Internet - Tunngle or Internet - GameSpy, then Internet - Manual IP and Local Area Network) and a Previous Menu button at the bottom left.
 9. Click at 800,366.
 10. Wait 1 second.
-11. Type "Zed".
+11. Type "zed".
 12. Wait 2 seconds.
 13. Take a screenshot called "typed".
-14. Check that the name field has a highlighted frame and reads Zed.
+14. Check that the name field has a highlighted frame and reads zed.
 15. Click "Previous Menu".
 16. Wait up to 20 seconds for "UI.log" to say "press on buttonBack".
 17. Wait up to 20 seconds for "UI.log" to say "forms: TMainForm is ours".
