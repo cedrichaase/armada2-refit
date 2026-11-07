@@ -1085,6 +1085,22 @@ is in the depth buffer.
   reads the particle's node from `esi` and skips a weld (and, while the sparks below
   are on, every other particle too). The welds are drawn as in the plugin, and each
   burning arc registers a point light.
+  **The welds noted are dropped before their light is placed**, not only before they
+  are drawn: a weld keeps its particle's node, object handle and hardpoint node, and the
+  lights come before the draw in a view. Placed at a hardpoint, a weld calls
+  `Entity::GetWorldPosition`, which walks the hardpoint node to the model's root
+  (`ST3D_Instance::GetWorldPosition`, `ST3D_Node::GetTransformToRoot`). A player who
+  aborted a mission while a station was being repaired and started an Instant Action
+  match crashed at the end of the load: at the new match's first view the welds of the
+  old one were still listed, their handle naming an object of the new match and their
+  hardpoint node freed memory, and `GetTransformToRoot` faulted (read off the hung
+  process with `perf`: the fault's address in it, the engine's exception filter in its
+  call-stack dump; the frames before render3d's lights stage were the last logged). The
+  engine's handler then made its display again windowed (`display/README.md`, "A
+  second window") and hung in the dump, a black screen. Whether the stale node faults
+  depends on what the freed memory holds, so `render3d-welds-next-mission` checks the
+  drop itself: `effects: repair: N weld(s) of a view T s ago dropped before their light`
+  after a gap of more than a second (a load, the shell).
 - **Debris** (`chunks.rs`), `Step::Chunks`: our own chunks (`spec-chunks-anim-lod.md`
   §1). The call to `ST3D_Instance::Fragment` (0x62eb20) in `Craft::Explode` (0x4c6bfc)
   is chained: for a craft whose SOD we read, the module notes its ODF, transform,

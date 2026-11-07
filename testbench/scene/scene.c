@@ -2117,6 +2117,16 @@ static void run_command(char *line)
         }
         return;
     }
+    if (s_ieq(t[0], "windowed")) {
+        /* `windowed`: the engine's own flip to windowed, as its assert and exception
+         * handlers make it (Debug_SystemCleanup): a new device on a new, windowed window.
+         * For Display8's handling of a later CreateDevice on another window. */
+        if (!need(SCENE_H_WINDOWED)) return;
+        logline("  flipping to windowed (Debug_SystemCleanup)");
+        ((void (__cdecl *)(void))a2e_addr(SCENE_S_FN_DEBUG_SYSTEM_CLEANUP))();
+        logline("  ok: windowed");
+        return;
+    }
     if (s_ieq(t[0], "pause"))  { pause_now("  ");  return; }
     if (s_ieq(t[0], "pause-at") && n >= 2) {
         long at = (long)s_atof(t[1]);

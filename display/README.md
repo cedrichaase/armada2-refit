@@ -682,8 +682,27 @@ window gets the first one's treatment (a popup over the desktop) and the swap ch
 to it: on Vulkan a surface of the new window, the old swap chain and surface destroyed and
 a swap chain made again (`Vk::rebind`); on Direct3D 12 the GPU's work waited for, the swap
 chain and its buffers released and a new one made on the new window (`Dx::rebind`). The
-colour target, the pipelines and the mirrors stay, so nothing a plugin holds changes. The
-stock engine reuses its one window at every `CreateDevice`, so this never runs there.
+colour target, the pipelines and the mirrors stay, so nothing a plugin holds changes.
+Display8 logs what the new window is first: `stub: CreateDevice on another window <hwnd>:
+class "<class>", shown|hidden, thread <n> (the old window <hwnd>: still there|gone, thread
+<n>)`.
+
+**Armada II meets it too**, though only when the engine makes its display again: a change of
+the fullscreen flag, the device type or the display device in
+`ST3D_GraphicsEngine::SetActiveDisplay_Internal` deletes the device, whose destructor
+destroys its window, and `DeviceOpen` makes a new `ST3D_DeviceDirectX8`, whose
+`CreateDevice` makes a new window of the engine's class (`CreateOrResizeWindow`, no window
+yet) and shows it only after the device is made (`CreateRenderSurfaces`). In a retail game
+the one thing that changes the flag in play is the engine's flip to windowed on an assert or
+an unhandled exception (`Debug_SystemCleanup`, which `Debug_Open` hands to both handlers,
+with `cfgFLIP_TO_WINDOWED_ON_ASSERT = 1` in the stock `RTS_CFG.h`; the `toggle_fullscreen`
+key, Alt+Enter, works only with the developers' `ATVI` file present). So the new window is
+hidden when Display8 sees it, on the engine's thread, and the old one is gone: the swap
+chain must follow it, and a rule of "only a visible window" would have kept it on a destroyed
+one. A player's black screen at the end of a load (fo-b, 2026-11-07) was this path after a
+crash in render3d (`render3d/README.md`, "effects", the welds' light), the engine hung in its
+call-stack dump; the move itself drew on (`display-a2-windowed-flip`, Scene.asi's
+`windowed`, calls `Debug_SystemCleanup` in a mission: the game goes on, on the new window).
 `display-window-follow` checks it on both backends (the bench-only `BenchWindow=N` hook
 hands a popup to the same function at the Nth `Present`, and the game's window again at the
 2Nth, hiding the popup; a thread of the hook's gives the activation back to the game's

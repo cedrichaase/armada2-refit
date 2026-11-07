@@ -26,3 +26,6 @@ GetWindowTextA@12
 ValidateRect@8
 FindWindowExA@16
 ShowWindow@8
+GetClassNameA@12
+IsWindowVisible@4
+GetWindowThreadProcessId@8
