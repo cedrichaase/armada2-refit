@@ -1130,12 +1130,33 @@ a host of their own, `engine/forms.rs` (drawn by `menus/roots.rs`):
 - **What stays Roots'.** The nine screens FleetOpsHook opens through its own
   `DialogBoxParamA` (Single Player, Game Setup, Game Settings, Load, Save, the licence, the
   Technology Tree, the Admiral's Log, Internet: phase two, not done), the map editor's
-  forms, Tunngle's wait; while one of the nine is up over a form of ours, the last frame of
-  ours stays under it.
+  forms, Tunngle's wait.
+- **The nine are framed, not redrawn** (PLAN-FLEETOPS.md, decision 200). The shell sizes a
+  full-screen screen to the device window's client area, which on Display8 is the
+  desktop's size, while Roots paints its 1200x900 art at the top left: the rest of the
+  dialog stayed white (Forms=0 shows the same; it is not the forms' doing). With the forms
+  on, every `#32770` owned by the device window is put where the frame wants it as it
+  activates: a full-screen one cut to the design size and centred, a smaller one left
+  where the shell put it unless that is off the client area (its owner a form of ours,
+  moved off screen), then centred. It is checked every tick and put back if anything moves
+  it. The pump goes on under it (the scene or the backdrop, the forms under it inert, a
+  panel of ours round the dialog), so the area around it is ours. It stays a Win32 window
+  at 1:1: scaling it means drawing it, which is phase two. UI.log: `forms: #32770 ...
+  framed at X,Y WxH on the device window`.
+- **The menu scene** (`[Menus] Scene=1`, decision 201): the forms' frame draws render3d's
+  menu scene first, as the dialog host's does; the main menu's form stands over the
+  `main` view and every other form and dialog over the view last shown. The `fleetops`
+  set names only `Main` in `[Scenes]` (Roots' campaigns are not the stock four, so no
+  campaign view is chosen). The screens' backdrop is then the scene, dimmed
+  (`theme::backdrop`), as on stock; without render3d it is the gradient as before.
 
-The screens: the main menu and Options are a column of our buttons in the form's order
-(Options' Back, which Roots binds when the form opens, at the window's foot; the main
-menu's version line at the bottom right); Yes/No draws the form's picture (Roots draws the
+The screens: the main menu and Options are a column of our buttons in the form's on-screen
+order, each labelled with the caption Roots set on it and pressed at its own rectangle, so
+a button is what the player sees whatever its field is called (on Roots' main menu the
+field named for Options reads "Map Editor" and runs the map editor, and the one named for
+the map editor reads "Options"; decision 204). Options' Back, which Roots binds when the
+form opens, stands at the window's foot, and the main menu's version line at the bottom
+right. Yes/No draws the form's picture (Roots draws the
 question into it) under our two buttons, where the form sits over the screen that asked;
 every other form is generic (`Generic=widgets` in Roots' defaults). The in-mission Options
 stands over the mission's last frame, as the stock host's in-mission menus do.

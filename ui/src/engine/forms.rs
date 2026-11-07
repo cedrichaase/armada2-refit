@@ -191,6 +191,10 @@ struct Tracked {
     hidden: bool,
     last: Vec<Control>,
     in_mission: bool,
+    /// A dialog over the device window (one of the nine FleetOpsHook opens, or one they
+    /// open), framed by the UI: where it was put, in the device window's client
+    /// coordinates (decision 200).
+    framed: Option<[i32; 4]>,
     // the probe's walk
     visit: u32,
     pressed: bool,
@@ -211,6 +215,9 @@ static mut LAST_DIAG: f64 = 0.0;
 static mut ACTIONS: Vec<Action> = Vec::new();
 /// The forms as the frame draws them, outermost first.
 static mut VIEW: Vec<Form> = Vec::new();
+/// The framed dialogs over them, outermost first: each one's rectangle in the device
+/// window's client coordinates, and that client area's size.
+static mut DIALOGS: Vec<([i32; 4], (i32, i32))> = Vec::new();
 /// The top form's picture: DC, bitmap, the DC's old bitmap, the bits (32-bit top-down),
 /// width and height.
 static mut PICTURE: (HDC, HGDIOBJ, HGDIOBJ, *mut u8, i32, i32) =
@@ -226,7 +233,25 @@ fn tracked() -> &'static mut Vec<Tracked> {
 /// Whether a form of Roots' is drawn by the UI now: the frame of `menus::forms` is the
 /// menus' frame.
 pub fn active() -> bool {
-    unsafe { MODE != 0 && TIMER != 0 && !(*core::ptr::addr_of!(VIEW)).is_empty() }
+    unsafe { MODE != 0 && TIMER != 0 && !((*core::ptr::addr_of!(VIEW)).is_empty() && (*core::ptr::addr_of!(DIALOGS)).is_empty()) }
+}
+
+/// Whether the main menu's form is the screen shown (the menu scene's main view).
+pub fn main_menu_shown() -> bool {
+    let v = unsafe { &*core::ptr::addr_of!(VIEW) };
+    let no_dialog = unsafe { (*core::ptr::addr_of!(DIALOGS)).is_empty() };
+    no_dialog && v.last().is_some_and(|f| f.class == "TMainForm")
+}
+
+/// The dialogs the UI frames (decision 200), outermost first: each one's rectangle on
+/// the device window's client area, and that area's size.
+pub fn dialogs() -> Vec<([i32; 4], (i32, i32))> {
+    unsafe { (*core::ptr::addr_of!(DIALOGS)).clone() }
+}
+
+/// Whether a tracked window keeps the pump going: a form of ours, or a framed dialog.
+fn ours(t: &Tracked) -> bool {
+    t.class != "#32770" || t.framed.is_some()
 }
 
 /// The probe of step 0 (`Forms=probe`).
@@ -384,8 +409,9 @@ fn activated(h: HWND) {
         unsafe { GetWindowRect(owner, &mut pr) };
         origin = (p.origin.0 + r.left - pr.left, p.origin.1 + r.top - pr.top);
     }
-    let first = !tracked().iter().any(|t| t.class != "#32770");
+    let first = !tracked().iter().any(ours);
     let in_mission = crate::engine::api::ingame::recent();
+    let framed = if dialog { frame_dialog(h) } else { None };
     tracked().push(Tracked {
         hwnd: h,
         class: class.clone(),
@@ -396,6 +422,7 @@ fn activated(h: HWND) {
         hidden: false,
         last: Vec::new(),
         in_mission,
+        framed,
         visit,
         pressed: false,
         combo: false,
@@ -404,7 +431,10 @@ fn activated(h: HWND) {
         "forms: {} {:p} up at {},{} {}x{}{}",
         class, h, origin.0, origin.1, r.right - r.left, r.bottom - r.top, if in_mission { ", over a mission" } else { "" }
     );
-    if first && !dialog {
+    if let Some(f) = framed {
+        crate::log!("forms: #32770 {:p} framed at {},{} {}x{} on the device window", h, f[0], f[1], f[2], f[3]);
+    }
+    if first && (!dialog || framed.is_some()) {
         crate::input::set_hosting(true);
         unsafe { HOSTING = true };
         crate::menus::backdrop::begin(if in_mission { "forms" } else { "main menu" });
@@ -434,7 +464,7 @@ fn destroyed(h: HWND) {
     let Some(i) = v.iter().position(|t| t.hwnd == h) else { return };
     let t = v.remove(i);
     crate::log!("forms: {} {:p} closed after {:.1} s ({} frames of ours so far)", t.class, h, crate::rt::now() - t.opened, unsafe { FRAMES });
-    if v.iter().all(|t| t.class == "#32770") {
+    if !v.iter().any(ours) {
         stop();
     }
 }
@@ -447,6 +477,7 @@ fn stop() {
             TIMER = 0;
         }
         (*core::ptr::addr_of_mut!(VIEW)).clear();
+        (*core::ptr::addr_of_mut!(DIALOGS)).clear();
         (*core::ptr::addr_of_mut!(ACTIONS)).clear();
         if HOSTING {
             HOSTING = false;
@@ -722,15 +753,22 @@ unsafe extern "system" fn tick(_h: HWND, _m: u32, _id: usize, _t: u32) {
     let now = crate::rt::now();
     let v = tracked();
     v.retain(|t| unsafe { IsWindow(t.hwnd) } != 0);
-    if !v.iter().any(|t| t.class != "#32770") {
+    if !v.iter().any(ours) {
         stop();
         return;
     }
     let top = v.len() - 1;
     if v[top].class == "#32770" {
         // One of the nine dialogs FleetOpsHook opens through its own import: Roots' own
-        // until phase two (decision 150). Our last frame stays under it.
+        // until phase two (decision 150). A framed one (decision 200) stands at its place
+        // over our frame, which goes on under it; any other leaves our last frame.
         unsafe { DIALOG_TICKS += 1 };
+        if v[top].framed.is_none() {
+            return;
+        }
+        keep_framed(&v[top]);
+        publish(v, None);
+        frame();
         return;
     }
     run_actions(v[top].hwnd);
@@ -773,7 +811,13 @@ unsafe extern "system" fn tick(_h: HWND, _m: u32, _id: usize, _t: u32) {
         let age = now - t.opened;
         script(t, age);
     }
-    // What the frame draws: the forms that are ours, outermost first; only the last is live.
+    publish(v, Some(top));
+    frame();
+}
+
+/// What the frame draws: the forms that are ours, outermost first, only `live` live
+/// (None: a dialog is on top and every form under it is inert); the framed dialogs.
+fn publish(v: &[Tracked], live: Option<usize>) {
     let view: Vec<Form> = v
         .iter()
         .enumerate()
@@ -784,12 +828,104 @@ unsafe extern "system" fn tick(_h: HWND, _m: u32, _id: usize, _t: u32) {
             origin: t.origin,
             size: t.size,
             controls: t.last.clone(),
-            top: i == top,
+            top: Some(i) == live,
             in_mission: t.in_mission,
         })
         .collect();
-    unsafe { *core::ptr::addr_of_mut!(VIEW) = view };
-    frame();
+    let dialogs: Vec<([i32; 4], (i32, i32))> = v.iter().filter_map(|t| t.framed.map(|f| (f, client_size(t.hwnd)))).collect();
+    unsafe {
+        *core::ptr::addr_of_mut!(VIEW) = view;
+        *core::ptr::addr_of_mut!(DIALOGS) = dialogs;
+    }
+}
+
+// ---- the dialogs over the device window (decision 200) ------------------------------------
+
+/// The device window a window is owned by (through its owners), or null.
+fn device_of(h: HWND) -> HWND {
+    let mut w = unsafe { GetWindow(h, GW_OWNER) };
+    for _ in 0..6 {
+        if w.is_null() || class_of(w) == "TMainWindowForm" {
+            return w;
+        }
+        w = unsafe { GetWindow(w, GW_OWNER) };
+    }
+    core::ptr::null_mut()
+}
+
+/// The device window's client size, for a window over it.
+fn client_size(h: HWND) -> (i32, i32) {
+    let d = device_of(h);
+    let mut c = WinRect::default();
+    if !d.is_null() {
+        unsafe { GetClientRect(d, &mut c) };
+    }
+    (c.right - c.left, c.bottom - c.top)
+}
+
+/// A window's rectangle in its device window's client coordinates.
+fn on_device(h: HWND, d: HWND) -> [i32; 4] {
+    let mut o = Point::default();
+    let mut r = WinRect::default();
+    unsafe {
+        ClientToScreen(d, &mut o);
+        GetWindowRect(h, &mut r);
+    }
+    [r.left - o.x, r.top - o.y, r.right - r.left, r.bottom - r.top]
+}
+
+/// Where a dialog over the device window stands. The shell sizes a full-screen screen to
+/// its owner's client area, which on Display8 is the desktop's size, while Roots paints the
+/// screen's design size (1200x900) at its top left and leaves the rest unpainted (white):
+/// such a dialog is cut to the design size and centred. A smaller one stays where the
+/// shell put it, unless that is off the client area (its owner a form of ours, moved off
+/// screen): then it is centred. None: not over the device window, left alone.
+fn placement(h: HWND) -> Option<[i32; 4]> {
+    let d = device_of(h);
+    if d.is_null() {
+        return None;
+    }
+    let (cw, ch) = client_size(h);
+    let [x, y, w, ht] = on_device(h, d);
+    let (dw, dh) = design();
+    if dw > 0 && dh > 0 && w >= dw && ht >= dh {
+        return Some([((cw - dw) / 2).max(0), ((ch - dh) / 2).max(0), dw, dh]);
+    }
+    if x >= 0 && y >= 0 && x + w <= cw && y + ht <= ch {
+        Some([x, y, w, ht])
+    } else {
+        Some([((cw - w) / 2).max(0), ((ch - ht) / 2).max(0), w, ht])
+    }
+}
+
+/// Puts a dialog where `placement` says; its place.
+fn frame_dialog(h: HWND) -> Option<[i32; 4]> {
+    let p = placement(h)?;
+    put(h, p);
+    Some(p)
+}
+
+fn put(h: HWND, p: [i32; 4]) {
+    let mut o = Point::default();
+    unsafe {
+        ClientToScreen(device_of(h), &mut o);
+        SetWindowPos(h, core::ptr::null_mut(), o.x + p[0], o.y + p[1], p[2], p[3], SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+}
+
+/// The shell or FleetOpsHook may place the dialog again (FleetOpsHook re-places the
+/// windows it registered when the device window moves): back where the frame has it.
+fn keep_framed(t: &Tracked) {
+    let Some(p) = t.framed else { return };
+    let d = device_of(t.hwnd);
+    if d.is_null() {
+        return;
+    }
+    let now = on_device(t.hwnd, d);
+    if now != p {
+        crate::log!("forms: #32770 {:p} was placed at {},{} {}x{}: framed again", t.hwnd, now[0], now[1], now[2], now[3]);
+        put(t.hwnd, p);
+    }
 }
 
 static mut BUTTON: bool = false;
@@ -935,6 +1071,8 @@ fn frame() {
     }
     dev8::set_viewport(dev, bb.width, bb.height);
     dev8::clear(dev, dev8::CLEAR_TARGET, 0xff000000);
+    // render3d's menu scene under everything of ours, as the dialog host's frame has it.
+    crate::menus::scene::draw(bb.width, bb.height);
     crate::surface::frame(crate::surface::Context::Menus);
     dev8::end_scene(dev);
     dev8::present(dev);

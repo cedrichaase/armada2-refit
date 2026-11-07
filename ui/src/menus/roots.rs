@@ -95,10 +95,13 @@ fn title(class: &str) -> &'static str {
 
 pub fn frame(ui: &mut Ui) {
     let view = forms::view();
-    let Some(top) = view.last() else { return };
+    let dialogs = forms::dialogs();
+    if view.is_empty() && dialogs.is_empty() {
+        return;
+    }
     let (mut dw, mut dh) = forms::design();
     if dw <= 0 || dh <= 0 {
-        (dw, dh) = top.size;
+        (dw, dh) = view.last().map_or((1200, 900), |f| f.size);
     }
     let s = (ui.w / dw as f32).min(ui.h / dh as f32);
     let fit = Fit { x: libm::floorf((ui.w - dw as f32 * s) * 0.5), y: libm::floorf((ui.h - dh as f32 * s) * 0.5), s };
@@ -112,11 +115,13 @@ pub fn frame(ui: &mut Ui) {
             crate::log!("menus: forms {}x{} @0,0 -> {}x{} @{},{} (the design space on the screen)", dw, dh, k.2, k.3, k.0, k.1);
         }
     }
-    // Over the mission it interrupts (the in-mission menu), else the theme's backdrop.
-    if !crate::menus::backdrop::draw(ui) {
-        let t = ui.theme;
+    // Over the mission it interrupts (the in-mission menu), else the theme's backdrop:
+    // render3d's menu scene, dimmed, when it drew under this frame.
+    // The main menu over the scene shades only where its column stands, as Armada II's.
+    let main_over_scene = crate::menus::scene::shown() && forms::main_menu_shown() && crate::config::get().menus_specs;
+    if !main_over_scene && !crate::menus::backdrop::draw(ui) {
         let full = ui.screen();
-        ui.draw.rect_vgrad(full, t.backdrop_top, t.backdrop_bottom);
+        crate::widgets::theme::backdrop(ui, full);
     }
     if forms::probe() {
         ui.note(R::new(area.x + ui.u(8.0), area.bottom() - ui.u(28.0), area.w, ui.u(24.0)), "forms probe");
@@ -128,13 +133,24 @@ pub fn frame(ui: &mut Ui) {
         let live = f.top;
         ui.scope(&crate::sfmt!("form{}", f.hwnd), |ui| {
             ui.inert_unless(live, |ui| match (cfg.menus_specs, f.class.as_str()) {
-                (true, "TMainForm") => column(ui, &fit, f, area, None),
+                (true, "TMainForm") => main_menu(ui, f),
                 (true, "TOptionsMenuForm") => column(ui, &fit, f, area, Some("buttonBack")),
                 (true, "TYesNoForm") => yes_no(ui, &fit, f),
                 _ => generic(ui, &fit, f, cfg.menus_widgets, live),
             })
         });
         let _ = i;
+    }
+    // The dialogs FleetOpsHook opens through its own import stand over this frame as
+    // Roots draws them, cut to the design size and centred (decision 200): a panel of
+    // ours frames each, in the device window's client pixels.
+    for (r, (cw, ch)) in dialogs {
+        if cw <= 0 || ch <= 0 {
+            continue;
+        }
+        let (sx, sy) = (ui.w / cw as f32, ui.h / ch as f32);
+        let dr = R::new(r[0] as f32 * sx, r[1] as f32 * sy, r[2] as f32 * sx, r[3] as f32 * sy);
+        ui.panel(dr.inset(-ui.u(6.0)));
     }
 }
 
@@ -149,7 +165,30 @@ fn caption(c: &Control) -> &str {
     if c.text.is_empty() || c.text == "*" { c.name.as_str() } else { c.text.as_str() }
 }
 
-/// The main menu and Options: our column of the form's visible buttons, in the form's
+/// The main menu: Armada II's main menu over the scene (`screens::main_menu::scene_column`,
+/// the same layout and look), titled for Roots, its entries the form's visible buttons in
+/// the order Roots shows them and with the captions Roots set (decision 205); a press goes
+/// to the button at its own rectangle, so two buttons whose names are swapped against
+/// their actions still do what their captions say. Roots' version line stands at the
+/// bottom right, as Armada II's does.
+fn main_menu(ui: &mut Ui, f: &Form) {
+    let buttons = shown(f, Kind::Button);
+    let labels: Vec<String> = buttons.iter().map(|c| caption(c).to_uppercase()).collect();
+    let entries: Vec<(&str, bool)> = labels.iter().zip(buttons.iter()).map(|(l, c)| (l.as_str(), f.top && c.enabled)).collect();
+    let (clicked, _) = crate::menus::screens::main_menu::scene_column(ui, "FLEET OPERATIONS", "ROOTS", &entries);
+    if let Some(i) = clicked {
+        forms::press(f, buttons[i]);
+    }
+    if let Some(v) = f.control("labelVersion").filter(|c| c.visible && !c.text.is_empty()) {
+        let t = ui.theme;
+        let s = ui.screen();
+        let m = ui.u(24.0);
+        let r = R::new(s.w - m - ui.u(400.0), s.h - m - ui.u(24.0), ui.u(400.0), ui.u(24.0));
+        ui.text_in(r, &v.text, t.small_size, Align::Right, t.text_dim, Weight::Regular);
+    }
+}
+
+/// Options: our column of the form's visible buttons, in the form's
 /// order, centred over the backdrop; Options' Back (bound by Roots when the form opens:
 /// Previous Menu in the shell, the return to the mission in one) at the window's foot; the
 /// main menu's version line at the bottom right. A press goes to Roots' own button, so the

@@ -106,6 +106,13 @@ fn wanted() -> Option<(&'static core::ffi::CStr, SceneFn)> {
     if !crate::config::get().menus_scene || super::backdrop::over_mission() {
         return None;
     }
+    // Roots' forms (MENUS.md, "Roots' forms"): the main menu's form shows the main view,
+    // every other form and the dialogs FleetOpsHook opens over them the view last shown.
+    if crate::engine::api::forms::active() {
+        let screen = if crate::engine::api::forms::main_menu_shown() { "main menu" } else { "forms" };
+        unsafe { CHOICE = None };
+        return Some((scene_for(screen)?, scene_fn()?));
+    }
     let all = crate::engine::api::dialogs::stack();
     let full = all.iter().rposition(|s| s.w() >= crate::engine::api::dialogs::design_w() && s.h() >= crate::engine::api::dialogs::design_h())?;
     let screen = crate::engine::api::dialogs::screen_name(all[full].proc_addr);
