@@ -1,6 +1,6 @@
 # Pay when queuing: refunds when the building is lost, and across a save
 
-Resolutions: 16:9
+Resolutions: 1280x720
 Mod: refit
 Launch: -nointro a2_borg01
 Setup: testbench/scene/bench-setup.sh stations
@@ -62,10 +62,10 @@ three `lost` lines after the save); the loaded bank is the saved one.
 36. Press Escape.
 37. Wait for the options menu.
 38. Click "Save Game".
-39. Wait 2 seconds.
-40. Click at design 400,518.
+39. Wait 3 seconds.
+40. Click at 700,607.
 41. Type "paybench".
-42. Click at design 400,579.
+42. Click at 640,639.
 43. Wait for "Save Successful".
 44. Click "O.K.".
 45. Click "Previous Menu".
@@ -73,7 +73,7 @@ three `lost` lines after the save); the loaded bank is the saved one.
 47. Click "Load Game".
 48. Wait 2 seconds.
 49. Click "paybench".
-50. Click at design 400,579.
+50. Click at 640,639.
 51. Wait for "abort the mission".
 52. Click "Yes".
 53. Wait 10 seconds.
