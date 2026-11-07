@@ -17,7 +17,7 @@ reading on the plates, and nothing that moves on its own.
 1. Include "_fo-render3d-skirmish".
 2. Move the mouse to 700,300.
 3. Wait 1 second.
-4. Drag from 300,590 to 385,695.
+4. Drag from 690,530 to 860,690.
 5. Wait 2 seconds.
 6. Move the mouse to 700,300.
 7. Wait 1 second.
