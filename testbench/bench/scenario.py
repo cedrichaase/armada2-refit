@@ -250,6 +250,15 @@ def s_quit(c, m):
             # spot first, for a moment
             c.sess.move(x, y)
             time.sleep(1.0)
+        else:
+            # Opening the in-mission menu changes what the pointer is (the engine's
+            # mission cursor is locked, the menu's arrow is not), and after a long
+            # mission the compositor's pointer and the game's can stand apart: a click
+            # then misses the button (multiplayer-online-loss, 2026-11-08, the Yes of
+            # the exit confirmation three times over).  Push both into the corner
+            # first, as `Session.to_corner` says, so the moves aim from where the
+            # pointer is.
+            c.sess.to_corner()
         c.sess.click(x, y)
 
     words = vision.ocr(c.fresh_shot('quit-0'))
