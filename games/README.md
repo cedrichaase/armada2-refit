@@ -22,8 +22,8 @@ manifest, `PLAYING.md` or the release notes until the user says otherwise.
 game that is not.
 
 What `./install --game fo-roots` puts in `Data/` now: Display8 (`display`), the ASI loader
-Roots ships none of (`asiloader`, `winmm.dll`; `asiloader/README.md`) and render3d. No UI,
-QOL, rules, online, textures or cutscenes yet. a2mod files each layer's files only for the
+Roots ships none of (`asiloader`, `winmm.dll`; `asiloader/README.md`), render3d, QOL, the UI and
+Online (`games/fo-roots.toml` lists them). No rules, textures or cutscenes yet. a2mod files each layer's files only for the
 games in the layer's `games`.
 
 ## Versions and changelogs

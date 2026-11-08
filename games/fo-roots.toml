@@ -17,9 +17,11 @@ default = false
 # and Shift+number on; every other part off until measured beside Roots' own behaviour); and
 # the UI (FO-6: UI.ini with Roots' own defaults, ui/defaults/fo-roots.ini: the parts verified on
 # Roots on, every other part off; no menu plates). No platform layer (no widescreen patch of
-# ours), and no rules, online, textures or cutscenes on Roots yet. A clone with no layers is
-# the game as shipped.
-layers = ["display", "asiloader", "render3d", "qol", "ui"]
+# ours); Online (FO-8: Online.asi's transport for Internet - Online, a button of the UI's
+# Roots forms, and its own kind on the server, online/README.md, "On Fleet Operations:
+# Roots"); no rules, textures or cutscenes on Roots yet. A clone with no layers is the game
+# as shipped.
+layers = ["display", "asiloader", "render3d", "qol", "ui", "online"]
 
 [exe]
 # The game itself in Data/, under a launcher (FleetOps.exe) that only starts it; the

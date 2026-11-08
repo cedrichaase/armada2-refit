@@ -15,7 +15,9 @@
 set -euo pipefail
 
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/a2env.sh"
-GAME="$A2_GAME"
+# into the executable's folder (dirname $A2_EXE): the game directory on Armada II, Data/
+# on Fleet Operations: Roots (games/<id>.toml, exe.data_dir)
+GAME="$(dirname "$A2_EXE")"
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 remove=0

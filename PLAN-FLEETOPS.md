@@ -160,7 +160,7 @@ written per hook. Observing the running game is preferred over reading
 | ui | the Refit screen, settings and the loading screen first; **HUD panels and the menu host off** at first | Roots changed its HUD (its own sprites and canvases) and its shell (1200x900, the dialog procedures); each part comes back when its specs are written for Roots |
 | qol | pan speed and the camera; **group, keyboard and station features off** until measured | Roots detours the same functions |
 | qol rules | **off** | must-match, and Roots has its own rules |
-| online | not at first; measured in FO-8 | Roots' lobby and CRC ride on top of the transport |
+| online | **yes** (FO-8): the transport, join codes and the server under Roots' own session; the entry is the UI's button on Roots' connection form (`Menus.Forms=1`); a Roots game is its own kind on the server | Roots' session is Armada II's DirectPlay one; a network game is blocked by Roots losing the player's name under Proton (decision 669) |
 | cutscenes (binkproxy) | yes, if the measurement passes | `FleetOpsHook` imports `binkw32` too; the proxy must forward every export it uses |
 | hud, grid, menus (legacy) | **no** | Roots has its own widescreen HUD layouts and shell; the legacy plugins assume stock's |
 | textures, models, menus backdrops, movies | **no** for now | the recipes are stock-hashed (`a2tex stock` refuses Roots' files, so nothing is installed by accident); Roots' art is mixed TGA and DDS |
@@ -1510,7 +1510,7 @@ them, 2–4 h together).
 | `fo-ui-standdown-ref`, `fo-ui-standdown` | every UI part at 0: the shell pixel for pixel as with Display8 and Render3D alone (passes, 0 pixels differ, 2026-11-06) |
 | `fo-ui-loading` | the loading screen of ours over Roots' own, 1280x960 (passes, 2026-11-06: `loading: standing down` not in the log, the hold, then Roots' HUD with no panel of ours; the ring-of-dots step is left to a person, the judge sees one shot, a pixel diff of the ring's crop between the two shots shows it turning) |
 | stock `ui-hud-bar`, `ui-loading` | 1280x720, `--install .` on the step 3 branch: `ui-hud-bar` passes (70 steps); `ui-loading` passes but for the ring step, which the judge cannot see (review; 2026-11-06) |
-| `fo-multiplayer` | two Roots games with the refit's visual plugins join and play past the file check |
+| `fo-multiplayer` | two Roots games with the refit's visual plugins join and play past the file check (2026-11-08: found and reached, on Microsoft's DirectPlay and through Internet - Online, then refused by name; decision 669) |
 | the stock set | unchanged on stock 1.1: the Roots work must not move a single stock pixel |
 
 ## What the user signs off
@@ -2148,6 +2148,47 @@ Bench: `fo-ui-credits` `20261107-202222` (1280x960) and `20261107-203219` (3440x
 left its screen as before (`demo screen left (0)`); its two runs failed on other steps (typed text,
 a drop-down), where `fo-b`'s own run passed, in the demo's widgets, which this branch does not touch.
 Sheets: `$A2_DATA/review/fo-menu-audit/sheet-credits-*.png`.
+
+## FO-8: multiplayer (2026-11-08, branch `fo-8-online`; decisions 660–672)
+
+Two Roots games on the bench with Display8, Render3D, QOL and the UI, first on Microsoft's
+DirectPlay in the clones (`online/reference-dplay.sh`, `Online.asi` tracing), then on
+`Online.asi`'s own transport through *Internet - Online*, a join code and a bench server.
+Observed, nothing read of FleetOpsHook beyond its run-time patch table and its forms:
+
+- **Roots' network layer is Armada II's.** `NetworkManager.dll` (Roots' copy) creates an
+  `IDirectPlay8Peer` through its one `CoCreateInstance` import, with Armada II's application
+  GUID (`1005fae8-…`); the lobby and GAME SETUP are the exe's dialogs (`InternetGameDlgProc`,
+  `MultiplayerSetupDlgProc`, adopted and drawn by the UI). FleetOpsHook replaces only what is
+  in front of them: `do_multiplayerConnection` jumps to `TMultiplayerConnectionForm`
+  (Tunngle, Manual IP, LAN) and `do_manual_ip` to `TManualIPForm`. A blank Manual IP address
+  hosts (the lobby, Create Game), a typed one searches. No lobby of Roots' own on this path,
+  no check before GAME SETUP.
+- **The baseline stops before the file check.** Both games find each other and connect, and
+  the host's game refuses the joiner: "The game you tried to join already has a player with
+  your name." Roots loses the player's name as its connection screen closes, as shipped too
+  (no plugin of ours, DxWrapper): the first two bytes of the name become a small number
+  (0x0006, 0x0012), so every player is one control character. Roots' CRC check, the launch
+  and a tick were therefore not reached, on either transport.
+- **Online.asi carries Roots up to the same point**: the UI's *Internet - Online*, the join
+  code from the server (Roots' kind), shown in GAME SETUP's chat, the direct path, the
+  joiner connected; then the same refusal by name.
+
+| # | Decision | Why | Revisit when |
+|---|---|---|---|
+| 660 | **Roots' multiplayer is Armada II's DirectPlay session behind two forms of FleetOpsHook's**: the same `NetworkManager.dll` slot, peer, application GUID, lobby and GAME SETUP; `Online.asi`'s transport sits below it unchanged | traced on the bench with Microsoft's DirectPlay and with ours; FleetOpsHook's patch table writes nothing in `NetworkManager.dll`'s import or `GenericConnection`'s path beyond the two dialogs | a Roots build with a lobby of its own |
+| 661 | **`online.entry` is split into `entry`, `labels`, `chat` and `kind`**, each checked and written on its own; on Armada II all four are ready and the screen is as before | Roots needs the labels, the chat notices and its kind, not the exe's connection screen, which never opens there | — |
+| 662 | **On Roots `online.entry` is off (`[[disable]]`)**, `online.chat` verified beside Roots' edits of the lobby and GAME SETUP (stock bytes at both `Chat::Init` sites, file and memory; the join code seen in the chat), `online.labels` ready (`read_text_label` unchanged) | the bench | — |
+| 663 | **Internet - Online on Roots is the UI's button in Tunngle's place** on the connection form (`Menus.Forms=1`): `Online_Available` says whether to show it, `Online_Choose(1)` then a press of Roots' own Manual IP button; every other button `Online_Choose(0)`; Roots' Manual IP form then reads INTERNET - ONLINE and "Join code or host address (blank to host)". Nothing of FleetOpsHook's written, no user32 hook | Tunngle is a dead service, as IPX is on Armada II (decision 605 lists it so); a fifth button would be a form control Roots does not have | — |
+| 664 | **Without the UI's forms there is no Internet - Online on Roots** (Roots' own form, `[Menus] Forms` ships 0 on Roots, decision 149) | the alternatives are writing into FleetOpsHook's form or hooking user32; both are ruled out | the user's choice: Forms on by default where Online is installed, or a way that needs neither |
+| 665 | **The server keeps games apart by a kind** ending `SV_HOST` and `SV_JOIN`: 0 for Armada II and every client before kinds, `0x14e91822` (the CRC-32 of `fo-roots`, top bit cleared) for every Roots build, a `value` in the build's profile (`online.kind`). A joiner of another kind is never introduced: `SV_ERROR` to a kind-aware one (its lookup stops), `SV_NOTFOUND` to an older one. Backward compatible both ways; `selftest.py` covers it | Roots and Armada II share the application GUID, so nothing else tells them apart before the game's own file check; the server stays ignorant of games by name | Roots builds that must not meet (Roots' own check refuses them, with its message) |
+| 666 | **The public server must run the kinds before Roots players are pointed at it**: a server before kinds would match a Roots code with an Armada II joiner (the game's file check then refuses) | the field is read past by an old server | deploying the server (the user's) |
+| 667 | **Joining by address is not checked by kind**: `P_CONN` and `P_ENUM_Q` end in the game's own data, so a kind needs a new protocol version there; the player chose the address | — | a reason to bump the peer protocol |
+| 668 | **The rules layer stays off on Roots** (decision 105): a Roots player reports no QOLRules in the handshake, so a Roots game plays Roots' rules | Roots has its own balance | — |
+| 669 | **The player's name lost by Roots under Proton is a blocker for every Roots network game, reported, not mended here.** Handing DirectPlay another name in `peer.c` was tried and taken out (the game compares its own copy). A mend would write the name back into the engine's shell settings after FleetOpsHook's handler, from Roots' name field: the engine's data, not FleetOpsHook's, but a setting written by a plugin, which the UI's rule forbids for menus | measured: `shell.set`'s name loses its first two bytes as the connection form closes, with and without our plugins; `Online.log` now prints a name's first characters as numbers | the user's decision on a mend, or whether Roots does the same on Windows |
+| 670 | **GAME SETUP's chat is the log under the players** when a screen has two multi-line edits left of `log_right` (Roots' multiplayer setup has an empty one at x 907, where its Instant Action's only log stands) | the join code's line was in the one under the players and the UI drew the other | — |
+| 671 | **A game's password is `ui.forms.password_spec`, a hook of its own** (Armada II's small form, titled PASSWORD), standing down on Roots until measured: `PasswordDlgProc` is marked changed at run time, and adding it to `forms.dialog_specs` stood the thirteen dialogs down on the first run (the trap of decision 604). The map transfer is not specced: its procedure is changed at run time too, and neither was reached, since no joiner gets past the name | the bench | the name mended (decision 669): then the password prompt and the map transfer can be reached and verified |
+| 672 | **Bench**: `fo-multiplayer` (Microsoft's DirectPlay, Manual IP) and `fo-multiplayer-online` (Internet - Online, join code, bench server), both 1280x960 with the UI's forms (the bench's clicks on Roots' own VCL buttons were lost), the joiner picks the game by its map ("'s Game" has no name); both end at the refusal by name and check the transport up to it | the acceptance scenario `fo-multiplayer` cannot pass while decision 669 stands | — |
 
 ## Open decisions
 

@@ -154,7 +154,11 @@ fn players(ui: &mut Ui, s: &dyn Host, l: &Layout, combos: &[&Control], r: R) {
     let edits = kit::visible(s, kit::is_edit);
     // A multiplayer game has a second multi-line edit at the right (x 600, the
     // observers); the log is the one under the table.
-    let log = edits.iter().find(|c| c.style & 0x4 != 0 && c.rect[0] < l.log_right).copied();
+    // Roots' multiplayer game has two as well, the log under the table (x 52) and an
+    // empty one at x 907, where its Instant Action's only log stands: under the table
+    // first, then any (FO-8: the join code's line is in the one under the table).
+    let logs: Vec<&Control> = edits.iter().filter(|c| c.style & 0x4 != 0 && c.rect[0] < l.log_right).copied().collect();
+    let log = logs.iter().find(|c| c.rect[0] < l.table_right).or(logs.first()).copied();
     let line = edits.iter().find(|c| c.style & 0x4 == 0).copied();
     // The log also says what the host changed ("Resources: Lots"), in Instant Action too.
     let chat = line.is_some() || log.is_some();

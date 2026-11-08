@@ -133,7 +133,7 @@ files = ['Online.asi', 'Online.ini']
 select = 'on'
 requires = []
 scope = 'match'
-games = ['armada2']
+games = ['armada2', 'fo-roots']
 steps = ['online']
 summary = 'online multiplayer that works under Wine/Proton: the Internet - Online entry, join codes, no port forwarding'
 

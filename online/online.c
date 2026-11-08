@@ -535,7 +535,15 @@ static HRESULT __stdcall P_SetPeerInfo(Proxy *p, DWORD info, DWORD actx,
     s_cat(m, " SetPeerInfo");
     if (b) {
         s_cat(m, " infoflags ");  s_hex(m, *(const DWORD *)(b + 4));
-        s_cat(m, " name ");       s_wide(m, *(const WCHAR *const *)(b + 8), 64);
+        const WCHAR *w = *(const WCHAR *const *)(b + 8);
+        int          i;
+        s_cat(m, " name ");       s_wide(m, w, 64);
+        if (w) {                  /* the first characters as numbers: one that is not ASCII
+                                   * reads as '?' above */
+            s_cat(m, " [");
+            for (i = 0; i < 8 && w[i]; i++) { if (i) s_cat(m, " "); s_hexw(m, w[i], 4); }
+            s_cat(m, "]");
+        }
         s_cat(m, " data ");       s_num(m, (long)*(const DWORD *)(b + 16));
         s_cat(m, " playerflags "); s_hex(m, *(const DWORD *)(b + 20));
     }

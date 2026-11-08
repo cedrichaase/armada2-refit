@@ -362,7 +362,7 @@ slot, the same peer, the same server. What differs is the entry and the kind:
 |---|---|---|
 | `online.entry` | **off** (`[[disable]]`, the connection screen is a form) | the exe's connection dialog never opens, so its IPX branch never runs |
 | `online.labels` | ready | `read_text_label` is stock's in the file and FleetOpsHook writes nothing there; the connect texts it reads go through it |
-| `online.chat` | ready, verified beside Roots' edits of the two dialogs | both `Chat::Init` call sites are stock's bytes in the file and in memory; the join code shows in GAME SETUP's chat (bench, 2026-11-08) |
+| `online.chat` | ready, verified beside Roots' edits of the two dialogs | both `Chat::Init` call sites are stock's bytes in the file and in memory; the join code shows in GAME SETUP's chat (bench, 2026-11-08; the UI's GAME SETUP now shows the log under the players, Roots' screen having a second, empty one at the right) |
 | `online.kind` | `0x14e91822` | Roots players meet only Roots players ("Which game") |
 
 **The entry is the UI's.** With the UI's Roots forms on (`[Menus] Forms=1`), its
@@ -381,9 +381,25 @@ connection screen is Roots' own and offers no *Internet - Online*.
 own balance, and a Roots player reports no QOLRules in the handshake, so a Roots game plays
 Roots' rules.
 
+**Where it stops (bench, 2026-11-08): Roots refuses the joiner by name.** Over Microsoft's
+DirectPlay and over our transport alike the joiner finds the game (by address, or by its
+join code through the server), connects (`CONNECT_COMPLETE`, `net joiner: connected`), and
+the host's game then refuses it: "The game you tried to join already has a player with your
+name." Roots loses the player's name as its connection screen closes, as shipped too
+(without a plugin of ours, on DxWrapper): the name's first two bytes become a small number
+(the shell's `save/shell.set` shows it, 0x0006 with the UI's forms, 0x0012 with Roots' own),
+so the name is one control character on every player (`Online.log`'s `SetPeerInfo` prints
+the name's first characters as numbers: `name "?" [0006]`). A different name handed to
+DirectPlay alone did not help (tried in `peer.c` and taken out): the game compares its own
+copy. Whether Roots does this on Windows is not known; under Proton it blocks every Roots
+network game, ours or DirectPlay's. Mending it would mean writing the player's name back into
+the engine's shell settings after FleetOpsHook's handler, which is a decision of its own
+(PLAN-FLEETOPS.md, FO-8).
+
 `./a2test --game fo-roots run fo-multiplayer --install .` is the reference (two games on
-Microsoft's DirectPlay, Roots' own path); `fo-multiplayer-online` the same match through
-*Internet - Online*, a join code and a bench server.
+Microsoft's DirectPlay, Roots' own path) and `fo-multiplayer-online` the same through
+*Internet - Online*, a join code and a bench server; both stop at the refusal and check that
+everything before it held.
 
 ## The plan
 
