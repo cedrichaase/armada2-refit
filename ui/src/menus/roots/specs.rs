@@ -15,6 +15,8 @@ pub(super) fn draw(ui: &mut Ui, _fit: &super::Fit, f: &Form) -> bool {
         "TMapEditForm" => super::mapedit::draw(ui, f),
         "TMapEditCreateForm" => super::mapeditcreate::draw(ui, f),
         "TMapSaveForm" => super::mapsave::draw(ui, f),
+        "TGameObjectDialogForm" => super::objdlg::draw(ui, f),
+        "TMapOptionsDialogForm" => super::mapopts::draw(ui, f),
         "TMessageForm" => super::msgdlg::draw(ui, f),
         "TMultiplayerConnectionForm" => super::multiplayer::draw(ui, f),
         "TManualIPForm" => super::manualip::draw(ui, f),
