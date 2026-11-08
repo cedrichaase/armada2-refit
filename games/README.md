@@ -22,9 +22,15 @@ manifest, `PLAYING.md` or the release notes until the user says otherwise.
 game that is not.
 
 What `./install --game fo-roots` puts in `Data/` now: Display8 (`display`), the ASI loader
-Roots ships none of (`asiloader`, `winmm.dll`; `asiloader/README.md`) and render3d. No UI,
-QOL, rules, online, textures or cutscenes yet. a2mod files each layer's files only for the
-games in the layer's `games`.
+Roots ships none of (`asiloader`, `winmm.dll`; `asiloader/README.md`), render3d, QOL and the
+UI (each with Roots' own defaults). No rules, online, textures or cutscenes yet. a2mod files
+each layer's files only for the games in the layer's `games`.
+
+**A tester's package, 2026-11-08:** at the Roots dev's request, the user asked for a small
+installer they can try. `fo-roots/package/package.sh` zips the same files prebuilt, with
+`install.bat`/`install.ps1` (Windows) and `install.sh` (Wine) that back up and restore, into
+`$A2_DATA/fo-roots/dist/`. The user hands it over by hand; it is not a release and stays out
+of everything listed above.
 
 ## Versions and changelogs
 
