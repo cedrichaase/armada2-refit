@@ -79,4 +79,4 @@ mended (PLAN-FLEETOPS.md, FO-8, decisions 660 onwards), the launch and the match
 49. Joiner: Quit the game.
 50. Host: Quit the game.
 51. Expect no crash.
-52. Expect "Online.log" contains "closed; datagrams sent".
+52. Joiner: Expect "Online.log" contains "closed; datagrams sent".
