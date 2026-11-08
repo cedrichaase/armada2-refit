@@ -1,0 +1,22 @@
+LIBRARY KERNEL32.dll
+EXPORTS
+CreateFileMappingA@24
+MapViewOfFile@20
+CreateProcessA@40
+TerminateProcess@8
+WaitForSingleObject@8
+CreateThread@24
+Sleep@4
+GetModuleHandleA@4
+GetProcAddress@8
+GetModuleFileNameA@12
+QueryPerformanceCounter@4
+QueryPerformanceFrequency@4
+GetCurrentProcessId@0
+CreateFileA@28
+WriteFile@20
+ReadFile@20
+CloseHandle@4
+GetFileAttributesA@4
+DeleteFileA@4
+DisableThreadLibraryCalls@4

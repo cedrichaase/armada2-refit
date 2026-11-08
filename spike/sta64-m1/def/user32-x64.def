@@ -1,0 +1,19 @@
+LIBRARY USER32.dll
+EXPORTS
+RegisterClassExA
+CreateWindowExA
+DefWindowProcA
+PeekMessageA
+TranslateMessage
+DispatchMessageA
+ShowWindow
+SetWindowPos
+GetClientRect
+ClientToScreen
+PostMessageA
+SetLayeredWindowAttributes
+IsWindow
+SetParent
+GetForegroundWindow
+wsprintfA
+LoadCursorA
