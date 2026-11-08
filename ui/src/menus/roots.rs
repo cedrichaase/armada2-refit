@@ -18,6 +18,8 @@ mod mapedit;
 mod mapeditcreate;
 mod mapsave;
 mod msgdlg;
+mod mapopts;
+mod objdlg;
 mod graphics;
 mod kit;
 mod mapselect;

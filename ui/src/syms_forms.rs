@@ -2,22 +2,22 @@
 //! The symbol table of `ui` (crates/a2engine/README.md).
 
 pub mod sym {
-    pub const FORMS_PROC_SINGLE_PLAYER: a2engine::Sym = a2engine::Sym(22);
-    pub const FORMS_PROC_MISSION_SELECT: a2engine::Sym = a2engine::Sym(23);
-    pub const FORMS_PROC_LOAD_GAME: a2engine::Sym = a2engine::Sym(24);
-    pub const FORMS_PROC_SAVE_GAME: a2engine::Sym = a2engine::Sym(25);
-    pub const FORMS_PROC_GAME_SETTINGS: a2engine::Sym = a2engine::Sym(26);
-    pub const FORMS_PROC_GAME_SETUP: a2engine::Sym = a2engine::Sym(27);
-    pub const FORMS_PROC_ADMIRALS_LOG: a2engine::Sym = a2engine::Sym(28);
-    pub const FORMS_PROC_MESSAGE: a2engine::Sym = a2engine::Sym(29);
-    pub const FORMS_PROC_LICENCE: a2engine::Sym = a2engine::Sym(30);
-    pub const FORMS_PROC_INTERNET_GAME: a2engine::Sym = a2engine::Sym(31);
-    pub const FORMS_PROC_NET_WAITING: a2engine::Sym = a2engine::Sym(32);
-    pub const FORMS_PROC_HELP: a2engine::Sym = a2engine::Sym(33);
-    pub const FORMS_PROC_GAME_NAME: a2engine::Sym = a2engine::Sym(34);
-    pub const FORMS_DRAW_TRANSPARENT: a2engine::Sym = a2engine::Sym(35);
-    pub const FORMS_YES_NO_MESSAGE: a2engine::Sym = a2engine::Sym(36);
-    pub const FORMS_YES_NO_TITLE: a2engine::Sym = a2engine::Sym(37);
+    pub const FORMS_PROC_SINGLE_PLAYER: a2engine::Sym = a2engine::Sym(36);
+    pub const FORMS_PROC_MISSION_SELECT: a2engine::Sym = a2engine::Sym(37);
+    pub const FORMS_PROC_LOAD_GAME: a2engine::Sym = a2engine::Sym(38);
+    pub const FORMS_PROC_SAVE_GAME: a2engine::Sym = a2engine::Sym(39);
+    pub const FORMS_PROC_GAME_SETTINGS: a2engine::Sym = a2engine::Sym(40);
+    pub const FORMS_PROC_GAME_SETUP: a2engine::Sym = a2engine::Sym(41);
+    pub const FORMS_PROC_ADMIRALS_LOG: a2engine::Sym = a2engine::Sym(42);
+    pub const FORMS_PROC_MESSAGE: a2engine::Sym = a2engine::Sym(43);
+    pub const FORMS_PROC_LICENCE: a2engine::Sym = a2engine::Sym(44);
+    pub const FORMS_PROC_INTERNET_GAME: a2engine::Sym = a2engine::Sym(45);
+    pub const FORMS_PROC_NET_WAITING: a2engine::Sym = a2engine::Sym(46);
+    pub const FORMS_PROC_HELP: a2engine::Sym = a2engine::Sym(47);
+    pub const FORMS_PROC_GAME_NAME: a2engine::Sym = a2engine::Sym(48);
+    pub const FORMS_DRAW_TRANSPARENT: a2engine::Sym = a2engine::Sym(49);
+    pub const FORMS_YES_NO_MESSAGE: a2engine::Sym = a2engine::Sym(50);
+    pub const FORMS_YES_NO_TITLE: a2engine::Sym = a2engine::Sym(51);
 }
 
 pub mod hook {
@@ -48,6 +48,20 @@ pub mod field {
     #[inline(always)] pub fn FORMS_CELLS_LISTS() -> usize { super::TABLE.engine().field(a2engine::Sym(19)) }
     #[inline(always)] pub fn FORMS_COLUMNS_LIST() -> usize { super::TABLE.engine().field(a2engine::Sym(20)) }
     #[inline(always)] pub fn FORMS_CELL_VALUE() -> usize { super::TABLE.engine().field(a2engine::Sym(21)) }
+    #[inline(always)] pub fn FORMS_INSP_ITEMS() -> usize { super::TABLE.engine().field(a2engine::Sym(22)) }
+    #[inline(always)] pub fn FORMS_INSP_ROW() -> usize { super::TABLE.engine().field(a2engine::Sym(23)) }
+    #[inline(always)] pub fn FORMS_INSP_SPLIT() -> usize { super::TABLE.engine().field(a2engine::Sym(24)) }
+    #[inline(always)] pub fn FORMS_ITEMS_LIST() -> usize { super::TABLE.engine().field(a2engine::Sym(25)) }
+    #[inline(always)] pub fn FORMS_ITEM_CAPTION() -> usize { super::TABLE.engine().field(a2engine::Sym(26)) }
+    #[inline(always)] pub fn FORMS_ITEM_EXPANDED() -> usize { super::TABLE.engine().field(a2engine::Sym(27)) }
+    #[inline(always)] pub fn FORMS_ITEM_LEVEL() -> usize { super::TABLE.engine().field(a2engine::Sym(28)) }
+    #[inline(always)] pub fn FORMS_ITEM_READONLY() -> usize { super::TABLE.engine().field(a2engine::Sym(29)) }
+    #[inline(always)] pub fn FORMS_ITEM_HEIGHT() -> usize { super::TABLE.engine().field(a2engine::Sym(30)) }
+    #[inline(always)] pub fn FORMS_ITEM_VISIBLE() -> usize { super::TABLE.engine().field(a2engine::Sym(31)) }
+    #[inline(always)] pub fn FORMS_ITEM_BUTTONS() -> usize { super::TABLE.engine().field(a2engine::Sym(32)) }
+    #[inline(always)] pub fn FORMS_ITEM_VALUE() -> usize { super::TABLE.engine().field(a2engine::Sym(33)) }
+    #[inline(always)] pub fn FORMS_COLLECTION_LIST() -> usize { super::TABLE.engine().field(a2engine::Sym(34)) }
+    #[inline(always)] pub fn FORMS_BUTTON_CHECKED() -> usize { super::TABLE.engine().field(a2engine::Sym(35)) }
 }
 
 pub mod value {
@@ -80,6 +94,20 @@ pub const SYMS: &[a2engine::SymDef] = &[
     a2engine::SymDef { id: "forms_cells_lists", symbol: "TCells", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "forms_columns_list", symbol: "TNxColumns", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "forms_cell_value", symbol: "TCell", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "forms_insp_items", symbol: "TNextInspector", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "forms_insp_row", symbol: "TNextInspector", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "forms_insp_split", symbol: "TNextInspector", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "forms_items_list", symbol: "TNxPropertyItems", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "forms_item_caption", symbol: "TNxPropertyItem", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "forms_item_expanded", symbol: "TNxPropertyItem", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "forms_item_level", symbol: "TNxPropertyItem", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "forms_item_readonly", symbol: "TNxPropertyItem", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "forms_item_height", symbol: "TNxPropertyItem", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "forms_item_visible", symbol: "TNxPropertyItem", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "forms_item_buttons", symbol: "TNxPropertyItem", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "forms_item_value", symbol: "TNxPropertyItem", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "forms_collection_list", symbol: "TCollection", kind: a2engine::Kind::Field },
+    a2engine::SymDef { id: "forms_button_checked", symbol: "TNxToolbarItemButton", kind: a2engine::Kind::Field },
     a2engine::SymDef { id: "forms_proc_single_player", symbol: "SingleDlgProc", kind: a2engine::Kind::Fn },
     a2engine::SymDef { id: "forms_proc_mission_select", symbol: "MissionSelectDlgProc", kind: a2engine::Kind::Fn },
     a2engine::SymDef { id: "forms_proc_load_game", symbol: "LoadGameDlgProc", kind: a2engine::Kind::Fn },
@@ -99,10 +127,10 @@ pub const SYMS: &[a2engine::SymDef] = &[
 ];
 
 pub const HOOKS: &[a2engine::HookDef] = &[
-    a2engine::HookDef { id: "ui.forms.vcl", run_unknown: false, rows: &[], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21] },
-    a2engine::HookDef { id: "ui.forms.shell_background", run_unknown: false, rows: &["Menus.Forms"], syms: &[35] },
-    a2engine::HookDef { id: "ui.forms.dialog_specs", run_unknown: false, rows: &["Menus.Forms"], syms: &[22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34] },
-    a2engine::HookDef { id: "ui.forms.message_text", run_unknown: false, rows: &["Menus.Forms"], syms: &[36, 37] },
+    a2engine::HookDef { id: "ui.forms.vcl", run_unknown: false, rows: &[], syms: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35] },
+    a2engine::HookDef { id: "ui.forms.shell_background", run_unknown: false, rows: &["Menus.Forms"], syms: &[49] },
+    a2engine::HookDef { id: "ui.forms.dialog_specs", run_unknown: false, rows: &["Menus.Forms"], syms: &[36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48] },
+    a2engine::HookDef { id: "ui.forms.message_text", run_unknown: false, rows: &["Menus.Forms"], syms: &[50, 51] },
 ];
 
 pub const BUILDS: &[a2engine::Build] = &[
@@ -114,7 +142,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x3fa000,
         sections: 0xa1a8a321,
         image_base: 0x400000,
-        n_resolved: 38,
+        n_resolved: 52,
         content: "stock",
         entries: &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_present
@@ -139,6 +167,20 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // forms_cells_lists
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // forms_columns_list
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // forms_cell_value
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 780 }, // forms_insp_items
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 900 }, // forms_insp_row
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 912 }, // forms_insp_split
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 48 }, // forms_items_list
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 48 }, // forms_item_caption
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 81 }, // forms_item_expanded
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 120 }, // forms_item_level
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 148 }, // forms_item_readonly
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 184 }, // forms_item_height
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 180 }, // forms_item_visible
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 212 }, // forms_item_buttons
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 216 }, // forms_item_value
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // forms_collection_list
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 13 }, // forms_button_checked
             a2engine::Entry { present: true, addr: 0x5dbdc0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_single_player
             a2engine::Entry { present: true, addr: 0x5d6d80, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_mission_select
             a2engine::Entry { present: true, addr: 0x5d48c0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_load_game
@@ -162,7 +204,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         modules: &[],
         blocked_mod: &[
         ],
-        n_resolved_mod: 38,
+        n_resolved_mod: 52,
     },
     a2engine::Build {
         name: "fo-roots-5.0Z11",
@@ -172,7 +214,7 @@ pub const BUILDS: &[a2engine::Build] = &[
         image_size: 0x405000,
         sections: 0xca07c55a,
         image_base: 0x400000,
-        n_resolved: 38,
+        n_resolved: 52,
         content: "fleetops",
         entries: &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 1 }, // forms_present
@@ -197,6 +239,20 @@ pub const BUILDS: &[a2engine::Build] = &[
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 4 }, // forms_cells_lists
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 56 }, // forms_columns_list
             a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 32 }, // forms_cell_value
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 780 }, // forms_insp_items
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 900 }, // forms_insp_row
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 912 }, // forms_insp_split
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 48 }, // forms_items_list
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 48 }, // forms_item_caption
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 81 }, // forms_item_expanded
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 120 }, // forms_item_level
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 148 }, // forms_item_readonly
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 184 }, // forms_item_height
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 180 }, // forms_item_visible
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 212 }, // forms_item_buttons
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 216 }, // forms_item_value
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 8 }, // forms_collection_list
+            a2engine::Entry { present: true, addr: 0x0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 13 }, // forms_button_checked
             a2engine::Entry { present: true, addr: 0x5dbdc0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_single_player
             a2engine::Entry { present: true, addr: 0x5d6d80, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_mission_select
             a2engine::Entry { present: true, addr: 0x5d48c0, end: 0x0, target: 0xffff, vtable: 0xffff, index: 0, chain: false, check: &[], mask: &[], section: "", count: 0, value: 0 }, // forms_proc_load_game
@@ -221,13 +277,13 @@ pub const BUILDS: &[a2engine::Build] = &[
         blocked_mod: &[
             a2engine::Block { hook: 2, symbol: "LicenseAgreementWindowDlgProc", why: "is patched by FleetOpsHook.dll, which is not the profiled one", note: "Stands down: LicenseAgreementWindowDlgProc is patched by FleetOpsHook.dll, which is not the profiled one" },
         ],
-        n_resolved_mod: 25,
+        n_resolved_mod: 39,
     },
 ];
 
 static HOOK_STATE: [core::sync::atomic::AtomicU64; 4] = [const { core::sync::atomic::AtomicU64::new(0) }; 4];
-static SYM_FLAGS: [core::sync::atomic::AtomicU8; 38] = [const { core::sync::atomic::AtomicU8::new(0) }; 38];
-static SYM_ADDR: [core::sync::atomic::AtomicUsize; 38] = [const { core::sync::atomic::AtomicUsize::new(0) }; 38];
+static SYM_FLAGS: [core::sync::atomic::AtomicU8; 52] = [const { core::sync::atomic::AtomicU8::new(0) }; 52];
+static SYM_ADDR: [core::sync::atomic::AtomicUsize; 52] = [const { core::sync::atomic::AtomicUsize::new(0) }; 52];
 static NOTES: [a2engine::Note; 4] = [const { a2engine::Note::new() }; 4];
 static RT: a2engine::Runtime = a2engine::Runtime::new(&HOOK_STATE, &SYM_FLAGS, &SYM_ADDR, &NOTES);
 

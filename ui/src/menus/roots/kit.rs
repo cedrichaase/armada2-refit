@@ -220,6 +220,13 @@ pub fn edit(ui: &mut Ui, f: &Form, c: &Control, r: R) {
     }
 }
 
+/// The keyboard to a field of Roots' that opened by itself (an inspector's in-place editor):
+/// typing goes to its window, and the field of ours shows a caret.
+pub fn start_typing(c: &Control) {
+    forms::act(Action::Focus(c.hwnd));
+    unsafe { TYPING = key_of(&c.name) };
+}
+
 /// A small dim note under or beside a field.
 pub fn note(ui: &mut Ui, r: R, text: &str) {
     let t = ui.theme;
