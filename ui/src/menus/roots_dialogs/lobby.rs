@@ -49,3 +49,10 @@ pub fn game_name(ui: &mut Ui, s: &Screen) -> bool {
     setup_kit::button(ui, s, btns[1], crate::gfx::R::new(inner.right() - bw, by, bw, bh), None);
     true
 }
+
+/// A game's password, asked of a joiner (`PasswordDlgProc`, FO-8): Armada II's small form
+/// (`setup_kit::form`), the stock field and buttons, titled PASSWORD when the dialog's own
+/// label does not give a title.
+pub fn password(ui: &mut Ui, s: &Screen) -> bool {
+    setup_kit::form(ui, s, "PASSWORD")
+}

@@ -23,6 +23,9 @@ rows = ["Menus.Forms"]
 doc = "The dialog procedures FleetOpsHook opens, told by address to choose a screen spec for an adopted dialog"
 rows = ["Menus.Forms"]
 
+[hook."forms.password_spec"]
+doc = "A game's password dialog told by address, apart from forms.dialog_specs so an unverified build stands only it down"
+
 [hook."forms.message_text"]
 doc = "The Yes/No prompt's title and question, read from the executable's text buffers"
 rows = ["Menus.Forms"]
@@ -343,6 +346,15 @@ symbol = "GameNameDlgProc"
 kind = "fn"
 addr = 0x5ac3d0
 used_by = ["forms.dialog_specs"]
+
+# A game's password, asked of a joiner (FO-8): unchanged in Roots' file, changed at run time
+# (the profile's mark); a hook of its own, so that until it is verified only it stands down.
+[[sym]]
+id = "forms_proc_password"
+symbol = "PasswordDlgProc"
+kind = "fn"
+addr = 0x5ca690
+used_by = ["forms.password_spec"]
 
 # ---- forms.shell_background: the shell background kept off the game window -------------
 # (engine/fodialogs.rs; PLAN-FLEETOPS.md, decision 300). Roots replaces SetCurrentBackground

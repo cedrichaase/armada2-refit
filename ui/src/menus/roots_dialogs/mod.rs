@@ -224,6 +224,7 @@ fn spec(screen: &str) -> Option<Draw> {
         "internet game" => lobby::draw,
         "net waiting" => notice::draw,
         "game name" => lobby::game_name,
+        "password" => lobby::password,
         _ => return None,
     })
 }

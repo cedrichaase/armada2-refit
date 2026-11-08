@@ -125,6 +125,9 @@ pub fn dialog_screen(stock_proc: usize) -> &'static str {
     if stock_proc == 0 || eng().ready(hook::FORMS_DIALOG_SPECS).is_err() {
         return "";
     }
+    if stock_proc == eng().addr(sym::FORMS_PROC_PASSWORD) && eng().ready(hook::FORMS_PASSWORD_SPEC).is_ok() {
+        return "password";
+    }
     const SCREENS: [(a2engine::Sym, &str); 13] = [
         (sym::FORMS_PROC_SINGLE_PLAYER, "single player"),
         (sym::FORMS_PROC_MISSION_SELECT, "mission select"),

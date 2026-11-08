@@ -1401,7 +1401,10 @@ them (Single Player, the mission list, Load, Save, Game Settings, Game Setup, th
 Admiral's Log, the one-button message, the map editor's licence, the lobby, Please Wait,
 the lobby's Help and Create Game's name), told apart by address only; Roots' build marks
 each verified beside its edit, since FleetOpsHook's record (or the dialog's own procedure,
-for those the executable opens) was measured to hold stock's address for every one. A spec acts as a player: `Screen::click` moves the pointer to the
+for those the executable opens) was measured to hold stock's address for every one. A
+game's password (`PasswordDlgProc`, asked of a joiner) is `ui.forms.password_spec`, a hook of
+its own, so that a build which has not verified it (Roots marks it changed at run time)
+stands only it down and not the thirteen (FO-8; the trap of decision 604). A spec acts as a player: `Screen::click` moves the pointer to the
 stock control's point, and once it has rested there (0.12 s; Roots' screens take a press
 only on a control already under the pointer, decision 190) presses, and releases 0.06 s
 later, each in a pass of its own through the dialog's messages; one click at a time, in
