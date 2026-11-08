@@ -194,7 +194,14 @@ pub fn run(ui: &mut Ui) {
         if b.sprite != 0 {
             if let Some((tex, uv)) = sprite::art(b.sprite) {
                 let sz = (b.size.max(4.0) * tx).max(ui.u(6.0));
-                ui.draw.image_uv(tex, R::new(x - sz * 0.5, y - sz * 0.5, sz, sz), uv, if b.ghost { 0x80ffffff } else { 0xffffffff });
+                // Added, as stock draws it: the radar sprites (`gui_map.spr`'s `map_planet`,
+                // `map_dmoon`, ...) are of the 'additive' material, a symbol on an opaque
+                // black ground in `Gminicon`, which has no alpha. Blended, the ground drew a
+                // black box round every planet (issue #155).
+                let (x0, y0, x1, y1) = (x - sz * 0.5, y - sz * 0.5, x + sz * 0.5, y + sz * 0.5);
+                let c = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)];
+                let q = [(uv[0], uv[1]), (uv[2], uv[1]), (uv[2], uv[3]), (uv[0], uv[3])];
+                ui.draw.quad_additive(tex, c, q, if b.ghost { 0x80ffffff } else { 0xffffffff });
                 continue;
             }
         }

@@ -820,7 +820,10 @@ it is hidden from the radar (`+0x18c`) or outside the map, and a craft class
 `PlanetClass`) passes the ship or station filter (`sg_shipFilterState` /
 `sg_stationFilterState`; a station is `CraftClass+0x20d`): 0 all, 1 allies, 2
 enemies, 3 neutral, by the user team's `Team::IsUnconfirmedAlly` / `Enemy` /
-`Neutral`. A class with a radar sprite (`+0x190`: the moons, the planets) shows it; any
+`Neutral`. A class with a radar sprite (`+0x190`: the moons, the planets) shows it,
+**added** as stock draws it (`gui_map.spr` gives every radar sprite the `additive`
+material: a symbol on an opaque black ground in `Gminicon`, which has no alpha; an
+alpha blend drew a black box round every planet, issue #155); any
 other a dot whose size is `ComputeDot`'s (0x4e99d0): `MapSize` (vtable `+0x24`) when the
 class has one (`+0x184`), else 2 for a ship, 3 for a station, 1 for anything else, in
 texels of a 128-texel map. Ours draws ships as round dots and stations as squares at
