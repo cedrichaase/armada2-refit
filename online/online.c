@@ -928,39 +928,85 @@ __attribute__((naked)) static void stub_ipx(void)
 static int write_call(DWORD at, void *to, int n) { return a2_write_call(at, to, n); }
 static int write_jmp(DWORD at, void *to, int n)  { return a2_write_jmp(at, to, n); }
 
-static void install_entry(char *b)
+/* read_text_label's trampoline and jump (hook online.labels): the online texts */
+static int install_labels(void)
 {
     DWORD prot, rel, rl;
     int   i;
-
-    if (!g_entry) { s_cat(b, "  menu entry off (Entry=0)"); return; }
-    if (!a2e_ready(ONLINE_H_ENTRY)) {
-        const char *why = a2e_note(ONLINE_H_ENTRY);
-        s_cat(b, "  menu entry NOT installed: ");
-        s_cat(b, why ? why : a2e_note_plugin());
-        return;
-    }
+    if (!a2e_ready(ONLINE_H_LABELS)) return 0;
     rl = a2e_addr(ONLINE_S_READ_LABEL);
     /* trampoline: read_text_label's first 8 bytes, then back to the rest */
     for (i = 0; i < PATCH_LABEL_LEN; i++) g_label_tramp[i] = ((const BYTE *)rl)[i];
     rel = (rl + PATCH_LABEL_LEN) - ((DWORD)g_label_tramp + PATCH_LABEL_LEN + 5);
     g_label_tramp[8] = 0xe9;
     for (i = 0; i < 4; i++) g_label_tramp[9 + i] = (BYTE)(rel >> (8 * i));
-    if (!VirtualProtect(g_label_tramp, sizeof g_label_tramp, PAGE_EXECUTE_READWRITE, &prot)) {
-        s_cat(b, "  menu entry NOT installed: VirtualProtect failed on the trampoline");
-        return;
-    }
+    if (!VirtualProtect(g_label_tramp, sizeof g_label_tramp, PAGE_EXECUTE_READWRITE, &prot)) return 0;
+    return write_jmp(rl, (void *)label_hook, PATCH_LABEL_LEN);
+}
 
-    if (write_jmp(rl, (void *)label_hook, PATCH_LABEL_LEN)
-        && write_jmp(a2e_addr(ONLINE_S_CLICK), (void *)stub_click, 9)
-        && write_jmp(a2e_addr(ONLINE_S_IPX_PRESSED), (void *)stub_ipx, 5)
+/* The four parts (hooks entry, labels, chat, kind; profiles/<build>/online.toml), each
+ * checked whole before it is written. On Armada II all four are ready and the screen is as
+ * it always was. On a build whose connection screen is not the exe's (Fleet Operations:
+ * Roots: FleetOpsHook's form) entry stands down and the UI's form spec chooses the entry
+ * through Online_Choose (README.md, "On Fleet Operations: Roots"). */
+static int g_entry_ready, g_labels_ready;
+
+static void install_entry(char *b)
+{
+    const char *why;
+
+    if (a2e_ready(ONLINE_H_KIND)) g_kind = (DWORD)ONLINE_V_NET_KIND;
+    if (g_kind) { s_cat(b, "  kind "); s_hex(b, g_kind); }
+    if (!g_entry) { s_cat(b, "  menu entry off (Entry=0)"); return; }
+
+    g_labels_ready = install_labels();
+    if (a2e_ready(ONLINE_H_CHAT)
         && write_call(a2e_addr(ONLINE_S_ROOM_INIT), (void *)stub_room_init, 10)
-        && write_call(a2e_addr(ONLINE_S_GAME_INIT), (void *)stub_game_init, 10)) {
+        && write_call(a2e_addr(ONLINE_S_GAME_INIT), (void *)stub_game_init, 10))
         g_chat_hooked = 1;
+    if (g_labels_ready && a2e_ready(ONLINE_H_ENTRY)
+        && write_jmp(a2e_addr(ONLINE_S_CLICK), (void *)stub_click, 9)
+        && write_jmp(a2e_addr(ONLINE_S_IPX_PRESSED), (void *)stub_ipx, 5)) {
+        g_entry_ready = 1;
         s_cat(b, "  menu entry: LAN (IPX) is Internet - Online");
+    } else {
+        why = a2e_note(ONLINE_H_ENTRY);
+        if (!why) why = a2e_note(ONLINE_H_LABELS);
+        s_cat(b, "  menu entry NOT on the exe's screen: ");
+        s_cat(b, why ? why : a2e_note_plugin() ? a2e_note_plugin() : "VirtualProtect failed");
+        if (g_real_cci) s_cat(b, "; a screen of the UI may choose it (Online_Choose)");
     }
-    else
-        s_cat(b, "  menu entry: VirtualProtect failed");
+    s_cat(b, g_labels_ready ? "  labels: online texts" : "  labels: stock");
+    if (!g_chat_hooked) {
+        why = a2e_note(ONLINE_H_CHAT);
+        s_cat(b, "  chat notices NOT installed: ");
+        s_cat(b, why ? why : a2e_note_plugin() ? a2e_note_plugin() : "VirtualProtect failed");
+    }
+}
+
+/* ---- the entry chosen by another screen ---------------------------------- *
+ * Where the connection screen is not the exe's dialog (Roots' is FleetOpsHook's form),
+ * the UI draws it and has a button of its own for Internet - Online: it asks
+ * Online_Available whether to show it, calls Online_Choose(1) before it presses the
+ * form's own Manual IP button (whose address field then takes a join code), and
+ * Online_Choose(0) for every other button, as stub_click clears the flag on the exe's
+ * screen. Online_Chosen tells its Manual IP dialog to say so. */
+__declspec(dllexport) int __cdecl Online_Available(void)
+{
+    return g_entry && g_real_cci && !g_entry_ready;
+}
+
+__declspec(dllexport) void __cdecl Online_Choose(int on)
+{
+    if (!Online_Available()) return;
+    if (on && !g_online) logline("menu: Internet - Online chosen (by the UI)");
+    else if (!on && g_online) logline("menu: another connection chosen (by the UI)");
+    g_online = on != 0;
+}
+
+__declspec(dllexport) int __cdecl Online_Chosen(void)
+{
+    return g_online;
 }
 
 /* ---- startup ---------------------------------------------------------- */

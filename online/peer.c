@@ -288,6 +288,8 @@ static WORD  g_port = 2302;
 static int   g_loss;                 /* Loss=: percent of datagrams dropped on purpose (tests) */
 static int   g_direct = 1;           /* Direct=0: never try a direct path, always relay (tests) */
 static char  g_server[128];          /* Server=host:port; empty = none */
+static DWORD g_kind;                 /* the game's kind, ending SV_HOST and SV_JOIN (README.md,
+                                      * "Which game"): 0 Armada II, else the build's net_kind */
 static DWORD g_srv_ip; static WORD g_srv_port;   /* resolved, network order */
 
 /* posts a line in one of the game's chat boxes (online.c); sticky = again
@@ -1043,6 +1045,7 @@ static void on_server(Peer *p, const BYTE *b, int n, int type)
     case SV_ERROR:
         s_cat(t, "Online server: ");
         if (n > 4) { int k = s_len(t); for (i = 4; i < n && k < 190; i++) t[k++] = (char)b[i]; t[k] = 0; }
+        if (p->jn_state == 1 && n >= 4 && get32(b) == p->jn_nonce) p->jn_state = 0;   /* this lookup's answer */
         plog(p, t);
         say(p, p->role == ROLE_HOST ? CHAT_GAME : CHAT_ROOM, t, 0);
         break;
@@ -1273,7 +1276,8 @@ static void tick_server(Peer *p, DWORD now)
     if (p->sv_state && (int)(now - p->sv_next) >= 0) {     /* host: get, then keep, the code */
         k = hdr(b, SV_HOST);
         put32(b + k, p->sv_token); mcpy(b + k + 4, &p->lan_ip, 4); mcpy(b + k + 8, &p->lan_port, 2);
-        to_server(p, b, k + 10);
+        put32(b + k + 10, g_kind);          /* a server before kinds reads past it */
+        to_server(p, b, k + 14);
         p->sv_next = now + (p->sv_state == 2 ? REGISTER_MS : 1000);
         if (p->sv_state == 1 && now - p->sv_start > LOOKUP_MS) {
             p->sv_next = now + 5000;
@@ -1305,7 +1309,8 @@ static void tick_server(Peer *p, DWORD now)
             k = hdr(b, SV_JOIN);
             put32(b + k, p->jn_nonce); mcpy(b + k + 4, p->jn_code, 6);
             mcpy(b + k + 10, &p->lan_ip, 4); mcpy(b + k + 14, &p->lan_port, 2);
-            to_server(p, b, k + 16);
+            put32(b + k + 16, g_kind);
+            to_server(p, b, k + 20);
             p->jn_next = now + 500;
         }
     }

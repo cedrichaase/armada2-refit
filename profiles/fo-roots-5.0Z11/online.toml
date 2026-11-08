@@ -1,0 +1,14 @@
+# Fleet Operations: Roots 5.0Z11: Online.asi's overrides (PLAN-FLEETOPS.md, FO-8;
+# online/README.md, "On Fleet Operations: Roots").
+schema = 1
+plugin = "online"
+
+# Roots' network game is not Armada II's: its own file check, its own balance and data. The
+# server introduces a joiner only to a host of the same kind, so a Roots player and an
+# Armada II player are never matched by a join code (README.md, "Which game"). The value is
+# opaque to the server: the CRC-32 of the game descriptor's id, "fo-roots", with its top bit
+# cleared (a value is a signed 32-bit integer), shared by every
+# Roots build (Roots' own check tells its builds apart, with its own message).
+[[sym]]
+id = "net_kind"
+value = 0x14e91822

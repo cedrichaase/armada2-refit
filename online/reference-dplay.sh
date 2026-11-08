@@ -107,7 +107,10 @@ grep -q 'Wow6432Node\\\\Microsoft\\\\DirectPlay8\\\\Service Providers\\\\DPNSPWi
 echo "Microsoft DirectPlay installed in $prefix"
 
 if [ "$asi" = 1 ]; then
+    # beside the executable: the clone's root, or its Data/ on Fleet Operations: Roots
+    # (games/<id>.toml, exe.data_dir; A2_PROFILE comes from a2test --game)
+    exe_dir="$(cd "$here/.." && python3 -c 'import os, a2env; print(os.path.relpath(os.path.dirname(a2env.EXE), a2env.GAME))')"
     bash "$here/build.sh" >/dev/null
-    cp "$here/build/Online.asi" "$here/Online.ini" "$work/game/"
-    echo "Online.asi installed in $work/game (log: Online.log)"
+    cp "$here/build/Online.asi" "$here/Online.ini" "$work/game/$exe_dir/"
+    echo "Online.asi installed in $work/game/$exe_dir (log: Online.log)"
 fi

@@ -36,9 +36,13 @@ done
 work="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["work"])' "$state")"
 [ -d "$work/game" ] || { echo "no clone at $work/game" >&2; exit 1; }
 
+# beside the executable: the clone's root, or its Data/ on Fleet Operations: Roots
+# (games/<id>.toml, exe.data_dir; A2_PROFILE comes from a2test --game)
+exe_dir="$(cd "$here/.." && python3 -c 'import os, a2env; print(os.path.relpath(os.path.dirname(a2env.EXE), a2env.GAME))')"
+game="$work/game/$exe_dir"
 bash "$here/build.sh" >/dev/null
-cp "$here/build/Online.asi" "$here/Online.ini" "$work/game/"
-ini="$work/game/Online.ini"
+cp "$here/build/Online.asi" "$here/Online.ini" "$game/"
+ini="$game/Online.ini"
 
 # replaced, not appended: the profile reader takes a key's first value
 set_key() {
@@ -57,7 +61,7 @@ if [ -n "$server" ]; then
         # the idle exit counts from here, before the games start: a 4K take's game takes about
         # 100 s to reach its menus, and with 90 s the server was gone before the host asked
         setsid python3 "$here/server/a2online-server.py" --bind 127.0.0.1 --port "$port" --idle-exit 600 \
-            >>"$work/game/OnlineServer.log" 2>&1 9>&- </dev/null &
+            >>"$game/OnlineServer.log" 2>&1 9>&- </dev/null &
         sleep 0.5
         echo "started a2online-server on 127.0.0.1:$port (log: OnlineServer.log)"
     fi
@@ -68,7 +72,7 @@ else
     set_key Server ""
 fi
 who="$(python3 -c 'import json,os,sys; d=json.load(open(sys.argv[1])); print((d.get("label") or "").split("/")[-1])' "$state")"
-[ "$who" = "$norules" ] && rm -f "$work/game/QOLRules.asi" "$work/game/QOLRules.ini"
+[ "$who" = "$norules" ] && rm -f "$game/QOLRules.asi" "$game/QOLRules.ini"
 [ -n "$loss" ] && set_key Loss "$loss"
 [ -n "$relay" ] && set_key Direct 0
-echo "Online.asi installed in $work/game (log: Online.log)${loss:+, Loss=$loss}${server:+, Server=127.0.0.1:$port}${relay:+, Direct=0}"
+echo "Online.asi installed in $game (log: Online.log)${loss:+, Loss=$loss}${server:+, Server=127.0.0.1:$port}${relay:+, Direct=0}"

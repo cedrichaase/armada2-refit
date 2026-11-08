@@ -67,6 +67,14 @@ why = "Roots holds its own selection of 30 in an array of its own"
 hooks = ["qol.stations"]
 why = "Roots replaces Select and the bar's update with its own code, where QOL-6's sites never run"
 
+# The exe's Multiplayer Connection dialog never opens on Roots: do_multiplayerConnection jumps
+# to FleetOpsHook's TMultiplayerConnectionForm, so the IPX branch online.entry patches never
+# runs. Internet - Online is the UI's button on that form there (Online_Choose; FO-8,
+# online/README.md, "On Fleet Operations: Roots").
+[[disable]]
+hooks = ["online.entry"]
+why = "the connection screen is a form; UI Forms=1 shows Internet - Online"
+
 # ---- display ------------------------------------------------------------------------
 # display.modes verified 2026-11-06 (FO-A; display/README.md, "On Fleet Operations:
 # Roots"): its six call sites and FindDisplayMode's checked entry are stock's bytes in the
@@ -180,7 +188,7 @@ verified = ["ui.forms.dialog_specs"]
 [[changed]]
 fn = "InternetGameDlgProc"
 how = "edit"
-verified = ["ui.forms.dialog_specs"]
+verified = ["ui.forms.dialog_specs", "online.chat"]
 
 [[changed]]
 fn = "LoadGameDlgProc"
@@ -195,7 +203,7 @@ verified = ["ui.forms.dialog_specs"]
 [[changed]]
 fn = "MultiplayerSetupDlgProc"
 how = "edit"
-verified = ["ui.forms.dialog_specs"]
+verified = ["ui.forms.dialog_specs", "online.chat"]
 
 [[changed]]
 fn = "NetWaitingDlgProc"
@@ -567,10 +575,12 @@ fn = "MultiplayerAdvancedOptionsDlgProc"
 how = "runtime"
 verified = []
 
+# online.entry: measured (FO-8): the dialog never opens on Roots (do_multiplayerConnection
+# jumps to FleetOpsHook's form), so the hook is off by the [[disable]] above, which says why.
 [[changed]]
 fn = "MultiplayerConnectionDlgProc"
 how = "runtime"
-verified = []
+verified = ["online.entry"]
 
 [[changed]]
 fn = "PasswordDlgProc"

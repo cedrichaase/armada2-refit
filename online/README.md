@@ -156,13 +156,17 @@ own on top of the game's. LAN (TCP/IP) and Manual IP stay as they were.
 
 Every address is in the symbol profile, `profiles/<build>/online.toml`, generated into
 `engine_syms.h` (`crates/a2engine/README.md`), and the stubs jump through the resolved
-variables `a2s_online_*`. One hook, **`online.entry`**, feeds the row `Online.Entry`: the
-six patch sites with the bytes they replace (a `patch` each), the two continue points
-(`label`s), `Chat::Init` and `Chat::Append` (`fn`s with their first bytes), the two chat
-boxes and the click's object (`global`s) and the edit-control offset in `Chat` (`field`).
-They are checked as a whole before anything is written: if any differs on a build, none is
-patched, `Online.log` says `engine: online.entry stands down: ...` and the menu line says
-why, and `Online_SettingsNote` gives the same reason to the settings screen.
+variables `a2s_online_*`. Four hooks feed the row `Online.Entry`, each checked as a whole
+before anything of it is written: **`online.entry`**, the connection screen's two patch
+sites and their continue points (the click and the IPX branch, `patch`es and `label`s, and
+the click's object, a `global`); **`online.labels`**, `read_text_label`'s entry (the online
+texts below); **`online.chat`**, the two `Chat::Init` call sites, `Chat::Init` and
+`Chat::Append` (`fn`s with their first bytes), the two chat boxes (`global`s) and the
+edit-control offset in `Chat` (`field`); and **`online.kind`**, a `value`, the game's kind
+(below, "Which game"). If an entry differs on a build, its hook is not patched,
+`Online.log` says `engine: online.<hook> stands down: ...` and the menu line says why, and
+`Online_SettingsNote` gives the same reason to the settings screen. On Armada II all four
+are ready, and the entry needs `labels` as well as `entry`.
 Without the hook the IPX button and the chat boxes stay stock. (Before the profile, each
 site was checked against the bytes it replaces and `Online.log` said the exe was not
 the 1.1 this was made for.) `Entry=0` in `Online.ini` leaves the screen stock. `Entry` is a settings row (`settings.toml`,
@@ -295,6 +299,27 @@ the table above). The host's code is posted again on every `Init` of GAME SETUP 
 the session closes, so it is back after a match. A line from the network thread is
 added outside our lock, where the game adds its own players' chat lines.
 
+### Which game
+
+Fleet Operations: Roots runs the same `NetworkManager.dll` and asks DirectPlay for the
+same application GUID as Armada II (`1005fae8-…`, traced on both), so nothing in the
+game's own session keeps a Roots player and an Armada II player apart until the game's
+file check, deep in GAME SETUP. The server does: `SV_HOST` and `SV_JOIN` end in a 32-bit
+**kind**, the game the client plays, and a code is found only by a joiner of its host's
+kind. The kind is the build's `net_kind` value in its profile (`online.kind`): 0 for
+Armada II, the CRC-32 of `fo-roots` (top bit cleared, `0x14e91822`) for every Roots build.
+It is opaque to the server, which knows no game by name.
+
+It is backward compatible both ways. A client before kinds sends neither field and is kind
+0; a server before kinds reads past the four bytes. A joiner of another kind is never
+introduced: one that sent its kind gets `SV_ERROR` ("that join code is for a game of
+another kind than yours", shown in the lobby's chat, and the lookup stops), one that did
+not gets `SV_NOTFOUND`, as an unknown code. A Roots client against a server before kinds
+is not kept apart, so the public server has to run this version before Roots is offered
+online. Joining by address (no server) is the player's own choice and is not checked:
+`P_CONN` and `P_ENUM_Q` end in the game's own data, so a kind cannot be added there without
+a new protocol version; the game's file check then refuses the other game.
+
 ### Running a server
 
     python3 online/server/a2online-server.py --port 2399     # UDP 2399 open to the internet
@@ -316,6 +341,49 @@ told `--server`.
   get through and the relay is only reached with `Direct=0`. One game across two real
   networks has worked (2026-10-09); which routers the direct path beats, and how often
   the relay is needed, takes more of them, read from `Online.log`.
+
+## On Fleet Operations: Roots
+
+Roots (PLAN-FLEETOPS.md, FO-8) keeps Armada II's network layer, as observed on the bench
+with Microsoft's DirectPlay in two clones and `Online.asi` tracing:
+`NetworkManager.dll` (Roots ships its own copy) creates DirectPlay through its
+one `CoCreateInstance` import, an `IDirectPlay8Peer` with the same application GUID as
+Armada II's, and the lobby (`InternetGameDlgProc`) and GAME SETUP (`MultiplayerSetupDlgProc`)
+are the exe's own dialogs (FleetOpsHook repaints and moves them; the UI draws them,
+decisions 600–606). What FleetOpsHook replaces is in front of them: `do_multiplayerConnection`
+jumps to its `TMultiplayerConnectionForm` (Internet - Tunngle, Internet - Manual IP, Local
+Area Network) and `do_manual_ip` to its `TManualIPForm`. A blank address there goes to the
+lobby with Create Game, as on Armada II, and a typed one searches it.
+
+So `Online.asi` carries a Roots game unchanged below the game: the same `CoCreateInstance`
+slot, the same peer, the same server. What differs is the entry and the kind:
+
+| Hook | On Roots 5.0Z11 | Why |
+|---|---|---|
+| `online.entry` | **off** (`[[disable]]`, the connection screen is a form) | the exe's connection dialog never opens, so its IPX branch never runs |
+| `online.labels` | ready | `read_text_label` is stock's in the file and FleetOpsHook writes nothing there; the connect texts it reads go through it |
+| `online.chat` | ready, verified beside Roots' edits of the two dialogs | both `Chat::Init` call sites are stock's bytes in the file and in memory; the join code shows in GAME SETUP's chat (bench, 2026-11-08) |
+| `online.kind` | `0x14e91822` | Roots players meet only Roots players ("Which game") |
+
+**The entry is the UI's.** With the UI's Roots forms on (`[Menus] Forms=1`), its
+Multiplayer Connection screen (`ui/src/menus/roots/multiplayer.rs`) shows *Internet -
+Online* in the first button's place, Tunngle's (a dead service, as IPX is on Armada II), when
+`Online.asi` says the entry is free for it (`Online_Available`: loaded, `NetworkManager.dll`
+hooked, `Entry` on, and `online.entry` not installed). Its click calls `Online_Choose(1)` and
+presses Roots' own Manual IP button; every other button calls `Online_Choose(0)`, as
+`stub_click` clears the flag on Armada II. Roots' Manual IP form then reads *Internet -
+Online* and "Join code or host address" (`Online_Chosen`), and the address typed (a join
+code, an address, or blank to host) goes through Roots' own handler to `EnumHosts` as on
+Armada II. Nothing of FleetOpsHook's is written or hooked. Without the UI's forms the
+connection screen is Roots' own and offers no *Internet - Online*.
+
+**The rules layer stays off on Roots** (`qolrules.*` disabled, decision 105): Roots has its
+own balance, and a Roots player reports no QOLRules in the handshake, so a Roots game plays
+Roots' rules.
+
+`./a2test --game fo-roots run fo-multiplayer --install .` is the reference (two games on
+Microsoft's DirectPlay, Roots' own path); `fo-multiplayer-online` the same match through
+*Internet - Online*, a join code and a bench server.
 
 ## The plan
 

@@ -8,8 +8,32 @@ lang = "c"
 out = "online/engine_syms.h"
 
 [hook.entry]
-doc = "The Internet - Online button in IPX's place, and the notices in the chat boxes (all or none)"
+doc = "The Internet - Online button in IPX's place on the exe's Multiplayer Connection screen"
 rows = ["Online.Entry"]
+
+[hook.labels]
+doc = "The Manual IP prompt, the connect texts and the titles read as online ones while the entry is chosen"
+rows = ["Online.Entry"]
+
+[hook.chat]
+doc = "The join code and the server's messages as lines in the lobby's and GAME SETUP's chat boxes"
+rows = ["Online.Entry"]
+
+[hook.kind]
+doc = "Which game this build plays online, so the server never matches players of different games"
+rows = ["Online.Entry"]
+
+# ---- the game's kind ----------------------------------------------------------------
+
+# The kind ending SV_HOST and SV_JOIN (README.md, "Which game"): the server introduces a
+# joiner only to a host of the same kind. 0 is Armada II, what every client before kinds
+# is taken for; a build whose network game is another game's gives its own.
+[[sym]]
+id = "net_kind"
+symbol = "the game's online kind"
+kind = "value"
+value = 0
+used_by = ["kind"]
 
 # ---- the three patches of the connection screen ------------------------------------
 
@@ -20,7 +44,7 @@ kind = "patch"
 addr = 0x4d9a30
 check = "55 8b ec a0 68 13 76 00"
 in = "read_text_label"
-used_by = ["entry"]
+used_by = ["labels"]
 
 [[sym]]
 id = "click"
@@ -74,7 +98,7 @@ symbol = "Chat::Init"
 kind = "fn"
 addr = 0x5a9890
 check = "55 8b ec 8b 45 08 c6 41 04 00"
-used_by = ["entry"]
+used_by = ["chat"]
 
 [[sym]]
 id = "chat_append"
@@ -82,21 +106,21 @@ symbol = "Chat::Append"
 kind = "fn"
 addr = 0x5a98b0
 check = "55 8b ec 81 ec 00 04 00 00 8b 4d 0c"
-used_by = ["entry"]
+used_by = ["chat"]
 
 [[sym]]
 id = "chat_room"
 symbol = "chatRoom"
 kind = "global"
 addr = 0x79df50
-used_by = ["entry"]
+used_by = ["chat"]
 
 [[sym]]
 id = "chat_game"
 symbol = "chatGame"
 kind = "global"
 addr = 0x79b838
-used_by = ["entry"]
+used_by = ["chat"]
 
 [[sym]]
 id = "room_init"
@@ -105,7 +129,7 @@ kind = "patch"
 addr = 0x5b2ff2
 check = "b9 50 df 79 00 e8 94 68 ff ff"
 in = "InternetGameDlgProc"
-used_by = ["entry"]
+used_by = ["chat"]
 
 [[sym]]
 id = "game_init"
@@ -114,7 +138,7 @@ kind = "patch"
 addr = 0x5c5395
 check = "b9 38 b8 79 00 e8 f1 44 fe ff"
 in = "MultiplayerSetupDlgProc"
-used_by = ["entry"]
+used_by = ["chat"]
 
 # the edit control Chat::Init was given
 [[sym]]
@@ -124,4 +148,4 @@ kind = "field"
 struct = "Chat"
 offset = 0x2714
 type = "ptr"
-used_by = ["entry"]
+used_by = ["chat"]

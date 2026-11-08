@@ -21,6 +21,12 @@ What it does, for each game hosted through Internet - Online
 The wire format is the client's (peer.c): "A2O", version 1, a type byte, then
 little-endian fields; addresses are 4 address bytes and a big-endian port, as
 on the wire.  Nothing a client sends is trusted beyond its own source address.
+
+A game's kind (online/README.md, "Which game"): SV_HOST and SV_JOIN may end in
+a u32 that says which game the client runs, opaque to this server; a client
+that sends none (every client before it) is kind 0, Armada II.  A code is only
+ever found by a joiner of its host's kind, so players of different games are
+never introduced to each other.
 """
 
 import argparse
@@ -88,9 +94,16 @@ class Endpoint:
         return True
 
 
+def kind_of(b, at):
+    """The game's kind at `at`, the optional field ending SV_HOST and SV_JOIN; 0 (Armada II)
+    from a client that does not send it."""
+    return struct.unpack_from('<I', b, at)[0] if len(b) >= at + 4 else 0
+
+
 class Game:
-    def __init__(self, code, host, token, lan, now):
+    def __init__(self, code, host, token, lan, now, kind=0):
         self.code = code
+        self.kind = kind            # the game the host runs (kind_of); only joiners of it find the code
         self.host = host            # Endpoint
         self.token = token
         self.lan = lan              # 6 bytes, the host's own idea of its address
@@ -112,6 +125,7 @@ class Server(asyncio.DatagramProtocol):
         self.lookups = {}           # ip -> [tokens, last refill]: the lookup rate limit
         self.misses = 0             # unknown codes looked up, logged in sum by sweep()
         self.limited = 0            # lookups dropped by the rate limit, likewise
+        self.others = 0             # codes looked up by a joiner of another kind of game, likewise
 
     # -- plumbing
 
@@ -170,14 +184,15 @@ class Server(asyncio.DatagramProtocol):
             pass
 
     def on_host(self, ep, b, now):
-        """[token u32][lan addr 6]: register, or refresh, the game this endpoint hosts.
-        The token keeps the code when the host's NAT gives it a new port."""
+        """[token u32][lan addr 6][kind u32, optional]: register, or refresh, the game this
+        endpoint hosts. The token keeps the code when the host's NAT gives it a new port."""
         if len(b) < 10:
             return
         token = struct.unpack_from('<I', b)[0]
         lan = b[4:10]
+        kind = kind_of(b, 10)
         game = next((g for g in self.games.values() if g.token == token and
-                     g.host.addr[0] == ep.addr[0]), None)
+                     g.host.addr[0] == ep.addr[0] and g.kind == kind), None)
         if game:
             if game.host is not ep:
                 log(f'game {show_code(game.code)}: host moved {game.host.addr} -> {ep.addr}')
@@ -186,22 +201,36 @@ class Server(asyncio.DatagramProtocol):
             if sum(1 for g in self.games.values() if g.host.addr[0] == ep.addr[0]) >= MAX_GAMES_PER_IP:
                 self.error(ep, token, 'too many games hosted from this address')
                 return
-            game = Game(self.new_code(), ep, token, lan, now)
+            game = Game(self.new_code(), ep, token, lan, now, kind)
             self.games[game.code] = game
-            log(f'game {show_code(game.code)}: hosted by {ep.addr} (lan {unpack_addr(lan)}, id {ep.id})')
+            log(f'game {show_code(game.code)}: hosted by {ep.addr} (lan {unpack_addr(lan)}, id {ep.id}'
+                + (f', kind {kind:#010x})' if kind else ')'))
         game.seen = now
         game.lan = lan
         self.send(ep.addr, SV_HOSTED, struct.pack('<I', token) + game.code.encode() +
                   pack_addr(ep.addr) + struct.pack('<I', ep.id))
 
     def on_join(self, ep, b, now):
-        """[nonce u32][code 6][lan addr 6]: introduce a joiner and the host."""
+        """[nonce u32][code 6][lan addr 6][kind u32, optional]: introduce a joiner and the
+        host, when both run the same game."""
         if len(b) < 16 or not self.may_look_up(ep.addr[0], now):
             return
         nonce = struct.unpack_from('<I', b)[0]
         code = b[4:10].decode('ascii', 'replace').upper()
         lan = b[10:16]
+        kind = kind_of(b, 16)
         game = self.games.get(code)
+        if game and game.kind != kind and game.host is not ep:
+            # another game's code: never introduced. A client that sends its kind is told
+            # why (and stops asking); one that does not (older, Armada II) hears what an
+            # unknown code gets, which it already shows
+            if len(b) >= 20:
+                self.send(ep.addr, SV_ERROR, struct.pack('<I', nonce) +
+                          b'that join code is for a game of another kind than yours')
+            else:
+                self.send(ep.addr, SV_NOTFOUND, struct.pack('<I', nonce))
+            self.others += 1
+            return
         if not game or game.host is ep:
             self.send(ep.addr, SV_NOTFOUND, struct.pack('<I', nonce))
             if not game:
@@ -283,9 +312,10 @@ class Server(asyncio.DatagramProtocol):
         for ip, (tokens, t) in list(self.lookups.items()):
             if tokens + (now - t) * LOOKUP_RATE >= LOOKUP_BURST:
                 del self.lookups[ip]
-        if self.misses or self.limited:
-            log(f'lookups: {self.misses} of unknown codes, {self.limited} over the rate limit')
-            self.misses = self.limited = 0
+        if self.misses or self.limited or self.others:
+            log(f'lookups: {self.misses} of unknown codes, {self.limited} over the rate limit, '
+                f'{self.others} by a joiner of another kind of game')
+            self.misses = self.limited = self.others = 0
         return self.idle_exit and now - self.last_packet > self.idle_exit
 
 

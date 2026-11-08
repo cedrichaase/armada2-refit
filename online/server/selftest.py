@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Runs a2online-server.py on a free local port and plays a host and a joiner
 against it with plain sockets: register, look the code up, the introduction,
-a relayed datagram each way, a relay to someone never introduced (dropped), an
-unknown code, the code freed by BYE, a registration too short to read, and the
+a relayed datagram each way, a relay to someone never introduced (dropped), a
+game of another kind (never introduced), an unknown code, the code freed by BYE, a registration too short to read, and the
 rate limit on lookups.  Exit 0 when all of it holds.
 
     python3 online/server/selftest.py
@@ -150,6 +150,29 @@ def main():
         stranger.sendto(MAGIC + bytes([SV_JOIN]) + struct.pack('<I', 5) + b'ZZZZZZ' + LAN, S)
         check(recv(stranger, SV_NOTFOUND) is not None, 'an unknown code is answered NOTFOUND')
 
+        # kinds (README.md, "Which game"): a game of kind K is found only by joiners of kind K;
+        # a client that sends no kind is Armada II's, kind 0, as every client before kinds
+        KIND = 0x5a17c0de
+        other = sock()
+        other.sendto(MAGIC + bytes([SV_HOST]) + struct.pack('<I', 0x4321) + LAN + struct.pack('<I', KIND), S)
+        r = recv(other, SV_HOSTED)
+        check(r is not None, 'a host of another kind registers')
+        kcode = r[4:10].decode() if r else 'XXXXXX'
+        stranger.sendto(MAGIC + bytes([SV_JOIN]) + struct.pack('<I', 40) + kcode.encode() + LAN, S)
+        check(recv(stranger, SV_NOTFOUND) is not None and recv(other, SV_INTRO) is None,
+              "a joiner that sends no kind does not find another kind's code (NOTFOUND, as before)")
+        stranger.sendto(MAGIC + bytes([SV_JOIN]) + struct.pack('<I', 41) + kcode.encode() + LAN + struct.pack('<I', 0), S)
+        r = recv(stranger, SV_ERROR)
+        check(r is not None and struct.unpack_from('<I', r)[0] == 41 and recv(other, SV_INTRO) is None,
+              "a joiner of kind 0 is told the code is another kind's, and nobody is introduced")
+        stranger.sendto(MAGIC + bytes([SV_JOIN]) + struct.pack('<I', 42) + kcode.encode() + LAN + struct.pack('<I', KIND), S)
+        check(recv(stranger, SV_PEER) is not None and recv(other, SV_INTRO) is not None,
+              'a joiner of the same kind is introduced')
+        stranger.sendto(MAGIC + bytes([SV_JOIN]) + struct.pack('<I', 43) + code.encode() + LAN + struct.pack('<I', 0), S)
+        check(recv(stranger, SV_PEER) is not None and recv(host, SV_INTRO) is not None,
+              'a joiner that says kind 0 finds a host that sends no kind')
+        other.sendto(MAGIC + bytes([SV_BYE]) + struct.pack('<I', 0x4321), S)
+
         host.sendto(MAGIC + bytes([SV_BYE]) + struct.pack('<I', 0x1234), S)
         time.sleep(0.2)
         stranger.sendto(MAGIC + bytes([SV_JOIN]) + struct.pack('<I', 6) + code.encode() + LAN, S)
@@ -161,7 +184,8 @@ def main():
         stranger.settimeout(2)
 
         # every socket here is 127.0.0.1, so this goes last: it spends the address's lookups
-        time.sleep(1)
+        # (the bucket refills at 2 a second up to 10: full again after the lookups above)
+        time.sleep(5)
         for n in range(30):
             stranger.sendto(MAGIC + bytes([SV_JOIN]) + struct.pack('<I', 100 + n) + b'ZZZZZZ' + LAN, S)
         stranger.settimeout(0.5)
